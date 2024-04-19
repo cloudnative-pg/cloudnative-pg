@@ -61,6 +61,8 @@ func detect(version *semver.Version) *Capabilities {
 		newCapabilities.HasErrorCodesForWALRestore = true
 		// azure-identity credential of type managed-identity added in Barman >= 2.18
 		newCapabilities.HasAzureManagedIdentity = true
+		// error codes for barman-cloud-restore command added in Barman >= 2.18
+		newCapabilities.HasErrorCodesForRestore = true
 		fallthrough
 	case version.GE(semver.Version{Major: 2, Minor: 14}):
 		// Retention policy support, added in Barman >= 2.14

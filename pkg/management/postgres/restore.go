@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -398,6 +399,11 @@ func (info InitInfo) restoreDataDir(backup *apiv1.Backup, env []string) error {
 	cmd.Env = env
 	err = execlog.RunStreaming(cmd, barmanCapabilities.BarmanCloudRestore)
 	if err != nil {
+		var exitError *exec.ExitError
+		if errors.As(err, &exitError) {
+			err = barman.UnmarshalBarmanCloudRestoreExitCode(exitError.ExitCode())
+		}
+
 		log.Error(err, "Can't restore backup")
 		return err
 	}

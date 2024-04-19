@@ -19,6 +19,7 @@ package restore
 
 import (
 	"context"
+	"errors"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -26,7 +27,9 @@ import (
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/istio"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/linkerd"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
@@ -87,8 +90,28 @@ func restoreSubCommand(ctx context.Context, info postgres.InitInfo) error {
 	err = info.Restore(ctx)
 	if err != nil {
 		log.Error(err, "Error while restoring a backup")
+		cleanupDataDirectoryIfNeeded(err, info.PgData)
 		return err
 	}
 
 	return nil
+}
+
+func cleanupDataDirectoryIfNeeded(restoreError error, dataDirectory string) {
+	var barmanError *barman.CloudRestoreError
+	if !errors.As(restoreError, &barmanError) {
+		return
+	}
+
+	if !barmanError.IsRetriable() {
+		return
+	}
+
+	log.Info("Cleaning up data directory", "directory", dataDirectory)
+	if err := fileutils.RemoveDirectory(dataDirectory); err != nil && !os.IsNotExist(err) {
+		log.Error(
+			err,
+			"error occurred cleaning up data directory",
+			"directory", dataDirectory)
+	}
 }

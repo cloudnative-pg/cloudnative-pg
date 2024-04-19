@@ -39,6 +39,7 @@ var _ = Describe("detect capabilities", func() {
 			HasCheckWalArchive:         true,
 			HasSnappy:                  true,
 			HasErrorCodesForWALRestore: true,
+			HasErrorCodesForRestore:    true,
 			HasAzureManagedIdentity:    true,
 		}))
 	})
@@ -57,6 +58,7 @@ var _ = Describe("detect capabilities", func() {
 			HasCheckWalArchive:         true,
 			HasSnappy:                  true,
 			HasErrorCodesForWALRestore: true,
+			HasErrorCodesForRestore:    true,
 			HasAzureManagedIdentity:    true,
 		}))
 	})
@@ -74,6 +76,7 @@ var _ = Describe("detect capabilities", func() {
 			HasCheckWalArchive:         true,
 			HasSnappy:                  true,
 			HasErrorCodesForWALRestore: true,
+			HasErrorCodesForRestore:    true,
 			HasAzureManagedIdentity:    true,
 		}))
 	})
