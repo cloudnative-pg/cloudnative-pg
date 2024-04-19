@@ -89,6 +89,7 @@ func restoreSubCommand(ctx context.Context, info postgres.InitInfo) error {
 
 	err = info.Restore(ctx)
 	if err != nil {
+		log.Error(err, "Error while restoring a backup")
 		cleanupDataDirectoryIfNeeded(err, info.PgData)
 		return err
 	}
