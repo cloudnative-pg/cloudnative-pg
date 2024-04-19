@@ -389,7 +389,6 @@ jobs:
     outputs:
       commit_version: ${{ env.VERSION }}
       commit: ${{ env.COMMIT_SHA }}
-      image_name: ${{ env.IMAGE_NAME }}
       controller_img: ${{ env.CONTROLLER_IMG }}
       controller_img_ubi8: ${{ env.CONTROLLER_IMG_UBI8 }}
       bundle_img: ${{ env.BUNDLE_IMG }}
@@ -697,7 +696,6 @@ jobs:
           LOWERCASE_OPERATOR_IMAGE_NAME=${OPERATOR_IMAGE_NAME,,}
           TAG=${TAGS#*:}
           TAG_UBI=${TAGS_UBI8#*:}
-          echo "IMAGE_NAME=${LOWERCASE_OPERATOR_IMAGE_NAME}" >> $GITHUB_ENV
           echo "CONTROLLER_IMG=${LOWERCASE_OPERATOR_IMAGE_NAME}:${TAG}" >> $GITHUB_ENV
           echo "CONTROLLER_IMG_UBI8=${LOWERCASE_OPERATOR_IMAGE_NAME}:${TAG_UBI}" >> $GITHUB_ENV
           echo "BUNDLE_IMG=${LOWERCASE_OPERATOR_IMAGE_NAME}:bundle-${TAG}" >> $GITHUB_ENV
@@ -745,7 +743,6 @@ jobs:
 
       - name: Create bundle
         env:
-          IMAGE_NAME: ${{ needs.buildx.outputs.image_name }}
           CONTROLLER_IMG: ${{ needs.buildx.outputs.controller_img_ubi8 }}
           BUNDLE_IMG: ${{ needs.buildx.outputs.bundle_img }}
           CATALOG_IMG: ${{ needs.buildx.outputs.catalog_img }}

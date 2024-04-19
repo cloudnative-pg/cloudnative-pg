@@ -304,7 +304,7 @@ jobs:
           echo "IMAGE_NAME=${LOWERCASE_CNPG_IMAGE_NAME}" >> $GITHUB_ENV
           echo "CONTROLLER_IMG=${LOWERCASE_CNPG_IMAGE_NAME}:${version}-ubi8" >> $GITHUB_ENV
           echo "BUNDLE_IMG=${LOWERCASE_CNPG_IMAGE_NAME}:bundle-${version}" >> $GITHUB_ENV
-          echo "CATALOG_IMG=${LOWERCASE_OPERATOR_IMAGE_NAME}:catalog-${TAG}" >> $GITHUB_ENV
+          echo "CATALOG_IMG=${LOWERCASE_CNPG_IMAGE_NAME}:catalog-${version}" >> $GITHUB_ENV
 
       - name: Create bundle
         env:

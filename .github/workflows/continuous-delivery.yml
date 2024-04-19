@@ -255,7 +255,8 @@ jobs:
       commit_sha: ${{ steps.build-meta.outputs.commit_sha }}
       author_name: ${{ steps.build-meta.outputs.author_name }}
       author_email: ${{ steps.build-meta.outputs.author_email }}
-      controller_img_ubi: ${{ env.CONTROLLER_IMG_UBI }}
+      controller_img: ${{ env.CONTROLLER_IMG }}
+      controller_img_ubi8: ${{ env.CONTROLLER_IMG_UBI8 }}
       bundle_img: ${{ env.BUNDLE_IMG }}
       catalog_img: ${{ env.CATALOG_IMG }}
     steps:
@@ -423,13 +424,13 @@ jobs:
         name: Output images
         env:
           TAGS: ${{ steps.docker-meta.outputs.tags }}
-          TAGS_UBI: ${{ steps.docker-meta-ubi8.outputs.tags }}
+          TAGS_UBI8: ${{ steps.docker-meta-ubi8.outputs.tags }}
         run: |
           LOWERCASE_OPERATOR_IMAGE_NAME=${OPERATOR_IMAGE_NAME,,}
           TAG=${TAGS#*:}
-          TAG_UBI=${TAGS_UBI#*:}
+          TAG_UBI=${TAGS_UBI8#*:}
           echo "CONTROLLER_IMG=${LOWERCASE_OPERATOR_IMAGE_NAME}:${TAG}" >> $GITHUB_ENV
-          echo "CONTROLLER_IMG_UBI=${LOWERCASE_OPERATOR_IMAGE_NAME}:${TAG_UBI}" >> $GITHUB_ENV
+          echo "CONTROLLER_IMG_UBI8=${LOWERCASE_OPERATOR_IMAGE_NAME}:${TAG_UBI}" >> $GITHUB_ENV
           echo "BUNDLE_IMG=${LOWERCASE_OPERATOR_IMAGE_NAME}:bundle-${TAG}" >> $GITHUB_ENV
           echo "CATALOG_IMG=${LOWERCASE_OPERATOR_IMAGE_NAME}:catalog-${TAG}" >> $GITHUB_ENV
       -
@@ -1935,6 +1936,7 @@ jobs:
       -
         name: Build and push the operator and catalog
         env:
+          CONTROLLER_IMG: ${{ needs.buildx.outputs.controller_img_ubi8 }}
           BUNDLE_IMG: ${{ needs.buildx.outputs.bundle_img }}
           CATALOG_IMG: ${{ needs.buildx.outputs.catalog_img }}
         run: |
