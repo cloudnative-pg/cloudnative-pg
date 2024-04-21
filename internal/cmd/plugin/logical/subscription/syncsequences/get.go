@@ -72,6 +72,9 @@ func GetSequenceStatus(ctx context.Context, clusterName string, connectionString
 	if err != nil {
 		return nil, fmt.Errorf("while executing query: %w", err)
 	}
+	if len(output) == 0 {
+		return nil, nil
+	}
 
 	var records []SequenceStatus
 	if err := json.Unmarshal(output, &records); err != nil {
