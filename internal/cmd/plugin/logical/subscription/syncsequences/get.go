@@ -22,6 +22,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 
@@ -72,7 +73,7 @@ func GetSequenceStatus(ctx context.Context, clusterName string, connectionString
 	if err != nil {
 		return nil, fmt.Errorf("while executing query: %w", err)
 	}
-	if len(output) == 0 {
+	if len(strings.TrimSpace(string(output))) == 0 {
 		return nil, nil
 	}
 
