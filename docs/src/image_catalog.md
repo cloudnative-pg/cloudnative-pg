@@ -94,7 +94,7 @@ kubectl apply \
   -f https://raw.githubusercontent.com/cloudnative-pg/postgres-containers/main/Debian/ClusterImageCatalog.yaml
 ```
 
-### PostgreSQL Container Images
+### PostGIS Container Images
 
 You can install the
 [latest version of the cluster catalog for the PostGIS Container Images](https://raw.githubusercontent.com/cloudnative-pg/postgis-containers/main/PostGIS/ClusterImageCatalog.yaml)
