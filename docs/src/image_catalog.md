@@ -22,6 +22,7 @@ expose different images under the same `major` value.
 **Example of a Namespaced `ImageCatalog`:**
 
 ```yaml
+apiVersion: postgresql.cnpg.io/v1
 kind: ImageCatalog
 metadata:
   name: postgresql
@@ -85,7 +86,7 @@ specified major release.
   ```shell
   kubectl apply -f https://raw.githubusercontent.com/cloudnative-pg/postgres-containers/main/Debian/ClusterImageCatalog.yaml
   ```
-* [cloudnative-pg/postgis-containers](https://github.com/cloudnative-pg/postgis-containers)
+* [cloudnative-pg/postgis-containers](https://github.com/cloudnative-pg/postgis-containers):
   ```shell
   kubectl apply -f https://raw.githubusercontent.com/cloudnative-pg/postgis-containers/main/PostGIS/ClusterImageCatalog.yaml
   ```
