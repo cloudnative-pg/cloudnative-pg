@@ -82,11 +82,26 @@ CloudNativePG project's GitHub repositories, cluster administrators can ensure
 that their clusters are automatically updated to the latest version within the
 specified major release.
 
-* [cloudnative-pg/postgres-containers](https://github.com/cloudnative-pg/postgres-containers):
-  ```shell
-  kubectl apply -f https://raw.githubusercontent.com/cloudnative-pg/postgres-containers/main/Debian/ClusterImageCatalog.yaml
-  ```
-* [cloudnative-pg/postgis-containers](https://github.com/cloudnative-pg/postgis-containers):
-  ```shell
-  kubectl apply -f https://raw.githubusercontent.com/cloudnative-pg/postgis-containers/main/PostGIS/ClusterImageCatalog.yaml
-  ```
+### PostgreSQL Container Images
+
+You can install the
+[latest version of the cluster catalog for the PostgreSQL Container Images](https://raw.githubusercontent.com/cloudnative-pg/postgres-containers/main/Debian/ClusterImageCatalog.yaml)
+([cloudnative-pg/postgres-containers](https://github.com/cloudnative-pg/postgres-containers) repository)
+with:
+
+```shell
+kubectl apply \
+  -f https://raw.githubusercontent.com/cloudnative-pg/postgres-containers/main/Debian/ClusterImageCatalog.yaml
+```
+
+### PostgreSQL Container Images
+
+You can install the
+[latest version of the cluster catalog for the PostGIS Container Images](https://raw.githubusercontent.com/cloudnative-pg/postgis-containers/main/PostGIS/ClusterImageCatalog.yaml)
+([cloudnative-pg/postgis-containers](https://github.com/cloudnative-pg/postgis-containers) repository)
+with:
+
+```shell
+kubectl apply \
+  -f https://raw.githubusercontent.com/cloudnative-pg/postgis-containers/main/PostGIS/ClusterImageCatalog.yaml
+```
