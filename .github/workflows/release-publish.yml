@@ -304,12 +304,14 @@ jobs:
           echo "IMAGE_NAME=${LOWERCASE_CNPG_IMAGE_NAME}" >> $GITHUB_ENV
           echo "CONTROLLER_IMG=${LOWERCASE_CNPG_IMAGE_NAME}:${version}-ubi8" >> $GITHUB_ENV
           echo "BUNDLE_IMG=${LOWERCASE_CNPG_IMAGE_NAME}:bundle-${version}" >> $GITHUB_ENV
+          echo "CATALOG_IMG=${LOWERCASE_CNPG_IMAGE_NAME}:catalog-${version}" >> $GITHUB_ENV
 
       - name: Create bundle
         env:
           IMAGE_NAME: ${{ env.IMAGE_NAME }}
           CONTROLLER_IMG: ${{ env.CONTROLLER_IMG }}
           BUNDLE_IMG: ${{ env.BUNDLE_IMG }}
+          CATALOG_IMG: ${{ env.CATALOG_IMG }}
         run: |
           make olm-catalog
 
