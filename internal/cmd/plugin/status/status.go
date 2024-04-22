@@ -18,7 +18,6 @@ package status
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path"
@@ -122,8 +121,8 @@ func Status(ctx context.Context, clusterName string, verbose bool, format plugin
 	status.printUnmanagedReplicationSlotStatus()
 	status.printRoleManagerStatus()
 	status.printTablespacesStatus()
-	status.printInstancesStatus()
 	status.printPodDisruptionBudgetStatus()
+	status.printInstancesStatus()
 
 	if nonFatalError != nil {
 		return nonFatalError
@@ -804,19 +803,20 @@ func (fullStatus *PostgresqlStatus) printUnmanagedReplicationSlotStatus() {
 }
 
 func (fullStatus *PostgresqlStatus) printPodDisruptionBudgetStatus() {
-	const header = "PodDisruptionBudget status"
+	const header = "PodDisruptionBudgets status"
 
 	fmt.Println(aurora.Green(header))
 
 	if len(fullStatus.PodDisruptionBudgetList.Items) == 0 {
 		fmt.Println("No active PodDisruptionBudgets found")
+		fmt.Println()
 		return
 	}
 
 	status := tabby.New()
 	status.AddHeader(
 		"Name",
-		"Selectors",
+		"Role",
 		"Expected Pods",
 		"Current Healthy",
 		"Desired Healthy",
@@ -824,9 +824,8 @@ func (fullStatus *PostgresqlStatus) printPodDisruptionBudgetStatus() {
 	)
 
 	for _, item := range fullStatus.PodDisruptionBudgetList.Items {
-		serialized, _ := json.Marshal(item.Spec.Selector)
 		status.AddLine(item.Name,
-			string(serialized),
+			item.Spec.Selector.MatchLabels[utils.ClusterRoleLabelName],
 			item.Status.ExpectedPods,
 			item.Status.CurrentHealthy,
 			item.Status.DesiredHealthy,
