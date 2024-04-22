@@ -36,6 +36,7 @@ type Capabilities struct {
 	HasCheckWalArchive         bool
 	HasSnappy                  bool
 	HasErrorCodesForWALRestore bool
+	HasErrorCodesForRestore    bool
 	HasAzureManagedIdentity    bool
 }
 
