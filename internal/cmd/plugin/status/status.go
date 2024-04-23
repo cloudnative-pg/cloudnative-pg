@@ -58,7 +58,8 @@ type PostgresqlStatus struct {
 	// PrimaryPod contains the primary Pod
 	PrimaryPod corev1.Pod
 
-	// PodDisruptionBudgetList prints every PDBs that contains as label selector the cluster
+	// PodDisruptionBudgetList prints every PDB that matches against the cluster
+	// with the label selector
 	PodDisruptionBudgetList policyv1.PodDisruptionBudgetList
 }
 
@@ -803,7 +804,7 @@ func (fullStatus *PostgresqlStatus) printUnmanagedReplicationSlotStatus() {
 }
 
 func (fullStatus *PostgresqlStatus) printPodDisruptionBudgetStatus() {
-	const header = "PodDisruptionBudgets status"
+	const header = "Pod Disruption Budgets status"
 
 	fmt.Println(aurora.Green(header))
 
@@ -819,7 +820,7 @@ func (fullStatus *PostgresqlStatus) printPodDisruptionBudgetStatus() {
 		"Role",
 		"Expected Pods",
 		"Current Healthy",
-		"Desired Healthy",
+		"Minimum Desired Healthy",
 		"Disruptions Allowed",
 	)
 
