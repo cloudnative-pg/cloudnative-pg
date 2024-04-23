@@ -1,14 +1,16 @@
-[![Documentation][documentation-badge]][documentation]
-[![Stack Overflow](https://img.shields.io/badge/stackoverflow-cloudnative--pg-blue?logo=stackoverflow&logoColor=%23F48024&link=https%3A%2F%2Fstackoverflow.com%2Fquestions%2Ftagged%2Fcloudnative-pg)][stackoverflow]
+[![CNCF Landscape](https://img.shields.io/badge/CNCF%20Landscape-5699C6)](https://landscape.cncf.io/?item=app-definition-and-development--database--cloudnativepg)
 [![Latest Release](https://img.shields.io/github/v/release/cloudnative-pg/cloudnative-pg.svg)][latest-release]
 [![GitHub License](https://img.shields.io/github/license/cloudnative-pg/cloudnative-pg)][license]
-[![CNCF Landscape](https://img.shields.io/badge/CNCF%20Landscape-5699C6)](https://landscape.cncf.io/?item=app-definition-and-development--database--cloudnativepg)
+[![Documentation][documentation-badge]][documentation]
+[![Stack Overflow](https://img.shields.io/badge/stackoverflow-cloudnative--pg-blue?logo=stackoverflow&logoColor=%23F48024&link=https%3A%2F%2Fstackoverflow.com%2Fquestions%2Ftagged%2Fcloudnative-pg)][stackoverflow]
 
 # Welcome to the CloudNativePG project!
 
-**CloudNativePG** is an open source operator designed to manage
-[PostgreSQL](https://www.postgresql.org/) workloads on any supported Kubernetes
-cluster running in private, public, hybrid, or multi-cloud environments.
+**CloudNativePG** is a comprehensive open source platform designed to
+seamlessly manage [PostgreSQL](https://www.postgresql.org/) databases within
+Kubernetes environments, covering the entire operational lifecycle from initial
+deployment to ongoing maintenance. The main component is the CloudNativePG
+operator.
 
 CloudNativePG was originally built and sponsored by [EDB](https://www.enterprisedb.com).
 
@@ -17,11 +19,12 @@ CloudNativePG was originally built and sponsored by [EDB](https://www.enterprise
 - [Code of conduct](CODE_OF_CONDUCT.md)
 - [Governance policies](GOVERNANCE.md)
 - [Contributing](CONTRIBUTING.md)
+- [Adopters](ADOPTERS.md)
 - [License](LICENSE)
 
 ## Getting Started
 
-The best way to get started is with the ["Quickstart"](docs/src/quickstart.md)
+The best way to get started is with the ["Quickstart"](https://cloudnative-pg.io/documentation/current/quickstart/)
 section in the documentation.
 
 ## Scope
@@ -52,8 +55,8 @@ managing complex applications.
 
 As a result, the operator is responsible for managing the status of the
 `Cluster` resource, keeping it up to date with the information that each
-PostgreSQL instance manager regularly reports back through the API server. Such
-changes might trigger, for example, actions like:
+PostgreSQL instance manager regularly reports back through the API server.
+Such changes might trigger, for example, actions like:
 
 * a PostgreSQL failover where, after an unexpected failure of a cluster's
   primary instance, the operator itself elects the new primary, updates the
@@ -86,12 +89,14 @@ intermediate management tool responsible for high availability and failover
 management like similar open source operators.
 
 CloudNativePG also manages additional resources to help the `Cluster` resource
-manage PostgreSQL - currently `ScheduledBackup`, `Pooler`, and `Backup`.
+manage PostgreSQL - currently `Backup`, `ClusterImageCatalog`, `ImageCatalog`,
+`Pooler`, and `ScheduledBackup`.
 
-Fully embracing Kubernetes also means that, in case of failure of the whole
-Kubernetes cluster, the operator won’t do anything, postponing any decision to
-when the cluster is back up again. In the meantime, Postgres instances should
-continue running according to the last known state of the cluster.
+Fully embracing Kubernetes involves a hands-off approach during temporary
+failures of the Kubernetes API server. In such instances, the operator refrains
+from taking action, deferring decisions until the API server is operational
+again. Meanwhile, Postgres instances persist, maintaining operations based on
+the latest known state of the cluster.
 
 ### Out of scope
 
@@ -117,16 +122,11 @@ MariaDB cluster).
 - [FAQ](docs/src/faq.md)
 - [Blog](https://cloudnative-pg.io/blog/)
 
-### Useful links
+## Adopters
 
-- [Data on Kubernetes (DoK) Community](https://dok.community/)
-- ["Recommended Architectures for PostgreSQL in Kubernetes" by Gabriele Bartolini](https://www.cncf.io/blog/2023/09/29/recommended-architectures-for-postgresql-in-kubernetes/)
-- ["How CloudNativePG manages physical replication slots for PostgreSQL in Kubernetes" by Gabriele Bartolini](https://www.enterprisedb.com/blog/how-cloudnativepg-manages-replication-slots) (September 2023)
-- ["The Current State of Major PostgreSQL Upgrades with CloudNativePG" by Gabriele Bartolini](https://www.enterprisedb.com/blog/current-state-major-postgresql-upgrades-cloudnativepg-kubernetes) (August 2023)
-- ["The Rise of the Kubernetes Native Database" by Jeff Carpenter](https://thenewstack.io/the-rise-of-the-kubernetes-native-database/) (December 2022)
-- ["Why Run Postgres in Kubernetes?" by Gabriele Bartolini](https://cloudnativenow.com/kubecon-cnc-eu-2022/why-run-postgres-in-kubernetes/) (May 2022)
-- ["Shift-Left Security: The Path To PostgreSQL On Kubernetes" by Gabriele Bartolini](https://www.tfir.io/shift-left-security-the-path-to-postgresql-on-kubernetes/) (April 2021)
-- ["Local Persistent Volumes and PostgreSQL usage in Kubernetes" by Gabriele Bartolini](https://www.2ndquadrant.com/en/blog/local-persistent-volumes-and-postgresql-usage-in-kubernetes/) (June 2020)
+A list of publicly known users of the CloudNativePG operator is in [ADOPTERS.md](ADOPTERS.md).
+Help us grow our community and CloudNativePG by adding yourself and your
+organization to this list!
 
 ## Maintainers
 
@@ -138,15 +138,28 @@ The current maintainers of the CloudNativePG project are:
 - Jonathan Gonzalez (EDB)
 - Marco Nenciarini (EDB)
 - Armando Ruocco (EDB)
-- Philippe Scorsolini (upbound)
+- Philippe Scorsolini (Upbound)
 
 They are listed in the [CODEOWNERS](CODEOWNERS) file.
 
-## Adopters
+### CloudNativePG at KubeCon
 
-A list of publicly known users of the CloudNativePG operator is in [ADOPTERS.md](ADOPTERS.md).
-Help us grow our community and CloudNativePG by adding yourself and your
-organization to this list!
+- March 21 2024, KubeCon Europe 2024 in Paris: ["Scaling Heights: Mastering Postgres Database Vertical Scalability with Kubernetes Storage Magic"](https://kccnceu2024.sched.com/event/1YeM4/scaling-heights-mastering-postgres-database-vertical-scalability-with-kubernetes-storage-magic-gabriele-bartolini-edb-gari-singh-google) (Gari Singh, Google & Gabriele Bartolini, EDB)
+- March 19 2024, Data on Kubernetes Day at KubeCon Europe 2024 in Paris: ["From Zero to Hero: Scaling Postgres in Kubernetes Using the Power of CloudNativePG"](https://colocatedeventseu2024.sched.com/event/1YFha/from-zero-to-hero-scaling-postgres-in-kubernetes-using-the-power-of-cloudnativepg-gabriele-bartolini-edb) (Gabriele Bartolini, EDB)
+- 7 November 2023, KubeCon North America 2023 in Chicago: ["Disaster Recovery with Very Large Postgres Databases (in Kubernetes)"](https://kccncna2023.sched.com/event/1R2ml/disaster-recovery-with-very-large-postgres-databases-gabriele-bartolini-edb-michelle-au-google) (Michelle Au, Google & Gabriele Bartolini, EDB)
+- 27 October 2022, KubeCon North America 2022 in Detroit: ["Data On Kubernetes, Deploying And Running PostgreSQL And Patterns For Databases In a Kubernetes Cluster"](https://kccncna2022.sched.com/event/182GB/data-on-kubernetes-deploying-and-running-postgresql-and-patterns-for-databases-in-a-kubernetes-cluster-chris-milsted-ondat-gabriele-bartolini-edb) (Chris Milsted, Ondat & Gabriele Bartolini, EDB)
+
+### Useful links
+
+- [Data on Kubernetes (DoK) Community](https://dok.community/)
+- ["How to migrate your PostgreSQL database in Kubernetes with ~0 downtime from anywhere" by Gabriele Bartolini](https://gabrielebartolini.it/articles/2024/03/cloudnativepg-recipe-5-how-to-migrate-your-postgresql-database-in-kubernetes-with-~0-downtime-from-anywhere/) (March 2024)
+- ["Maximizing Microservice Databases with Kubernetes, Postgres, and CloudNativePG" by Gabriele Bartolini](https://gabrielebartolini.it/articles/2024/02/maximizing-microservice-databases-with-kubernetes-postgres-and-cloudnativepg/) (February 2024)
+- ["Recommended Architectures for PostgreSQL in Kubernetes" by Gabriele Bartolini](https://www.cncf.io/blog/2023/09/29/recommended-architectures-for-postgresql-in-kubernetes/) (September 2023)
+- ["The Current State of Major PostgreSQL Upgrades with CloudNativePG" by Gabriele Bartolini](https://www.enterprisedb.com/blog/current-state-major-postgresql-upgrades-cloudnativepg-kubernetes) (August 2023)
+- ["The Rise of the Kubernetes Native Database" by Jeff Carpenter](https://thenewstack.io/the-rise-of-the-kubernetes-native-database/) (December 2022)
+- ["Why Run Postgres in Kubernetes?" by Gabriele Bartolini](https://cloudnativenow.com/kubecon-cnc-eu-2022/why-run-postgres-in-kubernetes/) (May 2022)
+- ["Shift-Left Security: The Path To PostgreSQL On Kubernetes" by Gabriele Bartolini](https://www.tfir.io/shift-left-security-the-path-to-postgresql-on-kubernetes/) (April 2021)
+- ["Local Persistent Volumes and PostgreSQL usage in Kubernetes" by Gabriele Bartolini](https://www.2ndquadrant.com/en/blog/local-persistent-volumes-and-postgresql-usage-in-kubernetes/) (June 2020)
 
 ## Star History
 
