@@ -170,9 +170,20 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(ctx context.Context
 
 	contextLogger.Info("Cluster status",
 		"currentPrimary", currentPrimary,
-		"targetPrimary", targetPrimary)
+		"targetPrimary", targetPrimary,
+		"isReplicaCluster", cluster.IsReplica())
 
 	switch {
+	case cluster.IsReplica():
+		// I'm an old primary, and now I'm inside a replica cluster. This can
+		// only happen when a primary cluster is demoted while being hibernated.
+		// Otherwise, this would have been caught by the operator, and the operator
+		// would have requested a replica cluster transition.
+		// In this case, we're demoting the cluster immediately.
+		contextLogger.Info("Detected transition to replica cluster after reconciliation " +
+			"of the cluster is resumed, demoting immediately")
+		return r.instance.Demote(ctx, cluster)
+
 	case targetPrimary == r.instance.PodName:
 		if currentPrimary == "" {
 			// This means that this cluster has been just started up and the
@@ -190,7 +201,7 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(ctx context.Context
 
 	default:
 		// I'm an old primary and not the current one. I need to wait for
-		// the switchover procedure to finish and then I can demote myself
+		// the switchover procedure to finish, and then I can demote myself
 		// and start following the new primary
 		contextLogger.Info("This is an old primary instance, waiting for the "+
 			"switchover to finish",
