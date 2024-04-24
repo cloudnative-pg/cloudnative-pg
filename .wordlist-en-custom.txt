@@ -133,6 +133,7 @@ EphemeralVolumeSource
 EphemeralVolumesSizeLimit
 EphemeralVolumesSizeLimitConfiguration
 ExternalCluster
+FQDN
 Fei
 Filesystem
 Fluentd
@@ -241,6 +242,8 @@ OpenShift
 Openshift
 OperatorGroup
 OperatorHub
+PDB
+PDBs
 PGAudit
 PGDATA
 PGDG
@@ -391,6 +394,7 @@ TopologySpreadConstraints
 TypedLocalObjectReference
 UI
 UID
+URIs
 UTF
 Uncomment
 Unrealizable
@@ -601,6 +605,7 @@ dT
 danglingPVC
 dataChecksums
 databackupconfiguration
+datacenter
 datacenters
 datallowconn
 datistemplate
