@@ -392,6 +392,7 @@ StorageClass
 StorageConfiguration
 Storages
 SuccessfullyExtracted
+SwitchReplicaClusterStatus
 SyncReplicaElectionConstraints
 SynchronizeReplicas
 SynchronizeReplicasConfiguration
@@ -683,6 +684,7 @@ env
 envFrom
 ephemeralVolumeSource
 ephemeralVolumesSizeLimit
+eu
 excludePatterns
 executables
 expirations
@@ -1137,6 +1139,7 @@ superuserSecret
 superuserSecretVersion
 sv
 svc
+switchReplicaClusterStatus
 switchoverDelay
 switchovers
 syncReplicaElectionConstraint

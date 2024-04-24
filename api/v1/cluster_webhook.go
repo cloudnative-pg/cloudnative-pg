@@ -444,10 +444,10 @@ func (r *Cluster) ValidateChanges(old *Cluster) (allErrs field.ErrorList) {
 		r.validateStorageChange,
 		r.validateWalStorageChange,
 		r.validateTablespacesChange,
-		r.validateReplicaModeChange,
 		r.validateUnixPermissionIdentifierChange,
 		r.validateReplicationSlotsChange,
 		r.validateWALLevelChange,
+		r.validateReplicaClusterChange,
 	}
 	for _, validate := range validations {
 		allErrs = append(allErrs, validate(old)...)
@@ -1872,23 +1872,25 @@ func (r *Cluster) validateExternalCluster(externalCluster *ExternalCluster, path
 	return result
 }
 
-// Check replica mode is enabled only at cluster creation time
-func (r *Cluster) validateReplicaModeChange(old *Cluster) field.ErrorList {
-	var result field.ErrorList
-	// if we are not specifying any replica cluster configuration or disabling it, nothing to do
-	if r.Spec.ReplicaCluster == nil || !r.Spec.ReplicaCluster.Enabled {
-		return result
+func (r *Cluster) validateReplicaClusterChange(old *Cluster) field.ErrorList {
+	// If the replication role didn't change then everything
+	// is fine
+	if r.IsReplica() == old.IsReplica() {
+		return nil
 	}
 
-	// otherwise if it was not defined before or it was just not enabled, add an error
-	if old.Spec.ReplicaCluster == nil || !old.Spec.ReplicaCluster.Enabled {
-		result = append(result, field.Invalid(
-			field.NewPath("spec", "replicaCluster"),
-			r.Spec.ReplicaCluster,
-			"Can not enable replication on existing clusters"))
+	// We disallow changing the replication role when
+	// being in a replication cluster switchover
+	if r.Status.SwitchReplicaClusterStatus.InProgress {
+		return field.ErrorList{
+			field.Forbidden(
+				field.NewPath("spec", "replica", "enabled"),
+				"cannot modify the field while there is an ongoing operation to enable the replica cluster",
+			),
+		}
 	}
 
-	return result
+	return nil
 }
 
 func (r *Cluster) validateUnixPermissionIdentifierChange(old *Cluster) field.ErrorList {
@@ -1916,7 +1918,7 @@ func (r *Cluster) validateUnixPermissionIdentifierChange(old *Cluster) field.Err
 func (r *Cluster) validateReplicaMode() field.ErrorList {
 	var result field.ErrorList
 
-	if r.Spec.ReplicaCluster == nil {
+	if r.Spec.ReplicaCluster == nil || !r.Spec.ReplicaCluster.Enabled {
 		return result
 	}
 
@@ -1925,11 +1927,14 @@ func (r *Cluster) validateReplicaMode() field.ErrorList {
 			field.NewPath("spec", "bootstrap"),
 			r.Spec.ReplicaCluster,
 			"bootstrap configuration is required for replica mode"))
-	} else if r.Spec.Bootstrap.PgBaseBackup == nil && r.Spec.Bootstrap.Recovery == nil {
+	} else if r.Spec.Bootstrap.PgBaseBackup == nil && r.Spec.Bootstrap.Recovery == nil &&
+		// this is needed because we only want to validate this during cluster creation, currently if we would have
+		// to enable this logic only during creation and not cluster changes it would require a meaningful refactor
+		len(r.ObjectMeta.ResourceVersion) == 0 {
 		result = append(result, field.Invalid(
 			field.NewPath("spec", "replicaCluster"),
 			r.Spec.ReplicaCluster,
-			"replica mode is compatible only with bootstrap using pg_basebackup or recovery"))
+			"replica mode bootstrap is compatible only with pg_basebackup or recovery"))
 	}
 	_, found := r.ExternalCluster(r.Spec.ReplicaCluster.Source)
 	if !found {

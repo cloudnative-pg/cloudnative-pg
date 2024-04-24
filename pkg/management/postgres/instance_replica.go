@@ -47,7 +47,7 @@ func (instance *Instance) RefreshReplicaConfiguration(
 		return changed, err
 	}
 
-	if primary {
+	if primary && !instance.RequiresDesignatedPrimaryTransition {
 		return changed, nil
 	}
 
