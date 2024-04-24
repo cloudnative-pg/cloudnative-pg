@@ -684,6 +684,7 @@ env
 envFrom
 ephemeralVolumeSource
 ephemeralVolumesSizeLimit
+eu
 excludePatterns
 executables
 expirations
