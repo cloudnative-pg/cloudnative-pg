@@ -2431,7 +2431,7 @@ func collectAndAssertDefaultMetricsPresentOnEachPod(namespace, clusterName, curl
 			"cnpg_pg_stat_database",
 		}
 
-		if env.PostgresVersion > 16 {
+		if env.PostgresVersion >= 17 {
 			defaultMetrics = append(defaultMetrics,
 				"cnpg_pg_stat_checkpointer",
 			)
