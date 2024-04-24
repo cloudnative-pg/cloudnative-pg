@@ -106,9 +106,6 @@ signs:
   - artifacts: checksum
     args: ["--batch", "-u", "{{ .Env.GPG_FINGERPRINT }}", "--output", "${signature}", "--detach-sign", "${artifact}"]
 
-sboms:
-  - artifacts: archive
-
 krews:
   - name: cnpg
     homepage: https://github.com/cloudnative-pg/cloudnative-pg
