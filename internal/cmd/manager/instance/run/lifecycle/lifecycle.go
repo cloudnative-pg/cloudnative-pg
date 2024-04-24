@@ -100,12 +100,19 @@ func (i *PostgresLifecycle) Start(ctx context.Context) error {
 				// restart the Pod.
 				if err != nil {
 					var exitError *exec.ExitError
-					if !errors.As(err, &exitError) {
+					switch {
+					case errors.Is(err, ErrNoFreeWALSpace):
+						contextLogger.Info("Detected low-disk space condition, setting instance as not available")
+						i.instance.SetMightBeUnavailable(true)
+
+					case !errors.As(err, &exitError):
 						contextLogger.Error(err, "Error waiting on the PostgreSQL process")
-					} else {
+
+					default:
 						contextLogger.Error(exitError, "PostgreSQL process exited with errors")
 					}
 				}
+
 				if !i.instance.MightBeUnavailable() {
 					return err
 				}

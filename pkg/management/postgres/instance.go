@@ -42,9 +42,10 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/logpipe"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pool"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
+	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	// this is needed to correctly open the sql connection with the pgx driver
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -187,6 +188,9 @@ type Instance struct {
 	// mightBeUnavailable specifies whether we expect the instance to be down
 	mightBeUnavailable atomic.Bool
 
+	// noWALDiskSpaceLeft specified whether there's no more free disk space
+	noWALDiskSpaceLeft atomic.Bool
+
 	// fenced specifies whether fencing is on for the instance
 	// fenced entails mightBeUnavailable ( entails as in logical consequence)
 	fenced atomic.Bool
@@ -247,9 +251,39 @@ func (instance *Instance) SetCanCheckReadiness(enabled bool) {
 	instance.canCheckReadiness.Store(enabled)
 }
 
+// HasWALDiskSpace checks if we have enough disk space to store two WAL files
+func (instance *Instance) HasWALDiskSpace(ctx context.Context) (bool, error) {
+	pgControlDataString, err := instance.GetPgControldata()
+	if err != nil {
+		return false, fmt.Errorf("while running pg_controldata to detect WAL segment size: %w", err)
+	}
+
+	pgControlData := utils.ParsePgControldataOutput(pgControlDataString)
+	walSegmentSizeString, ok := pgControlData["Bytes per WAL segment"]
+	if !ok {
+		return false, fmt.Errorf("no 'Bytes per WAL segment' secton into pg_controldata output")
+	}
+
+	walSegmentSize, err := strconv.Atoi(walSegmentSizeString)
+	if err != nil {
+		return false, fmt.Errorf(
+			"wrong 'Bytes per WAL segment' pg_controldata value (not an integer): '%s' %w",
+			walSegmentSizeString, err)
+	}
+
+	walDirectory := path.Join(instance.PgData, pgWalDirectory)
+	return fileutils.HasSpaceInDirectory(ctx, walDirectory, walSegmentSize*2)
+}
+
 // SetMightBeUnavailable marks whether the instance being down should be tolerated
 func (instance *Instance) SetMightBeUnavailable(enabled bool) {
 	instance.mightBeUnavailable.Store(enabled)
+}
+
+// SetNoDiskSpaceLeft marks whether PostgreSQL exited because there's no more
+// disk space left for WALs
+func (instance *Instance) SetNoDiskSpaceLeft(enabled bool) {
+	instance.noWALDiskSpaceLeft.Store(enabled)
 }
 
 // ConfigureSlotReplicator sends the configuration to the slot replicator
@@ -681,7 +715,7 @@ func (instance *Instance) GetPgVersion() (semver.Version, error) {
 		return semver.Version{}, err
 	}
 
-	parsedVersion, err := utils.GetPgVersion(db)
+	parsedVersion, err := postgresutils.GetPgVersion(db)
 	if err != nil {
 		return semver.Version{}, err
 	}

@@ -79,6 +79,8 @@ func (instance *Instance) GetStatus() (result *postgres.PostgresqlStatus, err er
 		if result.MightBeUnavailable && err == nil {
 			return
 		}
+		result.NoWALDiskSpaceLeft = instance.noWALDiskSpaceLeft.Load()
+
 		// we save the error that we are masking
 		result.MightBeUnavailableMaskedError = err.Error()
 		// We override the error. We only care about checking if isPrimary is correctly detected
