@@ -24,7 +24,7 @@ CloudNativePG was originally built and sponsored by [EDB](https://www.enterprise
 
 ## Getting Started
 
-The best way to get started is with the ["Quickstart"](https://cloudnative-pg.io/documentation/current/quickstart/)
+The best way to get started is with the ["Quickstart"](docs/src/quickstart.md)
 section in the documentation.
 
 ## Scope
@@ -56,7 +56,7 @@ managing complex applications.
 As a result, the operator is responsible for managing the status of the
 `Cluster` resource, keeping it up to date with the information that each
 PostgreSQL instance manager regularly reports back through the API server.
-Such changes might trigger, for example, actions like:
+Changes to the cluster status might trigger, for example, actions like:
 
 * a PostgreSQL failover where, after an unexpected failure of a cluster's
   primary instance, the operator itself elects the new primary, updates the
@@ -92,7 +92,7 @@ CloudNativePG also manages additional resources to help the `Cluster` resource
 manage PostgreSQL - currently `Backup`, `ClusterImageCatalog`, `ImageCatalog`,
 `Pooler`, and `ScheduledBackup`.
 
-Fully embracing Kubernetes involves a hands-off approach during temporary
+Fully embracing Kubernetes means adopting a hands-off approach during temporary
 failures of the Kubernetes API server. In such instances, the operator refrains
 from taking action, deferring decisions until the API server is operational
 again. Meanwhile, Postgres instances persist, maintaining operations based on
