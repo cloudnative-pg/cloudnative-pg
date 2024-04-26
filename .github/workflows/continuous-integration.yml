@@ -781,6 +781,13 @@ jobs:
       - name: Setup tools
         run: |
           make operator-sdk preflight
+      
+      - name: Login to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run preflight container test
         env:
