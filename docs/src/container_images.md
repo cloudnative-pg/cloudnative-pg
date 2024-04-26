@@ -38,10 +38,6 @@ The CloudNativePG community provides and supports
 that work with CloudNativePG, and publishes them on
 [ghcr.io](https://ghcr.io/cloudnative-pg/postgresql).
 
-## Image tag requirements
-
-Certainly! Here's an improved version:
-
 ## Image Tag Requirements
 
 To ensure the operator makes informed decisions, it must accurately detect the
