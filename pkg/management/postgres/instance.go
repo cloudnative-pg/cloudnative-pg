@@ -175,6 +175,10 @@ type Instance struct {
 	// SmartStopDelay is used to control PostgreSQL smart shutdown timeout
 	SmartStopDelay int32
 
+	// RequiresDesignatedPrimaryTransition indicates if this instance is a primary that needs to become
+	// a designatedPrimary
+	RequiresDesignatedPrimaryTransition bool
+
 	// canCheckReadiness specifies whether the instance can start being checked for readiness
 	// Is set to true before the instance is run and to false once it exits,
 	// it's used by the readiness probe to know whether it should be short-circuited

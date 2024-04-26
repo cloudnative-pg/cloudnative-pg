@@ -53,6 +53,7 @@ import (
 	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/metricserver"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	externalcluster "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/replicaclusterswitch"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/system"
 	pkgUtils "github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -271,7 +272,8 @@ func (r *InstanceReconciler) restartPrimaryInplaceIfRequested(
 	if err != nil {
 		return false, err
 	}
-	if isPrimary && cluster.Status.Phase == apiv1.PhaseInplacePrimaryRestart {
+	restartRequested := isPrimary && cluster.Status.Phase == apiv1.PhaseInplacePrimaryRestart
+	if restartRequested {
 		if err := r.instance.RequestAndWaitRestartSmartFast(); err != nil {
 			return true, err
 		}
@@ -891,10 +893,28 @@ func (r *InstanceReconciler) RefreshSecrets(
 
 // reconcileInstance sets PostgreSQL instance parameters to current values
 func (r *InstanceReconciler) reconcileInstance(cluster *apiv1.Cluster) {
+	detectRequiresDesignatedPrimaryTransition := func() bool {
+		if !cluster.IsReplica() {
+			return false
+		}
+
+		if !externalcluster.IsDesignatedPrimaryTransitionRequested(cluster) {
+			return false
+		}
+
+		if !r.instance.IsFenced() && !r.instance.MightBeUnavailable() {
+			return false
+		}
+
+		isPrimary, _ := r.instance.IsPrimary()
+		return isPrimary
+	}
+
 	r.instance.PgCtlTimeoutForPromotion = cluster.GetPgCtlTimeoutForPromotion()
 	r.instance.MaxSwitchoverDelay = cluster.GetMaxSwitchoverDelay()
 	r.instance.MaxStopDelay = cluster.GetMaxStopDelay()
 	r.instance.SmartStopDelay = cluster.GetSmartShutdownTimeout()
+	r.instance.RequiresDesignatedPrimaryTransition = detectRequiresDesignatedPrimaryTransition()
 }
 
 // reconcileAutoConf reconciles the permission of `postgresql.auto.conf`
@@ -1145,7 +1165,7 @@ func (r *InstanceReconciler) reconcileDesignatedPrimary(
 	cluster *apiv1.Cluster,
 ) (changed bool, err error) {
 	// If I'm already the current designated primary everything is ok.
-	if cluster.Status.CurrentPrimary == r.instance.PodName {
+	if cluster.Status.CurrentPrimary == r.instance.PodName && !r.instance.RequiresDesignatedPrimaryTransition {
 		return false, nil
 	}
 
@@ -1161,6 +1181,9 @@ func (r *InstanceReconciler) reconcileDesignatedPrimary(
 	oldCluster := cluster.DeepCopy()
 	cluster.Status.CurrentPrimary = r.instance.PodName
 	cluster.Status.CurrentPrimaryTimestamp = pkgUtils.GetCurrentTimestamp()
+	if r.instance.RequiresDesignatedPrimaryTransition {
+		externalcluster.SetDesignatedPrimaryTransitionCompleted(cluster)
+	}
 	return changed, r.client.Status().Patch(ctx, cluster, client.MergeFrom(oldCluster))
 }
 

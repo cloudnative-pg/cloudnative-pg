@@ -49,6 +49,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/hibernation"
 	instanceReconciler "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/instance"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/replicaclusterswitch"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/instance"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -306,6 +307,13 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 				"Please verify your network configuration.",
 		)
 		return ctrl.Result{RequeueAfter: 10 * time.Second}, registerPhaseErr
+	}
+
+	if res, err := replicaclusterswitch.Reconcile(ctx, r.Client, cluster, instancesStatus); res != nil || err != nil {
+		if res != nil {
+			return *res, nil
+		}
+		return ctrl.Result{}, err
 	}
 
 	// The instance list is sorted and will present the primary as the first

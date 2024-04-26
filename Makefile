@@ -23,10 +23,10 @@ ifeq (,$(CONTROLLER_IMG))
 IMAGE_TAG = $(shell (git symbolic-ref -q --short HEAD || git describe --tags --exact-match) | tr / -)
 ifneq (,${IMAGE_TAG})
 CONTROLLER_IMG = ${IMAGE_NAME}:${IMAGE_TAG}
-BUNDLE_IMG = ${IMAGE_NAME}:bundle-${IMAGE_TAG}
-CATALOG_IMG = ${IMAGE_NAME}:catalog-${IMAGE_TAG}
 endif
 endif
+CATALOG_IMG ?= $(shell echo "${CONTROLLER_IMG}" | sed -e 's/:/:catalog-/')
+BUNDLE_IMG ?= $(shell echo "${CONTROLLER_IMG}" | sed -e 's/:/:bundle-/')
 
 COMMIT := $(shell git rev-parse --short HEAD || echo unknown)
 DATE := $(shell git log -1 --pretty=format:'%ad' --date short)

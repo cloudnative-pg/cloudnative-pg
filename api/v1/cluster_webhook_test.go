@@ -2632,6 +2632,87 @@ var _ = Describe("replica mode validation", func() {
 		Expect(cluster.validateReplicaMode()).ToNot(BeEmpty())
 	})
 
+	It("doesn't complain about initdb if we enable the external cluster on an existing cluster", func() {
+		cluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				ResourceVersion: "existing",
+			},
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled: true,
+					Source:  "test",
+				},
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{},
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "test",
+					},
+				},
+			},
+		}
+		result := cluster.validateReplicaMode()
+		Expect(result).To(BeEmpty())
+	})
+
+	It("should complain if enabled is set to off during a transition", func() {
+		old := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				ResourceVersion: "existing",
+			},
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled: true,
+					Source:  "test",
+				},
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{},
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "test",
+					},
+				},
+			},
+			Status: ClusterStatus{
+				SwitchReplicaClusterStatus: SwitchReplicaClusterStatus{
+					InProgress: true,
+				},
+			},
+		}
+
+		cluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				ResourceVersion: "existing",
+			},
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled: false,
+					Source:  "test",
+				},
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{},
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "test",
+					},
+				},
+			},
+			Status: ClusterStatus{
+				SwitchReplicaClusterStatus: SwitchReplicaClusterStatus{
+					InProgress: true,
+				},
+			},
+		}
+
+		result := cluster.validateReplicaClusterChange(old)
+		Expect(result).To(HaveLen(1))
+		Expect(result[0].Type).To(Equal(field.ErrorTypeForbidden))
+		Expect(result[0].Field).To(Equal("spec.replica.enabled"))
+	})
+
 	It("is valid when the pg_basebackup bootstrap option is used", func() {
 		cluster := &Cluster{
 			Spec: ClusterSpec{
@@ -2691,61 +2772,6 @@ var _ = Describe("replica mode validation", func() {
 		cluster.Spec.Bootstrap.PgBaseBackup = nil
 		result := cluster.validateReplicaMode()
 		Expect(result).ToNot(BeEmpty())
-	})
-
-	It("complains when enabled on an existing cluster with no replica mode configured", func() {
-		oldCluster := &Cluster{
-			Spec: ClusterSpec{},
-		}
-		cluster := &Cluster{
-			Spec: ClusterSpec{
-				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled: true,
-					Source:  "test",
-				},
-				Bootstrap: &BootstrapConfiguration{
-					PgBaseBackup: &BootstrapPgBaseBackup{},
-				},
-				ExternalClusters: []ExternalCluster{
-					{Name: "test"},
-				},
-			},
-		}
-		Expect(cluster.validateReplicaMode()).To(BeEmpty())
-		Expect(cluster.validateReplicaModeChange(oldCluster)).ToNot(BeEmpty())
-	})
-
-	It("complains when enabled on an existing cluster with replica mode disabled", func() {
-		oldCluster := &Cluster{
-			Spec: ClusterSpec{
-				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled: false,
-					Source:  "test",
-				},
-				Bootstrap: &BootstrapConfiguration{
-					PgBaseBackup: &BootstrapPgBaseBackup{},
-				},
-				ExternalClusters: []ExternalCluster{
-					{Name: "test"},
-				},
-			},
-		}
-		cluster := &Cluster{
-			Spec: ClusterSpec{
-				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled: true,
-					Source:  "test",
-				},
-				Bootstrap: &BootstrapConfiguration{
-					PgBaseBackup: &BootstrapPgBaseBackup{},
-				},
-				ExternalClusters: []ExternalCluster{
-					{Name: "test"},
-				},
-			},
-		}
-		Expect(cluster.validateReplicaMode()).To(BeEmpty())
-		Expect(cluster.validateReplicaModeChange(oldCluster)).ToNot(BeEmpty())
 	})
 })
 

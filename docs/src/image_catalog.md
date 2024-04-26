@@ -11,17 +11,18 @@ a `major` field indicating the major version of the image.
 
 !!! Warning
     The operator places trust in the user-defined major version and refrains
-    from conducting any PostgreSQL version detection. It falls upon your
+    from conducting any PostgreSQL version detection. It is the user's
     responsibility to ensure alignment between the declared major version in
     the catalog and the PostgreSQL image.
 
 The `major` field's value must remain unique within a catalog, preventing
-duplication across images. Distinct catalogs, however, have the flexibility to
+duplication across images. Distinct catalogs, however, may
 expose different images under the same `major` value.
 
 **Example of a Namespaced `ImageCatalog`:**
 
 ```yaml
+apiVersion: postgresql.cnpg.io/v1
 kind: ImageCatalog
 metadata:
   name: postgresql
@@ -71,3 +72,36 @@ spec:
 Clusters utilizing these catalogs maintain continuous monitoring.
 Any alterations to the images within a catalog trigger automatic updates for
 **all associated clusters** referencing that specific entry.
+
+## CloudNativePG Catalogs
+
+The CloudNativePG project maintains `ClusterImageCatalogs` for the images it
+provides. These catalogs are regularly updated with the latest images for each
+major version. By applying the `ClusterImageCatalog.yaml` file from the
+CloudNativePG project's GitHub repositories, cluster administrators can ensure
+that their clusters are automatically updated to the latest version within the
+specified major release.
+
+### PostgreSQL Container Images
+
+You can install the
+[latest version of the cluster catalog for the PostgreSQL Container Images](https://raw.githubusercontent.com/cloudnative-pg/postgres-containers/main/Debian/ClusterImageCatalog.yaml)
+([cloudnative-pg/postgres-containers](https://github.com/cloudnative-pg/postgres-containers) repository)
+with:
+
+```shell
+kubectl apply \
+  -f https://raw.githubusercontent.com/cloudnative-pg/postgres-containers/main/Debian/ClusterImageCatalog.yaml
+```
+
+### PostGIS Container Images
+
+You can install the
+[latest version of the cluster catalog for the PostGIS Container Images](https://raw.githubusercontent.com/cloudnative-pg/postgis-containers/main/PostGIS/ClusterImageCatalog.yaml)
+([cloudnative-pg/postgis-containers](https://github.com/cloudnative-pg/postgis-containers) repository)
+with:
+
+```shell
+kubectl apply \
+  -f https://raw.githubusercontent.com/cloudnative-pg/postgis-containers/main/PostGIS/ClusterImageCatalog.yaml
+```

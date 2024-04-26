@@ -140,6 +140,7 @@ EphemeralVolumeSource
 EphemeralVolumesSizeLimit
 EphemeralVolumesSizeLimitConfiguration
 ExternalCluster
+FQDN
 Fei
 Filesystem
 Fluentd
@@ -253,6 +254,7 @@ OperatorCapabilities
 OperatorGroup
 OperatorHub
 PDB
+PDBs
 PGAudit
 PGDATA
 PGDG
@@ -392,6 +394,7 @@ StorageClass
 StorageConfiguration
 Storages
 SuccessfullyExtracted
+SwitchReplicaClusterStatus
 SyncReplicaElectionConstraints
 SynchronizeReplicas
 SynchronizeReplicasConfiguration
@@ -417,6 +420,7 @@ TopologySpreadConstraints
 TypedLocalObjectReference
 UI
 UID
+URIs
 UTF
 Uncomment
 Unrealizable
@@ -631,6 +635,7 @@ dT
 danglingPVC
 dataChecksums
 databackupconfiguration
+datacenter
 datacenters
 datallowconn
 datistemplate
@@ -683,6 +688,7 @@ env
 envFrom
 ephemeralVolumeSource
 ephemeralVolumesSizeLimit
+eu
 excludePatterns
 executables
 expirations
@@ -1137,6 +1143,7 @@ superuserSecret
 superuserSecretVersion
 sv
 svc
+switchReplicaClusterStatus
 switchoverDelay
 switchovers
 syncReplicaElectionConstraint

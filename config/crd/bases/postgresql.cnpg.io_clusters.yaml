@@ -5303,6 +5303,15 @@ spec:
                     description: The resource version of the "postgres" user secret
                     type: string
                 type: object
+              switchReplicaClusterStatus:
+                description: SwitchReplicaClusterStatus is the status of the switch
+                  to replica cluster
+                properties:
+                  inProgress:
+                    description: InProgress indicates if there is an ongoing procedure
+                      of switching a cluster to a replica cluster.
+                    type: boolean
+                type: object
               tablespacesStatus:
                 description: TablespacesStatus reports the state of the declarative
                   tablespaces in the cluster

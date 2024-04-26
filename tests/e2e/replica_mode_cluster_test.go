@@ -23,10 +23,13 @@ import (
 	"time"
 
 	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	k8client "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/replicaclusterswitch"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
@@ -111,6 +114,101 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				sourceDBName,
 				replicaDBName,
 				"test_replica")
+		})
+
+		It("should be able to switch to replica cluster and sync data", func(ctx SpecContext) {
+			const (
+				clusterOneName = "cluster-one"
+				clusterTwoName = "cluster-two"
+				clusterOneFile = fixturesDir + replicaModeClusterDir +
+					"cluster-demotion-one.yaml.template"
+				clusterTwoFile = fixturesDir + replicaModeClusterDir +
+					"cluster-demotion-two.yaml.template"
+			)
+
+			getReplicaClusterSwitchCondition := func(conditions []metav1.Condition) *metav1.Condition {
+				for _, condition := range conditions {
+					if condition.Type == replicaclusterswitch.ConditionReplicaClusterSwitch {
+						return &condition
+					}
+				}
+				return nil
+			}
+
+			namespace, err := env.CreateUniqueNamespace("replica-promotion-demotion")
+			Expect(err).ToNot(HaveOccurred())
+			DeferCleanup(func() error {
+				if CurrentSpecReport().Failed() {
+					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+				}
+				return env.DeleteNamespace(namespace)
+			})
+			AssertCreateCluster(namespace, clusterOneName, clusterOneFile, env)
+			AssertReplicaModeCluster(
+				namespace,
+				clusterOneName,
+				clusterTwoFile,
+				checkQuery,
+				psqlClientPod)
+
+			// turn the src cluster into a replica
+			By("setting replica mode on the src cluster", func() {
+				cluster, err := env.GetCluster(namespace, clusterOneName)
+				Expect(err).ToNot(HaveOccurred())
+				cluster.Spec.ReplicaCluster.Enabled = true
+				err = env.Client.Update(ctx, cluster)
+				Expect(err).ToNot(HaveOccurred())
+				AssertClusterIsReady(namespace, clusterOneName, testTimeouts[testUtils.ClusterIsReady], env)
+				time.Sleep(time.Second * 10)
+				Eventually(func(g Gomega) {
+					cluster, err := env.GetCluster(namespace, clusterOneName)
+					g.Expect(err).ToNot(HaveOccurred())
+					condition := getReplicaClusterSwitchCondition(cluster.Status.Conditions)
+					g.Expect(condition).ToNot(BeNil())
+					g.Expect(condition.Status).To(Equal(metav1.ConditionTrue))
+				}).Should(Succeed())
+			})
+
+			By("disabling the replica mode on the src cluster", func() {
+				cluster, err := env.GetCluster(namespace, clusterTwoName)
+				Expect(err).ToNot(HaveOccurred())
+				cluster.Spec.ReplicaCluster.Enabled = false
+				err = env.Client.Update(ctx, cluster)
+				Expect(err).ToNot(HaveOccurred())
+				AssertClusterIsReady(namespace, clusterOneName, testTimeouts[testUtils.ClusterIsReady], env)
+			})
+
+			var newPrimaryPod *corev1.Pod
+			Eventually(func() error {
+				newPrimaryPod, err = env.GetClusterPrimary(namespace, clusterTwoName)
+				return err
+			}, 30, 3).Should(BeNil())
+
+			var newPrimaryReplicaPod *corev1.Pod
+			Eventually(func() error {
+				newPrimaryReplicaPod, err = env.GetClusterPrimary(namespace, clusterOneName)
+				return err
+			}, 30, 3).Should(BeNil())
+
+			By("creating a new data in the new source cluster", func() {
+				query := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s AS VALUES (1),(2);", "new_test_table")
+				commandTimeout := time.Second * 10
+				Eventually(func(g Gomega) {
+					_, _, err := env.ExecCommand(env.Ctx, *newPrimaryPod, specs.PostgresContainerName,
+						&commandTimeout, "psql", "-U", "postgres", "appSrc", "-tAc", query)
+					g.Expect(err).ToNot(HaveOccurred())
+				}, 300).Should(Succeed())
+			})
+
+			By("checking that the data is present in the old src cluster", func() {
+				AssertDataExpectedCountWithDatabaseName(
+					namespace,
+					newPrimaryReplicaPod.Name,
+					"appSrc",
+					"new_test_table",
+					2,
+				)
+			})
 		})
 	})
 

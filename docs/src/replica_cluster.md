@@ -202,33 +202,61 @@ store to fetch the WAL files.
 You can check the [sample YAML](samples/cluster-example-replica-from-volume-snapshot.yaml)
 for it in the `samples/` subdirectory.
 
+## Demoting a Primary to a Replica Cluster
+
+CloudNativePG provides the functionality to demote a primary cluster to a
+replica cluster. This action is typically planned when transitioning the
+primary role from one data center to another. The process involves demoting the
+current primary cluster (e.g., cluster-eu-south) to a replica cluster and
+subsequently promoting the designated replica cluster (e.g.,
+`cluster-eu-central`) to primary when fully synchronized.
+Provided you have defined an external cluster in the current primary `Cluster`
+resource that points to the replica cluster that's been selected to become the
+new primary, all you need to do is to enable replica mode and define the source
+as follows:
+
+```yaml
+ replica:
+   enabled: true
+   source: cluster-eu-central
+```
+
 ## Promoting the designated primary in the replica cluster
 
-To promote the **designated primary** to **primary**, all we need to do is to
+To promote a replica cluster (e.g. `cluster-eu-central`) to a primary cluster
+and make the designated primary a real primary, all you need to do is to
 disable the replica mode in the replica cluster through the option
-`.spec.replica.enabled`
+`.spec.replica.enabled`:
 
 ```yaml
  replica:
    enabled: false
-   source: cluster-example
+   source: cluster-eu-south
 ```
 
-Once the replica mode is disabled, the replica cluster and the source cluster
-will become two separate clusters, and the **designated primary** in the replica
-cluster will be promoted to be that cluster's **primary**. We can verify the role
-change using the cnpg plugin, checking the status of the cluster which was
-previously the replica:
+If you have first demoted the `cluster-eu-south` and waited for
+`cluster-eu-central` to be in sync, once `cluster-eu-central` starts as
+primary, the `cluster-eu-south` cluster will seamlessly start as a replica
+cluster, without the need of re-cloning.
+
+If you disable replica mode without prior demotion, the replica cluster and the
+source cluster will become two separate clusters.
+
+When replica mode is disabled, the **designated primary** in the replica
+cluster will be promoted to be that cluster's **primary**.
+
+You can verify the role change using the `cnpg` plugin, checking the status of
+the cluster which was previously the replica:
 
 ```shell
-kubectl cnpg -n <cluster-name-space> status cluster-replica-example
+kubectl cnpg -n <cluster-name-space> status cluster-eu-central
 ```
 
 !!! Note
-    Disabling replication is an **irreversible** operation: once replication is
-    disabled and the **designated primary** is promoted to **primary**, the
-    replica cluster and the source cluster will become two independent clusters
-    definitively.
+    Disabling replication is an **irreversible** operation. Once replication is
+    disabled and the designated primary is promoted to primary, the replica cluster
+    and the source cluster become two independent clusters definitively. Ensure to
+    follow the demotion procedure correctly to avoid unintended consequences.
 
 ## Delayed replicas
 
