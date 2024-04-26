@@ -758,13 +758,19 @@ jobs:
         run: |
           make operator-sdk preflight
 
+      - name: Setup credentials 
+        run: |
+          AUTH=$(echo -n "${{ env.REGISTRY_USER }}:${{ env.REGISTRY_PASSWORD }}" | base64 -w 0)
+          echo -n '{"auths": {"'${{ env.REGISTRY }}'": {"auth": "'"$AUTH"'"}}}' > config.json
+
       - name: Run preflight container test
         env:
           CONTROLLER_IMG: ${{ needs.buildx.outputs.controller_img_ubi8 }}
           PFLT_ARTIFACTS: "preflight_results"
         run: |
-          bin/preflight check container ${CONTROLLER_IMG}
-
+          bin/preflight check container ${CONTROLLER_IMG} \
+          --docker-config config.json
+          
       - name: Archive the preflight results
         uses: actions/upload-artifact@v4
         with:
