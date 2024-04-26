@@ -185,7 +185,7 @@ func (r *ClusterReconciler) reconcileSuperuserSecret(ctx context.Context, cluste
 			"*",
 			"postgres",
 			postgresPassword,
-		    "superuser")
+			"superuser")
 		cluster.SetInheritedDataAndOwnership(&postgresSecret.ObjectMeta)
 
 		return createOrPatchClusterCredentialSecret(ctx, r.Client, postgresSecret)

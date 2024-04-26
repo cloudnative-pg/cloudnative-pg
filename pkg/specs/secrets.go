@@ -45,7 +45,7 @@ func CreateSecret(
 			Namespace: namespace,
 			Labels: map[string]string{
 				utils.UserRoleLabelName: userrole,
-				utils.WatchedLabelName: "true",
+				utils.WatchedLabelName:  "true",
 			},
 		},
 		Type: corev1.SecretTypeBasicAuth,

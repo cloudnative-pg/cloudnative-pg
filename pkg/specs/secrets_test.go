@@ -24,7 +24,7 @@ import (
 var _ = Describe("Secret creation", func() {
 	It("create a secret with the right user and password", func() {
 		secret := CreateSecret("name", "namespace",
-			"thishost", "thisdb", "thisuser", "thispassword")
+			"thishost", "thisdb", "thisuser", "thispassword", "default")
 		Expect(secret.Name).To(Equal("name"))
 		Expect(secret.Namespace).To(Equal("namespace"))
 		Expect(secret.StringData["username"]).To(Equal("thisuser"))
