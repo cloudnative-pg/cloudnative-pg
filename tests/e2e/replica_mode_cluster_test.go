@@ -174,7 +174,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			By("setting replica mode on the src cluster", func() {
 				cluster, err := env.GetCluster(namespace, clusterOneName)
 				Expect(err).ToNot(HaveOccurred())
-				cluster.Spec.ReplicaCluster.Enabled = true
+				cluster.Spec.ReplicaCluster.Enabled = ptr.To(true)
 				err = env.Client.Update(ctx, cluster)
 				Expect(err).ToNot(HaveOccurred())
 				AssertClusterIsReady(namespace, clusterOneName, testTimeouts[testUtils.ClusterIsReady], env)
@@ -200,7 +200,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			By("disabling the replica mode on the dst cluster", func() {
 				cluster, err := env.GetCluster(namespace, clusterTwoName)
 				Expect(err).ToNot(HaveOccurred())
-				cluster.Spec.ReplicaCluster.Enabled = false
+				cluster.Spec.ReplicaCluster.Enabled = ptr.To(false)
 				err = env.Client.Update(ctx, cluster)
 				Expect(err).ToNot(HaveOccurred())
 				AssertClusterIsReady(namespace, clusterTwoName, testTimeouts[testUtils.ClusterIsReady], env)
@@ -633,7 +633,7 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication), Ordered, f
 				cluster, err := env.GetCluster(namespace, clusterAName)
 				Expect(err).ToNot(HaveOccurred())
 				oldCluster := cluster.DeepCopy()
-				cluster.Spec.ReplicaCluster.Enabled = true
+				cluster.Spec.ReplicaCluster.Enabled = ptr.To(true)
 				Expect(env.Client.Patch(env.Ctx, cluster, k8client.MergeFrom(oldCluster))).To(Succeed())
 				podList, err := env.GetClusterPodList(namespace, clusterAName)
 				Expect(err).ToNot(HaveOccurred())
@@ -665,7 +665,7 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication), Ordered, f
 
 				oldCluster := cluster.DeepCopy()
 				cluster.Spec.ReplicaCluster.PromotionToken = invalidToken
-				cluster.Spec.ReplicaCluster.Enabled = false
+				cluster.Spec.ReplicaCluster.Enabled = ptr.To(false)
 				Expect(env.Client.Patch(env.Ctx, cluster, k8client.MergeFrom(oldCluster))).To(Succeed())
 			})
 
@@ -688,7 +688,7 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication), Ordered, f
 				Expect(err).ToNot(HaveOccurred())
 				oldCluster := cluster.DeepCopy()
 				cluster.Spec.ReplicaCluster.PromotionToken = token
-				cluster.Spec.ReplicaCluster.Enabled = false
+				cluster.Spec.ReplicaCluster.Enabled = ptr.To(false)
 				Expect(env.Client.Patch(env.Ctx, cluster, k8client.MergeFrom(oldCluster))).To(Succeed())
 			})
 

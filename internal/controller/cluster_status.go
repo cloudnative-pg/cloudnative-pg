@@ -347,7 +347,7 @@ func (r *ClusterReconciler) updateResourceStatus(
 		cluster.Status.LastPromotionToken = ""
 	}
 
-	if cluster.Spec.ReplicaCluster != nil && !cluster.Spec.ReplicaCluster.Enabled {
+	if !cluster.IsReplica() {
 		cluster.Status.DemotionToken = ""
 	}
 
