@@ -203,10 +203,10 @@ func (pair KeyPair) createAndSignPairWithValidity(
 		for _, h := range hosts {
 			if ip := net.ParseIP(h); ip != nil {
 				leafTemplate.IPAddresses = append(leafTemplate.IPAddresses, ip)
-			} else {
-				if len(leafTemplate.DNSNames) == 0 || !slices.Contains(leafTemplate.DNSNames, h) {
-					leafTemplate.DNSNames = append(leafTemplate.DNSNames, h)
-				}
+				continue
+			}
+			if !slices.Contains(leafTemplate.DNSNames, h) {
+				leafTemplate.DNSNames = append(leafTemplate.DNSNames, h)
 			}
 		}
 	}
@@ -263,7 +263,11 @@ func (pair KeyPair) GenerateCertificateSecret(namespace, name string) *v1.Secret
 // with the passed private key and will have as parent the specified
 // parent certificate. If the parent certificate is nil the certificate
 // will be self-signed
-func (pair *KeyPair) RenewCertificate(caPrivateKey *ecdsa.PrivateKey, parentCertificate *x509.Certificate, altDNSNames []string) error {
+func (pair *KeyPair) RenewCertificate(
+	caPrivateKey *ecdsa.PrivateKey,
+	parentCertificate *x509.Certificate,
+	altDNSNames []string,
+) error {
 	oldCertificate, err := pair.ParseCertificate()
 	if err != nil {
 		return err
@@ -283,13 +287,10 @@ func (pair *KeyPair) RenewCertificate(caPrivateKey *ecdsa.PrivateKey, parentCert
 	newCertificate.NotBefore = notBefore
 	newCertificate.NotAfter = notAfter
 	newCertificate.SerialNumber = serialNumber
+	newCertificate.DNSNames = altDNSNames
 
 	if parentCertificate == nil {
 		parentCertificate = &newCertificate
-	}
-
-	if len(altDNSNames) > 0 {
-		newCertificate.DNSNames = altDNSNames
 	}
 
 	tlsPrivateKey, err := pair.ParseECPrivateKey()

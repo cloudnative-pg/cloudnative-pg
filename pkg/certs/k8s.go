@@ -221,7 +221,7 @@ func renewCACertificate(ctx context.Context, kubeClient client.Client, secret *v
 		return nil, err
 	}
 
-	err = pair.RenewCertificate(privateKey, nil, []string{})
+	err = pair.RenewCertificate(privateKey, nil, nil)
 	if err != nil {
 		return nil, err
 	}
