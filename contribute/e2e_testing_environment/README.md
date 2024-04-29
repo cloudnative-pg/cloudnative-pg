@@ -203,6 +203,7 @@ exported, it will select all medium test cases from the feature type provided.
 | `storage`                         |
 | `security`                        |
 | `maintenance`                     |
+| `prometheus`                      |
 
 ex:
 ```shell
