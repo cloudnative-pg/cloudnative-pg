@@ -56,9 +56,9 @@ func (data *data) LifecycleHook(
 	if gvk.Kind == "" || gvk.Version == "" {
 		gvk, err = apiutil.GVKForObject(object, runtimeScheme)
 		if err != nil {
-			contextLogger.Trace("skipping unknown object", "object", object)
-			// Skip unknown object
-			return nil, nil
+			// Skip unknown object, but returning the same object so the reconcile can continue
+			contextLogger.Debug("skipping unknown object", "object", object, "error", err)
+			return object, nil
 		}
 	}
 	object.GetObjectKind().SetGroupVersionKind(gvk)

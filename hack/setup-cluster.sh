@@ -452,6 +452,12 @@ EOF
   kubectl -n cnpg-system patch deployment cnpg-controller-manager --patch-file "${annotations}"
 }
 
+deploy_prometheus_crds() {
+  echo "${bright}Starting deployment of Prometheus CRDs... ${reset}"
+  helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+  helm -n kube-system install prometheus-operator-crds prometheus-community/prometheus-operator-crds
+}
+
 load_image_registry() {
   local image=$1
 
@@ -540,6 +546,7 @@ create() {
 
   deploy_fluentd
   deploy_csi_host_path
+  deploy_prometheus_crds
 
   echo "${bright}Done creating ${ENGINE} cluster ${CLUSTER_NAME} with version ${K8S_VERSION}${reset}"
 }
