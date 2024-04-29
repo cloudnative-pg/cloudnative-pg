@@ -20,6 +20,7 @@ import (
 	"context"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	k8client "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -49,6 +50,7 @@ type fakePluginClient struct {
 func (f fakePluginClient) LifecycleHook(
 	_ context.Context,
 	_ plugin.OperationVerb,
+	_ *runtime.Scheme,
 	_ k8client.Object,
 	object k8client.Object,
 ) (k8client.Object, error) {

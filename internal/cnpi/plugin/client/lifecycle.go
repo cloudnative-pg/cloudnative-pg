@@ -25,6 +25,7 @@ import (
 	"github.com/cloudnative-pg/cnpg-i/pkg/lifecycle"
 	jsonpatch "github.com/evanphx/json-patch/v5"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -34,15 +35,10 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
-var runtimeScheme = runtime.NewScheme()
-
-func init() {
-	_ = scheme.AddToScheme(runtimeScheme)
-}
-
-func (data *data) LifecycleHook(
+func (data *data) LifecycleHook( //nolint:gocognit
 	ctx context.Context,
 	operationType plugin.OperationVerb,
+	schema *runtime.Scheme,
 	cluster client.Object,
 	object client.Object,
 ) (client.Object, error) {
@@ -53,15 +49,20 @@ func (data *data) LifecycleHook(
 		return nil, err
 	}
 	gvk := object.GetObjectKind().GroupVersionKind()
-	if gvk.Kind == "" || gvk.Version == "" {
-		gvk, err = apiutil.GVKForObject(object, runtimeScheme)
-		if err != nil {
-			contextLogger.Trace("skipping unknown object", "object", object)
-			// Skip unknown object
-			return nil, nil
+	if gvk.Empty() {
+		if schema == nil {
+			contextLogger.Info("missing scheme, unable to infer gvk for object", "object", object)
+			return object, nil
 		}
+		gvk, err = apiutil.GVKForObject(object, schema)
+		if err != nil {
+			contextLogger.Info("missing gvk for object, got error trying to infer it from schema",
+				"object", object, "error", err)
+			// Skip unknown object
+			return object, nil
+		}
+		object.GetObjectKind().SetGroupVersionKind(gvk)
 	}
-	object.GetObjectKind().SetGroupVersionKind(gvk)
 
 	var invokablePlugin []pluginData
 	for _, plg := range data.plugins {
@@ -144,7 +145,7 @@ func (data *data) LifecycleHook(
 		return object, nil
 	}
 
-	decoder := scheme.Codecs.UniversalDeserializer()
+	decoder := serializer.NewCodecFactory(scheme.Scheme).UniversalDeserializer()
 	mutatedObject, _, err := decoder.Decode(serializedObject, nil, nil)
 	if err != nil {
 		return nil, fmt.Errorf("while deserializing %s %s/%s to JSON: %w",

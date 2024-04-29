@@ -26,8 +26,10 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/json"
 	decoder "k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/client-go/kubernetes/scheme"
 	k8client "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin"
@@ -157,6 +159,9 @@ var _ = Describe("LifecycleHook", func() {
 		}
 	)
 
+	runtimeScheme := runtime.NewScheme()
+	_ = scheme.AddToScheme(runtimeScheme)
+
 	BeforeEach(func() {
 		d = &data{
 			plugins: []pluginData{
@@ -183,7 +188,7 @@ var _ = Describe("LifecycleHook", func() {
 			},
 			ObjectMeta: metav1.ObjectMeta{},
 		}
-		obj, err := d.LifecycleHook(ctx, plugin.OperationVerbCreate, clusterObj, pod)
+		obj, err := d.LifecycleHook(ctx, plugin.OperationVerbCreate, runtimeScheme, clusterObj, pod)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(obj).ToNot(BeNil())
 		podModified, ok := obj.(*corev1.Pod)
@@ -209,7 +214,7 @@ var _ = Describe("LifecycleHook", func() {
 				},
 			},
 		}
-		obj, err := d.LifecycleHook(ctx, plugin.OperationVerbDelete, clusterObj, pod)
+		obj, err := d.LifecycleHook(ctx, plugin.OperationVerbDelete, runtimeScheme, clusterObj, pod)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(obj).ToNot(BeNil())
 		podModified, ok := obj.(*corev1.Pod)

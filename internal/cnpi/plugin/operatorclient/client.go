@@ -67,7 +67,7 @@ func (e *extendedClient) invokePlugin(
 
 	contextLogger.Debug("correctly loaded the plugin client")
 
-	return pClient.LifecycleHook(ctx, operationVerb, cluster, obj)
+	return pClient.LifecycleHook(ctx, operationVerb, e.Scheme(), cluster, obj)
 }
 
 // Create saves the object obj in the Kubernetes cluster. obj must be a

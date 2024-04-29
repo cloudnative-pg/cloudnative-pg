@@ -19,6 +19,7 @@ package client
 import (
 	"context"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -123,6 +124,7 @@ type LifecycleCapabilities interface {
 	LifecycleHook(
 		ctx context.Context,
 		operationVerb plugin.OperationVerb,
+		schema *runtime.Scheme,
 		cluster client.Object,
 		object client.Object,
 	) (client.Object, error)
