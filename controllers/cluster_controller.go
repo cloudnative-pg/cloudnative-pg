@@ -73,14 +73,13 @@ type ClusterReconciler struct {
 	DiscoveryClient discovery.DiscoveryInterface
 	Scheme          *runtime.Scheme
 	Recorder        record.EventRecorder
-
-	*instance.StatusClient
+	InstanceClient  instance.Client
 }
 
 // NewClusterReconciler creates a new ClusterReconciler initializing it
 func NewClusterReconciler(mgr manager.Manager, discoveryClient *discovery.DiscoveryClient) *ClusterReconciler {
 	return &ClusterReconciler{
-		StatusClient:    instance.NewStatusClient(),
+		InstanceClient:  instance.NewStatusClient(),
 		DiscoveryClient: discoveryClient,
 		Client:          operatorclient.NewExtendedClient(mgr.GetClient()),
 		Scheme:          mgr.GetScheme(),
@@ -250,7 +249,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	}
 
 	// Get the replication status
-	instancesStatus := r.StatusClient.GetStatusFromInstances(ctx, resources.instances)
+	instancesStatus := r.InstanceClient.GetStatusFromInstances(ctx, resources.instances)
 
 	// we update all the cluster status fields that require the instances status
 	if err := r.updateClusterStatusThatRequiresInstancesState(ctx, cluster, instancesStatus); err != nil {
@@ -334,6 +333,10 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		isPodReady := mostAdvancedInstance.IsPodReady
 
 		if hasHTTPStatus && !isPodReady {
+			if err := r.evaluateShutdownCheckpointToken(ctx, cluster, instancesStatus); err != nil {
+				return ctrl.Result{}, fmt.Errorf("while evaluating shutdownCheckpointoken: %w", err)
+			}
+
 			// The readiness probe status from the Kubelet is not updated, so
 			// we need to wait for it to be refreshed
 			contextLogger.Info(
@@ -606,6 +609,58 @@ func (r *ClusterReconciler) reconcileResources(
 	r.cleanupCompletedJobs(ctx, resources.jobs)
 
 	return ctrl.Result{}, nil
+}
+
+func (r *ClusterReconciler) evaluateShutdownCheckpointToken(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	instancesStatus postgres.PostgresqlStatusList,
+) error {
+	contextLogger := log.FromContext(ctx).WithName("shutdown_checkpoint")
+	var primaryInstance *postgres.PostgresqlStatus
+	var foundUnfencedInstance bool
+	for idx := range instancesStatus.Items {
+		item := instancesStatus.Items[idx]
+		if item.IsPrimary {
+			primaryInstance = &item
+		}
+		if !cluster.IsInstanceFenced(item.Pod.Name) {
+			contextLogger.Debug("found an unfenced instance", "instanceName", item.Pod.Name)
+			foundUnfencedInstance = true
+		}
+	}
+	if primaryInstance == nil || foundUnfencedInstance {
+		return nil
+	}
+
+	instanceName := primaryInstance.Pod.Name
+	if instanceName != cluster.Status.CurrentPrimary || instanceName != cluster.Status.TargetPrimary {
+		contextLogger.Debug("not a primary, skipping", "target", cluster.Status.TargetPrimary,
+			"name", instanceName,
+			"currentPrimary", cluster.Status.CurrentPrimary,
+		)
+		return nil
+	}
+
+	rawPgControlData, err := r.InstanceClient.GetPgControlDataFromInstance(ctx, primaryInstance.Pod)
+	if err != nil {
+		return err
+	}
+	parsed := utils.ParsePgControldataOutput(rawPgControlData)
+	token, err := utils.CreatePgControldataToken(parsed)
+	if err != nil {
+		return err
+	}
+	if token == cluster.Status.ShutdownCheckpointToken {
+		contextLogger.Debug("no changes in the token value, skipping")
+		return nil
+	}
+
+	origCluster := cluster.DeepCopy()
+	contextLogger.Info("patching the shutdownCheckpointToken in the  cluster status",
+		"value", token, "previousValue", cluster.Status.ShutdownCheckpointToken)
+	cluster.Status.ShutdownCheckpointToken = token
+	return r.Client.Status().Patch(ctx, cluster, client.MergeFrom(origCluster))
 }
 
 // deleteEvictedOrUnscheduledInstances will delete the Pods that the Kubelet has evicted or cannot schedule

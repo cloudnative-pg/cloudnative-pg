@@ -923,6 +923,15 @@ type ClusterStatus struct {
 	// SwitchReplicaClusterStatus is the status of the switch to replica cluster
 	// +optional
 	SwitchReplicaClusterStatus SwitchReplicaClusterStatus `json:"switchReplicaClusterStatus,omitempty"`
+
+	// ShutdownCheckpointToken is a json token containing the following information from pg_controldata:
+	//	Database system identifier
+	//	Latest checkpoint's TimeLineID
+	//	Latest checkpoint's REDO location
+	//	Latest checkpoint's REDO WAL file
+	//	Time of latest checkpoint
+	// +optional
+	ShutdownCheckpointToken string `json:"shutdownCheckpointToken,omitempty"`
 }
 
 // SwitchReplicaClusterStatus contains all the statuses regarding the switch of a cluster to a replica cluster

@@ -41,6 +41,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 
@@ -55,6 +56,30 @@ func init() {
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Controllers Suite")
+}
+
+type fakeInstanceStatusClient struct {
+	getStatusFromInstancesFunc func(ctx context.Context,
+		pods corev1.PodList,
+	) postgres.PostgresqlStatusList
+	getPgControlDataFromInstanceFunc func(
+		ctx context.Context,
+		pod *corev1.Pod,
+	) (string, error)
+}
+
+func (f fakeInstanceStatusClient) GetStatusFromInstances(
+	ctx context.Context,
+	pods corev1.PodList,
+) postgres.PostgresqlStatusList {
+	return f.getStatusFromInstancesFunc(ctx, pods)
+}
+
+func (f fakeInstanceStatusClient) GetPgControlDataFromInstance(
+	ctx context.Context,
+	pod *corev1.Pod,
+) (string, error) {
+	return f.getPgControlDataFromInstanceFunc(ctx, pod)
 }
 
 type testingEnvironment struct {
@@ -167,8 +192,10 @@ func newFakeCNPGCluster(
 
 	cluster := &apiv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
+			Name:        name,
+			Namespace:   namespace,
+			Annotations: map[string]string{},
+			Labels:      map[string]string{},
 		},
 		Spec: apiv1.ClusterSpec{
 			Instances: instances,

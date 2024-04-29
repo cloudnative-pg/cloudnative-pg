@@ -5303,6 +5303,12 @@ spec:
                     description: The resource version of the "postgres" user secret
                     type: string
                 type: object
+              shutdownCheckpointToken:
+                description: "ShutdownCheckpointToken is a json token containing the
+                  following information from pg_controldata:\n\tDatabase system identifier\n\tLatest
+                  checkpoint's TimeLineID\n\tLatest checkpoint's REDO location\n\tLatest
+                  checkpoint's REDO WAL file\n\tTime of latest checkpoint"
+                type: string
               switchReplicaClusterStatus:
                 description: SwitchReplicaClusterStatus is the status of the switch
                   to replica cluster

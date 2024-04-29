@@ -44,7 +44,7 @@ import (
 type Reconciler struct {
 	cli                  client.Client
 	recorder             record.EventRecorder
-	instanceStatusClient *instance.StatusClient
+	instanceStatusClient instance.Client
 }
 
 // ExecutorBuilder is a struct capable of creating a Reconciler
@@ -96,11 +96,11 @@ func (se *Reconciler) enrichSnapshot(
 	if data, err := se.instanceStatusClient.GetPgControlDataFromInstance(ctx, targetPod); err == nil {
 		vs.Annotations[utils.PgControldataAnnotationName] = data
 		pgControlData := utils.ParsePgControldataOutput(data)
-		timelineID, ok := pgControlData["Latest checkpoint's TimeLineID"]
+		timelineID, ok := pgControlData[utils.PgControlDataKeyLatestCheckpointTimelineID]
 		if ok {
 			vs.Labels[utils.BackupTimelineLabelName] = timelineID
 		}
-		startWal, ok := pgControlData["Latest checkpoint's REDO WAL file"]
+		startWal, ok := pgControlData[utils.PgControlDataKeyREDOWALFile]
 		if ok {
 			vs.Annotations[utils.BackupStartWALAnnotationName] = startWal
 			// TODO: once we have online volumesnapshot backups, this should change

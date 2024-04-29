@@ -2246,6 +2246,18 @@ This field is reported when <code>.spec.failoverDelay</code> is populated or dur
    <p>SwitchReplicaClusterStatus is the status of the switch to replica cluster</p>
 </td>
 </tr>
+<tr><td><code>shutdownCheckpointToken</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>ShutdownCheckpointToken is a json token containing the following information from pg_controldata:
+Database system identifier
+Latest checkpoint's TimeLineID
+Latest checkpoint's REDO location
+Latest checkpoint's REDO WAL file
+Time of latest checkpoint</p>
+</td>
+</tr>
 </tbody>
 </table>
 
