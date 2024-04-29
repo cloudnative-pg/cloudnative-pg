@@ -66,7 +66,7 @@ In addition, check that the following packages are installed in your system:
 The previous list assumes that you are using a Debian-based distribution. For
 other distributions the name of the packages may vary.
 
-## Microsoft WSL2
+### Microsoft WSL2
 
 To setup a development environment you can use the same instructions discussed
 for GNU/Linux.
