@@ -38,7 +38,6 @@ ENGINE=${CLUSTER_ENGINE:-kind}
 ENABLE_REGISTRY=${ENABLE_REGISTRY:-}
 ENABLE_PYROSCOPE=${ENABLE_PYROSCOPE:-}
 ENABLE_CSI_DRIVER=${ENABLE_CSI_DRIVER:-}
-PROM_CHART_VERSION=${PROM_CHART_VERSION:-9.0.1}
 NODES=${NODES:-3}
 # This option is telling the docker to use node image with certain arch, i.e kindest/node in kind.
 # In M1/M2,  if enable amd64 emulation then we keep it as linux/amd64.
@@ -456,7 +455,7 @@ EOF
 deploy_prometheus_crds() {
   echo "${bright}Starting deployment of Prometheus CRDs... ${reset}"
   helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-  helm -n kube-system install prometheus-operator-crds prometheus-community/prometheus-operator-crds --version "${PROM_CHART_VERSION}"
+  helm -n kube-system install prometheus-operator-crds prometheus-community/prometheus-operator-crds
 }
 
 load_image_registry() {

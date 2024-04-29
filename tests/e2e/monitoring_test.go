@@ -17,8 +17,6 @@ limitations under the License.
 package e2e
 
 import (
-	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
-
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 
@@ -67,8 +65,6 @@ var _ = Describe("PodMonitor support", Serial, Label(tests.LabelObservability), 
 		AssertCreateCluster(namespace, clusterDefaultName, clusterDefaultMonitoringFile, env)
 
 		By("verifying PodMonitor existence", func() {
-			var podMonitor *monitoringv1.PodMonitor
-
 			podMonitor, err := env.GetPodMonitor(namespace, clusterDefaultName)
 			Expect(err).ToNot(HaveOccurred())
 
