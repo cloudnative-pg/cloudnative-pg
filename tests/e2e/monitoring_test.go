@@ -47,7 +47,7 @@ var _ = Describe("PodMonitor support", Serial, Label(tests.LabelObservability), 
 		}
 	})
 
-	It("requires existance of the PodMonitor CRD", func() {
+	It("requires existence of the PodMonitor CRD", func() {
 		// Check if CRD exists, otherwise test is invalid
 		exist, err := utils.PodMonitorExist(env.APIExtensionClient.Discovery())
 		Expect(err).ToNot(HaveOccurred())
