@@ -243,7 +243,7 @@ data:
             usage: "GAUGE"
             description: "Time at which these statistics were last reset"
 
-    pg_stat_bgwriter:
+    pg_stat_background_writer:
       runonserver: ">=17.0.0"
       query: |
         SELECT buffers_clean
