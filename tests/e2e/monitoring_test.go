@@ -17,8 +17,6 @@ limitations under the License.
 package e2e
 
 import (
-	"fmt"
-
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -47,13 +45,9 @@ var _ = Describe("PodMonitor support", Serial, Label(tests.LabelObservability), 
 		if !IsLocal() {
 			Skip("PodMonitor test only runs on Local deployment")
 		}
+	})
 
-		// Add schema to client so we can use it
-		err := monitoringv1.AddToScheme(env.Scheme)
-		if err != nil {
-			Fail(fmt.Sprintf("Failed to add monitoring v1 scheme: %v", err))
-		}
-
+	It("requires existance of the PodMonitor CRD", func() {
 		// Check if CRD exists, otherwise test is invalid
 		exist, err := utils.PodMonitorExist(env.APIExtensionClient.Discovery())
 		Expect(err).ToNot(HaveOccurred())
