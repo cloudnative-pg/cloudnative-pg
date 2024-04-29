@@ -56,8 +56,31 @@ var requestRetry = wait.Backoff{
 	Jitter:   0.1,
 }
 
-// StatusClient a http client capable of querying the instance HTTP endpoints
-type StatusClient struct {
+// Client a http client capable of querying the instance HTTP endpoints
+type Client interface {
+	// GetStatusFromInstances gets the replication status from the PostgreSQL instances,
+	// the returned list is sorted in order to have the primary as the first element
+	// and the other instances in their election order
+	GetStatusFromInstances(
+		ctx context.Context,
+		pods corev1.PodList,
+	) postgres.PostgresqlStatusList
+
+	// GetPgControlDataFromInstance obtains the pg_controldata from the instance HTTP endpoint
+	GetPgControlDataFromInstance(
+		ctx context.Context,
+		pod *corev1.Pod,
+	) (string, error)
+
+	// UpgradeInstanceManager upgrades the instance manager to the passed availableArchitecture
+	UpgradeInstanceManager(
+		ctx context.Context,
+		pod *corev1.Pod,
+		availableArchitecture *utils.AvailableArchitecture,
+	) error
+}
+
+type statusClient struct {
 	*http.Client
 }
 
@@ -72,7 +95,7 @@ func (i StatusError) Error() string {
 }
 
 // NewStatusClient returns a client capable of querying the instance HTTP endpoints
-func NewStatusClient() *StatusClient {
+func NewStatusClient() Client {
 	const defaultConnectionTimeout = 2 * time.Second
 
 	// We want a connection timeout to prevent waiting for the default
@@ -97,13 +120,13 @@ func NewStatusClient() *StatusClient {
 		},
 	}
 
-	return &StatusClient{Client: timeoutClient}
+	return &statusClient{timeoutClient}
 }
 
 // extractInstancesStatus extracts the status of the underlying PostgreSQL instance from
 // the requested Pod, via the instance manager. In case of failure, errors are passed
 // in the result list
-func (r *StatusClient) extractInstancesStatus(
+func (r statusClient) extractInstancesStatus(
 	ctx context.Context,
 	activePods []corev1.Pod,
 ) postgres.PostgresqlStatusList {
@@ -118,7 +141,7 @@ func (r *StatusClient) extractInstancesStatus(
 
 // getReplicaStatusFromPodViaHTTP retrieves the status of PostgreSQL pod via HTTP, retrying
 // the request if some communication error is encountered
-func (r *StatusClient) getReplicaStatusFromPodViaHTTP(
+func (r *statusClient) getReplicaStatusFromPodViaHTTP(
 	ctx context.Context,
 	pod corev1.Pod,
 ) (result postgres.PostgresqlStatus) {
@@ -156,10 +179,7 @@ func (r *StatusClient) getReplicaStatusFromPodViaHTTP(
 	return result
 }
 
-// GetStatusFromInstances gets the replication status from the PostgreSQL instances,
-// the returned list is sorted in order to have the primary as the first element
-// and the other instances in their election order
-func (r *StatusClient) GetStatusFromInstances(
+func (r *statusClient) GetStatusFromInstances(
 	ctx context.Context,
 	pods corev1.PodList,
 ) postgres.PostgresqlStatusList {
@@ -182,8 +202,7 @@ func (r *StatusClient) GetStatusFromInstances(
 	return status
 }
 
-// GetPgControlDataFromInstance obtains the pg_controldata from the instance HTTP endpoint
-func (r *StatusClient) GetPgControlDataFromInstance(
+func (r *statusClient) GetPgControlDataFromInstance(
 	ctx context.Context,
 	pod *corev1.Pod,
 ) (string, error) {
@@ -232,7 +251,7 @@ func (r *StatusClient) GetPgControlDataFromInstance(
 }
 
 // UpgradeInstanceManager upgrades the instance manager to the passed availableArchitecture
-func (r *StatusClient) UpgradeInstanceManager(
+func (r *statusClient) UpgradeInstanceManager(
 	ctx context.Context,
 	pod *corev1.Pod,
 	availableArchitecture *utils.AvailableArchitecture,
@@ -294,7 +313,7 @@ func isEOF(err error) bool {
 }
 
 // rawInstanceStatusRequest retrieves the status of PostgreSQL pods via an HTTP request with GET method.
-func (r *StatusClient) rawInstanceStatusRequest(
+func (r *statusClient) rawInstanceStatusRequest(
 	ctx context.Context,
 	pod corev1.Pod,
 ) (result postgres.PostgresqlStatus) {

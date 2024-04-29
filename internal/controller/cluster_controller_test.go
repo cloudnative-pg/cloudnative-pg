@@ -29,6 +29,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -271,5 +272,68 @@ var _ = Describe("Updating target primary", func() {
 			}, &expectedPod)
 			Expect(err).ToNot(HaveOccurred())
 		})
+	})
+})
+
+var _ = FDescribe("evaluateShutdownCheckpointToken", func() {
+	var env *testingEnvironment
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+	})
+	It("can correctly set the token", func(ctx SpecContext) {
+		const fakeControlData = `pg_control version number:               1002
+Catalog version number:                  202201241
+Database cluster state:                  in production
+Database system identifier:              12345678901234567890123456789012
+Latest checkpoint's TimeLineID:       3
+pg_control last modified:                2024-04-30 12:00:00 UTC
+Latest checkpoint location:              0/3000FF0
+Prior checkpoint location:               0/2000AA0
+Minimum recovery ending location:        0/3000000
+Time of latest checkpoint:               2024-04-30 10:00:00 UTC
+Database block size:                     8192 bytes
+Latest checkpoint's REDO location:         0/3000CC0
+Latest checkpoint's REDO WAL file:         000000010000000000000003
+Blocks per segment of large relation:    131072
+Maximum data alignment:                  8
+Database disk usage:                     10240 KB
+Maximum xlog ID:                         123456789
+Next xlog byte position:                 0/3000010`
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace, func(cluster *apiv1.Cluster) {
+			instanceName := specs.GetInstanceName(cluster.Name, 1)
+			_, err := utils.AddFencedInstance(utils.FenceAllInstances, &cluster.ObjectMeta)
+			Expect(err).ToNot(HaveOccurred())
+			cluster.Status.TargetPrimary = instanceName
+			cluster.Status.CurrentPrimary = instanceName
+		})
+		instances := generateFakeClusterPods(env.client, cluster, true)
+		statusList := postgres.PostgresqlStatusList{
+			Items: []postgres.PostgresqlStatus{
+				{
+					CurrentLsn:         postgres.LSN("0/0"),
+					ReceivedLsn:        postgres.LSN("0/0"),
+					ReplayLsn:          postgres.LSN("0/0"),
+					IsPodReady:         true,
+					IsPrimary:          true,
+					Pod:                &instances[0],
+					MightBeUnavailable: false,
+				},
+			},
+		}
+		controlDataFunc := func(_ context.Context, _ *corev1.Pod) (string, error) {
+			return fakeControlData, nil
+		}
+		env.clusterReconciler.InstanceClient = fakeInstanceStatusClient{getPgControlDataFromInstanceFunc: controlDataFunc}
+		err := env.clusterReconciler.evaluateShutdownCheckpointToken(ctx, cluster, statusList)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(cluster.Status.ShutdownCheckpointToken).ToNot(BeEmpty())
+		data, err := utils.ParsePgControldataToken(cluster.Status.ShutdownCheckpointToken)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(data.LatestCheckpointTimelineID).To(Equal("3"))
+		Expect(data.TimeOfLatestCheckpoint).To(Equal("2024-04-30 10:00:00 UTC"))
+		Expect(data.LatestCheckpointREDOLocation).To(Equal("0/3000CC0"))
+		Expect(data.REDOWALFile).To(Equal("000000010000000000000003"))
+		Expect(data.DatabaseSystemIdentifier).To(Equal("12345678901234567890123456789012"))
 	})
 })

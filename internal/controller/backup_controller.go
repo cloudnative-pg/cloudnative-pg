@@ -68,7 +68,7 @@ type BackupReconciler struct {
 	Scheme   *runtime.Scheme
 	Recorder record.EventRecorder
 
-	instanceStatusClient *instance.StatusClient
+	instanceStatusClient instance.Client
 }
 
 // NewBackupReconciler properly initializes the BackupReconciler

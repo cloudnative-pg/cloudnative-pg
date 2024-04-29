@@ -386,6 +386,7 @@ ServiceAccountTemplate
 ServiceMonitor
 ServiceSpec
 ServiceTemplateSpec
+ShutdownCheckpointToken
 Silvela
 Slonik
 SnapshotOwnerReference
@@ -604,6 +605,7 @@ connectionParameters
 connectionString
 conninfo
 containerPort
+controldata
 coredump
 coredumps
 coreos
@@ -1097,6 +1099,7 @@ sha
 shm
 shmall
 shmmax
+shutdownCheckpointToken
 sig
 sigs
 singlenamespace
