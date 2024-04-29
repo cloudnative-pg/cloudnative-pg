@@ -29,7 +29,7 @@ import (
 )
 
 // Set of tests that set up a cluster with monitoring support enabled
-var _ = Describe("PodMonitor support", Serial, Label(tests.LabelPrometheus), func() {
+var _ = Describe("PodMonitor support", Serial, Label(tests.LabelObservability), func() {
 	const (
 		namespacePrefix              = "cluster-monitoring-e2e"
 		level                        = tests.Medium
