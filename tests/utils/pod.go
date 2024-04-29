@@ -92,6 +92,16 @@ func PodHasAnnotations(pod corev1.Pod, annotations map[string]string) bool {
 	return true
 }
 
+// PodHasCondition verifies that a pod has a specified condition
+func PodHasCondition(pod *corev1.Pod, conditionType corev1.PodConditionType, status corev1.ConditionStatus) bool {
+	for _, cond := range pod.Status.Conditions {
+		if cond.Type == conditionType && cond.Status == status {
+			return true
+		}
+	}
+	return false
+}
+
 // DeletePod deletes a pod if existent
 func (env TestingEnvironment) DeletePod(namespace string, name string, opts ...client.DeleteOption) error {
 	u := &unstructured.Unstructured{}
