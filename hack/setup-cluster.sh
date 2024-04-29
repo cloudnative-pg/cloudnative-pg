@@ -406,6 +406,7 @@ deploy_csi_host_path() {
   done
 }
 
+
 deploy_pyroscope() {
   helm repo add pyroscope-io https://grafana.github.io/helm-charts
 
@@ -453,6 +454,7 @@ EOF
 }
 
 deploy_prometheus_crds() {
+  echo "${bright}Starting deployment of Prometheus CRDs... ${reset}"
   helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
   helm -n kube-system install prometheus-operator-crds prometheus-community/prometheus-operator-crds --version "${PROM_CHART_VERSION}"
 }
