@@ -171,17 +171,16 @@ func (r *InstanceReconciler) Reconcile(
 		return reconcile.Result{RequeueAfter: time.Second}, nil
 	}
 
-	restarted, err := r.reconcilePrimary(ctx, cluster)
-	if err != nil {
+	// If the instance is promoted, it will not automatically load the changed configuration files
+	// so promoted should not stop the instance reload requires
+	if _, err := r.reconcilePrimary(ctx, cluster); err != nil {
 		return reconcile.Result{}, err
 	}
 
-	restartedFromOldPrimary, err := r.reconcileOldPrimary(ctx, cluster)
+	restarted, err := r.reconcileOldPrimary(ctx, cluster)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
-
-	restarted = restarted || restartedFromOldPrimary
 
 	if r.IsDBUp(ctx) != nil {
 		return reconcile.Result{RequeueAfter: time.Second}, nil
@@ -1104,7 +1103,7 @@ func (r *InstanceReconciler) refreshFileFromSecret(
 }
 
 // Reconciler primary logic. DB needed.
-func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv1.Cluster) (restarted bool, err error) {
+func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv1.Cluster) (promoted bool, err error) {
 	if cluster.Status.TargetPrimary != r.instance.PodName || cluster.IsReplica() {
 		return false, nil
 	}
@@ -1121,7 +1120,7 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 		if err := r.handlePromotion(ctx, cluster); err != nil {
 			return false, err
 		}
-		restarted = true
+		promoted = true
 	}
 
 	// if the currentPrimary doesn't match the PodName we set the correct value.
@@ -1130,19 +1129,19 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 		cluster.Status.CurrentPrimaryTimestamp = pkgUtils.GetCurrentTimestamp()
 
 		if err := r.client.Status().Patch(ctx, cluster, client.MergeFrom(oldCluster)); err != nil {
-			return restarted, err
+			return promoted, err
 		}
 
 		if err := r.instance.DropConnections(); err != nil {
-			return restarted, err
+			return promoted, err
 		}
 
 		cluster.LogTimestampsWithMessage(ctx, "Finished setting myself as primary")
-		return restarted, nil
+		return promoted, nil
 	}
 
 	// If it is already the current primary, everything is ok
-	return restarted, nil
+	return promoted, nil
 }
 
 func (r *InstanceReconciler) handlePromotion(ctx context.Context, cluster *apiv1.Cluster) error {
