@@ -51,10 +51,9 @@ var _ = Describe("PodMonitor support", Serial, Label(tests.LabelObservability), 
 		}
 
 		// Check if CRD exists, otherwise test is invalid
-		exist, _ := utils.PodMonitorExist(env.APIExtensionClient.Discovery())
-		if !exist {
-			Skip("PodMonitor resource is not available")
-		}
+		exist, err := utils.PodMonitorExist(env.APIExtensionClient.Discovery())
+		Expect(err).ToNot(HaveOccurred())
+		Expect(exist).To(BeTrue())
 	})
 
 	It("sets up a cluster enabling PodMonitor feature", func() {
