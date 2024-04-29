@@ -44,6 +44,10 @@ var _ = Describe("PodMonitor support", Serial, Label(tests.LabelObservability), 
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 
+		if !IsLocal() {
+			Skip("PodMonitor test only runs on Local deployment")
+		}
+
 		// Add schema to client so we can use it
 		err := monitoringv1.AddToScheme(env.Scheme)
 		if err != nil {
