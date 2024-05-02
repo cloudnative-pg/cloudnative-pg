@@ -19,6 +19,7 @@ package controllers
 
 import (
 	"context"
+	"reflect"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -52,6 +53,11 @@ func (r *ClusterReconciler) updatePluginsStatus(ctx context.Context, cluster *ap
 		cluster.Status.PluginStatus[i].OperatorCapabilities = entry.OperatorCapabilities
 		cluster.Status.PluginStatus[i].WALCapabilities = entry.WALCapabilities
 		cluster.Status.PluginStatus[i].BackupCapabilities = entry.BackupCapabilities
+	}
+
+	// If nothing changes, there's no need to hit the API server
+	if reflect.DeepEqual(oldCluster.Status.PluginStatus, cluster.Status.PluginStatus) {
+		return nil
 	}
 
 	return r.Client.Status().Patch(ctx, cluster, client.MergeFrom(oldCluster))
