@@ -123,17 +123,12 @@ var ErrNextLoop = utils.ErrNextLoop
 // Reconcile is the operator reconcile loop
 func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	contextLogger, ctx := log.SetupLogger(ctx)
-	var err error
 
+	contextLogger.Debug("Reconciliation loop start")
 	defer func() {
-		if err != nil {
-			contextLogger.Debug(fmt.Sprintf("object %#q has failed", req.NamespacedName))
-		} else {
-			contextLogger.Debug(fmt.Sprintf("object %#q has been reconciled", req.NamespacedName))
-		}
+		contextLogger.Debug("Reconciliation loop end")
 	}()
 
-	contextLogger.Debug(fmt.Sprintf("reconciling object %#q", req.NamespacedName))
 	cluster, err := r.getCluster(ctx, req)
 	if err != nil {
 		return ctrl.Result{}, err
