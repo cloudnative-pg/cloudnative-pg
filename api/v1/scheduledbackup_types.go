@@ -60,10 +60,10 @@ type ScheduledBackupSpec struct {
 	// +optional
 	Target BackupTarget `json:"target,omitempty"`
 
-	// The backup method to be used, possible options are `barmanObjectStore`
-	// and `volumeSnapshot`. Defaults to: `barmanObjectStore`.
+	// The backup method to be used, possible options are `barmanObjectStore`,
+	// `volumeSnapshot` or `plugin`. Defaults to: `barmanObjectStore`.
 	// +optional
-	// +kubebuilder:validation:Enum=barmanObjectStore;volumeSnapshot
+	// +kubebuilder:validation:Enum=barmanObjectStore;volumeSnapshot;plugin
 	// +kubebuilder:default:=barmanObjectStore
 	Method BackupMethod `json:"method,omitempty"`
 
