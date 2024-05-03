@@ -21,7 +21,7 @@ See [CNPG backup documentation](https://cloudnative-pg.io/documentation/current/
 ## Regularly test restore from backup
 
 Having backups is essential. It is equally essential to test those backups.
-CloudNativePG  makes it very easy to spin up a cluster from a backup. You should
+CloudNativePG makes it very easy to spin up a cluster from a backup. You should
 regularly check backups are recent and in good condition.
 
 See [CNPG recovery documentation](https://cloudnative-pg.io/documentation/current/recovery/).
