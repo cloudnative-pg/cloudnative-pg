@@ -21,6 +21,7 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"sync"
 
 	"github.com/jackc/pgx/v5"
 
@@ -40,7 +41,18 @@ func (i *PostgresLifecycle) runPostgresAndWait(ctx context.Context) <-chan error
 
 	go func() {
 		defer close(errChan)
-		err := i.instance.VerifyPgDataCoherence(ctx)
+
+		var wg sync.WaitGroup
+		defer func() {
+			wg.Wait()
+		}()
+
+		postgresContext, postgresContextCancel := context.WithCancel(ctx)
+		defer func() {
+			postgresContextCancel()
+		}()
+
+		err := i.instance.VerifyPgDataCoherence(postgresContext)
 		if err != nil {
 			errChan <- err
 			return
@@ -56,8 +68,8 @@ func (i *PostgresLifecycle) runPostgresAndWait(ctx context.Context) <-chan error
 			return
 		}
 
-		i.instance.LogPgControldata(ctx, "postmaster start up")
-		defer i.instance.LogPgControldata(ctx, "postmaster has exited")
+		i.instance.LogPgControldata(postgresContext, "postmaster start up")
+		defer i.instance.LogPgControldata(postgresContext, "postmaster has exited")
 
 		streamingCmd, err := i.instance.Run()
 		if err != nil {
@@ -67,12 +79,15 @@ func (i *PostgresLifecycle) runPostgresAndWait(ctx context.Context) <-chan error
 		}
 
 		// once the database will be up we'll connect and setup everything required
-		err = configureInstancePermissions(ctx, i.instance)
-		if err != nil {
-			contextLogger.Error(err, "Unable to update PostgreSQL roles and permissions")
-			errChan <- err
-			return
-		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := configureInstancePermissions(postgresContext, i.instance); err != nil {
+				contextLogger.Error(err, "Unable to update PostgreSQL roles and permissions")
+				errChan <- err
+				return
+			}
+		}()
 
 		// from now on the instance can be considered ready
 		i.instance.SetCanCheckReadiness(true)
@@ -108,7 +123,7 @@ func configureInstancePermissions(ctx context.Context, instance *postgres.Instan
 	}
 
 	contextLogger.Debug("Verifying connection to DB")
-	err = instance.WaitForSuperuserConnectionAvailable()
+	err = instance.WaitForSuperuserConnectionAvailable(ctx)
 	if err != nil {
 		contextLogger.Error(err, "DB not available")
 		os.Exit(1)
@@ -117,7 +132,7 @@ func configureInstancePermissions(ctx context.Context, instance *postgres.Instan
 	contextLogger.Debug("Validating DB configuration")
 
 	// A transaction is required to temporarily disable synchronous replication
-	tx, err := db.Begin()
+	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("creating a new transaction to setup the instance: %w", err)
 	}
