@@ -58,6 +58,10 @@ const (
 	// hibernation condition that is used when the operator is waiting for a Pod
 	// to be deleted
 	HibernationConditionReasonWaitingPodsDeletion = "WaitingPodsDeletion"
+
+	// HibernationConditionFencing is the value of the
+	// hibernation condition that is used when the operator needs to execute fencing
+	HibernationConditionFencing = "WaitingForFencing"
 )
 
 // ErrInvalidHibernationValue is raised when the hibernation annotation has
@@ -86,7 +90,7 @@ func EnrichStatus(
 	// Hibernating a non-ready cluster may be dangerous since the PVCs
 	// won't be completely created.
 	// We should stop the enrich status only when the cluster is unhealthy and the process hasn't already started
-	if cluster.Status.Phase != apiv1.PhaseHealthy && !isHibernationOngoing(cluster) {
+	if cluster.Status.Phase != apiv1.PhaseHealthy && !IsHibernationOngoing(cluster) {
 		return
 	}
 
@@ -98,6 +102,15 @@ func EnrichStatus(
 			Message: "Cluster has been hibernated",
 		})
 		return
+	}
+
+	if !cluster.IsInstanceFenced("*") {
+		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+			Type:    HibernationConditionType,
+			Status:  metav1.ConditionFalse,
+			Reason:  HibernationConditionFencing,
+			Message: "Waiting for the cluster to be fenced",
+		})
 	}
 
 	for idx := range podList {
@@ -124,7 +137,7 @@ func isHibernationEnabled(cluster *apiv1.Cluster) bool {
 	return cluster.Annotations[utils.HibernationAnnotationName] == HibernationOn
 }
 
-// isHibernationOngoing check if the cluster is doing the hibernation process
-func isHibernationOngoing(cluster *apiv1.Cluster) bool {
+// IsHibernationOngoing check if the cluster is doing the hibernation process
+func IsHibernationOngoing(cluster *apiv1.Cluster) bool {
 	return meta.FindStatusCondition(cluster.Status.Conditions, HibernationConditionType) != nil
 }

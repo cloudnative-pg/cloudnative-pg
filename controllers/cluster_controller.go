@@ -327,6 +327,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	// negative: this is going to happen, i.e., when an instance is
 	// un-fenced, and the Kubelet still hasn't refreshed the status of the
 	// readiness probe.
+	// nolint: nestif
 	if instancesStatus.Len() > 0 {
 		mostAdvancedInstance := instancesStatus.Items[0]
 		hasHTTPStatus := mostAdvancedInstance.HasHTTPStatus()
@@ -335,6 +336,17 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		if hasHTTPStatus && !isPodReady {
 			if err := r.evaluateShutdownCheckpointToken(ctx, cluster, instancesStatus); err != nil {
 				return ctrl.Result{}, fmt.Errorf("while evaluating shutdownCheckpointoken: %w", err)
+			}
+
+			if hibernation.IsHibernationOngoing(cluster) {
+				if result, err := hibernation.Reconcile(ctx,
+					r.Client,
+					cluster,
+					resources.instances.Items,
+					true,
+				); !result.IsZero() || err != nil {
+					return result, err
+				}
 			}
 
 			// The readiness probe status from the Kubelet is not updated, so
@@ -357,8 +369,9 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		r.Client,
 		cluster,
 		resources.instances.Items,
-	); result != nil || err != nil {
-		return *result, err
+		false,
+	); !result.IsZero() || err != nil {
+		return result, err
 	}
 
 	// We have already updated the status in updateResourceStatus call,

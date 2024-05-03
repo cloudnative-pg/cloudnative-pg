@@ -69,7 +69,9 @@ var _ = Describe("Reconcile resources", func() {
 		mock := &clientMock{}
 		cluster := apiv1.Cluster{}
 		// A Reconcile with a nil return will allow cluster reconciliation to proceed
-		Expect(Reconcile(ctx, mock, &cluster, nil)).To(BeNil())
+		res, err := Reconcile(ctx, mock, &cluster, nil, false)
+		Expect(res.IsZero()).To(BeTrue())
+		Expect(err).To(BeNil())
 		Expect(mock.deletedPods).To(BeEmpty())
 	})
 
@@ -92,7 +94,7 @@ var _ = Describe("Reconcile resources", func() {
 			},
 		}
 		// A Reconcile with a non-nil return will stop the cluster reconciliation
-		Expect(Reconcile(ctx, mock, &cluster, nil)).ToNot(BeNil())
+		Expect(Reconcile(ctx, mock, &cluster, nil, false)).ToNot(BeNil())
 		Expect(mock.deletedPods).To(BeEmpty())
 	})
 
@@ -123,7 +125,7 @@ var _ = Describe("Reconcile resources", func() {
 				},
 			},
 		}
-		result, err := Reconcile(ctx, mock, &cluster, pods)
+		result, err := Reconcile(ctx, mock, &cluster, pods, true)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(result).ToNot(BeNil())
 		Expect(result.RequeueAfter).ToNot(BeZero())
@@ -151,7 +153,7 @@ var _ = Describe("Reconcile resources", func() {
 		}
 
 		pods := fakePodListWithPrimary()
-		Expect(Reconcile(ctx, mock, &cluster, pods)).ToNot(BeNil())
+		Expect(Reconcile(ctx, mock, &cluster, pods, true)).ToNot(BeNil())
 		Expect(mock.deletedPods).To(ConsistOf("cluster-example-2"))
 	})
 
@@ -176,7 +178,7 @@ var _ = Describe("Reconcile resources", func() {
 		}
 
 		pods := fakePodListWithoutPrimary()
-		Expect(Reconcile(ctx, mock, &cluster, pods)).ToNot(BeNil())
+		Expect(Reconcile(ctx, mock, &cluster, pods, true)).ToNot(BeNil())
 		Expect(mock.deletedPods).To(ConsistOf("cluster-example-1"))
 	})
 })

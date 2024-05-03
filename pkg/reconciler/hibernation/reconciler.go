@@ -28,6 +28,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // Reconcile reconciles the cluster hibernation status.
@@ -36,34 +37,49 @@ func Reconcile(
 	c client.Client,
 	cluster *apiv1.Cluster,
 	instances []corev1.Pod,
-) (*ctrl.Result, error) {
+	instancesStopped bool,
+) (ctrl.Result, error) {
+	contextLogger := log.FromContext(ctx).WithName("hibernation_reconciler")
 	hibernationCondition := meta.FindStatusCondition(cluster.Status.Conditions, HibernationConditionType)
 	if hibernationCondition == nil {
 		// This means that hibernation has not been requested
-		return nil, nil
+		return ctrl.Result{}, nil
 	}
 
 	switch hibernationCondition.Reason {
 	case HibernationConditionReasonDeletingPods:
+		if !instancesStopped {
+			contextLogger.Info("waiting for all instances to be fenced")
+			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+		}
 		return reconcileDeletePods(ctx, c, instances)
 
 	case HibernationConditionReasonWaitingPodsDeletion:
-		return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 
+	case HibernationConditionFencing:
+		return reconcileFenceCluster(ctx, c, cluster)
 	default:
-		return &ctrl.Result{}, nil
+		return ctrl.Result{}, nil
 	}
+}
+
+func reconcileFenceCluster(ctx context.Context, c client.Client, cluster *apiv1.Cluster) (ctrl.Result, error) {
+	err := utils.NewFencingMetadataExecutor(c).AddFencing().ForAllInstances().
+		Execute(ctx, client.ObjectKeyFromObject(cluster), cluster)
+
+	return ctrl.Result{RequeueAfter: 5 * time.Second}, err
 }
 
 func reconcileDeletePods(
 	ctx context.Context,
 	c client.Client,
 	instances []corev1.Pod,
-) (*ctrl.Result, error) {
+) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
 	if len(instances) == 0 {
-		return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 	}
 
 	var podToBeDeleted *corev1.Pod
@@ -83,5 +99,5 @@ func reconcileDeletePods(
 	// will always be the first one, if present
 	contextLogger.Info("Deleting Pod as requested by the hibernation procedure", "podName", podToBeDeleted.Name)
 	deletionResult := c.Delete(ctx, podToBeDeleted)
-	return &ctrl.Result{RequeueAfter: 5 * time.Second}, deletionResult
+	return ctrl.Result{RequeueAfter: 5 * time.Second}, deletionResult
 }
