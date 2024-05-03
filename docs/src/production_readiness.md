@@ -2,7 +2,7 @@
 
 Running a production grade PostgreSQL system requires effort and preparation. If
 you're coming to CloudNativePG with PostgreSQL experience, or with other
-relational database  experience, you should already know much of what you need
+relational database experience, you should already know much of what you need
 to have a production-ready CNPG system, with the additional benefits brought by
 the Kubernetes ecosystem.
 
