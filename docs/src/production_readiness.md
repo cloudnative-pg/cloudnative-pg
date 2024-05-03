@@ -31,7 +31,7 @@ See [CNPG recovery documentation](https://cloudnative-pg.io/documentation/curren
 It goes without saying, a production database should be monitored, not only for
 uptime, load etc., but for space. In addition, it is vitally important to ensure
 that WAL files don't pile up and potentially fill your `PGDATA` volume, or your
-dedicated WAL storage volume. The CloudNativePG Quickstart guide includes
+dedicated WAL storage volume. The [CloudNativePG Quickstart guide](https://cloudnative-pg.io/documentation/current/quickstart/) includes
 instructions on setting up a Grafana / Prometheus monitoring system. Prometheus
 also allows you to define Alerts.
 
