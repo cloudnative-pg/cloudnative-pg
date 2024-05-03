@@ -67,8 +67,6 @@ CloudNativePG works in practice. For example, you should test performing a
 manual switchover, you should try killing your test database's primary pod and
 see how soon it recovers, you should try resizing your database PVC's.
 
-It is also important to know how to use the debugging tools, which is the topic
-of the following section:
 
 ## Know how to perform some debugging steps
 
