@@ -71,8 +71,8 @@ see how soon it recovers, you should try resizing your database PVC's.
 ## Know how to perform some debugging steps
 
 You should know the basics of inspecting your CloudNativePG clusters and the
-operator. The Troubleshooting documentation includes some basic steps. It would
-be recommendable that you install the suggested tools in this section:
+operator. The [Troubleshooting documentation](https://cloudnative-pg.io/documentation/current/troubleshooting) includes some basic steps. It is
+recommended that you install the suggested tools in this section:
 
 See [troubleshooting tools](https://cloudnative-pg.io/documentation/current/troubleshooting/#before-you-start).
 
