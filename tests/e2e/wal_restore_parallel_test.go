@@ -32,7 +32,7 @@ import (
 // wal section under backup for wal archive storing/recovering. To facilitate controlling the testing, we directly forge
 // wals on the object storage ("minio" in this testing) by copying and renaming an existing wal file.
 
-var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), func() {
+var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore, tests.LabelMinIO), func() {
 	const (
 		level          = tests.High
 		PgWalPath      = specs.PgWalPath

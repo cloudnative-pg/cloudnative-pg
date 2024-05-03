@@ -32,6 +32,9 @@ const (
 	// LabelDisruptive is the string for labelling disruptive tests
 	LabelDisruptive = "disruptive"
 
+	// LabelHibernation is the label for hibernation tests
+	LabelHibernation = "hibernation"
+
 	// LabelIgnoreFails is the string for labelling tests that should not be considered when failing.
 	LabelIgnoreFails = "ignore-fails"
 
@@ -40,6 +43,9 @@ const (
 
 	// LabelMaintenance is a label for selecting maintenance test
 	LabelMaintenance = "maintenance"
+
+	// LabelMinIO is for internal use only
+	LabelMinIO = "minio"
 
 	// LabelNoOpenshift is the string for labelling tests that don't run on Openshift
 	LabelNoOpenshift = "no-openshift"
@@ -61,6 +67,9 @@ const (
 
 	// LabelPostgresConfiguration is a label for selecting postgres-configuration test
 	LabelPostgresConfiguration = "postgres-configuration"
+
+	// LabelPsql is for internal use only
+	LabelPsql = "psql"
 
 	// LabelRecovery is a label for selecting recovery test
 	LabelRecovery = "recovery"

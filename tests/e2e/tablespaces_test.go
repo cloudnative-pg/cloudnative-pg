@@ -48,7 +48,9 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 	tests.LabelStorage,
 	tests.LabelBasic,
 	tests.LabelSnapshot,
-	tests.LabelBackupRestore), func() {
+	tests.LabelBackupRestore,
+	tests.LabelMinIO,
+	tests.LabelPsql), func() {
 	const (
 		level           = tests.Medium
 		namespacePrefix = "tablespaces"

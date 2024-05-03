@@ -40,7 +40,11 @@ import (
 // Test case for validating volume snapshots
 // with different storage providers in different k8s environments
 var _ = Describe("Verify Volume Snapshot",
-	Label(tests.LabelBackupRestore, tests.LabelStorage, tests.LabelSnapshot), func() {
+	Label(tests.LabelBackupRestore,
+		tests.LabelStorage,
+		tests.LabelSnapshot,
+		tests.LabelMinIO,
+		tests.LabelPsql), func() {
 		getSnapshots := func(
 			backupName string,
 			clusterName string,

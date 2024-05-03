@@ -38,7 +38,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Configuration update", Ordered, Label(tests.LabelClusterMetadata), func() {
+var _ = Describe("Configuration update", Ordered, Label(tests.LabelClusterMetadata, tests.LabelPsql), func() {
 	const (
 		clusterName          = "postgresql-storage-class"
 		namespacePrefix      = "cluster-update-config-e2e"

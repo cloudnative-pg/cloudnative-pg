@@ -33,89 +33,91 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Update user and superuser password", Label(tests.LabelServiceConnectivity), func() {
-	const (
-		namespacePrefix = "cluster-update-user-password"
-		sampleFile      = fixturesDir + "/secrets/cluster-secrets.yaml"
-		level           = tests.Low
-	)
-	BeforeEach(func() {
-		if testLevelEnv.Depth < int(level) {
-			Skip("Test depth is lower than the amount requested for this test")
-		}
-	})
-
-	It("can update the user application password", func() {
-		// Create a cluster in a namespace we'll delete after the test
-		namespace, err := env.CreateUniqueNamespace(namespacePrefix)
-		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+var _ = Describe("Update user and superuser password",
+	Label(tests.LabelServiceConnectivity,
+		tests.LabelPsql), func() {
+		const (
+			namespacePrefix = "cluster-update-user-password"
+			sampleFile      = fixturesDir + "/secrets/cluster-secrets.yaml"
+			level           = tests.Low
+		)
+		BeforeEach(func() {
+			if testLevelEnv.Depth < int(level) {
+				Skip("Test depth is lower than the amount requested for this test")
 			}
-			return env.DeleteNamespace(namespace)
-		})
-		clusterName, err := env.GetResourceNameFromYAML(sampleFile)
-		Expect(err).ToNot(HaveOccurred())
-		AssertCreateCluster(namespace, clusterName, sampleFile, env)
-
-		host, err := testsUtils.GetHostName(namespace, clusterName, env)
-		Expect(err).ToNot(HaveOccurred())
-
-		appSecretName := clusterName + apiv1.ApplicationUserSecretSuffix
-		superUserSecretName := clusterName + apiv1.SuperUserSecretSuffix
-
-		By("update user application password", func() {
-			const newPassword = "eeh2Zahohx" //nolint:gosec
-			AssertUpdateSecret("password", newPassword, appSecretName, namespace, clusterName, 30, env)
-			AssertConnection(host, testsUtils.AppUser, testsUtils.AppDBName, newPassword, *psqlClientPod, 60, env)
 		})
 
-		By("fail updating user application password with wrong user in secret", func() {
-			const newUser = "postgres"
-			const newPassword = "newpassword"
+		It("can update the user application password", func() {
+			// Create a cluster in a namespace we'll delete after the test
+			namespace, err := env.CreateUniqueNamespace(namespacePrefix)
+			Expect(err).ToNot(HaveOccurred())
+			DeferCleanup(func() error {
+				if CurrentSpecReport().Failed() {
+					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+				}
+				return env.DeleteNamespace(namespace)
+			})
+			clusterName, err := env.GetResourceNameFromYAML(sampleFile)
+			Expect(err).ToNot(HaveOccurred())
+			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
-			AssertUpdateSecret("password", newPassword, appSecretName, namespace, clusterName, 30, env)
-			AssertUpdateSecret("username", newUser, appSecretName, namespace, clusterName, 30, env)
+			host, err := testsUtils.GetHostName(namespace, clusterName, env)
+			Expect(err).ToNot(HaveOccurred())
 
-			timeout := time.Second * 10
-			dsn := testsUtils.CreateDSN(host, newUser, testsUtils.AppDBName, newPassword, testsUtils.Require, 5432)
+			appSecretName := clusterName + apiv1.ApplicationUserSecretSuffix
+			superUserSecretName := clusterName + apiv1.SuperUserSecretSuffix
 
-			_, _, err := env.ExecCommand(env.Ctx, *psqlClientPod,
-				specs.PostgresContainerName, &timeout,
-				"psql", dsn, "-tAc", "SELECT 1")
-			Expect(err).To(HaveOccurred())
+			By("update user application password", func() {
+				const newPassword = "eeh2Zahohx" //nolint:gosec
+				AssertUpdateSecret("password", newPassword, appSecretName, namespace, clusterName, 30, env)
+				AssertConnection(host, testsUtils.AppUser, testsUtils.AppDBName, newPassword, *psqlClientPod, 60, env)
+			})
 
-			// Revert the username change
-			AssertUpdateSecret("username", testsUtils.AppUser, appSecretName, namespace, clusterName, 30, env)
-		})
+			By("fail updating user application password with wrong user in secret", func() {
+				const newUser = "postgres"
+				const newPassword = "newpassword"
 
-		By("update superuser password", func() {
-			// Setting EnableSuperuserAccess to true
-			Eventually(func() error {
-				cluster, err := env.GetCluster(namespace, clusterName)
-				Expect(err).NotTo(HaveOccurred())
-				cluster.Spec.EnableSuperuserAccess = ptr.To(true)
-				return env.Client.Update(env.Ctx, cluster)
-			}, 60, 5).Should(Not(HaveOccurred()))
+				AssertUpdateSecret("password", newPassword, appSecretName, namespace, clusterName, 30, env)
+				AssertUpdateSecret("username", newUser, appSecretName, namespace, clusterName, 30, env)
 
-			// We should now have a secret
-			var secret corev1.Secret
-			namespacedName := types.NamespacedName{
-				Namespace: namespace,
-				Name:      superUserSecretName,
-			}
-			Eventually(func(g Gomega) {
-				err = env.Client.Get(env.Ctx, namespacedName, &secret)
-				g.Expect(err).ToNot(HaveOccurred())
-			}, 60).Should(Succeed())
+				timeout := time.Second * 10
+				dsn := testsUtils.CreateDSN(host, newUser, testsUtils.AppDBName, newPassword, testsUtils.Require, 5432)
 
-			const newPassword = "fi6uCae7" //nolint:gosec
-			AssertUpdateSecret("password", newPassword, superUserSecretName, namespace, clusterName, 30, env)
-			AssertConnection(host, testsUtils.PostgresUser, testsUtils.PostgresDBName, newPassword, *psqlClientPod, 60, env)
+				_, _, err := env.ExecCommand(env.Ctx, *psqlClientPod,
+					specs.PostgresContainerName, &timeout,
+					"psql", dsn, "-tAc", "SELECT 1")
+				Expect(err).To(HaveOccurred())
+
+				// Revert the username change
+				AssertUpdateSecret("username", testsUtils.AppUser, appSecretName, namespace, clusterName, 30, env)
+			})
+
+			By("update superuser password", func() {
+				// Setting EnableSuperuserAccess to true
+				Eventually(func() error {
+					cluster, err := env.GetCluster(namespace, clusterName)
+					Expect(err).NotTo(HaveOccurred())
+					cluster.Spec.EnableSuperuserAccess = ptr.To(true)
+					return env.Client.Update(env.Ctx, cluster)
+				}, 60, 5).Should(Not(HaveOccurred()))
+
+				// We should now have a secret
+				var secret corev1.Secret
+				namespacedName := types.NamespacedName{
+					Namespace: namespace,
+					Name:      superUserSecretName,
+				}
+				Eventually(func(g Gomega) {
+					err = env.Client.Get(env.Ctx, namespacedName, &secret)
+					g.Expect(err).ToNot(HaveOccurred())
+				}, 60).Should(Succeed())
+
+				const newPassword = "fi6uCae7" //nolint:gosec
+				AssertUpdateSecret("password", newPassword, superUserSecretName, namespace, clusterName, 30, env)
+				AssertConnection(host, testsUtils.PostgresUser, testsUtils.PostgresDBName, newPassword, *psqlClientPod, 60, env)
+			})
 		})
 	})
-})
 
 var _ = Describe("Enable superuser password", Label(tests.LabelServiceConnectivity), func() {
 	const (

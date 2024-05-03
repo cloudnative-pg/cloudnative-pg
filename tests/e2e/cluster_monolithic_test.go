@@ -37,7 +37,7 @@ import (
 // 2. the superuser role should have been downgraded to a normal user
 // and testData :
 // Taking two database i.e. db1 and db2 and two roles testuserone and testusertwo
-var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingDatabases), func() {
+var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingDatabases, tests.LabelPsql), func() {
 	const (
 		level             = tests.Medium
 		sourceClusterFile = fixturesDir + "/cluster_monolith/cluster-monolith.yaml.template"

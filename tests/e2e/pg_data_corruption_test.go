@@ -33,7 +33,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), Ordered, func() {
+var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery, tests.LabelPsql), Ordered, func() {
 	const (
 		namespacePrefix = "pg-data-corruption"
 		level           = tests.Medium

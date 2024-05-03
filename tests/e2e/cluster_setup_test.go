@@ -35,7 +35,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), func() {
+var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic, tests.LabelPsql), func() {
 	const (
 		sampleFile  = fixturesDir + "/base/cluster-storage-class.yaml.template"
 		clusterName = "postgresql-storage-class"

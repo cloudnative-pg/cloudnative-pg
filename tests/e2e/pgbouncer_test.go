@@ -23,7 +23,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("PGBouncer Connections", Label(tests.LabelServiceConnectivity), func() {
+var _ = Describe("PGBouncer Connections", Label(tests.LabelServiceConnectivity, tests.LabelPsql), func() {
 	const (
 		sampleFile                    = fixturesDir + "/pgbouncer/cluster-pgbouncer.yaml.template"
 		poolerBasicAuthRWSampleFile   = fixturesDir + "/pgbouncer/pgbouncer-pooler-basic-auth-rw.yaml"

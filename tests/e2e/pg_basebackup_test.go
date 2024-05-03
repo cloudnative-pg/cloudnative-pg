@@ -25,7 +25,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Bootstrap with pg_basebackup", Label(tests.LabelRecovery), func() {
+var _ = Describe("Bootstrap with pg_basebackup", Label(tests.LabelRecovery, tests.LabelPsql), func() {
 	const (
 		namespacePrefix = "cluster-pg-basebackup"
 		srcCluster      = fixturesDir + "/pg_basebackup/cluster-src.yaml.template"

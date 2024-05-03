@@ -44,7 +44,7 @@ import (
 // 3. Different database names
 // 4. Failure
 // 5. Different versions of Postgres
-var _ = Describe("Imports with Microservice Approach", Label(tests.LabelImportingDatabases), func() {
+var _ = Describe("Imports with Microservice Approach", Label(tests.LabelImportingDatabases, tests.LabelPsql), func() {
 	const (
 		level            = tests.Medium
 		sourceSampleFile = fixturesDir + "/cluster_microservice/cluster-base.yaml.template"

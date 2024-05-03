@@ -74,32 +74,39 @@ var (
 
 var _ = SynchronizedBeforeSuite(func() []byte {
 	var err error
+	var psqlPod *corev1.Pod
+	var minioClient *corev1.Pod
+	objs := make(map[string]corev1.Pod, 2)
+
 	env, err = utils.NewTestingEnvironment()
 	Expect(err).ShouldNot(HaveOccurred())
 
-	psqlPod, err := utils.GetPsqlClient(psqlClientNamespace, env)
-	Expect(err).ShouldNot(HaveOccurred())
-	DeferCleanup(func() {
-		err := env.DeleteNamespaceAndWait(psqlClientNamespace, 300)
-		Expect(err).ToNot(HaveOccurred())
-	})
+	if Label(tests.LabelPsql).MatchesLabelFilter(GinkgoLabelFilter()) {
+		psqlPod, err = utils.GetPsqlClient(psqlClientNamespace, env)
+		Expect(err).ShouldNot(HaveOccurred())
+		DeferCleanup(func() {
+			err := env.DeleteNamespaceAndWait(psqlClientNamespace, 300)
+			Expect(err).ToNot(HaveOccurred())
+		})
 
-	// Set up a global MinIO service on his own namespace
-	err = env.CreateNamespace(minioEnv.Namespace)
-	Expect(err).ToNot(HaveOccurred())
-	DeferCleanup(func() {
-		err := env.DeleteNamespaceAndWait(minioEnv.Namespace, 300)
-		Expect(err).ToNot(HaveOccurred())
-	})
-	minioEnv.Timeout = uint(testTimeouts[utils.MinioInstallation])
-	minioClient, err := utils.MinioDeploy(minioEnv, env)
-	Expect(err).ToNot(HaveOccurred())
+		objs["posql"] = *psqlPod
+	}
 
-	caSecret := minioEnv.CaPair.GenerateCASecret(minioEnv.Namespace, minioEnv.CaSecretName)
-	minioEnv.CaSecretObj = *caSecret
-	objs := map[string]corev1.Pod{
-		"psql":  *psqlPod,
-		"minio": *minioClient,
+	if Label(tests.LabelMinIO).MatchesLabelFilter(GinkgoLabelFilter()) {
+		// Set up a global MinIO service on his own namespace
+		err = env.CreateNamespace(minioEnv.Namespace)
+		Expect(err).ToNot(HaveOccurred())
+		DeferCleanup(func() {
+			err := env.DeleteNamespaceAndWait(minioEnv.Namespace, 300)
+			Expect(err).ToNot(HaveOccurred())
+		})
+		minioEnv.Timeout = uint(testTimeouts[utils.MinioInstallation])
+		minioClient, err = utils.MinioDeploy(minioEnv, env)
+		Expect(err).ToNot(HaveOccurred())
+
+		caSecret := minioEnv.CaPair.GenerateCASecret(minioEnv.Namespace, minioEnv.CaSecretName)
+		minioEnv.CaSecretObj = *caSecret
+		objs["minio"] = *minioClient
 	}
 
 	jsonObjs, err := json.Marshal(objs)
@@ -136,8 +143,12 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 		panic(err)
 	}
 
-	psqlClientPod = objs["psql"]
-	minioEnv.Client = objs["minio"]
+	if _, ok := objs["psql"]; ok {
+		psqlClientPod = objs["psql"]
+	}
+	if _, ok := objs["minio"]; ok {
+		minioEnv.Client = objs["minio"]
+	}
 })
 
 var _ = SynchronizedAfterSuite(func() {

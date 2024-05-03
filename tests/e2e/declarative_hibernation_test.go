@@ -29,7 +29,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Cluster declarative hibernation", func() {
+var _ = Describe("Cluster declarative hibernation", Label(tests.LabelHibernation, tests.LabelPsql), func() {
 	const (
 		sampleFileCluster = fixturesDir + "/base/cluster-storage-class.yaml.template"
 		level             = tests.Medium
