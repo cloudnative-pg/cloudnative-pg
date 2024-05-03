@@ -100,7 +100,6 @@ func (env TestingEnvironment) DumpOperator(namespace string, filename string) {
 
 // GetOperatorDeployment returns the operator Deployment if there is a single one running, error otherwise
 func (env TestingEnvironment) GetOperatorDeployment() (appsv1.Deployment, error) {
-	const operatorDeploymentName = "cnpg-controller-manager"
 	deploymentList := &appsv1.DeploymentList{}
 	if err := GetObjectList(&env, deploymentList,
 		ctrlclient.MatchingLabels{"app.kubernetes.io/name": "cloudnative-pg"},
@@ -133,18 +132,6 @@ func (env TestingEnvironment) GetOperatorDeployment() (appsv1.Deployment, error)
 		return deploymentList.Items[0], nil
 	}
 
-	// This is for deployments created before 1.4.0
-
-	if err := GetObjectList(
-		&env, deploymentList, ctrlclient.MatchingFields{"metadata.name": operatorDeploymentName},
-	); err != nil {
-		return appsv1.Deployment{}, err
-	}
-
-	if len(deploymentList.Items) != 1 {
-		err := fmt.Errorf("number of %v deployments != 1", operatorDeploymentName)
-		return appsv1.Deployment{}, err
-	}
 	return deploymentList.Items[0], nil
 }
 
@@ -248,6 +235,49 @@ func (env TestingEnvironment) IsOperatorReady() (bool, error) {
 	}
 
 	return true, err
+}
+
+// IsOperatorDeploymentReady return true or false for the operator and error if it wasn't possible
+// to get the operator deployment
+func (env *TestingEnvironment) IsOperatorDeploymentReady() (bool, error) {
+	operatorDeployment, err := env.GetOperatorDeployment()
+	if err != nil {
+		return false, err
+	}
+
+	if operatorDeployment.Status.ReadyReplicas != operatorDeployment.Status.Replicas {
+		return false, fmt.Errorf("deployment not ready %v of %v ready",
+			operatorDeployment.Status.ReadyReplicas, operatorDeployment.Status.ReadyReplicas)
+	}
+
+	return true, nil
+}
+
+// ScaleOperatorDeployment will scale the operator to n replicas and return error in case of failure
+func (env *TestingEnvironment) ScaleOperatorDeployment(replicas int) error {
+	operatorDeployment, err := env.GetOperatorDeployment()
+	if err != nil {
+		return err
+	}
+
+	updatedOperatorDeployment := *operatorDeployment.DeepCopy()
+	replicasZero := int32(replicas)
+	updatedOperatorDeployment.Spec.Replicas = &replicasZero
+
+	// Scale down operator deployment to zero replicas
+	err = env.Client.Patch(env.Ctx, &updatedOperatorDeployment, ctrlclient.MergeFrom(&operatorDeployment))
+	if err != nil {
+		return err
+	}
+
+	return retry.Do(
+		func() error {
+			_, err := env.IsOperatorDeploymentReady()
+			return err
+		},
+		retry.Delay(time.Second),
+		retry.Attempts(120),
+	)
 }
 
 // OperatorPodRenamed checks if the operator pod was renamed

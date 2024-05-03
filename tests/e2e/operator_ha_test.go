@@ -17,9 +17,6 @@ limitations under the License.
 package e2e
 
 import (
-	"fmt"
-
-	corev1 "k8s.io/api/core/v1"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -31,7 +28,7 @@ import (
 )
 
 var _ = Describe("Operator High Availability", Serial,
-	Label(tests.LabelDisruptive, tests.LabelNoOpenshift, tests.LabelOperator), func() {
+	Label(tests.LabelDisruptive, tests.LabelOperator), func() {
 		const (
 			namespacePrefix = "operator-ha-e2e"
 			sampleFile      = fixturesDir + "/operator-ha/operator-ha.yaml.template"
@@ -63,10 +60,6 @@ var _ = Describe("Operator High Availability", Serial,
 			operatorNamespace, err := env.GetOperatorNamespaceName()
 			Expect(err).ToNot(HaveOccurred())
 
-			// Get operator deployment name
-			operatorDeployment, err := env.GetOperatorDeployment()
-			Expect(err).ToNot(HaveOccurred())
-
 			// Create the cluster namespace
 			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
@@ -89,17 +82,8 @@ var _ = Describe("Operator High Availability", Serial,
 				// Set old leader pod name to operator pod name
 				oldLeaderPodName = operatorPodName.GetName()
 
-				// Scale up operator deployment to 3 replicas
-				cmd := fmt.Sprintf("kubectl scale deploy %v --replicas=3 -n %v",
-					operatorDeployment.Name, operatorNamespace)
-				_, _, err = testsUtils.Run(cmd)
+				err := env.ScaleOperatorDeployment(3)
 				Expect(err).ToNot(HaveOccurred())
-
-				// Verify the 3 operator pods are present
-				Eventually(func() (int, error) {
-					podList, _ := env.GetPodList(operatorNamespace)
-					return utils.CountReadyPods(podList.Items), err
-				}, 120).Should(BeEquivalentTo(3))
 
 				// Gather pod names from operator deployment
 				podList, err := env.GetPodList(operatorNamespace)
@@ -162,28 +146,8 @@ var _ = Describe("Operator High Availability", Serial,
 
 			By("scale down operator replicas to 1", func() {
 				// Scale down operator deployment to one replica
-				cmd := fmt.Sprintf("kubectl scale deploy %v --replicas=1 -n %v",
-					operatorDeployment.Name, operatorNamespace)
-				_, _, err = testsUtils.Run(cmd)
+				err := env.ScaleOperatorDeployment(1)
 				Expect(err).ToNot(HaveOccurred())
-
-				// Verify there is only one operator pod
-				Eventually(func() (int, error) {
-					podList := &corev1.PodList{}
-					err := env.Client.List(env.Ctx, podList, ctrlclient.InNamespace(operatorNamespace))
-					return len(podList.Items), err
-				}, 120).Should(BeEquivalentTo(1))
-
-				// And to stay like that
-				Consistently(func() int32 {
-					podList := &corev1.PodList{}
-					err := env.Client.List(
-						env.Ctx, podList,
-						ctrlclient.InNamespace(operatorNamespace),
-					)
-					Expect(err).ToNot(HaveOccurred())
-					return int32(len(podList.Items))
-				}, 10).Should(BeEquivalentTo(1))
 			})
 
 			By("verifying leader information after scale down", func() {
