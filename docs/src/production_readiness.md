@@ -54,11 +54,11 @@ example:
 
 ## Have a Kubernetes installation in good working order
 
-We see support tickets where an investigation reveals an out-of-memory
-kubernetes installation, processors at capacity, or a network with large
+We see issues where an investigation reveals an out-of-memory
+Kubernetes installation, processors at capacity, or a network with large
 latency.
-With a compromised Kubernetes installation, you won't have a great CloudNativePG
-experience.
+Kubernetes could be thought of as the Operating System for CloudNativePG
+and as such it must be functioning properly for CloudNativePG to work reliably. 
 
 ## Know how basic CNPG operations work
 
