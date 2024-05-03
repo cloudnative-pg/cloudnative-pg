@@ -16,7 +16,7 @@ You should not have a database in production without taking regular backups.
 CloudNativePG can help with scheduled backups, using object stores or volume
 snapshots.
 
-See [CNPG backups documentation](https://cloudnative-pg.io/documentation/current/backup/).
+See [CNPG backup documentation](https://cloudnative-pg.io/documentation/current/backup/).
 
 ## Regularly test restore from backup
 
