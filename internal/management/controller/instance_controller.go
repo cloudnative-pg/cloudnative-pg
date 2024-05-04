@@ -1011,7 +1011,7 @@ func (r *InstanceReconciler) refreshCertificateFilesFromSecret(
 		return false, fmt.Errorf("while writing server private key: %w", err)
 	}
 
-	if certificateIsChanged {
+	if privateKeyIsChanged {
 		contextLogger.Info("Refreshed configuration file",
 			"filename", privateKeyLocation,
 			"secret", secret.Name)
