@@ -18,6 +18,7 @@ package instance
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -68,11 +69,23 @@ func NewStatusClient() *StatusClient {
 
 	// We want a connection timeout to prevent waiting for the default
 	// TCP connection timeout (30 seconds) on lost SYN packets
+	dialer := &net.Dialer{
+		Timeout: connectionTimeout,
+	}
 	timeoutClient := &http.Client{
 		Transport: &http.Transport{
-			DialContext: (&net.Dialer{
-				Timeout: connectionTimeout,
-			}).DialContext,
+			DialContext: dialer.DialContext,
+			DialTLSContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+				tlsConfig, ok := ctx.Value(utils.ContextKeyTLSConfig).(*tls.Config)
+				if !ok || tlsConfig == nil {
+					return nil, fmt.Errorf("missing TLSConfig object in context")
+				}
+				tlsDialer := tls.Dialer{
+					NetDialer: dialer,
+					Config:    tlsConfig,
+				}
+				return tlsDialer.DialContext(ctx, network, addr)
+			},
 		},
 		Timeout: requestTimeout,
 	}
@@ -83,7 +96,7 @@ func NewStatusClient() *StatusClient {
 // extractInstancesStatus extracts the status of the underlying PostgreSQL instance from
 // the requested Pod, via the instance manager. In case of failure, errors are passed
 // in the result list
-func (r StatusClient) extractInstancesStatus(
+func (r *StatusClient) extractInstancesStatus(
 	ctx context.Context,
 	activePods []corev1.Pod,
 ) postgres.PostgresqlStatusList {
@@ -127,7 +140,7 @@ func (r *StatusClient) getReplicaStatusFromPodViaHTTP(
 	// online upgrades. It is not intended to wait for recovering from any
 	// other remote failure.
 	_ = retry.OnError(requestRetry, isErrorRetryable, func() error {
-		result = r.rawInstanceStatusRequest(ctx, r.Client, pod)
+		result = r.rawInstanceStatusRequest(ctx, pod)
 		return result.Error
 	})
 
@@ -175,7 +188,7 @@ func (r *StatusClient) GetPgControlDataFromInstance(
 		return "", err
 	}
 
-	resp, err := r.Client.Do(req)
+	resp, err := url.DoWithHTTPFallback(r.Client, req)
 	if err != nil {
 		return "", err
 	}
@@ -213,7 +226,6 @@ func (r *StatusClient) GetPgControlDataFromInstance(
 // rawInstanceStatusRequest retrieves the status of PostgreSQL pods via an HTTP request with GET method.
 func (r *StatusClient) rawInstanceStatusRequest(
 	ctx context.Context,
-	client *http.Client,
 	pod corev1.Pod,
 ) (result postgres.PostgresqlStatus) {
 	statusURL := url.Build(pod.Status.PodIP, url.PathPgStatus, url.StatusPort)
@@ -223,7 +235,7 @@ func (r *StatusClient) rawInstanceStatusRequest(
 		return result
 	}
 
-	resp, err := client.Do(req)
+	resp, err := url.DoWithHTTPFallback(r.Client, req)
 	if err != nil {
 		result.Error = err
 		return result

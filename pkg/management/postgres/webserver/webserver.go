@@ -86,7 +86,12 @@ func (ws *Webserver) Start(ctx context.Context) error {
 	go func() {
 		log.Info("Starting webserver", "address", ws.server.Addr)
 
-		err := ws.server.ListenAndServe()
+		var err error
+		if ws.server.TLSConfig != nil {
+			err = ws.server.ListenAndServeTLS("", "")
+		} else {
+			err = ws.server.ListenAndServe()
+		}
 		if err != nil {
 			errChan <- err
 		}

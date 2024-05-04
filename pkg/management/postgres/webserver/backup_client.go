@@ -19,6 +19,7 @@ package webserver
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -28,6 +29,7 @@ import (
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // backupClient a client to interact with the instance backup endpoints
@@ -53,11 +55,23 @@ func NewBackupClient() BackupClient {
 
 	// We want a connection timeout to prevent waiting for the default
 	// TCP connection timeout (30 seconds) on lost SYN packets
+	dialer := &net.Dialer{
+		Timeout: connectionTimeout,
+	}
 	timeoutClient := &http.Client{
 		Transport: &http.Transport{
-			DialContext: (&net.Dialer{
-				Timeout: connectionTimeout,
-			}).DialContext,
+			DialContext: dialer.DialContext,
+			DialTLSContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+				tlsConfig, ok := ctx.Value(utils.ContextKeyTLSConfig).(*tls.Config)
+				if !ok || tlsConfig == nil {
+					return nil, fmt.Errorf("missing TLSConfig object in context")
+				}
+				tlsDialer := tls.Dialer{
+					NetDialer: dialer,
+					Config:    tlsConfig,
+				}
+				return tlsDialer.DialContext(ctx, network, addr)
+			},
 		},
 		Timeout: requestTimeout,
 	}
@@ -125,7 +139,7 @@ func executeRequestWithError[T any](
 ) (*Response[T], error) {
 	contextLogger := log.FromContext(ctx)
 
-	resp, err := cli.Do(req)
+	resp, err := url.DoWithHTTPFallback(cli, req)
 	if err != nil {
 		return nil, fmt.Errorf("while executing http request: %w", err)
 	}

@@ -19,6 +19,8 @@ package controller
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"reflect"
@@ -44,6 +46,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/operatorclient"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/hibernation"
@@ -247,6 +250,13 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
+	// Store in the context the TLS configuration required communicating with the Pods
+	tlsConfig, err := newTLSConfigFromCluster(ctx, cluster, r.Client)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	ctx = context.WithValue(ctx, utils.ContextKeyTLSConfig, tlsConfig)
+
 	// Get the replication status
 	instancesStatus := r.StatusClient.GetStatusFromInstances(ctx, resources.instances)
 
@@ -428,6 +438,29 @@ func (r *ClusterReconciler) ensureNoFailoverOnFullDisk(
 		reason,
 	)
 	return ctrl.Result{RequeueAfter: 10 * time.Second}, registerPhaseErr
+}
+
+func newTLSConfigFromCluster(ctx context.Context, cluster *apiv1.Cluster, c client.Client) (*tls.Config, error) {
+	secret := &corev1.Secret{}
+	err := c.Get(ctx, client.ObjectKey{Namespace: cluster.Namespace, Name: cluster.GetServerCASecretName()}, secret)
+	if err != nil {
+		return nil, fmt.Errorf("while getting secret %s: %w", cluster.GetServerCASecretName(), err)
+	}
+
+	caCertificate, ok := secret.Data[certs.CACertKey]
+	if !ok {
+		return nil, fmt.Errorf("missing %s entry in secret %s", certs.CACertKey, cluster.GetServerCASecretName())
+	}
+
+	caCertPool := x509.NewCertPool()
+	caCertPool.AppendCertsFromPEM(caCertificate)
+	tlsConfig := tls.Config{
+		MinVersion: tls.VersionTLS13,
+		ServerName: cluster.GetServiceReadWriteName(),
+		RootCAs:    caCertPool,
+	}
+
+	return &tlsConfig, nil
 }
 
 func (r *ClusterReconciler) handleSwitchover(

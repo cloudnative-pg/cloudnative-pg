@@ -36,6 +36,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/instance"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -742,7 +743,7 @@ func (r *ClusterReconciler) upgradeInstanceManager(
 				}
 			}
 
-			err = upgradeInstanceManagerOnPod(ctx, postgresqlStatus.Pod, targetManager)
+			err = upgradeInstanceManagerOnPod(ctx, r.StatusClient, postgresqlStatus.Pod, targetManager)
 			if err != nil {
 				enrichedError := fmt.Errorf("while upgrading instance manager on %s (hash: %s): %w",
 					postgresqlStatus.Pod.Name,
@@ -770,6 +771,7 @@ func (r *ClusterReconciler) upgradeInstanceManager(
 // upgradeInstanceManagerOnPod upgrades an instance manager of a Pod via an HTTP PUT request.
 func upgradeInstanceManagerOnPod(
 	ctx context.Context,
+	statusClient *instance.StatusClient,
 	pod *corev1.Pod,
 	targetManager *utils.AvailableArchitecture,
 ) error {
@@ -788,7 +790,7 @@ func upgradeInstanceManagerOnPod(
 	}
 	req.Body = binaryFileStream
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := url.DoWithHTTPFallback(statusClient.Client, req)
 	if err != nil {
 		if errors.Is(err.(*neturl.Error).Err, io.EOF) {
 			// This is perfectly fine as the instance manager will
