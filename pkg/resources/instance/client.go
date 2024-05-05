@@ -25,6 +25,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"slices"
 	"sort"
 	"time"
 
@@ -35,6 +36,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -182,13 +184,14 @@ func (r *StatusClient) GetPgControlDataFromInstance(
 ) (string, error) {
 	contextLogger := log.FromContext(ctx)
 
-	httpURL := url.Build(pod.Status.PodIP, url.PathPGControlData, url.StatusPort)
+	scheme := GetStatusSchemeFromPod(pod)
+	httpURL := url.Build(scheme, pod.Status.PodIP, url.PathPGControlData, url.StatusPort)
 	req, err := http.NewRequestWithContext(ctx, "GET", httpURL, nil)
 	if err != nil {
 		return "", err
 	}
 
-	resp, err := url.DoWithHTTPFallback(r.Client, req)
+	resp, err := r.Client.Do(req)
 	if err != nil {
 		return "", err
 	}
@@ -228,14 +231,15 @@ func (r *StatusClient) rawInstanceStatusRequest(
 	ctx context.Context,
 	pod corev1.Pod,
 ) (result postgres.PostgresqlStatus) {
-	statusURL := url.Build(pod.Status.PodIP, url.PathPgStatus, url.StatusPort)
+	scheme := GetStatusSchemeFromPod(&pod)
+	statusURL := url.Build(scheme, pod.Status.PodIP, url.PathPgStatus, url.StatusPort)
 	req, err := http.NewRequestWithContext(ctx, "GET", statusURL, nil)
 	if err != nil {
 		result.Error = err
 		return result
 	}
 
-	resp, err := url.DoWithHTTPFallback(r.Client, req)
+	resp, err := r.Client.Do(req)
 	if err != nil {
 		result.Error = err
 		return result
@@ -266,4 +270,23 @@ func (r *StatusClient) rawInstanceStatusRequest(
 	}
 
 	return result
+}
+
+// GetStatusSchemeFromPod detects if a Pod is esposint the status via HTTP or HTTPS
+func GetStatusSchemeFromPod(pod *corev1.Pod) string {
+	// Fall back to comparing the container environment configuration
+	for _, container := range pod.Spec.Containers {
+		// we go to the next array element if it isn't the postgres container
+		if container.Name != specs.PostgresContainerName {
+			continue
+		}
+
+		if slices.Contains(container.Command, "--tls-status") {
+			return "https"
+		}
+
+		break
+	}
+
+	return "http"
 }

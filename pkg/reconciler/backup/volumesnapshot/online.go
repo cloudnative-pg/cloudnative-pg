@@ -26,6 +26,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/instance"
 )
 
 type onlineExecutor struct {
@@ -42,7 +43,8 @@ func (o *onlineExecutor) finalize(
 	backup *apiv1.Backup,
 	targetPod *corev1.Pod,
 ) (*ctrl.Result, error) {
-	body, err := o.backupClient.StatusWithErrors(ctx, targetPod.Status.PodIP)
+	scheme := instance.GetStatusSchemeFromPod(targetPod)
+	body, err := o.backupClient.StatusWithErrors(ctx, scheme, targetPod.Status.PodIP)
 	if err != nil {
 		return nil, fmt.Errorf("while getting status while finalizing: %w", err)
 	}
@@ -72,6 +74,7 @@ func (o *onlineExecutor) finalize(
 	switch status.Phase {
 	case webserver.Started:
 		if err := o.backupClient.Stop(ctx,
+			scheme,
 			targetPod.Status.PodIP,
 			*webserver.NewStopBackupRequest(backup.Name)); err != nil {
 			return nil, fmt.Errorf("while stopping the backup client: %w", err)
@@ -96,7 +99,8 @@ func (o *onlineExecutor) prepare(
 	volumeSnapshotConfig := backup.GetVolumeSnapshotConfiguration(*cluster.Spec.Backup.VolumeSnapshot)
 
 	// Handle hot snapshots
-	body, err := o.backupClient.StatusWithErrors(ctx, targetPod.Status.PodIP)
+	scheme := instance.GetStatusSchemeFromPod(targetPod)
+	body, err := o.backupClient.StatusWithErrors(ctx, scheme, targetPod.Status.PodIP)
 	if err != nil {
 		return nil, fmt.Errorf("while getting status while preparing: %w", err)
 	}
@@ -114,7 +118,7 @@ func (o *onlineExecutor) prepare(
 			BackupName:          backup.Name,
 			Force:               true,
 		}
-		if err := o.backupClient.Start(ctx, targetPod.Status.PodIP, req); err != nil {
+		if err := o.backupClient.Start(ctx, scheme, targetPod.Status.PodIP, req); err != nil {
 			return nil, fmt.Errorf("while trying to start the backup: %w", err)
 		}
 		return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil

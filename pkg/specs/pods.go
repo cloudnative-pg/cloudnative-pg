@@ -230,6 +230,7 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig) []core
 				"/controller/manager",
 				"instance",
 				"run",
+				"--tls-status",
 			},
 			Resources: cluster.Spec.Resources,
 			Ports: []corev1.ContainerPort{

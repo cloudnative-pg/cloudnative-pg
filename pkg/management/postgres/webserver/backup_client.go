@@ -39,13 +39,14 @@ type backupClient struct {
 
 // BackupClient is a struct capable of interacting with the instance backup endpoints
 type BackupClient interface {
-	StatusWithErrors(ctx context.Context, podIP string) (*Response[BackupResultData], error)
+	StatusWithErrors(ctx context.Context, scheme string, podIP string) (*Response[BackupResultData], error)
 	Start(
 		ctx context.Context,
+		scheme string,
 		podIP string,
 		sbq StartBackupRequest,
 	) error
-	Stop(ctx context.Context, podIP string, sbq StopBackupRequest) error
+	Stop(ctx context.Context, scheme string, podIP string, sbq StopBackupRequest) error
 }
 
 // NewBackupClient creates a client capable of interacting with the instance backup endpoints
@@ -80,8 +81,12 @@ func NewBackupClient() BackupClient {
 
 // StatusWithErrors retrieves the current status of the backup.
 // Returns the response body in case there is an error in the request
-func (c *backupClient) StatusWithErrors(ctx context.Context, podIP string) (*Response[BackupResultData], error) {
-	httpURL := url.Build(podIP, url.PathPgModeBackup, url.StatusPort)
+func (c *backupClient) StatusWithErrors(
+	ctx context.Context,
+	scheme string,
+	podIP string,
+) (*Response[BackupResultData], error) {
+	httpURL := url.Build(scheme, podIP, url.PathPgModeBackup, url.StatusPort)
 	req, err := http.NewRequestWithContext(ctx, "GET", httpURL, nil)
 	if err != nil {
 		return nil, err
@@ -93,10 +98,11 @@ func (c *backupClient) StatusWithErrors(ctx context.Context, podIP string) (*Res
 // Start runs the pg_start_backup
 func (c *backupClient) Start(
 	ctx context.Context,
+	scheme string,
 	podIP string,
 	sbq StartBackupRequest,
 ) error {
-	httpURL := url.Build(podIP, url.PathPgModeBackup, url.StatusPort)
+	httpURL := url.Build(scheme, podIP, url.PathPgModeBackup, url.StatusPort)
 
 	// Marshalling the payload to JSON
 	jsonBody, err := json.Marshal(sbq)
@@ -115,8 +121,8 @@ func (c *backupClient) Start(
 }
 
 // Stop runs the command pg_stop_backup
-func (c *backupClient) Stop(ctx context.Context, podIP string, sbq StopBackupRequest) error {
-	httpURL := url.Build(podIP, url.PathPgModeBackup, url.StatusPort)
+func (c *backupClient) Stop(ctx context.Context, scheme string, podIP string, sbq StopBackupRequest) error {
+	httpURL := url.Build(scheme, podIP, url.PathPgModeBackup, url.StatusPort)
 	// Marshalling the payload to JSON
 	jsonBody, err := json.Marshal(sbq)
 	if err != nil {
@@ -139,7 +145,7 @@ func executeRequestWithError[T any](
 ) (*Response[T], error) {
 	contextLogger := log.FromContext(ctx)
 
-	resp, err := url.DoWithHTTPFallback(cli, req)
+	resp, err := cli.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("while executing http request: %w", err)
 	}

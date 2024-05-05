@@ -75,6 +75,7 @@ func NewCmd() *cobra.Command {
 	var podName string
 	var clusterName string
 	var namespace string
+	var tlsStatus bool
 
 	cmd := &cobra.Command{
 		Use: "run [flags]",
@@ -92,6 +93,7 @@ func NewCmd() *cobra.Command {
 			instance.Namespace = namespace
 			instance.PodName = podName
 			instance.ClusterName = clusterName
+			instance.StatusTLS = tlsStatus
 
 			err := retry.OnError(retry.DefaultRetry, isRunSubCommandRetryable, func() error {
 				return runSubCommand(ctx, instance)
@@ -119,7 +121,8 @@ func NewCmd() *cobra.Command {
 		"current cluster in k8s, used to coordinate switchover and failover")
 	cmd.Flags().StringVar(&namespace, "namespace", os.Getenv("NAMESPACE"), "The namespace of "+
 		"the cluster and of the Pod in k8s")
-
+	cmd.Flags().BoolVar(&tlsStatus, "tls-status", false,
+		"Enable TLS communicating with the operator")
 	return cmd
 }
 

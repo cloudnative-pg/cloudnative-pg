@@ -783,14 +783,15 @@ func upgradeInstanceManagerOnPod(
 		err = binaryFileStream.Close()
 	}()
 
-	updateURL := url.Build(pod.Status.PodIP, url.PathUpdate, url.StatusPort)
+	scheme := instance.GetStatusSchemeFromPod(pod)
+	updateURL := url.Build(scheme, pod.Status.PodIP, url.PathUpdate, url.StatusPort)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPut, updateURL, nil)
 	if err != nil {
 		return err
 	}
 	req.Body = binaryFileStream
 
-	resp, err := url.DoWithHTTPFallback(statusClient.Client, req)
+	resp, err := statusClient.Client.Do(req)
 	if err != nil {
 		if errors.Is(err.(*neturl.Error).Err, io.EOF) {
 			// This is perfectly fine as the instance manager will

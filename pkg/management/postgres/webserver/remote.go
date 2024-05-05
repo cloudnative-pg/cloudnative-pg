@@ -83,19 +83,20 @@ func NewRemoteWebServer(
 	serveMux.HandleFunc(url.PathPGControlData, endpoints.pgControlData)
 	serveMux.HandleFunc(url.PathUpdate, endpoints.updateInstanceManager(cancelFunc, exitedConditions))
 
-	tlsConfig := &tls.Config{
-		MinVersion: tls.VersionTLS13,
-		GetCertificate: func(_ *tls.ClientHelloInfo) (*tls.Certificate, error) {
-			return instance.ServerCertificate, nil
-		},
-	}
-
 	server := &http.Server{
 		Addr:              fmt.Sprintf(":%d", url.StatusPort),
 		Handler:           serveMux,
 		ReadTimeout:       DefaultReadTimeout,
 		ReadHeaderTimeout: DefaultReadHeaderTimeout,
-		TLSConfig:         tlsConfig,
+	}
+
+	if instance.StatusTLS {
+		server.TLSConfig = &tls.Config{
+			MinVersion: tls.VersionTLS13,
+			GetCertificate: func(_ *tls.ClientHelloInfo) (*tls.Certificate, error) {
+				return instance.ServerCertificate, nil
+			},
+		}
 	}
 
 	return NewWebServer(instance, server), nil
