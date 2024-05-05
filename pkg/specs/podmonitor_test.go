@@ -44,6 +44,7 @@ var _ = Describe("PodMonitor test", func() {
 		},
 	}
 
+	additionalPodMonitorLabels := map[string]string{"testlabel": "value"}
 	expectedEndpoint := monitoringv1.PodMetricsEndpoint{Port: "metrics"}
 	metricRelabelings := []*monitoringv1.RelabelConfig{
 		{
@@ -103,6 +104,14 @@ var _ = Describe("PodMonitor test", func() {
 		expectedEndpoint.MetricRelabelConfigs = metricRelabelings
 		expectedEndpoint.RelabelConfigs = relabelings
 		Expect(monitor.Spec.PodMetricsEndpoints).To(ContainElement(*expectedEndpoint))
+	})
+	It("Should add the necessary labels to the monitoringv1.PodMonitoring object if they are set", func() {
+		relabeledCluster := cluster.DeepCopy()
+		relabeledCluster.Spec.Monitoring.PodMonitorAdditionalLabels = additionalPodMonitorLabels
+		mgr := NewClusterPodMonitorManager(relabeledCluster)
+		monitor := mgr.BuildPodMonitor()
+
+		Expect(monitor.Labels).To(ContainElement(additionalPodMonitorLabels["testlabel"]))
 	})
 
 	It("does not panic if monitoring section is not present", func() {

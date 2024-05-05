@@ -17,6 +17,8 @@ limitations under the License.
 package specs
 
 import (
+	"maps"
+
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -40,6 +42,8 @@ func (c ClusterPodMonitorManager) BuildPodMonitor() *monitoringv1.PodMonitor {
 		Name:      c.cluster.Name,
 	}
 	c.cluster.SetInheritedDataAndOwnership(&meta)
+
+	maps.Copy(meta.Labels, c.cluster.GetPodMonitorAdditionalLabels())
 
 	endpoint := monitoringv1.PodMetricsEndpoint{
 		Port: "metrics",

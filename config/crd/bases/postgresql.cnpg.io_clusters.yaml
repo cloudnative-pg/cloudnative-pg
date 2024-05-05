@@ -3017,6 +3017,10 @@ spec:
                     default: false
                     description: Enable or disable the `PodMonitor`
                     type: boolean
+                  podMonitorAdditionalLabels:
+                    additionalProperties:
+                      type: string
+                    type: object
                   podMonitorMetricRelabelings:
                     description: The list of metric relabelings for the `PodMonitor`.
                       Applied to samples before ingestion.

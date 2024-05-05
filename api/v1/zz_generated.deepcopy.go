@@ -1634,6 +1634,13 @@ func (in *MonitoringConfiguration) DeepCopyInto(out *MonitoringConfiguration) {
 		*out = make([]SecretKeySelector, len(*in))
 		copy(*out, *in)
 	}
+	if in.PodMonitorAdditionalLabels != nil {
+		in, out := &in.PodMonitorAdditionalLabels, &out.PodMonitorAdditionalLabels
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	if in.PodMonitorMetricRelabelConfigs != nil {
 		in, out := &in.PodMonitorMetricRelabelConfigs, &out.PodMonitorMetricRelabelConfigs
 		*out = make([]*monitoringv1.RelabelConfig, len(*in))
