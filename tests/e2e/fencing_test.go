@@ -224,6 +224,11 @@ var _ = Describe("Fencing", Label(tests.LabelPlugin), func() {
 					checkPostgresConnection(pod.GetName(), namespace)
 				}
 			})
+			By("checking that the shutdown checkpoint token is present", func() {
+				cluster, err := env.GetCluster(namespace, clusterName)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(cluster.Status.ShutdownCheckpointToken).ToNot(BeEmpty())
+			})
 			By("lift the fencing", func() {
 				Expect(testUtils.FencingOff(env, "*", namespace, clusterName, fencingMethod)).ToNot(HaveOccurred())
 			})
