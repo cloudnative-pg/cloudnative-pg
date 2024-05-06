@@ -90,6 +90,14 @@ var _ = Describe("Cluster declarative hibernation", func() {
 			Expect(len(podList.Items)).Should(BeEquivalentTo(0))
 		})
 
+		By("verifying that the shutdown token is present", func() {
+			Eventually(func(g Gomega) {
+				cluster, err := env.GetCluster(namespace, clusterName)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(cluster.Status.ShutdownCheckpointToken).ToNot(BeEmpty())
+			}, 120).Should(Succeed())
+		})
+
 		By("rehydrating the cluster", func() {
 			cluster, err := env.GetCluster(namespace, clusterName)
 			Expect(err).NotTo(HaveOccurred())
