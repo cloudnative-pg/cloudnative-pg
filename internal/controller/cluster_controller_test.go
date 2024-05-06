@@ -275,7 +275,7 @@ var _ = Describe("Updating target primary", func() {
 	})
 })
 
-var _ = FDescribe("evaluateShutdownCheckpointToken", func() {
+var _ = Describe("evaluateShutdownCheckpointToken", func() {
 	var env *testingEnvironment
 	BeforeEach(func() {
 		env = buildTestEnvironment()
