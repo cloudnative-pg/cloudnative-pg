@@ -49,7 +49,7 @@ func Reconcile(
 	switch hibernationCondition.Reason {
 	case HibernationConditionReasonDeletingPods:
 		if !instancesStopped {
-			contextLogger.Info("waiting for all instances to be fenced")
+			contextLogger.Info("waiting for all instances to be stopped before deleting")
 			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 		}
 		return reconcileDeletePods(ctx, c, instances)
@@ -59,9 +59,20 @@ func Reconcile(
 
 	case HibernationConditionFencing:
 		return reconcileFenceCluster(ctx, c, cluster)
+	case HibernationConditionReasonHibernated:
+		contextLogger.Info("cluster is in hibernation state, remove the annotation to rehydrate")
+		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+	case HibernationConditionRehydration:
+		return reconcileRehydration(ctx, c, cluster)
 	default:
 		return ctrl.Result{}, nil
 	}
+}
+
+func reconcileRehydration(ctx context.Context, c client.Client, cluster *apiv1.Cluster) (ctrl.Result, error) {
+	err := utils.NewFencingMetadataExecutor(c).RemoveFencing().ForAllInstances().
+		Execute(ctx, client.ObjectKeyFromObject(cluster), cluster)
+	return ctrl.Result{RequeueAfter: 5 * time.Second}, err
 }
 
 func reconcileFenceCluster(ctx context.Context, c client.Client, cluster *apiv1.Cluster) (ctrl.Result, error) {

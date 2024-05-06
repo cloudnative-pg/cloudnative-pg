@@ -71,7 +71,7 @@ var _ = Describe("Reconcile resources", func() {
 		// A Reconcile with a nil return will allow cluster reconciliation to proceed
 		res, err := Reconcile(ctx, mock, &cluster, nil, false)
 		Expect(res.IsZero()).To(BeTrue())
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 		Expect(mock.deletedPods).To(BeEmpty())
 	})
 

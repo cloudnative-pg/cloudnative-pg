@@ -110,6 +110,9 @@ var _ = Describe("Status enrichment", func() {
 			},
 		}
 
+		_, err := utils.AddFencedInstance(utils.FenceAllInstances, &cluster.ObjectMeta)
+		Expect(err).ToNot(HaveOccurred())
+
 		EnrichStatus(ctx, &cluster, []corev1.Pod{{}})
 		hibernationCondition := meta.FindStatusCondition(cluster.Status.Conditions, HibernationConditionType)
 		Expect(hibernationCondition).ToNot(BeNil())
@@ -145,7 +148,8 @@ var _ = Describe("Status enrichment", func() {
 				Phase: apiv1.PhaseHealthy,
 			},
 		}
-
+		_, err := utils.AddFencedInstance(utils.FenceAllInstances, &cluster.ObjectMeta)
+		Expect(err).ToNot(HaveOccurred())
 		now := metav1.Now()
 		pods := []corev1.Pod{
 			{

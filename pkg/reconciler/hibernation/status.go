@@ -61,7 +61,11 @@ const (
 
 	// HibernationConditionFencing is the value of the
 	// hibernation condition that is used when the operator needs to execute fencing
-	HibernationConditionFencing = "WaitingForFencing"
+	HibernationConditionFencing = "Fencing"
+
+	// HibernationConditionRehydration is the value of the
+	// hibernation condition that is used when the operator needs to execute Rehydration
+	HibernationConditionRehydration = "Rehydration"
 )
 
 // ErrInvalidHibernationValue is raised when the hibernation annotation has
@@ -82,6 +86,15 @@ func EnrichStatus(
 	podList []corev1.Pod,
 ) {
 	if !isHibernationEnabled(cluster) {
+		if cluster.IsInstanceFenced("*") {
+			meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+				Type:    HibernationConditionType,
+				Status:  metav1.ConditionTrue,
+				Reason:  HibernationConditionRehydration,
+				Message: "Cluster Rehydration",
+			})
+			return
+		}
 		meta.RemoveStatusCondition(&cluster.Status.Conditions, HibernationConditionType)
 		return
 	}
@@ -104,13 +117,14 @@ func EnrichStatus(
 		return
 	}
 
-	if !cluster.IsInstanceFenced("*") {
+	if !cluster.IsInstanceFenced(utils.FenceAllInstances) {
 		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
 			Type:    HibernationConditionType,
 			Status:  metav1.ConditionFalse,
 			Reason:  HibernationConditionFencing,
 			Message: "Waiting for the cluster to be fenced",
 		})
+		return
 	}
 
 	for idx := range podList {
