@@ -35,7 +35,6 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-// TODO: assert shut down token is present
 var _ = Describe("Fencing", Label(tests.LabelPlugin), func() {
 	const (
 		sampleFile = fixturesDir + "/base/cluster-storage-class.yaml.template"
@@ -217,6 +216,13 @@ var _ = Describe("Fencing", Label(tests.LabelPlugin), func() {
 				for _, pod := range podList.Items {
 					checkInstanceStatusReadyOrNot(pod.GetName(), namespace, false)
 				}
+			})
+			By("checking that the shutdown checkpoint token is present", func() {
+				Eventually(func(g Gomega) {
+					cluster, err := env.GetCluster(namespace, clusterName)
+					g.Expect(err).ToNot(HaveOccurred())
+					g.Expect(cluster.Status.ShutdownCheckpointToken).ToNot(BeEmpty())
+				}, 120).Should(Succeed())
 			})
 			By("check postgres connection on all instances", func() {
 				podList, err := env.GetClusterPodList(namespace, clusterName)
