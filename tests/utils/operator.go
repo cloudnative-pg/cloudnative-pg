@@ -31,6 +31,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/utils/ptr"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -237,8 +238,9 @@ func (env TestingEnvironment) IsOperatorReady() (bool, error) {
 	return true, err
 }
 
-// IsOperatorDeploymentReady return true or false for the operator and error if it wasn't possible
-// to get the operator deployment
+// IsOperatorDeploymentReady returns true if the operator deployment has the expected number
+// of ready pods.
+// It returns an error if there was a problem getting the operator deployment
 func (env *TestingEnvironment) IsOperatorDeploymentReady() (bool, error) {
 	operatorDeployment, err := env.GetOperatorDeployment()
 	if err != nil {
@@ -254,15 +256,14 @@ func (env *TestingEnvironment) IsOperatorDeploymentReady() (bool, error) {
 }
 
 // ScaleOperatorDeployment will scale the operator to n replicas and return error in case of failure
-func (env *TestingEnvironment) ScaleOperatorDeployment(replicas int) error {
+func (env *TestingEnvironment) ScaleOperatorDeployment(replicas int32) error {
 	operatorDeployment, err := env.GetOperatorDeployment()
 	if err != nil {
 		return err
 	}
 
 	updatedOperatorDeployment := *operatorDeployment.DeepCopy()
-	replicasZero := int32(replicas)
-	updatedOperatorDeployment.Spec.Replicas = &replicasZero
+	updatedOperatorDeployment.Spec.Replicas = ptr.To(replicas)
 
 	// Scale down operator deployment to zero replicas
 	err = env.Client.Patch(env.Ctx, &updatedOperatorDeployment, ctrlclient.MergeFrom(&operatorDeployment))
