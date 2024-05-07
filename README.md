@@ -128,20 +128,6 @@ A list of publicly known users of the CloudNativePG operator is in [ADOPTERS.md]
 Help us grow our community and CloudNativePG by adding yourself and your
 organization to this list!
 
-## Maintainers
-
-The current maintainers of the CloudNativePG project are:
-
-- Gabriele Bartolini (EDB)
-- Francesco Canovai (EDB)
-- Leonardo Cecchi (EDB)
-- Jonathan Gonzalez (EDB)
-- Marco Nenciarini (EDB)
-- Armando Ruocco (EDB)
-- Philippe Scorsolini (Upbound)
-
-They are listed in the [CODEOWNERS](CODEOWNERS) file.
-
 ### CloudNativePG at KubeCon
 
 - March 21 2024, KubeCon Europe 2024 in Paris: ["Scaling Heights: Mastering Postgres Database Vertical Scalability with Kubernetes Storage Magic"](https://kccnceu2024.sched.com/event/1YeM4/scaling-heights-mastering-postgres-database-vertical-scalability-with-kubernetes-storage-magic-gabriele-bartolini-edb-gari-singh-google) (Gari Singh, Google & Gabriele Bartolini, EDB)
