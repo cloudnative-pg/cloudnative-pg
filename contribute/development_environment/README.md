@@ -117,7 +117,7 @@ brew install jq \
 
 You can then follow the provided instructions. As you'll see, you need to add
 the following lines to the profile of your shell (eg `~/.bash_profile` or
-`~/.zlogin`):
+`~/.zprofile`):
 
 **Warning**: for Apple Silicon macs, the new default location for homebrew
 is `/opt/homebrew`, not `/usr/local`. See [discussion](https://github.com/Homebrew/brew/issues/9177).
