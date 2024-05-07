@@ -6,13 +6,15 @@ compute:
   name: worker
   platform:
     aws:
-      type: m5.2xlarge
+      type: m6i.xlarge
   replicas: 3
 controlPlane:
   architecture: amd64
   hyperthreading: Enabled
   name: master
-  platform: {}
+  platform:
+    aws:
+      type: m6i.2xlarge
   replicas: 3
 metadata:
   name: ${CLUSTER_NAME}
