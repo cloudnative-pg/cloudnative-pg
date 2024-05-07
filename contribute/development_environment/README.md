@@ -121,61 +121,35 @@ the following lines to the profile of your shell (eg `~/.bash_profile` or
 
 **Warning**: for Apple Silicon macs, the new default location for homebrew
 is `/opt/homebrew`, not `/usr/local`. See [discussion](https://github.com/Homebrew/brew/issues/9177).
-Please choose the right processor architecture in the following section:
+Please choose the right definition of `HOMEBREW_PATH` for the following section:
 
-#### Intel
-
-``` bash
-# Go settings
-export GOPATH="${HOME}/go"
-# Homebrew settings
-export PATH="/usr/local/opt/gettext/bin:$PATH"
-export PATH="/usr/local/opt/coreutils/libexec/gnubin:$PATH"
-export PATH="/usr/local/opt/findutils/libexec/gnubin:$PATH"
-export PATH="/usr/local/opt/gnu-getopt/bin:$PATH"
-export PATH="/usr/local/opt/gnu-sed/libexec/gnubin:$PATH"
-export PATH="/usr/local/opt/gnu-tar/libexec/gnubin:$PATH"
-export MANPATH="/usr/local/opt/coreutils/libexec/gnuman:$MANPATH"
-export MANPATH="/usr/local/opt/findutils/libexec/gnuman:$MANPATH"
-export MANPATH="/usr/local/opt/gnu-getopt/share/man:$MANPATH"
-export MANPATH="/usr/local/opt/gnu-sed/libexec/gnuman:$MANPATH"
-export MANPATH="/usr/local/opt/gnu-tar/libexec/gnuman:$MANPATH"
-export LDFLAGS="-L/usr/local/opt/zlib/lib $LDFLAGS"
-export LDFLAGS="-L/usr/local/opt/gettext/lib $LDFLAGS"
-export LDFLAGS="-L/usr/local/opt/readline/lib $LDFLAGS"
-export CPPFLAGS="-I/usr/local/opt/zlib/include $CPPFLAGS"
-export CPPFLAGS="-I/usr/local/opt/gettext/include $CPPFLAGS"
-export CPPFLAGS="-I/usr/local/opt/readline/include $CPPFLAGS"
-export PKG_CONFIG_PATH="/usr/local/opt/readline/lib/pkgconfig"
-# GPGv2 backward compatibility
-export GPG_AGENT_INFO=~/.gnupg/S.gpg-agent::1
-export GPG_TTY=$(tty)
-```
-
-#### Apple Silicon
+* Intel:  `export HOMEBREW_PATH="/usr/local"`
+* Apple Silicon: `export HOMEBREW_PATH="/opt/homebrew"`
 
 ``` bash
 # Go settings
 export GOPATH="${HOME}/go"
+# Substitute your HOMEBREW_PATH if necessary
+export HOMEBREW_PATH="/usr/local"
 # Homebrew settings
-export PATH="/opt/homebrew/opt/gettext/bin:$PATH"
-export PATH="/opt/homebrew/opt/coreutils/libexec/gnubin:$PATH"
-export PATH="/opt/homebrew/opt/findutils/libexec/gnubin:$PATH"
-export PATH="/opt/homebrew/opt/gnu-getopt/bin:$PATH"
-export PATH="/opt/homebrew/opt/gnu-sed/libexec/gnubin:$PATH"
-export PATH="/opt/homebrew/opt/gnu-tar/libexec/gnubin:$PATH"
-export MANPATH="/opt/homebrew/opt/coreutils/libexec/gnuman:$MANPATH"
-export MANPATH="/opt/homebrew/opt/findutils/libexec/gnuman:$MANPATH"
-export MANPATH="/opt/homebrew/opt/gnu-getopt/share/man:$MANPATH"
-export MANPATH="/opt/homebrew/opt/gnu-sed/libexec/gnuman:$MANPATH"
-export MANPATH="/opt/homebrew/opt/gnu-tar/libexec/gnuman:$MANPATH"
-export LDFLAGS="-L/opt/homebrew/opt/zlib/lib $LDFLAGS"
-export LDFLAGS="-L/opt/homebrew/opt/gettext/lib $LDFLAGS"
-export LDFLAGS="-L/opt/homebrew/opt/readline/lib $LDFLAGS"
-export CPPFLAGS="-I/opt/homebrew/opt/zlib/include $CPPFLAGS"
-export CPPFLAGS="-I/opt/homebrew/opt/gettext/include $CPPFLAGS"
-export CPPFLAGS="-I/opt/homebrew/opt/readline/include $CPPFLAGS"
-export PKG_CONFIG_PATH="/opt/homebrew/opt/readline/lib/pkgconfig"
+export PATH="${HOMEBREW_PATH}/opt/gettext/bin:$PATH"
+export PATH="${HOMEBREW_PATH}/opt/coreutils/libexec/gnubin:$PATH"
+export PATH="${HOMEBREW_PATH}/opt/findutils/libexec/gnubin:$PATH"
+export PATH="${HOMEBREW_PATH}/opt/gnu-getopt/bin:$PATH"
+export PATH="${HOMEBREW_PATH}/opt/gnu-sed/libexec/gnubin:$PATH"
+export PATH="${HOMEBREW_PATH}/opt/gnu-tar/libexec/gnubin:$PATH"
+export MANPATH="${HOMEBREW_PATH}/opt/coreutils/libexec/gnuman:$MANPATH"
+export MANPATH="${HOMEBREW_PATH}/opt/findutils/libexec/gnuman:$MANPATH"
+export MANPATH="${HOMEBREW_PATH}/opt/gnu-getopt/share/man:$MANPATH"
+export MANPATH="${HOMEBREW_PATH}/opt/gnu-sed/libexec/gnuman:$MANPATH"
+export MANPATH="${HOMEBREW_PATH}/opt/gnu-tar/libexec/gnuman:$MANPATH"
+export LDFLAGS="-L${HOMEBREW_PATH}/opt/zlib/lib $LDFLAGS"
+export LDFLAGS="-L${HOMEBREW_PATH}/opt/gettext/lib $LDFLAGS"
+export LDFLAGS="-L${HOMEBREW_PATH}/opt/readline/lib $LDFLAGS"
+export CPPFLAGS="-I${HOMEBREW_PATH}/opt/zlib/include $CPPFLAGS"
+export CPPFLAGS="-I${HOMEBREW_PATH}/opt/gettext/include $CPPFLAGS"
+export CPPFLAGS="-I${HOMEBREW_PATH}/opt/readline/include $CPPFLAGS"
+export PKG_CONFIG_PATH="${HOMEBREW_PATH}/opt/readline/lib/pkgconfig"
 # GPGv2 backward compatibility
 export GPG_AGENT_INFO=~/.gnupg/S.gpg-agent::1
 export GPG_TTY=$(tty)
