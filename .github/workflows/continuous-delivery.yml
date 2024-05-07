@@ -827,7 +827,7 @@ jobs:
           timeout_minutes: 10
           max_attempts: 3
           command: |
-            az extension add --name aks-preview
+            az extension add --allow-preview true --name aks-preview
             az account set --subscription ${{ secrets.AZURE_SUBSCRIPTION }}
 
             AZURE_STORAGE_ACCOUNT="${{ github.run_number }}${{ env.E2E_SUFFIX }}"
@@ -938,7 +938,7 @@ jobs:
           timeout_minutes: 10
           max_attempts: 3
           command: |
-            az extension add --name aks-preview
+            az extension add --allow-preview true --name aks-preview
             az account set --subscription ${{ secrets.AZURE_SUBSCRIPTION }}
 
             # name of the AKS cluster
