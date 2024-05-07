@@ -344,7 +344,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 					cluster,
 					resources.instances.Items,
 					true,
-				); !result.IsZero() || err != nil {
+				); err != nil || !result.IsZero() {
 					return result, err
 				}
 			}
@@ -370,7 +370,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		cluster,
 		resources.instances.Items,
 		false,
-	); !result.IsZero() || err != nil {
+	); err != nil || !result.IsZero() {
 		return result, err
 	}
 

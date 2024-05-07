@@ -41,6 +41,9 @@ const (
 	// the hibernation status
 	HibernationConditionType = "cnpg.io/hibernation"
 
+	// HibernationFenceConditionType is used to keep track of programmatic fencing
+	HibernationFenceConditionType = "cnpg.io/HibernationFence"
+
 	// HibernationConditionReasonWrongAnnotationValue is the value of the hibernation
 	// condition that is used when the value of the annotation is not correct
 	HibernationConditionReasonWrongAnnotationValue = "WrongAnnotationValue"
@@ -86,7 +89,8 @@ func EnrichStatus(
 	podList []corev1.Pod,
 ) {
 	if !isHibernationEnabled(cluster) {
-		if cluster.IsInstanceFenced("*") {
+		cond := meta.FindStatusCondition(cluster.Status.Conditions, HibernationFenceConditionType)
+		if cond != nil && cluster.IsInstanceFenced(utils.FenceAllInstances) {
 			meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
 				Type:    HibernationConditionType,
 				Status:  metav1.ConditionTrue,
@@ -95,6 +99,7 @@ func EnrichStatus(
 			})
 			return
 		}
+		meta.RemoveStatusCondition(&cluster.Status.Conditions, HibernationFenceConditionType)
 		meta.RemoveStatusCondition(&cluster.Status.Conditions, HibernationConditionType)
 		return
 	}
@@ -123,6 +128,12 @@ func EnrichStatus(
 			Status:  metav1.ConditionFalse,
 			Reason:  HibernationConditionFencing,
 			Message: "Waiting for the cluster to be fenced",
+		})
+		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+			Type:    HibernationFenceConditionType,
+			Status:  metav1.ConditionTrue,
+			Reason:  HibernationConditionFencing,
+			Message: "Fencing was executed programmatically",
 		})
 		return
 	}
