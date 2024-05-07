@@ -247,7 +247,8 @@ func (env *TestingEnvironment) IsOperatorDeploymentReady() (bool, error) {
 		return false, err
 	}
 
-	if operatorDeployment.Status.ReadyReplicas != operatorDeployment.Status.Replicas {
+	if operatorDeployment.Spec.Replicas != nil &&
+		operatorDeployment.Status.ReadyReplicas != *operatorDeployment.Spec.Replicas {
 		return false, fmt.Errorf("deployment not ready %v of %v ready",
 			operatorDeployment.Status.ReadyReplicas, operatorDeployment.Status.ReadyReplicas)
 	}
