@@ -43,14 +43,10 @@ func (i *PostgresLifecycle) runPostgresAndWait(ctx context.Context) <-chan error
 		defer close(errChan)
 
 		var wg sync.WaitGroup
-		defer func() {
-			wg.Wait()
-		}()
+		defer wg.Wait()
 
 		postgresContext, postgresContextCancel := context.WithCancel(ctx)
-		defer func() {
-			postgresContextCancel()
-		}()
+		defer postgresContextCancel()
 
 		err := i.instance.VerifyPgDataCoherence(postgresContext)
 		if err != nil {
