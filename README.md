@@ -9,7 +9,7 @@ CloudNativePG was originally built and sponsored by [EDB](https://www.enterprise
 ## Table of content
 
 - [Code of conduct](CODE_OF_CONDUCT.md)
-- [Governance policies](GOVERNANCE.md)
+- [Governance policies](https://github.com/cloudnative-pg/governance/blob/main/GOVERNANCE.md)
 - [Contributing](CONTRIBUTING.md)
 - [License](LICENSE)
 
@@ -121,20 +121,6 @@ MariaDB cluster).
 - ["Why Run Postgres in Kubernetes?" by Gabriele Bartolini](https://cloudnativenow.com/kubecon-cnc-eu-2022/why-run-postgres-in-kubernetes/) (May 2022)
 - ["Shift-Left Security: The Path To PostgreSQL On Kubernetes" by Gabriele Bartolini](https://www.tfir.io/shift-left-security-the-path-to-postgresql-on-kubernetes/) (April 2021)
 - ["Local Persistent Volumes and PostgreSQL usage in Kubernetes" by Gabriele Bartolini](https://www.2ndquadrant.com/en/blog/local-persistent-volumes-and-postgresql-usage-in-kubernetes/) (June 2020)
-
-## Maintainers
-
-The current maintainers of the CloudNativePG project are:
-
-- Gabriele Bartolini (EDB)
-- Francesco Canovai (EDB)
-- Leonardo Cecchi (EDB)
-- Jonathan Gonzalez (EDB)
-- Marco Nenciarini (EDB)
-- Armando Ruocco (EDB)
-- Philippe Scorsolini (upbound)
-
-They are listed in the [CODEOWNERS](CODEOWNERS) file.
 
 ## Adopters
 
