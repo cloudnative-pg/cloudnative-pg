@@ -189,7 +189,8 @@ jobs:
     needs:
       - duplicate_runs
       - change-triage
-    if: needs.duplicate_runs.outputs.should_skip != 'true'
+    if: needs.duplicate_runs.outputs.should_skip != 'true' &&
+      needs.change-triage.outputs.go-code-changed == 'true'
     runs-on: ubuntu-22.04
     steps:
       - name: Run govulncheck
