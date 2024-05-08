@@ -121,16 +121,12 @@ the following lines to the profile of your shell (eg `~/.bash_profile` or
 
 **Warning**: for Apple Silicon macs, the new default location for homebrew
 is `/opt/homebrew`, not `/usr/local`. See [discussion](https://github.com/Homebrew/brew/issues/9177).
-Please choose the right definition of `HOMEBREW_PATH` for the following section:
-
-* Intel:  `export HOMEBREW_PATH="/usr/local"`
-* Apple Silicon: `export HOMEBREW_PATH="/opt/homebrew"`
 
 ``` bash
 # Go settings
 export GOPATH="${HOME}/go"
-# Substitute your HOMEBREW_PATH if necessary
-export HOMEBREW_PATH="/usr/local"
+# Autofill HOMEBREW_PATH
+export HOMEBREW_PATH=$(brew --prefix)
 # Homebrew settings
 export PATH="${HOMEBREW_PATH}/opt/gettext/bin:$PATH"
 export PATH="${HOMEBREW_PATH}/opt/coreutils/libexec/gnubin:$PATH"
