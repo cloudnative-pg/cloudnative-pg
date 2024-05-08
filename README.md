@@ -17,7 +17,7 @@ CloudNativePG was originally built and sponsored by [EDB](https://www.enterprise
 ## Table of content
 
 - [Code of conduct](CODE_OF_CONDUCT.md)
-- [Governance policies](GOVERNANCE.md)
+- [Governance policies](https://github.com/cloudnative-pg/governance/blob/main/GOVERNANCE.md)
 - [Contributing](CONTRIBUTING.md)
 - [Adopters](ADOPTERS.md)
 - [License](LICENSE)
@@ -127,20 +127,6 @@ MariaDB cluster).
 A list of publicly known users of the CloudNativePG operator is in [ADOPTERS.md](ADOPTERS.md).
 Help us grow our community and CloudNativePG by adding yourself and your
 organization to this list!
-
-## Maintainers
-
-The current maintainers of the CloudNativePG project are:
-
-- Gabriele Bartolini (EDB)
-- Francesco Canovai (EDB)
-- Leonardo Cecchi (EDB)
-- Jonathan Gonzalez (EDB)
-- Marco Nenciarini (EDB)
-- Armando Ruocco (EDB)
-- Philippe Scorsolini (Upbound)
-
-They are listed in the [CODEOWNERS](CODEOWNERS) file.
 
 ### CloudNativePG at KubeCon
 
