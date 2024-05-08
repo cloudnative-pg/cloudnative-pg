@@ -126,7 +126,7 @@ is `/opt/homebrew`, not `/usr/local`. See [discussion](https://github.com/Homebr
 # Go settings
 export GOPATH="${HOME}/go"
 # Autofill HOMEBREW_PATH
-export HOMEBREW_PATH=$(brew --prefix)
+HOMEBREW_PATH=$(brew --prefix)
 # Homebrew settings
 export PATH="${HOMEBREW_PATH}/opt/gettext/bin:$PATH"
 export PATH="${HOMEBREW_PATH}/opt/coreutils/libexec/gnubin:$PATH"
