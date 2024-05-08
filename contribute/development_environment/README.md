@@ -125,27 +125,27 @@ is `/opt/homebrew`, not `/usr/local`. See [discussion](https://github.com/Homebr
 ``` bash
 # Go settings
 export GOPATH="${HOME}/go"
-# Autofill HOMEBREW_PATH
-HOMEBREW_PATH=$(brew --prefix)
 # Homebrew settings
-export PATH="${HOMEBREW_PATH}/opt/gettext/bin:$PATH"
-export PATH="${HOMEBREW_PATH}/opt/coreutils/libexec/gnubin:$PATH"
-export PATH="${HOMEBREW_PATH}/opt/findutils/libexec/gnubin:$PATH"
-export PATH="${HOMEBREW_PATH}/opt/gnu-getopt/bin:$PATH"
-export PATH="${HOMEBREW_PATH}/opt/gnu-sed/libexec/gnubin:$PATH"
-export PATH="${HOMEBREW_PATH}/opt/gnu-tar/libexec/gnubin:$PATH"
-export MANPATH="${HOMEBREW_PATH}/opt/coreutils/libexec/gnuman:$MANPATH"
-export MANPATH="${HOMEBREW_PATH}/opt/findutils/libexec/gnuman:$MANPATH"
-export MANPATH="${HOMEBREW_PATH}/opt/gnu-getopt/share/man:$MANPATH"
-export MANPATH="${HOMEBREW_PATH}/opt/gnu-sed/libexec/gnuman:$MANPATH"
-export MANPATH="${HOMEBREW_PATH}/opt/gnu-tar/libexec/gnuman:$MANPATH"
-export LDFLAGS="-L${HOMEBREW_PATH}/opt/zlib/lib $LDFLAGS"
-export LDFLAGS="-L${HOMEBREW_PATH}/opt/gettext/lib $LDFLAGS"
-export LDFLAGS="-L${HOMEBREW_PATH}/opt/readline/lib $LDFLAGS"
-export CPPFLAGS="-I${HOMEBREW_PATH}/opt/zlib/include $CPPFLAGS"
-export CPPFLAGS="-I${HOMEBREW_PATH}/opt/gettext/include $CPPFLAGS"
-export CPPFLAGS="-I${HOMEBREW_PATH}/opt/readline/include $CPPFLAGS"
-export PKG_CONFIG_PATH="${HOMEBREW_PATH}/opt/readline/lib/pkgconfig"
+HOMEBREW_PREFIX=$(brew --prefix)
+export PATH="${HOMEBREW_PREFIX}/opt/gettext/bin:$PATH"
+export PATH="${HOMEBREW_PREFIX}/opt/coreutils/libexec/gnubin:$PATH"
+export PATH="${HOMEBREW_PREFIX}/opt/findutils/libexec/gnubin:$PATH"
+export PATH="${HOMEBREW_PREFIX}/opt/gnu-getopt/bin:$PATH"
+export PATH="${HOMEBREW_PREFIX}/opt/gnu-sed/libexec/gnubin:$PATH"
+export PATH="${HOMEBREW_PREFIX}/opt/gnu-tar/libexec/gnubin:$PATH"
+export MANPATH="${HOMEBREW_PREFIX}/opt/coreutils/libexec/gnuman:$MANPATH"
+export MANPATH="${HOMEBREW_PREFIX}/opt/findutils/libexec/gnuman:$MANPATH"
+export MANPATH="${HOMEBREW_PREFIX}/opt/gnu-getopt/share/man:$MANPATH"
+export MANPATH="${HOMEBREW_PREFIX}/opt/gnu-sed/libexec/gnuman:$MANPATH"
+export MANPATH="${HOMEBREW_PREFIX}/opt/gnu-tar/libexec/gnuman:$MANPATH"
+export LDFLAGS="-L${HOMEBREW_PREFIX}/opt/zlib/lib $LDFLAGS"
+export LDFLAGS="-L${HOMEBREW_PREFIX}/opt/gettext/lib $LDFLAGS"
+export LDFLAGS="-L${HOMEBREW_PREFIX}/opt/readline/lib $LDFLAGS"
+export CPPFLAGS="-I${HOMEBREW_PREFIX}/opt/zlib/include $CPPFLAGS"
+export CPPFLAGS="-I${HOMEBREW_PREFIX}/opt/gettext/include $CPPFLAGS"
+export CPPFLAGS="-I${HOMEBREW_PREFIX}/opt/readline/include $CPPFLAGS"
+export PKG_CONFIG_PATH="${HOMEBREW_PREFIX}/opt/readline/lib/pkgconfig"
+unset HOMEBREW_PREFIX
 # GPGv2 backward compatibility
 export GPG_AGENT_INFO=~/.gnupg/S.gpg-agent::1
 export GPG_TTY=$(tty)
