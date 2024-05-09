@@ -209,7 +209,7 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(ctx context.Context
 			"currentPrimary", cluster.Status.CurrentPrimary)
 
 		// Wait for the new primary to really accept connections
-		err := r.instance.WaitForPrimaryAvailable()
+		err := r.instance.WaitForPrimaryAvailable(ctx)
 		if err != nil {
 			return err
 		}
@@ -250,7 +250,7 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(ctx context.Context
 			// pg_rewind requires a clean shutdown of the old primary to work.
 			// The only way to do that is to start the server again
 			// and wait for it to be available again.
-			err = r.instance.CompleteCrashRecovery()
+			err = r.instance.CompleteCrashRecovery(ctx)
 			if err != nil {
 				return err
 			}
