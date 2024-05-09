@@ -49,7 +49,7 @@ func (i *PostgresLifecycle) runPostgresAndWait(ctx context.Context) <-chan error
 		// is ready to accept connection.
 		//
 		// This wait group ensures this goroutine to be finished when
-		// this funcion exits
+		// this function exits
 		var wg sync.WaitGroup
 		defer wg.Wait()
 
@@ -81,8 +81,8 @@ func (i *PostgresLifecycle) runPostgresAndWait(ctx context.Context) <-chan error
 		// following will be a no-op.
 		i.systemInitialization.Wait()
 
-		// The lifecycle loop will call us even when PostgreSQL is fenced. In
-		// that case there's no need to proceed.
+		// The lifecycle loop will call us even when PostgreSQL is fenced.
+		// In that case there's no need to proceed.
 		if i.instance.IsFenced() {
 			contextLogger.Info("Instance is fenced, won't start postgres right now")
 			return
