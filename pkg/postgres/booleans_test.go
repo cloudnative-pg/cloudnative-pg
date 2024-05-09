@@ -21,17 +21,29 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = DescribeTable("PostgreSQL booleans parsing",
-	func(input string, expectedPositive, expectedNegative bool) {
-		Expect(IsTrue(input)).To(Equal(expectedPositive))
-		Expect(IsFalse(input)).To(Equal(expectedNegative))
+var _ = DescribeTable("Moar PostgreSQL booleans parsing",
+	func(input string, expectedValue, expectError bool) {
+		value, err := ParsePostgresBoolean(input)
+		if expectError {
+			Expect(err).Should(HaveOccurred())
+		} else {
+			Expect(err).ShouldNot(HaveOccurred())
+		}
+		Expect(value).To(Equal(expectedValue))
 	},
-	Entry("foo", "foo", false, false),
+	Entry("foo", "foo", false, true),
 	Entry("on", "on", true, false),
 	Entry("ON", "ON", true, false),
-	Entry("off", "off", false, true),
+	Entry("off", "off", false, false),
 	Entry("true", "true", true, false),
-	Entry("false", "false", false, true),
-	Entry("0", "0", false, true),
+	Entry("false", "false", false, false),
+	Entry("0", "0", false, false),
 	Entry("1", "1", true, false),
+	Entry("n", "n", false, false),
+	Entry("y", "y", true, false),
+	Entry("t", "t", true, false),
+	Entry("f", "f", false, false),
+	Entry("ye", "ye", true, false),
+	Entry("tr", "tr", true, false),
+	Entry("fa", "fa", false, false),
 )
