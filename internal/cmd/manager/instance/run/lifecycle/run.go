@@ -39,26 +39,50 @@ func (i *PostgresLifecycle) runPostgresAndWait(ctx context.Context) <-chan error
 	contextLogger := log.FromContext(ctx)
 	errChan := make(chan error, 1)
 
+	// The following goroutine runs the postmaster process, and stops
+	// when the process exits.
 	go func() {
 		defer close(errChan)
 
+		// Meanwhile PostgreSQL is starting, we'll start a goroutine
+		// that will configure its permission once the database system
+		// is ready to accept connection.
+		//
+		// This wait group ensures this goroutine to be finished when
+		// this funcion exits
 		var wg sync.WaitGroup
 		defer wg.Wait()
 
+		// We're creating a new Context for PostgreSQL, that will be cancelled
+		// as soon as the postmaster exits.
+		// The cancellation of this context will trigger the termination
+		// of the goroutine initialization function.
 		postgresContext, postgresContextCancel := context.WithCancel(ctx)
 		defer postgresContextCancel()
 
+		// Before starting the postmaster, we ensure we've the correct
+		// permissions and user maps to start it.
 		err := i.instance.VerifyPgDataCoherence(postgresContext)
 		if err != nil {
 			errChan <- err
 			return
 		}
 
-		// here we need to wait for initialization to be executed before
-		// being able to start the instance
+		// Here we need to wait for initialization to be executed before
+		// being able to start the instance. Once this is done, we've executed
+		// the first part of the instance reconciliation loop that don't need
+		// a postmaster to be ready.
+		// That part of the reconciliation loop ensures the PGDATA contains
+		// the correct signal files to start in the correct replication role,
+		// being a primary or a replica.
+		//
+		// If we come here because PostgreSQL have been restarted or because
+		// fencing was lifted, this condition will be already met and the
+		// following will be a no-op.
 		i.systemInitialization.Wait()
 
-		// if the instance is marked as fenced we don't need to start it at all
+		// The lifecycle loop will call us even when PostgreSQL is fenced. In
+		// that case there's no need to proceed.
 		if i.instance.IsFenced() {
 			contextLogger.Info("Instance is fenced, won't start postgres right now")
 			return
@@ -74,7 +98,8 @@ func (i *PostgresLifecycle) runPostgresAndWait(ctx context.Context) <-chan error
 			return
 		}
 
-		// once the database will be up we'll connect and setup everything required
+		// Now we'll wait for PostgreSQL to accept connections, and setup everything required
+		// for replication and pg_rewind to work correctly.
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -85,7 +110,8 @@ func (i *PostgresLifecycle) runPostgresAndWait(ctx context.Context) <-chan error
 			}
 		}()
 
-		// from now on the instance can be considered ready
+		// From now on the instance can be checked for readiness. This is
+		// used from the readiness probe to avoid testing PostgreSQL.
 		i.instance.SetCanCheckReadiness(true)
 		defer i.instance.SetCanCheckReadiness(false)
 
