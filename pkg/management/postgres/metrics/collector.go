@@ -22,11 +22,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"github.com/blang/semver"
-	"github.com/prometheus/client_golang/prometheus"
 	"path"
 	"regexp"
-	"strings"
+
+	"github.com/blang/semver"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
@@ -390,8 +390,7 @@ func (c QueryCollector) collect(conn *sql.DB, ch chan<- prometheus.Metric) error
 // isCollectable checks if a query to collect metrics can be executed or not.
 // The method tests the query provided in the PredicateQuery property within the same transaction
 // used to collect metrics.
-// Accepts any kind of query and evaluates the value (against a type check) of the first column of the first row.
-// Supported types are: bool, int64, string["t", "true"]
+// Accepts a query that returns a boolean on the first column of the first row.
 func (c QueryCollector) isCollectable(tx *sql.Tx) (bool, error) {
 	if c.userQuery.PredicateQuery == "" {
 		return true, nil
@@ -426,25 +425,25 @@ func (c QueryCollector) isCollectable(tx *sql.Tx) (bool, error) {
 	if err = rows.Scan(scanArgs...); err != nil {
 		return false, err
 	}
+	if err = rows.Err(); err != nil {
+		log.Warning("Error while loading predicate evaluation",
+			"err", err.Error())
+		return false, nil
+	}
 
 	if len(columnData) == 0 || columnData[0] == nil {
 		return false, nil
 	}
 
-	switch data := columnData[0].(type) {
-	case bool:
-		return data, nil
-	case int64:
-		return data > 0, nil
-	case string:
-		lower := strings.ToLower(data)
-		return lower == "t" || lower == "true", nil
-	default:
+	result, ok := columnData[0].(bool)
+	if !ok {
 		log.Warning("Unsupported column type",
 			"predicate_query", c.userQuery.PredicateQuery,
-			"type", fmt.Sprintf("%T", data))
+			"type", fmt.Sprintf("%T", result))
 		return false, nil
 	}
+
+	return result, nil
 }
 
 // Collect the list of labels from the database, and returns true if the
