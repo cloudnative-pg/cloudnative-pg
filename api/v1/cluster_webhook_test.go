@@ -1396,7 +1396,7 @@ var _ = Describe("configuration change validation", func() {
 					Instances: 3,
 					PostgresConfiguration: PostgresConfiguration{
 						Parameters: map[string]string{
-							"wal_log_hints": "on",
+							"wal_log_hints": "true",
 						},
 					},
 				},
@@ -3629,7 +3629,7 @@ var _ = Describe("Managed Extensions validation", func() {
 			Spec: ClusterSpec{
 				PostgresConfiguration: PostgresConfiguration{
 					Parameters: map[string]string{
-						"hot_standby_feedback":                     "on",
+						"hot_standby_feedback":                     "yes",
 						"pg_failover_slots.synchronize_slot_names": "my_slot",
 					},
 				},

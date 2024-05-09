@@ -1146,7 +1146,8 @@ func (r *Cluster) validateConfiguration() field.ErrorList {
 	}
 
 	walLevel := postgres.WalLevelValue(sanitizedParameters[postgres.ParameterWalLevel])
-	hasWalLevelRequirement := r.Spec.Instances > 1 || sanitizedParameters[postgres.ParameterArchiveMode] != "off" ||
+	hasWalLevelRequirement := r.Spec.Instances > 1 ||
+		!postgres.IsFalse(sanitizedParameters[postgres.ParameterArchiveMode]) ||
 		r.IsReplica()
 	if !walLevel.IsKnownValue() {
 		result = append(
@@ -1195,7 +1196,8 @@ func (r *Cluster) validateConfiguration() field.ErrorList {
 		}
 	}
 
-	if r.Spec.Instances > 1 && r.Spec.PostgresConfiguration.Parameters[postgres.ParameterWalLogHints] == "off" {
+	if r.Spec.Instances > 1 &&
+		postgres.IsFalse(r.Spec.PostgresConfiguration.Parameters[postgres.ParameterWalLogHints]) {
 		result = append(
 			result,
 			field.Invalid(
@@ -2399,7 +2401,8 @@ func (r *Cluster) validatePgFailoverSlots() field.ErrorList {
 	const hotStandbyFeedbackKey = "hot_standby_feedback"
 	hotStandbyFeedback, hasHotStandbyFeedback := r.Spec.PostgresConfiguration.Parameters[hotStandbyFeedbackKey]
 
-	if !hasHotStandbyFeedback || hotStandbyFeedback != "on" {
+	if !hasHotStandbyFeedback ||
+		!postgres.IsTrue(hotStandbyFeedback) {
 		result = append(
 			result,
 			field.Invalid(
