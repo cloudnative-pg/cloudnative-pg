@@ -954,7 +954,7 @@ func (r *InstanceReconciler) reconcileCheckWalArchiveFile(cluster *apiv1.Cluster
 func (r *InstanceReconciler) processConfigReloadAndManageRestart(ctx context.Context, cluster *apiv1.Cluster) error {
 	contextLogger := log.FromContext(ctx)
 
-	status, err := r.instance.WaitForConfigReload()
+	status, err := r.instance.WaitForConfigReload(ctx)
 	if err != nil {
 		return err
 	}
