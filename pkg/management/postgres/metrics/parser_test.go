@@ -47,6 +47,8 @@ var _ = Describe("Metrics parser", func() {
 some_query:
   query: |
     SELECT current_database() as datname, count(*) as rows FROM some_table
+  predicate_query: |
+    SELECT 1 as row FROM some_table WHERE some filters
   cache_seconds: 100
   metrics:
   - datname:
@@ -67,6 +69,8 @@ some_query:
 
 		Expect(result["some_query"].Query).To(Equal("SELECT current_database() as datname, count(*)" +
 			" as rows FROM some_table\n"))
+		Expect(result["some_query"].PredicateQuery).To(Equal("SELECT 1 as row" +
+			" FROM some_table WHERE some filters\n"))
 		Expect(result["some_query"].Primary).To(BeFalse())
 		Expect(result["some_query"].TargetDatabases).To(ContainElements("test", "app"))
 		Expect(result["some_query"].CacheSeconds).To(BeEquivalentTo(100))

@@ -22,11 +22,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"path"
-	"regexp"
-
 	"github.com/blang/semver"
 	"github.com/prometheus/client_golang/prometheus"
+	"path"
+	"regexp"
+	"strings"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
@@ -330,6 +330,15 @@ func (c QueryCollector) collect(conn *sql.DB, ch chan<- prometheus.Metric) error
 		}
 	}()
 
+	isCollectable, err := c.isCollectable(tx)
+	if err != nil {
+		return err
+	}
+
+	if !isCollectable {
+		return nil
+	}
+
 	rows, err := tx.Query(c.userQuery.Query)
 	if err != nil {
 		return err
@@ -376,6 +385,66 @@ func (c QueryCollector) collect(conn *sql.DB, ch chan<- prometheus.Metric) error
 		return err
 	}
 	return nil
+}
+
+// isCollectable checks if a query to collect metrics can be executed or not.
+// The method tests the query provided in the PredicateQuery property within the same transaction
+// used to collect metrics.
+// Accepts any kind of query and evaluates the value (against a type check) of the first column of the first row.
+// Supported types are: bool, int64, string["t", "true"]
+func (c QueryCollector) isCollectable(tx *sql.Tx) (bool, error) {
+	if c.userQuery.PredicateQuery == "" {
+		return true, nil
+	}
+
+	rows, err := tx.Query(c.userQuery.PredicateQuery)
+	if err != nil {
+		return false, err
+	}
+
+	defer func() {
+		if err = rows.Close(); err != nil {
+			log.Warning("Error while closing predicate evaluation",
+				"err", err.Error())
+		}
+	}()
+
+	columns, err := rows.Columns()
+	if err != nil {
+		return false, err
+	}
+
+	columnData := make([]interface{}, len(columns))
+	scanArgs := make([]interface{}, len(columns))
+	for i := range columnData {
+		scanArgs[i] = &columnData[i]
+	}
+
+	if !rows.Next() {
+		return false, nil
+	}
+	if err = rows.Scan(scanArgs...); err != nil {
+		return false, err
+	}
+
+	if len(columnData) == 0 || columnData[0] == nil {
+		return false, nil
+	}
+
+	switch data := columnData[0].(type) {
+	case bool:
+		return data, nil
+	case int64:
+		return data > 0, nil
+	case string:
+		lower := strings.ToLower(data)
+		return lower == "t" || lower == "true", nil
+	default:
+		log.Warning("Unsupported column type",
+			"predicate_query", c.userQuery.PredicateQuery,
+			"type", fmt.Sprintf("%T", data))
+		return false, nil
+	}
 }
 
 // Collect the list of labels from the database, and returns true if the

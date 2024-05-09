@@ -29,6 +29,7 @@ type UserQueries map[string]UserQuery
 // UserQuery represent a query created by the user
 type UserQuery struct {
 	Query           string    `yaml:"query"`
+	PredicateQuery  string    `yaml:"predicate_query"`
 	Metrics         []Mapping `yaml:"metrics"`
 	Master          bool      `yaml:"master"` // wokeignore:rule=master
 	Primary         bool      `yaml:"primary"`

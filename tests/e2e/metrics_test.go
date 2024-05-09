@@ -36,15 +36,16 @@ import (
 
 var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 	const (
-		targetDBOne                    = "test"
-		targetDBTwo                    = "test1"
-		targetDBSecret                 = "secret_test"
-		testTableName                  = "test_table"
-		clusterMetricsFile             = fixturesDir + "/metrics/cluster-metrics.yaml.template"
-		clusterMetricsDBFile           = fixturesDir + "/metrics/cluster-metrics-with-target-databases.yaml.template"
-		customQueriesSampleFile        = fixturesDir + "/metrics/custom-queries-with-target-databases.yaml"
-		defaultMonitoringConfigMapName = "cnpg-default-monitoring"
-		level                          = tests.Low
+		targetDBOne                      = "test"
+		targetDBTwo                      = "test1"
+		targetDBSecret                   = "secret_test"
+		testTableName                    = "test_table"
+		clusterMetricsFile               = fixturesDir + "/metrics/cluster-metrics.yaml.template"
+		clusterMetricsDBFile             = fixturesDir + "/metrics/cluster-metrics-with-target-databases.yaml.template"
+		clusterMetricsPredicateQueryFile = fixturesDir + "/metrics/cluster-metrics-with-predicate-query.yaml.template"
+		customQueriesSampleFile          = fixturesDir + "/metrics/custom-queries-with-target-databases.yaml"
+		defaultMonitoringConfigMapName   = "cnpg-default-monitoring"
+		level                            = tests.Low
 	)
 
 	buildExpectedMetrics := func(cluster *apiv1.Cluster, isReplicaPod bool) map[string]*regexp.Regexp {
@@ -207,6 +208,56 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 		})
 
 		collectAndAssertDefaultMetricsPresentOnEachPod(namespace, metricsClusterName, curlPodName, true)
+	})
+
+	It("can gather metrics according with predicate query", func() {
+		// Create the cluster namespace
+		const namespacePrefix = "predicate-query-metrics-e2e"
+		metricsClusterName, err = env.GetResourceNameFromYAML(clusterMetricsPredicateQueryFile)
+		Expect(err).ToNot(HaveOccurred())
+		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+		Expect(err).ToNot(HaveOccurred())
+		DeferCleanup(func() error {
+			return env.DeleteNamespace(namespace)
+		})
+
+		AssertCustomMetricsResourcesExist(namespace, fixturesDir+"/metrics/custom-queries-with-predicate-query.yaml", 1, 0)
+
+		// Create the curl client pod and wait for it to be ready.
+		By("setting up curl client pod", func() {
+			curlClient := utils.CurlClient(namespace)
+			err := utils.PodCreateAndWaitForReady(env, &curlClient, 240)
+			Expect(err).ToNot(HaveOccurred())
+			curlPodName = curlClient.GetName()
+		})
+
+		// Create the cluster
+		AssertCreateCluster(namespace, metricsClusterName, clusterMetricsPredicateQueryFile, env)
+
+		By("ensuring metrics with positive predicate are collected", func() {
+			podList, err := env.GetClusterPodList(namespace, metricsClusterName)
+			Expect(err).ToNot(HaveOccurred())
+
+			// We expect only the metrics that have a predicate_query valid.
+			expectedMetrics := map[string]*regexp.Regexp{
+				"cnpg_pg_predicate_query_return_true_fixed":                                           regexp.MustCompile(`42`),
+				"cnpg_pg_predicate_query_return_one_as_true_fixed":                                    regexp.MustCompile(`42`),
+				"cnpg_pg_predicate_query_return_one_as_true_and_multiple_columns_fixed":               regexp.MustCompile(`42`),
+				"cnpg_pg_predicate_query_return_one_as_true_and_multiple_rows_fixed":                  regexp.MustCompile(`42`),
+				"cnpg_pg_predicate_query_return_one_as_true_and_multiple_columns_multiple_rows_fixed": regexp.MustCompile(`42`),
+				"cnpg_pg_predicate_query_return_t_as_true_fixed":                                      regexp.MustCompile(`42`),
+				"cnpg_pg_predicate_query_return_True_as_true_fixed":                                   regexp.MustCompile(`42`),
+			}
+
+			// Gather metrics in each pod
+			for _, pod := range podList.Items {
+				By(fmt.Sprintf("checking metrics for pod: %s", pod.Name), func() {
+					out, err := utils.CurlGetMetrics(namespace, curlPodName, pod.Status.PodIP, 9187)
+					Expect(err).ToNot(HaveOccurred(), "while getting pod metrics")
+					assertMetrics(out, expectedMetrics)
+				})
+			}
+		})
 	})
 
 	It("default set of metrics queries should not be injected into the cluster "+

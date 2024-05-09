@@ -1,0 +1,129 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: monitoring-01
+  labels:
+    e2e: metrics
+data:
+  queries.yaml: |
+    pg_predicate_query_return_true:
+      query: "SELECT 42 as fixed"
+      predicate_query: "SELECT true as result"
+      primary: false
+      metrics:
+        - fixed:
+            usage: "GAUGE"
+            description: "Always 42, used to test predicate_query"
+    pg_predicate_query_return_false:
+      query: "SELECT 42 as fixed"
+      predicate_query: "SELECT false as result"
+      primary: false
+      metrics:
+        - fixed:
+            usage: "GAUGE"
+            description: "Always 42, used to test predicate_query"
+    pg_predicate_query_return_one_as_true:
+      query: "SELECT 42 as fixed"
+      predicate_query: "SELECT 1 as result"
+      primary: false
+      metrics:
+        - fixed:
+            usage: "GAUGE"
+            description: "Always 42, used to test predicate_query"
+    pg_predicate_query_return_zero_as_false:
+      query: "SELECT 42 as fixed"
+      predicate_query: "SELECT 0 as result"
+      primary: false
+      metrics:
+        - fixed:
+            usage: "GAUGE"
+            description: "Always 42, used to test predicate_query"
+    pg_predicate_query_return_null_as_false:
+      query: "SELECT 42 as fixed"
+      predicate_query: "SELECT null as result"
+      primary: false
+      metrics:
+        - fixed:
+            usage: "GAUGE"
+            description: "Always 42, used to test predicate_query"        
+    pg_predicate_query_return_no_rows:
+      query: "SELECT 42 as fixed"
+      predicate_query: "SELECT 1 as result WHERE 1 <> 1"
+      primary: false
+      metrics:
+        - fixed:
+            usage: "GAUGE"
+            description: "Always 42, used to test predicate_query"
+    pg_predicate_query_return_one_as_true_and_multiple_columns:
+      query: "SELECT 42 as fixed"
+      predicate_query: "SELECT 1 as result, 0 as column_one, 'something' as column_two"
+      primary: false
+      metrics:
+        - fixed:
+            usage: "GAUGE"
+            description: "Always 42, used to test predicate_query"
+    pg_predicate_query_return_one_as_false_and_multiple_columns:
+      query: "SELECT 42 as fixed"
+      predicate_query: "SELECT 0 as result, 0 as column_one, 'something' as column_two"
+      primary: false
+      metrics:
+        - fixed:
+            usage: "GAUGE"
+            description: "Always 42, used to test predicate_query"
+    pg_predicate_query_return_one_as_true_and_multiple_rows:
+      query: "SELECT 42 as fixed"
+      predicate_query: "SELECT 1 as result UNION SELECT 2 as result UNION SELECT 3 as result"
+      primary: false
+      metrics:
+        - fixed:
+            usage: "GAUGE"
+            description: "Always 42, used to test predicate_query"
+    pg_predicate_query_return_zero_as_false_and_multiple_rows:
+      query: "SELECT 42 as fixed"
+      predicate_query: "SELECT 0 as result UNION SELECT 1 as result UNION SELECT 3 as result"
+      primary: false
+      metrics:
+        - fixed:
+            usage: "GAUGE"
+            description: "Always 42, used to test predicate_query"
+    pg_predicate_query_return_one_as_true_and_multiple_columns_multiple_rows:
+        query: "SELECT 42 as fixed"
+        predicate_query: "SELECT 1 as result, 0 as column_one, 'something' as column_two UNION SELECT 2 as result, 0 as column_one, 'something' as column_two"
+        primary: false
+        metrics:
+            - fixed:
+                  usage: "GAUGE"
+                  description: "Always 42, used to test predicate_query"
+    pg_predicate_query_return_zero_as_false_and_multiple_columns_multiple_rows:
+        query: "SELECT 42 as fixed"
+        predicate_query: "SELECT 0 as result, 0 as column_one, 'something' as column_two UNION SELECT 1 as result, 0 as column_one, 'something' as column_two"
+        primary: false
+        metrics:
+            - fixed:
+                  usage: "GAUGE"
+                  description: "Always 42, used to test predicate_query"
+    pg_predicate_query_return_t_as_true:
+        query: "SELECT 42 as fixed"
+        predicate_query: "SELECT 't' as result"
+        primary: false
+        metrics:
+            - fixed:
+                  usage: "GAUGE"
+                  description: "Always 42, used to test predicate_query"
+    pg_predicate_query_return_True_as_true:
+        query: "SELECT 42 as fixed"
+        predicate_query: "SELECT 'True' as result"
+        primary: false
+        metrics:
+            - fixed:
+                  usage: "GAUGE"
+                  description: "Always 42, used to test predicate_query"
+    pg_predicate_query_return_whatever_as_false:
+        query: "SELECT 42 as fixed"
+        predicate_query: "SELECT 'Whatever' as result"
+        primary: false
+        metrics:
+            - fixed:
+                  usage: "GAUGE"
+                  description: "Always 42, used to test predicate_query"
