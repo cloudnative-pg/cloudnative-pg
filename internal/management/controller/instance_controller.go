@@ -171,8 +171,8 @@ func (r *InstanceReconciler) Reconcile(
 		return reconcile.Result{RequeueAfter: time.Second}, nil
 	}
 
-	// If the instance is promoted, it will not automatically load the changed configuration files
-	// so promoted should not stop the instance reload requires
+	// Instance promotion will not automatically load the changed configuration files.
+	// Therefore it should not be counted as "a restart" to prevent instance restart.
 	if _, err := r.reconcilePrimary(ctx, cluster); err != nil {
 		return reconcile.Result{}, err
 	}
