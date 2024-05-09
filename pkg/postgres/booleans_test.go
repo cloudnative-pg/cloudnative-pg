@@ -26,12 +26,12 @@ var _ = DescribeTable("PostgreSQL booleans parsing",
 		Expect(IsTrue(input)).To(Equal(expectedPositive))
 		Expect(IsFalse(input)).To(Equal(expectedNegative))
 	},
+	Entry("foo", "foo", false, false),
 	Entry("on", "on", true, false),
-	Entry("oN", "oN", true, false),
+	Entry("ON", "ON", true, false),
 	Entry("off", "off", false, true),
 	Entry("true", "true", true, false),
 	Entry("false", "false", false, true),
 	Entry("0", "0", false, true),
 	Entry("1", "1", true, false),
-	Entry("foo", "foo", false, false),
 )
