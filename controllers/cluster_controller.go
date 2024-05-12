@@ -620,11 +620,7 @@ func (r *ClusterReconciler) deleteEvictedOrUnscheduledInstances(
 	for idx := range resources.instances.Items {
 		instance := &resources.instances.Items[idx]
 
-		// we process unscheduled pod only if we are in IsNodeMaintenanceWindow, and we can delete the PVC Group
-		// This will be better handled in a next patch
-		if !utils.IsPodEvicted(instance) && !(utils.IsPodUnscheduled(instance) &&
-			cluster.IsNodeMaintenanceWindowInProgress() &&
-			!cluster.IsReusePVCEnabled()) {
+		if !utils.IsPodEvicted(instance) && !utils.IsPodUnscheduled(instance) {
 			continue
 		}
 		contextLogger.Warning("Deleting evicted/unscheduled pod",
@@ -643,6 +639,11 @@ func (r *ClusterReconciler) deleteEvictedOrUnscheduledInstances(
 			"Deleted evicted/unscheduled Pod %v",
 			instance.Name)
 
+		// we never delete the PVCs of unscheduled pods
+		if utils.IsPodUnscheduled(instance) {
+			continue
+		}
+
 		// we never delete the pvc unless we are in node Maintenance Window and the Reuse PVC is false
 		if !cluster.IsNodeMaintenanceWindowInProgress() || cluster.IsReusePVCEnabled() {
 			continue
@@ -658,7 +659,7 @@ func (r *ClusterReconciler) deleteEvictedOrUnscheduledInstances(
 			return nil, err
 		}
 		r.Recorder.Eventf(cluster, "Normal", "DeletePVCs",
-			"Deleted evicted/unscheduled Pod %v PVCs",
+			"Deleted evicted Pod %v PVCs",
 			instance.Name)
 	}
 
