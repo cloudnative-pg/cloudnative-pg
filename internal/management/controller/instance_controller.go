@@ -172,7 +172,7 @@ func (r *InstanceReconciler) Reconcile(
 	}
 
 	// Instance promotion will not automatically load the changed configuration files.
-	// Therefore it should not be counted as "a restart" to prevent instance restart.
+	// Therefore it should not be counted as "a restart".
 	if err := r.reconcilePrimary(ctx, cluster); err != nil {
 		return reconcile.Result{}, err
 	}
