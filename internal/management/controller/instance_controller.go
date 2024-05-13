@@ -173,7 +173,7 @@ func (r *InstanceReconciler) Reconcile(
 
 	// Instance promotion will not automatically load the changed configuration files.
 	// Therefore it should not be counted as "a restart" to prevent instance restart.
-	if _, err := r.reconcilePrimary(ctx, cluster); err != nil {
+	if err := r.reconcilePrimary(ctx, cluster); err != nil {
 		return reconcile.Result{}, err
 	}
 
@@ -1103,24 +1103,23 @@ func (r *InstanceReconciler) refreshFileFromSecret(
 }
 
 // Reconciler primary logic. DB needed.
-func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv1.Cluster) (promoted bool, err error) {
+func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv1.Cluster) error {
 	if cluster.Status.TargetPrimary != r.instance.PodName || cluster.IsReplica() {
-		return false, nil
+		return nil
 	}
 
 	oldCluster := cluster.DeepCopy()
 	isPrimary, err := r.instance.IsPrimary()
 	if err != nil {
-		return false, err
+		return err
 	}
 
 	// If I'm not the primary, let's promote myself
 	if !isPrimary {
 		cluster.LogTimestampsWithMessage(ctx, "Setting myself as primary")
 		if err := r.handlePromotion(ctx, cluster); err != nil {
-			return false, err
+			return err
 		}
-		promoted = true
 	}
 
 	// if the currentPrimary doesn't match the PodName we set the correct value.
@@ -1129,19 +1128,17 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 		cluster.Status.CurrentPrimaryTimestamp = pkgUtils.GetCurrentTimestamp()
 
 		if err := r.client.Status().Patch(ctx, cluster, client.MergeFrom(oldCluster)); err != nil {
-			return promoted, err
+			return err
 		}
 
 		if err := r.instance.DropConnections(); err != nil {
-			return promoted, err
+			return err
 		}
-
 		cluster.LogTimestampsWithMessage(ctx, "Finished setting myself as primary")
-		return promoted, nil
 	}
 
 	// If it is already the current primary, everything is ok
-	return promoted, nil
+	return nil
 }
 
 func (r *InstanceReconciler) handlePromotion(ctx context.Context, cluster *apiv1.Cluster) error {
