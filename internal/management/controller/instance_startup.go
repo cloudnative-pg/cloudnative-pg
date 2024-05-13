@@ -65,11 +65,15 @@ func (r *InstanceReconciler) refreshServerCertificateFiles(ctx context.Context, 
 		&secret,
 		postgresSpec.ServerCertificateLocation,
 		postgresSpec.ServerKeyLocation)
-	if !changed || err != nil {
+	if err != nil {
 		return changed, err
 	}
 
-	return changed, r.refreshInstanceCertificateFromSecret(&secret)
+	if r.instance.ServerCertificate == nil || changed {
+		return changed, r.refreshInstanceCertificateFromSecret(&secret)
+	}
+
+	return changed, nil
 }
 
 // refreshReplicationUserCertificate gets the latest replication certificates from the
