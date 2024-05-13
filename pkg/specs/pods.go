@@ -159,6 +159,7 @@ func CreateClusterPodSpec(
 	cluster apiv1.Cluster,
 	envConfig EnvConfig,
 	gracePeriod int64,
+	enableHTTPS bool,
 ) corev1.PodSpec {
 	return corev1.PodSpec{
 		Hostname: podName,
@@ -166,7 +167,7 @@ func CreateClusterPodSpec(
 			createBootstrapContainer(cluster),
 		},
 		SchedulerName: cluster.Spec.SchedulerName,
-		Containers:    createPostgresContainers(cluster, envConfig),
+		Containers:    createPostgresContainers(cluster, envConfig, enableHTTPS),
 		Volumes:       createPostgresVolumes(&cluster, podName),
 		SecurityContext: CreatePodSecurityContext(
 			cluster.GetSeccompProfile(),
@@ -183,7 +184,7 @@ func CreateClusterPodSpec(
 
 // createPostgresContainers create the PostgreSQL containers that are
 // used for every instance
-func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig) []corev1.Container {
+func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig, enableHTTPS bool) []corev1.Container {
 	containers := []corev1.Container{
 		{
 			Name:            PostgresContainerName,
@@ -198,9 +199,8 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig) []core
 				TimeoutSeconds:   5,
 				ProbeHandler: corev1.ProbeHandler{
 					HTTPGet: &corev1.HTTPGetAction{
-						Scheme: corev1.URISchemeHTTPS,
-						Path:   url.PathHealth,
-						Port:   intstr.FromInt32(int32(url.StatusPort)),
+						Path: url.PathHealth,
+						Port: intstr.FromInt32(int32(url.StatusPort)),
 					},
 				},
 			},
@@ -209,9 +209,8 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig) []core
 				PeriodSeconds:  ReadinessProbePeriod,
 				ProbeHandler: corev1.ProbeHandler{
 					HTTPGet: &corev1.HTTPGetAction{
-						Scheme: corev1.URISchemeHTTPS,
-						Path:   url.PathReady,
-						Port:   intstr.FromInt32(int32(url.StatusPort)),
+						Path: url.PathReady,
+						Port: intstr.FromInt32(int32(url.StatusPort)),
 					},
 				},
 			},
@@ -220,9 +219,8 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig) []core
 				TimeoutSeconds: 5,
 				ProbeHandler: corev1.ProbeHandler{
 					HTTPGet: &corev1.HTTPGetAction{
-						Scheme: corev1.URISchemeHTTPS,
-						Path:   url.PathHealth,
-						Port:   intstr.FromInt32(int32(url.StatusPort)),
+						Path: url.PathHealth,
+						Port: intstr.FromInt32(int32(url.StatusPort)),
 					},
 				},
 			},
@@ -230,7 +228,6 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig) []core
 				"/controller/manager",
 				"instance",
 				"run",
-				"--tls-status",
 			},
 			Resources: cluster.Spec.Resources,
 			Ports: []corev1.ContainerPort{
@@ -252,6 +249,13 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig) []core
 			},
 			SecurityContext: CreateContainerSecurityContext(cluster.GetSeccompProfile()),
 		},
+	}
+
+	if enableHTTPS {
+		containers[0].StartupProbe.ProbeHandler.HTTPGet.Scheme = corev1.URISchemeHTTPS
+		containers[0].LivenessProbe.ProbeHandler.HTTPGet.Scheme = corev1.URISchemeHTTPS
+		containers[0].ReadinessProbe.ProbeHandler.HTTPGet.Scheme = corev1.URISchemeHTTPS
+		containers[0].Command = append(containers[0].Command, "--tls-status")
 	}
 
 	addManagerLoggingOptions(cluster, &containers[0])
@@ -385,7 +389,7 @@ func PodWithExistingStorage(cluster apiv1.Cluster, nodeSerial int) *corev1.Pod {
 
 	envConfig := CreatePodEnvConfig(cluster, podName)
 
-	podSpec := CreateClusterPodSpec(podName, cluster, envConfig, gracePeriod)
+	podSpec := CreateClusterPodSpec(podName, cluster, envConfig, gracePeriod, true)
 
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
