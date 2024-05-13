@@ -1159,11 +1159,11 @@ func (instance *Instance) requestFencingOff() {
 // waitForInstanceRestarted waits until the instance reports being started
 // after the given time
 func (instance *Instance) waitForInstanceRestarted(ctx context.Context, after time.Time) error {
-	retryOnEveryError := func(_ error) bool {
+	retryUntilContextCancelled := func(_ error) bool {
 		return ctx.Err() == nil
 	}
 
-	return retry.OnError(RetryUntilServerAvailable, retryOnEveryError, func() error {
+	return retry.OnError(RetryUntilServerAvailable, retryUntilContextCancelled, func() error {
 		db, err := instance.GetSuperUserDB()
 		if err != nil {
 			return err

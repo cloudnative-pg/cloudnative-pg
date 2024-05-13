@@ -272,7 +272,6 @@ func (r *InstanceReconciler) restartPrimaryInplaceIfRequested(
 	if err != nil {
 		return false, err
 	}
-
 	restartRequested := isPrimary && cluster.Status.Phase == apiv1.PhaseInplacePrimaryRestart
 	if restartRequested {
 		restartTimeout := cluster.GetRestartTimeout()
