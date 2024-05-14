@@ -90,7 +90,7 @@ func UpdateConfigurationContents(lines []string, options map[string]string) ([]s
 	for _, key := range keysList {
 		if !foundKeys.Has(key) {
 			value := options[key]
-			lines = append(lines, key+" = "+pq.QuoteLiteral(value))
+			lines = append(lines, fmt.Sprintf("%s = %s", key, pq.QuoteLiteral(value)))
 		}
 	}
 
