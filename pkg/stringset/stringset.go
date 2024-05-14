@@ -43,6 +43,16 @@ func From(strings []string) *Data {
 	return result
 }
 
+// FromKeys create a string set from the
+// keys of a map
+func FromKeys[T any](v map[string]T) *Data {
+	result := New()
+	for key := range v {
+		result.Put(key)
+	}
+	return result
+}
+
 // Put a string in the set
 func (set *Data) Put(key string) {
 	set.innerMap[key] = struct{}{}
