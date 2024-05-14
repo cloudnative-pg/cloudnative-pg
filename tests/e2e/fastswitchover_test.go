@@ -210,11 +210,11 @@ func assertFastSwitchover(namespace, sampleFile, clusterName, webTestFile, webTe
 	var maxReattachTime int32 = 60
 	var maxSwitchoverTime int32 = 20
 
-	// GKE has an higher kube-proxy timeout, and the connections could try
-	// using a service for which the routing table hasn't changed, getting
-	// stuck for a while. We raise the timeout, since we can't intervene
-	// on GKE configuration.
-	if IsGKE() {
+	// Due to the tcp_syn_retries having a default of 6, meaning that every connection
+	// will retry on a syn after 127 seconds, this will sometimes, delay the reconnection
+	// of the second instance waiting for a connection to be dead, this is specially happening
+	// on platforms like EKS, AKS, GKE and OpenShift
+	if !IsLocal() {
 		maxReattachTime = 180
 	}
 

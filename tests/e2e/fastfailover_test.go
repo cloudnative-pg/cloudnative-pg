@@ -44,25 +44,13 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance, tests.La
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
-		// Sometimes on AKS the promotion itself takes more than 10 seconds.
-		// Nothing to be done operator side, we raise the timeout to avoid
-		// failures in the test.
-		if IsAKS() {
-			maxFailoverTime = 30
-		}
 
-		// GKE has a higher kube-proxy timeout, and the connections could try
-		// using a service, for which the routing table hasn't changed, getting
-		// stuck for a while.
-		// We raise the timeout, since we can't intervene on GKE configuration.
-		if IsGKE() {
+		// Due to the tcp_syn_retries having a default of 6, meaning that every connection
+		// will retry on a syn after 127 seconds, this will sometimes, delay the reconnection
+		// of the second instance waiting for a connection to be dead, this is specially happening
+		// on platforms like EKS, AKS, GKE and OpenShift
+		if !IsLocal() {
 			maxReattachTime = 180
-			maxFailoverTime = 20
-		}
-
-		// OpenShift takes longer to recover than a standard and simple Kubernetes cluster
-		if IsOpenshift() {
-			maxReattachTime = 120
 			maxFailoverTime = 20
 		}
 	})
