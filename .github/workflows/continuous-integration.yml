@@ -770,7 +770,7 @@ jobs:
         run: |
           bin/preflight check container ${CONTROLLER_IMG} \
           --docker-config config.json
-          
+
       - name: Archive the preflight results
         uses: actions/upload-artifact@v4
         with:
