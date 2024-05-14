@@ -45,10 +45,12 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance, tests.La
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 
-		// Due to the tcp_syn_retries having a default of 6, meaning that every connection
-		// will retry on a syn after 127 seconds, this will sometimes, delay the reconnection
-		// of the second instance waiting for a connection to be dead, this is specially happening
-		// on platforms like EKS, AKS, GKE and OpenShift
+		// The walreceiver of a standby that wasn't promoted may try to reconnect
+		// before the rw service endpoints are updated. In this case, the walreceiver
+		// can be stuck for waiting for the connection to be established for a time that
+		// depends on the tcp_syn_retries sysctl. Since by default
+		// net.ipv4.tcp_syn_retries=6, PostgreSQL can wait 2^7-1=127 seconds before
+		// restarting the walreceiver.
 		if !IsLocal() {
 			maxReattachTime = 180
 			maxFailoverTime = 30
