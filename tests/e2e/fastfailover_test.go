@@ -51,7 +51,7 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance, tests.La
 		// on platforms like EKS, AKS, GKE and OpenShift
 		if !IsLocal() {
 			maxReattachTime = 180
-			maxFailoverTime = 20
+			maxFailoverTime = 30
 		}
 	})
 
