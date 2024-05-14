@@ -156,7 +156,7 @@ func ExtractPostgresqlStatus(ctx context.Context, clusterName string) (*Postgres
 
 	var pdbl policyv1.PodDisruptionBudgetList
 	if err := plugin.Client.List(ctx, &pdbl, client.MatchingLabels{utils.ClusterLabelName: clusterName}); err != nil {
-		return nil, fmt.Errorf("while extracting PodDisruptionBudgetList: %w", err)
+		fmt.Println(err)
 	}
 	// Extract the status from the instances
 	status := PostgresqlStatus{
