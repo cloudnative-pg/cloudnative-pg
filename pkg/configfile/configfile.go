@@ -97,8 +97,8 @@ func UpdateConfigurationContents(lines []string, options map[string]string) ([]s
 	return lines, nil
 }
 
-// WritePostgresConfiguration replaces the content of a Postgres configuration file
-// with the options provided
+// WritePostgresConfiguration replaces the content of a PostgreSQL configuration
+// file with the provided options
 func WritePostgresConfiguration(
 	fileName string,
 	options map[string]string,
