@@ -210,11 +210,13 @@ func assertFastSwitchover(namespace, sampleFile, clusterName, webTestFile, webTe
 	var maxReattachTime int32 = 60
 	var maxSwitchoverTime int32 = 20
 
-	// GKE has an higher kube-proxy timeout, and the connections could try
-	// using a service for which the routing table hasn't changed, getting
-	// stuck for a while. We raise the timeout, since we can't intervene
-	// on GKE configuration.
-	if IsGKE() {
+	// The walreceiver of a standby that wasn't promoted may try to reconnect
+	// before the rw service endpoints are updated. In this case, the walreceiver
+	// can be stuck for waiting for the connection to be established for a time that
+	// depends on the tcp_syn_retries sysctl. Since by default
+	// net.ipv4.tcp_syn_retries=6, PostgreSQL can wait 2^7-1=127 seconds before
+	// restarting the walreceiver.
+	if !IsLocal() {
 		maxReattachTime = 180
 	}
 
