@@ -75,7 +75,7 @@ func UpdateConfigurationContents(lines []string, options map[string]string) ([]s
 			}
 
 			foundKeys.Put(key)
-			lines[index] = key + " = " + pq.QuoteLiteral(value)
+			lines[index] = fmt.Sprintf("%s = %s", key, pq.QuoteLiteral(value))
 			index++
 			continue
 		}
