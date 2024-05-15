@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
 
 	corev1 "k8s.io/api/core/v1"
@@ -139,9 +140,9 @@ func removeFencedInstance(instanceName string, object metav1.Object) (bool, erro
 // FencingMetadataExecutor executes the logic regarding adding and removing the fencing annotation for a kubernetes
 // object
 type FencingMetadataExecutor struct {
-	fenceFunc    func(string, metav1.Object) (appliedChange bool, err error)
-	instanceName string
-	cli          client.Client
+	fenceFunc     func(string, metav1.Object) (appliedChange bool, err error)
+	cli           client.Client
+	instanceNames []string
 }
 
 // NewFencingMetadataExecutor creates a fluent client for FencingMetadataExecutor
@@ -165,37 +166,46 @@ func (fb *FencingMetadataExecutor) RemoveFencing() *FencingMetadataExecutor {
 
 // ForAllInstances applies the logic to all cluster instances
 func (fb *FencingMetadataExecutor) ForAllInstances() *FencingMetadataExecutor {
-	fb.instanceName = FenceAllInstances
+	fb.instanceNames = []string{FenceAllInstances}
 	return fb
 }
 
 // ForInstance applies the logic to the specified instance
-func (fb *FencingMetadataExecutor) ForInstance(instanceName string) *FencingMetadataExecutor {
-	fb.instanceName = instanceName
+func (fb *FencingMetadataExecutor) ForInstance(instanceNames ...string) *FencingMetadataExecutor {
+	fb.instanceNames = instanceNames
 	return fb
 }
 
 // Execute executes the instructions given with the fluent builder, returns any error encountered
 func (fb *FencingMetadataExecutor) Execute(ctx context.Context, key types.NamespacedName, obj client.Object) error {
-	if fb.instanceName == "" {
+	if len(fb.instanceNames) == 0 {
 		return errors.New("chose an operation to execute")
+	}
+	if len(fb.instanceNames) > 1 && slices.Contains(fb.instanceNames, FenceAllInstances) {
+		return errors.New("the fence all instance token cannot be used along other instances")
 	}
 
 	if err := fb.cli.Get(ctx, key, obj); err != nil {
 		return err
 	}
 
-	if fb.instanceName != FenceAllInstances {
-		var pod corev1.Pod
-		if err := fb.cli.Get(ctx, client.ObjectKey{Namespace: key.Namespace, Name: fb.instanceName}, &pod); err != nil {
-			return fmt.Errorf("node %s not found in namespace %s", fb.instanceName, key.Namespace)
+	for _, name := range fb.instanceNames {
+		if name != FenceAllInstances {
+			var pod corev1.Pod
+			if err := fb.cli.Get(ctx, client.ObjectKey{Namespace: key.Namespace, Name: name}, &pod); err != nil {
+				return fmt.Errorf("node %s not found in namespace %s", name, key.Namespace)
+			}
 		}
 	}
 
+	var appliedChange bool
 	fencedObject := obj.DeepCopyObject().(client.Object)
-	appliedChange, err := fb.fenceFunc(fb.instanceName, fencedObject)
-	if err != nil {
-		return err
+	for _, name := range fb.instanceNames {
+		changed, err := fb.fenceFunc(name, fencedObject)
+		if err != nil {
+			return err
+		}
+		appliedChange = appliedChange || changed
 	}
 	if !appliedChange {
 		return nil

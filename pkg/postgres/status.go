@@ -398,17 +398,16 @@ func (list PostgresqlStatusList) AllReadyInstancesStatusUnreachable() bool {
 	return hasActiveAndReady
 }
 
-// HaveEnoughDiskSpace checks if every Pod has enough disk space
-// to proceed running. If there is a pod in lack of disk space
-// the name of that Pod is returned
-func (list PostgresqlStatusList) HaveEnoughDiskSpace() (string, bool) {
+// WithInsufficientDiskSpace returns the pods with insufficient disk space
+func (list PostgresqlStatusList) WithInsufficientDiskSpace() PostgresqlStatusList {
+	newList := PostgresqlStatusList{}
 	for _, item := range list.Items {
 		if item.NoWALDiskSpaceLeft {
-			return item.Pod.Name, false
+			newList.Items = append(newList.Items, item)
 		}
 	}
 
-	return "", true
+	return newList
 }
 
 // InstancesReportingStatus returns the number of instances that are Ready or MightBeUnavailable

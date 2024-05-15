@@ -303,33 +303,8 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		return ctrl.Result{RequeueAfter: 10 * time.Second}, registerPhaseErr
 	}
 
-	if podName, enoughDiskSpace := instancesStatus.HaveEnoughDiskSpace(); !enoughDiskSpace {
-		contextLogger.Warning(
-			"A Pod is having not enough disk space to proceed running, waiting for the user to enlarge its PVCs",
-			"podName", podName,
-		)
-
-		fencingErr := utils.NewFencingMetadataExecutor(r.Client).
-			ForInstance(podName).
-			AddFencing().
-			Execute(ctx, client.ObjectKeyFromObject(cluster), cluster)
-		if fencingErr != nil {
-			contextLogger.Error(
-				err,
-				"Error while fencing instance because disk space is finished",
-				"podName", podName,
-			)
-			return ctrl.Result{}, fencingErr
-		}
-
-		registerPhaseErr := r.RegisterPhase(
-			ctx,
-			cluster,
-			"Not enough disk space",
-			fmt.Sprintf("Pod %s have not enough disk space for PostgreSQL to continue running. Please verify your storage "+
-				"settings.", podName),
-		)
-		return ctrl.Result{RequeueAfter: 10 * time.Second}, registerPhaseErr
+	if res, err := r.ensureSufficientDiskSpace(ctx, cluster, instancesStatus); err != nil || !res.IsZero() {
+		return res, err
 	}
 
 	if res, err := replicaclusterswitch.Reconcile(ctx, r.Client, cluster, instancesStatus); res != nil || err != nil {
@@ -420,6 +395,47 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	// Calls post-reconcile hooks
 	hookResult := postReconcilePluginHooks(ctx, cluster, cluster)
 	return hookResult.Result, hookResult.Err
+}
+
+func (r *ClusterReconciler) ensureSufficientDiskSpace(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	instancesStatus postgres.PostgresqlStatusList,
+) (ctrl.Result, error) {
+	contextLogger := log.FromContext(ctx).WithName("ensure_sufficient_disk_space")
+
+	instancesWithoutSpace := instancesStatus.WithInsufficientDiskSpace()
+	if instancesWithoutSpace.Len() == 0 {
+		return ctrl.Result{}, nil
+	}
+	instanceNames := instancesWithoutSpace.GetNames()
+	contextLogger = contextLogger.WithValues("instanceNames", instanceNames)
+
+	contextLogger.Warning(
+		"One or more Pod doesn't have  enough disk space to proceed running, waiting for the user to enlarge its PVCs",
+	)
+
+	fencingErr := utils.NewFencingMetadataExecutor(r.Client).
+		ForInstance(instanceNames...).
+		AddFencing().
+		Execute(ctx, client.ObjectKeyFromObject(cluster), cluster)
+	if fencingErr != nil {
+		contextLogger.Error(
+			fencingErr,
+			"Error while fencing instance because disk space is finished",
+		)
+		return ctrl.Result{}, fencingErr
+	}
+
+	reason := "Found one or more Pods without enough disk space for PostgreSQL to continue running." +
+		"Please verify your storage settings. Further information inside .status.instancesReportedState"
+	registerPhaseErr := r.RegisterPhase(
+		ctx,
+		cluster,
+		"Not enough disk space",
+		reason,
+	)
+	return ctrl.Result{RequeueAfter: 10 * time.Second}, registerPhaseErr
 }
 
 func (r *ClusterReconciler) handleSwitchover(

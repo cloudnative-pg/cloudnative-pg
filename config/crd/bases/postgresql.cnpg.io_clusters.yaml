@@ -5192,6 +5192,9 @@ spec:
                     isPrimary:
                       description: indicates if an instance is the primary one
                       type: boolean
+                    noWALDiskSpace:
+                      description: indicates if the instance is out of space for WALs
+                      type: boolean
                     timeLineID:
                       description: indicates on which TimelineId the instance is
                       type: integer

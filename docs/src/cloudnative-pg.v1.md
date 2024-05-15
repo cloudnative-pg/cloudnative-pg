@@ -2863,6 +2863,13 @@ database right after is imported - to be used with extreme care
    <p>indicates on which TimelineId the instance is</p>
 </td>
 </tr>
+<tr><td><code>noWALDiskSpace</code> <B>[Required]</B><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>indicates if the instance is out of space for WALs</p>
+</td>
+</tr>
 </tbody>
 </table>
 

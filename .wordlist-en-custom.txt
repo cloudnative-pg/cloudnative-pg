@@ -883,6 +883,7 @@ networkpolicy
 newers
 nextScheduleTime
 nginx
+noWALDiskSpace
 nodeAffinity
 nodeLabelsAntiAffinity
 nodeMaintenanceWindow
