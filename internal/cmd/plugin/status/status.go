@@ -154,7 +154,12 @@ func ExtractPostgresqlStatus(ctx context.Context, clusterName string) (*Postgres
 		specs.PostgresContainerName)
 
 	var pdbl policyv1.PodDisruptionBudgetList
-	if err := plugin.Client.List(ctx, &pdbl, client.MatchingLabels{utils.ClusterLabelName: clusterName}); err != nil {
+	if err := plugin.Client.List(
+		ctx,
+		&pdbl,
+		client.InNamespace(plugin.Namespace),
+		client.MatchingLabels{utils.ClusterLabelName: clusterName},
+	); err != nil {
 		return nil, fmt.Errorf("while extracting PodDisruptionBudgetList: %w", err)
 	}
 	// Extract the status from the instances
