@@ -75,7 +75,7 @@ func UpdateConfigurationContents(lines []string, options map[string]string) ([]s
 			}
 
 			foundKeys.Put(key)
-			lines[index] = key + " = " + pq.QuoteLiteral(value)
+			lines[index] = fmt.Sprintf("%s = %s", key, pq.QuoteLiteral(value))
 			index++
 			continue
 		}
@@ -86,18 +86,20 @@ func UpdateConfigurationContents(lines []string, options map[string]string) ([]s
 	lines = lines[:index]
 
 	// Append missing options to the end of the file
-	for key, value := range options {
+	keysList := stringset.FromKeys(options).ToSortedList()
+	for _, key := range keysList {
 		if !foundKeys.Has(key) {
-			lines = append(lines, key+" = "+pq.QuoteLiteral(value))
+			value := options[key]
+			lines = append(lines, fmt.Sprintf("%s = %s", key, pq.QuoteLiteral(value)))
 		}
 	}
 
 	return lines, nil
 }
 
-// WritePostgresConfigurationFile replaces the content of a Postgres configuration file
-// with the provide options
-func WritePostgresConfigurationFile(
+// WritePostgresConfiguration replaces the content of a PostgreSQL configuration
+// file with the provided options
+func WritePostgresConfiguration(
 	fileName string,
 	options map[string]string,
 ) (changed bool, err error) {
