@@ -45,6 +45,10 @@ var _ = Describe("Operator High Availability", Serial,
 		})
 
 		It("can work as HA mode", func() {
+			// Make sure there's at least one pod of the operator
+			err := env.ScaleOperatorDeployment(1)
+			Expect(err).ToNot(HaveOccurred())
+
 			// Get Operator Pod name
 			operatorPodName, err := env.GetOperatorPod()
 			Expect(err).ToNot(HaveOccurred())
