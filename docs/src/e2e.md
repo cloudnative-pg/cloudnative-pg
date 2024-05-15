@@ -5,7 +5,7 @@ commit via a suite of **End-to-end (E2E) tests** (or integration tests)
 which ensure that the operator correctly deploys and manages PostgreSQL
 clusters.
 
-Kubernetes versions 1.23 through 1.29, and PostgreSQL versions 12 through 16,
+Kubernetes versions 1.25 through 1.29, and PostgreSQL versions 12 through 16,
 are tested for each commit, helping detect bugs at an early stage of the
 development process.
 
