@@ -124,10 +124,9 @@ var ErrNextLoop = utils.ErrNextLoop
 func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	contextLogger, ctx := log.SetupLogger(ctx)
 
-	contextLogger.Debug(fmt.Sprintf("reconciling object %#q", req.NamespacedName))
-
+	contextLogger.Debug("Reconciliation loop start")
 	defer func() {
-		contextLogger.Debug(fmt.Sprintf("object %#q has been reconciled", req.NamespacedName))
+		contextLogger.Debug("Reconciliation loop end")
 	}()
 
 	cluster, err := r.getCluster(ctx, req)
