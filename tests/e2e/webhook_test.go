@@ -71,9 +71,13 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive, tests.LabelOper
 		webhookNamespacePrefix := "webhook-test"
 		clusterIsDefaulted = true
 		By("having a deployment for the operator in state ready", func() {
-			deployment, err := env.GetOperatorDeployment()
+			// Make sure that we have at least one operator already working
+			err := env.ScaleOperatorDeployment(1)
+			Expect(err).ToNot(HaveOccurred())
+
+			ready, err := env.IsOperatorDeploymentReady()
 			Expect(err).ShouldNot(HaveOccurred())
-			Expect(deployment.Status.ReadyReplicas).Should(BeEquivalentTo(1))
+			Expect(ready).To(BeTrue())
 		})
 
 		// Create a basic PG cluster
@@ -135,9 +139,9 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive, tests.LabelOper
 
 		// Make sure the operator is intact and not crashing
 		By("having a deployment for the operator in state ready", func() {
-			deployment, err := env.GetOperatorDeployment()
+			ready, err := env.IsOperatorDeploymentReady()
 			Expect(err).ShouldNot(HaveOccurred())
-			Expect(deployment.Status.ReadyReplicas).Should(BeEquivalentTo(1))
+			Expect(ready).To(BeTrue())
 		})
 
 		By("by cleaning up the webhook configurations", func() {
