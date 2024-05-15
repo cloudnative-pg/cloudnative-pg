@@ -68,7 +68,6 @@ body:
         - 1.27
         - 1.26
         - 1.25 (unsupported)
-        - 1.24 (unsupported)
         - other (unsupported)
     validations:
       required: true
@@ -127,4 +126,3 @@ body:
       options:
         - label: I agree to follow this project's Code of Conduct
           required: true
-
