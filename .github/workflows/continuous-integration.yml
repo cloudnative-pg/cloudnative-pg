@@ -758,12 +758,20 @@ jobs:
         run: |
           make operator-sdk preflight
 
+      - name: Loging to container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ env.REGISTRY_USER }}
+          password: ${{ env.REGISTRY_PASSWORD }}
+
       - name: Run preflight container test
         env:
           CONTROLLER_IMG: ${{ needs.buildx.outputs.controller_img_ubi8 }}
           PFLT_ARTIFACTS: "preflight_results"
         run: |
-          bin/preflight check container ${CONTROLLER_IMG}
+          bin/preflight check container ${CONTROLLER_IMG} \
+          --docker-config $HOME/.docker/config.json
 
       - name: Archive the preflight results
         uses: actions/upload-artifact@v4
