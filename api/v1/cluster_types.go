@@ -2383,7 +2383,7 @@ func (cfg *DataBackupConfiguration) AppendAdditionalCommandArgs(options []string
 	if cfg == nil {
 		return options
 	}
-	return AppendAdditionalCommandArgs(cfg.AdditionalCommandArgs, options)
+	return appendAdditionalCommandArgs(cfg.AdditionalCommandArgs, options)
 }
 
 // AppendAdditionalCommandArgs adds custom arguments as barman-cloud-wal-archive command-line options
@@ -2391,10 +2391,10 @@ func (cfg *WalBackupConfiguration) AppendAdditionalCommandArgs(options []string)
 	if cfg == nil {
 		return options
 	}
-	return AppendAdditionalCommandArgs(cfg.AdditionalCommandArgs, options)
+	return appendAdditionalCommandArgs(cfg.AdditionalCommandArgs, options)
 }
 
-func AppendAdditionalCommandArgs(additionalCommandArgs []string, options []string) []string {
+func appendAdditionalCommandArgs(additionalCommandArgs []string, options []string) []string {
 	for _, userOption := range additionalCommandArgs {
 		key := strings.Split(userOption, "=")[0]
 		if key == "" || slices.Contains(options, key) {

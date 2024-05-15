@@ -5249,5 +5249,23 @@ will be processed one at a time. It accepts a positive integer as a
 value - with 1 being the minimum accepted value.</p>
 </td>
 </tr>
+<tr><td><code>additionalCommandArgs</code> <B>[Required]</B><br/>
+<i>[]string</i>
+</td>
+<td>
+   <p>AdditionalCommandArgs represents additional arguments that can be appended
+to the 'barman-cloud-wal-archive' command-line invocation. These arguments
+provide flexibility to customize the backup process further according to
+specific requirements or configurations.</p>
+<p>Example:
+In a scenario where specialized backup options are required, such as setting
+a specific timeout or defining custom behavior, users can use this field
+to specify additional command arguments.</p>
+<p>Note:
+It's essential to ensure that the provided arguments are valid and supported
+by the 'barman-cloud-wal-archive' command, to avoid potential errors or unintended
+behavior during execution.</p>
+</td>
+</tr>
 </tbody>
 </table>
