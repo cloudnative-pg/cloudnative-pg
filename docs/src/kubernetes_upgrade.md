@@ -83,7 +83,7 @@ reusePVC disabled: see section below.
 
 !!! Note
     When performing the `kubectl drain` command, you will need
-    to add the `--delete-local-data` option.
+    to add the `--delete-emptydir-data` option.
     Don't be afraid: it refers to another volume internally used
     by the operator - not the PostgreSQL data directory.
 
