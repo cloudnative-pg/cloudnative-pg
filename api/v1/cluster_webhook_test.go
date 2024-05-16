@@ -2878,6 +2878,72 @@ var _ = Describe("replica mode validation", func() {
 		result := cluster.validatePromotionToken()
 		Expect(result).To(BeEmpty())
 	})
+
+	It("complains when the primary field is used with the enabled field", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled: ptr.To(true),
+					Primary: "toast",
+					Source:  "test",
+				},
+				Bootstrap: &BootstrapConfiguration{
+					PgBaseBackup: &BootstrapPgBaseBackup{},
+				},
+				ExternalClusters: []ExternalCluster{},
+			},
+		}
+		result := cluster.validateReplicaMode()
+		Expect(result).ToNot(BeEmpty())
+	})
+
+	It("doesn't complain when the enabled field is not specified", func() {
+		cluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-2",
+			},
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Primary: "test",
+					Source:  "test",
+				},
+				Bootstrap: &BootstrapConfiguration{
+					PgBaseBackup: &BootstrapPgBaseBackup{},
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "test",
+					},
+				},
+			},
+		}
+		result := cluster.validateReplicaMode()
+		Expect(result).To(BeEmpty())
+	})
+
+	It("doesn't complain when creating a new primary cluster with the replication stanza set", func() {
+		cluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test",
+			},
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Primary: "test",
+					Source:  "test",
+				},
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{},
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "test",
+					},
+				},
+			},
+		}
+		result := cluster.validateReplicaMode()
+		Expect(result).To(BeEmpty())
+	})
 })
 
 var _ = Describe("Validation changes", func() {

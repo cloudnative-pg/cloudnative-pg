@@ -1,0 +1,64 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-dc-a
+spec:
+  instances: 3
+
+  storage:
+    size: 1Gi
+
+  replica:
+    self: cluster-dc-a
+    primary: cluster-dc-a
+    source: cluster-dc-c
+
+  storage:
+    size: 1Gi
+
+  externalClusters:
+  - name: cluster-dc-a
+    connectionParameters:
+      host: cluster-dc-a-rw.default.svc
+      user: streaming_replica
+      sslmode: verify-full
+      dbname: postgres
+    sslKey:
+      name: cluster-dc-a-replication
+      key: tls.key
+    sslCert:
+      name: cluster-dc-a-replication
+      key: tls.crt
+    sslRootCert:
+      name: cluster-dc-a-ca
+      key: ca.crt
+  - name: cluster-dc-b
+    connectionParameters:
+      host: cluster-dc-b-rw.default.svc
+      user: streaming_replica
+      sslmode: verify-full
+      dbname: postgres
+    sslKey:
+      name: cluster-dc-b-replication
+      key: tls.key
+    sslCert:
+      name: cluster-dc-b-replication
+      key: tls.crt
+    sslRootCert:
+      name: cluster-dc-b-ca
+      key: ca.crt
+  - name: cluster-dc-c
+    connectionParameters:
+      host: cluster-dc-c-rw.default.svc
+      user: streaming_replica
+      sslmode: verify-full
+      dbname: postgres
+    sslKey:
+      name: cluster-dc-c-replication
+      key: tls.key
+    sslCert:
+      name: cluster-dc-c-replication
+      key: tls.crt
+    sslRootCert:
+      name: cluster-dc-c-ca
+      key: ca.crt            

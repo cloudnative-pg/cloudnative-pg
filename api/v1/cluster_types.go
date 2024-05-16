@@ -1086,9 +1086,14 @@ type PgBouncerIntegrationStatus struct {
 // cluster
 // +kubebuilder:validation:XValidation:rule="!has(self.promotionToken) || size(self.promotionToken) == 0 || !self.enabled",message=Promotion token must be empty on replica clusters
 type ReplicaClusterConfiguration struct {
+	// Self defines the name of this cluster. It is used to determine if this is a primary
+	// or a replica cluster, comparing it with `primary`
+	Self string `json:"self,omitempty"`
+
 	// Primary defines which Cluster is defined to be the primary in the distributed PostgreSQL cluster, based on the
 	// topology specified in externalClusters
 	Primary string `json:"primary,omitempty"`
+
 	// The name of the external cluster which is the replication origin
 	// +kubebuilder:validation:MinLength=1
 	Source string `json:"source"`
@@ -3246,17 +3251,30 @@ func (cluster Cluster) ExternalCluster(name string) (ExternalCluster, bool) {
 
 // IsReplica checks if this is a replica cluster or not
 func (cluster Cluster) IsReplica() bool {
+	// Before introducing the "primary" field, the
+	// "enabled" parameter was declared as a "boolean"
+	// and was not declared "omitempty".
+	//
+	// Legacy replica clusters will have the "replica" stanza
+	// and the "enabled" field set explicitly to true.
+	//
+	// The following code is designed to not change the
+	// previous semantics.
 	r := cluster.Spec.ReplicaCluster
 	if r == nil {
 		return false
 	}
-	if r.Primary != "" {
-		return r.Source != r.Primary
+
+	if r.Enabled != nil {
+		return *r.Enabled
 	}
-	if r.Enabled == nil {
-		return false
+
+	clusterName := r.Self
+	if len(clusterName) == 0 {
+		clusterName = cluster.Name
 	}
-	return *r.Enabled
+
+	return clusterName != r.Primary
 }
 
 var slotNameNegativeRegex = regexp.MustCompile("[^a-z0-9_]+")

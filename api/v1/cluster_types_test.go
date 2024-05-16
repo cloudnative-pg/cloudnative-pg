@@ -1296,3 +1296,125 @@ var _ = Describe("ShouldPromoteFromReplicaCluster", func() {
 		Expect(cluster.ShouldPromoteFromReplicaCluster()).To(BeTrue())
 	})
 })
+
+var _ = Describe("IsReplica", func() {
+	Describe("using the legacy API", func() {
+		replicaClusterOldAPI := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled: ptr.To(true),
+					Source:  "source-cluster",
+				},
+			},
+		}
+
+		primaryClusterOldAPI := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: nil,
+			},
+		}
+
+		primaryClusterOldAPIExplicit := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled: ptr.To(false),
+					Source:  "source-cluster",
+				},
+			},
+		}
+
+		DescribeTable(
+			"doesn't change the semantics",
+			func(resource *Cluster, isReplica bool) {
+				Expect(resource.IsReplica()).To(Equal(isReplica))
+			},
+			Entry(
+				"replica cluster with the old API",
+				replicaClusterOldAPI, true),
+			Entry(
+				"primary cluster with the old API",
+				primaryClusterOldAPI, false),
+			Entry(
+				"primary cluster with the old API, explicitly disabling replica",
+				primaryClusterOldAPIExplicit, false),
+		)
+	})
+
+	Describe("using the new API, with an implicit self", func() {
+		primaryClusterNewAPI := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "cluster-1",
+			},
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Primary: "cluster-1",
+					Enabled: nil,
+					Source:  "source-cluster",
+				},
+			},
+		}
+
+		replicaClusterNewAPI := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "cluster-1",
+			},
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Primary: "cluster-2",
+					Enabled: nil,
+					Source:  "source-cluster",
+				},
+			},
+		}
+
+		DescribeTable(
+			"uses the primary cluster name",
+			func(resource *Cluster, isReplica bool) {
+				Expect(resource.IsReplica()).To(Equal(isReplica))
+			},
+			Entry(
+				"primary cluster",
+				primaryClusterNewAPI, false),
+			Entry(
+				"replica cluster",
+				replicaClusterNewAPI, true),
+		)
+	})
+
+	Describe("using the new API, with an explicit self", func() {
+		primaryClusterNewAPI := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Self:    "cluster-1",
+					Primary: "cluster-1",
+					Enabled: nil,
+					Source:  "source-cluster",
+				},
+			},
+		}
+
+		replicaClusterNewAPI := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Self:    "cluster-1",
+					Primary: "cluster-2",
+					Enabled: nil,
+					Source:  "source-cluster",
+				},
+			},
+		}
+
+		DescribeTable(
+			"uses the primary cluster name",
+			func(resource *Cluster, isReplica bool) {
+				Expect(resource.IsReplica()).To(Equal(isReplica))
+			},
+			Entry(
+				"primary cluster",
+				primaryClusterNewAPI, false),
+			Entry(
+				"replica cluster",
+				replicaClusterNewAPI, true),
+		)
+	})
+})

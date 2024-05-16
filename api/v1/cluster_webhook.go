@@ -1960,28 +1960,26 @@ func (r *Cluster) validatePromotionToken() field.ErrorList {
 // Check if the replica mode is used with an incompatible bootstrap
 // method
 func (r *Cluster) validateReplicaMode() field.ErrorList {
+	var result field.ErrorList
+
 	replicaClusterConf := r.Spec.ReplicaCluster
 	if replicaClusterConf == nil {
 		return nil
 	}
 
-	isEnabled := replicaClusterConf.Enabled == nil || *replicaClusterConf.Enabled
-	hasPrimary := replicaClusterConf.Primary != ""
-	if !isEnabled && !hasPrimary {
-		return nil
+	// Having enabled set to "true" means that the automatic mode is not active.
+	// The "primary" field is used only when the automatic mode is active.
+	// This implies that hasEnabled and hasPrimary are mutually exclusive
+	hasEnabled := replicaClusterConf.Enabled != nil
+	hasPrimary := len(replicaClusterConf.Primary) > 0
+	if hasPrimary && hasEnabled {
+		result = append(result, field.Invalid(
+			field.NewPath("spec", "replicaCluster", "enabled"),
+			replicaClusterConf,
+			"replica mode enabled is not compatible with the primary field"))
 	}
 
-	var result field.ErrorList
-	if hasPrimary {
-		if isEnabled {
-			result = append(result, field.Invalid(
-				field.NewPath("spec", "replicaCluster", "enabled"),
-				replicaClusterConf,
-				"replica mode enabled is not compatible with the primary field"))
-		}
-	}
-
-	if isEnabled {
+	if r.IsReplica() {
 		if r.Spec.Bootstrap == nil {
 			result = append(result, field.Invalid(
 				field.NewPath("spec", "bootstrap"),
