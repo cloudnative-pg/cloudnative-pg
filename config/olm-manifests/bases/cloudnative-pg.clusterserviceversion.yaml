@@ -95,7 +95,10 @@ spec:
   - cloudnativepg
   - cloudnative-pg
   - cnpg
-  minKubeVersion: 1.25.0
+  # This version should be keep as low as this one or at least satisfy the version
+  # that we have here https://github.com/redhat-openshift-ecosystem/community-operators-pipeline/blob/ci/latest/ci/scripts/opp.sh#L19
+  # If we change this, the kiwi test will fail
+  minKubeVersion: 1.23.0
   links:
   - name: CloudNativePG
     url: https://cloudnative-pg.io/
