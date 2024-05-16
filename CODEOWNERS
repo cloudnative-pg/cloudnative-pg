@@ -12,3 +12,5 @@
 /.github/ @cloudnative-pg/maintainers @jsilvela @NiccoloFei @litaocdl
 /hack/ @cloudnative-pg/maintainers @jsilvela @NiccoloFei @litaocdl
 /tests/ @cloudnative-pg/maintainers @jsilvela @NiccoloFei @litaocdl
+
+/config/olm-*/ @cloudnative-pg/maintainers @NiccoloFei
