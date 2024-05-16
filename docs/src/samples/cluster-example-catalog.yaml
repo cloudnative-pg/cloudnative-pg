@@ -1,0 +1,24 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: ImageCatalog
+metadata:
+  name: image-catalog-example
+spec:
+  images:
+    - image: ghcr.io/cloudnative-pg/postgresql:16
+      major: 16
+    - image: ghcr.io/cloudnative-pg/postgresql:15
+      major: 15
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example
+spec:
+  instances: 3
+  imageCatalogRef:
+    apiGroup: postgresql.cnpg.io
+    kind: ImageCatalog
+    name: image-catalog-example
+    major: 15
+  storage:
+    size: 1Gi

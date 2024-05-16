@@ -51,13 +51,13 @@ func NewCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use: "pgbasebackup",
-		PreRunE: func(cmd *cobra.Command, args []string) error {
+		PreRunE: func(cmd *cobra.Command, _ []string) error {
 			return management.WaitKubernetesAPIServer(cmd.Context(), ctrl.ObjectKey{
 				Name:      clusterName,
 				Namespace: namespace,
 			})
 		},
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			client, err := management.NewControllerRuntimeClient()
 			if err != nil {
 				return err
@@ -80,7 +80,7 @@ func NewCmd() *cobra.Command {
 			}
 			return err
 		},
-		PostRunE: func(cmd *cobra.Command, args []string) error {
+		PostRunE: func(cmd *cobra.Command, _ []string) error {
 			if err := istio.TryInvokeQuitEndpoint(cmd.Context()); err != nil {
 				return err
 			}
@@ -126,6 +126,19 @@ func (env *CloneInfo) bootstrapUsingPgbasebackup(ctx context.Context) error {
 		ctx, env.client, env.info.Namespace, &server)
 	if err != nil {
 		return err
+	}
+
+	pgVersion, err := cluster.GetPostgresqlVersion()
+	if err != nil {
+		log.Warning(
+			"Error while parsing PostgreSQL server version to define connection options, defaulting to PostgreSQL 11",
+			"imageName", cluster.GetImageName(),
+			"err", err)
+	} else if pgVersion >= 120000 {
+		// We explicitly disable wal_sender_timeout for join-related pg_basebackup executions.
+		// A short timeout could not be enough in case the instance is slow to send data,
+		// like when the I/O is overloaded.
+		connectionString += " options='-c wal_sender_timeout=0s'"
 	}
 
 	err = postgres.ClonePgData(connectionString, env.info.PgData, env.info.PgWal)

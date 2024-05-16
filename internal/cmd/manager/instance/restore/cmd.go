@@ -19,6 +19,7 @@ package restore
 
 import (
 	"context"
+	"errors"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -26,7 +27,9 @@ import (
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/istio"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/linkerd"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
@@ -41,13 +44,13 @@ func NewCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "restore [flags]",
 		SilenceErrors: true,
-		PreRunE: func(cmd *cobra.Command, args []string) error {
+		PreRunE: func(cmd *cobra.Command, _ []string) error {
 			return management.WaitKubernetesAPIServer(cmd.Context(), ctrl.ObjectKey{
 				Name:      clusterName,
 				Namespace: namespace,
 			})
 		},
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
 
 			info := postgres.InitInfo{
@@ -59,7 +62,7 @@ func NewCmd() *cobra.Command {
 
 			return restoreSubCommand(ctx, info)
 		},
-		PostRunE: func(cmd *cobra.Command, args []string) error {
+		PostRunE: func(cmd *cobra.Command, _ []string) error {
 			if err := istio.TryInvokeQuitEndpoint(cmd.Context()); err != nil {
 				return err
 			}
@@ -87,8 +90,28 @@ func restoreSubCommand(ctx context.Context, info postgres.InitInfo) error {
 	err = info.Restore(ctx)
 	if err != nil {
 		log.Error(err, "Error while restoring a backup")
+		cleanupDataDirectoryIfNeeded(err, info.PgData)
 		return err
 	}
 
 	return nil
+}
+
+func cleanupDataDirectoryIfNeeded(restoreError error, dataDirectory string) {
+	var barmanError *barman.CloudRestoreError
+	if !errors.As(restoreError, &barmanError) {
+		return
+	}
+
+	if !barmanError.IsRetriable() {
+		return
+	}
+
+	log.Info("Cleaning up data directory", "directory", dataDirectory)
+	if err := fileutils.RemoveDirectory(dataDirectory); err != nil && !os.IsNotExist(err) {
+		log.Error(
+			err,
+			"error occurred cleaning up data directory",
+			"directory", dataDirectory)
+	}
 }

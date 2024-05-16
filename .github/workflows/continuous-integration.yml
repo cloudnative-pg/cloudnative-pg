@@ -16,15 +16,16 @@ on:
 
 # set up environment variables to be used across all the jobs
 env:
-  GOLANG_VERSION: "1.21.x"
-  GOLANGCI_LINT_VERSION: "v1.55"
+  GOLANG_VERSION: "1.22.x"
+  GOLANGCI_LINT_VERSION: "v1.58"
   KUBEBUILDER_VERSION: "2.3.1"
+  KIND_VERSION: "v0.22.0"
   OPERATOR_IMAGE_NAME: "ghcr.io/${{ github.repository }}-testing"
   API_DOC_NAME: "cloudnative-pg.v1.md"
   SLACK_USERNAME: "cnpg-bot"
   # Keep in mind that adding more platforms (architectures) will increase the building
   # time even if we use the ghcache for the building process.
-  PLATFORM: "linux/amd64,linux/arm64"
+  PLATFORMS: "linux/amd64,linux/arm64"
   BUILD_PUSH_PROVENANCE: ""
   BUILD_PUSH_CACHE_FROM: ""
   BUILD_PUSH_CACHE_TO: ""
@@ -97,7 +98,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Check for changes
-        uses: dorny/paths-filter@v2.11.1
+        uses: dorny/paths-filter@v3.0.2
         id: filter
         # Remember to add new folders in the operator-changed filter if needed
         with:
@@ -156,10 +157,9 @@ jobs:
           check-latest: true
 
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v3
+        uses: golangci/golangci-lint-action@v6
         with:
           version: ${{ env.GOLANGCI_LINT_VERSION }}
-          args: --timeout 4m
 
       - name: Check go mod tidy has no pending changes
         run: |
@@ -389,11 +389,10 @@ jobs:
     outputs:
       commit_version: ${{ env.VERSION }}
       commit: ${{ env.COMMIT_SHA }}
-      platforms: ${{ env.PLATFORMS }}
-      image_name: ${{ env.IMAGE_NAME }}
       controller_img: ${{ env.CONTROLLER_IMG }}
       controller_img_ubi8: ${{ env.CONTROLLER_IMG_UBI8 }}
       bundle_img: ${{ env.BUNDLE_IMG }}
+      catalog_img: ${{ env.CATALOG_IMG }}
       push: ${{ env.PUSH }}
     steps:
       - name: Checkout
@@ -529,13 +528,6 @@ jobs:
             type=ref,event=branch
             type=ref,event=pr
 
-      - name: Detect platforms
-        run: |
-          # Keep in mind that adding more platforms (architectures) will increase the building
-          # time even if we use the ghcache for the building process.
-          platforms="linux/amd64,linux/arm64"
-          echo "PLATFORMS=${platforms}" >> $GITHUB_ENV
-
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
         with:
@@ -551,18 +543,19 @@ jobs:
           username: ${{ env.REGISTRY_USER }}
           password:  ${{ env.REGISTRY_PASSWORD }}
 
-      - name: Build for scan
+      - name: Build for scan distroless image
         uses: docker/build-push-action@v5
         with:
           platforms: "linux/amd64"
           context: .
+          file: Dockerfile
           push: false
           load: true
           build-args: |
             VERSION=${{ env.VERSION }}
           tags: ${{ steps.docker-meta.outputs.tags }}
 
-      - name: Dockle scan
+      - name: Dockle scan distroless image
         uses: erzz/dockle-action@v1
         with:
           image: ${{ steps.docker-meta.outputs.tags }}
@@ -570,10 +563,54 @@ jobs:
           failure-threshold: WARN
           accept-keywords: key
 
+      - name: Build for scan UBI8 image
+        uses: docker/build-push-action@v5
+        with:
+          platforms: "linux/amd64"
+          context: .
+          file: Dockerfile-ubi8
+          push: false
+          load: true
+          build-args: |
+            VERSION=${{ env.VERSION }}
+          tags: ${{ steps.docker-meta-ubi8.outputs.tags }}
+
+      - name: Dockle scan UBI8 image
+        uses: erzz/dockle-action@v1
+        env:
+          DOCKLE_IGNORES: CIS-DI-0009
+        with:
+          image: ${{ steps.docker-meta-ubi8.outputs.tags }}
+          exit-code: '1'
+          failure-threshold: WARN
+          accept-keywords: key
+
+      - name: Build for scan UBI9 image
+        uses: docker/build-push-action@v5
+        with:
+          platforms: "linux/amd64"
+          context: .
+          file: Dockerfile-ubi9
+          push: false
+          load: true
+          build-args: |
+            VERSION=${{ env.VERSION }}
+          tags: ${{ steps.docker-meta-ubi9.outputs.tags }}
+
+      - name: Dockle scan UBI9 image
+        uses: erzz/dockle-action@v1
+        env:
+          DOCKLE_IGNORES: CIS-DI-0009
+        with:
+          image: ${{ steps.docker-meta-ubi9.outputs.tags }}
+          exit-code: '1'
+          failure-threshold: WARN
+          accept-keywords: key
+
       - name: Run Snyk to check Docker image for vulnerabilities
         uses: snyk/actions/docker@master
         if: |
-          github.repository_owner == 'cloudnative-pg' &&
+          !github.event.repository.fork && 
           !github.event.pull_request.head.repo.fork
         continue-on-error: true
         env:
@@ -585,8 +622,9 @@ jobs:
       - name: Upload result to GitHub Code Scanning
         uses: github/codeql-action/upload-sarif@v3
         if: |
-          github.repository_owner == 'cloudnative-pg' &&
+          !github.event.repository.fork && 
           !github.event.pull_request.head.repo.fork
+        continue-on-error: true
         with:
           sarif_file: snyk.sarif
 
@@ -595,6 +633,7 @@ jobs:
         with:
           platforms: ${{ env.PLATFORMS }}
           context: .
+          file: Dockerfile
           push: ${{ env.PUSH }}
           build-args: |
             VERSION=${{ env.VERSION }}
@@ -633,10 +672,10 @@ jobs:
           LOWERCASE_OPERATOR_IMAGE_NAME=${OPERATOR_IMAGE_NAME,,}
           TAG=${TAGS#*:}
           TAG_UBI=${TAGS_UBI8#*:}
-          echo "IMAGE_NAME=${LOWERCASE_OPERATOR_IMAGE_NAME}" >> $GITHUB_ENV
           echo "CONTROLLER_IMG=${LOWERCASE_OPERATOR_IMAGE_NAME}:${TAG}" >> $GITHUB_ENV
           echo "CONTROLLER_IMG_UBI8=${LOWERCASE_OPERATOR_IMAGE_NAME}:${TAG_UBI}" >> $GITHUB_ENV
           echo "BUNDLE_IMG=${LOWERCASE_OPERATOR_IMAGE_NAME}:bundle-${TAG}" >> $GITHUB_ENV
+          echo "CATALOG_IMG=${LOWERCASE_OPERATOR_IMAGE_NAME}:catalog-${TAG}" >> $GITHUB_ENV
 
   olm-bundle:
     name: Create OLM bundle and catalog
@@ -660,7 +699,7 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
         with:
-          platforms: ${{ needs.buildx.outputs.platforms }}
+          platforms: ${{ env.PLATFORMS }}
 
       - name: Install Go
         uses: actions/setup-go@v5
@@ -680,9 +719,9 @@ jobs:
 
       - name: Create bundle
         env:
-          IMAGE_NAME: ${{ needs.buildx.outputs.image_name }}
           CONTROLLER_IMG: ${{ needs.buildx.outputs.controller_img_ubi8 }}
           BUNDLE_IMG: ${{ needs.buildx.outputs.bundle_img }}
+          CATALOG_IMG: ${{ needs.buildx.outputs.catalog_img }}
         run: |
           make olm-catalog
 
@@ -695,6 +734,62 @@ jobs:
             bundle/
             cloudnative-pg-catalog.yaml
           retention-days: 7
+
+  preflight:
+    name: Run openshift-preflight test
+    runs-on: ubuntu-22.04
+    needs:
+      - buildx
+      - olm-bundle
+    if: |
+      (always() && !cancelled()) &&
+      needs.olm-bundle.result == 'success'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GOLANG_VERSION }}
+          check-latest: true
+
+      - name: Setup tools
+        run: |
+          make operator-sdk preflight
+
+      - name: Loging to container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ env.REGISTRY_USER }}
+          password: ${{ env.REGISTRY_PASSWORD }}
+
+      - name: Run preflight container test
+        env:
+          CONTROLLER_IMG: ${{ needs.buildx.outputs.controller_img_ubi8 }}
+          PFLT_ARTIFACTS: "preflight_results"
+        run: |
+          bin/preflight check container ${CONTROLLER_IMG} \
+          --docker-config $HOME/.docker/config.json
+
+      - name: Archive the preflight results
+        uses: actions/upload-artifact@v4
+        with:
+          name: preflight_results
+          path: |
+            preflight_results
+          retention-days: 7
+
+      - name: Check preflight container results
+        run: |
+          for dir in `ls preflight_results`; do
+              PASS=`jq -r .passed preflight_results/$dir/results.json`
+              if [[ "$PASS" == "false" ]]
+              then
+                exit 1
+              fi
+          done
 
   olm-scorecard:
     name: Run OLM scorecard test
@@ -710,16 +805,16 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: "Setting up KinD cluster"
-        uses: helm/kind-action@v1.8.0
+      - name: Setting up KinD cluster
+        uses: helm/kind-action@v1.10.0
         with:
           wait: "600s"
-          version: "v0.20.0"
+          version: ${{ env.KIND_VERSION }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
         with:
-          platforms: ${{ needs.buildx.outputs.platforms }}
+          platforms: ${{ env.PLATFORMS }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -737,7 +832,7 @@ jobs:
           go-version: ${{ env.GOLANG_VERSION }}
           check-latest: true
 
-      - name: "Running Scorecard tests"
+      - name: Running Scorecard tests
         env:
           BUNDLE_IMG: ${{ needs.buildx.outputs.bundle_img }}
         run: |

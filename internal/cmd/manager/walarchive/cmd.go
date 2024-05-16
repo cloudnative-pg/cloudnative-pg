@@ -123,7 +123,7 @@ func NewCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&podName, "pod-name", os.Getenv("POD_NAME"), "The name of the "+
 		"current pod in k8s")
-	cmd.Flags().StringVar(&pgData, "pg-data", os.Getenv("PGDATA"), "The PGDATA to be created")
+	cmd.Flags().StringVar(&pgData, "pg-data", os.Getenv("PGDATA"), "The PGDATA to be used")
 
 	return &cmd
 }
@@ -137,16 +137,6 @@ func run(
 	startTime := time.Now()
 	contextLog := log.FromContext(ctx)
 	walName := args[0]
-
-	if cluster.Spec.Backup == nil || cluster.Spec.Backup.BarmanObjectStore == nil {
-		// Backup not configured, skipping WAL
-		contextLog.Info("Backup not configured, skip WAL archiving",
-			"walName", walName,
-			"currentPrimary", cluster.Status.CurrentPrimary,
-			"targetPrimary", cluster.Status.TargetPrimary,
-		)
-		return nil
-	}
 
 	if cluster.Spec.ReplicaCluster != nil && cluster.Spec.ReplicaCluster.Enabled {
 		if podName != cluster.Status.CurrentPrimary && podName != cluster.Status.TargetPrimary {
@@ -169,15 +159,31 @@ func run(
 		return errSwitchoverInProgress
 	}
 
-	maxParallel := 1
-	if cluster.Spec.Backup.BarmanObjectStore.Wal != nil {
-		maxParallel = cluster.Spec.Backup.BarmanObjectStore.Wal.MaxParallel
+	// Request the plugins to archive this WAL
+	if err := archiveWALViaPlugins(ctx, cluster, path.Join(pgData, walName)); err != nil {
+		return err
+	}
+
+	// Request Barman Cloud to archive this WAL
+	if cluster.Spec.Backup == nil || cluster.Spec.Backup.BarmanObjectStore == nil {
+		// Backup not configured, skipping WAL
+		contextLog.Info("Backup not configured, skip WAL archiving via Barman Cloud",
+			"walName", walName,
+			"currentPrimary", cluster.Status.CurrentPrimary,
+			"targetPrimary", cluster.Status.TargetPrimary,
+		)
+		return nil
 	}
 
 	// Get environment from cache
 	env, err := cacheClient.GetEnv(cache.WALArchiveKey)
 	if err != nil {
 		return fmt.Errorf("failed to get envs: %w", err)
+	}
+
+	maxParallel := 1
+	if cluster.Spec.Backup.BarmanObjectStore.Wal != nil {
+		maxParallel = cluster.Spec.Backup.BarmanObjectStore.Wal.MaxParallel
 	}
 
 	// Create the archiver
@@ -232,6 +238,26 @@ func run(
 	// The other errors are related to WAL files that were pre-archived as
 	// a performance optimization and are just logged
 	return walStatus[0].Err
+}
+
+// archiveWALViaPlugins requests every capable plugin to archive the passed
+// WAL file, and returns an error if a configured plugin fails to do so.
+// It will not return an error if there's no plugin capable of WAL archiving
+func archiveWALViaPlugins(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	walName string,
+) error {
+	contextLogger := log.FromContext(ctx)
+
+	pluginClient, err := cluster.LoadSelectedPluginsClient(ctx, cluster.GetWALPluginNames())
+	if err != nil {
+		contextLogger.Error(err, "Error loading plugins while archiving a WAL")
+		return err
+	}
+	defer pluginClient.Close(ctx)
+
+	return pluginClient.ArchiveWAL(ctx, cluster, walName)
 }
 
 // gatherWALFilesToArchive reads from the archived status the list of WAL files

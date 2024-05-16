@@ -33,15 +33,20 @@ import (
 )
 
 var _ = Describe("cluster_status unit tests", func() {
+	var env *testingEnvironment
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+	})
+
 	It("should make sure setCertExpiration works correctly", func() {
 		var certExpirationDate string
 		ctx := context.Background()
-		namespace := newFakeNamespace()
-		cluster := newFakeCNPGCluster(namespace)
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
 		secretName := rand.String(10)
 
 		By("creating the required secret", func() {
-			secret, keyPair := generateFakeCASecretWithDefaultClient(secretName, namespace, "unittest.com")
+			secret, keyPair := generateFakeCASecret(env.client, secretName, namespace, "unittest.com")
 			Expect(secret.Name).To(Equal(secretName))
 
 			_, expDate, err := keyPair.IsExpiring()
@@ -51,7 +56,7 @@ var _ = Describe("cluster_status unit tests", func() {
 		})
 		By("making sure that sets the status of the secret correctly", func() {
 			cluster.Status.Certificates.Expirations = map[string]string{}
-			err := clusterReconciler.setCertExpiration(ctx, cluster, secretName, namespace, certs.CACertKey)
+			err := env.clusterReconciler.setCertExpiration(ctx, cluster, secretName, namespace, certs.CACertKey)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(cluster.Status.Certificates.Expirations[secretName]).To(Equal(certExpirationDate))
 		})
@@ -59,25 +64,25 @@ var _ = Describe("cluster_status unit tests", func() {
 
 	It("makes sure that getPgbouncerIntegrationStatus returns the correct secret name without duplicates", func() {
 		ctx := context.Background()
-		namespace := newFakeNamespace()
-		cluster := newFakeCNPGCluster(namespace)
-		pooler1 := *newFakePooler(cluster)
-		pooler2 := *newFakePooler(cluster)
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		pooler1 := *newFakePooler(env.client, cluster)
+		pooler2 := *newFakePooler(env.client, cluster)
 		Expect(pooler1.Name).ToNot(Equal(pooler2.Name))
 		poolerList := v1.PoolerList{Items: []v1.Pooler{pooler1, pooler2}}
 
-		intStatus, err := clusterReconciler.getPgbouncerIntegrationStatus(ctx, cluster, poolerList)
+		intStatus, err := env.clusterReconciler.getPgbouncerIntegrationStatus(ctx, cluster, poolerList)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(intStatus.Secrets).To(HaveLen(1))
 	})
 
 	It("makes sure getObjectResourceVersion returns the correct object version", func() {
 		ctx := context.Background()
-		namespace := newFakeNamespace()
-		cluster := newFakeCNPGCluster(namespace)
-		pooler := newFakePooler(cluster)
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		pooler := newFakePooler(env.client, cluster)
 
-		version, err := clusterReconciler.getObjectResourceVersion(ctx, cluster, pooler.Name, &v1.Pooler{})
+		version, err := env.clusterReconciler.getObjectResourceVersion(ctx, cluster, pooler.Name, &v1.Pooler{})
 		Expect(err).ToNot(HaveOccurred())
 		Expect(version).To(Equal(pooler.ResourceVersion))
 	})
@@ -85,12 +90,12 @@ var _ = Describe("cluster_status unit tests", func() {
 	It("makes sure setPrimaryInstance works correctly", func() {
 		const podName = "test-pod"
 		ctx := context.Background()
-		namespace := newFakeNamespace()
-		cluster := newFakeCNPGCluster(namespace)
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
 		Expect(cluster.Status.TargetPrimaryTimestamp).To(BeEmpty())
 
 		By("setting the primaryInstance and making sure the passed object is updated", func() {
-			err := clusterReconciler.setPrimaryInstance(ctx, cluster, podName)
+			err := env.clusterReconciler.setPrimaryInstance(ctx, cluster, podName)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(cluster.Status.TargetPrimaryTimestamp).ToNot(BeEmpty())
 			Expect(cluster.Status.TargetPrimary).To(Equal(podName))
@@ -99,7 +104,7 @@ var _ = Describe("cluster_status unit tests", func() {
 		By("making sure the remote resource is updated", func() {
 			remoteCluster := &v1.Cluster{}
 
-			err := k8sClient.Get(ctx, types.NamespacedName{Name: cluster.Name, Namespace: cluster.Namespace}, remoteCluster)
+			err := env.client.Get(ctx, types.NamespacedName{Name: cluster.Name, Namespace: cluster.Namespace}, remoteCluster)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(remoteCluster.Status.TargetPrimaryTimestamp).ToNot(BeEmpty())
 			Expect(remoteCluster.Status.TargetPrimary).To(Equal(podName))
@@ -109,11 +114,11 @@ var _ = Describe("cluster_status unit tests", func() {
 	It("makes sure RegisterPhase works correctly", func() {
 		const phaseReason = "testing"
 		ctx := context.Background()
-		namespace := newFakeNamespace()
-		cluster := newFakeCNPGCluster(namespace)
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
 
 		By("registering the phase and making sure the passed object is updated", func() {
-			err := clusterReconciler.RegisterPhase(ctx, cluster, v1.PhaseSwitchover, phaseReason)
+			err := env.clusterReconciler.RegisterPhase(ctx, cluster, v1.PhaseSwitchover, phaseReason)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(cluster.Status.Phase).To(Equal(v1.PhaseSwitchover))
 			Expect(cluster.Status.PhaseReason).To(Equal(phaseReason))
@@ -121,7 +126,7 @@ var _ = Describe("cluster_status unit tests", func() {
 
 		By("making sure the remote resource is updated", func() {
 			remoteCluster := &v1.Cluster{}
-			err := k8sClient.Get(ctx, types.NamespacedName{Name: cluster.Name, Namespace: cluster.Namespace}, remoteCluster)
+			err := env.client.Get(ctx, types.NamespacedName{Name: cluster.Name, Namespace: cluster.Namespace}, remoteCluster)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(remoteCluster.Status.Phase).To(Equal(v1.PhaseSwitchover))
 			Expect(remoteCluster.Status.PhaseReason).To(Equal(phaseReason))
@@ -132,16 +137,16 @@ var _ = Describe("cluster_status unit tests", func() {
 		ctx := context.Background()
 		crReconciler := &ClusterReconciler{
 			Client: fakeClientWithIndexAdapter{
-				Client: clusterReconciler.Client,
+				Client: env.clusterReconciler.Client,
 			},
-			DiscoveryClient: clusterReconciler.DiscoveryClient,
-			Scheme:          clusterReconciler.Scheme,
-			Recorder:        clusterReconciler.Recorder,
-			StatusClient:    clusterReconciler.StatusClient,
+			DiscoveryClient: env.clusterReconciler.DiscoveryClient,
+			Scheme:          env.clusterReconciler.Scheme,
+			Recorder:        env.clusterReconciler.Recorder,
+			StatusClient:    env.clusterReconciler.StatusClient,
 		}
 
-		namespace := newFakeNamespace()
-		cluster := newFakeCNPGCluster(namespace)
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
 		var jobs []batchv1.Job
 		var pods []corev1.Pod
 		var pvcs []corev1.PersistentVolumeClaim

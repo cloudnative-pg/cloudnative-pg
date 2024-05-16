@@ -20,7 +20,7 @@ import (
 	"context"
 	"time"
 
-	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -35,6 +35,11 @@ import (
 )
 
 var _ = Describe("backup_controller barmanObjectStore unit tests", func() {
+	var env *testingEnvironment
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+	})
+
 	Context("isValidBackupRunning works correctly", func() {
 		const (
 			clusterPrimary = "cluster-example-1"
@@ -46,7 +51,7 @@ var _ = Describe("backup_controller barmanObjectStore unit tests", func() {
 		var pod *corev1.Pod
 
 		BeforeEach(func(ctx context.Context) {
-			namespace := newFakeNamespace()
+			namespace := newFakeNamespace(env.client)
 
 			cluster = &apiv1.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
@@ -91,7 +96,7 @@ var _ = Describe("backup_controller barmanObjectStore unit tests", func() {
 					},
 				},
 			}
-			err := backupReconciler.Create(ctx, pod)
+			err := env.backupReconciler.Create(ctx, pod)
 			Expect(err).ToNot(HaveOccurred())
 
 			pod.Status = corev1.PodStatus{
@@ -102,20 +107,20 @@ var _ = Describe("backup_controller barmanObjectStore unit tests", func() {
 					},
 				},
 			}
-			err = backupReconciler.Status().Update(ctx, pod)
+			err = env.backupReconciler.Status().Update(ctx, pod)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
 		It("returning true when a backup is in running phase (primary)", func(ctx context.Context) {
 			backup.Spec.Target = apiv1.BackupTargetPrimary
-			res, err := backupReconciler.isValidBackupRunning(ctx, backup, cluster)
+			res, err := env.backupReconciler.isValidBackupRunning(ctx, backup, cluster)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(res).To(BeTrue())
 		})
 
 		It("returning true when a backup is in running phase (standby)", func(ctx context.Context) {
 			backup.Spec.Target = apiv1.BackupTargetStandby
-			res, err := backupReconciler.isValidBackupRunning(ctx, backup, cluster)
+			res, err := env.backupReconciler.isValidBackupRunning(ctx, backup, cluster)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(res).To(BeTrue())
 		})
@@ -123,31 +128,31 @@ var _ = Describe("backup_controller barmanObjectStore unit tests", func() {
 		It("returning false when a backup has no Phase or InstanceID", func(ctx context.Context) {
 			backup.Status.Phase = ""
 			backup.Status.InstanceID = nil
-			res, err := backupReconciler.isValidBackupRunning(ctx, backup, cluster)
+			res, err := env.backupReconciler.isValidBackupRunning(ctx, backup, cluster)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(res).To(BeFalse())
 		})
 
 		It("returning false if the elected backup pod is inactive", func(ctx context.Context) {
 			pod.Status.Phase = corev1.PodFailed
-			err := backupReconciler.Status().Update(ctx, pod)
+			err := env.backupReconciler.Status().Update(ctx, pod)
 			Expect(err).NotTo(HaveOccurred())
 
-			res, err := backupReconciler.isValidBackupRunning(ctx, backup, cluster)
+			res, err := env.backupReconciler.isValidBackupRunning(ctx, backup, cluster)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(res).To(BeFalse())
 		})
 
 		It("returning false if the elected backup pod has been restarted", func(ctx context.Context) {
 			backup.Status.InstanceID.ContainerID = containerID + "-new"
-			res, err := backupReconciler.isValidBackupRunning(ctx, backup, cluster)
+			res, err := env.backupReconciler.isValidBackupRunning(ctx, backup, cluster)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(res).To(BeFalse())
 		})
 
 		It("returning an error when the backup target is wrong", func(ctx context.Context) {
 			backup.Spec.Target = "fakeTarget"
-			res, err := backupReconciler.isValidBackupRunning(ctx, backup, cluster)
+			res, err := env.backupReconciler.isValidBackupRunning(ctx, backup, cluster)
 			Expect(err).To(HaveOccurred())
 			Expect(res).To(BeFalse())
 		})
@@ -256,6 +261,7 @@ var _ = Describe("backup_controller volumeSnapshot unit tests", func() {
 
 var _ = Describe("update snapshot backup metadata", func() {
 	var (
+		env           *testingEnvironment
 		snapshots     volumesnapshot.VolumeSnapshotList
 		cluster       *apiv1.Cluster
 		now           = metav1.NewTime(time.Now().Local().Truncate(time.Second))
@@ -265,7 +271,8 @@ var _ = Describe("update snapshot backup metadata", func() {
 	)
 
 	BeforeEach(func() {
-		namespace := newFakeNamespace()
+		env = buildTestEnvironment()
+		namespace := newFakeNamespace(env.client)
 		cluster = &apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "cluster-example",

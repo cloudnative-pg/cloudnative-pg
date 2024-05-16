@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	"github.com/kballard/go-shellquote"
-	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -334,7 +334,7 @@ func createPrimaryJob(cluster apiv1.Cluster, nodeSerial int, role jobRole, initC
 							SecurityContext: CreateContainerSecurityContext(cluster.GetSeccompProfile()),
 						},
 					},
-					Volumes: createPostgresVolumes(cluster, instanceName),
+					Volumes: createPostgresVolumes(&cluster, instanceName),
 					SecurityContext: CreatePodSecurityContext(
 						cluster.GetSeccompProfile(),
 						cluster.GetPostgresUID(),

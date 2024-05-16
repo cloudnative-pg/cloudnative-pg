@@ -70,13 +70,13 @@ func NewCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use: "run [flags]",
-		PreRunE: func(cmd *cobra.Command, args []string) error {
+		PreRunE: func(cmd *cobra.Command, _ []string) error {
 			return management.WaitKubernetesAPIServer(cmd.Context(), client.ObjectKey{
 				Name:      clusterName,
 				Namespace: namespace,
 			})
 		},
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := log.IntoContext(cmd.Context(), log.GetLogger())
 			instance := postgres.NewInstance()
 
@@ -89,7 +89,7 @@ func NewCmd() *cobra.Command {
 				return runSubCommand(ctx, instance)
 			})
 		},
-		PostRunE: func(cmd *cobra.Command, args []string) error {
+		PostRunE: func(cmd *cobra.Command, _ []string) error {
 			if err := istio.TryInvokeQuitEndpoint(cmd.Context()); err != nil {
 				return err
 			}

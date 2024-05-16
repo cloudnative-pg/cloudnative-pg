@@ -37,7 +37,7 @@ import (
 
 const (
 	// DefaultPgbouncerImage is the name of the pgbouncer image used by default
-	DefaultPgbouncerImage = "ghcr.io/cloudnative-pg/pgbouncer:1.21.0"
+	DefaultPgbouncerImage = "ghcr.io/cloudnative-pg/pgbouncer:1.22.1"
 )
 
 // Deployment create the deployment of pgbouncer, given
@@ -76,7 +76,7 @@ func Deployment(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*appsv1.Deploymen
 			"run",
 		}, false).
 		WithContainerPort("pgbouncer", &corev1.ContainerPort{
-			Name:          "pgbouncer",
+			Name:          pgBouncerConfig.PgBouncerPortName,
 			ContainerPort: pgBouncerConfig.PgBouncerPort,
 		}).
 		WithContainerPort("pgbouncer", &corev1.ContainerPort{

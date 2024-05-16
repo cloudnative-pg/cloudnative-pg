@@ -64,6 +64,12 @@ var (
 	operatorLogDumped       bool
 	quickDeletionPeriod     = int64(1)
 	testTimeouts            map[utils.Timeout]int
+	minioEnv                = &utils.MinioEnv{
+		Namespace:    "minio",
+		ServiceName:  "minio-service.minio",
+		CaSecretName: "minio-server-ca-secret",
+		TLSSecret:    "minio-server-tls-secret",
+	}
 )
 
 var _ = SynchronizedBeforeSuite(func() []byte {
@@ -71,40 +77,67 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	env, err = utils.NewTestingEnvironment()
 	Expect(err).ShouldNot(HaveOccurred())
 
-	pod, err := utils.GetPsqlClient(psqlClientNamespace, env)
+	psqlPod, err := utils.GetPsqlClient(psqlClientNamespace, env)
 	Expect(err).ShouldNot(HaveOccurred())
 	DeferCleanup(func() {
 		err := env.DeleteNamespaceAndWait(psqlClientNamespace, 300)
 		Expect(err).ToNot(HaveOccurred())
 	})
-	// here we serialized psql client pod object info and will be
-	// accessible to all nodes (specs)
-	psqlPodJSONObj, err := json.Marshal(pod)
+
+	// Set up a global MinIO service on his own namespace
+	err = env.CreateNamespace(minioEnv.Namespace)
+	Expect(err).ToNot(HaveOccurred())
+	DeferCleanup(func() {
+		err := env.DeleteNamespaceAndWait(minioEnv.Namespace, 300)
+		Expect(err).ToNot(HaveOccurred())
+	})
+	minioEnv.Timeout = uint(testTimeouts[utils.MinioInstallation])
+	minioClient, err := utils.MinioDeploy(minioEnv, env)
+	Expect(err).ToNot(HaveOccurred())
+
+	caSecret := minioEnv.CaPair.GenerateCASecret(minioEnv.Namespace, minioEnv.CaSecretName)
+	minioEnv.CaSecretObj = *caSecret
+	objs := map[string]corev1.Pod{
+		"psql":  *psqlPod,
+		"minio": *minioClient,
+	}
+
+	jsonObjs, err := json.Marshal(objs)
 	if err != nil {
 		panic(err)
 	}
-	return psqlPodJSONObj
-}, func(data []byte) {
+
+	return jsonObjs
+}, func(jsonObjs []byte) {
 	var err error
 	// We are creating new testing env object again because above testing env can not serialize and
 	// accessible to all nodes (specs)
 	if env, err = utils.NewTestingEnvironment(); err != nil {
 		panic(err)
 	}
+
 	_ = k8sscheme.AddToScheme(env.Scheme)
 	_ = apiv1.AddToScheme(env.Scheme)
+
 	if testLevelEnv, err = tests.TestLevel(); err != nil {
 		panic(err)
 	}
+
 	if testTimeouts, err = utils.Timeouts(); err != nil {
 		panic(err)
 	}
+
 	if testCloudVendorEnv, err = utils.TestCloudVendor(); err != nil {
 		panic(err)
 	}
-	if err := json.Unmarshal(data, &psqlClientPod); err != nil {
+
+	var objs map[string]*corev1.Pod
+	if err := json.Unmarshal(jsonObjs, &objs); err != nil {
 		panic(err)
 	}
+
+	psqlClientPod = objs["psql"]
+	minioEnv.Client = objs["minio"]
 })
 
 var _ = SynchronizedAfterSuite(func() {
@@ -119,6 +152,7 @@ var _ = SynchronizedAfterSuite(func() {
 // of output are not legal JSON
 func saveLogs(buf *bytes.Buffer, logsType, specName string, output io.Writer, capLines int) {
 	scanner := bufio.NewScanner(buf)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 	filename := fmt.Sprintf("out/%s_%s.log", logsType, specName)
 	f, err := os.Create(filepath.Clean(filename))
 	if err != nil {
@@ -209,7 +243,7 @@ var _ = BeforeEach(func() {
 			_, _ = fmt.Fprintf(&buf, "Error tailing logs, dumping operator logs: %v\n", err)
 		}
 	}()
-	DeferCleanup(func(ctx SpecContext) {
+	DeferCleanup(func(_ SpecContext) {
 		if CurrentSpecReport().Failed() {
 			specName := CurrentSpecReport().FullText()
 			capLines := 10

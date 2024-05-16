@@ -720,7 +720,20 @@ func minioPath(serverName, fileName string) string {
 	// the * regexes enable matching these typical paths:
 	// 	minio/backups/serverName/base/20220618T140300/data.tar
 	// 	minio/backups/serverName/wals/0000000100000000/000000010000000000000002.gz
-	return filepath.Join("*", serverName, "*", "*", fileName)
+	//  minio/backups/serverName/wals/00000002.history.gz
+	return filepath.Join("*", serverName, "*", fileName)
+}
+
+// CheckPointAndSwitchWalOnPrimary trigger a checkpoint and switch wal on primary pod and returns the latest WAL file
+func CheckPointAndSwitchWalOnPrimary(namespace, clusterName string) string {
+	var latestWAL string
+	By("trigger checkpoint and switch wal on primary", func() {
+		pod, err := env.GetClusterPrimary(namespace, clusterName)
+		Expect(err).ToNot(HaveOccurred())
+		primary := pod.GetName()
+		latestWAL = switchWalAndGetLatestArchive(namespace, primary)
+	})
+	return latestWAL
 }
 
 // AssertArchiveWalOnMinio archives WALs and verifies that they are in the storage
@@ -738,7 +751,7 @@ func AssertArchiveWalOnMinio(namespace, clusterName string, serverName string) {
 	By(fmt.Sprintf("verify the existence of WAL %v in minio", latestWALPath), func() {
 		Eventually(func() (int, error) {
 			// WALs are compressed with gzip in the fixture
-			return testsUtils.CountFilesOnMinio(namespace, minioClientName, latestWALPath)
+			return testsUtils.CountFilesOnMinio(minioEnv, latestWALPath)
 		}, testTimeouts[testsUtils.WalsInMinio]).Should(BeEquivalentTo(1))
 	})
 }
@@ -1122,7 +1135,6 @@ func AssertFastFailOver(
 		}
 		lm := clusterName + "-1"
 		err = env.DeletePod(namespace, lm, quickDelete)
-
 		Expect(err).ToNot(HaveOccurred())
 	})
 
@@ -1812,7 +1824,7 @@ func prepareClusterForPITROnMinio(
 		testsUtils.ExecuteBackup(namespace, backupSampleFile, false, testTimeouts[testsUtils.BackupIsReady], env)
 		latestTar := minioPath(clusterName, "data.tar")
 		Eventually(func() (int, error) {
-			return testsUtils.CountFilesOnMinio(namespace, minioClientName, latestTar)
+			return testsUtils.CountFilesOnMinio(minioEnv, latestTar)
 		}, 60).Should(BeNumerically(">=", expectedVal),
 			fmt.Sprintf("verify the number of backups %v is greater than or equal to %v", latestTar,
 				expectedVal))
@@ -2408,16 +2420,22 @@ func DeleteTableUsingPgBouncerService(
 }
 
 func collectAndAssertDefaultMetricsPresentOnEachPod(namespace, clusterName, curlPodName string, expectPresent bool) {
-	By("collecting and verify a set of default metrics on each pod", func() {
+	By("collecting and verifying a set of default metrics on each pod", func() {
 		defaultMetrics := []string{
 			"cnpg_pg_settings_setting",
 			"cnpg_backends_waiting_total",
 			"cnpg_pg_postmaster_start_time",
 			"cnpg_pg_replication",
 			"cnpg_pg_stat_archiver",
-			"cnpg_pg_stat_bgwriter",
 			"cnpg_pg_stat_database",
 		}
+
+		if env.PostgresVersion < 17 {
+			defaultMetrics = append(defaultMetrics,
+				"cnpg_pg_stat_bgwriter",
+			)
+		}
+
 		podList, err := env.GetClusterPodList(namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 		for _, pod := range podList.Items {
@@ -2551,6 +2569,10 @@ func GetYAMLContent(sampleFilePath string) ([]byte, error) {
 			"E2E_PRE_ROLLING_UPDATE_IMG": preRollingUpdateImg,
 			"E2E_CSI_STORAGE_CLASS":      csiStorageClass,
 		})
+
+		if serverName := os.Getenv("SERVER_NAME"); serverName != "" {
+			envVars["SERVER_NAME"] = serverName
+		}
 
 		yaml, err = testsUtils.Envsubst(envVars, data)
 		if err != nil {

@@ -33,11 +33,11 @@ on:
 
 # set up environment variables to be used across all the jobs
 env:
-  GOLANG_VERSION: "1.21.x"
+  GOLANG_VERSION: "1.22.x"
   KUBEBUILDER_VERSION: "2.3.1"
-  KIND_VERSION: "v0.20.0"
-  ROOK_VERSION: "v1.12.0"
-  EXTERNAL_SNAPSHOTTER_VERSION: "v6.2.2"
+  KIND_VERSION: "v0.22.0"
+  ROOK_VERSION: "v1.14.3"
+  EXTERNAL_SNAPSHOTTER_VERSION: "v7.0.2"
   OPERATOR_IMAGE_NAME: "ghcr.io/${{ github.repository }}-testing"
   BUILD_PUSH_PROVENANCE: ""
   BUILD_PUSH_CACHE_FROM: ""
@@ -50,7 +50,7 @@ env:
   BUILD_MANAGER_RELEASE_ARGS: "build --skip=validate --rm-dist --id manager"
   # Keep in mind that adding more platforms (architectures) will increase the building
   # time even if we use the ghcache for the building process.
-  PLATFORM: "linux/amd64,linux/arm64"
+  PLATFORMS: "linux/amd64,linux/arm64"
   E2E_SUFFIX: "cnpge2e"
 
 defaults:
@@ -68,7 +68,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        branch: [release-1.21, release-1.22]
+        branch: [release-1.21, release-1.22, release-1.23]
     steps:
       - name: Invoke workflow with inputs
         uses: benc-uk/workflow-dispatch@v1
@@ -148,7 +148,7 @@ jobs:
         id: refs
 
       - name: Create comment
-        uses: peter-evans/create-or-update-comment@v3
+        uses: peter-evans/create-or-update-comment@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           repository: ${{ github.repository }}
@@ -248,7 +248,6 @@ jobs:
       pull-requests: read
     outputs:
       image: ${{ steps.image-meta.outputs.image }}
-      image_name: ${{ env.IMAGE_NAME }}
       # 'branch_name' is used in 'GetMostRecentReleaseTag' in the Go code
       branch_name: ${{ steps.build-meta.outputs.branch_name }}
       upload_artifacts: ${{ steps.build-meta.outputs.upload_artifacts }}
@@ -256,8 +255,10 @@ jobs:
       commit_sha: ${{ steps.build-meta.outputs.commit_sha }}
       author_name: ${{ steps.build-meta.outputs.author_name }}
       author_email: ${{ steps.build-meta.outputs.author_email }}
-      controller_img_ubi: ${{ env.CONTROLLER_IMG_UBI }}
+      controller_img: ${{ env.CONTROLLER_IMG }}
+      controller_img_ubi8: ${{ env.CONTROLLER_IMG_UBI8 }}
       bundle_img: ${{ env.BUNDLE_IMG }}
+      catalog_img: ${{ env.CATALOG_IMG }}
     steps:
       -
         name: Checkout
@@ -363,8 +364,7 @@ jobs:
           flavor: |
             suffix=-ubi8
           tags: |
-            type=ref,event=branch
-            type=ref,event=pr
+            type=raw,value=${{ steps.build-meta.outputs.tag_name }}
       -
         name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -386,6 +386,7 @@ jobs:
         with:
           platforms: ${{ env.PLATFORMS }}
           context: .
+          file: Dockerfile
           push: true
           build-args: |
             VERSION=${{ env.VERSION }}
@@ -423,15 +424,15 @@ jobs:
         name: Output images
         env:
           TAGS: ${{ steps.docker-meta.outputs.tags }}
-          TAGS_UBI: ${{ steps.docker-meta-ubi8.outputs.tags }}
+          TAGS_UBI8: ${{ steps.docker-meta-ubi8.outputs.tags }}
         run: |
           LOWERCASE_OPERATOR_IMAGE_NAME=${OPERATOR_IMAGE_NAME,,}
           TAG=${TAGS#*:}
-          TAG_UBI=${TAGS_UBI#*:}
-          echo "IMAGE_NAME=${LOWERCASE_OPERATOR_IMAGE_NAME}" >> $GITHUB_ENV
+          TAG_UBI=${TAGS_UBI8#*:}
           echo "CONTROLLER_IMG=${LOWERCASE_OPERATOR_IMAGE_NAME}:${TAG}" >> $GITHUB_ENV
-          echo "CONTROLLER_IMG_UBI=${LOWERCASE_OPERATOR_IMAGE_NAME}:${TAG_UBI}" >> $GITHUB_ENV
+          echo "CONTROLLER_IMG_UBI8=${LOWERCASE_OPERATOR_IMAGE_NAME}:${TAG_UBI}" >> $GITHUB_ENV
           echo "BUNDLE_IMG=${LOWERCASE_OPERATOR_IMAGE_NAME}:bundle-${TAG}" >> $GITHUB_ENV
+          echo "CATALOG_IMG=${LOWERCASE_OPERATOR_IMAGE_NAME}:catalog-${TAG}" >> $GITHUB_ENV
       -
         name: Generate manifest for operator deployment
         id: generate-manifest
@@ -484,6 +485,7 @@ jobs:
         with:
           platforms: ${{ env.PLATFORMS }}
           context: .
+          file: Dockerfile
           push: true
           build-args: |
             VERSION=${{ env.VERSION }}-prime
@@ -686,7 +688,7 @@ jobs:
       -
         # 'Retry' preparing the E2E test ENV
         name: Prepare the environment
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         with:
           timeout_seconds: 300
           max_attempts: 3
@@ -814,18 +816,18 @@ jobs:
     steps:
       -
         name: Azure Login
-        uses: azure/login@v1.5.1
+        uses: azure/login@v2.1.0
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
       -
         name: Create AKS shared resources
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         id: setup
         with:
           timeout_minutes: 10
           max_attempts: 3
           command: |
-            az extension add --name aks-preview
+            az extension add --allow-preview true --name aks-preview
             az account set --subscription ${{ secrets.AZURE_SUBSCRIPTION }}
 
             AZURE_STORAGE_ACCOUNT="${{ github.run_number }}${{ env.E2E_SUFFIX }}"
@@ -896,7 +898,7 @@ jobs:
           check-latest: true
       -
         name: Prepare the environment
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         with:
           timeout_seconds: 300
           max_attempts: 3
@@ -905,7 +907,7 @@ jobs:
             sudo apt-get install -y gettext-base
       -
         name: Install ginkgo
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         with:
           timeout_minutes: 1
           max_attempts: 3
@@ -921,7 +923,7 @@ jobs:
           password: ${{ env.REGISTRY_PASSWORD }}
       -
         name: Azure Login
-        uses: azure/login@v1.5.1
+        uses: azure/login@v2.1.0
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
       -
@@ -931,12 +933,12 @@ jobs:
           version: v${{ env.K8S_VERSION }}
       -
         name: Create AKS cluster
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         with:
           timeout_minutes: 10
           max_attempts: 3
           command: |
-            az extension add --name aks-preview
+            az extension add --allow-preview true --name aks-preview
             az account set --subscription ${{ secrets.AZURE_SUBSCRIPTION }}
 
             # name of the AKS cluster
@@ -976,7 +978,7 @@ jobs:
         # use rook to get the small PV we use in the tests.
         # It can still take a while to deploy rook.
         name: Set up Rook
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         with:
           timeout_minutes: 27
           max_attempts: 1
@@ -1090,6 +1092,7 @@ jobs:
         name: Clean up
         if: always()
         run: |
+          az extension add --allow-preview true --name monitor-control-service
           az account set --subscription ${{ secrets.AZURE_SUBSCRIPTION }}
           attempt=1
           max_attempts=3
@@ -1148,7 +1151,7 @@ jobs:
       -
         name: Azure Login
         if: always()
-        uses: azure/login@v1.5.1
+        uses: azure/login@v2.1.0
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
       -
@@ -1245,7 +1248,7 @@ jobs:
           password: ${{ env.REGISTRY_PASSWORD }}
       -
         name: Prepare the environment
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         with:
           timeout_seconds: 300
           max_attempts: 3
@@ -1254,7 +1257,7 @@ jobs:
             sudo apt-get install -y gettext-base
       -
         name: Install ginkgo
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         with:
           timeout_minutes: 1
           max_attempts: 3
@@ -1269,7 +1272,7 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
       -
         name: Install eksctl
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         with:
           timeout_minutes: 1
           max_attempts: 3
@@ -1321,7 +1324,7 @@ jobs:
           kubectl get storageclass
       -
         name: Setup Velero
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         env:
           VELERO_VERSION: v1.9.2
           VELERO_AWS_PLUGIN_VERSION: v1.5.1
@@ -1372,7 +1375,7 @@ jobs:
               --wait
       -
         name: Setup log archiving via fluentd and insights
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         with:
           timeout_minutes: 1
           max_attempts: 3
@@ -1628,7 +1631,7 @@ jobs:
           password: ${{ env.REGISTRY_PASSWORD }}
       -
         name: Prepare the environment
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         with:
           timeout_seconds: 300
           max_attempts: 3
@@ -1637,7 +1640,7 @@ jobs:
             sudo apt-get install -y gettext-base
       -
         name: Install ginkgo
-        uses: nick-fields/retry@v2
+        uses: nick-fields/retry@v3
         with:
           timeout_seconds: 120
           max_attempts: 3
@@ -1849,7 +1852,7 @@ jobs:
 
   e2e-openshift:
     name: Run E2E on OpenShift
-    if: | 
+    if: |
       always() && !cancelled() &&
       vars.OPENSHIFT_ENABLED == 'true' &&
       needs.generate-jobs.outputs.openshiftEnabled == 'true' &&
@@ -1919,7 +1922,7 @@ jobs:
         name: Set up QEMU
         uses: docker/setup-qemu-action@v3
         with:
-          platforms: ${{ needs.buildx.outputs.platforms }}
+          platforms: ${{ env.PLATFORMS }}
       -
         name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -1934,9 +1937,9 @@ jobs:
       -
         name: Build and push the operator and catalog
         env:
-          IMAGE_NAME: ${{ needs.buildx.outputs.image_name }}
-          CONTROLLER_IMG: ${{ needs.buildx.outputs.controller_img_ubi }}
+          CONTROLLER_IMG: ${{ needs.buildx.outputs.controller_img_ubi8 }}
           BUNDLE_IMG: ${{ needs.buildx.outputs.bundle_img }}
+          CATALOG_IMG: ${{ needs.buildx.outputs.catalog_img }}
         run: |
           make olm-catalog
       -
@@ -1971,6 +1974,7 @@ jobs:
   summarize-e2e-tests:
     name: E2E test suite
     needs:
+      - evaluate_options
       - e2e-local
       - e2e-eks
       - e2e-aks
@@ -2033,7 +2037,10 @@ jobs:
         if: |
           steps.generate-summary.outputs.alerts &&
           github.repository_owner == env.REPOSITORY_OWNER &&
-          github.ref == 'refs/heads/main'
+          (
+            github.event_name == 'schedule' ||
+            startsWith(needs.evaluate_options.outputs.git_ref, 'refs/heads/release-')
+          )
         env:
           SLACK_COLOR: "danger"
           SLACK_ICON: https://avatars.githubusercontent.com/u/85171364?size=48

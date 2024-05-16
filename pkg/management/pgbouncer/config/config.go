@@ -66,6 +66,8 @@ const (
 	PgBouncerSocketDir = postgres.SocketDirectory
 	// PgBouncerPort is the port where pgbouncer will be listening
 	PgBouncerPort = 5432
+	// PgBouncerPortName is the name of the port where pgbouncer will be listening
+	PgBouncerPortName = "pgbouncer"
 
 	pgBouncerIniTemplateString = `
 [databases]

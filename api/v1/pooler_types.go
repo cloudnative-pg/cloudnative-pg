@@ -36,7 +36,7 @@ const (
 	PoolerTypeRO = PoolerType("ro")
 
 	// DefaultPgBouncerPoolerAuthQuery is the default auth_query for PgBouncer
-	DefaultPgBouncerPoolerAuthQuery = "SELECT usename, passwd FROM user_search($1)"
+	DefaultPgBouncerPoolerAuthQuery = "SELECT usename, passwd FROM public.user_search($1)"
 )
 
 // PgBouncerPoolMode is the mode of PgBouncer
@@ -81,6 +81,10 @@ type PoolerSpec struct {
 	// The configuration of the monitoring infrastructure of this pooler.
 	// +optional
 	Monitoring *PoolerMonitoringConfiguration `json:"monitoring,omitempty"`
+
+	// Template for the Service to be created
+	// +optional
+	ServiceTemplate *ServiceTemplateSpec `json:"serviceTemplate,omitempty"`
 }
 
 // PoolerMonitoringConfiguration is the type containing all the monitoring
@@ -126,6 +130,20 @@ type PodTemplateSpec struct {
 	Spec corev1.PodSpec `json:"spec,omitempty"`
 }
 
+// ServiceTemplateSpec is a structure allowing the user to set
+// a template for Service generation.
+type ServiceTemplateSpec struct {
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	// +optional
+	ObjectMeta Metadata `json:"metadata,omitempty"`
+
+	// Specification of the desired behavior of the service.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	// +optional
+	Spec corev1.ServiceSpec `json:"spec,omitempty"`
+}
+
 // PgBouncerSpec defines how to configure PgBouncer
 type PgBouncerSpec struct {
 	// The pool mode. Default: `session`.
@@ -135,13 +153,13 @@ type PgBouncerSpec struct {
 
 	// The credentials of the user that need to be used for the authentication
 	// query. In case it is specified, also an AuthQuery
-	// (e.g. "SELECT usename, passwd FROM pg_shadow WHERE usename=$1")
+	// (e.g. "SELECT usename, passwd FROM pg_catalog.pg_shadow WHERE usename=$1")
 	// has to be specified and no automatic CNPG Cluster integration will be triggered.
 	// +optional
 	AuthQuerySecret *LocalObjectReference `json:"authQuerySecret,omitempty"`
 
 	// The query that will be used to download the hash of the password
-	// of a certain user. Default: "SELECT usename, passwd FROM user_search($1)".
+	// of a certain user. Default: "SELECT usename, passwd FROM public.user_search($1)".
 	// In case it is specified, also an AuthQuerySecret has to be specified and
 	// no automatic CNPG Cluster integration will be triggered.
 	// +optional

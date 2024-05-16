@@ -32,7 +32,7 @@ on:
 
 # set up environment variables to be used across all the jobs
 env:
-  GOLANG_VERSION: "1.21.x"
+  GOLANG_VERSION: "1.22.x"
 
 jobs:
   duplicate_runs:

@@ -40,7 +40,7 @@ For development contributions, please refer to the separate section called
 ## Ask for Help
 
 The best way to reach us with a question when contributing is to drop a line in
-our [Slack channel](https://join.slack.com/t/cloudnativepg/shared_invite/zt-237bhehx3-htDW2kz2hKJxEhn1W4VTnw), or
+our [Slack channel](https://join.slack.com/t/cloudnativepg/shared_invite/zt-2ij5hagfo-B04EQ9DUlGFzD6GEHDqE0g), or
 start a new Github discussion.
 
 ## Raising Issues
@@ -57,20 +57,7 @@ If you are trying to report a vulnerability, please refer to the
 
 ## Meetings
 
-Absolutely everyone is welcome to come to any of our meetings. You never need an
-invitation to join us. In fact, we want you to join us, even if you don’t have
-anything you feel like you want to contribute. Just being there is enough!
+We extend a warm welcome to everyone to join any of our meetings.
+For further details, please visit the
+[CloudNativePG Community Meetings](https://github.com/cloudnative-pg#cloudnativepg-community-meetings) page.
 
-You don’t have to turn on your video. The first time you come, introducing
-yourself is more than enough. Over time, we hope that you feel comfortable
-voicing your opinions, giving feedback on others’ ideas, and even sharing your
-own ideas, and experiences.
-
-At the moment, the only meeting we have is the bi-weekly meeting for developers.
-When the community grows, we hope there'll be other meetings, more focused on
-specific aspects/subprojects (e.g. website).
-
-| What               | When                                                | Where                                                                                                      | Notes                                                                                                              |
-| ------------------ | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| Developers meeting | First and third Wednesday of each month, 4PM CET/CEST | [Zoom](https://enterprisedb.zoom.us/j/95167522706?pwd=WTJxZFRVUUFBNHVrL3hSVDhuMXdQUT09) (Passcode: 278691) | [Agenda/minutes](https://docs.google.com/document/d/1Bmf2AZG5WLKAyESJbYk7MbsfiuD3jgdIDQrDkNuKT9w/edit?usp=sharing), [Calendar](https://calendar.google.com/calendar?cid=NTRuNzMxMjY5aDNhcDN1cGs4MzdyYW9naThAZ3JvdXAuY2FsZW5kYXIuZ29vZ2xlLmNvbQ) |
-| Office Hours meeting | Fourth Wednesday of each month, 4PM CET/CEST | [Zoom](https://enterprisedb.zoom.us/j/95167522706?pwd=WTJxZFRVUUFBNHVrL3hSVDhuMXdQUT09) (Passcode: 278691) | It’s a free-form meeting, we can look at problems, discuss PR’s or Issues etc. There’s the [#office-hours](https://cloudnativepg.slack.com/archives/C05RKMLTY1F) channel available if you want to mention something relating to office hours (today or future sessions). |

@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"runtime"
 	"sort"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -32,7 +33,6 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/executablehash"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/hibernation"
@@ -311,11 +311,23 @@ func (r *ClusterReconciler) updateResourceStatus(
 	// Set the current hash code of the operator binary inside the status.
 	// This is used by the instance manager to validate if a certain binary is
 	// valid or not
-	var err error
-	cluster.Status.OperatorHash, err = executablehash.Get()
+	currentArch, err := utils.GetAvailableArchitecture(runtime.GOARCH)
 	if err != nil {
 		return err
 	}
+	cluster.Status.OperatorHash = currentArch.GetHash()
+
+	// Set all the architectures available for this cluster inside the status.
+	architectures := utils.GetAvailableArchitectures()
+	availableArchitectures := make([]apiv1.AvailableArchitecture, 0, len(architectures))
+	for _, a := range architectures {
+		availableArchitectures = append(availableArchitectures,
+			apiv1.AvailableArchitecture{
+				GoArch: a.GoArch,
+				Hash:   a.GetHash(),
+			})
+	}
+	cluster.Status.AvailableArchitectures = availableArchitectures
 
 	// refresh expiration dates of certifications
 	if err := r.refreshCertsExpirations(ctx, cluster); err != nil {

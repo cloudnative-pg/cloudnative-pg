@@ -60,8 +60,8 @@ var _ = Describe("Test the command", func() {
 		Build()
 	It("should get the command help", func() {
 		cmd := clusterCmd()
-		err := cmd.Execute()
-		Expect(err).To(HaveOccurred())
+		// A panic happens when a tested function returns with os.Exit(0)
+		Expect(func() { _ = cmd.Execute() }).Should(Panic())
 	})
 
 	It("should not fail, with cluster name as argument", func() {

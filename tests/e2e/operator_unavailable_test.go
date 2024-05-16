@@ -17,7 +17,6 @@ limitations under the License.
 package e2e
 
 import (
-	"fmt"
 	"sync"
 
 	corev1 "k8s.io/api/core/v1"
@@ -27,7 +26,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
-	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -73,24 +71,9 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 			Expect(err).ToNot(HaveOccurred())
 			AssertCreateTestData(namespace, clusterName, "test", primary)
 
-			operatorNamespace, err := env.GetOperatorNamespaceName()
-			Expect(err).ToNot(HaveOccurred())
-
 			By("scaling down operator replicas to zero", func() {
-				operatorDeployment, err := env.GetOperatorDeployment()
+				err := env.ScaleOperatorDeployment(0)
 				Expect(err).ToNot(HaveOccurred())
-				// Scale down operator deployment to zero replicas
-				cmd := fmt.Sprintf("kubectl scale deploy %v --replicas=0 -n %v",
-					operatorDeployment.Name, operatorNamespace)
-				_, _, err = testsUtils.Run(cmd)
-				Expect(err).ToNot(HaveOccurred())
-
-				// Verify the operator pod is not present anymore
-				Eventually(func() (int, error) {
-					podList := &corev1.PodList{}
-					err := env.Client.List(env.Ctx, podList, ctrlclient.InNamespace(operatorNamespace))
-					return len(podList.Items), err
-				}, 120).Should(BeEquivalentTo(0))
 			})
 
 			By("deleting primary pod", func() {
@@ -128,18 +111,8 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 
 			By("scaling up the operator replicas to 1", func() {
 				// Scale up operator deployment to one replica
-				deployment, err := env.GetOperatorDeployment()
+				err := env.ScaleOperatorDeployment(1)
 				Expect(err).ToNot(HaveOccurred())
-				cmd := fmt.Sprintf("kubectl scale deploy %v --replicas=1 -n %v",
-					deployment.Name, operatorNamespace)
-				_, _, err = testsUtils.Run(cmd)
-				Expect(err).ToNot(HaveOccurred())
-				timeout := 120
-				Eventually(func() (int, error) {
-					podList := &corev1.PodList{}
-					err := env.Client.List(env.Ctx, podList, ctrlclient.InNamespace(operatorNamespace))
-					return utils.CountReadyPods(podList.Items), err
-				}, timeout).Should(BeEquivalentTo(1))
 			})
 
 			// Expect a new primary to be elected and promoted
@@ -232,10 +205,7 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 			By("verifying the operator pod is now back", func() {
 				timeout := 120
 				Eventually(func() (bool, error) {
-					podList := &corev1.PodList{}
-					err := env.Client.List(env.Ctx, podList, ctrlclient.InNamespace(operatorNamespace))
-					return utils.CountReadyPods(podList.Items) == 1 &&
-						podList.Items[0].ObjectMeta.Name != operatorPodName, err
+					return env.IsOperatorDeploymentReady()
 				}, timeout).Should(BeTrue())
 			})
 

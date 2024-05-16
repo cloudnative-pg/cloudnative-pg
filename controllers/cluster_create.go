@@ -22,7 +22,7 @@ import (
 	"reflect"
 	"time"
 
-	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/sethvargo/go-password/password"
 	"golang.org/x/exp/slices"
@@ -108,6 +108,10 @@ func (r *ClusterReconciler) createPostgresClusterObjects(ctx context.Context, cl
 }
 
 func (r *ClusterReconciler) reconcilePodDisruptionBudget(ctx context.Context, cluster *apiv1.Cluster) error {
+	if !cluster.GetEnablePDB() {
+		return r.deletePodDisruptionBudgetIfExists(ctx, cluster)
+	}
+
 	// The PDB should not be enforced if we are inside a maintenance
 	// window, and we chose to avoid allocating more storage space.
 	if cluster.IsNodeMaintenanceWindowInProgress() && cluster.IsReusePVCEnabled() {
@@ -411,6 +415,18 @@ func (r *ClusterReconciler) createOrPatchOwnedPodDisruptionBudget(
 
 	if err := r.Patch(ctx, patchedPdb, client.MergeFrom(&oldPdb)); err != nil {
 		return fmt.Errorf("while patching PodDisruptionBudget: %w", err)
+	}
+
+	return nil
+}
+
+func (r *ClusterReconciler) deletePodDisruptionBudgetIfExists(ctx context.Context, cluster *apiv1.Cluster) error {
+	if err := r.deletePrimaryPodDisruptionBudget(ctx, cluster); err != nil && !apierrs.IsNotFound(err) {
+		return fmt.Errorf("unable to retrieve primary PodDisruptionBudget: %w", err)
+	}
+
+	if err := r.deleteReplicasPodDisruptionBudget(ctx, cluster); err != nil && !apierrs.IsNotFound(err) {
+		return fmt.Errorf("unable to retrieve replica PodDisruptionBudget: %w", err)
 	}
 
 	return nil
@@ -968,47 +984,42 @@ func (r *ClusterReconciler) createPrimaryInstance(
 		return ctrl.Result{}, nil
 	}
 
+	var (
+		backup           *apiv1.Backup
+		recoverySnapshot *persistentvolumeclaim.StorageSource
+	)
+	// If the cluster is bootstrapping from recovery, it may do so from:
+	//  1 - a backup object, which may be done with volume snapshots or object storage
+	//  2 - volume snapshots
+	// We need to check that whichever alternative is used, the backup/snapshot is completed.
+	if cluster.Spec.Bootstrap != nil &&
+		cluster.Spec.Bootstrap.Recovery != nil {
+		var err error
+		backup, err = r.getOriginBackup(ctx, cluster)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+
+		if res, err := r.checkReadyForRecovery(ctx, backup, cluster); !res.IsZero() || err != nil {
+			return res, err
+		}
+
+		recoverySnapshot = persistentvolumeclaim.GetCandidateStorageSourceForPrimary(cluster, backup)
+	}
+
 	// Generate a new node serial
 	nodeSerial, err := r.generateNodeSerial(ctx, cluster)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("cannot generate node serial: %w", err)
 	}
 
-	var backup *apiv1.Backup
-	if cluster.Spec.Bootstrap != nil &&
-		cluster.Spec.Bootstrap.Recovery != nil &&
-		cluster.Spec.Bootstrap.Recovery.Backup != nil {
-		backup, err = r.getOriginBackup(ctx, cluster)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-		if backup == nil {
-			contextLogger.Info("Missing backup object, can't continue full recovery",
-				"backup", cluster.Spec.Bootstrap.Recovery.Backup)
-			return ctrl.Result{
-				Requeue:      true,
-				RequeueAfter: time.Minute,
-			}, nil
-		}
-		if backup.Status.Phase != apiv1.BackupPhaseCompleted {
-			contextLogger.Info("The source backup object is not completed, can't continue full recovery",
-				"backup", cluster.Spec.Bootstrap.Recovery.Backup,
-				"backupPhase", backup.Status.Phase)
-			return ctrl.Result{
-				Requeue:      true,
-				RequeueAfter: time.Minute,
-			}, nil
-		}
-	}
-
-	// Get the source storage from where to create the primary instance.
-	candidateSource := persistentvolumeclaim.GetCandidateStorageSourceForPrimary(cluster, backup)
-
+	// Create the PVCs from the cluster definition, and if bootstrapping from
+	// recoverySnapshot, use that as the source
 	if err := persistentvolumeclaim.CreateInstancePVCs(
 		ctx,
 		r.Client,
 		cluster,
-		candidateSource,
+		recoverySnapshot,
 		nodeSerial,
 	); err != nil {
 		return ctrl.Result{RequeueAfter: time.Minute}, err
@@ -1017,47 +1028,27 @@ func (r *ClusterReconciler) createPrimaryInstance(
 	// We are bootstrapping a cluster and in need to create the first node
 	var job *batchv1.Job
 
+	isBootstrappingFromRecovery := cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.Recovery != nil
+	isBootstrappingFromBaseBackup := cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.PgBaseBackup != nil
 	switch {
-	case cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.Recovery != nil:
-		volumeSnapshotsRecovery := cluster.Spec.Bootstrap.Recovery.VolumeSnapshots
-		if volumeSnapshotsRecovery != nil {
-			status, err := persistentvolumeclaim.VerifyDataSourceCoherence(
-				ctx, r.Client, cluster.Namespace, volumeSnapshotsRecovery)
-			if err != nil {
-				return ctrl.Result{}, err
-			}
-			if status.ContainsErrors() {
-				contextLogger.Warning(
-					"Volume snapshots verification failed, retrying",
-					"status", status)
-				return ctrl.Result{
-					Requeue:      true,
-					RequeueAfter: 5 * time.Second,
-				}, nil
-			}
-			if status.ContainsWarnings() {
-				contextLogger.Warning("Volume snapshots verification warnings",
-					"status", status)
-			}
+	case isBootstrappingFromRecovery && recoverySnapshot != nil:
+		var snapshot volumesnapshot.VolumeSnapshot
+		if err := r.Client.Get(ctx,
+			types.NamespacedName{Name: recoverySnapshot.DataSource.Name, Namespace: cluster.Namespace},
+			&snapshot); err != nil {
+			return ctrl.Result{}, err
 		}
+		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (from volumeSnapshots)")
+		job = specs.CreatePrimaryJobViaRestoreSnapshot(*cluster, nodeSerial, snapshot, backup)
 
-		if candidateSource != nil {
-			var snapshot volumesnapshot.VolumeSnapshot
-			if err := r.Client.Get(ctx,
-				types.NamespacedName{Name: candidateSource.DataSource.Name, Namespace: cluster.Namespace},
-				&snapshot); err != nil {
-				return ctrl.Result{}, err
-			}
-			r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (from volumeSnapshots)")
-			job = specs.CreatePrimaryJobViaRestoreSnapshot(*cluster, nodeSerial, snapshot, backup)
-			break
-		}
-
+	case isBootstrappingFromRecovery:
 		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (from backup)")
 		job = specs.CreatePrimaryJobViaRecovery(*cluster, nodeSerial, backup)
-	case cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.PgBaseBackup != nil:
+
+	case isBootstrappingFromBaseBackup:
 		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (from physical backup)")
 		job = specs.CreatePrimaryJobViaPgBaseBackup(*cluster, nodeSerial)
+
 	default:
 		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (initdb)")
 		job = specs.CreatePrimaryJobViaInitdb(*cluster, nodeSerial)
@@ -1360,4 +1351,57 @@ func findInstancePodToCreate(
 	}
 
 	return nil, nil
+}
+
+// checkReadyForRecovery checks if the backup or volumeSnapshots are ready, and
+// returns for requeue if not
+func (r *ClusterReconciler) checkReadyForRecovery(
+	ctx context.Context,
+	backup *apiv1.Backup,
+	cluster *apiv1.Cluster,
+) (ctrl.Result, error) {
+	contextLogger := log.FromContext(ctx)
+
+	if cluster.Spec.Bootstrap.Recovery.Backup != nil {
+		if backup == nil {
+			contextLogger.Info("Missing backup object, can't continue full recovery",
+				"backup", cluster.Spec.Bootstrap.Recovery.Backup)
+			return ctrl.Result{
+				Requeue:      true,
+				RequeueAfter: time.Minute,
+			}, nil
+		}
+		if backup.Status.Phase != apiv1.BackupPhaseCompleted {
+			contextLogger.Info("The source backup object is not completed, can't continue full recovery",
+				"backup", cluster.Spec.Bootstrap.Recovery.Backup,
+				"backupPhase", backup.Status.Phase)
+			return ctrl.Result{
+				Requeue:      true,
+				RequeueAfter: time.Minute,
+			}, nil
+		}
+	}
+
+	volumeSnapshotsRecovery := cluster.Spec.Bootstrap.Recovery.VolumeSnapshots
+	if volumeSnapshotsRecovery != nil {
+		status, err := persistentvolumeclaim.VerifyDataSourceCoherence(
+			ctx, r.Client, cluster.Namespace, volumeSnapshotsRecovery)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		if status.ContainsErrors() {
+			contextLogger.Warning(
+				"Volume snapshots verification failed, retrying",
+				"status", status)
+			return ctrl.Result{
+				Requeue:      true,
+				RequeueAfter: 5 * time.Second,
+			}, nil
+		}
+		if status.ContainsWarnings() {
+			contextLogger.Warning("Volume snapshots verification warnings",
+				"status", status)
+		}
+	}
+	return ctrl.Result{}, nil
 }

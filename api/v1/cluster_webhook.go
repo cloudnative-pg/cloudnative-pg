@@ -17,12 +17,13 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
 
-	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -89,7 +90,7 @@ func (r *Cluster) SetDefaults() {
 
 func (r *Cluster) setDefaults(preserveUserSettings bool) {
 	// Defaulting the image name if not specified
-	if r.Spec.ImageName == "" {
+	if r.Spec.ImageName == "" && r.Spec.ImageCatalogRef == nil {
 		r.Spec.ImageName = configuration.Current.PostgresImageName
 	}
 
@@ -128,6 +129,7 @@ func (r *Cluster) setDefaults(preserveUserSettings bool) {
 			UserSettings:                  r.Spec.PostgresConfiguration.Parameters,
 			IsReplicaCluster:              r.IsReplica(),
 			PreserveFixedSettingsFromUser: preserveUserSettings,
+			IsWalArchivingDisabled:        utils.IsWalArchivingDisabled(&r.ObjectMeta),
 		}
 		sanitizedParameters := postgres.CreatePostgresqlConfiguration(info).GetConfigurationParameters()
 		r.Spec.PostgresConfiguration.Parameters = sanitizedParameters
@@ -162,6 +164,27 @@ func (r *Cluster) setDefaults(preserveUserSettings bool) {
 	if len(r.Spec.Tablespaces) > 0 {
 		r.defaultTablespaces()
 	}
+
+	ctx := context.Background()
+
+	// Call the plugins to help with defaulting this cluster
+	contextLogger := log.FromContext(ctx)
+	pluginClient, err := r.LoadPluginClient(ctx)
+	if err != nil {
+		contextLogger.Error(err, "Error invoking plugin in the defaulting webhook, skipping")
+		return
+	}
+	defer func() {
+		pluginClient.Close(ctx)
+	}()
+
+	var mutatedCluster Cluster
+	if err := pluginClient.MutateCluster(ctx, r, &mutatedCluster); err != nil {
+		contextLogger.Error(err, "Error invoking plugin in the defaulting webhook, skipping")
+		return
+	}
+
+	mutatedCluster.DeepCopyInto(r)
 }
 
 // defaultTablespaces adds the tablespace owner where the
@@ -286,8 +309,29 @@ var _ webhook.Validator = &Cluster{}
 func (r *Cluster) ValidateCreate() (admission.Warnings, error) {
 	clusterLog.Info("validate create", "name", r.Name, "namespace", r.Namespace)
 	allErrs := r.Validate()
+
+	// Call the plugins to help validating this cluster creation
+	ctx := context.Background()
+	contextLogger := log.FromContext(ctx)
+	pluginClient, err := r.LoadPluginClient(ctx)
+	if err != nil {
+		contextLogger.Error(err, "Error invoking plugin in the validate/create webhook")
+		return nil, err
+	}
+	defer func() {
+		pluginClient.Close(ctx)
+	}()
+
+	pluginValidationResult, err := pluginClient.ValidateClusterCreate(ctx, r)
+	if err != nil {
+		contextLogger.Error(err, "Error invoking plugin in the validate/update webhook")
+		return nil, err
+	}
+	allErrs = append(allErrs, pluginValidationResult...)
+	allWarnings := r.getAdmissionWarnings()
+
 	if len(allErrs) == 0 {
-		return nil, nil
+		return allWarnings, nil
 	}
 
 	return nil, apierrors.NewInvalid(
@@ -334,6 +378,7 @@ func (r *Cluster) Validate() (allErrs field.ErrorList) {
 		r.validateManagedRoles,
 		r.validateManagedExtensions,
 		r.validateResources,
+		r.validateHibernationAnnotation,
 	}
 
 	for _, validate := range validations {
@@ -356,8 +401,27 @@ func (r *Cluster) ValidateUpdate(old runtime.Object) (admission.Warnings, error)
 		r.ValidateChanges(oldCluster)...,
 	)
 
+	// Call the plugins to help validating this cluster update
+	ctx := context.Background()
+	contextLogger := log.FromContext(ctx)
+	pluginClient, err := r.LoadPluginClient(ctx)
+	if err != nil {
+		contextLogger.Error(err, "Error invoking plugin in the validate/create webhook")
+		return nil, err
+	}
+	defer func() {
+		pluginClient.Close(ctx)
+	}()
+
+	pluginValidationResult, err := pluginClient.ValidateClusterUpdate(ctx, oldCluster, r)
+	if err != nil {
+		contextLogger.Error(err, "Error invoking plugin in the validate/update webhook")
+		return nil, err
+	}
+	allErrs = append(allErrs, pluginValidationResult...)
+
 	if len(allErrs) == 0 {
-		return nil, nil
+		return r.getAdmissionWarnings(), nil
 	}
 
 	return nil, apierrors.NewInvalid(
@@ -380,9 +444,10 @@ func (r *Cluster) ValidateChanges(old *Cluster) (allErrs field.ErrorList) {
 		r.validateStorageChange,
 		r.validateWalStorageChange,
 		r.validateTablespacesChange,
-		r.validateReplicaModeChange,
 		r.validateUnixPermissionIdentifierChange,
 		r.validateReplicationSlotsChange,
+		r.validateWALLevelChange,
+		r.validateReplicaClusterChange,
 	}
 	for _, validate := range validations {
 		allErrs = append(allErrs, validate(old)...)
@@ -673,7 +738,10 @@ func (r *Cluster) validatePgBaseBackupApplicationDatabase() field.ErrorList {
 }
 
 // validateApplicationDatabase validate the configuration for application database
-func (r *Cluster) validateApplicationDatabase(database string, owner string, command string,
+func (r *Cluster) validateApplicationDatabase(
+	database string,
+	owner string,
+	command string,
 ) field.ErrorList {
 	var result field.ErrorList
 	// If you specify the database name, then you need also to specify the
@@ -926,10 +994,11 @@ func (r *Cluster) validateImageName() field.ErrorList {
 	var result field.ErrorList
 
 	if r.Spec.ImageName == "" {
-		// We'll use the default one
+		// We'll use the default one or the one in the catalog
 		return result
 	}
 
+	// We have to check if the image has a valid tag
 	tag := utils.GetImageTag(r.Spec.ImageName)
 	switch tag {
 	case "latest":
@@ -1055,10 +1124,11 @@ func (r *Cluster) validateConfiguration() field.ErrorList {
 				"Unsupported PostgreSQL version. Versions 11 or newer are supported"))
 	}
 	info := postgres.ConfigurationInfo{
-		Settings:         postgres.CnpgConfigurationSettings,
-		MajorVersion:     pgVersion,
-		UserSettings:     r.Spec.PostgresConfiguration.Parameters,
-		IsReplicaCluster: r.IsReplica(),
+		Settings:               postgres.CnpgConfigurationSettings,
+		MajorVersion:           pgVersion,
+		UserSettings:           r.Spec.PostgresConfiguration.Parameters,
+		IsReplicaCluster:       r.IsReplica(),
+		IsWalArchivingDisabled: utils.IsWalArchivingDisabled(&r.ObjectMeta),
 	}
 	sanitizedParameters := postgres.CreatePostgresqlConfiguration(info).GetConfigurationParameters()
 
@@ -1075,6 +1145,41 @@ func (r *Cluster) validateConfiguration() field.ErrorList {
 		}
 	}
 
+	walLevel := postgres.WalLevelValue(sanitizedParameters[postgres.ParameterWalLevel])
+	hasWalLevelRequirement := r.Spec.Instances > 1 || sanitizedParameters[postgres.ParameterArchiveMode] != "off" ||
+		r.IsReplica()
+	if !walLevel.IsKnownValue() {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "postgresql", "parameters", postgres.ParameterWalLevel),
+				walLevel,
+				fmt.Sprintf("unrecognized `wal_level` value - allowed values: `%s`, `%s`, `%s`",
+					postgres.WalLevelValueLogical,
+					postgres.WalLevelValueReplica,
+					postgres.WalLevelValueMinimal,
+				)))
+	} else if hasWalLevelRequirement && !walLevel.IsStricterThanMinimal() {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "postgresql", "parameters", postgres.ParameterWalLevel),
+				walLevel,
+				"`wal_level` should be set at `logical` or `replica` when `archive_mode` is `on`, "+
+					"'.instances' field is greater than 1, or this is a replica cluster"))
+	}
+
+	if walLevel == "minimal" {
+		if value, ok := sanitizedParameters[postgres.ParameterMaxWalSenders]; !ok || value != "0" {
+			result = append(
+				result,
+				field.Invalid(
+					field.NewPath("spec", "postgresql", "parameters", "max_wal_senders"),
+					walLevel,
+					"`max_wal_senders` should be set at `0` when `wal_level` is `minimal`"))
+		}
+	}
+
 	if value := r.Spec.PostgresConfiguration.Parameters[sharedBuffersParameter]; value != "" {
 		if _, err := parsePostgresQuantityValue(value); err != nil {
 			result = append(
@@ -1088,6 +1193,15 @@ func (r *Cluster) validateConfiguration() field.ErrorList {
 						sharedBuffersParameter,
 					)))
 		}
+	}
+
+	if r.Spec.Instances > 1 && r.Spec.PostgresConfiguration.Parameters[postgres.ParameterWalLogHints] == "off" {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "postgresql", "parameters", postgres.ParameterWalLogHints),
+				r.Spec.PostgresConfiguration.Parameters[postgres.ParameterWalLogHints],
+				"`wal_log_hints` must be set to `on` when `instances` > 1"))
 	}
 
 	// verify the postgres setting min_wal_size < max_wal_size < volume size
@@ -1264,34 +1378,41 @@ func validateSyncReplicaElectionConstraint(constraints SyncReplicaElectionConstr
 // to a new one.
 func (r *Cluster) validateImageChange(old *Cluster) field.ErrorList {
 	var result field.ErrorList
-
-	newVersion := r.Spec.ImageName
-	if newVersion == "" {
-		// We'll use the default one
-		newVersion = configuration.Current.PostgresImageName
+	var newMajor, oldMajor int
+	var err error
+	var newImagePath *field.Path
+	if r.Spec.ImageCatalogRef != nil {
+		newImagePath = field.NewPath("spec", "imageCatalogRef")
+	} else {
+		newImagePath = field.NewPath("spec", "imageName")
 	}
 
-	oldVersion := old.Spec.ImageName
-	if oldVersion == "" {
-		oldVersion = configuration.Current.PostgresImageName
-	}
-
-	status, err := postgres.CanUpgrade(oldVersion, newVersion)
+	r.Status.Image = ""
+	newMajor, err = r.GetPostgresqlVersion()
 	if err != nil {
+		// The validation error will be already raised by the
+		// validateImageName function
+		return result
+	}
+
+	old.Status.Image = ""
+	oldMajor, err = old.GetPostgresqlVersion()
+	if err != nil {
+		// The validation error will be already raised by the
+		// validateImageName function
+		return result
+	}
+
+	status := postgres.IsUpgradePossible(oldMajor, newMajor)
+
+	if !status {
 		result = append(
 			result,
 			field.Invalid(
-				field.NewPath("spec", "imageName"),
-				r.Spec.ImageName,
-				fmt.Sprintf("wrong version: %v", err.Error())))
-	} else if !status {
-		result = append(
-			result,
-			field.Invalid(
-				field.NewPath("spec", "imageName"),
-				r.Spec.ImageName,
-				fmt.Sprintf("can't upgrade between %v and %v",
-					oldVersion, newVersion)))
+				newImagePath,
+				newMajor,
+				fmt.Sprintf("can't upgrade between majors %v and %v",
+					oldMajor, newMajor)))
 	}
 
 	return result
@@ -1751,23 +1872,25 @@ func (r *Cluster) validateExternalCluster(externalCluster *ExternalCluster, path
 	return result
 }
 
-// Check replica mode is enabled only at cluster creation time
-func (r *Cluster) validateReplicaModeChange(old *Cluster) field.ErrorList {
-	var result field.ErrorList
-	// if we are not specifying any replica cluster configuration or disabling it, nothing to do
-	if r.Spec.ReplicaCluster == nil || !r.Spec.ReplicaCluster.Enabled {
-		return result
+func (r *Cluster) validateReplicaClusterChange(old *Cluster) field.ErrorList {
+	// If the replication role didn't change then everything
+	// is fine
+	if r.IsReplica() == old.IsReplica() {
+		return nil
 	}
 
-	// otherwise if it was not defined before or it was just not enabled, add an error
-	if old.Spec.ReplicaCluster == nil || !old.Spec.ReplicaCluster.Enabled {
-		result = append(result, field.Invalid(
-			field.NewPath("spec", "replicaCluster"),
-			r.Spec.ReplicaCluster,
-			"Can not enable replication on existing clusters"))
+	// We disallow changing the replication role when
+	// being in a replication cluster switchover
+	if r.Status.SwitchReplicaClusterStatus.InProgress {
+		return field.ErrorList{
+			field.Forbidden(
+				field.NewPath("spec", "replica", "enabled"),
+				"cannot modify the field while there is an ongoing operation to enable the replica cluster",
+			),
+		}
 	}
 
-	return result
+	return nil
 }
 
 func (r *Cluster) validateUnixPermissionIdentifierChange(old *Cluster) field.ErrorList {
@@ -1795,7 +1918,7 @@ func (r *Cluster) validateUnixPermissionIdentifierChange(old *Cluster) field.Err
 func (r *Cluster) validateReplicaMode() field.ErrorList {
 	var result field.ErrorList
 
-	if r.Spec.ReplicaCluster == nil {
+	if r.Spec.ReplicaCluster == nil || !r.Spec.ReplicaCluster.Enabled {
 		return result
 	}
 
@@ -1804,11 +1927,14 @@ func (r *Cluster) validateReplicaMode() field.ErrorList {
 			field.NewPath("spec", "bootstrap"),
 			r.Spec.ReplicaCluster,
 			"bootstrap configuration is required for replica mode"))
-	} else if r.Spec.Bootstrap.PgBaseBackup == nil && r.Spec.Bootstrap.Recovery == nil {
+	} else if r.Spec.Bootstrap.PgBaseBackup == nil && r.Spec.Bootstrap.Recovery == nil &&
+		// this is needed because we only want to validate this during cluster creation, currently if we would have
+		// to enable this logic only during creation and not cluster changes it would require a meaningful refactor
+		len(r.ObjectMeta.ResourceVersion) == 0 {
 		result = append(result, field.Invalid(
 			field.NewPath("spec", "replicaCluster"),
 			r.Spec.ReplicaCluster,
-			"replica mode is compatible only with bootstrap using pg_basebackup or recovery"))
+			"replica mode bootstrap is compatible only with pg_basebackup or recovery"))
 	}
 	_, found := r.ExternalCluster(r.Spec.ReplicaCluster.Source)
 	if !found {
@@ -2074,6 +2200,22 @@ func (r *Cluster) validateReplicationSlotsChange(old *Cluster) field.ErrorList {
 	return errs
 }
 
+func (r *Cluster) validateWALLevelChange(old *Cluster) field.ErrorList {
+	var errs field.ErrorList
+
+	newWALLevel := r.Spec.PostgresConfiguration.Parameters[postgres.ParameterWalLevel]
+	oldWALLevel := old.Spec.PostgresConfiguration.Parameters[postgres.ParameterWalLevel]
+
+	if newWALLevel == "minimal" && len(oldWALLevel) > 0 && oldWALLevel != newWALLevel {
+		errs = append(errs, field.Invalid(
+			field.NewPath("spec", "postgresql", "parameters", "wal_level"),
+			"minimal",
+			fmt.Sprintf("Change of `wal_level` to `minimal` not allowed on an existing cluster (from %s)", oldWALLevel)))
+	}
+
+	return errs
+}
+
 // validateAzureCredentials checks and validates the azure credentials
 func (azure *AzureCredentials) validateAzureCredentials(path *field.Path) field.ErrorList {
 	allErrors := field.ErrorList{}
@@ -2286,4 +2428,40 @@ func (r *Cluster) validatePgFailoverSlots() field.ErrorList {
 	}
 
 	return result
+}
+
+func (r *Cluster) getAdmissionWarnings() admission.Warnings {
+	return r.getMaintenanceWindowsAdmissionWarnings()
+}
+
+func (r *Cluster) getMaintenanceWindowsAdmissionWarnings() admission.Warnings {
+	var result admission.Warnings
+
+	if r.Spec.NodeMaintenanceWindow != nil {
+		result = append(
+			result,
+			"Consider using `.spec.enablePDB` instead of the node maintenance window feature")
+	}
+	return result
+}
+
+// validate whether the hibernation configuration is valid
+func (r *Cluster) validateHibernationAnnotation() field.ErrorList {
+	value, ok := r.Annotations[utils.HibernationAnnotationName]
+	isKnownValue := value == string(utils.HibernationAnnotationValueOn) ||
+		value == string(utils.HibernationAnnotationValueOff)
+	if !ok || isKnownValue {
+		return nil
+	}
+
+	return field.ErrorList{
+		field.Invalid(
+			field.NewPath("metadata", "annotations", utils.HibernationAnnotationName),
+			value,
+			fmt.Sprintf("Annotation value for hibernation should be %q or %q",
+				utils.HibernationAnnotationValueOn,
+				utils.HibernationAnnotationValueOff,
+			),
+		),
+	}
 }

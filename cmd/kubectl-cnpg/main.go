@@ -33,6 +33,8 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/fio"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/hibernate"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/install"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/logical/publication"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/logical/subscription"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/logs"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/maintenance"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/pgadmin"
@@ -55,10 +57,13 @@ func main() {
 	configFlags := genericclioptions.NewConfigFlags(true)
 
 	rootCmd := &cobra.Command{
-		Use:          "kubectl-cnpg",
-		Short:        "A plugin to manage your CloudNativePG clusters",
+		Use:   "kubectl-cnpg",
+		Short: "A plugin to manage your CloudNativePG clusters",
+		Annotations: map[string]string{
+			cobra.CommandDisplayNameAnnotation: "kubectl cnpg",
+		},
 		SilenceUsage: true,
-		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
 			logFlags.ConfigureLogging()
 
 			// If we're invoking the completion command we shouldn't try to create
@@ -94,6 +99,8 @@ func main() {
 	rootCmd.AddCommand(snapshot.NewCmd())
 	rootCmd.AddCommand(logs.NewCmd())
 	rootCmd.AddCommand(pgadmin.NewCmd())
+	rootCmd.AddCommand(publication.NewCmd())
+	rootCmd.AddCommand(subscription.NewCmd())
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)

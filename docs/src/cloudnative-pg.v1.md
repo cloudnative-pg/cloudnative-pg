@@ -8,6 +8,8 @@
 
 - [Backup](#postgresql-cnpg-io-v1-Backup)
 - [Cluster](#postgresql-cnpg-io-v1-Cluster)
+- [ClusterImageCatalog](#postgresql-cnpg-io-v1-ClusterImageCatalog)
+- [ImageCatalog](#postgresql-cnpg-io-v1-ImageCatalog)
 - [Pooler](#postgresql-cnpg-io-v1-Pooler)
 - [ScheduledBackup](#postgresql-cnpg-io-v1-ScheduledBackup)
 
@@ -81,6 +83,64 @@ More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-
 <td>
    <p>Most recently observed status of the cluster. This data may not be up
 to date. Populated by the system. Read-only.
+More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## ClusterImageCatalog     {#postgresql-cnpg-io-v1-ClusterImageCatalog}
+
+
+
+<p>ClusterImageCatalog is the Schema for the clusterimagecatalogs API</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>apiVersion</code> <B>[Required]</B><br/>string</td><td><code>postgresql.cnpg.io/v1</code></td></tr>
+<tr><td><code>kind</code> <B>[Required]</B><br/>string</td><td><code>ClusterImageCatalog</code></td></tr>
+<tr><td><code>metadata</code> <B>[Required]</B><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#objectmeta-v1-meta"><i>meta/v1.ObjectMeta</i></a>
+</td>
+<td>
+   <span class="text-muted">No description provided.</span>Refer to the Kubernetes API documentation for the fields of the <code>metadata</code> field.</td>
+</tr>
+<tr><td><code>spec</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-ImageCatalogSpec"><i>ImageCatalogSpec</i></a>
+</td>
+<td>
+   <p>Specification of the desired behavior of the ClusterImageCatalog.
+More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## ImageCatalog     {#postgresql-cnpg-io-v1-ImageCatalog}
+
+
+
+<p>ImageCatalog is the Schema for the imagecatalogs API</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>apiVersion</code> <B>[Required]</B><br/>string</td><td><code>postgresql.cnpg.io/v1</code></td></tr>
+<tr><td><code>kind</code> <B>[Required]</B><br/>string</td><td><code>ImageCatalog</code></td></tr>
+<tr><td><code>metadata</code> <B>[Required]</B><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#objectmeta-v1-meta"><i>meta/v1.ObjectMeta</i></a>
+</td>
+<td>
+   <span class="text-muted">No description provided.</span>Refer to the Kubernetes API documentation for the fields of the <code>metadata</code> field.</td>
+</tr>
+<tr><td><code>spec</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-ImageCatalogSpec"><i>ImageCatalogSpec</i></a>
+</td>
+<td>
+   <p>Specification of the desired behavior of the ImageCatalog.
 More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status</p>
 </td>
 </tr>
@@ -250,6 +310,37 @@ by the operator if EnablePodAntiAffinity is set to true (default) or to be used 
 </tbody>
 </table>
 
+## AvailableArchitecture     {#postgresql-cnpg-io-v1-AvailableArchitecture}
+
+
+**Appears in:**
+
+- [ClusterStatus](#postgresql-cnpg-io-v1-ClusterStatus)
+
+
+<p>AvailableArchitecture represents the state of a cluster's architecture</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>goArch</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>GoArch is the name of the executable architecture</p>
+</td>
+</tr>
+<tr><td><code>hash</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Hash is the hash of the executable</p>
+</td>
+</tr>
+</tbody>
+</table>
+
 ## AzureCredentials     {#postgresql-cnpg-io-v1-AzureCredentials}
 
 
@@ -406,6 +497,41 @@ the selected PostgreSQL instance</p>
 
 
 
+## BackupPluginConfiguration     {#postgresql-cnpg-io-v1-BackupPluginConfiguration}
+
+
+**Appears in:**
+
+- [BackupSpec](#postgresql-cnpg-io-v1-BackupSpec)
+
+- [ScheduledBackupSpec](#postgresql-cnpg-io-v1-ScheduledBackupSpec)
+
+
+<p>BackupPluginConfiguration contains the backup configuration used by
+the backup plugin</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>name</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Name is the name of the plugin managing this backup</p>
+</td>
+</tr>
+<tr><td><code>parameters</code><br/>
+<i>map[string]string</i>
+</td>
+<td>
+   <p>Parameters are the configuration parameters passed to the backup
+plugin for this backup</p>
+</td>
+</tr>
+</tbody>
+</table>
+
 ## BackupSnapshotElementStatus     {#postgresql-cnpg-io-v1-BackupSnapshotElementStatus}
 
 
@@ -539,8 +665,15 @@ standby, if available.</p>
 <a href="#postgresql-cnpg-io-v1-BackupMethod"><i>BackupMethod</i></a>
 </td>
 <td>
-   <p>The backup method to be used, possible options are <code>barmanObjectStore</code>
-and <code>volumeSnapshot</code>. Defaults to: <code>barmanObjectStore</code>.</p>
+   <p>The backup method to be used, possible options are <code>barmanObjectStore</code>,
+<code>volumeSnapshot</code> or <code>plugin</code>. Defaults to: <code>barmanObjectStore</code>.</p>
+</td>
+</tr>
+<tr><td><code>pluginConfiguration</code><br/>
+<a href="#postgresql-cnpg-io-v1-BackupPluginConfiguration"><i>BackupPluginConfiguration</i></a>
+</td>
+<td>
+   <p>Configuration parameters passed to the plugin managing this backup</p>
 </td>
 </tr>
 <tr><td><code>online</code><br/>
@@ -1232,6 +1365,37 @@ created from scratch</p>
 </tbody>
 </table>
 
+## CatalogImage     {#postgresql-cnpg-io-v1-CatalogImage}
+
+
+**Appears in:**
+
+- [ImageCatalogSpec](#postgresql-cnpg-io-v1-ImageCatalogSpec)
+
+
+<p>CatalogImage defines the image and major version</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>image</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The image reference</p>
+</td>
+</tr>
+<tr><td><code>major</code> <B>[Required]</B><br/>
+<i>int</i>
+</td>
+<td>
+   <p>The PostgreSQL major version of the image. Must be unique within the catalog.</p>
+</td>
+</tr>
+</tbody>
+</table>
+
 ## CertificatesConfiguration     {#postgresql-cnpg-io-v1-CertificatesConfiguration}
 
 
@@ -1378,6 +1542,13 @@ this can be omitted.<!-- raw HTML omitted --></li>
    <p>Name of the container image, supporting both tags (<code>&lt;image&gt;:&lt;tag&gt;</code>)
 and digests for deterministic and repeatable deployments
 (<code>&lt;image&gt;:&lt;tag&gt;@sha256:&lt;digestValue&gt;</code>)</p>
+</td>
+</tr>
+<tr><td><code>imageCatalogRef</code><br/>
+<a href="#postgresql-cnpg-io-v1-ImageCatalogRef"><i>ImageCatalogRef</i></a>
+</td>
+<td>
+   <p>Defines the major PostgreSQL version we want to use within an ImageCatalog</p>
 </td>
 </tr>
 <tr><td><code>imagePullPolicy</code><br/>
@@ -1717,6 +1888,28 @@ Defaults to: <code>RuntimeDefault</code></p>
    <p>The tablespaces configuration</p>
 </td>
 </tr>
+<tr><td><code>enablePDB</code><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>Manage the <code>PodDisruptionBudget</code> resources within the cluster. When
+configured as <code>true</code> (default setting), the pod disruption budgets
+will safeguard the primary node from being terminated. Conversely,
+setting it to <code>false</code> will result in the absence of any
+<code>PodDisruptionBudget</code> resource, permitting the shutdown of all nodes
+hosting the PostgreSQL cluster. This latter configuration is
+advisable for any PostgreSQL cluster employed for
+development/staging purposes.</p>
+</td>
+</tr>
+<tr><td><code>plugins</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-PluginConfigurationList"><i>PluginConfigurationList</i></a>
+</td>
+<td>
+   <p>The plugins configuration, containing
+any plugin to be loaded with the corresponding configuration</p>
+</td>
+</tr>
 </tbody>
 </table>
 
@@ -1997,6 +2190,13 @@ This field is reported when <code>.spec.failoverDelay</code> is populated or dur
    <p>The hash of the binary of the operator</p>
 </td>
 </tr>
+<tr><td><code>availableArchitectures</code><br/>
+<a href="#postgresql-cnpg-io-v1-AvailableArchitecture"><i>[]AvailableArchitecture</i></a>
+</td>
+<td>
+   <p>AvailableArchitectures reports the available architectures of a cluster</p>
+</td>
+</tr>
 <tr><td><code>conditions</code><br/>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#condition-v1-meta"><i>[]meta/v1.Condition</i></a>
 </td>
@@ -2023,6 +2223,27 @@ This field is reported when <code>.spec.failoverDelay</code> is populated or dur
 </td>
 <td>
    <p>AzurePVCUpdateEnabled shows if the PVC online upgrade is enabled for this cluster</p>
+</td>
+</tr>
+<tr><td><code>image</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Image contains the image name used by the pods</p>
+</td>
+</tr>
+<tr><td><code>pluginStatus</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-PluginStatus"><i>[]PluginStatus</i></a>
+</td>
+<td>
+   <p>PluginStatus is the status of the loaded plugins</p>
+</td>
+</tr>
+<tr><td><code>switchReplicaClusterStatus</code><br/>
+<a href="#postgresql-cnpg-io-v1-SwitchReplicaClusterStatus"><i>SwitchReplicaClusterStatus</i></a>
+</td>
+<td>
+   <p>SwitchReplicaClusterStatus is the status of the switch to replica cluster</p>
 </td>
 </tr>
 </tbody>
@@ -2155,6 +2376,24 @@ be limited, according to the <code>checkpoint_completion_target</code> setting o
 the PostgreSQL server. If set to true, an immediate checkpoint will be
 used, meaning PostgreSQL will complete the checkpoint as soon as
 possible. <code>false</code> by default.</p>
+</td>
+</tr>
+<tr><td><code>additionalCommandArgs</code> <B>[Required]</B><br/>
+<i>[]string</i>
+</td>
+<td>
+   <p>AdditionalCommandArgs represents additional arguments that can be appended
+to the 'barman-cloud-backup' command-line invocation. These arguments
+provide flexibility to customize the backup process further according to
+specific requirements or configurations.</p>
+<p>Example:
+In a scenario where specialized backup options are required, such as setting
+a specific timeout or defining custom behavior, users can use this field
+to specify additional command arguments.</p>
+<p>Note:
+It's essential to ensure that the provided arguments are valid and supported
+by the 'barman-cloud-backup' command, to avoid potential errors or unintended
+behavior during execution.</p>
 </td>
 </tr>
 </tbody>
@@ -2418,6 +2657,62 @@ This needs to be specified even if we run inside a GKE environment.</p>
 <td>
    <p>If set to true, will presume that it's running inside a GKE environment,
 default to false.</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## ImageCatalogRef     {#postgresql-cnpg-io-v1-ImageCatalogRef}
+
+
+**Appears in:**
+
+- [ClusterSpec](#postgresql-cnpg-io-v1-ClusterSpec)
+
+
+<p>ImageCatalogRef defines the reference to a major version in an ImageCatalog</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>TypedLocalObjectReference</code><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#typedlocalobjectreference-v1-core"><i>core/v1.TypedLocalObjectReference</i></a>
+</td>
+<td>(Members of <code>TypedLocalObjectReference</code> are embedded into this type.)
+   <span class="text-muted">No description provided.</span></td>
+</tr>
+<tr><td><code>major</code> <B>[Required]</B><br/>
+<i>int</i>
+</td>
+<td>
+   <p>The major version of PostgreSQL we want to use from the ImageCatalog</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## ImageCatalogSpec     {#postgresql-cnpg-io-v1-ImageCatalogSpec}
+
+
+**Appears in:**
+
+- [ClusterImageCatalog](#postgresql-cnpg-io-v1-ClusterImageCatalog)
+
+- [ImageCatalog](#postgresql-cnpg-io-v1-ImageCatalog)
+
+
+<p>ImageCatalogSpec defines the desired ImageCatalog</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>images</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-CatalogImage"><i>[]CatalogImage</i></a>
+</td>
+<td>
+   <p>List of CatalogImages available in the catalog</p>
 </td>
 </tr>
 </tbody>
@@ -2849,6 +3144,8 @@ with an explanation of the cause</p>
 
 - [ServiceAccountTemplate](#postgresql-cnpg-io-v1-ServiceAccountTemplate)
 
+- [ServiceTemplateSpec](#postgresql-cnpg-io-v1-ServiceTemplateSpec)
+
 
 <p>Metadata is a structure similar to the metav1.ObjectMeta, but still
 parseable by controller-gen to create a suitable CRD for the user.
@@ -3146,7 +3443,7 @@ by pgbouncer</p>
 <td>
    <p>The credentials of the user that need to be used for the authentication
 query. In case it is specified, also an AuthQuery
-(e.g. &quot;SELECT usename, passwd FROM pg_shadow WHERE usename=$1&quot;)
+(e.g. &quot;SELECT usename, passwd FROM pg_catalog.pg_shadow WHERE usename=$1&quot;)
 has to be specified and no automatic CNPG Cluster integration will be triggered.</p>
 </td>
 </tr>
@@ -3155,7 +3452,7 @@ has to be specified and no automatic CNPG Cluster integration will be triggered.
 </td>
 <td>
    <p>The query that will be used to download the hash of the password
-of a certain user. Default: &quot;SELECT usename, passwd FROM user_search($1)&quot;.
+of a certain user. Default: &quot;SELECT usename, passwd FROM public.user_search($1)&quot;.
 In case it is specified, also an AuthQuerySecret has to be specified and
 no automatic CNPG Cluster integration will be triggered.</p>
 </td>
@@ -3184,6 +3481,70 @@ to the pg_hba.conf file)</p>
 server, first waiting for all queries to complete, and pause all new
 client connections until this value is set to <code>false</code> (default). Internally,
 the operator calls PgBouncer's <code>PAUSE</code> and <code>RESUME</code> commands.</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## PluginStatus     {#postgresql-cnpg-io-v1-PluginStatus}
+
+
+**Appears in:**
+
+- [ClusterStatus](#postgresql-cnpg-io-v1-ClusterStatus)
+
+
+<p>PluginStatus is the status of a loaded plugin</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>name</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Name is the name of the plugin</p>
+</td>
+</tr>
+<tr><td><code>version</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Version is the version of the plugin loaded by the
+latest reconciliation loop</p>
+</td>
+</tr>
+<tr><td><code>capabilities</code> <B>[Required]</B><br/>
+<i>[]string</i>
+</td>
+<td>
+   <p>Capabilities are the list of capabilities of the
+plugin</p>
+</td>
+</tr>
+<tr><td><code>operatorCapabilities</code> <B>[Required]</B><br/>
+<i>[]string</i>
+</td>
+<td>
+   <p>OperatorCapabilities are the list of capabilities of the
+plugin regarding the reconciler</p>
+</td>
+</tr>
+<tr><td><code>walCapabilities</code> <B>[Required]</B><br/>
+<i>[]string</i>
+</td>
+<td>
+   <p>WALCapabilities are the list of capabilities of the
+plugin regarding the WAL management</p>
+</td>
+</tr>
+<tr><td><code>backupCapabilities</code> <B>[Required]</B><br/>
+<i>[]string</i>
+</td>
+<td>
+   <p>BackupCapabilities are the list of capabilities of the
+plugin regarding the Backup management</p>
 </td>
 </tr>
 </tbody>
@@ -3415,6 +3776,13 @@ Pooler name should never match with any cluster name within the same namespace.<
 </td>
 <td>
    <p>The configuration of the monitoring infrastructure of this pooler.</p>
+</td>
+</tr>
+<tr><td><code>serviceTemplate</code><br/>
+<a href="#postgresql-cnpg-io-v1-ServiceTemplateSpec"><i>ServiceTemplateSpec</i></a>
+</td>
+<td>
+   <p>Template for the Service to be created</p>
 </td>
 </tr>
 </tbody>
@@ -4096,6 +4464,13 @@ standby, if available.</p>
 and <code>volumeSnapshot</code>. Defaults to: <code>barmanObjectStore</code>.</p>
 </td>
 </tr>
+<tr><td><code>pluginConfiguration</code><br/>
+<a href="#postgresql-cnpg-io-v1-BackupPluginConfiguration"><i>BackupPluginConfiguration</i></a>
+</td>
+<td>
+   <p>Configuration parameters passed to the plugin managing this backup</p>
+</td>
+</tr>
 <tr><td><code>online</code><br/>
 <i>bool</i>
 </td>
@@ -4354,6 +4729,40 @@ service account</p>
 </tbody>
 </table>
 
+## ServiceTemplateSpec     {#postgresql-cnpg-io-v1-ServiceTemplateSpec}
+
+
+**Appears in:**
+
+- [PoolerSpec](#postgresql-cnpg-io-v1-PoolerSpec)
+
+
+<p>ServiceTemplateSpec is a structure allowing the user to set
+a template for Service generation.</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>metadata</code><br/>
+<a href="#postgresql-cnpg-io-v1-Metadata"><i>Metadata</i></a>
+</td>
+<td>
+   <p>Standard object's metadata.
+More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata</p>
+</td>
+</tr>
+<tr><td><code>spec</code><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#servicespec-v1-core"><i>core/v1.ServiceSpec</i></a>
+</td>
+<td>
+   <p>Specification of the desired behavior of the service.
+More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status</p>
+</td>
+</tr>
+</tbody>
+</table>
+
 ## SnapshotOwnerReference     {#postgresql-cnpg-io-v1-SnapshotOwnerReference}
 
 (Alias of `string`)
@@ -4431,6 +4840,30 @@ Size cannot be decreased.</p>
 </td>
 <td>
    <p>Template to be used to generate the Persistent Volume Claim</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## SwitchReplicaClusterStatus     {#postgresql-cnpg-io-v1-SwitchReplicaClusterStatus}
+
+
+**Appears in:**
+
+- [ClusterStatus](#postgresql-cnpg-io-v1-ClusterStatus)
+
+
+<p>SwitchReplicaClusterStatus contains all the statuses regarding the switch of a cluster to a replica cluster</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>inProgress</code><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>InProgress indicates if there is an ongoing procedure of switching a cluster to a replica cluster.</p>
 </td>
 </tr>
 </tbody>

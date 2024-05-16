@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -224,6 +226,18 @@ func (o OnlineConfiguration) GetImmediateCheckpoint() bool {
 	return *o.ImmediateCheckpoint
 }
 
+// ImageCatalogRef defines the reference to a major version in an ImageCatalog
+type ImageCatalogRef struct {
+	// +kubebuilder:validation:XValidation:rule="self.kind == 'ImageCatalog' || self.kind == 'ClusterImageCatalog'",message="Only image catalogs are supported"
+	// +kubebuilder:validation:XValidation:rule="self.apiGroup == 'postgresql.cnpg.io'",message="Only image catalogs are supported"
+	corev1.TypedLocalObjectReference `json:",inline"`
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Major is immutable"
+	// The major version of PostgreSQL we want to use from the ImageCatalog
+	Major int `json:"major"`
+}
+
+// +kubebuilder:validation:XValidation:rule="!(has(self.imageCatalogRef) && has(self.imageName))",message="imageName and imageCatalogRef are mutually exclusive"
+
 // ClusterSpec defines the desired state of Cluster
 type ClusterSpec struct {
 	// Description of this PostgreSQL cluster
@@ -239,6 +253,10 @@ type ClusterSpec struct {
 	// (`<image>:<tag>@sha256:<digestValue>`)
 	// +optional
 	ImageName string `json:"imageName,omitempty"`
+
+	// Defines the major PostgreSQL version we want to use within an ImageCatalog
+	// +optional
+	ImageCatalogRef *ImageCatalogRef `json:"imageCatalogRef,omitempty"`
 
 	// Image pull policy.
 	// One of `Always`, `Never` or `IfNotPresent`.
@@ -471,7 +489,27 @@ type ClusterSpec struct {
 	// The tablespaces configuration
 	// +optional
 	Tablespaces []TablespaceConfiguration `json:"tablespaces,omitempty"`
+
+	// Manage the `PodDisruptionBudget` resources within the cluster. When
+	// configured as `true` (default setting), the pod disruption budgets
+	// will safeguard the primary node from being terminated. Conversely,
+	// setting it to `false` will result in the absence of any
+	// `PodDisruptionBudget` resource, permitting the shutdown of all nodes
+	// hosting the PostgreSQL cluster. This latter configuration is
+	// advisable for any PostgreSQL cluster employed for
+	// development/staging purposes.
+	// +kubebuilder:default:=true
+	// +optional
+	EnablePDB *bool `json:"enablePDB,omitempty"`
+
+	// The plugins configuration, containing
+	// any plugin to be loaded with the corresponding configuration
+	Plugins PluginConfigurationList `json:"plugins,omitempty"`
 }
+
+// PluginConfigurationList represent a set of plugin with their
+// configuration parameters
+type PluginConfigurationList []PluginConfiguration
 
 const (
 	// PhaseSwitchover when a cluster is changing the primary node
@@ -501,8 +539,15 @@ const (
 	// PhaseHealthy for a cluster doing nothing
 	PhaseHealthy = "Cluster in healthy state"
 
+	// PhaseImageCatalogError is triggered when the cluster cannot select the image to
+	// apply because of an invalid or incomplete catalog
+	PhaseImageCatalogError = "Cluster has incomplete or invalid image catalog"
+
 	// PhaseUnrecoverable for an unrecoverable cluster
 	PhaseUnrecoverable = "Cluster is in an unrecoverable state, needs manual intervention"
+
+	// PhaseArchitectureBinaryMissing is the error phase describing a missing architecture
+	PhaseArchitectureBinaryMissing = "Cluster cannot execute instance online upgrade due to missing architecture binary"
 
 	// PhaseWaitingForInstancesToBeActive is a waiting phase that is triggered when an instance pod is not active
 	PhaseWaitingForInstancesToBeActive = "Waiting for the instances to become active"
@@ -672,6 +717,25 @@ const (
 	TablespaceStatusPendingReconciliation TablespaceStatus = "pending"
 )
 
+// AvailableArchitecture represents the state of a cluster's architecture
+type AvailableArchitecture struct {
+	// GoArch is the name of the executable architecture
+	GoArch string `json:"goArch"`
+
+	// Hash is the hash of the executable
+	Hash string `json:"hash"`
+}
+
+// GetAvailableArchitecture returns an AvailableArchitecture given it's name. It returns nil if it's not found.
+func (status *ClusterStatus) GetAvailableArchitecture(archName string) *AvailableArchitecture {
+	for _, architecture := range status.AvailableArchitectures {
+		if architecture.GoArch == archName {
+			return &architecture
+		}
+	}
+	return nil
+}
+
 // ClusterStatus defines the observed state of Cluster
 type ClusterStatus struct {
 	// The total number of PVC Groups detected in the cluster. It may differ from the number of existing instance pods.
@@ -829,6 +893,10 @@ type ClusterStatus struct {
 	// +optional
 	OperatorHash string `json:"cloudNativePGOperatorHash,omitempty"`
 
+	// AvailableArchitectures reports the available architectures of a cluster
+	// +optional
+	AvailableArchitectures []AvailableArchitecture `json:"availableArchitectures,omitempty"`
+
 	// Conditions for cluster object
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
@@ -844,6 +912,24 @@ type ClusterStatus struct {
 	// AzurePVCUpdateEnabled shows if the PVC online upgrade is enabled for this cluster
 	// +optional
 	AzurePVCUpdateEnabled bool `json:"azurePVCUpdateEnabled,omitempty"`
+
+	// Image contains the image name used by the pods
+	// +optional
+	Image string `json:"image,omitempty"`
+
+	// PluginStatus is the status of the loaded plugins
+	PluginStatus []PluginStatus `json:"pluginStatus,omitempty"`
+
+	// SwitchReplicaClusterStatus is the status of the switch to replica cluster
+	// +optional
+	SwitchReplicaClusterStatus SwitchReplicaClusterStatus `json:"switchReplicaClusterStatus,omitempty"`
+}
+
+// SwitchReplicaClusterStatus contains all the statuses regarding the switch of a cluster to a replica cluster
+type SwitchReplicaClusterStatus struct {
+	// InProgress indicates if there is an ongoing procedure of switching a cluster to a replica cluster.
+	// +optional
+	InProgress bool `json:"inProgress,omitempty"`
 }
 
 // InstanceReportedState describes the last reported state of an instance during a reconciliation loop
@@ -2078,6 +2164,22 @@ type DataBackupConfiguration struct {
 	// possible. `false` by default.
 	// +optional
 	ImmediateCheckpoint bool `json:"immediateCheckpoint,omitempty"`
+
+	// AdditionalCommandArgs represents additional arguments that can be appended
+	// to the 'barman-cloud-backup' command-line invocation. These arguments
+	// provide flexibility to customize the backup process further according to
+	// specific requirements or configurations.
+	//
+	// Example:
+	// In a scenario where specialized backup options are required, such as setting
+	// a specific timeout or defining custom behavior, users can use this field
+	// to specify additional command arguments.
+	//
+	// Note:
+	// It's essential to ensure that the provided arguments are valid and supported
+	// by the 'barman-cloud-backup' command, to avoid potential errors or unintended
+	// behavior during execution.
+	AdditionalCommandArgs []string `json:"additionalCommandArgs,omitempty"`
 }
 
 // S3Credentials is the type for the credentials to be used to upload
@@ -2231,6 +2333,23 @@ type ExternalCluster struct {
 	BarmanObjectStore *BarmanObjectStoreConfiguration `json:"barmanObjectStore,omitempty"`
 }
 
+// AppendAdditionalCommandArgs adds custom arguments as barman cloud command-line options
+func (cfg *BarmanObjectStoreConfiguration) AppendAdditionalCommandArgs(options []string) []string {
+	if cfg == nil || cfg.Data == nil {
+		return options
+	}
+
+	for _, userOption := range cfg.Data.AdditionalCommandArgs {
+		key := strings.Split(userOption, "=")[0]
+		if key == "" || slices.Contains(options, key) {
+			continue
+		}
+		options = append(options, userOption)
+	}
+
+	return options
+}
+
 // GetServerName returns the server name, defaulting to the name of the external cluster or using the one specified
 // in the BarmanObjectStore
 func (in ExternalCluster) GetServerName() string {
@@ -2256,6 +2375,42 @@ type ManagedConfiguration struct {
 	// Database roles managed by the `Cluster`
 	// +optional
 	Roles []RoleConfiguration `json:"roles,omitempty"`
+}
+
+// PluginConfiguration specifies a plugin that need to be loaded for this
+// cluster to be reconciled
+type PluginConfiguration struct {
+	// Name is the plugin name
+	Name string `json:"name"`
+
+	// Parameters is the configuration of the plugin
+	Parameters map[string]string `json:"parameters,omitempty"`
+}
+
+// PluginStatus is the status of a loaded plugin
+type PluginStatus struct {
+	// Name is the name of the plugin
+	Name string `json:"name"`
+
+	// Version is the version of the plugin loaded by the
+	// latest reconciliation loop
+	Version string `json:"version"`
+
+	// Capabilities are the list of capabilities of the
+	// plugin
+	Capabilities []string `json:"capabilities,omitempty"`
+
+	// OperatorCapabilities are the list of capabilities of the
+	// plugin regarding the reconciler
+	OperatorCapabilities []string `json:"operatorCapabilities,omitempty"`
+
+	// WALCapabilities are the list of capabilities of the
+	// plugin regarding the WAL management
+	WALCapabilities []string `json:"walCapabilities,omitempty"`
+
+	// BackupCapabilities are the list of capabilities of the
+	// plugin regarding the Backup management
+	BackupCapabilities []string `json:"backupCapabilities,omitempty"`
 }
 
 // RoleConfiguration is the representation, in Kubernetes, of a PostgreSQL role
@@ -2494,24 +2649,47 @@ func (secretResourceVersion *SecretsResourceVersion) SetExternalClusterSecretVer
 // GetImageName get the name of the image that should be used
 // to create the pods
 func (cluster *Cluster) GetImageName() string {
+	// If the image is specified in the status, use that one
+	// It should be there since the first reconciliation
+	if len(cluster.Status.Image) > 0 {
+		return cluster.Status.Image
+	}
+
+	// Fallback to the information we have in the spec
 	if len(cluster.Spec.ImageName) > 0 {
 		return cluster.Spec.ImageName
 	}
 
+	// TODO: check: does a scenario exists in which we do have an imageCatalog
+	//   and no status.image? In that case this should probably error out, not
+	//   returning the default image name.
 	return configuration.Current.PostgresImageName
 }
 
 // GetPostgresqlVersion gets the PostgreSQL image version detecting it from the
-// image name.
+// image name or from the ImageCatalogRef.
 // Example:
 //
 // ghcr.io/cloudnative-pg/postgresql:14.0 corresponds to version 140000
 // ghcr.io/cloudnative-pg/postgresql:13.2 corresponds to version 130002
 // ghcr.io/cloudnative-pg/postgresql:9.6.3 corresponds to version 90603
 func (cluster *Cluster) GetPostgresqlVersion() (int, error) {
+	if cluster.Spec.ImageCatalogRef != nil {
+		return postgres.GetPostgresVersionFromTag(strconv.Itoa(cluster.Spec.ImageCatalogRef.Major))
+	}
+
 	image := cluster.GetImageName()
 	tag := utils.GetImageTag(image)
 	return postgres.GetPostgresVersionFromTag(tag)
+}
+
+// GetPostgresqlMajorVersion gets the PostgreSQL image major version used in the Cluster
+func (cluster *Cluster) GetPostgresqlMajorVersion() (int, error) {
+	version, err := cluster.GetPostgresqlVersion()
+	if err != nil {
+		return 0, err
+	}
+	return postgres.GetPostgresMajorVersion(version), nil
 }
 
 // GetImagePullSecret get the name of the pull secret to use
@@ -2791,6 +2969,15 @@ func (cluster *Cluster) GetPrimaryUpdateMethod() PrimaryUpdateMethod {
 	return strategy
 }
 
+// GetEnablePDB get the cluster EnablePDB value, defaults to true
+func (cluster *Cluster) GetEnablePDB() bool {
+	if cluster.Spec.EnablePDB == nil {
+		return true
+	}
+
+	return *cluster.Spec.EnablePDB
+}
+
 // IsNodeMaintenanceWindowInProgress check if the upgrade mode is active or not
 func (cluster *Cluster) IsNodeMaintenanceWindowInProgress() bool {
 	return cluster.Spec.NodeMaintenanceWindow != nil && cluster.Spec.NodeMaintenanceWindow.InProgress
@@ -2822,7 +3009,7 @@ func (cluster *Cluster) IsInstanceFenced(instance string) bool {
 		return false
 	}
 
-	if fencedInstances.Has(utils.FenceAllServers) {
+	if fencedInstances.Has(utils.FenceAllInstances) {
 		return true
 	}
 	return fencedInstances.Has(instance)
@@ -3116,7 +3303,7 @@ func (cluster *Cluster) GetEnableSuperuserAccess() bool {
 		return *cluster.Spec.EnableSuperuserAccess
 	}
 
-	return true
+	return false
 }
 
 // LogTimestampsWithMessage prints useful information about timestamps in stdout

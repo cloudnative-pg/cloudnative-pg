@@ -25,7 +25,6 @@ import (
 	"time"
 
 	"github.com/thoas/go-funk"
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -35,7 +34,6 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
@@ -86,16 +84,17 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		// This is a cluster of the previous version, created before the operator upgrade
 		clusterName1 = "cluster1"
 		sampleFile   = fixturesDir + "/upgrade/cluster1.yaml.template"
+		minioPath1   = "minio/cluster-full-backup"
 
 		// This is a cluster of the previous version, created after the operator upgrade
 		clusterName2 = "cluster2"
 		sampleFile2  = fixturesDir + "/upgrade/cluster2.yaml.template"
+		minioPath2   = "minio/cluster2-full-backup"
 
 		backupName          = "cluster-backup"
 		backupFile          = fixturesDir + "/upgrade/backup1.yaml"
 		restoreFile         = fixturesDir + "/upgrade/cluster-restore.yaml.template"
 		scheduledBackupFile = fixturesDir + "/upgrade/scheduled-backup.yaml"
-		countBackupsScript  = "sh -c 'mc find minio --name data.tar.gz | wc -l'"
 
 		pgBouncerSampleFile = fixturesDir + "/upgrade/pgbouncer.yaml"
 		pgBouncerName       = "pgbouncer"
@@ -143,30 +142,13 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 	// Check that the amount of backups is increasing on minio.
 	// This check relies on the fact that nothing is performing backups
 	// but a single scheduled backups during the check
-	AssertScheduledBackupsAreScheduled := func(upgradeNamespace string) {
+	AssertScheduledBackupsAreScheduled := func(serverName string) {
 		By("verifying scheduled backups are still happening", func() {
-			out, _, err := env.ExecCommandInContainer(
-				testsUtils.ContainerLocator{
-					Namespace:     upgradeNamespace,
-					PodName:       minioClientName,
-					ContainerName: "mc",
-				}, nil,
-				"sh", "-c", "mc find minio --name data.tar.gz | wc -l")
-			Expect(err).ToNot(HaveOccurred())
-			currentBackups, err := strconv.Atoi(strings.Trim(out, "\n"))
+			latestTar := minioPath(serverName, "data.tar.gz")
+			currentBackups, err := testsUtils.CountFilesOnMinio(minioEnv, latestTar)
 			Expect(err).ToNot(HaveOccurred())
 			Eventually(func() (int, error) {
-				out, _, err := env.ExecCommandInContainer(
-					testsUtils.ContainerLocator{
-						Namespace:     upgradeNamespace,
-						PodName:       minioClientName,
-						ContainerName: "mc",
-					}, nil,
-					"sh", "-c", "mc find minio --name data.tar.gz | wc -l")
-				if err != nil {
-					return 0, err
-				}
-				return strconv.Atoi(strings.Trim(out, "\n"))
+				return testsUtils.CountFilesOnMinio(minioEnv, latestTar)
 			}, 120).Should(BeNumerically(">", currentBackups))
 		})
 	}
@@ -315,6 +297,8 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		GinkgoWriter.Println("cleaning up")
 		if CurrentSpecReport().Failed() {
 			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+			// Dump the minio namespace when failed
+			env.DumpNamespaceObjects(minioEnv.Namespace, "out/"+CurrentSpecReport().LeafNodeText+"minio.log")
 			// Dump the operator namespace, as operator is changing too
 			env.DumpOperator(operatorNamespace,
 				"out/"+CurrentSpecReport().LeafNodeText+"operator.log")
@@ -324,9 +308,23 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		if err != nil {
 			return fmt.Errorf("could not cleanup. Failed to delete namespace: %v", err)
 		}
+
 		// Delete the operator's namespace in case that the previous test make corrupted changes to
 		// the operator's namespace so that affects subsequent test
-		return env.DeleteNamespaceAndWait(operatorNamespace, 60)
+		if err := env.DeleteNamespaceAndWait(operatorNamespace, 60); err != nil {
+			return fmt.Errorf("could not cleanup, failed to delete operator namespace: %v", err)
+		}
+
+		if _, err := testsUtils.CleanFilesOnMinio(minioEnv, minioPath1); err != nil {
+			return fmt.Errorf("encountered an error while cleaning up minio: %v", err)
+		}
+
+		if _, err := testsUtils.CleanFilesOnMinio(minioEnv, minioPath2); err != nil {
+			return fmt.Errorf("encountered an error while cleaning up minio: %v", err)
+		}
+
+		GinkgoWriter.Println("cleaning up done")
+		return nil
 	}
 
 	assertCreateNamespace := func(namespacePrefix string) string {
@@ -358,7 +356,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		By(fmt.Sprintf("applying manager manifest %s", operatorManifestFile), func() {
 			// Upgrade to the new version
 			_, stderr, err := testsUtils.Run(
-				fmt.Sprintf("kubectl apply --server-side -f %v", operatorManifestFile))
+				fmt.Sprintf("kubectl apply --server-side --force-conflicts -f %v", operatorManifestFile))
 			Expect(err).NotTo(HaveOccurred(), "stderr: "+stderr)
 		})
 
@@ -384,6 +382,9 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 	}
 
 	assertClustersWorkAfterOperatorUpgrade := func(upgradeNamespace, operatorManifest string) {
+		// generate random serverNames for the clusters each time
+		serverName1 := fmt.Sprintf("%s-%d", clusterName1, funk.RandomInt(0, 9999))
+		serverName2 := fmt.Sprintf("%s-%d", clusterName2, funk.RandomInt(0, 9999))
 		// Create the secrets used by the clusters and minio
 		By("creating the postgres secrets", func() {
 			CreateResourceFromFile(upgradeNamespace, pgSecrets)
@@ -391,52 +392,18 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		By("creating the cloud storage credentials", func() {
 			AssertStorageCredentialsAreCreated(upgradeNamespace, "aws-creds", "minio", "minio123")
 		})
-
+		By("create the certificates for MinIO", func() {
+			err := minioEnv.CreateCaSecret(env, upgradeNamespace)
+			Expect(err).ToNot(HaveOccurred())
+		})
 		// Create the cluster. Since it will take a while, we'll do more stuff
 		// in parallel and check for it to be up later.
 		By(fmt.Sprintf("creating a Cluster in the '%v' upgradeNamespace",
 			upgradeNamespace), func() {
+			// set the serverName to a random name
+			err := os.Setenv("SERVER_NAME", serverName1)
+			Expect(err).ToNot(HaveOccurred())
 			CreateResourceFromFile(upgradeNamespace, sampleFile)
-		})
-
-		By("setting up minio", func() {
-			setup, err := testsUtils.MinioDefaultSetup(upgradeNamespace)
-			Expect(err).ToNot(HaveOccurred())
-			err = testsUtils.InstallMinio(env, setup, uint(testTimeouts[testsUtils.MinioInstallation]))
-			Expect(err).ToNot(HaveOccurred())
-		})
-
-		// Create the minio client pod and wait for it to be ready.
-		// We'll use it to check if everything is archived correctly
-		By("setting up minio client pod", func() {
-			minioClient := testsUtils.MinioDefaultClient(upgradeNamespace)
-			err := testsUtils.PodCreateAndWaitForReady(env, &minioClient, uint(testTimeouts[testsUtils.MinioInstallation]))
-			Expect(err).ToNot(HaveOccurred())
-		})
-
-		By("having minio resources ready", func() {
-			// Wait for the minio pod to be ready
-			deploymentName := "minio"
-			deploymentNamespacedName := types.NamespacedName{
-				Namespace: upgradeNamespace,
-				Name:      deploymentName,
-			}
-			Eventually(func() (int32, error) {
-				deployment := &appsv1.Deployment{}
-				err := env.Client.Get(env.Ctx, deploymentNamespacedName, deployment)
-				return deployment.Status.ReadyReplicas, err
-			}, 300).Should(BeEquivalentTo(1))
-
-			// Wait for the minio client pod to be ready
-			mcNamespacedName := types.NamespacedName{
-				Namespace: upgradeNamespace,
-				Name:      minioClientName,
-			}
-			Eventually(func() (bool, error) {
-				mc := &corev1.Pod{}
-				err := env.Client.Get(env.Ctx, mcNamespacedName, mc)
-				return utils.IsPodReady(*mc), err
-			}, 180).Should(BeTrue())
 		})
 
 		// Cluster ready happens after minio is ready
@@ -461,36 +428,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		// Create a WAL on the primary and check if it arrives on
-		// minio within a short time.
-		By("archiving WALs on minio", func() {
-			primary := clusterName1 + "-1"
-			out, _, err := env.ExecCommandInInstancePod(
-				testsUtils.PodLocator{
-					Namespace: upgradeNamespace,
-					PodName:   primary,
-				}, nil,
-				"psql", "-U", "postgres", "appdb", "-v", "SHOW_ALL_RESULTS=off", "-tAc",
-				"CHECKPOINT; SELECT pg_walfile_name(pg_switch_wal())")
-			Expect(err).ToNot(HaveOccurred())
-			latestWAL := strings.TrimSpace(out)
-
-			Eventually(func() (int, error, error) {
-				// In the fixture WALs are compressed with gzip
-				findCmd := fmt.Sprintf(
-					"mc find minio --name %v.gz | wc -l",
-					latestWAL)
-				out, _, err := env.ExecCommandInContainer(
-					testsUtils.ContainerLocator{
-						Namespace:     upgradeNamespace,
-						PodName:       minioClientName,
-						ContainerName: "mc",
-					}, nil,
-					"sh", "-c", findCmd)
-				value, atoiErr := strconv.Atoi(strings.Trim(out, "\n"))
-				return value, err, atoiErr
-			}, 60).Should(BeEquivalentTo(1))
-		})
+		AssertArchiveWalOnMinio(upgradeNamespace, clusterName1, serverName1)
 
 		By("uploading a backup on minio", func() {
 			// We create a Backup
@@ -512,8 +450,8 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			Eventually(func() (int, error, error) {
 				out, _, err := env.ExecCommandInContainer(
 					testsUtils.ContainerLocator{
-						Namespace:     upgradeNamespace,
-						PodName:       minioClientName,
+						Namespace:     minioEnv.Namespace,
+						PodName:       minioEnv.Client.Name,
 						ContainerName: "mc",
 					}, nil,
 					"sh", "-c", "mc find minio --name data.tar.gz | wc -l")
@@ -526,7 +464,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			// We create a ScheduledBackup
 			CreateResourceFromFile(upgradeNamespace, scheduledBackupFile)
 		})
-		AssertScheduledBackupsAreScheduled(upgradeNamespace)
+		AssertScheduledBackupsAreScheduled(serverName1)
 
 		assertPGBouncerPodsAreReady(upgradeNamespace, pgBouncerSampleFile, 2)
 
@@ -598,6 +536,9 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		AssertConfUpgrade(clusterName1, upgradeNamespace)
 
 		By("installing a second Cluster on the upgraded operator", func() {
+			// set the serverName to a random name
+			err := os.Setenv("SERVER_NAME", serverName2)
+			Expect(err).ToNot(HaveOccurred())
 			CreateResourceFromFile(upgradeNamespace, sampleFile2)
 			AssertClusterIsReady(upgradeNamespace, clusterName2, testTimeouts[testsUtils.ClusterIsReady], env)
 		})
@@ -649,7 +590,8 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 				return strings.Trim(out, "\n"), err
 			}, 180).Should(BeEquivalentTo("2"))
 		})
-		AssertScheduledBackupsAreScheduled(upgradeNamespace)
+		AssertArchiveWalOnMinio(upgradeNamespace, clusterName1, serverName1)
+		AssertScheduledBackupsAreScheduled(serverName1)
 
 		By("scaling down the pooler to 0", func() {
 			assertPGBouncerPodsAreReady(upgradeNamespace, pgBouncerSampleFile, 2)

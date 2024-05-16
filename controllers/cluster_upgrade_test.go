@@ -80,20 +80,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 		}
 		rollout := isPodNeedingRollout(ctx, status, &cluster)
 		Expect(rollout.required).To(BeTrue())
-		Expect(rollout.reason).To(BeEquivalentTo("the instance is using an old image: postgres:13.10 -> postgres:13.11"))
-	})
-
-	It("does not ask for rollout when update is to a different major release", func(ctx SpecContext) {
-		pod := specs.PodWithExistingStorage(cluster, 1)
-		pod.Spec.Containers[0].Image = "postgres:12.15"
-		status := postgres.PostgresqlStatus{
-			Pod:            pod,
-			IsPodReady:     true,
-			ExecutableHash: "test_hash",
-		}
-		rollout := isPodNeedingRollout(ctx, status, &cluster)
-		Expect(rollout.required).To(BeFalse())
-		Expect(rollout.reason).To(BeEmpty())
+		Expect(rollout.reason).To(BeEquivalentTo("the instance is using a different image: postgres:13.10 -> postgres:13.11"))
 	})
 
 	It("requires rollout when a restart annotation has been added to the cluster", func(ctx SpecContext) {
@@ -155,7 +142,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 		Expect(rollout.canBeInPlace).To(BeFalse())
 	})
 
-	It("checkPodSpecIsOutdated should not return any error", func(ctx SpecContext) {
+	It("checkPodSpecIsOutdated should not return any error", func() {
 		pod := specs.PodWithExistingStorage(cluster, 1)
 		status := postgres.PostgresqlStatus{
 			Pod:            pod,
@@ -496,16 +483,17 @@ var _ = Describe("Test pod rollout due to topology", func() {
 	})
 
 	When("the original podSpec annotation is available", func() {
-		It("should not require rollout when cluster and pod have the same TopologySpreadConstraints", func(ctx SpecContext) {
-			status := postgres.PostgresqlStatus{
-				Pod:            pod,
-				IsPodReady:     true,
-				ExecutableHash: "test_hash",
-			}
-			rollout := isPodNeedingRollout(ctx, status, cluster)
-			Expect(rollout.reason).To(BeEmpty())
-			Expect(rollout.required).To(BeFalse())
-		})
+		It("should not require rollout when cluster and pod have the same TopologySpreadConstraints",
+			func(ctx SpecContext) {
+				status := postgres.PostgresqlStatus{
+					Pod:            pod,
+					IsPodReady:     true,
+					ExecutableHash: "test_hash",
+				}
+				rollout := isPodNeedingRollout(ctx, status, cluster)
+				Expect(rollout.reason).To(BeEmpty())
+				Expect(rollout.required).To(BeFalse())
+			})
 
 		It("should require rollout when the cluster and pod do not have "+
 			"the same TopologySpreadConstraints", func(ctx SpecContext) {

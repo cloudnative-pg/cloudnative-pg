@@ -75,7 +75,8 @@ cluster role which defines the set of rules/resources/verbs granted to the opera
     The above permissions are exclusively reserved for the operator's service
     account to interact with the Kubernetes API server.  They are not directly
     accessible by the users of the operator that interact only with `Cluster`,
-    `Pooler`, `Backup`, and `ScheduledBackup` resources.
+    `Pooler`, `Backup`, `ScheduledBackup`, `ImageCatalog` and
+    `ClusterImageCatalog` resources.
 
 Below we provide some examples and, most importantly, the reasons why
 CloudNativePG requires full or partial management of standard Kubernetes
@@ -213,6 +214,13 @@ CloudNativePG.
   `Backup` resource in the namespace
 
 ### Pod Security Policies
+
+!!! Important
+    Starting from Kubernetes v1.21, the use of `PodSecurityPolicy` has been
+    deprecated, and as of Kubernetes v1.25, it has been completely removed. Despite
+    this deprecation, we acknowledge that the operator is currently undergoing
+    testing in older and unsupported versions of Kubernetes. Therefore, this
+    section is retained for those specific scenarios.
 
 A [Pod Security Policy](https://kubernetes.io/docs/concepts/policy/pod-security-policy/)
 is the Kubernetes way to define security rules and specifications that a pod needs to meet

@@ -26,7 +26,7 @@ defaults:
 
 env:
   # The minimal k8s version supported, k8s version smaller than this one will be removed from vendor
-  MINIMAL_K8S: "1.23"
+  MINIMAL_K8S: "1.25"
 
 jobs:
 
@@ -47,7 +47,7 @@ jobs:
         if: github.event.inputs.limit == null || github.event.inputs.limit == 'eks'
       -
         name: Azure Login
-        uses: azure/login@v1.5.1
+        uses: azure/login@v2.1.0
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
         if: github.event.inputs.limit == null || github.event.inputs.limit == 'aks'
@@ -97,8 +97,8 @@ jobs:
           # and write them to a file, starting from the MINIMAL_K8S
           for baseversion in $(seq $MINIMAL_K8S 0.01 99); do
             URL="https://registry.hub.docker.com/v2/repositories/kindest/node/tags?name=${baseversion}&ordering=last_updated"
-            v=$(curl -SsL "${URL}" | jq -rc '.results[].name' | sort -Vr | head -n1)
-            if [[ -z "${v}" ]] || [[ "${v}" =~ "alpha" ]]; then
+            v=$(curl -SsL "${URL}" | jq -rc '.results[].name' | grep -v "alpha" | sort -Vr | head -n1)
+            if [[ -z "${v}" ]]; then
                break
             fi
             echo "${v}"
@@ -106,7 +106,7 @@ jobs:
         if: github.event.inputs.limit == null || github.event.inputs.limit == 'kind'
       -
         name: Create Pull Request if versions have been updated
-        uses: peter-evans/create-pull-request@v5
+        uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           title: "feat: Public Cloud K8S versions update"

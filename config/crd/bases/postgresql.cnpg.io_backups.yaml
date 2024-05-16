@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.13.0
+    controller-gen.kubebuilder.io/version: v0.15.0
   name: backups.postgresql.cnpg.io
 spec:
   group: postgresql.cnpg.io
@@ -36,20 +36,26 @@ spec:
         description: Backup is the Schema for the backups API
         properties:
           apiVersion:
-            description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
             type: string
           kind:
-            description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
             type: string
           metadata:
             type: object
           spec:
-            description: 'Specification of the desired behavior of the backup. More
-              info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status'
+            description: |-
+              Specification of the desired behavior of the backup.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
             properties:
               cluster:
                 description: The cluster to backup
@@ -62,50 +68,72 @@ spec:
                 type: object
               method:
                 default: barmanObjectStore
-                description: 'The backup method to be used, possible options are `barmanObjectStore`
-                  and `volumeSnapshot`. Defaults to: `barmanObjectStore`.'
+                description: |-
+                  The backup method to be used, possible options are `barmanObjectStore`,
+                  `volumeSnapshot` or `plugin`. Defaults to: `barmanObjectStore`.
                 enum:
                 - barmanObjectStore
                 - volumeSnapshot
+                - plugin
                 type: string
               online:
-                description: Whether the default type of backup with volume snapshots
-                  is online/hot (`true`, default) or offline/cold (`false`) Overrides
-                  the default setting specified in the cluster field '.spec.backup.volumeSnapshot.online'
+                description: |-
+                  Whether the default type of backup with volume snapshots is
+                  online/hot (`true`, default) or offline/cold (`false`)
+                  Overrides the default setting specified in the cluster field '.spec.backup.volumeSnapshot.online'
                 type: boolean
               onlineConfiguration:
-                description: Configuration parameters to control the online/hot backup
-                  with volume snapshots Overrides the default settings specified in
-                  the cluster '.backup.volumeSnapshot.onlineConfiguration' stanza
+                description: |-
+                  Configuration parameters to control the online/hot backup with volume snapshots
+                  Overrides the default settings specified in the cluster '.backup.volumeSnapshot.onlineConfiguration' stanza
                 properties:
                   immediateCheckpoint:
-                    description: Control whether the I/O workload for the backup initial
-                      checkpoint will be limited, according to the `checkpoint_completion_target`
-                      setting on the PostgreSQL server. If set to true, an immediate
-                      checkpoint will be used, meaning PostgreSQL will complete the
-                      checkpoint as soon as possible. `false` by default.
+                    description: |-
+                      Control whether the I/O workload for the backup initial checkpoint will
+                      be limited, according to the `checkpoint_completion_target` setting on
+                      the PostgreSQL server. If set to true, an immediate checkpoint will be
+                      used, meaning PostgreSQL will complete the checkpoint as soon as
+                      possible. `false` by default.
                     type: boolean
                   waitForArchive:
                     default: true
-                    description: If false, the function will return immediately after
-                      the backup is completed, without waiting for WAL to be archived.
-                      This behavior is only useful with backup software that independently
-                      monitors WAL archiving. Otherwise, WAL required to make the
-                      backup consistent might be missing and make the backup useless.
-                      By default, or when this parameter is true, pg_backup_stop will
-                      wait for WAL to be archived when archiving is enabled. On a
-                      standby, this means that it will wait only when archive_mode
-                      = always. If write activity on the primary is low, it may be
-                      useful to run pg_switch_wal on the primary in order to trigger
+                    description: |-
+                      If false, the function will return immediately after the backup is completed,
+                      without waiting for WAL to be archived.
+                      This behavior is only useful with backup software that independently monitors WAL archiving.
+                      Otherwise, WAL required to make the backup consistent might be missing and make the backup useless.
+                      By default, or when this parameter is true, pg_backup_stop will wait for WAL to be archived when archiving is
+                      enabled.
+                      On a standby, this means that it will wait only when archive_mode = always.
+                      If write activity on the primary is low, it may be useful to run pg_switch_wal on the primary in order to trigger
                       an immediate segment switch.
                     type: boolean
                 type: object
+              pluginConfiguration:
+                description: Configuration parameters passed to the plugin managing
+                  this backup
+                properties:
+                  name:
+                    description: Name is the name of the plugin managing this backup
+                    type: string
+                  parameters:
+                    additionalProperties:
+                      type: string
+                    description: |-
+                      Parameters are the configuration parameters passed to the backup
+                      plugin for this backup
+                    type: object
+                required:
+                - name
+                type: object
               target:
-                description: The policy to decide which instance should perform this
-                  backup. If empty, it defaults to `cluster.spec.backup.target`. Available
-                  options are empty string, `primary` and `prefer-standby`. `primary`
-                  to have backups run always on primary instances, `prefer-standby`
-                  to have backups run preferably on the most updated standby, if available.
+                description: |-
+                  The policy to decide which instance should perform this backup. If empty,
+                  it defaults to `cluster.spec.backup.target`.
+                  Available options are empty string, `primary` and `prefer-standby`.
+                  `primary` to have backups run always on primary instances,
+                  `prefer-standby` to have backups run preferably on the most updated
+                  standby, if available.
                 enum:
                 - primary
                 - prefer-standby
@@ -114,8 +142,10 @@ spec:
             - cluster
             type: object
           status:
-            description: 'Most recently observed status of the backup. This data may
-              not be up to date. Populated by the system. Read-only. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status'
+            description: |-
+              Most recently observed status of the backup. This data may not be up to
+              date. Populated by the system. Read-only.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
             properties:
               azureCredentials:
                 description: The credentials to use to upload data to Azure Blob Storage
@@ -151,7 +181,8 @@ spec:
                     - name
                     type: object
                   storageKey:
-                    description: The storage account key to be used in conjunction
+                    description: |-
+                      The storage account key to be used in conjunction
                       with the storage account name
                     properties:
                       key:
@@ -165,8 +196,9 @@ spec:
                     - name
                     type: object
                   storageSasToken:
-                    description: A shared-access-signature to be used in conjunction
-                      with the storage account name
+                    description: |-
+                      A shared-access-signature to be used in conjunction with
+                      the storage account name
                     properties:
                       key:
                         description: The key to select
@@ -203,9 +235,10 @@ spec:
                 description: Unused. Retained for compatibility with old versions.
                 type: string
               destinationPath:
-                description: The path where to store the backup (i.e. s3://bucket/path/to/folder)
-                  this path, with different destination folders, will be used for
-                  WALs and for data. This may not be populated in case of errors.
+                description: |-
+                  The path where to store the backup (i.e. s3://bucket/path/to/folder)
+                  this path, with different destination folders, will be used for WALs
+                  and for data. This may not be populated in case of errors.
                 type: string
               encryption:
                 description: Encryption method required to S3 API
@@ -217,9 +250,10 @@ spec:
                 description: The ending WAL
                 type: string
               endpointCA:
-                description: EndpointCA store the CA bundle of the barman endpoint.
-                  Useful when using self-signed certificates to avoid errors with
-                  certificate issuer and barman-cloud-wal-archive.
+                description: |-
+                  EndpointCA store the CA bundle of the barman endpoint.
+                  Useful when using self-signed certificates to avoid
+                  errors with certificate issuer and barman-cloud-wal-archive.
                 properties:
                   key:
                     description: The key to select
@@ -232,8 +266,9 @@ spec:
                 - name
                 type: object
               endpointURL:
-                description: Endpoint to be used to upload data to the cloud, overriding
-                  the automatic endpoint discovery
+                description: |-
+                  Endpoint to be used to upload data to the cloud,
+                  overriding the automatic endpoint discovery
                 type: string
               error:
                 description: The detected error
@@ -257,8 +292,9 @@ spec:
                     - name
                     type: object
                   gkeEnvironment:
-                    description: If set to true, will presume that it's running inside
-                      a GKE environment, default to false.
+                    description: |-
+                      If set to true, will presume that it's running inside a GKE environment,
+                      default to false.
                     type: boolean
                 type: object
               instanceID:
@@ -344,7 +380,8 @@ spec:
                     type: object
                 type: object
               serverName:
-                description: The server name on S3, the cluster name is used if this
+                description: |-
+                  The server name on S3, the cluster name is used if this
                   parameter is omitted
                 type: string
               snapshotBackupStatus:
@@ -361,8 +398,9 @@ spec:
                           description: Name is the snapshot resource name
                           type: string
                         tablespaceName:
-                          description: TablespaceName is the name of the snapshotted
-                            tablespace. Only set when type is PG_TABLESPACE
+                          description: |-
+                            TablespaceName is the name of the snapshotted tablespace. Only set
+                            when type is PG_TABLESPACE
                           type: string
                         type:
                           description: Type is tho role of the snapshot in the cluster,

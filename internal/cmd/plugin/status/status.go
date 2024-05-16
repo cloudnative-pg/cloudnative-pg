@@ -29,6 +29,7 @@ import (
 	"github.com/cheynewallace/tabby"
 	"github.com/logrusorgru/aurora/v4"
 	corev1 "k8s.io/api/core/v1"
+	policyv1 "k8s.io/api/policy/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -56,6 +57,10 @@ type PostgresqlStatus struct {
 
 	// PrimaryPod contains the primary Pod
 	PrimaryPod corev1.Pod
+
+	// PodDisruptionBudgetList prints every PDB that matches against the cluster
+	// with the label selector
+	PodDisruptionBudgetList policyv1.PodDisruptionBudgetList
 }
 
 func (fullStatus *PostgresqlStatus) getReplicationSlotList() postgres.PgReplicationSlotList {
@@ -117,6 +122,7 @@ func Status(ctx context.Context, clusterName string, verbose bool, format plugin
 	status.printUnmanagedReplicationSlotStatus()
 	status.printRoleManagerStatus()
 	status.printTablespacesStatus()
+	status.printPodDisruptionBudgetStatus()
 	status.printInstancesStatus()
 
 	if nonFatalError != nil {
@@ -148,17 +154,27 @@ func ExtractPostgresqlStatus(ctx context.Context, clusterName string) (*Postgres
 		managedPods,
 		specs.PostgresContainerName)
 
+	var pdbl policyv1.PodDisruptionBudgetList
+	if err := plugin.Client.List(
+		ctx,
+		&pdbl,
+		client.InNamespace(plugin.Namespace),
+		client.MatchingLabels{utils.ClusterLabelName: clusterName},
+	); err != nil {
+		return nil, fmt.Errorf("while extracting PodDisruptionBudgetList: %w", err)
+	}
 	// Extract the status from the instances
 	status := PostgresqlStatus{
-		Cluster:        &cluster,
-		InstanceStatus: &instancesStatus,
-		PrimaryPod:     primaryPod,
+		Cluster:                 &cluster,
+		InstanceStatus:          &instancesStatus,
+		PrimaryPod:              primaryPod,
+		PodDisruptionBudgetList: pdbl,
 	}
 	return &status, nil
 }
 
 func listFencedInstances(fencedInstances *stringset.Data) string {
-	if fencedInstances.Has(utils.FenceAllServers) {
+	if fencedInstances.Has(utils.FenceAllInstances) {
 		return "All Instances"
 	}
 	return strings.Join(fencedInstances.ToList(), ", ")
@@ -504,7 +520,7 @@ func (fullStatus *PostgresqlStatus) printReplicaStatus(verbose bool) {
 	fullStatus.printReplicaStatusTableHeader(status, verbose)
 
 	// print Replication Slots columns only if the cluster has replication slots enabled
-	addReplicationSlotsColumns := func(applicationName string, columns *[]interface{}) {}
+	addReplicationSlotsColumns := func(_ string, _ *[]interface{}) {}
 	if fullStatus.areReplicationSlotsEnabled() {
 		addReplicationSlotsColumns = func(applicationName string, columns *[]interface{}) {
 			fullStatus.addReplicationSlotsColumns(applicationName, columns, verbose)
@@ -792,6 +808,41 @@ func (fullStatus *PostgresqlStatus) printUnmanagedReplicationSlotStatus() {
 	fmt.Println()
 }
 
+func (fullStatus *PostgresqlStatus) printPodDisruptionBudgetStatus() {
+	const header = "Pod Disruption Budgets status"
+
+	fmt.Println(aurora.Green(header))
+
+	if len(fullStatus.PodDisruptionBudgetList.Items) == 0 {
+		fmt.Println("No active PodDisruptionBudgets found")
+		fmt.Println()
+		return
+	}
+
+	status := tabby.New()
+	status.AddHeader(
+		"Name",
+		"Role",
+		"Expected Pods",
+		"Current Healthy",
+		"Minimum Desired Healthy",
+		"Disruptions Allowed",
+	)
+
+	for _, item := range fullStatus.PodDisruptionBudgetList.Items {
+		status.AddLine(item.Name,
+			item.Spec.Selector.MatchLabels[utils.ClusterRoleLabelName],
+			item.Status.ExpectedPods,
+			item.Status.CurrentHealthy,
+			item.Status.DesiredHealthy,
+			item.Status.DisruptionsAllowed,
+		)
+	}
+
+	status.Print()
+	fmt.Println()
+}
+
 func (fullStatus *PostgresqlStatus) printBasebackupStatus() {
 	const header = "Physical backups"
 
@@ -831,7 +882,7 @@ func (fullStatus *PostgresqlStatus) printBasebackupStatus() {
 		// See: https://www.postgresql.org/docs/current/progress-reporting.html#BASEBACKUP-PROGRESS-REPORTING
 		progress := ""
 		if bb.BackupTotal != 0 {
-			progress = fmt.Sprintf("%.2f%%", float64(bb.BackupStreamed)/float64(bb.BackupTotal))
+			progress = fmt.Sprintf("%.2f%%", float64(bb.BackupStreamed)/float64(bb.BackupTotal)*100)
 		}
 
 		columns := []interface{}{

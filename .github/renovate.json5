@@ -8,7 +8,7 @@
   "prConcurrentLimit": 5,
 // The branches renovate should target
 // PLEASE UPDATE THIS WHEN RELEASING.
-  "baseBranches": ["main","release-1.21","release-1.22"],
+  "baseBranches": ["main","release-1.21","release-1.22", "release-1.23"],
   "ignorePaths": ["docs/**", "config/**", "releases/**", "contribute/**", "config/**", "licenses/**"],
   "postUpdateOptions": ["gomodTidy"],
   "semanticCommits": "enabled",
@@ -47,8 +47,84 @@
       "versioningTemplate": "loose",
       "depNameTemplate": "github.com/goreleaser/goreleaser",
     }, {
+      // We want a PR to bump the external-snapshotter version
       "fileMatch": [
-        "^.github/workflows/continuous-delivery.yml"
+        "^.github/workflows/continuous-delivery.yml",
+        "^hack/setup-cluster\.sh$",
+      ],
+      "matchStrings": [
+        "EXTERNAL_SNAPSHOTTER_VERSION: \"(?<currentValue>.*?)\"",
+        "EXTERNAL_SNAPSHOTTER_VERSION=(?<currentValue>.*?)\\n",
+      ],
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "loose",
+      "depNameTemplate": "kubernetes-csi/external-snapshotter",
+      "extractVersionTemplate": "^(?<version>v\\d+\\.\\d+\\.\\d+)"
+    }, {
+      // We want a PR to bump the external-provisioner version
+      "fileMatch": [
+        "^hack/setup-cluster\.sh$",
+      ],
+      "matchStrings": [
+        "EXTERNAL_PROVISIONER_VERSION=(?<currentValue>.*?)\\n",
+      ],
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "loose",
+      "depNameTemplate": "kubernetes-csi/external-provisioner",
+      "extractVersionTemplate": "^(?<version>v\\d+\\.\\d+\\.\\d+)"
+    }, {
+      // We want a PR to bump the external-resizer version
+      "fileMatch": [
+        "^hack/setup-cluster\.sh$",
+      ],
+      "matchStrings": [
+        "EXTERNAL_RESIZER_VERSION=(?<currentValue>.*?)\\n",
+      ],
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "loose",
+      "depNameTemplate": "kubernetes-csi/external-resizer",
+      "extractVersionTemplate": "^(?<version>v\\d+\\.\\d+\\.\\d+)"
+    }, {
+      // We want a PR to bump the external-attacher version
+      "fileMatch": [
+        "^hack/setup-cluster\.sh$",
+      ],
+      "matchStrings": [
+        "EXTERNAL_ATTACHER_VERSION=(?<currentValue>.*?)\\n",
+      ],
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "loose",
+      "depNameTemplate": "kubernetes-csi/external-attacher",
+      "extractVersionTemplate": "^(?<version>v\\d+\\.\\d+\\.\\d+)"
+    }, {
+      // We want a PR to bump the csi-driver-host-path version
+      "fileMatch": [
+        "^hack/setup-cluster\.sh$",
+      ],
+      "matchStrings": [
+        "CSI_DRIVER_HOST_PATH_DEFAULT_VERSION=(?<currentValue>.*?)\\n",
+      ],
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "loose",
+      "depNameTemplate": "kubernetes-csi/csi-driver-host-path",
+      "extractVersionTemplate": "^(?<version>v\\d+\\.\\d+\\.\\d+)"
+    }, {
+      // We want a PR to bump the rook version
+      "fileMatch": [
+        "^.github/workflows/continuous-delivery.yml",
+      ],
+      "matchStrings": [
+        "ROOK_VERSION: \"(?<currentValue>.*?)\"",
+      ],
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "loose",
+      "depNameTemplate": "rook/rook",
+      "extractVersionTemplate": "^(?<version>v\\d+\\.\\d+\\.\\d+)"
+    }, {
+      // We want a PR to bump kind version
+      "fileMatch": [
+        "^.github/workflows/continuous-delivery.yml",
+        "^.github/workflows/continuous-integration.yml",
       ],
       "matchStrings": [
         "KIND_VERSION: \"(?<currentValue>.*?)\"",
@@ -56,19 +132,30 @@
       "datasourceTemplate": "github-tags",
       "depNameTemplate": "kubernetes-sigs/kind",
     }, {
-      // We want a PR to bump kind node version in the Makefile
+      // We want a PR to bump kind node version
       "fileMatch": [
-        "^Makefile$",
         "^hack/setup-cluster.sh$",
+        "^hack/e2e/run-e2e-kind.sh$",
       ],
-
       "matchStrings": [
-        "KIND_CLUSTER_VERSION \\?= (?<currentValue>.*?)\\n",
-        "K8S_DEFAULT_VERSION=(?<currentValue>.*?)\\n",
+        "KIND_NODE_DEFAULT_VERSION=(?<currentValue>.*?)\\n",
       ],
       "datasourceTemplate": "docker",
       "versioningTemplate": "loose",
       "depNameTemplate": "kindest/node",
+    }, {
+      // We want a PR to bump k3d node version
+      "fileMatch": [
+        "^hack/setup-cluster.sh$",
+        "^hack/e2e/run-e2e-k3d.sh$",
+      ],
+      "matchStrings": [
+        "K3D_NODE_DEFAULT_VERSION=(?<currentValue>.*?)\\n",
+      ],
+      "versioningTemplate": "regex:^v(?<major>\\d+)(\\.(?<minor>\\d+))?(\\.(?<patch>\\d+))(\\+k3s?(?<build>\\d+))?$",
+      "extractVersionTemplate": "^(?<version>v\\d+\\.\\d+\\.\\d+)",
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "k3s-io/k3s",
     }, {
       // We want a PR to bump spellcheck version in the Makefile
       "fileMatch": [
@@ -92,6 +179,42 @@
       "versioningTemplate": "loose",
       "depNameTemplate": "getwoke/woke",
     }, {
+      // We want a PR to bump operator-sdk in the Makefile
+      "fileMatch": [
+        "^Makefile$",
+      ],
+      "matchStrings": [
+        "OPERATOR_SDK_VERSION \\?= (?<currentValue>.*?)\\n"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "operator-framework/operator-sdk",
+      "versioningTemplate": "loose",
+      "extractVersionTemplate": "^(?<version>v\\d+\\.\\d+\\.\\d+)"
+    }, {
+      // We want a PR to bump operator package manager (opm) in the Makefile
+      "fileMatch": [
+        "^Makefile$",
+      ],
+      "matchStrings": [
+        "OPM_VERSION \\?= (?<currentValue>.*?)\\n"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "operator-framework/operator-registry",
+      "versioningTemplate": "loose",
+      "extractVersionTemplate": "^(?<version>v\\d+\\.\\d+\\.\\d+)"
+    }, {
+      // We want a PR to bump redhat-preflight in the Makefile
+      "fileMatch": [
+        "^Makefile$",
+      ],
+      "matchStrings": [
+        "PREFLIGHT_VERSION \\?= (?<currentValue>.*?)\\n"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "redhat-openshift-ecosystem/openshift-preflight",
+      "versioningTemplate": "loose",
+      "extractVersionTemplate": "^(?<version>\\d+\\.\\d+\\.\\d+)"
+    },{
       // We want a PR to bump Default Container Images versions.
       "fileMatch": [
         "^pkg\\/versions\\/versions\\.go$",
@@ -232,6 +355,14 @@
       "matchDepTypes": [
         "action"
       ],
+      "pinDigests": false
+    },{
+// PR group for Kubernetes CSI
+      "groupName": "kubernetes CSI",
+      "matchPackagePrefixes": [
+        "kubernetes-csi"
+      ],
+      "separateMajorMinor": "false",
       "pinDigests": false
     }
   ]

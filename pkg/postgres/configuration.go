@@ -25,6 +25,49 @@ import (
 	"text/template"
 )
 
+// WalLevelValue a value that is assigned to the 'wal_level' configuration field
+type WalLevelValue string
+
+// ParameterWalLevel the configuration key containing the wal_level value
+const ParameterWalLevel = "wal_level"
+
+// ParameterMaxWalSenders the configuration key containing the max_wal_senders value
+const ParameterMaxWalSenders = "max_wal_senders"
+
+// ParameterArchiveMode the configuration key containing the archive_mode value
+const ParameterArchiveMode = "archive_mode"
+
+// ParameterWalLogHints the configuration key containing the wal_log_hints value
+const ParameterWalLogHints = "wal_log_hints"
+
+// An acceptable wal_level value
+const (
+	WalLevelValueLogical WalLevelValue = "logical"
+	WalLevelValueReplica WalLevelValue = "replica"
+	WalLevelValueMinimal WalLevelValue = "minimal"
+)
+
+// IsKnownValue returns a bool indicating if the contained value is a well-know value
+func (w WalLevelValue) IsKnownValue() bool {
+	switch w {
+	case WalLevelValueLogical, WalLevelValueReplica, WalLevelValueMinimal:
+		return true
+	default:
+		return false
+	}
+}
+
+// IsStricterThanMinimal returns a boolean indicating if the contained value is stricter than the minimal
+// wal_level
+func (w WalLevelValue) IsStricterThanMinimal() bool {
+	switch w {
+	case WalLevelValueLogical, WalLevelValueReplica:
+		return true
+	default:
+		return false
+	}
+}
+
 const (
 	// hbaTemplateString is the template used to generate the pg_hba.conf
 	// configuration file
@@ -263,6 +306,9 @@ type ConfigurationInfo struct {
 
 	// TemporaryTablespaces is the list of temporary tablespaces
 	TemporaryTablespaces []string
+
+	// IsWalArchivingDisabled is true when user requested to disable WAL archiving
+	IsWalArchivingDisabled bool
 }
 
 // ManagedExtension defines all the information about a managed extension
@@ -357,8 +403,6 @@ var (
 		"unix_socket_directories":   blockedConfigurationParameter,
 		"unix_socket_group":         blockedConfigurationParameter,
 		"unix_socket_permissions":   blockedConfigurationParameter,
-		"wal_level":                 fixedConfigurationParameter,
-		"wal_log_hints":             fixedConfigurationParameter,
 
 		// The following parameters need a reload to be applied
 		"archive_cleanup_command":                blockedConfigurationParameter,
@@ -412,6 +456,8 @@ var (
 			"dynamic_shared_memory_type": "posix",
 			"wal_sender_timeout":         "5s",
 			"wal_receiver_timeout":       "5s",
+			"wal_level":                  "logical",
+			"wal_log_hints":              "on",
 			// Workaround for PostgreSQL not behaving correctly when
 			// a default value is not explicit in the postgresql.conf and
 			// the parameter cannot be changed without a restart.
@@ -442,8 +488,6 @@ var (
 				"/controller/manager wal-archive --log-destination %s/%s.json %%p",
 				LogPath, LogFileName),
 			"port":                fmt.Sprint(ServerPort),
-			"wal_level":           "logical",
-			"wal_log_hints":       "on",
 			"full_page_writes":    "on",
 			"ssl":                 "on",
 			"ssl_cert_file":       ServerCertificateLocation,
@@ -580,9 +624,14 @@ func CreatePostgresqlConfiguration(info ConfigurationInfo) *PgConfiguration {
 	}
 
 	// Apply the correct archive_mode
-	if info.IsReplicaCluster {
+	switch {
+	case info.IsWalArchivingDisabled:
+		configuration.OverwriteConfig("archive_mode", "off")
+
+	case info.IsReplicaCluster:
 		configuration.OverwriteConfig("archive_mode", "always")
-	} else {
+
+	default:
 		configuration.OverwriteConfig("archive_mode", "on")
 	}
 

@@ -22,6 +22,8 @@ import (
 	"strconv"
 
 	"github.com/spf13/cobra"
+
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 )
 
 // NewCmd create the new "promote" subcommand
@@ -29,8 +31,8 @@ func NewCmd() *cobra.Command {
 	promoteCmd := &cobra.Command{
 		Use:   "promote [cluster] [node]",
 		Short: "Promote the pod named [cluster]-[node] or [node] to primary",
-		Args:  cobra.ExactArgs(2),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		Args:  plugin.RequiresArguments(2),
+		RunE: func(_ *cobra.Command, args []string) error {
 			ctx := context.Background()
 			clusterName := args[0]
 			node := args[1]

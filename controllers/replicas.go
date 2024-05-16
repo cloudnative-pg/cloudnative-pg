@@ -40,9 +40,11 @@ var ErrWalReceiversRunning = fmt.Errorf("wal receivers are still running")
 // elapsed yet
 var ErrWaitingOnFailOverDelay = fmt.Errorf("current primary isn't healthy, waiting for the delay before triggering a failover") //nolint: lll
 
-// updateTargetPrimaryFromPods sets the name of the target primary from the Pods status if needed
-// this function will return the name of the new primary selected for promotion
-func (r *ClusterReconciler) updateTargetPrimaryFromPods(
+// reconcileTargetPrimaryFromPods sets the name of the target primary from the Pods status if needed
+// this function will return the name of the new primary selected for promotion.
+// Returns the name of the primary if any changes was made and any error encountered.
+// TODO: move to a reconciler package
+func (r *ClusterReconciler) reconcileTargetPrimaryFromPods(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	status postgres.PostgresqlStatusList,
@@ -74,15 +76,15 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPods(
 
 	// Second step: check if the first element of the sorted list is the primary
 	if cluster.IsReplica() {
-		return r.updateTargetPrimaryFromPodsReplicaCluster(ctx, cluster, status, resources)
+		return r.reconcileTargetPrimaryForReplicaCluster(ctx, cluster, status, resources)
 	}
 
-	return r.updateTargetPrimaryFromPodsPrimaryCluster(ctx, cluster, status, resources)
+	return r.reconcileTargetPrimaryForNonReplicaCluster(ctx, cluster, status, resources)
 }
 
-// updateTargetPrimaryFromPodsPrimaryCluster sets the name of the target primary from the Pods status if needed
+// reconcileTargetPrimaryForNonReplicaCluster sets the name of the target primary from the Pods status if needed
 // this function will return the name of the new primary selected for promotion
-func (r *ClusterReconciler) updateTargetPrimaryFromPodsPrimaryCluster(
+func (r *ClusterReconciler) reconcileTargetPrimaryForNonReplicaCluster(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	status postgres.PostgresqlStatusList,
@@ -90,24 +92,14 @@ func (r *ClusterReconciler) updateTargetPrimaryFromPodsPrimaryCluster(
 ) (string, error) {
 	contextLogger := log.FromContext(ctx)
 
-	// When replica mode is not active, the first instance in the list is the primary one.
-	// This means we can just look at the first element of the list to check if the primary
-	// is available or not.
-
-	// If the first pod in the sorted list is not the primary we need to execute a failover
-	// or wait if the failover has already been triggered
-
-	// If the first pod in the sorted list is already the targetPrimary,
-	// we have nothing to do here.
 	mostAdvancedInstance := status.Items[0]
 	if cluster.Status.TargetPrimary == mostAdvancedInstance.Pod.Name {
 		return "", nil
 	}
 
-	// If the first pod of the list has no reported status, it means that we weren't able to fetch any status.
-	// This is a programmatic error as the reconciliation cycle should not have reached this function.
+	// If the first pod of the list has no reported status we can't evaluate the failover logic.
 	if !mostAdvancedInstance.HasHTTPStatus() {
-		return "", fmt.Errorf("unable to evaluate failover logic, unable to fetch the instances status")
+		return "", nil
 	}
 
 	if err := r.enforceFailoverDelay(ctx, cluster); err != nil {
@@ -207,7 +199,7 @@ func (r *ClusterReconciler) setPrimaryOnSchedulableNode(
 			// e.g. we want all instances to be moved to a schedulable node before triggering the switchover
 			len(podsOnOtherNodes.Items) < cluster.Spec.Instances-1) {
 		contextLogger.Info("Current primary is running on unschedulable node and something is already in progress",
-			"currentPrimary", primaryPod,
+			"currentPrimary", primaryPod.Pod.Name,
 			"podsOnOtherNodes", len(podsOnOtherNodes.Items),
 			"instances", cluster.Spec.Instances,
 			"readyInstances", cluster.Status.ReadyInstances,
@@ -264,10 +256,10 @@ func (r *ClusterReconciler) setPrimaryOnSchedulableNode(
 	return "", nil
 }
 
-// updateTargetPrimaryFromPodsReplicaCluster sets the name of the target designated
+// reconcileTargetPrimaryForReplicaCluster sets the name of the target designated
 // primary from the Pods status if needed this function will return the name of the
 // new primary selected for promotion
-func (r *ClusterReconciler) updateTargetPrimaryFromPodsReplicaCluster(
+func (r *ClusterReconciler) reconcileTargetPrimaryForReplicaCluster(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	status postgres.PostgresqlStatusList,

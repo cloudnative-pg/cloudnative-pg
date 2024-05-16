@@ -69,14 +69,21 @@ func FromReader(
 				"name", updatedInstanceManager.Name(), "err", err)
 		}
 	}()
+	// Gather the status of the instance
+	instanceStatus, err := instance.GetStatus()
+	if err != nil {
+		return fmt.Errorf("while retrieving instance's status: %w", err)
+	}
 
 	// Read the new instance manager version
 	newHash, err := downloadAndCloseInstanceManagerBinary(updatedInstanceManager, r)
 	if err != nil {
 		return fmt.Errorf("while reading new instance manager binary: %w", err)
 	}
+
 	// Validate the hash of this instance manager
-	if err := validateInstanceManagerHash(typedClient, instance.ClusterName, instance.Namespace, newHash); err != nil {
+	if err := validateInstanceManagerHash(typedClient, instance.ClusterName, instance.Namespace,
+		instanceStatus.InstanceArch, newHash); err != nil {
 		return fmt.Errorf("while validating instance manager binary: %w", err)
 	}
 
@@ -144,9 +151,10 @@ func downloadAndCloseInstanceManagerBinary(dst *os.File, src io.Reader) (string,
 // It returns any errors during execution, or nil if the hash is fine
 func validateInstanceManagerHash(
 	typedClient client.Client,
-	clusterName string,
-	namespace string,
-	hashCode string,
+	clusterName,
+	namespace,
+	instanceArch,
+	newHashCode string,
 ) error {
 	var cluster apiv1.Cluster
 
@@ -158,9 +166,14 @@ func validateInstanceManagerHash(
 		return err
 	}
 
-	if cluster.Status.OperatorHash != hashCode {
+	availableArch := cluster.Status.GetAvailableArchitecture(instanceArch)
+	if availableArch == nil {
+		return fmt.Errorf("missing architecture %s", instanceArch)
+	}
+
+	if availableArch.Hash != newHashCode {
 		log.Warning("Received invalid version of the instance manager",
-			"hashCode", hashCode)
+			"hashCode", newHashCode)
 		return ErrorInvalidInstanceManagerBinary
 	}
 
@@ -169,7 +182,7 @@ func validateInstanceManagerHash(
 
 // reloadInstanceManager gracefully stops the log collection process and then
 // replace this process with a new one executing the new binary.
-// This function never return in case of success.
+// This function never returns in case of success.
 func reloadInstanceManager() error {
 	log.Info("Replacing current instance")
 	err := syscall.Exec(os.Args[0], os.Args, os.Environ()) // #nosec

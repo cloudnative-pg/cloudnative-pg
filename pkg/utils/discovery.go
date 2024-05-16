@@ -18,13 +18,19 @@ package utils
 
 import (
 	"fmt"
+	"io"
+	"path/filepath"
 	"regexp"
 	"strconv"
+	"strings"
+	"sync"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/discovery"
 	ctrl "sigs.k8s.io/controller-runtime"
+
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/executablehash"
 )
 
 // haveSCC stores the result of the DetectSecurityContextConstraints check
@@ -35,6 +41,58 @@ var haveVolumeSnapshot bool
 
 // supportSeccomp specifies whether we should set the SeccompProfile or not in the pods
 var supportSeccomp bool
+
+// AvailableArchitecture is a struct containing info about an available architecture
+type AvailableArchitecture struct {
+	GoArch         string
+	hash           string
+	mx             sync.Mutex
+	hashCalculator func(name string) (hash string, err error)
+	binaryPath     string
+}
+
+func newAvailableArchitecture(goArch, binaryPath string) *AvailableArchitecture {
+	return &AvailableArchitecture{
+		GoArch:         goArch,
+		hashCalculator: executablehash.GetByName,
+		binaryPath:     binaryPath,
+	}
+}
+
+// GetHash retrieves the hash for a given AvailableArchitecture
+func (arch *AvailableArchitecture) GetHash() string {
+	if arch.hash == "" {
+		arch.calculateHash()
+	}
+	arch.mx.Lock()
+	defer arch.mx.Unlock()
+	return arch.hash
+}
+
+// calculateHash calculates the hash for a given AvailableArchitecture
+func (arch *AvailableArchitecture) calculateHash() {
+	arch.mx.Lock()
+	defer arch.mx.Unlock()
+
+	if arch.hash != "" {
+		return
+	}
+
+	hash, err := arch.hashCalculator(arch.binaryPath)
+	if err != nil {
+		panic(fmt.Errorf("while calculating architecture hash: %w", err))
+	}
+
+	arch.hash = hash
+}
+
+// FileStream opens a stream reading from the manager's binary
+func (arch *AvailableArchitecture) FileStream() (io.ReadCloser, error) {
+	return executablehash.StreamByName(arch.binaryPath)
+}
+
+// availableArchitectures stores the result of DetectAvailableArchitectures function
+var availableArchitectures []*AvailableArchitecture
 
 // minorVersionRegexp is used to extract the minor version from
 // the Kubernetes API server version. Some providers, like AWS,
@@ -170,4 +228,38 @@ func DetectSeccompSupport(client discovery.DiscoveryInterface) (err error) {
 	}
 
 	return
+}
+
+// GetAvailableArchitectures returns the available instance's architectures
+func GetAvailableArchitectures() []*AvailableArchitecture { return availableArchitectures }
+
+// GetAvailableArchitecture returns an available architecture given its goArch
+func GetAvailableArchitecture(goArch string) (*AvailableArchitecture, error) {
+	for _, a := range availableArchitectures {
+		if a.GoArch == goArch {
+			return a, nil
+		}
+	}
+	return nil, fmt.Errorf("invalid architecture: %s", goArch)
+}
+
+// detectAvailableArchitectures detects the architectures available in a given path
+func detectAvailableArchitectures(filepathGlob string) error {
+	binaries, err := filepath.Glob(filepathGlob)
+	if err != nil {
+		return err
+	}
+	for _, b := range binaries {
+		goArch := strings.Split(filepath.Base(b), "manager_")[1]
+		arch := newAvailableArchitecture(goArch, b)
+		availableArchitectures = append(availableArchitectures, arch)
+		go arch.calculateHash()
+	}
+
+	return err
+}
+
+// DetectAvailableArchitectures detects the architectures available in the cluster
+func DetectAvailableArchitectures() error {
+	return detectAvailableArchitectures("bin/manager_*")
 }

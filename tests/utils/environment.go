@@ -29,7 +29,8 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/thoas/go-funk"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -115,6 +116,10 @@ func NewTestingEnvironment() (*TestingEnvironment, error) {
 	env.Scheme = runtime.NewScheme()
 
 	if err := storagesnapshotv1.AddToScheme(env.Scheme); err != nil {
+		return nil, err
+	}
+
+	if err := monitoringv1.AddToScheme(env.Scheme); err != nil {
 		return nil, err
 	}
 

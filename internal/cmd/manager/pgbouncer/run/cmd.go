@@ -54,7 +54,7 @@ func NewCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "run",
 		SilenceErrors: true,
-		PreRunE: func(cmd *cobra.Command, args []string) error {
+		PreRunE: func(_ *cobra.Command, _ []string) error {
 			if poolerNamespacedName.Name == "" || poolerNamespacedName.Namespace == "" {
 				log.Info(
 					"pooler object key not set",
@@ -63,7 +63,7 @@ func NewCmd() *cobra.Command {
 			}
 			return nil
 		},
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			if err := runSubCommand(cmd.Context(), poolerNamespacedName); err != nil {
 				log.Error(err, "Error while running manager")
 				return err

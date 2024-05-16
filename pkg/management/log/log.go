@@ -25,7 +25,6 @@ import (
 	"runtime"
 
 	"github.com/go-logr/logr"
-	"github.com/google/uuid"
 	"go.uber.org/zap/zapcore"
 	ctrl "sigs.k8s.io/controller-runtime"
 	ctrlLog "sigs.k8s.io/controller-runtime/pkg/log"
@@ -62,8 +61,6 @@ const (
 	// DefaultLevel is the default logging level
 	DefaultLevel = InfoLevel
 )
-
-type uuidKey struct{}
 
 // Logger wraps a logr.Logger, hiding parts of its APIs
 type logger struct {
@@ -208,11 +205,6 @@ func FromContext(ctx context.Context) Logger {
 		l = &logger{Logger: ctrlLog.FromContext(ctx)}
 	}
 
-	uuid, ok := ctx.Value(uuidKey{}).(uuid.UUID)
-	if ok {
-		l = l.WithValues("uuid", uuid)
-	}
-
 	return l
 }
 
@@ -221,21 +213,8 @@ func IntoContext(ctx context.Context, log Logger) context.Context {
 	return ctrlLog.IntoContext(ctx, log.GetLogger())
 }
 
-// AddUUID wraps a given context to inject a new uuid
-func AddUUID(ctx context.Context) (context.Context, error) {
-	id, err := uuid.NewUUID()
-	if err != nil {
-		return ctx, err
-	}
-	return context.WithValue(ctx, uuidKey{}, id), nil
-}
-
 // SetupLogger sets up the logger from a given context, wrapping it with a new uuid, and any given name
 func SetupLogger(ctx context.Context) (Logger, context.Context) {
-	if newCtx, err := AddUUID(ctx); err == nil {
-		ctx = newCtx
-	}
-
 	// The only error that we can have calling FromContext() is a not found
 	// in which case we will have an empty not nil value for newLogger which
 	// still useful when setting up the logger

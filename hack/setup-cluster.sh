@@ -24,10 +24,15 @@ if [ "${DEBUG-}" = true ]; then
 fi
 
 # Defaults
-K8S_DEFAULT_VERSION=v1.28.0
-CSI_DRIVER_HOST_PATH_DEFAULT_VERSION=v1.11.0
-K8S_VERSION=${K8S_VERSION:-$K8S_DEFAULT_VERSION}
-KUBECTL_VERSION=${KUBECTL_VERSION:-$K8S_VERSION}
+KIND_NODE_DEFAULT_VERSION=v1.29.2
+K3D_NODE_DEFAULT_VERSION=v1.29.3
+CSI_DRIVER_HOST_PATH_DEFAULT_VERSION=v1.13.0
+EXTERNAL_SNAPSHOTTER_VERSION=v7.0.2
+EXTERNAL_PROVISIONER_VERSION=v4.0.1
+EXTERNAL_RESIZER_VERSION=v1.10.1
+EXTERNAL_ATTACHER_VERSION=v4.5.1
+K8S_VERSION=${K8S_VERSION-}
+KUBECTL_VERSION=${KUBECTL_VERSION-}
 CSI_DRIVER_HOST_PATH_VERSION=${CSI_DRIVER_HOST_PATH_VERSION:-$CSI_DRIVER_HOST_PATH_DEFAULT_VERSION}
 ENGINE=${CLUSTER_ENGINE:-kind}
 ENABLE_REGISTRY=${ENABLE_REGISTRY:-}
@@ -217,7 +222,7 @@ create_cluster_k3d() {
   local latest_k3s_tag
   latest_k3s_tag=$(k3d version list k3s | grep -- "^${k8s_version//./\\.}"'\+-k3s[0-9]$' | tail -n 1)
 
-  local volumes=()
+  local options=()
   if [ -n "${DOCKER_REGISTRY_MIRROR:-}" ] || [ -n "${ENABLE_REGISTRY:-}" ]; then
     config_file="${TEMP_DIR}/k3d-registries.yaml"
     cat >"${config_file}" <<-EOF
@@ -240,7 +245,7 @@ EOF
 EOF
     fi
 
-    volumes=(--volume "${config_file}:/etc/rancher/k3s/registries.yaml")
+    options+=(--registry-config "${config_file}")
   fi
 
   local agents=()
@@ -248,7 +253,7 @@ EOF
     agents=(-a "${NODES}")
   fi
 
-  k3d cluster create "${volumes[@]}" "${agents[@]}" -i "rancher/k3s:${latest_k3s_tag}" --no-lb "${cluster_name}" \
+  K3D_FIX_MOUNTS=1 k3d cluster create "${options[@]}" "${agents[@]}" -i "rancher/k3s:${latest_k3s_tag}" --no-lb "${cluster_name}" \
     --k3s-arg "--disable=traefik@server:0" --k3s-arg "--disable=metrics-server@server:0" \
     --k3s-arg "--node-taint=node-role.kubernetes.io/master:NoSchedule@server:0" #wokeignore:rule=master
 
@@ -353,10 +358,6 @@ deploy_fluentd() {
 deploy_csi_host_path() {
   echo "${bright}Starting deployment of CSI driver plugin... ${reset}"
   CSI_BASE_URL=https://raw.githubusercontent.com/kubernetes-csi
-  EXTERNAL_SNAPSHOTTER_VERSION="v6.3.1"
-  EXTERNAL_PROVISIONER_VERSION="v3.6.1"
-  EXTERNAL_RESIZER_VERSION="v1.9.1"
-  EXTERNAL_ATTACHER_VERSION="v4.4.1"
 
   ## Install external snapshotter CRD
   kubectl apply -f "${CSI_BASE_URL}"/external-snapshotter/"${EXTERNAL_SNAPSHOTTER_VERSION}"/client/config/crd/snapshot.storage.k8s.io_volumesnapshotclasses.yaml
@@ -376,15 +377,15 @@ deploy_csi_host_path() {
   kubectl apply -f "${CSI_BASE_URL}"/external-resizer/"${EXTERNAL_RESIZER_VERSION}"/deploy/kubernetes/rbac.yaml
 
   ## Install driver and plugin
-  kubectl apply -f "${CSI_BASE_URL}"/csi-driver-host-path/"${CSI_DRIVER_HOST_PATH_VERSION}"/deploy/kubernetes-1.24/hostpath/csi-hostpath-driverinfo.yaml
-  kubectl apply -f "${CSI_BASE_URL}"/csi-driver-host-path/"${CSI_DRIVER_HOST_PATH_VERSION}"/deploy/kubernetes-1.24/hostpath/csi-hostpath-plugin.yaml
+  kubectl apply -f "${CSI_BASE_URL}"/csi-driver-host-path/"${CSI_DRIVER_HOST_PATH_VERSION}"/deploy/kubernetes-1.27/hostpath/csi-hostpath-driverinfo.yaml
+  kubectl apply -f "${CSI_BASE_URL}"/csi-driver-host-path/"${CSI_DRIVER_HOST_PATH_VERSION}"/deploy/kubernetes-1.27/hostpath/csi-hostpath-plugin.yaml
 
   ## create volumesnapshotclass
-  kubectl apply -f "${CSI_BASE_URL}"/csi-driver-host-path/"${CSI_DRIVER_HOST_PATH_VERSION}"/deploy/kubernetes-1.24/hostpath/csi-hostpath-snapshotclass.yaml
+  kubectl apply -f "${CSI_BASE_URL}"/csi-driver-host-path/"${CSI_DRIVER_HOST_PATH_VERSION}"/deploy/kubernetes-1.27/hostpath/csi-hostpath-snapshotclass.yaml
 
   ## create storage class
   kubectl apply -f "${CSI_BASE_URL}"/csi-driver-host-path/"${CSI_DRIVER_HOST_PATH_VERSION}"/examples/csi-storageclass.yaml
-
+  kubectl annotate storageclass csi-hostpath-sc storage.kubernetes.io/default-snapshot-class=csi-hostpath-snapclass
 
   echo "${bright} CSI driver plugin deployment has started. Waiting for the CSI plugin to be ready... ${reset}"
   ITER=0
@@ -406,21 +407,12 @@ deploy_csi_host_path() {
 
 
 deploy_pyroscope() {
-  helm repo add pyroscope-io https://pyroscope-io.github.io/helm-chart
+  helm repo add pyroscope-io https://grafana.github.io/helm-charts
 
   values_file="${TEMP_DIR}/pyroscope_values.yaml"
   cat >"${values_file}" <<-EOF
 pyroscopeConfigs:
   log-level: "debug"
-  scrape-configs:
-    - job-name: cnpg
-      enabled-profiles: [cpu, mem]
-      static-configs:
-        - application: cloudnative-pg
-          targets:
-            - cnpg-pprof:6060
-          labels:
-            cnpg: cnpg
 EOF
   helm -n cnpg-system install pyroscope pyroscope-io/pyroscope -f "${values_file}"
 
@@ -442,6 +434,28 @@ spec:
     app.kubernetes.io/name: cloudnative-pg
 EOF
   kubectl -n cnpg-system apply -f "${service_file}"
+
+  annotations="${TEMP_DIR}/pyroscope_annotations.yaml"
+  cat >"${annotations}" <<- EOF
+spec:
+   template:
+      metadata:
+         annotations:
+            profiles.grafana.com/memory.scrape: "true"
+            profiles.grafana.com/memory.port: "6060"
+            profiles.grafana.com/cpu.scrape: "true"
+            profiles.grafana.com/cpu.port: "6060"
+            profiles.grafana.com/goroutine.scrape: "true"
+            profiles.grafana.com/goroutine.port: "6060"
+EOF
+
+  kubectl -n cnpg-system patch deployment cnpg-controller-manager --patch-file "${annotations}"
+}
+
+deploy_prometheus_crds() {
+  echo "${bright}Starting deployment of Prometheus CRDs... ${reset}"
+  helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+  helm -n kube-system install prometheus-operator-crds prometheus-community/prometheus-operator-crds
 }
 
 load_image_registry() {
@@ -502,8 +516,6 @@ Options:
 
     -r|--registry         Enable local registry. Env: ENABLE_REGISTRY
 
-    -p|--pyroscope        Enable Pyroscope in the operator namespace
-
 To use long options you need to have GNU enhanced getopt available, otherwise
 you can only use the short version of the options.
 EOF
@@ -534,6 +546,7 @@ create() {
 
   deploy_fluentd
   deploy_csi_host_path
+  deploy_prometheus_crds
 
   echo "${bright}Done creating ${ENGINE} cluster ${CLUSTER_NAME} with version ${K8S_VERSION}${reset}"
 }
@@ -579,7 +592,7 @@ load() {
     # to a future one, we build and push an image with a different VERSION
     # to force a different hash for the manager binary.
     # (Otherwise the ONLINE upgrade won't trigger)
-    
+
     echo "${bright}Building a 'prime' operator from current worktree${reset}"
 
     PRIME_CONTROLLER_IMG="${CONTROLLER_IMG}-prime"
@@ -700,6 +713,18 @@ main() {
     echo >&2
     usage
   fi
+
+  if [ -z "${K8S_VERSION}" ]; then
+    case "${ENGINE}" in
+    kind)
+      K8S_VERSION=${KIND_NODE_DEFAULT_VERSION}
+      ;;
+    k3d)
+      K8S_VERSION=${K3D_NODE_DEFAULT_VERSION}
+      ;;
+    esac
+  fi
+  KUBECTL_VERSION=${KUBECTL_VERSION:-$K8S_VERSION}
 
   # Only here the K8S_VERSION veriable contains its final value
   # so we can set the default cluster name

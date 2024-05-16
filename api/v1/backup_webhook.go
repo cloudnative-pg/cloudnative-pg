@@ -108,5 +108,13 @@ func (r *Backup) validate() field.ErrorList {
 		))
 	}
 
+	if r.Spec.Method == BackupMethodPlugin && r.Spec.PluginConfiguration.IsEmpty() {
+		result = append(result, field.Invalid(
+			field.NewPath("spec", "pluginConfiguration"),
+			r.Spec.OnlineConfiguration,
+			"cannot be empty when the backup method is plugin",
+		))
+	}
+
 	return result
 }

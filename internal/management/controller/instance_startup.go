@@ -69,7 +69,8 @@ func (r *InstanceReconciler) refreshServerCertificateFiles(ctx context.Context, 
 
 // refreshReplicationUserCertificate gets the latest replication certificates from the
 // secrets. Returns true if configuration has been changed
-func (r *InstanceReconciler) refreshReplicationUserCertificate(ctx context.Context,
+func (r *InstanceReconciler) refreshReplicationUserCertificate(
+	ctx context.Context,
 	cluster *apiv1.Cluster,
 ) (bool, error) {
 	var secret corev1.Secret
@@ -169,9 +170,20 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(ctx context.Context
 
 	contextLogger.Info("Cluster status",
 		"currentPrimary", currentPrimary,
-		"targetPrimary", targetPrimary)
+		"targetPrimary", targetPrimary,
+		"isReplicaCluster", cluster.IsReplica())
 
 	switch {
+	case cluster.IsReplica():
+		// I'm an old primary, and now I'm inside a replica cluster. This can
+		// only happen when a primary cluster is demoted while being hibernated.
+		// Otherwise, this would have been caught by the operator, and the operator
+		// would have requested a replica cluster transition.
+		// In this case, we're demoting the cluster immediately.
+		contextLogger.Info("Detected transition to replica cluster after reconciliation " +
+			"of the cluster is resumed, demoting immediately")
+		return r.instance.Demote(ctx, cluster)
+
 	case targetPrimary == r.instance.PodName:
 		if currentPrimary == "" {
 			// This means that this cluster has been just started up and the
@@ -189,7 +201,7 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(ctx context.Context
 
 	default:
 		// I'm an old primary and not the current one. I need to wait for
-		// the switchover procedure to finish and then I can demote myself
+		// the switchover procedure to finish, and then I can demote myself
 		// and start following the new primary
 		contextLogger.Info("This is an old primary instance, waiting for the "+
 			"switchover to finish",
@@ -209,13 +221,12 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(ctx context.Context
 			"currentPrimary", cluster.Status.CurrentPrimary)
 
 		// Wait for the new primary to really accept connections
-		err := r.instance.WaitForPrimaryAvailable()
+		err := r.instance.WaitForPrimaryAvailable(ctx)
 		if err != nil {
 			return err
 		}
 
-		tag := pkgUtils.GetImageTag(cluster.GetImageName())
-		pgMajorVersion, err := postgresSpec.GetPostgresMajorVersionFromTag(tag)
+		pgMajorVersion, err := cluster.GetPostgresqlMajorVersion()
 		if err != nil {
 			return err
 		}
@@ -250,7 +261,7 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(ctx context.Context
 			// pg_rewind requires a clean shutdown of the old primary to work.
 			// The only way to do that is to start the server again
 			// and wait for it to be available again.
-			err = r.instance.CompleteCrashRecovery()
+			err = r.instance.CompleteCrashRecovery(ctx)
 			if err != nil {
 				return err
 			}

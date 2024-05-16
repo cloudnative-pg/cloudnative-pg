@@ -1,0 +1,9 @@
+kind: ClusterImageCatalog
+metadata:
+  name: postgresql
+spec:
+  images:
+    - major: 15
+      image: ghcr.io/cloudnative-pg/postgresql:15.6
+    - major: 16
+      image: ghcr.io/cloudnative-pg/postgresql:16.2

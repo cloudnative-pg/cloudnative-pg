@@ -19,7 +19,7 @@ package v1
 import (
 	"strings"
 
-	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,6 +27,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -1066,59 +1067,560 @@ var _ = Describe("configuration change validation", func() {
 
 		Expect(cluster.validateConfiguration()).To(HaveLen(1))
 	})
+
+	It("should reject minimal wal_level when backup is configured", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Backup: &BackupConfiguration{
+					BarmanObjectStore: &BarmanObjectStoreConfiguration{
+						BarmanCredentials: BarmanCredentials{
+							AWS: &S3Credentials{},
+						},
+					},
+				},
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"wal_level":       "minimal",
+						"max_wal_senders": "0",
+					},
+				},
+			},
+		}
+		Expect(cluster.Spec.Backup.IsBarmanBackupConfigured()).To(BeTrue())
+		Expect(cluster.validateConfiguration()).To(HaveLen(1))
+	})
+
+	It("should allow replica wal_level when backup is configured", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Backup: &BackupConfiguration{
+					BarmanObjectStore: &BarmanObjectStoreConfiguration{
+						BarmanCredentials: BarmanCredentials{
+							AWS: &S3Credentials{},
+						},
+					},
+				},
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"wal_level": "replica",
+					},
+				},
+			},
+		}
+		Expect(cluster.Spec.Backup.IsBarmanBackupConfigured()).To(BeTrue())
+		Expect(cluster.validateConfiguration()).To(BeEmpty())
+	})
+
+	It("should allow logical wal_level when backup is configured", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Backup: &BackupConfiguration{
+					BarmanObjectStore: &BarmanObjectStoreConfiguration{
+						BarmanCredentials: BarmanCredentials{
+							AWS: &S3Credentials{},
+						},
+					},
+				},
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"wal_level": "logical",
+					},
+				},
+			},
+		}
+		Expect(cluster.Spec.Backup.IsBarmanBackupConfigured()).To(BeTrue())
+		Expect(cluster.validateConfiguration()).To(BeEmpty())
+	})
+
+	It("should reject minimal wal_level when instances is greater than one", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Instances: 2,
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"wal_level":       "minimal",
+						"max_wal_senders": "0",
+					},
+				},
+			},
+		}
+
+		Expect(cluster.validateConfiguration()).To(HaveLen(1))
+	})
+
+	It("should allow replica wal_level when instances is greater than one", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Instances: 2,
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"wal_level": "replica",
+					},
+				},
+			},
+		}
+		Expect(cluster.validateConfiguration()).To(BeEmpty())
+	})
+
+	It("should allow logical wal_level when instances is greater than one", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Instances: 2,
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"wal_level": "logical",
+					},
+				},
+			},
+		}
+		Expect(cluster.validateConfiguration()).To(BeEmpty())
+	})
+
+	It("should reject an unknown wal_level value", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Instances: 1,
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"wal_level": "test",
+					},
+				},
+			},
+		}
+
+		errs := cluster.validateConfiguration()
+		Expect(errs).To(HaveLen(1))
+		Expect(errs[0].Detail).To(ContainSubstring("unrecognized `wal_level` value - allowed values"))
+	})
+
+	It("should reject minimal if it is a replica cluster", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Instances: 1,
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled: true,
+				},
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"wal_level":       "minimal",
+						"max_wal_senders": "0",
+					},
+				},
+			},
+		}
+		Expect(cluster.IsReplica()).To(BeTrue())
+		Expect(cluster.validateConfiguration()).To(HaveLen(1))
+	})
+
+	It("should allow minimal wal_level with one instance and without archive mode", func() {
+		cluster := Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					utils.SkipWalArchiving: "enabled",
+				},
+			},
+			Spec: ClusterSpec{
+				Instances: 1,
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"wal_level":       "minimal",
+						"max_wal_senders": "0",
+					},
+				},
+			},
+		}
+		Expect(cluster.validateConfiguration()).To(BeEmpty())
+	})
+
+	It("should disallow minimal wal_level with one instance, without max_wal_senders being specified", func() {
+		cluster := Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					utils.SkipWalArchiving: "enabled",
+				},
+			},
+			Spec: ClusterSpec{
+				Instances: 1,
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"wal_level": "minimal",
+					},
+				},
+			},
+		}
+		Expect(cluster.validateConfiguration()).To(HaveLen(1))
+	})
+
+	It("should disallow changing wal_level to minimal for existing clusters", func() {
+		oldCluster := Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					utils.SkipWalArchiving: "enabled",
+				},
+			},
+			Spec: ClusterSpec{
+				Instances: 1,
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"max_wal_senders": "0",
+					},
+				},
+			},
+		}
+		oldCluster.setDefaults(true)
+
+		cluster := Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					utils.SkipWalArchiving: "enabled",
+				},
+			},
+			Spec: ClusterSpec{
+				Instances: 1,
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"wal_level":       "minimal",
+						"max_wal_senders": "0",
+					},
+				},
+			},
+		}
+		Expect(cluster.validateWALLevelChange(&oldCluster)).To(HaveLen(1))
+	})
+
+	It("should allow retaining wal_level to minimal for existing clusters", func() {
+		oldCluster := Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					utils.SkipWalArchiving: "enabled",
+				},
+			},
+			Spec: ClusterSpec{
+				Instances: 1,
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"wal_level":       "minimal",
+						"max_wal_senders": "0",
+					},
+				},
+			},
+		}
+		oldCluster.setDefaults(true)
+
+		cluster := Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					utils.SkipWalArchiving: "enabled",
+				},
+			},
+			Spec: ClusterSpec{
+				Instances: 1,
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"wal_level":       "minimal",
+						"max_wal_senders": "0",
+						"shared_buffers":  "512MB",
+					},
+				},
+			},
+		}
+		Expect(cluster.validateWALLevelChange(&oldCluster)).To(BeEmpty())
+	})
+
+	Describe("wal_log_hints", func() {
+		It("should allow wal_log_hints set to off for clusters having just one instance", func() {
+			cluster := Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						utils.SkipWalArchiving: "enabled",
+					},
+				},
+				Spec: ClusterSpec{
+					Instances: 1,
+					PostgresConfiguration: PostgresConfiguration{
+						Parameters: map[string]string{
+							"wal_log_hints": "off",
+						},
+					},
+				},
+			}
+			Expect(cluster.validateConfiguration()).To(BeEmpty())
+		})
+
+		It("should not allow wal_log_hints set to off for clusters having more than one instance", func() {
+			cluster := Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						utils.SkipWalArchiving: "enabled",
+					},
+				},
+				Spec: ClusterSpec{
+					Instances: 3,
+					PostgresConfiguration: PostgresConfiguration{
+						Parameters: map[string]string{
+							"wal_log_hints": "off",
+						},
+					},
+				},
+			}
+			Expect(cluster.validateConfiguration()).ToNot(BeEmpty())
+		})
+
+		It("should allow wal_log_hints set to on for clusters having just one instance", func() {
+			cluster := Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						utils.SkipWalArchiving: "enabled",
+					},
+				},
+				Spec: ClusterSpec{
+					Instances: 1,
+					PostgresConfiguration: PostgresConfiguration{
+						Parameters: map[string]string{
+							"wal_log_hints": "on",
+						},
+					},
+				},
+			}
+			Expect(cluster.validateConfiguration()).To(BeEmpty())
+		})
+
+		It("should not allow wal_log_hints set to on for clusters having more than one instance", func() {
+			cluster := Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						utils.SkipWalArchiving: "enabled",
+					},
+				},
+				Spec: ClusterSpec{
+					Instances: 3,
+					PostgresConfiguration: PostgresConfiguration{
+						Parameters: map[string]string{
+							"wal_log_hints": "on",
+						},
+					},
+				},
+			}
+			Expect(cluster.validateConfiguration()).To(BeEmpty())
+		})
+	})
 })
 
 var _ = Describe("validate image name change", func() {
-	It("doesn't complain with no changes", func() {
-		clusterOld := Cluster{
-			Spec: ClusterSpec{},
-		}
-		clusterNew := Cluster{
-			Spec: ClusterSpec{},
-		}
-		Expect(clusterNew.validateImageChange(&clusterOld)).To(BeEmpty())
+	Context("using image name", func() {
+		It("doesn't complain with no changes", func() {
+			clusterOld := Cluster{
+				Spec: ClusterSpec{},
+			}
+			clusterNew := Cluster{
+				Spec: ClusterSpec{},
+			}
+			Expect(clusterNew.validateImageChange(&clusterOld)).To(BeEmpty())
+		})
+
+		It("complains if it can't upgrade between mayor versions", func() {
+			clusterOld := Cluster{
+				Spec: ClusterSpec{
+					ImageName: "postgres:12.0",
+				},
+			}
+			clusterNew := Cluster{
+				Spec: ClusterSpec{
+					ImageName: "postgres:11.0",
+				},
+			}
+			Expect(clusterNew.validateImageChange(&clusterOld)).To(HaveLen(1))
+		})
+
+		It("doesn't complain if image change is valid", func() {
+			clusterOld := Cluster{
+				Spec: ClusterSpec{
+					ImageName: "postgres:12.1",
+				},
+			}
+			clusterNew := Cluster{
+				Spec: ClusterSpec{
+					ImageName: "postgres:12.0",
+				},
+			}
+			Expect(clusterNew.validateImageChange(&clusterOld)).To(BeEmpty())
+		})
+	})
+	Context("using image catalog", func() {
+		It("complains on major upgrades", func() {
+			clusterOld := Cluster{
+				Spec: ClusterSpec{
+					ImageCatalogRef: &ImageCatalogRef{
+						TypedLocalObjectReference: corev1.TypedLocalObjectReference{
+							Name: "test",
+							Kind: "ImageCatalog",
+						},
+						Major: 15,
+					},
+				},
+			}
+			clusterNew := Cluster{
+				Spec: ClusterSpec{
+					ImageCatalogRef: &ImageCatalogRef{
+						TypedLocalObjectReference: corev1.TypedLocalObjectReference{
+							Name: "test",
+							Kind: "ImageCatalog",
+						},
+						Major: 16,
+					},
+				},
+			}
+			Expect(clusterNew.validateImageChange(&clusterOld)).To(HaveLen(1))
+		})
+	})
+	Context("changing from imageName to imageCatalogRef", func() {
+		It("doesn't complain when the major is the same", func() {
+			clusterOld := Cluster{
+				Spec: ClusterSpec{
+					ImageName: "postgres:16.1",
+				},
+			}
+			clusterNew := Cluster{
+				Spec: ClusterSpec{
+					ImageCatalogRef: &ImageCatalogRef{
+						TypedLocalObjectReference: corev1.TypedLocalObjectReference{
+							Name: "test",
+							Kind: "ImageCatalog",
+						},
+						Major: 16,
+					},
+				},
+			}
+			Expect(clusterNew.validateImageChange(&clusterOld)).To(BeEmpty())
+		})
+		It("complains on major upgrades", func() {
+			clusterOld := Cluster{
+				Spec: ClusterSpec{
+					ImageName: "postgres:15.1",
+				},
+			}
+			clusterNew := Cluster{
+				Spec: ClusterSpec{
+					ImageCatalogRef: &ImageCatalogRef{
+						TypedLocalObjectReference: corev1.TypedLocalObjectReference{
+							Name: "test",
+							Kind: "ImageCatalog",
+						},
+						Major: 16,
+					},
+				},
+			}
+			Expect(clusterNew.validateImageChange(&clusterOld)).To(HaveLen(1))
+		})
+		It("complains going from default imageName to different major imageCatalogRef", func() {
+			clusterOld := Cluster{
+				Spec: ClusterSpec{},
+			}
+			clusterNew := Cluster{
+				Spec: ClusterSpec{
+					ImageCatalogRef: &ImageCatalogRef{
+						TypedLocalObjectReference: corev1.TypedLocalObjectReference{
+							Name: "test",
+							Kind: "ImageCatalog",
+						},
+						Major: 14,
+					},
+				},
+			}
+			Expect(clusterNew.validateImageChange(&clusterOld)).To(HaveLen(1))
+		})
+		It("doesn't complain going from default imageName to same major imageCatalogRef", func() {
+			clusterOld := Cluster{
+				Spec: ClusterSpec{},
+			}
+			clusterNew := Cluster{
+				Spec: ClusterSpec{
+					ImageCatalogRef: &ImageCatalogRef{
+						TypedLocalObjectReference: corev1.TypedLocalObjectReference{
+							Name: "test",
+							Kind: "ImageCatalog",
+						},
+						Major: 16,
+					},
+				},
+			}
+			Expect(clusterNew.validateImageChange(&clusterOld)).To(BeEmpty())
+		})
 	})
 
-	It("complains if versions are wrong", func() {
-		clusterOld := Cluster{
-			Spec: ClusterSpec{
-				ImageName: "12:1",
-			},
-		}
-		clusterNew := Cluster{
-			Spec: ClusterSpec{
-				ImageName: "postgres:12.0",
-			},
-		}
-		Expect(clusterNew.validateImageChange(&clusterOld)).To(HaveLen(1))
-	})
-
-	It("complains if can't upgrade between mayor versions", func() {
-		clusterOld := Cluster{
-			Spec: ClusterSpec{
-				ImageName: "postgres:12.0",
-			},
-		}
-		clusterNew := Cluster{
-			Spec: ClusterSpec{
-				ImageName: "postgres:11.0",
-			},
-		}
-		Expect(clusterNew.validateImageChange(&clusterOld)).To(HaveLen(1))
-	})
-
-	It("doesn't complain if image change it's valid", func() {
-		clusterOld := Cluster{
-			Spec: ClusterSpec{
-				ImageName: "postgres:12.1",
-			},
-		}
-		clusterNew := Cluster{
-			Spec: ClusterSpec{
-				ImageName: "postgres:12.0",
-			},
-		}
-		Expect(clusterNew.validateImageChange(&clusterOld)).To(BeEmpty())
+	Context("changing from imageCatalogRef to imageName", func() {
+		It("doesn't complain when the major is the same", func() {
+			clusterOld := Cluster{
+				Spec: ClusterSpec{
+					ImageCatalogRef: &ImageCatalogRef{
+						TypedLocalObjectReference: corev1.TypedLocalObjectReference{
+							Name: "test",
+							Kind: "ImageCatalog",
+						},
+						Major: 16,
+					},
+				},
+			}
+			clusterNew := Cluster{
+				Spec: ClusterSpec{
+					ImageName: "postgres:16.1",
+				},
+			}
+			Expect(clusterNew.validateImageChange(&clusterOld)).To(BeEmpty())
+		})
+		It("complains on major upgrades", func() {
+			clusterOld := Cluster{
+				Spec: ClusterSpec{
+					ImageCatalogRef: &ImageCatalogRef{
+						TypedLocalObjectReference: corev1.TypedLocalObjectReference{
+							Name: "test",
+							Kind: "ImageCatalog",
+						},
+						Major: 15,
+					},
+				},
+			}
+			clusterNew := Cluster{
+				Spec: ClusterSpec{
+					ImageName: "postgres:16.1",
+				},
+			}
+			Expect(clusterNew.validateImageChange(&clusterOld)).To(HaveLen(1))
+		})
+		It("complains going from default imageName to different major imageCatalogRef", func() {
+			clusterOld := Cluster{
+				Spec: ClusterSpec{
+					ImageCatalogRef: &ImageCatalogRef{
+						TypedLocalObjectReference: corev1.TypedLocalObjectReference{
+							Name: "test",
+							Kind: "ImageCatalog",
+						},
+						Major: 14,
+					},
+				},
+			}
+			clusterNew := Cluster{
+				Spec: ClusterSpec{},
+			}
+			Expect(clusterNew.validateImageChange(&clusterOld)).To(HaveLen(1))
+		})
+		It("doesn't complain going from default imageName to same major imageCatalogRef", func() {
+			clusterOld := Cluster{
+				Spec: ClusterSpec{
+					ImageCatalogRef: &ImageCatalogRef{
+						TypedLocalObjectReference: corev1.TypedLocalObjectReference{
+							Name: "test",
+							Kind: "ImageCatalog",
+						},
+						Major: 16,
+					},
+				},
+			}
+			clusterNew := Cluster{
+				Spec: ClusterSpec{},
+			}
+			Expect(clusterNew.validateImageChange(&clusterOld)).To(BeEmpty())
+		})
 	})
 })
 
@@ -2130,6 +2632,87 @@ var _ = Describe("replica mode validation", func() {
 		Expect(cluster.validateReplicaMode()).ToNot(BeEmpty())
 	})
 
+	It("doesn't complain about initdb if we enable the external cluster on an existing cluster", func() {
+		cluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				ResourceVersion: "existing",
+			},
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled: true,
+					Source:  "test",
+				},
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{},
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "test",
+					},
+				},
+			},
+		}
+		result := cluster.validateReplicaMode()
+		Expect(result).To(BeEmpty())
+	})
+
+	It("should complain if enabled is set to off during a transition", func() {
+		old := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				ResourceVersion: "existing",
+			},
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled: true,
+					Source:  "test",
+				},
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{},
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "test",
+					},
+				},
+			},
+			Status: ClusterStatus{
+				SwitchReplicaClusterStatus: SwitchReplicaClusterStatus{
+					InProgress: true,
+				},
+			},
+		}
+
+		cluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				ResourceVersion: "existing",
+			},
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled: false,
+					Source:  "test",
+				},
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{},
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "test",
+					},
+				},
+			},
+			Status: ClusterStatus{
+				SwitchReplicaClusterStatus: SwitchReplicaClusterStatus{
+					InProgress: true,
+				},
+			},
+		}
+
+		result := cluster.validateReplicaClusterChange(old)
+		Expect(result).To(HaveLen(1))
+		Expect(result[0].Type).To(Equal(field.ErrorTypeForbidden))
+		Expect(result[0].Field).To(Equal("spec.replica.enabled"))
+	})
+
 	It("is valid when the pg_basebackup bootstrap option is used", func() {
 		cluster := &Cluster{
 			Spec: ClusterSpec{
@@ -2189,61 +2772,6 @@ var _ = Describe("replica mode validation", func() {
 		cluster.Spec.Bootstrap.PgBaseBackup = nil
 		result := cluster.validateReplicaMode()
 		Expect(result).ToNot(BeEmpty())
-	})
-
-	It("complains when enabled on an existing cluster with no replica mode configured", func() {
-		oldCluster := &Cluster{
-			Spec: ClusterSpec{},
-		}
-		cluster := &Cluster{
-			Spec: ClusterSpec{
-				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled: true,
-					Source:  "test",
-				},
-				Bootstrap: &BootstrapConfiguration{
-					PgBaseBackup: &BootstrapPgBaseBackup{},
-				},
-				ExternalClusters: []ExternalCluster{
-					{Name: "test"},
-				},
-			},
-		}
-		Expect(cluster.validateReplicaMode()).To(BeEmpty())
-		Expect(cluster.validateReplicaModeChange(oldCluster)).ToNot(BeEmpty())
-	})
-
-	It("complains when enabled on an existing cluster with replica mode disabled", func() {
-		oldCluster := &Cluster{
-			Spec: ClusterSpec{
-				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled: false,
-					Source:  "test",
-				},
-				Bootstrap: &BootstrapConfiguration{
-					PgBaseBackup: &BootstrapPgBaseBackup{},
-				},
-				ExternalClusters: []ExternalCluster{
-					{Name: "test"},
-				},
-			},
-		}
-		cluster := &Cluster{
-			Spec: ClusterSpec{
-				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled: true,
-					Source:  "test",
-				},
-				Bootstrap: &BootstrapConfiguration{
-					PgBaseBackup: &BootstrapPgBaseBackup{},
-				},
-				ExternalClusters: []ExternalCluster{
-					{Name: "test"},
-				},
-			},
-		}
-		Expect(cluster.validateReplicaMode()).To(BeEmpty())
-		Expect(cluster.validateReplicaModeChange(oldCluster)).ToNot(BeEmpty())
 	})
 })
 
@@ -2874,7 +3402,7 @@ var _ = Describe("Storage configuration validation", func() {
 				Spec: ClusterSpec{
 					StorageConfiguration: StorageConfiguration{
 						PersistentVolumeClaimTemplate: &corev1.PersistentVolumeClaimSpec{
-							Resources: corev1.ResourceRequirements{
+							Resources: corev1.VolumeResourceRequirements{
 								Requests: corev1.ResourceList{"storage": resource.MustParse("1Gi")},
 							},
 						},
@@ -3786,5 +4314,40 @@ var _ = Describe("Tablespaces validation", func() {
 			},
 		}
 		Expect(cluster.validateTablespaceBackupSnapshot()).To(HaveLen(1))
+	})
+})
+
+var _ = Describe("Validate hibernation", func() {
+	It("should succeed if hibernation is set to 'on'", func() {
+		cluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					utils.HibernationAnnotationName: string(utils.HibernationAnnotationValueOn),
+				},
+			},
+		}
+		Expect(cluster.validateHibernationAnnotation()).To(BeEmpty())
+	})
+
+	It("should succeed if hibernation is set to 'off'", func() {
+		cluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					utils.HibernationAnnotationName: string(utils.HibernationAnnotationValueOff),
+				},
+			},
+		}
+		Expect(cluster.validateHibernationAnnotation()).To(BeEmpty())
+	})
+
+	It("should fail if hibernation is set to an invalid value", func() {
+		cluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					utils.HibernationAnnotationName: "",
+				},
+			},
+		}
+		Expect(cluster.validateHibernationAnnotation()).To(HaveLen(1))
 	})
 })

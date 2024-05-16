@@ -39,7 +39,7 @@ Please refer to the ["Supported releases"](supported_releases.md) page for detai
 
 ## Container images
 
-The [CloudNativePG community](https://github.com/cloudnative-pg)  maintains
+The [CloudNativePG community](https://github.com/cloudnative-pg) maintains
 container images for both the operator and the operand, that is PostgreSQL.
 
 The CloudNativePG operator container images are [distroless](https://github.com/GoogleContainerTools/distroless)
@@ -51,11 +51,6 @@ on multiple architectures, directly from the
 [`postgres-containers` project's GitHub Container Registry](https://github.com/cloudnative-pg/postgres-containers/pkgs/container/postgresql).
 
 Additionally, the Community provides images for the [PostGIS extension](postgis.md).
-
-!!! Warning
-    CloudNativePG requires that all nodes in a Kubernetes cluster have the
-    same CPU architecture, thus a hybrid CPU architecture Kubernetes cluster is not
-    supported.
 
 ## Main features
 
@@ -86,6 +81,7 @@ Additionally, the Community provides images for the [PostGIS extension](postgis.
 * Backups on object stores (AWS S3 and S3-compatible, Azure Blob Storage, and Google Cloud Storage)
 * Full recovery and Point-In-Time recovery from an existing backup on volume snapshots or object stores
 * Offline import of existing PostgreSQL databases, including major upgrades of PostgreSQL
+* Online import of existing PostgreSQL databases, including major upgrades of PostgreSQL, through PostgreSQL native logical replication (imperative, via the `cnpg` plugin)
 * Fencing of an entire PostgreSQL cluster, or a subset of the instances in a declarative way
 * Hibernation of a PostgreSQL cluster in a declarative way
 * Support for Synchronous Replicas
@@ -96,9 +92,10 @@ Additionally, the Community provides images for the [PostGIS extension](postgis.
 * Parallel WAL archiving and restore to allow the database to keep up with WAL
   generation on high write systems
 * Support tagging backup files uploaded to an object store to enable optional
-  retention management at the object store layer Replica clusters for
-* PostgreSQL deployments across multiple Kubernetes
+  retention management at the object store layer
+* Replica clusters for PostgreSQL deployments across multiple Kubernetes
   clusters, enabling private, public, hybrid, and multi-cloud architectures
+* Delayed Replica clusters
 * Connection pooling with PgBouncer
 * Support for node affinity via `nodeSelector`
 * Native customizable exporter of user defined metrics for Prometheus through the `metrics` port (9187)

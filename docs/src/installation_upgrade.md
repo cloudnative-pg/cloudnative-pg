@@ -7,12 +7,12 @@
 The operator can be installed like any other resource in Kubernetes,
 through a YAML manifest applied via `kubectl`.
 
-You can install the [latest operator manifest](https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.22/releases/cnpg-1.22.1.yaml)
+You can install the [latest operator manifest](https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.23/releases/cnpg-1.23.1.yaml)
 for this minor release as follows:
 
 ```sh
 kubectl apply --server-side -f \
-  https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.22/releases/cnpg-1.22.1.yaml
+  https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.23/releases/cnpg-1.23.1.yaml
 ```
 
 You can verify that with:
@@ -72,7 +72,7 @@ specific minor release, you can just run:
 
 ```sh
 curl -sSfL \
-  https://raw.githubusercontent.com/cloudnative-pg/artifacts/release-1.22/manifests/operator-manifest.yaml | \
+  https://raw.githubusercontent.com/cloudnative-pg/artifacts/release-1.23/manifests/operator-manifest.yaml | \
   kubectl apply --server-side -f -
 ```
 
@@ -141,10 +141,6 @@ plane for self-managed Kubernetes installations).
     before performing an upgrade as some versions might require
     extra steps.
 
-!!! Warning
-    If you are upgrading to version 1.20, please read carefully
-    the [dedicated section below](#upgrading-to-120-from-a-previous-minor-version).
-
 Upgrading CloudNativePG operator is a two-step process:
 
 1. upgrade the controller and the related Kubernetes resources
@@ -204,10 +200,6 @@ The in-place upgrade process will not change the init container image inside the
 Pods. Therefore, the Pod definition will not reflect the current version of the
 operator.
 
-!!! Important
-    This feature requires that all pods (operators and operands) run on the
-    same platform/architecture (for example, all `linux/amd64`).
-
 ### Compatibility among versions
 
 CloudNativePG follows semantic versioning. Every release of the
@@ -236,8 +228,7 @@ When versions are not directly upgradable, the old version needs to be
 removed before installing the new one. This won't affect user data but
 only the operator itself.
 
-<!--
-### Upgrading to 1.23.0, 1.22.2 or 1.21.4
+### Upgrading to 1.23.0, 1.22.3 or 1.21.5
 
 !!! Important
     We encourage all existing users of CloudNativePG to upgrade to version
@@ -308,8 +299,6 @@ kubectl apply --server-side --force-conflicts -f <OPERATOR_MANIFEST>
 Henceforth, `kube-apiserver` will be automatically acknowledged as a recognized
 manager for the CRDs, eliminating the need for any further manual intervention
 on this matter.
-
--->
 
 ### Upgrading to 1.22 from a previous minor version
 
@@ -519,80 +508,4 @@ Once the upgrade is completed, also add:
 spec:
    ...
    smartShutdownTimeout: 15
-```
-
-### Upgrading to 1.20 from a previous minor version
-
-CloudNativePG 1.20 introduces some changes from previous versions of the
-operator in the default behavior of a few features, with the goal to improve
-resilience and usability of a Postgres cluster out of the box, through
-convention over configuration.
-
-!!! Important
-    These changes all involve cases where at least one replica is present, and
-    **only affect new `Cluster` resources**.
-
-#### Backup from a standby
-
-[Backup from a standby](backup.md#backup-from-a-standby)
-was introduced in CloudNativePG 1.19, but disabled by default - meaning that
-the base backup is taken from the primary unless the target is explicitly
-set to prefer standby.
-
-From version 1.20, if one or more replicas are available, the operator
-will prefer the most aligned standby to take a full base backup.
-
-If you are upgrading your CloudNativePG deployment to 1.20 and are concerned that
-this feature might impact your production environment for the new `Cluster` resources
-that you create, you can explicitly set the target to the primary by adding the
-following line to all your `Cluster` resources:
-
-```yaml
-spec:
-   ...
-   backup:
-     target: "primary"
-```
-
-#### Restart of a primary after a rolling update
-
-[Automated rolling updates](rolling_update.md#automated-updates-unsupervised)
-have been always available in CloudNativePG, and by default they update the
-primary after having performed a switchover to the most aligned replica.
-
-From version 1.20, we are changing the default update method
-of the primary from switchover to restart as, in most cases, this is
-the fastest and safest way.
-
-If you are upgrading your CloudNativePG deployment to 1.20 and are concerned that
-this feature might impact your production environment for the new `Cluster`
-resources that you create, you can explicitly set the update method of the
-primary to switchover by adding the following line to all your `Cluster`
-resources:
-
-```yaml
-spec:
-   ...
-   primaryUpdateMethod: switchover
-```
-
-#### Replication slots for High Availability
-
-[Replication slots for High Availability](replication.md#replication-slots-for-high-availability)
-were introduced in CloudNativePG in version 1.18, but disabled by default.
-
-Version 1.20 prepares the ground for enabling this feature by default in any
-future release, as replication slots enhance the resilience and robustness of a
-High Availability cluster.
-
-For future compatibility, if you already know that your environments won't ever
-need replication slots, our recommendation is that you explicitly disable their
-management by adding from now the following lines to your `Cluster` resources:
-
-```yaml
-spec:
-   ...
-   replicationSlots:
-     highAvailability:
-       enabled: false
 ```

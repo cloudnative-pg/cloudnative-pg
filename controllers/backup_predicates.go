@@ -19,7 +19,7 @@ package controllers
 import (
 	"context"
 
-	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -129,7 +129,7 @@ var volumeSnapshotsPredicate = predicate.Funcs{
 }
 
 func (r *BackupReconciler) mapVolumeSnapshotsToBackups() handler.MapFunc {
-	return func(ctx context.Context, obj client.Object) []reconcile.Request {
+	return func(_ context.Context, obj client.Object) []reconcile.Request {
 		volumeSnapshot, ok := obj.(*storagesnapshotv1.VolumeSnapshot)
 		if !ok {
 			return nil

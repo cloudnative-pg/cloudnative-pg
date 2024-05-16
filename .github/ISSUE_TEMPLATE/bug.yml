@@ -48,11 +48,12 @@ body:
       label: Version
       description: What is the version of CloudNativePG you are running?
       options:
-        - 1.22.1
-        - 1.21.3
+        - 1.23.0
+        - 1.22.3
+        - 1.21.5
         - trunk (main)
-        - older in 1.21.x
         - older in 1.22.x
+        - older in 1.21.x
         - older minor (unsupported)
     validations:
       required: true
@@ -61,11 +62,12 @@ body:
     attributes:
       label: What version of Kubernetes are you using?
       options:
+        - 1.30 (unsuppprted)
+        - 1.29
         - 1.28
         - 1.27
         - 1.26
         - 1.25 (unsupported)
-        - 1.24 (unsupported)
         - other (unsupported)
     validations:
       required: true
@@ -120,8 +122,7 @@ body:
     id: terms
     attributes:
       label: Code of Conduct
-      description: By submitting this issue, you agree to follow our [Code of Conduct](https://github.com/cloudnative-pg/cloudnative-pg/blob/main/CODE_OF_CONDUCT.md)
+      description: By submitting this issue, you agree to follow our [Code of Conduct](https://github.com/cloudnative-pg/governance/blob/main/CODE_OF_CONDUCT.md)
       options:
         - label: I agree to follow this project's Code of Conduct
           required: true
-

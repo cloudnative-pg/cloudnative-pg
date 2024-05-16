@@ -18,6 +18,7 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -68,8 +69,9 @@ type BackupCommand struct {
 	Capabilities *barmanCapabilities.Capabilities
 }
 
-// NewBackupCommand initializes a BackupCommand object
-func NewBackupCommand(
+// NewBarmanBackupCommand initializes a BackupCommand object, taking a physical
+// backup using Barman Cloud
+func NewBarmanBackupCommand(
 	cluster *apiv1.Cluster,
 	backup *apiv1.Backup,
 	client client.Client,
@@ -134,7 +136,7 @@ func getDataConfiguration(
 			strconv.Itoa(int(*configuration.Data.Jobs)))
 	}
 
-	return options, nil
+	return configuration.AppendAdditionalCommandArgs(options), nil
 }
 
 // getBarmanCloudBackupOptions extract the list of command line options to be used with
@@ -249,16 +251,7 @@ func (b *BackupCommand) retryWithRefreshedCluster(
 	ctx context.Context,
 	cb func() error,
 ) error {
-	return retry.OnError(retry.DefaultBackoff, resources.RetryAlways, func() error {
-		if err := b.Client.Get(ctx, types.NamespacedName{
-			Namespace: b.Cluster.Namespace,
-			Name:      b.Cluster.Name,
-		}, b.Cluster); err != nil {
-			return err
-		}
-
-		return cb()
-	})
+	return resources.RetryWithRefreshedResource(ctx, b.Client, b.Cluster, cb)
 }
 
 // run executes the barman-cloud-backup command and updates the status
@@ -309,7 +302,7 @@ func (b *BackupCommand) takeBackup(ctx context.Context) error {
 	}
 
 	// record the backup beginning
-	b.Log.Info("Backup started", "options", options)
+	b.Log.Info("Starting barman-cloud-backup", "options", options)
 	b.Recorder.Event(b.Backup, "Normal", "Starting", "Backup started")
 
 	// Update backup status in cluster conditions on startup
@@ -331,6 +324,14 @@ func (b *BackupCommand) takeBackup(ctx context.Context) error {
 	cmd.Env = b.Env
 	cmd.Env = append(cmd.Env, "TMPDIR="+postgres.BackupTemporaryDirectory)
 	if err := execlog.RunStreaming(cmd, barmanCapabilities.BarmanCloudBackup); err != nil {
+		const badArgumentsErrorCode = "3"
+		if err.Error() == badArgumentsErrorCode {
+			descriptiveError := errors.New("invalid arguments for barman-cloud-backup. " +
+				"Ensure that the additionalCommandArgs field is correctly populated")
+			b.Log.Error(descriptiveError, "error while executing barman-cloud-backup",
+				"arguments", options)
+			return descriptiveError
+		}
 		return err
 	}
 

@@ -131,6 +131,34 @@ var _ = Describe("File copying functions", func() {
 		Expect(err).ToNot(HaveOccurred())
 		Expect(result).To(BeFalse())
 	})
+
+	It("removes the directory", func() {
+		var err error
+		var result bool
+
+		testDir, err := os.MkdirTemp(tempDir2, "testDir")
+		Expect(err).ToNot(HaveOccurred())
+
+		changed, err := WriteStringToFile(path.Join(testDir, "file.txt"), "this is a test file")
+		Expect(changed).To(BeTrue())
+		Expect(err).ToNot(HaveOccurred())
+
+		result, err = FileExists(path.Join(testDir, "file.txt"))
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result).To(BeTrue())
+
+		err = RemoveDirectory(testDir)
+		Expect(err).ToNot(HaveOccurred())
+
+		result, err = FileExists(path.Join(testDir, "file.txt"))
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result).To(BeFalse())
+	})
+
+	It("fails when the directory to be removed doesn't exist", func() {
+		err := RemoveDirectory(path.Join(tempDir2, "not-existing"))
+		Expect(err).To(MatchError(os.IsNotExist, "is not exists"))
+	})
 })
 
 var _ = Describe("function GetDirectoryContent", func() {

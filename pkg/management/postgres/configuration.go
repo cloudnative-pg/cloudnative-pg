@@ -32,6 +32,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
 	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // InstallPgDataFileContent installs a file in PgData, returning true/false if
@@ -305,7 +306,7 @@ func configurePostgresOverrideConfFile(pgData, primaryConnInfo, slotName string)
 	}
 
 	// Ensure that override.conf file contains just the above options
-	changed, err = configfile.WritePostgresConfigurationFile(targetFile, options)
+	changed, err = configfile.WritePostgresConfiguration(targetFile, options)
 	if err != nil {
 		return false, err
 	}
@@ -425,6 +426,7 @@ func createPostgresqlConfiguration(cluster *apiv1.Cluster, preserveUserSettings 
 		IncludingSharedPreloadLibraries:  true,
 		AdditionalSharedPreloadLibraries: cluster.Spec.PostgresConfiguration.AdditionalLibraries,
 		IsReplicaCluster:                 cluster.IsReplica(),
+		IsWalArchivingDisabled:           utils.IsWalArchivingDisabled(&cluster.ObjectMeta),
 	}
 
 	if preserveUserSettings {
@@ -472,7 +474,7 @@ func configurePostgresForImport(ctx context.Context, pgData string) (changed boo
 	}
 
 	// Ensure that override.conf file contains just the above options
-	changed, err = configfile.WritePostgresConfigurationFile(targetFile, options)
+	changed, err = configfile.WritePostgresConfiguration(targetFile, options)
 	if err != nil {
 		return false, err
 	}

@@ -19,7 +19,7 @@ package persistentvolumeclaim
 import (
 	"context"
 
-	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
@@ -169,15 +169,9 @@ func getCandidateSourceFromBackup(backup *apiv1.Backup) *StorageSource {
 // from a Cluster definition, taking into consideration the backup that the
 // cluster has been bootstrapped from
 func getCandidateSourceFromClusterDefinition(cluster *apiv1.Cluster) *StorageSource {
-	if cluster.Spec.Bootstrap == nil {
-		return nil
-	}
-
-	if cluster.Spec.Bootstrap.Recovery == nil {
-		return nil
-	}
-
-	if cluster.Spec.Bootstrap.Recovery.VolumeSnapshots == nil {
+	if cluster.Spec.Bootstrap == nil ||
+		cluster.Spec.Bootstrap.Recovery == nil ||
+		cluster.Spec.Bootstrap.Recovery.VolumeSnapshots == nil {
 		return nil
 	}
 

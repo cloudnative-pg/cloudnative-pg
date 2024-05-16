@@ -362,9 +362,7 @@ func appendRoleOptions(role DatabaseRole, query *strings.Builder) {
 		query.WriteString(" NOSUPERUSER")
 	}
 
-	if role.ConnectionLimit > -1 {
-		query.WriteString(fmt.Sprintf(" CONNECTION LIMIT %d", role.ConnectionLimit))
-	}
+	query.WriteString(fmt.Sprintf(" CONNECTION LIMIT %d", role.ConnectionLimit))
 }
 
 func appendPasswordOption(role DatabaseRole,

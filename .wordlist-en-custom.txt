@@ -3,6 +3,7 @@ API's
 APIs
 ARMv
 AcolumnName
+AdditionalCommandArgs
 AdditionalPodAffinity
 AdditionalPodAntiAffinity
 AffinityConfiguration
@@ -13,16 +14,21 @@ Armando
 AuthQuery
 AuthQuerySecret
 Autoscaler
+AvailableArchitecture
+AvailableArchitectureList
+AvailableArchitectures
 AzureCredentials
 AzurePVCUpdateEnabled
 Azurite
 BDR
+BackupCapabilities
 BackupConfiguration
 BackupFrom
 BackupLabelFile
 BackupList
 BackupMethod
 BackupPhase
+BackupPluginConfiguration
 BackupSnapshotElementStatus
 BackupSnapshotStatus
 BackupSource
@@ -55,6 +61,8 @@ CSV
 CSVs
 CannotReconcile
 Canovai
+CatalogImage
+CatalogImages
 Cecchi
 Ceph
 CertificatesConfiguration
@@ -69,6 +77,7 @@ CloudNativePG's
 ClusterCondition
 ClusterConditionType
 ClusterIP
+ClusterImageCatalog
 ClusterIsNotReady
 ClusterList
 ClusterRole
@@ -118,6 +127,7 @@ EKS
 EOF
 EOL
 EmbeddedObjectMetadata
+EnablePDB
 EncryptionType
 EndpointCA
 EnsureOption
@@ -130,6 +140,7 @@ EphemeralVolumeSource
 EphemeralVolumesSizeLimit
 EphemeralVolumesSizeLimitConfiguration
 ExternalCluster
+FQDN
 Fei
 Filesystem
 Fluentd
@@ -146,12 +157,12 @@ GUCs
 Gabriele
 GaugeVec
 Gi
+GoArch
 Golang
 GolangCI
 GoogleCredentials
 Grafana
 HH
-Hai
 HashiCorp
 HistoryTags
 Huß
@@ -162,6 +173,9 @@ IPv
 IRSA
 Ibryam
 IfNotPresent
+ImageCatalog
+ImageCatalogRef
+ImageCatalogSpec
 ImportSource
 InfoSec
 Innocenti
@@ -236,8 +250,11 @@ OnlineUpgrading
 OpenSSL
 OpenShift
 Openshift
+OperatorCapabilities
 OperatorGroup
 OperatorHub
+PDB
+PDBs
 PGAudit
 PGDATA
 PGDG
@@ -262,13 +279,17 @@ PgBouncerSecrets
 PgBouncerSecretsVersions
 PgBouncerSpec
 Philippe
+PluginConfigurationList
+PluginStatus
 PoLA
 PodAffinity
 PodAntiAffinity
 PodAntiAffinityType
 PodDisruptionBudget
+PodDisruptionBudgets
 PodMeta
 PodMonitor
+PodSecurityPolicy
 PodSpec
 PodStatus
 PodTemplateSpec
@@ -359,6 +380,8 @@ ServiceAccount
 ServiceAccount's
 ServiceAccountTemplate
 ServiceMonitor
+ServiceSpec
+ServiceTemplateSpec
 Silvela
 Slonik
 SnapshotOwnerReference
@@ -371,6 +394,7 @@ StorageClass
 StorageConfiguration
 Storages
 SuccessfullyExtracted
+SwitchReplicaClusterStatus
 SyncReplicaElectionConstraints
 SynchronizeReplicas
 SynchronizeReplicasConfiguration
@@ -396,6 +420,7 @@ TopologySpreadConstraints
 TypedLocalObjectReference
 UI
 UID
+URIs
 UTF
 Uncomment
 Unrealizable
@@ -413,6 +438,7 @@ VolumeSnapshots
 WAL
 WAL's
 WALBackupConfiguration
+WALCapabilities
 WALs
 Wadle
 WalBackupConfiguration
@@ -426,6 +452,7 @@ abd
 accessKeyId
 accessModes
 adc
+additionalCommandArgs
 additionalPodAffinity
 additionalPodAntiAffinity
 addons
@@ -464,6 +491,7 @@ authn
 authz
 autoscaler
 autovacuum
+availableArchitectures
 aws
 az
 azureCredentials
@@ -475,6 +503,7 @@ backends
 backport
 backported
 backporting
+backupCapabilities
 backupID
 backupId
 backupLabelFile
@@ -516,6 +545,7 @@ bzip
 cGFzc
 caSecretVersion
 cannotReconcile
+catalogName
 cb
 cd
 ce
@@ -540,6 +570,7 @@ cloudnative
 cloudnativepg
 clusterBackup
 clusterName
+clusterimagecatalogs
 clusterlist
 clusterrole
 clusterspec
@@ -604,6 +635,7 @@ dT
 danglingPVC
 dataChecksums
 databackupconfiguration
+datacenter
 datacenters
 datallowconn
 datistemplate
@@ -642,6 +674,7 @@ ecdsa
 edb
 eks
 enableAlterSystem
+enablePDB
 enablePodAntiAffinity
 enablePodMonitor
 enableSuperuserAccess
@@ -655,6 +688,7 @@ env
 envFrom
 ephemeralVolumeSource
 ephemeralVolumesSizeLimit
+eu
 excludePatterns
 executables
 expirations
@@ -692,6 +726,7 @@ ghcr
 github
 gkeEnvironment
 gmail
+goArch
 golangci
 goodwithtech
 googleCredentials
@@ -718,9 +753,11 @@ httpGet
 https
 hugepages
 ident
+imageCatalogRef
 imageName
 imagePullPolicy
 imagePullSecrets
+imagecatalogs
 img
 immediateCheckpoint
 impactful
@@ -875,6 +912,7 @@ openldap
 openshift
 operability
 operativity
+operatorCapabilities
 operatorframework
 operatorgorup
 operatorgroup
@@ -913,6 +951,8 @@ pid
 pitr
 plpgsql
 pluggable
+pluginConfiguration
+pluginStatus
 png
 podAffinityTerm
 podAntiAffinity
@@ -972,6 +1012,7 @@ readService
 readinessProbe
 readthedocs
 readyInstances
+reconciler
 reconciliationLoop
 recoverability
 recoveredCluster
@@ -1043,6 +1084,7 @@ serverSecretVersion
 serverTLS
 serverTLSSecret
 serviceAccountTemplate
+serviceTemplate
 serviceaccount
 sessionToken
 sha
@@ -1101,6 +1143,7 @@ superuserSecret
 superuserSecretVersion
 sv
 svc
+switchReplicaClusterStatus
 switchoverDelay
 switchovers
 syncReplicaElectionConstraint
@@ -1158,6 +1201,7 @@ unencrypted
 unfence
 unfencing
 unix
+unsetting
 unusablePVC
 updateInterval
 upgradable
@@ -1179,6 +1223,7 @@ volumeSnapshots
 volumesnapshot
 waitForArchive
 wal
+walCapabilities
 walClassName
 walSegmentSize
 walStorage

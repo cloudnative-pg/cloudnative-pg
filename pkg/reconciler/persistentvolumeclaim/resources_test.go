@@ -34,7 +34,7 @@ var _ = Describe("PVC detection", func() {
 	It("will list PVCs with Jobs or Pods or which are Ready", func() {
 		clusterName := "myCluster"
 		makeClusterPVC := func(serial string, isResizing bool) corev1.PersistentVolumeClaim {
-			return makePVC(clusterName, serial, NewPgDataCalculator(), isResizing)
+			return makePVC(clusterName, serial, serial, NewPgDataCalculator(), isResizing)
 		}
 		pvcs := []corev1.PersistentVolumeClaim{
 			makeClusterPVC("1", false), // has a Pod

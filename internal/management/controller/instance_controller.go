@@ -53,13 +53,15 @@ import (
 	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/metricserver"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	externalcluster "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/replicaclusterswitch"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/system"
 	pkgUtils "github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 const (
-	userSearchFunctionName = "user_search"
-	userSearchFunction     = "SELECT usename, passwd FROM pg_shadow WHERE usename=$1;"
+	userSearchFunctionSchema = "public"
+	userSearchFunctionName   = "user_search"
+	userSearchFunction       = "SELECT usename, passwd FROM pg_catalog.pg_shadow WHERE usename=$1;"
 )
 
 // RetryUntilWalReceiverDown is the default retry configuration that is used
@@ -270,7 +272,8 @@ func (r *InstanceReconciler) restartPrimaryInplaceIfRequested(
 	if err != nil {
 		return false, err
 	}
-	if isPrimary && cluster.Status.Phase == apiv1.PhaseInplacePrimaryRestart {
+	restartRequested := isPrimary && cluster.Status.Phase == apiv1.PhaseInplacePrimaryRestart
+	if restartRequested {
 		if err := r.instance.RequestAndWaitRestartSmartFast(); err != nil {
 			return true, err
 		}
@@ -658,20 +661,23 @@ func (r *InstanceReconciler) reconcilePoolers(
 		return err
 	}
 	if !existsFunction {
-		_, err = tx.Exec(fmt.Sprintf("CREATE OR REPLACE FUNCTION %s(uname TEXT) "+
+		_, err = tx.Exec(fmt.Sprintf("CREATE OR REPLACE FUNCTION %s.%s(uname TEXT) "+
 			"RETURNS TABLE (usename name, passwd text) "+
 			"as '%s' "+
 			"LANGUAGE sql SECURITY DEFINER",
+			userSearchFunctionSchema,
 			userSearchFunctionName,
 			userSearchFunction))
 		if err != nil {
 			return err
 		}
-		_, err = tx.Exec(fmt.Sprintf("REVOKE ALL ON FUNCTION %s(text) FROM public;", userSearchFunctionName))
+		_, err = tx.Exec(fmt.Sprintf("REVOKE ALL ON FUNCTION %s.%s(text) FROM public;",
+			userSearchFunctionSchema, userSearchFunctionName))
 		if err != nil {
 			return err
 		}
-		_, err = tx.Exec(fmt.Sprintf("GRANT EXECUTE ON FUNCTION %s(text) TO %s",
+		_, err = tx.Exec(fmt.Sprintf("GRANT EXECUTE ON FUNCTION %s.%s(text) TO %s",
+			userSearchFunctionSchema,
 			userSearchFunctionName,
 			apiv1.PGBouncerPoolerUserName))
 		if err != nil {
@@ -887,10 +893,28 @@ func (r *InstanceReconciler) RefreshSecrets(
 
 // reconcileInstance sets PostgreSQL instance parameters to current values
 func (r *InstanceReconciler) reconcileInstance(cluster *apiv1.Cluster) {
+	detectRequiresDesignatedPrimaryTransition := func() bool {
+		if !cluster.IsReplica() {
+			return false
+		}
+
+		if !externalcluster.IsDesignatedPrimaryTransitionRequested(cluster) {
+			return false
+		}
+
+		if !r.instance.IsFenced() && !r.instance.MightBeUnavailable() {
+			return false
+		}
+
+		isPrimary, _ := r.instance.IsPrimary()
+		return isPrimary
+	}
+
 	r.instance.PgCtlTimeoutForPromotion = cluster.GetPgCtlTimeoutForPromotion()
 	r.instance.MaxSwitchoverDelay = cluster.GetMaxSwitchoverDelay()
 	r.instance.MaxStopDelay = cluster.GetMaxStopDelay()
 	r.instance.SmartStopDelay = cluster.GetSmartShutdownTimeout()
+	r.instance.RequiresDesignatedPrimaryTransition = detectRequiresDesignatedPrimaryTransition()
 }
 
 // reconcileAutoConf reconciles the permission of `postgresql.auto.conf`
@@ -930,7 +954,7 @@ func (r *InstanceReconciler) reconcileCheckWalArchiveFile(cluster *apiv1.Cluster
 func (r *InstanceReconciler) processConfigReloadAndManageRestart(ctx context.Context, cluster *apiv1.Cluster) error {
 	contextLogger := log.FromContext(ctx)
 
-	status, err := r.instance.WaitForConfigReload()
+	status, err := r.instance.WaitForConfigReload(ctx)
 	if err != nil {
 		return err
 	}
@@ -1011,7 +1035,7 @@ func (r *InstanceReconciler) refreshCertificateFilesFromSecret(
 		return false, fmt.Errorf("while writing server private key: %w", err)
 	}
 
-	if certificateIsChanged {
+	if privateKeyIsChanged {
 		contextLogger.Info("Refreshed configuration file",
 			"filename", privateKeyLocation,
 			"secret", secret.Name)
@@ -1141,7 +1165,7 @@ func (r *InstanceReconciler) reconcileDesignatedPrimary(
 	cluster *apiv1.Cluster,
 ) (changed bool, err error) {
 	// If I'm already the current designated primary everything is ok.
-	if cluster.Status.CurrentPrimary == r.instance.PodName {
+	if cluster.Status.CurrentPrimary == r.instance.PodName && !r.instance.RequiresDesignatedPrimaryTransition {
 		return false, nil
 	}
 
@@ -1157,6 +1181,9 @@ func (r *InstanceReconciler) reconcileDesignatedPrimary(
 	oldCluster := cluster.DeepCopy()
 	cluster.Status.CurrentPrimary = r.instance.PodName
 	cluster.Status.CurrentPrimaryTimestamp = pkgUtils.GetCurrentTimestamp()
+	if r.instance.RequiresDesignatedPrimaryTransition {
+		externalcluster.SetDesignatedPrimaryTransitionCompleted(cluster)
+	}
 	return changed, r.client.Status().Patch(ctx, cluster, client.MergeFrom(oldCluster))
 }
 

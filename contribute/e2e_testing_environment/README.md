@@ -121,7 +121,7 @@ It is a great tool to interactively monitor memory and CPU usage.
 ## E2E tests suite
 
 E2E testing is performed by running the
-[`hack/e2e/run-e2e.sh`](../../../hack/e2e/run-e2e.sh) bash script, making sure
+[`hack/e2e/run-e2e.sh`](../../hack/e2e/run-e2e.sh) bash script, making sure
 you have a Kubernetes cluster and `kubectl` is configured to point to it
 (this should be the default when you are running tests locally as per the
 instructions in the above section).
@@ -133,12 +133,16 @@ The script can be configured through the following environment variables:
 * `E2E_PRE_ROLLING_UPDATE_IMG`: test a rolling upgrade from this version to the
   latest minor
 * `E2E_DEFAULT_STORAGE_CLASS`: default storage class, depending on the provider
+* `E2E_CSI_STORAGE_CLASS`: csi storage class to be used together with volume snapshots, depending on the provider,
+  must be set if `E2E_DEFAULT_STORAGE_CLASS` is not a csi storage class
+* `E2E_DEFAULT_VOLUMESNAPSHOT_CLASS`: default volume snapshot class, depending on the provider,
+  need to match with `E2E_CSI_STORAGE_CLASS`
 * `AZURE_STORAGE_ACCOUNT`: Azure storage account to test backup and restore, using Barman Cloud on Azure
   blob storage
 * `AZURE_STORAGE_KEY`: Azure storage key to test backup and restore, using Barman Cloud on Azure
   blob storage
 * `FEATURE_TYPE`: Feature type key to run e2e based on feature labels.Ex: smoke, basic, security... details
-  can be fetched from labels file [`tests/labels.go`](../../../tests/labels.go)
+  can be fetched from labels file [`tests/labels.go`](../../tests/labels.go)
 
 If the `CONTROLLER_IMG` is in a private registry, you'll also need to define
 the following variables to create a pull secret:
@@ -161,14 +165,18 @@ To run E2E testing you can also use:
 
 ### Wrapper scripts for E2E testing
 
-There are currently two available scripts that wrap setup of the cluster and
+There are currently two available scripts that wrap cluster setup and
 execution of tests. One is for `kind` and one is for `k3d`. They simply embed
 `hack/setup-cluster.sh` and `hack/e2e/run-e2e.sh` to create a local Kubernetes
 cluster and then run E2E tests on it.
 
+There is also a script to run E2E tests on an existing `local` Kubernetes cluster.
+It tries to detect the appropriate defaults for storage class and volume snapshot class environment variables
+by looking at the annotation of the default storage class and the volume snapshot class.
+
 ### Using feature type test selection/filter
 
-All the current test cases are labelled with features. Which can be selected
+All the current test cases are labeled with features. Which can be selected
 by exporting value `FEATURE_TYPE` and running any script. By default, if test level is not
 exported, it will select all medium test cases from the feature type provided.
 
@@ -195,6 +203,7 @@ exported, it will select all medium test cases from the feature type provided.
 | `storage`                         |
 | `security`                        |
 | `maintenance`                     |
+| `prometheus`                      |
 
 ex:
 ```shell
@@ -240,6 +249,33 @@ We have also provided a shortcut to this script in the main `Makefile`:
 
 ```shell
 make e2e-test-k3d
+```
+
+#### On existing local cluster
+
+You can test the operator locally on `local` with:
+
+``` bash
+run-e2e-local.sh
+```
+
+The script will try detecting the storage class and volume snapshot class to use
+by looking at the following annotations and environment variables:
+
+* `storageclass.kubernetes.io/is-default-class: "true"` for the default storage class to use
+* `E2E_CSI_STORAGE_CLASS` variable for the default CSI storage class to use. The default is `csi-hostpath-sc`
+* `storage.kubernetes.io/default-snapshot-class: "$SNAPSHOT_CLASS_NAME"` for the default volume snapshot class
+   to use with the storage class provided in the `E2E_CSI_STORAGE_CLASS` environment variable.
+
+The clusters created by setup-cluster.sh script will have the correct storage class and volume snapshot class
+detected automatically.
+
+The script will then run the tests on the existing cluster.
+
+We have also provided a shortcut to this script in the main `Makefile`:
+
+```shell
+make e2e-test-local
 ```
 
 #### Environment variables

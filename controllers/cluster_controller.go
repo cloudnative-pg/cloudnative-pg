@@ -22,7 +22,6 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	goruntime "runtime"
 	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -39,18 +38,20 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/operatorclient"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/hibernation"
 	instanceReconciler "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/instance"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/replicaclusterswitch"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/instance"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/stringset"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -60,6 +61,7 @@ const (
 	jobOwnerKey                   = ".metadata.controller"
 	poolerClusterKey              = ".spec.cluster.name"
 	disableDefaultQueriesSpecPath = ".spec.monitoring.disableDefaultQueries"
+	imageCatalogKey               = ".spec.imageCatalog.name"
 )
 
 var apiGVString = apiv1.GroupVersion.String()
@@ -80,7 +82,7 @@ func NewClusterReconciler(mgr manager.Manager, discoveryClient *discovery.Discov
 	return &ClusterReconciler{
 		StatusClient:    instance.NewStatusClient(),
 		DiscoveryClient: discoveryClient,
-		Client:          mgr.GetClient(),
+		Client:          operatorclient.NewExtendedClient(mgr.GetClient()),
 		Scheme:          mgr.GetScheme(),
 		Recorder:        mgr.GetEventRecorderFor("cloudnative-pg"),
 	}
@@ -115,15 +117,16 @@ var ErrNextLoop = utils.ErrNextLoop
 // +kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=create;patch;update;list;watch;get
 // +kubebuilder:rbac:groups="",resources=services,verbs=get;create;delete;update;patch;list;watch
 // +kubebuilder:rbac:groups=snapshot.storage.k8s.io,resources=volumesnapshots,verbs=get;create;watch;list;patch
+// +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=imagecatalogs,verbs=get;watch;list
+// +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=clusterimagecatalogs,verbs=get;watch;list
 
 // Reconcile is the operator reconcile loop
 func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	contextLogger, ctx := log.SetupLogger(ctx)
 
-	contextLogger.Debug(fmt.Sprintf("reconciling object %#q", req.NamespacedName))
-
+	contextLogger.Debug("Reconciliation loop start")
 	defer func() {
-		contextLogger.Debug(fmt.Sprintf("object %#q has been reconciled", req.NamespacedName))
+		contextLogger.Debug("Reconciliation loop end")
 	}()
 
 	cluster, err := r.getCluster(ctx, req)
@@ -142,17 +145,20 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 		return ctrl.Result{}, err
 	}
-
+	ctx = cluster.SetInContext(ctx)
 	// Run the inner reconcile loop. Translate any ErrNextLoop to an errorless return
 	result, err := r.reconcile(ctx, cluster)
 	if errors.Is(err, ErrNextLoop) {
 		return result, nil
 	}
+	if errors.Is(err, utils.ErrTerminateLoop) {
+		return ctrl.Result{}, nil
+	}
 	return result, err
 }
 
 // Inner reconcile loop. Anything inside can require the reconciliation loop to stop by returning ErrNextLoop
-// nolint:gocognit
+// nolint:gocognit,gocyclo
 func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluster) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
@@ -181,8 +187,25 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		return ctrl.Result{}, err
 	}
 
+	// Discover the image to be used and set it into the status
+	if result, err := r.reconcileImage(ctx, cluster); result != nil || err != nil {
+		if result != nil {
+			return *result, err
+		}
+
+		return ctrl.Result{}, fmt.Errorf("cannot set image name: %w", err)
+	}
+
+	// Ensure we load all the plugins that are required to reconcile this cluster
+	if err := r.updatePluginsStatus(ctx, cluster); err != nil {
+		return ctrl.Result{}, fmt.Errorf("cannot reconcile required plugins: %w", err)
+	}
+
 	// Ensure we reconcile the orphan resources if present when we reconcile for the first time a cluster
-	if err := r.reconcileRestoredCluster(ctx, cluster); err != nil {
+	if res, err := r.reconcileRestoredCluster(ctx, cluster); res != nil || err != nil {
+		if res != nil {
+			return *res, nil
+		}
 		return ctrl.Result{}, fmt.Errorf("cannot reconcile restored Cluster: %w", err)
 	}
 
@@ -210,6 +233,11 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		return ctrl.Result{}, fmt.Errorf("cannot update the resource status: %w", err)
 	}
 
+	// Calls pre-reconcile hooks
+	if hookResult := preReconcilePluginHooks(ctx, cluster, cluster); hookResult.StopReconciliation {
+		return hookResult.Result, hookResult.Err
+	}
+
 	if cluster.Status.CurrentPrimary != "" &&
 		cluster.Status.CurrentPrimary != cluster.Status.TargetPrimary {
 		contextLogger.Info("There is a switchover or a failover "+
@@ -233,7 +261,31 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		return ctrl.Result{}, fmt.Errorf("cannot update the instances status on the cluster: %w", err)
 	}
 
-	if err := instanceReconciler.ReconcileMetadata(ctx, r.Client, cluster, resources.instances); err != nil {
+	if err := persistentvolumeclaim.ReconcileMetadata(
+		ctx,
+		r.Client,
+		cluster,
+		resources.pvcs.Items,
+	); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	if err := instanceReconciler.ReconcileMetadata(
+		ctx,
+		r.Client,
+		cluster,
+		resources.instances.Items,
+	); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	if err := persistentvolumeclaim.ReconcileSerialAnnotation(
+		ctx,
+		r.Client,
+		cluster,
+		resources.instances.Items,
+		resources.pvcs.Items,
+	); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -252,19 +304,11 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		return ctrl.Result{RequeueAfter: 10 * time.Second}, registerPhaseErr
 	}
 
-	// Verify the architecture of all the instances and update the OnlineUpdateEnabled
-	// field in the status
-	onlineUpdateEnabled := configuration.Current.EnableInstanceManagerInplaceUpdates
-	fencedInstances, err := utils.GetFencedInstances(cluster.Annotations)
-	if err != nil {
-		contextLogger.Error(err, "while getting fenced instances")
+	if res, err := replicaclusterswitch.Reconcile(ctx, r.Client, cluster, instancesStatus); res != nil || err != nil {
+		if res != nil {
+			return *res, nil
+		}
 		return ctrl.Result{}, err
-	}
-
-	isArchitectureConsistent := r.checkPodsArchitecture(ctx, fencedInstances, &instancesStatus)
-	if !isArchitectureConsistent && onlineUpdateEnabled {
-		contextLogger.Info("Architecture mismatch detected, disabling instance manager online updates")
-		onlineUpdateEnabled = false
 	}
 
 	// The instance list is sorted and will present the primary as the first
@@ -320,6 +364,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	// We cannot merge this code with updateResourceStatus because
 	// it needs to run after retrieving the status from the pods,
 	// which is a time-expensive operation.
+	onlineUpdateEnabled := configuration.Current.EnableInstanceManagerInplaceUpdates
 	if err = r.updateOnlineUpdateEnabled(ctx, cluster, onlineUpdateEnabled); err != nil {
 		if apierrs.IsConflict(err) {
 			// Requeue a new reconciliation cycle, as in this point we need
@@ -339,7 +384,14 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	}
 
 	// Updates all the objects managed by the controller
-	return r.reconcileResources(ctx, cluster, resources, instancesStatus)
+	res, err := r.reconcileResources(ctx, cluster, resources, instancesStatus)
+	if err != nil || !res.IsZero() {
+		return res, err
+	}
+
+	// Calls post-reconcile hooks
+	hookResult := postReconcilePluginHooks(ctx, cluster, cluster)
+	return hookResult.Result, hookResult.Err
 }
 
 func (r *ClusterReconciler) handleSwitchover(
@@ -371,7 +423,7 @@ func (r *ClusterReconciler) handleSwitchover(
 
 	// Update the target primary name from the Pods status.
 	// This means issuing a failover or switchover when needed.
-	selectedPrimary, err := r.updateTargetPrimaryFromPods(ctx, cluster, instancesStatus, resources)
+	selectedPrimary, err := r.reconcileTargetPrimaryFromPods(ctx, cluster, instancesStatus, resources)
 	if err != nil {
 		if errors.Is(err, ErrWaitingOnFailOverDelay) {
 			contextLogger.Info("Waiting for the failover delay to expire")
@@ -556,7 +608,9 @@ func (r *ClusterReconciler) reconcileResources(
 }
 
 // deleteEvictedOrUnscheduledInstances will delete the Pods that the Kubelet has evicted or cannot schedule
-func (r *ClusterReconciler) deleteEvictedOrUnscheduledInstances(ctx context.Context, cluster *apiv1.Cluster,
+func (r *ClusterReconciler) deleteEvictedOrUnscheduledInstances(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
 	resources *managedResources,
 ) (*ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
@@ -615,49 +669,10 @@ func (r *ClusterReconciler) deleteEvictedOrUnscheduledInstances(ctx context.Cont
 	return nil, nil
 }
 
-// checkPodsArchitecture checks whether the architecture of the instances is consistent with the runtime one
-func (r *ClusterReconciler) checkPodsArchitecture(
-	ctx context.Context,
-	fencedInstances *stringset.Data,
-	status *postgres.PostgresqlStatusList,
-) bool {
-	contextLogger := log.FromContext(ctx)
-	isConsistent := true
-
-	if fencedInstances.Has(utils.FenceAllServers) {
-		return isConsistent
-	}
-
-	for _, podStatus := range status.Items {
-		// Ignore architecture in podStatus with errors or that are fenced
-		if podStatus.Error != nil || fencedInstances.Has(podStatus.Pod.Name) {
-			continue
-		}
-
-		switch podStatus.InstanceArch {
-		case goruntime.GOARCH:
-			// architecture matches, everything ok for this pod
-
-		case "":
-			// an empty podStatus.InstanceArch should be due to an old version of the instance manager
-			contextLogger.Info("ignoring empty architecture from the instance",
-				"pod", podStatus.Pod.Name)
-
-		default:
-			contextLogger.Info("Warning: mismatch architecture between controller and instances. "+
-				"This is an unsupported configuration.",
-				"controllerArch", goruntime.GOARCH,
-				"instanceArch", podStatus.InstanceArch,
-				"pod", podStatus.Pod.Name)
-			isConsistent = false
-		}
-	}
-
-	return isConsistent
-}
-
 // reconcilePods decides when to create, scale up/down or wait for pods
-func (r *ClusterReconciler) reconcilePods(ctx context.Context, cluster *apiv1.Cluster,
+func (r *ClusterReconciler) reconcilePods(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
 	resources *managedResources, instancesStatus postgres.PostgresqlStatusList,
 ) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
@@ -764,14 +779,20 @@ func (r *ClusterReconciler) handleRollingUpdate(
 	cluster *apiv1.Cluster,
 	instancesStatus postgres.PostgresqlStatusList,
 ) (ctrl.Result, error) {
-	contextLogger := log.FromContext(ctx)
+	contextLogger := log.FromContext(ctx).WithName("handle_rolling_update")
 
 	// If we need to roll out a restart of any instance, this is the right moment
 	done, err := r.rolloutRequiredInstances(ctx, cluster, &instancesStatus)
-	if err != nil {
+	switch {
+	case errors.Is(err, errLogShippingReplicaElected):
+		contextLogger.Warning(
+			"The primary needs to be restarted, but the chosen new primary is still " +
+				"not connected via streaming replication, waiting for 5 seconds",
+		)
+		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+	case err != nil:
 		return ctrl.Result{}, err
-	}
-	if done {
+	case done:
 		// Rolling upgrade is in progress, let's avoid marking stuff as synchronized
 		return ctrl.Result{}, ErrNextLoop
 	}
@@ -835,6 +856,16 @@ func (r *ClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 			&corev1.Node{},
 			handler.EnqueueRequestsFromMapFunc(r.mapNodeToClusters()),
 			builder.WithPredicates(nodesPredicate),
+		).
+		Watches(
+			&apiv1.ImageCatalog{},
+			handler.EnqueueRequestsFromMapFunc(r.mapImageCatalogsToClusters()),
+			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+		).
+		Watches(
+			&apiv1.ClusterImageCatalog{},
+			handler.EnqueueRequestsFromMapFunc(r.mapClusterImageCatalogsToClusters()),
+			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
 		).
 		Complete(r)
 }
@@ -920,6 +951,21 @@ func (r *ClusterReconciler) createFieldIndexes(ctx context.Context, mgr ctrl.Man
 			}
 
 			return []string{pooler.Spec.Cluster.Name}
+		}); err != nil {
+		return err
+	}
+
+	// Create a new indexed field on ImageCatalogs. This field will be used to easily
+	// find all the ImageCatalogs pointing to a cluster.
+	if err := mgr.GetFieldIndexer().IndexField(
+		ctx,
+		&apiv1.Cluster{},
+		imageCatalogKey, func(rawObj client.Object) []string {
+			cluster := rawObj.(*apiv1.Cluster)
+			if cluster.Spec.ImageCatalogRef == nil || cluster.Spec.ImageCatalogRef.Name == "" {
+				return nil
+			}
+			return []string{cluster.Spec.ImageCatalogRef.Name}
 		}); err != nil {
 		return err
 	}

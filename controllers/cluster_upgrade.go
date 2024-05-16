@@ -32,7 +32,6 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/executablehash"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
@@ -40,6 +39,11 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
+
+// errLogShippingReplicaElected is raised when the pod update process need
+// to select a new primary before upgrading the old primary, but the chosen
+// instance is not connected via streaming replication
+var errLogShippingReplicaElected = errors.New("log shipping replica elected as a new post-switchover primary")
 
 type rolloutReason = string
 
@@ -81,7 +85,7 @@ func (r *ClusterReconciler) rolloutRequiredInstances(
 	}
 
 	// report an error if there is no primary. This condition should never happen because
-	// `updateTargetPrimaryFromPods()` is executed before this function
+	// `reconcileTargetPrimaryFromPods()` is executed before this function
 	if primaryPostgresqlStatus == nil {
 		return false, fmt.Errorf("expected 1 primary PostgreSQL but none found")
 	}
@@ -160,23 +164,39 @@ func (r *ClusterReconciler) updatePrimaryPod(
 		// as the pod list is sorted in the same order we use for switchover / failover.
 		// This may not be true for replica clusters, where every instance is a replica
 		// from the PostgreSQL point-of-view.
-		targetPrimary := podList.Items[1].Pod.Name
+		targetInstance := podList.Items[1]
 
 		// If this is a replica cluster, the target primary we chose may be
 		// the one we're trying to upgrade, as the list isn't sorted. In
 		// this case, we promote the first instance of the list
-		if targetPrimary == primaryPod.Name {
-			targetPrimary = podList.Items[0].Pod.Name
+		if targetInstance.Pod.Name == primaryPod.Name {
+			targetInstance = podList.Items[0]
+		}
+
+		// Before promoting a replica, the instance manager will wait for the WAL receiver
+		// process to be down. We're doing that to avoid losing data written on the primary.
+		// This protection can work only when the streaming connection is active.
+		// Given that, we refuse to promote a replica when the streaming connection
+		// is not active.
+		if !targetInstance.IsWalReceiverActive {
+			contextLogger.Info(
+				"chosen new primary is still not connected via streaming replication, "+
+					"interrupting the primaryPodUpdate",
+				"updateReason", reason,
+				"currentPrimary", primaryPod.Name,
+				"targetPrimary", targetInstance.Pod.Name,
+			)
+			return false, errLogShippingReplicaElected
 		}
 
 		contextLogger.Info("The primary needs to be restarted, we'll trigger a switchover to do that",
 			"reason", reason,
 			"currentPrimary", primaryPod.Name,
-			"targetPrimary", targetPrimary,
+			"targetPrimary", targetInstance.Pod.Name,
 			"podList", podList)
 		r.Recorder.Eventf(cluster, "Normal", "Switchover",
-			"Initiating switchover to %s to upgrade %s", targetPrimary, primaryPod.Name)
-		return true, r.setPrimaryInstance(ctx, cluster, targetPrimary)
+			"Initiating switchover to %s to upgrade %s", targetInstance.Pod.Name, primaryPod.Name)
+		return true, r.setPrimaryInstance(ctx, cluster, targetInstance.Pod.Name)
 	}
 
 	// if there is only one instance in the cluster, we should upgrade it even if it's a primary
@@ -198,7 +218,9 @@ func (r *ClusterReconciler) updateRestartAnnotation(
 	contextLogger := log.FromContext(ctx)
 	if clusterRestart, ok := cluster.Annotations[utils.ClusterRestartAnnotationName]; ok &&
 		(primaryPod.Annotations == nil || primaryPod.Annotations[utils.ClusterRestartAnnotationName] != clusterRestart) {
-		contextLogger.Info("Setting restart annotation on primary pod as needed", "label", utils.ClusterRestartAnnotationName)
+		contextLogger.Info(
+			"Setting restart annotation on primary pod as needed",
+			"label", utils.ClusterRestartAnnotationName)
 		original := primaryPod.DeepCopy()
 		if primaryPod.Annotations == nil {
 			primaryPod.Annotations = make(map[string]string)
@@ -442,20 +464,9 @@ func checkPodImageIsOutdated(
 		return rollout{}, nil
 	}
 
-	canUpgradeImage, err := postgres.CanUpgrade(pgCurrentImageName, targetImageName)
-	if err != nil {
-		return rollout{}, err
-	}
-
-	// We do not report anything here. The webhook should prevent the user to
-	// set an invalid target image
-	if !canUpgradeImage {
-		return rollout{}, nil
-	}
-
 	return rollout{
 		required: true,
-		reason: fmt.Sprintf("the instance is using an old image: %s -> %s",
+		reason: fmt.Sprintf("the instance is using a different image: %s -> %s",
 			pgCurrentImageName, targetImageName),
 	}, nil
 }
@@ -490,7 +501,11 @@ func checkHasMissingPVCs(
 	cluster *apiv1.Cluster,
 ) (rollout, error) {
 	if persistentvolumeclaim.InstanceHasMissingMounts(cluster, status.Pod) {
-		return rollout{required: true, primaryForceRecreate: true, reason: "attaching a new PVC to the instance Pod"}, nil
+		return rollout{
+			required:             true,
+			primaryForceRecreate: true,
+			reason:               "attaching a new PVC to the instance Pod",
+		}, nil
 	}
 	return rollout{}, nil
 }
@@ -657,7 +672,7 @@ func (r *ClusterReconciler) upgradePod(
 	return nil
 }
 
-// upgradeInstanceManager upgrades the instance managers of the Pod running in this cluster
+// upgradeInstanceManager upgrades the instance managers of each Pod running in this cluster
 func (r *ClusterReconciler) upgradeInstanceManager(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
@@ -671,7 +686,7 @@ func (r *ClusterReconciler) upgradeInstanceManager(
 	// 1. an instance manager which doesn't support automatic update
 	// 2. an instance manager which isn't working
 	//
-	// In both ways, we are skipping this automatic update and we rely
+	// In both ways, we are skipping this automatic update and relying
 	// on the rollout strategy
 	for i := len(podList.Items) - 1; i >= 0; i-- {
 		postgresqlStatus := podList.Items[i]
@@ -686,16 +701,34 @@ func (r *ClusterReconciler) upgradeInstanceManager(
 		}
 	}
 
-	operatorHash, err := executablehash.Get()
-	if err != nil {
-		return err
-	}
-
 	// We start upgrading the instance managers we have
 	for i := len(podList.Items) - 1; i >= 0; i-- {
 		postgresqlStatus := podList.Items[i]
 		instanceManagerHash := postgresqlStatus.ExecutableHash
 		instanceManagerIsUpgrading := postgresqlStatus.IsInstanceManagerUpgrading
+
+		// Gather the hash of the operator's manager using the current pod architecture.
+		// If one of the pods is requesting an architecture that's not present in the
+		// operator, that means we've upgraded to an image which doesn't support all
+		// the architectures currently being used by this cluster.
+		// In this case we force the reconciliation loop to stop, requiring manual
+		// intervention.
+		targetManager, err := utils.GetAvailableArchitecture(postgresqlStatus.InstanceArch)
+		if err != nil {
+			contextLogger.Error(err, "encountered an error while upgrading the instance manager")
+			if regErr := r.RegisterPhase(
+				ctx,
+				cluster,
+				apiv1.PhaseArchitectureBinaryMissing,
+				fmt.Sprintf("encountered an error while upgrading the instance manager: %s", err.Error()),
+			); regErr != nil {
+				return regErr
+			}
+
+			return utils.ErrTerminateLoop
+		}
+		operatorHash := targetManager.GetHash()
+
 		if instanceManagerHash != "" && instanceManagerHash != operatorHash && !instanceManagerIsUpgrading {
 			// We need to upgrade this Pod
 			contextLogger.Info("Upgrading instance manager",
@@ -709,7 +742,7 @@ func (r *ClusterReconciler) upgradeInstanceManager(
 				}
 			}
 
-			err = upgradeInstanceManagerOnPod(ctx, *postgresqlStatus.Pod)
+			err = upgradeInstanceManagerOnPod(ctx, postgresqlStatus.Pod, targetManager)
 			if err != nil {
 				enrichedError := fmt.Errorf("while upgrading instance manager on %s (hash: %s): %w",
 					postgresqlStatus.Pod.Name,
@@ -735,8 +768,12 @@ func (r *ClusterReconciler) upgradeInstanceManager(
 }
 
 // upgradeInstanceManagerOnPod upgrades an instance manager of a Pod via an HTTP PUT request.
-func upgradeInstanceManagerOnPod(ctx context.Context, pod corev1.Pod) error {
-	binaryFileStream, err := executablehash.Stream()
+func upgradeInstanceManagerOnPod(
+	ctx context.Context,
+	pod *corev1.Pod,
+	targetManager *utils.AvailableArchitecture,
+) error {
+	binaryFileStream, err := targetManager.FileStream()
 	if err != nil {
 		return err
 	}

@@ -34,25 +34,28 @@ func NewCmd() *cobra.Command {
 		Use:   "psql [cluster] [-- psqlArgs...]",
 		Short: "Start a psql session targeting a CloudNativePG cluster",
 		Args:  validatePsqlArgs,
-		Long:  "This command will start an interactive psql session inside a PostgreSQL Pod created by CloudNativePG.",
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return plugin.CompleteClusters(cmd.Context(), args, toComplete), cobra.ShellCompDirectiveNoFileComp
+		},
+		Long: "This command will start an interactive psql session inside a PostgreSQL Pod created by CloudNativePG.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			clusterName := args[0]
 			psqlArgs := args[1:]
-			psqlOptions := psqlCommandOptions{
-				replica:     replica,
-				namespace:   plugin.Namespace,
-				allocateTTY: allocateTTY,
-				passStdin:   passStdin,
-				args:        psqlArgs,
-				name:        clusterName,
+			psqlOptions := CommandOptions{
+				Replica:     replica,
+				Namespace:   plugin.Namespace,
+				AllocateTTY: allocateTTY,
+				PassStdin:   passStdin,
+				Args:        psqlArgs,
+				Name:        clusterName,
 			}
 
-			psqlCommand, err := newPsqlCommand(cmd.Context(), psqlOptions)
+			psqlCommand, err := NewCommand(cmd.Context(), psqlOptions)
 			if err != nil {
 				return err
 			}
 
-			return psqlCommand.exec()
+			return psqlCommand.Exec()
 		},
 	}
 

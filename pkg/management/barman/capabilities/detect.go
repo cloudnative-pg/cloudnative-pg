@@ -29,19 +29,13 @@ import (
 // capabilities stores the current Barman capabilities
 var capabilities *Capabilities
 
-// Detect barman-cloud executables presence and store the Capabilities
+// detect barman-cloud executables presence and store the Capabilities
 // of the barman-cloud version it finds
-func Detect() (*Capabilities, error) {
-	version, err := getBarmanCloudVersion(BarmanCloudWalArchive)
-	if err != nil {
-		return nil, err
-	}
-
+func detect(version *semver.Version) *Capabilities {
 	newCapabilities := new(Capabilities)
-
 	if version == nil {
 		log.Info("Missing Barman Cloud installation in the operand image")
-		return newCapabilities, nil
+		return newCapabilities
 	}
 
 	newCapabilities.Version = version
@@ -51,6 +45,10 @@ func Detect() (*Capabilities, error) {
 		// The --name flag was added to Barman in version 3.3 but we also require the
 		// barman-cloud-backup-show command which was not added until Barman version 3.4
 		newCapabilities.hasName = true
+		fallthrough
+	case version.GE(semver.Version{Major: 2, Minor: 19}):
+		// Google Cloud Storage support, added in Barman >= 2.19
+		newCapabilities.HasGoogle = true
 		fallthrough
 	case version.GE(semver.Version{Major: 2, Minor: 18}):
 		// Tags, added in Barman >= 2.18
@@ -63,6 +61,8 @@ func Detect() (*Capabilities, error) {
 		newCapabilities.HasErrorCodesForWALRestore = true
 		// azure-identity credential of type managed-identity added in Barman >= 2.18
 		newCapabilities.HasAzureManagedIdentity = true
+		// error codes for barman-cloud-restore command added in Barman >= 2.18
+		newCapabilities.HasErrorCodesForRestore = true
 		fallthrough
 	case version.GE(semver.Version{Major: 2, Minor: 14}):
 		// Retention policy support, added in Barman >= 2.14
@@ -72,15 +72,11 @@ func Detect() (*Capabilities, error) {
 		// Cloud providers support, added in Barman >= 2.13
 		newCapabilities.HasAzure = true
 		newCapabilities.HasS3 = true
-		fallthrough
-	case version.GE(semver.Version{Major: 2, Minor: 19}):
-		// Google Cloud Storage support, added in Barman >= 2.19
-		newCapabilities.HasGoogle = true
 	}
 
 	log.Debug("Detected Barman installation", "newCapabilities", newCapabilities)
 
-	return newCapabilities, nil
+	return newCapabilities
 }
 
 // barmanCloudVersionRegex is a regular expression to parse the output of
@@ -93,6 +89,7 @@ var barmanCloudVersionRegex = regexp.MustCompile("barman-cloud.* (?P<Version>.*)
 func getBarmanCloudVersion(command string) (*semver.Version, error) {
 	_, err := exec.LookPath(command)
 	if err != nil {
+		log.Info("barman-cloud command not found", "command", command)
 		return nil, nil
 	}
 
@@ -108,10 +105,13 @@ func getBarmanCloudVersion(command string) (*semver.Version, error) {
 	matches := barmanCloudVersionRegex.FindStringSubmatch(string(out))
 	version, err := semver.ParseTolerant(matches[1])
 	if err != nil {
+		log.Error(err, "was unable to parse the version from the given regexp match",
+			"command", command,
+			"match", matches[1])
 		return nil, fmt.Errorf("while parsing %s version: %w", command, err)
 	}
 
-	return &version, err
+	return &version, nil
 }
 
 // CurrentCapabilities retrieves the capabilities of local barman installation,
@@ -119,11 +119,11 @@ func getBarmanCloudVersion(command string) (*semver.Version, error) {
 func CurrentCapabilities() (*Capabilities, error) {
 	if capabilities == nil {
 		var err error
-		capabilities, err = Detect()
+		version, err := getBarmanCloudVersion(BarmanCloudWalArchive)
 		if err != nil {
-			log.Error(err, "Failed to detect Barman capabilities")
 			return nil, err
 		}
+		capabilities = detect(version)
 	}
 
 	return capabilities, nil

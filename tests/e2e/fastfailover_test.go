@@ -44,20 +44,16 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance, tests.La
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
-		// Sometimes on AKS the promotion itself takes more than 10 seconds.
-		// Nothing to be done operator side, we raise the timeout to avoid
-		// failures in the test.
-		if IsAKS() {
-			maxFailoverTime = 30
-		}
 
-		// GKE has a higher kube-proxy timeout, and the connections could try
-		// using a service, for which the routing table hasn't changed, getting
-		// stuck for a while.
-		// We raise the timeout, since we can't intervene on GKE configuration.
-		if IsGKE() {
+		// The walreceiver of a standby that wasn't promoted may try to reconnect
+		// before the rw service endpoints are updated. In this case, the walreceiver
+		// can be stuck for waiting for the connection to be established for a time that
+		// depends on the tcp_syn_retries sysctl. Since by default
+		// net.ipv4.tcp_syn_retries=6, PostgreSQL can wait 2^7-1=127 seconds before
+		// restarting the walreceiver.
+		if !IsLocal() {
 			maxReattachTime = 180
-			maxFailoverTime = 20
+			maxFailoverTime = 30
 		}
 	})
 
