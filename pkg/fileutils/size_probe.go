@@ -36,7 +36,24 @@ const (
 
 type fileCreatorFunc = func(ctx context.Context, name string, size int) error
 
-// CreateFileWithSize creates a file with a certain name and
+// Directory represents a filesystem directory and provides methods to interact
+// with it, such as checking for available disk space by attempting to create
+// a file of a specified size.
+type Directory struct {
+	path           string
+	createFileFunc fileCreatorFunc
+}
+
+// NewDirectory creates and returns a new Directory instance for the specified
+// path.
+func NewDirectory(path string) *Directory {
+	return &Directory{
+		path:           path,
+		createFileFunc: createFileWithSize,
+	}
+}
+
+// createFileWithSize creates a file with a certain name and
 // a certain size. It will fail if the file already exists.
 //
 // To allocate the file, the specified number zero bytes will
@@ -44,7 +61,7 @@ type fileCreatorFunc = func(ctx context.Context, name string, size int) error
 //
 // The code of this function is written after the `XLogFileInitInternal`
 // PostgreSQL function, to be found in `src/backend/access/transam/xlog.c`
-func CreateFileWithSize(ctx context.Context, name string, size int) error {
+func createFileWithSize(ctx context.Context, name string, size int) error {
 	contextLogger := log.FromContext(ctx).WithValues("probeFileName", name)
 
 	f, err := os.OpenFile(name, os.O_RDWR|os.O_CREATE, 0o600) // nolint:gosec
@@ -80,18 +97,12 @@ func CreateFileWithSize(ctx context.Context, name string, size int) error {
 
 // HasSpaceInDirectory checks if there's enough disk space to store a
 // file with a specified size inside the passed directory. It does that
-// by using CreateFileWithSize to create such a file in the directory
+// by using createFileWithSize to create such a file in the directory
 // and then removing it.
-func HasSpaceInDirectory(ctx context.Context, directory string, size int) (bool, error) {
-	return hasSpaceInDirectoryInternal(ctx, directory, size, CreateFileWithSize)
-}
-
-func hasSpaceInDirectoryInternal(
-	ctx context.Context, directory string, size int, tester fileCreatorFunc,
-) (bool, error) {
+func (d Directory) HasSpaceInDirectory(ctx context.Context, size int) (bool, error) {
 	var err error
 
-	probeFileName := path.Join(directory, probeFileName+funk.RandomString(4))
+	probeFileName := path.Join(d.path, probeFileName+funk.RandomString(4))
 	contextLogger := log.FromContext(ctx).WithValues("probeFileName", probeFileName)
 
 	defer func() {
@@ -107,7 +118,7 @@ func hasSpaceInDirectoryInternal(
 		}
 	}()
 
-	err = tester(ctx, probeFileName, size)
+	err = d.createFileFunc(ctx, probeFileName, size)
 	if IsNoSpaceLeftOnDevice(err) {
 		return false, nil
 	} else if err != nil {

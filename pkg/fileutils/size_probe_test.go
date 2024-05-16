@@ -38,7 +38,7 @@ var _ = Describe("Size probe functions", func() {
 	It("creates a file with a specific size", func(ctx SpecContext) {
 		expectedSize := createFileBlockSize + 400
 
-		err := CreateFileWithSize(ctx, testFileName, expectedSize)
+		err := createFileWithSize(ctx, testFileName, expectedSize)
 		Expect(err).ToNot(HaveOccurred())
 
 		info, err := os.Stat(testFileName)
@@ -47,7 +47,7 @@ var _ = Describe("Size probe functions", func() {
 	})
 
 	It("can create an empty file", func(ctx SpecContext) {
-		err := CreateFileWithSize(ctx, testFileName, 0)
+		err := createFileWithSize(ctx, testFileName, 0)
 		Expect(err).ToNot(HaveOccurred())
 
 		info, err := os.Stat(testFileName)
@@ -56,13 +56,13 @@ var _ = Describe("Size probe functions", func() {
 	})
 
 	It("can detect free space in a directory", func(ctx SpecContext) {
-		result, err := HasSpaceInDirectory(ctx, tempDir1, 100)
+		result, err := NewDirectory(tempDir1).HasSpaceInDirectory(ctx, 100)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(result).To(BeTrue())
 	})
 
 	It("errors out when the directory doesn't exist", func(ctx SpecContext) {
-		result, err := HasSpaceInDirectory(ctx, path.Join(tempDir1, "_not_existing_"), 100)
+		result, err := NewDirectory(path.Join(tempDir1, "_not_existing_")).HasSpaceInDirectory(ctx, 100)
 		Expect(err).To(HaveOccurred())
 		Expect(result).To(BeFalse())
 	})
@@ -74,7 +74,9 @@ var _ = Describe("Size probe functions", func() {
 			}
 		}
 
-		result, err := hasSpaceInDirectoryInternal(ctx, tempDir1, 100, creatorFunction)
+		dir := NewDirectory(tempDir1)
+		dir.createFileFunc = creatorFunction
+		result, err := dir.HasSpaceInDirectory(ctx, 100)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(result).To(BeFalse())
 	})

@@ -272,7 +272,7 @@ func (instance *Instance) HasWALDiskSpace(ctx context.Context) (bool, error) {
 	}
 
 	walDirectory := path.Join(instance.PgData, pgWalDirectory)
-	return fileutils.HasSpaceInDirectory(ctx, walDirectory, walSegmentSize*2)
+	return fileutils.NewDirectory(walDirectory).HasSpaceInDirectory(ctx, walSegmentSize*2)
 }
 
 // SetMightBeUnavailable marks whether the instance being down should be tolerated
