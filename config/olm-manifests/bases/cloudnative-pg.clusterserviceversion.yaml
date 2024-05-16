@@ -95,7 +95,7 @@ spec:
   - cloudnativepg
   - cloudnative-pg
   - cnpg
-  minKubeVersion: 1.23.0
+  minKubeVersion: 1.25.0
   links:
   - name: CloudNativePG
     url: https://cloudnative-pg.io/

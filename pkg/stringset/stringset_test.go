@@ -63,4 +63,14 @@ var _ = Describe("String set", func() {
 			HaveExactElements("four", "one", "three", "two"))
 		Expect(New().ToList()).To(BeEmpty())
 	})
+
+	It("constructs a string set from a map having string as keys", func() {
+		Expect(FromKeys(map[string]int{
+			"one":   1,
+			"two":   2,
+			"three": 3,
+		}).ToSortedList()).To(
+			HaveExactElements("one", "three", "two"),
+		)
+	})
 })
