@@ -3,3 +3,12 @@
 # https://docs.github.com/en/free-pro-team@latest/github/creating-cloning-and-archiving-repositories/about-code-owners
 
 * @cloudnative-pg/maintainers
+
+# Component owners
+# See https://github.com/cloudnative-pg/governance/blob/main/COMPONENT-OWNERS.md#cloudnative-pg
+
+/docs/ @cloudnative-pg/maintainers @jsilvela
+
+/.github/ @cloudnative-pg/maintainers @jsilvela @NiccoloFei @litaocdl
+/hack/ @cloudnative-pg/maintainers @jsilvela @NiccoloFei @litaocdl
+/tests/ @cloudnative-pg/maintainers @jsilvela @NiccoloFei @litaocdl
