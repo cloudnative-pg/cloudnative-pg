@@ -7,10 +7,14 @@
 # Component owners
 # See https://github.com/cloudnative-pg/governance/blob/main/COMPONENT-OWNERS.md#cloudnative-pg
 
+# OLM
+/config/olm-*/ @cloudnative-pg/maintainers @NiccoloFei
+
+# Documentation
 /docs/ @cloudnative-pg/maintainers @jsilvela
 
+# Tests
 /.github/ @cloudnative-pg/maintainers @jsilvela @NiccoloFei @litaocdl
 /hack/ @cloudnative-pg/maintainers @jsilvela @NiccoloFei @litaocdl
 /tests/ @cloudnative-pg/maintainers @jsilvela @NiccoloFei @litaocdl
 
-/config/olm-*/ @cloudnative-pg/maintainers @NiccoloFei
