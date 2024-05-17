@@ -2420,7 +2420,7 @@ func (r *Cluster) validatePgFailoverSlots() field.ErrorList {
 				field.Invalid(
 					field.NewPath("spec", "postgresql", "parameters", hotStandbyFeedbackKey),
 					hotStandbyFeedback,
-					fmt.Sprintf("invalid %s value. Must be a postgres boolean", hotStandbyFeedbackKey)))
+					fmt.Sprintf("invalid `%s` value. Must be a postgres boolean", hotStandbyFeedbackKey)))
 		}
 	}
 
