@@ -1160,7 +1160,7 @@ jobs:
         if: always()
         uses: nick-fields/retry@v3
         with:
-          timeout_minutes: 1
+          timeout_minutes: 5
           max_attempts: 3
           command: |
             az account set --subscription ${{ secrets.AZURE_SUBSCRIPTION }}
