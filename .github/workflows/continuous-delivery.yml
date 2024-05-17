@@ -1788,7 +1788,7 @@ jobs:
           kubectl delete pvc --all --all-namespaces --now --timeout=30s || true
 
           # Wait until all the PVs provisioned are actually reclaimed
-          kubectl wait --for delete pv --timeout=60s || true
+          kubectl wait --for delete --all pv --timeout=60s || true
 
           attempt=1
           max_attempts=3
