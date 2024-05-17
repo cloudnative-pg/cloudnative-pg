@@ -93,6 +93,7 @@ jobs:
       test-changed: ${{ steps.filter.outputs.test-changed }}
       shell-script-changed: ${{ steps.filter.outputs.shell-script-changed }}
       go-code-changed: ${{ steps.filter.outputs.go-code-changed }}
+      renovate-changed: ${{ steps.filter.outputs.renovate-changed }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -135,6 +136,8 @@ jobs:
             go-code-changed:
               - '**/*.go'
               - '.golangci.yml'
+            renovate-changed:
+              - '.github/renovate.json5'
 
   go-linters:
     name: Run linters
@@ -164,6 +167,22 @@ jobs:
       - name: Check go mod tidy has no pending changes
         run: |
           make go-mod-check
+
+  renovate-linter:
+    name: Renovate Linter
+    needs:
+      - duplicate_runs
+      - change-triage
+    if: |
+      needs.duplicate_runs.outputs.should_skip != 'true' &&
+      needs.change-triage.outputs.renovate-changed == 'true'
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate Renovate JSON
+        run:  npx --yes --package renovate -- renovate-config-validator
 
   go-vulncheck:
     name: Run govulncheck
