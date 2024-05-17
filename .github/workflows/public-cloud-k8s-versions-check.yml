@@ -40,7 +40,7 @@ jobs:
         # There is no command to get EKS k8s versions, we have to parse the documentation
         name: Get updated EKS versions
         run: |
-          DOC_URL="https://raw.githubusercontent.com/awsdocs/amazon-eks-user-guide/master/doc_source/kubernetes-versions.md" #wokeignore:rule=master
+          DOC_URL="https://raw.githubusercontent.com/awsdocs/amazon-eks-user-guide/main/doc_source/kubernetes-versions.md"
           curl --silent "${DOC_URL}" | grep -E '^\+ `[0-9]\.[0-9]{2}`$' | sed -e 's/[\ +`]//g' | \
             awk -vv=$MINIMAL_K8S '$0>=v {print $0}' | \
             jq -Rn '[inputs]' | tee .github/eks_versions.json
