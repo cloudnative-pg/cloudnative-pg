@@ -1092,6 +1092,7 @@ jobs:
         name: Clean up
         if: always()
         run: |
+          set +e
           az extension add --allow-preview true --name monitor-control-service
           az account set --subscription ${{ secrets.AZURE_SUBSCRIPTION }}
           attempt=1
@@ -1157,22 +1158,13 @@ jobs:
       -
         name: Teardown AKS shared resources
         if: always()
-        run: |
-          az account set --subscription ${{ secrets.AZURE_SUBSCRIPTION }}
-          attempt=1
-          max_attempts=3
-          while [ "${attempt}" -le "${max_attempts}" ]; do
-              echo "Deleting storage account. Attempt ${attempt} of ${max_attempts}"
-              az storage account delete -y --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} --name ${{ env.AZURE_STORAGE_ACCOUNT }}
-              status=$?
-              if [[ $status == 0 ]]; then
-                echo "Storage account deleted"
-                break
-              fi
-              echo "Failed deleting storage account ${{ env.AZURE_STORAGE_ACCOUNT }}, retrying"
-              sleep 5
-              attempt=$((attempt+1))
-          done
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 1
+          max_attempts: 3
+          command: |
+            az account set --subscription ${{ secrets.AZURE_SUBSCRIPTION }}
+            az storage account delete -y --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} --name ${{ env.AZURE_STORAGE_ACCOUNT }}
 
   # EKS Secrets required
   # secrets.AWS_EKS_ADMIN_IAM_ROLES
@@ -1670,6 +1662,7 @@ jobs:
       -
         name: Create GKE cluster
         run: |
+          set +e
           # We may go over the amount of API requests allowed
           # by Google when creating all the clusters at the same time.
           # We give a few attempts at creating the cluster before giving up
@@ -1788,6 +1781,7 @@ jobs:
         name: Clean up
         if: always()
         run: |
+          set +e
           # Attempt to remove any leftover resource
           kubectl delete cluster --all --all-namespaces --now --timeout=30s || true
           kubectl delete pdb --all --all-namespaces --now --timeout=30s || true
