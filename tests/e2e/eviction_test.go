@@ -52,7 +52,7 @@ import (
 // so we choose to use patch and drain to simulate the eviction. The patch status issued one problem,
 // when evicting the primary pod of multiple clusters.
 
-var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive, tests.LabelOperator), func() {
+var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 	const (
 		level                    = tests.Low
 		singleInstanceSampleFile = fixturesDir + "/eviction/single-instance-cluster.yaml.template"
