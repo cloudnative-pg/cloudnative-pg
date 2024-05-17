@@ -360,7 +360,18 @@
 // PR group for Kubernetes CSI
       "groupName": "kubernetes CSI",
       "matchPackagePrefixes": [
-        "kubernetes-csi"
+        "kubernetes-csi",
+        "rook",
+      ],
+      "separateMajorMinor": "false",
+      "pinDigests": false
+    },
+    {
+// PR group for all the operator framework related things
+      "groupName": "operator framework",
+      "matchPackagePrefixes": [
+        "operator-framework",
+        "redhat-openshift-ecosystem",
       ],
       "separateMajorMinor": "false",
       "pinDigests": false
