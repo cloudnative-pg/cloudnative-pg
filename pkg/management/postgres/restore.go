@@ -27,6 +27,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -579,10 +580,10 @@ func (info InitInfo) writeRestoreWalConfig(backup *apiv1.Backup, cluster *apiv1.
 		strings.Join(cmd, " "),
 		cluster.Spec.Bootstrap.Recovery.RecoveryTarget.BuildPostgresOptions())
 
-	return info.writeRecoveryConfiguration(recoveryFileContents)
+	return info.writeRecoveryConfiguration(cluster, recoveryFileContents)
 }
 
-func (info InitInfo) writeRecoveryConfiguration(recoveryFileContents string) error {
+func (info InitInfo) writeRecoveryConfiguration(cluster *apiv1.Cluster, recoveryFileContents string) error {
 	// Ensure restore_command is used to correctly recover WALs
 	// from the object storage
 	major, err := postgresutils.GetMajorVersion(info.PgData)
@@ -600,9 +601,11 @@ func (info InitInfo) writeRecoveryConfiguration(recoveryFileContents string) err
 	if err != nil {
 		return fmt.Errorf("cannot write recovery config: %w", err)
 	}
-
 	enforcedParams, err := GetEnforcedParametersThroughPgControldata(info.PgData)
 	if err != nil {
+		return err
+	}
+	if err = updateEnforcedParametersWithUserSettings(cluster, enforcedParams); err != nil {
 		return err
 	}
 	if enforcedParams != nil {
@@ -611,7 +614,7 @@ func (info InitInfo) writeRecoveryConfiguration(recoveryFileContents string) err
 			enforcedParams,
 		)
 		if changed {
-			log.Info("enforcing parameters found in pg_controldata", "parameters", enforcedParams)
+			log.Info("enforcing parameters found in pg_controldata and cluster spec", "parameters", enforcedParams)
 		}
 		if err != nil {
 			return fmt.Errorf("cannot write recovery config for enforced parameters: %w", err)
@@ -678,6 +681,41 @@ func GetEnforcedParametersThroughPgControldata(pgData string) (map[string]string
 		}
 	}
 	return enforcedParams, nil
+}
+
+// updateEnforcedParametersWithUserSettings will compare the values of the enforced parameters
+// given with the ones defined in cluster spec, choosing the higher value between the two and
+// returning the final map of enforced parameters
+func updateEnforcedParametersWithUserSettings(
+	cluster *apiv1.Cluster,
+	enforcedParams map[string]string,
+) error {
+	if enforcedParams == nil {
+		return nil
+	}
+	clusterParams := cluster.Spec.PostgresConfiguration.Parameters
+	for key, enforcedparam := range enforcedParams {
+		clusterparam, found := clusterParams[key]
+		if !found {
+			continue
+		}
+		enforcedparamInt, err := strconv.Atoi(enforcedparam)
+		if err != nil {
+			return err
+		}
+		clusterparamInt, err := strconv.Atoi(clusterparam)
+		if err != nil {
+			return err
+		}
+		// if the values from `pg_controldata` are smaller than the cluster spec,
+		// we use the user settings
+		if clusterparamInt > enforcedparamInt {
+			log.Info("enforcing parameters found in cluster spec is bigger, use the value in cluster spec",
+				"parameter", key, "value", clusterparam)
+			enforcedParams[key] = clusterparam
+		}
+	}
+	return nil
 }
 
 // WriteInitialPostgresqlConf resets the postgresql.conf that there is in the instance using
