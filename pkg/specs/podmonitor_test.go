@@ -45,7 +45,7 @@ var _ = Describe("PodMonitor test", func() {
 	}
 
 	expectedEndpoint := monitoringv1.PodMetricsEndpoint{Port: "metrics"}
-	metricRelabelings := []*monitoringv1.RelabelConfig{
+	metricRelabelings := []monitoringv1.RelabelConfig{
 		{
 			SourceLabels: []monitoringv1.LabelName{"cluster"},
 			TargetLabel:  "cnpg_cluster",
@@ -55,7 +55,7 @@ var _ = Describe("PodMonitor test", func() {
 			Action: "labeldrop",
 		},
 	}
-	relabelings := []*monitoringv1.RelabelConfig{
+	relabelings := []monitoringv1.RelabelConfig{
 		{
 			SourceLabels: []monitoringv1.LabelName{"__their_label"},
 			TargetLabel:  "my_label",
