@@ -21,7 +21,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = DescribeTable("Test PostgreSQL booleans parsing",
+var _ = DescribeTable("Test parsing of PostgreSQL booleans",
 	func(input string, expectedValue, expectError bool) {
 		value, err := ParsePostgresBoolean(input)
 		if expectError {
