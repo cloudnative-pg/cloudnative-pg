@@ -247,7 +247,7 @@ Cluster in healthy state
 Name:               sandbox
 Namespace:          default
 System ID:          7039966298120953877
-PostgreSQL Image:   ghcr.io/cloudnative-pg/postgresql:16.2
+PostgreSQL Image:   ghcr.io/cloudnative-pg/postgresql:16.3
 Primary instance:   sandbox-2
 Instances:          3
 Ready instances:    3
@@ -292,7 +292,7 @@ Cluster in healthy state
 Name:               sandbox
 Namespace:          default
 System ID:          7039966298120953877
-PostgreSQL Image:   ghcr.io/cloudnative-pg/postgresql:16.2
+PostgreSQL Image:   ghcr.io/cloudnative-pg/postgresql:16.3
 Primary instance:   sandbox-2
 Instances:          3
 Ready instances:    3
@@ -979,7 +979,7 @@ it from the actual pod. This means that you will be using the `postgres` user.
 ```shell
 kubectl cnpg psql cluster-example
 
-psql (16.2 (Debian 16.2-1.pgdg110+1))
+psql (16.3 (Debian 16.3-1.pgdg110+1))
 Type "help" for help.
 
 postgres=#
@@ -990,7 +990,7 @@ select to work against a replica by using the `--replica` option:
 
 ```shell
 kubectl cnpg psql --replica cluster-example
-psql (16.2 (Debian 16.2-1.pgdg110+1))
+psql (16.3 (Debian 16.3-1.pgdg110+1))
 
 Type "help" for help.
 
