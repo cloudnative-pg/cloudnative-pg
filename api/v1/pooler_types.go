@@ -100,11 +100,11 @@ type PoolerMonitoringConfiguration struct {
 
 	// The list of metric relabelings for the `PodMonitor`. Applied to samples before ingestion.
 	// +optional
-	PodMonitorMetricRelabelConfigs []*monitoringv1.RelabelConfig `json:"podMonitorMetricRelabelings,omitempty"`
+	PodMonitorMetricRelabelConfigs []monitoringv1.RelabelConfig `json:"podMonitorMetricRelabelings,omitempty"`
 
 	// The list of relabelings for the `PodMonitor`. Applied to samples before scraping.
 	// +optional
-	PodMonitorRelabelConfigs []*monitoringv1.RelabelConfig `json:"podMonitorRelabelings,omitempty"`
+	PodMonitorRelabelConfigs []monitoringv1.RelabelConfig `json:"podMonitorRelabelings,omitempty"`
 }
 
 // PodTemplateSpec is a structure allowing the user to set
