@@ -1643,24 +1643,16 @@ func (in *MonitoringConfiguration) DeepCopyInto(out *MonitoringConfiguration) {
 	}
 	if in.PodMonitorMetricRelabelConfigs != nil {
 		in, out := &in.PodMonitorMetricRelabelConfigs, &out.PodMonitorMetricRelabelConfigs
-		*out = make([]*monitoringv1.RelabelConfig, len(*in))
+		*out = make([]monitoringv1.RelabelConfig, len(*in))
 		for i := range *in {
-			if (*in)[i] != nil {
-				in, out := &(*in)[i], &(*out)[i]
-				*out = new(monitoringv1.RelabelConfig)
-				(*in).DeepCopyInto(*out)
-			}
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
 	if in.PodMonitorRelabelConfigs != nil {
 		in, out := &in.PodMonitorRelabelConfigs, &out.PodMonitorRelabelConfigs
-		*out = make([]*monitoringv1.RelabelConfig, len(*in))
+		*out = make([]monitoringv1.RelabelConfig, len(*in))
 		for i := range *in {
-			if (*in)[i] != nil {
-				in, out := &(*in)[i], &(*out)[i]
-				*out = new(monitoringv1.RelabelConfig)
-				(*in).DeepCopyInto(*out)
-			}
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
 }
@@ -2004,24 +1996,16 @@ func (in *PoolerMonitoringConfiguration) DeepCopyInto(out *PoolerMonitoringConfi
 	*out = *in
 	if in.PodMonitorMetricRelabelConfigs != nil {
 		in, out := &in.PodMonitorMetricRelabelConfigs, &out.PodMonitorMetricRelabelConfigs
-		*out = make([]*monitoringv1.RelabelConfig, len(*in))
+		*out = make([]monitoringv1.RelabelConfig, len(*in))
 		for i := range *in {
-			if (*in)[i] != nil {
-				in, out := &(*in)[i], &(*out)[i]
-				*out = new(monitoringv1.RelabelConfig)
-				(*in).DeepCopyInto(*out)
-			}
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
 	if in.PodMonitorRelabelConfigs != nil {
 		in, out := &in.PodMonitorRelabelConfigs, &out.PodMonitorRelabelConfigs
-		*out = make([]*monitoringv1.RelabelConfig, len(*in))
+		*out = make([]monitoringv1.RelabelConfig, len(*in))
 		for i := range *in {
-			if (*in)[i] != nil {
-				in, out := &(*in)[i], &(*out)[i]
-				*out = new(monitoringv1.RelabelConfig)
-				(*in).DeepCopyInto(*out)
-			}
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
 }

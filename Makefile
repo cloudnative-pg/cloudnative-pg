@@ -42,13 +42,13 @@ LOCALBIN ?= $(shell pwd)/bin
 BUILD_IMAGE ?= true
 POSTGRES_IMAGE_NAME ?= $(shell grep 'DefaultImageName.*=' "pkg/versions/versions.go" | cut -f 2 -d \")
 KUSTOMIZE_VERSION ?= v5.4.1
-CONTROLLER_TOOLS_VERSION ?= v0.14.0
-GORELEASER_VERSION ?= v1.25.1
+CONTROLLER_TOOLS_VERSION ?= v0.15.0
+GORELEASER_VERSION ?= v1.26.1
 SPELLCHECK_VERSION ?= 0.36.0
 WOKE_VERSION ?= 0.19.0
-OPERATOR_SDK_VERSION ?= v1.34.1
-OPM_VERSION ?= v1.39.0
-PREFLIGHT_VERSION ?= 1.9.2
+OPERATOR_SDK_VERSION ?= v1.34.2
+OPM_VERSION ?= v1.43.0
+PREFLIGHT_VERSION ?= 1.9.5
 OPENSHIFT_VERSIONS ?= v4.11-v4.15
 ARCH ?= amd64
 
@@ -234,10 +234,10 @@ shellcheck: ## Shellcheck for the hack directory.
 	}
 
 spellcheck: ## Runs the spellcheck on the project.
-	docker run --rm -v $(PWD):/tmp jonasbn/github-action-spellcheck:$(SPELLCHECK_VERSION)
+	docker run --rm -v $(PWD):/tmp:Z jonasbn/github-action-spellcheck:$(SPELLCHECK_VERSION)
 
 woke: ## Runs the woke checks on project.
-	docker run --rm -v $(PWD):/src -w /src getwoke/woke:$(WOKE_VERSION) woke -c .woke.yaml
+	docker run --rm -v $(PWD):/src:Z -w /src getwoke/woke:$(WOKE_VERSION) woke -c .woke.yaml
 
 wordlist-ordered: ## Order the wordlist using sort
 	LANG=C LC_ALL=C sort .wordlist-en-custom.txt > .wordlist-en-custom.txt.new && \

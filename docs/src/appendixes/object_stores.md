@@ -155,7 +155,7 @@ spec:
 ## Azure Blob Storage
 
 [Azure Blob Storage](https://azure.microsoft.com/en-us/services/storage/blobs/) is the
-obect storage service provided by Microsoft.
+object storage service provided by Microsoft.
 
 In order to access your storage account for backup and recovery of
 CloudNativePG managed databases, you will need one of the following
