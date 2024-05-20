@@ -1197,7 +1197,7 @@ func (r *Cluster) validateConfiguration() field.ErrorList {
 
 	walLogHintsValue, walLogHintsSet := r.Spec.PostgresConfiguration.Parameters[postgres.ParameterWalLogHints]
 	if walLogHintsSet {
-		walLogHintsActivated, err := postgres.ParsePostgresBoolean(walLogHintsValue)
+		walLogHintsActivated, err := postgres.ParsePostgresConfigBoolean(walLogHintsValue)
 		if err != nil {
 			result = append(
 				result,
@@ -2413,7 +2413,7 @@ func (r *Cluster) validatePgFailoverSlots() field.ErrorList {
 	hotStandbyFeedback, hasHotStandbyFeedback := r.Spec.PostgresConfiguration.Parameters[hotStandbyFeedbackKey]
 	if hasHotStandbyFeedback {
 		var err error
-		hotStandbyFeedbackActivated, err = postgres.ParsePostgresBoolean(hotStandbyFeedback)
+		hotStandbyFeedbackActivated, err = postgres.ParsePostgresConfigBoolean(hotStandbyFeedback)
 		if err != nil {
 			result = append(
 				result,

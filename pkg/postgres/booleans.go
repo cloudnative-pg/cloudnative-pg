@@ -21,16 +21,13 @@ import (
 	"strings"
 )
 
-// ParsePostgresBoolean returns the boolean value parsed from a string as a postgres boolean.
+// ParsePostgresConfigBoolean returns the boolean value parsed from a string as a postgres boolean.
 // It returns an error if the input string is not a valid postgres boolean
 // See: https://www.postgresql.org/docs/current/config-setting.html
 // Boolean: Values can be written as on, off, true, false, yes, no, 1, 0 (all case-insensitive)
 // or any unambiguous prefix of one of these.
-func ParsePostgresBoolean(in string) (bool, error) {
-	sanitized := strings.TrimSpace(in)
-	sanitized = strings.ToLower(sanitized)
-
-	switch sanitized {
+func ParsePostgresConfigBoolean(in string) (bool, error) {
+	switch strings.ToLower(in) {
 	case "1", "on", "y", "ye", "yes", "t", "tr", "tru", "true":
 		return true, nil
 	case "0", "of", "off", "n", "no", "f", "fa", "fal", "fals", "false":
