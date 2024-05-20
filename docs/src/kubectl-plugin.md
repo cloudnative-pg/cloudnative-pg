@@ -96,6 +96,27 @@ kubectl krew update
 kubectl krew upgrade cnpg
 ```
 
+### Using Homebrew
+
+If you already have [Homebrew](https://brew.sh/) installed, you can simply
+run:
+
+```sh
+brew install kubectl-cnpg
+```
+
+When a new version of the plugin is released, you can update the existing
+installation with:
+
+```sh
+brew update
+brew upgrade kubectl-cnpg
+```
+
+!!! Note
+    Auto-completion for the kubectl plugin is already managed by Homebrew.
+    There's no need to create the `kubectl_complete-cnpg` script mentioned below.
+
 ### Supported Architectures
 
 CloudNativePG Plugin is currently built for the following
