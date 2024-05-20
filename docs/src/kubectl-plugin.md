@@ -98,6 +98,9 @@ kubectl krew upgrade cnpg
 
 ### Using Homebrew
 
+!!! Note
+    Please note that the Homebrew community manages the availability of the [kubectl-cnpg plugin on Homebrew](https://formulae.brew.sh/formula/kubectl-cnpg).
+
 If you already have [Homebrew](https://brew.sh/) installed, you can simply
 run:
 
