@@ -2656,6 +2656,12 @@ func (cluster *Cluster) GetSmartShutdownTimeout() int32 {
 	return 180
 }
 
+// GetRestartTimeout is used to have a timeout for operations that involve
+// a restart of a PostgreSQL instance
+func (cluster *Cluster) GetRestartTimeout() int32 {
+	return cluster.GetMaxStopDelay() + cluster.GetMaxStartDelay()
+}
+
 // GetMaxSwitchoverDelay get the amount of time PostgreSQL has to stop before switchover
 func (cluster *Cluster) GetMaxSwitchoverDelay() int32 {
 	if cluster.Spec.MaxSwitchoverDelay > 0 {
