@@ -19,6 +19,7 @@ package logs
 import (
 	"context"
 	"io"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"log"
 	"sync"
 	"time"
@@ -223,7 +224,7 @@ func (csr *ClusterStreamingRequest) streamInGoroutine(
 		csr.getLogOptions())
 
 	logStream, err := logsRequest.Stream(ctx)
-	if err != nil {
+	if err != nil && !apierrs.IsBadRequest(err) {
 		log.Printf("error on streaming request, pod %s: %v", podName, err)
 		return
 	}
