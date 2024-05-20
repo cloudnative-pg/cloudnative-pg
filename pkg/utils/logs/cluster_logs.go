@@ -19,12 +19,12 @@ package logs
 import (
 	"context"
 	"io"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"log"
 	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	ctrl "sigs.k8s.io/controller-runtime"
