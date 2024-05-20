@@ -1,10 +1,10 @@
 {
   "e2e_test": {
-    "KIND": {"min": "1.25", "max": ""},
-    "AKS": {"min": "1.25", "max": ""},
-    "EKS": {"min": "1.25", "max": ""},
-    "GKE": {"min": "1.25", "max": ""},
+    "KIND": {"min": "1.26", "max": ""},
+    "AKS": {"min": "1.26", "max": ""},
+    "EKS": {"min": "1.26", "max": ""},
+    "GKE": {"min": "1.26", "max": ""},
     "OPENSHIFT": {"min":  "4.12", "max": ""}
   },
-  "unit_test": {"min":  "1.25", "max":  "1.29"}
+  "unit_test": {"min":  "1.26", "max":  "1.29"}
 }
