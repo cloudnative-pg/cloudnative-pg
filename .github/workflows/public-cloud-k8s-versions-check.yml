@@ -26,7 +26,7 @@ defaults:
 
 env:
   # The minimal k8s version supported, k8s version smaller than this one will be removed from vendor
-  MINIMAL_K8S: "1.25"
+  MINIMAL_K8S: "1.26"
 
 jobs:
 
