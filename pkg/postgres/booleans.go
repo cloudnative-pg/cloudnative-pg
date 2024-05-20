@@ -18,7 +18,6 @@ package postgres
 
 import (
 	"fmt"
-	"slices"
 	"strings"
 )
 
@@ -28,17 +27,15 @@ import (
 // Boolean: Values can be written as on, off, true, false, yes, no, 1, 0 (all case-insensitive)
 // or any unambiguous prefix of one of these.
 func ParsePostgresBoolean(in string) (bool, error) {
-	trueValues := []string{"1", "on", "yes", "true", "y", "t", "ye", "tr", "tru"}
-	falseValues := []string{"0", "no", "off", "false", "n", "f", "of", "fa", "fal", "fals"}
-
 	sanitized := strings.TrimSpace(in)
 	sanitized = strings.ToLower(sanitized)
 
-	if slices.Contains(falseValues, sanitized) {
-		return false, nil
-	}
-	if slices.Contains(trueValues, sanitized) {
+	switch sanitized {
+	case "1", "on", "yes", "true", "y", "t", "ye", "tr", "tru":
 		return true, nil
+	case "0", "no", "off", "false", "n", "f", "of", "fa", "fal", "fals":
+		return false, nil
+	default:
+		return false, fmt.Errorf("configuration value is not a postgres boolean: %s", in)
 	}
-	return false, fmt.Errorf("configuration value is not a postgres boolean: %s", in)
 }
