@@ -73,7 +73,7 @@ var DefaultTestTimeouts = map[Timeout]int{
 	Short:                     5,
 }
 
-// Timeouts returns the map of timeouts, where each event gets the timeout specificed
+// Timeouts returns the map of timeouts, where each event gets the timeout specified
 // in the `TEST_TIMEOUTS` environment variable, or if not specified, takes the default
 // value
 func Timeouts() (map[Timeout]int, error) {
