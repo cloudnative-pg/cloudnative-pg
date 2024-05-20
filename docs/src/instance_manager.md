@@ -94,3 +94,37 @@ the WAL files. By default it is set to `3600` (1 hour).
 
 In case of primary pod failure, the cluster will go into failover mode.
 Please refer to the ["Failover" section](failover.md) for details.
+
+## Behavior on exhausted disk storage
+
+Exhaustion of storage is a well known issue for PostgreSQL clusters. The
+[Postgres documentation](https://www.postgresql.org/docs/current/disk-full.html)
+explains the importance of monitoring disk usage to ensure it doesn't become
+full.
+In the [CNPG monitoring document](monitoring.md#predefined-set-of-metrics) you
+will find there is a predefined metric for the size occupied by the WAL segments
+on disk. In addition, regular metrics on volumes and occupation are exported to
+Prometheus.
+
+!!! Important
+    It is critical, in a production system, to monitor the database. Exhausted
+    disk storage could lead to a database server panic and shutdown.
+
+In the case when the disk does become full and no more WAL segments can be
+stored, the instance will malfunction. The instance manager will detect that
+the cause of malfunction is exhausted WAL storage, and will fence the primary
+instance as a result.
+The rationale is that in normal failure circumstances, a failover would happen
+upon failure of the primary, without any chance of addressing the root cause.
+It is better in this case to fence the primary, and to wait for a human
+operator to decide on a course of action.
+
+The quickest and most likely course of action would be to
+[resize the volume](storage.md#volume-expansion), assuming that is available
+from the storage class used.
+Other possible courses of action, as suggested by the  [Postgres documentation](https://www.postgresql.org/docs/current/disk-full.html)
+could be freeing up storage in the existing volume, or moving some database
+files to other volumes by use of [tablespaces](tablespaces.md).
+
+Once the situation has been addressed, and there is enough free space to store
+WAL segments, the cluster can be [unfenced](fencing.md#how-to-lift-fencing).
