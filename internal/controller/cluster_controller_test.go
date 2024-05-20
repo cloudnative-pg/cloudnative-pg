@@ -30,6 +30,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -335,5 +336,6 @@ Next xlog byte position:                 0/3000010`
 		Expect(data.LatestCheckpointREDOLocation).To(Equal("0/3000CC0"))
 		Expect(data.REDOWALFile).To(Equal("000000010000000000000003"))
 		Expect(data.DatabaseSystemIdentifier).To(Equal("12345678901234567890123456789012"))
+		Expect(data.OperatorVersion).To(Equal(versions.Info.Version))
 	})
 })

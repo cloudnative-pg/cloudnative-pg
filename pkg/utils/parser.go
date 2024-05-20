@@ -19,18 +19,34 @@ package utils
 import (
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"strings"
+
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
 
 type pgControlDataKey = string
 
-// A key of pg_controldata
 const (
-	PgControlDataKeyLatestCheckpointTimelineID   pgControlDataKey = "Latest checkpoint's TimeLineID"
-	PgControlDataKeyREDOWALFile                  pgControlDataKey = "Latest checkpoint's REDO WAL file"
-	PgControlDataKeyDatabaseSystemIdentifier     pgControlDataKey = "Database system identifier"
+	// PgControlDataKeyLatestCheckpointTimelineID is the
+	// latest checkpoint's TimeLineID pg_controldata entry
+	PgControlDataKeyLatestCheckpointTimelineID pgControlDataKey = "Latest checkpoint's TimeLineID"
+
+	// PgControlDataKeyREDOWALFile is the latest checkpoint's
+	// REDO WAL file pg_controldata entry
+	PgControlDataKeyREDOWALFile pgControlDataKey = "Latest checkpoint's REDO WAL file"
+
+	// PgControlDataKeyDatabaseSystemIdentifier is the database
+	// system identifier pg_controldata entry
+	PgControlDataKeyDatabaseSystemIdentifier pgControlDataKey = "Database system identifier"
+
+	// PgControlDataKeyLatestCheckpointREDOLocation is the latest
+	// checkpoint's REDO location pg_controldata entry
 	PgControlDataKeyLatestCheckpointREDOLocation pgControlDataKey = "Latest checkpoint's REDO location"
-	PgControlDataKeyTimeOfLatestCheckpoint       pgControlDataKey = "Time of latest checkpoint"
+
+	// PgControlDataKeyTimeOfLatestCheckpoint is the time
+	// of latest checkpoint pg_controldata entry
+	PgControlDataKeyTimeOfLatestCheckpoint pgControlDataKey = "Time of latest checkpoint"
 )
 
 // ParsePgControldataOutput parses a pg_controldata output into a map of key-value pairs
@@ -49,11 +65,38 @@ func ParsePgControldataOutput(data string) map[string]string {
 
 // PgControldataTokenContent contains the data needed to properly create a shutdown token
 type PgControldataTokenContent struct {
-	LatestCheckpointTimelineID   string `json:"latestCheckpointTimelineID,omitempty"`
-	REDOWALFile                  string `json:"redoWalFile,omitempty"`
-	DatabaseSystemIdentifier     string `json:"databaseSystemIdentifier,omitempty"`
+	// Latest checkpoint's TimeLineID
+	LatestCheckpointTimelineID string `json:"latestCheckpointTimelineID,omitempty"`
+
+	// Latest checkpoint's REDO WAL file
+	REDOWALFile string `json:"redoWalFile,omitempty"`
+
+	// Database system identifier
+	DatabaseSystemIdentifier string `json:"databaseSystemIdentifier,omitempty"`
+
+	// Latest checkpoint's REDO location
 	LatestCheckpointREDOLocation string `json:"latestCheckpointREDOLocation,omitempty"`
-	TimeOfLatestCheckpoint       string `json:"timeOfLatestCheckpoint,omitempty"`
+
+	// Time of latest checkpoint
+	TimeOfLatestCheckpoint string `json:"timeOfLatestCheckpoint,omitempty"`
+
+	// The version of the operator that created the token
+	OperatorVersion string `json:"operatorVersion,omitempty"`
+}
+
+// ErrInvalidShutdownToken is raised when the shutdown checkpoint token
+// is not valid
+type ErrInvalidShutdownToken struct {
+	err    error
+	reason string
+}
+
+func (e *ErrInvalidShutdownToken) Error() string {
+	return fmt.Sprintf("invalid shutdown token format (%s): %s", e.reason, e.err.Error())
+}
+
+func (e *ErrInvalidShutdownToken) Unwrap() error {
+	return e.err
 }
 
 // CreatePgControldataToken translates a parsed pgControlData into a JSON token
@@ -64,12 +107,14 @@ func CreatePgControldataToken(data map[string]string) (string, error) {
 		DatabaseSystemIdentifier:     data[PgControlDataKeyDatabaseSystemIdentifier],
 		LatestCheckpointREDOLocation: data[PgControlDataKeyLatestCheckpointREDOLocation],
 		TimeOfLatestCheckpoint:       data[PgControlDataKeyTimeOfLatestCheckpoint],
+		OperatorVersion:              versions.Info.Version,
 	}
 
 	token, err := json.Marshal(content)
 	if err != nil {
 		return "", err
 	}
+
 	return base64.StdEncoding.EncodeToString(token), nil
 }
 
@@ -77,9 +122,16 @@ func CreatePgControldataToken(data map[string]string) (string, error) {
 func ParsePgControldataToken(base64Token string) (*PgControldataTokenContent, error) {
 	token, err := base64.StdEncoding.DecodeString(base64Token)
 	if err != nil {
-		return nil, err
+		return nil, &ErrInvalidShutdownToken{
+			err:    err,
+			reason: "Base64 decoding failed",
+		}
 	}
+
 	var content PgControldataTokenContent
 	err = json.Unmarshal(token, &content)
-	return &content, err
+	return &content, &ErrInvalidShutdownToken{
+		err:    err,
+		reason: "JSON decoding failed",
+	}
 }
