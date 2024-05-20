@@ -67,7 +67,6 @@ body:
         - 1.28
         - 1.27
         - 1.26
-        - 1.25 (unsupported)
         - other (unsupported)
     validations:
       required: true
