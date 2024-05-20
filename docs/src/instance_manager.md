@@ -122,7 +122,7 @@ operator to decide on a course of action.
 The quickest and most likely course of action would be to
 [resize the volume](storage.md#volume-expansion), assuming that is available
 from the storage class used.
-Other possible courses of action, as suggested by the  [Postgres documentation](https://www.postgresql.org/docs/current/disk-full.html)
+Other possible courses of action, as suggested by the  [Postgres documentation](https://www.postgresql.org/docs/current/disk-full.html),
 could be freeing up storage in the existing volume, or moving some database
 files to other volumes by use of [tablespaces](tablespaces.md).
 
