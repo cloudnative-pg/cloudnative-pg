@@ -31,9 +31,9 @@ func ParsePostgresBoolean(in string) (bool, error) {
 	sanitized = strings.ToLower(sanitized)
 
 	switch sanitized {
-	case "1", "on", "yes", "true", "y", "t", "ye", "tr", "tru":
+	case "1", "on", "y", "ye", "yes", "t", "tr", "tru", "true":
 		return true, nil
-	case "0", "no", "off", "false", "n", "f", "of", "fa", "fal", "fals":
+	case "0", "n", "no", "of", "off", "f", "fa", "fal", "fals", "false":
 		return false, nil
 	default:
 		return false, fmt.Errorf("configuration value is not a postgres boolean: %s", in)
