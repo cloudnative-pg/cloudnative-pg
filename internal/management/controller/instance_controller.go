@@ -155,7 +155,7 @@ func (r *InstanceReconciler) Reconcile(
 
 	r.systemInitialization.Broadcast()
 
-	if result := r.reconcileFencing(cluster); result != nil {
+	if result := r.reconcileFencing(ctx, cluster); result != nil {
 		contextLogger.Info("Fencing status changed, will not proceed with the reconciliation loop")
 		return *result, nil
 	}
@@ -272,7 +272,12 @@ func (r *InstanceReconciler) restartPrimaryInplaceIfRequested(
 		return false, err
 	}
 	if isPrimary && cluster.Status.Phase == apiv1.PhaseInplacePrimaryRestart {
-		if err := r.instance.RequestAndWaitRestartSmartFast(); err != nil {
+		restartTimeout := cluster.GetRestartTimeout()
+
+		if err := r.instance.RequestAndWaitRestartSmartFast(
+			ctx,
+			time.Duration(restartTimeout)*time.Second,
+		); err != nil {
 			return true, err
 		}
 		oldCluster := cluster.DeepCopy()
@@ -314,7 +319,7 @@ func (r *InstanceReconciler) refreshConfigurationFiles(
 	return reloadNeeded, nil
 }
 
-func (r *InstanceReconciler) reconcileFencing(cluster *apiv1.Cluster) *reconcile.Result {
+func (r *InstanceReconciler) reconcileFencing(ctx context.Context, cluster *apiv1.Cluster) *reconcile.Result {
 	fencingRequired := cluster.IsInstanceFenced(r.instance.PodName)
 	isFenced := r.instance.IsFenced()
 	switch {
@@ -324,7 +329,8 @@ func (r *InstanceReconciler) reconcileFencing(cluster *apiv1.Cluster) *reconcile
 		return &reconcile.Result{}
 	case isFenced && !fencingRequired:
 		// fencing enabled and not required anymore, request to disable fencing and continue
-		err := r.instance.RequestAndWaitFencingOff()
+		timeout := time.Second * time.Duration(cluster.GetMaxStartDelay())
+		err := r.instance.RequestAndWaitFencingOff(ctx, timeout)
 		if err != nil {
 			log.Error(err, "while waiting for the instance to be restarted after lifting the fence")
 		}
@@ -952,7 +958,8 @@ func (r *InstanceReconciler) processConfigReloadAndManageRestart(ctx context.Con
 	if status.IsPrimary && status.PendingRestartForDecrease {
 		if cluster.GetPrimaryUpdateStrategy() == apiv1.PrimaryUpdateStrategyUnsupervised {
 			contextLogger.Info("Restarting primary in-place due to hot standby sensible parameters decrease")
-			return r.Instance().RequestAndWaitRestartSmartFast()
+			restartTimeout := time.Duration(cluster.GetRestartTimeout()) * time.Second
+			return r.Instance().RequestAndWaitRestartSmartFast(ctx, restartTimeout)
 		}
 		reason := "decrease of hot standby sensitive parameters"
 		contextLogger.Info("Waiting for the user to request a restart of the primary instance or a switchover "+
