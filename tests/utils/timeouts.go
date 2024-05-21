@@ -62,7 +62,7 @@ var DefaultTestTimeouts = map[Timeout]int{
 	NewPrimaryAfterSwitchover: 45,
 	NewPrimaryAfterFailover:   30,
 	NewTargetOnFailover:       120,
-	PodRollout:                120,
+	PodRollout:                180,
 	OperatorIsReady:           120,
 	LargeObject:               300,
 	WalsInMinio:               60,

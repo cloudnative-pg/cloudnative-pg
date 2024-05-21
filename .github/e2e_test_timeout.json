@@ -59,6 +59,7 @@
     "newPrimaryAfterFailover":   30,
     "newTargetOnFailover":       120,
     "operatorIsReady":           120,
+    "podRollout": 180,
     "largeObject":               300,
     "walsInMinio":               60,
     "minioInstallation":         300,

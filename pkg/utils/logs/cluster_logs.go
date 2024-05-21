@@ -224,8 +224,10 @@ func (csr *ClusterStreamingRequest) streamInGoroutine(
 		csr.getLogOptions())
 
 	logStream, err := logsRequest.Stream(ctx)
-	if err != nil && !apierrs.IsBadRequest(err) {
+	if err != nil {
 		log.Printf("error on streaming request, pod %s: %v", podName, err)
+		return
+	} else if apierrs.IsBadRequest(err) {
 		return
 	}
 	defer func() {
