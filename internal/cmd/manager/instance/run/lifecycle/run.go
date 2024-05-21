@@ -122,7 +122,7 @@ func (i *PostgresLifecycle) runPostgresAndWait(ctx context.Context) <-chan error
 
 		if pgExitStatus := streamingCmd.Wait(); pgExitStatus != nil {
 			contextLogger.Info("postmaster has exited with errors", "err", pgExitStatus)
-			freeDiskSpace, err := i.instance.HasWALDiskSpace(ctx)
+			freeDiskSpace, err := i.instance.HasDiskSpaceForWAL(ctx)
 			switch {
 			case err != nil:
 				contextLogger.Error(err, "unable to check for free disk space")

@@ -251,8 +251,8 @@ func (instance *Instance) SetCanCheckReadiness(enabled bool) {
 	instance.canCheckReadiness.Store(enabled)
 }
 
-// HasWALDiskSpace checks if we have enough disk space to store two WAL files
-func (instance *Instance) HasWALDiskSpace(ctx context.Context) (bool, error) {
+// HasDiskSpaceForWAL checks if we have enough disk space to store two WAL files
+func (instance *Instance) HasDiskSpaceForWAL(ctx context.Context) (bool, error) {
 	pgControlDataString, err := instance.GetPgControldata()
 	if err != nil {
 		return false, fmt.Errorf("while running pg_controldata to detect WAL segment size: %w", err)
