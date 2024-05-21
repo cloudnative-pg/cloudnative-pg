@@ -240,10 +240,7 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 
 			// We expect only the metrics that have a predicate_query valid.
 			expectedMetrics := map[string]*regexp.Regexp{
-				"cnpg_pg_predicate_query_return_true_fixed":                                    regexp.MustCompile(`42`),
-				"cnpg_pg_predicate_query_return_true_and_multiple_columns_fixed":               regexp.MustCompile(`42`),
-				"cnpg_pg_predicate_query_return_true_and_multiple_rows_fixed":                  regexp.MustCompile(`42`),
-				"cnpg_pg_predicate_query_return_true_and_multiple_columns_multiple_rows_fixed": regexp.MustCompile(`42`),
+				"cnpg_pg_predicate_query_return_true_fixed": regexp.MustCompile(`42`),
 			}
 
 			// Gather metrics in each pod

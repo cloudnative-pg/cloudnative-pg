@@ -21,6 +21,7 @@ package metrics
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"path"
 	"regexp"
@@ -390,60 +391,26 @@ func (c QueryCollector) collect(conn *sql.DB, ch chan<- prometheus.Metric) error
 // isCollectable checks if a query to collect metrics can be executed or not.
 // The method tests the query provided in the PredicateQuery property within the same transaction
 // used to collect metrics.
-// Accepts a query that returns a boolean on the first column of the first row.
+// Accepts a query that returns at most a single row with a single column with type bool
 func (c QueryCollector) isCollectable(tx *sql.Tx) (bool, error) {
 	if c.userQuery.PredicateQuery == "" {
 		return true, nil
 	}
 
-	rows, err := tx.Query(c.userQuery.PredicateQuery)
-	if err != nil {
-		return false, err
-	}
-
-	defer func() {
-		if err = rows.Close(); err != nil {
-			log.Warning("Error while closing predicate evaluation",
-				"err", err.Error())
+	var isCollectable *bool
+	if err := tx.QueryRow(c.userQuery.PredicateQuery).Scan(&isCollectable); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
 		}
-	}()
 
-	columns, err := rows.Columns()
-	if err != nil {
 		return false, err
 	}
 
-	columnData := make([]interface{}, len(columns))
-	scanArgs := make([]interface{}, len(columns))
-	for i := range columnData {
-		scanArgs[i] = &columnData[i]
-	}
-
-	if !rows.Next() {
-		return false, nil
-	}
-	if err = rows.Scan(scanArgs...); err != nil {
-		return false, err
-	}
-	if err = rows.Err(); err != nil {
-		log.Warning("Error while loading predicate evaluation",
-			"err", err.Error())
+	if isCollectable == nil {
 		return false, nil
 	}
 
-	if len(columnData) == 0 || columnData[0] == nil {
-		return false, nil
-	}
-
-	result, ok := columnData[0].(bool)
-	if !ok {
-		log.Warning("Unsupported column type",
-			"predicate_query", c.userQuery.PredicateQuery,
-			"type", fmt.Sprintf("%T", result))
-		return false, nil
-	}
-
-	return result, nil
+	return *isCollectable, nil
 }
 
 // Collect the list of labels from the database, and returns true if the
