@@ -303,7 +303,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		return ctrl.Result{RequeueAfter: 10 * time.Second}, registerPhaseErr
 	}
 
-	if res, err := r.ensureSufficientDiskSpace(ctx, cluster, instancesStatus); err != nil || !res.IsZero() {
+	if res, err := r.ensureNoFailoverOnFullDisk(ctx, cluster, instancesStatus); err != nil || !res.IsZero() {
 		return res, err
 	}
 
@@ -397,7 +397,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	return hookResult.Result, hookResult.Err
 }
 
-func (r *ClusterReconciler) ensureSufficientDiskSpace(
+func (r *ClusterReconciler) ensureNoFailoverOnFullDisk(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	instancesStatus postgres.PostgresqlStatusList,
