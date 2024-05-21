@@ -182,7 +182,7 @@ func (fb *FencingMetadataExecutor) Execute(ctx context.Context, key types.Namesp
 		return errors.New("chose an operation to execute")
 	}
 	if len(fb.instanceNames) > 1 && slices.Contains(fb.instanceNames, FenceAllInstances) {
-		return errors.New("the fence all instance token cannot be used along other instances")
+		return errors.New("the fence-all-instances token (*) cannot be used along other instances")
 	}
 
 	if err := fb.cli.Get(ctx, key, obj); err != nil {
