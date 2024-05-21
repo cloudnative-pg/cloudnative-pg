@@ -57,7 +57,7 @@ data:
             description: "Always 42, used to test predicate_query"
     pg_predicate_query_return_true_and_multiple_rows:
       query: "SELECT 42 as fixed"
-      predicate_query: "SELECT result FROM (SELECT true as result UNION SELECT false as result) order by result desc"
+      predicate_query: "SELECT result FROM (VALUES (true), (false)) AS r(result) ORDER BY 1  DESC"
       primary: false
       metrics:
         - fixed:
