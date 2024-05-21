@@ -299,7 +299,8 @@ func (instance *Instance) VerifyPgDataCoherence(ctx context.Context) error {
 		return err
 	}
 
-	return WritePostgresUserMaps(instance.PgData)
+	_, err := instance.RefreshPGIdent(nil)
+	return err
 }
 
 // InstanceCommand are commands for the goroutine managing postgres

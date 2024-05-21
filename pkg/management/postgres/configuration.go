@@ -198,16 +198,22 @@ func quoteHbaLiteral(literal string) string {
 	return fmt.Sprintf(`"%s"`, literal)
 }
 
-// GeneratePostgresqlIdent generates the pg_ident.conf content
-func (instance *Instance) GeneratePostgresqlIdent(cluster *apiv1.Cluster) (string, error) {
-	return postgres.CreateIdentRules(cluster.Spec.PostgresConfiguration.PgIdent,
-		getCurrentUserOrDefaultToInsecureMapping())
+// generatePostgresqlIdent generates the pg_ident.conf content given
+// a set of additional pg_ident lines that is usually taken from the
+// Cluster configuration
+func (instance *Instance) generatePostgresqlIdent(additionalLines []string) (string, error) {
+	return postgres.CreateIdentRules(
+		additionalLines,
+		getCurrentUserOrDefaultToInsecureMapping(),
+	)
 }
 
-// RefreshPGIdent generates and writes down the pg_ident.conf file
-func (instance *Instance) RefreshPGIdent(cluster *apiv1.Cluster) (postgresIdentChanged bool, err error) {
+// RefreshPGIdent generates and writes down the pg_ident.conf file given
+// a set of additional pg_ident lines that is usually taken from the
+// Cluster configuration
+func (instance *Instance) RefreshPGIdent(additionalLines []string) (postgresIdentChanged bool, err error) {
 	// Generate pg_hba.conf file
-	pgIdentContent, err := instance.GeneratePostgresqlIdent(cluster)
+	pgIdentContent, err := instance.generatePostgresqlIdent(additionalLines)
 	if err != nil {
 		return false, nil
 	}

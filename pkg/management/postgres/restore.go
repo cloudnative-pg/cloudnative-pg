@@ -717,7 +717,7 @@ func (info InitInfo) WriteInitialPostgresqlConf(cluster *apiv1.Cluster) error {
 	if err != nil {
 		return fmt.Errorf("while reading configuration files from ConfigMap: %w", err)
 	}
-	_, err = temporaryInstance.RefreshPGIdent(cluster)
+	_, err = temporaryInstance.RefreshPGIdent(nil)
 	if err != nil {
 		return fmt.Errorf("while reading configuration files from ConfigMap: %w", err)
 	}
@@ -771,7 +771,8 @@ func (info InitInfo) WriteRestoreHbaConf() error {
 	}
 
 	// Create the local map referred in the HBA configuration
-	return WritePostgresUserMaps(info.PgData)
+	_, err = info.GetInstance().RefreshPGIdent(nil)
+	return err
 }
 
 // ConfigureInstanceAfterRestore changes the superuser password
