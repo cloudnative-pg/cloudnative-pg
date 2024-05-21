@@ -412,7 +412,7 @@ func (r *ClusterReconciler) ensureSufficientDiskSpace(
 	contextLogger = contextLogger.WithValues("instanceNames", instanceNames)
 
 	contextLogger.Warning(
-		"One or more Pod doesn't have  enough disk space to proceed running, waiting for the user to enlarge its PVCs",
+		"Insufficient disk space detected in a pod. PostgreSQL cannot proceed until the PVC group is enlarged",
 	)
 
 	fencingErr := utils.NewFencingMetadataExecutor(r.Client).

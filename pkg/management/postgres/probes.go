@@ -79,7 +79,7 @@ func (instance *Instance) GetStatus() (result *postgres.PostgresqlStatus, err er
 		if result.MightBeUnavailable && err == nil {
 			return
 		}
-		result.NoWALDiskSpaceLeft = instance.noWALDiskSpaceLeft.Load()
+		result.NoSpaceLeftOnWALDisk = instance.noSpaceLeftOnWALDisk.Load()
 
 		// we save the error that we are masking
 		result.MightBeUnavailableMaskedError = err.Error()

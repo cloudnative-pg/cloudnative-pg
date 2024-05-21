@@ -188,8 +188,8 @@ type Instance struct {
 	// mightBeUnavailable specifies whether we expect the instance to be down
 	mightBeUnavailable atomic.Bool
 
-	// noWALDiskSpaceLeft specified whether there's no more free disk space
-	noWALDiskSpaceLeft atomic.Bool
+	// noSpaceLeftOnWALDisk specified whether there's no more free disk space
+	noSpaceLeftOnWALDisk atomic.Bool
 
 	// fenced specifies whether fencing is on for the instance
 	// fenced entails mightBeUnavailable ( entails as in logical consequence)
@@ -283,7 +283,7 @@ func (instance *Instance) SetMightBeUnavailable(enabled bool) {
 // SetNoDiskSpaceLeft marks whether PostgreSQL exited because there's no more
 // disk space left for WALs
 func (instance *Instance) SetNoDiskSpaceLeft(enabled bool) {
-	instance.noWALDiskSpaceLeft.Store(enabled)
+	instance.noSpaceLeftOnWALDisk.Store(enabled)
 }
 
 // ConfigureSlotReplicator sends the configuration to the slot replicator

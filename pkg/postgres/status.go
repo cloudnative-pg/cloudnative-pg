@@ -48,7 +48,7 @@ type PostgresqlStatus struct {
 
 	// When true, PostgreSQL have been terminated because no more disk space
 	// is left
-	NoWALDiskSpaceLeft bool `json:"noWALDiskSpaceLeft,omitempty"`
+	NoSpaceLeftOnWALDisk bool `json:"noSpaceLeftOnWALDisk,omitempty"`
 
 	// Archiver status
 
@@ -402,7 +402,7 @@ func (list PostgresqlStatusList) AllReadyInstancesStatusUnreachable() bool {
 func (list PostgresqlStatusList) WithInsufficientDiskSpace() PostgresqlStatusList {
 	newList := PostgresqlStatusList{}
 	for _, item := range list.Items {
-		if item.NoWALDiskSpaceLeft {
+		if item.NoSpaceLeftOnWALDisk {
 			newList.Items = append(newList.Items, item)
 		}
 	}
