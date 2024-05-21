@@ -41,6 +41,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/conditions"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
@@ -143,7 +144,12 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	contextLogger.Debug("Found cluster for backup", "cluster", clusterName)
 
 	// Store in the context the TLS configuration required communicating with the Pods
-	tlsConfig, err := newTLSConfigFromCluster(ctx, &cluster, r.Client)
+	tlsConfig, err := certs.NewTLSFromSecret(
+		ctx,
+		r.Client,
+		cluster.GetServerCASecretObjectKey(),
+		cluster.GetServiceReadWriteName(),
+	)
 	if err != nil {
 		return ctrl.Result{}, err
 	}

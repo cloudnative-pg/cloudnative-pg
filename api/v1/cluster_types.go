@@ -29,6 +29,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
@@ -3439,6 +3440,11 @@ func (cluster *Cluster) GetTablespaceConfiguration(name string) *TablespaceConfi
 	}
 
 	return nil
+}
+
+// GetServerCASecretObjectKey returns a types.NamespacedName pointing to the secret
+func (cluster *Cluster) GetServerCASecretObjectKey() types.NamespacedName {
+	return types.NamespacedName{Namespace: cluster.Namespace, Name: cluster.GetServerCASecretName()}
 }
 
 // IsBarmanBackupConfigured returns true if one of the possible backup destination
