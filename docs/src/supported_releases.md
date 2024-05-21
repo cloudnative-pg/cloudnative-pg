@@ -66,7 +66,7 @@ Git tags for versions are prepended with `v`.
 
 | Version         | Currently supported  | Release date      | End of life         | Supported Kubernetes versions | Tested, but not supported | Supported Postgres versions |
 |-----------------|----------------------|-------------------|---------------------|-------------------------------|---------------------------|-----------------------------|
-| 1.23.x          | Yes                  | April 24, 2024    | ~ October, 2024     | 1.27, 1.28, 1.29              | 1.26                      | 12 - 16                     |
+| 1.23.x          | Yes                  | April 24, 2024    | ~ October, 2024     | 1.27, 1.28, 1.29              |                           | 12 - 16                     |
 | 1.22.x          | Yes                  | December 21, 2023 | July 24, 2024       | 1.26, 1.27, 1.28              | 1.29                      | 12 - 16                     |
 | 1.21.x          | Yes                  | October 12, 2023  | May 24, 2024        | 1.25, 1.26, 1.27, 1.28        | 1.29                      | 12 - 16                     |
 | main            | No, development only |                   |                     |                               |                           | 12 - 16                     |
