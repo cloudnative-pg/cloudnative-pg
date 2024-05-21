@@ -95,7 +95,7 @@ the WAL files. By default it is set to `3600` (1 hour).
 In case of primary pod failure, the cluster will go into failover mode.
 Please refer to the ["Failover" section](failover.md) for details.
 
-## Behavior when disk becomes full
+## Behavior when disk storage becomes full
 
 Exhaustion of storage is a well known issue for PostgreSQL clusters. The
 [Postgres documentation](https://www.postgresql.org/docs/current/disk-full.html)
