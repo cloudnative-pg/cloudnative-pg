@@ -25,6 +25,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	neturl "net/url"
 	"slices"
 	"sort"
 	"time"
@@ -224,6 +225,67 @@ func (r *StatusClient) GetPgControlDataFromInstance(
 	}
 
 	return result.Data, result.Error
+}
+
+// UpgradeInstanceManager upgrades the instance manager to the passed availableArchitecture
+func (r *StatusClient) UpgradeInstanceManager(
+	ctx context.Context,
+	pod *corev1.Pod,
+	availableArchitecture *utils.AvailableArchitecture,
+) error {
+	contextLogger := log.FromContext(ctx)
+
+	binaryFileStream, err := availableArchitecture.FileStream()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if binaryErr := binaryFileStream.Close(); binaryErr != nil {
+			contextLogger.Error(err, "while closing the binaryFileStream")
+		}
+	}()
+
+	scheme := GetStatusSchemeFromPod(pod)
+	updateURL := url.Build(scheme, pod.Status.PodIP, url.PathUpdate, url.StatusPort)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, updateURL, nil)
+	if err != nil {
+		return err
+	}
+	req.Body = binaryFileStream
+
+	resp, err := r.Client.Do(req)
+	// This is the desired response. The instance manager will
+	// synchronously update and this call won't return.
+	if isEOF(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	if resp.StatusCode == http.StatusOK {
+		// Currently the instance manager should never return StatusOK
+		return errors.New("instance manager has returned an unexpected status code")
+	}
+
+	var body []byte
+	body, err = io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	if err = resp.Body.Close(); err != nil {
+		return err
+	}
+
+	return fmt.Errorf("the instance manager upgrade path returned the following error: '%s", string(body))
+}
+
+func isEOF(err error) bool {
+	if err == nil {
+		return false
+	}
+	return errors.Is(err.(*neturl.Error).Err, io.EOF)
 }
 
 // rawInstanceStatusRequest retrieves the status of PostgreSQL pods via an HTTP request with GET method.
