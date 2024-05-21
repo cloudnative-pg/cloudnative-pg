@@ -95,43 +95,36 @@ the WAL files. By default it is set to `3600` (1 hour).
 In case of primary pod failure, the cluster will go into failover mode.
 Please refer to the ["Failover" section](failover.md) for details.
 
-## Behavior when disk storage becomes full
+## Disk Full Failure
 
-Exhaustion of storage is a well known issue for PostgreSQL clusters. The
-[Postgres documentation](https://www.postgresql.org/docs/current/disk-full.html)
-explains the importance of monitoring disk usage to ensure it doesn't become
+Storage exhaustion is a well known issue for PostgreSQL clusters.
+The [PostgreSQL documentation](https://www.postgresql.org/docs/current/disk-full.html)
+highlights the importance of monitoring disk usage to prevent it from becoming
 full.
-In the [CNPG monitoring document](monitoring.md#predefined-set-of-metrics) you
-will find there is a predefined metric for the size occupied by the WAL segments
-on disk. In addition, regular metrics on volumes and occupation are exported to
-Prometheus.
+
+The same applies to CloudNativePG and Kubernetes as well: the
+["Monitoring" section](monitoring.md#predefined-set-of-metrics)
+provides details on checking the disk space used by WAL segments and standard
+metrics on disk usage exported to Prometheus.
 
 !!! Important
-    It is critical, in a production system, to monitor the database. Exhausted
-    disk storage could lead to database server shutdown.
+    In a production system, it is critical to monitor the database
+    continuously. Exhausted disk storage can lead to a database server shutdown.
 
 !!! Note
-    The detection of exhausted storage depends on having a storage class that
-    correctly reports disk size and usage. This will not be the case when
-    running on simulated Kubernetes, e.g. Kind, or using test storage class
-    implementations such as `csi-driver-host-path`.
+    The detection of exhausted storage relies on a storage class that
+    accurately reports disk size and usage. This may not be the case in simulated
+    Kubernetes environments like Kind or with test storage class implementations
+    such as `csi-driver-host-path`.
 
-If the disk does become full, and no more WAL segments can be
-stored, the instance will malfunction. The instance manager will detect that
-the cause of malfunction is exhausted WAL storage, and will fence the primary
-instance as a result.
-The rationale is that in normal failure circumstances, a failover would happen
-upon failure of the primary, without any chance of addressing the root cause,
-and might even make recovery more complex.
-It is better in this case to fence the primary, and to wait for a human
-administrator to decide on a course of action.
+If the disk becomes full and no more WAL segments can be stored, PostgreSQL
+will stop working. CloudNativePG correctly detects this issue, and will fence
+the primary instance. This approach prevents a failover that could complicate
+recovery, allowing a human administrator to address the root cause.
 
-The quickest and most likely course of action would be to
-[resize the volume](storage.md#volume-expansion), assuming that is available
-from the storage class used.
-Other possible courses of action, as suggested by the  [Postgres documentation](https://www.postgresql.org/docs/current/disk-full.html),
-could be freeing up storage in the existing volume, or moving some database
-files to other volumes by use of [tablespaces](tablespaces.md).
+In such a case, the quickest course of action is currently to
+[resize the volume](storage.md#volume-expansion),
+if supported by the storage class.
 
-Once the situation has been addressed, and there is enough free space to store
-WAL segments, the cluster can be [unfenced](fencing.md#how-to-lift-fencing).
+Once the issue is resolved and there is sufficient free space for WAL segments,
+the cluster can be [unfenced](fencing.md#how-to-lift-fencing).

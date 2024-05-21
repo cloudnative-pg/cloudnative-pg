@@ -427,7 +427,7 @@ func (r *ClusterReconciler) ensureNoFailoverOnFullDisk(
 		return ctrl.Result{}, fencingErr
 	}
 
-	reason := "Found one or more Pods without enough disk space for PostgreSQL to continue running." +
+	reason := "Insufficient disk space detected in one or more pods is preventing PostgreSQL from running." +
 		"Please verify your storage settings. Further information inside .status.instancesReportedState"
 	registerPhaseErr := r.RegisterPhase(
 		ctx,
