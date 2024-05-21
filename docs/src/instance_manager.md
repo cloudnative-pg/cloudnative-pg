@@ -95,7 +95,7 @@ the WAL files. By default it is set to `3600` (1 hour).
 In case of primary pod failure, the cluster will go into failover mode.
 Please refer to the ["Failover" section](failover.md) for details.
 
-## Behavior on exhausted disk storage
+## Behavior when disk becomes full
 
 Exhaustion of storage is a well known issue for PostgreSQL clusters. The
 [Postgres documentation](https://www.postgresql.org/docs/current/disk-full.html)
@@ -108,16 +108,23 @@ Prometheus.
 
 !!! Important
     It is critical, in a production system, to monitor the database. Exhausted
-    disk storage could lead to a database server panic and shutdown.
+    disk storage could lead to database server shutdown.
 
-In the case when the disk does become full and no more WAL segments can be
+!!! Note
+    The detection of exhausted storage depends on having a storage class that
+    correctly reports disk size and usage. This will not be the case when
+    running on simulated Kubernetes, e.g. Kind, or using test storage class
+    implementations such as `csi-driver-host-path`.
+
+If the disk does become full, and no more WAL segments can be
 stored, the instance will malfunction. The instance manager will detect that
 the cause of malfunction is exhausted WAL storage, and will fence the primary
 instance as a result.
 The rationale is that in normal failure circumstances, a failover would happen
-upon failure of the primary, without any chance of addressing the root cause.
+upon failure of the primary, without any chance of addressing the root cause,
+and might even make recovery more complex.
 It is better in this case to fence the primary, and to wait for a human
-operator to decide on a course of action.
+administrator to decide on a course of action.
 
 The quickest and most likely course of action would be to
 [resize the volume](storage.md#volume-expansion), assuming that is available

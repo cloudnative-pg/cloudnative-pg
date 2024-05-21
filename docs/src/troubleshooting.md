@@ -629,7 +629,7 @@ kubectl cp POD:/var/lib/postgresql/data/pgdata/core.14177 core.14177
 You now have the file. Make sure you free the space on the server by
 removing the core dumps.
 
-## Some common issues
+## Some known issues
 
 ### Storage is full
 
@@ -638,7 +638,7 @@ suggest this could be due to a full disk, you probably have to increase the
 size of the instance's `PersistentVolumeClaim`. Please look at the
 ["Volume expansion" section](storage.md#volume-expansion) in the documentation.
 
-#### Automatically fenced cluster on WAL storage exhaustion
+#### Automatically fenced cluster on WAL storage becoming full
 
 If the space for WAL segments is full, the instance manager will
 [automatically fence the cluster](instance_manager.md#behavior-on-exhausted-disk-storage)
