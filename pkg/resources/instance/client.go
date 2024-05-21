@@ -41,6 +41,9 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
+const defaultRequestTimeout = 30 * time.Second
+const noRequestTimeout = 0
+
 // requestRetry is the default backoff used to query the instance manager
 // for the status of each PostgreSQL instance.
 var requestRetry = wait.Backoff{
@@ -67,13 +70,12 @@ func (i StatusError) Error() string {
 
 // NewStatusClient returns a client capable of querying the instance HTTP endpoints
 func NewStatusClient() *StatusClient {
-	const connectionTimeout = 2 * time.Second
-	const requestTimeout = 30 * time.Second
+	const defaultConnectionTimeout = 2 * time.Second
 
 	// We want a connection timeout to prevent waiting for the default
 	// TCP connection timeout (30 seconds) on lost SYN packets
 	dialer := &net.Dialer{
-		Timeout: connectionTimeout,
+		Timeout: defaultConnectionTimeout,
 	}
 	timeoutClient := &http.Client{
 		Transport: &http.Transport{
@@ -90,10 +92,9 @@ func NewStatusClient() *StatusClient {
 				return tlsDialer.DialContext(ctx, network, addr)
 			},
 		},
-		Timeout: requestTimeout,
 	}
 
-	return &StatusClient{timeoutClient}
+	return &StatusClient{Client: timeoutClient}
 }
 
 // extractInstancesStatus extracts the status of the underlying PostgreSQL instance from
@@ -191,7 +192,7 @@ func (r *StatusClient) GetPgControlDataFromInstance(
 	if err != nil {
 		return "", err
 	}
-
+	r.Client.Timeout = defaultRequestTimeout
 	resp, err := r.Client.Do(req)
 	if err != nil {
 		return "", err
@@ -253,6 +254,7 @@ func (r *StatusClient) UpgradeInstanceManager(
 	}
 	req.Body = binaryFileStream
 
+	r.Client.Timeout = noRequestTimeout
 	resp, err := r.Client.Do(req)
 	// This is the desired response. The instance manager will
 	// synchronously update and this call won't return.
@@ -301,6 +303,7 @@ func (r *StatusClient) rawInstanceStatusRequest(
 		return result
 	}
 
+	r.Client.Timeout = defaultRequestTimeout
 	resp, err := r.Client.Do(req)
 	if err != nil {
 		result.Error = err
