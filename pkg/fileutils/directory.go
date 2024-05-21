@@ -56,8 +56,8 @@ func NewDirectory(path string) *Directory {
 // createFileWithSize creates a file with a certain name and
 // a certain size. It will fail if the file already exists.
 //
-// To allocate the file, the specified number zero bytes will
-// be written.
+// To allocate the file, the specified number of bytes will
+// be written, set to zero.
 //
 // The code of this function is written after the `XLogFileInitInternal`
 // PostgreSQL function, to be found in `src/backend/access/transam/xlog.c`
