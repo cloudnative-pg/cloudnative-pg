@@ -36,18 +36,18 @@ const (
 
 type fileCreatorFunc = func(ctx context.Context, name string, size int) error
 
-// Directory represents a filesystem directory and provides methods to interact
+// DiskProbe represents a filesystem directory and provides methods to interact
 // with it, such as checking for available disk space by attempting to create
 // a file of a specified size.
-type Directory struct {
+type DiskProbe struct {
 	path           string
 	createFileFunc fileCreatorFunc
 }
 
-// NewDirectory creates and returns a new Directory instance for the specified
+// NewDiskProbe creates and returns a new Directory instance for the specified
 // path.
-func NewDirectory(path string) *Directory {
-	return &Directory{
+func NewDiskProbe(path string) *DiskProbe {
+	return &DiskProbe{
 		path:           path,
 		createFileFunc: createFileWithSize,
 	}
@@ -95,11 +95,11 @@ func createFileWithSize(ctx context.Context, name string, size int) error {
 	return nil
 }
 
-// HasSpaceInDirectory checks if there's enough disk space to store a
+// HasStorageAvailable checks if there's enough disk space to store a
 // file with a specified size inside the directory. It does that
 // by using createFileFunc to create such a file in the directory
 // and then removing it.
-func (d Directory) HasSpaceInDirectory(ctx context.Context, size int) (bool, error) {
+func (d DiskProbe) HasStorageAvailable(ctx context.Context, size int) (bool, error) {
 	var err error
 
 	probeFileName := path.Join(d.path, probeFileName+funk.RandomString(4))

@@ -56,13 +56,13 @@ var _ = Describe("Size probe functions", func() {
 	})
 
 	It("can detect free space in a directory", func(ctx SpecContext) {
-		result, err := NewDirectory(tempDir1).HasSpaceInDirectory(ctx, 100)
+		result, err := NewDiskProbe(tempDir1).HasStorageAvailable(ctx, 100)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(result).To(BeTrue())
 	})
 
 	It("errors out when the directory doesn't exist", func(ctx SpecContext) {
-		result, err := NewDirectory(path.Join(tempDir1, "_not_existing_")).HasSpaceInDirectory(ctx, 100)
+		result, err := NewDiskProbe(path.Join(tempDir1, "_not_existing_")).HasStorageAvailable(ctx, 100)
 		Expect(err).To(HaveOccurred())
 		Expect(result).To(BeFalse())
 	})
@@ -74,9 +74,9 @@ var _ = Describe("Size probe functions", func() {
 			}
 		}
 
-		dir := NewDirectory(tempDir1)
+		dir := NewDiskProbe(tempDir1)
 		dir.createFileFunc = creatorFunction
-		result, err := dir.HasSpaceInDirectory(ctx, 100)
+		result, err := dir.HasStorageAvailable(ctx, 100)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(result).To(BeFalse())
 	})
