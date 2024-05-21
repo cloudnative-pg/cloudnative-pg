@@ -160,6 +160,7 @@ Grafana
 HH
 HashiCorp
 HistoryTags
+Homebrew
 Huß
 IAM
 INPLACE
