@@ -96,8 +96,8 @@ func createFileWithSize(ctx context.Context, name string, size int) error {
 }
 
 // HasSpaceInDirectory checks if there's enough disk space to store a
-// file with a specified size inside the passed directory. It does that
-// by using createFileWithSize to create such a file in the directory
+// file with a specified size inside the directory. It does that
+// by using createFileFunc to create such a file in the directory
 // and then removing it.
 func (d Directory) HasSpaceInDirectory(ctx context.Context, size int) (bool, error) {
 	var err error
