@@ -640,7 +640,7 @@ size of the instance's `PersistentVolumeClaim`. Please look at the
 
 #### Automatically fenced cluster on WAL storage becoming full
 
-If the space for WAL segments is full, the instance manager will
+If the space for WAL segments is exhausted, the instance manager will
 [automatically fence the cluster](instance_manager.md#behavior-on-exhausted-disk-storage)
 instead of allowing a failover to happen, which would not address the root cause
 and might lead to further complications.
