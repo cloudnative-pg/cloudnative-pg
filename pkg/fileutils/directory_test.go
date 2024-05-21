@@ -84,18 +84,18 @@ var _ = Describe("Size probe functions", func() {
 
 var _ = Describe("ENOSPC error checking", func() {
 	It("does not detect a nil error as ENOSPC", func() {
-		Expect(IsNoSpaceLeftOnDevice(nil)).To(BeFalse())
+		Expect(isNoSpaceLeftOnDevice(nil)).To(BeFalse())
 	})
 
 	It("does not detect a generic error as ENOSPC", func() {
-		Expect(IsNoSpaceLeftOnDevice(fmt.Errorf("a generic error"))).To(BeFalse())
+		Expect(isNoSpaceLeftOnDevice(fmt.Errorf("a generic error"))).To(BeFalse())
 	})
 
 	It("detects ENOSPC errors", func() {
 		testError := &os.PathError{
 			Err: syscall.ENOSPC,
 		}
-		Expect(IsNoSpaceLeftOnDevice(testError)).To(BeTrue())
+		Expect(isNoSpaceLeftOnDevice(testError)).To(BeTrue())
 	})
 
 	It("detects ENOSPC errors when they're wrapped in other errors", func() {
@@ -104,6 +104,6 @@ var _ = Describe("ENOSPC error checking", func() {
 			Err: syscall.ENOSPC,
 		}
 		testError = fmt.Errorf("something bad happened: %w", testError)
-		Expect(IsNoSpaceLeftOnDevice(testError)).To(BeTrue())
+		Expect(isNoSpaceLeftOnDevice(testError)).To(BeTrue())
 	})
 })

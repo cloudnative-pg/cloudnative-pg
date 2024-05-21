@@ -94,7 +94,7 @@ func (i *PostgresLifecycle) runPostgresAndWait(ctx context.Context) <-chan error
 		i.instance.LogPgControldata(postgresContext, "postmaster start up")
 		defer i.instance.LogPgControldata(postgresContext, "postmaster has exited")
 
-		i.instance.SetNoDiskSpaceLeft(false)
+		i.instance.SetWALDiskIsFull(false)
 
 		streamingCmd, err := i.instance.Run()
 		if err != nil {
@@ -128,11 +128,11 @@ func (i *PostgresLifecycle) runPostgresAndWait(ctx context.Context) <-chan error
 				contextLogger.Error(err, "unable to check for free disk space")
 
 			case !freeDiskSpace:
-				i.instance.SetNoDiskSpaceLeft(true)
+				i.instance.SetWALDiskIsFull(true)
 				errChan <- ErrNoFreeWALSpace
 
 			default:
-				errChan <- err
+				errChan <- pgExitStatus
 			}
 			return
 		}

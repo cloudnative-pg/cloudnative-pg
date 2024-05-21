@@ -280,10 +280,10 @@ func (instance *Instance) SetMightBeUnavailable(enabled bool) {
 	instance.mightBeUnavailable.Store(enabled)
 }
 
-// SetNoDiskSpaceLeft marks whether PostgreSQL exited because there's no more
+// SetWALDiskIsFull marks whether PostgreSQL exited because there's no more
 // disk space left for WALs
-func (instance *Instance) SetNoDiskSpaceLeft(enabled bool) {
-	instance.noSpaceLeftOnWALDisk.Store(enabled)
+func (instance *Instance) SetWALDiskIsFull(isDiskFull bool) {
+	instance.noSpaceLeftOnWALDisk.Store(isDiskFull)
 }
 
 // ConfigureSlotReplicator sends the configuration to the slot replicator

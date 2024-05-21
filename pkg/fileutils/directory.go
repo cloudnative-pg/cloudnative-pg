@@ -119,7 +119,7 @@ func (d Directory) HasSpaceInDirectory(ctx context.Context, size int) (bool, err
 	}()
 
 	err = d.createFileFunc(ctx, probeFileName, size)
-	if IsNoSpaceLeftOnDevice(err) {
+	if isNoSpaceLeftOnDevice(err) {
 		return false, nil
 	} else if err != nil {
 		return false, err
@@ -127,9 +127,9 @@ func (d Directory) HasSpaceInDirectory(ctx context.Context, size int) (bool, err
 	return true, nil
 }
 
-// IsNoSpaceLeftOnDevice returns true when there's no more
+// isNoSpaceLeftOnDevice returns true when there's no more
 // space left
-func IsNoSpaceLeftOnDevice(err error) bool {
+func isNoSpaceLeftOnDevice(err error) bool {
 	var pathError *os.PathError
 	if errors.As(err, &pathError) {
 		return pathError.Err == syscall.ENOSPC
