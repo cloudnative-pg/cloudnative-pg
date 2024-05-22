@@ -26,6 +26,25 @@ a linter that scans the abstract syntactic tree of the source against a set of r
 the discovery of well-known vulnerabilities, threats, and weaknesses hidden in
 the code such as hard-coded credentials, integer overflows and SQL injections - to name a few.
 
+Another step during the CI/CD pipeline is running [govulncheck](https://pkg.go.dev/golang.org/x/vuln/cmd/govulncheck)
+which reports known vulnerabilities that affect Go code, or even the compiler, meaning that if
+for some reason, the operator is built with a version of the Go compiler that contains
+a known bug this will be spotted during the process.
+
+GitHub also provides another tool [CodeQL](https://codeql.github.com/) that has been enabled
+and included in our CI/CD pipeline, thus, will block any pull request on which it could find
+any security issue. The configuration of CodeQL was set to only review Go code, so any other
+language in the repository like, python or bash, is not covered by this test.
+
+The [Snyk](https://snyk.io/) has an Open Source Projects in which CloudNativePG was accepted and
+we run the Snyk code scan every night in a scheduled job and produce weekly reports with any
+new finding on code security and also for licensing issues that could come up.
+
+One of the last things to note is that we have the "Report a vulnerability" option enabled
+on the Security section inside the repository that allows users to safely report any security
+issue that may require a proper and careful handling before being released to the public, please,
+if you find any security bug, use that medium to report it.
+
 !!! Important
     A failure in the static code analysis phase of the CI/CD pipeline is a blocker
     for the entire delivery of CloudNativePG, meaning that each commit is validated
@@ -37,8 +56,10 @@ Every container image that is part of CloudNativePG is automatically built via C
 Such images include not only the operator's, but also the operands' - specifically every supported PostgreSQL version.
 Within the pipelines, images are scanned with:
 
-- [Dockle](https://github.com/goodwithtech/dockle): for best practices in terms
-  of the container build process
+- [Dockle](https://github.com/goodwithtech/dockle): for best practices in terms of the container build process
+
+- [Snyk](https://snyk.io/): Looks for any possible security issue on the container and
+  report it using the GitHub interface for it.
 
 !!! Important
     All operand images are automatically rebuilt once a day by our pipelines in case
@@ -367,3 +388,66 @@ For further detail on how `pg_ident.conf` is managed by the operator, see the
 CloudNativePG delegates encryption at rest to the underlying storage class. For
 data protection in production environments, we highly recommend that you choose
 a storage class that supports encryption at rest.
+
+## Cluster wide permissions and operator deployment
+
+### Using manifest
+
+In the default installation for a vanilla Kubernetes cluster, the operator is deployed
+using the manifest that is build using `Kustomize` on the yaml files generated
+by `controller-gen` using the decorations available on [Kubebuilder](https://book.kubebuilder.io/),
+sadly, these is a bit limited for now, and we can create a manifest
+with all permissions for RoleBinding or ClusterBinding, in our case, the permissions
+are cluster wide in the default deployment, thus, we recommend to deploy the operator
+in it's own single place when using this kind of deployment and add the proper permissions
+to block any external users access to the operator namespace including access to the
+operator `ServiceAccount`.
+
+### Using Helm chart
+
+Another way it's provided to deploy the operator is Helm Charts, but for now, it will
+produce the same effect that we already have in the previous deployment method, meaning
+that all the permissions will be cluster wide in this way to deploy, so please, follow
+the same permissions recommendation.
+
+### Using OLM
+
+The last method to discuss, from a security point of view, it's the OLM, the community
+provides support to build all the files and package required to deploy the operator
+from [OperatorHub.io](https://operatorhub.io/operator/cloudnative-pg) and thus, we have
+a little bit more help on how we manage the permissions.
+
+The first things to understand it's that OLM allows the users to enable the operator
+to "watch" one, a few or all the namespaces depending on how it is deployed, this open
+the possibility to be more granular on the permissions.
+
+When using OLM the default set of permissions is set to be the two types needed,
+RoleBinding and ClusterBinding, meaning that a set of permissions will be namespaced
+and other permissions will be cluster wide.
+
+### Why cluster wide permissions are needed?
+
+Currently the operator requires cluster wide permissions only for `namespace` and
+`nodes` objects, all the other permissions can be namespaced or cluster wide.
+
+The reason for these permissions are:
+* namespace: required to watch other namespaces to keep track of the
+  the objects.
+* nodes: required to get the list of nodes and know the state of them so we avoid
+  scheduling any pod in a node that can't be used.
+
+These permissions, even if someone get access to the `ServiceAccount`, that are only; `get`,
+`list` and `watch`, will not have access to nothing more than just see, and if that
+user already had access to that `ServiceAccount`, probably, you have worst problem by now,
+is on you to not allow the users to access to the operator `ServiceAccount` and any
+other `ServiceAccount` used by any other operator that has permissions.
+
+### Can this issue be mitigated?
+
+In the manifest and helm chart installation, it's recommended to deploy the operator
+in it's own namespace and don't allow other user than the administrator to access that
+namespace, in this way, all the standard users will not have access to the operator
+`ServiceAccount`.
+
+When using OLM is recommended to deploy the operator on his own namespace watching the
+namespaces that will make use of the operator.
