@@ -44,14 +44,17 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 		replicaModeClusterDir = "/replica_mode_cluster/"
 		srcClusterName        = "cluster-replica-src"
 		srcClusterSample      = fixturesDir + replicaModeClusterDir + srcClusterName + ".yaml.template"
-		checkQuery            = "SELECT count(*) FROM test_replica"
 		level                 = tests.Medium
 	)
 
 	// those values are present in the cluster manifests
 	const (
-		sourceDBName  = "appSrc"
+		// sourceDBName is the name of the database in the source cluster
+		sourceDBName = "appSrc"
+		// Application database configuration is skipped for replica clusters,
+		// so we expect these to not be present
 		replicaDBName = "appTgt"
+		replicaUser   = "userTgt"
 	)
 
 	BeforeEach(func() {
@@ -62,8 +65,12 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 
 	Context("can bootstrap a replica cluster using TLS auth", func() {
 		It("should work", func() {
-			const replicaClusterSampleTLS = fixturesDir + replicaModeClusterDir + "cluster-replica-tls.yaml.template"
-			replicaNamespacePrefix := "replica-mode-tls-auth"
+			const (
+				replicaClusterSampleTLS = fixturesDir + replicaModeClusterDir + "cluster-replica-tls.yaml.template"
+				replicaNamespacePrefix  = "replica-mode-tls-auth"
+				testTableName           = "replica_mode_tls_auth"
+			)
+
 			replicaNamespace, err := env.CreateUniqueNamespace(replicaNamespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
@@ -73,11 +80,15 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				return env.DeleteNamespace(replicaNamespace)
 			})
 			AssertCreateCluster(replicaNamespace, srcClusterName, srcClusterSample, env)
+
+			checkQuery := fmt.Sprintf("SELECT count(*) FROM %v", testTableName)
 			AssertReplicaModeCluster(
 				replicaNamespace,
 				srcClusterName,
+				sourceDBName,
 				replicaClusterSampleTLS,
 				checkQuery,
+				testTableName,
 				psqlClientPod)
 		})
 	})
@@ -87,6 +98,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			const (
 				replicaClusterSampleBasicAuth = fixturesDir + replicaModeClusterDir + "cluster-replica-basicauth.yaml.template"
 				replicaNamespacePrefix        = "replica-mode-basic-auth"
+				testTableName                 = "replica_mode_basic_auth"
 			)
 
 			replicaClusterName, err := env.GetResourceNameFromYAML(replicaClusterSampleBasicAuth)
@@ -100,20 +112,25 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				return env.DeleteNamespace(replicaNamespace)
 			})
 			AssertCreateCluster(replicaNamespace, srcClusterName, srcClusterSample, env)
+
+			checkQuery := fmt.Sprintf("SELECT count(*) FROM %v", testTableName)
 			AssertReplicaModeCluster(
 				replicaNamespace,
 				srcClusterName,
+				sourceDBName,
 				replicaClusterSampleBasicAuth,
 				checkQuery,
+				testTableName,
 				psqlClientPod)
 
 			AssertDetachReplicaModeCluster(
 				replicaNamespace,
 				srcClusterName,
-				replicaClusterName,
 				sourceDBName,
+				replicaClusterName,
 				replicaDBName,
-				"test_replica")
+				replicaUser,
+				"replica_mode_basic_auth_detach")
 		})
 
 		It("should be able to switch to replica cluster and sync data", func(ctx SpecContext) {
@@ -124,7 +141,9 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 					"cluster-demotion-one.yaml.template"
 				clusterTwoFile = fixturesDir + replicaModeClusterDir +
 					"cluster-demotion-two.yaml.template"
+				testTableName = "replica_promotion_demotion"
 			)
+			var clusterOnePrimary, clusterTwoPrimary *corev1.Pod
 
 			getReplicaClusterSwitchCondition := func(conditions []metav1.Condition) *metav1.Condition {
 				for _, condition := range conditions {
@@ -144,11 +163,15 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				return env.DeleteNamespace(namespace)
 			})
 			AssertCreateCluster(namespace, clusterOneName, clusterOneFile, env)
+
+			checkQuery := fmt.Sprintf("SELECT count(*) FROM %v", testTableName)
 			AssertReplicaModeCluster(
 				namespace,
 				clusterOneName,
+				sourceDBName,
 				clusterTwoFile,
 				checkQuery,
+				testTableName,
 				psqlClientPod)
 
 			// turn the src cluster into a replica
@@ -167,44 +190,39 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 					g.Expect(condition).ToNot(BeNil())
 					g.Expect(condition.Status).To(Equal(metav1.ConditionTrue))
 				}).Should(Succeed())
+				AssertPgRecoveryMode(namespace, clusterOneName, true)
 			})
 
-			By("disabling the replica mode on the src cluster", func() {
+			// turn the dst cluster into a primary
+			By("disabling the replica mode on the dst cluster", func() {
 				cluster, err := env.GetCluster(namespace, clusterTwoName)
 				Expect(err).ToNot(HaveOccurred())
 				cluster.Spec.ReplicaCluster.Enabled = false
 				err = env.Client.Update(ctx, cluster)
 				Expect(err).ToNot(HaveOccurred())
-				AssertClusterIsReady(namespace, clusterOneName, testTimeouts[testUtils.ClusterIsReady], env)
+				AssertClusterIsReady(namespace, clusterTwoName, testTimeouts[testUtils.ClusterIsReady], env)
+				AssertPgRecoveryMode(namespace, clusterTwoName, false)
 			})
 
-			var newPrimaryPod *corev1.Pod
-			Eventually(func() error {
-				newPrimaryPod, err = env.GetClusterPrimary(namespace, clusterTwoName)
-				return err
-			}, 30, 3).Should(BeNil())
-
-			var newPrimaryReplicaPod *corev1.Pod
-			Eventually(func() error {
-				newPrimaryReplicaPod, err = env.GetClusterPrimary(namespace, clusterOneName)
-				return err
-			}, 30, 3).Should(BeNil())
-
 			By("creating a new data in the new source cluster", func() {
-				query := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s AS VALUES (1),(2);", "new_test_table")
-				commandTimeout := time.Second * 10
-				Eventually(func(g Gomega) {
-					_, _, err := env.ExecCommand(env.Ctx, *newPrimaryPod, specs.PostgresContainerName,
-						&commandTimeout, "psql", "-U", "postgres", "appSrc", "-tAc", query)
-					g.Expect(err).ToNot(HaveOccurred())
-				}, 300).Should(Succeed())
+				Eventually(func() error {
+					clusterTwoPrimary, err = env.GetClusterPrimary(namespace, clusterTwoName)
+					return err
+				}, 30, 3).Should(BeNil())
+				AssertCreateTestDataWithDatabaseName(namespace, clusterTwoName, sourceDBName,
+					"new_test_table", clusterTwoPrimary)
 			})
 
 			By("checking that the data is present in the old src cluster", func() {
+				Eventually(func() error {
+					clusterOnePrimary, err = env.GetClusterPrimary(namespace, clusterOneName)
+					return err
+				}, 30, 3).Should(BeNil())
+
 				AssertDataExpectedCountWithDatabaseName(
 					namespace,
-					newPrimaryReplicaPod.Name,
-					"appSrc",
+					clusterOnePrimary.Name,
+					sourceDBName,
 					"new_test_table",
 					2,
 				)
@@ -217,6 +235,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			const (
 				replicaClusterSample   = fixturesDir + replicaModeClusterDir + "cluster-replica-archive-mode-always.yaml.template"
 				replicaNamespacePrefix = "replica-mode-archive"
+				testTableName          = "replica_mode_archive"
 			)
 
 			replicaClusterName, err := env.GetResourceNameFromYAML(replicaClusterSample)
@@ -239,11 +258,15 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			})
 
 			AssertCreateCluster(replicaNamespace, srcClusterName, srcClusterSample, env)
+
+			checkQuery := fmt.Sprintf("SELECT count(*) FROM %v", testTableName)
 			AssertReplicaModeCluster(
 				replicaNamespace,
 				srcClusterName,
+				sourceDBName,
 				replicaClusterSample,
 				checkQuery,
+				testTableName,
 				psqlClientPod)
 
 			// Get primary from replica cluster
@@ -268,26 +291,24 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 		})
 	})
 
-	Context("can bootstrap a replica cluster from a backup", func() {
+	Context("can bootstrap a replica cluster from a backup", Ordered, func() {
 		const (
 			clusterSample   = fixturesDir + replicaModeClusterDir + "cluster-replica-src-with-backup.yaml.template"
 			namespacePrefix = "replica-cluster-from-backup"
 		)
 		var namespace, clusterName string
 
-		BeforeEach(func() {
+		JustAfterEach(func() {
+			if CurrentSpecReport().Failed() {
+				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+			}
+		})
+
+		BeforeAll(func() {
 			var err error
 			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			clusterName, err = env.GetResourceNameFromYAML(clusterSample)
-			Expect(err).ToNot(HaveOccurred())
-
-			DeferCleanup(func() error {
-				if CurrentSpecReport().Failed() {
-					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-				}
-				return env.DeleteNamespace(namespace)
-			})
+			DeferCleanup(func() error { return env.DeleteNamespace(namespace) })
 
 			By("creating the credentials for minio", func() {
 				AssertStorageCredentialsAreCreated(namespace, "backup-storage-creds", "minio", "minio123")
@@ -299,11 +320,16 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			})
 
 			// Create the cluster
+			clusterName, err = env.GetResourceNameFromYAML(clusterSample)
+			Expect(err).ToNot(HaveOccurred())
 			AssertCreateCluster(namespace, clusterName, clusterSample, env)
 		})
 
 		It("using a Backup from the object store", func() {
-			const replicaClusterSample = fixturesDir + replicaModeClusterDir + "cluster-replica-from-backup.yaml.template"
+			const (
+				replicaClusterSample = fixturesDir + replicaModeClusterDir + "cluster-replica-from-backup.yaml.template"
+				testTableName        = "replica_mode_backup"
+			)
 
 			By("creating a backup and waiting until it's completed", func() {
 				backupName := fmt.Sprintf("%v-backup", clusterName)
@@ -326,11 +352,14 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			})
 
 			By("creating a replica cluster from the backup", func() {
+				checkQuery := fmt.Sprintf("SELECT count(*) FROM %v", testTableName)
 				AssertReplicaModeCluster(
 					namespace,
 					clusterName,
+					sourceDBName,
 					replicaClusterSample,
 					checkQuery,
+					testTableName,
 					psqlClientPod)
 			})
 		})
@@ -340,6 +369,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				replicaClusterSample = fixturesDir + replicaModeClusterDir + "cluster-replica-from-snapshot.yaml.template"
 				snapshotDataEnv      = "REPLICA_CLUSTER_SNAPSHOT_NAME_PGDATA"
 				snapshotWalEnv       = "REPLICA_CLUSTER_SNAPSHOT_NAME_PGWAL"
+				testTableName        = "replica_mode_snapshot"
 			)
 
 			DeferCleanup(func() error {
@@ -395,11 +425,14 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			})
 
 			By("creating a replica cluster from the snapshot", func() {
+				checkQuery := fmt.Sprintf("SELECT count(*) FROM %v", testTableName)
 				AssertReplicaModeCluster(
 					namespace,
 					clusterName,
+					sourceDBName,
 					replicaClusterSample,
 					checkQuery,
+					testTableName,
 					psqlClientPod)
 			})
 		})

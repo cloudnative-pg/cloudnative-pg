@@ -364,6 +364,28 @@ func AssertCreateTestData(namespace, clusterName, tableName string, pod *corev1.
 	})
 }
 
+// AssertCreateTestDataWithDatabaseName create test data in a given database.
+func AssertCreateTestDataWithDatabaseName(
+	namespace,
+	clusterName,
+	databaseName,
+	tableName string,
+	pod *corev1.Pod,
+) {
+	By(fmt.Sprintf("creating test data in cluster %v", clusterName), func() {
+		query := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %v AS VALUES (1),(2);", tableName)
+		_, _, err := env.ExecCommandWithPsqlClient(
+			namespace,
+			clusterName,
+			pod,
+			apiv1.ApplicationUserSecretSuffix,
+			databaseName,
+			query,
+		)
+		Expect(err).ToNot(HaveOccurred())
+	})
+}
+
 type TableLocator struct {
 	Namespace   string
 	ClusterName string
@@ -448,12 +470,31 @@ func insertRecordIntoTable(namespace, clusterName, tableName string, value int, 
 	Expect(err).NotTo(HaveOccurred())
 }
 
-// AssertDatabaseExists assert if database is existed
+// AssertDatabaseExists assert if database exists
 func AssertDatabaseExists(namespace, podName, databaseName string, expectedValue bool) {
-	By(fmt.Sprintf("verifying is database exists %v", databaseName), func() {
+	By(fmt.Sprintf("verifying if database %v exists", databaseName), func() {
 		pod := &corev1.Pod{}
 		commandTimeout := time.Second * 10
 		query := fmt.Sprintf("SELECT EXISTS(SELECT 1 FROM pg_database WHERE lower(datname) = lower('%v'));", databaseName)
+		err := env.Client.Get(env.Ctx, ctrlclient.ObjectKey{Namespace: namespace, Name: podName}, pod)
+		Expect(err).ToNot(HaveOccurred())
+		stdout, _, err := env.ExecCommand(env.Ctx, *pod, specs.PostgresContainerName,
+			&commandTimeout, "psql", "-U", "postgres", "postgres", "-tAc", query)
+		Expect(err).ToNot(HaveOccurred())
+		if expectedValue {
+			Expect(strings.Trim(stdout, "\n")).To(BeEquivalentTo("t"))
+		} else {
+			Expect(strings.Trim(stdout, "\n")).To(BeEquivalentTo("f"))
+		}
+	})
+}
+
+// AssertUserExists assert if user exists
+func AssertUserExists(namespace, podName, userName string, expectedValue bool) {
+	By(fmt.Sprintf("verifying if user %v exists", userName), func() {
+		pod := &corev1.Pod{}
+		commandTimeout := time.Second * 10
+		query := fmt.Sprintf("SELECT EXISTS(SELECT 1 FROM pg_user WHERE lower(usename) = lower('%v'));", userName)
 		err := env.Client.Get(env.Ctx, ctrlclient.ObjectKey{Namespace: namespace, Name: podName}, pod)
 		Expect(err).ToNot(HaveOccurred())
 		stdout, _, err := env.ExecCommand(env.Ctx, *pod, specs.PostgresContainerName,
@@ -824,41 +865,60 @@ func getScheduledBackupCompleteBackupsCount(namespace string, scheduledBackupNam
 	return completed, nil
 }
 
+// AssertPgRecoveryMode verifies if the postgres recovery mode is enabled or disabled
+func AssertPgRecoveryMode(namespace, clusterName string, expectedValue bool) {
+	By(fmt.Sprintf("verifying that postgres recovery mode is %v", expectedValue), func() {
+		var stringExpectedValue string
+		if expectedValue {
+			stringExpectedValue = "t"
+		} else {
+			stringExpectedValue = "f"
+		}
+
+		var err error
+		var primaryPod *corev1.Pod
+		Eventually(func() error {
+			primaryPod, err = env.GetClusterPrimary(namespace, clusterName)
+			return err
+		}, 180, 10).Should(BeNil())
+
+		commandTimeout := time.Second * 10
+		Eventually(func() (string, error) {
+			stdOut, _, err := env.ExecCommand(env.Ctx, *primaryPod, specs.PostgresContainerName, &commandTimeout,
+				"psql", "-U", "postgres", "postgres", "-tAc", "select pg_is_in_recovery();")
+			return strings.Trim(stdOut, "\n"), err
+		}, 120, 10).Should(BeEquivalentTo(stringExpectedValue))
+	})
+}
+
 // AssertReplicaModeCluster checks that, after inserting some data in a source cluster,
 // a replica cluster can be bootstrapped using pg_basebackup and is properly replicating
 // from the source cluster
 func AssertReplicaModeCluster(
 	namespace,
 	srcClusterName,
+	srcClusterDBName,
 	replicaClusterSample,
-	checkQuery string,
+	checkQuery,
+	testTableName string,
 	pod *corev1.Pod,
 ) {
 	var primaryReplicaCluster *corev1.Pod
 	commandTimeout := time.Second * 10
 
-	By("creating test data in source cluster", func() {
-		cmd := "CREATE TABLE IF NOT EXISTS test_replica AS VALUES (1),(2);"
-		appUser, appUserPass, err := testsUtils.GetCredentials(srcClusterName, namespace,
-			apiv1.ApplicationUserSecretSuffix, env)
-		Expect(err).ToNot(HaveOccurred())
-		host, err := testsUtils.GetHostName(namespace, srcClusterName, env)
-		Expect(err).ToNot(HaveOccurred())
-		_, _, err = testsUtils.RunQueryFromPod(
-			pod,
-			host,
-			"appSrc",
-			appUser,
-			appUserPass,
-			cmd,
-			env)
-		Expect(err).ToNot(HaveOccurred())
-	})
+	AssertCreateTestDataWithDatabaseName(
+		namespace,
+		srcClusterName,
+		srcClusterDBName,
+		testTableName,
+		pod,
+	)
 
 	By("creating replica cluster", func() {
 		replicaClusterName, err := env.GetResourceNameFromYAML(replicaClusterSample)
 		Expect(err).ToNot(HaveOccurred())
 		AssertCreateCluster(namespace, replicaClusterName, replicaClusterSample, env)
+		AssertPgRecoveryMode(namespace, replicaClusterName, true)
 		// Get primary from replica cluster
 		Eventually(func() error {
 			primaryReplicaCluster, err = env.GetClusterPrimary(namespace, replicaClusterName)
@@ -866,42 +926,30 @@ func AssertReplicaModeCluster(
 		}, 30, 3).Should(BeNil())
 	})
 
-	By("verifying that replica cluster primary is in recovery mode", func() {
-		query := "select pg_is_in_recovery();"
-		Eventually(func() (string, error) {
-			stdOut, _, err := env.ExecCommand(env.Ctx, *primaryReplicaCluster, specs.PostgresContainerName,
-				&commandTimeout, "psql", "-U", "postgres", "appSrc", "-tAc", query)
-			return strings.Trim(stdOut, "\n"), err
-		}, 300, 15).Should(BeEquivalentTo("t"))
-	})
-
 	By("checking data have been copied correctly in replica cluster", func() {
 		Eventually(func() (string, error) {
 			stdOut, _, err := env.ExecCommand(env.Ctx, *primaryReplicaCluster, specs.PostgresContainerName,
-				&commandTimeout, "psql", "-U", "postgres", "appSrc", "-tAc", checkQuery)
+				&commandTimeout, "psql", "-U", "postgres", srcClusterDBName, "-tAc", checkQuery)
 			return strings.Trim(stdOut, "\n"), err
 		}, 180, 10).Should(BeEquivalentTo("2"))
 	})
 
 	By("writing some new data to the source cluster", func() {
-		insertRecordIntoTableWithDatabaseName(namespace, srcClusterName, "appSrc", "test_replica", 3, pod)
+		insertRecordIntoTableWithDatabaseName(namespace, srcClusterName, srcClusterDBName, testTableName, 3, pod)
 	})
 
 	By("checking new data have been copied correctly in replica cluster", func() {
 		Eventually(func() (string, error) {
 			stdOut, _, err := env.ExecCommand(env.Ctx, *primaryReplicaCluster, specs.PostgresContainerName,
-				&commandTimeout, "psql", "-U", "postgres", "appSrc", "-tAc", checkQuery)
+				&commandTimeout, "psql", "-U", "postgres", srcClusterDBName, "-tAc", checkQuery)
 			return strings.Trim(stdOut, "\n"), err
 		}, 180, 15).Should(BeEquivalentTo("3"))
 	})
 
-	// verify that if replica mode is enabled, no application user is created
-	By("checking in replica cluster, there is no database app and user app", func() {
-		checkDB := "select exists( SELECT datname FROM pg_catalog.pg_database WHERE lower(datname) = lower('app'));"
-		stdOut, _, err := env.ExecCommand(env.Ctx, *primaryReplicaCluster, specs.PostgresContainerName,
-			&commandTimeout, "psql", "-U", "postgres", "appSrc", "-tAc", checkDB)
-		Expect(err).ToNot(HaveOccurred())
-		Expect(strings.Trim(stdOut, "\n")).To(BeEquivalentTo("f"))
+	// verify that if replica mode is enabled, no default "app" user and "app" database are created
+	By("checking that in replica cluster there is no database app and user app", func() {
+		AssertDatabaseExists(namespace, primaryReplicaCluster.Name, "app", false)
+		AssertUserExists(namespace, primaryReplicaCluster.Name, "app", false)
 	})
 }
 
@@ -913,10 +961,11 @@ func AssertReplicaModeCluster(
 func AssertDetachReplicaModeCluster(
 	namespace,
 	srcClusterName,
-	replicaClusterName,
 	srcDatabaseName,
+	replicaClusterName,
 	replicaDatabaseName,
-	srcTableName string,
+	replicaUserName,
+	testTableName string,
 ) {
 	var primaryReplicaCluster *corev1.Pod
 	replicaCommandTimeout := time.Second * 10
@@ -941,21 +990,27 @@ func AssertDetachReplicaModeCluster(
 			primaryReplicaCluster, err = env.GetClusterPrimary(namespace, replicaClusterName)
 			g.Expect(err).ToNot(HaveOccurred())
 			_, _, err = env.EventuallyExecCommand(env.Ctx, *primaryReplicaCluster, specs.PostgresContainerName,
-				&replicaCommandTimeout, "psql", "-U", "postgres", "appSrc", "-tAc", query)
+				&replicaCommandTimeout, "psql", "-U", "postgres", srcDatabaseName, "-tAc", query)
 			g.Expect(err).ToNot(HaveOccurred())
 		}, 300, 15).Should(Succeed())
 	})
 
 	By("verifying the replica database doesn't exist in the replica cluster", func() {
+		// Application database configuration is skipped for replica clusters,
+		// so we expect these to not be present
 		AssertDatabaseExists(namespace, primaryReplicaCluster.Name, replicaDatabaseName, false)
+		AssertUserExists(namespace, primaryReplicaCluster.Name, replicaUserName, false)
 	})
 
 	By("writing some new data to the source cluster", func() {
-		insertRecordIntoTableWithDatabaseName(namespace, srcClusterName, srcDatabaseName, srcTableName, 4, psqlClientPod)
+		AssertCreateTestDataWithDatabaseName(namespace, srcClusterName, srcDatabaseName, testTableName, psqlClientPod)
 	})
 
 	By("verifying that replica cluster was not modified", func() {
-		AssertDataExpectedCountWithDatabaseName(namespace, primaryReplicaCluster.Name, srcDatabaseName, srcTableName, 3)
+		outTables, _, err := env.EventuallyExecCommand(env.Ctx, *primaryReplicaCluster, specs.PostgresContainerName,
+			&replicaCommandTimeout, "psql", "-U", "postgres", srcDatabaseName, "-tAc", "\\dt")
+		Expect(err).ToNot(HaveOccurred())
+		Expect(strings.Contains(outTables, testTableName), err).Should(BeFalse())
 	})
 }
 
