@@ -132,7 +132,7 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 					out, err := utils.CurlGetMetrics(namespace, curlPodName, pod.Status.PodIP, 9187)
 					Expect(err).ToNot(HaveOccurred(), "while getting pod metrics")
 					expectedMetrics := buildExpectedMetrics(metricsCluster, !specs.IsPodPrimary(pod))
-					assertMetrics(out, expectedMetrics)
+					assertIncludesMetrics(out, expectedMetrics)
 				})
 			}
 		})
@@ -210,7 +210,7 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 		collectAndAssertDefaultMetricsPresentOnEachPod(namespace, metricsClusterName, curlPodName, true)
 	})
 
-	It("can gather metrics according with predicate query", func() {
+	It("can gather metrics depending on the predicate query", func() {
 		// Create the cluster namespace
 		const namespacePrefix = "predicate-query-metrics-e2e"
 		metricsClusterName, err = env.GetResourceNameFromYAML(clusterMetricsPredicateQueryFile)
@@ -234,13 +234,21 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 		// Create the cluster
 		AssertCreateCluster(namespace, metricsClusterName, clusterMetricsPredicateQueryFile, env)
 
-		By("ensuring metrics with positive predicate are collected", func() {
+		By("ensuring only metrics with a positive predicate are collected", func() {
 			podList, err := env.GetClusterPodList(namespace, metricsClusterName)
 			Expect(err).ToNot(HaveOccurred())
 
 			// We expect only the metrics that have a predicate_query valid.
 			expectedMetrics := map[string]*regexp.Regexp{
 				"cnpg_pg_predicate_query_return_true_fixed": regexp.MustCompile(`42`),
+				"cnpg_pg_predicate_query_empty":             regexp.MustCompile(`42`),
+			}
+			nonCollectableMetrics := []string{
+				"cnpg_pg_predicate_query_return_false",
+				"cnpg_pg_predicate_query_return_null_as_false",
+				"cnpg_pg_predicate_query_return_no_rows",
+				"cnpg_pg_predicate_query_multiple_rows",
+				"cnpg_pg_predicate_query_multiple_columns",
 			}
 
 			// Gather metrics in each pod
@@ -248,7 +256,8 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 				By(fmt.Sprintf("checking metrics for pod: %s", pod.Name), func() {
 					out, err := utils.CurlGetMetrics(namespace, curlPodName, pod.Status.PodIP, 9187)
 					Expect(err).ToNot(HaveOccurred(), "while getting pod metrics")
-					assertMetrics(out, expectedMetrics)
+					assertIncludesMetrics(out, expectedMetrics)
+					assertExcludesMetrics(out, nonCollectableMetrics)
 				})
 			}
 		})

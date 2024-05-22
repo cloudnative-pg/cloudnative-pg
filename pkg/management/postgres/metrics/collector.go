@@ -331,12 +331,12 @@ func (c QueryCollector) collect(conn *sql.DB, ch chan<- prometheus.Metric) error
 		}
 	}()
 
-	isCollectable, err := c.isCollectable(tx)
+	shouldBeCollected, err := isCollectable(c.userQuery, tx)
 	if err != nil {
 		return err
 	}
 
-	if !isCollectable {
+	if !shouldBeCollected {
 		return nil
 	}
 
@@ -388,17 +388,18 @@ func (c QueryCollector) collect(conn *sql.DB, ch chan<- prometheus.Metric) error
 	return nil
 }
 
-// isCollectable checks if a query to collect metrics can be executed or not.
+// isCollectable checks if a query to collect metrics should be executed.
 // The method tests the query provided in the PredicateQuery property within the same transaction
 // used to collect metrics.
-// Accepts a query that returns at most a single row with a single column with type bool
-func (c QueryCollector) isCollectable(tx *sql.Tx) (bool, error) {
-	if c.userQuery.PredicateQuery == "" {
+// PredicateQuery should return at most a single row with a single column with type bool.
+// If no PredicateQuery is provided, the query is considered collectable by default
+func isCollectable(q UserQuery, tx *sql.Tx) (bool, error) {
+	if q.PredicateQuery == "" {
 		return true, nil
 	}
 
-	var isCollectable *bool
-	if err := tx.QueryRow(c.userQuery.PredicateQuery).Scan(&isCollectable); err != nil {
+	var isCollectable sql.NullBool
+	if err := tx.QueryRow(q.PredicateQuery).Scan(&isCollectable); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return false, nil
 		}
@@ -406,11 +407,11 @@ func (c QueryCollector) isCollectable(tx *sql.Tx) (bool, error) {
 		return false, err
 	}
 
-	if isCollectable == nil {
+	if !isCollectable.Valid {
 		return false, nil
 	}
 
-	return *isCollectable, nil
+	return isCollectable.Bool, nil
 }
 
 // Collect the list of labels from the database, and returns true if the
