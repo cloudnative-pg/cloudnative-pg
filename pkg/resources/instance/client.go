@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
@@ -83,9 +84,9 @@ func NewStatusClient() *StatusClient {
 		Transport: &http.Transport{
 			DialContext: dialer.DialContext,
 			DialTLSContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-				tlsConfig, ok := ctx.Value(utils.ContextKeyTLSConfig).(*tls.Config)
-				if !ok || tlsConfig == nil {
-					return nil, fmt.Errorf("missing TLSConfig object in context")
+				tlsConfig, err := certs.GetTLSConfigFromContext(ctx)
+				if err != nil {
+					return nil, err
 				}
 				tlsDialer := tls.Dialer{
 					NetDialer: dialer,

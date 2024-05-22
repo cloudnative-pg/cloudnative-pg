@@ -29,10 +29,10 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/instance"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // backupClient a client to interact with the instance backup endpoints
@@ -61,9 +61,9 @@ func NewBackupClient() BackupClient {
 		Transport: &http.Transport{
 			DialContext: dialer.DialContext,
 			DialTLSContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-				tlsConfig, ok := ctx.Value(utils.ContextKeyTLSConfig).(*tls.Config)
-				if !ok || tlsConfig == nil {
-					return nil, fmt.Errorf("missing TLSConfig object in context")
+				tlsConfig, err := certs.GetTLSConfigFromContext(ctx)
+				if err != nil {
+					return nil, err
 				}
 				tlsDialer := tls.Dialer{
 					NetDialer: dialer,

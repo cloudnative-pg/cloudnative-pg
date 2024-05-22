@@ -249,7 +249,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	}
 
 	// Store in the context the TLS configuration required communicating with the Pods
-	tlsConfig, err := certs.NewTLSFromSecret(
+	ctx, err = certs.NewTLSConfigForContext(
 		ctx,
 		r.Client,
 		cluster.GetServerCASecretObjectKey(),
@@ -258,7 +258,6 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-	ctx = context.WithValue(ctx, utils.ContextKeyTLSConfig, tlsConfig)
 
 	// Get the replication status
 	instancesStatus := r.StatusClient.GetStatusFromInstances(ctx, resources.instances)

@@ -27,15 +27,20 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// NewTLSFromSecret creates a tls.Config from the given ca secret and serverName pair
-func NewTLSFromSecret(
+type contextKey string
+
+// contextKeyTLSConfig is the context key holding the TLS configuration
+const contextKeyTLSConfig contextKey = "tlsConfig"
+
+// newTLSConfigFromSecret creates a tls.Config from the given ca secret and serverName pair
+func newTLSConfigFromSecret(
 	ctx context.Context,
-	c client.Client,
+	cli client.Client,
 	caSecret types.NamespacedName,
 	serverName string,
 ) (*tls.Config, error) {
 	secret := &v1.Secret{}
-	err := c.Get(ctx, caSecret, secret)
+	err := cli.Get(ctx, caSecret, secret)
 	if err != nil {
 		return nil, fmt.Errorf("while getting secret %s: %w", caSecret.Name, err)
 	}
@@ -54,4 +59,29 @@ func NewTLSFromSecret(
 	}
 
 	return &tlsConfig, nil
+}
+
+// NewTLSConfigForContext creates a tls.config with the provided data and returns an expanded context that contains
+// the *tls.Config
+func NewTLSConfigForContext(
+	ctx context.Context,
+	cli client.Client,
+	caSecret types.NamespacedName,
+	serverName string,
+) (context.Context, error) {
+	conf, err := newTLSConfigFromSecret(ctx, cli, caSecret, serverName)
+	if err != nil {
+		return nil, err
+	}
+
+	return context.WithValue(ctx, contextKeyTLSConfig, conf), nil
+}
+
+// GetTLSConfigFromContext returns the *tls.Config contained by the context or any error encountered
+func GetTLSConfigFromContext(ctx context.Context) (*tls.Config, error) {
+	conf, ok := ctx.Value(contextKeyTLSConfig).(*tls.Config)
+	if !ok || conf == nil {
+		return nil, fmt.Errorf("context does not contain TLSConfig")
+	}
+	return conf, nil
 }

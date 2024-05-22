@@ -31,7 +31,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("NewTLSFromSecret", func() {
+var _ = Describe("newTLSConfigFromSecret", func() {
 	var (
 		ctx        context.Context
 		c          client.Client
@@ -64,7 +64,7 @@ MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA7Qe3X7Q6WZpXqlXkq0Bd
 		})
 
 		It("should return a valid tls.Config", func() {
-			tlsConfig, err := NewTLSFromSecret(ctx, c, caSecret, serverName)
+			tlsConfig, err := newTLSConfigFromSecret(ctx, c, caSecret, serverName)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(tlsConfig).NotTo(BeNil())
 			Expect(tlsConfig.MinVersion).To(Equal(uint16(tls.VersionTLS13)))
@@ -79,7 +79,7 @@ MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA7Qe3X7Q6WZpXqlXkq0Bd
 		})
 
 		It("should return an error", func() {
-			tlsConfig, err := NewTLSFromSecret(ctx, c, caSecret, serverName)
+			tlsConfig, err := newTLSConfigFromSecret(ctx, c, caSecret, serverName)
 			Expect(err).To(HaveOccurred())
 			Expect(tlsConfig).To(BeNil())
 			Expect(err.Error()).To(ContainSubstring(fmt.Sprintf("while getting secret %s", caSecret.Name)))
@@ -98,7 +98,7 @@ MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA7Qe3X7Q6WZpXqlXkq0Bd
 		})
 
 		It("should return an error", func() {
-			tlsConfig, err := NewTLSFromSecret(ctx, c, caSecret, serverName)
+			tlsConfig, err := newTLSConfigFromSecret(ctx, c, caSecret, serverName)
 			Expect(err).To(HaveOccurred())
 			Expect(tlsConfig).To(BeNil())
 			Expect(err.Error()).To(ContainSubstring(fmt.Sprintf("missing %s entry in secret %s", CACertKey, caSecret.Name)))

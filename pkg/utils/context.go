@@ -21,6 +21,3 @@ type contextKey string
 
 // ContextKeyCluster is the context key holding cluster data
 const ContextKeyCluster contextKey = "cluster"
-
-// ContextKeyTLSConfig is the context key holding the TLS configuration
-const ContextKeyTLSConfig contextKey = "tlsConfig"
