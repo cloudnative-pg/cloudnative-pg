@@ -200,7 +200,7 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig, enable
 				ProbeHandler: corev1.ProbeHandler{
 					HTTPGet: &corev1.HTTPGetAction{
 						Path: url.PathHealth,
-						Port: intstr.FromInt32(int32(url.StatusPort)),
+						Port: intstr.FromInt32(url.StatusPort),
 					},
 				},
 			},
@@ -210,7 +210,7 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig, enable
 				ProbeHandler: corev1.ProbeHandler{
 					HTTPGet: &corev1.HTTPGetAction{
 						Path: url.PathReady,
-						Port: intstr.FromInt32(int32(url.StatusPort)),
+						Port: intstr.FromInt32(url.StatusPort),
 					},
 				},
 			},
@@ -220,7 +220,7 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig, enable
 				ProbeHandler: corev1.ProbeHandler{
 					HTTPGet: &corev1.HTTPGetAction{
 						Path: url.PathHealth,
-						Port: intstr.FromInt32(int32(url.StatusPort)),
+						Port: intstr.FromInt32(url.StatusPort),
 					},
 				},
 			},
@@ -238,12 +238,12 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig, enable
 				},
 				{
 					Name:          "metrics",
-					ContainerPort: int32(url.PostgresMetricsPort),
+					ContainerPort: url.PostgresMetricsPort,
 					Protocol:      "TCP",
 				},
 				{
 					Name:          "status",
-					ContainerPort: int32(url.StatusPort),
+					ContainerPort: url.StatusPort,
 					Protocol:      "TCP",
 				},
 			},

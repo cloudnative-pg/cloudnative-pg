@@ -23,13 +23,13 @@ import (
 
 const (
 	// LocalPort is the port for only available from Postgres.
-	LocalPort int = 8010
+	LocalPort int32 = 8010
 
 	// PostgresMetricsPort is the port for the exporter of PostgreSQL related metrics (HTTP)
-	PostgresMetricsPort int = 9187
+	PostgresMetricsPort int32 = 9187
 
 	// PgBouncerMetricsPort is the port for the exporter of PgBouncer related metrics (HTTP)
-	PgBouncerMetricsPort int = 9127
+	PgBouncerMetricsPort int32 = 9127
 
 	// PathHealth is the URL path for Health State
 	PathHealth string = "/healthz"
@@ -59,16 +59,16 @@ const (
 	PathCache string = "/cache/"
 
 	// StatusPort is the port for status HTTP requests
-	StatusPort int = 8000
+	StatusPort int32 = 8000
 )
 
 // Local builds an http request pointing to localhost
-func Local(path string, port int) string {
+func Local(path string, port int32) string {
 	return Build("http", "localhost", path, port)
 }
 
 // Build builds an url given the hostname and the path, pointing to the status web server
-func Build(scheme, hostname, path string, port int) string {
+func Build(scheme, hostname, path string, port int32) string {
 	// If path already starts with '/' we remove it
 	if path[0] == '/' {
 		path = path[1:]
