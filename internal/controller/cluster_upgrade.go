@@ -610,7 +610,7 @@ func checkPodSpecIsOutdated(
 	envConfig := specs.CreatePodEnvConfig(*cluster, status.Pod.Name)
 	gracePeriod := int64(cluster.GetMaxStopDelay())
 	targetPodSpec := specs.CreateClusterPodSpec(status.Pod.Name, *cluster, envConfig, gracePeriod,
-		instance.GetStatusSchemeFromPod(status.Pod) == "https")
+		instance.GetStatusSchemeFromPod(status.Pod).IsHTTPS())
 
 	// the bootstrap init-container could change image after an operator upgrade.
 	// If in-place upgrades of the instance manager are enabled, we don't need rollout.
