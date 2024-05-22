@@ -456,7 +456,7 @@ func readSecret(
 	return data, nil
 }
 
-// startPprofDebugServer exposes pprof debug server if POD_DEBUG env variable is set to 1
+// startPprofDebugServer exposes pprof debug server if the pprof-server env variable is set to 1
 func startPprofDebugServer(ctx context.Context) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/debug/pprof/", pprof.Index)
