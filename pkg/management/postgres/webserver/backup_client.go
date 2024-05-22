@@ -27,8 +27,11 @@ import (
 	"net/http"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
+
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/instance"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -39,14 +42,9 @@ type backupClient struct {
 
 // BackupClient is a struct capable of interacting with the instance backup endpoints
 type BackupClient interface {
-	StatusWithErrors(ctx context.Context, scheme string, podIP string) (*Response[BackupResultData], error)
-	Start(
-		ctx context.Context,
-		scheme string,
-		podIP string,
-		sbq StartBackupRequest,
-	) error
-	Stop(ctx context.Context, scheme string, podIP string, sbq StopBackupRequest) error
+	StatusWithErrors(ctx context.Context, pod *corev1.Pod) (*Response[BackupResultData], error)
+	Start(ctx context.Context, pod *corev1.Pod, sbq StartBackupRequest) error
+	Stop(ctx context.Context, pod *corev1.Pod, sbq StopBackupRequest) error
 }
 
 // NewBackupClient creates a client capable of interacting with the instance backup endpoints
@@ -81,12 +79,9 @@ func NewBackupClient() BackupClient {
 
 // StatusWithErrors retrieves the current status of the backup.
 // Returns the response body in case there is an error in the request
-func (c *backupClient) StatusWithErrors(
-	ctx context.Context,
-	scheme string,
-	podIP string,
-) (*Response[BackupResultData], error) {
-	httpURL := url.Build(scheme, podIP, url.PathPgModeBackup, url.StatusPort)
+func (c *backupClient) StatusWithErrors(ctx context.Context, pod *corev1.Pod) (*Response[BackupResultData], error) {
+	scheme := instance.GetStatusSchemeFromPod(pod)
+	httpURL := url.Build(scheme, pod.Status.PodIP, url.PathPgModeBackup, url.StatusPort)
 	req, err := http.NewRequestWithContext(ctx, "GET", httpURL, nil)
 	if err != nil {
 		return nil, err
@@ -96,13 +91,9 @@ func (c *backupClient) StatusWithErrors(
 }
 
 // Start runs the pg_start_backup
-func (c *backupClient) Start(
-	ctx context.Context,
-	scheme string,
-	podIP string,
-	sbq StartBackupRequest,
-) error {
-	httpURL := url.Build(scheme, podIP, url.PathPgModeBackup, url.StatusPort)
+func (c *backupClient) Start(ctx context.Context, pod *corev1.Pod, sbq StartBackupRequest) error {
+	scheme := instance.GetStatusSchemeFromPod(pod)
+	httpURL := url.Build(scheme, pod.Status.PodIP, url.PathPgModeBackup, url.StatusPort)
 
 	// Marshalling the payload to JSON
 	jsonBody, err := json.Marshal(sbq)
@@ -121,8 +112,9 @@ func (c *backupClient) Start(
 }
 
 // Stop runs the command pg_stop_backup
-func (c *backupClient) Stop(ctx context.Context, scheme string, podIP string, sbq StopBackupRequest) error {
-	httpURL := url.Build(scheme, podIP, url.PathPgModeBackup, url.StatusPort)
+func (c *backupClient) Stop(ctx context.Context, pod *corev1.Pod, sbq StopBackupRequest) error {
+	scheme := instance.GetStatusSchemeFromPod(pod)
+	httpURL := url.Build(scheme, pod.Status.PodIP, url.PathPgModeBackup, url.StatusPort)
 	// Marshalling the payload to JSON
 	jsonBody, err := json.Marshal(sbq)
 	if err != nil {

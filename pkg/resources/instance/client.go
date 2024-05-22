@@ -41,8 +41,10 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-const defaultRequestTimeout = 30 * time.Second
-const noRequestTimeout = 0
+const (
+	defaultRequestTimeout = 30 * time.Second
+	noRequestTimeout      = 0
+)
 
 // requestRetry is the default backoff used to query the instance manager
 // for the status of each PostgreSQL instance.
@@ -337,7 +339,7 @@ func (r *StatusClient) rawInstanceStatusRequest(
 	return result
 }
 
-// GetStatusSchemeFromPod detects if a Pod is esposint the status via HTTP or HTTPS
+// GetStatusSchemeFromPod detects if a Pod is exposing the status via HTTP or HTTPS
 func GetStatusSchemeFromPod(pod *corev1.Pod) string {
 	// Fall back to comparing the container environment configuration
 	for _, container := range pod.Spec.Containers {
