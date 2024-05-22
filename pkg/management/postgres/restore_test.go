@@ -149,15 +149,7 @@ var _ = Describe("testing restore InitInfo methods", func() {
 		Expect(chg).To(BeFalse())
 	})
 
-	It("should get higher enforced params", func() {
-		enforcedParamsInPGData := map[string]string{
-			"max_connections":           "100",
-			"max_wal_senders":           "10",
-			"max_worker_processes":      "8",
-			"max_prepared_transactions": "100",
-			"max_locks_per_transaction": "64",
-		}
-
+	It("should parse enforced params from cluster", func() {
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
 				PostgresConfiguration: apiv1.PostgresConfiguration{
@@ -170,25 +162,16 @@ var _ = Describe("testing restore InitInfo methods", func() {
 				},
 			},
 		}
-		err := updateEnforcedParametersWithUserSettings(cluster, enforcedParamsInPGData)
+		enforcedParamsInPGData, err := LoadEnforcedParametersFromCluster(cluster)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(enforcedParamsInPGData).To(HaveLen(5))
-		Expect(enforcedParamsInPGData["max_connections"]).To(Equal("200"))
-		Expect(enforcedParamsInPGData["max_wal_senders"]).To(Equal("20"))
-		Expect(enforcedParamsInPGData["max_worker_processes"]).To(Equal("18"))
-		Expect(enforcedParamsInPGData["max_prepared_transactions"]).To(Equal("100"))
-		Expect(enforcedParamsInPGData["max_locks_per_transaction"]).To(Equal("64"))
+		Expect(enforcedParamsInPGData).To(HaveLen(4))
+		Expect(enforcedParamsInPGData["max_connections"]).To(Equal(200))
+		Expect(enforcedParamsInPGData["max_wal_senders"]).To(Equal(20))
+		Expect(enforcedParamsInPGData["max_worker_processes"]).To(Equal(18))
+		Expect(enforcedParamsInPGData["max_prepared_transactions"]).To(Equal(50))
 	})
 
-	It("report error if user given one in incorrect format", func() {
-		enforcedParamsInPGData := map[string]string{
-			"max_connections":           "100",
-			"max_wal_senders":           "10",
-			"max_worker_processes":      "8",
-			"max_prepared_transactions": "100",
-			"max_locks_per_transaction": "64",
-		}
-
+	It("report error if user given one in incorrect value in the cluster", func() {
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
 				PostgresConfiguration: apiv1.PostgresConfiguration{
@@ -201,19 +184,11 @@ var _ = Describe("testing restore InitInfo methods", func() {
 				},
 			},
 		}
-		err := updateEnforcedParametersWithUserSettings(cluster, enforcedParamsInPGData)
+		_, err := LoadEnforcedParametersFromCluster(cluster)
 		Expect(err).To(HaveOccurred())
 	})
 
-	It("ingore the non-enforced params user give", func() {
-		enforcedParamsInPGData := map[string]string{
-			"max_connections":           "100",
-			"max_wal_senders":           "10",
-			"max_worker_processes":      "8",
-			"max_prepared_transactions": "100",
-			"max_locks_per_transaction": "64",
-		}
-
+	It("ignore the non-enforced params user give", func() {
 		cluster := &apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
 				PostgresConfiguration: apiv1.PostgresConfiguration{
@@ -224,13 +199,9 @@ var _ = Describe("testing restore InitInfo methods", func() {
 				},
 			},
 		}
-		err := updateEnforcedParametersWithUserSettings(cluster, enforcedParamsInPGData)
+		enforcedParamsInPGData, err := LoadEnforcedParametersFromCluster(cluster)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(enforcedParamsInPGData).To(HaveLen(5))
-		Expect(enforcedParamsInPGData["max_connections"]).To(Equal("200"))
-		Expect(enforcedParamsInPGData["max_wal_senders"]).To(Equal("10"))
-		Expect(enforcedParamsInPGData["max_worker_processes"]).To(Equal("8"))
-		Expect(enforcedParamsInPGData["max_prepared_transactions"]).To(Equal("100"))
-		Expect(enforcedParamsInPGData["max_locks_per_transaction"]).To(Equal("64"))
+		Expect(enforcedParamsInPGData).To(HaveLen(1))
+		Expect(enforcedParamsInPGData["max_connections"]).To(Equal(200))
 	})
 })

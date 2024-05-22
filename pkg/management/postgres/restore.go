@@ -601,24 +601,31 @@ func (info InitInfo) writeRecoveryConfiguration(cluster *apiv1.Cluster, recovery
 	if err != nil {
 		return fmt.Errorf("cannot write recovery config: %w", err)
 	}
-	enforcedParams, err := GetEnforcedParametersThroughPgControldata(info.PgData)
+
+	controldataParams, err := LoadEnforcedParametersFromPgControldata(info.PgData)
 	if err != nil {
 		return err
 	}
-	if err = updateEnforcedParametersWithUserSettings(cluster, enforcedParams); err != nil {
+	clusterParams, err := LoadEnforcedParametersFromCluster(cluster)
+	if err != nil {
 		return err
 	}
-	if enforcedParams != nil {
-		changed, err := configfile.UpdatePostgresConfigurationFile(
-			path.Join(info.PgData, constants.PostgresqlCustomConfigurationFile),
-			enforcedParams,
-		)
-		if changed {
-			log.Info("enforcing parameters found in pg_controldata and cluster spec", "parameters", enforcedParams)
+	enforcedParams := make(map[string]string)
+	for _, param := range pgControldataSettingsToParamsMap {
+		value := max(clusterParams[param], controldataParams[param])
+		if value > 0 {
+			enforcedParams[param] = strconv.Itoa(value)
 		}
-		if err != nil {
-			return fmt.Errorf("cannot write recovery config for enforced parameters: %w", err)
-		}
+	}
+	changed, err := configfile.UpdatePostgresConfigurationFile(
+		path.Join(info.PgData, constants.PostgresqlCustomConfigurationFile),
+		enforcedParams,
+	)
+	if changed {
+		log.Info("enforcing parameters found in pg_controldata and cluster spec", "parameters", enforcedParams)
+	}
+	if err != nil {
+		return fmt.Errorf("cannot write recovery config for enforced parameters: %w", err)
 	}
 
 	if major >= 12 {
@@ -653,9 +660,9 @@ func (info InitInfo) writeRecoveryConfiguration(cluster *apiv1.Cluster, recovery
 		0o600)
 }
 
-// GetEnforcedParametersThroughPgControldata will parse the output of pg_controldata in order to get
+// LoadEnforcedParametersFromPgControldata will parse the output of pg_controldata in order to get
 // the values of all the hot standby sensible parameters
-func GetEnforcedParametersThroughPgControldata(pgData string) (map[string]string, error) {
+func LoadEnforcedParametersFromPgControldata(pgData string) (map[string]int, error) {
 	var stdoutBuffer bytes.Buffer
 	var stderrBuffer bytes.Buffer
 	pgControlDataCmd := exec.Command(pgControlDataName,
@@ -674,48 +681,47 @@ func GetEnforcedParametersThroughPgControldata(pgData string) (map[string]string
 
 	log.Debug("pg_controldata stdout", "stdout", stdoutBuffer.String())
 
-	enforcedParams := map[string]string{}
+	enforcedParams := make(map[string]int)
 	for key, value := range utils.ParsePgControldataOutput(stdoutBuffer.String()) {
 		if param, ok := pgControldataSettingsToParamsMap[key]; ok {
-			enforcedParams[param] = value
+			intValue, err := strconv.Atoi(value)
+			if err != nil {
+				log.Error(err, "while parsing pg_controldata content",
+					"key", key,
+					"value", value)
+				return nil, err
+			}
+			enforcedParams[param] = intValue
 		}
 	}
+
 	return enforcedParams, nil
 }
 
-// updateEnforcedParametersWithUserSettings will compare the values of the enforced parameters
+// LoadEnforcedParametersFromCluster will compare the values of the enforced parameters
 // given with the ones defined in cluster spec, choosing the higher value between the two and
 // returning the final map of enforced parameters
-func updateEnforcedParametersWithUserSettings(
+func LoadEnforcedParametersFromCluster(
 	cluster *apiv1.Cluster,
-	enforcedParams map[string]string,
-) error {
-	if enforcedParams == nil {
-		return nil
-	}
+) (map[string]int, error) {
 	clusterParams := cluster.Spec.PostgresConfiguration.Parameters
-	for key, enforcedparam := range enforcedParams {
-		clusterparam, found := clusterParams[key]
+	enforcedParams := map[string]int{}
+	for _, param := range pgControldataSettingsToParamsMap {
+		value, found := clusterParams[param]
 		if !found {
 			continue
 		}
-		enforcedparamInt, err := strconv.Atoi(enforcedparam)
+
+		intValue, err := strconv.Atoi(value)
 		if err != nil {
-			return err
+			log.Error(err, "while parsing enforced postgres parameter",
+				"param", param,
+				"value", value)
+			return nil, err
 		}
-		clusterparamInt, err := strconv.Atoi(clusterparam)
-		if err != nil {
-			return err
-		}
-		// if the values from `pg_controldata` are smaller than the cluster spec,
-		// we use the user settings
-		if clusterparamInt > enforcedparamInt {
-			log.Info("enforcing parameters found in cluster spec is bigger, use the value in cluster spec",
-				"parameter", key, "value", clusterparam)
-			enforcedParams[key] = clusterparam
-		}
+		enforcedParams[param] = intValue
 	}
-	return nil
+	return enforcedParams, nil
 }
 
 // WriteInitialPostgresqlConf resets the postgresql.conf that there is in the instance using
