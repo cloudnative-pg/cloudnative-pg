@@ -81,6 +81,14 @@ func (i *PostgresLifecycle) Start(ctx context.Context) error {
 			contextLogger.Debug("starting signal loop")
 			select {
 			case err := <-postMasterErrChan:
+				// The postmaster error channel will send an error value, possibly being nil,
+				// corresponding to the postmaster exit status.
+				// Having done that, it will be closed.
+				//
+				// Closed channels are always ready for communication and to avoid a spin
+				// loop we need to ensure it is never selected again.
+				postMasterErrChan = nil
+
 				// We didn't request postmaster to shut down or to restart, nevertheless
 				// the postmaster is terminated. This can happen in the following
 				// conditions:
