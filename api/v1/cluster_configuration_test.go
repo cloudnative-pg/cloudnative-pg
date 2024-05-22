@@ -79,4 +79,18 @@ var _ = Describe("ensuring the correctness of synchronous replica data calculati
 		Expect(names).To(BeEmpty())
 		Expect(cluster.Spec.MinSyncReplicas).To(Equal(1))
 	})
+
+	It("should behave correctly if there is no ready host", func() {
+		cluster := createFakeCluster("example")
+		cluster.Status = ClusterStatus{
+			CurrentPrimary: "example-1",
+			InstancesStatus: map[utils.PodStatus][]string{
+				utils.PodFailed: {"example-1", "example-2", "example-3"},
+			},
+		}
+		number, names := cluster.GetSyncReplicasData()
+
+		Expect(number).To(BeZero())
+		Expect(names).To(BeEmpty())
+	})
 })
