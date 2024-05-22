@@ -112,7 +112,7 @@ func Deployment(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*appsv1.Deploymen
 			TimeoutSeconds: 5,
 			ProbeHandler: corev1.ProbeHandler{
 				TCPSocket: &corev1.TCPSocketAction{
-					Port: intstr.FromInt(pgBouncerConfig.PgBouncerPort),
+					Port: intstr.FromInt32(pgBouncerConfig.PgBouncerPort),
 				},
 			},
 		}, false).
