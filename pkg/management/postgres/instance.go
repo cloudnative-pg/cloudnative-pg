@@ -1088,13 +1088,19 @@ func (instance *Instance) RequestFastImmediateShutdown() {
 
 // RequestAndWaitRestartSmartFast requests the lifecycle manager to
 // restart the postmaster, and wait for the postmaster to be restarted
-func (instance *Instance) RequestAndWaitRestartSmartFast() error {
+func (instance *Instance) RequestAndWaitRestartSmartFast(ctx context.Context, timeout time.Duration) error {
 	instance.SetMightBeUnavailable(true)
 	defer instance.SetMightBeUnavailable(false)
+
+	restartCtx, cancel := context.WithTimeoutCause(
+		ctx,
+		timeout,
+		fmt.Errorf("timeout while restarting PostgreSQL"))
+	defer cancel()
+
 	now := time.Now()
 	instance.requestRestartSmartFast()
-	err := instance.waitForInstanceRestarted(now)
-	if err != nil {
+	if err := instance.waitForInstanceRestarted(restartCtx, now); err != nil {
 		return fmt.Errorf("while waiting for instance restart: %w", err)
 	}
 
@@ -1114,13 +1120,29 @@ func (instance *Instance) RequestFencingOn() {
 
 // RequestAndWaitFencingOff will request to remove the fencing
 // and wait for the instance to be restarted
-func (instance *Instance) RequestAndWaitFencingOff() error {
-	defer instance.SetMightBeUnavailable(false)
-	now := time.Now()
-	instance.requestFencingOff()
-	err := instance.waitForInstanceRestarted(now)
-	if err != nil {
-		return fmt.Errorf("while waiting for instance restart: %w", err)
+func (instance *Instance) RequestAndWaitFencingOff(ctx context.Context, timeout time.Duration) error {
+	liftFencing := func() error {
+		ctxWithTimeout, cancel := context.WithTimeoutCause(
+			ctx,
+			timeout,
+			fmt.Errorf("timeout while resuming PostgreSQL from fencing"),
+		)
+		defer cancel()
+
+		defer instance.SetMightBeUnavailable(false)
+		now := time.Now()
+		instance.requestFencingOff()
+		err := instance.waitForInstanceRestarted(ctxWithTimeout, now)
+		if err != nil {
+			return fmt.Errorf("while waiting for instance restart: %w", err)
+		}
+
+		return nil
+	}
+
+	// let PostgreSQL start up
+	if err := liftFencing(); err != nil {
+		return err
 	}
 
 	// sleep enough for the pod to be ready again
@@ -1136,17 +1158,18 @@ func (instance *Instance) requestFencingOff() {
 
 // waitForInstanceRestarted waits until the instance reports being started
 // after the given time
-func (instance *Instance) waitForInstanceRestarted(after time.Time) error {
-	retryOnEveryError := func(_ error) bool {
-		return true
+func (instance *Instance) waitForInstanceRestarted(ctx context.Context, after time.Time) error {
+	retryUntilContextCancelled := func(_ error) bool {
+		return ctx.Err() == nil
 	}
-	return retry.OnError(RetryUntilServerAvailable, retryOnEveryError, func() error {
+
+	return retry.OnError(RetryUntilServerAvailable, retryUntilContextCancelled, func() error {
 		db, err := instance.GetSuperUserDB()
 		if err != nil {
 			return err
 		}
 		var startTime time.Time
-		row := db.QueryRow("SELECT pg_postmaster_start_time()")
+		row := db.QueryRowContext(ctx, "SELECT pg_postmaster_start_time()")
 		err = row.Scan(&startTime)
 		if err != nil {
 			return err
