@@ -97,9 +97,6 @@ type Data struct {
 	// EnableAzurePVCUpdates enables the live update of PVC in Azure environment
 	EnableAzurePVCUpdates bool `json:"enableAzurePVCUpdates" env:"ENABLE_AZURE_PVC_UPDATES"`
 
-	// EnablePodDebugging enable debugging mode in new generated pods
-	EnablePodDebugging bool `json:"enablePodDebugging" env:"POD_DEBUG"`
-
 	// This is the lifetime of the generated certificates
 	CertificateDuration int `json:"certificateDuration" env:"CERTIFICATE_DURATION"`
 
