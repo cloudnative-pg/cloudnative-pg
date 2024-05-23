@@ -715,7 +715,7 @@ func (r *ClusterReconciler) RegisterPhase(ctx context.Context,
 		cluster.Status.Conditions = []metav1.Condition{}
 	}
 
-	existingClusterStatus := cluster.Status
+	existingCluster := cluster.DeepCopy()
 	cluster.Status.Phase = phase
 	cluster.Status.PhaseReason = reason
 
@@ -737,8 +737,8 @@ func (r *ClusterReconciler) RegisterPhase(ctx context.Context,
 
 	meta.SetStatusCondition(&cluster.Status.Conditions, condition)
 
-	if !reflect.DeepEqual(existingClusterStatus, cluster.Status) {
-		if err := r.Status().Update(ctx, cluster); err != nil {
+	if !reflect.DeepEqual(existingCluster, cluster) {
+		if err := r.Status().Patch(ctx, cluster, client.MergeFrom(existingCluster)); err != nil {
 			return err
 		}
 	}
