@@ -16,29 +16,29 @@ that are analyzed at 3 different layers: Code, Container and Cluster.
 
 ## Code
 
-Source code of CloudNativePG is *systematically scanned* for static analysis purposes,
+CloudNativePG's source code is *systematically scanned* for static analysis purposes,
 including **security problems**, using a popular open-source linter for Go called
 [GolangCI-Lint](https://github.com/golangci/golangci-lint) directly in the CI/CD pipeline.
 GolangCI-Lint can run several *linters* on the same source code.
 
 One of these is [Golang Security Checker](https://github.com/securego/gosec), or simply `gosec`,
-a linter that scans the abstract syntactic tree of the source against a set of rules aimed at
+a linter that scans the abstract syntax tree of the source against a set of rules aimed at
 the discovery of well-known vulnerabilities, threats, and weaknesses hidden in
-the code such as hard-coded credentials, integer overflows and SQL injections - to name a few.
+the code, such as hard-coded credentials, integer overflows and SQL injections - to name a few.
 
-Another step during the CI/CD pipeline is running [govulncheck](https://pkg.go.dev/golang.org/x/vuln/cmd/govulncheck)
+Another step in the CI/CD pipeline is running [govulncheck](https://pkg.go.dev/golang.org/x/vuln/cmd/govulncheck),
 which reports known vulnerabilities that affect Go code, or even the compiler, meaning that if
 for some reason, the operator is built with a version of the Go compiler that contains
-a known bug this will be spotted during the process.
+a known bug, this will be spotted by govulncheck.
 
 GitHub also provides another tool [CodeQL](https://codeql.github.com/) that has been enabled
 and included in our CI/CD pipeline, thus, will block any pull request on which it could find
 any security issue. The configuration of CodeQL was set to only review Go code, so any other
 language in the repository like, python or bash, is not covered by this test.
 
-The [Snyk](https://snyk.io/) has an Open Source Projects in which CloudNativePG was accepted and
-we run the Snyk code scan every night in a scheduled job and produce weekly reports with any
-new finding on code security and also for licensing issues that could come up.
+[Snyk](https://snyk.io/) recognizes  CloudNativePG as an Open Source Project.
+Snyk code scan is run every night in a scheduled job, and produces weekly reports with any
+new findings on code security, and also on licensing issues.
 
 One of the last things to note is that we have the "Report a vulnerability" option enabled
 on the Security section inside the repository that allows users to safely report any security
@@ -391,10 +391,10 @@ a storage class that supports encryption at rest.
 
 ## Cluster wide permissions and operator deployment
 
-### Using manifest
+### Using the manifest
 
 In the default installation for a vanilla Kubernetes cluster, the operator is deployed
-using the manifest that is build using `Kustomize` on the yaml files generated
+using the manifest that is built using `Kustomize` on the yaml files generated
 by `controller-gen` using the decorations available on [Kubebuilder](https://book.kubebuilder.io/),
 sadly, these is a bit limited for now, and we can create a manifest
 with all permissions for RoleBinding or ClusterBinding, in our case, the permissions
