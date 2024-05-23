@@ -191,8 +191,15 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 				Eventually(func() (int, error, error) {
 					stdout, _, err := env.ExecCommand(env.Ctx, pod, specs.PostgresContainerName, &commandTimeout,
 						"psql", "-U", "postgres", "-tAc", "show max_replication_slots")
-					value, atoiErr := strconv.Atoi(strings.Trim(stdout, "\n"))
-					return value, err, atoiErr
+					if err != nil {
+						return 0, err, nil
+					}
+					replicaSlot := strings.Trim(stdout, "\n")
+					if len(replicaSlot) > 0 {
+						value, atoiErr := strconv.Atoi(replicaSlot)
+						return value, err, atoiErr
+					}
+					return 0, fmt.Errorf("replica slot value empty"), nil
 				}, timeout).Should(BeEquivalentTo(16),
 					"Pod %v should have updated its config", pod.Name)
 
