@@ -77,6 +77,10 @@ These predefined labels are managed by CloudNativePG.
 : Available on `ConfigMap` and `Secret` resources. When set to `true`,
   a change in the resource is automatically reloaded by the operator.
 
+`cnpg.io/user-role`
+: Available on `Secret` resources. Indicates the kind of user the Secret refers
+to, such as `superuser` or `default`.
+
 `role` - **deprecated**
 :  Whether the instance running in a pod is a `primary` or a `replica`.
    This label is deprecated, you should use `cnpg.io/instanceRole` instead.
