@@ -1099,7 +1099,7 @@ jobs:
           max_attempts=3
           while [ "${attempt}" -le "${max_attempts}" ]; do
               echo "Deleting cluster. Attempt ${attempt} of ${max_attempts}"
-              az aks delete --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} -y  --name ${{ env.AZURE_AKS }}
+              az aks delete --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} -y --name ${{ env.AZURE_AKS }}
               status=$?
               if [[ $status == 0 ]]; then
                 echo "AKS cluster deleted"
@@ -1127,7 +1127,7 @@ jobs:
                 echo "AKS data-collection rule deleted"
                 break
               fi
-              echo "Failed deleting data-collection rule ${ DATA_COLL_RULE_NAME }, retrying"
+              echo "Failed deleting data-collection rule ${DATA_COLL_RULE_NAME}, retrying"
               sleep 5
               attempt=$((attempt+1))
           done
