@@ -188,18 +188,17 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			// Check that both parameters have been modified in each pod
 			for _, pod := range podList.Items {
 				pod := pod // pin the variable
-				Eventually(func() (int, error, error) {
-					stdout, _, err := env.ExecCommand(env.Ctx, pod, specs.PostgresContainerName, &commandTimeout,
+				Eventually(func() (int, error) {
+					stdout, stderr, err := env.ExecCommand(env.Ctx, pod, specs.PostgresContainerName, &commandTimeout,
 						"psql", "-U", "postgres", "-tAc", "show max_replication_slots")
 					if err != nil {
-						return 0, err, nil
+						return 0, err
 					}
 					replicaSlot := strings.Trim(stdout, "\n")
-					if len(replicaSlot) > 0 {
-						value, atoiErr := strconv.Atoi(replicaSlot)
-						return value, err, atoiErr
+					if len(replicaSlot) == 0 {
+						return 0, fmt.Errorf("empty max_replication_slots value. stderr: %q", stderr)
 					}
-					return 0, fmt.Errorf("replica slot value empty"), nil
+					return strconv.Atoi(replicaSlot)
 				}, timeout).Should(BeEquivalentTo(16),
 					"Pod %v should have updated its config", pod.Name)
 
