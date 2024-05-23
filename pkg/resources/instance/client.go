@@ -367,7 +367,7 @@ func GetStatusSchemeFromPod(pod *corev1.Pod) HTTPScheme {
 			continue
 		}
 
-		if slices.Contains(container.Command, "--tls-status") {
+		if slices.Contains(container.Command, "--status-port-tls") {
 			return schemeHTTPS
 		}
 
