@@ -41,9 +41,10 @@ Snyk code scan is run every night in a scheduled job, and produces weekly report
 new findings on code security, and also on licensing issues.
 
 One of the last things to note is that we have the "Report a vulnerability" option enabled
-on the Security section inside the repository that allows users to safely report any security
-issue that may require a proper and careful handling before being released to the public, please,
-if you find any security bug, use that medium to report it.
+on the [Security section](https://github.com/cloudnative-pg/cloudnative-pg/security) inside
+the repository that allows users to safely report any security issue that may require a
+proper and careful handling before being released to the public, please, if you find any security
+bug, use that medium to report it.
 
 !!! Important
     A failure in the static code analysis phase of the CI/CD pipeline is a blocker
@@ -395,7 +396,7 @@ a storage class that supports encryption at rest.
 
 In the default installation for a vanilla Kubernetes cluster, the operator is deployed
 using the manifest that is built using `Kustomize` on the yaml files generated
-by `controller-gen` using the decorations available on [Kubebuilder](https://book.kubebuilder.io/),
+by `controller-gen` using the markers available on [Kubebuilder](https://book.kubebuilder.io/),
 sadly, these is a bit limited for now, and we can create a manifest
 with all permissions for RoleBinding or ClusterBinding, in our case, the permissions
 are cluster wide in the default deployment, thus, we recommend to deploy the operator
@@ -431,10 +432,8 @@ Currently the operator requires cluster wide permissions only for `namespace` an
 `nodes` objects, all the other permissions can be namespaced or cluster wide.
 
 The reason for these permissions are:
-* namespace: required to watch other namespaces to keep track of the
-  the objects.
-* nodes: required to get the list of nodes and know the state of them so we avoid
-  scheduling any pod in a node that can't be used.
+* namespace: required to handle the deletion of namespaces containing Clusters.
+* nodes: required to switch to a different instance if the primary is on a node being cordoned or drained. Without this, the PodDistructionBudget would keep the primary Pod from being evicted, preventing the maintenance operation from being completed.
 
 These permissions, even if someone get access to the `ServiceAccount`, that are only; `get`,
 `list` and `watch`, will not have access to nothing more than just see, and if that
