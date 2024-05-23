@@ -389,7 +389,8 @@ func PodWithExistingStorage(cluster apiv1.Cluster, nodeSerial int) *corev1.Pod {
 
 	envConfig := CreatePodEnvConfig(cluster, podName)
 
-	podSpec := CreateClusterPodSpec(podName, cluster, envConfig, gracePeriod, true)
+	tlsEnabled := true
+	podSpec := CreateClusterPodSpec(podName, cluster, envConfig, gracePeriod, tlsEnabled)
 
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
