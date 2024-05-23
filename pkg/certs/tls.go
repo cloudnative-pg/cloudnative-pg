@@ -32,7 +32,7 @@ type contextKey string
 // contextKeyTLSConfig is the context key holding the TLS configuration
 const contextKeyTLSConfig contextKey = "tlsConfig"
 
-// newTLSConfigFromSecret creates a tls.Config from the given ca secret and serverName pair
+// newTLSConfigFromSecret creates a tls.Config from the given CA secret and serverName pair
 func newTLSConfigFromSecret(
 	ctx context.Context,
 	cli client.Client,
@@ -42,7 +42,7 @@ func newTLSConfigFromSecret(
 	secret := &v1.Secret{}
 	err := cli.Get(ctx, caSecret, secret)
 	if err != nil {
-		return nil, fmt.Errorf("while getting secret %s: %w", caSecret.Name, err)
+		return nil, fmt.Errorf("while getting caSecret %s: %w", caSecret.Name, err)
 	}
 
 	caCertificate, ok := secret.Data[CACertKey]

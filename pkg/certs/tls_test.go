@@ -82,7 +82,7 @@ MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA7Qe3X7Q6WZpXqlXkq0Bd
 			tlsConfig, err := newTLSConfigFromSecret(ctx, c, caSecret, serverName)
 			Expect(err).To(HaveOccurred())
 			Expect(tlsConfig).To(BeNil())
-			Expect(err.Error()).To(ContainSubstring(fmt.Sprintf("while getting secret %s", caSecret.Name)))
+			Expect(err.Error()).To(ContainSubstring(fmt.Sprintf("while getting caSecret %s", caSecret.Name)))
 		})
 	})
 

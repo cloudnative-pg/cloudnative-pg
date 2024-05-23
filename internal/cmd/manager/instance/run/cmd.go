@@ -122,7 +122,7 @@ func NewCmd() *cobra.Command {
 	cmd.Flags().StringVar(&namespace, "namespace", os.Getenv("NAMESPACE"), "The namespace of "+
 		"the cluster and of the Pod in k8s")
 	cmd.Flags().BoolVar(&tlsStatus, "tls-status", false,
-		"Enable TLS communicating with the operator")
+		"Enable TLS for communicating with the operator")
 	return cmd
 }
 
