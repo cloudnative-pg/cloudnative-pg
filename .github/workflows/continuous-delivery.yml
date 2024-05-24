@@ -816,7 +816,7 @@ jobs:
     steps:
       -
         name: Azure Login
-        uses: azure/login@v2.1.0
+        uses: azure/login@v2.1.1
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
       -
@@ -923,7 +923,7 @@ jobs:
           password: ${{ env.REGISTRY_PASSWORD }}
       -
         name: Azure Login
-        uses: azure/login@v2.1.0
+        uses: azure/login@v2.1.1
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
       -
@@ -1152,7 +1152,7 @@ jobs:
       -
         name: Azure Login
         if: always()
-        uses: azure/login@v2.1.0
+        uses: azure/login@v2.1.1
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
       -
