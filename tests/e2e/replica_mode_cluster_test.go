@@ -81,13 +81,11 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			})
 			AssertCreateCluster(replicaNamespace, srcClusterName, srcClusterSample, env)
 
-			checkQuery := fmt.Sprintf("SELECT count(*) FROM %v", testTableName)
 			AssertReplicaModeCluster(
 				replicaNamespace,
 				srcClusterName,
 				sourceDBName,
 				replicaClusterSampleTLS,
-				checkQuery,
 				testTableName,
 				psqlClientPod)
 		})
@@ -113,13 +111,11 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			})
 			AssertCreateCluster(replicaNamespace, srcClusterName, srcClusterSample, env)
 
-			checkQuery := fmt.Sprintf("SELECT count(*) FROM %v", testTableName)
 			AssertReplicaModeCluster(
 				replicaNamespace,
 				srcClusterName,
 				sourceDBName,
 				replicaClusterSampleBasicAuth,
-				checkQuery,
 				testTableName,
 				psqlClientPod)
 
@@ -164,13 +160,11 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			})
 			AssertCreateCluster(namespace, clusterOneName, clusterOneFile, env)
 
-			checkQuery := fmt.Sprintf("SELECT count(*) FROM %v", testTableName)
 			AssertReplicaModeCluster(
 				namespace,
 				clusterOneName,
 				sourceDBName,
 				clusterTwoFile,
-				checkQuery,
 				testTableName,
 				psqlClientPod)
 
@@ -254,13 +248,11 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 
 			AssertCreateCluster(replicaNamespace, srcClusterName, srcClusterSample, env)
 
-			checkQuery := fmt.Sprintf("SELECT count(*) FROM %v", testTableName)
 			AssertReplicaModeCluster(
 				replicaNamespace,
 				srcClusterName,
 				sourceDBName,
 				replicaClusterSample,
-				checkQuery,
 				testTableName,
 				psqlClientPod)
 
@@ -347,13 +339,11 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			})
 
 			By("creating a replica cluster from the backup", func() {
-				checkQuery := fmt.Sprintf("SELECT count(*) FROM %v", testTableName)
 				AssertReplicaModeCluster(
 					namespace,
 					clusterName,
 					sourceDBName,
 					replicaClusterSample,
-					checkQuery,
 					testTableName,
 					psqlClientPod)
 			})
@@ -420,13 +410,11 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			})
 
 			By("creating a replica cluster from the snapshot", func() {
-				checkQuery := fmt.Sprintf("SELECT count(*) FROM %v", testTableName)
 				AssertReplicaModeCluster(
 					namespace,
 					clusterName,
 					sourceDBName,
 					replicaClusterSample,
-					checkQuery,
 					testTableName,
 					psqlClientPod)
 			})

@@ -331,13 +331,11 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 		AssertCreateCluster(namespace, srcClusterName, srcClusterSampleFile, env)
 
 		// Create the replica Cluster
-		checkQuery := fmt.Sprintf("SELECT count(*) FROM %v", testTableName)
 		AssertReplicaModeCluster(
 			namespace,
 			srcClusterName,
 			srcClusterDatabaseName,
 			replicaClusterSampleFile,
-			checkQuery,
 			testTableName,
 			psqlClientPod)
 
