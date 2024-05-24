@@ -868,22 +868,20 @@ func getScheduledBackupCompleteBackupsCount(namespace string, scheduledBackupNam
 // AssertPgRecoveryMode verifies if the postgres recovery mode is enabled or disabled
 func AssertPgRecoveryMode(namespace, clusterName string, expectedValue bool) {
 	By(fmt.Sprintf("verifying that postgres recovery mode is %v", expectedValue), func() {
-		var stringExpectedValue string
+		stringExpectedValue := "f"
 		if expectedValue {
 			stringExpectedValue = "t"
-		} else {
-			stringExpectedValue = "f"
 		}
 
-		var err error
 		var primaryPod *corev1.Pod
 		Eventually(func() error {
+			var err error
 			primaryPod, err = env.GetClusterPrimary(namespace, clusterName)
 			return err
 		}, 180, 10).Should(BeNil())
 
-		commandTimeout := time.Second * 10
 		Eventually(func() (string, error) {
+			commandTimeout := time.Second * 10
 			stdOut, _, err := env.ExecCommand(env.Ctx, *primaryPod, specs.PostgresContainerName, &commandTimeout,
 				"psql", "-U", "postgres", "postgres", "-tAc", "select pg_is_in_recovery();")
 			return strings.Trim(stdOut, "\n"), err
