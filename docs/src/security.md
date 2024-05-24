@@ -302,7 +302,7 @@ System           | Port number  | Exposing            |  Name               |  C
 operator         | 9443         | webhook server      | `webhook-server`    |  TLS                           | Yes
 operator         | 8080         | metrics             | `metrics`           |  no TLS                        | No
 instance manager | 9187         | metrics             | `metrics`           |  no TLS                        | No
-instance manager | 8000         | status              | `status`            |  TLS (no TLS in old releases)  | Yes
+instance manager | 8000         | status              | `status`            |  TLS (no TLS in old releases)  | No
 operand          | 5432         | PostgreSQL instance | `postgresql`        |  optional TLS                  | Yes
 
 ### PostgreSQL
