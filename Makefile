@@ -101,7 +101,7 @@ test: generate fmt vet manifests envtest ## Run tests.
 	source <(${ENVTEST} use -p env --bin-dir ${ENVTEST_ASSETS_DIR} ${ENVTEST_K8S_VERSION}) ;\
 	export KUBEBUILDER_CONTROLPLANE_STOP_TIMEOUT=60s ;\
 	export KUBEBUILDER_CONTROLPLANE_START_TIMEOUT=60s ;\
-	go test -coverpkg=./... --count=1 -coverprofile=cover.out ./api/... ./cmd/... ./controllers/... ./internal/... ./pkg/... ./tests/utils ;
+	go test -coverpkg=./... --count=1 -coverprofile=cover.out ./api/... ./cmd/... ./internal/... ./pkg/... ./tests/utils ;
 
 e2e-test-kind: ## Run e2e tests locally using kind.
 	hack/e2e/run-e2e-kind.sh
