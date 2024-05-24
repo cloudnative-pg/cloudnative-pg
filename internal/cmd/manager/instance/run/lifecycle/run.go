@@ -20,7 +20,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"os"
 	"sync"
 
 	"github.com/jackc/pgx/v5"
@@ -148,7 +147,7 @@ func configureInstancePermissions(ctx context.Context, instance *postgres.Instan
 	err = instance.WaitForSuperuserConnectionAvailable(ctx)
 	if err != nil {
 		contextLogger.Error(err, "DB not available")
-		os.Exit(1)
+		return fmt.Errorf("while verifying DB connection: %w", err)
 	}
 
 	contextLogger.Debug("Validating DB configuration")
