@@ -144,10 +144,9 @@ func configureInstancePermissions(ctx context.Context, instance *postgres.Instan
 	}
 
 	contextLogger.Debug("Verifying connection to DB")
-	err = instance.WaitForSuperuserConnectionAvailable(ctx)
-	if err != nil {
+	if err := instance.WaitForSuperuserConnectionAvailable(ctx); err != nil {
 		contextLogger.Error(err, "DB not available")
-		return fmt.Errorf("while verifying DB connection: %w", err)
+		return fmt.Errorf("while verifying super user DB connection: %w", err)
 	}
 
 	contextLogger.Debug("Validating DB configuration")
