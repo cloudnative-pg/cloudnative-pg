@@ -190,7 +190,9 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 					g.Expect(condition).ToNot(BeNil())
 					g.Expect(condition.Status).To(Equal(metav1.ConditionTrue))
 				}).Should(Succeed())
-				AssertPgRecoveryMode(namespace, clusterOneName, true)
+				clusterOnePrimary, err = env.GetClusterPrimary(namespace, clusterOneName)
+				Expect(err).ToNot(HaveOccurred())
+				AssertPgRecoveryMode(clusterOnePrimary, true)
 			})
 
 			// turn the dst cluster into a primary
@@ -201,24 +203,17 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				err = env.Client.Update(ctx, cluster)
 				Expect(err).ToNot(HaveOccurred())
 				AssertClusterIsReady(namespace, clusterTwoName, testTimeouts[testUtils.ClusterIsReady], env)
-				AssertPgRecoveryMode(namespace, clusterTwoName, false)
+				clusterTwoPrimary, err = env.GetClusterPrimary(namespace, clusterTwoName)
+				Expect(err).ToNot(HaveOccurred())
+				AssertPgRecoveryMode(clusterTwoPrimary, false)
 			})
 
 			By("creating a new data in the new source cluster", func() {
-				Eventually(func() error {
-					clusterTwoPrimary, err = env.GetClusterPrimary(namespace, clusterTwoName)
-					return err
-				}, 30, 3).Should(BeNil())
 				AssertCreateTestDataWithDatabaseName(namespace, clusterTwoName, sourceDBName,
 					"new_test_table", clusterTwoPrimary)
 			})
 
 			By("checking that the data is present in the old src cluster", func() {
-				Eventually(func() error {
-					clusterOnePrimary, err = env.GetClusterPrimary(namespace, clusterOneName)
-					return err
-				}, 30, 3).Should(BeNil())
-
 				AssertDataExpectedCountWithDatabaseName(
 					namespace,
 					clusterOnePrimary.Name,

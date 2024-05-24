@@ -374,15 +374,20 @@ func AssertCreateTestDataWithDatabaseName(
 ) {
 	By(fmt.Sprintf("creating test data in cluster %v", clusterName), func() {
 		query := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %v AS VALUES (1),(2);", tableName)
-		_, _, err := env.ExecCommandWithPsqlClient(
-			namespace,
-			clusterName,
-			pod,
-			apiv1.ApplicationUserSecretSuffix,
-			databaseName,
-			query,
-		)
-		Expect(err).ToNot(HaveOccurred())
+		Eventually(func() error {
+			_, _, err := env.ExecCommandWithPsqlClient(
+				namespace,
+				clusterName,
+				pod,
+				apiv1.ApplicationUserSecretSuffix,
+				databaseName,
+				query,
+			)
+			if err != nil {
+				return err
+			}
+			return nil
+		}, RetryTimeout, PollingTime).Should(BeNil())
 	})
 }
 
@@ -393,7 +398,7 @@ type TableLocator struct {
 	Tablespace  string
 }
 
-// AssertCreateTestData create test data.
+// AssertCreateTestDataInTablespace create test data.
 func AssertCreateTestDataInTablespace(tl TableLocator, pod *corev1.Pod) {
 	By(fmt.Sprintf("creating test data in tablespace %q", tl.Tablespace), func() {
 		query := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %v TABLESPACE %v AS VALUES (1),(2);",
@@ -865,27 +870,20 @@ func getScheduledBackupCompleteBackupsCount(namespace string, scheduledBackupNam
 	return completed, nil
 }
 
-// AssertPgRecoveryMode verifies if the postgres recovery mode is enabled or disabled
-func AssertPgRecoveryMode(namespace, clusterName string, expectedValue bool) {
+// AssertPgRecoveryMode verifies if the target pod recovery mode is enabled or disabled
+func AssertPgRecoveryMode(pod *corev1.Pod, expectedValue bool) {
 	By(fmt.Sprintf("verifying that postgres recovery mode is %v", expectedValue), func() {
 		stringExpectedValue := "f"
 		if expectedValue {
 			stringExpectedValue = "t"
 		}
 
-		var primaryPod *corev1.Pod
-		Eventually(func() error {
-			var err error
-			primaryPod, err = env.GetClusterPrimary(namespace, clusterName)
-			return err
-		}, 180, 10).Should(BeNil())
-
 		Eventually(func() (string, error) {
 			commandTimeout := time.Second * 10
-			stdOut, _, err := env.ExecCommand(env.Ctx, *primaryPod, specs.PostgresContainerName, &commandTimeout,
+			stdOut, _, err := env.ExecCommand(env.Ctx, *pod, specs.PostgresContainerName, &commandTimeout,
 				"psql", "-U", "postgres", "postgres", "-tAc", "select pg_is_in_recovery();")
 			return strings.Trim(stdOut, "\n"), err
-		}, 120, 10).Should(BeEquivalentTo(stringExpectedValue))
+		}, 300, 10).Should(BeEquivalentTo(stringExpectedValue))
 	})
 }
 
@@ -916,12 +914,12 @@ func AssertReplicaModeCluster(
 		replicaClusterName, err := env.GetResourceNameFromYAML(replicaClusterSample)
 		Expect(err).ToNot(HaveOccurred())
 		AssertCreateCluster(namespace, replicaClusterName, replicaClusterSample, env)
-		AssertPgRecoveryMode(namespace, replicaClusterName, true)
 		// Get primary from replica cluster
 		Eventually(func() error {
 			primaryReplicaCluster, err = env.GetClusterPrimary(namespace, replicaClusterName)
 			return err
 		}, 30, 3).Should(BeNil())
+		AssertPgRecoveryMode(primaryReplicaCluster, true)
 	})
 
 	By("checking data have been copied correctly in replica cluster", func() {
