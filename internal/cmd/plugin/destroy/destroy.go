@@ -26,8 +26,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/cloudnative-pg/cloudnative-pg/controllers"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/controller"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -46,7 +46,7 @@ func Destroy(ctx context.Context, clusterName, instanceName string, keepPVC bool
 	if keepPVC {
 		// we remove the ownership from the pvcs if present
 		for i := range pvcs {
-			if _, isOwned := controllers.IsOwnedByCluster(&pvcs[i]); !isOwned {
+			if _, isOwned := controller.IsOwnedByCluster(&pvcs[i]); !isOwned {
 				continue
 			}
 
@@ -71,7 +71,7 @@ func Destroy(ctx context.Context, clusterName, instanceName string, keepPVC bool
 			pvcs[i].Labels = map[string]string{}
 		}
 
-		_, isOwned := controllers.IsOwnedByCluster(&pvcs[i])
+		_, isOwned := controller.IsOwnedByCluster(&pvcs[i])
 		// if it is requested for deletion and it is owned by the cluster, we delete it. If it is not owned by the cluster
 		// but it does have the instance label and the detached annotation then we can still delete it
 		// We will only skip the iteration and not delete the pvc if it is not owned by the cluster, and it does not have
@@ -104,7 +104,7 @@ func ensurePodIsDeleted(ctx context.Context, instanceName, clusterName string) e
 		return err
 	}
 
-	if _, isOwned := controllers.IsOwnedByCluster(&pod); !isOwned {
+	if _, isOwned := controller.IsOwnedByCluster(&pod); !isOwned {
 		return fmt.Errorf("instance %s is not owned by cluster %s", pod.Name, clusterName)
 	}
 

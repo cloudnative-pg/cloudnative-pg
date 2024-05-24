@@ -26,7 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/controllers"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/controller"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	postgresSpec "github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
@@ -199,7 +199,7 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(ctx context.Context
 			contextLogger.Info("Switchover in progress",
 				"targetPrimary", cluster.Status.TargetPrimary,
 				"currentPrimary", cluster.Status.CurrentPrimary)
-			return controllers.ErrNextLoop
+			return controller.ErrNextLoop
 		}
 
 		contextLogger.Info("Switchover completed",
