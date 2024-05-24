@@ -41,9 +41,6 @@ type FakeData struct {
 
 	//  Threshold to consider a certificate as expiring
 	ExpiringCheckThreshold int `json:"expiringCheckThreshold" env:"EXPIRING_CHECK_THRESHOLD"`
-
-	// EnablePodDebugging enable debugging mode in new generated pods
-	EnablePodDebugging bool `json:"enablePodDebugging" env:"POD_DEBUG"`
 }
 
 var defaultInheritedAnnotations = []string{

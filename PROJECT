@@ -1,7 +1,7 @@
 domain: cnpg.io
 layout:
-- go.kubebuilder.io/v3
-projectName: cloudnative-pg-kubebuilderv3
+- go.kubebuilder.io/v4
+projectName: cloudnative-pg-kubebuilderv4
 repo: github.com/cloudnative-pg/cloudnative-pg
 resources:
 - api:

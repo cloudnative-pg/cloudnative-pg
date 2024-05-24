@@ -113,7 +113,6 @@ jobs:
               - 'api/**'
               - 'cmd/**'
               - 'config/**'
-              - 'controllers/**'
               - 'internal/**'
               - 'licenses/**'
               - 'pkg/**'
