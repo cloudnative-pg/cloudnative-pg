@@ -21,35 +21,41 @@ including **security problems**, using a popular open-source linter for Go calle
 [GolangCI-Lint](https://github.com/golangci/golangci-lint) directly in the CI/CD pipeline.
 GolangCI-Lint can run several *linters* on the same source code.
 
-One of these is [Golang Security Checker](https://github.com/securego/gosec), or simply `gosec`,
-a linter that scans the abstract syntax tree of the source against a set of rules aimed at
-the discovery of well-known vulnerabilities, threats, and weaknesses hidden in
-the code, such as hard-coded credentials, integer overflows and SQL injections - to name a few.
+The following tools are used to check for security issues:
 
-Another step in the CI/CD pipeline is running [govulncheck](https://pkg.go.dev/golang.org/x/vuln/cmd/govulncheck),
-which reports known vulnerabilities that affect Go code, or even the compiler, meaning that if
-for some reason, the operator is built with a version of the Go compiler that contains
-a known bug, this will be spotted by govulncheck.
+-  [Golang Security Checker](https://github.com/securego/gosec), or simply
+  `gosec`, is  a linter run by GolangCI-Lint that scans the abstract syntax tree
+  of the source against a set of rules aimed at the discovery of well-known
+  vulnerabilities, threats, and weaknesses hidden in the code, such as
+  hard-coded credentials, integer overflows and SQL injections - to name a few.
 
-GitHub also provides another tool [CodeQL](https://codeql.github.com/) that has been enabled
-and included in our CI/CD pipeline, thus, will block any pull request on which it could find
-any security issue. The configuration of CodeQL was set to only review Go code, so any other
-language in the repository like, python or bash, is not covered by this test.
+- [govulncheck](https://pkg.go.dev/golang.org/x/vuln/cmd/govulncheck), which
+  is run as part of the CI/CD pipeline, reports known vulnerabilities that
+  affect Go code, or even the compiler. If the operator is built with a version
+  of the Go compiler that contains a known vulnerability, this will be spotted
+  by govulncheck.
 
-[Snyk](https://snyk.io/) recognizes  CloudNativePG as an Open Source Project.
-Snyk code scan is run every night in a scheduled job, and produces weekly reports with any
-new findings on code security, and also on licensing issues.
+- [CodeQL](https://codeql.github.com/), a tool provided by GitHub that is run
+  as part of the CI/CD pipeline, will block any pull request in which it can
+  find any security issue. The configuration of CodeQL is set to only review Go
+  code, so any other language in the repository like, python or bash, is not
+  covered by this test.
 
-One of the last things to note is that we have the "Report a vulnerability" option enabled
-on the [Security section](https://github.com/cloudnative-pg/cloudnative-pg/security) inside
-the repository that allows users to safely report any security issue that may require a
-proper and careful handling before being released to the public, please, if you find any security
-bug, use that medium to report it.
+- [Snyk](https://snyk.io/) code scan is run every night in a scheduled job, and
+  produces weekly reports with any new findings on code security, and also on
+  licensing issues.
+
+The CloudNativePG repository has the *"Private vulnerability reporting"*
+option enabled in the
+[Security section](https://github.com/cloudnative-pg/cloudnative-pg/security).
+This allows users to safely report any security issue that may require careful
+handling before being released to the public.
+Please, if you find any security bug, use that medium to report it.
 
 !!! Important
-    A failure in the static code analysis phase of the CI/CD pipeline is a blocker
-    for the entire delivery of CloudNativePG, meaning that each commit is validated
-    against all the linters defined by GolangCI-Lint.
+    A failure in the static code analysis phase of the CI/CD pipeline is a
+    blocker for the entire delivery of CloudNativePG, meaning that each commit
+    is validated against all the linters defined by GolangCI-Lint.
 
 ## Container
 
@@ -59,8 +65,7 @@ Within the pipelines, images are scanned with:
 
 - [Dockle](https://github.com/goodwithtech/dockle): for best practices in terms of the container build process
 
-- [Snyk](https://snyk.io/): Looks for any possible security issue on the container and
-  report it using the GitHub interface for it.
+- [Snyk](https://snyk.io/): looks for security issues in the container, and reports findings using the GitHub interface.
 
 !!! Important
     All operand images are automatically rebuilt once a day by our pipelines in case
@@ -394,10 +399,10 @@ a storage class that supports encryption at rest.
 
 ### Using the manifest
 
-In the default installation for a vanilla Kubernetes cluster, the operator is deployed
-using the manifest that is built using `Kustomize` on the yaml files generated
-by `controller-gen` using the markers available on [Kubebuilder](https://book.kubebuilder.io/),
-sadly, these is a bit limited for now, and we can create a manifest
+In the default installation for a vanilla Kubernetes cluster, the operator is
+deployed using the manifest built using `Kustomize` on the yaml files generated
+by `controller-gen` using the markers available on [Kubebuilder](https://book.kubebuilder.io/).
+Sadly, these is a bit limited for now, and we can create a manifest
 with all permissions for RoleBinding or ClusterBinding, in our case, the permissions
 are cluster wide in the default deployment, thus, we recommend to deploy the operator
 in it's own single place when using this kind of deployment and add the proper permissions
@@ -426,14 +431,19 @@ When using OLM the default set of permissions is set to be the two types needed,
 RoleBinding and ClusterBinding, meaning that a set of permissions will be namespaced
 and other permissions will be cluster wide.
 
-### Why cluster wide permissions are needed?
+### Why are cluster wide permissions needed?
 
-Currently the operator requires cluster wide permissions only for `namespace` and
-`nodes` objects, all the other permissions can be namespaced or cluster wide.
+Currently the operator requires cluster wide permissions only for `namespace`
+and `nodes` objects. All the other permissions can be namespaced or cluster
+wide.
 
-The reason for these permissions are:
-* namespace: required to handle the deletion of namespaces containing Clusters.
-* nodes: required to switch to a different instance if the primary is on a node being cordoned or drained. Without this, the PodDistructionBudget would keep the primary Pod from being evicted, preventing the maintenance operation from being completed.
+The reason for these mandated permissions are:
+
+- namespace: required to handle the deletion of namespaces containing Clusters.
+- nodes: required to switch to a different instance if the primary is on a node
+  being cordoned or drained. Without this, the PodDisruptionBudget would keep
+  the primary Pod from being evicted, preventing the maintenance operation from
+  being completed.
 
 These permissions, even if someone get access to the `ServiceAccount`, that are only; `get`,
 `list` and `watch`, will not have access to nothing more than just see, and if that
