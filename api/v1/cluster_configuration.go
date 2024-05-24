@@ -30,6 +30,12 @@ func (cluster *Cluster) GetSyncReplicasData() (syncReplicas int, electableSyncRe
 	// Formula: 1 <= minSyncReplicas <= SyncReplicas <= maxSyncReplicas < readyReplicas
 	readyReplicas := len(cluster.Status.InstancesStatus[utils.PodHealthy]) - 1
 
+	// If the number of ready replicas is negative,
+	// there are no healthy Pods so no sync replica can be configured
+	if readyReplicas < 0 {
+		return 0, nil
+	}
+
 	// Initially set it to the max sync replicas requested by user
 	syncReplicas = cluster.Spec.MaxSyncReplicas
 
