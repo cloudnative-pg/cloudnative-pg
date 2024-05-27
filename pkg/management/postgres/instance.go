@@ -299,6 +299,7 @@ func (instance *Instance) VerifyPgDataCoherence(ctx context.Context) error {
 		return err
 	}
 
+	// creates a bare pg_ident.conf that only grants local access
 	_, err := instance.RefreshPGIdent(nil)
 	return err
 }

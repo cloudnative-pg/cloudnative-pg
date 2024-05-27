@@ -758,8 +758,8 @@ func (info InitInfo) WriteInitialPostgresqlConf(cluster *apiv1.Cluster) error {
 	return err
 }
 
-// WriteRestoreHbaConf writes a pg_hba.conf allowing access without password from localhost.
-// this is needed to set the PostgreSQL password after the postgres server is started and active
+// WriteRestoreHbaConf writes basic pg_hba.conf and pg_ident.conf allowing access without password from localhost.
+// This is needed to set the PostgreSQL password after the postgres server is started and active
 func (info InitInfo) WriteRestoreHbaConf() error {
 	// We allow every access from localhost, and this is needed to correctly restore
 	// the database
@@ -770,7 +770,7 @@ func (info InitInfo) WriteRestoreHbaConf() error {
 		return err
 	}
 
-	// Create the local map referred in the HBA configuration
+	// Create only the local map referred in the HBA configuration
 	_, err = info.GetInstance().RefreshPGIdent(nil)
 	return err
 }

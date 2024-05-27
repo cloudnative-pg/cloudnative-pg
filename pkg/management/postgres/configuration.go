@@ -212,7 +212,7 @@ func (instance *Instance) generatePostgresqlIdent(additionalLines []string) (str
 // a set of additional pg_ident lines that is usually taken from the
 // Cluster configuration
 func (instance *Instance) RefreshPGIdent(additionalLines []string) (postgresIdentChanged bool, err error) {
-	// Generate pg_hba.conf file
+	// Generate pg_ident.conf file
 	pgIdentContent, err := instance.generatePostgresqlIdent(additionalLines)
 	if err != nil {
 		return false, nil
