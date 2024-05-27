@@ -977,8 +977,18 @@ func AssertDetachReplicaModeCluster(
 	})
 
 	By("verifying write operation on the replica cluster primary pod", func() {
-		AssertCreateTestDataWithDatabaseName(namespace, replicaClusterName, srcDatabaseName,
-			"replica_cluster_primary", psqlClientPod)
+		query := "CREATE TABLE IF NOT EXISTS replica_cluster_primary AS VALUES (1),(2);"
+		// Expect write operation to succeed
+		Eventually(func(g Gomega) {
+			var err error
+
+			// Get primary from replica cluster
+			primaryReplicaCluster, err = env.GetClusterPrimary(namespace, replicaClusterName)
+			g.Expect(err).ToNot(HaveOccurred())
+			_, _, err = env.EventuallyExecCommand(env.Ctx, *primaryReplicaCluster, specs.PostgresContainerName,
+				&replicaCommandTimeout, "psql", "-U", "postgres", srcDatabaseName, "-tAc", query)
+			g.Expect(err).ToNot(HaveOccurred())
+		}, 300, 15).Should(Succeed())
 	})
 
 	By("verifying the replica database doesn't exist in the replica cluster", func() {

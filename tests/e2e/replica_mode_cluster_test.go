@@ -184,8 +184,13 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 					g.Expect(condition).ToNot(BeNil())
 					g.Expect(condition.Status).To(Equal(metav1.ConditionTrue))
 				}).Should(Succeed())
-				clusterOnePrimary, err = env.GetClusterPrimary(namespace, clusterOneName)
-				Expect(err).ToNot(HaveOccurred())
+			})
+
+			By("checking that src cluster is now a replica cluster", func() {
+				Eventually(func() error {
+					clusterOnePrimary, err = env.GetClusterPrimary(namespace, clusterOneName)
+					return err
+				}, 30, 3).Should(BeNil())
 				AssertPgRecoveryMode(clusterOnePrimary, true)
 			})
 
@@ -197,8 +202,13 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				err = env.Client.Update(ctx, cluster)
 				Expect(err).ToNot(HaveOccurred())
 				AssertClusterIsReady(namespace, clusterTwoName, testTimeouts[testUtils.ClusterIsReady], env)
-				clusterTwoPrimary, err = env.GetClusterPrimary(namespace, clusterTwoName)
-				Expect(err).ToNot(HaveOccurred())
+			})
+
+			By("checking that dst cluster has been promoted", func() {
+				Eventually(func() error {
+					clusterTwoPrimary, err = env.GetClusterPrimary(namespace, clusterTwoName)
+					return err
+				}, 30, 3).Should(BeNil())
 				AssertPgRecoveryMode(clusterTwoPrimary, false)
 			})
 
