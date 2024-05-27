@@ -17,6 +17,10 @@ limitations under the License.
 package metrics
 
 import (
+	"database/sql"
+
+	"github.com/DATA-DOG/go-sqlmock"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -89,6 +93,74 @@ test:
     bread`))
 		Expect(err).To(HaveOccurred())
 		Expect(result).To(BeNil())
+	})
+})
+
+var _ = Describe("userQuery", func() {
+	var uq *UserQuery
+	var db *sql.DB
+	var mock sqlmock.Sqlmock
+	BeforeEach(func() {
+		var err error
+		uq = &UserQuery{}
+		db, mock, err = sqlmock.New()
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("should evaluate true correctly (isCollectable)", func(ctx SpecContext) {
+		const predicate = "SELECT TRUE"
+		uq.PredicateQuery = predicate
+		rows := sqlmock.NewRows([]string{"result"}).AddRow(true)
+		mock.ExpectBegin()
+		mock.ExpectQuery(predicate).WithoutArgs().WillReturnRows(rows)
+
+		tx, err := db.BeginTx(ctx, nil)
+		Expect(err).ToNot(HaveOccurred())
+		res, err := uq.isCollectable(tx)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(res).To(BeTrue())
+	})
+
+	It("should evaluate false correctly (isCollectable)", func(ctx SpecContext) {
+		const predicate = "SELECT FALSE"
+		uq.PredicateQuery = predicate
+		rows := sqlmock.NewRows([]string{"result"}).AddRow(false)
+		mock.ExpectBegin()
+		mock.ExpectQuery(predicate).WithoutArgs().WillReturnRows(rows)
+
+		tx, err := db.BeginTx(ctx, nil)
+		Expect(err).ToNot(HaveOccurred())
+		res, err := uq.isCollectable(tx)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(res).To(BeFalse())
+	})
+
+	It("should evaluate nil correctly (isCollectable)", func(ctx SpecContext) {
+		const predicate = "SELECT NIL"
+		uq.PredicateQuery = predicate
+		rows := sqlmock.NewRows([]string{"result"}).AddRow(nil)
+		mock.ExpectBegin()
+		mock.ExpectQuery(predicate).WithoutArgs().WillReturnRows(rows)
+
+		tx, err := db.BeginTx(ctx, nil)
+		Expect(err).ToNot(HaveOccurred())
+		res, err := uq.isCollectable(tx)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(res).To(BeFalse())
+	})
+
+	It("should evaluate ErrNoRows correctly (isCollectable)", func(ctx SpecContext) {
+		const predicate = "SELECT TEST_EMPTY"
+		uq.PredicateQuery = predicate
+		rows := sqlmock.NewRows([]string{"result"}).RowError(0, sql.ErrNoRows)
+		mock.ExpectBegin()
+		mock.ExpectQuery(predicate).WithoutArgs().WillReturnRows(rows)
+
+		tx, err := db.BeginTx(ctx, nil)
+		Expect(err).ToNot(HaveOccurred())
+		res, err := uq.isCollectable(tx)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(res).To(BeFalse())
 	})
 })
 

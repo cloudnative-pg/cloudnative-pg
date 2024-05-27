@@ -21,7 +21,6 @@ package metrics
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"path"
 	"regexp"
@@ -331,7 +330,7 @@ func (c QueryCollector) collect(conn *sql.DB, ch chan<- prometheus.Metric) error
 		}
 	}()
 
-	shouldBeCollected, err := isCollectable(c.userQuery, tx)
+	shouldBeCollected, err := c.userQuery.isCollectable(tx)
 	if err != nil {
 		return err
 	}
@@ -386,32 +385,6 @@ func (c QueryCollector) collect(conn *sql.DB, ch chan<- prometheus.Metric) error
 		return err
 	}
 	return nil
-}
-
-// isCollectable checks if a query to collect metrics should be executed.
-// The method tests the query provided in the PredicateQuery property within the same transaction
-// used to collect metrics.
-// PredicateQuery should return at most a single row with a single column with type bool.
-// If no PredicateQuery is provided, the query is considered collectable by default
-func isCollectable(q UserQuery, tx *sql.Tx) (bool, error) {
-	if q.PredicateQuery == "" {
-		return true, nil
-	}
-
-	var isCollectable sql.NullBool
-	if err := tx.QueryRow(q.PredicateQuery).Scan(&isCollectable); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return false, nil
-		}
-
-		return false, err
-	}
-
-	if !isCollectable.Valid {
-		return false, nil
-	}
-
-	return isCollectable.Bool, nil
 }
 
 // Collect the list of labels from the database, and returns true if the
