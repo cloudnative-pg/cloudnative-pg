@@ -823,7 +823,7 @@ jobs:
     if: |
       (always() && !cancelled()) &&
       needs.olm-bundle.result == 'success' &&
-      github.repository_owner == 'cloudnative-pg'
+      github.repository_owner == env.REPOSITORY_OWNER
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
