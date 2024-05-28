@@ -1328,6 +1328,20 @@ var _ = Describe("configuration change validation", func() {
 	})
 
 	Describe("wal_log_hints", func() {
+		It("should reject wal_log_hints set to an invalid value", func() {
+			cluster := Cluster{
+				Spec: ClusterSpec{
+					Instances: 1,
+					PostgresConfiguration: PostgresConfiguration{
+						Parameters: map[string]string{
+							"wal_log_hints": "foo",
+						},
+					},
+				},
+			}
+			Expect(cluster.validateConfiguration()).To(HaveLen(1))
+		})
+
 		It("should allow wal_log_hints set to off for clusters having just one instance", func() {
 			cluster := Cluster{
 				ObjectMeta: metav1.ObjectMeta{
@@ -1396,7 +1410,7 @@ var _ = Describe("configuration change validation", func() {
 					Instances: 3,
 					PostgresConfiguration: PostgresConfiguration{
 						Parameters: map[string]string{
-							"wal_log_hints": "on",
+							"wal_log_hints": "true",
 						},
 					},
 				},
@@ -3340,6 +3354,25 @@ var _ = Describe("Managed Extensions validation", func() {
 		Expect(cluster.validateManagedExtensions()).To(BeEmpty())
 	})
 
+	It("should fail if hot_standby_feedback is set to an invalid value", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ReplicationSlots: &ReplicationSlotsConfiguration{
+					HighAvailability: &ReplicationSlotsHAConfiguration{
+						Enabled: ptr.To(true),
+					},
+				},
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"hot_standby_feedback":                     "foo",
+						"pg_failover_slots.synchronize_slot_names": "my_slot",
+					},
+				},
+			},
+		}
+		Expect(cluster.validatePgFailoverSlots()).To(HaveLen(2))
+	})
+
 	It("should succeed if pg_failover_slots and its prerequisites are enabled", func() {
 		cluster := &Cluster{
 			Spec: ClusterSpec{
@@ -3377,7 +3410,7 @@ var _ = Describe("Managed Extensions validation", func() {
 			Spec: ClusterSpec{
 				PostgresConfiguration: PostgresConfiguration{
 					Parameters: map[string]string{
-						"hot_standby_feedback":                     "on",
+						"hot_standby_feedback":                     "yes",
 						"pg_failover_slots.synchronize_slot_names": "my_slot",
 					},
 				},
