@@ -1,7 +1,7 @@
 {
   "local": {
-    "failover": 240,
-    "namespaceCreation": 30,
+    "failover":                  240,
+    "namespaceCreation":         30,
     "clusterIsReady":            600,
     "clusterIsReadyQuick":       300,
     "clusterIsReadySlow":        800,
@@ -16,8 +16,8 @@
     "drainNode":                 900
   },
   "aks": {
-    "failover": 240,
-    "namespaceCreation": 30,
+    "failover":                  240,
+    "namespaceCreation":         30,
     "clusterIsReady":            600,
     "clusterIsReadyQuick":       300,
     "clusterIsReadySlow":        800,
@@ -33,8 +33,8 @@
     "short":                     10
   },
   "eks": {
-    "failover": 240,
-    "namespaceCreation": 30,
+    "failover":                  240,
+    "namespaceCreation":         30,
     "clusterIsReady":            600,
     "clusterIsReadyQuick":       300,
     "clusterIsReadySlow":        800,
@@ -50,8 +50,8 @@
     "short":                     10
   },
   "gke": {
-    "failover": 240,
-    "namespaceCreation": 30,
+    "failover":                  240,
+    "namespaceCreation":         30,
     "clusterIsReady":            600,
     "clusterIsReadyQuick":       300,
     "clusterIsReadySlow":        800,
@@ -67,8 +67,8 @@
     "short":                     10
   },
   "openshift": {
-    "failover": 240,
-    "namespaceCreation": 30,
+    "failover":                  240,
+    "namespaceCreation":         30,
     "clusterIsReady":            600,
     "clusterIsReadyQuick":       300,
     "clusterIsReadySlow":        800,
