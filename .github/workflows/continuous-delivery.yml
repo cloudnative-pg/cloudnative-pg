@@ -1959,6 +1959,72 @@ jobs:
           find -type f -name "cloudnative-pg-catalog.yaml"
           cat cloudnative-pg-catalog.yaml
           KUBECONFIG=$(pwd)/hack/auth/kubeconfig bash -x hack/e2e/run-e2e-ocp.sh
+
+      -
+        # Summarize the failed E2E tests cases if there are any
+        name: Report failed E2E tests
+        if: failure()
+        run: |
+          set +x
+          chmod +x .github/report-failed-test.sh
+          ./.github/report-failed-test.sh
+      -
+        # Create an individual artifact for each E2E test, which will be used to
+        # generate E2E test summary in the follow-up job 'summarize-e2e-tests'
+        name: Create individual artifact for each E2E test
+        if: (always() && !cancelled())
+        env:
+          RUNNER: "openshift"
+          RUN_ID: ${{ github.run_id }}
+          REPOSITORY: ${{ github.repository }}
+          GIT_REF: ${{ needs.evaluate_options.outputs.git_ref }}
+        run: |
+          set +x
+          python .github/generate-test-artifacts.py \
+            -o testartifacts-${{ env.MATRIX }} \
+            -f tests/e2e/out/report.json \
+            --environment=true
+          if [ -f tests/e2e/out/upgrade_report.json ]; then
+            python .github/generate-test-artifacts.py \
+              -o testartifacts-${{ env.MATRIX }} \
+              -f tests/e2e/out/upgrade_report.json \
+              --environment=true
+          fi
+      -
+        name: Archive test artifacts
+        if: (always() && !cancelled())
+        uses: actions/upload-artifact@v4
+        with:
+          name: testartifacts-${{ env.MATRIX }}
+          path: testartifacts-${{ env.MATRIX }}/
+          retention-days: 7
+      -
+        name: Cleanup test artifacts
+        if: always()
+        run:
+          rm -rf testartifacts-${{ env.MATRIX }}/
+      -
+        name: Cleanup ginkgo JSON report
+        # Delete report.json after the analysis. File should always exist.
+        # Delete upgrade_report.json. It may not exist depending on test level.
+        if: always()
+        run: |
+          if [ -f tests/e2e/out/upgrade_report.json ]; then
+            rm tests/e2e/out/upgrade_report.json
+          fi
+          if [ -f tests/e2e/out/report.json ]; then
+            rm tests/e2e/out/report.json
+          fi
+      -
+        name: Archive e2e failure contexts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-failure-contexts-${{ matrix.id }}
+          path: |
+            tests/*/out/
+          retention-days: 7
+          if-no-files-found: ignore
       -
         name: Destroy OpenShift Cluster ${{ matrix.k8s_version }}
         if: always()
@@ -1974,6 +2040,7 @@ jobs:
       - e2e-eks
       - e2e-aks
       - e2e-gke
+      - e2e-openshift
     if: |
       (always() && !cancelled()) &&
       ((
@@ -1991,6 +2058,10 @@ jobs:
       (
         needs.e2e-gke.result == 'success' ||
         needs.e2e-gke.result == 'failure'
+      ) ||
+      (
+        needs.e2e-openshift.result == 'success' ||
+        needs.e2e-openshift.result == 'failure'
       ))
     runs-on: ubuntu-22.04
     steps:
