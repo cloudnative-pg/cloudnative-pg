@@ -1124,13 +1124,25 @@ func (r *Cluster) validateConfiguration() field.ErrorList {
 		}
 	}
 
-	if r.Spec.Instances > 1 && r.Spec.PostgresConfiguration.Parameters[postgres.ParameterWalLogHints] == "off" {
-		result = append(
-			result,
-			field.Invalid(
-				field.NewPath("spec", "postgresql", "parameters", postgres.ParameterWalLogHints),
-				r.Spec.PostgresConfiguration.Parameters[postgres.ParameterWalLogHints],
-				"`wal_log_hints` must be set to `on` when `instances` > 1"))
+	walLogHintsValue, walLogHintsSet := r.Spec.PostgresConfiguration.Parameters[postgres.ParameterWalLogHints]
+	if walLogHintsSet {
+		walLogHintsActivated, err := postgres.ParsePostgresConfigBoolean(walLogHintsValue)
+		if err != nil {
+			result = append(
+				result,
+				field.Invalid(
+					field.NewPath("spec", "postgresql", "parameters", postgres.ParameterWalLogHints),
+					walLogHintsValue,
+					"invalid `wal_log_hints`. Must be a postgres boolean"))
+		}
+		if r.Spec.Instances > 1 && !walLogHintsActivated {
+			result = append(
+				result,
+				field.Invalid(
+					field.NewPath("spec", "postgresql", "parameters", postgres.ParameterWalLogHints),
+					r.Spec.PostgresConfiguration.Parameters[postgres.ParameterWalLogHints],
+					"`wal_log_hints` must be set to `on` when `instances` > 1"))
+		}
 	}
 
 	// verify the postgres setting min_wal_size < max_wal_size < volume size
@@ -2291,15 +2303,28 @@ func (r *Cluster) validatePgFailoverSlots() field.ErrorList {
 	}
 
 	const hotStandbyFeedbackKey = "hot_standby_feedback"
+	hotStandbyFeedbackActivated := false
 	hotStandbyFeedback, hasHotStandbyFeedback := r.Spec.PostgresConfiguration.Parameters[hotStandbyFeedbackKey]
+	if hasHotStandbyFeedback {
+		var err error
+		hotStandbyFeedbackActivated, err = postgres.ParsePostgresConfigBoolean(hotStandbyFeedback)
+		if err != nil {
+			result = append(
+				result,
+				field.Invalid(
+					field.NewPath("spec", "postgresql", "parameters", hotStandbyFeedbackKey),
+					hotStandbyFeedback,
+					fmt.Sprintf("invalid `%s` value. Must be a postgres boolean", hotStandbyFeedbackKey)))
+		}
+	}
 
-	if !hasHotStandbyFeedback || hotStandbyFeedback != "on" {
+	if !hotStandbyFeedbackActivated {
 		result = append(
 			result,
 			field.Invalid(
 				field.NewPath("spec", "postgresql", "parameters", hotStandbyFeedbackKey),
 				hotStandbyFeedback,
-				fmt.Sprintf("%s must be 'on' to use %s", hotStandbyFeedbackKey, pgFailoverSlots.Name)))
+				fmt.Sprintf("`%s` must be enabled to use %s extension", hotStandbyFeedbackKey, pgFailoverSlots.Name)))
 	}
 
 	if r.Spec.ReplicationSlots == nil {
