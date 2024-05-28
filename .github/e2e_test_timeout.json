@@ -30,7 +30,7 @@
     "minioInstallation":         300,
     "backupIsReady":             180,
     "drainNode":                 900,
-    "short": 10
+    "short":                     10
   },
   "eks": {
     "failover": 240,
@@ -47,7 +47,7 @@
     "minioInstallation":         300,
     "backupIsReady":             180,
     "drainNode":                 900,
-    "short": 10
+    "short":                     10
   },
   "gke": {
     "failover": 240,
@@ -59,13 +59,12 @@
     "newPrimaryAfterFailover":   30,
     "newTargetOnFailover":       120,
     "operatorIsReady":           120,
-    "podRollout": 180,
     "largeObject":               300,
     "walsInMinio":               60,
     "minioInstallation":         300,
     "backupIsReady":             180,
     "drainNode":                 900,
-    "short": 10
+    "short":                     10
   },
   "openshift": {
     "failover": 240,
@@ -82,6 +81,6 @@
     "minioInstallation":         300,
     "backupIsReady":             180,
     "drainNode":                 900,
-    "short": 10
+    "short":                     10
   }
 }
