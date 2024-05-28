@@ -928,7 +928,7 @@ jobs:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
       -
         name: Install kubectl
-        uses: azure/setup-kubectl@v3.2
+        uses: azure/setup-kubectl@v4
         with:
           version: v${{ env.K8S_VERSION }}
       -
