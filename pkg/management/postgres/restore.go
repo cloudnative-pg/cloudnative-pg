@@ -715,36 +715,36 @@ func (info InitInfo) WriteInitialPostgresqlConf(cluster *apiv1.Cluster) error {
 
 	_, err = temporaryInstance.RefreshPGHBA(cluster, "")
 	if err != nil {
-		return fmt.Errorf("while reading configuration files from ConfigMap: %w", err)
+		return fmt.Errorf("while generating pg_hba.conf: %w", err)
 	}
-	_, err = temporaryInstance.RefreshPGIdent(cluster)
+	_, err = temporaryInstance.RefreshPGIdent(cluster.Spec.PostgresConfiguration.PgIdent)
 	if err != nil {
-		return fmt.Errorf("while reading configuration files from ConfigMap: %w", err)
+		return fmt.Errorf("while generating pg_ident.conf: %w", err)
 	}
 	_, err = temporaryInstance.RefreshConfigurationFilesFromCluster(cluster, false)
 	if err != nil {
-		return fmt.Errorf("while reading configuration files from ConfigMap: %w", err)
+		return fmt.Errorf("while generating Postgres configuration: %w", err)
 	}
 
 	err = fileutils.CopyFile(
 		path.Join(temporaryInitInfo.PgData, "postgresql.conf"),
 		path.Join(info.PgData, "postgresql.conf"))
 	if err != nil {
-		return fmt.Errorf("while creating postgresql.conf: %w", err)
+		return fmt.Errorf("while installing postgresql.conf: %w", err)
 	}
 
 	err = fileutils.CopyFile(
 		path.Join(temporaryInitInfo.PgData, constants.PostgresqlCustomConfigurationFile),
 		path.Join(info.PgData, constants.PostgresqlCustomConfigurationFile))
 	if err != nil {
-		return fmt.Errorf("while creating custom.conf: %w", err)
+		return fmt.Errorf("while installing %v: %w", constants.PostgresqlCustomConfigurationFile, err)
 	}
 
 	err = fileutils.CopyFile(
 		path.Join(temporaryInitInfo.PgData, constants.PostgresqlOverrideConfigurationFile),
 		path.Join(info.PgData, constants.PostgresqlOverrideConfigurationFile))
 	if err != nil {
-		return fmt.Errorf("while creating %v: %w", constants.PostgresqlOverrideConfigurationFile, err)
+		return fmt.Errorf("while installing %v: %w", constants.PostgresqlOverrideConfigurationFile, err)
 	}
 
 	// Disable SSL as we still don't have the required certificates
@@ -758,8 +758,8 @@ func (info InitInfo) WriteInitialPostgresqlConf(cluster *apiv1.Cluster) error {
 	return err
 }
 
-// WriteRestoreHbaConf writes a pg_hba.conf allowing access without password from localhost.
-// this is needed to set the PostgreSQL password after the postgres server is started and active
+// WriteRestoreHbaConf writes basic pg_hba.conf and pg_ident.conf allowing access without password from localhost.
+// This is needed to set the PostgreSQL password after the postgres server is started and active
 func (info InitInfo) WriteRestoreHbaConf() error {
 	// We allow every access from localhost, and this is needed to correctly restore
 	// the database
@@ -770,8 +770,9 @@ func (info InitInfo) WriteRestoreHbaConf() error {
 		return err
 	}
 
-	// Create the local map referred in the HBA configuration
-	return WritePostgresUserMaps(info.PgData)
+	// Create only the local map referred in the HBA configuration
+	_, err = info.GetInstance().RefreshPGIdent(nil)
+	return err
 }
 
 // ConfigureInstanceAfterRestore changes the superuser password
