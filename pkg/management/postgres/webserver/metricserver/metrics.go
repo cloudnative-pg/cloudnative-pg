@@ -60,7 +60,7 @@ func New(serverInstance *postgres.Instance) (*MetricsServer, error) {
 	}
 
 	metricServer := &MetricsServer{
-		Webserver: webserver.NewWebServer(serverInstance, server),
+		Webserver: webserver.NewWebServer(server),
 		exporter:  exporter,
 	}
 

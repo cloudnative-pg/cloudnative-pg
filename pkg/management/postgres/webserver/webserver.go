@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
 
 const (
@@ -65,22 +64,20 @@ func (body Response[T]) EnsureDataIsPresent() error {
 	return fmt.Errorf("encounteered an empty body while expecting it to not be empty")
 }
 
-// Webserver contains a server that interacts with postgres instance
+// Webserver wraps a webserver and makes it a kubernetes Runnable
 type Webserver struct {
 	// instance is the PostgreSQL instance to be collected
-	instance *postgres.Instance
-	server   *http.Server
+	server *http.Server
 }
 
-// NewWebServer creates a Webserver given a postgres.Instance and a http.Server
-func NewWebServer(instance *postgres.Instance, server *http.Server) *Webserver {
+// NewWebServer creates a Webserver as a Kubernetes Runnable, given a http.Server
+func NewWebServer(server *http.Server) *Webserver {
 	return &Webserver{
-		instance: instance,
-		server:   server,
+		server: server,
 	}
 }
 
-// Start implements the runnable interface
+// Start starts a webserver listener, implementing the K8s runnable interface
 func (ws *Webserver) Start(ctx context.Context) error {
 	errChan := make(chan error, 1)
 	go func() {

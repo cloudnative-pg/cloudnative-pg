@@ -69,7 +69,7 @@ func NewLocalWebServer(instance *postgres.Instance) (*Webserver, error) {
 		ReadTimeout:       DefaultReadTimeout,
 	}
 
-	webserver := NewWebServer(instance, server)
+	webserver := NewWebServer(server)
 
 	return webserver, nil
 }
