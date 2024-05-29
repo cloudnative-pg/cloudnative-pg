@@ -502,8 +502,11 @@ func AssertUserExists(namespace, podName, userName string, expectedValue bool) {
 		query := fmt.Sprintf("SELECT EXISTS(SELECT 1 FROM pg_user WHERE lower(usename) = lower('%v'));", userName)
 		err := env.Client.Get(env.Ctx, ctrlclient.ObjectKey{Namespace: namespace, Name: podName}, pod)
 		Expect(err).ToNot(HaveOccurred())
-		stdout, _, err := env.ExecCommand(env.Ctx, *pod, specs.PostgresContainerName,
+		stdout, stderr, err := env.ExecCommand(env.Ctx, *pod, specs.PostgresContainerName,
 			&commandTimeout, "psql", "-U", "postgres", "postgres", "-tAc", query)
+		if err != nil {
+			GinkgoWriter.Printf("stdout: %v\nstderr: %v", stdout, stderr)
+		}
 		Expect(err).ToNot(HaveOccurred())
 		if expectedValue {
 			Expect(strings.Trim(stdout, "\n")).To(BeEquivalentTo("t"))
@@ -880,8 +883,11 @@ func AssertPgRecoveryMode(pod *corev1.Pod, expectedValue bool) {
 
 		Eventually(func() (string, error) {
 			commandTimeout := time.Second * 10
-			stdOut, _, err := env.ExecCommand(env.Ctx, *pod, specs.PostgresContainerName, &commandTimeout,
+			stdOut, stdErr, err := env.ExecCommand(env.Ctx, *pod, specs.PostgresContainerName, &commandTimeout,
 				"psql", "-U", "postgres", "postgres", "-tAc", "select pg_is_in_recovery();")
+			if err != nil {
+				GinkgoWriter.Printf("stdout: %v\ntderr: %v\n", stdOut, stdErr)
+			}
 			return strings.Trim(stdOut, "\n"), err
 		}, 300, 10).Should(BeEquivalentTo(stringExpectedValue))
 	})
@@ -1003,8 +1009,11 @@ func AssertDetachReplicaModeCluster(
 	})
 
 	By("verifying that replica cluster was not modified", func() {
-		outTables, _, err := env.EventuallyExecCommand(env.Ctx, *primaryReplicaCluster, specs.PostgresContainerName,
+		outTables, stdErr, err := env.EventuallyExecCommand(env.Ctx, *primaryReplicaCluster, specs.PostgresContainerName,
 			&replicaCommandTimeout, "psql", "-U", "postgres", srcDatabaseName, "-tAc", "\\dt")
+		if err != nil {
+			GinkgoWriter.Printf("stdout: %v\nstderr: %v\n", outTables, stdErr)
+		}
 		Expect(err).ToNot(HaveOccurred())
 		Expect(strings.Contains(outTables, testTableName), err).Should(BeFalse())
 	})
