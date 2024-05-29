@@ -446,7 +446,7 @@ that is already installed in your CloudNativePG deployment (see ["Default set of
 The `predicate_query` option allows the user to execute the `query` to collect the metrics only under the specified conditions.
 To do so the user needs to provide a predicate query that returns at most one row with a single `boolean` column.
 
-The predicate query is executed in the same transaction of the main query and against the same databases.
+The predicate query is executed in the same transaction as the main query and against the same databases.
 
 ```yaml
 some_query: |
