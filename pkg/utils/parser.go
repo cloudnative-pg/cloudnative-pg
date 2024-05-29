@@ -129,9 +129,12 @@ func ParsePgControldataToken(base64Token string) (*PgControldataTokenContent, er
 	}
 
 	var content PgControldataTokenContent
-	err = json.Unmarshal(token, &content)
-	return &content, &ErrInvalidShutdownToken{
-		err:    err,
-		reason: "JSON decoding failed",
+	if err = json.Unmarshal(token, &content); err != nil {
+		return nil, &ErrInvalidShutdownToken{
+			err:    err,
+			reason: "JSON decoding failed",
+		}
 	}
+
+	return &content, nil
 }
