@@ -546,6 +546,8 @@ Here is a short description of all the available fields:
     - `target_databases`: a list of databases to run the `query` against,
       or a [shell-like pattern](#example-of-a-user-defined-metric-running-on-multiple-databases)
       to enable auto discovery. Overwrites the default database if provided.
+    - `predicate_query`: a SQL query that returns at most one row and one `boolean` column to run on the target database.
+       The system evaluates the predicate and if `true` executes the `query`. 
     - `metrics`: section containing a list of all exported columns, defined as follows:
       - `<ColumnName>`: the name of the column returned by the query
           - `usage`: one of the values described below
