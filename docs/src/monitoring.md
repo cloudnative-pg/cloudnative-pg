@@ -441,6 +441,29 @@ A list of basic monitoring queries can be found in the
 [`default-monitoring.yaml` file](https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/main/config/manager/default-monitoring.yaml)
 that is already installed in your CloudNativePG deployment (see ["Default set of metrics"](#default-set-of-metrics)).
 
+#### Example of a user defined metric with predicate query
+
+The `predicate_query` option allows the user to execute the `query` to collect the metrics only under the specified conditions.
+To do so the user needs to provide a predicate query that returns at most one row with a single `boolean` column.
+
+The predicate query is executed in the same transaction of the main query and against the same databases.
+
+```yaml
+some_query: |
+  predicate_query: |
+    SELECT 
+      some_bool as predicate 
+    FROM some_table
+  query: |
+    SELECT
+     count(*) as rows
+    FROM some_table
+  metrics:
+    - rows:
+        usage: "GAUGE"
+        description: "number of rows"
+```
+
 #### Example of a user defined metric running on multiple databases
 
 If the `target_databases` option lists more than one database
