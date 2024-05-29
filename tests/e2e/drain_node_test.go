@@ -323,6 +323,14 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 		const clusterName = "cluster-drain-node"
 
 		var namespace string
+		BeforeEach(func() {
+			// All GKE and AKS persistent disks are network storage located independently of the underlying Nodes, so
+			// they don't get deleted after a Drain. Hence, even when using "reusePVC off", all the pods will
+			// be recreated with the same name and will reuse the existing volume.
+			if IsAKS() || IsGKE() {
+				Skip("This test case is only applicable on clusters with local storage")
+			}
+		})
 		JustAfterEach(func() {
 			if CurrentSpecReport().Failed() {
 				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
