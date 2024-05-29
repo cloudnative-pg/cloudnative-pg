@@ -13,7 +13,8 @@
     "walsInMinio":               60,
     "minioInstallation":         300,
     "backupIsReady":             180,
-    "drainNode":                 900
+    "drainNode":                 900,
+    "short":                     5
   },
   "aks": {
     "failover":                  240,
