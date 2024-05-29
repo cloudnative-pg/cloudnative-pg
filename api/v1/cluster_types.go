@@ -2287,11 +2287,11 @@ type MonitoringConfiguration struct {
 
 	// The list of metric relabelings for the `PodMonitor`. Applied to samples before ingestion.
 	// +optional
-	PodMonitorMetricRelabelConfigs []*monitoringv1.RelabelConfig `json:"podMonitorMetricRelabelings,omitempty"`
+	PodMonitorMetricRelabelConfigs []monitoringv1.RelabelConfig `json:"podMonitorMetricRelabelings,omitempty"`
 
 	// The list of relabelings for the `PodMonitor`. Applied to samples before scraping.
 	// +optional
-	PodMonitorRelabelConfigs []*monitoringv1.RelabelConfig `json:"podMonitorRelabelings,omitempty"`
+	PodMonitorRelabelConfigs []monitoringv1.RelabelConfig `json:"podMonitorRelabelings,omitempty"`
 }
 
 // AreDefaultQueriesDisabled checks whether default monitoring queries should be disabled
@@ -2943,6 +2943,12 @@ func (cluster *Cluster) GetSmartShutdownTimeout() int32 {
 		return cluster.Spec.SmartShutdownTimeout
 	}
 	return 180
+}
+
+// GetRestartTimeout is used to have a timeout for operations that involve
+// a restart of a PostgreSQL instance
+func (cluster *Cluster) GetRestartTimeout() int32 {
+	return cluster.GetMaxStopDelay() + cluster.GetMaxStartDelay()
 }
 
 // GetMaxSwitchoverDelay get the amount of time PostgreSQL has to stop before switchover

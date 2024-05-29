@@ -17,9 +17,9 @@ on:
 # set up environment variables to be used across all the jobs
 env:
   GOLANG_VERSION: "1.22.x"
-  GOLANGCI_LINT_VERSION: "v1.58"
+  GOLANGCI_LINT_VERSION: "v1.59"
   KUBEBUILDER_VERSION: "2.3.1"
-  KIND_VERSION: "v0.22.0"
+  KIND_VERSION: "v0.23.0"
   OPERATOR_IMAGE_NAME: "ghcr.io/${{ github.repository }}-testing"
   API_DOC_NAME: "cloudnative-pg.v1.md"
   SLACK_USERNAME: "cnpg-bot"
@@ -93,6 +93,7 @@ jobs:
       test-changed: ${{ steps.filter.outputs.test-changed }}
       shell-script-changed: ${{ steps.filter.outputs.shell-script-changed }}
       go-code-changed: ${{ steps.filter.outputs.go-code-changed }}
+      renovate-changed: ${{ steps.filter.outputs.renovate-changed }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -112,7 +113,6 @@ jobs:
               - 'api/**'
               - 'cmd/**'
               - 'config/**'
-              - 'controllers/**'
               - 'internal/**'
               - 'licenses/**'
               - 'pkg/**'
@@ -135,6 +135,8 @@ jobs:
             go-code-changed:
               - '**/*.go'
               - '.golangci.yml'
+            renovate-changed:
+              - '.github/renovate.json5'
 
   go-linters:
     name: Run linters
@@ -165,12 +167,33 @@ jobs:
         run: |
           make go-mod-check
 
+  renovate-linter:
+    name: Renovate Linter
+    needs:
+      - duplicate_runs
+      - change-triage
+    if: |
+      needs.duplicate_runs.outputs.should_skip != 'true' &&
+      needs.change-triage.outputs.renovate-changed == 'true'
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate Renovate JSON
+        run:  npx --yes --package renovate -- renovate-config-validator
+
   go-vulncheck:
     name: Run govulncheck
     needs:
       - duplicate_runs
       - change-triage
-    if: needs.duplicate_runs.outputs.should_skip != 'true'
+    if: |
+      needs.duplicate_runs.outputs.should_skip != 'true' &&
+      (
+        needs.change-triage.outputs.operator-changed == 'true' ||
+        needs.change-triage.outputs.go-code-changed == 'true'
+      )
     runs-on: ubuntu-22.04
     steps:
       - name: Run govulncheck

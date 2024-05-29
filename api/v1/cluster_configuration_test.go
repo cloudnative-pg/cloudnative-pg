@@ -33,12 +33,12 @@ var _ = Describe("ensuring the correctness of synchronous replica data calculati
 
 	It("should return only the pod in the different AZ", func() {
 		const (
-			primaryPod     = "example-1"
-			sameZonePod    = "example-2"
-			differentAZPod = "example-3"
+			primaryPod     = "exampleAntiAffinity-1"
+			sameZonePod    = "exampleAntiAffinity-2"
+			differentAZPod = "exampleAntiAffinity-3"
 		)
 
-		cluster := createFakeCluster("example")
+		cluster := createFakeCluster("exampleAntiAffinity")
 		cluster.Spec.PostgresConfiguration.SyncReplicaElectionConstraint = SyncReplicaElectionConstraints{
 			Enabled:                true,
 			NodeLabelsAntiAffinity: []string{"az"},
@@ -65,12 +65,12 @@ var _ = Describe("ensuring the correctness of synchronous replica data calculati
 	})
 
 	It("should lower the synchronous replica number to enforce self-healing", func() {
-		cluster := createFakeCluster("example")
+		cluster := createFakeCluster("exampleOnePod")
 		cluster.Status = ClusterStatus{
-			CurrentPrimary: "example-1",
+			CurrentPrimary: "exampleOnePod-1",
 			InstancesStatus: map[utils.PodStatus][]string{
-				utils.PodHealthy: {"example-1"},
-				utils.PodFailed:  {"example-2", "example-3"},
+				utils.PodHealthy: {"exampleOnePod-1"},
+				utils.PodFailed:  {"exampleOnePod-2", "exampleOnePod-3"},
 			},
 		}
 		number, names := cluster.GetSyncReplicasData()
@@ -78,5 +78,19 @@ var _ = Describe("ensuring the correctness of synchronous replica data calculati
 		Expect(number).To(BeZero())
 		Expect(names).To(BeEmpty())
 		Expect(cluster.Spec.MinSyncReplicas).To(Equal(1))
+	})
+
+	It("should behave correctly if there is no ready host", func() {
+		cluster := createFakeCluster("exampleNoPods")
+		cluster.Status = ClusterStatus{
+			CurrentPrimary: "example-1",
+			InstancesStatus: map[utils.PodStatus][]string{
+				utils.PodFailed: {"exampleNoPods-1", "exampleNoPods-2", "exampleNoPods-3"},
+			},
+		}
+		number, names := cluster.GetSyncReplicasData()
+
+		Expect(number).To(BeZero())
+		Expect(names).To(BeEmpty())
 	})
 })

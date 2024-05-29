@@ -41,14 +41,14 @@ LOCALBIN ?= $(shell pwd)/bin
 
 BUILD_IMAGE ?= true
 POSTGRES_IMAGE_NAME ?= $(shell grep 'DefaultImageName.*=' "pkg/versions/versions.go" | cut -f 2 -d \")
-KUSTOMIZE_VERSION ?= v5.4.1
+KUSTOMIZE_VERSION ?= v5.4.2
 CONTROLLER_TOOLS_VERSION ?= v0.15.0
-GORELEASER_VERSION ?= v1.25.1
+GORELEASER_VERSION ?= v1.26.2
 SPELLCHECK_VERSION ?= 0.36.0
 WOKE_VERSION ?= 0.19.0
-OPERATOR_SDK_VERSION ?= v1.34.1
-OPM_VERSION ?= v1.40.0
-PREFLIGHT_VERSION ?= 1.9.4
+OPERATOR_SDK_VERSION ?= v1.34.2
+OPM_VERSION ?= v1.43.0
+PREFLIGHT_VERSION ?= 1.9.6
 OPENSHIFT_VERSIONS ?= v4.11-v4.15
 ARCH ?= amd64
 
@@ -101,7 +101,7 @@ test: generate fmt vet manifests envtest ## Run tests.
 	source <(${ENVTEST} use -p env --bin-dir ${ENVTEST_ASSETS_DIR} ${ENVTEST_K8S_VERSION}) ;\
 	export KUBEBUILDER_CONTROLPLANE_STOP_TIMEOUT=60s ;\
 	export KUBEBUILDER_CONTROLPLANE_START_TIMEOUT=60s ;\
-	go test -coverpkg=./... --count=1 -coverprofile=cover.out ./api/... ./cmd/... ./controllers/... ./internal/... ./pkg/... ./tests/utils ;
+	go test -coverpkg=./... --count=1 -coverprofile=cover.out ./api/... ./cmd/... ./internal/... ./pkg/... ./tests/utils ;
 
 e2e-test-kind: ## Run e2e tests locally using kind.
 	hack/e2e/run-e2e-kind.sh

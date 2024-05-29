@@ -37,7 +37,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/controllers"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/controller"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/roles"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/slots/infrastructure"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/slots/reconciler"
@@ -156,7 +156,7 @@ func (r *InstanceReconciler) Reconcile(
 
 	r.systemInitialization.Broadcast()
 
-	if result := r.reconcileFencing(cluster); result != nil {
+	if result := r.reconcileFencing(ctx, cluster); result != nil {
 		contextLogger.Info("Fencing status changed, will not proceed with the reconciliation loop")
 		return *result, nil
 	}
@@ -171,17 +171,16 @@ func (r *InstanceReconciler) Reconcile(
 		return reconcile.Result{RequeueAfter: time.Second}, nil
 	}
 
-	restarted, err := r.reconcilePrimary(ctx, cluster)
-	if err != nil {
+	// Instance promotion will not automatically load the changed configuration files.
+	// Therefore it should not be counted as "a restart".
+	if err := r.reconcilePrimary(ctx, cluster); err != nil {
 		return reconcile.Result{}, err
 	}
 
-	restartedFromOldPrimary, err := r.reconcileOldPrimary(ctx, cluster)
+	restarted, err := r.reconcileOldPrimary(ctx, cluster)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
-
-	restarted = restarted || restartedFromOldPrimary
 
 	if r.IsDBUp(ctx) != nil {
 		return reconcile.Result{RequeueAfter: time.Second}, nil
@@ -274,7 +273,12 @@ func (r *InstanceReconciler) restartPrimaryInplaceIfRequested(
 	}
 	restartRequested := isPrimary && cluster.Status.Phase == apiv1.PhaseInplacePrimaryRestart
 	if restartRequested {
-		if err := r.instance.RequestAndWaitRestartSmartFast(); err != nil {
+		restartTimeout := cluster.GetRestartTimeout()
+
+		if err := r.instance.RequestAndWaitRestartSmartFast(
+			ctx,
+			time.Duration(restartTimeout)*time.Second,
+		); err != nil {
 			return true, err
 		}
 		oldCluster := cluster.DeepCopy()
@@ -294,7 +298,7 @@ func (r *InstanceReconciler) refreshConfigurationFiles(
 		return false, err
 	}
 
-	reloadIdent, err := r.instance.RefreshPGIdent(cluster)
+	reloadIdent, err := r.instance.RefreshPGIdent(cluster.Spec.PostgresConfiguration.PgIdent)
 	if err != nil {
 		return false, err
 	}
@@ -316,7 +320,7 @@ func (r *InstanceReconciler) refreshConfigurationFiles(
 	return reloadNeeded, nil
 }
 
-func (r *InstanceReconciler) reconcileFencing(cluster *apiv1.Cluster) *reconcile.Result {
+func (r *InstanceReconciler) reconcileFencing(ctx context.Context, cluster *apiv1.Cluster) *reconcile.Result {
 	fencingRequired := cluster.IsInstanceFenced(r.instance.PodName)
 	isFenced := r.instance.IsFenced()
 	switch {
@@ -326,7 +330,8 @@ func (r *InstanceReconciler) reconcileFencing(cluster *apiv1.Cluster) *reconcile
 		return &reconcile.Result{}
 	case isFenced && !fencingRequired:
 		// fencing enabled and not required anymore, request to disable fencing and continue
-		err := r.instance.RequestAndWaitFencingOff()
+		timeout := time.Second * time.Duration(cluster.GetMaxStartDelay())
+		err := r.instance.RequestAndWaitFencingOff(ctx, timeout)
 		if err != nil {
 			log.Error(err, "while waiting for the instance to be restarted after lifting the fence")
 		}
@@ -336,7 +341,7 @@ func (r *InstanceReconciler) reconcileFencing(cluster *apiv1.Cluster) *reconcile
 }
 
 func handleErrNextLoop(err error) (reconcile.Result, error) {
-	if errors.Is(err, controllers.ErrNextLoop) {
+	if errors.Is(err, controller.ErrNextLoop) {
 		return reconcile.Result{RequeueAfter: time.Second}, nil
 	}
 	return reconcile.Result{}, err
@@ -972,7 +977,8 @@ func (r *InstanceReconciler) processConfigReloadAndManageRestart(ctx context.Con
 	if status.IsPrimary && status.PendingRestartForDecrease {
 		if cluster.GetPrimaryUpdateStrategy() == apiv1.PrimaryUpdateStrategyUnsupervised {
 			contextLogger.Info("Restarting primary in-place due to hot standby sensible parameters decrease")
-			return r.Instance().RequestAndWaitRestartSmartFast()
+			restartTimeout := time.Duration(cluster.GetRestartTimeout()) * time.Second
+			return r.Instance().RequestAndWaitRestartSmartFast(ctx, restartTimeout)
 		}
 		reason := "decrease of hot standby sensitive parameters"
 		contextLogger.Info("Waiting for the user to request a restart of the primary instance or a switchover "+
@@ -1097,24 +1103,23 @@ func (r *InstanceReconciler) refreshFileFromSecret(
 }
 
 // Reconciler primary logic. DB needed.
-func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv1.Cluster) (restarted bool, err error) {
+func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv1.Cluster) error {
 	if cluster.Status.TargetPrimary != r.instance.PodName || cluster.IsReplica() {
-		return false, nil
+		return nil
 	}
 
 	oldCluster := cluster.DeepCopy()
 	isPrimary, err := r.instance.IsPrimary()
 	if err != nil {
-		return false, err
+		return err
 	}
 
 	// If I'm not the primary, let's promote myself
 	if !isPrimary {
 		cluster.LogTimestampsWithMessage(ctx, "Setting myself as primary")
 		if err := r.handlePromotion(ctx, cluster); err != nil {
-			return false, err
+			return err
 		}
-		restarted = true
 	}
 
 	// if the currentPrimary doesn't match the PodName we set the correct value.
@@ -1123,19 +1128,17 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 		cluster.Status.CurrentPrimaryTimestamp = pkgUtils.GetCurrentTimestamp()
 
 		if err := r.client.Status().Patch(ctx, cluster, client.MergeFrom(oldCluster)); err != nil {
-			return restarted, err
+			return err
 		}
 
 		if err := r.instance.DropConnections(); err != nil {
-			return restarted, err
+			return err
 		}
-
 		cluster.LogTimestampsWithMessage(ctx, "Finished setting myself as primary")
-		return restarted, nil
 	}
 
 	// If it is already the current primary, everything is ok
-	return restarted, nil
+	return nil
 }
 
 func (r *InstanceReconciler) handlePromotion(ctx context.Context, cluster *apiv1.Cluster) error {

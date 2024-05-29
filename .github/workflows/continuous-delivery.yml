@@ -35,9 +35,9 @@ on:
 env:
   GOLANG_VERSION: "1.22.x"
   KUBEBUILDER_VERSION: "2.3.1"
-  KIND_VERSION: "v0.22.0"
-  ROOK_VERSION: "v1.14.3"
-  EXTERNAL_SNAPSHOTTER_VERSION: "v7.0.2"
+  KIND_VERSION: "v0.23.0"
+  ROOK_VERSION: "v1.14.4"
+  EXTERNAL_SNAPSHOTTER_VERSION: "v8.0.0"
   OPERATOR_IMAGE_NAME: "ghcr.io/${{ github.repository }}-testing"
   BUILD_PUSH_PROVENANCE: ""
   BUILD_PUSH_CACHE_FROM: ""
@@ -816,7 +816,7 @@ jobs:
     steps:
       -
         name: Azure Login
-        uses: azure/login@v2.1.0
+        uses: azure/login@v2.1.1
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
       -
@@ -923,12 +923,12 @@ jobs:
           password: ${{ env.REGISTRY_PASSWORD }}
       -
         name: Azure Login
-        uses: azure/login@v2.1.0
+        uses: azure/login@v2.1.1
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
       -
         name: Install kubectl
-        uses: azure/setup-kubectl@v3.2
+        uses: azure/setup-kubectl@v4
         with:
           version: v${{ env.K8S_VERSION }}
       -
@@ -957,6 +957,7 @@ jobs:
             # create and login to the AKS cluster
             az aks create --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} \
               --name ${AZURE_AKS} \
+              --tier standard \
               --node-count 3 -k v${K8S_VERSION} --generate-ssh-keys --enable-addons monitoring \
               --workspace-resource-id ${{ secrets.AZURE_WORKSPACE_RESOURCE_ID }} \
               --aks-custom-headers EnableAzureDiskFileCSIDriver=true
@@ -1092,13 +1093,14 @@ jobs:
         name: Clean up
         if: always()
         run: |
+          set +e
           az extension add --allow-preview true --name monitor-control-service
           az account set --subscription ${{ secrets.AZURE_SUBSCRIPTION }}
           attempt=1
           max_attempts=3
           while [ "${attempt}" -le "${max_attempts}" ]; do
               echo "Deleting cluster. Attempt ${attempt} of ${max_attempts}"
-              az aks delete --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} -y  --name ${{ env.AZURE_AKS }}
+              az aks delete --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} -y --name ${{ env.AZURE_AKS }}
               status=$?
               if [[ $status == 0 ]]; then
                 echo "AKS cluster deleted"
@@ -1126,7 +1128,7 @@ jobs:
                 echo "AKS data-collection rule deleted"
                 break
               fi
-              echo "Failed deleting data-collection rule ${ DATA_COLL_RULE_NAME }, retrying"
+              echo "Failed deleting data-collection rule ${DATA_COLL_RULE_NAME}, retrying"
               sleep 5
               attempt=$((attempt+1))
           done
@@ -1151,28 +1153,19 @@ jobs:
       -
         name: Azure Login
         if: always()
-        uses: azure/login@v2.1.0
+        uses: azure/login@v2.1.1
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
       -
         name: Teardown AKS shared resources
         if: always()
-        run: |
-          az account set --subscription ${{ secrets.AZURE_SUBSCRIPTION }}
-          attempt=1
-          max_attempts=3
-          while [ "${attempt}" -le "${max_attempts}" ]; do
-              echo "Deleting storage account. Attempt ${attempt} of ${max_attempts}"
-              az storage account delete -y --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} --name ${{ env.AZURE_STORAGE_ACCOUNT }}
-              status=$?
-              if [[ $status == 0 ]]; then
-                echo "Storage account deleted"
-                break
-              fi
-              echo "Failed deleting storage account ${{ env.AZURE_STORAGE_ACCOUNT }}, retrying"
-              sleep 5
-              attempt=$((attempt+1))
-          done
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 5
+          max_attempts: 3
+          command: |
+            az account set --subscription ${{ secrets.AZURE_SUBSCRIPTION }}
+            az storage account delete -y --resource-group ${{ secrets.AZURE_RESOURCEGROUP }} --name ${{ env.AZURE_STORAGE_ACCOUNT }}
 
   # EKS Secrets required
   # secrets.AWS_EKS_ADMIN_IAM_ROLES
@@ -1670,6 +1663,7 @@ jobs:
       -
         name: Create GKE cluster
         run: |
+          set +e
           # We may go over the amount of API requests allowed
           # by Google when creating all the clusters at the same time.
           # We give a few attempts at creating the cluster before giving up
@@ -1788,13 +1782,14 @@ jobs:
         name: Clean up
         if: always()
         run: |
+          set +e
           # Attempt to remove any leftover resource
           kubectl delete cluster --all --all-namespaces --now --timeout=30s || true
           kubectl delete pdb --all --all-namespaces --now --timeout=30s || true
           kubectl delete pvc --all --all-namespaces --now --timeout=30s || true
 
           # Wait until all the PVs provisioned are actually reclaimed
-          kubectl wait --for delete pv --timeout=60s || true
+          kubectl wait --for delete --all pv --timeout=60s || true
 
           attempt=1
           max_attempts=3
@@ -1964,6 +1959,72 @@ jobs:
           find -type f -name "cloudnative-pg-catalog.yaml"
           cat cloudnative-pg-catalog.yaml
           KUBECONFIG=$(pwd)/hack/auth/kubeconfig bash -x hack/e2e/run-e2e-ocp.sh
+
+      -
+        # Summarize the failed E2E tests cases if there are any
+        name: Report failed E2E tests
+        if: failure()
+        run: |
+          set +x
+          chmod +x .github/report-failed-test.sh
+          ./.github/report-failed-test.sh
+      -
+        # Create an individual artifact for each E2E test, which will be used to
+        # generate E2E test summary in the follow-up job 'summarize-e2e-tests'
+        name: Create individual artifact for each E2E test
+        if: (always() && !cancelled())
+        env:
+          RUNNER: "openshift"
+          RUN_ID: ${{ github.run_id }}
+          REPOSITORY: ${{ github.repository }}
+          GIT_REF: ${{ needs.evaluate_options.outputs.git_ref }}
+        run: |
+          set +x
+          python .github/generate-test-artifacts.py \
+            -o testartifacts-${{ env.MATRIX }} \
+            -f tests/e2e/out/report.json \
+            --environment=true
+          if [ -f tests/e2e/out/upgrade_report.json ]; then
+            python .github/generate-test-artifacts.py \
+              -o testartifacts-${{ env.MATRIX }} \
+              -f tests/e2e/out/upgrade_report.json \
+              --environment=true
+          fi
+      -
+        name: Archive test artifacts
+        if: (always() && !cancelled())
+        uses: actions/upload-artifact@v4
+        with:
+          name: testartifacts-${{ env.MATRIX }}
+          path: testartifacts-${{ env.MATRIX }}/
+          retention-days: 7
+      -
+        name: Cleanup test artifacts
+        if: always()
+        run:
+          rm -rf testartifacts-${{ env.MATRIX }}/
+      -
+        name: Cleanup ginkgo JSON report
+        # Delete report.json after the analysis. File should always exist.
+        # Delete upgrade_report.json. It may not exist depending on test level.
+        if: always()
+        run: |
+          if [ -f tests/e2e/out/upgrade_report.json ]; then
+            rm tests/e2e/out/upgrade_report.json
+          fi
+          if [ -f tests/e2e/out/report.json ]; then
+            rm tests/e2e/out/report.json
+          fi
+      -
+        name: Archive e2e failure contexts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-failure-contexts-${{ matrix.id }}
+          path: |
+            tests/*/out/
+          retention-days: 7
+          if-no-files-found: ignore
       -
         name: Destroy OpenShift Cluster ${{ matrix.k8s_version }}
         if: always()
@@ -1979,6 +2040,7 @@ jobs:
       - e2e-eks
       - e2e-aks
       - e2e-gke
+      - e2e-openshift
     if: |
       (always() && !cancelled()) &&
       ((
@@ -1996,6 +2058,10 @@ jobs:
       (
         needs.e2e-gke.result == 'success' ||
         needs.e2e-gke.result == 'failure'
+      ) ||
+      (
+        needs.e2e-openshift.result == 'success' ||
+        needs.e2e-openshift.result == 'failure'
       ))
     runs-on: ubuntu-22.04
     steps:
