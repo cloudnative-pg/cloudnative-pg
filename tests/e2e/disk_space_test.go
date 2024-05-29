@@ -27,7 +27,6 @@ import (
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
@@ -41,7 +40,7 @@ var _ = Describe("Volume space unavailable", Label(tests.LabelStorage), func() {
 		namespacePrefix = "diskspace-e2e"
 	)
 
-	selfFencingTest := func(namespace, clusterName string) {
+	diskSpaceDetectionTest := func(namespace, clusterName string) {
 		const walDir = "/var/lib/postgresql/data/pgdata/pg_wal"
 		var cluster *apiv1.Cluster
 		var primaryPod *corev1.Pod
@@ -98,13 +97,12 @@ var _ = Describe("Volume space unavailable", Label(tests.LabelStorage), func() {
 				return testsUtils.PodHasCondition(primaryPod, corev1.PodReady, corev1.ConditionFalse)
 			}).WithTimeout(time.Minute).Should(BeTrue())
 		})
-		By("checking if the primary is fenced", func() {
-			Eventually(func(g Gomega) map[string]string {
+		By("checking if the operator detects the issue", func() {
+			Eventually(func(g Gomega) string {
 				cluster, err := env.GetCluster(namespace, clusterName)
 				g.Expect(err).ToNot(HaveOccurred())
-				return cluster.Annotations
-			}).WithTimeout(time.Minute).Should(HaveKeyWithValue(utils.FencedInstanceAnnotation,
-				fmt.Sprintf("[\"%v\"]", primaryPod.Name)))
+				return cluster.Status.Phase
+			}).WithTimeout(time.Minute).Should(Equal("Not enough disk space"))
 		})
 	}
 
@@ -130,22 +128,6 @@ var _ = Describe("Volume space unavailable", Label(tests.LabelStorage), func() {
 				types.NamespacedName{Namespace: primaryPod.Namespace, Name: primaryWALPVCName}, primaryWALPVC)
 			Expect(err).ToNot(HaveOccurred())
 		})
-		// TODO: this tests currently fails, because if the primary is unfenced, the operator will not react and
-		//   get stuck forever.
-		By("unfencing the primary without increasing the disk", func() {
-			cluster, err := env.GetCluster(namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
-			cluster.Annotations = map[string]string{}
-			Expect(env.Client.Update(env.Ctx, cluster)).To(Succeed())
-		})
-		By("checking if the primary is fenced again", func() {
-			Eventually(func(g Gomega) map[string]string {
-				cluster, err := env.GetCluster(namespace, clusterName)
-				g.Expect(err).ToNot(HaveOccurred())
-				return cluster.Annotations
-			}).WithTimeout(time.Minute).Should(HaveKeyWithValue(utils.FencedInstanceAnnotation,
-				fmt.Sprintf("[\"%v\"]", primaryPod.Name)))
-		})
 		By("resizing the WAL volume", func() {
 			originPVC := primaryWALPVC.DeepCopy()
 			newSize := *resource.NewScaledQuantity(2, resource.Giga)
@@ -161,18 +143,24 @@ var _ = Describe("Volume space unavailable", Label(tests.LabelStorage), func() {
 			}).WithTimeout(time.Minute * 5).Should(BeNumerically(">=",
 				newSize.Value()))
 		})
-		By("unfencing the primary", func() {
-			cluster, err := env.GetCluster(namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
-			cluster.Annotations = map[string]string{}
-			Expect(env.Client.Update(env.Ctx, cluster)).To(Succeed())
-		})
 		By("waiting for the primary to become ready", func() {
+			// The primary Pod will be in crash loop backoff. We need
+			// to wait for the Pod to restart. The maximum backoff time
+			// is set in the kubelet to 5 minutes, and this parameter
+			// is not configurable without recompiling the kubelet
+			// itself. See:
+			//
+			// https://github.com/kubernetes/kubernetes/blob/
+			//   1d5589e4910ed859a69b3e57c25cbbd3439cd65f/pkg/kubelet/kubelet.go#L145
+			//
+			// This is why we wait for 10 minutes here.
+			// We can't delete the Pod, as this will trigger
+			// a failover.
 			Eventually(func(g Gomega) bool {
 				primaryPod, err := env.GetPod(namespace, primaryPod.Name)
 				g.Expect(err).ToNot(HaveOccurred())
 				return testsUtils.PodHasCondition(primaryPod, corev1.PodReady, corev1.ConditionTrue)
-			}).WithTimeout(time.Minute).Should(BeTrue())
+			}).WithTimeout(10 * time.Minute).Should(BeTrue())
 		})
 		By("writing some WAL", func() {
 			query := "CHECKPOINT; SELECT pg_switch_wal(); CHECKPOINT"
@@ -217,7 +205,7 @@ var _ = Describe("Volume space unavailable", Label(tests.LabelStorage), func() {
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
 			By("leaving a full disk pod fenced", func() {
-				selfFencingTest(namespace, clusterName)
+				diskSpaceDetectionTest(namespace, clusterName)
 			})
 			By("being able to recover with manual intervention", func() {
 				recoveryTest(namespace, clusterName)

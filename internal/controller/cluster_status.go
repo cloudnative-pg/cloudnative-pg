@@ -37,6 +37,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/hibernation"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
@@ -758,9 +759,9 @@ func (r *ClusterReconciler) updateClusterStatusThatRequiresInstancesState(
 	// we extract the instances reported state
 	for _, item := range statuses.Items {
 		cluster.Status.InstancesReportedState[apiv1.PodName(item.Pod.Name)] = apiv1.InstanceReportedState{
-			IsPrimary:      item.IsPrimary,
-			TimeLineID:     item.TimeLineID,
-			NoWALDiskSpace: item.NoSpaceLeftOnWALDisk,
+			IsPrimary:         item.IsPrimary,
+			TimeLineID:        item.TimeLineID,
+			WALSpaceAvailable: isWALSpaceAvailableOnPod(item.Pod),
 		}
 	}
 
@@ -810,4 +811,42 @@ func getPodsTopology(
 	}
 
 	return apiv1.Topology{SuccessfullyExtracted: true, Instances: data, NodesUsed: int32(len(nodesMap))}
+}
+
+// isWALSpaceAvailableOnPod check if a Pod terminated because it has no
+// disk space for WALs
+func isWALSpaceAvailableOnPod(pod *corev1.Pod) bool {
+	isTerminatedForMissingWALDiskSpace := func(state *corev1.ContainerState) bool {
+		return state.Terminated != nil && state.Terminated.ExitCode == apiv1.MissingWALDiskSpaceExitCode
+	}
+
+	var pgContainerStatus *corev1.ContainerStatus
+	for i := range pod.Status.ContainerStatuses {
+		status := pod.Status.ContainerStatuses[i]
+		if status.Name == specs.PostgresContainerName {
+			pgContainerStatus = &pod.Status.ContainerStatuses[i]
+			break
+		}
+	}
+
+	// This is not an instance Pod as there's no PostgreSQL
+	// container
+	if pgContainerStatus == nil {
+		return true
+	}
+
+	// If the Pod was terminated because it didn't have enough disk
+	// space, then we have no disk space
+	if isTerminatedForMissingWALDiskSpace(&pgContainerStatus.State) {
+		return false
+	}
+
+	// The Pod is now running but not still ready, and last time it
+	// was terminated for missing disk space. Let's wait for it
+	// to be ready before classifying it as having enough disk space
+	if !pgContainerStatus.Ready && isTerminatedForMissingWALDiskSpace(&pgContainerStatus.LastTerminationState) {
+		return false
+	}
+
+	return true
 }

@@ -188,9 +188,6 @@ type Instance struct {
 	// mightBeUnavailable specifies whether we expect the instance to be down
 	mightBeUnavailable atomic.Bool
 
-	// noSpaceLeftOnWALDisk specified whether there's no more free disk space
-	noSpaceLeftOnWALDisk atomic.Bool
-
 	// fenced specifies whether fencing is on for the instance
 	// fenced entails mightBeUnavailable ( entails as in logical consequence)
 	fenced atomic.Bool
@@ -251,8 +248,9 @@ func (instance *Instance) SetCanCheckReadiness(enabled bool) {
 	instance.canCheckReadiness.Store(enabled)
 }
 
-// HasDiskSpaceForWAL checks if we have enough disk space to store two WAL files
-func (instance *Instance) HasDiskSpaceForWAL(ctx context.Context) (bool, error) {
+// CheckHasDiskSpaceForWAL checks if we have enough disk space to store two WAL files,
+// and returns true if we have free disk space for 2 WAL segments, false otherwise
+func (instance *Instance) CheckHasDiskSpaceForWAL(ctx context.Context) (bool, error) {
 	pgControlDataString, err := instance.GetPgControldata()
 	if err != nil {
 		return false, fmt.Errorf("while running pg_controldata to detect WAL segment size: %w", err)
@@ -261,7 +259,7 @@ func (instance *Instance) HasDiskSpaceForWAL(ctx context.Context) (bool, error) 
 	pgControlData := utils.ParsePgControldataOutput(pgControlDataString)
 	walSegmentSizeString, ok := pgControlData["Bytes per WAL segment"]
 	if !ok {
-		return false, fmt.Errorf("no 'Bytes per WAL segment' secton into pg_controldata output")
+		return false, fmt.Errorf("no 'Bytes per WAL segment' section into pg_controldata output")
 	}
 
 	walSegmentSize, err := strconv.Atoi(walSegmentSizeString)
@@ -278,12 +276,6 @@ func (instance *Instance) HasDiskSpaceForWAL(ctx context.Context) (bool, error) 
 // SetMightBeUnavailable marks whether the instance being down should be tolerated
 func (instance *Instance) SetMightBeUnavailable(enabled bool) {
 	instance.mightBeUnavailable.Store(enabled)
-}
-
-// SetWALDiskIsFull marks whether PostgreSQL exited because there's no more
-// disk space left for WALs
-func (instance *Instance) SetWALDiskIsFull(isDiskFull bool) {
-	instance.noSpaceLeftOnWALDisk.Store(isDiskFull)
 }
 
 // ConfigureSlotReplicator sends the configuration to the slot replicator

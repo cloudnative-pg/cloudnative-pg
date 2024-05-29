@@ -118,13 +118,14 @@ metrics on disk usage exported to Prometheus.
     such as `csi-driver-host-path`.
 
 If the disk becomes full and no more WAL segments can be stored, PostgreSQL
-will stop working. CloudNativePG correctly detects this issue, and will fence
-the primary instance. This approach prevents a failover that could complicate
-recovery, allowing a human administrator to address the root cause.
+will stop working. CloudNativePG correctly detects this issue and avoids
+triggering a failover, that could complicate recovery.
+
+That allows a human administrator to address the root cause.
 
 In such a case, the quickest course of action is currently to
 [resize the volume](storage.md#volume-expansion),
 if supported by the storage class.
 
 Once the issue is resolved and there is sufficient free space for WAL segments,
-the cluster can be [unfenced](fencing.md#how-to-lift-fencing).
+the Pod will restart and the cluster will become healthy.

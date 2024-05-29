@@ -46,10 +46,6 @@ type PostgresqlStatus struct {
 	// populated when MightBeUnavailable reported a healthy status even if it found an error
 	MightBeUnavailableMaskedError string `json:"mightBeUnavailableMaskedError,omitempty"`
 
-	// When true, PostgreSQL have been terminated because no more disk space
-	// is left
-	NoSpaceLeftOnWALDisk bool `json:"noSpaceLeftOnWALDisk,omitempty"`
-
 	// Archiver status
 
 	LastArchivedWAL     string `json:"lastArchivedWAL,omitempty"`
@@ -396,18 +392,6 @@ func (list PostgresqlStatusList) AllReadyInstancesStatusUnreachable() bool {
 	}
 
 	return hasActiveAndReady
-}
-
-// WithInsufficientDiskSpace returns the pods with insufficient disk space
-func (list PostgresqlStatusList) WithInsufficientDiskSpace() PostgresqlStatusList {
-	newList := PostgresqlStatusList{}
-	for _, item := range list.Items {
-		if item.NoSpaceLeftOnWALDisk {
-			newList.Items = append(newList.Items, item)
-		}
-	}
-
-	return newList
 }
 
 // InstancesReportingStatus returns the number of instances that are Ready or MightBeUnavailable

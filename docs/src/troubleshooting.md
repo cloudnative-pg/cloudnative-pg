@@ -649,7 +649,7 @@ The quickest and most likely course of action would be to
 [resize the volume](storage.md#volume-expansion).
 
 Once the situation has been addressed, and there is enough free space to store
-WAL segments, the cluster can be [unfenced](fencing.md#how-to-lift-fencing).
+WAL segments, the cluster can be become healthy.
 
 ### Pods are stuck in `Pending` state
 

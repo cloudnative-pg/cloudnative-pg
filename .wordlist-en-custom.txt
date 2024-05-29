@@ -440,6 +440,7 @@ WAL
 WAL's
 WALBackupConfiguration
 WALCapabilities
+WALSpaceAvailable
 WALs
 Wadle
 WalBackupConfiguration
@@ -883,7 +884,6 @@ networkpolicy
 newers
 nextScheduleTime
 nginx
-noWALDiskSpace
 nodeAffinity
 nodeLabelsAntiAffinity
 nodeMaintenanceWindow
@@ -1201,7 +1201,6 @@ un
 uncordon
 unencrypted
 unfence
-unfenced
 unfencing
 unix
 unsetting

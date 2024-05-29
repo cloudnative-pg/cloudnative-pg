@@ -32,10 +32,6 @@ import (
 
 var identifierStreamingReplicationUser = pgx.Identifier{apiv1.StreamingReplicationUser}.Sanitize()
 
-// ErrNoFreeWALSpace is raised when there's no more free disk space
-// to store WAL files
-var ErrNoFreeWALSpace = fmt.Errorf("no free WAL disk space")
-
 // runPostgresAndWait runs a goroutine which will run, configure and run Postgres itself,
 // returning any error via the returned channel
 func (i *PostgresLifecycle) runPostgresAndWait(ctx context.Context) <-chan error {
@@ -94,8 +90,6 @@ func (i *PostgresLifecycle) runPostgresAndWait(ctx context.Context) <-chan error
 		i.instance.LogPgControldata(postgresContext, "postmaster start up")
 		defer i.instance.LogPgControldata(postgresContext, "postmaster has exited")
 
-		i.instance.SetWALDiskIsFull(false)
-
 		streamingCmd, err := i.instance.Run()
 		if err != nil {
 			contextLogger.Error(err, "Unable to start PostgreSQL up")
@@ -120,25 +114,7 @@ func (i *PostgresLifecycle) runPostgresAndWait(ctx context.Context) <-chan error
 		i.instance.SetCanCheckReadiness(true)
 		defer i.instance.SetCanCheckReadiness(false)
 
-		if pgExitStatus := streamingCmd.Wait(); pgExitStatus != nil {
-			contextLogger.Info("postmaster has exited with errors", "err", pgExitStatus)
-			freeDiskSpace, err := i.instance.HasDiskSpaceForWAL(ctx)
-			switch {
-			case err != nil:
-				contextLogger.Error(err, "unable to check for free disk space")
-
-			case !freeDiskSpace:
-				i.instance.SetWALDiskIsFull(true)
-				errChan <- ErrNoFreeWALSpace
-
-			default:
-				errChan <- pgExitStatus
-			}
-			return
-		}
-
-		contextLogger.Info("postmaster terminated without errors")
-		errChan <- nil
+		errChan <- streamingCmd.Wait()
 	}()
 
 	return errChan

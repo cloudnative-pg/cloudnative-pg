@@ -19,6 +19,8 @@ package run
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -54,7 +56,13 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
 
-var scheme = runtime.NewScheme()
+var (
+	scheme = runtime.NewScheme()
+
+	// errNoFreeWALSpace is raised when there's not enough disk space
+	// to store two WAL files
+	errNoFreeWALSpace = fmt.Errorf("no free disk space for WALs")
+)
 
 func init() {
 	_ = clientgoscheme.AddToScheme(scheme)
@@ -85,9 +93,15 @@ func NewCmd() *cobra.Command {
 			instance.PodName = podName
 			instance.ClusterName = clusterName
 
-			return retry.OnError(retry.DefaultRetry, isRunSubCommandRetryable, func() error {
+			err := retry.OnError(retry.DefaultRetry, isRunSubCommandRetryable, func() error {
 				return runSubCommand(ctx, instance)
 			})
+
+			if errors.Is(err, errNoFreeWALSpace) {
+				os.Exit(apiv1.MissingWALDiskSpaceExitCode)
+			}
+
+			return err
 		},
 		PostRunE: func(cmd *cobra.Command, _ []string) error {
 			if err := istio.TryInvokeQuitEndpoint(cmd.Context()); err != nil {
@@ -116,6 +130,15 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 	setupLog.Info("Starting CloudNativePG Instance Manager",
 		"version", versions.Version,
 		"build", versions.Info)
+
+	setupLog.Info("Checking for free disk space for WALs before starting PostgreSQL")
+	hasDiskSpaceForWals, err := instance.CheckHasDiskSpaceForWAL(ctx)
+	if err != nil {
+		setupLog.Error(err, "Error while checking if there is enough disk space for WALs, skipping")
+	} else if !hasDiskSpaceForWals {
+		setupLog.Info("Detected low-disk space condition, avoid starting the instance")
+		return errNoFreeWALSpace
+	}
 
 	mgr, err := ctrl.NewManager(config.GetConfigOrDie(), ctrl.Options{
 		Scheme: scheme,
@@ -267,6 +290,15 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 	if err := mgr.Start(onlineUpgradeCtx); err != nil {
 		setupLog.Error(err, "unable to run controller-runtime manager")
 		return makeUnretryableError(err)
+	}
+
+	setupLog.Info("Checking for free disk space for WALs after PostgreSQL finished")
+	hasDiskSpaceForWals, err = instance.CheckHasDiskSpaceForWAL(ctx)
+	if err != nil {
+		setupLog.Error(err, "Error while checking if there is enough disk space for WALs, skipping")
+	} else if !hasDiskSpaceForWals {
+		setupLog.Info("Detected low-disk space condition")
+		return errNoFreeWALSpace
 	}
 
 	return nil
