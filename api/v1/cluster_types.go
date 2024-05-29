@@ -510,6 +510,14 @@ type ClusterSpec struct {
 	// The plugins configuration, containing
 	// any plugin to be loaded with the corresponding configuration
 	Plugins PluginConfigurationList `json:"plugins,omitempty"`
+
+	// LivenessProbeTimeout is the time in seconds that is allowed for a PostgreSQL instance
+	// to successfully respond to the liveness probe (default 30).
+	// The Liveness probe failure threshold is derived from this value using the formula:
+	// ceiling(livenessProbe / 10).
+	// +kubebuilder:default:=30
+	// +optional
+	LivenessProbeTimeout int32 `json:"livenessProbeTimeout,omitempty"`
 }
 
 // PluginConfigurationList represent a set of plugin with their
@@ -1330,6 +1338,12 @@ const (
 	// FailureThreshold of startupProbe, the formula is `FailureThreshold = ceiling(startDelay / periodSeconds)`,
 	// the minimum value is 1
 	DefaultStartupDelay = 3600
+
+	// DefaultLivenessProbeTimeout is the default value for livenessProbeTimeout, livenessProbeTimeout will be
+	// used to calculate the FailureThreshold of livenessProbe, the formula is
+	// `FailureThreshold = ceiling(livenessProbeTimeout / periodSeconds)`,
+	// the minimum value is 1
+	DefaultLivenessProbeTimeout = 30
 )
 
 // PostgresConfiguration defines the PostgreSQL configuration
@@ -2955,6 +2969,14 @@ func (cluster *Cluster) GetMaxSwitchoverDelay() int32 {
 		return cluster.Spec.MaxSwitchoverDelay
 	}
 	return DefaultMaxSwitchoverDelay
+}
+
+// GetLivenessProbeTimeout get the total allowed time before the liveness probe fail
+func (cluster *Cluster) GetLivenessProbeTimeout() int32 {
+	if cluster.Spec.LivenessProbeTimeout > 0 {
+		return cluster.Spec.LivenessProbeTimeout
+	}
+	return DefaultLivenessProbeTimeout
 }
 
 // GetPrimaryUpdateStrategy get the cluster primary update strategy,

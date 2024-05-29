@@ -215,8 +215,9 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig, enable
 				},
 			},
 			LivenessProbe: &corev1.Probe{
-				PeriodSeconds:  LivenessProbePeriod,
-				TimeoutSeconds: 5,
+				FailureThreshold: getLivenessProbeFailureThreshold(cluster.GetLivenessProbeTimeout()),
+				PeriodSeconds:    LivenessProbePeriod,
+				TimeoutSeconds:   5,
 				ProbeHandler: corev1.ProbeHandler{
 					HTTPGet: &corev1.HTTPGetAction{
 						Path: url.PathHealth,
@@ -270,6 +271,15 @@ func getStartupProbeFailureThreshold(startupDelay int32) int32 {
 		return 1
 	}
 	return int32(math.Ceil(float64(startupDelay) / float64(StartupProbePeriod)))
+}
+
+// getLivenessProbeFailureThreshold get the liveness probe failure threshold
+// FAILURE_THRESHOLD = ceil(livenessTimeout / periodSeconds) and minimum value is 1
+func getLivenessProbeFailureThreshold(livenessTimeout int32) int32 {
+	if livenessTimeout <= LivenessProbePeriod {
+		return 1
+	}
+	return int32(math.Ceil(float64(livenessTimeout) / float64(LivenessProbePeriod)))
 }
 
 // CreateAffinitySection creates the affinity sections for Pods, given the configuration
