@@ -60,6 +60,11 @@ var (
 	// ErrInstanceInRecovery is raised while PostgreSQL is still in recovery mode
 	ErrInstanceInRecovery = fmt.Errorf("instance in recovery")
 
+	// ErrInstanceRecoveryPaused is raised while PostgreSQL is still in recovery mode
+	// but the wal replay is paused unexpectedly
+	ErrInstanceRecoveryPaused = fmt.Errorf("instance in recovery but wal replay paused, " +
+		"please check the logs and ensure the enforced parameters defined in the cluster spec are greater than the ones wals")
+
 	// RetryUntilRecoveryDone is the default retry configuration that is used
 	// to wait for a restored cluster to promote itself
 	RetryUntilRecoveryDone = wait.Backoff{
@@ -887,17 +892,24 @@ func waitUntilRecoveryFinishes(db *sql.DB) error {
 	}
 
 	return retry.OnError(RetryUntilRecoveryDone, errorIsRetriable, func() error {
-		row := db.QueryRow("SELECT pg_is_in_recovery()")
+		row := db.QueryRow(`SELECT pg_is_in_recovery(), 
+		CASE WHEN pg_is_in_recovery() 
+		THEN pg_is_wal_replay_paused() 
+		ELSE false 
+		END`)
 
-		var status bool
-		if err := row.Scan(&status); err != nil {
-			return fmt.Errorf("error while reading results of pg_is_in_recovery: %w", err)
+		var recovery, paused bool
+		if err := row.Scan(&recovery, &paused); err != nil {
+			return fmt.Errorf("error while reading results of pg_is_in_recovery and pg_is_wal_replay_paused(): %w", err)
 		}
 
 		log.Info("Checking if the server is still in recovery",
-			"recovery", status)
+			"recovery", recovery, "paused", paused)
 
-		if status {
+		if recovery {
+			if paused {
+				return ErrInstanceRecoveryPaused
+			}
 			return ErrInstanceInRecovery
 		}
 
