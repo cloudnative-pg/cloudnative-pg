@@ -80,6 +80,8 @@ type PgControldataTokenContent struct {
 	// Time of latest checkpoint
 	TimeOfLatestCheckpoint string `json:"timeOfLatestCheckpoint,omitempty"`
 
+	PartialWALName string `json:"partialWALName"`
+
 	// The version of the operator that created the token
 	OperatorVersion string `json:"operatorVersion,omitempty"`
 }
@@ -99,15 +101,16 @@ func (e *ErrInvalidShutdownToken) Unwrap() error {
 	return e.err
 }
 
-// CreatePgControldataToken translates a parsed pgControlData into a JSON token
-func CreatePgControldataToken(data map[string]string) (string, error) {
+// CreateShutdownToken translates a parsed pgControlData into a JSON token
+func CreateShutdownToken(pgDataMap map[string]string, partialWalName string) (string, error) {
 	content := PgControldataTokenContent{
-		LatestCheckpointTimelineID:   data[PgControlDataKeyLatestCheckpointTimelineID],
-		REDOWALFile:                  data[PgControlDataKeyREDOWALFile],
-		DatabaseSystemIdentifier:     data[PgControlDataKeyDatabaseSystemIdentifier],
-		LatestCheckpointREDOLocation: data[PgControlDataKeyLatestCheckpointREDOLocation],
-		TimeOfLatestCheckpoint:       data[PgControlDataKeyTimeOfLatestCheckpoint],
+		LatestCheckpointTimelineID:   pgDataMap[PgControlDataKeyLatestCheckpointTimelineID],
+		REDOWALFile:                  pgDataMap[PgControlDataKeyREDOWALFile],
+		DatabaseSystemIdentifier:     pgDataMap[PgControlDataKeyDatabaseSystemIdentifier],
+		LatestCheckpointREDOLocation: pgDataMap[PgControlDataKeyLatestCheckpointREDOLocation],
+		TimeOfLatestCheckpoint:       pgDataMap[PgControlDataKeyTimeOfLatestCheckpoint],
 		OperatorVersion:              versions.Info.Version,
+		PartialWALName:               partialWalName,
 	}
 
 	token, err := json.Marshal(content)

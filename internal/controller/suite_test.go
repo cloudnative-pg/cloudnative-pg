@@ -67,6 +67,11 @@ type fakeInstanceStatusClient struct {
 		ctx context.Context,
 		pod *corev1.Pod,
 	) (string, error)
+	archivePartialWALFunc func(ctx context.Context, pod *corev1.Pod) (string, error)
+}
+
+func (f fakeInstanceStatusClient) ArchivePartialWAL(ctx context.Context, pod *corev1.Pod) (string, error) {
+	return f.archivePartialWALFunc(ctx, pod)
 }
 
 func (f fakeInstanceStatusClient) GetStatusFromInstances(

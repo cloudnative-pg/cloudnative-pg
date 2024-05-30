@@ -78,6 +78,8 @@ type Client interface {
 		pod *corev1.Pod,
 		availableArchitecture *utils.AvailableArchitecture,
 	) error
+
+	ArchivePartialWAL(context.Context, *corev1.Pod) (string, error)
 }
 
 type statusClient struct {
@@ -241,9 +243,7 @@ func (r *statusClient) GetPgControlDataFromInstance(
 	}
 
 	var result pgControldataResponse
-	err = json.Unmarshal(body, &result)
-	if err != nil {
-		result.Error = err
+	if err := json.Unmarshal(body, &result); err != nil {
 		return "", err
 	}
 
@@ -394,4 +394,45 @@ func GetStatusSchemeFromPod(pod *corev1.Pod) HTTPScheme {
 	}
 
 	return schemeHTTP
+}
+
+func (r *statusClient) ArchivePartialWAL(ctx context.Context, pod *corev1.Pod) (string, error) {
+	contextLogger := log.FromContext(ctx)
+
+	statusURL := url.Build(GetStatusSchemeFromPod(pod).ToString(), pod.Status.PodIP, url.PathPgArchivePartial, url.StatusPort)
+	req, err := http.NewRequestWithContext(ctx, "POST", statusURL, nil)
+	if err != nil {
+		return "", err
+	}
+	resp, err := r.Client.Do(req)
+	if err != nil {
+		return "", err
+	}
+
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			contextLogger.Error(err, "while closing body")
+		}
+	}()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	if resp.StatusCode != 200 {
+		return "", &StatusError{StatusCode: resp.StatusCode, Body: string(body)}
+	}
+
+	type pgArchivePartialResponse struct {
+		Data string `json:"data,omitempty"`
+	}
+
+	var result pgArchivePartialResponse
+	err = json.Unmarshal(body, &result)
+	if err != nil {
+		return "", err
+	}
+
+	return result.Data, nil
 }
