@@ -627,9 +627,7 @@ func (info InitInfo) writeRecoveryConfiguration(cluster *apiv1.Cluster, recovery
 	enforcedParams := make(map[string]string)
 	for _, param := range pgControldataSettingsToParamsMap {
 		value := max(clusterParams[param], controldataParams[param])
-		if value > 0 {
-			enforcedParams[param] = strconv.Itoa(value)
-		}
+		enforcedParams[param] = strconv.Itoa(value)
 	}
 	changed, err := configfile.UpdatePostgresConfigurationFile(
 		path.Join(info.PgData, constants.PostgresqlCustomConfigurationFile),
