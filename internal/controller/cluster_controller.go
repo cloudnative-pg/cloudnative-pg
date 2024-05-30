@@ -153,7 +153,10 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if errors.Is(err, utils.ErrTerminateLoop) {
 		return ctrl.Result{}, nil
 	}
-	return result, err
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	return result, nil
 }
 
 // Inner reconcile loop. Anything inside can require the reconciliation loop to stop by returning ErrNextLoop
@@ -318,7 +321,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		return res, err
 	}
 
-	if res, err := replicaclusterswitch.Reconcile(ctx, r.Client, cluster, instancesStatus); res != nil || err != nil {
+	if res, err := replicaclusterswitch.Reconcile(ctx, r.Client, cluster, r.InstanceClient, instancesStatus); res != nil || err != nil {
 		if res != nil {
 			return *res, nil
 		}
@@ -347,10 +350,6 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		isPodReady := mostAdvancedInstance.IsPodReady
 
 		if hasHTTPStatus && !isPodReady {
-			if err := r.evaluateShutdownCheckpointToken(ctx, cluster, instancesStatus); err != nil {
-				return ctrl.Result{}, fmt.Errorf("while evaluating shutdownCheckpointoken: %w", err)
-			}
-
 			// The readiness probe status from the Kubelet is not updated, so
 			// we need to wait for it to be refreshed
 			contextLogger.Info(
@@ -644,69 +643,6 @@ func (r *ClusterReconciler) reconcileResources(
 	r.cleanupCompletedJobs(ctx, resources.jobs)
 
 	return ctrl.Result{}, nil
-}
-
-func (r *ClusterReconciler) evaluateShutdownCheckpointToken(
-	ctx context.Context,
-	cluster *apiv1.Cluster,
-	instancesStatus postgres.PostgresqlStatusList,
-) error {
-	contextLogger := log.FromContext(ctx).WithName("shutdown_checkpoint")
-	var primaryInstance *postgres.PostgresqlStatus
-	var foundUnfencedInstance bool
-	for idx := range instancesStatus.Items {
-		item := instancesStatus.Items[idx]
-		if item.IsPrimary {
-			primaryInstance = &item
-		}
-		if !cluster.IsInstanceFenced(item.Pod.Name) {
-			contextLogger.Debug("found an unfenced instance", "instanceName", item.Pod.Name)
-			foundUnfencedInstance = true
-		}
-	}
-	if primaryInstance == nil || foundUnfencedInstance {
-		return nil
-	}
-
-	instanceName := primaryInstance.Pod.Name
-	if instanceName != cluster.Status.CurrentPrimary || instanceName != cluster.Status.TargetPrimary {
-		contextLogger.Debug("not a primary, skipping", "target", cluster.Status.TargetPrimary,
-			"name", instanceName,
-			"currentPrimary", cluster.Status.CurrentPrimary,
-		)
-		return nil
-	}
-
-	partialArchiveWALName, err := r.InstanceClient.ArchivePartialWAL(ctx, primaryInstance.Pod)
-	if err != nil {
-		return fmt.Errorf("while doing partial archivation: %w", err)
-	}
-
-	rawPgControlData, err := r.InstanceClient.GetPgControlDataFromInstance(ctx, primaryInstance.Pod)
-	if err != nil {
-		return err
-	}
-	parsed := utils.ParsePgControldataOutput(rawPgControlData)
-	if parsed[utils.PgControlDataKeyREDOWALFile] != partialArchiveWALName {
-		return fmt.Errorf("unexpected partial wal archived, expected: %s, got: %s",
-			parsed[utils.PgControlDataKeyREDOWALFile],
-			partialArchiveWALName,
-		)
-	}
-	token, err := utils.CreateShutdownToken(parsed)
-	if err != nil {
-		return err
-	}
-	if token == cluster.Status.ShutdownCheckpointToken {
-		contextLogger.Debug("no changes in the token value, skipping")
-		return nil
-	}
-
-	origCluster := cluster.DeepCopy()
-	contextLogger.Info("patching the shutdownCheckpointToken in the  cluster status",
-		"value", token, "previousValue", cluster.Status.ShutdownCheckpointToken)
-	cluster.Status.ShutdownCheckpointToken = token
-	return r.Client.Status().Patch(ctx, cluster, client.MergeFrom(origCluster))
 }
 
 // deleteEvictedOrUnscheduledInstances will delete the Pods that the Kubelet has evicted or cannot schedule

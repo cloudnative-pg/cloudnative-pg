@@ -17,11 +17,13 @@ limitations under the License.
 package utils
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"strings"
 
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
 
@@ -47,7 +49,32 @@ const (
 	// PgControlDataKeyTimeOfLatestCheckpoint is the time
 	// of latest checkpoint pg_controldata entry
 	PgControlDataKeyTimeOfLatestCheckpoint pgControlDataKey = "Time of latest checkpoint"
+
+	// PgControlDataDatabaseClusterStateKey is the status
+	// of the latest master that run on this data directory.
+	PgControlDataDatabaseClusterStateKey pgControlDataKey = "Database cluster state"
 )
+
+type PgDataState string
+
+// IsShutdown checks if the PGDATA status represents
+// a shut down instance
+func (state PgDataState) IsShutdown(ctx context.Context) bool {
+	contextLogger := log.FromContext(ctx)
+
+	switch state {
+	case "shut down", "shut down in recovery":
+		return true
+
+	case "starting up", "shutting down", "in crash recovery", "in archive recovery", "in production":
+		return false
+	}
+
+	err := fmt.Errorf("unknown pg_controldata cluster state")
+	contextLogger.Error(err, "Unknown pg_controldata cluster state, defaulting to running cluster",
+		"state", state)
+	return false
+}
 
 // ParsePgControldataOutput parses a pg_controldata output into a map of key-value pairs
 func ParsePgControldataOutput(data string) map[string]string {
@@ -84,6 +111,36 @@ type PgControldataTokenContent struct {
 	OperatorVersion string `json:"operatorVersion,omitempty"`
 }
 
+// IsValid checks if the shutdown token is valid or
+// returns an error otherwise
+func (token *PgControldataTokenContent) IsValid() error {
+	if len(token.LatestCheckpointTimelineID) == 0 {
+		return ErrEmptyLatestCheckpointTimelineID
+	}
+
+	if len(token.REDOWALFile) == 0 {
+		return ErrEmptyREDOWALFile
+	}
+
+	if len(token.DatabaseSystemIdentifier) == 0 {
+		return ErrEmptyDatabaseSystemIdentifier
+	}
+
+	if len(token.LatestCheckpointREDOLocation) == 0 {
+		return ErrEmptyLatestCheckpointREDOLocation
+	}
+
+	if len(token.TimeOfLatestCheckpoint) == 0 {
+		return ErrEmptyTimeOfLatestCheckpoint
+	}
+
+	if len(token.OperatorVersion) == 0 {
+		return ErrEmptyOperatorVersion
+	}
+
+	return nil
+}
+
 // ErrInvalidShutdownToken is raised when the shutdown checkpoint token
 // is not valid
 type ErrInvalidShutdownToken struct {
@@ -92,12 +149,60 @@ type ErrInvalidShutdownToken struct {
 }
 
 func (e *ErrInvalidShutdownToken) Error() string {
-	return fmt.Sprintf("invalid shutdown token format (%s): %s", e.reason, e.err.Error())
+	message := fmt.Sprintf("invalid shutdown token (%s)", e.reason)
+	if e.err != nil {
+		message = fmt.Sprintf("%s: %s", message, e.err.Error())
+	}
+	return message
 }
 
 func (e *ErrInvalidShutdownToken) Unwrap() error {
 	return e.err
 }
+
+var (
+	// ErrEmptyLatestCheckpointTimelineID is raised when the relative field
+	// in the shutdown token is empty
+	ErrEmptyLatestCheckpointTimelineID = &ErrInvalidShutdownToken{
+		err:    nil,
+		reason: "LatestCheckpointTimelineID is empty",
+	}
+
+	// ErrEmptyREDOWALFile is raised when the relative field
+	// in the shutdown token is empty
+	ErrEmptyREDOWALFile = &ErrInvalidShutdownToken{
+		err:    nil,
+		reason: "REDOWALFile is empty",
+	}
+
+	// ErrEmptyDatabaseSystemIdentifier is raised when the relative field
+	// in the shutdown token is empty
+	ErrEmptyDatabaseSystemIdentifier = &ErrInvalidShutdownToken{
+		err:    nil,
+		reason: "DatabaseSystemIdentifier is empty",
+	}
+
+	// ErrEmptyLatestCheckpointREDOLocation is raised when the relative field
+	// in the shutdown token is empty
+	ErrEmptyLatestCheckpointREDOLocation = &ErrInvalidShutdownToken{
+		err:    nil,
+		reason: "LatestCheckpointREDOLocation is empty",
+	}
+
+	// ErrEmptyTimeOfLatestCheckpoint is raised when the relative field
+	// in the shutdown token is empty
+	ErrEmptyTimeOfLatestCheckpoint = &ErrInvalidShutdownToken{
+		err:    nil,
+		reason: "TimeOfLatestCheckpoint is empty",
+	}
+
+	// ErrEmptyOperatorVersion is raised when the relative field
+	// in the shutdown token is empty
+	ErrEmptyOperatorVersion = &ErrInvalidShutdownToken{
+		err:    nil,
+		reason: "OperatorVersion is empty",
+	}
+)
 
 // CreateShutdownToken translates a parsed pgControlData into a JSON token
 func CreateShutdownToken(pgDataMap map[string]string) (string, error) {

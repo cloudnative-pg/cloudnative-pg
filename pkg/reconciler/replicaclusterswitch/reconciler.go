@@ -18,6 +18,8 @@ package replicaclusterswitch
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -28,6 +30,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/instance"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -36,6 +39,7 @@ func Reconcile(
 	ctx context.Context,
 	cli client.Client,
 	cluster *apiv1.Cluster,
+	instanceClient instance.Client,
 	instances postgres.PostgresqlStatusList,
 ) (*ctrl.Result, error) {
 	if !cluster.IsReplica() {
@@ -45,7 +49,7 @@ func Reconcile(
 	contextLogger := log.FromContext(ctx).WithName("replica_cluster")
 
 	if isDesignatedPrimaryTransitionCompleted(cluster) {
-		return &ctrl.Result{RequeueAfter: time.Second}, cleanupTransitionMetadata(ctx, cli, cluster)
+		return reconcileShutdownCheckpointToken(ctx, cli, cluster, instanceClient, instances)
 	}
 
 	// waiting for the instance manager
@@ -75,11 +79,15 @@ func containsPrimaryInstance(instances postgres.PostgresqlStatusList) bool {
 func startTransition(ctx context.Context, cli client.Client, cluster *apiv1.Cluster) (*ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx).WithName("replica_cluster_start_transition")
 	contextLogger.Info("starting the transition to replica cluster")
-	err := utils.NewFencingMetadataExecutor(cli).AddFencing().ForAllInstances().Execute(
+
+	// TODO(leonardoce): should we fence just the primary?
+	if err := utils.NewFencingMetadataExecutor(cli).AddFencing().ForAllInstances().Execute(
 		ctx,
 		client.ObjectKeyFromObject(cluster),
 		cluster,
-	)
+	); err != nil {
+		return nil, fmt.Errorf("while fencing primary cluster to demote it: %w", err)
+	}
 
 	origCluster := cluster.DeepCopy()
 	meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
@@ -106,12 +114,14 @@ func startTransition(ctx context.Context, cli client.Client, cluster *apiv1.Clus
 		return nil, err
 	}
 
-	return &ctrl.Result{RequeueAfter: time.Second}, err
+	return &ctrl.Result{RequeueAfter: time.Second}, nil
 }
 
 func cleanupTransitionMetadata(ctx context.Context, cli client.Client, cluster *apiv1.Cluster) error {
 	contextLogger := log.FromContext(ctx).WithName("replica_cluster_cleanup_transition")
 	contextLogger.Info("removing all the unnecessary metadata from the cluster object")
+
+	// TODO(leonardoce): should we unfence just the primary?
 	if meta.IsStatusConditionPresentAndEqual(cluster.Status.Conditions, conditionFence, metav1.ConditionTrue) &&
 		cluster.IsInstanceFenced("*") {
 		if err := utils.NewFencingMetadataExecutor(cli).RemoveFencing().ForAllInstances().Execute(
@@ -134,4 +144,44 @@ func cleanupTransitionMetadata(ctx context.Context, cli client.Client, cluster *
 	cluster.Status.SwitchReplicaClusterStatus.InProgress = false
 
 	return cli.Status().Patch(ctx, cluster, client.MergeFrom(origCluster))
+}
+
+func reconcileShutdownCheckpointToken(
+	ctx context.Context,
+	cli client.Client,
+	cluster *apiv1.Cluster,
+	instanceClient instance.Client,
+	instances postgres.PostgresqlStatusList,
+) (*ctrl.Result, error) {
+	contextLogger := log.FromContext(ctx).WithName("replica_cluster")
+
+	shutdownToken, err := generateShutdownCheckpointToken(ctx, cluster, instanceClient, instances)
+	if err != nil {
+		if errors.Is(err, errPostgresNotShutDown) {
+			return &ctrl.Result{
+				RequeueAfter: 10 * time.Second,
+			}, nil
+		}
+
+		return nil, err
+	}
+
+	if cluster.Status.ShutdownCheckpointToken != shutdownToken {
+		origCluster := cluster.DeepCopy()
+		contextLogger.Info(
+			"patching the shutdownCheckpointToken in the  cluster status",
+			"value", shutdownToken,
+			"previousValue", cluster.Status.ShutdownCheckpointToken)
+		cluster.Status.ShutdownCheckpointToken = shutdownToken
+
+		if err := cli.Status().Patch(ctx, cluster, client.MergeFrom(origCluster)); err != nil {
+			return nil, fmt.Errorf("while setting shutdown checkpoint token: %w", err)
+		}
+	}
+
+	if err := cleanupTransitionMetadata(ctx, cli, cluster); err != nil {
+		return nil, fmt.Errorf("while cleaning up demotion transition metadata: %w", err)
+	}
+
+	return &ctrl.Result{}, nil
 }

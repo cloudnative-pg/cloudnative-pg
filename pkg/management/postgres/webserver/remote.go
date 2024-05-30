@@ -351,15 +351,6 @@ func (ws *remoteWebserverEndpoints) pgArchivePartial(w http.ResponseWriter, req 
 		sendBadRequestJSONResponse(w, "NOT_FENCED", "")
 		return
 	}
-	primary, err := ws.instance.IsPrimary()
-	if err != nil {
-		sendBadRequestJSONResponse(w, "WHILE_CHECKING_PRIMARY_STATUS", err.Error())
-		return
-	}
-	if !primary {
-		sendBadRequestJSONResponse(w, "NOT_PRIMARY", "")
-		return
-	}
 
 	var cluster apiv1.Cluster
 	if err := ws.typedClient.Get(req.Context(),
