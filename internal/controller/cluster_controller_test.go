@@ -282,7 +282,6 @@ var _ = Describe("evaluateShutdownCheckpointToken", func() {
 		env = buildTestEnvironment()
 	})
 	It("can correctly set the token", func(ctx SpecContext) {
-		const partialWALName = "test.partial"
 		const fakeControlData = `pg_control version number:               1002
 Catalog version number:                  202201241
 Database cluster state:                  in production
@@ -328,7 +327,7 @@ Next xlog byte position:                 0/3000010`
 				return fakeControlData, nil
 			},
 			archivePartialWALFunc: func(_ context.Context, _ *corev1.Pod) (string, error) {
-				return partialWALName, nil
+				return "000000010000000000000003", nil
 			},
 		}
 		err := env.clusterReconciler.evaluateShutdownCheckpointToken(ctx, cluster, statusList)
@@ -341,7 +340,6 @@ Next xlog byte position:                 0/3000010`
 		Expect(data.LatestCheckpointREDOLocation).To(Equal("0/3000CC0"))
 		Expect(data.REDOWALFile).To(Equal("000000010000000000000003"))
 		Expect(data.DatabaseSystemIdentifier).To(Equal("12345678901234567890123456789012"))
-		Expect(data.PartialWALName).To(Equal(partialWALName))
 		Expect(data.OperatorVersion).To(Equal(versions.Info.Version))
 	})
 })

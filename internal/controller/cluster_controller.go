@@ -677,18 +677,23 @@ func (r *ClusterReconciler) evaluateShutdownCheckpointToken(
 		return nil
 	}
 
-	rawPgControlData, err := r.InstanceClient.GetPgControlDataFromInstance(ctx, primaryInstance.Pod)
-	if err != nil {
-		return err
-	}
-	parsed := utils.ParsePgControldataOutput(rawPgControlData)
-
 	partialArchiveWALName, err := r.InstanceClient.ArchivePartialWAL(ctx, primaryInstance.Pod)
 	if err != nil {
 		return fmt.Errorf("while doing partial archivation: %w", err)
 	}
 
-	token, err := utils.CreateShutdownToken(parsed, partialArchiveWALName)
+	rawPgControlData, err := r.InstanceClient.GetPgControlDataFromInstance(ctx, primaryInstance.Pod)
+	if err != nil {
+		return err
+	}
+	parsed := utils.ParsePgControldataOutput(rawPgControlData)
+	if parsed[utils.PgControlDataKeyREDOWALFile] != partialArchiveWALName {
+		return fmt.Errorf("unexpected partial wal archived, expected: %s, got: %s",
+			parsed[utils.PgControlDataKeyREDOWALFile],
+			partialArchiveWALName,
+		)
+	}
+	token, err := utils.CreateShutdownToken(parsed)
 	if err != nil {
 		return err
 	}
