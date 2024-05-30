@@ -292,14 +292,14 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 
 	It("execute custom queries against the application database on replica clusters", func() {
 		const (
+			namespacePrefix          = "metrics-with-replica-mode"
 			replicaModeClusterDir    = "/replica_mode_cluster/"
 			replicaClusterSampleFile = fixturesDir + "/metrics/cluster-replica-tls-with-metrics.yaml.template"
 			srcClusterSampleFile     = fixturesDir + replicaModeClusterDir + "cluster-replica-src.yaml.template"
+			srcClusterDatabaseName   = "appSrc"
 			configMapFIle            = fixturesDir + "/metrics/custom-queries-for-replica-cluster.yaml"
-			checkQuery               = "SELECT count(*) FROM test_replica"
+			testTableName            = "metrics_replica_mode"
 		)
-
-		const namespacePrefix = "metrics-with-replica-mode"
 
 		// Fetching the source cluster name
 		srcClusterName, err := env.GetResourceNameFromYAML(srcClusterSampleFile)
@@ -334,12 +334,13 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 		AssertReplicaModeCluster(
 			namespace,
 			srcClusterName,
+			srcClusterDatabaseName,
 			replicaClusterSampleFile,
-			checkQuery,
+			testTableName,
 			psqlClientPod)
 
-		By("grant select permission for test_replica table to pg_monitor", func() {
-			cmd := "GRANT SELECT ON test_replica TO pg_monitor"
+		By(fmt.Sprintf("grant select permission for %v table to pg_monitor", testTableName), func() {
+			cmd := fmt.Sprintf("GRANT SELECT ON %v TO pg_monitor", testTableName)
 			appUser, appUserPass, err := utils.GetCredentials(srcClusterName, namespace, apiv1.ApplicationUserSecretSuffix, env)
 			Expect(err).ToNot(HaveOccurred())
 			host, err := utils.GetHostName(namespace, srcClusterName, env)
@@ -347,7 +348,7 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 			_, _, err = utils.RunQueryFromPod(
 				psqlClientPod,
 				host,
-				"appSrc",
+				srcClusterDatabaseName,
 				appUser,
 				appUserPass,
 				cmd,
@@ -359,11 +360,12 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 			podList, err := env.GetClusterPodList(namespace, replicaClusterName)
 			Expect(err).ToNot(HaveOccurred())
 			// Gather metrics in each pod
+			expectedMetric := fmt.Sprintf("cnpg_%v_row_count 3", testTableName)
 			for _, pod := range podList.Items {
 				podIP := pod.Status.PodIP
 				out, err := utils.CurlGetMetrics(namespace, curlPodName, podIP, 9187)
 				Expect(err).Should(Not(HaveOccurred()))
-				Expect(strings.Split(out, "\n")).Should(ContainElement("cnpg_replica_test_row_count 3"))
+				Expect(strings.Split(out, "\n")).Should(ContainElement(expectedMetric))
 			}
 		})
 		collectAndAssertDefaultMetricsPresentOnEachPod(namespace, replicaClusterName, curlPodName, true)

@@ -6,11 +6,11 @@ metadata:
     e2e: metrics
 data:
   queries.yaml: |
-    replica_test:
+    metrics_replica_mode:
       query: |
-        SELECT count(*) as row_count FROM test_replica
+        SELECT count(*) as row_count FROM metrics_replica_mode
       primary: false
       metrics:
         - row_count:
             usage: "GAUGE"
-            description: "Number of rows present in test_replica table"
+            description: "Number of rows present in metrics_replica_mode table"
