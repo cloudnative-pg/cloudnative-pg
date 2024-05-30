@@ -698,9 +698,7 @@ func LoadEnforcedParametersFromPgControldata(pgData string) (map[string]int, err
 	return enforcedParams, nil
 }
 
-// LoadEnforcedParametersFromCluster will compare the values of the enforced parameters
-// given with the ones defined in cluster spec, choosing the higher value between the two and
-// returning the final map of enforced parameters
+// LoadEnforcedParametersFromCluster loads the enforced parameters which defined in cluster spec
 func LoadEnforcedParametersFromCluster(
 	cluster *apiv1.Cluster,
 ) (map[string]int, error) {
