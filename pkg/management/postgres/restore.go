@@ -602,6 +602,20 @@ func (info InitInfo) writeRecoveryConfiguration(cluster *apiv1.Cluster, recovery
 		return fmt.Errorf("cannot write recovery config: %w", err)
 	}
 
+	// Now we need to choose which parameters to use to complete the recovery
+	// of this PostgreSQL instance.
+	// We know the values that these parameters had when the backup was started
+	// from the `pg_controldata` output.
+	// We don't know how these values were set in the newer WALs.
+	//
+	// The only way to proceed is to rely on the user-defined configuration,
+	// with the caveat of ensuring that the values are high enough to be
+	// able to start recovering the backup.
+	//
+	// To be on the safe side, we'll use the largest setting we find
+	// from `pg_controldata` and the Cluster definition.
+	//
+	// https://www.postgresql.org/docs/16/hot-standby.html#HOT-STANDBY-ADMIN
 	controldataParams, err := LoadEnforcedParametersFromPgControldata(info.PgData)
 	if err != nil {
 		return err
