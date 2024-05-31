@@ -352,7 +352,7 @@ func AssertOperatorIsReady() {
 //
 // NOTE: even if we checked AssertClusterIsReady, a temporary DB connectivity issue would take
 // failureThreshold x periodSeconds to be detected
-func AssertDatabaseIsReady(namespace, clusterName string) {
+func AssertDatabaseIsReady(namespace, clusterName, dbName string) {
 	By(fmt.Sprintf("checking the database on %s is ready", clusterName), func() {
 		primary, err := env.GetClusterPrimary(namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
@@ -373,7 +373,7 @@ func AssertDatabaseIsReady(namespace, clusterName string) {
 			_, _, err = env.ExecQueryInInstancePod(testsUtils.PodLocator{
 				Namespace: namespace,
 				PodName:   primary.GetName(),
-			}, testsUtils.AppDBName, "select 1")
+			}, testsUtils.DatabaseName(dbName), "select 1")
 			return err
 		}, RetryTimeout, PollingTime).ShouldNot(HaveOccurred())
 	})
@@ -381,7 +381,7 @@ func AssertDatabaseIsReady(namespace, clusterName string) {
 
 // AssertCreateTestData create test data.
 func AssertCreateTestData(namespace, clusterName, tableName string, pod *corev1.Pod) {
-	AssertDatabaseIsReady(namespace, clusterName)
+	AssertDatabaseIsReady(namespace, clusterName, testsUtils.AppDBName)
 	By(fmt.Sprintf("creating test data in cluster %v", clusterName), func() {
 		query := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %v AS VALUES (1),(2);", tableName)
 		Eventually(func() error {
@@ -437,7 +437,7 @@ type TableLocator struct {
 
 // AssertCreateTestDataInTablespace create test data.
 func AssertCreateTestDataInTablespace(tl TableLocator, pod *corev1.Pod) {
-	AssertDatabaseIsReady(tl.Namespace, tl.ClusterName)
+	AssertDatabaseIsReady(tl.Namespace, tl.ClusterName, testsUtils.AppDBName)
 	By(fmt.Sprintf("creating test data in tablespace %q", tl.Tablespace), func() {
 		query := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %v TABLESPACE %v AS VALUES (1),(2);",
 			tl.TableName, tl.Tablespace)
@@ -951,7 +951,7 @@ func AssertReplicaModeCluster(
 	commandTimeout := time.Second * 10
 	checkQuery := fmt.Sprintf("SELECT count(*) FROM %v", testTableName)
 
-	AssertDatabaseIsReady(namespace, srcClusterName)
+	AssertDatabaseIsReady(namespace, srcClusterName, srcClusterDBName)
 
 	AssertCreateTestDataWithDatabaseName(
 		namespace,
