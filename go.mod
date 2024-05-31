@@ -30,7 +30,7 @@ require (
 	github.com/thoas/go-funk v0.9.3
 	go.uber.org/atomic v1.11.0
 	go.uber.org/zap v1.27.0
-	golang.org/x/exp v0.0.0-20240529005216-23cca8864a10
+	golang.org/x/exp v0.0.0-20240530194437-404ba88c7ed0
 	golang.org/x/sys v0.20.0
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.30.1
