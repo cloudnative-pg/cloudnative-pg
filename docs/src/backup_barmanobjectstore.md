@@ -163,7 +163,7 @@ For additional options supported by `barman-cloud-backup` and `barman-cloud-wal-
 official barman documentation [here](https://www.pgbarman.org/documentation/).
 
 If an option provided in `additionalCommandArgs` is already present in the
-declared options in its section (`barmanObjectStore` or `wal`), the extra option will be
+declared options in its section (`.spec.backup.barmanObjectStore.data` or `.spec.backup.barmanObjectStore.wal`), the extra option will be
 ignored.
 
 The following is an example of how to use this property:
@@ -192,9 +192,9 @@ kind: Cluster
 [...]
 spec:
   backup:
-    wal:
+    barmanObjectStore:
       [...]
-      data:
+      wal:
         additionalCommandArgs:
         - "--max-concurrency=1"
         - "--read-timeout=60"
