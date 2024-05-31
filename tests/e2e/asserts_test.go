@@ -348,19 +348,56 @@ func AssertOperatorIsReady() {
 	}, testTimeouts[testsUtils.OperatorIsReady]).Should(BeTrue(), "Operator pod is not ready")
 }
 
+// AssertDatabaseIsReady checks the database on the primary is ready to run queries
+//
+// NOTE: even if we checked AssertClusterIsReady, a temporary DB connectivity issue would take
+// failureThreshold x periodSeconds to be detected
+func AssertDatabaseIsReady(namespace, clusterName, dbName string) {
+	By(fmt.Sprintf("checking the database on %s is ready", clusterName), func() {
+		primary, err := env.GetClusterPrimary(namespace, clusterName)
+		Expect(err).ToNot(HaveOccurred())
+		Eventually(func() error {
+			stdout, stderr, err := env.ExecCommandInInstancePod(testsUtils.PodLocator{
+				Namespace: namespace,
+				PodName:   primary.GetName(),
+			}, nil, "pg_isready")
+			if err != nil {
+				return err
+			}
+			if stderr != "" {
+				return fmt.Errorf("while checking pg_isready: %s", stderr)
+			}
+			if !strings.Contains(stdout, "accepting") {
+				return fmt.Errorf("while checking pg_isready: Not accepting connections")
+			}
+			_, _, err = env.ExecQueryInInstancePod(testsUtils.PodLocator{
+				Namespace: namespace,
+				PodName:   primary.GetName(),
+			}, testsUtils.DatabaseName(dbName), "select 1")
+			return err
+		}, RetryTimeout, PollingTime).ShouldNot(HaveOccurred())
+	})
+}
+
 // AssertCreateTestData create test data.
 func AssertCreateTestData(namespace, clusterName, tableName string, pod *corev1.Pod) {
-	By("creating test data", func() {
+	AssertDatabaseIsReady(namespace, clusterName, testsUtils.AppDBName)
+	By(fmt.Sprintf("creating test data in cluster %v", clusterName), func() {
 		query := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %v AS VALUES (1),(2);", tableName)
-		_, _, err := env.ExecCommandWithPsqlClient(
-			namespace,
-			clusterName,
-			pod,
-			apiv1.ApplicationUserSecretSuffix,
-			testsUtils.AppDBName,
-			query,
-		)
-		Expect(err).ToNot(HaveOccurred())
+		Eventually(func() error {
+			_, _, err := env.ExecCommandWithPsqlClient(
+				namespace,
+				clusterName,
+				pod,
+				apiv1.ApplicationUserSecretSuffix,
+				testsUtils.AppDBName,
+				query,
+			)
+			if err != nil {
+				return err
+			}
+			return nil
+		}, RetryTimeout, PollingTime).Should(BeNil())
 	})
 }
 
@@ -400,18 +437,24 @@ type TableLocator struct {
 
 // AssertCreateTestDataInTablespace create test data.
 func AssertCreateTestDataInTablespace(tl TableLocator, pod *corev1.Pod) {
+	AssertDatabaseIsReady(tl.Namespace, tl.ClusterName, testsUtils.AppDBName)
 	By(fmt.Sprintf("creating test data in tablespace %q", tl.Tablespace), func() {
 		query := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %v TABLESPACE %v AS VALUES (1),(2);",
 			tl.TableName, tl.Tablespace)
-		_, _, err := env.ExecCommandWithPsqlClient(
-			tl.Namespace,
-			tl.ClusterName,
-			pod,
-			apiv1.ApplicationUserSecretSuffix,
-			testsUtils.AppDBName,
-			query,
-		)
-		Expect(err).ToNot(HaveOccurred())
+		Eventually(func() error {
+			_, _, err := env.ExecCommandWithPsqlClient(
+				tl.Namespace,
+				tl.ClusterName,
+				pod,
+				apiv1.ApplicationUserSecretSuffix,
+				testsUtils.AppDBName,
+				query,
+			)
+			if err != nil {
+				return err
+			}
+			return nil
+		}, RetryTimeout, PollingTime).Should(BeNil())
 	})
 }
 
@@ -907,6 +950,8 @@ func AssertReplicaModeCluster(
 	var primaryReplicaCluster *corev1.Pod
 	commandTimeout := time.Second * 10
 	checkQuery := fmt.Sprintf("SELECT count(*) FROM %v", testTableName)
+
+	AssertDatabaseIsReady(namespace, srcClusterName, srcClusterDBName)
 
 	AssertCreateTestDataWithDatabaseName(
 		namespace,
