@@ -1746,6 +1746,16 @@ after the primary PostgreSQL instance in the cluster was detected
 to be unhealthy</p>
 </td>
 </tr>
+<tr><td><code>livenessProbeTimeout</code><br/>
+<i>int32</i>
+</td>
+<td>
+   <p>LivenessProbeTimeout is the time in seconds that is allowed for a PostgreSQL instance
+to successfully respond to the liveness probe (default 30).
+The Liveness probe failure threshold is derived from this value using the formula:
+ceiling(livenessProbe / 10).</p>
+</td>
+</tr>
 <tr><td><code>affinity</code><br/>
 <a href="#postgresql-cnpg-io-v1-AffinityConfiguration"><i>AffinityConfiguration</i></a>
 </td>
@@ -1908,16 +1918,6 @@ development/staging purposes.</p>
 <td>
    <p>The plugins configuration, containing
 any plugin to be loaded with the corresponding configuration</p>
-</td>
-</tr>
-<tr><td><code>livenessProbeTimeout</code><br/>
-<i>int32</i>
-</td>
-<td>
-   <p>LivenessProbeTimeout is the time in seconds that is allowed for a PostgreSQL instance
-to successfully respond to the liveness probe (default 30).
-The Liveness probe failure threshold is derived from this value using the formula:
-ceiling(livenessProbe / 10).</p>
 </td>
 </tr>
 </tbody>
