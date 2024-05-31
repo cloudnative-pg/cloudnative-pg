@@ -634,7 +634,12 @@ func (info InitInfo) writeRecoveryConfiguration(cluster *apiv1.Cluster, recovery
 		enforcedParams,
 	)
 	if changed {
-		log.Info("enforcing parameters found in pg_controldata and cluster spec", "parameters", enforcedParams)
+		log.Info(
+			"Aligned PostgreSQL configuration to satisfy both pg_controldata and cluster spec",
+			"enforcedParams", enforcedParams,
+			"controldataParams", controldataParams,
+			"clusterParams", clusterParams,
+		)
 	}
 	if err != nil {
 		return fmt.Errorf("cannot write recovery config for enforced parameters: %w", err)
