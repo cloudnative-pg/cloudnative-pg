@@ -19,10 +19,12 @@ package walarchive
 import (
 	"strings"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var _ = Describe("barmanCloudWalArchiveOptions", func() {
@@ -71,7 +73,8 @@ var _ = Describe("barmanCloudWalArchiveOptions", func() {
 		Expect(strings.Join(options, " ")).
 			To(
 				Equal(
-					"--gzip -e aes256 --min-chunk-size=5MB --read-timeout=60 -vv --immediate-checkpoint=false s3://bucket-name/ test-cluster",
+					"--gzip -e aes256 --min-chunk-size=5MB --read-timeout=60 " +
+						"-vv --immediate-checkpoint=false s3://bucket-name/ test-cluster",
 				))
 	})
 })
