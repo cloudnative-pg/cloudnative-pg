@@ -1,10 +1,9 @@
 # Quickstart
 
-This section describes how to test a PostgreSQL cluster on your laptop/computer
-using CloudNativePG on a local Kubernetes cluster in [Kind](https://kind.sigs.k8s.io/) or
+This section guides you through testing a PostgreSQL cluster on your local machine by deploying CloudNativePG on a local Kubernetes cluster using either [Kind](https://kind.sigs.k8s.io/) or
 [Minikube](https://kubernetes.io/docs/setup/learning-environment/minikube/).
 
-!!! Warning
+> [!WARNING]
     The instructions contained in this section are for demonstration,
     testing, and practice purposes only and must not be used in production.
 
@@ -14,7 +13,7 @@ regular manifests written in YAML.
 By following the instructions on this page you should be able to start a PostgreSQL
 cluster on your local Kubernetes installation and experiment with it.
 
-!!! Important
+> [!IMPORTANT]
     Make sure that you have `kubectl` installed on your machine in order
     to connect to the Kubernetes cluster. Please follow the Kubernetes documentation
     on [how to install `kubectl`](https://kubernetes.io/docs/tasks/tools/install-kubectl/).
@@ -93,7 +92,7 @@ spec:
     size: 1Gi
 ```
 
-!!! Note "There's more"
+> [!NOTE] 
     For more detailed information about the available options, please refer
     to the ["API Reference" section](cloudnative-pg.v1.md).
 
@@ -119,7 +118,7 @@ label on all objects relevant to a particular cluster. For example:
 kubectl get pods -l cnpg.io/cluster=<CLUSTER>
 ```
 
-!!! Important
+> [!IMPORTANT]
     Note that we are using `cnpg.io/cluster` as the label. In the past you may
     have seen or used `postgresql`. This label is being deprecated, and
     will be dropped in the future. Please use `cngp.io/cluster`.
@@ -140,7 +139,7 @@ spec:
    #[...]
 ```
 
-!!! Important
+> [!IMPORTANT]
     The immutable infrastructure paradigm requires that you always
     point to a specific version of the container image.
     Never use tags like `latest` or `13` in a production environment
@@ -149,13 +148,13 @@ spec:
     For strict deterministic and repeatable deployments, you can add the digests
     to the image name, through the `<image>:<tag>@sha256:<digestValue>` format.
 
-!!! Note "There's more"
+> [!NOTE]
     There are some examples cluster configurations bundled with the operator.
     Please refer to the ["Examples" section](samples.md).
 
 ## Part 4: Monitor clusters with Prometheus and Grafana
 
-!!! Important
+> [!IMPORTANT]
     Installing Prometheus and Grafana is beyond the scope of this project.
     The instructions in this section are provided for experimentation and
     illustration only.
@@ -203,8 +202,8 @@ After completion, you will have Prometheus, Grafana and Alert Manager installed 
   (see [*monitoring*](monitoring.md)).
 - The Grafana installation will be watching for a Grafana dashboard `ConfigMap`.
 
-!!! Seealso
-    For further information about the above command see the [helm install](https://helm.sh/docs/helm/helm_install/) 
+> [!TIP]
+    For further information about the above command, refer to the [helm install](https://helm.sh/docs/helm/helm_install/) 
     documentation. 
 
 You can see several Custom Resources have been created:
@@ -232,7 +231,7 @@ prometheus-community-kube-operator        ClusterIP   443/TCP
 prometheus-community-kube-prometheus      ClusterIP   9090/TCP
 ```
 
-### Viewing with Prometheus
+### Monitoring with Prometheus
 
 At this point, a CloudNativePG cluster deployed with Monitoring activated
 would be observable via Prometheus.
@@ -265,7 +264,7 @@ kubectl port-forward svc/prometheus-community-kube-prometheus 9090
 
 Then access the Prometheus console locally at: [`http://localhost:9090/`](http://localhost:9090/)
 
-Assuming that the monitoring stack was successfully deployed, and you have a Cluster with `enablePodMonitor: true`
+Assuming that the monitoring stack was successfully deployed, and you have a Cluster with `enablePodMonitor: true`,
 you should find a series of metrics relating to CloudNativePG clusters. Again, please
 refer to the [*monitoring section*](monitoring.md) for more information.
 
@@ -307,12 +306,12 @@ CloudNativePG provides a default dashboard for Grafana as part of the official
 [grafana-dashboard.json](https://github.com/cloudnative-pg/grafana-dashboards/blob/main/charts/cluster/grafana-dashboard.json)
 file and manually importing it via the GUI.
 
-!!! Warning
+> [!WARNING]
     Some graphs in the previous dashboard make use of metrics that are in alpha stage by the time
     this was created, like `kubelet_volume_stats_available_bytes` and `kubelet_volume_stats_capacity_bytes`
     producing some graphs to show `No data`.
 
 ![local grafana](images/grafana-local.png)
 
-Note that in our example setup, both Prometheus and Grafana will pick up
-any other CloudNativePG clusters deployed with Monitoring activated.
+> [!NOTE] 
+    In our local setup, Prometheus and Grafana are configured to automatically discover and monitor any CloudNativePG clusters deployed with the Monitoring feature enabled.
