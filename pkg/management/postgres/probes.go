@@ -161,7 +161,7 @@ func updateResultForDecrease(
 	if !result.IsPrimary {
 		// in case of hot standby parameters being decreased,
 		// followers need to wait for the new value to be present in the PGDATA before being restarted.
-		pgControldataParams, err := GetEnforcedParametersThroughPgControldata(instance.PgData)
+		pgControldataParams, err := LoadEnforcedParametersFromPgControldata(instance.PgData)
 		if err != nil {
 			return err
 		}
@@ -172,7 +172,7 @@ func updateResultForDecrease(
 	return nil
 }
 
-func areAllParamsUpdated(decreasedValues map[string]string, pgControldataParams map[string]string) bool {
+func areAllParamsUpdated(decreasedValues map[string]int, pgControldataParams map[string]int) bool {
 	var readyParams int
 	for setting, newValue := range decreasedValues {
 		if pgControldataParams[setting] == newValue {
@@ -185,12 +185,12 @@ func areAllParamsUpdated(decreasedValues map[string]string, pgControldataParams 
 // GetDecreasedSensibleSettings tries to get all decreased hot standby sensible parameters from the instance.
 // Returns a map containing all the decreased hot standby sensible parameters with their new value.
 // See https://www.postgresql.org/docs/current/hot-standby.html#HOT-STANDBY-ADMIN for more details.
-func (instance *Instance) GetDecreasedSensibleSettings(superUserDB *sql.DB) (map[string]string, error) {
+func (instance *Instance) GetDecreasedSensibleSettings(superUserDB *sql.DB) (map[string]int, error) {
 	// We check whether all parameters with a pending restart from pg_settings
 	// have a decreased value reported as not applied from pg_file_settings.
 	rows, err := superUserDB.Query(
 		`
-SELECT pending_settings.name, coalesce(new_setting,default_setting) as new_setting
+SELECT pending_settings.name, CAST(coalesce(new_setting,default_setting) AS INTEGER) as new_setting
 FROM
    (
 	  SELECT name,
@@ -231,9 +231,10 @@ WHERE pending_settings.name IN (
 		}
 	}()
 
-	decreasedSensibleValues := make(map[string]string)
+	decreasedSensibleValues := make(map[string]int)
 	for rows.Next() {
-		var newValue, name string
+		var name string
+		var newValue int
 		if err = rows.Scan(&name, &newValue); err != nil {
 			return nil, err
 		}
