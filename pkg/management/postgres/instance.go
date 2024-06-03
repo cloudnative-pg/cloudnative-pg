@@ -270,7 +270,7 @@ func (instance *Instance) CheckHasDiskSpaceForWAL(ctx context.Context) (bool, er
 	}
 
 	walDirectory := path.Join(instance.PgData, pgWalDirectory)
-	return fileutils.NewDiskProbe(walDirectory).HasStorageAvailable(ctx, walSegmentSize*2)
+	return fileutils.NewDiskProbe(walDirectory).HasStorageAvailable(ctx, walSegmentSize)
 }
 
 // SetMightBeUnavailable marks whether the instance being down should be tolerated
