@@ -206,12 +206,6 @@ func RunController(
 		return err
 	}
 
-	// Retrieve the Kubernetes cluster system UID
-	if err = utils.DetectKubeSystemUID(ctx, kubeClient); err != nil {
-		setupLog.Error(err, "unable to retrieve the Kubernetes cluster system UID")
-		return err
-	}
-
 	// Detect the available architectures
 	if err = utils.DetectAvailableArchitectures(); err != nil {
 		setupLog.Error(err, "unable to detect the available instance's architectures")
@@ -219,7 +213,6 @@ func RunController(
 	}
 
 	setupLog.Info("Kubernetes system metadata",
-		"systemUID", utils.GetKubeSystemUID(),
 		"haveSCC", utils.HaveSecurityContextConstraints(),
 		"haveSeccompProfile", utils.HaveSeccompSupport(),
 		"haveVolumeSnapshot", utils.HaveVolumeSnapshot(),
