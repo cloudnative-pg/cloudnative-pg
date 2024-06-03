@@ -936,12 +936,10 @@ type ClusterStatus struct {
 	// +optional
 	SwitchReplicaClusterStatus SwitchReplicaClusterStatus `json:"switchReplicaClusterStatus,omitempty"`
 
-	// ShutdownCheckpointToken is a json token containing the following information from pg_controldata:
-	//	Database system identifier
-	//	Latest checkpoint's TimeLineID
-	//	Latest checkpoint's REDO location
-	//	Latest checkpoint's REDO WAL file
-	//	Time of latest checkpoint
+	// shutdownCheckpointToken is a JSON token containing the information
+	// from pg_controldata such as Database system identifier, Latest checkpoint's
+	// TimeLineID, Latest checkpoint's REDO location, Latest checkpoint's REDO
+	// WAL file, and Time of latest checkpoint
 	// +optional
 	ShutdownCheckpointToken string `json:"shutdownCheckpointToken,omitempty"`
 }
