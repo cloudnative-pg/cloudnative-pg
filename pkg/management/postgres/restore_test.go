@@ -24,6 +24,7 @@ import (
 	"github.com/thoas/go-funk"
 	"k8s.io/utils/strings/slices"
 
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -146,5 +147,61 @@ var _ = Describe("testing restore InitInfo methods", func() {
 		chg, err := initInfo.restoreCustomWalDir(context.TODO())
 		Expect(err).ToNot(HaveOccurred())
 		Expect(chg).To(BeFalse())
+	})
+
+	It("should parse enforced params from cluster", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Parameters: map[string]string{
+						"max_connections":           "200",
+						"max_wal_senders":           "20",
+						"max_worker_processes":      "18",
+						"max_prepared_transactions": "50",
+					},
+				},
+			},
+		}
+		enforcedParamsInPGData, err := LoadEnforcedParametersFromCluster(cluster)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(enforcedParamsInPGData).To(HaveLen(4))
+		Expect(enforcedParamsInPGData["max_connections"]).To(Equal(200))
+		Expect(enforcedParamsInPGData["max_wal_senders"]).To(Equal(20))
+		Expect(enforcedParamsInPGData["max_worker_processes"]).To(Equal(18))
+		Expect(enforcedParamsInPGData["max_prepared_transactions"]).To(Equal(50))
+	})
+
+	It("report error if user given one in incorrect value in the cluster", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Parameters: map[string]string{
+						"max_connections":           "200s",
+						"max_wal_senders":           "20",
+						"max_worker_processes":      "18",
+						"max_prepared_transactions": "50",
+					},
+				},
+			},
+		}
+		_, err := LoadEnforcedParametersFromCluster(cluster)
+		Expect(err).To(HaveOccurred())
+	})
+
+	It("ignore the non-enforced params user give", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Parameters: map[string]string{
+						"max_connections":    "200",
+						"wal_sender_timeout": "10min",
+					},
+				},
+			},
+		}
+		enforcedParamsInPGData, err := LoadEnforcedParametersFromCluster(cluster)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(enforcedParamsInPGData).To(HaveLen(1))
+		Expect(enforcedParamsInPGData["max_connections"]).To(Equal(200))
 	})
 })

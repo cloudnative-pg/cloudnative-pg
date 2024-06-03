@@ -388,30 +388,25 @@ func (r *InstanceReconciler) verifyParametersForFollower(cluster *apiv1.Cluster)
 		return err
 	}
 	log.Info("Found previous run flag", "filename", filename)
-	enforcedParams, err := postgresManagement.GetEnforcedParametersThroughPgControldata(r.instance.PgData)
+	controldataParams, err := postgresManagement.LoadEnforcedParametersFromPgControldata(r.instance.PgData)
+	if err != nil {
+		return err
+	}
+	clusterParams, err := postgresManagement.LoadEnforcedParametersFromCluster(cluster)
 	if err != nil {
 		return err
 	}
 
-	clusterParams := cluster.Spec.PostgresConfiguration.Parameters
 	options := make(map[string]string)
-	for key, enforcedparam := range enforcedParams {
+	for key, enforcedparam := range controldataParams {
 		clusterparam, found := clusterParams[key]
 		if !found {
 			continue
 		}
-		enforcedparamInt, err := strconv.Atoi(enforcedparam)
-		if err != nil {
-			return err
-		}
-		clusterparamInt, err := strconv.Atoi(clusterparam)
-		if err != nil {
-			return err
-		}
 		// if the values from `pg_controldata` are higher than the cluster spec,
 		// they are the safer choice, so set them in config
-		if enforcedparamInt > clusterparamInt {
-			options[key] = enforcedparam
+		if enforcedparam > clusterparam {
+			options[key] = strconv.Itoa(enforcedparam)
 		}
 	}
 	if len(options) == 0 {

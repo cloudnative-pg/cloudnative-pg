@@ -27,6 +27,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -579,10 +580,10 @@ func (info InitInfo) writeRestoreWalConfig(backup *apiv1.Backup, cluster *apiv1.
 		strings.Join(cmd, " "),
 		cluster.Spec.Bootstrap.Recovery.RecoveryTarget.BuildPostgresOptions())
 
-	return info.writeRecoveryConfiguration(recoveryFileContents)
+	return info.writeRecoveryConfiguration(cluster, recoveryFileContents)
 }
 
-func (info InitInfo) writeRecoveryConfiguration(recoveryFileContents string) error {
+func (info InitInfo) writeRecoveryConfiguration(cluster *apiv1.Cluster, recoveryFileContents string) error {
 	// Ensure restore_command is used to correctly recover WALs
 	// from the object storage
 	major, err := postgresutils.GetMajorVersion(info.PgData)
@@ -601,21 +602,47 @@ func (info InitInfo) writeRecoveryConfiguration(recoveryFileContents string) err
 		return fmt.Errorf("cannot write recovery config: %w", err)
 	}
 
-	enforcedParams, err := GetEnforcedParametersThroughPgControldata(info.PgData)
+	// Now we need to choose which parameters to use to complete the recovery
+	// of this PostgreSQL instance.
+	// We know the values that these parameters had when the backup was started
+	// from the `pg_controldata` output.
+	// We don't know how these values were set in the newer WALs.
+	//
+	// The only way to proceed is to rely on the user-defined configuration,
+	// with the caveat of ensuring that the values are high enough to be
+	// able to start recovering the backup.
+	//
+	// To be on the safe side, we'll use the largest setting we find
+	// from `pg_controldata` and the Cluster definition.
+	//
+	// https://www.postgresql.org/docs/16/hot-standby.html#HOT-STANDBY-ADMIN
+	controldataParams, err := LoadEnforcedParametersFromPgControldata(info.PgData)
 	if err != nil {
 		return err
 	}
-	if enforcedParams != nil {
-		changed, err := configfile.UpdatePostgresConfigurationFile(
-			path.Join(info.PgData, constants.PostgresqlCustomConfigurationFile),
-			enforcedParams,
+	clusterParams, err := LoadEnforcedParametersFromCluster(cluster)
+	if err != nil {
+		return err
+	}
+	enforcedParams := make(map[string]string)
+	for _, param := range pgControldataSettingsToParamsMap {
+		value := max(clusterParams[param], controldataParams[param])
+		enforcedParams[param] = strconv.Itoa(value)
+	}
+	changed, err := configfile.UpdatePostgresConfigurationFile(
+		path.Join(info.PgData, constants.PostgresqlCustomConfigurationFile),
+		enforcedParams,
+	)
+	if changed {
+		log.Info(
+			"Aligned PostgreSQL configuration to satisfy both pg_controldata and cluster spec",
+			"enforcedParams", enforcedParams,
+			"controldataParams", controldataParams,
+			"clusterParams", clusterParams,
 		)
-		if changed {
-			log.Info("enforcing parameters found in pg_controldata", "parameters", enforcedParams)
-		}
-		if err != nil {
-			return fmt.Errorf("cannot write recovery config for enforced parameters: %w", err)
-		}
+	}
+	if err != nil {
+		return fmt.Errorf("cannot write recovery config for enforced parameters: %w", err)
 	}
 
 	if major >= 12 {
@@ -650,9 +677,9 @@ func (info InitInfo) writeRecoveryConfiguration(recoveryFileContents string) err
 		0o600)
 }
 
-// GetEnforcedParametersThroughPgControldata will parse the output of pg_controldata in order to get
+// LoadEnforcedParametersFromPgControldata will parse the output of pg_controldata in order to get
 // the values of all the hot standby sensible parameters
-func GetEnforcedParametersThroughPgControldata(pgData string) (map[string]string, error) {
+func LoadEnforcedParametersFromPgControldata(pgData string) (map[string]int, error) {
 	var stdoutBuffer bytes.Buffer
 	var stderrBuffer bytes.Buffer
 	pgControlDataCmd := exec.Command(pgControlDataName,
@@ -671,11 +698,43 @@ func GetEnforcedParametersThroughPgControldata(pgData string) (map[string]string
 
 	log.Debug("pg_controldata stdout", "stdout", stdoutBuffer.String())
 
-	enforcedParams := map[string]string{}
+	enforcedParams := make(map[string]int)
 	for key, value := range utils.ParsePgControldataOutput(stdoutBuffer.String()) {
 		if param, ok := pgControldataSettingsToParamsMap[key]; ok {
-			enforcedParams[param] = value
+			intValue, err := strconv.Atoi(value)
+			if err != nil {
+				log.Error(err, "while parsing pg_controldata content",
+					"key", key,
+					"value", value)
+				return nil, err
+			}
+			enforcedParams[param] = intValue
 		}
+	}
+
+	return enforcedParams, nil
+}
+
+// LoadEnforcedParametersFromCluster loads the enforced parameters which defined in cluster spec
+func LoadEnforcedParametersFromCluster(
+	cluster *apiv1.Cluster,
+) (map[string]int, error) {
+	clusterParams := cluster.Spec.PostgresConfiguration.Parameters
+	enforcedParams := map[string]int{}
+	for _, param := range pgControldataSettingsToParamsMap {
+		value, found := clusterParams[param]
+		if !found {
+			continue
+		}
+
+		intValue, err := strconv.Atoi(value)
+		if err != nil {
+			log.Error(err, "while parsing enforced postgres parameter",
+				"param", param,
+				"value", value)
+			return nil, err
+		}
+		enforcedParams[param] = intValue
 	}
 	return enforcedParams, nil
 }
