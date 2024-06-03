@@ -328,10 +328,14 @@ func (backupStatus *BackupStatus) SetAsCompleted() {
 // SetAsStarted marks a certain backup as started
 func (backupStatus *BackupStatus) SetAsStarted(targetPod *corev1.Pod, method BackupMethod) {
 	backupStatus.Phase = BackupPhaseStarted
-	backupStatus.InstanceID = &InstanceID{
-		PodName:     targetPod.Name,
-		ContainerID: targetPod.Status.ContainerStatuses[0].ContainerID,
+
+	if len(targetPod.Status.ContainerStatuses) > 0 {
+		backupStatus.InstanceID = &InstanceID{
+			PodName:     targetPod.Name,
+			ContainerID: targetPod.Status.ContainerStatuses[0].ContainerID,
+		}
 	}
+
 	backupStatus.Method = method
 }
 
