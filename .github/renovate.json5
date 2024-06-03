@@ -375,6 +375,16 @@
       ],
       "separateMajorMinor": "false",
       "pinDigests": false
+    },
+    {
+// PR group for spellcheck
+      "groupName": "spellcheck",
+      "matchPackagePrefixes": [
+        "jonasbn/github-action-spellcheck",
+        "rojopolis/spellcheck-github-actions",
+      ],
+      "separateMajorMinor": "false",
+      "pinDigests": false,
     }
   ]
 }
