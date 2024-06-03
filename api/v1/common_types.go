@@ -16,6 +16,8 @@ limitations under the License.
 
 package v1
 
+import "k8s.io/apimachinery/pkg/util/validation/field"
+
 // VolumeSnapshotKind this is a strongly typed reference to the kind used by the volumesnapshot package
 const VolumeSnapshotKind = "VolumeSnapshot"
 
@@ -24,6 +26,9 @@ const VolumeSnapshotKind = "VolumeSnapshot"
 // The comment of PodTemplateSpec has an explanation of why we are
 // not using the core data types.
 type Metadata struct {
+	// The name of the resource. Only supported for certain types
+	Name string `json:"name,omitempty"`
+
 	// Map of string keys and values that can be used to organize and categorize
 	// (scope and select) objects. May match selectors of replication controllers
 	// and services.
@@ -37,4 +42,38 @@ type Metadata struct {
 	// More info: http://kubernetes.io/docs/user-guide/annotations
 	// +optional
 	Annotations map[string]string `json:"annotations,omitempty"`
+}
+
+// WebhookValidateNameAsRequired checks if the Name field in Metadata is set.
+// It returns nil if the Name is not empty, indicating the validation passed.
+// Otherwise, it returns a field.Error indicating that the Name is required.
+//
+// Parameters:
+// - path: the field.Path to the Name field.
+//
+// Returns:
+// - *field.Error: an error if the Name is not specified, otherwise nil.
+func (m Metadata) WebhookValidateNameAsRequired(path *field.Path) *field.Error {
+	if m.Name != "" {
+		return nil
+	}
+
+	return field.Required(path, "must specify name")
+}
+
+// WebhookValidateNameAsProhibited checks if the Name field in Metadata is not set.
+// It returns nil if the Name is empty, indicating the validation passed.
+// Otherwise, it returns a field.Error indicating that the Name is not supported.
+//
+// Parameters:
+// - path: the field.Path to the Name field.
+//
+// Returns:
+// - *field.Error: an error if the Name is specified, otherwise nil.
+func (m Metadata) WebhookValidateNameAsProhibited(path *field.Path) *field.Error {
+	if m.Name == "" {
+		return nil
+	}
+
+	return field.Invalid(path, m.Name, "name field not supported")
 }

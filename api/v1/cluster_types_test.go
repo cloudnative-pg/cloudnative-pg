@@ -1418,3 +1418,92 @@ var _ = Describe("IsReplica", func() {
 		)
 	})
 })
+
+var _ = Describe("Cluster Managed Service Enablement", func() {
+	var cluster *Cluster
+
+	BeforeEach(func() {
+		cluster = &Cluster{}
+	})
+
+	Describe("IsReadServiceEnabled", func() {
+		It("should return true if Managed or Services is nil", func() {
+			Expect(cluster.IsReadServiceEnabled()).To(BeTrue())
+
+			cluster.Spec.Managed = &ManagedConfiguration{}
+			Expect(cluster.IsReadServiceEnabled()).To(BeTrue())
+		})
+
+		It("should return true if read service is not in DisabledDefaultServices", func() {
+			cluster.Spec.Managed = &ManagedConfiguration{
+				Services: &ManagedServices{
+					DisabledDefaultServices: []ServiceSelectorType{},
+				},
+			}
+			Expect(cluster.IsReadServiceEnabled()).To(BeTrue())
+		})
+
+		It("should return false if read service is in DisabledDefaultServices", func() {
+			cluster.Spec.Managed = &ManagedConfiguration{
+				Services: &ManagedServices{
+					DisabledDefaultServices: []ServiceSelectorType{ServiceSelectorTypeR},
+				},
+			}
+			Expect(cluster.IsReadServiceEnabled()).To(BeFalse())
+		})
+	})
+
+	Describe("IsReadWriteServiceEnabled", func() {
+		It("should return true if Managed or Services is nil", func() {
+			Expect(cluster.IsReadWriteServiceEnabled()).To(BeTrue())
+
+			cluster.Spec.Managed = &ManagedConfiguration{}
+			Expect(cluster.IsReadWriteServiceEnabled()).To(BeTrue())
+		})
+
+		It("should return true if read-write service is not in DisabledDefaultServices", func() {
+			cluster.Spec.Managed = &ManagedConfiguration{
+				Services: &ManagedServices{
+					DisabledDefaultServices: []ServiceSelectorType{},
+				},
+			}
+			Expect(cluster.IsReadWriteServiceEnabled()).To(BeTrue())
+		})
+
+		It("should return false if read-write service is in DisabledDefaultServices", func() {
+			cluster.Spec.Managed = &ManagedConfiguration{
+				Services: &ManagedServices{
+					DisabledDefaultServices: []ServiceSelectorType{ServiceSelectorTypeRW},
+				},
+			}
+			Expect(cluster.IsReadWriteServiceEnabled()).To(BeFalse())
+		})
+	})
+
+	Describe("IsReadOnlyServiceEnabled", func() {
+		It("should return true if Managed or Services is nil", func() {
+			Expect(cluster.IsReadOnlyServiceEnabled()).To(BeTrue())
+
+			cluster.Spec.Managed = &ManagedConfiguration{}
+			Expect(cluster.IsReadOnlyServiceEnabled()).To(BeTrue())
+		})
+
+		It("should return true if read-only service is not in DisabledDefaultServices", func() {
+			cluster.Spec.Managed = &ManagedConfiguration{
+				Services: &ManagedServices{
+					DisabledDefaultServices: []ServiceSelectorType{},
+				},
+			}
+			Expect(cluster.IsReadOnlyServiceEnabled()).To(BeTrue())
+		})
+
+		It("should return false if read-only service is in DisabledDefaultServices", func() {
+			cluster.Spec.Managed = &ManagedConfiguration{
+				Services: &ManagedServices{
+					DisabledDefaultServices: []ServiceSelectorType{ServiceSelectorTypeRO},
+				},
+			}
+			Expect(cluster.IsReadOnlyServiceEnabled()).To(BeFalse())
+		})
+	})
+})

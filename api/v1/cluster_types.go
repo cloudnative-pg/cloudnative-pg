@@ -2406,12 +2406,50 @@ const (
 	EnsureAbsent  EnsureOption = "absent"
 )
 
+// ServiceSelectorType describes a valid value for generating the service selectors.
+// It indicates which type of service the selector applies to, such as read-write, read, or read-only
+type ServiceSelectorType string
+
+// Constants representing the valid values for ServiceSelectorType.
+const (
+	// ServiceSelectorTypeRW selects the read-write service.
+	ServiceSelectorTypeRW ServiceSelectorType = "rw"
+	// ServiceSelectorTypeR selects the read service.
+	ServiceSelectorTypeR ServiceSelectorType = "r"
+	// ServiceSelectorTypeRO selects the read-only service.
+	ServiceSelectorTypeRO ServiceSelectorType = "ro"
+)
+
+// ManagedServices represents the services managed by the cluster.
+type ManagedServices struct {
+	// DisabledDefaultServices is a list of service types that are disabled by default.
+	// Valid values are "rw", "r", and "ro", representing read-write, read, and read-only services.
+	// +kubebuilder:validation:Enum=rw;r;ro
+	DisabledDefaultServices []ServiceSelectorType `json:"disabledDefaultServices,omitempty"`
+	// Additional is a list of additional managed services specified by the user.
+	Additional []ManagedService `json:"additional,omitempty"`
+}
+
+// ManagedService represents a specific service managed by the cluster.
+// It includes the type of service and its associated template specification.
+type ManagedService struct {
+	// SelectorType specifies the type of service.
+	// Valid values are "rw", "r", and "ro", representing read-write, read, and read-only services.
+	// +kubebuilder:validation:Enum=rw;r;ro
+	SelectorType ServiceSelectorType `json:"selectorType"`
+	// ServiceTemplate is the template specification for the service.
+	ServiceTemplate ServiceTemplateSpec `json:"serviceTemplate"`
+}
+
 // ManagedConfiguration represents the portions of PostgreSQL that are managed
 // by the instance manager
 type ManagedConfiguration struct {
 	// Database roles managed by the `Cluster`
 	// +optional
 	Roles []RoleConfiguration `json:"roles,omitempty"`
+	// Services roles managed by the `Cluster`
+	// +optional
+	Services *ManagedServices `json:"services,omitempty"`
 }
 
 // PluginConfiguration specifies a plugin that need to be loaded for this
@@ -3600,6 +3638,35 @@ func (cluster *Cluster) UpdateBackupTimes(
 		func(a metav1.Time, b metav1.Time) bool {
 			return b.Before(&a)
 		})
+}
+
+// IsReadServiceEnabled checks if the read service is enabled for the cluster.
+// It returns false if the read service is listed in the DisabledDefaultServices slice.
+func (cluster *Cluster) IsReadServiceEnabled() bool {
+	if cluster.Spec.Managed == nil || cluster.Spec.Managed.Services == nil {
+		return true
+	}
+
+	return !slices.Contains(cluster.Spec.Managed.Services.DisabledDefaultServices, ServiceSelectorTypeR)
+}
+
+// IsReadWriteServiceEnabled checks if the read-write service is enabled for the cluster.
+// It returns false if the read-write service is listed in the DisabledDefaultServices slice.
+func (cluster *Cluster) IsReadWriteServiceEnabled() bool {
+	if cluster.Spec.Managed == nil || cluster.Spec.Managed.Services == nil {
+		return true
+	}
+	return !slices.Contains(cluster.Spec.Managed.Services.DisabledDefaultServices, ServiceSelectorTypeRW)
+}
+
+// IsReadOnlyServiceEnabled checks if the read-only service is enabled for the cluster.
+// It returns false if the read-only service is listed in the DisabledDefaultServices slice.
+func (cluster *Cluster) IsReadOnlyServiceEnabled() bool {
+	if cluster.Spec.Managed == nil || cluster.Spec.Managed.Services == nil {
+		return true
+	}
+
+	return !slices.Contains(cluster.Spec.Managed.Services.DisabledDefaultServices, ServiceSelectorTypeRO)
 }
 
 // BuildPostgresOptions create the list of options that

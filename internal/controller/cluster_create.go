@@ -311,24 +311,44 @@ func (r *ClusterReconciler) reconcilePostgresServices(ctx context.Context, clust
 		}
 	}
 
-	readService := specs.CreateClusterReadService(*cluster)
-	cluster.SetInheritedDataAndOwnership(&readService.ObjectMeta)
+	if cluster.IsReadServiceEnabled() {
+		readService := specs.CreateClusterReadService(*cluster)
+		cluster.SetInheritedDataAndOwnership(&readService.ObjectMeta)
 
-	if err := r.serviceReconciler(ctx, readService); err != nil {
-		return err
+		if err := r.serviceReconciler(ctx, readService); err != nil {
+			return err
+		}
 	}
 
-	readOnlyService := specs.CreateClusterReadOnlyService(*cluster)
-	cluster.SetInheritedDataAndOwnership(&readOnlyService.ObjectMeta)
+	if cluster.IsReadOnlyServiceEnabled() {
+		readOnlyService := specs.CreateClusterReadOnlyService(*cluster)
+		cluster.SetInheritedDataAndOwnership(&readOnlyService.ObjectMeta)
 
-	if err := r.serviceReconciler(ctx, readOnlyService); err != nil {
-		return err
+		if err := r.serviceReconciler(ctx, readOnlyService); err != nil {
+			return err
+		}
 	}
 
-	readWriteService := specs.CreateClusterReadWriteService(*cluster)
-	cluster.SetInheritedDataAndOwnership(&readWriteService.ObjectMeta)
+	if cluster.IsReadWriteServiceEnabled() {
+		readWriteService := specs.CreateClusterReadWriteService(*cluster)
+		cluster.SetInheritedDataAndOwnership(&readWriteService.ObjectMeta)
 
-	return r.serviceReconciler(ctx, readWriteService)
+		if err := r.serviceReconciler(ctx, readWriteService); err != nil {
+			return err
+		}
+	}
+
+	services, err := specs.CreateManagedServices(*cluster)
+	if err != nil {
+		return err
+	}
+	for idx := range services {
+		if err := r.serviceReconciler(ctx, &services[idx]); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (r *ClusterReconciler) serviceReconciler(ctx context.Context, proposed *corev1.Service) error {

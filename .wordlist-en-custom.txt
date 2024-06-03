@@ -121,6 +121,7 @@ DevSecOps
 Dhilip
 DigitalOcean
 DisablePassword
+DisabledDefaultServices
 DoD
 DockerHub
 Dockle
@@ -222,6 +223,8 @@ MVCC
 ManagedConfiguration
 ManagedRoles
 ManagedRolesStatus
+ManagedService
+ManagedServices
 MetricDescription
 MetricName
 MetricType
@@ -382,12 +385,14 @@ SecretVersion
 SecretsResourceVersion
 SecurityProfiles
 Seealso
+SelectorType
 ServerCASecret
 ServerTLSSecret
 ServiceAccount
 ServiceAccount's
 ServiceAccountTemplate
 ServiceMonitor
+ServiceSelectorType
 ServiceSpec
 ServiceTemplateSpec
 ShutdownCheckpointToken
@@ -668,6 +673,7 @@ digestValue
 dir
 disableDefaultQueries
 disablePassword
+disabledDefaultServices
 distro
 distroless
 distros
@@ -1090,6 +1096,7 @@ securego
 securityContext
 seg
 segsize
+selectorType
 serverAltDNSNames
 serverCA
 serverCASecret
