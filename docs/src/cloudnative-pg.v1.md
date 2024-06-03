@@ -1750,7 +1750,7 @@ to be unhealthy</p>
 <i>int32</i>
 </td>
 <td>
-   <p>LivenessProbeTimeout is the time in seconds that is allowed for a PostgreSQL instance
+   <p>LivenessProbeTimeout is the time (in seconds) that is allowed for a PostgreSQL instance
 to successfully respond to the liveness probe (default 30).
 The Liveness probe failure threshold is derived from this value using the formula:
 ceiling(livenessProbe / 10).</p>

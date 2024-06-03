@@ -260,13 +260,18 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig, enable
 
 	addManagerLoggingOptions(cluster, &containers[0])
 
-	// by default, the failureThreshold for liveness probe is 3, we do not want
-	// to change it if the user has not set the liveness probe timeout
-	if getLivenessProbeFailureThreshold(cluster.GetLivenessProbeTimeout()) != 3 {
-		containers[0].LivenessProbe.FailureThreshold = getLivenessProbeFailureThreshold(cluster.GetLivenessProbeTimeout())
-	}
+	// if user customizes the liveness probe timeout, we need to adjust the failure threshold
+	addLivenessProbeFailureThreshold(cluster, &containers[0])
 
 	return containers
+}
+
+// adjust the liveness probe failure threshold based on the `spec.livenessProbeTimeout` value
+func addLivenessProbeFailureThreshold(cluster apiv1.Cluster, container *corev1.Container) {
+	if cluster.Spec.LivenessProbeTimeout != nil {
+		timeout := *cluster.Spec.LivenessProbeTimeout
+		container.LivenessProbe.FailureThreshold = getLivenessProbeFailureThreshold(timeout)
+	}
 }
 
 // getStartupProbeFailureThreshold get the startup probe failure threshold
