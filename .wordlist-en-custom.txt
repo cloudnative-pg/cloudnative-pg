@@ -440,7 +440,6 @@ WAL
 WAL's
 WALBackupConfiguration
 WALCapabilities
-WALSpaceAvailable
 WALs
 Wadle
 WalBackupConfiguration

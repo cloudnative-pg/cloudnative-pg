@@ -943,8 +943,6 @@ type InstanceReportedState struct {
 	// indicates on which TimelineId the instance is
 	// +optional
 	TimeLineID int `json:"timeLineID,omitempty"`
-	// indicates if the instance have enough space for WALs
-	WALSpaceAvailable bool `json:"WALSpaceAvailable,omitempty"`
 }
 
 // ClusterConditionType defines types of cluster conditions

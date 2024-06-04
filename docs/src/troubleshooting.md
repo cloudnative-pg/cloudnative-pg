@@ -634,7 +634,7 @@ removing the core dumps.
 ### Storage is full
 
 In case the storage is full, the PostgreSQL pods will not be able to write new
-data, or, in case of the disk containing the WAL segments being full, PosgreSQL
+data, or, in case of the disk containing the WAL segments being full, PostgreSQL
 will shut down.
 
 If you see messages in the logs about the disk being full, you should increase
@@ -643,7 +643,7 @@ the `spec.resources.requests.storage` field. After that, you should also update
 the Cluster resource with the new size to apply the same change to all the pods.
 Please look at the ["Volume expansion" section](storage.md#volume-expansion) in the documentation.
 
-If the space for WAL segments is exhausted, the pod will be crashlooping and
+If the space for WAL segments is exhausted, the pod will be crash-looping and
 the cluster status will report `Not enough disk space`. Increasing the size in
 the PVC and then in the Cluster resource will solve the issue. See also
 the ["Disk Full Failure" section](instance_manager.md#disk-full-failure)

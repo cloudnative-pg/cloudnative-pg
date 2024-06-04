@@ -303,7 +303,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		return ctrl.Result{RequeueAfter: 10 * time.Second}, registerPhaseErr
 	}
 
-	if res, err := r.ensureNoFailoverOnFullDisk(ctx, cluster); err != nil || !res.IsZero() {
+	if res, err := r.ensureNoFailoverOnFullDisk(ctx, cluster, instancesStatus); err != nil || !res.IsZero() {
 		return res, err
 	}
 
@@ -400,13 +400,14 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 func (r *ClusterReconciler) ensureNoFailoverOnFullDisk(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
+	instances postgres.PostgresqlStatusList,
 ) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx).WithName("ensure_sufficient_disk_space")
 
 	var instanceNames []string
-	for name, state := range cluster.Status.InstancesReportedState {
-		if !state.WALSpaceAvailable {
-			instanceNames = append(instanceNames, string(name))
+	for _, state := range instances.Items {
+		if !isWALSpaceAvailableOnPod(state.Pod) {
+			instanceNames = append(instanceNames, state.Pod.Name)
 		}
 	}
 	if len(instanceNames) == 0 {

@@ -759,9 +759,8 @@ func (r *ClusterReconciler) updateClusterStatusThatRequiresInstancesState(
 	// we extract the instances reported state
 	for _, item := range statuses.Items {
 		cluster.Status.InstancesReportedState[apiv1.PodName(item.Pod.Name)] = apiv1.InstanceReportedState{
-			IsPrimary:         item.IsPrimary,
-			TimeLineID:        item.TimeLineID,
-			WALSpaceAvailable: isWALSpaceAvailableOnPod(item.Pod),
+			IsPrimary:  item.IsPrimary,
+			TimeLineID: item.TimeLineID,
 		}
 	}
 
