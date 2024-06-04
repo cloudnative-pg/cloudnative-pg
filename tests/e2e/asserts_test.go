@@ -2532,13 +2532,8 @@ func collectAndAssertDefaultMetricsPresentOnEachPod(namespace, clusterName, curl
 			"cnpg_pg_postmaster_start_time",
 			"cnpg_pg_replication",
 			"cnpg_pg_stat_archiver",
+			"cnpg_pg_stat_bgwriter",
 			"cnpg_pg_stat_database",
-		}
-
-		if env.PostgresVersion < 17 {
-			defaultMetrics = append(defaultMetrics,
-				"cnpg_pg_stat_bgwriter",
-			)
 		}
 
 		podList, err := env.GetClusterPodList(namespace, clusterName)
