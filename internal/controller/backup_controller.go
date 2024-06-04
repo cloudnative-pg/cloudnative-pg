@@ -197,7 +197,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		}
 		contextLogger.Debug("Found pod for backup", "pod", pod.Name)
 
-		if !utils.IsPodReady(*pod) || !utils.PodHasContainerStatuses(*pod) {
+		if !utils.IsPodReady(*pod) {
 			contextLogger.Info("Backup target is not ready, will retry in 30 seconds", "target", pod.Name)
 			backup.Status.Phase = apiv1.BackupPhasePending
 			r.Recorder.Eventf(&backup, "Warning", "BackupPending", "Backup target pod not ready: %s",
@@ -288,7 +288,7 @@ func (r *BackupReconciler) isValidBackupRunning(
 	}
 
 	var containerIsNotRestarted bool
-	if utils.PodHasContainerStatuses(pod) && backup.Status.InstanceID != nil {
+	if utils.PodHasContainerStatuses(pod) {
 		containerIsNotRestarted = backup.Status.InstanceID.ContainerID == pod.Status.ContainerStatuses[0].ContainerID
 	}
 	isPodActive := utils.IsPodActive(pod)
@@ -374,7 +374,11 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 	}
 
 	if len(backup.Status.Phase) == 0 || backup.Status.Phase == apiv1.BackupPhasePending {
-		backup.Status.SetAsStarted(targetPod, apiv1.BackupMethodVolumeSnapshot)
+		backup.Status.SetAsStarted(
+			targetPod.Name,
+			targetPod.Status.ContainerStatuses[0].ContainerID,
+			apiv1.BackupMethodVolumeSnapshot,
+		)
 		// given that we use only kubernetes resources we can use the backup name as ID
 		backup.Status.BackupID = backup.Name
 		backup.Status.BackupName = backup.Name
@@ -569,7 +573,7 @@ func startInstanceManagerBackup(
 ) error {
 	// This backup has been started
 	status := backup.GetStatus()
-	status.SetAsStarted(pod, backup.Spec.Method)
+	status.SetAsStarted(pod.Name, pod.Status.ContainerStatuses[0].ContainerID, backup.Spec.Method)
 
 	if err := postgres.PatchBackupStatusAndRetry(ctx, client, backup); err != nil {
 		return err
