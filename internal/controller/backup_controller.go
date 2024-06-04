@@ -288,7 +288,7 @@ func (r *BackupReconciler) isValidBackupRunning(
 	}
 
 	var containerIsNotRestarted bool
-	if len(pod.Status.ContainerStatuses) > 0 && backup.Status.InstanceID != nil {
+	if !utils.IsPodReady(pod) && backup.Status.InstanceID != nil {
 		containerIsNotRestarted = backup.Status.InstanceID.ContainerID == pod.Status.ContainerStatuses[0].ContainerID
 	}
 	isPodActive := utils.IsPodActive(pod)
