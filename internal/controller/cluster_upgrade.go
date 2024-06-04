@@ -192,8 +192,8 @@ func (r *ClusterReconciler) updatePrimaryPod(
 		contextLogger.Info("The primary needs to be restarted, we'll trigger a switchover to do that",
 			"reason", reason,
 			"currentPrimary", primaryPod.Name,
-			"targetPrimary", targetInstance.Pod.Name,
-			"podList", podList)
+			"targetPrimary", targetInstance.Pod.Name)
+		podList.LogStatus(ctx)
 		r.Recorder.Eventf(cluster, "Normal", "Switchover",
 			"Initiating switchover to %s to upgrade %s", targetInstance.Pod.Name, primaryPod.Name)
 		return true, r.setPrimaryInstance(ctx, cluster, targetInstance.Pod.Name)
