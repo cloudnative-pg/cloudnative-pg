@@ -18,13 +18,13 @@ package plugin
 
 import (
 	"github.com/logrusorgru/aurora/v4"
+	"github.com/spf13/cobra"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	"github.com/spf13/cobra"
 )
 
-var _ = FDescribe("Configure color", func() {
+var _ = Describe("Configure color", func() {
 	var cmd *cobra.Command
 	BeforeEach(func() {
 		cmd = &cobra.Command{
