@@ -193,6 +193,7 @@ func (r *ClusterReconciler) updatePrimaryPod(
 			"reason", reason,
 			"currentPrimary", primaryPod.Name,
 			"targetPrimary", targetInstance.Pod.Name)
+		podList.LogStatus(ctx)
 		r.Recorder.Eventf(cluster, "Normal", "Switchover",
 			"Initiating switchover to %s to upgrade %s", targetInstance.Pod.Name, primaryPod.Name)
 		return true, r.setPrimaryInstance(ctx, cluster, targetInstance.Pod.Name)
