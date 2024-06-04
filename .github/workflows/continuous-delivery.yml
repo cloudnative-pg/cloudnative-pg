@@ -47,7 +47,7 @@ env:
   REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
   REPOSITORY_OWNER: "cloudnative-pg"
   SLACK_USERNAME: "cnpg-bot"
-  BUILD_MANAGER_RELEASE_ARGS: "build --skip=validate --rm-dist --id manager"
+  BUILD_MANAGER_RELEASE_ARGS: "build --skip=validate --clean --id manager"
   # Keep in mind that adding more platforms (architectures) will increase the building
   # time even if we use the ghcache for the building process.
   PLATFORMS: "linux/amd64,linux/arm64"
