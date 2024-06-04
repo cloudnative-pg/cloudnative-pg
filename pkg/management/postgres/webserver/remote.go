@@ -23,7 +23,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"time"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -74,7 +73,6 @@ func NewRemoteWebServer(
 		typedClient: typedClient,
 		instance:    instance,
 	}
-	go endpoints.keepBackupAliveConn()
 
 	serveMux := http.NewServeMux()
 	serveMux.HandleFunc(url.PathPgModeBackup, endpoints.backup)
@@ -326,17 +324,5 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 		go ws.currentBackup.stopBackup(context.Background(), p.BackupName)
 		sendJSONResponseWithData(w, 200, struct{}{})
 		return
-	}
-}
-
-// TODO: no need to active ping, we are connected locally
-func (ws *remoteWebserverEndpoints) keepBackupAliveConn() {
-	for {
-		if ws.currentBackup != nil && ws.currentBackup.conn != nil &&
-			ws.currentBackup.err == nil && ws.currentBackup.data.Phase != Completed {
-			log.Trace("keeping current backup connection alive")
-			_ = ws.currentBackup.conn.PingContext(context.Background())
-		}
-		time.Sleep(3 * time.Second)
 	}
 }
