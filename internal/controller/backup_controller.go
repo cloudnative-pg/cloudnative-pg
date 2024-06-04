@@ -197,7 +197,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		}
 		contextLogger.Debug("Found pod for backup", "pod", pod.Name)
 
-		if !utils.IsPodReady(*pod) {
+		if !utils.IsPodReady(*pod) || !utils.PodHasContainerStatuses(*pod) {
 			contextLogger.Info("Backup target is not ready, will retry in 30 seconds", "target", pod.Name)
 			backup.Status.Phase = apiv1.BackupPhasePending
 			r.Recorder.Eventf(&backup, "Warning", "BackupPending", "Backup target pod not ready: %s",
@@ -209,7 +209,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			"cluster", cluster.Name,
 			"pod", pod.Name)
 
-		// This backup has been started
+		// This backup can be started
 		if err := startInstanceManagerBackup(ctx, r.Client, &backup, pod, &cluster); err != nil {
 			r.Recorder.Eventf(&backup, "Warning", "Error", "Backup exit with error %v", err)
 			tryFlagBackupAsFailed(ctx, r.Client, &backup, fmt.Errorf("encountered an error while taking the backup: %w", err))
@@ -369,8 +369,8 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 		return &ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 	}
 
-	if len(targetPod.Status.ContainerStatuses) == 0 {
-		return nil, fmt.Errorf("pod container statuses list is empty")
+	if !utils.PodHasContainerStatuses(*targetPod) {
+		return nil, fmt.Errorf("target pod lacks container statuses")
 	}
 
 	if len(backup.Status.Phase) == 0 || backup.Status.Phase == apiv1.BackupPhasePending {
@@ -567,10 +567,6 @@ func startInstanceManagerBackup(
 	pod *corev1.Pod,
 	cluster *apiv1.Cluster,
 ) error {
-	if len(pod.Status.ContainerStatuses) == 0 {
-		return fmt.Errorf("pod container statuses list is empty")
-	}
-
 	// This backup has been started
 	status := backup.GetStatus()
 	status.SetAsStarted(pod, backup.Spec.Method)

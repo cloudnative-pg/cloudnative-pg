@@ -535,9 +535,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			podList, err := env.GetClusterPodList(upgradeNamespace, clusterName1)
 			Expect(err).ToNot(HaveOccurred())
 			for _, pod := range podList.Items {
-				if len(pod.Status.ContainerStatuses) == 0 {
-					Fail("Pod container statuses list is empty")
-				}
+				Expect(pod.Status.ContainerStatuses).NotTo(BeEmpty())
 				Expect(pod.Status.ContainerStatuses[0].RestartCount).To(BeEquivalentTo(0))
 			}
 		})
