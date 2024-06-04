@@ -347,7 +347,7 @@ func (info InitInfo) restoreCustomWalDir(ctx context.Context) (bool, error) {
 	}
 
 	contextLogger := log.FromContext(ctx)
-	pgDataWal := path.Join(info.PgData, "pg_wal")
+	pgDataWal := path.Join(info.PgData, pgWalDirectory)
 
 	// if the link is already present we have nothing to do.
 	if linkInfo, _ := os.Readlink(pgDataWal); linkInfo == info.PgWal {

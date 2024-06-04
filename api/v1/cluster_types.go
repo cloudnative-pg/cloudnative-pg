@@ -121,6 +121,10 @@ const (
 
 	// PGBouncerPoolerUserName is the name of the role to be used for
 	PGBouncerPoolerUserName = "cnpg_pooler_pgbouncer"
+
+	// MissingWALDiskSpaceExitCode is the exit code the instance manager
+	// will use to signal that there's no more WAL disk space
+	MissingWALDiskSpaceExitCode = 4
 )
 
 // SnapshotOwnerReference defines the reference type for the owner of the snapshot.

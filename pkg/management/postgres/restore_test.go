@@ -36,8 +36,8 @@ var _ = Describe("testing restore InitInfo methods", func() {
 	Expect(err).ToNot(HaveOccurred())
 
 	pgData := path.Join(tempDir, "postgres", "data", "pgdata")
-	pgWal := path.Join(pgData, "pg_wal")
-	newPgWal := path.Join(tempDir, "postgres", "wal", "pg_wal")
+	pgWal := path.Join(pgData, pgWalDirectory)
+	newPgWal := path.Join(tempDir, "postgres", "wal", pgWalDirectory)
 
 	AfterEach(func() {
 		_ = fileutils.RemoveDirectoryContent(tempDir)

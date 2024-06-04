@@ -94,3 +94,43 @@ the WAL files. By default it is set to `3600` (1 hour).
 
 In case of primary pod failure, the cluster will go into failover mode.
 Please refer to the ["Failover" section](failover.md) for details.
+
+## Disk Full Failure
+
+Storage exhaustion is a well known issue for PostgreSQL clusters.
+The [PostgreSQL documentation](https://www.postgresql.org/docs/current/disk-full.html)
+highlights the possible failure scenarios and the importance of monitoring disk
+usage to prevent it from becoming full.
+
+The same applies to CloudNativePG and Kubernetes as well: the
+["Monitoring" section](monitoring.md#predefined-set-of-metrics)
+provides details on checking the disk space used by WAL segments and standard
+metrics on disk usage exported to Prometheus.
+
+!!! Important
+    In a production system, it is critical to monitor the database
+    continuously. Exhausted disk storage can lead to a database server shutdown.
+
+!!! Note
+    The detection of exhausted storage relies on a storage class that
+    accurately reports disk size and usage. This may not be the case in simulated
+    Kubernetes environments like Kind or with test storage class implementations
+    such as `csi-driver-host-path`.
+
+If the disk containing the WALs becomes full and no more WAL segments can be
+stored, PostgreSQL will stop working. CloudNativePG correctly detects this issue
+by verifying that there is enough space to store the next WAL segment,
+and avoids triggering a failover, which could complicate recovery.
+
+That allows a human administrator to address the root cause.
+
+In such a case, if supported by the storage class, the quickest course of action
+is currently to:
+1. Expand the storage size of the full PVC
+2. Increase the size in the `Cluster` resource to the same value
+
+Once the issue is resolved and there is sufficient free space for WAL segments,
+the Pod will restart and the cluster will become healthy.
+
+See also the ["Volume expansion" section](storage.md#volume-expansion) of the
+documentation.
