@@ -117,7 +117,7 @@ func NewCmd() *cobra.Command {
 			"text",
 			"Output format. One of text, json, or yaml",
 		)
-	plugin.AddColorControlFlags(hibernateStatusCmd)
+	plugin.AddColorControlFlag(hibernateStatusCmd)
 
 	return cmd
 }

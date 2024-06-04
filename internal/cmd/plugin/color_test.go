@@ -31,7 +31,7 @@ var _ = Describe("Configure color", func() {
 			Use: "test",
 		}
 
-		AddColorControlFlags(cmd)
+		AddColorControlFlag(cmd)
 	})
 
 	It("enables color as the a terminal is attached", func() {
@@ -44,7 +44,7 @@ var _ = Describe("Configure color", func() {
 	})
 
 	It("disables color as the a terminal is not attached", func() {
-		err := cmd.ParseFlags(nil)
+		err := cmd.ParseFlags([]string{"--color", "auto"})
 		Expect(err).NotTo(HaveOccurred())
 
 		err = configureColor(cmd, false)
@@ -53,7 +53,7 @@ var _ = Describe("Configure color", func() {
 	})
 
 	It("enables color as the flag is set", func() {
-		err := cmd.ParseFlags([]string{"--colors"})
+		err := cmd.ParseFlags([]string{"--color", "always"})
 		Expect(err).NotTo(HaveOccurred())
 
 		err = configureColor(cmd, false)
@@ -62,7 +62,7 @@ var _ = Describe("Configure color", func() {
 	})
 
 	It("disables color as the flag is set", func() {
-		err := cmd.ParseFlags([]string{"--no-colors"})
+		err := cmd.ParseFlags([]string{"--color", "never"})
 		Expect(err).NotTo(HaveOccurred())
 
 		err = configureColor(cmd, true)

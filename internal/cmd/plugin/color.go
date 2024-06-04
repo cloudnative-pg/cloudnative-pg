@@ -17,36 +17,35 @@ limitations under the License.
 package plugin
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/logrusorgru/aurora/v4"
-	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 )
 
 // ConfigureColor renews aurora.DefaultColorizer based on flags and TTY
 func ConfigureColor(cmd *cobra.Command) error {
-	return configureColor(cmd, isatty.IsTerminal(os.Stdout.Fd()))
+	return configureColor(cmd, term.IsTerminal(int(os.Stdout.Fd())))
 }
 
 func configureColor(cmd *cobra.Command, isTTY bool) error {
-	colors, err := cmd.Flags().GetBool("colors")
-	if err != nil {
-		return err
-	}
-	noColors, err := cmd.Flags().GetBool("no-colors")
+	colorFlag, err := cmd.Flags().GetString("color")
 	if err != nil {
 		return err
 	}
 
 	var shouldColorize bool
-	switch {
-	case colors:
+	switch colorFlag {
+	case "always":
 		shouldColorize = true
-	case noColors:
+	case "never":
 		shouldColorize = false
-	default:
+	case "auto":
 		shouldColorize = isTTY
+	default:
+		return fmt.Errorf("invalid value for --color: %s, must be one of 'always', 'auto', or 'never'", colorFlag)
 	}
 
 	aurora.DefaultColorizer = aurora.New(
@@ -56,9 +55,12 @@ func configureColor(cmd *cobra.Command, isTTY bool) error {
 	return nil
 }
 
-// AddColorControlFlags adds color control flags to the command
-func AddColorControlFlags(cmd *cobra.Command) {
-	cmd.Flags().Bool("colors", false, "Force colorized output even if no terminal is attached")
-	cmd.Flags().Bool("no-colors", false, "Disable colorized output")
-	cmd.MarkFlagsMutuallyExclusive("colors", "no-colors")
+// AddColorControlFlag adds color control flags to the command
+func AddColorControlFlag(cmd *cobra.Command) {
+	cmd.Flags().String("color", "auto", "Control color output; options include 'always', 'auto', or 'never'")
+	_ = cmd.RegisterFlagCompletionFunc("color",
+		func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
+			return []string{"always", "auto", "never"},
+				cobra.ShellCompDirectiveDefault | cobra.ShellCompDirectiveKeepOrder
+		})
 }
