@@ -103,7 +103,6 @@ var ErrNextLoop = utils.ErrNextLoop
 // +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch;create;update;watch;delete;patch
 // +kubebuilder:rbac:groups="",resources=configmaps/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
-// +kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=nodes,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=persistentvolumeclaims,verbs=get;list;create;watch;delete;patch
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get;list;delete;patch;create;watch
@@ -436,18 +435,6 @@ func (r *ClusterReconciler) getCluster(
 
 		// This is a real error, maybe the RBAC configuration is wrong?
 		return nil, fmt.Errorf("cannot get the managed resource: %w", err)
-	}
-
-	var namespace corev1.Namespace
-	if err := r.Get(ctx, client.ObjectKey{Namespace: "", Name: req.Namespace}, &namespace); err != nil {
-		// This is a real error, maybe the RBAC configuration is wrong?
-		return nil, fmt.Errorf("cannot get the containing namespace: %w", err)
-	}
-
-	if !namespace.DeletionTimestamp.IsZero() {
-		// This happens when you delete a namespace containing a Cluster resource. If that's the case,
-		// let's just wait for the Kubernetes to remove all object in the namespace.
-		return nil, nil
 	}
 
 	return cluster, nil
