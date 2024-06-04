@@ -200,7 +200,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 				errors.New("no barmanObjectStore section defined on the target cluster"))
 			return ctrl.Result{}, nil
 		}
-		// This backup has been started
+		// This backup can be started
 		if err := startBarmanBackup(ctx, r.Client, &backup, pod, &cluster); err != nil {
 			r.Recorder.Eventf(&backup, "Warning", "Error", "Backup exit with error %v", err)
 			tryFlagBackupAsFailed(ctx, r.Client, &backup, fmt.Errorf("encountered an error while taking the backup: %w", err))
@@ -275,7 +275,8 @@ func (r *BackupReconciler) isValidBackupRunning(
 		return false, fmt.Errorf("unknown.spec.target received: %s", backup.Spec.Target)
 	}
 
-	containerIsNotRestarted := backup.Status.InstanceID.ContainerID == pod.Status.ContainerStatuses[0].ContainerID
+	containerIsNotRestarted := utils.PodHasContainerStatuses(pod) &&
+		backup.Status.InstanceID.ContainerID == pod.Status.ContainerStatuses[0].ContainerID
 	isPodActive := utils.IsPodActive(pod)
 	if isCorrectPodElected && containerIsNotRestarted && isPodActive {
 		contextLogger.Info("Backup is already running on",
@@ -354,8 +355,16 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 		return &ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 	}
 
+	if !utils.PodHasContainerStatuses(*targetPod) {
+		return nil, fmt.Errorf("target pod lacks container statuses")
+	}
+
 	if len(backup.Status.Phase) == 0 || backup.Status.Phase == apiv1.BackupPhasePending {
-		backup.Status.SetAsStarted(targetPod, apiv1.BackupMethodVolumeSnapshot)
+		backup.Status.SetAsStarted(
+			targetPod.Name,
+			targetPod.Status.ContainerStatuses[0].ContainerID,
+			apiv1.BackupMethodVolumeSnapshot,
+		)
 		// given that we use only kubernetes resources we can use the backup name as ID
 		backup.Status.BackupID = backup.Name
 		backup.Status.BackupName = backup.Name
@@ -550,7 +559,7 @@ func startBarmanBackup(
 ) error {
 	// This backup has been started
 	status := backup.GetStatus()
-	status.SetAsStarted(pod, apiv1.BackupMethodBarmanObjectStore)
+	status.SetAsStarted(pod.Name, pod.Status.ContainerStatuses[0].ContainerID, apiv1.BackupMethodBarmanObjectStore)
 
 	if err := postgres.PatchBackupStatusAndRetry(ctx, client, backup); err != nil {
 		return err
