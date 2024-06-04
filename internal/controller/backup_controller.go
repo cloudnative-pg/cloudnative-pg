@@ -369,6 +369,10 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 		return &ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 	}
 
+	if len(targetPod.Status.ContainerStatuses) == 0 {
+		return nil, fmt.Errorf("pod container statuses list is empty")
+	}
+
 	if len(backup.Status.Phase) == 0 || backup.Status.Phase == apiv1.BackupPhasePending {
 		backup.Status.SetAsStarted(targetPod, apiv1.BackupMethodVolumeSnapshot)
 		// given that we use only kubernetes resources we can use the backup name as ID
@@ -563,6 +567,10 @@ func startInstanceManagerBackup(
 	pod *corev1.Pod,
 	cluster *apiv1.Cluster,
 ) error {
+	if len(pod.Status.ContainerStatuses) == 0 {
+		return fmt.Errorf("pod container statuses list is empty")
+	}
+
 	// This backup has been started
 	status := backup.GetStatus()
 	status.SetAsStarted(pod, backup.Spec.Method)
