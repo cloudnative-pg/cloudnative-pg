@@ -41,6 +41,10 @@ func NewCmd() *cobra.Command {
 			ctx := cmd.Context()
 			clusterName := args[0]
 
+			if err := plugin.ConfigureColor(cmd); err != nil {
+				return err
+			}
+
 			verbose, _ := cmd.Flags().GetBool("verbose")
 			output, _ := cmd.Flags().GetString("output")
 
@@ -52,6 +56,8 @@ func NewCmd() *cobra.Command {
 		"verbose", "v", false, "Include PostgreSQL configuration, HBA rules, and full replication slots info")
 	statusCmd.Flags().StringP(
 		"output", "o", "text", "Output format. One of text|json")
+
+	plugin.AddColorControlFlags(statusCmd)
 
 	return statusCmd
 }

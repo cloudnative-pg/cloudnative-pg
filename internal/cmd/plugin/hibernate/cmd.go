@@ -57,6 +57,7 @@ var (
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			clusterName := args[0]
+
 			off := newOffCommand(cmd.Context(), clusterName)
 			return off.execute()
 		},
@@ -71,6 +72,11 @@ var (
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			clusterName := args[0]
+
+			if err := plugin.ConfigureColor(cmd); err != nil {
+				return err
+			}
+
 			rawOutput, err := cmd.Flags().GetString("output")
 			if err != nil {
 				return err
@@ -111,6 +117,7 @@ func NewCmd() *cobra.Command {
 			"text",
 			"Output format. One of text, json, or yaml",
 		)
+	plugin.AddColorControlFlags(hibernateStatusCmd)
 
 	return cmd
 }
