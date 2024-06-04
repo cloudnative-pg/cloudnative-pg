@@ -287,10 +287,7 @@ func (r *BackupReconciler) isValidBackupRunning(
 		return false, fmt.Errorf("unknown.spec.target received: %s", backup.Spec.Target)
 	}
 
-	var containerIsNotRestarted bool
-	if utils.PodHasContainerStatuses(pod) {
-		containerIsNotRestarted = backup.Status.InstanceID.ContainerID == pod.Status.ContainerStatuses[0].ContainerID
-	}
+	containerIsNotRestarted := utils.PodHasContainerStatuses(pod) && backup.Status.InstanceID.ContainerID == pod.Status.ContainerStatuses[0].ContainerID
 	isPodActive := utils.IsPodActive(pod)
 	if isCorrectPodElected && containerIsNotRestarted && isPodActive {
 		contextLogger.Info("Backup is already running on",
