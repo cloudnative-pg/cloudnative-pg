@@ -46,7 +46,7 @@ var _ = Describe("BackupStatus structure", func() {
 			},
 		}
 
-		status.SetAsStarted(&pod, BackupMethodBarmanObjectStore)
+		status.SetAsStarted(pod.Name, pod.Status.ContainerStatuses[0].ContainerID, BackupMethodBarmanObjectStore)
 		Expect(status.Phase).To(BeEquivalentTo(BackupPhaseStarted))
 		Expect(status.InstanceID).ToNot(BeNil())
 		Expect(status.InstanceID.PodName).To(Equal("cluster-example-1"))
