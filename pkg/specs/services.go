@@ -114,14 +114,14 @@ func CreateClusterReadWriteService(cluster apiv1.Cluster) *corev1.Service {
 	}
 }
 
-// CreateManagedServices creates a list of Kubernetes Services based on the
+// BuildManagedServices creates a list of Kubernetes Services based on the
 // additional managed services specified in the Cluster's ManagedServices configuration.
 // Returns:
 // - []corev1.Service: a slice of Service objects created from the managed services configuration.
 // - error: an error if the creation of any service fails, otherwise nil.
 //
 // Example usage:
-// services, err := CreateManagedServices(cluster)
+// services, err := BuildManagedServices(cluster)
 //
 //	if err != nil {
 //	    // handle error
@@ -130,7 +130,7 @@ func CreateClusterReadWriteService(cluster apiv1.Cluster) *corev1.Service {
 //	for idx := range services {
 //	    // use the created services
 //	}
-func CreateManagedServices(cluster apiv1.Cluster) ([]corev1.Service, error) {
+func BuildManagedServices(cluster apiv1.Cluster) ([]corev1.Service, error) {
 	if cluster.Spec.Managed == nil || cluster.Spec.Managed.Services == nil {
 		return nil, nil
 	}
@@ -149,7 +149,8 @@ func CreateManagedServices(cluster apiv1.Cluster) ([]corev1.Service, error) {
 			return nil, err
 		}
 		builder := servicespec.NewFrom(&serviceConfiguration.ServiceTemplate).
-			WithServiceType(defaultService.Spec.Type, false)
+			WithServiceType(defaultService.Spec.Type, false).
+			WithLabel(utils.IsManagedLabelName, "true")
 
 		for idx := range defaultService.Spec.Selector {
 			builder = builder.WithSelector(defaultService.Spec.Selector[idx], true)

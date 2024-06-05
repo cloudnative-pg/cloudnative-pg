@@ -302,65 +302,90 @@ func (r *ClusterReconciler) reconcilePoolerSecrets(ctx context.Context, cluster 
 }
 
 func (r *ClusterReconciler) reconcilePostgresServices(ctx context.Context, cluster *apiv1.Cluster) error {
-	if configuration.Current.CreateAnyService {
-		anyService := specs.CreateClusterAnyService(*cluster)
-		cluster.SetInheritedDataAndOwnership(&anyService.ObjectMeta)
+	anyService := specs.CreateClusterAnyService(*cluster)
+	cluster.SetInheritedDataAndOwnership(&anyService.ObjectMeta)
 
-		if err := r.serviceReconciler(ctx, anyService); err != nil {
-			return err
-		}
+	if err := r.serviceReconciler(ctx, anyService, configuration.Current.CreateAnyService); err != nil {
+		return err
 	}
 
-	if cluster.IsReadServiceEnabled() {
-		readService := specs.CreateClusterReadService(*cluster)
-		cluster.SetInheritedDataAndOwnership(&readService.ObjectMeta)
+	readService := specs.CreateClusterReadService(*cluster)
+	cluster.SetInheritedDataAndOwnership(&readService.ObjectMeta)
 
-		if err := r.serviceReconciler(ctx, readService); err != nil {
-			return err
-		}
+	if err := r.serviceReconciler(ctx, readService, cluster.IsReadServiceEnabled()); err != nil {
+		return err
 	}
 
-	if cluster.IsReadOnlyServiceEnabled() {
-		readOnlyService := specs.CreateClusterReadOnlyService(*cluster)
-		cluster.SetInheritedDataAndOwnership(&readOnlyService.ObjectMeta)
+	readOnlyService := specs.CreateClusterReadOnlyService(*cluster)
+	cluster.SetInheritedDataAndOwnership(&readOnlyService.ObjectMeta)
 
-		if err := r.serviceReconciler(ctx, readOnlyService); err != nil {
-			return err
-		}
+	if err := r.serviceReconciler(ctx, readOnlyService, cluster.IsReadOnlyServiceEnabled()); err != nil {
+		return err
 	}
 
-	if cluster.IsReadWriteServiceEnabled() {
-		readWriteService := specs.CreateClusterReadWriteService(*cluster)
-		cluster.SetInheritedDataAndOwnership(&readWriteService.ObjectMeta)
+	readWriteService := specs.CreateClusterReadWriteService(*cluster)
+	cluster.SetInheritedDataAndOwnership(&readWriteService.ObjectMeta)
 
-		if err := r.serviceReconciler(ctx, readWriteService); err != nil {
-			return err
-		}
+	if err := r.serviceReconciler(ctx, readWriteService, cluster.IsReadWriteServiceEnabled()); err != nil {
+		return err
 	}
 
-	services, err := specs.CreateManagedServices(*cluster)
+	return r.reconcileManagedServices(ctx, cluster)
+}
+
+func (r *ClusterReconciler) reconcileManagedServices(ctx context.Context, cluster *apiv1.Cluster) error {
+	services, err := specs.BuildManagedServices(*cluster)
 	if err != nil {
 		return err
 	}
-	for idx := range services {
-		if err := r.serviceReconciler(ctx, &services[idx]); err != nil {
+
+	var livingManagedSvcs corev1.ServiceList
+	if err := r.Client.List(ctx, &livingManagedSvcs, client.InNamespace(cluster.Namespace), client.MatchingLabels{
+		utils.IsManagedLabelName: "true",
+		utils.ClusterLabelName:   cluster.Name,
+	}); err != nil {
+		return err
+	}
+
+	for idx := range livingManagedSvcs.Items {
+		svc := livingManagedSvcs.Items[idx]
+		for idx := range services {
+			expectedSvc := services[idx]
+			if expectedSvc.Name != svc.Name {
+				continue
+			}
+			if err := r.serviceReconciler(ctx, &expectedSvc, true); err != nil {
+				return err
+			}
+			break
+		}
+		// if we have a managed service that is not appearing in the expecting managed services we should delete it
+		if err := r.Client.Delete(ctx, &svc); err != nil {
 			return err
 		}
 	}
-
 	return nil
 }
 
-func (r *ClusterReconciler) serviceReconciler(ctx context.Context, proposed *corev1.Service) error {
+func (r *ClusterReconciler) serviceReconciler(
+	ctx context.Context,
+	proposed *corev1.Service,
+	enabled bool,
+) error {
 	var livingService corev1.Service
 	err := r.Client.Get(ctx, types.NamespacedName{Name: proposed.Name, Namespace: proposed.Namespace}, &livingService)
 	if apierrs.IsNotFound(err) {
+		if !enabled {
+			return nil
+		}
 		return r.Client.Create(ctx, proposed)
 	}
 	if err != nil {
 		return err
 	}
-
+	if !enabled {
+		return r.Client.Delete(ctx, &livingService)
+	}
 	var shouldUpdate bool
 
 	// we ensure that the selector perfectly match
