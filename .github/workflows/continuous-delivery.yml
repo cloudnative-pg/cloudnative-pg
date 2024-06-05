@@ -2112,7 +2112,7 @@ jobs:
           SLACK_ICON: https://avatars.githubusercontent.com/u/85171364?size=48
           SLACK_USERNAME: ${{ env.SLACK_USERNAME }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-          SLACK_TITLE: Ciclops view for: ${{github.repository}}
+          SLACK_TITLE: Ciclops view for ${{github.repository}}
           SLACK_MESSAGE: |
             ${{ steps.generate-summary.outputs.alerts &&
               steps.generate-summary.outputs.thermometer
