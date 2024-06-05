@@ -2380,7 +2380,7 @@ type ExternalCluster struct {
 
 // AppendAdditionalCommandArgs adds custom arguments as barman-cloud-backup command-line options
 func (cfg *DataBackupConfiguration) AppendAdditionalCommandArgs(options []string) []string {
-	if cfg == nil {
+	if cfg == nil || len(cfg.AdditionalCommandArgs) == 0 {
 		return options
 	}
 	return appendAdditionalCommandArgs(cfg.AdditionalCommandArgs, options)
@@ -2388,26 +2388,26 @@ func (cfg *DataBackupConfiguration) AppendAdditionalCommandArgs(options []string
 
 // AppendAdditionalCommandArgs adds custom arguments as barman-cloud-wal-archive command-line options
 func (cfg *WalBackupConfiguration) AppendAdditionalCommandArgs(options []string) []string {
-	if cfg == nil {
+	if cfg == nil || len(cfg.AdditionalCommandArgs) == 0 {
 		return options
 	}
 	return appendAdditionalCommandArgs(cfg.AdditionalCommandArgs, options)
 }
 
 func appendAdditionalCommandArgs(additionalCommandArgs []string, options []string) []string {
-	optionsKeys := map[string]bool{}
+	optionKeys := map[string]bool{}
 	for _, option := range options {
 		key := strings.Split(option, "=")[0]
 		if key != "" {
-			optionsKeys[key] = true
+			optionKeys[key] = true
 		}
 	}
-	for _, userOption := range additionalCommandArgs {
-		key := strings.Split(userOption, "=")[0]
-		if key == "" || slices.Contains(options, key) || optionsKeys[key] {
+	for _, additionalCommandArg := range additionalCommandArgs {
+		key := strings.Split(additionalCommandArg, "=")[0]
+		if key == "" || slices.Contains(options, key) || optionKeys[key] {
 			continue
 		}
-		options = append(options, userOption)
+		options = append(options, additionalCommandArg)
 	}
 	return options
 }
