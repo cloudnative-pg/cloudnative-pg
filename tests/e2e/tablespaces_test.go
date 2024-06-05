@@ -659,7 +659,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 
 				cluster, err = env.GetCluster(namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
-				Expect(cluster.ContainsTablespaces()).To(BeTrue())
+				Expect(cluster.ContainsTablespaces()).To(BeFalse())
 			})
 			By("verify tablespaces and PVC were created", func() {
 				cluster, err := env.GetCluster(namespace, clusterName)

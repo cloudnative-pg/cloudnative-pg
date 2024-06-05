@@ -2108,7 +2108,9 @@ jobs:
         #     startsWith(needs.evaluate_options.outputs.git_ref, 'refs/heads/release-')
         #   )
         env:
-          SLACK_COLOR: ${{ steps.generate-summary.outputs.alerts && 'failure' || 'success' }}
+          # SLACK_COLOR is where we distinguish a run with/without alerts. It's where the
+          # action has hooks for conditionality in the message body (yeah, weird)
+          SLACK_COLOR: ${{ steps.generate-summary.outputs.alerts && 'failure' || 'success' }} 
           SLACK_ICON: https://avatars.githubusercontent.com/u/85171364?size=48
           SLACK_USERNAME: ${{ env.SLACK_USERNAME }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
@@ -2117,9 +2119,10 @@ jobs:
             ${{steps.generate-summary.outputs.thermometer}}
           SLACK_MESSAGE_ON_FAILURE: |
             ${{steps.generate-summary.outputs.thermometer}}
-            :warning: ${{steps.generate-summary.outputs.alerts}}
+            :warning: **There are systematic failures!**
+            ${{steps.generate-summary.outputs.alerts}}
           SLACK_FOOTER: |
-            <${{ github.server_url }}/${{github.repository}}/actions/runs/${{ github.run_id }}|See full CI run>
+            <${{ github.server_url }}/${{github.repository}}/actions/runs/${{ github.run_id }}|**See full CI run**>
 
       - name: Delete the downloaded files
         run: rm -rf test-artifacts
