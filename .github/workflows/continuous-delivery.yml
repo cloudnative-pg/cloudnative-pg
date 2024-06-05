@@ -338,7 +338,7 @@ jobs:
           echo PWD=$(pwd) >> $GITHUB_ENV
       -
         name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v5
+        uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
           version: latest
@@ -456,7 +456,7 @@ jobs:
       # NOTE: we only fire this in TEST DEPTH = 4, as that is the level of the
       # upgrade test
         name: Build binary for upgrade test
-        uses: goreleaser/goreleaser-action@v5
+        uses: goreleaser/goreleaser-action@v6
         if: |
           always() && !cancelled() &&
           needs.evaluate_options.outputs.test_level == '4'
