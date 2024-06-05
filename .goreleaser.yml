@@ -1,3 +1,4 @@
+version: 2
 project_name: cnpg
 
 release:
@@ -100,7 +101,7 @@ snapshot:
   name_template: "{{ .Tag }}-next"
 
 changelog:
-  skip: true
+  disable: true
 
 signs:
   - artifacts: checksum
