@@ -2108,7 +2108,7 @@ jobs:
         #     startsWith(needs.evaluate_options.outputs.git_ref, 'refs/heads/release-')
         #   )
         env:
-          SLACK_COLOR: ${{ steps.generate-summary.outputs.alerts && failure || success }}
+          SLACK_COLOR: ${{ steps.generate-summary.outputs.alerts && 'failure' || 'success' }}
           SLACK_ICON: https://avatars.githubusercontent.com/u/85171364?size=48
           SLACK_USERNAME: ${{ env.SLACK_USERNAME }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
