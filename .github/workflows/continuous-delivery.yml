@@ -2100,20 +2100,21 @@ jobs:
 
       - name: If there are alerts, send them over Slack
         uses: rtCamp/action-slack-notify@v2
-        if: |
-          steps.generate-summary.outputs.alerts &&
-          github.repository_owner == env.REPOSITORY_OWNER &&
-          (
-            github.event_name == 'schedule' ||
-            startsWith(needs.evaluate_options.outputs.git_ref, 'refs/heads/release-')
-          )
+        # if: |
+        #   steps.generate-summary.outputs.alerts &&
+        #   github.repository_owner == env.REPOSITORY_OWNER &&
+        #   (
+        #     github.event_name == 'schedule' ||
+        #     startsWith(needs.evaluate_options.outputs.git_ref, 'refs/heads/release-')
+        #   )
         env:
-          SLACK_COLOR: "danger"
+          SLACK_COLOR: ${{ job.status }}
           SLACK_ICON: https://avatars.githubusercontent.com/u/85171364?size=48
           SLACK_USERNAME: ${{ env.SLACK_USERNAME }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-          SLACK_TITLE: CIclops found systematic failures in the E2E tests in ${{github.repository}} repository
+          SLACK_TITLE: Ciclops (prototype) view for the E2E tests in the ${{github.repository}} repository
           SLACK_MESSAGE: |
+            ${{steps.generate-summary.outputs.thermometer}}
             :warning: ${{steps.generate-summary.outputs.alerts}}
             <${{ github.server_url }}/${{github.repository}}/actions/runs/${{ github.run_id }}|See full CI run>
 
