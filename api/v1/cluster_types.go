@@ -1171,7 +1171,6 @@ const (
 
 	// DefaultMaxSwitchoverDelay is the default for the pg_ctl timeout in seconds when a primary PostgreSQL instance
 	// is gracefully shutdown during a switchover.
-	// It is greater than one year in seconds, big enough to simulate an infinite timeout
 	DefaultMaxSwitchoverDelay = 3600
 
 	// DefaultStartupDelay is the default value for startupDelay, startupDelay will be used to calculate the
