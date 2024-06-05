@@ -360,7 +360,7 @@ func (r *ClusterReconciler) reconcileManagedServices(ctx context.Context, cluste
 			break
 		}
 		// if we have a managed service that is not appearing in the expecting managed services we should delete it
-		if err := r.Client.Delete(ctx, &svc); err != nil {
+		if err := r.Client.Delete(ctx, &svc); err != nil && !apierrs.IsNotFound(err) {
 			return err
 		}
 	}
