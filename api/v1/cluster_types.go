@@ -2395,9 +2395,16 @@ func (cfg *WalBackupConfiguration) AppendAdditionalCommandArgs(options []string)
 }
 
 func appendAdditionalCommandArgs(additionalCommandArgs []string, options []string) []string {
+	optionsKeys := map[string]bool{}
+	for _, option := range options {
+		key := strings.Split(option, "=")[0]
+		if key != "" {
+			optionsKeys[key] = true
+		}
+	}
 	for _, userOption := range additionalCommandArgs {
 		key := strings.Split(userOption, "=")[0]
-		if key == "" || slices.Contains(options, key) {
+		if key == "" || slices.Contains(options, key) || optionsKeys[key] {
 			continue
 		}
 		options = append(options, userOption)
