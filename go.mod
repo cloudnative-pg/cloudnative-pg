@@ -15,7 +15,6 @@ require (
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/jackc/pgx/v5 v5.6.0
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
-	github.com/kubernetes-csi/external-snapshotter/client/v7 v7.0.0
 	github.com/kubernetes-csi/external-snapshotter/client/v8 v8.0.0
 	github.com/lib/pq v1.10.9
 	github.com/logrusorgru/aurora/v4 v4.0.0
