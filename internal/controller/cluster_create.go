@@ -389,7 +389,7 @@ func (r *ClusterReconciler) serviceReconciler(
 		return err
 	}
 
-	if clusterName, isOwned := IsOwnedByCluster(&livingService); !isOwned || clusterName != cluster.Name {
+	if clusterName, _ := IsOwnedByCluster(&livingService); clusterName != cluster.Name {
 		return fmt.Errorf("refusing to reconcile service: %s, not owned by the cluster", livingService.Name)
 	}
 
