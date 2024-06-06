@@ -1705,7 +1705,7 @@ jobs:
           LEADER_ELECTION: "true"
           LEADER_LEASE_DURATION: 20
           LEADER_RENEW_DEADLINE: 25
-          LIVENESS_PROBE_THRESHOLD: 3
+          LIVENESS_PROBE_THRESHOLD: 9
           LOG_LEVEL: ${{ needs.evaluate_options.outputs.log_level }}
         run: |
           LOG_LEVEL=${LOG_LEVEL:-info}
