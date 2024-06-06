@@ -57,7 +57,6 @@ var (
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			clusterName := args[0]
-
 			off := newOffCommand(cmd.Context(), clusterName)
 			return off.execute()
 		},
