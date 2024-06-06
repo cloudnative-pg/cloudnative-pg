@@ -311,7 +311,7 @@ go-licenses: ## Download go-licenses locally if necessary.
 
 GO_RELEASER = $(LOCALBIN)/goreleaser
 go-releaser: ## Download go-releaser locally if necessary.
-	$(call go-install-tool,$(GO_RELEASER),github.com/goreleaser/goreleaser@$(GORELEASER_VERSION))
+	$(call go-install-tool,$(GO_RELEASER),github.com/goreleaser/goreleaser/v2@$(GORELEASER_VERSION))
 
 .PHONY: govulncheck
 GOVULNCHECK = $(LOCALBIN)/govulncheck
