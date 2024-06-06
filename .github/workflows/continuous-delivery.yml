@@ -1702,10 +1702,10 @@ jobs:
         env:
           ## the following variable all need be set if we use env_override_customized.yaml.template
           ## this is customization for gke
-          LEADER_ELECTION: "false"
-          LEADER_LEASE_DURATION: 240
-          LEADER_RENEW_DEADLINE: 230
-          LIVENESS_PROBE_THRESHOLD: 9
+          LEADER_ELECTION: "true"
+          LEADER_LEASE_DURATION: 20
+          LEADER_RENEW_DEADLINE: 25
+          LIVENESS_PROBE_THRESHOLD: 3
           LOG_LEVEL: ${{ needs.evaluate_options.outputs.log_level }}
         run: |
           LOG_LEVEL=${LOG_LEVEL:-info}
