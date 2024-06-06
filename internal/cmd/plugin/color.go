@@ -25,6 +25,34 @@ import (
 	"golang.org/x/term"
 )
 
+type colorValue string
+
+const (
+	colorAlways colorValue = "always"
+	colorAuto   colorValue = "auto"
+	colorNever  colorValue = "never"
+)
+
+// String implements pflag.Value interface
+func (e colorValue) String() string {
+	return string(e)
+}
+
+// Set implements pflag.Value interface
+func (e *colorValue) Set(val string) error {
+	colorVal := colorValue(val)
+	if colorVal != colorAlways && colorVal != colorAuto && colorVal != colorNever {
+		return fmt.Errorf("invalid value for enum: %s", val)
+	}
+	*e = colorVal
+	return nil
+}
+
+// Type implements pflag.Value interface
+func (e *colorValue) Type() string {
+	return "string"
+}
+
 // ConfigureColor renews aurora.DefaultColorizer based on flags and TTY
 func ConfigureColor(cmd *cobra.Command) error {
 	return configureColor(cmd, term.IsTerminal(int(os.Stdout.Fd())))
@@ -37,12 +65,12 @@ func configureColor(cmd *cobra.Command, isTTY bool) error {
 	}
 
 	var shouldColorize bool
-	switch colorFlag {
-	case "always":
+	switch colorValue(colorFlag) {
+	case colorAlways:
 		shouldColorize = true
-	case "never":
+	case colorNever:
 		shouldColorize = false
-	case "auto":
+	case colorAuto:
 		shouldColorize = isTTY
 	default:
 		return fmt.Errorf("invalid value for --color: %s, must be one of 'always', 'auto', or 'never'", colorFlag)
@@ -57,10 +85,12 @@ func configureColor(cmd *cobra.Command, isTTY bool) error {
 
 // AddColorControlFlag adds color control flags to the command
 func AddColorControlFlag(cmd *cobra.Command) {
-	cmd.Flags().String("color", "auto", "Control color output; options include 'always', 'auto', or 'never'")
+	// By default, color is set to 'auto'
+	colorValue := colorAuto
+	cmd.Flags().Var(&colorValue, "color", "Control color output; options include 'always', 'auto', or 'never'")
 	_ = cmd.RegisterFlagCompletionFunc("color",
 		func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
-			return []string{"always", "auto", "never"},
+			return []string{colorAlways.String(), colorAuto.String(), colorNever.String()},
 				cobra.ShellCompDirectiveDefault | cobra.ShellCompDirectiveKeepOrder
 		})
 }
