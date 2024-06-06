@@ -87,9 +87,9 @@ var _ = Describe("PostgresManager", func() {
 		})
 
 		It("should successfully list replication slots", func() {
-			rows := sqlmock.NewRows([]string{"slot_name", "slot_type", "active", "restart_lsn"}).
-				AddRow("_cnpg_slot1", string(SlotTypePhysical), true, "lsn1").
-				AddRow("slot2", string(SlotTypePhysical), true, "lsn2")
+			rows := sqlmock.NewRows([]string{"slot_name", "slot_type", "active", "restart_lsn", "holds_xmin"}).
+				AddRow("_cnpg_slot1", string(SlotTypePhysical), true, "lsn1", false).
+				AddRow("slot2", string(SlotTypePhysical), true, "lsn2", false)
 
 			mock.ExpectQuery("^SELECT (.+) FROM pg_replication_slots").
 				WillReturnRows(rows)

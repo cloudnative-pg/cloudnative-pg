@@ -177,8 +177,11 @@ func synchronizeReplicationSlots(
 		}
 	}
 	for _, slot := range slotsInLocal.Items {
-		// We delete the slots not present on the primary or old HA replication slots.
-		if !slotsInPrimary.Has(slot.SlotName) || slot.SlotName == mySlotName {
+		// Delete slots on standby with wrong state:
+		//  * slots not present on the primary
+		//  * the slot used by this node
+		//  * slots holding xmin (this can happen on a former primary)
+		if !slotsInPrimary.Has(slot.SlotName) || slot.SlotName == mySlotName || slot.HoldsXmin {
 			if err := localSlotManager.Delete(ctx, slot); err != nil {
 				return err
 			}
