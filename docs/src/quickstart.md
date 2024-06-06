@@ -203,7 +203,8 @@ After completion, you will have Prometheus, Grafana and Alert Manager installed 
 - The Grafana installation will be watching for a Grafana dashboard `ConfigMap`.
 
 !!! See also
-    For further information about the above command, refer to the [helm install](https://helm.sh/docs/helm/helm_install/)       documentation. 
+    For further information about the above command, refer to the [helm install](https://helm.sh/docs/helm/helm_install/)
+    documentation. 
 
 You can see several Custom Resources have been created:
 
