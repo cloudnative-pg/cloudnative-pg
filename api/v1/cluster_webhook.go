@@ -375,6 +375,7 @@ func (r *Cluster) Validate() (allErrs field.ErrorList) {
 		r.validateLDAP,
 		r.validateReplicationSlots,
 		r.validateEnv,
+		r.validateManagedServices,
 		r.validateManagedRoles,
 		r.validateManagedExtensions,
 		r.validateResources,
@@ -2436,6 +2437,26 @@ func (gcs *GoogleCredentials) validateGCSCredentials(path *field.Path) field.Err
 	return allErrors
 }
 
+func (r *Cluster) validateManagedServices() field.ErrorList {
+	if r.Spec.Managed == nil {
+		return nil
+	}
+	if r.Spec.Managed.Services == nil {
+		return nil
+	}
+	var errs field.ErrorList
+	for idx := range r.Spec.Managed.Services.Additional {
+		serviceTemplate := &r.Spec.Managed.Services.Additional[idx]
+		errs = append(errs, validateServiceTemplate(
+			field.NewPath("spec", "managed", "services", fmt.Sprintf("additional[%d]", idx)),
+			true,
+			serviceTemplate.ServiceTemplate,
+		)...)
+	}
+
+	return errs
+}
+
 // validateManagedRoles validate the environment variables settings proposed by the user
 func (r *Cluster) validateManagedRoles() field.ErrorList {
 	var result field.ErrorList
@@ -2589,4 +2610,24 @@ func (r *Cluster) validateHibernationAnnotation() field.ErrorList {
 	}
 }
 
-// TODO: validation of servicetemplate
+func validateServiceTemplate(
+	path *field.Path,
+	nameRequired bool,
+	specs ...ServiceTemplateSpec,
+) field.ErrorList {
+	var errs field.ErrorList
+	for idx := range specs {
+		spec := specs[idx]
+		name := spec.ObjectMeta.Name
+		if name == "" && nameRequired {
+			errs = append(errs, field.Invalid(path, name, "name is required"))
+			continue
+		}
+		if name != "" && !nameRequired {
+			errs = append(errs, field.Invalid(path, name, "name is not allowed"))
+			continue
+		}
+	}
+
+	return errs
+}

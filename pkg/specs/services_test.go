@@ -125,7 +125,7 @@ var _ = Describe("BuildManagedServices", func() {
 			services, err := BuildManagedServices(cluster)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(services).NotTo(BeNil())
-			Expect(len(services)).To(HaveLen(1))
+			Expect(services).To(HaveLen(1))
 			Expect(services[0].ObjectMeta.Name).To(Equal("test-service"))
 			Expect(services[0].ObjectMeta.Labels).To(HaveKeyWithValue(utils.IsManagedLabelName, "true"))
 			Expect(services[0].ObjectMeta.Labels).To(HaveKeyWithValue("test-label", "test-value"))

@@ -4663,3 +4663,82 @@ var _ = Describe("Validate hibernation", func() {
 		Expect(cluster.validateHibernationAnnotation()).To(HaveLen(1))
 	})
 })
+
+var _ = Describe("ServiceTemplate Validation", func() {
+	var (
+		path         *field.Path
+		serviceSpecs []ServiceTemplateSpec
+	)
+
+	BeforeEach(func() {
+		path = field.NewPath("spec")
+	})
+
+	Describe("validateServiceTemplate", func() {
+		Context("when name is required", func() {
+			It("should return an error if the name is empty", func() {
+				serviceSpecs = []ServiceTemplateSpec{
+					{ObjectMeta: Metadata{Name: ""}},
+				}
+
+				errs := validateServiceTemplate(path, true, serviceSpecs...)
+				Expect(errs).To(HaveLen(1))
+				Expect(errs[0].Error()).To(ContainSubstring("name is required"))
+			})
+
+			It("should not return an error if the name is present", func() {
+				serviceSpecs = []ServiceTemplateSpec{
+					{ObjectMeta: Metadata{Name: "valid-name"}},
+				}
+
+				errs := validateServiceTemplate(path, true, serviceSpecs...)
+				Expect(errs).To(BeEmpty())
+			})
+		})
+
+		Context("when name is not allowed", func() {
+			It("should return an error if the name is present", func() {
+				serviceSpecs = []ServiceTemplateSpec{
+					{ObjectMeta: Metadata{Name: "invalid-name"}},
+				}
+
+				errs := validateServiceTemplate(path, false, serviceSpecs...)
+				Expect(errs).To(HaveLen(1))
+				Expect(errs[0].Error()).To(ContainSubstring("name is not allowed"))
+			})
+
+			It("should not return an error if the name is empty", func() {
+				serviceSpecs = []ServiceTemplateSpec{
+					{ObjectMeta: Metadata{Name: ""}},
+				}
+
+				errs := validateServiceTemplate(path, false, serviceSpecs...)
+				Expect(errs).To(BeEmpty())
+			})
+		})
+
+		Context("multiple specs", func() {
+			It("should validate each spec individually", func() {
+				serviceSpecs = []ServiceTemplateSpec{
+					{ObjectMeta: Metadata{Name: ""}},
+					{ObjectMeta: Metadata{Name: "valid-name"}},
+				}
+
+				errs := validateServiceTemplate(path, true, serviceSpecs...)
+				Expect(errs).To(HaveLen(1))
+				Expect(errs[0].Error()).To(ContainSubstring("name is required"))
+			})
+
+			It("should return errors for all invalid specs", func() {
+				serviceSpecs = []ServiceTemplateSpec{
+					{ObjectMeta: Metadata{Name: ""}},
+					{ObjectMeta: Metadata{Name: "invalid-name"}},
+				}
+
+				errs := validateServiceTemplate(path, true, serviceSpecs...)
+				Expect(errs).To(HaveLen(1))
+				Expect(errs[0].Error()).To(ContainSubstring("name is required"))
+			})
+		})
+	})
+})
