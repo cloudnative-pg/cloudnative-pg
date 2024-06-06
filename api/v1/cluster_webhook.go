@@ -2438,6 +2438,17 @@ func (gcs *GoogleCredentials) validateGCSCredentials(path *field.Path) field.Err
 }
 
 func (r *Cluster) validateManagedServices() field.ErrorList {
+	hasDuplicates := func(strings []string) bool {
+		seen := make(map[string]bool)
+		for _, str := range strings {
+			if seen[str] {
+				return true
+			}
+			seen[str] = true
+		}
+		return false
+	}
+
 	if r.Spec.Managed == nil {
 		return nil
 	}
@@ -2445,13 +2456,27 @@ func (r *Cluster) validateManagedServices() field.ErrorList {
 		return nil
 	}
 	var errs field.ErrorList
+	var names []string
 	for idx := range r.Spec.Managed.Services.Additional {
 		serviceTemplate := &r.Spec.Managed.Services.Additional[idx]
-		errs = append(errs, validateServiceTemplate(
+		fieldErr := validateServiceTemplate(
 			field.NewPath("spec", "managed", "services", fmt.Sprintf("additional[%d]", idx)),
 			true,
 			serviceTemplate.ServiceTemplate,
-		)...)
+		)
+		if len(errs) > 0 {
+			errs = append(errs, fieldErr...)
+		} else {
+			names = append(names, serviceTemplate.ServiceTemplate.ObjectMeta.Name)
+		}
+	}
+
+	if hasDuplicates(names) {
+		errs = append(errs, field.Invalid(
+			field.NewPath("spec", "managed", "services", "additional"),
+			names,
+			"contains services with the same .metadata.name",
+		))
 	}
 
 	return errs

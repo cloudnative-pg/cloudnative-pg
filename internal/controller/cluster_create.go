@@ -305,28 +305,28 @@ func (r *ClusterReconciler) reconcilePostgresServices(ctx context.Context, clust
 	anyService := specs.CreateClusterAnyService(*cluster)
 	cluster.SetInheritedDataAndOwnership(&anyService.ObjectMeta)
 
-	if err := r.serviceReconciler(ctx, anyService, configuration.Current.CreateAnyService); err != nil {
+	if err := r.serviceReconciler(ctx, anyService, configuration.Current.CreateAnyService, cluster); err != nil {
 		return err
 	}
 
 	readService := specs.CreateClusterReadService(*cluster)
 	cluster.SetInheritedDataAndOwnership(&readService.ObjectMeta)
 
-	if err := r.serviceReconciler(ctx, readService, cluster.IsReadServiceEnabled()); err != nil {
+	if err := r.serviceReconciler(ctx, readService, cluster.IsReadServiceEnabled(), cluster); err != nil {
 		return err
 	}
 
 	readOnlyService := specs.CreateClusterReadOnlyService(*cluster)
 	cluster.SetInheritedDataAndOwnership(&readOnlyService.ObjectMeta)
 
-	if err := r.serviceReconciler(ctx, readOnlyService, cluster.IsReadOnlyServiceEnabled()); err != nil {
+	if err := r.serviceReconciler(ctx, readOnlyService, cluster.IsReadOnlyServiceEnabled(), cluster); err != nil {
 		return err
 	}
 
 	readWriteService := specs.CreateClusterReadWriteService(*cluster)
 	cluster.SetInheritedDataAndOwnership(&readWriteService.ObjectMeta)
 
-	if err := r.serviceReconciler(ctx, readWriteService, cluster.IsReadWriteServiceEnabled()); err != nil {
+	if err := r.serviceReconciler(ctx, readWriteService, cluster.IsReadWriteServiceEnabled(), cluster); err != nil {
 		return err
 	}
 
@@ -354,10 +354,14 @@ func (r *ClusterReconciler) reconcileManagedServices(ctx context.Context, cluste
 			if expectedSvc.Name != svc.Name {
 				continue
 			}
-			if err := r.serviceReconciler(ctx, &expectedSvc, true); err != nil {
+			if err := r.serviceReconciler(ctx, &expectedSvc, true, cluster); err != nil {
 				return err
 			}
 			break
+		}
+
+		if clusterName, _ := IsOwnedByCluster(&svc); clusterName != cluster.Name {
+			continue
 		}
 		// if we have a managed service that is not appearing in the expecting managed services we should delete it
 		if err := r.Client.Delete(ctx, &svc); err != nil && !apierrs.IsNotFound(err) {
@@ -371,6 +375,7 @@ func (r *ClusterReconciler) serviceReconciler(
 	ctx context.Context,
 	proposed *corev1.Service,
 	enabled bool,
+	cluster *apiv1.Cluster,
 ) error {
 	var livingService corev1.Service
 	err := r.Client.Get(ctx, types.NamespacedName{Name: proposed.Name, Namespace: proposed.Namespace}, &livingService)
@@ -383,6 +388,11 @@ func (r *ClusterReconciler) serviceReconciler(
 	if err != nil {
 		return err
 	}
+
+	if clusterName, isOwned := IsOwnedByCluster(&livingService); !isOwned || clusterName != cluster.Name {
+		return fmt.Errorf("refusing to reconcile service: %s, not owned by the cluster", livingService.Name)
+	}
+
 	if !enabled {
 		return r.Client.Delete(ctx, &livingService)
 	}

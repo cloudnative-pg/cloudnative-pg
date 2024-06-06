@@ -1129,6 +1129,10 @@ var _ = Describe("Service Reconciling", func() {
 	BeforeEach(func() {
 		ctx = context.Background()
 		cluster = apiv1.Cluster{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       apiv1.ClusterKind,
+				APIVersion: apiv1.GroupVersion.String(),
+			},
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test-cluster",
 				Namespace: "default",
@@ -1142,7 +1146,9 @@ var _ = Describe("Service Reconciling", func() {
 			},
 		}
 
-		serviceClient = fake.NewClientBuilder().WithScheme(schemeBuilder.BuildWithAllKnownScheme()).Build()
+		serviceClient = fake.NewClientBuilder().
+			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+			Build()
 		reconciler = &ClusterReconciler{
 			Client: serviceClient,
 		}
@@ -1162,11 +1168,12 @@ var _ = Describe("Service Reconciling", func() {
 					Ports:    []corev1.ServicePort{{Port: 80}},
 				},
 			}
+			cluster.SetInheritedDataAndOwnership(&proposedService.ObjectMeta)
 		})
 
 		Context("when service does not exist", func() {
 			It("should create a new service if enabled", func() {
-				err := reconciler.serviceReconciler(ctx, proposedService, true)
+				err := reconciler.serviceReconciler(ctx, proposedService, true, &cluster)
 				Expect(err).NotTo(HaveOccurred())
 
 				var createdService corev1.Service
@@ -1179,7 +1186,7 @@ var _ = Describe("Service Reconciling", func() {
 			})
 
 			It("should not create a new service if not enabled", func() {
-				err := reconciler.serviceReconciler(ctx, proposedService, false)
+				err := reconciler.serviceReconciler(ctx, proposedService, false, &cluster)
 				Expect(err).NotTo(HaveOccurred())
 
 				var createdService corev1.Service
@@ -1199,7 +1206,7 @@ var _ = Describe("Service Reconciling", func() {
 			})
 
 			It("should delete the service if not enabled", func() {
-				err := reconciler.serviceReconciler(ctx, proposedService, false)
+				err := reconciler.serviceReconciler(ctx, proposedService, false, &cluster)
 				Expect(err).NotTo(HaveOccurred())
 
 				var deletedService corev1.Service
@@ -1216,7 +1223,7 @@ var _ = Describe("Service Reconciling", func() {
 				err := serviceClient.Update(ctx, existingService)
 				Expect(err).NotTo(HaveOccurred())
 
-				err = reconciler.serviceReconciler(ctx, proposedService, true)
+				err = reconciler.serviceReconciler(ctx, proposedService, true, &cluster)
 				Expect(err).NotTo(HaveOccurred())
 
 				var updatedService corev1.Service
@@ -1238,7 +1245,7 @@ var _ = Describe("Service Reconciling", func() {
 				proposedService.Labels = map[string]string{"app": "test"}
 				proposedService.Annotations = map[string]string{"annotation": "test"}
 
-				err = reconciler.serviceReconciler(ctx, proposedService, true)
+				err = reconciler.serviceReconciler(ctx, proposedService, true, &cluster)
 				Expect(err).NotTo(HaveOccurred())
 
 				var updatedService corev1.Service

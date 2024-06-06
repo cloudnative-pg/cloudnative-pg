@@ -169,7 +169,6 @@ func BuildManagedServices(cluster apiv1.Cluster) ([]corev1.Service, error) {
 		}
 
 		serviceTemplate := builder.Build()
-
 		services[i] = corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:        serviceTemplate.ObjectMeta.Name,
@@ -179,6 +178,7 @@ func BuildManagedServices(cluster apiv1.Cluster) ([]corev1.Service, error) {
 			},
 			Spec: serviceTemplate.Spec,
 		}
+		cluster.SetInheritedDataAndOwnership(&services[i].ObjectMeta)
 	}
 
 	return services, nil
