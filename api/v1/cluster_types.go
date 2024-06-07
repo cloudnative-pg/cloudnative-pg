@@ -370,6 +370,13 @@ type ClusterSpec struct {
 	// +optional
 	FailoverDelay int32 `json:"failoverDelay,omitempty"`
 
+	// LivenessProbeTimeout is the time (in seconds) that is allowed for a PostgreSQL instance
+	// to successfully respond to the liveness probe (default 30).
+	// The Liveness probe failure threshold is derived from this value using the formula:
+	// ceiling(livenessProbe / 10).
+	// +optional
+	LivenessProbeTimeout *int32 `json:"livenessProbeTimeout,omitempty"`
+
 	// Affinity/Anti-affinity rules for Pods
 	// +optional
 	Affinity AffinityConfiguration `json:"affinity,omitempty"`
