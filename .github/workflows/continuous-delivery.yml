@@ -2118,15 +2118,15 @@ jobs:
           SLACK_ICON: https://avatars.githubusercontent.com/u/85171364?size=48
           SLACK_USERNAME: ${{ env.SLACK_USERNAME }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-          SLACK_TITLE: CICLOPS view for ${{github.repository}}
+          SLACK_TITLE: CICLOPS view for ${{ github.repository }}
           SLACK_MESSAGE_ON_SUCCESS: |
-            ${{steps.generate-summary.outputs.thermometer}}
+            ${{ steps.generate-summary.outputs.thermometer }}
           SLACK_MESSAGE_ON_FAILURE: |
-            ${{steps.generate-summary.outputs.thermometer}}
+            ${{ steps.generate-summary.outputs.thermometer }}
             :warning: *Systematic failures!*
-            ${{steps.generate-summary.outputs.alerts}}
+            ${{ steps.generate-summary.outputs.alerts }}
           SLACK_FOOTER: |
-            <${{ github.server_url }}/${{github.repository}}/actions/runs/${{ github.run_id }}|*See full CI run*>
+            <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|*See full CI run*>
 
       - name: Delete the downloaded files
         run: rm -rf test-artifacts
