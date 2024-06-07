@@ -32,6 +32,7 @@ import (
 type fakeSlot struct {
 	name       string
 	restartLSN string
+	holdsXmin  bool
 }
 
 type fakeSlotManager struct {
@@ -52,6 +53,7 @@ func (sm *fakeSlotManager) List(
 			RestartLSN: slot.restartLSN,
 			Type:       infrastructure.SlotTypePhysical,
 			Active:     false,
+			HoldsXmin:  slot.holdsXmin,
 		})
 	}
 	return slotList, nil
@@ -155,5 +157,23 @@ var _ = Describe("Slot synchronization", func() {
 		Expect(localSlotsAfter.Items).Should(HaveLen(1))
 		Expect(localSlotsAfter.Has(slot3)).To(BeTrue())
 		Expect(local.slotsDeleted).To(Equal(1))
+	})
+	It("can drop slots in local that hold xmin", func() {
+		slotWithXmin := "_cnpg_xmin"
+		err := primary.Create(ctx, infrastructure.ReplicationSlot{SlotName: slotWithXmin})
+		Expect(err).ShouldNot(HaveOccurred())
+		local.slots[slotWithXmin] = fakeSlot{name: slotWithXmin, holdsXmin: true}
+		localSlotsBefore, err := local.List(ctx, &config)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(localSlotsBefore.Has(slotWithXmin)).To(BeTrue())
+
+		err = synchronizeReplicationSlots(context.TODO(), primary, local, localPodName, &config)
+		Expect(err).ShouldNot(HaveOccurred())
+
+		localSlotsAfter, err := local.List(ctx, &config)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(localSlotsAfter.Has(slotWithXmin)).To(BeFalse())
+		Expect(localSlotsAfter.Items).Should(HaveLen(1))
+		Expect(local.slotsDeleted).To(Equal(2))
 	})
 })

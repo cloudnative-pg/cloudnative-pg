@@ -180,7 +180,8 @@ func synchronizeReplicationSlots(
 		// Delete slots on standby with wrong state:
 		//  * slots not present on the primary
 		//  * the slot used by this node
-		//  * slots holding xmin (this can happen on a former primary)
+		//  * slots holding xmin (this can happen on a former primary, and will prevent VACUUM from
+		//      removing tuples deleted by any later transaction.)
 		if !slotsInPrimary.Has(slot.SlotName) || slot.SlotName == mySlotName || slot.HoldsXmin {
 			if err := localSlotManager.Delete(ctx, slot); err != nil {
 				return err
