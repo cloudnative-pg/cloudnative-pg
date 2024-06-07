@@ -175,6 +175,24 @@ func (r *InstanceReconciler) Reconcile(
 	// Instance promotion will not automatically load the changed configuration files.
 	// Therefore it should not be counted as "a restart".
 	if err := r.reconcilePrimary(ctx, cluster); err != nil {
+		var tokenError *tokenVerificationError
+		if errors.As(err, &tokenError) {
+			if tokenError.retryable {
+				contextLogger.Warning(
+					"Waiting for shutdown token to be verified",
+					"tokenStatus", tokenError.msg,
+					"tokenContent", tokenError.tokenContent,
+				)
+				return reconcile.Result{RequeueAfter: 10 * time.Second}, nil
+			}
+
+			contextLogger.Error(
+				err,
+				"Fatal error while verifying the shutdown token",
+				"tokenStatus", tokenError.msg,
+				"tokenContent", tokenError.tokenContent,
+			)
+		}
 		return reconcile.Result{}, err
 	}
 
@@ -1125,6 +1143,8 @@ func (r *InstanceReconciler) refreshFileFromSecret(
 
 // Reconciler primary logic. DB needed.
 func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv1.Cluster) error {
+	contextLogger := log.FromContext(ctx)
+
 	if cluster.Status.TargetPrimary != r.instance.PodName || cluster.IsReplica() {
 		return nil
 	}
@@ -1137,6 +1157,11 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 
 	// If I'm not the primary, let's promote myself
 	if !isPrimary {
+		// Verify that the shutdown token is met before promoting
+		if err := r.verifyShutdownToken(cluster); err != nil {
+			return err
+		}
+
 		cluster.LogTimestampsWithMessage(ctx, "Setting myself as primary")
 		if err := r.handlePromotion(ctx, cluster); err != nil {
 			return err
@@ -1156,6 +1181,15 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 			return err
 		}
 		cluster.LogTimestampsWithMessage(ctx, "Finished setting myself as primary")
+	}
+
+	if cluster.Spec.ReplicaCluster != nil && cluster.Spec.ReplicaCluster.Token != cluster.Status.LastPromotionToken {
+		cluster.Status.LastPromotionToken = cluster.Spec.ReplicaCluster.Token
+		if err := r.client.Status().Patch(ctx, cluster, client.MergeFrom(oldCluster)); err != nil {
+			return err
+		}
+
+		contextLogger.Info("Updated last promotion token", "lastPromotionToken", cluster.Spec.ReplicaCluster.Token)
 	}
 
 	// If it is already the current primary, everything is ok

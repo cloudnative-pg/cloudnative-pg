@@ -795,6 +795,10 @@ type ClusterStatus struct {
 	// +optional
 	TargetPrimary string `json:"targetPrimary,omitempty"`
 
+	// LastPromotionToken is the last verified promotion token that
+	// was used to promote a replica cluster
+	LastPromotionToken string `json:"lastPromotionToken,omitempty"`
+
 	// How many PVCs have been created by this cluster
 	// +optional
 	PVCCount int32 `json:"pvcCount,omitempty"`
@@ -1087,6 +1091,11 @@ type ReplicaClusterConfiguration struct {
 	// object store or via streaming through pg_basebackup.
 	// Refer to the Replica clusters page of the documentation for more information.
 	Enabled bool `json:"enabled"`
+
+	// TODO(leonardoce): choose a better explanation for this field
+	// The shutdown checkpoint token that should be verified before
+	// this replica cluster will be promoted
+	Token string `json:"token,omitempty"`
 }
 
 // DefaultReplicationSlotsUpdateInterval is the default in seconds for the replication slots update interval

@@ -90,9 +90,13 @@ func ParsePgControldataOutput(data string) map[string]string {
 	return pairs
 }
 
+// TODO(leonardoce): I believe that the code about the shutdown token
+// belongs to a different package
+
 // PgControldataTokenContent contains the data needed to properly create a shutdown token
 type PgControldataTokenContent struct {
 	// Latest checkpoint's TimeLineID
+	// TODO(leonardoce): should this be an integer?
 	LatestCheckpointTimelineID string `json:"latestCheckpointTimelineID,omitempty"`
 
 	// Latest checkpoint's REDO WAL file
@@ -107,7 +111,13 @@ type PgControldataTokenContent struct {
 	// Time of latest checkpoint
 	TimeOfLatestCheckpoint string `json:"timeOfLatestCheckpoint,omitempty"`
 
+	// TODO(leonardoce): add a token API version
+	// if the token API version is different, the webhook should
+	// block the operation
+
 	// The version of the operator that created the token
+	// TODO(leonardoce): if the version of the operator is different,
+	// the webhook should raise a warning
 	OperatorVersion string `json:"operatorVersion,omitempty"`
 }
 

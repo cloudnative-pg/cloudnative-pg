@@ -1958,6 +1958,26 @@ func (r *Cluster) validateReplicaMode() field.ErrorList {
 				fmt.Sprintf("External cluster %v not found", r.Spec.ReplicaCluster.Source)))
 	}
 
+	token := r.Spec.ReplicaCluster.Token
+	if len(token) > 0 {
+		tokenContent, err := utils.ParsePgControldataToken(token)
+		if err != nil {
+			result = append(
+				result,
+				field.Invalid(
+					field.NewPath("spec", "replicaCluster", "token"),
+					token,
+					fmt.Sprintf("Invalid shutdown token format: %s", err.Error())))
+		} else if err := tokenContent.IsValid(); err != nil {
+			result = append(
+				result,
+				field.Invalid(
+					field.NewPath("spec", "replicaCluster", "token"),
+					token,
+					fmt.Sprintf("Invalid shutdown token content: %s", err.Error())))
+		}
+	}
+
 	return result
 }
 

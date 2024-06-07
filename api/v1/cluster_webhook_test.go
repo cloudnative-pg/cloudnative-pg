@@ -17,6 +17,8 @@ limitations under the License.
 package v1
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"strings"
 
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
@@ -2786,6 +2788,95 @@ var _ = Describe("replica mode validation", func() {
 		cluster.Spec.Bootstrap.PgBaseBackup = nil
 		result := cluster.validateReplicaMode()
 		Expect(result).ToNot(BeEmpty())
+	})
+
+	It("complains if the replica token is not formatted in base64", func() {
+		cluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				ResourceVersion: "existing",
+			},
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled: true,
+					Source:  "test",
+					Token:   "this-is-a-wrong-token",
+				},
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{},
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "test",
+					},
+				},
+			},
+		}
+
+		result := cluster.validateReplicaMode()
+		Expect(result).ToNot(BeEmpty())
+	})
+
+	It("complains if the replica token is not valid", func() {
+		cluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				ResourceVersion: "existing",
+			},
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled: true,
+					Source:  "test",
+					Token:   base64.StdEncoding.EncodeToString([]byte("{}")),
+				},
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{},
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "test",
+					},
+				},
+			},
+		}
+
+		result := cluster.validateReplicaMode()
+		Expect(result).ToNot(BeEmpty())
+	})
+
+	It("doesn't complain if the replica token is valid", func() {
+		tokenContent := utils.PgControldataTokenContent{
+			LatestCheckpointTimelineID:   "3",
+			REDOWALFile:                  "this-wal-file",
+			DatabaseSystemIdentifier:     "231231212",
+			LatestCheckpointREDOLocation: "33322232",
+			TimeOfLatestCheckpoint:       "we don't know",
+			OperatorVersion:              "version info",
+		}
+		jsonToken, err := json.Marshal(tokenContent)
+		Expect(err).ToNot(HaveOccurred())
+
+		cluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				ResourceVersion: "existing",
+			},
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled: true,
+					Source:  "test",
+					Token:   base64.StdEncoding.EncodeToString(jsonToken),
+				},
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{},
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "test",
+					},
+				},
+			},
+		}
+
+		result := cluster.validateReplicaMode()
+		Expect(result).To(BeEmpty())
 	})
 })
 

@@ -3860,6 +3860,12 @@ spec:
                       origin
                     minLength: 1
                     type: string
+                  token:
+                    description: |-
+                      TODO(leonardoce): choose a better explanation for this field
+                      The shutdown checkpoint token that should be verified before
+                      this replica cluster will be promoted
+                    type: string
                 required:
                 - enabled
                 - source
@@ -5223,6 +5229,11 @@ spec:
                 type: integer
               lastFailedBackup:
                 description: Stored as a date in RFC3339 format
+                type: string
+              lastPromotionToken:
+                description: |-
+                  LastPromotionToken is the last verified promotion token that
+                  was used to promote a replica cluster
                 type: string
               lastSuccessfulBackup:
                 description: |-
