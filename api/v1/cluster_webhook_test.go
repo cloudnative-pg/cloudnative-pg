@@ -2797,9 +2797,9 @@ var _ = Describe("replica mode validation", func() {
 			},
 			Spec: ClusterSpec{
 				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled: true,
-					Source:  "test",
-					Token:   "this-is-a-wrong-token",
+					Enabled:        true,
+					Source:         "test",
+					PromotionToken: "this-is-a-wrong-token",
 				},
 				Bootstrap: &BootstrapConfiguration{
 					InitDB: &BootstrapInitDB{},
@@ -2823,9 +2823,9 @@ var _ = Describe("replica mode validation", func() {
 			},
 			Spec: ClusterSpec{
 				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled: true,
-					Source:  "test",
-					Token:   base64.StdEncoding.EncodeToString([]byte("{}")),
+					Enabled:        true,
+					Source:         "test",
+					PromotionToken: base64.StdEncoding.EncodeToString([]byte("{}")),
 				},
 				Bootstrap: &BootstrapConfiguration{
 					InitDB: &BootstrapInitDB{},
@@ -2860,9 +2860,9 @@ var _ = Describe("replica mode validation", func() {
 			},
 			Spec: ClusterSpec{
 				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled: true,
-					Source:  "test",
-					Token:   base64.StdEncoding.EncodeToString(jsonToken),
+					Enabled:        true,
+					Source:         "test",
+					PromotionToken: base64.StdEncoding.EncodeToString(jsonToken),
 				},
 				Bootstrap: &BootstrapConfiguration{
 					InitDB: &BootstrapInitDB{},

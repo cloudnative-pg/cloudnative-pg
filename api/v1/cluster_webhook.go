@@ -1958,7 +1958,7 @@ func (r *Cluster) validateReplicaMode() field.ErrorList {
 				fmt.Sprintf("External cluster %v not found", r.Spec.ReplicaCluster.Source)))
 	}
 
-	token := r.Spec.ReplicaCluster.Token
+	token := r.Spec.ReplicaCluster.PromotionToken
 	if len(token) > 0 {
 		tokenContent, err := utils.ParsePgControldataToken(token)
 		if err != nil {

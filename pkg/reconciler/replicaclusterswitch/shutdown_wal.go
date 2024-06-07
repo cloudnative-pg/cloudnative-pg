@@ -78,7 +78,7 @@ func generateShutdownCheckpointToken(
 	if err != nil {
 		return "", err
 	}
-	if token == cluster.Status.ShutdownCheckpointToken {
+	if token == cluster.Status.DemotionToken {
 		contextLogger.Debug("no changes in the token value, skipping")
 		return "", nil
 	}

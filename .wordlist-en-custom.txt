@@ -114,6 +114,7 @@ DataBackupConfiguration
 DataBase
 DataSource
 DatabaseRoleRef
+DemotionToken
 DeploymentStrategy
 DevOps
 DevSecOps
@@ -205,6 +206,7 @@ LTS
 LastBackupFailed
 LastBackupSucceeded
 LastFailedArchiveTime
+LastPromotionToken
 Lifecycle
 Linkerd
 Linode
@@ -653,6 +655,7 @@ de
 declaratively
 defaultMode
 defaultPoolSize
+demotionToken
 deployer
 deploymentStrategy
 destinationPath
@@ -814,6 +817,7 @@ labelling
 largeobject
 lastCheckTime
 lastFailedBackup
+lastPromotionToken
 lastScheduleTime
 lastSuccessfulBackup
 lastSuccessfulBackupByMethod
@@ -1005,6 +1009,7 @@ proj
 projectedVolumeTemplate
 prometheus
 promotionTimeout
+promotionToken
 provisioner
 psql
 pv

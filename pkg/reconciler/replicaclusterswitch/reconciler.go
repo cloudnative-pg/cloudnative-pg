@@ -166,13 +166,13 @@ func reconcileShutdownCheckpointToken(
 		return nil, err
 	}
 
-	if cluster.Status.ShutdownCheckpointToken != shutdownToken {
+	if cluster.Status.DemotionToken != shutdownToken {
 		origCluster := cluster.DeepCopy()
 		contextLogger.Info(
 			"patching the shutdownCheckpointToken in the  cluster status",
 			"value", shutdownToken,
-			"previousValue", cluster.Status.ShutdownCheckpointToken)
-		cluster.Status.ShutdownCheckpointToken = shutdownToken
+			"previousValue", cluster.Status.DemotionToken)
+		cluster.Status.DemotionToken = shutdownToken
 
 		if err := cli.Status().Patch(ctx, cluster, client.MergeFrom(origCluster)); err != nil {
 			return nil, fmt.Errorf("while setting shutdown checkpoint token: %w", err)

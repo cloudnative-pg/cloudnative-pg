@@ -1183,13 +1183,13 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 		cluster.LogTimestampsWithMessage(ctx, "Finished setting myself as primary")
 	}
 
-	if cluster.Spec.ReplicaCluster != nil && cluster.Spec.ReplicaCluster.Token != cluster.Status.LastPromotionToken {
-		cluster.Status.LastPromotionToken = cluster.Spec.ReplicaCluster.Token
+	if cluster.Spec.ReplicaCluster != nil && cluster.Spec.ReplicaCluster.PromotionToken != cluster.Status.LastPromotionToken {
+		cluster.Status.LastPromotionToken = cluster.Spec.ReplicaCluster.PromotionToken
 		if err := r.client.Status().Patch(ctx, cluster, client.MergeFrom(oldCluster)); err != nil {
 			return err
 		}
 
-		contextLogger.Info("Updated last promotion token", "lastPromotionToken", cluster.Spec.ReplicaCluster.Token)
+		contextLogger.Info("Updated last promotion token", "lastPromotionToken", cluster.Spec.ReplicaCluster.PromotionToken)
 	}
 
 	// If it is already the current primary, everything is ok

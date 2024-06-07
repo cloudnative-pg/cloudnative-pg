@@ -56,17 +56,17 @@ func (r *InstanceReconciler) verifyShutdownToken(cluster *apiv1.Cluster) error {
 	}
 
 	// If we don't have a shutdown token, we don't need to wait
-	if len(cluster.Spec.ReplicaCluster.Token) == 0 {
+	if len(cluster.Spec.ReplicaCluster.PromotionToken) == 0 {
 		return nil
 	}
 
 	// If the current token was already used, there's no need to
 	// verify it again
-	if cluster.Spec.ReplicaCluster.Token == cluster.Status.LastPromotionToken {
+	if cluster.Spec.ReplicaCluster.PromotionToken == cluster.Status.LastPromotionToken {
 		return nil
 	}
 
-	shutdownToken, err := utils.ParsePgControldataToken(cluster.Spec.ReplicaCluster.Token)
+	shutdownToken, err := utils.ParsePgControldataToken(cluster.Spec.ReplicaCluster.PromotionToken)
 	if err != nil {
 		// The shutdown token is not correct, and the webhook should
 		// have prevented this to happen. If we're here, two things

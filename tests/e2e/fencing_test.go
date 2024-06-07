@@ -221,7 +221,7 @@ var _ = Describe("Fencing", Label(tests.LabelPlugin), func() {
 				Eventually(func(g Gomega) {
 					cluster, err := env.GetCluster(namespace, clusterName)
 					g.Expect(err).ToNot(HaveOccurred())
-					g.Expect(cluster.Status.ShutdownCheckpointToken).ToNot(BeEmpty())
+					g.Expect(cluster.Status.DemotionToken).ToNot(BeEmpty())
 				}, 120).Should(Succeed())
 			})
 			By("check postgres connection on all instances", func() {
