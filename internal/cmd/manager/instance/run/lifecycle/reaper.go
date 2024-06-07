@@ -25,7 +25,7 @@ import (
 	"path"
 	"syscall"
 
-	"github.com/mitchellh/go-ps"
+	ps "github.com/shirou/gopsutil/v4/process"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
@@ -99,14 +99,16 @@ func (z *PostgresOrphansReaper) handleSignal(contextLogger log.Logger) error {
 	pidFile := path.Join(z.instance.PgData, postgres.PostgresqlPidFile)
 	_, postMasterPid, _ := z.instance.GetPostmasterPidFromFile(pidFile)
 	for _, p := range processes {
-		if p.PPid() == 1 && p.Executable() == "postgres" {
-			pid := p.Pid()
+		ppid, _ := p.Ppid()
+		executable, _ := p.Name()
+		if ppid == 1 && executable == "postgres" {
+			pid := p.Pid
 			if pid == postMasterPid {
 				continue
 			}
 			var ws syscall.WaitStatus
 			var ru syscall.Rusage
-			wpid, err := syscall.Wait4(pid, &ws, syscall.WNOHANG, &ru)
+			wpid, err := syscall.Wait4(int(pid), &ws, syscall.WNOHANG, &ru)
 			if wpid <= 0 || err == nil || errors.Is(err, syscall.ECHILD) {
 				continue
 			}
