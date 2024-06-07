@@ -1183,7 +1183,8 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 		cluster.LogTimestampsWithMessage(ctx, "Finished setting myself as primary")
 	}
 
-	if cluster.Spec.ReplicaCluster != nil && cluster.Spec.ReplicaCluster.PromotionToken != cluster.Status.LastPromotionToken {
+	if cluster.Spec.ReplicaCluster != nil &&
+		cluster.Spec.ReplicaCluster.PromotionToken != cluster.Status.LastPromotionToken {
 		cluster.Status.LastPromotionToken = cluster.Spec.ReplicaCluster.PromotionToken
 		if err := r.client.Status().Patch(ctx, cluster, client.MergeFrom(oldCluster)); err != nil {
 			return err

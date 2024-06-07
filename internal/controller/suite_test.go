@@ -41,10 +41,8 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -57,43 +55,6 @@ func init() {
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Controllers Suite")
-}
-
-type fakeInstanceStatusClient struct {
-	getStatusFromInstancesFunc func(ctx context.Context,
-		pods corev1.PodList,
-	) postgres.PostgresqlStatusList
-	getPgControlDataFromInstanceFunc func(
-		ctx context.Context,
-		pod *corev1.Pod,
-	) (string, error)
-	archivePartialWALFunc func(ctx context.Context, pod *corev1.Pod) (string, error)
-}
-
-func (f fakeInstanceStatusClient) ArchivePartialWAL(ctx context.Context, pod *corev1.Pod) (string, error) {
-	return f.archivePartialWALFunc(ctx, pod)
-}
-
-func (f fakeInstanceStatusClient) GetStatusFromInstances(
-	ctx context.Context,
-	pods corev1.PodList,
-) postgres.PostgresqlStatusList {
-	return f.getStatusFromInstancesFunc(ctx, pods)
-}
-
-func (f fakeInstanceStatusClient) GetPgControlDataFromInstance(
-	ctx context.Context,
-	pod *corev1.Pod,
-) (string, error) {
-	return f.getPgControlDataFromInstanceFunc(ctx, pod)
-}
-
-func (f fakeInstanceStatusClient) UpgradeInstanceManager(
-	ctx context.Context,
-	pod *corev1.Pod,
-	availableArchitecture *utils.AvailableArchitecture,
-) error {
-	return nil
 }
 
 type testingEnvironment struct {

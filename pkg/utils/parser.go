@@ -51,10 +51,11 @@ const (
 	PgControlDataKeyTimeOfLatestCheckpoint pgControlDataKey = "Time of latest checkpoint"
 
 	// PgControlDataDatabaseClusterStateKey is the status
-	// of the latest master that run on this data directory.
+	// of the latest primary that run on this data directory.
 	PgControlDataDatabaseClusterStateKey pgControlDataKey = "Database cluster state"
 )
 
+// PgDataState represents the "Database cluster state" field of pg_controldata
 type PgDataState string
 
 // IsShutdown checks if the PGDATA status represents

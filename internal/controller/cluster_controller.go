@@ -321,7 +321,8 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		return res, err
 	}
 
-	if res, err := replicaclusterswitch.Reconcile(ctx, r.Client, cluster, r.InstanceClient, instancesStatus); res != nil || err != nil {
+	if res, err := replicaclusterswitch.Reconcile(
+		ctx, r.Client, cluster, r.InstanceClient, instancesStatus); res != nil || err != nil {
 		if res != nil {
 			return *res, nil
 		}
