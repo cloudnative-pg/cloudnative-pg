@@ -18,6 +18,7 @@ package webserver
 
 import (
 	"context"
+	"crypto/tls"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -87,6 +88,15 @@ func NewRemoteWebServer(
 		Handler:           serveMux,
 		ReadTimeout:       DefaultReadTimeout,
 		ReadHeaderTimeout: DefaultReadHeaderTimeout,
+	}
+
+	if instance.StatusPortTLS {
+		server.TLSConfig = &tls.Config{
+			MinVersion: tls.VersionTLS13,
+			GetCertificate: func(_ *tls.ClientHelloInfo) (*tls.Certificate, error) {
+				return instance.ServerCertificate, nil
+			},
+		}
 	}
 
 	return NewWebServer(instance, server), nil

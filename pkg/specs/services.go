@@ -31,7 +31,7 @@ func buildInstanceServicePorts() []corev1.ServicePort {
 		{
 			Name:       PostgresContainerName,
 			Protocol:   corev1.ProtocolTCP,
-			TargetPort: intstr.FromInt(postgres.ServerPort),
+			TargetPort: intstr.FromInt32(postgres.ServerPort),
 			Port:       postgres.ServerPort,
 		},
 	}

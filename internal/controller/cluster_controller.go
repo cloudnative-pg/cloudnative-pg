@@ -44,6 +44,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/operatorclient"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/hibernation"
@@ -245,6 +246,17 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 			"targetPrimary", cluster.Status.TargetPrimary)
 
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+	}
+
+	// Store in the context the TLS configuration required communicating with the Pods
+	ctx, err = certs.NewTLSConfigForContext(
+		ctx,
+		r.Client,
+		cluster.GetServerCASecretObjectKey(),
+		cluster.GetServiceReadWriteName(),
+	)
+	if err != nil {
+		return ctrl.Result{}, err
 	}
 
 	// Get the replication status

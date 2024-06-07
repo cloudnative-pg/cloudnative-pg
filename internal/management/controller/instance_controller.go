@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"crypto/tls"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -998,6 +999,31 @@ func (r *InstanceReconciler) processConfigReloadAndManageRestart(ctx context.Con
 	cluster.Status.Phase = phase
 	cluster.Status.PhaseReason = phaseReason
 	return r.client.Status().Patch(ctx, cluster, client.MergeFrom(oldCluster))
+}
+
+// refreshCertificateFilesFromSecret receive a secret and rewrite the file
+// corresponding to the server certificate
+func (r *InstanceReconciler) refreshInstanceCertificateFromSecret(
+	secret *corev1.Secret,
+) error {
+	certData, ok := secret.Data[corev1.TLSCertKey]
+	if !ok {
+		return fmt.Errorf("missing %s field in Secret", corev1.TLSCertKey)
+	}
+
+	keyData, ok := secret.Data[corev1.TLSPrivateKeyKey]
+	if !ok {
+		return fmt.Errorf("missing %s field in Secret", corev1.TLSPrivateKeyKey)
+	}
+
+	certificate, err := tls.X509KeyPair(certData, keyData)
+	if err != nil {
+		return fmt.Errorf("failed decoding Secret: %w", err)
+	}
+
+	r.instance.ServerCertificate = &certificate
+
+	return err
 }
 
 // refreshCertificateFilesFromSecret receive a secret and rewrite the file

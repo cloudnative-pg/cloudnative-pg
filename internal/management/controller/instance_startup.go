@@ -37,7 +37,8 @@ import (
 )
 
 // refreshServerCertificateFiles gets the latest server certificates files from the
-// secrets. Returns true if configuration has been changed
+// secrets, and may set the instance certificate if it was missing our outdated.
+// Returns true if configuration has been changed or the instance has been updated
 func (r *InstanceReconciler) refreshServerCertificateFiles(ctx context.Context, cluster *apiv1.Cluster) (bool, error) {
 	contextLogger := log.FromContext(ctx)
 
@@ -60,11 +61,20 @@ func (r *InstanceReconciler) refreshServerCertificateFiles(ctx context.Context, 
 		return false, err
 	}
 
-	return r.refreshCertificateFilesFromSecret(
+	changed, err := r.refreshCertificateFilesFromSecret(
 		ctx,
 		&secret,
 		postgresSpec.ServerCertificateLocation,
 		postgresSpec.ServerKeyLocation)
+	if err != nil {
+		return changed, err
+	}
+
+	if r.instance.ServerCertificate == nil || changed {
+		return changed, r.refreshInstanceCertificateFromSecret(&secret)
+	}
+
+	return changed, nil
 }
 
 // refreshReplicationUserCertificate gets the latest replication certificates from the

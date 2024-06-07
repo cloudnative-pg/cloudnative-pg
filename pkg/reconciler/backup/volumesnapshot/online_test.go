@@ -46,17 +46,17 @@ type fakeBackupClient struct {
 
 func (f *fakeBackupClient) StatusWithErrors(
 	_ context.Context,
-	_ string,
+	_ *corev1.Pod,
 ) (*webserver.Response[webserver.BackupResultData], error) {
 	return f.response, f.injectStatusError
 }
 
-func (f *fakeBackupClient) Start(_ context.Context, _ string, _ webserver.StartBackupRequest) error {
+func (f *fakeBackupClient) Start(_ context.Context, _ *corev1.Pod, _ webserver.StartBackupRequest) error {
 	f.startCalled = true
 	return f.injectStartError
 }
 
-func (f *fakeBackupClient) Stop(_ context.Context, _ string, _ webserver.StopBackupRequest) error {
+func (f *fakeBackupClient) Stop(_ context.Context, _ *corev1.Pod, _ webserver.StopBackupRequest) error {
 	f.stopCalled = true
 	return f.injectStopError
 }

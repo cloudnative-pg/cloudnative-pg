@@ -18,6 +18,7 @@ package postgres
 
 import (
 	"context"
+	"crypto/tls"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -200,6 +201,12 @@ type Instance struct {
 
 	// tablespaceSynchronizerChan is used to send tablespace configuration to the tablespace synchronizer
 	tablespaceSynchronizerChan chan map[string]apiv1.TablespaceConfiguration
+
+	// StatusPortTLS enables TLS on the status port used to communicate with the operator
+	StatusPortTLS bool
+
+	// ServerCertificate is the certificate we use to serve https connections
+	ServerCertificate *tls.Certificate
 }
 
 // SetAlterSystemEnabled allows or deny the usage of the

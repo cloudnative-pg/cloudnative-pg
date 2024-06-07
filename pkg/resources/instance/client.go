@@ -18,12 +18,15 @@ package instance
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
+	neturl "net/url"
+	"slices"
 	"sort"
 	"time"
 
@@ -31,10 +34,17 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+)
+
+const (
+	defaultRequestTimeout = 30 * time.Second
+	noRequestTimeout      = 0
 )
 
 // requestRetry is the default backoff used to query the instance manager
@@ -63,27 +73,37 @@ func (i StatusError) Error() string {
 
 // NewStatusClient returns a client capable of querying the instance HTTP endpoints
 func NewStatusClient() *StatusClient {
-	const connectionTimeout = 2 * time.Second
-	const requestTimeout = 30 * time.Second
+	const defaultConnectionTimeout = 2 * time.Second
 
 	// We want a connection timeout to prevent waiting for the default
 	// TCP connection timeout (30 seconds) on lost SYN packets
+	dialer := &net.Dialer{
+		Timeout: defaultConnectionTimeout,
+	}
 	timeoutClient := &http.Client{
 		Transport: &http.Transport{
-			DialContext: (&net.Dialer{
-				Timeout: connectionTimeout,
-			}).DialContext,
+			DialContext: dialer.DialContext,
+			DialTLSContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+				tlsConfig, err := certs.GetTLSConfigFromContext(ctx)
+				if err != nil {
+					return nil, err
+				}
+				tlsDialer := tls.Dialer{
+					NetDialer: dialer,
+					Config:    tlsConfig,
+				}
+				return tlsDialer.DialContext(ctx, network, addr)
+			},
 		},
-		Timeout: requestTimeout,
 	}
 
-	return &StatusClient{timeoutClient}
+	return &StatusClient{Client: timeoutClient}
 }
 
 // extractInstancesStatus extracts the status of the underlying PostgreSQL instance from
 // the requested Pod, via the instance manager. In case of failure, errors are passed
 // in the result list
-func (r StatusClient) extractInstancesStatus(
+func (r *StatusClient) extractInstancesStatus(
 	ctx context.Context,
 	activePods []corev1.Pod,
 ) postgres.PostgresqlStatusList {
@@ -127,7 +147,7 @@ func (r *StatusClient) getReplicaStatusFromPodViaHTTP(
 	// online upgrades. It is not intended to wait for recovering from any
 	// other remote failure.
 	_ = retry.OnError(requestRetry, isErrorRetryable, func() error {
-		result = r.rawInstanceStatusRequest(ctx, r.Client, pod)
+		result = r.rawInstanceStatusRequest(ctx, pod)
 		return result.Error
 	})
 
@@ -169,12 +189,13 @@ func (r *StatusClient) GetPgControlDataFromInstance(
 ) (string, error) {
 	contextLogger := log.FromContext(ctx)
 
-	httpURL := url.Build(pod.Status.PodIP, url.PathPGControlData, url.StatusPort)
+	scheme := GetStatusSchemeFromPod(pod)
+	httpURL := url.Build(scheme.ToString(), pod.Status.PodIP, url.PathPGControlData, url.StatusPort)
 	req, err := http.NewRequestWithContext(ctx, "GET", httpURL, nil)
 	if err != nil {
 		return "", err
 	}
-
+	r.Client.Timeout = defaultRequestTimeout
 	resp, err := r.Client.Do(req)
 	if err != nil {
 		return "", err
@@ -210,20 +231,83 @@ func (r *StatusClient) GetPgControlDataFromInstance(
 	return result.Data, result.Error
 }
 
+// UpgradeInstanceManager upgrades the instance manager to the passed availableArchitecture
+func (r *StatusClient) UpgradeInstanceManager(
+	ctx context.Context,
+	pod *corev1.Pod,
+	availableArchitecture *utils.AvailableArchitecture,
+) error {
+	contextLogger := log.FromContext(ctx)
+
+	binaryFileStream, err := availableArchitecture.FileStream()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if binaryErr := binaryFileStream.Close(); binaryErr != nil {
+			contextLogger.Error(err, "while closing the binaryFileStream")
+		}
+	}()
+
+	scheme := GetStatusSchemeFromPod(pod)
+	updateURL := url.Build(scheme.ToString(), pod.Status.PodIP, url.PathUpdate, url.StatusPort)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, updateURL, nil)
+	if err != nil {
+		return err
+	}
+	req.Body = binaryFileStream
+
+	r.Client.Timeout = noRequestTimeout
+	resp, err := r.Client.Do(req)
+	// This is the desired response. The instance manager will
+	// synchronously update and this call won't return.
+	if isEOF(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	if resp.StatusCode == http.StatusOK {
+		// Currently the instance manager should never return StatusOK
+		return errors.New("instance manager has returned an unexpected status code")
+	}
+
+	var body []byte
+	body, err = io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	if err = resp.Body.Close(); err != nil {
+		return err
+	}
+
+	return fmt.Errorf("the instance manager upgrade path returned the following error: '%s", string(body))
+}
+
+func isEOF(err error) bool {
+	if err == nil {
+		return false
+	}
+	return errors.Is(err.(*neturl.Error).Err, io.EOF)
+}
+
 // rawInstanceStatusRequest retrieves the status of PostgreSQL pods via an HTTP request with GET method.
 func (r *StatusClient) rawInstanceStatusRequest(
 	ctx context.Context,
-	client *http.Client,
 	pod corev1.Pod,
 ) (result postgres.PostgresqlStatus) {
-	statusURL := url.Build(pod.Status.PodIP, url.PathPgStatus, url.StatusPort)
+	scheme := GetStatusSchemeFromPod(&pod)
+	statusURL := url.Build(scheme.ToString(), pod.Status.PodIP, url.PathPgStatus, url.StatusPort)
 	req, err := http.NewRequestWithContext(ctx, "GET", statusURL, nil)
 	if err != nil {
 		result.Error = err
 		return result
 	}
 
-	resp, err := client.Do(req)
+	r.Client.Timeout = defaultRequestTimeout
+	resp, err := r.Client.Do(req)
 	if err != nil {
 		result.Error = err
 		return result
@@ -254,4 +338,41 @@ func (r *StatusClient) rawInstanceStatusRequest(
 	}
 
 	return result
+}
+
+// HTTPScheme identifies a valid scheme: http, https
+type HTTPScheme string
+
+const (
+	schemeHTTP  HTTPScheme = "http"
+	schemeHTTPS HTTPScheme = "https"
+)
+
+// IsHTTPS returns true if schemeHTTPS
+func (h HTTPScheme) IsHTTPS() bool {
+	return h == schemeHTTPS
+}
+
+// ToString returns the scheme as a string value
+func (h HTTPScheme) ToString() string {
+	return string(h)
+}
+
+// GetStatusSchemeFromPod detects if a Pod is exposing the status via HTTP or HTTPS
+func GetStatusSchemeFromPod(pod *corev1.Pod) HTTPScheme {
+	// Fall back to comparing the container environment configuration
+	for _, container := range pod.Spec.Containers {
+		// we go to the next array element if it isn't the postgres container
+		if container.Name != specs.PostgresContainerName {
+			continue
+		}
+
+		if slices.Contains(container.Command, "--status-port-tls") {
+			return schemeHTTPS
+		}
+
+		break
+	}
+
+	return schemeHTTP
 }

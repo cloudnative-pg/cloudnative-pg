@@ -21,9 +21,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"net/http"
-	neturl "net/url"
 	"reflect"
 
 	corev1 "k8s.io/api/core/v1"
@@ -33,9 +30,9 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/instance"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -612,7 +609,8 @@ func checkPodSpecIsOutdated(
 	}
 	envConfig := specs.CreatePodEnvConfig(*cluster, status.Pod.Name)
 	gracePeriod := int64(cluster.GetMaxStopDelay())
-	targetPodSpec := specs.CreateClusterPodSpec(status.Pod.Name, *cluster, envConfig, gracePeriod)
+	tlsEnabled := instance.GetStatusSchemeFromPod(status.Pod).IsHTTPS()
+	targetPodSpec := specs.CreateClusterPodSpec(status.Pod.Name, *cluster, envConfig, gracePeriod, tlsEnabled)
 
 	// the bootstrap init-container could change image after an operator upgrade.
 	// If in-place upgrades of the instance manager are enabled, we don't need rollout.
@@ -742,7 +740,7 @@ func (r *ClusterReconciler) upgradeInstanceManager(
 				}
 			}
 
-			err = upgradeInstanceManagerOnPod(ctx, postgresqlStatus.Pod, targetManager)
+			err = r.StatusClient.UpgradeInstanceManager(ctx, postgresqlStatus.Pod, targetManager)
 			if err != nil {
 				enrichedError := fmt.Errorf("while upgrading instance manager on %s (hash: %s): %w",
 					postgresqlStatus.Pod.Name,
@@ -765,55 +763,4 @@ func (r *ClusterReconciler) upgradeInstanceManager(
 	}
 
 	return nil
-}
-
-// upgradeInstanceManagerOnPod upgrades an instance manager of a Pod via an HTTP PUT request.
-func upgradeInstanceManagerOnPod(
-	ctx context.Context,
-	pod *corev1.Pod,
-	targetManager *utils.AvailableArchitecture,
-) error {
-	binaryFileStream, err := targetManager.FileStream()
-	if err != nil {
-		return err
-	}
-	defer func() {
-		err = binaryFileStream.Close()
-	}()
-
-	updateURL := url.Build(pod.Status.PodIP, url.PathUpdate, url.StatusPort)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, updateURL, nil)
-	if err != nil {
-		return err
-	}
-	req.Body = binaryFileStream
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		if errors.Is(err.(*neturl.Error).Err, io.EOF) {
-			// This is perfectly fine as the instance manager will
-			// synchronously update and this call won't return.
-			return nil
-		}
-
-		return err
-	}
-
-	if resp.StatusCode == http.StatusOK {
-		// This should not happen. See previous block.
-		return nil
-	}
-
-	var body []byte
-	body, err = io.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-
-	err = resp.Body.Close()
-	if err != nil {
-		return err
-	}
-
-	return fmt.Errorf(string(body))
 }

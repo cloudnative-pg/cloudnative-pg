@@ -159,6 +159,7 @@ func CreateClusterPodSpec(
 	cluster apiv1.Cluster,
 	envConfig EnvConfig,
 	gracePeriod int64,
+	enableHTTPS bool,
 ) corev1.PodSpec {
 	return corev1.PodSpec{
 		Hostname: podName,
@@ -166,7 +167,7 @@ func CreateClusterPodSpec(
 			createBootstrapContainer(cluster),
 		},
 		SchedulerName: cluster.Spec.SchedulerName,
-		Containers:    createPostgresContainers(cluster, envConfig),
+		Containers:    createPostgresContainers(cluster, envConfig, enableHTTPS),
 		Volumes:       createPostgresVolumes(&cluster, podName),
 		SecurityContext: CreatePodSecurityContext(
 			cluster.GetSeccompProfile(),
@@ -183,7 +184,7 @@ func CreateClusterPodSpec(
 
 // createPostgresContainers create the PostgreSQL containers that are
 // used for every instance
-func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig) []corev1.Container {
+func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig, enableHTTPS bool) []corev1.Container {
 	containers := []corev1.Container{
 		{
 			Name:            PostgresContainerName,
@@ -199,7 +200,7 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig) []core
 				ProbeHandler: corev1.ProbeHandler{
 					HTTPGet: &corev1.HTTPGetAction{
 						Path: url.PathHealth,
-						Port: intstr.FromInt32(int32(url.StatusPort)),
+						Port: intstr.FromInt32(url.StatusPort),
 					},
 				},
 			},
@@ -209,7 +210,7 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig) []core
 				ProbeHandler: corev1.ProbeHandler{
 					HTTPGet: &corev1.HTTPGetAction{
 						Path: url.PathReady,
-						Port: intstr.FromInt(url.StatusPort),
+						Port: intstr.FromInt32(url.StatusPort),
 					},
 				},
 			},
@@ -219,7 +220,7 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig) []core
 				ProbeHandler: corev1.ProbeHandler{
 					HTTPGet: &corev1.HTTPGetAction{
 						Path: url.PathHealth,
-						Port: intstr.FromInt(url.StatusPort),
+						Port: intstr.FromInt32(url.StatusPort),
 					},
 				},
 			},
@@ -237,17 +238,24 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig) []core
 				},
 				{
 					Name:          "metrics",
-					ContainerPort: int32(url.PostgresMetricsPort),
+					ContainerPort: url.PostgresMetricsPort,
 					Protocol:      "TCP",
 				},
 				{
 					Name:          "status",
-					ContainerPort: int32(url.StatusPort),
+					ContainerPort: url.StatusPort,
 					Protocol:      "TCP",
 				},
 			},
 			SecurityContext: CreateContainerSecurityContext(cluster.GetSeccompProfile()),
 		},
+	}
+
+	if enableHTTPS {
+		containers[0].StartupProbe.ProbeHandler.HTTPGet.Scheme = corev1.URISchemeHTTPS
+		containers[0].LivenessProbe.ProbeHandler.HTTPGet.Scheme = corev1.URISchemeHTTPS
+		containers[0].ReadinessProbe.ProbeHandler.HTTPGet.Scheme = corev1.URISchemeHTTPS
+		containers[0].Command = append(containers[0].Command, "--status-port-tls")
 	}
 
 	addManagerLoggingOptions(cluster, &containers[0])
@@ -381,7 +389,8 @@ func PodWithExistingStorage(cluster apiv1.Cluster, nodeSerial int) *corev1.Pod {
 
 	envConfig := CreatePodEnvConfig(cluster, podName)
 
-	podSpec := CreateClusterPodSpec(podName, cluster, envConfig, gracePeriod)
+	tlsEnabled := true
+	podSpec := CreateClusterPodSpec(podName, cluster, envConfig, gracePeriod, tlsEnabled)
 
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
