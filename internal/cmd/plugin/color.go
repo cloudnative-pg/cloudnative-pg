@@ -28,9 +28,12 @@ import (
 type colorValue string
 
 const (
+	// colorAlways is meant to output colorized output always
 	colorAlways colorValue = "always"
-	colorAuto   colorValue = "auto"
-	colorNever  colorValue = "never"
+	// colorAuto is meant to output colorized output only when the output is attached to a terminal
+	colorAuto colorValue = "auto"
+	// colorNever is meant to output colorized output never
+	colorNever colorValue = "never"
 )
 
 // String implements pflag.Value interface
@@ -42,7 +45,7 @@ func (e colorValue) String() string {
 func (e *colorValue) Set(val string) error {
 	colorVal := colorValue(val)
 	if colorVal != colorAlways && colorVal != colorAuto && colorVal != colorNever {
-		return fmt.Errorf("invalid value for enum: %s", val)
+		return fmt.Errorf("should be one of 'always', 'auto', or 'never'")
 	}
 	*e = colorVal
 	return nil
