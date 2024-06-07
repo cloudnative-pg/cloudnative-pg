@@ -835,6 +835,7 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
 		}
 	}
 	in.Resources.DeepCopyInto(&out.Resources)
+	in.ContainerLifecycle.DeepCopyInto(&out.ContainerLifecycle)
 	if in.EphemeralVolumesSizeLimit != nil {
 		in, out := &in.EphemeralVolumesSizeLimit, &out.EphemeralVolumesSizeLimit
 		*out = new(EphemeralVolumesSizeLimitConfiguration)

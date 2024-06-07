@@ -415,6 +415,12 @@ type ClusterSpec struct {
 	// +optional
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 
+	// Container lifecycle of every container inside the generated Pod. Please refer to
+	// https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/
+	// for more information.
+	// +optional
+	ContainerLifecycle corev1.Lifecycle `json:"containerLifecycle,omitempty"`
+
 	// EphemeralVolumesSizeLimit allows the user to set the limits for the ephemeral
 	// volumes
 	EphemeralVolumesSizeLimit *EphemeralVolumesSizeLimitConfiguration `json:"ephemeralVolumesSizeLimit,omitempty"`

@@ -209,7 +209,7 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig) []core
 				ProbeHandler: corev1.ProbeHandler{
 					HTTPGet: &corev1.HTTPGetAction{
 						Path: url.PathReady,
-						Port: intstr.FromInt(url.StatusPort),
+						Port: intstr.FromInt32(int32(url.StatusPort)),
 					},
 				},
 			},
@@ -219,7 +219,7 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig) []core
 				ProbeHandler: corev1.ProbeHandler{
 					HTTPGet: &corev1.HTTPGetAction{
 						Path: url.PathHealth,
-						Port: intstr.FromInt(url.StatusPort),
+						Port: intstr.FromInt32(int32(url.StatusPort)),
 					},
 				},
 			},
@@ -246,6 +246,7 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig) []core
 					Protocol:      "TCP",
 				},
 			},
+			Lifecycle:       &cluster.Spec.ContainerLifecycle,
 			SecurityContext: CreateContainerSecurityContext(cluster.GetSeccompProfile()),
 		},
 	}
