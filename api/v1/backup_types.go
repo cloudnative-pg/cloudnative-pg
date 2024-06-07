@@ -21,7 +21,7 @@ import (
 	"sort"
 	"strings"
 
-	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v7/apis/volumesnapshot/v1"
+	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
@@ -326,11 +326,11 @@ func (backupStatus *BackupStatus) SetAsCompleted() {
 }
 
 // SetAsStarted marks a certain backup as started
-func (backupStatus *BackupStatus) SetAsStarted(targetPod *corev1.Pod, method BackupMethod) {
+func (backupStatus *BackupStatus) SetAsStarted(podName, containerID string, method BackupMethod) {
 	backupStatus.Phase = BackupPhaseStarted
 	backupStatus.InstanceID = &InstanceID{
-		PodName:     targetPod.Name,
-		ContainerID: targetPod.Status.ContainerStatuses[0].ContainerID,
+		PodName:     podName,
+		ContainerID: containerID,
 	}
 	backupStatus.Method = method
 }

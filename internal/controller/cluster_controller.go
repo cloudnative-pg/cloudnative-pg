@@ -107,7 +107,6 @@ var ErrNextLoop = utils.ErrNextLoop
 // +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch;create;update;watch;delete;patch
 // +kubebuilder:rbac:groups="",resources=configmaps/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
-// +kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=nodes,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=persistentvolumeclaims,verbs=get;list;create;watch;delete;patch
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get;list;delete;patch;create;watch
@@ -304,6 +303,10 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		return ctrl.Result{RequeueAfter: 10 * time.Second}, registerPhaseErr
 	}
 
+	if res, err := r.ensureNoFailoverOnFullDisk(ctx, cluster, instancesStatus); err != nil || !res.IsZero() {
+		return res, err
+	}
+
 	if res, err := replicaclusterswitch.Reconcile(ctx, r.Client, cluster, instancesStatus); res != nil || err != nil {
 		if res != nil {
 			return *res, nil
@@ -394,6 +397,39 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	return hookResult.Result, hookResult.Err
 }
 
+func (r *ClusterReconciler) ensureNoFailoverOnFullDisk(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	instances postgres.PostgresqlStatusList,
+) (ctrl.Result, error) {
+	contextLogger := log.FromContext(ctx).WithName("ensure_sufficient_disk_space")
+
+	var instanceNames []string
+	for _, state := range instances.Items {
+		if !isWALSpaceAvailableOnPod(state.Pod) {
+			instanceNames = append(instanceNames, state.Pod.Name)
+		}
+	}
+	if len(instanceNames) == 0 {
+		return ctrl.Result{}, nil
+	}
+
+	contextLogger = contextLogger.WithValues("instanceNames", instanceNames)
+	contextLogger.Warning(
+		"Insufficient disk space detected in a pod. PostgreSQL cannot proceed until the PVC group is enlarged",
+	)
+
+	reason := "Insufficient disk space detected in one or more pods is preventing PostgreSQL from running." +
+		"Please verify your storage settings. Further information inside .status.instancesReportedState"
+	registerPhaseErr := r.RegisterPhase(
+		ctx,
+		cluster,
+		"Not enough disk space",
+		reason,
+	)
+	return ctrl.Result{RequeueAfter: 10 * time.Second}, registerPhaseErr
+}
+
 func (r *ClusterReconciler) handleSwitchover(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
@@ -474,18 +510,6 @@ func (r *ClusterReconciler) getCluster(
 
 		// This is a real error, maybe the RBAC configuration is wrong?
 		return nil, fmt.Errorf("cannot get the managed resource: %w", err)
-	}
-
-	var namespace corev1.Namespace
-	if err := r.Get(ctx, client.ObjectKey{Namespace: "", Name: req.Namespace}, &namespace); err != nil {
-		// This is a real error, maybe the RBAC configuration is wrong?
-		return nil, fmt.Errorf("cannot get the containing namespace: %w", err)
-	}
-
-	if !namespace.DeletionTimestamp.IsZero() {
-		// This happens when you delete a namespace containing a Cluster resource. If that's the case,
-		// let's just wait for the Kubernetes to remove all object in the namespace.
-		return nil, nil
 	}
 
 	return cluster, nil

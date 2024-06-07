@@ -121,6 +121,10 @@ const (
 
 	// PGBouncerPoolerUserName is the name of the role to be used for
 	PGBouncerPoolerUserName = "cnpg_pooler_pgbouncer"
+
+	// MissingWALDiskSpaceExitCode is the exit code the instance manager
+	// will use to signal that there's no more WAL disk space
+	MissingWALDiskSpaceExitCode = 4
 )
 
 // SnapshotOwnerReference defines the reference type for the owner of the snapshot.
@@ -1325,7 +1329,6 @@ const (
 
 	// DefaultMaxSwitchoverDelay is the default for the pg_ctl timeout in seconds when a primary PostgreSQL instance
 	// is gracefully shutdown during a switchover.
-	// It is greater than one year in seconds, big enough to simulate an infinite timeout
 	DefaultMaxSwitchoverDelay = 3600
 
 	// DefaultStartupDelay is the default value for startupDelay, startupDelay will be used to calculate the

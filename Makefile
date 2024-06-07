@@ -43,12 +43,12 @@ BUILD_IMAGE ?= true
 POSTGRES_IMAGE_NAME ?= $(shell grep 'DefaultImageName.*=' "pkg/versions/versions.go" | cut -f 2 -d \")
 KUSTOMIZE_VERSION ?= v5.4.2
 CONTROLLER_TOOLS_VERSION ?= v0.15.0
-GORELEASER_VERSION ?= v1.26.2
+GORELEASER_VERSION ?= v2.0.0
 SPELLCHECK_VERSION ?= 0.37.0
 WOKE_VERSION ?= 0.19.0
 OPERATOR_SDK_VERSION ?= v1.34.2
-OPM_VERSION ?= v1.43.0
-PREFLIGHT_VERSION ?= 1.9.6
+OPM_VERSION ?= v1.43.1
+PREFLIGHT_VERSION ?= 1.9.7
 OPENSHIFT_VERSIONS ?= v4.11-v4.15
 ARCH ?= amd64
 
@@ -311,7 +311,7 @@ go-licenses: ## Download go-licenses locally if necessary.
 
 GO_RELEASER = $(LOCALBIN)/goreleaser
 go-releaser: ## Download go-releaser locally if necessary.
-	$(call go-install-tool,$(GO_RELEASER),github.com/goreleaser/goreleaser@$(GORELEASER_VERSION))
+	$(call go-install-tool,$(GO_RELEASER),github.com/goreleaser/goreleaser/v2@$(GORELEASER_VERSION))
 
 .PHONY: govulncheck
 GOVULNCHECK = $(LOCALBIN)/govulncheck
