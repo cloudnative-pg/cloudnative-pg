@@ -2853,6 +2853,14 @@ spec:
                 description: Number of instances required in the cluster
                 minimum: 1
                 type: integer
+              livenessProbeTimeout:
+                description: |-
+                  LivenessProbeTimeout is the time (in seconds) that is allowed for a PostgreSQL instance
+                  to successfully respond to the liveness probe (default 30).
+                  The Liveness probe failure threshold is derived from this value using the formula:
+                  ceiling(livenessProbe / 10).
+                format: int32
+                type: integer
               logLevel:
                 default: info
                 description: 'The instances'' log level, one of the following values:

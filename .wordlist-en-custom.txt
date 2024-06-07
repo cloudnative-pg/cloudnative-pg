@@ -198,6 +198,7 @@ Linkerd
 Linode
 ListMeta
 Liveness
+LivenessProbeTimeout
 LoadBalancer
 LocalObjectReference
 MAPPEDMETRIC
@@ -803,6 +804,7 @@ linux
 listmeta
 liveness
 livenessProbe
+livenessProbeTimeout
 lm
 localeCType
 localeCollate

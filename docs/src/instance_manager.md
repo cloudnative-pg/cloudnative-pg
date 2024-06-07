@@ -34,6 +34,10 @@ broken state and needs to be restarted. The value in `startDelay` is used
 to delay the probe's execution, preventing an
 instance with a long startup time from being restarted.
 
+The amount of time needed for a Pod to be classified as not alive is
+configurable in the `.spec.livenessProbeTimeout` parameter, that
+defaults to 30 seconds.
+
 The interval (in seconds) after the Pod has started before the liveness
 probe starts working is expressed in the `.spec.startDelay` parameter,
 which defaults to 3600 seconds. The correct value for your cluster is
