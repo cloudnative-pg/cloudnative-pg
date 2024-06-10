@@ -2438,7 +2438,7 @@ func (gcs *GoogleCredentials) validateGCSCredentials(path *field.Path) field.Err
 }
 
 func (r *Cluster) validateManagedServices() field.ErrorList {
-	hasDuplicates := func(names []string) bool {
+	containsDuplicateNames := func(names []string) bool {
 		seen := make(map[string]bool)
 		for _, str := range names {
 			if seen[str] {
@@ -2449,34 +2449,53 @@ func (r *Cluster) validateManagedServices() field.ErrorList {
 		return false
 	}
 
-	if r.Spec.Managed == nil {
+	if r.Spec.Managed == nil || r.Spec.Managed.Services == nil {
 		return nil
 	}
-	if r.Spec.Managed.Services == nil {
-		return nil
-	}
+
 	var errs field.ErrorList
-	var names []string
+	names := make([]string, len(r.Spec.Managed.Services.Additional))
 	for idx := range r.Spec.Managed.Services.Additional {
-		serviceTemplate := &r.Spec.Managed.Services.Additional[idx]
-		fieldErr := validateServiceTemplate(
+		additionalService := &r.Spec.Managed.Services.Additional[idx]
+		names[idx] = additionalService.ServiceTemplate.ObjectMeta.Name
+
+		if fieldErr := validateServiceTemplate(
 			field.NewPath("spec", "managed", "services", fmt.Sprintf("additional[%d]", idx)),
 			true,
-			serviceTemplate.ServiceTemplate,
-		)
-		if len(errs) > 0 {
+			additionalService.ServiceTemplate,
+		); len(fieldErr) > 0 {
 			errs = append(errs, fieldErr...)
-		} else {
-			names = append(names, serviceTemplate.ServiceTemplate.ObjectMeta.Name)
 		}
 	}
 
-	if hasDuplicates(names) {
+	if containsDuplicateNames(names) {
 		errs = append(errs, field.Invalid(
 			field.NewPath("spec", "managed", "services", "additional"),
 			names,
 			"contains services with the same .metadata.name",
 		))
+	}
+
+	return errs
+}
+
+func validateServiceTemplate(
+	path *field.Path,
+	nameRequired bool,
+	template ServiceTemplateSpec,
+) field.ErrorList {
+	var errs field.ErrorList
+
+	if len(template.Spec.Selector) > 0 {
+		errs = append(errs, field.Invalid(path, template.Spec.Selector, "selector field is managed by the operator"))
+	}
+
+	name := template.ObjectMeta.Name
+	if name == "" && nameRequired {
+		errs = append(errs, field.Invalid(path, name, "name is required"))
+	}
+	if name != "" && !nameRequired {
+		errs = append(errs, field.Invalid(path, name, "name is not allowed"))
 	}
 
 	return errs
@@ -2633,24 +2652,4 @@ func (r *Cluster) validateHibernationAnnotation() field.ErrorList {
 			),
 		),
 	}
-}
-
-func validateServiceTemplate(
-	path *field.Path,
-	nameRequired bool,
-	template ServiceTemplateSpec,
-) field.ErrorList {
-	var errs field.ErrorList
-	name := template.ObjectMeta.Name
-	if name == "" && nameRequired {
-		errs = append(errs, field.Invalid(path, name, "name is required"))
-	}
-	if name != "" && !nameRequired {
-		errs = append(errs, field.Invalid(path, name, "name is not allowed"))
-	}
-	if len(template.Spec.Selector) > 0 {
-		errs = append(errs, field.Invalid(path, name, "selector field is managed by the operator"))
-	}
-
-	return errs
 }
