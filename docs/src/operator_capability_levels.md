@@ -100,9 +100,10 @@ PVC template in the CR's `storage` parameter.
 For better performance and finer control, you can also choose to host your
 cluster's write-ahead log (WAL, also known as `pg_wal`) on a separate volume,
 preferably on different storage.
-The [`cnp-bench`](https://github.com/EnterpriseDB/cnp-bench) open source
-project can be used to benchmark both the storage and the database prior to
-production.
+The ["Benchmarking"](benchmarking.md) section of the documentation provides
+detailed instructions on benchmarking both storage and the database before
+production. It relies on the `cnpg` plugin to ensure optimal performance and
+reliability.
 
 ### Replica configuration
 
