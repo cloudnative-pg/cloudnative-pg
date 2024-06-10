@@ -30,9 +30,6 @@ var _ = Describe("Set default queries", func() {
 		Expect(q.userQueries).To(BeEmpty())
 		Expect(q.mappings).To(BeEmpty())
 		Expect(q.variableLabels).To(BeEmpty())
-		Expect(q.userQueries).To(BeEmpty())
-		Expect(q.mappings).To(BeEmpty())
-		Expect(q.variableLabels).To(BeEmpty())
 	})
 
 	It("properly works", func() {
