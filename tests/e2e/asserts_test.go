@@ -2536,6 +2536,12 @@ func collectAndAssertDefaultMetricsPresentOnEachPod(namespace, clusterName, curl
 			"cnpg_pg_stat_database",
 		}
 
+		if env.PostgresVersion > 16 {
+			defaultMetrics = append(defaultMetrics,
+				"cnpg_pg_stat_checkpointer",
+			)
+		}
+
 		podList, err := env.GetClusterPodList(namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 		for _, pod := range podList.Items {
