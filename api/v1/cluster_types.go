@@ -2437,7 +2437,7 @@ type ManagedServices struct {
 // ManagedService represents a specific service managed by the cluster.
 // It includes the type of service and its associated template specification.
 type ManagedService struct {
-	// SelectorType specifies the type of service.
+	// SelectorType specifies the type of selectors that the service will have.
 	// Valid values are "rw", "r", and "ro", representing read-write, read, and read-only services.
 	// +kubebuilder:validation:Enum=rw;r;ro
 	SelectorType ServiceSelectorType `json:"selectorType"`

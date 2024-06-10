@@ -17,6 +17,7 @@ limitations under the License.
 package specs
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -85,6 +86,11 @@ var _ = Describe("BuildManagedServices", func() {
 										},
 										Annotations: map[string]string{
 											"test-annotation": "test-value",
+										},
+									},
+									Spec: corev1.ServiceSpec{
+										Selector: map[string]string{
+											"additional": "true",
 										},
 									},
 								},

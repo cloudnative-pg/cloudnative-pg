@@ -26,6 +26,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -34,7 +35,7 @@ import (
 // - spinning up a cluster with some post-init-sql query and verifying that they are really executed
 
 // Set of tests in which we check that the initdb options are really applied
-var _ = FDescribe("Managed services tests", Label(tests.LabelSmoke, tests.LabelBasic), func() {
+var _ = Describe("Managed services tests", Label(tests.LabelSmoke, tests.LabelBasic), func() {
 	const (
 		level           = tests.Medium
 		namespacePrefix = "managed-services"
@@ -70,26 +71,30 @@ var _ = FDescribe("Managed services tests", Label(tests.LabelSmoke, tests.LabelB
 		cluster, err := env.GetCluster(namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 
-		baseRWService := specs.CreateClusterReadWriteService(*cluster)
-		var serviceRW corev1.Service
-		err = env.Client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: serviceName}, &serviceRW)
-		Expect(err).ToNot(HaveOccurred())
-		Expect(serviceRW.Spec.Selector).To(Equal(baseRWService.Spec.Selector))
-		Expect(serviceRW.Labels).ToNot(BeNil())
-		Expect(serviceRW.Labels["test-label"]).To(Equal("true"),
-			fmt.Sprintf("found labels: %s", serviceRW.Labels))
-		Expect(serviceRW.Annotations).ToNot(BeNil())
-		Expect(serviceRW.Annotations["test-annotation"]).To(Equal("true"))
-
-		cluster.Spec.Managed.Services.Additional = []apiv1.ManagedService{}
-		err = env.Client.Update(ctx, cluster)
-		Expect(err).ToNot(HaveOccurred())
-		AssertClusterIsReady(namespace, clusterName, 30, env)
-		Eventually(func(g Gomega) {
+		By("ensuring the service is created", func() {
+			baseRWService := specs.CreateClusterReadWriteService(*cluster)
 			var serviceRW corev1.Service
-			err = env.Client.Get(ctx, types.NamespacedName{}, &serviceRW)
-			g.Expect(apierrs.IsNotFound(err)).To(BeTrue())
-		}).Should(Succeed())
+			err = env.Client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: serviceName}, &serviceRW)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(serviceRW.Spec.Selector).To(Equal(baseRWService.Spec.Selector))
+			Expect(serviceRW.Labels).ToNot(BeNil())
+			Expect(serviceRW.Labels["test-label"]).To(Equal("true"),
+				fmt.Sprintf("found labels: %s", serviceRW.Labels))
+			Expect(serviceRW.Annotations).ToNot(BeNil())
+			Expect(serviceRW.Annotations["test-annotation"]).To(Equal("true"))
+		})
+
+		By("ensuring the service is deleted when removed from the additional field", func() {
+			cluster.Spec.Managed.Services.Additional = []apiv1.ManagedService{}
+			err = env.Client.Update(ctx, cluster)
+			Expect(err).ToNot(HaveOccurred())
+			AssertClusterIsReady(namespace, clusterName, testTimeouts[utils.ManagedServices], env)
+			Eventually(func(g Gomega) {
+				var serviceRW corev1.Service
+				err = env.Client.Get(ctx, types.NamespacedName{Name: serviceName, Namespace: namespace}, &serviceRW)
+				g.Expect(apierrs.IsNotFound(err)).To(BeTrue())
+			}, testTimeouts[utils.ManagedServices]).Should(Succeed())
+		})
 	})
 
 	It("should properly handle disabledDefaultServices field", func(ctx SpecContext) {
@@ -127,25 +132,25 @@ var _ = FDescribe("Managed services tests", Label(tests.LabelSmoke, tests.LabelB
 			err = env.Client.Update(ctx, cluster)
 			Expect(err).ToNot(HaveOccurred())
 
-			AssertClusterIsReady(namespace, clusterName, 30, env)
+			AssertClusterIsReady(namespace, clusterName, testTimeouts[utils.ManagedServices], env)
 
 			Eventually(func(g Gomega) {
 				var service corev1.Service
 				err = env.Client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: rw.Name}, &service)
 				g.Expect(err).ToNot(HaveOccurred())
-			}, 30).Should(Succeed())
+			}, testTimeouts[utils.ManagedServices]).Should(Succeed())
 
 			Eventually(func(g Gomega) {
 				var service corev1.Service
 				err = env.Client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: ro.Name}, &service)
 				g.Expect(err).ToNot(HaveOccurred())
-			}, 30).Should(Succeed())
+			}, testTimeouts[utils.ManagedServices]).Should(Succeed())
 
 			Eventually(func(g Gomega) {
 				var service corev1.Service
 				err = env.Client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: r.Name}, &service)
 				g.Expect(err).ToNot(HaveOccurred())
-			}, 30).Should(Succeed())
+			}, testTimeouts[utils.ManagedServices]).Should(Succeed())
 		})
 	})
 })

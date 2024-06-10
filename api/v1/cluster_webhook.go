@@ -2438,9 +2438,9 @@ func (gcs *GoogleCredentials) validateGCSCredentials(path *field.Path) field.Err
 }
 
 func (r *Cluster) validateManagedServices() field.ErrorList {
-	hasDuplicates := func(strings []string) bool {
+	hasDuplicates := func(names []string) bool {
 		seen := make(map[string]bool)
-		for _, str := range strings {
+		for _, str := range names {
 			if seen[str] {
 				return true
 			}
@@ -2638,20 +2638,18 @@ func (r *Cluster) validateHibernationAnnotation() field.ErrorList {
 func validateServiceTemplate(
 	path *field.Path,
 	nameRequired bool,
-	specs ...ServiceTemplateSpec,
+	template ServiceTemplateSpec,
 ) field.ErrorList {
 	var errs field.ErrorList
-	for idx := range specs {
-		spec := specs[idx]
-		name := spec.ObjectMeta.Name
-		if name == "" && nameRequired {
-			errs = append(errs, field.Invalid(path, name, "name is required"))
-			continue
-		}
-		if name != "" && !nameRequired {
-			errs = append(errs, field.Invalid(path, name, "name is not allowed"))
-			continue
-		}
+	name := template.ObjectMeta.Name
+	if name == "" && nameRequired {
+		errs = append(errs, field.Invalid(path, name, "name is required"))
+	}
+	if name != "" && !nameRequired {
+		errs = append(errs, field.Invalid(path, name, "name is not allowed"))
+	}
+	if len(template.Spec.Selector) > 0 {
+		errs = append(errs, field.Invalid(path, name, "selector field is managed by the operator"))
 	}
 
 	return errs

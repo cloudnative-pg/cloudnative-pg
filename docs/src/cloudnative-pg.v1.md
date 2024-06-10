@@ -3189,7 +3189,7 @@ It includes the type of service and its associated template specification.</p>
 <a href="#postgresql-cnpg-io-v1-ServiceSelectorType"><i>ServiceSelectorType</i></a>
 </td>
 <td>
-   <p>SelectorType specifies the type of service.
+   <p>SelectorType specifies the type of selectors that the service will have.
 Valid values are &quot;rw&quot;, &quot;r&quot;, and &quot;ro&quot;, representing read-write, read, and read-only services.</p>
 </td>
 </tr>

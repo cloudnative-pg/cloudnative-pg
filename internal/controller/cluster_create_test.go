@@ -1173,7 +1173,7 @@ var _ = Describe("Service Reconciling", func() {
 
 		Context("when service does not exist", func() {
 			It("should create a new service if enabled", func() {
-				err := reconciler.serviceReconciler(ctx, proposedService, true, &cluster)
+				err := reconciler.serviceReconciler(ctx, &cluster, proposedService, true)
 				Expect(err).NotTo(HaveOccurred())
 
 				var createdService corev1.Service
@@ -1186,7 +1186,7 @@ var _ = Describe("Service Reconciling", func() {
 			})
 
 			It("should not create a new service if not enabled", func() {
-				err := reconciler.serviceReconciler(ctx, proposedService, false, &cluster)
+				err := reconciler.serviceReconciler(ctx, &cluster, proposedService, false)
 				Expect(err).NotTo(HaveOccurred())
 
 				var createdService corev1.Service
@@ -1206,7 +1206,7 @@ var _ = Describe("Service Reconciling", func() {
 			})
 
 			It("should delete the service if not enabled", func() {
-				err := reconciler.serviceReconciler(ctx, proposedService, false, &cluster)
+				err := reconciler.serviceReconciler(ctx, &cluster, proposedService, false)
 				Expect(err).NotTo(HaveOccurred())
 
 				var deletedService corev1.Service
@@ -1223,7 +1223,7 @@ var _ = Describe("Service Reconciling", func() {
 				err := serviceClient.Update(ctx, existingService)
 				Expect(err).NotTo(HaveOccurred())
 
-				err = reconciler.serviceReconciler(ctx, proposedService, true, &cluster)
+				err = reconciler.serviceReconciler(ctx, &cluster, proposedService, true)
 				Expect(err).NotTo(HaveOccurred())
 
 				var updatedService corev1.Service
@@ -1245,7 +1245,7 @@ var _ = Describe("Service Reconciling", func() {
 				proposedService.Labels = map[string]string{"app": "test"}
 				proposedService.Annotations = map[string]string{"annotation": "test"}
 
-				err = reconciler.serviceReconciler(ctx, proposedService, true, &cluster)
+				err = reconciler.serviceReconciler(ctx, &cluster, proposedService, true)
 				Expect(err).NotTo(HaveOccurred())
 
 				var updatedService corev1.Service

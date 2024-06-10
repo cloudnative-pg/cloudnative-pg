@@ -87,14 +87,14 @@ func (builder *Builder) WithServicePort(value *corev1.ServicePort) *Builder {
 	return builder
 }
 
-// WithSelector adds a selector to the current status
-func (builder *Builder) WithSelector(name string, overwrite bool) *Builder {
-	if overwrite {
-		builder.status.Spec.Selector = map[string]string{
-			utils.PgbouncerNameLabel: name,
-		}
-	}
+// SetPGBouncerSelector overwrites the selectors field with the PgbouncerNameLabel selector.
+func (builder *Builder) SetPGBouncerSelector(name string) *Builder {
+	return builder.SetSelectors(map[string]string{utils.PgbouncerNameLabel: name})
+}
 
+// SetSelectors overwrites the selector fields
+func (builder *Builder) SetSelectors(selectors map[string]string) *Builder {
+	builder.status.Spec.Selector = selectors
 	return builder
 }
 
