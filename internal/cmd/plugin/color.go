@@ -57,33 +57,31 @@ func (e *colorValue) Type() string {
 }
 
 // ConfigureColor renews aurora.DefaultColorizer based on flags and TTY
-func ConfigureColor(cmd *cobra.Command) error {
-	return configureColor(cmd, term.IsTerminal(int(os.Stdout.Fd())))
+func ConfigureColor(cmd *cobra.Command) {
+	configureColor(cmd, term.IsTerminal(int(os.Stdout.Fd())))
 }
 
-func configureColor(cmd *cobra.Command, isTTY bool) error {
-	colorFlag, err := cmd.Flags().GetString("color")
-	if err != nil {
-		return err
+func configureColor(cmd *cobra.Command, isTTY bool) {
+	colorFlag := cmd.Flag("color")
+	// skip if the command does not have the color flag
+	if colorFlag == nil {
+		return
 	}
 
 	var shouldColorize bool
-	switch colorValue(colorFlag) {
+	switch colorValue(colorFlag.Value.String()) {
 	case colorAlways:
 		shouldColorize = true
 	case colorNever:
 		shouldColorize = false
 	case colorAuto:
 		shouldColorize = isTTY
-	default:
-		return fmt.Errorf("invalid value for --color: %s, must be one of 'always', 'auto', or 'never'", colorFlag)
 	}
 
 	aurora.DefaultColorizer = aurora.New(
 		aurora.WithColors(shouldColorize),
 		aurora.WithHyperlinks(true),
 	)
-	return nil
 }
 
 // AddColorControlFlag adds color control flags to the command

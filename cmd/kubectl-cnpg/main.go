@@ -66,6 +66,8 @@ func main() {
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
 			logFlags.ConfigureLogging()
 
+			plugin.ConfigureColor(cmd)
+
 			// If we're invoking the completion command we shouldn't try to create
 			// a Kubernetes client and we just let the Cobra flow to continue
 			if cmd.Name() == "completion" || cmd.Name() == "version" ||

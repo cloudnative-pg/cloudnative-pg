@@ -41,10 +41,6 @@ func NewCmd() *cobra.Command {
 			ctx := cmd.Context()
 			clusterName := args[0]
 
-			if err := plugin.ConfigureColor(cmd); err != nil {
-				return err
-			}
-
 			verbose, _ := cmd.Flags().GetBool("verbose")
 			output, _ := cmd.Flags().GetString("output")
 

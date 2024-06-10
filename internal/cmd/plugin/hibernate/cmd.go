@@ -71,11 +71,6 @@ var (
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			clusterName := args[0]
-
-			if err := plugin.ConfigureColor(cmd); err != nil {
-				return err
-			}
-
 			rawOutput, err := cmd.Flags().GetString("output")
 			if err != nil {
 				return err

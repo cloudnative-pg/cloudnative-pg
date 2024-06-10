@@ -34,12 +34,16 @@ var _ = Describe("Configure color", func() {
 		AddColorControlFlag(cmd)
 	})
 
+	It("meets the error when the flag is invalid", func() {
+		err := cmd.ParseFlags([]string{"--color", "invalid"})
+		Expect(err).To(HaveOccurred())
+	})
+
 	It("enables color as the a terminal is attached", func() {
 		err := cmd.ParseFlags(nil)
 		Expect(err).NotTo(HaveOccurred())
 
-		err = configureColor(cmd, true)
-		Expect(err).NotTo(HaveOccurred())
+		configureColor(cmd, true)
 		Expect(aurora.DefaultColorizer.Config().Colors).To(BeTrue())
 	})
 
@@ -47,8 +51,7 @@ var _ = Describe("Configure color", func() {
 		err := cmd.ParseFlags([]string{"--color", "auto"})
 		Expect(err).NotTo(HaveOccurred())
 
-		err = configureColor(cmd, false)
-		Expect(err).NotTo(HaveOccurred())
+		configureColor(cmd, false)
 		Expect(aurora.DefaultColorizer.Config().Colors).To(BeFalse())
 	})
 
@@ -56,8 +59,7 @@ var _ = Describe("Configure color", func() {
 		err := cmd.ParseFlags([]string{"--color", "always"})
 		Expect(err).NotTo(HaveOccurred())
 
-		err = configureColor(cmd, false)
-		Expect(err).NotTo(HaveOccurred())
+		configureColor(cmd, false)
 		Expect(aurora.DefaultColorizer.Config().Colors).To(BeTrue())
 	})
 
@@ -65,8 +67,7 @@ var _ = Describe("Configure color", func() {
 		err := cmd.ParseFlags([]string{"--color", "never"})
 		Expect(err).NotTo(HaveOccurred())
 
-		err = configureColor(cmd, true)
-		Expect(err).NotTo(HaveOccurred())
+		configureColor(cmd, true)
 		Expect(aurora.DefaultColorizer.Config().Colors).To(BeFalse())
 	})
 })
