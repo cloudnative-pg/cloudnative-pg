@@ -32,6 +32,7 @@ import (
 type fakeSlot struct {
 	name       string
 	restartLSN string
+	holdsXmin  bool
 }
 
 type fakeSlotManager struct {
@@ -52,6 +53,7 @@ func (sm *fakeSlotManager) List(
 			RestartLSN: slot.restartLSN,
 			Type:       infrastructure.SlotTypePhysical,
 			Active:     false,
+			HoldsXmin:  slot.holdsXmin,
 		})
 	}
 	return slotList, nil
@@ -88,7 +90,6 @@ func (sm *fakeSlotManager) Delete(_ context.Context, slot infrastructure.Replica
 }
 
 var _ = Describe("Slot synchronization", func() {
-	ctx := context.TODO()
 	localPodName := "cluster-2"
 	localSlotName := "_cnpg_cluster_2"
 	slot3 := "cluster-3"
@@ -111,12 +112,12 @@ var _ = Describe("Slot synchronization", func() {
 		},
 	}
 
-	It("can create slots in local from those on primary", func() {
+	It("can create slots in local from those on primary", func(ctx SpecContext) {
 		localSlotsBefore, err := local.List(ctx, &config)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(localSlotsBefore.Items).Should(BeEmpty())
 
-		err = synchronizeReplicationSlots(context.TODO(), primary, local, localPodName, &config)
+		err = synchronizeReplicationSlots(ctx, primary, local, localPodName, &config)
 		Expect(err).ShouldNot(HaveOccurred())
 
 		localSlotsAfter, err := local.List(ctx, &config)
@@ -126,13 +127,13 @@ var _ = Describe("Slot synchronization", func() {
 		Expect(localSlotsAfter.Has(slot4)).To(BeTrue())
 		Expect(local.slotsCreated).To(Equal(2))
 	})
-	It("can update slots in local when ReplayLSN in primary advanced", func() {
+	It("can update slots in local when ReplayLSN in primary advanced", func(ctx SpecContext) {
 		// advance slot3 in primary
 		newLSN := "0/308C4D8"
 		err := primary.Update(ctx, infrastructure.ReplicationSlot{SlotName: slot3, RestartLSN: newLSN})
 		Expect(err).ShouldNot(HaveOccurred())
 
-		err = synchronizeReplicationSlots(context.TODO(), primary, local, localPodName, &config)
+		err = synchronizeReplicationSlots(ctx, primary, local, localPodName, &config)
 		Expect(err).ShouldNot(HaveOccurred())
 
 		localSlotsAfter, err := local.List(ctx, &config)
@@ -143,11 +144,11 @@ var _ = Describe("Slot synchronization", func() {
 		Expect(slot.RestartLSN).To(Equal(newLSN))
 		Expect(local.slotsUpdated).To(Equal(1))
 	})
-	It("can drop slots in local when they are no longer in primary", func() {
+	It("can drop slots in local when they are no longer in primary", func(ctx SpecContext) {
 		err := primary.Delete(ctx, infrastructure.ReplicationSlot{SlotName: slot4})
 		Expect(err).ShouldNot(HaveOccurred())
 
-		err = synchronizeReplicationSlots(context.TODO(), primary, local, localPodName, &config)
+		err = synchronizeReplicationSlots(ctx, primary, local, localPodName, &config)
 		Expect(err).ShouldNot(HaveOccurred())
 
 		localSlotsAfter, err := local.List(ctx, &config)
@@ -155,5 +156,23 @@ var _ = Describe("Slot synchronization", func() {
 		Expect(localSlotsAfter.Items).Should(HaveLen(1))
 		Expect(localSlotsAfter.Has(slot3)).To(BeTrue())
 		Expect(local.slotsDeleted).To(Equal(1))
+	})
+	It("can drop slots in local that hold xmin", func(ctx SpecContext) {
+		slotWithXmin := "_cnpg_xmin"
+		err := primary.Create(ctx, infrastructure.ReplicationSlot{SlotName: slotWithXmin})
+		Expect(err).ShouldNot(HaveOccurred())
+		local.slots[slotWithXmin] = fakeSlot{name: slotWithXmin, holdsXmin: true}
+		localSlotsBefore, err := local.List(ctx, &config)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(localSlotsBefore.Has(slotWithXmin)).To(BeTrue())
+
+		err = synchronizeReplicationSlots(ctx, primary, local, localPodName, &config)
+		Expect(err).ShouldNot(HaveOccurred())
+
+		localSlotsAfter, err := local.List(ctx, &config)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(localSlotsAfter.Has(slotWithXmin)).To(BeFalse())
+		Expect(localSlotsAfter.Items).Should(HaveLen(1))
+		Expect(local.slotsDeleted).To(Equal(2))
 	})
 })
