@@ -81,28 +81,36 @@ func main() {
 
 	logFlags.AddFlags(rootCmd.PersistentFlags())
 	configFlags.AddFlags(rootCmd.PersistentFlags())
+	//	plugin.AddColorControlFlag(hibernateStatusCmd)
 
-	rootCmd.AddCommand(certificate.NewCmd())
-	rootCmd.AddCommand(destroy.NewCmd())
-	rootCmd.AddCommand(fence.NewCmd())
-	rootCmd.AddCommand(fio.NewCmd())
-	rootCmd.AddCommand(hibernate.NewCmd())
-	rootCmd.AddCommand(install.NewCmd())
-	rootCmd.AddCommand(maintenance.NewCmd())
-	rootCmd.AddCommand(pgbench.NewCmd())
-	rootCmd.AddCommand(promote.NewCmd())
-	rootCmd.AddCommand(reload.NewCmd())
-	rootCmd.AddCommand(report.NewCmd())
-	rootCmd.AddCommand(restart.NewCmd())
-	rootCmd.AddCommand(status.NewCmd())
-	rootCmd.AddCommand(versions.NewCmd())
-	rootCmd.AddCommand(backup.NewCmd())
-	rootCmd.AddCommand(psql.NewCmd())
-	rootCmd.AddCommand(snapshot.NewCmd())
-	rootCmd.AddCommand(logs.NewCmd())
-	rootCmd.AddCommand(pgadmin.NewCmd())
-	rootCmd.AddCommand(publication.NewCmd())
-	rootCmd.AddCommand(subscription.NewCmd())
+	subcommands := []*cobra.Command{
+		certificate.NewCmd(),
+		destroy.NewCmd(),
+		fence.NewCmd(),
+		fio.NewCmd(),
+		hibernate.NewCmd(),
+		install.NewCmd(),
+		maintenance.NewCmd(),
+		pgbench.NewCmd(),
+		promote.NewCmd(),
+		reload.NewCmd(),
+		report.NewCmd(),
+		restart.NewCmd(),
+		status.NewCmd(),
+		versions.NewCmd(),
+		backup.NewCmd(),
+		psql.NewCmd(),
+		snapshot.NewCmd(),
+		logs.NewCmd(),
+		pgadmin.NewCmd(),
+		publication.NewCmd(),
+		subscription.NewCmd(),
+	}
+
+	for _, cmd := range subcommands {
+		plugin.AddColorControlFlag(cmd)
+		rootCmd.AddCommand(cmd)
+	}
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)

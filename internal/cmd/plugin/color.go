@@ -25,34 +25,38 @@ import (
 	"golang.org/x/term"
 )
 
-type colorValue string
+// colorConfiguration represents how the output should be colorized.
+// It is a `pflag.Value`, therefore implements String(), Set(), Type()
+type colorConfiguration string
 
 const (
-	// colorAlways is meant to output colorized output always
-	colorAlways colorValue = "always"
-	// colorAuto is meant to output colorized output only when the output is attached to a terminal
-	colorAuto colorValue = "auto"
-	// colorNever is meant to output colorized output never
-	colorNever colorValue = "never"
+	// colorAlways configures the output to always be colorized
+	colorAlways colorConfiguration = "always"
+	// colorAuto configures the the output to be colorized only when attached to a terminal
+	colorAuto colorConfiguration = "auto"
+	// colorNever configures the the output never to be colorized
+	colorNever colorConfiguration = "never"
 )
 
-// String implements pflag.Value interface
-func (e colorValue) String() string {
+// String returns the strig representation
+func (e colorConfiguration) String() string {
 	return string(e)
 }
 
-// Set implements pflag.Value interface
-func (e *colorValue) Set(val string) error {
-	colorVal := colorValue(val)
-	if colorVal != colorAlways && colorVal != colorAuto && colorVal != colorNever {
+// Set sets the color configuration
+func (e *colorConfiguration) Set(val string) error {
+	colorVal := colorConfiguration(val)
+	switch colorVal {
+	case colorAlways, colorAuto, colorNever:
+		*e = colorVal
+		return nil
+	default:
 		return fmt.Errorf("should be one of 'always', 'auto', or 'never'")
 	}
-	*e = colorVal
-	return nil
 }
 
-// Type implements pflag.Value interface
-func (e *colorValue) Type() string {
+// Type returns the data type of the flag used for the color configuration
+func (e *colorConfiguration) Type() string {
 	return "string"
 }
 
@@ -63,13 +67,13 @@ func ConfigureColor(cmd *cobra.Command) {
 
 func configureColor(cmd *cobra.Command, isTTY bool) {
 	colorFlag := cmd.Flag("color")
-	// skip if the command does not have the color flag
-	if colorFlag == nil {
-		return
+	colorConfig := colorAuto // default config
+	if colorFlag != nil {
+		colorConfig = colorConfiguration(colorFlag.Value.String())
 	}
 
 	var shouldColorize bool
-	switch colorValue(colorFlag.Value.String()) {
+	switch colorConfig {
 	case colorAlways:
 		shouldColorize = true
 	case colorNever:

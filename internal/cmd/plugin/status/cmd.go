@@ -53,7 +53,5 @@ func NewCmd() *cobra.Command {
 	statusCmd.Flags().StringP(
 		"output", "o", "text", "Output format. One of text|json")
 
-	plugin.AddColorControlFlag(statusCmd)
-
 	return statusCmd
 }
