@@ -24,14 +24,12 @@ import (
 	"os"
 	"os/exec"
 	"syscall"
-
-	"golang.org/x/sys/unix"
 )
 
 // CreateFifo invokes the Unix system call Mkfifo, if the given filename exists
 func CreateFifo(fileName string) error {
 	if _, err := os.Stat(fileName); err != nil {
-		return unix.Mkfifo(fileName, 0o600)
+		return syscall.Mkfifo(fileName, 0o600)
 	}
 	return nil
 }
@@ -45,5 +43,5 @@ func AddInstanceRunCommands(cmd *exec.Cmd) {
 
 // Umask sets the process's unix umask to prevent/allow permissions changes
 func Umask(mask int) int {
-	return unix.Umask(mask)
+	return syscall.Umask(mask)
 }
