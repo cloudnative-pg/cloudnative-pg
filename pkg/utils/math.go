@@ -16,26 +16,16 @@ limitations under the License.
 
 package utils
 
-// anySigned is a constraint that permits any signed integer type. This type
+// anyNumber is a constraint that permits any number type. This type
 // definition is copied rather than depending on x/exp/constraints since the
 // dependency is otherwise unneeded, the definition is relatively trivial and
 // static, and the Go language maintainers are not sure if/where these will live
 // in the standard library.
 //
 // Reference: https://github.com/golang/go/issues/61914
-type anySigned interface {
-	~int | ~int8 | ~int16 | ~int32 | ~int64
-}
-
-// anyFloat is a constraint that permits any floating-point type. This type
-// definition is copied rather than depending on x/exp/constraints since the
-// dependency is otherwise unneeded, the definition is relatively trivial and
-// static, and the Go language maintainers are not sure if/where these will live
-// in the standard library.
-//
-// Reference: https://github.com/golang/go/issues/61914
-type anyFloat interface {
-	~float32 | ~float64
+type anyNumber interface {
+	~int | ~int8 | ~int16 | ~int32 | ~int64 | ~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 | ~uintptr |
+		~float32 | ~float64
 }
 
 // IsPowerOfTwo calculates if a number is power of two or not
@@ -46,9 +36,9 @@ func IsPowerOfTwo(n int) bool {
 }
 
 // ToBytes converts an input value in MB to bytes
-// Input: value - an integer representing size in MB
+// Input: value - a number representing size in MB
 // Output: the size in bytes, calculated by multiplying the input value by 1024 * 1024
-func ToBytes[T anySigned | anyFloat](mb T) float64 {
+func ToBytes[T anyNumber](mb T) float64 {
 	multiplier := float64(1024)
 	return float64(mb) * multiplier * multiplier
 }
