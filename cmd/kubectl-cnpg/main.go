@@ -84,27 +84,27 @@ func main() {
 	//	plugin.AddColorControlFlag(hibernateStatusCmd)
 
 	subcommands := []*cobra.Command{
+		backup.NewCmd(),
 		certificate.NewCmd(),
 		destroy.NewCmd(),
 		fence.NewCmd(),
 		fio.NewCmd(),
 		hibernate.NewCmd(),
 		install.NewCmd(),
+		logs.NewCmd(),
 		maintenance.NewCmd(),
+		pgadmin.NewCmd(),
 		pgbench.NewCmd(),
 		promote.NewCmd(),
+		psql.NewCmd(),
+		publication.NewCmd(),
 		reload.NewCmd(),
 		report.NewCmd(),
 		restart.NewCmd(),
-		status.NewCmd(),
-		versions.NewCmd(),
-		backup.NewCmd(),
-		psql.NewCmd(),
 		snapshot.NewCmd(),
-		logs.NewCmd(),
-		pgadmin.NewCmd(),
-		publication.NewCmd(),
+		status.NewCmd(),
 		subscription.NewCmd(),
+		versions.NewCmd(),
 	}
 
 	for _, cmd := range subcommands {
