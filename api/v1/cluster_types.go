@@ -2411,6 +2411,7 @@ const (
 
 // ServiceSelectorType describes a valid value for generating the service selectors.
 // It indicates which type of service the selector applies to, such as read-write, read, or read-only
+// +kubebuilder:validation:Enum=rw;r;ro
 type ServiceSelectorType string
 
 // Constants representing the valid values for ServiceSelectorType.
@@ -2427,7 +2428,7 @@ const (
 type ManagedServices struct {
 	// DisabledDefaultServices is a list of service types that are disabled by default.
 	// Valid values are "rw", "r", and "ro", representing read-write, read, and read-only services.
-	// +kubebuilder:validation:Enum=rw;r;ro
+	// +optional
 	DisabledDefaultServices []ServiceSelectorType `json:"disabledDefaultServices,omitempty"`
 	// Additional is a list of additional managed services specified by the user.
 	Additional []ManagedService `json:"additional,omitempty"`

@@ -3217,7 +3217,7 @@ Valid values are &quot;rw&quot;, &quot;r&quot;, and &quot;ro&quot;, representing
 <table class="table">
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td><code>disabledDefaultServices</code> <B>[Required]</B><br/>
+<tr><td><code>disabledDefaultServices</code><br/>
 <a href="#postgresql-cnpg-io-v1-ServiceSelectorType"><i>[]ServiceSelectorType</i></a>
 </td>
 <td>

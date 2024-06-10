@@ -334,40 +334,64 @@ func (r *ClusterReconciler) reconcilePostgresServices(ctx context.Context, clust
 }
 
 func (r *ClusterReconciler) reconcileManagedServices(ctx context.Context, cluster *apiv1.Cluster) error {
-	services, err := specs.BuildManagedServices(*cluster)
+	containService := func(expected corev1.Service) func(iterated corev1.Service) bool {
+		return func(iterated corev1.Service) bool {
+			return iterated.Name == expected.Name
+		}
+	}
+
+	managedServices, err := specs.BuildManagedServices(*cluster)
 	if err != nil {
 		return err
 	}
 
-	var livingManagedSvcs corev1.ServiceList
-	if err := r.Client.List(ctx, &livingManagedSvcs, client.InNamespace(cluster.Namespace), client.MatchingLabels{
+	var livingServices corev1.ServiceList
+	if err := r.Client.List(ctx, &livingServices, client.InNamespace(cluster.Namespace), client.MatchingLabels{
 		utils.IsManagedLabelName: "true",
 		utils.ClusterLabelName:   cluster.Name,
 	}); err != nil {
 		return err
 	}
 
-	for idx := range livingManagedSvcs.Items {
-		svc := livingManagedSvcs.Items[idx]
-		for idx := range services {
-			expectedSvc := services[idx]
-			if expectedSvc.Name != svc.Name {
-				continue
-			}
-			if err := r.serviceReconciler(ctx, &expectedSvc, true, cluster); err != nil {
+	for idx := range managedServices {
+		managedService := managedServices[idx]
+		contextLogger := log.FromContext(ctx).WithValues("serviceName", managedService.Name)
+
+		livingIdx := slices.IndexFunc(livingServices.Items, containService(managedService))
+		if livingIdx == -1 {
+			if err := r.serviceReconciler(ctx, &managedService, true, cluster); err != nil {
 				return err
 			}
-			break
-		}
-
-		if clusterName, _ := IsOwnedByCluster(&svc); clusterName != cluster.Name {
 			continue
 		}
-		// if we have a managed service that is not appearing in the expecting managed services we should delete it
-		if err := r.Client.Delete(ctx, &svc); err != nil && !apierrs.IsNotFound(err) {
+		livingService := livingServices.Items[livingIdx]
+		if clusterName, _ := IsOwnedByCluster(&livingService); clusterName != cluster.Name {
+			contextLogger.Trace("managed service not owned by cluster, skipping")
+			continue
+		}
+		if err := r.serviceReconciler(ctx, &managedService, true, cluster); err != nil {
 			return err
 		}
 	}
+
+	for idx := range livingServices.Items {
+		livingService := livingServices.Items[idx]
+		contextLogger := log.FromContext(ctx).WithValues("serviceName", livingService.Name)
+
+		managedIdx := slices.IndexFunc(managedServices, containService(livingService))
+		if managedIdx != -1 {
+			return nil
+		}
+		if clusterName, _ := IsOwnedByCluster(&livingService); clusterName != cluster.Name {
+			contextLogger.Trace("managed service not owned by cluster, skipping")
+			continue
+		}
+		contextLogger.Info("deleting managed service")
+		if err := r.Client.Delete(ctx, &livingService); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -377,12 +401,15 @@ func (r *ClusterReconciler) serviceReconciler(
 	enabled bool,
 	cluster *apiv1.Cluster,
 ) error {
+	contextLogger := log.FromContext(ctx).WithValues("serviceName", proposed.Name)
+
 	var livingService corev1.Service
 	err := r.Client.Get(ctx, types.NamespacedName{Name: proposed.Name, Namespace: proposed.Namespace}, &livingService)
 	if apierrs.IsNotFound(err) {
 		if !enabled {
 			return nil
 		}
+		contextLogger.Info("creating service")
 		return r.Client.Create(ctx, proposed)
 	}
 	if err != nil {
@@ -394,6 +421,7 @@ func (r *ClusterReconciler) serviceReconciler(
 	}
 
 	if !enabled {
+		contextLogger.Info("deleting service")
 		return r.Client.Delete(ctx, &livingService)
 	}
 	var shouldUpdate bool
@@ -427,6 +455,7 @@ func (r *ClusterReconciler) serviceReconciler(
 		return nil
 	}
 
+	contextLogger.Info("updating service")
 	// we update to ensure that we substitute the selectors
 	return r.Client.Update(ctx, &livingService)
 }
