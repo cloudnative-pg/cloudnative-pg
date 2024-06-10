@@ -171,6 +171,14 @@ Once the plugin was installed and deployed, you can start using it like this:
 kubectl cnpg <command> <args...>
 ```
 
+!!! Note
+    The plugin uses colorization to help make the information easier to read at
+    a glance.
+    Some users may prefer to deactivate colorization, which can be done setting
+    the `--color` flag to `never`. By default the plugin will deactivate
+    colorization when its output is sent to a non-terminal (e.g. piping to a
+    pager or `grep`).
+
 ### Generation of installation manifests
 
 The `cnpg` plugin can be used to generate the YAML manifest for the
