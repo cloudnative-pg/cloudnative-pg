@@ -398,7 +398,7 @@ func (r *ClusterReconciler) serviceReconciler(
 	}
 
 	if !enabled {
-		contextLogger.Info("deleting service")
+		contextLogger.Info("deleting service, due to not being managed anymore")
 		return r.Client.Delete(ctx, &livingService)
 	}
 	var shouldUpdate bool
@@ -432,7 +432,7 @@ func (r *ClusterReconciler) serviceReconciler(
 		return nil
 	}
 
-	contextLogger.Info("updating service")
+	contextLogger.Info("reconciling service")
 	// we update to ensure that we substitute the selectors
 	return r.Client.Update(ctx, &livingService)
 }
