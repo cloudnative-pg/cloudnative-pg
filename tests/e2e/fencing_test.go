@@ -217,7 +217,7 @@ var _ = Describe("Fencing", Label(tests.LabelPlugin), func() {
 					checkInstanceStatusReadyOrNot(pod.GetName(), namespace, false)
 				}
 			})
-			By("checking that the shutdown checkpoint token is present", func() {
+			By("checking that the demotion token is present", func() {
 				Eventually(func(g Gomega) {
 					cluster, err := env.GetCluster(namespace, clusterName)
 					g.Expect(err).ToNot(HaveOccurred())
