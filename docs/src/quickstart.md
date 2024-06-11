@@ -309,8 +309,8 @@ CloudNativePG provides a default dashboard for Grafana as part of the official
 file and manually importing it via the GUI.
 
 !!! Warning
-    Some graphs in the previous dashboard make use of metrics that are in alpha stage by the time 
-    this was created, like `kubelet_volume_stats_available_bytes` and `kubelet_volume_stats_capacity_bytes` 
+    Some graphs in the previous dashboard make use of metrics that are in alpha stage by the time
+    this was created, like `kubelet_volume_stats_available_bytes` and `kubelet_volume_stats_capacity_bytes`
     producing some graphs to show `No data`.
 
 ![local grafana](images/grafana-local.png)
