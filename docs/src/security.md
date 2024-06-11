@@ -399,13 +399,13 @@ a storage class that supports encryption at rest.
 
 ### Using the manifest
 
-In the default installation for a vanilla Kubernetes cluster, the operator is
+In the default installation for a vanilla Kubernetes deployment, the operator is
 deployed using the manifest built using `Kustomize` on the yaml files generated
 by `controller-gen` using the markers available on [Kubebuilder](https://book.kubebuilder.io/).
 Sadly, these is a bit limited for now, and we can create a manifest
-with all permissions for RoleBinding or ClusterBinding, in our case, the permissions
-are cluster wide in the default deployment, thus, we recommend to deploy the operator
-in it's own single place when using this kind of deployment and add the proper permissions
+with all permissions set to be RoleBinding or ClusterBinding, in our case, the permissions
+are ClusterBinding(cluster wide) in the default deployment, thus, we recommend to deploy the operator
+on it's own single place when using the manifest to deploy and add the proper permissions
 to block any external users access to the operator namespace including access to the
 operator `ServiceAccount`.
 
@@ -427,19 +427,13 @@ The first things to understand it's that OLM allows the users to enable the oper
 to "watch" one, a few or all the namespaces depending on how it is deployed, this open
 the possibility to be more granular on the permissions.
 
-When using OLM the default set of permissions is set to be the two types needed,
-RoleBinding and ClusterBinding, meaning that a set of permissions will be namespaced
-and other permissions will be cluster wide.
-
 ### Why are cluster wide permissions needed?
 
-Currently the operator requires cluster wide permissions only for `namespace`
-and `nodes` objects. All the other permissions can be namespaced or cluster
-wide.
+Currently the operator requires cluster wide permissions only for `nodes` objects.
+All the other permissions can be namespaced or cluster wide.
 
 The reason for these mandated permissions are:
 
-- namespace: required to handle the deletion of namespaces containing Clusters.
 - nodes: required to switch to a different instance if the primary is on a node
   being cordoned or drained. Without this, the PodDisruptionBudget would keep
   the primary Pod from being evicted, preventing the maintenance operation from
@@ -449,7 +443,7 @@ These permissions, even if someone get access to the `ServiceAccount`, that are 
 `list` and `watch`, will not have access to nothing more than just see, and if that
 user already had access to that `ServiceAccount`, probably, you have worst problem by now,
 is on you to not allow the users to access to the operator `ServiceAccount` and any
-other `ServiceAccount` used by any other operator that has permissions.
+other `ServiceAccount` used by any other operator that has this kind of permissions.
 
 ### Can this issue be mitigated?
 
