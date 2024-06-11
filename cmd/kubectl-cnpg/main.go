@@ -81,7 +81,6 @@ func main() {
 
 	logFlags.AddFlags(rootCmd.PersistentFlags())
 	configFlags.AddFlags(rootCmd.PersistentFlags())
-	//	plugin.AddColorControlFlag(hibernateStatusCmd)
 
 	subcommands := []*cobra.Command{
 		backup.NewCmd(),

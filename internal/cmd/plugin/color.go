@@ -38,7 +38,7 @@ const (
 	colorNever colorConfiguration = "never"
 )
 
-// String returns the strig representation
+// String returns the string representation
 func (e colorConfiguration) String() string {
 	return string(e)
 }
