@@ -16,73 +16,80 @@ that are analyzed at 3 different layers: Code, Container and Cluster.
 
 ## Code
 
-CloudNativePG's source code is *systematically scanned* for static analysis purposes,
-including **security problems**, using a popular open-source linter for Go called
-[GolangCI-Lint](https://github.com/golangci/golangci-lint) directly in the CI/CD pipeline.
-GolangCI-Lint can run several *linters* on the same source code.
+CloudNativePG's source code undergoes systematic static analysis, including
+checks for security vulnerabilities, using the popular open-source linter for
+Go, [GolangCI-Lint](https://github.com/golangci/golangci-lint), directly
+integrated into the CI/CD pipeline. GolangCI-Lint can run multiple linters on
+the same source code.
 
-The following tools are used to check for security issues:
+The following tools are used to identify security issues:
 
--  [Golang Security Checker](https://github.com/securego/gosec), or simply
-  `gosec`, is  a linter run by GolangCI-Lint that scans the abstract syntax tree
-  of the source against a set of rules aimed at the discovery of well-known
-  vulnerabilities, threats, and weaknesses hidden in the code, such as
-  hard-coded credentials, integer overflows and SQL injections - to name a few.
+- **[Golang Security Checker](https://github.com/securego/gosec) (`gosec`):** A
+  linter that scans the abstract syntax tree of the source code against a set
+  of rules designed to detect known vulnerabilities, threats, and weaknesses,
+  such as hard-coded credentials, integer overflows, and SQL injections.
+  GolangCI-Lint runs `gosec` as part of its suite.
 
-- [govulncheck](https://pkg.go.dev/golang.org/x/vuln/cmd/govulncheck), which
-  is run as part of the CI/CD pipeline, reports known vulnerabilities that
-  affect Go code, or even the compiler. If the operator is built with a version
-  of the Go compiler that contains a known vulnerability, this will be spotted
-  by govulncheck.
+- **[govulncheck](https://pkg.go.dev/golang.org/x/vuln/cmd/govulncheck):** This
+  tool runs in the CI/CD pipeline and reports known vulnerabilities affecting
+  Go code or the compiler. If the operator is built with a version of the Go
+  compiler containing a known vulnerability, `govulncheck` will detect it.
 
-- [CodeQL](https://codeql.github.com/), a tool provided by GitHub that is run
-  as part of the CI/CD pipeline, will block any pull request in which it can
-  find any security issue. The configuration of CodeQL is set to only review Go
-  code, so any other language in the repository like, python or bash, is not
-  covered by this test.
+- **[CodeQL](https://codeql.github.com/):** Provided by GitHub, this tool scans
+  for security issues and blocks any pull request with detected
+  vulnerabilities. CodeQL is configured to review only Go code, excluding other
+  languages in the repository such as Python or Bash.
 
-- [Snyk](https://snyk.io/) code scan is run every night in a scheduled job, and
-  produces weekly reports with any new findings on code security, and also on
-  licensing issues.
+- **[Snyk](https://snyk.io/):** Conducts nightly code scans in a scheduled job
+  and generates weekly reports highlighting any new findings related to code
+  security and licensing issues.
 
-The CloudNativePG repository has the *"Private vulnerability reporting"*
-option enabled in the
-[Security section](https://github.com/cloudnative-pg/cloudnative-pg/security).
-This allows users to safely report any security issue that may require careful
-handling before being released to the public.
-Please, if you find any security bug, use that medium to report it.
+The CloudNativePG repository has the *"Private vulnerability reporting"* option
+enabled in the [Security section](https://github.com/cloudnative-pg/cloudnative-pg/security).
+This feature allows users to safely report security issues that require careful
+handling before being publicly disclosed. If you discover any security bug,
+please use this medium to report it.
 
 !!! Important
-    A failure in the static code analysis phase of the CI/CD pipeline is a
-    blocker for the entire delivery of CloudNativePG, meaning that each commit
-    is validated against all the linters defined by GolangCI-Lint.
+    A failure in the static code analysis phase of the CI/CD pipeline will
+    block the entire delivery process of CloudNativePG. Every commit must pass all
+    the linters defined by GolangCI-Lint.
+
+Sure, here's an improved version of the container documentation section:
 
 ## Container
 
-Every container image that is part of CloudNativePG is automatically built via CI/CD pipelines following every commit.
-Such images include not only the operator's, but also the operands' - specifically every supported PostgreSQL version.
-Within the pipelines, images are scanned with:
+Every container image in CloudNativePG is automatically built via CI/CD
+pipelines following every commit. These images include not only the operator's
+image but also the operands' images, specifically for every supported
+PostgreSQL version. During the CI/CD process, images undergo scanning with the
+following tools:
 
-- [Dockle](https://github.com/goodwithtech/dockle): for best practices in terms of the container build process
-
-- [Snyk](https://snyk.io/): looks for security issues in the container, and reports findings using the GitHub interface.
+- **[Dockle](https://github.com/goodwithtech/dockle):** Ensures best practices
+  in the container build process.
+- **[Snyk](https://snyk.io/):** Detects security issues within the container
+  and reports findings via the GitHub interface.
 
 !!! Important
-    All operand images are automatically rebuilt once a day by our pipelines in case
-    of security updates at the base image and package level, providing **patch level updates**
-    for the container images that the community distributes.
+    All operand images are automatically rebuilt daily by our pipelines to
+    incorporate security updates at the base image and package level, providing
+    **patch-level updates** for the container images distributed to the community.
 
-The following guidelines and frameworks have been taken into account for container-level security:
+### Guidelines and Frameworks for Container Security
 
-- the ["Container Image Creation and Deployment Guide"](https://dl.dod.cyber.mil/wp-content/uploads/devsecops/pdf/DevSecOps_Enterprise_Container_Image_Creation_and_Deployment_Guide_2.6-Public-Release.pdf),
-  developed by the Defense Information Systems Agency (DISA) of the United States Department of Defense (DoD)
-- the ["CIS Benchmark for Docker"](https://www.cisecurity.org/benchmark/docker/),
-  developed by the Center for Internet Security (CIS)
+The following guidelines and frameworks have been considered for ensuring
+container-level security:
 
-!!! Seealso "About the Container level security"
-    Please refer to ["Security and Containers in CloudNativePG"](https://www.enterprisedb.com/blog/security-and-containers-cloud-native-postgresql)
-    blog article for more information about the approach that EDB has taken on
-    security at the container level in CloudNativePG.
+- **["Container Image Creation and Deployment Guide"](https://dl.dod.cyber.mil/wp-content/uploads/devsecops/pdf/DevSecOps_Enterprise_Container_Image_Creation_and_Deployment_Guide_2.6-Public-Release.pdf):**
+  Developed by the Defense Information Systems Agency (DISA) of the United States
+  Department of Defense (DoD).
+- **["CIS Benchmark for Docker"](https://www.cisecurity.org/benchmark/docker/):**
+  Developed by the Center for Internet Security (CIS).
+
+!!! Seealso "About Container-Level Security"
+    For more information on the approach that EDB has taken regarding security
+    at the container level in CloudNativePG, please refer to the blog article
+    ["Security and Containers in CloudNativePG"](https://www.enterprisedb.com/blog/security-and-containers-cloud-native-postgresql).
 
 ## Cluster
 
@@ -395,62 +402,3 @@ CloudNativePG delegates encryption at rest to the underlying storage class. For
 data protection in production environments, we highly recommend that you choose
 a storage class that supports encryption at rest.
 
-## Cluster wide permissions and operator deployment
-
-### Using the manifest
-
-In the default installation for a vanilla Kubernetes deployment, the operator is
-deployed using the manifest built using `Kustomize` on the yaml files generated
-by `controller-gen` using the markers available on [Kubebuilder](https://book.kubebuilder.io/).
-Sadly, these is a bit limited for now, and we can create a manifest
-with all permissions set to be RoleBinding or ClusterBinding, in our case, the permissions
-are ClusterBinding(cluster wide) in the default deployment, thus, we recommend to deploy the operator
-on it's own single place when using the manifest to deploy and add the proper permissions
-to block any external users access to the operator namespace including access to the
-operator `ServiceAccount`.
-
-### Using Helm chart
-
-Another way it's provided to deploy the operator is Helm Charts, but for now, it will
-produce the same effect that we already have in the previous deployment method, meaning
-that all the permissions will be cluster wide in this way to deploy, so please, follow
-the same permissions recommendation.
-
-### Using OLM
-
-The last method to discuss, from a security point of view, it's the OLM, the community
-provides support to build all the files and package required to deploy the operator
-from [OperatorHub.io](https://operatorhub.io/operator/cloudnative-pg) and thus, we have
-a little bit more help on how we manage the permissions.
-
-The first things to understand it's that OLM allows the users to enable the operator
-to "watch" one, a few or all the namespaces depending on how it is deployed, this open
-the possibility to be more granular on the permissions.
-
-### Why are cluster wide permissions needed?
-
-Currently the operator requires cluster wide permissions only for `nodes` objects.
-All the other permissions can be namespaced or cluster wide.
-
-The reason for these mandated permissions are:
-
-- nodes: required to switch to a different instance if the primary is on a node
-  being cordoned or drained. Without this, the PodDisruptionBudget would keep
-  the primary Pod from being evicted, preventing the maintenance operation from
-  being completed.
-
-These permissions, even if someone get access to the `ServiceAccount`, that are only; `get`,
-`list` and `watch`, will not have access to nothing more than just see, and if that
-user already had access to that `ServiceAccount`, probably, you have worst problem by now,
-is on you to not allow the users to access to the operator `ServiceAccount` and any
-other `ServiceAccount` used by any other operator that has this kind of permissions.
-
-### Can this issue be mitigated?
-
-In the manifest and helm chart installation, it's recommended to deploy the operator
-in it's own namespace and don't allow other user than the administrator to access that
-namespace, in this way, all the standard users will not have access to the operator
-`ServiceAccount`.
-
-When using OLM is recommended to deploy the operator on his own namespace watching the
-namespaces that will make use of the operator.
