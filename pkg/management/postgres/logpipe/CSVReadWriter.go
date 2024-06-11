@@ -37,17 +37,20 @@ type CSVRecordReadWriter struct {
 	allowedFieldsPerRecord []int
 }
 
-// Read reads a CSV record from the underlying reader
-func (r *CSVRecordReadWriter) Read() (record []string, err error) {
-	record, err = r.Reader.Read()
+// Read reads a CSV record from the underlying reader, returns the records or any error encountered
+func (r *CSVRecordReadWriter) Read() ([]string, error) {
+	record, err := r.Reader.Read()
+	if err == nil {
+		return record, nil
+	}
 
 	var parseError *csv.ParseError
 	if !errors.As(err, &parseError) {
-		return record, err
+		return nil, err
 	}
 
 	if !errors.Is(parseError.Err, csv.ErrFieldCount) {
-		return record, err
+		return nil, err
 	}
 
 	for _, allowedFields := range r.allowedFieldsPerRecord {
@@ -57,7 +60,7 @@ func (r *CSVRecordReadWriter) Read() (record []string, err error) {
 		}
 	}
 
-	return record, err
+	return nil, err
 }
 
 // NewCSVRecordReadWriter returns a new CSVRecordReadWriter which parses CSV lines
