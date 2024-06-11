@@ -174,6 +174,72 @@ namespaced resources.
 To see all the permissions required by the operator, you can run `kubectl
 describe clusterrole cnpg-manager`.
 
+<!-- TODO: please integrate this or align it with the RBAC section -->
+
+### Cluster-Wide Permissions and Operator Deployment
+
+#### Using the Manifest
+
+In the default installation for a vanilla Kubernetes deployment, the operator
+is deployed using a manifest built with `Kustomize` on the YAML files generated
+by `controller-gen` using the markers available in
+[Kubebuilder](https://book.kubebuilder.io/).
+
+Although this method is currently somewhat limited, it allows for creating a
+manifest with permissions set as either `RoleBinding` or `ClusterRoleBinding`.
+
+In the default deployment, permissions are set to `ClusterRoleBinding`
+(cluster-wide).
+
+Therefore, we recommend deploying the operator in a dedicated namespace and
+assigning proper permissions to prevent external user access, including
+restricting access to the operator's `ServiceAccount`.
+
+#### Using Helm Chart
+
+Another method to deploy the operator is via Helm Charts. However, this method
+also results in cluster-wide permissions similar to the manifest-based
+deployment.
+
+#### Using OLM
+
+From a security perspective, the Operator Lifecycle Manager (OLM) provides a
+more flexible deployment method. The community offers support for building the
+necessary files and packages to deploy the operator from
+[OperatorHub.io](https://operatorhub.io/operator/cloudnative-pg). OLM allows
+users to configure the operator to watch specific namespaces or all namespaces,
+enabling more granular permission management.
+
+#### Why Are Cluster-Wide Permissions Needed?
+
+Currently, the operator requires cluster-wide permissions only for `nodes`
+objects. All other permissions can be namespace-scoped or cluster-wide.
+
+The reasons for these permissions are:
+
+- **Nodes:** Required to switch to a different instance if the primary is on a
+  node being cordoned or drained. Without this, the `PodDisruptionBudget` would
+  prevent the primary Pod from being evicted, blocking the maintenance operation.
+
+Even with these permissions, if someone gains access to the `ServiceAccount`,
+they will only have `get`, `list`, and `watch` permissions, which are limited
+to viewing resources. If an unauthorized user already has access to the
+`ServiceAccount`, it indicates a more significant security issue.
+
+It's crucial to prevent users from accessing the operator's `ServiceAccount`
+and any other `ServiceAccount` with elevated permissions.
+
+#### Can This Issue Be Mitigated?
+
+For both manifest and Helm chart installations, it is recommended to deploy the
+operator in a dedicated namespace and restrict access to this namespace to
+administrators only. This ensures that standard users cannot access the
+operator's `ServiceAccount`.
+
+When using OLM, it is advisable to deploy the operator in its own namespace
+while configuring it to watch the namespaces that will use the operator. This
+setup helps contain permissions and restrict access effectively.
+
 ### Calls to the API server made by the instance manager
 
 The instance manager, which is the entry point of the operand container, needs
