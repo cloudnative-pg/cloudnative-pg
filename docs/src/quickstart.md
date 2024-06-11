@@ -315,5 +315,5 @@ file and manually importing it via the GUI.
 
 ![local grafana](images/grafana-local.png)
 
-Note that in our local setup, Prometheus and Grafana are configured to automatically discover 
+Note that in our local setup, Prometheus and Grafana are configured to automatically discover
 and monitor any CloudNativePG clusters deployed with the Monitoring feature enabled.
