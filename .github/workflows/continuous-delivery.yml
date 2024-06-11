@@ -2098,24 +2098,35 @@ jobs:
           path: ${{ steps.generate-summary.outputs.Overflow }}
           retention-days: 7
 
-      - name: If there are alerts, send them over Slack
+      - name: Send the Ciclops view over Slack
+        # Send the Ciclops thermometer on every scheduled run on `main`.
+        # or when there are systematic failures in release branches
         uses: rtCamp/action-slack-notify@v2
         if: |
-          steps.generate-summary.outputs.alerts &&
           github.repository_owner == env.REPOSITORY_OWNER &&
           (
             github.event_name == 'schedule' ||
-            startsWith(needs.evaluate_options.outputs.git_ref, 'refs/heads/release-')
+            (
+              steps.generate-summary.outputs.alerts &&
+              startsWith(needs.evaluate_options.outputs.git_ref, 'refs/heads/release-')
+            )
           )
         env:
-          SLACK_COLOR: "danger"
+          # SLACK_COLOR is where we distinguish a run with/without alerts. It's where the
+          # action has hooks for conditionality in the message body (yeah, weird)
+          SLACK_COLOR: ${{ steps.generate-summary.outputs.alerts && 'failure' || 'success' }}
           SLACK_ICON: https://avatars.githubusercontent.com/u/85171364?size=48
           SLACK_USERNAME: ${{ env.SLACK_USERNAME }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-          SLACK_TITLE: CIclops found systematic failures in the E2E tests in ${{github.repository}} repository
-          SLACK_MESSAGE: |
-            :warning: ${{steps.generate-summary.outputs.alerts}}
-            <${{ github.server_url }}/${{github.repository}}/actions/runs/${{ github.run_id }}|See full CI run>
+          SLACK_TITLE: CICLOPS view for ${{ github.repository }}
+          SLACK_MESSAGE_ON_SUCCESS: |
+            ${{ steps.generate-summary.outputs.thermometer }}
+          SLACK_MESSAGE_ON_FAILURE: |
+            ${{ steps.generate-summary.outputs.thermometer }}
+            :warning: *Systematic failures!*
+            ${{ steps.generate-summary.outputs.alerts }}
+          SLACK_FOOTER: |
+            <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|*See full CI run*>
 
       - name: Delete the downloaded files
         run: rm -rf test-artifacts
