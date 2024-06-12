@@ -45,12 +45,12 @@ func (e *tokenVerificationError) IsRetryable() bool {
 	return e.retryable
 }
 
-// Assuming this PostgreSQL instance is a replica and we have a shutdown token
+// Assuming this PostgreSQL instance is a replica and we have a promotion token
 // to wait before promoting it, we verify it, delaying the promotion if the
 // token conditions are not met
-func (r *InstanceReconciler) verifyShutdownToken(cluster *apiv1.Cluster) error {
+func (r *InstanceReconciler) verifyPromotionToken(cluster *apiv1.Cluster) error {
 	// If there's no replica cluster configuration there's no
-	// shutdown token too, so we don't need to wait.
+	// promotion token too, so we don't need to wait.
 	if cluster.Spec.ReplicaCluster == nil {
 		return nil
 	}
@@ -66,9 +66,9 @@ func (r *InstanceReconciler) verifyShutdownToken(cluster *apiv1.Cluster) error {
 		return nil
 	}
 
-	shutdownToken, err := utils.ParsePgControldataToken(cluster.Spec.ReplicaCluster.PromotionToken)
+	promotionToken, err := utils.ParsePgControldataToken(cluster.Spec.ReplicaCluster.PromotionToken)
 	if err != nil {
-		// The shutdown token is not correct, and the webhook should
+		// The promotion token is not correct, and the webhook should
 		// have prevented this to happen. If we're here, two things
 		// could have happened:
 		//
@@ -77,14 +77,14 @@ func (r *InstanceReconciler) verifyShutdownToken(cluster *apiv1.Cluster) error {
 		//
 		// We don't have any other possibility than raising this error.
 		// It will be written in the log of the instance manager
-		return fmt.Errorf("while decoding the shutdown token: %w", err)
+		return fmt.Errorf("while decoding the promotion token: %w", err)
 	}
 
-	if err := shutdownToken.IsValid(); err != nil {
-		// The shutdown token is not valid, and the webhook should
+	if err := promotionToken.IsValid(); err != nil {
+		// The promotion token is not valid, and the webhook should
 		// have prevented this to happen. This is the same case as
 		// the previous check
-		return fmt.Errorf("while validating the shutdown token: %w", err)
+		return fmt.Errorf("while validating the promotion token: %w", err)
 	}
 
 	// Request a checkpoint on the replica instance, to
@@ -102,7 +102,7 @@ func (r *InstanceReconciler) verifyShutdownToken(cluster *apiv1.Cluster) error {
 	// SQL. We need to call pg_controldata just for that.
 	out, err := r.instance.GetPgControldata()
 	if err != nil {
-		return fmt.Errorf("while verifying the shutdown token [pg_controldata]: %w", err)
+		return fmt.Errorf("while verifying the promotion token [pg_controldata]: %w", err)
 	}
 
 	parsedControlData := utils.ParsePgControldataOutput(out)
@@ -111,24 +111,24 @@ func (r *InstanceReconciler) verifyShutdownToken(cluster *apiv1.Cluster) error {
 	replayLSNString := parsedControlData[utils.PgControlDataKeyLatestCheckpointREDOLocation]
 
 	// If the token belongs to a different database, we cannot use if
-	if shutdownToken.DatabaseSystemIdentifier != currentSystemIdentifier {
+	if promotionToken.DatabaseSystemIdentifier != currentSystemIdentifier {
 		return &tokenVerificationError{
 			msg: fmt.Sprintf("mismatching system identifiers, current:%s wanted:%s",
-				currentSystemIdentifier, shutdownToken.DatabaseSystemIdentifier),
+				currentSystemIdentifier, promotionToken.DatabaseSystemIdentifier),
 			retryable:    false,
-			tokenContent: shutdownToken,
+			tokenContent: promotionToken,
 		}
 	}
 
 	// If we're in a different timeline, we should definitely wait
 	// for this replica to be in the same timeline as the old primary
-	shutdownTokenTimeline, err := strconv.Atoi(shutdownToken.LatestCheckpointTimelineID)
+	shutdownTokenTimeline, err := strconv.Atoi(promotionToken.LatestCheckpointTimelineID)
 	if err != nil {
 		return &tokenVerificationError{
-			msg: fmt.Sprintf("shutdown token timeline is not an integer: %s (%s)",
-				shutdownToken.LatestCheckpointTimelineID, err.Error()),
+			msg: fmt.Sprintf("promotion token timeline is not an integer: %s (%s)",
+				promotionToken.LatestCheckpointTimelineID, err.Error()),
 			retryable:    false,
-			tokenContent: shutdownToken,
+			tokenContent: promotionToken,
 		}
 	}
 
@@ -138,7 +138,7 @@ func (r *InstanceReconciler) verifyShutdownToken(cluster *apiv1.Cluster) error {
 			msg: fmt.Sprintf("current timeline is not an integer: %s (%s)",
 				currentTimelineIDString, err.Error()),
 			retryable:    false,
-			tokenContent: shutdownToken,
+			tokenContent: promotionToken,
 		}
 	}
 
@@ -148,7 +148,7 @@ func (r *InstanceReconciler) verifyShutdownToken(cluster *apiv1.Cluster) error {
 			msg: fmt.Sprintf("requested timeline not reached, current:%d wanted:%d",
 				currentTimelineID, shutdownTokenTimeline),
 			retryable:    true,
-			tokenContent: shutdownToken,
+			tokenContent: promotionToken,
 		}
 
 	case shutdownTokenTimeline < currentTimelineID:
@@ -156,17 +156,18 @@ func (r *InstanceReconciler) verifyShutdownToken(cluster *apiv1.Cluster) error {
 			msg: fmt.Sprintf("requested timeline is older than current one, current:%d wanted:%d",
 				currentTimelineID, shutdownTokenTimeline),
 			retryable:    false,
-			tokenContent: shutdownToken,
+			tokenContent: promotionToken,
 		}
 	}
 
-	shutdownTokenLSNString := shutdownToken.LatestCheckpointREDOLocation
+	shutdownTokenLSNString := promotionToken.LatestCheckpointREDOLocation
 	shutdownTokenLSN, err := postgres.LSN(shutdownTokenLSNString).Parse()
 	if err != nil {
 		return &tokenVerificationError{
-			msg:          fmt.Sprintf("shutdown token LSN is invalid: %s", shutdownToken.LatestCheckpointREDOLocation),
+			msg: fmt.Sprintf("promotion token LSN is invalid: %s",
+				promotionToken.LatestCheckpointREDOLocation),
 			retryable:    false,
-			tokenContent: shutdownToken,
+			tokenContent: promotionToken,
 		}
 	}
 
@@ -175,7 +176,7 @@ func (r *InstanceReconciler) verifyShutdownToken(cluster *apiv1.Cluster) error {
 		return &tokenVerificationError{
 			msg:          fmt.Sprintf("last replay LSN is invalid: %s", replayLSNString),
 			retryable:    false,
-			tokenContent: shutdownToken,
+			tokenContent: promotionToken,
 		}
 	}
 
@@ -183,19 +184,19 @@ func (r *InstanceReconciler) verifyShutdownToken(cluster *apiv1.Cluster) error {
 	case shutdownTokenLSN < replayLSN:
 		return &tokenVerificationError{
 			msg: fmt.Sprintf(
-				"shutdown token LSN (%s) is older than the last replay LSN (%s)",
+				"promotion token LSN (%s) is older than the last replay LSN (%s)",
 				shutdownTokenLSNString, replayLSNString),
 			retryable:    false,
-			tokenContent: shutdownToken,
+			tokenContent: promotionToken,
 		}
 
 	case replayLSN < shutdownTokenLSN:
 		return &tokenVerificationError{
 			msg: fmt.Sprintf(
-				"waiting for shutdown token LSN (%s) to be replayed (the last replayed LSN is %s)",
+				"waiting for promotion token LSN (%s) to be replayed (the last replayed LSN is %s)",
 				shutdownTokenLSNString, replayLSNString),
 			retryable:    true,
-			tokenContent: shutdownToken,
+			tokenContent: promotionToken,
 		}
 	}
 

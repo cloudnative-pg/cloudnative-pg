@@ -49,7 +49,7 @@ func Reconcile(
 	contextLogger := log.FromContext(ctx).WithName("replica_cluster")
 
 	if isDesignatedPrimaryTransitionCompleted(cluster) {
-		return reconcileShutdownCheckpointToken(ctx, cli, cluster, instanceClient, instances)
+		return reconcileDemotionToken(ctx, cli, cluster, instanceClient, instances)
 	}
 
 	// waiting for the instance manager
@@ -146,7 +146,7 @@ func cleanupTransitionMetadata(ctx context.Context, cli client.Client, cluster *
 	return cli.Status().Patch(ctx, cluster, client.MergeFrom(origCluster))
 }
 
-func reconcileShutdownCheckpointToken(
+func reconcileDemotionToken(
 	ctx context.Context,
 	cli client.Client,
 	cluster *apiv1.Cluster,
@@ -155,7 +155,7 @@ func reconcileShutdownCheckpointToken(
 ) (*ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx).WithName("replica_cluster")
 
-	shutdownToken, err := generateShutdownCheckpointToken(ctx, cluster, instanceClient, instances)
+	shutdownToken, err := generateDemotionToken(ctx, cluster, instanceClient, instances)
 	if err != nil {
 		if errors.Is(err, errPostgresNotShutDown) {
 			return &ctrl.Result{
@@ -169,13 +169,13 @@ func reconcileShutdownCheckpointToken(
 	if cluster.Status.DemotionToken != shutdownToken {
 		origCluster := cluster.DeepCopy()
 		contextLogger.Info(
-			"patching the shutdownCheckpointToken in the  cluster status",
+			"patching the demotionToken in the  cluster status",
 			"value", shutdownToken,
 			"previousValue", cluster.Status.DemotionToken)
 		cluster.Status.DemotionToken = shutdownToken
 
 		if err := cli.Status().Patch(ctx, cluster, client.MergeFrom(origCluster)); err != nil {
-			return nil, fmt.Errorf("while setting shutdown checkpoint token: %w", err)
+			return nil, fmt.Errorf("while setting demotion token: %w", err)
 		}
 	}
 

@@ -31,10 +31,10 @@ import (
 // and we required to archive the shutdown checkpoint WAL file
 var errPostgresNotShutDown = fmt.Errorf("expected postmaster to be shut down")
 
-// generateShutdownCheckpointToken gets the shutdown token from
+// generateDemotionToken gets the shutdown token from
 // the current primary and archives the WAL containing the shutdown
 // checkpoint entry
-func generateShutdownCheckpointToken(
+func generateDemotionToken(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	instanceClient instance.Client,

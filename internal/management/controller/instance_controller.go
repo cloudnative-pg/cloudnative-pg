@@ -1158,7 +1158,7 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 	// If I'm not the primary, let's promote myself
 	if !isPrimary {
 		// Verify that the shutdown token is met before promoting
-		if err := r.verifyShutdownToken(cluster); err != nil {
+		if err := r.verifyPromotionToken(cluster); err != nil {
 			return err
 		}
 
