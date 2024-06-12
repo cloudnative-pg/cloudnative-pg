@@ -68,7 +68,6 @@ Git tags for versions are prepended with `v`.
 |-----------------|----------------------|-------------------|---------------------|-------------------------------|---------------------------|-----------------------------|
 | 1.23.x          | Yes                  | April 24, 2024    | ~ October, 2024     | 1.27, 1.28, 1.29              | 1.26                      | 12 - 16                     |
 | 1.22.x          | Yes                  | December 21, 2023 | July 24, 2024       | 1.26, 1.27, 1.28              | 1.29                      | 12 - 16                     |
-| 1.21.x          | Yes                  | October 12, 2023  | May 24, 2024        | 1.25, 1.26, 1.27, 1.28        | 1.29                      | 12 - 16                     |
 | main            | No, development only |                   |                     |                               |                           | 12 - 16                     |
 
 The list of supported Kubernetes versions in the table depends on what
@@ -98,10 +97,11 @@ version of PostgreSQL, we might not be able to help you.
 
 ## Upcoming releases
 
-| Version         | Release date          | End of life               | Supported Kubernetes versions |
-|-----------------|-----------------------|---------------------------|-------------------------------|
-| 1.23.0          | April 23, 2024        | -                         | -                             |
-| 1.24.0          | June/July, 2024       | -                         | -                             |
+| Version         | Release date          | End of life               |
+|-----------------|-----------------------|---------------------------|
+| 1.24.0          | July 16, 2024         | Jan/Feb, 2025             |
+| 1.25.0          | Oct/Nov, 2024         | Apr/May, 2025             |
+| 1.26.0          | Feb, 2025             | Jul/Aug, 2025             |
 
 !!! Note
     Feature freeze happens one week before the release
@@ -116,6 +116,7 @@ version of PostgreSQL, we might not be able to help you.
 
 | Version         | Release date      | End of life         | Compatible Kubernetes versions |
 |-----------------|-------------------|---------------------|--------------------------------|
+| 1.21.x          | October 12, 2023  | Jun 12, 2024        | 1.25, 1.26, 1.27, 1.28         |
 | 1.20.x          | April 27, 2023    | January 21, 2024    | 1.24, 1.25, 1.26, 1.27         |
 | 1.19.x          | February 14, 2023 | November 3, 2023    | 1.23, 1.24, 1.25, 1.26         |
 | 1.18.x          | Nov 10, 2022      | June 12, 2023       | 1.23, 1.24, 1.25, 1.26, 1.27   |
