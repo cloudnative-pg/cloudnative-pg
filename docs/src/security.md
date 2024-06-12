@@ -55,8 +55,6 @@ please use this medium to report it.
     block the entire delivery process of CloudNativePG. Every commit must pass all
     the linters defined by GolangCI-Lint.
 
-Sure, here's an improved version of the container documentation section:
-
 ## Container
 
 Every container image in CloudNativePG is automatically built via CI/CD
