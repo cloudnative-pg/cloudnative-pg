@@ -26,6 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	k8client "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -640,6 +641,7 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication), func() {
 				Expect(tokenContent.LatestCheckpointTimelineID).To(BeEquivalentTo("1"))
 				Expect(tokenContent.IsValid()).To(Succeed())
 			})
+
 			By("promoting B with the token", func() {
 				cluster, err := env.GetCluster(namespace, clusterBName)
 				Expect(err).ToNot(HaveOccurred())
@@ -653,11 +655,227 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication), func() {
 				waitForTimelineIncrease(namespace, clusterBName, expectedTimeline)
 			})
 
+			By("verifying B contains the primary", func() {
+				primary, err := env.GetClusterPrimary(namespace, clusterBName)
+				Expect(err).ToNot(HaveOccurred())
+				AssertPgRecoveryMode(primary, false)
+				podList, err := env.GetClusterReplicas(namespace, clusterBName)
+				Expect(err).ToNot(HaveOccurred())
+				for _, pod := range podList.Items {
+					AssertPgRecoveryMode(&pod, true)
+				}
+			})
+
 			By("verifying replication from new primary works everywhere", func() {
 				validateReplication(namespace, clusterAName, clusterBName)
 			})
 		},
 		Entry("when primaryUpdateMethod is set to restart", clusterAFileRestart, clusterBFileRestart, 2),
 		Entry("when primaryUpdateMethod is set to switchover", clusterAFileSwitchover, clusterBFileSwitchover, 3),
+	)
+
+	DescribeTable("should fail when we use an old token",
+		func(clusterAFile string, clusterBFile string, expectedTimeline int) {
+
+			var clusterAName, clusterBName string
+
+			var err error
+			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			Expect(err).ToNot(HaveOccurred())
+			DeferCleanup(func() error { return env.DeleteNamespace(namespace) })
+
+			stopLoad := make(chan struct{})
+			DeferCleanup(func() { close(stopLoad) })
+
+			By("creating the credentials for minio", func() {
+				AssertStorageCredentialsAreCreated(namespace, "backup-storage-creds", "minio", "minio123")
+			})
+
+			By("create the certificates for MinIO", func() {
+				err := minioEnv.CreateCaSecret(env, namespace)
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			By("creating the A cluster", func() {
+				var err error
+				clusterAName, err = env.GetResourceNameFromYAML(clusterAFile)
+				Expect(err).ToNot(HaveOccurred())
+				AssertCreateCluster(namespace, clusterAName, clusterAFile, env)
+			})
+			By("creating some load on the A cluster", func() {
+				primary, err := env.GetClusterPrimary(namespace, clusterAName)
+				Expect(err).ToNot(HaveOccurred())
+				_, _, err = env.ExecQueryInInstancePod(
+					testUtils.PodLocator{Namespace: namespace, PodName: primary.Name},
+					"postgres",
+					"CREATE TABLE switchover_load (i int);",
+				)
+				Expect(err).ToNot(HaveOccurred())
+
+				go func() {
+					for {
+						_, _, _ = env.ExecQueryInInstancePod(
+							testUtils.PodLocator{Namespace: namespace, PodName: primary.Name},
+							"postgres",
+							"INSERT INTO switchover_load SELECT generate_series(1, 10000)",
+						)
+						select {
+						case <-stopLoad:
+							GinkgoWriter.Println("Terminating load")
+							return
+						default:
+							continue
+						}
+					}
+				}()
+			})
+
+			By("backing up the A cluster", func() {
+				backup, err := testUtils.CreateBackup(
+					apiv1.Backup{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: namespace,
+							Name:      clusterAName,
+						},
+						Spec: apiv1.BackupSpec{
+							Target:  apiv1.BackupTargetPrimary,
+							Method:  apiv1.BackupMethodBarmanObjectStore,
+							Cluster: apiv1.LocalObjectReference{Name: clusterAName},
+						},
+					},
+					env,
+				)
+				Expect(err).ToNot(HaveOccurred())
+
+				// Speed up backup finalization
+				primary, err := env.GetClusterPrimary(namespace, clusterAName)
+				Expect(err).ToNot(HaveOccurred())
+				_ = switchWalAndGetLatestArchive(namespace, primary.Name)
+				Expect(err).ToNot(HaveOccurred())
+
+				Eventually(
+					func() (apiv1.BackupPhase, error) {
+						err = env.Client.Get(env.Ctx, types.NamespacedName{
+							Namespace: namespace,
+							Name:      clusterAName,
+						}, backup)
+						return backup.Status.Phase, err
+					},
+					testTimeouts[testUtils.BackupIsReady],
+				).WithPolling(10 * time.Second).
+					Should(BeEquivalentTo(apiv1.BackupPhaseCompleted))
+			})
+
+			By("creating the B cluster from the backup", func() {
+				var err error
+				clusterBName, err = env.GetResourceNameFromYAML(clusterBFile)
+				Expect(err).ToNot(HaveOccurred())
+				AssertCreateCluster(namespace, clusterBName, clusterBFile, env)
+			})
+
+			By("demoting A to a replica", func() {
+				cluster, err := env.GetCluster(namespace, clusterAName)
+				Expect(err).ToNot(HaveOccurred())
+				oldCluster := cluster.DeepCopy()
+				cluster.Spec.ReplicaCluster.Enabled = true
+				Expect(env.Client.Patch(env.Ctx, cluster, k8client.MergeFrom(oldCluster))).To(Succeed())
+				podList, err := env.GetClusterPodList(namespace, clusterAName)
+				Expect(err).ToNot(HaveOccurred())
+				for _, pod := range podList.Items {
+					AssertPgRecoveryMode(&pod, true)
+				}
+			})
+
+			var token string
+			By("getting the demotion token", func() {
+				cluster, err := env.GetCluster(namespace, clusterAName)
+				Expect(err).ToNot(HaveOccurred())
+				token = cluster.Status.DemotionToken
+			})
+
+			By("promoting A again", func() {
+				cluster, err := env.GetCluster(namespace, clusterAName)
+				Expect(err).ToNot(HaveOccurred())
+				oldCluster := cluster.DeepCopy()
+				cluster.Spec.ReplicaCluster.Enabled = false
+				Expect(env.Client.Patch(env.Ctx, cluster, k8client.MergeFrom(oldCluster))).To(Succeed())
+				primary, err := env.GetClusterPrimary(namespace, clusterAName)
+				Expect(err).ToNot(HaveOccurred())
+				AssertPgRecoveryMode(primary, false)
+				podList, err := env.GetClusterReplicas(namespace, clusterAName)
+				Expect(err).ToNot(HaveOccurred())
+				for _, pod := range podList.Items {
+					AssertPgRecoveryMode(&pod, true)
+				}
+			})
+
+			By("demoting A to a replica again", func() {
+				cluster, err := env.GetCluster(namespace, clusterAName)
+				Expect(err).ToNot(HaveOccurred())
+				oldCluster := cluster.DeepCopy()
+				cluster.Spec.ReplicaCluster.Enabled = true
+				Expect(env.Client.Patch(env.Ctx, cluster, k8client.MergeFrom(oldCluster))).To(Succeed())
+				podList, err := env.GetClusterPodList(namespace, clusterAName)
+				Expect(err).ToNot(HaveOccurred())
+				for _, pod := range podList.Items {
+					AssertPgRecoveryMode(&pod, true)
+				}
+			})
+
+			By("promoting B with the old token", func() {
+				cluster, err := env.GetCluster(namespace, clusterBName)
+				Expect(err).ToNot(HaveOccurred())
+				oldCluster := cluster.DeepCopy()
+				cluster.Spec.ReplicaCluster.PromotionToken = token
+				cluster.Spec.ReplicaCluster.Enabled = false
+				Expect(env.Client.Patch(env.Ctx, cluster, k8client.MergeFrom(oldCluster))).To(Succeed())
+			})
+
+			By("failing to promote B with the old token", func() {
+				Consistently(func(g Gomega) {
+					pod, err := env.GetClusterPrimary(namespace, clusterBName)
+					g.Expect(err).ToNot(HaveOccurred())
+					stdOut, _, err := env.ExecCommand(env.Ctx, *pod, specs.PostgresContainerName, ptr.To(2*time.Second),
+						"psql", "-U", "postgres", "postgres", "-tAc", "select pg_is_in_recovery();")
+					g.Expect(err).ToNot(HaveOccurred())
+					g.Expect(strings.Trim(stdOut, "\n")).To(Equal("t"))
+				}, 60, 10).Should(Succeed())
+			})
+
+			By("getting the new demotion token", func() {
+				cluster, err := env.GetCluster(namespace, clusterAName)
+				Expect(err).ToNot(HaveOccurred())
+				token = cluster.Status.DemotionToken
+			})
+
+			By("promoting B with the new token", func() {
+				cluster, err := env.GetCluster(namespace, clusterBName)
+				Expect(err).ToNot(HaveOccurred())
+				oldCluster := cluster.DeepCopy()
+				cluster.Spec.ReplicaCluster.PromotionToken = token
+				cluster.Spec.ReplicaCluster.Enabled = false
+				Expect(env.Client.Patch(env.Ctx, cluster, k8client.MergeFrom(oldCluster))).To(Succeed())
+			})
+
+			By("reaching the target timeline", func() {
+				waitForTimelineIncrease(namespace, clusterBName, expectedTimeline)
+			})
+
+			By("verifying B contains the primary", func() {
+				primary, err := env.GetClusterPrimary(namespace, clusterBName)
+				Expect(err).ToNot(HaveOccurred())
+				AssertPgRecoveryMode(primary, false)
+				podList, err := env.GetClusterReplicas(namespace, clusterBName)
+				Expect(err).ToNot(HaveOccurred())
+				for _, pod := range podList.Items {
+					AssertPgRecoveryMode(&pod, true)
+				}
+			})
+
+			By("verifying replication from new primary works everywhere", func() {
+				validateReplication(namespace, clusterAName, clusterBName)
+			})
+		},
+		FEntry("when primaryUpdateMethod is set to restart", clusterAFileRestart, clusterBFileRestart, 3),
 	)
 })
