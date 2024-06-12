@@ -37,24 +37,36 @@ func newTLSConfigFromSecret(
 	ctx context.Context,
 	cli client.Client,
 	caSecret types.NamespacedName,
-	serverName string,
+	serverSecret types.NamespacedName,
 ) (*tls.Config, error) {
-	secret := &v1.Secret{}
-	err := cli.Get(ctx, caSecret, secret)
-	if err != nil {
-		return nil, fmt.Errorf("while getting caSecret %s: %w", caSecret.Name, err)
+	ca := &v1.Secret{}
+	if err := cli.Get(ctx, caSecret, ca); err != nil {
+		return nil, fmt.Errorf("while getting CA secret %s: %w", caSecret, err)
 	}
 
-	caCertificate, ok := secret.Data[CACertKey]
+	caCertificate, ok := ca.Data[CACertKey]
 	if !ok {
-		return nil, fmt.Errorf("missing %s entry in secret %s", CACertKey, caSecret.Name)
+		return nil, fmt.Errorf("missing %s entry in secret %s", CACertKey, caSecret)
+	}
+
+	server := &v1.Secret{}
+	if err := cli.Get(ctx, serverSecret, server); err != nil {
+		return nil, fmt.Errorf("while getting server secret %s: %w", serverSecret, err)
+	}
+	pair, err := ParseServerSecret(server)
+	if err != nil {
+		return nil, fmt.Errorf("while parsing server secret %s: %w", serverSecret, err)
+	}
+	serverCert, err := pair.ParseCertificate()
+	if err != nil {
+		return nil, fmt.Errorf("while parsing the server secret %s certificate: %w", serverSecret, err)
 	}
 
 	caCertPool := x509.NewCertPool()
 	caCertPool.AppendCertsFromPEM(caCertificate)
 	tlsConfig := tls.Config{
 		MinVersion: tls.VersionTLS13,
-		ServerName: serverName,
+		ServerName: serverCert.Subject.CommonName,
 		RootCAs:    caCertPool,
 	}
 
@@ -67,9 +79,9 @@ func NewTLSConfigForContext(
 	ctx context.Context,
 	cli client.Client,
 	caSecret types.NamespacedName,
-	serverName string,
+	serverSecret types.NamespacedName,
 ) (context.Context, error) {
-	conf, err := newTLSConfigFromSecret(ctx, cli, caSecret, serverName)
+	conf, err := newTLSConfigFromSecret(ctx, cli, caSecret, serverSecret)
 	if err != nil {
 		return nil, err
 	}

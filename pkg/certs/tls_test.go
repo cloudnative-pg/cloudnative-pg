@@ -33,42 +33,91 @@ import (
 
 var _ = Describe("newTLSConfigFromSecret", func() {
 	var (
-		ctx        context.Context
-		c          client.Client
-		caSecret   types.NamespacedName
-		serverName string
+		c            client.Client
+		caSecret     types.NamespacedName
+		serverSecret types.NamespacedName
 	)
 
 	BeforeEach(func() {
-		ctx = context.TODO()
-		caSecret = types.NamespacedName{Name: "test-secret", Namespace: "default"}
-		serverName = "test-server"
+		caSecret = types.NamespacedName{Name: "test-ca-secret", Namespace: "default"}
+		serverSecret = types.NamespacedName{Name: "test-server-secret", Namespace: "default"}
 	})
 
 	Context("when the secret is found and valid", func() {
 		BeforeEach(func() {
-			secretData := map[string][]byte{
+			caData := map[string][]byte{
 				CACertKey: []byte(`-----BEGIN CERTIFICATE-----
-MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA7Qe3X7Q6WZpXqlXkq0Bd
-... (rest of the CA certificate) ...
+MIICPjCCAcSgAwIBAgIUJsgJfS4wtL/nVC28UHtSeM3yYjwwCgYIKoZIzj0EAwIw
+VjELMAkGA1UEBhMCSVQxDjAMBgNVBAgMBVByYXRvMQ4wDAYDVQQHDAVQcmF0bzEM
+MAoGA1UECgwDRURCMQwwCgYDVQQLDANXRUIxCzAJBgNVBAMMAkNBMB4XDTI0MDYx
+MjEyMzkxMFoXDTM0MDYxMDEyMzkxMFowVjELMAkGA1UEBhMCSVQxDjAMBgNVBAgM
+BVByYXRvMQ4wDAYDVQQHDAVQcmF0bzEMMAoGA1UECgwDRURCMQwwCgYDVQQLDANX
+RUIxCzAJBgNVBAMMAkNBMHYwEAYHKoZIzj0CAQYFK4EEACIDYgAETWFM9TA5Qcgq
+enACpSG2qYc/Or7OYbDY74ng0ZrQPcUUL3QbMzrx7wYhA4gECgLdBVqYivgqml37
+bks7DhhYe4h0/0jlqL0cqTzWJxrEbnCoDFDJ1FfJJ02ID/TdtvsSo1MwUTAdBgNV
+HQ4EFgQUd2X2XXcREi+k1PQV9NRFjKrwCKkwHwYDVR0jBBgwFoAUd2X2XXcREi+k
+1PQV9NRFjKrwCKkwDwYDVR0TAQH/BAUwAwEB/zAKBggqhkjOPQQDAgNoADBlAjEA
+9CcEvnf75XYQBtGoYsecBkVFfCGxJPXjBYS/5sOCcx7jX0bo8pQn0UMvadN2I2kM
+AjABtpzmdjSn59hozhmg14x6KrL2OBS2W+PchpaJ5+brX7krRH/PWsiGDZAI1+xx
+Wis=
 -----END CERTIFICATE-----`),
 			}
-			secret := &v1.Secret{
+			serverData := map[string][]byte{
+				TLSCertKey: []byte(`-----BEGIN CERTIFICATE-----
+MIIDSjCCAtGgAwIBAgIUKqMcWodLQqR5RQoSFIjJm2FhPM4wCgYIKoZIzj0EAwIw
+VjELMAkGA1UEBhMCSVQxDjAMBgNVBAgMBVByYXRvMQ4wDAYDVQQHDAVQcmF0bzEM
+MAoGA1UECgwDRURCMQwwCgYDVQQLDANXRUIxCzAJBgNVBAMMAkNBMB4XDTI0MDYx
+MjEyMzkxMFoXDTM0MDYxMDEyMzkxMFowWjELMAkGA1UEBhMCSVQxDjAMBgNVBAgM
+BVByYXRvMQ4wDAYDVQQHDAVQcmF0bzEMMAoGA1UECgwDRURCMQwwCgYDVQQLDANX
+RUIxDzANBgNVBAMMBnNlcnZlcjB2MBAGByqGSM49AgEGBSuBBAAiA2IABOW9IUt6
+c8AEcotrYEDNp2u8daGAamiQdlfWk9qOokPhIMi9bfEJaV6gppzmONmtvwSGgAyZ
+rsAdNTSiug8jl4aX3P7r+OMGeFojSVqGfT+DohEk5yPSL99zmy2PTQDbd6OCAVow
+ggFWMAkGA1UdEwQCMAAwEQYJYIZIAYb4QgEBBAQDAgZAMDMGCWCGSAGG+EIBDQQm
+FiRPcGVuU1NMIEdlbmVyYXRlZCBTZXJ2ZXIgQ2VydGlmaWNhdGUwHQYDVR0OBBYE
+FF5PHGe9xOrp6lb1ehg5aJcmwiVHMIGTBgNVHSMEgYswgYiAFHdl9l13ERIvpNT0
+FfTURYyq8AipoVqkWDBWMQswCQYDVQQGEwJJVDEOMAwGA1UECAwFUHJhdG8xDjAM
+BgNVBAcMBVByYXRvMQwwCgYDVQQKDANFREIxDDAKBgNVBAsMA1dFQjELMAkGA1UE
+AwwCQ0GCFCbICX0uMLS/51QtvFB7UnjN8mI8MA4GA1UdDwEB/wQEAwIFoDAdBgNV
+HSUEFjAUBggrBgEFBQcDAQYIKwYBBQUHAwIwHQYDVR0RBBYwFIISc2VydmVyLnBy
+aXZhdGUudGxkMAoGCCqGSM49BAMCA2cAMGQCMATaIxLFrs1Jl9NHWbor1YQ74tyV
+ezD8cxjuSvVGLqJGY0KO5QQqhvi/pgOziUX4VwIwfjH/6u/0HCV813pb1BK5qJvD
+vF0yoWNwrkGqVn9d/cKVnGCNWz3FyF+AheA5kOni
+-----END CERTIFICATE-----
+`),
+				TLSPrivateKeyKey: []byte(`-----BEGIN EC PARAMETERS-----
+BgUrgQQAIg==
+-----END EC PARAMETERS-----
+-----BEGIN EC PRIVATE KEY-----
+MIGkAgEBBDADWXMBEMbLt7RKCOFpbYxwumKYA+Mkw/V19aibN/j8oS/uN7Qz+BIJ
++5Lkd3OUhPagBwYFK4EEACKhZANiAATlvSFLenPABHKLa2BAzadrvHWhgGpokHZX
+1pPajqJD4SDIvW3xCWleoKac5jjZrb8EhoAMma7AHTU0oroPI5eGl9z+6/jjBnha
+I0lahn0/g6IRJOcj0i/fc5stj00A23c=
+-----END EC PRIVATE KEY-----
+`),
+			}
+			ca := &v1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      caSecret.Name,
 					Namespace: caSecret.Namespace,
 				},
-				Data: secretData,
+				Data: caData,
 			}
-			c = fake.NewClientBuilder().WithObjects(secret).Build()
+			server := &v1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      serverSecret.Name,
+					Namespace: serverSecret.Namespace,
+				},
+				Data: serverData,
+			}
+			c = fake.NewClientBuilder().WithObjects(ca, server).Build()
 		})
 
-		It("should return a valid tls.Config", func() {
-			tlsConfig, err := newTLSConfigFromSecret(ctx, c, caSecret, serverName)
+		It("should return a valid tls.Config", func(ctx context.Context) {
+			tlsConfig, err := newTLSConfigFromSecret(ctx, c, caSecret, serverSecret)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(tlsConfig).NotTo(BeNil())
 			Expect(tlsConfig.MinVersion).To(Equal(uint16(tls.VersionTLS13)))
-			Expect(tlsConfig.ServerName).To(Equal(serverName))
+			Expect(tlsConfig.ServerName).To(Equal(`server`))
 			Expect(tlsConfig.RootCAs).ToNot(BeNil())
 		})
 	})
@@ -78,11 +127,11 @@ MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA7Qe3X7Q6WZpXqlXkq0Bd
 			c = fake.NewClientBuilder().Build()
 		})
 
-		It("should return an error", func() {
-			tlsConfig, err := newTLSConfigFromSecret(ctx, c, caSecret, serverName)
+		It("should return an error", func(ctx context.Context) {
+			tlsConfig, err := newTLSConfigFromSecret(ctx, c, caSecret, serverSecret)
 			Expect(err).To(HaveOccurred())
 			Expect(tlsConfig).To(BeNil())
-			Expect(err.Error()).To(ContainSubstring(fmt.Sprintf("while getting caSecret %s", caSecret.Name)))
+			Expect(err.Error()).To(ContainSubstring(fmt.Sprintf("while getting CA secret %s", caSecret)))
 		})
 	})
 
@@ -97,11 +146,11 @@ MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA7Qe3X7Q6WZpXqlXkq0Bd
 			c = fake.NewClientBuilder().WithObjects(secret).Build()
 		})
 
-		It("should return an error", func() {
-			tlsConfig, err := newTLSConfigFromSecret(ctx, c, caSecret, serverName)
+		It("should return an error", func(ctx context.Context) {
+			tlsConfig, err := newTLSConfigFromSecret(ctx, c, caSecret, serverSecret)
 			Expect(err).To(HaveOccurred())
 			Expect(tlsConfig).To(BeNil())
-			Expect(err.Error()).To(ContainSubstring(fmt.Sprintf("missing %s entry in secret %s", CACertKey, caSecret.Name)))
+			Expect(err.Error()).To(ContainSubstring(fmt.Sprintf("missing %s entry in secret %s", CACertKey, caSecret)))
 		})
 	})
 })

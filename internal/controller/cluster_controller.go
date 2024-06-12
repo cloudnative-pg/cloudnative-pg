@@ -253,7 +253,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		ctx,
 		r.Client,
 		cluster.GetServerCASecretObjectKey(),
-		cluster.GetServiceReadWriteName(),
+		cluster.GetServerTLSSecretObjectKey(),
 	)
 	if err != nil {
 		return ctrl.Result{}, err

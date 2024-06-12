@@ -3454,6 +3454,11 @@ func (cluster *Cluster) GetServerCASecretObjectKey() types.NamespacedName {
 	return types.NamespacedName{Namespace: cluster.Namespace, Name: cluster.GetServerCASecretName()}
 }
 
+// GetServerTLSSecretObjectKey returns a types.NamespacedName pointing to the secret
+func (cluster *Cluster) GetServerTLSSecretObjectKey() types.NamespacedName {
+	return types.NamespacedName{Namespace: cluster.Namespace, Name: cluster.GetServerTLSSecretName()}
+}
+
 // IsBarmanBackupConfigured returns true if one of the possible backup destination
 // is configured, false otherwise
 func (backupConfiguration *BackupConfiguration) IsBarmanBackupConfigured() bool {
