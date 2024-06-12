@@ -2812,7 +2812,7 @@ var _ = Describe("replica mode validation", func() {
 			},
 		}
 
-		result := cluster.validateReplicaMode()
+		result := cluster.validatePromotionToken()
 		Expect(result).ToNot(BeEmpty())
 	})
 
@@ -2875,7 +2875,7 @@ var _ = Describe("replica mode validation", func() {
 			},
 		}
 
-		result := cluster.validateReplicaMode()
+		result := cluster.validatePromotionToken()
 		Expect(result).To(BeEmpty())
 	})
 })

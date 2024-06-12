@@ -379,6 +379,7 @@ func (r *Cluster) Validate() (allErrs field.ErrorList) {
 		r.validateManagedExtensions,
 		r.validateResources,
 		r.validateHibernationAnnotation,
+		r.validatePromotionToken,
 	}
 
 	for _, validate := range validations {
@@ -1925,6 +1926,37 @@ func (r *Cluster) validateUnixPermissionIdentifierChange(old *Cluster) field.Err
 	return result
 }
 
+func (r *Cluster) validatePromotionToken() field.ErrorList {
+	var result field.ErrorList
+
+	if r.Spec.ReplicaCluster == nil {
+		return result
+	}
+
+	if !r.Spec.ReplicaCluster.Enabled {
+		token := r.Spec.ReplicaCluster.PromotionToken
+		if len(token) > 0 {
+			tokenContent, err := utils.ParsePgControldataToken(token)
+			if err != nil {
+				result = append(
+					result,
+					field.Invalid(
+						field.NewPath("spec", "replicaCluster", "token"),
+						token,
+						fmt.Sprintf("Invalid promotionToken format: %s", err.Error())))
+			} else if err := tokenContent.IsValid(); err != nil {
+				result = append(
+					result,
+					field.Invalid(
+						field.NewPath("spec", "replicaCluster", "token"),
+						token,
+						fmt.Sprintf("Invalid promotionToken content: %s", err.Error())))
+			}
+		}
+	}
+	return result
+}
+
 // Check if the replica mode is used with an incompatible bootstrap
 // method
 func (r *Cluster) validateReplicaMode() field.ErrorList {
@@ -1956,26 +1988,6 @@ func (r *Cluster) validateReplicaMode() field.ErrorList {
 				field.NewPath("spec", "replicaCluster", "primaryServerName"),
 				r.Spec.ReplicaCluster.Source,
 				fmt.Sprintf("External cluster %v not found", r.Spec.ReplicaCluster.Source)))
-	}
-
-	token := r.Spec.ReplicaCluster.PromotionToken
-	if len(token) > 0 {
-		tokenContent, err := utils.ParsePgControldataToken(token)
-		if err != nil {
-			result = append(
-				result,
-				field.Invalid(
-					field.NewPath("spec", "replicaCluster", "token"),
-					token,
-					fmt.Sprintf("Invalid shutdown token format: %s", err.Error())))
-		} else if err := tokenContent.IsValid(); err != nil {
-			result = append(
-				result,
-				field.Invalid(
-					field.NewPath("spec", "replicaCluster", "token"),
-					token,
-					fmt.Sprintf("Invalid shutdown token content: %s", err.Error())))
-		}
 	}
 
 	return result
@@ -2242,7 +2254,8 @@ func (r *Cluster) validateWALLevelChange(old *Cluster) field.ErrorList {
 		errs = append(errs, field.Invalid(
 			field.NewPath("spec", "postgresql", "parameters", "wal_level"),
 			"minimal",
-			fmt.Sprintf("Change of `wal_level` to `minimal` not allowed on an existing cluster (from %s)", oldWALLevel)))
+			fmt.Sprintf("Change of `wal_level` to `minimal` not allowed on an existing cluster (from %s)",
+				oldWALLevel)))
 	}
 
 	return errs
