@@ -70,6 +70,7 @@ ClientCertsCASecret
 ClientReplicationSecret
 CloudNativePG
 CloudNativePG's
+ClusterBinding
 ClusterCondition
 ClusterConditionType
 ClusterIP
@@ -80,6 +81,7 @@ ClusterRole's
 ClusterServiceVersion
 ClusterSpec
 ClusterStatus
+CodeQL
 CodeReady
 ColumnName
 CompressionType
@@ -708,6 +710,7 @@ goodwithtech
 googleCredentials
 goroutines
 gosec
+govulncheck
 grafana
 gzip
 hashicorp
