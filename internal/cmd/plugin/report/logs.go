@@ -62,9 +62,13 @@ func streamOperatorLogsToZip(
 			Options:  podLogOptions,
 			Previous: true,
 		}
-		fmt.Fprint(writer, "\n\"====== Begin of Previous Log =====\"\n")
+		if _, err := fmt.Fprint(writer, "\n\"====== Begin of Previous Log =====\"\n"); err != nil {
+			return err
+		}
 		_ = streamPodLogs.Stream(ctx, writer)
-		fmt.Fprint(writer, "\n\"====== End of Previous Log =====\"\n")
+		if _, err := fmt.Fprint(writer, "\n\"====== End of Previous Log =====\"\n"); err != nil {
+			return err
+		}
 
 		streamPodLogs.Previous = false
 		if err := streamPodLogs.Stream(ctx, writer); err != nil {
@@ -118,15 +122,18 @@ func streamClusterLogsToZip(
 		podPointer := pod
 		streamPodLogs.Pod = &podPointer
 
-		fmt.Fprint(writer, "\n\"====== Begin of Previous Log =====\"\n")
+		if _, err := fmt.Fprint(writer, "\n\"====== Begin of Previous Log =====\"\n"); err != nil {
+			return err
+		}
 		// We ignore the error because it will error if there are no previous logs
 		_ = streamPodLogs.Stream(ctx, writer)
-		fmt.Fprint(writer, "\n\"====== End of Previous Log =====\"\n")
+		if _, err := fmt.Fprint(writer, "\n\"====== End of Previous Log =====\"\n"); err != nil {
+			return err
+		}
 
 		streamPodLogs.Previous = false
 
-		err = streamPodLogs.Stream(ctx, writer)
-		if err != nil {
+		if err := streamPodLogs.Stream(ctx, writer); err != nil {
 			return err
 		}
 	}

@@ -629,14 +629,25 @@ kubectl cp POD:/var/lib/postgresql/data/pgdata/core.14177 core.14177
 You now have the file. Make sure you free the space on the server by
 removing the core dumps.
 
-## Some common issues
+## Some known issues
 
 ### Storage is full
 
-If one or more pods in the cluster are in `CrashloopBackoff` and logs
-suggest this could be due to a full disk, you probably have to increase the
-size of the instance's `PersistentVolumeClaim`. Please look at the
-["Volume expansion" section](storage.md#volume-expansion) in the documentation.
+In case the storage is full, the PostgreSQL pods will not be able to write new
+data, or, in case of the disk containing the WAL segments being full, PostgreSQL
+will shut down.
+
+If you see messages in the logs about the disk being full, you should increase
+the size of the affected PVC. You can do this by editing the PVC and changing
+the `spec.resources.requests.storage` field. After that, you should also update
+the Cluster resource with the new size to apply the same change to all the pods.
+Please look at the ["Volume expansion" section](storage.md#volume-expansion) in the documentation.
+
+If the space for WAL segments is exhausted, the pod will be crash-looping and
+the cluster status will report `Not enough disk space`. Increasing the size in
+the PVC and then in the Cluster resource will solve the issue. See also
+the ["Disk Full Failure" section](instance_manager.md#disk-full-failure)
+
 
 ### Pods are stuck in `Pending` state
 

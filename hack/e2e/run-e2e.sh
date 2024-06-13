@@ -108,6 +108,7 @@ if [[ "${TEST_UPGRADE_TO_V1}" != "false" ]] && [[ "${TEST_CLOUD_VENDOR}" != "ocp
   unset DEBUG
   unset TEST_SKIP_UPGRADE
   ginkgo --nodes=1 --timeout 90m --poll-progress-after=1200s --poll-progress-interval=150s --label-filter "${LABEL_FILTERS}" \
+   --github-output --force-newlines \
    --focus-file "${ROOT_DIR}/tests/e2e/upgrade_test.go" --output-dir "${ROOT_DIR}/tests/e2e/out" \
    --json-report  "upgrade_report.json" -v "${ROOT_DIR}/tests/e2e/..." || RC_GINKGO1=$?
 
@@ -144,6 +145,7 @@ RC_GINKGO2=0
 export TEST_SKIP_UPGRADE=true
 ginkgo --nodes=4 --timeout 3h --poll-progress-after=1200s --poll-progress-interval=150s \
        ${LABEL_FILTERS:+--label-filter "${LABEL_FILTERS}"} \
+       --github-output --force-newlines \
        --output-dir "${ROOT_DIR}/tests/e2e/out/" \
        --json-report  "report.json" -v "${ROOT_DIR}/tests/e2e/..." || RC_GINKGO2=$?
 

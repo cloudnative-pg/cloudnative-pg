@@ -18,7 +18,7 @@ limitations under the License.
 package stringset
 
 import (
-	"golang.org/x/exp/slices"
+	"slices"
 )
 
 // Data represent a set of strings

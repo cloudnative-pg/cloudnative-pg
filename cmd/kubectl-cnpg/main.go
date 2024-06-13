@@ -66,6 +66,8 @@ func main() {
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
 			logFlags.ConfigureLogging()
 
+			plugin.ConfigureColor(cmd)
+
 			// If we're invoking the completion command we shouldn't try to create
 			// a Kubernetes client and we just let the Cobra flow to continue
 			if cmd.Name() == "completion" || cmd.Name() == "version" ||
@@ -80,27 +82,34 @@ func main() {
 	logFlags.AddFlags(rootCmd.PersistentFlags())
 	configFlags.AddFlags(rootCmd.PersistentFlags())
 
-	rootCmd.AddCommand(certificate.NewCmd())
-	rootCmd.AddCommand(destroy.NewCmd())
-	rootCmd.AddCommand(fence.NewCmd())
-	rootCmd.AddCommand(fio.NewCmd())
-	rootCmd.AddCommand(hibernate.NewCmd())
-	rootCmd.AddCommand(install.NewCmd())
-	rootCmd.AddCommand(maintenance.NewCmd())
-	rootCmd.AddCommand(pgbench.NewCmd())
-	rootCmd.AddCommand(promote.NewCmd())
-	rootCmd.AddCommand(reload.NewCmd())
-	rootCmd.AddCommand(report.NewCmd())
-	rootCmd.AddCommand(restart.NewCmd())
-	rootCmd.AddCommand(status.NewCmd())
-	rootCmd.AddCommand(versions.NewCmd())
-	rootCmd.AddCommand(backup.NewCmd())
-	rootCmd.AddCommand(psql.NewCmd())
-	rootCmd.AddCommand(snapshot.NewCmd())
-	rootCmd.AddCommand(logs.NewCmd())
-	rootCmd.AddCommand(pgadmin.NewCmd())
-	rootCmd.AddCommand(publication.NewCmd())
-	rootCmd.AddCommand(subscription.NewCmd())
+	subcommands := []*cobra.Command{
+		backup.NewCmd(),
+		certificate.NewCmd(),
+		destroy.NewCmd(),
+		fence.NewCmd(),
+		fio.NewCmd(),
+		hibernate.NewCmd(),
+		install.NewCmd(),
+		logs.NewCmd(),
+		maintenance.NewCmd(),
+		pgadmin.NewCmd(),
+		pgbench.NewCmd(),
+		promote.NewCmd(),
+		psql.NewCmd(),
+		publication.NewCmd(),
+		reload.NewCmd(),
+		report.NewCmd(),
+		restart.NewCmd(),
+		snapshot.NewCmd(),
+		status.NewCmd(),
+		subscription.NewCmd(),
+		versions.NewCmd(),
+	}
+
+	for _, cmd := range subcommands {
+		plugin.AddColorControlFlag(cmd)
+		rootCmd.AddCommand(cmd)
+	}
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)

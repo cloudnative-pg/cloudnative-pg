@@ -171,6 +171,10 @@ Once the plugin was installed and deployed, you can start using it like this:
 kubectl cnpg <command> <args...>
 ```
 
+!!! Note
+    The plugin automatically detects if the standard output channel is connected to a terminal.
+    In such cases, it may add ANSI colors to the command output. To disable colors, use the
+    `--color=never` option with the command.
 ### Generation of installation manifests
 
 The `cnpg` plugin can be used to generate the YAML manifest for the

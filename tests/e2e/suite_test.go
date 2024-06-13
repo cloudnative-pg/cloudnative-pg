@@ -160,13 +160,20 @@ func saveLogs(buf *bytes.Buffer, logsType, specName string, output io.Writer, ca
 		return
 	}
 	defer func() {
+		var err error
 		syncErr := f.Sync()
 		if syncErr != nil {
-			fmt.Fprintln(output, "ERROR while flushing file:", syncErr)
+			_, err = fmt.Fprintln(output, "ERROR while flushing file:", syncErr)
+		}
+		if err != nil {
+			fmt.Println(err)
 		}
 		closeErr := f.Close()
 		if closeErr != nil {
-			fmt.Fprintln(output, "ERROR while closing file:", err)
+			_, err = fmt.Fprintln(output, "ERROR while closing file:", err)
+		}
+		if err != nil {
+			fmt.Println(err)
 		}
 	}()
 
@@ -183,7 +190,11 @@ func saveLogs(buf *bytes.Buffer, logsType, specName string, output io.Writer, ca
 		var js map[string]interface{}
 		err = json.Unmarshal([]byte(lg), &js)
 		if err != nil {
-			fmt.Fprintln(output, "ERROR parsing log:", err, lg)
+			_, err = fmt.Fprintln(output, "ERROR parsing log:", err, lg)
+			if err != nil {
+				fmt.Println(err)
+				continue
+			}
 		}
 		timestamp, ok := js["ts"].(float64)
 		if ok {
@@ -200,25 +211,37 @@ func saveLogs(buf *bytes.Buffer, logsType, specName string, output io.Writer, ca
 			bufferIdx = linesToShow % capLines
 		}
 		// write every line to the file stream
-		fmt.Fprintln(f, lg)
+		_, err := fmt.Fprintln(f, lg)
+		if err != nil {
+			fmt.Println(err)
+			continue
+		}
 	}
 
 	// print the last `capLines` lines of logs to the `output`
+	var switchErr error
 	switch {
 	case linesToShow == 0:
-		fmt.Fprintln(output, "-- no error / warning logs --")
+		_, switchErr = fmt.Fprintln(output, "-- no error / warning logs --")
 	case linesToShow <= capLines:
-		fmt.Fprintln(output, strings.Join(lineBuffer[:linesToShow], "\n"))
+		_, switchErr = fmt.Fprintln(output, strings.Join(lineBuffer[:linesToShow], "\n"))
 	case bufferIdx == 0:
 		// if bufferIdx == 0, the buffer just finished filling and is in order
-		fmt.Fprintln(output, strings.Join(lineBuffer, "\n"))
+		_, switchErr = fmt.Fprintln(output, strings.Join(lineBuffer, "\n"))
 	default:
 		// the line buffer cycled back and the items 0 to bufferIdx - 1 are newer than the rest
-		fmt.Fprintln(output, strings.Join(append(lineBuffer[bufferIdx:], lineBuffer[:bufferIdx]...), "\n"))
+		_, switchErr = fmt.Fprintln(output, strings.Join(append(lineBuffer[bufferIdx:], lineBuffer[:bufferIdx]...), "\n"))
+	}
+
+	if switchErr != nil {
+		fmt.Println(switchErr)
 	}
 
 	if err := scanner.Err(); err != nil {
-		fmt.Fprintln(output, "ERROR while scanning:", err)
+		_, err := fmt.Fprintln(output, "ERROR while scanning:", err)
+		if err != nil {
+			fmt.Println(err)
+		}
 	}
 }
 

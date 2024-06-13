@@ -457,7 +457,7 @@ var (
 			"wal_sender_timeout":         "5s",
 			"wal_receiver_timeout":       "5s",
 			"wal_level":                  "logical",
-			"wal_log_hints":              "on",
+			ParameterWalLogHints:         "on",
 			// Workaround for PostgreSQL not behaving correctly when
 			// a default value is not explicit in the postgresql.conf and
 			// the parameter cannot be changed without a restart.

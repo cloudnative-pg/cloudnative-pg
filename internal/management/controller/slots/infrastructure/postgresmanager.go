@@ -53,7 +53,9 @@ func (sm PostgresManager) List(
 
 	rows, err := db.QueryContext(
 		ctx,
-		`SELECT slot_name, slot_type, active, coalesce(restart_lsn::TEXT, '') AS restart_lsn FROM pg_replication_slots
+		`SELECT slot_name, slot_type, active, coalesce(restart_lsn::TEXT, '') AS restart_lsn,
+            xmin IS NOT NULL OR catalog_xmin IS NOT NULL AS holds_xmin
+            FROM pg_replication_slots
             WHERE NOT temporary AND slot_type = 'physical'`,
 	)
 	if err != nil {
@@ -71,6 +73,7 @@ func (sm PostgresManager) List(
 			&slot.Type,
 			&slot.Active,
 			&slot.RestartLSN,
+			&slot.HoldsXmin,
 		)
 		if err != nil {
 			return ReplicationSlotList{}, err

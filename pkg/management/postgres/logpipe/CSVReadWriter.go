@@ -19,6 +19,7 @@ package logpipe
 import (
 	"bytes"
 	"encoding/csv"
+	"errors"
 	"io"
 )
 
@@ -33,17 +34,57 @@ type CSVReadWriter interface {
 type CSVRecordReadWriter struct {
 	io.Writer
 	*csv.Reader
+	allowedFieldsPerRecord []int
+}
+
+// Read reads a CSV record from the underlying reader, returns the records or any error encountered
+func (r *CSVRecordReadWriter) Read() ([]string, error) {
+	record, err := r.Reader.Read()
+	if err == nil {
+		return record, nil
+	}
+
+	var parseError *csv.ParseError
+	if !errors.As(err, &parseError) {
+		return nil, err
+	}
+
+	if !errors.Is(parseError.Err, csv.ErrFieldCount) {
+		return nil, err
+	}
+
+	for _, allowedFields := range r.allowedFieldsPerRecord {
+		if len(record) == allowedFields {
+			r.Reader.FieldsPerRecord = allowedFields
+			return record, nil
+		}
+	}
+
+	return nil, err
 }
 
 // NewCSVRecordReadWriter returns a new CSVRecordReadWriter which parses CSV lines
 // with an expected number of fields. It uses a single record for memory efficiency.
-func NewCSVRecordReadWriter(fieldsPerRecord int) *CSVRecordReadWriter {
+// If no fieldsPerRecord are provided, it allows variable fields per record.
+// If fieldsPerRecord are provided, it will only allow those numbers of fields per record.
+func NewCSVRecordReadWriter(fieldsPerRecord ...int) *CSVRecordReadWriter {
 	recordBuffer := new(bytes.Buffer)
 	reader := csv.NewReader(recordBuffer)
 	reader.ReuseRecord = true
-	reader.FieldsPerRecord = fieldsPerRecord
+
+	if len(fieldsPerRecord) == 0 {
+		// Allow variable fields per record as we don't have an opinion
+		reader.FieldsPerRecord = -1
+	} else {
+		// We'll optimistically set the first value as the default, this way we'll get an error on the first line too.
+		// Leaving this to 0 would allow the first line to pass, setting the
+		// fields per record for all the following lines without us checking it.
+		reader.FieldsPerRecord = fieldsPerRecord[0]
+	}
+
 	return &CSVRecordReadWriter{
-		Writer: recordBuffer,
-		Reader: reader,
+		Writer:                 recordBuffer,
+		Reader:                 reader,
+		allowedFieldsPerRecord: fieldsPerRecord,
 	}
 }

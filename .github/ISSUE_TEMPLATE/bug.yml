@@ -48,12 +48,11 @@ body:
       label: Version
       description: What is the version of CloudNativePG you are running?
       options:
-        - 1.23.1
-        - 1.22.3
-        - 1.21.5
+        - 1.23.2
+        - 1.22.4
         - trunk (main)
+        - older in 1.23.x
         - older in 1.22.x
-        - older in 1.21.x
         - older minor (unsupported)
     validations:
       required: true

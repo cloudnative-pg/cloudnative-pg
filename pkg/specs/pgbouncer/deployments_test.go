@@ -154,6 +154,6 @@ var _ = Describe("Deployment", func() {
 		Expect(deployment).ToNot(BeNil())
 		Expect(deployment.Spec.Template.Spec.Containers[0].ReadinessProbe.TimeoutSeconds).To(Equal(int32(5)))
 		Expect(deployment.Spec.Template.Spec.Containers[0].ReadinessProbe.TCPSocket.Port).
-			To(Equal(intstr.FromInt(pgBouncerConfig.PgBouncerPort)))
+			To(Equal(intstr.FromInt32(pgBouncerConfig.PgBouncerPort)))
 	})
 })

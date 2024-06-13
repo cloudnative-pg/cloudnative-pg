@@ -19,9 +19,9 @@ package controller
 import (
 	"context"
 	"fmt"
+	"slices"
 	"time"
 
-	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 

@@ -929,3 +929,13 @@ var _ = Describe("Compute startup probe failure threshold", func() {
 		Expect(getStartupProbeFailureThreshold(109)).To(BeNumerically("==", 11))
 	})
 })
+
+var _ = Describe("Compute liveness probe failure threshold", func() {
+	It("should take the minimum value 1", func() {
+		Expect(getLivenessProbeFailureThreshold(5)).To(BeNumerically("==", 1))
+	})
+
+	It("should take the value from 'startDelay / periodSeconds'", func() {
+		Expect(getLivenessProbeFailureThreshold(31)).To(BeNumerically("==", 4))
+	})
+})

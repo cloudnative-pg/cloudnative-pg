@@ -55,6 +55,11 @@ func IsPodReady(pod corev1.Pod) bool {
 	return false
 }
 
+// PodHasContainerStatuses checks if a Pod has container status elements
+func PodHasContainerStatuses(pod corev1.Pod) bool {
+	return len(pod.Status.ContainerStatuses) > 0
+}
+
 // IsPodActive checks if a pod is active, copied from:
 // https://github.com/kubernetes/kubernetes/blob/1bd0077/test/e2e/framework/pod/resource.go#L664
 func IsPodActive(p corev1.Pod) bool {

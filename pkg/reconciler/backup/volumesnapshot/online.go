@@ -42,7 +42,7 @@ func (o *onlineExecutor) finalize(
 	backup *apiv1.Backup,
 	targetPod *corev1.Pod,
 ) (*ctrl.Result, error) {
-	body, err := o.backupClient.StatusWithErrors(ctx, targetPod.Status.PodIP)
+	body, err := o.backupClient.StatusWithErrors(ctx, targetPod)
 	if err != nil {
 		return nil, fmt.Errorf("while getting status while finalizing: %w", err)
 	}
@@ -71,9 +71,7 @@ func (o *onlineExecutor) finalize(
 
 	switch status.Phase {
 	case webserver.Started:
-		if err := o.backupClient.Stop(ctx,
-			targetPod.Status.PodIP,
-			*webserver.NewStopBackupRequest(backup.Name)); err != nil {
+		if err := o.backupClient.Stop(ctx, targetPod, *webserver.NewStopBackupRequest(backup.Name)); err != nil {
 			return nil, fmt.Errorf("while stopping the backup client: %w", err)
 		}
 		return &ctrl.Result{RequeueAfter: time.Second * 5}, nil
@@ -96,7 +94,7 @@ func (o *onlineExecutor) prepare(
 	volumeSnapshotConfig := backup.GetVolumeSnapshotConfiguration(*cluster.Spec.Backup.VolumeSnapshot)
 
 	// Handle hot snapshots
-	body, err := o.backupClient.StatusWithErrors(ctx, targetPod.Status.PodIP)
+	body, err := o.backupClient.StatusWithErrors(ctx, targetPod)
 	if err != nil {
 		return nil, fmt.Errorf("while getting status while preparing: %w", err)
 	}
@@ -114,7 +112,7 @@ func (o *onlineExecutor) prepare(
 			BackupName:          backup.Name,
 			Force:               true,
 		}
-		if err := o.backupClient.Start(ctx, targetPod.Status.PodIP, req); err != nil {
+		if err := o.backupClient.Start(ctx, targetPod, req); err != nil {
 			return nil, fmt.Errorf("while trying to start the backup: %w", err)
 		}
 		return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil

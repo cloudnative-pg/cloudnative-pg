@@ -1,7 +1,8 @@
 # Quickstart
 
-This section describes how to test a PostgreSQL cluster on your laptop/computer
-using CloudNativePG on a local Kubernetes cluster in [Kind](https://kind.sigs.k8s.io/) or
+This section guides you through testing a PostgreSQL cluster on your local machine by
+deploying CloudNativePG on a local Kubernetes cluster
+using either [Kind](https://kind.sigs.k8s.io/) or
 [Minikube](https://kubernetes.io/docs/setup/learning-environment/minikube/).
 
 !!! Warning
@@ -204,7 +205,7 @@ After completion, you will have Prometheus, Grafana and Alert Manager installed 
 - The Grafana installation will be watching for a Grafana dashboard `ConfigMap`.
 
 !!! Seealso
-    For further information about the above command see the [helm install](https://helm.sh/docs/helm/helm_install/) 
+    For further information about the above command, refer to the [helm install](https://helm.sh/docs/helm/helm_install/)
     documentation. 
 
 You can see several Custom Resources have been created:
@@ -265,7 +266,7 @@ kubectl port-forward svc/prometheus-community-kube-prometheus 9090
 
 Then access the Prometheus console locally at: [`http://localhost:9090/`](http://localhost:9090/)
 
-Assuming that the monitoring stack was successfully deployed, and you have a Cluster with `enablePodMonitor: true`
+Assuming that the monitoring stack was successfully deployed, and you have a Cluster with `enablePodMonitor: true`,
 you should find a series of metrics relating to CloudNativePG clusters. Again, please
 refer to the [*monitoring section*](monitoring.md) for more information.
 
@@ -314,5 +315,5 @@ file and manually importing it via the GUI.
 
 ![local grafana](images/grafana-local.png)
 
-Note that in our example setup, both Prometheus and Grafana will pick up
-any other CloudNativePG clusters deployed with Monitoring activated.
+Note that in our local setup, Prometheus and Grafana are configured to automatically discover
+and monitor any CloudNativePG clusters deployed with the Monitoring feature enabled.

@@ -330,6 +330,15 @@ func (c QueryCollector) collect(conn *sql.DB, ch chan<- prometheus.Metric) error
 		}
 	}()
 
+	shouldBeCollected, err := c.userQuery.isCollectable(tx)
+	if err != nil {
+		return err
+	}
+
+	if !shouldBeCollected {
+		return nil
+	}
+
 	rows, err := tx.Query(c.userQuery.Query)
 	if err != nil {
 		return err

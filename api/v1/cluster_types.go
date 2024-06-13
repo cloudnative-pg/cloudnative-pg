@@ -29,6 +29,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
@@ -121,6 +122,10 @@ const (
 
 	// PGBouncerPoolerUserName is the name of the role to be used for
 	PGBouncerPoolerUserName = "cnpg_pooler_pgbouncer"
+
+	// MissingWALDiskSpaceExitCode is the exit code the instance manager
+	// will use to signal that there's no more WAL disk space
+	MissingWALDiskSpaceExitCode = 4
 )
 
 // SnapshotOwnerReference defines the reference type for the owner of the snapshot.
@@ -394,6 +399,13 @@ type ClusterSpec struct {
 	// +kubebuilder:default:=0
 	// +optional
 	FailoverDelay int32 `json:"failoverDelay,omitempty"`
+
+	// LivenessProbeTimeout is the time (in seconds) that is allowed for a PostgreSQL instance
+	// to successfully respond to the liveness probe (default 30).
+	// The Liveness probe failure threshold is derived from this value using the formula:
+	// ceiling(livenessProbe / 10).
+	// +optional
+	LivenessProbeTimeout *int32 `json:"livenessProbeTimeout,omitempty"`
 
 	// Affinity/Anti-affinity rules for Pods
 	// +optional
@@ -1319,7 +1331,6 @@ const (
 
 	// DefaultMaxSwitchoverDelay is the default for the pg_ctl timeout in seconds when a primary PostgreSQL instance
 	// is gracefully shutdown during a switchover.
-	// It is greater than one year in seconds, big enough to simulate an infinite timeout
 	DefaultMaxSwitchoverDelay = 3600
 
 	// DefaultStartupDelay is the default value for startupDelay, startupDelay will be used to calculate the
@@ -3436,6 +3447,11 @@ func (cluster *Cluster) GetTablespaceConfiguration(name string) *TablespaceConfi
 	}
 
 	return nil
+}
+
+// GetServerCASecretObjectKey returns a types.NamespacedName pointing to the secret
+func (cluster *Cluster) GetServerCASecretObjectKey() types.NamespacedName {
+	return types.NamespacedName{Namespace: cluster.Namespace, Name: cluster.GetServerCASecretName()}
 }
 
 // IsBarmanBackupConfigured returns true if one of the possible backup destination

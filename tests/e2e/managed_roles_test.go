@@ -18,11 +18,11 @@ package e2e
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/lib/pq"
-	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"

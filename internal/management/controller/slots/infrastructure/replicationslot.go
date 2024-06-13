@@ -29,6 +29,7 @@ type ReplicationSlot struct {
 	Active     bool     `json:"active"`
 	RestartLSN string   `json:"restartLSN,omitempty"`
 	IsHA       bool     `json:"isHA,omitempty"`
+	HoldsXmin  bool     `json:"holdsXmin,omitempty"`
 }
 
 // ReplicationSlotList contains a list of replication slots

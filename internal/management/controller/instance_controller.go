@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"crypto/tls"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -298,7 +299,7 @@ func (r *InstanceReconciler) refreshConfigurationFiles(
 		return false, err
 	}
 
-	reloadIdent, err := r.instance.RefreshPGIdent(cluster)
+	reloadIdent, err := r.instance.RefreshPGIdent(cluster.Spec.PostgresConfiguration.PgIdent)
 	if err != nil {
 		return false, err
 	}
@@ -394,30 +395,25 @@ func (r *InstanceReconciler) verifyParametersForFollower(cluster *apiv1.Cluster)
 		return err
 	}
 	log.Info("Found previous run flag", "filename", filename)
-	enforcedParams, err := postgresManagement.GetEnforcedParametersThroughPgControldata(r.instance.PgData)
+	controldataParams, err := postgresManagement.LoadEnforcedParametersFromPgControldata(r.instance.PgData)
+	if err != nil {
+		return err
+	}
+	clusterParams, err := postgresManagement.LoadEnforcedParametersFromCluster(cluster)
 	if err != nil {
 		return err
 	}
 
-	clusterParams := cluster.Spec.PostgresConfiguration.Parameters
 	options := make(map[string]string)
-	for key, enforcedparam := range enforcedParams {
+	for key, enforcedparam := range controldataParams {
 		clusterparam, found := clusterParams[key]
 		if !found {
 			continue
 		}
-		enforcedparamInt, err := strconv.Atoi(enforcedparam)
-		if err != nil {
-			return err
-		}
-		clusterparamInt, err := strconv.Atoi(clusterparam)
-		if err != nil {
-			return err
-		}
 		// if the values from `pg_controldata` are higher than the cluster spec,
 		// they are the safer choice, so set them in config
-		if enforcedparamInt > clusterparamInt {
-			options[key] = enforcedparam
+		if enforcedparam > clusterparam {
+			options[key] = strconv.Itoa(enforcedparam)
 		}
 	}
 	if len(options) == 0 {
@@ -1003,6 +999,31 @@ func (r *InstanceReconciler) processConfigReloadAndManageRestart(ctx context.Con
 	cluster.Status.Phase = phase
 	cluster.Status.PhaseReason = phaseReason
 	return r.client.Status().Patch(ctx, cluster, client.MergeFrom(oldCluster))
+}
+
+// refreshCertificateFilesFromSecret receive a secret and rewrite the file
+// corresponding to the server certificate
+func (r *InstanceReconciler) refreshInstanceCertificateFromSecret(
+	secret *corev1.Secret,
+) error {
+	certData, ok := secret.Data[corev1.TLSCertKey]
+	if !ok {
+		return fmt.Errorf("missing %s field in Secret", corev1.TLSCertKey)
+	}
+
+	keyData, ok := secret.Data[corev1.TLSPrivateKeyKey]
+	if !ok {
+		return fmt.Errorf("missing %s field in Secret", corev1.TLSPrivateKeyKey)
+	}
+
+	certificate, err := tls.X509KeyPair(certData, keyData)
+	if err != nil {
+		return fmt.Errorf("failed decoding Secret: %w", err)
+	}
+
+	r.instance.ServerCertificate = &certificate
+
+	return err
 }
 
 // refreshCertificateFilesFromSecret receive a secret and rewrite the file

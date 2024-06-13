@@ -826,6 +826,11 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
 		*out = new(corev1.EphemeralVolumeSource)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.LivenessProbeTimeout != nil {
+		in, out := &in.LivenessProbeTimeout, &out.LivenessProbeTimeout
+		*out = new(int32)
+		**out = **in
+	}
 	in.Affinity.DeepCopyInto(&out.Affinity)
 	if in.TopologySpreadConstraints != nil {
 		in, out := &in.TopologySpreadConstraints, &out.TopologySpreadConstraints

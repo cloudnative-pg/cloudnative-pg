@@ -19,10 +19,9 @@ package utils
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
-
-	"golang.org/x/exp/slices"
 )
 
 // ParseJSONLogs returns the pod's logs of a given pod name,
