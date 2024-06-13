@@ -26,7 +26,6 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/strings/slices"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -37,6 +36,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/hibernation"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/status"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
@@ -719,40 +719,7 @@ func (r *ClusterReconciler) RegisterPhase(ctx context.Context,
 	phase string,
 	reason string,
 ) error {
-	// we ensure that the cluster conditions aren't nil before operating
-	if cluster.Status.Conditions == nil {
-		cluster.Status.Conditions = []metav1.Condition{}
-	}
-
-	existingCluster := cluster.DeepCopy()
-	cluster.Status.Phase = phase
-	cluster.Status.PhaseReason = reason
-
-	condition := metav1.Condition{
-		Type:    string(apiv1.ConditionClusterReady),
-		Status:  metav1.ConditionFalse,
-		Reason:  string(apiv1.ClusterIsNotReady),
-		Message: "Cluster Is Not Ready",
-	}
-
-	if cluster.Status.Phase == apiv1.PhaseHealthy {
-		condition = metav1.Condition{
-			Type:    string(apiv1.ConditionClusterReady),
-			Status:  metav1.ConditionTrue,
-			Reason:  string(apiv1.ClusterReady),
-			Message: "Cluster is Ready",
-		}
-	}
-
-	meta.SetStatusCondition(&cluster.Status.Conditions, condition)
-
-	if !reflect.DeepEqual(existingCluster, cluster) {
-		if err := r.Status().Patch(ctx, cluster, client.MergeFrom(existingCluster)); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return status.RegisterPhase(ctx, r.Client, cluster, phase, reason)
 }
 
 // updateClusterStatusThatRequiresInstancesState updates all the cluster status fields that require the instances status
