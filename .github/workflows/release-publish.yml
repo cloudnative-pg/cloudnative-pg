@@ -248,7 +248,8 @@ jobs:
       - release-binaries
     if: |
       (always() && !cancelled()) &&
-      needs.release-binaries.result == 'success'
+      needs.release-binaries.result == 'success' &&
+      needs.check-branch.outputs.is_latest == 'true'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
