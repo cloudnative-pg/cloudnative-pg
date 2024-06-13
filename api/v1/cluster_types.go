@@ -570,6 +570,9 @@ const (
 	// PhaseApplyingConfiguration is set by the instance manager when a configuration
 	// change is being detected
 	PhaseApplyingConfiguration = "Applying configuration"
+
+	// PhaseReplicaClusterPromotion is the phase
+	PhaseReplicaClusterPromotion = "Promoting from Replica Cluster"
 )
 
 // EphemeralVolumesSizeLimitConfiguration contains the configuration of the ephemeral
@@ -3180,6 +3183,27 @@ func (cluster *Cluster) ShouldCreateProjectedVolume() bool {
 // ShouldCreateWalArchiveVolume returns whether we should create the wal archive volume
 func (cluster *Cluster) ShouldCreateWalArchiveVolume() bool {
 	return cluster.Spec.WalStorage != nil
+}
+
+// ShouldPromoteFromReplicaCluster returns true if the cluster should promote
+func (cluster *Cluster) ShouldPromoteFromReplicaCluster() bool {
+	// If there's no replica cluster configuration there's no
+	// promotion token too, so we don't need to promote.
+	if cluster.Spec.ReplicaCluster == nil {
+		return false
+	}
+
+	// If we don't have a shutdown token, we don't need to promote
+	if len(cluster.Spec.ReplicaCluster.PromotionToken) == 0 {
+		return false
+	}
+
+	// If the current token was already used, there's no need to
+	// promote
+	if cluster.Spec.ReplicaCluster.PromotionToken == cluster.Status.LastPromotionToken {
+		return false
+	}
+	return true
 }
 
 // ContainsTablespaces returns true if for this cluster, we need to create tablespaces

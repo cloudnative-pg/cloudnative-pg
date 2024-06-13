@@ -823,8 +823,17 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication), func() {
 			})
 
 			By("promoting B with the old token", func() {
+				primary, err := env.GetClusterPrimary(namespace, clusterBName)
+				Expect(err).ToNot(HaveOccurred())
+				checkpoint, _, err := env.ExecQueryInInstancePod(testUtils.PodLocator{Namespace: primary.Namespace,
+					PodName: primary.Name},
+					"postgres", "CHECKPOINT; SELECT pg_control_checkpoint()")
+				fmt.Printf("Checkpoint: %v\n", checkpoint)
+				Expect(err).ToNot(HaveOccurred())
+				fmt.Printf("OldToken: %v\n", token)
 				cluster, err := env.GetCluster(namespace, clusterBName)
 				Expect(err).ToNot(HaveOccurred())
+
 				oldCluster := cluster.DeepCopy()
 				cluster.Spec.ReplicaCluster.PromotionToken = token
 				cluster.Spec.ReplicaCluster.Enabled = false

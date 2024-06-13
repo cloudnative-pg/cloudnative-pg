@@ -250,6 +250,17 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
+	if cluster.ShouldPromoteFromReplicaCluster() {
+		if !(cluster.Status.Phase == apiv1.PhaseReplicaClusterPromotion ||
+			cluster.Status.Phase == apiv1.PhaseUnrecoverable) {
+			return ctrl.Result{RequeueAfter: 1 * time.Second}, r.RegisterPhase(ctx,
+				cluster,
+				apiv1.PhaseReplicaClusterPromotion,
+				"Replica cluster promotion in progress")
+		}
+		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+	}
+
 	// Store in the context the TLS configuration required communicating with the Pods
 	ctx, err = certs.NewTLSConfigForContext(
 		ctx,
