@@ -22,7 +22,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/mitchellh/go-ps"
+	ps "github.com/shirou/gopsutil/v4/process"
 	"k8s.io/utils/strings/slices"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
@@ -64,29 +64,32 @@ func (instance *Instance) CheckForExistingPostmaster(postgresExecutables ...stri
 		return nil, instance.CleanUpStalePid()
 	}
 
-	process, err := ps.FindProcess(pid)
+	process, err := ps.NewProcess(pid)
 	if err != nil {
-		// We cannot find this PID, so we can't really tell if this
-		// process exists or not
-		return nil, err
-	}
-	if process == nil {
 		// The process doesn't exist and this PID file is stale
 		contextLog.Info("The PID file is stale, deleting it", "pidFileContents", pidFileContents)
 		return nil, instance.CleanUpStalePid()
 	}
 
-	if !slices.Contains(postgresExecutables, process.Executable()) {
+	executable, err := process.Name()
+	if err != nil {
+		// The process doesn't exist and this PID file is stale
+		contextLog.Info("The PID file is stale (reading executable name), deleting it",
+			"pidFileContents", pidFileContents)
+		return nil, instance.CleanUpStalePid()
+	}
+
+	if !slices.Contains(postgresExecutables, executable) {
 		// The process is not running PostgreSQL and this PID file is stale
 		contextLog.Info("The PID file is stale (executable mismatch), deleting it",
-			"pidFileContents", pidFileContents, "postgresExecutable", process.Executable())
+			"pidFileContents", pidFileContents, "postgresExecutable", executable)
 		return nil, instance.CleanUpStalePid()
 	}
 
 	// The postmaster PID file is not stale, and we need to keep it
 	contextLog.Info("Detected alive postmaster from PID file")
 	contextLog.Debug("PID file", "contents", pidFileContents)
-	return os.FindProcess(pid)
+	return os.FindProcess(int(pid))
 }
 
 // CleanUpStalePid cleans up the files left around by a crashed PostgreSQL instance.
@@ -106,7 +109,7 @@ func (instance *Instance) CleanUpStalePid() error {
 }
 
 // GetPostmasterPidFromFile reads the given postmaster pid file, parse it and return its content and the actual pid
-func (instance *Instance) GetPostmasterPidFromFile(pidFile string) ([]byte, int, error) {
+func (instance *Instance) GetPostmasterPidFromFile(pidFile string) ([]byte, int32, error) {
 	pidFileExists, err := fileutils.FileExists(pidFile)
 	if err != nil {
 		return nil, -1, err
@@ -126,6 +129,6 @@ func (instance *Instance) GetPostmasterPidFromFile(pidFile string) ([]byte, int,
 	// Inside the PID file, the first line contain the actual postmaster
 	// PID working on the data directory
 	pidLine := strings.Split(string(pidFileContents), "\n")[0]
-	pid, err := strconv.Atoi(strings.TrimSpace(pidLine))
-	return pidFileContents, pid, err
+	pid, err := strconv.ParseInt(strings.TrimSpace(pidLine), 10, 32)
+	return pidFileContents, int32(pid), err
 }
