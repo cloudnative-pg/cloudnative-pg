@@ -189,7 +189,7 @@ func run(ctx context.Context, pgData string, podName string, args []string) erro
 
 	// Step 4: download the WAL files into the required place
 	downloadStartTime := time.Now()
-	walStatus := walRestorer.RestoreList(ctx, walFilesList, destinationPath, options)
+	walStatus := walRestorer.RestoreList(ctx, walFilesList, destinationPath, options, maxParallel)
 
 	// We return immediately if the first WAL has errors, because the first WAL
 	// is the one that PostgreSQL has requested to restore.
