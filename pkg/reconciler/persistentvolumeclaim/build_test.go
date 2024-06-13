@@ -19,7 +19,7 @@ package persistentvolumeclaim
 import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -123,7 +123,7 @@ var _ = Describe("PVC Creation", func() {
 		tbsName := "fragglerock"
 		pvc, err := Build(
 			&apiv1.Cluster{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name: "thecluster",
 				},
 				Spec: apiv1.ClusterSpec{},
@@ -148,5 +148,45 @@ var _ = Describe("PVC Creation", func() {
 		Expect(pvc.Name).To(Equal("thecluster-1-tbs-fragglerock"))
 		Expect(pvc.Spec.Resources.Requests.Storage().String()).To(Equal("2Gi"))
 		Expect(pvc.Labels[utils.TablespaceNameLabelName]).To(Equal(tbsName))
+	})
+
+	It("should not add the default access mode when the PVC template specifies at least a value", func() {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test",
+			},
+		}
+		pvc, err := Build(cluster, &CreateConfiguration{
+			NodeSerial: 1,
+			Calculator: NewPgDataCalculator(),
+			Storage: apiv1.StorageConfiguration{
+				Size: "1Gi",
+				PersistentVolumeClaimTemplate: &corev1.PersistentVolumeClaimSpec{
+					AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOncePod},
+				},
+			},
+		})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(pvc.Spec.AccessModes).To(HaveLen(1))
+		Expect(pvc.Spec.AccessModes).To(ContainElement(corev1.ReadWriteOncePod))
+	})
+
+	It("should add readWriteOnce to the template if no access mode is specified", func() {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{},
+		}
+		pvc, err := Build(cluster, &CreateConfiguration{
+			NodeSerial: 1,
+			Calculator: NewPgDataCalculator(),
+			Storage: apiv1.StorageConfiguration{
+				Size: "1Gi",
+				PersistentVolumeClaimTemplate: &corev1.PersistentVolumeClaimSpec{
+					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"test": "test"}},
+				},
+			},
+		})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(pvc.Spec.AccessModes).To(HaveLen(1))
+		Expect(pvc.Spec.AccessModes).To(ContainElement(corev1.ReadWriteOnce))
 	})
 })
