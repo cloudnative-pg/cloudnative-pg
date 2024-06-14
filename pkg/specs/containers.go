@@ -27,6 +27,32 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
+
+// createBootstrapInitContainer creates the init container bootstrapping the
+// initdb user inside the generated Pods
+func createInitDBUserContainer(cluster apiv1.Cluster) corev1.Container {
+	container := corev1.Container{
+		Name: 						BootstrapControllerContainerName,
+		Image: 						configuration.Current.OperatorImageName,
+		ImagePullPolicy:  cluster.Spec.ImagePullPolicy,
+		
+		Command: []string{
+			"/bin/sh",
+			"-c",
+			fmt.Sprintf("getent passwd %s &> /dev/null", cluster.Spec.postgresUID),
+			"||",
+			fmt.Sprintf("adduser --uid %s --gid %s --no-create-home --system --disabled-login --quiet %s", 
+				cluster.Spec.postgresUID, 
+				cluster.Spec.postgresGID,
+				"postgres"
+			 )
+		},
+	}
+
+	return container
+}
+
+
 // createBootstrapContainer creates the init container bootstrapping the operator
 // executable inside the generated Pods
 func createBootstrapContainer(cluster apiv1.Cluster) corev1.Container {
