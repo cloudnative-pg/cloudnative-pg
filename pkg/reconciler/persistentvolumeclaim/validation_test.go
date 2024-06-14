@@ -39,7 +39,7 @@ var _ = Describe("Volume Snapshot validation", func() {
 		}
 
 		var status ValidationStatus
-		status.validateVolumeSnapshot("pgdata", &snapshot, NewPgDataCalculator())
+		status.validateVolumeMetadata("pgdata", &snapshot.ObjectMeta, NewPgDataCalculator())
 		Expect(status).To(Equal(ValidationStatus{
 			Warnings: []ValidationMessage{
 				{
@@ -58,12 +58,12 @@ var _ = Describe("Volume Snapshot validation", func() {
 
 	It("Fails when the snapshot doesn't exist", func() {
 		var status ValidationStatus
-		status.validateVolumeSnapshot("pgdata", nil, NewPgDataCalculator())
+		status.validateVolumeMetadata("pgdata", nil, NewPgDataCalculator())
 		Expect(status).To(Equal(ValidationStatus{
 			Errors: []ValidationMessage{
 				{
 					ObjectName: "pgdata",
-					Message:    "VolumeSnapshot doesn't exist",
+					Message:    "the volume doesn't exist",
 				},
 			},
 		}))
@@ -80,7 +80,7 @@ var _ = Describe("Volume Snapshot validation", func() {
 		}
 
 		var status ValidationStatus
-		status.validateVolumeSnapshot("pgdata", &snapshot, NewPgDataCalculator())
+		status.validateVolumeMetadata("pgdata", &snapshot.ObjectMeta, NewPgDataCalculator())
 		Expect(status).To(Equal(ValidationStatus{
 			Errors: []ValidationMessage{
 				{
@@ -268,7 +268,7 @@ var _ = Describe("Volume Snapshot validation", func() {
 			Errors: []ValidationMessage{
 				{
 					ObjectName: "pgwal",
-					Message:    "VolumeSnapshot doesn't exist",
+					Message:    "the volume doesn't exist",
 				},
 			},
 		}))

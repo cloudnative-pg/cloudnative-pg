@@ -23,7 +23,6 @@ import (
 	"slices"
 	"time"
 
-	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/sethvargo/go-password/password"
 	batchv1 "k8s.io/api/batch/v1"
@@ -1032,14 +1031,17 @@ func (r *ClusterReconciler) createPrimaryInstance(
 	isBootstrappingFromBaseBackup := cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.PgBaseBackup != nil
 	switch {
 	case isBootstrappingFromRecovery && recoverySnapshot != nil:
-		var snapshot volumesnapshot.VolumeSnapshot
-		if err := r.Client.Get(ctx,
-			types.NamespacedName{Name: recoverySnapshot.DataSource.Name, Namespace: cluster.Namespace},
-			&snapshot); err != nil {
+		metadata, err := persistentvolumeclaim.GetSourceMetadataOrNil(
+			ctx,
+			r.Client,
+			cluster.Namespace,
+			recoverySnapshot.DataSource,
+		)
+		if err != nil {
 			return ctrl.Result{}, err
 		}
 		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (from volumeSnapshots)")
-		job = specs.CreatePrimaryJobViaRestoreSnapshot(*cluster, nodeSerial, snapshot, backup)
+		job = specs.CreatePrimaryJobViaRestoreSnapshot(*cluster, nodeSerial, metadata, backup)
 
 	case isBootstrappingFromRecovery:
 		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (from backup)")

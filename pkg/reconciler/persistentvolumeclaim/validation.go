@@ -20,8 +20,10 @@ import (
 	"context"
 	"fmt"
 
-	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
+	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
+	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -69,30 +71,42 @@ func (status *ValidationStatus) addWarningf(name string, format string, args ...
 	status.Warnings = append(status.Warnings, newValidationMessage(name, fmt.Sprintf(format, args...)))
 }
 
-// validateVolumeSnapshot validates the label of a volume snapshot,
+// validateVolumeMetadata validates the label of a volume source,
 // adding the result to the status
-func (status *ValidationStatus) validateVolumeSnapshot(
+func (status *ValidationStatus) validateVolumeMetadata(
 	name string,
-	snapshot *volumesnapshot.VolumeSnapshot,
+	object *metav1.ObjectMeta,
 	expectedMeta Meta,
 ) {
-	if snapshot == nil {
-		status.addErrorf(name, "VolumeSnapshot doesn't exist")
+	if object == nil {
+		status.addErrorf(name, "the volume doesn't exist")
 		return
 	}
 
-	pvcRoleLabel := snapshot.GetAnnotations()[utils.PvcRoleLabelName]
-	if len(pvcRoleLabel) == 0 {
+	pvcRoleLabel, present := object.GetLabels()[utils.PvcRoleLabelName]
+	if present {
+		if pvcRoleLabel != expectedMeta.GetRoleName() {
+			status.addErrorf(
+				name,
+				"Expected role '%s', found '%s'",
+				utils.PVCRolePgData,
+				pvcRoleLabel)
+		}
+		return
+	}
+
+	pvcRoleAnnotation := object.GetAnnotations()[utils.PvcRoleLabelName]
+	if len(pvcRoleAnnotation) == 0 {
 		status.addWarningf(name, "Empty PVC role annotation")
-	} else if pvcRoleLabel != expectedMeta.GetRoleName() {
+	} else if pvcRoleAnnotation != expectedMeta.GetRoleName() {
 		status.addErrorf(
 			name,
 			"Expected role '%s', found '%s'",
 			utils.PVCRolePgData,
-			pvcRoleLabel)
+			pvcRoleAnnotation)
 	}
 
-	backupNameLabel := snapshot.GetLabels()[utils.BackupNameLabelName]
+	backupNameLabel := object.GetLabels()[utils.BackupNameLabelName]
 	if len(backupNameLabel) == 0 {
 		status.addWarningf(
 			name,
@@ -101,7 +115,7 @@ func (status *ValidationStatus) validateVolumeSnapshot(
 	}
 }
 
-// VerifyDataSourceCoherence verifies if th specified data source that we should
+// VerifyDataSourceCoherence verifies if the specified data source that we should
 // use when creating a new cluster is coherent. We check for:
 //
 //   - role of the volume snapshot is coherent with the requested section
@@ -120,30 +134,32 @@ func VerifyDataSourceCoherence(
 		return result, nil
 	}
 
-	pgDataSnapshot, err := getVolumeShapshotOrNil(
+	pgData, err := GetSourceMetadataOrNil(
 		ctx,
 		c,
-		client.ObjectKey{Namespace: namespace, Name: source.Storage.Name})
+		namespace,
+		source.Storage)
 	if err != nil {
 		return result, err
 	}
-	result.validateVolumeSnapshot(source.Storage.Name, pgDataSnapshot, NewPgDataCalculator())
+	result.validateVolumeMetadata(source.Storage.Name, pgData, NewPgDataCalculator())
 
-	var pgWalSnapshot *volumesnapshot.VolumeSnapshot
+	var pgWal *metav1.ObjectMeta
 	if source.WalStorage != nil {
-		pgWalSnapshot, err = getVolumeShapshotOrNil(
+		pgWal, err = GetSourceMetadataOrNil(
 			ctx,
 			c,
-			client.ObjectKey{Namespace: namespace, Name: source.WalStorage.Name})
+			namespace,
+			*source.WalStorage)
 		if err != nil {
 			return result, err
 		}
-		result.validateVolumeSnapshot(source.WalStorage.Name, pgWalSnapshot, NewPgWalCalculator())
+		result.validateVolumeMetadata(source.WalStorage.Name, pgWal, NewPgWalCalculator())
 	}
 
-	if pgDataSnapshot != nil && pgWalSnapshot != nil {
-		pgDataBackupName := pgDataSnapshot.GetLabels()[utils.BackupNameLabelName]
-		pgWalBackupName := pgWalSnapshot.GetLabels()[utils.BackupNameLabelName]
+	if pgData != nil && pgWal != nil {
+		pgDataBackupName := pgData.GetLabels()[utils.BackupNameLabelName]
+		pgWalBackupName := pgWal.GetLabels()[utils.BackupNameLabelName]
 
 		if pgDataBackupName != pgWalBackupName {
 			result.addErrorf(
@@ -157,21 +173,43 @@ func VerifyDataSourceCoherence(
 	return result, nil
 }
 
-// getVolumeShapshotOrNil gets a volume snapshot with a specified name.
-// If the volume snapshot don't exist, returns nil
-func getVolumeShapshotOrNil(
+// GetSourceMetadataOrNil gets snapshot metadata from a specified source.
+// If the source doesn't exist, returns nil
+func GetSourceMetadataOrNil(
 	ctx context.Context,
 	c client.Client,
-	name client.ObjectKey,
-) (*volumesnapshot.VolumeSnapshot, error) {
-	var result volumesnapshot.VolumeSnapshot
-	if err := c.Get(ctx, name, &result); err != nil {
-		if apierrs.IsNotFound(err) {
-			return nil, nil
-		}
-
-		return nil, err
+	namespace string,
+	source corev1.TypedLocalObjectReference,
+) (*metav1.ObjectMeta, error) {
+	apiGroup := ""
+	if source.APIGroup != nil {
+		apiGroup = *source.APIGroup
 	}
 
-	return &result, nil
+	switch {
+	case apiGroup == "" && source.Kind == "":
+		fallthrough
+	case apiGroup == storagesnapshotv1.GroupName && source.Kind == "VolumeSnapshot":
+		var result storagesnapshotv1.VolumeSnapshot
+		if err := c.Get(ctx, client.ObjectKey{Namespace: namespace, Name: source.Name}, &result); err != nil {
+			if apierrs.IsNotFound(err) {
+				return nil, nil
+			}
+
+			return nil, err
+		}
+		return &result.ObjectMeta, nil
+	case apiGroup == corev1.GroupName && source.Kind == "PersistentVolumeClaim":
+		var result corev1.PersistentVolumeClaim
+		if err := c.Get(ctx, client.ObjectKey{Namespace: namespace, Name: source.Name}, &result); err != nil {
+			if apierrs.IsNotFound(err) {
+				return nil, nil
+			}
+
+			return nil, err
+		}
+		return &result.ObjectMeta, nil
+	}
+
+	return nil, fmt.Errorf("only VolumeSnapshots and PersistentVolumeClaims are supported")
 }

@@ -20,7 +20,6 @@ import (
 	"fmt"
 
 	"github.com/kballard/go-shellquote"
-	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -140,7 +139,7 @@ func buildInitDBFlags(cluster apiv1.Cluster) (initCommand []string) {
 func CreatePrimaryJobViaRestoreSnapshot(
 	cluster apiv1.Cluster,
 	nodeSerial int,
-	snapshot storagesnapshotv1.VolumeSnapshot,
+	object *metav1.ObjectMeta,
 	backup *apiv1.Backup,
 ) *batchv1.Job {
 	initCommand := []string{
@@ -149,13 +148,13 @@ func CreatePrimaryJobViaRestoreSnapshot(
 		"restoresnapshot",
 	}
 
-	if snapshot.Annotations[utils.BackupLabelFileAnnotationName] != "" {
-		flag := fmt.Sprintf("--backuplabel=%s", snapshot.Annotations[utils.BackupLabelFileAnnotationName])
+	if object.Annotations[utils.BackupLabelFileAnnotationName] != "" {
+		flag := fmt.Sprintf("--backuplabel=%s", object.Annotations[utils.BackupLabelFileAnnotationName])
 		initCommand = append(initCommand, flag)
 	}
 
-	if snapshot.Annotations[utils.BackupTablespaceMapFileAnnotationName] != "" {
-		flag := fmt.Sprintf("--tablespacemap=%s", snapshot.Annotations[utils.BackupTablespaceMapFileAnnotationName])
+	if object.Annotations[utils.BackupTablespaceMapFileAnnotationName] != "" {
+		flag := fmt.Sprintf("--tablespacemap=%s", object.Annotations[utils.BackupTablespaceMapFileAnnotationName])
 		initCommand = append(initCommand, flag)
 	}
 
