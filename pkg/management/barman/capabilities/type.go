@@ -38,6 +38,7 @@ type Capabilities struct {
 	HasErrorCodesForWALRestore bool
 	HasErrorCodesForRestore    bool
 	HasAzureManagedIdentity    bool
+	HasNoPartialWalRestore     bool
 }
 
 // ShouldExecuteBackupWithName returns true if the new backup logic should be executed

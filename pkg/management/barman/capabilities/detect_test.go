@@ -24,6 +24,27 @@ import (
 )
 
 var _ = Describe("detect capabilities", func() {
+	It("ensures that all capabilities are true for the 3.10.1 version", func() {
+		version, err := semver.ParseTolerant("3.10.1")
+		Expect(err).ToNot(HaveOccurred())
+		capabilities := detect(&version)
+		Expect(capabilities).To(Equal(&Capabilities{
+			Version:                    &version,
+			hasName:                    true,
+			HasAzure:                   true,
+			HasS3:                      true,
+			HasGoogle:                  true,
+			HasRetentionPolicy:         true,
+			HasTags:                    true,
+			HasCheckWalArchive:         true,
+			HasSnappy:                  true,
+			HasErrorCodesForWALRestore: true,
+			HasErrorCodesForRestore:    true,
+			HasAzureManagedIdentity:    true,
+			HasNoPartialWalRestore:     true,
+		}))
+	})
+
 	It("ensures that all capabilities are true for the 3.4 version", func() {
 		version, err := semver.ParseTolerant("3.4.0")
 		Expect(err).ToNot(HaveOccurred())
