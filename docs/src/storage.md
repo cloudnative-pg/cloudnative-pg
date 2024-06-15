@@ -467,7 +467,7 @@ To use a pre-provisioned volume in CloudNativePG:
     cluster.) Make sure you check for any pods stuck in `Pending` after you deploy
     the cluster. If the condition persists, investigate why it's happening.
 
-## Block storage considerations (Ceph/ Longhorn)
+## Block storage considerations (Ceph/Longhorn)
 
 Most block storage solutions in Kubernetes recommend having multiple replicas
 of a volume to improve resiliency. This works well for workloads that don't
@@ -480,3 +480,22 @@ clusters as one replica. By having additional replicas defined in the storage
 solution (like Longhorn and Ceph), you might incur what's known as write
 amplification, unnecessarily increasing disk I/O and space used.
 
+Another consideration when planning you storage configuration using these 
+storage solutions (with the one volume per pod) is to make sure that the 
+volumes for each pod instance is on a unique host. The risk when deploying 
+volumes to nodes  is that when the volumes are provisioned they might be created on the 
+-same- host. The  risk is that if the host is corrupted or needs to be redeployed the Postgres 
+Kubernetes cluster would go down because the data is sitting on that one host.
+
+In Longhorn, this can be set by turning on data locality to strict-local when you create a custom storage 
+class. The documentation to create a volume that has the strict-local setting on the volume is located 
+[here](https://longhorn.io/docs/1.6.2/high-availability/data-locality/). This will cause the data volume 
+of that pod to exist on the same node. Your Postgres `Cluster` should have the pod antiaffinity rules 
+created so the operator will have the pods on different nodes and in this case Longhorn will then have 
+the data volumes on that host. 
+
+If the host gets corrupted then it is a matter of using the cnpg plugin to destroy the instance in which case the operator
+will destroy the instance and create the instance on another host and replicate the data.
+
+On Ceph this can be configured through CRUSH rules. The documentation to configure this is located (here)[https://rook.io/docs/rook/latest-release/CRDs/Cluster/external-cluster/topology-for-external-mode/?h=topology].
+By creating these rules the idea is to have one volume/per pod  
