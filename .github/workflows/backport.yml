@@ -31,7 +31,6 @@ jobs:
           number:  ${{ github.event.pull_request.number }}
           labels: |
             backport-requested :arrow_backward:
-            release-1.21
             release-1.22
             release-1.23
       -
@@ -54,7 +53,6 @@ jobs:
         with:
           labels: |
             backport-requested :arrow_backward:
-            release-1.21
             release-1.22
             release-1.23
 
@@ -72,7 +70,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        branch: [release-1.21, release-1.22, release-1.23]
+        branch: [release-1.22, release-1.23]
     env:
       PR: ${{ github.event.pull_request.number }}
     outputs:
