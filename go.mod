@@ -25,13 +25,13 @@ require (
 	github.com/prometheus/client_golang v1.19.1
 	github.com/robfig/cron v1.2.0
 	github.com/sethvargo/go-password v0.3.0
-	github.com/spf13/cobra v1.8.0
+	github.com/spf13/cobra v1.8.1
 	github.com/spf13/pflag v1.0.5
 	github.com/thoas/go-funk v0.9.3
 	go.uber.org/atomic v1.11.0
 	go.uber.org/zap v1.27.0
-	golang.org/x/sys v0.20.0
-	golang.org/x/term v0.20.0
+	golang.org/x/sys v0.21.0
+	golang.org/x/term v0.21.0
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.30.1
 	k8s.io/apiextensions-apiserver v0.30.1
