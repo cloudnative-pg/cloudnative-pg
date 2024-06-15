@@ -8,7 +8,7 @@
   "prConcurrentLimit": 5,
 // The branches renovate should target
 // PLEASE UPDATE THIS WHEN RELEASING.
-  "baseBranches": ["main","release-1.21","release-1.22", "release-1.23"],
+  "baseBranches": ["main","release-1.22", "release-1.23"],
   "ignorePaths": ["docs/**", "config/**", "releases/**", "contribute/**", "config/**", "licenses/**"],
   "postUpdateOptions": ["gomodTidy"],
   "semanticCommits": "enabled",
