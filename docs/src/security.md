@@ -112,7 +112,7 @@ cluster role which defines the set of rules/resources/verbs granted to the opera
 
 Below we provide some examples and, most importantly, the reasons why
 CloudNativePG requires full or partial management of standard Kubernetes
-namespaced resources.
+namespaced or non-namespaced resources.
 
 `configmaps`
 : The operator needs to create and manage default config maps for
@@ -169,14 +169,13 @@ namespaced resources.
   decide in which nodes a pod can be scheduled preventing the replicas to be
   in the same node, specially if nodes are in different availability zones. This
   permission is also used to determine if a node is schedule or not, avoiding
-  the creation of pods that cannot be created at all.
+  the creation of pods that cannot be created at all and/or trigger a switch over if
+  the primary lives in a unscheduled node.
 
 To see all the permissions required by the operator, you can run `kubectl
 describe clusterrole cnpg-manager`.
 
-<!-- TODO: please integrate this or align it with the RBAC section -->
-
-### Cluster-Wide Permissions and Operator Deployment
+### ClusterRole Permissions and Operator Deployment
 
 #### Using the Manifest
 
@@ -185,21 +184,10 @@ is deployed using a manifest built with `Kustomize` on the YAML files generated
 by `controller-gen` using the markers available in
 [Kubebuilder](https://book.kubebuilder.io/).
 
-Although this method is currently somewhat limited, it allows for creating a
+Although this method is currently somewhat limited, it allows creating a
 manifest with permissions set as either `RoleBinding` or `ClusterRoleBinding`.
 
-In the default deployment, permissions are set to `ClusterRoleBinding`
-(cluster-wide).
-
-Therefore, we recommend deploying the operator in a dedicated namespace and
-assigning proper permissions to prevent external user access, including
-restricting access to the operator's `ServiceAccount`.
-
-#### Using Helm Chart
-
-Another method to deploy the operator is via Helm Charts. However, this method
-also results in cluster-wide permissions similar to the manifest-based
-deployment.
+In the default deployment, permissions are set to `ClusterRoleBinding`.
 
 #### Using OLM
 
@@ -210,16 +198,10 @@ necessary files and packages to deploy the operator from
 users to configure the operator to watch specific namespaces or all namespaces,
 enabling more granular permission management.
 
-#### Why Are Cluster-Wide Permissions Needed?
+#### Why Are ClusterRole Permissions Needed?
 
-Currently, the operator requires cluster-wide permissions only for `nodes`
-objects. All other permissions can be namespace-scoped or cluster-wide.
-
-The reasons for these permissions are:
-
-- **Nodes:** Required to switch to a different instance if the primary is on a
-  node being cordoned or drained. Without this, the `PodDisruptionBudget` would
-  prevent the primary Pod from being evicted, blocking the maintenance operation.
+Currently, the operator requires ClusterRole permissions only to get `nodes`
+objects. All other permissions can be namespace-scoped or ClusterRole.
 
 Even with these permissions, if someone gains access to the `ServiceAccount`,
 they will only have `get`, `list`, and `watch` permissions, which are limited
@@ -231,14 +213,14 @@ and any other `ServiceAccount` with elevated permissions.
 
 #### Can This Issue Be Mitigated?
 
-For both manifest and Helm chart installations, it is recommended to deploy the
+For the deployment using the YAML manifest it is recommended to deploy the
 operator in a dedicated namespace and restrict access to this namespace to
 administrators only. This ensures that standard users cannot access the
 operator's `ServiceAccount`.
 
 When using OLM, it is advisable to deploy the operator in its own namespace
 while configuring it to watch the namespaces that will use the operator. This
-setup helps contain permissions and restrict access effectively.
+setup helps to contain permissions and restrict access more effectively.
 
 ### Calls to the API server made by the instance manager
 
@@ -465,4 +447,3 @@ For further detail on how `pg_ident.conf` is managed by the operator, see the
 CloudNativePG delegates encryption at rest to the underlying storage class. For
 data protection in production environments, we highly recommend that you choose
 a storage class that supports encryption at rest.
-
