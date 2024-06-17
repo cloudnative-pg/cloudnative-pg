@@ -69,23 +69,18 @@ func (b *PersistentVolumeClaimBuilder) WithRequests(rl corev1.ResourceList) *Per
 	return b
 }
 
-// WithAccessModes adds the access modes to the object being build
-func (b *PersistentVolumeClaimBuilder) WithAccessModes(
-	accessModes ...corev1.PersistentVolumeAccessMode,
-) *PersistentVolumeClaimBuilder {
-	b.pvc.Spec.AccessModes = append(b.pvc.Spec.AccessModes, accessModes...)
-	return b
-}
-
 // WithDefaultAccessMode adds the access mode only if it was not present in the initial PersistentVolumeSpec
 func (b *PersistentVolumeClaimBuilder) WithDefaultAccessMode(
-	accessModes ...corev1.PersistentVolumeAccessMode,
+	accessMode corev1.PersistentVolumeAccessMode,
 ) *PersistentVolumeClaimBuilder {
 	if len(b.pvc.Spec.AccessModes) > 0 {
 		return b
 	}
 
-	return b.WithAccessModes(accessModes...)
+	b.pvc.Spec.AccessModes = []corev1.PersistentVolumeAccessMode{
+		accessMode,
+	}
+	return b
 }
 
 // BeginMetadata gets the metadata builder
