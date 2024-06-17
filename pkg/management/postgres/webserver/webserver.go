@@ -69,8 +69,6 @@ func (body Response[T]) EnsureDataIsPresent() error {
 type Webserver struct {
 	// instance is the PostgreSQL instance to be collected
 	server *http.Server
-
-	UseTLS bool
 }
 
 // NewWebServer creates a Webserver as a Kubernetes Runnable, given a http.Server
