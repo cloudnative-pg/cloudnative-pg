@@ -76,14 +76,6 @@ func appendCloudProviderOptions(options []string, credentials v1.BarmanCredentia
 		return nil, err
 	}
 
-	// TODO: evaluate whether to add a separate function for this
-	// if supported (Barman 3.10.1 or above) specify `--no-partial` by default
-	if !capabilities.HasNoPartialWalRestore {
-		options = append(
-			options,
-			"--no-partial")
-	}
-
 	switch {
 	case credentials.AWS != nil:
 		if capabilities.HasS3 {

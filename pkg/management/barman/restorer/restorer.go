@@ -49,7 +49,7 @@ type WALRestorer struct {
 	// The spool of WAL files to be archived in parallel
 	spool *spool.WALSpool
 
-	// The environment that should be used to invoke barman-cloud-wal-archive
+	// The environment that should be used to invoke barman-cloud-wal-restore
 	env []string
 }
 
@@ -64,10 +64,10 @@ type Result struct {
 	// If not nil, this is the error that has been detected
 	Err error
 
-	// The time when we started barman-cloud-wal-archive
+	// The time when we started barman-cloud-wal-restore
 	StartTime time.Time
 
-	// The time when end barman-cloud-wal-archive ended
+	// The time when end barman-cloud-wal-restore ended
 	EndTime time.Time
 }
 
@@ -238,6 +238,14 @@ func (restorer *WALRestorer) Restore(walName, destinationPath string, baseOption
 	}
 	options := make([]string, optionsLength, optionsLength+2)
 	copy(options, baseOptions)
+
+	// If supported (Barman 3.10.1 or above) specify `--no-partial`
+	if !currentCapabilities.HasNoPartialWalRestore {
+		options = append(
+			options,
+			"--no-partial")
+	}
+
 	options = append(options, walName, destinationPath)
 
 	barmanCloudWalRestoreCmd := exec.Command(
