@@ -17,6 +17,7 @@ limitations under the License.
 package metricserver
 
 import (
+	"crypto/tls"
 	"fmt"
 	"net/http"
 
@@ -59,8 +60,14 @@ func New(serverInstance *postgres.Instance, exporter *Exporter) (*MetricsServer,
 		ReadHeaderTimeout: webserver.DefaultReadHeaderTimeout,
 	}
 
+	server.TLSConfig = &tls.Config{
+		MinVersion: tls.VersionTLS13,
+		GetCertificate: func(_ *tls.ClientHelloInfo) (*tls.Certificate, error) {
+			return serverInstance.ServerCertificate, nil
+		},
+	}
+
 	ws := webserver.NewWebServer(server)
-	ws.UseTLS = true
 
 	metricServer := &MetricsServer{
 		Webserver: ws,
