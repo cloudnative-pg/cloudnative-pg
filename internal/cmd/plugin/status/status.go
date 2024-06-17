@@ -30,6 +30,7 @@ import (
 	"github.com/logrusorgru/aurora/v4"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -46,6 +47,11 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
+type pdbList struct {
+	err   error
+	inner policyv1.PodDisruptionBudgetList
+}
+
 // PostgresqlStatus contains the status of the Cluster and of all its instances
 type PostgresqlStatus struct {
 	// Cluster is the Cluster we are investigating
@@ -58,9 +64,9 @@ type PostgresqlStatus struct {
 	// PrimaryPod contains the primary Pod
 	PrimaryPod corev1.Pod
 
-	// PodDisruptionBudgetList prints every PDB that matches against the cluster
+	// podDisruptionBudgetList prints every PDB that matches against the cluster
 	// with the label selector
-	PodDisruptionBudgetList policyv1.PodDisruptionBudgetList
+	podDisruptionBudgetList pdbList
 }
 
 func (fullStatus *PostgresqlStatus) getReplicationSlotList() postgres.PgReplicationSlotList {
@@ -155,20 +161,21 @@ func ExtractPostgresqlStatus(ctx context.Context, clusterName string) (*Postgres
 		specs.PostgresContainerName)
 
 	var pdbl policyv1.PodDisruptionBudgetList
-	if err := plugin.Client.List(
+	pdblErr := plugin.Client.List(
 		ctx,
 		&pdbl,
 		client.InNamespace(plugin.Namespace),
 		client.MatchingLabels{utils.ClusterLabelName: clusterName},
-	); err != nil {
-		return nil, fmt.Errorf("while extracting PodDisruptionBudgetList: %w", err)
-	}
+	)
 	// Extract the status from the instances
 	status := PostgresqlStatus{
-		Cluster:                 &cluster,
-		InstanceStatus:          &instancesStatus,
-		PrimaryPod:              primaryPod,
-		PodDisruptionBudgetList: pdbl,
+		Cluster:        &cluster,
+		InstanceStatus: &instancesStatus,
+		PrimaryPod:     primaryPod,
+		podDisruptionBudgetList: pdbList{
+			err:   pdblErr,
+			inner: pdbl,
+		},
 	}
 	return &status, nil
 }
@@ -810,10 +817,22 @@ func (fullStatus *PostgresqlStatus) printUnmanagedReplicationSlotStatus() {
 
 func (fullStatus *PostgresqlStatus) printPodDisruptionBudgetStatus() {
 	const header = "Pod Disruption Budgets status"
+	pdbErr := fullStatus.podDisruptionBudgetList.err
+	if pdbErr != nil {
+		fmt.Println(aurora.Red(header))
+		if apierrs.IsForbidden(pdbErr) {
+			fmt.Println(aurora.Red("Unable to fetch PodDisruptionBudgetList due to a lack of permissions"))
+			return
+		}
+		fmt.Println(aurora.Red(
+			fmt.Sprintf("encountered an error while fetching PodDisruptionBudgetList: %s", pdbErr.Error()),
+		))
+		return
+	}
 
 	fmt.Println(aurora.Green(header))
 
-	if len(fullStatus.PodDisruptionBudgetList.Items) == 0 {
+	if len(fullStatus.podDisruptionBudgetList.inner.Items) == 0 {
 		fmt.Println("No active PodDisruptionBudgets found")
 		fmt.Println()
 		return
@@ -829,7 +848,7 @@ func (fullStatus *PostgresqlStatus) printPodDisruptionBudgetStatus() {
 		"Disruptions Allowed",
 	)
 
-	for _, item := range fullStatus.PodDisruptionBudgetList.Items {
+	for _, item := range fullStatus.podDisruptionBudgetList.inner.Items {
 		status.AddLine(item.Name,
 			item.Spec.Selector.MatchLabels[utils.ClusterRoleLabelName],
 			item.Status.ExpectedPods,
