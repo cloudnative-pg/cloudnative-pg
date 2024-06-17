@@ -245,6 +245,7 @@ jobs:
     name: Create OLM bundle and catalog
     runs-on: ubuntu-22.04
     needs:
+      - check-branch
       - release-binaries
     if: |
       (always() && !cancelled()) &&
