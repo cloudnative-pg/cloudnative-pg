@@ -2657,9 +2657,9 @@ func (secretResourceVersion *SecretsResourceVersion) SetExternalClusterSecretVer
 	secretResourceVersion.ExternalClusterSecretVersions[secretName] = *version
 }
 
-// GetImageName get the name of the image that should be used
+// getImageName get the name of the image that should be used
 // to create the pods
-func (cluster *Cluster) GetImageName() string {
+func (cluster *Cluster) getImageName() string {
 	// If the image is specified in the status, use that one
 	// It should be there since the first reconciliation
 	if len(cluster.Status.Image) > 0 {
@@ -2689,7 +2689,7 @@ func (cluster *Cluster) GetPostgresqlVersion() (int, error) {
 		return postgres.GetPostgresVersionFromTag(strconv.Itoa(cluster.Spec.ImageCatalogRef.Major))
 	}
 
-	image := cluster.GetImageName()
+	image := cluster.getImageName()
 	tag := utils.GetImageTag(image)
 	return postgres.GetPostgresVersionFromTag(tag)
 }

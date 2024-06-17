@@ -450,7 +450,7 @@ func checkPodImageIsOutdated(
 	status postgres.PostgresqlStatus,
 	cluster *apiv1.Cluster,
 ) (rollout, error) {
-	targetImageName := cluster.GetImageName()
+	targetImageName := cluster.Status.Image
 
 	pgCurrentImageName, err := specs.GetPostgresImageName(*status.Pod)
 	if err != nil {
