@@ -64,6 +64,7 @@ func main() {
 	cmd.AddCommand(debug.NewCmd())
 
 	if err := cmd.Execute(); err != nil {
+		log.Error(err, "error while executing command", "error", err.Error())
 		os.Exit(1)
 	}
 }
