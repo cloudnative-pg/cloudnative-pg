@@ -150,7 +150,7 @@ var _ = Describe("PVC Creation", func() {
 		Expect(pvc.Labels[utils.TablespaceNameLabelName]).To(Equal(tbsName))
 	})
 
-	It("should not add the default access mode when the PVC template specifies at least a value", func() {
+	It("should not add the default access mode when the PVC template specifies at least one value", func() {
 		cluster := &apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "test",
