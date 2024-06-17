@@ -174,15 +174,12 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 		return err
 	}
 
-	metricsServer, err := metricserver.New(instance)
-	if err != nil {
-		return err
-	}
+	metricsExporter := metricserver.NewExporter(instance)
 
 	postgresStartConditions := concurrency.MultipleExecuted{}
 	exitedConditions := concurrency.MultipleExecuted{}
 
-	reconciler := controller.NewInstanceReconciler(instance, mgr.GetClient(), metricsServer)
+	reconciler := controller.NewInstanceReconciler(instance, mgr.GetClient(), metricsExporter)
 	err = ctrl.NewControllerManagedBy(mgr).
 		For(&apiv1.Cluster{}).
 		Complete(reconciler)
@@ -227,11 +224,6 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 		return err
 	}
 
-	if err = mgr.Add(metricsServer); err != nil {
-		setupLog.Error(err, "unable to add metrics webserver runnable")
-		return err
-	}
-
 	if err = mgr.Add(lifecycle.NewPostgresOrphansReaper(instance)); err != nil {
 		setupLog.Error(err, "unable to create zombie reaper")
 		return err
@@ -271,6 +263,15 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 		return err
 	}
 	if err = mgr.Add(localSrv); err != nil {
+		setupLog.Error(err, "unable to add local webserver runnable")
+		return err
+	}
+
+	metricsServer, err := metricserver.New(instance, metricsExporter)
+	if err != nil {
+		return err
+	}
+	if err = mgr.Add(metricsServer); err != nil {
 		setupLog.Error(err, "unable to add local webserver runnable")
 		return err
 	}

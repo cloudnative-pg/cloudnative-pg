@@ -19,6 +19,7 @@ package webserver
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -68,6 +69,8 @@ func (body Response[T]) EnsureDataIsPresent() error {
 type Webserver struct {
 	// instance is the PostgreSQL instance to be collected
 	server *http.Server
+
+	UseTLS bool
 }
 
 // NewWebServer creates a Webserver as a Kubernetes Runnable, given a http.Server
@@ -81,11 +84,14 @@ func NewWebServer(server *http.Server) *Webserver {
 func (ws *Webserver) Start(ctx context.Context) error {
 	errChan := make(chan error, 1)
 	go func() {
-		log.Info("Starting webserver", "address", ws.server.Addr)
+		log.Info("Starting webserver", "address", ws.server.Addr, "hasTLS", ws.server.TLSConfig != nil)
 
 		var err error
 		if ws.server.TLSConfig != nil {
 			err = ws.server.ListenAndServeTLS("", "")
+			if err != nil {
+				err = fmt.Errorf("when starting with TLS, err: %w", err)
+			}
 		} else {
 			err = ws.server.ListenAndServe()
 		}
@@ -98,7 +104,11 @@ func (ws *Webserver) Start(ctx context.Context) error {
 	// we exit with error code, potentially we could do a retry logic, but rarely a webserver that doesn't start will run
 	// on subsequent tries
 	case err := <-errChan:
-		log.Error(err, "Error while starting the web server", "address", ws.server.Addr)
+		if errors.Is(http.ErrServerClosed, err) {
+			log.Error(err, "Closing the web server", "address", ws.server.Addr)
+		} else {
+			log.Error(err, "Error while running the web server", "address", ws.server.Addr)
+		}
 		return err
 	case <-ctx.Done():
 		if err := ws.server.Shutdown(context.Background()); err != nil {
