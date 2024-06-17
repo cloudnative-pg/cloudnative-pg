@@ -567,7 +567,7 @@ jobs:
           password: ${{ env.REGISTRY_PASSWORD }}
 
       - name: Build for scan distroless image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           platforms: "linux/amd64"
           context: .
@@ -587,7 +587,7 @@ jobs:
           accept-keywords: key
 
       - name: Build for scan UBI8 image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           platforms: "linux/amd64"
           context: .
@@ -609,7 +609,7 @@ jobs:
           accept-keywords: key
 
       - name: Build for scan UBI9 image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           platforms: "linux/amd64"
           context: .
@@ -652,7 +652,7 @@ jobs:
           sarif_file: snyk.sarif
 
       - name: Build and push
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           platforms: ${{ env.PLATFORMS }}
           context: .
@@ -666,7 +666,7 @@ jobs:
           cache-to: ${{ env.BUILD_PUSH_CACHE_TO }}
 
       - name: Build and push UBI8
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           platforms: ${{ env.PLATFORMS }}
           context: .
@@ -677,7 +677,7 @@ jobs:
           tags: ${{ steps.docker-meta-ubi8.outputs.tags }}
 
       - name: Build and push UBI9
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           platforms: ${{ env.PLATFORMS }}
           context: .
