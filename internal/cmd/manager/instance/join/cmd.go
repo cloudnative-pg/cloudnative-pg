@@ -105,17 +105,8 @@ func joinSubCommand(ctx context.Context, instance *postgres.Instance, info postg
 		return err
 	}
 
-	metricServer, err := metricserver.New(instance)
-	if err != nil {
-		return err
-	}
-	// Let's download the crypto material from the cluster
-	// secrets.
-	reconciler := controller.NewInstanceReconciler(instance, client, metricServer)
-	if err != nil {
-		log.Error(err, "Error creating reconciler to download certificates")
-		return err
-	}
+	metricExporter := metricserver.NewExporter(instance)
+	reconciler := controller.NewInstanceReconciler(instance, client, metricExporter)
 
 	var cluster apiv1.Cluster
 	err = reconciler.GetClient().Get(ctx,
@@ -126,6 +117,8 @@ func joinSubCommand(ctx context.Context, instance *postgres.Instance, info postg
 		return err
 	}
 
+	// Let's download the crypto material from the cluster
+	// secrets.
 	reconciler.RefreshSecrets(ctx, &cluster)
 
 	err = info.Join(&cluster)

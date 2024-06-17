@@ -52,7 +52,7 @@ type InstanceReconciler struct {
 func NewInstanceReconciler(
 	instance *postgres.Instance,
 	client ctrl.Client,
-	server *metricserver.MetricsServer,
+	metricsExporter *metricserver.Exporter,
 ) *InstanceReconciler {
 	return &InstanceReconciler{
 		instance:              instance,
@@ -60,7 +60,7 @@ func NewInstanceReconciler(
 		secretVersions:        make(map[string]string),
 		extensionStatus:       make(map[string]bool),
 		systemInitialization:  concurrency.NewExecuted(),
-		metricsServerExporter: server.GetExporter(),
+		metricsServerExporter: metricsExporter,
 	}
 }
 

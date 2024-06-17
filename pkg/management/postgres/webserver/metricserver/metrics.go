@@ -40,9 +40,9 @@ type MetricsServer struct {
 
 // New configure the web statusServer for a certain PostgreSQL instance, and
 // must be invoked before starting the real web statusServer
-func New(serverInstance *postgres.Instance) (*MetricsServer, error) {
+func New(serverInstance *postgres.Instance, exporter *Exporter) (*MetricsServer, error) {
+
 	registry := prometheus.NewRegistry()
-	exporter := NewExporter(serverInstance)
 	if err := registry.Register(exporter); err != nil {
 		return nil, fmt.Errorf("while registering PostgreSQL exporters: %w", err)
 	}
@@ -59,8 +59,11 @@ func New(serverInstance *postgres.Instance) (*MetricsServer, error) {
 		ReadHeaderTimeout: webserver.DefaultReadHeaderTimeout,
 	}
 
+	ws := webserver.NewWebServer(server)
+	ws.UseTLS = true
+
 	metricServer := &MetricsServer{
-		Webserver: webserver.NewWebServer(server),
+		Webserver: ws,
 		exporter:  exporter,
 	}
 
