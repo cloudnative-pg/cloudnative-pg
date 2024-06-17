@@ -35,7 +35,8 @@ import (
 
 var _ = Describe("Pod upgrade", Ordered, func() {
 	const (
-		newOperatorImage = "ghcr.io/cloudnative-pg/cloudnative-pg:next"
+		newOperatorImage  = "ghcr.io/cloudnative-pg/cloudnative-pg:next"
+		postgresImageName = "postgres:13.11"
 	)
 
 	var cluster apiv1.Cluster
@@ -46,8 +47,9 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 				Name: "test",
 			},
 			Spec: apiv1.ClusterSpec{
-				ImageName: "postgres:13.11",
+				ImageName: postgresImageName,
 			},
+			Status: apiv1.ClusterStatus{Image: postgresImageName},
 		}
 		configuration.Current = configuration.NewConfiguration()
 	})
@@ -200,7 +202,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 	It("should trigger a rollout when the scheduler changes", func(ctx SpecContext) {
 		cluster := apiv1.Cluster{
 			Spec: apiv1.ClusterSpec{
-				ImageName: "postgres:13.11",
+				ImageName: postgresImageName,
 			},
 		}
 		pod := specs.PodWithExistingStorage(cluster, 1)
@@ -292,7 +294,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 		It("should not trigger a rollout on operator changes with inplace upgrades", func(ctx SpecContext) {
 			cluster := apiv1.Cluster{
 				Spec: apiv1.ClusterSpec{
-					ImageName: "postgres:13.11",
+					ImageName: postgresImageName,
 				},
 			}
 			pod := specs.PodWithExistingStorage(cluster, 1)
@@ -316,7 +318,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 		It("should trigger an explicit rollout if operator changes without inplace upgrades", func(ctx SpecContext) {
 			cluster := apiv1.Cluster{
 				Spec: apiv1.ClusterSpec{
-					ImageName: "postgres:13.11",
+					ImageName: postgresImageName,
 				},
 			}
 			pod := specs.PodWithExistingStorage(cluster, 1)
@@ -365,7 +367,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 		It("should not trigger a rollout on operator changes with inplace upgrades", func(ctx SpecContext) {
 			cluster := apiv1.Cluster{
 				Spec: apiv1.ClusterSpec{
-					ImageName: "postgres:13.11",
+					ImageName: postgresImageName,
 				},
 			}
 			pod := specs.PodWithExistingStorage(cluster, 1)
@@ -388,7 +390,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 		It("should trigger an explicit rollout if operator changes without inplace upgrades", func(ctx SpecContext) {
 			cluster := apiv1.Cluster{
 				Spec: apiv1.ClusterSpec{
-					ImageName: "postgres:13.11",
+					ImageName: postgresImageName,
 				},
 			}
 			pod := specs.PodWithExistingStorage(cluster, 1)

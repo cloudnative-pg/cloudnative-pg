@@ -32,6 +32,9 @@ var _ = Describe("Extract the used image name", func() {
 			Name:      "clusterName",
 			Namespace: "default",
 		},
+		Status: apiv1.ClusterStatus{
+			Image: configuration.Current.PostgresImageName,
+		},
 	}
 	pod := PodWithExistingStorage(cluster, 1)
 
