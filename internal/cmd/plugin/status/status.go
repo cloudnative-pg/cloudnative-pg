@@ -128,7 +128,7 @@ func Status(ctx context.Context, clusterName string, verbose bool, format plugin
 	status.printUnmanagedReplicationSlotStatus()
 	status.printRoleManagerStatus()
 	status.printTablespacesStatus()
-	status.printPodDisruptionBudgetStatus()
+	status.printPodDisruptionBudgetStatus(verbose)
 	status.printInstancesStatus()
 
 	if nonFatalError != nil {
@@ -815,7 +815,7 @@ func (fullStatus *PostgresqlStatus) printUnmanagedReplicationSlotStatus() {
 	fmt.Println()
 }
 
-func (fullStatus *PostgresqlStatus) printPodDisruptionBudgetStatus() {
+func (fullStatus *PostgresqlStatus) printPodDisruptionBudgetStatus(verbose bool) {
 	const header = "Pod Disruption Budgets status"
 	pdbErr := fullStatus.podDisruptionBudgetList.err
 	if pdbErr != nil {
@@ -824,8 +824,14 @@ func (fullStatus *PostgresqlStatus) printPodDisruptionBudgetStatus() {
 			fmt.Println(aurora.Red("Unable to fetch PodDisruptionBudgetList due to a lack of permissions"))
 			return
 		}
+		if verbose {
+			fmt.Println(aurora.Red(
+				fmt.Sprintf("encountered an error while fetching PodDisruptionBudgetList: %s", pdbErr.Error()),
+			))
+			return
+		}
 		fmt.Println(aurora.Red(
-			fmt.Sprintf("encountered an error while fetching PodDisruptionBudgetList: %s", pdbErr.Error()),
+			"encountered an error while fetching PodDisruptionBudgetList, set verbose to true for additional details.",
 		))
 		return
 	}
