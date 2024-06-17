@@ -382,7 +382,7 @@ jobs:
           password: ${{ env.REGISTRY_PASSWORD }}
       -
         name: Build and push
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           platforms: ${{ env.PLATFORMS }}
           context: .
@@ -397,7 +397,7 @@ jobs:
           cache-to: ${{ env.BUILD_PUSH_CACHE_TO }}
       -
         name: Build and push UBI8
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           platforms: ${{ env.PLATFORMS }}
           context: .
@@ -478,7 +478,7 @@ jobs:
       # NOTE: we only fire this in TEST DEPTH = 4, as that is the level of the
       # upgrade test
         name: Build and push image for upgrade test
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         if: |
           always() && !cancelled() &&
           needs.evaluate_options.outputs.test_level == '4'

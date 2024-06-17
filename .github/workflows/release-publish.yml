@@ -209,7 +209,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       -
         name: Build and push
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           platforms: ${{ env.PLATFORMS }}
           context: .
@@ -220,7 +220,7 @@ jobs:
           tags: ${{ steps.docker-meta.outputs.tags }}
       -
         name: Build and push UBI8
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           platforms: ${{ env.PLATFORMS }}
           context: .
@@ -231,7 +231,7 @@ jobs:
           tags: ${{ steps.docker-meta-ubi8.outputs.tags }}
       -
         name: Build and push UBI9
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           platforms: ${{ env.PLATFORMS }}
           context: .
