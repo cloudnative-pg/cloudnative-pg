@@ -40,6 +40,7 @@ For details on the support provided by the community, see
 | Type              | Support level                                                                                                         | Quality and recommended Use                                                                                    |
 |-------------------|-----------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------|
 | Development Build | No support                                                                                                            | Dangerous, might not be fully reliable. Useful to experiment with.                                               |
+| Release Candidate | No support                                                                                                            | Preview version, not production ready. Useful to experiment with.                                               |
 | Minor Release     | Support provided until 3 months after the N+1 minor release (ex. 1.23 supported until 3 months after 1.24.0 is released)|
 | Patch             | Same as the corresponding minor release                                                                               | Users are encouraged to adopt patch releases as soon as they are available for a given release.                |
 | Security Patch    | Same as a patch, however, it doesn't contain any additional code other than the security fix from the previous patch | Given the nature of security fixes, users are **strongly** encouraged to adopt security patches after release. |
@@ -59,6 +60,9 @@ as follows:
 
 Where `<minor>` is increased for each release, and `<patch>` counts the number of patches for the
 current `<minor>` release. A patch is usually a small change relative to the `<minor>` release.
+
+Release candidates are denoted by an additional `-<pre-release>` identifier following the patch
+version, based on [Semantic Versioning 2.0.0 - Point 9](https://semver.org/#spec-item-9)
 
 Git tags for versions are prepended with `v`.
 
