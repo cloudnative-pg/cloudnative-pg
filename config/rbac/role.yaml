@@ -140,14 +140,6 @@ rules:
   - patch
   - update
 - apiGroups:
-  - apiextensions.k8s.io
-  resources:
-  - customresourcedefinitions
-  verbs:
-  - get
-  - list
-  - update
-- apiGroups:
   - apps
   resources:
   - deployments
