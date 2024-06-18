@@ -106,8 +106,8 @@ CronJobs
 CustomResourceDefinition
 CustomResourceDefinitions
 Customizations
-DBaaS
 DBA
+DBaaS
 DDTHH
 DISA
 DNS

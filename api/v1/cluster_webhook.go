@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -33,7 +34,6 @@ import (
 	validationutil "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/utils/ptr"
-	"k8s.io/utils/strings/slices"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -2453,14 +2453,25 @@ func (r *Cluster) validateManagedServices() field.ErrorList {
 		return nil
 	}
 
+	managedServices := r.Spec.Managed.Services
+	basePath := field.NewPath("spec", "managed", "services")
 	var errs field.ErrorList
-	names := make([]string, len(r.Spec.Managed.Services.Additional))
-	for idx := range r.Spec.Managed.Services.Additional {
-		additionalService := &r.Spec.Managed.Services.Additional[idx]
+
+	if slices.Contains(managedServices.DisabledDefaultServices, ServiceSelectorTypeRW) {
+		errs = append(errs, field.Invalid(
+			basePath.Child("disabledDefaultServices"),
+			ServiceSelectorTypeRW,
+			"service of type RW cannot be disabled.",
+		))
+	}
+
+	names := make([]string, len(managedServices.Additional))
+	for idx := range managedServices.Additional {
+		additionalService := &managedServices.Additional[idx]
 		names[idx] = additionalService.ServiceTemplate.ObjectMeta.Name
 
 		if fieldErr := validateServiceTemplate(
-			field.NewPath("spec", "managed", "services", fmt.Sprintf("additional[%d]", idx)),
+			basePath.Child(fmt.Sprintf("additional[%d]", idx)),
 			true,
 			additionalService.ServiceTemplate,
 		); len(fieldErr) > 0 {
@@ -2470,7 +2481,7 @@ func (r *Cluster) validateManagedServices() field.ErrorList {
 
 	if containsDuplicateNames(names) {
 		errs = append(errs, field.Invalid(
-			field.NewPath("spec", "managed", "services", "additional"),
+			basePath.Child("additional"),
 			names,
 			"contains services with the same .metadata.name",
 		))

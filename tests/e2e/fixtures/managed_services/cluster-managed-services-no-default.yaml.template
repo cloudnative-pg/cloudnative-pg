@@ -10,4 +10,4 @@ spec:
     storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
   managed:
     services:
-      disabledDefaultServices: ["rw", "ro", "r"]
+      disabledDefaultServices: ["ro", "r"]

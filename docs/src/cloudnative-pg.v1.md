@@ -3222,7 +3222,7 @@ Valid values are &quot;rw&quot;, &quot;r&quot;, and &quot;ro&quot;, representing
 </td>
 <td>
    <p>DisabledDefaultServices is a list of service types that are disabled by default.
-Valid values are &quot;rw&quot;, &quot;r&quot;, and &quot;ro&quot;, representing read-write, read, and read-only services.</p>
+Valid values are &quot;r&quot;, and &quot;ro&quot;, representing read, and read-only services.</p>
 </td>
 </tr>
 <tr><td><code>additional</code> <B>[Required]</B><br/>

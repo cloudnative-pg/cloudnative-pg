@@ -121,10 +121,13 @@ var _ = Describe("Managed services tests", Label(tests.LabelSmoke, tests.LabelBa
 		By("not creating the disabled services", func() {
 			err = env.Client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: ro.Name}, &corev1.Service{})
 			Expect(apierrs.IsNotFound(err)).To(BeTrue(), fmt.Sprintf("service: %s should not be found", ro.Name))
-			err = env.Client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: rw.Name}, &corev1.Service{})
-			Expect(apierrs.IsNotFound(err)).To(BeTrue(), fmt.Sprintf("service: %s should not be found", rw.Name))
 			err = env.Client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: r.Name}, &corev1.Service{})
 			Expect(apierrs.IsNotFound(err)).To(BeTrue(), fmt.Sprintf("service: %s should not be found", r.Name))
+		})
+
+		By("ensuring rw service is present", func() {
+			err = env.Client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: rw.Name}, &corev1.Service{})
+			Expect(err).ToNot(HaveOccurred())
 		})
 
 		By("creating them when they are re-enabled", func() {

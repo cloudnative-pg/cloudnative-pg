@@ -2427,7 +2427,7 @@ const (
 // ManagedServices represents the services managed by the cluster.
 type ManagedServices struct {
 	// DisabledDefaultServices is a list of service types that are disabled by default.
-	// Valid values are "rw", "r", and "ro", representing read-write, read, and read-only services.
+	// Valid values are "r", and "ro", representing read, and read-only services.
 	// +optional
 	DisabledDefaultServices []ServiceSelectorType `json:"disabledDefaultServices,omitempty"`
 	// Additional is a list of additional managed services specified by the user.

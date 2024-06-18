@@ -3451,7 +3451,7 @@ spec:
                       disabledDefaultServices:
                         description: |-
                           DisabledDefaultServices is a list of service types that are disabled by default.
-                          Valid values are "rw", "r", and "ro", representing read-write, read, and read-only services.
+                          Valid values are "r", and "ro", representing read, and read-only services.
                         items:
                           description: |-
                             ServiceSelectorType describes a valid value for generating the service selectors.
