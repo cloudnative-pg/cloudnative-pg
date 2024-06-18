@@ -19,6 +19,7 @@ package v1
 import (
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
@@ -4669,6 +4670,9 @@ var _ = Describe("validateManagedServices", func() {
 
 	BeforeEach(func() {
 		cluster = &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test",
+			},
 			Spec: ClusterSpec{
 				Managed: &ManagedConfiguration{
 					Services: &ManagedServices{
@@ -4743,6 +4747,27 @@ var _ = Describe("validateManagedServices", func() {
 			Expect(errs).To(HaveLen(1))
 			Expect(errs[0].Type).To(Equal(field.ErrorTypeInvalid))
 			Expect(errs[0].Field).To(Equal("spec.managed.services.additional[0]"))
+		})
+
+		It("should not allow reserved service names", func() {
+			assertError := func(name string, index int, err *field.Error) {
+				expectedDetail := fmt.Sprintf("the service name: '%s' is reserved for operator use", name)
+				Expect(err.Type).To(Equal(field.ErrorTypeInvalid))
+				Expect(err.Field).To(Equal(fmt.Sprintf("spec.managed.services.additional[%d]", index)))
+				Expect(err.Detail).To(Equal(expectedDetail))
+			}
+			cluster.Spec.Managed.Services.Additional = []ManagedService{
+				{ServiceTemplate: ServiceTemplateSpec{ObjectMeta: Metadata{Name: cluster.GetServiceReadWriteName()}}},
+				{ServiceTemplate: ServiceTemplateSpec{ObjectMeta: Metadata{Name: cluster.GetServiceReadName()}}},
+				{ServiceTemplate: ServiceTemplateSpec{ObjectMeta: Metadata{Name: cluster.GetServiceReadOnlyName()}}},
+				{ServiceTemplate: ServiceTemplateSpec{ObjectMeta: Metadata{Name: cluster.GetServiceAnyName()}}},
+			}
+			errs := cluster.validateManagedServices()
+			Expect(errs).To(HaveLen(4))
+			assertError("test-rw", 0, errs[0])
+			assertError("test-r", 1, errs[1])
+			assertError("test-ro", 2, errs[2])
+			assertError("test-any", 3, errs[3])
 		})
 	})
 
