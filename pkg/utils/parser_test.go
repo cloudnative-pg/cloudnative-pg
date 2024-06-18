@@ -97,8 +97,8 @@ var _ = Describe("pg_controldata output parser", func() {
 	})
 })
 
-var _ = Describe("shutdown token creation", func() {
-	It("creates a shutdown token from a parsed pg_controldata", func() {
+var _ = Describe("promotion token creation", func() {
+	It("creates a promotion token from a parsed pg_controldata", func() {
 		parsedControlData := ParsePgControldataOutput(fakeControlData)
 
 		decodeBase64 := func(s string) error {
@@ -106,18 +106,18 @@ var _ = Describe("shutdown token creation", func() {
 			return err
 		}
 
-		token, err := CreateShutdownToken(parsedControlData)
+		token, err := CreatePromotionToken(parsedControlData)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(token).ToNot(BeEmpty())
 		Expect(decodeBase64(token)).To(Succeed())
 	})
 })
 
-var _ = Describe("shutdown token parser", func() {
-	It("parses a newly generated shutdown token", func() {
+var _ = Describe("promotion token parser", func() {
+	It("parses a newly generated promotion token", func() {
 		parsedControlData := ParsePgControldataOutput(fakeControlData)
 
-		token, err := CreateShutdownToken(parsedControlData)
+		token, err := CreatePromotionToken(parsedControlData)
 		Expect(err).ToNot(HaveOccurred())
 
 		tokenContent, err := ParsePgControldataToken(token)
@@ -133,7 +133,7 @@ var _ = Describe("shutdown token parser", func() {
 		}))
 	})
 
-	It("fails when the shutdown token is not encoded in base64", func() {
+	It("fails when the promotion token is not encoded in base64", func() {
 		tokenContent, err := ParsePgControldataToken("***(((((((|||||||||)))))))")
 		Expect(err).To(HaveOccurred())
 		Expect(tokenContent).To(BeNil())
@@ -148,11 +148,11 @@ var _ = Describe("shutdown token parser", func() {
 	})
 })
 
-var _ = Describe("shutdown token validation", func() {
-	It("validates a newly generated shutdown token", func() {
+var _ = Describe("promotion token validation", func() {
+	It("validates a newly generated promotion token", func() {
 		parsedControlData := ParsePgControldataOutput(fakeControlData)
 
-		token, err := CreateShutdownToken(parsedControlData)
+		token, err := CreatePromotionToken(parsedControlData)
 		Expect(err).ToNot(HaveOccurred())
 
 		tokenContent, err := ParsePgControldataToken(token)

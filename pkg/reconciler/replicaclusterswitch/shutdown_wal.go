@@ -31,7 +31,7 @@ import (
 // and we required to archive the shutdown checkpoint WAL file
 var errPostgresNotShutDown = fmt.Errorf("expected postmaster to be shut down")
 
-// generateDemotionToken gets the shutdown token from
+// generateDemotionToken gets the demotion token from
 // the current primary and archives the WAL containing the shutdown
 // checkpoint entry
 func generateDemotionToken(
@@ -74,7 +74,7 @@ func generateDemotionToken(
 		return "", errPostgresNotShutDown
 	}
 
-	token, err := utils.CreateShutdownToken(parsed)
+	token, err := utils.CreatePromotionToken(parsed)
 	if err != nil {
 		return "", err
 	}

@@ -135,7 +135,7 @@ func (r *InstanceReconciler) Reconcile(
 				oldCluster := cluster.DeepCopy()
 				contextLogger.Error(
 					err,
-					"Fatal error while verifying the shutdown token",
+					"Fatal error while verifying the promotion token",
 					"tokenStatus", tokenError.Error(),
 					"tokenContent", tokenError.TokenContent(),
 				)
@@ -1170,7 +1170,7 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 
 	// If I'm not the primary, let's promote myself
 	if !isPrimary {
-		// Verify that the shutdown token is met before promoting
+		// Verify that the promotion token is met before promoting
 		if err := r.verifyPromotionToken(cluster); err != nil {
 			// Report that a promotion is still ongoing on the cluster
 			cluster.Status.Phase = apiv1.PhaseReplicaClusterPromotion

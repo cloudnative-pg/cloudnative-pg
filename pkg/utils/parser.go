@@ -91,10 +91,10 @@ func ParsePgControldataOutput(data string) map[string]string {
 	return pairs
 }
 
-// TODO(leonardoce): I believe that the code about the shutdown token
+// TODO(leonardoce): I believe that the code about the promotion token
 // belongs to a different package
 
-// PgControldataTokenContent contains the data needed to properly create a shutdown token
+// PgControldataTokenContent contains the data needed to properly create a promotion token
 type PgControldataTokenContent struct {
 	// Latest checkpoint's TimeLineID
 	// TODO(leonardoce): should this be an integer?
@@ -122,7 +122,7 @@ type PgControldataTokenContent struct {
 	OperatorVersion string `json:"operatorVersion,omitempty"`
 }
 
-// IsValid checks if the shutdown token is valid or
+// IsValid checks if the promotion token is valid or
 // returns an error otherwise
 func (token *PgControldataTokenContent) IsValid() error {
 	if len(token.LatestCheckpointTimelineID) == 0 {
@@ -162,71 +162,71 @@ func (token *PgControldataTokenContent) Encode() (string, error) {
 	return base64.StdEncoding.EncodeToString(tokenJSON), nil
 }
 
-// ErrInvalidShutdownToken is raised when the shutdown checkpoint token
+// ErrInvalidPromotionToken is raised when the promotion token
 // is not valid
-type ErrInvalidShutdownToken struct {
+type ErrInvalidPromotionToken struct {
 	err    error
 	reason string
 }
 
-func (e *ErrInvalidShutdownToken) Error() string {
-	message := fmt.Sprintf("invalid shutdown token (%s)", e.reason)
+func (e *ErrInvalidPromotionToken) Error() string {
+	message := fmt.Sprintf("invalid promotion token (%s)", e.reason)
 	if e.err != nil {
 		message = fmt.Sprintf("%s: %s", message, e.err.Error())
 	}
 	return message
 }
 
-func (e *ErrInvalidShutdownToken) Unwrap() error {
+func (e *ErrInvalidPromotionToken) Unwrap() error {
 	return e.err
 }
 
 var (
 	// ErrEmptyLatestCheckpointTimelineID is raised when the relative field
-	// in the shutdown token is empty
-	ErrEmptyLatestCheckpointTimelineID = &ErrInvalidShutdownToken{
+	// in the promotion token is empty
+	ErrEmptyLatestCheckpointTimelineID = &ErrInvalidPromotionToken{
 		err:    nil,
 		reason: "LatestCheckpointTimelineID is empty",
 	}
 
 	// ErrEmptyREDOWALFile is raised when the relative field
-	// in the shutdown token is empty
-	ErrEmptyREDOWALFile = &ErrInvalidShutdownToken{
+	// in the promotion token is empty
+	ErrEmptyREDOWALFile = &ErrInvalidPromotionToken{
 		err:    nil,
 		reason: "REDOWALFile is empty",
 	}
 
 	// ErrEmptyDatabaseSystemIdentifier is raised when the relative field
-	// in the shutdown token is empty
-	ErrEmptyDatabaseSystemIdentifier = &ErrInvalidShutdownToken{
+	// in the promotion token is empty
+	ErrEmptyDatabaseSystemIdentifier = &ErrInvalidPromotionToken{
 		err:    nil,
 		reason: "DatabaseSystemIdentifier is empty",
 	}
 
 	// ErrEmptyLatestCheckpointREDOLocation is raised when the relative field
-	// in the shutdown token is empty
-	ErrEmptyLatestCheckpointREDOLocation = &ErrInvalidShutdownToken{
+	// in the promotion token is empty
+	ErrEmptyLatestCheckpointREDOLocation = &ErrInvalidPromotionToken{
 		err:    nil,
 		reason: "LatestCheckpointREDOLocation is empty",
 	}
 
 	// ErrEmptyTimeOfLatestCheckpoint is raised when the relative field
-	// in the shutdown token is empty
-	ErrEmptyTimeOfLatestCheckpoint = &ErrInvalidShutdownToken{
+	// in the promotion token is empty
+	ErrEmptyTimeOfLatestCheckpoint = &ErrInvalidPromotionToken{
 		err:    nil,
 		reason: "TimeOfLatestCheckpoint is empty",
 	}
 
 	// ErrEmptyOperatorVersion is raised when the relative field
-	// in the shutdown token is empty
-	ErrEmptyOperatorVersion = &ErrInvalidShutdownToken{
+	// in the promotion token is empty
+	ErrEmptyOperatorVersion = &ErrInvalidPromotionToken{
 		err:    nil,
 		reason: "OperatorVersion is empty",
 	}
 )
 
-// CreateShutdownToken translates a parsed pgControlData into a JSON token
-func CreateShutdownToken(pgDataMap map[string]string) (string, error) {
+// CreatePromotionToken translates a parsed pgControlData into a JSON token
+func CreatePromotionToken(pgDataMap map[string]string) (string, error) {
 	content := PgControldataTokenContent{
 		LatestCheckpointTimelineID:   pgDataMap[PgControlDataKeyLatestCheckpointTimelineID],
 		REDOWALFile:                  pgDataMap[PgControlDataKeyREDOWALFile],
@@ -248,7 +248,7 @@ func CreateShutdownToken(pgDataMap map[string]string) (string, error) {
 func ParsePgControldataToken(base64Token string) (*PgControldataTokenContent, error) {
 	token, err := base64.StdEncoding.DecodeString(base64Token)
 	if err != nil {
-		return nil, &ErrInvalidShutdownToken{
+		return nil, &ErrInvalidPromotionToken{
 			err:    err,
 			reason: "Base64 decoding failed",
 		}
@@ -256,7 +256,7 @@ func ParsePgControldataToken(base64Token string) (*PgControldataTokenContent, er
 
 	var content PgControldataTokenContent
 	if err = json.Unmarshal(token, &content); err != nil {
-		return nil, &ErrInvalidShutdownToken{
+		return nil, &ErrInvalidPromotionToken{
 			err:    err,
 			reason: "JSON decoding failed",
 		}

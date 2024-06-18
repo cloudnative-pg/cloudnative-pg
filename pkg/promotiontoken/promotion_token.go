@@ -24,7 +24,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-// TokenVerificationError are raised when the shutdown token
+// TokenVerificationError are raised when the promotion token
 // does not correspond to the status of the current instance
 type TokenVerificationError struct {
 	msg          string
@@ -70,8 +70,8 @@ func ValidateAgainstInstanceStatus(
 
 // ValidateAgainstLSN checks if the promotion token is valid against the last replay LSN
 func ValidateAgainstLSN(promotionToken *utils.PgControldataTokenContent, replayLSNString string) error {
-	shutdownTokenLSNString := promotionToken.LatestCheckpointREDOLocation
-	shutdownTokenLSN, err := postgres.LSN(shutdownTokenLSNString).Parse()
+	promotionTokenLSNString := promotionToken.LatestCheckpointREDOLocation
+	promotionTokenLSN, err := postgres.LSN(promotionTokenLSNString).Parse()
 	if err != nil {
 		return &TokenVerificationError{
 			msg: fmt.Sprintf("promotion token LSN is invalid: %s",
@@ -91,20 +91,20 @@ func ValidateAgainstLSN(promotionToken *utils.PgControldataTokenContent, replayL
 	}
 
 	switch {
-	case shutdownTokenLSN < replayLSN:
+	case promotionTokenLSN < replayLSN:
 		return &TokenVerificationError{
 			msg: fmt.Sprintf(
 				"promotion token LSN (%s) is older than the last replay LSN (%s)",
-				shutdownTokenLSNString, replayLSNString),
+				promotionTokenLSNString, replayLSNString),
 			retryable:    false,
 			tokenContent: promotionToken,
 		}
 
-	case replayLSN < shutdownTokenLSN:
+	case replayLSN < promotionTokenLSN:
 		return &TokenVerificationError{
 			msg: fmt.Sprintf(
 				"waiting for promotion token LSN (%s) to be replayed (the last replayed LSN is %s)",
-				shutdownTokenLSNString, replayLSNString),
+				promotionTokenLSNString, replayLSNString),
 			retryable:    true,
 			tokenContent: promotionToken,
 		}
@@ -119,7 +119,7 @@ func ValidateAgainstTimelineID(
 ) error {
 	// If we're in a different timeline, we should definitely wait
 	// for this replica to be in the same timeline as the old primary
-	shutdownTokenTimeline, err := strconv.Atoi(promotionToken.LatestCheckpointTimelineID)
+	promotionTokenTimeline, err := strconv.Atoi(promotionToken.LatestCheckpointTimelineID)
 	if err != nil {
 		return &TokenVerificationError{
 			msg: fmt.Sprintf("promotion token timeline is not an integer: %s (%s)",
@@ -140,18 +140,18 @@ func ValidateAgainstTimelineID(
 	}
 
 	switch {
-	case shutdownTokenTimeline > currentTimelineID:
+	case promotionTokenTimeline > currentTimelineID:
 		return &TokenVerificationError{
 			msg: fmt.Sprintf("requested timeline not reached, current:%d wanted:%d",
-				currentTimelineID, shutdownTokenTimeline),
+				currentTimelineID, promotionTokenTimeline),
 			retryable:    true,
 			tokenContent: promotionToken,
 		}
 
-	case shutdownTokenTimeline < currentTimelineID:
+	case promotionTokenTimeline < currentTimelineID:
 		return &TokenVerificationError{
 			msg: fmt.Sprintf("requested timeline is older than current one, current:%d wanted:%d",
-				currentTimelineID, shutdownTokenTimeline),
+				currentTimelineID, promotionTokenTimeline),
 			retryable:    false,
 			tokenContent: promotionToken,
 		}

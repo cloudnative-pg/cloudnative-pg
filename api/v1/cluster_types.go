@@ -3193,7 +3193,7 @@ func (cluster *Cluster) ShouldPromoteFromReplicaCluster() bool {
 		return false
 	}
 
-	// If we don't have a shutdown token, we don't need to promote
+	// If we don't have a promotion token, we don't need to promote
 	if len(cluster.Spec.ReplicaCluster.PromotionToken) == 0 {
 		return false
 	}

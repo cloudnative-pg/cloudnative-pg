@@ -155,7 +155,7 @@ func reconcileDemotionToken(
 ) (*ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx).WithName("replica_cluster")
 
-	shutdownToken, err := generateDemotionToken(ctx, cluster, instanceClient, instances)
+	demotionToken, err := generateDemotionToken(ctx, cluster, instanceClient, instances)
 	if err != nil {
 		if errors.Is(err, errPostgresNotShutDown) {
 			return &ctrl.Result{
@@ -166,13 +166,13 @@ func reconcileDemotionToken(
 		return nil, err
 	}
 
-	if cluster.Status.DemotionToken != shutdownToken {
+	if cluster.Status.DemotionToken != demotionToken {
 		origCluster := cluster.DeepCopy()
 		contextLogger.Info(
 			"patching the demotionToken in the  cluster status",
-			"value", shutdownToken,
+			"value", demotionToken,
 			"previousValue", cluster.Status.DemotionToken)
-		cluster.Status.DemotionToken = shutdownToken
+		cluster.Status.DemotionToken = demotionToken
 
 		if err := cli.Status().Patch(ctx, cluster, client.MergeFrom(origCluster)); err != nil {
 			return nil, fmt.Errorf("while setting demotion token: %w", err)
