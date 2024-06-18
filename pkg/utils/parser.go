@@ -152,6 +152,16 @@ func (token *PgControldataTokenContent) IsValid() error {
 	return nil
 }
 
+// Encode encodes the token content into a base64 string
+func (token *PgControldataTokenContent) Encode() (string, error) {
+	tokenJSON, err := json.Marshal(token)
+	if err != nil {
+		return "", err
+	}
+
+	return base64.StdEncoding.EncodeToString(tokenJSON), nil
+}
+
 // ErrInvalidShutdownToken is raised when the shutdown checkpoint token
 // is not valid
 type ErrInvalidShutdownToken struct {
