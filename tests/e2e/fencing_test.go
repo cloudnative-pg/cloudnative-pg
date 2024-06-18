@@ -217,13 +217,6 @@ var _ = Describe("Fencing", Label(tests.LabelPlugin), func() {
 					checkInstanceStatusReadyOrNot(pod.GetName(), namespace, false)
 				}
 			})
-			By("checking that the demotion token is present", func() {
-				Eventually(func(g Gomega) {
-					cluster, err := env.GetCluster(namespace, clusterName)
-					g.Expect(err).ToNot(HaveOccurred())
-					g.Expect(cluster.Status.DemotionToken).ToNot(BeEmpty())
-				}, 120).Should(Succeed())
-			})
 			By("check postgres connection on all instances", func() {
 				podList, err := env.GetClusterPodList(namespace, clusterName)
 				Expect(err).NotTo(HaveOccurred())

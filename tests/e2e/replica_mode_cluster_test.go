@@ -638,6 +638,7 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication), Ordered, f
 				podList, err := env.GetClusterPodList(namespace, clusterAName)
 				Expect(err).ToNot(HaveOccurred())
 				for _, pod := range podList.Items {
+					pod := pod
 					AssertPgRecoveryMode(&pod, true)
 				}
 			})
@@ -702,6 +703,7 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication), Ordered, f
 				podList, err := env.GetClusterReplicas(namespace, clusterBName)
 				Expect(err).ToNot(HaveOccurred())
 				for _, pod := range podList.Items {
+					pod := pod
 					AssertPgRecoveryMode(&pod, true)
 				}
 			})

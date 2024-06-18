@@ -399,7 +399,8 @@ func GetStatusSchemeFromPod(pod *corev1.Pod) HTTPScheme {
 func (r *statusClient) ArchivePartialWAL(ctx context.Context, pod *corev1.Pod) (string, error) {
 	contextLogger := log.FromContext(ctx)
 
-	statusURL := url.Build(GetStatusSchemeFromPod(pod).ToString(), pod.Status.PodIP, url.PathPgArchivePartial, url.StatusPort)
+	statusURL := url.Build(
+		GetStatusSchemeFromPod(pod).ToString(), pod.Status.PodIP, url.PathPgArchivePartial, url.StatusPort)
 	req, err := http.NewRequestWithContext(ctx, "POST", statusURL, nil)
 	if err != nil {
 		return "", err
