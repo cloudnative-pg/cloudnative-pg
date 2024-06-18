@@ -837,7 +837,7 @@ func (fullStatus *PostgresqlStatus) printPodDisruptionBudgetStatus() {
 
 	for _, item := range fullStatus.PodDisruptionBudgetList.Items {
 		status.AddLine(item.Name,
-			item.Spec.Selector.MatchLabels[utils.ClusterRoleLabelName],
+			item.Spec.Selector.MatchLabels[utils.ClusterInstanceRoleLabelName],
 			item.Status.ExpectedPods,
 			item.Status.CurrentHealthy,
 			item.Status.DesiredHealthy,
