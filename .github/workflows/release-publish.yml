@@ -17,11 +17,12 @@ permissions:
 
 jobs:
 
-  check-branch:
+  check-version:
     name: Evaluate release tag
     runs-on: ubuntu-22.04
     outputs:
       is_latest: ${{ env.IS_LATEST }}
+      is_stable: ${{ env.IS_STABLE }}
     steps:
       -
         name: Checkout
@@ -30,7 +31,7 @@ jobs:
           # To identify the commit we need the history and all the tags.
           fetch-depth: 0
       -
-        name: Check release branch
+        name: Check release version
         run: |
           tag="${GITHUB_REF#refs/tags/v}"
           latest_release_branch=$(git branch -rl 'origin/release-*' | sort -r | head -n1 | sed -e 's/^.*\(release-.*\)/\1/')
@@ -39,13 +40,18 @@ jobs:
           if [[ "$latest_release_branch" == "$current_release_branch" ]]; then
             is_latest="true"
           fi
+          is_stable="false"
+          if [[ "$tag" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            is_stable="true"
+          fi
           echo "IS_LATEST=${is_latest}" >> $GITHUB_ENV
+          echo "IS_STABLE=${is_stable}" >> $GITHUB_ENV
 
   release:
     name: Create Github release
     runs-on: ubuntu-22.04
     needs:
-      - check-branch
+      - check-version
     steps:
       -
         name: Checkout
@@ -74,7 +80,8 @@ jobs:
           draft: false
           name: v${{ env.TAG }}
           files: releases/cnpg-${{ env.VERSION }}.yaml
-          make_latest: ${{ needs.check-branch.outputs.is_latest }}
+          make_latest: ${{ needs.check-version.outputs.is_latest == 'true' && needs.check-version.outputs.is_stable == 'true' }}
+          prerelease: ${{ needs.check-version.outputs.is_stable == 'false' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -82,7 +89,7 @@ jobs:
     name: Build containers
     runs-on: ubuntu-22.04
     needs:
-      - check-branch
+      - check-version
     outputs:
       version: ${{ steps.build-meta.outputs.version }}
       author_name: ${{ steps.build-meta.outputs.author_name }}
@@ -151,7 +158,9 @@ jobs:
           GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
       -
         name: Publish Krew
-        if: ${{ needs.check-branch.outputs.is_latest == 'true' }}
+        if: |
+          needs.check-version.outputs.is_latest == 'true' &&
+          needs.check-version.outputs.is_stable == 'true'
         uses: rajatjindal/krew-release-bot@v0.0.46
         with:
           krew_template_file: dist/krew/cnpg.yaml
@@ -245,12 +254,13 @@ jobs:
     name: Create OLM bundle and catalog
     runs-on: ubuntu-22.04
     needs:
-      - check-branch
+      - check-version
       - release-binaries
     if: |
       (always() && !cancelled()) &&
       needs.release-binaries.result == 'success' &&
-      needs.check-branch.outputs.is_latest == 'true'
+      needs.check-version.outputs.is_latest == 'true' &&
+      needs.check-version.outputs.is_stable == 'true'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -388,7 +398,6 @@ jobs:
       - release-binaries
     if: |
       (always() && !cancelled()) &&
-      needs.release-binaries.result == 'success' &&
       needs.olm-bundle.result == 'success' &&
       github.repository_owner == 'cloudnative-pg'
     env:

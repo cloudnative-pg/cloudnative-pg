@@ -77,6 +77,13 @@ else
     exit 1
 fi
 
+# Verify the maturity of the release
+IS_STABLE=false
+if [[ "${release_version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+then
+    IS_STABLE=true
+fi
+
 make kustomize
 KUSTOMIZE="${REPO_ROOT}/bin/kustomize"
 
@@ -88,9 +95,12 @@ sed -i -e "/Version *= *.*/Is/\".*\"/\"${release_version}\"/" \
     -e "/DefaultOperatorImageName *= *.*/Is/\"\(.*\):.*\"/\"\1:${release_version}\"/" \
     pkg/versions/versions.go
 
-sed -i -e "s@release-[0-9.]*/releases/cnpg-[0-9.]*.yaml@${branch}/releases/cnpg-${release_version}.yaml@g" \
-    -e "s@artifacts/release-[0-9.]*/@artifacts/${branch}/@g" \
-    docs/src/installation_upgrade.md
+if [ "${IS_STABLE}" = true ]
+then
+    sed -i -e "s@release-[0-9.]*/releases/cnpg-[0-9.]*.yaml@${branch}/releases/cnpg-${release_version}.yaml@g" \
+        -e "s@artifacts/release-[0-9.]*/@artifacts/${branch}/@g" \
+        docs/src/installation_upgrade.md
+fi
 
 CONFIG_TMP_DIR=$(mktemp -d)
 cp -r config/* "${CONFIG_TMP_DIR}"
