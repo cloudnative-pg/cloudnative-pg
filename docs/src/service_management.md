@@ -22,20 +22,25 @@ resource, with the following conventions:
 While this setup covers most use cases for accessing PostgreSQL within the same
 Kubernetes cluster, CloudNativePG offers flexibility to:
 
-- Disable the creation of any or all default services.
+- Disable the creation of the `ro` and/or `r` default services.
 - Define your own services using the standard `Service` API provided by
   Kubernetes.
 
+You can mix these two options.
+
 A common scenario arises when using CloudNativePG in database-as-a-service
 (DBaaS) contexts, where access to the database from outside the Kubernetes
-cluster is required. In such cases, you can disable the default services and
-create your own service of type `LoadBalancer`, if available in your Kubernetes
-environment.
+cluster is required. In such cases, you can create your own service of type
+`LoadBalancer`, if available in your Kubernetes environment.
 
 ## Disabling Default Services
 
-You can disable any or all default services through the
+You can disable any or all of the `ro` and `r` default services through the
 [`managed.services.disabledDefaultServices` option](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-ManagedServices).
+
+!!! Important
+    The `rw` service is essential because CloudNativePG relies on it to ensure
+    PostgreSQL replication.
 
 For example, if you want to remove both the `ro` (read-only) and `r` (read)
 services, you can use this configuration:
@@ -77,10 +82,9 @@ For example, if you want to have a single `LoadBalancer` service for your
 PostgreSQL database primary, you can use the following excerpt:
 
 ```yaml
+# <snip>
 managed:
   services:
-    # Disable all default services
-    disabledDefaultServices: ["rw", "ro", "r"]
     additional:
       - selectorType: rw
         serviceTemplate:
