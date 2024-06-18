@@ -168,8 +168,12 @@ jobs:
         name: Docker meta
         id: docker-meta
         uses: docker/metadata-action@v5
+        env:
+          IS_LATEST: ${{ needs.check-version.outputs.is_latest == 'true' && needs.check-version.outputs.is_stable == 'true' }}
         with:
           images: ${{ env.IMAGES }}
+          flavor: |
+            latest=${{ env.IS_LATEST }}
           tags: |
             type=semver,pattern={{version}}
       -
