@@ -240,8 +240,8 @@ var _ = Describe("cluster_create unit tests", func() {
 
 			By("checking read-write service", func() {
 				checkService(readWriteService, map[string]string{
-					"cnpg.io/cluster": cluster.Name,
-					"role":            "primary",
+					"cnpg.io/cluster":                  cluster.Name,
+					utils.ClusterInstanceRoleLabelName: "primary",
 				})
 			})
 
@@ -254,8 +254,8 @@ var _ = Describe("cluster_create unit tests", func() {
 
 			By("checking read only service", func() {
 				checkService(readOnlyService, map[string]string{
-					"cnpg.io/cluster": cluster.Name,
-					"role":            "replica",
+					"cnpg.io/cluster":                  cluster.Name,
+					utils.ClusterInstanceRoleLabelName: "replica",
 				})
 			})
 		})
