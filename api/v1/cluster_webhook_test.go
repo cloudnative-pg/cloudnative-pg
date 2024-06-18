@@ -2797,7 +2797,7 @@ var _ = Describe("replica mode validation", func() {
 			},
 			Spec: ClusterSpec{
 				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled:        true,
+					Enabled:        false,
 					Source:         "test",
 					PromotionToken: "this-is-a-wrong-token",
 				},
@@ -2823,7 +2823,7 @@ var _ = Describe("replica mode validation", func() {
 			},
 			Spec: ClusterSpec{
 				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled:        true,
+					Enabled:        false,
 					Source:         "test",
 					PromotionToken: base64.StdEncoding.EncodeToString([]byte("{}")),
 				},
@@ -2838,7 +2838,7 @@ var _ = Describe("replica mode validation", func() {
 			},
 		}
 
-		result := cluster.validateReplicaMode()
+		result := cluster.validatePromotionToken()
 		Expect(result).ToNot(BeEmpty())
 	})
 
