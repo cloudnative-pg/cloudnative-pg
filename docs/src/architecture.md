@@ -163,7 +163,9 @@ Kubernetes cluster, with the following specifications:
 !!! Important
     You can configure the above services through the `managed.services` section
     in the `Cluster` configuration. This can be done by reducing the number of
-    services and selecting the type (default is `ClusterIP`).
+    services and selecting the type (default is `ClusterIP`). For more details,
+    please refer to the ["Service Management" section](service_management.md)
+    below.
 
 The below diagram provides a simplistic view of the recommended shared-nothing
 architecture for a PostgreSQL cluster spanning across 3 different availability
