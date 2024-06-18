@@ -19,6 +19,7 @@ package e2e
 import (
 	"fmt"
 	"os"
+	"path"
 	"strings"
 	"time"
 
@@ -435,7 +436,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 
 // In this test we create a replica cluster from a backup and then promote it to a primary.
 // We expect the original primary to be demoted to a replica and be able to follow the new primary.
-var _ = Describe("Replica switchover", Label(tests.LabelReplication), func() {
+var _ = Describe("Replica switchover", Label(tests.LabelReplication), Ordered, func() {
 	const (
 		replicaSwitchoverClusterDir = "/replica_mode_cluster/"
 		namespacePrefix             = "replica-switchover"
@@ -450,7 +451,7 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication), func() {
 			"cluster-replica-switchover-switchover-2.yaml.template"
 	)
 
-	var namespace string
+	var namespace, clusterAName, clusterBName string
 
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
@@ -515,15 +516,30 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication), func() {
 		}, testTimeouts[testUtils.ClusterIsReadyQuick]).Should(Succeed())
 	}
 
-	DescribeTable("should perform a switchover",
+	DescribeTable("should promote a replica cluster",
 		func(clusterAFile string, clusterBFile string, expectedTimeline int) {
 
-			var clusterAName, clusterBName string
-
 			var err error
+
 			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error { return env.DeleteNamespace(namespace) })
+			DeferCleanup(func() error {
+				err := env.DeleteNamespaceAndWait(namespace, 120)
+				if err != nil {
+					return err
+				}
+				// Since we use multiple times the same cluster names for the same minio instance, we need to clean it up
+				// between tests
+				_, err = testUtils.CleanFilesOnMinio(minioEnv, path.Join("minio", "cluster-backups", clusterAName))
+				if err != nil {
+					return err
+				}
+				_, err = testUtils.CleanFilesOnMinio(minioEnv, path.Join("minio", "cluster-backups", clusterBName))
+				if err != nil {
+					return err
+				}
+				return nil
+			})
 
 			stopLoad := make(chan struct{})
 			DeferCleanup(func() { close(stopLoad) })
@@ -676,13 +692,26 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication), func() {
 
 	DescribeTable("should fail when we use an old token",
 		func(clusterAFile string, clusterBFile string, expectedTimeline int) {
-
-			var clusterAName, clusterBName string
-
 			var err error
 			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error { return env.DeleteNamespace(namespace) })
+			DeferCleanup(func() error {
+				err := env.DeleteNamespaceAndWait(namespace, 120)
+				if err != nil {
+					return err
+				}
+				// Since we use multiple times the same cluster names for the same minio instance, we need to clean it up
+				// between tests
+				_, err = testUtils.CleanFilesOnMinio(minioEnv, path.Join("minio", "cluster-backups", clusterAName))
+				if err != nil {
+					return err
+				}
+				_, err = testUtils.CleanFilesOnMinio(minioEnv, path.Join("minio", "cluster-backups", clusterBName))
+				if err != nil {
+					return err
+				}
+				return nil
+			})
 
 			stopLoad := make(chan struct{})
 			DeferCleanup(func() { close(stopLoad) })
@@ -702,6 +731,7 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication), func() {
 				Expect(err).ToNot(HaveOccurred())
 				AssertCreateCluster(namespace, clusterAName, clusterAFile, env)
 			})
+
 			By("creating some load on the A cluster", func() {
 				primary, err := env.GetClusterPrimary(namespace, clusterAName)
 				Expect(err).ToNot(HaveOccurred())
@@ -786,61 +816,33 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication), func() {
 				}
 			})
 
-			var token string
+			var token, invalidToken string
 			By("getting the demotion token", func() {
 				cluster, err := env.GetCluster(namespace, clusterAName)
 				Expect(err).ToNot(HaveOccurred())
 				token = cluster.Status.DemotionToken
 			})
 
-			By("promoting A again", func() {
-				cluster, err := env.GetCluster(namespace, clusterAName)
+			By("forging an invalid token", func() {
+				tokenContent, err := utils.ParsePgControldataToken(token)
 				Expect(err).ToNot(HaveOccurred())
-				oldCluster := cluster.DeepCopy()
-				cluster.Spec.ReplicaCluster.Enabled = false
-				Expect(env.Client.Patch(env.Ctx, cluster, k8client.MergeFrom(oldCluster))).To(Succeed())
-				primary, err := env.GetClusterPrimary(namespace, clusterAName)
+				tokenContent.LatestCheckpointREDOLocation = "0/0"
+				Expect(tokenContent.IsValid()).To(Succeed())
+				invalidToken, err = tokenContent.Encode()
 				Expect(err).ToNot(HaveOccurred())
-				AssertPgRecoveryMode(primary, false)
-				podList, err := env.GetClusterReplicas(namespace, clusterAName)
-				Expect(err).ToNot(HaveOccurred())
-				for _, pod := range podList.Items {
-					AssertPgRecoveryMode(&pod, true)
-				}
 			})
 
-			By("demoting A to a replica again", func() {
-				cluster, err := env.GetCluster(namespace, clusterAName)
-				Expect(err).ToNot(HaveOccurred())
-				oldCluster := cluster.DeepCopy()
-				cluster.Spec.ReplicaCluster.Enabled = true
-				Expect(env.Client.Patch(env.Ctx, cluster, k8client.MergeFrom(oldCluster))).To(Succeed())
-				podList, err := env.GetClusterPodList(namespace, clusterAName)
-				Expect(err).ToNot(HaveOccurred())
-				for _, pod := range podList.Items {
-					AssertPgRecoveryMode(&pod, true)
-				}
-			})
-
-			By("promoting B with the old token", func() {
-				primary, err := env.GetClusterPrimary(namespace, clusterBName)
-				Expect(err).ToNot(HaveOccurred())
-				checkpoint, _, err := env.ExecQueryInInstancePod(testUtils.PodLocator{Namespace: primary.Namespace,
-					PodName: primary.Name},
-					"postgres", "CHECKPOINT; SELECT pg_control_checkpoint()")
-				fmt.Printf("Checkpoint: %v\n", checkpoint)
-				Expect(err).ToNot(HaveOccurred())
-				fmt.Printf("OldToken: %v\n", token)
+			By("promoting B with the invalid token", func() {
 				cluster, err := env.GetCluster(namespace, clusterBName)
 				Expect(err).ToNot(HaveOccurred())
 
 				oldCluster := cluster.DeepCopy()
-				cluster.Spec.ReplicaCluster.PromotionToken = token
+				cluster.Spec.ReplicaCluster.PromotionToken = invalidToken
 				cluster.Spec.ReplicaCluster.Enabled = false
 				Expect(env.Client.Patch(env.Ctx, cluster, k8client.MergeFrom(oldCluster))).To(Succeed())
 			})
 
-			By("failing to promote B with the old token", func() {
+			By("failing to promote B with the invalid token", func() {
 				Consistently(func(g Gomega) {
 					pod, err := env.GetClusterPrimary(namespace, clusterBName)
 					g.Expect(err).ToNot(HaveOccurred())
@@ -849,15 +851,12 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication), func() {
 					g.Expect(err).ToNot(HaveOccurred())
 					g.Expect(strings.Trim(stdOut, "\n")).To(Equal("t"))
 				}, 60, 10).Should(Succeed())
-			})
-
-			By("getting the new demotion token", func() {
-				cluster, err := env.GetCluster(namespace, clusterAName)
+				cluster, err := env.GetCluster(namespace, clusterBName)
 				Expect(err).ToNot(HaveOccurred())
-				token = cluster.Status.DemotionToken
+				Expect(cluster.Status.Phase).To(BeEquivalentTo(apiv1.PhaseUnrecoverable))
 			})
 
-			By("promoting B with the new token", func() {
+			By("promoting B with the right token", func() {
 				cluster, err := env.GetCluster(namespace, clusterBName)
 				Expect(err).ToNot(HaveOccurred())
 				oldCluster := cluster.DeepCopy()
@@ -885,6 +884,7 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication), func() {
 				validateReplication(namespace, clusterAName, clusterBName)
 			})
 		},
-		FEntry("when primaryUpdateMethod is set to restart", clusterAFileRestart, clusterBFileRestart, 3),
+		Entry("when primaryUpdateMethod is set to restart", clusterAFileRestart, clusterBFileRestart, 2),
+		Entry("when primaryUpdateMethod is set to switchover", clusterAFileSwitchover, clusterBFileSwitchover, 3),
 	)
 })
