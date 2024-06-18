@@ -1,3 +1,19 @@
+/*
+Copyright The CloudNativePG Contributors
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package promotiontoken
 
 import (
@@ -28,6 +44,7 @@ func (e *TokenVerificationError) IsRetryable() bool {
 	return e.retryable
 }
 
+// TokenContent returns the token content that caused the error
 func (e *TokenVerificationError) TokenContent() *utils.PgControldataTokenContent {
 	return e.tokenContent
 }
@@ -51,6 +68,7 @@ func ValidateAgainstInstanceStatus(
 	return nil
 }
 
+// ValidateAgainstLSN checks if the promotion token is valid against the last replay LSN
 func ValidateAgainstLSN(promotionToken *utils.PgControldataTokenContent, replayLSNString string) error {
 	shutdownTokenLSNString := promotionToken.LatestCheckpointREDOLocation
 	shutdownTokenLSN, err := postgres.LSN(shutdownTokenLSNString).Parse()
@@ -95,6 +113,7 @@ func ValidateAgainstLSN(promotionToken *utils.PgControldataTokenContent, replayL
 	return nil
 }
 
+// ValidateAgainstTimelineID checks if the promotion token is valid against the timeline ID
 func ValidateAgainstTimelineID(
 	promotionToken *utils.PgControldataTokenContent, currentTimelineIDString string,
 ) error {
@@ -140,6 +159,7 @@ func ValidateAgainstTimelineID(
 	return nil
 }
 
+// ValidateAgainstSystemIdentifier checks if the promotion token is valid against the system identifier
 func ValidateAgainstSystemIdentifier(
 	promotionToken *utils.PgControldataTokenContent, currentSystemIdentifier string,
 ) error {

@@ -474,6 +474,7 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication), Ordered, f
 			"postgres",
 			"CREATE TABLE test_replication AS SELECT 1;",
 		)
+		Expect(err).ToNot(HaveOccurred())
 		_ = switchWalAndGetLatestArchive(namespace, primary.Name)
 
 		Eventually(func(g Gomega) {
@@ -518,7 +519,6 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication), Ordered, f
 
 	DescribeTable("should promote a replica cluster",
 		func(clusterAFile string, clusterBFile string, expectedTimeline int) {
-
 			var err error
 
 			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
