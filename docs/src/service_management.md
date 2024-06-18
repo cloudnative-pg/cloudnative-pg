@@ -51,9 +51,9 @@ managed:
 
 !!! Important
     When defining your own services, you cannot use any of the default reserved
-    service names that follow the convention `<CLUSTER_NAME>-<SERVICE_NAME>`.
-    It is your responsibility to pick a unique name for the service in the
-    Kubernetes namespace.
+    service names that follow the convention `<CLUSTER_NAME>-<SERVICE_NAME>`. It is
+    your responsibility to pick a unique name for the service in the Kubernetes
+    namespace.
 
 You can define a list of additional services through the
 [`managed.services.additional` stanza](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-ManagedService)
@@ -63,9 +63,15 @@ The `serviceTemplate` field gives you access to the standard Kubernetes API for
 the network `Service` resource, allowing you to define both the `metadata` and
 the `spec` sections as you like.
 
-<!--
-TODO: shall we mention that CloudNativePG manages the `selector` or `ports` parts of the service?
--->
+You must provide a `name` to the service and avoid defining the `selector`
+field, as it is managed by the operator.
+
+!!! Warning
+    Service templates give you unlimited possibilities in terms of configuring
+    network access to your PostgreSQL database. This translates into greater
+    responsibility on your end to ensure that services work as expected.
+    CloudNativePG has no control over the service configuration, except honoring
+    the selector.
 
 For example, if you want to have a single `LoadBalancer` service for your
 PostgreSQL database primary, you can use the following excerpt:
