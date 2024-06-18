@@ -2438,6 +2438,12 @@ func (gcs *GoogleCredentials) validateGCSCredentials(path *field.Path) field.Err
 }
 
 func (r *Cluster) validateManagedServices() field.ErrorList {
+	reservedNames := []string{
+		r.GetServiceReadWriteName(),
+		r.GetServiceReadOnlyName(),
+		r.GetServiceReadName(),
+		r.GetServiceAnyName(),
+	}
 	containsDuplicateNames := func(names []string) bool {
 		seen := make(map[string]bool)
 		for _, str := range names {
@@ -2468,10 +2474,21 @@ func (r *Cluster) validateManagedServices() field.ErrorList {
 	names := make([]string, len(managedServices.Additional))
 	for idx := range managedServices.Additional {
 		additionalService := &managedServices.Additional[idx]
-		names[idx] = additionalService.ServiceTemplate.ObjectMeta.Name
+		name := additionalService.ServiceTemplate.ObjectMeta.Name
+		names[idx] = name
+		path := basePath.Child(fmt.Sprintf("additional[%d]", idx))
+
+		if slices.Contains(reservedNames, name) {
+			errs = append(errs,
+				field.Invalid(
+					path,
+					name,
+					fmt.Sprintf("the service name: '%s' is reserved for operator use", name),
+				))
+		}
 
 		if fieldErr := validateServiceTemplate(
-			basePath.Child(fmt.Sprintf("additional[%d]", idx)),
+			path,
 			true,
 			additionalService.ServiceTemplate,
 		); len(fieldErr) > 0 {
