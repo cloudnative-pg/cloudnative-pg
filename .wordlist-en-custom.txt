@@ -106,6 +106,7 @@ CronJobs
 CustomResourceDefinition
 CustomResourceDefinitions
 Customizations
+DBaaS
 DBA
 DDTHH
 DISA
@@ -529,6 +530,7 @@ backuplist
 backupspec
 backupstatus
 balancer
+balancers
 barmanEndpointCA
 barmanObjectStore
 barmanobjectstore

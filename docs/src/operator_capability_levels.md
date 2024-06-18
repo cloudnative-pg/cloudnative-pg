@@ -120,6 +120,20 @@ proposed patch for PostgreSQL, called
 [failover slots](https://wiki.postgresql.org/wiki/Failover_slots), and
 also supports user defined physical replication slots on the primary.
 
+### Service Configuration
+
+By default, CloudNativePG creates three Kubernetes [services](service_management.md)
+for applications to access the cluster via the network:
+
+- One pointing to the primary for read/write operations.
+- One pointing to replicas for read-only queries.
+- A generic one pointing to any instance for read operations.
+
+You can disable the management of any or all of the above services via
+configuration. Additionally, you can leverage the service template capability
+to create custom service resources, including load balancers, to access
+PostgreSQL outside Kubernetes. This is particularly useful for DBaaS purposes.
+
 ### Database configuration
 
 The operator is designed to manage a PostgreSQL cluster with a single
