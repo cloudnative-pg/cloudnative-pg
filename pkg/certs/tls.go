@@ -37,7 +37,6 @@ func newTLSConfigFromSecret(
 	ctx context.Context,
 	cli client.Client,
 	caSecret types.NamespacedName,
-	serverName string,
 ) (*tls.Config, error) {
 	secret := &v1.Secret{}
 	err := cli.Get(ctx, caSecret, secret)
@@ -53,9 +52,39 @@ func newTLSConfigFromSecret(
 	caCertPool := x509.NewCertPool()
 	caCertPool.AppendCertsFromPEM(caCertificate)
 	tlsConfig := tls.Config{
-		MinVersion: tls.VersionTLS13,
-		ServerName: serverName,
-		RootCAs:    caCertPool,
+		MinVersion:         tls.VersionTLS13,
+		RootCAs:            caCertPool,
+		InsecureSkipVerify: true, //#nosec G402 -- we are verifying the certificate ourselves
+		VerifyPeerCertificate: func(rawCerts [][]byte, _ [][]*x509.Certificate) error {
+			// Code adapted from https://go.dev/src/crypto/tls/handshake_client.go#L986
+			if len(rawCerts) == 0 {
+				return fmt.Errorf("no raw certificates provided")
+			}
+
+			certs := make([]*x509.Certificate, len(rawCerts))
+			for i, rawCert := range rawCerts {
+				cert, err := x509.ParseCertificate(rawCert)
+				if err != nil {
+					return fmt.Errorf("failed to parse certificate: %v", err)
+				}
+				certs[i] = cert
+			}
+
+			opts := x509.VerifyOptions{
+				Roots:         caCertPool,
+				Intermediates: x509.NewCertPool(),
+			}
+
+			for _, cert := range certs[1:] {
+				opts.Intermediates.AddCert(cert)
+			}
+			_, err := certs[0].Verify(opts)
+			if err != nil {
+				return &tls.CertificateVerificationError{UnverifiedCertificates: certs, Err: err}
+			}
+
+			return nil
+		},
 	}
 
 	return &tlsConfig, nil
@@ -67,9 +96,8 @@ func NewTLSConfigForContext(
 	ctx context.Context,
 	cli client.Client,
 	caSecret types.NamespacedName,
-	serverName string,
 ) (context.Context, error) {
-	conf, err := newTLSConfigFromSecret(ctx, cli, caSecret, serverName)
+	conf, err := newTLSConfigFromSecret(ctx, cli, caSecret)
 	if err != nil {
 		return nil, err
 	}

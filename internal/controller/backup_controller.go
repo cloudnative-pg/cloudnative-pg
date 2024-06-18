@@ -148,7 +148,6 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		ctx,
 		r.Client,
 		cluster.GetServerCASecretObjectKey(),
-		cluster.GetServiceReadWriteName(),
 	)
 	if err != nil {
 		return ctrl.Result{}, err

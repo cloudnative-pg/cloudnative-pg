@@ -33,16 +33,14 @@ import (
 
 var _ = Describe("newTLSConfigFromSecret", func() {
 	var (
-		ctx        context.Context
-		c          client.Client
-		caSecret   types.NamespacedName
-		serverName string
+		ctx      context.Context
+		c        client.Client
+		caSecret types.NamespacedName
 	)
 
 	BeforeEach(func() {
 		ctx = context.TODO()
 		caSecret = types.NamespacedName{Name: "test-secret", Namespace: "default"}
-		serverName = "test-server"
 	})
 
 	Context("when the secret is found and valid", func() {
@@ -64,11 +62,10 @@ MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA7Qe3X7Q6WZpXqlXkq0Bd
 		})
 
 		It("should return a valid tls.Config", func() {
-			tlsConfig, err := newTLSConfigFromSecret(ctx, c, caSecret, serverName)
+			tlsConfig, err := newTLSConfigFromSecret(ctx, c, caSecret)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(tlsConfig).NotTo(BeNil())
 			Expect(tlsConfig.MinVersion).To(Equal(uint16(tls.VersionTLS13)))
-			Expect(tlsConfig.ServerName).To(Equal(serverName))
 			Expect(tlsConfig.RootCAs).ToNot(BeNil())
 		})
 	})
@@ -79,7 +76,7 @@ MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA7Qe3X7Q6WZpXqlXkq0Bd
 		})
 
 		It("should return an error", func() {
-			tlsConfig, err := newTLSConfigFromSecret(ctx, c, caSecret, serverName)
+			tlsConfig, err := newTLSConfigFromSecret(ctx, c, caSecret)
 			Expect(err).To(HaveOccurred())
 			Expect(tlsConfig).To(BeNil())
 			Expect(err.Error()).To(ContainSubstring(fmt.Sprintf("while getting caSecret %s", caSecret.Name)))
@@ -98,7 +95,7 @@ MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA7Qe3X7Q6WZpXqlXkq0Bd
 		})
 
 		It("should return an error", func() {
-			tlsConfig, err := newTLSConfigFromSecret(ctx, c, caSecret, serverName)
+			tlsConfig, err := newTLSConfigFromSecret(ctx, c, caSecret)
 			Expect(err).To(HaveOccurred())
 			Expect(tlsConfig).To(BeNil())
 			Expect(err.Error()).To(ContainSubstring(fmt.Sprintf("missing %s entry in secret %s", CACertKey, caSecret.Name)))
