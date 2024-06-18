@@ -795,6 +795,7 @@ initializingPVC
 instanceID
 instanceName
 instanceNames
+instanceRole
 instancesReportedState
 instancesStatus
 inuse
