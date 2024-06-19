@@ -572,7 +572,7 @@ const (
 	PhaseApplyingConfiguration = "Applying configuration"
 
 	// PhaseReplicaClusterPromotion is the phase
-	PhaseReplicaClusterPromotion = "Promoting from Replica Cluster"
+	PhaseReplicaClusterPromotion = "Promoting to primary cluster"
 )
 
 // EphemeralVolumesSizeLimitConfiguration contains the configuration of the ephemeral
