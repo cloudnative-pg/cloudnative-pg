@@ -1506,4 +1506,75 @@ var _ = Describe("Cluster Managed Service Enablement", func() {
 			Expect(cluster.IsReadOnlyServiceEnabled()).To(BeFalse())
 		})
 	})
+
+	Describe("GetAllManagedServicesName", func() {
+		ServiceSelectorTypesRO := []ServiceSelectorType{ServiceSelectorTypeRO}
+		ServiceSelectorTypesRW := []ServiceSelectorType{ServiceSelectorTypeRW}
+		ServiceSelectorTypesR := []ServiceSelectorType{ServiceSelectorTypeR}
+
+		It("should return default server name by default", func() {
+			Expect(cluster.GetAllManagedServicesName(ServiceSelectorTypesRO)).To(HaveLen(1))
+			Expect(cluster.GetAllManagedServicesName(ServiceSelectorTypesRO)[0]).To(Equal(cluster.GetServiceReadOnlyName()))
+
+			Expect(cluster.GetAllManagedServicesName(ServiceSelectorTypesRW)).To(HaveLen(1))
+			Expect(cluster.GetAllManagedServicesName(ServiceSelectorTypesRW)[0]).To(Equal(cluster.GetServiceReadWriteName()))
+
+			Expect(cluster.GetAllManagedServicesName(ServiceSelectorTypesR)).To(HaveLen(1))
+			Expect(cluster.GetAllManagedServicesName(ServiceSelectorTypesR)[0]).To(Equal(cluster.GetServiceReadName()))
+		})
+
+		It("return empty if r and ro service is disabled", func() {
+			cluster.Spec.Managed = &ManagedConfiguration{
+				Services: &ManagedServices{
+					DisabledDefaultServices: []ServiceSelectorType{
+						ServiceSelectorTypeR,
+						ServiceSelectorTypeRO,
+					},
+				},
+			}
+			Expect(cluster.GetAllManagedServicesName(ServiceSelectorTypesRO)).To(BeEmpty())
+			Expect(cluster.GetAllManagedServicesName(ServiceSelectorTypesR)).To(BeEmpty())
+
+			Expect(cluster.GetAllManagedServicesName(ServiceSelectorTypesRW)).To(HaveLen(1))
+			Expect(cluster.GetAllManagedServicesName(ServiceSelectorTypesRW)[0]).To(Equal(cluster.GetServiceReadWriteName()))
+		})
+
+		It("return all services if new services defined", func() {
+			cluster.Spec.Managed = &ManagedConfiguration{
+				Services: &ManagedServices{
+					DisabledDefaultServices: []ServiceSelectorType{ServiceSelectorTypeRO},
+					Additional: []ManagedService{
+						{
+							SelectorType: ServiceSelectorTypeRO,
+							ServiceTemplate: ServiceTemplateSpec{
+								ObjectMeta: Metadata{
+									Name: "additional-ro-service",
+								},
+								Spec: corev1.ServiceSpec{},
+							},
+						},
+						{
+							SelectorType: ServiceSelectorTypeR,
+							ServiceTemplate: ServiceTemplateSpec{
+								ObjectMeta: Metadata{
+									Name: "additional-r-service",
+								},
+								Spec: corev1.ServiceSpec{},
+							},
+						},
+					},
+				},
+			}
+
+			Expect(cluster.GetAllManagedServicesName(ServiceSelectorTypesRO)).To(HaveLen(1))
+			Expect(cluster.GetAllManagedServicesName(ServiceSelectorTypesRW)[1]).To(Equal("additional-ro-service"))
+
+			Expect(cluster.GetAllManagedServicesName(ServiceSelectorTypesR)).To(HaveLen(2))
+			Expect(cluster.GetAllManagedServicesName(ServiceSelectorTypesR)).To(ContainElement("additional-r-service"))
+			Expect(cluster.GetAllManagedServicesName(ServiceSelectorTypesR)).To(ContainElement(cluster.GetServiceReadName()))
+
+			Expect(cluster.GetAllManagedServicesName(ServiceSelectorTypesRW)).To(HaveLen(1))
+			Expect(cluster.GetAllManagedServicesName(ServiceSelectorTypesRW)[0]).To(Equal(cluster.GetServiceReadWriteName()))
+		})
+	})
 })

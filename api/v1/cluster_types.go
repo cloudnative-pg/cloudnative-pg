@@ -2445,6 +2445,34 @@ type ManagedService struct {
 	ServiceTemplate ServiceTemplateSpec `json:"serviceTemplate"`
 }
 
+// GetAllManagedServicesName returns the names of all managed services with given types
+func (cluster *Cluster) GetAllManagedServicesName(serviceTypes []ServiceSelectorType) []string {
+	if cluster.Spec.Managed == nil || cluster.Spec.Managed.Services == nil {
+		return nil
+	}
+
+	var serviceNames []string
+	for _, serviceType := range serviceTypes {
+		if !slices.Contains(cluster.Spec.Managed.Services.DisabledDefaultServices, serviceType) {
+			switch serviceType {
+			case ServiceSelectorTypeRW:
+				serviceNames = append(serviceNames, cluster.GetServiceReadWriteName())
+			case ServiceSelectorTypeR:
+				serviceNames = append(serviceNames, cluster.GetServiceReadName())
+			case ServiceSelectorTypeRO:
+				serviceNames = append(serviceNames, cluster.GetServiceReadOnlyName())
+			}
+		}
+	}
+
+	for _, service := range cluster.Spec.Managed.Services.Additional {
+		if slices.Contains(serviceTypes, service.SelectorType) {
+			serviceNames = append(serviceNames, service.ServiceTemplate.ObjectMeta.Name)
+		}
+	}
+	return serviceNames
+}
+
 // ManagedConfiguration represents the portions of PostgreSQL that are managed
 // by the instance manager
 type ManagedConfiguration struct {
@@ -2976,19 +3004,19 @@ func (cluster *Cluster) GetServiceAnyName() string {
 	return fmt.Sprintf("%v%v", cluster.Name, ServiceAnySuffix)
 }
 
-// GetServiceReadName return the name of the service that is used for
+// GetServiceReadName return the default name of the service that is used for
 // read transactions (including the primary)
 func (cluster *Cluster) GetServiceReadName() string {
 	return fmt.Sprintf("%v%v", cluster.Name, ServiceReadSuffix)
 }
 
-// GetServiceReadOnlyName return the name of the service that is used for
+// GetServiceReadOnlyName return the default name of the service that is used for
 // read-only transactions (excluding the primary)
 func (cluster *Cluster) GetServiceReadOnlyName() string {
 	return fmt.Sprintf("%v%v", cluster.Name, ServiceReadOnlySuffix)
 }
 
-// GetServiceReadWriteName return the name of the service that is used for
+// GetServiceReadWriteName return the default name of the service that is used for
 // read-write transactions
 func (cluster *Cluster) GetServiceReadWriteName() string {
 	return fmt.Sprintf("%v%v", cluster.Name, ServiceReadWriteSuffix)
@@ -3347,6 +3375,19 @@ func (cluster Cluster) GetBarmanEndpointCAForReplicaCluster() *SecretKeySelector
 
 // GetClusterAltDNSNames returns all the names needed to build a valid Server Certificate
 func (cluster *Cluster) GetClusterAltDNSNames() []string {
+	/*
+		for _, serviceName := range cluster.GetAllManagedServicesName(
+			[]ServiceSelectorType{
+				ServiceSelectorTypeRW,
+				ServiceSelectorTypeR,
+				ServiceSelectorTypeRO,
+			}) {
+			defaultAltDNSNames = append(defaultAltDNSNames, serviceName)
+			defaultAltDNSNames = append(defaultAltDNSNames, fmt.Sprintf("%v.%v", serviceName, cluster.Namespace))
+			defaultAltDNSNames = append(defaultAltDNSNames, fmt.Sprintf("%v.%v.svc", serviceName, cluster.Namespace))
+		}
+	*/
+
 	buildServiceNames := func(serviceName string) []string {
 		return []string{
 			serviceName,
@@ -3367,6 +3408,7 @@ func (cluster *Cluster) GetClusterAltDNSNames() []string {
 
 	return append(defaultAltDNSNames, cluster.Spec.Certificates.ServerAltDNSNames...)
 }
+
 
 // UsesSecret checks whether a given secret is used by a Cluster.
 //
