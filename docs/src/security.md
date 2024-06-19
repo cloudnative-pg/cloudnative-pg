@@ -112,7 +112,7 @@ cluster role which defines the set of rules/resources/verbs granted to the opera
 
 Below we provide some examples and, most importantly, the reasons why
 CloudNativePG requires full or partial management of standard Kubernetes
-namespaced or non-namespaced resources.
+namespaced or global resources.
 
 `configmaps`
 : The operator needs to create and manage default config maps for
