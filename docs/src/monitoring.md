@@ -538,6 +538,7 @@ Every custom query has the following basic structure:
 Here is a short description of all the available fields:
 
 - `<MetricName>`: the name of the Prometheus metric
+    - `name`: override `<MetricName>`, if defined
     - `query`: the SQL query to run on the target database to generate the metrics
     - `primary`: whether to run the query only on the primary instance
     - `master`: same as `primary` (for compatibility with the Prometheus PostgreSQL exporter's syntax - deprecated) <!-- wokeignore:rule=master -->
@@ -548,6 +549,7 @@ Here is a short description of all the available fields:
       to enable auto discovery. Overwrites the default database if provided.
     - `metrics`: section containing a list of all exported columns, defined as follows:
       - `<ColumnName>`: the name of the column returned by the query
+          - `name`: override the `ColumnName` of the column in the metric, if defined
           - `usage`: one of the values described below
           - `description`: the metric's description
           - `metrics_mapping`: the optional column mapping when `usage` is set to `MAPPEDMETRIC`

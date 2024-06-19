@@ -35,6 +35,8 @@ type UserQuery struct {
 	CacheSeconds    uint64    `yaml:"cache_seconds"`
 	RunOnServer     string    `yaml:"runonserver"`
 	TargetDatabases []string  `yaml:"target_databases"`
+	// Name allows overriding the key name in the metric namespace
+	Name string `yaml:"name"`
 }
 
 // Mapping decide how a certain field, extracted from the query's result, should be used
@@ -50,6 +52,9 @@ type ColumnMapping struct {
 
 	// SupportedVersions are the semantic version ranges which are supported.
 	SupportedVersions string `yaml:"pg_version"`
+
+	// Name allows overriding the key name when naming the column
+	Name string `yaml:"name"`
 }
 
 // ColumnUsage represent how a certain column should be used
