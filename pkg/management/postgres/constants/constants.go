@@ -46,6 +46,9 @@ const (
 	// InitdbName is the name of the command to initialize a PostgreSQL database
 	InitdbName = "initdb"
 
+	// WalArchiveCommand  is the name of the wal-archive command
+	WalArchiveCommand = "wal-archive"
+
 	// Startup is the name of a file that is created once during the first reconcile of an instance
 	Startup = "cnpg_initialized"
 )

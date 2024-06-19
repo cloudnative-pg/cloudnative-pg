@@ -740,7 +740,7 @@ func (r *ClusterReconciler) upgradeInstanceManager(
 				}
 			}
 
-			err = r.StatusClient.UpgradeInstanceManager(ctx, postgresqlStatus.Pod, targetManager)
+			err = r.InstanceClient.UpgradeInstanceManager(ctx, postgresqlStatus.Pod, targetManager)
 			if err != nil {
 				enrichedError := fmt.Errorf("while upgrading instance manager on %s (hash: %s): %w",
 					postgresqlStatus.Pod.Name,

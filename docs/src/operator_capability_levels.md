@@ -433,7 +433,7 @@ Notably, the source PostgreSQL instance can exist outside the Kubernetes
 environment, whether in a physical or virtual setting.
 
 Replica clusters can be instantiated through various methods, including volume
-snapshots, a recovery object store (utilizing the Barman Cloud backup format),
+snapshots, a recovery object store (using the Barman Cloud backup format),
 or streaming using `pg_basebackup`. Both WAL file shipping and WAL streaming
 are supported. The deployment of replica clusters significantly elevates the
 business continuity posture of PostgreSQL databases within Kubernetes,
@@ -445,6 +445,21 @@ Additionally, the flexibility extends to creating delayed replica clusters
 intentionally lagging behind the primary cluster. This intentional lag aims to
 minimize the Recovery Time Objective (RTO) in the event of unintended errors,
 such as incorrect `DELETE` or `UPDATE` SQL operations.
+
+### Distributed Database Topologies
+
+Using replica clusters, you can create distributed database topologies based on
+PostgreSQL that span different Kubernetes clusters, enabling hybrid and
+multi-cloud scenarios.
+With CloudNativePG, you can:
+
+- Declaratively control which PostgreSQL cluster is the primary.
+- Seamlessly demote the current primary and promote another PostgreSQL cluster
+  (typically in another region) without the need to re-clone the former primary.
+
+This setup can function across two or more regions, relying solely on object
+stores for replication, with a maximum guaranteed RPO of 5 minutes. This
+feature is currently unique to CloudNativePG.
 
 ### Tablespace support
 

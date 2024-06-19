@@ -55,6 +55,7 @@ export E2E_DEFAULT_STORAGE_CLASS=${E2E_DEFAULT_STORAGE_CLASS:-$(get_default_stor
 export E2E_CSI_STORAGE_CLASS=${E2E_CSI_STORAGE_CLASS:-csi-hostpath-sc}
 export E2E_DEFAULT_VOLUMESNAPSHOT_CLASS=${E2E_DEFAULT_VOLUMESNAPSHOT_CLASS:-$(get_default_snapshot_class "$E2E_CSI_STORAGE_CLASS")}
 export POSTGRES_IMG=${POSTGRES_IMG:-$(get_postgres_image)}
+export E2E_PRE_ROLLING_UPDATE_IMG=${E2E_PRE_ROLLING_UPDATE_IMG:-${POSTGRES_IMG%.*}}
 
 # Ensure GOBIN is in path, we'll use this to install and execute ginkgo
 go_bin="$(go env GOPATH)/bin"

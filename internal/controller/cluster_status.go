@@ -343,6 +343,14 @@ func (r *ClusterReconciler) updateResourceStatus(
 		return err
 	}
 
+	if cluster.Spec.ReplicaCluster != nil && len(cluster.Spec.ReplicaCluster.PromotionToken) == 0 {
+		cluster.Status.LastPromotionToken = ""
+	}
+
+	if cluster.Spec.ReplicaCluster != nil && !cluster.Spec.ReplicaCluster.Enabled {
+		cluster.Status.DemotionToken = ""
+	}
+
 	if !reflect.DeepEqual(existingClusterStatus, cluster.Status) {
 		return r.Status().Update(ctx, cluster)
 	}

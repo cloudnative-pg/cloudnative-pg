@@ -167,8 +167,10 @@ func newFakeCNPGCluster(
 
 	cluster := &apiv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
+			Name:        name,
+			Namespace:   namespace,
+			Annotations: map[string]string{},
+			Labels:      map[string]string{},
 		},
 		Spec: apiv1.ClusterSpec{
 			Instances: instances,

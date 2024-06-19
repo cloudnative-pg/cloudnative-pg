@@ -1225,3 +1225,67 @@ var _ = Describe("AvailableArchitectures", func() {
 		Expect(availableArch).To(BeNil())
 	})
 })
+
+var _ = Describe("ShouldPromoteFromReplicaCluster", func() {
+	It("returns true when the cluster should promote from a replica cluster", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled:        true,
+					PromotionToken: "ABC",
+				},
+			},
+		}
+		Expect(cluster.ShouldPromoteFromReplicaCluster()).To(BeTrue())
+	})
+
+	It("returns false when the cluster should not promote from a replica cluster", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled: true,
+				},
+			},
+		}
+		Expect(cluster.ShouldPromoteFromReplicaCluster()).To(BeFalse())
+	})
+
+	It("returns false when the cluster is not a replica cluster", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: nil,
+			},
+		}
+		Expect(cluster.ShouldPromoteFromReplicaCluster()).To(BeFalse())
+	})
+
+	It("returns false when the promotionToken and LastPromotionToken are equal", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled:        true,
+					PromotionToken: "ABC",
+				},
+			},
+			Status: ClusterStatus{
+				LastPromotionToken: "ABC",
+			},
+		}
+		Expect(cluster.ShouldPromoteFromReplicaCluster()).To(BeFalse())
+	})
+
+	It("returns true when the promotionToken and LastPromotionToken are different", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled:        true,
+					PromotionToken: "ABC",
+				},
+			},
+			Status: ClusterStatus{
+				LastPromotionToken: "DEF",
+			},
+		}
+		Expect(cluster.ShouldPromoteFromReplicaCluster()).To(BeTrue())
+	})
+})

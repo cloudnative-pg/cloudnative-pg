@@ -49,6 +49,9 @@ const (
 	// PathPgModeBackup is the URL path to interact with pg_start_backup and pg_stop_backup
 	PathPgModeBackup string = "/pg/mode/backup"
 
+	// PathPgArchivePartial is the URL path to interact with the partial wal archive
+	PathPgArchivePartial string = "/pg/archive/partial"
+
 	// PathMetrics is the URL path for Metrics
 	PathMetrics string = "/metrics"
 
