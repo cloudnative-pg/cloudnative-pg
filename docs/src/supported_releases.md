@@ -24,18 +24,24 @@ Subsequent patch releases on a minor release contain backward-compatible changes
 * [Support status of CloudNativePG releases](#support-status-of-cloudnativepg-releases)
 * [What we mean by support](#what-we-mean-by-support)
 
-## Support policy
+## Support Policy
 
-We produce new builds of CloudNativePG for each commit.
+CloudNativePG produces new builds for each commit.
 
-Approximately every two months, we build a minor release and run through several
-additional tests as well as release qualification. We release patch versions
-for issues found in supported minor releases.
+Approximately every two months, we create a minor release that undergoes
+several additional tests and a thorough release qualification process. We
+release patch versions for issues found in supported minor releases.
 
-The various types of releases represent a different product quality level and
-level of assistance from the CloudNativePG community.
-For details on the support provided by the community, see
-[What we mean by support](#what-we-mean-by-support).
+Before an official release, at least one Release Candidate (RC) is built for
+testing. Additional release candidates may be issued if new bugs are
+discovered. The Release Candidates are announced on the Slack channel to
+encourage community testing before the final release. The maintainers provide
+1-2 weeks for community testing, and if no objections are raised, the final
+release is announced.
+
+Different types of releases represent varying levels of product quality and
+assistance from the CloudNativePG community. For details on the support
+provided by the community, see [What we mean by support](#what-we-mean-by-support).
 
 | Type              | Support level                                                                                                         | Quality and recommended Use                                                                                    |
 |-------------------|-----------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------|
@@ -47,24 +53,28 @@ For details on the support provided by the community, see
 
 You can find available releases on the [releases page](https://github.com/cloudnative-pg/cloudnative-pg/releases).
 
-You can find high-level more information for each minor and patch release in the [release notes](release_notes.md).
+You can find high-level more information for each minor and patch release in
+the [release notes](release_notes.md).
 
-## Naming scheme
+Sure, here’s an improved version of the naming scheme section:
 
-Our naming scheme is based on [Semantic Versioning 2.0.0](https://semver.org/)
-as follows:
+## Naming Scheme
+
+Our naming scheme follows [Semantic Versioning 2.0.0](https://semver.org/) and
+is structured as follows:
 
 ```
 <major>.<minor>.<patch>
 ```
 
-Where `<minor>` is increased for each release, and `<patch>` counts the number of patches for the
-current `<minor>` release. A patch is usually a small change relative to the `<minor>` release.
+- `<minor>` is incremented for each release.
+- `<patch>` counts the number of patches for the current `<minor>` release,
+  representing small changes relative to the `<minor>` release.
 
-Release candidates are denoted by an additional `-<pre-release>` identifier following the patch
-version, based on [Semantic Versioning 2.0.0 - Point 9](https://semver.org/#spec-item-9)
+Release candidates are indicated by an additional `-<pre-release>` identifier
+following the patch version, as specified in [Semantic Versioning 2.0.0 - item #9](https://semver.org/#spec-item-9).
 
-Git tags for versions are prepended with `v`.
+Git tags for versions are prefixed with `v`.
 
 ## Support status of CloudNativePG releases
 
