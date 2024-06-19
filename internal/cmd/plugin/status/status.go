@@ -19,6 +19,7 @@ package status
 import (
 	"context"
 	"fmt"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"os"
 	"path"
 	"sort"
@@ -30,7 +31,6 @@ import (
 	"github.com/logrusorgru/aurora/v4"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -47,11 +47,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-type pdbList struct {
-	err   error
-	inner policyv1.PodDisruptionBudgetList
-}
-
 // PostgresqlStatus contains the status of the Cluster and of all its instances
 type PostgresqlStatus struct {
 	// Cluster is the Cluster we are investigating
@@ -66,7 +61,10 @@ type PostgresqlStatus struct {
 
 	// podDisruptionBudgetList prints every PDB that matches against the cluster
 	// with the label selector
-	podDisruptionBudgetList pdbList
+	PodDisruptionBudgetList policyv1.PodDisruptionBudgetList
+
+	// ErrorList store the possible errors while getting the PostgreSQL status
+	ErrorList []error
 }
 
 func (fullStatus *PostgresqlStatus) getReplicationSlotList() postgres.PgReplicationSlotList {
@@ -98,28 +96,25 @@ func getPrintableIntegerPointer(i *int) string {
 
 // Status implements the "status" subcommand
 func Status(ctx context.Context, clusterName string, verbose bool, format plugin.OutputFormat) error {
-	status, err := ExtractPostgresqlStatus(ctx, clusterName)
+	var cluster apiv1.Cluster
+	var errs []error
+	// Get the Cluster object
+	err := plugin.Client.Get(ctx, client.ObjectKey{Namespace: plugin.Namespace, Name: clusterName}, &cluster)
 	if err != nil {
 		return err
 	}
 
+	status := ExtractPostgresqlStatus(ctx, cluster)
 	err = plugin.Print(status, format, os.Stdout)
-	if err != nil {
+	if err != nil || format != plugin.OutputFormatText {
 		return err
 	}
-
-	if format != plugin.OutputFormatText {
-		return nil
-	}
+	errs = append(errs, status.ErrorList...)
 
 	status.printBasicInfo()
 	status.printHibernationInfo()
-	var nonFatalError error
 	if verbose {
-		err = status.printPostgresConfiguration(ctx)
-		if err != nil {
-			nonFatalError = err
-		}
+		errs = append(errs, status.printPostgresConfiguration(ctx)...)
 	}
 	status.printCertificatesStatus()
 	status.printBackupStatus()
@@ -128,56 +123,59 @@ func Status(ctx context.Context, clusterName string, verbose bool, format plugin
 	status.printUnmanagedReplicationSlotStatus()
 	status.printRoleManagerStatus()
 	status.printTablespacesStatus()
-	status.printPodDisruptionBudgetStatus(verbose)
+	status.printPodDisruptionBudgetStatus()
 	status.printInstancesStatus()
 
-	if nonFatalError != nil {
-		return nonFatalError
+	if len(errs) != 0 {
+		fmt.Println()
+
+		errors := tabby.New()
+		errors.AddHeader(aurora.Red("Error(s) extracting status"))
+		for _, err := range errs {
+			fmt.Printf("%s\n", err)
+		}
 	}
+
 	return nil
 }
 
 // ExtractPostgresqlStatus gets the PostgreSQL status using the Kubernetes API
-func ExtractPostgresqlStatus(ctx context.Context, clusterName string) (*PostgresqlStatus, error) {
-	var cluster apiv1.Cluster
+func ExtractPostgresqlStatus(ctx context.Context, cluster apiv1.Cluster) *PostgresqlStatus {
+	var errs []error
 
-	// Get the Cluster object
-	err := plugin.Client.Get(ctx, client.ObjectKey{Namespace: plugin.Namespace, Name: clusterName}, &cluster)
+	managedPods, primaryPod, err := resources.GetInstancePods(ctx, cluster.Name)
 	if err != nil {
-		return nil, err
+		errs = append(errs, err)
 	}
 
 	// Get the list of Pods created by this Cluster
-	var instancesStatus postgres.PostgresqlStatusList
-	managedPods, primaryPod, err := resources.GetInstancePods(ctx, clusterName)
-	if err != nil {
-		return nil, err
-	}
-
-	instancesStatus = resources.ExtractInstancesStatus(
+	instancesStatus, errList := resources.ExtractInstancesStatus(
 		ctx,
 		plugin.Config,
 		managedPods,
 		specs.PostgresContainerName)
+	if len(errList) != 0 {
+		errs = append(errs, errList...)
+	}
 
 	var pdbl policyv1.PodDisruptionBudgetList
-	pdblErr := plugin.Client.List(
+	if err := plugin.Client.List(
 		ctx,
 		&pdbl,
 		client.InNamespace(plugin.Namespace),
-		client.MatchingLabels{utils.ClusterLabelName: clusterName},
-	)
+		client.MatchingLabels{utils.ClusterLabelName: cluster.Name},
+	); err != nil {
+		errs = append(errs, err)
+	}
 	// Extract the status from the instances
 	status := PostgresqlStatus{
-		Cluster:        &cluster,
-		InstanceStatus: &instancesStatus,
-		PrimaryPod:     primaryPod,
-		podDisruptionBudgetList: pdbList{
-			err:   pdblErr,
-			inner: pdbl,
-		},
+		Cluster:                 &cluster,
+		InstanceStatus:          &instancesStatus,
+		PrimaryPod:              primaryPod,
+		PodDisruptionBudgetList: pdbl,
+		ErrorList:               errs,
 	}
-	return &status, nil
+	return &status
 }
 
 func listFencedInstances(fencedInstances *stringset.Data) string {
@@ -311,9 +309,10 @@ func (fullStatus *PostgresqlStatus) getStatus(isPrimaryFenced bool, cluster *api
 	}
 }
 
-func (fullStatus *PostgresqlStatus) printPostgresConfiguration(ctx context.Context) error {
+func (fullStatus *PostgresqlStatus) printPostgresConfiguration(ctx context.Context) []error {
 	timeout := time.Second * 10
 	clientInterface := kubernetes.NewForConfigOrDie(plugin.Config)
+	var errs []error
 
 	// Read PostgreSQL configuration from custom.conf
 	customConf, _, err := utils.ExecCommand(ctx, clientInterface, plugin.Config, fullStatus.PrimaryPod,
@@ -322,7 +321,7 @@ func (fullStatus *PostgresqlStatus) printPostgresConfiguration(ctx context.Conte
 		"cat",
 		path.Join(specs.PgDataPath, constants.PostgresqlCustomConfigurationFile))
 	if err != nil {
-		return err
+		errs = append(errs, err)
 	}
 
 	// Read PostgreSQL HBA Rules from pg_hba.conf
@@ -330,7 +329,7 @@ func (fullStatus *PostgresqlStatus) printPostgresConfiguration(ctx context.Conte
 		specs.PostgresContainerName,
 		&timeout, "cat", path.Join(specs.PgDataPath, constants.PostgresqlHBARulesFile))
 	if err != nil {
-		return err
+		errs = append(errs, err)
 	}
 
 	fmt.Println(aurora.Green("PostgreSQL Configuration"))
@@ -341,7 +340,7 @@ func (fullStatus *PostgresqlStatus) printPostgresConfiguration(ctx context.Conte
 	fmt.Println(pgHBAConf)
 	fmt.Println()
 
-	return nil
+	return errs
 }
 
 func (fullStatus *PostgresqlStatus) printBackupStatus() {
@@ -593,7 +592,7 @@ func (fullStatus *PostgresqlStatus) printInstancesStatus() {
 				"-",
 				"-",
 				"-",
-				instance.Error.Error(),
+				apierrs.ReasonForError(instance.Error),
 				instance.Pod.Status.QOSClass,
 				"-",
 				instance.Pod.Spec.NodeName,
@@ -815,30 +814,12 @@ func (fullStatus *PostgresqlStatus) printUnmanagedReplicationSlotStatus() {
 	fmt.Println()
 }
 
-func (fullStatus *PostgresqlStatus) printPodDisruptionBudgetStatus(verbose bool) {
+func (fullStatus *PostgresqlStatus) printPodDisruptionBudgetStatus() {
 	const header = "Pod Disruption Budgets status"
-	pdbErr := fullStatus.podDisruptionBudgetList.err
-	if pdbErr != nil {
-		fmt.Println(aurora.Red(header))
-		if apierrs.IsForbidden(pdbErr) {
-			fmt.Println(aurora.Red("Unable to fetch PodDisruptionBudgetList due to a lack of permissions"))
-			return
-		}
-		if verbose {
-			fmt.Println(aurora.Red(
-				fmt.Sprintf("encountered an error while fetching PodDisruptionBudgetList: %s", pdbErr.Error()),
-			))
-			return
-		}
-		fmt.Println(aurora.Red(
-			"encountered an error while fetching PodDisruptionBudgetList, set verbose to true for additional details.",
-		))
-		return
-	}
 
 	fmt.Println(aurora.Green(header))
 
-	if len(fullStatus.podDisruptionBudgetList.inner.Items) == 0 {
+	if len(fullStatus.PodDisruptionBudgetList.Items) == 0 {
 		fmt.Println("No active PodDisruptionBudgets found")
 		fmt.Println()
 		return
@@ -854,7 +835,7 @@ func (fullStatus *PostgresqlStatus) printPodDisruptionBudgetStatus(verbose bool)
 		"Disruptions Allowed",
 	)
 
-	for _, item := range fullStatus.podDisruptionBudgetList.inner.Items {
+	for _, item := range fullStatus.PodDisruptionBudgetList.Items {
 		status.AddLine(item.Name,
 			item.Spec.Selector.MatchLabels[utils.ClusterRoleLabelName],
 			item.Status.ExpectedPods,
