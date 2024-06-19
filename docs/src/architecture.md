@@ -289,7 +289,7 @@ This is typically triggered by:
   primary.
 - **Unexpected failure:** If the entire Kubernetes cluster fails, you might
   experience data loss, but you need to failover to the other Kubernetes
-  cluster by promoting the PostgreSQL replica cluster(s).
+  cluster by promoting the PostgreSQL replica cluster.
 
 !!! Warning
     CloudNativePG cannot perform any cross-cluster automated failover, as it
