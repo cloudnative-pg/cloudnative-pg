@@ -138,7 +138,7 @@ func run(
 	contextLog := log.FromContext(ctx)
 	walName := args[0]
 
-	if cluster.Spec.ReplicaCluster != nil && cluster.Spec.ReplicaCluster.Enabled {
+	if cluster.IsReplica() {
 		if podName != cluster.Status.CurrentPrimary && podName != cluster.Status.TargetPrimary {
 			contextLog.Debug("WAL archiving on a replica cluster, "+
 				"but this node is not the target primary nor the current one. "+

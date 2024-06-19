@@ -244,19 +244,21 @@ concept of a *PostgreSQL Replica Cluster*. Replica clusters are the
 CloudNativePG way to enable multi-cluster deployments in private, public,
 hybrid, and multi-cloud contexts.
 
-A replica cluster is a separate `Cluster` resource:
+A replica cluster is a separate `Cluster` resource that:
 
-1. having either `pg_basebackup` or full `recovery` as the `bootstrap`
-   option from a defined external source cluster
-2. having the `replica.enabled` option set to `true`
-3. replicating from a defined external cluster identified by `replica.source`,
-   normally located outside the Kubernetes cluster
-4. replaying WAL information received from the recovery object store
-   (using PostgreSQL's `restore_command` parameter), or via streaming
-   replication (using PostgreSQL's `primary_conninfo` parameter), or any of
-   the two (in case both the `barmanObjectStore` and `connectionParameters`
-   are defined in the external cluster)
-5. accepting only read connections, as supported by PostgreSQL's Hot Standby
+1. Uses either `pg_basebackup` or full `recovery` as the `bootstrap` option
+   from a specified external source cluster.
+2. Stays in continuous recovery by either enabling the `replica.enabled` option
+   or participating in a distributed topology architecture through the
+   `replica.primary` field.
+3. Replicates from a specified external cluster identified by `replica.source`,
+   which is typically located outside the Kubernetes cluster.
+4. Replays WAL information received from the recovery object store (using
+   PostgreSQL's `restore_command` parameter) or via streaming replication (using
+   PostgreSQL's `primary_conninfo` parameter), or both (if both
+   `barmanObjectStore` and `connectionParameters` are defined in the external
+   cluster).
+5. Accepts only read connections, as supported by PostgreSQL's Hot Standby.
 
 !!! Seealso
     Please refer to the ["Bootstrap" section](bootstrap.md) for more information
@@ -271,19 +273,34 @@ of disaster and unavailability of the first one.
 
 ![An example of multi-cluster deployment with a primary and a replica cluster](./images/multi-cluster.png)
 
-A replica cluster can have the same architecture of the primary cluster. In
-place of the primary instance, a replica cluster has a **designated primary**
+A replica cluster can have the same architecture as the primary cluster.
+Instead of a primary instance, a replica cluster has a **designated primary**
 instance, which is a standby server with an arbitrary number of cascading
 standby servers in streaming replication (symmetric architecture).
 
-The designated primary can be promoted at any time, making the replica cluster
-a primary cluster capable of accepting write connections.
+The designated primary can be promoted at any time, transforming the replica
+cluster into a primary cluster capable of accepting write connections.
+This is typically triggered by:
+
+- **Human decision:** You choose to make the other PostgreSQL cluster (or the
+  entire Kubernetes cluster) the primary. To avoid data loss and ensure that
+  the former primary can follow without being re-cloned (especially with large
+  data sets), you first demote the current primary, then promote the designated
+  primary.
+- **Unexpected failure:** If the entire Kubernetes cluster fails, you might
+  experience data loss, but you need to failover to the other Kubernetes
+  cluster by promoting the PostgreSQL replica cluster.
 
 !!! Warning
-    CloudNativePG does not perform any cross-cluster switchover
-    or failover at the moment. Such operation must be performed manually
-    or delegated to a multi-cluster/federated cluster aware authority.
-    Each PostgreSQL cluster is independent from any other.
+    CloudNativePG cannot perform any cross-cluster automated failover, as it
+    does not have authority beyond a single Kubernetes cluster. Such operations
+    must be performed manually or delegated to a multi-cluster/federated
+    cluster-aware authority.
+
+!!! Important
+    CloudNativePG allows you to control the distributed topology via
+    declarative configuration, enabling you to automate these procedures as part of
+    your Infrastructure as Code (IaC) process, including GitOps.
 
 The designated primary in the above example is fed via WAL streaming
 (`primary_conninfo`), with fallback option for file-based WAL shipping through

@@ -114,6 +114,7 @@ DataBackupConfiguration
 DataBase
 DataSource
 DatabaseRoleRef
+DemotionToken
 DeploymentStrategy
 DevOps
 DevSecOps
@@ -159,6 +160,7 @@ GUCs
 Gabriele
 GaugeVec
 Gi
+GitOps
 GoArch
 Golang
 GolangCI
@@ -174,6 +176,7 @@ INPLACE
 IOPS
 IPv
 IRSA
+IaC
 Ibryam
 IfNotPresent
 ImageCatalog
@@ -205,6 +208,7 @@ LTS
 LastBackupFailed
 LastBackupSucceeded
 LastFailedArchiveTime
+LastPromotionToken
 Lifecycle
 Linkerd
 Linode
@@ -386,6 +390,7 @@ ServiceAccountTemplate
 ServiceMonitor
 ServiceSpec
 ServiceTemplateSpec
+ShutdownCheckpointToken
 Silvela
 Slonik
 SnapshotOwnerReference
@@ -604,6 +609,7 @@ connectionParameters
 connectionString
 conninfo
 containerPort
+controldata
 coredump
 coredumps
 coreos
@@ -651,6 +657,7 @@ de
 declaratively
 defaultMode
 defaultPoolSize
+demotionToken
 deployer
 deploymentStrategy
 destinationPath
@@ -812,6 +819,7 @@ labelling
 largeobject
 lastCheckTime
 lastFailedBackup
+lastPromotionToken
 lastScheduleTime
 lastSuccessfulBackup
 lastSuccessfulBackupByMethod
@@ -1003,6 +1011,7 @@ proj
 projectedVolumeTemplate
 prometheus
 promotionTimeout
+promotionToken
 provisioner
 psql
 pv
@@ -1097,6 +1106,7 @@ sha
 shm
 shmall
 shmmax
+shutdownCheckpointToken
 sig
 sigs
 singlenamespace

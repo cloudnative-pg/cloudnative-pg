@@ -54,6 +54,7 @@ import (
 	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/metricserver"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/promotiontoken"
 	externalcluster "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/replicaclusterswitch"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/system"
 	pkgUtils "github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -126,6 +127,27 @@ func (r *InstanceReconciler) Reconcile(
 	r.reconcileMetrics(cluster)
 	r.reconcileMonitoringQueries(ctx, cluster)
 
+	// Verify that the promotion token is usable before changing the archive mode and triggering restarts
+	if err := r.verifyPromotionToken(cluster); err != nil {
+		var tokenError *promotiontoken.TokenVerificationError
+		if errors.As(err, &tokenError) {
+			if !tokenError.IsRetryable() {
+				oldCluster := cluster.DeepCopy()
+				contextLogger.Error(
+					err,
+					"Fatal error while verifying the promotion token",
+					"tokenStatus", tokenError.Error(),
+					"tokenContent", tokenError.TokenContent(),
+				)
+
+				cluster.Status.Phase = apiv1.PhaseUnrecoverable
+				cluster.Status.PhaseReason = "Promotion token content is not correct for current instance"
+				err := r.client.Status().Patch(ctx, cluster, client.MergeFrom(oldCluster))
+				return reconcile.Result{}, err
+			}
+		}
+	}
+
 	// Reconcile secrets and cryptographic material
 	// This doesn't need the PG connection, but it needs to reload it in case of changes
 	reloadNeeded := r.RefreshSecrets(ctx, cluster)
@@ -175,7 +197,16 @@ func (r *InstanceReconciler) Reconcile(
 	// Instance promotion will not automatically load the changed configuration files.
 	// Therefore it should not be counted as "a restart".
 	if err := r.reconcilePrimary(ctx, cluster); err != nil {
-		return reconcile.Result{}, err
+		var tokenError *promotiontoken.TokenVerificationError
+		if errors.As(err, &tokenError) {
+			contextLogger.Warning(
+				"Waiting for promotion token to be verified",
+				"tokenStatus", tokenError.Error(),
+				"tokenContent", tokenError.TokenContent(),
+			)
+			// We should be waiting for WAL recovery to reach the LSN in the token
+			return reconcile.Result{RequeueAfter: 10 * time.Second}, err
+		}
 	}
 
 	restarted, err := r.reconcileOldPrimary(ctx, cluster)
@@ -1125,6 +1156,8 @@ func (r *InstanceReconciler) refreshFileFromSecret(
 
 // Reconciler primary logic. DB needed.
 func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv1.Cluster) error {
+	contextLogger := log.FromContext(ctx)
+
 	if cluster.Status.TargetPrimary != r.instance.PodName || cluster.IsReplica() {
 		return nil
 	}
@@ -1137,6 +1170,16 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 
 	// If I'm not the primary, let's promote myself
 	if !isPrimary {
+		// Verify that the promotion token is met before promoting
+		if err := r.verifyPromotionToken(cluster); err != nil {
+			// Report that a promotion is still ongoing on the cluster
+			cluster.Status.Phase = apiv1.PhaseReplicaClusterPromotion
+			if err := r.client.Status().Patch(ctx, cluster, client.MergeFrom(oldCluster)); err != nil {
+				return err
+			}
+			return err
+		}
+
 		cluster.LogTimestampsWithMessage(ctx, "Setting myself as primary")
 		if err := r.handlePromotion(ctx, cluster); err != nil {
 			return err
@@ -1156,6 +1199,17 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 			return err
 		}
 		cluster.LogTimestampsWithMessage(ctx, "Finished setting myself as primary")
+	}
+
+	if cluster.Spec.ReplicaCluster != nil &&
+		cluster.Spec.ReplicaCluster.PromotionToken != cluster.Status.LastPromotionToken {
+		cluster.Status.LastPromotionToken = cluster.Spec.ReplicaCluster.PromotionToken
+		if err := r.client.Status().Patch(ctx, cluster, client.MergeFrom(oldCluster)); err != nil {
+			return err
+		}
+
+		contextLogger.Info("Updated last promotion token", "lastPromotionToken",
+			cluster.Spec.ReplicaCluster.PromotionToken)
 	}
 
 	// If it is already the current primary, everything is ok

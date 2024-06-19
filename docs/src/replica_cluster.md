@@ -221,7 +221,23 @@ as follows:
    source: cluster-eu-central
 ```
 
+<!--
+TODO:
+
+- require to use `primary` without setting `enabled`
+- mention demotionToken
+- mention archive partial WAL
+-->
+
 ## Promoting the designated primary in the replica cluster
+
+<!--
+TODO:
+
+- require to use `primary` without setting `enabled`
+- mention promotionToken
+- mention restore of partial WAL
+-->
 
 To promote a replica cluster (e.g. `cluster-eu-central`) to a primary cluster
 and make the designated primary a real primary, all you need to do is to

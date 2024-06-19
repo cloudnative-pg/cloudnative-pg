@@ -93,8 +93,9 @@ Additionally, the Community provides images for the [PostGIS extension](postgis.
   generation on high write systems
 * Support tagging backup files uploaded to an object store to enable optional
   retention management at the object store layer
-* Replica clusters for PostgreSQL deployments across multiple Kubernetes
-  clusters, enabling private, public, hybrid, and multi-cloud architectures
+* Replica clusters for PostgreSQL distributed topologies spanning multiple
+  Kubernetes clusters, enabling private, public, hybrid, and multi-cloud
+  architectures with support for controlled switchover.
 * Delayed Replica clusters
 * Connection pooling with PgBouncer
 * Support for node affinity via `nodeSelector`
