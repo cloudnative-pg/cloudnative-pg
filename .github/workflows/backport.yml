@@ -27,7 +27,7 @@ jobs:
         uses: actions-ecosystem/action-add-labels@v1
         if: ${{ !contains(github.event.pull_request.labels.*.name, 'do not backport') }}
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ secrets.REPO_GHA_PAT }}
           number:  ${{ github.event.pull_request.number }}
           labels: |
             backport-requested :arrow_backward:
