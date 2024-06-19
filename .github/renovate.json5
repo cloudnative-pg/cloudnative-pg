@@ -384,6 +384,7 @@
       "matchPackagePrefixes": [
         "operator-framework",
         "redhat-openshift-ecosystem",
+	"quay.io/operator-framework",
       ],
       "separateMajorMinor": "false",
       "pinDigests": false
