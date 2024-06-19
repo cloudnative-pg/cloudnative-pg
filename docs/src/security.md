@@ -165,12 +165,13 @@ namespaced or non-namespaced resources.
   validate them before starting the restore process.
 
 `nodes`
-: The operator needs to get the labels for Affinity and AntiAffinity, so it can
-  decide in which nodes a pod can be scheduled preventing the replicas to be
-  in the same node, specially if nodes are in different availability zones. This
-  permission is also used to determine if a node is schedule or not, avoiding
-  the creation of pods that cannot be created at all and/or trigger a switch over if
-  the primary lives in a unscheduled node.
+: The operator needs to get the labels for Affinity and AntiAffinity so it can
+  decide in which nodes a pod can be scheduled. This is useful, for example, to
+  prevent the replicas from being scheduled in the same node - especially
+  important if nodes are in different availability zones. This
+  permission is also used to determine whether a node is scheduled, preventing
+  the creation of pods on unscheduled nodes,  or triggering a switchover if
+  the primary lives in an unscheduled node.
 
 To see all the permissions required by the operator, you can run `kubectl
 describe clusterrole cnpg-manager`.
@@ -195,13 +196,14 @@ From a security perspective, the Operator Lifecycle Manager (OLM) provides a
 more flexible deployment method. The community offers support for building the
 necessary files and packages to deploy the operator from
 [OperatorHub.io](https://operatorhub.io/operator/cloudnative-pg). OLM allows
-users to configure the operator to watch specific namespaces or all namespaces,
-enabling more granular permission management.
+users to configure the operator to watch either all namespaces, or specific
+namespaces, enabling more granular permission management.
 
 #### Why Are ClusterRole Permissions Needed?
 
 Currently, the operator requires ClusterRole permissions only to get `nodes`
-objects. All other permissions can be namespace-scoped or ClusterRole.
+objects. All other permissions can be namespace-scoped (i.e. Role), or
+cluster-wide (i.e. ClusterRole).
 
 Even with these permissions, if someone gains access to the `ServiceAccount`,
 they will only have `get`, `list`, and `watch` permissions, which are limited
@@ -213,14 +215,15 @@ and any other `ServiceAccount` with elevated permissions.
 
 #### Can This Issue Be Mitigated?
 
-For the deployment using the YAML manifest it is recommended to deploy the
-operator in a dedicated namespace and restrict access to this namespace to
+When deploying using the YAML manifest, it is recommended to deploy the
+operator in a dedicated namespace, and to restrict access to this namespace to
 administrators only. This ensures that standard users cannot access the
 operator's `ServiceAccount`.
 
-When using OLM, it is advisable to deploy the operator in its own namespace
-while configuring it to watch the namespaces that will use the operator. This
-setup helps to contain permissions and restrict access more effectively.
+When using OLM, it is advisable to deploy the operator in its own namespace,
+and to configure it to watch the namespaces that will be used for CloudNativePG
+clusters. This setup helps to contain permissions and restrict access more
+effectively.
 
 ### Calls to the API server made by the instance manager
 
