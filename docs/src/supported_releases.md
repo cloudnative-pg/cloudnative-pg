@@ -45,11 +45,11 @@ provided by the community, see [What we mean by support](#what-we-mean-by-suppor
 
 | Type              | Support level                                                                                                         | Quality and recommended Use                                                                                    |
 |-------------------|-----------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------|
-| Development Build | No support                                                                                                            | Dangerous, might not be fully reliable. Useful to experiment with.                                               |
-| Release Candidate | No support                                                                                                            | Preview version, not production ready. Released for experimentation and testing.                              |
+| Development Build | No support                                                                                                            | Dangerous, might not be fully reliable. Useful to experiment with.                                             |
+| Release Candidate | No support                                                                                                            | Preview version: Not production-ready. Released for experimentation and testing.                               |
 | Minor Release     | Support provided until 3 months after the N+1 minor release (ex. 1.23 supported until 3 months after 1.24.0 is released)|
 | Patch             | Same as the corresponding minor release                                                                               | Users are encouraged to adopt patch releases as soon as they are available for a given release.                |
-| Security Patch    | Same as a patch, however, it doesn't contain any additional code other than the security fix from the previous patch | Given the nature of security fixes, users are **strongly** encouraged to adopt security patches after release. |
+| Security Patch    | Same as a patch, however, it doesn't contain any additional code other than the security fix from the previous patch  | Given the nature of security fixes, users are **strongly** encouraged to adopt security patches after release. |
 
 You can find available releases on the [releases page](https://github.com/cloudnative-pg/cloudnative-pg/releases).
 
