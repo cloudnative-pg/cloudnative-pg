@@ -216,14 +216,16 @@
       "extractVersionTemplate": "^(?<version>\\d+\\.\\d+\\.\\d+)"
     }, {
       "fileMatch": [
-        "config/olm-scorecard/**",
+        "^config\\/olm-scorecard\\/patches\\/basic\\.config\\.yaml$",
+        "^config\\/olm-scorecard\\/patches\\/olm\\.config\\.yaml$",
       ],
       "matchStrings": [
         "image: quay.io/operator-framework/scorecard-test:(?<currentValue>.*?)\\n",
       ],
       "datasourceTemplate": "docker",
       "versioningTemplate": "loose",
-      "depNameTemplate": "quay.io/operator-framework/scorecard-test"
+      "depNameTemplate": "quay.io/operator-framework/scorecard-test",
+      "extractVersionTemplate": "^(?<version>v\\d+\\.\\d+\\.\\d+)"
     },{
       // We want a PR to bump Default Container Images versions.
       "fileMatch": [
