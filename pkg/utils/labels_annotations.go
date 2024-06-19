@@ -57,6 +57,7 @@ const (
 	PgbouncerNameLabel = MetadataNamespace + "/poolerName"
 
 	// ClusterRoleLabelName is the name of label applied to instances to mark primary/replica
+	//
 	// Deprecated: Use ClusterInstanceRoleLabelName.
 	ClusterRoleLabelName = "role"
 

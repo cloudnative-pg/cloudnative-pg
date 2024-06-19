@@ -182,6 +182,8 @@ func updateRoleLabels(
 		instance.Labels = make(map[string]string)
 	}
 
+	// it is important to note that even if utils.ClusterRoleLabelName is deprecated we still ensure that the values
+	// are aligned between the two fields
 	podRole, hasRole := instance.ObjectMeta.Labels[utils.ClusterRoleLabelName]
 	newPodRole, newHasRole := instance.ObjectMeta.Labels[utils.ClusterInstanceRoleLabelName]
 

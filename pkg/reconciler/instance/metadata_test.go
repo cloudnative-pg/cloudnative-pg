@@ -107,6 +107,7 @@ var _ = Describe("object metadata test", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "oldPrimaryPod",
 					Labels: map[string]string{
+						utils.ClusterRoleLabelName:         specs.ClusterRoleLabelPrimary,
 						utils.ClusterInstanceRoleLabelName: specs.ClusterRoleLabelPrimary,
 					},
 				},
@@ -116,6 +117,7 @@ var _ = Describe("object metadata test", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "oldReplicaPod",
 					Labels: map[string]string{
+						utils.ClusterRoleLabelName:         specs.ClusterRoleLabelReplica,
 						utils.ClusterInstanceRoleLabelName: specs.ClusterRoleLabelReplica,
 					},
 				},
@@ -142,6 +144,7 @@ var _ = Describe("object metadata test", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "primaryPod",
 					Labels: map[string]string{
+						utils.ClusterRoleLabelName:         specs.ClusterRoleLabelPrimary,
 						utils.ClusterInstanceRoleLabelName: specs.ClusterRoleLabelPrimary,
 					},
 				},
@@ -151,6 +154,7 @@ var _ = Describe("object metadata test", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "replicaPod",
 					Labels: map[string]string{
+						utils.ClusterRoleLabelName:         specs.ClusterRoleLabelReplica,
 						utils.ClusterInstanceRoleLabelName: specs.ClusterRoleLabelReplica,
 					},
 				},
