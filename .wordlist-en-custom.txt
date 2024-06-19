@@ -160,6 +160,7 @@ GUCs
 Gabriele
 GaugeVec
 Gi
+GitOps
 GoArch
 Golang
 GolangCI
@@ -175,6 +176,7 @@ INPLACE
 IOPS
 IPv
 IRSA
+IaC
 Ibryam
 IfNotPresent
 ImageCatalog
