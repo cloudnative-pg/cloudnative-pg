@@ -3881,7 +3881,8 @@ spec:
                 x-kubernetes-validations:
                 - message: Promotion token must be empty on replica clusters
                   rule: '!has(self.promotionToken) || size(self.promotionToken) ==
-                    0 || !self.enabled'
+                    0 || (has(self.enabled) && !self.enabled) || (!has(self.enabled)
+                    && has(self.self) && has(self.primary) && self.self == self.primary)'
               replicationSlots:
                 default:
                   highAvailability:
