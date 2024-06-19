@@ -170,7 +170,7 @@ namespaced or non-namespaced resources.
   prevent the replicas from being scheduled in the same node - especially
   important if nodes are in different availability zones. This
   permission is also used to determine whether a node is scheduled, preventing
-  the creation of pods on unscheduled nodes,  or triggering a switchover if
+  the creation of pods on unscheduled nodes, or triggering a switchover if
   the primary lives in an unscheduled node.
 
 To see all the permissions required by the operator, you can run `kubectl
@@ -213,7 +213,7 @@ to viewing resources. If an unauthorized user already has access to the
 It's crucial to prevent users from accessing the operator's `ServiceAccount`
 and any other `ServiceAccount` with elevated permissions.
 
-#### Can This Issue Be Mitigated?
+#### Recommendations to Enhance Security
 
 When deploying using the YAML manifest, it is recommended to deploy the
 operator in a dedicated namespace, and to restrict access to this namespace to
