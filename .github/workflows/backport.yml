@@ -51,6 +51,7 @@ jobs:
         uses: actions-ecosystem/action-remove-labels@v1
         if: ${{ contains(github.event.pull_request.labels.*.name, 'do not backport') }}
         with:
+          github_token: ${{ secrets.REPO_GHA_PAT }}
           labels: |
             backport-requested :arrow_backward:
             release-1.22
