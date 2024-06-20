@@ -1294,6 +1294,9 @@ var _ = Describe("ShouldPromoteFromReplicaCluster", func() {
 			},
 		}
 		Expect(cluster.ShouldPromoteFromReplicaCluster()).To(BeTrue())
+	})
+})
+
 var _ = Describe("DataBackupConfiguration.AppendAdditionalCommandArgs", func() {
 	options := []string{"--option1", "--option2"}
 
