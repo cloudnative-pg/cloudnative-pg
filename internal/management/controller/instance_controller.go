@@ -958,13 +958,22 @@ func (r *InstanceReconciler) reconcileInstance(cluster *apiv1.Cluster) {
 // given the relative setting in `.spec.postgresql.enableAlterSystem`
 func (r *InstanceReconciler) reconcileAutoConf(ctx context.Context, cluster *apiv1.Cluster) {
 	contextLogger := log.FromContext(ctx)
-
-	err := r.instance.SetAlterSystemEnabled(
-		cluster.Spec.PostgresConfiguration.EnableAlterSystem,
-	)
+	version, err := r.instance.GetPgVersion()
 	if err != nil {
-		contextLogger.Error(
-			err, "Error while changing mode of the postgresql.auto.conf file, skipped")
+		contextLogger.Error(err, "while getting postgres version")
+	}
+
+	enabled := cluster.Spec.PostgresConfiguration.EnableAlterSystem
+
+	if version.Major >= 17 {
+		// we handle it through the ConfigurationInfo
+		enabled = true
+	}
+
+	if err = r.instance.SetAlterSystemEnabled(
+		enabled,
+	); err != nil {
+		contextLogger.Error(err, "Error while changing mode of the postgresql.auto.conf file, skipped")
 	}
 }
 
