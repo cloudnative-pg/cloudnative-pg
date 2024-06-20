@@ -97,6 +97,17 @@ func (i *PostgresLifecycle) runPostgresAndWait(ctx context.Context) <-chan error
 			return
 		}
 
+		postMasterPID, err := streamingCmd.Pid()
+		if err != nil {
+			contextLogger.Error(
+				err,
+				"Programmatic error: postmaster process was not set")
+			errChan <- err
+			return
+		}
+
+		log.Info("postmaster started", "postMasterPID", postMasterPID)
+
 		// Now we'll wait for PostgreSQL to accept connections, and setup everything required
 		// for replication and pg_rewind to work correctly.
 		wg.Add(1)
@@ -114,7 +125,9 @@ func (i *PostgresLifecycle) runPostgresAndWait(ctx context.Context) <-chan error
 		i.instance.SetCanCheckReadiness(true)
 		defer i.instance.SetCanCheckReadiness(false)
 
-		errChan <- streamingCmd.Wait()
+		postmasterExitStatus := streamingCmd.Wait()
+		log.Info("postmaster exited", "postmasterExitStatus", postmasterExitStatus, "postMasterPID", postMasterPID)
+		errChan <- postmasterExitStatus
 	}()
 
 	return errChan
