@@ -225,6 +225,51 @@ var _ = Describe("PostgreSQL configuration creation", func() {
 			Expect(config.GetConfig("recovery_target_name")).To(Equal(""))
 		})
 	})
+
+	Context("allow_alter_system", func() {
+		When("postgres >=17", func() {
+			It("can properly set allow_alter_system to on", func() {
+				info := ConfigurationInfo{
+					IsAlterSystemEnabled: true,
+					MajorVersion:         17,
+				}
+				config := CreatePostgresqlConfiguration(info)
+				Expect(config.GetConfig("allow_alter_system")).To(Equal("on"))
+			})
+
+			It("can properly set allow_alter_system to off", func() {
+				info := ConfigurationInfo{
+					IsAlterSystemEnabled: false,
+					MajorVersion:         18,
+				}
+				config := CreatePostgresqlConfiguration(info)
+				Expect(config.GetConfig("allow_alter_system")).To(Equal("off"))
+			})
+		})
+
+		When("postgres <17", func() {
+			It("should not set allow_alter_system", func() {
+				info := ConfigurationInfo{
+					IsAlterSystemEnabled: false,
+					MajorVersion:         14,
+				}
+				config := CreatePostgresqlConfiguration(info)
+				value, ok := config.configs["allow_alter_system"]
+				Expect(ok).To(BeFalse())
+				Expect(value).To(BeEmpty())
+			})
+			It("should not set allow_alter_system", func() {
+				info := ConfigurationInfo{
+					IsAlterSystemEnabled: true,
+					MajorVersion:         14,
+				}
+				config := CreatePostgresqlConfiguration(info)
+				value, ok := config.configs["allow_alter_system"]
+				Expect(ok).To(BeFalse())
+				Expect(value).To(BeEmpty())
+			})
+		})
+	})
 })
 
 var _ = Describe("pg_hba.conf generation", func() {
