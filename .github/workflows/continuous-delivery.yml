@@ -2151,7 +2151,7 @@ jobs:
       - name: Check preconditions
         id: get_pr_number_and_labels
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.REPO_GHA_PAT }}
         run: |
           ok_label=$(gh pr view "${{ github.event.issue.number }}" --json labels -q ".labels.[].name" 2>/dev/null | grep "ok to merge :ok_hand:" || :)
           echo "OK_LABEL=${ok_label}" >> $GITHUB_ENV
@@ -2161,7 +2161,7 @@ jobs:
           env.OK_LABEL == ''
         uses: actions-ecosystem/action-add-labels@v1.1.3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ secrets.REPO_GHA_PAT }}
           number: ${{ github.event.issue.number }}
           labels: "ok to merge :ok_hand:"
 
@@ -2180,7 +2180,7 @@ jobs:
       - name: Check preconditions
         id: get_pr_number_and_labels
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.REPO_GHA_PAT }}
         run: |
           ok_label=$(gh pr view "${{ github.event.issue.number }}" --json labels -q ".labels.[].name" 2>/dev/null | grep "ok to merge :ok_hand:" || :)
           echo "OK_LABEL=${ok_label}" >> $GITHUB_ENV
@@ -2190,6 +2190,6 @@ jobs:
           env.OK_LABEL != ''
         uses: actions-ecosystem/action-remove-labels@v1.3.0
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ secrets.REPO_GHA_PAT }}
           number: ${{ github.event.issue.number }}
           labels: "ok to merge :ok_hand:"
