@@ -2610,6 +2610,170 @@ var _ = Describe("unix permissions identifiers change validation", func() {
 	})
 })
 
+var _ = Describe("promotion token validation", func() {
+	It("complains if the replica token is not formatted in base64", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled:        ptr.To(false),
+					Source:         "test",
+					PromotionToken: "this-is-a-wrong-token",
+				},
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{},
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "test",
+					},
+				},
+			},
+		}
+
+		result := cluster.validatePromotionToken()
+		Expect(result).ToNot(BeEmpty())
+	})
+
+	It("complains if the replica token is not valid", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled:        ptr.To(false),
+					Source:         "test",
+					PromotionToken: base64.StdEncoding.EncodeToString([]byte("{}")),
+				},
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{},
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "test",
+					},
+				},
+			},
+		}
+
+		result := cluster.validatePromotionToken()
+		Expect(result).ToNot(BeEmpty())
+	})
+
+	It("doesn't complain if the replica token is valid", func() {
+		tokenContent := utils.PgControldataTokenContent{
+			LatestCheckpointTimelineID:   "3",
+			REDOWALFile:                  "this-wal-file",
+			DatabaseSystemIdentifier:     "231231212",
+			LatestCheckpointREDOLocation: "33322232",
+			TimeOfLatestCheckpoint:       "we don't know",
+			OperatorVersion:              "version info",
+		}
+		jsonToken, err := json.Marshal(tokenContent)
+		Expect(err).ToNot(HaveOccurred())
+
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled:        ptr.To(false),
+					Source:         "test",
+					PromotionToken: base64.StdEncoding.EncodeToString(jsonToken),
+				},
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{},
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "test",
+					},
+				},
+			},
+		}
+
+		result := cluster.validatePromotionToken()
+		Expect(result).To(BeEmpty())
+	})
+
+	It("complains if the token is set on a replica cluster (enabled)", func() {
+		tokenContent := utils.PgControldataTokenContent{
+			LatestCheckpointTimelineID:   "1",
+			REDOWALFile:                  "0000000100000001000000A1",
+			DatabaseSystemIdentifier:     "231231212",
+			LatestCheckpointREDOLocation: "0/1000000",
+			TimeOfLatestCheckpoint:       "we don't know",
+			OperatorVersion:              "version info",
+		}
+		jsonToken, err := json.Marshal(tokenContent)
+		Expect(err).ToNot(HaveOccurred())
+
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled:        ptr.To(true),
+					Source:         "test",
+					PromotionToken: base64.StdEncoding.EncodeToString(jsonToken),
+				},
+			},
+		}
+
+		result := cluster.validatePromotionToken()
+		Expect(result).NotTo(BeEmpty())
+	})
+
+	It("complains if the token is set on a replica cluster (primary, default name)", func() {
+		tokenContent := utils.PgControldataTokenContent{
+			LatestCheckpointTimelineID:   "1",
+			REDOWALFile:                  "0000000100000001000000A1",
+			DatabaseSystemIdentifier:     "231231212",
+			LatestCheckpointREDOLocation: "0/1000000",
+			TimeOfLatestCheckpoint:       "we don't know",
+			OperatorVersion:              "version info",
+		}
+		jsonToken, err := json.Marshal(tokenContent)
+		Expect(err).ToNot(HaveOccurred())
+
+		cluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test2",
+			},
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Primary:        "test",
+					Source:         "test",
+					PromotionToken: base64.StdEncoding.EncodeToString(jsonToken),
+				},
+			},
+		}
+
+		result := cluster.validatePromotionToken()
+		Expect(result).NotTo(BeEmpty())
+	})
+
+	It("complains if the token is set on a replica cluster (primary, self)", func() {
+		tokenContent := utils.PgControldataTokenContent{
+			LatestCheckpointTimelineID:   "1",
+			REDOWALFile:                  "0000000100000001000000A1",
+			DatabaseSystemIdentifier:     "231231212",
+			LatestCheckpointREDOLocation: "0/1000000",
+			TimeOfLatestCheckpoint:       "we don't know",
+			OperatorVersion:              "version info",
+		}
+		jsonToken, err := json.Marshal(tokenContent)
+		Expect(err).ToNot(HaveOccurred())
+
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Primary:        "test",
+					Self:           "test2",
+					Source:         "test",
+					PromotionToken: base64.StdEncoding.EncodeToString(jsonToken),
+				},
+			},
+		}
+
+		result := cluster.validatePromotionToken()
+		Expect(result).NotTo(BeEmpty())
+	})
+})
+
 var _ = Describe("replica mode validation", func() {
 	It("complains if the bootstrap method is not specified", func() {
 		cluster := &Cluster{
@@ -2771,114 +2935,6 @@ var _ = Describe("replica mode validation", func() {
 		Expect(result).To(BeEmpty())
 	})
 
-	It("complains when the external cluster doesn't exist", func() {
-		cluster := &Cluster{
-			Spec: ClusterSpec{
-				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled: ptr.To(true),
-					Source:  "test",
-				},
-				Bootstrap: &BootstrapConfiguration{
-					PgBaseBackup: &BootstrapPgBaseBackup{},
-				},
-				ExternalClusters: []ExternalCluster{},
-			},
-		}
-
-		cluster.Spec.Bootstrap.PgBaseBackup = nil
-		result := cluster.validateReplicaMode()
-		Expect(result).ToNot(BeEmpty())
-	})
-
-	It("complains if the replica token is not formatted in base64", func() {
-		cluster := &Cluster{
-			ObjectMeta: metav1.ObjectMeta{
-				ResourceVersion: "existing",
-			},
-			Spec: ClusterSpec{
-				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled:        ptr.To(false),
-					Source:         "test",
-					PromotionToken: "this-is-a-wrong-token",
-				},
-				Bootstrap: &BootstrapConfiguration{
-					InitDB: &BootstrapInitDB{},
-				},
-				ExternalClusters: []ExternalCluster{
-					{
-						Name: "test",
-					},
-				},
-			},
-		}
-
-		result := cluster.validatePromotionToken()
-		Expect(result).ToNot(BeEmpty())
-	})
-
-	It("complains if the replica token is not valid", func() {
-		cluster := &Cluster{
-			ObjectMeta: metav1.ObjectMeta{
-				ResourceVersion: "existing",
-			},
-			Spec: ClusterSpec{
-				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled:        ptr.To(false),
-					Source:         "test",
-					PromotionToken: base64.StdEncoding.EncodeToString([]byte("{}")),
-				},
-				Bootstrap: &BootstrapConfiguration{
-					InitDB: &BootstrapInitDB{},
-				},
-				ExternalClusters: []ExternalCluster{
-					{
-						Name: "test",
-					},
-				},
-			},
-		}
-
-		result := cluster.validatePromotionToken()
-		Expect(result).ToNot(BeEmpty())
-	})
-
-	It("doesn't complain if the replica token is valid", func() {
-		tokenContent := utils.PgControldataTokenContent{
-			LatestCheckpointTimelineID:   "3",
-			REDOWALFile:                  "this-wal-file",
-			DatabaseSystemIdentifier:     "231231212",
-			LatestCheckpointREDOLocation: "33322232",
-			TimeOfLatestCheckpoint:       "we don't know",
-			OperatorVersion:              "version info",
-		}
-		jsonToken, err := json.Marshal(tokenContent)
-		Expect(err).ToNot(HaveOccurred())
-
-		cluster := &Cluster{
-			ObjectMeta: metav1.ObjectMeta{
-				ResourceVersion: "existing",
-			},
-			Spec: ClusterSpec{
-				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled:        ptr.To(true),
-					Source:         "test",
-					PromotionToken: base64.StdEncoding.EncodeToString(jsonToken),
-				},
-				Bootstrap: &BootstrapConfiguration{
-					InitDB: &BootstrapInitDB{},
-				},
-				ExternalClusters: []ExternalCluster{
-					{
-						Name: "test",
-					},
-				},
-			},
-		}
-
-		result := cluster.validatePromotionToken()
-		Expect(result).To(BeEmpty())
-	})
-
 	It("complains when the primary field is used with the enabled field", func() {
 		cluster := &Cluster{
 			Spec: ClusterSpec{
@@ -2943,6 +2999,72 @@ var _ = Describe("replica mode validation", func() {
 		}
 		result := cluster.validateReplicaMode()
 		Expect(result).To(BeEmpty())
+	})
+})
+
+var _ = Describe("validate the replica cluster external clusters", func() {
+	It("complains when the external cluster doesn't exist (source)", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled: ptr.To(true),
+					Source:  "test",
+				},
+				Bootstrap: &BootstrapConfiguration{
+					PgBaseBackup: &BootstrapPgBaseBackup{},
+				},
+				ExternalClusters: []ExternalCluster{},
+			},
+		}
+
+		cluster.Spec.Bootstrap.PgBaseBackup = nil
+		result := cluster.validateReplicaClusterExternalClusters()
+		Expect(result).ToNot(BeEmpty())
+	})
+
+	It("complains when the external cluster doesn't exist (primary)", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Primary: "test2",
+					Source:  "test",
+				},
+				Bootstrap: &BootstrapConfiguration{
+					PgBaseBackup: &BootstrapPgBaseBackup{},
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "test",
+					},
+				},
+			},
+		}
+
+		result := cluster.validateReplicaClusterExternalClusters()
+		Expect(result).ToNot(BeEmpty())
+	})
+
+	It("complains when the external cluster doesn't exist (self)", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Self:    "test2",
+					Primary: "test",
+					Source:  "test",
+				},
+				Bootstrap: &BootstrapConfiguration{
+					PgBaseBackup: &BootstrapPgBaseBackup{},
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "test",
+					},
+				},
+			},
+		}
+
+		result := cluster.validateReplicaClusterExternalClusters()
+		Expect(result).ToNot(BeEmpty())
 	})
 })
 

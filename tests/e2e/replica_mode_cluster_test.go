@@ -633,7 +633,7 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication), Ordered, f
 				cluster, err := env.GetCluster(namespace, clusterAName)
 				Expect(err).ToNot(HaveOccurred())
 				oldCluster := cluster.DeepCopy()
-				cluster.Spec.ReplicaCluster.Enabled = ptr.To(true)
+				cluster.Spec.ReplicaCluster.Primary = clusterBName
 				Expect(env.Client.Patch(env.Ctx, cluster, k8client.MergeFrom(oldCluster))).To(Succeed())
 				podList, err := env.GetClusterPodList(namespace, clusterAName)
 				Expect(err).ToNot(HaveOccurred())
@@ -665,7 +665,7 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication), Ordered, f
 
 				oldCluster := cluster.DeepCopy()
 				cluster.Spec.ReplicaCluster.PromotionToken = invalidToken
-				cluster.Spec.ReplicaCluster.Enabled = ptr.To(false)
+				cluster.Spec.ReplicaCluster.Primary = clusterBName
 				Expect(env.Client.Patch(env.Ctx, cluster, k8client.MergeFrom(oldCluster))).To(Succeed())
 			})
 
@@ -688,7 +688,7 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication), Ordered, f
 				Expect(err).ToNot(HaveOccurred())
 				oldCluster := cluster.DeepCopy()
 				cluster.Spec.ReplicaCluster.PromotionToken = token
-				cluster.Spec.ReplicaCluster.Enabled = ptr.To(false)
+				cluster.Spec.ReplicaCluster.Primary = clusterBName
 				Expect(env.Client.Patch(env.Ctx, cluster, k8client.MergeFrom(oldCluster))).To(Succeed())
 			})
 

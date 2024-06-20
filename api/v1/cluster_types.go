@@ -1084,7 +1084,6 @@ type PgBouncerIntegrationStatus struct {
 
 // ReplicaClusterConfiguration encapsulates the configuration of a replica
 // cluster
-// +kubebuilder:validation:XValidation:rule="!has(self.promotionToken) || size(self.promotionToken) == 0 || (has(self.enabled) && !self.enabled) || (!has(self.enabled) && has(self.self) && has(self.primary) && self.self == self.primary)",message=Promotion token must be empty on replica clusters
 type ReplicaClusterConfiguration struct {
 	// Self defines the name of this cluster. It is used to determine if this is a primary
 	// or a replica cluster, comparing it with `primary`

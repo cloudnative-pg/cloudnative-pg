@@ -1933,25 +1933,38 @@ func (r *Cluster) validatePromotionToken() field.ErrorList {
 		return result
 	}
 
+	token := r.Spec.ReplicaCluster.PromotionToken
+	// Nothing to validate if the token is empty, we can immediately return
+	if len(token) == 0 {
+		return result
+	}
+
+	if r.IsReplica() {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "replicaCluster", "token"),
+				token,
+				"promotionToken is only allowed for primary clusters"))
+		return result
+	}
+
 	if !r.IsReplica() {
-		token := r.Spec.ReplicaCluster.PromotionToken
-		if len(token) > 0 {
-			tokenContent, err := utils.ParsePgControldataToken(token)
-			if err != nil {
-				result = append(
-					result,
-					field.Invalid(
-						field.NewPath("spec", "replicaCluster", "token"),
-						token,
-						fmt.Sprintf("Invalid promotionToken format: %s", err.Error())))
-			} else if err := tokenContent.IsValid(); err != nil {
-				result = append(
-					result,
-					field.Invalid(
-						field.NewPath("spec", "replicaCluster", "token"),
-						token,
-						fmt.Sprintf("Invalid promotionToken content: %s", err.Error())))
-			}
+		tokenContent, err := utils.ParsePgControldataToken(token)
+		if err != nil {
+			result = append(
+				result,
+				field.Invalid(
+					field.NewPath("spec", "replicaCluster", "token"),
+					token,
+					fmt.Sprintf("Invalid promotionToken format: %s", err.Error())))
+		} else if err := tokenContent.IsValid(); err != nil {
+			result = append(
+				result,
+				field.Invalid(
+					field.NewPath("spec", "replicaCluster", "token"),
+					token,
+					fmt.Sprintf("Invalid promotionToken content: %s", err.Error())))
 		}
 	}
 	return result
@@ -1964,7 +1977,7 @@ func (r *Cluster) validateReplicaMode() field.ErrorList {
 
 	replicaClusterConf := r.Spec.ReplicaCluster
 	if replicaClusterConf == nil {
-		return nil
+		return result
 	}
 
 	// Having enabled set to "true" means that the automatic mode is not active.
@@ -1996,6 +2009,19 @@ func (r *Cluster) validateReplicaMode() field.ErrorList {
 		}
 	}
 
+	result = append(result, r.validateReplicaClusterExternalClusters()...)
+
+	return result
+}
+
+func (r *Cluster) validateReplicaClusterExternalClusters() field.ErrorList {
+	var result field.ErrorList
+	replicaClusterConf := r.Spec.ReplicaCluster
+	if replicaClusterConf == nil {
+		return result
+	}
+
+	// Check that the externalCluster references are correct
 	_, found := r.ExternalCluster(replicaClusterConf.Source)
 	if !found {
 		result = append(
@@ -2006,6 +2032,29 @@ func (r *Cluster) validateReplicaMode() field.ErrorList {
 				fmt.Sprintf("External cluster %v not found", replicaClusterConf.Source)))
 	}
 
+	if len(replicaClusterConf.Self) > 0 {
+		_, found := r.ExternalCluster(replicaClusterConf.Self)
+		if !found {
+			result = append(
+				result,
+				field.Invalid(
+					field.NewPath("spec", "replicaCluster", "self"),
+					replicaClusterConf.Self,
+					fmt.Sprintf("External cluster %v not found", replicaClusterConf.Self)))
+		}
+	}
+
+	if len(replicaClusterConf.Primary) > 0 {
+		_, found := r.ExternalCluster(replicaClusterConf.Primary)
+		if !found {
+			result = append(
+				result,
+				field.Invalid(
+					field.NewPath("spec", "replicaCluster", "primary"),
+					replicaClusterConf.Primary,
+					fmt.Sprintf("External cluster %v not found", replicaClusterConf.Primary)))
+		}
+	}
 	return result
 }
 

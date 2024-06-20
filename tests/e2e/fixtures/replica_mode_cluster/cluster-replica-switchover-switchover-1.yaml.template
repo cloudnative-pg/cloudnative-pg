@@ -31,7 +31,7 @@ spec:
         immediateCheckpoint: true
 
   replica:
-    enabled: false
+    primary: replica-switchover-switchover-a
     source: replica-switchover-switchover-b
 
   externalClusters:
