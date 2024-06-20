@@ -3275,20 +3275,19 @@ func (cluster Cluster) GetBarmanEndpointCAForReplicaCluster() *SecretKeySelector
 
 // GetClusterAltDNSNames returns all the names needed to build a valid Server Certificate
 func (cluster *Cluster) GetClusterAltDNSNames() []string {
-	defaultAltDNSNames := []string{
-		cluster.GetServiceReadWriteName(),
-		fmt.Sprintf("%v.%v", cluster.GetServiceReadWriteName(), cluster.Namespace),
-		fmt.Sprintf("%v.%v.svc", cluster.GetServiceReadWriteName(), cluster.Namespace),
-		fmt.Sprintf("%v.%v.svc.cluster.local", cluster.GetServiceReadWriteName(), cluster.Namespace),
-		cluster.GetServiceReadName(),
-		fmt.Sprintf("%v.%v", cluster.GetServiceReadName(), cluster.Namespace),
-		fmt.Sprintf("%v.%v.svc", cluster.GetServiceReadName(), cluster.Namespace),
-		fmt.Sprintf("%v.%v.svc.cluster.local", cluster.GetServiceReadName(), cluster.Namespace),
-		cluster.GetServiceReadOnlyName(),
-		fmt.Sprintf("%v.%v", cluster.GetServiceReadOnlyName(), cluster.Namespace),
-		fmt.Sprintf("%v.%v.svc", cluster.GetServiceReadOnlyName(), cluster.Namespace),
-		fmt.Sprintf("%v.%v.svc.cluster.local", cluster.GetServiceReadOnlyName(), cluster.Namespace),
+	buildServiceNames := func(serviceName string) []string {
+		return []string{
+			serviceName,
+			fmt.Sprintf("%v.%v", serviceName, cluster.Namespace),
+			fmt.Sprintf("%v.%v.svc", serviceName, cluster.Namespace),
+			fmt.Sprintf("%v.%v.svc.cluster.local", serviceName, cluster.Namespace),
+		}
 	}
+	defaultAltDNSNames := slices.Concat(
+		buildServiceNames(cluster.GetServiceReadWriteName()),
+		buildServiceNames(cluster.GetServiceReadName()),
+		buildServiceNames(cluster.GetServiceReadOnlyName()),
+	)
 
 	if cluster.Spec.Certificates == nil {
 		return defaultAltDNSNames
