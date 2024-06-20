@@ -1544,6 +1544,14 @@ type CertificatesConfiguration struct {
 	ServerAltDNSNames []string `json:"serverAltDNSNames,omitempty"`
 }
 
+func (c *CertificatesConfiguration) getServerAltDNSNames() []string {
+	if c == nil {
+		return nil
+	}
+
+	return c.ServerAltDNSNames
+}
+
 // CertificatesStatus contains configuration certificates and related expiration dates.
 type CertificatesStatus struct {
 	// Needed configurations to handle server certificates, initialized with default values, if needed.
@@ -2443,38 +2451,6 @@ type ManagedService struct {
 	SelectorType ServiceSelectorType `json:"selectorType"`
 	// ServiceTemplate is the template specification for the service.
 	ServiceTemplate ServiceTemplateSpec `json:"serviceTemplate"`
-}
-
-// GetAllManagedServicesName returns the names of all managed services with given types
-func (cluster *Cluster) GetAllManagedServicesName(serviceTypes []ServiceSelectorType) []string {
-	var serviceNames []string
-	for _, serviceType := range serviceTypes {
-		switch serviceType {
-		case ServiceSelectorTypeRW:
-			if cluster.IsReadWriteServiceEnabled() {
-				serviceNames = append(serviceNames, cluster.GetServiceReadWriteName())
-			}
-		case ServiceSelectorTypeR:
-			if cluster.IsReadServiceEnabled() {
-				serviceNames = append(serviceNames, cluster.GetServiceReadName())
-			}
-		case ServiceSelectorTypeRO:
-			if cluster.IsReadOnlyServiceEnabled() {
-				serviceNames = append(serviceNames, cluster.GetServiceReadOnlyName())
-			}
-		}
-	}
-
-	if cluster.Spec.Managed == nil || cluster.Spec.Managed.Services == nil {
-		return serviceNames
-	}
-
-	for _, service := range cluster.Spec.Managed.Services.Additional {
-		if slices.Contains(serviceTypes, service.SelectorType) {
-			serviceNames = append(serviceNames, service.ServiceTemplate.ObjectMeta.Name)
-		}
-	}
-	return serviceNames
 }
 
 // ManagedConfiguration represents the portions of PostgreSQL that are managed
@@ -3379,20 +3355,10 @@ func (cluster Cluster) GetBarmanEndpointCAForReplicaCluster() *SecretKeySelector
 
 // GetClusterAltDNSNames returns all the names needed to build a valid Server Certificate
 func (cluster *Cluster) GetClusterAltDNSNames() []string {
-	/*
-		for _, serviceName := range cluster.GetAllManagedServicesName(
-			[]ServiceSelectorType{
-				ServiceSelectorTypeRW,
-				ServiceSelectorTypeR,
-				ServiceSelectorTypeRO,
-			}) {
-			defaultAltDNSNames = append(defaultAltDNSNames, serviceName)
-			defaultAltDNSNames = append(defaultAltDNSNames, fmt.Sprintf("%v.%v", serviceName, cluster.Namespace))
-			defaultAltDNSNames = append(defaultAltDNSNames, fmt.Sprintf("%v.%v.svc", serviceName, cluster.Namespace))
+	buildServiceNames := func(serviceName string, enabled bool) []string {
+		if !enabled {
+			return nil
 		}
-	*/
-
-	buildServiceNames := func(serviceName string) []string {
 		return []string{
 			serviceName,
 			fmt.Sprintf("%v.%v", serviceName, cluster.Namespace),
@@ -3400,19 +3366,20 @@ func (cluster *Cluster) GetClusterAltDNSNames() []string {
 			fmt.Sprintf("%v.%v.svc.cluster.local", serviceName, cluster.Namespace),
 		}
 	}
-	defaultAltDNSNames := slices.Concat(
-		buildServiceNames(cluster.GetServiceReadWriteName()),
-		buildServiceNames(cluster.GetServiceReadName()),
-		buildServiceNames(cluster.GetServiceReadOnlyName()),
+	altDNSNames := slices.Concat(
+		buildServiceNames(cluster.GetServiceReadWriteName(), cluster.IsReadWriteServiceEnabled()),
+		buildServiceNames(cluster.GetServiceReadName(), cluster.IsReadServiceEnabled()),
+		buildServiceNames(cluster.GetServiceReadOnlyName(), cluster.IsReadOnlyServiceEnabled()),
 	)
 
-	if cluster.Spec.Certificates == nil {
-		return defaultAltDNSNames
+	if cluster.Spec.Managed != nil && cluster.Spec.Managed.Services != nil {
+		for _, service := range cluster.Spec.Managed.Services.Additional {
+			altDNSNames = append(altDNSNames, buildServiceNames(service.ServiceTemplate.ObjectMeta.Name, true)...)
+		}
 	}
 
-	return append(defaultAltDNSNames, cluster.Spec.Certificates.ServerAltDNSNames...)
+	return append(altDNSNames, cluster.Spec.Certificates.getServerAltDNSNames()...)
 }
-
 
 // UsesSecret checks whether a given secret is used by a Cluster.
 //

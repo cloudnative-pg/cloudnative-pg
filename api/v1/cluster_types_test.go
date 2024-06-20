@@ -17,6 +17,8 @@ limitations under the License.
 package v1
 
 import (
+	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -453,6 +455,24 @@ var _ = Describe("look up for secrets", func() {
 			Name: "clustername",
 		},
 	}
+
+	// assertServiceNamesPresent returns the first missing service name encountered
+	assertServiceNamesPresent := func(data *stringset.Data, serviceName string) string {
+		assertions := []string{
+			serviceName,
+			fmt.Sprintf("%v.%v", serviceName, cluster.Namespace),
+			fmt.Sprintf("%v.%v.svc", serviceName, cluster.Namespace),
+			fmt.Sprintf("%v.%v.svc.cluster.local", serviceName, cluster.Namespace),
+		}
+		for _, assertion := range assertions {
+			if !data.Has(assertion) {
+				return assertion
+			}
+		}
+
+		return ""
+	}
+
 	It("retrieves client CA secret name", func() {
 		Expect(cluster.GetClientCASecretName()).To(Equal("clustername-ca"))
 	})
@@ -465,14 +485,54 @@ var _ = Describe("look up for secrets", func() {
 	It("retrieves replication secret name", func() {
 		Expect(cluster.GetReplicationSecretName()).To(Equal("clustername-replication"))
 	})
-	It("retrieves all names needed to build a server CA certificate are 9", func() {
+	It("retrieves all names needed to build a server CA certificate", func() {
 		names := cluster.GetClusterAltDNSNames()
 		Expect(names).To(HaveLen(12))
 		namesSet := stringset.From(names)
 		Expect(namesSet.Len()).To(Equal(12))
-		Expect(namesSet.Has(cluster.GetServiceReadWriteName())).To(BeTrue())
-		Expect(namesSet.Has(cluster.GetServiceReadName())).To(BeTrue())
-		Expect(namesSet.Has(cluster.GetServiceReadOnlyName())).To(BeTrue())
+		Expect(assertServiceNamesPresent(namesSet, cluster.GetServiceReadWriteName())).To(BeEmpty(),
+			"missing service name")
+		Expect(assertServiceNamesPresent(namesSet, cluster.GetServiceReadName())).To(BeEmpty(),
+			"missing service name")
+		Expect(assertServiceNamesPresent(namesSet, cluster.GetServiceReadOnlyName())).To(BeEmpty(),
+			"missing service name")
+	})
+
+	Context("managed services altDnsNames interactions", func() {
+		BeforeEach(func() {
+			cluster.Spec.Managed = &ManagedConfiguration{
+				Services: &ManagedServices{
+					Additional: []ManagedService{
+						{ServiceTemplate: ServiceTemplateSpec{ObjectMeta: Metadata{Name: "one"}}},
+						{ServiceTemplate: ServiceTemplateSpec{ObjectMeta: Metadata{Name: "two"}}},
+					},
+				},
+			}
+		})
+
+		It("should generate correctly the managed services names", func() {
+			namesSet := stringset.From(cluster.GetClusterAltDNSNames())
+			Expect(namesSet.Len()).To(Equal(20))
+			Expect(assertServiceNamesPresent(namesSet, "one")).To(BeEmpty(),
+				"missing service name")
+			Expect(assertServiceNamesPresent(namesSet, "two")).To(BeEmpty(),
+				"missing service name")
+		})
+
+		It("should not generate the default service names if disabled", func() {
+			cluster.Spec.Managed.Services.DisabledDefaultServices = []ServiceSelectorType{
+				ServiceSelectorTypeRO,
+				ServiceSelectorTypeR,
+			}
+			namesSet := stringset.From(cluster.GetClusterAltDNSNames())
+			Expect(namesSet.Len()).To(Equal(12))
+			Expect(namesSet.Has(cluster.GetServiceReadName())).To(BeFalse())
+			Expect(namesSet.Has(cluster.GetServiceReadOnlyName())).To(BeFalse())
+			Expect(assertServiceNamesPresent(namesSet, "one")).To(BeEmpty(),
+				"missing service name")
+			Expect(assertServiceNamesPresent(namesSet, "two")).To(BeEmpty(),
+				"missing service name")
+		})
 	})
 })
 
@@ -1504,77 +1564,6 @@ var _ = Describe("Cluster Managed Service Enablement", func() {
 				},
 			}
 			Expect(cluster.IsReadOnlyServiceEnabled()).To(BeFalse())
-		})
-	})
-
-	Describe("GetAllManagedServicesName", func() {
-		ServiceSelectorTypesRO := []ServiceSelectorType{ServiceSelectorTypeRO}
-		ServiceSelectorTypesRW := []ServiceSelectorType{ServiceSelectorTypeRW}
-		ServiceSelectorTypesR := []ServiceSelectorType{ServiceSelectorTypeR}
-
-		It("should return default server name by default", func() {
-			Expect(cluster.GetAllManagedServicesName(ServiceSelectorTypesRO)).To(HaveLen(1))
-			Expect(cluster.GetAllManagedServicesName(ServiceSelectorTypesRO)[0]).To(Equal(cluster.GetServiceReadOnlyName()))
-
-			Expect(cluster.GetAllManagedServicesName(ServiceSelectorTypesRW)).To(HaveLen(1))
-			Expect(cluster.GetAllManagedServicesName(ServiceSelectorTypesRW)[0]).To(Equal(cluster.GetServiceReadWriteName()))
-
-			Expect(cluster.GetAllManagedServicesName(ServiceSelectorTypesR)).To(HaveLen(1))
-			Expect(cluster.GetAllManagedServicesName(ServiceSelectorTypesR)[0]).To(Equal(cluster.GetServiceReadName()))
-		})
-
-		It("return empty if r and ro service is disabled", func() {
-			cluster.Spec.Managed = &ManagedConfiguration{
-				Services: &ManagedServices{
-					DisabledDefaultServices: []ServiceSelectorType{
-						ServiceSelectorTypeR,
-						ServiceSelectorTypeRO,
-					},
-				},
-			}
-			Expect(cluster.GetAllManagedServicesName(ServiceSelectorTypesRO)).To(BeEmpty())
-			Expect(cluster.GetAllManagedServicesName(ServiceSelectorTypesR)).To(BeEmpty())
-
-			Expect(cluster.GetAllManagedServicesName(ServiceSelectorTypesRW)).To(HaveLen(1))
-			Expect(cluster.GetAllManagedServicesName(ServiceSelectorTypesRW)[0]).To(Equal(cluster.GetServiceReadWriteName()))
-		})
-
-		It("return all services if new services defined", func() {
-			cluster.Spec.Managed = &ManagedConfiguration{
-				Services: &ManagedServices{
-					DisabledDefaultServices: []ServiceSelectorType{ServiceSelectorTypeRO},
-					Additional: []ManagedService{
-						{
-							SelectorType: ServiceSelectorTypeRO,
-							ServiceTemplate: ServiceTemplateSpec{
-								ObjectMeta: Metadata{
-									Name: "additional-ro-service",
-								},
-								Spec: corev1.ServiceSpec{},
-							},
-						},
-						{
-							SelectorType: ServiceSelectorTypeR,
-							ServiceTemplate: ServiceTemplateSpec{
-								ObjectMeta: Metadata{
-									Name: "additional-r-service",
-								},
-								Spec: corev1.ServiceSpec{},
-							},
-						},
-					},
-				},
-			}
-
-			Expect(cluster.GetAllManagedServicesName(ServiceSelectorTypesRO)).To(HaveLen(1))
-			Expect(cluster.GetAllManagedServicesName(ServiceSelectorTypesRO)[0]).To(Equal("additional-ro-service"))
-
-			Expect(cluster.GetAllManagedServicesName(ServiceSelectorTypesR)).To(HaveLen(2))
-			Expect(cluster.GetAllManagedServicesName(ServiceSelectorTypesR)).To(ContainElement("additional-r-service"))
-			Expect(cluster.GetAllManagedServicesName(ServiceSelectorTypesR)).To(ContainElement(cluster.GetServiceReadName()))
-
-			Expect(cluster.GetAllManagedServicesName(ServiceSelectorTypesRW)).To(HaveLen(1))
-			Expect(cluster.GetAllManagedServicesName(ServiceSelectorTypesRW)[0]).To(Equal(cluster.GetServiceReadWriteName()))
 		})
 	})
 })
