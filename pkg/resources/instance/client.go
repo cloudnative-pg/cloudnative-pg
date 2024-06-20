@@ -18,7 +18,6 @@ package instance
 
 import (
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -34,10 +33,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -98,31 +97,10 @@ func (i StatusError) Error() string {
 
 // NewStatusClient returns a client capable of querying the instance HTTP endpoints
 func NewStatusClient() Client {
-	const defaultConnectionTimeout = 2 * time.Second
+	const connectionTimeout = 2 * time.Second
+	const requestTimeout = 10 * time.Second
 
-	// We want a connection timeout to prevent waiting for the default
-	// TCP connection timeout (30 seconds) on lost SYN packets
-	dialer := &net.Dialer{
-		Timeout: defaultConnectionTimeout,
-	}
-	timeoutClient := &http.Client{
-		Transport: &http.Transport{
-			DialContext: dialer.DialContext,
-			DialTLSContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-				tlsConfig, err := certs.GetTLSConfigFromContext(ctx)
-				if err != nil {
-					return nil, err
-				}
-				tlsDialer := tls.Dialer{
-					NetDialer: dialer,
-					Config:    tlsConfig,
-				}
-				return tlsDialer.DialContext(ctx, network, addr)
-			},
-		},
-	}
-
-	return &statusClient{timeoutClient}
+	return &statusClient{Client: resources.NewHTTPClient(connectionTimeout, requestTimeout)}
 }
 
 // extractInstancesStatus extracts the status of the underlying PostgreSQL instance from
