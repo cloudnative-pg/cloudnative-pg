@@ -2072,6 +2072,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: test-artifacts
+          pattern: testartifacts-*
 
       - name: Flatten all artifacts onto directory
         # The download-artifact action, since we did not give it a name,
