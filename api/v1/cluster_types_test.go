@@ -22,6 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/stringset"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -465,7 +466,13 @@ var _ = Describe("look up for secrets", func() {
 		Expect(cluster.GetReplicationSecretName()).To(Equal("clustername-replication"))
 	})
 	It("retrieves all names needed to build a server CA certificate are 9", func() {
-		Expect(cluster.GetClusterAltDNSNames()).To(HaveLen(9))
+		names := cluster.GetClusterAltDNSNames()
+		Expect(names).To(HaveLen(12))
+		namesSet := stringset.From(names)
+		Expect(namesSet.Len()).To(Equal(12))
+		Expect(namesSet.Has(cluster.GetServiceReadWriteName())).To(BeTrue())
+		Expect(namesSet.Has(cluster.GetServiceReadName())).To(BeTrue())
+		Expect(namesSet.Has(cluster.GetServiceReadOnlyName())).To(BeTrue())
 	})
 })
 

@@ -91,7 +91,7 @@ type PublicKeyInfrastructure struct {
 // RenewLeafCertificate renew a secret containing a server
 // certificate given the secret containing the CA that will sign it.
 // Returns true if the certificate has been renewed
-func RenewLeafCertificate(caSecret *v1.Secret, secret *v1.Secret) (bool, error) {
+func RenewLeafCertificate(caSecret *v1.Secret, secret *v1.Secret, altDNSNames []string) (bool, error) {
 	// Verify the temporal validity of this CA
 	pair, err := ParseServerSecret(secret)
 	if err != nil {
@@ -102,7 +102,13 @@ func RenewLeafCertificate(caSecret *v1.Secret, secret *v1.Secret) (bool, error) 
 	if err != nil {
 		return false, err
 	}
-	if !expiring {
+
+	altDNSNamesMatch, err := pair.DoAltDNSNamesMatch(altDNSNames)
+	if err != nil {
+		return false, err
+	}
+
+	if !expiring && altDNSNamesMatch {
 		return false, nil
 	}
 
@@ -122,7 +128,7 @@ func RenewLeafCertificate(caSecret *v1.Secret, secret *v1.Secret) (bool, error) 
 		return false, err
 	}
 
-	err = pair.RenewCertificate(caPrivateKey, caCertificate)
+	err = pair.RenewCertificate(caPrivateKey, caCertificate, altDNSNames)
 	if err != nil {
 		return false, err
 	}
@@ -215,7 +221,7 @@ func renewCACertificate(ctx context.Context, kubeClient client.Client, secret *v
 		return nil, err
 	}
 
-	err = pair.RenewCertificate(privateKey, nil)
+	err = pair.RenewCertificate(privateKey, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -324,6 +330,10 @@ func (pki PublicKeyInfrastructure) schedulePeriodicMaintenance(
 func (pki PublicKeyInfrastructure) ensureCertificate(
 	ctx context.Context, kubeClient client.Client, caSecret *v1.Secret,
 ) (*v1.Secret, error) {
+	webhookHostname := fmt.Sprintf(
+		"%v.%v.svc",
+		pki.ServiceName,
+		pki.OperatorNamespace)
 	secret := &v1.Secret{}
 	// Checking if the secret already exist
 	if err := kubeClient.Get(
@@ -333,7 +343,7 @@ func (pki PublicKeyInfrastructure) ensureCertificate(
 	); err == nil {
 		// Verify the temporal validity of this certificate and
 		// renew it if needed
-		return renewServerCertificate(ctx, kubeClient, *caSecret, secret)
+		return renewServerCertificate(ctx, kubeClient, *caSecret, secret, []string{webhookHostname})
 	} else if !apierrors.IsNotFound(err) {
 		return nil, err
 	}
@@ -344,10 +354,6 @@ func (pki PublicKeyInfrastructure) ensureCertificate(
 		return nil, err
 	}
 
-	webhookHostname := fmt.Sprintf(
-		"%v.%v.svc",
-		pki.ServiceName,
-		pki.OperatorNamespace)
 	webhookPair, err := caPair.CreateAndSignPair(webhookHostname, CertTypeServer, nil)
 	if err != nil {
 		return nil, err
@@ -373,10 +379,10 @@ func (pki PublicKeyInfrastructure) ensureCertificate(
 // renewServerCertificate renews a server certificate if needed
 // Returns the renewed secret or the original one if unchanged
 func renewServerCertificate(
-	ctx context.Context, kubeClient client.Client, caSecret v1.Secret, secret *v1.Secret,
+	ctx context.Context, kubeClient client.Client, caSecret v1.Secret, secret *v1.Secret, altDNSNames []string,
 ) (*v1.Secret, error) {
 	origSecret := secret.DeepCopy()
-	hasBeenRenewed, err := RenewLeafCertificate(&caSecret, secret)
+	hasBeenRenewed, err := RenewLeafCertificate(&caSecret, secret, altDNSNames)
 	if err != nil {
 		return nil, err
 	}

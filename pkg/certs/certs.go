@@ -28,6 +28,8 @@ import (
 	"fmt"
 	"math/big"
 	"net"
+	"slices"
+	"sort"
 	"strings"
 	"time"
 
@@ -201,7 +203,9 @@ func (pair KeyPair) createAndSignPairWithValidity(
 		for _, h := range hosts {
 			if ip := net.ParseIP(h); ip != nil {
 				leafTemplate.IPAddresses = append(leafTemplate.IPAddresses, ip)
-			} else {
+				continue
+			}
+			if !slices.Contains(leafTemplate.DNSNames, h) {
 				leafTemplate.DNSNames = append(leafTemplate.DNSNames, h)
 			}
 		}
@@ -259,7 +263,11 @@ func (pair KeyPair) GenerateCertificateSecret(namespace, name string) *v1.Secret
 // with the passed private key and will have as parent the specified
 // parent certificate. If the parent certificate is nil the certificate
 // will be self-signed
-func (pair *KeyPair) RenewCertificate(caPrivateKey *ecdsa.PrivateKey, parentCertificate *x509.Certificate) error {
+func (pair *KeyPair) RenewCertificate(
+	caPrivateKey *ecdsa.PrivateKey,
+	parentCertificate *x509.Certificate,
+	altDNSNames []string,
+) error {
 	oldCertificate, err := pair.ParseCertificate()
 	if err != nil {
 		return err
@@ -279,6 +287,7 @@ func (pair *KeyPair) RenewCertificate(caPrivateKey *ecdsa.PrivateKey, parentCert
 	newCertificate.NotBefore = notBefore
 	newCertificate.NotAfter = notAfter
 	newCertificate.SerialNumber = serialNumber
+	newCertificate.DNSNames = altDNSNames
 
 	if parentCertificate == nil {
 		parentCertificate = &newCertificate
@@ -319,6 +328,19 @@ func (pair *KeyPair) IsExpiring() (bool, *time.Time, error) {
 	}
 
 	return false, &cert.NotAfter, nil
+}
+
+// DoAltDNSNamesMatch checks if the certificate has all of the specified altDNSNames
+func (pair *KeyPair) DoAltDNSNamesMatch(altDNSNames []string) (bool, error) {
+	cert, err := pair.ParseCertificate()
+	if err != nil {
+		return false, err
+	}
+
+	sort.Strings(cert.DNSNames)
+	sort.Strings(altDNSNames)
+
+	return slices.Equal(cert.DNSNames, altDNSNames), nil
 }
 
 // CreateDerivedCA create a new CA derived from the certificate in the
