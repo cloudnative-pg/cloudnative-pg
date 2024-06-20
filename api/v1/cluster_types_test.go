@@ -1567,7 +1567,7 @@ var _ = Describe("Cluster Managed Service Enablement", func() {
 			}
 
 			Expect(cluster.GetAllManagedServicesName(ServiceSelectorTypesRO)).To(HaveLen(1))
-			Expect(cluster.GetAllManagedServicesName(ServiceSelectorTypesRW)[1]).To(Equal("additional-ro-service"))
+			Expect(cluster.GetAllManagedServicesName(ServiceSelectorTypesRO)[0]).To(Equal("additional-ro-service"))
 
 			Expect(cluster.GetAllManagedServicesName(ServiceSelectorTypesR)).To(HaveLen(2))
 			Expect(cluster.GetAllManagedServicesName(ServiceSelectorTypesR)).To(ContainElement("additional-r-service"))

@@ -2447,22 +2447,26 @@ type ManagedService struct {
 
 // GetAllManagedServicesName returns the names of all managed services with given types
 func (cluster *Cluster) GetAllManagedServicesName(serviceTypes []ServiceSelectorType) []string {
-	if cluster.Spec.Managed == nil || cluster.Spec.Managed.Services == nil {
-		return nil
-	}
-
 	var serviceNames []string
 	for _, serviceType := range serviceTypes {
-		if !slices.Contains(cluster.Spec.Managed.Services.DisabledDefaultServices, serviceType) {
-			switch serviceType {
-			case ServiceSelectorTypeRW:
+		switch serviceType {
+		case ServiceSelectorTypeRW:
+			if cluster.IsReadWriteServiceEnabled() {
 				serviceNames = append(serviceNames, cluster.GetServiceReadWriteName())
-			case ServiceSelectorTypeR:
+			}
+		case ServiceSelectorTypeR:
+			if cluster.IsReadServiceEnabled() {
 				serviceNames = append(serviceNames, cluster.GetServiceReadName())
-			case ServiceSelectorTypeRO:
+			}
+		case ServiceSelectorTypeRO:
+			if cluster.IsReadOnlyServiceEnabled() {
 				serviceNames = append(serviceNames, cluster.GetServiceReadOnlyName())
 			}
 		}
+	}
+
+	if cluster.Spec.Managed == nil || cluster.Spec.Managed.Services == nil {
+		return serviceNames
 	}
 
 	for _, service := range cluster.Spec.Managed.Services.Additional {
