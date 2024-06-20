@@ -309,6 +309,18 @@ type ConfigurationInfo struct {
 
 	// IsWalArchivingDisabled is true when user requested to disable WAL archiving
 	IsWalArchivingDisabled bool
+
+	// IsAlterSystemEnabled is true when 'allow_alter_system' should be set to on
+	IsAlterSystemEnabled bool
+}
+
+// getAlterSystemEnabledValue returns a config compatible value for IsAlterSystemEnabled
+func (c ConfigurationInfo) getAlterSystemEnabledValue() string {
+	if c.IsAlterSystemEnabled {
+		return "on"
+	}
+
+	return "off"
 }
 
 // ManagedExtension defines all the information about a managed extension
@@ -649,6 +661,10 @@ func CreatePostgresqlConfiguration(info ConfigurationInfo) *PgConfiguration {
 	// Apply the list of temporary tablespaces
 	if len(info.TemporaryTablespaces) > 0 {
 		configuration.OverwriteConfig("temp_tablespaces", strings.Join(info.TemporaryTablespaces, ","))
+	}
+
+	if info.MajorVersion >= 17 {
+		configuration.OverwriteConfig("allow_alter_system", info.getAlterSystemEnabledValue())
 	}
 
 	return configuration
