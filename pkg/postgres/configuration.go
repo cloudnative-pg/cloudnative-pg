@@ -382,7 +382,6 @@ var (
 	// changed by the user
 	FixedConfigurationParameters = map[string]string{
 		// The following parameters need a restart to be applied
-		"allow_alter_system":        fixedConfigurationParameter,
 		"allow_system_table_mods":   blockedConfigurationParameter,
 		"archive_mode":              fixedConfigurationParameter,
 		"bonjour":                   blockedConfigurationParameter,
@@ -634,6 +633,12 @@ func CreatePostgresqlConfiguration(info ConfigurationInfo) *PgConfiguration {
 		for key, value := range info.Settings.MandatorySettings {
 			configuration.OverwriteConfig(key, value)
 		}
+
+		// IMPORTANT: yes, this field is called MajorVersion but actually
+		// it's just the PostgreSQL version number
+		if info.MajorVersion >= 170000 {
+			configuration.OverwriteConfig("allow_alter_system", info.getAlterSystemEnabledValue())
+		}
 	}
 
 	// Apply the correct archive_mode
@@ -662,10 +667,6 @@ func CreatePostgresqlConfiguration(info ConfigurationInfo) *PgConfiguration {
 	// Apply the list of temporary tablespaces
 	if len(info.TemporaryTablespaces) > 0 {
 		configuration.OverwriteConfig("temp_tablespaces", strings.Join(info.TemporaryTablespaces, ","))
-	}
-
-	if info.MajorVersion >= 17 {
-		configuration.OverwriteConfig("allow_alter_system", info.getAlterSystemEnabledValue())
 	}
 
 	return configuration
