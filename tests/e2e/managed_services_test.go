@@ -85,9 +85,13 @@ var _ = Describe("Managed services tests", Label(tests.LabelSmoke, tests.LabelBa
 		})
 
 		By("ensuring the service is deleted when removed from the additional field", func() {
-			cluster.Spec.Managed.Services.Additional = []apiv1.ManagedService{}
-			err = env.Client.Update(ctx, cluster)
-			Expect(err).ToNot(HaveOccurred())
+			Eventually(func(g Gomega) error {
+				cluster, err := env.GetCluster(namespace, clusterName)
+				g.Expect(err).ToNot(HaveOccurred())
+				cluster.Spec.Managed.Services.Additional = []apiv1.ManagedService{}
+				return env.Client.Update(ctx, cluster)
+			}, RetryTimeout, PollingTime).Should(BeNil())
+
 			AssertClusterIsReady(namespace, clusterName, testTimeouts[utils.ManagedServices], env)
 			Eventually(func(g Gomega) {
 				var serviceRW corev1.Service
@@ -131,9 +135,12 @@ var _ = Describe("Managed services tests", Label(tests.LabelSmoke, tests.LabelBa
 		})
 
 		By("creating them when they are re-enabled", func() {
-			cluster.Spec.Managed.Services.DisabledDefaultServices = []apiv1.ServiceSelectorType{}
-			err = env.Client.Update(ctx, cluster)
-			Expect(err).ToNot(HaveOccurred())
+			Eventually(func(g Gomega) error {
+				cluster, err := env.GetCluster(namespace, clusterName)
+				g.Expect(err).ToNot(HaveOccurred())
+				cluster.Spec.Managed.Services.DisabledDefaultServices = []apiv1.ServiceSelectorType{}
+				return env.Client.Update(ctx, cluster)
+			}, RetryTimeout, PollingTime).Should(BeNil())
 
 			AssertClusterIsReady(namespace, clusterName, testTimeouts[utils.ManagedServices], env)
 
