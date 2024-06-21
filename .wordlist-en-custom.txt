@@ -685,6 +685,7 @@ ecdsa
 edb
 eks
 enableAlterSystem
+enableMetricsTLS
 enablePDB
 enablePodAntiAffinity
 enablePodMonitor
