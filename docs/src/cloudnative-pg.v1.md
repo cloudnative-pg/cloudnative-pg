@@ -3366,6 +3366,13 @@ Default: false.</p>
    <p>Enable or disable the <code>PodMonitor</code></p>
 </td>
 </tr>
+<tr><td><code>enableMetricsTLS</code><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>Enable HTTPS for the metrics endpoint, (and if PodMonitor is enabled, also for PodMonitor)</p>
+</td>
+</tr>
 <tr><td><code>podMonitorMetricRelabelings</code><br/>
 <a href="https://pkg.go.dev/github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1#RelabelConfig"><i>[]github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1.RelabelConfig</i></a>
 </td>

@@ -2403,6 +2403,11 @@ type MonitoringConfiguration struct {
 	// +optional
 	EnablePodMonitor bool `json:"enablePodMonitor,omitempty"`
 
+	// Enable HTTPS for the metrics endpoint, (and if PodMonitor is enabled, also for PodMonitor)
+	// +kubebuilder:default:=false
+	// +optional
+	EnableMetricsTLS bool `json:"enableMetricsTLS,omitempty"`
+
 	// The list of metric relabelings for the `PodMonitor`. Applied to samples before ingestion.
 	// +optional
 	PodMonitorMetricRelabelConfigs []monitoringv1.RelabelConfig `json:"podMonitorMetricRelabelings,omitempty"`
@@ -3583,6 +3588,15 @@ func (cluster *Cluster) UsesConfigMap(config string) (ok bool) {
 func (cluster *Cluster) IsPodMonitorEnabled() bool {
 	if cluster.Spec.Monitoring != nil {
 		return cluster.Spec.Monitoring.EnablePodMonitor
+	}
+
+	return false
+}
+
+// IsMetricsTLSEnabled checks if the metrics endpoint should use TLS
+func (cluster *Cluster) IsMetricsTLSEnabled() bool {
+	if cluster.Spec.Monitoring != nil {
+		return cluster.Spec.Monitoring.EnableMetricsTLS
 	}
 
 	return false

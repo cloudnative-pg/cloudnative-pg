@@ -18,9 +18,12 @@ package specs
 
 import (
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 )
 
 // ClusterPodMonitorManager builds the PodMonitor for the cluster resource
@@ -41,8 +44,41 @@ func (c ClusterPodMonitorManager) BuildPodMonitor() *monitoringv1.PodMonitor {
 	}
 	c.cluster.SetInheritedDataAndOwnership(&meta)
 
+	var tlsConfig *monitoringv1.SafeTLSConfig
+	scheme := ""
+	if c.cluster.IsMetricsTLSEnabled() {
+		scheme = "https"
+		tlsConfig = &monitoringv1.SafeTLSConfig{
+			CA: monitoringv1.SecretOrConfigMap{
+				Secret: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: c.cluster.GetServerCASecretName(),
+					},
+					Key: certs.CACertKey,
+				},
+			},
+			Cert: monitoringv1.SecretOrConfigMap{
+				Secret: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: c.cluster.GetServerCASecretName(),
+					},
+					Key: certs.CACertKey,
+				},
+			},
+			KeySecret: &corev1.SecretKeySelector{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: c.cluster.GetServerCASecretName(),
+				},
+				Key: certs.CAPrivateKeyKey,
+			},
+			InsecureSkipVerify: ptr.To(true),
+		}
+	}
+
 	endpoint := monitoringv1.PodMetricsEndpoint{
-		Port: "metrics",
+		Port:      "metrics",
+		Scheme:    scheme,
+		TLSConfig: tlsConfig,
 	}
 
 	if c.cluster.Spec.Monitoring != nil {
