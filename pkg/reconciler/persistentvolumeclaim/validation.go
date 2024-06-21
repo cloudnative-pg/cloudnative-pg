@@ -89,7 +89,7 @@ func (status *ValidationStatus) validateVolumeMetadata(
 			status.addErrorf(
 				name,
 				"Expected role '%s', found '%s'",
-				utils.PVCRolePgData,
+				expectedMeta.GetRoleName(),
 				pvcRoleLabel)
 		}
 		return
@@ -102,7 +102,7 @@ func (status *ValidationStatus) validateVolumeMetadata(
 		status.addErrorf(
 			name,
 			"Expected role '%s', found '%s'",
-			utils.PVCRolePgData,
+			expectedMeta.GetRoleName(),
 			pvcRoleAnnotation)
 	}
 
@@ -173,43 +173,71 @@ func VerifyDataSourceCoherence(
 	return result, nil
 }
 
+type metadataSource struct {
+	snapshot *storagesnapshotv1.VolumeSnapshot
+	pvc      *corev1.PersistentVolumeClaim
+}
+
+func newMetadataSource(source corev1.TypedLocalObjectReference) (*metadataSource, error) {
+	objRef := &metadataSource{}
+	apiGroup := ""
+	if source.APIGroup != nil {
+		apiGroup = *source.APIGroup
+	}
+	if apiGroup == storagesnapshotv1.GroupName && source.Kind == "VolumeSnapshot" {
+		objRef.snapshot = &storagesnapshotv1.VolumeSnapshot{}
+		return objRef, nil
+	}
+	if apiGroup == corev1.GroupName && source.Kind == "PersistentVolumeClaim" {
+		objRef.pvc = &corev1.PersistentVolumeClaim{}
+		return objRef, nil
+	}
+
+	return nil, fmt.Errorf("only VolumeSnapshots and PersistentVolumeClaims are supported")
+}
+
+func (o metadataSource) getClientObject() client.Object {
+	if o.snapshot != nil {
+		return o.snapshot
+	}
+	return o.pvc
+}
+
+func (o metadataSource) getMetadata() *metav1.ObjectMeta {
+	if o.snapshot != nil {
+		return &o.snapshot.ObjectMeta
+	}
+	if o.pvc != nil {
+		return &o.pvc.ObjectMeta
+	}
+
+	return nil
+}
+
 // GetSourceMetadataOrNil gets snapshot metadata from a specified source.
 // If the source doesn't exist, returns nil
 func GetSourceMetadataOrNil(
 	ctx context.Context,
 	c client.Client,
 	namespace string,
-	source corev1.TypedLocalObjectReference,
+	typedSource corev1.TypedLocalObjectReference,
 ) (*metav1.ObjectMeta, error) {
-	apiGroup := ""
-	if source.APIGroup != nil {
-		apiGroup = *source.APIGroup
+	source, err := newMetadataSource(typedSource)
+	if err != nil {
+		return nil, err
+	}
+	err = c.Get(
+		ctx,
+		client.ObjectKey{Namespace: namespace, Name: typedSource.Name},
+		source.getClientObject(),
+	)
+
+	if apierrs.IsNotFound(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
 	}
 
-	switch {
-	case apiGroup == "" && source.Kind == "":
-		fallthrough
-	case apiGroup == storagesnapshotv1.GroupName && source.Kind == "VolumeSnapshot":
-		var result storagesnapshotv1.VolumeSnapshot
-		if err := c.Get(ctx, client.ObjectKey{Namespace: namespace, Name: source.Name}, &result); err != nil {
-			if apierrs.IsNotFound(err) {
-				return nil, nil
-			}
-
-			return nil, err
-		}
-		return &result.ObjectMeta, nil
-	case apiGroup == corev1.GroupName && source.Kind == "PersistentVolumeClaim":
-		var result corev1.PersistentVolumeClaim
-		if err := c.Get(ctx, client.ObjectKey{Namespace: namespace, Name: source.Name}, &result); err != nil {
-			if apierrs.IsNotFound(err) {
-				return nil, nil
-			}
-
-			return nil, err
-		}
-		return &result.ObjectMeta, nil
-	}
-
-	return nil, fmt.Errorf("only VolumeSnapshots and PersistentVolumeClaims are supported")
+	return source.getMetadata(), nil
 }
