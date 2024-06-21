@@ -54,6 +54,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/metricserver"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	externalcluster "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/replicaclusterswitch"
+	clusterstatus "github.com/cloudnative-pg/cloudnative-pg/pkg/resources/status"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/system"
 	pkgUtils "github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -281,10 +282,14 @@ func (r *InstanceReconciler) restartPrimaryInplaceIfRequested(
 		); err != nil {
 			return true, err
 		}
-		oldCluster := cluster.DeepCopy()
-		cluster.Status.Phase = apiv1.PhaseHealthy
-		cluster.Status.PhaseReason = "Primary instance restarted in-place"
-		return true, r.client.Status().Patch(ctx, cluster, client.MergeFrom(oldCluster))
+
+		return true, clusterstatus.RegisterPhase(
+			ctx,
+			r.client,
+			cluster,
+			apiv1.PhaseHealthy,
+			"Primary instance restarted in-place",
+		)
 	}
 	return false, nil
 }
@@ -994,10 +999,7 @@ func (r *InstanceReconciler) processConfigReloadAndManageRestart(ctx context.Con
 		return nil
 	}
 
-	oldCluster := cluster.DeepCopy()
-	cluster.Status.Phase = phase
-	cluster.Status.PhaseReason = phaseReason
-	return r.client.Status().Patch(ctx, cluster, client.MergeFrom(oldCluster))
+	return clusterstatus.RegisterPhase(ctx, r.client, cluster, phase, phaseReason)
 }
 
 // refreshCertificateFilesFromSecret receive a secret and rewrite the file
