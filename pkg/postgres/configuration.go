@@ -382,6 +382,7 @@ var (
 	// changed by the user
 	FixedConfigurationParameters = map[string]string{
 		// The following parameters need a restart to be applied
+		"allow_alter_system":        fixedConfigurationParameter,
 		"allow_system_table_mods":   blockedConfigurationParameter,
 		"archive_mode":              fixedConfigurationParameter,
 		"bonjour":                   blockedConfigurationParameter,
