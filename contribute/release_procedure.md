@@ -4,9 +4,9 @@ This section describes how to release a new set of supported versions of
 CloudNativePG, which should be done by one of the project's maintainers.
 It is a semi-automated process that requires human supervision.
 
-You can only release from a release branch, that is a branch in the
-Git repository called `release-X.Y`, e.g., `release-1.16`, which corresponds
-to a minor release.
+You can only release stable versions from a release branch, that is a branch
+in the Git repository called `release-X.Y`, e.g., `release-1.16`, which
+corresponds to a minor release.
 
 The release procedure must be repeated for all the supported minor releases,
 usually 3:
@@ -240,16 +240,22 @@ Open the `.github/ISSUE_TEMPLATES/bug.yml` file and update it accordingly.
 ## Release candidate
 
 It's possible to create a release candidate (RC) for any of the
-supported release branches. Unlike stable releases, a release candidate
-might be released just for one release branch. As such, in this case the
-release process doesn't necessarily have to be repeated for all the
-supported release branches.
+currently supported release branches, or also for a new minor release.
+Unlike stable releases, a release candidate might be released just for one
+version, and in this case the release process doesn't necessarily have to
+be repeated for all the supported release branches.
+
+**IMPORTANT:** RCs for currently supported release branches should be released
+from the related release branch.
+Instead, when releasing a RC for a new minor release (e.g a stable version
+for that minor hasn't been released yet), that should be done from the
+`main` branch.
 
 To release a RC you can follow the [Release steps](#release-steps) until
 point 5, taking care to use a valid semantic version when running the first
 step (e.g., `hack/release.sh 1.16.0-rc1`).
-See [Semantic Versioning 2.0.0 - Point 9](https://semver.org/#spec-item-9) to
+See [Semantic Versioning 2.0.0 - item 9](https://semver.org/#spec-item-9) to
 check for valid release candidate identifiers.
 
-**IMPORTANT:** Release candidates can only be installed via the YAML manifest,
+**NOTE:** Release candidates can only be installed via the YAML manifest,
 other installation methods such as Helm Chart or OLM are currently not supported.
