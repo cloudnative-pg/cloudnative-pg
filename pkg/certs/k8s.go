@@ -27,7 +27,6 @@ import (
 	"github.com/robfig/cron"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	v1 "k8s.io/api/core/v1"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -78,10 +77,6 @@ type PublicKeyInfrastructure struct {
 	// The name of the validating webhook configuration in k8s, used
 	// to inject the caBundle
 	ValidatingWebhookConfigurationName string
-
-	// The name of every CRD that has a reference to a conversion webhook
-	// on which we need to inject our public key
-	CustomResourceDefinitionsName []string
 
 	// The labelSelector to be used to get the operators deployment,
 	// e.g. "app.kubernetes.io/name=cloudnative-pg"
@@ -292,12 +287,6 @@ func (pki PublicKeyInfrastructure) setupWebhooksCertificate(
 		return nil, err
 	}
 
-	for _, name := range pki.CustomResourceDefinitionsName {
-		if err := pki.injectPublicKeyIntoCRD(ctx, kubeClient, name, webhookSecret); err != nil {
-			return nil, err
-		}
-	}
-
 	return webhookSecret, nil
 }
 
@@ -464,33 +453,6 @@ func (pki PublicKeyInfrastructure) injectPublicKeyIntoValidatingWebhook(
 	}
 
 	return kubeClient.Patch(ctx, config, client.MergeFrom(oldConfig))
-}
-
-// injectPublicKeyIntoCRD inject the TLS public key into the admitted
-// ones from a certain conversion webhook inside a CRD
-func (pki PublicKeyInfrastructure) injectPublicKeyIntoCRD(
-	ctx context.Context,
-	kubeClient client.Client,
-	name string,
-	tlsSecret *v1.Secret,
-) error {
-	crd := apiextensionsv1.CustomResourceDefinition{}
-	err := kubeClient.Get(ctx, client.ObjectKey{Name: name}, &crd)
-	if err != nil {
-		return err
-	}
-
-	oldCrd := crd.DeepCopy()
-	if crd.Spec.Conversion == nil ||
-		crd.Spec.Conversion.Webhook == nil ||
-		crd.Spec.Conversion.Webhook.ClientConfig == nil ||
-		reflect.DeepEqual(crd.Spec.Conversion.Webhook.ClientConfig.CABundle, tlsSecret.Data["tls.crt"]) {
-		return nil
-	}
-
-	crd.Spec.Conversion.Webhook.ClientConfig.CABundle = tlsSecret.Data["tls.crt"]
-
-	return kubeClient.Patch(ctx, &crd, client.MergeFrom(oldCrd))
 }
 
 func isSecretsMountNotRefreshedError(err error) bool {

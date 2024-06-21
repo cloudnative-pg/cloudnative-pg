@@ -24,7 +24,6 @@ import (
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	apiextensionv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -49,10 +48,6 @@ var (
 		OperatorNamespace:                  operatorNamespaceName,
 		MutatingWebhookConfigurationName:   "mutating-webhook",
 		ValidatingWebhookConfigurationName: "validating-webhook",
-		CustomResourceDefinitionsName: []string{
-			"clusters.postgresql.cnpg.io",
-			"backups.postgresql.cnpg.io",
-		},
 	}
 
 	mutatingWebhookTemplate = admissionregistrationv1.MutatingWebhookConfiguration{
@@ -73,34 +68,6 @@ var (
 		Webhooks: []admissionregistrationv1.ValidatingWebhook{
 			{
 				ClientConfig: admissionregistrationv1.WebhookClientConfig{},
-			},
-		},
-	}
-
-	firstCrdTemplate = apiextensionv1.CustomResourceDefinition{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: pkiEnvironmentTemplate.CustomResourceDefinitionsName[0],
-		},
-		Spec: apiextensionv1.CustomResourceDefinitionSpec{
-			Conversion: &apiextensionv1.CustomResourceConversion{
-				Webhook: &apiextensionv1.WebhookConversion{
-					ConversionReviewVersions: []string{"v1", "v1alpha1"},
-					ClientConfig:             &apiextensionv1.WebhookClientConfig{},
-				},
-			},
-		},
-	}
-
-	secondCrdTemplate = apiextensionv1.CustomResourceDefinition{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: pkiEnvironmentTemplate.CustomResourceDefinitionsName[1],
-		},
-		Spec: apiextensionv1.CustomResourceDefinitionSpec{
-			Conversion: &apiextensionv1.CustomResourceConversion{
-				Webhook: &apiextensionv1.WebhookConversion{
-					ConversionReviewVersions: []string{"v1", "v1alpha1"},
-					ClientConfig:             &apiextensionv1.WebhookClientConfig{},
-				},
 			},
 		},
 	}
@@ -360,18 +327,10 @@ var _ = Describe("Webhook environment creation", func() {
 		pki := pkiEnvironmentTemplate
 		mutatingWebhook := mutatingWebhookTemplate
 		validatingWebhook := validatingWebhookTemplate
-		firstCrd := firstCrdTemplate
-		secondCrd := secondCrdTemplate
 
 		kubeClient := generateFakeClient()
 
 		err = createFakeOperatorDeployment(ctx, kubeClient)
-		Expect(err).ToNot(HaveOccurred())
-
-		err = kubeClient.Create(ctx, &firstCrd)
-		Expect(err).ToNot(HaveOccurred())
-
-		err = kubeClient.Create(ctx, &secondCrd)
 		Expect(err).ToNot(HaveOccurred())
 
 		err = kubeClient.Create(ctx, &mutatingWebhook)
@@ -410,21 +369,5 @@ var _ = Describe("Webhook environment creation", func() {
 			&updatedValidatingWebhook)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(updatedValidatingWebhook.Webhooks[0].ClientConfig.CABundle).To(Equal(webhookSecret.Data["tls.crt"]))
-
-		updatedFirstCrd := apiextensionv1.CustomResourceDefinition{}
-		err = kubeClient.Get(
-			ctx,
-			client.ObjectKey{Name: pki.CustomResourceDefinitionsName[0]},
-			&updatedFirstCrd)
-		Expect(err).ToNot(HaveOccurred())
-		Expect(updatedFirstCrd.Spec.Conversion.Webhook.ClientConfig.CABundle).To(Equal(webhookSecret.Data["tls.crt"]))
-
-		updatedSecondCrd := apiextensionv1.CustomResourceDefinition{}
-		err = kubeClient.Get(
-			ctx,
-			client.ObjectKey{Name: pki.CustomResourceDefinitionsName[1]},
-			&updatedSecondCrd)
-		Expect(err).ToNot(HaveOccurred())
-		Expect(updatedSecondCrd.Spec.Conversion.Webhook.ClientConfig.CABundle).To(Equal(webhookSecret.Data["tls.crt"]))
 	})
 })
