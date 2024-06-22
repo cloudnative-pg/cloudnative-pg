@@ -86,9 +86,12 @@ func NewBackupReconciler(mgr manager.Manager, discoveryClient *discovery.Discove
 // +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=backups/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=clusters,verbs=get
 // +kubebuilder:rbac:groups=snapshot.storage.k8s.io,resources=volumesnapshots,verbs=get;create;watch;list;patch
+// +kubebuilder:rbac:groups=groupsnapshot.storage.k8s.io,resources=volumegroupsnapshots,verbs=get;create;watch;list;patch
+// +kubebuilder:rbac:groups=groupsnapshot.storage.k8s.io,resources=volumegroupsnapshotcontents,verbs=get;watch;list
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 // +kubebuilder:rbac:groups="",resources=pods/exec,verbs=get;list;delete;patch;create;watch
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get
+// +kubebuilder:rbac:groups="",resources=persistentvolumes,verbs=get;list;watch
 
 // Reconcile is the main reconciliation loop
 // nolint: gocognit
@@ -358,7 +361,7 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 		return &ctrl.Result{}, nil
 	}
 
-	ctx = log.IntoContext(ctx, contextLogger.WithValues("targetPod", targetPod))
+	ctx = log.IntoContext(ctx, contextLogger.WithValues("targetPodName", targetPod.Name))
 
 	// Validate we don't have other running backups
 	var clusterBackups apiv1.BackupList

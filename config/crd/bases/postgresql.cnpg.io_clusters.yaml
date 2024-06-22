@@ -1392,6 +1392,12 @@ spec:
                           ClassName specifies the Snapshot Class to be used for PG_DATA PersistentVolumeClaim.
                           It is the default class for the other types if no specific class is present
                         type: string
+                      groupSnapshot:
+                        default: false
+                        description: |-
+                          GroupSnapshot makes the operator use a VolumeGroupSnapshot resource
+                          instead of individual snapshots
+                        type: boolean
                       labels:
                         additionalProperties:
                           type: string
