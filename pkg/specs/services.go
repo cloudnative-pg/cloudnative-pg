@@ -121,7 +121,8 @@ func CreateClusterReadWriteService(cluster apiv1.Cluster) *corev1.Service {
 // - error: an error if the creation of any service fails, otherwise nil.
 //
 // Example usage:
-// services, err := BuildManagedServices(cluster)
+//
+//	services, err := BuildManagedServices(cluster)
 //
 //	if err != nil {
 //	    // handle error
