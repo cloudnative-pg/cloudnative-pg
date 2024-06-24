@@ -298,7 +298,7 @@ func EnsureParentDirectoryExist(fileName string) error {
 
 // EnsureDirectoryExists check if the passed directory exists or not, and if
 // it doesn't exist, create it using 0700 as permissions bits.
-// If the directory exists and does not have 0700 as permissions, leave them set
+// If the directory exists and its permissions are not 0700, that's fine
 func EnsureDirectoryExists(destinationDir string) (err error) {
 	if _, err = os.Stat(destinationDir); errors.Is(err, fs.ErrNotExist) {
 		err = os.MkdirAll(destinationDir, 0o700)
