@@ -26,6 +26,11 @@ primarily operates in two modes:
 You can also choose a hybrid approach, where only part of the certificates is
 generated outside CNPG.
 
+!!! Note
+    The operator will do a CA verification of the certificates, this is because
+    certificates externally provided will not have all the DNS name for all the
+    services inside causing an error when trying to fully verify the certificates
+
 ## Operator-managed mode
 
 By default, the operator generates a single CA and uses it for both client and
