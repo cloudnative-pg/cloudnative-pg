@@ -112,13 +112,13 @@ func (r *ClusterReconciler) ensureClientCASecret(ctx context.Context, cluster *a
 		return nil, err
 	}
 
-	err = r.verifyCAValidity(secret, cluster)
-	if err != nil {
-		return nil, err
-	}
-
 	// Validate also ca.key if needed
 	if cluster.Spec.Certificates.ReplicationTLSSecret == "" {
+		err = r.verifyCAValidity(secret, cluster)
+		if err != nil {
+			return nil, err
+		}
+
 		_, err = certs.ParseCASecret(&secret)
 		if err != nil {
 			r.Recorder.Event(cluster, "Warning", "InvalidCASecret",
@@ -149,13 +149,13 @@ func (r *ClusterReconciler) ensureServerCASecret(ctx context.Context, cluster *a
 		return nil, err
 	}
 
-	err = r.verifyCAValidity(secret, cluster)
-	if err != nil {
-		return nil, err
-	}
-
 	// validate also ca.key if needed
 	if cluster.Spec.Certificates.ServerTLSSecret == "" {
+		err = r.verifyCAValidity(secret, cluster)
+		if err != nil {
+			return nil, err
+		}
+
 		_, err = certs.ParseCASecret(&secret)
 		if err != nil {
 			r.Recorder.Event(cluster, "Warning", "InvalidCASecret",
