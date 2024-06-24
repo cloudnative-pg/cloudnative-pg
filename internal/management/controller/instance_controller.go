@@ -961,7 +961,7 @@ func (r *InstanceReconciler) reconcileAutoConf(ctx context.Context, cluster *api
 	contextLogger := log.FromContext(ctx)
 	version, err := r.instance.GetPgVersion()
 	if err != nil {
-		contextLogger.Error(err, "while getting postgres version")
+		contextLogger.Error(err, "while getting Postgres version")
 		return
 	}
 
