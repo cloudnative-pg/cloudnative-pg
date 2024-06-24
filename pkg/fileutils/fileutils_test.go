@@ -358,15 +358,15 @@ var _ = Describe("EnsureDirectoryExists", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fileInfo2.Mode().Perm()).To(Equal(fs.FileMode(0o700)))
 	})
-	It("errors out when trying to make an unrealizable path", func() {
-		err := EnsureDirectoryExists("")
+	It("errors out when it cannot create the directory", func() {
+		err := EnsureDirectoryExists("/dev/foobar")
 		Expect(err).To(HaveOccurred())
-		Expect(errors.Is(err, fs.ErrNotExist)).To(BeTrue())
+		Expect(errors.Is(err, fs.ErrPermission)).To(BeTrue())
 		pathErr, ok := err.(*os.PathError)
 		Expect(ok).To(BeTrue())
 		Expect(pathErr.Op).To(Equal("mkdir"))
 	})
-	It("errors out when given an invalid unix path", func() {
+	It("errors out when Stat fails for other reasons", func() {
 		err := EnsureDirectoryExists("illegalchar\x00")
 		Expect(err).To(HaveOccurred())
 		pathErr, ok := err.(*os.PathError)
