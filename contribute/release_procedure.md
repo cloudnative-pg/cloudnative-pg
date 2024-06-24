@@ -239,17 +239,17 @@ Open the `.github/ISSUE_TEMPLATES/bug.yml` file and update it accordingly.
 
 ## Release candidate
 
-It's possible to create a release candidate (RC) for any of the
-currently supported release branches, or also for a new minor release.
-Unlike stable releases, a release candidate might be released just for one
-version, and in this case the release process doesn't necessarily have to
-be repeated for all the supported release branches.
+It's possible to create a release candidate (RC) for a new upcoming
+minor release.
+Unlike stable releases, a release candidate will be released just for one
+version, as such the release process doesn't have to be repeated for all
+the supported release branches.
 
-**IMPORTANT:** RCs for currently supported release branches should be released
-from the related release branch.
-Instead, when releasing a RC for a new minor release (e.g a stable version
-for that minor hasn't been released yet), that should be done from the
-`main` branch.
+**IMPORTANT:** Release candidates should always be released from the
+`main` branch. A release branch for a new minor should only be created
+once we are releasing the first stable version. This is necessary to
+ensure the newly created release branch is a descendant of the `main`
+branch.
 
 To release a RC you can follow the [Release steps](#release-steps) until
 point 5, taking care to use a valid semantic version when running the first
