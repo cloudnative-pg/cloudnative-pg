@@ -22,8 +22,10 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -295,9 +297,10 @@ func EnsureParentDirectoryExist(fileName string) error {
 }
 
 // EnsureDirectoryExists check if the passed directory exists or not, and if
-// it doesn't exist, create it using 0700 as permissions bits
+// it doesn't exist, create it using 0700 as permissions bits.
+// If the directory exists and does not have 0700 as permissions, leave them set
 func EnsureDirectoryExists(destinationDir string) (err error) {
-	if _, err = os.Stat(destinationDir); os.IsNotExist(err) {
+	if _, err = os.Stat(destinationDir); errors.Is(err, fs.ErrNotExist) {
 		err = os.MkdirAll(destinationDir, 0o700)
 		if err != nil {
 			return err

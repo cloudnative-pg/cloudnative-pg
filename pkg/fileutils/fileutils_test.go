@@ -17,7 +17,9 @@ limitations under the License.
 package fileutils
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
@@ -333,5 +335,53 @@ var _ = Describe("RemoveRestoreExcludedFiles", func() {
 				Expect(os.IsNotExist(err)).To(BeTrue(), "Expected file to be removed: "+fullPath)
 			}
 		}
+	})
+})
+
+var _ = Describe("EnsureDirectoryExists", func() {
+	var tempDir string
+	BeforeEach(func() {
+		var err error
+		tempDir, err = os.MkdirTemp("", "test")
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	AfterEach(func() {
+		// Cleanup
+		Expect(os.RemoveAll(tempDir)).To(Succeed())
+	})
+	It("creates the directory with the right permissions", func() {
+		newDir := filepath.Join(tempDir, "newDir")
+
+		Expect(EnsureDirectoryExists(newDir)).To(Succeed())
+		fileInfo2, err := os.Stat(newDir)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(fileInfo2.Mode().Perm()).To(Equal(fs.FileMode(0o700)))
+	})
+	It("errors out when trying to make an unrealizable path", func() {
+		err := EnsureDirectoryExists("")
+		Expect(err).To(HaveOccurred())
+		Expect(errors.Is(err, fs.ErrNotExist)).To(BeTrue())
+		pathErr, ok := err.(*os.PathError)
+		Expect(ok).To(BeTrue())
+		Expect(pathErr.Op).To(Equal("mkdir"))
+	})
+	It("errors out when given an invalid unix path", func() {
+		err := EnsureDirectoryExists("illegalchar\x00")
+		Expect(err).To(HaveOccurred())
+		pathErr, ok := err.(*os.PathError)
+		Expect(ok).To(BeTrue())
+		Expect(pathErr.Op).To(Equal("stat"))
+		Expect(err.Error()).To(ContainSubstring("invalid"))
+	})
+	It("ignores the permissions if the file already exists", func() {
+		existingDir, err := os.MkdirTemp(tempDir, "existingDir")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(os.Chmod(existingDir, 0o600)).To(Succeed())
+
+		Expect(EnsureDirectoryExists(existingDir)).To(Succeed())
+		fileInfo2, err := os.Stat(existingDir)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(fileInfo2.Mode().Perm()).To(Equal(fs.FileMode(0o600)))
 	})
 })
