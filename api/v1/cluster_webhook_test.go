@@ -1200,7 +1200,7 @@ var _ = Describe("configuration change validation", func() {
 			Spec: ClusterSpec{
 				Instances: 1,
 				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled: true,
+					Enabled: ptr.To(true),
 				},
 				PostgresConfiguration: PostgresConfiguration{
 					Parameters: map[string]string{
@@ -2610,194 +2610,12 @@ var _ = Describe("unix permissions identifiers change validation", func() {
 	})
 })
 
-var _ = Describe("replica mode validation", func() {
-	It("complains if the bootstrap method is not specified", func() {
-		cluster := &Cluster{
-			Spec: ClusterSpec{
-				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled: true,
-					Source:  "test",
-				},
-				ExternalClusters: []ExternalCluster{
-					{
-						Name: "test",
-					},
-				},
-			},
-		}
-		Expect(cluster.validateReplicaMode()).ToNot(BeEmpty())
-	})
-
-	It("complains if the initdb bootstrap method is used", func() {
-		cluster := &Cluster{
-			Spec: ClusterSpec{
-				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled: true,
-					Source:  "test",
-				},
-				Bootstrap: &BootstrapConfiguration{
-					InitDB: &BootstrapInitDB{},
-				},
-				ExternalClusters: []ExternalCluster{
-					{
-						Name: "test",
-					},
-				},
-			},
-		}
-		Expect(cluster.validateReplicaMode()).ToNot(BeEmpty())
-	})
-
-	It("doesn't complain about initdb if we enable the external cluster on an existing cluster", func() {
-		cluster := &Cluster{
-			ObjectMeta: metav1.ObjectMeta{
-				ResourceVersion: "existing",
-			},
-			Spec: ClusterSpec{
-				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled: true,
-					Source:  "test",
-				},
-				Bootstrap: &BootstrapConfiguration{
-					InitDB: &BootstrapInitDB{},
-				},
-				ExternalClusters: []ExternalCluster{
-					{
-						Name: "test",
-					},
-				},
-			},
-		}
-		result := cluster.validateReplicaMode()
-		Expect(result).To(BeEmpty())
-	})
-
-	It("should complain if enabled is set to off during a transition", func() {
-		old := &Cluster{
-			ObjectMeta: metav1.ObjectMeta{
-				ResourceVersion: "existing",
-			},
-			Spec: ClusterSpec{
-				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled: true,
-					Source:  "test",
-				},
-				Bootstrap: &BootstrapConfiguration{
-					InitDB: &BootstrapInitDB{},
-				},
-				ExternalClusters: []ExternalCluster{
-					{
-						Name: "test",
-					},
-				},
-			},
-			Status: ClusterStatus{
-				SwitchReplicaClusterStatus: SwitchReplicaClusterStatus{
-					InProgress: true,
-				},
-			},
-		}
-
-		cluster := &Cluster{
-			ObjectMeta: metav1.ObjectMeta{
-				ResourceVersion: "existing",
-			},
-			Spec: ClusterSpec{
-				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled: false,
-					Source:  "test",
-				},
-				Bootstrap: &BootstrapConfiguration{
-					InitDB: &BootstrapInitDB{},
-				},
-				ExternalClusters: []ExternalCluster{
-					{
-						Name: "test",
-					},
-				},
-			},
-			Status: ClusterStatus{
-				SwitchReplicaClusterStatus: SwitchReplicaClusterStatus{
-					InProgress: true,
-				},
-			},
-		}
-
-		result := cluster.validateReplicaClusterChange(old)
-		Expect(result).To(HaveLen(1))
-		Expect(result[0].Type).To(Equal(field.ErrorTypeForbidden))
-		Expect(result[0].Field).To(Equal("spec.replica.enabled"))
-	})
-
-	It("is valid when the pg_basebackup bootstrap option is used", func() {
-		cluster := &Cluster{
-			Spec: ClusterSpec{
-				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled: true,
-					Source:  "test",
-				},
-				Bootstrap: &BootstrapConfiguration{
-					PgBaseBackup: &BootstrapPgBaseBackup{},
-				},
-				ExternalClusters: []ExternalCluster{
-					{
-						Name: "test",
-					},
-				},
-			},
-		}
-		result := cluster.validateReplicaMode()
-		Expect(result).To(BeEmpty())
-	})
-
-	It("is valid when the restore bootstrap option is used", func() {
-		cluster := &Cluster{
-			Spec: ClusterSpec{
-				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled: true,
-					Source:  "test",
-				},
-				Bootstrap: &BootstrapConfiguration{
-					Recovery: &BootstrapRecovery{},
-				},
-				ExternalClusters: []ExternalCluster{
-					{
-						Name: "test",
-					},
-				},
-			},
-		}
-		result := cluster.validateReplicaMode()
-		Expect(result).To(BeEmpty())
-	})
-
-	It("complains when the external cluster doesn't exist", func() {
-		cluster := &Cluster{
-			Spec: ClusterSpec{
-				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled: true,
-					Source:  "test",
-				},
-				Bootstrap: &BootstrapConfiguration{
-					PgBaseBackup: &BootstrapPgBaseBackup{},
-				},
-				ExternalClusters: []ExternalCluster{},
-			},
-		}
-
-		cluster.Spec.Bootstrap.PgBaseBackup = nil
-		result := cluster.validateReplicaMode()
-		Expect(result).ToNot(BeEmpty())
-	})
-
+var _ = Describe("promotion token validation", func() {
 	It("complains if the replica token is not formatted in base64", func() {
 		cluster := &Cluster{
-			ObjectMeta: metav1.ObjectMeta{
-				ResourceVersion: "existing",
-			},
 			Spec: ClusterSpec{
 				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled:        false,
+					Enabled:        ptr.To(false),
 					Source:         "test",
 					PromotionToken: "this-is-a-wrong-token",
 				},
@@ -2818,12 +2636,9 @@ var _ = Describe("replica mode validation", func() {
 
 	It("complains if the replica token is not valid", func() {
 		cluster := &Cluster{
-			ObjectMeta: metav1.ObjectMeta{
-				ResourceVersion: "existing",
-			},
 			Spec: ClusterSpec{
 				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled:        false,
+					Enabled:        ptr.To(false),
 					Source:         "test",
 					PromotionToken: base64.StdEncoding.EncodeToString([]byte("{}")),
 				},
@@ -2855,12 +2670,9 @@ var _ = Describe("replica mode validation", func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		cluster := &Cluster{
-			ObjectMeta: metav1.ObjectMeta{
-				ResourceVersion: "existing",
-			},
 			Spec: ClusterSpec{
 				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled:        true,
+					Enabled:        ptr.To(false),
 					Source:         "test",
 					PromotionToken: base64.StdEncoding.EncodeToString(jsonToken),
 				},
@@ -2877,6 +2689,382 @@ var _ = Describe("replica mode validation", func() {
 
 		result := cluster.validatePromotionToken()
 		Expect(result).To(BeEmpty())
+	})
+
+	It("complains if the token is set on a replica cluster (enabled)", func() {
+		tokenContent := utils.PgControldataTokenContent{
+			LatestCheckpointTimelineID:   "1",
+			REDOWALFile:                  "0000000100000001000000A1",
+			DatabaseSystemIdentifier:     "231231212",
+			LatestCheckpointREDOLocation: "0/1000000",
+			TimeOfLatestCheckpoint:       "we don't know",
+			OperatorVersion:              "version info",
+		}
+		jsonToken, err := json.Marshal(tokenContent)
+		Expect(err).ToNot(HaveOccurred())
+
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled:        ptr.To(true),
+					Source:         "test",
+					PromotionToken: base64.StdEncoding.EncodeToString(jsonToken),
+				},
+			},
+		}
+
+		result := cluster.validatePromotionToken()
+		Expect(result).NotTo(BeEmpty())
+	})
+
+	It("complains if the token is set on a replica cluster (primary, default name)", func() {
+		tokenContent := utils.PgControldataTokenContent{
+			LatestCheckpointTimelineID:   "1",
+			REDOWALFile:                  "0000000100000001000000A1",
+			DatabaseSystemIdentifier:     "231231212",
+			LatestCheckpointREDOLocation: "0/1000000",
+			TimeOfLatestCheckpoint:       "we don't know",
+			OperatorVersion:              "version info",
+		}
+		jsonToken, err := json.Marshal(tokenContent)
+		Expect(err).ToNot(HaveOccurred())
+
+		cluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test2",
+			},
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Primary:        "test",
+					Source:         "test",
+					PromotionToken: base64.StdEncoding.EncodeToString(jsonToken),
+				},
+			},
+		}
+
+		result := cluster.validatePromotionToken()
+		Expect(result).NotTo(BeEmpty())
+	})
+
+	It("complains if the token is set on a replica cluster (primary, self)", func() {
+		tokenContent := utils.PgControldataTokenContent{
+			LatestCheckpointTimelineID:   "1",
+			REDOWALFile:                  "0000000100000001000000A1",
+			DatabaseSystemIdentifier:     "231231212",
+			LatestCheckpointREDOLocation: "0/1000000",
+			TimeOfLatestCheckpoint:       "we don't know",
+			OperatorVersion:              "version info",
+		}
+		jsonToken, err := json.Marshal(tokenContent)
+		Expect(err).ToNot(HaveOccurred())
+
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Primary:        "test",
+					Self:           "test2",
+					Source:         "test",
+					PromotionToken: base64.StdEncoding.EncodeToString(jsonToken),
+				},
+			},
+		}
+
+		result := cluster.validatePromotionToken()
+		Expect(result).NotTo(BeEmpty())
+	})
+})
+
+var _ = Describe("replica mode validation", func() {
+	It("complains if the bootstrap method is not specified", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled: ptr.To(true),
+					Source:  "test",
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "test",
+					},
+				},
+			},
+		}
+		Expect(cluster.validateReplicaMode()).ToNot(BeEmpty())
+	})
+
+	It("complains if the initdb bootstrap method is used", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled: ptr.To(true),
+					Source:  "test",
+				},
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{},
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "test",
+					},
+				},
+			},
+		}
+		Expect(cluster.validateReplicaMode()).ToNot(BeEmpty())
+	})
+
+	It("doesn't complain about initdb if we enable the external cluster on an existing cluster", func() {
+		cluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				ResourceVersion: "existing",
+			},
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled: ptr.To(true),
+					Source:  "test",
+				},
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{},
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "test",
+					},
+				},
+			},
+		}
+		result := cluster.validateReplicaMode()
+		Expect(result).To(BeEmpty())
+	})
+
+	It("should complain if enabled is set to off during a transition", func() {
+		old := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				ResourceVersion: "existing",
+			},
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled: ptr.To(true),
+					Source:  "test",
+				},
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{},
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "test",
+					},
+				},
+			},
+			Status: ClusterStatus{
+				SwitchReplicaClusterStatus: SwitchReplicaClusterStatus{
+					InProgress: true,
+				},
+			},
+		}
+
+		cluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				ResourceVersion: "existing",
+			},
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled: ptr.To(false),
+					Source:  "test",
+				},
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{},
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "test",
+					},
+				},
+			},
+			Status: ClusterStatus{
+				SwitchReplicaClusterStatus: SwitchReplicaClusterStatus{
+					InProgress: true,
+				},
+			},
+		}
+
+		result := cluster.validateReplicaClusterChange(old)
+		Expect(result).To(HaveLen(1))
+		Expect(result[0].Type).To(Equal(field.ErrorTypeForbidden))
+		Expect(result[0].Field).To(Equal("spec.replica.enabled"))
+	})
+
+	It("is valid when the pg_basebackup bootstrap option is used", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled: ptr.To(true),
+					Source:  "test",
+				},
+				Bootstrap: &BootstrapConfiguration{
+					PgBaseBackup: &BootstrapPgBaseBackup{},
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "test",
+					},
+				},
+			},
+		}
+		result := cluster.validateReplicaMode()
+		Expect(result).To(BeEmpty())
+	})
+
+	It("is valid when the restore bootstrap option is used", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled: ptr.To(true),
+					Source:  "test",
+				},
+				Bootstrap: &BootstrapConfiguration{
+					Recovery: &BootstrapRecovery{},
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "test",
+					},
+				},
+			},
+		}
+		result := cluster.validateReplicaMode()
+		Expect(result).To(BeEmpty())
+	})
+
+	It("complains when the primary field is used with the enabled field", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled: ptr.To(true),
+					Primary: "toast",
+					Source:  "test",
+				},
+				Bootstrap: &BootstrapConfiguration{
+					PgBaseBackup: &BootstrapPgBaseBackup{},
+				},
+				ExternalClusters: []ExternalCluster{},
+			},
+		}
+		result := cluster.validateReplicaMode()
+		Expect(result).ToNot(BeEmpty())
+	})
+
+	It("doesn't complain when the enabled field is not specified", func() {
+		cluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-2",
+			},
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Primary: "test",
+					Source:  "test",
+				},
+				Bootstrap: &BootstrapConfiguration{
+					PgBaseBackup: &BootstrapPgBaseBackup{},
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "test",
+					},
+				},
+			},
+		}
+		result := cluster.validateReplicaMode()
+		Expect(result).To(BeEmpty())
+	})
+
+	It("doesn't complain when creating a new primary cluster with the replication stanza set", func() {
+		cluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test",
+			},
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Primary: "test",
+					Source:  "test",
+				},
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{},
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "test",
+					},
+				},
+			},
+		}
+		result := cluster.validateReplicaMode()
+		Expect(result).To(BeEmpty())
+	})
+})
+
+var _ = Describe("validate the replica cluster external clusters", func() {
+	It("complains when the external cluster doesn't exist (source)", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled: ptr.To(true),
+					Source:  "test",
+				},
+				Bootstrap: &BootstrapConfiguration{
+					PgBaseBackup: &BootstrapPgBaseBackup{},
+				},
+				ExternalClusters: []ExternalCluster{},
+			},
+		}
+
+		cluster.Spec.Bootstrap.PgBaseBackup = nil
+		result := cluster.validateReplicaClusterExternalClusters()
+		Expect(result).ToNot(BeEmpty())
+	})
+
+	It("complains when the external cluster doesn't exist (primary)", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Primary: "test2",
+					Source:  "test",
+				},
+				Bootstrap: &BootstrapConfiguration{
+					PgBaseBackup: &BootstrapPgBaseBackup{},
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "test",
+					},
+				},
+			},
+		}
+
+		result := cluster.validateReplicaClusterExternalClusters()
+		Expect(result).ToNot(BeEmpty())
+	})
+
+	It("complains when the external cluster doesn't exist (self)", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Self:    "test2",
+					Primary: "test",
+					Source:  "test",
+				},
+				Bootstrap: &BootstrapConfiguration{
+					PgBaseBackup: &BootstrapPgBaseBackup{},
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "test",
+					},
+				},
+			},
+		}
+
+		result := cluster.validateReplicaClusterExternalClusters()
+		Expect(result).ToNot(BeEmpty())
 	})
 })
 

@@ -29,7 +29,8 @@ spec:
       source: cluster-dc-a
 
   replica:
-    enabled: true
+    self: cluster-dc-b
+    primary: cluster-dc-a
     source: cluster-dc-a
 
   externalClusters:
