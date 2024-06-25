@@ -22,6 +22,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
 )
 
+// runProxyRequest makes a GET call on the pod interface proxy, and returns the raw response
 func runProxyRequest(env *TestingEnvironment, namespace, podName, path string, port int) ([]byte, error) {
 	portString := strconv.Itoa(port)
 
@@ -31,22 +32,22 @@ func runProxyRequest(env *TestingEnvironment, namespace, podName, path string, p
 	return req.DoRaw(env.Ctx)
 }
 
-// RetrieveMetricsFromCluster aims to retrieve the metrics from a pod in
-// PostgreSQL cluster using a proxy that can be used later
-func RetrieveMetricsFromCluster(
+// RetrieveMetricsFromInstance aims to retrieve the metrics from a PostgreSQL instance pod
+// using a GET request on the pod interface proxy
+func RetrieveMetricsFromInstance(
 	env *TestingEnvironment,
-	namespace, podNme string,
+	namespace, podName string,
 ) (string, error) {
-	body, err := runProxyRequest(env, namespace, podNme, url.PathMetrics, int(url.PostgresMetricsPort))
+	body, err := runProxyRequest(env, namespace, podName, url.PathMetrics, int(url.PostgresMetricsPort))
 	return string(body), err
 }
 
-// RetrieveMetricsFromPgBouncer aims to retrieve the metrics from a pod in
-// PgBouncerusing a proxy that can be used later
+// RetrieveMetricsFromPgBouncer aims to retrieve the metrics from a PgBouncer pod
+// using a GET request on the pod interface proxy
 func RetrieveMetricsFromPgBouncer(
 	env *TestingEnvironment,
-	namespace, podNme string,
+	namespace, podName string,
 ) (string, error) {
-	body, err := runProxyRequest(env, namespace, podNme, url.PathMetrics, int(url.PgBouncerMetricsPort))
+	body, err := runProxyRequest(env, namespace, podName, url.PathMetrics, int(url.PgBouncerMetricsPort))
 	return string(body), err
 }
