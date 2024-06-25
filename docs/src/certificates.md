@@ -27,9 +27,10 @@ You can also choose a hybrid approach, where only part of the certificates is
 generated outside CNPG.
 
 !!! Note
-    The operator and the instances verify the server certificates only against the CA,
-    ignoring the DNS name. This behavior is because user-provided certificates usually
-    do not have the DNS name for the <cluster>-rw service used for intra-cluster communication.
+    The operator and instances verify server certificates against the CA only,
+    disregarding the DNS name. This approach is due to the typical absence of DNS
+    names in user-provided certificates for the `<cluster>-rw` service used for
+    communication within the cluster.
 
 ## Operator-managed mode
 
@@ -95,10 +96,10 @@ the following parameters:
     certificates.
 
 !!! Note
-    The operator and the instances verify the certificates only against the CA,
-    ignoring the DNS name. This behavior is because user-provided certificates
-    usually do not have the DNS name for the <cluster>-rw service
-    used for intra-cluster communication.
+    The operator and instances verify server certificates against the CA only,
+    disregarding the DNS name. This approach is due to the typical absence of DNS
+    names in user-provided certificates for the `<cluster>-rw` service used for
+    communication within the cluster.
 
 !!! Note
     If you want ConfigMaps and secrets to be reloaded by instances, you can add
