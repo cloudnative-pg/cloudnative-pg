@@ -298,16 +298,21 @@ func EnsureParentDirectoryExist(fileName string) error {
 
 // EnsureDirectoryExists check if the passed directory exists or not, and if
 // it doesn't exist, create it using 0700 as permissions bits.
-// If the directory exists and its permissions are not 0700, that's fine
-func EnsureDirectoryExists(destinationDir string) (err error) {
-	if _, err = os.Stat(destinationDir); errors.Is(err, fs.ErrNotExist) {
-		err = os.MkdirAll(destinationDir, 0o700)
-		if err != nil {
-			return err
+// If the directory exists it doesn't change the permissions.
+func EnsureDirectoryExists(destinationDir string) error {
+	stat, err := os.Stat(destinationDir)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return os.MkdirAll(destinationDir, 0o700)
 		}
+		return err
 	}
 
-	return err
+	if !stat.IsDir() {
+		return fs.ErrInvalid
+	}
+
+	return nil
 }
 
 // MoveFile moves a file from a source path to its destination by copying
