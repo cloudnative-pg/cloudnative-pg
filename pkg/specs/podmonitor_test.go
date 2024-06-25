@@ -18,9 +18,12 @@ package specs
 
 import (
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -32,19 +35,6 @@ var _ = Describe("PodMonitor test", func() {
 		clusterName      = "test"
 		clusterNamespace = "test-namespace"
 	)
-	cluster := apiv1.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: clusterNamespace,
-			Name:      clusterName,
-		},
-		Spec: apiv1.ClusterSpec{
-			Monitoring: &apiv1.MonitoringConfiguration{
-				EnablePodMonitor: true,
-			},
-		},
-	}
-
-	expectedEndpoint := monitoringv1.PodMetricsEndpoint{Port: "metrics"}
 	metricRelabelings := []monitoringv1.RelabelConfig{
 		{
 			SourceLabels: []monitoringv1.LabelName{"cluster"},
@@ -62,52 +52,105 @@ var _ = Describe("PodMonitor test", func() {
 		},
 	}
 
-	It("should create a valid monitoringv1.PodMonitor object", func() {
-		mgr := NewClusterPodMonitorManager(cluster.DeepCopy())
-		monitor := mgr.BuildPodMonitor()
-		Expect(monitor.Labels[utils.ClusterLabelName]).To(Equal(clusterName))
-		Expect(monitor.Spec.Selector.MatchLabels[utils.ClusterLabelName]).To(Equal(clusterName))
-		Expect(monitor.Spec.PodMetricsEndpoints).To(ContainElement(expectedEndpoint))
+	assertPodMonitorCorrect := func(cluster *apiv1.Cluster, expectedEndpoint monitoringv1.PodMetricsEndpoint) {
+		It("should create a valid monitoringv1.PodMonitor object", func() {
+			mgr := NewClusterPodMonitorManager(cluster.DeepCopy())
+			monitor := mgr.BuildPodMonitor()
+			Expect(monitor.Labels[utils.ClusterLabelName]).To(Equal(clusterName))
+			Expect(monitor.Spec.Selector.MatchLabels[utils.ClusterLabelName]).To(Equal(clusterName))
+			Expect(monitor.Spec.PodMetricsEndpoints).To(ContainElement(expectedEndpoint))
+		})
+
+		It("should create a monitoringv1.PodMonitor object with MetricRelabelConfigs rules", func() {
+			relabeledCluster := cluster.DeepCopy()
+			relabeledCluster.Spec.Monitoring.PodMonitorMetricRelabelConfigs = metricRelabelings
+			mgr := NewClusterPodMonitorManager(relabeledCluster)
+			monitor := mgr.BuildPodMonitor()
+
+			expectedEndpoint := expectedEndpoint.DeepCopy()
+			expectedEndpoint.MetricRelabelConfigs = metricRelabelings
+			Expect(monitor.Spec.PodMetricsEndpoints).To(ContainElement(*expectedEndpoint))
+		})
+
+		It("should create a monitoringv1.PodMonitor object with RelabelConfigs rules", func() {
+			relabeledCluster := cluster.DeepCopy()
+			relabeledCluster.Spec.Monitoring.PodMonitorRelabelConfigs = relabelings
+			mgr := NewClusterPodMonitorManager(relabeledCluster)
+			monitor := mgr.BuildPodMonitor()
+
+			expectedEndpoint := expectedEndpoint.DeepCopy()
+			expectedEndpoint.RelabelConfigs = relabelings
+			Expect(monitor.Spec.PodMetricsEndpoints).To(ContainElement(*expectedEndpoint))
+		})
+
+		It("should create a monitoringv1.PodMonitor object with MetricRelabelConfigs and RelabelConfigs rules", func() {
+			relabeledCluster := cluster.DeepCopy()
+			relabeledCluster.Spec.Monitoring.PodMonitorMetricRelabelConfigs = metricRelabelings
+			relabeledCluster.Spec.Monitoring.PodMonitorRelabelConfigs = relabelings
+			mgr := NewClusterPodMonitorManager(relabeledCluster)
+			monitor := mgr.BuildPodMonitor()
+
+			expectedEndpoint := expectedEndpoint.DeepCopy()
+			expectedEndpoint.MetricRelabelConfigs = metricRelabelings
+			expectedEndpoint.RelabelConfigs = relabelings
+			Expect(monitor.Spec.PodMetricsEndpoints).To(ContainElement(*expectedEndpoint))
+		})
+
+		It("does not panic if monitoring section is not present", func() {
+			cluster := apiv1.Cluster{}
+			mgr := NewClusterPodMonitorManager(&cluster)
+			Expect(mgr.BuildPodMonitor()).ToNot(BeNil())
+		})
+	}
+
+	When("not using TLS", func() {
+		cluster := apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: clusterNamespace,
+				Name:      clusterName,
+			},
+			Spec: apiv1.ClusterSpec{
+				Monitoring: &apiv1.MonitoringConfiguration{
+					EnablePodMonitor: true,
+				},
+			},
+		}
+
+		expectedEndpoint := monitoringv1.PodMetricsEndpoint{Port: "metrics"}
+
+		assertPodMonitorCorrect(&cluster, expectedEndpoint)
 	})
+	When("TLS is enabled for metrics", func() {
+		cluster := apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: clusterNamespace,
+				Name:      clusterName,
+			},
+			Spec: apiv1.ClusterSpec{
+				Monitoring: &apiv1.MonitoringConfiguration{
+					EnablePodMonitor: true,
+					EnableMetricsTLS: true,
+				},
+			},
+		}
 
-	It("should create a monitoringv1.PodMonitor object with MetricRelabelConfigs rules", func() {
-		relabeledCluster := cluster.DeepCopy()
-		relabeledCluster.Spec.Monitoring.PodMonitorMetricRelabelConfigs = metricRelabelings
-		mgr := NewClusterPodMonitorManager(relabeledCluster)
-		monitor := mgr.BuildPodMonitor()
+		expectedEndpoint := monitoringv1.PodMetricsEndpoint{
+			Port:   "metrics",
+			Scheme: "https",
+			TLSConfig: &monitoringv1.SafeTLSConfig{
+				CA: monitoringv1.SecretOrConfigMap{
+					Secret: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: "test-ca",
+						},
+						Key: certs.CACertKey,
+					},
+				},
+				Cert:               monitoringv1.SecretOrConfigMap{},
+				InsecureSkipVerify: ptr.To(true),
+			},
+		}
 
-		expectedEndpoint := expectedEndpoint.DeepCopy()
-		expectedEndpoint.MetricRelabelConfigs = metricRelabelings
-		Expect(monitor.Spec.PodMetricsEndpoints).To(ContainElement(*expectedEndpoint))
-	})
-
-	It("should create a monitoringv1.PodMonitor object with RelabelConfigs rules", func() {
-		relabeledCluster := cluster.DeepCopy()
-		relabeledCluster.Spec.Monitoring.PodMonitorRelabelConfigs = relabelings
-		mgr := NewClusterPodMonitorManager(relabeledCluster)
-		monitor := mgr.BuildPodMonitor()
-
-		expectedEndpoint := expectedEndpoint.DeepCopy()
-		expectedEndpoint.RelabelConfigs = relabelings
-		Expect(monitor.Spec.PodMetricsEndpoints).To(ContainElement(*expectedEndpoint))
-	})
-
-	It("should create a monitoringv1.PodMonitor object with MetricRelabelConfigs and RelabelConfigs rules", func() {
-		relabeledCluster := cluster.DeepCopy()
-		relabeledCluster.Spec.Monitoring.PodMonitorMetricRelabelConfigs = metricRelabelings
-		relabeledCluster.Spec.Monitoring.PodMonitorRelabelConfigs = relabelings
-		mgr := NewClusterPodMonitorManager(relabeledCluster)
-		monitor := mgr.BuildPodMonitor()
-
-		expectedEndpoint := expectedEndpoint.DeepCopy()
-		expectedEndpoint.MetricRelabelConfigs = metricRelabelings
-		expectedEndpoint.RelabelConfigs = relabelings
-		Expect(monitor.Spec.PodMetricsEndpoints).To(ContainElement(*expectedEndpoint))
-	})
-
-	It("does not panic if monitoring section is not present", func() {
-		cluster := apiv1.Cluster{}
-		mgr := NewClusterPodMonitorManager(&cluster)
-		Expect(mgr.BuildPodMonitor()).ToNot(BeNil())
+		assertPodMonitorCorrect(&cluster, expectedEndpoint)
 	})
 })
