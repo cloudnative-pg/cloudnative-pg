@@ -59,11 +59,13 @@ func New(serverInstance *postgres.Instance, exporter *Exporter) (*MetricsServer,
 		ReadHeaderTimeout: webserver.DefaultReadHeaderTimeout,
 	}
 
-	server.TLSConfig = &tls.Config{
-		MinVersion: tls.VersionTLS13,
-		GetCertificate: func(_ *tls.ClientHelloInfo) (*tls.Certificate, error) {
-			return serverInstance.ServerCertificate, nil
-		},
+	if serverInstance.MetricsPortTLS {
+		server.TLSConfig = &tls.Config{
+			MinVersion: tls.VersionTLS13,
+			GetCertificate: func(_ *tls.ClientHelloInfo) (*tls.Certificate, error) {
+				return serverInstance.ServerCertificate, nil
+			},
+		}
 	}
 
 	ws := webserver.NewWebServer(server)
@@ -74,10 +76,4 @@ func New(serverInstance *postgres.Instance, exporter *Exporter) (*MetricsServer,
 	}
 
 	return metricServer, nil
-}
-
-// GetExporter get the exporter used for metrics. If the web statusServer still
-// has not started, the exporter is nil
-func (ms *MetricsServer) GetExporter() *Exporter {
-	return ms.exporter
 }
