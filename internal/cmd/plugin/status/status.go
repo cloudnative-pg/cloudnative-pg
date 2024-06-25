@@ -19,7 +19,6 @@ package status
 import (
 	"context"
 	"fmt"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"os"
 	"path"
 	"sort"
@@ -31,6 +30,7 @@ import (
 	"github.com/logrusorgru/aurora/v4"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -59,7 +59,7 @@ type PostgresqlStatus struct {
 	// PrimaryPod contains the primary Pod
 	PrimaryPod corev1.Pod
 
-	// podDisruptionBudgetList prints every PDB that matches against the cluster
+	// PodDisruptionBudgetList prints every PDB that matches against the cluster
 	// with the label selector
 	PodDisruptionBudgetList policyv1.PodDisruptionBudgetList
 
@@ -126,7 +126,7 @@ func Status(ctx context.Context, clusterName string, verbose bool, format plugin
 	status.printPodDisruptionBudgetStatus()
 	status.printInstancesStatus()
 
-	if len(errs) != 0 {
+	if len(errs) > 0 {
 		fmt.Println()
 
 		errors := tabby.New()
