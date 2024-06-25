@@ -344,12 +344,6 @@ func (r *ClusterReconciler) reconcileManagedServices(ctx context.Context, cluste
 		}
 	}
 
-	containService := func(expected corev1.Service) func(iterated corev1.Service) bool {
-		return func(iterated corev1.Service) bool {
-			return iterated.Name == expected.Name
-		}
-	}
-
 	// we delete the old managed services not appearing anymore in the spec
 	var livingServices corev1.ServiceList
 	if err := r.Client.List(ctx, &livingServices, client.InNamespace(cluster.Namespace), client.MatchingLabels{
@@ -357,6 +351,12 @@ func (r *ClusterReconciler) reconcileManagedServices(ctx context.Context, cluste
 		utils.ClusterLabelName:   cluster.Name,
 	}); err != nil {
 		return err
+	}
+
+	containService := func(expected corev1.Service) func(iterated corev1.Service) bool {
+		return func(iterated corev1.Service) bool {
+			return iterated.Name == expected.Name
+		}
 	}
 
 	for idx := range livingServices.Items {
@@ -393,7 +393,7 @@ func (r *ClusterReconciler) serviceReconciler(
 		return err
 	}
 
-	if clusterName, _ := IsOwnedByCluster(&livingService); clusterName != cluster.Name {
+	if owner, _ := IsOwnedByCluster(&livingService); owner != cluster.Name {
 		return fmt.Errorf("refusing to reconcile service: %s, not owned by the cluster", livingService.Name)
 	}
 
