@@ -205,7 +205,7 @@ type Instance struct {
 	// StatusPortTLS enables TLS on the status port used to communicate with the operator
 	StatusPortTLS bool
 
-	// MetricsPortTLS enables TLS on the metrics port
+	// MetricsPortTLS enables TLS on the port used to publish metrics over HTTP/HTTPS
 	MetricsPortTLS bool
 
 	// ServerCertificate is the certificate we use to serve https connections
