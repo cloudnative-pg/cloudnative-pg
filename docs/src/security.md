@@ -98,10 +98,14 @@ the cluster (PostgreSQL included).
 ### Role Based Access Control (RBAC)
 
 The operator interacts with the Kubernetes API server with a dedicated service
-account called `cnpg-manager`. In Kubernetes this is installed
-by default in the `cnpg-system` namespace, with a cluster role
-binding between this service account and the `cnpg-manager`
-cluster role which defines the set of rules/resources/verbs granted to the operator.
+account called `cnpg-manager`, this is installed in the operator namespace, which
+by default is `cnpg-system` namespace, but this may change due to how the operator
+is deployed. In the same operator namespace there's a binding between this service
+account(`cnpg-manager`) and a role, the name for that role will depend on how was
+the operator deployed, the name can be `cnpg-manager` or something else, and the
+type of it will be `ClusterRole` or just a `Role`, again, depending on how it was
+the operator deployed. These role will contain the set of permissions granted to the
+operator to work with.
 
 !!! Important
     The above permissions are exclusively reserved for the operator's service
@@ -112,7 +116,7 @@ cluster role which defines the set of rules/resources/verbs granted to the opera
 
 Below we provide some examples and, most importantly, the reasons why
 CloudNativePG requires full or partial management of standard Kubernetes
-namespaced or global resources.
+namespaced or non-namespaced resources.
 
 `configmaps`
 : The operator needs to create and manage default config maps for
