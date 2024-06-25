@@ -10,7 +10,7 @@ CloudNativePG defines three types of services for each `Cluster` resource:
 * `ro`: Points to the replicas, where available (read-only).
 * `r`: Points to any PostgreSQL instance in the cluster (read).
 
-By default, CloudNativePG creates all of the above services for a `Cluster`
+By default, CloudNativePG creates all the above services for a `Cluster`
 resource, with the following conventions:
 
 - The name of the service follows this format: `<CLUSTER_NAME>-<SERVICE_NAME>`.
@@ -39,8 +39,8 @@ You can disable any or all of the `ro` and `r` default services through the
 [`managed.services.disabledDefaultServices` option](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-ManagedServices).
 
 !!! Important
-    The `rw` service is essential because CloudNativePG relies on it to ensure
-    PostgreSQL replication.
+    The `rw` service is essential and cannot be disabled because CloudNativePG
+    relies on it to ensure PostgreSQL replication.
 
 For example, if you want to remove both the `ro` (read-only) and `r` (read)
 services, you can use this configuration:
@@ -118,4 +118,3 @@ expose your database to potential attacks from malicious users.
 !!! Warning
     Ensure you secure your database before granting external access, or make
     sure your Kubernetes cluster is only reachable from a private network.
-

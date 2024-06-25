@@ -112,7 +112,7 @@ your PostgreSQL cluster.
 **Cluster with managed services**
 : [`cluster-example-managed-services.yaml`](samples/cluster-example-managed-services.yaml):
   Declares a service with the `managed` stanza. Includes default service disabled and new
-  rw service template defined.
+  `rw` service template of `LoadBalancer` type defined.
 
 ## Declarative tablespaces
 

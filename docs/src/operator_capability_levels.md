@@ -129,8 +129,8 @@ for applications to access the cluster via the network:
 - One pointing to replicas for read-only queries.
 - A generic one pointing to any instance for read operations.
 
-You can disable the management the read-only and read services via
-configuration. Additionally, you can leverage the service template capability
+You can disable the read-only and read services via configuration.
+Additionally, you can leverage the service template capability
 to create custom service resources, including load balancers, to access
 PostgreSQL outside Kubernetes. This is particularly useful for DBaaS purposes.
 

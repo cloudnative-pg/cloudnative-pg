@@ -20,3 +20,5 @@ spec:
                 test-label: "true"
               annotations:
                 test-annotation: "true"
+            spec:
+              type: LoadBalancer
