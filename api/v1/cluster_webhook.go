@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -33,7 +34,6 @@ import (
 	validationutil "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/utils/ptr"
-	"k8s.io/utils/strings/slices"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -375,6 +375,7 @@ func (r *Cluster) Validate() (allErrs field.ErrorList) {
 		r.validateLDAP,
 		r.validateReplicationSlots,
 		r.validateEnv,
+		r.validateManagedServices,
 		r.validateManagedRoles,
 		r.validateManagedExtensions,
 		r.validateResources,
@@ -2434,6 +2435,98 @@ func (gcs *GoogleCredentials) validateGCSCredentials(path *field.Path) field.Err
 	}
 
 	return allErrors
+}
+
+func (r *Cluster) validateManagedServices() field.ErrorList {
+	reservedNames := []string{
+		r.GetServiceReadWriteName(),
+		r.GetServiceReadOnlyName(),
+		r.GetServiceReadName(),
+		r.GetServiceAnyName(),
+	}
+	containsDuplicateNames := func(names []string) bool {
+		seen := make(map[string]bool)
+		for _, str := range names {
+			if seen[str] {
+				return true
+			}
+			seen[str] = true
+		}
+		return false
+	}
+
+	if r.Spec.Managed == nil || r.Spec.Managed.Services == nil {
+		return nil
+	}
+
+	managedServices := r.Spec.Managed.Services
+	basePath := field.NewPath("spec", "managed", "services")
+	var errs field.ErrorList
+
+	if slices.Contains(managedServices.DisabledDefaultServices, ServiceSelectorTypeRW) {
+		errs = append(errs, field.Invalid(
+			basePath.Child("disabledDefaultServices"),
+			ServiceSelectorTypeRW,
+			"service of type RW cannot be disabled.",
+		))
+	}
+
+	names := make([]string, len(managedServices.Additional))
+	for idx := range managedServices.Additional {
+		additionalService := &managedServices.Additional[idx]
+		name := additionalService.ServiceTemplate.ObjectMeta.Name
+		names[idx] = name
+		path := basePath.Child(fmt.Sprintf("additional[%d]", idx))
+
+		if slices.Contains(reservedNames, name) {
+			errs = append(errs,
+				field.Invalid(
+					path,
+					name,
+					fmt.Sprintf("the service name: '%s' is reserved for operator use", name),
+				))
+		}
+
+		if fieldErr := validateServiceTemplate(
+			path,
+			true,
+			additionalService.ServiceTemplate,
+		); len(fieldErr) > 0 {
+			errs = append(errs, fieldErr...)
+		}
+	}
+
+	if containsDuplicateNames(names) {
+		errs = append(errs, field.Invalid(
+			basePath.Child("additional"),
+			names,
+			"contains services with the same .metadata.name",
+		))
+	}
+
+	return errs
+}
+
+func validateServiceTemplate(
+	path *field.Path,
+	nameRequired bool,
+	template ServiceTemplateSpec,
+) field.ErrorList {
+	var errs field.ErrorList
+
+	if len(template.Spec.Selector) > 0 {
+		errs = append(errs, field.Invalid(path, template.Spec.Selector, "selector field is managed by the operator"))
+	}
+
+	name := template.ObjectMeta.Name
+	if name == "" && nameRequired {
+		errs = append(errs, field.Invalid(path, name, "name is required"))
+	}
+	if name != "" && !nameRequired {
+		errs = append(errs, field.Invalid(path, name, "name is not allowed"))
+	}
+
+	return errs
 }
 
 // validateManagedRoles validate the environment variables settings proposed by the user

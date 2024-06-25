@@ -211,6 +211,9 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 
 	// Ensure we have the required global objects
 	if err := r.createPostgresClusterObjects(ctx, cluster); err != nil {
+		if regErr := r.RegisterPhase(ctx, cluster, apiv1.PhaseCannotCreateClusterObjects, err.Error()); regErr != nil {
+			contextLogger.Error(regErr, "unable to register phase", "outerErr", err.Error())
+		}
 		return ctrl.Result{}, fmt.Errorf("cannot create Cluster auxiliary objects: %w", err)
 	}
 
@@ -264,7 +267,6 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		ctx,
 		r.Client,
 		cluster.GetServerCASecretObjectKey(),
-		cluster.GetServiceReadWriteName(),
 	)
 	if err != nil {
 		return ctrl.Result{}, err

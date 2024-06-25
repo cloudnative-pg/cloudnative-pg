@@ -24,6 +24,9 @@ const VolumeSnapshotKind = "VolumeSnapshot"
 // The comment of PodTemplateSpec has an explanation of why we are
 // not using the core data types.
 type Metadata struct {
+	// The name of the resource. Only supported for certain types
+	Name string `json:"name,omitempty"`
+
 	// Map of string keys and values that can be used to organize and categorize
 	// (scope and select) objects. May match selectors of replication controllers
 	// and services.

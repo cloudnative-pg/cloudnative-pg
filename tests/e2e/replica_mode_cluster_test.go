@@ -174,18 +174,19 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			By("setting replica mode on the src cluster", func() {
 				cluster, err := env.GetCluster(namespace, clusterOneName)
 				Expect(err).ToNot(HaveOccurred())
+				updateTime := time.Now().Truncate(time.Second)
 				cluster.Spec.ReplicaCluster.Enabled = ptr.To(true)
 				err = env.Client.Update(ctx, cluster)
 				Expect(err).ToNot(HaveOccurred())
-				AssertClusterIsReady(namespace, clusterOneName, testTimeouts[testUtils.ClusterIsReady], env)
-				time.Sleep(time.Second * 10)
 				Eventually(func(g Gomega) {
 					cluster, err := env.GetCluster(namespace, clusterOneName)
 					g.Expect(err).ToNot(HaveOccurred())
 					condition := getReplicaClusterSwitchCondition(cluster.Status.Conditions)
 					g.Expect(condition).ToNot(BeNil())
 					g.Expect(condition.Status).To(Equal(metav1.ConditionTrue))
-				}).Should(Succeed())
+					g.Expect(condition.LastTransitionTime.Time).To(BeTemporally(">=", updateTime))
+				}).WithTimeout(30 * time.Second).Should(Succeed())
+				AssertClusterIsReady(namespace, clusterOneName, testTimeouts[testUtils.ClusterIsReady], env)
 			})
 
 			By("checking that src cluster is now a replica cluster", func() {

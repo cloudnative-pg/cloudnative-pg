@@ -84,7 +84,7 @@ var _ = Describe("Service template builder", func() {
 					utils.PgbouncerNameLabel: "myservice",
 				},
 			},
-		}).WithSelector("otherservice", true).Build().Spec.Selector).
+		}).SetPGBouncerSelector("otherservice").Build().Spec.Selector).
 			To(Equal(map[string]string{utils.PgbouncerNameLabel: "otherservice"}))
 	})
 })

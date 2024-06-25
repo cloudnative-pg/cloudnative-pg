@@ -65,7 +65,6 @@ func statusSubCommand(ctx context.Context) error {
 		ctx,
 		cli,
 		cluster.GetServerCASecretObjectKey(),
-		cluster.GetServiceReadWriteName(),
 	)
 	if err != nil {
 		log.Error(err, "Error while building the TLS context")

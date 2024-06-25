@@ -17,12 +17,15 @@ limitations under the License.
 package specs
 
 import (
+	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/servicespec"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -108,5 +111,86 @@ func CreateClusterReadWriteService(cluster apiv1.Cluster) *corev1.Service {
 				utils.ClusterRoleLabelName: ClusterRoleLabelPrimary,
 			},
 		},
+	}
+}
+
+// BuildManagedServices creates a list of Kubernetes Services based on the
+// additional managed services specified in the Cluster's ManagedServices configuration.
+// Returns:
+// - []corev1.Service: a slice of Service objects created from the managed services configuration.
+// - error: an error if the creation of any service fails, otherwise nil.
+//
+// Example usage:
+//
+//	services, err := BuildManagedServices(cluster)
+//
+//	if err != nil {
+//	    // handle error
+//	}
+//
+//	for idx := range services {
+//	    // use the created services
+//	}
+func BuildManagedServices(cluster apiv1.Cluster) ([]corev1.Service, error) {
+	if cluster.Spec.Managed == nil || cluster.Spec.Managed.Services == nil {
+		return nil, nil
+	}
+
+	managedServices := cluster.Spec.Managed.Services
+	if len(managedServices.Additional) == 0 {
+		return nil, nil
+	}
+
+	services := make([]corev1.Service, len(managedServices.Additional))
+
+	for i := range managedServices.Additional {
+		serviceConfiguration := managedServices.Additional[i]
+		defaultService, err := buildDefaultService(cluster, serviceConfiguration)
+		if err != nil {
+			return nil, err
+		}
+		builder := servicespec.NewFrom(&serviceConfiguration.ServiceTemplate).
+			WithServiceType(defaultService.Spec.Type, false).
+			WithLabel(utils.IsManagedLabelName, "true").
+			SetSelectors(defaultService.Spec.Selector)
+
+		for idx := range defaultService.Spec.Ports {
+			builder = builder.WithServicePort(&defaultService.Spec.Ports[idx])
+		}
+
+		for key, value := range defaultService.Labels {
+			builder = builder.WithLabel(key, value)
+		}
+
+		for key, value := range defaultService.Annotations {
+			builder = builder.WithAnnotation(key, value)
+		}
+
+		serviceTemplate := builder.Build()
+		services[i] = corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        serviceTemplate.ObjectMeta.Name,
+				Namespace:   cluster.Namespace,
+				Labels:      serviceTemplate.ObjectMeta.Labels,
+				Annotations: serviceTemplate.ObjectMeta.Annotations,
+			},
+			Spec: serviceTemplate.Spec,
+		}
+		cluster.SetInheritedDataAndOwnership(&services[i].ObjectMeta)
+	}
+
+	return services, nil
+}
+
+func buildDefaultService(cluster apiv1.Cluster, serviceConf apiv1.ManagedService) (*corev1.Service, error) {
+	switch serviceConf.SelectorType {
+	case apiv1.ServiceSelectorTypeRO:
+		return CreateClusterReadOnlyService(cluster), nil
+	case apiv1.ServiceSelectorTypeRW:
+		return CreateClusterReadWriteService(cluster), nil
+	case apiv1.ServiceSelectorTypeR:
+		return CreateClusterReadService(cluster), nil
+	default:
+		return nil, fmt.Errorf("unknown service type: %s", serviceConf.SelectorType)
 	}
 }
