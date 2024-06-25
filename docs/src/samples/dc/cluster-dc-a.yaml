@@ -25,7 +25,8 @@ spec:
         compression: gzip
 
   replica:
-    enabled: false
+    self: cluster-dc-a
+    primary: cluster-dc-a
     source: cluster-dc-b
 
   externalClusters:

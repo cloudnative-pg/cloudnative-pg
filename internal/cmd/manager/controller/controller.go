@@ -368,12 +368,7 @@ func ensurePKI(
 		OperatorNamespace:                  configuration.Current.OperatorNamespace,
 		MutatingWebhookConfigurationName:   MutatingWebhookConfigurationName,
 		ValidatingWebhookConfigurationName: ValidatingWebhookConfigurationName,
-		CustomResourceDefinitionsName: []string{
-			"backups.postgresql.cnpg.io",
-			"clusters.postgresql.cnpg.io",
-			"scheduledbackups.postgresql.cnpg.io",
-		},
-		OperatorDeploymentLabelSelector: "app.kubernetes.io/name=cloudnative-pg",
+		OperatorDeploymentLabelSelector:    "app.kubernetes.io/name=cloudnative-pg",
 	}
 	err := pkiConfig.Setup(ctx, kubeClient)
 	if err != nil {

@@ -22,6 +22,7 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -90,6 +91,15 @@ func (se *StreamingCmd) Wait() error {
 	}
 
 	return nil
+}
+
+// Pid gets the PID of the embedded process when set
+func (se *StreamingCmd) Pid() (int, error) {
+	if se.process == nil {
+		return 0, fmt.Errorf("process not set")
+	}
+
+	return se.process.Pid, nil
 }
 
 // RunStreaming executes the command redirecting its stdout and stderr to the logger.

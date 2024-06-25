@@ -1933,25 +1933,38 @@ func (r *Cluster) validatePromotionToken() field.ErrorList {
 		return result
 	}
 
-	if !r.Spec.ReplicaCluster.Enabled {
-		token := r.Spec.ReplicaCluster.PromotionToken
-		if len(token) > 0 {
-			tokenContent, err := utils.ParsePgControldataToken(token)
-			if err != nil {
-				result = append(
-					result,
-					field.Invalid(
-						field.NewPath("spec", "replicaCluster", "token"),
-						token,
-						fmt.Sprintf("Invalid promotionToken format: %s", err.Error())))
-			} else if err := tokenContent.IsValid(); err != nil {
-				result = append(
-					result,
-					field.Invalid(
-						field.NewPath("spec", "replicaCluster", "token"),
-						token,
-						fmt.Sprintf("Invalid promotionToken content: %s", err.Error())))
-			}
+	token := r.Spec.ReplicaCluster.PromotionToken
+	// Nothing to validate if the token is empty, we can immediately return
+	if len(token) == 0 {
+		return result
+	}
+
+	if r.IsReplica() {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "replicaCluster", "token"),
+				token,
+				"promotionToken is only allowed for primary clusters"))
+		return result
+	}
+
+	if !r.IsReplica() {
+		tokenContent, err := utils.ParsePgControldataToken(token)
+		if err != nil {
+			result = append(
+				result,
+				field.Invalid(
+					field.NewPath("spec", "replicaCluster", "token"),
+					token,
+					fmt.Sprintf("Invalid promotionToken format: %s", err.Error())))
+		} else if err := tokenContent.IsValid(); err != nil {
+			result = append(
+				result,
+				field.Invalid(
+					field.NewPath("spec", "replicaCluster", "token"),
+					token,
+					fmt.Sprintf("Invalid promotionToken content: %s", err.Error())))
 		}
 	}
 	return result
@@ -1962,34 +1975,86 @@ func (r *Cluster) validatePromotionToken() field.ErrorList {
 func (r *Cluster) validateReplicaMode() field.ErrorList {
 	var result field.ErrorList
 
-	if r.Spec.ReplicaCluster == nil || !r.Spec.ReplicaCluster.Enabled {
+	replicaClusterConf := r.Spec.ReplicaCluster
+	if replicaClusterConf == nil {
 		return result
 	}
 
-	if r.Spec.Bootstrap == nil {
+	// Having enabled set to "true" means that the automatic mode is not active.
+	// The "primary" field is used only when the automatic mode is active.
+	// This implies that hasEnabled and hasPrimary are mutually exclusive
+	hasEnabled := replicaClusterConf.Enabled != nil
+	hasPrimary := len(replicaClusterConf.Primary) > 0
+	if hasPrimary && hasEnabled {
 		result = append(result, field.Invalid(
-			field.NewPath("spec", "bootstrap"),
-			r.Spec.ReplicaCluster,
-			"bootstrap configuration is required for replica mode"))
-	} else if r.Spec.Bootstrap.PgBaseBackup == nil && r.Spec.Bootstrap.Recovery == nil &&
-		// this is needed because we only want to validate this during cluster creation, currently if we would have
-		// to enable this logic only during creation and not cluster changes it would require a meaningful refactor
-		len(r.ObjectMeta.ResourceVersion) == 0 {
-		result = append(result, field.Invalid(
-			field.NewPath("spec", "replicaCluster"),
-			r.Spec.ReplicaCluster,
-			"replica mode bootstrap is compatible only with pg_basebackup or recovery"))
+			field.NewPath("spec", "replicaCluster", "enabled"),
+			replicaClusterConf,
+			"replica mode enabled is not compatible with the primary field"))
 	}
-	_, found := r.ExternalCluster(r.Spec.ReplicaCluster.Source)
+
+	if r.IsReplica() {
+		if r.Spec.Bootstrap == nil {
+			result = append(result, field.Invalid(
+				field.NewPath("spec", "bootstrap"),
+				replicaClusterConf,
+				"bootstrap configuration is required for replica mode"))
+		} else if r.Spec.Bootstrap.PgBaseBackup == nil && r.Spec.Bootstrap.Recovery == nil &&
+			// this is needed because we only want to validate this during cluster creation, currently if we would have
+			// to enable this logic only during creation and not cluster changes it would require a meaningful refactor
+			len(r.ObjectMeta.ResourceVersion) == 0 {
+			result = append(result, field.Invalid(
+				field.NewPath("spec", "replicaCluster"),
+				replicaClusterConf,
+				"replica mode bootstrap is compatible only with pg_basebackup or recovery"))
+		}
+	}
+
+	result = append(result, r.validateReplicaClusterExternalClusters()...)
+
+	return result
+}
+
+func (r *Cluster) validateReplicaClusterExternalClusters() field.ErrorList {
+	var result field.ErrorList
+	replicaClusterConf := r.Spec.ReplicaCluster
+	if replicaClusterConf == nil {
+		return result
+	}
+
+	// Check that the externalCluster references are correct
+	_, found := r.ExternalCluster(replicaClusterConf.Source)
 	if !found {
 		result = append(
 			result,
 			field.Invalid(
 				field.NewPath("spec", "replicaCluster", "primaryServerName"),
-				r.Spec.ReplicaCluster.Source,
-				fmt.Sprintf("External cluster %v not found", r.Spec.ReplicaCluster.Source)))
+				replicaClusterConf.Source,
+				fmt.Sprintf("External cluster %v not found", replicaClusterConf.Source)))
 	}
 
+	if len(replicaClusterConf.Self) > 0 {
+		_, found := r.ExternalCluster(replicaClusterConf.Self)
+		if !found {
+			result = append(
+				result,
+				field.Invalid(
+					field.NewPath("spec", "replicaCluster", "self"),
+					replicaClusterConf.Self,
+					fmt.Sprintf("External cluster %v not found", replicaClusterConf.Self)))
+		}
+	}
+
+	if len(replicaClusterConf.Primary) > 0 {
+		_, found := r.ExternalCluster(replicaClusterConf.Primary)
+		if !found {
+			result = append(
+				result,
+				field.Invalid(
+					field.NewPath("spec", "replicaCluster", "primary"),
+					replicaClusterConf.Primary,
+					fmt.Sprintf("External cluster %v not found", replicaClusterConf.Primary)))
+		}
+	}
 	return result
 }
 

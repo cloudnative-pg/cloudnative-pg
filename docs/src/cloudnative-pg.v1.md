@@ -4101,6 +4101,22 @@ cluster</p>
 <table class="table">
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
+<tr><td><code>self</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Self defines the name of this cluster. It is used to determine if this is a primary
+or a replica cluster, comparing it with <code>primary</code></p>
+</td>
+</tr>
+<tr><td><code>primary</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Primary defines which Cluster is defined to be the primary in the distributed PostgreSQL cluster, based on the
+topology specified in externalClusters</p>
+</td>
+</tr>
 <tr><td><code>source</code> <B>[Required]</B><br/>
 <i>string</i>
 </td>

@@ -22,6 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/stringset"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -465,7 +466,13 @@ var _ = Describe("look up for secrets", func() {
 		Expect(cluster.GetReplicationSecretName()).To(Equal("clustername-replication"))
 	})
 	It("retrieves all names needed to build a server CA certificate are 9", func() {
-		Expect(cluster.GetClusterAltDNSNames()).To(HaveLen(9))
+		names := cluster.GetClusterAltDNSNames()
+		Expect(names).To(HaveLen(12))
+		namesSet := stringset.From(names)
+		Expect(namesSet.Len()).To(Equal(12))
+		Expect(namesSet.Has(cluster.GetServiceReadWriteName())).To(BeTrue())
+		Expect(namesSet.Has(cluster.GetServiceReadName())).To(BeTrue())
+		Expect(namesSet.Has(cluster.GetServiceReadOnlyName())).To(BeTrue())
 	})
 })
 
@@ -781,7 +788,7 @@ var _ = Describe("Barman Endpoint CA for replica cluster", func() {
 		Spec: ClusterSpec{
 			ReplicaCluster: &ReplicaClusterConfiguration{
 				Source:  "testSource",
-				Enabled: true,
+				Enabled: ptr.To(true),
 			},
 		},
 	}
@@ -810,7 +817,7 @@ var _ = Describe("Barman Endpoint CA for replica cluster", func() {
 			},
 			ReplicaCluster: &ReplicaClusterConfiguration{
 				Source:  "testReplica",
-				Enabled: true,
+				Enabled: ptr.To(true),
 			},
 		},
 	}
@@ -1001,7 +1008,7 @@ var _ = Describe("Cluster ShouldRecoveryCreateApplicationDatabase", func() {
 	})
 
 	It("should return false if the cluster is a replica", func() {
-		cluster.Spec.ReplicaCluster = &ReplicaClusterConfiguration{Enabled: true}
+		cluster.Spec.ReplicaCluster = &ReplicaClusterConfiguration{Enabled: ptr.To(true)}
 		result := cluster.ShouldRecoveryCreateApplicationDatabase()
 		Expect(result).To(BeFalse())
 	})
@@ -1231,7 +1238,7 @@ var _ = Describe("ShouldPromoteFromReplicaCluster", func() {
 		cluster := &Cluster{
 			Spec: ClusterSpec{
 				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled:        true,
+					Enabled:        ptr.To(true),
 					PromotionToken: "ABC",
 				},
 			},
@@ -1243,7 +1250,7 @@ var _ = Describe("ShouldPromoteFromReplicaCluster", func() {
 		cluster := &Cluster{
 			Spec: ClusterSpec{
 				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled: true,
+					Enabled: ptr.To(true),
 				},
 			},
 		}
@@ -1263,7 +1270,7 @@ var _ = Describe("ShouldPromoteFromReplicaCluster", func() {
 		cluster := &Cluster{
 			Spec: ClusterSpec{
 				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled:        true,
+					Enabled:        ptr.To(true),
 					PromotionToken: "ABC",
 				},
 			},
@@ -1278,7 +1285,7 @@ var _ = Describe("ShouldPromoteFromReplicaCluster", func() {
 		cluster := &Cluster{
 			Spec: ClusterSpec{
 				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled:        true,
+					Enabled:        ptr.To(true),
 					PromotionToken: "ABC",
 				},
 			},
@@ -1287,5 +1294,127 @@ var _ = Describe("ShouldPromoteFromReplicaCluster", func() {
 			},
 		}
 		Expect(cluster.ShouldPromoteFromReplicaCluster()).To(BeTrue())
+	})
+})
+
+var _ = Describe("IsReplica", func() {
+	Describe("using the legacy API", func() {
+		replicaClusterOldAPI := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled: ptr.To(true),
+					Source:  "source-cluster",
+				},
+			},
+		}
+
+		primaryClusterOldAPI := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: nil,
+			},
+		}
+
+		primaryClusterOldAPIExplicit := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled: ptr.To(false),
+					Source:  "source-cluster",
+				},
+			},
+		}
+
+		DescribeTable(
+			"doesn't change the semantics",
+			func(resource *Cluster, isReplica bool) {
+				Expect(resource.IsReplica()).To(Equal(isReplica))
+			},
+			Entry(
+				"replica cluster with the old API",
+				replicaClusterOldAPI, true),
+			Entry(
+				"primary cluster with the old API",
+				primaryClusterOldAPI, false),
+			Entry(
+				"primary cluster with the old API, explicitly disabling replica",
+				primaryClusterOldAPIExplicit, false),
+		)
+	})
+
+	Describe("using the new API, with an implicit self", func() {
+		primaryClusterNewAPI := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "cluster-1",
+			},
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Primary: "cluster-1",
+					Enabled: nil,
+					Source:  "source-cluster",
+				},
+			},
+		}
+
+		replicaClusterNewAPI := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "cluster-1",
+			},
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Primary: "cluster-2",
+					Enabled: nil,
+					Source:  "source-cluster",
+				},
+			},
+		}
+
+		DescribeTable(
+			"uses the primary cluster name",
+			func(resource *Cluster, isReplica bool) {
+				Expect(resource.IsReplica()).To(Equal(isReplica))
+			},
+			Entry(
+				"primary cluster",
+				primaryClusterNewAPI, false),
+			Entry(
+				"replica cluster",
+				replicaClusterNewAPI, true),
+		)
+	})
+
+	Describe("using the new API, with an explicit self", func() {
+		primaryClusterNewAPI := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Self:    "cluster-1",
+					Primary: "cluster-1",
+					Enabled: nil,
+					Source:  "source-cluster",
+				},
+			},
+		}
+
+		replicaClusterNewAPI := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Self:    "cluster-1",
+					Primary: "cluster-2",
+					Enabled: nil,
+					Source:  "source-cluster",
+				},
+			},
+		}
+
+		DescribeTable(
+			"uses the primary cluster name",
+			func(resource *Cluster, isReplica bool) {
+				Expect(resource.IsReplica()).To(Equal(isReplica))
+			},
+			Entry(
+				"primary cluster",
+				primaryClusterNewAPI, false),
+			Entry(
+				"replica cluster",
+				replicaClusterNewAPI, true),
+		)
 	})
 })

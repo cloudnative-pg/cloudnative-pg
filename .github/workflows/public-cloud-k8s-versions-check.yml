@@ -108,7 +108,7 @@ jobs:
         name: Create Pull Request if versions have been updated
         uses: peter-evans/create-pull-request@v6
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.REPO_GHA_PAT }}
           title: "feat: Public Cloud K8S versions update"
           body: "Update the versions used to test the operator on public cloud providers"
           branch: "k8s-cloud-versions-update"

@@ -35,7 +35,7 @@ spec:
       source: replica-switchover-switchover-a
 
   replica:
-    enabled: true
+    primary: replica-switchover-switchover-a
     source: replica-switchover-switchover-a
 
   externalClusters:
