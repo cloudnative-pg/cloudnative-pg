@@ -498,4 +498,4 @@ If the host gets corrupted then it is a matter of using the cnpg plugin to destr
 will destroy the instance and create the instance on another host and replicate the data.
 
 On Ceph this can be configured through CRUSH rules. The documentation to configure this is located (here)[https://rook.io/docs/rook/latest-release/CRDs/Cluster/external-cluster/topology-for-external-mode/?h=topology].
-By creating these rules the idea is to have one volume/per pod  
+By creating these rules the idea is to have one volume/per pod  per node.
