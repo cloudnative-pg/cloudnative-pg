@@ -65,9 +65,8 @@ func (body Response[T]) EnsureDataIsPresent() error {
 	return fmt.Errorf("encounteered an empty body while expecting it to not be empty")
 }
 
-// Webserver wraps a webserver and makes it a kubernetes Runnable
+// Webserver wraps a webserver to make it a kubernetes Runnable
 type Webserver struct {
-	// instance is the PostgreSQL instance to be collected
 	server *http.Server
 }
 
@@ -87,9 +86,6 @@ func (ws *Webserver) Start(ctx context.Context) error {
 		var err error
 		if ws.server.TLSConfig != nil {
 			err = ws.server.ListenAndServeTLS("", "")
-			if err != nil {
-				err = fmt.Errorf("when starting with TLS, err: %w", err)
-			}
 		} else {
 			err = ws.server.ListenAndServe()
 		}
