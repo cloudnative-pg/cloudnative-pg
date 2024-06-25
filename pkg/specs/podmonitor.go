@@ -57,20 +57,6 @@ func (c ClusterPodMonitorManager) BuildPodMonitor() *monitoringv1.PodMonitor {
 					Key: certs.CACertKey,
 				},
 			},
-			Cert: monitoringv1.SecretOrConfigMap{
-				Secret: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: c.cluster.GetServerCASecretName(),
-					},
-					Key: certs.CACertKey,
-				},
-			},
-			KeySecret: &corev1.SecretKeySelector{
-				LocalObjectReference: corev1.LocalObjectReference{
-					Name: c.cluster.GetServerCASecretName(),
-				},
-				Key: certs.CAPrivateKeyKey,
-			},
 			InsecureSkipVerify: ptr.To(true),
 		}
 	}
