@@ -360,7 +360,10 @@ var _ = Describe("EnsureDirectoryExists", func() {
 	})
 
 	It("errors out when it cannot create the directory", func() {
-		err := EnsureDirectoryExists("/dev/foobar")
+		Expect(os.Chmod(tempDir, 0o500)).To(Succeed()) //#nosec G302 -- this is a directory in a test
+		newDir := filepath.Join(tempDir, "newDir")
+
+		err := EnsureDirectoryExists(newDir)
 		Expect(err).To(HaveOccurred())
 		Expect(errors.Is(err, fs.ErrPermission)).To(BeTrue())
 		var pathErr *os.PathError
