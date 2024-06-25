@@ -302,45 +302,105 @@ func (r *ClusterReconciler) reconcilePoolerSecrets(ctx context.Context, cluster 
 }
 
 func (r *ClusterReconciler) reconcilePostgresServices(ctx context.Context, cluster *apiv1.Cluster) error {
-	if configuration.Current.CreateAnyService {
-		anyService := specs.CreateClusterAnyService(*cluster)
-		cluster.SetInheritedDataAndOwnership(&anyService.ObjectMeta)
+	anyService := specs.CreateClusterAnyService(*cluster)
+	cluster.SetInheritedDataAndOwnership(&anyService.ObjectMeta)
 
-		if err := r.serviceReconciler(ctx, anyService); err != nil {
-			return err
-		}
+	if err := r.serviceReconciler(ctx, cluster, anyService, configuration.Current.CreateAnyService); err != nil {
+		return err
 	}
 
 	readService := specs.CreateClusterReadService(*cluster)
 	cluster.SetInheritedDataAndOwnership(&readService.ObjectMeta)
 
-	if err := r.serviceReconciler(ctx, readService); err != nil {
+	if err := r.serviceReconciler(ctx, cluster, readService, cluster.IsReadServiceEnabled()); err != nil {
 		return err
 	}
 
 	readOnlyService := specs.CreateClusterReadOnlyService(*cluster)
 	cluster.SetInheritedDataAndOwnership(&readOnlyService.ObjectMeta)
 
-	if err := r.serviceReconciler(ctx, readOnlyService); err != nil {
+	if err := r.serviceReconciler(ctx, cluster, readOnlyService, cluster.IsReadOnlyServiceEnabled()); err != nil {
 		return err
 	}
 
 	readWriteService := specs.CreateClusterReadWriteService(*cluster)
 	cluster.SetInheritedDataAndOwnership(&readWriteService.ObjectMeta)
 
-	return r.serviceReconciler(ctx, readWriteService)
+	if err := r.serviceReconciler(ctx, cluster, readWriteService, cluster.IsReadWriteServiceEnabled()); err != nil {
+		return err
+	}
+
+	return r.reconcileManagedServices(ctx, cluster)
 }
 
-func (r *ClusterReconciler) serviceReconciler(ctx context.Context, proposed *corev1.Service) error {
+func (r *ClusterReconciler) reconcileManagedServices(ctx context.Context, cluster *apiv1.Cluster) error {
+	managedServices, err := specs.BuildManagedServices(*cluster)
+	if err != nil {
+		return err
+	}
+	for idx := range managedServices {
+		if err := r.serviceReconciler(ctx, cluster, &managedServices[idx], true); err != nil {
+			return err
+		}
+	}
+
+	// we delete the old managed services not appearing anymore in the spec
+	var livingServices corev1.ServiceList
+	if err := r.Client.List(ctx, &livingServices, client.InNamespace(cluster.Namespace), client.MatchingLabels{
+		utils.IsManagedLabelName: "true",
+		utils.ClusterLabelName:   cluster.Name,
+	}); err != nil {
+		return err
+	}
+
+	containService := func(expected corev1.Service) func(iterated corev1.Service) bool {
+		return func(iterated corev1.Service) bool {
+			return iterated.Name == expected.Name
+		}
+	}
+
+	for idx := range livingServices.Items {
+		livingService := livingServices.Items[idx]
+		isEnabled := slices.ContainsFunc(managedServices, containService(livingService))
+		if isEnabled {
+			continue
+		}
+		if err := r.serviceReconciler(ctx, cluster, &livingService, false); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *ClusterReconciler) serviceReconciler(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	proposed *corev1.Service,
+	enabled bool,
+) error {
+	contextLogger := log.FromContext(ctx).WithValues("serviceName", proposed.Name)
+
 	var livingService corev1.Service
 	err := r.Client.Get(ctx, types.NamespacedName{Name: proposed.Name, Namespace: proposed.Namespace}, &livingService)
 	if apierrs.IsNotFound(err) {
+		if !enabled {
+			return nil
+		}
+		contextLogger.Info("creating service")
 		return r.Client.Create(ctx, proposed)
 	}
 	if err != nil {
 		return err
 	}
 
+	if owner, _ := IsOwnedByCluster(&livingService); owner != cluster.Name {
+		return fmt.Errorf("refusing to reconcile service: %s, not owned by the cluster", livingService.Name)
+	}
+
+	if !enabled {
+		contextLogger.Info("deleting service, due to not being managed anymore")
+		return r.Client.Delete(ctx, &livingService)
+	}
 	var shouldUpdate bool
 
 	// we ensure that the selector perfectly match
@@ -372,6 +432,7 @@ func (r *ClusterReconciler) serviceReconciler(ctx context.Context, proposed *cor
 		return nil
 	}
 
+	contextLogger.Info("reconciling service")
 	// we update to ensure that we substitute the selectors
 	return r.Client.Update(ctx, &livingService)
 }

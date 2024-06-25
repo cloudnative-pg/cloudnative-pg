@@ -48,7 +48,7 @@ func Service(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*corev1.Service, err
 			TargetPort: intstr.FromString(pgBouncerConfig.PgBouncerPortName),
 			Protocol:   corev1.ProtocolTCP,
 		}).
-		WithSelector(pooler.Name, true).
+		SetPGBouncerSelector(pooler.Name).
 		Build()
 
 	return &corev1.Service{

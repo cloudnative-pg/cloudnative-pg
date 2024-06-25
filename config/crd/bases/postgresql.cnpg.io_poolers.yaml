@@ -396,6 +396,10 @@ spec:
                           and services.
                           More info: http://kubernetes.io/docs/user-guide/labels
                         type: object
+                      name:
+                        description: The name of the resource. Only supported for
+                          certain types
+                        type: string
                     type: object
                   spec:
                     description: |-
@@ -774,6 +778,10 @@ spec:
                           and services.
                           More info: http://kubernetes.io/docs/user-guide/labels
                         type: object
+                      name:
+                        description: The name of the resource. Only supported for
+                          certain types
+                        type: string
                     type: object
                   spec:
                     description: |-

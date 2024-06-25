@@ -19,6 +19,7 @@ package v1
 import (
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
@@ -4661,5 +4662,215 @@ var _ = Describe("Validate hibernation", func() {
 			},
 		}
 		Expect(cluster.validateHibernationAnnotation()).To(HaveLen(1))
+	})
+})
+
+var _ = Describe("validateManagedServices", func() {
+	var cluster *Cluster
+
+	BeforeEach(func() {
+		cluster = &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test",
+			},
+			Spec: ClusterSpec{
+				Managed: &ManagedConfiguration{
+					Services: &ManagedServices{
+						Additional: []ManagedService{},
+					},
+				},
+			},
+		}
+	})
+
+	Context("when Managed or Services is nil", func() {
+		It("should return no errors", func() {
+			cluster.Spec.Managed = nil
+			Expect(cluster.validateManagedServices()).To(BeNil())
+
+			cluster.Spec.Managed = &ManagedConfiguration{}
+			cluster.Spec.Managed.Services = nil
+			Expect(cluster.validateManagedServices()).To(BeNil())
+		})
+	})
+
+	Context("when there are no duplicate names", func() {
+		It("should return no errors", func() {
+			cluster.Spec.Managed.Services.Additional = []ManagedService{
+				{
+					ServiceTemplate: ServiceTemplateSpec{
+						ObjectMeta: Metadata{Name: "service1"},
+					},
+				},
+				{
+					ServiceTemplate: ServiceTemplateSpec{
+						ObjectMeta: Metadata{Name: "service2"},
+					},
+				},
+			}
+			Expect(cluster.validateManagedServices()).To(BeNil())
+		})
+	})
+
+	Context("when there are duplicate names", func() {
+		It("should return an error", func() {
+			cluster.Spec.Managed.Services.Additional = []ManagedService{
+				{
+					ServiceTemplate: ServiceTemplateSpec{
+						ObjectMeta: Metadata{Name: "service1"},
+					},
+				},
+				{
+					ServiceTemplate: ServiceTemplateSpec{
+						ObjectMeta: Metadata{Name: "service1"},
+					},
+				},
+			}
+			errs := cluster.validateManagedServices()
+			Expect(errs).To(HaveLen(1))
+			Expect(errs[0].Type).To(Equal(field.ErrorTypeInvalid))
+			Expect(errs[0].Field).To(Equal("spec.managed.services.additional"))
+			Expect(errs[0].Detail).To(ContainSubstring("contains services with the same .metadata.name"))
+		})
+	})
+
+	Context("when service template validation fails", func() {
+		It("should return an error", func() {
+			cluster.Spec.Managed.Services.Additional = []ManagedService{
+				{
+					ServiceTemplate: ServiceTemplateSpec{
+						ObjectMeta: Metadata{Name: ""},
+					},
+				},
+			}
+			errs := cluster.validateManagedServices()
+			Expect(errs).To(HaveLen(1))
+			Expect(errs[0].Type).To(Equal(field.ErrorTypeInvalid))
+			Expect(errs[0].Field).To(Equal("spec.managed.services.additional[0]"))
+		})
+
+		It("should not allow reserved service names", func() {
+			assertError := func(name string, index int, err *field.Error) {
+				expectedDetail := fmt.Sprintf("the service name: '%s' is reserved for operator use", name)
+				Expect(err.Type).To(Equal(field.ErrorTypeInvalid))
+				Expect(err.Field).To(Equal(fmt.Sprintf("spec.managed.services.additional[%d]", index)))
+				Expect(err.Detail).To(Equal(expectedDetail))
+			}
+			cluster.Spec.Managed.Services.Additional = []ManagedService{
+				{ServiceTemplate: ServiceTemplateSpec{ObjectMeta: Metadata{Name: cluster.GetServiceReadWriteName()}}},
+				{ServiceTemplate: ServiceTemplateSpec{ObjectMeta: Metadata{Name: cluster.GetServiceReadName()}}},
+				{ServiceTemplate: ServiceTemplateSpec{ObjectMeta: Metadata{Name: cluster.GetServiceReadOnlyName()}}},
+				{ServiceTemplate: ServiceTemplateSpec{ObjectMeta: Metadata{Name: cluster.GetServiceAnyName()}}},
+			}
+			errs := cluster.validateManagedServices()
+			Expect(errs).To(HaveLen(4))
+			assertError("test-rw", 0, errs[0])
+			assertError("test-r", 1, errs[1])
+			assertError("test-ro", 2, errs[2])
+			assertError("test-any", 3, errs[3])
+		})
+	})
+
+	Context("disabledDefault service validation", func() {
+		It("should allow the disablement of ro and r service", func() {
+			cluster.Spec.Managed.Services.DisabledDefaultServices = []ServiceSelectorType{
+				ServiceSelectorTypeR,
+				ServiceSelectorTypeRO,
+			}
+			errs := cluster.validateManagedServices()
+			Expect(errs).To(BeEmpty())
+		})
+
+		It("should not allow the disablement of rw service", func() {
+			cluster.Spec.Managed.Services.DisabledDefaultServices = []ServiceSelectorType{
+				ServiceSelectorTypeRW,
+			}
+			errs := cluster.validateManagedServices()
+			Expect(errs).To(HaveLen(1))
+			Expect(errs[0].Type).To(Equal(field.ErrorTypeInvalid))
+			Expect(errs[0].Field).To(Equal("spec.managed.services.disabledDefaultServices"))
+		})
+	})
+})
+
+var _ = Describe("ServiceTemplate Validation", func() {
+	var (
+		path         *field.Path
+		serviceSpecs ServiceTemplateSpec
+	)
+
+	BeforeEach(func() {
+		path = field.NewPath("spec")
+	})
+
+	Describe("validateServiceTemplate", func() {
+		Context("when name is required", func() {
+			It("should return an error if the name is empty", func() {
+				serviceSpecs = ServiceTemplateSpec{
+					ObjectMeta: Metadata{Name: ""},
+				}
+
+				errs := validateServiceTemplate(path, true, serviceSpecs)
+				Expect(errs).To(HaveLen(1))
+				Expect(errs[0].Error()).To(ContainSubstring("name is required"))
+			})
+
+			It("should not return an error if the name is present", func() {
+				serviceSpecs = ServiceTemplateSpec{
+					ObjectMeta: Metadata{Name: "valid-name"},
+				}
+
+				errs := validateServiceTemplate(path, true, serviceSpecs)
+				Expect(errs).To(BeEmpty())
+			})
+		})
+
+		Context("when name is not allowed", func() {
+			It("should return an error if the name is present", func() {
+				serviceSpecs = ServiceTemplateSpec{
+					ObjectMeta: Metadata{Name: "invalid-name"},
+				}
+
+				errs := validateServiceTemplate(path, false, serviceSpecs)
+				Expect(errs).To(HaveLen(1))
+				Expect(errs[0].Error()).To(ContainSubstring("name is not allowed"))
+			})
+
+			It("should not return an error if the name is empty", func() {
+				serviceSpecs = ServiceTemplateSpec{
+					ObjectMeta: Metadata{Name: ""},
+				}
+
+				errs := validateServiceTemplate(path, false, serviceSpecs)
+				Expect(errs).To(BeEmpty())
+			})
+		})
+
+		Context("when selector is present", func() {
+			It("should return an error if the selector is present", func() {
+				serviceSpecs = ServiceTemplateSpec{
+					ObjectMeta: Metadata{Name: "valid-name"},
+					Spec: corev1.ServiceSpec{
+						Selector: map[string]string{"app": "test"},
+					},
+				}
+
+				errs := validateServiceTemplate(path, true, serviceSpecs)
+				Expect(errs).To(HaveLen(1))
+				Expect(errs[0].Error()).To(ContainSubstring("selector field is managed by the operator"))
+			})
+
+			It("should not return an error if the selector is absent", func() {
+				serviceSpecs = ServiceTemplateSpec{
+					ObjectMeta: Metadata{Name: "valid-name"},
+					Spec: corev1.ServiceSpec{
+						Selector: map[string]string{},
+					},
+				}
+
+				errs := validateServiceTemplate(path, true, serviceSpecs)
+				Expect(errs).To(BeEmpty())
+			})
+		})
 	})
 })

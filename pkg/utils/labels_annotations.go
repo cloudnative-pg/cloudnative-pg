@@ -89,6 +89,9 @@ const (
 
 	// IsOnlineBackupLabelName is the name of the label used to specify whether a backup was online
 	IsOnlineBackupLabelName = MetadataNamespace + "/onlineBackup"
+
+	// IsManagedLabelName is the name of the label used to indicate a '.spec.managed' resource
+	IsManagedLabelName = MetadataNamespace + "/isManaged"
 )
 
 const (
