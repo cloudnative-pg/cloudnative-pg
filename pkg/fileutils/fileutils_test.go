@@ -347,41 +347,53 @@ var _ = Describe("EnsureDirectoryExists", func() {
 	})
 
 	AfterEach(func() {
-		// Cleanup
 		Expect(os.RemoveAll(tempDir)).To(Succeed())
 	})
+
 	It("creates the directory with the right permissions", func() {
 		newDir := filepath.Join(tempDir, "newDir")
 
 		Expect(EnsureDirectoryExists(newDir)).To(Succeed())
-		fileInfo2, err := os.Stat(newDir)
+		fileInfo, err := os.Stat(newDir)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(fileInfo2.Mode().Perm()).To(Equal(fs.FileMode(0o700)))
+		Expect(fileInfo.Mode().Perm()).To(Equal(fs.FileMode(0o700)))
 	})
+
 	It("errors out when it cannot create the directory", func() {
 		err := EnsureDirectoryExists("/dev/foobar")
 		Expect(err).To(HaveOccurred())
 		Expect(errors.Is(err, fs.ErrPermission)).To(BeTrue())
-		pathErr, ok := err.(*os.PathError)
-		Expect(ok).To(BeTrue())
+		var pathErr *os.PathError
+		Expect(errors.As(err, &pathErr)).To(BeTrue())
 		Expect(pathErr.Op).To(Equal("mkdir"))
 	})
+
 	It("errors out when Stat fails for other reasons", func() {
 		err := EnsureDirectoryExists("illegalchar\x00")
 		Expect(err).To(HaveOccurred())
-		pathErr, ok := err.(*os.PathError)
-		Expect(ok).To(BeTrue())
+		Expect(err).To(MatchError(ContainSubstring("invalid")))
+		var pathErr *os.PathError
+		Expect(errors.As(err, &pathErr)).To(BeTrue())
 		Expect(pathErr.Op).To(Equal("stat"))
-		Expect(err.Error()).To(ContainSubstring("invalid"))
 	})
+
+	It("errors out when not a directory", func() {
+		newNonDir := filepath.Join(tempDir, "newNonDir")
+		Expect(CreateEmptyFile(newNonDir)).To(Succeed())
+
+		err := EnsureDirectoryExists(newNonDir)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(MatchError(fs.ErrInvalid))
+	})
+
 	It("ignores the permissions if the file already exists", func() {
 		existingDir, err := os.MkdirTemp(tempDir, "existingDir")
 		Expect(err).NotTo(HaveOccurred())
 		Expect(os.Chmod(existingDir, 0o600)).To(Succeed())
 
 		Expect(EnsureDirectoryExists(existingDir)).To(Succeed())
-		fileInfo2, err := os.Stat(existingDir)
+		fileInfo, err := os.Stat(existingDir)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(fileInfo2.Mode().Perm()).To(Equal(fs.FileMode(0o600)))
+		Expect(fileInfo.Mode().Perm()).To(Equal(fs.FileMode(0o600)))
 	})
 })
