@@ -121,11 +121,11 @@ func (data *data) Backup(
 		return nil, err
 	}
 
-	if !slices.Contains(plugin.capabilities, identity.PluginCapability_Service_TYPE_BACKUP_SERVICE) {
+	if !slices.Contains(plugin.PluginCapabilities(), identity.PluginCapability_Service_TYPE_BACKUP_SERVICE) {
 		return nil, ErrPluginNotSupportBackup
 	}
 
-	if !slices.Contains(plugin.backupCapabilities, backup.BackupCapability_RPC_TYPE_BACKUP) {
+	if !slices.Contains(plugin.BackupCapabilities(), backup.BackupCapability_RPC_TYPE_BACKUP) {
 		return nil, ErrPluginNotSupportBackupEndpoint
 	}
 
@@ -144,7 +144,7 @@ func (data *data) Backup(
 		"clusterDefinition", request.ClusterDefinition,
 		"parameters", parameters)
 
-	result, err := plugin.backupClient.Backup(ctx, &request)
+	result, err := plugin.BackupClient().Backup(ctx, &request)
 	if err != nil {
 		contextLogger.Error(err, "Error while calling Backup, failing")
 		return nil, err

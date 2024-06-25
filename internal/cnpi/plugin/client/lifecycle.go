@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/connection"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
@@ -63,9 +64,9 @@ func (data *data) LifecycleHook(
 	}
 	object.GetObjectKind().SetGroupVersionKind(gvk)
 
-	var invokablePlugin []pluginData
+	var invokablePlugin []connection.Interface
 	for _, plg := range data.plugins {
-		for _, capability := range plg.lifecycleCapabilities {
+		for _, capability := range plg.LifecycleCapabilities() {
 			if capability.Group != gvk.Group || capability.Kind != gvk.Kind {
 				continue
 			}
@@ -114,7 +115,7 @@ func (data *data) LifecycleHook(
 			ClusterDefinition: serializedCluster,
 			ObjectDefinition:  serializedObject,
 		}
-		result, err := plg.lifecycleClient.LifecycleHook(ctx, req)
+		result, err := plg.LifecycleClient().LifecycleHook(ctx, req)
 		if err != nil {
 			contextLogger.Error(err, "Error while calling LifecycleHook")
 			return nil, err

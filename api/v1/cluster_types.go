@@ -551,6 +551,10 @@ const (
 	// PhaseHealthy for a cluster doing nothing
 	PhaseHealthy = "Cluster in healthy state"
 
+	// PhaseUnknownPlugin is triggered when the required CNPG-i plugin have not been
+	// loaded still
+	PhaseUnknownPlugin = "Unknown plugin"
+
 	// PhaseImageCatalogError is triggered when the cluster cannot select the image to
 	// apply because of an invalid or incomplete catalog
 	PhaseImageCatalogError = "Cluster has incomplete or invalid image catalog"

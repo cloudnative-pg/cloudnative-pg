@@ -46,14 +46,14 @@ func (data *data) ArchiveWAL(
 	}
 
 	for idx := range data.plugins {
-		plugin := &data.plugins[idx]
+		plugin := data.plugins[idx]
 
-		if !slices.Contains(plugin.walCapabilities, wal.WALCapability_RPC_TYPE_ARCHIVE_WAL) {
+		if !slices.Contains(plugin.WALCapabilities(), wal.WALCapability_RPC_TYPE_ARCHIVE_WAL) {
 			continue
 		}
 
 		contextLogger := contextLogger.WithValues(
-			"pluginName", plugin.name,
+			"pluginName", plugin.Name,
 		)
 		request := wal.WALArchiveRequest{
 			ClusterDefinition: serializedCluster,
@@ -64,7 +64,7 @@ func (data *data) ArchiveWAL(
 			"Calling ArchiveWAL endpoint",
 			"clusterDefinition", request.ClusterDefinition,
 			"sourceFile", request.SourceFileName)
-		_, err := plugin.walClient.Archive(ctx, &request)
+		_, err := plugin.WALClient().Archive(ctx, &request)
 		if err != nil {
 			contextLogger.Error(err, "Error while calling ArchiveWAL, failing")
 			return err
@@ -94,14 +94,14 @@ func (data *data) RestoreWAL(
 	}
 
 	for idx := range data.plugins {
-		plugin := &data.plugins[idx]
+		plugin := data.plugins[idx]
 
-		if !slices.Contains(plugin.walCapabilities, wal.WALCapability_RPC_TYPE_RESTORE_WAL) {
+		if !slices.Contains(plugin.WALCapabilities(), wal.WALCapability_RPC_TYPE_RESTORE_WAL) {
 			continue
 		}
 
 		contextLogger := contextLogger.WithValues(
-			"pluginName", plugin.name,
+			"pluginName", plugin.Name,
 		)
 		request := wal.WALRestoreRequest{
 			ClusterDefinition:   serializedCluster,
@@ -115,7 +115,7 @@ func (data *data) RestoreWAL(
 			"sourceWALName", sourceWALName,
 			"destinationFileName", destinationFileName,
 		)
-		if _, err := plugin.walClient.Restore(ctx, &request); err != nil {
+		if _, err := plugin.WALClient().Restore(ctx, &request); err != nil {
 			contextLogger.Trace("WAL restore via plugin failed, trying next one", "err", err)
 			errorCollector = multierr.Append(errorCollector, err)
 		} else {
