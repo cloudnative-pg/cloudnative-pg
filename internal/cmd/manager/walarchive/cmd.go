@@ -32,6 +32,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	pluginClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/cache"
 	cacheClient "github.com/cloudnative-pg/cloudnative-pg/internal/management/cache/client"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/conditions"
@@ -250,14 +253,20 @@ func archiveWALViaPlugins(
 ) error {
 	contextLogger := log.FromContext(ctx)
 
-	pluginClient, err := cluster.LoadSelectedPluginsClient(ctx, cluster.GetWALPluginNames())
+	plugins := repository.New()
+	if err := plugins.RegisterUnixSocketPluginsInPath(configuration.Current.PluginSocketDir); err != nil {
+		contextLogger.Error(err, "Error while loading local plugins")
+	}
+	defer plugins.Close()
+
+	client, err := pluginClient.WithPlugins(ctx, plugins, cluster.GetPluginNames()...)
 	if err != nil {
-		contextLogger.Error(err, "Error loading plugins while archiving a WAL")
+		contextLogger.Error(err, "Error while loading required plugins")
 		return err
 	}
-	defer pluginClient.Close(ctx)
+	defer client.Close(ctx)
 
-	return pluginClient.ArchiveWAL(ctx, cluster, walName)
+	return client.ArchiveWAL(ctx, cluster, walName)
 }
 
 // gatherWALFilesToArchive reads from the archived status the list of WAL files

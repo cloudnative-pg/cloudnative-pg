@@ -35,6 +35,7 @@ import (
 
 	// +kubebuilder:scaffold:imports
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/controller"
 	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
@@ -216,13 +217,38 @@ func RunController(
 		return err
 	}
 
-	if err = controller.NewClusterReconciler(mgr, discoveryClient).SetupWithManager(ctx, mgr); err != nil {
+	// Load the sidecar plugins
+	pluginRepository := repository.New()
+
+	if err := pluginRepository.RegisterUnixSocketPluginsInPath(
+		configuration.Current.PluginSocketDir,
+	); err != nil {
+		setupLog.Error(err, "Unable to load sidecar CNPG-i plugins, skipping")
+	}
+
+	if err = controller.NewClusterReconciler(
+		mgr,
+		discoveryClient,
+		pluginRepository,
+	).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Cluster")
 		return err
 	}
 
-	if err = controller.NewBackupReconciler(mgr, discoveryClient).SetupWithManager(ctx, mgr); err != nil {
+	if err = controller.NewBackupReconciler(
+		mgr,
+		discoveryClient,
+		pluginRepository,
+	).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Backup")
+		return err
+	}
+
+	if err = controller.NewPluginReconciler(
+		mgr,
+		pluginRepository,
+	).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "Plugin")
 		return err
 	}
 

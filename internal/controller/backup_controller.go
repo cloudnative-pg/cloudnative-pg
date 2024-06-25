@@ -41,6 +41,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	cnpgiClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/conditions"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
@@ -67,18 +69,24 @@ type BackupReconciler struct {
 
 	Scheme   *runtime.Scheme
 	Recorder record.EventRecorder
+	Plugins  repository.Interface
 
 	instanceStatusClient instance.Client
 }
 
 // NewBackupReconciler properly initializes the BackupReconciler
-func NewBackupReconciler(mgr manager.Manager, discoveryClient *discovery.DiscoveryClient) *BackupReconciler {
+func NewBackupReconciler(
+	mgr manager.Manager,
+	discoveryClient *discovery.DiscoveryClient,
+	plugins repository.Interface,
+) *BackupReconciler {
 	return &BackupReconciler{
 		Client:               mgr.GetClient(),
 		DiscoveryClient:      discoveryClient,
 		Scheme:               mgr.GetScheme(),
 		Recorder:             mgr.GetEventRecorderFor("cloudnative-pg-backup"),
 		instanceStatusClient: instance.NewStatusClient(),
+		Plugins:              plugins,
 	}
 }
 
@@ -127,6 +135,18 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, nil
 	}
 
+	// Load the required plugins
+	pluginClient, err := cnpgiClient.WithPlugins(ctx, r.Plugins, cluster.GetPluginNames()...)
+	if err != nil {
+		contextLogger.Error(err, "Error loading plugins, retrying")
+		return ctrl.Result{}, err
+	}
+	defer func() {
+		pluginClient.Close(ctx)
+	}()
+
+	ctx = setPluginClientInContext(ctx, pluginClient)
+
 	// Plugin pre-hooks
 	if hookResult := preReconcilePluginHooks(ctx, &cluster, &backup); hookResult.StopReconciliation {
 		return hookResult.Result, hookResult.Err
@@ -144,7 +164,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	contextLogger.Debug("Found cluster for backup", "cluster", clusterName)
 
 	// Store in the context the TLS configuration required communicating with the Pods
-	ctx, err := certs.NewTLSConfigForContext(
+	ctx, err = certs.NewTLSConfigForContext(
 		ctx,
 		r.Client,
 		cluster.GetServerCASecretObjectKey(),

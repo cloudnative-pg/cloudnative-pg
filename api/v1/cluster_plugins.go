@@ -19,35 +19,17 @@ package v1
 import (
 	"context"
 
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-// LoadPluginClient creates a new plugin client, loading the plugins that are
-// required by this cluster
-func (cluster *Cluster) LoadPluginClient(ctx context.Context) (client.Client, error) {
+// GetPluginNames gets the name of the plugins that are involved
+// in the reconciliation of this cluster
+func (cluster *Cluster) GetPluginNames() (result []string) {
 	pluginNames := make([]string, len(cluster.Spec.Plugins))
 	for i, pluginDeclaration := range cluster.Spec.Plugins {
 		pluginNames[i] = pluginDeclaration.Name
 	}
-
-	return cluster.LoadSelectedPluginsClient(ctx, pluginNames)
-}
-
-// LoadSelectedPluginsClient creates a new plugin client, loading the requested
-// plugins
-func (cluster *Cluster) LoadSelectedPluginsClient(ctx context.Context, pluginNames []string) (client.Client, error) {
-	pluginLoader := client.NewUnixSocketClient(configuration.Current.PluginSocketDir)
-
-	// Load the plugins
-	for _, name := range pluginNames {
-		if err := pluginLoader.Load(ctx, name); err != nil {
-			return nil, err
-		}
-	}
-
-	return pluginLoader, nil
+	return pluginNames
 }
 
 // GetWALPluginNames gets the list of all the plugin names capable of handling

@@ -229,4 +229,5 @@ func (ws *localWebserverEndpoints) startPluginBackup(
 ) {
 	cmd := NewPluginBackupCommand(cluster, backup, ws.typedClient, ws.eventRecorder)
 	cmd.Start(ctx)
+	cmd.Close()
 }
