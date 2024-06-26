@@ -19,12 +19,12 @@ package webserver
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
 
 const (
@@ -65,26 +65,23 @@ func (body Response[T]) EnsureDataIsPresent() error {
 	return fmt.Errorf("encounteered an empty body while expecting it to not be empty")
 }
 
-// Webserver contains a server that interacts with postgres instance
+// Webserver wraps a webserver to make it a kubernetes Runnable
 type Webserver struct {
-	// instance is the PostgreSQL instance to be collected
-	instance *postgres.Instance
-	server   *http.Server
+	server *http.Server
 }
 
-// NewWebServer creates a Webserver given a postgres.Instance and a http.Server
-func NewWebServer(instance *postgres.Instance, server *http.Server) *Webserver {
+// NewWebServer creates a Webserver as a Kubernetes Runnable, given a http.Server
+func NewWebServer(server *http.Server) *Webserver {
 	return &Webserver{
-		instance: instance,
-		server:   server,
+		server: server,
 	}
 }
 
-// Start implements the runnable interface
+// Start starts a webserver listener, implementing the K8s runnable interface
 func (ws *Webserver) Start(ctx context.Context) error {
 	errChan := make(chan error, 1)
 	go func() {
-		log.Info("Starting webserver", "address", ws.server.Addr)
+		log.Info("Starting webserver", "address", ws.server.Addr, "hasTLS", ws.server.TLSConfig != nil)
 
 		var err error
 		if ws.server.TLSConfig != nil {
@@ -101,7 +98,11 @@ func (ws *Webserver) Start(ctx context.Context) error {
 	// we exit with error code, potentially we could do a retry logic, but rarely a webserver that doesn't start will run
 	// on subsequent tries
 	case err := <-errChan:
-		log.Error(err, "Error while starting the web server", "address", ws.server.Addr)
+		if errors.Is(http.ErrServerClosed, err) {
+			log.Error(err, "Closing the web server", "address", ws.server.Addr)
+		} else {
+			log.Error(err, "Error while running the web server", "address", ws.server.Addr)
+		}
 		return err
 	case <-ctx.Done():
 		if err := ws.server.Shutdown(context.Background()); err != nil {

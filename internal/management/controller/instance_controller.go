@@ -952,6 +952,7 @@ func (r *InstanceReconciler) reconcileInstance(cluster *apiv1.Cluster) {
 	r.instance.MaxStopDelay = cluster.GetMaxStopDelay()
 	r.instance.SmartStopDelay = cluster.GetSmartShutdownTimeout()
 	r.instance.RequiresDesignatedPrimaryTransition = detectRequiresDesignatedPrimaryTransition()
+	r.instance.MetricsPortTLS = cluster.IsMetricsTLSEnabled()
 }
 
 // reconcileAutoConf reconciles the permission of `postgresql.auto.conf`
