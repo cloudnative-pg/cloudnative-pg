@@ -23,7 +23,6 @@ import (
 	"slices"
 	"time"
 
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/sethvargo/go-password/password"
@@ -35,7 +34,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
-	"k8s.io/client-go/util/retry"
 	k8slices "k8s.io/utils/strings/slices"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -410,6 +408,11 @@ func (r *ClusterReconciler) serviceReconciler(
 		return fmt.Errorf("refusing to reconcile service: %s, not owned by the cluster", livingService.Name)
 	}
 
+	if !livingService.DeletionTimestamp.IsZero() {
+		contextLogger.Info("waiting for service to be deleted")
+		return ErrNextLoop
+	}
+
 	if !enabled {
 		contextLogger.Info("deleting service, due to not being managed anymore")
 		return r.Client.Delete(ctx, &livingService)
@@ -451,32 +454,12 @@ func (r *ClusterReconciler) serviceReconciler(
 		return r.Client.Update(ctx, &livingService)
 	}
 
-	if strategy != apiv1.ServiceUpdateStrategyReplace {
-		contextLogger.Error(err, "while reconciling the service")
-		return fmt.Errorf("unexpected service update strategy: %s", strategy)
-	}
-
-	contextLogger.Info("replacing the service")
+	contextLogger.Info("deleting the service")
 	if err := r.Client.Delete(ctx, &livingService); err != nil {
 		return err
 	}
 
-	if err := retry.OnError(retry.DefaultRetry, resources.RetryAlways, func() error {
-		getErr := r.Client.Get(ctx, client.ObjectKeyFromObject(proposed), &corev1.Service{})
-		if apierrs.IsNotFound(getErr) {
-			return nil
-		}
-		if getErr != nil {
-			return getErr
-		}
-
-		return fmt.Errorf("waiting for the service to be deleted due to the Replace update strategy")
-	}); err != nil {
-		contextLogger.Error(err, "while replacing the service")
-		return err
-	}
-
-	return r.Client.Create(ctx, proposed)
+	return ErrNextLoop
 }
 
 // createOrPatchOwnedPodDisruptionBudget ensures that we have a PDB requiring to remove one node at a time

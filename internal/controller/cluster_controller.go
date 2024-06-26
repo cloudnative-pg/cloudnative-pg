@@ -211,6 +211,10 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 
 	// Ensure we have the required global objects
 	if err := r.createPostgresClusterObjects(ctx, cluster); err != nil {
+		if errors.Is(err, ErrNextLoop) {
+			return ctrl.Result{}, err
+		}
+		contextLogger.Error(err, "while reconciling postgres cluster objects")
 		if regErr := r.RegisterPhase(ctx, cluster, apiv1.PhaseCannotCreateClusterObjects, err.Error()); regErr != nil {
 			contextLogger.Error(regErr, "unable to register phase", "outerErr", err.Error())
 		}
