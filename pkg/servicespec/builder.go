@@ -75,16 +75,29 @@ func (builder *Builder) WithServiceType(serviceType corev1.ServiceType, overwrit
 	return builder
 }
 
-// WithServicePort adds a port to the current status
+// WithServicePort adds a port to the current service
 func (builder *Builder) WithServicePort(value *corev1.ServicePort) *Builder {
 	for idx, port := range builder.status.Spec.Ports {
 		if port.Name == value.Name {
 			builder.status.Spec.Ports[idx] = *value
+			return builder
 		}
 	}
 
 	builder.status.Spec.Ports = append(builder.status.Spec.Ports, *value)
 	return builder
+}
+
+// WithServicePortNoOverwrite adds a ServicePort to the current service if no ServicePort that matches the name
+// or port value is found
+func (builder *Builder) WithServicePortNoOverwrite(value *corev1.ServicePort) *Builder {
+	for _, port := range builder.status.Spec.Ports {
+		if port.Name == value.Name || port.Port == value.Port {
+			return builder
+		}
+	}
+
+	return builder.WithServicePort(value)
 }
 
 // SetPGBouncerSelector overwrites the selectors field with the PgbouncerNameLabel selector.
