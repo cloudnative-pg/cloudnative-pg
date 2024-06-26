@@ -1360,14 +1360,13 @@ func AssertApplicationDatabaseConnection(
 	})
 }
 
-func AssertMetricsData(namespace, curlPodName, targetOne, targetTwo, targetSecret string, cluster *apiv1.Cluster) {
+func AssertMetricsData(namespace, targetOne, targetTwo, targetSecret string, cluster *apiv1.Cluster) {
 	By("collect and verify metric being exposed with target databases", func() {
 		podList, err := env.GetClusterPodList(namespace, cluster.Name)
 		Expect(err).ToNot(HaveOccurred())
 		for _, pod := range podList.Items {
 			podName := pod.GetName()
-			podIP := pod.Status.PodIP
-			out, err := testsUtils.CurlGetMetrics(namespace, curlPodName, podIP, 9187)
+			out, err := testsUtils.RetrieveMetricsFromInstance(env, namespace, podName)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(strings.Contains(out, fmt.Sprintf(`cnpg_some_query_rows{datname="%v"} 0`, targetOne))).Should(BeTrue(),
 				"Metric collection issues on %v.\nCollected metrics:\n%v", podName, out)
@@ -2524,7 +2523,7 @@ func DeleteTableUsingPgBouncerService(
 	Expect(err).ToNot(HaveOccurred())
 }
 
-func collectAndAssertDefaultMetricsPresentOnEachPod(namespace, clusterName, curlPodName string, expectPresent bool) {
+func collectAndAssertDefaultMetricsPresentOnEachPod(namespace, clusterName string, expectPresent bool) {
 	By("collecting and verifying a set of default metrics on each pod", func() {
 		defaultMetrics := []string{
 			"cnpg_pg_settings_setting",
@@ -2546,8 +2545,7 @@ func collectAndAssertDefaultMetricsPresentOnEachPod(namespace, clusterName, curl
 		Expect(err).ToNot(HaveOccurred())
 		for _, pod := range podList.Items {
 			podName := pod.GetName()
-			podIP := pod.Status.PodIP
-			out, err := testsUtils.CurlGetMetrics(namespace, curlPodName, podIP, 9187)
+			out, err := testsUtils.RetrieveMetricsFromInstance(env, namespace, podName)
 			Expect(err).ToNot(HaveOccurred())
 
 			// error should be zero on each pod metrics
@@ -2570,7 +2568,7 @@ func collectAndAssertDefaultMetricsPresentOnEachPod(namespace, clusterName, curl
 }
 
 // collectAndAssertMetricsPresentOnEachPod verify a set of metrics is existed in each pod
-func collectAndAssertCollectorMetricsPresentOnEachPod(namespace, clusterName, curlPodName string) {
+func collectAndAssertCollectorMetricsPresentOnEachPod(namespace, clusterName string) {
 	cnpgCollectorMetrics := []string{
 		"cnpg_collector_collection_duration_seconds",
 		"cnpg_collector_fencing_on",
@@ -2603,8 +2601,7 @@ func collectAndAssertCollectorMetricsPresentOnEachPod(namespace, clusterName, cu
 		Expect(err).ToNot(HaveOccurred())
 		for _, pod := range podList.Items {
 			podName := pod.GetName()
-			podIP := pod.Status.PodIP
-			out, err := testsUtils.CurlGetMetrics(namespace, curlPodName, podIP, 9187)
+			out, err := testsUtils.RetrieveMetricsFromInstance(env, namespace, podName)
 			Expect(err).ToNot(HaveOccurred())
 
 			// error should be zero on each pod metrics
