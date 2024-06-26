@@ -62,7 +62,7 @@ managed:
 
 You can define a list of additional services through the
 [`managed.services.additional` stanza](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-ManagedService)
-by specifying the service type (e.g., `rw`) in the `selectorType` field.
+by specifying the service type (e.g., `rw`) in the `selectorType` field and optionally the `updateStrategy`.
 
 The `serviceTemplate` field gives you access to the standard Kubernetes API for
 the network `Service` resource, allowing you to define both the `metadata` and
