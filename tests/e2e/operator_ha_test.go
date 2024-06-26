@@ -42,6 +42,9 @@ var _ = Describe("Operator High Availability", Serial,
 			if testLevelEnv.Depth < int(level) {
 				Skip("Test depth is lower than the amount requested for this test")
 			}
+			if IsGKE() {
+				Skip("Skip the scale test case in GKE as in GKE we disable the leader election")
+			}
 		})
 
 		It("can work as HA mode", func() {
