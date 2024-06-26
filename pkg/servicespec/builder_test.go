@@ -18,8 +18,10 @@ package servicespec
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	pgBouncerConfig "github.com/cloudnative-pg/cloudnative-pg/pkg/management/pgbouncer/config"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -86,5 +88,57 @@ var _ = Describe("Service template builder", func() {
 			},
 		}).WithSelector("otherservice", true).Build().Spec.Selector).
 			To(Equal(map[string]string{utils.PgbouncerNameLabel: "otherservice"}))
+	})
+
+	It("should not add the default ServicePort when a matching port is found", func() {
+		expectedPort := corev1.ServicePort{
+			Name:       "test-port",
+			Port:       pgBouncerConfig.PgBouncerPort,
+			TargetPort: intstr.FromString(pgBouncerConfig.PgBouncerPortName),
+			Protocol:   corev1.ProtocolTCP,
+			NodePort:   30000,
+		}
+		svc := NewFrom(&apiv1.ServiceTemplateSpec{
+			Spec: corev1.ServiceSpec{
+				Selector: map[string]string{
+					utils.PgbouncerNameLabel: "myservice",
+				},
+				Ports: []corev1.ServicePort{expectedPort},
+			},
+		}).WithServicePortNoOverwrite(&corev1.ServicePort{
+			Name:       pgBouncerConfig.PgBouncerPortName,
+			Port:       pgBouncerConfig.PgBouncerPort,
+			TargetPort: intstr.FromString(pgBouncerConfig.PgBouncerPortName),
+			Protocol:   corev1.ProtocolTCP,
+		}).Build()
+
+		Expect(svc.Spec.Ports).To(HaveLen(1))
+		Expect(svc.Spec.Ports).To(HaveExactElements(expectedPort))
+	})
+
+	It("should not add the default ServicePort when a matching name is found", func() {
+		expectedPort := corev1.ServicePort{
+			Name:       pgBouncerConfig.PgBouncerPortName,
+			Port:       70000,
+			TargetPort: intstr.FromString(pgBouncerConfig.PgBouncerPortName),
+			Protocol:   corev1.ProtocolTCP,
+			NodePort:   30000,
+		}
+		svc := NewFrom(&apiv1.ServiceTemplateSpec{
+			Spec: corev1.ServiceSpec{
+				Selector: map[string]string{
+					utils.PgbouncerNameLabel: "myservice",
+				},
+				Ports: []corev1.ServicePort{expectedPort},
+			},
+		}).WithServicePortNoOverwrite(&corev1.ServicePort{
+			Name:       pgBouncerConfig.PgBouncerPortName,
+			Port:       pgBouncerConfig.PgBouncerPort,
+			TargetPort: intstr.FromString(pgBouncerConfig.PgBouncerPortName),
+			Protocol:   corev1.ProtocolTCP,
+		}).Build()
+
+		Expect(svc.Spec.Ports).To(HaveLen(1))
+		Expect(svc.Spec.Ports).To(HaveExactElements(expectedPort))
 	})
 })
