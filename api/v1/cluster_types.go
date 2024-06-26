@@ -2464,6 +2464,17 @@ const (
 	ServiceSelectorTypeRO ServiceSelectorType = "ro"
 )
 
+// ServiceUpdateStrategy describes how the changes to the managed service should be handled
+// +kubebuilder:validation:Enum=patch;replace
+type ServiceUpdateStrategy string
+
+const (
+	// ServiceUpdateStrategyPatch applies a patch deriving from the differences of the actual service and the expect one
+	ServiceUpdateStrategyPatch = "patch"
+	// ServiceUpdateStrategyReplace deletes the existing service and recreates it when a difference is detected
+	ServiceUpdateStrategyReplace = "replace"
+)
+
 // ManagedServices represents the services managed by the cluster.
 type ManagedServices struct {
 	// DisabledDefaultServices is a list of service types that are disabled by default.
@@ -2481,6 +2492,11 @@ type ManagedService struct {
 	// Valid values are "rw", "r", and "ro", representing read-write, read, and read-only services.
 	// +kubebuilder:validation:Enum=rw;r;ro
 	SelectorType ServiceSelectorType `json:"selectorType"`
+
+	// UpdateStrategy describes how the service differences should be reconciled
+	// +kubebuilder:default:="patch"
+	UpdateStrategy ServiceUpdateStrategy `json:"updateStrategy,omitempty"`
+
 	// ServiceTemplate is the template specification for the service.
 	ServiceTemplate ServiceTemplateSpec `json:"serviceTemplate"`
 }

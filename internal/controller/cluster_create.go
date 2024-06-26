@@ -23,6 +23,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/sethvargo/go-password/password"
@@ -34,6 +35,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/util/retry"
 	k8slices "k8s.io/utils/strings/slices"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -365,6 +367,8 @@ func (r *ClusterReconciler) reconcileManagedServices(ctx context.Context, cluste
 		if isEnabled {
 			continue
 		}
+
+		// we ensure the services are deleted
 		if err := r.serviceReconciler(ctx, cluster, &livingService, false); err != nil {
 			return err
 		}
@@ -378,7 +382,16 @@ func (r *ClusterReconciler) serviceReconciler(
 	proposed *corev1.Service,
 	enabled bool,
 ) error {
-	contextLogger := log.FromContext(ctx).WithValues("serviceName", proposed.Name)
+	strategy := apiv1.ServiceUpdateStrategyPatch
+	annotationStrategy := apiv1.ServiceUpdateStrategy(proposed.Annotations[utils.UpdateStrategyAnnotation])
+	if annotationStrategy == apiv1.ServiceUpdateStrategyReplace {
+		strategy = apiv1.ServiceUpdateStrategyReplace
+	}
+
+	contextLogger := log.FromContext(ctx).WithValues(
+		"serviceName", proposed.Name,
+		"updateStrategy", strategy,
+	)
 
 	var livingService corev1.Service
 	err := r.Client.Get(ctx, types.NamespacedName{Name: proposed.Name, Namespace: proposed.Namespace}, &livingService)
@@ -432,9 +445,38 @@ func (r *ClusterReconciler) serviceReconciler(
 		return nil
 	}
 
-	contextLogger.Info("reconciling service")
-	// we update to ensure that we substitute the selectors
-	return r.Client.Update(ctx, &livingService)
+	if strategy == apiv1.ServiceUpdateStrategyPatch {
+		contextLogger.Info("reconciling service")
+		// we update to ensure that we substitute the selectors
+		return r.Client.Update(ctx, &livingService)
+	}
+
+	if strategy != apiv1.ServiceUpdateStrategyReplace {
+		contextLogger.Error(err, "while reconciling the service")
+		return fmt.Errorf("unexpected service update strategy: %s", strategy)
+	}
+
+	contextLogger.Info("replacing the service")
+	if err := r.Client.Delete(ctx, &livingService); err != nil {
+		return err
+	}
+
+	if err := retry.OnError(retry.DefaultRetry, resources.RetryAlways, func() error {
+		getErr := r.Client.Get(ctx, client.ObjectKeyFromObject(proposed), &corev1.Service{})
+		if apierrs.IsNotFound(getErr) {
+			return nil
+		}
+		if getErr != nil {
+			return getErr
+		}
+
+		return fmt.Errorf("waiting for the service to be deleted due to the Replace update strategy")
+	}); err != nil {
+		contextLogger.Error(err, "while replacing the service")
+		return err
+	}
+
+	return r.Client.Create(ctx, proposed)
 }
 
 // createOrPatchOwnedPodDisruptionBudget ensures that we have a PDB requiring to remove one node at a time

@@ -21,6 +21,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -160,6 +161,62 @@ var _ = Describe("Managed services tests", Label(tests.LabelSmoke, tests.LabelBa
 				var service corev1.Service
 				err = env.Client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: r.Name}, &service)
 				g.Expect(err).ToNot(HaveOccurred())
+			}, testTimeouts[utils.ManagedServices]).Should(Succeed())
+		})
+	})
+
+	It("should properly handle replace update strategy", func(ctx SpecContext) {
+		const clusterManifest = fixturesDir + "/managed_services/cluster-managed-services-replace-strategy.yaml.template"
+		const serviceName = "test-rw"
+		namespace, err := env.CreateUniqueNamespace(namespacePrefix)
+		Expect(err).ToNot(HaveOccurred())
+
+		DeferCleanup(func() error {
+			return env.DeleteNamespace(namespace)
+		})
+
+		clusterName, err := env.GetResourceNameFromYAML(clusterManifest)
+		Expect(err).ToNot(HaveOccurred())
+		AssertCreateCluster(namespace, clusterName, clusterManifest, env)
+
+		cluster, err := env.GetCluster(namespace, clusterName)
+		Expect(err).ToNot(HaveOccurred())
+
+		var creationTimestamp metav1.Time
+		var uid types.UID
+		By("ensuring the service is created", func() {
+			baseRWService := specs.CreateClusterReadWriteService(*cluster)
+			var serviceRW corev1.Service
+			err = env.Client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: serviceName}, &serviceRW)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(serviceRW.Spec.Selector).To(Equal(baseRWService.Spec.Selector))
+			Expect(serviceRW.Labels).ToNot(BeNil())
+			Expect(serviceRW.Labels["test-label"]).To(Equal("true"),
+				fmt.Sprintf("found labels: %s", serviceRW.Labels))
+			Expect(serviceRW.Annotations).ToNot(BeNil())
+			Expect(serviceRW.Annotations["test-annotation"]).To(Equal("true"))
+
+			creationTimestamp = serviceRW.CreationTimestamp
+			uid = serviceRW.UID
+		})
+
+		By("updating the service definition", func() {
+			Eventually(func(g Gomega) error {
+				cluster, err := env.GetCluster(namespace, clusterName)
+				g.Expect(err).ToNot(HaveOccurred())
+				cluster.Spec.Managed.Services.Additional[0].ServiceTemplate.ObjectMeta.Labels["new-label"] = "new"
+				return env.Client.Update(ctx, cluster)
+			}, RetryTimeout, PollingTime).Should(BeNil())
+		})
+
+		By("expecting the service to be recreated", func() {
+			Eventually(func(g Gomega) {
+				var service corev1.Service
+				err = env.Client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: serviceName}, &service)
+				g.Expect(err).ToNot(HaveOccurred())
+				g.Expect(service.Labels["new-label"]).To(Equal("new"))
+				g.Expect(service.UID).ToNot(Equal(uid))
+				g.Expect(service.CreationTimestamp).ToNot(Equal(creationTimestamp))
 			}, testTimeouts[utils.ManagedServices]).Should(Succeed())
 		})
 	})

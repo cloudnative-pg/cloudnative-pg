@@ -396,6 +396,7 @@ ServiceMonitor
 ServiceSelectorType
 ServiceSpec
 ServiceTemplateSpec
+ServiceUpdateStrategy
 ShutdownCheckpointToken
 Silvela
 Slonik
@@ -439,6 +440,7 @@ URIs
 UTF
 Uncomment
 Unrealizable
+UpdateStrategy
 VLDB
 VM
 VMs
@@ -1230,6 +1232,7 @@ unix
 unsetting
 unusablePVC
 updateInterval
+updateStrategy
 upgradable
 uptime
 uri

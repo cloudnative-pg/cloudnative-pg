@@ -3193,6 +3193,13 @@ It includes the type of service and its associated template specification.</p>
 Valid values are &quot;rw&quot;, &quot;r&quot;, and &quot;ro&quot;, representing read-write, read, and read-only services.</p>
 </td>
 </tr>
+<tr><td><code>updateStrategy</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-ServiceUpdateStrategy"><i>ServiceUpdateStrategy</i></a>
+</td>
+<td>
+   <p>UpdateStrategy describes how the service differences should be reconciled</p>
+</td>
+</tr>
 <tr><td><code>serviceTemplate</code> <B>[Required]</B><br/>
 <a href="#postgresql-cnpg-io-v1-ServiceTemplateSpec"><i>ServiceTemplateSpec</i></a>
 </td>
@@ -4912,6 +4919,20 @@ More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-
 </tr>
 </tbody>
 </table>
+
+## ServiceUpdateStrategy     {#postgresql-cnpg-io-v1-ServiceUpdateStrategy}
+
+(Alias of `string`)
+
+**Appears in:**
+
+- [ManagedService](#postgresql-cnpg-io-v1-ManagedService)
+
+
+<p>ServiceUpdateStrategy describes how the changes to the managed service should be handled</p>
+
+
+
 
 ## SnapshotOwnerReference     {#postgresql-cnpg-io-v1-SnapshotOwnerReference}
 
