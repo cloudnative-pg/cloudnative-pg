@@ -342,7 +342,7 @@ The following example also adds the timestamp in a user-friendly format:
 
 ```shell
 kubectl logs -n <NAMESPACE> <CLUSTER>-<N> | \
-  jq -r 'select(.logger=="postgres") | [(.ts|strflocaltime("%Y-%m-%dT%H:%M:%S %Z")), .record.message] | @csv'
+  jq -r 'select(.logger=="postgres") | [.ts, .record.message] | @csv'
 ```
 
 ### Gather and filter extra information about PostgreSQL pods
