@@ -88,9 +88,9 @@ func (builder *Builder) WithServicePort(value *corev1.ServicePort) *Builder {
 	return builder
 }
 
-// WithDefaultServicePort adds a default ServicePort to the current service if no ServicePort that matches the name
+// WithServicePortNoOverwrite adds a ServicePort to the current service if no ServicePort that matches the name
 // or port value is found
-func (builder *Builder) WithDefaultServicePort(value *corev1.ServicePort) *Builder {
+func (builder *Builder) WithServicePortNoOverwrite(value *corev1.ServicePort) *Builder {
 	for _, port := range builder.status.Spec.Ports {
 		if port.Name == value.Name || port.Port == value.Port {
 			return builder

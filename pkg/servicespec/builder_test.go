@@ -105,7 +105,7 @@ var _ = Describe("Service template builder", func() {
 				},
 				Ports: []corev1.ServicePort{expectedPort},
 			},
-		}).WithDefaultServicePort(&corev1.ServicePort{
+		}).WithServicePortNoOverwrite(&corev1.ServicePort{
 			Name:       pgBouncerConfig.PgBouncerPortName,
 			Port:       pgBouncerConfig.PgBouncerPort,
 			TargetPort: intstr.FromString(pgBouncerConfig.PgBouncerPortName),
@@ -131,7 +131,7 @@ var _ = Describe("Service template builder", func() {
 				},
 				Ports: []corev1.ServicePort{expectedPort},
 			},
-		}).WithDefaultServicePort(&corev1.ServicePort{
+		}).WithServicePortNoOverwrite(&corev1.ServicePort{
 			Name:       pgBouncerConfig.PgBouncerPortName,
 			Port:       pgBouncerConfig.PgBouncerPort,
 			TargetPort: intstr.FromString(pgBouncerConfig.PgBouncerPortName),
