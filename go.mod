@@ -27,7 +27,7 @@ require (
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.74.0
 	github.com/prometheus/client_golang v1.19.1
 	github.com/robfig/cron v1.2.0
-	github.com/sethvargo/go-password v0.3.0
+	github.com/sethvargo/go-password v0.3.1
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/pflag v1.0.5
 	github.com/thoas/go-funk v0.9.3
