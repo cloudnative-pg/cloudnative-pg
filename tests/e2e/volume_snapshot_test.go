@@ -164,7 +164,7 @@ var _ = Describe("Verify Volume Snapshot",
 				}
 
 				if !(IsLocal() || IsGKE()) {
-					Skip("This test is only executed on gke, openshift and local")
+					Skip("This test is only executed on gke and local")
 				}
 
 				var err error
@@ -359,7 +359,7 @@ var _ = Describe("Verify Volume Snapshot",
 				}
 
 				if !(IsLocal() || IsGKE()) {
-					Skip("This test is only executed on gke, openshift and local")
+					Skip("This test is only executed on gke and local")
 				}
 
 				var err error
@@ -579,7 +579,7 @@ var _ = Describe("Verify Volume Snapshot",
 				}
 
 				if !(IsLocal() || IsGKE()) {
-					Skip("This test is only executed on gke, openshift and local")
+					Skip("This test is only executed on gke and local")
 				}
 
 				var err error
