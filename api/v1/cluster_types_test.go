@@ -1429,6 +1429,8 @@ var _ = Describe("appendAdditionalCommandArgs", func() {
 
 		updatedOptions := appendAdditionalCommandArgs(additionalCommandArgs, options)
 		Expect(updatedOptions).To(Equal([]string{"--option1=abc", "--option2"}))
+	})
+})
 
 var _ = Describe("IsReplica", func() {
 	Describe("using the legacy API", func() {
