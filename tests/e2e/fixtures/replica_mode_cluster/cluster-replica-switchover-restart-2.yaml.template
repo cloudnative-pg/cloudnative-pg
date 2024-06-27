@@ -35,7 +35,7 @@ spec:
       source: replica-switchover-restart-a
 
   replica:
-    enabled: true
+    primary: replica-switchover-restart-a
     source: replica-switchover-restart-a
 
   externalClusters:

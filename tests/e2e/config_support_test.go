@@ -42,7 +42,7 @@ var _ = Describe("Config support", Serial, Ordered, Label(tests.LabelDisruptive,
 		namespacePrefix                = "configmap-support-e2e"
 		level                          = tests.Low
 	)
-	var operatorNamespace, curlPodName, namespace string
+	var operatorNamespace, namespace string
 
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
@@ -125,14 +125,6 @@ var _ = Describe("Config support", Serial, Ordered, Label(tests.LabelDisruptive,
 			return env.DeleteNamespace(namespace)
 		})
 
-		// Create the curl client pod and wait for it to be ready.
-		By("setting up curl client pod", func() {
-			curlClient := utils.CurlClient(namespace)
-			err := utils.PodCreateAndWaitForReady(env, &curlClient, 240)
-			Expect(err).ToNot(HaveOccurred())
-			curlPodName = curlClient.GetName()
-		})
-
 		AssertCreateCluster(namespace, clusterName, clusterWithInheritedLabelsFile, env)
 	})
 
@@ -183,6 +175,6 @@ var _ = Describe("Config support", Serial, Ordered, Label(tests.LabelDisruptive,
 	// Setting MONITORING_QUERIES_CONFIGMAP: "" should disable monitoring
 	// queries on new cluster. We expect those metrics to be missing.
 	It("verify metrics details when updated default monitoring configMap queries parameter is set to be empty", func() {
-		collectAndAssertDefaultMetricsPresentOnEachPod(namespace, clusterName, curlPodName, false)
+		collectAndAssertDefaultMetricsPresentOnEachPod(namespace, clusterName, false)
 	})
 })

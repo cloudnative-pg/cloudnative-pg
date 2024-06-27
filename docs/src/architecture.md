@@ -160,6 +160,13 @@ Kubernetes cluster, with the following specifications:
     * PostgreSQL instances should reside in different availability zones
       within the same Kubernetes cluster / region
 
+!!! Important
+    You can configure the above services through the `managed.services` section
+    in the `Cluster` configuration. This can be done by reducing the number of
+    services and selecting the type (default is `ClusterIP`). For more details,
+    please refer to the ["Service Management" section](service_management.md)
+    below.
+
 The below diagram provides a simplistic view of the recommended shared-nothing
 architecture for a PostgreSQL cluster spanning across 3 different availability
 zones, running on separate nodes, each with dedicated local storage for

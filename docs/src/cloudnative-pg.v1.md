@@ -3121,6 +3121,13 @@ by the instance manager</p>
    <p>Database roles managed by the <code>Cluster</code></p>
 </td>
 </tr>
+<tr><td><code>services</code><br/>
+<a href="#postgresql-cnpg-io-v1-ManagedServices"><i>ManagedServices</i></a>
+</td>
+<td>
+   <p>Services roles managed by the <code>Cluster</code></p>
+</td>
+</tr>
 </tbody>
 </table>
 
@@ -3163,6 +3170,71 @@ with an explanation of the cause</p>
 </tbody>
 </table>
 
+## ManagedService     {#postgresql-cnpg-io-v1-ManagedService}
+
+
+**Appears in:**
+
+- [ManagedServices](#postgresql-cnpg-io-v1-ManagedServices)
+
+
+<p>ManagedService represents a specific service managed by the cluster.
+It includes the type of service and its associated template specification.</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>selectorType</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-ServiceSelectorType"><i>ServiceSelectorType</i></a>
+</td>
+<td>
+   <p>SelectorType specifies the type of selectors that the service will have.
+Valid values are &quot;rw&quot;, &quot;r&quot;, and &quot;ro&quot;, representing read-write, read, and read-only services.</p>
+</td>
+</tr>
+<tr><td><code>serviceTemplate</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-ServiceTemplateSpec"><i>ServiceTemplateSpec</i></a>
+</td>
+<td>
+   <p>ServiceTemplate is the template specification for the service.</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## ManagedServices     {#postgresql-cnpg-io-v1-ManagedServices}
+
+
+**Appears in:**
+
+- [ManagedConfiguration](#postgresql-cnpg-io-v1-ManagedConfiguration)
+
+
+<p>ManagedServices represents the services managed by the cluster.</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>disabledDefaultServices</code><br/>
+<a href="#postgresql-cnpg-io-v1-ServiceSelectorType"><i>[]ServiceSelectorType</i></a>
+</td>
+<td>
+   <p>DisabledDefaultServices is a list of service types that are disabled by default.
+Valid values are &quot;r&quot;, and &quot;ro&quot;, representing read, and read-only services.</p>
+</td>
+</tr>
+<tr><td><code>additional</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-ManagedService"><i>[]ManagedService</i></a>
+</td>
+<td>
+   <p>Additional is a list of additional managed services specified by the user.</p>
+</td>
+</tr>
+</tbody>
+</table>
+
 ## Metadata     {#postgresql-cnpg-io-v1-Metadata}
 
 
@@ -3184,6 +3256,13 @@ not using the core data types.</p>
 <table class="table">
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
+<tr><td><code>name</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The name of the resource. Only supported for certain types</p>
+</td>
+</tr>
 <tr><td><code>labels</code><br/>
 <i>map[string]string</i>
 </td>
@@ -4101,6 +4180,22 @@ cluster</p>
 <table class="table">
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
+<tr><td><code>self</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Self defines the name of this cluster. It is used to determine if this is a primary
+or a replica cluster, comparing it with <code>primary</code></p>
+</td>
+</tr>
+<tr><td><code>primary</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Primary defines which Cluster is defined to be the primary in the distributed PostgreSQL cluster, based on the
+topology specified in externalClusters</p>
+</td>
+</tr>
 <tr><td><code>source</code> <B>[Required]</B><br/>
 <i>string</i>
 </td>
@@ -4765,10 +4860,29 @@ service account</p>
 </tbody>
 </table>
 
+## ServiceSelectorType     {#postgresql-cnpg-io-v1-ServiceSelectorType}
+
+(Alias of `string`)
+
+**Appears in:**
+
+- [ManagedService](#postgresql-cnpg-io-v1-ManagedService)
+
+- [ManagedServices](#postgresql-cnpg-io-v1-ManagedServices)
+
+
+<p>ServiceSelectorType describes a valid value for generating the service selectors.
+It indicates which type of service the selector applies to, such as read-write, read, or read-only</p>
+
+
+
+
 ## ServiceTemplateSpec     {#postgresql-cnpg-io-v1-ServiceTemplateSpec}
 
 
 **Appears in:**
+
+- [ManagedService](#postgresql-cnpg-io-v1-ManagedService)
 
 - [PoolerSpec](#postgresql-cnpg-io-v1-PoolerSpec)
 
