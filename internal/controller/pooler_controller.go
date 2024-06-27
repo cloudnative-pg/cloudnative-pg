@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -105,6 +106,10 @@ func (r *PoolerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 
+	if res := r.ensureManagedResourcesAreOwned(ctx, pooler, resources); !res.IsZero() {
+		return res, nil
+	}
+
 	// Update the status of the Pooler resource given what we read
 	// from the controlled resources
 	if err := r.updatePoolerStatus(ctx, &pooler, resources); err != nil {
@@ -137,9 +142,9 @@ func (r *PoolerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-// isOwnedByPooler checks that an object is owned by a pooler and returns
+// isOwnedByPoolerKind checks that an object is owned by a pooler and returns
 // the owner name
-func isOwnedByPooler(obj client.Object) (string, bool) {
+func isOwnedByPoolerKind(obj client.Object) (string, bool) {
 	owner := metav1.GetControllerOf(obj)
 	if owner == nil {
 		return "", false
@@ -154,6 +159,55 @@ func isOwnedByPooler(obj client.Object) (string, bool) {
 	}
 
 	return owner.Name, true
+}
+
+func isOwnedByPooler(poolerName string, obj client.Object) bool {
+	ownerName, isOwned := isOwnedByPoolerKind(obj)
+	if !isOwned {
+		return false
+	}
+
+	return poolerName == ownerName
+}
+
+func (r *PoolerReconciler) ensureManagedResourcesAreOwned(
+	ctx context.Context,
+	pooler apiv1.Pooler,
+	resources *poolerManagedResources,
+) ctrl.Result {
+	contextLogger := log.FromContext(ctx)
+	expectedOwnedResources := []client.Object{
+		resources.Deployment,
+		resources.Service,
+	}
+
+	var keyValues []interface{}
+	for idx, resource := range expectedOwnedResources {
+		if resource == nil {
+			continue
+		}
+		if !isOwnedByPooler(pooler.Name, resource) {
+			keyValues = append(
+				keyValues,
+				fmt.Sprintf("item[%d].kind", idx), resource.GetObjectKind().GroupVersionKind().Kind,
+				fmt.Sprintf("item[%d].name", idx), resource.GetName(),
+			)
+		}
+	}
+
+	if len(keyValues) == 0 {
+		return ctrl.Result{}
+	}
+
+	err := errors.New("found managed resources without the pooler ownership, stopping the reconciliation")
+	contextLogger.Error(
+		err,
+		"while checking pooler managed resources ownership",
+		keyValues...,
+	)
+
+	r.Recorder.Event(&pooler, "Warning", "InvalidOwnership", err.Error())
+	return ctrl.Result{RequeueAfter: 120 * time.Second}
 }
 
 // mapSecretToPooler returns a function mapping secrets events to the poolers using them
@@ -190,7 +244,7 @@ func (r *PoolerReconciler) mapSecretToPooler() handler.MapFunc {
 // getPoolersUsingSecret get a list of poolers which are using the passed secret
 func getPoolersUsingSecret(poolers apiv1.PoolerList, secret *corev1.Secret) (requests []types.NamespacedName) {
 	for _, pooler := range poolers.Items {
-		if name, ok := isOwnedByPooler(secret); ok && pooler.Name == name {
+		if name, ok := isOwnedByPoolerKind(secret); ok && pooler.Name == name {
 			requests = append(requests,
 				types.NamespacedName{
 					Name:      pooler.Name,
