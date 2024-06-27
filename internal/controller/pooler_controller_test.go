@@ -190,7 +190,7 @@ var _ = Describe("pooler_controller unit tests", func() {
 		})
 	})
 
-	It("should make sure that isOwnedByPooler works correctly", func() {
+	It("should make sure that isOwnedByPoolerKind works correctly", func() {
 		namespace := newFakeNamespace(env.client)
 		cluster := newFakeCNPGCluster(env.client, namespace)
 		pooler := *newFakePooler(env.client, cluster)
@@ -199,7 +199,7 @@ var _ = Describe("pooler_controller unit tests", func() {
 			ownedResource := corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "example-service", Namespace: namespace}}
 			utils.SetAsOwnedBy(&ownedResource.ObjectMeta, pooler.ObjectMeta, pooler.TypeMeta)
 
-			name, owned := isOwnedByPooler(&ownedResource)
+			name, owned := isOwnedByPoolerKind(&ownedResource)
 			Expect(owned).To(BeTrue())
 			Expect(name).To(Equal(pooler.Name))
 		})
@@ -208,7 +208,7 @@ var _ = Describe("pooler_controller unit tests", func() {
 			ownedResource := corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "example-service", Namespace: namespace}}
 			utils.SetAsOwnedBy(&ownedResource.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
 
-			name, owned := isOwnedByPooler(&ownedResource)
+			name, owned := isOwnedByPoolerKind(&ownedResource)
 			Expect(owned).To(BeFalse())
 			Expect(name).To(Equal(""))
 		})
