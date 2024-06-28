@@ -73,7 +73,7 @@ type EnvProfile interface {
 	UsesNodeDiskSpace() bool
 }
 
-// GetEnvProfile returns a cloud environment's capablities envProfile
+// GetEnvProfile returns a cloud environment's capabilities envProfile
 func GetEnvProfile(te TestEnvVendor) EnvProfile {
 	profileMap := map[TestEnvVendor]EnvProfile{
 		LOCAL: envProfile{

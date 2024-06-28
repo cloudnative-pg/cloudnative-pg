@@ -163,10 +163,6 @@ var _ = Describe("Verify Volume Snapshot",
 					Skip("Test depth is lower than the amount requested for this test")
 				}
 
-				if !(IsLocal() || IsGKE()) {
-					Skip("This test is only executed on gke and local")
-				}
-
 				var err error
 				clusterToSnapshotName, err = env.GetResourceNameFromYAML(clusterToSnapshot)
 				Expect(err).ToNot(HaveOccurred())
@@ -356,10 +352,6 @@ var _ = Describe("Verify Volume Snapshot",
 			BeforeAll(func() {
 				if testLevelEnv.Depth < int(level) {
 					Skip("Test depth is lower than the amount requested for this test")
-				}
-
-				if !(IsLocal() || IsGKE()) {
-					Skip("This test is only executed on gke and local")
 				}
 
 				var err error
@@ -576,10 +568,6 @@ var _ = Describe("Verify Volume Snapshot",
 			BeforeAll(func() {
 				if testLevelEnv.Depth < int(level) {
 					Skip("Test depth is lower than the amount requested for this test")
-				}
-
-				if !(IsLocal() || IsGKE()) {
-					Skip("This test is only executed on gke and local")
 				}
 
 				var err error
