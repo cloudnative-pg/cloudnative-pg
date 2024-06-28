@@ -73,55 +73,32 @@ type EnvProfile interface {
 	UsesNodeDiskSpace() bool
 }
 
-// GetEnvProfile returns a cloud environment's capablities profile
+// GetEnvProfile returns a cloud environment's capablities envProfile
 func GetEnvProfile(te TestEnvVendor) EnvProfile {
 	profileMap := map[TestEnvVendor]EnvProfile{
-		LOCAL: localProfile{},
-		AKS:   aksProfile{},
-		EKS:   eksProfile{},
-		GKE:   gkeProfile{},
-		OCP:   ocpProfile{},
+		LOCAL: envProfile{isLeaderElectionEnabled: true, usesNodeDiskSpace: true},
+		AKS:   envProfile{canMovePVCAcrossNodes: true, isLeaderElectionEnabled: true, canRunAppArmor: true},
+		EKS:   envProfile{isLeaderElectionEnabled: true},
+		GKE:   envProfile{canMovePVCAcrossNodes: true},
+		OCP:   envProfile{isLeaderElectionEnabled: true},
 	}
 
 	profile, found := profileMap[te]
 	if !found {
-		return localProfile{}
+		return envProfile{}
 	}
 
 	return profile
 }
 
-type localProfile struct{}
+type envProfile struct {
+	canMovePVCAcrossNodes   bool
+	isLeaderElectionEnabled bool
+	canRunAppArmor          bool
+	usesNodeDiskSpace       bool
+}
 
-func (e localProfile) CanMovePVCAcrossNodes() bool   { return false }
-func (e localProfile) IsLeaderElectionEnabled() bool { return true }
-func (e localProfile) CanRunAppArmor() bool          { return false }
-func (e localProfile) UsesNodeDiskSpace() bool       { return true }
-
-type aksProfile struct{}
-
-func (e aksProfile) CanMovePVCAcrossNodes() bool   { return true }
-func (e aksProfile) IsLeaderElectionEnabled() bool { return true }
-func (e aksProfile) CanRunAppArmor() bool          { return true }
-func (e aksProfile) UsesNodeDiskSpace() bool       { return false }
-
-type eksProfile struct{}
-
-func (e eksProfile) CanMovePVCAcrossNodes() bool   { return false }
-func (e eksProfile) IsLeaderElectionEnabled() bool { return true }
-func (e eksProfile) CanRunAppArmor() bool          { return false }
-func (e eksProfile) UsesNodeDiskSpace() bool       { return false }
-
-type gkeProfile struct{}
-
-func (e gkeProfile) CanMovePVCAcrossNodes() bool   { return true }
-func (e gkeProfile) IsLeaderElectionEnabled() bool { return false }
-func (e gkeProfile) CanRunAppArmor() bool          { return false }
-func (e gkeProfile) UsesNodeDiskSpace() bool       { return false }
-
-type ocpProfile struct{}
-
-func (e ocpProfile) CanMovePVCAcrossNodes() bool   { return false }
-func (e ocpProfile) IsLeaderElectionEnabled() bool { return true }
-func (e ocpProfile) CanRunAppArmor() bool          { return false }
-func (e ocpProfile) UsesNodeDiskSpace() bool       { return false }
+func (p envProfile) CanMovePVCAcrossNodes() bool   { return p.canMovePVCAcrossNodes }
+func (p envProfile) IsLeaderElectionEnabled() bool { return p.isLeaderElectionEnabled }
+func (p envProfile) CanRunAppArmor() bool          { return p.canRunAppArmor }
+func (p envProfile) UsesNodeDiskSpace() bool       { return p.usesNodeDiskSpace }
