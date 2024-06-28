@@ -76,11 +76,24 @@ type EnvProfile interface {
 // GetEnvProfile returns a cloud environment's capablities envProfile
 func GetEnvProfile(te TestEnvVendor) EnvProfile {
 	profileMap := map[TestEnvVendor]EnvProfile{
-		LOCAL: envProfile{isLeaderElectionEnabled: true, usesNodeDiskSpace: true},
-		AKS:   envProfile{canMovePVCAcrossNodes: true, isLeaderElectionEnabled: true, canRunAppArmor: true},
-		EKS:   envProfile{isLeaderElectionEnabled: true},
-		GKE:   envProfile{canMovePVCAcrossNodes: true},
-		OCP:   envProfile{isLeaderElectionEnabled: true},
+		LOCAL: envProfile{
+			isLeaderElectionEnabled: true,
+			usesNodeDiskSpace:       true,
+		},
+		AKS: envProfile{
+			canMovePVCAcrossNodes:   true,
+			isLeaderElectionEnabled: true,
+			canRunAppArmor:          true,
+		},
+		EKS: envProfile{
+			isLeaderElectionEnabled: true,
+		},
+		GKE: envProfile{
+			canMovePVCAcrossNodes: true,
+		},
+		OCP: envProfile{
+			isLeaderElectionEnabled: true,
+		},
 	}
 
 	profile, found := profileMap[te]
