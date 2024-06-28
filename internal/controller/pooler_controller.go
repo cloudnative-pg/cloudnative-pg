@@ -176,37 +176,38 @@ func (r *PoolerReconciler) ensureManagedResourcesAreOwned(
 	resources *poolerManagedResources,
 ) ctrl.Result {
 	contextLogger := log.FromContext(ctx)
-	expectedOwnedResources := []client.Object{
-		resources.Deployment,
-		resources.Service,
+
+	var invalidData []interface{}
+	if resources.Deployment != nil && !isOwnedByPooler(pooler.Name, resources.Deployment) {
+		invalidData = append(invalidData, "notOwnedDeploymentName", resources.Deployment.Name)
 	}
 
-	var keyValues []interface{}
-	for idx, resource := range expectedOwnedResources {
-		if resource == nil {
-			continue
-		}
-		if !isOwnedByPooler(pooler.Name, resource) {
-			keyValues = append(
-				keyValues,
-				fmt.Sprintf("item[%d].kind", idx), resource.GetObjectKind().GroupVersionKind().Kind,
-				fmt.Sprintf("item[%d].name", idx), resource.GetName(),
-			)
-		}
+	if resources.Service != nil && !isOwnedByPooler(pooler.Name, resources.Service) {
+		invalidData = append(invalidData, "notOwnedServiceName", resources.Service.Name)
 	}
 
-	if len(keyValues) == 0 {
+	if resources.Role != nil && !isOwnedByPooler(pooler.Name, resources.Role) {
+		invalidData = append(invalidData, "notOwnedRoleName", resources.Role.Name)
+	}
+
+	if resources.RoleBinding != nil && !isOwnedByPooler(pooler.Name, resources.RoleBinding) {
+		invalidData = append(invalidData, "notOwnedRoleBindingName", resources.RoleBinding.Name)
+	}
+
+	if len(invalidData) == 0 {
 		return ctrl.Result{}
 	}
 
-	err := errors.New("found managed resources without the pooler ownership, stopping the reconciliation")
 	contextLogger.Error(
-		err,
-		"while checking pooler managed resources ownership",
-		keyValues...,
+		errors.New("invalid ownership for managed resources"),
+		"while ensuring managed resources are owned, requeueing...",
+		invalidData...,
 	)
+	r.Recorder.Event(&pooler,
+		"Warning",
+		"InvalidOwnership",
+		"found invalid ownership for managed resources, check logs")
 
-	r.Recorder.Event(&pooler, "Warning", "InvalidOwnership", err.Error())
 	return ctrl.Result{RequeueAfter: 120 * time.Second}
 }
 
