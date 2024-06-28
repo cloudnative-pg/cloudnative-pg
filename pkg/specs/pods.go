@@ -143,6 +143,10 @@ func CreatePodEnvConfig(cluster apiv1.Cluster, podName string) EnvConfig {
 				Name:  "PGHOST",
 				Value: postgres.SocketDirectory,
 			},
+			{
+				Name:  "IMAGE",
+				Value: cluster.GetImageName(),
+			},
 		},
 		EnvFrom: cluster.Spec.EnvFrom,
 	}
