@@ -1358,11 +1358,14 @@ var _ = Describe("ShouldPromoteFromReplicaCluster", func() {
 })
 
 var _ = Describe("DataBackupConfiguration.AppendAdditionalCommandArgs", func() {
-	options := []string{"--option1", "--option2"}
-
-	config := DataBackupConfiguration{
-		AdditionalCommandArgs: []string{"--option3", "--option4"},
-	}
+	var options []string
+	var config DataBackupConfiguration
+	BeforeEach(func() {
+		options = []string{"--option1", "--option2"}
+		config = DataBackupConfiguration{
+			AdditionalCommandArgs: []string{"--option3", "--option4"},
+		}
+	})
 
 	It("should append additional command args to the options", func() {
 		updatedOptions := config.AppendAdditionalCommandArgs(options)
@@ -1377,11 +1380,14 @@ var _ = Describe("DataBackupConfiguration.AppendAdditionalCommandArgs", func() {
 })
 
 var _ = Describe("WalBackupConfiguration.AppendAdditionalCommandArgs", func() {
-	options := []string{"--option1", "--option2"}
-
-	config := WalBackupConfiguration{
-		AdditionalCommandArgs: []string{"--option3", "--option4"},
-	}
+	var options []string
+	var config DataBackupConfiguration
+	BeforeEach(func() {
+		options = []string{"--option1", "--option2"}
+		config = DataBackupConfiguration{
+			AdditionalCommandArgs: []string{"--option3", "--option4"},
+		}
+	})
 
 	It("should append additional command args to the options", func() {
 		updatedOptions := config.AppendAdditionalCommandArgs(options)
