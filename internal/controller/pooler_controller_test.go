@@ -214,3 +214,55 @@ var _ = Describe("pooler_controller unit tests", func() {
 		})
 	})
 })
+
+var _ = Describe("isOwnedByPooler function tests", func() {
+	var env *testingEnvironment
+	BeforeEach(func() {
+		env = buildTestEnvironment()
+	})
+
+	It("should return true if the object is owned by the specified pooler", func() {
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		pooler := *newFakePooler(env.client, cluster)
+
+		ownedResource := corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "example-service", Namespace: namespace}}
+		utils.SetAsOwnedBy(&ownedResource.ObjectMeta, pooler.ObjectMeta, pooler.TypeMeta)
+
+		result := isOwnedByPooler(pooler.Name, &ownedResource)
+		Expect(result).To(BeTrue())
+	})
+
+	It("should return false if the object is not owned by the specified pooler", func() {
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		pooler := *newFakePooler(env.client, cluster)
+
+		anotherPooler := *newFakePooler(env.client, cluster)
+		ownedResource := corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "example-service", Namespace: namespace}}
+		utils.SetAsOwnedBy(&ownedResource.ObjectMeta, anotherPooler.ObjectMeta, anotherPooler.TypeMeta)
+
+		result := isOwnedByPooler(pooler.Name, &ownedResource)
+		Expect(result).To(BeFalse())
+	})
+
+	It("should return false if the object is not owned by any pooler", func() {
+		namespace := newFakeNamespace(env.client)
+		ownedResource := corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "example-service", Namespace: namespace}}
+
+		result := isOwnedByPooler("some-pooler", &ownedResource)
+		Expect(result).To(BeFalse())
+	})
+
+	It("should return false if the object is owned by a different kind", func() {
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		pooler := *newFakePooler(env.client, cluster)
+
+		ownedResource := corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "example-service", Namespace: namespace}}
+		utils.SetAsOwnedBy(&ownedResource.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
+
+		result := isOwnedByPooler(pooler.Name, &ownedResource)
+		Expect(result).To(BeFalse())
+	})
+})
