@@ -1324,6 +1324,27 @@ spec:
                           When not defined, WAL files will be stored uncompressed and may be
                           unencrypted in the object store, according to the bucket default policy.
                         properties:
+                          additionalCommandArgs:
+                            description: |-
+                              AdditionalCommandArgs represents additional arguments that can be appended
+                              to the 'barman-cloud-wal-archive' command-line invocation. These arguments
+                              provide flexibility to customize the backup process further according to
+                              specific requirements or configurations.
+
+
+                              Example:
+                              In a scenario where specialized backup options are required, such as setting
+                              a specific timeout or defining custom behavior, users can use this field
+                              to specify additional command arguments.
+
+
+                              Note:
+                              It's essential to ensure that the provided arguments are valid and supported
+                              by the 'barman-cloud-wal-archive' command, to avoid potential errors or unintended
+                              behavior during execution.
+                            items:
+                              type: string
+                            type: array
                           compression:
                             description: |-
                               Compress a WAL file before sending it to the object store. Available
@@ -2636,6 +2657,27 @@ spec:
                             When not defined, WAL files will be stored uncompressed and may be
                             unencrypted in the object store, according to the bucket default policy.
                           properties:
+                            additionalCommandArgs:
+                              description: |-
+                                AdditionalCommandArgs represents additional arguments that can be appended
+                                to the 'barman-cloud-wal-archive' command-line invocation. These arguments
+                                provide flexibility to customize the backup process further according to
+                                specific requirements or configurations.
+
+
+                                Example:
+                                In a scenario where specialized backup options are required, such as setting
+                                a specific timeout or defining custom behavior, users can use this field
+                                to specify additional command arguments.
+
+
+                                Note:
+                                It's essential to ensure that the provided arguments are valid and supported
+                                by the 'barman-cloud-wal-archive' command, to avoid potential errors or unintended
+                                behavior during execution.
+                              items:
+                                type: string
+                              type: array
                             compression:
                               description: |-
                                 Compress a WAL file before sending it to the object store. Available

@@ -1989,6 +1989,21 @@ type WalBackupConfiguration struct {
 	// +kubebuilder:validation:Minimum=1
 	// +optional
 	MaxParallel int `json:"maxParallel,omitempty"`
+	// AdditionalCommandArgs represents additional arguments that can be appended
+	// to the 'barman-cloud-wal-archive' command-line invocation. These arguments
+	// provide flexibility to customize the backup process further according to
+	// specific requirements or configurations.
+	//
+	// Example:
+	// In a scenario where specialized backup options are required, such as setting
+	// a specific timeout or defining custom behavior, users can use this field
+	// to specify additional command arguments.
+	//
+	// Note:
+	// It's essential to ensure that the provided arguments are valid and supported
+	// by the 'barman-cloud-wal-archive' command, to avoid potential errors or unintended
+	// behavior during execution.
+	AdditionalCommandArgs []string `json:"additionalCommandArgs,omitempty"`
 }
 
 // DataBackupConfiguration is the configuration of the backup of
@@ -2191,20 +2206,37 @@ type ExternalCluster struct {
 	BarmanObjectStore *BarmanObjectStoreConfiguration `json:"barmanObjectStore,omitempty"`
 }
 
-// AppendAdditionalCommandArgs adds custom arguments as barman cloud command-line options
-func (cfg *BarmanObjectStoreConfiguration) AppendAdditionalCommandArgs(options []string) []string {
-	if cfg == nil || cfg.Data == nil {
+// AppendAdditionalCommandArgs adds custom arguments as barman-cloud-backup command-line options
+func (cfg *DataBackupConfiguration) AppendAdditionalCommandArgs(options []string) []string {
+	if cfg == nil || len(cfg.AdditionalCommandArgs) == 0 {
 		return options
 	}
+	return appendAdditionalCommandArgs(cfg.AdditionalCommandArgs, options)
+}
 
-	for _, userOption := range cfg.Data.AdditionalCommandArgs {
-		key := strings.Split(userOption, "=")[0]
-		if key == "" || slices.Contains(options, key) {
+// AppendAdditionalCommandArgs adds custom arguments as barman-cloud-wal-archive command-line options
+func (cfg *WalBackupConfiguration) AppendAdditionalCommandArgs(options []string) []string {
+	if cfg == nil || len(cfg.AdditionalCommandArgs) == 0 {
+		return options
+	}
+	return appendAdditionalCommandArgs(cfg.AdditionalCommandArgs, options)
+}
+
+func appendAdditionalCommandArgs(additionalCommandArgs []string, options []string) []string {
+	optionKeys := map[string]bool{}
+	for _, option := range options {
+		key := strings.Split(option, "=")[0]
+		if key != "" {
+			optionKeys[key] = true
+		}
+	}
+	for _, additionalCommandArg := range additionalCommandArgs {
+		key := strings.Split(additionalCommandArg, "=")[0]
+		if key == "" || slices.Contains(options, key) || optionKeys[key] {
 			continue
 		}
-		options = append(options, userOption)
+		options = append(options, additionalCommandArg)
 	}
-
 	return options
 }
 

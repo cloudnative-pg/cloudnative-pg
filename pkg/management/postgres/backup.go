@@ -135,7 +135,7 @@ func getDataConfiguration(
 			strconv.Itoa(int(*configuration.Data.Jobs)))
 	}
 
-	return configuration.AppendAdditionalCommandArgs(options), nil
+	return configuration.Data.AppendAdditionalCommandArgs(options), nil
 }
 
 // getBarmanCloudBackupOptions extract the list of command line options to be used with
