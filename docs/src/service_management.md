@@ -62,7 +62,8 @@ managed:
 
 You can define a list of additional services through the
 [`managed.services.additional` stanza](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-ManagedService)
-by specifying the service type (e.g., `rw`) in the `selectorType` field and optionally the `updateStrategy`.
+by specifying the service type (e.g., `rw`) in the `selectorType` field
+and optionally the `updateStrategy`.
 
 The `serviceTemplate` field gives you access to the standard Kubernetes API for
 the network `Service` resource, allowing you to define both the `metadata` and
@@ -77,6 +78,17 @@ field, as it is managed by the operator.
     responsibility on your end to ensure that services work as expected.
     CloudNativePG has no control over the service configuration, except honoring
     the selector.
+
+The `updateStrategy` field allows you to control how the operator
+updates a service definition. By default, the operator uses the `patch`
+strategy, applying changes directly to the service.
+Alternatively, the `recreate` strategy deletes the existing service and
+recreates it from the template.
+
+!!! Warning
+    The `recreate` strategy will cause a service disruption with every
+    change.  However, it may be necessary for modifying certain
+    parameters that can only be set during service creation.
 
 For example, if you want to have a single `LoadBalancer` service for your
 PostgreSQL database primary, you can use the following excerpt:
