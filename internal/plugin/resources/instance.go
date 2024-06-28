@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -32,6 +33,7 @@ import (
 	corev1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -73,14 +75,13 @@ func ExtractInstancesStatus(
 	ctx context.Context,
 	config *rest.Config,
 	filteredPods []v1.Pod,
-	postgresContainerName string,
 ) (postgres.PostgresqlStatusList, []error) {
 	var result postgres.PostgresqlStatusList
 	var errs []error
 
 	for idx := range filteredPods {
 		instanceStatus := getInstanceStatusFromPodViaExec(
-			ctx, config, filteredPods[idx], postgresContainerName)
+			ctx, config, filteredPods[idx])
 		result.Items = append(result.Items, instanceStatus)
 		if instanceStatus.Error != nil {
 			errs = append(errs, instanceStatus.Error)
@@ -94,27 +95,27 @@ func getInstanceStatusFromPodViaExec(
 	ctx context.Context,
 	config *rest.Config,
 	pod v1.Pod,
-	postgresContainerName string,
 ) postgres.PostgresqlStatus {
 	var result postgres.PostgresqlStatus
-	timeout := time.Second * 10
 
 	clientInterface := kubernetes.NewForConfigOrDie(config)
-	stdout, _, err := utils.ExecCommand(
-		ctx,
-		clientInterface,
-		config,
-		pod,
-		postgresContainerName,
-		&timeout,
-		"/controller/manager", "instance", "status")
+	req := clientInterface.CoreV1().
+		Pods(pod.Namespace).
+		ProxyGet(
+			"https",
+			pod.Name,
+			strconv.Itoa(int(url.StatusPort)),
+			url.PathPgStatus,
+			map[string]string{},
+		)
+	statusResult, err := req.DoRaw(ctx)
 	if err != nil {
 		result.AddPod(pod)
 		result.Error = err
 		return result
 	}
 
-	err = json.Unmarshal([]byte(stdout), &result)
+	err = json.Unmarshal(statusResult, &result)
 	if err != nil {
 		result.Error = fmt.Errorf("can't parse pod output")
 	}
