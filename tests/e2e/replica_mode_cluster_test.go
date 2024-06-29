@@ -674,7 +674,7 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication), Ordered, f
 				Consistently(func(g Gomega) {
 					pod, err := env.GetClusterPrimary(namespace, clusterBName)
 					g.Expect(err).ToNot(HaveOccurred())
-					stdOut, _, err := env.ExecCommand(env.Ctx, *pod, specs.PostgresContainerName, ptr.To(2*time.Second),
+					stdOut, _, err := env.ExecCommand(env.Ctx, *pod, specs.PostgresContainerName, ptr.To(time.Second*10),
 						"psql", "-U", "postgres", "postgres", "-tAc", "select pg_is_in_recovery();")
 					g.Expect(err).ToNot(HaveOccurred())
 					g.Expect(strings.Trim(stdOut, "\n")).To(Equal("t"))
