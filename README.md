@@ -104,7 +104,8 @@ CloudNativePG is exclusively focused on the PostgreSQL database management
 system maintained by the PostgreSQL Global Development Group (PGDG). We are not
 currently considering adding to CloudNativePG extensions or capabilities that
 are included in forks of the PostgreSQL database management system, unless in
-the form of extensible or pluggable frameworks.
+the form of extensible or pluggable frameworks. [The operator itself can be extended
+via a plugin interface called CNPG-I](https://github.com/cloudnative-pg/cnpg-i).
 
 CloudNativePG doesn't intend to pursue database independence (e.g. control a
 MariaDB cluster).
@@ -121,6 +122,7 @@ MariaDB cluster).
 - [Website](https://cloudnative-pg.io)
 - [FAQ](docs/src/faq.md)
 - [Blog](https://cloudnative-pg.io/blog/)
+- [CloudNativePG plugin Interface (CNPG-I)](https://github.com/cloudnative-pg/cnpg-i).
 
 ## Adopters
 
