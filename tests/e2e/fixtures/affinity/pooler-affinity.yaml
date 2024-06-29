@@ -1,0 +1,13 @@
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Pooler
+metadata:
+  name: cluster-pooler-affinity
+spec:
+  cluster:
+    name: cluster-affinity
+
+  instances: 3
+
+  pgbouncer:
+    poolMode: session
