@@ -97,15 +97,17 @@ the cluster (PostgreSQL included).
 
 ### Role Based Access Control (RBAC)
 
-The operator interacts with the Kubernetes API server with a dedicated service
-account called `cnpg-manager`, this is installed in the operator namespace, which
-by default is `cnpg-system` namespace, but this may change due to how the operator
-is deployed. In the same operator namespace there's a binding between this service
-account(`cnpg-manager`) and a role, the name for that role will depend on how was
-the operator deployed, the name can be `cnpg-manager` or something else, and the
-type of it will be `ClusterRole` or just a `Role`, again, depending on how it was
-the operator deployed. These role will contain the set of permissions granted to the
-operator to work with.
+The operator interacts with the Kubernetes API server using a dedicated service
+account named `cnpg-manager`. This service account is typically installed in
+the operator namespace, commonly `cnpg-system`. However, the namespace may vary
+based on the deployment method (see the subsection below).
+
+In the same namespace, there is a binding between the `cnpg-manager` service
+account and a role. The specific name and type of this role (either `Role` or
+`ClusterRole`) also depend on the deployment method. This role defines the
+necessary permissions required by the operator to function correctly. To learn
+more about these roles, you can use the `kubectl describe clusterrole` or
+`kubectl describe role` commands, depending on the deployment method.
 
 !!! Important
     The above permissions are exclusively reserved for the operator's service
@@ -177,57 +179,55 @@ namespaced or non-namespaced resources.
   the creation of pods on unscheduled nodes, or triggering a switchover if
   the primary lives in an unscheduled node.
 
-To see all the permissions required by the operator, you can run `kubectl
-describe clusterrole cnpg-manager`.
 
-### ClusterRole Permissions and Operator Deployment
+#### Deployments and `ClusterRole` Resources
 
-#### Using the Manifest
+As mentioned above, each deployment method may have variations in the namespace
+location of the service account, as well as the names and types of role
+bindings and respective roles.
 
-In the default installation for a vanilla Kubernetes deployment, the operator
-is deployed using a manifest built with `Kustomize` on the YAML files generated
-by `controller-gen` using the markers available in
-[Kubebuilder](https://book.kubebuilder.io/).
+##### Via Kubernetes Manifest
 
-Although this method is currently somewhat limited, it allows creating a
-manifest with permissions set as either `RoleBinding` or `ClusterRoleBinding`.
+When installing CloudNativePG using the Kubernetes manifest, permissions are
+set to `ClusterRoleBinding` by default. You can inspect the permissions
+required by the operator by running:
 
-In the default deployment, permissions are set to `ClusterRoleBinding`.
+```sh
+kubectl describe clusterrole cnpg-manager
+```
 
-#### Using OLM
+!!! Info
+    You can customize the YAML file to align with your security requirements by
+    using a `RoleBinding` instead of a `ClusterRoleBinding`. This approach enables
+    deployment of the operator in a dedicated namespace with restricted access from
+    administrators. This ensures that standard users cannot access the operator's
+    `ServiceAccount`.
+
+##### Via OLM
 
 From a security perspective, the Operator Lifecycle Manager (OLM) provides a
-more flexible deployment method. The community offers support for building the
-necessary files and packages to deploy the operator from
-[OperatorHub.io](https://operatorhub.io/operator/cloudnative-pg). OLM allows
-users to configure the operator to watch either all namespaces, or specific
-namespaces, enabling more granular permission management.
+more flexible deployment method. It allows you to configure the operator to
+watch either all namespaces or specific namespaces, enabling more granular
+permission management.
+
+!!! Info
+   OLM allows you to deploy the operator in its own namespace and configure it
+   to watch specific namespaces used for CloudNativePG clusters. This setup helps
+   to contain permissions and restrict access more effectively.
 
 #### Why Are ClusterRole Permissions Needed?
 
-Currently, the operator requires ClusterRole permissions only to get `nodes`
-objects. All other permissions can be namespace-scoped (i.e. Role), or
-cluster-wide (i.e. ClusterRole).
+The operator currently requires `ClusterRole` permissions just to read `nodes`
+objects. All other permissions can be namespace-scoped (i.e., `Role`) or
+cluster-wide (i.e., `ClusterRole`).
 
 Even with these permissions, if someone gains access to the `ServiceAccount`,
 they will only have `get`, `list`, and `watch` permissions, which are limited
-to viewing resources. If an unauthorized user already has access to the
+to viewing resources. However, if an unauthorized user gains access to the
 `ServiceAccount`, it indicates a more significant security issue.
 
-It's crucial to prevent users from accessing the operator's `ServiceAccount`
-and any other `ServiceAccount` with elevated permissions.
-
-#### Recommendations to Enhance Security
-
-When deploying using the YAML manifest, it is recommended to deploy the
-operator in a dedicated namespace, and to restrict access to this namespace to
-administrators only. This ensures that standard users cannot access the
-operator's `ServiceAccount`.
-
-When using OLM, it is advisable to deploy the operator in its own namespace,
-and to configure it to watch the namespaces that will be used for CloudNativePG
-clusters. This setup helps to contain permissions and restrict access more
-effectively.
+Therefore, it's crucial to prevent users from accessing the operator's
+`ServiceAccount` and any other `ServiceAccount` with elevated permissions.
 
 ### Calls to the API server made by the instance manager
 
