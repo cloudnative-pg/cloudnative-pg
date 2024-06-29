@@ -338,11 +338,18 @@ kubectl logs -n <NAMESPACE> <CLUSTER>-<N> | \
   jq 'select(.logger=="postgres") | .record.message'
 ```
 
-The following example also adds the timestamp in a user-friendly format:
+The following example also adds the timestamp:
 
 ```shell
 kubectl logs -n <NAMESPACE> <CLUSTER>-<N> | \
   jq -r 'select(.logger=="postgres") | [.ts, .record.message] | @csv'
+```
+
+If the timestamp is displayed in Unix Epoch time, you can convert it to a user-friedgly format:
+
+```shell
+kubectl logs -n <NAMESPACE> <CLUSTER>-<N> | \
+  jq -r 'select(.logger=="postgres") | [(.ts|strflocaltime("%Y-%m-%dT%H:%M:%S %Z")), .record.message] | @csv'
 ```
 
 ### Gather and filter extra information about PostgreSQL pods
