@@ -3550,6 +3550,12 @@ possible. <code>false</code> by default.</p>
 <td>
    <span class="text-muted">No description provided.</span></td>
 </tr>
+<tr><td><code>authDBName</code><br/>
+<i>string</i>
+</td>
+<td>
+   <span class="text-muted">No description provided.</span></td>
+</tr>
 </tbody>
 </table>
 
@@ -3631,6 +3637,13 @@ has to be specified and no automatic CNPG Cluster integration will be triggered.
 of a certain user. Default: &quot;SELECT usename, passwd FROM public.user_search($1)&quot;.
 In case it is specified, also an AuthQuerySecret has to be specified and
 no automatic CNPG Cluster integration will be triggered.</p>
+</td>
+</tr>
+<tr><td><code>authDBName</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The database name to use for the authentication query. Default: &quot;postgres&quot;.</p>
 </td>
 </tr>
 <tr><td><code>parameters</code><br/>

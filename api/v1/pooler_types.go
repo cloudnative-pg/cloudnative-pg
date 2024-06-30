@@ -36,7 +36,10 @@ const (
 	PoolerTypeRO = PoolerType("ro")
 
 	// DefaultPgBouncerPoolerAuthQuery is the default auth_query for PgBouncer
-	DefaultPgBouncerPoolerAuthQuery = "SELECT usename, passwd FROM public.user_search($1)"
+	DefaultPgBouncerPoolerAuthQuery = "SELECT usename, passwd FROM pg_shadow WHERE usename = $1"
+
+	// DefaultPgBouncerPoolerAuthDBName is the default auth_dbname for PgBouncer
+	DefaultPgBouncerPoolerAuthDBName = "postgres"
 )
 
 // PgBouncerPoolMode is the mode of PgBouncer
@@ -164,6 +167,10 @@ type PgBouncerSpec struct {
 	// no automatic CNPG Cluster integration will be triggered.
 	// +optional
 	AuthQuery string `json:"authQuery,omitempty"`
+
+	// The database name to use for the authentication query. Default: "postgres".
+	// +optional
+	AuthDBName string `json:"authDBName,omitempty"`
 
 	// Additional parameters to be passed to PgBouncer - please check
 	// the CNPG documentation for a list of options you can configure
@@ -293,16 +300,26 @@ func (in *Pooler) GetAuthQuery() string {
 	return DefaultPgBouncerPoolerAuthQuery
 }
 
+// GetAuthDBName returns the specified AuthDBName for PgBouncer
+// if provided or the default name otherwise.
+func (in *Pooler) GetAuthDBName() string {
+	if in.Spec.PgBouncer.AuthDBName != "" {
+		return in.Spec.PgBouncer.AuthDBName
+	}
+
+	return DefaultPgBouncerPoolerAuthDBName
+}
+
 // IsAutomatedIntegration returns whether the Pooler integration with the
 // Cluster is automated or not.
 func (in *Pooler) IsAutomatedIntegration() bool {
 	if in.Spec.PgBouncer == nil {
 		return true
 	}
-	// If the user specified an AuthQuerySecret or an AuthQuery, the integration
+	// If the user specified an AuthQuerySecret, AuthQuery, or AuthDBName, the integration
 	// is not going to be handled by the operator.
 	if (in.Spec.PgBouncer.AuthQuerySecret != nil && in.Spec.PgBouncer.AuthQuerySecret.Name != "") ||
-		in.Spec.PgBouncer.AuthQuery != "" {
+		in.Spec.PgBouncer.AuthQuery != "" && in.Spec.PgBouncer.AuthDBName != "" {
 		return false
 	}
 	return true

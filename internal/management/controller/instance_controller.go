@@ -62,12 +62,6 @@ import (
 	pkgUtils "github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-const (
-	userSearchFunctionSchema = "public"
-	userSearchFunctionName   = "user_search"
-	userSearchFunction       = "SELECT usename, passwd FROM pg_catalog.pg_shadow WHERE usename=$1;"
-)
-
 // RetryUntilWalReceiverDown is the default retry configuration that is used
 // to wait for the WAL receiver process to be down
 var RetryUntilWalReceiverDown = wait.Backoff{
@@ -560,6 +554,10 @@ func (r *InstanceReconciler) reconcileDatabases(ctx context.Context, cluster *ap
 		}
 	}
 
+	if err = r.reconcilePoolers(ctx, db, cluster.Status.PoolerIntegrations); err != nil {
+		return fmt.Errorf("could not reconcile poolers: %w", err)
+	}
+
 	databases, errors := r.getAllAccessibleDatabases(ctx, db)
 	for _, databaseName := range databases {
 		db, err := r.instance.ConnectionPool().Connection(databaseName)
@@ -573,10 +571,6 @@ func (r *InstanceReconciler) reconcileDatabases(ctx context.Context, cluster *ap
 				errors = append(errors,
 					fmt.Errorf("could not reconcile extensions for database %s: %w", databaseName, err))
 			}
-		}
-		if err = r.reconcilePoolers(ctx, db, databaseName, cluster.Status.PoolerIntegrations); err != nil {
-			errors = append(errors,
-				fmt.Errorf("could not reconcile extensions for database %s: %w", databaseName, err))
 		}
 	}
 	if errors != nil {
@@ -665,7 +659,7 @@ func (r *InstanceReconciler) reconcileExtensions(
 // ReconcileExtensions reconciles the expected extensions for this
 // PostgreSQL instance
 func (r *InstanceReconciler) reconcilePoolers(
-	ctx context.Context, db *sql.DB, dbName string, integrations *apiv1.PoolerIntegrations,
+	ctx context.Context, db *sql.DB, integrations *apiv1.PoolerIntegrations,
 ) (err error) {
 	if integrations == nil || len(integrations.PgBouncerIntegration.Secrets) == 0 {
 		return err
@@ -692,39 +686,13 @@ func (r *InstanceReconciler) reconcilePoolers(
 		if err != nil {
 			return err
 		}
-		_, err = tx.Exec(fmt.Sprintf("GRANT CONNECT ON DATABASE %s TO %s", dbName, apiv1.PGBouncerPoolerUserName))
+		_, err = tx.Exec(fmt.Sprintf("GRANT CONNECT ON DATABASE %s TO %s",
+			apiv1.DefaultPgBouncerPoolerAuthDBName,
+			apiv1.PGBouncerPoolerUserName))
 		if err != nil {
 			return err
 		}
-	}
-
-	var existsFunction bool
-	row = tx.QueryRow(fmt.Sprintf("SELECT COUNT(*) > 0 FROM pg_proc WHERE proname='%s' and prosrc='%s'",
-		userSearchFunctionName,
-		userSearchFunction))
-	err = row.Scan(&existsFunction)
-	if err != nil {
-		return err
-	}
-	if !existsFunction {
-		_, err = tx.Exec(fmt.Sprintf("CREATE OR REPLACE FUNCTION %s.%s(uname TEXT) "+
-			"RETURNS TABLE (usename name, passwd text) "+
-			"as '%s' "+
-			"LANGUAGE sql SECURITY DEFINER",
-			userSearchFunctionSchema,
-			userSearchFunctionName,
-			userSearchFunction))
-		if err != nil {
-			return err
-		}
-		_, err = tx.Exec(fmt.Sprintf("REVOKE ALL ON FUNCTION %s.%s(text) FROM public;",
-			userSearchFunctionSchema, userSearchFunctionName))
-		if err != nil {
-			return err
-		}
-		_, err = tx.Exec(fmt.Sprintf("GRANT EXECUTE ON FUNCTION %s.%s(text) TO %s",
-			userSearchFunctionSchema,
-			userSearchFunctionName,
+		_, err = tx.Exec(fmt.Sprintf("GRANT SELECT (usename, passwd) ON pg_catalog.pg_shadow TO %s",
 			apiv1.PGBouncerPoolerUserName))
 		if err != nil {
 			return err
