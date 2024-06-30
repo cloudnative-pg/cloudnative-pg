@@ -5842,6 +5842,8 @@ spec:
                     description: PgBouncerIntegrationStatus encapsulates the needed
                       integration for the pgbouncer poolers referencing the cluster
                     properties:
+                      authDBName:
+                        type: string
                       secrets:
                         items:
                           type: string
