@@ -42,6 +42,9 @@ var _ = Describe("Operator High Availability", Serial,
 			if testLevelEnv.Depth < int(level) {
 				Skip("Test depth is lower than the amount requested for this test")
 			}
+			if !GetEnvProfile().IsLeaderElectionEnabled() {
+				Skip("Skip the scale test case if leader election is disabled")
+			}
 		})
 
 		It("can work as HA mode", func() {
