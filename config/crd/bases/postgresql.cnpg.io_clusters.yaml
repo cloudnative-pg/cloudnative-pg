@@ -3485,6 +3485,14 @@ spec:
                                       type: string
                                   type: object
                               type: object
+                            updateStrategy:
+                              default: patch
+                              description: UpdateStrategy describes how the service
+                                differences should be reconciled
+                              enum:
+                              - patch
+                              - replace
+                              type: string
                           required:
                           - selectorType
                           - serviceTemplate

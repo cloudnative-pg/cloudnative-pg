@@ -152,6 +152,7 @@ func BuildManagedServices(cluster apiv1.Cluster) ([]corev1.Service, error) {
 		builder := servicespec.NewFrom(&serviceConfiguration.ServiceTemplate).
 			WithServiceType(defaultService.Spec.Type, false).
 			WithLabel(utils.IsManagedLabelName, "true").
+			WithAnnotation(utils.UpdateStrategyAnnotation, string(serviceConfiguration.UpdateStrategy)).
 			SetSelectors(defaultService.Spec.Selector)
 
 		for idx := range defaultService.Spec.Ports {

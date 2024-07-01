@@ -205,6 +205,9 @@ const (
 	// ClusterRestartAnnotationName is the name of the annotation containing the
 	// latest required restart time
 	ClusterRestartAnnotationName = "kubectl.kubernetes.io/restartedAt"
+
+	// UpdateStrategyAnnotation is the name of the annotation used to indicate how to update the given resource
+	UpdateStrategyAnnotation = MetadataNamespace + "/updateStrategy"
 )
 
 type annotationStatus string

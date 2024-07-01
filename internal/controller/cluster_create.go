@@ -365,6 +365,8 @@ func (r *ClusterReconciler) reconcileManagedServices(ctx context.Context, cluste
 		if isEnabled {
 			continue
 		}
+
+		// Ensure the service is not present
 		if err := r.serviceReconciler(ctx, cluster, &livingService, false); err != nil {
 			return err
 		}
@@ -378,7 +380,16 @@ func (r *ClusterReconciler) serviceReconciler(
 	proposed *corev1.Service,
 	enabled bool,
 ) error {
-	contextLogger := log.FromContext(ctx).WithValues("serviceName", proposed.Name)
+	strategy := apiv1.ServiceUpdateStrategyPatch
+	annotationStrategy := apiv1.ServiceUpdateStrategy(proposed.Annotations[utils.UpdateStrategyAnnotation])
+	if annotationStrategy == apiv1.ServiceUpdateStrategyReplace {
+		strategy = apiv1.ServiceUpdateStrategyReplace
+	}
+
+	contextLogger := log.FromContext(ctx).WithValues(
+		"serviceName", proposed.Name,
+		"updateStrategy", strategy,
+	)
 
 	var livingService corev1.Service
 	err := r.Client.Get(ctx, types.NamespacedName{Name: proposed.Name, Namespace: proposed.Namespace}, &livingService)
@@ -395,6 +406,11 @@ func (r *ClusterReconciler) serviceReconciler(
 
 	if owner, _ := IsOwnedByCluster(&livingService); owner != cluster.Name {
 		return fmt.Errorf("refusing to reconcile service: %s, not owned by the cluster", livingService.Name)
+	}
+
+	if !livingService.DeletionTimestamp.IsZero() {
+		contextLogger.Info("waiting for service to be deleted")
+		return ErrNextLoop
 	}
 
 	if !enabled {
@@ -432,9 +448,18 @@ func (r *ClusterReconciler) serviceReconciler(
 		return nil
 	}
 
-	contextLogger.Info("reconciling service")
-	// we update to ensure that we substitute the selectors
-	return r.Client.Update(ctx, &livingService)
+	if strategy == apiv1.ServiceUpdateStrategyPatch {
+		contextLogger.Info("reconciling service")
+		// we update to ensure that we substitute the selectors
+		return r.Client.Update(ctx, &livingService)
+	}
+
+	contextLogger.Info("deleting the service")
+	if err := r.Client.Delete(ctx, &livingService); err != nil {
+		return err
+	}
+
+	return ErrNextLoop
 }
 
 // createOrPatchOwnedPodDisruptionBudget ensures that we have a PDB requiring to remove one node at a time
