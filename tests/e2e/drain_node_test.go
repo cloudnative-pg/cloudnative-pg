@@ -208,7 +208,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 		When("the cluster allows moving PVCs between nodes", func() {
 			BeforeEach(func() {
 				// AKS using rook and the standard GKE StorageClass allow moving PVCs between nodes
-				if !(IsAKS() || IsGKE()) {
+				if !GetEnvProfile().CanMovePVCAcrossNodes() {
 					Skip("This test case is only applicable on clusters where PVC can be moved")
 				}
 			})
@@ -330,7 +330,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 			// All GKE and AKS persistent disks are network storage located independently of the underlying Nodes, so
 			// they don't get deleted after a Drain. Hence, even when using "reusePVC off", all the pods will
 			// be recreated with the same name and will reuse the existing volume.
-			if IsAKS() || IsGKE() {
+			if GetEnvProfile().CanMovePVCAcrossNodes() {
 				Skip("This test case is only applicable on clusters with local storage")
 			}
 		})
