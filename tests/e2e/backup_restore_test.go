@@ -69,7 +69,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 
 		BeforeAll(func() {
 			if !IsLocal() {
-				Skip("This test is only run on local cluster")
+				Skip("This test is only run on local clusters")
 			}
 			const namespacePrefix = "cluster-backup-minio"
 			var err error
