@@ -175,6 +175,10 @@ func ReconcileScheduledBackup(
 	origScheduled := scheduledBackup.DeepCopy()
 
 	if scheduledBackup.Status.LastCheckTime == nil {
+		if scheduledBackup.IsImmediate() {
+			event.Eventf(scheduledBackup, "Normal", "BackupSchedule", "Scheduled immediate backup now: %v", now)
+			return createBackup(ctx, event, cli, scheduledBackup, now, now, schedule, true)
+		}
 		// This is the first time we check this schedule,
 		// let's wait until the first job will be actually
 		// scheduled
@@ -184,11 +188,6 @@ func ReconcileScheduledBackup(
 		err := cli.Status().Patch(ctx, scheduledBackup, client.MergeFrom(origScheduled))
 		if err != nil {
 			return ctrl.Result{}, err
-		}
-
-		if scheduledBackup.IsImmediate() {
-			event.Eventf(scheduledBackup, "Normal", "BackupSchedule", "Scheduled immediate backup now: %v", now)
-			return createBackup(ctx, event, cli, scheduledBackup, now, now, schedule, true)
 		}
 
 		nextTime := schedule.Next(now)
