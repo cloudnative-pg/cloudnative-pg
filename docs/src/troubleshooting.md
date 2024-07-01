@@ -345,7 +345,7 @@ kubectl logs -n <NAMESPACE> <CLUSTER>-<N> | \
   jq -r 'select(.logger=="postgres") | [.ts, .record.message] | @csv'
 ```
 
-If the timestamp is displayed in Unix Epoch time, you can convert it to a user-friedgly format:
+If the timestamp is displayed in Unix Epoch time, you can convert it to a user-friendly format:
 
 ```shell
 kubectl logs -n <NAMESPACE> <CLUSTER>-<N> | \
