@@ -38,7 +38,7 @@ func RetrieveMetricsFromInstance(
 	env *TestingEnvironment,
 	namespace, podName string,
 ) (string, error) {
-	body, err := runProxyRequest(env, namespace, podName, url.PathMetrics, int(url.PostgresMetricsPort))
+	body, err := runProxyRequest(env, namespace, podName, url.PathMetrics, url.PostgresMetricsPort)
 	return string(body), err
 }
 
@@ -48,6 +48,6 @@ func RetrieveMetricsFromPgBouncer(
 	env *TestingEnvironment,
 	namespace, podName string,
 ) (string, error) {
-	body, err := runProxyRequest(env, namespace, podName, url.PathMetrics, int(url.PgBouncerMetricsPort))
+	body, err := runProxyRequest(env, namespace, podName, url.PathMetrics, url.PgBouncerMetricsPort)
 	return string(body), err
 }
