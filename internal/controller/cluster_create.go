@@ -366,7 +366,7 @@ func (r *ClusterReconciler) reconcileManagedServices(ctx context.Context, cluste
 			continue
 		}
 
-		// Ensure the service id not present
+		// Ensure the service is not present
 		if err := r.serviceReconciler(ctx, cluster, &livingService, false); err != nil {
 			return err
 		}
