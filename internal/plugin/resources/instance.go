@@ -98,25 +98,18 @@ func getInstanceStatusFromPodViaExec(
 ) postgres.PostgresqlStatus {
 	var result postgres.PostgresqlStatus
 
-	clientInterface := kubernetes.NewForConfigOrDie(config)
-	req := clientInterface.CoreV1().
+	statusResult, err := kubernetes.NewForConfigOrDie(config).
+		CoreV1().
 		Pods(pod.Namespace).
-		ProxyGet(
-			"https",
-			pod.Name,
-			strconv.Itoa(int(url.StatusPort)),
-			url.PathPgStatus,
-			map[string]string{},
-		)
-	statusResult, err := req.DoRaw(ctx)
+		ProxyGet("https", pod.Name, strconv.Itoa(int(url.StatusPort)), url.PathPgStatus, map[string]string{}).
+		DoRaw(ctx)
 	if err != nil {
 		result.AddPod(pod)
 		result.Error = err
 		return result
 	}
 
-	err = json.Unmarshal(statusResult, &result)
-	if err != nil {
+	if err := json.Unmarshal(statusResult, &result); err != nil {
 		result.Error = fmt.Errorf("can't parse pod output")
 	}
 
