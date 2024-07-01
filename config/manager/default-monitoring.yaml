@@ -76,14 +76,14 @@ data:
             usage: "GAUGE"
             description: "Total number of backends that are currently waiting on other queries"
 
-    pg_database_frozen_xid:
+    pg_database:
       query: |
         SELECT datname
           , pg_catalog.pg_database_size(datname) AS size_bytes
           , pg_catalog.age(datfrozenxid) AS xid_age
           , pg_catalog.mxid_age(datminmxid) AS mxid_age
         FROM pg_catalog.pg_database
-          WHERE datname not in ('template0','template1')
+          WHERE datallowconn = 't'
       metrics:
         - datname:
             usage: "LABEL"
