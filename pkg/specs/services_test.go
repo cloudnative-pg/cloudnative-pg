@@ -21,6 +21,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -34,36 +35,52 @@ var _ = Describe("Services specification", func() {
 		},
 	}
 
-	It("create a configured -any service", func() {
+	It("create a configured -any service", func() { //nolint:all
 		service := CreateClusterAnyService(postgresql)
 		Expect(service.Name).To(Equal("clustername-any"))
 		Expect(service.Spec.PublishNotReadyAddresses).To(BeTrue())
 		Expect(service.Spec.Selector[utils.ClusterLabelName]).To(Equal("clustername"))
 		Expect(service.Spec.Selector[utils.PodRoleLabelName]).To(Equal(string(utils.PodRoleInstance)))
+		Expect(service.Spec.Ports[0].Name).To(Equal(PostgresContainerName))
+		Expect(service.Spec.Ports[0].Protocol).To(Equal(corev1.ProtocolTCP))
+		Expect(service.Spec.Ports[0].TargetPort.IntVal).To(BeEquivalentTo(postgres.ServerPort))
+		Expect(service.Spec.Ports[0].Port).To(BeEquivalentTo(postgres.ServerPort))
 	})
 
-	It("create a configured -r service", func() {
+	It("create a configured -r service", func() { //nolint:all
 		service := CreateClusterReadService(postgresql)
 		Expect(service.Name).To(Equal("clustername-r"))
 		Expect(service.Spec.PublishNotReadyAddresses).To(BeFalse())
 		Expect(service.Spec.Selector[utils.ClusterLabelName]).To(Equal("clustername"))
 		Expect(service.Spec.Selector[utils.PodRoleLabelName]).To(Equal(string(utils.PodRoleInstance)))
+		Expect(service.Spec.Ports[0].Name).To(Equal(PostgresContainerName))
+		Expect(service.Spec.Ports[0].Protocol).To(Equal(corev1.ProtocolTCP))
+		Expect(service.Spec.Ports[0].TargetPort.IntVal).To(BeEquivalentTo(postgres.ServerPort))
+		Expect(service.Spec.Ports[0].Port).To(BeEquivalentTo(postgres.ServerPort))
 	})
 
-	It("create a configured -ro service", func() {
+	It("create a configured -ro service", func() { //nolint:all
 		service := CreateClusterReadOnlyService(postgresql)
 		Expect(service.Name).To(Equal("clustername-ro"))
 		Expect(service.Spec.PublishNotReadyAddresses).To(BeFalse())
 		Expect(service.Spec.Selector[utils.ClusterLabelName]).To(Equal("clustername"))
 		Expect(service.Spec.Selector[utils.ClusterRoleLabelName]).To(Equal(ClusterRoleLabelReplica))
+		Expect(service.Spec.Ports[0].Name).To(Equal(PostgresContainerName))
+		Expect(service.Spec.Ports[0].Protocol).To(Equal(corev1.ProtocolTCP))
+		Expect(service.Spec.Ports[0].TargetPort.IntVal).To(BeEquivalentTo(postgres.ServerPort))
+		Expect(service.Spec.Ports[0].Port).To(BeEquivalentTo(postgres.ServerPort))
 	})
 
-	It("create a configured -rw service", func() {
+	It("create a configured -rw service", func() { //nolint:all
 		service := CreateClusterReadWriteService(postgresql)
 		Expect(service.Name).To(Equal("clustername-rw"))
 		Expect(service.Spec.PublishNotReadyAddresses).To(BeFalse())
 		Expect(service.Spec.Selector[utils.ClusterLabelName]).To(Equal("clustername"))
 		Expect(service.Spec.Selector[utils.ClusterRoleLabelName]).To(Equal(ClusterRoleLabelPrimary))
+		Expect(service.Spec.Ports[0].Name).To(Equal(PostgresContainerName))
+		Expect(service.Spec.Ports[0].Protocol).To(Equal(corev1.ProtocolTCP))
+		Expect(service.Spec.Ports[0].TargetPort.IntVal).To(BeEquivalentTo(postgres.ServerPort))
+		Expect(service.Spec.Ports[0].Port).To(BeEquivalentTo(postgres.ServerPort))
 	})
 })
 
