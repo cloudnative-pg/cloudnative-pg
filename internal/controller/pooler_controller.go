@@ -163,11 +163,7 @@ func isOwnedByPoolerKind(obj client.Object) (string, bool) {
 
 func isOwnedByPooler(poolerName string, obj client.Object) bool {
 	ownerName, isOwned := isOwnedByPoolerKind(obj)
-	if !isOwned {
-		return false
-	}
-
-	return poolerName == ownerName
+	return isOwned && poolerName == ownerName
 }
 
 func (r *PoolerReconciler) ensureManagedResourcesAreOwned(
