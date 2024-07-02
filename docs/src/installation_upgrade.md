@@ -170,7 +170,10 @@ promote the new primary instance using the `cnpg` plugin for `kubectl`.
 !!! Important
     In case `primaryUpdateStrategy` is set to the default value of `unsupervised`,
     an upgrade of the operator will trigger a switchover on your PostgreSQL cluster,
-    causing a (normally negligible) downtime.
+    causing a (normally negligible) downtime. If your PostgreSQL Cluster has only one
+    instance, the instance will be automatically restarted as `supervised` value is
+    not supported for `primaryUpdateStrategy`. In either case, your applications will
+    have to reconnect to PostgreSQL.
 
 The default rolling update behavior can be replaced with in-place updates of
 the instance manager. This approach does not require a restart of the
