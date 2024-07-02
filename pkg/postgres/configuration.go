@@ -309,6 +309,18 @@ type ConfigurationInfo struct {
 
 	// IsWalArchivingDisabled is true when user requested to disable WAL archiving
 	IsWalArchivingDisabled bool
+
+	// IsAlterSystemEnabled is true when 'allow_alter_system' should be set to on
+	IsAlterSystemEnabled bool
+}
+
+// getAlterSystemEnabledValue returns a config compatible value for IsAlterSystemEnabled
+func (c ConfigurationInfo) getAlterSystemEnabledValue() string {
+	if c.IsAlterSystemEnabled {
+		return "on"
+	}
+
+	return "off"
 }
 
 // ManagedExtension defines all the information about a managed extension
@@ -620,6 +632,12 @@ func CreatePostgresqlConfiguration(info ConfigurationInfo) *PgConfiguration {
 	if info.IncludingMandatory {
 		for key, value := range info.Settings.MandatorySettings {
 			configuration.OverwriteConfig(key, value)
+		}
+
+		// IMPORTANT: yes, this field is called MajorVersion but actually
+		// it's just the PostgreSQL version number
+		if info.MajorVersion >= 170000 {
+			configuration.OverwriteConfig("allow_alter_system", info.getAlterSystemEnabledValue())
 		}
 	}
 

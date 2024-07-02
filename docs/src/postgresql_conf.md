@@ -470,11 +470,10 @@ exclusive method for altering the configuration of a PostgreSQL cluster. This
 approach guarantees coherence across the entire high-availability cluster and
 aligns with best practices for Infrastructure-as-Code.
 
-In CloudNativePG version 1.22 and onwards, the default configuration disables
-the use of `ALTER SYSTEM` on new Postgres clusters. This decision is rooted in
-the recognition of potential risks associated with this command. To enable the
-use of `ALTER SYSTEM`, you can explicitly set `.spec.postgresql.enableAlterSystem`
-to `true`.
+In CloudNativePG the default configuration disables the use of `ALTER SYSTEM`
+on new Postgres clusters. This decision is rooted in the recognition of
+potential risks associated with this command. To enable the use of `ALTER SYSTEM`,
+you can explicitly set `.spec.postgresql.enableAlterSystem` to `true`.
 
 !!! Warning
     Proceed with caution when utilizing `ALTER SYSTEM`. This command operates
@@ -482,9 +481,14 @@ to `true`.
     CloudNativePG assumes responsibility for certain fixed parameters and complete
     control over others, emphasizing the need for careful consideration.
 
-When `.spec.postgresql.enableAlterSystem` is configured as `false`, any attempt
-to execute `ALTER SYSTEM` will result in an error. The error message might
-resemble the following:
+Starting from PostgreSQL 17, the `.spec.postgresql.enableAlterSystem` setting
+directly controls the [`allow_alter_system` GUC in PostgreSQL](https://www.postgresql.org/docs/17/runtime-config-compatible.html#GUC-ALLOW-ALTER-SYSTEM)
+— a feature directly contributed by CloudNativePG to PostgreSQL.
+
+Prior to PostgreSQL 17, when `.spec.postgresql.enableAlterSystem` is set to
+`false`, the `postgresql.auto.conf` file is made read-only. Consequently, any
+attempt to execute the `ALTER SYSTEM` command will result in an error. The
+error message might look like this:
 
 ``` output
 ERROR:  could not open file "postgresql.auto.conf": Permission denied
@@ -575,6 +579,7 @@ operator. The operator prevents the user from setting them using a webhook.
 Users are not allowed to set the following configuration parameters in the
 `postgresql` section:
 
+- `allow_alter_system`
 - `allow_system_table_mods`
 - `archive_cleanup_command`
 - `archive_command`

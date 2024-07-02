@@ -433,6 +433,7 @@ func createPostgresqlConfiguration(cluster *apiv1.Cluster, preserveUserSettings 
 		AdditionalSharedPreloadLibraries: cluster.Spec.PostgresConfiguration.AdditionalLibraries,
 		IsReplicaCluster:                 cluster.IsReplica(),
 		IsWalArchivingDisabled:           utils.IsWalArchivingDisabled(&cluster.ObjectMeta),
+		IsAlterSystemEnabled:             cluster.Spec.PostgresConfiguration.EnableAlterSystem,
 	}
 
 	if preserveUserSettings {
