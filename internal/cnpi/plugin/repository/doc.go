@@ -14,13 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package utils
-
-// contextKey a type used to assign values inside the context
-type contextKey string
-
-// ContextKeyCluster is the context key holding cluster data
-const ContextKeyCluster contextKey = "cluster"
-
-// PluginClientKey is the context key holding cluster data
-const PluginClientKey contextKey = "pluginClient"
+// Package repository contains the plugin discovery and
+// connection pooling feature of CNPG
+package repository

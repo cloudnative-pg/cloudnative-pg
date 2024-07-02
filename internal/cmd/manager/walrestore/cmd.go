@@ -29,6 +29,9 @@ import (
 	"github.com/spf13/cobra"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	pluginClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/cache"
 	cacheClient "github.com/cloudnative-pg/cloudnative-pg/internal/management/cache/client"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman"
@@ -243,14 +246,20 @@ func restoreWALViaPlugins(
 ) error {
 	contextLogger := log.FromContext(ctx)
 
-	pluginClient, err := cluster.LoadSelectedPluginsClient(ctx, cluster.GetWALPluginNames())
+	plugins := repository.New()
+	if err := plugins.RegisterUnixSocketPluginsInPath(configuration.Current.PluginSocketDir); err != nil {
+		contextLogger.Error(err, "Error while loading local plugins")
+	}
+	defer plugins.Close()
+
+	client, err := pluginClient.WithPlugins(ctx, plugins, cluster.Spec.Plugins.GetNames()...)
 	if err != nil {
-		contextLogger.Error(err, "Error loading plugins while archiving a WAL")
+		contextLogger.Error(err, "Error while loading required plugins")
 		return err
 	}
-	defer pluginClient.Close(ctx)
+	defer client.Close(ctx)
 
-	return pluginClient.RestoreWAL(ctx, cluster, walName, destinationPathName)
+	return client.RestoreWAL(ctx, cluster, walName, destinationPathName)
 }
 
 // checkEndOfWALStreamFlag returns ErrEndOfWALStreamReached if the flag is set in the restorer

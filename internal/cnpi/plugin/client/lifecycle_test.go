@@ -21,7 +21,12 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/cloudnative-pg/cnpg-i/pkg/backup"
+	"github.com/cloudnative-pg/cnpg-i/pkg/identity"
 	"github.com/cloudnative-pg/cnpg-i/pkg/lifecycle"
+	"github.com/cloudnative-pg/cnpg-i/pkg/operator"
+	"github.com/cloudnative-pg/cnpg-i/pkg/reconciler"
+	"github.com/cloudnative-pg/cnpg-i/pkg/wal"
 	"google.golang.org/grpc"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -31,10 +36,77 @@ import (
 	k8client "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/connection"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
+
+type fakeConnection struct {
+	lifecycleClient       lifecycle.OperatorLifecycleClient
+	lifecycleCapabilities []*lifecycle.OperatorLifecycleCapabilities
+	name                  string
+}
+
+func (f fakeConnection) Name() string {
+	return f.name
+}
+
+func (f fakeConnection) Metadata() connection.Metadata {
+	panic("not implemented") // TODO: Implement
+}
+
+func (f fakeConnection) LifecycleClient() lifecycle.OperatorLifecycleClient {
+	return f.lifecycleClient
+}
+
+func (f fakeConnection) OperatorClient() operator.OperatorClient {
+	panic("not implemented") // TODO: Implement
+}
+
+func (f fakeConnection) WALClient() wal.WALClient {
+	panic("not implemented") // TODO: Implement
+}
+
+func (f fakeConnection) BackupClient() backup.BackupClient {
+	panic("not implemented") // TODO: Implement
+}
+
+func (f fakeConnection) ReconcilerHooksClient() reconciler.ReconcilerHooksClient {
+	panic("not implemented") // TODO: Implement
+}
+
+func (f fakeConnection) PluginCapabilities() []identity.PluginCapability_Service_Type {
+	panic("not implemented") // TODO: Implement
+}
+
+func (f fakeConnection) OperatorCapabilities() []operator.OperatorCapability_RPC_Type {
+	panic("not implemented") // TODO: Implement
+}
+
+func (f fakeConnection) WALCapabilities() []wal.WALCapability_RPC_Type {
+	panic("not implemented") // TODO: Implement
+}
+
+func (f fakeConnection) LifecycleCapabilities() []*lifecycle.OperatorLifecycleCapabilities {
+	return f.lifecycleCapabilities
+}
+
+func (f fakeConnection) BackupCapabilities() []backup.BackupCapability_RPC_Type {
+	panic("not implemented") // TODO: Implement
+}
+
+func (f fakeConnection) ReconcilerCapabilities() []reconciler.ReconcilerHooksCapability_Kind {
+	panic("not implemented") // TODO: Implement
+}
+
+func (f fakeConnection) Ping(_ context.Context) error {
+	panic("not implemented") // TODO: Implement
+}
+
+func (f fakeConnection) Close() error {
+	panic("not implemented") // TODO: Implement
+}
 
 type fakeLifecycleClient struct {
 	capabilitiesError  error
@@ -128,7 +200,7 @@ func tryDecode[T k8client.Object](rawObj []byte, cast T) error {
 	return dec.Decode(cast)
 }
 
-func (f *fakeLifecycleClient) set(d *pluginData) {
+func (f *fakeLifecycleClient) set(d *fakeConnection) {
 	if d == nil {
 		return
 	}
@@ -159,8 +231,8 @@ var _ = Describe("LifecycleHook", func() {
 
 	BeforeEach(func() {
 		d = &data{
-			plugins: []pluginData{
-				{
+			plugins: []connection.Interface{
+				&fakeConnection{
 					name: "test",
 				},
 			},
@@ -174,7 +246,7 @@ var _ = Describe("LifecycleHook", func() {
 	It("should correctly inject the values in the passed object", func(ctx SpecContext) {
 		mapInjector := map[string]string{"test": "test"}
 		f := newFakeLifecycleClient(capabilities, mapInjector, nil, nil)
-		f.set(&d.plugins[0])
+		f.set(d.plugins[0].(*fakeConnection))
 
 		pod := &corev1.Pod{
 			TypeMeta: metav1.TypeMeta{
@@ -195,7 +267,7 @@ var _ = Describe("LifecycleHook", func() {
 	It("should correctly remove the values in the passed object", func(ctx SpecContext) {
 		mapInjector := map[string]string{"test": "test"}
 		f := newFakeLifecycleClient(capabilities, mapInjector, nil, nil)
-		f.set(&d.plugins[0])
+		f.set(d.plugins[0].(*fakeConnection))
 
 		pod := &corev1.Pod{
 			TypeMeta: metav1.TypeMeta{

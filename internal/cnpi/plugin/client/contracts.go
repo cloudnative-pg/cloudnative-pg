@@ -24,25 +24,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/connection"
 )
-
-// Metadata expose the metadata as discovered
-// from a plugin
-type Metadata struct {
-	Name                 string
-	Version              string
-	Capabilities         []string
-	OperatorCapabilities []string
-	WALCapabilities      []string
-	BackupCapabilities   []string
-}
-
-// Loader describes a struct capable of generating a plugin Client
-type Loader interface {
-	// LoadPluginClient creates a new plugin client, loading the plugins that are required
-	// by this cluster
-	LoadPluginClient(ctx context.Context) (Client, error)
-}
 
 // Client describes a set of behaviour needed to properly handle all the plugin client expected features
 type Client interface {
@@ -56,14 +39,11 @@ type Client interface {
 
 // Connection describes a set of behaviour needed to properly handle the plugin connections
 type Connection interface {
-	// Load connect to the plugin with the specified name
-	Load(ctx context.Context, name string) error
-
 	// Close closes the connection to every loaded plugin
 	Close(ctx context.Context)
 
 	// MetadataList exposes the metadata of the loaded plugins
-	MetadataList() []Metadata
+	MetadataList() []connection.Metadata
 }
 
 // ClusterCapabilities describes a set of behaviour needed to implement the Cluster capabilities

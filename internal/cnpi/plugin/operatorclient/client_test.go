@@ -34,11 +34,11 @@ import (
 
 type fakeClusterCRD struct {
 	k8client.Object
-	pluginClient *fakePluginClient
+	pluginNames []string
 }
 
-func (f *fakeClusterCRD) LoadPluginClient(_ context.Context) (pluginclient.Client, error) {
-	return f.pluginClient, nil
+func (f *fakeClusterCRD) GetPluginNames() (result []string) {
+	return f.pluginNames
 }
 
 type fakePluginClient struct {
@@ -74,10 +74,10 @@ var _ = Describe("extendedClient", func() {
 	})
 
 	It("invokePlugin", func(ctx SpecContext) {
-		fakeCrd := &fakeClusterCRD{
-			pluginClient: pluginClient,
-		}
+		fakeCrd := &fakeClusterCRD{}
 		newCtx := context.WithValue(ctx, utils.ContextKeyCluster, fakeCrd)
+		newCtx = context.WithValue(newCtx, utils.PluginClientKey, pluginClient)
+
 		By("ensuring it works the first invocation", func() {
 			obj, err := c.invokePlugin(newCtx, plugin.OperationVerbCreate, &corev1.Pod{})
 			Expect(err).ToNot(HaveOccurred())

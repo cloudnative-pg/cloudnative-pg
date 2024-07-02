@@ -43,21 +43,21 @@ func (data *data) MutateCluster(ctx context.Context, object client.Object, mutat
 	}
 
 	for idx := range data.plugins {
-		plugin := &data.plugins[idx]
+		plugin := data.plugins[idx]
 
-		if !slices.Contains(plugin.operatorCapabilities, operator.OperatorCapability_RPC_TYPE_MUTATE_CLUSTER) {
+		if !slices.Contains(plugin.OperatorCapabilities(), operator.OperatorCapability_RPC_TYPE_MUTATE_CLUSTER) {
 			continue
 		}
 
 		contextLogger := contextLogger.WithValues(
-			"pluginName", plugin.name,
+			"pluginName", plugin.Name,
 		)
 		request := operator.OperatorMutateClusterRequest{
 			Definition: serializedObject,
 		}
 
 		contextLogger.Trace("Calling MutateCluster endpoint", "definition", request.Definition)
-		result, err := plugin.operatorClient.MutateCluster(ctx, &request)
+		result, err := plugin.OperatorClient().MutateCluster(ctx, &request)
 		if err != nil {
 			contextLogger.Error(err, "Error while calling MutateCluster")
 			return err
@@ -111,21 +111,21 @@ func (data *data) ValidateClusterCreate(
 
 	var validationErrors []*operator.ValidationError
 	for idx := range data.plugins {
-		plugin := &data.plugins[idx]
+		plugin := data.plugins[idx]
 
-		if !slices.Contains(plugin.operatorCapabilities, operator.OperatorCapability_RPC_TYPE_VALIDATE_CLUSTER_CREATE) {
+		if !slices.Contains(plugin.OperatorCapabilities(), operator.OperatorCapability_RPC_TYPE_VALIDATE_CLUSTER_CREATE) {
 			continue
 		}
 
 		contextLogger := contextLogger.WithValues(
-			"pluginName", plugin.name,
+			"pluginName", plugin.Name,
 		)
 		request := operator.OperatorValidateClusterCreateRequest{
 			Definition: serializedObject,
 		}
 
 		contextLogger.Trace("Calling ValidatedClusterCreate endpoint", "definition", request.Definition)
-		result, err := plugin.operatorClient.ValidateClusterCreate(ctx, &request)
+		result, err := plugin.OperatorClient().ValidateClusterCreate(ctx, &request)
 		if err != nil {
 			contextLogger.Error(err, "Error while calling ValidatedClusterCreate")
 			return nil, err
@@ -164,14 +164,14 @@ func (data *data) ValidateClusterUpdate(
 
 	var validationErrors []*operator.ValidationError
 	for idx := range data.plugins {
-		plugin := &data.plugins[idx]
+		plugin := data.plugins[idx]
 
-		if !slices.Contains(plugin.operatorCapabilities, operator.OperatorCapability_RPC_TYPE_VALIDATE_CLUSTER_CHANGE) {
+		if !slices.Contains(plugin.OperatorCapabilities(), operator.OperatorCapability_RPC_TYPE_VALIDATE_CLUSTER_CHANGE) {
 			continue
 		}
 
 		contextLogger := contextLogger.WithValues(
-			"pluginName", plugin.name,
+			"pluginName", plugin.Name,
 		)
 		request := operator.OperatorValidateClusterChangeRequest{
 			OldCluster: serializedOldObject,
@@ -182,7 +182,7 @@ func (data *data) ValidateClusterUpdate(
 			"Calling ValidateClusterChange endpoint",
 			"oldCluster", request.OldCluster,
 			"newCluster", request.NewCluster)
-		result, err := plugin.operatorClient.ValidateClusterChange(ctx, &request)
+		result, err := plugin.OperatorClient().ValidateClusterChange(ctx, &request)
 		if err != nil {
 			contextLogger.Error(err, "Error while calling ValidatedClusterCreate")
 			return nil, err

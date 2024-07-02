@@ -22,8 +22,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	cnpiClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	cnpgiClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // preReconcilePluginHooks ensures we call the pre-reconcile plugin hooks
@@ -31,22 +31,8 @@ func preReconcilePluginHooks(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	object client.Object,
-) cnpiClient.ReconcilerHookResult {
-	contextLogger := log.FromContext(ctx)
-
-	// Load the plugins
-	pluginClient, err := cluster.LoadPluginClient(ctx)
-	if err != nil {
-		contextLogger.Error(err, "Error loading plugins, retrying")
-		return cnpiClient.ReconcilerHookResult{
-			Err:                err,
-			StopReconciliation: true,
-		}
-	}
-	defer func() {
-		pluginClient.Close(ctx)
-	}()
-
+) cnpgiClient.ReconcilerHookResult {
+	pluginClient := getPluginClientFromContext(ctx)
 	return pluginClient.PreReconcile(ctx, cluster, object)
 }
 
@@ -55,21 +41,17 @@ func postReconcilePluginHooks(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	object client.Object,
-) cnpiClient.ReconcilerHookResult {
-	contextLogger := log.FromContext(ctx)
-
-	// Load the plugins
-	pluginClient, err := cluster.LoadPluginClient(ctx)
-	if err != nil {
-		contextLogger.Error(err, "Error loading plugins, retrying")
-		return cnpiClient.ReconcilerHookResult{
-			Err:                err,
-			StopReconciliation: true,
-		}
-	}
-	defer func() {
-		pluginClient.Close(ctx)
-	}()
-
+) cnpgiClient.ReconcilerHookResult {
+	pluginClient := getPluginClientFromContext(ctx)
 	return pluginClient.PostReconcile(ctx, cluster, object)
+}
+
+// setPluginClientInContext records the plugin client in the given context
+func setPluginClientInContext(ctx context.Context, client cnpgiClient.Client) context.Context {
+	return context.WithValue(ctx, utils.PluginClientKey, client)
+}
+
+// getPluginClientFromContext gets the current plugin client from the context
+func getPluginClientFromContext(ctx context.Context) cnpgiClient.Client {
+	return ctx.Value(utils.PluginClientKey).(cnpgiClient.Client)
 }

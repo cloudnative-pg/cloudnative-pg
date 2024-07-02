@@ -27,6 +27,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/connection"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
@@ -95,7 +96,7 @@ func reconcilerHook(
 	ctx context.Context,
 	cluster client.Object,
 	object client.Object,
-	plugins []pluginData,
+	plugins []connection.Interface,
 	executeRequest reconcilerHookFunc,
 ) ReconcilerHookResult {
 	contextLogger := log.FromContext(ctx)
@@ -142,13 +143,13 @@ func reconcilerHook(
 	}
 
 	for idx := range plugins {
-		plugin := &plugins[idx]
+		plugin := plugins[idx]
 
-		if !slices.Contains(plugin.reconcilerCapabilities, kind) {
+		if !slices.Contains(plugin.ReconcilerCapabilities(), kind) {
 			continue
 		}
 
-		result, err := executeRequest(ctx, plugin.reconcilerHooksClient, request)
+		result, err := executeRequest(ctx, plugin.ReconcilerHooksClient(), request)
 		if err != nil {
 			return newReconcilerErrorResult(err)
 		}
