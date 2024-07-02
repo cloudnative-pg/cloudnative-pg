@@ -1083,6 +1083,9 @@ type PoolerIntegrations struct {
 type PgBouncerIntegrationStatus struct {
 	// +optional
 	Secrets []string `json:"secrets,omitempty"`
+
+	// +optional
+	AuthDBName string `json:"authDBName,omitempty"`
 }
 
 // ReplicaClusterConfiguration encapsulates the configuration of a replica
