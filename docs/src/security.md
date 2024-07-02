@@ -196,13 +196,6 @@ required by the operator by running:
 kubectl describe clusterrole cnpg-manager
 ```
 
-!!! Info
-    You can customize the YAML file to align with your security requirements by
-    using a `RoleBinding` instead of a `ClusterRoleBinding`. This approach enables
-    deployment of the operator in a dedicated namespace with restricted access from
-    administrators. This ensures that standard users cannot access the operator's
-    `ServiceAccount`.
-
 ##### Via OLM
 
 From a security perspective, the Operator Lifecycle Manager (OLM) provides a
