@@ -523,6 +523,16 @@ type ClusterSpec struct {
 // configuration parameters
 type PluginConfigurationList []PluginConfiguration
 
+// GetNames gets the name of the plugins that are involved
+// in the reconciliation of this cluster
+func (pluginList PluginConfigurationList) GetNames() (result []string) {
+	pluginNames := make([]string, len(pluginList))
+	for i, pluginDeclaration := range pluginList {
+		pluginNames[i] = pluginDeclaration.Name
+	}
+	return pluginNames
+}
+
 const (
 	// PhaseSwitchover when a cluster is changing the primary node
 	PhaseSwitchover = "Switchover in progress"
@@ -2783,6 +2793,11 @@ func (secretResourceVersion *SecretsResourceVersion) SetExternalClusterSecretVer
 	}
 
 	secretResourceVersion.ExternalClusterSecretVersions[secretName] = *version
+}
+
+// SetInContext records the cluster in the given context
+func (cluster *Cluster) SetInContext(ctx context.Context) context.Context {
+	return context.WithValue(ctx, utils.ContextKeyCluster, cluster)
 }
 
 // GetImageName get the name of the image that should be used
