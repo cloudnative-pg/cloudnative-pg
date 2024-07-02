@@ -103,6 +103,12 @@ func (r *PoolerReconciler) updateDeployment(
 
 		utils.MergeObjectsMetadata(deployment, generatedDeployment)
 
+		// If the init containers are the only change in the template, restore the current value to avoid
+		// unnecessary rollouts
+		if isTemplateEqualIgnoringInitContainers(resources.Deployment.Spec.Template, deployment.Spec.Template) {
+			deployment.Spec.Template.Spec.InitContainers = resources.Deployment.Spec.Template.Spec.InitContainers
+		}
+
 		contextLog.Info("Updating deployment")
 		err = r.Patch(ctx, deployment, client.MergeFrom(resources.Deployment))
 		if err != nil {
@@ -113,6 +119,15 @@ func (r *PoolerReconciler) updateDeployment(
 	}
 
 	return nil
+}
+
+func isTemplateEqualIgnoringInitContainers(
+	oldTemplate corev1.PodTemplateSpec,
+	newTemplate corev1.PodTemplateSpec,
+) bool {
+	newTemplateCopy := newTemplate.DeepCopy()
+	newTemplateCopy.Spec.InitContainers = oldTemplate.Spec.InitContainers
+	return reflect.DeepEqual(newTemplateCopy, oldTemplate)
 }
 
 // reconcileService update or create the pgbouncer service as needed
