@@ -2342,6 +2342,8 @@ type MonitoringConfiguration struct {
 	// +optional
 	EnablePodMonitor bool `json:"enablePodMonitor,omitempty"`
 
+	PodMonitorAdditionalLabels map[string]string `json:"podMonitorAdditionalLabels,omitempty"`
+
 	// The list of metric relabelings for the `PodMonitor`. Applied to samples before ingestion.
 	// +optional
 	PodMonitorMetricRelabelConfigs []monitoringv1.RelabelConfig `json:"podMonitorMetricRelabelings,omitempty"`
@@ -3487,6 +3489,16 @@ func (cluster *Cluster) IsPodMonitorEnabled() bool {
 	}
 
 	return false
+}
+
+// GetPodMonitorAdditionalLabels returns the additional labels for the PodMonitor resource
+func (cluster *Cluster) GetPodMonitorAdditionalLabels() map[string]string {
+	if cluster.Spec.Monitoring != nil {
+		if cluster.Spec.Monitoring.PodMonitorAdditionalLabels != nil {
+			return cluster.Spec.Monitoring.PodMonitorAdditionalLabels
+		}
+	}
+	return map[string]string{}
 }
 
 // GetEnableSuperuserAccess returns if the superuser access is enabled or not
