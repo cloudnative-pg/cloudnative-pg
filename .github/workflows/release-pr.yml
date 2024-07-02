@@ -17,9 +17,13 @@ jobs:
       -
         name: Get tag
         run: |
-          TAG=${GITHUB_REF##*/}
-          DEST=$(echo ${TAG#v} | awk -F '[.]' '{print "release-"$1"."$2}')
-          echo "TAG=${TAG#v}" >> $GITHUB_ENV
+          TAG=${GITHUB_REF##*/v}
+          if [[ "${TAG}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            DEST=$(echo ${TAG} | awk -F '[.]' '{print "release-"$1"."$2}')
+          else
+            DEST="main"
+          fi
+          echo "TAG=${TAG}" >> $GITHUB_ENV
           echo "DEST=${DEST}" >> $GITHUB_ENV
       -
         name: Pull Request
