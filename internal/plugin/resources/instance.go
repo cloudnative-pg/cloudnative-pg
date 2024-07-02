@@ -80,7 +80,7 @@ func ExtractInstancesStatus(
 	var errs []error
 
 	for idx := range filteredPods {
-		instanceStatus := getInstanceStatusFromPodViaExec(
+		instanceStatus := getInstanceStatusFromPod(
 			ctx, config, filteredPods[idx])
 		result.Items = append(result.Items, instanceStatus)
 		if instanceStatus.Error != nil {
@@ -91,7 +91,7 @@ func ExtractInstancesStatus(
 	return result, errs
 }
 
-func getInstanceStatusFromPodViaExec(
+func getInstanceStatusFromPod(
 	ctx context.Context,
 	config *rest.Config,
 	pod v1.Pod,
