@@ -97,11 +97,17 @@ the cluster (PostgreSQL included).
 
 ### Role Based Access Control (RBAC)
 
-The operator interacts with the Kubernetes API server with a dedicated service
-account called `cnpg-manager`. In Kubernetes this is installed
-by default in the `cnpg-system` namespace, with a cluster role
-binding between this service account and the `cnpg-manager`
-cluster role which defines the set of rules/resources/verbs granted to the operator.
+The operator interacts with the Kubernetes API server using a dedicated service
+account named `cnpg-manager`. This service account is typically installed in
+the operator namespace, commonly `cnpg-system`. However, the namespace may vary
+based on the deployment method (see the subsection below).
+
+In the same namespace, there is a binding between the `cnpg-manager` service
+account and a role. The specific name and type of this role (either `Role` or
+`ClusterRole`) also depend on the deployment method. This role defines the
+necessary permissions required by the operator to function correctly. To learn
+more about these roles, you can use the `kubectl describe clusterrole` or
+`kubectl describe role` commands, depending on the deployment method.
 
 !!! Important
     The above permissions are exclusively reserved for the operator's service
@@ -112,7 +118,7 @@ cluster role which defines the set of rules/resources/verbs granted to the opera
 
 Below we provide some examples and, most importantly, the reasons why
 CloudNativePG requires full or partial management of standard Kubernetes
-namespaced resources.
+namespaced or non-namespaced resources.
 
 `configmaps`
 : The operator needs to create and manage default config maps for
@@ -165,14 +171,56 @@ namespaced resources.
   validate them before starting the restore process.
 
 `nodes`
-: The operator needs to get the labels for Affinity and AntiAffinity, so it can
-  decide in which nodes a pod can be scheduled preventing the replicas to be
-  in the same node, specially if nodes are in different availability zones. This
-  permission is also used to determine if a node is schedule or not, avoiding
-  the creation of pods that cannot be created at all.
+: The operator needs to get the labels for Affinity and AntiAffinity so it can
+  decide in which nodes a pod can be scheduled. This is useful, for example, to
+  prevent the replicas from being scheduled in the same node - especially
+  important if nodes are in different availability zones. This
+  permission is also used to determine whether a node is scheduled, preventing
+  the creation of pods on unscheduled nodes, or triggering a switchover if
+  the primary lives in an unscheduled node.
 
-To see all the permissions required by the operator, you can run `kubectl
-describe clusterrole cnpg-manager`.
+
+#### Deployments and `ClusterRole` Resources
+
+As mentioned above, each deployment method may have variations in the namespace
+location of the service account, as well as the names and types of role
+bindings and respective roles.
+
+##### Via Kubernetes Manifest
+
+When installing CloudNativePG using the Kubernetes manifest, permissions are
+set to `ClusterRoleBinding` by default. You can inspect the permissions
+required by the operator by running:
+
+```sh
+kubectl describe clusterrole cnpg-manager
+```
+
+##### Via OLM
+
+From a security perspective, the Operator Lifecycle Manager (OLM) provides a
+more flexible deployment method. It allows you to configure the operator to
+watch either all namespaces or specific namespaces, enabling more granular
+permission management.
+
+!!! Info
+   OLM allows you to deploy the operator in its own namespace and configure it
+   to watch specific namespaces used for CloudNativePG clusters. This setup helps
+   to contain permissions and restrict access more effectively.
+
+#### Why Are ClusterRole Permissions Needed?
+
+The operator currently requires `ClusterRole` permissions just to read `nodes`
+objects. All other permissions can be namespace-scoped (i.e., `Role`) or
+cluster-wide (i.e., `ClusterRole`).
+
+Even with these permissions, if someone gains access to the `ServiceAccount`,
+they will only have `get`, `list`, and `watch` permissions, which are limited
+to viewing resources. However, if an unauthorized user gains access to the
+`ServiceAccount`, it indicates a more significant security issue.
+
+Therefore, it's crucial to prevent users from accessing the operator's
+`ServiceAccount` and any other `ServiceAccount` with elevated permissions.
 
 ### Calls to the API server made by the instance manager
 
@@ -399,4 +447,3 @@ For further detail on how `pg_ident.conf` is managed by the operator, see the
 CloudNativePG delegates encryption at rest to the underlying storage class. For
 data protection in production environments, we highly recommend that you choose
 a storage class that supports encryption at rest.
-
