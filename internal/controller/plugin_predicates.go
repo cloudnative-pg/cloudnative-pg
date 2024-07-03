@@ -23,19 +23,22 @@ import (
 )
 
 var isPluginService = func(object client.Object) bool {
-	if _, hasLabel := object.GetLabels()[utils.PluginNameLabelName]; !hasLabel {
+	labels := object.GetLabels()
+	if _, hasLabel := labels[utils.PluginNameLabelName]; !hasLabel {
 		return false
 	}
 
-	if _, hasAnnotation := object.GetAnnotations()[utils.PluginClientSecretAnnotationName]; !hasAnnotation {
+	annotations := object.GetAnnotations()
+
+	if _, hasAnnotation := annotations[utils.PluginClientSecretAnnotationName]; !hasAnnotation {
 		return false
 	}
 
-	if _, hasAnnotation := object.GetAnnotations()[utils.PluginServerSecretAnnotationName]; !hasAnnotation {
+	if _, hasAnnotation := annotations[utils.PluginServerSecretAnnotationName]; !hasAnnotation {
 		return false
 	}
 
-	if _, hasAnnotation := object.GetAnnotations()[utils.PluginPortAnnotationName]; !hasAnnotation {
+	if _, hasAnnotation := annotations[utils.PluginPortAnnotationName]; !hasAnnotation {
 		return false
 	}
 
