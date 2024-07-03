@@ -104,7 +104,7 @@ func Status(ctx context.Context, clusterName string, verbose bool, format plugin
 		return err
 	}
 
-	status := ExtractPostgresqlStatus(ctx, cluster)
+	status := extractPostgresqlStatus(ctx, cluster)
 	err = plugin.Print(status, format, os.Stdout)
 	if err != nil || format != plugin.OutputFormatText {
 		return err
@@ -139,8 +139,8 @@ func Status(ctx context.Context, clusterName string, verbose bool, format plugin
 	return nil
 }
 
-// ExtractPostgresqlStatus gets the PostgreSQL status using the Kubernetes API
-func ExtractPostgresqlStatus(ctx context.Context, cluster apiv1.Cluster) *PostgresqlStatus {
+// extractPostgresqlStatus gets the PostgreSQL status using the Kubernetes API
+func extractPostgresqlStatus(ctx context.Context, cluster apiv1.Cluster) *PostgresqlStatus {
 	var errs []error
 
 	managedPods, primaryPod, err := resources.GetInstancePods(ctx, cluster.Name)
@@ -153,7 +153,7 @@ func ExtractPostgresqlStatus(ctx context.Context, cluster apiv1.Cluster) *Postgr
 		ctx,
 		plugin.Config,
 		managedPods,
-		specs.PostgresContainerName)
+	)
 	if len(errList) != 0 {
 		errs = append(errs, errList...)
 	}
