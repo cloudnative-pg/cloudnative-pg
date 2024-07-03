@@ -31,20 +31,14 @@ type data struct {
 }
 
 func (data *data) getPlugin(pluginName string) (connection.Interface, error) {
-	selectedPluginIdx := -1
 	for idx := range data.plugins {
 		plugin := data.plugins[idx]
 		if plugin.Name() == pluginName {
-			selectedPluginIdx = idx
-			break
+			return plugin, nil
 		}
 	}
 
-	if selectedPluginIdx == -1 {
-		return nil, ErrPluginNotLoaded
-	}
-
-	return data.plugins[selectedPluginIdx], nil
+	return nil, ErrPluginNotLoaded
 }
 
 func (data *data) load(ctx context.Context, names ...string) error {
