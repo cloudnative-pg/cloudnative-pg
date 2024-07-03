@@ -49,17 +49,15 @@ func (data *data) MutateCluster(ctx context.Context, object client.Object, mutat
 			continue
 		}
 
-		contextLogger := contextLogger.WithValues(
-			"pluginName", plugin.Name,
-		)
+		pluginLogger := contextLogger.WithValues("pluginName", plugin.Name())
 		request := operator.OperatorMutateClusterRequest{
 			Definition: serializedObject,
 		}
 
-		contextLogger.Trace("Calling MutateCluster endpoint", "definition", request.Definition)
+		pluginLogger.Trace("Calling MutateCluster endpoint", "definition", request.Definition)
 		result, err := plugin.OperatorClient().MutateCluster(ctx, &request)
 		if err != nil {
-			contextLogger.Error(err, "Error while calling MutateCluster")
+			pluginLogger.Error(err, "Error while calling MutateCluster")
 			return err
 		}
 
@@ -70,13 +68,13 @@ func (data *data) MutateCluster(ctx context.Context, object client.Object, mutat
 
 		patch, err := jsonpatch.DecodePatch(result.JsonPatch)
 		if err != nil {
-			contextLogger.Error(err, "Error while decoding JSON patch from plugin", "patch", result.JsonPatch)
+			pluginLogger.Error(err, "Error while decoding JSON patch from plugin", "patch", result.JsonPatch)
 			return err
 		}
 
 		mutatedObject, err := patch.Apply(serializedObject)
 		if err != nil {
-			contextLogger.Error(err, "Error while applying JSON patch from plugin", "patch", result.JsonPatch)
+			pluginLogger.Error(err, "Error while applying JSON patch from plugin", "patch", result.JsonPatch)
 			return err
 		}
 
@@ -117,17 +115,15 @@ func (data *data) ValidateClusterCreate(
 			continue
 		}
 
-		contextLogger := contextLogger.WithValues(
-			"pluginName", plugin.Name,
-		)
+		pluginLogger := contextLogger.WithValues("pluginName", plugin.Name())
 		request := operator.OperatorValidateClusterCreateRequest{
 			Definition: serializedObject,
 		}
 
-		contextLogger.Trace("Calling ValidatedClusterCreate endpoint", "definition", request.Definition)
+		pluginLogger.Trace("Calling ValidatedClusterCreate endpoint", "definition", request.Definition)
 		result, err := plugin.OperatorClient().ValidateClusterCreate(ctx, &request)
 		if err != nil {
-			contextLogger.Error(err, "Error while calling ValidatedClusterCreate")
+			pluginLogger.Error(err, "Error while calling ValidatedClusterCreate")
 			return nil, err
 		}
 
@@ -170,21 +166,19 @@ func (data *data) ValidateClusterUpdate(
 			continue
 		}
 
-		contextLogger := contextLogger.WithValues(
-			"pluginName", plugin.Name,
-		)
+		pluginLogger := contextLogger.WithValues("pluginName", plugin.Name())
 		request := operator.OperatorValidateClusterChangeRequest{
 			OldCluster: serializedOldObject,
 			NewCluster: serializedNewObject,
 		}
 
-		contextLogger.Trace(
+		pluginLogger.Trace(
 			"Calling ValidateClusterChange endpoint",
 			"oldCluster", request.OldCluster,
 			"newCluster", request.NewCluster)
 		result, err := plugin.OperatorClient().ValidateClusterChange(ctx, &request)
 		if err != nil {
-			contextLogger.Error(err, "Error while calling ValidatedClusterCreate")
+			pluginLogger.Error(err, "Error while calling ValidatedClusterCreate")
 			return nil, err
 		}
 

@@ -72,10 +72,10 @@ func (data *data) Close(ctx context.Context) {
 	contextLogger := log.FromContext(ctx)
 	for i := range data.plugins {
 		plugin := data.plugins[i]
-		contextLogger := contextLogger.WithValues("pluginName", plugin.Name)
+		pluginLogger := contextLogger.WithValues("pluginName", plugin.Name())
 
 		if err := plugin.Close(); err != nil {
-			contextLogger.Error(err, "while closing plugin connection")
+			pluginLogger.Error(err, "while closing plugin connection")
 		}
 	}
 
