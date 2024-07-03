@@ -1403,6 +1403,17 @@ type PostgresConfiguration struct {
 	// +optional
 	SyncReplicaElectionConstraint SyncReplicaElectionConstraints `json:"syncReplicaElectionConstraint,omitempty"`
 
+	// MinSyncReplicasEnforcement describe how synchronous replication react
+	// to non-ready replicas. When not set or set to `preferred`, those
+	// replicas are not considered against the synchronous replication
+	// candidates, giving priority to the availability of the cluster.
+	// When set to `required`, non-ready replicas are considered
+	// synchronous replication candidates, giving priority to the
+	// consistency of the cluster over its availability.
+	// +kubebuilder:validation:Enum=preferred;required
+	// +optional
+	MinSyncReplicasEnforcement *MinSyncReplicasEnforcementType `json:"minSyncReplicasEnforcement,omitempty"`
+
 	// Lists of shared preload libraries to add to the default ones
 	// +optional
 	AdditionalLibraries []string `json:"shared_preload_libraries,omitempty"`
@@ -1424,6 +1435,19 @@ type PostgresConfiguration struct {
 	// +optional
 	EnableAlterSystem bool `json:"enableAlterSystem,omitempty"`
 }
+
+// MinSyncReplicasEnforcementType is the type of .spec.postgres.minSyncReplicasEnforcement
+type MinSyncReplicasEnforcementType string
+
+const (
+	// MinSyncReplicasEnforcementTypePreferred means the enforcement of minSyncReplicas
+	// is preferred and the actual number of ready replicas is taken into consideration
+	MinSyncReplicasEnforcementTypePreferred = MinSyncReplicasEnforcementType("preferred")
+
+	// MinSyncReplicasEnforcementTypeRequired means the enforcement of minSyncReplicas
+	// is required, being replicas actually ready or not
+	MinSyncReplicasEnforcementTypeRequired = MinSyncReplicasEnforcementType("required")
+)
 
 // BootstrapConfiguration contains information about how to create the PostgreSQL
 // cluster. Only a single bootstrap method can be defined among the supported

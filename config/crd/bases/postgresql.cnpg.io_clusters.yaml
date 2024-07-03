@@ -3904,6 +3904,19 @@ spec:
                           is default
                         type: boolean
                     type: object
+                  minSyncReplicasEnforcement:
+                    description: |-
+                      MinSyncReplicasEnforcement describe how synchronous replication react
+                      to non-ready replicas. When not set or set to `preferred`, those
+                      replicas are not considered against the synchronous replication
+                      candidates, giving priority to the availability of the cluster.
+                      When set to `required`, non-ready replicas are considered
+                      synchronous replication candidates, giving priority to the
+                      consistency of the cluster over its availability.
+                    enum:
+                    - preferred
+                    - required
+                    type: string
                   parameters:
                     additionalProperties:
                       type: string

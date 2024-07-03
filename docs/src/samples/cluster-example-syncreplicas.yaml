@@ -5,8 +5,11 @@ metadata:
 spec:
   instances: 5
 
-  minSyncReplicas: 1
-  maxSyncReplicas: 3
+  minSyncReplicas: 3
+  maxSyncReplicas: 4
+
+  postgresql:
+    minSyncReplicasEnforcement: required
 
   storage:
     size: 1G

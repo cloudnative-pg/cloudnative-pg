@@ -21,6 +21,16 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
+// IsMinSyncReplicasEnforcementRequired checks whether we should consider the readiness
+// of replicas when enforcing the minimum number of synchronous replicas
+func (config *PostgresConfiguration) IsMinSyncReplicasEnforcementRequired() bool {
+	if config.MinSyncReplicasEnforcement == nil {
+		return false
+	}
+
+	return *config.MinSyncReplicasEnforcement == MinSyncReplicasEnforcementTypeRequired
+}
+
 // GetSyncReplicasData computes the actual number of required synchronous replicas and the names of
 // the electable sync replicas given the requested min, max, the number of ready replicas in the cluster and the sync
 // replicas constraints (if any)
@@ -33,7 +43,7 @@ func (cluster *Cluster) GetSyncReplicasData() (syncReplicas int, electableSyncRe
 	// If the number of ready replicas is negative,
 	// there are no healthy Pods so no sync replica can be configured
 	if readyReplicas < 0 {
-		return 0, nil
+		readyReplicas = 0
 	}
 
 	// Initially set it to the max sync replicas requested by user
@@ -66,15 +76,38 @@ func (cluster *Cluster) GetSyncReplicasData() (syncReplicas int, electableSyncRe
 		syncReplicas = numberOfElectableSyncReplicas
 	}
 
+	enforcingSyncReplicas := cluster.Spec.PostgresConfiguration.IsMinSyncReplicasEnforcementRequired()
+	if enforcingSyncReplicas && syncReplicas < cluster.Spec.MinSyncReplicas {
+		syncReplicas = cluster.Spec.MinSyncReplicas
+	}
+
 	return syncReplicas, electableSyncReplicas
 }
 
 // getElectableSyncReplicas computes the names of the instances that can be elected to sync replicas
 func (cluster *Cluster) getElectableSyncReplicas() []string {
 	var nonPrimaryInstances []string
-	for _, instance := range cluster.Status.InstancesStatus[utils.PodHealthy] {
-		if cluster.Status.CurrentPrimary != instance {
-			nonPrimaryInstances = append(nonPrimaryInstances, instance)
+
+	// When minSyncReplicas is enforced, we consider all the possible
+	// replicas as candidates. In this case we need to prefer consistency
+	// over availability, and synchronous replication should stop
+	// us even when there is no replica available.
+	// If we had an empty list of replicas, we wouldn't set
+	// `synchronous_standby_names` de-facto disabling synchronous_replication.
+	//
+	// Otherwise, when minSyncReplicas is not enforced, we can list only
+	// the ready replicas.
+	if cluster.Spec.PostgresConfiguration.IsMinSyncReplicasEnforcementRequired() {
+		for _, instance := range cluster.Status.InstanceNames {
+			if cluster.Status.CurrentPrimary != instance {
+				nonPrimaryInstances = append(nonPrimaryInstances, instance)
+			}
+		}
+	} else {
+		for _, instance := range cluster.Status.InstancesStatus[utils.PodHealthy] {
+			if cluster.Status.CurrentPrimary != instance {
+				nonPrimaryInstances = append(nonPrimaryInstances, instance)
+			}
 		}
 	}
 

@@ -44,6 +44,7 @@ func createFakeCluster(name string) *Cluster {
 			utils.PodHealthy: {primaryPod, fmt.Sprintf("%s-2", name), fmt.Sprintf("%s-3", name)},
 			utils.PodFailed:  {},
 		},
+		InstanceNames: []string{"exampleOnePod-1", "exampleOnePod-2", "exampleOnePod-3"},
 	}
 	return cluster
 }

@@ -2201,6 +2201,11 @@ func (in *PostgresConfiguration) DeepCopyInto(out *PostgresConfiguration) {
 		copy(*out, *in)
 	}
 	in.SyncReplicaElectionConstraint.DeepCopyInto(&out.SyncReplicaElectionConstraint)
+	if in.MinSyncReplicasEnforcement != nil {
+		in, out := &in.MinSyncReplicasEnforcement, &out.MinSyncReplicasEnforcement
+		*out = new(MinSyncReplicasEnforcementType)
+		**out = **in
+	}
 	if in.AdditionalLibraries != nil {
 		in, out := &in.AdditionalLibraries, &out.AdditionalLibraries
 		*out = make([]string, len(*in))

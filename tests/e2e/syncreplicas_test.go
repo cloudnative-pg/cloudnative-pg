@@ -31,150 +31,163 @@ import (
 )
 
 var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
-	var namespace string
-	var clusterName string
 	const level = tests.Medium
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 	})
-	It("can manage sync replicas", func() {
-		const namespacePrefix = "sync-replicas-e2e"
-		clusterName = "cluster-syncreplicas"
-		const sampleFile = fixturesDir + "/sync_replicas/cluster-syncreplicas.yaml.template"
-		var err error
-		// Create a cluster in a namespace we'll delete after the test
-		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
-		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-			return env.DeleteNamespace(namespace)
-		})
 
-		AssertCreateCluster(namespace, clusterName, sampleFile, env)
+	DescribeTable(
+		"Synchronous Replicas",
+		Label(tests.LabelReplication),
+		func(sampleFile string) {
+			var namespace string
+			var clusterName string
+			const namespacePrefix = "sync-replicas-e2e"
+			clusterName = "cluster-syncreplicas"
+			var err error
+			// Create a cluster in a namespace we'll delete after the test
+			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			Expect(err).ToNot(HaveOccurred())
+			DeferCleanup(func() error {
+				if CurrentSpecReport().Failed() {
+					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+				}
+				return env.DeleteNamespace(namespace)
+			})
 
-		commandTimeout := time.Second * 10
-		// First we check that the starting situation is the expected one
-		By("checking that we have the correct amount of syncreplicas", func() {
-			// We should have 2 candidates for quorum standbys
-			Eventually(func() (int, error, error) {
-				primaryPod, err := env.GetClusterPrimary(namespace, clusterName)
+			AssertCreateCluster(namespace, clusterName, sampleFile, env)
+
+			commandTimeout := time.Second * 10
+			// First we check that the starting situation is the expected one
+			By("checking that we have the correct amount of syncreplicas", func() {
+				// We should have 2 candidates for quorum standbys
+				Eventually(func() (int, error, error) {
+					primaryPod, err := env.GetClusterPrimary(namespace, clusterName)
+					Expect(err).ToNot(HaveOccurred())
+					query := "SELECT count(*) from pg_stat_replication WHERE sync_state = 'quorum'"
+					out, _, err := env.ExecCommand(env.Ctx, *primaryPod, specs.PostgresContainerName, &commandTimeout,
+						"psql", "-U", "postgres", "-tAc", query)
+					value, atoiErr := strconv.Atoi(strings.Trim(out, "\n"))
+					return value, err, atoiErr
+				}, RetryTimeout).Should(BeEquivalentTo(2))
+			})
+			By("checking that synchronous_standby_names reflects cluster's changes", func() {
+				// Set MaxSyncReplicas to 1
+				Eventually(func(g Gomega) error {
+					cluster, err := env.GetCluster(namespace, clusterName)
+					g.Expect(err).ToNot(HaveOccurred())
+
+					cluster.Spec.MaxSyncReplicas = 1
+					return env.Client.Update(env.Ctx, cluster)
+				}, RetryTimeout, 5).Should(BeNil())
+
+				// Scale the cluster down to 2 pods
+				_, _, err := utils.Run(fmt.Sprintf("kubectl scale --replicas=2 -n %v cluster/%v", namespace, clusterName))
 				Expect(err).ToNot(HaveOccurred())
-				query := "SELECT count(*) from pg_stat_replication WHERE sync_state = 'quorum'"
-				out, _, err := env.ExecCommand(env.Ctx, *primaryPod, specs.PostgresContainerName, &commandTimeout,
-					"psql", "-U", "postgres", "-tAc", query)
-				value, atoiErr := strconv.Atoi(strings.Trim(out, "\n"))
-				return value, err, atoiErr
-			}, RetryTimeout).Should(BeEquivalentTo(2))
-		})
-		By("checking that synchronous_standby_names reflects cluster's changes", func() {
-			// Set MaxSyncReplicas to 1
-			Eventually(func(g Gomega) error {
+				timeout := 120
+				// Wait for pod 3 to be completely terminated
+				Eventually(func() (int, error) {
+					podList, err := env.GetClusterPodList(namespace, clusterName)
+					return len(podList.Items), err
+				}, timeout).Should(BeEquivalentTo(2))
+
+				// Construct the expected synchronous_standby_names value
+				var podNames []string
 				cluster, err := env.GetCluster(namespace, clusterName)
-				g.Expect(err).ToNot(HaveOccurred())
-
-				cluster.Spec.MaxSyncReplicas = 1
-				return env.Client.Update(env.Ctx, cluster)
-			}, RetryTimeout, 5).Should(BeNil())
-
-			// Scale the cluster down to 2 pods
-			_, _, err := utils.Run(fmt.Sprintf("kubectl scale --replicas=2 -n %v cluster/%v", namespace, clusterName))
-			Expect(err).ToNot(HaveOccurred())
-			timeout := 120
-			// Wait for pod 3 to be completely terminated
-			Eventually(func() (int, error) {
+				Expect(err).ToNot(HaveOccurred())
 				podList, err := env.GetClusterPodList(namespace, clusterName)
-				return len(podList.Items), err
-			}, timeout).Should(BeEquivalentTo(2))
-
-			// Construct the expected synchronous_standby_names value
-			var podNames []string
-			cluster, err := env.GetCluster(namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
-			podList, err := env.GetClusterPodList(namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
-			for _, pod := range podList.Items {
-				if cluster.Status.CurrentPrimary != pod.GetName() {
-					podNames = append(podNames, pod.GetName())
+				Expect(err).ToNot(HaveOccurred())
+				for _, pod := range podList.Items {
+					if cluster.Status.CurrentPrimary != pod.GetName() {
+						podNames = append(podNames, pod.GetName())
+					}
 				}
-			}
-			ExpectedValue := "ANY " + fmt.Sprint(cluster.Spec.MaxSyncReplicas) + " (\"" + strings.Join(podNames, "\",\"") + "\")"
+				ExpectedValue := "ANY " + fmt.Sprint(cluster.Spec.MaxSyncReplicas) + " (\"" + strings.Join(podNames, "\",\"") + "\")"
 
-			// Verify the parameter has been updated in every pod
-			for _, pod := range podList.Items {
-				pod := pod // pin the variable
-				Eventually(func() (string, error) {
-					stdout, _, err := env.ExecCommand(env.Ctx, pod, "postgres", &commandTimeout,
-						"psql", "-U", "postgres", "-tAc", "show synchronous_standby_names")
-					value := strings.Trim(stdout, "\n")
-					return value, err
-				}, timeout).Should(BeEquivalentTo(ExpectedValue))
-			}
-		})
-
-		By("erroring out when SyncReplicas fields are invalid", func() {
-			cluster, err := env.GetCluster(namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
-			// Expect an error. MaxSyncReplicas must be lower than the number of instances
-			cluster.Spec.MaxSyncReplicas = 2
-			err = env.Client.Update(env.Ctx, cluster)
-			Expect(err).To(HaveOccurred())
-
-			cluster, err = env.GetCluster(namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
-			// Expect an error. MinSyncReplicas must be lower than MaxSyncReplicas
-			cluster.Spec.MinSyncReplicas = 2
-			err = env.Client.Update(env.Ctx, cluster)
-			Expect(err).To(HaveOccurred())
-		})
-	})
-
-	It("will not prevent a cluster with pg_stat_statements from being created", func() {
-		const namespacePrefix = "sync-replicas-statstatements"
-		clusterName = "cluster-pgstatstatements"
-		const sampleFile = fixturesDir + "/sync_replicas/cluster-pgstatstatements.yaml.template"
-		var err error
-		// Are extensions a problem with synchronous replication? No, absolutely not,
-		// but to install pg_stat_statements you need to create the relative extension
-		// and that will be done just after having bootstrapped the first instance,
-		// which is the primary.
-		// If the number of ready replicas is not taken into consideration while
-		// bootstrapping the cluster, the CREATE EXTENSION instruction will block
-		// the primary since the desired number of synchronous replicas (even when 1)
-		// is not met.
-		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
-		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-			return env.DeleteNamespace(namespace)
-		})
-
-		AssertCreateCluster(namespace, clusterName, sampleFile, env)
-		AssertClusterIsReady(namespace, clusterName, 30, env)
-
-		By("checking that synchronous_standby_names has the expected value on the primary", func() {
-			Eventually(func() string {
-				primary, err := env.GetClusterPrimary(namespace, clusterName)
-				if err != nil {
-					return err.Error()
+				// Verify the parameter has been updated in every pod
+				for _, pod := range podList.Items {
+					pod := pod // pin the variable
+					Eventually(func() (string, error) {
+						stdout, _, err := env.ExecCommand(env.Ctx, pod, "postgres", &commandTimeout,
+							"psql", "-U", "postgres", "-tAc", "show synchronous_standby_names")
+						value := strings.Trim(stdout, "\n")
+						return value, err
+					}, timeout).Should(BeEquivalentTo(ExpectedValue))
 				}
-				out, stderr, err := env.ExecQueryInInstancePod(
-					utils.PodLocator{
-						Namespace: namespace,
-						PodName:   primary.GetName(),
-					},
-					utils.DatabaseName("postgres"),
-					"select setting from pg_settings where name = 'synchronous_standby_names'")
-				if err != nil {
-					return stderr + " - " + err.Error()
+			})
+
+			By("erroring out when SyncReplicas fields are invalid", func() {
+				cluster, err := env.GetCluster(namespace, clusterName)
+				Expect(err).ToNot(HaveOccurred())
+				// Expect an error. MaxSyncReplicas must be lower than the number of instances
+				cluster.Spec.MaxSyncReplicas = 2
+				err = env.Client.Update(env.Ctx, cluster)
+				Expect(err).To(HaveOccurred())
+
+				cluster, err = env.GetCluster(namespace, clusterName)
+				Expect(err).ToNot(HaveOccurred())
+				// Expect an error. MinSyncReplicas must be lower than MaxSyncReplicas
+				cluster.Spec.MinSyncReplicas = 2
+				err = env.Client.Update(env.Ctx, cluster)
+				Expect(err).To(HaveOccurred())
+			})
+		},
+		Entry("minSyncReplica is not enforced", fixturesDir+"/sync_replicas/cluster-syncreplicas.yaml.template"),
+		Entry("minSyncReplica is enforced", fixturesDir+"/sync_replicas/cluster-syncreplicas-enforce.yaml.template"),
+	)
+
+	DescribeTable("Synchronous Replicas with pg_stat_statements",
+		Label(tests.LabelReplication),
+		func(sampleFile string) {
+			var namespace string
+			var clusterName string
+
+			const namespacePrefix = "sync-replicas-statstatements"
+			clusterName = "cluster-pgstatstatements"
+			var err error
+			// Are extensions a problem with synchronous replication? No, absolutely not,
+			// but to install pg_stat_statements you need to create the relative extension
+			// and that will be done just after having bootstrapped the first instance,
+			// which is the primary.
+			// If the number of ready replicas is not taken into consideration while
+			// bootstrapping the cluster, the CREATE EXTENSION instruction will block
+			// the primary since the desired number of synchronous replicas (even when 1)
+			// is not met.
+			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			Expect(err).ToNot(HaveOccurred())
+			DeferCleanup(func() error {
+				if CurrentSpecReport().Failed() {
+					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 				}
-				return strings.Trim(out, "\n")
-			}, 30).Should(Equal("ANY 1 (\"cluster-pgstatstatements-2\",\"cluster-pgstatstatements-3\")"))
-		})
-	})
+				return env.DeleteNamespace(namespace)
+			})
+
+			AssertCreateCluster(namespace, clusterName, sampleFile, env)
+			AssertClusterIsReady(namespace, clusterName, 30, env)
+
+			By("checking that synchronous_standby_names has the expected value on the primary", func() {
+				Eventually(func() string {
+					primary, err := env.GetClusterPrimary(namespace, clusterName)
+					if err != nil {
+						return err.Error()
+					}
+					out, stderr, err := env.ExecQueryInInstancePod(
+						utils.PodLocator{
+							Namespace: namespace,
+							PodName:   primary.GetName(),
+						},
+						utils.DatabaseName("postgres"),
+						"select setting from pg_settings where name = 'synchronous_standby_names'")
+					if err != nil {
+						return stderr + " - " + err.Error()
+					}
+					return strings.Trim(out, "\n")
+				}, 30).Should(Equal("ANY 1 (\"cluster-pgstatstatements-2\",\"cluster-pgstatstatements-3\")"))
+			})
+		},
+		Entry("minSyncReplica is not enforced", fixturesDir+"/sync_replicas/cluster-pgstatstatements.yaml.template"),
+		Entry("minSyncReplica is enforced", fixturesDir+"/sync_replicas/cluster-pgstatstatements-enforce.yaml.template"),
+	)
 })
