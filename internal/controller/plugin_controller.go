@@ -85,7 +85,22 @@ func (r *PluginReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		contextLogger.Info("Detected service whose plugin name label is empty, skipping")
 		return ctrl.Result{}, nil
 	}
-	contextLogger = contextLogger.WithValues("pluginName", pluginName)
+
+	res, err := r.reconcile(ctx, &service, pluginName)
+	if err != nil {
+		r.Plugins.ForgetPlugin(pluginName)
+		return ctrl.Result{}, err
+	}
+
+	return res, nil
+}
+
+func (r *PluginReconciler) reconcile(
+	ctx context.Context,
+	service *corev1.Service,
+	pluginName string,
+) (ctrl.Result, error) {
+	contextLogger := log.FromContext(ctx).WithValues("pluginName", pluginName)
 
 	pluginServerSecret := service.Annotations[utils.PluginServerSecretAnnotationName]
 	if len(pluginServerSecret) == 0 {

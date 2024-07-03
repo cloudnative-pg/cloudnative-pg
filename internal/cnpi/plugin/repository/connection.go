@@ -52,7 +52,7 @@ func (r *data) GetConnection(ctx context.Context, name string) (connection.Inter
 	var err error
 
 	for i := 0; i < maxPoolSize; i++ {
-		contextLogger.Info("try getting connection")
+		contextLogger.Trace("try getting connection")
 		resource, err = pool.Acquire(ctx)
 		if err != nil {
 			break
@@ -60,7 +60,7 @@ func (r *data) GetConnection(ctx context.Context, name string) (connection.Inter
 
 		err = resource.Value().Ping(ctx)
 		if err != nil {
-			contextLogger.Info("Detected plugin connection error, closing the connection and trying again")
+			contextLogger.Debug("Detected plugin connection error, closing the connection and trying again")
 			resource.Destroy()
 		} else {
 			break
