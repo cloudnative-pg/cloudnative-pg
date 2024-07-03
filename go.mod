@@ -2,7 +2,7 @@ module github.com/cloudnative-pg/cloudnative-pg
 
 go 1.22.0
 
-toolchain go1.22.4
+toolchain go1.22.5
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
