@@ -83,7 +83,7 @@ data:
           , pg_catalog.age(datfrozenxid) AS xid_age
           , pg_catalog.mxid_age(datminmxid) AS mxid_age
         FROM pg_catalog.pg_database
-          WHERE datallowconn = 't'
+        WHERE datallowconn
       metrics:
         - datname:
             usage: "LABEL"
