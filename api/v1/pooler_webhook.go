@@ -184,6 +184,14 @@ func (r *Pooler) validateCluster() field.ErrorList {
 				field.NewPath("metadata", "name"),
 				r.Name, "the pooler resource cannot have the same name of a cluster"))
 	}
+
+	defaultClusterRWServiceName := fmt.Sprintf("%v%v", r.Spec.Cluster.Name, ServiceReadWriteSuffix)
+	if defaultClusterRWServiceName == r.Name {
+		result = append(result,
+			field.Invalid(
+				field.NewPath("metadata", "name"),
+				r.Name, "the pooler resource cannot have the same name with default rw service of the referenced cluster"))
+	}
 	return result
 }
 
