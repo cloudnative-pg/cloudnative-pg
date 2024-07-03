@@ -21,18 +21,21 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/exec"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	corev1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/instance"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -47,17 +50,17 @@ const (
 
 // GetInstancePods gets all the pods belonging to a given cluster
 // returns an array with all the instances, the primary instance and any error encountered.
-func GetInstancePods(ctx context.Context, clusterName string) ([]v1.Pod, v1.Pod, error) {
-	var pods v1.PodList
+func GetInstancePods(ctx context.Context, clusterName string) ([]corev1.Pod, corev1.Pod, error) {
+	var pods corev1.PodList
 	if err := plugin.Client.List(ctx, &pods, client.InNamespace(plugin.Namespace)); err != nil {
-		return nil, v1.Pod{}, err
+		return nil, corev1.Pod{}, err
 	}
 
-	var managedPods []v1.Pod
-	var primaryPod v1.Pod
+	var managedPods []corev1.Pod
+	var primaryPod corev1.Pod
 	for idx := range pods.Items {
 		for _, owner := range pods.Items[idx].ObjectMeta.OwnerReferences {
-			if owner.Kind == corev1.ClusterKind && owner.Name == clusterName {
+			if owner.Kind == apiv1.ClusterKind && owner.Name == clusterName {
 				managedPods = append(managedPods, pods.Items[idx])
 				if specs.IsPodPrimary(pods.Items[idx]) {
 					primaryPod = pods.Items[idx]
@@ -72,15 +75,14 @@ func GetInstancePods(ctx context.Context, clusterName string) ([]v1.Pod, v1.Pod,
 func ExtractInstancesStatus(
 	ctx context.Context,
 	config *rest.Config,
-	filteredPods []v1.Pod,
-	postgresContainerName string,
+	filteredPods []corev1.Pod,
 ) (postgres.PostgresqlStatusList, []error) {
 	var result postgres.PostgresqlStatusList
 	var errs []error
 
 	for idx := range filteredPods {
-		instanceStatus := getInstanceStatusFromPodViaExec(
-			ctx, config, filteredPods[idx], postgresContainerName)
+		instanceStatus := getInstanceStatusFromPod(
+			ctx, config, filteredPods[idx])
 		result.Items = append(result.Items, instanceStatus)
 		if instanceStatus.Error != nil {
 			errs = append(errs, instanceStatus.Error)
@@ -90,32 +92,31 @@ func ExtractInstancesStatus(
 	return result, errs
 }
 
-func getInstanceStatusFromPodViaExec(
+func getInstanceStatusFromPod(
 	ctx context.Context,
 	config *rest.Config,
-	pod v1.Pod,
-	postgresContainerName string,
+	pod corev1.Pod,
 ) postgres.PostgresqlStatus {
 	var result postgres.PostgresqlStatus
-	timeout := time.Second * 10
 
-	clientInterface := kubernetes.NewForConfigOrDie(config)
-	stdout, _, err := utils.ExecCommand(
-		ctx,
-		clientInterface,
-		config,
-		pod,
-		postgresContainerName,
-		&timeout,
-		"/controller/manager", "instance", "status")
+	statusResult, err := kubernetes.NewForConfigOrDie(config).
+		CoreV1().
+		Pods(pod.Namespace).
+		ProxyGet(
+			instance.GetStatusSchemeFromPod(&pod).ToString(),
+			pod.Name,
+			strconv.Itoa(int(url.StatusPort)),
+			url.PathPgStatus,
+			nil,
+		).
+		DoRaw(ctx)
 	if err != nil {
 		result.AddPod(pod)
 		result.Error = err
 		return result
 	}
 
-	err = json.Unmarshal([]byte(stdout), &result)
-	if err != nil {
+	if err := json.Unmarshal(statusResult, &result); err != nil {
 		result.Error = fmt.Errorf("can't parse pod output")
 	}
 
@@ -127,7 +128,7 @@ func getInstanceStatusFromPodViaExec(
 // IsInstanceRunning returns a boolean indicating if the given instance is running and any error encountered
 func IsInstanceRunning(
 	ctx context.Context,
-	pod v1.Pod,
+	pod corev1.Pod,
 ) (bool, error) {
 	contextLogger := log.FromContext(ctx).WithName("plugin.IsInstanceRunning")
 	timeout := time.Second * 10
