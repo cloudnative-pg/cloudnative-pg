@@ -64,16 +64,12 @@ func (r *data) setPluginProtocol(name string, protocol connection.Protocol) erro
 	r.mux.Lock()
 	defer r.mux.Unlock()
 
-	ctx := context.Background()
-	contextLogger := log.FromContext(ctx).WithValues("pluginName", "name")
-
 	if r.pluginConnectionPool == nil {
 		r.pluginConnectionPool = make(map[string]*puddle.Pool[connection.Interface])
 	}
 
 	_, ok := r.pluginConnectionPool[name]
 	if ok {
-		// This plugin was already registered
 		return &ErrPluginAlreadyRegistered{
 			Name: name,
 		}
@@ -88,11 +84,11 @@ func (r *data) setPluginProtocol(name string, protocol connection.Protocol) erro
 			}
 		}()
 
-		contextLogger := log.FromContext(ctx).WithValues("pluginName", name)
-		ctx = log.IntoContext(ctx, contextLogger)
+		constructorLogger := log.FromContext(ctx).WithValues("pluginName", name)
+		ctx = log.IntoContext(ctx, constructorLogger)
 
 		if handler, err = protocol.Dial(ctx); err != nil {
-			contextLogger.Error(err, "Got error while connecting to plugin")
+			constructorLogger.Error(err, "Got error while connecting to plugin")
 			return nil, err
 		}
 
@@ -102,9 +98,8 @@ func (r *data) setPluginProtocol(name string, protocol connection.Protocol) erro
 	destructor := func(res connection.Interface) {
 		err := res.Close()
 		if err != nil {
-			contextLogger.Warning("Error while closing plugin connection",
-				"err", err,
-			)
+			destructorLogger := log.FromContext(context.Background()).WithValues("pluginName", res.Name())
+			destructorLogger.Warning("Error while closing plugin connection", "err", err)
 		}
 	}
 
