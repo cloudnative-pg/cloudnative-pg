@@ -1,6 +1,6 @@
 # This builder stage it's only because we need a command
 # to create a symlink and reduce the size of the image
-FROM gcr.io/distroless/static-debian11:debug-nonroot as builder
+FROM gcr.io/distroless/static-debian11:debug-nonroot AS builder
 ARG TARGETARCH
 
 SHELL ["/busybox/sh", "-c"]
