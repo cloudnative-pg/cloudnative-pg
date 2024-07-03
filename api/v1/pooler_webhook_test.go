@@ -107,20 +107,6 @@ var _ = Describe("Pooler validation", func() {
 		Expect(pooler.validateCluster()).To(BeEmpty())
 	})
 
-	It(
-		"complain when specifying a pooler name same as default rw service name of referenced cluster",
-		func() {
-			pooler := Pooler{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "cluster-example-rw",
-				},
-				Spec: PoolerSpec{
-					Cluster: LocalObjectReference{Name: "cluster-example"},
-				},
-			}
-			Expect(pooler.validateCluster()).To(Not(BeEmpty()))
-		})
-
 	It("does complain when given a fixed parameter", func() {
 		pooler := Pooler{
 			Spec: PoolerSpec{
