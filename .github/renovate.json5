@@ -9,7 +9,7 @@
 // The branches renovate should target
 // PLEASE UPDATE THIS WHEN RELEASING.
   "baseBranches": ["main","release-1.22", "release-1.23"],
-  "ignorePaths": ["docs/**", "releases/**", "contribute/**", "licenses/**"],
+  "ignorePaths": ["docs/**", "releases/**", "contribute/**", "licenses/**", "pkg/versions/**"],
   "postUpdateOptions": ["gomodTidy"],
   "semanticCommits": "enabled",
 // All PRs should have a label
