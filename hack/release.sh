@@ -68,14 +68,28 @@ require_clean_work_tree () {
 
 require_clean_work_tree "release"
 
-# Verify that you are in a release branch
-if branch=$(git symbolic-ref --short -q HEAD) && [[ "$branch" == release-* ]]
-then
+# Verify that you are in a proper branch
+# Releases can only be triggered from:
+# - a release branch (for stable releases)
+# - main (for release candidate only)
+branch=$(git symbolic-ref --short -q HEAD)
+case $branch in
+  release-*)
     echo "Releasing ${release_version}"
-else
-    echo >&2 "Release is not possible because you are not on a 'release-*' branch ($branch)"
+    ;;
+  main)
+    if [[ "${release_version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+    then
+        echo >&2 "Cannot release a stable version from 'main'"
+        exit 1
+    fi
+    echo "Releasing ${release_version}"
+    ;;
+  *)
+    echo >&2 "Release is not possible because you are not on 'main' or a 'release-*' branch ($branch)"
     exit 1
-fi
+    ;;
+esac
 
 make kustomize
 KUSTOMIZE="${REPO_ROOT}/bin/kustomize"
