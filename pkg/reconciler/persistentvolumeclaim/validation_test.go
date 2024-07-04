@@ -20,6 +20,7 @@ import (
 	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -129,10 +130,14 @@ var _ = Describe("Volume Snapshot validation", func() {
 		}
 		dataSource := apiv1.DataSource{
 			Storage: corev1.TypedLocalObjectReference{
-				Name: "pgdata",
+				APIGroup: ptr.To(volumesnapshot.GroupName),
+				Kind:     "VolumeSnapshot",
+				Name:     "pgdata",
 			},
 			WalStorage: &corev1.TypedLocalObjectReference{
-				Name: "pgwal",
+				APIGroup: ptr.To(volumesnapshot.GroupName),
+				Kind:     "VolumeSnapshot",
+				Name:     "pgwal",
 			},
 		}
 		mockClient := fake.NewClientBuilder().
@@ -183,10 +188,14 @@ var _ = Describe("Volume Snapshot validation", func() {
 		}
 		dataSource := apiv1.DataSource{
 			Storage: corev1.TypedLocalObjectReference{
-				Name: "pgdata",
+				APIGroup: ptr.To(volumesnapshot.GroupName),
+				Kind:     "VolumeSnapshot",
+				Name:     "pgdata",
 			},
 			WalStorage: &corev1.TypedLocalObjectReference{
-				Name: "pgwal",
+				APIGroup: ptr.To(volumesnapshot.GroupName),
+				Kind:     "VolumeSnapshot",
+				Name:     "pgwal",
 			},
 		}
 		mockClient := fake.NewClientBuilder().
@@ -218,7 +227,9 @@ var _ = Describe("Volume Snapshot validation", func() {
 		}
 		dataSource := apiv1.DataSource{
 			Storage: corev1.TypedLocalObjectReference{
-				Name: "pgdata",
+				APIGroup: ptr.To(volumesnapshot.GroupName),
+				Kind:     "VolumeSnapshot",
+				Name:     "pgdata",
 			},
 		}
 		mockClient := fake.NewClientBuilder().
@@ -250,10 +261,14 @@ var _ = Describe("Volume Snapshot validation", func() {
 		}
 		dataSource := apiv1.DataSource{
 			Storage: corev1.TypedLocalObjectReference{
-				Name: "pgdata",
+				APIGroup: ptr.To(volumesnapshot.GroupName),
+				Kind:     "VolumeSnapshot",
+				Name:     "pgdata",
 			},
 			WalStorage: &corev1.TypedLocalObjectReference{
-				Name: "pgwal",
+				APIGroup: ptr.To(volumesnapshot.GroupName),
+				Kind:     "VolumeSnapshot",
+				Name:     "pgwal",
 			},
 		}
 		mockClient := fake.NewClientBuilder().
