@@ -492,10 +492,13 @@ class. The documentation to create a volume that has the strict-local setting on
 [here](https://longhorn.io/docs/1.6.2/high-availability/data-locality/). This will cause the data volume 
 of that pod to exist on the same node. Your Postgres `Cluster` should have the pod antiaffinity rules 
 created so the operator will have the pods on different nodes and in this case Longhorn will then have 
-the data volumes on that host. 
+the data volumes on that host. You can move the volumes manually in Longhorn by temporarily setting the volumes to replica 2
+and then reducing the replica and then removing the old replica.
 
 If the host gets corrupted then it is a matter of using the cnpg plugin to destroy the instance in which case the operator
 will destroy the instance and create the instance on another host and replicate the data.
 
 On Ceph this can be configured through CRUSH rules. The documentation to configure this is located (here)[https://rook.io/docs/rook/latest-release/CRDs/Cluster/external-cluster/topology-for-external-mode/?h=topology].
-By creating these rules the idea is to have one volume/per pod  per node.
+By creating these rules the idea is to have one volume/per pod  per node. You can similary look to relocate the volumes by means of importing volumes to a different pool. 
+These are some of the considerations that are needed to have a stable deployment of your storage solution with CloudNative Postgres.
+
