@@ -200,12 +200,6 @@ func RunController(
 		return err
 	}
 
-	// Detect if we support SeccompProfile
-	if err = utils.DetectSeccompSupport(discoveryClient); err != nil {
-		setupLog.Error(err, "unable to detect SeccompProfile support")
-		return err
-	}
-
 	// Detect the available architectures
 	if err = utils.DetectAvailableArchitectures(); err != nil {
 		setupLog.Error(err, "unable to detect the available instance's architectures")
@@ -214,7 +208,6 @@ func RunController(
 
 	setupLog.Info("Kubernetes system metadata",
 		"haveSCC", utils.HaveSecurityContextConstraints(),
-		"haveSeccompProfile", utils.HaveSeccompSupport(),
 		"haveVolumeSnapshot", utils.HaveVolumeSnapshot(),
 		"availableArchitectures", utils.GetAvailableArchitectures(),
 	)

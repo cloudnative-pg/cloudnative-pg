@@ -36,7 +36,6 @@ import (
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 const (
@@ -131,9 +130,6 @@ func MinioDefaultSetup(namespace string) (MinioSetup, error) {
 func MinioDefaultDeployment(namespace string, minioPVC corev1.PersistentVolumeClaim) appsv1.Deployment {
 	seccompProfile := &corev1.SeccompProfile{
 		Type: corev1.SeccompProfileTypeRuntimeDefault,
-	}
-	if !utils.HaveSeccompSupport() {
-		seccompProfile = nil
 	}
 
 	minioDeployment := appsv1.Deployment{
@@ -349,9 +345,6 @@ func MinioSSLSetup(namespace string) (MinioSetup, error) {
 func MinioDefaultClient(namespace string) corev1.Pod {
 	seccompProfile := &corev1.SeccompProfile{
 		Type: corev1.SeccompProfileTypeRuntimeDefault,
-	}
-	if !utils.HaveSeccompSupport() {
-		seccompProfile = nil
 	}
 
 	minioClient := corev1.Pod{

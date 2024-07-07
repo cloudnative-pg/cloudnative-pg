@@ -39,9 +39,6 @@ var haveSCC bool
 // haveVolumeSnapshot stores the result of the VolumeSnapshotExist function
 var haveVolumeSnapshot bool
 
-// supportSeccomp specifies whether we should set the SeccompProfile or not in the pods
-var supportSeccomp bool
-
 // AvailableArchitecture is a struct containing info about an available architecture
 type AvailableArchitecture struct {
 	GoArch         string
@@ -186,17 +183,6 @@ func PodMonitorExist(client discovery.DiscoveryInterface) (bool, error) {
 	return exist, nil
 }
 
-// HaveSeccompSupport returns true if Seccomp is supported. If it is, we should
-// set the SeccompProfile in the pods
-func HaveSeccompSupport() bool {
-	return supportSeccomp
-}
-
-// SetSeccompSupport set the supportSeccomp variable to a specific value for testing purposes
-func SetSeccompSupport(value bool) {
-	supportSeccomp = value
-}
-
 // extractK8sMinorVersion extracts and parses the Kubernetes minor version from
 // the version info that's been  detected by discovery client
 func extractK8sMinorVersion(info *version.Info) (int, error) {
@@ -207,27 +193,6 @@ func extractK8sMinorVersion(info *version.Info) (int, error) {
 	}
 
 	return strconv.Atoi(matches[1])
-}
-
-// DetectSeccompSupport checks the version of Kubernetes in the cluster to determine
-// whether Seccomp is supported
-func DetectSeccompSupport(client discovery.DiscoveryInterface) (err error) {
-	supportSeccomp = false
-	kubernetesVersion, err := client.ServerVersion()
-	if err != nil {
-		return err
-	}
-
-	minor, err := extractK8sMinorVersion(kubernetesVersion)
-	if err != nil {
-		return err
-	}
-
-	if minor >= 24 {
-		supportSeccomp = true
-	}
-
-	return
 }
 
 // GetAvailableArchitectures returns the available instance's architectures

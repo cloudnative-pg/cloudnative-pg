@@ -17,13 +17,13 @@ limitations under the License.
 package utils
 
 import (
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
 
@@ -52,7 +52,7 @@ func createPsqlClient(namespace string, env *TestingEnvironment) (*corev1.Pod, e
 	seccompProfile := &corev1.SeccompProfile{
 		Type: corev1.SeccompProfileTypeRuntimeDefault,
 	}
-	if !utils.HaveSeccompSupport() || utils.HaveSecurityContextConstraints() {
+	if utils.HaveSecurityContextConstraints() {
 		seccompProfile = nil
 	}
 
