@@ -88,9 +88,7 @@ func GetEnvProfile(te TestEnvVendor) EnvProfile {
 		EKS: envProfile{
 			isLeaderElectionEnabled: true,
 		},
-		GKE: envProfile{
-			canMovePVCAcrossNodes: true,
-		},
+		GKE: envProfile{},
 		OCP: envProfile{
 			isLeaderElectionEnabled: true,
 		},

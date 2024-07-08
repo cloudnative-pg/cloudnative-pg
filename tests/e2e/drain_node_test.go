@@ -201,11 +201,17 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 		// If PVCs can be moved: all the replicas will be killed and rescheduled to a different node,
 		// then a switchover will be triggered, and the old primary will be killed and moved too.
 		// The drain will succeed.
-		// We have skipped this scenario on the Local executors, Openshift, EKS, RKE
+		// We have skipped this scenario on the local executors, Openshift, EKS, GKE
 		// because here PVCs can not be moved, so this all replicas should be killed and can not be rescheduled on a
 		// new node as there are none, the primary node can not be killed, therefore the drain fails.
 
 		When("the cluster allows moving PVCs between nodes", func() {
+			BeforeEach(func() {
+				// AKS using rook allows moving PVCs between nodes
+				if !GetEnvProfile().CanMovePVCAcrossNodes() {
+					Skip("This test case is only applicable on clusters where PVC can be moved")
+				}
+			})
 			It("can drain the primary pod's node with 3 pods on 1 nodes", func() {
 				const namespacePrefix = "drain-node-e2e-pvc-on-one-nodes"
 				var cordonNodes []string
