@@ -39,9 +39,14 @@ const (
 	labelOperatorNameKey    = "app.kubernetes.io/name"
 	labelOperatorName       = "cloudnative-pg"
 	labelOperatorKeyPrefix  = "operators.coreos.com/cloudnative-pg."
+	labelOpenshiftOperators = labelOperatorKeyPrefix + "openshift-operators"
 )
 
 var errNoOperatorDeployment = fmt.Errorf("no deployment found")
+
+func getLabelOperatorsNamespace() string {
+	return labelOperatorKeyPrefix + plugin.Namespace
+}
 
 // getOperatorDeployment returns the operator Deployment if there is a single one running, error otherwise
 func getOperatorDeployment(ctx context.Context) (appsv1.Deployment, error) {
@@ -53,14 +58,14 @@ func getOperatorDeployment(ctx context.Context) (appsv1.Deployment, error) {
 	}
 
 	deployment, err = tryGetOperatorDeployment(ctx,
-		ctrlclient.HasLabels{labelOperatorKeyPrefix + "openshift-operators"},
+		ctrlclient.HasLabels{labelOpenshiftOperators},
 		ctrlclient.InNamespace(plugin.Namespace))
 	if err != errNoOperatorDeployment {
 		return deployment, err
 	}
 
 	deployment, err = tryGetOperatorDeployment(ctx,
-		ctrlclient.HasLabels{labelOperatorKeyPrefix + plugin.Namespace},
+		ctrlclient.HasLabels{getLabelOperatorsNamespace()},
 		ctrlclient.InNamespace(plugin.Namespace))
 	if err == errNoOperatorDeployment {
 		return appsv1.Deployment{},

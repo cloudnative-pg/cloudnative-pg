@@ -42,13 +42,13 @@ func getOlmResource(
 	}
 
 	list, err := dynamicClient.Resource(resource).Namespace(namespace).
-		List(ctx, metav1.ListOptions{LabelSelector: labelOperatorKeyPrefix + "openshift-operators"})
+		List(ctx, metav1.ListOptions{LabelSelector: labelOpenshiftOperators})
 	if err != nil {
 		return nil, fmt.Errorf("could note get resource: %v, %v", resource, err)
 	}
 
 	list, err = dynamicClient.Resource(resource).Namespace(namespace).
-		List(ctx, metav1.ListOptions{LabelSelector: labelOperatorKeyPrefix + plugin.Namespace})
+		List(ctx, metav1.ListOptions{LabelSelector: getLabelOperatorsNamespace()})
 	if err != nil {
 		return nil, fmt.Errorf("could note get resource: %v, %v", resource, err)
 	}
