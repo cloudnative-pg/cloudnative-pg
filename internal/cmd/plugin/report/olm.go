@@ -20,13 +20,14 @@ import (
 	"archive/zip"
 	"context"
 	"fmt"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"path/filepath"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/dynamic"
 )
 
 // getOlmResource gets the desired resource using the Dynamic Client
@@ -40,12 +41,14 @@ func getOlmResource(
 		Resource: item,
 	}
 
-	list, err := dynamicClient.Resource(resource).Namespace(namespace).List(ctx, metav1.ListOptions{LabelSelector: labelOperatorKeyPrefix + "openshift-operators"})
+	list, err := dynamicClient.Resource(resource).Namespace(namespace).
+		List(ctx, metav1.ListOptions{LabelSelector: labelOperatorKeyPrefix + "openshift-operators"})
 	if err != nil {
 		return nil, fmt.Errorf("could note get resource: %v, %v", resource, err)
 	}
 
-	list, err = dynamicClient.Resource(resource).Namespace(namespace).List(ctx, metav1.ListOptions{LabelSelector: labelOperatorKeyPrefix + plugin.Namespace})
+	list, err = dynamicClient.Resource(resource).Namespace(namespace).
+		List(ctx, metav1.ListOptions{LabelSelector: labelOperatorKeyPrefix + plugin.Namespace})
 	if err != nil {
 		return nil, fmt.Errorf("could note get resource: %v, %v", resource, err)
 	}
