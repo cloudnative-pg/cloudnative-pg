@@ -76,8 +76,13 @@ func IsPodEvicted(p *corev1.Pod) bool {
 		PodReasonEvicted == p.Status.Reason
 }
 
-// IsPodUnscheduled check if a Pod is unscheduled
-func IsPodUnscheduled(p *corev1.Pod) bool {
+// IsPodSucceeded returns true if pod has a Phase of v1.PodSucceeded
+func IsPodSucceeded(pod *corev1.Pod) bool {
+	return pod.Status.Phase == corev1.PodSucceeded
+}
+
+// IsPodUnschedulable check if a Pod is unschedulable
+func IsPodUnschedulable(p *corev1.Pod) bool {
 	if corev1.PodPending != p.Status.Phase && corev1.PodFailed != p.Status.Phase {
 		return false
 	}
