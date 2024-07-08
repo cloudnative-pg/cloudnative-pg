@@ -1,0 +1,71 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-dc-a
+spec:
+  instances: 3
+  primaryUpdateStrategy: unsupervised
+
+  storage:
+    storageClass: csi-hostpath-sc
+    size: 1Gi
+
+  backup:
+    barmanObjectStore:
+      destinationPath: s3://backups/
+      endpointURL: http://minio:9000
+      s3Credentials:
+        accessKeyId:
+          name: minio
+          key: ACCESS_KEY_ID
+        secretAccessKey:
+          name: minio
+          key: ACCESS_SECRET_KEY
+      wal:
+        compression: gzip
+
+  replica:
+    self: cluster-dc-a
+    primary: cluster-dc-a
+    source: cluster-dc-b
+
+  externalClusters:
+  - name: cluster-dc-a
+    barmanObjectStore: 
+      serverName: cluster-dc-a
+      destinationPath: s3://backups/
+      endpointURL: http://minio:9000
+      s3Credentials:
+        accessKeyId:
+          name: minio
+          key: ACCESS_KEY_ID
+        secretAccessKey:
+          name: minio
+          key: ACCESS_SECRET_KEY
+      wal:
+        compression: gzip
+  - name: cluster-dc-b
+    barmanObjectStore: 
+      serverName: cluster-dc-b
+      destinationPath: s3://backups/
+      endpointURL: http://minio:9000
+      s3Credentials:
+        accessKeyId:
+          name: minio
+          key: ACCESS_KEY_ID
+        secretAccessKey:
+          name: minio
+          key: ACCESS_SECRET_KEY
+      wal:
+        compression: gzip
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: cluster-dc-a-backup
+spec:
+  schedule: '0 0 0 * * *'
+  backupOwnerReference: self
+  cluster:
+    name: cluster-dc-a
+  immediate: true

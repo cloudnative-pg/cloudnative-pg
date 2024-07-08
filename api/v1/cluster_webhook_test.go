@@ -17,6 +17,9 @@ limitations under the License.
 package v1
 
 import (
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
 	"strings"
 
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
@@ -1198,7 +1201,7 @@ var _ = Describe("configuration change validation", func() {
 			Spec: ClusterSpec{
 				Instances: 1,
 				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled: true,
+					Enabled: ptr.To(true),
 				},
 				PostgresConfiguration: PostgresConfiguration{
 					Parameters: map[string]string{
@@ -2608,12 +2611,176 @@ var _ = Describe("unix permissions identifiers change validation", func() {
 	})
 })
 
+var _ = Describe("promotion token validation", func() {
+	It("complains if the replica token is not formatted in base64", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled:        ptr.To(false),
+					Source:         "test",
+					PromotionToken: "this-is-a-wrong-token",
+				},
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{},
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "test",
+					},
+				},
+			},
+		}
+
+		result := cluster.validatePromotionToken()
+		Expect(result).ToNot(BeEmpty())
+	})
+
+	It("complains if the replica token is not valid", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled:        ptr.To(false),
+					Source:         "test",
+					PromotionToken: base64.StdEncoding.EncodeToString([]byte("{}")),
+				},
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{},
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "test",
+					},
+				},
+			},
+		}
+
+		result := cluster.validatePromotionToken()
+		Expect(result).ToNot(BeEmpty())
+	})
+
+	It("doesn't complain if the replica token is valid", func() {
+		tokenContent := utils.PgControldataTokenContent{
+			LatestCheckpointTimelineID:   "3",
+			REDOWALFile:                  "this-wal-file",
+			DatabaseSystemIdentifier:     "231231212",
+			LatestCheckpointREDOLocation: "33322232",
+			TimeOfLatestCheckpoint:       "we don't know",
+			OperatorVersion:              "version info",
+		}
+		jsonToken, err := json.Marshal(tokenContent)
+		Expect(err).ToNot(HaveOccurred())
+
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled:        ptr.To(false),
+					Source:         "test",
+					PromotionToken: base64.StdEncoding.EncodeToString(jsonToken),
+				},
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{},
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "test",
+					},
+				},
+			},
+		}
+
+		result := cluster.validatePromotionToken()
+		Expect(result).To(BeEmpty())
+	})
+
+	It("complains if the token is set on a replica cluster (enabled)", func() {
+		tokenContent := utils.PgControldataTokenContent{
+			LatestCheckpointTimelineID:   "1",
+			REDOWALFile:                  "0000000100000001000000A1",
+			DatabaseSystemIdentifier:     "231231212",
+			LatestCheckpointREDOLocation: "0/1000000",
+			TimeOfLatestCheckpoint:       "we don't know",
+			OperatorVersion:              "version info",
+		}
+		jsonToken, err := json.Marshal(tokenContent)
+		Expect(err).ToNot(HaveOccurred())
+
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled:        ptr.To(true),
+					Source:         "test",
+					PromotionToken: base64.StdEncoding.EncodeToString(jsonToken),
+				},
+			},
+		}
+
+		result := cluster.validatePromotionToken()
+		Expect(result).NotTo(BeEmpty())
+	})
+
+	It("complains if the token is set on a replica cluster (primary, default name)", func() {
+		tokenContent := utils.PgControldataTokenContent{
+			LatestCheckpointTimelineID:   "1",
+			REDOWALFile:                  "0000000100000001000000A1",
+			DatabaseSystemIdentifier:     "231231212",
+			LatestCheckpointREDOLocation: "0/1000000",
+			TimeOfLatestCheckpoint:       "we don't know",
+			OperatorVersion:              "version info",
+		}
+		jsonToken, err := json.Marshal(tokenContent)
+		Expect(err).ToNot(HaveOccurred())
+
+		cluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test2",
+			},
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Primary:        "test",
+					Source:         "test",
+					PromotionToken: base64.StdEncoding.EncodeToString(jsonToken),
+				},
+			},
+		}
+
+		result := cluster.validatePromotionToken()
+		Expect(result).NotTo(BeEmpty())
+	})
+
+	It("complains if the token is set on a replica cluster (primary, self)", func() {
+		tokenContent := utils.PgControldataTokenContent{
+			LatestCheckpointTimelineID:   "1",
+			REDOWALFile:                  "0000000100000001000000A1",
+			DatabaseSystemIdentifier:     "231231212",
+			LatestCheckpointREDOLocation: "0/1000000",
+			TimeOfLatestCheckpoint:       "we don't know",
+			OperatorVersion:              "version info",
+		}
+		jsonToken, err := json.Marshal(tokenContent)
+		Expect(err).ToNot(HaveOccurred())
+
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Primary:        "test",
+					Self:           "test2",
+					Source:         "test",
+					PromotionToken: base64.StdEncoding.EncodeToString(jsonToken),
+				},
+			},
+		}
+
+		result := cluster.validatePromotionToken()
+		Expect(result).NotTo(BeEmpty())
+	})
+})
+
 var _ = Describe("replica mode validation", func() {
 	It("complains if the bootstrap method is not specified", func() {
 		cluster := &Cluster{
 			Spec: ClusterSpec{
 				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled: true,
+					Enabled: ptr.To(true),
 					Source:  "test",
 				},
 				ExternalClusters: []ExternalCluster{
@@ -2630,7 +2797,7 @@ var _ = Describe("replica mode validation", func() {
 		cluster := &Cluster{
 			Spec: ClusterSpec{
 				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled: true,
+					Enabled: ptr.To(true),
 					Source:  "test",
 				},
 				Bootstrap: &BootstrapConfiguration{
@@ -2653,7 +2820,7 @@ var _ = Describe("replica mode validation", func() {
 			},
 			Spec: ClusterSpec{
 				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled: true,
+					Enabled: ptr.To(true),
 					Source:  "test",
 				},
 				Bootstrap: &BootstrapConfiguration{
@@ -2677,7 +2844,7 @@ var _ = Describe("replica mode validation", func() {
 			},
 			Spec: ClusterSpec{
 				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled: true,
+					Enabled: ptr.To(true),
 					Source:  "test",
 				},
 				Bootstrap: &BootstrapConfiguration{
@@ -2702,7 +2869,7 @@ var _ = Describe("replica mode validation", func() {
 			},
 			Spec: ClusterSpec{
 				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled: false,
+					Enabled: ptr.To(false),
 					Source:  "test",
 				},
 				Bootstrap: &BootstrapConfiguration{
@@ -2731,7 +2898,7 @@ var _ = Describe("replica mode validation", func() {
 		cluster := &Cluster{
 			Spec: ClusterSpec{
 				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled: true,
+					Enabled: ptr.To(true),
 					Source:  "test",
 				},
 				Bootstrap: &BootstrapConfiguration{
@@ -2752,7 +2919,7 @@ var _ = Describe("replica mode validation", func() {
 		cluster := &Cluster{
 			Spec: ClusterSpec{
 				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled: true,
+					Enabled: ptr.To(true),
 					Source:  "test",
 				},
 				Bootstrap: &BootstrapConfiguration{
@@ -2769,11 +2936,79 @@ var _ = Describe("replica mode validation", func() {
 		Expect(result).To(BeEmpty())
 	})
 
-	It("complains when the external cluster doesn't exist", func() {
+	It("complains when the primary field is used with the enabled field", func() {
 		cluster := &Cluster{
 			Spec: ClusterSpec{
 				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled: true,
+					Enabled: ptr.To(true),
+					Primary: "toast",
+					Source:  "test",
+				},
+				Bootstrap: &BootstrapConfiguration{
+					PgBaseBackup: &BootstrapPgBaseBackup{},
+				},
+				ExternalClusters: []ExternalCluster{},
+			},
+		}
+		result := cluster.validateReplicaMode()
+		Expect(result).ToNot(BeEmpty())
+	})
+
+	It("doesn't complain when the enabled field is not specified", func() {
+		cluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-2",
+			},
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Primary: "test",
+					Source:  "test",
+				},
+				Bootstrap: &BootstrapConfiguration{
+					PgBaseBackup: &BootstrapPgBaseBackup{},
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "test",
+					},
+				},
+			},
+		}
+		result := cluster.validateReplicaMode()
+		Expect(result).To(BeEmpty())
+	})
+
+	It("doesn't complain when creating a new primary cluster with the replication stanza set", func() {
+		cluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test",
+			},
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Primary: "test",
+					Source:  "test",
+				},
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{},
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "test",
+					},
+				},
+			},
+		}
+		result := cluster.validateReplicaMode()
+		Expect(result).To(BeEmpty())
+	})
+})
+
+var _ = Describe("validate the replica cluster external clusters", func() {
+	It("complains when the external cluster doesn't exist (source)", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled: ptr.To(true),
 					Source:  "test",
 				},
 				Bootstrap: &BootstrapConfiguration{
@@ -2784,7 +3019,52 @@ var _ = Describe("replica mode validation", func() {
 		}
 
 		cluster.Spec.Bootstrap.PgBaseBackup = nil
-		result := cluster.validateReplicaMode()
+		result := cluster.validateReplicaClusterExternalClusters()
+		Expect(result).ToNot(BeEmpty())
+	})
+
+	It("complains when the external cluster doesn't exist (primary)", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Primary: "test2",
+					Source:  "test",
+				},
+				Bootstrap: &BootstrapConfiguration{
+					PgBaseBackup: &BootstrapPgBaseBackup{},
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "test",
+					},
+				},
+			},
+		}
+
+		result := cluster.validateReplicaClusterExternalClusters()
+		Expect(result).ToNot(BeEmpty())
+	})
+
+	It("complains when the external cluster doesn't exist (self)", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Self:    "test2",
+					Primary: "test",
+					Source:  "test",
+				},
+				Bootstrap: &BootstrapConfiguration{
+					PgBaseBackup: &BootstrapPgBaseBackup{},
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "test",
+					},
+				},
+			},
+		}
+
+		result := cluster.validateReplicaClusterExternalClusters()
 		Expect(result).ToNot(BeEmpty())
 	})
 })
@@ -4382,5 +4662,215 @@ var _ = Describe("Validate hibernation", func() {
 			},
 		}
 		Expect(cluster.validateHibernationAnnotation()).To(HaveLen(1))
+	})
+})
+
+var _ = Describe("validateManagedServices", func() {
+	var cluster *Cluster
+
+	BeforeEach(func() {
+		cluster = &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test",
+			},
+			Spec: ClusterSpec{
+				Managed: &ManagedConfiguration{
+					Services: &ManagedServices{
+						Additional: []ManagedService{},
+					},
+				},
+			},
+		}
+	})
+
+	Context("when Managed or Services is nil", func() {
+		It("should return no errors", func() {
+			cluster.Spec.Managed = nil
+			Expect(cluster.validateManagedServices()).To(BeNil())
+
+			cluster.Spec.Managed = &ManagedConfiguration{}
+			cluster.Spec.Managed.Services = nil
+			Expect(cluster.validateManagedServices()).To(BeNil())
+		})
+	})
+
+	Context("when there are no duplicate names", func() {
+		It("should return no errors", func() {
+			cluster.Spec.Managed.Services.Additional = []ManagedService{
+				{
+					ServiceTemplate: ServiceTemplateSpec{
+						ObjectMeta: Metadata{Name: "service1"},
+					},
+				},
+				{
+					ServiceTemplate: ServiceTemplateSpec{
+						ObjectMeta: Metadata{Name: "service2"},
+					},
+				},
+			}
+			Expect(cluster.validateManagedServices()).To(BeNil())
+		})
+	})
+
+	Context("when there are duplicate names", func() {
+		It("should return an error", func() {
+			cluster.Spec.Managed.Services.Additional = []ManagedService{
+				{
+					ServiceTemplate: ServiceTemplateSpec{
+						ObjectMeta: Metadata{Name: "service1"},
+					},
+				},
+				{
+					ServiceTemplate: ServiceTemplateSpec{
+						ObjectMeta: Metadata{Name: "service1"},
+					},
+				},
+			}
+			errs := cluster.validateManagedServices()
+			Expect(errs).To(HaveLen(1))
+			Expect(errs[0].Type).To(Equal(field.ErrorTypeInvalid))
+			Expect(errs[0].Field).To(Equal("spec.managed.services.additional"))
+			Expect(errs[0].Detail).To(ContainSubstring("contains services with the same .metadata.name"))
+		})
+	})
+
+	Context("when service template validation fails", func() {
+		It("should return an error", func() {
+			cluster.Spec.Managed.Services.Additional = []ManagedService{
+				{
+					ServiceTemplate: ServiceTemplateSpec{
+						ObjectMeta: Metadata{Name: ""},
+					},
+				},
+			}
+			errs := cluster.validateManagedServices()
+			Expect(errs).To(HaveLen(1))
+			Expect(errs[0].Type).To(Equal(field.ErrorTypeInvalid))
+			Expect(errs[0].Field).To(Equal("spec.managed.services.additional[0]"))
+		})
+
+		It("should not allow reserved service names", func() {
+			assertError := func(name string, index int, err *field.Error) {
+				expectedDetail := fmt.Sprintf("the service name: '%s' is reserved for operator use", name)
+				Expect(err.Type).To(Equal(field.ErrorTypeInvalid))
+				Expect(err.Field).To(Equal(fmt.Sprintf("spec.managed.services.additional[%d]", index)))
+				Expect(err.Detail).To(Equal(expectedDetail))
+			}
+			cluster.Spec.Managed.Services.Additional = []ManagedService{
+				{ServiceTemplate: ServiceTemplateSpec{ObjectMeta: Metadata{Name: cluster.GetServiceReadWriteName()}}},
+				{ServiceTemplate: ServiceTemplateSpec{ObjectMeta: Metadata{Name: cluster.GetServiceReadName()}}},
+				{ServiceTemplate: ServiceTemplateSpec{ObjectMeta: Metadata{Name: cluster.GetServiceReadOnlyName()}}},
+				{ServiceTemplate: ServiceTemplateSpec{ObjectMeta: Metadata{Name: cluster.GetServiceAnyName()}}},
+			}
+			errs := cluster.validateManagedServices()
+			Expect(errs).To(HaveLen(4))
+			assertError("test-rw", 0, errs[0])
+			assertError("test-r", 1, errs[1])
+			assertError("test-ro", 2, errs[2])
+			assertError("test-any", 3, errs[3])
+		})
+	})
+
+	Context("disabledDefault service validation", func() {
+		It("should allow the disablement of ro and r service", func() {
+			cluster.Spec.Managed.Services.DisabledDefaultServices = []ServiceSelectorType{
+				ServiceSelectorTypeR,
+				ServiceSelectorTypeRO,
+			}
+			errs := cluster.validateManagedServices()
+			Expect(errs).To(BeEmpty())
+		})
+
+		It("should not allow the disablement of rw service", func() {
+			cluster.Spec.Managed.Services.DisabledDefaultServices = []ServiceSelectorType{
+				ServiceSelectorTypeRW,
+			}
+			errs := cluster.validateManagedServices()
+			Expect(errs).To(HaveLen(1))
+			Expect(errs[0].Type).To(Equal(field.ErrorTypeInvalid))
+			Expect(errs[0].Field).To(Equal("spec.managed.services.disabledDefaultServices"))
+		})
+	})
+})
+
+var _ = Describe("ServiceTemplate Validation", func() {
+	var (
+		path         *field.Path
+		serviceSpecs ServiceTemplateSpec
+	)
+
+	BeforeEach(func() {
+		path = field.NewPath("spec")
+	})
+
+	Describe("validateServiceTemplate", func() {
+		Context("when name is required", func() {
+			It("should return an error if the name is empty", func() {
+				serviceSpecs = ServiceTemplateSpec{
+					ObjectMeta: Metadata{Name: ""},
+				}
+
+				errs := validateServiceTemplate(path, true, serviceSpecs)
+				Expect(errs).To(HaveLen(1))
+				Expect(errs[0].Error()).To(ContainSubstring("name is required"))
+			})
+
+			It("should not return an error if the name is present", func() {
+				serviceSpecs = ServiceTemplateSpec{
+					ObjectMeta: Metadata{Name: "valid-name"},
+				}
+
+				errs := validateServiceTemplate(path, true, serviceSpecs)
+				Expect(errs).To(BeEmpty())
+			})
+		})
+
+		Context("when name is not allowed", func() {
+			It("should return an error if the name is present", func() {
+				serviceSpecs = ServiceTemplateSpec{
+					ObjectMeta: Metadata{Name: "invalid-name"},
+				}
+
+				errs := validateServiceTemplate(path, false, serviceSpecs)
+				Expect(errs).To(HaveLen(1))
+				Expect(errs[0].Error()).To(ContainSubstring("name is not allowed"))
+			})
+
+			It("should not return an error if the name is empty", func() {
+				serviceSpecs = ServiceTemplateSpec{
+					ObjectMeta: Metadata{Name: ""},
+				}
+
+				errs := validateServiceTemplate(path, false, serviceSpecs)
+				Expect(errs).To(BeEmpty())
+			})
+		})
+
+		Context("when selector is present", func() {
+			It("should return an error if the selector is present", func() {
+				serviceSpecs = ServiceTemplateSpec{
+					ObjectMeta: Metadata{Name: "valid-name"},
+					Spec: corev1.ServiceSpec{
+						Selector: map[string]string{"app": "test"},
+					},
+				}
+
+				errs := validateServiceTemplate(path, true, serviceSpecs)
+				Expect(errs).To(HaveLen(1))
+				Expect(errs[0].Error()).To(ContainSubstring("selector field is managed by the operator"))
+			})
+
+			It("should not return an error if the selector is absent", func() {
+				serviceSpecs = ServiceTemplateSpec{
+					ObjectMeta: Metadata{Name: "valid-name"},
+					Spec: corev1.ServiceSpec{
+						Selector: map[string]string{},
+					},
+				}
+
+				errs := validateServiceTemplate(path, true, serviceSpecs)
+				Expect(errs).To(BeEmpty())
+			})
+		})
 	})
 })

@@ -45,7 +45,7 @@ func isOwnedByPoolerOrSatisfiesPredicate(
 	object client.Object,
 	predicate func(client.Object) bool,
 ) bool {
-	_, owned := isOwnedByPooler(object)
+	_, owned := isOwnedByPoolerKind(object)
 	return owned || predicate(object)
 }
 

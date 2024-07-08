@@ -179,9 +179,9 @@ var _ = Describe("Volume space unavailable", Label(tests.LabelStorage), func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
-		if IsLocal() {
+		if GetEnvProfile().UsesNodeDiskSpace() {
 			// Local environments use the node disk space, running out of that space could cause multiple failures
-			Skip("This test is not executed on local environments")
+			Skip("this test might exhaust node storage")
 		}
 	})
 

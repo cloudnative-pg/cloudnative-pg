@@ -74,14 +74,13 @@ type ClusterReconciler struct {
 	DiscoveryClient discovery.DiscoveryInterface
 	Scheme          *runtime.Scheme
 	Recorder        record.EventRecorder
-
-	*instance.StatusClient
+	InstanceClient  instance.Client
 }
 
 // NewClusterReconciler creates a new ClusterReconciler initializing it
 func NewClusterReconciler(mgr manager.Manager, discoveryClient *discovery.DiscoveryClient) *ClusterReconciler {
 	return &ClusterReconciler{
-		StatusClient:    instance.NewStatusClient(),
+		InstanceClient:  instance.NewStatusClient(),
 		DiscoveryClient: discoveryClient,
 		Client:          operatorclient.NewExtendedClient(mgr.GetClient()),
 		Scheme:          mgr.GetScheme(),
@@ -93,9 +92,8 @@ func NewClusterReconciler(mgr manager.Manager, discoveryClient *discovery.Discov
 var ErrNextLoop = utils.ErrNextLoop
 
 // Alphabetical order to not repeat or miss permissions
-// +kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=mutatingwebhookconfigurations,verbs=get;update;list;patch
-// +kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=validatingwebhookconfigurations,verbs=get;update;list;patch
-// +kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=get;update;list
+// +kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=mutatingwebhookconfigurations,verbs=get;patch
+// +kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=validatingwebhookconfigurations,verbs=get;patch
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;delete;patch;create;watch
 // +kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;create;update
 // +kubebuilder:rbac:groups=monitoring.coreos.com,resources=podmonitors,verbs=get;create;list;watch;delete;patch
@@ -107,11 +105,10 @@ var ErrNextLoop = utils.ErrNextLoop
 // +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles,verbs=create;patch;update;get;list;watch
 // +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch;create;update;watch;delete;patch
 // +kubebuilder:rbac:groups="",resources=configmaps/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
+// +kubebuilder:rbac:groups="",resources=events,verbs=create
 // +kubebuilder:rbac:groups="",resources=nodes,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=persistentvolumeclaims,verbs=get;list;create;watch;delete;patch
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get;list;delete;patch;create;watch
-// +kubebuilder:rbac:groups="",resources=pods/exec,verbs=get;list;delete;patch;create;watch
 // +kubebuilder:rbac:groups="",resources=pods/status,verbs=get
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=create;list;get;watch;delete
 // +kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=create;patch;update;list;watch;get
@@ -154,7 +151,10 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if errors.Is(err, utils.ErrTerminateLoop) {
 		return ctrl.Result{}, nil
 	}
-	return result, err
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	return result, nil
 }
 
 // Inner reconcile loop. Anything inside can require the reconciliation loop to stop by returning ErrNextLoop
@@ -211,6 +211,13 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 
 	// Ensure we have the required global objects
 	if err := r.createPostgresClusterObjects(ctx, cluster); err != nil {
+		if errors.Is(err, ErrNextLoop) {
+			return ctrl.Result{}, err
+		}
+		contextLogger.Error(err, "while reconciling postgres cluster objects")
+		if regErr := r.RegisterPhase(ctx, cluster, apiv1.PhaseCannotCreateClusterObjects, err.Error()); regErr != nil {
+			contextLogger.Error(regErr, "unable to register phase", "outerErr", err.Error())
+		}
 		return ctrl.Result{}, fmt.Errorf("cannot create Cluster auxiliary objects: %w", err)
 	}
 
@@ -248,19 +255,29 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
+	if cluster.ShouldPromoteFromReplicaCluster() {
+		if !(cluster.Status.Phase == apiv1.PhaseReplicaClusterPromotion ||
+			cluster.Status.Phase == apiv1.PhaseUnrecoverable) {
+			return ctrl.Result{RequeueAfter: 1 * time.Second}, r.RegisterPhase(ctx,
+				cluster,
+				apiv1.PhaseReplicaClusterPromotion,
+				"Replica cluster promotion in progress")
+		}
+		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+	}
+
 	// Store in the context the TLS configuration required communicating with the Pods
 	ctx, err = certs.NewTLSConfigForContext(
 		ctx,
 		r.Client,
 		cluster.GetServerCASecretObjectKey(),
-		cluster.GetServiceReadWriteName(),
 	)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
 	// Get the replication status
-	instancesStatus := r.StatusClient.GetStatusFromInstances(ctx, resources.instances)
+	instancesStatus := r.InstanceClient.GetStatusFromInstances(ctx, resources.instances)
 
 	// we update all the cluster status fields that require the instances status
 	if err := r.updateClusterStatusThatRequiresInstancesState(ctx, cluster, instancesStatus); err != nil {
@@ -319,7 +336,8 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		return res, err
 	}
 
-	if res, err := replicaclusterswitch.Reconcile(ctx, r.Client, cluster, instancesStatus); res != nil || err != nil {
+	if res, err := replicaclusterswitch.Reconcile(
+		ctx, r.Client, cluster, r.InstanceClient, instancesStatus); res != nil || err != nil {
 		if res != nil {
 			return *res, nil
 		}
@@ -1189,9 +1207,8 @@ func (r *ClusterReconciler) mapNodeToClusters() handler.MapFunc {
 		err := r.List(ctx, &childPods,
 			client.MatchingFields{".spec.nodeName": node.Name},
 			client.MatchingLabels{
-				// TODO: eventually migrate to the new label
-				utils.ClusterRoleLabelName: specs.ClusterRoleLabelPrimary,
-				utils.PodRoleLabelName:     string(utils.PodRoleInstance),
+				utils.ClusterInstanceRoleLabelName: specs.ClusterRoleLabelPrimary,
+				utils.PodRoleLabelName:             string(utils.PodRoleInstance),
 			},
 		)
 		if err != nil {

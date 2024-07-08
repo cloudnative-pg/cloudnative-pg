@@ -32,12 +32,11 @@ type contextKey string
 // contextKeyTLSConfig is the context key holding the TLS configuration
 const contextKeyTLSConfig contextKey = "tlsConfig"
 
-// newTLSConfigFromSecret creates a tls.Config from the given CA secret and serverName pair
+// newTLSConfigFromSecret creates a tls.Config from the given CA secret.
 func newTLSConfigFromSecret(
 	ctx context.Context,
 	cli client.Client,
 	caSecret types.NamespacedName,
-	serverName string,
 ) (*tls.Config, error) {
 	secret := &v1.Secret{}
 	err := cli.Get(ctx, caSecret, secret)
@@ -50,12 +49,45 @@ func newTLSConfigFromSecret(
 		return nil, fmt.Errorf("missing %s entry in secret %s", CACertKey, caSecret.Name)
 	}
 
+	// The operator will verify the certificates only against the CA, ignoring the DNS name.
+	// This behavior is because user-provided certificates could not have the DNS name
+	// for the <cluster>-rw service, which would cause a name verification error.
 	caCertPool := x509.NewCertPool()
 	caCertPool.AppendCertsFromPEM(caCertificate)
 	tlsConfig := tls.Config{
-		MinVersion: tls.VersionTLS13,
-		ServerName: serverName,
-		RootCAs:    caCertPool,
+		MinVersion:         tls.VersionTLS13,
+		RootCAs:            caCertPool,
+		InsecureSkipVerify: true, //#nosec G402 -- we are verifying the certificate ourselves
+		VerifyPeerCertificate: func(rawCerts [][]byte, _ [][]*x509.Certificate) error {
+			// Code adapted from https://go.dev/src/crypto/tls/handshake_client.go#L986
+			if len(rawCerts) == 0 {
+				return fmt.Errorf("no raw certificates provided")
+			}
+
+			certs := make([]*x509.Certificate, len(rawCerts))
+			for i, rawCert := range rawCerts {
+				cert, err := x509.ParseCertificate(rawCert)
+				if err != nil {
+					return fmt.Errorf("failed to parse certificate: %v", err)
+				}
+				certs[i] = cert
+			}
+
+			opts := x509.VerifyOptions{
+				Roots:         caCertPool,
+				Intermediates: x509.NewCertPool(),
+			}
+
+			for _, cert := range certs[1:] {
+				opts.Intermediates.AddCert(cert)
+			}
+			_, err := certs[0].Verify(opts)
+			if err != nil {
+				return &tls.CertificateVerificationError{UnverifiedCertificates: certs, Err: err}
+			}
+
+			return nil
+		},
 	}
 
 	return &tlsConfig, nil
@@ -67,9 +99,8 @@ func NewTLSConfigForContext(
 	ctx context.Context,
 	cli client.Client,
 	caSecret types.NamespacedName,
-	serverName string,
 ) (context.Context, error) {
-	conf, err := newTLSConfigFromSecret(ctx, cli, caSecret, serverName)
+	conf, err := newTLSConfigFromSecret(ctx, cli, caSecret)
 	if err != nil {
 		return nil, err
 	}

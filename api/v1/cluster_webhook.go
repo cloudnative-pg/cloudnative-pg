@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -33,7 +34,6 @@ import (
 	validationutil "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/utils/ptr"
-	"k8s.io/utils/strings/slices"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -375,10 +375,12 @@ func (r *Cluster) Validate() (allErrs field.ErrorList) {
 		r.validateLDAP,
 		r.validateReplicationSlots,
 		r.validateEnv,
+		r.validateManagedServices,
 		r.validateManagedRoles,
 		r.validateManagedExtensions,
 		r.validateResources,
 		r.validateHibernationAnnotation,
+		r.validatePromotionToken,
 	}
 
 	for _, validate := range validations {
@@ -1925,39 +1927,135 @@ func (r *Cluster) validateUnixPermissionIdentifierChange(old *Cluster) field.Err
 	return result
 }
 
+func (r *Cluster) validatePromotionToken() field.ErrorList {
+	var result field.ErrorList
+
+	if r.Spec.ReplicaCluster == nil {
+		return result
+	}
+
+	token := r.Spec.ReplicaCluster.PromotionToken
+	// Nothing to validate if the token is empty, we can immediately return
+	if len(token) == 0 {
+		return result
+	}
+
+	if r.IsReplica() {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "replicaCluster", "token"),
+				token,
+				"promotionToken is only allowed for primary clusters"))
+		return result
+	}
+
+	if !r.IsReplica() {
+		tokenContent, err := utils.ParsePgControldataToken(token)
+		if err != nil {
+			result = append(
+				result,
+				field.Invalid(
+					field.NewPath("spec", "replicaCluster", "token"),
+					token,
+					fmt.Sprintf("Invalid promotionToken format: %s", err.Error())))
+		} else if err := tokenContent.IsValid(); err != nil {
+			result = append(
+				result,
+				field.Invalid(
+					field.NewPath("spec", "replicaCluster", "token"),
+					token,
+					fmt.Sprintf("Invalid promotionToken content: %s", err.Error())))
+		}
+	}
+	return result
+}
+
 // Check if the replica mode is used with an incompatible bootstrap
 // method
 func (r *Cluster) validateReplicaMode() field.ErrorList {
 	var result field.ErrorList
 
-	if r.Spec.ReplicaCluster == nil || !r.Spec.ReplicaCluster.Enabled {
+	replicaClusterConf := r.Spec.ReplicaCluster
+	if replicaClusterConf == nil {
 		return result
 	}
 
-	if r.Spec.Bootstrap == nil {
+	// Having enabled set to "true" means that the automatic mode is not active.
+	// The "primary" field is used only when the automatic mode is active.
+	// This implies that hasEnabled and hasPrimary are mutually exclusive
+	hasEnabled := replicaClusterConf.Enabled != nil
+	hasPrimary := len(replicaClusterConf.Primary) > 0
+	if hasPrimary && hasEnabled {
 		result = append(result, field.Invalid(
-			field.NewPath("spec", "bootstrap"),
-			r.Spec.ReplicaCluster,
-			"bootstrap configuration is required for replica mode"))
-	} else if r.Spec.Bootstrap.PgBaseBackup == nil && r.Spec.Bootstrap.Recovery == nil &&
-		// this is needed because we only want to validate this during cluster creation, currently if we would have
-		// to enable this logic only during creation and not cluster changes it would require a meaningful refactor
-		len(r.ObjectMeta.ResourceVersion) == 0 {
-		result = append(result, field.Invalid(
-			field.NewPath("spec", "replicaCluster"),
-			r.Spec.ReplicaCluster,
-			"replica mode bootstrap is compatible only with pg_basebackup or recovery"))
+			field.NewPath("spec", "replicaCluster", "enabled"),
+			replicaClusterConf,
+			"replica mode enabled is not compatible with the primary field"))
 	}
-	_, found := r.ExternalCluster(r.Spec.ReplicaCluster.Source)
+
+	if r.IsReplica() {
+		if r.Spec.Bootstrap == nil {
+			result = append(result, field.Invalid(
+				field.NewPath("spec", "bootstrap"),
+				replicaClusterConf,
+				"bootstrap configuration is required for replica mode"))
+		} else if r.Spec.Bootstrap.PgBaseBackup == nil && r.Spec.Bootstrap.Recovery == nil &&
+			// this is needed because we only want to validate this during cluster creation, currently if we would have
+			// to enable this logic only during creation and not cluster changes it would require a meaningful refactor
+			len(r.ObjectMeta.ResourceVersion) == 0 {
+			result = append(result, field.Invalid(
+				field.NewPath("spec", "replicaCluster"),
+				replicaClusterConf,
+				"replica mode bootstrap is compatible only with pg_basebackup or recovery"))
+		}
+	}
+
+	result = append(result, r.validateReplicaClusterExternalClusters()...)
+
+	return result
+}
+
+func (r *Cluster) validateReplicaClusterExternalClusters() field.ErrorList {
+	var result field.ErrorList
+	replicaClusterConf := r.Spec.ReplicaCluster
+	if replicaClusterConf == nil {
+		return result
+	}
+
+	// Check that the externalCluster references are correct
+	_, found := r.ExternalCluster(replicaClusterConf.Source)
 	if !found {
 		result = append(
 			result,
 			field.Invalid(
 				field.NewPath("spec", "replicaCluster", "primaryServerName"),
-				r.Spec.ReplicaCluster.Source,
-				fmt.Sprintf("External cluster %v not found", r.Spec.ReplicaCluster.Source)))
+				replicaClusterConf.Source,
+				fmt.Sprintf("External cluster %v not found", replicaClusterConf.Source)))
 	}
 
+	if len(replicaClusterConf.Self) > 0 {
+		_, found := r.ExternalCluster(replicaClusterConf.Self)
+		if !found {
+			result = append(
+				result,
+				field.Invalid(
+					field.NewPath("spec", "replicaCluster", "self"),
+					replicaClusterConf.Self,
+					fmt.Sprintf("External cluster %v not found", replicaClusterConf.Self)))
+		}
+	}
+
+	if len(replicaClusterConf.Primary) > 0 {
+		_, found := r.ExternalCluster(replicaClusterConf.Primary)
+		if !found {
+			result = append(
+				result,
+				field.Invalid(
+					field.NewPath("spec", "replicaCluster", "primary"),
+					replicaClusterConf.Primary,
+					fmt.Sprintf("External cluster %v not found", replicaClusterConf.Primary)))
+		}
+	}
 	return result
 }
 
@@ -2222,7 +2320,8 @@ func (r *Cluster) validateWALLevelChange(old *Cluster) field.ErrorList {
 		errs = append(errs, field.Invalid(
 			field.NewPath("spec", "postgresql", "parameters", "wal_level"),
 			"minimal",
-			fmt.Sprintf("Change of `wal_level` to `minimal` not allowed on an existing cluster (from %s)", oldWALLevel)))
+			fmt.Sprintf("Change of `wal_level` to `minimal` not allowed on an existing cluster (from %s)",
+				oldWALLevel)))
 	}
 
 	return errs
@@ -2336,6 +2435,98 @@ func (gcs *GoogleCredentials) validateGCSCredentials(path *field.Path) field.Err
 	}
 
 	return allErrors
+}
+
+func (r *Cluster) validateManagedServices() field.ErrorList {
+	reservedNames := []string{
+		r.GetServiceReadWriteName(),
+		r.GetServiceReadOnlyName(),
+		r.GetServiceReadName(),
+		r.GetServiceAnyName(),
+	}
+	containsDuplicateNames := func(names []string) bool {
+		seen := make(map[string]bool)
+		for _, str := range names {
+			if seen[str] {
+				return true
+			}
+			seen[str] = true
+		}
+		return false
+	}
+
+	if r.Spec.Managed == nil || r.Spec.Managed.Services == nil {
+		return nil
+	}
+
+	managedServices := r.Spec.Managed.Services
+	basePath := field.NewPath("spec", "managed", "services")
+	var errs field.ErrorList
+
+	if slices.Contains(managedServices.DisabledDefaultServices, ServiceSelectorTypeRW) {
+		errs = append(errs, field.Invalid(
+			basePath.Child("disabledDefaultServices"),
+			ServiceSelectorTypeRW,
+			"service of type RW cannot be disabled.",
+		))
+	}
+
+	names := make([]string, len(managedServices.Additional))
+	for idx := range managedServices.Additional {
+		additionalService := &managedServices.Additional[idx]
+		name := additionalService.ServiceTemplate.ObjectMeta.Name
+		names[idx] = name
+		path := basePath.Child(fmt.Sprintf("additional[%d]", idx))
+
+		if slices.Contains(reservedNames, name) {
+			errs = append(errs,
+				field.Invalid(
+					path,
+					name,
+					fmt.Sprintf("the service name: '%s' is reserved for operator use", name),
+				))
+		}
+
+		if fieldErr := validateServiceTemplate(
+			path,
+			true,
+			additionalService.ServiceTemplate,
+		); len(fieldErr) > 0 {
+			errs = append(errs, fieldErr...)
+		}
+	}
+
+	if containsDuplicateNames(names) {
+		errs = append(errs, field.Invalid(
+			basePath.Child("additional"),
+			names,
+			"contains services with the same .metadata.name",
+		))
+	}
+
+	return errs
+}
+
+func validateServiceTemplate(
+	path *field.Path,
+	nameRequired bool,
+	template ServiceTemplateSpec,
+) field.ErrorList {
+	var errs field.ErrorList
+
+	if len(template.Spec.Selector) > 0 {
+		errs = append(errs, field.Invalid(path, template.Spec.Selector, "selector field is managed by the operator"))
+	}
+
+	name := template.ObjectMeta.Name
+	if name == "" && nameRequired {
+		errs = append(errs, field.Invalid(path, name, "name is required"))
+	}
+	if name != "" && !nameRequired {
+		errs = append(errs, field.Invalid(path, name, "name is not allowed"))
+	}
+
+	return errs
 }
 
 // validateManagedRoles validate the environment variables settings proposed by the user

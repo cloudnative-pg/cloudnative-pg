@@ -202,8 +202,15 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 				}, 120).Should(BeEquivalentTo(2))
 			})
 
-			By("verifying the operator pod is now back", func() {
+			By("verifying a new operator pod is now back", func() {
 				timeout := 120
+				Eventually(func(g Gomega) {
+					podList := &corev1.PodList{}
+					err := env.Client.List(env.Ctx, podList, ctrlclient.InNamespace(operatorNamespace))
+					g.Expect(err).ToNot(HaveOccurred())
+					g.Expect(podList.Items).To(HaveLen(1))
+					g.Expect(podList.Items[0].Name).NotTo(BeEquivalentTo(operatorPodName))
+				}, timeout).Should(Succeed())
 				Eventually(func() (bool, error) {
 					return env.IsOperatorDeploymentReady()
 				}, timeout).Should(BeTrue())

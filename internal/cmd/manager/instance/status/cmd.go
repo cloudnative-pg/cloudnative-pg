@@ -18,32 +18,63 @@ limitations under the License.
 package status
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/spf13/cobra"
 
+	cacheClient "github.com/cloudnative-pg/cloudnative-pg/internal/management/cache/client"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 )
 
 // NewCmd create the "instance status" subcommand
 func NewCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "status",
-		RunE: func(_ *cobra.Command, _ []string) error {
-			return statusSubCommand()
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return statusSubCommand(cmd.Context())
 		},
 	}
 
 	return cmd
 }
 
-func statusSubCommand() error {
-	statusURL := url.Local(url.PathPgStatus, url.StatusPort)
-	resp, err := http.Get(statusURL) // nolint:gosec
+func statusSubCommand(ctx context.Context) error {
+	cli, err := management.NewControllerRuntimeClient()
+	if err != nil {
+		log.Error(err, "while building the controller runtime client")
+		return err
+	}
+
+	cluster, err := cacheClient.GetCluster()
+	if err != nil {
+		log.Error(err, "while loading the cluster from cache")
+		return err
+	}
+
+	ctx, err = certs.NewTLSConfigForContext(
+		ctx,
+		cli,
+		cluster.GetServerCASecretObjectKey(),
+	)
+	if err != nil {
+		log.Error(err, "Error while building the TLS context")
+		return err
+	}
+
+	resp, err := executeRequest(ctx, "https")
+	if errors.Is(err, http.ErrSchemeMismatch) {
+		resp, err = executeRequest(ctx, "http")
+	}
 	if err != nil {
 		log.Error(err, "Error while requesting instance status")
 		return err
@@ -53,7 +84,6 @@ func statusSubCommand() error {
 		err = resp.Body.Close()
 		if err != nil {
 			log.Error(err, "Can't close the connection",
-				"statusURL", statusURL,
 				"statusCode", resp.StatusCode,
 			)
 		}
@@ -62,7 +92,6 @@ func statusSubCommand() error {
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		log.Error(err, "Error while reading status response body",
-			"statusURL", statusURL,
 			"statusCode", resp.StatusCode,
 		)
 		return err
@@ -71,7 +100,6 @@ func statusSubCommand() error {
 	if resp.StatusCode != 200 {
 		log.Info(
 			"Error while extracting status",
-			"statusURL", statusURL,
 			"statusCode", resp.StatusCode,
 			"body", string(body),
 		)
@@ -85,4 +113,21 @@ func statusSubCommand() error {
 	}
 
 	return nil
+}
+
+func executeRequest(ctx context.Context, scheme string) (*http.Response, error) {
+	const connectionTimeout = 2 * time.Second
+	const requestTimeout = 30 * time.Second
+
+	statusURL := url.Build(
+		scheme,
+		"localhost", url.PathPgStatus, url.StatusPort,
+	)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, statusURL, nil)
+	if err != nil {
+		log.Error(err, "Error while building the request")
+		return nil, err
+	}
+	httpClient := resources.NewHTTPClient(connectionTimeout, requestTimeout)
+	return httpClient.Do(req) // nolint:gosec
 }

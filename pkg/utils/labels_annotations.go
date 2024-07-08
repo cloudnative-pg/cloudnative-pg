@@ -89,6 +89,9 @@ const (
 
 	// IsOnlineBackupLabelName is the name of the label used to specify whether a backup was online
 	IsOnlineBackupLabelName = MetadataNamespace + "/onlineBackup"
+
+	// IsManagedLabelName is the name of the label used to indicate a '.spec.managed' resource
+	IsManagedLabelName = MetadataNamespace + "/isManaged"
 )
 
 const (
@@ -202,6 +205,9 @@ const (
 	// ClusterRestartAnnotationName is the name of the annotation containing the
 	// latest required restart time
 	ClusterRestartAnnotationName = "kubectl.kubernetes.io/restartedAt"
+
+	// UpdateStrategyAnnotation is the name of the annotation used to indicate how to update the given resource
+	UpdateStrategyAnnotation = MetadataNamespace + "/updateStrategy"
 )
 
 type annotationStatus string

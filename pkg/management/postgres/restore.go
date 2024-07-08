@@ -312,7 +312,7 @@ func (info InitInfo) ensureArchiveContainsLastCheckpointRedoWAL(
 		}
 	}()
 
-	if err := fileutils.EnsureParentDirectoryExist(testWALPath); err != nil {
+	if err := fileutils.EnsureParentDirectoryExists(testWALPath); err != nil {
 		return err
 	}
 

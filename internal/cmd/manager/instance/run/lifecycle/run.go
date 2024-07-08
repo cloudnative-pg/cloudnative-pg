@@ -36,13 +36,8 @@ var identifierStreamingReplicationUser = pgx.Identifier{apiv1.StreamingReplicati
 // returning any error via the returned channel
 func (i *PostgresLifecycle) runPostgresAndWait(ctx context.Context) <-chan error {
 	contextLogger := log.FromContext(ctx)
-	errChan := make(chan error, 1)
 
-	// The following goroutine runs the postmaster process, and stops
-	// when the process exits.
-	go func() {
-		defer close(errChan)
-
+	runPostmasterSession := func() error {
 		// Meanwhile PostgreSQL is starting, we'll start a goroutine
 		// that will configure its permission once the database system
 		// is ready to accept connection.
@@ -63,8 +58,7 @@ func (i *PostgresLifecycle) runPostgresAndWait(ctx context.Context) <-chan error
 		// permissions and user maps to start it.
 		err := i.instance.VerifyPgDataCoherence(postgresContext)
 		if err != nil {
-			errChan <- err
-			return
+			return err
 		}
 
 		// Here we need to wait for initialization to be executed before
@@ -84,7 +78,7 @@ func (i *PostgresLifecycle) runPostgresAndWait(ctx context.Context) <-chan error
 		// In that case there's no need to proceed.
 		if i.instance.IsFenced() {
 			contextLogger.Info("Instance is fenced, won't start postgres right now")
-			return
+			return nil
 		}
 
 		i.instance.LogPgControldata(postgresContext, "postmaster start up")
@@ -93,9 +87,18 @@ func (i *PostgresLifecycle) runPostgresAndWait(ctx context.Context) <-chan error
 		streamingCmd, err := i.instance.Run()
 		if err != nil {
 			contextLogger.Error(err, "Unable to start PostgreSQL up")
-			errChan <- err
-			return
+			return err
 		}
+
+		postMasterPID, err := streamingCmd.Pid()
+		if err != nil {
+			contextLogger.Error(
+				err,
+				"Programmatic error: postmaster process was not set")
+			return err
+		}
+
+		log.Info("postmaster started", "postMasterPID", postMasterPID)
 
 		// Now we'll wait for PostgreSQL to accept connections, and setup everything required
 		// for replication and pg_rewind to work correctly.
@@ -104,8 +107,6 @@ func (i *PostgresLifecycle) runPostgresAndWait(ctx context.Context) <-chan error
 			defer wg.Done()
 			if err := configureInstancePermissions(postgresContext, i.instance); err != nil {
 				contextLogger.Error(err, "Unable to update PostgreSQL roles and permissions")
-				errChan <- err
-				return
 			}
 		}()
 
@@ -114,7 +115,18 @@ func (i *PostgresLifecycle) runPostgresAndWait(ctx context.Context) <-chan error
 		i.instance.SetCanCheckReadiness(true)
 		defer i.instance.SetCanCheckReadiness(false)
 
-		errChan <- streamingCmd.Wait()
+		postmasterExitStatus := streamingCmd.Wait()
+		log.Info("postmaster exited", "postmasterExitStatus", postmasterExitStatus, "postMasterPID", postMasterPID)
+		return postmasterExitStatus
+	}
+
+	errChan := make(chan error, 1)
+
+	// The following goroutine runs the postmaster process, and stops
+	// when the process exits.
+	go func() {
+		errChan <- runPostmasterSession()
+		close(errChan)
 	}()
 
 	return errChan

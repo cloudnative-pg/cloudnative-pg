@@ -18,6 +18,10 @@ package e2e
 
 import "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
+func GetEnvProfile() utils.EnvProfile {
+	return utils.GetEnvProfile(*testCloudVendorEnv)
+}
+
 // IsAKS checks if the running cluster is on AKS
 func IsAKS() bool {
 	return *testCloudVendorEnv == utils.AKS

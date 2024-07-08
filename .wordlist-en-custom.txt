@@ -107,6 +107,7 @@ CustomResourceDefinition
 CustomResourceDefinitions
 Customizations
 DBA
+DBaaS
 DDTHH
 DISA
 DNS
@@ -114,12 +115,14 @@ DataBackupConfiguration
 DataBase
 DataSource
 DatabaseRoleRef
+DemotionToken
 DeploymentStrategy
 DevOps
 DevSecOps
 Dhilip
 DigitalOcean
 DisablePassword
+DisabledDefaultServices
 DoD
 DockerHub
 Dockle
@@ -159,6 +162,7 @@ GUCs
 Gabriele
 GaugeVec
 Gi
+GitOps
 GoArch
 Golang
 GolangCI
@@ -174,6 +178,7 @@ INPLACE
 IOPS
 IPv
 IRSA
+IaC
 Ibryam
 IfNotPresent
 ImageCatalog
@@ -205,6 +210,7 @@ LTS
 LastBackupFailed
 LastBackupSucceeded
 LastFailedArchiveTime
+LastPromotionToken
 Lifecycle
 Linkerd
 Linode
@@ -218,6 +224,8 @@ MVCC
 ManagedConfiguration
 ManagedRoles
 ManagedRolesStatus
+ManagedService
+ManagedServices
 MetricDescription
 MetricName
 MetricType
@@ -378,14 +386,18 @@ SecretVersion
 SecretsResourceVersion
 SecurityProfiles
 Seealso
+SelectorType
 ServerCASecret
 ServerTLSSecret
 ServiceAccount
 ServiceAccount's
 ServiceAccountTemplate
 ServiceMonitor
+ServiceSelectorType
 ServiceSpec
 ServiceTemplateSpec
+ServiceUpdateStrategy
+ShutdownCheckpointToken
 Silvela
 Slonik
 SnapshotOwnerReference
@@ -428,6 +440,7 @@ URIs
 UTF
 Uncomment
 Unrealizable
+UpdateStrategy
 VLDB
 VM
 VMs
@@ -519,6 +532,7 @@ backuplist
 backupspec
 backupstatus
 balancer
+balancers
 barmanEndpointCA
 barmanObjectStore
 barmanobjectstore
@@ -604,6 +618,7 @@ connectionParameters
 connectionString
 conninfo
 containerPort
+controldata
 coredump
 coredumps
 coreos
@@ -651,6 +666,7 @@ de
 declaratively
 defaultMode
 defaultPoolSize
+demotionToken
 deployer
 deploymentStrategy
 destinationPath
@@ -661,6 +677,7 @@ digestValue
 dir
 disableDefaultQueries
 disablePassword
+disabledDefaultServices
 distro
 distroless
 distros
@@ -780,6 +797,7 @@ initializingPVC
 instanceID
 instanceName
 instanceNames
+instanceRole
 instancesReportedState
 instancesStatus
 inuse
@@ -812,6 +830,7 @@ labelling
 largeobject
 lastCheckTime
 lastFailedBackup
+lastPromotionToken
 lastScheduleTime
 lastSuccessfulBackup
 lastSuccessfulBackupByMethod
@@ -1003,6 +1022,7 @@ proj
 projectedVolumeTemplate
 prometheus
 promotionTimeout
+promotionToken
 provisioner
 psql
 pv
@@ -1081,6 +1101,7 @@ securego
 securityContext
 seg
 segsize
+selectorType
 serverAltDNSNames
 serverCA
 serverCASecret
@@ -1097,6 +1118,7 @@ sha
 shm
 shmall
 shmmax
+shutdownCheckpointToken
 sig
 sigs
 singlenamespace
@@ -1210,6 +1232,7 @@ unix
 unsetting
 unusablePVC
 updateInterval
+updateStrategy
 upgradable
 uptime
 uri

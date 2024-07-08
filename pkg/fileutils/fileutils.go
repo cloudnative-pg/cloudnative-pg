@@ -22,8 +22,10 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -100,7 +102,7 @@ func FileExists(fileName string) (bool, error) {
 // CopyFile copy a file from a location to another one
 func CopyFile(source, destination string) (err error) {
 	// Ensure that the directory really exist
-	if err := EnsureParentDirectoryExist(destination); err != nil {
+	if err := EnsureParentDirectoryExists(destination); err != nil {
 		return err
 	}
 
@@ -181,7 +183,7 @@ func WriteFileAtomic(fileName string, contents []byte, perm os.FileMode) (bool, 
 	}
 
 	// Ensure that the directory really exist
-	if err := EnsureParentDirectoryExist(fileName); err != nil {
+	if err := EnsureParentDirectoryExists(fileName); err != nil {
 		return false, err
 	}
 
@@ -286,22 +288,28 @@ func CreateEmptyFile(fileName string) error {
 	return file.Close()
 }
 
-// EnsureParentDirectoryExist check if the directory containing a certain file
-// exist or not, and if is not existent will create the directory using
-// 0700 as permissions bits
-func EnsureParentDirectoryExist(fileName string) error {
+// EnsureParentDirectoryExists check whether the directory containing a certain file
+// exists, and if it does not exist, create it using 0700 as permissions bits.
+// No permissions check is performed if the directory already exists.
+func EnsureParentDirectoryExists(fileName string) error {
 	destinationDir := filepath.Dir(fileName)
 	return EnsureDirectoryExists(destinationDir)
 }
 
 // EnsureDirectoryExists check if the passed directory exists or not, and if
-// it doesn't exist, create it using 0700 as permissions bits
+// it doesn't exist, create it using 0700 as permissions bits.
+// No permissions check is performed if the directory already exists.
 func EnsureDirectoryExists(destinationDir string) error {
-	if _, err := os.Stat(destinationDir); os.IsNotExist(err) {
-		err = os.MkdirAll(destinationDir, 0o700)
-		if err != nil {
-			return err
+	stat, err := os.Stat(destinationDir)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return os.MkdirAll(destinationDir, 0o700)
 		}
+		return err
+	}
+
+	if !stat.IsDir() {
+		return fs.ErrInvalid
 	}
 
 	return nil

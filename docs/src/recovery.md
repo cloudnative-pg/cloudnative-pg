@@ -588,10 +588,10 @@ could be overwritten by the new cluster.
 
 !!! Warning
     The operator includes a safety check to ensure a cluster doesn't overwrite
-a storage bucket that contained information. A cluster that would overwrite
-existing storage remains in the state `Setting up primary` with pods in an
-error state. The pod logs show: `ERROR: WAL archive check failed for server
-recoveredCluster: Expected empty archive`.
+    a storage bucket that contained information. A cluster that would overwrite
+    existing storage remains in the state `Setting up primary` with pods in an
+    error state. The pod logs show: `ERROR: WAL archive check failed for server
+    recoveredCluster: Expected empty archive`.
 
 !!! Important
     If you set the `cnpg.io/skipEmptyWalArchiveCheck` annotation to `enabled`

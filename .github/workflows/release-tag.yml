@@ -7,6 +7,9 @@ on:
       - closed
     branches:
       - release-*
+      - main
+    paths:
+      - 'pkg/versions/versions.go'
 
 jobs:
   tag:
@@ -21,6 +24,6 @@ jobs:
         uses: christophebedard/tag-version-commit@v1.7.0
         with:
           token: ${{ secrets.REPO_GHA_PAT }}
-          version_regex: '^Version tag to ([0-9]+\.[0-9]+\.[0-9]+)'
+          version_regex: '^Version tag to ([0-9]+\.[0-9]+\.[0-9]+(?:-[a-z][0-9a-z]*)?)'
           version_tag_prefix: v
           dry_run: false

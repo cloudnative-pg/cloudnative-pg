@@ -26,6 +26,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/status"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -54,16 +55,19 @@ func Promote(ctx context.Context, clusterName string, serverName string) error {
 	}
 
 	// The Pod exists, let's update status fields
+	origCluster := cluster.DeepCopy()
 	cluster.Status.TargetPrimary = serverName
 	cluster.Status.TargetPrimaryTimestamp = utils.GetCurrentTimestamp()
-	cluster.Status.Phase = apiv1.PhaseSwitchover
-	cluster.Status.PhaseReason = fmt.Sprintf("Switching over to %v", serverName)
-
-	err = plugin.Client.Status().Update(ctx, &cluster)
-	if err != nil {
+	if err := status.RegisterPhaseWithOrigCluster(
+		ctx,
+		plugin.Client,
+		&cluster,
+		origCluster,
+		apiv1.PhaseSwitchover,
+		fmt.Sprintf("Switching over to %v", serverName),
+	); err != nil {
 		return err
 	}
-
 	fmt.Printf("Node %s in cluster %s will be promoted\n", serverName, clusterName)
 	return nil
 }

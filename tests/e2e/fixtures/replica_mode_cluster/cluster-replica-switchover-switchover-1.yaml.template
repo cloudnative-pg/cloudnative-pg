@@ -1,0 +1,71 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: replica-switchover-switchover-a
+spec:
+  instances: 3
+  primaryUpdateStrategy: unsupervised
+  primaryUpdateMethod: switchover
+
+  storage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    size: 1Gi
+
+  backup:
+    barmanObjectStore:
+      destinationPath: s3://cluster-backups/
+      endpointURL: https://minio-service.minio:9000
+      endpointCA:
+        key: ca.crt
+        name: minio-server-ca-secret
+      s3Credentials:
+        accessKeyId:
+          name: backup-storage-creds
+          key: ID
+        secretAccessKey:
+          name: backup-storage-creds
+          key: KEY
+      wal:
+        compression: gzip
+      data:
+        immediateCheckpoint: true
+
+  replica:
+    primary: replica-switchover-switchover-a
+    source: replica-switchover-switchover-b
+
+  externalClusters:
+  - name: replica-switchover-switchover-a
+    barmanObjectStore:
+      serverName: replica-switchover-switchover-a
+      destinationPath: s3://cluster-backups/
+      endpointURL: https://minio-service.minio:9000
+      endpointCA:
+        key: ca.crt
+        name: minio-server-ca-secret
+      s3Credentials:
+        accessKeyId:
+          name: backup-storage-creds
+          key: ID
+        secretAccessKey:
+          name: backup-storage-creds
+          key: KEY
+      wal:
+        compression: gzip
+  - name: replica-switchover-switchover-b
+    barmanObjectStore:
+      serverName: replica-switchover-switchover-b
+      destinationPath: s3://cluster-backups/
+      endpointURL: https://minio-service.minio:9000
+      endpointCA:
+        key: ca.crt
+        name: minio-server-ca-secret
+      s3Credentials:
+        accessKeyId:
+          name: backup-storage-creds
+          key: ID
+        secretAccessKey:
+          name: backup-storage-creds
+          key: KEY
+      wal:
+        compression: gzip

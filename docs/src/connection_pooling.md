@@ -283,6 +283,18 @@ spec:
       max_client_conn: "1000"
       default_pool_size: "10"
 ```
+The operator by default adds a `ServicePort` with the following data:
+```
+  ports:
+  - name: pgbouncer
+    port: 5432
+    protocol: TCP
+    targetPort: pgbouncer
+```
+
+!!! Warning
+    Specifying a `ServicePort` with the name `pgbouncer` or the port `5432`  will prevent the default `ServicePort` from being added.
+    This because `ServicePort` entries with the same `name` or `port` are not allowed on Kubernetes and result in errors.
 
 ## High availability (HA)
 

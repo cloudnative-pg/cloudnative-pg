@@ -68,7 +68,7 @@ type BackupReconciler struct {
 	Scheme   *runtime.Scheme
 	Recorder record.EventRecorder
 
-	instanceStatusClient *instance.StatusClient
+	instanceStatusClient instance.Client
 }
 
 // NewBackupReconciler properly initializes the BackupReconciler
@@ -148,7 +148,6 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		ctx,
 		r.Client,
 		cluster.GetServerCASecretObjectKey(),
-		cluster.GetServiceReadWriteName(),
 	)
 	if err != nil {
 		return ctrl.Result{}, err

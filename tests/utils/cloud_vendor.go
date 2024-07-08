@@ -64,3 +64,54 @@ func TestCloudVendor() (*TestEnvVendor, error) {
 	// if none above, it is a local
 	return &LOCAL, nil
 }
+
+// EnvProfile represents the capabilities of different cloud environments for testing
+type EnvProfile interface {
+	CanMovePVCAcrossNodes() bool
+	IsLeaderElectionEnabled() bool
+	CanRunAppArmor() bool
+	UsesNodeDiskSpace() bool
+}
+
+// GetEnvProfile returns a cloud environment's capabilities envProfile
+func GetEnvProfile(te TestEnvVendor) EnvProfile {
+	profileMap := map[TestEnvVendor]EnvProfile{
+		LOCAL: envProfile{
+			isLeaderElectionEnabled: true,
+			usesNodeDiskSpace:       true,
+		},
+		AKS: envProfile{
+			canMovePVCAcrossNodes:   true,
+			isLeaderElectionEnabled: true,
+			canRunAppArmor:          true,
+		},
+		EKS: envProfile{
+			isLeaderElectionEnabled: true,
+		},
+		GKE: envProfile{
+			canMovePVCAcrossNodes: true,
+		},
+		OCP: envProfile{
+			isLeaderElectionEnabled: true,
+		},
+	}
+
+	profile, found := profileMap[te]
+	if !found {
+		return envProfile{}
+	}
+
+	return profile
+}
+
+type envProfile struct {
+	canMovePVCAcrossNodes   bool
+	isLeaderElectionEnabled bool
+	canRunAppArmor          bool
+	usesNodeDiskSpace       bool
+}
+
+func (p envProfile) CanMovePVCAcrossNodes() bool   { return p.canMovePVCAcrossNodes }
+func (p envProfile) IsLeaderElectionEnabled() bool { return p.isLeaderElectionEnabled }
+func (p envProfile) CanRunAppArmor() bool          { return p.canRunAppArmor }
+func (p envProfile) UsesNodeDiskSpace() bool       { return p.usesNodeDiskSpace }

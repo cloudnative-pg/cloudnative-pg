@@ -17,7 +17,9 @@ limitations under the License.
 package fileutils
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
@@ -333,5 +335,68 @@ var _ = Describe("RemoveRestoreExcludedFiles", func() {
 				Expect(os.IsNotExist(err)).To(BeTrue(), "Expected file to be removed: "+fullPath)
 			}
 		}
+	})
+})
+
+var _ = Describe("EnsureDirectoryExists", func() {
+	var tempDir string
+	BeforeEach(func() {
+		var err error
+		tempDir, err = os.MkdirTemp("", "test")
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	AfterEach(func() {
+		Expect(os.RemoveAll(tempDir)).To(Succeed())
+	})
+
+	It("creates the directory with the right permissions", func() {
+		newDir := filepath.Join(tempDir, "newDir")
+
+		Expect(EnsureDirectoryExists(newDir)).To(Succeed())
+		fileInfo, err := os.Stat(newDir)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(fileInfo.Mode().Perm()).To(Equal(fs.FileMode(0o700)))
+	})
+
+	It("errors out when it cannot create the directory", func() {
+		Expect(os.Chmod(tempDir, 0o500)).To(Succeed()) //#nosec G302 -- this is a directory in a test
+		newDir := filepath.Join(tempDir, "newDir")
+
+		err := EnsureDirectoryExists(newDir)
+		Expect(err).To(HaveOccurred())
+		Expect(errors.Is(err, fs.ErrPermission)).To(BeTrue())
+		var pathErr *os.PathError
+		Expect(errors.As(err, &pathErr)).To(BeTrue())
+		Expect(pathErr.Op).To(Equal("mkdir"))
+	})
+
+	It("errors out when Stat fails for other reasons", func() {
+		err := EnsureDirectoryExists("illegalchar\x00")
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(MatchError(ContainSubstring("invalid")))
+		var pathErr *os.PathError
+		Expect(errors.As(err, &pathErr)).To(BeTrue())
+		Expect(pathErr.Op).To(Equal("stat"))
+	})
+
+	It("errors out when not a directory", func() {
+		newNonDir := filepath.Join(tempDir, "newNonDir")
+		Expect(CreateEmptyFile(newNonDir)).To(Succeed())
+
+		err := EnsureDirectoryExists(newNonDir)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(MatchError(fs.ErrInvalid))
+	})
+
+	It("ignores the permissions if the file already exists", func() {
+		existingDir, err := os.MkdirTemp(tempDir, "existingDir")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(os.Chmod(existingDir, 0o600)).To(Succeed())
+
+		Expect(EnsureDirectoryExists(existingDir)).To(Succeed())
+		fileInfo, err := os.Stat(existingDir)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(fileInfo.Mode().Perm()).To(Equal(fs.FileMode(0o600)))
 	})
 })

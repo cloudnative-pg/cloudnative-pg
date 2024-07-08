@@ -14,11 +14,12 @@ in a chosen Kubernetes namespace for High Availability and offloading of
 read-only queries.
 
 Applications that reside in the same Kubernetes cluster can access the
-PostgreSQL database using a service which is solely managed by the operator,
-without having to worry about changes of the primary role following a failover
-or a switchover. Applications that reside outside the Kubernetes cluster, need
-to configure a Service or Ingress object to expose the Postgres via TCP.
-Web applications can take advantage of the native connection pooler based on PgBouncer.
+PostgreSQL database using a service solely managed by the operator, without
+needing to worry about changes in the primary role following a failover or
+switchover. Applications that reside outside the Kubernetes cluster can
+leverage the service template capability and a `LoadBalancer` service to expose
+PostgreSQL via TCP. Additionally, web applications can take advantage of the
+native connection pooler based on PgBouncer.
 
 CloudNativePG was originally built by [EDB](https://www.enterprisedb.com), then
 released open source under Apache License 2.0 and submitted for CNCF Sandbox in April 2022.
@@ -93,8 +94,9 @@ Additionally, the Community provides images for the [PostGIS extension](postgis.
   generation on high write systems
 * Support tagging backup files uploaded to an object store to enable optional
   retention management at the object store layer
-* Replica clusters for PostgreSQL deployments across multiple Kubernetes
-  clusters, enabling private, public, hybrid, and multi-cloud architectures
+* Replica clusters for PostgreSQL distributed topologies spanning multiple
+  Kubernetes clusters, enabling private, public, hybrid, and multi-cloud
+  architectures with support for controlled switchover.
 * Delayed Replica clusters
 * Connection pooling with PgBouncer
 * Support for node affinity via `nodeSelector`

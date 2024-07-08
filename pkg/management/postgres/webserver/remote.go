@@ -24,15 +24,23 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
+	"os/exec"
+	"path"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/concurrency"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/upgrade"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 type remoteWebserverEndpoints struct {
@@ -80,6 +88,7 @@ func NewRemoteWebServer(
 	serveMux.HandleFunc(url.PathHealth, endpoints.isServerHealthy)
 	serveMux.HandleFunc(url.PathReady, endpoints.isServerReady)
 	serveMux.HandleFunc(url.PathPgStatus, endpoints.pgStatus)
+	serveMux.HandleFunc(url.PathPgArchivePartial, endpoints.pgArchivePartial)
 	serveMux.HandleFunc(url.PathPGControlData, endpoints.pgControlData)
 	serveMux.HandleFunc(url.PathUpdate, endpoints.updateInstanceManager(cancelFunc, exitedConditions))
 
@@ -335,4 +344,63 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 		sendJSONResponseWithData(w, 200, struct{}{})
 		return
 	}
+}
+
+func (ws *remoteWebserverEndpoints) pgArchivePartial(w http.ResponseWriter, req *http.Request) {
+	if !ws.instance.IsFenced() {
+		sendBadRequestJSONResponse(w, "NOT_FENCED", "")
+		return
+	}
+
+	var cluster apiv1.Cluster
+	if err := ws.typedClient.Get(req.Context(),
+		client.ObjectKey{Namespace: ws.instance.Namespace, Name: ws.instance.ClusterName},
+		&cluster); err != nil {
+		sendBadRequestJSONResponse(w, "NO_CLUSTER_FOUND", err.Error())
+		return
+	}
+
+	if cluster.Status.TargetPrimary != ws.instance.PodName || cluster.Status.CurrentPrimary != ws.instance.PodName {
+		sendBadRequestJSONResponse(w, "NOT_EXPECTED_PRIMARY", "")
+		return
+	}
+
+	out, err := ws.instance.GetPgControldata()
+	if err != nil {
+		log.Debug("Instance pg_controldata endpoint failing", "err", err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	data := utils.ParsePgControldataOutput(out)
+	walFile := data[utils.PgControlDataKeyREDOWALFile]
+	if walFile == "" {
+		sendBadRequestJSONResponse(w, "COULD_NOT_PARSE_REDOWAL_FILE", "")
+		return
+	}
+
+	pgWalDirectory := path.Join(os.Getenv("PGDATA"), "pg_wal")
+	walFilPath := path.Join(pgWalDirectory, walFile)
+	partialWalFilePath := fmt.Sprintf("%s.partial", walFilPath)
+
+	if err := os.Link(walFilPath, partialWalFilePath); err != nil {
+		log.Error(err, "failed to get pg_controldata")
+		sendBadRequestJSONResponse(w, "ERROR_WHILE_CREATING_SYMLINK", err.Error())
+		return
+	}
+
+	defer func() {
+		if err := fileutils.RemoveFile(partialWalFilePath); err != nil {
+			log.Error(err, "while deleting the partial wal file symlink")
+		}
+	}()
+
+	options := []string{constants.WalArchiveCommand, partialWalFilePath}
+	walArchiveCmd := exec.Command("/controller/manager", options...) // nolint: gosec
+	if err := execlog.RunBuffering(walArchiveCmd, "wal-archive-partial"); err != nil {
+		sendBadRequestJSONResponse(w, "ERROR_WHILE_EXECUTING_WAL_ARCHIVE", err.Error())
+		return
+	}
+
+	sendJSONResponseWithData(w, 200, walFile)
 }

@@ -1,0 +1,22 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-managed-services-rw
+spec:
+  instances: 1
+  imageName: "${POSTGRES_IMG}"
+  storage:
+    size: 1Gi
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+  managed:
+    services:
+      additional:
+        - selectorType: rw
+          updateStrategy: replace
+          serviceTemplate:
+            metadata:
+              name: "test-rw"
+              labels:
+                test-label: "true"
+              annotations:
+                test-annotation: "true"

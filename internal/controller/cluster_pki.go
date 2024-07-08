@@ -240,7 +240,7 @@ func (r *ClusterReconciler) renewCASecret(ctx context.Context, secret *v1.Secret
 		return err
 	}
 
-	err = pair.RenewCertificate(privateKey, nil)
+	err = pair.RenewCertificate(privateKey, nil, nil)
 	if err != nil {
 		return err
 	}
@@ -330,7 +330,7 @@ func (r *ClusterReconciler) ensureLeafCertificate(
 	var secret v1.Secret
 	err := r.Get(ctx, secretName, &secret)
 	if err == nil {
-		return r.renewAndUpdateCertificate(ctx, caSecret, &secret)
+		return r.renewAndUpdateCertificate(ctx, caSecret, &secret, altDNSNames)
 	}
 
 	serverSecret, err := generateCertificateFromCA(caSecret, commonName, usage, altDNSNames, secretName)
@@ -376,9 +376,10 @@ func (r *ClusterReconciler) renewAndUpdateCertificate(
 	ctx context.Context,
 	caSecret *v1.Secret,
 	secret *v1.Secret,
+	altDNSNames []string,
 ) error {
 	origSecret := secret.DeepCopy()
-	hasBeenRenewed, err := certs.RenewLeafCertificate(caSecret, secret)
+	hasBeenRenewed, err := certs.RenewLeafCertificate(caSecret, secret, altDNSNames)
 	if err != nil {
 		return err
 	}

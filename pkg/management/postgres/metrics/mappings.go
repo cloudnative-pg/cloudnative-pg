@@ -94,6 +94,10 @@ func (columnMapping ColumnMapping) ToMetricMap(
 	columnName, namespace string, variableLabels []string,
 ) MetricMapSet {
 	result := make(MetricMapSet)
+	columnFQName := fmt.Sprintf("%s_%s", namespace, columnName)
+	if columnMapping.Name != "" {
+		columnFQName = fmt.Sprintf("%s_%s", namespace, columnMapping.Name)
+	}
 	// Determine how to convert the column based on its usage.
 	// nolint: dupl
 	switch columnMapping.Usage {
@@ -118,7 +122,7 @@ func (columnMapping ColumnMapping) ToMetricMap(
 			Name:  columnName,
 			Vtype: prometheus.CounterValue,
 			Desc: prometheus.NewDesc(
-				fmt.Sprintf("%s_%s", namespace, columnName),
+				columnFQName,
 				columnMapping.Description, variableLabels, nil),
 			Conversion: postgresutils.DBToFloat64,
 			Label:      false,
@@ -129,7 +133,7 @@ func (columnMapping ColumnMapping) ToMetricMap(
 			Name:  columnName,
 			Vtype: prometheus.GaugeValue,
 			Desc: prometheus.NewDesc(
-				fmt.Sprintf("%s_%s", namespace, columnName),
+				columnFQName,
 				columnMapping.Description, variableLabels, nil),
 			Conversion: postgresutils.DBToFloat64,
 			Label:      false,
@@ -141,7 +145,7 @@ func (columnMapping ColumnMapping) ToMetricMap(
 			Histogram: true,
 			Vtype:     prometheus.UntypedValue,
 			Desc: prometheus.NewDesc(
-				fmt.Sprintf("%s_%s", namespace, columnName),
+				columnFQName,
 				columnMapping.Description, variableLabels, nil),
 			Conversion: postgresutils.DBToFloat64,
 			Label:      false,
@@ -173,7 +177,7 @@ func (columnMapping ColumnMapping) ToMetricMap(
 			Name:  columnName,
 			Vtype: prometheus.GaugeValue,
 			Desc: prometheus.NewDesc(
-				fmt.Sprintf("%s_%s", namespace, columnName),
+				columnFQName,
 				columnMapping.Description, variableLabels, nil),
 			Conversion: func(in interface{}) (float64, bool) {
 				text, ok := in.(string)
@@ -195,7 +199,7 @@ func (columnMapping ColumnMapping) ToMetricMap(
 			Name:  columnName,
 			Vtype: prometheus.GaugeValue,
 			Desc: prometheus.NewDesc(
-				fmt.Sprintf("%s_%s_milliseconds", namespace, columnName),
+				fmt.Sprintf("%s_milliseconds", columnFQName),
 				columnMapping.Description, variableLabels, nil),
 			Conversion: func(in interface{}) (float64, bool) {
 				var durationString string

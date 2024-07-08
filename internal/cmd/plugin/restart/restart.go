@@ -27,6 +27,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/status"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -68,10 +69,15 @@ func instanceRestart(ctx context.Context, clusterName, node string) error {
 	originalCluster := cluster.DeepCopy()
 
 	if cluster.Status.CurrentPrimary == node {
-		cluster.Status.Phase = apiv1.PhaseInplacePrimaryRestart
-		cluster.Status.PhaseReason = "Requested by the user"
 		cluster.ManagedFields = nil
-		if err := plugin.Client.Status().Patch(ctx, &cluster, client.MergeFrom(originalCluster)); err != nil {
+		if err := status.RegisterPhaseWithOrigCluster(
+			ctx,
+			plugin.Client,
+			&cluster,
+			originalCluster,
+			apiv1.PhaseInplacePrimaryRestart,
+			"Requested by the user",
+		); err != nil {
 			return fmt.Errorf("while requesting restart on primary POD for cluster %v: %w", clusterName, err)
 		}
 	} else {

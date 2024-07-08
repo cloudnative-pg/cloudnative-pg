@@ -39,8 +39,7 @@ var _ = Describe("PGBouncer Metrics", Label(tests.LabelObservability), func() {
 		namespacePrefix             = "pgbouncer-metrics-e2e"
 		level                       = tests.Low
 	)
-	var namespace string
-	var clusterName, curlPodName string
+	var namespace, clusterName string
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
@@ -57,14 +56,6 @@ var _ = Describe("PGBouncer Metrics", Label(tests.LabelObservability), func() {
 					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 				}
 				return env.DeleteNamespace(namespace)
-			})
-
-			// Create the curl client pod and wait for it to be ready.
-			By("setting up curl client pod", func() {
-				curlClient := utils.CurlClient(namespace)
-				err := utils.PodCreateAndWaitForReady(env, &curlClient, 240)
-				Expect(err).ToNot(HaveOccurred())
-				curlPodName = curlClient.GetName()
 			})
 
 			clusterName, err = env.GetResourceNameFromYAML(cnpgCluster)
@@ -111,8 +102,7 @@ var _ = Describe("PGBouncer Metrics", Label(tests.LabelObservability), func() {
 
 			for _, pod := range podList.Items {
 				podName := pod.GetName()
-				podIP := pod.Status.PodIP
-				out, err := utils.CurlGetMetrics(namespace, curlPodName, podIP, 9127)
+				out, err := utils.RetrieveMetricsFromPgBouncer(env, namespace, podName)
 				Expect(err).ToNot(HaveOccurred())
 				matches := metricsRegexp.FindAllString(out, -1)
 				Expect(matches).To(

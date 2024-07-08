@@ -186,7 +186,7 @@ func fakePod(name string, role string) corev1.Pod {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Labels: map[string]string{
-				utils.ClusterRoleLabelName: role,
+				utils.ClusterInstanceRoleLabelName: role,
 			},
 		},
 	}

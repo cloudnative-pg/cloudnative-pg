@@ -2015,6 +2015,14 @@ any plugin to be loaded with the corresponding configuration</p>
 during a switchover or a failover</p>
 </td>
 </tr>
+<tr><td><code>lastPromotionToken</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>LastPromotionToken is the last verified promotion token that
+was used to promote a replica cluster</p>
+</td>
+</tr>
 <tr><td><code>pvcCount</code><br/>
 <i>int32</i>
 </td>
@@ -2254,6 +2262,16 @@ This field is reported when <code>.spec.failoverDelay</code> is populated or dur
 </td>
 <td>
    <p>SwitchReplicaClusterStatus is the status of the switch to replica cluster</p>
+</td>
+</tr>
+<tr><td><code>demotionToken</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>DemotionToken is a JSON token containing the information
+from pg_controldata such as Database system identifier, Latest checkpoint's
+TimeLineID, Latest checkpoint's REDO location, Latest checkpoint's REDO
+WAL file, and Time of latest checkpoint</p>
 </td>
 </tr>
 </tbody>
@@ -3103,6 +3121,13 @@ by the instance manager</p>
    <p>Database roles managed by the <code>Cluster</code></p>
 </td>
 </tr>
+<tr><td><code>services</code><br/>
+<a href="#postgresql-cnpg-io-v1-ManagedServices"><i>ManagedServices</i></a>
+</td>
+<td>
+   <p>Services roles managed by the <code>Cluster</code></p>
+</td>
+</tr>
 </tbody>
 </table>
 
@@ -3145,6 +3170,78 @@ with an explanation of the cause</p>
 </tbody>
 </table>
 
+## ManagedService     {#postgresql-cnpg-io-v1-ManagedService}
+
+
+**Appears in:**
+
+- [ManagedServices](#postgresql-cnpg-io-v1-ManagedServices)
+
+
+<p>ManagedService represents a specific service managed by the cluster.
+It includes the type of service and its associated template specification.</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>selectorType</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-ServiceSelectorType"><i>ServiceSelectorType</i></a>
+</td>
+<td>
+   <p>SelectorType specifies the type of selectors that the service will have.
+Valid values are &quot;rw&quot;, &quot;r&quot;, and &quot;ro&quot;, representing read-write, read, and read-only services.</p>
+</td>
+</tr>
+<tr><td><code>updateStrategy</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-ServiceUpdateStrategy"><i>ServiceUpdateStrategy</i></a>
+</td>
+<td>
+   <p>UpdateStrategy describes how the service differences should be reconciled</p>
+</td>
+</tr>
+<tr><td><code>serviceTemplate</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-ServiceTemplateSpec"><i>ServiceTemplateSpec</i></a>
+</td>
+<td>
+   <p>ServiceTemplate is the template specification for the service.</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## ManagedServices     {#postgresql-cnpg-io-v1-ManagedServices}
+
+
+**Appears in:**
+
+- [ManagedConfiguration](#postgresql-cnpg-io-v1-ManagedConfiguration)
+
+
+<p>ManagedServices represents the services managed by the cluster.</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>disabledDefaultServices</code><br/>
+<a href="#postgresql-cnpg-io-v1-ServiceSelectorType"><i>[]ServiceSelectorType</i></a>
+</td>
+<td>
+   <p>DisabledDefaultServices is a list of service types that are disabled by default.
+Valid values are &quot;r&quot;, and &quot;ro&quot;, representing read, and read-only services.</p>
+</td>
+</tr>
+<tr><td><code>additional</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-ManagedService"><i>[]ManagedService</i></a>
+</td>
+<td>
+   <p>Additional is a list of additional managed services specified by the user.</p>
+</td>
+</tr>
+</tbody>
+</table>
+
 ## Metadata     {#postgresql-cnpg-io-v1-Metadata}
 
 
@@ -3166,6 +3263,13 @@ not using the core data types.</p>
 <table class="table">
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
+<tr><td><code>name</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The name of the resource. Only supported for certain types</p>
+</td>
+</tr>
 <tr><td><code>labels</code><br/>
 <i>map[string]string</i>
 </td>
@@ -4083,6 +4187,22 @@ cluster</p>
 <table class="table">
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
+<tr><td><code>self</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Self defines the name of this cluster. It is used to determine if this is a primary
+or a replica cluster, comparing it with <code>primary</code></p>
+</td>
+</tr>
+<tr><td><code>primary</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Primary defines which Cluster is defined to be the primary in the distributed PostgreSQL cluster, based on the
+topology specified in externalClusters</p>
+</td>
+</tr>
 <tr><td><code>source</code> <B>[Required]</B><br/>
 <i>string</i>
 </td>
@@ -4098,6 +4218,14 @@ cluster</p>
 existing cluster. Replica cluster can be created from a recovery
 object store or via streaming through pg_basebackup.
 Refer to the Replica clusters page of the documentation for more information.</p>
+</td>
+</tr>
+<tr><td><code>promotionToken</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>A demotion token generated by an external cluster used to
+check if the promotion requirements are met.</p>
 </td>
 </tr>
 </tbody>
@@ -4739,10 +4867,29 @@ service account</p>
 </tbody>
 </table>
 
+## ServiceSelectorType     {#postgresql-cnpg-io-v1-ServiceSelectorType}
+
+(Alias of `string`)
+
+**Appears in:**
+
+- [ManagedService](#postgresql-cnpg-io-v1-ManagedService)
+
+- [ManagedServices](#postgresql-cnpg-io-v1-ManagedServices)
+
+
+<p>ServiceSelectorType describes a valid value for generating the service selectors.
+It indicates which type of service the selector applies to, such as read-write, read, or read-only</p>
+
+
+
+
 ## ServiceTemplateSpec     {#postgresql-cnpg-io-v1-ServiceTemplateSpec}
 
 
 **Appears in:**
+
+- [ManagedService](#postgresql-cnpg-io-v1-ManagedService)
 
 - [PoolerSpec](#postgresql-cnpg-io-v1-PoolerSpec)
 
@@ -4772,6 +4919,20 @@ More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-
 </tr>
 </tbody>
 </table>
+
+## ServiceUpdateStrategy     {#postgresql-cnpg-io-v1-ServiceUpdateStrategy}
+
+(Alias of `string`)
+
+**Appears in:**
+
+- [ManagedService](#postgresql-cnpg-io-v1-ManagedService)
+
+
+<p>ServiceUpdateStrategy describes how the changes to the managed service should be handled</p>
+
+
+
 
 ## SnapshotOwnerReference     {#postgresql-cnpg-io-v1-SnapshotOwnerReference}
 
@@ -5221,6 +5382,24 @@ restored in parallel (when a PostgreSQL standby is fetching WAL
 files from a recovery object store). If not specified, WAL files
 will be processed one at a time. It accepts a positive integer as a
 value - with 1 being the minimum accepted value.</p>
+</td>
+</tr>
+<tr><td><code>additionalCommandArgs</code> <B>[Required]</B><br/>
+<i>[]string</i>
+</td>
+<td>
+   <p>AdditionalCommandArgs represents additional arguments that can be appended
+to the 'barman-cloud-wal-archive' command-line invocation. These arguments
+provide flexibility to customize the backup process further according to
+specific requirements or configurations.</p>
+<p>Example:
+In a scenario where specialized backup options are required, such as setting
+a specific timeout or defining custom behavior, users can use this field
+to specify additional command arguments.</p>
+<p>Note:
+It's essential to ensure that the provided arguments are valid and supported
+by the 'barman-cloud-wal-archive' command, to avoid potential errors or unintended
+behavior during execution.</p>
 </td>
 </tr>
 </tbody>

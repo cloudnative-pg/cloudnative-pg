@@ -309,7 +309,7 @@ func (r *PoolerReconciler) ensureServiceAccountPullSecret(
 	}
 
 	// we reconcile only if the secret is owned by us
-	if _, isOwned := isOwnedByPooler(&remoteSecret); !isOwned {
+	if _, isOwned := isOwnedByPoolerKind(&remoteSecret); !isOwned {
 		return pullSecretName, nil
 	}
 	if reflect.DeepEqual(remoteSecret.Data, secret.Data) && reflect.DeepEqual(remoteSecret.Type, secret.Type) {

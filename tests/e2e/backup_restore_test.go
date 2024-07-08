@@ -41,7 +41,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 		barmanCloudBackupLogEntry = "Starting barman-cloud-backup"
 	)
 
-	var namespace, clusterName, curlPodName string
+	var namespace, clusterName string
 	currentTimestamp := new(string)
 
 	BeforeEach(func() {
@@ -69,7 +69,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 
 		BeforeAll(func() {
 			if !IsLocal() {
-				Skip("This test is only run on local cluster")
+				Skip("This test is only run on local clusters")
 			}
 			const namespacePrefix = "cluster-backup-minio"
 			var err error
@@ -89,14 +89,6 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 
 			By("creating the credentials for minio", func() {
 				AssertStorageCredentialsAreCreated(namespace, "backup-storage-creds", "minio", "minio123")
-			})
-
-			// Create the curl client pod and wait for it to be ready.
-			By("setting up curl client pod", func() {
-				curlClient := testUtils.CurlClient(namespace)
-				err := testUtils.PodCreateAndWaitForReady(env, &curlClient, 240)
-				Expect(err).ToNot(HaveOccurred())
-				curlPodName = curlClient.GetName()
 			})
 
 			// Create ConfigMap and secrets to verify metrics for target database after backup restore
@@ -238,7 +230,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 
 			cluster, err := env.GetCluster(namespace, restoredClusterName)
 			Expect(err).ToNot(HaveOccurred())
-			AssertMetricsData(namespace, curlPodName, targetDBOne, targetDBTwo, targetDBSecret, cluster)
+			AssertMetricsData(namespace, targetDBOne, targetDBTwo, targetDBSecret, cluster)
 
 			previous := 0
 			latestGZ := filepath.Join("*", clusterName, "*", "*.history.gz")

@@ -81,7 +81,7 @@ func makePod(clusterName, serial, role string) corev1.Pod {
 				utils.ClusterSerialAnnotationName: serial,
 			},
 			Labels: map[string]string{
-				utils.ClusterRoleLabelName: role,
+				utils.ClusterInstanceRoleLabelName: role,
 			},
 		},
 		Spec: corev1.PodSpec{

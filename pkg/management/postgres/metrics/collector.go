@@ -288,8 +288,13 @@ func (q *QueriesCollector) ParseQueries(customQueries []byte) error {
 		}
 
 		q.userQueries[name] = query
+		// For the metric namespace, override the value included in the key with the query name, if it exists
+		metricMapNamespace := name
+		if query.Name != "" {
+			metricMapNamespace = query.Name
+		}
 		q.mappings[name], q.variableLabels[name] = query.ToMetricMap(
-			fmt.Sprintf("%v_%v", q.collectorName, name))
+			fmt.Sprintf("%v_%v", q.Name(), metricMapNamespace))
 	}
 
 	return nil
@@ -304,7 +309,7 @@ func (q *QueriesCollector) InjectUserQueries(defaultQueries UserQueries) {
 	for name, query := range defaultQueries {
 		q.userQueries[name] = query
 		q.mappings[name], q.variableLabels[name] = query.ToMetricMap(
-			fmt.Sprintf("%v_%v", q.collectorName, name))
+			fmt.Sprintf("%v_%v", q.Name(), name))
 	}
 }
 

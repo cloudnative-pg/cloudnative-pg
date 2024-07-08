@@ -19,19 +19,17 @@ package webserver
 import (
 	"bytes"
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/instance"
 )
 
@@ -52,29 +50,7 @@ func NewBackupClient() BackupClient {
 	const connectionTimeout = 2 * time.Second
 	const requestTimeout = 30 * time.Second
 
-	// We want a connection timeout to prevent waiting for the default
-	// TCP connection timeout (30 seconds) on lost SYN packets
-	dialer := &net.Dialer{
-		Timeout: connectionTimeout,
-	}
-	timeoutClient := &http.Client{
-		Transport: &http.Transport{
-			DialContext: dialer.DialContext,
-			DialTLSContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-				tlsConfig, err := certs.GetTLSConfigFromContext(ctx)
-				if err != nil {
-					return nil, err
-				}
-				tlsDialer := tls.Dialer{
-					NetDialer: dialer,
-					Config:    tlsConfig,
-				}
-				return tlsDialer.DialContext(ctx, network, addr)
-			},
-		},
-		Timeout: requestTimeout,
-	}
-	return &backupClient{cli: timeoutClient}
+	return &backupClient{cli: resources.NewHTTPClient(connectionTimeout, requestTimeout)}
 }
 
 // StatusWithErrors retrieves the current status of the backup.

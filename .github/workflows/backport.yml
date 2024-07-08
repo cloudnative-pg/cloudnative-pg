@@ -27,11 +27,10 @@ jobs:
         uses: actions-ecosystem/action-add-labels@v1
         if: ${{ !contains(github.event.pull_request.labels.*.name, 'do not backport') }}
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ secrets.REPO_GHA_PAT }}
           number:  ${{ github.event.pull_request.number }}
           labels: |
             backport-requested :arrow_backward:
-            release-1.21
             release-1.22
             release-1.23
       -
@@ -52,9 +51,9 @@ jobs:
         uses: actions-ecosystem/action-remove-labels@v1
         if: ${{ contains(github.event.pull_request.labels.*.name, 'do not backport') }}
         with:
+          github_token: ${{ secrets.REPO_GHA_PAT }}
           labels: |
             backport-requested :arrow_backward:
-            release-1.21
             release-1.22
             release-1.23
 
@@ -72,7 +71,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        branch: [release-1.21, release-1.22, release-1.23]
+        branch: [release-1.22, release-1.23]
     env:
       PR: ${{ github.event.pull_request.number }}
     outputs:
