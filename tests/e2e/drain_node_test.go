@@ -206,12 +206,6 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 		// new node as there are none, the primary node can not be killed, therefore the drain fails.
 
 		When("the cluster allows moving PVCs between nodes", func() {
-			BeforeEach(func() {
-				// AKS using rook and the standard GKE StorageClass allow moving PVCs between nodes
-				if !GetEnvProfile().CanMovePVCAcrossNodes() {
-					Skip("This test case is only applicable on clusters where PVC can be moved")
-				}
-			})
 			It("can drain the primary pod's node with 3 pods on 1 nodes", func() {
 				const namespacePrefix = "drain-node-e2e-pvc-on-one-nodes"
 				var cordonNodes []string
