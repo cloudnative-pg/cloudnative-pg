@@ -30,15 +30,12 @@ import (
 	"github.com/cloudnative-pg/cnpg-i/pkg/reconciler"
 	"github.com/cloudnative-pg/cnpg-i/pkg/wal"
 	"google.golang.org/grpc"
-
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
 // defaultTimeout is the timeout applied by default to every GRPC call
 const defaultTimeout = 30 * time.Second
 
-// Protocol represents a way to connect
-// to a plugin
+// Protocol represents a way to connect to a plugin
 type Protocol interface {
 	Dial(ctx context.Context) (Handler, error)
 }
@@ -327,13 +324,7 @@ func (pluginData *data) Ping(ctx context.Context) error {
 // LoadPlugin loads the plugin connected over a certain collections,
 // queries the metadata and prepares an active plugin connection interface
 func LoadPlugin(ctx context.Context, handler Handler) (Interface, error) {
-	var err error
-
-	contextLogger := log.FromContext(ctx)
-	ctx = log.IntoContext(ctx, contextLogger)
-
-	var result data
-	result, err = newPluginDataFromConnection(ctx, handler)
+	result, err := newPluginDataFromConnection(ctx, handler)
 	if err != nil {
 		return nil, err
 	}

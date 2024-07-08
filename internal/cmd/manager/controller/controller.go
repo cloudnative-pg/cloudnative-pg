@@ -217,9 +217,7 @@ func RunController(
 		return err
 	}
 
-	// Load the sidecar plugins
 	pluginRepository := repository.New()
-
 	if err := pluginRepository.RegisterUnixSocketPluginsInPath(
 		configuration.Current.PluginSocketDir,
 	); err != nil {
