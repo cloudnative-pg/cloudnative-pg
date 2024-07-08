@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -33,26 +34,45 @@ import (
 // getOlmResource gets the desired resource using the Dynamic Client
 // to avoid code dependencies on the OLM libraries
 func getOlmResource(
-	ctx context.Context, dynamicClient dynamic.Interface, namespace, item string,
+	ctx context.Context,
+	dynamicClient dynamic.Interface,
+	namespace, resource string,
 ) (client.ObjectList, error) {
-	resource := schema.GroupVersionResource{
+	isContained := func(item unstructured.Unstructured, list []unstructured.Unstructured) bool {
+		for _, element := range list {
+			if element.GetName() == item.GetName() {
+				return true
+			}
+		}
+		return false
+	}
+
+	gvr := schema.GroupVersionResource{
 		Group:    "operators.coreos.com",
 		Version:  "v1alpha1",
-		Resource: item,
+		Resource: resource,
 	}
 
-	list, err := dynamicClient.Resource(resource).Namespace(namespace).
+	listFromLabelOpenshift, err := dynamicClient.Resource(gvr).Namespace(namespace).
 		List(ctx, metav1.ListOptions{LabelSelector: labelOpenshiftOperators})
 	if err != nil {
-		return nil, fmt.Errorf("could note get resource: %v, %v", resource, err)
+		return nil, fmt.Errorf("could note get resource: %v, %v", gvr, err)
 	}
 
-	list, err = dynamicClient.Resource(resource).Namespace(namespace).
+	listFromLabelNamespace, err := dynamicClient.Resource(gvr).Namespace(namespace).
 		List(ctx, metav1.ListOptions{LabelSelector: getLabelOperatorsNamespace()})
 	if err != nil {
-		return nil, fmt.Errorf("could note get resource: %v, %v", resource, err)
+		return nil, fmt.Errorf("could note get resource: %v, %v", gvr, err)
 	}
-	return list, err
+
+	for idx := range listFromLabelOpenshift.Items {
+		item := listFromLabelOpenshift.Items[idx]
+		if !isContained(item, listFromLabelNamespace.Items) {
+			listFromLabelOpenshift.Items = append(listFromLabelOpenshift.Items, item)
+		}
+	}
+
+	return listFromLabelOpenshift, err
 }
 
 // olmOperatorReport contains the operator data in Oolm
@@ -61,22 +81,22 @@ type olmOperatorReport map[string]client.ObjectList
 
 // getOlmReport builds the olm operator report
 func getOlmReport(ctx context.Context, namespace string) (olmOperatorReport, error) {
-	items := []string{"clusterserviceversions", "installplans", "subscriptions"}
-	operatorReport := make(olmOperatorReport)
+	resources := []string{"clusterserviceversions", "installplans", "subscriptions"}
+	report := make(olmOperatorReport)
 
-	client, err := dynamic.NewForConfig(plugin.Config)
+	cli, err := dynamic.NewForConfig(plugin.Config)
 	if err != nil {
 		return nil, fmt.Errorf("could not get dynamic client: %w", err)
 	}
 
-	for _, item := range items {
-		resource, err := getOlmResource(ctx, client, namespace, item)
+	for _, item := range resources {
+		resource, err := getOlmResource(ctx, cli, namespace, item)
 		if err != nil {
 			return nil, fmt.Errorf("could not build report. Failed on item %s: %w", item, err)
 		}
-		operatorReport[item] = resource
+		report[item] = resource
 	}
-	return operatorReport, nil
+	return report, nil
 }
 
 // writeToZip makes a new section in the ZIP file, and adds in it various
