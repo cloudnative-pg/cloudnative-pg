@@ -8,16 +8,16 @@ on:
   workflow_dispatch:
     inputs:
       depth:
-        description: 'Depth (push, pull_request, main, schedule)'
+        description: 'Depth (push, pull_request, main (default), schedule)'
         required: true
         default: 'main'
       limit:
         description: 'Limit to the specified engines list (local, eks, aks, gke, openshift)'
         required: false
       test_level:
-        description: 'Test level (0-4)'
+        description: 'Test level (0-4, 4 is default) '
         required: false
-        default: '1'
+        default: '4'
       feature_type:
         description: >
           Feature Type (disruptive, performance, upgrade, smoke, basic, service-connectivity, self-healing,
@@ -25,9 +25,9 @@ on:
           pod-scheduling, cluster-metadata, recovery, importing-databases, storage, security, maintenance)
         required: false
       log_level:
-        description: 'Log level for operator (error, warning, info(default), debug, trace)'
+        description: 'Log level for operator (error, warning, info, debug(default), trace)'
         required: false
-        default: 'info'
+        default: 'debug'
   schedule:
     - cron:  '0 1 * * *'
 
