@@ -210,8 +210,8 @@ permission management.
 
 #### Why Are ClusterRole Permissions Needed?
 
-The operator currently requires `ClusterRole` permissions just to read `nodes`
-objects. All other permissions can be namespace-scoped (i.e., `Role`) or
+The operator currently requires `ClusterRole` permissions to read `nodes` and
+`ClusterImageCatalog` objects. All other permissions can be namespace-scoped (i.e., `Role`) or
 cluster-wide (i.e., `ClusterRole`).
 
 Even with these permissions, if someone gains access to the `ServiceAccount`,
