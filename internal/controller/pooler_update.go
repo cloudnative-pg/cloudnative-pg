@@ -99,7 +99,11 @@ func (r *PoolerReconciler) updateDeployment(
 		}
 
 		deployment := resources.Deployment.DeepCopy()
-		deployment.Spec = generatedDeployment.Spec
+		deployment.Spec.Replicas = generatedDeployment.Spec.Replicas
+
+		if !utils.IsPodSpecReconciliationDisabled(&pooler.ObjectMeta) {
+			deployment.Spec = generatedDeployment.Spec
+		}
 
 		utils.MergeObjectsMetadata(deployment, generatedDeployment)
 

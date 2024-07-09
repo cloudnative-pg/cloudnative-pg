@@ -41,16 +41,15 @@ func DeepHashObject(hasher hash.Hash, objectToWrite interface{}) error {
 	return err
 }
 
-// ComputeHash returns a hash value calculated from pod template and
-// a collisionCount to avoid hash collision. The hash will be safe encoded to
-// avoid bad words.
+// ComputeHash returns a hash value calculated from the provided object.
+// The hash will be safe encoded to avoid bad words.
 func ComputeHash(object interface{}) (string, error) {
-	podTemplateSpecHasher := fnv.New32a()
-	if err := DeepHashObject(podTemplateSpecHasher, object); err != nil {
+	hasher := fnv.New32a()
+	if err := DeepHashObject(hasher, object); err != nil {
 		return "", err
 	}
 
-	return rand.SafeEncodeString(fmt.Sprint(podTemplateSpecHasher.Sum32())), nil
+	return rand.SafeEncodeString(fmt.Sprint(hasher.Sum32())), nil
 }
 
 // ComputeVersionedHash follows the same rules of ComputeHash with the exception that accepts also a epoc value.
