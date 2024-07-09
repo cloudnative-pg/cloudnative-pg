@@ -302,9 +302,10 @@ func (e *Exporter) collectShowStats(ch chan<- prometheus.Metric, db *sql.DB) {
 		e.Metrics.ShowStats.AvgWaitTime.WithLabelValues(database).Set(float64(avgWaitTime))
 
 		if statColsCount >= 16 {
-			e.Metrics.ShowStats.TotalServerAssigCount.WithLabelValues(database).Set(float64(totalServerAssigCount))
-			e.Metrics.ShowStats.AvgServerAssigCount.WithLabelValues(database).Set(float64(avgServerAssigCount))
-
+			e.Metrics.ShowStats.TotalServerAssigCount.WithLabelValues(database).Set(
+				float64(totalServerAssigCount))
+			e.Metrics.ShowStats.AvgServerAssigCount.WithLabelValues(database).Set(
+				float64(avgServerAssigCount))
 		}
 	}
 
