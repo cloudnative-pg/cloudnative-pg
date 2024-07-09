@@ -19,6 +19,7 @@ package metricsserver
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -71,7 +72,7 @@ func ListenAndServe() error {
 	err := server.ListenAndServe()
 
 	// The metricsServer has been shut down
-	if err == http.ErrServerClosed {
+	if errors.Is(err, http.ErrServerClosed) {
 		return nil
 	}
 
