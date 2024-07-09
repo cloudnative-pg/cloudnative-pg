@@ -171,8 +171,17 @@ namespaced resources.
   permission is also used to determine if a node is schedule or not, avoiding
   the creation of pods that cannot be created at all.
 
-To see all the permissions required by the operator, you can run `kubectl
-describe clusterrole cnpg-manager`.
+The operator currently requires `ClusterRole` permissions to read `nodes` and
+`ClusterImageCatalog` objects. All other permissions can be namespace-scoped (i.e., `Role`) or
+cluster-wide (i.e., `ClusterRole`).
+
+Even with these permissions, if someone gains access to the `ServiceAccount`,
+they will only have `get`, `list`, and `watch` permissions, which are limited
+to viewing resources. However, if an unauthorized user gains access to the
+`ServiceAccount`, it indicates a more significant security issue.
+
+Therefore, it's crucial to prevent users from accessing the operator's
+`ServiceAccount` and any other `ServiceAccount` with elevated permissions.
 
 ### Calls to the API server made by the instance manager
 
