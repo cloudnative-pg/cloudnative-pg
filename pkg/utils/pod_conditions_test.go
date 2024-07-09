@@ -134,19 +134,24 @@ var _ = Describe("Pod conditions test suite", func() {
 		})
 	})
 
-	Describe("Must detect if a pod has been evicted or not", func() {
+	Describe("Must detect if a podis unschedulable", func() {
 		pod := &corev1.Pod{
 			Status: corev1.PodStatus{
-				Phase:  corev1.PodFailed,
-				Reason: PodReasonEvicted,
-				Message: "The node was low on resource: memory. " +
-					"Container postgres was using 111 which exceeds its request of 0.",
+				Phase: corev1.PodPending,
+				Conditions: []corev1.PodCondition{
+					{
+						Type:   corev1.PodScheduled,
+						Status: corev1.ConditionFalse,
+						Reason: corev1.PodReasonUnschedulable,
+					},
+				},
 			},
 		}
-		Expect(IsPodEvicted(pod)).To(BeTrue())
+		Expect(IsPodUnschedulable(pod)).To(BeTrue())
 
 		pod = &corev1.Pod{
 			Status: corev1.PodStatus{
+				Phase: corev1.PodRunning,
 				Conditions: []corev1.PodCondition{
 					{
 						Type:   corev1.ContainersReady,
@@ -155,6 +160,6 @@ var _ = Describe("Pod conditions test suite", func() {
 				},
 			},
 		}
-		Expect(IsPodEvicted(pod)).To(BeFalse())
+		Expect(IsPodUnschedulable(pod)).To(BeFalse())
 	})
 })

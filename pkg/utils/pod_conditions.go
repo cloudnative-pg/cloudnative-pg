@@ -69,21 +69,9 @@ func IsPodActive(p corev1.Pod) bool {
 		p.DeletionTimestamp == nil
 }
 
-// IsPodEvicted checks if a pod has been evicted by the
-// Kubelet
-func IsPodEvicted(p *corev1.Pod) bool {
-	return corev1.PodFailed == p.Status.Phase &&
-		PodReasonEvicted == p.Status.Reason
-}
-
-// IsPodSucceeded returns true if pod has a Phase of v1.PodSucceeded
-func IsPodSucceeded(pod *corev1.Pod) bool {
-	return pod.Status.Phase == corev1.PodSucceeded
-}
-
 // IsPodUnschedulable check if a Pod is unschedulable
 func IsPodUnschedulable(p *corev1.Pod) bool {
-	if corev1.PodPending != p.Status.Phase && corev1.PodFailed != p.Status.Phase {
+	if corev1.PodPending != p.Status.Phase {
 		return false
 	}
 	for _, c := range p.Status.Conditions {
