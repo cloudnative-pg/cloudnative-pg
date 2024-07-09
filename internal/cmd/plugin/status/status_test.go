@@ -46,19 +46,19 @@ var _ = Describe("getPrimaryStartTime", func() {
 	})
 
 	Context("when CurrentPrimaryTimestamp is valid", func() {
-		BeforeEach(func() {
+		It("should return the formatted timestamp", func() {
 			now := time.Now()
+			uptime := 1 * time.Hour
+			currentPrimaryTimestamp := now.Add(-uptime)
+
 			cluster = &apiv1.Cluster{
 				Status: apiv1.ClusterStatus{
-					CurrentPrimaryTimestamp: now.Format(metav1.RFC3339Micro),
+					CurrentPrimaryTimestamp: currentPrimaryTimestamp.Format(metav1.RFC3339Micro),
 				},
 			}
-		})
 
-		It("should return the formatted timestamp", func() {
-			uptime := time.Since(time.Now()) // It won't be exactly zero, but close
-			expected := fmt.Sprintf("%s (uptime %s)", time.Now().Round(time.Second), uptime.Round(time.Second))
-			Expect(getPrimaryStartTime(cluster)).To(Equal(expected))
+			expected := fmt.Sprintf("%s (uptime %s)", currentPrimaryTimestamp.Round(time.Second), uptime)
+			Expect(getPrimaryStartTimeIdempotent(cluster, now)).To(Equal(expected))
 		})
 	})
 
