@@ -12,3 +12,11 @@ rules:
   - get
   - list
   - watch
+- apiGroups:
+    - postgresql.cnpg.io
+  resources:
+    - clusterimagecatalogs
+  verbs:
+    - get
+    - list
+    - watch
