@@ -104,6 +104,9 @@ const (
 	// the status of the reconciliation loop for the cluster
 	ReconciliationLoopAnnotationName = MetadataNamespace + "/reconciliationLoop"
 
+	// ReconcilePodSpecAnnotationName is the name of the annotation that prevents the pod spec to be reconciled
+	ReconcilePodSpecAnnotationName = MetadataNamespace + "/reconcilePodSpec"
+
 	// HibernateClusterManifestAnnotationName contains the hibernated cluster manifest
 	// Deprecated. Replaced by: ClusterManifestAnnotationName. This annotation is
 	// kept for backward compatibility
@@ -384,6 +387,14 @@ func AnnotateAppArmor(object *metav1.ObjectMeta, spec *corev1.PodSpec, annotatio
 // IsReconciliationDisabled checks if the reconciliation loop is disabled on the given resource
 func IsReconciliationDisabled(object *metav1.ObjectMeta) bool {
 	return object.Annotations[ReconciliationLoopAnnotationName] == string(annotationStatusDisabled)
+}
+
+// IsPodSpecReconciliationDisabled checks if the pod spec reconciliation is disabled
+func IsPodSpecReconciliationDisabled(object *metav1.ObjectMeta) bool {
+	if object.Annotations == nil {
+		return false
+	}
+	return object.Annotations[ReconcilePodSpecAnnotationName] == string(annotationStatusDisabled)
 }
 
 // IsEmptyWalArchiveCheckEnabled returns a boolean indicating if we should run the logic that checks if the WAL archive
