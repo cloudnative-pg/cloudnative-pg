@@ -122,7 +122,7 @@ func (cmd *pgBenchRun) buildNodeSelector() map[string]string {
 func (cmd *pgBenchRun) buildJob(cluster *apiv1.Cluster) *batchv1.Job {
 	clusterImageName := cluster.Spec.ImageName
 	labels := map[string]string{
-		"pbBenchJob": cluster.Name,
+		"pgBenchJob": cluster.Name,
 	}
 	return &batchv1.Job{
 		// To ensure we have manifest with Kind and APi in --dry-run
