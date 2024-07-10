@@ -14,13 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package client
+package connection
 
 import (
 	"context"
 	"fmt"
 	"io"
-	"path"
 	"slices"
 	"time"
 
@@ -30,69 +29,48 @@ import (
 	"github.com/cloudnative-pg/cnpg-i/pkg/operator"
 	"github.com/cloudnative-pg/cnpg-i/pkg/reconciler"
 	"github.com/cloudnative-pg/cnpg-i/pkg/wal"
-	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/timeout"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
-
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
 // defaultTimeout is the timeout applied by default to every GRPC call
 const defaultTimeout = 30 * time.Second
 
-type protocol interface {
-	dial(ctx context.Context, path string) (connectionHandler, error)
+// Protocol represents a way to connect to a plugin
+type Protocol interface {
+	Dial(ctx context.Context) (Handler, error)
 }
 
-type connectionHandler interface {
+// Handler represent a plugin connection
+type Handler interface {
 	grpc.ClientConnInterface
 	io.Closer
 }
 
-type protocolUnix string
+// Interface exposes the methods that allow the user to access to the features
+// of a plugin
+type Interface interface {
+	Name() string
+	Metadata() Metadata
 
-func (p protocolUnix) dial(ctx context.Context, path string) (connectionHandler, error) {
-	contextLogger := log.FromContext(ctx)
-	dialPath := fmt.Sprintf("unix://%s", path)
+	LifecycleClient() lifecycle.OperatorLifecycleClient
+	OperatorClient() operator.OperatorClient
+	WALClient() wal.WALClient
+	BackupClient() backup.BackupClient
+	ReconcilerHooksClient() reconciler.ReconcilerHooksClient
 
-	contextLogger.Debug("Connecting to plugin", "path", dialPath)
+	PluginCapabilities() []identity.PluginCapability_Service_Type
+	OperatorCapabilities() []operator.OperatorCapability_RPC_Type
+	WALCapabilities() []wal.WALCapability_RPC_Type
+	LifecycleCapabilities() []*lifecycle.OperatorLifecycleCapabilities
+	BackupCapabilities() []backup.BackupCapability_RPC_Type
+	ReconcilerCapabilities() []reconciler.ReconcilerHooksCapability_Kind
 
-	return grpc.NewClient(
-		dialPath,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithUnaryInterceptor(
-			timeout.UnaryClientInterceptor(defaultTimeout),
-		),
-	)
+	Ping(ctx context.Context) error
+	Close() error
 }
 
-// data represent a new CNPI client collection
 type data struct {
-	pluginPath string
-	protocol   protocol
-	plugins    []pluginData
-}
-
-func (data *data) getPlugin(pluginName string) (*pluginData, error) {
-	selectedPluginIdx := -1
-	for idx := range data.plugins {
-		plugin := &data.plugins[idx]
-
-		if plugin.name == pluginName {
-			selectedPluginIdx = idx
-			break
-		}
-	}
-
-	if selectedPluginIdx == -1 {
-		return nil, ErrPluginNotLoaded
-	}
-
-	return &data.plugins[selectedPluginIdx], nil
-}
-
-type pluginData struct {
-	connection            connectionHandler
+	connection            Handler
 	identityClient        identity.IdentityClient
 	operatorClient        operator.OperatorClient
 	lifecycleClient       lifecycle.OperatorLifecycleClient
@@ -110,124 +88,7 @@ type pluginData struct {
 	reconcilerCapabilities []reconciler.ReconcilerHooksCapability_Kind
 }
 
-// NewUnixSocketClient creates a new CNPI client discovering plugins
-// registered in a specific path
-func NewUnixSocketClient(pluginPath string) Client {
-	return &data{
-		pluginPath: pluginPath,
-		protocol:   protocolUnix(""),
-	}
-}
-
-func (data *data) Load(ctx context.Context, name string) error {
-	pluginData, err := data.loadPlugin(ctx, name)
-	if err != nil {
-		return err
-	}
-
-	data.plugins = append(data.plugins, pluginData)
-	return nil
-}
-
-func (data *data) MetadataList() []Metadata {
-	result := make([]Metadata, len(data.plugins))
-	for i := range data.plugins {
-		result[i] = data.plugins[i].Metadata()
-	}
-
-	return result
-}
-
-func (data *data) loadPlugin(ctx context.Context, name string) (pluginData, error) {
-	var connection connectionHandler
-	var err error
-
-	defer func() {
-		if err != nil && connection != nil {
-			_ = connection.Close()
-		}
-	}()
-
-	contextLogger := log.FromContext(ctx).WithValues("pluginName", name)
-	ctx = log.IntoContext(ctx, contextLogger)
-
-	if connection, err = data.protocol.dial(
-		ctx,
-		path.Join(data.pluginPath, name),
-	); err != nil {
-		contextLogger.Error(err, "Error while connecting to plugin")
-		return pluginData{}, err
-	}
-
-	var result pluginData
-	result, err = newPluginDataFromConnection(ctx, connection)
-	if err != nil {
-		return pluginData{}, err
-	}
-
-	// Load the list of services implemented by the plugin
-	if err = result.loadPluginCapabilities(ctx); err != nil {
-		return pluginData{}, err
-	}
-
-	// If the plugin implements the Operator service, load its
-	// capabilities
-	if slices.Contains(result.capabilities, identity.PluginCapability_Service_TYPE_OPERATOR_SERVICE) {
-		if err = result.loadOperatorCapabilities(ctx); err != nil {
-			return pluginData{}, err
-		}
-	}
-
-	// If the plugin implements the lifecycle service, load its
-	// capabilities
-	if slices.Contains(result.capabilities, identity.PluginCapability_Service_TYPE_LIFECYCLE_SERVICE) {
-		if err = result.loadLifecycleCapabilities(ctx); err != nil {
-			return pluginData{}, err
-		}
-	}
-
-	// If the plugin implements the WAL service, load its
-	// capabilities
-	if slices.Contains(result.capabilities, identity.PluginCapability_Service_TYPE_WAL_SERVICE) {
-		if err = result.loadWALCapabilities(ctx); err != nil {
-			return pluginData{}, err
-		}
-	}
-
-	// If the plugin implements the backup service, load its
-	// capabilities
-	if slices.Contains(result.capabilities, identity.PluginCapability_Service_TYPE_BACKUP_SERVICE) {
-		if err = result.loadBackupCapabilities(ctx); err != nil {
-			return pluginData{}, err
-		}
-	}
-
-	// If the plugin implements the reconciler hooks, load its
-	// capabilities
-	if slices.Contains(result.capabilities, identity.PluginCapability_Service_TYPE_RECONCILER_HOOKS) {
-		if err = result.loadReconcilerHooksCapabilities(ctx); err != nil {
-			return pluginData{}, err
-		}
-	}
-
-	return result, nil
-}
-
-func (data *data) Close(ctx context.Context) {
-	contextLogger := log.FromContext(ctx)
-	for i := range data.plugins {
-		plugin := &data.plugins[i]
-		contextLogger := contextLogger.WithValues("pluginName", plugin.name)
-
-		if err := plugin.connection.Close(); err != nil {
-			contextLogger.Error(err, "while closing plugin connection")
-		}
-	}
-
-	data.plugins = nil
-}
-
-func newPluginDataFromConnection(ctx context.Context, connection connectionHandler) (pluginData, error) {
+func newPluginDataFromConnection(ctx context.Context, connection Handler) (data, error) {
 	var err error
 
 	identityClient := identity.NewIdentityClient(connection)
@@ -238,10 +99,10 @@ func newPluginDataFromConnection(ctx context.Context, connection connectionHandl
 		ctx,
 		&identity.GetPluginMetadataRequest{},
 	); err != nil {
-		return pluginData{}, fmt.Errorf("while querying plugin identity: %w", err)
+		return data{}, fmt.Errorf("while querying plugin identity: %w", err)
 	}
 
-	result := pluginData{}
+	result := data{}
 	result.connection = connection
 	result.name = pluginInfoResponse.Name
 	result.version = pluginInfoResponse.Version
@@ -255,7 +116,7 @@ func newPluginDataFromConnection(ctx context.Context, connection connectionHandl
 	return result, err
 }
 
-func (pluginData *pluginData) loadPluginCapabilities(ctx context.Context) error {
+func (pluginData *data) loadPluginCapabilities(ctx context.Context) error {
 	var pluginCapabilitiesResponse *identity.GetPluginCapabilitiesResponse
 	var err error
 
@@ -274,7 +135,7 @@ func (pluginData *pluginData) loadPluginCapabilities(ctx context.Context) error 
 	return nil
 }
 
-func (pluginData *pluginData) loadOperatorCapabilities(ctx context.Context) error {
+func (pluginData *data) loadOperatorCapabilities(ctx context.Context) error {
 	var operatorCapabilitiesResponse *operator.OperatorCapabilitiesResult
 	var err error
 
@@ -295,7 +156,7 @@ func (pluginData *pluginData) loadOperatorCapabilities(ctx context.Context) erro
 	return nil
 }
 
-func (pluginData *pluginData) loadLifecycleCapabilities(ctx context.Context) error {
+func (pluginData *data) loadLifecycleCapabilities(ctx context.Context) error {
 	var lifecycleCapabilitiesResponse *lifecycle.OperatorLifecycleCapabilitiesResponse
 	var err error
 	if lifecycleCapabilitiesResponse, err = pluginData.lifecycleClient.GetCapabilities(
@@ -309,7 +170,7 @@ func (pluginData *pluginData) loadLifecycleCapabilities(ctx context.Context) err
 	return nil
 }
 
-func (pluginData *pluginData) loadReconcilerHooksCapabilities(ctx context.Context) error {
+func (pluginData *data) loadReconcilerHooksCapabilities(ctx context.Context) error {
 	var reconcilerHooksCapabilitiesResult *reconciler.ReconcilerHooksCapabilitiesResult
 	var err error
 	if reconcilerHooksCapabilitiesResult, err = pluginData.reconcilerHooksClient.GetCapabilities(
@@ -329,7 +190,7 @@ func (pluginData *pluginData) loadReconcilerHooksCapabilities(ctx context.Contex
 	return nil
 }
 
-func (pluginData *pluginData) loadWALCapabilities(ctx context.Context) error {
+func (pluginData *data) loadWALCapabilities(ctx context.Context) error {
 	var walCapabilitiesResponse *wal.WALCapabilitiesResult
 	var err error
 
@@ -350,7 +211,7 @@ func (pluginData *pluginData) loadWALCapabilities(ctx context.Context) error {
 	return nil
 }
 
-func (pluginData *pluginData) loadBackupCapabilities(ctx context.Context) error {
+func (pluginData *data) loadBackupCapabilities(ctx context.Context) error {
 	var backupCapabilitiesResponse *backup.BackupCapabilitiesResult
 	var err error
 
@@ -373,7 +234,7 @@ func (pluginData *pluginData) loadBackupCapabilities(ctx context.Context) error 
 
 // Metadata extracts the plugin metadata reading from
 // the internal metadata
-func (pluginData *pluginData) Metadata() Metadata {
+func (pluginData *data) Metadata() Metadata {
 	result := Metadata{
 		Name:                 pluginData.name,
 		Version:              pluginData.version,
@@ -400,4 +261,118 @@ func (pluginData *pluginData) Metadata() Metadata {
 	}
 
 	return result
+}
+
+func (pluginData *data) Name() string {
+	return pluginData.name
+}
+
+// Close closes the connection to the plugin.
+func (pluginData *data) Close() error {
+	return pluginData.connection.Close()
+}
+
+func (pluginData *data) LifecycleClient() lifecycle.OperatorLifecycleClient {
+	return pluginData.lifecycleClient
+}
+
+func (pluginData *data) OperatorClient() operator.OperatorClient {
+	return pluginData.operatorClient
+}
+
+func (pluginData *data) WALClient() wal.WALClient {
+	return pluginData.walClient
+}
+
+func (pluginData *data) BackupClient() backup.BackupClient {
+	return pluginData.backupClient
+}
+
+func (pluginData *data) ReconcilerHooksClient() reconciler.ReconcilerHooksClient {
+	return pluginData.reconcilerHooksClient
+}
+
+func (pluginData *data) PluginCapabilities() []identity.PluginCapability_Service_Type {
+	return pluginData.capabilities
+}
+
+func (pluginData *data) OperatorCapabilities() []operator.OperatorCapability_RPC_Type {
+	return pluginData.operatorCapabilities
+}
+
+func (pluginData *data) WALCapabilities() []wal.WALCapability_RPC_Type {
+	return pluginData.walCapabilities
+}
+
+func (pluginData *data) LifecycleCapabilities() []*lifecycle.OperatorLifecycleCapabilities {
+	return pluginData.lifecycleCapabilities
+}
+
+func (pluginData *data) BackupCapabilities() []backup.BackupCapability_RPC_Type {
+	return pluginData.backupCapabilities
+}
+
+func (pluginData *data) ReconcilerCapabilities() []reconciler.ReconcilerHooksCapability_Kind {
+	return pluginData.reconcilerCapabilities
+}
+
+func (pluginData *data) Ping(ctx context.Context) error {
+	_, err := pluginData.identityClient.Probe(ctx, &identity.ProbeRequest{})
+	return err
+}
+
+// LoadPlugin loads the plugin connected over a certain collections,
+// queries the metadata and prepares an active plugin connection interface
+func LoadPlugin(ctx context.Context, handler Handler) (Interface, error) {
+	result, err := newPluginDataFromConnection(ctx, handler)
+	if err != nil {
+		return nil, err
+	}
+
+	// Load the list of services implemented by the plugin
+	if err = result.loadPluginCapabilities(ctx); err != nil {
+		return nil, err
+	}
+
+	// If the plugin implements the Operator service, load its
+	// capabilities
+	if slices.Contains(result.capabilities, identity.PluginCapability_Service_TYPE_OPERATOR_SERVICE) {
+		if err = result.loadOperatorCapabilities(ctx); err != nil {
+			return nil, err
+		}
+	}
+
+	// If the plugin implements the lifecycle service, load its
+	// capabilities
+	if slices.Contains(result.capabilities, identity.PluginCapability_Service_TYPE_LIFECYCLE_SERVICE) {
+		if err = result.loadLifecycleCapabilities(ctx); err != nil {
+			return nil, err
+		}
+	}
+
+	// If the plugin implements the WAL service, load its
+	// capabilities
+	if slices.Contains(result.capabilities, identity.PluginCapability_Service_TYPE_WAL_SERVICE) {
+		if err = result.loadWALCapabilities(ctx); err != nil {
+			return nil, err
+		}
+	}
+
+	// If the plugin implements the backup service, load its
+	// capabilities
+	if slices.Contains(result.capabilities, identity.PluginCapability_Service_TYPE_BACKUP_SERVICE) {
+		if err = result.loadBackupCapabilities(ctx); err != nil {
+			return nil, err
+		}
+	}
+
+	// If the plugin implements the reconciler hooks, load its
+	// capabilities
+	if slices.Contains(result.capabilities, identity.PluginCapability_Service_TYPE_RECONCILER_HOOKS) {
+		if err = result.loadReconcilerHooksCapabilities(ctx); err != nil {
+			return nil, err
+		}
+	}
+
+	return &result, nil
 }

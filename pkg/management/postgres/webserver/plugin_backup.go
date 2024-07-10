@@ -27,6 +27,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	pluginClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/conditions"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
@@ -41,6 +44,7 @@ type PluginBackupCommand struct {
 	Client   client.Client
 	Recorder record.EventRecorder
 	Log      log.Logger
+	Plugins  repository.Interface
 }
 
 // NewPluginBackupCommand initializes a BackupCommand object, taking a physical
@@ -55,12 +59,19 @@ func NewPluginBackupCommand(
 		"pluginConfiguration", backup.Spec.PluginConfiguration,
 		"backupName", backup.Name,
 		"backupNamespace", backup.Name)
+
+	plugins := repository.New()
+	if err := plugins.RegisterUnixSocketPluginsInPath(configuration.Current.PluginSocketDir); err != nil {
+		logger.Error(err, "Error while discovering plugins")
+	}
+
 	return &PluginBackupCommand{
 		Cluster:  cluster,
 		Backup:   backup,
 		Client:   client,
 		Recorder: recorder,
 		Log:      logger,
+		Plugins:  plugins,
 	}
 }
 
@@ -69,12 +80,17 @@ func (b *PluginBackupCommand) Start(ctx context.Context) {
 	go b.invokeStart(ctx)
 }
 
+// Close closes all the connections to the plugins
+func (b *PluginBackupCommand) Close() {
+	b.Plugins.Close()
+}
+
 func (b *PluginBackupCommand) invokeStart(ctx context.Context) {
 	backupLog := b.Log.WithValues(
 		"backupName", b.Backup.Name,
 		"backupNamespace", b.Backup.Name)
 
-	cli, err := b.Cluster.LoadPluginClient(ctx)
+	cli, err := pluginClient.WithPlugins(ctx, b.Plugins, b.Cluster.Spec.Plugins.GetNames()...)
 	if err != nil {
 		b.markBackupAsFailed(ctx, err)
 		return

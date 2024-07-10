@@ -14,13 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package utils
+package connection
 
-// contextKey a type used to assign values inside the context
-type contextKey string
-
-// ContextKeyCluster is the context key holding cluster data
-const ContextKeyCluster contextKey = "cluster"
-
-// PluginClientKey is the context key holding cluster data
-const PluginClientKey contextKey = "pluginClient"
+// Metadata expose the metadata as discovered
+// from a plugin
+type Metadata struct {
+	Name                 string
+	Version              string
+	Capabilities         []string
+	OperatorCapabilities []string
+	WALCapabilities      []string
+	BackupCapabilities   []string
+}

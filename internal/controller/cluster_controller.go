@@ -42,7 +42,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	cnpgiClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/operatorclient"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
@@ -75,16 +77,22 @@ type ClusterReconciler struct {
 	Scheme          *runtime.Scheme
 	Recorder        record.EventRecorder
 	InstanceClient  instance.Client
+	Plugins         repository.Interface
 }
 
 // NewClusterReconciler creates a new ClusterReconciler initializing it
-func NewClusterReconciler(mgr manager.Manager, discoveryClient *discovery.DiscoveryClient) *ClusterReconciler {
+func NewClusterReconciler(
+	mgr manager.Manager,
+	discoveryClient *discovery.DiscoveryClient,
+	plugins repository.Interface,
+) *ClusterReconciler {
 	return &ClusterReconciler{
 		InstanceClient:  instance.NewStatusClient(),
 		DiscoveryClient: discoveryClient,
 		Client:          operatorclient.NewExtendedClient(mgr.GetClient()),
 		Scheme:          mgr.GetScheme(),
 		Recorder:        mgr.GetEventRecorderFor("cloudnative-pg"),
+		Plugins:         plugins,
 	}
 }
 
@@ -142,7 +150,33 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 		return ctrl.Result{}, err
 	}
+
 	ctx = cluster.SetInContext(ctx)
+
+	// Load the required plugins
+	pluginClient, err := cnpgiClient.WithPlugins(ctx, r.Plugins, cluster.Spec.Plugins.GetNames()...)
+	if err != nil {
+		var errUnknownPlugin *repository.ErrUnknownPlugin
+		if errors.As(err, &errUnknownPlugin) {
+			return ctrl.Result{
+					RequeueAfter: 10 * time.Second,
+				}, r.RegisterPhase(
+					ctx,
+					cluster,
+					apiv1.PhaseUnknownPlugin,
+					fmt.Sprintf("Unknown plugin %s", errUnknownPlugin.Name),
+				)
+		}
+
+		contextLogger.Error(err, "Error loading plugins, retrying")
+		return ctrl.Result{}, err
+	}
+	defer func() {
+		pluginClient.Close(ctx)
+	}()
+
+	ctx = setPluginClientInContext(ctx, pluginClient)
+
 	// Run the inner reconcile loop. Translate any ErrNextLoop to an errorless return
 	result, err := r.reconcile(ctx, cluster)
 	if errors.Is(err, ErrNextLoop) {

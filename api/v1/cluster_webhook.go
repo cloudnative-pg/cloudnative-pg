@@ -17,7 +17,6 @@ limitations under the License.
 package v1
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"slices"
@@ -164,27 +163,6 @@ func (r *Cluster) setDefaults(preserveUserSettings bool) {
 	if len(r.Spec.Tablespaces) > 0 {
 		r.defaultTablespaces()
 	}
-
-	ctx := context.Background()
-
-	// Call the plugins to help with defaulting this cluster
-	contextLogger := log.FromContext(ctx)
-	pluginClient, err := r.LoadPluginClient(ctx)
-	if err != nil {
-		contextLogger.Error(err, "Error invoking plugin in the defaulting webhook, skipping")
-		return
-	}
-	defer func() {
-		pluginClient.Close(ctx)
-	}()
-
-	var mutatedCluster Cluster
-	if err := pluginClient.MutateCluster(ctx, r, &mutatedCluster); err != nil {
-		contextLogger.Error(err, "Error invoking plugin in the defaulting webhook, skipping")
-		return
-	}
-
-	mutatedCluster.DeepCopyInto(r)
 }
 
 // defaultTablespaces adds the tablespace owner where the
@@ -309,25 +287,6 @@ var _ webhook.Validator = &Cluster{}
 func (r *Cluster) ValidateCreate() (admission.Warnings, error) {
 	clusterLog.Info("validate create", "name", r.Name, "namespace", r.Namespace)
 	allErrs := r.Validate()
-
-	// Call the plugins to help validating this cluster creation
-	ctx := context.Background()
-	contextLogger := log.FromContext(ctx)
-	pluginClient, err := r.LoadPluginClient(ctx)
-	if err != nil {
-		contextLogger.Error(err, "Error invoking plugin in the validate/create webhook")
-		return nil, err
-	}
-	defer func() {
-		pluginClient.Close(ctx)
-	}()
-
-	pluginValidationResult, err := pluginClient.ValidateClusterCreate(ctx, r)
-	if err != nil {
-		contextLogger.Error(err, "Error invoking plugin in the validate/update webhook")
-		return nil, err
-	}
-	allErrs = append(allErrs, pluginValidationResult...)
 	allWarnings := r.getAdmissionWarnings()
 
 	if len(allErrs) == 0 {
@@ -402,25 +361,6 @@ func (r *Cluster) ValidateUpdate(old runtime.Object) (admission.Warnings, error)
 		r.Validate(),
 		r.ValidateChanges(oldCluster)...,
 	)
-
-	// Call the plugins to help validating this cluster update
-	ctx := context.Background()
-	contextLogger := log.FromContext(ctx)
-	pluginClient, err := r.LoadPluginClient(ctx)
-	if err != nil {
-		contextLogger.Error(err, "Error invoking plugin in the validate/create webhook")
-		return nil, err
-	}
-	defer func() {
-		pluginClient.Close(ctx)
-	}()
-
-	pluginValidationResult, err := pluginClient.ValidateClusterUpdate(ctx, oldCluster, r)
-	if err != nil {
-		contextLogger.Error(err, "Error invoking plugin in the validate/update webhook")
-		return nil, err
-	}
-	allErrs = append(allErrs, pluginValidationResult...)
 
 	if len(allErrs) == 0 {
 		return r.getAdmissionWarnings(), nil
