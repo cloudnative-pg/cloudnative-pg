@@ -8,26 +8,27 @@ on:
   workflow_dispatch:
     inputs:
       depth:
-        description: 'Depth (push, pull_request, main, schedule)'
+        description: 'Depth (push, pull_request, main (default), schedule)'
         required: true
         default: 'main'
       limit:
         description: 'Limit to the specified engines list (local, eks, aks, gke, openshift)'
         required: false
       test_level:
-        description: 'Test level (0-4)'
+        description: 'Test level: 0(highest) to 4(lowest). Default is 4.'
         required: false
-        default: '1'
+        default: '4'
       feature_type:
         description: >
           Feature Type (disruptive, performance, upgrade, smoke, basic, service-connectivity, self-healing,
           backup-restore, snapshot, operator, observability, replication, plugin, postgres-configuration,
-          pod-scheduling, cluster-metadata, recovery, importing-databases, storage, security, maintenance)
+          pod-scheduling, cluster-metadata, recovery, importing-databases, storage, security, maintenance,
+          tablespaces)
         required: false
       log_level:
-        description: 'Log level for operator (error, warning, info(default), debug, trace)'
+        description: 'Log level for operator (error, warning, info, debug(default), trace)'
         required: false
-        default: 'info'
+        default: 'debug'
   schedule:
     - cron:  '0 1 * * *'
 
@@ -621,7 +622,7 @@ jobs:
       matrix: ${{ fromJSON(needs.generate-jobs.outputs.localMatrix) }}
     runs-on: ubuntu-22.04
     env:
-      # TEST_DEPTH determines the matrix of K8S_VERSION x POSTGRES_VERSION jobs where E2E tests will be executed
+      # TEST_DEPTH determines the maximum test level the suite should be running
       TEST_DEPTH: ${{ needs.evaluate_options.outputs.test_level }}
       # FEATURE_TYPE, when defined, determines the subset of E2E tests that will be executed, divided by feature type
       FEATURE_TYPE: ${{ needs.evaluate_options.outputs.feature_type }}
@@ -858,7 +859,7 @@ jobs:
       matrix: ${{ fromJSON(needs.generate-jobs.outputs.aksMatrix) }}
     runs-on: ubuntu-22.04
     env:
-      # TEST_DEPTH determines the matrix of K8S_VERSION x POSTGRES_VERSION jobs where E2E tests will be executed
+      # TEST_DEPTH determines the maximum test level the suite should be running
       TEST_DEPTH: ${{ needs.evaluate_options.outputs.test_level }}
       # FEATURE_TYPE, when defined, determines the subset of E2E tests that will be executed, divided by feature type
       FEATURE_TYPE: ${{ needs.evaluate_options.outputs.feature_type }}
@@ -1189,7 +1190,7 @@ jobs:
       matrix: ${{ fromJSON(needs.generate-jobs.outputs.eksMatrix) }}
     runs-on: ubuntu-22.04
     env:
-      # TEST_DEPTH determines the matrix of K8S_VERSION x POSTGRES_VERSION jobs where E2E tests will be executed
+      # TEST_DEPTH determines the maximum test level the suite should be running
       TEST_DEPTH: ${{ needs.evaluate_options.outputs.test_level }}
       # FEATURE_TYPE, when defined, determines the subset of E2E tests that will be executed, divided by feature type
       FEATURE_TYPE: ${{ needs.evaluate_options.outputs.feature_type }}
@@ -1567,7 +1568,7 @@ jobs:
       matrix: ${{ fromJSON(needs.generate-jobs.outputs.gkeMatrix) }}
     runs-on: ubuntu-22.04
     env:
-      # TEST_DEPTH determines the matrix of K8S_VERSION x POSTGRES_VERSION jobs where E2E tests will be executed
+      # TEST_DEPTH determines the maximum test level the suite should be running
       TEST_DEPTH: ${{ needs.evaluate_options.outputs.test_level }}
       # FEATURE_TYPE, when defined, determines the subset of E2E tests that will be executed, divided by feature type
       FEATURE_TYPE: ${{ needs.evaluate_options.outputs.feature_type }}
@@ -1852,7 +1853,7 @@ jobs:
       matrix: ${{ fromJSON(needs.generate-jobs.outputs.openshiftMatrix) }}
     runs-on: ubuntu-22.04
     env:
-      # TEST_DEPTH determines the matrix of K8S_VERSION x POSTGRES_VERSION jobs where E2E tests will be executed
+      # TEST_DEPTH determines the maximum test level the suite should be running
       TEST_DEPTH: ${{ needs.evaluate_options.outputs.test_level }}
       # FEATURE_TYPE, when defined, determines the subset of E2E tests that will be executed, divided by feature type
       FEATURE_TYPE: ${{ needs.evaluate_options.outputs.feature_type }}
