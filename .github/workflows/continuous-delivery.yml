@@ -1367,16 +1367,6 @@ jobs:
               --secret-file ./credentials-velero \
               --wait
       -
-        name: Setup log archiving via fluentd and insights
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 1
-          max_attempts: 3
-          command: |
-            curl https://raw.githubusercontent.com/aws-samples/amazon-cloudwatch-container-insights/latest/k8s-deployment-manifest-templates/deployment-mode/daemonset/container-insights-monitoring/quickstart/cwagent-fluentd-quickstart.yaml \
-              | sed "s/{{cluster_name}}/${{ env.CLUSTER_NAME }}/;s/{{region_name}}/${{ env.AWS_REGION }}/" \
-              | kubectl apply -f -
-      -
         name: Prepare patch for customization
         env:
           ## the following variable all need be set if we use env_override_customized.yaml.template
