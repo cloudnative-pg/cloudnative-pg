@@ -1660,7 +1660,7 @@ jobs:
           # We give a few attempts at creating the cluster before giving up
           for i in `seq 1 5`; do
             if gcloud container clusters create ${{ env.CLUSTER_NAME }} \
-              --num-nodes=3 \
+              --num-nodes=1 \
               --cluster-version=${{ env.K8S_VERSION }} \
               --region=${{ env.REGION }} \
               --disk-size=20 \
