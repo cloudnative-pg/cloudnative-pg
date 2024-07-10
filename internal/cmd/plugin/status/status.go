@@ -1013,6 +1013,10 @@ func (fullStatus *PostgresqlStatus) printTablespacesStatus() {
 }
 
 func getPrimaryStartTime(cluster *apiv1.Cluster) string {
+	return getPrimaryStartTimeIdempotent(cluster, time.Now())
+}
+
+func getPrimaryStartTimeIdempotent(cluster *apiv1.Cluster, currentTime time.Time) string {
 	if len(cluster.Status.CurrentPrimaryTimestamp) == 0 {
 		return ""
 	}
@@ -1025,7 +1029,7 @@ func getPrimaryStartTime(cluster *apiv1.Cluster) string {
 		return aurora.Red("error: " + err.Error()).String()
 	}
 
-	uptime := time.Since(primaryInstanceTimestamp)
+	uptime := currentTime.Sub(primaryInstanceTimestamp)
 	return fmt.Sprintf(
 		"%s (uptime %s)",
 		primaryInstanceTimestamp.Round(time.Second),
