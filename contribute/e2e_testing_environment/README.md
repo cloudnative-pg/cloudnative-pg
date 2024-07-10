@@ -141,6 +141,8 @@ The script can be configured through the following environment variables:
   blob storage
 * `AZURE_STORAGE_KEY`: Azure storage key to test backup and restore, using Barman Cloud on Azure
   blob storage
+* `TEST_DEPTH`: maximum test level included in the run.
+   From `0` (only critical tests) to `4` (all the tests), default `2`
 * `FEATURE_TYPE`: Feature type key to run e2e based on feature labels.Ex: smoke, basic, security... details
   can be fetched from labels file [`tests/labels.go`](../../tests/labels.go)
 
