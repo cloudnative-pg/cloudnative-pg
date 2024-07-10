@@ -388,8 +388,7 @@ targetImmediate
     The operator can retrieve the closest backup when you specify either
     `targetTime` or `targetLSN`. However, this isn't possible for the remaining
     targets: `targetName`, `targetXID`, and `targetImmediate`. In such cases, it's
-    important to specify `backupID`, unless the last available backup in the
-    catalog is acceptable.
+    mandatory to specify `backupID`.
 
 This example uses a `targetName`-based recovery target:
 
