@@ -15,16 +15,21 @@ managedNodeGroups:
     desiredCapacity: 3
 
 addons:
-- name: vpc-cni
-  attachPolicyARNs:
-    - arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
-- name: coredns
-  version: latest
-- name: kube-proxy
-  version: latest
-- name: aws-ebs-csi-driver
-  version: latest
-
-cloudWatch:
-    clusterLogging:
-        enableTypes: ["all"]
+  - name: vpc-cni
+    attachPolicyARNs:
+      - arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
+  - name: coredns
+    version: latest
+  - name: kube-proxy
+    version: latest
+  - name: aws-ebs-csi-driver
+    version: latest
+  # Default configuration for CloudWatch agent enabled by the addon can be found here:
+  # https://raw.githubusercontent.com/aws-samples/amazon-cloudwatch-container-insights/latest/k8s-deployment-manifest-templates/deployment-mode/daemonset/container-insights-monitoring/fluent-bit/fluent-bit.yaml
+  # There is no retention for the logs by default. You can override the FluentBit configuration to set
+  # log_retention_days, or use a lambda to set the retention period, like
+  # https://github.com/binxio/aws-cloudwatch-log-minder
+  - name: amazon-cloudwatch-observability
+    version: latest
+    attachPolicyARNs:
+      - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
