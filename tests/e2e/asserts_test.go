@@ -1017,6 +1017,8 @@ func AssertDetachReplicaModeCluster(
 	var primaryReplicaCluster *corev1.Pod
 	replicaCommandTimeout := time.Second * 10
 
+	updateTime := time.Now().Truncate(time.Second)
+
 	By("disabling the replica mode", func() {
 		Eventually(func(g Gomega) {
 			_, _, err := testsUtils.RunUnchecked(fmt.Sprintf(
@@ -1025,6 +1027,20 @@ func AssertDetachReplicaModeCluster(
 				replicaClusterName, namespace))
 			g.Expect(err).ToNot(HaveOccurred())
 		}, 60, 5).Should(Succeed())
+	})
+
+	By("ensuring the replica cluster got promoted and restarted", func() {
+		Eventually(func(g Gomega) {
+			cluster, err := env.GetCluster(namespace, replicaClusterName)
+			g.Expect(err).ToNot(HaveOccurred())
+			condition, err := testsUtils.GetConditionsInClusterStatus(namespace, cluster.Name, env,
+				apiv1.ConditionClusterReady)
+			g.Expect(err).ToNot(HaveOccurred())
+			g.Expect(condition).ToNot(BeNil())
+			g.Expect(condition.Status).To(BeEquivalentTo(corev1.ConditionTrue))
+			g.Expect(condition.LastTransitionTime.Time).To(BeTemporally(">=", updateTime))
+		}).WithTimeout(60 * time.Second).Should(Succeed())
+		AssertClusterIsReady(namespace, replicaClusterName, testTimeouts[testsUtils.ClusterIsReady], env)
 	})
 
 	By("verifying write operation on the replica cluster primary pod", func() {
