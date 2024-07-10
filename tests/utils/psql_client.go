@@ -23,7 +23,6 @@ import (
 	"k8s.io/utils/ptr"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
 
@@ -51,9 +50,6 @@ func GetPsqlClient(namespace string, env *TestingEnvironment) (*corev1.Pod, erro
 func createPsqlClient(namespace string, env *TestingEnvironment) (*corev1.Pod, error) {
 	seccompProfile := &corev1.SeccompProfile{
 		Type: corev1.SeccompProfileTypeRuntimeDefault,
-	}
-	if !utils.HaveSeccompSupport() || utils.HaveSecurityContextConstraints() {
-		seccompProfile = nil
 	}
 
 	psqlPod := &corev1.Pod{

@@ -384,10 +384,6 @@ func CreatePodSecurityContext(seccompProfile *corev1.SeccompProfile, user, group
 		return nil
 	}
 
-	if !utils.HaveSeccompSupport() {
-		seccompProfile = nil
-	}
-
 	trueValue := true
 	return &corev1.PodSecurityContext{
 		RunAsNonRoot:   &trueValue,

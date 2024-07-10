@@ -42,45 +42,6 @@ var _ = DescribeTable("Kubernetes minor version detection",
 	Entry("When minor version is wrong", &version.Info{Minor: "c3p0"}, 0, false),
 )
 
-var _ = Describe("Set and unset Seccomp support", func() {
-	It("should have seccomp support", func() {
-		SetSeccompSupport(true)
-		Expect(HaveSeccompSupport()).To(BeTrue())
-	})
-
-	It("should not have seccomp support", func() {
-		SetSeccompSupport(false)
-		Expect(HaveSeccompSupport()).To(BeFalse())
-	})
-})
-
-var _ = Describe("Detect Seccomp support depending on", func() {
-	client := fakeClient.NewSimpleClientset()
-	fakeDiscovery := client.Discovery().(*discoveryFake.FakeDiscovery)
-
-	It("version 1.22 not supported", func() {
-		fakeDiscovery.FakedServerVersion = &version.Info{
-			Major: "1",
-			Minor: "22",
-		}
-
-		err := DetectSeccompSupport(client.Discovery())
-		Expect(err).ToNot(HaveOccurred())
-		Expect(HaveSeccompSupport()).To(BeFalse())
-	})
-
-	It("version 1.26 supported", func() {
-		fakeDiscovery.FakedServerVersion = &version.Info{
-			Major: "1",
-			Minor: "26",
-		}
-
-		err := DetectSeccompSupport(client.Discovery())
-		Expect(err).ToNot(HaveOccurred())
-		Expect(HaveSeccompSupport()).To(BeTrue())
-	})
-})
-
 var _ = Describe("Detect resources properly when", func() {
 	client := fakeClient.NewSimpleClientset()
 	fakeDiscovery := client.Discovery().(*discoveryFake.FakeDiscovery)
