@@ -294,7 +294,7 @@ var _ = Describe("initdb options validation", func() {
 					InitDB: &BootstrapInitDB{
 						Database: "app",
 						Owner:    "app",
-						PostInitApplicationSQLRefs: &PostInitApplicationSQLRefs{
+						PostInitApplicationSQLRefs: &SQLRefs{
 							SecretRefs: []SecretKeySelector{
 								{
 									LocalObjectReference: LocalObjectReference{Name: "secret1"},
@@ -317,7 +317,7 @@ var _ = Describe("initdb options validation", func() {
 					InitDB: &BootstrapInitDB{
 						Database: "app",
 						Owner:    "app",
-						PostInitApplicationSQLRefs: &PostInitApplicationSQLRefs{
+						PostInitApplicationSQLRefs: &SQLRefs{
 							SecretRefs: []SecretKeySelector{
 								{
 									Key: "key",
@@ -340,7 +340,7 @@ var _ = Describe("initdb options validation", func() {
 					InitDB: &BootstrapInitDB{
 						Database: "app",
 						Owner:    "app",
-						PostInitApplicationSQLRefs: &PostInitApplicationSQLRefs{
+						PostInitApplicationSQLRefs: &SQLRefs{
 							ConfigMapRefs: []ConfigMapKeySelector{
 								{
 									LocalObjectReference: LocalObjectReference{Name: "configmap1"},
@@ -363,7 +363,7 @@ var _ = Describe("initdb options validation", func() {
 					InitDB: &BootstrapInitDB{
 						Database: "app",
 						Owner:    "app",
-						PostInitApplicationSQLRefs: &PostInitApplicationSQLRefs{
+						PostInitApplicationSQLRefs: &SQLRefs{
 							ConfigMapRefs: []ConfigMapKeySelector{
 								{
 									Key: "key",
@@ -386,7 +386,7 @@ var _ = Describe("initdb options validation", func() {
 					InitDB: &BootstrapInitDB{
 						Database: "app",
 						Owner:    "app",
-						PostInitApplicationSQLRefs: &PostInitApplicationSQLRefs{
+						PostInitApplicationSQLRefs: &SQLRefs{
 							ConfigMapRefs: []ConfigMapKeySelector{
 								{
 									LocalObjectReference: LocalObjectReference{Name: "configmap1"},

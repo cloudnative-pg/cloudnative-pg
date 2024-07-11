@@ -173,9 +173,20 @@ func createPostgresVolumes(cluster *apiv1.Cluster, podName string) []corev1.Volu
 	return result
 }
 
-func createVolumesAndVolumeMountsForPostInitApplicationSQLRefs(
-	refs *apiv1.PostInitApplicationSQLRefs,
+func createVolumesAndVolumeMountsForSQLRefs(
+	folder postInitFolder,
+	refs *apiv1.SQLRefs,
 ) ([]corev1.Volume, []corev1.VolumeMount) {
+	var suffix string
+	switch folder {
+	case postInitApplicationSQLRefsFolder:
+		suffix = "post-init-application"
+	case postInitTemplateQLRefsFolder:
+		suffix = "post-init-template"
+	case postInitSQLRefsFolder:
+		suffix = "post-init"
+	}
+
 	length := len(refs.ConfigMapRefs) + len(refs.SecretRefs)
 	digitsCount := len(fmt.Sprintf("%d", length))
 	volumes := make([]corev1.Volume, 0, length)
@@ -183,7 +194,7 @@ func createVolumesAndVolumeMountsForPostInitApplicationSQLRefs(
 
 	for i := range refs.SecretRefs {
 		volumes = append(volumes, corev1.Volume{
-			Name: fmt.Sprintf("%0*d-post-init-application-sql", digitsCount, i),
+			Name: fmt.Sprintf("%0*d-%s-sql", digitsCount, i, suffix),
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
 					SecretName: refs.SecretRefs[i].Name,
@@ -198,8 +209,8 @@ func createVolumesAndVolumeMountsForPostInitApplicationSQLRefs(
 		})
 
 		volumeMounts = append(volumeMounts, corev1.VolumeMount{
-			Name:      fmt.Sprintf("%0*d-post-init-application-sql", digitsCount, i),
-			MountPath: fmt.Sprintf("%s/%0*d.sql", postInitApplicationSQLRefsFolder, digitsCount, i),
+			Name:      fmt.Sprintf("%0*d-%s-sql", digitsCount, i, suffix),
+			MountPath: fmt.Sprintf("%s/%0*d.sql", folder, digitsCount, i),
 			SubPath:   fmt.Sprintf("%0*d.sql", digitsCount, i),
 			ReadOnly:  true,
 		})
@@ -207,7 +218,7 @@ func createVolumesAndVolumeMountsForPostInitApplicationSQLRefs(
 
 	for i := range refs.ConfigMapRefs {
 		volumes = append(volumes, corev1.Volume{
-			Name: fmt.Sprintf("%0*d-post-init-application-sql", digitsCount, i+len(refs.SecretRefs)),
+			Name: fmt.Sprintf("%0*d-%s-sql", digitsCount, i+len(refs.SecretRefs), suffix),
 			VolumeSource: corev1.VolumeSource{
 				ConfigMap: &corev1.ConfigMapVolumeSource{
 					LocalObjectReference: corev1.LocalObjectReference{
@@ -224,8 +235,8 @@ func createVolumesAndVolumeMountsForPostInitApplicationSQLRefs(
 		})
 
 		volumeMounts = append(volumeMounts, corev1.VolumeMount{
-			Name:      fmt.Sprintf("%0*d-post-init-application-sql", digitsCount, i+len(refs.SecretRefs)),
-			MountPath: fmt.Sprintf("%s/%0*d.sql", postInitApplicationSQLRefsFolder, digitsCount, i+len(refs.SecretRefs)),
+			Name:      fmt.Sprintf("%0*d-%s-sql", digitsCount, i+len(refs.SecretRefs), suffix),
+			MountPath: fmt.Sprintf("%s/%0*d.sql", folder, digitsCount, i+len(refs.SecretRefs)),
 			SubPath:   fmt.Sprintf("%0*d.sql", digitsCount, i+len(refs.SecretRefs)),
 			ReadOnly:  true,
 		})

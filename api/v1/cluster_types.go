@@ -1655,7 +1655,23 @@ type BootstrapInitDB struct {
 	// the implementation order is same as the order of each array
 	// (by default empty)
 	// +optional
-	PostInitApplicationSQLRefs *PostInitApplicationSQLRefs `json:"postInitApplicationSQLRefs,omitempty"`
+	PostInitApplicationSQLRefs *SQLRefs `json:"postInitApplicationSQLRefs,omitempty"`
+
+	// PostInitTemplateSQLRefs points references to ConfigMaps or Secrets which
+	// contain SQL files, the general implementation order to these references is
+	// from all Secrets to all ConfigMaps, and inside Secrets or ConfigMaps,
+	// the implementation order is same as the order of each array
+	// (by default empty)
+	// +optional
+	PostInitTemplateSQLRefs *SQLRefs `json:"postInitTemplateSQLRefs,omitempty"`
+
+	// PostInitSQLRefs points references to ConfigMaps or Secrets which
+	// contain SQL files, the general implementation order to these references is
+	// from all Secrets to all ConfigMaps, and inside Secrets or ConfigMaps,
+	// the implementation order is same as the order of each array
+	// (by default empty)
+	// +optional
+	PostInitSQLRefs *SQLRefs `json:"postInitSQLRefs,omitempty"`
 }
 
 // SnapshotType is a type of allowed import
@@ -1703,11 +1719,11 @@ type ImportSource struct {
 	ExternalCluster string `json:"externalCluster"`
 }
 
-// PostInitApplicationSQLRefs points references to ConfigMaps or Secrets which
+// SQLRefs points references to ConfigMaps or Secrets which
 // contain SQL files, the general implementation order to these references is
 // from all Secrets to all ConfigMaps, and inside Secrets or ConfigMaps,
 // the implementation order is same as the order of each array
-type PostInitApplicationSQLRefs struct {
+type SQLRefs struct {
 	// SecretRefs holds a list of references to Secrets
 	// +optional
 	SecretRefs []SecretKeySelector `json:"secretRefs,omitempty"`
@@ -1715,6 +1731,16 @@ type PostInitApplicationSQLRefs struct {
 	// ConfigMapRefs holds a list of references to ConfigMaps
 	// +optional
 	ConfigMapRefs []ConfigMapKeySelector `json:"configMapRefs,omitempty"`
+}
+
+// HasElements returns true if it contains any Reference
+func (s *SQLRefs) HasElements() bool {
+	if s == nil {
+		return false
+	}
+
+	return len(s.ConfigMapRefs) != 0 ||
+		len(s.SecretRefs) != 0
 }
 
 // BootstrapRecovery contains the configuration required to restore
@@ -3259,12 +3285,36 @@ func (cluster *Cluster) ShouldInitDBRunPostInitApplicationSQLRefs() bool {
 		return false
 	}
 
-	if cluster.Spec.Bootstrap.InitDB.PostInitApplicationSQLRefs == nil {
+	return cluster.Spec.Bootstrap.InitDB.PostInitApplicationSQLRefs.HasElements()
+}
+
+// ShouldInitDBRunPostInitTemplateSQLRefs returns true if for this cluster,
+// during the bootstrap phase using initDB, we need to run post template
+// SQL files from provided references.
+func (cluster *Cluster) ShouldInitDBRunPostInitTemplateSQLRefs() bool {
+	if cluster.Spec.Bootstrap == nil {
 		return false
 	}
 
-	return (len(cluster.Spec.Bootstrap.InitDB.PostInitApplicationSQLRefs.ConfigMapRefs) != 0 ||
-		len(cluster.Spec.Bootstrap.InitDB.PostInitApplicationSQLRefs.SecretRefs) != 0)
+	if cluster.Spec.Bootstrap.InitDB == nil {
+		return false
+	}
+
+	return cluster.Spec.Bootstrap.InitDB.PostInitTemplateSQLRefs.HasElements()
+}
+
+// ShouldInitDBRunPostInitSQLRefs returns true if for this cluster,
+// during the bootstrap phase using initDB, we need to run SQL files from provided references.
+func (cluster *Cluster) ShouldInitDBRunPostInitSQLRefs() bool {
+	if cluster.Spec.Bootstrap == nil {
+		return false
+	}
+
+	if cluster.Spec.Bootstrap.InitDB == nil {
+		return false
+	}
+
+	return cluster.Spec.Bootstrap.InitDB.PostInitSQLRefs.HasElements()
 }
 
 // ShouldInitDBCreateApplicationDatabase returns true if the application database needs to be created during initdb

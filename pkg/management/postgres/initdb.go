@@ -99,7 +99,9 @@ type InitInfo struct {
 	BackupLabelFile []byte
 
 	// TablespaceMapFile holds the content returned by pg_stop_backup. Needed for a hot backup restore
-	TablespaceMapFile []byte
+	TablespaceMapFile             []byte
+	PostInitSQLRefsFolder         string
+	PostInitTemplateSQLRefsFolder string
 }
 
 // VerifyPGData verifies if the passed configuration is OK, otherwise it returns an error
@@ -223,6 +225,9 @@ func (info InitInfo) ConfigureNewInstance(instance *Instance) error {
 	if err = info.executeQueries(dbSuperUser, info.PostInitSQL); err != nil {
 		return err
 	}
+	if err = info.executeSQLRefs(dbSuperUser, info.PostInitSQLRefsFolder); err != nil {
+		return fmt.Errorf("could not execute post init application SQL refs: %w", err)
+	}
 
 	dbTemplate, err := instance.GetTemplateDB()
 	if err != nil {
@@ -233,7 +238,9 @@ func (info InitInfo) ConfigureNewInstance(instance *Instance) error {
 	if err = info.executeQueries(dbTemplate, info.PostInitTemplateSQL); err != nil {
 		return fmt.Errorf("could not execute init Template queries: %w", err)
 	}
-
+	if err = info.executeSQLRefs(dbTemplate, info.PostInitTemplateSQLRefsFolder); err != nil {
+		return fmt.Errorf("could not execute post init application SQL refs: %w", err)
+	}
 	if info.ApplicationDatabase == "" {
 		return nil
 	}
@@ -264,7 +271,7 @@ func (info InitInfo) ConfigureNewInstance(instance *Instance) error {
 		return fmt.Errorf("could not execute init Application queries: %w", err)
 	}
 
-	if err = info.executePostInitApplicationSQLRefs(appDB); err != nil {
+	if err = info.executeSQLRefs(appDB, info.PostInitApplicationSQLRefsFolder); err != nil {
 		return fmt.Errorf("could not execute post init application SQL refs: %w", err)
 	}
 
@@ -278,19 +285,19 @@ func (info InitInfo) ConfigureNewInstance(instance *Instance) error {
 	return nil
 }
 
-func (info InitInfo) executePostInitApplicationSQLRefs(sqlUser *sql.DB) error {
-	if info.PostInitApplicationSQLRefsFolder == "" {
+func (info InitInfo) executeSQLRefs(sqlUser *sql.DB, directory string) error {
+	if directory == "" {
 		return nil
 	}
 
-	if err := fileutils.EnsureDirectoryExists(info.PostInitApplicationSQLRefsFolder); err != nil {
-		return fmt.Errorf("could not find directory: %s, err: %w", info.PostInitApplicationSQLRefsFolder, err)
+	if err := fileutils.EnsureDirectoryExists(directory); err != nil {
+		return fmt.Errorf("could not find directory: %s, err: %w", directory, err)
 	}
 
-	files, err := fileutils.GetDirectoryContent(info.PostInitApplicationSQLRefsFolder)
+	files, err := fileutils.GetDirectoryContent(directory)
 	if err != nil {
 		return fmt.Errorf("could not get directory content from: %s, err: %w",
-			info.PostInitApplicationSQLRefsFolder, err)
+			directory, err)
 	}
 
 	// Sorting ensures that we execute the files in the correct order.
@@ -298,7 +305,7 @@ func (info InitInfo) executePostInitApplicationSQLRefs(sqlUser *sql.DB) error {
 	sort.Strings(files)
 
 	for _, file := range files {
-		sql, ioErr := fileutils.ReadFile(path.Join(info.PostInitApplicationSQLRefsFolder, file))
+		sql, ioErr := fileutils.ReadFile(path.Join(directory, file))
 		if ioErr != nil {
 			return fmt.Errorf("could not read file: %s, err; %w", file, err)
 		}

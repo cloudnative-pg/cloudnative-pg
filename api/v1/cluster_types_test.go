@@ -177,7 +177,7 @@ var _ = Describe("Bootstrap via initdb", func() {
 						Secret: &LocalObjectReference{
 							Name: "appSecret",
 						},
-						PostInitApplicationSQLRefs: &PostInitApplicationSQLRefs{
+						PostInitApplicationSQLRefs: &SQLRefs{
 							SecretRefs: []SecretKeySelector{
 								{
 									Key: "secretKey",
@@ -208,7 +208,7 @@ var _ = Describe("Bootstrap via initdb", func() {
 						Secret: &LocalObjectReference{
 							Name: "appSecret",
 						},
-						PostInitApplicationSQLRefs: &PostInitApplicationSQLRefs{
+						PostInitApplicationSQLRefs: &SQLRefs{
 							ConfigMapRefs: []ConfigMapKeySelector{
 								{
 									Key: "configMapKey",

@@ -320,6 +320,8 @@ PoolerStatus
 PoolerType
 PostGIS
 PostInitApplicationSQLRefs
+PostInitSQLRefs
+PostInitTemplateSQLRefs
 Postgres
 PostgresConfiguration
 PrimaryUpdateMethod
@@ -370,6 +372,7 @@ SHA
 SLA
 SPoF
 SQLQuery
+SQLRefs
 SSL
 SSZ
 STORAGEACCOUNTNAME
@@ -1000,7 +1003,9 @@ postImportApplicationSQL
 postInitApplicationSQL
 postInitApplicationSQLRefs
 postInitSQL
+postInitSQLRefs
 postInitTemplateSQL
+postInitTemplateSQLRefs
 postgis
 postgres
 postgresGID
