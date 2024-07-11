@@ -1657,7 +1657,9 @@ jobs:
           set +e
           # We may go over the amount of API requests allowed
           # by Google when creating all the clusters at the same time.
-          # We give a few attempts at creating the cluster before giving up
+          # We give a few attempts at creating the cluster before giving up.
+          # The following command will create a 3 nodes cluster, with each
+          # node deployed in its own availability zone.
           for i in `seq 1 5`; do
             if gcloud container clusters create ${{ env.CLUSTER_NAME }} \
               --num-nodes=1 \
