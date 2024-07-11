@@ -125,10 +125,13 @@ Where:
 - `pod1, pod2, ...` is the list of all PostgreSQL pods in the cluster
 
 !!! Warning
-    To provide self-healing capabilities, the operator can ignore
-    `minSyncReplicas` if such value is higher than the currently available
-    number of replicas. Synchronous replication is automatically disabled
-    when `readyReplicas` is `0`.
+    By default, CloudNativePG prioritizes self-healing over consistency by
+    ignoring `minSyncReplicas` if it exceeds the currently available number of
+    replicas. Synchronous replication is automatically disabled when
+    `readyReplicas` is `0`. This behavior differs from the expectations of a
+    typical PostgreSQL DBA, who prioritizes database consistency over
+    availability when synchronous replication is requested. In such cases, you
+    can set `.spec.postgresql.minSyncReplicasEnforcement` to `required`.
 
 As stated in the
 [PostgreSQL documentation](https://www.postgresql.org/docs/current/warm-standby.html#SYNCHRONOUS-REPLICATION),

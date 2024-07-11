@@ -1403,13 +1403,14 @@ type PostgresConfiguration struct {
 	// +optional
 	SyncReplicaElectionConstraint SyncReplicaElectionConstraints `json:"syncReplicaElectionConstraint,omitempty"`
 
-	// MinSyncReplicasEnforcement describe how synchronous replication react
-	// to non-ready replicas. When not set or set to `preferred`, those
-	// replicas are not considered against the synchronous replication
-	// candidates, giving priority to the availability of the cluster.
-	// When set to `required`, non-ready replicas are considered
-	// synchronous replication candidates, giving priority to the
-	// consistency of the cluster over its availability.
+	// MinSyncReplicasEnforcement describes how synchronous replication
+	// handles non-ready replicas. When this setting is either unset or set
+	// to `preferred`, non-ready replicas are excluded from the pool of
+	// synchronous replication candidates, prioritizing the cluster's
+	// availability.  When set to `required` — the typical expectation of a
+	// PostgreSQL DBA — non-ready replicas are included as synchronous
+	// replication candidates, prioritizing the cluster's consistency over
+	// its availability.
 	// +kubebuilder:validation:Enum=preferred;required
 	// +optional
 	MinSyncReplicasEnforcement *MinSyncReplicasEnforcementType `json:"minSyncReplicasEnforcement,omitempty"`

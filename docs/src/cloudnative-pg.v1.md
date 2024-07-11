@@ -4045,13 +4045,14 @@ set up.</p>
 <a href="#postgresql-cnpg-io-v1-MinSyncReplicasEnforcementType"><i>MinSyncReplicasEnforcementType</i></a>
 </td>
 <td>
-   <p>MinSyncReplicasEnforcement describe how synchronous replication react
-to non-ready replicas. When not set or set to <code>preferred</code>, those
-replicas are not considered against the synchronous replication
-candidates, giving priority to the availability of the cluster.
-When set to <code>required</code>, non-ready replicas are considered
-synchronous replication candidates, giving priority to the
-consistency of the cluster over its availability.</p>
+   <p>MinSyncReplicasEnforcement describes how synchronous replication
+handles non-ready replicas. When this setting is either unset or set
+to <code>preferred</code>, non-ready replicas are excluded from the pool of
+synchronous replication candidates, prioritizing the cluster's
+availability.  When set to <code>required</code> — the typical expectation of a
+PostgreSQL DBA — non-ready replicas are included as synchronous
+replication candidates, prioritizing the cluster's consistency over
+its availability.</p>
 </td>
 </tr>
 <tr><td><code>shared_preload_libraries</code><br/>

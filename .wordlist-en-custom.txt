@@ -232,6 +232,8 @@ MetricType
 MiB
 Milsted
 MinIO
+MinSyncReplicasEnforcement
+MinSyncReplicasEnforcementType
 Minikube
 MonitoringConfiguration
 NFS
@@ -888,6 +890,7 @@ microservice
 microservices
 microsoft
 minSyncReplicas
+minSyncReplicasEnforcement
 minikube
 minio
 mmap
