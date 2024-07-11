@@ -18,6 +18,7 @@ package e2e
 
 import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -33,6 +34,13 @@ var _ = Describe("Switchover", Serial, Label(tests.LabelSelfHealing), func() {
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
+		}
+	})
+
+	JustAfterEach(func() {
+		utils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
+		if CurrentSpecReport().Failed() {
+			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
 	})
 	Context("with HA Replication slots", func() {

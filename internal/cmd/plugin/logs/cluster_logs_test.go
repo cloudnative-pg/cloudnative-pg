@@ -54,14 +54,14 @@ var _ = Describe("Get the logs", func() {
 		},
 		Spec: apiv1.ClusterSpec{},
 	}
-	cl := clusterLogs{
-		ctx:         context.TODO(),
-		clusterName: clusterName,
-		namespace:   namespace,
-		follow:      true,
+	cl := ClusterLogs{
+		Ctx:         context.TODO(),
+		ClusterName: clusterName,
+		Namespace:   namespace,
+		Follow:      true,
 		timestamp:   true,
-		tailLines:   -1,
-		client:      client,
+		TailLines:   -1,
+		Client:      client,
 	}
 	plugin.Client = fake.NewClientBuilder().
 		WithScheme(scheme.BuildWithAllKnownScheme()).
@@ -75,7 +75,7 @@ var _ = Describe("Get the logs", func() {
 	})
 
 	It("should get the proper stream cluster log", func() {
-		logsStream := getStreamClusterLogs(cluster, cl)
+		logsStream := GetStreamClusterLogs(cluster, cl)
 		Expect(logsStream).ToNot(BeNil())
 		Expect(logsStream.Options.Follow).To(BeTrue())
 		Expect(logsStream.Options.Timestamps).To(BeTrue())
@@ -84,8 +84,8 @@ var _ = Describe("Get the logs", func() {
 	})
 
 	It("should get the proper tail lines", func() {
-		cl.tailLines = 5
-		logsStream := getStreamClusterLogs(cluster, cl)
+		cl.TailLines = 5
+		logsStream := GetStreamClusterLogs(cluster, cl)
 		Expect(logsStream).ToNot(BeNil())
 		Expect(logsStream.Options.Follow).To(BeTrue())
 		Expect(logsStream.Options.Timestamps).To(BeTrue())
@@ -95,25 +95,25 @@ var _ = Describe("Get the logs", func() {
 	})
 
 	It("should get the proper stream for logs", func() {
-		err := followCluster(cl)
+		err := FollowCluster(cl)
 		Expect(err).ToNot(HaveOccurred())
 	})
 
 	It("should save the logs to file", func() {
-		cl.outputFile = path.Join(tempDir, "test-file.logs")
+		cl.OutputFile = path.Join(tempDir, "test-file.logs")
 		err := saveClusterLogs(cl)
 		Expect(err).ToNot(HaveOccurred())
 	})
 
 	It("should fail if can't write a file", func() {
-		cl.outputFile = "/this-does-not-exist/test-file.log"
+		cl.OutputFile = "/this-does-not-exist/test-file.log"
 		err := saveClusterLogs(cl)
 		Expect(err).To(HaveOccurred())
 	})
 
 	It("should fail when cluster doesn't exists", func() {
-		cl.clusterName += "-fail"
-		err := followCluster(cl)
+		cl.ClusterName += "-fail"
+		err := FollowCluster(cl)
 		Expect(err).To(HaveOccurred())
 
 		err = saveClusterLogs(cl)

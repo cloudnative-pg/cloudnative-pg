@@ -69,6 +69,12 @@ var _ = Describe("Verify storage", Label(tests.LabelStorage), func() {
 				}
 				return env.DeleteNamespace(namespace)
 			})
+			JustAfterEach(func() {
+				utils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
+				if CurrentSpecReport().Failed() {
+					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+				}
+			})
 			// Creating a cluster with three nodes
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 			OnlineResizePVC(namespace, clusterName)
@@ -87,7 +93,12 @@ var _ = Describe("Verify storage", Label(tests.LabelStorage), func() {
 				Skip(fmt.Sprintf("AllowedVolumeExpansion is true on %v", defaultStorageClass))
 			}
 		})
-
+		JustAfterEach(func() {
+			utils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
+			if CurrentSpecReport().Failed() {
+				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+			}
+		})
 		It("expands PVCs via offline resize", func() {
 			var err error
 			// Creating namespace

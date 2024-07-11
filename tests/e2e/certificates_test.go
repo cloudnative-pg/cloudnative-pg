@@ -60,6 +60,7 @@ var _ = Describe("Certificates", func() {
 
 	var namespace, clusterName string
 	JustAfterEach(func() {
+		utils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
 		if CurrentSpecReport().Failed() {
 			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 		}

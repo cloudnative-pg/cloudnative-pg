@@ -18,6 +18,7 @@ package e2e
 
 import (
 	"fmt"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	pkgutils "github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -44,6 +45,13 @@ var _ = Describe("AppArmor support", Serial, Label(tests.LabelNoOpenshift, tests
 		}
 		if !MustGetEnvProfile().CanRunAppArmor() {
 			Skip("environment does not support AppArmor")
+		}
+	})
+
+	JustAfterEach(func() {
+		utils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
+		if CurrentSpecReport().Failed() {
+			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
 	})
 

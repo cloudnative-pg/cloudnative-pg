@@ -60,6 +60,7 @@ var _ = Describe("Imports with Microservice Approach", Label(tests.LabelImportin
 	})
 
 	JustAfterEach(func() {
+		testsUtils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
 		if CurrentSpecReport().Failed() {
 			env.DumpNamespaceObjects(namespace,
 				"out/"+CurrentSpecReport().LeafNodeText+".log")

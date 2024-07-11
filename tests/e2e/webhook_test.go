@@ -57,6 +57,7 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive, tests.LabelOper
 	})
 
 	JustAfterEach(func() {
+		utils.CleanupClusterLogs(CurrentSpecReport().Failed(), webhookNamespace)
 		if CurrentSpecReport().Failed() {
 			env.DumpNamespaceObjects(webhookNamespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 		}

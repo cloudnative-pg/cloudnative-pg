@@ -70,6 +70,14 @@ var _ = Describe("Available Architectures", Label(tests.LabelBasic), func() {
 		return true
 	}
 
+	var namespace string
+	JustAfterEach(func() {
+		utils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
+		if CurrentSpecReport().Failed() {
+			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+		}
+	})
+
 	It("manages each available architecture", func() {
 		namespace, err := env.CreateUniqueNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())

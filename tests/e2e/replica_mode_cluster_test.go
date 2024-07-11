@@ -299,6 +299,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 		var namespace, clusterName string
 
 		JustAfterEach(func() {
+			testUtils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
 			if CurrentSpecReport().Failed() {
 				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 			}
@@ -461,6 +462,7 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication), Ordered, f
 	})
 
 	JustAfterEach(func() {
+		testUtils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
 		if CurrentSpecReport().Failed() {
 			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 		}

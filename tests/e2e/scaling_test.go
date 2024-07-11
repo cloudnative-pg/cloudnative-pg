@@ -52,6 +52,12 @@ var _ = Describe("Cluster scale up and down", Serial, Label(tests.LabelReplicati
 				}
 				return env.DeleteNamespaceAndWait(namespace, 60)
 			})
+			JustAfterEach(func() {
+				utils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
+				if CurrentSpecReport().Failed() {
+					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+				}
+			})
 			AssertCreateCluster(namespace, clusterName, sampleFileWithReplicationSlots, env)
 
 			AssertClusterHAReplicationSlots(clusterName, namespace)
@@ -93,6 +99,12 @@ var _ = Describe("Cluster scale up and down", Serial, Label(tests.LabelReplicati
 					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 				}
 				return env.DeleteNamespaceAndWait(namespace, 60)
+			})
+			JustAfterEach(func() {
+				utils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
+				if CurrentSpecReport().Failed() {
+					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+				}
 			})
 			AssertCreateCluster(namespace, clusterName, sampleFileWithoutReplicationSlots, env)
 

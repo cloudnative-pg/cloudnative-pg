@@ -47,6 +47,12 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 	})
+	JustAfterEach(func() {
+		testsUtils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
+		if CurrentSpecReport().Failed() {
+			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+		}
+	})
 
 	It("sets up a cluster", func(_ SpecContext) {
 		const namespacePrefix = "cluster-storageclass-e2e"
