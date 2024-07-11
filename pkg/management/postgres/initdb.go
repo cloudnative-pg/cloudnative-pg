@@ -95,13 +95,19 @@ type InitInfo struct {
 	// of SQL files to be executed just after having configured a new instance
 	PostInitApplicationSQLRefsFolder string
 
+	// the folder which contains a bunch of SQL files to be executed just after having
+	// configured a new instance
+	PostInitSQLRefsFolder string
+
+	// the folder which contains a bunch of SQL files to be executed inside the template1
+	// database just after having configured a new instance
+	PostInitTemplateSQLRefsFolder string
+
 	// BackupLabelFile holds the content returned by pg_stop_backup. Needed for a hot backup restore
 	BackupLabelFile []byte
 
 	// TablespaceMapFile holds the content returned by pg_stop_backup. Needed for a hot backup restore
-	TablespaceMapFile             []byte
-	PostInitSQLRefsFolder         string
-	PostInitTemplateSQLRefsFolder string
+	TablespaceMapFile []byte
 }
 
 // VerifyPGData verifies if the passed configuration is OK, otherwise it returns an error
