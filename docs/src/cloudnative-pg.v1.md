@@ -3293,6 +3293,20 @@ More info: http://kubernetes.io/docs/user-guide/annotations</p>
 </tbody>
 </table>
 
+## MinSyncReplicasEnforcementType     {#postgresql-cnpg-io-v1-MinSyncReplicasEnforcementType}
+
+(Alias of `string`)
+
+**Appears in:**
+
+- [PostgresConfiguration](#postgresql-cnpg-io-v1-PostgresConfiguration)
+
+
+<p>MinSyncReplicasEnforcementType is the type of .spec.postgres.minSyncReplicasEnforcement</p>
+
+
+
+
 ## MonitoringConfiguration     {#postgresql-cnpg-io-v1-MonitoringConfiguration}
 
 
@@ -4025,6 +4039,19 @@ to the pg_ident.conf file)</p>
 <td>
    <p>Requirements to be met by sync replicas. This will affect how the &quot;synchronous_standby_names&quot; parameter will be
 set up.</p>
+</td>
+</tr>
+<tr><td><code>minSyncReplicasEnforcement</code><br/>
+<a href="#postgresql-cnpg-io-v1-MinSyncReplicasEnforcementType"><i>MinSyncReplicasEnforcementType</i></a>
+</td>
+<td>
+   <p>MinSyncReplicasEnforcement describe how synchronous replication react
+to non-ready replicas. When not set or set to <code>preferred</code>, those
+replicas are not considered against the synchronous replication
+candidates, giving priority to the availability of the cluster.
+When set to <code>required</code>, non-ready replicas are considered
+synchronous replication candidates, giving priority to the
+consistency of the cluster over its availability.</p>
 </td>
 </tr>
 <tr><td><code>shared_preload_libraries</code><br/>
