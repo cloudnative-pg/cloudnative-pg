@@ -140,9 +140,9 @@ func NewCmd() *cobra.Command {
 	cmd.Flags().StringVar(&postInitApplicationSQLRefsFolder, "post-init-application-sql-refs-folder",
 		"", "The folder contains a set of SQL files to be executed in alphabetical order "+
 			"against the application database immediately after its creation")
-	cmd.Flags().StringVar(&postInitApplicationSQLRefsFolder, "post-init-template-sql-refs-folder",
+	cmd.Flags().StringVar(&postInitTemplateSQLRefsFolder, "post-init-template-sql-refs-folder",
 		"", "The folder contains a set of SQL files to be executed in alphabetical order")
-	cmd.Flags().StringVar(&postInitApplicationSQLRefsFolder, "post-init-sql-refs-folder",
+	cmd.Flags().StringVar(&postInitSQLRefsFolder, "post-init-sql-refs-folder",
 		"", "The folder contains a set of SQL files to be executed in alphabetical order")
 	return cmd
 }
