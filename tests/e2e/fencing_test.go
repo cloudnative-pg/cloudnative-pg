@@ -49,6 +49,7 @@ var _ = Describe("Fencing", Label(tests.LabelPlugin), func() {
 	var pod corev1.Pod
 
 	JustAfterEach(func() {
+		testUtils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
 		if CurrentSpecReport().Failed() {
 			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 		}

@@ -192,6 +192,12 @@ var _ = Describe("Volume space unavailable", Label(tests.LabelStorage), func() {
 			// Create a cluster in a namespace we'll delete after the test
 			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
+			JustAfterEach(func() {
+				testsUtils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
+				if CurrentSpecReport().Failed() {
+					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+				}
+			})
 			DeferCleanup(func() error {
 				return env.CleanupNamespace(
 					namespace,

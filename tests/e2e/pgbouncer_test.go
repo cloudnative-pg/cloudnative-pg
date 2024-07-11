@@ -18,6 +18,7 @@ package e2e
 
 import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -40,6 +41,7 @@ var _ = Describe("PGBouncer Connections", Label(tests.LabelServiceConnectivity),
 		}
 	})
 	JustAfterEach(func() {
+		testsUtils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
 		if CurrentSpecReport().Failed() {
 			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 			env.DumpPoolerResourcesInfo(namespace, CurrentSpecReport().LeafNodeText)
@@ -64,6 +66,7 @@ var _ = Describe("PGBouncer Connections", Label(tests.LabelServiceConnectivity),
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 		})
 		JustAfterEach(func() {
+			testsUtils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
 			DeleteTableUsingPgBouncerService(namespace, clusterName, poolerBasicAuthRWSampleFile, env, psqlClientPod)
 		})
 

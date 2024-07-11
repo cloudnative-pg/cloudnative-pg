@@ -44,6 +44,7 @@ var _ = Describe("nodeSelector", Label(tests.LabelPodScheduling), func() {
 		const sampleFile = fixturesDir + "/nodeselector/nodeselector-label-not-exists.yaml.template"
 		var namespace string
 		JustAfterEach(func() {
+			utils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
 			if CurrentSpecReport().Failed() {
 				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 			}
@@ -115,6 +116,7 @@ var _ = Describe("nodeSelector", Label(tests.LabelPodScheduling), func() {
 		const clusterName = "postgresql-nodeselector"
 		var namespace string
 		JustAfterEach(func() {
+			utils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
 			if CurrentSpecReport().Failed() {
 				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 			}

@@ -59,9 +59,6 @@ var _ = Describe("Verify Volume Snapshot",
 			return snapshotList, nil
 		}
 
-		// Initializing a global namespace variable to be used in each test case
-		var namespace string
-
 		Context("using the kubectl cnpg plugin", Ordered, func() {
 			const (
 				sampleFile      = fixturesDir + "/volume_snapshot/cluster-volume-snapshot.yaml.template"
@@ -69,7 +66,13 @@ var _ = Describe("Verify Volume Snapshot",
 				level           = tests.High
 			)
 
-			var clusterName string
+			var clusterName, namespace string
+			JustAfterEach(func() {
+				testUtils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
+				if CurrentSpecReport().Failed() {
+					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+				}
+			})
 			BeforeAll(func() {
 				if testLevelEnv.Depth < int(level) {
 					Skip("Test depth is lower than the amount requested for this test")
@@ -159,7 +162,13 @@ var _ = Describe("Verify Volume Snapshot",
 				tableName = "test"
 			)
 
-			var clusterToSnapshotName string
+			var clusterToSnapshotName, namespace string
+			JustAfterEach(func() {
+				testUtils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
+				if CurrentSpecReport().Failed() {
+					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+				}
+			})
 			BeforeAll(func() {
 				if testLevelEnv.Depth < int(level) {
 					Skip("Test depth is lower than the amount requested for this test")
@@ -352,7 +361,13 @@ var _ = Describe("Verify Volume Snapshot",
 				})
 				return snapshotList
 			}
-
+			var namespace string
+			JustAfterEach(func() {
+				testUtils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
+				if CurrentSpecReport().Failed() {
+					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+				}
+			})
 			BeforeAll(func() {
 				if testLevelEnv.Depth < int(level) {
 					Skip("Test depth is lower than the amount requested for this test")
@@ -568,8 +583,14 @@ var _ = Describe("Verify Volume Snapshot",
 				clusterSnapshotRestoreFile = filesDir + "/cluster-pvc-hot-restore.yaml.template"
 			)
 
-			var clusterToSnapshotName string
+			var clusterToSnapshotName, namespace string
 			var backup *apiv1.Backup
+			JustAfterEach(func() {
+				testUtils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
+				if CurrentSpecReport().Failed() {
+					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+				}
+			})
 			BeforeAll(func() {
 				if testLevelEnv.Depth < int(level) {
 					Skip("Test depth is lower than the amount requested for this test")

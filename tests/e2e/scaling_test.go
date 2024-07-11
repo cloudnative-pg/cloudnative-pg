@@ -54,6 +54,12 @@ var _ = Describe("Cluster scale up and down", Serial, Label(tests.LabelReplicati
 					GinkgoWriter,
 				)
 			})
+			JustAfterEach(func() {
+				utils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
+				if CurrentSpecReport().Failed() {
+					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+				}
+			})
 			AssertCreateCluster(namespace, clusterName, sampleFileWithReplicationSlots, env)
 
 			AssertClusterHAReplicationSlots(clusterName, namespace)
@@ -97,6 +103,12 @@ var _ = Describe("Cluster scale up and down", Serial, Label(tests.LabelReplicati
 					CurrentSpecReport().Failed(),
 					GinkgoWriter,
 				)
+			})
+			JustAfterEach(func() {
+				utils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
+				if CurrentSpecReport().Failed() {
+					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+				}
 			})
 			AssertCreateCluster(namespace, clusterName, sampleFileWithoutReplicationSlots, env)
 

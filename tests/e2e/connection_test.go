@@ -73,6 +73,8 @@ var _ = Describe("Connection via services", Label(tests.LabelServiceConnectivity
 		const clusterName = "postgresql-auto-generated"
 		var namespace string
 		JustAfterEach(func() {
+			utils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
+
 			if CurrentSpecReport().Failed() {
 				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 			}
@@ -127,6 +129,7 @@ var _ = Describe("Connection via services", Label(tests.LabelServiceConnectivity
 		const clusterName = "postgresql-user-supplied"
 		var namespace string
 		JustAfterEach(func() {
+			utils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
 			if CurrentSpecReport().Failed() {
 				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 			}

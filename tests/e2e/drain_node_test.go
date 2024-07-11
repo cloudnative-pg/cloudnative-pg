@@ -83,6 +83,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 		const clusterName = "cluster-drain-node"
 
 		JustAfterEach(func() {
+			testsUtils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
 			if CurrentSpecReport().Failed() {
 				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 			}

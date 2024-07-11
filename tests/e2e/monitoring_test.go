@@ -19,7 +19,7 @@ package e2e
 import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
-
+	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -42,6 +42,14 @@ var _ = Describe("PodMonitor support", Serial, Label(tests.LabelObservability), 
 
 		if !IsLocal() {
 			Skip("PodMonitor test only runs on Local deployment")
+		}
+	})
+
+	JustAfterEach(func() {
+		testsUtils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
+
+		if CurrentSpecReport().Failed() {
+			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
 	})
 

@@ -51,6 +51,7 @@ var _ = Describe("PGBouncer Types", Ordered, Label(tests.LabelServiceConnectivit
 	})
 
 	JustAfterEach(func() {
+		utils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
 		if CurrentSpecReport().Failed() {
 			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 		}

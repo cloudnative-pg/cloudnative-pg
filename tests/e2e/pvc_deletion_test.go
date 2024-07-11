@@ -44,6 +44,12 @@ var _ = Describe("PVC Deletion", Label(tests.LabelSelfHealing), func() {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 	})
+	JustAfterEach(func() {
+		testsUtils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
+		if CurrentSpecReport().Failed() {
+			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+		}
+	})
 
 	It("correctly manages PVCs", func() {
 		var err error

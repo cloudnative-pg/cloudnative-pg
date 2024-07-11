@@ -23,35 +23,35 @@ import (
 )
 
 func clusterCmd() *cobra.Command {
-	cl := clusterLogs{}
+	cl := ClusterLogs{}
 
 	cmd := &cobra.Command{
-		Use:   "cluster <clusterName>",
+		Use:   "cluster <ClusterName>",
 		Short: "Logs for cluster's pods",
-		Long:  "Collects the logs for all pods in a cluster into a single stream or outputFile",
+		Long:  "Collects the logs for all pods in a cluster into a single stream or OutputFile",
 		Args:  plugin.RequiresArguments(1),
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			return plugin.CompleteClusters(cmd.Context(), args, toComplete), cobra.ShellCompDirectiveNoFileComp
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cl.clusterName = args[0]
-			cl.namespace = plugin.Namespace
-			cl.ctx = cmd.Context()
-			cl.client = plugin.ClientInterface
-			if cl.follow {
-				return followCluster(cl)
+			cl.ClusterName = args[0]
+			cl.Namespace = plugin.Namespace
+			cl.Ctx = cmd.Context()
+			cl.Client = plugin.ClientInterface
+			if cl.Follow {
+				return FollowCluster(cl)
 			}
 			return saveClusterLogs(cl)
 		},
 	}
 
-	cmd.Flags().StringVarP(&cl.outputFile, "output", "o", "",
-		"Output outputFile")
+	cmd.Flags().StringVarP(&cl.OutputFile, "output", "o", "",
+		"Output OutputFile")
 	cmd.Flags().BoolVarP(&cl.timestamp, "timestamps", "t", false,
 		"Prepend human-readable timestamp to each log line. If set, logs start from current time")
-	cmd.Flags().Int64Var(&cl.tailLines, "tail", -1,
+	cmd.Flags().Int64Var(&cl.TailLines, "tail", -1,
 		"Number of lines from the end of the logs to show for each pod. By default there is no limit")
-	cmd.Flags().BoolVarP(&cl.follow, "follow", "f", false,
+	cmd.Flags().BoolVarP(&cl.Follow, "Follow", "f", false,
 		"Follow cluster logs (watches for new and re-created pods)")
 
 	return cmd

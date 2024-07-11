@@ -116,6 +116,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 			fullBackupName = "full-barman-backup"
 		)
 		JustAfterEach(func() {
+			testUtils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
 			if CurrentSpecReport().Failed() {
 				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 			}
@@ -387,6 +388,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 		)
 		checkPointTimeout := time.Second * 10
 		JustAfterEach(func() {
+			testUtils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
 			if CurrentSpecReport().Failed() {
 				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 			}
@@ -626,6 +628,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 
 	Context("on a plain cluster with primaryUpdateMethod=restart", Ordered, func() {
 		JustAfterEach(func() {
+			testUtils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
 			if CurrentSpecReport().Failed() {
 				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 			}
@@ -769,6 +772,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 
 	Context("on a plain cluster with primaryUpdateMethod=switchover", Ordered, func() {
 		JustAfterEach(func() {
+			testUtils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
 			if CurrentSpecReport().Failed() {
 				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 			}

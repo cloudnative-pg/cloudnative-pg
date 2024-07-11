@@ -33,7 +33,6 @@ import (
 	"github.com/thoas/go-funk"
 	corev1 "k8s.io/api/core/v1"
 	k8sscheme "k8s.io/client-go/kubernetes/scheme"
-
 	// +kubebuilder:scaffold:imports
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
@@ -116,6 +115,8 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 
 	_ = k8sscheme.AddToScheme(env.Scheme)
 	_ = apiv1.AddToScheme(env.Scheme)
+
+	go utils.WatchNamespaces(env)
 
 	if testLevelEnv, err = tests.TestLevel(); err != nil {
 		panic(err)

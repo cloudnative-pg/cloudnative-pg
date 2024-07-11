@@ -17,6 +17,7 @@ limitations under the License.
 package e2e
 
 import (
+	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 	"sync"
 
 	corev1 "k8s.io/api/core/v1"
@@ -51,6 +52,7 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 		const namespacePrefix = "op-unavailable-e2e-zero-replicas"
 		var namespace string
 		JustAfterEach(func() {
+			testsUtils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
 			if CurrentSpecReport().Failed() {
 				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 			}
@@ -146,6 +148,7 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 		const namespacePrefix = "op-unavailable-e2e-delete-operator"
 		var namespace string
 		JustAfterEach(func() {
+			testsUtils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
 			if CurrentSpecReport().Failed() {
 				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 			}

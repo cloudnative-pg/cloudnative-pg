@@ -84,6 +84,13 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 
 		var namespace string
 
+		JustAfterEach(func() {
+			utils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
+			if CurrentSpecReport().Failed() {
+				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+			}
+		})
+
 		It("can find the tables created by the post-init SQL queries", func() {
 			// Create a cluster in a namespace we'll delete after the test
 			const namespacePrefix = "initdb-postqueries"
@@ -98,7 +105,6 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 					GinkgoWriter,
 				)
 			})
-
 			CreateResourceFromFile(namespace, postInitSQLSecretRef)
 			CreateResourceFromFile(namespace, postInitSQLConfigMapRef)
 			CreateResourceFromFile(namespace, postInitApplicationSQLSecretRef)
@@ -157,6 +163,12 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 		)
 
 		var namespace string
+		JustAfterEach(func() {
+			utils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
+			if CurrentSpecReport().Failed() {
+				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+			}
+		})
 
 		It("use the custom default locale specified", func() {
 			// Create a cluster in a namespace we'll delete after the test

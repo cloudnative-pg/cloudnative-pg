@@ -51,6 +51,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 	})
 
 	JustAfterEach(func() {
+		testUtils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
 		if CurrentSpecReport().Failed() {
 			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
@@ -804,6 +805,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 	})
 
 	JustAfterEach(func() {
+		testUtils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
 		if CurrentSpecReport().Failed() {
 			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
