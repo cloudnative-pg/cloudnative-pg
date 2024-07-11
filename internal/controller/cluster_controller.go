@@ -607,15 +607,13 @@ func (r *ClusterReconciler) reconcileResources(
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
-	// Process terminated pods
 	if result, err := r.deleteTerminatedPods(ctx, cluster, resources); err != nil {
 		contextLogger.Error(err, "While deleting terminated pods")
 		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 	} else if result != nil {
-		return *result, err
+		return *result, nil
 	}
 
-	// Process unschedulable instances
 	if result, err := r.processUnschedulableInstances(ctx, cluster, resources); err != nil {
 		contextLogger.Error(err, "While processing unschedulable instances")
 		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
@@ -717,22 +715,24 @@ func (r *ClusterReconciler) deleteTerminatedPods(
 			continue
 		}
 
-		if pod.Status.Phase != corev1.PodSucceeded &&
-			pod.Status.Phase != corev1.PodFailed {
+		if pod.Status.Phase != corev1.PodSucceeded && pod.Status.Phase != corev1.PodFailed {
 			continue
 		}
 
-		contextLogger.Info(fmt.Sprintf("Deleting %s pod", pod.Status.Phase),
-			"pod", pod.Name,
-			"podStatus", pod.Status)
+		contextLogger.Info(
+			"Deleting terminated pod",
+			"podName", pod.Name,
+			"phase", pod.Status.Phase,
+		)
 		if err := r.Delete(ctx, pod); err != nil && !apierrs.IsNotFound(err) {
 			return nil, err
 		}
 		deletedPods = true
 
-		r.Recorder.Eventf(cluster, "Normal", "DeletePod",
-			"Deleted %s pod %v",
-			pod.Status.Phase, pod.Name)
+		r.Recorder.Eventf(cluster,
+			"Normal",
+			"DeletePod",
+			"Deleted '%s' pod: '%v'", pod.Status.Phase, pod.Name)
 	}
 
 	if deletedPods {
@@ -766,14 +766,11 @@ func (r *ClusterReconciler) processUnschedulableInstances(
 				r.upgradePod(ctx, cluster, pod, fmt.Sprintf("recreating unschedulable pod: %s", podRollout.reason))
 		}
 
-		if !cluster.IsNodeMaintenanceWindowInProgress() ||
-			cluster.IsReusePVCEnabled() {
+		if !cluster.IsNodeMaintenanceWindowInProgress() || cluster.IsReusePVCEnabled() {
 			continue
 		}
 
-		contextLogger.Warning("Deleting unschedulable pod",
-			"pod", pod.Name,
-			"podStatus", pod.Status)
+		contextLogger.Warning("Deleting unschedulable pod", "pod", pod.Name, "podStatus", pod.Status)
 		if err := r.Delete(ctx, pod); err != nil && !apierrs.IsNotFound(err) {
 			return nil, err
 		}
@@ -795,7 +792,7 @@ func (r *ClusterReconciler) processUnschedulableInstances(
 			"Deleted unschedulable pod %v PVCs",
 			pod.Name)
 
-		// We deleted the a pod and its PVCs. Give time to the informer cache to notice that.
+		// We deleted the pod and the PVCGroup. Give time to the informer cache to notice that.
 		return &ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 

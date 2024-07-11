@@ -303,7 +303,7 @@ func isPodNeedingRollout(
 				if podRollout.reason == "" {
 					podRollout.reason = message
 				}
-				contextLogger.Info("Pod rollout required", "pod", pod.Name, "reason", podRollout.reason)
+				contextLogger.Info("Pod rollout required", "podName", pod.Name, "reason", podRollout.reason)
 				return podRollout
 			}
 		}
@@ -363,7 +363,7 @@ func checkHasResizingPVC(pod *corev1.Pod, cluster *apiv1.Cluster) (rollout, erro
 			if persistentvolumeclaim.BelongToInstance(cluster, pod.Name, pvcName) {
 				return rollout{
 					required: true,
-					reason:   fmt.Sprintf("rebooting pod to complete resizing %s", pvcName),
+					reason:   fmt.Sprintf("rebooting pod to complete the resizing of the following PVC: '%s'", pvcName),
 				}, nil
 			}
 		}
