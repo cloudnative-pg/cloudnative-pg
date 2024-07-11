@@ -261,10 +261,10 @@ func (r *InstanceReconciler) Reconcile(
 		return reconcile.Result{}, fmt.Errorf("cannot reconcile database configurations: %w", err)
 	}
 
-	// Reconcile postgresql.auto.conf file
+	// Reconcile postgresql.auto.conf file permissions (< PG 17)
 	// IMPORTANT: this needs a database connection to determine
 	// the PostgreSQL major version
-	r.reconcileAutoConf(ctx, cluster)
+	r.reconcilePostgreSQLAutoConfFilePermissions(ctx, cluster)
 
 	// EXTREMELY IMPORTANT
 	//
@@ -955,9 +955,9 @@ func (r *InstanceReconciler) reconcileInstance(cluster *apiv1.Cluster) {
 	r.instance.RequiresDesignatedPrimaryTransition = detectRequiresDesignatedPrimaryTransition()
 }
 
-// reconcileAutoConf reconciles the permissions bit of `postgresql.auto.conf`
+// PostgreSQLAutoConfWritable reconciles the permissions bit of `postgresql.auto.conf`
 // given the relative setting in `.spec.postgresql.enableAlterSystem`
-func (r *InstanceReconciler) reconcileAutoConf(ctx context.Context, cluster *apiv1.Cluster) {
+func (r *InstanceReconciler) reconcilePostgreSQLAutoConfFilePermissions(ctx context.Context, cluster *apiv1.Cluster) {
 	contextLogger := log.FromContext(ctx)
 	version, err := r.instance.GetPgVersion()
 	if err != nil {
