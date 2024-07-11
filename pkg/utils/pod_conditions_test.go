@@ -134,7 +134,7 @@ var _ = Describe("Pod conditions test suite", func() {
 		})
 	})
 
-	Describe("Must detect if a podis unschedulable", func() {
+	Describe("Must detect if a pod is unschedulable", func() {
 		pod := &corev1.Pod{
 			Status: corev1.PodStatus{
 				Phase: corev1.PodPending,
