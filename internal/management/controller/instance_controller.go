@@ -143,10 +143,6 @@ func (r *InstanceReconciler) Reconcile(
 		r.firstReconcileDone.Store(true)
 	}
 
-	// Reconcile postgresql.auto.conf file. This operation must be after the initialize() call
-	// because it could interfere with pg_rewind execution
-	r.reconcileAutoConf(ctx, cluster)
-
 	// Reconcile cluster role without DB
 	reloadClusterRoleConfig, err := r.reconcileClusterRoleWithoutDB(ctx, cluster)
 	if err != nil {
@@ -231,6 +227,11 @@ func (r *InstanceReconciler) Reconcile(
 	if err := r.reconcileDatabases(ctx, cluster); err != nil {
 		return reconcile.Result{}, fmt.Errorf("cannot reconcile database configurations: %w", err)
 	}
+
+	// Reconcile postgresql.auto.conf file permissions (< PG 17)
+	// IMPORTANT: this needs a database connection to determine
+	// the PostgreSQL major version
+	r.reconcilePostgreSQLAutoConfFilePermissions(ctx, cluster)
 
 	// EXTREMELY IMPORTANT
 	//
@@ -902,17 +903,26 @@ func (r *InstanceReconciler) reconcileInstance(cluster *apiv1.Cluster) {
 	r.instance.SmartStopDelay = cluster.GetSmartShutdownTimeout()
 }
 
-// reconcileAutoConf reconciles the permission of `postgresql.auto.conf`
+// PostgreSQLAutoConfWritable reconciles the permissions bit of `postgresql.auto.conf`
 // given the relative setting in `.spec.postgresql.enableAlterSystem`
-func (r *InstanceReconciler) reconcileAutoConf(ctx context.Context, cluster *apiv1.Cluster) {
+func (r *InstanceReconciler) reconcilePostgreSQLAutoConfFilePermissions(ctx context.Context, cluster *apiv1.Cluster) {
 	contextLogger := log.FromContext(ctx)
-
-	err := r.instance.SetAlterSystemEnabled(
-		cluster.Spec.PostgresConfiguration.EnableAlterSystem,
-	)
+	version, err := r.instance.GetPgVersion()
 	if err != nil {
-		contextLogger.Error(
-			err, "Error while changing mode of the postgresql.auto.conf file, skipped")
+		contextLogger.Error(err, "while getting Postgres version")
+		return
+	}
+
+	if version.Major >= 17 {
+		// PostgreSQL 17 and newer versions allow preventing ALTER SYSTEM
+		// usages using a GUC. We don't need to do anything on the file
+		// system side.
+		return
+	}
+
+	autoConfWriteable := cluster.Spec.PostgresConfiguration.EnableAlterSystem
+	if err = r.instance.SetPostgreSQLAutoConfWritable(autoConfWriteable); err != nil {
+		contextLogger.Error(err, "Error while changing mode of the postgresql.auto.conf file, skipped")
 	}
 }
 

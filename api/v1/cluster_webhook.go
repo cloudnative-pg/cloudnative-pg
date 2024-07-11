@@ -129,6 +129,7 @@ func (r *Cluster) setDefaults(preserveUserSettings bool) {
 			IsReplicaCluster:              r.IsReplica(),
 			PreserveFixedSettingsFromUser: preserveUserSettings,
 			IsWalArchivingDisabled:        utils.IsWalArchivingDisabled(&r.ObjectMeta),
+			IsAlterSystemEnabled:          r.Spec.PostgresConfiguration.EnableAlterSystem,
 		}
 		sanitizedParameters := postgres.CreatePostgresqlConfiguration(info).GetConfigurationParameters()
 		r.Spec.PostgresConfiguration.Parameters = sanitizedParameters
@@ -1059,6 +1060,7 @@ func (r *Cluster) validateConfiguration() field.ErrorList {
 		UserSettings:           r.Spec.PostgresConfiguration.Parameters,
 		IsReplicaCluster:       r.IsReplica(),
 		IsWalArchivingDisabled: utils.IsWalArchivingDisabled(&r.ObjectMeta),
+		IsAlterSystemEnabled:   r.Spec.PostgresConfiguration.EnableAlterSystem,
 	}
 	sanitizedParameters := postgres.CreatePostgresqlConfiguration(info).GetConfigurationParameters()
 
