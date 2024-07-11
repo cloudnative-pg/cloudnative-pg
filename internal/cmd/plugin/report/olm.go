@@ -65,9 +65,8 @@ func getOlmResource(
 		return nil, fmt.Errorf("could note get resource: %v, %v", gvr, err)
 	}
 
-	for idx := range listFromLabelOpenshift.Items {
-		item := listFromLabelOpenshift.Items[idx]
-		if !isContained(item, listFromLabelNamespace.Items) {
+	for _, item := range listFromLabelNamespace.Items {
+		if !isContained(item, listFromLabelOpenshift.Items) {
 			listFromLabelOpenshift.Items = append(listFromLabelOpenshift.Items, item)
 		}
 	}
