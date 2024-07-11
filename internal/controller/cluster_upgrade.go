@@ -323,6 +323,12 @@ func isPodNeedingRollout(
 		return podRollout
 	}
 
+	// If the cluster is annotated with `cnpg.io/reconcilePodSpec: disabled`,
+	// we avoid to check the PodSpec
+	if utils.IsPodSpecReconciliationDisabled(&cluster.ObjectMeta) {
+		return rollout{}
+	}
+
 	// If the pod has a valid PodSpec annotation, that's the final check.
 	// If not, we should perform additional legacy checks
 	if hasValidPodSpec(pod) {

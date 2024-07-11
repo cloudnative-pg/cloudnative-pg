@@ -87,6 +87,10 @@ deletion of the pooler, and vice versa.
     possible architectures. You can have clusters without poolers, clusters with
     a single pooler, or clusters with several poolers, that is, one per application.
 
+!!! Important
+    When operator is upgraded, the pooler pod will rolling upgrade as the instance
+    manager in pooler pod need to be upgraded.
+
 ## Security
 
 Any PgBouncer pooler is transparently integrated with CloudNativePG support for

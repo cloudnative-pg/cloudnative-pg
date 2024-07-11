@@ -164,6 +164,21 @@ These predefined annotations are managed by CloudNativePG.
 `cnpg.io/pvcStatus`
 :   Current status of the PVC: `initializing`, `ready`, or `detached`.
 
+`cnpg.io/reconcilePodSpec`
+:  Annotation is used on `Cluster` or `Pooler` for special purpose
+
+   When set to `disabled` on a `Cluster`, the operator prevents instances
+   from being restarted in case of drift in the PodSpec.
+   PodSpec drift could be due, for example, to:
+
+     - Changes to topology or affinity
+     - Change of scheduler
+     - Change to volumes or containers
+
+  When set to `disabled` on a `Pooler`, the operator will restrict changes to 
+  the deployment spec from being made by the Pooler, except the `spec.instances` 
+  changes. 
+
 `cnpg.io/reconciliationLoop`
 :   When set to `disabled` on a `Cluster`, the operator prevents the
     reconciliation loop from running.
