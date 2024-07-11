@@ -22,12 +22,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
-const (
-	// PodReasonEvicted is set inside the status as the Pod failure reason
-	// when the Kubelet evicts a Pod
-	PodReasonEvicted = "Evicted"
-)
-
 var utilsLog = log.WithName("utils")
 
 // PodStatus represent the possible status of pods
