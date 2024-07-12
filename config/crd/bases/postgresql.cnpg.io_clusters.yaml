@@ -1596,8 +1596,9 @@ spec:
                         type: array
                       postInitApplicationSQLRefs:
                         description: |-
-                          PostInitApplicationSQLRefs holds references to ConfigMaps or Secrets
-                          containing SQL files. The references are processed in a specific order:
+                          List of references to ConfigMaps or Secrets containing SQL files
+                          to be executed as a superuser in the application database right after
+                          it is created. The references are processed in a specific order:
                           first, all Secrets are processed, followed by all ConfigMaps.
                           Within each group, the processing order follows the sequence specified
                           in their respective arrays.
@@ -1652,8 +1653,9 @@ spec:
                         type: array
                       postInitSQLRefs:
                         description: |-
-                          PostInitSQLRefs holds references to ConfigMaps or Secrets
-                          containing SQL files. The references are processed in a specific order:
+                          List of references to ConfigMaps or Secrets containing SQL files
+                          to be executed as a superuser immediately after the cluster
+                          has been created. The references are processed in a specific order:
                           first, all Secrets are processed, followed by all ConfigMaps.
                           Within each group, the processing order follows the sequence specified
                           in their respective arrays.
@@ -1708,8 +1710,9 @@ spec:
                         type: array
                       postInitTemplateSQLRefs:
                         description: |-
-                          PostInitTemplateSQLRefs holds references to ConfigMaps or Secrets
-                          containing SQL files. The references are processed in a specific order:
+                          List of references to ConfigMaps or Secrets containing SQL files
+                          to be executed as a superuser in the `template1` after the cluster
+                          has been created. The references are processed in a specific order:
                           first, all Secrets are processed, followed by all ConfigMaps.
                           Within each group, the processing order follows the sequence specified
                           in their respective arrays.

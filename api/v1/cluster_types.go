@@ -1649,8 +1649,9 @@ type BootstrapInitDB struct {
 	// +optional
 	Import *Import `json:"import,omitempty"`
 
-	// PostInitApplicationSQLRefs holds references to ConfigMaps or Secrets
-	// containing SQL files. The references are processed in a specific order:
+	// List of references to ConfigMaps or Secrets containing SQL files
+	// to be executed as a superuser in the application database right after
+	// it is created. The references are processed in a specific order:
 	// first, all Secrets are processed, followed by all ConfigMaps.
 	// Within each group, the processing order follows the sequence specified
 	// in their respective arrays.
@@ -1658,8 +1659,9 @@ type BootstrapInitDB struct {
 	// +optional
 	PostInitApplicationSQLRefs *SQLRefs `json:"postInitApplicationSQLRefs,omitempty"`
 
-	// PostInitTemplateSQLRefs holds references to ConfigMaps or Secrets
-	// containing SQL files. The references are processed in a specific order:
+	// List of references to ConfigMaps or Secrets containing SQL files
+	// to be executed as a superuser in the `template1` after the cluster
+	// has been created. The references are processed in a specific order:
 	// first, all Secrets are processed, followed by all ConfigMaps.
 	// Within each group, the processing order follows the sequence specified
 	// in their respective arrays.
@@ -1667,8 +1669,9 @@ type BootstrapInitDB struct {
 	// +optional
 	PostInitTemplateSQLRefs *SQLRefs `json:"postInitTemplateSQLRefs,omitempty"`
 
-	// PostInitSQLRefs holds references to ConfigMaps or Secrets
-	// containing SQL files. The references are processed in a specific order:
+	// List of references to ConfigMaps or Secrets containing SQL files
+	// to be executed as a superuser immediately after the cluster
+	// has been created. The references are processed in a specific order:
 	// first, all Secrets are processed, followed by all ConfigMaps.
 	// Within each group, the processing order follows the sequence specified
 	// in their respective arrays.

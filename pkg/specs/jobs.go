@@ -96,12 +96,12 @@ func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int) *batchv1.J
 
 	if cluster.ShouldInitDBRunPostInitTemplateSQLRefs() {
 		initCommand = append(initCommand,
-			"--post-init-template-sql-refs-folder", postInitApplicationSQLRefsFolder.toString())
+			"--post-init-template-sql-refs-folder", postInitTemplateQLRefsFolder.toString())
 	}
 
 	if cluster.ShouldInitDBRunPostInitSQLRefs() {
 		initCommand = append(initCommand,
-			"--post-init-sql-refs-folder", postInitApplicationSQLRefsFolder.toString())
+			"--post-init-sql-refs-folder", postInitSQLRefsFolder.toString())
 	}
 
 	return createPrimaryJob(cluster, nodeSerial, jobRoleInitDB, initCommand)

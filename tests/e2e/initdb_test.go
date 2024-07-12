@@ -29,8 +29,8 @@ import (
 // Set of tests in which we check that the initdb options are really applied
 var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), func() {
 	const (
-		fixturesCertificatesDir = fixturesDir + "/initdb"
-		level                   = tests.Medium
+		fixturesInitdbDir = fixturesDir + "/initdb"
+		level             = tests.Medium
 	)
 
 	BeforeEach(func() {
@@ -41,10 +41,14 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 
 	Context("initdb custom post-init SQL scripts", func() {
 		const (
-			clusterName             = "p-postinit-sql"
-			postInitSQLCluster      = fixturesCertificatesDir + "/cluster-postinit-sql.yaml.template"
-			postInitSQLSecretRef    = fixturesCertificatesDir + "/cluster_post_init_secret.yaml"
-			postInitSQLConfigMapRef = fixturesCertificatesDir + "/cluster_post_init_configmap.yaml"
+			clusterName                        = "p-postinit-sql"
+			postInitSQLCluster                 = fixturesInitdbDir + "/cluster-postinit-sql.yaml.template"
+			postInitApplicationSQLSecretRef    = fixturesInitdbDir + "/cluster_post_init_application_secret.yaml"
+			postInitApplicationSQLConfigMapRef = fixturesInitdbDir + "/cluster_post_init_application_configmap.yaml"
+			postInitSQLSecretRef               = fixturesInitdbDir + "/cluster_post_init_secret.yaml"
+			postInitSQLConfigMapRef            = fixturesInitdbDir + "/cluster_post_init_configmap.yaml"
+			postInitTemplateSQLSecretRef       = fixturesInitdbDir + "/cluster_post_init_template_secret.yaml"
+			postInitTemplateSQLConfigMapRef    = fixturesInitdbDir + "/cluster_post_init_template_configmap.yaml"
 		)
 
 		var namespace string
@@ -64,63 +68,111 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 
 			CreateResourceFromFile(namespace, postInitSQLSecretRef)
 			CreateResourceFromFile(namespace, postInitSQLConfigMapRef)
+			CreateResourceFromFile(namespace, postInitApplicationSQLSecretRef)
+			CreateResourceFromFile(namespace, postInitApplicationSQLConfigMapRef)
+			CreateResourceFromFile(namespace, postInitTemplateSQLSecretRef)
+			CreateResourceFromFile(namespace, postInitTemplateSQLConfigMapRef)
 
 			AssertCreateCluster(namespace, clusterName, postInitSQLCluster, env)
 
 			primaryDst := clusterName + "-1"
 
-			By("querying the tables via psql", func() {
+			By("querying the postgres database tables defined by SQL", func() {
 				_, _, err := env.ExecQueryInInstancePod(
 					utils.PodLocator{
 						Namespace: namespace,
 						PodName:   primaryDst,
-					}, utils.DatabaseName("postgres"),
-					"SELECT count(*) FROM numbers")
+					}, "postgres",
+					"SELECT count(*) FROM sql")
 				Expect(err).ToNot(HaveOccurred())
 			})
-			By("querying the App database tables via psql", func() {
+
+			By("querying the app database tables defined by SQL", func() {
 				_, _, err := env.ExecQueryInInstancePod(
 					utils.PodLocator{
 						Namespace: namespace,
 						PodName:   primaryDst,
-					}, utils.DatabaseName("app"),
-					"SELECT count(*) FROM application_numbers")
+					}, "app",
+					"SELECT count(*) FROM application_sql")
 				Expect(err).ToNot(HaveOccurred())
 			})
-			By("querying the App database tables defined by secretRefs", func() {
+
+			By("querying the app database tables from the template defined by SQL", func() {
 				_, _, err := env.ExecQueryInInstancePod(
 					utils.PodLocator{
 						Namespace: namespace,
 						PodName:   primaryDst,
-					}, utils.DatabaseName("app"),
+					}, "app",
+					"SELECT count(*) FROM template_sql")
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			By("querying the postgres database tables defined by secretRefs", func() {
+				_, _, err := env.ExecQueryInInstancePod(
+					utils.PodLocator{
+						Namespace: namespace,
+						PodName:   primaryDst,
+					}, "postgres",
 					"SELECT count(*) FROM secrets")
 				Expect(err).ToNot(HaveOccurred())
 			})
-			By("querying the App database tables defined by configMapRefs", func() {
+
+			By("querying the postgres database tables defined by configMapRefs", func() {
 				_, _, err := env.ExecQueryInInstancePod(
 					utils.PodLocator{
 						Namespace: namespace,
 						PodName:   primaryDst,
-					}, utils.DatabaseName("app"),
+					}, "postgres",
 					"SELECT count(*) FROM configmaps")
 				Expect(err).ToNot(HaveOccurred())
 			})
-			By("querying the database to ensure the installed extension is there", func() {
-				stdout, _, err := env.ExecQueryInInstancePod(
+
+			By("querying the app database tables defined by secretRefs", func() {
+				_, _, err := env.ExecQueryInInstancePod(
 					utils.PodLocator{
 						Namespace: namespace,
 						PodName:   primaryDst,
-					}, utils.DatabaseName("postgres"),
-					"SELECT count(*) FROM pg_available_extensions WHERE name LIKE 'intarray'")
+					}, "app",
+					"SELECT count(*) FROM application_secrets")
 				Expect(err).ToNot(HaveOccurred())
-				Expect(stdout, err).To(Equal("1\n"))
 			})
+
+			By("querying the app database tables defined by configMapRefs", func() {
+				_, _, err := env.ExecQueryInInstancePod(
+					utils.PodLocator{
+						Namespace: namespace,
+						PodName:   primaryDst,
+					}, "app",
+					"SELECT count(*) FROM application_configmaps")
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			By("querying the app database tables from the template defined by secretRefs", func() {
+				_, _, err := env.ExecQueryInInstancePod(
+					utils.PodLocator{
+						Namespace: namespace,
+						PodName:   primaryDst,
+					}, "app",
+					"SELECT count(*) FROM template_secrets")
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			By("querying the app database tables from the template defined by configMapRefs", func() {
+				_, _, err := env.ExecQueryInInstancePod(
+					utils.PodLocator{
+						Namespace: namespace,
+						PodName:   primaryDst,
+					}, "app",
+					"SELECT count(*) FROM template_configmaps")
+				Expect(err).ToNot(HaveOccurred())
+			})
+
 			By("checking inside the database the default locale", func() {
 				stdout, _, err := env.ExecQueryInInstancePod(
 					utils.PodLocator{
 						Namespace: namespace,
 						PodName:   primaryDst,
-					}, utils.DatabaseName("postgres"),
+					}, "postgres",
 					"select datcollate from pg_database where datname='template0'")
 				Expect(err).ToNot(HaveOccurred())
 				Expect(stdout, err).To(Equal("C\n"))
@@ -131,7 +183,7 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 	Context("custom default locale", func() {
 		const (
 			clusterName        = "p-locale"
-			postInitSQLCluster = fixturesCertificatesDir + "/cluster-custom-locale.yaml.template"
+			postInitSQLCluster = fixturesInitdbDir + "/cluster-custom-locale.yaml.template"
 		)
 
 		var namespace string

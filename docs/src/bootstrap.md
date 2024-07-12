@@ -271,10 +271,14 @@ spec:
     `-d`), this technique is deprecated and will be removed from future versions of
     the API.
 
-You can also specify a custom list of queries that will be executed
-once, just after the database is created and configured. These queries will
-be executed as the *superuser* (`postgres`), connected to the `postgres`
-database:
+### Executing queries after initialization
+
+You can specify a custom list of queries that will be executed
+once, just after the cluster is created and configured.
+These queries  will be executed as the *superuser* (`postgres`), connected
+to the `postgres`, `template1`, or the application database specified in
+the `initdb` section, respectively with `postInitSQL`, `postInitTemplateSQL`,
+or`postInitApplicationSQL`.
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -300,15 +304,15 @@ spec:
 !!! Warning
     Please use the `postInitSQL`, `postInitApplicationSQL` and
     `postInitTemplateSQL` options with extreme care, as queries are run as a
-    superuser and can disrupt the entire cluster.  An error in any of those queries
+    superuser and can disrupt the entire cluster. An error in any of those queries
     interrupts the bootstrap phase, leaving the cluster incomplete.
 
-### Executing queries after initialization
-
 Moreover, you can specify a list of Secrets and/or ConfigMaps which contains
-SQL script that will be executed after the database is created and configured.
-These SQL script will be executed using the **superuser** role (`postgres`),
-connected to the database specified in the `initdb` section:
+SQL script that will be executed after the cluster is created and configured.
+These SQL scripts will be executed as the *superuser* (`postgres`), connected
+to the `postgres`, `template1`, or the application database specified in
+the `initdb` section, respectively with `postInitSQL`, `postInitTemplateSQL`,
+or`postInitApplicationSQL`.
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -343,7 +347,8 @@ spec:
 
 !!! Warning
     Please make sure the existence of the entries inside the ConfigMaps or
-    Secrets specified in `postInitApplicationSQLRefs`, otherwise the bootstrap will
+    Secrets specified in `postInitSQLRefs`, `postInitTemplateSQLRefs`,
+    and `postInitApplicationSQLRefs`, otherwise the bootstrap will
     fail. Errors in any of those SQL files will prevent the bootstrap phase to
     complete successfully.
 

@@ -1210,8 +1210,9 @@ instance using logical backup (<code>pg_dump</code> and <code>pg_restore</code>)
 <a href="#postgresql-cnpg-io-v1-SQLRefs"><i>SQLRefs</i></a>
 </td>
 <td>
-   <p>PostInitApplicationSQLRefs holds references to ConfigMaps or Secrets
-containing SQL files. The references are processed in a specific order:
+   <p>List of references to ConfigMaps or Secrets containing SQL files
+to be executed as a superuser in the application database right after
+it is created. The references are processed in a specific order:
 first, all Secrets are processed, followed by all ConfigMaps.
 Within each group, the processing order follows the sequence specified
 in their respective arrays.
@@ -1222,8 +1223,9 @@ in their respective arrays.
 <a href="#postgresql-cnpg-io-v1-SQLRefs"><i>SQLRefs</i></a>
 </td>
 <td>
-   <p>PostInitTemplateSQLRefs holds references to ConfigMaps or Secrets
-containing SQL files. The references are processed in a specific order:
+   <p>List of references to ConfigMaps or Secrets containing SQL files
+to be executed as a superuser in the <code>template1</code> after the cluster
+has been created. The references are processed in a specific order:
 first, all Secrets are processed, followed by all ConfigMaps.
 Within each group, the processing order follows the sequence specified
 in their respective arrays.
@@ -1234,8 +1236,9 @@ in their respective arrays.
 <a href="#postgresql-cnpg-io-v1-SQLRefs"><i>SQLRefs</i></a>
 </td>
 <td>
-   <p>PostInitSQLRefs holds references to ConfigMaps or Secrets
-containing SQL files. The references are processed in a specific order:
+   <p>List of references to ConfigMaps or Secrets containing SQL files
+to be executed as a superuser immediately after the cluster
+has been created. The references are processed in a specific order:
 first, all Secrets are processed, followed by all ConfigMaps.
 Within each group, the processing order follows the sequence specified
 in their respective arrays.
