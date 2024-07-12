@@ -23,7 +23,6 @@ import (
 	"path/filepath"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -31,50 +30,29 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 )
 
-// getOlmResource gets the desired resource using the Dynamic Client
+// getOlmResourceList gets the desired resource using the Dynamic Client
 // to avoid code dependencies on the OLM libraries
-func getOlmResource(
+func getOlmResourceList(
 	ctx context.Context,
 	dynamicClient dynamic.Interface,
 	namespace, resource string,
 ) (client.ObjectList, error) {
-	isContained := func(item unstructured.Unstructured, list []unstructured.Unstructured) bool {
-		for _, element := range list {
-			if element.GetName() == item.GetName() {
-				return true
-			}
-		}
-		return false
-	}
-
 	gvr := schema.GroupVersionResource{
 		Group:    "operators.coreos.com",
 		Version:  "v1alpha1",
 		Resource: resource,
 	}
 
-	listFromLabelOpenshift, err := dynamicClient.Resource(gvr).Namespace(namespace).
-		List(ctx, metav1.ListOptions{LabelSelector: labelOpenshiftOperators})
-	if err != nil {
-		return nil, fmt.Errorf("could note get resource: %v, %v", gvr, err)
-	}
-
-	listFromLabelNamespace, err := dynamicClient.Resource(gvr).Namespace(namespace).
+	resourceList, err := dynamicClient.Resource(gvr).Namespace(namespace).
 		List(ctx, metav1.ListOptions{LabelSelector: getLabelOperatorsNamespace()})
 	if err != nil {
 		return nil, fmt.Errorf("could note get resource: %v, %v", gvr, err)
 	}
 
-	for _, item := range listFromLabelNamespace.Items {
-		if !isContained(item, listFromLabelOpenshift.Items) {
-			listFromLabelOpenshift.Items = append(listFromLabelOpenshift.Items, item)
-		}
-	}
-
-	return listFromLabelOpenshift, err
+	return resourceList, nil
 }
 
-// olmOperatorReport contains the operator data in Oolm
+// olmOperatorReport contains the operator data in OLM
 // to be printed by the `report operator` plugin
 type olmOperatorReport map[string]client.ObjectList
 
@@ -89,12 +67,13 @@ func getOlmReport(ctx context.Context, namespace string) (olmOperatorReport, err
 	}
 
 	for _, item := range resources {
-		resource, err := getOlmResource(ctx, cli, namespace, item)
+		resource, err := getOlmResourceList(ctx, cli, namespace, item)
 		if err != nil {
 			return nil, fmt.Errorf("could not build report. Failed on item %s: %w", item, err)
 		}
 		report[item] = resource
 	}
+
 	return report, nil
 }
 

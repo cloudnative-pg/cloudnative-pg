@@ -39,7 +39,7 @@ var haveSCC bool
 // haveVolumeSnapshot stores the result of the VolumeSnapshotExist function
 var haveVolumeSnapshot bool
 
-// olmPlatform specifies whethere we are running on a platform with OLM support
+// olmPlatform specifies whether we are running on a platform with OLM support
 var olmPlatform bool
 
 // AvailableArchitecture is a struct containing info about an available architecture
