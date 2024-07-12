@@ -172,7 +172,6 @@ func ReconcileScheduledBackup(
 	}
 
 	now := time.Now()
-	origScheduled := scheduledBackup.DeepCopy()
 
 	if scheduledBackup.Status.LastCheckTime == nil && scheduledBackup.IsImmediate() {
 		// we populate the status (lastCheckTime...) by following the same rules of the scheduled backup
@@ -181,6 +180,7 @@ func ReconcileScheduledBackup(
 	}
 
 	if scheduledBackup.Status.LastCheckTime == nil {
+		origScheduled := scheduledBackup.DeepCopy()
 		// This is the first time we check this schedule,
 		// let's wait until the first job will be actually
 		// scheduled
