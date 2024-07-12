@@ -27,6 +27,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/lib/pq"
 	"github.com/thoas/go-funk"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -228,7 +229,41 @@ func AssertClusterIsReady(namespace string, clusterName string, timeout int, env
 				nodes, _ := env.DescribeKubernetesNodes()
 				return fmt.Sprintf("CLUSTER STATE\n%s\n\nK8S NODES\n%s",
 					cluster, nodes)
-			})
+			},
+		)
+
+		Eventually(func(g Gomega) {
+			if cluster.Spec.Instances == 1 {
+				return
+			}
+
+			podList, err := env.GetClusterPodList(namespace, clusterName)
+			g.Expect(err).ToNot(HaveOccurred(), "cannot get cluster pod list")
+
+			primaryPod, err := env.GetClusterPrimary(namespace, clusterName)
+			g.Expect(err).ToNot(HaveOccurred(), "cannot find cluster primary pod")
+
+			replicaNamesList := make([]string, 0, len(podList.Items)-1)
+			for _, pod := range podList.Items {
+				if pod.Name != primaryPod.Name {
+					replicaNamesList = append(replicaNamesList, pq.QuoteLiteral(pod.Name))
+				}
+			}
+			replicaNamesString := strings.Join(replicaNamesList, ",")
+
+			out, _, err := env.ExecCommandInInstancePod(
+				testsUtils.PodLocator{
+					Namespace: namespace,
+					PodName:   primaryPod.Name,
+				}, nil,
+				"psql", "-t", "-A", "-c",
+				fmt.Sprintf("SELECT COUNT(*) FROM pg_stat_replication WHERE application_name IN (%s)", replicaNamesString),
+				"postgres",
+			)
+			g.Expect(err).ToNot(HaveOccurred(), "cannot extract the list of streaming replicas")
+			g.Expect(strings.TrimSpace(out)).To(BeEquivalentTo(fmt.Sprintf("%d", len(replicaNamesList))))
+		}, timeout, 2).Should(Succeed(), "Replicas are attached via streaming connection")
+
 		GinkgoWriter.Println("Cluster ready, took", time.Since(start))
 	})
 }
