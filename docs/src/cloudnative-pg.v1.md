@@ -1210,10 +1210,11 @@ instance using logical backup (<code>pg_dump</code> and <code>pg_restore</code>)
 <a href="#postgresql-cnpg-io-v1-SQLRefs"><i>SQLRefs</i></a>
 </td>
 <td>
-   <p>PostInitApplicationSQLRefs points references to ConfigMaps or Secrets which
-contain SQL files, the general implementation order to these references is
-from all Secrets to all ConfigMaps, and inside Secrets or ConfigMaps,
-the implementation order is same as the order of each array
+   <p>PostInitApplicationSQLRefs holds references to ConfigMaps or Secrets
+containing SQL files. The references are processed in a specific order:
+first, all Secrets are processed, followed by all ConfigMaps.
+Within each group, the processing order follows the sequence specified
+in their respective arrays.
 (by default empty)</p>
 </td>
 </tr>
@@ -1221,10 +1222,11 @@ the implementation order is same as the order of each array
 <a href="#postgresql-cnpg-io-v1-SQLRefs"><i>SQLRefs</i></a>
 </td>
 <td>
-   <p>PostInitTemplateSQLRefs points references to ConfigMaps or Secrets which
-contain SQL files, the general implementation order to these references is
-from all Secrets to all ConfigMaps, and inside Secrets or ConfigMaps,
-the implementation order is same as the order of each array
+   <p>PostInitTemplateSQLRefs holds references to ConfigMaps or Secrets
+containing SQL files. The references are processed in a specific order:
+first, all Secrets are processed, followed by all ConfigMaps.
+Within each group, the processing order follows the sequence specified
+in their respective arrays.
 (by default empty)</p>
 </td>
 </tr>
@@ -1232,10 +1234,11 @@ the implementation order is same as the order of each array
 <a href="#postgresql-cnpg-io-v1-SQLRefs"><i>SQLRefs</i></a>
 </td>
 <td>
-   <p>PostInitSQLRefs points references to ConfigMaps or Secrets which
-contain SQL files, the general implementation order to these references is
-from all Secrets to all ConfigMaps, and inside Secrets or ConfigMaps,
-the implementation order is same as the order of each array
+   <p>PostInitSQLRefs holds references to ConfigMaps or Secrets
+containing SQL files. The references are processed in a specific order:
+first, all Secrets are processed, followed by all ConfigMaps.
+Within each group, the processing order follows the sequence specified
+in their respective arrays.
 (by default empty)</p>
 </td>
 </tr>
@@ -4522,10 +4525,11 @@ files to S3. It can be provided in two alternative ways:</p>
 - [BootstrapInitDB](#postgresql-cnpg-io-v1-BootstrapInitDB)
 
 
-<p>SQLRefs points references to ConfigMaps or Secrets which
-contain SQL files, the general implementation order to these references is
-from all Secrets to all ConfigMaps, and inside Secrets or ConfigMaps,
-the implementation order is same as the order of each array</p>
+<p>SQLRefs holds references to ConfigMaps or Secrets
+containing SQL files. The references are processed in a specific order:
+first, all Secrets are processed, followed by all ConfigMaps.
+Within each group, the processing order follows the sequence specified
+in their respective arrays.</p>
 
 
 <table class="table">

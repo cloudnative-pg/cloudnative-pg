@@ -1649,26 +1649,29 @@ type BootstrapInitDB struct {
 	// +optional
 	Import *Import `json:"import,omitempty"`
 
-	// PostInitApplicationSQLRefs points references to ConfigMaps or Secrets which
-	// contain SQL files, the general implementation order to these references is
-	// from all Secrets to all ConfigMaps, and inside Secrets or ConfigMaps,
-	// the implementation order is same as the order of each array
+	// PostInitApplicationSQLRefs holds references to ConfigMaps or Secrets
+	// containing SQL files. The references are processed in a specific order:
+	// first, all Secrets are processed, followed by all ConfigMaps.
+	// Within each group, the processing order follows the sequence specified
+	// in their respective arrays.
 	// (by default empty)
 	// +optional
 	PostInitApplicationSQLRefs *SQLRefs `json:"postInitApplicationSQLRefs,omitempty"`
 
-	// PostInitTemplateSQLRefs points references to ConfigMaps or Secrets which
-	// contain SQL files, the general implementation order to these references is
-	// from all Secrets to all ConfigMaps, and inside Secrets or ConfigMaps,
-	// the implementation order is same as the order of each array
+	// PostInitTemplateSQLRefs holds references to ConfigMaps or Secrets
+	// containing SQL files. The references are processed in a specific order:
+	// first, all Secrets are processed, followed by all ConfigMaps.
+	// Within each group, the processing order follows the sequence specified
+	// in their respective arrays.
 	// (by default empty)
 	// +optional
 	PostInitTemplateSQLRefs *SQLRefs `json:"postInitTemplateSQLRefs,omitempty"`
 
-	// PostInitSQLRefs points references to ConfigMaps or Secrets which
-	// contain SQL files, the general implementation order to these references is
-	// from all Secrets to all ConfigMaps, and inside Secrets or ConfigMaps,
-	// the implementation order is same as the order of each array
+	// PostInitSQLRefs holds references to ConfigMaps or Secrets
+	// containing SQL files. The references are processed in a specific order:
+	// first, all Secrets are processed, followed by all ConfigMaps.
+	// Within each group, the processing order follows the sequence specified
+	// in their respective arrays.
 	// (by default empty)
 	// +optional
 	PostInitSQLRefs *SQLRefs `json:"postInitSQLRefs,omitempty"`
@@ -1719,10 +1722,11 @@ type ImportSource struct {
 	ExternalCluster string `json:"externalCluster"`
 }
 
-// SQLRefs points references to ConfigMaps or Secrets which
-// contain SQL files, the general implementation order to these references is
-// from all Secrets to all ConfigMaps, and inside Secrets or ConfigMaps,
-// the implementation order is same as the order of each array
+// SQLRefs holds references to ConfigMaps or Secrets
+// containing SQL files. The references are processed in a specific order:
+// first, all Secrets are processed, followed by all ConfigMaps.
+// Within each group, the processing order follows the sequence specified
+// in their respective arrays.
 type SQLRefs struct {
 	// SecretRefs holds a list of references to Secrets
 	// +optional
