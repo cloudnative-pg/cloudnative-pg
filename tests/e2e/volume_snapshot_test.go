@@ -697,4 +697,149 @@ var _ = Describe("Verify Volume Snapshot",
 				})
 			})
 		})
+
+		Context("Scale up with volume snapshot", Ordered, func() {
+			// test env constants
+			const (
+				namespacePrefix = "volume-snapshot-scale"
+				level           = tests.High
+				filesDir        = fixturesDir + "/volume_snapshot"
+				snapshotDataEnv = "SNAPSHOT_PITR_PGDATA"
+				snapshotWalEnv  = "SNAPSHOT_PITR_PGWAL"
+			)
+			// file constants
+			const (
+				clusterToSnapshot = filesDir + "/cluster-scale.yaml.template"
+			)
+
+			var clusterToSnapshotName string
+			BeforeAll(func() {
+				if testLevelEnv.Depth < int(level) {
+					Skip("Test depth is lower than the amount requested for this test")
+				}
+
+				var err error
+				clusterToSnapshotName, err = env.GetResourceNameFromYAML(clusterToSnapshot)
+				Expect(err).ToNot(HaveOccurred())
+
+				namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+				Expect(err).ToNot(HaveOccurred())
+
+				DeferCleanup(func() error {
+					if CurrentSpecReport().Failed() {
+						env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+					}
+					return env.DeleteNamespace(namespace)
+				})
+
+				By("create the certificates for MinIO", func() {
+					err := minioEnv.CreateCaSecret(env, namespace)
+					Expect(err).ToNot(HaveOccurred())
+				})
+
+				AssertStorageCredentialsAreCreated(namespace, "backup-storage-creds", "minio", "minio123")
+
+				By("creating the cluster to snapshot", func() {
+					AssertCreateCluster(namespace, clusterToSnapshotName, clusterToSnapshot, env)
+				})
+
+				By("verify test connectivity to minio using barman-cloud-wal-archive script", func() {
+					primaryPod, err := env.GetClusterPrimary(namespace, clusterToSnapshotName)
+					Expect(err).ToNot(HaveOccurred())
+					Eventually(func() (bool, error) {
+						connectionStatus, err := testUtils.MinioTestConnectivityUsingBarmanCloudWalArchive(
+							namespace, clusterToSnapshotName, primaryPod.GetName(), "minio", "minio123", minioEnv.ServiceName)
+						if err != nil {
+							return false, err
+						}
+						return connectionStatus, nil
+					}, 60).Should(BeTrue())
+				})
+			})
+
+			It("scaling up a cluster using volume snapshots", func() {
+				const (
+					tableName = "online_test"
+				)
+
+				DeferCleanup(func() error {
+					if err := os.Unsetenv(snapshotDataEnv); err != nil {
+						return err
+					}
+
+					return os.Unsetenv(snapshotWalEnv)
+				})
+
+				By("inserting test data and creating WALs on the cluster to be snapshotted", func() {
+					// Create a "test" table with values 1,2
+					AssertCreateTestData(namespace, clusterToSnapshotName, tableName, psqlClientPod)
+
+					// Insert 2 more rows which we expect not to be present at the end of the recovery
+					insertRecordIntoTable(namespace, clusterToSnapshotName, tableName, 3, psqlClientPod)
+					insertRecordIntoTable(namespace, clusterToSnapshotName, tableName, 4, psqlClientPod)
+
+					// Close and archive the current WAL file
+					AssertArchiveWalOnMinio(namespace, clusterToSnapshotName, clusterToSnapshotName)
+				})
+
+				var backup *apiv1.Backup
+				By("creating a snapshot and waiting until it's completed", func() {
+					var err error
+					backupName := fmt.Sprintf("%s-online", clusterToSnapshotName)
+					backup, err = testUtils.CreateBackup(
+						apiv1.Backup{
+							ObjectMeta: metav1.ObjectMeta{
+								Namespace: namespace,
+								Name:      backupName,
+							},
+							Spec: apiv1.BackupSpec{
+								Target:  apiv1.BackupTargetPrimary,
+								Method:  apiv1.BackupMethodVolumeSnapshot,
+								Cluster: apiv1.LocalObjectReference{Name: clusterToSnapshotName},
+							},
+						},
+						env,
+					)
+					Expect(err).ToNot(HaveOccurred())
+
+					Eventually(func(g Gomega) {
+						err = env.Client.Get(env.Ctx, types.NamespacedName{
+							Namespace: namespace,
+							Name:      backupName,
+						}, backup)
+						g.Expect(err).ToNot(HaveOccurred())
+						g.Expect(backup.Status.Phase).To(BeEquivalentTo(apiv1.BackupPhaseCompleted),
+							"Backup should be completed correctly, error message is '%s'",
+							backup.Status.Error)
+						g.Expect(backup.Status.BackupSnapshotStatus.Elements).To(HaveLen(2))
+						g.Expect(backup.Status.BackupLabelFile).ToNot(BeEmpty())
+					}, testTimeouts[testUtils.VolumeSnapshotIsReady]).Should(Succeed())
+				})
+
+				By("fetching the volume snapshots", func() {
+					snapshotList, err := getSnapshots(backup.Name, clusterToSnapshotName, namespace)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(snapshotList.Items).To(HaveLen(len(backup.Status.BackupSnapshotStatus.Elements)))
+
+					envVars := testUtils.EnvVarsForSnapshots{
+						DataSnapshot: snapshotDataEnv,
+						WalSnapshot:  snapshotWalEnv,
+					}
+					err = testUtils.SetSnapshotNameAsEnv(&snapshotList, backup, envVars)
+					Expect(err).ToNot(HaveOccurred())
+				})
+
+				By("scale up the cluster", func() {
+					err := env.ScaleClusterSize(namespace, clusterToSnapshotName, 2)
+					Expect(err).ToNot(HaveOccurred())
+				})
+
+				By("checking the the cluster is working", func() {
+					// Setting up a cluster with three pods is slow, usually 200-600s
+					AssertClusterIsReady(namespace, clusterToSnapshotName, testTimeouts[testUtils.ClusterIsReady], env)
+				})
+			})
+
+		})
+
 	})
