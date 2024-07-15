@@ -694,7 +694,7 @@ var _ = Describe("Cluster upgrade with podSpec reconciliation disabled", func() 
 			ExecutableHash: "test_hash",
 		}
 
-		rollout := isPodNeedingRollout(ctx, status, &cluster)
+		rollout := isInstanceNeedingRollout(ctx, status, &cluster)
 		Expect(rollout.required).To(BeFalse())
 		Expect(rollout.canBeInPlace).To(BeFalse())
 		Expect(rollout.reason).To(BeEmpty())
