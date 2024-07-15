@@ -550,7 +550,7 @@ var _ = Describe("Verify Volume Snapshot",
 			})
 		})
 
-		Context("Declarative Hot Backup", Ordered, func() {
+		Context("Declarative Hot Backup and scaleup", Ordered, func() {
 			// test env constants
 			const (
 				namespacePrefix = "volume-snapshot-recovery"
@@ -558,13 +558,16 @@ var _ = Describe("Verify Volume Snapshot",
 				filesDir        = fixturesDir + "/volume_snapshot"
 				snapshotDataEnv = "SNAPSHOT_PITR_PGDATA"
 				snapshotWalEnv  = "SNAPSHOT_PITR_PGWAL"
+				tableName       = "online_test"
 			)
 			// file constants
 			const (
-				clusterToSnapshot = filesDir + "/cluster-pvc-hot-snapshot.yaml.template"
+				clusterToSnapshot          = filesDir + "/cluster-pvc-hot-snapshot.yaml.template"
+				clusterSnapshotRestoreFile = filesDir + "/cluster-pvc-hot-restore.yaml.template"
 			)
 
 			var clusterToSnapshotName string
+			var backup *apiv1.Backup
 			BeforeAll(func() {
 				if testLevelEnv.Depth < int(level) {
 					Skip("Test depth is lower than the amount requested for this test")
@@ -610,11 +613,6 @@ var _ = Describe("Verify Volume Snapshot",
 			})
 
 			It("should execute a backup with online set to true", func() {
-				const (
-					tableName                  = "online_test"
-					clusterSnapshotRestoreFile = filesDir + "/cluster-pvc-hot-restore.yaml.template"
-				)
-
 				DeferCleanup(func() error {
 					if err := os.Unsetenv(snapshotDataEnv); err != nil {
 						return err
@@ -635,7 +633,6 @@ var _ = Describe("Verify Volume Snapshot",
 					AssertArchiveWalOnMinio(namespace, clusterToSnapshotName, clusterToSnapshotName)
 				})
 
-				var backup *apiv1.Backup
 				By("creating a snapshot and waiting until it's completed", func() {
 					var err error
 					backupName := fmt.Sprintf("%s-online", clusterToSnapshotName)
@@ -694,6 +691,52 @@ var _ = Describe("Verify Volume Snapshot",
 					restoredPrimary, err := env.GetClusterPrimary(namespace, clusterToRestoreName)
 					Expect(err).ToNot(HaveOccurred())
 					AssertDataExpectedCount(namespace, clusterToRestoreName, tableName, 4, restoredPrimary)
+				})
+			})
+
+			It("should scale up the cluster with volume snapshot", func() {
+				// insert some data after the snapshot is taken, we want to verify the data exists in
+				// the new pod when cluster scaled up
+				By("inserting more test data and creating WALs on the cluster snapshotted", func() {
+					// Insert 2 more rows which we expect not to be present at the end of the recovery
+					insertRecordIntoTable(namespace, clusterToSnapshotName, tableName, 5, psqlClientPod)
+					insertRecordIntoTable(namespace, clusterToSnapshotName, tableName, 6, psqlClientPod)
+
+					// Close and archive the current WAL file
+					AssertArchiveWalOnMinio(namespace, clusterToSnapshotName, clusterToSnapshotName)
+				})
+
+				// reuse the snapshot taken from the clusterToSnapshot cluster
+				By("fetching the volume snapshots", func() {
+					snapshotList, err := getSnapshots(backup.Name, clusterToSnapshotName, namespace)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(snapshotList.Items).To(HaveLen(len(backup.Status.BackupSnapshotStatus.Elements)))
+
+					envVars := testUtils.EnvVarsForSnapshots{
+						DataSnapshot: snapshotDataEnv,
+						WalSnapshot:  snapshotWalEnv,
+					}
+					err = testUtils.SetSnapshotNameAsEnv(&snapshotList, backup, envVars)
+					Expect(err).ToNot(HaveOccurred())
+				})
+
+				By("scale up the cluster", func() {
+					err := env.ScaleClusterSize(namespace, clusterToSnapshotName, 3)
+					Expect(err).ToNot(HaveOccurred())
+				})
+
+				By("checking the the cluster is working", func() {
+					// Setting up a cluster with three pods is slow, usually 200-600s
+					AssertClusterIsReady(namespace, clusterToSnapshotName, testTimeouts[testUtils.ClusterIsReady], env)
+				})
+
+				// we need to verify the streaming replica continue works
+				By("verifying the correct data exists in the new pod of the scaled cluster", func() {
+					podList, err := env.GetClusterReplicas(namespace, clusterToSnapshotName)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(podList.Items).To(HaveLen(2))
+					AssertDataExpectedCount(namespace, clusterToSnapshotName, tableName, 6, &podList.Items[0])
+					AssertDataExpectedCount(namespace, clusterToSnapshotName, tableName, 6, &podList.Items[1])
 				})
 			})
 		})
