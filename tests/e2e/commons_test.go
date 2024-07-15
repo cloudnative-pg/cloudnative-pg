@@ -18,7 +18,7 @@ package e2e
 
 import "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
-func GetEnvProfile() utils.EnvProfile {
+func MustGetEnvProfile() utils.EnvProfile {
 	return utils.GetEnvProfile(*testCloudVendorEnv)
 }
 
