@@ -88,8 +88,8 @@ deletion of the pooler, and vice versa.
     a single pooler, or clusters with several poolers, that is, one per application.
 
 !!! Important
-    When operator is upgraded, the pooler pod will rolling upgrade as the instance
-    manager in pooler pod need to be upgraded.
+    When the operator is upgraded, the pooler pods will start a rolling upgrade,
+    as the instance manager in the pooler pods needs to be upgraded.
 
 ## Security
 

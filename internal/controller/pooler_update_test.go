@@ -296,7 +296,7 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 		cluster := newFakeCNPGCluster(env.client, namespace)
 		pooler := newFakePooler(env.client, cluster)
 		res := &poolerManagedResources{Deployment: nil, Cluster: cluster}
-		By("set reconcilePodSpec annotation to disabled to pooler ", func() {
+		By("setting the reconcilePodSpec annotation to disabled on the pooler ", func() {
 			// set annotation inside cluster
 			if pooler.ObjectMeta.Annotations == nil {
 				pooler.ObjectMeta.Annotations = make(map[string]string)
@@ -319,7 +319,7 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 			Expect(deployment.Spec.Replicas).To(Equal(pooler.Spec.Instances))
 		})
 
-		By("making sure pooler change is not update to deployment", func() {
+		By("making sure pooler change does not update the deployment", func() {
 			beforeDep := getPoolerDeployment(ctx, env.client, pooler)
 			pooler.Spec.Template.Spec.TerminationGracePeriodSeconds = ptr.To(int64(200))
 			err := env.poolerReconciler.updateDeployment(ctx, pooler, res)
@@ -348,7 +348,7 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 			Expect(*afterDep.Spec.Replicas).To(Equal(instancesNumber))
 		})
 
-		By("enable again, making sure pooler change is update to deployment", func() {
+		By("enable again, making sure pooler change updates the deployment", func() {
 			delete(pooler.ObjectMeta.Annotations, utils.ReconcilePodSpecAnnotationName)
 			beforeDep := getPoolerDeployment(ctx, env.client, pooler)
 			pooler.Spec.Template.Spec.TerminationGracePeriodSeconds = ptr.To(int64(300))
