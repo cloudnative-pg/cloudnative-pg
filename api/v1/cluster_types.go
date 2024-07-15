@@ -3857,6 +3857,11 @@ func (cluster *Cluster) IsReadOnlyServiceEnabled() bool {
 	return !slices.Contains(cluster.Spec.Managed.Services.DisabledDefaultServices, ServiceSelectorTypeRO)
 }
 
+func (cluster *Cluster) IsDesignatedPrimary(instanceName string) bool {
+	return cluster.IsReplica() && cluster.Status.CurrentPrimary == instanceName &&
+		cluster.Status.TargetPrimary == instanceName
+}
+
 // BuildPostgresOptions create the list of options that
 // should be added to the PostgreSQL configuration to
 // recover given a certain target

@@ -233,7 +233,7 @@ func (instance *Instance) RefreshPGIdent(additionalLines []string) (postgresIden
 // UpdateReplicaConfiguration updates the override.conf or recovery.conf file for the proper version
 // of PostgreSQL, using the specified connection string to connect to the primary server
 func UpdateReplicaConfiguration(pgData, primaryConnInfo, slotName string) (changed bool, err error) {
-	changed, err = configurePostgresOverrideConfFile(pgData, primaryConnInfo, slotName)
+	changed, err = configurePostgresOverrideConfFile(pgData, primaryConnInfo, slotName, false)
 	if err != nil {
 		return changed, err
 	}
@@ -289,7 +289,10 @@ func configureRecoveryConfFile(pgData, primaryConnInfo, slotName string) (change
 
 // configurePostgresOverrideConfFile writes the content of override.conf file, including
 // replication information
-func configurePostgresOverrideConfFile(pgData, primaryConnInfo, slotName string) (changed bool, err error) {
+func configurePostgresOverrideConfFile(
+	pgData, primaryConnInfo, slotName string,
+	isDesignatedPrimary bool,
+) (changed bool, err error) {
 	targetFile := path.Join(pgData, constants.PostgresqlOverrideConfigurationFile)
 
 	major, err := postgresutils.GetMajorVersion(pgData)
@@ -309,6 +312,10 @@ func configurePostgresOverrideConfFile(pgData, primaryConnInfo, slotName string)
 			"primary_slot_name":        slotName,
 			"primary_conninfo":         primaryConnInfo,
 		}
+	}
+
+	if !isDesignatedPrimary {
+		options["recovery_min_apply_delay"] = "0"
 	}
 
 	// Ensure that override.conf file contains just the above options

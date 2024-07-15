@@ -886,7 +886,12 @@ func (info InitInfo) ConfigureInstanceAfterRestore(ctx context.Context, cluster 
 
 	primaryConnInfo := info.GetPrimaryConnInfo()
 	slotName := cluster.GetSlotNameFromInstanceName(info.PodName)
-	if _, err := configurePostgresOverrideConfFile(info.PgData, primaryConnInfo, slotName); err != nil {
+	if _, err := configurePostgresOverrideConfFile(
+		info.PgData,
+		primaryConnInfo,
+		slotName,
+		cluster.IsDesignatedPrimary(info.PodName),
+	); err != nil {
 		return fmt.Errorf("while configuring replica: %w", err)
 	}
 
