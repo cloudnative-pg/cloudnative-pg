@@ -3717,8 +3717,9 @@ spec:
                     type: boolean
                   enableMetricsTLS:
                     default: false
-                    description: Enable HTTPS for the metrics endpoint, (and if PodMonitor
-                      is enabled, also for PodMonitor)
+                    description: |-
+                      Enable HTTPS for the metrics endpoint.
+                      Changing this option will force a rollout of all instances.
                     type: boolean
                   enablePodMonitor:
                     default: false

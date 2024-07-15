@@ -3370,7 +3370,8 @@ Default: false.</p>
 <i>bool</i>
 </td>
 <td>
-   <p>Enable HTTPS for the metrics endpoint, (and if PodMonitor is enabled, also for PodMonitor)</p>
+   <p>Enable HTTPS for the metrics endpoint.
+Changing this option will force a rollout of all instances.</p>
 </td>
 </tr>
 <tr><td><code>podMonitorMetricRelabelings</code><br/>

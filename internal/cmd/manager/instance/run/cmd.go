@@ -76,6 +76,7 @@ func NewCmd() *cobra.Command {
 	var clusterName string
 	var namespace string
 	var statusPortTLS bool
+	var metricsPortTLS bool
 
 	cmd := &cobra.Command{
 		Use: "run [flags]",
@@ -94,6 +95,7 @@ func NewCmd() *cobra.Command {
 			instance.PodName = podName
 			instance.ClusterName = clusterName
 			instance.StatusPortTLS = statusPortTLS
+			instance.MetricsPortTLS = metricsPortTLS
 
 			err := retry.OnError(retry.DefaultRetry, isRunSubCommandRetryable, func() error {
 				return runSubCommand(ctx, instance)
@@ -123,6 +125,8 @@ func NewCmd() *cobra.Command {
 		"the cluster and of the Pod in k8s")
 	cmd.Flags().BoolVar(&statusPortTLS, "status-port-tls", false,
 		"Enable TLS for communicating with the operator")
+	cmd.Flags().BoolVar(&metricsPortTLS, "metrics-port-tls", false,
+		"Enable TLS for metrics scraping")
 	return cmd
 }
 
@@ -174,11 +178,10 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 		return err
 	}
 
-	metricsExporter := metricserver.NewExporter(instance)
-
 	postgresStartConditions := concurrency.MultipleExecuted{}
 	exitedConditions := concurrency.MultipleExecuted{}
 
+	metricsExporter := metricserver.NewExporter(instance)
 	reconciler := controller.NewInstanceReconciler(instance, mgr.GetClient(), metricsExporter)
 	err = ctrl.NewControllerManagedBy(mgr).
 		For(&apiv1.Cluster{}).

@@ -2403,7 +2403,8 @@ type MonitoringConfiguration struct {
 	// +optional
 	EnablePodMonitor bool `json:"enablePodMonitor,omitempty"`
 
-	// Enable HTTPS for the metrics endpoint, (and if PodMonitor is enabled, also for PodMonitor)
+	// Enable HTTPS for the metrics endpoint.
+	// Changing this option will force a rollout of all instances.
 	// +kubebuilder:default:=false
 	// +optional
 	EnableMetricsTLS bool `json:"enableMetricsTLS,omitempty"`

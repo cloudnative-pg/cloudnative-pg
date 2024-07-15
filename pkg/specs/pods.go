@@ -254,6 +254,10 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig, enable
 		containers[0].Command = append(containers[0].Command, "--status-port-tls")
 	}
 
+	if cluster.IsMetricsTLSEnabled() {
+		containers[0].Command = append(containers[0].Command, "--metrics-port-tls")
+	}
+
 	addManagerLoggingOptions(cluster, &containers[0])
 
 	// if user customizes the liveness probe timeout, we need to adjust the failure threshold
