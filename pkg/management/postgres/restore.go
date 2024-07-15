@@ -98,10 +98,26 @@ func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client, imm
 		return fmt.Errorf("error while cleaning up the recovered PGDATA: %w", err)
 	}
 
-	if immediate || cluster.Spec.Bootstrap == nil || cluster.Spec.Bootstrap.Recovery == nil ||
-		cluster.Spec.Bootstrap.Recovery.Source == "" {
-		// We are recovering from an existing PVC snapshot, we
-		// don't need to invoke the recovery job
+	// We're creating a new replica of an existing cluster, and the PVCs
+	// have been initialized by a set of VolumeSnapshots.
+	if immediate {
+		// If the instance will start as a primary, we will enter in the
+		// same logic attaching an old primary back after a failover.
+		// We don't need that as this instance has never diverged.
+		if err := info.GetInstance().Demote(ctx, cluster); err != nil {
+			return fmt.Errorf("error while demoting the instance: %w", err)
+		}
+		return nil
+	}
+
+	// We're creating a new cluster from a snapshot backup, but we
+	// have no recovery section defined. This is not possible.
+	if cluster.Spec.Bootstrap == nil || cluster.Spec.Bootstrap.Recovery == nil {
+		return fmt.Errorf("missing snapshot recovery stanza in cluster .spec.bootstrap")
+	}
+
+	// We've no WAL archive, so we can't proceed with a PITR
+	if cluster.Spec.Bootstrap.Recovery.Source == "" {
 		return nil
 	}
 
