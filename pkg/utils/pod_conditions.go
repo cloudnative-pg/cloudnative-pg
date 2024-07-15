@@ -22,12 +22,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
-const (
-	// PodReasonEvicted is set inside the status as the Pod failure reason
-	// when the Kubelet evicts a Pod
-	PodReasonEvicted = "Evicted"
-)
-
 var utilsLog = log.WithName("utils")
 
 // PodStatus represent the possible status of pods
@@ -69,16 +63,9 @@ func IsPodActive(p corev1.Pod) bool {
 		p.DeletionTimestamp == nil
 }
 
-// IsPodEvicted checks if a pod has been evicted by the
-// Kubelet
-func IsPodEvicted(p *corev1.Pod) bool {
-	return corev1.PodFailed == p.Status.Phase &&
-		PodReasonEvicted == p.Status.Reason
-}
-
-// IsPodUnscheduled check if a Pod is unscheduled
-func IsPodUnscheduled(p *corev1.Pod) bool {
-	if corev1.PodPending != p.Status.Phase && corev1.PodFailed != p.Status.Phase {
+// IsPodUnschedulable check if a Pod is unschedulable
+func IsPodUnschedulable(p *corev1.Pod) bool {
+	if corev1.PodPending != p.Status.Phase {
 		return false
 	}
 	for _, c := range p.Status.Conditions {
