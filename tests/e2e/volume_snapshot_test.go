@@ -728,10 +728,10 @@ var _ = Describe("Verify Volume Snapshot",
 				})
 
 				// we need to verify the streaming replica continue works
-				By("verifying the correct data exists in the restored cluster", func() {
+				By("verifying the correct data exists in the scaled pod", func() {
 					podList, err := env.GetClusterReplicas(namespace, clusterToSnapshotName)
 					Expect(err).ToNot(HaveOccurred())
-					Expect(podList).To(HaveLen(2))
+					Expect(podList.Items).To(HaveLen(2))
 					AssertDataExpectedCount(namespace, clusterToSnapshotName, tableName, 6, &podList.Items[0])
 					AssertDataExpectedCount(namespace, clusterToSnapshotName, tableName, 6, &podList.Items[1])
 				})
