@@ -1590,7 +1590,7 @@ jobs:
       E2E_CSI_STORAGE_CLASS: standard-rwo
       E2E_DEFAULT_VOLUMESNAPSHOT_CLASS: pd-csi-snapclass
 
-      ZONE: europe-west3-a
+      REGION: europe-west3
       TEST_CLOUD_VENDOR: "gke"
 
     steps:
@@ -1657,12 +1657,14 @@ jobs:
           set +e
           # We may go over the amount of API requests allowed
           # by Google when creating all the clusters at the same time.
-          # We give a few attempts at creating the cluster before giving up
+          # We give a few attempts at creating the cluster before giving up.
+          # The following command will create a 3 nodes cluster, with each
+          # node deployed in its own availability zone.
           for i in `seq 1 5`; do
             if gcloud container clusters create ${{ env.CLUSTER_NAME }} \
-              --num-nodes=3 \
+              --num-nodes=1 \
               --cluster-version=${{ env.K8S_VERSION }} \
-              --zone=${{ env.ZONE }} \
+              --region=${{ env.REGION }} \
               --disk-size=20 \
               --machine-type=e2-standard-2 \
               --labels=cluster=${{ env.CLUSTER_NAME }}
@@ -1679,7 +1681,7 @@ jobs:
         env:
           USE_GKE_GCLOUD_AUTH_PLUGIN: "True"
         run: |
-          gcloud container clusters get-credentials ${{ env.CLUSTER_NAME }} --zone ${{ env.ZONE }} --project ${{ secrets.GCP_PROJECT_ID }}
+          gcloud container clusters get-credentials ${{ env.CLUSTER_NAME }} --region ${{ env.REGION }} --project ${{ secrets.GCP_PROJECT_ID }}
       -
         name: Configure Storage
         run: |
@@ -1785,13 +1787,13 @@ jobs:
           attempt=1
           max_attempts=3
           while [ "${attempt}" -le "${max_attempts}" ]; do
-            gcloud container clusters delete ${{ env.CLUSTER_NAME }} --zone=${{ env.ZONE }} --quiet
+            gcloud container clusters delete ${{ env.CLUSTER_NAME }} --region=${{ env.REGION }} --quiet
             status=$?
             if [[ $status == 0 ]]; then
-                echo "GKS cluster ${{ env.CLUSTER_NAME }} deleted from zone ${{ env.ZONE }}"
+                echo "GKS cluster ${{ env.CLUSTER_NAME }} deleted from region ${{ env.REGION }}"
                 break
             fi
-            echo "Failed deleting cluster ${{ env.CLUSTER_NAME }} from zone ${{ env.ZONE }}, retrying"
+            echo "Failed deleting cluster ${{ env.CLUSTER_NAME }} from region ${{ env.REGION }}, retrying"
             sleep 5
             attempt=$((attempt+1))
           done
@@ -1803,7 +1805,7 @@ jobs:
           attempt=1
           max_attempts=3
           while [ "${attempt}" -le "${max_attempts}" ]; do
-            IDS=$(gcloud compute disks list --filter="labels.cluster=${{ env.CLUSTER_NAME }} AND zone:${{ env.ZONE }} AND -users:*" --format="value(id)")
+            IDS=$(gcloud compute disks list --filter="labels.cluster=${{ env.CLUSTER_NAME }} AND region:${{ env.REGION }} AND -users:*" --format="value(id)")
             amount="$(echo $IDS | awk '{print NF}')"
             if [[ "$amount" == 3 ]]; then
               echo -e "Found the 3 disks to be removed:\n$IDS"
@@ -1819,13 +1821,13 @@ jobs:
             attempt=1
             max_attempts=3
             while [ "${attempt}" -le "${max_attempts}" ]; do
-               gcloud compute disks delete --zone "${{ env.ZONE }}" --quiet "${ID}"
+               gcloud compute disks delete --region "${{ env.REGION }}" --quiet "${ID}"
                status=$?
                if [[ $status == 0 ]]; then
                   echo "computer disk ${ID} deleted"
                   break
                fi
-               echo "Failed deleting disk ${ID} from zone ${{ env.ZONE }}, retrying"
+               echo "Failed deleting disk ${ID} from region ${{ env.REGION }}, retrying"
                sleep 5
                attempt=$((attempt+1))
             done

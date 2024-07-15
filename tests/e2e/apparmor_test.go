@@ -42,7 +42,7 @@ var _ = Describe("AppArmor support", Serial, Label(tests.LabelNoOpenshift, tests
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
-		if !GetEnvProfile().CanRunAppArmor() {
+		if !MustGetEnvProfile().CanRunAppArmor() {
 			Skip("environment does not support AppArmor")
 		}
 	})
