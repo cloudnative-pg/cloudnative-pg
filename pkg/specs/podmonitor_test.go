@@ -35,64 +35,69 @@ var _ = Describe("PodMonitor test", func() {
 		clusterName      = "test"
 		clusterNamespace = "test-namespace"
 	)
-	metricRelabelings := []monitoringv1.RelabelConfig{
-		{
-			SourceLabels: []monitoringv1.LabelName{"cluster"},
-			TargetLabel:  "cnpg_cluster",
-		},
-		{
-			Regex:  "cluster",
-			Action: "labeldrop",
-		},
-	}
-	relabelings := []monitoringv1.RelabelConfig{
-		{
-			SourceLabels: []monitoringv1.LabelName{"__their_label"},
-			TargetLabel:  "my_label",
-		},
-	}
 
 	assertPodMonitorCorrect := func(cluster *apiv1.Cluster, expectedEndpoint monitoringv1.PodMetricsEndpoint) {
+		getMetricRelabelings := func() []monitoringv1.RelabelConfig {
+			return []monitoringv1.RelabelConfig{
+				{
+					SourceLabels: []monitoringv1.LabelName{"cluster"},
+					TargetLabel:  "cnpg_cluster",
+				},
+				{
+					Regex:  "cluster",
+					Action: "labeldrop",
+				},
+			}
+		}
+		getRelabelings := func() []monitoringv1.RelabelConfig {
+			return []monitoringv1.RelabelConfig{
+				{
+					SourceLabels: []monitoringv1.LabelName{"__their_label"},
+					TargetLabel:  "my_label",
+				},
+			}
+		}
+
 		It("should create a valid monitoringv1.PodMonitor object", func() {
 			mgr := NewClusterPodMonitorManager(cluster.DeepCopy())
 			monitor := mgr.BuildPodMonitor()
-			Expect(monitor.Labels[utils.ClusterLabelName]).To(Equal(clusterName))
-			Expect(monitor.Spec.Selector.MatchLabels[utils.ClusterLabelName]).To(Equal(clusterName))
+			Expect(monitor.Labels[utils.ClusterLabelName]).To(Equal(cluster.Name))
+			Expect(monitor.Spec.Selector.MatchLabels[utils.ClusterLabelName]).To(Equal(cluster.Name))
 			Expect(monitor.Spec.PodMetricsEndpoints).To(ContainElement(expectedEndpoint))
 		})
 
 		It("should create a monitoringv1.PodMonitor object with MetricRelabelConfigs rules", func() {
 			relabeledCluster := cluster.DeepCopy()
-			relabeledCluster.Spec.Monitoring.PodMonitorMetricRelabelConfigs = metricRelabelings
+			relabeledCluster.Spec.Monitoring.PodMonitorMetricRelabelConfigs = getMetricRelabelings()
 			mgr := NewClusterPodMonitorManager(relabeledCluster)
 			monitor := mgr.BuildPodMonitor()
 
 			expectedEndpoint := expectedEndpoint.DeepCopy()
-			expectedEndpoint.MetricRelabelConfigs = metricRelabelings
+			expectedEndpoint.MetricRelabelConfigs = getMetricRelabelings()
 			Expect(monitor.Spec.PodMetricsEndpoints).To(ContainElement(*expectedEndpoint))
 		})
 
 		It("should create a monitoringv1.PodMonitor object with RelabelConfigs rules", func() {
 			relabeledCluster := cluster.DeepCopy()
-			relabeledCluster.Spec.Monitoring.PodMonitorRelabelConfigs = relabelings
+			relabeledCluster.Spec.Monitoring.PodMonitorRelabelConfigs = getRelabelings()
 			mgr := NewClusterPodMonitorManager(relabeledCluster)
 			monitor := mgr.BuildPodMonitor()
 
 			expectedEndpoint := expectedEndpoint.DeepCopy()
-			expectedEndpoint.RelabelConfigs = relabelings
+			expectedEndpoint.RelabelConfigs = getRelabelings()
 			Expect(monitor.Spec.PodMetricsEndpoints).To(ContainElement(*expectedEndpoint))
 		})
 
 		It("should create a monitoringv1.PodMonitor object with MetricRelabelConfigs and RelabelConfigs rules", func() {
 			relabeledCluster := cluster.DeepCopy()
-			relabeledCluster.Spec.Monitoring.PodMonitorMetricRelabelConfigs = metricRelabelings
-			relabeledCluster.Spec.Monitoring.PodMonitorRelabelConfigs = relabelings
+			relabeledCluster.Spec.Monitoring.PodMonitorMetricRelabelConfigs = getMetricRelabelings()
+			relabeledCluster.Spec.Monitoring.PodMonitorRelabelConfigs = getRelabelings()
 			mgr := NewClusterPodMonitorManager(relabeledCluster)
 			monitor := mgr.BuildPodMonitor()
 
 			expectedEndpoint := expectedEndpoint.DeepCopy()
-			expectedEndpoint.MetricRelabelConfigs = metricRelabelings
-			expectedEndpoint.RelabelConfigs = relabelings
+			expectedEndpoint.MetricRelabelConfigs = getMetricRelabelings()
+			expectedEndpoint.RelabelConfigs = getRelabelings()
 			Expect(monitor.Spec.PodMetricsEndpoints).To(ContainElement(*expectedEndpoint))
 		})
 
