@@ -695,6 +695,8 @@ var _ = Describe("Verify Volume Snapshot",
 			})
 
 			It("should scale up the cluster with volume snapshot", func() {
+				// insert some data after the snapshot is taken, we want to verify the data exists in
+				// the new pod when cluster scaled up
 				By("inserting more test data and creating WALs on the cluster snapshotted", func() {
 					// Insert 2 more rows which we expect not to be present at the end of the recovery
 					insertRecordIntoTable(namespace, clusterToSnapshotName, tableName, 5, psqlClientPod)
@@ -704,6 +706,7 @@ var _ = Describe("Verify Volume Snapshot",
 					AssertArchiveWalOnMinio(namespace, clusterToSnapshotName, clusterToSnapshotName)
 				})
 
+				// reuse the snapshot taken from the clusterToSnapshot cluster
 				By("fetching the volume snapshots", func() {
 					snapshotList, err := getSnapshots(backup.Name, clusterToSnapshotName, namespace)
 					Expect(err).ToNot(HaveOccurred())
@@ -728,7 +731,7 @@ var _ = Describe("Verify Volume Snapshot",
 				})
 
 				// we need to verify the streaming replica continue works
-				By("verifying the correct data exists in the scaled pod", func() {
+				By("verifying the correct data exists in the new pod of the scaled cluster", func() {
 					podList, err := env.GetClusterReplicas(namespace, clusterToSnapshotName)
 					Expect(err).ToNot(HaveOccurred())
 					Expect(podList.Items).To(HaveLen(2))
