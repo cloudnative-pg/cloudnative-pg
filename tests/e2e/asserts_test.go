@@ -1023,6 +1023,7 @@ func AssertDetachReplicaModeCluster(
 			referenceCondition, err := testsUtils.GetConditionsInClusterStatus(namespace, replicaClusterName, env,
 				apiv1.ConditionClusterReady)
 			g.Expect(err).ToNot(HaveOccurred())
+			g.Expect(referenceCondition.Status).To(BeEquivalentTo(corev1.ConditionTrue))
 			g.Expect(referenceCondition).ToNot(BeNil())
 			referenceTime = referenceCondition.LastTransitionTime.Time
 		}, 60, 5).Should(Succeed())
@@ -1047,7 +1048,7 @@ func AssertDetachReplicaModeCluster(
 			g.Expect(err).ToNot(HaveOccurred())
 			g.Expect(condition).ToNot(BeNil())
 			g.Expect(condition.Status).To(BeEquivalentTo(corev1.ConditionTrue))
-			g.Expect(condition.LastTransitionTime.Time).To(BeTemporally(">=", referenceTime))
+			g.Expect(condition.LastTransitionTime.Time).To(BeTemporally(">", referenceTime))
 		}).WithTimeout(60 * time.Second).Should(Succeed())
 		AssertClusterIsReady(namespace, replicaClusterName, testTimeouts[testsUtils.ClusterIsReady], env)
 	})
