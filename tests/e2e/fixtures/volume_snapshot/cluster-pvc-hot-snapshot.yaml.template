@@ -3,7 +3,7 @@ kind: Cluster
 metadata:
   name: cluster-pvc-hot-snapshot
 spec:
-  instances: 2
+  instances: 1
   primaryUpdateStrategy: unsupervised
   imageName: "${POSTGRES_IMG}"
 
