@@ -324,7 +324,7 @@ func isPodNeedingRollout(
 	}
 
 	// If the cluster is annotated with `cnpg.io/reconcilePodSpec: disabled`,
-	// we avoid to check the PodSpec
+	// we avoid checking the PodSpec
 	if utils.IsPodSpecReconciliationDisabled(&cluster.ObjectMeta) {
 		return rollout{}
 	}

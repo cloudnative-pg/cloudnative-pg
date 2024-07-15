@@ -165,7 +165,7 @@ These predefined annotations are managed by CloudNativePG.
 :   Current status of the PVC: `initializing`, `ready`, or `detached`.
 
 `cnpg.io/reconcilePodSpec`
-:  Annotation is used on `Cluster` or `Pooler` for special purpose
+:  Annotation is used on `Cluster` or `Pooler` for the purpose of avoid restarts.
 
    When set to `disabled` on a `Cluster`, the operator prevents instances
    from being restarted in case of drift in the PodSpec.
@@ -175,9 +175,8 @@ These predefined annotations are managed by CloudNativePG.
      - Change of scheduler
      - Change to volumes or containers
 
-  When set to `disabled` on a `Pooler`, the operator will restrict changes to 
-  the deployment spec from being made by the Pooler, except the `spec.instances` 
-  changes. 
+  When set to `disabled` on a `Pooler`, the operator will restrain to do any change
+  to the deployment spec, except changing the value of `spec.instances`.
 
 `cnpg.io/reconciliationLoop`
 :   When set to `disabled` on a `Cluster`, the operator prevents the

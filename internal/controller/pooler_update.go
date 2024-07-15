@@ -101,8 +101,8 @@ func (r *PoolerReconciler) updateDeployment(
 		deployment := resources.Deployment.DeepCopy()
 		deployment.Spec.Replicas = generatedDeployment.Spec.Replicas
 
-		// If the pooler is annotated with `cnpg.io/reconcilePodSpec: disabled`,
-		// we avoid to patch the deployment spec change, except the number replicas
+		// If the Pooler is annotated with `cnpg.io/reconcilePodSpec: disabled`,
+		// we avoid patching the deployment spec, except the number replicas
 		if !utils.IsPodSpecReconciliationDisabled(&pooler.ObjectMeta) {
 			deployment.Spec = generatedDeployment.Spec
 		}
