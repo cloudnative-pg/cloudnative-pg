@@ -98,8 +98,8 @@ func NewCmd() *cobra.Command {
 				PostInitSQL:            postInitSQL,
 				PostInitApplicationSQL: postInitApplicationSQL,
 				PostInitTemplateSQL:    postInitTemplateSQL,
-				// if the value to postInitApplicationSQLRefsFolder is empty,
-				// bootstrap will do nothing for post init application SQL refs.
+				// If the value for an SQLRefsFolder is empty,
+				// bootstrap will do nothing for that specific PostInit option.
 				PostInitApplicationSQLRefsFolder: postInitApplicationSQLRefsFolder,
 				PostInitTemplateSQLRefsFolder:    postInitTemplateSQLRefsFolder,
 				PostInitSQLRefsFolder:            postInitSQLRefsFolder,

@@ -1589,7 +1589,7 @@ spec:
                       postInitApplicationSQL:
                         description: |-
                           List of SQL queries to be executed as a superuser in the application
-                          database right after is created - to be used with extreme care
+                          database right after the cluster has been created - to be used with extreme care
                           (by default empty)
                         items:
                           type: string
@@ -1598,7 +1598,7 @@ spec:
                         description: |-
                           List of references to ConfigMaps or Secrets containing SQL files
                           to be executed as a superuser in the application database right after
-                          it is created. The references are processed in a specific order:
+                          the cluster has been created. The references are processed in a specific order:
                           first, all Secrets are processed, followed by all ConfigMaps.
                           Within each group, the processing order follows the sequence specified
                           in their respective arrays.
@@ -1645,8 +1645,8 @@ spec:
                         type: object
                       postInitSQL:
                         description: |-
-                          List of SQL queries to be executed as a superuser immediately
-                          after the cluster has been created - to be used with extreme care
+                          List of SQL queries to be executed as a superuser in the `postgres`
+                          database right after the cluster has been created - to be used with extreme care
                           (by default empty)
                         items:
                           type: string
@@ -1654,8 +1654,8 @@ spec:
                       postInitSQLRefs:
                         description: |-
                           List of references to ConfigMaps or Secrets containing SQL files
-                          to be executed as a superuser immediately after the cluster
-                          has been created. The references are processed in a specific order:
+                          to be executed as a superuser in the `postgres` database right after
+                          the cluster has been created. The references are processed in a specific order:
                           first, all Secrets are processed, followed by all ConfigMaps.
                           Within each group, the processing order follows the sequence specified
                           in their respective arrays.
@@ -1703,7 +1703,7 @@ spec:
                       postInitTemplateSQL:
                         description: |-
                           List of SQL queries to be executed as a superuser in the `template1`
-                          after the cluster has been created - to be used with extreme care
+                          database right after the cluster has been created - to be used with extreme care
                           (by default empty)
                         items:
                           type: string
@@ -1711,8 +1711,8 @@ spec:
                       postInitTemplateSQLRefs:
                         description: |-
                           List of references to ConfigMaps or Secrets containing SQL files
-                          to be executed as a superuser in the `template1` after the cluster
-                          has been created. The references are processed in a specific order:
+                          to be executed as a superuser in the `template1` database right after
+                          the cluster has been created. The references are processed in a specific order:
                           first, all Secrets are processed, followed by all ConfigMaps.
                           Within each group, the processing order follows the sequence specified
                           in their respective arrays.

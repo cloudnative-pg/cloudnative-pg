@@ -92,15 +92,16 @@ type InitInfo struct {
 	Temporary bool
 
 	// PostInitApplicationSQLRefsFolder is the folder which contains a bunch
-	// of SQL files to be executed just after having configured a new instance
+	// of SQL files to be executed inside the application database right after
+	// having configured a new instance
 	PostInitApplicationSQLRefsFolder string
 
-	// the folder which contains a bunch of SQL files to be executed just after having
-	// configured a new instance
+	// PostInitSQLRefsFolder is the folder which contains a bunch of SQL files
+	// to be executed inside the `postgres` database right after having configured a new instance
 	PostInitSQLRefsFolder string
 
-	// the folder which contains a bunch of SQL files to be executed inside the template1
-	// database just after having configured a new instance
+	// PostInitTemplateSQLRefsFolder is the folder which contains a bunch of SQL files
+	// to be executed inside the `template1` database right after having configured a new instance
 	PostInitTemplateSQLRefsFolder string
 
 	// BackupLabelFile holds the content returned by pg_stop_backup. Needed for a hot backup restore
@@ -226,7 +227,7 @@ func (info InitInfo) ConfigureNewInstance(instance *Instance) error {
 		}
 	}
 
-	// Execute the custom set of init queries
+	// Execute the custom set of init queries for the `postgres` database
 	log.Info("Executing post-init SQL instructions")
 	if err = info.executeQueries(dbSuperUser, info.PostInitSQL); err != nil {
 		return err
@@ -239,7 +240,7 @@ func (info InitInfo) ConfigureNewInstance(instance *Instance) error {
 	if err != nil {
 		return fmt.Errorf("while getting template database: %w", err)
 	}
-	// Execute the custom set of init queries of the template
+	// Execute the custom set of init queries for the `template1` database
 	log.Info("Executing post-init template SQL instructions")
 	if err = info.executeQueries(dbTemplate, info.PostInitTemplateSQL); err != nil {
 		return fmt.Errorf("could not execute init Template queries: %w", err)
@@ -271,7 +272,7 @@ func (info InitInfo) ConfigureNewInstance(instance *Instance) error {
 	if err != nil {
 		return fmt.Errorf("could not get connection to ApplicationDatabase: %w", err)
 	}
-	// Execute the custom set of init queries of the application database
+	// Execute the custom set of init queries for the application database
 	log.Info("executing Application instructions")
 	if err = info.executeQueries(appDB, info.PostInitApplicationSQL); err != nil {
 		return fmt.Errorf("could not execute init Application queries: %w", err)

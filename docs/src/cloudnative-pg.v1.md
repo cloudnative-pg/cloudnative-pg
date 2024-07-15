@@ -1175,8 +1175,8 @@ option for initdb (default: empty, resulting in PostgreSQL default: 16MB)</p>
 <i>[]string</i>
 </td>
 <td>
-   <p>List of SQL queries to be executed as a superuser immediately
-after the cluster has been created - to be used with extreme care
+   <p>List of SQL queries to be executed as a superuser in the <code>postgres</code>
+database right after the cluster has been created - to be used with extreme care
 (by default empty)</p>
 </td>
 </tr>
@@ -1185,7 +1185,7 @@ after the cluster has been created - to be used with extreme care
 </td>
 <td>
    <p>List of SQL queries to be executed as a superuser in the application
-database right after is created - to be used with extreme care
+database right after the cluster has been created - to be used with extreme care
 (by default empty)</p>
 </td>
 </tr>
@@ -1194,7 +1194,7 @@ database right after is created - to be used with extreme care
 </td>
 <td>
    <p>List of SQL queries to be executed as a superuser in the <code>template1</code>
-after the cluster has been created - to be used with extreme care
+database right after the cluster has been created - to be used with extreme care
 (by default empty)</p>
 </td>
 </tr>
@@ -1212,7 +1212,7 @@ instance using logical backup (<code>pg_dump</code> and <code>pg_restore</code>)
 <td>
    <p>List of references to ConfigMaps or Secrets containing SQL files
 to be executed as a superuser in the application database right after
-it is created. The references are processed in a specific order:
+the cluster has been created. The references are processed in a specific order:
 first, all Secrets are processed, followed by all ConfigMaps.
 Within each group, the processing order follows the sequence specified
 in their respective arrays.
@@ -1224,8 +1224,8 @@ in their respective arrays.
 </td>
 <td>
    <p>List of references to ConfigMaps or Secrets containing SQL files
-to be executed as a superuser in the <code>template1</code> after the cluster
-has been created. The references are processed in a specific order:
+to be executed as a superuser in the <code>template1</code> database right after
+the cluster has been created. The references are processed in a specific order:
 first, all Secrets are processed, followed by all ConfigMaps.
 Within each group, the processing order follows the sequence specified
 in their respective arrays.
@@ -1237,8 +1237,8 @@ in their respective arrays.
 </td>
 <td>
    <p>List of references to ConfigMaps or Secrets containing SQL files
-to be executed as a superuser immediately after the cluster
-has been created. The references are processed in a specific order:
+to be executed as a superuser in the <code>postgres</code> database right after
+the cluster has been created. The references are processed in a specific order:
 first, all Secrets are processed, followed by all ConfigMaps.
 Within each group, the processing order follows the sequence specified
 in their respective arrays.

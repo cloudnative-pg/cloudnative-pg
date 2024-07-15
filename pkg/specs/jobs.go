@@ -33,8 +33,8 @@ import (
 type postInitFolder string
 
 const (
-	// postInitApplicationSQLRefsFolder points to the folder of
-	// postInitApplicationSQL files in the primary job with initdb.
+	// Each SQLRefsFolder entry points to the related folder containing
+	// its post init SQL files, in the primary job with initdb.
 	postInitApplicationSQLRefsFolder postInitFolder = "/etc/post-init-application-sql"
 	postInitTemplateQLRefsFolder     postInitFolder = "/etc/post-init-template-sql"
 	postInitSQLRefsFolder            postInitFolder = "/etc/post-init-sql"
