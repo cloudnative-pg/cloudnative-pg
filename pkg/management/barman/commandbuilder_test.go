@@ -29,16 +29,20 @@ import (
 
 var _ = Describe("barmanCloudWalRestoreOptions", func() {
 	const namespace = "test"
-	cluster := &apiv1.Cluster{
-		ObjectMeta: metav1.ObjectMeta{Name: "test-cluster", Namespace: namespace},
-		Spec: apiv1.ClusterSpec{
-			Backup: &apiv1.BackupConfiguration{
-				BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{
-					DestinationPath: "s3://bucket-name/",
+	var cluster *apiv1.Cluster
+
+	BeforeEach(func() {
+		cluster = &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{Name: "test-cluster", Namespace: namespace},
+			Spec: apiv1.ClusterSpec{
+				Backup: &apiv1.BackupConfiguration{
+					BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{
+						DestinationPath: "s3://bucket-name/",
+					},
 				},
 			},
-		},
-	}
+		}
+	})
 
 	It("should generate correct arguments without the wal stanza", func() {
 		options, err := CloudWalRestoreOptions(cluster.Spec.Backup.BarmanObjectStore, "test-cluster")

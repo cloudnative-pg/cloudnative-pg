@@ -29,20 +29,24 @@ import (
 
 var _ = Describe("barmanCloudWalArchiveOptions", func() {
 	const namespace = "test"
-	cluster := &apiv1.Cluster{
-		ObjectMeta: metav1.ObjectMeta{Name: "test-cluster", Namespace: namespace},
-		Spec: apiv1.ClusterSpec{
-			Backup: &apiv1.BackupConfiguration{
-				BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{
-					DestinationPath: "s3://bucket-name/",
-					Wal: &apiv1.WalBackupConfiguration{
-						Compression: "gzip",
-						Encryption:  "aes256",
+	var cluster *apiv1.Cluster
+
+	BeforeEach(func() {
+		cluster = &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{Name: "test-cluster", Namespace: namespace},
+			Spec: apiv1.ClusterSpec{
+				Backup: &apiv1.BackupConfiguration{
+					BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{
+						DestinationPath: "s3://bucket-name/",
+						Wal: &apiv1.WalBackupConfiguration{
+							Compression: "gzip",
+							Encryption:  "aes256",
+						},
 					},
 				},
 			},
-		},
-	}
+		}
+	})
 
 	It("should generate correct arguments", func() {
 		extraOptions := []string{"--min-chunk-size=5MB", "--read-timeout=60", "-vv"}
