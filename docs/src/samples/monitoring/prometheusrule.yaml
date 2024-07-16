@@ -24,7 +24,7 @@ spec:
       for: 1m
       labels:
         severity: warning
-    - alert: PGDatabase
+    - alert: PGDatabaseXidAge
       annotations:
         description: Over 150,000,000 transactions from frozen xid on pod {{ $labels.pod  }}
         summary: Number of transactions from the frozen XID to the current one
