@@ -368,7 +368,7 @@ func barmanCloudWalArchiveOptions(
 				"-e",
 				string(configuration.Wal.Encryption))
 		}
-		options = configuration.Wal.AppendAdditionalCommandArgs(options)
+		options = configuration.Wal.AppendArchiveAdditionalCommandArgs(options)
 	}
 	if len(configuration.EndpointURL) > 0 {
 		options = append(
