@@ -61,7 +61,7 @@ func statusSubCommand(ctx context.Context) error {
 		return err
 	}
 
-	tlsCtx, err := certs.NewTLSConfigForContext(
+	ctx, err = certs.NewTLSConfigForContext(
 		ctx,
 		cli,
 		cluster.GetServerCASecretObjectKey(),
@@ -70,7 +70,6 @@ func statusSubCommand(ctx context.Context) error {
 		log.Error(err, "Error while building the TLS context")
 		return err
 	}
-	ctx = tlsCtx
 
 	resp, err := executeRequest(ctx, "https")
 	if errors.Is(err, http.ErrSchemeMismatch) {
