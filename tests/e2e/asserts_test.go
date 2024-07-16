@@ -251,14 +251,14 @@ func AssertClusterIsReady(namespace string, clusterName string, timeout int, env
 			}
 			replicaNamesString := strings.Join(replicaNamesList, ",")
 
-			out, _, err := env.ExecCommandInInstancePod(
+			out, _, err := env.ExecQueryInInstancePod(
 				testsUtils.PodLocator{
 					Namespace: namespace,
 					PodName:   primaryPod.Name,
-				}, nil,
-				"psql", "-t", "-A", "-c",
-				fmt.Sprintf("SELECT COUNT(*) FROM pg_stat_replication WHERE application_name IN (%s)", replicaNamesString),
+				},
 				"postgres",
+				fmt.Sprintf("SELECT COUNT(*) FROM pg_stat_replication WHERE application_name IN (%s)",
+					replicaNamesString),
 			)
 			g.Expect(err).ToNot(HaveOccurred(), "cannot extract the list of streaming replicas")
 			g.Expect(strings.TrimSpace(out)).To(BeEquivalentTo(fmt.Sprintf("%d", len(replicaNamesList))))
