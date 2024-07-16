@@ -102,7 +102,7 @@ func NewTLSConfigForContext(
 ) (context.Context, error) {
 	conf, err := newTLSConfigFromSecret(ctx, cli, caSecret)
 	if err != nil {
-		return nil, err
+		return ctx, err
 	}
 
 	return context.WithValue(ctx, contextKeyTLSConfig, conf), nil
