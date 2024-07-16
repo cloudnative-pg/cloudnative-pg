@@ -95,6 +95,7 @@ func (info InitInfo) Join(cluster *apiv1.Cluster) error {
 	}
 
 	slotName := cluster.GetSlotNameFromInstanceName(info.PodName)
-	_, err = UpdateReplicaConfiguration(info.PgData, info.GetPrimaryConnInfo(), slotName)
+	_, err = UpdateReplicaConfiguration(info.PgData, info.GetPrimaryConnInfo(), slotName,
+		cluster.IsDesignatedPrimary(info.PodName))
 	return err
 }

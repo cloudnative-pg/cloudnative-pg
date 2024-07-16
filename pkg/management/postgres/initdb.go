@@ -440,7 +440,12 @@ func (info InitInfo) Bootstrap(ctx context.Context) error {
 		}
 	} else {
 		// Write standard replication configuration
-		if _, err = configurePostgresOverrideConfFile(info.PgData, primaryConnInfo, slotName); err != nil {
+		if _, err = configurePostgresOverrideConfFile(
+			info.PgData,
+			primaryConnInfo,
+			slotName,
+			cluster.IsDesignatedPrimary(info.PodName),
+		); err != nil {
 			return fmt.Errorf("while configuring Postgres for replication: %w", err)
 		}
 	}
@@ -467,7 +472,12 @@ func (info InitInfo) Bootstrap(ctx context.Context) error {
 	// In case of import bootstrap, we restore the standard configuration file content
 	if isImportBootstrap {
 		/// Write standard replication configuration
-		if _, err = configurePostgresOverrideConfFile(info.PgData, primaryConnInfo, slotName); err != nil {
+		if _, err = configurePostgresOverrideConfFile(
+			info.PgData,
+			primaryConnInfo,
+			slotName,
+			cluster.IsDesignatedPrimary(info.PodName),
+		); err != nil {
 			return fmt.Errorf("while configuring Postgres for replication: %w", err)
 		}
 

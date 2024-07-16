@@ -148,7 +148,12 @@ func (env *CloneInfo) bootstrapUsingPgbasebackup(ctx context.Context) error {
 
 	if cluster.IsReplica() {
 		// TODO: Using a replication slot on replica cluster is not supported (yet?)
-		_, err = postgres.UpdateReplicaConfiguration(env.info.PgData, connectionString, "")
+		_, err = postgres.UpdateReplicaConfiguration(
+			env.info.PgData,
+			connectionString,
+			"",
+			cluster.IsDesignatedPrimary(env.info.PodName),
+		)
 		return err
 	}
 

@@ -61,7 +61,12 @@ func (instance *Instance) RefreshReplicaConfiguration(
 
 func (instance *Instance) writeReplicaConfigurationForReplica(cluster *apiv1.Cluster) (changed bool, err error) {
 	slotName := cluster.GetSlotNameFromInstanceName(instance.PodName)
-	return UpdateReplicaConfiguration(instance.PgData, instance.GetPrimaryConnInfo(), slotName)
+	return UpdateReplicaConfiguration(
+		instance.PgData,
+		instance.GetPrimaryConnInfo(),
+		slotName,
+		cluster.IsDesignatedPrimary(instance.PodName),
+	)
 }
 
 func (instance *Instance) writeReplicaConfigurationForDesignatedPrimary(
@@ -80,5 +85,5 @@ func (instance *Instance) writeReplicaConfigurationForDesignatedPrimary(
 		return false, err
 	}
 
-	return UpdateReplicaConfiguration(instance.PgData, connectionString, "")
+	return UpdateReplicaConfiguration(instance.PgData, connectionString, "", true)
 }

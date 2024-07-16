@@ -164,7 +164,12 @@ func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client, imm
 		}
 
 		// TODO: Using a replication slot on replica cluster is not supported (yet?)
-		_, err = UpdateReplicaConfiguration(info.PgData, connectionString, "")
+		_, err = UpdateReplicaConfiguration(
+			info.PgData,
+			connectionString,
+			"",
+			cluster.IsDesignatedPrimary(info.PodName),
+		)
 		return err
 	}
 
@@ -297,7 +302,12 @@ func (info InitInfo) Restore(ctx context.Context) error {
 		}
 
 		// TODO: Using a replication slot on replica cluster is not supported (yet?)
-		_, err = UpdateReplicaConfiguration(info.PgData, connectionString, "")
+		_, err = UpdateReplicaConfiguration(
+			info.PgData,
+			connectionString,
+			"",
+			cluster.IsDesignatedPrimary(info.PodName),
+		)
 		return err
 	}
 

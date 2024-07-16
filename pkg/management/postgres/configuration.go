@@ -232,8 +232,8 @@ func (instance *Instance) RefreshPGIdent(additionalLines []string) (postgresIden
 
 // UpdateReplicaConfiguration updates the override.conf or recovery.conf file for the proper version
 // of PostgreSQL, using the specified connection string to connect to the primary server
-func UpdateReplicaConfiguration(pgData, primaryConnInfo, slotName string) (changed bool, err error) {
-	changed, err = configurePostgresOverrideConfFile(pgData, primaryConnInfo, slotName, false)
+func UpdateReplicaConfiguration(pgData, primaryConnInfo, slotName string, isDesignatedPrimary bool) (changed bool, err error) {
+	changed, err = configurePostgresOverrideConfFile(pgData, primaryConnInfo, slotName, isDesignatedPrimary)
 	if err != nil {
 		return changed, err
 	}

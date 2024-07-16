@@ -3857,9 +3857,15 @@ func (cluster *Cluster) IsReadOnlyServiceEnabled() bool {
 	return !slices.Contains(cluster.Spec.Managed.Services.DisabledDefaultServices, ServiceSelectorTypeRO)
 }
 
+// IsDesignatedPrimary returns true of the passed instance is the designatedPrimary
 func (cluster *Cluster) IsDesignatedPrimary(instanceName string) bool {
-	return cluster.IsReplica() && cluster.Status.CurrentPrimary == instanceName &&
-		cluster.Status.TargetPrimary == instanceName
+	isTargetPrimary := cluster.IsReplica() && cluster.Status.TargetPrimary == instanceName
+	if !isTargetPrimary {
+		return false
+	}
+	// CurrentPrimary will be empty during the primary bootstrap, but we still need to return true
+	// to generate the correct conf
+	return cluster.Status.CurrentPrimary == "" || cluster.Status.CurrentPrimary == instanceName
 }
 
 // BuildPostgresOptions create the list of options that

@@ -777,7 +777,8 @@ func (instance *Instance) Demote(ctx context.Context, cluster *apiv1.Cluster) er
 
 	contextLogger.Info("Demoting instance", "pgpdata", instance.PgData)
 	slotName := cluster.GetSlotNameFromInstanceName(instance.PodName)
-	_, err := UpdateReplicaConfiguration(instance.PgData, instance.GetPrimaryConnInfo(), slotName)
+	_, err := UpdateReplicaConfiguration(instance.PgData, instance.GetPrimaryConnInfo(), slotName,
+		cluster.IsDesignatedPrimary(instance.PodName))
 	return err
 }
 
