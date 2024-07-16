@@ -164,7 +164,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	contextLogger.Debug("Found cluster for backup", "cluster", clusterName)
 
 	// Store in the context the TLS configuration required communicating with the Pods
-	ctx, err = certs.NewTLSConfigForContext(
+	tlsCtx, err := certs.NewTLSConfigForContext(
 		ctx,
 		r.Client,
 		cluster.GetServerCASecretObjectKey(),
@@ -172,6 +172,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	if err != nil {
 		return ctrl.Result{}, err
 	}
+	ctx = tlsCtx
 
 	isRunning, err := r.isValidBackupRunning(ctx, &backup, &cluster)
 	if err != nil {
