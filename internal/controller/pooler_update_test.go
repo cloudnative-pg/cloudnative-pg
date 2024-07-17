@@ -297,12 +297,7 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 		pooler := newFakePooler(env.client, cluster)
 		res := &poolerManagedResources{Deployment: nil, Cluster: cluster}
 		By("setting the reconcilePodSpec annotation to disabled on the pooler ", func() {
-			// set annotation inside cluster
-			if pooler.ObjectMeta.Annotations == nil {
-				pooler.ObjectMeta.Annotations = make(map[string]string)
-			}
 			pooler.ObjectMeta.Annotations[utils.ReconcilePodSpecAnnotationName] = "disabled"
-
 			pooler.Spec.Template = &apiv1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					TerminationGracePeriodSeconds: ptr.To(int64(100)),

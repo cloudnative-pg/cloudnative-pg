@@ -158,22 +158,22 @@ var _ = Describe("Annotate pods management", func() {
 })
 
 var _ = Describe("Pod spec reconciliation", func() {
-	objectMeta := metav1.ObjectMeta{}
+	var objectMeta *metav1.ObjectMeta
+	BeforeEach(func() {
+		objectMeta = &metav1.ObjectMeta{Annotations: map[string]string{}}
+	})
 
 	It("is not disabled if annotation map is empty", func() {
-		objectMeta.Annotations = make(map[string]string)
-		Expect(IsPodSpecReconciliationDisabled(&objectMeta)).To(BeFalse())
+		Expect(IsPodSpecReconciliationDisabled(objectMeta)).To(BeFalse())
 	})
 
 	It("is not disabled if annotation exists and its value is not 'disabled'", func() {
-		objectMeta.Annotations = make(map[string]string)
 		objectMeta.Annotations[ReconcilePodSpecAnnotationName] = string(annotationStatusEnabled)
-		Expect(IsPodSpecReconciliationDisabled(&objectMeta)).To(BeFalse())
+		Expect(IsPodSpecReconciliationDisabled(objectMeta)).To(BeFalse())
 	})
 
 	It("is disabled if annotation exists and its value is 'disabled'", func() {
-		objectMeta.Annotations = make(map[string]string)
 		objectMeta.Annotations[ReconcilePodSpecAnnotationName] = string(annotationStatusDisabled)
-		Expect(IsPodSpecReconciliationDisabled(&objectMeta)).To(BeTrue())
+		Expect(IsPodSpecReconciliationDisabled(objectMeta)).To(BeTrue())
 	})
 })

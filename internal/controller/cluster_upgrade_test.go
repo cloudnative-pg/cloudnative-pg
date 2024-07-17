@@ -667,7 +667,9 @@ var _ = Describe("Cluster upgrade with podSpec reconciliation disabled", func() 
 	BeforeEach(func() {
 		cluster = apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: "test",
+				Name:        "test",
+				Annotations: map[string]string{},
+				Labels:      map[string]string{},
 			},
 			Spec: apiv1.ClusterSpec{
 				ImageName: "postgres:13.11",
@@ -677,10 +679,6 @@ var _ = Describe("Cluster upgrade with podSpec reconciliation disabled", func() 
 	})
 
 	It("skips the rollout if the annotation that disables PodSpec reconciliation is set", func(ctx SpecContext) {
-		// set annotation inside cluster
-		if cluster.ObjectMeta.Annotations == nil {
-			cluster.ObjectMeta.Annotations = make(map[string]string)
-		}
 		cluster.ObjectMeta.Annotations[utils.ReconcilePodSpecAnnotationName] = "disabled"
 
 		pod := specs.PodWithExistingStorage(cluster, 1)
@@ -698,8 +696,5 @@ var _ = Describe("Cluster upgrade with podSpec reconciliation disabled", func() 
 		Expect(rollout.required).To(BeFalse())
 		Expect(rollout.canBeInPlace).To(BeFalse())
 		Expect(rollout.reason).To(BeEmpty())
-
-		// cleanup annotation
-		delete(cluster.ObjectMeta.Annotations, utils.ReconcilePodSpecAnnotationName)
 	})
 })
