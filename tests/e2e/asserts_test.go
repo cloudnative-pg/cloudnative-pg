@@ -232,38 +232,34 @@ func AssertClusterIsReady(namespace string, clusterName string, timeout int, env
 			},
 		)
 
-		Eventually(func(g Gomega) {
-			if cluster.Spec.Instances == 1 {
-				return
-			}
+		if cluster.Spec.Instances != 1 {
+			Eventually(func(g Gomega) {
+				podList, err := env.GetClusterPodList(namespace, clusterName)
+				g.Expect(err).ToNot(HaveOccurred(), "cannot get cluster pod list")
 
-			podList, err := env.GetClusterPodList(namespace, clusterName)
-			g.Expect(err).ToNot(HaveOccurred(), "cannot get cluster pod list")
+				primaryPod, err := env.GetClusterPrimary(namespace, clusterName)
+				g.Expect(err).ToNot(HaveOccurred(), "cannot find cluster primary pod")
 
-			primaryPod, err := env.GetClusterPrimary(namespace, clusterName)
-			g.Expect(err).ToNot(HaveOccurred(), "cannot find cluster primary pod")
-
-			replicaNamesList := make([]string, 0, len(podList.Items)-1)
-			for _, pod := range podList.Items {
-				if pod.Name != primaryPod.Name {
-					replicaNamesList = append(replicaNamesList, pq.QuoteLiteral(pod.Name))
+				replicaNamesList := make([]string, 0, len(podList.Items)-1)
+				for _, pod := range podList.Items {
+					if pod.Name != primaryPod.Name {
+						replicaNamesList = append(replicaNamesList, pq.QuoteLiteral(pod.Name))
+					}
 				}
-			}
-			replicaNamesString := strings.Join(replicaNamesList, ",")
-
-			out, _, err := env.ExecQueryInInstancePod(
-				testsUtils.PodLocator{
-					Namespace: namespace,
-					PodName:   primaryPod.Name,
-				},
-				"postgres",
-				fmt.Sprintf("SELECT COUNT(*) FROM pg_stat_replication WHERE application_name IN (%s)",
-					replicaNamesString),
-			)
-			g.Expect(err).ToNot(HaveOccurred(), "cannot extract the list of streaming replicas")
-			g.Expect(strings.TrimSpace(out)).To(BeEquivalentTo(fmt.Sprintf("%d", len(replicaNamesList))))
-		}, timeout, 2).Should(Succeed(), "Replicas are attached via streaming connection")
-
+				replicaNamesString := strings.Join(replicaNamesList, ",")
+				out, _, err := env.ExecQueryInInstancePod(
+					testsUtils.PodLocator{
+						Namespace: namespace,
+						PodName:   primaryPod.Name,
+					},
+					"postgres",
+					fmt.Sprintf("SELECT COUNT(*) FROM pg_stat_replication WHERE application_name IN (%s)",
+						replicaNamesString),
+				)
+				g.Expect(err).ToNot(HaveOccurred(), "cannot extract the list of streaming replicas")
+				g.Expect(strings.TrimSpace(out)).To(BeEquivalentTo(fmt.Sprintf("%d", len(replicaNamesList))))
+			}, timeout, 2).Should(Succeed(), "Replicas are attached via streaming connection")
+		}
 		GinkgoWriter.Println("Cluster ready, took", time.Since(start))
 	})
 }
