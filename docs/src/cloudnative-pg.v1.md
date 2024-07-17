@@ -4598,8 +4598,8 @@ standby, if available.</p>
 <a href="#postgresql-cnpg-io-v1-BackupMethod"><i>BackupMethod</i></a>
 </td>
 <td>
-   <p>The backup method to be used, possible options are <code>barmanObjectStore</code>
-and <code>volumeSnapshot</code>. Defaults to: <code>barmanObjectStore</code>.</p>
+   <p>The backup method to be used, possible options are <code>barmanObjectStore</code>,
+<code>volumeSnapshot</code> or <code>plugin</code>. Defaults to: <code>barmanObjectStore</code>.</p>
 </td>
 </tr>
 <tr><td><code>pluginConfiguration</code><br/>

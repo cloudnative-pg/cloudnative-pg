@@ -79,11 +79,12 @@ spec:
               method:
                 default: barmanObjectStore
                 description: |-
-                  The backup method to be used, possible options are `barmanObjectStore`
-                  and `volumeSnapshot`. Defaults to: `barmanObjectStore`.
+                  The backup method to be used, possible options are `barmanObjectStore`,
+                  `volumeSnapshot` or `plugin`. Defaults to: `barmanObjectStore`.
                 enum:
                 - barmanObjectStore
                 - volumeSnapshot
+                - plugin
                 type: string
               online:
                 description: |-
