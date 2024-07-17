@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package walarchive
+package barman
 
 import (
 	"strings"
@@ -27,7 +27,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("barmanCloudWalArchiveOptions", func() {
+var _ = Describe("barmanCloudWalRestoreOptions", func() {
 	const namespace = "test"
 	var cluster *apiv1.Cluster
 
@@ -38,47 +38,33 @@ var _ = Describe("barmanCloudWalArchiveOptions", func() {
 				Backup: &apiv1.BackupConfiguration{
 					BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{
 						DestinationPath: "s3://bucket-name/",
-						Wal: &apiv1.WalBackupConfiguration{
-							Compression: "gzip",
-							Encryption:  "aes256",
-						},
 					},
 				},
 			},
 		}
 	})
 
-	It("should generate correct arguments", func() {
-		extraOptions := []string{"--min-chunk-size=5MB", "--read-timeout=60", "-vv"}
-		cluster.Spec.Backup.BarmanObjectStore.Wal.ArchiveAdditionalCommandArgs = extraOptions
-		options, err := barmanCloudWalArchiveOptions(cluster, "test-cluster")
+	It("should generate correct arguments without the wal stanza", func() {
+		options, err := CloudWalRestoreOptions(cluster.Spec.Backup.BarmanObjectStore, "test-cluster")
 		Expect(err).ToNot(HaveOccurred())
 		Expect(strings.Join(options, " ")).
 			To(
 				Equal(
-					"--gzip -e aes256 --min-chunk-size=5MB --read-timeout=60 -vv s3://bucket-name/ test-cluster",
+					"s3://bucket-name/ test-cluster",
 				))
 	})
 
-	It("should not overwrite declared options if conflict", func() {
-		extraOptions := []string{
-			"--min-chunk-size=5MB",
-			"--read-timeout=60",
-			"-vv",
-			"--immediate-checkpoint=false",
-			"--gzip",
-			"-e",
-			"aes256",
+	It("should generate correct arguments", func() {
+		extraOptions := []string{"--read-timeout=60", "-vv"}
+		cluster.Spec.Backup.BarmanObjectStore.Wal = &apiv1.WalBackupConfiguration{
+			RestoreAdditionalCommandArgs: extraOptions,
 		}
-		cluster.Spec.Backup.BarmanObjectStore.Wal.ArchiveAdditionalCommandArgs = extraOptions
-		options, err := barmanCloudWalArchiveOptions(cluster, "test-cluster")
+		options, err := CloudWalRestoreOptions(cluster.Spec.Backup.BarmanObjectStore, "test-cluster")
 		Expect(err).ToNot(HaveOccurred())
-
 		Expect(strings.Join(options, " ")).
 			To(
 				Equal(
-					"--gzip -e aes256 --min-chunk-size=5MB --read-timeout=60 " +
-						"-vv --immediate-checkpoint=false s3://bucket-name/ test-cluster",
+					"s3://bucket-name/ test-cluster --read-timeout=60 -vv",
 				))
 	})
 })

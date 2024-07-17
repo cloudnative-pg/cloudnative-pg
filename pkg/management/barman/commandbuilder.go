@@ -48,6 +48,8 @@ func CloudWalRestoreOptions(
 	}
 
 	options = append(options, configuration.DestinationPath, serverName)
+	options = configuration.Wal.AppendRestoreAdditionalCommandArgs(options)
+
 	return options, nil
 }
 

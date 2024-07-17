@@ -2193,10 +2193,9 @@ type WalBackupConfiguration struct {
 	// +kubebuilder:validation:Minimum=1
 	// +optional
 	MaxParallel int `json:"maxParallel,omitempty"`
-	// AdditionalCommandArgs represents additional arguments that can be appended
-	// to the 'barman-cloud-wal-archive' command-line invocation. These arguments
-	// provide flexibility to customize the backup process further according to
-	// specific requirements or configurations.
+	// Additional arguments that can be appended to the 'barman-cloud-wal-archive'
+	// command-line invocation. These arguments provide flexibility to customize
+	// the WAL archive process further, according to specific requirements or configurations.
 	//
 	// Example:
 	// In a scenario where specialized backup options are required, such as setting
@@ -2207,7 +2206,22 @@ type WalBackupConfiguration struct {
 	// It's essential to ensure that the provided arguments are valid and supported
 	// by the 'barman-cloud-wal-archive' command, to avoid potential errors or unintended
 	// behavior during execution.
-	AdditionalCommandArgs []string `json:"additionalCommandArgs,omitempty"`
+	ArchiveAdditionalCommandArgs []string `json:"archiveAdditionalCommandArgs,omitempty"`
+
+	// Additional arguments that can be appended to the 'barman-cloud-wal-restore'
+	// command-line invocation. These arguments provide flexibility to customize
+	// the WAL restore process further, according to specific requirements or configurations.
+	//
+	// Example:
+	// In a scenario where specialized backup options are required, such as setting
+	// a specific timeout or defining custom behavior, users can use this field
+	// to specify additional command arguments.
+	//
+	// Note:
+	// It's essential to ensure that the provided arguments are valid and supported
+	// by the 'barman-cloud-wal-restore' command, to avoid potential errors or unintended
+	// behavior during execution.
+	RestoreAdditionalCommandArgs []string `json:"restoreAdditionalCommandArgs,omitempty"`
 }
 
 // DataBackupConfiguration is the configuration of the backup of
@@ -2418,12 +2432,20 @@ func (cfg *DataBackupConfiguration) AppendAdditionalCommandArgs(options []string
 	return appendAdditionalCommandArgs(cfg.AdditionalCommandArgs, options)
 }
 
-// AppendAdditionalCommandArgs adds custom arguments as barman-cloud-wal-archive command-line options
-func (cfg *WalBackupConfiguration) AppendAdditionalCommandArgs(options []string) []string {
-	if cfg == nil || len(cfg.AdditionalCommandArgs) == 0 {
+// AppendArchiveAdditionalCommandArgs adds custom arguments as barman-cloud-wal-archive command-line options
+func (cfg *WalBackupConfiguration) AppendArchiveAdditionalCommandArgs(options []string) []string {
+	if cfg == nil || len(cfg.ArchiveAdditionalCommandArgs) == 0 {
 		return options
 	}
-	return appendAdditionalCommandArgs(cfg.AdditionalCommandArgs, options)
+	return appendAdditionalCommandArgs(cfg.ArchiveAdditionalCommandArgs, options)
+}
+
+// AppendRestoreAdditionalCommandArgs adds custom arguments as barman-cloud-wal-restore command-line options
+func (cfg *WalBackupConfiguration) AppendRestoreAdditionalCommandArgs(options []string) []string {
+	if cfg == nil || len(cfg.RestoreAdditionalCommandArgs) == 0 {
+		return options
+	}
+	return appendAdditionalCommandArgs(cfg.RestoreAdditionalCommandArgs, options)
 }
 
 func appendAdditionalCommandArgs(additionalCommandArgs []string, options []string) []string {
