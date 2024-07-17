@@ -271,10 +271,43 @@ spec:
     `-d`), this technique is deprecated and will be removed from future versions of
     the API.
 
-You can also specify a custom list of queries that will be executed
-once, just after the database is created and configured. These queries will
-be executed as the *superuser* (`postgres`), connected to the `postgres`
-database:
+### Executing Queries After Initialization
+
+You can specify a custom list of queries that will be executed once,
+immediately after the cluster is created and configured. These queries will be
+executed as the *superuser* (`postgres`) against three different databases, in
+this specific order:
+
+1. The `postgres` database (`postInit` section)
+2. The `template1` database (`postInitTemplate` section)
+3. The application database (`postInitApplication` section)
+
+For each of these sections, CloudNativePG provides two ways to specify custom
+queries, executed in the following order:
+
+- As a list of SQL queries in the cluster's definition (`postInitSQL`,
+  `postInitTemplateSQL`, and `postInitApplicationSQL` stanzas)
+- As a list of Secrets and/or ConfigMaps, each containing a SQL script to be
+  executed (`postInitSQLRefs`, `postInitTemplateSQLRefs`, and
+  `postInitApplicationSQLRefs` stanzas). Secrets are processed before ConfigMaps.
+
+Objects in each list will be processed sequentially.
+
+!!! Warning
+    Use the `postInit`, `postInitTemplate`, and `postInitApplication` options
+    with extreme care, as queries are run as a superuser and can disrupt the entire
+    cluster. An error in any of those queries will interrupt the bootstrap phase,
+    leaving the cluster incomplete and requiring manual intervention.
+
+!!! Important
+    Ensure the existence of entries inside the ConfigMaps or Secrets specified
+    in `postInitSQLRefs`, `postInitTemplateSQLRefs`, and
+    `postInitApplicationSQLRefs`, otherwise the bootstrap will fail. Errors in any
+    of those SQL files will prevent the bootstrap phase from completing
+    successfully.
+
+The following example runs a single SQL query as part of the `postInitSQL`
+stanza:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -297,18 +330,9 @@ spec:
     size: 1Gi
 ```
 
-!!! Warning
-    Please use the `postInitSQL`, `postInitApplicationSQL` and
-    `postInitTemplateSQL` options with extreme care, as queries are run as a
-    superuser and can disrupt the entire cluster.  An error in any of those queries
-    interrupts the bootstrap phase, leaving the cluster incomplete.
-
-### Executing queries after initialization
-
-Moreover, you can specify a list of Secrets and/or ConfigMaps which contains
-SQL script that will be executed after the database is created and configured.
-These SQL script will be executed using the **superuser** role (`postgres`),
-connected to the database specified in the `initdb` section:
+The example below relies on `postInitApplicationSQLRefs` to specify a secret
+and a ConfigMap containing the queries to run after the initialization on the
+application database:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -334,18 +358,9 @@ spec:
 ```
 
 !!! Note
-    The SQL scripts referenced in `secretRefs` will be executed before the ones
-    referenced in `configMapRefs`. For both sections the SQL scripts will be
-    executed respecting the order in the list.  Inside SQL scripts, each SQL
-    statement is executed in a single exec on the server according to the
-    [PostgreSQL semantics](https://www.postgresql.org/docs/current/protocol-flow.html#PROTOCOL-FLOW-MULTI-STATEMENT),
-    comments can be included, but internal command like `psql` cannot.
-
-!!! Warning
-    Please make sure the existence of the entries inside the ConfigMaps or
-    Secrets specified in `postInitApplicationSQLRefs`, otherwise the bootstrap will
-    fail. Errors in any of those SQL files will prevent the bootstrap phase to
-    complete successfully.
+    Within SQL scripts, each SQL statement is executed in a single exec on the
+    server according to the [PostgreSQL semantics](https://www.postgresql.org/docs/current/protocol-flow.html#PROTOCOL-FLOW-MULTI-STATEMENT).
+    Comments can be included, but internal commands like `psql` cannot.
 
 ## Bootstrap from another cluster
 

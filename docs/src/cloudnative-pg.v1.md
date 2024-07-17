@@ -1175,8 +1175,8 @@ option for initdb (default: empty, resulting in PostgreSQL default: 16MB)</p>
 <i>[]string</i>
 </td>
 <td>
-   <p>List of SQL queries to be executed as a superuser immediately
-after the cluster has been created - to be used with extreme care
+   <p>List of SQL queries to be executed as a superuser in the <code>postgres</code>
+database right after the cluster has been created - to be used with extreme care
 (by default empty)</p>
 </td>
 </tr>
@@ -1185,7 +1185,7 @@ after the cluster has been created - to be used with extreme care
 </td>
 <td>
    <p>List of SQL queries to be executed as a superuser in the application
-database right after is created - to be used with extreme care
+database right after the cluster has been created - to be used with extreme care
 (by default empty)</p>
 </td>
 </tr>
@@ -1194,7 +1194,7 @@ database right after is created - to be used with extreme care
 </td>
 <td>
    <p>List of SQL queries to be executed as a superuser in the <code>template1</code>
-after the cluster has been created - to be used with extreme care
+database right after the cluster has been created - to be used with extreme care
 (by default empty)</p>
 </td>
 </tr>
@@ -1207,13 +1207,41 @@ instance using logical backup (<code>pg_dump</code> and <code>pg_restore</code>)
 </td>
 </tr>
 <tr><td><code>postInitApplicationSQLRefs</code><br/>
-<a href="#postgresql-cnpg-io-v1-PostInitApplicationSQLRefs"><i>PostInitApplicationSQLRefs</i></a>
+<a href="#postgresql-cnpg-io-v1-SQLRefs"><i>SQLRefs</i></a>
 </td>
 <td>
-   <p>PostInitApplicationSQLRefs points references to ConfigMaps or Secrets which
-contain SQL files, the general implementation order to these references is
-from all Secrets to all ConfigMaps, and inside Secrets or ConfigMaps,
-the implementation order is same as the order of each array
+   <p>List of references to ConfigMaps or Secrets containing SQL files
+to be executed as a superuser in the application database right after
+the cluster has been created. The references are processed in a specific order:
+first, all Secrets are processed, followed by all ConfigMaps.
+Within each group, the processing order follows the sequence specified
+in their respective arrays.
+(by default empty)</p>
+</td>
+</tr>
+<tr><td><code>postInitTemplateSQLRefs</code><br/>
+<a href="#postgresql-cnpg-io-v1-SQLRefs"><i>SQLRefs</i></a>
+</td>
+<td>
+   <p>List of references to ConfigMaps or Secrets containing SQL files
+to be executed as a superuser in the <code>template1</code> database right after
+the cluster has been created. The references are processed in a specific order:
+first, all Secrets are processed, followed by all ConfigMaps.
+Within each group, the processing order follows the sequence specified
+in their respective arrays.
+(by default empty)</p>
+</td>
+</tr>
+<tr><td><code>postInitSQLRefs</code><br/>
+<a href="#postgresql-cnpg-io-v1-SQLRefs"><i>SQLRefs</i></a>
+</td>
+<td>
+   <p>List of references to ConfigMaps or Secrets containing SQL files
+to be executed as a superuser in the <code>postgres</code> database right after
+the cluster has been created. The references are processed in a specific order:
+first, all Secrets are processed, followed by all ConfigMaps.
+Within each group, the processing order follows the sequence specified
+in their respective arrays.
 (by default empty)</p>
 </td>
 </tr>
@@ -2300,7 +2328,7 @@ WAL file, and Time of latest checkpoint</p>
 
 - [MonitoringConfiguration](#postgresql-cnpg-io-v1-MonitoringConfiguration)
 
-- [PostInitApplicationSQLRefs](#postgresql-cnpg-io-v1-PostInitApplicationSQLRefs)
+- [SQLRefs](#postgresql-cnpg-io-v1-SQLRefs)
 
 
 <p>ConfigMapKeySelector contains enough information to let you locate
@@ -3948,40 +3976,6 @@ we are targeting. Allowed values are <code>rw</code> and <code>ro</code>.</p>
 
 
 
-## PostInitApplicationSQLRefs     {#postgresql-cnpg-io-v1-PostInitApplicationSQLRefs}
-
-
-**Appears in:**
-
-- [BootstrapInitDB](#postgresql-cnpg-io-v1-BootstrapInitDB)
-
-
-<p>PostInitApplicationSQLRefs points references to ConfigMaps or Secrets which
-contain SQL files, the general implementation order to these references is
-from all Secrets to all ConfigMaps, and inside Secrets or ConfigMaps,
-the implementation order is same as the order of each array</p>
-
-
-<table class="table">
-<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
-<tbody>
-<tr><td><code>secretRefs</code><br/>
-<a href="#postgresql-cnpg-io-v1-SecretKeySelector"><i>[]SecretKeySelector</i></a>
-</td>
-<td>
-   <p>SecretRefs holds a list of references to Secrets</p>
-</td>
-</tr>
-<tr><td><code>configMapRefs</code><br/>
-<a href="#postgresql-cnpg-io-v1-ConfigMapKeySelector"><i>[]ConfigMapKeySelector</i></a>
-</td>
-<td>
-   <p>ConfigMapRefs holds a list of references to ConfigMaps</p>
-</td>
-</tr>
-</tbody>
-</table>
-
 ## PostgresConfiguration     {#postgresql-cnpg-io-v1-PostgresConfiguration}
 
 
@@ -4526,6 +4520,41 @@ files to S3. It can be provided in two alternative ways:</p>
 </tbody>
 </table>
 
+## SQLRefs     {#postgresql-cnpg-io-v1-SQLRefs}
+
+
+**Appears in:**
+
+- [BootstrapInitDB](#postgresql-cnpg-io-v1-BootstrapInitDB)
+
+
+<p>SQLRefs holds references to ConfigMaps or Secrets
+containing SQL files. The references are processed in a specific order:
+first, all Secrets are processed, followed by all ConfigMaps.
+Within each group, the processing order follows the sequence specified
+in their respective arrays.</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>secretRefs</code><br/>
+<a href="#postgresql-cnpg-io-v1-SecretKeySelector"><i>[]SecretKeySelector</i></a>
+</td>
+<td>
+   <p>SecretRefs holds a list of references to Secrets</p>
+</td>
+</tr>
+<tr><td><code>configMapRefs</code><br/>
+<a href="#postgresql-cnpg-io-v1-ConfigMapKeySelector"><i>[]ConfigMapKeySelector</i></a>
+</td>
+<td>
+   <p>ConfigMapRefs holds a list of references to ConfigMaps</p>
+</td>
+</tr>
+</tbody>
+</table>
+
 ## ScheduledBackupSpec     {#postgresql-cnpg-io-v1-ScheduledBackupSpec}
 
 
@@ -4684,9 +4713,9 @@ Overrides the default settings specified in the cluster '.backup.volumeSnapshot.
 
 - [MonitoringConfiguration](#postgresql-cnpg-io-v1-MonitoringConfiguration)
 
-- [PostInitApplicationSQLRefs](#postgresql-cnpg-io-v1-PostInitApplicationSQLRefs)
-
 - [S3Credentials](#postgresql-cnpg-io-v1-S3Credentials)
+
+- [SQLRefs](#postgresql-cnpg-io-v1-SQLRefs)
 
 
 <p>SecretKeySelector contains enough information to let you locate
