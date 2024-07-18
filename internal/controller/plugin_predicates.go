@@ -19,10 +19,17 @@ package controller
 import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 var isPluginService = func(object client.Object) bool {
+	if object.GetNamespace() != configuration.Current.OperatorNamespace {
+		// Only consider the services that are in the same
+		// namespace where the operator is installed
+		return false
+	}
+
 	labels := object.GetLabels()
 	if _, hasLabel := labels[utils.PluginNameLabelName]; !hasLabel {
 		return false
