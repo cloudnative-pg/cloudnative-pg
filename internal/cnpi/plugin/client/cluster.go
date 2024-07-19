@@ -92,6 +92,47 @@ func (data *data) MutateCluster(ctx context.Context, object client.Object, mutat
 	return nil
 }
 
+func (data *data) SetClusterStatus(ctx context.Context, cluster client.Object) (map[string]string, error) {
+	contextLogger := log.FromContext(ctx)
+	serializedObject, err := json.Marshal(cluster)
+	if err != nil {
+		return nil, fmt.Errorf("while serializing %s %s/%s to JSON: %w",
+			cluster.GetObjectKind().GroupVersionKind().Kind,
+			cluster.GetNamespace(), cluster.GetName(),
+			err,
+		)
+	}
+
+	pluginStatuses := make(map[string]string)
+	for idx := range data.plugins {
+		plugin := data.plugins[idx]
+
+		if !slices.Contains(plugin.OperatorCapabilities(), operator.OperatorCapability_RPC_TYPE_SET_CLUSTER_STATUS) {
+			continue
+		}
+
+		pluginLogger := contextLogger.WithValues("pluginName", plugin.Name())
+		request := operator.SetClusterStatusRequest{
+			Cluster: serializedObject,
+		}
+
+		pluginLogger.Trace("Calling SetClusterStatus endpoint")
+		response, err := plugin.OperatorClient().SetClusterStatus(ctx, &request)
+		if err != nil {
+			pluginLogger.Error(err, "Error while calling SetClusterStatus")
+			return nil, err
+		}
+
+		if len(response.JsonStatus) == 0 {
+			continue
+		}
+
+		pluginStatuses[plugin.Name()] = string(response.JsonStatus)
+	}
+
+	return pluginStatuses, nil
+}
+
 func (data *data) ValidateClusterCreate(
 	ctx context.Context,
 	object client.Object,

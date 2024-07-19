@@ -18,7 +18,9 @@ package controller
 
 import (
 	"context"
+	"time"
 
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -44,6 +46,27 @@ func postReconcilePluginHooks(
 ) cnpgiClient.ReconcilerHookResult {
 	pluginClient := getPluginClientFromContext(ctx)
 	return pluginClient.PostReconcile(ctx, cluster, object)
+}
+
+func setStatusPluginHook(ctx context.Context, cli client.Client, cluster *apiv1.Cluster) (ctrl.Result, error) {
+	origCluster := cluster.DeepCopy()
+	pluginClient := getPluginClientFromContext(ctx)
+	statuses, err := pluginClient.SetClusterStatus(ctx, cluster)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	if len(statuses) == 0 {
+		return ctrl.Result{}, nil
+	}
+	for _, status := range cluster.Status.PluginStatus {
+		val, ok := statuses[status.Name]
+		if !ok {
+			continue
+		}
+		status.Status = val
+	}
+
+	return ctrl.Result{RequeueAfter: 5 * time.Second}, cli.Status().Patch(ctx, cluster, client.MergeFrom(origCluster))
 }
 
 // setPluginClientInContext records the plugin client in the given context

@@ -2694,6 +2694,9 @@ type PluginStatus struct {
 	// BackupCapabilities are the list of capabilities of the
 	// plugin regarding the Backup management
 	BackupCapabilities []string `json:"backupCapabilities,omitempty"`
+
+	// Status the internal status of the plugin
+	Status string `json:"status,omitempty"`
 }
 
 // RoleConfiguration is the representation, in Kubernetes, of a PostgreSQL role
