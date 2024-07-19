@@ -285,6 +285,75 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 			Expect(expectedSVC.Labels[utils.ClusterLabelName]).To(Equal(cluster.Name))
 		})
 	})
+
+	It("should not reconcile if pooler has podSpec reconciliation disabled", func() {
+		ctx := context.Background()
+		namespace := newFakeNamespace(env.client)
+		cluster := newFakeCNPGCluster(env.client, namespace)
+		pooler := newFakePooler(env.client, cluster)
+		res := &poolerManagedResources{Deployment: nil, Cluster: cluster}
+		By("setting the reconcilePodSpec annotation to disabled on the pooler ", func() {
+			pooler.ObjectMeta.Annotations[utils.ReconcilePodSpecAnnotationName] = "disabled"
+			pooler.Spec.Template = &apiv1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					TerminationGracePeriodSeconds: ptr.To(int64(100)),
+				},
+			}
+		})
+
+		By("making sure that updateDeployment creates the deployment", func() {
+			err := env.poolerReconciler.updateDeployment(ctx, pooler, res)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(res.Deployment).ToNot(BeNil())
+
+			deployment := getPoolerDeployment(ctx, env.client, pooler)
+			Expect(deployment.Spec.Replicas).To(Equal(pooler.Spec.Instances))
+		})
+
+		By("making sure pooler change does not update the deployment", func() {
+			beforeDep := getPoolerDeployment(ctx, env.client, pooler)
+			pooler.Spec.Template.Spec.TerminationGracePeriodSeconds = ptr.To(int64(200))
+			err := env.poolerReconciler.updateDeployment(ctx, pooler, res)
+			Expect(err).ToNot(HaveOccurred())
+
+			afterDep := getPoolerDeployment(ctx, env.client, pooler)
+			Expect(afterDep.Spec.Template.Spec.TerminationGracePeriodSeconds).To(
+				Equal(beforeDep.Spec.Template.Spec.TerminationGracePeriodSeconds))
+			Expect(beforeDep.Annotations[utils.PoolerSpecHashAnnotationName]).
+				NotTo(Equal(afterDep.Annotations[utils.PoolerSpecHashAnnotationName]))
+		})
+
+		By("making sure that the deployments gets updated if the pooler.spec changes", func() {
+			const instancesNumber int32 = 3
+			poolerUpdate := pooler.DeepCopy()
+			poolerUpdate.Spec.Instances = ptr.To(instancesNumber)
+
+			beforeDep := getPoolerDeployment(ctx, env.client, poolerUpdate)
+
+			err := env.poolerReconciler.updateDeployment(ctx, poolerUpdate, res)
+			Expect(err).ToNot(HaveOccurred())
+
+			afterDep := getPoolerDeployment(ctx, env.client, poolerUpdate)
+			Expect(beforeDep.Annotations[utils.PoolerSpecHashAnnotationName]).
+				ToNot(Equal(afterDep.Annotations[utils.PoolerSpecHashAnnotationName]))
+			Expect(*afterDep.Spec.Replicas).To(Equal(instancesNumber))
+		})
+
+		By("enable again, making sure pooler change updates the deployment", func() {
+			delete(pooler.ObjectMeta.Annotations, utils.ReconcilePodSpecAnnotationName)
+			beforeDep := getPoolerDeployment(ctx, env.client, pooler)
+			pooler.Spec.Template.Spec.TerminationGracePeriodSeconds = ptr.To(int64(300))
+			err := env.poolerReconciler.updateDeployment(ctx, pooler, res)
+			Expect(err).ToNot(HaveOccurred())
+
+			afterDep := getPoolerDeployment(ctx, env.client, pooler)
+			Expect(afterDep.Spec.Template.Spec.TerminationGracePeriodSeconds).NotTo(
+				Equal(beforeDep.Spec.Template.Spec.TerminationGracePeriodSeconds))
+			Expect(afterDep.Spec.Template.Spec.TerminationGracePeriodSeconds).To(Equal(ptr.To(int64(300))))
+			Expect(beforeDep.Annotations[utils.PoolerSpecHashAnnotationName]).
+				NotTo(Equal(afterDep.Annotations[utils.PoolerSpecHashAnnotationName]))
+		})
+	})
 })
 
 var _ = Describe("ensureServiceAccountPullSecret", func() {

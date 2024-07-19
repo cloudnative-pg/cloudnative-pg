@@ -672,3 +672,41 @@ var _ = Describe("hasValidPodSpec", func() {
 		})
 	})
 })
+
+var _ = Describe("Cluster upgrade with podSpec reconciliation disabled", func() {
+	var cluster apiv1.Cluster
+
+	BeforeEach(func() {
+		cluster = apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        "test",
+				Annotations: map[string]string{},
+				Labels:      map[string]string{},
+			},
+			Spec: apiv1.ClusterSpec{
+				ImageName: "postgres:13.11",
+			},
+		}
+		configuration.Current = configuration.NewConfiguration()
+	})
+
+	It("skips the rollout if the annotation that disables PodSpec reconciliation is set", func(ctx SpecContext) {
+		cluster.ObjectMeta.Annotations[utils.ReconcilePodSpecAnnotationName] = "disabled"
+
+		pod := specs.PodWithExistingStorage(cluster, 1)
+		cluster.Spec.SchedulerName = "newScheduler"
+		delete(pod.Annotations, utils.PodSpecAnnotationName)
+
+		status := postgres.PostgresqlStatus{
+			Pod:            pod,
+			PendingRestart: false,
+			IsPodReady:     true,
+			ExecutableHash: "test_hash",
+		}
+
+		rollout := isInstanceNeedingRollout(ctx, status, &cluster)
+		Expect(rollout.required).To(BeFalse())
+		Expect(rollout.canBeInPlace).To(BeFalse())
+		Expect(rollout.reason).To(BeEmpty())
+	})
+})
