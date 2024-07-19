@@ -22,11 +22,14 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"path"
 	"path/filepath"
 	"sort"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
@@ -45,6 +48,10 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pool"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/system"
 )
+
+// ErrExistingPGDATA is raised when the PGDATA to be written
+// is already existing.
+var ErrExistingPGDATA = errors.New("PGDATA already existing")
 
 // InitInfo contains all the info needed to bootstrap a new PostgreSQL instance
 type InitInfo struct {
@@ -111,16 +118,73 @@ type InitInfo struct {
 	TablespaceMapFile []byte
 }
 
-// VerifyPGData verifies if the passed configuration is OK, otherwise it returns an error
-func (info InitInfo) VerifyPGData() error {
-	pgdataExists, err := fileutils.FileExists(info.PgData)
+// CheckTargetDataDirectory ensures that the target data directory is
+// not existent. This allows it to be recreated, restored from primary
+// instance or restored from a backup.
+//
+// If cleanup is false, this function will fail when PGDATA already
+// exists.
+//
+// If cleanup is true, this function will move the existing contents
+// of the target directory if a correct control file can be found.
+// Otherwise, the directory will be cleaned up.
+//
+// By moving the existing contents away and not removing them, we
+// are going to use more free space then we really need it. In
+// defense of this approach, we've two considerations:
+//
+//  1. The PostgreSQL control file is the last file written by
+//     pg_basebackup. We'll only rename a data directory written
+//     by us if the "join" Pod got interrupted (i.e. the node was
+//     shut down immediately) after having written the control file
+//     and before the Pod was terminated. This is quite a short time
+//     span.
+//
+//  2. If the PGDATA wasn't written by us, we're probably saving the
+//     data of the user. That is still possible if you configure your
+//     PVC template to use static provisioning, and are reusing a set
+//     of existing PVs.
+func (info InitInfo) CheckTargetDataDirectory(ctx context.Context, cleanup bool) error {
+	contextLogger := log.FromContext(ctx).WithValues("pgdata", info.PgData)
+
+	pgDataExists, err := fileutils.FileExists(info.PgData)
 	if err != nil {
 		log.Error(err, "Error while checking for an existing PGData")
-		return err
+		return fmt.Errorf("while verifying is PGDATA exists: %w", err)
 	}
-	if pgdataExists {
-		log.Info("PGData already exists, can't overwrite")
-		return fmt.Errorf("PGData directories already exist")
+	if !pgDataExists {
+		// The PGDATA directory doesn't exist. We can definitely
+		// write to it
+		return nil
+	}
+	if !cleanup {
+		// We cannot clean up an existing directory, so we raise
+		// an error.
+		return ErrExistingPGDATA
+	}
+
+	// We've an existing directory. Let's check if this is a real
+	// PGDATA directory or not.
+	if out, err := info.GetInstance().GetPgControldata(); err != nil {
+		contextLogger.Info("pg_controldata check on existing directory failed, cleaning it up",
+			"out", out, "err", err)
+
+		if err := fileutils.RemoveDirectory(info.PgData); err != nil {
+			contextLogger.Error(err, "error while cleaning up existing data directory")
+			return err
+		}
+	} else {
+		renamedDirectoryName := fmt.Sprintf("%s_%s", info.PgData, fileutils.FormatFriendlyTimestamp(time.Now()))
+		contextLogger := contextLogger.WithValues(
+			"out", out,
+			"newName", renamedDirectoryName,
+		)
+
+		contextLogger.Info("pg_controldata check on existing directory succeeded, renaming the folder")
+		if err := os.Rename(info.PgData, renamedDirectoryName); err != nil {
+			contextLogger.Error(err, "error while renaming existing data directory")
+			return fmt.Errorf("while renaming existing data directory: %w", err)
+		}
 	}
 
 	return nil

@@ -148,7 +148,7 @@ func NewCmd() *cobra.Command {
 }
 
 func initSubCommand(ctx context.Context, info postgres.InitInfo) error {
-	err := info.VerifyPGData()
+	err := info.CheckTargetDataDirectory(ctx, true)
 	if err != nil {
 		return err
 	}
