@@ -31,6 +31,7 @@ import (
 // the required cryptographic material
 func GetServerConnectionString(
 	server *apiv1.ExternalCluster,
+	databaseName string,
 ) string {
 	connectionParameters := maps.Clone(server.ConnectionParameters)
 
@@ -52,6 +53,10 @@ func GetServerConnectionString(
 	if server.Password != nil {
 		pgpassfile := getPgPassFilePath(server.Name)
 		connectionParameters["passfile"] = pgpassfile
+	}
+
+	if databaseName != "" {
+		connectionParameters["dbname"] = databaseName
 	}
 
 	return configfile.CreateConnectionString(connectionParameters)

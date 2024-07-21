@@ -61,7 +61,7 @@ func NewCmd() *cobra.Command {
 					"the name of the database was not specified and there is no available application database")
 			}
 
-			connectionString, err := logical.GetConnectionString(cmd.Context(), clusterName, externalClusterName)
+			connectionString, err := logical.GetConnectionString(cmd.Context(), clusterName, externalClusterName, dbName)
 			if err != nil {
 				return err
 			}

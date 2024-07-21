@@ -34,6 +34,7 @@ func GetConnectionString(
 	ctx context.Context,
 	clusterName string,
 	externalClusterName string,
+	databaseName string,
 ) (string, error) {
 	var cluster apiv1.Cluster
 	err := plugin.Client.Get(
@@ -53,5 +54,5 @@ func GetConnectionString(
 		return "", fmt.Errorf("external cluster not existent in the cluster definition")
 	}
 
-	return external.GetServerConnectionString(&externalCluster), nil
+	return external.GetServerConnectionString(&externalCluster, databaseName), nil
 }
