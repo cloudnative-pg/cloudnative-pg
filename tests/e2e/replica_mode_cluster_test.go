@@ -60,9 +60,17 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 		replicaUser   = "userTgt"
 	)
 
+	var namespace string
+
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
+		}
+	})
+
+	JustAfterEach(func() {
+		if CurrentSpecReport().Failed() {
+			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
 	})
 
@@ -74,7 +82,8 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				testTableName           = "replica_mode_tls_auth"
 			)
 
-			replicaNamespace, err := env.CreateUniqueNamespace(replicaNamespacePrefix)
+			var err error
+			namespace, err = env.CreateUniqueNamespace(replicaNamespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
 				return env.CleanupNamespace(
@@ -84,10 +93,10 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 					GinkgoWriter,
 				)
 			})
-			AssertCreateCluster(replicaNamespace, srcClusterName, srcClusterSample, env)
+			AssertCreateCluster(namespace, srcClusterName, srcClusterSample, env)
 
 			AssertReplicaModeCluster(
-				replicaNamespace,
+				namespace,
 				srcClusterName,
 				sourceDBName,
 				replicaClusterSampleTLS,
@@ -115,7 +124,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 
 			replicaClusterName, err := env.GetResourceNameFromYAML(replicaClusterSampleBasicAuth)
 			Expect(err).ToNot(HaveOccurred())
-			replicaNamespace, err := env.CreateUniqueNamespace(replicaNamespacePrefix)
+			namespace, err = env.CreateUniqueNamespace(replicaNamespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
 				return env.CleanupNamespace(
@@ -125,10 +134,10 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 					GinkgoWriter,
 				)
 			})
-			AssertCreateCluster(replicaNamespace, srcClusterName, srcClusterSample, env)
+			AssertCreateCluster(namespace, srcClusterName, srcClusterSample, env)
 
 			AssertReplicaModeCluster(
-				replicaNamespace,
+				namespace,
 				srcClusterName,
 				sourceDBName,
 				replicaClusterSampleBasicAuth,
@@ -136,7 +145,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				psqlClientPod)
 
 			AssertDetachReplicaModeCluster(
-				replicaNamespace,
+				namespace,
 				srcClusterName,
 				sourceDBName,
 				replicaClusterName,
@@ -258,7 +267,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 
 			replicaClusterName, err := env.GetResourceNameFromYAML(replicaClusterSample)
 			Expect(err).ToNot(HaveOccurred())
-			replicaNamespace, err := env.CreateUniqueNamespace(replicaNamespacePrefix)
+			namespace, err = env.CreateUniqueNamespace(replicaNamespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
 				return env.CleanupNamespace(
@@ -269,18 +278,18 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				)
 			})
 			By("creating the credentials for minio", func() {
-				AssertStorageCredentialsAreCreated(replicaNamespace, "backup-storage-creds", "minio", "minio123")
+				AssertStorageCredentialsAreCreated(namespace, "backup-storage-creds", "minio", "minio123")
 			})
 
 			By("create the certificates for MinIO", func() {
-				err := minioEnv.CreateCaSecret(env, replicaNamespace)
+				err := minioEnv.CreateCaSecret(env, namespace)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
-			AssertCreateCluster(replicaNamespace, srcClusterName, srcClusterSample, env)
+			AssertCreateCluster(namespace, srcClusterName, srcClusterSample, env)
 
 			AssertReplicaModeCluster(
-				replicaNamespace,
+				namespace,
 				srcClusterName,
 				sourceDBName,
 				replicaClusterSample,
@@ -288,7 +297,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				psqlClientPod)
 
 			// Get primary from replica cluster
-			primaryReplicaCluster, err := env.GetClusterPrimary(replicaNamespace, replicaClusterName)
+			primaryReplicaCluster, err := env.GetClusterPrimary(namespace, replicaClusterName)
 			Expect(err).ToNot(HaveOccurred())
 
 			commandTimeout := time.Second * 10
@@ -304,7 +313,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			By("verify the WALs are archived from the designated primary", func() {
 				// only replica cluster has backup configure to minio,
 				// need the server name  be replica cluster name here
-				AssertArchiveWalOnMinio(replicaNamespace, srcClusterName, replicaClusterName)
+				AssertArchiveWalOnMinio(namespace, srcClusterName, replicaClusterName)
 			})
 		})
 	})
@@ -314,14 +323,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			clusterSample   = fixturesDir + replicaModeClusterDir + "cluster-replica-src-with-backup.yaml.template"
 			namespacePrefix = "replica-cluster-from-backup"
 		)
-		var namespace, clusterName string
-
-		JustAfterEach(func() {
-			testUtils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-		})
+		var clusterName string
 
 		BeforeAll(func() {
 			var err error
@@ -487,7 +489,6 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication), Ordered, f
 	})
 
 	JustAfterEach(func() {
-		testUtils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
 		if CurrentSpecReport().Failed() {
 			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 		}

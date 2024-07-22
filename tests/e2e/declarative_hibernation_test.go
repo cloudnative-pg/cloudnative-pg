@@ -17,7 +17,6 @@ limitations under the License.
 package e2e
 
 import (
-	testUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 	"k8s.io/apimachinery/pkg/api/meta"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -45,7 +44,6 @@ var _ = Describe("Cluster declarative hibernation", func() {
 	})
 
 	JustAfterEach(func() {
-		testUtils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
 		if CurrentSpecReport().Failed() {
 			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 		}

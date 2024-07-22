@@ -40,6 +40,8 @@ var _ = Describe("Volume space unavailable", Label(tests.LabelStorage), func() {
 		namespacePrefix = "diskspace-e2e"
 	)
 
+	var namespace string
+
 	diskSpaceDetectionTest := func(namespace, clusterName string) {
 		const walDir = "/var/lib/postgresql/data/pgdata/pg_wal"
 		var cluster *apiv1.Cluster
@@ -185,19 +187,18 @@ var _ = Describe("Volume space unavailable", Label(tests.LabelStorage), func() {
 		}
 	})
 
+	JustAfterEach(func() {
+		if CurrentSpecReport().Failed() {
+			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+		}
+	})
+
 	DescribeTable("WAL volume space unavailable",
 		func(sampleFile string) {
-			var namespace string
 			var err error
 			// Create a cluster in a namespace we'll delete after the test
 			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			JustAfterEach(func() {
-				testsUtils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
-				if CurrentSpecReport().Failed() {
-					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-				}
-			})
 			DeferCleanup(func() error {
 				return env.CleanupNamespace(
 					namespace,

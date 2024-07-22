@@ -33,9 +33,16 @@ import (
 
 var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 	const level = tests.Medium
+	var namespace string
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
+		}
+	})
+
+	JustAfterEach(func() {
+		if CurrentSpecReport().Failed() {
+			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
 	})
 
@@ -162,7 +169,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 			// bootstrapping the cluster, the CREATE EXTENSION instruction will block
 			// the primary since the desired number of synchronous replicas (even when 1)
 			// is not met.
-			namespace, err := env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
 				return env.CleanupNamespace(
@@ -193,7 +200,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			// Create a cluster in a namespace we'll delete after the test
-			namespace, err := env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
 				return env.CleanupNamespace(

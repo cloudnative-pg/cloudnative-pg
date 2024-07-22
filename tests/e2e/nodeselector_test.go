@@ -23,15 +23,16 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	"github.com/cloudnative-pg/cloudnative-pg/tests"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 )
 
 var _ = Describe("nodeSelector", Label(tests.LabelPodScheduling), func() {
 	const level = tests.Low
+	var namespace string
 
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
@@ -39,16 +40,16 @@ var _ = Describe("nodeSelector", Label(tests.LabelPodScheduling), func() {
 		}
 	})
 
+	JustAfterEach(func() {
+		if CurrentSpecReport().Failed() {
+			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+		}
+	})
+
 	Context("The label doesn't exist", func() {
 		const namespacePrefix = "nodeselector-e2e-missing-label"
 		const sampleFile = fixturesDir + "/nodeselector/nodeselector-label-not-exists.yaml.template"
-		var namespace string
-		JustAfterEach(func() {
-			utils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-		})
+
 		It("verifies that pods can't be scheduled", func() {
 			// We create a namespace and verify it exists
 			By(fmt.Sprintf("having a %v namespace", namespace), func() {
@@ -114,13 +115,6 @@ var _ = Describe("nodeSelector", Label(tests.LabelPodScheduling), func() {
 		const namespacePrefix = "nodeselector-e2e-existing-label"
 		const sampleFile = fixturesDir + "/nodeselector/nodeselector-label-exists.yaml.template"
 		const clusterName = "postgresql-nodeselector"
-		var namespace string
-		JustAfterEach(func() {
-			utils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-		})
 
 		It("verifies the pods run on the labeled node", func() {
 			var nodeName string

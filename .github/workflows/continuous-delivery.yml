@@ -800,7 +800,7 @@ jobs:
         with:
           name: cluster-logs-${{ matrix.id }}
           path: |
-            tests/e2e/clusters_logs/*
+            tests/e2e/cluster_logs/**
           retention-days: 7
           if-no-files-found: ignore
 

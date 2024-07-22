@@ -67,6 +67,12 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 		}
 	})
 
+	JustAfterEach(func() {
+		if CurrentSpecReport().Failed() {
+			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+		}
+	})
+
 	clusterSetup := func(clusterManifest string) {
 		var err error
 
@@ -115,12 +121,6 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 				"/tablespaces/cluster-with-tablespaces-backup.yaml.template"
 			fullBackupName = "full-barman-backup"
 		)
-		JustAfterEach(func() {
-			testUtils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-		})
 		BeforeAll(func() {
 			// Create a cluster in a namespace we'll delete after the test
 			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
@@ -387,12 +387,6 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 			table2                = "test_tbs2"
 		)
 		checkPointTimeout := time.Second * 10
-		JustAfterEach(func() {
-			testUtils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-		})
 		BeforeAll(func() {
 			// Create a cluster in a namespace we'll delete after the test
 			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
@@ -627,13 +621,6 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 	})
 
 	Context("on a plain cluster with primaryUpdateMethod=restart", Ordered, func() {
-		JustAfterEach(func() {
-			testUtils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-		})
-
 		clusterManifest := fixturesDir + "/tablespaces/cluster-without-tablespaces.yaml.template"
 		BeforeAll(func() {
 			var err error
@@ -771,13 +758,6 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 	})
 
 	Context("on a plain cluster with primaryUpdateMethod=switchover", Ordered, func() {
-		JustAfterEach(func() {
-			testUtils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-		})
-
 		clusterManifest := fixturesDir + "/tablespaces/cluster-without-tablespaces.yaml.template"
 		BeforeAll(func() {
 			var err error

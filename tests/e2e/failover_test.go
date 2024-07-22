@@ -44,7 +44,6 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 		}
 	})
 	JustAfterEach(func() {
-		utils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
 		if CurrentSpecReport().Failed() {
 			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
@@ -247,12 +246,16 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
+<<<<<<< HEAD
 			return env.CleanupNamespace(
 				namespace,
 				CurrentSpecReport().LeafNodeText,
 				CurrentSpecReport().Failed(),
 				GinkgoWriter,
 			)
+=======
+			return env.DeleteNamespace(namespace)
+>>>>>>> 0e3fe0b8 (refactor: stern approach)
 		})
 
 		clusterName, err := env.GetResourceNameFromYAML(sampleFile)

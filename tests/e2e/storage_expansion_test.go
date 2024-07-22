@@ -35,13 +35,19 @@ var _ = Describe("Verify storage", Label(tests.LabelStorage), func() {
 		clusterName = "storage-expansion"
 		level       = tests.Lowest
 	)
+	// Initializing a global namespace variable to be used in each test case
+	var namespace, namespacePrefix string
+
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 	})
-	// Initializing a global namespace variable to be used in each test case
-	var namespace, namespacePrefix string
+	JustAfterEach(func() {
+		if CurrentSpecReport().Failed() {
+			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+		}
+	})
 	// Gathering default storage class requires to check whether the value
 	// of 'allowVolumeExpansion' is true or false
 	defaultStorageClass := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
@@ -71,12 +77,6 @@ var _ = Describe("Verify storage", Label(tests.LabelStorage), func() {
 					GinkgoWriter,
 				)
 			})
-			JustAfterEach(func() {
-				utils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
-				if CurrentSpecReport().Failed() {
-					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-				}
-			})
 			// Creating a cluster with three nodes
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 			OnlineResizePVC(namespace, clusterName)
@@ -84,7 +84,6 @@ var _ = Describe("Verify storage", Label(tests.LabelStorage), func() {
 	})
 
 	Context("can not be expanded", func() {
-		var namespace string
 		BeforeEach(func() {
 			// Initializing namespace variable to be used in test case
 			namespacePrefix = "storage-expansion-false"
@@ -93,12 +92,6 @@ var _ = Describe("Verify storage", Label(tests.LabelStorage), func() {
 			Expect(err).ToNot(HaveOccurred())
 			if (allowExpansion != nil) && (*allowExpansion == true) {
 				Skip(fmt.Sprintf("AllowedVolumeExpansion is true on %v", defaultStorageClass))
-			}
-		})
-		JustAfterEach(func() {
-			utils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 			}
 		})
 		It("expands PVCs via offline resize", func() {

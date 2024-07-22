@@ -60,7 +60,6 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 		}
 	})
 	JustAfterEach(func() {
-		testsUtils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
 		if CurrentSpecReport().Failed() {
 			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
@@ -328,12 +327,16 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 				namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
 				DeferCleanup(func() error {
+<<<<<<< HEAD
 					return env.CleanupNamespace(
 						namespace,
 						CurrentSpecReport().LeafNodeText,
 						CurrentSpecReport().Failed(),
 						GinkgoWriter,
 					)
+=======
+					return env.DeleteNamespace(namespace)
+>>>>>>> 0e3fe0b8 (refactor: stern approach)
 				})
 				AssertCreateCluster(namespace, clusterName, sampleFileClusterWithOutPGWalVolume, env)
 				// Write a table and some data on the "app" database
@@ -396,12 +399,16 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 				namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
 				DeferCleanup(func() error {
+<<<<<<< HEAD
 					return env.CleanupNamespace(
 						namespace,
 						CurrentSpecReport().LeafNodeText,
 						CurrentSpecReport().Failed(),
 						GinkgoWriter,
 					)
+=======
+					return env.DeleteNamespace(namespace)
+>>>>>>> 0e3fe0b8 (refactor: stern approach)
 				})
 				AssertCreateCluster(namespace, clusterName, sampleFileClusterWithPGWalVolume, env)
 				AssertSwitchover(namespace, clusterName, env)

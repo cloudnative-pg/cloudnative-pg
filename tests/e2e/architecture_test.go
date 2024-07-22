@@ -72,7 +72,6 @@ var _ = Describe("Available Architectures", Label(tests.LabelBasic), func() {
 
 	var namespace string
 	JustAfterEach(func() {
-		utils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
 		if CurrentSpecReport().Failed() {
 			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 		}

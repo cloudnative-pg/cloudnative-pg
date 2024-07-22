@@ -51,7 +51,6 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 		}
 	})
 	JustAfterEach(func() {
-		testUtils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
 		if CurrentSpecReport().Failed() {
 			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 		}

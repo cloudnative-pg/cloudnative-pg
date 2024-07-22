@@ -51,7 +51,6 @@ var _ = Describe("Fast switchover", Serial, Label(tests.LabelPerformance, tests.
 		}
 	})
 	JustAfterEach(func() {
-		utils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
 		if CurrentSpecReport().Failed() {
 			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 		}

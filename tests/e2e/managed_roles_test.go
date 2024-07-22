@@ -67,7 +67,6 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 		var clusterName, secretName, namespace string
 		var secretNameSpacedName *types.NamespacedName
 		JustAfterEach(func() {
-			utils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
 			if CurrentSpecReport().Failed() {
 				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 			}
