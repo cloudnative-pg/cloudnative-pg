@@ -9,7 +9,7 @@
 ## Monitoring Instances
 
 For each PostgreSQL instance, the operator provides an exporter of metrics for
-[Prometheus](https://prometheus.io/) via HTTP, on port 9187, named `metrics`.
+[Prometheus](https://prometheus.io/) via HTTP or HTTPS, on port 9187, named `metrics`.
 The operator comes with a [predefined set of metrics](#predefined-set-of-metrics), as well as a highly
 configurable and customizable system to define additional queries via one or
 more `ConfigMap` or `Secret` resources (see the
@@ -68,6 +68,7 @@ A PodMonitor correctly pointing to a Cluster can be automatically created by the
     cycle, in case you need to customize it, you can do so as described below.
 
 To deploy a `PodMonitor` for a specific Cluster manually, you can just define it as follows, changing it as needed:
+
 ```yaml
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
@@ -89,6 +90,49 @@ spec:
     Label `postgresql`, used in previous versions of this document, is deprecated
     and will be removed in the future. Please use the label `cnpg.io/cluster`
     instead to select the instances.
+
+### Enabling TLS on the Metrics Port
+
+To enable TLS communication on the metrics port, configure the `spec.monitoring.tls.enable`
+setting to `true`. This setup ensures that the metrics exporter uses the same
+server certificates as PostgreSQL to secure communication on port 5432.
+
+!!! important
+    Changing the `spec.monitoring.tls.enable` value will cause all instances to restart.
+    Plan accordingly to minimize downtime.
+
+A `PodMonitor` that correctly points to the cluster can be automatically created by the operator by setting
+`.spec.monitoring.enablePodMonitor` to `true` in the cluster resource itself (default: `false`).
+
+To deploy a `PodMonitor` for a specific cluster manually, define it as follows and adjust as needed:
+
+```yaml
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: cluster-example
+spec:
+  selector:
+    matchLabels:
+      "cnpg.io/cluster": cluster-example
+  podMetricsEndpoints:
+  - port: metrics
+    scheme: https
+    tlsConfig:
+      ca:
+        secret:
+          name: cluster-example-ca
+        key: ca.crt
+      serverName: cluster-example-rw
+```
+
+!!! Important
+    Ensure you modify the example above with a unique name, as well as the
+    correct cluster's namespace and labels (e.g., `cluster-example`).
+
+!!! Important
+    The `serverName` field in the metrics endpoint must match one of the names
+    defined in the server certificate.
 
 ### Predefined set of metrics
 
