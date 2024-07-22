@@ -462,7 +462,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		return hookResult.Result, hookResult.Err
 	}
 
-	return setStatusPluginHook(ctx, r.Client, cluster)
+	return setStatusPluginHook(ctx, r.Client, getPluginClientFromContext(ctx), cluster)
 }
 
 func (r *ClusterReconciler) ensureNoFailoverOnFullDisk(

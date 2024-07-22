@@ -50,11 +50,15 @@ func postReconcilePluginHooks(
 	return pluginClient.PostReconcile(ctx, cluster, object)
 }
 
-func setStatusPluginHook(ctx context.Context, cli client.Client, cluster *apiv1.Cluster) (ctrl.Result, error) {
+func setStatusPluginHook(
+	ctx context.Context,
+	cli client.Client,
+	pluginClient cnpgiClient.Client,
+	cluster *apiv1.Cluster,
+) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx).WithName("set_status_plugin_hook")
 
 	origCluster := cluster.DeepCopy()
-	pluginClient := getPluginClientFromContext(ctx)
 	statuses, err := pluginClient.SetClusterStatus(ctx, cluster)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("while calling SetClusterStatus: %w", err)
@@ -62,12 +66,13 @@ func setStatusPluginHook(ctx context.Context, cli client.Client, cluster *apiv1.
 	if len(statuses) == 0 {
 		return ctrl.Result{}, nil
 	}
-	for _, status := range cluster.Status.PluginStatus {
-		val, ok := statuses[status.Name]
+	for idx := range cluster.Status.PluginStatus {
+		plugin := &cluster.Status.PluginStatus[idx]
+		val, ok := statuses[plugin.Name]
 		if !ok {
 			continue
 		}
-		status.Status = val
+		plugin.Status = val
 	}
 
 	contextLogger.Info("patching cluster status with the updated plugin statuses")
