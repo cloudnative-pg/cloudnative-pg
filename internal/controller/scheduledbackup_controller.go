@@ -179,6 +179,17 @@ func ReconcileScheduledBackup(
 		return createBackup(ctx, event, cli, scheduledBackup, now, now, schedule, true)
 	}
 
+	var nextTime time.Time
+	if lastCheckTime := scheduledBackup.Status.LastCheckTime; !lastCheckTime.IsZero() {
+		nextTime = schedule.Next(lastCheckTime.Time)
+	} else {
+		nextTime = schedule.Next(now)
+	}
+	if nextTime.IsZero() {
+		contextLogger.Warning("The schedule is invalid, we do not schedule any backup")
+		return ctrl.Result{}, nil
+	}
+
 	if scheduledBackup.Status.LastCheckTime == nil {
 		origScheduled := scheduledBackup.DeepCopy()
 		// This is the first time we check this schedule,
@@ -192,16 +203,13 @@ func ReconcileScheduledBackup(
 			return ctrl.Result{}, err
 		}
 
-		nextTime := schedule.Next(now)
 		contextLogger.Info("Next backup schedule", "next", nextTime)
 		event.Eventf(scheduledBackup, "Normal", "BackupSchedule", "Scheduled first backup by %v", nextTime)
 		return ctrl.Result{RequeueAfter: nextTime.Sub(now)}, nil
 	}
 
 	// Let's check if we are supposed to start a new backup.
-	nextTime := schedule.Next(scheduledBackup.GetStatus().LastCheckTime.Time)
 	contextLogger.Info("Next backup schedule", "next", nextTime)
-
 	if now.Before(nextTime) {
 		// No need to schedule a new backup, let's wait a bit
 		return ctrl.Result{RequeueAfter: nextTime.Sub(now)}, nil
