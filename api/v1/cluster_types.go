@@ -2695,7 +2695,7 @@ type PluginStatus struct {
 	// plugin regarding the Backup management
 	BackupCapabilities []string `json:"backupCapabilities,omitempty"`
 
-	// Status the internal status of the plugin
+	// Status contain the statuses of the registered plugins having the SET_CLUSTER_STATUS capability
 	Status string `json:"status,omitempty"`
 }
 

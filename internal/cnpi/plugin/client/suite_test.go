@@ -1,7 +1,18 @@
 package client
 
 import (
+	"context"
 	"testing"
+
+	"github.com/cloudnative-pg/cnpg-i/pkg/backup"
+	"github.com/cloudnative-pg/cnpg-i/pkg/identity"
+	"github.com/cloudnative-pg/cnpg-i/pkg/lifecycle"
+	"github.com/cloudnative-pg/cnpg-i/pkg/operator"
+	"github.com/cloudnative-pg/cnpg-i/pkg/reconciler"
+	"github.com/cloudnative-pg/cnpg-i/pkg/wal"
+	"google.golang.org/grpc"
+
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/connection"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -10,4 +21,134 @@ import (
 func TestClient(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Client Suite")
+}
+
+type fakeOperatorClient struct {
+	capabilities        *operator.OperatorCapabilitiesResult
+	status              *operator.SetClusterStatusResponse
+	errSetClusterStatus error
+}
+
+func (f *fakeOperatorClient) GetCapabilities(
+	_ context.Context,
+	_ *operator.OperatorCapabilitiesRequest,
+	_ ...grpc.CallOption,
+) (*operator.OperatorCapabilitiesResult, error) {
+	return f.capabilities, nil
+}
+
+func (f *fakeOperatorClient) ValidateClusterCreate(
+	_ context.Context,
+	_ *operator.OperatorValidateClusterCreateRequest,
+	_ ...grpc.CallOption,
+) (*operator.OperatorValidateClusterCreateResult, error) {
+	panic("implement me")
+}
+
+func (f *fakeOperatorClient) ValidateClusterChange(
+	_ context.Context,
+	_ *operator.OperatorValidateClusterChangeRequest,
+	_ ...grpc.CallOption,
+) (*operator.OperatorValidateClusterChangeResult, error) {
+	panic("implement me")
+}
+
+func (f *fakeOperatorClient) MutateCluster(
+	_ context.Context,
+	_ *operator.OperatorMutateClusterRequest,
+	_ ...grpc.CallOption,
+) (*operator.OperatorMutateClusterResult, error) {
+	panic("implement me")
+}
+
+func (f *fakeOperatorClient) SetClusterStatus(
+	_ context.Context,
+	_ *operator.SetClusterStatusRequest,
+	_ ...grpc.CallOption,
+) (*operator.SetClusterStatusResponse, error) {
+	if f.errSetClusterStatus != nil {
+		return nil, f.errSetClusterStatus
+	}
+	return f.status, nil
+}
+
+type fakeConnection struct {
+	lifecycleClient       lifecycle.OperatorLifecycleClient
+	lifecycleCapabilities []*lifecycle.OperatorLifecycleCapabilities
+	name                  string
+	operatorClient        *fakeOperatorClient
+}
+
+func (f *fakeConnection) setStatusResponse(status []byte) {
+	f.operatorClient.status = &operator.SetClusterStatusResponse{
+		JsonStatus: status,
+	}
+}
+
+func (f *fakeConnection) Name() string {
+	return f.name
+}
+
+func (f *fakeConnection) Metadata() connection.Metadata {
+	panic("not implemented") // TODO: Implement
+}
+
+func (f *fakeConnection) LifecycleClient() lifecycle.OperatorLifecycleClient {
+	return f.lifecycleClient
+}
+
+func (f *fakeConnection) OperatorClient() operator.OperatorClient {
+	return f.operatorClient
+}
+
+func (f *fakeConnection) WALClient() wal.WALClient {
+	panic("not implemented") // TODO: Implement
+}
+
+func (f *fakeConnection) BackupClient() backup.BackupClient {
+	panic("not implemented") // TODO: Implement
+}
+
+func (f *fakeConnection) ReconcilerHooksClient() reconciler.ReconcilerHooksClient {
+	panic("not implemented") // TODO: Implement
+}
+
+func (f *fakeConnection) PluginCapabilities() []identity.PluginCapability_Service_Type {
+	panic("not implemented") // TODO: Implement
+}
+
+func (f *fakeConnection) OperatorCapabilities() []operator.OperatorCapability_RPC_Type {
+	res := make(
+		[]operator.OperatorCapability_RPC_Type,
+		len(f.operatorClient.capabilities.Capabilities))
+
+	for i := range f.operatorClient.capabilities.Capabilities {
+		res[i] = f.operatorClient.capabilities.Capabilities[i].GetRpc().Type
+	}
+
+	return res
+}
+
+func (f *fakeConnection) WALCapabilities() []wal.WALCapability_RPC_Type {
+	panic("not implemented") // TODO: Implement
+}
+
+func (f *fakeConnection) LifecycleCapabilities() []*lifecycle.OperatorLifecycleCapabilities {
+	return f.lifecycleCapabilities
+}
+
+func (f *fakeConnection) BackupCapabilities() []backup.BackupCapability_RPC_Type {
+	panic("not implemented") // TODO: Implement
+}
+
+func (f *fakeConnection) ReconcilerCapabilities() []reconciler.ReconcilerHooksCapability_Kind {
+	panic("not implemented")
+}
+
+func (f *fakeConnection) Ping(_ context.Context) error {
+	panic("not implemented") // TODO: Implement
+}
+
+func (f *fakeConnection) Close() error {
+	panic("not implemented") // TODO: Implement
 }

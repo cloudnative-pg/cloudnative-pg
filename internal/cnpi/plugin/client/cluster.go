@@ -19,6 +19,7 @@ package client
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"slices"
 
@@ -92,6 +93,11 @@ func (data *data) MutateCluster(ctx context.Context, object client.Object, mutat
 	return nil
 }
 
+var (
+	errInvalidJSON      = errors.New("invalid json")
+	errSetClusterStatus = errors.New("set cluster status invokation failed")
+)
+
 func (data *data) SetClusterStatus(ctx context.Context, cluster client.Object) (map[string]string, error) {
 	contextLogger := log.FromContext(ctx)
 	serializedObject, err := json.Marshal(cluster)
@@ -120,7 +126,7 @@ func (data *data) SetClusterStatus(ctx context.Context, cluster client.Object) (
 		response, err := plugin.OperatorClient().SetClusterStatus(ctx, &request)
 		if err != nil {
 			pluginLogger.Error(err, "Error while calling SetClusterStatus")
-			return nil, err
+			return nil, fmt.Errorf("%w: %w", errSetClusterStatus, err)
 		}
 
 		if len(response.JsonStatus) == 0 {
@@ -130,7 +136,7 @@ func (data *data) SetClusterStatus(ctx context.Context, cluster client.Object) (
 		if err := json.Unmarshal(response.JsonStatus, &json.RawMessage{}); err != nil {
 			contextLogger.Error(err, "found a malformed json while evaluating SetClusterStatus response",
 				"pluginName", plugin.Name())
-			return nil, err
+			return nil, fmt.Errorf("%w: %w", errInvalidJSON, err)
 		}
 
 		pluginStatuses[plugin.Name()] = string(response.JsonStatus)

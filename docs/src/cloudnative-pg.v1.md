@@ -3727,7 +3727,7 @@ plugin regarding the Backup management</p>
 <i>string</i>
 </td>
 <td>
-   <p>Status the internal status of the plugin</p>
+   <p>Status contain the statuses of the registered plugins having the SET_CLUSTER_STATUS capability</p>
 </td>
 </tr>
 </tbody>
