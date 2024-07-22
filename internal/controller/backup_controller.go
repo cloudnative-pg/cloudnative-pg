@@ -43,6 +43,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	cnpgiClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/conditions"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
@@ -67,9 +68,10 @@ type BackupReconciler struct {
 	client.Client
 	DiscoveryClient discovery.DiscoveryInterface
 
-	Scheme   *runtime.Scheme
-	Recorder record.EventRecorder
-	Plugins  repository.Interface
+	Scheme        *runtime.Scheme
+	Recorder      record.EventRecorder
+	Plugins       repository.Interface
+	Configuration *configuration.Data
 
 	instanceStatusClient instance.Client
 }
@@ -79,6 +81,7 @@ func NewBackupReconciler(
 	mgr manager.Manager,
 	discoveryClient *discovery.DiscoveryClient,
 	plugins repository.Interface,
+	config *configuration.Data,
 ) *BackupReconciler {
 	return &BackupReconciler{
 		Client:               mgr.GetClient(),
@@ -87,6 +90,7 @@ func NewBackupReconciler(
 		Recorder:             mgr.GetEventRecorderFor("cloudnative-pg-backup"),
 		instanceStatusClient: instance.NewStatusClient(),
 		Plugins:              plugins,
+		Configuration:        config,
 	}
 }
 
@@ -427,7 +431,7 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 	}
 
 	reconciler := volumesnapshot.
-		NewReconcilerBuilder(r.Client, r.Recorder).
+		NewReconcilerBuilder(r.Client, r.Recorder, r.Configuration).
 		Build()
 
 	res, err := reconciler.Reconcile(ctx, cluster, backup, targetPod, pvcs)

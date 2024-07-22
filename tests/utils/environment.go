@@ -50,6 +50,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
@@ -85,6 +86,7 @@ type TestingEnvironment struct {
 	PostgresVersion    int
 	createdNamespaces  *uniqueStringSlice
 	AzureConfiguration AzureConfiguration
+	Configuration      *configuration.Data
 }
 
 type uniqueStringSlice struct {
@@ -114,6 +116,7 @@ func NewTestingEnvironment() (*TestingEnvironment, error) {
 	env.APIExtensionClient = apiextensionsclientset.NewForConfigOrDie(env.RestClientConfig)
 	env.Ctx = context.Background()
 	env.Scheme = runtime.NewScheme()
+	env.Configuration = configuration.Current
 
 	if err := storagesnapshotv1.AddToScheme(env.Scheme); err != nil {
 		return nil, err

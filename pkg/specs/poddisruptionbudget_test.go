@@ -20,6 +20,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -37,20 +38,21 @@ var _ = Describe("POD Disruption Budget specifications", func() {
 		},
 		Spec: apiv1.ClusterSpec{Instances: instancesNum},
 	}
+	config := configuration.NewConfiguration()
 
 	It("have the same name as the PostgreSQL cluster", func() {
-		result := BuildReplicasPodDisruptionBudget(cluster)
+		result := BuildReplicasPodDisruptionBudget(cluster, config)
 		Expect(result.Name).To(Equal(cluster.Name))
 		Expect(result.Namespace).To(Equal(cluster.Namespace))
 	})
 
 	It("require not more than one unavailable replicas", func() {
-		result := BuildReplicasPodDisruptionBudget(cluster)
+		result := BuildReplicasPodDisruptionBudget(cluster, config)
 		Expect(result.Spec.MinAvailable.IntVal).To(Equal(int32(minAvailableReplicas)))
 	})
 
 	It("require at least one primary instance to be available at all times", func() {
-		result := BuildPrimaryPodDisruptionBudget(cluster)
+		result := BuildPrimaryPodDisruptionBudget(cluster, config)
 		Expect(result.Spec.MinAvailable.IntVal).To(Equal(int32(minAvailablePrimary)))
 	})
 })

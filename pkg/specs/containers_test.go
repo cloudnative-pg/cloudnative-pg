@@ -21,15 +21,18 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Bootstrap Container creation", func() {
+	config := configuration.NewConfiguration()
+
 	It("create a Bootstrap Container with resources with nil values into Limits and Requests fields", func() {
 		cluster := apiv1.Cluster{}
-		container := createBootstrapContainer(cluster)
+		container := createBootstrapContainer(cluster, config)
 		Expect(container.Resources.Limits).To(BeNil())
 		Expect(container.Resources.Requests).To(BeNil())
 	})
@@ -48,7 +51,7 @@ var _ = Describe("Bootstrap Container creation", func() {
 				LogLevel: "info",
 			},
 		}
-		container := createBootstrapContainer(cluster)
+		container := createBootstrapContainer(cluster, config)
 		Expect(container.Resources.Limits["a_test_field"]).ToNot(BeNil())
 		Expect(container.Resources.Requests["another_test_field"]).ToNot(BeNil())
 	})

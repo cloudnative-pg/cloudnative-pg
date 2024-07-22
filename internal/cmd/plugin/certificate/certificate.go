@@ -27,6 +27,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 )
 
@@ -40,7 +41,13 @@ type Params struct {
 
 // Generate generates a Kubernetes secret suitable to allow certificate authentication
 // for a PostgreSQL user
-func Generate(ctx context.Context, params Params, dryRun bool, format plugin.OutputFormat) error {
+func Generate(
+	ctx context.Context,
+	params Params,
+	dryRun bool,
+	format plugin.OutputFormat,
+	config *configuration.Data,
+) error {
 	var secret corev1.Secret
 
 	var cluster apiv1.Cluster
@@ -64,7 +71,7 @@ func Generate(ctx context.Context, params Params, dryRun bool, format plugin.Out
 		return err
 	}
 
-	userPair, err := caPair.CreateAndSignPair(params.User, certs.CertTypeClient, nil)
+	userPair, err := caPair.CreateAndSignPair(params.User, certs.CertTypeClient, nil, config)
 	if err != nil {
 		return err
 	}

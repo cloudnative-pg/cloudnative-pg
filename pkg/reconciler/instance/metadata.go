@@ -36,6 +36,7 @@ func ReconcileMetadata(
 	cli client.Client,
 	cluster *apiv1.Cluster,
 	instances []corev1.Pod,
+	config *configuration.Data,
 ) error {
 	contextLogger := log.FromContext(ctx)
 
@@ -50,10 +51,10 @@ func ReconcileMetadata(
 		modified = updateOperatorLabels(ctx, instance) || modified
 
 		// Update any modified/new labels coming from the cluster resource
-		modified = updateClusterLabels(ctx, cluster, instance) || modified
+		modified = updateClusterLabels(ctx, cluster, instance, config) || modified
 
 		// Update any modified/new annotations coming from the cluster resource
-		modified = updateClusterAnnotations(ctx, cluster, instance) || modified
+		modified = updateClusterAnnotations(ctx, cluster, instance, config) || modified
 
 		if !modified {
 			continue
@@ -81,6 +82,7 @@ func updateClusterAnnotations(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	instance *corev1.Pod,
+	config *configuration.Data,
 ) bool {
 	contextLogger := log.FromContext(ctx)
 
@@ -91,7 +93,7 @@ func updateClusterAnnotations(
 	// if all the required annotations are already set and with the correct value,
 	// we are done
 	if utils.IsAnnotationSubset(instance.Annotations, cluster.Annotations, cluster.GetFixedInheritedAnnotations(),
-		configuration.Current) &&
+		config) &&
 		utils.IsAnnotationAppArmorPresentInObject(&instance.ObjectMeta, &instance.Spec, cluster.Annotations) {
 		// let's create a copy of the pod Annotations without the PodSpec, otherwise
 		// the debug log will get clogged
@@ -114,7 +116,7 @@ func updateClusterAnnotations(
 	// otherwise, we add the modified/new annotations to the pod
 	contextLogger.Info("Updating cluster annotations on pod", "pod", instance.Name)
 	utils.InheritAnnotations(&instance.ObjectMeta, cluster.Annotations,
-		cluster.GetFixedInheritedAnnotations(), configuration.Current)
+		cluster.GetFixedInheritedAnnotations(), config)
 	if utils.IsAnnotationAppArmorPresent(&instance.Spec, cluster.Annotations) {
 		utils.AnnotateAppArmor(&instance.ObjectMeta, &instance.Spec, cluster.Annotations)
 	}
@@ -131,6 +133,7 @@ func updateClusterLabels(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	instance *corev1.Pod,
+	config *configuration.Data,
 ) bool {
 	contextLogger := log.FromContext(ctx)
 
@@ -141,7 +144,7 @@ func updateClusterLabels(
 	// if all the required labels are already set and with the correct value,
 	// there's nothing more to do
 	if utils.IsLabelSubset(instance.Labels, cluster.Labels, cluster.GetFixedInheritedLabels(),
-		configuration.Current) {
+		config) {
 		contextLogger.Trace(
 			"Skipping cluster label reconciliation, because they are already present on pod",
 			"pod", instance.Name,
@@ -153,7 +156,7 @@ func updateClusterLabels(
 
 	// otherwise, we add the modified/new labels to the pod
 	contextLogger.Info("Updating cluster labels on pod", "pod", instance.Name)
-	utils.InheritLabels(&instance.ObjectMeta, cluster.Labels, cluster.GetFixedInheritedLabels(), configuration.Current)
+	utils.InheritLabels(&instance.ObjectMeta, cluster.Labels, cluster.GetFixedInheritedLabels(), config)
 	return true
 }
 

@@ -2855,24 +2855,28 @@ func (cluster *Cluster) SetInContext(ctx context.Context) context.Context {
 	return context.WithValue(ctx, utils.ContextKeyCluster, cluster)
 }
 
+// ErrNoPostgresImageSelected is raised when no PG image have been selected
+// in the cluster and no default exists
+var ErrNoPostgresImageSelected = fmt.Errorf("no postgresql image selected in cluster")
+
 // GetImageName get the name of the image that should be used
 // to create the pods
-func (cluster *Cluster) GetImageName() string {
+func (cluster *Cluster) GetImageName() (string, error) {
 	// If the image is specified in the status, use that one
 	// It should be there since the first reconciliation
 	if len(cluster.Status.Image) > 0 {
-		return cluster.Status.Image
+		return cluster.Status.Image, nil
 	}
 
 	// Fallback to the information we have in the spec
 	if len(cluster.Spec.ImageName) > 0 {
-		return cluster.Spec.ImageName
+		return cluster.Spec.ImageName, nil
 	}
 
 	// TODO: check: does a scenario exists in which we do have an imageCatalog
 	//   and no status.image? In that case this should probably error out, not
 	//   returning the default image name.
-	return configuration.Current.PostgresImageName
+	return "", ErrNoPostgresImageSelected
 }
 
 // GetPostgresqlVersion gets the PostgreSQL image version detecting it from the
@@ -2887,7 +2891,10 @@ func (cluster *Cluster) GetPostgresqlVersion() (int, error) {
 		return postgres.GetPostgresVersionFromTag(strconv.Itoa(cluster.Spec.ImageCatalogRef.Major))
 	}
 
-	image := cluster.GetImageName()
+	image, err := cluster.GetImageName()
+	if err != nil {
+		return 0, err
+	}
 	tag := utils.GetImageTag(image)
 	return postgres.GetPostgresVersionFromTag(tag)
 }
@@ -3665,15 +3672,15 @@ func (cluster *Cluster) LogTimestampsWithMessage(ctx context.Context, logMessage
 
 // SetInheritedDataAndOwnership sets the cluster as owner of the passed object and then
 // sets all the needed annotations and labels
-func (cluster *Cluster) SetInheritedDataAndOwnership(obj *metav1.ObjectMeta) {
-	cluster.SetInheritedData(obj)
+func (cluster *Cluster) SetInheritedDataAndOwnership(obj *metav1.ObjectMeta, config *configuration.Data) {
+	cluster.SetInheritedData(obj, config)
 	utils.SetAsOwnedBy(obj, cluster.ObjectMeta, cluster.TypeMeta)
 }
 
 // SetInheritedData sets all the needed annotations and labels
-func (cluster *Cluster) SetInheritedData(obj *metav1.ObjectMeta) {
-	utils.InheritAnnotations(obj, cluster.Annotations, cluster.GetFixedInheritedAnnotations(), configuration.Current)
-	utils.InheritLabels(obj, cluster.Labels, cluster.GetFixedInheritedLabels(), configuration.Current)
+func (cluster *Cluster) SetInheritedData(obj *metav1.ObjectMeta, config *configuration.Data) {
+	utils.InheritAnnotations(obj, cluster.Annotations, cluster.GetFixedInheritedAnnotations(), config)
+	utils.InheritLabels(obj, cluster.Labels, cluster.GetFixedInheritedLabels(), config)
 	utils.LabelClusterName(obj, cluster.GetName())
 	utils.SetOperatorVersion(obj, versions.Version)
 }

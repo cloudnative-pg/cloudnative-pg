@@ -18,21 +18,27 @@ package resources
 
 import (
 	corev1 "k8s.io/api/core/v1"
+
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 )
 
 // PersistentVolumeClaimBuilder creates a fluent abstraction to interact with the kubernetes resources
 type PersistentVolumeClaimBuilder struct {
-	pvc *corev1.PersistentVolumeClaim
+	pvc    *corev1.PersistentVolumeClaim
+	config *configuration.Data
 }
 
 // NewPersistentVolumeClaimBuilder instantiates an empty PersistentVolumeClaimBuilder
-func NewPersistentVolumeClaimBuilder() *PersistentVolumeClaimBuilder {
-	return &PersistentVolumeClaimBuilder{pvc: &corev1.PersistentVolumeClaim{}}
+func NewPersistentVolumeClaimBuilder(config *configuration.Data) *PersistentVolumeClaimBuilder {
+	return &PersistentVolumeClaimBuilder{pvc: &corev1.PersistentVolumeClaim{}, config: config}
 }
 
 // NewPersistentVolumeClaimBuilderFromPVC instantiates a builder with an existing object
-func NewPersistentVolumeClaimBuilderFromPVC(pvc *corev1.PersistentVolumeClaim) *PersistentVolumeClaimBuilder {
-	return &PersistentVolumeClaimBuilder{pvc: pvc}
+func NewPersistentVolumeClaimBuilderFromPVC(
+	pvc *corev1.PersistentVolumeClaim,
+	config *configuration.Data,
+) *PersistentVolumeClaimBuilder {
+	return &PersistentVolumeClaimBuilder{pvc: pvc, config: config}
 }
 
 // WithSpec assigns the currently passed specs to the underlying object
@@ -85,7 +91,7 @@ func (b *PersistentVolumeClaimBuilder) WithDefaultAccessMode(
 
 // BeginMetadata gets the metadata builder
 func (b *PersistentVolumeClaimBuilder) BeginMetadata() *ResourceMetadataBuilder[*PersistentVolumeClaimBuilder] {
-	return NewResourceMetadataBuilder(&b.pvc.ObjectMeta, b)
+	return NewResourceMetadataBuilder(&b.pvc.ObjectMeta, b, b.config)
 }
 
 // Build returns the underlying object

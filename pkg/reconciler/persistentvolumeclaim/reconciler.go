@@ -25,6 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
@@ -35,14 +36,17 @@ func Reconcile(
 	cluster *apiv1.Cluster,
 	instances []corev1.Pod,
 	pvcs []corev1.PersistentVolumeClaim,
+	config *configuration.Data,
 ) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
-	if res, err := reconcileMultipleInstancesMissingPVCs(ctx, c, cluster, instances, pvcs); !res.IsZero() || err != nil {
+	if res, err := reconcileMultipleInstancesMissingPVCs(
+		ctx, c, cluster, instances, pvcs, config,
+	); !res.IsZero() || err != nil {
 		return res, err
 	}
 
-	if err := reconcileResourceRequests(ctx, c, cluster, pvcs); err != nil {
+	if err := reconcileResourceRequests(ctx, c, cluster, pvcs, config); err != nil {
 		if apierrs.IsConflict(err) {
 			contextLogger.Debug("Conflict error while reconciling PVCs", "error", err)
 			return ctrl.Result{Requeue: true}, nil

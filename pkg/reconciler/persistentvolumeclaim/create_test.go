@@ -27,6 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -43,6 +44,7 @@ var _ = Describe("testing create function", func() {
 	var instanceName string
 	var pvcName string
 	var cc *CreateConfiguration
+	var config *configuration.Data
 
 	BeforeEach(func() {
 		cli = fake.NewClientBuilder().WithScheme(schemeBuilder.BuildWithAllKnownScheme()).Build()
@@ -57,11 +59,12 @@ var _ = Describe("testing create function", func() {
 
 		instanceName = specs.GetInstanceName(cluster.Name, cc.NodeSerial)
 		pvcName = cc.Calculator.GetName(instanceName)
+		config = configuration.NewConfiguration()
 	})
 
 	Context("when PVC does not exist", func() {
 		It("should create the PVC successfully", func() {
-			err := createIfNotExists(ctx, cli, cluster, cc)
+			err := createIfNotExists(ctx, cli, cluster, cc, config)
 			Expect(err).ToNot(HaveOccurred())
 
 			var expectedPVC corev1.PersistentVolumeClaim
@@ -92,14 +95,14 @@ var _ = Describe("testing create function", func() {
 				}).
 				Build()
 
-			err := createIfNotExists(ctx, cli, cluster, cc)
+			err := createIfNotExists(ctx, cli, cluster, cc, config)
 			Expect(err).ToNot(HaveOccurred())
 		})
 	})
 
 	It("should return ErrNextLoop on invalid size", func() {
 		cc.Storage.Size = "typo"
-		err := createIfNotExists(ctx, cli, cluster, cc)
+		err := createIfNotExists(ctx, cli, cluster, cc, config)
 		Expect(err).To(Equal(utils.ErrNextLoop))
 	})
 })

@@ -46,10 +46,10 @@ var _ = Describe("cluster_status unit tests", func() {
 		secretName := rand.String(10)
 
 		By("creating the required secret", func() {
-			secret, keyPair := generateFakeCASecret(env.client, secretName, namespace, "unittest.com")
+			secret, keyPair := generateFakeCASecret(env.client, secretName, namespace, "unittest.com", env.config)
 			Expect(secret.Name).To(Equal(secretName))
 
-			_, expDate, err := keyPair.IsExpiring()
+			_, expDate, err := keyPair.IsExpiring(env.config)
 			Expect(err).ToNot(HaveOccurred())
 
 			certExpirationDate = expDate.String()
@@ -152,9 +152,9 @@ var _ = Describe("cluster_status unit tests", func() {
 		var pvcs []corev1.PersistentVolumeClaim
 
 		By("creating the required resources", func() {
-			jobs = generateFakeInitDBJobs(crReconciler.Client, cluster)
-			pods = generateFakeClusterPods(crReconciler.Client, cluster, true)
-			pvcs = generateClusterPVC(crReconciler.Client, cluster, persistentvolumeclaim.StatusReady)
+			jobs = generateFakeInitDBJobs(crReconciler.Client, cluster, env.config)
+			pods = generateFakeClusterPods(crReconciler.Client, cluster, true, env.config)
+			pvcs = generateClusterPVC(crReconciler.Client, cluster, persistentvolumeclaim.StatusReady, env.config)
 			name, isOwned := IsOwnedByCluster(&pods[0])
 			Expect(isOwned).To(BeTrue())
 			Expect(name).To(Equal(cluster.Name))

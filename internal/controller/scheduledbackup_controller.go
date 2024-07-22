@@ -33,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -52,8 +53,9 @@ const (
 // ScheduledBackupReconciler reconciles a ScheduledBackup object
 type ScheduledBackupReconciler struct {
 	client.Client
-	Scheme   *runtime.Scheme
-	Recorder record.EventRecorder
+	Scheme        *runtime.Scheme
+	Recorder      record.EventRecorder
+	Configuration *configuration.Data
 }
 
 // +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=scheduledbackups,verbs=get;list;watch;create;update;patch;delete
@@ -118,7 +120,7 @@ func (r *ScheduledBackupReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 	}
 
-	return ReconcileScheduledBackup(ctx, r.Recorder, r.Client, &scheduledBackup)
+	return ReconcileScheduledBackup(ctx, r.Recorder, r.Client, &scheduledBackup, r.Configuration)
 }
 
 // ReconcileScheduledBackup is the main reconciliation logic for a scheduled backup
@@ -127,6 +129,7 @@ func ReconcileScheduledBackup(
 	event record.EventRecorder,
 	cli client.Client,
 	scheduledBackup *apiv1.ScheduledBackup,
+	config *configuration.Data,
 ) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
@@ -176,7 +179,7 @@ func ReconcileScheduledBackup(
 	if scheduledBackup.Status.LastCheckTime == nil && scheduledBackup.IsImmediate() {
 		// we populate the status (lastCheckTime...) by following the same rules of the scheduled backup
 		event.Eventf(scheduledBackup, "Normal", "BackupSchedule", "Scheduled immediate backup now: %v", now)
-		return createBackup(ctx, event, cli, scheduledBackup, now, now, schedule, true)
+		return createBackup(ctx, event, cli, scheduledBackup, now, now, schedule, true, config)
 	}
 
 	if scheduledBackup.Status.LastCheckTime == nil {
@@ -207,7 +210,7 @@ func ReconcileScheduledBackup(
 		return ctrl.Result{RequeueAfter: nextTime.Sub(now)}, nil
 	}
 
-	return createBackup(ctx, event, cli, scheduledBackup, nextTime, now, schedule, false)
+	return createBackup(ctx, event, cli, scheduledBackup, nextTime, now, schedule, false, config)
 }
 
 // createBackup creates a scheduled backup for a backuptime, updating the ScheduledBackup accordingly
@@ -220,6 +223,7 @@ func createBackup(
 	now time.Time,
 	schedule cron.Schedule,
 	immediate bool,
+	config *configuration.Data,
 ) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
@@ -229,7 +233,7 @@ func createBackup(
 	// Let's have deterministic names to avoid creating the job two
 	// times
 	name := fmt.Sprintf("%s-%s", scheduledBackup.GetName(), utils.ToCompactISO8601(backupTime))
-	backup := scheduledBackup.CreateBackup(name)
+	backup := scheduledBackup.CreateBackup(name, config)
 	metadata := &backup.ObjectMeta
 	if metadata.Labels == nil {
 		metadata.Labels = make(map[string]string)
@@ -248,7 +252,7 @@ func createBackup(
 		); err != nil {
 			return ctrl.Result{}, err
 		}
-		cluster.SetInheritedDataAndOwnership(&backup.ObjectMeta)
+		cluster.SetInheritedDataAndOwnership(&backup.ObjectMeta, config)
 	case "self":
 		utils.SetAsOwnedBy(&backup.ObjectMeta, scheduledBackup.ObjectMeta, scheduledBackup.TypeMeta)
 	default:

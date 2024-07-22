@@ -542,7 +542,7 @@ func (r *ClusterReconciler) setCertExpiration(ctx context.Context, cluster *apiv
 	}
 
 	keyPair := certs.KeyPair{Certificate: cert}
-	_, expDate, err := keyPair.IsExpiring()
+	_, expDate, err := keyPair.IsExpiring(r.Configuration)
 	if err != nil {
 		return err
 	}

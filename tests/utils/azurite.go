@@ -65,6 +65,7 @@ func CreateCertificateSecretsOnAzurite(
 	// sign and create secret using CA certificate and key
 	serverPair, err := caPair.CreateAndSignPair("azurite", certs.CertTypeServer,
 		[]string{"azurite.internal.mydomain.net, azurite.default.svc, azurite.default,"},
+		env.Configuration,
 	)
 	if err != nil {
 		return err

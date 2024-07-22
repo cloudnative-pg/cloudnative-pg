@@ -24,7 +24,6 @@ import (
 	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -36,8 +35,7 @@ var _ = Describe("ensures that deleteDanglingMonitoringQueries works correctly",
 
 	BeforeEach(func() {
 		env = buildTestEnvironment()
-		configuration.Current = configuration.NewConfiguration()
-		configuration.Current.MonitoringQueriesConfigmap = cmName
+		env.config.MonitoringQueriesConfigmap = cmName
 	})
 
 	It("should make sure that a dangling monitoring queries config map is deleted", func() {
@@ -52,6 +50,7 @@ var _ = Describe("ensures that deleteDanglingMonitoringQueries works correctly",
 			Recorder:        env.clusterReconciler.Recorder,
 			DiscoveryClient: env.clusterReconciler.DiscoveryClient,
 			InstanceClient:  env.clusterReconciler.InstanceClient,
+			Configuration:   env.config,
 		}
 
 		By("creating the required monitoring configmap", func() {
@@ -92,6 +91,7 @@ var _ = Describe("ensures that deleteDanglingMonitoringQueries works correctly",
 			Recorder:        env.clusterReconciler.Recorder,
 			DiscoveryClient: env.clusterReconciler.DiscoveryClient,
 			InstanceClient:  env.clusterReconciler.InstanceClient,
+			Configuration:   env.config,
 		}
 		namespace := newFakeNamespace(env.client)
 		var cluster *apiv1.Cluster

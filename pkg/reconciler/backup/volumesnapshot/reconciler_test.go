@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -62,6 +63,7 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 		targetPod *v1.Pod
 		pvcs      []v1.PersistentVolumeClaim
 		backup    *apiv1.Backup
+		config    *configuration.Data
 	)
 
 	BeforeEach(func() {
@@ -120,6 +122,7 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 				StoppedAt: ptr.To(stoppedAt),
 			},
 		}
+		config = configuration.NewConfiguration()
 	})
 
 	It("should fence the target pod when there are no volumesnapshots", func(ctx SpecContext) {
@@ -130,7 +133,7 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 
 		fakeRecorder := record.NewFakeRecorder(3)
 
-		executor := NewReconcilerBuilder(mockClient, fakeRecorder).
+		executor := NewReconcilerBuilder(mockClient, fakeRecorder, config).
 			Build()
 
 		result, err := executor.Reconcile(ctx, cluster, backup, targetPod, pvcs)
@@ -186,7 +189,7 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 			Build()
 		fakeRecorder := record.NewFakeRecorder(3)
 
-		executor := NewReconcilerBuilder(mockClient, fakeRecorder).
+		executor := NewReconcilerBuilder(mockClient, fakeRecorder, config).
 			Build()
 
 		result, err := executor.Reconcile(ctx, cluster, backup, targetPod, pvcs)
@@ -256,7 +259,7 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 			Build()
 		fakeRecorder := record.NewFakeRecorder(3)
 
-		executor := NewReconcilerBuilder(mockClient, fakeRecorder).
+		executor := NewReconcilerBuilder(mockClient, fakeRecorder, config).
 			Build()
 
 		result, err := executor.Reconcile(ctx, cluster, backup, targetPod, pvcs)
@@ -332,7 +335,7 @@ var _ = Describe("Volumesnapshot reconciler", func() {
 			Build()
 		fakeRecorder := record.NewFakeRecorder(3)
 
-		executor := NewReconcilerBuilder(mockClient, fakeRecorder).
+		executor := NewReconcilerBuilder(mockClient, fakeRecorder, config).
 			Build()
 
 		result, err := executor.Reconcile(ctx, cluster, backup, targetPod, pvcs)

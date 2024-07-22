@@ -25,6 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	k8scheme "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
@@ -290,7 +291,8 @@ var _ = Describe("getOrphanPVCs", func() {
 	})
 
 	It("should correctly restore the orphan pvcs", func() {
-		err := restoreOrphanPVCs(ctx, mockCli, cluster, goodPvcs)
+		config := configuration.NewConfiguration()
+		err := restoreOrphanPVCs(ctx, mockCli, cluster, goodPvcs, config)
 		Expect(err).ToNot(HaveOccurred())
 
 		for _, pvc := range goodPvcs {

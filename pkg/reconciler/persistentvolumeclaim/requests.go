@@ -23,6 +23,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -34,13 +35,14 @@ func reconcileResourceRequests(
 	c client.Client,
 	cluster *apiv1.Cluster,
 	pvcs []corev1.PersistentVolumeClaim,
+	config *configuration.Data,
 ) error {
 	if !cluster.ShouldResizeInUseVolumes() {
 		return nil
 	}
 
 	for idx := range pvcs {
-		if err := reconcilePVCQuantity(ctx, c, cluster, &pvcs[idx]); err != nil {
+		if err := reconcilePVCQuantity(ctx, c, cluster, &pvcs[idx], config); err != nil {
 			return err
 		}
 	}
@@ -53,6 +55,7 @@ func reconcilePVCQuantity(
 	c client.Client,
 	cluster *apiv1.Cluster,
 	pvc *corev1.PersistentVolumeClaim,
+	config *configuration.Data,
 ) error {
 	contextLogger := log.FromContext(ctx)
 	pvcRole, err := GetExpectedObjectCalculator(pvc.GetLabels())
@@ -92,7 +95,7 @@ func reconcilePVCQuantity(
 
 	oldPVC := pvc.DeepCopy()
 	// right now we reconcile the metadata in a different set of functions, so it's not needed to do it here
-	pvc = resources.NewPersistentVolumeClaimBuilderFromPVC(pvc).
+	pvc = resources.NewPersistentVolumeClaimBuilderFromPVC(pvc, config).
 		WithRequests(corev1.ResourceList{"storage": *parsedSize}).
 		Build()
 

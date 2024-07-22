@@ -30,7 +30,9 @@ import (
 
 var _ = Describe("Keypair generation", func() {
 	It("should generate a correct root CA", func() {
-		pair, err := CreateRootCA("test", "namespace")
+		config := configuration.NewConfiguration()
+
+		pair, err := CreateRootCA("test", "namespace", config)
 		Expect(err).ToNot(HaveOccurred())
 
 		cert, err := pair.ParseCertificate()
@@ -52,7 +54,9 @@ var _ = Describe("Keypair generation", func() {
 	})
 
 	It("should create a CA K8s corev1/secret resource structure", func() {
-		pair, err := CreateRootCA("test", "namespace")
+		config := configuration.NewConfiguration()
+
+		pair, err := CreateRootCA("test", "namespace", config)
 		Expect(err).ToNot(HaveOccurred())
 
 		secret := pair.GenerateCASecret("namespace", "name")
@@ -63,6 +67,8 @@ var _ = Describe("Keypair generation", func() {
 	})
 
 	It("should be able to renew an existing CA certificate", func() {
+		config := configuration.NewConfiguration()
+
 		notAfter := time.Now().Add(-10 * time.Hour)
 		notBefore := notAfter.Add(-90 * 24 * time.Hour)
 		ca, err := createCAWithValidity(notBefore, notAfter, nil, nil, "root", "namespace")
@@ -74,7 +80,7 @@ var _ = Describe("Keypair generation", func() {
 		oldCert, err := ca.ParseCertificate()
 		Expect(err).ToNot(HaveOccurred())
 
-		err = ca.RenewCertificate(privateKey, nil, []string{})
+		err = ca.RenewCertificate(privateKey, nil, []string{}, config)
 		Expect(err).ToNot(HaveOccurred())
 
 		newCert, err := ca.ParseCertificate()
@@ -93,30 +99,38 @@ var _ = Describe("Keypair generation", func() {
 	})
 
 	It("marks expiring certificate as expiring", func() {
+		config := configuration.NewConfiguration()
+
 		notAfter := time.Now().Add(-10 * time.Hour)
 		notBefore := notAfter.Add(-90 * 24 * time.Hour)
 		ca, err := createCAWithValidity(notBefore, notAfter, nil, nil, "root", "namespace")
 		Expect(err).ToNot(HaveOccurred())
-		isExpiring, _, err := ca.IsExpiring()
+		isExpiring, _, err := ca.IsExpiring(config)
 		Expect(isExpiring, err).To(BeTrue())
 	})
 
 	It("doesn't marks a valid certificate as expiring", func() {
-		ca, err := CreateRootCA("test", "namespace")
+		config := configuration.NewConfiguration()
+
+		ca, err := CreateRootCA("test", "namespace", config)
 		Expect(err).ToNot(HaveOccurred())
-		isExpiring, _, err := ca.IsExpiring()
+		isExpiring, _, err := ca.IsExpiring(config)
 		Expect(isExpiring, err).To(BeFalse())
 	})
 
 	It("marks matching alt DNS names as matching", func() {
-		ca, err := CreateRootCA("test", "namespace")
+		config := configuration.NewConfiguration()
+
+		ca, err := CreateRootCA("test", "namespace", config)
 		Expect(err).ToNot(HaveOccurred())
 		doAltDNSNamesMatch, err := ca.DoAltDNSNamesMatch([]string{})
 		Expect(doAltDNSNamesMatch, err).To(BeTrue())
 	})
 
 	It("doesn't mark different alt DNS names as matching", func() {
-		ca, err := CreateRootCA("test", "namespace")
+		config := configuration.NewConfiguration()
+
+		ca, err := CreateRootCA("test", "namespace", config)
 		Expect(err).ToNot(HaveOccurred())
 		doAltDNSNamesMatch, err := ca.DoAltDNSNamesMatch([]string{"foo.bar"})
 		Expect(doAltDNSNamesMatch, err).To(BeFalse())
@@ -124,10 +138,12 @@ var _ = Describe("Keypair generation", func() {
 
 	When("we have a CA generated", func() {
 		It("should successfully generate a leaf certificate", func() {
-			rootCA, err := CreateRootCA("test", "namespace")
+			config := configuration.NewConfiguration()
+
+			rootCA, err := CreateRootCA("test", "namespace", config)
 			Expect(err).ToNot(HaveOccurred())
 
-			pair, err := rootCA.CreateAndSignPair("this.host.name.com", CertTypeServer, nil)
+			pair, err := rootCA.CreateAndSignPair("this.host.name.com", CertTypeServer, nil, config)
 			Expect(err).ToNot(HaveOccurred())
 
 			cert, err := pair.ParseCertificate()
@@ -154,10 +170,12 @@ var _ = Describe("Keypair generation", func() {
 		})
 
 		It("should create a CA K8s corev1/secret resource structure", func() {
-			rootCA, err := CreateRootCA("test", "namespace")
+			config := configuration.NewConfiguration()
+
+			rootCA, err := CreateRootCA("test", "namespace", config)
 			Expect(err).ToNot(HaveOccurred())
 
-			pair, err := rootCA.CreateAndSignPair("this.host.name.com", CertTypeServer, nil)
+			pair, err := rootCA.CreateAndSignPair("this.host.name.com", CertTypeServer, nil, config)
 			Expect(err).ToNot(HaveOccurred())
 
 			secret := pair.GenerateCertificateSecret("namespace", "name")
@@ -168,7 +186,9 @@ var _ = Describe("Keypair generation", func() {
 		})
 
 		It("should be able to renew an existing certificate with no DNS names provided", func() {
-			ca, err := CreateRootCA("test", "namespace")
+			config := configuration.NewConfiguration()
+
+			ca, err := CreateRootCA("test", "namespace", config)
 			Expect(err).ToNot(HaveOccurred())
 
 			notAfter := time.Now().Add(-10 * time.Hour)
@@ -186,7 +206,7 @@ var _ = Describe("Keypair generation", func() {
 			oldCert, err := pair.ParseCertificate()
 			Expect(err).ToNot(HaveOccurred())
 
-			err = pair.RenewCertificate(privateKey, caCert, nil)
+			err = pair.RenewCertificate(privateKey, caCert, nil, config)
 			Expect(err).ToNot(HaveOccurred())
 
 			newCert, err := pair.ParseCertificate()
@@ -207,7 +227,9 @@ var _ = Describe("Keypair generation", func() {
 		})
 
 		It("should be able to renew an existing certificate with new DNS names provided", func() {
-			ca, err := CreateRootCA("test", "namespace")
+			config := configuration.NewConfiguration()
+
+			ca, err := CreateRootCA("test", "namespace", config)
 			Expect(err).ToNot(HaveOccurred())
 
 			notAfter := time.Now().Add(-10 * time.Hour)
@@ -226,7 +248,7 @@ var _ = Describe("Keypair generation", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			newDNSNames := []string{"new.host.name.com"}
-			err = pair.RenewCertificate(privateKey, caCert, newDNSNames)
+			err = pair.RenewCertificate(privateKey, caCert, newDNSNames, config)
 			Expect(err).ToNot(HaveOccurred())
 
 			newCert, err := pair.ParseCertificate()
@@ -248,10 +270,12 @@ var _ = Describe("Keypair generation", func() {
 		})
 
 		It("should be validated against the right server", func() {
-			rootCA, err := CreateRootCA("test", "namespace")
+			config := configuration.NewConfiguration()
+
+			rootCA, err := CreateRootCA("test", "namespace", config)
 			Expect(err).ToNot(HaveOccurred())
 
-			pair, err := rootCA.CreateAndSignPair("this.host.name.com", CertTypeServer, nil)
+			pair, err := rootCA.CreateAndSignPair("this.host.name.com", CertTypeServer, nil, config)
 			Expect(err).ToNot(HaveOccurred())
 
 			err = pair.IsValid(rootCA, nil)
@@ -262,7 +286,7 @@ var _ = Describe("Keypair generation", func() {
 			err = pair.IsValid(rootCA, &opts)
 			Expect(err).ToNot(HaveOccurred())
 
-			otherRootCA, err := CreateRootCA("test", "namespace")
+			otherRootCA, err := CreateRootCA("test", "namespace", config)
 			Expect(err).ToNot(HaveOccurred())
 
 			err = pair.IsValid(otherRootCA, nil)
@@ -270,10 +294,12 @@ var _ = Describe("Keypair generation", func() {
 		})
 
 		It("should be able to handle new lines at the end of server certificates", func() {
-			rootCA, err := CreateRootCA("test", "namespace")
+			config := configuration.NewConfiguration()
+
+			rootCA, err := CreateRootCA("test", "namespace", config)
 			Expect(err).ToNot(HaveOccurred())
 
-			pair, err := rootCA.CreateAndSignPair("this.host.name.com", CertTypeServer, nil)
+			pair, err := rootCA.CreateAndSignPair("this.host.name.com", CertTypeServer, nil, config)
 			Expect(err).ToNot(HaveOccurred())
 
 			blockServer, intermediatesPEM := pem.Decode(pair.Certificate)
@@ -291,16 +317,18 @@ var _ = Describe("Keypair generation", func() {
 		})
 
 		It("should validate using the full certificate chain", func() {
-			rootCA, err := CreateRootCA("ROOT", "root certificate")
+			config := configuration.NewConfiguration()
+
+			rootCA, err := CreateRootCA("ROOT", "root certificate", config)
 			Expect(err).ShouldNot(HaveOccurred())
 
-			intermediate1, err := rootCA.CreateDerivedCA("L1", "intermediate 1")
+			intermediate1, err := rootCA.CreateDerivedCA("L1", "intermediate 1", config)
 			Expect(err).ShouldNot(HaveOccurred())
 
-			intermediate2, err := intermediate1.CreateDerivedCA("L2", "intermediate 2")
+			intermediate2, err := intermediate1.CreateDerivedCA("L2", "intermediate 2", config)
 			Expect(err).ShouldNot(HaveOccurred())
 
-			server, err := intermediate2.CreateAndSignPair("this.host.name.com", CertTypeServer, nil)
+			server, err := intermediate2.CreateAndSignPair("this.host.name.com", CertTypeServer, nil, config)
 			Expect(err).ShouldNot(HaveOccurred())
 
 			var caBuffer bytes.Buffer
@@ -344,40 +372,42 @@ var _ = Describe("Certicate duration and expiration threshold", func() {
 	tenDays := 10 * 24 * time.Hour
 
 	It("returns the default duration", func() {
-		duration := getCertificateDuration()
+		config := configuration.NewConfiguration()
+		duration := getCertificateDuration(config)
 		Expect(duration).To(BeEquivalentTo(defaultCertificateDuration))
 	})
 
 	It("returns the default duration if the configuration is a negative value", func() {
-		configuration.Current = configuration.NewConfiguration()
-		configuration.Current.CertificateDuration = -1
-		duration := getCertificateDuration()
+		config := configuration.NewConfiguration()
+		config.CertificateDuration = -1
+		duration := getCertificateDuration(config)
 		Expect(duration).To(BeEquivalentTo(defaultCertificateDuration))
 	})
 
 	It("returns a valid duration of 10 days", func() {
-		configuration.Current = configuration.NewConfiguration()
-		configuration.Current.CertificateDuration = 10
-		duration := getCertificateDuration()
+		config := configuration.NewConfiguration()
+		config.CertificateDuration = 10
+		duration := getCertificateDuration(config)
 		Expect(duration).To(BeEquivalentTo(tenDays))
 	})
 
 	It("returns the default check threshold", func() {
-		threshold := getCheckThreshold()
+		config := configuration.NewConfiguration()
+		threshold := getCheckThreshold(config)
 		Expect(threshold).To(BeEquivalentTo(defaultExpiringThreshold))
 	})
 
 	It("returns the default check threshold if the configuration is a negative value", func() {
-		configuration.Current = configuration.NewConfiguration()
-		configuration.Current.ExpiringCheckThreshold = -1
-		threshold := getCheckThreshold()
+		config := configuration.NewConfiguration()
+		config.ExpiringCheckThreshold = -1
+		threshold := getCheckThreshold(config)
 		Expect(threshold).To(BeEquivalentTo(defaultExpiringThreshold))
 	})
 
 	It("returns a valid threshold of 10 days", func() {
-		configuration.Current = configuration.NewConfiguration()
-		configuration.Current.ExpiringCheckThreshold = 10
-		threshold := getCheckThreshold()
+		config := configuration.NewConfiguration()
+		config.ExpiringCheckThreshold = 10
+		threshold := getCheckThreshold(config)
 		Expect(threshold).To(BeEquivalentTo(tenDays))
 	})
 })

@@ -451,7 +451,7 @@ func MinioSSLClient(namespace string) corev1.Pod {
 // MinioDeploy will create a full MinIO deployment defined inthe minioEnv variable
 func MinioDeploy(minioEnv *MinioEnv, env *TestingEnvironment) (*corev1.Pod, error) {
 	var err error
-	minioEnv.CaPair, err = certs.CreateRootCA(minioEnv.Namespace, "minio")
+	minioEnv.CaPair, err = certs.CreateRootCA(minioEnv.Namespace, "minio", env.Configuration)
 	if err != nil {
 		return nil, err
 	}
@@ -464,6 +464,7 @@ func MinioDeploy(minioEnv *MinioEnv, env *TestingEnvironment) (*corev1.Pod, erro
 	// sign and create secret using CA certificate and key
 	serverPair, err := minioEnv.CaPair.CreateAndSignPair("minio-service", certs.CertTypeServer,
 		[]string{"minio.useless.domain.not.verified", "minio-service.minio"},
+		env.Configuration,
 	)
 	if err != nil {
 		return nil, err

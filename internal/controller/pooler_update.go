@@ -225,7 +225,7 @@ func (r *PoolerReconciler) updateServiceAccount(
 ) error {
 	contextLog := log.FromContext(ctx)
 
-	pullSecretName, err := r.ensureServiceAccountPullSecret(ctx, pooler, configuration.Current)
+	pullSecretName, err := r.ensureServiceAccountPullSecret(ctx, pooler, r.Configuration)
 	if err != nil {
 		return err
 	}

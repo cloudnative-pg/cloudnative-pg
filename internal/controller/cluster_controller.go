@@ -78,6 +78,7 @@ type ClusterReconciler struct {
 	Recorder        record.EventRecorder
 	InstanceClient  instance.Client
 	Plugins         repository.Interface
+	Configuration   *configuration.Data
 }
 
 // NewClusterReconciler creates a new ClusterReconciler initializing it
@@ -85,6 +86,7 @@ func NewClusterReconciler(
 	mgr manager.Manager,
 	discoveryClient *discovery.DiscoveryClient,
 	plugins repository.Interface,
+	config *configuration.Data,
 ) *ClusterReconciler {
 	return &ClusterReconciler{
 		InstanceClient:  instance.NewStatusClient(),
@@ -93,6 +95,7 @@ func NewClusterReconciler(
 		Scheme:          mgr.GetScheme(),
 		Recorder:        mgr.GetEventRecorderFor("cloudnative-pg"),
 		Plugins:         plugins,
+		Configuration:   config,
 	}
 }
 
@@ -328,6 +331,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		r.Client,
 		cluster,
 		resources.pvcs.Items,
+		r.Configuration,
 	); err != nil {
 		return ctrl.Result{}, err
 	}
@@ -337,6 +341,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		r.Client,
 		cluster,
 		resources.instances.Items,
+		r.Configuration,
 	); err != nil {
 		return ctrl.Result{}, err
 	}
@@ -431,7 +436,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	// We cannot merge this code with updateResourceStatus because
 	// it needs to run after retrieving the status from the pods,
 	// which is a time-expensive operation.
-	onlineUpdateEnabled := configuration.Current.EnableInstanceManagerInplaceUpdates
+	onlineUpdateEnabled := r.Configuration.EnableInstanceManagerInplaceUpdates
 	if err = r.updateOnlineUpdateEnabled(ctx, cluster, onlineUpdateEnabled); err != nil {
 		if apierrs.IsConflict(err) {
 			// Requeue a new reconciliation cycle, as in this point we need
@@ -665,6 +670,7 @@ func (r *ClusterReconciler) reconcileResources(
 		cluster,
 		resources.instances.Items,
 		resources.pvcs.Items,
+		r.Configuration,
 	); !res.IsZero() || err != nil {
 		return res, err
 	}
@@ -761,7 +767,7 @@ func (r *ClusterReconciler) processUnschedulableInstances(
 			continue
 		}
 
-		if podRollout := isPodNeedingRollout(ctx, pod, cluster); podRollout.required {
+		if podRollout := r.isPodNeedingRollout(ctx, pod, cluster); podRollout.required {
 			return &ctrl.Result{RequeueAfter: 1 * time.Second},
 				r.upgradePod(ctx, cluster, pod, fmt.Sprintf("recreating unschedulable pod: %s", podRollout.reason))
 		}
@@ -1163,9 +1169,9 @@ func (r *ClusterReconciler) getClustersForSecretsOrConfigMapsToClustersMapper(
 	}
 
 	// Get all the clusters handled by the operator in the secret namespaces
-	if object.GetNamespace() == configuration.Current.OperatorNamespace &&
-		((isConfigMap && object.GetName() == configuration.Current.MonitoringQueriesConfigmap) ||
-			(isSecret && object.GetName() == configuration.Current.MonitoringQueriesSecret)) {
+	if object.GetNamespace() == r.Configuration.OperatorNamespace &&
+		((isConfigMap && object.GetName() == r.Configuration.MonitoringQueriesConfigmap) ||
+			(isSecret && object.GetName() == r.Configuration.MonitoringQueriesSecret)) {
 		// The events in MonitoringQueriesSecrets impacts all the clusters.
 		// We proceed to fetch all the clusters and create a reconciliation request for them.
 		// This works as long as the replicated MonitoringQueriesConfigmap in the different namespaces
@@ -1351,15 +1357,15 @@ func (r *ClusterReconciler) deleteOldCustomQueriesConfigmap(ctx context.Context,
 
 	// if the cluster didn't have default monitoring queries, do nothing
 	if cluster.Spec.Monitoring.AreDefaultQueriesDisabled() ||
-		configuration.Current.MonitoringQueriesConfigmap == "" ||
-		configuration.Current.MonitoringQueriesConfigmap == apiv1.DefaultMonitoringConfigMapName {
+		r.Configuration.MonitoringQueriesConfigmap == "" ||
+		r.Configuration.MonitoringQueriesConfigmap == apiv1.DefaultMonitoringConfigMapName {
 		return
 	}
 
 	// otherwise, remove the old default monitoring queries configmap from the cluster and delete it, if present
 	oldCmID := -1
 	for idx, cm := range cluster.Spec.Monitoring.CustomQueriesConfigMap {
-		if cm.Name == configuration.Current.MonitoringQueriesConfigmap &&
+		if cm.Name == r.Configuration.MonitoringQueriesConfigmap &&
 			cm.Key == apiv1.DefaultMonitoringKey {
 			oldCmID = idx
 			break
@@ -1374,7 +1380,7 @@ func (r *ClusterReconciler) deleteOldCustomQueriesConfigmap(ctx context.Context,
 	// if we found it, we are going to get it and check it was actually created by the operator or was already deleted
 	var oldCm corev1.ConfigMap
 	err := r.Get(ctx, types.NamespacedName{
-		Name:      configuration.Current.MonitoringQueriesConfigmap,
+		Name:      r.Configuration.MonitoringQueriesConfigmap,
 		Namespace: cluster.Namespace,
 	}, &oldCm)
 	// if we found it, we check the annotation the operator should have set to be sure it was created by us
@@ -1386,7 +1392,7 @@ func (r *ClusterReconciler) deleteOldCustomQueriesConfigmap(ctx context.Context,
 			if err != nil && !apierrs.IsNotFound(err) {
 				contextLogger.Warning("error while deleting old default monitoring custom queries configmap",
 					"err", err,
-					"configmap", configuration.Current.MonitoringQueriesConfigmap)
+					"configmap", r.Configuration.MonitoringQueriesConfigmap)
 				return
 			}
 		} else {
@@ -1401,7 +1407,7 @@ func (r *ClusterReconciler) deleteOldCustomQueriesConfigmap(ctx context.Context,
 		// if there is any error except the cm was already deleted, we return
 		contextLogger.Warning("error while getting old default monitoring custom queries configmap",
 			"err", err,
-			"configmap", configuration.Current.MonitoringQueriesConfigmap)
+			"configmap", r.Configuration.MonitoringQueriesConfigmap)
 		return
 	}
 	// both if it exists or not, if we are here we should delete it from the list of custom queries configmaps
@@ -1413,6 +1419,6 @@ func (r *ClusterReconciler) deleteOldCustomQueriesConfigmap(ctx context.Context,
 		log.Warning("had an error while removing the old custom monitoring queries configmap from "+
 			"the monitoring section in the cluster",
 			"err", err,
-			"configmap", configuration.Current.MonitoringQueriesConfigmap)
+			"configmap", r.Configuration.MonitoringQueriesConfigmap)
 	}
 }

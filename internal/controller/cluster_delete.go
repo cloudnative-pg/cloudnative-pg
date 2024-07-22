@@ -25,21 +25,21 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 )
 
 // deleteDanglingMonitoringQueries deletes the default monitoring configMap and/or secret if no cluster in the namespace
 // is using it.
 func (r *ClusterReconciler) deleteDanglingMonitoringQueries(ctx context.Context, namespace string) error {
-	configMapName := configuration.Current.MonitoringQueriesConfigmap
-	secretName := configuration.Current.MonitoringQueriesSecret
+	configMapName := r.Configuration.MonitoringQueriesConfigmap
+	secretName := r.Configuration.MonitoringQueriesSecret
+
 	if secretName == "" && configMapName == "" {
 		// no configmap or secretName configured, we can exit.
 		return nil
 	}
 
 	// we avoid deleting the operator configmap.
-	if namespace == configuration.Current.OperatorNamespace {
+	if namespace == r.Configuration.OperatorNamespace {
 		return nil
 	}
 

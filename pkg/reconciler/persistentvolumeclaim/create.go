@@ -24,6 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -32,11 +33,12 @@ func createIfNotExists(
 	ctx context.Context,
 	c client.Client,
 	cluster *apiv1.Cluster,
-	configuration *CreateConfiguration,
+	pvcConfig *CreateConfiguration,
+	config *configuration.Data,
 ) error {
 	contextLogger := log.FromContext(ctx)
 
-	pvc, err := Build(cluster, configuration)
+	pvc, err := Build(cluster, pvcConfig, config)
 	if err != nil {
 		if err == ErrorInvalidSize {
 			// This error should have been caught by the validating
@@ -44,12 +46,12 @@ func createIfNotExists(
 			// validation, and we must react.
 			contextLogger.Info("The size specified for the cluster is not valid",
 				"size",
-				configuration.Storage.Size)
+				pvcConfig.Storage.Size)
 			return utils.ErrNextLoop
 		}
 		return fmt.Errorf(
 			"unable to create a PVC spec for node with serial %v: %w",
-			configuration.NodeSerial,
+			pvcConfig.NodeSerial,
 			err,
 		)
 	}
@@ -57,7 +59,7 @@ func createIfNotExists(
 	if err = c.Create(ctx, pvc); err != nil && !apierrs.IsAlreadyExists(err) {
 		return fmt.Errorf("unable to create a PVC: %s for this node (nodeSerial: %d): %w",
 			pvc.Name,
-			configuration.NodeSerial,
+			pvcConfig.NodeSerial,
 			err,
 		)
 	}

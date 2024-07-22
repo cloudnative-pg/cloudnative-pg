@@ -156,11 +156,12 @@ func CreateClusterPodSpec(
 	envConfig EnvConfig,
 	gracePeriod int64,
 	enableHTTPS bool,
+	config *configuration.Data,
 ) corev1.PodSpec {
 	return corev1.PodSpec{
 		Hostname: podName,
 		InitContainers: []corev1.Container{
-			createBootstrapContainer(cluster),
+			createBootstrapContainer(cluster, config),
 		},
 		SchedulerName: cluster.Spec.SchedulerName,
 		Containers:    createPostgresContainers(cluster, envConfig, enableHTTPS),
@@ -181,10 +182,18 @@ func CreateClusterPodSpec(
 // createPostgresContainers create the PostgreSQL containers that are
 // used for every instance
 func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig, enableHTTPS bool) []corev1.Container {
+	imageName, err := cluster.GetImageName()
+	if err != nil {
+		// We're creating a job for a cluster whose
+		// image name have not been selected. That's
+		// a programmatic error
+		panic(err)
+	}
+
 	containers := []corev1.Container{
 		{
 			Name:            PostgresContainerName,
-			Image:           cluster.GetImageName(),
+			Image:           imageName,
 			ImagePullPolicy: cluster.Spec.ImagePullPolicy,
 			Env:             envConfig.EnvVars,
 			EnvFrom:         envConfig.EnvFrom,
@@ -395,14 +404,14 @@ func CreatePodSecurityContext(seccompProfile *corev1.SeccompProfile, user, group
 }
 
 // PodWithExistingStorage create a new instance with an existing storage
-func PodWithExistingStorage(cluster apiv1.Cluster, nodeSerial int) *corev1.Pod {
+func PodWithExistingStorage(cluster apiv1.Cluster, nodeSerial int, config *configuration.Data) *corev1.Pod {
 	podName := GetInstanceName(cluster.Name, nodeSerial)
 	gracePeriod := int64(cluster.GetMaxStopDelay())
 
 	envConfig := CreatePodEnvConfig(cluster, podName)
 
 	tlsEnabled := true
-	podSpec := CreateClusterPodSpec(podName, cluster, envConfig, gracePeriod, tlsEnabled)
+	podSpec := CreateClusterPodSpec(podName, cluster, envConfig, gracePeriod, tlsEnabled, config)
 
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -429,7 +438,7 @@ func PodWithExistingStorage(cluster apiv1.Cluster, nodeSerial int) *corev1.Pod {
 		pod.Spec.PriorityClassName = cluster.Spec.PriorityClassName
 	}
 
-	if configuration.Current.CreateAnyService {
+	if config.CreateAnyService {
 		pod.Spec.Subdomain = cluster.GetServiceAnyName()
 	}
 

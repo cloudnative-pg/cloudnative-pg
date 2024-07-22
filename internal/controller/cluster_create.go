@@ -38,7 +38,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
@@ -92,7 +91,11 @@ func (r *ClusterReconciler) createPostgresClusterObjects(ctx context.Context, cl
 		}
 	}
 
-	err = createOrPatchPodMonitor(ctx, r.Client, r.DiscoveryClient, specs.NewClusterPodMonitorManager(cluster))
+	err = createOrPatchPodMonitor(
+		ctx,
+		r.Client,
+		r.DiscoveryClient,
+		specs.NewClusterPodMonitorManager(cluster, r.Configuration))
 	if err != nil {
 		return err
 	}
@@ -130,14 +133,14 @@ func (r *ClusterReconciler) reconcilePodDisruptionBudget(ctx context.Context, cl
 		// we create the primary PDB even if we're under a maintenance window
 		return r.createOrPatchOwnedPodDisruptionBudget(ctx,
 			cluster,
-			specs.BuildPrimaryPodDisruptionBudget(cluster),
+			specs.BuildPrimaryPodDisruptionBudget(cluster, r.Configuration),
 		)
 	}
 
 	// Reconcile the primary PDB
 	err := r.createOrPatchOwnedPodDisruptionBudget(ctx,
 		cluster,
-		specs.BuildPrimaryPodDisruptionBudget(cluster),
+		specs.BuildPrimaryPodDisruptionBudget(cluster, r.Configuration),
 	)
 	if err != nil {
 		return err
@@ -145,7 +148,7 @@ func (r *ClusterReconciler) reconcilePodDisruptionBudget(ctx context.Context, cl
 
 	return r.createOrPatchOwnedPodDisruptionBudget(ctx,
 		cluster,
-		specs.BuildReplicasPodDisruptionBudget(cluster),
+		specs.BuildReplicasPodDisruptionBudget(cluster, r.Configuration),
 	)
 }
 
@@ -184,7 +187,7 @@ func (r *ClusterReconciler) reconcileSuperuserSecret(ctx context.Context, cluste
 			"*",
 			"postgres",
 			postgresPassword)
-		cluster.SetInheritedDataAndOwnership(&postgresSecret.ObjectMeta)
+		cluster.SetInheritedDataAndOwnership(&postgresSecret.ObjectMeta, r.Configuration)
 
 		return createOrPatchClusterCredentialSecret(ctx, r.Client, postgresSecret)
 	}
@@ -225,7 +228,7 @@ func (r *ClusterReconciler) reconcileAppUserSecret(ctx context.Context, cluster 
 			cluster.GetApplicationDatabaseOwner(),
 			appPassword)
 
-		cluster.SetInheritedDataAndOwnership(&appSecret.ObjectMeta)
+		cluster.SetInheritedDataAndOwnership(&appSecret.ObjectMeta, r.Configuration)
 		return createOrPatchClusterCredentialSecret(ctx, r.Client, appSecret)
 	}
 	return nil
@@ -302,28 +305,28 @@ func (r *ClusterReconciler) reconcilePoolerSecrets(ctx context.Context, cluster 
 
 func (r *ClusterReconciler) reconcilePostgresServices(ctx context.Context, cluster *apiv1.Cluster) error {
 	anyService := specs.CreateClusterAnyService(*cluster)
-	cluster.SetInheritedDataAndOwnership(&anyService.ObjectMeta)
+	cluster.SetInheritedDataAndOwnership(&anyService.ObjectMeta, r.Configuration)
 
-	if err := r.serviceReconciler(ctx, cluster, anyService, configuration.Current.CreateAnyService); err != nil {
+	if err := r.serviceReconciler(ctx, cluster, anyService, r.Configuration.CreateAnyService); err != nil {
 		return err
 	}
 
 	readService := specs.CreateClusterReadService(*cluster)
-	cluster.SetInheritedDataAndOwnership(&readService.ObjectMeta)
+	cluster.SetInheritedDataAndOwnership(&readService.ObjectMeta, r.Configuration)
 
 	if err := r.serviceReconciler(ctx, cluster, readService, cluster.IsReadServiceEnabled()); err != nil {
 		return err
 	}
 
 	readOnlyService := specs.CreateClusterReadOnlyService(*cluster)
-	cluster.SetInheritedDataAndOwnership(&readOnlyService.ObjectMeta)
+	cluster.SetInheritedDataAndOwnership(&readOnlyService.ObjectMeta, r.Configuration)
 
 	if err := r.serviceReconciler(ctx, cluster, readOnlyService, cluster.IsReadOnlyServiceEnabled()); err != nil {
 		return err
 	}
 
 	readWriteService := specs.CreateClusterReadWriteService(*cluster)
-	cluster.SetInheritedDataAndOwnership(&readWriteService.ObjectMeta)
+	cluster.SetInheritedDataAndOwnership(&readWriteService.ObjectMeta, r.Configuration)
 
 	if err := r.serviceReconciler(ctx, cluster, readWriteService, cluster.IsReadWriteServiceEnabled()); err != nil {
 		return err
@@ -333,7 +336,7 @@ func (r *ClusterReconciler) reconcilePostgresServices(ctx context.Context, clust
 }
 
 func (r *ClusterReconciler) reconcileManagedServices(ctx context.Context, cluster *apiv1.Cluster) error {
-	managedServices, err := specs.BuildManagedServices(*cluster)
+	managedServices, err := specs.BuildManagedServices(*cluster, r.Configuration)
 	if err != nil {
 		return err
 	}
@@ -585,7 +588,7 @@ func (r *ClusterReconciler) createOrPatchServiceAccount(ctx context.Context, clu
 		return fmt.Errorf("while generating service account: %w", err)
 	}
 	// we add the ownerMetadata only when creating the SA
-	cluster.SetInheritedData(&sa.ObjectMeta)
+	cluster.SetInheritedData(&sa.ObjectMeta, r.Configuration)
 	cluster.Spec.ServiceAccountTemplate.MergeMetadata(&sa)
 
 	if specs.IsServiceAccountAligned(ctx, origSa, generatedPullSecretNames, sa.ObjectMeta) {
@@ -618,7 +621,7 @@ func (r *ClusterReconciler) createServiceAccount(ctx context.Context, cluster *a
 		return fmt.Errorf("while creating new ServiceAccount: %w", err)
 	}
 
-	cluster.SetInheritedDataAndOwnership(&serviceAccount.ObjectMeta)
+	cluster.SetInheritedDataAndOwnership(&serviceAccount.ObjectMeta, r.Configuration)
 	cluster.Spec.ServiceAccountTemplate.MergeMetadata(serviceAccount)
 
 	err = r.Create(ctx, serviceAccount)
@@ -658,7 +661,7 @@ func (r *ClusterReconciler) generateServiceAccountPullSecretsNames(
 // operator was downloaded via a Secret.
 // It will return the string of the secret name if a secret need to be used to use the operator
 func (r *ClusterReconciler) copyPullSecretFromOperator(ctx context.Context, cluster *apiv1.Cluster) (string, error) {
-	if configuration.Current.OperatorNamespace == "" {
+	if r.Configuration.OperatorNamespace == "" {
 		// We are not getting started via a k8s deployment. Perhaps we are running in our development environment
 		return "", nil
 	}
@@ -666,8 +669,8 @@ func (r *ClusterReconciler) copyPullSecretFromOperator(ctx context.Context, clus
 	// Let's find the operator secret
 	var operatorSecret corev1.Secret
 	if err := r.Get(ctx, client.ObjectKey{
-		Name:      configuration.Current.OperatorPullSecretName,
-		Namespace: configuration.Current.OperatorNamespace,
+		Name:      r.Configuration.OperatorPullSecretName,
+		Namespace: r.Configuration.OperatorNamespace,
 	}, &operatorSecret); err != nil {
 		if apierrs.IsNotFound(err) {
 			// There is no secret like that, probably because we are running in our development environment
@@ -687,7 +690,7 @@ func (r *ClusterReconciler) copyPullSecretFromOperator(ctx context.Context, clus
 		Data: operatorSecret.Data,
 		Type: operatorSecret.Type,
 	}
-	cluster.SetInheritedDataAndOwnership(&secret.ObjectMeta)
+	cluster.SetInheritedDataAndOwnership(&secret.ObjectMeta, r.Configuration)
 
 	// Another sync loop may have already created the service. Let's check that
 	if err := r.Create(ctx, &secret); err != nil && !apierrs.IsAlreadyExists(err) {
@@ -743,8 +746,8 @@ func (r *ClusterReconciler) createOrPatchDefaultMetricsConfigmap(ctx context.Con
 	var sourceConfigmap corev1.ConfigMap
 	if err := r.Get(ctx,
 		client.ObjectKey{
-			Name:      configuration.Current.MonitoringQueriesConfigmap,
-			Namespace: configuration.Current.OperatorNamespace,
+			Name:      r.Configuration.MonitoringQueriesConfigmap,
+			Namespace: r.Configuration.OperatorNamespace,
 		}, &sourceConfigmap); err != nil {
 		if apierrs.IsNotFound(err) {
 			contextLogger.Error(err, "while trying to get default metrics configMap")
@@ -759,8 +762,8 @@ func (r *ClusterReconciler) createOrPatchDefaultMetricsConfigmap(ctx context.Con
 		return nil
 	}
 
-	if cluster.Namespace == configuration.Current.OperatorNamespace &&
-		configuration.Current.MonitoringQueriesConfigmap == apiv1.DefaultMonitoringConfigMapName {
+	if cluster.Namespace == r.Configuration.OperatorNamespace &&
+		r.Configuration.MonitoringQueriesConfigmap == apiv1.DefaultMonitoringConfigMapName {
 		contextLogger.Debug(
 			"skipping default metrics synchronization. The cluster resides in the same namespace of the operator",
 			"clusterNamespace", cluster.Namespace,
@@ -830,8 +833,8 @@ func (r *ClusterReconciler) createOrPatchDefaultMetricsSecret(ctx context.Contex
 	var sourceSecret corev1.Secret
 	if err := r.Get(ctx,
 		client.ObjectKey{
-			Name:      configuration.Current.MonitoringQueriesSecret,
-			Namespace: configuration.Current.OperatorNamespace,
+			Name:      r.Configuration.MonitoringQueriesSecret,
+			Namespace: r.Configuration.OperatorNamespace,
 		}, &sourceSecret); err != nil {
 		if apierrs.IsNotFound(err) {
 			contextLogger.Error(err, "while trying to get default metrics secret")
@@ -846,8 +849,8 @@ func (r *ClusterReconciler) createOrPatchDefaultMetricsSecret(ctx context.Contex
 		return nil
 	}
 
-	if cluster.Namespace == configuration.Current.OperatorNamespace &&
-		configuration.Current.MonitoringQueriesSecret == apiv1.DefaultMonitoringSecretName {
+	if cluster.Namespace == r.Configuration.OperatorNamespace &&
+		r.Configuration.MonitoringQueriesSecret == apiv1.DefaultMonitoringSecretName {
 		contextLogger.Debug(
 			"skipping default metrics synchronization. The cluster resides in the same namespace of the operator",
 			"clusterNamespace", cluster.Namespace,
@@ -909,13 +912,13 @@ func (r *ClusterReconciler) createOrPatchDefaultMetricsSecret(ctx context.Contex
 }
 
 func (r *ClusterReconciler) createOrPatchDefaultMetrics(ctx context.Context, cluster *apiv1.Cluster) (err error) {
-	if configuration.Current.MonitoringQueriesConfigmap != "" {
+	if r.Configuration.MonitoringQueriesConfigmap != "" {
 		err = r.createOrPatchDefaultMetricsConfigmap(ctx, cluster)
 		if err != nil {
 			return err
 		}
 	}
-	if configuration.Current.MonitoringQueriesSecret != "" {
+	if r.Configuration.MonitoringQueriesSecret != "" {
 		err = r.createOrPatchDefaultMetricsSecret(ctx, cluster)
 		if err != nil {
 			return err
@@ -1007,7 +1010,7 @@ func createOrPatchPodMonitor(
 // createRole creates the role
 func (r *ClusterReconciler) createRole(ctx context.Context, cluster *apiv1.Cluster, backupOrigin *apiv1.Backup) error {
 	role := specs.CreateRole(*cluster, backupOrigin)
-	cluster.SetInheritedDataAndOwnership(&role.ObjectMeta)
+	cluster.SetInheritedDataAndOwnership(&role.ObjectMeta, r.Configuration)
 
 	err := r.Create(ctx, &role)
 	if err != nil && !apierrs.IsAlreadyExists(err) {
@@ -1021,7 +1024,7 @@ func (r *ClusterReconciler) createRole(ctx context.Context, cluster *apiv1.Clust
 // createRoleBinding creates the role binding
 func (r *ClusterReconciler) createRoleBinding(ctx context.Context, cluster *apiv1.Cluster) error {
 	roleBinding := specs.CreateRoleBinding(cluster.ObjectMeta)
-	cluster.SetInheritedDataAndOwnership(&roleBinding.ObjectMeta)
+	cluster.SetInheritedDataAndOwnership(&roleBinding.ObjectMeta, r.Configuration)
 
 	err := r.Create(ctx, &roleBinding)
 	if err != nil && !apierrs.IsAlreadyExists(err) {
@@ -1106,6 +1109,7 @@ func (r *ClusterReconciler) createPrimaryInstance(
 		cluster,
 		recoverySnapshot,
 		nodeSerial,
+		r.Configuration,
 	); err != nil {
 		return ctrl.Result{RequeueAfter: time.Minute}, err
 	}
@@ -1127,19 +1131,19 @@ func (r *ClusterReconciler) createPrimaryInstance(
 			return ctrl.Result{}, err
 		}
 		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (from volumeSnapshots)")
-		job = specs.CreatePrimaryJobViaRestoreSnapshot(*cluster, nodeSerial, metadata, backup)
+		job = specs.CreatePrimaryJobViaRestoreSnapshot(*cluster, nodeSerial, metadata, backup, r.Configuration)
 
 	case isBootstrappingFromRecovery:
 		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (from backup)")
-		job = specs.CreatePrimaryJobViaRecovery(*cluster, nodeSerial, backup)
+		job = specs.CreatePrimaryJobViaRecovery(*cluster, nodeSerial, backup, r.Configuration)
 
 	case isBootstrappingFromBaseBackup:
 		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (from physical backup)")
-		job = specs.CreatePrimaryJobViaPgBaseBackup(*cluster, nodeSerial)
+		job = specs.CreatePrimaryJobViaPgBaseBackup(*cluster, nodeSerial, r.Configuration)
 
 	default:
 		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (initdb)")
-		job = specs.CreatePrimaryJobViaInitdb(*cluster, nodeSerial)
+		job = specs.CreatePrimaryJobViaInitdb(*cluster, nodeSerial, r.Configuration)
 	}
 
 	if err := ctrl.SetControllerReference(cluster, job, r.Scheme); err != nil {
@@ -1165,13 +1169,13 @@ func (r *ClusterReconciler) createPrimaryInstance(
 
 	utils.SetOperatorVersion(&job.ObjectMeta, versions.Version)
 	utils.InheritAnnotations(&job.ObjectMeta, cluster.Annotations,
-		cluster.GetFixedInheritedAnnotations(), configuration.Current)
+		cluster.GetFixedInheritedAnnotations(), r.Configuration)
 	utils.InheritAnnotations(&job.Spec.Template.ObjectMeta, cluster.Annotations,
-		cluster.GetFixedInheritedAnnotations(), configuration.Current)
+		cluster.GetFixedInheritedAnnotations(), r.Configuration)
 	utils.InheritLabels(&job.ObjectMeta, cluster.Labels,
-		cluster.GetFixedInheritedLabels(), configuration.Current)
+		cluster.GetFixedInheritedLabels(), r.Configuration)
 	utils.InheritLabels(&job.Spec.Template.ObjectMeta, cluster.Labels,
-		cluster.GetFixedInheritedLabels(), configuration.Current)
+		cluster.GetFixedInheritedLabels(), r.Configuration)
 
 	if err = r.Create(ctx, job); err != nil {
 		if apierrs.IsAlreadyExists(err) {
@@ -1231,12 +1235,12 @@ func (r *ClusterReconciler) joinReplicaInstance(
 		return ctrl.Result{}, err
 	}
 
-	job := specs.JoinReplicaInstance(*cluster, nodeSerial)
+	job := specs.JoinReplicaInstance(*cluster, nodeSerial, r.Configuration)
 
 	// If we can bootstrap this replica from a pre-existing source, we do it
 	storageSource := persistentvolumeclaim.GetCandidateStorageSourceForReplica(ctx, cluster, backupList)
 	if storageSource != nil {
-		job = specs.RestoreReplicaInstance(*cluster, nodeSerial)
+		job = specs.RestoreReplicaInstance(*cluster, nodeSerial, r.Configuration)
 	}
 
 	contextLogger.Info("Creating new Job",
@@ -1262,13 +1266,13 @@ func (r *ClusterReconciler) joinReplicaInstance(
 
 	utils.SetOperatorVersion(&job.ObjectMeta, versions.Version)
 	utils.InheritAnnotations(&job.ObjectMeta, cluster.Annotations,
-		cluster.GetFixedInheritedAnnotations(), configuration.Current)
+		cluster.GetFixedInheritedAnnotations(), r.Configuration)
 	utils.InheritAnnotations(&job.Spec.Template.ObjectMeta, cluster.Annotations,
-		cluster.GetFixedInheritedAnnotations(), configuration.Current)
+		cluster.GetFixedInheritedAnnotations(), r.Configuration)
 	utils.InheritLabels(&job.ObjectMeta, cluster.Labels,
-		cluster.GetFixedInheritedLabels(), configuration.Current)
+		cluster.GetFixedInheritedLabels(), r.Configuration)
 	utils.InheritLabels(&job.Spec.Template.ObjectMeta, cluster.Labels,
-		cluster.GetFixedInheritedLabels(), configuration.Current)
+		cluster.GetFixedInheritedLabels(), r.Configuration)
 
 	if err := r.Create(ctx, job); err != nil {
 		if apierrs.IsAlreadyExists(err) {
@@ -1287,6 +1291,7 @@ func (r *ClusterReconciler) joinReplicaInstance(
 		cluster,
 		storageSource,
 		nodeSerial,
+		r.Configuration,
 	); err != nil {
 		return ctrl.Result{RequeueAfter: time.Minute}, err
 	}
@@ -1303,7 +1308,7 @@ func (r *ClusterReconciler) ensureInstancesAreCreated(
 ) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
-	instanceToCreate, err := findInstancePodToCreate(cluster, instancesStatus, resources.pvcs.Items)
+	instanceToCreate, err := r.findInstancePodToCreate(cluster, instancesStatus, resources.pvcs.Items)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -1339,7 +1344,7 @@ func (r *ClusterReconciler) ensureInstancesAreCreated(
 			return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
 		}
 
-		if configuration.Current.EnableAzurePVCUpdates {
+		if r.Configuration.EnableAzurePVCUpdates {
 			for _, resizingPVC := range cluster.Status.ResizingPVC {
 				// if the pvc is in resizing state we requeue and wait
 				if resizingPVC == instancePVC.Name {
@@ -1371,9 +1376,9 @@ func (r *ClusterReconciler) ensureInstancesAreCreated(
 
 	utils.SetOperatorVersion(&instanceToCreate.ObjectMeta, versions.Version)
 	utils.InheritAnnotations(&instanceToCreate.ObjectMeta, cluster.Annotations,
-		cluster.GetFixedInheritedAnnotations(), configuration.Current)
+		cluster.GetFixedInheritedAnnotations(), r.Configuration)
 	utils.InheritLabels(&instanceToCreate.ObjectMeta, cluster.Labels,
-		cluster.GetFixedInheritedLabels(), configuration.Current)
+		cluster.GetFixedInheritedLabels(), r.Configuration)
 
 	if err := r.Create(ctx, instanceToCreate); err != nil {
 		if apierrs.IsAlreadyExists(err) {
@@ -1390,7 +1395,7 @@ func (r *ClusterReconciler) ensureInstancesAreCreated(
 }
 
 // we elect a current instance that doesn't exist for creation
-func findInstancePodToCreate(
+func (r *ClusterReconciler) findInstancePodToCreate(
 	cluster *apiv1.Cluster,
 	instancesStatus postgres.PostgresqlStatusList,
 	pvcs []corev1.PersistentVolumeClaim,
@@ -1437,7 +1442,7 @@ func findInstancePodToCreate(
 		if err != nil {
 			return nil, err
 		}
-		return specs.PodWithExistingStorage(*cluster, serial), nil
+		return specs.PodWithExistingStorage(*cluster, serial, r.Configuration), nil
 	}
 
 	return nil, nil

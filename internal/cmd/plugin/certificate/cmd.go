@@ -22,6 +22,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 )
 
 // NewCmd creates the new "certificate" subcommand
@@ -49,7 +50,8 @@ connect to the PostgreSQL cluster.`,
 				ClusterName: cluster,
 			}
 
-			return Generate(ctx, params, dryRun, plugin.OutputFormat(output))
+			config := configuration.NewConfiguration()
+			return Generate(ctx, params, dryRun, plugin.OutputFormat(output), config)
 		},
 	}
 

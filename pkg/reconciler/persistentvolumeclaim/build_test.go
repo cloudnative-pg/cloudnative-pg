@@ -22,6 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -30,6 +31,7 @@ import (
 
 var _ = Describe("PVC Creation", func() {
 	storageClass := "default"
+	config := configuration.NewConfiguration()
 	It("handles size properly only with size specified", func() {
 		pvc, err := Build(
 			&apiv1.Cluster{},
@@ -42,6 +44,7 @@ var _ = Describe("PVC Creation", func() {
 					StorageClass: &storageClass,
 				},
 			},
+			config,
 		)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(pvc.Spec.Resources.Requests.Storage().String()).To(Equal("1Gi"))
@@ -61,6 +64,7 @@ var _ = Describe("PVC Creation", func() {
 				},
 				Calculator: NewPgDataCalculator(),
 			},
+			config,
 		)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(pvc.Spec.Resources.Requests.Storage().String()).To(Equal("1Gi"))
@@ -82,6 +86,7 @@ var _ = Describe("PVC Creation", func() {
 					},
 				},
 			},
+			config,
 		)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(pvc.Spec.Resources.Requests.Storage().String()).To(Equal("2Gi"))
@@ -99,6 +104,7 @@ var _ = Describe("PVC Creation", func() {
 					StorageClass: &storageClass,
 				},
 			},
+			config,
 		)
 		Expect(err).To(HaveOccurred())
 	})
@@ -115,6 +121,7 @@ var _ = Describe("PVC Creation", func() {
 					StorageClass: &storageClass,
 				},
 			},
+			config,
 		)
 		Expect(err).To(HaveOccurred())
 	})
@@ -143,6 +150,7 @@ var _ = Describe("PVC Creation", func() {
 				},
 				TablespaceName: tbsName,
 			},
+			config,
 		)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(pvc.Name).To(Equal("thecluster-1-tbs-fragglerock"))
@@ -156,16 +164,20 @@ var _ = Describe("PVC Creation", func() {
 				Name: "test",
 			},
 		}
-		pvc, err := Build(cluster, &CreateConfiguration{
-			NodeSerial: 1,
-			Calculator: NewPgDataCalculator(),
-			Storage: apiv1.StorageConfiguration{
-				Size: "1Gi",
-				PersistentVolumeClaimTemplate: &corev1.PersistentVolumeClaimSpec{
-					AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOncePod},
+		pvc, err := Build(
+			cluster,
+			&CreateConfiguration{
+				NodeSerial: 1,
+				Calculator: NewPgDataCalculator(),
+				Storage: apiv1.StorageConfiguration{
+					Size: "1Gi",
+					PersistentVolumeClaimTemplate: &corev1.PersistentVolumeClaimSpec{
+						AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOncePod},
+					},
 				},
 			},
-		})
+			config,
+		)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(pvc.Spec.AccessModes).To(HaveLen(1))
 		Expect(pvc.Spec.AccessModes).To(ContainElement(corev1.ReadWriteOncePod))
@@ -175,16 +187,20 @@ var _ = Describe("PVC Creation", func() {
 		cluster := &apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{},
 		}
-		pvc, err := Build(cluster, &CreateConfiguration{
-			NodeSerial: 1,
-			Calculator: NewPgDataCalculator(),
-			Storage: apiv1.StorageConfiguration{
-				Size: "1Gi",
-				PersistentVolumeClaimTemplate: &corev1.PersistentVolumeClaimSpec{
-					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"test": "test"}},
+		pvc, err := Build(
+			cluster,
+			&CreateConfiguration{
+				NodeSerial: 1,
+				Calculator: NewPgDataCalculator(),
+				Storage: apiv1.StorageConfiguration{
+					Size: "1Gi",
+					PersistentVolumeClaimTemplate: &corev1.PersistentVolumeClaimSpec{
+						Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"test": "test"}},
+					},
 				},
 			},
-		})
+			config,
+		)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(pvc.Spec.AccessModes).To(HaveLen(1))
 		Expect(pvc.Spec.AccessModes).To(ContainElement(corev1.ReadWriteOnce))

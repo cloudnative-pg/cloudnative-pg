@@ -28,9 +28,14 @@ import (
 var _ = Describe("Scheduled backup", func() {
 	scheduledBackup := &ScheduledBackup{}
 	backupName := "test"
+	var config *configuration.Data
+
+	BeforeEach(func() {
+		config = configuration.NewConfiguration()
+	})
 
 	It("properly creates a backup with no annotations", func() {
-		backup := scheduledBackup.CreateBackup("test")
+		backup := scheduledBackup.CreateBackup("test", config)
 		Expect(backup).ToNot(BeNil())
 		Expect(backup.ObjectMeta.Name).To(BeEquivalentTo(backupName))
 		Expect(backup.Annotations).To(BeEmpty())
@@ -40,9 +45,9 @@ var _ = Describe("Scheduled backup", func() {
 		annotations := make(map[string]string, 1)
 		annotations["test"] = "annotations"
 		scheduledBackup.Annotations = annotations
-		configuration.Current.InheritedAnnotations = []string{"test"}
 
-		backup := scheduledBackup.CreateBackup("test")
+		config.InheritedAnnotations = []string{"test"}
+		backup := scheduledBackup.CreateBackup("test", config)
 		Expect(backup).ToNot(BeNil())
 		Expect(backup.ObjectMeta.Name).To(BeEquivalentTo(backupName))
 		Expect(backup.Annotations).ToNot(BeEmpty())
@@ -51,7 +56,7 @@ var _ = Describe("Scheduled backup", func() {
 
 	It("properly creates a backup with standby target", func() {
 		scheduledBackup.Spec.Target = BackupTargetStandby
-		backup := scheduledBackup.CreateBackup("test")
+		backup := scheduledBackup.CreateBackup("test", config)
 		Expect(backup).ToNot(BeNil())
 		Expect(backup.ObjectMeta.Name).To(BeEquivalentTo(backupName))
 		Expect(backup.Spec.Target).To(BeEquivalentTo(BackupTargetStandby))
@@ -59,7 +64,7 @@ var _ = Describe("Scheduled backup", func() {
 
 	It("properly creates a backup with primary target", func() {
 		scheduledBackup.Spec.Target = BackupTargetPrimary
-		backup := scheduledBackup.CreateBackup("test")
+		backup := scheduledBackup.CreateBackup("test", config)
 		Expect(backup).ToNot(BeNil())
 		Expect(backup.ObjectMeta.Name).To(BeEquivalentTo(backupName))
 		Expect(backup.Spec.Target).To(BeEquivalentTo(BackupTargetPrimary))

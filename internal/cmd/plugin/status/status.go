@@ -214,7 +214,13 @@ func (fullStatus *PostgresqlStatus) printBasicInfo() {
 	if primaryInstanceStatus != nil {
 		summary.AddLine("System ID:", primaryInstanceStatus.SystemID)
 	}
-	summary.AddLine("PostgreSQL Image:", cluster.GetImageName())
+
+	if imageName, err := cluster.GetImageName(); err != nil {
+		summary.AddLine("PostgreSQL Image:", aurora.Red(err.Error()))
+	} else {
+		summary.AddLine("PostgreSQL Image:", imageName)
+	}
+
 	if cluster.IsReplica() {
 		summary.AddLine("Designated primary:", primaryInstance)
 		summary.AddLine("Source cluster: ", cluster.Spec.ReplicaCluster.Source)

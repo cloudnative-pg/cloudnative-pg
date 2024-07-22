@@ -47,7 +47,7 @@ func CreateSecretCA(
 		return cluster, nil, err
 	}
 
-	caPair, err := certs.CreateRootCA(cluster.Name, namespace)
+	caPair, err := certs.CreateRootCA(cluster.Name, namespace, env.Configuration)
 	if err != nil {
 		return cluster, nil, err
 	}

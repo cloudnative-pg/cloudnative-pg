@@ -21,6 +21,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -69,6 +70,7 @@ var _ = Describe("Services specification", func() {
 
 var _ = Describe("BuildManagedServices", func() {
 	var cluster apiv1.Cluster
+	config := configuration.NewConfiguration()
 
 	BeforeEach(func() {
 		cluster = apiv1.Cluster{
@@ -105,13 +107,13 @@ var _ = Describe("BuildManagedServices", func() {
 	Context("when Managed or Services is nil", func() {
 		It("should return nil services", func() {
 			cluster.Spec.Managed = nil
-			services, err := BuildManagedServices(cluster)
+			services, err := BuildManagedServices(cluster, config)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(services).To(BeNil())
 
 			cluster.Spec.Managed = &apiv1.ManagedConfiguration{}
 			cluster.Spec.Managed.Services = nil
-			services, err = BuildManagedServices(cluster)
+			services, err = BuildManagedServices(cluster, config)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(services).To(BeNil())
 		})
@@ -120,7 +122,7 @@ var _ = Describe("BuildManagedServices", func() {
 	Context("when there are no additional managed services", func() {
 		It("should return nil services", func() {
 			cluster.Spec.Managed.Services.Additional = []apiv1.ManagedService{}
-			services, err := BuildManagedServices(cluster)
+			services, err := BuildManagedServices(cluster, config)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(services).To(BeNil())
 		})
@@ -128,7 +130,7 @@ var _ = Describe("BuildManagedServices", func() {
 
 	Context("when there are additional managed services", func() {
 		It("should build the services", func() {
-			services, err := BuildManagedServices(cluster)
+			services, err := BuildManagedServices(cluster, config)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(services).NotTo(BeNil())
 			Expect(services).To(HaveLen(1))

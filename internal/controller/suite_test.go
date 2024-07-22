@@ -39,6 +39,7 @@ import (
 
 	// +kubebuilder:scaffold:imports
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
@@ -64,6 +65,7 @@ type testingEnvironment struct {
 	poolerReconciler  *PoolerReconciler
 	discoveryClient   *fakediscovery.FakeDiscovery
 	client            client.WithWatch
+	config            *configuration.Data
 }
 
 func buildTestEnvironment() *testingEnvironment {
@@ -95,8 +97,11 @@ func buildTestEnvironment() *testingEnvironment {
 	}
 	Expect(err).ToNot(HaveOccurred())
 
+	config := configuration.NewConfiguration()
+
 	clusterReconciler := &ClusterReconciler{
 		Client:          k8sClient,
+		Configuration:   config,
 		Scheme:          scheme,
 		Recorder:        record.NewFakeRecorder(120),
 		DiscoveryClient: discoveryClient,
@@ -107,6 +112,7 @@ func buildTestEnvironment() *testingEnvironment {
 		Scheme:          scheme,
 		Recorder:        record.NewFakeRecorder(120),
 		DiscoveryClient: discoveryClient,
+		Configuration:   config,
 	}
 
 	backupReconciler := &BackupReconciler{
@@ -122,6 +128,7 @@ func buildTestEnvironment() *testingEnvironment {
 		backupReconciler:  backupReconciler,
 		poolerReconciler:  poolerReconciler,
 		discoveryClient:   discoveryClient,
+		config:            config,
 	}
 }
 
@@ -308,13 +315,14 @@ func generateFakeClusterPods(
 	c client.Client,
 	cluster *apiv1.Cluster,
 	markAsReady bool,
+	config *configuration.Data,
 ) []corev1.Pod {
 	var idx int
 	var pods []corev1.Pod
 	for idx < cluster.Spec.Instances {
 		idx++
-		pod := specs.PodWithExistingStorage(*cluster, idx)
-		cluster.SetInheritedDataAndOwnership(&pod.ObjectMeta)
+		pod := specs.PodWithExistingStorage(*cluster, idx, config)
+		cluster.SetInheritedDataAndOwnership(&pod.ObjectMeta, config)
 
 		err := c.Create(context.Background(), pod)
 		Expect(err).ToNot(HaveOccurred())
@@ -341,17 +349,18 @@ func generateFakeClusterPodsWithDefaultClient(
 	k8sClient client.Client,
 	cluster *apiv1.Cluster,
 	markAsReady bool,
+	config *configuration.Data,
 ) []corev1.Pod {
-	return generateFakeClusterPods(k8sClient, cluster, markAsReady)
+	return generateFakeClusterPods(k8sClient, cluster, markAsReady, config)
 }
 
-func generateFakeInitDBJobs(c client.Client, cluster *apiv1.Cluster) []batchv1.Job {
+func generateFakeInitDBJobs(c client.Client, cluster *apiv1.Cluster, config *configuration.Data) []batchv1.Job {
 	var idx int
 	var jobs []batchv1.Job
 	for idx < cluster.Spec.Instances {
 		idx++
-		job := specs.CreatePrimaryJobViaInitdb(*cluster, idx)
-		cluster.SetInheritedDataAndOwnership(&job.ObjectMeta)
+		job := specs.CreatePrimaryJobViaInitdb(*cluster, idx, config)
+		cluster.SetInheritedDataAndOwnership(&job.ObjectMeta, config)
 
 		err := c.Create(context.Background(), job)
 		Expect(err).ToNot(HaveOccurred())
@@ -360,20 +369,25 @@ func generateFakeInitDBJobs(c client.Client, cluster *apiv1.Cluster) []batchv1.J
 	return jobs
 }
 
-func generateFakeInitDBJobsWithDefaultClient(k8sClient client.Client, cluster *apiv1.Cluster) []batchv1.Job {
-	return generateFakeInitDBJobs(k8sClient, cluster)
+func generateFakeInitDBJobsWithDefaultClient(
+	k8sClient client.Client,
+	cluster *apiv1.Cluster,
+	config *configuration.Data,
+) []batchv1.Job {
+	return generateFakeInitDBJobs(k8sClient, cluster, config)
 }
 
 func generateClusterPVC(
 	c client.Client,
 	cluster *apiv1.Cluster,
 	status persistentvolumeclaim.PVCStatus, // nolint:unparam
+	config *configuration.Data,
 ) []corev1.PersistentVolumeClaim {
 	var idx int
 	var pvcs []corev1.PersistentVolumeClaim
 	for idx < cluster.Spec.Instances {
 		idx++
-		pvcs = append(pvcs, newFakePVC(c, cluster, idx, status)...)
+		pvcs = append(pvcs, newFakePVC(c, cluster, idx, status, config)...)
 	}
 	return pvcs
 }
@@ -383,6 +397,7 @@ func newFakePVC(
 	cluster *apiv1.Cluster,
 	serial int,
 	status persistentvolumeclaim.PVCStatus,
+	config *configuration.Data,
 ) []corev1.PersistentVolumeClaim {
 	var pvcGroup []corev1.PersistentVolumeClaim
 	pvc, err := persistentvolumeclaim.Build(
@@ -392,9 +407,10 @@ func newFakePVC(
 			NodeSerial: serial,
 			Calculator: persistentvolumeclaim.NewPgDataCalculator(),
 			Storage:    cluster.Spec.StorageConfiguration,
-		})
+		},
+		config)
 	Expect(err).ToNot(HaveOccurred())
-	cluster.SetInheritedDataAndOwnership(&pvc.ObjectMeta)
+	cluster.SetInheritedDataAndOwnership(&pvc.ObjectMeta, config)
 
 	err = c.Create(context.Background(), pvc)
 	Expect(err).ToNot(HaveOccurred())
@@ -409,9 +425,10 @@ func newFakePVC(
 				Calculator: persistentvolumeclaim.NewPgWalCalculator(),
 				Storage:    cluster.Spec.StorageConfiguration,
 			},
+			config,
 		)
 		Expect(err).ToNot(HaveOccurred())
-		cluster.SetInheritedDataAndOwnership(&pvcWal.ObjectMeta)
+		cluster.SetInheritedDataAndOwnership(&pvcWal.ObjectMeta, config)
 		err = c.Create(context.Background(), pvcWal)
 		Expect(err).ToNot(HaveOccurred())
 		pvcGroup = append(pvcGroup, *pvcWal)
@@ -421,8 +438,12 @@ func newFakePVC(
 }
 
 // generateFakeCASecret follows the conventions established by cert.GenerateCASecret
-func generateFakeCASecret(c client.Client, name, namespace, domain string) (*corev1.Secret, *certs.KeyPair) {
-	keyPair, err := certs.CreateRootCA(domain, namespace)
+func generateFakeCASecret(
+	c client.Client,
+	name, namespace,
+	domain string, config *configuration.Data,
+) (*corev1.Secret, *certs.KeyPair) {
+	keyPair, err := certs.CreateRootCA(domain, namespace, config)
 	Expect(err).ToNot(HaveOccurred())
 	secret := &corev1.Secret{
 		Type: corev1.SecretTypeOpaque,

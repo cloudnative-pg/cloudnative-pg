@@ -21,11 +21,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 )
 
 // ClusterPodMonitorManager builds the PodMonitor for the cluster resource
 type ClusterPodMonitorManager struct {
 	cluster *apiv1.Cluster
+	config  *configuration.Data
 }
 
 // IsPodMonitorEnabled returns a boolean indicating if the PodMonitor should exists or not
@@ -39,7 +41,7 @@ func (c ClusterPodMonitorManager) BuildPodMonitor() *monitoringv1.PodMonitor {
 		Namespace: c.cluster.Namespace,
 		Name:      c.cluster.Name,
 	}
-	c.cluster.SetInheritedDataAndOwnership(&meta)
+	c.cluster.SetInheritedDataAndOwnership(&meta, c.config)
 
 	endpoint := monitoringv1.PodMetricsEndpoint{
 		Port: "metrics",
@@ -64,6 +66,6 @@ func (c ClusterPodMonitorManager) BuildPodMonitor() *monitoringv1.PodMonitor {
 }
 
 // NewClusterPodMonitorManager returns a new instance of ClusterPodMonitorManager
-func NewClusterPodMonitorManager(cluster *apiv1.Cluster) *ClusterPodMonitorManager {
-	return &ClusterPodMonitorManager{cluster: cluster}
+func NewClusterPodMonitorManager(cluster *apiv1.Cluster, config *configuration.Data) *ClusterPodMonitorManager {
+	return &ClusterPodMonitorManager{cluster: cluster, config: config}
 }

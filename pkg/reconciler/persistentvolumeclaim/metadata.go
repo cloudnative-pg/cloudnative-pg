@@ -116,16 +116,17 @@ func ReconcileMetadata(
 	c client.Client,
 	cluster *apiv1.Cluster,
 	pvcs []corev1.PersistentVolumeClaim,
+	config *configuration.Data,
 ) error {
 	if err := reconcileInstanceRoleLabel(ctx, c, cluster, pvcs); err != nil {
 		return fmt.Errorf("cannot update role labels on pvcs: %w", err)
 	}
 
-	if err := newAnnotationReconciler(cluster).reconcile(ctx, c, pvcs); err != nil {
+	if err := newAnnotationReconciler(cluster, config).reconcile(ctx, c, pvcs); err != nil {
 		return fmt.Errorf("cannot update annotations on pvcs: %w", err)
 	}
 
-	if err := newLabelReconciler(cluster).reconcile(ctx, c, pvcs); err != nil {
+	if err := newLabelReconciler(cluster, config).reconcile(ctx, c, pvcs); err != nil {
 		return fmt.Errorf("cannot update cluster labels on pvcs: %w", err)
 	}
 
@@ -173,30 +174,30 @@ func ReconcileSerialAnnotation(
 	return nil
 }
 
-func newAnnotationReconciler(cluster *apiv1.Cluster) metadataReconciler {
+func newAnnotationReconciler(cluster *apiv1.Cluster, config *configuration.Data) metadataReconciler {
 	return metadataReconciler{
 		name: "annotations",
 		isUpToDate: func(pvc *corev1.PersistentVolumeClaim) bool {
 			return utils.IsAnnotationSubset(pvc.Annotations,
 				cluster.Annotations,
 				cluster.GetFixedInheritedAnnotations(),
-				configuration.Current)
+				config)
 		},
 		update: func(pvc *corev1.PersistentVolumeClaim) {
 			utils.InheritAnnotations(&pvc.ObjectMeta, cluster.Annotations,
-				cluster.GetFixedInheritedAnnotations(), configuration.Current)
+				cluster.GetFixedInheritedAnnotations(), config)
 		},
 	}
 }
 
-func newLabelReconciler(cluster *apiv1.Cluster) metadataReconciler { //nolint: gocognit
+func newLabelReconciler(cluster *apiv1.Cluster, config *configuration.Data) metadataReconciler { //nolint: gocognit
 	return metadataReconciler{
 		name: "labels",
 		isUpToDate: func(pvc *corev1.PersistentVolumeClaim) bool {
 			if !utils.IsLabelSubset(pvc.Labels,
 				cluster.Labels,
 				cluster.GetFixedInheritedLabels(),
-				configuration.Current) {
+				config) {
 				return false
 			}
 
@@ -238,7 +239,7 @@ func newLabelReconciler(cluster *apiv1.Cluster) metadataReconciler { //nolint: g
 			return true
 		},
 		update: func(pvc *corev1.PersistentVolumeClaim) {
-			utils.InheritLabels(&pvc.ObjectMeta, cluster.Labels, cluster.GetFixedInheritedLabels(), configuration.Current)
+			utils.InheritLabels(&pvc.ObjectMeta, cluster.Labels, cluster.GetFixedInheritedLabels(), config)
 
 			pvcRole := pvc.Labels[utils.PvcRoleLabelName]
 			for _, instanceName := range cluster.Status.InstanceNames {

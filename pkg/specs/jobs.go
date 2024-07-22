@@ -45,7 +45,7 @@ func (p postInitFolder) toString() string {
 }
 
 // CreatePrimaryJobViaInitdb creates a new primary instance in a Pod
-func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int) *batchv1.Job {
+func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int, config *configuration.Data) *batchv1.Job {
 	initCommand := []string{
 		"/controller/manager",
 		"instance",
@@ -86,7 +86,7 @@ func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int) *batchv1.J
 	initCommand = append(initCommand, buildCommonInitJobFlags(cluster)...)
 
 	if cluster.Spec.Bootstrap.InitDB.Import != nil {
-		return createPrimaryJob(cluster, nodeSerial, jobRoleImport, initCommand)
+		return createPrimaryJob(cluster, nodeSerial, jobRoleImport, initCommand, config)
 	}
 
 	if cluster.ShouldInitDBRunPostInitApplicationSQLRefs() {
@@ -104,7 +104,7 @@ func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int) *batchv1.J
 			"--post-init-sql-refs-folder", postInitSQLRefsFolder.toString())
 	}
 
-	return createPrimaryJob(cluster, nodeSerial, jobRoleInitDB, initCommand)
+	return createPrimaryJob(cluster, nodeSerial, jobRoleInitDB, initCommand, config)
 }
 
 func buildInitDBFlags(cluster apiv1.Cluster) (initCommand []string) {
@@ -159,6 +159,7 @@ func CreatePrimaryJobViaRestoreSnapshot(
 	nodeSerial int,
 	object *metav1.ObjectMeta,
 	backup *apiv1.Backup,
+	config *configuration.Data,
 ) *batchv1.Job {
 	initCommand := []string{
 		"/controller/manager",
@@ -178,7 +179,7 @@ func CreatePrimaryJobViaRestoreSnapshot(
 
 	initCommand = append(initCommand, buildCommonInitJobFlags(cluster)...)
 
-	job := createPrimaryJob(cluster, nodeSerial, jobRoleSnapshotRecovery, initCommand)
+	job := createPrimaryJob(cluster, nodeSerial, jobRoleSnapshotRecovery, initCommand, config)
 
 	addBarmanEndpointCAToJobFromCluster(cluster, backup, job)
 
@@ -186,7 +187,12 @@ func CreatePrimaryJobViaRestoreSnapshot(
 }
 
 // CreatePrimaryJobViaRecovery creates a new primary instance in a Pod, restoring from a Backup
-func CreatePrimaryJobViaRecovery(cluster apiv1.Cluster, nodeSerial int, backup *apiv1.Backup) *batchv1.Job {
+func CreatePrimaryJobViaRecovery(
+	cluster apiv1.Cluster,
+	nodeSerial int,
+	backup *apiv1.Backup,
+	config *configuration.Data,
+) *batchv1.Job {
 	initCommand := []string{
 		"/controller/manager",
 		"instance",
@@ -195,7 +201,7 @@ func CreatePrimaryJobViaRecovery(cluster apiv1.Cluster, nodeSerial int, backup *
 
 	initCommand = append(initCommand, buildCommonInitJobFlags(cluster)...)
 
-	job := createPrimaryJob(cluster, nodeSerial, jobRoleFullRecovery, initCommand)
+	job := createPrimaryJob(cluster, nodeSerial, jobRoleFullRecovery, initCommand, config)
 
 	addBarmanEndpointCAToJobFromCluster(cluster, backup, job)
 
@@ -227,7 +233,7 @@ func addBarmanEndpointCAToJobFromCluster(cluster apiv1.Cluster, backup *apiv1.Ba
 }
 
 // CreatePrimaryJobViaPgBaseBackup creates a new primary instance in a Pod
-func CreatePrimaryJobViaPgBaseBackup(cluster apiv1.Cluster, nodeSerial int) *batchv1.Job {
+func CreatePrimaryJobViaPgBaseBackup(cluster apiv1.Cluster, nodeSerial int, config *configuration.Data) *batchv1.Job {
 	initCommand := []string{
 		"/controller/manager",
 		"instance",
@@ -236,11 +242,11 @@ func CreatePrimaryJobViaPgBaseBackup(cluster apiv1.Cluster, nodeSerial int) *bat
 
 	initCommand = append(initCommand, buildCommonInitJobFlags(cluster)...)
 
-	return createPrimaryJob(cluster, nodeSerial, jobRolePGBaseBackup, initCommand)
+	return createPrimaryJob(cluster, nodeSerial, jobRolePGBaseBackup, initCommand, config)
 }
 
 // JoinReplicaInstance create a new PostgreSQL node, copying the contents from another Pod
-func JoinReplicaInstance(cluster apiv1.Cluster, nodeSerial int) *batchv1.Job {
+func JoinReplicaInstance(cluster apiv1.Cluster, nodeSerial int, config *configuration.Data) *batchv1.Job {
 	initCommand := []string{
 		"/controller/manager",
 		"instance",
@@ -250,11 +256,11 @@ func JoinReplicaInstance(cluster apiv1.Cluster, nodeSerial int) *batchv1.Job {
 
 	initCommand = append(initCommand, buildCommonInitJobFlags(cluster)...)
 
-	return createPrimaryJob(cluster, nodeSerial, jobRoleJoin, initCommand)
+	return createPrimaryJob(cluster, nodeSerial, jobRoleJoin, initCommand, config)
 }
 
 // RestoreReplicaInstance creates a new PostgreSQL replica starting from a volume snapshot backup
-func RestoreReplicaInstance(cluster apiv1.Cluster, nodeSerial int) *batchv1.Job {
+func RestoreReplicaInstance(cluster apiv1.Cluster, nodeSerial int, config *configuration.Data) *batchv1.Job {
 	initCommand := []string{
 		"/controller/manager",
 		"instance",
@@ -264,7 +270,7 @@ func RestoreReplicaInstance(cluster apiv1.Cluster, nodeSerial int) *batchv1.Job 
 
 	initCommand = append(initCommand, buildCommonInitJobFlags(cluster)...)
 
-	job := createPrimaryJob(cluster, nodeSerial, jobRoleSnapshotRecovery, initCommand)
+	job := createPrimaryJob(cluster, nodeSerial, jobRoleSnapshotRecovery, initCommand, config)
 	return job
 }
 
@@ -308,9 +314,23 @@ func GetPossibleJobNames(instanceName string) []string {
 
 // createPrimaryJob create a job that executes the provided command.
 // The role should describe the purpose of the executed job
-func createPrimaryJob(cluster apiv1.Cluster, nodeSerial int, role jobRole, initCommand []string) *batchv1.Job {
+func createPrimaryJob(
+	cluster apiv1.Cluster,
+	nodeSerial int,
+	role jobRole,
+	initCommand []string,
+	config *configuration.Data,
+) *batchv1.Job {
 	instanceName := GetInstanceName(cluster.Name, nodeSerial)
 	jobName := role.getJobName(instanceName)
+
+	imageName, err := cluster.GetImageName()
+	if err != nil {
+		// We're creating a job for a cluster whose
+		// image name have not been selected. That's
+		// a programmatic error
+		panic(err)
+	}
 
 	envConfig := CreatePodEnvConfig(cluster, jobName)
 
@@ -335,13 +355,13 @@ func createPrimaryJob(cluster apiv1.Cluster, nodeSerial int, role jobRole, initC
 				Spec: corev1.PodSpec{
 					Hostname: jobName,
 					InitContainers: []corev1.Container{
-						createBootstrapContainer(cluster),
+						createBootstrapContainer(cluster, config),
 					},
 					SchedulerName: cluster.Spec.SchedulerName,
 					Containers: []corev1.Container{
 						{
 							Name:            string(role),
-							Image:           cluster.GetImageName(),
+							Image:           imageName,
 							ImagePullPolicy: cluster.Spec.ImagePullPolicy,
 							Env:             envConfig.EnvVars,
 							EnvFrom:         envConfig.EnvFrom,
@@ -367,11 +387,11 @@ func createPrimaryJob(cluster apiv1.Cluster, nodeSerial int, role jobRole, initC
 		},
 	}
 
-	if configuration.Current.CreateAnyService {
+	if config.CreateAnyService {
 		job.Spec.Template.Spec.Subdomain = cluster.GetServiceAnyName()
 	}
 
-	cluster.SetInheritedDataAndOwnership(&job.ObjectMeta)
+	cluster.SetInheritedDataAndOwnership(&job.ObjectMeta, config)
 	addManagerLoggingOptions(cluster, &job.Spec.Template.Spec.Containers[0])
 	if utils.IsAnnotationAppArmorPresent(&job.Spec.Template.Spec, cluster.Annotations) {
 		utils.AnnotateAppArmor(&job.ObjectMeta, &job.Spec.Template.Spec, cluster.Annotations)

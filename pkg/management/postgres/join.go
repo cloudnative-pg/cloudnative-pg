@@ -76,7 +76,8 @@ func (info InitInfo) Join(cluster *apiv1.Cluster) error {
 	if err != nil {
 		log.Warning(
 			"Error while parsing PostgreSQL server version to define connection options, defaulting to PostgreSQL 11",
-			"imageName", cluster.GetImageName(),
+			"imageName", cluster.Spec.ImageName,
+			"statusImage", cluster.Status.Image,
 			"err", err)
 	} else if pgVersion >= 120000 {
 		// We explicitly disable wal_sender_timeout for join-related pg_basebackup executions.

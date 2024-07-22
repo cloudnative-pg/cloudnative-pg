@@ -21,6 +21,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -43,6 +44,7 @@ var _ = Describe("PodMonitor test", func() {
 			},
 		},
 	}
+	config := configuration.NewConfiguration()
 
 	expectedEndpoint := monitoringv1.PodMetricsEndpoint{Port: "metrics"}
 	metricRelabelings := []monitoringv1.RelabelConfig{
@@ -63,7 +65,7 @@ var _ = Describe("PodMonitor test", func() {
 	}
 
 	It("should create a valid monitoringv1.PodMonitor object", func() {
-		mgr := NewClusterPodMonitorManager(cluster.DeepCopy())
+		mgr := NewClusterPodMonitorManager(cluster.DeepCopy(), config)
 		monitor := mgr.BuildPodMonitor()
 		Expect(monitor.Labels[utils.ClusterLabelName]).To(Equal(clusterName))
 		Expect(monitor.Spec.Selector.MatchLabels[utils.ClusterLabelName]).To(Equal(clusterName))
@@ -73,7 +75,7 @@ var _ = Describe("PodMonitor test", func() {
 	It("should create a monitoringv1.PodMonitor object with MetricRelabelConfigs rules", func() {
 		relabeledCluster := cluster.DeepCopy()
 		relabeledCluster.Spec.Monitoring.PodMonitorMetricRelabelConfigs = metricRelabelings
-		mgr := NewClusterPodMonitorManager(relabeledCluster)
+		mgr := NewClusterPodMonitorManager(relabeledCluster, config)
 		monitor := mgr.BuildPodMonitor()
 
 		expectedEndpoint := expectedEndpoint.DeepCopy()
@@ -84,7 +86,7 @@ var _ = Describe("PodMonitor test", func() {
 	It("should create a monitoringv1.PodMonitor object with RelabelConfigs rules", func() {
 		relabeledCluster := cluster.DeepCopy()
 		relabeledCluster.Spec.Monitoring.PodMonitorRelabelConfigs = relabelings
-		mgr := NewClusterPodMonitorManager(relabeledCluster)
+		mgr := NewClusterPodMonitorManager(relabeledCluster, config)
 		monitor := mgr.BuildPodMonitor()
 
 		expectedEndpoint := expectedEndpoint.DeepCopy()
@@ -96,7 +98,7 @@ var _ = Describe("PodMonitor test", func() {
 		relabeledCluster := cluster.DeepCopy()
 		relabeledCluster.Spec.Monitoring.PodMonitorMetricRelabelConfigs = metricRelabelings
 		relabeledCluster.Spec.Monitoring.PodMonitorRelabelConfigs = relabelings
-		mgr := NewClusterPodMonitorManager(relabeledCluster)
+		mgr := NewClusterPodMonitorManager(relabeledCluster, config)
 		monitor := mgr.BuildPodMonitor()
 
 		expectedEndpoint := expectedEndpoint.DeepCopy()
@@ -107,7 +109,7 @@ var _ = Describe("PodMonitor test", func() {
 
 	It("does not panic if monitoring section is not present", func() {
 		cluster := apiv1.Cluster{}
-		mgr := NewClusterPodMonitorManager(&cluster)
+		mgr := NewClusterPodMonitorManager(&cluster, config)
 		Expect(mgr.BuildPodMonitor()).ToNot(BeNil())
 	})
 })

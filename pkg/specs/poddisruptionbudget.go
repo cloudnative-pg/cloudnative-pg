@@ -22,12 +22,16 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // BuildReplicasPodDisruptionBudget creates a pod disruption budget telling
 // K8s to avoid removing more than one replica at a time
-func BuildReplicasPodDisruptionBudget(cluster *apiv1.Cluster) *policyv1.PodDisruptionBudget {
+func BuildReplicasPodDisruptionBudget(
+	cluster *apiv1.Cluster,
+	config *configuration.Data,
+) *policyv1.PodDisruptionBudget {
 	// We should ensure that in a cluster of n instances,
 	// with n-1 replicas, at least n-2 are always available
 	if cluster == nil || cluster.Spec.Instances < 3 {
@@ -52,14 +56,14 @@ func BuildReplicasPodDisruptionBudget(cluster *apiv1.Cluster) *policyv1.PodDisru
 		},
 	}
 
-	cluster.SetInheritedDataAndOwnership(&pdb.ObjectMeta)
+	cluster.SetInheritedDataAndOwnership(&pdb.ObjectMeta, config)
 
 	return pdb
 }
 
 // BuildPrimaryPodDisruptionBudget creates a pod disruption budget, telling
 // K8s to avoid removing more than one primary instance at a time
-func BuildPrimaryPodDisruptionBudget(cluster *apiv1.Cluster) *policyv1.PodDisruptionBudget {
+func BuildPrimaryPodDisruptionBudget(cluster *apiv1.Cluster, config *configuration.Data) *policyv1.PodDisruptionBudget {
 	if cluster == nil {
 		return nil
 	}
@@ -81,7 +85,7 @@ func BuildPrimaryPodDisruptionBudget(cluster *apiv1.Cluster) *policyv1.PodDisrup
 		},
 	}
 
-	cluster.SetInheritedDataAndOwnership(&pdb.ObjectMeta)
+	cluster.SetInheritedDataAndOwnership(&pdb.ObjectMeta, config)
 
 	return pdb
 }

@@ -21,6 +21,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -50,7 +51,8 @@ var _ = Describe("metadataReconciler", func() {
 						},
 					},
 				}
-				reconciler := newLabelReconciler(cluster)
+				config := configuration.NewConfiguration()
+				reconciler := newLabelReconciler(cluster, config)
 
 				// Assert that the PVC is not up-to-date
 				Expect(reconciler.isUpToDate(pvc)).To(BeFalse())
@@ -91,7 +93,8 @@ var _ = Describe("metadataReconciler", func() {
 						Annotations: map[string]string{},
 					},
 				}
-				reconciler := newLabelReconciler(cluster)
+				config := configuration.NewConfiguration()
+				reconciler := newLabelReconciler(cluster, config)
 
 				// Assert that the PVC is up-to-date
 				Expect(reconciler.isUpToDate(pvc)).To(BeTrue())

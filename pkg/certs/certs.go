@@ -141,8 +141,13 @@ func (pair KeyPair) IsValid(caPair *KeyPair, opts *x509.VerifyOptions) error {
 }
 
 // CreateAndSignPair given a CA keypair, generate and sign a leaf keypair
-func (pair KeyPair) CreateAndSignPair(host string, usage CertType, altDNSNames []string) (*KeyPair, error) {
-	certificateDuration := getCertificateDuration()
+func (pair KeyPair) CreateAndSignPair(
+	host string,
+	usage CertType,
+	altDNSNames []string,
+	config *configuration.Data,
+) (*KeyPair, error) {
+	certificateDuration := getCertificateDuration(config)
 	notBefore := time.Now().Add(time.Minute * -5)
 	notAfter := notBefore.Add(certificateDuration)
 	return pair.createAndSignPairWithValidity(host, notBefore, notAfter, usage, altDNSNames)
@@ -267,13 +272,14 @@ func (pair *KeyPair) RenewCertificate(
 	caPrivateKey *ecdsa.PrivateKey,
 	parentCertificate *x509.Certificate,
 	altDNSNames []string,
+	config *configuration.Data,
 ) error {
 	oldCertificate, err := pair.ParseCertificate()
 	if err != nil {
 		return err
 	}
 
-	certificateDuration := getCertificateDuration()
+	certificateDuration := getCertificateDuration(config)
 	notBefore := time.Now().Add(time.Minute * -5)
 	notAfter := notBefore.Add(certificateDuration)
 
@@ -313,7 +319,7 @@ func (pair *KeyPair) RenewCertificate(
 }
 
 // IsExpiring check if the certificate will expire in the configured duration
-func (pair *KeyPair) IsExpiring() (bool, *time.Time, error) {
+func (pair *KeyPair) IsExpiring(config *configuration.Data) (bool, *time.Time, error) {
 	cert, err := pair.ParseCertificate()
 	if err != nil {
 		return true, nil, err
@@ -322,7 +328,7 @@ func (pair *KeyPair) IsExpiring() (bool, *time.Time, error) {
 	if time.Now().Before(cert.NotBefore) {
 		return true, &cert.NotAfter, nil
 	}
-	expiringCheckThreshold := getCheckThreshold()
+	expiringCheckThreshold := getCheckThreshold(config)
 	if time.Now().Add(expiringCheckThreshold).After(cert.NotAfter) {
 		return true, &cert.NotAfter, nil
 	}
@@ -345,7 +351,11 @@ func (pair *KeyPair) DoAltDNSNamesMatch(altDNSNames []string) (bool, error) {
 
 // CreateDerivedCA create a new CA derived from the certificate in the
 // keypair
-func (pair *KeyPair) CreateDerivedCA(commonName string, organizationalUnit string) (*KeyPair, error) {
+func (pair *KeyPair) CreateDerivedCA(
+	commonName string,
+	organizationalUnit string,
+	config *configuration.Data,
+) (*KeyPair, error) {
 	certificate, err := pair.ParseCertificate()
 	if err != nil {
 		return nil, err
@@ -356,7 +366,7 @@ func (pair *KeyPair) CreateDerivedCA(commonName string, organizationalUnit strin
 		return nil, err
 	}
 
-	certificateDuration := getCertificateDuration()
+	certificateDuration := getCertificateDuration(config)
 	notBefore := time.Now().Add(time.Minute * -5)
 	notAfter := notBefore.Add(certificateDuration)
 
@@ -364,8 +374,8 @@ func (pair *KeyPair) CreateDerivedCA(commonName string, organizationalUnit strin
 }
 
 // CreateRootCA generates a CA returning its keys
-func CreateRootCA(commonName string, organizationalUnit string) (*KeyPair, error) {
-	certificateDuration := getCertificateDuration()
+func CreateRootCA(commonName string, organizationalUnit string, config *configuration.Data) (*KeyPair, error) {
+	certificateDuration := getCertificateDuration(config)
 	notBefore := time.Now().Add(time.Minute * -5)
 	notAfter := notBefore.Add(certificateDuration)
 	return createCAWithValidity(notBefore, notAfter, nil, nil, commonName, organizationalUnit)
@@ -491,16 +501,16 @@ func encodePrivateKey(derBytes []byte) []byte {
 	return pem.EncodeToMemory(&pem.Block{Type: ecPrivateKeyPEMBlockType, Bytes: derBytes})
 }
 
-func getCertificateDuration() time.Duration {
-	duration := configuration.Current.CertificateDuration
+func getCertificateDuration(config *configuration.Data) time.Duration {
+	duration := config.CertificateDuration
 	if duration <= 0 {
 		return configuration.CertificateDuration * 24 * time.Hour
 	}
 	return time.Duration(duration) * 24 * time.Hour
 }
 
-func getCheckThreshold() time.Duration {
-	threshold := configuration.Current.ExpiringCheckThreshold
+func getCheckThreshold(config *configuration.Data) time.Duration {
+	threshold := config.ExpiringCheckThreshold
 	if threshold <= 0 {
 		return configuration.ExpiringCheckThreshold * 24 * time.Hour
 	}

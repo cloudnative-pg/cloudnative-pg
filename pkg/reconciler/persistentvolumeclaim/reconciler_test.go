@@ -129,13 +129,15 @@ var _ = Describe("Reconcile Metadata", func() {
 			WithLists(&pvcs, &pods).
 			Build()
 
-		configuration.Current.InheritedAnnotations = []string{"annotation1"}
-		configuration.Current.InheritedLabels = []string{"label1"}
+		config := configuration.NewConfiguration()
+		config.InheritedAnnotations = []string{"annotation1"}
+		config.InheritedLabels = []string{"label1"}
 		err := ReconcileMetadata(
 			context.Background(),
 			cli,
 			cluster,
 			pvcs.Items,
+			config,
 		)
 		Expect(err).ToNot(HaveOccurred())
 		for _, stalePVC := range pvcs.Items {
@@ -157,11 +159,13 @@ var _ = Describe("Reconcile resource requests", func() {
 	cluster := &apiv1.Cluster{}
 
 	It("Reconcile resources with empty PVCs shouldn't fail", func() {
+		config := configuration.NewConfiguration()
 		err := reconcileResourceRequests(
 			context.Background(),
 			cli,
 			cluster,
 			[]corev1.PersistentVolumeClaim{},
+			config,
 		)
 		Expect(err).ToNot(HaveOccurred())
 	})
@@ -173,12 +177,14 @@ var _ = Describe("Reconcile resource requests", func() {
 			},
 		}
 
+		config := configuration.NewConfiguration()
 		cli := fake.NewClientBuilder().WithScheme(scheme.BuildWithAllKnownScheme()).WithObjects(cluster).Build()
 		err := reconcileResourceRequests(
 			context.Background(),
 			cli,
 			cluster,
 			[]corev1.PersistentVolumeClaim{},
+			config,
 		)
 		Expect(err).ToNot(HaveOccurred())
 	})
@@ -186,6 +192,7 @@ var _ = Describe("Reconcile resource requests", func() {
 
 var _ = Describe("PVC reconciliation", func() {
 	const clusterName = "cluster-pvc-reconciliation"
+	config := configuration.NewConfiguration()
 
 	fetchPVC := func(cl client.Client, pvcToFetch corev1.PersistentVolumeClaim) corev1.PersistentVolumeClaim {
 		var pvc corev1.PersistentVolumeClaim
@@ -218,7 +225,8 @@ var _ = Describe("PVC reconciliation", func() {
 				},
 			},
 		}
-		configuration.Current.InheritedLabels = []string{"label1"}
+
+		config.InheritedLabels = []string{"label1"}
 		pvcs.Items[1].Labels = map[string]string{
 			"label1": "value",
 			"label2": "value",
@@ -230,7 +238,7 @@ var _ = Describe("PVC reconciliation", func() {
 			WithLists(&pvcs).
 			Build()
 
-		err := newLabelReconciler(cluster).reconcile(
+		err := newLabelReconciler(cluster, config).reconcile(
 			context.Background(),
 			cli,
 			pvcs.Items,
@@ -243,12 +251,12 @@ var _ = Describe("PVC reconciliation", func() {
 			"label2":                    "value",
 		}))
 
-		configuration.Current.InheritedAnnotations = []string{"annotation1"}
+		config.InheritedAnnotations = []string{"annotation1"}
 		pvcs.Items[1].Annotations = map[string]string{
 			"annotation1": "value",
 			"annotation2": "value",
 		}
-		err = newAnnotationReconciler(cluster).reconcile(
+		err = newAnnotationReconciler(cluster, config).reconcile(
 			context.Background(),
 			cli,
 			pvcs.Items,
@@ -300,7 +308,7 @@ var _ = Describe("PVC reconciliation", func() {
 			Build()
 
 		ctx := context.Background()
-		err := newLabelReconciler(cluster).reconcile(
+		err := newLabelReconciler(cluster, config).reconcile(
 			ctx,
 			cl,
 			pvcs,
@@ -368,7 +376,8 @@ var _ = Describe("PVC reconciliation", func() {
 			context.Background(),
 			cl,
 			cluster,
-			pvcs)
+			pvcs,
+			config)
 		Expect(err).NotTo(HaveOccurred())
 
 		err = ReconcileSerialAnnotation(
@@ -455,6 +464,7 @@ var _ = Describe("Reconcile PVC Quantity", func() {
 		pvc         corev1.PersistentVolumeClaim
 		pvc2        corev1.PersistentVolumeClaim
 		cli         client.Client
+		config      *configuration.Data
 	)
 
 	BeforeEach(func() {
@@ -470,6 +480,7 @@ var _ = Describe("Reconcile PVC Quantity", func() {
 			"storage": resource.MustParse("3Gi"),
 		}
 
+		config = configuration.NewConfiguration()
 		cli = fake.NewClientBuilder().
 			WithScheme(scheme.BuildWithAllKnownScheme()).
 			WithObjects(cluster, &pvc, &pvc2).
@@ -481,7 +492,8 @@ var _ = Describe("Reconcile PVC Quantity", func() {
 			context.Background(),
 			cli,
 			cluster,
-			&pvc)
+			&pvc,
+			config)
 		Expect(err).To(HaveOccurred())
 	})
 
@@ -494,7 +506,8 @@ var _ = Describe("Reconcile PVC Quantity", func() {
 			context.Background(),
 			cli,
 			cluster,
-			&pvc)
+			&pvc,
+			config)
 		Expect(err).To(HaveOccurred())
 	})
 
@@ -506,7 +519,8 @@ var _ = Describe("Reconcile PVC Quantity", func() {
 			context.Background(),
 			cli,
 			cluster,
-			&pvc)
+			&pvc,
+			config)
 		Expect(err).To(HaveOccurred())
 	})
 
@@ -520,7 +534,8 @@ var _ = Describe("Reconcile PVC Quantity", func() {
 			context.Background(),
 			cli,
 			cluster,
-			&pvc)
+			&pvc,
+			config)
 		Expect(err).ToNot(HaveOccurred())
 	})
 
@@ -539,7 +554,8 @@ var _ = Describe("Reconcile PVC Quantity", func() {
 			context.Background(),
 			cli,
 			cluster,
-			&pvc2)
+			&pvc2,
+			config)
 		Expect(err).ToNot(HaveOccurred())
 	})
 
@@ -558,7 +574,8 @@ var _ = Describe("Reconcile PVC Quantity", func() {
 			context.Background(),
 			cli,
 			cluster,
-			&pvc2)
+			&pvc2,
+			config)
 		Expect(err).ToNot(HaveOccurred())
 	})
 })

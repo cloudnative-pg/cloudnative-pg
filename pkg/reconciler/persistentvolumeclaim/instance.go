@@ -26,6 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 )
 
@@ -36,8 +37,9 @@ func CreateInstancePVCs(
 	cluster *apiv1.Cluster,
 	source *StorageSource,
 	serial int,
+	config *configuration.Data,
 ) error {
-	_, err := reconcileSingleInstanceMissingPVCs(ctx, c, cluster, serial, nil, source)
+	_, err := reconcileSingleInstanceMissingPVCs(ctx, c, cluster, serial, nil, source, config)
 	return err
 }
 
@@ -50,6 +52,7 @@ func reconcileMultipleInstancesMissingPVCs(
 	cluster *apiv1.Cluster,
 	runningInstances []corev1.Pod,
 	pvcs []corev1.PersistentVolumeClaim,
+	config *configuration.Data,
 ) (ctrl.Result, error) {
 	var result ctrl.Result
 	for idx := range runningInstances {
@@ -57,7 +60,7 @@ func reconcileMultipleInstancesMissingPVCs(
 		if err != nil {
 			return ctrl.Result{}, err
 		}
-		res, err := reconcileSingleInstanceMissingPVCs(ctx, c, cluster, serial, pvcs, nil)
+		res, err := reconcileSingleInstanceMissingPVCs(ctx, c, cluster, serial, pvcs, nil, config)
 		if err != nil {
 			return res, err
 		}
@@ -77,6 +80,7 @@ func reconcileSingleInstanceMissingPVCs(
 	serial int,
 	pvcs []corev1.PersistentVolumeClaim,
 	source *StorageSource,
+	config *configuration.Data,
 ) (ctrl.Result, error) {
 	var shouldReconcile bool
 	instanceName := specs.GetInstanceName(cluster.Name, serial)
@@ -98,7 +102,7 @@ func reconcileSingleInstanceMissingPVCs(
 
 		createConfiguration := expectedPVC.toCreateConfiguration(serial, conf, pvcSource)
 
-		if err := createIfNotExists(ctx, c, cluster, createConfiguration); err != nil {
+		if err := createIfNotExists(ctx, c, cluster, createConfiguration, config); err != nil {
 			return ctrl.Result{}, err
 		}
 

@@ -50,11 +50,11 @@ var _ = Describe("scale down", func() {
 
 			resources := &managedResources{
 				pvcs: corev1.PersistentVolumeClaimList{
-					Items: generateClusterPVC(env.client, cluster, persistentvolumeclaim.StatusReady),
+					Items: generateClusterPVC(env.client, cluster, persistentvolumeclaim.StatusReady, env.config),
 				},
-				jobs: batchv1.JobList{Items: generateFakeInitDBJobsWithDefaultClient(env.client, cluster)},
+				jobs: batchv1.JobList{Items: generateFakeInitDBJobsWithDefaultClient(env.client, cluster, env.config)},
 				instances: corev1.PodList{
-					Items: generateFakeClusterPodsWithDefaultClient(env.client, cluster, true),
+					Items: generateFakeClusterPodsWithDefaultClient(env.client, cluster, true, env.config),
 				},
 			}
 
@@ -101,11 +101,11 @@ var _ = Describe("scale down", func() {
 
 			resources := &managedResources{
 				pvcs: corev1.PersistentVolumeClaimList{
-					Items: generateClusterPVC(env.client, cluster, persistentvolumeclaim.StatusReady),
+					Items: generateClusterPVC(env.client, cluster, persistentvolumeclaim.StatusReady, env.config),
 				},
-				jobs: batchv1.JobList{Items: generateFakeInitDBJobsWithDefaultClient(env.client, cluster)},
+				jobs: batchv1.JobList{Items: generateFakeInitDBJobsWithDefaultClient(env.client, cluster, env.config)},
 				instances: corev1.PodList{
-					Items: generateFakeClusterPodsWithDefaultClient(env.client, cluster, true),
+					Items: generateFakeClusterPodsWithDefaultClient(env.client, cluster, true, env.config),
 				},
 			}
 

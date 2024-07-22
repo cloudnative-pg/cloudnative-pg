@@ -44,13 +44,8 @@ import (
 var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 	var env *testingEnvironment
 
-	AfterEach(func() {
-		configuration.Current = configuration.NewConfiguration()
-	})
-
 	BeforeEach(func() {
 		env = buildTestEnvironment()
-		configuration.Current = configuration.NewConfiguration()
 	})
 
 	It("it should test the deployment update logic", func() {
@@ -156,13 +151,13 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 		By("creating the requirement for the imagePullSecret", func() {
 			namespace := newFakeNamespace(env.client)
 
-			configuration.Current.OperatorPullSecretName = "test-secret-pull"
-			configuration.Current.OperatorNamespace = namespace
+			env.config.OperatorPullSecretName = "test-secret-pull"
+			env.config.OperatorNamespace = namespace
 
 			pullSecret := &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      configuration.Current.OperatorPullSecretName,
-					Namespace: configuration.Current.OperatorNamespace,
+					Name:      env.config.OperatorPullSecretName,
+					Namespace: env.config.OperatorNamespace,
 				},
 				Data: map[string][]byte{
 					corev1.TLSCertKey:       []byte("test-cert"),

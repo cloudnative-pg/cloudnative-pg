@@ -69,6 +69,7 @@ var _ = Describe("cluster_create unit tests", func() {
 				cluster.GetClientCASecretName(),
 				namespace,
 				"testdomain.com",
+				env.config,
 			)
 		})
 
@@ -156,7 +157,7 @@ var _ = Describe("cluster_create unit tests", func() {
 		func(ctx SpecContext) {
 			namespace := newFakeNamespace(env.client)
 			cluster := newFakeCNPGCluster(env.client, namespace)
-			configuration.Current.CreateAnyService = true
+			env.config.CreateAnyService = true
 
 			By("executing reconcilePostgresServices", func() {
 				err := env.clusterReconciler.reconcilePostgresServices(ctx, cluster)
@@ -175,10 +176,10 @@ var _ = Describe("cluster_create unit tests", func() {
 		func(ctx SpecContext) {
 			namespace := newFakeNamespace(env.client)
 			cluster := newFakeCNPGCluster(env.client, namespace)
-			configuration.Current.CreateAnyService = true
+			env.config.CreateAnyService = true
 
 			createOutdatedService := func(svc *corev1.Service) {
-				cluster.SetInheritedDataAndOwnership(&svc.ObjectMeta)
+				cluster.SetInheritedDataAndOwnership(&svc.ObjectMeta, env.config)
 				svc.Spec.Selector = map[string]string{
 					"outdated": "selector",
 				}
@@ -335,8 +336,8 @@ var _ = Describe("cluster_create unit tests", func() {
 	It("should make sure that reconcilePodDisruptionBudget works correctly", func(ctx SpecContext) {
 		namespace := newFakeNamespace(env.client)
 		cluster := newFakeCNPGCluster(env.client, namespace)
-		pdbReplicaName := specs.BuildReplicasPodDisruptionBudget(cluster).Name
-		pdbPrimaryName := specs.BuildPrimaryPodDisruptionBudget(cluster).Name
+		pdbReplicaName := specs.BuildReplicasPodDisruptionBudget(cluster, env.config).Name
+		pdbPrimaryName := specs.BuildPrimaryPodDisruptionBudget(cluster, env.config).Name
 		reconcilePDB := func() {
 			err := env.clusterReconciler.reconcilePodDisruptionBudget(ctx, cluster)
 			Expect(err).ToNot(HaveOccurred())
@@ -844,7 +845,8 @@ var _ = Describe("createOrPatchClusterCredentialSecret", func() {
 				},
 				ObjectMeta: metav1.ObjectMeta{Name: "test-cluster", Namespace: namespace},
 			}
-			cluster.SetInheritedDataAndOwnership(&existingSecret.ObjectMeta)
+			config := configuration.NewConfiguration()
+			cluster.SetInheritedDataAndOwnership(&existingSecret.ObjectMeta, config)
 			Expect(cli.Create(ctx, existingSecret)).To(Succeed())
 		})
 
@@ -1150,7 +1152,8 @@ var _ = Describe("Service Reconciling", func() {
 			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
 			Build()
 		reconciler = &ClusterReconciler{
-			Client: serviceClient,
+			Client:        serviceClient,
+			Configuration: configuration.NewConfiguration(),
 		}
 	})
 
@@ -1168,7 +1171,7 @@ var _ = Describe("Service Reconciling", func() {
 					Ports:    []corev1.ServicePort{{Port: 80}},
 				},
 			}
-			cluster.SetInheritedDataAndOwnership(&proposedService.ObjectMeta)
+			cluster.SetInheritedDataAndOwnership(&proposedService.ObjectMeta, reconciler.Configuration)
 		})
 
 		Context("when service does not exist", func() {

@@ -26,6 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
@@ -85,7 +86,7 @@ func (r *ClusterReconciler) reconcileRestoredCluster(
 	}
 
 	contextLogger.Debug("restored the cluster status, proceeding to restore the orphan PVCS")
-	return nil, restoreOrphanPVCs(ctx, r.Client, cluster, pvcs)
+	return nil, restoreOrphanPVCs(ctx, r.Client, cluster, pvcs, r.Configuration)
 }
 
 // ensureClusterRestoreCanStart is a function where the plugins can inject their custom logic to tell the
@@ -233,6 +234,7 @@ func restoreOrphanPVCs(
 	c client.Client,
 	cluster *apiv1.Cluster,
 	pvcs []corev1.PersistentVolumeClaim,
+	config *configuration.Data,
 ) error {
 	for i := range pvcs {
 		pvc := &pvcs[i]
@@ -241,7 +243,7 @@ func restoreOrphanPVCs(
 		}
 
 		pvcOrig := pvc.DeepCopy()
-		cluster.SetInheritedDataAndOwnership(&pvc.ObjectMeta)
+		cluster.SetInheritedDataAndOwnership(&pvc.ObjectMeta, config)
 		pvc.Annotations[utils.PVCStatusAnnotationName] = persistentvolumeclaim.StatusReady
 		// we clean hibernation metadata if it exists
 		delete(pvc.Annotations, utils.HibernateClusterManifestAnnotationName)

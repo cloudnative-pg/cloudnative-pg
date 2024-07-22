@@ -172,7 +172,7 @@ func (scheduledBackup *ScheduledBackup) GetStatus() *ScheduledBackupStatus {
 }
 
 // CreateBackup creates a backup from this scheduled backup
-func (scheduledBackup *ScheduledBackup) CreateBackup(name string) *Backup {
+func (scheduledBackup *ScheduledBackup) CreateBackup(name string, config *configuration.Data) *Backup {
 	backup := Backup{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -187,7 +187,7 @@ func (scheduledBackup *ScheduledBackup) CreateBackup(name string) *Backup {
 			PluginConfiguration: scheduledBackup.Spec.PluginConfiguration,
 		},
 	}
-	utils.InheritAnnotations(&backup.ObjectMeta, scheduledBackup.Annotations, nil, configuration.Current)
+	utils.InheritAnnotations(&backup.ObjectMeta, scheduledBackup.Annotations, nil, config)
 	return &backup
 }
 

@@ -78,9 +78,9 @@ var _ = Describe("Updating target primary", func() {
 		cluster := newFakeCNPGCluster(env.client, namespace)
 
 		By("creating the cluster resources")
-		jobs := generateFakeInitDBJobs(env.client, cluster)
-		instances := generateFakeClusterPods(env.client, cluster, true)
-		pvc := generateClusterPVC(env.client, cluster, persistentvolumeclaim.StatusReady)
+		jobs := generateFakeInitDBJobs(env.client, cluster, env.config)
+		instances := generateFakeClusterPods(env.client, cluster, true, env.config)
+		pvc := generateClusterPVC(env.client, cluster, persistentvolumeclaim.StatusReady, env.config)
 
 		managedResources := &managedResources{
 			nodes:     nil,
@@ -139,9 +139,9 @@ var _ = Describe("Updating target primary", func() {
 		})
 
 		By("creating the cluster resources")
-		jobs := generateFakeInitDBJobs(env.client, cluster)
-		instances := generateFakeClusterPods(env.client, cluster, true)
-		pvc := generateClusterPVC(env.client, cluster, persistentvolumeclaim.StatusReady)
+		jobs := generateFakeInitDBJobs(env.client, cluster, env.config)
+		instances := generateFakeClusterPods(env.client, cluster, true, env.config)
+		pvc := generateClusterPVC(env.client, cluster, persistentvolumeclaim.StatusReady, env.config)
 
 		managedResources := &managedResources{
 			nodes:     nil,
@@ -219,10 +219,10 @@ var _ = Describe("Updating target primary", func() {
 		})
 
 		By("creating the cluster resources")
-		jobs := generateFakeInitDBJobs(env.client, cluster)
-		instances := generateFakeClusterPods(env.client, cluster, true)
-		pvcs := generateClusterPVC(env.client, cluster, persistentvolumeclaim.StatusReady)
-		thirdInstancePVCGroup := newFakePVC(env.client, cluster, 3, persistentvolumeclaim.StatusReady)
+		jobs := generateFakeInitDBJobs(env.client, cluster, env.config)
+		instances := generateFakeClusterPods(env.client, cluster, true, env.config)
+		pvcs := generateClusterPVC(env.client, cluster, persistentvolumeclaim.StatusReady, env.config)
+		thirdInstancePVCGroup := newFakePVC(env.client, cluster, 3, persistentvolumeclaim.StatusReady, env.config)
 		pvcs = append(pvcs, thirdInstancePVCGroup...)
 
 		cluster.Status.DanglingPVC = append(cluster.Status.DanglingPVC, thirdInstancePVCGroup[0].Name)

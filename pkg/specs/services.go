@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/servicespec"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -130,7 +131,7 @@ func CreateClusterReadWriteService(cluster apiv1.Cluster) *corev1.Service {
 //	for idx := range services {
 //	    // use the created services
 //	}
-func BuildManagedServices(cluster apiv1.Cluster) ([]corev1.Service, error) {
+func BuildManagedServices(cluster apiv1.Cluster, config *configuration.Data) ([]corev1.Service, error) {
 	if cluster.Spec.Managed == nil || cluster.Spec.Managed.Services == nil {
 		return nil, nil
 	}
@@ -176,7 +177,7 @@ func BuildManagedServices(cluster apiv1.Cluster) ([]corev1.Service, error) {
 			},
 			Spec: serviceTemplate.Spec,
 		}
-		cluster.SetInheritedDataAndOwnership(&services[i].ObjectMeta)
+		cluster.SetInheritedDataAndOwnership(&services[i].ObjectMeta, config)
 	}
 
 	return services, nil

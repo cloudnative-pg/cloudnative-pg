@@ -24,6 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -33,6 +34,8 @@ import (
 )
 
 var _ = Describe("object metadata test", func() {
+	config := configuration.NewConfiguration()
+
 	Context("updateRoleLabelsOnPods", func() {
 		It("Should update the role labels correctly", func() {
 			cluster := &apiv1.Cluster{
@@ -317,7 +320,7 @@ var _ = Describe("object metadata test", func() {
 				}
 
 				for idx := range pods.Items {
-					updated := updateClusterLabels(context.Background(), cluster, &pods.Items[idx])
+					updated := updateClusterLabels(context.Background(), cluster, &pods.Items[idx], config)
 					Expect(updated).To(BeTrue())
 				}
 
@@ -349,7 +352,7 @@ var _ = Describe("object metadata test", func() {
 
 				Expect(cluster.Spec.InheritedMetadata.Labels).To(Equal(cluster.GetFixedInheritedLabels()))
 
-				updated := updateClusterLabels(context.Background(), cluster, pod)
+				updated := updateClusterLabels(context.Background(), cluster, pod, config)
 				Expect(updated).To(BeFalse())
 				Expect(pod.Labels).To(Equal(cluster.GetFixedInheritedLabels()))
 			})
@@ -362,7 +365,7 @@ var _ = Describe("object metadata test", func() {
 				}
 				pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}}
 
-				updated := updateClusterLabels(context.Background(), cluster, pod)
+				updated := updateClusterLabels(context.Background(), cluster, pod, config)
 				Expect(updated).To(BeFalse())
 				Expect(pod.Labels).To(BeEmpty())
 			})
@@ -386,7 +389,7 @@ var _ = Describe("object metadata test", func() {
 						},
 					},
 				}
-				updated := updateClusterAnnotations(context.Background(), cluster, pod)
+				updated := updateClusterAnnotations(context.Background(), cluster, pod, config)
 				Expect(updated).To(BeTrue())
 
 				Expect(pod.Annotations[key]).To(Equal(value))
@@ -411,7 +414,7 @@ var _ = Describe("object metadata test", func() {
 
 				Expect(cluster.Spec.InheritedMetadata.Annotations).To(Equal(cluster.GetFixedInheritedAnnotations()))
 
-				updated := updateClusterAnnotations(context.Background(), cluster, pod)
+				updated := updateClusterAnnotations(context.Background(), cluster, pod, config)
 				Expect(updated).To(BeFalse())
 				Expect(pod.Annotations).To(HaveLen(1))
 				Expect(pod.Annotations[key]).To(Equal(value))
@@ -436,7 +439,7 @@ var _ = Describe("object metadata test", func() {
 					},
 				}
 
-				updated := updateClusterAnnotations(context.Background(), cluster, pod)
+				updated := updateClusterAnnotations(context.Background(), cluster, pod, config)
 				Expect(updated).To(BeTrue())
 				Expect(pod.Annotations[key]).To(Equal(value))
 			})
@@ -449,7 +452,7 @@ var _ = Describe("object metadata test", func() {
 				}
 				cluster := &apiv1.Cluster{}
 
-				updated := updateClusterAnnotations(context.Background(), cluster, pod)
+				updated := updateClusterAnnotations(context.Background(), cluster, pod, config)
 				Expect(updated).To(BeFalse())
 				Expect(pod.Annotations).To(BeEmpty())
 			})
@@ -458,6 +461,8 @@ var _ = Describe("object metadata test", func() {
 })
 
 var _ = Describe("metadata reconciliation test", func() {
+	config := configuration.NewConfiguration()
+
 	Context("ReconcileMetadata", func() {
 		It("Should update all pods metadata successfully", func() {
 			instances := []corev1.Pod{
@@ -482,7 +487,7 @@ var _ = Describe("metadata reconciliation test", func() {
 				WithObjects(&instances[0], &instances[1]).
 				Build()
 
-			err := ReconcileMetadata(context.Background(), cli, cluster, instances)
+			err := ReconcileMetadata(context.Background(), cli, cluster, instances, config)
 			Expect(err).ToNot(HaveOccurred())
 
 			var updatedInstanceList corev1.PodList
@@ -510,6 +515,7 @@ var _ = Describe("metadata update functions", func() {
 			ctx      context.Context
 			cluster  *apiv1.Cluster
 			instance *corev1.Pod
+			config   *configuration.Data
 		)
 
 		BeforeEach(func() {
@@ -537,6 +543,8 @@ var _ = Describe("metadata update functions", func() {
 					Annotations: nil,
 				},
 			}
+
+			config = configuration.NewConfiguration()
 		})
 
 		It("Should updateRoleLabels correctly", func() {
@@ -556,13 +564,13 @@ var _ = Describe("metadata update functions", func() {
 		})
 
 		It("Should updateClusterLabels correctly", func() {
-			modified := updateClusterLabels(ctx, cluster, instance)
+			modified := updateClusterLabels(ctx, cluster, instance, config)
 			Expect(modified).To(BeTrue())
 			Expect(instance.Labels).To(Equal(cluster.Spec.InheritedMetadata.Labels))
 		})
 
 		It("Should updateClusterAnnotations correctly", func() {
-			modified := updateClusterAnnotations(ctx, cluster, instance)
+			modified := updateClusterAnnotations(ctx, cluster, instance, config)
 			Expect(modified).To(BeTrue())
 			Expect(instance.Annotations).To(Equal(cluster.Spec.InheritedMetadata.Annotations))
 		})

@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -42,32 +43,33 @@ type CreateConfiguration struct {
 // TODO: this logic eventually should be moved inside reconcile
 func Build(
 	cluster *apiv1.Cluster,
-	configuration *CreateConfiguration,
+	pvcConfig *CreateConfiguration,
+	config *configuration.Data,
 ) (*corev1.PersistentVolumeClaim, error) {
-	instanceName := specs.GetInstanceName(cluster.Name, configuration.NodeSerial)
-	calculator := configuration.Calculator
-	builder := resources.NewPersistentVolumeClaimBuilder().
+	instanceName := specs.GetInstanceName(cluster.Name, pvcConfig.NodeSerial)
+	calculator := pvcConfig.Calculator
+	builder := resources.NewPersistentVolumeClaimBuilder(config).
 		BeginMetadata().
 		WithNamespacedName(calculator.GetName(instanceName), cluster.Namespace).
 		WithAnnotations(map[string]string{
-			utils.ClusterSerialAnnotationName: strconv.Itoa(configuration.NodeSerial),
-			utils.PVCStatusAnnotationName:     configuration.Status,
+			utils.ClusterSerialAnnotationName: strconv.Itoa(pvcConfig.NodeSerial),
+			utils.PVCStatusAnnotationName:     pvcConfig.Status,
 		}).
 		WithLabels(calculator.GetLabels(instanceName)).
 		WithClusterInheritance(cluster).
 		EndMetadata().
-		WithSpec(configuration.Storage.PersistentVolumeClaimTemplate).
-		WithSource(configuration.Source).
+		WithSpec(pvcConfig.Storage.PersistentVolumeClaimTemplate).
+		WithSource(pvcConfig.Source).
 		WithDefaultAccessMode(corev1.ReadWriteOnce)
 
 	// If the customer specified a storage class, let's use it
-	if configuration.Storage.StorageClass != nil {
-		builder = builder.WithStorageClass(configuration.Storage.StorageClass)
+	if pvcConfig.Storage.StorageClass != nil {
+		builder = builder.WithStorageClass(pvcConfig.Storage.StorageClass)
 	}
 
-	if configuration.Storage.Size != "" {
+	if pvcConfig.Storage.Size != "" {
 		// Insert the storage requirement
-		parsedSize, err := resource.ParseQuantity(configuration.Storage.Size)
+		parsedSize, err := resource.ParseQuantity(pvcConfig.Storage.Size)
 		if err != nil {
 			return nil, ErrorInvalidSize
 		}

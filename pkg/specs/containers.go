@@ -28,10 +28,10 @@ import (
 
 // createBootstrapContainer creates the init container bootstrapping the operator
 // executable inside the generated Pods
-func createBootstrapContainer(cluster apiv1.Cluster) corev1.Container {
+func createBootstrapContainer(cluster apiv1.Cluster, config *configuration.Data) corev1.Container {
 	container := corev1.Container{
 		Name:            BootstrapControllerContainerName,
-		Image:           configuration.Current.OperatorImageName,
+		Image:           config.OperatorImageName,
 		ImagePullPolicy: cluster.Spec.ImagePullPolicy,
 		Command: []string{
 			"/manager",

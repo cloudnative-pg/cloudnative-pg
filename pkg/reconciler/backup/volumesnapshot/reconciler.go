@@ -33,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
@@ -45,6 +46,7 @@ type Reconciler struct {
 	cli                  client.Client
 	recorder             record.EventRecorder
 	instanceStatusClient instance.Client
+	config               *configuration.Data
 }
 
 // ExecutorBuilder is a struct capable of creating a Reconciler
@@ -56,12 +58,14 @@ type ExecutorBuilder struct {
 func NewReconcilerBuilder(
 	cli client.Client,
 	recorder record.EventRecorder,
+	config *configuration.Data,
 ) *ExecutorBuilder {
 	return &ExecutorBuilder{
 		executor: Reconciler{
 			cli:                  cli,
 			recorder:             recorder,
 			instanceStatusClient: instance.NewStatusClient(),
+			config:               config,
 		},
 	}
 }
@@ -85,7 +89,7 @@ func (se *Reconciler) enrichSnapshot(
 
 	switch snapshotConfig.SnapshotOwnerReference {
 	case apiv1.SnapshotOwnerReferenceCluster:
-		cluster.SetInheritedDataAndOwnership(&vs.ObjectMeta)
+		cluster.SetInheritedDataAndOwnership(&vs.ObjectMeta, se.config)
 	case apiv1.SnapshotOwnerReferenceBackup:
 		utils.SetAsOwnedBy(&vs.ObjectMeta, backup.ObjectMeta, backup.TypeMeta)
 	default:
