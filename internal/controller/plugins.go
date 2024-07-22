@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -25,6 +26,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	cnpgiClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -49,11 +51,13 @@ func postReconcilePluginHooks(
 }
 
 func setStatusPluginHook(ctx context.Context, cli client.Client, cluster *apiv1.Cluster) (ctrl.Result, error) {
+	contextLogger := log.FromContext(ctx).WithName("set_status_plugin_hook")
+
 	origCluster := cluster.DeepCopy()
 	pluginClient := getPluginClientFromContext(ctx)
 	statuses, err := pluginClient.SetClusterStatus(ctx, cluster)
 	if err != nil {
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("while calling SetClusterStatus: %w", err)
 	}
 	if len(statuses) == 0 {
 		return ctrl.Result{}, nil
@@ -65,6 +69,12 @@ func setStatusPluginHook(ctx context.Context, cli client.Client, cluster *apiv1.
 		}
 		status.Status = val
 	}
+
+	contextLogger.Info("patching cluster status with the updated plugin statuses")
+	contextLogger.Debug("diff detected",
+		"before", origCluster.Status.PluginStatus,
+		"after", cluster.Status.PluginStatus,
+	)
 
 	return ctrl.Result{RequeueAfter: 5 * time.Second}, cli.Status().Patch(ctx, cluster, client.MergeFrom(origCluster))
 }
