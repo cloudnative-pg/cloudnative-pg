@@ -98,8 +98,7 @@ setting to `true`. This setup ensures that the metrics exporter uses the same
 server certificates as PostgreSQL to secure communication on port 5432.
 
 !!! important
-    Changing the `spec.monitoring.tls.enable` value will cause all instances to restart.
-    Plan accordingly to minimize downtime.
+    Changing the `spec.monitoring.tls.enable` setting will trigger a rolling restart of the cluster.
 
 A `PodMonitor` that correctly points to the cluster can be automatically created by the operator by setting
 `.spec.monitoring.enablePodMonitor` to `true` in the cluster resource itself (default: `false`).
