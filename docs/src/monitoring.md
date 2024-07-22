@@ -121,7 +121,7 @@ spec:
       ca:
         secret:
           name: cluster-example-ca
-        key: ca.crt
+          key: ca.crt
       serverName: cluster-example-rw
 ```
 
