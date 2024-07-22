@@ -464,18 +464,22 @@ such as incorrect `DELETE` or `UPDATE` SQL operations.
 
 ### Distributed Database Topologies
 
-Using replica clusters, you can create distributed database topologies based on
-PostgreSQL that span different Kubernetes clusters, enabling hybrid and
-multi-cloud scenarios.
-With CloudNativePG, you can:
+Leverage replica clusters to craft [distributed database topologies](replica_cluster.md#distributed-topology)
+for PostgreSQL that span across various Kubernetes clusters, facilitating
+hybrid and multi-cloud deployments. With CloudNativePG, you gain powerful
+capabilities, including:
 
-- Declaratively control which PostgreSQL cluster is the primary.
-- Seamlessly demote the current primary and promote another PostgreSQL cluster
-  (typically in another region) without the need to re-clone the former primary.
+- **Declarative Primary Control**: Easily specify which PostgreSQL cluster acts
+  as the primary.
+- **Seamless Primary Switchover**: Effortlessly demote the current primary and
+  promote another PostgreSQL cluster, typically located in a different region,
+  without needing to re-clone the former primary.
 
-This setup can function across two or more regions, relying solely on object
-stores for replication, with a maximum guaranteed RPO of 5 minutes. This
-feature is currently unique to CloudNativePG.
+This setup can efficiently operate across two or more regions, using only
+object stores for replication, and guarantees a maximum RPO (Recovery Point
+Objective) of 5 minutes. This advanced feature is uniquely provided by
+CloudNativePG, ensuring robust data integrity and continuity across diverse
+environments.
 
 ### Tablespace support
 

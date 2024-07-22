@@ -1,102 +1,382 @@
 # Replica clusters
 
-A replica cluster is an independent CloudNativePG `Cluster` resource that has
-the main characteristic to be in replica from another Postgres instance,
-ideally also managed by CloudNativePG. Normally, a replica cluster is in another
-Kubernetes cluster in another region. Replica clusters can be cascading too,
-and they can solely rely on object stores for replication of the data from
-the source, as described further down.
+A replica cluster is a separate CloudNativePG `Cluster` resource designed to
+replicate data from another PostgreSQL instance, ideally also managed by
+CloudNativePG.
 
-The diagram below - taken from the ["Architecture"
-section](architecture.md#deployments-across-kubernetes-clusters) containing more
-information about this capability - shows just an example of architecture
-that you can implement with replica clusters.
+Typically, a replica cluster is deployed in a different Kubernetes cluster in
+another region. These clusters can be configured to perform cascading
+replication and can rely on object stores for data replication from the source,
+as detailed further down.
+
+There are primarily two use cases for replica clusters:
+
+1. **Disaster Recovery and High Availability**: Enhance disaster recovery and,
+   to some extent, high availability of a CloudNativePG cluster across different
+   Kubernetes clusters, typically located in different regions. In CloudNativePG
+   terms, this is known as a ["Distributed Topology"](replica_cluster.md#distributed-topology).
+
+2. **Read-Only Workloads**: Create standalone replicas of a PostgreSQL cluster
+   for purposes such as reporting or Online Analytical Processing (OLAP). These
+   replicas are primarily for read-only workloads. In CloudNativePG terms, this is
+   referred to as a ["Standalone Replica Cluster"](replica_cluster.md#standalone-replica-clusters).
+
+For example, the diagram below — taken from the ["Architecture" section](architecture.md#deployments-across-kubernetes-clusters)
+— illustrates a distributed PostgreSQL topology spanning two Kubernetes
+clusters, with a symmetric replica cluster primarily serving disaster recovery
+purposes.
 
 ![An example of multi-cluster deployment with a primary and a replica cluster](./images/multi-cluster.png)
 
-## Basic concepts
+## Basic Concepts
 
-CloudNativePG relies on the foundations of the PostgreSQL replication
-framework even when a PostgreSQL cluster is created from an existing one (source)
-and kept synchronized through the
-[replica cluster](architecture.md#deployments-across-kubernetes-clusters) feature. The source
-can be a primary cluster or another replica cluster (cascading replica cluster).
+CloudNativePG builds on the PostgreSQL replication framework, allowing you to
+create and synchronize a PostgreSQL cluster from an existing source cluster
+using the replica cluster feature — described in this section. The source can
+be a primary cluster or another replica cluster (cascading replication).
 
-The first step is to bootstrap the replica cluster, choosing among one of the
-available methods:
+### Bootstrapping a Replica Cluster
 
-- streaming replication, via `pg_basebackup`
-- recovery from a volume snapshot
-- recovery from a Barman Cloud backup in an object store
+The first step is to bootstrap the replica cluster using one of the following
+methods:
 
-Please refer to the ["Bootstrap" section](bootstrap.md#bootstrap-from-another-cluster)
-for information on how to clone a PostgreSQL server using either
-`pg_basebackup` (streaming) or `recovery` (volume snapshot or object store).
+- **Streaming replication** via `pg_basebackup`
+- **Recovery from a volume snapshot**
+- **Recovery from a Barman Cloud backup** in an object store
 
-Once the replica cluster's base backup is available, you need to define how
-changes are replicated from the origin, through PostgreSQL continuous recovery.
-There are two options:
+For detailed instructions on cloning a PostgreSQL server using `pg_basebackup`
+(streaming) or recovery (volume snapshot or object store), refer to the
+["Bootstrap" section](bootstrap.md#bootstrap-from-another-cluster).
 
-- use streaming replication between the replica cluster and the source
-  (this will certainly require some administrative and security related
-  work to be done to make sure that the network connection between the
-  two clusters are correctly setup)
-- use the WAL archive (on an object store) to fetch the WAL files that are
-  regularly shipped from the source to the object store and pulled by
-  `barman-cloud-wal-restore` in the replica cluster
-- any of the two
+### Configuring Replication
 
-All you have to do is actually define an external cluster.
+Once the base backup for the replica cluster is available, you need to define
+how changes will be replicated from the origin using PostgreSQL continuous
+recovery. There are three main options:
 
-If the external cluster contains a `barmanObjectStore` section:
+1. **Streaming Replication**: Set up streaming replication between the replica
+   cluster and the source. This method requires configuring network connections
+   and implementing appropriate administrative and security measures to ensure
+   seamless data transfer.
+2. **WAL Archive**: Utilize the WAL (Write-Ahead Logging) archive stored in an
+   object store. WAL files are regularly transferred from the source to the object
+   store, from where the `barman-cloud-wal-restore` utility retrieves them for the
+   replica cluster.
+3. **Hybrid Approach**: Combine both streaming replication and WAL archive
+   methods. PostgreSQL can manage and switch between these two approaches as
+   needed to ensure data consistency and availability.
 
-- you'll be able to use the WAL archive, and CloudNativePG will automatically
-  set the `restore_command` in the designated primary instance
-- you'll be able to bootstrap the replica cluster from an object store
-  using the `recovery` section, in case you cannot take advantage of
-  volume snapshots
+### Defining an External Cluster
 
-If the external cluster contains a `connectionParameters` section:
+When configuring the external cluster, you have the following options:
 
-- you'll be able to bootstrap the replica cluster via streaming replication
-  using the `pg_basebackup` section
-- CloudNativePG will automatically set the `primary_conninfo`
-  option in the designated primary instance, so that a WAL receiver
-  process is started to connect to the source cluster and receive data
+- **`barmanObjectStore` section**:
+    - Enables use of the WAL archive, with CloudNativePG automatically setting
+      the `restore_command` in the designated primary instance.
+    - Allows bootstrapping the replica cluster from an object store using the
+      `recovery` section if volume snapshots are not feasible.
+- **`connectionParameters` section**:
+    - Enables bootstrapping the replica cluster via streaming replication using
+      the `pg_basebackup` section.
+    - CloudNativePG automatically sets the `primary_conninfo` option in the
+      designated primary instance, initiating a WAL receiver process to connect
+      to the source cluster and receive data.
 
-The created replica cluster can perform backups in a reserved object store from
-the designated primary, enabling symmetric architectures in a distributed
-fashion.
+### Backup and Symmetric Architectures
 
-You have full flexibility and freedom to decide your favorite
-distributed architecture for a PostgreSQL database by choosing:
+The replica cluster can perform backups to a reserved object store from the
+designated primary, supporting symmetric architectures in a distributed
+environment. This architectural choice is crucial as it ensures the cluster is
+prepared for promotion during a controlled data center switchover or a failover
+following an unexpected event.
 
-- a private cloud spanning over multiple Kubernetes clusters in different data
-  centers
-- a public cloud spanning over multiple Kubernetes clusters in different
-  regions
-- a mix of the previous two (hybrid)
-- a public cloud spanning over multiple Kubernetes clusters in different
-  regions and on different Cloud Service Providers
+### Distributed Architecture Flexibility
 
-## Setting up a replica cluster
+You have the flexibility to design your preferred distributed architecture for
+a PostgreSQL database, choosing from:
 
-To set up a replica cluster from a source cluster, we need to create a cluster YAML
-file and define the following parts accordingly:
+- **Private Cloud**: Spanning multiple Kubernetes clusters in different data
+  centers.
+- **Public Cloud**: Spanning multiple Kubernetes clusters in different regions.
+- **Hybrid Cloud**: Combining private and public clouds.
+- **Multi-Cloud**: Spanning multiple Kubernetes clusters across different
+  regions and Cloud Service Providers.
 
-- define the `externalClusters` section in the replica cluster
-- define the bootstrap part for the replica cluster. We can either bootstrap via
-  streaming using the `pg_basebackup` section, or bootstrap from a volume snapshot
-  or an object store using the `recovery` section
-- define the continuous recovery part (`.spec.replica`) in the replica cluster. All
-  we need to do is to enable the replica mode through option `.spec.replica.enabled`
-  and set the `externalClusters` name in option `.spec.replica.source`
+## Setting Up a Replica Cluster
 
-#### Example using pg_basebackup
+To set up a replica cluster from a source cluster, follow these steps to create
+a cluster YAML file and configure it accordingly:
 
-This **first example** defines a replica cluster using streaming replication in
-both bootstrap and continuous recovery. The replica cluster connects to the
-source cluster using TLS authentication.
+1. **Define External Clusters**:
+    - In the `externalClusters` section, specify the replica cluster.
+    - For a distributed PostgreSQL topology aimed at disaster recovery (DR) and
+      high availability (HA), this section should be defined for every
+      PostgreSQL cluster in the distributed database.
+
+2. **Bootstrap the Replica Cluster**:
+    - **Streaming Bootstrap**: Use the `pg_basebackup` section for bootstrapping
+      via streaming replication.
+    - **Snapshot/Object Store Bootstrap**: Use the `recovery` section to
+      bootstrap from a volume snapshot or an object store.
+3. **Continuous Recovery Strategy**: Define this in the `.spec.replica` stanza:
+    - **Distributed Topology**: Configure using the `primary`, `source`, and
+      `self` fields along with the distributed topology defined in
+      `externalClusters`. This allows CloudNativePG to declaratively control the
+      demotion of a primary cluster and the subsequent promotion of a replica cluster
+      using a promotion token.
+    - **Standalone Replica Cluster**: Enable continuous recovery using the
+      `enabled` option and set the `source` field to point to an
+      `externalClusters` name. This configuration is suitable for creating replicas
+      primarily intended for read-only workloads.
+
+Both the Distributed Topology and the Standalone Replica Cluster strategies for
+continuous recovery are thoroughly explained below.
+
+## Distributed Topology
+
+!!! Important
+    The Distributed Topology strategy was introduced in CloudNativePG 1.24.
+
+### Planning for a Distributed PostgreSQL Database
+
+As Winston Churchill famously said, "Planning is essential", and this holds
+true for designing PostgreSQL architectures in Kubernetes.
+
+First, conceptualize your distributed topology on paper, and then translate it
+into a CloudNativePG API configuration. This configuration primarily involves:
+
+- The `externalClusters` section, which must be included in every `Cluster`
+  definition within your distributed PostgreSQL setup.
+- The `.spec.replica` stanza, specifically the `primary`, `source`, and
+  (optionally) `self` fields.
+
+For example, suppose you want to deploy a PostgreSQL cluster distributed across
+two Kubernetes clusters located in Southern Europe and Central Europe.
+
+In this scenario, assume you have CloudNativePG installed in the Southern
+Europe Kubernetes cluster, with a PostgreSQL `Cluster` named `cluster-eu-south`
+acting as the primary. This cluster has continuous backup configured with a
+local object store. This object store is also accessible by the PostgreSQL
+`Cluster` named `cluster-eu-central`, installed in the Central European
+Kubernetes cluster. Initially, `cluster-eu-central` functions as a replica
+cluster. Following a symmetric approach, it also has a local object store for
+continuous backup, which needs to be read by `cluster-eu-south`. The recovery
+in this setup relies solely on WAL shipping, with no streaming connection
+between the two clusters.
+
+Here’s how you would configure the `externalClusters` section for both
+`Cluster` resources:
+
+```yaml
+# Distributed topology configuration
+externalClusters:
+  - name: cluster-eu-south
+    barmanObjectStore:
+      destinationPath: s3://cluster-eu-central/
+      # Additional configuration
+  - name: cluster-eu-central
+    barmanObjectStore:
+      destinationPath: s3://cluster-eu-south/
+      # Additional configuration
+```
+
+The `.spec.replica` stanza for the `cluster-eu-south` PostgreSQL primary
+`Cluster` should be configured as follows:
+
+```yaml
+replica:
+  primary: cluster-eu-south
+  source: cluster-eu-central
+```
+
+Meanwhile, the `.spec.replica` stanza for the `cluster-eu-central` PostgreSQL
+replica `Cluster` should be configured as:
+
+```yaml
+replica:
+  primary: cluster-eu-south
+  source: cluster-eu-south
+```
+
+In this configuration, when the `primary` field matches the name of the
+`Cluster` resource (or `.spec.replica.self` if a different one is used), the
+current cluster is considered the primary in the distributed topology.
+Otherwise, it is set as a replica from the `source` (in this case, using the
+Barman object store).
+
+This setup allows you to efficiently manage a distributed PostgreSQL
+architecture across multiple Kubernetes clusters, ensuring both high
+availability and disaster recovery through controlled switchover of a primary
+PostgreSQL cluster using declarative configuration.
+
+Controlled switchover in a distributed topology is a two-step process
+involving:
+
+- Demotion of a primary cluster to a replica cluster
+- Promotion of a replica cluster to a primary cluster
+
+These processes are described below.
+
+### Demoting a Primary to a Replica Cluster
+
+CloudNativePG provides the functionality to demote a primary cluster to a
+replica cluster. This action is typically planned when transitioning the
+primary role from one data center to another. The process involves demoting the
+current primary cluster (e.g., `cluster-eu-south`) to a replica cluster and
+subsequently promoting the designated replica cluster (e.g.,
+`cluster-eu-central`) to primary when fully synchronized.
+
+Provided you have defined an external cluster in the current primary `Cluster`
+resource that points to the replica cluster that's been selected to become the
+new primary, all you need to do is change the `primary` field as follows:
+
+```yaml
+replica:
+  primary: cluster-eu-central
+  source: cluster-eu-central
+```
+
+When the primary PostgreSQL cluster is shut down, write operations are no
+longer possible. CloudNativePG then:
+
+1. Archives the WAL file containing the shutdown checkpoint as a `.partial`
+   file in the WAL archive.
+
+2. Generates a `demotionToken` in the status, a base64-encoded JSON structure
+   containing relevant information from `pg_controldata` such as the system
+   identifier, the timestamp, timeline ID, REDO location, and REDO WAL file of the
+   latest checkpoint.
+
+The first step is necessary to demote/promote using solely the WAL archive to
+feed the continuous recovery process (without streaming replication).
+
+The second step, generation of the `.status.demotionToken`, will ensure a
+smooth demotion/promotion process, without any data loss and without rebuilding
+the former primary.
+
+At this stage, the former primary has transitioned to a replica cluster,
+awaiting WAL data from the new global primary: `cluster-eu-central`.
+
+To proceed with promoting the other cluster, you need to retrieve the
+`demotionToken` from `cluster-eu-south` using the following command:
+
+```sh
+kubectl get cluster cluster-eu-south \
+  -o jsonpath='{.status.demotionToken}'
+```
+
+!!! Note
+    The `demotionToken` obtained from `cluster-eu-south` will serve as the
+    `promotionToken` for `cluster-eu-central`.
+
+You can verify the role change using the `cnpg` plugin, checking the status of
+the cluster:
+
+```shell
+kubectl cnpg status cluster-eu-south
+```
+
+### Promoting a Replica to a Primary Cluster
+
+To promote a PostgreSQL replica cluster (e.g., `cluster-eu-central`) to a
+primary cluster and make the designated primary an actual primary instance,
+you need to perform the following steps simultaneously:
+
+1. Set the `.spec.replica.primary` to the name of the current replica cluster
+   to be promoted (e.g., `cluster-eu-central`).
+2. Set the `.spec.replica.promotionToken` with the value obtained from the
+   former primary cluster (refer to ["Demoting a Primary to a Replica Cluster"](replica_cluster.md#demoting-a-primary-to-a-replica-cluster)).
+
+The updated `replica` section in `cluster-eu-central`'s spec should look like
+this:
+
+```yaml
+replica:
+  primary: cluster-eu-central
+  promotionToken: <PROMOTION_TOKEN>
+  source: cluster-eu-south
+```
+
+!!! Warning
+    It is crucial to apply the changes to the `primary` and `promotionToken`
+    fields simultaneously. If the promotion token is omitted, a failover will be
+    triggered, necessitating a rebuild of the former primary.
+
+After making these adjustments, CloudNativePG will initiate the promotion of
+the replica cluster to a primary cluster. Initially, CloudNativePG will wait
+for the designated primary cluster to replicate all Write-Ahead Logging (WAL)
+information up to the specified Log Sequence Number (LSN) contained in the
+token. Once this target is achieved, the promotion process will commence. The
+new primary cluster will switch timelines, archive the history file and new
+WAL, thereby unblocking the replication process in the `cluster-eu-south`
+cluster, which will then operate as a replica.
+
+To verify the role change, use the `cnpg` plugin to check the status of the
+cluster:
+
+```shell
+kubectl cnpg status cluster-eu-central
+```
+
+This command will provide you with the current status of `cluster-eu-central`,
+confirming its promotion to primary.
+
+By following these steps, you ensure a smooth and controlled promotion process,
+minimizing disruption and maintaining data integrity across your PostgreSQL
+clusters.
+
+## Standalone Replica Clusters
+
+!!! Important
+    Standalone Replica Clusters were previously known as Replica Clusters
+    before the introduction of the Distributed Topology strategy in CloudNativePG
+    1.24.
+
+In CloudNativePG, a Standalone Replica Cluster is a PostgreSQL cluster in
+continuous recovery with the following configurations:
+
+- `.spec.replica.enabled` set to `true`
+- A physical replication source defined via the `.spec.replica.source` field,
+  pointing to an `externalClusters` name
+
+When `.spec.replica.enabled` is set to `false`, the replica cluster exits
+continuous recovery mode and becomes a primary cluster, completely detached
+from the original source.
+
+!!! Warning
+    Disabling replication is an **irreversible** operation. Once replication is
+    disabled and the designated primary is promoted to primary, the replica cluster
+    and the source cluster become two independent clusters definitively.
+
+!!! Important
+    Standalone replica clusters are suitable for several use cases, primarily
+    involving read-only workloads. If you are planning to setup a disaster
+    recovery solution, look into "Distributed Topology" above.
+
+### Main Differences with Distributed Topology
+
+Although Standalone Replica Clusters can be used for disaster recovery
+purposes, they differ from the "Distributed Topology" strategy in several key
+ways:
+
+- **Lack of Distributed Database Concept**: Standalone Replica Clusters do not
+  support the concept of a distributed database, whether in simple forms (two
+  clusters) or more complex configurations (e.g., three clusters in a circular
+  topology).
+- **No Global Primary Cluster**: There is no notion of a global primary cluster
+  in Standalone Replica Clusters.
+- **No Controlled Switchover**: A Standalone Replica Cluster can only be
+  promoted to primary. The former primary cluster must be re-cloned, as
+  controlled switchover is not possible.
+
+Failover is identical in both strategies, requiring the former primary to be
+re-cloned if it ever comes back up.
+
+### Example of Standalone Replica Cluster using `pg_basebackup`
+
+This **first example** defines a standalone replica cluster using streaming
+replication in both bootstrap and continuous recovery. The replica cluster
+connects to the source cluster using TLS authentication.
 
 You can check the [sample YAML](samples/cluster-example-replica-streaming.yaml)
 in the `samples/` subdirectory.
@@ -137,7 +417,7 @@ in case the replica cluster is in a separate namespace.
       key: ca.crt
 ```
 
-#### Example using a Backup from an object store
+### Example of Standalone Replica Cluster from an object store
 
 The **second example** defines a replica cluster that bootstraps from an object
 store using the `recovery` section and continuous recovery using both streaming
@@ -187,7 +467,7 @@ a backup of the source cluster has been created already.
     clusters, and that all the necessary secrets which hold passwords or
     certificates are properly created in advance.
 
-#### Example using a Volume Snapshot
+### Example using a Volume Snapshot
 
 If you use volume snapshots and your storage class provides
 snapshots cross-cluster availability, you can leverage that to
@@ -201,78 +481,6 @@ store to fetch the WAL files.
 
 You can check the [sample YAML](samples/cluster-example-replica-from-volume-snapshot.yaml)
 for it in the `samples/` subdirectory.
-
-## Demoting a Primary to a Replica Cluster
-
-CloudNativePG provides the functionality to demote a primary cluster to a
-replica cluster. This action is typically planned when transitioning the
-primary role from one data center to another. The process involves demoting the
-current primary cluster (e.g., cluster-eu-south) to a replica cluster and
-subsequently promoting the designated replica cluster (e.g.,
-`cluster-eu-central`) to primary when fully synchronized.
-Provided you have defined an external cluster in the current primary `Cluster`
-resource that points to the replica cluster that's been selected to become the
-new primary, all you need to do is to enable replica mode and define the source
-as follows:
-
-```yaml
- replica:
-   enabled: true
-   source: cluster-eu-central
-```
-
-<!--
-TODO:
-
-- require to use `primary` without setting `enabled`
-- mention demotionToken
-- mention archive partial WAL
--->
-
-## Promoting the designated primary in the replica cluster
-
-<!--
-TODO:
-
-- require to use `primary` without setting `enabled`
-- mention promotionToken
-- mention restore of partial WAL
--->
-
-To promote a replica cluster (e.g. `cluster-eu-central`) to a primary cluster
-and make the designated primary a real primary, all you need to do is to
-disable the replica mode in the replica cluster through the option
-`.spec.replica.enabled`:
-
-```yaml
- replica:
-   enabled: false
-   source: cluster-eu-south
-```
-
-If you have first demoted the `cluster-eu-south` and waited for
-`cluster-eu-central` to be in sync, once `cluster-eu-central` starts as
-primary, the `cluster-eu-south` cluster will seamlessly start as a replica
-cluster, without the need of re-cloning.
-
-If you disable replica mode without prior demotion, the replica cluster and the
-source cluster will become two separate clusters.
-
-When replica mode is disabled, the **designated primary** in the replica
-cluster will be promoted to be that cluster's **primary**.
-
-You can verify the role change using the `cnpg` plugin, checking the status of
-the cluster which was previously the replica:
-
-```shell
-kubectl cnpg -n <cluster-name-space> status cluster-eu-central
-```
-
-!!! Note
-    Disabling replication is an **irreversible** operation. Once replication is
-    disabled and the designated primary is promoted to primary, the replica cluster
-    and the source cluster become two independent clusters definitively. Ensure to
-    follow the demotion procedure correctly to avoid unintended consequences.
 
 <!--
 ## Delayed replicas
