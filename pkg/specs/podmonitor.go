@@ -44,11 +44,13 @@ func (c ClusterPodMonitorManager) BuildPodMonitor() *monitoringv1.PodMonitor {
 	}
 	c.cluster.SetInheritedDataAndOwnership(&meta)
 
-	var tlsConfig *monitoringv1.SafeTLSConfig
-	scheme := ""
+	endpoint := monitoringv1.PodMetricsEndpoint{
+		Port: "metrics",
+	}
+
 	if c.cluster.IsMetricsTLSEnabled() {
-		scheme = "https"
-		tlsConfig = &monitoringv1.SafeTLSConfig{
+		endpoint.Scheme = "https"
+		endpoint.TLSConfig = &monitoringv1.SafeTLSConfig{
 			CA: monitoringv1.SecretOrConfigMap{
 				Secret: &corev1.SecretKeySelector{
 					LocalObjectReference: corev1.LocalObjectReference{
@@ -57,14 +59,9 @@ func (c ClusterPodMonitorManager) BuildPodMonitor() *monitoringv1.PodMonitor {
 					Key: certs.CACertKey,
 				},
 			},
+			ServerName:         ptr.To(c.cluster.GetServiceReadWriteName()),
 			InsecureSkipVerify: ptr.To(true),
 		}
-	}
-
-	endpoint := monitoringv1.PodMetricsEndpoint{
-		Port:      "metrics",
-		Scheme:    scheme,
-		TLSConfig: tlsConfig,
 	}
 
 	if c.cluster.Spec.Monitoring != nil {

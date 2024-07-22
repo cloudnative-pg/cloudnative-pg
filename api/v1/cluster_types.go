@@ -2403,11 +2403,10 @@ type MonitoringConfiguration struct {
 	// +optional
 	EnablePodMonitor bool `json:"enablePodMonitor,omitempty"`
 
-	// Enable HTTPS for the metrics endpoint.
-	// Changing this option will force a rollout of all instances.
-	// +kubebuilder:default:=false
+	// Configure TLS communication for the metrics endpoint.
+	// Changing tls.enable option will force a rollout of all instances.
 	// +optional
-	EnableMetricsTLS bool `json:"enableMetricsTLS,omitempty"`
+	TLSConfig *ClusterMonitoringTLSConfiguration `json:"tls,omitempty"`
 
 	// The list of metric relabelings for the `PodMonitor`. Applied to samples before ingestion.
 	// +optional
@@ -2421,6 +2420,16 @@ type MonitoringConfiguration struct {
 // AreDefaultQueriesDisabled checks whether default monitoring queries should be disabled
 func (m *MonitoringConfiguration) AreDefaultQueriesDisabled() bool {
 	return m != nil && m.DisableDefaultQueries != nil && *m.DisableDefaultQueries
+}
+
+// ClusterMonitoringTLSConfiguration is the type containing the TLS configuration
+// for the cluster's monitoring
+type ClusterMonitoringTLSConfiguration struct {
+	// Enable TLS for the monitoring endpoint.
+	// Changing this option will force a rollout of all instances.
+	// +kubebuilder:default:=false
+	// +optional
+	Enable bool `json:"enable,omitempty"`
 }
 
 // ExternalCluster represents the connection parameters to an
@@ -3596,8 +3605,8 @@ func (cluster *Cluster) IsPodMonitorEnabled() bool {
 
 // IsMetricsTLSEnabled checks if the metrics endpoint should use TLS
 func (cluster *Cluster) IsMetricsTLSEnabled() bool {
-	if cluster.Spec.Monitoring != nil {
-		return cluster.Spec.Monitoring.EnableMetricsTLS
+	if cluster.Spec.Monitoring != nil && cluster.Spec.Monitoring.TLSConfig != nil {
+		return cluster.Spec.Monitoring.TLSConfig.Enable
 	}
 
 	return false

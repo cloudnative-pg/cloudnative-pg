@@ -1535,6 +1535,32 @@ this can be omitted.<!-- raw HTML omitted --></li>
 </tbody>
 </table>
 
+## ClusterMonitoringTLSConfiguration     {#postgresql-cnpg-io-v1-ClusterMonitoringTLSConfiguration}
+
+
+**Appears in:**
+
+- [MonitoringConfiguration](#postgresql-cnpg-io-v1-MonitoringConfiguration)
+
+
+<p>ClusterMonitoringTLSConfiguration is the type containing the TLS configuration
+for the cluster's monitoring</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>enable</code><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>Enable TLS for the monitoring endpoint.
+Changing this option will force a rollout of all instances.</p>
+</td>
+</tr>
+</tbody>
+</table>
+
 ## ClusterSpec     {#postgresql-cnpg-io-v1-ClusterSpec}
 
 
@@ -3366,12 +3392,12 @@ Default: false.</p>
    <p>Enable or disable the <code>PodMonitor</code></p>
 </td>
 </tr>
-<tr><td><code>enableMetricsTLS</code><br/>
-<i>bool</i>
+<tr><td><code>tls</code><br/>
+<a href="#postgresql-cnpg-io-v1-ClusterMonitoringTLSConfiguration"><i>ClusterMonitoringTLSConfiguration</i></a>
 </td>
 <td>
-   <p>Enable HTTPS for the metrics endpoint.
-Changing this option will force a rollout of all instances.</p>
+   <p>Configure TLS communication for the metrics endpoint.
+Changing tls.enable option will force a rollout of all instances.</p>
 </td>
 </tr>
 <tr><td><code>podMonitorMetricRelabelings</code><br/>

@@ -134,7 +134,9 @@ var _ = Describe("PodMonitor test", func() {
 			Spec: apiv1.ClusterSpec{
 				Monitoring: &apiv1.MonitoringConfiguration{
 					EnablePodMonitor: true,
-					EnableMetricsTLS: true,
+					TLSConfig: &apiv1.ClusterMonitoringTLSConfiguration{
+						Enable: true,
+					},
 				},
 			},
 		}
@@ -152,6 +154,7 @@ var _ = Describe("PodMonitor test", func() {
 					},
 				},
 				Cert:               monitoringv1.SecretOrConfigMap{},
+				ServerName:         ptr.To(cluster.GetServiceReadWriteName()),
 				InsecureSkipVerify: ptr.To(true),
 			},
 		}

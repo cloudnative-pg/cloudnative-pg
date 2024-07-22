@@ -3715,12 +3715,6 @@ spec:
                       Set it to `true` if you don't want to inject default queries into the cluster.
                       Default: false.
                     type: boolean
-                  enableMetricsTLS:
-                    default: false
-                    description: |-
-                      Enable HTTPS for the metrics endpoint.
-                      Changing this option will force a rollout of all instances.
-                    type: boolean
                   enablePodMonitor:
                     default: false
                     description: Enable or disable the `PodMonitor`
@@ -3915,6 +3909,18 @@ spec:
                           type: string
                       type: object
                     type: array
+                  tls:
+                    description: |-
+                      Configure TLS communication for the metrics endpoint.
+                      Changing tls.enable option will force a rollout of all instances.
+                    properties:
+                      enable:
+                        default: false
+                        description: |-
+                          Enable TLS for the monitoring endpoint.
+                          Changing this option will force a rollout of all instances.
+                        type: boolean
+                    type: object
                 type: object
               nodeMaintenanceWindow:
                 description: Define a maintenance window for the Kubernetes nodes

@@ -83,6 +83,7 @@ ClusterIP
 ClusterImageCatalog
 ClusterIsNotReady
 ClusterList
+ClusterMonitoringTLSConfiguration
 ClusterRole
 ClusterRole's
 ClusterServiceVersion
