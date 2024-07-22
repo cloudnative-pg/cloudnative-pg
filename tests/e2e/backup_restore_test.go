@@ -51,7 +51,6 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 	})
 
 	JustAfterEach(func() {
-		testUtils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
 		if CurrentSpecReport().Failed() {
 			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
@@ -366,13 +365,6 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 
 			customClusterName, err := env.GetResourceNameFromYAML(clusterWithMinioCustomSampleFile)
 			Expect(err).ToNot(HaveOccurred())
-
-			// To also dump info. from `customClusterName` cluster after this spec gets executed
-			DeferCleanup(func() {
-				if CurrentSpecReport().Failed() {
-					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-				}
-			})
 
 			// Create the cluster with custom serverName in the backup spec
 			AssertCreateCluster(namespace, customClusterName, clusterWithMinioCustomSampleFile, env)
@@ -790,7 +782,6 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 	})
 
 	JustAfterEach(func() {
-		testUtils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
 		if CurrentSpecReport().Failed() {
 			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 		}

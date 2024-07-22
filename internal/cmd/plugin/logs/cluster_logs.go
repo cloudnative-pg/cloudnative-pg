@@ -34,62 +34,61 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/logs"
 )
 
-// ClusterLogs contains the options and context to retrieve cluster logs
-type ClusterLogs struct {
-	Ctx         context.Context
-	ClusterName string
-	Namespace   string
+// clusterLogs contains the options and context to retrieve cluster logs
+type clusterLogs struct {
+	ctx         context.Context
+	clusterName string
+	namespace   string
 	timestamp   bool
-	TailLines   int64
-	OutputFile  string
-	Follow      bool
-	Client      kubernetes.Interface
+	tailLines   int64
+	outputFile  string
+	follow      bool
+	client      kubernetes.Interface
 }
 
-func getCluster(cl ClusterLogs) (*cnpgv1.Cluster, error) {
+func getCluster(cl clusterLogs) (*cnpgv1.Cluster, error) {
 	var cluster cnpgv1.Cluster
-	err := plugin.Client.Get(cl.Ctx,
-		types.NamespacedName{Namespace: cl.Namespace, Name: cl.ClusterName},
+	err := plugin.Client.Get(cl.ctx,
+		types.NamespacedName{Namespace: cl.namespace, Name: cl.clusterName},
 		&cluster)
 
 	return &cluster, err
 }
 
-// GetStreamClusterLogs return a normlized struct with the default values for the stream request
-func GetStreamClusterLogs(cluster *cnpgv1.Cluster, cl ClusterLogs) logs.ClusterStreamingRequest {
+func getStreamClusterLogs(cluster *cnpgv1.Cluster, cl clusterLogs) logs.ClusterStreamingRequest {
 	var sinceTime *metav1.Time
 	var tail *int64
 	if cl.timestamp {
 		sinceTime = &metav1.Time{Time: time.Now().UTC()}
 	}
-	if cl.TailLines >= 0 {
-		tail = &cl.TailLines
+	if cl.tailLines >= 0 {
+		tail = &cl.tailLines
 	}
 	return logs.ClusterStreamingRequest{
 		Cluster: cluster,
 		Options: &corev1.PodLogOptions{
 			Timestamps: cl.timestamp,
-			Follow:     cl.Follow,
+			Follow:     cl.follow,
 			SinceTime:  sinceTime,
 			TailLines:  tail,
 		},
-		Client: cl.Client,
+		Client: cl.client,
 	}
 }
 
-// FollowCluster will tail all pods in the cluster, and will watch for any
+// followCluster will tail all pods in the cluster, and will watch for any
 // new pods
 //
 // It will write lines to standard-out, and will only return when there are
 // no pods left, or it is interrupted by the user
-func FollowCluster(cl ClusterLogs) error {
+func followCluster(cl clusterLogs) error {
 	cluster, err := getCluster(cl)
 	if err != nil {
 		return fmt.Errorf("could not get cluster: %w", err)
 	}
 
-	streamClusterLogs := GetStreamClusterLogs(cluster, cl)
-	return streamClusterLogs.SingleStream(cl.Ctx, os.Stdout)
+	streamClusterLogs := getStreamClusterLogs(cluster, cl)
+	return streamClusterLogs.SingleStream(cl.ctx, os.Stdout)
 }
 
 // saveClusterLogs will tail all pods in the cluster, and read their logs
@@ -97,15 +96,15 @@ func FollowCluster(cl ClusterLogs) error {
 //
 // It will write lines to standard-out, or to a file if the `file` argument
 // is provided.
-func saveClusterLogs(cl ClusterLogs) error {
+func saveClusterLogs(cl clusterLogs) error {
 	cluster, err := getCluster(cl)
 	if err != nil {
 		return fmt.Errorf("could not get cluster: %w", err)
 	}
 
 	var output io.Writer = os.Stdout
-	if cl.OutputFile != "" {
-		outputFile, err := os.Create(filepath.Clean(cl.OutputFile))
+	if cl.outputFile != "" {
+		outputFile, err := os.Create(filepath.Clean(cl.outputFile))
 		if err != nil {
 			return fmt.Errorf("could not create file: %w", err)
 		}
@@ -124,13 +123,13 @@ func saveClusterLogs(cl ClusterLogs) error {
 		}()
 	}
 
-	streamClusterLogs := GetStreamClusterLogs(cluster, cl)
-	err = streamClusterLogs.SingleStream(cl.Ctx, output)
+	streamClusterLogs := getStreamClusterLogs(cluster, cl)
+	err = streamClusterLogs.SingleStream(cl.ctx, output)
 	if err != nil {
 		return fmt.Errorf("could not stream the logs: %w", err)
 	}
-	if cl.OutputFile != "" {
-		fmt.Printf("Successfully written logs to \"%s\"\n", cl.OutputFile)
+	if cl.outputFile != "" {
+		fmt.Printf("Successfully written logs to \"%s\"\n", cl.outputFile)
 	}
 	return nil
 }

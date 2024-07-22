@@ -60,7 +60,6 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 		}
 	})
 	JustAfterEach(func() {
-		testsUtils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
 		if CurrentSpecReport().Failed() {
 			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
@@ -306,9 +305,6 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 				namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
 				DeferCleanup(func() error {
-					if CurrentSpecReport().Failed() {
-						env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-					}
 					return env.DeleteNamespace(namespace)
 				})
 				AssertCreateCluster(namespace, clusterName, sampleFileClusterWithPGWalVolume, env)
@@ -326,9 +322,6 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 				namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
 				DeferCleanup(func() error {
-					if CurrentSpecReport().Failed() {
-						env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-					}
 					return env.DeleteNamespace(namespace)
 				})
 				AssertCreateCluster(namespace, clusterName, sampleFileClusterWithOutPGWalVolume, env)
@@ -392,9 +385,6 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 				namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
 				DeferCleanup(func() error {
-					if CurrentSpecReport().Failed() {
-						env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-					}
 					return env.DeleteNamespace(namespace)
 				})
 				AssertCreateCluster(namespace, clusterName, sampleFileClusterWithPGWalVolume, env)

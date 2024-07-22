@@ -111,7 +111,6 @@ var _ = Describe("Separate pg_wal volume", Label(tests.LabelStorage), func() {
 		}
 	})
 	JustAfterEach(func() {
-		testsUtils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
 		if CurrentSpecReport().Failed() {
 			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
@@ -127,9 +126,6 @@ var _ = Describe("Separate pg_wal volume", Label(tests.LabelStorage), func() {
 		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
 			return env.DeleteNamespace(namespace)
 		})
 		AssertCreateCluster(namespace, clusterName, sampleFileWithPgWal, env)
@@ -143,9 +139,6 @@ var _ = Describe("Separate pg_wal volume", Label(tests.LabelStorage), func() {
 		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
 			return env.DeleteNamespace(namespace)
 		})
 		AssertCreateCluster(namespace, clusterName, sampleFileWithoutPgWal, env)

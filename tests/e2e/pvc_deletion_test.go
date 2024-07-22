@@ -45,7 +45,6 @@ var _ = Describe("PVC Deletion", Label(tests.LabelSelfHealing), func() {
 		}
 	})
 	JustAfterEach(func() {
-		testsUtils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
 		if CurrentSpecReport().Failed() {
 			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 		}

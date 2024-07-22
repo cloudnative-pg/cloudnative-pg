@@ -48,7 +48,6 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 		}
 	})
 	JustAfterEach(func() {
-		testsUtils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
 		if CurrentSpecReport().Failed() {
 			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 		}

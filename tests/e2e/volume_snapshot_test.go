@@ -59,6 +59,13 @@ var _ = Describe("Verify Volume Snapshot",
 			return snapshotList, nil
 		}
 
+		var namespace string
+		JustAfterEach(func() {
+			if CurrentSpecReport().Failed() {
+				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+			}
+		})
+
 		Context("using the kubectl cnpg plugin", Ordered, func() {
 			const (
 				sampleFile      = fixturesDir + "/volume_snapshot/cluster-volume-snapshot.yaml.template"
@@ -66,13 +73,7 @@ var _ = Describe("Verify Volume Snapshot",
 				level           = tests.High
 			)
 
-			var clusterName, namespace string
-			JustAfterEach(func() {
-				testUtils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
-				if CurrentSpecReport().Failed() {
-					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-				}
-			})
+			var clusterName string
 			BeforeAll(func() {
 				if testLevelEnv.Depth < int(level) {
 					Skip("Test depth is lower than the amount requested for this test")
@@ -86,9 +87,6 @@ var _ = Describe("Verify Volume Snapshot",
 				Expect(err).ToNot(HaveOccurred())
 
 				DeferCleanup(func() error {
-					if CurrentSpecReport().Failed() {
-						env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-					}
 					return env.DeleteNamespace(namespace)
 				})
 
@@ -160,13 +158,7 @@ var _ = Describe("Verify Volume Snapshot",
 				tableName = "test"
 			)
 
-			var clusterToSnapshotName, namespace string
-			JustAfterEach(func() {
-				testUtils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
-				if CurrentSpecReport().Failed() {
-					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-				}
-			})
+			var clusterToSnapshotName string
 			BeforeAll(func() {
 				if testLevelEnv.Depth < int(level) {
 					Skip("Test depth is lower than the amount requested for this test")
@@ -180,9 +172,6 @@ var _ = Describe("Verify Volume Snapshot",
 				Expect(err).ToNot(HaveOccurred())
 
 				DeferCleanup(func() error {
-					if CurrentSpecReport().Failed() {
-						env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-					}
 					return env.DeleteNamespace(namespace)
 				})
 
@@ -357,13 +346,6 @@ var _ = Describe("Verify Volume Snapshot",
 				})
 				return snapshotList
 			}
-			var namespace string
-			JustAfterEach(func() {
-				testUtils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
-				if CurrentSpecReport().Failed() {
-					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-				}
-			})
 			BeforeAll(func() {
 				if testLevelEnv.Depth < int(level) {
 					Skip("Test depth is lower than the amount requested for this test")
@@ -373,9 +355,6 @@ var _ = Describe("Verify Volume Snapshot",
 				namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
 				DeferCleanup(func() error {
-					if CurrentSpecReport().Failed() {
-						env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-					}
 					if err := os.Unsetenv(snapshotDataEnv); err != nil {
 						return err
 					}
@@ -581,14 +560,8 @@ var _ = Describe("Verify Volume Snapshot",
 				clusterSnapshotRestoreFile = filesDir + "/cluster-pvc-hot-restore.yaml.template"
 			)
 
-			var clusterToSnapshotName, namespace string
+			var clusterToSnapshotName string
 			var backup *apiv1.Backup
-			JustAfterEach(func() {
-				testUtils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
-				if CurrentSpecReport().Failed() {
-					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-				}
-			})
 			BeforeAll(func() {
 				if testLevelEnv.Depth < int(level) {
 					Skip("Test depth is lower than the amount requested for this test")
@@ -602,9 +575,6 @@ var _ = Describe("Verify Volume Snapshot",
 				Expect(err).ToNot(HaveOccurred())
 
 				DeferCleanup(func() error {
-					if CurrentSpecReport().Failed() {
-						env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-					}
 					return env.DeleteNamespace(namespace)
 				})
 

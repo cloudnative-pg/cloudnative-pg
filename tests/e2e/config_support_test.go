@@ -55,7 +55,6 @@ var _ = Describe("Config support", Serial, Ordered, Label(tests.LabelDisruptive,
 		operatorNamespace = operatorDeployment.GetNamespace()
 	})
 	JustAfterEach(func() {
-		utils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
 		if CurrentSpecReport().Failed() {
 			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 		}

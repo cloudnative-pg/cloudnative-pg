@@ -189,9 +189,7 @@ func (csr *ClusterStreamingRequest) SingleStream(ctx context.Context, writer io.
 			if streamSet.has(pod.Name) {
 				continue
 			}
-			if pod.Status.Phase != v1.PodRunning {
-				continue
-			}
+
 			streamSet.add(pod.Name)
 			go csr.streamInGoroutine(ctx, pod.Name, client, streamSet,
 				safeWriterFrom(writer))

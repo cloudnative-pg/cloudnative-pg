@@ -17,11 +17,10 @@ limitations under the License.
 package e2e
 
 import (
-	"github.com/cloudnative-pg/cloudnative-pg/tests"
-	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"github.com/cloudnative-pg/cloudnative-pg/tests"
 )
 
 var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance, tests.LabelSelfHealing), func() {
@@ -59,7 +58,6 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance, tests.La
 	})
 
 	JustAfterEach(func() {
-		testsUtils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
 		if CurrentSpecReport().Failed() {
 			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 		}

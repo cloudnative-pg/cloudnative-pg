@@ -44,7 +44,6 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 		}
 	})
 	JustAfterEach(func() {
-		utils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
 		if CurrentSpecReport().Failed() {
 			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
@@ -223,9 +222,6 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
 			return env.DeleteNamespace(namespace)
 		})
 		clusterName, err := env.GetResourceNameFromYAML(sampleFile)
@@ -245,9 +241,6 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
 			return env.DeleteNamespace(namespace)
 		})
 

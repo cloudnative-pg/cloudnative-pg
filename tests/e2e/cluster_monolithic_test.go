@@ -60,7 +60,6 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 	})
 
 	JustAfterEach(func() {
-		testsUtils.CleanupClusterLogs(CurrentSpecReport().Failed(), namespace)
 		if CurrentSpecReport().Failed() {
 			env.DumpNamespaceObjects(namespace,
 				"out/"+CurrentSpecReport().LeafNodeText+".log")
