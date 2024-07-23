@@ -131,7 +131,8 @@ spec:
 
 !!! Important
     The `serverName` field in the metrics endpoint must match one of the names
-    defined in the server certificate.
+    defined in the server certificate. If the default certificates are in use,
+    the `serverName` value should be in the format `<cluster-name>-rw`.
 
 ### Predefined set of metrics
 
