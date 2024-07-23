@@ -98,6 +98,7 @@ func RunController(
 	leaderConfig leaderElectionConfiguration,
 	pprofDebug bool,
 	port int,
+	conf *configuration.Data,
 ) error {
 	ctx := context.Background()
 
@@ -135,20 +136,20 @@ func RunController(
 		LeaderElectionReleaseOnCancel: true,
 	}
 
-	if configuration.Current.WatchNamespace != "" {
-		namespaces := configuration.Current.WatchedNamespaces()
+	if conf.WatchNamespace != "" {
+		namespaces := conf.WatchedNamespaces()
 		managerOptions.NewCache = multicache.DelegatingMultiNamespacedCacheBuilder(
 			namespaces,
-			configuration.Current.OperatorNamespace)
+			conf.OperatorNamespace)
 		setupLog.Info("Listening for changes", "watchNamespaces", namespaces)
 	} else {
 		setupLog.Info("Listening for changes on all namespaces")
 	}
 
-	if configuration.Current.WebhookCertDir != "" {
+	if conf.WebhookCertDir != "" {
 		// If OLM will generate certificates for us, let's just
 		// use those
-		managerOptions.WebhookServer.(*webhook.DefaultServer).Options.CertDir = configuration.Current.WebhookCertDir
+		managerOptions.WebhookServer.(*webhook.DefaultServer).Options.CertDir = conf.WebhookCertDir
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), managerOptions)
@@ -158,7 +159,7 @@ func RunController(
 	}
 
 	webhookServer := mgr.GetWebhookServer().(*webhook.DefaultServer)
-	if configuration.Current.WebhookCertDir != "" {
+	if conf.WebhookCertDir != "" {
 		// Use certificate names compatible with OLM
 		webhookServer.Options.CertName = "apiserver.crt"
 		webhookServer.Options.KeyName = "apiserver.key"
@@ -177,12 +178,12 @@ func RunController(
 		return err
 	}
 
-	err = loadConfiguration(ctx, kubeClient, configMapName, secretName)
+	err = loadConfiguration(ctx, kubeClient, configMapName, secretName, conf)
 	if err != nil {
 		return err
 	}
 
-	setupLog.Info("Operator configuration loaded", "configuration", configuration.Current)
+	setupLog.Info("Operator configuration loaded", "configuration", conf)
 
 	discoveryClient, err := utils.GetDiscoveryClient()
 	if err != nil {
@@ -213,13 +214,13 @@ func RunController(
 		"availableArchitectures", utils.GetAvailableArchitectures(),
 	)
 
-	if err := ensurePKI(ctx, kubeClient, webhookServer.Options.CertDir); err != nil {
+	if err := ensurePKI(ctx, kubeClient, webhookServer.Options.CertDir, conf); err != nil {
 		return err
 	}
 
 	pluginRepository := repository.New()
 	if err := pluginRepository.RegisterUnixSocketPluginsInPath(
-		configuration.Current.PluginSocketDir,
+		conf.PluginSocketDir,
 	); err != nil {
 		setupLog.Error(err, "Unable to load sidecar CNPG-i plugins, skipping")
 	}
@@ -319,15 +320,16 @@ func loadConfiguration(
 	kubeClient client.Client,
 	configMapName string,
 	secretName string,
+	conf *configuration.Data,
 ) error {
 	configData := make(map[string]string)
 
 	// First read the configmap if provided and store it in configData
 	if configMapName != "" {
-		configMapData, err := readConfigMap(ctx, kubeClient, configuration.Current.OperatorNamespace, configMapName)
+		configMapData, err := readConfigMap(ctx, kubeClient, conf.OperatorNamespace, configMapName)
 		if err != nil {
 			setupLog.Error(err, "unable to read ConfigMap",
-				"namespace", configuration.Current.OperatorNamespace,
+				"namespace", conf.OperatorNamespace,
 				"name", configMapName)
 			return err
 		}
@@ -338,10 +340,10 @@ func loadConfiguration(
 
 	// Then read the secret if provided and store it in configData, overwriting configmap's values
 	if secretName != "" {
-		secretData, err := readSecret(ctx, kubeClient, configuration.Current.OperatorNamespace, secretName)
+		secretData, err := readSecret(ctx, kubeClient, conf.OperatorNamespace, secretName)
 		if err != nil {
 			setupLog.Error(err, "unable to read Secret",
-				"namespace", configuration.Current.OperatorNamespace,
+				"namespace", conf.OperatorNamespace,
 				"name", secretName)
 			return err
 		}
@@ -352,7 +354,7 @@ func loadConfiguration(
 
 	// Finally, read the config if it was provided
 	if len(configData) > 0 {
-		configuration.Current.ReadConfigMap(configData)
+		conf.ReadConfigMap(configData)
 	}
 
 	return nil
@@ -369,8 +371,9 @@ func ensurePKI(
 	ctx context.Context,
 	kubeClient client.Client,
 	mgrCertDir string,
+	conf *configuration.Data,
 ) error {
-	if configuration.Current.WebhookCertDir != "" {
+	if conf.WebhookCertDir != "" {
 		// OLM is generating certificates for us, so we can avoid injecting/creating certificates.
 		return nil
 	}
@@ -382,7 +385,7 @@ func ensurePKI(
 		CertDir:                            mgrCertDir,
 		SecretName:                         WebhookSecretName,
 		ServiceName:                        WebhookServiceName,
-		OperatorNamespace:                  configuration.Current.OperatorNamespace,
+		OperatorNamespace:                  conf.OperatorNamespace,
 		MutatingWebhookConfigurationName:   MutatingWebhookConfigurationName,
 		ValidatingWebhookConfigurationName: ValidatingWebhookConfigurationName,
 		OperatorDeploymentLabelSelector:    "app.kubernetes.io/name=cloudnative-pg",
