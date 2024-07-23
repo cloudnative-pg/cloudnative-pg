@@ -274,7 +274,8 @@ kubectl cnpg -n <cluster-name-space> status cluster-eu-central
     and the source cluster become two independent clusters definitively. Ensure to
     follow the demotion procedure correctly to avoid unintended consequences.
 
-<!-- ## Delayed replicas
+<!--
+## Delayed replicas
 
 In addition to standard replica clusters, our system supports the creation of
 **delayed replicas** through the utilization of PostgreSQL's
@@ -326,4 +327,5 @@ your data.
     Always measure your goals. Depending on your environment, it might be more
     efficient to rely on volume snapshot-based recovery for faster outcomes.
     Evaluate and choose the approach that best aligns with your unique requirements
-    and infrastructure. -->
+    and infrastructure.
+-->
