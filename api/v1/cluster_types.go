@@ -646,9 +646,9 @@ func (st *ServiceAccountTemplate) MergeMetadata(sa *corev1.ServiceAccount) {
 // PodTopologyLabels represent the topology of a Pod. map[labelName]labelValue
 type PodTopologyLabels map[string]string
 
-// matchesTopology checks if the two topologies have
+// MatchesTopology checks if the two topologies have
 // the same label values (labels are specified in SyncReplicaElectionConstraints.NodeLabelsAntiAffinity)
-func (topologyLabels PodTopologyLabels) matchesTopology(instanceTopology PodTopologyLabels) bool {
+func (topologyLabels PodTopologyLabels) MatchesTopology(instanceTopology PodTopologyLabels) bool {
 	log.Debug("matching topology", "main", topologyLabels, "second", instanceTopology)
 	for mainLabelName, mainLabelValue := range topologyLabels {
 		if mainLabelValue != instanceTopology[mainLabelName] {
@@ -1382,11 +1382,53 @@ const (
 	DefaultStartupDelay = 3600
 )
 
+// SynchronousReplicaConfigurationMethod configured whether to use
+// quorum based replication or a priority list
+type SynchronousReplicaConfigurationMethod string
+
+const (
+	// SynchronousReplicaConfigurationMethodFirst means a priority list should be used
+	SynchronousReplicaConfigurationMethodFirst = SynchronousReplicaConfigurationMethod("first")
+
+	// SynchronousReplicaConfigurationMethodAny means that quorum based replication should be used
+	SynchronousReplicaConfigurationMethodAny = SynchronousReplicaConfigurationMethod("any")
+)
+
+// SynchronousReplicaConfiguration contains the configuration of the
+// PostgreSQL synchronous replication feature.
+// Important: at this moment, also `.spec.minSyncReplicas` and `.spec.maxSyncReplica`
+// need to be considered.
+type SynchronousReplicaConfiguration struct {
+	// Method can be either 'any' (quorum) or 'first' (priority)
+	// +kubebuilder:validation:Enum=any;first
+	Method SynchronousReplicaConfigurationMethod `json:"method,omitempty"`
+
+	// Number of sync replicas expected
+	// +kubebuilder:validation:XValidation:rule="self > 0",message="The number of synchrononus replicas should be greater than zero"
+	Number int `json:"number"`
+
+	// Max number of local cluster pods in 'synchronous_standby_names'
+	// +optional
+	MaxStandbyNamesFromCluster *int `json:"maxStandbyNamesFromCluster,omitempty"`
+
+	// User-defined list of application names to add before local ones
+	// +optional
+	StandbyNamesPre []string `json:"standbyNamesPre,omitempty"`
+
+	// User-defined list of application names to add after local ones
+	// +optional
+	StandbyNamesPost []string `json:"standbyNamesPost,omitempty"`
+}
+
 // PostgresConfiguration defines the PostgreSQL configuration
 type PostgresConfiguration struct {
 	// PostgreSQL configuration options (postgresql.conf)
 	// +optional
 	Parameters map[string]string `json:"parameters,omitempty"`
+
+	// Configuration of the PostgreSQL synchronous replication feature
+	// +optional
+	Synchronous *SynchronousReplicaConfiguration `json:"synchronous,omitempty"`
 
 	// PostgreSQL Host Based Authentication rules (lines to be appended
 	// to the pg_hba.conf file)

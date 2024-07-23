@@ -279,11 +279,9 @@ type ConfigurationInfo struct {
 	// The list of user-level settings
 	UserSettings map[string]string
 
-	// The list of replicas
-	SyncReplicasElectable []string
+	// The synchronous_standby_names configuration to be applied
+	SynchronousStandbyNames string
 
-	// The number of desired number of synchronous replicas
-	SyncReplicas int
 	// List of additional sharedPreloadLibraries to be loaded
 	AdditionalSharedPreloadLibraries []string
 
@@ -653,8 +651,15 @@ func CreatePostgresqlConfiguration(info ConfigurationInfo) *PgConfiguration {
 		configuration.OverwriteConfig("archive_mode", "on")
 	}
 
-	// Apply the list of replicas
-	setReplicasListConfigurations(info, configuration)
+	// Apply the synchronous replication settings
+	syncStandbyNames := info.SynchronousStandbyNames
+	if len(syncStandbyNames) > 0 {
+		configuration.OverwriteConfig(SynchronousStandbyNames, syncStandbyNames)
+	}
+
+	if info.ClusterName != "" {
+		configuration.OverwriteConfig("cluster_name", info.ClusterName)
+	}
 
 	if info.IncludingSharedPreloadLibraries {
 		// Set all managed shared preload libraries
@@ -726,25 +731,6 @@ func setUserSharedPreloadLibraries(info ConfigurationInfo, configuration *PgConf
 	}
 }
 
-// setReplicasListConfigurations sets the standby node list
-func setReplicasListConfigurations(info ConfigurationInfo, configuration *PgConfiguration) {
-	if info.SyncReplicasElectable != nil && info.SyncReplicas > 0 {
-		escapedReplicas := make([]string, len(info.SyncReplicasElectable))
-		for idx, name := range info.SyncReplicasElectable {
-			escapedReplicas[idx] = escapePostgresConfLiteral(name)
-		}
-		configuration.OverwriteConfig(SynchronousStandbyNames, fmt.Sprintf(
-			"ANY %v (%v)",
-			info.SyncReplicas,
-			strings.Join(escapedReplicas, ",")))
-	}
-
-	if info.ClusterName != "" {
-		// Apply the cluster name
-		configuration.OverwriteConfig("cluster_name", info.ClusterName)
-	}
-}
-
 // CreatePostgresqlConfFile creates the contents of the postgresql.conf file
 func CreatePostgresqlConfFile(configuration *PgConfiguration) (string, string) {
 	// We need to be able to compare two configurations generated
@@ -771,10 +757,4 @@ func CreatePostgresqlConfFile(configuration *PgConfiguration) (string, string) {
 // directly embeddable in the PostgreSQL configuration file
 func escapePostgresConfValue(value string) string {
 	return fmt.Sprintf("'%v'", strings.ReplaceAll(value, "'", "''"))
-}
-
-// escapePostgresLiteral escapes a value to make its representation
-// similar to the literals in PostgreSQL
-func escapePostgresConfLiteral(value string) string {
-	return fmt.Sprintf("\"%v\"", strings.ReplaceAll(value, "\"", "\"\""))
 }

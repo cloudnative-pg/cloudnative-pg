@@ -4103,6 +4103,42 @@ spec:
                     required:
                     - enabled
                     type: object
+                  synchronous:
+                    description: Configuration of the PostgreSQL synchronous replication
+                      feature
+                    properties:
+                      maxStandbyNamesFromCluster:
+                        description: Max number of local cluster pods in 'synchronous_standby_names'
+                        type: integer
+                      method:
+                        description: Method can be either 'any' (quorum) or 'first'
+                          (priority)
+                        enum:
+                        - any
+                        - first
+                        type: string
+                      number:
+                        description: Number of sync replicas expected
+                        type: integer
+                        x-kubernetes-validations:
+                        - message: The number of synchrononus replicas should be greater
+                            than zero
+                          rule: self > 0
+                      standbyNamesPost:
+                        description: User-defined list of application names to add
+                          after local ones
+                        items:
+                          type: string
+                        type: array
+                      standbyNamesPre:
+                        description: User-defined list of application names to add
+                          before local ones
+                        items:
+                          type: string
+                        type: array
+                    required:
+                    - number
+                    type: object
                 type: object
               primaryUpdateMethod:
                 default: restart
