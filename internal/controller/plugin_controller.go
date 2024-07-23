@@ -207,19 +207,19 @@ func (r *PluginReconciler) getSecret(
 }
 
 // SetupWithManager adds this PluginReconciler to the passed controller manager
-func (r *PluginReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *PluginReconciler) SetupWithManager(mgr ctrl.Manager, operatorNamespace string) error {
 	pluginServicesPredicate := predicate.Funcs{
 		CreateFunc: func(e event.CreateEvent) bool {
-			return isPluginService(e.Object)
+			return isPluginService(e.Object, operatorNamespace)
 		},
 		DeleteFunc: func(e event.DeleteEvent) bool {
-			return isPluginService(e.Object)
+			return isPluginService(e.Object, operatorNamespace)
 		},
 		GenericFunc: func(e event.GenericEvent) bool {
-			return isPluginService(e.Object)
+			return isPluginService(e.Object, operatorNamespace)
 		},
 		UpdateFunc: func(e event.UpdateEvent) bool {
-			return isPluginService(e.ObjectNew)
+			return isPluginService(e.ObjectNew, operatorNamespace)
 		},
 	}
 

@@ -22,7 +22,13 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-var isPluginService = func(object client.Object) bool {
+var isPluginService = func(object client.Object, operatorNamespace string) bool {
+	if object.GetNamespace() != operatorNamespace {
+		// Only consider the services that are in the same
+		// namespace where the operator is installed
+		return false
+	}
+
 	labels := object.GetLabels()
 	if _, hasLabel := labels[utils.PluginNameLabelName]; !hasLabel {
 		return false
