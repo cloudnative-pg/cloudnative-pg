@@ -94,12 +94,12 @@ spec:
 
 ### Enabling TLS on the Metrics Port
 
-To enable TLS communication on the metrics port, configure the `.spec.monitoring.tls.enable`
+To enable TLS communication on the metrics port, configure the `.spec.monitoring.tls.enabled`
 setting to `true`. This setup ensures that the metrics exporter uses the same
 server certificates used by PostgreSQL to secure communication on port 5432.
 
 !!! important
-    Changing the `.spec.monitoring.tls.enable` setting will trigger a rolling restart of the Cluster.
+    Changing the `.spec.monitoring.tls.enabled` setting will trigger a rolling restart of the Cluster.
 
 If the `PodMonitor` is managed by the operator (`.spec.monitoring.enablePodMonitor` set to `true`),
 it will automatically contain the necessary configurations to access the metrics via TLS.

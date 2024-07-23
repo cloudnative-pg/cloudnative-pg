@@ -1550,7 +1550,7 @@ for the cluster's monitoring</p>
 <table class="table">
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td><code>enable</code><br/>
+<tr><td><code>enabled</code><br/>
 <i>bool</i>
 </td>
 <td>

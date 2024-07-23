@@ -2429,7 +2429,7 @@ type ClusterMonitoringTLSConfiguration struct {
 	// Changing this option will force a rollout of all instances.
 	// +kubebuilder:default:=false
 	// +optional
-	Enable bool `json:"enable,omitempty"`
+	Enabled bool `json:"enabled,omitempty"`
 }
 
 // ExternalCluster represents the connection parameters to an
@@ -3606,7 +3606,7 @@ func (cluster *Cluster) IsPodMonitorEnabled() bool {
 // IsMetricsTLSEnabled checks if the metrics endpoint should use TLS
 func (cluster *Cluster) IsMetricsTLSEnabled() bool {
 	if cluster.Spec.Monitoring != nil && cluster.Spec.Monitoring.TLSConfig != nil {
-		return cluster.Spec.Monitoring.TLSConfig.Enable
+		return cluster.Spec.Monitoring.TLSConfig.Enabled
 	}
 
 	return false

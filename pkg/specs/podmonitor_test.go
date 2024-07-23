@@ -135,7 +135,7 @@ var _ = Describe("PodMonitor test", func() {
 				Monitoring: &apiv1.MonitoringConfiguration{
 					EnablePodMonitor: true,
 					TLSConfig: &apiv1.ClusterMonitoringTLSConfiguration{
-						Enable: true,
+						Enabled: true,
 					},
 				},
 			},

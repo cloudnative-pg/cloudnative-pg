@@ -3914,7 +3914,7 @@ spec:
                       Configure TLS communication for the metrics endpoint.
                       Changing tls.enable option will force a rollout of all instances.
                     properties:
-                      enable:
+                      enabled:
                         default: false
                         description: |-
                           Enable TLS for the monitoring endpoint.
