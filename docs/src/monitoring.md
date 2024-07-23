@@ -59,15 +59,16 @@ by specifying a list of one or more databases in the `target_databases` option.
 
 A specific PostgreSQL cluster can be monitored using the
 [Prometheus Operator's](https://github.com/prometheus-operator/prometheus-operator) resource 
-[PodMonitor](https://github.com/prometheus-operator/prometheus-operator/blob/v0.47.1/Documentation/api.md#podmonitor).
-A PodMonitor correctly pointing to a Cluster can be automatically created by the operator by setting
-`.spec.monitoring.enablePodMonitor` to `true` in the Cluster resource itself (default: false).
+[PodMonitor](https://github.com/prometheus-operator/prometheus-operator/blob/v0.75.1/Documentation/api.md#podmonitor).
+
+A `PodMonitor` that correctly points to the Cluster can be automatically created by the operator by setting
+`.spec.monitoring.enablePodMonitor` to `true` in the Cluster resource itself (default: `false`).
 
 !!! Important
     Any change to the `PodMonitor` created automatically will be overridden by the Operator at the next reconciliation
     cycle, in case you need to customize it, you can do so as described below.
 
-To deploy a `PodMonitor` for a specific Cluster manually, you can just define it as follows, changing it as needed:
+To deploy a `PodMonitor` for a specific Cluster manually, define it as follows and adjust as needed:
 
 ```yaml
 apiVersion: monitoring.coreos.com/v1
@@ -83,27 +84,28 @@ spec:
 ```
 
 !!! Important
-    Make sure you modify the example above with a unique name as well as the
-    correct cluster's namespace and labels (we are using `cluster-example`).
+    Ensure you modify the example above with a unique name, as well as the
+    correct cluster's namespace and labels (e.g., `cluster-example`).
 
 !!! Important
-    Label `postgresql`, used in previous versions of this document, is deprecated
-    and will be removed in the future. Please use the label `cnpg.io/cluster`
+    The `postgresql` label, used in previous versions of this document, is deprecated
+    and will be removed in the future. Please use the `cnpg.io/cluster` label
     instead to select the instances.
 
 ### Enabling TLS on the Metrics Port
 
-To enable TLS communication on the metrics port, configure the `spec.monitoring.tls.enable`
+To enable TLS communication on the metrics port, configure the `.spec.monitoring.tls.enable`
 setting to `true`. This setup ensures that the metrics exporter uses the same
 server certificates as PostgreSQL to secure communication on port 5432.
 
 !!! important
-    Changing the `spec.monitoring.tls.enable` setting will trigger a rolling restart of the cluster.
+    Changing the `.spec.monitoring.tls.enable` setting will trigger a rolling restart of the Cluster.
 
-A `PodMonitor` that correctly points to the cluster can be automatically created by the operator by setting
-`.spec.monitoring.enablePodMonitor` to `true` in the cluster resource itself (default: `false`).
+If the `PodMonitor` is managed by the operator (`.spec.monitoring.enablePodMonitor` set to `true`),
+it will automatically contain the necessary configurations to access the metrics via TLS.
 
-To deploy a `PodMonitor` for a specific cluster manually, define it as follows and adjust as needed:
+To manually deploy a `PodMonitor` suitable for reading metrics via TLS, define it as follows and
+adjust as needed:
 
 ```yaml
 apiVersion: monitoring.coreos.com/v1
@@ -127,7 +129,7 @@ spec:
 
 !!! Important
     Ensure you modify the example above with a unique name, as well as the
-    correct cluster's namespace and labels (e.g., `cluster-example`).
+    correct Cluster's namespace and labels (e.g., `cluster-example`).
 
 !!! Important
     The `serverName` field in the metrics endpoint must match one of the names
