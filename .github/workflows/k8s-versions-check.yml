@@ -4,15 +4,16 @@
 # - GKE (Google Kubernetes Engine): gke_versions.json
 # - AKS (Azure Kubernetes Service): aks_versions.json
 # - EKS (Amazon Elastic Kubernetes Service): eks_versions.json
+# - OCP (OpenShift): openshift_versions.json
 
-name: public-cloud-k8s-versions-check
+name: Check for new K8s versions
 on:
   schedule:
     - cron: "30 0 * * *"
   workflow_dispatch:
     inputs:
       limit:
-        description: 'Limit to the specified engines list (eks, aks, gke, kind)'
+        description: 'Limit to the specified engines list (eks, aks, gke, kind, ocp)'
         required: false
 
 permissions:
@@ -104,6 +105,17 @@ jobs:
             echo "${v}"
           done | jq -Rs 'split("\n") | map(select(length>0)) | sort | reverse' | tee .github/kind_versions.json
         if: github.event.inputs.limit == null || github.event.inputs.limit == 'kind'
+      -
+        name: Get updated OpenShift versions
+        run: |
+          curl -s https://mirror.openshift.com/pub/openshift-v4/clients/ocp/ | \
+          grep -e 'href.*"4\.1[2-9]\.[0-9].*"' | \
+          sed -e 's/\(.*\)href="\(4\.1[2-9]\)\(.*\)/\"\2\"/' | \
+          sort -r | uniq | tr '\r\n' ',' | \
+          sed -e 's/\(.*\)\(,\)$/\[\1\]/' | jq > .github/openshift_versions.json
+          OCP_VERSIONS=`cat .github/openshift_versions.json | jq -r '"v"+.[-1]+"-v"+.[0]'`
+          sed -i -e 's/\(OPENSHIFT_VERSIONS ?= \)\(.*\)/\1'${OCP_VERSIONS}'/g' Makefile
+        if: github.event.inputs.limit == null || github.event.inputs.limit == 'ocp'
       -
         name: Create Pull Request if versions have been updated
         uses: peter-evans/create-pull-request@v6
