@@ -172,22 +172,21 @@ func ReconcileScheduledBackup(
 	}
 
 	now := time.Now()
+	if schedule.Next(now).IsZero() {
+		// No time satisfying the schedule have been found.
+		// We cannot proceed reconciling it.
+		event.Eventf(
+			scheduledBackup,
+			"Warning",
+			"NoSchedule",
+			"No time satisfying the schedule %q have been found", scheduledBackup.Spec.Schedule)
+		return ctrl.Result{}, nil
+	}
 
 	if scheduledBackup.Status.LastCheckTime == nil && scheduledBackup.IsImmediate() {
 		// we populate the status (lastCheckTime...) by following the same rules of the scheduled backup
 		event.Eventf(scheduledBackup, "Normal", "BackupSchedule", "Scheduled immediate backup now: %v", now)
 		return createBackup(ctx, event, cli, scheduledBackup, now, now, schedule, true)
-	}
-
-	var nextTime time.Time
-	if lastCheckTime := scheduledBackup.Status.LastCheckTime; !lastCheckTime.IsZero() {
-		nextTime = schedule.Next(lastCheckTime.Time)
-	} else {
-		nextTime = schedule.Next(now)
-	}
-	if nextTime.IsZero() {
-		contextLogger.Warning("The schedule is invalid, we do not schedule any backup")
-		return ctrl.Result{}, nil
 	}
 
 	if scheduledBackup.Status.LastCheckTime == nil {
@@ -203,13 +202,16 @@ func ReconcileScheduledBackup(
 			return ctrl.Result{}, err
 		}
 
+		nextTime := schedule.Next(now)
 		contextLogger.Info("Next backup schedule", "next", nextTime)
 		event.Eventf(scheduledBackup, "Normal", "BackupSchedule", "Scheduled first backup by %v", nextTime)
 		return ctrl.Result{RequeueAfter: nextTime.Sub(now)}, nil
 	}
 
 	// Let's check if we are supposed to start a new backup.
+	nextTime := schedule.Next(scheduledBackup.GetStatus().LastCheckTime.Time)
 	contextLogger.Info("Next backup schedule", "next", nextTime)
+
 	if now.Before(nextTime) {
 		// No need to schedule a new backup, let's wait a bit
 		return ctrl.Result{RequeueAfter: nextTime.Sub(now)}, nil
