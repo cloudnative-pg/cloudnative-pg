@@ -6033,8 +6033,8 @@ spec:
                         type: string
                       type: array
                     status:
-                      description: Status contain the statuses of the registered plugins
-                        having the SET_CLUSTER_STATUS capability
+                      description: Status contain the status reported by the plugin
+                        through the SetClusterStatus interface
                       type: string
                     version:
                       description: |-
