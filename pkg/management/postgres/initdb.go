@@ -22,7 +22,6 @@ package postgres
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -48,10 +47,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pool"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/system"
 )
-
-// ErrExistingPGDATA is raised when the PGDATA to be written
-// is already existing.
-var ErrExistingPGDATA = errors.New("PGDATA already existing")
 
 // InitInfo contains all the info needed to bootstrap a new PostgreSQL instance
 type InitInfo struct {
@@ -144,7 +139,7 @@ type InitInfo struct {
 //     data of the user. That is still possible if you configure your
 //     PVC template to use static provisioning, and are reusing a set
 //     of existing PVs.
-func (info InitInfo) CheckTargetDataDirectory(ctx context.Context, cleanup bool) error {
+func (info InitInfo) CheckTargetDataDirectory(ctx context.Context) error {
 	contextLogger := log.FromContext(ctx).WithValues("pgdata", info.PgData)
 
 	pgDataExists, err := fileutils.FileExists(info.PgData)
@@ -157,15 +152,11 @@ func (info InitInfo) CheckTargetDataDirectory(ctx context.Context, cleanup bool)
 		// write to it
 		return nil
 	}
-	if !cleanup {
-		// We cannot clean up an existing directory, so we raise
-		// an error.
-		return ErrExistingPGDATA
-	}
 
 	// We've an existing directory. Let's check if this is a real
 	// PGDATA directory or not.
-	if out, err := info.GetInstance().GetPgControldata(); err != nil {
+	out, err := info.GetInstance().GetPgControldata()
+	if err != nil {
 		contextLogger.Info("pg_controldata check on existing directory failed, cleaning it up",
 			"out", out, "err", err)
 
@@ -173,18 +164,20 @@ func (info InitInfo) CheckTargetDataDirectory(ctx context.Context, cleanup bool)
 			contextLogger.Error(err, "error while cleaning up existing data directory")
 			return err
 		}
-	} else {
-		renamedDirectoryName := fmt.Sprintf("%s_%s", info.PgData, fileutils.FormatFriendlyTimestamp(time.Now()))
-		contextLogger := contextLogger.WithValues(
-			"out", out,
-			"newName", renamedDirectoryName,
-		)
 
-		contextLogger.Info("pg_controldata check on existing directory succeeded, renaming the folder")
-		if err := os.Rename(info.PgData, renamedDirectoryName); err != nil {
-			contextLogger.Error(err, "error while renaming existing data directory")
-			return fmt.Errorf("while renaming existing data directory: %w", err)
-		}
+		return nil
+	}
+
+	renamedDirectoryName := fmt.Sprintf("%s_%s", info.PgData, fileutils.FormatFriendlyTimestamp(time.Now()))
+	contextLogger = contextLogger.WithValues(
+		"out", out,
+		"newName", renamedDirectoryName,
+	)
+
+	contextLogger.Info("pg_controldata check on existing directory succeeded, renaming the folder")
+	if err := os.Rename(info.PgData, renamedDirectoryName); err != nil {
+		contextLogger.Error(err, "error while renaming existing data directory")
+		return fmt.Errorf("while renaming existing data directory: %w", err)
 	}
 
 	return nil

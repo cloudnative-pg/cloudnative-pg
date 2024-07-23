@@ -94,7 +94,7 @@ func NewCmd() *cobra.Command {
 }
 
 func joinSubCommand(ctx context.Context, instance *postgres.Instance, info postgres.InitInfo) error {
-	if err := info.CheckTargetDataDirectory(ctx, true); err != nil {
+	if err := info.CheckTargetDataDirectory(ctx); err != nil {
 		return err
 	}
 
