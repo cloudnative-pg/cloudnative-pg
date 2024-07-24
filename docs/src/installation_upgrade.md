@@ -265,39 +265,22 @@ it a robust solution for modern, distributed applications that require high
 availability and disaster recovery capabilities across diverse infrastructure
 setups.
 
-You can seamlessly transition from a previous replica cluster configuration to
-a distributed topology by modifying all the `Cluster` resources involved in the
+You can seamlessly transition from a previous replica cluster configuration to a
+distributed topology by modifying all the `Cluster` resources involved in the
 distributed PostgreSQL setup. Ensure the following steps are taken:
 
-- The `externalClusters` section must be identical across all `Cluster`
-  resources in the distributed topology.
-- Each external cluster should include information enabling any other cluster
-  to recover from it as a source.
-- The current primary cluster should have the following content in the
-  `.spec.replica` stanza:
-```yaml
-replica:
-  enabled:
-  primary: <CLUSTER_NAME>
-  source: <SOURCE>
-```
-- Each replica cluster should have the following content in the `.spec.replica`
-  stanza:
-```yaml
-replica:
-  enabled:
-  primary: <PRIMARY_CLUSTER_NAME>
-  source: <SOURCE>
-```
+- Configure the `externalClusters` section to include all the clusters involved
+  in the distributed topology. We strongly suggest using the same configuration
+  across all `Cluster` resources for maintainability and consistency.
+- Configure the `primary` and `source` fields in the `.spec.replica` stanza to
+  reflect the distributed topology. The `primary` field should contain the name
+  of the current primary cluster in the distributed topology, while the `source`
+  field should contain the name of the cluster each `Cluster` resource is
+  replicating from. It is important to note that the `enabled` field, which was
+  previously set to `true` or `false`, should now be unset (default).
 
-It is important to note that the `enabled` field, which was previously set to
-`true` or `false`, should now be unset (default). In CloudNativePG, we use this
-convention to let the `primary` field control the cluster's state. If the
-`primary` field differs from the current cluster name or `.spec.replica.self`,
-the cluster is in continuous recovery mode. If they match, the cluster is the
-primary.
-
-For more information, please refer to the ["Distributed Topology" section for replica clusters](replica_cluster.md#distributed-topology).
+For more information, please refer to
+the ["Distributed Topology" section for replica clusters](replica_cluster.md#distributed-topology).
 
 ### Upgrading to 1.23 from a previous minor version
 
@@ -388,4 +371,3 @@ set `enableAlterSystem` to `true` as shown above.
 !!! Important
     You can set the desired value for  `enableAlterSystem` immediately
     following your upgrade to version 1.22.3 as shown in the example above.
-

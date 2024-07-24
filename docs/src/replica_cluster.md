@@ -1,6 +1,6 @@
 # Replica clusters
 
-A replica cluster is a separate CloudNativePG `Cluster` resource designed to
+A replica cluster is a CloudNativePG `Cluster` resource designed to
 replicate data from another PostgreSQL instance, ideally also managed by
 CloudNativePG.
 
@@ -18,8 +18,8 @@ There are primarily two use cases for replica clusters:
 
 2. **Read-Only Workloads**: Create standalone replicas of a PostgreSQL cluster
    for purposes such as reporting or Online Analytical Processing (OLAP). These
-   replicas are primarily for read-only workloads. In CloudNativePG terms, this is
-   referred to as a ["Standalone Replica Cluster"](replica_cluster.md#standalone-replica-clusters).
+   replicas are primarily for read-only workloads. In CloudNativePG terms, this
+   is referred to as a ["Standalone Replica Cluster"](replica_cluster.md#standalone-replica-clusters).
 
 For example, the diagram below — taken from the ["Architecture" section](architecture.md#deployments-across-kubernetes-clusters)
 — illustrates a distributed PostgreSQL topology spanning two Kubernetes
@@ -58,10 +58,10 @@ recovery. There are three main options:
    cluster and the source. This method requires configuring network connections
    and implementing appropriate administrative and security measures to ensure
    seamless data transfer.
-2. **WAL Archive**: Utilize the WAL (Write-Ahead Logging) archive stored in an
-   object store. WAL files are regularly transferred from the source to the object
-   store, from where the `barman-cloud-wal-restore` utility retrieves them for the
-   replica cluster.
+2. **WAL Archive**: Use the WAL (Write-Ahead Logging) archive stored in an
+   object store. WAL files are regularly transferred from the source cluster to
+   the object store, from where the `barman-cloud-wal-restore` utility retrieves
+   them for the replica cluster.
 3. **Hybrid Approach**: Combine both streaming replication and WAL archive
    methods. PostgreSQL can manage and switch between these two approaches as
    needed to ensure data consistency and availability.
@@ -139,7 +139,7 @@ continuous recovery are thoroughly explained below.
 
 ### Planning for a Distributed PostgreSQL Database
 
-As Winston Churchill famously said, "Planning is essential", and this holds
+As Dwight Eisenhower famously said, "Planning is everything", and this holds
 true for designing PostgreSQL architectures in Kubernetes.
 
 First, conceptualize your distributed topology on paper, and then translate it
@@ -172,11 +172,11 @@ Here’s how you would configure the `externalClusters` section for both
 externalClusters:
   - name: cluster-eu-south
     barmanObjectStore:
-      destinationPath: s3://cluster-eu-central/
+      destinationPath: s3://cluster-eu-south/
       # Additional configuration
   - name: cluster-eu-central
     barmanObjectStore:
-      destinationPath: s3://cluster-eu-south/
+      destinationPath: s3://cluster-eu-central/
       # Additional configuration
 ```
 
@@ -236,7 +236,7 @@ replica:
   source: cluster-eu-central
 ```
 
-When the primary PostgreSQL cluster is shut down, write operations are no
+When the primary PostgreSQL cluster is demoted, write operations are no
 longer possible. CloudNativePG then:
 
 1. Archives the WAL file containing the shutdown checkpoint as a `.partial`

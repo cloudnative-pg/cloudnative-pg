@@ -3,9 +3,9 @@
 **CloudNativePG** is an open-source
 [operator](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/)
 designed to manage [PostgreSQL](https://www.postgresql.org/) workloads on any
-supported [Kubernetes](https://kubernetes.io) cluster.
-It supports deployment in private, public, hybrid, and multi-cloud
-environments, thanks to its [distributed topology](distributed_topology.md)
+supported [Kubernetes](https://kubernetes.io) cluster. It supports deployment in
+private, public, hybrid, and multi-cloud environments, thanks to
+its [distributed topology](replica_cluster.md#distributed-topology)
 feature.
 
 CloudNativePG adheres to DevOps principles and concepts such as declarative

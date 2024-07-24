@@ -110,13 +110,14 @@ CloudNativePG clusters suffer a failure.
 This scenario is typical of self-managed on-premise Kubernetes clusters, where
 only one data center is available.
 
-A single availability zone Kubernetes cluster is the only viable option when
+Single availability zone Kubernetes clusters are the only viable option when
 only **two data centers** are available within reach of a low-latency
 connection (typically in the same metropolitan area). Having only two zones
 prevents the creation of a multi-availability zone Kubernetes cluster, which
 requires a minimum of three zones. As a result, users must create two separate
 Kubernetes clusters in an active/passive configuration, with the second cluster
-primarily used for Disaster Recovery (see the [replica cluster feature](replica_cluster.md)).
+primarily used for Disaster Recovery (see
+the [replica cluster feature](replica_cluster.md)).
 
 ![Example of a Kubernetes architecture with only 2 data centers](./images/k8s-architecture-2-az.png)
 
@@ -329,4 +330,3 @@ increase this number when the cluster is promoted to primary.
     define a distributed topology with read-only clusters across different
     Kubernetes clusters. This approach can significantly enhance your global
     disaster recovery and high availability (HA) strategy.
-

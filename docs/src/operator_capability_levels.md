@@ -464,10 +464,11 @@ such as incorrect `DELETE` or `UPDATE` SQL operations.
 
 ### Distributed Database Topologies
 
-Leverage replica clusters to craft [distributed database topologies](replica_cluster.md#distributed-topology)
-for PostgreSQL that span across various Kubernetes clusters, facilitating
-hybrid and multi-cloud deployments. With CloudNativePG, you gain powerful
-capabilities, including:
+Leverage replica clusters to
+define [distributed database topologies](replica_cluster.md#distributed-topology)
+for PostgreSQL that span across various Kubernetes clusters, facilitating hybrid
+and multi-cloud deployments. With CloudNativePG, you gain powerful capabilities,
+including:
 
 - **Declarative Primary Control**: Easily specify which PostgreSQL cluster acts
   as the primary.
@@ -475,8 +476,8 @@ capabilities, including:
   promote another PostgreSQL cluster, typically located in a different region,
   without needing to re-clone the former primary.
 
-This setup can efficiently operate across two or more regions, using only
-object stores for replication, and guarantees a maximum RPO (Recovery Point
+This setup can efficiently operate across two or more regions, can rely entirely
+on object stores for replication, and guarantees a maximum RPO (Recovery Point
 Objective) of 5 minutes. This advanced feature is uniquely provided by
 CloudNativePG, ensuring robust data integrity and continuity across diverse
 environments.
