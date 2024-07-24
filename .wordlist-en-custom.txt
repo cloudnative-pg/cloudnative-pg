@@ -887,7 +887,6 @@ matchLabels
 maxClientConnections
 maxParallel
 maxStandbyNamesFromCluster
-maxSyncReplica
 maxSyncReplicas
 maxwait
 mcache

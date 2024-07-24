@@ -1402,26 +1402,35 @@ func (s SynchronousReplicaConfigurationMethod) ToPostgreSQLConfigurationKeyword(
 
 // SynchronousReplicaConfiguration contains the configuration of the
 // PostgreSQL synchronous replication feature.
-// Important: at this moment, also `.spec.minSyncReplicas` and `.spec.maxSyncReplica`
+// Important: at this moment, also `.spec.minSyncReplicas` and `.spec.maxSyncReplicas`
 // need to be considered.
 type SynchronousReplicaConfiguration struct {
-	// Method can be either 'any' (quorum) or 'first' (priority)
+	// Method to select synchronous replication standbys from the listed
+	// servers, accepting 'any' (quorum-based synchronous replication) or
+	// 'first' (priority-based synchronous replication) as values.
 	// +kubebuilder:validation:Enum=any;first
 	Method SynchronousReplicaConfigurationMethod `json:"method,omitempty"`
 
-	// Number of sync replicas expected
+	// Specifies the number of synchronous standby servers that
+	// transactions must wait for responses from.
 	// +kubebuilder:validation:XValidation:rule="self > 0",message="The number of synchrononus replicas should be greater than zero"
 	Number int `json:"number"`
 
-	// Max number of local cluster pods in 'synchronous_standby_names'
+	// Specifies the maximum number of local cluster pods that can be
+	// automatically included in the `synchronous_standby_names` option in
+	// PostgreSQL.
 	// +optional
 	MaxStandbyNamesFromCluster *int `json:"maxStandbyNamesFromCluster,omitempty"`
 
-	// User-defined list of application names to add before local ones
+	// A user-defined list of application names to be added to
+	// `synchronous_standby_names` before local cluster pods (useful for
+	// priority-based synchronous replication).
 	// +optional
 	StandbyNamesPre []string `json:"standbyNamesPre,omitempty"`
 
-	// User-defined list of application names to add after local ones
+	// A user-defined list of application names to be added to
+	// `synchronous_standby_names` after local cluster pods (useful for
+	// priority-based synchronous replication).
 	// +optional
 	StandbyNamesPost []string `json:"standbyNamesPost,omitempty"`
 }

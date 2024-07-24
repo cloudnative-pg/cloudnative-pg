@@ -5192,7 +5192,7 @@ physical replication slots</p>
 
 <p>SynchronousReplicaConfiguration contains the configuration of the
 PostgreSQL synchronous replication feature.
-Important: at this moment, also <code>.spec.minSyncReplicas</code> and <code>.spec.maxSyncReplica</code>
+Important: at this moment, also <code>.spec.minSyncReplicas</code> and <code>.spec.maxSyncReplicas</code>
 need to be considered.</p>
 
 
@@ -5203,35 +5203,44 @@ need to be considered.</p>
 <a href="#postgresql-cnpg-io-v1-SynchronousReplicaConfigurationMethod"><i>SynchronousReplicaConfigurationMethod</i></a>
 </td>
 <td>
-   <p>Method can be either 'any' (quorum) or 'first' (priority)</p>
+   <p>Method to select synchronous replication standbys from the listed
+servers, accepting 'any' (quorum-based synchronous replication) or
+'first' (priority-based synchronous replication) as values.</p>
 </td>
 </tr>
 <tr><td><code>number</code> <B>[Required]</B><br/>
 <i>int</i>
 </td>
 <td>
-   <p>Number of sync replicas expected</p>
+   <p>Specifies the number of synchronous standby servers that
+transactions must wait for responses from.</p>
 </td>
 </tr>
 <tr><td><code>maxStandbyNamesFromCluster</code><br/>
 <i>int</i>
 </td>
 <td>
-   <p>Max number of local cluster pods in 'synchronous_standby_names'</p>
+   <p>Specifies the maximum number of local cluster pods that can be
+automatically included in the <code>synchronous_standby_names</code> option in
+PostgreSQL.</p>
 </td>
 </tr>
 <tr><td><code>standbyNamesPre</code><br/>
 <i>[]string</i>
 </td>
 <td>
-   <p>User-defined list of application names to add before local ones</p>
+   <p>A user-defined list of application names to be added to
+<code>synchronous_standby_names</code> before local cluster pods (useful for
+priority-based synchronous replication).</p>
 </td>
 </tr>
 <tr><td><code>standbyNamesPost</code><br/>
 <i>[]string</i>
 </td>
 <td>
-   <p>User-defined list of application names to add after local ones</p>
+   <p>A user-defined list of application names to be added to
+<code>synchronous_standby_names</code> after local cluster pods (useful for
+priority-based synchronous replication).</p>
 </td>
 </tr>
 </tbody>
