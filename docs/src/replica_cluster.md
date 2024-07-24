@@ -230,6 +230,7 @@ kubectl cnpg -n <cluster-name-space> status cluster-replica-example
     replica cluster and the source cluster will become two independent clusters
     definitively.
 
+<!--
 ## Delayed replicas
 
 In addition to standard replica clusters, our system supports the creation of
@@ -283,3 +284,4 @@ your data.
     efficient to rely on volume snapshot-based recovery for faster outcomes.
     Evaluate and choose the approach that best aligns with your unique requirements
     and infrastructure.
+-->

@@ -436,10 +436,12 @@ extending across multiple data centers and facilitating hybrid and multi-cloud
 setups. (While anticipating Kubernetes federation native capabilities, manual
 switchover across data centers remains necessary.)
 
+<!--
 Additionally, the flexibility extends to creating delayed replica clusters
 intentionally lagging behind the primary cluster. This intentional lag aims to
 minimize the Recovery Time Objective (RTO) in the event of unintended errors,
 such as incorrect `DELETE` or `UPDATE` SQL operations.
+-->
 
 ### Tablespace support
 

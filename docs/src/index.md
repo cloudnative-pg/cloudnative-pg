@@ -94,7 +94,9 @@ Additionally, the Community provides images for the [PostGIS extension](postgis.
   retention management at the object store layer
 * Replica clusters for PostgreSQL deployments across multiple Kubernetes
   clusters, enabling private, public, hybrid, and multi-cloud architectures
+  <!--
 * Delayed Replica clusters
+-->
 * Connection pooling with PgBouncer
 * Support for node affinity via `nodeSelector`
 * Native customizable exporter of user defined metrics for Prometheus through the `metrics` port (9187)
