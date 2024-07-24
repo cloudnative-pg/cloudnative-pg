@@ -311,11 +311,12 @@ func (fullStatus *PostgresqlStatus) printTokenStatus(token string) {
 	} else {
 		var systemIDCheck string
 
-		if primaryInstanceStatus == nil {
+		switch {
+		case primaryInstanceStatus == nil:
 			systemIDCheck = aurora.Red("(no primary have been found)").String()
-		} else if tokenContent.DatabaseSystemIdentifier != primaryInstanceStatus.SystemID {
+		case tokenContent.DatabaseSystemIdentifier != primaryInstanceStatus.SystemID:
 			systemIDCheck = aurora.Red("(invalid)").String()
-		} else {
+		default:
 			systemIDCheck = aurora.Green("(ok)").String()
 		}
 
