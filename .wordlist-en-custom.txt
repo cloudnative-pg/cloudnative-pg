@@ -59,6 +59,8 @@ CRDs
 CSI
 CSV
 CSVs
+CVE
+CVEs
 CannotReconcile
 Canovai
 CatalogImage
