@@ -2404,7 +2404,7 @@ type MonitoringConfiguration struct {
 	EnablePodMonitor bool `json:"enablePodMonitor,omitempty"`
 
 	// Configure TLS communication for the metrics endpoint.
-	// Changing tls.enable option will force a rollout of all instances.
+	// Changing tls.enabled option will force a rollout of all instances.
 	// +optional
 	TLSConfig *ClusterMonitoringTLSConfiguration `json:"tls,omitempty"`
 

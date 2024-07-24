@@ -3397,7 +3397,7 @@ Default: false.</p>
 </td>
 <td>
    <p>Configure TLS communication for the metrics endpoint.
-Changing tls.enable option will force a rollout of all instances.</p>
+Changing tls.enabled option will force a rollout of all instances.</p>
 </td>
 </tr>
 <tr><td><code>podMonitorMetricRelabelings</code><br/>

@@ -3912,7 +3912,7 @@ spec:
                   tls:
                     description: |-
                       Configure TLS communication for the metrics endpoint.
-                      Changing tls.enable option will force a rollout of all instances.
+                      Changing tls.enabled option will force a rollout of all instances.
                     properties:
                       enabled:
                         default: false
