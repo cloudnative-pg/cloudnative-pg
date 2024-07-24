@@ -34,12 +34,25 @@ technologies, physical replication was first introduced in PostgreSQL 8.2
 (2006) through WAL shipping from the primary to a warm standby in
 continuous recovery.
 
-PostgreSQL 9.0 (2010) enhanced it with WAL streaming and read-only replicas via
-*hot standby*, while 9.1 (2011) introduced synchronous replication at the
-transaction level (for RPO=0 clusters). Cascading replication was released with
-PostgreSQL 9.2 (2012). The foundations of logical replication were laid in
-PostgreSQL 9.4, while version 10 (2017) introduced native support for the
-publisher/subscriber pattern to replicate data from an origin to a destination.
+PostgreSQL 9.0 (2010) introduced WAL streaming and read-only replicas through
+*hot standby*. In 2011, PostgreSQL 9.1 brought synchronous replication at the
+transaction level, supporting RPO=0 clusters. Cascading replication was added
+in PostgreSQL 9.2 (2012). The foundations for logical replication were
+established in PostgreSQL 9.4 (2014), and version 10 (2017) introduced native
+support for the publisher/subscriber pattern to replicate data from an origin
+to a destination. The table below summarizes these milestones.
+
+| Version | Year | Feature |
+|---------|------|---------|
+| 8.2     | 2006 | Warm Standby with WAL shipping |
+| 9.0     | 2010 | Hot Standby and physical streaming replication |
+| 9.1     | 2011 | Synchronous replication (priority-based) |
+| 9.2     | 2012 | Cascading replication |
+| 9.4     | 2014 | Foundations of logical replication |
+| 10      | 2017 | Logical publisher/subscriber and quorum-based synchronous replication |
+
+This table highlights key PostgreSQL replication features and their respective
+versions.
 
 ## Streaming replication support
 
@@ -58,7 +71,6 @@ called `streaming_replica` as follows:
 CREATE USER streaming_replica WITH REPLICATION;
    -- NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB NOBYPASSRLS
 ```
-
 
 Out of the box, the operator automatically sets up streaming replication within
 the cluster over an encrypted channel and enforces TLS client certificate
@@ -93,7 +105,217 @@ transparently configures replicas to take advantage of `restore_command` when
 in continuous recovery. As a result, PostgreSQL can use the WAL archive
 as a fallback option whenever pulling WALs via streaming replication fails.
 
-## Synchronous replication
+## Synchronous Replication
+
+CloudNativePG supports both
+[quorum-based and priority-based synchronous replication for PostgreSQL](https://www.postgresql.org/docs/current/warm-standby.html#SYNCHRONOUS-REPLICATION).
+
+!!! Warning
+    Please be aware that synchronous replication will halt your write
+    operations if the required number of standby nodes to replicate WAL data for
+    transaction commits is unavailable. In such cases, write operations for your
+    applications will hang. This behavior differs from the previous implementation
+    in CloudNativePG but aligns with the expectations of a PostgreSQL DBA for this
+    capability.
+
+While direct configuration of the `synchronous_standby_names` option is
+prohibited, CloudNativePG allows you to customize its content and extend
+synchronous replication beyond the `Cluster` resource through the
+[`.spec.postgresql.synchronous` stanza](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-SynchronousReplicaConfiguration).
+
+Synchronous replication is disabled by default (the `synchronous` stanza is not
+defined). When defined, two options are mandatory:
+
+- `method`: either `any` (quorum) or `first` (priority)
+- `number`: the number of synchronous standby servers that transactions must
+  wait for responses from
+
+### Quorum-based Synchronous Replication
+
+PostgreSQL's quorum-based synchronous replication makes transaction commits
+wait until their WAL records are replicated to at least a certain number of
+standbys. To use this method, set `method` to `any`.
+
+#### Migrating from the Deprecated Synchronous Replication Implementation
+
+This section provides instructions on migrating your existing quorum-based
+synchronous replication, defined using the deprecated form, to the new and more
+robust capability in CloudNativePG.
+
+Suppose you have the following manifest:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: angus
+spec:
+  instances: 3
+
+  minSyncReplicas: 1
+  maxSyncReplicas: 1
+
+  storage:
+    size: 1G
+```
+
+You can convert it to the new quorum-based format as follows:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: angus
+spec:
+  instances: 3
+
+  storage:
+    size: 1G
+
+  postgresql:
+    synchronous:
+      method: any
+      number: 1
+```
+
+!!! Important
+    The primary difference with the new capability is that PostgreSQL will
+    always prioritize data durability over high availability. Consequently, if no
+    replica is available, write operations on the primary will be blocked. However,
+    this behavior is consistent with the expectations of a PostgreSQL DBA for this
+    capability.
+
+### Priority-based Synchronous Replication
+
+PostgreSQL's priority-based synchronous replication makes transaction commits
+wait until their WAL records are replicated to the requested number of
+synchronous standbys chosen based on their priorities. Standbys listed earlier
+in the `synchronous_standby_names` option are given higher priority and
+considered synchronous. If a current synchronous standby disconnects, it is
+immediately replaced by the next-highest-priority standby. To use this method,
+set `method` to `first`.
+
+!!! Important
+    Currently, this method is most useful when extending
+    synchronous replication beyond the current cluster using the
+    `maxStandbyNamesFromCluster`, `standbyNamesPre`, and `standbyNamesPost`
+    options explained below.
+
+### Controlling `synchronous_standby_names` Content
+
+By default, CloudNativePG populates `synchronous_standby_names` with the names
+of local pods in a `Cluster` resource, ensuring synchronous replication within
+the PostgreSQL cluster. You can customize the content of
+`synchronous_standby_names` based on your requirements and replication method
+(quorum or priority) using the following optional parameters in the
+`.spec.postgresql.synchronous` stanza:
+
+- `maxStandbyNamesFromCluster`: the maximum number of pod names from the local
+  `Cluster` object that can be automatically included in the
+  `synchronous_standby_names` option in PostgreSQL.
+- `standbyNamesPre`: a list of standby names (specifically `application_name`)
+  to be prepended to the list of local pod names automatically listed by the
+  operator.
+- `standbyNamesPost`: a list of standby names (specifically `application_name`)
+  to be appended to the list of local pod names automatically listed by the
+  operator.
+
+!!! Warning
+    You are responsible for ensuring the correct names in `standbyNamesPre` and
+    `standbyNamesPost`. CloudNativePG expects that you manage any standby with an
+    `application_name` listed here, ensuring their high availability. Incorrect
+    entries can jeopardize your PostgreSQL database uptime.
+
+### Examples
+
+Here are some examples, all based on a `cluster-example` with three instances:
+
+If you set:
+
+```yaml
+postgresql:
+  synchronous:
+    method: any
+    number: 1
+```
+
+The content of `synchronous_standby_names` will be:
+
+```console
+ANY 1 (cluster-example-2, cluster-example-3)
+```
+
+If you set:
+
+```yaml
+postgresql:
+  synchronous:
+    method: any
+    number: 1
+    maxStandbyNamesFromCluster: 1
+    standbyNamesPre:
+      - angus
+```
+
+The content of `synchronous_standby_names` will be:
+
+```console
+ANY 1 (angus, cluster-example-2)
+```
+
+If you set:
+
+```yaml
+postgresql:
+  synchronous:
+    method: any
+    number: 1
+    maxStandbyNamesFromCluster: 0
+    standbyNamesPre:
+      - angus
+      - malcolm
+```
+
+The content of `synchronous_standby_names` will be:
+
+```console
+ANY 1 (angus, malcolm)
+```
+
+If you set:
+
+```yaml
+postgresql:
+  synchronous:
+    method: first
+    number: 2
+    maxStandbyNamesFromCluster: 1
+    standbyNamesPre:
+      - angus
+    standbyNamesPost:
+      - malcolm
+```
+
+The `synchronous_standby_names` option will look like:
+
+```console
+FIRST 2 (angus, cluster-example-2, malcolm)
+```
+
+## Synchronous Replication (Deprecated)
+
+!!! Warning
+    Prior to CloudNativePG 1.24, only the quorum-based synchronous replication
+    implementation was supported. Although this method is now deprecated, it will
+    not be removed anytime soon.
+    The new method prioritizes data durability over self-healing and offers
+    more robust features, including priority-based synchronous replication and full
+    control over the `synchronous_standby_names` option.
+    It is recommended to gradually migrate to the new configuration method for
+    synchronous replication, as explained in the previous paragraph.
+
+!!! Important
+    The deprecated method and the new method are mutually exclusive.
 
 CloudNativePG supports the configuration of **quorum-based synchronous
 streaming replication** via two configuration options called `minSyncReplicas`

@@ -1423,14 +1423,14 @@ type SynchronousReplicaConfiguration struct {
 	MaxStandbyNamesFromCluster *int `json:"maxStandbyNamesFromCluster,omitempty"`
 
 	// A user-defined list of application names to be added to
-	// `synchronous_standby_names` before local cluster pods (useful for
-	// priority-based synchronous replication).
+	// `synchronous_standby_names` before local cluster pods (the order is
+	// only useful for priority-based synchronous replication).
 	// +optional
 	StandbyNamesPre []string `json:"standbyNamesPre,omitempty"`
 
 	// A user-defined list of application names to be added to
-	// `synchronous_standby_names` after local cluster pods (useful for
-	// priority-based synchronous replication).
+	// `synchronous_standby_names` after local cluster pods (the order is
+	// only useful for priority-based synchronous replication).
 	// +optional
 	StandbyNamesPost []string `json:"standbyNamesPost,omitempty"`
 }

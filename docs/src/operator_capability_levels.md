@@ -420,18 +420,13 @@ label, or a transaction ID. This capability is built on top of the full restore
 one and supports all the options available in
 [PostgreSQL for PITR](https://www.postgresql.org/docs/current/runtime-config-wal.html#RUNTIME-CONFIG-WAL-RECOVERY-TARGET).
 
-### Zero-data-loss clusters through synchronous replication
+### Zero-Data-Loss Clusters Through Synchronous Replication
 
-Achieve  *zero data loss* (RPO=0) in your local high-availability CloudNativePG
-cluster through quorum-based synchronous replication support. The operator provides
-two configuration options that control the minimum and maximum number of
-expected synchronous standby replicas available at any time. The operator
-reacts accordingly, based on the number of available and ready PostgreSQL
-instances in the cluster. It uses the following formula for the quorum (`q`):
-
-```
-1 <= minSyncReplicas <= q <= maxSyncReplicas <= readyReplicas
-```
+Achieve *zero data loss* (RPO=0) in your local high-availability CloudNativePG
+cluster with support for both quorum-based and priority-based synchronous
+replication. The operator offers a flexible way to define the number of
+expected synchronous standby replicas available at any time, and allows
+customization of the `synchronous_standby_names` option as needed.
 
 ### Replica clusters
 

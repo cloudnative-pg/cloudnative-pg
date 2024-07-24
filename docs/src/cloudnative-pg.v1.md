@@ -5230,8 +5230,8 @@ PostgreSQL.</p>
 </td>
 <td>
    <p>A user-defined list of application names to be added to
-<code>synchronous_standby_names</code> before local cluster pods (useful for
-priority-based synchronous replication).</p>
+<code>synchronous_standby_names</code> before local cluster pods (the order is
+only useful for priority-based synchronous replication).</p>
 </td>
 </tr>
 <tr><td><code>standbyNamesPost</code><br/>
@@ -5239,8 +5239,8 @@ priority-based synchronous replication).</p>
 </td>
 <td>
    <p>A user-defined list of application names to be added to
-<code>synchronous_standby_names</code> after local cluster pods (useful for
-priority-based synchronous replication).</p>
+<code>synchronous_standby_names</code> after local cluster pods (the order is
+only useful for priority-based synchronous replication).</p>
 </td>
 </tr>
 </tbody>
