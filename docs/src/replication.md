@@ -42,13 +42,13 @@ established in PostgreSQL 9.4 (2014), and version 10 (2017) introduced native
 support for the publisher/subscriber pattern to replicate data from an origin
 to a destination. The table below summarizes these milestones.
 
-| Version | Year | Feature |
-|---------|------|---------|
-| 8.2     | 2006 | Warm Standby with WAL shipping |
-| 9.0     | 2010 | Hot Standby and physical streaming replication |
-| 9.1     | 2011 | Synchronous replication (priority-based) |
-| 9.2     | 2012 | Cascading replication |
-| 9.4     | 2014 | Foundations of logical replication |
+| Version | Year | Feature                                                               |
+|:-------:|:----:|-----------------------------------------------------------------------|
+| 8.2     | 2006 | Warm Standby with WAL shipping                                        |
+| 9.0     | 2010 | Hot Standby and physical streaming replication                        |
+| 9.1     | 2011 | Synchronous replication (priority-based)                              |
+| 9.2     | 2012 | Cascading replication                                                 |
+| 9.4     | 2014 | Foundations of logical replication                                    |
 | 10      | 2017 | Logical publisher/subscriber and quorum-based synchronous replication |
 
 This table highlights key PostgreSQL replication features and their respective
