@@ -6,7 +6,7 @@
 # - EKS (Amazon Elastic Kubernetes Service): eks_versions.json
 # - OCP (OpenShift): openshift_versions.json
 
-name: Check for new K8s versions
+name: k8s-versions-check
 on:
   schedule:
     - cron: "30 0 * * *"
