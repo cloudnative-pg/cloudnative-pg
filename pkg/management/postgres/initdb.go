@@ -113,32 +113,26 @@ type InitInfo struct {
 	TablespaceMapFile []byte
 }
 
-// CheckTargetDataDirectory ensures that the target data directory is
-// not existent. This allows it to be recreated, restored from primary
-// instance or restored from a backup.
+// CheckTargetDataDirectory ensures that the target data directory does not exist.
+// This is a sanity check we do before initializing a new instance data directory.
 //
-// If cleanup is false, this function will fail when PGDATA already
-// exists.
+// If the PGDATA directory already exists and contains a valid PostgreSQL control file,
+// the function moves its contents to a uniquely named directory.
+// If no valid control file is found, the function assumes the directory is the result of
+// a failed initialization attempt and removes it.
 //
-// If cleanup is true, this function will move the existing contents
-// of the target directory if a correct control file can be found.
-// Otherwise, the directory will be cleaned up.
+// By moving rather than deleting the existing data, we use more disk space than necessary.
+// However, this approach is justified for two reasons:
 //
-// By moving the existing contents away and not removing them, we
-// are going to use more free space then we really need it. In
-// defense of this approach, we've two considerations:
+//  1. The PostgreSQL control file is the last file written by pg_basebackup.
+//     So the only chance to trigger this protection is if the "join" Pod is interrupted
+//     shortly after writing the control file but before the Pod terminates.
+//     This is a very short time window, and it is extremely unlikely that it happens.
 //
-//  1. The PostgreSQL control file is the last file written by
-//     pg_basebackup. We'll only rename a data directory written
-//     by us if the "join" Pod got interrupted (i.e. the node was
-//     shut down immediately) after having written the control file
-//     and before the Pod was terminated. This is quite a short time
-//     span.
-//
-//  2. If the PGDATA wasn't written by us, we're probably saving the
-//     data of the user. That is still possible if you configure your
-//     PVC template to use static provisioning, and are reusing a set
-//     of existing PVs.
+//  2. If the PGDATA directory wasn't created by us, renaming preserves potentially
+//     important user data. This is particularly relevant when using static provisioning
+//     of PersistentVolumeClaims (PVCs), as it prevents accidental overwriting of a valid
+//     data directory that may exist in the PersistentVolumes (PVs).
 func (info InitInfo) CheckTargetDataDirectory(ctx context.Context) error {
 	contextLogger := log.FromContext(ctx).WithValues("pgdata", info.PgData)
 
