@@ -43,14 +43,9 @@ func explicitSynchronousStandbyNames(cluster *apiv1.Cluster) string {
 		escapedReplicas[idx] = escapePostgresConfLiteral(name)
 	}
 
-	method := "ANY"
-	if config.Method == apiv1.SynchronousReplicaConfigurationMethodFirst {
-		method = "FIRST"
-	}
-
 	return fmt.Sprintf(
 		"%s %v (%v)",
-		method,
+		config.Method.ToPostgreSQLConfigurationKeyword(),
 		config.Number,
 		strings.Join(escapedReplicas, ","))
 }

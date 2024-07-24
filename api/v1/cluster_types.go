@@ -1394,6 +1394,12 @@ const (
 	SynchronousReplicaConfigurationMethodAny = SynchronousReplicaConfigurationMethod("any")
 )
 
+// ToPostgreSQLConfigurationKeyword returns the contained value as a valid PostgreSQL parameter to be injected
+// inthe 'synchronous_standby_names' field
+func (s SynchronousReplicaConfigurationMethod) ToPostgreSQLConfigurationKeyword() string {
+	return strings.ToUpper(string(s))
+}
+
 // SynchronousReplicaConfiguration contains the configuration of the
 // PostgreSQL synchronous replication feature.
 // Important: at this moment, also `.spec.minSyncReplicas` and `.spec.maxSyncReplica`
