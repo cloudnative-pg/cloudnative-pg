@@ -421,6 +421,8 @@ SwitchReplicaClusterStatus
 SyncReplicaElectionConstraints
 SynchronizeReplicas
 SynchronizeReplicasConfiguration
+SynchronousReplicaConfiguration
+SynchronousReplicaConfigurationMethod
 Synopsys
 TCP
 TLS
@@ -884,6 +886,8 @@ matchExpressions
 matchLabels
 maxClientConnections
 maxParallel
+maxStandbyNamesFromCluster
+maxSyncReplica
 maxSyncReplicas
 maxwait
 mcache
@@ -1155,6 +1159,8 @@ sslkey
 sslmode
 sslrootcert
 sso
+standbyNamesPost
+standbyNamesPre
 startDelay
 startedAt
 stateful

@@ -4031,6 +4031,13 @@ we are targeting. Allowed values are <code>rw</code> and <code>ro</code>.</p>
    <p>PostgreSQL configuration options (postgresql.conf)</p>
 </td>
 </tr>
+<tr><td><code>synchronous</code><br/>
+<a href="#postgresql-cnpg-io-v1-SynchronousReplicaConfiguration"><i>SynchronousReplicaConfiguration</i></a>
+</td>
+<td>
+   <p>Configuration of the PostgreSQL synchronous replication feature</p>
+</td>
+</tr>
 <tr><td><code>pg_hba</code><br/>
 <i>[]string</i>
 </td>
@@ -5174,6 +5181,76 @@ physical replication slots</p>
 </tr>
 </tbody>
 </table>
+
+## SynchronousReplicaConfiguration     {#postgresql-cnpg-io-v1-SynchronousReplicaConfiguration}
+
+
+**Appears in:**
+
+- [PostgresConfiguration](#postgresql-cnpg-io-v1-PostgresConfiguration)
+
+
+<p>SynchronousReplicaConfiguration contains the configuration of the
+PostgreSQL synchronous replication feature.
+Important: at this moment, also <code>.spec.minSyncReplicas</code> and <code>.spec.maxSyncReplica</code>
+need to be considered.</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>method</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-SynchronousReplicaConfigurationMethod"><i>SynchronousReplicaConfigurationMethod</i></a>
+</td>
+<td>
+   <p>Method can be either 'any' (quorum) or 'first' (priority)</p>
+</td>
+</tr>
+<tr><td><code>number</code> <B>[Required]</B><br/>
+<i>int</i>
+</td>
+<td>
+   <p>Number of sync replicas expected</p>
+</td>
+</tr>
+<tr><td><code>maxStandbyNamesFromCluster</code><br/>
+<i>int</i>
+</td>
+<td>
+   <p>Max number of local cluster pods in 'synchronous_standby_names'</p>
+</td>
+</tr>
+<tr><td><code>standbyNamesPre</code><br/>
+<i>[]string</i>
+</td>
+<td>
+   <p>User-defined list of application names to add before local ones</p>
+</td>
+</tr>
+<tr><td><code>standbyNamesPost</code><br/>
+<i>[]string</i>
+</td>
+<td>
+   <p>User-defined list of application names to add after local ones</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## SynchronousReplicaConfigurationMethod     {#postgresql-cnpg-io-v1-SynchronousReplicaConfigurationMethod}
+
+(Alias of `string`)
+
+**Appears in:**
+
+- [SynchronousReplicaConfiguration](#postgresql-cnpg-io-v1-SynchronousReplicaConfiguration)
+
+
+<p>SynchronousReplicaConfigurationMethod configured whether to use
+quorum based replication or a priority list</p>
+
+
+
 
 ## TablespaceConfiguration     {#postgresql-cnpg-io-v1-TablespaceConfiguration}
 
