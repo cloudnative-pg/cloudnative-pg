@@ -40,17 +40,31 @@ Please refer to the ["Supported releases"](supported_releases.md) page for detai
 ## Container images
 
 The [CloudNativePG community](https://github.com/cloudnative-pg) maintains
-container images for both the operator and the operand, that is PostgreSQL.
+container images for both the operator and PostgreSQL (the operand).
 
-The CloudNativePG operator container images are [distroless](https://github.com/GoogleContainerTools/distroless)
-and available on the [`cloudnative-pg` project's GitHub Container Registry](https://github.com/cloudnative-pg/cloudnative-pg/pkgs/container/cloudnative-pg).
+### Operator
 
-The PostgreSQL operand container images are available for all the
+The CloudNativePG operator container images are available on the
+[`cloudnative-pg` project's GitHub Container Registry](https://github.com/cloudnative-pg/cloudnative-pg/pkgs/container/cloudnative-pg)
+in three different flavors:
+
+- Debian 12 distroless
+- Red Hat UBI 9 micro (suffix `-ubi9`)
+- Red Hat UBI 8 micro (suffix `-ubi8`)
+
+Red Hat UBI images are primarily intended for OLM consumption.
+
+### Operands
+
+The PostgreSQL operand container images are available for all
 [PGDG supported versions of PostgreSQL](https://www.postgresql.org/),
-on multiple architectures, directly from the
+across multiple architectures, directly from the
 [`postgres-containers` project's GitHub Container Registry](https://github.com/cloudnative-pg/postgres-containers/pkgs/container/postgresql).
 
-Additionally, the Community provides images for the [PostGIS extension](postgis.md).
+Daily jobs ensure that critical vulnerabilities (CVEs) in the entire stack are
+promptly addressed.
+
+Additionally, the community provides images for the [PostGIS extension](postgis.md).
 
 ## Main features
 
