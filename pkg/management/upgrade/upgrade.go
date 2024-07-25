@@ -185,7 +185,7 @@ func validateInstanceManagerHash(
 // This function never returns in case of success.
 func reloadInstanceManager() error {
 	log.Info("Replacing current instance")
-	err := syscall.Exec(os.Args[0], os.Args, os.Environ()) // #nosec
+	err := syscall.Exec(InstanceManagerPath, os.Args, os.Environ()) // #nosec G204
 	if err != nil {
 		return err
 	}
