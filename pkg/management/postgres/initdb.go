@@ -114,7 +114,7 @@ type InitInfo struct {
 }
 
 // CheckTargetDataDirectory ensures that the target data directory does not exist.
-// This is a sanity check we do before initializing a new instance data directory.
+// This is a safety check we do before initializing a new instance data directory.
 //
 // If the PGDATA directory already exists and contains a valid PostgreSQL control file,
 // the function moves its contents to a uniquely named directory.
