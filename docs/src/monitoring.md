@@ -96,9 +96,9 @@ spec:
 
 To enable TLS communication on the metrics port, configure the `.spec.monitoring.tls.enabled`
 setting to `true`. This setup ensures that the metrics exporter uses the same
-server certificates used by PostgreSQL to secure communication on port 5432.
+server certificate used by PostgreSQL to secure communication on port 5432.
 
-!!! important
+!!! Important
     Changing the `.spec.monitoring.tls.enabled` setting will trigger a rolling restart of the Cluster.
 
 If the `PodMonitor` is managed by the operator (`.spec.monitoring.enablePodMonitor` set to `true`),
@@ -133,7 +133,7 @@ spec:
 
 !!! Important
     The `serverName` field in the metrics endpoint must match one of the names
-    defined in the server certificate. If the default certificates are in use,
+    defined in the server certificate. If the default certificate are in use,
     the `serverName` value should be in the format `<cluster-name>-rw`.
 
 ### Predefined set of metrics
