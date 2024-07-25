@@ -367,6 +367,7 @@ RunningBackups
 RunningSnapshotBackups
 RuntimeDefault
 Ruocco
+SANs
 SAS
 SCC
 SCCs
@@ -1246,6 +1247,7 @@ unencrypted
 unfence
 unfencing
 unix
+unschedulable
 unsetting
 unusablePVC
 updateInterval
