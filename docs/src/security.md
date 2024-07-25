@@ -388,7 +388,7 @@ levels, as listed in the table below:
 ### PostgreSQL
 
 The current implementation of CloudNativePG automatically creates
-passwords and `.pgpass` files for the the database owner and, only
+passwords and `.pgpass` files for the database owner and, only
 if requested by setting `enableSuperuserAccess` to `true`, for the
 `postgres` superuser.
 
