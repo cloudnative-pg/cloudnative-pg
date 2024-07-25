@@ -18,8 +18,10 @@ package e2e
 
 import (
 	"fmt"
+
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -41,7 +43,7 @@ var _ = Describe("E2E Affinity", Serial, Label(tests.LabelPodScheduling), func()
 		}
 	})
 
-	It("can create a cluster with required affinity", func() {
+	It("can create a cluster and a pooler with required affinity", func() {
 		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
