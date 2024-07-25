@@ -1,10 +1,13 @@
 # CloudNativePG
 
-**CloudNativePG** is an open source
+**CloudNativePG** is an open-source
 [operator](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/)
 designed to manage [PostgreSQL](https://www.postgresql.org/) workloads on any
-supported [Kubernetes](https://kubernetes.io) cluster running in private,
-public, hybrid, or multi-cloud environments.
+supported [Kubernetes](https://kubernetes.io) cluster. It supports deployment in
+private, public, hybrid, and multi-cloud environments, thanks to
+its [distributed topology](replica_cluster.md#distributed-topology)
+feature.
+
 CloudNativePG adheres to DevOps principles and concepts such as declarative
 configuration and immutable infrastructure.
 
@@ -22,7 +25,7 @@ PostgreSQL via TCP. Additionally, web applications can take advantage of the
 native connection pooler based on PgBouncer.
 
 CloudNativePG was originally built by [EDB](https://www.enterprisedb.com), then
-released open source under Apache License 2.0 and submitted for CNCF Sandbox in April 2022.
+released open source under Apache License 2.0.
 The [source code repository is in Github](https://github.com/cloudnative-pg/cloudnative-pg).
 
 !!! Note

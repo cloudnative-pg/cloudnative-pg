@@ -228,19 +228,61 @@ When versions are not directly upgradable, the old version needs to be
 removed before installing the new one. This won't affect user data but
 only the operator itself.
 
-### Upgrading to 1.23.0, 1.22.3 or 1.21.5
+### Upgrading to 1.24.0 or 1.23.3
 
 !!! Important
     We encourage all existing users of CloudNativePG to upgrade to version
-    1.23.0 or at least to the latest stable version of the minor release you are
-    currently using (namely 1.22.2 or 1.21.4).
+    1.24.0 or at least to the latest stable version of the minor release you are
+    currently using (namely 1.23.3).
 
 !!! Warning
     Every time you are upgrading to a higher minor release, make sure you
     go through the release notes and upgrade instructions of all the
     intermediate minor releases. For example, if you want to move
-    from 1.21.x to 1.23, make sure you go through the release notes
-    and upgrade instructions for 1.22 and 1.23.
+    from 1.21.x to 1.24, make sure you go through the release notes
+    and upgrade instructions for 1.22, 1.23 and 1.24.
+
+#### From Replica Clusters to Distributed Topology
+
+One of the key enhancements in CloudNativePG 1.24.0 is the upgrade of the
+replica cluster feature.
+
+The former replica cluster feature, now referred to as the "Standalone Replica
+Cluster," is no longer recommended for Disaster Recovery (DR) and High
+Availability (HA) scenarios that span multiple Kubernetes clusters. Standalone
+replica clusters are best suited for read-only workloads, such as reporting,
+OLAP, or creating development environments with test data.
+
+For DR and HA purposes, CloudNativePG now introduces the Distributed Topology
+strategy for replica clusters. This new strategy allows you to build PostgreSQL
+clusters across private, public, hybrid, and multi-cloud environments, spanning
+multiple regions and potentially different cloud providers. It also provides an
+API to control the switchover operation, ensuring that only one cluster acts as
+the primary at any given time.
+
+This Distributed Topology strategy enhances resilience and scalability, making
+it a robust solution for modern, distributed applications that require high
+availability and disaster recovery capabilities across diverse infrastructure
+setups.
+
+You can seamlessly transition from a previous replica cluster configuration to a
+distributed topology by modifying all the `Cluster` resources involved in the
+distributed PostgreSQL setup. Ensure the following steps are taken:
+
+- Configure the `externalClusters` section to include all the clusters involved
+  in the distributed topology. We strongly suggest using the same configuration
+  across all `Cluster` resources for maintainability and consistency.
+- Configure the `primary` and `source` fields in the `.spec.replica` stanza to
+  reflect the distributed topology. The `primary` field should contain the name
+  of the current primary cluster in the distributed topology, while the `source`
+  field should contain the name of the cluster each `Cluster` resource is
+  replicating from. It is important to note that the `enabled` field, which was
+  previously set to `true` or `false`, should now be unset (default).
+
+For more information, please refer to
+the ["Distributed Topology" section for replica clusters](replica_cluster.md#distributed-topology).
+
+### Upgrading to 1.23 from a previous minor version
 
 #### User defined replication slots
 
@@ -323,189 +365,9 @@ excerpt:
 ```
 
 Clusters in 1.22 will have `enableAlterSystem` set to `false` by default.
-If you want to retain the existing behavior, in 1.22, you need to explicitly
+If you want to retain the existing behavior in 1.22, you need to explicitly
 set `enableAlterSystem` to `true` as shown above.
-
-In versions 1.21.2 and 1.20.5, and later patch releases in the 1.20 and 1.21
-branches, `enableAlterSystem` will be set to `true` by default, keeping with
-the existing behavior. If you don't need to use `ALTER SYSTEM`, we recommend
-that you set `enableAlterSystem` explicitly to `false`.
 
 !!! Important
     You can set the desired value for  `enableAlterSystem` immediately
-    following your upgrade to version 1.22.0, 1.21.2, or 1.20.5, as shown in
-    the example above.
-
-### Upgrading to 1.21 from a previous minor version
-
-With the goal to keep improving out-of-the-box the *convention over
-configuration* behavior of the operator, CloudNativePG changes the default
-value of several knobs in the following areas:
-
-- startup and shutdown control of the PostgreSQL instance
-- self-healing
-- security
-- labels
-
-!!! Warning
-    Please read carefully the list of changes below, and how to modify the
-    `Cluster` manifests to retain the existing behavior if you don't want to
-    disrupt your existing workloads. Alternatively, postpone the upgrade to
-    until you are sure. In general, we recommend adopting these default
-    values unless you have valid reasons not to.
-
-#### Superuser access disabled
-
-Pushing towards *security-by-default*, CloudNativePG now disables access
-`postgres` superuser access via the network in all new clusters, unless
-explicitly enabled.
-
-If you want to ensure superuser access to the PostgreSQL cluster, regardless
-which version of CloudNativePG you are running, we advise you to explicitly
-declare it by setting:
-
-```yaml
-spec:
-   ...
-   enableSuperuserAccess: true
-```
-
-#### Replication slots for HA
-
-Replication slots for High Availability are enabled by default.
-
-If you want to ensure replication slots are disabled, regardless of which
-version of CloudNativePG you are running, we advise you to explicitly declare
-it by setting:
-
-```yaml
-spec:
-   ...
-   replicationSlots:
-     highAvailability:
-       enabled: false
-```
-
-#### Delay for PostgreSQL shutdown
-
-Up to 1.20.2, [the `stopDelay` parameter](instance_manager.md#shutdown-control)
-was set to 30 seconds. Despite the recommendations to change and tune this
-value, almost all the cases we have examined during support incidents or
-community issues show that this value is left unchanged.
-
-The [new default value is 1800 seconds](https://github.com/cloudnative-pg/cloudnative-pg/commit/9f7f18c5b9d9103423a53d180c0e2f2189e71c3c),
-the equivalent of 30 minutes.
-
-The new `smartShutdownTimeout` parameter has been introduced to define
-the maximum time window within the `stopDelay` value reserved to complete
-the `smart` shutdown procedure in PostgreSQL. During this time, the
-Postgres server rejects any new connections while waiting for all regular
-sessions to terminate.
-
-Once elapsed, the remaining time up to `stopDelay` will be reserved for
-PostgreSQL to complete its duties regarding WAL commitments with both the
-archive and the streaming replicas to ensure the cluster doesn't lose any data.
-
-If you want to retain the old behavior, you need to set explicitly:
-
-```yaml
-spec:
-   ...
-   stopDelay: 30
-```
-
-And, **after** the upgrade has completed, specify `smartShutdownTimeout`:
-
-```yaml
-spec:
-   ...
-   stopDelay: 30
-   smartShutdownTimeout: 15
-```
-
-#### Delay for PostgreSQL startup
-
-Up to 1.20.2, [the `startDelay` parameter](instance_manager.md#startup-liveness-and-readiness-probes)
-was set to 30 seconds, and CloudNativePG used this parameter as
-`initialDelaySeconds` for the Kubernetes liveness probe. Given that all the
-supported Kubernetes releases provide [startup probes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#define-startup-probes),
-`startDelay` is now automatically divided into periods of 10 seconds of
-duration  each.
-
-!!! Important
-    In order to add the `startupProbe`, each pod needs to be restarted.
-    As a result, when you upgrade the operator, a one-time rolling
-    update of the cluster will be executed even in the online update case.
-
-Despite the recommendations to change and tune this value, almost all the cases
-we have examined during support incidents or community issues show that this
-value is left unchanged. Given that this parameter influences the startup of
-a PostgreSQL instance, a low value of `startDelay` would cause Postgres
-never to reach a consistent recovery state and be restarted indefinitely.
-
-For this reason, `startDelay` has been [raised by default to 3600 seconds](https://github.com/cloudnative-pg/cloudnative-pg/commit/4f4cd96bc6f8e284a200705c11a2b41652d58146),
-the equivalent of 1 hour.
-
-If you want to retain the existing behavior using the new implementation, you
-can do that by explicitly setting:
-
-```yaml
-spec:
-   ...
-   startDelay: 30
-```
-
-#### Delay for PostgreSQL switchover
-
-Up to 1.20.2, [the `switchoverDelay` parameter](instance_manager.md#shutdown-of-the-primary-during-a-switchover)
-was set by default to 40000000 seconds (over 15 months) to simulate a very long
-interval.
-
-The [default value has been lowered to 3600 seconds](https://github.com/cloudnative-pg/cloudnative-pg/commit/9565f9f2ebab8bc648d9c361198479974664c322),
-the equivalent of 1 hour.
-
-If you want to retain the old behavior, you need to set explicitly:
-
-```yaml
-spec:
-   ...
-   switchoverDelay: 40000000
-```
-
-#### Labels
-
-In version 1.18, we deprecated the `postgresql` label in pods to identify the
-name of the cluster, and replaced it with the more canonical `cnpg.io/cluster`
-label. The `postgresql` label is no longer maintained.
-
-Similarly, from this version, the `role` label is deprecated. The new label
-`cnpg.io/instanceRole` is now used, and will entirely replace the `role` label
-in a future release.
-
-#### Shortcut for keeping the existing behavior
-
-If you want to explicitly keep the behavior of CloudNativePG up to version
-1.20.2 (we advise not to), you need to set these values in all your `Cluster`
-definitions **before upgrading** to a higher version:
-
-```yaml
-spec:
-   ...
-   # Changed in 1.21.0, 1.20.3 and 1.19.5
-   startDelay: 30
-   stopDelay: 30
-   switchoverDelay: 40000000
-   # Changed in 1.21.0 only
-   enableSuperuserAccess: true
-   replicationSlots:
-     highAvailability:
-       enabled: false
-```
-
-Once the upgrade is completed, also add:
-
-```yaml
-spec:
-   ...
-   smartShutdownTimeout: 15
-```
+    following your upgrade to version 1.22.3 as shown in the example above.

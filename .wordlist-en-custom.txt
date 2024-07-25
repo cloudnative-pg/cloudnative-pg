@@ -251,6 +251,7 @@ NodeSelector
 NodesUsed
 Noland
 O'Reilly
+OLAP
 OLTP
 OOM
 OU
