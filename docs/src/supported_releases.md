@@ -80,7 +80,7 @@ Git tags for versions are prefixed with `v`.
 
 | Version         | Currently supported  | Release date      | End of life         | Supported Kubernetes versions | Tested, but not supported | Supported Postgres versions |
 |-----------------|----------------------|-------------------|---------------------|-------------------------------|---------------------------|-----------------------------|
-| 1.23.x          | Yes                  | April 24, 2024    | ~ November, 2024    | 1.27, 1.28, 1.29              |                           | 12 - 16                     |
+| 1.23.x          | Yes                  | April 24, 2024    | ~ November, 2024    | 1.27, 1.28, 1.29              | 1.30                      | 12 - 16                     |
 | main            | No, development only |                   |                     |                               |                           | 12 - 16                     |
 
 The list of supported Kubernetes versions in the table depends on what
