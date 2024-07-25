@@ -99,6 +99,13 @@ func FileExists(fileName string) (bool, error) {
 	return true, nil
 }
 
+// FormatFriendlyTimestamp formats a timestamp in a filename-friendly
+// way.
+func FormatFriendlyTimestamp(t time.Time) string {
+	const friendlyFormatRFC3339 = "20060102T150405Z0700"
+	return t.UTC().Format(friendlyFormatRFC3339)
+}
+
 // CopyFile copy a file from a location to another one
 func CopyFile(source, destination string) (err error) {
 	// Ensure that the directory really exist
