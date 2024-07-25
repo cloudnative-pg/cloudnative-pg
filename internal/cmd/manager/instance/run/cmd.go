@@ -76,6 +76,7 @@ func NewCmd() *cobra.Command {
 	var clusterName string
 	var namespace string
 	var statusPortTLS bool
+	var metricsPortTLS bool
 
 	cmd := &cobra.Command{
 		Use: "run [flags]",
@@ -94,6 +95,7 @@ func NewCmd() *cobra.Command {
 			instance.PodName = podName
 			instance.ClusterName = clusterName
 			instance.StatusPortTLS = statusPortTLS
+			instance.MetricsPortTLS = metricsPortTLS
 
 			err := retry.OnError(retry.DefaultRetry, isRunSubCommandRetryable, func() error {
 				return runSubCommand(ctx, instance)
@@ -123,6 +125,8 @@ func NewCmd() *cobra.Command {
 		"the cluster and of the Pod in k8s")
 	cmd.Flags().BoolVar(&statusPortTLS, "status-port-tls", false,
 		"Enable TLS for communicating with the operator")
+	cmd.Flags().BoolVar(&metricsPortTLS, "metrics-port-tls", false,
+		"Enable TLS for metrics scraping")
 	return cmd
 }
 
@@ -174,15 +178,11 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 		return err
 	}
 
-	metricsServer, err := metricserver.New(instance)
-	if err != nil {
-		return err
-	}
-
 	postgresStartConditions := concurrency.MultipleExecuted{}
 	exitedConditions := concurrency.MultipleExecuted{}
 
-	reconciler := controller.NewInstanceReconciler(instance, mgr.GetClient(), metricsServer)
+	metricsExporter := metricserver.NewExporter(instance)
+	reconciler := controller.NewInstanceReconciler(instance, mgr.GetClient(), metricsExporter)
 	err = ctrl.NewControllerManagedBy(mgr).
 		For(&apiv1.Cluster{}).
 		Complete(reconciler)
@@ -227,11 +227,6 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 		return err
 	}
 
-	if err = mgr.Add(metricsServer); err != nil {
-		setupLog.Error(err, "unable to add metrics webserver runnable")
-		return err
-	}
-
 	if err = mgr.Add(lifecycle.NewPostgresOrphansReaper(instance)); err != nil {
 		setupLog.Error(err, "unable to create zombie reaper")
 		return err
@@ -271,6 +266,15 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 		return err
 	}
 	if err = mgr.Add(localSrv); err != nil {
+		setupLog.Error(err, "unable to add local webserver runnable")
+		return err
+	}
+
+	metricsServer, err := metricserver.New(instance, metricsExporter)
+	if err != nil {
+		return err
+	}
+	if err = mgr.Add(metricsServer); err != nil {
 		setupLog.Error(err, "unable to add local webserver runnable")
 		return err
 	}

@@ -3909,6 +3909,18 @@ spec:
                           type: string
                       type: object
                     type: array
+                  tls:
+                    description: |-
+                      Configure TLS communication for the metrics endpoint.
+                      Changing tls.enabled option will force a rollout of all instances.
+                    properties:
+                      enabled:
+                        default: false
+                        description: |-
+                          Enable TLS for the monitoring endpoint.
+                          Changing this option will force a rollout of all instances.
+                        type: boolean
+                    type: object
                 type: object
               nodeMaintenanceWindow:
                 description: Define a maintenance window for the Kubernetes nodes

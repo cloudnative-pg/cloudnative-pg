@@ -377,18 +377,18 @@ section of the Kubernetes documentation for further information.
 CloudNativePG exposes ports at operator, instance manager and operand
 levels, as listed in the table below:
 
-System           | Port number  | Exposing            |  Name               |  Certificates                  |  Authentication
-:--------------- | :----------- | :------------------ | :------------------ | :----------------------------  | :--------------
-operator         | 9443         | webhook server      | `webhook-server`    |  TLS                           | Yes
-operator         | 8080         | metrics             | `metrics`           |  no TLS                        | No
-instance manager | 9187         | metrics             | `metrics`           |  no TLS                        | No
-instance manager | 8000         | status              | `status`            |  TLS (no TLS in old releases)  | No
-operand          | 5432         | PostgreSQL instance | `postgresql`        |  optional TLS                  | Yes
+| System           | Port number | Exposing            | Name             | TLS      | Authentication |
+|:-----------------|:------------|:--------------------|:-----------------|:---------|:---------------|
+| operator         | 9443        | webhook server      | `webhook-server` | Yes      | Yes            |
+| operator         | 8080        | metrics             | `metrics`        | No       | No             |
+| instance manager | 9187        | metrics             | `metrics`        | Optional | No             |
+| instance manager | 8000        | status              | `status`         | Yes      | No             |
+| operand          | 5432        | PostgreSQL instance | `postgresql`     | Optional | Yes            |
 
 ### PostgreSQL
 
 The current implementation of CloudNativePG automatically creates
-passwords and `.pgpass` files for the the database owner and, only
+passwords and `.pgpass` files for the database owner and, only
 if requested by setting `enableSuperuserAccess` to `true`, for the
 `postgres` superuser.
 
