@@ -792,6 +792,11 @@ And then run:
 kubectl exec -ti curl -- curl -s ${POD_IP}:9187/metrics
 ```
 
+If you enabled TLS metrics, run instead:
+```shell
+kubectl exec -ti curl -- curl -sk https://${POD_IP}:9187/metrics
+```
+
 In case you want to access the metrics of the operator, you need to point
 to the pod where the operator is running, and use TCP port 8080 as target.
 
