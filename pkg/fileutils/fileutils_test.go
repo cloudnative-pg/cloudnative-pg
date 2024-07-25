@@ -24,6 +24,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -398,5 +399,13 @@ var _ = Describe("EnsureDirectoryExists", func() {
 		fileInfo, err := os.Stat(existingDir)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fileInfo.Mode().Perm()).To(Equal(fs.FileMode(0o600)))
+	})
+})
+
+var _ = Describe("Filename-friendly timestamp", func() {
+	It("returns a nice timestamp", func() {
+		fakeNow := time.Date(2024, 7, 19, 12, 20, 23, 0, time.UTC)
+		ts := FormatFriendlyTimestamp(fakeNow)
+		Expect(ts).To(Equal("20240719T122023Z"))
 	})
 })

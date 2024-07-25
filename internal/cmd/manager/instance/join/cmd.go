@@ -94,8 +94,7 @@ func NewCmd() *cobra.Command {
 }
 
 func joinSubCommand(ctx context.Context, instance *postgres.Instance, info postgres.InitInfo) error {
-	err := info.VerifyPGData()
-	if err != nil {
+	if err := info.CheckTargetDataDirectory(ctx); err != nil {
 		return err
 	}
 
@@ -109,27 +108,34 @@ func joinSubCommand(ctx context.Context, instance *postgres.Instance, info postg
 	if err != nil {
 		return err
 	}
-	// Let's download the crypto material from the cluster
-	// secrets.
-	reconciler := controller.NewInstanceReconciler(instance, client, metricServer)
-	if err != nil {
-		log.Error(err, "Error creating reconciler to download certificates")
-		return err
-	}
 
+	// Create a fake reconciler just to download the secrets and
+	// the cluster definition
+	reconciler := controller.NewInstanceReconciler(instance, client, metricServer)
+
+	// Download the cluster definition from the API server
 	var cluster apiv1.Cluster
-	err = reconciler.GetClient().Get(ctx,
+	if err := reconciler.GetClient().Get(ctx,
 		ctrl.ObjectKey{Namespace: instance.Namespace, Name: instance.ClusterName},
-		&cluster)
-	if err != nil {
+		&cluster,
+	); err != nil {
 		log.Error(err, "Error while getting cluster")
 		return err
 	}
 
+	// Since we're directly using the reconciler here, we cannot
+	// tell if the secrets were correctly downloaded or not.
+	// If they were the following "pg_basebackup" command will work, if
+	// they don't "pg_basebackup" with fail, complaining that the
+	// cryptographic material is not available.
+	// So it doesn't make a real difference.
+	//
+	// Besides this, we should improve this situation to have
+	// a real error handling.
 	reconciler.RefreshSecrets(ctx, &cluster)
 
-	err = info.Join(&cluster)
-	if err != nil {
+	// Run "pg_basebackup" to download the data directory from the primary
+	if err := info.Join(&cluster); err != nil {
 		log.Error(err, "Error joining node")
 		return err
 	}

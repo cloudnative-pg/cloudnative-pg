@@ -23,10 +23,12 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"os"
 	"os/exec"
 	"path"
 	"path/filepath"
 	"sort"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
@@ -102,16 +104,65 @@ type InitInfo struct {
 	TablespaceMapFile []byte
 }
 
-// VerifyPGData verifies if the passed configuration is OK, otherwise it returns an error
-func (info InitInfo) VerifyPGData() error {
-	pgdataExists, err := fileutils.FileExists(info.PgData)
+// CheckTargetDataDirectory ensures that the target data directory does not exist.
+// This is a sanity check we do before initializing a new instance data directory.
+//
+// If the PGDATA directory already exists and contains a valid PostgreSQL control file,
+// the function moves its contents to a uniquely named directory.
+// If no valid control file is found, the function assumes the directory is the result of
+// a failed initialization attempt and removes it.
+//
+// By moving rather than deleting the existing data, we use more disk space than necessary.
+// However, this approach is justified for two reasons:
+//
+//  1. The PostgreSQL control file is the last file written by pg_basebackup.
+//     So the only chance to trigger this protection is if the "join" Pod is interrupted
+//     shortly after writing the control file but before the Pod terminates.
+//     This is a very short time window, and it is extremely unlikely that it happens.
+//
+//  2. If the PGDATA directory wasn't created by us, renaming preserves potentially
+//     important user data. This is particularly relevant when using static provisioning
+//     of PersistentVolumeClaims (PVCs), as it prevents accidental overwriting of a valid
+//     data directory that may exist in the PersistentVolumes (PVs).
+func (info InitInfo) CheckTargetDataDirectory(ctx context.Context) error {
+	contextLogger := log.FromContext(ctx).WithValues("pgdata", info.PgData)
+
+	pgDataExists, err := fileutils.FileExists(info.PgData)
 	if err != nil {
 		log.Error(err, "Error while checking for an existing PGData")
-		return err
+		return fmt.Errorf("while verifying is PGDATA exists: %w", err)
 	}
-	if pgdataExists {
-		log.Info("PGData already exists, can't overwrite")
-		return fmt.Errorf("PGData directories already exist")
+	if !pgDataExists {
+		// The PGDATA directory doesn't exist. We can definitely
+		// write to it
+		return nil
+	}
+
+	// We've an existing directory. Let's check if this is a real
+	// PGDATA directory or not.
+	out, err := info.GetInstance().GetPgControldata()
+	if err != nil {
+		contextLogger.Info("pg_controldata check on existing directory failed, cleaning it up",
+			"out", out, "err", err)
+
+		if err := fileutils.RemoveDirectory(info.PgData); err != nil {
+			contextLogger.Error(err, "error while cleaning up existing data directory")
+			return err
+		}
+
+		return nil
+	}
+
+	renamedDirectoryName := fmt.Sprintf("%s_%s", info.PgData, fileutils.FormatFriendlyTimestamp(time.Now()))
+	contextLogger = contextLogger.WithValues(
+		"out", out,
+		"newName", renamedDirectoryName,
+	)
+
+	contextLogger.Info("pg_controldata check on existing directory succeeded, renaming the folder")
+	if err := os.Rename(info.PgData, renamedDirectoryName); err != nil {
+		contextLogger.Error(err, "error while renaming existing data directory")
+		return fmt.Errorf("while renaming existing data directory: %w", err)
 	}
 
 	return nil
