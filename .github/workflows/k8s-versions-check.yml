@@ -111,9 +111,9 @@ jobs:
         run: |
           curl -s https://mirror.openshift.com/pub/openshift-v4/clients/ocp/ | \
           grep -e 'href.*"4\.1[2-9]\.[0-9].*"' | \
-          sed -e 's/\(.*\)href="\(4\.1[2-9]\)\(.*\)/\"\2\"/' | \
-          sort -r | uniq | sed -e 's/"//g' | \
-          awk -vv=$MINIMAL_OCP '$0>=v {print $0}' | \
+          sed -e 's/\(.*\)href="\(4\.1[2-9]\)\(.*\)/\2/' | \
+          sort -Vru | \
+          awk -vv="$MINIMAL_OCP" '$0>=v {print $0}' | \
           jq -Rn '[inputs]' | tee .github/openshift_versions.json
 
           OCP_VERSIONS=`cat .github/openshift_versions.json | jq -r '"v"+.[-1]+"-v"+.[0]'`
