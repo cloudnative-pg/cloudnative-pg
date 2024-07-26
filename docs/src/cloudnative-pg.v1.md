@@ -5255,7 +5255,7 @@ only useful for priority-based synchronous replication).</p>
 - [SynchronousReplicaConfiguration](#postgresql-cnpg-io-v1-SynchronousReplicaConfiguration)
 
 
-<p>SynchronousReplicaConfigurationMethod configured whether to use
+<p>SynchronousReplicaConfigurationMethod configures whether to use
 quorum based replication or a priority list</p>
 
 
