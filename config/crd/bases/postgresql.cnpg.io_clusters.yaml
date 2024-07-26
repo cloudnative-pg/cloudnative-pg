@@ -4148,6 +4148,7 @@ spec:
                           type: string
                         type: array
                     required:
+                    - method
                     - number
                     type: object
                 type: object

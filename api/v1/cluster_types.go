@@ -1409,7 +1409,7 @@ type SynchronousReplicaConfiguration struct {
 	// servers, accepting 'any' (quorum-based synchronous replication) or
 	// 'first' (priority-based synchronous replication) as values.
 	// +kubebuilder:validation:Enum=any;first
-	Method SynchronousReplicaConfigurationMethod `json:"method,omitempty"`
+	Method SynchronousReplicaConfigurationMethod `json:"method"`
 
 	// Specifies the number of synchronous standby servers that
 	// transactions must wait for responses from.
