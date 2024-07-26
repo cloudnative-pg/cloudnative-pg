@@ -399,7 +399,7 @@ Note the `bootstrap` and `replica` sections pointing to the source cluster.
 The previous configuration assumes that the application database and its owning
 user are set to the default, `app`. If the PostgreSQL cluster being restored
 uses different names, you must specify them as documented in [Configure the
-application database](recovery.md#configure-the-application-database).
+application database](bootstrap.md#configure-the-application-database).
 You should also consider copying over the application user secret from
 the original cluster.
 

@@ -594,6 +594,7 @@ spec:
       name: cluster-example-ca
       key: ca.crt
 ```
+
 #### Configure the application database
 
 We also support to configure the application database for cluster which bootstrap
