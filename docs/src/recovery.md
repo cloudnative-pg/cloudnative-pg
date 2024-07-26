@@ -87,6 +87,11 @@ spec:
           maxParallel: 8
 ```
 
+The previous example implies the application database and its owning user is
+the default one, `app`. If the PostgreSQL cluster being restored was using
+different names, you must specify them as documented in [Configure the
+application database](#configure-the-application-database).
+
 !!! Important
     By default, the `recovery` method strictly uses the `name` of the
     cluster in the `externalClusters` section as the name of the main folder
@@ -157,6 +162,11 @@ spec:
           apiGroup: snapshot.storage.k8s.io
 ```
 
+The previous example implies the application database and its owning user is
+the default one, `app`. If the PostgreSQL cluster being restored was using
+different names, you must specify them as documented in [Configure the
+application database](#configure-the-application-database).
+
 !!! Warning
     If bootstrapping a replica-mode cluster from snapshots, to leverage
     snapshots for the standby instances and not just the primary,
@@ -195,7 +205,7 @@ backup that needs to be restored.
 
 The previous example implies the application database and its owning user is
 the default one, `app`. If the PostgreSQL cluster being restored was using
-different names, you can specify them as documented in [Configure the
+different names, you must specify them as documented in [Configure the
 application database](#configure-the-application-database).
 
 ## Additional considerations
@@ -481,13 +491,16 @@ With this configuration, the following happens after recovery is complete:
 3. if user `app` isn't the owner of the database, user `app` is granted
    as owner of database `app`.
 4. If the value of `username` matches the value of `owner` in the secret, the
-   password of application database is changed to the value of `password` in the
+   password of application user is changed to the value of `password` in the
    secret.
 
 !!! Important
-    For a replica cluster with replica mode enabled, the operator doesn't
-    create any database or user in the PostgreSQL instance. These are
-    recovered from the original cluster.
+    In a replica cluster with replica mode enabled, the operator does not
+    create any databases or users in the PostgreSQL instance; these are
+    replicated from the original cluster. It is crucial to ensure that the
+    configuration of the replica cluster remains aligned with the source
+    cluster to prevent issues if the replica is promoted to the primary
+    role.
 
 ## How recovery works under the hood
 
