@@ -113,6 +113,8 @@ func Status(ctx context.Context, clusterName string, verbose bool, format plugin
 
 	status.printBasicInfo()
 	status.printHibernationInfo()
+	status.printDemotionTokenInfo()
+	status.printPromotionTokenInfo()
 	if verbose {
 		errs = append(errs, status.printPostgresConfiguration(ctx)...)
 	}
@@ -291,6 +293,89 @@ func (fullStatus *PostgresqlStatus) printHibernationInfo() {
 	fmt.Println(aurora.Green("Hibernation"))
 	hibernationStatus.Print()
 
+	fmt.Println()
+}
+
+func (fullStatus *PostgresqlStatus) printTokenStatus(token string) {
+	primaryInstanceStatus := fullStatus.tryGetPrimaryInstance()
+
+	tokenStatus := tabby.New()
+	if tokenContent, err := utils.ParsePgControldataToken(token); err != nil {
+		tokenStatus.AddLine(
+			"Token",
+			fmt.Sprintf("%s %s", token, aurora.Red(fmt.Sprintf("(invalid format: %s)", err.Error()))),
+		)
+	} else if err := tokenContent.IsValid(); err != nil {
+		tokenStatus.AddLine("Token", token)
+		tokenStatus.AddLine("Validity", aurora.Red(fmt.Sprintf("not valid: %s", err.Error())))
+	} else {
+		var systemIDCheck string
+
+		switch {
+		case primaryInstanceStatus == nil:
+			systemIDCheck = aurora.Red("(no primary have been found)").String()
+		case tokenContent.DatabaseSystemIdentifier != primaryInstanceStatus.SystemID:
+			systemIDCheck = aurora.Red("(invalid)").String()
+		default:
+			systemIDCheck = aurora.Green("(ok)").String()
+		}
+
+		tokenStatus.AddLine(
+			"Token",
+			token)
+		tokenStatus.AddLine(
+			"Validity",
+			aurora.Green("valid"))
+		tokenStatus.AddLine(
+			"Latest checkpoint's TimeLineID",
+			tokenContent.LatestCheckpointTimelineID)
+		tokenStatus.AddLine(
+			"Latest checkpoint's REDO WAL file",
+			tokenContent.REDOWALFile)
+		tokenStatus.AddLine(
+			"Latest checkpoint's REDO location",
+			tokenContent.LatestCheckpointREDOLocation)
+		tokenStatus.AddLine(
+			"Database system identifier",
+			fmt.Sprintf("%s %s", tokenContent.DatabaseSystemIdentifier, systemIDCheck))
+		tokenStatus.AddLine(
+			"Time of latest checkpoint",
+			tokenContent.TimeOfLatestCheckpoint)
+		tokenStatus.AddLine(
+			"Version of the operator",
+			tokenContent.OperatorVersion)
+	}
+	tokenStatus.Print()
+}
+
+func (fullStatus *PostgresqlStatus) printDemotionTokenInfo() {
+	demotionToken := fullStatus.Cluster.Status.DemotionToken
+	if len(demotionToken) == 0 {
+		return
+	}
+
+	fmt.Println(aurora.Green("Demotion token"))
+	fullStatus.printTokenStatus(demotionToken)
+	fmt.Println()
+}
+
+func (fullStatus *PostgresqlStatus) printPromotionTokenInfo() {
+	if fullStatus.Cluster.Spec.ReplicaCluster == nil {
+		return
+	}
+
+	promotionToken := fullStatus.Cluster.Spec.ReplicaCluster.PromotionToken
+	if len(promotionToken) == 0 {
+		return
+	}
+
+	if promotionToken == fullStatus.Cluster.Status.LastPromotionToken {
+		// This token was already processed
+		return
+	}
+
+	fmt.Println(aurora.Green("Promotion token"))
+	fullStatus.printTokenStatus(promotionToken)
 	fmt.Println()
 }
 
