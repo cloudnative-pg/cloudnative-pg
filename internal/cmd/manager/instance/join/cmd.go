@@ -104,14 +104,10 @@ func joinSubCommand(ctx context.Context, instance *postgres.Instance, info postg
 		return err
 	}
 
-	metricServer, err := metricserver.New(instance)
-	if err != nil {
-		return err
-	}
-
 	// Create a fake reconciler just to download the secrets and
 	// the cluster definition
-	reconciler := controller.NewInstanceReconciler(instance, client, metricServer)
+	metricExporter := metricserver.NewExporter(instance)
+	reconciler := controller.NewInstanceReconciler(instance, client, metricExporter)
 
 	// Download the cluster definition from the API server
 	var cluster apiv1.Cluster

@@ -83,6 +83,7 @@ ClusterIP
 ClusterImageCatalog
 ClusterIsNotReady
 ClusterList
+ClusterMonitoringTLSConfiguration
 ClusterRole
 ClusterRole's
 ClusterServiceVersion
@@ -702,6 +703,7 @@ ecdsa
 edb
 eks
 enableAlterSystem
+enableMetricsTLS
 enablePDB
 enablePodAntiAffinity
 enablePodMonitor
