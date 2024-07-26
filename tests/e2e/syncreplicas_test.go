@@ -18,9 +18,10 @@ package e2e
 
 import (
 	"fmt"
-	"k8s.io/utils/ptr"
 	"strconv"
 	"strings"
+
+	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
@@ -30,7 +31,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = FDescribe("Synchronous Replicas", Label(tests.LabelReplication), func() {
+var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 	const level = tests.Medium
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
