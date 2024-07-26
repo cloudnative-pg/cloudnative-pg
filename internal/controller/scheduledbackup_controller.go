@@ -172,6 +172,16 @@ func ReconcileScheduledBackup(
 	}
 
 	now := time.Now()
+	if schedule.Next(now).IsZero() {
+		// No time satisfying the schedule have been found.
+		// We cannot proceed reconciling it.
+		event.Eventf(
+			scheduledBackup,
+			"Warning",
+			"NoSchedule",
+			"No time satisfying the schedule %q have been found", scheduledBackup.Spec.Schedule)
+		return ctrl.Result{}, nil
+	}
 
 	if scheduledBackup.Status.LastCheckTime == nil && scheduledBackup.IsImmediate() {
 		// we populate the status (lastCheckTime...) by following the same rules of the scheduled backup
