@@ -375,6 +375,11 @@ Postgres pod are.
     For more information on the general pod affinity and anti-affinity rules,
     please check the ["Scheduling" section](scheduling.md).
 
+!!! Warning
+    The `.spec.postgresql.syncReplicaElectionConstraint` option only applies to the
+    legacy implementation of synchronous replication
+    (see ["Synchronous Replication (Deprecated)"](replication.md#synchronous-replication-deprecated)).
+
 As an example use-case for this feature: in a cluster with a single sync replica,
 we would be able to ensure the sync replica will be in a different availability
 zone from the primary instance, usually identified by the `topology.kubernetes.io/zone`

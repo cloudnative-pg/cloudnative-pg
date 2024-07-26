@@ -21,7 +21,7 @@ import (
 	"strings"
 )
 
-// escapePostgresLiteral escapes a value to make its representation
+// escapePostgresConfLiteral escapes a value to make its representation
 // similar to the literals in PostgreSQL
 func escapePostgresConfLiteral(value string) string {
 	return fmt.Sprintf("\"%v\"", strings.ReplaceAll(value, "\"", "\"\""))

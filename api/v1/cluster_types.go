@@ -1382,7 +1382,7 @@ const (
 	DefaultStartupDelay = 3600
 )
 
-// SynchronousReplicaConfigurationMethod configured whether to use
+// SynchronousReplicaConfigurationMethod configures whether to use
 // quorum based replication or a priority list
 type SynchronousReplicaConfigurationMethod string
 
@@ -1395,7 +1395,7 @@ const (
 )
 
 // ToPostgreSQLConfigurationKeyword returns the contained value as a valid PostgreSQL parameter to be injected
-// inthe 'synchronous_standby_names' field
+// in the 'synchronous_standby_names' field
 func (s SynchronousReplicaConfigurationMethod) ToPostgreSQLConfigurationKeyword() string {
 	return strings.ToUpper(string(s))
 }
@@ -1413,7 +1413,7 @@ type SynchronousReplicaConfiguration struct {
 
 	// Specifies the number of synchronous standby servers that
 	// transactions must wait for responses from.
-	// +kubebuilder:validation:XValidation:rule="self > 0",message="The number of synchrononus replicas should be greater than zero"
+	// +kubebuilder:validation:XValidation:rule="self > 0",message="The number of synchronous replicas should be greater than zero"
 	Number int `json:"number"`
 
 	// Specifies the maximum number of local cluster pods that can be
