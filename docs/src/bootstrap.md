@@ -626,16 +626,17 @@ With the above configuration, the following will happen after recovery is comple
 3. if user `app` is not the owner of database, user `app` will be granted
    as owner of database `app`.
 4. If the value of `username` matches the value of `owner` in the secret, the
-   password of application user is changed to the value of `password` in the
-   secret.
+   password of the application user is changed to the value of `password` in
+   the secret.
 
 !!! Important
     In a replica cluster with replica mode enabled, the operator does not
     create any databases or users in the PostgreSQL instance; these are
-    recovered from the original cluster. It is crucial to ensure that the
-    configuration of the replica cluster remains aligned with the source
-    cluster to prevent issues if the replica is promoted to the primary
-    role.
+    replicated from the original cluster.
+    It's essential to ensure that all configuration parameters, including
+    the application user secret, are synchronized between the replica
+    and source clusters. This synchronization is crucial to prevent issues
+    if the replica is promoted to primary.
 
 #### Current limitations
 

@@ -401,7 +401,7 @@ user are set to the default, `app`. If the PostgreSQL cluster being restored
 uses different names, you must specify them as documented in [Configure the
 application database](bootstrap.md#configure-the-application-database).
 You should also consider copying over the application user secret from
-the original cluster.
+the original cluster and keep it synchronized with the source.
 
 In the `externalClusters` section, remember to use the right namespace for the
 host in the `connectionParameters` sub-section.
@@ -454,7 +454,7 @@ user are set to the default, `app`. If the PostgreSQL cluster being restored
 uses different names, you must specify them as documented in [Configure the
 application database](recovery.md#configure-the-application-database).
 You should also consider copying over the application user secret from
-the original cluster.
+the original cluster and keep it synchronized with the source.
 
 In the `externalClusters` section, take care to use the right namespace in the
 `endpointURL` and the `connectionParameters.host`.
@@ -504,7 +504,7 @@ user are set to the default, `app`. If the PostgreSQL cluster being restored
 uses different names, you must specify them as documented in [Configure the
 application database](recovery.md#configure-the-application-database).
 You should also consider copying over the application user secret from
-the original cluster.
+the original cluster and keep it synchronized with the source.
 
 <!--
 ## Delayed replicas
