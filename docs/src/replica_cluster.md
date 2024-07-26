@@ -265,6 +265,10 @@ kubectl get cluster cluster-eu-south \
   -o jsonpath='{.status.demotionToken}'
 ```
 
+You can also get the `demotationToken` using `cnpg` plugin, by checking the 
+status of the cluster, the token is listed in `Demotion token` section.
+
+
 !!! Note
     The `demotionToken` obtained from `cluster-eu-south` will serve as the
     `promotionToken` for `cluster-eu-central`.
