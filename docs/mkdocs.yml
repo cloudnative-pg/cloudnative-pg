@@ -67,6 +67,7 @@ nav:
   - faq.md
   - cloudnative-pg.v1.md
   - supported_releases.md
+  - preview_version.md
   - release_notes.md
   - Appendixes:
     - appendixes/object_stores.md
