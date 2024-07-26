@@ -387,7 +387,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		})
 	}
 
-	assertClustersWorkAfterOperatorUpgrade := func(upgradeNamespace, operatorManifest string) {
+	assertClustersWorkAfterOperatorUpgrade := func(upgradeNamespace, operatorManifest string, online bool) {
 		// generate random serverNames for the clusters each time
 		serverName1 := fmt.Sprintf("%s-%d", clusterName1, funk.RandomInt(0, 9999))
 		serverName2 := fmt.Sprintf("%s-%d", clusterName2, funk.RandomInt(0, 9999))
@@ -410,6 +410,23 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			err := os.Setenv("SERVER_NAME", serverName1)
 			Expect(err).ToNot(HaveOccurred())
 			CreateResourceFromFile(upgradeNamespace, sampleFile)
+
+			if online {
+				// Upgrading to 1.24 will trigger a rollout of Pods even
+				// if online upgrade is enabled.
+				// This happens because of the following fix:
+				// https://github.com/cloudnative-pg/cloudnative-pg/pull/5156
+				//
+				// This E2e would correctly detect that and trigger a failure.
+				// To avoid this, just for this release, we disable the pod
+				// spec reconciliation.
+				// By doing that we don't test that the online upgrade won't
+				// trigger any Pod restart. We still test that the operator
+				// is upgraded in this case too.
+				_, stderr, err := testsUtils.Run(
+					fmt.Sprintf("kubectl annotate -n %s cluster/%s cnpg.io/reconcilePodSpec=disabled", upgradeNamespace, clusterName1))
+				Expect(err).NotTo(HaveOccurred(), "stderr: "+stderr)
+			}
 		})
 
 		// Cluster ready happens after minio is ready
@@ -645,7 +662,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			upgradeNamespace := assertCreateNamespace(upgradeNamespacePrefix)
 			DeferCleanup(cleanupNamespace, upgradeNamespace)
 
-			assertClustersWorkAfterOperatorUpgrade(upgradeNamespace, currentOperatorManifest)
+			assertClustersWorkAfterOperatorUpgrade(upgradeNamespace, currentOperatorManifest, false)
 		})
 
 		It("keeps clusters working after an online upgrade", func() {
@@ -662,7 +679,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 
 			upgradeNamespace := assertCreateNamespace(upgradeNamespacePrefix)
 			DeferCleanup(cleanupNamespace, upgradeNamespace)
-			assertClustersWorkAfterOperatorUpgrade(upgradeNamespace, currentOperatorManifest)
+			assertClustersWorkAfterOperatorUpgrade(upgradeNamespace, currentOperatorManifest, true)
 			assertManagerRollout()
 		})
 	})
@@ -685,7 +702,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			upgradeNamespace := assertCreateNamespace(upgradeNamespacePrefix)
 			DeferCleanup(cleanupNamespace, upgradeNamespace)
 
-			assertClustersWorkAfterOperatorUpgrade(upgradeNamespace, primeOperatorManifest)
+			assertClustersWorkAfterOperatorUpgrade(upgradeNamespace, primeOperatorManifest, true)
 		})
 
 		It("keeps clusters working after a rolling upgrade", func() {
@@ -699,7 +716,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			upgradeNamespace := assertCreateNamespace(upgradeNamespacePrefix)
 			DeferCleanup(cleanupNamespace, upgradeNamespace)
 
-			assertClustersWorkAfterOperatorUpgrade(upgradeNamespace, primeOperatorManifest)
+			assertClustersWorkAfterOperatorUpgrade(upgradeNamespace, primeOperatorManifest, false)
 		})
 	})
 })
