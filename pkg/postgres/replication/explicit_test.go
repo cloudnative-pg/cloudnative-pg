@@ -103,4 +103,16 @@ var _ = Describe("synchronous replica configuration with the new API", func() {
 		Expect(explicitSynchronousStandbyNames(cluster)).To(
 			Equal("FIRST 2 (\"prefix\",\"here\",\"three\",\"suffix\",\"there\")"))
 	})
+
+	It("returns an empty value when no instance is available", func() {
+		cluster := createFakeCluster("example")
+		cluster.Spec.PostgresConfiguration.Synchronous = &apiv1.SynchronousReplicaConfiguration{
+			Method:                     apiv1.SynchronousReplicaConfigurationMethodFirst,
+			Number:                     2,
+			MaxStandbyNamesFromCluster: ptr.To(1),
+		}
+		cluster.Status = apiv1.ClusterStatus{}
+
+		Expect(explicitSynchronousStandbyNames(cluster)).To(BeEmpty())
+	})
 })

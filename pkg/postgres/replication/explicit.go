@@ -36,6 +36,9 @@ func explicitSynchronousStandbyNames(cluster *apiv1.Cluster) string {
 	instancesList := config.StandbyNamesPre
 	instancesList = append(instancesList, clusterInstancesList...)
 	instancesList = append(instancesList, config.StandbyNamesPost...)
+	if len(instancesList) == 0 {
+		return ""
+	}
 
 	// Escape the pod list
 	escapedReplicas := make([]string, len(instancesList))
