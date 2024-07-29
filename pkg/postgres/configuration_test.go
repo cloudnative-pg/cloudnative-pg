@@ -18,6 +18,7 @@ package postgres
 
 import (
 	"strings"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -370,5 +371,33 @@ var _ = Describe("pg_failover_slots", func() {
 		Expect(libraries).To(HaveLen(1))
 		Expect(libraries).ToNot(ContainElement(""))
 		Expect(libraries).To(ContainElements("pg_failover_slots"))
+	})
+})
+
+var _ = Describe("recovery_min_apply_delay", func() {
+	It("is not added when zero", func() {
+		info := ConfigurationInfo{
+			Settings:                        CnpgConfigurationSettings,
+			MajorVersion:                    130000,
+			UserSettings:                    map[string]string{"pg_failover_slots.something": "something"},
+			IncludingMandatory:              true,
+			IncludingSharedPreloadLibraries: true,
+			RecoveryMinApplyDelay:           0,
+		}
+		config := CreatePostgresqlConfiguration(info)
+		Expect(config.GetConfig(ParameterRecoveyMinApplyDelay)).To(BeEmpty())
+	})
+
+	It("is added to the configuration when specified", func() {
+		info := ConfigurationInfo{
+			Settings:                        CnpgConfigurationSettings,
+			MajorVersion:                    130000,
+			UserSettings:                    map[string]string{"pg_failover_slots.something": "something"},
+			IncludingMandatory:              true,
+			IncludingSharedPreloadLibraries: true,
+			RecoveryMinApplyDelay:           1 * time.Hour,
+		}
+		config := CreatePostgresqlConfiguration(info)
+		Expect(config.GetConfig(ParameterRecoveyMinApplyDelay)).To(Equal("3600s"))
 	})
 })

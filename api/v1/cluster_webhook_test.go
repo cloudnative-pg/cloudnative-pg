@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -2786,6 +2787,36 @@ var _ = Describe("promotion token validation", func() {
 					Self:           "test2",
 					Source:         "test",
 					PromotionToken: base64.StdEncoding.EncodeToString(jsonToken),
+				},
+			},
+		}
+
+		result := cluster.validatePromotionToken()
+		Expect(result).NotTo(BeEmpty())
+	})
+
+	It("complains it the token is set when minApplyDelay is being used", func() {
+		tokenContent := utils.PgControldataTokenContent{
+			LatestCheckpointTimelineID:   "1",
+			REDOWALFile:                  "0000000100000001000000A1",
+			DatabaseSystemIdentifier:     "231231212",
+			LatestCheckpointREDOLocation: "0/1000000",
+			TimeOfLatestCheckpoint:       "we don't know",
+			OperatorVersion:              "version info",
+		}
+		jsonToken, err := json.Marshal(tokenContent)
+		Expect(err).ToNot(HaveOccurred())
+
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Primary:        "test",
+					Self:           "test",
+					Source:         "test",
+					PromotionToken: base64.StdEncoding.EncodeToString(jsonToken),
+					MinApplyDelay: &metav1.Duration{
+						Duration: 1 * time.Hour,
+					},
 				},
 			},
 		}

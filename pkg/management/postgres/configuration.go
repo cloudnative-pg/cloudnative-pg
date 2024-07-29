@@ -455,6 +455,11 @@ func createPostgresqlConfiguration(cluster *apiv1.Cluster, preserveUserSettings 
 	}
 	sort.Strings(info.TemporaryTablespaces)
 
+	// Setup minimum replay delay if we're on a replica cluster
+	if cluster.IsReplica() && cluster.Spec.ReplicaCluster.MinApplyDelay != nil {
+		info.RecoveryMinApplyDelay = cluster.Spec.ReplicaCluster.MinApplyDelay.Duration
+	}
+
 	conf, sha256 := postgres.CreatePostgresqlConfFile(postgres.CreatePostgresqlConfiguration(info))
 	return conf, sha256, nil
 }

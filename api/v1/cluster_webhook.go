@@ -1895,6 +1895,16 @@ func (r *Cluster) validatePromotionToken() field.ErrorList {
 		return result
 	}
 
+	if r.Spec.ReplicaCluster.MinApplyDelay != nil {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "replicaCluster", "minApplyDelay"),
+				token,
+				"minApplyDelay cannot be applied with a promotion token"))
+		return result
+	}
+
 	if r.IsReplica() {
 		result = append(
 			result,

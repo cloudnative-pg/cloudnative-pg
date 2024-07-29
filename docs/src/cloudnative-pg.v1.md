@@ -4263,6 +4263,17 @@ Refer to the Replica clusters page of the documentation for more information.</p
 check if the promotion requirements are met.</p>
 </td>
 </tr>
+<tr><td><code>minApplyDelay</code> <B>[Required]</B><br/>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/apis/meta/v1#Duration"><i>meta/v1.Duration</i></a>
+</td>
+<td>
+   <p>When replica mode is enabled, this parameter allows the
+user to replay the transactions only when the system time
+is at least the configured time past the commit time,
+offering an opportunity to correct data loss errors.  When
+this parameter is set, a promotion token cannot be used.</p>
+</td>
+</tr>
 </tbody>
 </table>
 
