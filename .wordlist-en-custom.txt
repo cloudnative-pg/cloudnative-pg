@@ -1027,6 +1027,7 @@ recoveredCluster
 recoveryTarget
 recoverytarget
 recv
+redefinitions
 redhat
 rehydrate
 rehydrated

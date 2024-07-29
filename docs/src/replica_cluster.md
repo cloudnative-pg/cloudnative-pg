@@ -113,6 +113,13 @@ Note the `bootstrap` and `replica` sections pointing to the source cluster.
     source: cluster-example
 ```
 
+The previous configuration assumes that the application database and its owning
+user are set to the default, `app`. If the PostgreSQL cluster being restored
+uses different names, you must specify them as documented in [Configure the application database](bootstrap.md#configure-the-application-database).
+You should also consider copying over the application user secret from
+the original cluster and keep it synchronized with the source.
+See ["About PostgreSQL Roles"](#about-postgresql-roles) for more details.
+
 In the `externalClusters` section, remember to use the right namespace for the
 host in the `connectionParameters` sub-section.
 The `-replication` and `-ca` secrets should have been copied over if necessary,
@@ -159,6 +166,13 @@ Note the `bootstrap` and `replica` sections pointing to the source cluster.
     source: cluster-example
 ```
 
+The previous configuration assumes that the application database and its owning
+user are set to the default, `app`. If the PostgreSQL cluster being restored
+uses different names, you must specify them as documented in [Configure the application database](recovery.md#configure-the-application-database).
+You should also consider copying over the application user secret from
+the original cluster and keep it synchronized with the source.
+See ["About PostgreSQL Roles"](#about-postgresql-roles) for more details.
+
 In the `externalClusters` section, take care to use the right namespace in the
 `endpointURL` and the `connectionParameters.host`.
 And do ensure that the necessary secrets have been copied if necessary, and that
@@ -201,6 +215,14 @@ store to fetch the WAL files.
 
 You can check the [sample YAML](samples/cluster-example-replica-from-volume-snapshot.yaml)
 for it in the `samples/` subdirectory.
+
+The example assumes that the application database and its owning
+user are set to the default, `app`. If the PostgreSQL cluster being restored
+uses different names, you must specify them as documented in [Configure the
+application database](recovery.md#configure-the-application-database).
+You should also consider copying over the application user secret from
+the original cluster and keep it synchronized with the source.
+See ["About PostgreSQL Roles"](#about-postgresql-roles) for more details.
 
 ## Demoting a Primary to a Replica Cluster
 
