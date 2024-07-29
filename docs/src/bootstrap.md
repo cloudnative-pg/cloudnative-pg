@@ -602,8 +602,15 @@ from a live cluster, just like the case of `initdb` and  `recovery` bootstrap me
 If the new cluster is created as a replica cluster (with replica mode enabled), application
 database configuration will be skipped.
 
-The following example configure the application database `app` with password in
-supplied secret `app-secret` after bootstrap from a live cluster.
+!!! Important
+    While the `Cluster` is in recovery mode, no changes to the database,
+    including the catalog, are permitted. This restriction includes any role
+    overrides, which are deferred until the `Cluster` transitions to primary.
+    During this phase, users remain as defined in the source cluster.
+
+The example below configures the `app` database with the owner `app` and
+the password stored in the provided secret `app-secret`, following the
+bootstrap from a live cluster.
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -619,25 +626,16 @@ spec:
       source: cluster-example
 ```
 
-With the above configuration, the following will happen after recovery is completed:
+With the above configuration, the following will happen only **after recovery is
+completed**:
 
-1. if database `app` does not exist, a new database `app` will be created.
-2. if user `app` does not exist, a new user `app` will be created.
-3. if user `app` is not the owner of database, user `app` will be granted
-   as owner of database `app`.
-4. If the value of `username` matches the value of `owner` in the secret, the
-   password of the application user is changed to the value of `password` in
-   the secret.
-
-!!! Important
-    In a replica cluster with replica mode enabled, the operator does not
-    create any databases or users in the PostgreSQL instance; instead these are
-    replicated from the source cluster.
-    If a replica cluster is detached or promoted to primary, it will start
-    applying the content of the application user secret on the database.
-    Therefore, it's essential to ensure that all configuration parameters,
-    including the application user secret, are synchronized between replica
-    and source clusters.
+1. If the `app` database does not exist, it will be created.
+2. If the `app` user does not exist, it will be created.
+3. If the `app` user is not the owner of the `app` database, ownership will be
+   granted to the `app` user.
+4. If the `username` value matches the `owner` value in the secret, the
+   password for the application user (the `app` user in this case) will be
+   updated to the `password` value in the secret.
 
 #### Current limitations
 
