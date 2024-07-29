@@ -89,7 +89,7 @@ spec:
 
 The previous example assumes that the application database and its owning user
 are named `app` by default. If the PostgreSQL cluster being restored uses
-different names upon exiting the recovery phase, you must specify these names
+different names, you must specify these names before exiting the recovery phase,
 as documented in ["Configure the application database"](#configure-the-application-database).
 
 !!! Important
@@ -164,7 +164,7 @@ spec:
 
 The previous example assumes that the application database and its owning user
 are named `app` by default. If the PostgreSQL cluster being restored uses
-different names upon exiting the recovery phase, you must specify these names
+different names, you must specify these names before exiting the recovery phase,
 as documented in ["Configure the application database"](#configure-the-application-database).
 
 !!! Warning
@@ -205,7 +205,7 @@ backup that needs to be restored.
 
 The previous example assumes that the application database and its owning user
 are named `app` by default. If the PostgreSQL cluster being restored uses
-different names upon exiting the recovery phase, you must specify these names
+different names, you must specify these names before exiting the recovery phase,
 as documented in ["Configure the application database"](#configure-the-application-database).
 
 ## Additional Considerations
