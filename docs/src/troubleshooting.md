@@ -713,8 +713,7 @@ Cluster is stuck in "Creating a new replica", while pod logs don't show
 relevant problems.
 This has been found to be related to the next issue
 [on connectivity](#networking-is-impaired-by-installed-network-policies).
-From releases 1.20.1, 1.19.3, and 1.18.5, networking issues will be more clearly
-reflected in the status column as follows:
+Networking issues are reflected in the status column as follows:
 
 ``` text
 Instance Status Extraction Error: HTTP communication issue

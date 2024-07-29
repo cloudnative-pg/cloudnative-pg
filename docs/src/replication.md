@@ -242,7 +242,7 @@ For details, please refer to the
 Here follows a brief description of the main options:
 
 `.spec.replicationSlots.highAvailability.enabled`
-: if `true`, the feature is enabled (`true` is the default since 1.21)
+: if `true`, the feature is enabled (`true` is the default)
 
 `.spec.replicationSlots.highAvailability.slotPrefix`
 : the prefix that identifies replication slots managed by the operator

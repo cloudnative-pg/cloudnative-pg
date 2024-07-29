@@ -77,5 +77,8 @@ connecting to the PostgreSQL cluster, and correspond to the user *owning* the
 database.
 
 The `-superuser` ones are supposed to be used only for administrative purposes,
-and correspond to the `postgres` user. Since version 1.21, superuser access
-over the network is disabled by default.
+and correspond to the `postgres` user.
+
+!!! Important
+    Superuser access over the network is disabled by default.
+

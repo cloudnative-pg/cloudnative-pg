@@ -1,15 +1,6 @@
 # Backup on volume snapshots
 
 !!! Warning
-    The initial release of volume snapshots (version 1.21.0) only supported
-    cold backups, which required fencing of the instance. This limitation
-    has been waived starting with version 1.21.1. Given the minimal impact of
-    the change on the code, maintainers have decided to backport this feature
-    immediately instead of waiting for version 1.22.0 to be out, and make online
-    backups the default behavior on volume snapshots too. If you are planning
-    to rely instead on cold backups, make sure you follow the instructions below.
-
-!!! Warning
     As noted in the [backup document](backup.md), a cold snapshot explicitly
     set to target the primary will result in the primary being fenced for
     the duration of the backup, rendering the cluster read-only during that

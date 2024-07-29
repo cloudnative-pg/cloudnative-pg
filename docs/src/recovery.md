@@ -21,14 +21,7 @@ from the archive.
 
 WAL files are pulled from the defined *recovery object store*.
 
-Base backups can be taken either on object stores or using volume snapshots
-(from version 1.21).
-
-!!! Warning
-    Recovery using volume snapshots had an initial release on 1.20.1. Because of
-    the amount of progress on the feature for 1.21.0, to use volume
-    snapshots, we strongly advise you to upgrade to 1.21 or more advanced
-    releases.
+Base backups can be taken either on object stores or using volume snapshots.
 
 You can achieve recovery from a *recovery object store* in two ways:
 
