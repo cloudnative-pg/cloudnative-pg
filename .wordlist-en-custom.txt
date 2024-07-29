@@ -992,6 +992,7 @@ readService
 readinessProbe
 readthedocs
 readyInstances
+reconciler
 reconciliationLoop
 recoverability
 recoveredCluster
