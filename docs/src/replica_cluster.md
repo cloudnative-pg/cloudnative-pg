@@ -45,8 +45,8 @@ the source cluster. CloudNativePG applies any local redefinitions once the
 cluster is promoted.
 
 If you are not planning to promote the cluster (e.g., for read-only workloads)
-or if you intend to detach completely from the source of the replica cluster
-once it is promoted, you don't need to take any action.
+or if you intend to detach completely from the source cluster
+once the replica cluster is promoted, you don't need to take any action.
 This is normally the case of the ["Standalone Replica Cluster"](replica_cluster.md#standalone-replica-clusters).
 
 If you are planning to promote the cluster at some point, CloudNativePG will
