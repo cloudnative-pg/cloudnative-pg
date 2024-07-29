@@ -245,5 +245,9 @@ var _ = Describe("barman-cloud-backup-show parsing", func() {
 		Expect(result.SystemID).To(Equal("6885668674852188181"))
 		Expect(result.BeginTimeString).To(Equal("Tue Jan 19 03:14:08 2038"))
 		Expect(result.EndTimeString).To(Equal("Tue Jan 19 04:14:08 2038"))
+
+		// Test timezone set in the parsed time is equal to local one
+		Expect(result.BeginTime.Location()).To(Equal(time.Now().Location()))
+		Expect(result.EndTime.Location()).To(Equal(time.Now().Location()))
 	})
 })

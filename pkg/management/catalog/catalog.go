@@ -282,19 +282,20 @@ func (b *BarmanBackup) deserializeBackupTimeStrings() error {
 		barmanTimeLayout = "Mon Jan 2 15:04:05 2006"
 	)
 
-	var err error
 	if b.BeginTimeString != "" {
-		b.BeginTime, err = time.Parse(barmanTimeLayout, b.BeginTimeString)
+		ts, err := time.Parse(barmanTimeLayout, b.BeginTimeString)
 		if err != nil {
 			return err
 		}
+		b.BeginTime = time.Date(ts.Year(), ts.Month(), ts.Day(), ts.Hour(), ts.Minute(), ts.Second(), ts.Nanosecond(), time.Local)
 	}
 
 	if b.EndTimeString != "" {
-		b.EndTime, err = time.Parse(barmanTimeLayout, b.EndTimeString)
+		ts, err := time.Parse(barmanTimeLayout, b.EndTimeString)
 		if err != nil {
 			return err
 		}
+		b.EndTime = time.Date(ts.Year(), ts.Month(), ts.Day(), ts.Hour(), ts.Minute(), ts.Second(), ts.Nanosecond(), time.Local)
 	}
 
 	return nil
