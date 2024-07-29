@@ -934,18 +934,13 @@ Refer to the [Benchmarking fio section](benchmarking.md#fio) for more details.
 The `kubectl cnpg backup` command requests a new physical backup for
 an existing Postgres cluster by creating a new `Backup` resource.
 
-!!! Info
-    From release 1.21, the `backup` command accepts a new flag, `-m`
-    to specify the backup method.
-    To request a backup using volume snapshots, set `-m volumeSnapshot`
-
 The following example requests an on-demand backup for a given cluster:
 
 ```shell
 kubectl cnpg backup [cluster_name]
 ```
 
-or, if using volume snapshots (from release 1.21)
+or, if using volume snapshots:
 
 ```shell
 kubectl cnpg backup [cluster_name] -m volumeSnapshot
@@ -1014,7 +1009,7 @@ reachable in your `PATH` variable to correctly work.
 
 !!! Warning
     The `kubectl cnpg snapshot` command has been removed.
-    Please use the [`backup` command](#requesting-a-new-backup) to request
+    Please use the [`backup` command](#requesting-a-new-physical-backup) to request
     backups using volume snapshots.
 
 ### Using pgAdmin4 for evaluation/demonstration purposes only

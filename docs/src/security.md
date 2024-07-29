@@ -393,12 +393,11 @@ if requested by setting `enableSuperuserAccess` to `true`, for the
 `postgres` superuser.
 
 !!! Warning
-    Prior to CloudNativePG 1.21, `enableSuperuserAccess` was set to `true` by
-    default. This change has been implemented to improve the security-by-default
-    posture of the operator, fostering a microservice approach where changes to
-    PostgreSQL are performed in a declarative way through the `spec` of the
-    `Cluster` resource, while providing developers with full powers inside the
-    database through the database owner user.
+    `enableSuperuserAccess` is set to `false` by default to improve the
+    security-by-default posture of the operator, fostering a microservice approach
+    where changes to PostgreSQL are performed in a declarative way through the
+    `spec` of the `Cluster` resource, while providing developers with full powers
+    inside the database through the database owner user.
 
 As far as password encryption is concerned, CloudNativePG follows
 the default behavior of PostgreSQL: starting from PostgreSQL 14,
