@@ -1124,11 +1124,11 @@ type ReplicaClusterConfiguration struct {
 	// check if the promotion requirements are met.
 	PromotionToken string `json:"promotionToken,omitempty"`
 
-	// When replica mode is enabled, this parameter allows the
-	// user to replay the transactions only when the system time
-	// is at least the configured time past the commit time,
-	// offering an opportunity to correct data loss errors.  When
-	// this parameter is set, a promotion token cannot be used.
+	// When replica mode is enabled, this parameter allows you to replay
+	// transactions only when the system time is at least the configured
+	// time past the commit time. This provides an opportunity to correct
+	// data loss errors. Note that when this parameter is set, a promotion
+	// token cannot be used.
 	MinApplyDelay *metav1.Duration `json:"minApplyDelay,omitempty"`
 }
 

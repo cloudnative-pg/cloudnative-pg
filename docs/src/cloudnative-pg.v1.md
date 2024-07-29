@@ -4267,11 +4267,11 @@ check if the promotion requirements are met.</p>
 <a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/apis/meta/v1#Duration"><i>meta/v1.Duration</i></a>
 </td>
 <td>
-   <p>When replica mode is enabled, this parameter allows the
-user to replay the transactions only when the system time
-is at least the configured time past the commit time,
-offering an opportunity to correct data loss errors.  When
-this parameter is set, a promotion token cannot be used.</p>
+   <p>When replica mode is enabled, this parameter allows you to replay
+transactions only when the system time is at least the configured
+time past the commit time. This provides an opportunity to correct
+data loss errors. Note that when this parameter is set, a promotion
+token cannot be used.</p>
 </td>
 </tr>
 </tbody>
