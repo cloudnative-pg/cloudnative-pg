@@ -87,8 +87,8 @@ spec:
           maxParallel: 8
 ```
 
-The previous example implies the application database and its owning user is
-the default one, `app`. If the PostgreSQL cluster being restored was using
+The previous example assumes the application database and its owning user are
+the default, `app`. If the PostgreSQL cluster being restored was using
 different names, you must specify them as documented in [Configure the
 application database](#configure-the-application-database).
 
@@ -162,8 +162,8 @@ spec:
           apiGroup: snapshot.storage.k8s.io
 ```
 
-The previous example implies the application database and its owning user is
-the default one, `app`. If the PostgreSQL cluster being restored was using
+The previous example assumes the application database and its owning user are
+the default, `app`. If the PostgreSQL cluster being restored was using
 different names, you must specify them as documented in [Configure the
 application database](#configure-the-application-database).
 
@@ -203,8 +203,8 @@ spec:
 This bootstrap method allows you to specify just a reference to the
 backup that needs to be restored.
 
-The previous example implies the application database and its owning user is
-the default one, `app`. If the PostgreSQL cluster being restored was using
+The previous example assumes the application database and its owning user are
+the default, `app`. If the PostgreSQL cluster being restored was using
 different names, you must specify them as documented in [Configure the
 application database](#configure-the-application-database).
 
@@ -496,12 +496,13 @@ With this configuration, the following happens after recovery is complete:
 
 !!! Important
     In a replica cluster with replica mode enabled, the operator does not
-    create any databases or users in the PostgreSQL instance; these are
-    replicated from the original cluster.
-    It's essential to ensure that all configuration parameters, including
-    the application user secret, are synchronized between the replica
-    and source clusters. This synchronization is crucial to prevent issues
-    if the replica is promoted to primary.
+    create any databases or users in the PostgreSQL instance; instead these are
+    replicated from the source cluster.
+    If a replica cluster is detached or promoted to primary, it will start
+    applying the content of the application user secret on the database.
+    Therefore, it's essential to ensure that all configuration parameters,
+    including the application user secret, are synchronized between replica
+    and source clusters.
 
 ## How recovery works under the hood
 

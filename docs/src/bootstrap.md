@@ -631,12 +631,13 @@ With the above configuration, the following will happen after recovery is comple
 
 !!! Important
     In a replica cluster with replica mode enabled, the operator does not
-    create any databases or users in the PostgreSQL instance; these are
-    replicated from the original cluster.
-    It's essential to ensure that all configuration parameters, including
-    the application user secret, are synchronized between the replica
-    and source clusters. This synchronization is crucial to prevent issues
-    if the replica is promoted to primary.
+    create any databases or users in the PostgreSQL instance; instead these are
+    replicated from the source cluster.
+    If a replica cluster is detached or promoted to primary, it will start
+    applying the content of the application user secret on the database.
+    Therefore, it's essential to ensure that all configuration parameters,
+    including the application user secret, are synchronized between replica
+    and source clusters.
 
 #### Current limitations
 
