@@ -35,6 +35,34 @@ create and synchronize a PostgreSQL cluster from an existing source cluster
 using the replica cluster feature — described in this section. The source can
 be a primary cluster or another replica cluster (cascading replication).
 
+### About PostgreSQL Roles
+
+A replica cluster operates in continuous recovery mode, meaning no changes to
+the database, including the catalog and global objects like roles or databases,
+are permitted. These changes are deferred until the `Cluster` transitions to
+primary. During this phase, global objects such as roles remain as defined in
+the source cluster. CloudNativePG applies any local redefinitions once the
+cluster is promoted.
+
+If you are not planning to promote the cluster (e.g., for read-only workloads)
+or if you intend to detach completely from the source cluster
+once the replica cluster is promoted, you don't need to take any action.
+This is normally the case of the ["Standalone Replica Cluster"](replica_cluster.md#standalone-replica-clusters).
+
+If you are planning to promote the cluster at some point, CloudNativePG will
+manage the following roles and passwords when transitioning from replica
+cluster to primary:
+
+- the application user
+- the superuser (if you are using it)
+- any role defined using the [declarative interface](declarative_role_management.md)
+
+
+If your intention is to seamlessly ensure that the above roles and passwords
+don't change, you need to define the necessary secrets for the above in each
+`Cluster`.
+This is normally the case of the ["Distributed Topology"](replica_cluster.md#distributed-topology).
+
 ### Bootstrapping a Replica Cluster
 
 The first step is to bootstrap the replica cluster using one of the following
@@ -215,7 +243,12 @@ involving:
 - Demotion of a primary cluster to a replica cluster
 - Promotion of a replica cluster to a primary cluster
 
-These processes are described below.
+These processes are described in the next sections.
+
+!!! Important
+    Before you proceed, ensure you review the ["About PostgreSQL Roles" section](#about-postgresql-roles)
+    above and use identical role definitions, including secrets, in all
+    `Cluster` objects participating in the distributed topology.
 
 ### Demoting a Primary to a Replica Cluster
 
@@ -396,6 +429,13 @@ Note the `bootstrap` and `replica` sections pointing to the source cluster.
     source: cluster-example
 ```
 
+The previous configuration assumes that the application database and its owning
+user are set to the default, `app`. If the PostgreSQL cluster being restored
+uses different names, you must specify them as documented in [Configure the application database](bootstrap.md#configure-the-application-database).
+You should also consider copying over the application user secret from
+the original cluster and keep it synchronized with the source.
+See ["About PostgreSQL Roles"](#about-postgresql-roles) for more details.
+
 In the `externalClusters` section, remember to use the right namespace for the
 host in the `connectionParameters` sub-section.
 The `-replication` and `-ca` secrets should have been copied over if necessary,
@@ -442,6 +482,13 @@ Note the `bootstrap` and `replica` sections pointing to the source cluster.
     source: cluster-example
 ```
 
+The previous configuration assumes that the application database and its owning
+user are set to the default, `app`. If the PostgreSQL cluster being restored
+uses different names, you must specify them as documented in [Configure the application database](recovery.md#configure-the-application-database).
+You should also consider copying over the application user secret from
+the original cluster and keep it synchronized with the source.
+See ["About PostgreSQL Roles"](#about-postgresql-roles) for more details.
+
 In the `externalClusters` section, take care to use the right namespace in the
 `endpointURL` and the `connectionParameters.host`.
 And do ensure that the necessary secrets have been copied if necessary, and that
@@ -485,7 +532,15 @@ store to fetch the WAL files.
 You can check the [sample YAML](samples/cluster-example-replica-from-volume-snapshot.yaml)
 for it in the `samples/` subdirectory.
 
-## Delayed Replicas
+The example assumes that the application database and its owning
+user are set to the default, `app`. If the PostgreSQL cluster being restored
+uses different names, you must specify them as documented in [Configure the
+application database](recovery.md#configure-the-application-database).
+You should also consider copying over the application user secret from
+the original cluster and keep it synchronized with the source.
+See ["About PostgreSQL Roles"](#about-postgresql-roles) for more details.
+
+## Delayed replicas
 
 CloudNativePG supports the creation of **delayed replicas** through the
 [`.spec.replica.minApplyDelay` option](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-ReplicaClusterConfiguration),
