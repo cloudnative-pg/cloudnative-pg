@@ -217,7 +217,7 @@ operations. This restriction includes any role overrides, which are deferred
 until the `Cluster` transitions to primary.
 As a result, the following considerations apply:
 
-- The application database name and user are preserved from the backup being
+- The application database name and user are copied from the backup being
   restored. The operator does not currently back up the underlying secrets, as
   this is part of the usual maintenance activity of the Kubernetes cluster.
 - To preserve the original postgres user password, configure
