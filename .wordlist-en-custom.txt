@@ -367,6 +367,7 @@ RunningBackups
 RunningSnapshotBackups
 RuntimeDefault
 Ruocco
+SANs
 SAS
 SCC
 SCCs
@@ -1048,6 +1049,7 @@ quantile
 queryable
 quickstart
 rbac
+rc
 readService
 readinessProbe
 readthedocs
@@ -1246,6 +1248,8 @@ unencrypted
 unfence
 unfencing
 unix
+unsatisfiable
+unschedulable
 unsetting
 unusablePVC
 updateInterval
