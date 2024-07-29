@@ -50,7 +50,7 @@ once the replica cluster is promoted, you don't need to take any action.
 This is normally the case of the ["Standalone Replica Cluster"](replica_cluster.md#standalone-replica-clusters).
 
 If you are planning to promote the cluster at some point, CloudNativePG will
-take care of the following roles and passwords when transitioning from replica
+manage the following roles and passwords when transitioning from replica
 cluster to primary:
 
 - the application user
