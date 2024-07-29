@@ -54,6 +54,7 @@ import (
 	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/metricserver"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres/replication"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/promotiontoken"
 	externalcluster "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/replicaclusterswitch"
 	clusterstatus "github.com/cloudnative-pg/cloudnative-pg/pkg/resources/status"
@@ -771,7 +772,7 @@ func (r *InstanceReconciler) reconcileMetrics(
 	exporter.Metrics.SyncReplicas.WithLabelValues("min").Set(float64(cluster.Spec.MinSyncReplicas))
 	exporter.Metrics.SyncReplicas.WithLabelValues("max").Set(float64(cluster.Spec.MaxSyncReplicas))
 
-	syncReplicas, _ := cluster.GetSyncReplicasData()
+	syncReplicas := replication.GetExpectedSyncReplicasNumber(cluster)
 	exporter.Metrics.SyncReplicas.WithLabelValues("expected").Set(float64(syncReplicas))
 
 	if cluster.IsReplica() {

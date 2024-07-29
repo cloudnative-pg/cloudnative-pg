@@ -4103,6 +4103,54 @@ spec:
                     required:
                     - enabled
                     type: object
+                  synchronous:
+                    description: Configuration of the PostgreSQL synchronous replication
+                      feature
+                    properties:
+                      maxStandbyNamesFromCluster:
+                        description: |-
+                          Specifies the maximum number of local cluster pods that can be
+                          automatically included in the `synchronous_standby_names` option in
+                          PostgreSQL.
+                        type: integer
+                      method:
+                        description: |-
+                          Method to select synchronous replication standbys from the listed
+                          servers, accepting 'any' (quorum-based synchronous replication) or
+                          'first' (priority-based synchronous replication) as values.
+                        enum:
+                        - any
+                        - first
+                        type: string
+                      number:
+                        description: |-
+                          Specifies the number of synchronous standby servers that
+                          transactions must wait for responses from.
+                        type: integer
+                        x-kubernetes-validations:
+                        - message: The number of synchronous replicas should be greater
+                            than zero
+                          rule: self > 0
+                      standbyNamesPost:
+                        description: |-
+                          A user-defined list of application names to be added to
+                          `synchronous_standby_names` after local cluster pods (the order is
+                          only useful for priority-based synchronous replication).
+                        items:
+                          type: string
+                        type: array
+                      standbyNamesPre:
+                        description: |-
+                          A user-defined list of application names to be added to
+                          `synchronous_standby_names` before local cluster pods (the order is
+                          only useful for priority-based synchronous replication).
+                        items:
+                          type: string
+                        type: array
+                    required:
+                    - method
+                    - number
+                    type: object
                 type: object
               primaryUpdateMethod:
                 default: restart

@@ -4031,6 +4031,13 @@ we are targeting. Allowed values are <code>rw</code> and <code>ro</code>.</p>
    <p>PostgreSQL configuration options (postgresql.conf)</p>
 </td>
 </tr>
+<tr><td><code>synchronous</code><br/>
+<a href="#postgresql-cnpg-io-v1-SynchronousReplicaConfiguration"><i>SynchronousReplicaConfiguration</i></a>
+</td>
+<td>
+   <p>Configuration of the PostgreSQL synchronous replication feature</p>
+</td>
+</tr>
 <tr><td><code>pg_hba</code><br/>
 <i>[]string</i>
 </td>
@@ -5174,6 +5181,85 @@ physical replication slots</p>
 </tr>
 </tbody>
 </table>
+
+## SynchronousReplicaConfiguration     {#postgresql-cnpg-io-v1-SynchronousReplicaConfiguration}
+
+
+**Appears in:**
+
+- [PostgresConfiguration](#postgresql-cnpg-io-v1-PostgresConfiguration)
+
+
+<p>SynchronousReplicaConfiguration contains the configuration of the
+PostgreSQL synchronous replication feature.
+Important: at this moment, also <code>.spec.minSyncReplicas</code> and <code>.spec.maxSyncReplicas</code>
+need to be considered.</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>method</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-SynchronousReplicaConfigurationMethod"><i>SynchronousReplicaConfigurationMethod</i></a>
+</td>
+<td>
+   <p>Method to select synchronous replication standbys from the listed
+servers, accepting 'any' (quorum-based synchronous replication) or
+'first' (priority-based synchronous replication) as values.</p>
+</td>
+</tr>
+<tr><td><code>number</code> <B>[Required]</B><br/>
+<i>int</i>
+</td>
+<td>
+   <p>Specifies the number of synchronous standby servers that
+transactions must wait for responses from.</p>
+</td>
+</tr>
+<tr><td><code>maxStandbyNamesFromCluster</code><br/>
+<i>int</i>
+</td>
+<td>
+   <p>Specifies the maximum number of local cluster pods that can be
+automatically included in the <code>synchronous_standby_names</code> option in
+PostgreSQL.</p>
+</td>
+</tr>
+<tr><td><code>standbyNamesPre</code><br/>
+<i>[]string</i>
+</td>
+<td>
+   <p>A user-defined list of application names to be added to
+<code>synchronous_standby_names</code> before local cluster pods (the order is
+only useful for priority-based synchronous replication).</p>
+</td>
+</tr>
+<tr><td><code>standbyNamesPost</code><br/>
+<i>[]string</i>
+</td>
+<td>
+   <p>A user-defined list of application names to be added to
+<code>synchronous_standby_names</code> after local cluster pods (the order is
+only useful for priority-based synchronous replication).</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## SynchronousReplicaConfigurationMethod     {#postgresql-cnpg-io-v1-SynchronousReplicaConfigurationMethod}
+
+(Alias of `string`)
+
+**Appears in:**
+
+- [SynchronousReplicaConfiguration](#postgresql-cnpg-io-v1-SynchronousReplicaConfiguration)
+
+
+<p>SynchronousReplicaConfigurationMethod configures whether to use
+quorum based replication or a priority list</p>
+
+
+
 
 ## TablespaceConfiguration     {#postgresql-cnpg-io-v1-TablespaceConfiguration}
 

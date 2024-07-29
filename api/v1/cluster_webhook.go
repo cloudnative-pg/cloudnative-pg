@@ -1054,6 +1054,18 @@ func (r *Cluster) validateResources() field.ErrorList {
 func (r *Cluster) validateConfiguration() field.ErrorList {
 	var result field.ErrorList
 
+	// We cannot have both old-style synchronous replica configuration
+	// and new-style synchronous replica configuration
+	haveOldStyleSyncReplicaConfig := r.Spec.PostgresConfiguration.Synchronous != nil
+	haveNewStyleSyncReplicaConfig := r.Spec.MinSyncReplicas > 0 || r.Spec.MaxSyncReplicas > 0
+	if haveOldStyleSyncReplicaConfig && haveNewStyleSyncReplicaConfig {
+		result = append(result,
+			field.Invalid(
+				field.NewPath("spec", "postgresql", "synchronous"),
+				r.Spec.PostgresConfiguration.Synchronous,
+				"Can't have both legacy synchronous replica configuration and new one"))
+	}
+
 	pgVersion, err := r.GetPostgresqlVersion()
 	if err != nil {
 		// The validation error will be already raised by the

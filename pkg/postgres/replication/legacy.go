@@ -14,17 +14,41 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1
+package replication
 
 import (
+	"fmt"
+	"sort"
+	"strings"
+
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-// GetSyncReplicasData computes the actual number of required synchronous replicas and the names of
+// legacySynchronousStandbyNames sets the standby node list with the
+// legacy API
+func legacySynchronousStandbyNames(cluster *apiv1.Cluster) string {
+	syncReplicas, syncReplicasElectable := getSyncReplicasData(cluster)
+
+	if syncReplicasElectable != nil && syncReplicas > 0 {
+		escapedReplicas := make([]string, len(syncReplicasElectable))
+		for idx, name := range syncReplicasElectable {
+			escapedReplicas[idx] = escapePostgresConfLiteral(name)
+		}
+		return fmt.Sprintf(
+			"ANY %v (%v)",
+			syncReplicas,
+			strings.Join(escapedReplicas, ","))
+	}
+
+	return ""
+}
+
+// getSyncReplicasData computes the actual number of required synchronous replicas and the names of
 // the electable sync replicas given the requested min, max, the number of ready replicas in the cluster and the sync
 // replicas constraints (if any)
-func (cluster *Cluster) GetSyncReplicasData() (syncReplicas int, electableSyncReplicas []string) {
+func getSyncReplicasData(cluster *apiv1.Cluster) (syncReplicas int, electableSyncReplicas []string) {
 	// We start with the number of healthy replicas (healthy pods minus one)
 	// and verify it is greater than 0 and between minSyncReplicas and maxSyncReplicas.
 	// Formula: 1 <= minSyncReplicas <= SyncReplicas <= maxSyncReplicas < readyReplicas
@@ -55,7 +79,7 @@ func (cluster *Cluster) GetSyncReplicasData() (syncReplicas int, electableSyncRe
 			"maxSyncReplicas", cluster.Spec.MaxSyncReplicas)
 	}
 
-	electableSyncReplicas = cluster.getElectableSyncReplicas()
+	electableSyncReplicas = getElectableSyncReplicas(cluster)
 	numberOfElectableSyncReplicas := len(electableSyncReplicas)
 	if numberOfElectableSyncReplicas < syncReplicas {
 		log.Warning("lowering sync replicas due to not enough electable instances for sync replication "+
@@ -70,13 +94,8 @@ func (cluster *Cluster) GetSyncReplicasData() (syncReplicas int, electableSyncRe
 }
 
 // getElectableSyncReplicas computes the names of the instances that can be elected to sync replicas
-func (cluster *Cluster) getElectableSyncReplicas() []string {
-	var nonPrimaryInstances []string
-	for _, instance := range cluster.Status.InstancesStatus[utils.PodHealthy] {
-		if cluster.Status.CurrentPrimary != instance {
-			nonPrimaryInstances = append(nonPrimaryInstances, instance)
-		}
-	}
+func getElectableSyncReplicas(cluster *apiv1.Cluster) []string {
+	nonPrimaryInstances := getSortedNonPrimaryInstanceNames(cluster)
 
 	topology := cluster.Status.Topology
 	// We need to include every replica inside the list of possible synchronous standbys if we have no constraints
@@ -93,7 +112,7 @@ func (cluster *Cluster) getElectableSyncReplicas() []string {
 		return nonPrimaryInstances
 	}
 
-	currentPrimary := PodName(cluster.Status.CurrentPrimary)
+	currentPrimary := apiv1.PodName(cluster.Status.CurrentPrimary)
 	// given that the constraints are based off the primary instance if we still don't have one we cannot continue
 	if currentPrimary == "" {
 		log.Warning("no primary elected, cannot compute electable sync replicas")
@@ -109,7 +128,7 @@ func (cluster *Cluster) getElectableSyncReplicas() []string {
 
 	electableReplicas := make([]string, 0, len(nonPrimaryInstances))
 	for _, name := range nonPrimaryInstances {
-		name := PodName(name)
+		name := apiv1.PodName(name)
 
 		instanceTopology, ok := topology.Instances[name]
 		// if we still don't have the topology data for the node we skip it from inserting it in the electable pool
@@ -118,10 +137,22 @@ func (cluster *Cluster) getElectableSyncReplicas() []string {
 			continue
 		}
 
-		if !currentPrimaryTopology.matchesTopology(instanceTopology) {
+		if !currentPrimaryTopology.MatchesTopology(instanceTopology) {
 			electableReplicas = append(electableReplicas, string(name))
 		}
 	}
 
 	return electableReplicas
+}
+
+func getSortedNonPrimaryInstanceNames(cluster *apiv1.Cluster) []string {
+	var nonPrimaryInstances []string
+	for _, instance := range cluster.Status.InstancesStatus[utils.PodHealthy] {
+		if cluster.Status.CurrentPrimary != instance {
+			nonPrimaryInstances = append(nonPrimaryInstances, instance)
+		}
+	}
+
+	sort.Strings(nonPrimaryInstances)
+	return nonPrimaryInstances
 }

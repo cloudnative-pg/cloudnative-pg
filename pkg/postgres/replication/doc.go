@@ -14,16 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1
-
-import (
-	"testing"
-
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-)
-
-func TestApi(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "v1 API tests")
-}
+// Package replication contains the code relative to the
+// synchronous replication feature
+package replication

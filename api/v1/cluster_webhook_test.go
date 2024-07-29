@@ -1967,54 +1967,74 @@ var _ = Describe("primary update strategy", func() {
 })
 
 var _ = Describe("Number of synchronous replicas", func() {
-	It("should be a positive integer", func() {
-		cluster := Cluster{
-			Spec: ClusterSpec{
-				Instances:       3,
-				MaxSyncReplicas: -3,
-			},
-		}
-		Expect(cluster.validateMaxSyncReplicas()).ToNot(BeEmpty())
+	Context("new-style configuration", func() {
+		It("can't have both new-style configuration and legacy one", func() {
+			cluster := Cluster{
+				Spec: ClusterSpec{
+					Instances:       3,
+					MinSyncReplicas: 1,
+					MaxSyncReplicas: 2,
+					PostgresConfiguration: PostgresConfiguration{
+						Synchronous: &SynchronousReplicaConfiguration{
+							Number: 2,
+						},
+					},
+				},
+			}
+			Expect(cluster.validateConfiguration()).ToNot(BeEmpty())
+		})
 	})
 
-	It("should not be equal than the number of replicas", func() {
-		cluster := Cluster{
-			Spec: ClusterSpec{
-				Instances:       3,
-				MaxSyncReplicas: 3,
-			},
-		}
-		Expect(cluster.validateMaxSyncReplicas()).ToNot(BeEmpty())
-	})
+	Context("legacy configuration", func() {
+		It("should be a positive integer", func() {
+			cluster := Cluster{
+				Spec: ClusterSpec{
+					Instances:       3,
+					MaxSyncReplicas: -3,
+				},
+			}
+			Expect(cluster.validateMaxSyncReplicas()).ToNot(BeEmpty())
+		})
 
-	It("should not be greater than the number of replicas", func() {
-		cluster := Cluster{
-			Spec: ClusterSpec{
-				Instances:       3,
-				MaxSyncReplicas: 5,
-			},
-		}
-		Expect(cluster.validateMaxSyncReplicas()).ToNot(BeEmpty())
-	})
+		It("should not be equal than the number of replicas", func() {
+			cluster := Cluster{
+				Spec: ClusterSpec{
+					Instances:       3,
+					MaxSyncReplicas: 3,
+				},
+			}
+			Expect(cluster.validateMaxSyncReplicas()).ToNot(BeEmpty())
+		})
 
-	It("can be zero", func() {
-		cluster := Cluster{
-			Spec: ClusterSpec{
-				Instances:       3,
-				MaxSyncReplicas: 0,
-			},
-		}
-		Expect(cluster.validateMaxSyncReplicas()).To(BeEmpty())
-	})
+		It("should not be greater than the number of replicas", func() {
+			cluster := Cluster{
+				Spec: ClusterSpec{
+					Instances:       3,
+					MaxSyncReplicas: 5,
+				},
+			}
+			Expect(cluster.validateMaxSyncReplicas()).ToNot(BeEmpty())
+		})
 
-	It("can be lower than the number of replicas", func() {
-		cluster := Cluster{
-			Spec: ClusterSpec{
-				Instances:       3,
-				MaxSyncReplicas: 2,
-			},
-		}
-		Expect(cluster.validateMaxSyncReplicas()).To(BeEmpty())
+		It("can be zero", func() {
+			cluster := Cluster{
+				Spec: ClusterSpec{
+					Instances:       3,
+					MaxSyncReplicas: 0,
+				},
+			}
+			Expect(cluster.validateMaxSyncReplicas()).To(BeEmpty())
+		})
+
+		It("can be lower than the number of replicas", func() {
+			cluster := Cluster{
+				Spec: ClusterSpec{
+					Instances:       3,
+					MaxSyncReplicas: 2,
+				},
+			}
+			Expect(cluster.validateMaxSyncReplicas()).To(BeEmpty())
+		})
 	})
 })
 
