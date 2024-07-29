@@ -606,7 +606,7 @@ database configuration will be skipped.
     While the `Cluster` is in recovery mode, no changes to the database,
     including the catalog, are permitted. This restriction includes any role
     overrides, which are deferred until the `Cluster` transitions to primary.
-    During this phase, users remain as defined in the source cluster.
+    During the recovery phase, roles remain as defined in the source cluster.
 
 The example below configures the `app` database with the owner `app` and
 the password stored in the provided secret `app-secret`, following the
