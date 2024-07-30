@@ -4532,6 +4532,14 @@ spec:
                       object store or via streaming through pg_basebackup.
                       Refer to the Replica clusters page of the documentation for more information.
                     type: boolean
+                  minApplyDelay:
+                    description: |-
+                      When replica mode is enabled, this parameter allows you to replay
+                      transactions only when the system time is at least the configured
+                      time past the commit time. This provides an opportunity to correct
+                      data loss errors. Note that when this parameter is set, a promotion
+                      token cannot be used.
+                    type: string
                   primary:
                     description: |-
                       Primary defines which Cluster is defined to be the primary in the distributed PostgreSQL cluster, based on the

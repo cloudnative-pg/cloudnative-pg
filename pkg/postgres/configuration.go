@@ -20,25 +20,32 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 	"text/template"
+	"time"
 )
 
 // WalLevelValue a value that is assigned to the 'wal_level' configuration field
 type WalLevelValue string
 
-// ParameterWalLevel the configuration key containing the wal_level value
-const ParameterWalLevel = "wal_level"
+const (
+	// ParameterWalLevel the configuration key containing the wal_level value
+	ParameterWalLevel = "wal_level"
 
-// ParameterMaxWalSenders the configuration key containing the max_wal_senders value
-const ParameterMaxWalSenders = "max_wal_senders"
+	// ParameterMaxWalSenders the configuration key containing the max_wal_senders value
+	ParameterMaxWalSenders = "max_wal_senders"
 
-// ParameterArchiveMode the configuration key containing the archive_mode value
-const ParameterArchiveMode = "archive_mode"
+	// ParameterArchiveMode the configuration key containing the archive_mode value
+	ParameterArchiveMode = "archive_mode"
 
-// ParameterWalLogHints the configuration key containing the wal_log_hints value
-const ParameterWalLogHints = "wal_log_hints"
+	// ParameterWalLogHints the configuration key containing the wal_log_hints value
+	ParameterWalLogHints = "wal_log_hints"
+
+	// ParameterRecoveyMinApplyDelay is the configuration key containing the recovery_min_apply_delay parameter
+	ParameterRecoveyMinApplyDelay = "recovery_min_apply_delay"
+)
 
 // An acceptable wal_level value
 const (
@@ -310,6 +317,9 @@ type ConfigurationInfo struct {
 
 	// IsAlterSystemEnabled is true when 'allow_alter_system' should be set to on
 	IsAlterSystemEnabled bool
+
+	// Minimum apply delay of transaction
+	RecoveryMinApplyDelay time.Duration
 }
 
 // getAlterSystemEnabledValue returns a config compatible value for IsAlterSystemEnabled
@@ -659,6 +669,22 @@ func CreatePostgresqlConfiguration(info ConfigurationInfo) *PgConfiguration {
 
 	if info.ClusterName != "" {
 		configuration.OverwriteConfig("cluster_name", info.ClusterName)
+	}
+
+	// Apply the replication delay
+	if info.RecoveryMinApplyDelay != 0 {
+		// We set recovery_min_apply_delay on every instance
+		// of a replica cluster and not just on the primary.
+		// PostgreSQL will look at the difference between the
+		// current timestamp and the timestamp when the commit
+		// was created (by the primary instance).
+		//
+		// Since both timestamps are the same on the designed
+		// primary and on the replicas, setting it on both
+		// is a safe approach.
+		configuration.OverwriteConfig(
+			ParameterRecoveyMinApplyDelay,
+			fmt.Sprintf("%vs", math.Floor(info.RecoveryMinApplyDelay.Seconds())))
 	}
 
 	if info.IncludingSharedPreloadLibraries {

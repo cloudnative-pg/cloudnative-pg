@@ -540,33 +540,40 @@ You should also consider copying over the application user secret from
 the original cluster and keep it synchronized with the source.
 See ["About PostgreSQL Roles"](#about-postgresql-roles) for more details.
 
-<!--
 ## Delayed replicas
 
-In addition to standard replica clusters, our system supports the creation of
-**delayed replicas** through the utilization of PostgreSQL's
-[`recovery_min_apply_delay`](https://www.postgresql.org/docs/current/runtime-config-replication.html#GUC-RECOVERY-MIN-APPLY-DELAY)
-option.
+CloudNativePG supports the creation of **delayed replicas** through the
+[`.spec.replica.minApplyDelay` option](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-ReplicaClusterConfiguration),
+leveraging PostgreSQL's
+[`recovery_min_apply_delay`](https://www.postgresql.org/docs/current/runtime-config-replication.html#GUC-RECOVERY-MIN-APPLY-DELAY).
 
-Delayed replicas intentionally lag behind the primary database by a specified
-amount of time. This delay is configurable using the `recovery_min_apply_delay`
-option in PostgreSQL. The primary objective of introducing delayed replicas is
-to mitigate the impact of unintentional executions of SQL statements on the
-primary database. This is particularly useful in scenarios where an incorrect
-or missing `WHERE` clause is used in operations such as `UPDATE` or `DELETE`.
+Delayed replicas are designed to intentionally lag behind the primary database
+by a specified amount of time. This delay is configurable using the
+`.spec.replica.minApplyDelay` option, which maps to the underlying
+`recovery_min_apply_delay` parameter in PostgreSQL.
 
-To introduce a delay in a replica cluster, adjust the
-`recovery_min_apply_delay` option. This parameter determines the time by which
-replicas lag behind the primary. For example:
+The primary objective of delayed replicas is to mitigate the impact of
+unintended SQL statement executions on the primary database. This is especially
+useful in scenarios where operations such as `UPDATE` or `DELETE` are performed
+without a proper `WHERE` clause.
+
+To configure a delay in a replica cluster, adjust the
+`.spec.replica.minApplyDelay` option. This parameter determines how much time
+the replicas will lag behind the primary. For example:
 
 ```yaml
   # ...
-  postgresql:
-    parameters:
-      # Enforce a delay of 8 hours
-      recovery_min_apply_delay = '8h'
+  replica:
+    enabled: true
+    source: cluster-example
+    # Enforce a delay of 8 hours
+    minApplyDelay: '8h'
   # ...
 ```
+
+The above example helps safeguard against accidental data modifications by
+providing a buffer period of 8 hours to detect and correct issues before they
+propagate to the replicas.
 
 Monitor and adjust the delay as needed based on your recovery time objectives
 and the potential impact of unintended primary database operations.
@@ -584,6 +591,10 @@ The main use cases of delayed replicas can be summarized into:
    buffer that provides an opportunity to intervene and prevent the propagation of
    undesirable changes.
 
+!!! Warning
+    The `minApplyDelay` option of delayed replicas cannot be used in
+    conjunction with `promotionToken`.
+
 By integrating delayed replicas into your replication strategy, you can enhance
 the resilience and data protection capabilities of your PostgreSQL environment.
 Adjust the delay duration based on your specific needs and the criticality of
@@ -594,4 +605,3 @@ your data.
     efficient to rely on volume snapshot-based recovery for faster outcomes.
     Evaluate and choose the approach that best aligns with your unique requirements
     and infrastructure.
--->

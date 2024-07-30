@@ -19,9 +19,11 @@ package postgres
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 
@@ -180,5 +182,76 @@ var _ = Describe("Test building of the list of temporary tablespaces", func() {
 		config, _, err := createPostgresqlConfiguration(&clusterWithTemporaryTablespaces, true)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(config).To(ContainSubstring("temp_tablespaces = 'other_temporary_tablespace,temporary_tablespace'"))
+	})
+})
+
+var _ = Describe("recovery_min_apply_delay", func() {
+	primaryCluster := apiv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "configurationTest",
+			Namespace: "default",
+		},
+
+		Spec: apiv1.ClusterSpec{
+			ReplicaCluster: &apiv1.ReplicaClusterConfiguration{
+				Enabled: ptr.To(false),
+				MinApplyDelay: &metav1.Duration{
+					Duration: 1 * time.Hour,
+				},
+			},
+		},
+	}
+
+	replicaCluster := apiv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "configurationTest",
+			Namespace: "default",
+		},
+
+		Spec: apiv1.ClusterSpec{
+			ReplicaCluster: &apiv1.ReplicaClusterConfiguration{
+				Enabled: ptr.To(true),
+				MinApplyDelay: &metav1.Duration{
+					Duration: 1 * time.Hour,
+				},
+			},
+		},
+	}
+
+	replicaClusterWithNoDelay := apiv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "configurationTest",
+			Namespace: "default",
+		},
+
+		Spec: apiv1.ClusterSpec{
+			ReplicaCluster: &apiv1.ReplicaClusterConfiguration{
+				Enabled: ptr.To(true),
+			},
+		},
+	}
+
+	It("do not set recovery_min_apply_delay in primary clusters", func() {
+		Expect(primaryCluster.IsReplica()).To(BeFalse())
+
+		config, _, err := createPostgresqlConfiguration(&primaryCluster, true)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(config).ToNot(ContainSubstring("recovery_min_apply_delay"))
+	})
+
+	It("set recovery_min_apply_delay in replica clusters when set", func() {
+		Expect(replicaCluster.IsReplica()).To(BeTrue())
+
+		config, _, err := createPostgresqlConfiguration(&replicaCluster, true)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(config).To(ContainSubstring("recovery_min_apply_delay = '3600s'"))
+	})
+
+	It("do not set recovery_min_apply_delay in replica clusters when not set", func() {
+		Expect(replicaClusterWithNoDelay.IsReplica()).To(BeTrue())
+
+		config, _, err := createPostgresqlConfiguration(&replicaClusterWithNoDelay, true)
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(config).ToNot(ContainSubstring("recovery_min_apply_delay"))
 	})
 })
