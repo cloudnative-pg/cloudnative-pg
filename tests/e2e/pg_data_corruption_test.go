@@ -80,7 +80,7 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), Ordered, func(
 		})
 
 		By("corrupting primary pod by removing PGDATA", func() {
-			cmd := fmt.Sprintf("rm -fr %v/base/*", specs.PgDataPath)
+			cmd := fmt.Sprintf("find %v/base/* -type f -delete", specs.PgDataPath)
 			_, _, err = env.ExecCommandInInstancePod(
 				testsUtils.PodLocator{
 					Namespace: namespace,
