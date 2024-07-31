@@ -50,19 +50,6 @@ func (instance *Instance) IsServerHealthy() error {
 	return err
 }
 
-// IsServerReady check if the instance is healthy and can really accept connections
-func (instance *Instance) IsServerReady() error {
-	if !instance.CanCheckReadiness() {
-		return fmt.Errorf("instance is not ready yet")
-	}
-	superUserDB, err := instance.GetSuperUserDB()
-	if err != nil {
-		return err
-	}
-
-	return superUserDB.Ping()
-}
-
 // GetStatus Extract the status of this PostgreSQL database
 func (instance *Instance) GetStatus() (result *postgres.PostgresqlStatus, err error) {
 	result = &postgres.PostgresqlStatus{
