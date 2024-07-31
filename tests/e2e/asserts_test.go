@@ -48,6 +48,23 @@ import (
 )
 
 func AssertSwitchover(namespace string, clusterName string, env *testsUtils.TestingEnvironment) {
+	AssertSwitchoverWithHistory(namespace, clusterName, false, env)
+}
+
+func AssertSwitchoverOnReplica(namespace string, clusterName string, env *testsUtils.TestingEnvironment) {
+	AssertSwitchoverWithHistory(namespace, clusterName, true, env)
+}
+
+// AssertSwitchoverWithHistory does a switchover and waits until the old primary
+// is streaming from the new primary.
+// In a primary cluster it checks a new timeline was created by watching for history files.
+// In a replica cluster, a switchover per se does not switch the timeline
+func AssertSwitchoverWithHistory(
+	namespace string,
+	clusterName string,
+	isReplica bool,
+	env *testsUtils.TestingEnvironment,
+) {
 	var pods []string
 	var oldPrimary, targetPrimary string
 	var oldPodListLength int
@@ -75,11 +92,13 @@ func AssertSwitchover(namespace string, clusterName string, env *testsUtils.Test
 			pods = append(pods, p.Name)
 		}
 		sort.Strings(pods)
+		// TODO: this algorithm is very naïve, only works if we're lucky and the `-1` instance
+		// is the primary and the -2 is the most advanced replica
 		Expect(pods[0]).To(BeEquivalentTo(oldPrimary))
 		targetPrimary = pods[1]
 	})
 
-	By("setting the TargetPrimary node to trigger a switchover", func() {
+	By(fmt.Sprintf("setting the TargetPrimary node to trigger a switchover to %s", targetPrimary), func() {
 		err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 			cluster, err := env.GetCluster(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
@@ -123,41 +142,43 @@ func AssertSwitchover(namespace string, clusterName string, env *testsUtils.Test
 		}, timeout).Should(BeTrue())
 	})
 
-	By("confirming that the all postgres container have *.history file after switchover", func() {
-		pods = []string{}
-		timeout := 120
+	if !isReplica {
+		By("confirming that the all postgres containers have *.history file after switchover", func() {
+			pods = []string{}
+			timeout := 120
 
-		// Gather pod names
-		podList, err := env.GetClusterPodList(namespace, clusterName)
-		Expect(len(podList.Items), err).To(BeEquivalentTo(oldPodListLength))
-		for _, p := range podList.Items {
-			pods = append(pods, p.Name)
-		}
-
-		Eventually(func() error {
-			count := 0
-			for _, pod := range pods {
-				out, _, err := env.ExecCommandInInstancePod(
-					testsUtils.PodLocator{
-						Namespace: namespace,
-						PodName:   pod,
-					}, nil, "sh", "-c", "ls $PGDATA/pg_wal/*.history")
-				if err != nil {
-					return err
-				}
-
-				numHistory := len(strings.Split(strings.TrimSpace(out), "\n"))
-				GinkgoWriter.Printf("count %d: pod: %s, the number of history file in pg_wal: %d\n", count, pod, numHistory)
-				count++
-				if numHistory > 0 {
-					continue
-				}
-
-				return errors.New("more than 1 .history file are expected but not found")
+			// Gather pod names
+			podList, err := env.GetClusterPodList(namespace, clusterName)
+			Expect(len(podList.Items), err).To(BeEquivalentTo(oldPodListLength))
+			for _, p := range podList.Items {
+				pods = append(pods, p.Name)
 			}
-			return nil
-		}, timeout).ShouldNot(HaveOccurred())
-	})
+
+			Eventually(func() error {
+				count := 0
+				for _, pod := range pods {
+					out, _, err := env.ExecCommandInInstancePod(
+						testsUtils.PodLocator{
+							Namespace: namespace,
+							PodName:   pod,
+						}, nil, "sh", "-c", "ls $PGDATA/pg_wal/*.history")
+					if err != nil {
+						return err
+					}
+
+					numHistory := len(strings.Split(strings.TrimSpace(out), "\n"))
+					GinkgoWriter.Printf("count %d: pod: %s, the number of history file in pg_wal: %d\n", count, pod, numHistory)
+					count++
+					if numHistory > 0 {
+						continue
+					}
+
+					return errors.New("at least 1 .history file expected but none found")
+				}
+				return nil
+			}, timeout).ShouldNot(HaveOccurred())
+		})
+	}
 }
 
 // AssertCreateCluster creates the cluster and verifies that the ready pods
@@ -385,32 +406,27 @@ func AssertOperatorIsReady() {
 // failureThreshold x periodSeconds to be detected
 func AssertDatabaseIsReady(namespace, clusterName, dbName string) {
 	By(fmt.Sprintf("checking the database on %s is ready", clusterName), func() {
-		primary, err := env.GetClusterPrimary(namespace, clusterName)
-		Expect(err).ToNot(HaveOccurred())
-		Eventually(func() error {
+		Eventually(func(g Gomega) {
+			primary, err := env.GetClusterPrimary(namespace, clusterName)
+			g.Expect(err).ToNot(HaveOccurred())
+
 			stdout, stderr, err := env.ExecCommandInInstancePod(testsUtils.PodLocator{
 				Namespace: namespace,
 				PodName:   primary.GetName(),
 			}, nil, "pg_isready")
-			if err != nil {
-				return err
-			}
-			if stderr != "" {
-				return fmt.Errorf("while checking pg_isready: %s", stderr)
-			}
-			if !strings.Contains(stdout, "accepting") {
-				return fmt.Errorf("while checking pg_isready: Not accepting connections")
-			}
+			g.Expect(err).ShouldNot(HaveOccurred())
+			g.Expect(stderr).To(BeEmpty(), "while checking pg_isready")
+			g.Expect(stdout).To(ContainSubstring("accepting"), "while checking pg_isready: Not accepting connections")
 			_, _, err = env.ExecQueryInInstancePod(testsUtils.PodLocator{
 				Namespace: namespace,
 				PodName:   primary.GetName(),
 			}, testsUtils.DatabaseName(dbName), "select 1")
-			return err
-		}, RetryTimeout, PollingTime).ShouldNot(HaveOccurred())
+			g.Expect(err).ShouldNot(HaveOccurred())
+		}, RetryTimeout, PollingTime).Should(Succeed())
 	})
 }
 
-// AssertCreateTestData create test data.
+// AssertCreateTestData create test on the "app" database
 func AssertCreateTestData(namespace, clusterName, tableName string, pod *corev1.Pod) {
 	AssertDatabaseIsReady(namespace, clusterName, testsUtils.AppDBName)
 	By(fmt.Sprintf("creating test data in cluster %v", clusterName), func() {
@@ -1024,11 +1040,14 @@ func AssertReplicaModeCluster(
 		}, 180, 15).Should(BeEquivalentTo("3"))
 	})
 
-	// verify that if replica mode is enabled, no default "app" user and "app" database are created
-	By("checking that in replica cluster there is no database app and user app", func() {
-		AssertDatabaseExists(namespace, primaryReplicaCluster.Name, "app", false)
-		AssertUserExists(namespace, primaryReplicaCluster.Name, "app", false)
-	})
+	if srcClusterDBName != "app" {
+		// verify the replica database created followed the source database, rather than
+		// default to the "app" db and user
+		By("checking that in replica cluster there is no database app and user app", func() {
+			AssertDatabaseExists(namespace, primaryReplicaCluster.Name, "app", false)
+			AssertUserExists(namespace, primaryReplicaCluster.Name, "app", false)
+		})
+	}
 }
 
 // AssertDetachReplicaModeCluster verifies that a replica cluster can be detached from the
