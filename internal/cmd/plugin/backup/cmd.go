@@ -166,13 +166,13 @@ func NewCmd() *cobra.Command {
 	const optionalAcceptedValues = "Optional. Accepted values: true|false|\"\"."
 	backupSubcommand.Flags().StringVar(&online, "online",
 		"",
-		"Set the `.spec.online` field of the Backup resource. If not specified, "+
+		"Set the '.spec.online' field of the Backup resource. If not specified, "+
 			"the value in the '.spec.backup.volumeSnapshot' field of the Cluster "+
 			"resource will be used. "+
 			optionalAcceptedValues)
 
 	backupSubcommand.Flags().StringVar(&immediateCheckpoint, "immediate-checkpoint", "",
-		"Set the `.spec.onlineConfiguration.immediateCheckpoint` field of the "+
+		"Set the '.spec.onlineConfiguration.immediateCheckpoint' field of the "+
 			"Backup resource. If not specified, the value in the "+
 			"'.spec.backup.volumeSnapshot.onlineConfiguration' field "+
 			"of the Cluster resource will be used. "+
@@ -180,7 +180,7 @@ func NewCmd() *cobra.Command {
 	)
 
 	backupSubcommand.Flags().StringVar(&waitForArchive, "wait-for-archive", "",
-		"Set the `.spec.onlineConfiguratoin.waitForArchive` field of the "+
+		"Set the '.spec.onlineConfiguratoin.waitForArchive' field of the "+
 			"Backup resource. If not specified, the value in the "+
 			"'.spec.backup.volumeSnapshot.onlineConfiguration' field will be used. "+
 			optionalAcceptedValues,
