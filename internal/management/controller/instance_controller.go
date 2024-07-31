@@ -193,7 +193,7 @@ func (r *InstanceReconciler) Reconcile(
 	}
 
 	// Instance promotion will not automatically load the changed configuration files.
-	// Therefore it should not be counted as "a restart".
+	// Therefore, it should not be counted as "a restart".
 	if err := r.reconcilePrimary(ctx, cluster); err != nil {
 		var tokenError *promotiontoken.TokenVerificationError
 		if errors.As(err, &tokenError) {
@@ -256,6 +256,10 @@ func (r *InstanceReconciler) Reconcile(
 
 	if err = r.refreshCredentialsFromSecret(ctx, cluster); err != nil {
 		return reconcile.Result{}, fmt.Errorf("while updating database owner password: %w", err)
+	}
+
+	if err := r.dropStaleReplicationConnections(ctx, cluster); err != nil {
+		return reconcile.Result{}, fmt.Errorf("cannot reconcile database configurations: %w", err)
 	}
 
 	if err := r.reconcileDatabases(ctx, cluster); err != nil {
@@ -1420,4 +1424,49 @@ func (r *InstanceReconciler) shouldRequeueForMissingTopology(cluster *apiv1.Clus
 	}
 
 	return false
+}
+
+// dropStaleReplicationConnections is responsible for terminating all existing
+// replication connections following a role change in a replica cluster.
+//
+// For context, demoting a PostgreSQL instance involves shutting it down,
+// adjusting the necessary signal files and configuration, and then
+// restarting it, which inherently disconnects all existing connections.
+//
+// In a replica cluster, demotion is unnecessary since it comprises replicas
+// only. In this scenario, only the primary_conninfo parameter needs to be
+// modified, which doesn't require a shutdown.
+// However, this also implies that replicas receiving data from the old
+// primary won't have their connections terminated.
+//
+// Consequently, high-availability replicas connected to the previous primary
+// will remain connected, necessitating manual intervention to terminate
+// those connections and re-establish them with the new endpoint.
+//
+// The dropStaleReplicationConnections function addresses this requirement.
+func (r *InstanceReconciler) dropStaleReplicationConnections(ctx context.Context, cluster *apiv1.Cluster) error {
+	if !cluster.IsReplica() {
+		return nil
+	}
+
+	if cluster.Status.CurrentPrimary == r.instance.PodName {
+		return nil
+	}
+
+	conn, err := r.instance.GetSuperUserDB()
+	if err != nil {
+		return err
+	}
+
+	if _, err := conn.ExecContext(
+		ctx,
+		`SELECT pg_terminate_backend(pid)
+		FROM pg_stat_replication
+		WHERE application_name ILIKE $1`,
+		fmt.Sprintf("%v-%%", cluster.Name),
+	); err != nil {
+		return fmt.Errorf("while dropping connections: %w", err)
+	}
+
+	return nil
 }
