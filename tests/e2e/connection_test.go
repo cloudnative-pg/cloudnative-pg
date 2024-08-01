@@ -72,11 +72,7 @@ var _ = Describe("Connection via services", Label(tests.LabelServiceConnectivity
 		const sampleFile = fixturesDir + "/secrets/cluster-auto-generated.yaml.template"
 		const clusterName = "postgresql-auto-generated"
 		var namespace string
-		JustAfterEach(func() {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-		})
+
 		// If we don't specify secrets, the operator should autogenerate them.
 		// We check that we're able to use them
 		It("can connect with auto-generated passwords", func() {
@@ -126,11 +122,7 @@ var _ = Describe("Connection via services", Label(tests.LabelServiceConnectivity
 		const sampleFile = fixturesDir + "/secrets/cluster-user-supplied.yaml.template"
 		const clusterName = "postgresql-user-supplied"
 		var namespace string
-		JustAfterEach(func() {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-		})
+
 		// If we have specified secrets, we test that we're able to use them
 		// to connect
 		It("can connect with user-supplied passwords", func() {

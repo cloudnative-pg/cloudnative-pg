@@ -46,12 +46,6 @@ var _ = Describe("PGBouncer Metrics", Label(tests.LabelObservability), func() {
 		}
 	})
 
-	JustAfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-		}
-	})
-
 	It("should retrieve the metrics exposed by a freshly created pooler of type pgBouncer and validate its content",
 		func() {
 			var err error

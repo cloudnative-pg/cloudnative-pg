@@ -84,12 +84,6 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 
 		var namespace string
 
-		JustAfterEach(func() {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-		})
-
 		It("can find the tables created by the post-init SQL queries", func() {
 			// Create a cluster in a namespace we'll delete after the test
 			const namespacePrefix = "initdb-postqueries"
@@ -162,11 +156,6 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 		)
 
 		var namespace string
-		JustAfterEach(func() {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-		})
 
 		It("use the custom default locale specified", func() {
 			// Create a cluster in a namespace we'll delete after the test
@@ -175,16 +164,12 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
-<<<<<<< HEAD
 				return env.CleanupNamespace(
 					namespace,
 					CurrentSpecReport().LeafNodeText,
 					CurrentSpecReport().Failed(),
 					GinkgoWriter,
 				)
-=======
-				return env.DeleteNamespace(namespace)
->>>>>>> 0e3fe0b8 (refactor: stern approach)
 			})
 			AssertCreateCluster(namespace, clusterName, postInitSQLCluster, env)
 

@@ -50,12 +50,6 @@ var _ = Describe("PGBouncer Types", Ordered, Label(tests.LabelServiceConnectivit
 		}
 	})
 
-	JustAfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-		}
-	})
-
 	BeforeAll(func() {
 		// Create a cluster in a namespace we'll delete after the test
 		// This cluster will be shared by the next tests

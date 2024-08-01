@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/logs"
 )
@@ -198,6 +199,18 @@ func (env TestingEnvironment) CleanupNamespace(
 		env.DumpNamespaceOperatorLogs(namespace, testName, output)
 		env.DumpNamespaceObjects(namespace, "out/"+testName+".log")
 	}
+
+	if len(namespace) == 0 {
+		return fmt.Errorf("namespace is empty")
+	}
+	exists, _ := fileutils.FileExists("cluster_logs/" + namespace)
+	if exists && !testFailed {
+		err := fileutils.RemoveDirectory("cluster_logs/" + namespace)
+		if err != nil {
+			return err
+		}
+	}
+
 	return env.DeleteNamespace(namespace)
 }
 

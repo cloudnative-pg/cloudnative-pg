@@ -43,11 +43,6 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 	})
-	JustAfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-		}
-	})
 
 	failoverTest := func(namespace, clusterName string, hasDelay bool) {
 		var pods []string
@@ -246,16 +241,12 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
-<<<<<<< HEAD
 			return env.CleanupNamespace(
 				namespace,
 				CurrentSpecReport().LeafNodeText,
 				CurrentSpecReport().Failed(),
 				GinkgoWriter,
 			)
-=======
-			return env.DeleteNamespace(namespace)
->>>>>>> 0e3fe0b8 (refactor: stern approach)
 		})
 
 		clusterName, err := env.GetResourceNameFromYAML(sampleFile)

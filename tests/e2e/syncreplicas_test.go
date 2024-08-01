@@ -33,16 +33,9 @@ import (
 
 var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 	const level = tests.Medium
-	var namespace string
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
-		}
-	})
-
-	JustAfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
 	})
 
@@ -86,6 +79,8 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 	}
 
 	Context("Legacy synchronous replication", func() {
+		var namespace string
+
 		It("can manage sync replicas", func() {
 			const (
 				namespacePrefix = "legacy-sync-replicas-e2e"
@@ -95,7 +90,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			// Create a cluster in a namespace we'll delete after the test
-			namespace, err := env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
 				return env.CleanupNamespace(
@@ -191,6 +186,8 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 	})
 
 	Context("Synchronous replication", func() {
+		var namespace string
+
 		It("can manage quorum/priority based synchronous replication", func() {
 			const (
 				namespacePrefix = "sync-replicas-e2e"

@@ -43,11 +43,7 @@ var _ = Describe("Verify storage", Label(tests.LabelStorage), func() {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 	})
-	JustAfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-		}
-	})
+
 	// Gathering default storage class requires to check whether the value
 	// of 'allowVolumeExpansion' is true or false
 	defaultStorageClass := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")

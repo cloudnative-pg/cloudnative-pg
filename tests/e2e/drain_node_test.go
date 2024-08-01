@@ -82,12 +82,6 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 		const sampleFile = fixturesDir + "/drain-node/cluster-drain-node.yaml.template"
 		const clusterName = "cluster-drain-node"
 
-		JustAfterEach(func() {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-		})
-
 		// We cordon one node, so pods will run on one or two nodes. This
 		// is only to create a harder situation for the operator.
 		// We then drain the node containing the primary and expect the pod(s)
@@ -342,11 +336,6 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 			// be recreated with the same name and will reuse the existing volume.
 			if MustGetEnvProfile().CanMovePVCAcrossNodes() {
 				Skip("This test case is only applicable on clusters with local storage")
-			}
-		})
-		JustAfterEach(func() {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 			}
 		})
 

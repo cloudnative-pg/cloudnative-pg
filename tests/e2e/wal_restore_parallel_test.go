@@ -50,11 +50,7 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 			Skip("This test is only run on local cluster")
 		}
 	})
-	JustAfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-		}
-	})
+
 	It("Wal-restore in parallel using minio as object storage for backup", func() {
 		// This is a set of tests using a minio server deployed in the same
 		// namespace as the cluster. Since each cluster is installed in its

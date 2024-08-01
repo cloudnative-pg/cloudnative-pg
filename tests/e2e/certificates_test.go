@@ -59,11 +59,6 @@ var _ = Describe("Certificates", func() {
 	})
 
 	var namespace, clusterName string
-	JustAfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-		}
-	})
 
 	Context("Operator managed mode", Ordered, func() {
 		const (

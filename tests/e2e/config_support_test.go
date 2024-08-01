@@ -54,11 +54,6 @@ var _ = Describe("Config support", Serial, Ordered, Label(tests.LabelDisruptive,
 
 		operatorNamespace = operatorDeployment.GetNamespace()
 	})
-	JustAfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-		}
-	})
 
 	AfterAll(func() {
 		if CurrentSpecReport().State.Is(types.SpecStateSkipped) {

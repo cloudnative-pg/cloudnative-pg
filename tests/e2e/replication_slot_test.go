@@ -44,11 +44,6 @@ var _ = Describe("Replication Slot", Label(tests.LabelReplication), func() {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 	})
-	JustAfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-		}
-	})
 
 	It("Can enable and disable replication slots", func() {
 		var err error

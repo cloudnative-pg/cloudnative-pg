@@ -46,11 +46,6 @@ var _ = Describe("Operator High Availability", Serial,
 				Skip("Skip the scale test case if leader election is disabled")
 			}
 		})
-		JustAfterEach(func() {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-		})
 
 		It("can work as HA mode", func() {
 			// Make sure there's at least one pod of the operator

@@ -199,12 +199,6 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), Ordered, func(
 		AssertClusterStandbysAreStreaming(namespace, clusterName, 120)
 	}
 
-	JustAfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-		}
-	})
-
 	Context("plain cluster", func() {
 		It("can recover cluster after pgdata corruption on primary", func() {
 			const sampleFile = fixturesDir + "/pg_data_corruption/cluster-pg-data-corruption.yaml.template"

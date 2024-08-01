@@ -60,11 +60,6 @@ var _ = Describe("Verify Volume Snapshot",
 		}
 
 		var namespace string
-		JustAfterEach(func() {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-		})
 
 		Context("using the kubectl cnpg plugin", Ordered, func() {
 			const (

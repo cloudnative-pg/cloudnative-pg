@@ -41,11 +41,6 @@ var _ = Describe("Cluster scale up and down", Serial, Label(tests.LabelReplicati
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 	})
-	JustAfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-		}
-	})
 
 	Context("with HA Replication Slots", func() {
 		It("can scale the cluster size", func() {

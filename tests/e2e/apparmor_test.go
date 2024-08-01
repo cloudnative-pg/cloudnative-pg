@@ -47,12 +47,6 @@ var _ = Describe("AppArmor support", Serial, Label(tests.LabelNoOpenshift, tests
 		}
 	})
 
-	JustAfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-		}
-	})
-
 	It("sets up a cluster enabling AppArmor annotation feature", func() {
 		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())

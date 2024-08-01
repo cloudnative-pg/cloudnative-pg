@@ -149,12 +149,6 @@ var _ = Describe("Configuration update", Ordered, Label(tests.LabelClusterMetada
 		})
 	})
 
-	JustAfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-		}
-	})
-
 	It("01. reloading Pg when a parameter requiring reload is modified", func() {
 		// max_connection increase to 110
 		podList, err := env.GetClusterPodList(namespace, clusterName)
@@ -466,12 +460,6 @@ var _ = Describe("Configuration update with primaryUpdateMethod", Label(tests.La
 		clusterFileWithPrimaryUpdateRestart := fixturesDir +
 			"/config_update/primary_update_method/primary-update-restart.yaml.template"
 		var namespace, clusterName string
-
-		JustAfterEach(func() {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-		})
 
 		BeforeAll(func() {
 			const namespacePrefix = "config-change-primary-update-restart"

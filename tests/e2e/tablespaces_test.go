@@ -55,7 +55,6 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 	)
 	var (
 		clusterName string
-		namespace   string
 		cluster     *apiv1.Cluster
 	)
 
@@ -67,13 +66,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 		}
 	})
 
-	JustAfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-		}
-	})
-
-	clusterSetup := func(clusterManifest string) {
+	clusterSetup := func(namespace, clusterManifest string) {
 		var err error
 
 		clusterName, err = env.GetResourceNameFromYAML(clusterManifest)
@@ -112,7 +105,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 	}
 
 	Context("on a new cluster with tablespaces", Ordered, func() {
-		var backupName string
+		var namespace, backupName string
 		var err error
 		const (
 			clusterManifest = fixturesDir +
@@ -133,6 +126,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 					GinkgoWriter,
 				)
 			})
+
 			// We create the MinIO credentials required to login into the system
 			AssertStorageCredentialsAreCreated(namespace, "backup-storage-creds", "minio", "minio123")
 
@@ -141,7 +135,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 				Expect(err).ToNot(HaveOccurred())
 			})
 
-			clusterSetup(clusterManifest)
+			clusterSetup(namespace, clusterManifest)
 		})
 
 		It("can verify tablespaces and PVC were created", func() {
@@ -364,7 +358,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 	})
 
 	Context("on a new cluster with tablespaces and volumesnapshot support", Ordered, func() {
-		var backupName string
+		var namespace, backupName string
 		var err error
 		var backupObject *apiv1.Backup
 		const (
@@ -399,6 +393,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 					GinkgoWriter,
 				)
 			})
+
 			// We create the required credentials for MinIO
 			AssertStorageCredentialsAreCreated(namespace, "backup-storage-creds", "minio", "minio123")
 
@@ -407,7 +402,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 				Expect(err).ToNot(HaveOccurred())
 			})
 
-			clusterSetup(clusterManifest)
+			clusterSetup(namespace, clusterManifest)
 		})
 
 		It("can verify tablespaces and PVC were created", func() {
@@ -621,6 +616,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 	})
 
 	Context("on a plain cluster with primaryUpdateMethod=restart", Ordered, func() {
+		var namespace string
 		clusterManifest := fixturesDir + "/tablespaces/cluster-without-tablespaces.yaml.template"
 		BeforeAll(func() {
 			var err error
@@ -635,7 +631,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 					GinkgoWriter,
 				)
 			})
-			clusterSetup(clusterManifest)
+			clusterSetup(namespace, clusterManifest)
 		})
 
 		It("can update cluster by adding tablespaces", func() {
@@ -758,6 +754,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 	})
 
 	Context("on a plain cluster with primaryUpdateMethod=switchover", Ordered, func() {
+		var namespace string
 		clusterManifest := fixturesDir + "/tablespaces/cluster-without-tablespaces.yaml.template"
 		BeforeAll(func() {
 			var err error
@@ -772,8 +769,9 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 					GinkgoWriter,
 				)
 			})
-			clusterSetup(clusterManifest)
+			clusterSetup(namespace, clusterManifest)
 		})
+
 		It("can update cluster adding tablespaces", func() {
 			By("patch cluster with primaryUpdateMethod=switchover", func() {
 				cluster, err := env.GetCluster(namespace, clusterName)

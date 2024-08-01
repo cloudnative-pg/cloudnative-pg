@@ -53,18 +53,14 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 		summaryInStatus         expectedKeysInStatus  = "summary"
 		tableName                                     = "test"
 	)
-	var namespace string
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 	})
-	JustAfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-		}
-	})
+
 	Context("hibernate", func() {
+		var namespace string
 		var err error
 		getPrimaryAndClusterManifest := func(namespace, clusterName string) ([]byte, string) {
 			var beforeHibernationClusterInfo *apiv1.Cluster
@@ -223,7 +219,6 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 			}
 			testsUtils.ObjectMatchesAnnotations(&pvcInfo, expectedAnnotation)
 		}
-
 		assertHibernation := func(namespace, clusterName, tableName string) {
 			var beforeHibernationPgWalPvcUID types.UID
 			var beforeHibernationPgDataPvcUID types.UID
@@ -327,16 +322,12 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 				namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
 				DeferCleanup(func() error {
-<<<<<<< HEAD
 					return env.CleanupNamespace(
 						namespace,
 						CurrentSpecReport().LeafNodeText,
 						CurrentSpecReport().Failed(),
 						GinkgoWriter,
 					)
-=======
-					return env.DeleteNamespace(namespace)
->>>>>>> 0e3fe0b8 (refactor: stern approach)
 				})
 				AssertCreateCluster(namespace, clusterName, sampleFileClusterWithOutPGWalVolume, env)
 				// Write a table and some data on the "app" database
@@ -399,16 +390,12 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 				namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
 				DeferCleanup(func() error {
-<<<<<<< HEAD
 					return env.CleanupNamespace(
 						namespace,
 						CurrentSpecReport().LeafNodeText,
 						CurrentSpecReport().Failed(),
 						GinkgoWriter,
 					)
-=======
-					return env.DeleteNamespace(namespace)
->>>>>>> 0e3fe0b8 (refactor: stern approach)
 				})
 				AssertCreateCluster(namespace, clusterName, sampleFileClusterWithPGWalVolume, env)
 				AssertSwitchover(namespace, clusterName, env)

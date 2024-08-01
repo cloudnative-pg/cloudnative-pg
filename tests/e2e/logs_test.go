@@ -44,12 +44,6 @@ var _ = Describe("JSON log output", Label(tests.LabelObservability), func() {
 		}
 	})
 
-	JustAfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-		}
-	})
-
 	It("correctly produces logs in JSON format", func() {
 		const namespacePrefix = "json-logs-e2e"
 		clusterName = "postgresql-json-logs"

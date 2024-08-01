@@ -59,13 +59,6 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 		}
 	})
 
-	JustAfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace,
-				"out/"+CurrentSpecReport().LeafNodeText+".log")
-		}
-	})
-
 	It("can import data from a cluster with a different major version", func() {
 		var err error
 		sourceDatabases := []string{databaseOne, databaseTwo}

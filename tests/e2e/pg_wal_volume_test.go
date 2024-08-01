@@ -110,11 +110,6 @@ var _ = Describe("Separate pg_wal volume", Label(tests.LabelStorage), func() {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 	})
-	JustAfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-		}
-	})
 
 	// This test checks for separate and dedicated pg_wal volume well behaving, by
 	// ensuring WAL files are archived to the correct location and a symlink

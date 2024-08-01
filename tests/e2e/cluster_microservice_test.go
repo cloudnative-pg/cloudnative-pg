@@ -59,13 +59,6 @@ var _ = Describe("Imports with Microservice Approach", Label(tests.LabelImportin
 		}
 	})
 
-	JustAfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace,
-				"out/"+CurrentSpecReport().LeafNodeText+".log")
-		}
-	})
-
 	It("can import a database with large objects", func() {
 		var err error
 		const namespacePrefix = "microservice-large-object"

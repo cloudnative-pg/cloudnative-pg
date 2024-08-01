@@ -41,7 +41,6 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 		barmanCloudBackupLogEntry = "Starting barman-cloud-backup"
 	)
 
-	var namespace, clusterName string
 	currentTimestamp := new(string)
 
 	BeforeEach(func() {
@@ -50,16 +49,11 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 		}
 	})
 
-	JustAfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-		}
-	})
 	Context("using minio as object storage for backup", Ordered, func() {
 		// This is a set of tests using a minio server deployed in the same
 		// namespace as the cluster. Since each cluster is installed in its
 		// own namespace, they can share the configuration file
-
+		var namespace, clusterName string
 		const (
 			backupFile              = fixturesDir + "/backup/minio/backup-minio.yaml"
 			customQueriesSampleFile = fixturesDir + "/metrics/custom-queries-with-target-databases.yaml"
@@ -518,6 +512,8 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 		const scheduledBackupSampleFile = fixturesDir +
 			"/backup/scheduled_backup_immediate/scheduled-backup-immediate-azure-blob.yaml"
 		backupFile := fixturesDir + "/backup/azure_blob/backup-azure-blob.yaml"
+		var namespace, clusterName string
+
 		BeforeAll(func() {
 			if !IsAKS() {
 				Skip("This test is only run on AKS clusters")
@@ -662,6 +658,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 			azuriteCaSecName  = "azurite-ca-secret"
 			azuriteTLSSecName = "azurite-tls-secret"
 		)
+		var namespace, clusterName string
 
 		BeforeAll(func() {
 			if !(IsLocal() || IsGKE() || IsOpenshift()) {
@@ -787,7 +784,6 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 		azuriteTLSSecName               = "azurite-tls-secret"
 	)
 
-	var namespace, clusterName string
 	currentTimestamp := new(string)
 
 	BeforeEach(func() {
@@ -796,15 +792,11 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 		}
 	})
 
-	JustAfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-		}
-	})
-
 	// Restore cluster using a recovery object store, that is a backup of another cluster,
 	// created by Barman Cloud, and defined via the barmanObjectStore option in the externalClusters section
 	Context("using minio as object storage", Ordered, func() {
+		var namespace, clusterName string
+
 		BeforeAll(func() {
 			if !IsLocal() {
 				Skip("This test is only executed on local")
@@ -968,6 +960,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 
 	Context("using azure blobs as object storage", func() {
 		Context("storage account access authentication", Ordered, func() {
+			var namespace, clusterName string
 			BeforeAll(func() {
 				if !IsAKS() {
 					Skip("This test is only executed on AKS clusters")
@@ -1057,6 +1050,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 		})
 
 		Context("storage account SAS Token authentication", Ordered, func() {
+			var namespace, clusterName string
 			BeforeAll(func() {
 				if !IsAKS() {
 					Skip("This test is only executed on AKS clusters")
@@ -1149,6 +1143,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 	})
 
 	Context("using Azurite blobs as object storage", Ordered, func() {
+		var namespace, clusterName string
 		BeforeAll(func() {
 			if IsAKS() {
 				Skip("This test is not run on AKS")

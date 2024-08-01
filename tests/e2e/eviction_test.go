@@ -110,11 +110,7 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 				Skip("Test depth is lower than the amount requested for this test")
 			}
 		})
-		JustAfterEach(func() {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-		})
+
 		BeforeAll(func() {
 			// limit the case running on local kind env as we are using taint to simulate the eviction
 			// we do not know if other cloud vendor crd controller is running on the node been evicted
@@ -184,11 +180,7 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 				Skip("This test is only run on local cluster")
 			}
 		})
-		JustAfterEach(func() {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-		})
+
 		BeforeAll(func() {
 			const namespacePrefix = "multi-instance-pod-eviction"
 			var err error

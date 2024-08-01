@@ -43,12 +43,6 @@ var _ = Describe("Cluster declarative hibernation", func() {
 		}
 	})
 
-	JustAfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-		}
-	})
-
 	It("hibernates an existing cluster", func(ctx SpecContext) {
 		const namespacePrefix = "declarative-hibernation"
 

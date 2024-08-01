@@ -187,12 +187,6 @@ var _ = Describe("Volume space unavailable", Label(tests.LabelStorage), func() {
 		}
 	})
 
-	JustAfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-		}
-	})
-
 	DescribeTable("WAL volume space unavailable",
 		func(sampleFile string) {
 			var err error

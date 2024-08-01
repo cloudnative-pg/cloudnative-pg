@@ -47,11 +47,6 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 	})
-	JustAfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-		}
-	})
 
 	Context("Scale down operator replicas to zero and delete primary", func() {
 		const namespacePrefix = "op-unavailable-e2e-zero-replicas"

@@ -17,10 +17,10 @@ limitations under the License.
 package e2e
 
 import (
+	"github.com/cloudnative-pg/cloudnative-pg/tests"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	"github.com/cloudnative-pg/cloudnative-pg/tests"
 )
 
 var _ = Describe("Switchover", Serial, Label(tests.LabelSelfHealing), func() {
@@ -36,11 +36,6 @@ var _ = Describe("Switchover", Serial, Label(tests.LabelSelfHealing), func() {
 		}
 	})
 
-	JustAfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-		}
-	})
 	Context("with HA Replication slots", func() {
 		It("reacts to switchover requests", func() {
 			// Create a cluster in a namespace we'll delete after the test

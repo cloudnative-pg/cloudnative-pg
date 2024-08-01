@@ -46,19 +46,13 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive, tests.LabelOper
 		validatingWebhook = "vcluster.cnpg.io"
 	)
 
-	var namespace, clusterName string
+	var webhookNamespace, clusterName string
 	var clusterIsDefaulted bool
 	var err error
 
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
-		}
-	})
-
-	JustAfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
 	})
 
@@ -81,7 +75,7 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive, tests.LabelOper
 		})
 
 		// Create a basic PG cluster
-		namespace, err = env.CreateUniqueNamespace(webhookNamespacePrefix)
+		webhookNamespace, err := env.CreateUniqueNamespace(webhookNamespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
 			return env.CleanupNamespace(
@@ -91,9 +85,9 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive, tests.LabelOper
 				GinkgoWriter,
 			)
 		})
-		AssertCreateCluster(namespace, clusterName, sampleFile, env)
+		AssertCreateCluster(webhookNamespace, clusterName, sampleFile, env)
 		// Check if cluster is ready and the default values are populated
-		AssertClusterDefault(namespace, clusterName, clusterIsDefaulted, env)
+		AssertClusterDefault(webhookNamespace, clusterName, clusterIsDefaulted, env)
 	})
 
 	It("Does not crash the operator when disabled", func() {
@@ -127,7 +121,7 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive, tests.LabelOper
 		})
 
 		// Create a basic PG cluster
-		namespace, err = env.CreateUniqueNamespace(webhookNamespacePrefix)
+		webhookNamespace, err = env.CreateUniqueNamespace(webhookNamespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
 			return env.CleanupNamespace(
@@ -137,9 +131,9 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive, tests.LabelOper
 				GinkgoWriter,
 			)
 		})
-		AssertCreateCluster(namespace, clusterName, sampleFile, env)
+		AssertCreateCluster(webhookNamespace, clusterName, sampleFile, env)
 		// Check if cluster is ready and has no default value in the object
-		AssertClusterDefault(namespace, clusterName, clusterIsDefaulted, env)
+		AssertClusterDefault(webhookNamespace, clusterName, clusterIsDefaulted, env)
 
 		// Make sure the operator is intact and not crashing
 		By("having a deployment for the operator in state ready", func() {

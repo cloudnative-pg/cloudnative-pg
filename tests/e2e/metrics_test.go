@@ -90,12 +90,6 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 	// Cluster identifiers
 	var namespace string
 
-	JustAfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-		}
-	})
-
 	AssertGatherMetrics := func(namespacePrefix, clusterFile string) {
 		// Create the cluster namespace
 		namespace, err := env.CreateUniqueNamespace(namespacePrefix)

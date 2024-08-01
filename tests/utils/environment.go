@@ -56,7 +56,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/logs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/stern_multitailer"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/sternmultitailer"
 
 	// Import the client auth plugin package to allow use gke or ake to run tests
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -86,7 +86,7 @@ type TestingEnvironment struct {
 	PostgresVersion    int
 	createdNamespaces  *uniqueStringSlice
 	AzureConfiguration AzureConfiguration
-	SternMultiTailer   stern_multitailer.SternMultiTailer
+	SternMultiTailer   sternmultitailer.SternMultiTailer
 }
 
 type uniqueStringSlice struct {
