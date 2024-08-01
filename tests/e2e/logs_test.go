@@ -59,7 +59,12 @@ var _ = Describe("JSON log output", Label(tests.LabelObservability), func() {
 		namespace, namespaceErr = env.CreateUniqueNamespace(namespacePrefix)
 		Expect(namespaceErr).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
-			return env.DeleteNamespace(namespace)
+			return env.CleanupNamespace(
+				namespace,
+				CurrentSpecReport().LeafNodeText,
+				CurrentSpecReport().Failed(),
+				GinkgoWriter,
+			)
 		})
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 

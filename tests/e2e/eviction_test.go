@@ -126,7 +126,12 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
-				return env.DeleteNamespace(namespace)
+				return env.CleanupNamespace(
+					namespace,
+					CurrentSpecReport().LeafNodeText,
+					CurrentSpecReport().Failed(),
+					GinkgoWriter,
+				)
 			})
 			By("creating a cluster", func() {
 				// Create a cluster in a namespace we'll delete after the test
@@ -190,7 +195,12 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
-				return env.DeleteNamespace(namespace)
+				return env.CleanupNamespace(
+					namespace,
+					CurrentSpecReport().LeafNodeText,
+					CurrentSpecReport().Failed(),
+					GinkgoWriter,
+				)
 			})
 			By("Creating a cluster with multiple instances", func() {
 				// Create a cluster in a namespace and shared in containers, we'll delete after the test

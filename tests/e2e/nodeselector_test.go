@@ -55,7 +55,12 @@ var _ = Describe("nodeSelector", Label(tests.LabelPodScheduling), func() {
 				namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
 				DeferCleanup(func() error {
-					return env.DeleteNamespace(namespace)
+					return env.CleanupNamespace(
+						namespace,
+						CurrentSpecReport().LeafNodeText,
+						CurrentSpecReport().Failed(),
+						GinkgoWriter,
+					)
 				})
 
 				// Creating a namespace should be quick
@@ -122,7 +127,12 @@ var _ = Describe("nodeSelector", Label(tests.LabelPodScheduling), func() {
 			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
-				return env.DeleteNamespace(namespace)
+				return env.CleanupNamespace(
+					namespace,
+					CurrentSpecReport().LeafNodeText,
+					CurrentSpecReport().Failed(),
+					GinkgoWriter,
+				)
 			})
 
 			// We label one node with the label we have defined in the cluster

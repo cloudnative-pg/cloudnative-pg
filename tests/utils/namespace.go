@@ -19,6 +19,7 @@ package utils
 import (
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -26,6 +27,43 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+// CleanupNamespace is cool
+func (env TestingEnvironment) CleanupNamespace(
+	namespace string,
+	testName string,
+	testFailed bool,
+	output io.Writer,
+) error {
+	lines, err := env.DumpOperatorLogs(false, 10)
+	if err != nil {
+		_, _ = fmt.Fprintf(output, "cleanupNamespace: error dumping opertor logs: %v\n", err)
+	}
+	_, _ = fmt.Fprintln(output, strings.Join(lines, "\n"))
+	if testFailed {
+		env.DumpNamespaceObjects(namespace, "out/"+testName+".log")
+	}
+	return env.DeleteNamespace(namespace)
+}
+
+// CleanupNamespaceAndWait is cool
+func (env TestingEnvironment) CleanupNamespaceAndWait(
+	namespace string,
+	testName string,
+	testFailed bool,
+	timeoutSeconds int,
+	output io.Writer,
+) error {
+	lines, err := env.DumpOperatorLogs(false, 10)
+	if err != nil {
+		_, _ = fmt.Fprintf(output, "cleanupNamespace: error dumping opertor logs: %v\n", err)
+	}
+	_, _ = fmt.Fprintln(output, strings.Join(lines, "\n"))
+	if testFailed {
+		env.DumpNamespaceObjects(namespace, "out/"+testName+".log")
+	}
+	return env.DeleteNamespaceAndWait(namespace, timeoutSeconds)
+}
 
 // CreateUniqueNamespace creates a namespace by using the passed prefix.
 // Return the namespace name and any errors encountered.

@@ -1093,6 +1093,8 @@ func AssertDetachReplicaModeCluster(
 		Eventually(func(g Gomega) {
 			cluster, err := env.GetCluster(namespace, replicaClusterName)
 			g.Expect(err).ToNot(HaveOccurred())
+			g.Expect(cluster.Spec.ReplicaCluster.Enabled).NotTo(BeNil(), "replica.enabled was nil")
+			g.Expect(*cluster.Spec.ReplicaCluster.Enabled).To(BeFalse(), "replica.enabled still true")
 			condition, err := testsUtils.GetConditionsInClusterStatus(namespace, cluster.Name, env,
 				apiv1.ConditionClusterReady)
 			g.Expect(err).ToNot(HaveOccurred())

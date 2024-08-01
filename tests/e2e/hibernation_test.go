@@ -301,10 +301,12 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 				namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
 				DeferCleanup(func() error {
-					if CurrentSpecReport().Failed() {
-						env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-					}
-					return env.DeleteNamespace(namespace)
+					return env.CleanupNamespace(
+						namespace,
+						CurrentSpecReport().LeafNodeText,
+						CurrentSpecReport().Failed(),
+						GinkgoWriter,
+					)
 				})
 				AssertCreateCluster(namespace, clusterName, sampleFileClusterWithPGWalVolume, env)
 				assertHibernation(namespace, clusterName, tableName)
@@ -321,10 +323,12 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 				namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
 				DeferCleanup(func() error {
-					if CurrentSpecReport().Failed() {
-						env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-					}
-					return env.DeleteNamespace(namespace)
+					return env.CleanupNamespace(
+						namespace,
+						CurrentSpecReport().LeafNodeText,
+						CurrentSpecReport().Failed(),
+						GinkgoWriter,
+					)
 				})
 				AssertCreateCluster(namespace, clusterName, sampleFileClusterWithOutPGWalVolume, env)
 				// Write a table and some data on the "app" database
@@ -387,10 +391,12 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 				namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
 				DeferCleanup(func() error {
-					if CurrentSpecReport().Failed() {
-						env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-					}
-					return env.DeleteNamespace(namespace)
+					return env.CleanupNamespace(
+						namespace,
+						CurrentSpecReport().LeafNodeText,
+						CurrentSpecReport().Failed(),
+						GinkgoWriter,
+					)
 				})
 				AssertCreateCluster(namespace, clusterName, sampleFileClusterWithPGWalVolume, env)
 				AssertSwitchover(namespace, clusterName, env)
