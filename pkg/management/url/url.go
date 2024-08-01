@@ -61,6 +61,9 @@ const (
 	// PathCache is the URL path for cached resources
 	PathCache string = "/cache/"
 
+	// PathPgDatabase is the URL path to manage a PG database
+	PathPgDatabase string = "/pg/database/{dbname}"
+
 	// StatusPort is the port for status HTTP requests
 	StatusPort int32 = 8000
 )

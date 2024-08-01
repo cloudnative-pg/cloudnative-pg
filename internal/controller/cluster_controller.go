@@ -49,6 +49,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/databases"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/hibernation"
 	instanceReconciler "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/instance"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
@@ -454,6 +455,17 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	res, err := r.reconcileResources(ctx, cluster, resources, instancesStatus)
 	if err != nil || !res.IsZero() {
 		return res, err
+	}
+
+	// Reconcile managed databases
+	if result, err := databases.Reconcile(
+		ctx,
+		r.Client,
+		cluster,
+		resources.instances.Items,
+		r.InstanceClient,
+	); result != nil || err != nil {
+		return *result, err
 	}
 
 	// Calls post-reconcile hooks

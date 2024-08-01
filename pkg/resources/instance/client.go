@@ -78,7 +78,21 @@ type Client interface {
 		availableArchitecture *utils.AvailableArchitecture,
 	) error
 
+	// ArchivePartialWAL trigger the archiver for the latest partial WAL
+	// file created in a specific Pod
 	ArchivePartialWAL(context.Context, *corev1.Pod) (string, error)
+
+	// DeleteDatabase deletes the database with a specific name
+	DeleteDatabase(ctx context.Context, pod *corev1.Pod, dbname string) error
+
+	// GetDatabase gets the status of a database from the instance manager
+	GetDatabase(ctx context.Context, pod *corev1.Pod, dbname string) (PgDatabase, error)
+
+	// PutDatabase creates a new database via the instance manager
+	PutDatabase(ctx context.Context, pod *corev1.Pod, dbname string, data PgDatabase) error
+
+	// PatchDatabase changes an existing database via the instance manager
+	PatchDatabase(ctx context.Context, pod *corev1.Pod, dbname string, data PgDatabase) error
 }
 
 type statusClient struct {

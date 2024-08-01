@@ -94,6 +94,7 @@ func NewRemoteWebServer(
 	serveMux.HandleFunc(url.PathPgArchivePartial, endpoints.pgArchivePartial)
 	serveMux.HandleFunc(url.PathPGControlData, endpoints.pgControlData)
 	serveMux.HandleFunc(url.PathUpdate, endpoints.updateInstanceManager(cancelFunc, exitedConditions))
+	serveMux.HandleFunc(url.PathPgDatabase, endpoints.pgDatabase)
 
 	server := &http.Server{
 		Addr:              fmt.Sprintf(":%d", url.StatusPort),

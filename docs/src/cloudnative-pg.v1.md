@@ -2033,6 +2033,13 @@ any plugin to be loaded with the corresponding configuration</p>
    <p>TablespacesStatus reports the state of the declarative tablespaces in the cluster</p>
 </td>
 </tr>
+<tr><td><code>databaseStatus</code><br/>
+<a href="#postgresql-cnpg-io-v1-ManagedDatabaseStatus"><i>ManagedDatabaseStatus</i></a>
+</td>
+<td>
+   <p>ManagedDatabaseStatus reports the status of the managed databases</p>
+</td>
+</tr>
 <tr><td><code>timelineID</code><br/>
 <i>int</i>
 </td>
@@ -2520,6 +2527,80 @@ PostgreSQL cluster from an existing storage</p>
 </tbody>
 </table>
 
+## DatabaseConfiguration     {#postgresql-cnpg-io-v1-DatabaseConfiguration}
+
+
+**Appears in:**
+
+- [ManagedConfiguration](#postgresql-cnpg-io-v1-ManagedConfiguration)
+
+
+<p>DatabaseConfiguration is the representation in Kubernetes of a PostgreSQL Database</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>name</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The name</p>
+</td>
+</tr>
+<tr><td><code>owner</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The owner</p>
+</td>
+</tr>
+<tr><td><code>encoding</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The encoding (cannot be changed)</p>
+</td>
+</tr>
+<tr><td><code>isTemplate</code><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>True when the database is a template</p>
+</td>
+</tr>
+<tr><td><code>allowConnections</code><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>True when connections to this database are allowed</p>
+</td>
+</tr>
+<tr><td><code>connectionLimit</code><br/>
+<i>int</i>
+</td>
+<td>
+   <p>Connection limit, -1 means no limit and -2 means the
+database is not valid</p>
+</td>
+</tr>
+<tr><td><code>tablespace</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The default tablespace of this database</p>
+</td>
+</tr>
+<tr><td><code>ensure</code><br/>
+<a href="#postgresql-cnpg-io-v1-EnsureOption"><i>EnsureOption</i></a>
+</td>
+<td>
+   <p>Ensure the database is <code>present</code> or <code>absent</code> - defaults to &quot;present&quot;</p>
+</td>
+</tr>
+</tbody>
+</table>
+
 ## DatabaseRoleRef     {#postgresql-cnpg-io-v1-DatabaseRoleRef}
 
 
@@ -2539,6 +2620,44 @@ PostgreSQL cluster from an existing storage</p>
 </td>
 <td>
    <span class="text-muted">No description provided.</span></td>
+</tr>
+</tbody>
+</table>
+
+## DatabaseStatus     {#postgresql-cnpg-io-v1-DatabaseStatus}
+
+
+**Appears in:**
+
+- [ManagedDatabaseStatus](#postgresql-cnpg-io-v1-ManagedDatabaseStatus)
+
+
+<p>DatabaseStatus is the status of a single managed database</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>name</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Name is the name of the database</p>
+</td>
+</tr>
+<tr><td><code>ready</code> <B>[Required]</B><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>Ready is true if the database was reconciled correctly</p>
+</td>
+</tr>
+<tr><td><code>errorMessage</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>ErrorMessage is the reconciliation error message</p>
+</td>
 </tr>
 </tbody>
 </table>
@@ -2593,6 +2712,8 @@ PostgreSQL cluster from an existing storage</p>
 (Alias of `string`)
 
 **Appears in:**
+
+- [DatabaseConfiguration](#postgresql-cnpg-io-v1-DatabaseConfiguration)
 
 - [RoleConfiguration](#postgresql-cnpg-io-v1-RoleConfiguration)
 
@@ -3180,6 +3301,45 @@ by the instance manager</p>
 </td>
 <td>
    <p>Services roles managed by the <code>Cluster</code></p>
+</td>
+</tr>
+<tr><td><code>databases</code><br/>
+<a href="#postgresql-cnpg-io-v1-DatabaseConfiguration"><i>[]DatabaseConfiguration</i></a>
+</td>
+<td>
+   <p>Databases managed by the <code>Cluster</code></p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## ManagedDatabaseStatus     {#postgresql-cnpg-io-v1-ManagedDatabaseStatus}
+
+
+**Appears in:**
+
+- [ClusterStatus](#postgresql-cnpg-io-v1-ClusterStatus)
+
+
+<p>ManagedDatabaseStatus represents the status of the managed databases feature</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>observedGeneration</code><br/>
+<i>int64</i>
+</td>
+<td>
+   <p>A sequence number representing the latest
+desired state that was synchronized</p>
+</td>
+</tr>
+<tr><td><code>database</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-DatabaseStatus"><i>[]DatabaseStatus</i></a>
+</td>
+<td>
+   <p>Database is the status of each managed database</p>
 </td>
 </tr>
 </tbody>
