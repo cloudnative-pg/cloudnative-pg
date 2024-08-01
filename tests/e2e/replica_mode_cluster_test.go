@@ -31,6 +31,7 @@ import (
 	k8client "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/replicaclusterswitch"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -60,7 +61,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 	)
 
 	var namespace string
-
+	var err error
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
@@ -70,6 +71,9 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 	JustAfterEach(func() {
 		if CurrentSpecReport().Failed() {
 			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+		} else {
+			err := fileutils.RemoveDirectory("cluster_logs/" + namespace)
+			Expect(err).ToNot(HaveOccurred())
 		}
 	})
 
@@ -155,7 +159,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				return nil
 			}
 
-			namespace, err := env.CreateUniqueNamespace("replica-promotion-demotion")
+			namespace, err = env.CreateUniqueNamespace("replica-promotion-demotion")
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
 				return env.DeleteNamespace(namespace)
@@ -454,6 +458,9 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication), Ordered, f
 	JustAfterEach(func() {
 		if CurrentSpecReport().Failed() {
 			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+		} else {
+			err := fileutils.RemoveDirectory("cluster_logs/" + namespace)
+			Expect(err).ToNot(HaveOccurred())
 		}
 	})
 

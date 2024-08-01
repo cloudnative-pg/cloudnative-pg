@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
@@ -42,10 +43,14 @@ var _ = Describe("Managed services tests", Label(tests.LabelSmoke, tests.LabelBa
 		namespacePrefix = "managed-services"
 	)
 	var namespace string
+	var err error
 
 	JustAfterEach(func() {
 		if CurrentSpecReport().Failed() {
 			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+		} else {
+			err := fileutils.RemoveDirectory("cluster_logs/" + namespace)
+			Expect(err).ToNot(HaveOccurred())
 		}
 	})
 
@@ -58,7 +63,7 @@ var _ = Describe("Managed services tests", Label(tests.LabelSmoke, tests.LabelBa
 	It("should create and delete a rw managed service", func(ctx SpecContext) {
 		const clusterManifest = fixturesDir + "/managed_services/cluster-managed-services-rw.yaml.template"
 		const serviceName = "test-rw"
-		namespace, err := env.CreateUniqueNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 
 		DeferCleanup(func() error {
@@ -105,7 +110,7 @@ var _ = Describe("Managed services tests", Label(tests.LabelSmoke, tests.LabelBa
 	It("should properly handle disabledDefaultServices field", func(ctx SpecContext) {
 		const clusterManifest = fixturesDir + "/managed_services/cluster-managed-services-no-default.yaml.template"
 
-		namespace, err := env.CreateUniqueNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 
 		DeferCleanup(func() error {
@@ -168,7 +173,7 @@ var _ = Describe("Managed services tests", Label(tests.LabelSmoke, tests.LabelBa
 	It("should properly handle replace update strategy", func(ctx SpecContext) {
 		const clusterManifest = fixturesDir + "/managed_services/cluster-managed-services-replace-strategy.yaml.template"
 		const serviceName = "test-rw"
-		namespace, err := env.CreateUniqueNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 
 		DeferCleanup(func() error {

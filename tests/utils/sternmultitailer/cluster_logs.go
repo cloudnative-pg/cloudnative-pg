@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package stern_multitailer
+package sternmultitailer
 
 import (
 	"bufio"
@@ -40,6 +40,7 @@ const (
 	clusterLogsDirectory = "cluster_logs/"
 )
 
+// SternMultiTailer contains the necessary data for the logs of every cluster
 type SternMultiTailer struct {
 	stdOut       *io.PipeReader
 	openFilesMap map[string]*os.File
@@ -57,7 +58,7 @@ func (s *SternMultiTailer) Run(ctx context.Context, client kubernetes.Interface)
 
 	// Create the Stern configuration
 
-	// Select all the pods belonging to cnpg
+	// Select all the pods belonging to CNPG
 	selector, _ := v1.LabelSelectorAsSelector(&v1.LabelSelector{
 		MatchExpressions: []v1.LabelSelectorRequirement{
 			{
@@ -70,7 +71,11 @@ func (s *SternMultiTailer) Run(ctx context.Context, client kubernetes.Interface)
 	// JSON output
 	pod := regexp.MustCompile(".*")
 	container := regexp.MustCompile(".*")
-	t := "{ \"message\": {{json .Message}}, \"namespace\": \"{{.Namespace}}\", \"podName\": \"{{.PodName}}\", \"containerName\": \"{{.ContainerName}}\" }\n"
+	t := "{ \"message\": {{json .Message}}, " +
+		"\"namespace\": \"{{.Namespace}}\", " +
+		"\"podName\": \"{{.PodName}}\", " +
+		"\"containerName\": \"{{.ContainerName}}\" }\n"
+
 	funs := template.FuncMap{
 		"json": func(v interface{}) (string, error) {
 			b, err := json.Marshal(v)
@@ -122,8 +127,7 @@ func (s *SternMultiTailer) Run(ctx context.Context, client kubernetes.Interface)
 		if err != nil {
 			fmt.Printf("stern failed: %v", err)
 		}
-		select {
-		case <-ctx.Done():
+		if <-ctx.Done(); true {
 			_ = outPipeWriter.Close()
 			_ = errOut.Close()
 		}
@@ -183,7 +187,7 @@ func (s *SternMultiTailer) outputWriter() {
 // Get an open file for the log, or open a new one
 func (s *SternMultiTailer) getLogFile(log stern.Log) (*os.File, error) {
 	filePath := path.Join(clusterLogsDirectory, log.Namespace, log.PodName, log.ContainerName+".log")
-	dir := path.Dir(filePath)
+	dirFile := path.Dir(filePath)
 
 	file, ok := s.openFilesMap[filePath]
 	if ok {
@@ -191,11 +195,11 @@ func (s *SternMultiTailer) getLogFile(log stern.Log) (*os.File, error) {
 	}
 
 	// If we don't have the file already opened, we open it
-	err := os.MkdirAll(dir, 0o700)
+	err := os.MkdirAll(dirFile, 0o700)
 	if err != nil {
-		return nil, fmt.Errorf("cannot ensure directory existence (%v): %w", dir, err)
+		return nil, fmt.Errorf("cannot ensure directory existence (%v): %w", dirFile, err)
 	}
-	file, err = os.OpenFile(filePath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
+	file, err = os.OpenFile(filePath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600) // nolint:gosec
 	if err != nil {
 		return nil, fmt.Errorf("cannot open file %v: %w", filePath, err)
 	}

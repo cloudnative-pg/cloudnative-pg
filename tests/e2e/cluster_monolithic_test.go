@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
@@ -63,6 +64,9 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 		if CurrentSpecReport().Failed() {
 			env.DumpNamespaceObjects(namespace,
 				"out/"+CurrentSpecReport().LeafNodeText+".log")
+		} else {
+			err := fileutils.RemoveDirectory("cluster_logs/" + namespace)
+			Expect(err).ToNot(HaveOccurred())
 		}
 	})
 

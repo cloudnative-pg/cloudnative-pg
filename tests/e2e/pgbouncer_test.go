@@ -17,10 +17,11 @@ limitations under the License.
 package e2e
 
 import (
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	"github.com/cloudnative-pg/cloudnative-pg/tests"
 )
 
 var _ = Describe("PGBouncer Connections", Label(tests.LabelServiceConnectivity), func() {
@@ -43,6 +44,9 @@ var _ = Describe("PGBouncer Connections", Label(tests.LabelServiceConnectivity),
 		if CurrentSpecReport().Failed() {
 			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 			env.DumpPoolerResourcesInfo(namespace, CurrentSpecReport().LeafNodeText)
+		} else {
+			err := fileutils.RemoveDirectory("cluster_logs/" + namespace)
+			Expect(err).ToNot(HaveOccurred())
 		}
 	})
 

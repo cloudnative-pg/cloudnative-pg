@@ -22,6 +22,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
@@ -75,6 +76,9 @@ var _ = Describe("Connection via services", Label(tests.LabelServiceConnectivity
 		JustAfterEach(func() {
 			if CurrentSpecReport().Failed() {
 				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+			} else {
+				err := fileutils.RemoveDirectory("cluster_logs/" + namespace)
+				Expect(err).ToNot(HaveOccurred())
 			}
 		})
 		// If we don't specify secrets, the operator should autogenerate them.
@@ -124,6 +128,9 @@ var _ = Describe("Connection via services", Label(tests.LabelServiceConnectivity
 		JustAfterEach(func() {
 			if CurrentSpecReport().Failed() {
 				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+			} else {
+				err := fileutils.RemoveDirectory("cluster_logs/" + namespace)
+				Expect(err).ToNot(HaveOccurred())
 			}
 		})
 		// If we have specified secrets, we test that we're able to use them
