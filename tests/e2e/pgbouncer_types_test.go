@@ -62,7 +62,12 @@ var _ = Describe("PGBouncer Types", Ordered, Label(tests.LabelServiceConnectivit
 		namespace, err = env.CreateUniqueNamespace("pgbouncer-types")
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
-			return env.DeleteNamespace(namespace)
+			return env.CleanupNamespace(
+				namespace,
+				CurrentSpecReport().LeafNodeText,
+				CurrentSpecReport().Failed(),
+				GinkgoWriter,
+			)
 		})
 		clusterName, err = env.GetResourceNameFromYAML(sampleFile)
 		Expect(err).ToNot(HaveOccurred())

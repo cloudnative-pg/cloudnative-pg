@@ -83,10 +83,12 @@ var _ = Describe("Verify Volume Snapshot",
 				Expect(err).ToNot(HaveOccurred())
 
 				DeferCleanup(func() error {
-					if CurrentSpecReport().Failed() {
-						env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-					}
-					return env.DeleteNamespace(namespace)
+					return env.CleanupNamespace(
+						namespace,
+						CurrentSpecReport().LeafNodeText,
+						CurrentSpecReport().Failed(),
+						GinkgoWriter,
+					)
 				})
 
 				// Creating a cluster with three nodes
@@ -171,10 +173,12 @@ var _ = Describe("Verify Volume Snapshot",
 				Expect(err).ToNot(HaveOccurred())
 
 				DeferCleanup(func() error {
-					if CurrentSpecReport().Failed() {
-						env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-					}
-					return env.DeleteNamespace(namespace)
+					return env.CleanupNamespace(
+						namespace,
+						CurrentSpecReport().LeafNodeText,
+						CurrentSpecReport().Failed(),
+						GinkgoWriter,
+					)
 				})
 
 				By("create the certificates for MinIO", func() {
@@ -358,16 +362,18 @@ var _ = Describe("Verify Volume Snapshot",
 				namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
 				DeferCleanup(func() error {
-					if CurrentSpecReport().Failed() {
-						env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-					}
+					return env.CleanupNamespace(
+						namespace,
+						CurrentSpecReport().LeafNodeText,
+						CurrentSpecReport().Failed(),
+						GinkgoWriter,
+					)
+				})
+				DeferCleanup(func() error {
 					if err := os.Unsetenv(snapshotDataEnv); err != nil {
 						return err
 					}
-					if err := os.Unsetenv(snapshotWalEnv); err != nil {
-						return err
-					}
-					return env.DeleteNamespace(namespace)
+					return os.Unsetenv(snapshotWalEnv)
 				})
 				clusterToBackupName, err = env.GetResourceNameFromYAML(clusterToBackupFilePath)
 				Expect(err).ToNot(HaveOccurred())
@@ -581,10 +587,12 @@ var _ = Describe("Verify Volume Snapshot",
 				Expect(err).ToNot(HaveOccurred())
 
 				DeferCleanup(func() error {
-					if CurrentSpecReport().Failed() {
-						env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-					}
-					return env.DeleteNamespace(namespace)
+					return env.CleanupNamespace(
+						namespace,
+						CurrentSpecReport().LeafNodeText,
+						CurrentSpecReport().Failed(),
+						GinkgoWriter,
+					)
 				})
 
 				By("create the certificates for MinIO", func() {

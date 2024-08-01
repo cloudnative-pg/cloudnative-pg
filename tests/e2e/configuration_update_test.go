@@ -138,7 +138,12 @@ var _ = Describe("Configuration update", Ordered, Label(tests.LabelClusterMetada
 			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
-				return env.DeleteNamespace(namespace)
+				return env.CleanupNamespace(
+					namespace,
+					CurrentSpecReport().LeafNodeText,
+					CurrentSpecReport().Failed(),
+					GinkgoWriter,
+				)
 			})
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 		})
@@ -483,7 +488,12 @@ var _ = Describe("Configuration update with primaryUpdateMethod", Label(tests.La
 			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
-				return env.DeleteNamespace(namespace)
+				return env.CleanupNamespace(
+					namespace,
+					CurrentSpecReport().LeafNodeText,
+					CurrentSpecReport().Failed(),
+					GinkgoWriter,
+				)
 			})
 
 			clusterName, err = env.GetResourceNameFromYAML(clusterFileWithPrimaryUpdateRestart)
