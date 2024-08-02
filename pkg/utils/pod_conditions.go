@@ -124,6 +124,9 @@ func ListStatusPods(podList []corev1.Pod) map[PodStatus][]string {
 	podsNames := make(map[PodStatus][]string)
 
 	for _, pod := range podList {
+		if !pod.DeletionTimestamp.IsZero() {
+			continue
+		}
 		switch {
 		case IsPodReady(pod):
 			podsNames[PodHealthy] = append(podsNames[PodHealthy], pod.Name)
