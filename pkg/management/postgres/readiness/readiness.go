@@ -74,12 +74,10 @@ func (data *Data) IsServerReady(ctx context.Context) error {
 	row := superUserDB.QueryRowContext(
 		ctx,
 		`
-		SELECT 
-		    NOT pg_is_in_recovery() 
-			OR length(coalesce(setting, '')) = 0
+		SELECT
+			NOT pg_is_in_recovery()
+			OR (SELECT coalesce(setting, '') = '' FROM pg_settings WHERE name = 'primary_conninfo')
 			OR pg_last_wal_replay_lsn() IS NOT NULL
-		FROM pg_settings 
-		WHERE name = 'primary_conninfo'
 		`,
 	)
 	if err := row.Err(); err != nil {
