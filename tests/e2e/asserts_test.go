@@ -179,6 +179,50 @@ func AssertSwitchoverWithHistory(
 			}, timeout).ShouldNot(HaveOccurred())
 		})
 	}
+
+	if isReplica {
+		By("verifying that the all standbys are streaming from the new primary", func() {
+			timeout := 120
+			commandTimeout := time.Second * 10
+			Eventually(func(g Gomega) {
+				podList, err := env.GetClusterPodList(namespace, clusterName)
+				g.Expect(err).ToNot(HaveOccurred())
+
+				var standbys []interface{}
+				for _, pod := range podList.Items {
+					if specs.IsPodStandby(pod) {
+						standbys = append(standbys, pod.Name)
+					}
+				}
+
+				for _, pod := range podList.Items {
+					stdout, _, err := env.ExecCommand(
+						env.Ctx,
+						pod,
+						specs.PostgresContainerName,
+						&commandTimeout,
+						"psql", "-U", "postgres", "-tAc",
+						"select string_agg(application_name, ',')  from pg_stat_replication;",
+					)
+					g.Expect(err).ToNot(HaveOccurred())
+
+					if specs.IsPrimary(pod.ObjectMeta) {
+						appNames := strings.Split(strings.TrimSpace(stdout), ",")
+						g.Expect(appNames).To(
+							ContainElements(standbys...),
+							"not all standbys are streaming from the new primary "+pod.Name,
+						)
+					} else {
+						g.Expect(strings.TrimSpace(stdout)).To(
+							BeEmpty(),
+							fmt.Sprintf("the standby %s should not stream to any other instance", pod.Name),
+						)
+					}
+				}
+
+			}, timeout).ShouldNot(HaveOccurred())
+		})
+	}
 }
 
 // AssertCreateCluster creates the cluster and verifies that the ready pods
