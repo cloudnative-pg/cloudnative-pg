@@ -90,6 +90,10 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				replicaClusterSampleTLS,
 				testTableName,
 				psqlClientPod)
+
+			replicaName, err := env.GetResourceNameFromYAML(replicaClusterSampleTLS)
+			Expect(err).ToNot(HaveOccurred())
+			AssertSwitchoverOnReplica(replicaNamespace, replicaName, env)
 		})
 	})
 
