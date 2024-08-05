@@ -133,7 +133,7 @@ func (data *data) SetClusterStatus(ctx context.Context, cluster client.Object) (
 			contextLogger.Trace("json status is empty, skipping it", "pluginName", plugin.Name())
 			continue
 		}
-		if err := json.Unmarshal(response.JsonStatus, &json.RawMessage{}); err != nil {
+		if err := json.Unmarshal(response.JsonStatus, &map[string]interface{}{}); err != nil {
 			contextLogger.Error(err, "found a malformed json while evaluating SetClusterStatus response",
 				"pluginName", plugin.Name())
 			return nil, fmt.Errorf("%w: %w", errInvalidJSON, err)
