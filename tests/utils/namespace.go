@@ -17,16 +17,159 @@ limitations under the License.
 package utils
 
 import (
+	"bufio"
+	"bytes"
+	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/logs"
 )
+
+func writeInlineOutput(linesToShow, bufferIdx, capLines int, lineBuffer []string, output io.Writer) error {
+	// print the last `capLines` lines of logs to the `output`
+	_, _ = fmt.Fprintln(output, "-- OPERATOR LOGS for this namespace, with error/warning --")
+	var switchErr error
+	switch {
+	case linesToShow == 0:
+		_, switchErr = fmt.Fprintln(output, "-- no error / warning logs --")
+	case linesToShow <= capLines:
+		_, switchErr = fmt.Fprintln(output, strings.Join(lineBuffer[:linesToShow], "\n"))
+	case bufferIdx == 0:
+		// if bufferIdx == 0, the buffer just finished filling and is in order
+		_, switchErr = fmt.Fprintln(output, strings.Join(lineBuffer, "\n"))
+	default:
+		// the line buffer cycled back and the items 0 to bufferIdx - 1 are newer than the rest
+		_, switchErr = fmt.Fprintln(output, strings.Join(
+			append(lineBuffer[bufferIdx:], lineBuffer[:bufferIdx]...),
+			"\n"))
+	}
+
+	return switchErr
+}
+
+// saveNamespaceLogs does 2 things:
+//   - displays the last `capLines` of error/warning logs on the `output` io.Writer (likely GinkgoWriter)
+//   - saves the full logs to a file
+func saveNamespaceLogs(buf *bytes.Buffer, logsType, specName, namespace string, output io.Writer, capLines int) {
+	scanner := bufio.NewScanner(buf)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	filename := fmt.Sprintf("out/%s_ns-%s_%s.log", logsType, namespace, specName)
+	f, err := os.Create(filepath.Clean(filename))
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer func() {
+		var err error
+		syncErr := f.Sync()
+		if syncErr != nil {
+			_, err = fmt.Fprintln(output, "ERROR while flushing file:", syncErr)
+		}
+		if err != nil {
+			fmt.Println(err)
+		}
+		closeErr := f.Close()
+		if closeErr != nil {
+			_, err = fmt.Fprintln(output, "ERROR while closing file:", err)
+		}
+		if err != nil {
+			fmt.Println(err)
+		}
+	}()
+
+	// circular buffer to hold the last `capLines` of non-DEBUG operator logs
+	lineBuffer := make([]string, capLines)
+	linesIdx := 0
+	// insertion point in the lineBuffer: values 0 to capLines - 1 (i.e. modulo capLines)
+	bufferIdx := 0
+
+	for scanner.Scan() {
+		lg := scanner.Text()
+
+		var js map[string]interface{}
+		err = json.Unmarshal([]byte(lg), &js)
+		if err != nil {
+			_, err = fmt.Fprintln(output, "ERROR parsing log:", err, lg)
+			if err != nil {
+				fmt.Println(err)
+				continue
+			}
+		}
+
+		// store the latest line of error or warning log to the slice
+		isImportant := func(js map[string]interface{}) bool {
+			return js["level"] == log.WarningLevelString || js["level"] == log.ErrorLevelString
+		}
+
+		if js["namespace"] == namespace {
+			// write every matching line to the file stream
+			_, err := fmt.Fprintln(f, lg)
+			if err != nil {
+				fmt.Println(err)
+				continue
+			}
+			if isImportant(js) {
+				lineBuffer[bufferIdx] = lg
+				linesIdx++
+				// `bufferIdx` walks from `0` to `capLines-1` and then to `0` in a cycle
+				bufferIdx = linesIdx % capLines
+			}
+		}
+	}
+
+	// print the last `capLines` lines of logs to the `output`
+	_ = writeInlineOutput(linesIdx, bufferIdx, capLines, lineBuffer, output)
+
+	if err := scanner.Err(); err != nil {
+		_, err := fmt.Fprintln(output, "ERROR while scanning:", err)
+		if err != nil {
+			fmt.Println(err)
+		}
+	}
+}
+
+// GetOperatorLogs is collects the operator logs
+func (env TestingEnvironment) GetOperatorLogs(buf *bytes.Buffer) error {
+	operatorPod, err := env.GetOperatorPod()
+	if err != nil {
+		return err
+	}
+
+	streamPodLog := logs.StreamingRequest{
+		Pod: &operatorPod,
+		Options: &corev1.PodLogOptions{
+			Timestamps: false,
+			Follow:     false,
+		},
+		Client: env.Interface,
+	}
+	return streamPodLog.Stream(context.TODO(), buf)
+}
+
+// DumpNamespaceOperatorLogs writes the operator logs related to a namespace into a writer
+// and also into a file
+func (env TestingEnvironment) DumpNamespaceOperatorLogs(namespace, testName string, output io.Writer) {
+	var buf bytes.Buffer
+	err := env.GetOperatorLogs(&buf)
+	if err != nil {
+		return
+	}
+	capLines := 5
+	sanitizedTestName := strings.ReplaceAll(testName, " ", "_")
+	saveNamespaceLogs(&buf, "operator_logs", sanitizedTestName, namespace, output, capLines)
+}
 
 // CleanupNamespace is cool
 func (env TestingEnvironment) CleanupNamespace(
@@ -35,12 +178,8 @@ func (env TestingEnvironment) CleanupNamespace(
 	testFailed bool,
 	output io.Writer,
 ) error {
-	lines, err := env.DumpOperatorLogs(false, 10)
-	if err != nil {
-		_, _ = fmt.Fprintf(output, "cleanupNamespace: error dumping opertor logs: %v\n", err)
-	}
-	_, _ = fmt.Fprintln(output, strings.Join(lines, "\n"))
 	if testFailed {
+		env.DumpNamespaceOperatorLogs(namespace, testName, output)
 		env.DumpNamespaceObjects(namespace, "out/"+testName+".log")
 	}
 	return env.DeleteNamespace(namespace)
