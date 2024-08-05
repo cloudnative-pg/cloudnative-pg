@@ -1,23 +1,23 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: cluster-replica-non-streaming
+  name: cluster-replica-from-restore
 spec:
   instances: 3
 
   bootstrap:
     recovery:
-      source: cluster-example-with-backup
+      source: postgresql-bkp
 
   replica:
     enabled: true
-    source: cluster-example-with-backup
+    source: postgresql-bkp
 
   storage:
     size: 1Gi
 
   externalClusters:
-  - name: cluster-example-with-backup
+  - name: postgresql-bkp
     barmanObjectStore:
       destinationPath: s3://backups/
       endpointURL: http://minio:9000
@@ -28,3 +28,17 @@ spec:
         secretAccessKey:
           name: minio
           key: ACCESS_SECRET_KEY
+    connectionParameters:
+      host: postgresql-bkp-rw.default.svc
+      user: streaming_replica
+      sslmode: verify-full
+      dbname: postgres
+    sslKey:
+      name: postgresql-bkp-replication
+      key: tls.key
+    sslCert:
+      name: postgresql-bkp-replication
+      key: tls.crt
+    sslRootCert:
+      name: postgresql-bkp-ca
+      key: ca.crt
