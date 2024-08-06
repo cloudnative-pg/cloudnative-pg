@@ -21,7 +21,7 @@ import json
 from packaging import version
 from subprocess import check_output
 
-min_supported_major = 11
+min_supported_major = 12
 
 pg_repo_name = "cloudnative-pg/postgresql"
 pg_version_re = re.compile(r"^(\d+)(?:\.\d+|beta\d+|rc\d+|alpha\d+)(-\d+)?$")
