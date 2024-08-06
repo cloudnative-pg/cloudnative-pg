@@ -1461,23 +1461,23 @@ func (r *InstanceReconciler) dropStaleReplicationConnections(
 		return ctrl.Result{}, err
 	}
 
-	if result, err := conn.ExecContext(
+	result, err := conn.ExecContext(
 		ctx,
 		`SELECT pg_terminate_backend(pid)
 		FROM pg_stat_replication
 		WHERE application_name LIKE $1`,
 		fmt.Sprintf("%v-%%", cluster.Name),
-	); err != nil {
+	)
+	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("while dropping connections: %w", err)
-	} else {
-		terminatedConnections, err := result.RowsAffected()
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-		if terminatedConnections > 0 {
-			log.Info("Terminated stale replica connections", "terminatedConnections", terminatedConnections)
-			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
-		}
+	}
+
+	terminatedConnections, err := result.RowsAffected()
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	if terminatedConnections > 0 {
+		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 	}
 
 	return ctrl.Result{}, nil
