@@ -20,7 +20,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
@@ -45,7 +44,7 @@ func ForInstance(instance *postgres.Instance) *Data {
 // IsServerReady check if the instance is healthy and can really accept connections
 func (data *Data) IsServerReady(ctx context.Context) error {
 	if !data.instance.CanCheckReadiness() {
-		return fmt.Errorf("instance is not ready yet")
+		return errors.New("instance is not ready yet")
 	}
 	superUserDB, err := data.instance.GetSuperUserDB()
 	if err != nil {
