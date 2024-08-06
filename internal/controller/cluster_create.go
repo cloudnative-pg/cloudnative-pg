@@ -743,7 +743,7 @@ func (r *ClusterReconciler) createOrPatchDefaultMetricsConfigmap(ctx context.Con
 	var sourceConfigmap corev1.ConfigMap
 	if err := r.Get(ctx,
 		client.ObjectKey{
-			Name:      "fooBar",
+			Name:      configuration.Current.MonitoringQueriesConfigmap,
 			Namespace: configuration.Current.OperatorNamespace,
 		}, &sourceConfigmap); err != nil {
 		if apierrs.IsNotFound(err) {
