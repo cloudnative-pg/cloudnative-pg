@@ -2618,7 +2618,12 @@ func (r *Cluster) getAdmissionWarnings() admission.Warnings {
 func (r *Cluster) getMaintenanceWindowsAdmissionWarnings() admission.Warnings {
 	var result admission.Warnings
 
-	if r.Spec.NodeMaintenanceWindow != nil {
+	// before .spec.enablePDB was added, PDBs could only be disabled by setting
+	// .spec.nodeMaintenanceWindow.inProgress = true and .spec.nodeMaintenanceWindow.reusePVC = true (default)
+	// recommend users towards .spec.enablePDB = false if they're using this configuration
+	if r.Spec.NodeMaintenanceWindow != nil &&
+		r.Spec.NodeMaintenanceWindow.InProgress &&
+		(r.Spec.NodeMaintenanceWindow.ReusePVC == nil || *r.Spec.NodeMaintenanceWindow.ReusePVC) {
 		result = append(
 			result,
 			"Consider using `.spec.enablePDB` instead of the node maintenance window feature")
