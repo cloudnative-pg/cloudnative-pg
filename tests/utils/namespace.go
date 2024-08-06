@@ -19,7 +19,6 @@ package utils
 import (
 	"bufio"
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -163,7 +162,7 @@ func (env TestingEnvironment) GetOperatorLogs(buf *bytes.Buffer) error {
 		},
 		Client: env.Interface,
 	}
-	return streamPodLog.Stream(context.TODO(), buf)
+	return streamPodLog.Stream(env.Ctx, buf)
 }
 
 // DumpNamespaceOperatorLogs writes the operator logs related to a namespace into a writer
