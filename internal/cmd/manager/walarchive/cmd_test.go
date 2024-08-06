@@ -81,4 +81,15 @@ var _ = Describe("barmanCloudWalArchiveOptions", func() {
 						"-vv --immediate-checkpoint=false s3://bucket-name/ test-cluster",
 				))
 	})
+
+	It("should generate a path with the namespace", func() {
+		cluster.Spec.Backup.BarmanObjectStore.IncludeNamespace = true
+		options, err := barmanCloudWalArchiveOptions(cluster, "test-cluster")
+		Expect(err).ToNot(HaveOccurred())
+		Expect(strings.Join(options, " ")).
+			To(
+				ContainSubstring(
+					"s3://bucket-name/test test-cluster",
+				))
+	})
 })
