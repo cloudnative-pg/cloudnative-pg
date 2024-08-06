@@ -362,18 +362,14 @@ var _ = Describe("Verify Volume Snapshot",
 				namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
 				DeferCleanup(func() error {
+					_ = os.Unsetenv(snapshotDataEnv)
+					_ = os.Unsetenv(snapshotWalEnv)
 					return env.CleanupNamespace(
 						namespace,
 						CurrentSpecReport().LeafNodeText,
 						CurrentSpecReport().Failed(),
 						GinkgoWriter,
 					)
-				})
-				DeferCleanup(func() error {
-					if err := os.Unsetenv(snapshotDataEnv); err != nil {
-						return err
-					}
-					return os.Unsetenv(snapshotWalEnv)
 				})
 				clusterToBackupName, err = env.GetResourceNameFromYAML(clusterToBackupFilePath)
 				Expect(err).ToNot(HaveOccurred())
