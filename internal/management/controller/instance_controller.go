@@ -258,8 +258,8 @@ func (r *InstanceReconciler) Reconcile(
 		return reconcile.Result{}, fmt.Errorf("while updating database owner password: %w", err)
 	}
 
-	if err := r.dropStaleReplicationConnections(ctx, cluster); err != nil {
-		return reconcile.Result{}, fmt.Errorf("cannot reconcile database configurations: %w", err)
+	if res, err := r.dropStaleReplicationConnections(ctx, cluster); err != nil || !res.IsZero() {
+		return res, err
 	}
 
 	if err := r.reconcileDatabases(ctx, cluster); err != nil {
@@ -1444,29 +1444,41 @@ func (r *InstanceReconciler) shouldRequeueForMissingTopology(cluster *apiv1.Clus
 // those connections and re-establish them with the new endpoint.
 //
 // The dropStaleReplicationConnections function addresses this requirement.
-func (r *InstanceReconciler) dropStaleReplicationConnections(ctx context.Context, cluster *apiv1.Cluster) error {
+func (r *InstanceReconciler) dropStaleReplicationConnections(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+) (ctrl.Result, error) {
 	if !cluster.IsReplica() {
-		return nil
+		return ctrl.Result{}, nil
 	}
 
 	if cluster.Status.CurrentPrimary == r.instance.PodName {
-		return nil
+		return ctrl.Result{}, nil
 	}
 
 	conn, err := r.instance.GetSuperUserDB()
 	if err != nil {
-		return err
+		return ctrl.Result{}, err
 	}
 
-	if _, err := conn.ExecContext(
+	if result, err := conn.ExecContext(
 		ctx,
 		`SELECT pg_terminate_backend(pid)
 		FROM pg_stat_replication
-		WHERE application_name ILIKE $1`,
+		WHERE application_name LIKE $1`,
 		fmt.Sprintf("%v-%%", cluster.Name),
 	); err != nil {
-		return fmt.Errorf("while dropping connections: %w", err)
+		return ctrl.Result{}, fmt.Errorf("while dropping connections: %w", err)
+	} else {
+		terminatedConnections, err := result.RowsAffected()
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		if terminatedConnections > 0 {
+			log.Info("Terminated stale replica connections", "terminatedConnections", terminatedConnections)
+			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+		}
 	}
 
-	return nil
+	return ctrl.Result{}, nil
 }
