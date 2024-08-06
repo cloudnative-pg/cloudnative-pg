@@ -58,6 +58,26 @@ func writeInlineOutput(linesToShow, bufferIdx, capLines int, lineBuffer []string
 	return switchErr
 }
 
+type logLine map[string]interface{}
+
+func (l logLine) isAtLeastWarningLevel() bool {
+	rawLevel := l["level"]
+	return rawLevel == log.WarningLevelString || rawLevel == log.ErrorLevelString
+}
+
+func (l logLine) getNamespace() string {
+	s, ok := l["namespace"].(string)
+	if !ok {
+		return ""
+	}
+
+	return s
+}
+
+func (l logLine) matchesNamespace(ns string) bool {
+	return l.getNamespace() == ns
+}
+
 // saveNamespaceLogs does 2 things:
 //   - displays the last `capLines` of error/warning logs on the `output` io.Writer (likely GinkgoWriter)
 //   - saves the full logs to a file
@@ -92,45 +112,41 @@ func saveNamespaceLogs(
 	}()
 
 	// circular buffer to hold the last `capLines` of non-DEBUG operator logs
-	lineBuffer := make([]string, capLines)
-	linesIdx := 0
+	importantLogsBuffer := make([]string, capLines)
+	importantLogsIdx := 0
 	// insertion point in the lineBuffer: values 0 to capLines - 1 (i.e. modulo capLines)
-	bufferIdx := 0
+	importantLogsBufferIdx := 0
 
 	for scanner.Scan() {
-		lg := scanner.Text()
+		rawLine := scanner.Text()
 
-		var js map[string]interface{}
-		if unmarshalErr := json.Unmarshal([]byte(lg), &js); unmarshalErr != nil {
-			if _, err := fmt.Fprintln(output, "ERROR parsing log:", unmarshalErr, lg); err != nil {
+		var parsedLine logLine
+		if unmarshalErr := json.Unmarshal([]byte(rawLine), &parsedLine); unmarshalErr != nil {
+			if _, err := fmt.Fprintln(output, "ERROR parsing log:", unmarshalErr, rawLine); err != nil {
 				fmt.Println(err)
 				continue
 			}
 		}
 
-		isImportant := func(js map[string]interface{}) bool {
-			return js["level"] == log.WarningLevelString || js["level"] == log.ErrorLevelString
+		if !parsedLine.matchesNamespace(namespace) {
+			continue
 		}
 
-		// store the latest line of error or warning log to the slice,
-		// output every line to the file
-		if js["namespace"] == namespace {
-			// write every matching line to the file stream
-			if _, err := fmt.Fprintln(f, lg); err != nil {
-				fmt.Println(err)
-				continue
-			}
-			if isImportant(js) {
-				lineBuffer[bufferIdx] = lg
-				linesIdx++
-				// `bufferIdx` walks from `0` to `capLines-1` and then to `0` in a cycle
-				bufferIdx = linesIdx % capLines
-			}
+		// write every matching line to the file stream
+		if _, err := fmt.Fprintln(f, rawLine); err != nil {
+			fmt.Println(err)
+			continue
+		}
+		if parsedLine.isAtLeastWarningLevel() {
+			importantLogsBuffer[importantLogsBufferIdx] = rawLine
+			importantLogsIdx++
+			// `bufferIdx` walks from `0` to `capLines-1` and then to `0` in a cycle
+			importantLogsBufferIdx = importantLogsIdx % capLines
 		}
 	}
 
 	// print the last `capLines` lines of logs to the `output`
-	_ = writeInlineOutput(linesIdx, bufferIdx, capLines, lineBuffer, output)
+	_ = writeInlineOutput(importantLogsIdx, importantLogsBufferIdx, capLines, importantLogsBuffer, output)
 
 	if scanErr := scanner.Err(); scanErr != nil {
 		if _, err := fmt.Fprintln(output, "ERROR while scanning:", scanErr); err != nil {
