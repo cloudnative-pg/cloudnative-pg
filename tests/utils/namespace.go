@@ -72,26 +72,22 @@ func saveNamespaceLogs(
 	scanner := bufio.NewScanner(buf)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 	filename := fmt.Sprintf("out/%s_ns-%s_%s.log", logsType, namespace, specName)
-	f, err := os.Create(filepath.Clean(filename))
-	if err != nil {
-		fmt.Println(err)
+	f, createErr := os.Create(filepath.Clean(filename))
+	if createErr != nil {
+		fmt.Println(createErr)
 		return
 	}
 	defer func() {
-		var err error
-		syncErr := f.Sync()
-		if syncErr != nil {
-			_, err = fmt.Fprintln(output, "ERROR while flushing file:", syncErr)
+		if syncErr := f.Sync(); syncErr != nil {
+			if _, err := fmt.Fprintln(output, "ERROR while flushing file:", syncErr); err != nil {
+				fmt.Println(err)
+			}
 		}
-		if err != nil {
-			fmt.Println(err)
-		}
-		closeErr := f.Close()
-		if closeErr != nil {
-			_, err = fmt.Fprintln(output, "ERROR while closing file:", err)
-		}
-		if err != nil {
-			fmt.Println(err)
+
+		if closeErr := f.Close(); closeErr != nil {
+			if _, err := fmt.Fprintln(output, "ERROR while closing file:", closeErr); err != nil {
+				fmt.Println(err)
+			}
 		}
 	}()
 
@@ -105,10 +101,8 @@ func saveNamespaceLogs(
 		lg := scanner.Text()
 
 		var js map[string]interface{}
-		err = json.Unmarshal([]byte(lg), &js)
-		if err != nil {
-			_, err = fmt.Fprintln(output, "ERROR parsing log:", err, lg)
-			if err != nil {
+		if unmarshalErr := json.Unmarshal([]byte(lg), &js); unmarshalErr != nil {
+			if _, err := fmt.Fprintln(output, "ERROR parsing log:", unmarshalErr, lg); err != nil {
 				fmt.Println(err)
 				continue
 			}
@@ -122,8 +116,7 @@ func saveNamespaceLogs(
 		// output every line to the file
 		if js["namespace"] == namespace {
 			// write every matching line to the file stream
-			_, err := fmt.Fprintln(f, lg)
-			if err != nil {
+			if _, err := fmt.Fprintln(f, lg); err != nil {
 				fmt.Println(err)
 				continue
 			}
@@ -139,9 +132,8 @@ func saveNamespaceLogs(
 	// print the last `capLines` lines of logs to the `output`
 	_ = writeInlineOutput(linesIdx, bufferIdx, capLines, lineBuffer, output)
 
-	if err := scanner.Err(); err != nil {
-		_, err := fmt.Fprintln(output, "ERROR while scanning:", err)
-		if err != nil {
+	if scanErr := scanner.Err(); scanErr != nil {
+		if _, err := fmt.Fprintln(output, "ERROR while scanning:", scanErr); err != nil {
 			fmt.Println(err)
 		}
 	}
