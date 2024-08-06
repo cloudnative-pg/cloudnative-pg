@@ -62,7 +62,14 @@ func writeInlineOutput(linesToShow, bufferIdx, capLines int, lineBuffer []string
 // saveNamespaceLogs does 2 things:
 //   - displays the last `capLines` of error/warning logs on the `output` io.Writer (likely GinkgoWriter)
 //   - saves the full logs to a file
-func saveNamespaceLogs(buf *bytes.Buffer, logsType, specName, namespace string, output io.Writer, capLines int) {
+func saveNamespaceLogs(
+	buf *bytes.Buffer,
+	logsType string,
+	specName string,
+	namespace string,
+	output io.Writer,
+	capLines int,
+) {
 	scanner := bufio.NewScanner(buf)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 	filename := fmt.Sprintf("out/%s_ns-%s_%s.log", logsType, namespace, specName)
@@ -108,11 +115,12 @@ func saveNamespaceLogs(buf *bytes.Buffer, logsType, specName, namespace string, 
 			}
 		}
 
-		// store the latest line of error or warning log to the slice
 		isImportant := func(js map[string]interface{}) bool {
 			return js["level"] == log.WarningLevelString || js["level"] == log.ErrorLevelString
 		}
 
+		// store the latest line of error or warning log to the slice,
+		// output every line to the file
 		if js["namespace"] == namespace {
 			// write every matching line to the file stream
 			_, err := fmt.Fprintln(f, lg)
@@ -140,7 +148,7 @@ func saveNamespaceLogs(buf *bytes.Buffer, logsType, specName, namespace string, 
 	}
 }
 
-// GetOperatorLogs is collects the operator logs
+// GetOperatorLogs collects the operator logs
 func (env TestingEnvironment) GetOperatorLogs(buf *bytes.Buffer) error {
 	operatorPod, err := env.GetOperatorPod()
 	if err != nil {
@@ -171,7 +179,8 @@ func (env TestingEnvironment) DumpNamespaceOperatorLogs(namespace, testName stri
 	saveNamespaceLogs(&buf, "operator_logs", sanitizedTestName, namespace, output, capLines)
 }
 
-// CleanupNamespace is cool
+// CleanupNamespace does cleanup duty related to the tear-down of a namespace,
+// and is intended to be called in a DeferCleanup clause
 func (env TestingEnvironment) CleanupNamespace(
 	namespace string,
 	testName string,
@@ -185,7 +194,8 @@ func (env TestingEnvironment) CleanupNamespace(
 	return env.DeleteNamespace(namespace)
 }
 
-// CleanupNamespaceAndWait is cool
+// CleanupNamespaceAndWait does cleanup just like CleanupNamespace, but waits for
+// the namespace to be deleted, with a timeout
 func (env TestingEnvironment) CleanupNamespaceAndWait(
 	namespace string,
 	testName string,
