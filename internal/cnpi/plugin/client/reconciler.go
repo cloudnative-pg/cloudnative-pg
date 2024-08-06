@@ -130,7 +130,7 @@ func reconcilerHook(
 	}
 
 	var kind reconciler.ReconcilerHooksCapability_Kind
-	switch cluster.GetObjectKind().GroupVersionKind().Kind {
+	switch object.GetObjectKind().GroupVersionKind().Kind {
 	case "Cluster":
 		kind = reconciler.ReconcilerHooksCapability_KIND_CLUSTER
 	case "Backup":
