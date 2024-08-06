@@ -54,7 +54,6 @@ var _ = Describe("Cluster scale up and down", Serial, Label(tests.LabelReplicati
 					GinkgoWriter,
 				)
 			})
-
 			AssertCreateCluster(namespace, clusterName, sampleFileWithReplicationSlots, env)
 
 			AssertClusterHAReplicationSlots(clusterName, namespace)
