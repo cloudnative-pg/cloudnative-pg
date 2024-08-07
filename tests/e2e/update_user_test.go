@@ -25,6 +25,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
@@ -39,20 +40,27 @@ var _ = Describe("Update user and superuser password", Label(tests.LabelServiceC
 		sampleFile      = fixturesDir + "/secrets/cluster-secrets.yaml"
 		level           = tests.Low
 	)
+	var namespace string
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 	})
+	JustAfterEach(func() {
+		if CurrentSpecReport().Failed() {
+			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+		} else {
+			err := fileutils.RemoveDirectory("cluster_logs/" + namespace)
+			Expect(err).ToNot(HaveOccurred())
+		}
+	})
 
 	It("can update the user application password", func() {
+		var err error
 		// Create a cluster in a namespace we'll delete after the test
-		namespace, err := env.CreateUniqueNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
 			return env.DeleteNamespace(namespace)
 		})
 		clusterName, err := env.GetResourceNameFromYAML(sampleFile)
@@ -123,20 +131,28 @@ var _ = Describe("Enable superuser password", Label(tests.LabelServiceConnectivi
 		sampleFile      = fixturesDir + "/secrets/cluster-secrets.yaml"
 		level           = tests.Low
 	)
+	var namespace string
+
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
+		} else {
+			err := fileutils.RemoveDirectory("cluster_logs/" + namespace)
+			Expect(err).ToNot(HaveOccurred())
+		}
+	})
+	JustAfterEach(func() {
+		if CurrentSpecReport().Failed() {
+			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 		}
 	})
 
 	It("enable and disable superuser access", func() {
+		var err error
 		// Create a cluster in a namespace we'll delete after the test
-		namespace, err := env.CreateUniqueNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
 			return env.DeleteNamespace(namespace)
 		})
 		clusterName, err := env.GetResourceNameFromYAML(sampleFile)

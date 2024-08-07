@@ -29,6 +29,7 @@ import (
 	k8client "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	testUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
@@ -59,8 +60,15 @@ var _ = Describe("Verify Volume Snapshot",
 			return snapshotList, nil
 		}
 
-		// Initializing a global namespace variable to be used in each test case
 		var namespace string
+		JustAfterEach(func() {
+			if CurrentSpecReport().Failed() {
+				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+			} else {
+				err := fileutils.RemoveDirectory("cluster_logs/" + namespace)
+				Expect(err).ToNot(HaveOccurred())
+			}
+		})
 
 		Context("using the kubectl cnpg plugin", Ordered, func() {
 			const (
@@ -83,9 +91,6 @@ var _ = Describe("Verify Volume Snapshot",
 				Expect(err).ToNot(HaveOccurred())
 
 				DeferCleanup(func() error {
-					if CurrentSpecReport().Failed() {
-						env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-					}
 					return env.DeleteNamespace(namespace)
 				})
 
@@ -171,9 +176,6 @@ var _ = Describe("Verify Volume Snapshot",
 				Expect(err).ToNot(HaveOccurred())
 
 				DeferCleanup(func() error {
-					if CurrentSpecReport().Failed() {
-						env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-					}
 					return env.DeleteNamespace(namespace)
 				})
 
@@ -348,7 +350,6 @@ var _ = Describe("Verify Volume Snapshot",
 				})
 				return snapshotList
 			}
-
 			BeforeAll(func() {
 				if testLevelEnv.Depth < int(level) {
 					Skip("Test depth is lower than the amount requested for this test")
@@ -358,9 +359,6 @@ var _ = Describe("Verify Volume Snapshot",
 				namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
 				DeferCleanup(func() error {
-					if CurrentSpecReport().Failed() {
-						env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-					}
 					if err := os.Unsetenv(snapshotDataEnv); err != nil {
 						return err
 					}
@@ -581,9 +579,6 @@ var _ = Describe("Verify Volume Snapshot",
 				Expect(err).ToNot(HaveOccurred())
 
 				DeferCleanup(func() error {
-					if CurrentSpecReport().Failed() {
-						env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-					}
 					return env.DeleteNamespace(namespace)
 				})
 

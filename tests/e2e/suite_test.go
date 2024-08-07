@@ -77,6 +77,14 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	env, err = utils.NewTestingEnvironment()
 	Expect(err).ShouldNot(HaveOccurred())
 
+	// Start stern to write the logs of every single pod we create under cluster_logs
+	sternCtx, sternCancel := context.WithCancel(env.Ctx)
+	done := env.SternMultiTailer.Run(sternCtx, env.Interface)
+	DeferCleanup(func() {
+		sternCancel()
+		<-done
+	})
+
 	psqlPod, err := utils.GetPsqlClient(psqlClientNamespace, env)
 	Expect(err).ShouldNot(HaveOccurred())
 	DeferCleanup(func() {

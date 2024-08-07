@@ -23,6 +23,7 @@ import (
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	testUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
@@ -53,6 +54,9 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 	JustAfterEach(func() {
 		if CurrentSpecReport().Failed() {
 			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+		} else {
+			err := fileutils.RemoveDirectory("cluster_logs/" + namespace)
+			Expect(err).ToNot(HaveOccurred())
 		}
 	})
 	Context("using minio as object storage for backup", Ordered, func() {
@@ -365,13 +369,6 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 
 			customClusterName, err := env.GetResourceNameFromYAML(clusterWithMinioCustomSampleFile)
 			Expect(err).ToNot(HaveOccurred())
-
-			// To also dump info. from `customClusterName` cluster after this spec gets executed
-			DeferCleanup(func() {
-				if CurrentSpecReport().Failed() {
-					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-				}
-			})
 
 			// Create the cluster with custom serverName in the backup spec
 			AssertCreateCluster(namespace, customClusterName, clusterWithMinioCustomSampleFile, env)
@@ -791,6 +788,9 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 	JustAfterEach(func() {
 		if CurrentSpecReport().Failed() {
 			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+		} else {
+			err := fileutils.RemoveDirectory("cluster_logs/" + namespace)
+			Expect(err).ToNot(HaveOccurred())
 		}
 	})
 

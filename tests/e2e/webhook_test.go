@@ -21,6 +21,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
@@ -46,7 +47,7 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive, tests.LabelOper
 		validatingWebhook = "vcluster.cnpg.io"
 	)
 
-	var webhookNamespace, clusterName string
+	var namespace, clusterName string
 	var clusterIsDefaulted bool
 	var err error
 
@@ -58,7 +59,10 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive, tests.LabelOper
 
 	JustAfterEach(func() {
 		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(webhookNamespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+		} else {
+			err := fileutils.RemoveDirectory("cluster_logs/" + namespace)
+			Expect(err).ToNot(HaveOccurred())
 		}
 	})
 
@@ -81,17 +85,17 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive, tests.LabelOper
 		})
 
 		// Create a basic PG cluster
-		webhookNamespace, err = env.CreateUniqueNamespace(webhookNamespacePrefix)
+		namespace, err = env.CreateUniqueNamespace(webhookNamespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
 			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(webhookNamespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 			}
-			return env.DeleteNamespace(webhookNamespace)
+			return env.DeleteNamespace(namespace)
 		})
-		AssertCreateCluster(webhookNamespace, clusterName, sampleFile, env)
+		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 		// Check if cluster is ready and the default values are populated
-		AssertClusterDefault(webhookNamespace, clusterName, clusterIsDefaulted, env)
+		AssertClusterDefault(namespace, clusterName, clusterIsDefaulted, env)
 	})
 
 	It("Does not crash the operator when disabled", func() {
@@ -125,17 +129,17 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive, tests.LabelOper
 		})
 
 		// Create a basic PG cluster
-		webhookNamespace, err = env.CreateUniqueNamespace(webhookNamespacePrefix)
+		namespace, err = env.CreateUniqueNamespace(webhookNamespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
 			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(webhookNamespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 			}
-			return env.DeleteNamespace(webhookNamespace)
+			return env.DeleteNamespace(namespace)
 		})
-		AssertCreateCluster(webhookNamespace, clusterName, sampleFile, env)
+		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 		// Check if cluster is ready and has no default value in the object
-		AssertClusterDefault(webhookNamespace, clusterName, clusterIsDefaulted, env)
+		AssertClusterDefault(namespace, clusterName, clusterIsDefaulted, env)
 
 		// Make sure the operator is intact and not crashing
 		By("having a deployment for the operator in state ready", func() {

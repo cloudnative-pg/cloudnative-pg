@@ -27,6 +27,7 @@ import (
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
@@ -39,6 +40,8 @@ var _ = Describe("Volume space unavailable", Label(tests.LabelStorage), func() {
 		level           = tests.Low
 		namespacePrefix = "diskspace-e2e"
 	)
+
+	var namespace string
 
 	diskSpaceDetectionTest := func(namespace, clusterName string) {
 		const walDir = "/var/lib/postgresql/data/pgdata/pg_wal"
@@ -185,17 +188,22 @@ var _ = Describe("Volume space unavailable", Label(tests.LabelStorage), func() {
 		}
 	})
 
+	JustAfterEach(func() {
+		if CurrentSpecReport().Failed() {
+			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+		} else {
+			err := fileutils.RemoveDirectory("cluster_logs/" + namespace)
+			Expect(err).ToNot(HaveOccurred())
+		}
+	})
+
 	DescribeTable("WAL volume space unavailable",
 		func(sampleFile string) {
-			var namespace string
 			var err error
 			// Create a cluster in a namespace we'll delete after the test
 			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
-				if CurrentSpecReport().Failed() {
-					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-				}
 				return env.DeleteNamespace(namespace)
 			})
 

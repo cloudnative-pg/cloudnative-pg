@@ -21,6 +21,7 @@ import (
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/hibernation"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
@@ -43,6 +44,15 @@ var _ = Describe("Cluster declarative hibernation", func() {
 		}
 	})
 
+	JustAfterEach(func() {
+		if CurrentSpecReport().Failed() {
+			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+		} else {
+			err := fileutils.RemoveDirectory("cluster_logs/" + namespace)
+			Expect(err).ToNot(HaveOccurred())
+		}
+	})
+
 	It("hibernates an existing cluster", func(ctx SpecContext) {
 		const namespacePrefix = "declarative-hibernation"
 
@@ -53,9 +63,6 @@ var _ = Describe("Cluster declarative hibernation", func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		DeferCleanup(func() error {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
 			return env.DeleteNamespace(namespace)
 		})
 

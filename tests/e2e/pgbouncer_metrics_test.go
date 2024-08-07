@@ -24,6 +24,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	pkgutils "github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
@@ -46,15 +47,21 @@ var _ = Describe("PGBouncer Metrics", Label(tests.LabelObservability), func() {
 		}
 	})
 
+	JustAfterEach(func() {
+		if CurrentSpecReport().Failed() {
+			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+		} else {
+			err := fileutils.RemoveDirectory("cluster_logs/" + namespace)
+			Expect(err).ToNot(HaveOccurred())
+		}
+	})
+
 	It("should retrieve the metrics exposed by a freshly created pooler of type pgBouncer and validate its content",
 		func() {
 			var err error
 			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
-				if CurrentSpecReport().Failed() {
-					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-				}
 				return env.DeleteNamespace(namespace)
 			})
 

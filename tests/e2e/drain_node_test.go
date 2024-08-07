@@ -24,6 +24,7 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
@@ -85,6 +86,9 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 		JustAfterEach(func() {
 			if CurrentSpecReport().Failed() {
 				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+			} else {
+				err := fileutils.RemoveDirectory("cluster_logs/" + namespace)
+				Expect(err).ToNot(HaveOccurred())
 			}
 		})
 
@@ -337,6 +341,9 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 		JustAfterEach(func() {
 			if CurrentSpecReport().Failed() {
 				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+			} else {
+				err := fileutils.RemoveDirectory("cluster_logs/" + namespace)
+				Expect(err).ToNot(HaveOccurred())
 			}
 		})
 

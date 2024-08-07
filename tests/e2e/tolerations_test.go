@@ -19,6 +19,7 @@ package e2e
 import (
 	"fmt"
 
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
@@ -53,6 +54,14 @@ var _ = Describe("E2E Tolerations Node", Serial, Label(tests.LabelDisruptive, te
 		}
 		taintedNodes = nil
 	})
+	JustAfterEach(func() {
+		if CurrentSpecReport().Failed() {
+			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+		} else {
+			err := fileutils.RemoveDirectory("cluster_logs/" + namespace)
+			Expect(err).ToNot(HaveOccurred())
+		}
+	})
 
 	It("can create a cluster with tolerations", func() {
 		var err error
@@ -60,9 +69,6 @@ var _ = Describe("E2E Tolerations Node", Serial, Label(tests.LabelDisruptive, te
 		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
 			return env.DeleteNamespace(namespace)
 		})
 

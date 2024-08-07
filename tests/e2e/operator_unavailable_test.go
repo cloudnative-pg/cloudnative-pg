@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
@@ -40,21 +41,24 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 		sampleFile  = fixturesDir + "/operator-unavailable/operator-unavailable.yaml.template"
 		level       = tests.Medium
 	)
+	var namespace string
 
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 	})
+	JustAfterEach(func() {
+		if CurrentSpecReport().Failed() {
+			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+		} else {
+			err := fileutils.RemoveDirectory("cluster_logs/" + namespace)
+			Expect(err).ToNot(HaveOccurred())
+		}
+	})
 
 	Context("Scale down operator replicas to zero and delete primary", func() {
 		const namespacePrefix = "op-unavailable-e2e-zero-replicas"
-		var namespace string
-		JustAfterEach(func() {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-		})
 		It("can survive operator failures", func() {
 			var err error
 			// Create the cluster namespace
@@ -139,12 +143,7 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 
 	Context("Delete primary and operator concurrently", func() {
 		const namespacePrefix = "op-unavailable-e2e-delete-operator"
-		var namespace string
-		JustAfterEach(func() {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-		})
+
 		It("can survive operator failures", func() {
 			var operatorPodName string
 			var err error

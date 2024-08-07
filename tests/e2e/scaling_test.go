@@ -19,6 +19,7 @@ package e2e
 import (
 	"fmt"
 
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
@@ -34,22 +35,30 @@ var _ = Describe("Cluster scale up and down", Serial, Label(tests.LabelReplicati
 		level                             = tests.Lowest
 		expectedPvcCount                  = 6
 	)
+
+	var namespace string
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
+		}
+	})
+	JustAfterEach(func() {
+		if CurrentSpecReport().Failed() {
+			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+		} else {
+			err := fileutils.RemoveDirectory("cluster_logs/" + namespace)
+			Expect(err).ToNot(HaveOccurred())
 		}
 	})
 
 	Context("with HA Replication Slots", func() {
 		It("can scale the cluster size", func() {
 			const namespacePrefix = "cluster-scale-e2e-with-slots"
+			var err error
 			// Create a cluster in a namespace we'll delete after the test
-			namespace, err := env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
-				if CurrentSpecReport().Failed() {
-					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-				}
 				return env.DeleteNamespaceAndWait(namespace, 60)
 			})
 			AssertCreateCluster(namespace, clusterName, sampleFileWithReplicationSlots, env)
@@ -86,12 +95,10 @@ var _ = Describe("Cluster scale up and down", Serial, Label(tests.LabelReplicati
 		It("can scale the cluster size", func() {
 			// Create a cluster in a namespace we'll delete after the test
 			const namespacePrefix = "cluster-scale-e2e"
-			namespace, err := env.CreateUniqueNamespace(namespacePrefix)
+			var err error
+			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
-				if CurrentSpecReport().Failed() {
-					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-				}
 				return env.DeleteNamespaceAndWait(namespace, 60)
 			})
 			AssertCreateCluster(namespace, clusterName, sampleFileWithoutReplicationSlots, env)

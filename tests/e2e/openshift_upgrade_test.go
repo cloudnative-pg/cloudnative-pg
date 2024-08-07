@@ -18,6 +18,7 @@ package e2e
 import (
 	"github.com/blang/semver"
 
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
@@ -139,7 +140,14 @@ var _ = Describe("Upgrade Paths on OpenShift", Label(tests.LabelUpgrade), Ordere
 		namespace, err := env.CreateUniqueNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
-
+		JustAfterEach(func() {
+			if CurrentSpecReport().Failed() {
+				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+			} else {
+				err := fileutils.RemoveDirectory("cluster_logs/" + namespace)
+				Expect(err).ToNot(HaveOccurred())
+			}
+		})
 		By("Patching the status condition if required", func() {
 			// Patch the status conditions if we are running on a pre new-policy release
 			if currentSemVersion.LT(newPolicyRelease) {

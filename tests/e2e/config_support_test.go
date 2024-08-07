@@ -23,6 +23,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
@@ -57,6 +58,9 @@ var _ = Describe("Config support", Serial, Ordered, Label(tests.LabelDisruptive,
 	JustAfterEach(func() {
 		if CurrentSpecReport().Failed() {
 			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+		} else {
+			err := fileutils.RemoveDirectory("cluster_logs/" + namespace)
+			Expect(err).ToNot(HaveOccurred())
 		}
 	})
 

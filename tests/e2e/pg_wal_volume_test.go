@@ -28,6 +28,7 @@ import (
 	"k8s.io/client-go/util/retry"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
@@ -110,6 +111,14 @@ var _ = Describe("Separate pg_wal volume", Label(tests.LabelStorage), func() {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 	})
+	JustAfterEach(func() {
+		if CurrentSpecReport().Failed() {
+			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+		} else {
+			err := fileutils.RemoveDirectory("cluster_logs/" + namespace)
+			Expect(err).ToNot(HaveOccurred())
+		}
+	})
 
 	// This test checks for separate and dedicated pg_wal volume well behaving, by
 	// ensuring WAL files are archived to the correct location and a symlink
@@ -121,9 +130,6 @@ var _ = Describe("Separate pg_wal volume", Label(tests.LabelStorage), func() {
 		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
 			return env.DeleteNamespace(namespace)
 		})
 		AssertCreateCluster(namespace, clusterName, sampleFileWithPgWal, env)
@@ -137,9 +143,6 @@ var _ = Describe("Separate pg_wal volume", Label(tests.LabelStorage), func() {
 		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
 			return env.DeleteNamespace(namespace)
 		})
 		AssertCreateCluster(namespace, clusterName, sampleFileWithoutPgWal, env)

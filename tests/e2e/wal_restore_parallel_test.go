@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/walrestore"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	testUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
@@ -50,7 +51,14 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 			Skip("This test is only run on local cluster")
 		}
 	})
-
+	JustAfterEach(func() {
+		if CurrentSpecReport().Failed() {
+			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+		} else {
+			err := fileutils.RemoveDirectory("cluster_logs/" + namespace)
+			Expect(err).ToNot(HaveOccurred())
+		}
+	})
 	It("Wal-restore in parallel using minio as object storage for backup", func() {
 		// This is a set of tests using a minio server deployed in the same
 		// namespace as the cluster. Since each cluster is installed in its

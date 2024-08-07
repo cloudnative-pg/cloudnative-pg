@@ -17,6 +17,7 @@ limitations under the License.
 package e2e
 
 import (
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 
@@ -45,6 +46,15 @@ var _ = Describe("PodMonitor support", Serial, Label(tests.LabelObservability), 
 		}
 	})
 
+	JustAfterEach(func() {
+		if CurrentSpecReport().Failed() {
+			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+		} else {
+			err := fileutils.RemoveDirectory("cluster_logs/" + namespace)
+			Expect(err).ToNot(HaveOccurred())
+		}
+	})
+
 	It("requires existence of the PodMonitor CRD", func() {
 		// Check if CRD exists, otherwise test is invalid
 		exist, err := utils.PodMonitorExist(env.APIExtensionClient.Discovery())
@@ -56,9 +66,6 @@ var _ = Describe("PodMonitor support", Serial, Label(tests.LabelObservability), 
 		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
 			return env.DeleteNamespace(namespace)
 		})
 

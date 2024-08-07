@@ -21,6 +21,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
@@ -84,6 +85,15 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 
 		var namespace string
 
+		JustAfterEach(func() {
+			if CurrentSpecReport().Failed() {
+				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+			} else {
+				err := fileutils.RemoveDirectory("cluster_logs/" + namespace)
+				Expect(err).ToNot(HaveOccurred())
+			}
+		})
+
 		It("can find the tables created by the post-init SQL queries", func() {
 			// Create a cluster in a namespace we'll delete after the test
 			const namespacePrefix = "initdb-postqueries"
@@ -91,12 +101,8 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
-				if CurrentSpecReport().Failed() {
-					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-				}
 				return env.DeleteNamespace(namespace)
 			})
-
 			CreateResourceFromFile(namespace, postInitSQLSecretRef)
 			CreateResourceFromFile(namespace, postInitSQLConfigMapRef)
 			CreateResourceFromFile(namespace, postInitApplicationSQLSecretRef)
@@ -155,6 +161,14 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 		)
 
 		var namespace string
+		JustAfterEach(func() {
+			if CurrentSpecReport().Failed() {
+				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+			} else {
+				err := fileutils.RemoveDirectory("cluster_logs/" + namespace)
+				Expect(err).ToNot(HaveOccurred())
+			}
+		})
 
 		It("use the custom default locale specified", func() {
 			// Create a cluster in a namespace we'll delete after the test
@@ -163,9 +177,6 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
-				if CurrentSpecReport().Failed() {
-					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-				}
 				return env.DeleteNamespace(namespace)
 			})
 			AssertCreateCluster(namespace, clusterName, postInitSQLCluster, env)

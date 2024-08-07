@@ -33,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/logs"
@@ -64,6 +65,15 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
+		}
+	})
+
+	JustAfterEach(func() {
+		if CurrentSpecReport().Failed() {
+			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+		} else {
+			err := fileutils.RemoveDirectory("cluster_logs/" + namespace)
+			Expect(err).ToNot(HaveOccurred())
 		}
 	})
 
@@ -115,11 +125,6 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 				"/tablespaces/cluster-with-tablespaces-backup.yaml.template"
 			fullBackupName = "full-barman-backup"
 		)
-		JustAfterEach(func() {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-		})
 		BeforeAll(func() {
 			// Create a cluster in a namespace we'll delete after the test
 			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
@@ -382,11 +387,6 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 			table2                = "test_tbs2"
 		)
 		checkPointTimeout := time.Second * 10
-		JustAfterEach(func() {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-		})
 		BeforeAll(func() {
 			// Create a cluster in a namespace we'll delete after the test
 			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
@@ -618,12 +618,6 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 	})
 
 	Context("on a plain cluster with primaryUpdateMethod=restart", Ordered, func() {
-		JustAfterEach(func() {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-		})
-
 		clusterManifest := fixturesDir + "/tablespaces/cluster-without-tablespaces.yaml.template"
 		BeforeAll(func() {
 			var err error
@@ -756,12 +750,6 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 	})
 
 	Context("on a plain cluster with primaryUpdateMethod=switchover", Ordered, func() {
-		JustAfterEach(func() {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-		})
-
 		clusterManifest := fixturesDir + "/tablespaces/cluster-without-tablespaces.yaml.template"
 		BeforeAll(func() {
 			var err error

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
@@ -35,13 +36,22 @@ var _ = Describe("Verify storage", Label(tests.LabelStorage), func() {
 		clusterName = "storage-expansion"
 		level       = tests.Lowest
 	)
+	// Initializing a global namespace variable to be used in each test case
+	var namespace, namespacePrefix string
+
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 	})
-	// Initializing a global namespace variable to be used in each test case
-	var namespace, namespacePrefix string
+	JustAfterEach(func() {
+		if CurrentSpecReport().Failed() {
+			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+		} else {
+			err := fileutils.RemoveDirectory("cluster_logs/" + namespace)
+			Expect(err).ToNot(HaveOccurred())
+		}
+	})
 	// Gathering default storage class requires to check whether the value
 	// of 'allowVolumeExpansion' is true or false
 	defaultStorageClass := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
@@ -64,9 +74,6 @@ var _ = Describe("Verify storage", Label(tests.LabelStorage), func() {
 			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
-				if CurrentSpecReport().Failed() {
-					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-				}
 				return env.DeleteNamespace(namespace)
 			})
 			// Creating a cluster with three nodes
@@ -76,7 +83,6 @@ var _ = Describe("Verify storage", Label(tests.LabelStorage), func() {
 	})
 
 	Context("can not be expanded", func() {
-		var namespace string
 		BeforeEach(func() {
 			// Initializing namespace variable to be used in test case
 			namespacePrefix = "storage-expansion-false"
@@ -87,16 +93,12 @@ var _ = Describe("Verify storage", Label(tests.LabelStorage), func() {
 				Skip(fmt.Sprintf("AllowedVolumeExpansion is true on %v", defaultStorageClass))
 			}
 		})
-
 		It("expands PVCs via offline resize", func() {
 			var err error
 			// Creating namespace
 			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
-				if CurrentSpecReport().Failed() {
-					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-				}
 				return env.DeleteNamespace(namespace)
 			})
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
