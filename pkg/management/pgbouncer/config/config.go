@@ -77,6 +77,7 @@ const (
 pool_mode = {{ .Pooler.Spec.PgBouncer.PoolMode }}
 auth_user = {{ .AuthQueryUser }}
 auth_query = {{ .AuthQuery }}
+auth_dbname = {{ .AuthDBName }}
 
 {{ .Parameters -}}
 `
@@ -187,10 +188,12 @@ func BuildConfigurationFiles(pooler *apiv1.Pooler, secrets *Secrets) (Configurat
 		AuthQuery         string
 		AuthQueryUser     string
 		AuthQueryPassword string
+		AuthDBName        string
 		Parameters        string
 		PgHba             []string
 	}{
 		Pooler:            pooler,
+		AuthDBName:        pooler.GetAuthDBName(),
 		AuthQuery:         pooler.GetAuthQuery(),
 		AuthQueryUser:     authQueryUser,
 		AuthQueryPassword: authQueryPassword,
