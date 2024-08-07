@@ -1472,6 +1472,10 @@ func (r *InstanceReconciler) dropStaleReplicationConnections(
 		return ctrl.Result{}, fmt.Errorf("while dropping connections: %w", err)
 	}
 
+	// There is a possibility that when connections are dropped at the first time,
+	// the pod of the designated primary has not yet been labeled as primary.
+	// As a result, the standbys might reconnect to the old primary by the Service `<cluster>-rw`
+	// To avoid this issue, attempt to drop the connections again after 5s.
 	terminatedConnections, err := result.RowsAffected()
 	if err != nil {
 		return ctrl.Result{}, err
