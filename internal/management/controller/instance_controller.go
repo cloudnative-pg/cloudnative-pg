@@ -259,7 +259,7 @@ func (r *InstanceReconciler) Reconcile(
 	}
 
 	if res, err := r.dropStaleReplicationConnections(ctx, cluster); err != nil || !res.IsZero() {
-		return res, err
+		return res, fmt.Errorf("while dropping stale replica connections: %w", err)
 	}
 
 	if err := r.reconcileDatabases(ctx, cluster); err != nil {
@@ -1469,18 +1469,17 @@ func (r *InstanceReconciler) dropStaleReplicationConnections(
 		fmt.Sprintf("%v-%%", cluster.Name),
 	)
 	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("while dropping connections: %w", err)
+		return ctrl.Result{}, fmt.Errorf("while executing pg_terminate_backend: %w", err)
 	}
 
-	// There is a possibility that when connections are dropped at the first time,
-	// the pod of the designated primary has not yet been labeled as primary.
-	// As a result, the standbys might reconnect to the old primary by the Service `<cluster>-rw`
-	// To avoid this issue, attempt to drop the connections again after 5s.
 	terminatedConnections, err := result.RowsAffected()
 	if err != nil {
 		return ctrl.Result{}, err
 	}
+
 	if terminatedConnections > 0 {
+		// given that we have executed a pg_terminate_backend, we request a new reconciliation loop to ensure that
+		// everything is in order and no leftovers that needs to be dropped are present.
 		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 	}
 

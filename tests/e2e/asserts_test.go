@@ -178,16 +178,14 @@ func AssertSwitchoverWithHistory(
 				return nil
 			}, timeout).ShouldNot(HaveOccurred())
 		})
-	}
-
-	if isReplica {
+	} else {
 		By("verifying that the all standbys are streaming from the new primary", func() {
 			timeout := 120
 			commandTimeout := time.Second * 10
 			Eventually(func(g Gomega) {
 				podList, err := env.GetClusterPodList(namespace, clusterName)
 				g.Expect(err).ToNot(HaveOccurred())
-
+				g.Expect(podList.Items).To(HaveLen(oldPodListLength))
 				var standbys []interface{}
 				for _, pod := range podList.Items {
 					if specs.IsPodStandby(pod) {
@@ -219,7 +217,6 @@ func AssertSwitchoverWithHistory(
 						)
 					}
 				}
-
 			}, timeout).ShouldNot(HaveOccurred())
 		})
 	}
