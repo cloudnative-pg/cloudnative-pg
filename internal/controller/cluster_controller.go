@@ -516,6 +516,9 @@ func (r *ClusterReconciler) handleSwitchover(
 			"currentPrimary", cluster.Status.CurrentPrimary,
 			"targetPrimary", cluster.Status.TargetPrimary)
 		if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseHealthy, ""); err != nil {
+			contextLogger.Error(err, "while handling swtichover, failed to register phase",
+				"currentPrimary", cluster.Status.CurrentPrimary,
+				"targetPrimary", cluster.Status.TargetPrimary)
 			return nil, err
 		}
 		return nil, nil
