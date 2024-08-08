@@ -47,10 +47,12 @@ var _ = Describe("Cluster scale up and down", Serial, Label(tests.LabelReplicati
 			namespace, err := env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
-				if CurrentSpecReport().Failed() {
-					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-				}
-				return env.DeleteNamespaceAndWait(namespace, 60)
+				return env.CleanupNamespace(
+					namespace,
+					CurrentSpecReport().LeafNodeText,
+					CurrentSpecReport().Failed(),
+					GinkgoWriter,
+				)
 			})
 			AssertCreateCluster(namespace, clusterName, sampleFileWithReplicationSlots, env)
 
@@ -89,10 +91,12 @@ var _ = Describe("Cluster scale up and down", Serial, Label(tests.LabelReplicati
 			namespace, err := env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
-				if CurrentSpecReport().Failed() {
-					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-				}
-				return env.DeleteNamespaceAndWait(namespace, 60)
+				return env.CleanupNamespace(
+					namespace,
+					CurrentSpecReport().LeafNodeText,
+					CurrentSpecReport().Failed(),
+					GinkgoWriter,
+				)
 			})
 			AssertCreateCluster(namespace, clusterName, sampleFileWithoutReplicationSlots, env)
 

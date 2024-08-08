@@ -78,7 +78,12 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
-				return env.DeleteNamespace(namespace)
+				return env.CleanupNamespace(
+					namespace,
+					CurrentSpecReport().LeafNodeText,
+					CurrentSpecReport().Failed(),
+					GinkgoWriter,
+				)
 			})
 			AssertCreateCluster(namespace, sourceClusterName, sourceClusterFile, env)
 		})

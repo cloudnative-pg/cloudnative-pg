@@ -56,7 +56,7 @@ var _ = Describe("Pod logging tests", func() {
 		streamPodLog := StreamingRequest{
 			Pod:     nil,
 			Options: podLogOptions,
-			client:  client,
+			Client:  client,
 		}
 		var logBuffer bytes.Buffer
 		err := streamPodLog.Stream(ctx, &logBuffer)
@@ -95,7 +95,7 @@ var _ = Describe("Pod logging tests", func() {
 			Pod:      pod,
 			Options:  podLogOptions,
 			Previous: false,
-			client:   client,
+			Client:   client,
 		}
 
 		var logBuffer bytes.Buffer

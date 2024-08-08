@@ -52,7 +52,12 @@ var _ = Describe("PGBouncer Connections", Label(tests.LabelServiceConnectivity),
 			namespace, err = env.CreateUniqueNamespace("pgbouncer-auth-no-user-certs")
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
-				return env.DeleteNamespace(namespace)
+				return env.CleanupNamespace(
+					namespace,
+					CurrentSpecReport().LeafNodeText,
+					CurrentSpecReport().Failed(),
+					GinkgoWriter,
+				)
 			})
 			clusterName, err = env.GetResourceNameFromYAML(sampleFile)
 			Expect(err).ToNot(HaveOccurred())
@@ -151,7 +156,12 @@ var _ = Describe("PGBouncer Connections", Label(tests.LabelServiceConnectivity),
 			namespace, err = env.CreateUniqueNamespace("pgbouncer-separate-certificates")
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
-				return env.DeleteNamespace(namespace)
+				return env.CleanupNamespace(
+					namespace,
+					CurrentSpecReport().LeafNodeText,
+					CurrentSpecReport().Failed(),
+					GinkgoWriter,
+				)
 			})
 			clusterName, err = env.GetResourceNameFromYAML(sampleFileWithCertificate)
 			Expect(err).ToNot(HaveOccurred())

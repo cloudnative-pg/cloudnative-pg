@@ -77,7 +77,12 @@ var _ = Describe("Imports with Microservice Approach", Label(tests.LabelImportin
 		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
-			return env.DeleteNamespace(namespace)
+			return env.CleanupNamespace(
+				namespace,
+				CurrentSpecReport().LeafNodeText,
+				CurrentSpecReport().Failed(),
+				GinkgoWriter,
+			)
 		})
 		AssertCreateCluster(namespace, sourceClusterName, sourceSampleFile, env)
 		AssertCreateTestData(namespace, sourceClusterName, tableName, psqlClientPod)
@@ -101,7 +106,12 @@ var _ = Describe("Imports with Microservice Approach", Label(tests.LabelImportin
 		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
-			return env.DeleteNamespace(namespace)
+			return env.CleanupNamespace(
+				namespace,
+				CurrentSpecReport().LeafNodeText,
+				CurrentSpecReport().Failed(),
+				GinkgoWriter,
+			)
 		})
 		AssertCreateCluster(namespace, sourceClusterName, sourceSampleFile, env)
 		assertCreateTableWithDataOnSourceCluster(namespace, tableName, sourceClusterName)
@@ -120,7 +130,12 @@ var _ = Describe("Imports with Microservice Approach", Label(tests.LabelImportin
 		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
-			return env.DeleteNamespace(namespace)
+			return env.CleanupNamespace(
+				namespace,
+				CurrentSpecReport().LeafNodeText,
+				CurrentSpecReport().Failed(),
+				GinkgoWriter,
+			)
 		})
 		assertImportRenamesSelectedDatabase(namespace, sourceSampleFile,
 			importedClusterName, tableName, "")
@@ -136,7 +151,12 @@ var _ = Describe("Imports with Microservice Approach", Label(tests.LabelImportin
 		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
-			return env.DeleteNamespace(namespace)
+			return env.CleanupNamespace(
+				namespace,
+				CurrentSpecReport().LeafNodeText,
+				CurrentSpecReport().Failed(),
+				GinkgoWriter,
+			)
 		})
 		AssertCreateCluster(namespace, sourceClusterName, sourceSampleFile, env)
 
@@ -183,7 +203,12 @@ var _ = Describe("Imports with Microservice Approach", Label(tests.LabelImportin
 			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
-				return env.DeleteNamespace(namespace)
+				return env.CleanupNamespace(
+					namespace,
+					CurrentSpecReport().LeafNodeText,
+					CurrentSpecReport().Failed(),
+					GinkgoWriter,
+				)
 			})
 			assertImportRenamesSelectedDatabase(namespace, sourceSampleFile, importedClusterName,
 				tableName, targetImage)

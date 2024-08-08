@@ -35,9 +35,9 @@ type StreamingRequest struct {
 	Pod      *v1.Pod
 	Options  *v1.PodLogOptions
 	Previous bool `json:"previous,omitempty"`
-	// NOTE: the client argument may be omitted, but it is good practice to pass it
+	// NOTE: the Client argument may be omitted, but it is good practice to pass it
 	// Importantly, it makes the logging functions testable
-	client kubernetes.Interface
+	Client kubernetes.Interface
 }
 
 func (spl *StreamingRequest) getPodName() string {
@@ -63,14 +63,14 @@ func (spl *StreamingRequest) getLogOptions() *v1.PodLogOptions {
 }
 
 func (spl *StreamingRequest) getKubernetesClient() kubernetes.Interface {
-	if spl.client != nil {
-		return spl.client
+	if spl.Client != nil {
+		return spl.Client
 	}
 	conf := ctrl.GetConfigOrDie()
 
-	spl.client = kubernetes.NewForConfigOrDie(conf)
+	spl.Client = kubernetes.NewForConfigOrDie(conf)
 
-	return spl.client
+	return spl.Client
 }
 
 // getStreamToPod opens the REST request to the pod
@@ -125,7 +125,7 @@ func TailPodLogs(
 			Follow:     true,
 			SinceTime:  &now,
 		},
-		client: client,
+		Client: client,
 	}
 	return streamPodLog.Stream(ctx, writer)
 }
@@ -154,7 +154,7 @@ func GetPodLogs(
 		Pod:      &pod,
 		Previous: getPrevious,
 		Options:  &v1.PodLogOptions{},
-		client:   client,
+		Client:   client,
 	}
 	logsRequest := streamPodLog.getStreamToPod()
 

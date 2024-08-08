@@ -84,10 +84,12 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive, tests.LabelOper
 		webhookNamespace, err = env.CreateUniqueNamespace(webhookNamespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(webhookNamespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-			return env.DeleteNamespace(webhookNamespace)
+			return env.CleanupNamespace(
+				webhookNamespace,
+				CurrentSpecReport().LeafNodeText,
+				CurrentSpecReport().Failed(),
+				GinkgoWriter,
+			)
 		})
 		AssertCreateCluster(webhookNamespace, clusterName, sampleFile, env)
 		// Check if cluster is ready and the default values are populated
@@ -128,10 +130,12 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive, tests.LabelOper
 		webhookNamespace, err = env.CreateUniqueNamespace(webhookNamespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		DeferCleanup(func() error {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(webhookNamespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-			return env.DeleteNamespace(webhookNamespace)
+			return env.CleanupNamespace(
+				webhookNamespace,
+				CurrentSpecReport().LeafNodeText,
+				CurrentSpecReport().Failed(),
+				GinkgoWriter,
+			)
 		})
 		AssertCreateCluster(webhookNamespace, clusterName, sampleFile, env)
 		// Check if cluster is ready and has no default value in the object
