@@ -103,10 +103,6 @@ func (r *statusClient) GetDatabase(ctx context.Context, pod *corev1.Pod, dbname 
 	return result, nil
 }
 
-func (r *statusClient) DeleteDatabase(ctx context.Context, pod *corev1.Pod, dbname string) error {
-	return r.rawDatabaseEntrypoint(ctx, pod, http.MethodDelete, dbname, PgDatabase{})
-}
-
 func (r *statusClient) PutDatabase(ctx context.Context, pod *corev1.Pod, dbname string, data PgDatabase) error {
 	return r.rawDatabaseEntrypoint(ctx, pod, http.MethodPut, dbname, data)
 }

@@ -3120,14 +3120,6 @@ spec:
                         encoding:
                           description: The encoding (cannot be changed)
                           type: string
-                        ensure:
-                          default: present
-                          description: Ensure the database is `present` or `absent`
-                            - defaults to "present"
-                          enum:
-                          - present
-                          - absent
-                          type: string
                         isTemplate:
                           description: True when the database is a template
                           type: boolean

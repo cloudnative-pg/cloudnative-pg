@@ -82,9 +82,6 @@ type Client interface {
 	// file created in a specific Pod
 	ArchivePartialWAL(context.Context, *corev1.Pod) (string, error)
 
-	// DeleteDatabase deletes the database with a specific name
-	DeleteDatabase(ctx context.Context, pod *corev1.Pod, dbname string) error
-
 	// GetDatabase gets the status of a database from the instance manager
 	GetDatabase(ctx context.Context, pod *corev1.Pod, dbname string) (PgDatabase, error)
 

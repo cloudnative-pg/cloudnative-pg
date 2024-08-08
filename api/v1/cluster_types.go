@@ -2842,12 +2842,6 @@ type DatabaseConfiguration struct {
 	// The default tablespace of this database
 	// +optional
 	Tablespace string `json:"tablespace,omitempty"`
-
-	// Ensure the database is `present` or `absent` - defaults to "present"
-	// +kubebuilder:default:="present"
-	// +kubebuilder:validation:Enum=present;absent
-	// +optional
-	Ensure EnsureOption `json:"ensure,omitempty"`
 }
 
 // ManagedDatabaseStatus represents the status of the managed databases feature

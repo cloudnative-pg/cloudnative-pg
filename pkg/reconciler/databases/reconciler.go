@@ -118,22 +118,10 @@ func reconcileDatabase(
 
 	_, err := instanceClient.GetDatabase(ctx, primaryPod, desiredState.Name)
 	switch {
-	case errors.Is(err, instance.ErrDatabaseNotFound) && desiredState.Ensure == apiv1.EnsureAbsent:
-		result.Ready = true
-		return result
-
 	case errors.Is(err, instance.ErrDatabaseNotFound):
 		if putError := instanceClient.PutDatabase(ctx, primaryPod, desiredState.Name, dbRequest); putError != nil {
 			result.Ready = false
 			result.ErrorMessage = putError.Error()
-		} else {
-			result.Ready = true
-		}
-
-	case err == nil && desiredState.Ensure == apiv1.EnsureAbsent:
-		if deleteError := instanceClient.DeleteDatabase(ctx, primaryPod, desiredState.Name); deleteError != nil {
-			result.Ready = false
-			result.ErrorMessage = deleteError.Error()
 		} else {
 			result.Ready = true
 		}

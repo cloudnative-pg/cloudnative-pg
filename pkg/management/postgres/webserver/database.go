@@ -17,13 +17,11 @@ limitations under the License.
 package webserver
 
 import (
-	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -56,9 +54,6 @@ func (ws *remoteWebserverEndpoints) pgDatabase(w http.ResponseWriter, req *http.
 	switch req.Method {
 	case http.MethodPut:
 		ws.putPgDatabase(w, req)
-
-	case http.MethodDelete:
-		ws.deletePgDatabase(w, req)
 
 	case http.MethodGet:
 		ws.getPgDatabase(w, req)
@@ -139,52 +134,6 @@ func (ws *remoteWebserverEndpoints) getPgDatabase(w http.ResponseWriter, req *ht
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-}
-
-func (ws *remoteWebserverEndpoints) deletePgDatabase(w http.ResponseWriter, req *http.Request) {
-	dbname := req.PathValue("dbname")
-
-	db, err := ws.instance.GetSuperUserDB()
-	if err != nil {
-		log.Debug(
-			"Error while getting DB connection",
-			"err", err.Error())
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	// Should we prevent our users from deleting an empty database?
-	// It sounds like a good idea, but the implementation is
-	// surprisingly difficult because it is surprising difficult
-	// to understand what an empty database really is.
-	//
-	// An empty database is not really empty, as new databases
-	// are created from a template that is not empty (system catalog).
-	// To add even more complexity, the template database can change
-	// over time.
-	//
-	// Perhaps a good approach would be disallowing to delete
-	// a database.
-
-	// The DROP DATABASE statement will be stuck if there are
-	// active connections on the target database. Let's give it
-	// a deadline.
-	ctx, cancelFunc := context.WithTimeout(req.Context(), 5*time.Second)
-	defer cancelFunc()
-
-	if _, err := db.ExecContext(
-		ctx,
-		fmt.Sprintf("DROP DATABASE %s", pgx.Identifier{dbname}.Sanitize()),
-	); err != nil {
-		log.Debug(
-			"Error while deleting database",
-			"dbname", dbname,
-			"err", err.Error())
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
 }
 
 func (ws *remoteWebserverEndpoints) patchPgDatabase(w http.ResponseWriter, req *http.Request) {
