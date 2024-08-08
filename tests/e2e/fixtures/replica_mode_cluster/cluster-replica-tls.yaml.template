@@ -3,7 +3,7 @@ kind: Cluster
 metadata:
   name: cluster-replica-tls
 spec:
-  instances: 1
+  instances: 3
 
   bootstrap:
     pg_basebackup:
