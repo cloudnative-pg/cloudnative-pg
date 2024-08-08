@@ -48,6 +48,27 @@ type pgDatabaseRequestFormat struct {
 
 	// The default tablespace of this database
 	Tablespace string `json:"tablespace"`
+
+	// the name of the database, this is gathered internally from the request param
+	name string
+}
+
+func getPgDatabaseRequest(req *http.Request) (pgDatabaseRequestFormat, error) {
+	contextLogger := log.FromContext(req.Context())
+	dbname := req.PathValue("dbname")
+
+	var database pgDatabaseRequestFormat
+	if err := json.NewDecoder(req.Body).Decode(&database); err != nil {
+		contextLogger.Debug("Error while decoding the database request",
+			"dbname", dbname,
+			"error", err.Error(),
+			"url", req.URL,
+			"method", req.Method,
+		)
+		return pgDatabaseRequestFormat{}, err
+	}
+	database.name = dbname
+	return database, nil
 }
 
 func (ws *remoteWebserverEndpoints) pgDatabase(w http.ResponseWriter, req *http.Request) {
@@ -62,16 +83,17 @@ func (ws *remoteWebserverEndpoints) pgDatabase(w http.ResponseWriter, req *http.
 		ws.patchPgDatabase(w, req)
 
 	default:
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		http.Error(w, fmt.Sprintf("method '%s' not allowed", req.Method), http.StatusMethodNotAllowed)
 	}
 }
 
 func (ws *remoteWebserverEndpoints) getPgDatabase(w http.ResponseWriter, req *http.Request) {
+	contextLogger := log.FromContext(req.Context())
 	dbname := req.PathValue("dbname")
 
 	db, err := ws.instance.GetSuperUserDB()
 	if err != nil {
-		log.Debug(
+		contextLogger.Debug(
 			"Error while getting DB connection",
 			"err", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -95,7 +117,7 @@ func (ws *remoteWebserverEndpoints) getPgDatabase(w http.ResponseWriter, req *ht
 		`,
 		dbname)
 	if row.Err() != nil {
-		log.Debug(
+		contextLogger.Debug(
 			"Error while getting database status",
 			"dbname", dbname,
 			"err", row.Err().Error())
@@ -117,7 +139,7 @@ func (ws *remoteWebserverEndpoints) getPgDatabase(w http.ResponseWriter, req *ht
 			return
 		}
 
-		log.Debug(
+		contextLogger.Debug(
 			"Error while getting database status (scanning error)",
 			"dbname", dbname,
 			"err", err.Error())
@@ -127,7 +149,7 @@ func (ws *remoteWebserverEndpoints) getPgDatabase(w http.ResponseWriter, req *ht
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(result); err != nil {
-		log.Debug(
+		contextLogger.Debug(
 			"Error while marshalling database status",
 			"dbname", dbname,
 			"err", err.Error())
@@ -137,22 +159,18 @@ func (ws *remoteWebserverEndpoints) getPgDatabase(w http.ResponseWriter, req *ht
 }
 
 func (ws *remoteWebserverEndpoints) patchPgDatabase(w http.ResponseWriter, req *http.Request) {
-	dbname := req.PathValue("dbname")
-
-	var database pgDatabaseRequestFormat
-	if err := json.NewDecoder(req.Body).Decode(&database); err != nil {
-		log.Debug("Error while decoding patch database request",
-			"dbname", dbname,
-			"error", err.Error())
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	contextLogger := log.FromContext(req.Context())
+	database, err := getPgDatabaseRequest(req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	db, err := ws.instance.GetSuperUserDB()
 	if err != nil {
-		log.Debug(
+		contextLogger.Debug(
 			"Error while getting DB connection",
-			"dbname", dbname,
+			"dbname", database.name,
 			"err", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -161,13 +179,13 @@ func (ws *remoteWebserverEndpoints) patchPgDatabase(w http.ResponseWriter, req *
 	if len(database.Owner) > 0 {
 		changeOwnerSQL := fmt.Sprintf(
 			"ALTER DATABASE %s OWNER TO %s",
-			pgx.Identifier{dbname}.Sanitize(),
+			pgx.Identifier{database.name}.Sanitize(),
 			pgx.Identifier{database.Owner}.Sanitize())
 
 		if _, err := db.ExecContext(req.Context(), changeOwnerSQL); err != nil {
-			log.Debug(
+			contextLogger.Debug(
 				"Error while changing database ownership",
-				"dbname", dbname,
+				"dbname", database.name,
 				"err", err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -177,13 +195,13 @@ func (ws *remoteWebserverEndpoints) patchPgDatabase(w http.ResponseWriter, req *
 	if database.IsTemplate != nil {
 		changeIsTemplateSQL := fmt.Sprintf(
 			"ALTER DATABASE %s WITH IS_TEMPLATE %v",
-			pgx.Identifier{dbname}.Sanitize(),
+			pgx.Identifier{database.name}.Sanitize(),
 			*database.IsTemplate)
 
 		if _, err := db.ExecContext(req.Context(), changeIsTemplateSQL); err != nil {
-			log.Debug(
+			contextLogger.Debug(
 				"Error while changing database IS_TEMPLATE option",
-				"dbname", dbname,
+				"dbname", database.name,
 				"err", err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -193,13 +211,13 @@ func (ws *remoteWebserverEndpoints) patchPgDatabase(w http.ResponseWriter, req *
 	if database.AllowConnections != nil {
 		changeAllowConnectionsSQL := fmt.Sprintf(
 			"ALTER DATABASE %s WITH ALLOW_CONNECTIONS %v",
-			pgx.Identifier{dbname}.Sanitize(),
+			pgx.Identifier{database.name}.Sanitize(),
 			*database.AllowConnections)
 
 		if _, err := db.ExecContext(req.Context(), changeAllowConnectionsSQL); err != nil {
-			log.Debug(
+			contextLogger.Debug(
 				"Error while changing database ALLOW_CONNECTIONS option",
-				"dbname", dbname,
+				"dbname", database.name,
 				"err", err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -209,13 +227,13 @@ func (ws *remoteWebserverEndpoints) patchPgDatabase(w http.ResponseWriter, req *
 	if database.ConnectionLimit != nil {
 		changeConnectionsLimitSQL := fmt.Sprintf(
 			"ALTER DATABASE %s WITH CONNECTION LIMIT %v",
-			pgx.Identifier{dbname}.Sanitize(),
+			pgx.Identifier{database.name}.Sanitize(),
 			*database.ConnectionLimit)
 
 		if _, err := db.ExecContext(req.Context(), changeConnectionsLimitSQL); err != nil {
-			log.Debug(
+			contextLogger.Debug(
 				"Error while changing database CONNECTION LIMIT option",
-				"dbname", dbname,
+				"dbname", database.name,
 				"err", err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -225,13 +243,13 @@ func (ws *remoteWebserverEndpoints) patchPgDatabase(w http.ResponseWriter, req *
 	if len(database.Tablespace) > 0 {
 		changeTablespaceSQL := fmt.Sprintf(
 			"ALTER DATABASE %s SET TABLESPACE %s",
-			pgx.Identifier{dbname}.Sanitize(),
+			pgx.Identifier{database.name}.Sanitize(),
 			pgx.Identifier{database.Tablespace}.Sanitize())
 
 		if _, err := db.ExecContext(req.Context(), changeTablespaceSQL); err != nil {
-			log.Debug(
+			contextLogger.Debug(
 				"Error while changing database default tablespace",
-				"dbname", dbname,
+				"dbname", database.name,
 				"err", err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -242,28 +260,24 @@ func (ws *remoteWebserverEndpoints) patchPgDatabase(w http.ResponseWriter, req *
 }
 
 func (ws *remoteWebserverEndpoints) putPgDatabase(w http.ResponseWriter, req *http.Request) {
-	dbname := req.PathValue("dbname")
-
-	var database pgDatabaseRequestFormat
-	if err := json.NewDecoder(req.Body).Decode(&database); err != nil {
-		log.Debug("Error while decoding patch database request",
-			"dbname", dbname,
-			"error", err.Error())
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	contextLogger := log.FromContext(req.Context())
+	database, err := getPgDatabaseRequest(req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	db, err := ws.instance.GetSuperUserDB()
 	if err != nil {
-		log.Debug(
+		contextLogger.Debug(
 			"Error while getting DB connection",
-			"dbname", dbname,
+			"dbname", database,
 			"err", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	sqlCreateDatabase := fmt.Sprintf("CREATE DATABASE %s ", dbname)
+	sqlCreateDatabase := fmt.Sprintf("CREATE DATABASE %s ", database.name)
 	if database.IsTemplate != nil {
 		sqlCreateDatabase += fmt.Sprintf(" IS_TEMPLATE %v", *database.IsTemplate)
 	}
@@ -281,9 +295,9 @@ func (ws *remoteWebserverEndpoints) putPgDatabase(w http.ResponseWriter, req *ht
 	}
 
 	if _, err := db.ExecContext(req.Context(), sqlCreateDatabase); err != nil {
-		log.Debug(
+		contextLogger.Debug(
 			"Error while creating database",
-			"dbname", dbname,
+			"dbname", database.name,
 			"err", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
