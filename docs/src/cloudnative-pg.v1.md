@@ -2033,13 +2033,6 @@ any plugin to be loaded with the corresponding configuration</p>
    <p>TablespacesStatus reports the state of the declarative tablespaces in the cluster</p>
 </td>
 </tr>
-<tr><td><code>databaseStatus</code><br/>
-<a href="#postgresql-cnpg-io-v1-ManagedDatabaseStatus"><i>ManagedDatabaseStatus</i></a>
-</td>
-<td>
-   <p>ManagedDatabaseStatus reports the status of the managed databases</p>
-</td>
-</tr>
 <tr><td><code>timelineID</code><br/>
 <i>int</i>
 </td>
@@ -2527,25 +2520,86 @@ PostgreSQL cluster from an existing storage</p>
 </tbody>
 </table>
 
-## DatabaseConfiguration     {#postgresql-cnpg-io-v1-DatabaseConfiguration}
+## Database     {#postgresql-cnpg-io-v1-Database}
 
 
-**Appears in:**
 
-- [ManagedConfiguration](#postgresql-cnpg-io-v1-ManagedConfiguration)
-
-
-<p>DatabaseConfiguration is the representation in Kubernetes of a PostgreSQL Database</p>
+<p>Database is the Schema for the databases API</p>
 
 
 <table class="table">
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
+<tr><td><code>metadata</code> <B>[Required]</B><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#objectmeta-v1-meta"><i>meta/v1.ObjectMeta</i></a>
+</td>
+<td>
+   <span class="text-muted">No description provided.</span>Refer to the Kubernetes API documentation for the fields of the <code>metadata</code> field.</td>
+</tr>
+<tr><td><code>spec</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-DatabaseSpec"><i>DatabaseSpec</i></a>
+</td>
+<td>
+   <span class="text-muted">No description provided.</span></td>
+</tr>
+<tr><td><code>status</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-DatabaseStatus"><i>DatabaseStatus</i></a>
+</td>
+<td>
+   <span class="text-muted">No description provided.</span></td>
+</tr>
+</tbody>
+</table>
+
+## DatabaseRoleRef     {#postgresql-cnpg-io-v1-DatabaseRoleRef}
+
+
+**Appears in:**
+
+- [TablespaceConfiguration](#postgresql-cnpg-io-v1-TablespaceConfiguration)
+
+
+<p>DatabaseRoleRef is a reference an a role available inside PostgreSQL</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>name</code><br/>
+<i>string</i>
+</td>
+<td>
+   <span class="text-muted">No description provided.</span></td>
+</tr>
+</tbody>
+</table>
+
+## DatabaseSpec     {#postgresql-cnpg-io-v1-DatabaseSpec}
+
+
+**Appears in:**
+
+- [Database](#postgresql-cnpg-io-v1-Database)
+
+
+<p>DatabaseSpec is the specification of a Postgresql Database</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>cluster</code> <B>[Required]</B><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#localobjectreference-v1-core"><i>core/v1.LocalObjectReference</i></a>
+</td>
+<td>
+   <p>The corresponding cluster</p>
+</td>
+</tr>
 <tr><td><code>name</code> <B>[Required]</B><br/>
 <i>string</i>
 </td>
 <td>
-   <p>The name</p>
+   <p>The name inside PostgreSQL</p>
 </td>
 </tr>
 <tr><td><code>owner</code> <B>[Required]</B><br/>
@@ -2591,36 +2645,6 @@ database is not valid</p>
    <p>The default tablespace of this database</p>
 </td>
 </tr>
-<tr><td><code>ensure</code><br/>
-<a href="#postgresql-cnpg-io-v1-EnsureOption"><i>EnsureOption</i></a>
-</td>
-<td>
-   <p>Ensure the database is <code>present</code> or <code>absent</code> - defaults to &quot;present&quot;</p>
-</td>
-</tr>
-</tbody>
-</table>
-
-## DatabaseRoleRef     {#postgresql-cnpg-io-v1-DatabaseRoleRef}
-
-
-**Appears in:**
-
-- [TablespaceConfiguration](#postgresql-cnpg-io-v1-TablespaceConfiguration)
-
-
-<p>DatabaseRoleRef is a reference an a role available inside PostgreSQL</p>
-
-
-<table class="table">
-<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
-<tbody>
-<tr><td><code>name</code><br/>
-<i>string</i>
-</td>
-<td>
-   <span class="text-muted">No description provided.</span></td>
-</tr>
 </tbody>
 </table>
 
@@ -2629,20 +2653,21 @@ database is not valid</p>
 
 **Appears in:**
 
-- [ManagedDatabaseStatus](#postgresql-cnpg-io-v1-ManagedDatabaseStatus)
+- [Database](#postgresql-cnpg-io-v1-Database)
 
 
-<p>DatabaseStatus is the status of a single managed database</p>
+<p>DatabaseStatus defines the observed state of Database</p>
 
 
 <table class="table">
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td><code>name</code> <B>[Required]</B><br/>
-<i>string</i>
+<tr><td><code>observedGeneration</code><br/>
+<i>int64</i>
 </td>
 <td>
-   <p>Name is the name of the database</p>
+   <p>A sequence number representing the latest
+desired state that was synchronized</p>
 </td>
 </tr>
 <tr><td><code>ready</code> <B>[Required]</B><br/>
@@ -2652,11 +2677,11 @@ database is not valid</p>
    <p>Ready is true if the database was reconciled correctly</p>
 </td>
 </tr>
-<tr><td><code>errorMessage</code> <B>[Required]</B><br/>
+<tr><td><code>error</code> <B>[Required]</B><br/>
 <i>string</i>
 </td>
 <td>
-   <p>ErrorMessage is the reconciliation error message</p>
+   <p>Error is the reconciliation error message</p>
 </td>
 </tr>
 </tbody>
@@ -2712,8 +2737,6 @@ database is not valid</p>
 (Alias of `string`)
 
 **Appears in:**
-
-- [DatabaseConfiguration](#postgresql-cnpg-io-v1-DatabaseConfiguration)
 
 - [RoleConfiguration](#postgresql-cnpg-io-v1-RoleConfiguration)
 
@@ -3301,45 +3324,6 @@ by the instance manager</p>
 </td>
 <td>
    <p>Services roles managed by the <code>Cluster</code></p>
-</td>
-</tr>
-<tr><td><code>databases</code><br/>
-<a href="#postgresql-cnpg-io-v1-DatabaseConfiguration"><i>[]DatabaseConfiguration</i></a>
-</td>
-<td>
-   <p>Databases managed by the <code>Cluster</code></p>
-</td>
-</tr>
-</tbody>
-</table>
-
-## ManagedDatabaseStatus     {#postgresql-cnpg-io-v1-ManagedDatabaseStatus}
-
-
-**Appears in:**
-
-- [ClusterStatus](#postgresql-cnpg-io-v1-ClusterStatus)
-
-
-<p>ManagedDatabaseStatus represents the status of the managed databases feature</p>
-
-
-<table class="table">
-<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
-<tbody>
-<tr><td><code>observedGeneration</code><br/>
-<i>int64</i>
-</td>
-<td>
-   <p>A sequence number representing the latest
-desired state that was synchronized</p>
-</td>
-</tr>
-<tr><td><code>database</code> <B>[Required]</B><br/>
-<a href="#postgresql-cnpg-io-v1-DatabaseStatus"><i>[]DatabaseStatus</i></a>
-</td>
-<td>
-   <p>Database is the status of each managed database</p>
 </td>
 </tr>
 </tbody>

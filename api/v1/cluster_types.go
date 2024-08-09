@@ -794,10 +794,6 @@ type ClusterStatus struct {
 	// +optional
 	TablespacesStatus []TablespaceState `json:"tablespacesStatus,omitempty"`
 
-	// ManagedDatabaseStatus reports the status of the managed databases
-	// +optional
-	ManagedDatabaseStatus ManagedDatabaseStatus `json:"databaseStatus,omitempty"`
-
 	// The timeline of the Postgres cluster
 	// +optional
 	TimelineID int `json:"timelineID,omitempty"`
@@ -2662,9 +2658,6 @@ type ManagedConfiguration struct {
 	// Services roles managed by the `Cluster`
 	// +optional
 	Services *ManagedServices `json:"services,omitempty"`
-	// Databases managed by the `Cluster`
-	// +optional
-	Databases []DatabaseConfiguration `json:"databases,omitempty"`
 }
 
 // PluginConfiguration specifies a plugin that need to be loaded for this
@@ -2812,59 +2805,6 @@ func (roleConfiguration *RoleConfiguration) GetRoleInherit() bool {
 		return *roleConfiguration.Inherit
 	}
 	return true
-}
-
-// DatabaseConfiguration is the representation in Kubernetes of a PostgreSQL Database
-type DatabaseConfiguration struct {
-	// The name
-	Name string `json:"name"`
-
-	// The owner
-	Owner string `json:"owner"`
-
-	// The encoding (cannot be changed)
-	// +optional
-	Encoding string `json:"encoding,omitempty"`
-
-	// True when the database is a template
-	// +optional
-	IsTemplate *bool `json:"isTemplate,omitempty"`
-
-	// True when connections to this database are allowed
-	// +optional
-	AllowConnections *bool `json:"allowConnections,omitempty"`
-
-	// Connection limit, -1 means no limit and -2 means the
-	// database is not valid
-	// +optional
-	ConnectionLimit *int `json:"connectionLimit,omitempty"`
-
-	// The default tablespace of this database
-	// +optional
-	Tablespace string `json:"tablespace,omitempty"`
-}
-
-// ManagedDatabaseStatus represents the status of the managed databases feature
-type ManagedDatabaseStatus struct {
-	// A sequence number representing the latest
-	// desired state that was synchronized
-	// +optional
-	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
-
-	// Database is the status of each managed database
-	Database []DatabaseStatus `json:"database,omitempty"`
-}
-
-// DatabaseStatus is the status of a single managed database
-type DatabaseStatus struct {
-	// Name is the name of the database
-	Name string `json:"name"`
-
-	// Ready is true if the database was reconciled correctly
-	Ready bool `json:"ready,omitempty"`
-
-	// ErrorMessage is the reconciliation error message
-	ErrorMessage string `json:"errorMessage,omitempty"`
 }
 
 // +genclient

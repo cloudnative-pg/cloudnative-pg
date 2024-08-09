@@ -121,6 +121,7 @@ DataBase
 DataSource
 DatabaseConfiguration
 DatabaseRoleRef
+DatabaseSpec
 DatabaseStatus
 DemotionToken
 DeploymentStrategy

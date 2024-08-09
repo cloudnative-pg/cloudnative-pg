@@ -3102,41 +3102,6 @@ spec:
                 description: The configuration that is used by the portions of PostgreSQL
                   that are managed by the instance manager
                 properties:
-                  databases:
-                    description: Databases managed by the `Cluster`
-                    items:
-                      description: DatabaseConfiguration is the representation in
-                        Kubernetes of a PostgreSQL Database
-                      properties:
-                        allowConnections:
-                          description: True when connections to this database are
-                            allowed
-                          type: boolean
-                        connectionLimit:
-                          description: |-
-                            Connection limit, -1 means no limit and -2 means the
-                            database is not valid
-                          type: integer
-                        encoding:
-                          description: The encoding (cannot be changed)
-                          type: string
-                        isTemplate:
-                          description: True when the database is a template
-                          type: boolean
-                        name:
-                          description: The name
-                          type: string
-                        owner:
-                          description: The owner
-                          type: string
-                        tablespace:
-                          description: The default tablespace of this database
-                          type: string
-                      required:
-                      - name
-                      - owner
-                      type: object
-                    type: array
                   roles:
                     description: Database roles managed by the `Cluster`
                     items:
@@ -5895,37 +5860,6 @@ spec:
                 items:
                   type: string
                 type: array
-              databaseStatus:
-                description: ManagedDatabaseStatus reports the status of the managed
-                  databases
-                properties:
-                  database:
-                    description: Database is the status of each managed database
-                    items:
-                      description: DatabaseStatus is the status of a single managed
-                        database
-                      properties:
-                        errorMessage:
-                          description: ErrorMessage is the reconciliation error message
-                          type: string
-                        name:
-                          description: Name is the name of the database
-                          type: string
-                        ready:
-                          description: Ready is true if the database was reconciled
-                            correctly
-                          type: boolean
-                      required:
-                      - name
-                      type: object
-                    type: array
-                  observedGeneration:
-                    description: |-
-                      A sequence number representing the latest
-                      desired state that was synchronized
-                    format: int64
-                    type: integer
-                type: object
               demotionToken:
                 description: |-
                   DemotionToken is a JSON token containing the information
