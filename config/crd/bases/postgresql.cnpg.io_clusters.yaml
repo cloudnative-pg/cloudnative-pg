@@ -1245,6 +1245,12 @@ spec:
                           HistoryTags is a list of key value pairs that will be passed to the
                           Barman --history-tags option.
                         type: object
+                      includeNamespace:
+                        description: |-
+                          Include the namespace that the cluster exists in the name used on the object storage.
+                          The namespace will be appended to the end of the destinationPath.
+                          It empty, if defaults to false.
+                        type: boolean
                       s3Credentials:
                         description: The credentials to use to upload data to S3
                         properties:
@@ -2709,6 +2715,12 @@ spec:
                             HistoryTags is a list of key value pairs that will be passed to the
                             Barman --history-tags option.
                           type: object
+                        includeNamespace:
+                          description: |-
+                            Include the namespace that the cluster exists in the name used on the object storage.
+                            The namespace will be appended to the end of the destinationPath.
+                            It empty, if defaults to false.
+                          type: boolean
                         s3Credentials:
                           description: The credentials to use to upload data to S3
                           properties:

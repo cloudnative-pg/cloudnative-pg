@@ -2203,6 +2203,12 @@ type BarmanObjectStoreConfiguration struct {
 	// +kubebuilder:validation:MinLength=1
 	DestinationPath string `json:"destinationPath"`
 
+	// Include the namespace that the cluster exists in the name used on the object storage.
+	// The namespace will be appended to the end of the destinationPath.
+	// It empty, if defaults to false.
+	// +optional
+	IncludeNamespace bool `json:"includeNamespace"`
+
 	// The server name on S3, the cluster name is used if this
 	// parameter is omitted
 	// +optional
