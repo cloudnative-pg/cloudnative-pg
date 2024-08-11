@@ -85,6 +85,10 @@ type Client interface {
 	// PostDatabase configures a database inside PostgreSQL by creating it
 	// or altering it as needed
 	PostDatabase(ctx context.Context, pod *corev1.Pod, dbname string, request PgDatabase) error
+
+	// PostPublication configures a publication inside PostgreSQL by creating it
+	// or altering it as needed
+	PostPublication(ctx context.Context, pod *corev1.Pod, dbname string, request PgPublication) error
 }
 
 type statusClient struct {

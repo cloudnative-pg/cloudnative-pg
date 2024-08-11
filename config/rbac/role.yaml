@@ -302,6 +302,32 @@ rules:
 - apiGroups:
   - postgresql.cnpg.io
   resources:
+  - publications
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - postgresql.cnpg.io
+  resources:
+  - publications/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - postgresql.cnpg.io
+  resources:
+  - publications/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - postgresql.cnpg.io
+  resources:
   - scheduledbackups
   verbs:
   - create

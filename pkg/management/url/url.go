@@ -64,6 +64,9 @@ const (
 	// PathPgDatabase is the URL path to manage a PG database
 	PathPgDatabase string = "/pg/database/{dbname}"
 
+	// PathPgPublication is the URL path to manage a PG publication
+	PathPgPublication string = "/pg/database/{dbname}/publication/{pubname}"
+
 	// StatusPort is the port for status HTTP requests
 	StatusPort int32 = 8000
 )

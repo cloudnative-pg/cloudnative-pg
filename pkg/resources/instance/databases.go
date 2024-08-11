@@ -57,12 +57,6 @@ type PgDatabase struct {
 	Tablespace string `json:"tablespace"`
 }
 
-func pgDatabaseURL(pod *corev1.Pod, dbname string) string {
-	path := fmt.Sprintf("/pg/database/%s", url.PathEscape(dbname))
-	return pgurl.Build(
-		GetStatusSchemeFromPod(pod).ToString(), pod.Status.PodIP, path, pgurl.StatusPort)
-}
-
 func (r *statusClient) PostDatabase(ctx context.Context, pod *corev1.Pod, dbname string, data PgDatabase) error {
 	return r.rawDatabaseEntrypoint(ctx, pod, http.MethodPost, dbname, data)
 }
@@ -74,6 +68,17 @@ func (r *statusClient) rawDatabaseEntrypoint(
 	dbname string,
 	data PgDatabase,
 ) error {
+	path := fmt.Sprintf("/pg/database/%s", url.PathEscape(dbname))
+	return r.rawEntrypoint(ctx, pod, method, path, data)
+}
+
+func (r *statusClient) rawEntrypoint(
+	ctx context.Context,
+	pod *corev1.Pod,
+	method string,
+	path string,
+	data any,
+) error {
 	contextLogger := log.FromContext(ctx)
 
 	var requestBody bytes.Buffer
@@ -81,7 +86,8 @@ func (r *statusClient) rawDatabaseEntrypoint(
 		return err
 	}
 
-	statusURL := pgDatabaseURL(pod, dbname)
+	statusURL := pgurl.Build(
+		GetStatusSchemeFromPod(pod).ToString(), pod.Status.PodIP, path, pgurl.StatusPort)
 	req, err := http.NewRequestWithContext(ctx, method, statusURL, &requestBody)
 	if err != nil {
 		return err
