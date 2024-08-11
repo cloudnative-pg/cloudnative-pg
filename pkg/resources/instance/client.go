@@ -82,14 +82,9 @@ type Client interface {
 	// file created in a specific Pod
 	ArchivePartialWAL(context.Context, *corev1.Pod) (string, error)
 
-	// GetDatabase gets the status of a database from the instance manager
-	GetDatabase(ctx context.Context, pod *corev1.Pod, dbname string) (PgDatabase, error)
-
-	// PutDatabase creates a new database via the instance manager
-	PutDatabase(ctx context.Context, pod *corev1.Pod, dbname string, data PgDatabase) error
-
-	// PatchDatabase changes an existing database via the instance manager
-	PatchDatabase(ctx context.Context, pod *corev1.Pod, dbname string, data PgDatabase) error
+	// PostDatabase configures a database inside PostgreSQL by creating it
+	// or altering it as needed
+	PostDatabase(ctx context.Context, pod *corev1.Pod, dbname string, request PgDatabase) error
 }
 
 type statusClient struct {

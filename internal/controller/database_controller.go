@@ -161,27 +161,12 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		Tablespace:       database.Spec.Tablespace,
 	}
 
-	_, err = r.instanceClient.GetDatabase(ctx, &primaryPod, database.Spec.Name)
-	switch {
-	case errors.Is(err, instance.ErrDatabaseNotFound):
-		if putError := r.instanceClient.PutDatabase(ctx, &primaryPod, database.Spec.Name, dbRequest); putError != nil {
-			return r.failedReconciliation(
-				ctx,
-				&database,
-				putError,
-			)
-		}
-
-	case err == nil:
-		if patchError := r.instanceClient.PatchDatabase(ctx, &primaryPod, database.Spec.Name, dbRequest); patchError != nil {
-			return r.failedReconciliation(
-				ctx,
-				&database,
-				patchError,
-			)
-		}
-
-	default:
+	if err := r.instanceClient.PostDatabase(
+		ctx,
+		&primaryPod,
+		database.Spec.Name,
+		dbRequest,
+	); err != nil {
 		return r.failedReconciliation(
 			ctx,
 			&database,

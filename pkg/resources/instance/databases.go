@@ -63,52 +63,8 @@ func pgDatabaseURL(pod *corev1.Pod, dbname string) string {
 		GetStatusSchemeFromPod(pod).ToString(), pod.Status.PodIP, path, pgurl.StatusPort)
 }
 
-func (r *statusClient) GetDatabase(ctx context.Context, pod *corev1.Pod, dbname string) (PgDatabase, error) {
-	contextLogger := log.FromContext(ctx)
-
-	statusURL := pgDatabaseURL(pod, dbname)
-	req, err := http.NewRequestWithContext(ctx, "GET", statusURL, nil)
-	if err != nil {
-		return PgDatabase{}, err
-	}
-	resp, err := r.Client.Do(req)
-	if err != nil {
-		return PgDatabase{}, err
-	}
-
-	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			contextLogger.Error(err, "while closing body")
-		}
-	}()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return PgDatabase{}, err
-	}
-
-	if resp.StatusCode == http.StatusNotFound {
-		return PgDatabase{}, ErrDatabaseNotFound
-	}
-	if resp.StatusCode != 200 {
-		return PgDatabase{}, &StatusError{StatusCode: resp.StatusCode, Body: string(body)}
-	}
-
-	var result PgDatabase
-	err = json.Unmarshal(body, &result)
-	if err != nil {
-		return PgDatabase{}, err
-	}
-
-	return result, nil
-}
-
-func (r *statusClient) PutDatabase(ctx context.Context, pod *corev1.Pod, dbname string, data PgDatabase) error {
-	return r.rawDatabaseEntrypoint(ctx, pod, http.MethodPut, dbname, data)
-}
-
-func (r *statusClient) PatchDatabase(ctx context.Context, pod *corev1.Pod, dbname string, data PgDatabase) error {
-	return r.rawDatabaseEntrypoint(ctx, pod, http.MethodPatch, dbname, data)
+func (r *statusClient) PostDatabase(ctx context.Context, pod *corev1.Pod, dbname string, data PgDatabase) error {
+	return r.rawDatabaseEntrypoint(ctx, pod, http.MethodPost, dbname, data)
 }
 
 func (r *statusClient) rawDatabaseEntrypoint(

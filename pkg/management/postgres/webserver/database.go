@@ -17,6 +17,7 @@ limitations under the License.
 package webserver
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -73,23 +74,23 @@ func getPgDatabaseRequest(req *http.Request) (pgDatabaseRequestFormat, error) {
 
 func (ws *remoteWebserverEndpoints) pgDatabase(w http.ResponseWriter, req *http.Request) {
 	switch req.Method {
-	case http.MethodPut:
-		ws.putPgDatabase(w, req)
-
-	case http.MethodGet:
-		ws.getPgDatabase(w, req)
-
-	case http.MethodPatch:
-		ws.patchPgDatabase(w, req)
+	case http.MethodPost:
+		ws.postPgDatabase(w, req)
 
 	default:
 		http.Error(w, fmt.Sprintf("method '%s' not allowed", req.Method), http.StatusMethodNotAllowed)
 	}
 }
 
-func (ws *remoteWebserverEndpoints) getPgDatabase(w http.ResponseWriter, req *http.Request) {
+func (ws *remoteWebserverEndpoints) postPgDatabase(w http.ResponseWriter, req *http.Request) {
 	contextLogger := log.FromContext(req.Context())
 	dbname := req.PathValue("dbname")
+
+	pgRequest, err := getPgDatabaseRequest(req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	db, err := ws.instance.GetSuperUserDB()
 	if err != nil {
@@ -103,17 +104,9 @@ func (ws *remoteWebserverEndpoints) getPgDatabase(w http.ResponseWriter, req *ht
 	row := db.QueryRowContext(
 		req.Context(),
 		`
-		SELECT
-			coalesce(pg_authid.rolname, '') as rolname,
-			coalesce(pg_encoding_to_char(encoding), '') as encoding,
-			datistemplate,
-			datallowconn,
-			datconnlimit,
-			coalesce(pg_tablespace.spcname, '') as spcname
+		SELECT count(*)
 		FROM pg_database
-		LEFT JOIN pg_authid ON pg_authid.oid = pg_database.datdba
-		LEFT JOIN pg_tablespace ON pg_tablespace.oid = pg_database.dattablespace
-		WHERE datname = $1
+	        WHERE datname = $1
 		`,
 		dbname)
 	if row.Err() != nil {
@@ -125,15 +118,8 @@ func (ws *remoteWebserverEndpoints) getPgDatabase(w http.ResponseWriter, req *ht
 		return
 	}
 
-	var result pgDatabaseRequestFormat
-	if err := row.Scan(
-		&result.Owner,
-		&result.Encoding,
-		&result.IsTemplate,
-		&result.AllowConnections,
-		&result.ConnectionLimit,
-		&result.Tablespace,
-	); err != nil {
+	var count int
+	if err := row.Scan(&count); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			w.WriteHeader(http.StatusNotFound)
 			return
@@ -147,161 +133,118 @@ func (ws *remoteWebserverEndpoints) getPgDatabase(w http.ResponseWriter, req *ht
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(result); err != nil {
+	if count > 0 {
+		if err := patchDatabase(req.Context(), db, &pgRequest); err != nil {
+			contextLogger.Debug(
+				"Error while patching database",
+				"dbname", dbname,
+				"err", err.Error())
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		return
+	}
+
+	if err := createDatabase(req.Context(), db, &pgRequest); err != nil {
 		contextLogger.Debug(
-			"Error while marshalling database status",
+			"Error while creating database",
 			"dbname", dbname,
 			"err", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	w.WriteHeader(http.StatusOK)
 }
 
-func (ws *remoteWebserverEndpoints) patchPgDatabase(w http.ResponseWriter, req *http.Request) {
-	contextLogger := log.FromContext(req.Context())
-	database, err := getPgDatabaseRequest(req)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+func createDatabase(
+	ctx context.Context,
+	db *sql.DB,
+	request *pgDatabaseRequestFormat,
+) error {
+	sqlCreateDatabase := fmt.Sprintf("CREATE DATABASE %s ", request.name)
+	if request.IsTemplate != nil {
+		sqlCreateDatabase += fmt.Sprintf(" IS_TEMPLATE %v", *request.IsTemplate)
+	}
+	if len(request.Owner) > 0 {
+		sqlCreateDatabase += fmt.Sprintf(" OWNER %s", pgx.Identifier{request.Owner}.Sanitize())
+	}
+	if len(request.Tablespace) > 0 {
+		sqlCreateDatabase += fmt.Sprintf(" TABLESPACE %s", pgx.Identifier{request.Tablespace}.Sanitize())
+	}
+	if request.AllowConnections != nil {
+		sqlCreateDatabase += fmt.Sprintf(" ALLOW_CONNECTIONS %v", *request.AllowConnections)
+	}
+	if request.ConnectionLimit != nil {
+		sqlCreateDatabase += fmt.Sprintf(" CONNECTION LIMIT %v", *request.ConnectionLimit)
 	}
 
-	db, err := ws.instance.GetSuperUserDB()
-	if err != nil {
-		contextLogger.Debug(
-			"Error while getting DB connection",
-			"dbname", database.name,
-			"err", err.Error())
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+	if _, err := db.ExecContext(ctx, sqlCreateDatabase); err != nil {
+		return err
 	}
 
-	if len(database.Owner) > 0 {
+	return nil
+}
+
+func patchDatabase(
+	ctx context.Context,
+	db *sql.DB,
+	request *pgDatabaseRequestFormat,
+) error {
+	if len(request.Owner) > 0 {
 		changeOwnerSQL := fmt.Sprintf(
 			"ALTER DATABASE %s OWNER TO %s",
-			pgx.Identifier{database.name}.Sanitize(),
-			pgx.Identifier{database.Owner}.Sanitize())
+			pgx.Identifier{request.name}.Sanitize(),
+			pgx.Identifier{request.Owner}.Sanitize())
 
-		if _, err := db.ExecContext(req.Context(), changeOwnerSQL); err != nil {
-			contextLogger.Debug(
-				"Error while changing database ownership",
-				"dbname", database.name,
-				"err", err.Error())
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
+		if _, err := db.ExecContext(ctx, changeOwnerSQL); err != nil {
+			return fmt.Errorf("alter database owner to: %w", err)
 		}
 	}
 
-	if database.IsTemplate != nil {
+	if request.IsTemplate != nil {
 		changeIsTemplateSQL := fmt.Sprintf(
 			"ALTER DATABASE %s WITH IS_TEMPLATE %v",
-			pgx.Identifier{database.name}.Sanitize(),
-			*database.IsTemplate)
+			pgx.Identifier{request.name}.Sanitize(),
+			*request.IsTemplate)
 
-		if _, err := db.ExecContext(req.Context(), changeIsTemplateSQL); err != nil {
-			contextLogger.Debug(
-				"Error while changing database IS_TEMPLATE option",
-				"dbname", database.name,
-				"err", err.Error())
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
+		if _, err := db.ExecContext(ctx, changeIsTemplateSQL); err != nil {
+			return fmt.Errorf("alter database with is_template: %w", err)
 		}
 	}
 
-	if database.AllowConnections != nil {
+	if request.AllowConnections != nil {
 		changeAllowConnectionsSQL := fmt.Sprintf(
 			"ALTER DATABASE %s WITH ALLOW_CONNECTIONS %v",
-			pgx.Identifier{database.name}.Sanitize(),
-			*database.AllowConnections)
+			pgx.Identifier{request.name}.Sanitize(),
+			*request.AllowConnections)
 
-		if _, err := db.ExecContext(req.Context(), changeAllowConnectionsSQL); err != nil {
-			contextLogger.Debug(
-				"Error while changing database ALLOW_CONNECTIONS option",
-				"dbname", database.name,
-				"err", err.Error())
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
+		if _, err := db.ExecContext(ctx, changeAllowConnectionsSQL); err != nil {
+			return fmt.Errorf("alter database with allow_connections: %w", err)
 		}
 	}
 
-	if database.ConnectionLimit != nil {
+	if request.ConnectionLimit != nil {
 		changeConnectionsLimitSQL := fmt.Sprintf(
 			"ALTER DATABASE %s WITH CONNECTION LIMIT %v",
-			pgx.Identifier{database.name}.Sanitize(),
-			*database.ConnectionLimit)
+			pgx.Identifier{request.name}.Sanitize(),
+			*request.ConnectionLimit)
 
-		if _, err := db.ExecContext(req.Context(), changeConnectionsLimitSQL); err != nil {
-			contextLogger.Debug(
-				"Error while changing database CONNECTION LIMIT option",
-				"dbname", database.name,
-				"err", err.Error())
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
+		if _, err := db.ExecContext(ctx, changeConnectionsLimitSQL); err != nil {
+			return fmt.Errorf("alter database with connection limit: %w", err)
 		}
 	}
 
-	if len(database.Tablespace) > 0 {
+	if len(request.Tablespace) > 0 {
 		changeTablespaceSQL := fmt.Sprintf(
 			"ALTER DATABASE %s SET TABLESPACE %s",
-			pgx.Identifier{database.name}.Sanitize(),
-			pgx.Identifier{database.Tablespace}.Sanitize())
+			pgx.Identifier{request.name}.Sanitize(),
+			pgx.Identifier{request.Tablespace}.Sanitize())
 
-		if _, err := db.ExecContext(req.Context(), changeTablespaceSQL); err != nil {
-			contextLogger.Debug(
-				"Error while changing database default tablespace",
-				"dbname", database.name,
-				"err", err.Error())
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
+		if _, err := db.ExecContext(ctx, changeTablespaceSQL); err != nil {
+			return fmt.Errorf("alter database set tablespace: %w", err)
 		}
 	}
 
-	w.WriteHeader(http.StatusOK)
-}
-
-func (ws *remoteWebserverEndpoints) putPgDatabase(w http.ResponseWriter, req *http.Request) {
-	contextLogger := log.FromContext(req.Context())
-	database, err := getPgDatabaseRequest(req)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	db, err := ws.instance.GetSuperUserDB()
-	if err != nil {
-		contextLogger.Debug(
-			"Error while getting DB connection",
-			"dbname", database,
-			"err", err.Error())
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	sqlCreateDatabase := fmt.Sprintf("CREATE DATABASE %s ", database.name)
-	if database.IsTemplate != nil {
-		sqlCreateDatabase += fmt.Sprintf(" IS_TEMPLATE %v", *database.IsTemplate)
-	}
-	if len(database.Owner) > 0 {
-		sqlCreateDatabase += fmt.Sprintf(" OWNER %s", pgx.Identifier{database.Owner}.Sanitize())
-	}
-	if len(database.Tablespace) > 0 {
-		sqlCreateDatabase += fmt.Sprintf(" TABLESPACE %s", pgx.Identifier{database.Tablespace}.Sanitize())
-	}
-	if database.AllowConnections != nil {
-		sqlCreateDatabase += fmt.Sprintf(" ALLOW_CONNECTIONS %v", *database.AllowConnections)
-	}
-	if database.ConnectionLimit != nil {
-		sqlCreateDatabase += fmt.Sprintf(" CONNECTION LIMIT %v", *database.ConnectionLimit)
-	}
-
-	if _, err := db.ExecContext(req.Context(), sqlCreateDatabase); err != nil {
-		contextLogger.Debug(
-			"Error while creating database",
-			"dbname", database.name,
-			"err", err.Error())
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
+	return nil
 }
