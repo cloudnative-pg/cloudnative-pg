@@ -24,6 +24,7 @@ import (
 	"time"
 
 	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
+	"github.com/thoas/go-funk"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -36,6 +37,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	testUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -93,7 +95,12 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 
 			replicaName, err := env.GetResourceNameFromYAML(replicaClusterSampleTLS)
 			Expect(err).ToNot(HaveOccurred())
+
+			assertReplicaClusterTopology(replicaNamespace, replicaName)
+
 			AssertSwitchoverOnReplica(replicaNamespace, replicaName, env)
+
+			assertReplicaClusterTopology(replicaNamespace, replicaName)
 		})
 	})
 
@@ -721,3 +728,86 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication), Ordered, f
 		Entry("when primaryUpdateMethod is set to switchover", clusterAFileSwitchover, clusterBFileSwitchover, 3),
 	)
 })
+
+// assertReplicaClusterTopology asserts that the replica cluster topology is correct
+// it verifies that the designated primary is streaming from the source
+// and that the replicas are only streaming from the designated primary
+func assertReplicaClusterTopology(namespace, clusterName string) {
+	var (
+		timeout        = 120
+		commandTimeout = time.Second * 10
+
+		sourceHost, primary string
+		standbys            []string
+	)
+
+	cluster, err := env.GetCluster(namespace, clusterName)
+	Expect(err).ToNot(HaveOccurred())
+	Expect(cluster.Status.ReadyInstances).To(BeEquivalentTo(cluster.Spec.Instances))
+
+	Expect(cluster.Spec.ExternalClusters).Should(HaveLen(1))
+	sourceHost = cluster.Spec.ExternalClusters[0].ConnectionParameters["host"]
+	Expect(sourceHost).ToNot(BeEmpty())
+
+	primary = cluster.Status.CurrentPrimary
+	standbys = funk.FilterString(cluster.Status.InstanceNames, func(name string) bool { return name != primary })
+
+	getStreamingInfo := func(podName string) ([]string, error) {
+		stdout, _, err := env.ExecCommandInInstancePod(
+			testsUtils.PodLocator{
+				Namespace: namespace,
+				PodName:   podName,
+			},
+			&commandTimeout,
+			"psql", "-U", "postgres", "-tAc",
+			"select string_agg(application_name, ',') from pg_stat_replication;",
+		)
+		if err != nil {
+			return nil, err
+		}
+		stdout = strings.TrimSpace(stdout)
+		if stdout == "" {
+			return []string{}, nil
+		}
+		return strings.Split(stdout, ","), err
+	}
+
+	By("verifying that the standby is not streaming to any other instance", func() {
+		Eventually(func(g Gomega) {
+			for _, standby := range standbys {
+				streamingInstances, err := getStreamingInfo(standby)
+				g.Expect(err).ToNot(HaveOccurred())
+				g.Expect(streamingInstances).To(BeEmpty(),
+					fmt.Sprintf("the standby %s should not stream to any other instance", standby),
+				)
+			}
+		}, timeout).ShouldNot(HaveOccurred())
+	})
+
+	By("verifying that the new primary is streaming to all standbys", func() {
+		Eventually(func(g Gomega) {
+			streamingInstances, err := getStreamingInfo(primary)
+			g.Expect(err).ToNot(HaveOccurred())
+			g.Expect(streamingInstances).To(
+				ContainElements(standbys),
+				"not all standbys are streaming from the new primary "+primary,
+			)
+		}, timeout).ShouldNot(HaveOccurred())
+	})
+
+	By("verifying that the new primary is streaming from the source cluster", func() {
+		Eventually(func(g Gomega) {
+			stdout, _, err := env.ExecCommandInInstancePod(
+				testsUtils.PodLocator{
+					Namespace: namespace,
+					PodName:   primary,
+				},
+				&commandTimeout,
+				"psql", "-U", "postgres", "-tAc",
+				"select sender_host from pg_stat_wal_receiver limit 1;",
+			)
+			g.Expect(err).ToNot(HaveOccurred())
+			g.Expect(strings.TrimSpace(stdout)).To(BeEquivalentTo(sourceHost))
+		}, timeout).ShouldNot(HaveOccurred())
+	})
+}
