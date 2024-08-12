@@ -259,7 +259,10 @@ func (r *InstanceReconciler) Reconcile(
 	}
 
 	if res, err := r.dropStaleReplicationConnections(ctx, cluster); err != nil || !res.IsZero() {
-		return res, fmt.Errorf("while dropping stale replica connections: %w", err)
+		if err != nil {
+			return reconcile.Result{}, fmt.Errorf("while dropping stale replica connections: %w", err)
+		}
+		return res, nil
 	}
 
 	if err := r.reconcileDatabases(ctx, cluster); err != nil {
