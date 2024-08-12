@@ -4,7 +4,7 @@ metadata:
   name: publication-sample
 spec:
   name: pub
-  dbname: postgres
+  dbName: app
   cluster:
     name: cluster-example
   target:

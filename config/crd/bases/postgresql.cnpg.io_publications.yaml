@@ -98,7 +98,7 @@ spec:
                   objects:
                     description: Just the following schema objects
                     items:
-                      description: PublicationObject is an object to publicate
+                      description: PublicationTargetObject is an object to publicate
                       properties:
                         schema:
                           description: The schema to publicate

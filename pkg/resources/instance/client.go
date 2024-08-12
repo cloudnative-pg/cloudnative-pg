@@ -81,14 +81,6 @@ type Client interface {
 	// ArchivePartialWAL trigger the archiver for the latest partial WAL
 	// file created in a specific Pod
 	ArchivePartialWAL(context.Context, *corev1.Pod) (string, error)
-
-	// PostDatabase configures a database inside PostgreSQL by creating it
-	// or altering it as needed
-	PostDatabase(ctx context.Context, pod *corev1.Pod, dbname string, request PgDatabase) error
-
-	// PostPublication configures a publication inside PostgreSQL by creating it
-	// or altering it as needed
-	PostPublication(ctx context.Context, pod *corev1.Pod, dbname string, request PgPublication) error
 }
 
 type statusClient struct {

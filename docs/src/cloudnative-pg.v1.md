@@ -4279,6 +4279,210 @@ the primary server of the cluster as part of rolling updates</p>
 
 
 
+## Publication     {#postgresql-cnpg-io-v1-Publication}
+
+
+
+<p>Publication is the Schema for the publications API</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>metadata</code> <B>[Required]</B><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#objectmeta-v1-meta"><i>meta/v1.ObjectMeta</i></a>
+</td>
+<td>
+   <span class="text-muted">No description provided.</span>Refer to the Kubernetes API documentation for the fields of the <code>metadata</code> field.</td>
+</tr>
+<tr><td><code>spec</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-PublicationSpec"><i>PublicationSpec</i></a>
+</td>
+<td>
+   <span class="text-muted">No description provided.</span></td>
+</tr>
+<tr><td><code>status</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-PublicationStatus"><i>PublicationStatus</i></a>
+</td>
+<td>
+   <span class="text-muted">No description provided.</span></td>
+</tr>
+</tbody>
+</table>
+
+## PublicationSpec     {#postgresql-cnpg-io-v1-PublicationSpec}
+
+
+**Appears in:**
+
+- [Publication](#postgresql-cnpg-io-v1-Publication)
+
+
+<p>PublicationSpec defines the desired state of Publication</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>cluster</code> <B>[Required]</B><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#localobjectreference-v1-core"><i>core/v1.LocalObjectReference</i></a>
+</td>
+<td>
+   <p>The corresponding cluster</p>
+</td>
+</tr>
+<tr><td><code>name</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The name inside PostgreSQL</p>
+</td>
+</tr>
+<tr><td><code>dbname</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The name of the database</p>
+</td>
+</tr>
+<tr><td><code>owner</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The owner</p>
+</td>
+</tr>
+<tr><td><code>parameters</code> <B>[Required]</B><br/>
+<i>map[string]string</i>
+</td>
+<td>
+   <p>Parameters</p>
+</td>
+</tr>
+<tr><td><code>target</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-PublicationTarget"><i>PublicationTarget</i></a>
+</td>
+<td>
+   <p>Publication target</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## PublicationStatus     {#postgresql-cnpg-io-v1-PublicationStatus}
+
+
+**Appears in:**
+
+- [Publication](#postgresql-cnpg-io-v1-Publication)
+
+
+<p>PublicationStatus defines the observed state of Publication</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>observedGeneration</code><br/>
+<i>int64</i>
+</td>
+<td>
+   <p>A sequence number representing the latest
+desired state that was synchronized</p>
+</td>
+</tr>
+<tr><td><code>ready</code> <B>[Required]</B><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>Ready is true if the database was reconciled correctly</p>
+</td>
+</tr>
+<tr><td><code>error</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Error is the reconciliation error message</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## PublicationTarget     {#postgresql-cnpg-io-v1-PublicationTarget}
+
+
+**Appears in:**
+
+- [PublicationSpec](#postgresql-cnpg-io-v1-PublicationSpec)
+
+
+<p>PublicationTarget is what this publication should publish</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>allTables</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-PublicationTargetAllTables"><i>PublicationTargetAllTables</i></a>
+</td>
+<td>
+   <p>All tables should be publicated</p>
+</td>
+</tr>
+<tr><td><code>objects</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-PublicationTargetObject"><i>[]PublicationTargetObject</i></a>
+</td>
+<td>
+   <p>Just the following schema objects</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## PublicationTargetAllTables     {#postgresql-cnpg-io-v1-PublicationTargetAllTables}
+
+
+**Appears in:**
+
+- [PublicationTarget](#postgresql-cnpg-io-v1-PublicationTarget)
+
+
+<p>PublicationTargetAllTables means all tables should be publicated</p>
+
+
+
+
+## PublicationTargetObject     {#postgresql-cnpg-io-v1-PublicationTargetObject}
+
+
+**Appears in:**
+
+- [PublicationTarget](#postgresql-cnpg-io-v1-PublicationTarget)
+
+
+<p>PublicationTargetObject is an object to publicate</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>schema</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The schema to publicate</p>
+</td>
+</tr>
+<tr><td><code>tableExpression</code> <B>[Required]</B><br/>
+<i>[]string</i>
+</td>
+<td>
+   <p>A list of table expressions</p>
+</td>
+</tr>
+</tbody>
+</table>
+
 ## RecoveryTarget     {#postgresql-cnpg-io-v1-RecoveryTarget}
 
 

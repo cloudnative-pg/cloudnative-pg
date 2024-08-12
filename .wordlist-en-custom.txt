@@ -340,6 +340,12 @@ PrimaryUpdateStrategy
 PriorityClass
 PriorityClassName
 ProjectedVolumeSource
+PublicationObject
+PublicationSpec
+PublicationStatus
+PublicationTarget
+PublicationTargetAllTables
+PublicationTargetObject
 PullPolicy
 QoS
 Quaresima
@@ -494,6 +500,7 @@ addons
 affinityconfiguration
 aks
 albert
+allTables
 allnamespaces
 alloc
 allocator
@@ -680,6 +687,7 @@ datacenters
 datallowconn
 datistemplate
 datname
+dbName
 dbe
 dbname
 ddl
@@ -1054,6 +1062,8 @@ promotionTimeout
 promotionToken
 provisioner
 psql
+publicate
+publicated
 pv
 pvc
 pvcCount
@@ -1216,6 +1226,7 @@ syslog
 systemd
 sysv
 tAc
+tableExpression
 tablespace
 tablespaceClassName
 tablespaceMapFile

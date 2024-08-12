@@ -18,20 +18,23 @@ package controller
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	"github.com/jackc/pgx/v5"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/instance"
 )
 
@@ -40,7 +43,7 @@ type PublicationReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 
-	instanceClient instance.Client
+	instance *postgres.Instance
 }
 
 // publicationReconciliationInterval is the time between the
@@ -76,7 +79,7 @@ func (r *PublicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}, &publication); err != nil {
 		// This is a deleted object, there's nothing
 		// to do.
-		if apierrs.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, err
@@ -87,22 +90,30 @@ func (r *PublicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, nil
 	}
 
-	// Let's get the corresponding Cluster object
-	var cluster apiv1.Cluster
-	if err := r.Client.Get(ctx, client.ObjectKey{
-		Namespace: publication.Namespace,
-		Name:      publication.Spec.ClusterRef.Name,
-	}, &cluster); err != nil {
-		if apierrs.IsNotFound(err) {
-			return r.failedReconciliation(
-				ctx,
-				&publication,
-				errClusterNotPresent,
-			)
+	// Fetch the Cluster from the cache
+	cluster, err := r.GetCluster(ctx)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			// The cluster has been deleted.
+			// We just need to wait for this instance manager to be terminated
+			contextLogger.Debug("Could not find Cluster")
+			return ctrl.Result{}, nil
 		}
-		return ctrl.Result{}, err
+
+		return ctrl.Result{}, fmt.Errorf("could not fetch Cluster: %w", err)
 	}
 
+	// This is not for me, at least now
+	if cluster.Status.CurrentPrimary != r.instance.PodName {
+		return ctrl.Result{RequeueAfter: databaseReconciliationInterval}, nil
+	}
+
+	// Still not for me, we're waiting for a switchover
+	if cluster.Status.CurrentPrimary != cluster.Status.TargetPrimary {
+		return ctrl.Result{RequeueAfter: databaseReconciliationInterval}, nil
+	}
+
+	// Cannot do anything on a replica cluster
 	if cluster.IsReplica() {
 		return r.failedReconciliation(
 			ctx,
@@ -111,50 +122,9 @@ func (r *PublicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		)
 	}
 
-	if cluster.Status.CurrentPrimary != cluster.Status.TargetPrimary ||
-		len(cluster.Status.CurrentPrimary) == 0 {
-		return r.failedReconciliation(
-			ctx,
-			&publication,
-			errClusterPrimaryNotStable,
-		)
-	}
-
-	// Get the reference to the primary pod
-	var primaryPod corev1.Pod
-	if err := r.Client.Get(ctx, client.ObjectKey{
-		Namespace: publication.Namespace,
-		Name:      cluster.Status.CurrentPrimary,
-	}, &primaryPod); err != nil {
-		return r.failedReconciliation(
-			ctx,
-			&publication,
-			fmt.Errorf("while getting primary pod: %w", err),
-		)
-	}
-
-	// Store in the context the TLS configuration required communicating with the Pods
-	ctx, err := certs.NewTLSConfigForContext(
+	if err := r.alignPublication(
 		ctx,
-		r.Client,
-		cluster.GetServerCASecretObjectKey(),
-	)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-
-	publicationRequest := instance.PgPublication{
-		Name:       publication.Spec.Name,
-		Owner:      publication.Spec.Owner,
-		Parameters: publication.Spec.Parameters,
-		Target:     toPublicationTarget(publication.Spec.Target),
-	}
-
-	if err := r.instanceClient.PostPublication(
-		ctx,
-		&primaryPod,
-		publication.Spec.DbName,
-		publicationRequest,
+		&publication,
 	); err != nil {
 		return r.failedReconciliation(
 			ctx,
@@ -169,39 +139,14 @@ func (r *PublicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	)
 }
 
-func toPublicationTarget(publicationTarget apiv1.PublicationTarget) instance.PgPublicationTarget {
-	return instance.PgPublicationTarget{
-		AllTables: toPublicationAllTables(publicationTarget.AllTables),
-		Objects:   toPublicationTargetObject(publicationTarget.Objects),
-	}
-}
-
-func toPublicationTargetObject(publicationTargetObject []apiv1.PublicationTargetObject) []instance.PgPublicationTargetObject {
-	result := make([]instance.PgPublicationTargetObject, len(publicationTargetObject))
-	for i := range publicationTargetObject {
-		result[i] = instance.PgPublicationTargetObject{
-			Schema:          publicationTargetObject[i].Schema,
-			TableExpression: publicationTargetObject[i].TableExpression,
-		}
-	}
-	return result
-}
-
-func toPublicationAllTables(publicationTargetAllTables *apiv1.PublicationTargetAllTables) *instance.PgPublicationTargetAllTables {
-	if publicationTargetAllTables == nil {
-		return nil
-	}
-
-	return &instance.PgPublicationTargetAllTables{}
-}
-
 // NewPublicationReconciler creates a new publication reconciler
 func NewPublicationReconciler(
 	mgr manager.Manager,
+	instance *postgres.Instance,
 ) *PublicationReconciler {
 	return &PublicationReconciler{
-		Client:         mgr.GetClient(),
-		instanceClient: instance.NewStatusClient(),
+		Client:   mgr.GetClient(),
+		instance: instance,
 	}
 }
 
@@ -255,4 +200,149 @@ func (r *PublicationReconciler) succeededRenconciliation(
 	return ctrl.Result{
 		RequeueAfter: publicationReconciliationInterval,
 	}, nil
+}
+
+// GetCluster gets the managed cluster through the client
+func (r *PublicationReconciler) GetCluster(ctx context.Context) (*apiv1.Cluster, error) {
+	var cluster apiv1.Cluster
+	err := r.Client.Get(ctx,
+		types.NamespacedName{
+			Namespace: r.instance.Namespace,
+			Name:      r.instance.ClusterName,
+		},
+		&cluster)
+	if err != nil {
+		return nil, err
+	}
+
+	return &cluster, nil
+}
+
+func (r *PublicationReconciler) alignPublication(ctx context.Context, obj *apiv1.Publication) error {
+	db, err := r.instance.ConnectionPool().Connection(obj.Spec.DBName)
+	if err != nil {
+		return fmt.Errorf("while getting DB connection: %w", err)
+	}
+
+	row := db.QueryRowContext(
+		ctx,
+		`
+		SELECT count(*)
+		FROM pg_publication
+	        WHERE pubname = $1
+		`,
+		obj.Spec.Name)
+	if row.Err() != nil {
+		return fmt.Errorf("while getting publication status: %w", row.Err())
+	}
+
+	var count int
+	if err := row.Scan(&count); err != nil {
+		return fmt.Errorf("while getting publication status (scan): %w", err)
+	}
+
+	if count > 0 {
+		if err := r.patchPublication(ctx, db, obj); err != nil {
+			return fmt.Errorf("while patching publication: %w", err)
+		}
+		return nil
+	}
+
+	if err := r.createPublication(ctx, db, obj); err != nil {
+		return fmt.Errorf("while creating publication: %w", err)
+	}
+
+	return nil
+}
+
+func (r *PublicationReconciler) patchPublication(
+	ctx context.Context,
+	db *sql.DB,
+	obj *apiv1.Publication,
+) error {
+	sqls := toAlterSQL(obj)
+	for _, sqlQuery := range sqls {
+		if _, err := db.ExecContext(ctx, sqlQuery); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (r *PublicationReconciler) createPublication(
+	ctx context.Context,
+	db *sql.DB,
+	obj *apiv1.Publication,
+) error {
+	sqlQuery := toCreateSQL(obj)
+	if _, err := db.ExecContext(ctx, sqlQuery); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func toCreateSQL(obj *apiv1.Publication) string {
+	result := fmt.Sprintf(
+		"CREATE PUBLICATION %s %s",
+		pgx.Identifier{obj.Spec.Name}.Sanitize(),
+		toPublicationTargetSQL(&obj.Spec.Target),
+	)
+
+	if len(obj.Spec.Parameters) > 0 {
+		result = fmt.Sprintf("%s WITH (%s)", result, obj.Spec.Parameters)
+	}
+
+	return result
+}
+
+func toAlterSQL(obj *apiv1.Publication) []string {
+	result := make([]string, 0, 2)
+	result = append(result,
+		fmt.Sprintf(
+			"ALTER PUBLICATION %s SET %s",
+			pgx.Identifier{obj.Spec.Name}.Sanitize(),
+			toPublicationTargetSQL(&obj.Spec.Target),
+		),
+	)
+
+	if len(obj.Spec.Parameters) > 0 {
+		result = append(result,
+			fmt.Sprintf(
+				"ALTER PUBLICATION %s SET (%s)",
+				result,
+				obj.Spec.Parameters,
+			),
+		)
+	}
+
+	return result
+}
+
+func toPublicationTargetSQL(obj *apiv1.PublicationTarget) string {
+	if obj.AllTables != nil {
+		return "FOR ALL TABLES"
+	}
+
+	result := ""
+	for _, object := range obj.Objects {
+		if len(result) > 0 {
+			result += ", "
+		}
+		result += toPublicationObjectSQL(&object)
+	}
+
+	if len(result) > 0 {
+		result = fmt.Sprintf("FOR %s", result)
+	}
+	return result
+}
+
+func toPublicationObjectSQL(obj *apiv1.PublicationTargetObject) string {
+	if len(obj.Schema) > 0 {
+		return fmt.Sprintf("TABLES IN SCHEMA %s", pgx.Identifier{obj.Schema}.Sanitize())
+	}
+
+	return fmt.Sprintf("TABLE %s", strings.Join(obj.TableExpression, ", "))
 }

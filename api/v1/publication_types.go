@@ -32,8 +32,8 @@ type PublicationSpec struct {
 
 	// The name of the database
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="dbname is immutable"
-	DbName string `json:"dbname"`
-	
+	DBName string `json:"dbname"`
+
 	// The owner
 	Owner string `json:"owner,omitempty"`
 
@@ -55,10 +55,9 @@ type PublicationTarget struct {
 }
 
 // PublicationTargetAllTables means all tables should be publicated
-type PublicationTargetAllTables struct {
-}
+type PublicationTargetAllTables struct{}
 
-// PublicationObject is an object to publicate
+// PublicationTargetObject is an object to publicate
 type PublicationTargetObject struct {
 	// The schema to publicate
 	Schema string `json:"schema,omitempty"`
