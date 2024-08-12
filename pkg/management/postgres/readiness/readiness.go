@@ -18,7 +18,6 @@ package readiness
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
@@ -85,16 +84,6 @@ func (data *Data) IsServerReady(ctx context.Context) error {
 
 	var status bool
 	if err := row.Scan(&status); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			// PostgreSQL 11 do not have a `primary_conninfo` record
-			// in `pg_settings` (we still have a recovery.conf), and
-			// is not supported by the community.
-			//
-			// We don't support this feature, and we declare this replica
-			// healthy, retaining the behavior the operator had before.
-			data.streamingReplicaValidated = true
-			return nil
-		}
 		return err
 	}
 
