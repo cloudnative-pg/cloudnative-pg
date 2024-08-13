@@ -21,8 +21,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// DatabaseSpec is the specification of a Postgresql Database
-type DatabaseSpec struct {
+// SubscriptionSpec defines the desired state of Subscription
+type SubscriptionSpec struct {
 	// The corresponding cluster
 	ClusterRef corev1.LocalObjectReference `json:"cluster"`
 
@@ -31,33 +31,25 @@ type DatabaseSpec struct {
 	Name string `json:"name"`
 
 	// The owner
-	Owner string `json:"owner"`
+	Owner string `json:"owner,omitempty"`
 
-	// The encoding (cannot be changed)
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="encoding is immutable"
-	// +optional
-	Encoding string `json:"encoding,omitempty"`
+	// The name of the database
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="dbname is immutable"
+	DBName string `json:"dbname"`
 
-	// True when the database is a template
+	// Parameters
 	// +optional
-	IsTemplate *bool `json:"isTemplate,omitempty"`
+	Parameters map[string]string `json:"parameters,omitempty"`
 
-	// True when connections to this database are allowed
-	// +optional
-	AllowConnections *bool `json:"allowConnections,omitempty"`
+	// The name of the publication
+	PublicationName string `json:"publicationName"`
 
-	// Connection limit, -1 means no limit and -2 means the
-	// database is not valid
-	// +optional
-	ConnectionLimit *int `json:"connectionLimit,omitempty"`
-
-	// The default tablespace of this database
-	// +optional
-	Tablespace string `json:"tablespace,omitempty"`
+	// The name of the external cluster with the publication
+	ExternalClusterName string `json:"externalClusterName"`
 }
 
-// DatabaseStatus defines the observed state of Database
-type DatabaseStatus struct {
+// SubscriptionStatus defines the observed state of Subscription
+type SubscriptionStatus struct {
 	// A sequence number representing the latest
 	// desired state that was synchronized
 	// +optional
@@ -78,24 +70,24 @@ type DatabaseStatus struct {
 // +kubebuilder:printcolumn:name="Ready",type="boolean",JSONPath=".status.ready"
 // +kubebuilder:printcolumn:name="Error",type="string",JSONPath=".status.error",description="Latest error message"
 
-// Database is the Schema for the databases API
-type Database struct {
+// Subscription is the Schema for the subscriptions API
+type Subscription struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   DatabaseSpec   `json:"spec,omitempty"`
-	Status DatabaseStatus `json:"status,omitempty"`
+	Spec   SubscriptionSpec   `json:"spec,omitempty"`
+	Status SubscriptionStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-// DatabaseList contains a list of Database
-type DatabaseList struct {
+// SubscriptionList contains a list of Subscription
+type SubscriptionList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []Database `json:"items"`
+	Items           []Subscription `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&Database{}, &DatabaseList{})
+	SchemeBuilder.Register(&Subscription{}, &SubscriptionList{})
 }

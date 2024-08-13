@@ -74,4 +74,12 @@ resources:
   kind: Publication
   path: github.com/cloudnative-pg/cloudnative-pg/api/v1
   version: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: cnpg.io
+  group: postgresql
+  kind: Subscription
+  path: github.com/cloudnative-pg/cloudnative-pg/api/v1
+  version: v1
 version: "3"

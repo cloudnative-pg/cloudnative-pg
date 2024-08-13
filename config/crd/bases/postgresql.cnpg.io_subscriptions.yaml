@@ -4,14 +4,14 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.15.0
-  name: databases.postgresql.cnpg.io
+  name: subscriptions.postgresql.cnpg.io
 spec:
   group: postgresql.cnpg.io
   names:
-    kind: Database
-    listKind: DatabaseList
-    plural: databases
-    singular: database
+    kind: Subscription
+    listKind: SubscriptionList
+    plural: subscriptions
+    singular: subscription
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
@@ -34,7 +34,7 @@ spec:
     name: v1
     schema:
       openAPIV3Schema:
-        description: Database is the Schema for the databases API
+        description: Subscription is the Schema for the subscriptions API
         properties:
           apiVersion:
             description: |-
@@ -54,11 +54,8 @@ spec:
           metadata:
             type: object
           spec:
-            description: DatabaseSpec is the specification of a Postgresql Database
+            description: SubscriptionSpec defines the desired state of Subscription
             properties:
-              allowConnections:
-                description: True when connections to this database are allowed
-                type: boolean
               cluster:
                 description: The corresponding cluster
                 properties:
@@ -75,20 +72,15 @@ spec:
                     type: string
                 type: object
                 x-kubernetes-map-type: atomic
-              connectionLimit:
-                description: |-
-                  Connection limit, -1 means no limit and -2 means the
-                  database is not valid
-                type: integer
-              encoding:
-                description: The encoding (cannot be changed)
+              dbname:
+                description: The name of the database
                 type: string
                 x-kubernetes-validations:
-                - message: encoding is immutable
+                - message: dbname is immutable
                   rule: self == oldSelf
-              isTemplate:
-                description: True when the database is a template
-                type: boolean
+              externalClusterName:
+                description: The name of the external cluster with the publication
+                type: string
               name:
                 description: The name inside PostgreSQL
                 type: string
@@ -98,16 +90,23 @@ spec:
               owner:
                 description: The owner
                 type: string
-              tablespace:
-                description: The default tablespace of this database
+              parameters:
+                additionalProperties:
+                  type: string
+                description: Parameters
+                type: object
+              publicationName:
+                description: The name of the publication
                 type: string
             required:
             - cluster
+            - dbname
+            - externalClusterName
             - name
-            - owner
+            - publicationName
             type: object
           status:
-            description: DatabaseStatus defines the observed state of Database
+            description: SubscriptionStatus defines the observed state of Subscription
             properties:
               error:
                 description: Error is the reconciliation error message

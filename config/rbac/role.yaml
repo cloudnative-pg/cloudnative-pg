@@ -340,6 +340,26 @@ rules:
   - patch
   - update
 - apiGroups:
+  - postgresql.cnpg.io
+  resources:
+  - subscriptions
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - postgresql.cnpg.io
+  resources:
+  - subscriptions/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
   - rbac.authorization.k8s.io
   resources:
   - rolebindings

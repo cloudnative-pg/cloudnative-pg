@@ -98,6 +98,11 @@ func (r *PublicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, fmt.Errorf("could not fetch Cluster: %w", err)
 	}
 
+	// This is not for me!
+	if publication.Spec.ClusterRef.Name != r.instance.ClusterName {
+		return ctrl.Result{}, nil
+	}
+
 	// This is not for me, at least now
 	if cluster.Status.CurrentPrimary != r.instance.PodName {
 		return ctrl.Result{RequeueAfter: databaseReconciliationInterval}, nil
@@ -285,7 +290,7 @@ func (r *PublicationReconciler) patchPublication(
 	db *sql.DB,
 	obj *apiv1.Publication,
 ) error {
-	sqls := toAlterSQL(obj)
+	sqls := toPublicationAlterSQL(obj)
 	for _, sqlQuery := range sqls {
 		if _, err := db.ExecContext(ctx, sqlQuery); err != nil {
 			return err
@@ -300,30 +305,47 @@ func (r *PublicationReconciler) createPublication(
 	db *sql.DB,
 	obj *apiv1.Publication,
 ) error {
-	sqlQuery := toCreateSQL(obj)
-	if _, err := db.ExecContext(ctx, sqlQuery); err != nil {
-		return err
+	sqls := toPublicationCreateSQL(obj)
+	for _, sqlQuery := range sqls {
+		if _, err := db.ExecContext(ctx, sqlQuery); err != nil {
+			return err
+		}
 	}
-
 	return nil
 }
 
-func toCreateSQL(obj *apiv1.Publication) string {
-	result := fmt.Sprintf(
-		"CREATE PUBLICATION %s %s",
-		pgx.Identifier{obj.Spec.Name}.Sanitize(),
-		toPublicationTargetSQL(&obj.Spec.Target),
+func toPublicationCreateSQL(obj *apiv1.Publication) []string {
+	result := make([]string, 0, 2)
+
+	result = append(result,
+		fmt.Sprintf(
+			"CREATE PUBLICATION %s %s",
+			pgx.Identifier{obj.Spec.Name}.Sanitize(),
+			toPublicationTargetSQL(&obj.Spec.Target),
+		),
 	)
 
+	if len(obj.Spec.Owner) > 0 {
+		result = append(result,
+			fmt.Sprintf(
+				"ALTER PUBLICATION %s OWNER to %s",
+				pgx.Identifier{obj.Spec.Name}.Sanitize(),
+				toPublicationTargetSQL(&obj.Spec.Target),
+			),
+		)
+	}
+
 	if len(obj.Spec.Parameters) > 0 {
-		result = fmt.Sprintf("%s WITH (%s)", result, obj.Spec.Parameters)
+		result = append(result,
+			fmt.Sprintf("%s WITH (%s)", result, obj.Spec.Parameters),
+		)
 	}
 
 	return result
 }
 
-func toAlterSQL(obj *apiv1.Publication) []string {
-	result := make([]string, 0, 2)
+func toPublicationAlterSQL(obj *apiv1.Publication) []string {
+	result := make([]string, 0, 3)
 	result = append(result,
 		fmt.Sprintf(
 			"ALTER PUBLICATION %s SET %s",
@@ -331,6 +353,16 @@ func toAlterSQL(obj *apiv1.Publication) []string {
 			toPublicationTargetSQL(&obj.Spec.Target),
 		),
 	)
+
+	if len(obj.Spec.Owner) > 0 {
+		result = append(result,
+			fmt.Sprintf(
+				"ALTER PUBLICATION %s OWNER TO %s",
+				pgx.Identifier{obj.Spec.Name}.Sanitize(),
+				pgx.Identifier{obj.Spec.Owner}.Sanitize(),
+			),
+		)
+	}
 
 	if len(obj.Spec.Parameters) > 0 {
 		result = append(result,

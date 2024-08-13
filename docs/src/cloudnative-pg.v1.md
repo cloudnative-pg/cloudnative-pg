@@ -5452,6 +5452,142 @@ Size cannot be decreased.</p>
 </tbody>
 </table>
 
+## Subscription     {#postgresql-cnpg-io-v1-Subscription}
+
+
+
+<p>Subscription is the Schema for the subscriptions API</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>metadata</code> <B>[Required]</B><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#objectmeta-v1-meta"><i>meta/v1.ObjectMeta</i></a>
+</td>
+<td>
+   <span class="text-muted">No description provided.</span>Refer to the Kubernetes API documentation for the fields of the <code>metadata</code> field.</td>
+</tr>
+<tr><td><code>spec</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-SubscriptionSpec"><i>SubscriptionSpec</i></a>
+</td>
+<td>
+   <span class="text-muted">No description provided.</span></td>
+</tr>
+<tr><td><code>status</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-SubscriptionStatus"><i>SubscriptionStatus</i></a>
+</td>
+<td>
+   <span class="text-muted">No description provided.</span></td>
+</tr>
+</tbody>
+</table>
+
+## SubscriptionSpec     {#postgresql-cnpg-io-v1-SubscriptionSpec}
+
+
+**Appears in:**
+
+- [Subscription](#postgresql-cnpg-io-v1-Subscription)
+
+
+<p>SubscriptionSpec defines the desired state of Subscription</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>cluster</code> <B>[Required]</B><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#localobjectreference-v1-core"><i>core/v1.LocalObjectReference</i></a>
+</td>
+<td>
+   <p>The corresponding cluster</p>
+</td>
+</tr>
+<tr><td><code>name</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The name inside PostgreSQL</p>
+</td>
+</tr>
+<tr><td><code>owner</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The owner</p>
+</td>
+</tr>
+<tr><td><code>dbname</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The name of the database</p>
+</td>
+</tr>
+<tr><td><code>parameters</code><br/>
+<i>map[string]string</i>
+</td>
+<td>
+   <p>Parameters</p>
+</td>
+</tr>
+<tr><td><code>publicationName</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The name of the publication</p>
+</td>
+</tr>
+<tr><td><code>externalClusterName</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The name of the external cluster with the publication</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## SubscriptionStatus     {#postgresql-cnpg-io-v1-SubscriptionStatus}
+
+
+**Appears in:**
+
+- [Subscription](#postgresql-cnpg-io-v1-Subscription)
+
+
+<p>SubscriptionStatus defines the observed state of Subscription</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>observedGeneration</code><br/>
+<i>int64</i>
+</td>
+<td>
+   <p>A sequence number representing the latest
+desired state that was synchronized</p>
+</td>
+</tr>
+<tr><td><code>ready</code> <B>[Required]</B><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>Ready is true if the database was reconciled correctly</p>
+</td>
+</tr>
+<tr><td><code>error</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Error is the reconciliation error message</p>
+</td>
+</tr>
+</tbody>
+</table>
+
 ## SwitchReplicaClusterStatus     {#postgresql-cnpg-io-v1-SwitchReplicaClusterStatus}
 
 
