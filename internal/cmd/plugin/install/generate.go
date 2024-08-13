@@ -56,11 +56,13 @@ type generateExecutor struct {
 	postgresImage        string
 	logFieldLevel        string
 	logFieldTimestamp    string
+	nodeSelector         []string
 }
 
 func newGenerateCmd() *cobra.Command {
 	var version, watchNamespaces, postgresImage, logFieldLevel, logFieldTimestamp string
 	var replicas int32
+	var nodeSelector []string
 	cmd := &cobra.Command{
 		Use:   "generate",
 		Short: "generates the YAML manifests needed to install the CloudNativePG operator",
@@ -80,6 +82,7 @@ func newGenerateCmd() *cobra.Command {
 				postgresImage:        postgresImage,
 				logFieldLevel:        logFieldLevel,
 				logFieldTimestamp:    logFieldTimestamp,
+				nodeSelector:         nodeSelector,
 			}
 			return command.execute()
 		},
@@ -130,6 +133,12 @@ func newGenerateCmd() *cobra.Command {
 		"JSON log field to report timestamp in (default: ts)",
 	)
 
+	cmd.Flags().StringSliceVar(
+		&nodeSelector,
+		"node-selector",
+		[]string{},
+		"Node label selector in the <labelName>=<labelValue> format.",
+	)
 	return cmd
 }
 
