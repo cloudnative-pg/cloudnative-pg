@@ -366,7 +366,7 @@ func toSubscriptionAlterSQL(obj *apiv1.Subscription, connString string) []string
 	)
 
 	setConnStringSQL := fmt.Sprintf(
-		"ALTER SUBSCRIPTION %s SET CONNECTION %s",
+		"ALTER SUBSCRIPTION %s CONNECTION %s",
 		pgx.Identifier{obj.Spec.Name}.Sanitize(),
 		pq.QuoteLiteral(connString),
 	)
