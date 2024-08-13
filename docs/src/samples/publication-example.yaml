@@ -4,7 +4,7 @@ metadata:
   name: publication-sample
 spec:
   name: pub
-  dbName: app
+  dbname: app
   cluster:
     name: cluster-example
   target:

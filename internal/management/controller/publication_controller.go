@@ -30,12 +30,14 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/instance"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // PublicationReconciler reconciles a Publication object
@@ -50,9 +52,12 @@ type PublicationReconciler struct {
 // publication reconciliation loop failures
 const publicationReconciliationInterval = 30 * time.Second
 
+// publicationFinalizerName is the name of the finalizer
+// triggering the deletion of the publication
+const publicationFinalizerName = utils.MetadataNamespace + "/deletePublication"
+
 // +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=publications,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=publications/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=publications/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -77,17 +82,7 @@ func (r *PublicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		Namespace: req.Namespace,
 		Name:      req.Name,
 	}, &publication); err != nil {
-		// This is a deleted object, there's nothing
-		// to do.
-		if apierrors.IsNotFound(err) {
-			return ctrl.Result{}, nil
-		}
-		return ctrl.Result{}, err
-	}
-
-	// If everything is reconciled, we're done here
-	if publication.Generation == publication.Status.ObservedGeneration {
-		return ctrl.Result{}, nil
+		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
 	// Fetch the Cluster from the cache
@@ -120,6 +115,36 @@ func (r *PublicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 			&publication,
 			errClusterIsReplica,
 		)
+	}
+
+	// Add the finalizer if we don't have it
+	// nolint:nestif
+	if publication.DeletionTimestamp.IsZero() {
+		if controllerutil.AddFinalizer(&publication, publicationFinalizerName) {
+			if err := r.Update(ctx, &publication); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+	} else {
+		// This publication is being deleted
+		if controllerutil.ContainsFinalizer(&publication, publicationFinalizerName) {
+			if err := r.dropPublication(ctx, &publication); err != nil {
+				return ctrl.Result{}, err
+			}
+
+			// remove our finalizer from the list and update it.
+			controllerutil.RemoveFinalizer(&publication, publicationFinalizerName)
+			if err := r.Update(ctx, &publication); err != nil {
+				return ctrl.Result{}, err
+			}
+
+			return ctrl.Result{}, nil
+		}
+	}
+
+	// If everything is reconciled, we're done here
+	if publication.Generation == publication.Status.ObservedGeneration {
+		return ctrl.Result{}, nil
 	}
 
 	if err := r.alignPublication(
@@ -318,6 +343,22 @@ func toAlterSQL(obj *apiv1.Publication) []string {
 	}
 
 	return result
+}
+
+func (r *PublicationReconciler) dropPublication(ctx context.Context, obj *apiv1.Publication) error {
+	db, err := r.instance.ConnectionPool().Connection(obj.Spec.DBName)
+	if err != nil {
+		return fmt.Errorf("while getting DB connection: %w", err)
+	}
+
+	if _, err := db.ExecContext(
+		ctx,
+		fmt.Sprintf("DROP PUBLICATION IF EXISTS %s", pgx.Identifier{obj.Spec.Name}.Sanitize()),
+	); err != nil {
+		return fmt.Errorf("while dropping publication: %w", err)
+	}
+
+	return nil
 }
 
 func toPublicationTargetSQL(obj *apiv1.PublicationTarget) string {

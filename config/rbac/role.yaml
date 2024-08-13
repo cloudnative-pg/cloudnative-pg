@@ -314,12 +314,6 @@ rules:
 - apiGroups:
   - postgresql.cnpg.io
   resources:
-  - publications/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - postgresql.cnpg.io
-  resources:
   - publications/status
   verbs:
   - get
