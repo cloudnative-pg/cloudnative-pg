@@ -37,7 +37,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	testUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
-	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -754,7 +753,7 @@ func assertReplicaClusterTopology(namespace, clusterName string) {
 
 	getStreamingInfo := func(podName string) ([]string, error) {
 		stdout, _, err := env.ExecCommandInInstancePod(
-			testsUtils.PodLocator{
+			testUtils.PodLocator{
 				Namespace: namespace,
 				PodName:   podName,
 			},
@@ -798,7 +797,7 @@ func assertReplicaClusterTopology(namespace, clusterName string) {
 	By("verifying that the new primary is streaming from the source cluster", func() {
 		Eventually(func(g Gomega) {
 			stdout, _, err := env.ExecCommandInInstancePod(
-				testsUtils.PodLocator{
+				testUtils.PodLocator{
 					Namespace: namespace,
 					PodName:   primary,
 				},
