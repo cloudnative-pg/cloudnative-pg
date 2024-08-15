@@ -17,8 +17,10 @@ limitations under the License.
 package e2e
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -260,15 +262,36 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		})
 	}
 
-	assertManagerRollout := func() {
-		retryCheckingEvents := wait.Backoff{
+	getExecutableHashesFromInstances := func(upgradeNamespace, clusterName1 string, w io.Writer) error {
+		pods, err := env.GetClusterPodList(upgradeNamespace, clusterName1)
+		if err != nil {
+			return err
+		}
+		for _, pod := range pods.Items {
+			status, err := testsUtils.RetrievePgStatusFromInstance(env, upgradeNamespace, pod.Name)
+			if err != nil {
+				continue
+			}
+			var statusFields map[string]interface{}
+			err = json.Unmarshal([]byte(status), &statusFields)
+			if err != nil {
+				continue
+			}
+			_, _ = fmt.Fprintln(w, "Pod", pod.Name, "executableHash", statusFields["executableHash"])
+		}
+		return nil
+	}
+
+	assertManagerRollout := func(upgradeNamespace string) {
+		backoffCheckingEvents := wait.Backoff{
 			Duration: 10 * time.Second,
 			Steps:    5,
 		}
 		notUpdated := errors.New("notUpdated")
-		err := retry.OnError(retryCheckingEvents, func(err error) bool {
+		shouldRetry := func(err error) bool {
 			return errors.Is(err, notUpdated)
-		}, func() error {
+		}
+		err := retry.OnError(backoffCheckingEvents, shouldRetry, func() error {
 			eventList := corev1.EventList{}
 			err := env.Client.List(env.Ctx,
 				&eventList,
@@ -281,11 +304,16 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 				return err
 			}
 
-			var count int
+			var count, nonUpgradeCount int
+			By("checking cluster events for manager")
 			for _, event := range eventList.Items {
 				if event.Reason == "InstanceManagerUpgraded" {
 					count++
 					GinkgoWriter.Printf("%d: %s\n", count, event.Message)
+				}
+				if event.Reason == "SkippedInstanceManagerUpgrade" || event.Reason == "InstanceManagerUpgradeFailed" {
+					nonUpgradeCount++
+					GinkgoWriter.Printf("%d: %s\n", nonUpgradeCount, event.Message)
 				}
 			}
 
@@ -295,6 +323,11 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 
 			return nil
 		})
+		if err != nil {
+			By("getting the executable hash from the cluster pods", func() {
+				_ = getExecutableHashesFromInstances(upgradeNamespace, clusterName1, GinkgoWriter)
+			})
+		}
 		Expect(err).NotTo(HaveOccurred())
 	}
 
@@ -377,6 +410,16 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 
 				return err
 			}, timeout).ShouldNot(HaveOccurred())
+		})
+		By("getting the operator info", func() {
+			pod, err := env.GetOperatorPod()
+			Expect(err).NotTo(HaveOccurred())
+			GinkgoWriter.Println("image used for operator", pod.Spec.Containers[0].Image)
+			lgs, err := env.GetPodLogs(pod.Namespace, pod.Name)
+			Expect(err).NotTo(HaveOccurred())
+			lines := strings.Split(lgs, "\n")
+			Expect(lines).ShouldNot(BeEmpty())
+			GinkgoWriter.Println(lines[0])
 		})
 	}
 
@@ -474,6 +517,10 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			podUIDs = append(podUIDs, pod.GetUID())
 		}
 
+		By("getting the executable hash from the cluster pods", func() {
+			_ = getExecutableHashesFromInstances(upgradeNamespace, clusterName1, GinkgoWriter)
+		})
+
 		deployOperator(operatorManifest)
 
 		operatorConfigMapNamespacedName := types.NamespacedName{
@@ -507,7 +554,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		} else {
 			GinkgoWriter.Printf("online upgrade\n")
 			// Pods shouldn't change and there should be an event
-			assertManagerRollout()
+			assertManagerRollout(upgradeNamespace)
 			GinkgoWriter.Printf("assertManagerRollout is done\n")
 			Eventually(func() (int, error) {
 				var currentUIDs []types.UID
@@ -656,7 +703,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 
 			upgradeNamespace := assertCreateNamespace(upgradeNamespacePrefix)
 			assertClustersWorkAfterOperatorUpgrade(upgradeNamespace, currentOperatorManifest)
-			assertManagerRollout()
+			assertManagerRollout(upgradeNamespace)
 		})
 	})
 

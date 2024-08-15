@@ -40,6 +40,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/controller"
 	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/executablehash"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/multicache"
@@ -102,9 +103,18 @@ func RunController(
 ) error {
 	ctx := context.Background()
 
+	var operatorHash string
+	h, err := executablehash.Get()
+	if err != nil {
+		setupLog.Error(err, "could not get executable hash")
+	} else {
+		operatorHash = h
+	}
+
 	setupLog.Info("Starting CloudNativePG Operator",
 		"version", versions.Version,
-		"build", versions.Info)
+		"build", versions.Info,
+		"executableHash", operatorHash)
 
 	if pprofDebug {
 		startPprofDebugServer(ctx)

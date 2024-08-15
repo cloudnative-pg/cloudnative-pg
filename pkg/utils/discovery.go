@@ -64,8 +64,6 @@ func (arch *AvailableArchitecture) GetHash() string {
 	if arch.hash == "" {
 		arch.calculateHash()
 	}
-	arch.mx.Lock()
-	defer arch.mx.Unlock()
 	return arch.hash
 }
 
