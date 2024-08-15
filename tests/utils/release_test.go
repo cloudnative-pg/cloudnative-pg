@@ -19,6 +19,7 @@ package utils
 import (
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 
@@ -59,7 +60,12 @@ var _ = Describe("Most recent tag", func() {
 		Expect(err).ToNot(HaveOccurred())
 		tag, err := GetMostRecentReleaseTag(releasesDir)
 		Expect(tag).To(Not(BeEmpty()))
-		Expect(tag).To(BeEquivalentTo(versions.Version))
+		if strings.Contains(versions.Version, "-rc") {
+			// an RC release should not count as the most recent release
+			Expect(tag).NotTo(BeEquivalentTo(versions.Version))
+		} else {
+			Expect(tag).To(BeEquivalentTo(versions.Version))
+		}
 		Expect(err).ToNot(HaveOccurred())
 	})
 })
