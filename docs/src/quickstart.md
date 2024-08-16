@@ -123,7 +123,7 @@ kubectl get pods -l cnpg.io/cluster=<CLUSTER>
 !!! Important
     Note that we are using `cnpg.io/cluster` as the label. In the past you may
     have seen or used `postgresql`. This label is being deprecated, and
-    will be dropped in the future. Please use `cngp.io/cluster`.
+    will be dropped in the future. Please use `cnpg.io/cluster`.
 
 By default, the operator will install the latest available minor version
 of the latest major version of PostgreSQL when the operator was released.
