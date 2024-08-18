@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	appsv1 "k8s.io/api/apps/v1"
 	"math"
 	"os"
 	"path/filepath"
@@ -55,7 +56,6 @@ var (
 	env                     *utils.TestingEnvironment
 	testLevelEnv            *tests.TestEnvLevel
 	testCloudVendorEnv      *utils.TestEnvVendor
-	psqlClientPod           *corev1.Pod
 	expectedOperatorPodName string
 	operatorPodWasRenamed   bool
 	operatorWasRestarted    bool
@@ -75,12 +75,8 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	env, err = utils.NewTestingEnvironment()
 	Expect(err).ShouldNot(HaveOccurred())
 
-	psqlPod, err := utils.GetPsqlClient(psqlClientNamespace, env)
-	Expect(err).ShouldNot(HaveOccurred())
-	DeferCleanup(func() {
-		err := env.DeleteNamespaceAndWait(psqlClientNamespace, 300)
-		Expect(err).ToNot(HaveOccurred())
-	})
+	_ = corev1.AddToScheme(env.Scheme)
+	_ = appsv1.AddToScheme(env.Scheme)
 
 	// Set up a global MinIO service on his own namespace
 	err = env.CreateNamespace(minioEnv.Namespace)
@@ -96,7 +92,6 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	caSecret := minioEnv.CaPair.GenerateCASecret(minioEnv.Namespace, minioEnv.CaSecretName)
 	minioEnv.CaSecretObj = *caSecret
 	objs := map[string]corev1.Pod{
-		"psql":  *psqlPod,
 		"minio": *minioClient,
 	}
 
@@ -134,7 +129,6 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 		panic(err)
 	}
 
-	psqlClientPod = objs["psql"]
 	minioEnv.Client = objs["minio"]
 })
 

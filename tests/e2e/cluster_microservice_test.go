@@ -84,14 +84,17 @@ var _ = Describe("Imports with Microservice Approach", Label(tests.LabelImportin
 				GinkgoWriter,
 			)
 		})
+
 		AssertCreateCluster(namespace, sourceClusterName, sourceSampleFile, env)
-		AssertCreateTestData(namespace, sourceClusterName, tableName, psqlClientPod)
-		AssertCreateTestDataLargeObject(namespace, sourceClusterName, oid, data, psqlClientPod)
+		AssertCreateTestData(env, namespace, sourceClusterName, tableName)
+		primaryPod, err := env.GetClusterPrimary(namespace, sourceClusterName)
+		Expect(err).ToNot(HaveOccurred())
+		AssertCreateTestDataLargeObject(namespace, sourceClusterName, oid, data, primaryPod)
 
 		importedClusterName = "cluster-pgdump-large-object"
 		cluster := AssertClusterImport(namespace, importedClusterName, sourceClusterName, "app")
-		AssertDataExpectedCount(namespace, importedClusterName, tableName, 2, psqlClientPod)
-		AssertLargeObjectValue(namespace, importedClusterName, oid, data, psqlClientPod)
+		AssertDataExpectedCount(env, namespace, importedClusterName, tableName, 2)
+		AssertLargeObjectValue(namespace, importedClusterName, oid, data, primaryPod)
 		By("deleting the imported database", func() {
 			Expect(testsUtils.DeleteObject(env, cluster)).To(Succeed())
 		})
@@ -118,7 +121,7 @@ var _ = Describe("Imports with Microservice Approach", Label(tests.LabelImportin
 
 		importedClusterName = "cluster-pgdump"
 		AssertClusterImport(namespace, importedClusterName, sourceClusterName, "app")
-		AssertDataExpectedCount(namespace, importedClusterName, tableName, 2, psqlClientPod)
+		AssertDataExpectedCount(env, namespace, importedClusterName, tableName, 2)
 		assertTableAndDataOnImportedCluster(namespace, tableName, importedClusterName)
 	})
 
@@ -364,7 +367,7 @@ func assertImportRenamesSelectedDatabase(
 		AssertClusterStandbysAreStreaming(namespace, importedClusterName, 120)
 	})
 
-	AssertDataExpectedCount(namespace, importedClusterName, tableName, 2, psqlClientPod)
+	AssertDataExpectedCount(env, namespace, importedClusterName, tableName, 2)
 
 	By("verifying that only 'app' DB exists in the imported cluster", func() {
 		importedPrimaryPod, err := env.GetClusterPrimary(namespace, importedClusterName)
