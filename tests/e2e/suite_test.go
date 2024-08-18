@@ -19,10 +19,10 @@ package e2e
 import (
 	"context"
 	"encoding/json"
+	appsv1 "k8s.io/api/apps/v1"
 	"testing"
 	"time"
 
-	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/onsi/ginkgo/v2/types"
 	"github.com/thoas/go-funk"
 	corev1 "k8s.io/api/core/v1"
@@ -36,6 +36,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/sternmultitailer"
+	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -52,7 +53,6 @@ var (
 	env                     *utils.TestingEnvironment
 	testLevelEnv            *tests.TestEnvLevel
 	testCloudVendorEnv      *utils.TestEnvVendor
-	psqlClientPod           *corev1.Pod
 	expectedOperatorPodName string
 	operatorPodWasRenamed   bool
 	operatorWasRestarted    bool
@@ -88,12 +88,8 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 		<-sternOperatorDoneChan
 	})
 
-	psqlPod, err := utils.GetPsqlClient(psqlClientNamespace, env)
-	Expect(err).ShouldNot(HaveOccurred())
-	DeferCleanup(func() {
-		err := env.DeleteNamespaceAndWait(psqlClientNamespace, 300)
-		Expect(err).ToNot(HaveOccurred())
-	})
+	_ = corev1.AddToScheme(env.Scheme)
+	_ = appsv1.AddToScheme(env.Scheme)
 
 	// Set up a global MinIO service on his own namespace
 	err = env.CreateNamespace(minioEnv.Namespace)
@@ -109,7 +105,6 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	caSecret := minioEnv.CaPair.GenerateCASecret(minioEnv.Namespace, minioEnv.CaSecretName)
 	minioEnv.CaSecretObj = *caSecret
 	objs := map[string]corev1.Pod{
-		"psql":  *psqlPod,
 		"minio": *minioClient,
 	}
 
@@ -147,7 +142,6 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 		panic(err)
 	}
 
-	psqlClientPod = objs["psql"]
 	minioEnv.Client = objs["minio"]
 })
 

@@ -17,13 +17,13 @@ limitations under the License.
 package e2e
 
 import (
+	"database/sql"
 	"fmt"
-	"os"
-	"strings"
-
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	"github.com/lib/pq"
+	"os"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -49,9 +49,9 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 		databaseTwo       = "db2"
 	)
 
-	var namespace, sourceClusterName, sourceClusterHost,
-		sourceClusterSuperUser, sourceClusterPass,
-		targetClusterHost, targetClusterSuperUser, targetClusterPass string
+	var namespace, sourceClusterName string
+	var forwardTarget *testsUtils.PSQLConnection
+	var connTarget *sql.DB
 
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
@@ -73,41 +73,31 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 			AssertCreateCluster(namespace, sourceClusterName, sourceClusterFile, env)
 		})
 
-		By("creating several roles, one of them a superuser", func() {
+		By("creating several roles, one of them a superuser and source databases", func() {
+			forward, conn, err := testsUtils.ForwardPSQLConnection(
+				env,
+				namespace,
+				sourceClusterName,
+				testsUtils.PostgresDBName,
+				apiv1.SuperUserSecretSuffix,
+			)
+			defer func() {
+				_ = conn.Close()
+				forward.Stop()
+			}()
+			Expect(err).ToNot(HaveOccurred())
+
 			// create 1st user with superuser role
 			createSuperUserQuery := fmt.Sprintf("create user %v with superuser password '123';",
 				databaseSuperUser)
-			sourceClusterHost, err = testsUtils.GetHostName(namespace, sourceClusterName, env)
-			Expect(err).ToNot(HaveOccurred())
-			sourceClusterSuperUser, sourceClusterPass, err = testsUtils.GetCredentials(
-				sourceClusterName, namespace, apiv1.SuperUserSecretSuffix, env)
-			Expect(err).ToNot(HaveOccurred())
-			_, _, err = testsUtils.RunQueryFromPod(
-				psqlClientPod,
-				sourceClusterHost,
-				testsUtils.PostgresDBName,
-				sourceClusterSuperUser,
-				sourceClusterPass,
-				createSuperUserQuery,
-				env,
-			)
+			_, err = conn.Exec(createSuperUserQuery)
 			Expect(err).ToNot(HaveOccurred())
 
 			// create 2nd user
 			createUserQuery := fmt.Sprintf("create user %v;", databaseUserTwo)
-			_, _, err = testsUtils.RunQueryFromPod(
-				psqlClientPod,
-				sourceClusterHost,
-				testsUtils.PostgresDBName,
-				sourceClusterSuperUser,
-				sourceClusterPass,
-				createUserQuery,
-				env,
-			)
+			_, err = conn.Exec(createUserQuery)
 			Expect(err).ToNot(HaveOccurred())
-		})
 
-		By("creating the source databases", func() {
 			queries := []string{
 				fmt.Sprintf("create database %v;", databaseOne),
 				fmt.Sprintf("alter database %v owner to %v;", databaseOne, databaseSuperUser),
@@ -116,30 +106,16 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 			}
 
 			for _, query := range queries {
-				_, _, err = testsUtils.RunQueryFromPod(
-					psqlClientPod,
-					sourceClusterHost,
-					testsUtils.PostgresDBName,
-					sourceClusterSuperUser,
-					sourceClusterPass,
-					query,
-					env,
-				)
+				_, err := conn.Exec(query)
 				Expect(err).ToNot(HaveOccurred())
 			}
 
 			// create test data and insert some records in both databases
 			for _, database := range sourceDatabases {
-				query := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %v AS VALUES (1),(2);", tableName)
-				_, _, err = testsUtils.RunQueryFromPod(
-					psqlClientPod,
-					sourceClusterHost,
-					database,
-					sourceClusterSuperUser,
-					sourceClusterPass,
-					query,
-					env,
-				)
+				query := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s AS VALUES (1),(2);", tableName)
+				conn, err := forward.Pooler.Connection(database)
+				Expect(err).ToNot(HaveOccurred())
+				_, err = conn.Exec(query)
 				Expect(err).ToNot(HaveOccurred())
 			}
 		})
@@ -161,59 +137,56 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 			AssertClusterIsReady(namespace, targetClusterName, testTimeouts[testsUtils.ClusterIsReady], env)
 		})
 
+		By("connect to the imported cluster", func() {
+			forwardTarget, connTarget, err = testsUtils.ForwardPSQLConnection(
+				env,
+				namespace,
+				targetClusterName,
+				testsUtils.PostgresDBName,
+				apiv1.SuperUserSecretSuffix,
+			)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
 		By("verifying that the specified source databases were imported", func() {
-			targetClusterHost, err = testsUtils.GetHostName(namespace, targetClusterName, env)
+			stmt, err := connTarget.Prepare("SELECT datname FROM pg_database WHERE datname IN ($1)")
 			Expect(err).ToNot(HaveOccurred())
-			targetClusterSuperUser, targetClusterPass, err = testsUtils.GetCredentials(
-				targetClusterName, namespace, apiv1.SuperUserSecretSuffix, env)
+			rows, err := stmt.QueryContext(env.Ctx, pq.Array(sourceDatabases))
 			Expect(err).ToNot(HaveOccurred())
-			for _, database := range sourceDatabases {
-				databaseEntryQuery := fmt.Sprintf("SELECT datname FROM pg_database where datname='%v'", database)
-				stdOut, _, err := testsUtils.RunQueryFromPod(
-					psqlClientPod,
-					targetClusterHost,
-					testsUtils.PostgresDBName,
-					targetClusterSuperUser,
-					targetClusterPass,
-					databaseEntryQuery,
-					env,
-				)
+			var datName string
+			for rows.Next() {
+				err = rows.Scan(&datName)
 				Expect(err).ToNot(HaveOccurred())
-				Expect(strings.Contains(stdOut, database)).Should(BeTrue())
+				Expect(sourceDatabases).Should(ContainElement(datName))
 			}
 		})
 
 		By(fmt.Sprintf("verifying that the source superuser '%s' became a normal user in target",
 			databaseSuperUser), func() {
-			getSuperUserQuery := "select * from pg_user where usesuper"
-			stdOut, _, err := testsUtils.RunQueryFromPod(
-				psqlClientPod,
-				targetClusterHost,
-				testsUtils.PostgresDBName,
-				targetClusterSuperUser,
-				targetClusterPass,
-				getSuperUserQuery,
-				env,
-			)
+			row := connTarget.QueryRow(fmt.Sprintf("SELECT usesuper FROM pg_user WHERE usename='%s'", databaseSuperUser))
+			var superUser bool
+			err := row.Scan(&superUser)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(strings.Contains(stdOut, databaseSuperUser)).Should(BeFalse())
+			Expect(superUser).Should(BeFalse())
 		})
 
 		By("verifying the test data was imported from the source databases", func() {
 			for _, database := range sourceDatabases {
-				selectQuery := fmt.Sprintf("select count(*) from %v", tableName)
-				stdOut, _, err := testsUtils.RunQueryFromPod(
-					psqlClientPod,
-					targetClusterHost,
-					database,
-					targetClusterSuperUser,
-					targetClusterPass,
-					selectQuery,
-					env,
-				)
+				selectQuery := fmt.Sprintf("SELECT COUNT(*) FROM %s", tableName)
+				connTemp, err := forwardTarget.Pooler.Connection(database)
 				Expect(err).ToNot(HaveOccurred())
-				Expect(strings.TrimSpace(stdOut)).Should(BeEquivalentTo("2"))
+				row := connTemp.QueryRow(selectQuery)
+				var count int
+				err = row.Scan(&count)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(count).To(BeEquivalentTo(2))
 			}
+		})
+
+		By("close connection to imported cluster", func() {
+			err = connTarget.Close()
+			Expect(err).ToNot(HaveOccurred())
+			forwardTarget.Stop()
 		})
 	})
 })

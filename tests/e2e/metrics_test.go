@@ -149,9 +149,9 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 
 		// Create the cluster
 		AssertCreateCluster(namespace, metricsClusterName, clusterMetricsDBFile, env)
-		AssertCreationOfTestDataForTargetDB(namespace, metricsClusterName, targetDBOne, testTableName, psqlClientPod)
-		AssertCreationOfTestDataForTargetDB(namespace, metricsClusterName, targetDBTwo, testTableName, psqlClientPod)
-		AssertCreationOfTestDataForTargetDB(namespace, metricsClusterName, targetDBSecret, testTableName, psqlClientPod)
+		AssertCreationOfTestDataForTargetDB(env, namespace, metricsClusterName, targetDBOne, testTableName)
+		AssertCreationOfTestDataForTargetDB(env, namespace, metricsClusterName, targetDBTwo, testTableName)
+		AssertCreationOfTestDataForTargetDB(env, namespace, metricsClusterName, targetDBSecret, testTableName)
 
 		cluster, err := env.GetCluster(namespace, metricsClusterName)
 		Expect(err).ToNot(HaveOccurred())
@@ -287,22 +287,24 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 			srcClusterDatabaseName,
 			replicaClusterSampleFile,
 			testTableName,
-			psqlClientPod)
+		)
 
 		By(fmt.Sprintf("grant select permission for %v table to pg_monitor", testTableName), func() {
-			cmd := fmt.Sprintf("GRANT SELECT ON %v TO pg_monitor", testTableName)
-			appUser, appUserPass, err := utils.GetCredentials(srcClusterName, namespace, apiv1.ApplicationUserSecretSuffix, env)
-			Expect(err).ToNot(HaveOccurred())
-			host, err := utils.GetHostName(namespace, srcClusterName, env)
-			Expect(err).ToNot(HaveOccurred())
-			_, _, err = utils.RunQueryFromPod(
-				psqlClientPod,
-				host,
+			forward, conn, err := utils.ForwardPSQLConnection(
+				env,
+				namespace,
+				srcClusterName,
 				srcClusterDatabaseName,
-				appUser,
-				appUserPass,
-				cmd,
-				env)
+				apiv1.ApplicationUserSecretSuffix,
+			)
+			defer func() {
+				_ = conn.Close()
+				forward.Stop()
+			}()
+			Expect(err).ToNot(HaveOccurred())
+
+			cmd := fmt.Sprintf("GRANT SELECT ON %v TO pg_monitor", testTableName)
+			_, err = conn.Exec(cmd)
 			Expect(err).ToNot(HaveOccurred())
 		})
 		replicaCluster, err := env.GetCluster(namespace, replicaClusterName)

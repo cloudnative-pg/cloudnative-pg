@@ -52,7 +52,7 @@ var _ = Describe("Bootstrap with pg_basebackup", Label(tests.LabelRecovery), fun
 			srcClusterName, err = env.GetResourceNameFromYAML(srcCluster)
 			Expect(err).ToNot(HaveOccurred())
 			AssertCreateCluster(namespace, srcClusterName, srcCluster, env)
-			AssertCreateTestData(namespace, srcClusterName, tableName, psqlClientPod)
+			AssertCreateTestData(env, namespace, srcClusterName, tableName)
 		})
 
 		It("using basic authentication", func() {
@@ -65,9 +65,12 @@ var _ = Describe("Bootstrap with pg_basebackup", Label(tests.LabelRecovery), fun
 
 			secretName := dstClusterName + apiv1.ApplicationUserSecretSuffix
 
+			primaryPod, err := env.GetClusterPrimary(namespace, dstClusterName)
+			Expect(err).ToNot(HaveOccurred())
+
 			By("checking the dst cluster with auto generated app password connectable", func() {
 				AssertApplicationDatabaseConnection(namespace, dstClusterName,
-					appUser, utils.AppDBName, "", secretName, psqlClientPod)
+					appUser, utils.AppDBName, "", secretName, primaryPod)
 			})
 
 			By("update user application password for dst cluster and verify connectivity", func() {
@@ -80,19 +83,31 @@ var _ = Describe("Bootstrap with pg_basebackup", Label(tests.LabelRecovery), fun
 					utils.AppDBName,
 					newPassword,
 					secretName,
-					psqlClientPod)
+					primaryPod)
 			})
 
 			By("checking data have been copied correctly", func() {
-				AssertDataExpectedCount(namespace, dstClusterName, tableName, 2, psqlClientPod)
+				AssertDataExpectedCount(env, namespace, dstClusterName, tableName, 2)
 			})
 
 			By("writing some new data to the dst cluster", func() {
-				insertRecordIntoTable(namespace, dstClusterName, tableName, 3, psqlClientPod)
+				forward, conn, err := utils.ForwardPSQLConnection(
+					env,
+					namespace,
+					dstClusterName,
+					utils.AppDBName,
+					apiv1.ApplicationUserSecretSuffix,
+				)
+				defer func() {
+					_ = conn.Close()
+					forward.Stop()
+				}()
+				Expect(err).ToNot(HaveOccurred())
+				insertRecordIntoTable(tableName, 3, conn)
 			})
 
 			By("checking the src cluster was not modified", func() {
-				AssertDataExpectedCount(namespace, srcClusterName, tableName, 2, psqlClientPod)
+				AssertDataExpectedCount(env, namespace, srcClusterName, tableName, 2)
 			})
 		})
 
@@ -105,15 +120,27 @@ var _ = Describe("Bootstrap with pg_basebackup", Label(tests.LabelRecovery), fun
 			AssertClusterIsReady(namespace, dstClusterName, testTimeouts[utils.ClusterIsReadySlow], env)
 
 			By("checking data have been copied correctly", func() {
-				AssertDataExpectedCount(namespace, dstClusterName, tableName, 2, psqlClientPod)
+				AssertDataExpectedCount(env, namespace, dstClusterName, tableName, 2)
 			})
 
 			By("writing some new data to the dst cluster", func() {
-				insertRecordIntoTable(namespace, dstClusterName, tableName, 3, psqlClientPod)
+				forward, conn, err := utils.ForwardPSQLConnection(
+					env,
+					namespace,
+					dstClusterName,
+					utils.AppDBName,
+					apiv1.ApplicationUserSecretSuffix,
+				)
+				defer func() {
+					_ = conn.Close()
+					forward.Stop()
+				}()
+				Expect(err).ToNot(HaveOccurred())
+				insertRecordIntoTable(tableName, 3, conn)
 			})
 
 			By("checking the src cluster was not modified", func() {
-				AssertDataExpectedCount(namespace, srcClusterName, tableName, 2, psqlClientPod)
+				AssertDataExpectedCount(env, namespace, srcClusterName, tableName, 2)
 			})
 		})
 	})

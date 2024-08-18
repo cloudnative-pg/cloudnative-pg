@@ -143,13 +143,25 @@ func ForwardPSQLConnection(
 	dbname,
 	secretSuffix string,
 ) (*PSQLConnection, *sql.DB, error) {
-
-	cluster, err := env.GetCluster(namespace, clusterName)
+	user, pass, err := GetCredentials(clusterName, namespace, secretSuffix, env)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	user, pass, err := GetCredentials(clusterName, namespace, secretSuffix, env)
+	return ForwardPSQLConnectionWithCreds(env, namespace, clusterName, dbname, user, pass)
+}
+
+// ForwardPSQLConnectionWithCreds does the same as ForwardPSQLConnection but without trying to
+// get the credentials using the cluster
+func ForwardPSQLConnectionWithCreds(
+	env *TestingEnvironment,
+	namespace,
+	clusterName,
+	dbname,
+	userApp,
+	passApp string,
+) (*PSQLConnection, *sql.DB, error) {
+	cluster, err := env.GetCluster(namespace, clusterName)
 	if err != nil {
 		return nil, nil, err
 	}

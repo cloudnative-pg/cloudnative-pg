@@ -242,21 +242,33 @@ var _ = Describe("Verify Volume Snapshot",
 
 				By("inserting test data and creating WALs on the cluster to be snapshotted", func() {
 					// Create a "test" table with values 1,2
-					AssertCreateTestData(namespace, clusterToSnapshotName, tableName, psqlClientPod)
+					AssertCreateTestData(env, namespace, clusterToSnapshotName, tableName)
 
 					// Because GetCurrentTimestamp() rounds down to the second and is executed
 					// right after the creation of the test data, we wait for 1s to avoid not
 					// including the newly created data within the recovery_target_time
 					time.Sleep(1 * time.Second)
 					// Get the recovery_target_time and pass it to the template engine
-					recoveryTargetTime, err := testUtils.GetCurrentTimestamp(namespace, clusterToSnapshotName, env, psqlClientPod)
+					recoveryTargetTime, err := testUtils.GetCurrentTimestamp(namespace, clusterToSnapshotName, env)
 					Expect(err).ToNot(HaveOccurred())
 					err = os.Setenv(recoveryTargetTimeEnv, recoveryTargetTime)
 					Expect(err).ToNot(HaveOccurred())
 
+					forward, conn, err := testUtils.ForwardPSQLConnection(
+						env,
+						namespace,
+						clusterToSnapshotName,
+						testUtils.AppDBName,
+						apiv1.ApplicationUserSecretSuffix,
+					)
+					defer func() {
+						_ = conn.Close()
+						forward.Stop()
+					}()
+					Expect(err).ToNot(HaveOccurred())
 					// Insert 2 more rows which we expect not to be present at the end of the recovery
-					insertRecordIntoTable(namespace, clusterToSnapshotName, tableName, 3, psqlClientPod)
-					insertRecordIntoTable(namespace, clusterToSnapshotName, tableName, 4, psqlClientPod)
+					insertRecordIntoTable(tableName, 3, conn)
+					insertRecordIntoTable(tableName, 4, conn)
 
 					// Close and archive the current WAL file
 					AssertArchiveWalOnMinio(namespace, clusterToSnapshotName, clusterToSnapshotName)
@@ -271,9 +283,7 @@ var _ = Describe("Verify Volume Snapshot",
 				})
 
 				By("verifying the correct data exists in the restored cluster", func() {
-					restoredPrimary, err := env.GetClusterPrimary(namespace, clusterToRestoreName)
-					Expect(err).ToNot(HaveOccurred())
-					AssertDataExpectedCount(namespace, clusterToRestoreName, tableName, 2, restoredPrimary)
+					AssertDataExpectedCount(env, namespace, clusterToRestoreName, tableName, 2)
 				})
 			})
 		})
@@ -351,12 +361,13 @@ var _ = Describe("Verify Volume Snapshot",
 
 				By("creating the cluster on which to execute the backup", func() {
 					AssertCreateCluster(namespace, clusterToBackupName, clusterToBackupFilePath, env)
+					AssertClusterIsReady(namespace, clusterToBackupName, testTimeouts[testUtils.ClusterIsReadySlow], env)
 				})
 			})
 
 			It("can create a declarative cold backup and restoring using it", func() {
 				By("inserting test data", func() {
-					AssertCreateTestData(namespace, clusterToBackupName, tableName, psqlClientPod)
+					AssertCreateTestData(env, namespace, clusterToBackupName, tableName)
 				})
 
 				backupName, err := env.GetResourceNameFromYAML(backupFileFilePath)
@@ -408,10 +419,15 @@ var _ = Describe("Verify Volume Snapshot",
 
 				By("executing the restore", func() {
 					CreateResourceFromFile(namespace, clusterToRestoreFilePath)
+					AssertClusterIsReady(namespace,
+						clusterToRestoreName,
+						testTimeouts[testUtils.ClusterIsReady],
+						env,
+					)
 				})
 
 				By("checking that the data is present on the restored cluster", func() {
-					AssertDataExpectedCount(namespace, clusterToRestoreName, tableName, 2, psqlClientPod)
+					AssertDataExpectedCount(env, namespace, clusterToRestoreName, tableName, 2)
 				})
 			})
 			It("can take a snapshot targeting the primary", func() {
@@ -592,12 +608,24 @@ var _ = Describe("Verify Volume Snapshot",
 				})
 
 				By("inserting test data and creating WALs on the cluster to be snapshotted", func() {
+					forward, conn, err := testUtils.ForwardPSQLConnection(
+						env,
+						namespace,
+						clusterToSnapshotName,
+						testUtils.AppDBName,
+						apiv1.ApplicationUserSecretSuffix,
+					)
+					defer func() {
+						_ = conn.Close()
+						forward.Stop()
+					}()
+					Expect(err).ToNot(HaveOccurred())
 					// Create a "test" table with values 1,2
-					AssertCreateTestData(namespace, clusterToSnapshotName, tableName, psqlClientPod)
+					AssertCreateTestData(env, namespace, clusterToSnapshotName, tableName)
 
 					// Insert 2 more rows which we expect not to be present at the end of the recovery
-					insertRecordIntoTable(namespace, clusterToSnapshotName, tableName, 3, psqlClientPod)
-					insertRecordIntoTable(namespace, clusterToSnapshotName, tableName, 4, psqlClientPod)
+					insertRecordIntoTable(tableName, 3, conn)
+					insertRecordIntoTable(tableName, 4, conn)
 
 					// Close and archive the current WAL file
 					AssertArchiveWalOnMinio(namespace, clusterToSnapshotName, clusterToSnapshotName)
@@ -658,9 +686,7 @@ var _ = Describe("Verify Volume Snapshot",
 				})
 
 				By("verifying the correct data exists in the restored cluster", func() {
-					restoredPrimary, err := env.GetClusterPrimary(namespace, clusterToRestoreName)
-					Expect(err).ToNot(HaveOccurred())
-					AssertDataExpectedCount(namespace, clusterToRestoreName, tableName, 4, restoredPrimary)
+					AssertDataExpectedCount(env, namespace, clusterToRestoreName, tableName, 4)
 				})
 			})
 
@@ -668,9 +694,21 @@ var _ = Describe("Verify Volume Snapshot",
 				// insert some data after the snapshot is taken, we want to verify the data exists in
 				// the new pod when cluster scaled up
 				By("inserting more test data and creating WALs on the cluster snapshotted", func() {
+					forward, conn, err := testUtils.ForwardPSQLConnection(
+						env,
+						namespace,
+						clusterToSnapshotName,
+						testUtils.AppDBName,
+						apiv1.ApplicationUserSecretSuffix,
+					)
+					defer func() {
+						_ = conn.Close()
+						forward.Stop()
+					}()
+					Expect(err).ToNot(HaveOccurred())
 					// Insert 2 more rows which we expect not to be present at the end of the recovery
-					insertRecordIntoTable(namespace, clusterToSnapshotName, tableName, 5, psqlClientPod)
-					insertRecordIntoTable(namespace, clusterToSnapshotName, tableName, 6, psqlClientPod)
+					insertRecordIntoTable(tableName, 5, conn)
+					insertRecordIntoTable(tableName, 6, conn)
 
 					// Close and archive the current WAL file
 					AssertArchiveWalOnMinio(namespace, clusterToSnapshotName, clusterToSnapshotName)
@@ -705,8 +743,8 @@ var _ = Describe("Verify Volume Snapshot",
 					podList, err := env.GetClusterReplicas(namespace, clusterToSnapshotName)
 					Expect(err).ToNot(HaveOccurred())
 					Expect(podList.Items).To(HaveLen(2))
-					AssertDataExpectedCount(namespace, clusterToSnapshotName, tableName, 6, &podList.Items[0])
-					AssertDataExpectedCount(namespace, clusterToSnapshotName, tableName, 6, &podList.Items[1])
+					AssertDataExpectedCount(env, namespace, clusterToSnapshotName, tableName, 6)
+					AssertDataExpectedCount(env, namespace, clusterToSnapshotName, tableName, 6)
 				})
 			})
 		})

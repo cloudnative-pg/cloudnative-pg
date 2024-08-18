@@ -483,38 +483,38 @@ var _ = Describe("Configuration update with primaryUpdateMethod", Label(tests.La
 
 				oldPrimaryPodName = primaryPodInfo.GetName()
 
-				appUser, appUserPass, err := utils.GetCredentials(clusterName, namespace, apiv1.ApplicationUserSecretSuffix, env)
-				Expect(err).ToNot(HaveOccurred())
-				host, err := utils.GetHostName(namespace, clusterName, env)
-				Expect(err).ToNot(HaveOccurred())
-				query := "select to_char(pg_postmaster_start_time(), 'YYYY-MM-DD HH24:MI:SS');"
-				stdout, _, cmdErr := utils.RunQueryFromPod(
-					psqlClientPod,
-					host,
+				forward, conn, err := utils.ForwardPSQLConnection(
+					env,
+					namespace,
+					clusterName,
 					utils.AppDBName,
-					appUser,
-					appUserPass,
-					query,
-					env)
-				Expect(cmdErr).ToNot(HaveOccurred())
+					apiv1.ApplicationUserSecretSuffix,
+				)
+				Expect(err).ToNot(HaveOccurred())
+				defer func() {
+					// Here we need to close the connection and close the forward, if we don't do both steps
+					// the PostgreSQL connection will be there and PostgreSQL will not restart in time because
+					// of the connection that wasn't close and stays idle
+					_ = conn.Close()
+					forward.Stop()
+				}()
 
-				primaryStartTime, err = cnpgTypes.ParseTargetTime(nil, strings.Trim(stdout, "\n"))
+				query := "SELECT TO_CHAR(pg_postmaster_start_time(), 'YYYY-MM-DD HH24:MI:SS');"
+				var startTime string
+				row := conn.QueryRow(query)
+				err = row.Scan(&startTime)
+				Expect(err).ToNot(HaveOccurred())
+
+				primaryStartTime, err = cnpgTypes.ParseTargetTime(nil, startTime)
 				Expect(err).NotTo(HaveOccurred())
+
 				query = "show max_connections"
-				stdout, _, cmdErr = utils.RunQueryFromPod(
-					psqlClientPod,
-					host,
-					utils.AppDBName,
-					appUser,
-					appUserPass,
-					query,
-					env)
-				Expect(cmdErr).ToNot(HaveOccurred())
+				row = conn.QueryRow(query)
+				var maxConnections int
+				err = row.Scan(&maxConnections)
+				Expect(err).ToNot(HaveOccurred())
 
-				v, err := strconv.Atoi(strings.Trim(stdout, "\n"))
-				Expect(err).NotTo(HaveOccurred())
-
-				newMaxConnectionsValue = v + 10
+				newMaxConnectionsValue = maxConnections + 10
 			})
 
 			By(fmt.Sprintf("updating max_connection value to %v", newMaxConnectionsValue), func() {

@@ -55,7 +55,7 @@ var _ = Describe("Cluster declarative hibernation", func() {
 		By("creating a new cluster", func() {
 			AssertCreateCluster(namespace, clusterName, sampleFileCluster, env)
 			// Write a table and some data on the "app" database
-			AssertCreateTestData(namespace, clusterName, tableName, psqlClientPod)
+			AssertCreateTestData(env, namespace, clusterName, tableName)
 		})
 
 		By("hibernating the new cluster", func() {
@@ -114,7 +114,7 @@ var _ = Describe("Cluster declarative hibernation", func() {
 		})
 
 		By("verifying the data has been preserved", func() {
-			AssertDataExpectedCount(namespace, clusterName, tableName, 2, psqlClientPod)
+			AssertDataExpectedCount(env, namespace, clusterName, tableName, 2)
 		})
 	})
 })
