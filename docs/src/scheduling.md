@@ -83,7 +83,7 @@ For example, setting `podAntiAffinityType` to `required` will enforce
 `preferredDuringSchedulingIgnoredDuringExecution`.
 
 However, be aware that this strict requirement may cause pods to remain pending
-if resources are insufficient—this is particularly relevant when using [Cluster Autoscaler](https://github.com/kubernetes/autoscaler/tree/master/cluster-autoscaler)
+if resources are insufficient—this is particularly relevant when using [Cluster Autoscaler](https://github.com/kubernetes/autoscaler/tree/master/cluster-autoscaler) <!-- wokeignore:rule=master -->
 for automated horizontal scaling in a Kubernetes cluster.
 
 !!! Seealso "Inter-pod Affinity and Anti-Affinity"
