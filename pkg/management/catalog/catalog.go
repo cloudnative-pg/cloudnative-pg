@@ -138,7 +138,7 @@ func (catalog *Catalog) findClosestBackupFromTargetLSN(
 ) (*BarmanBackup, error) {
 	targetLSN := postgres.LSN(targetLSNString)
 	if _, err := targetLSN.Parse(); err != nil {
-		return nil, fmt.Errorf("while parsing recovery target targetLSN: " + err.Error())
+		return nil, fmt.Errorf("while parsing recovery target targetLSN: %s", err.Error())
 	}
 	for i := len(catalog.List) - 1; i >= 0; i-- {
 		barmanBackup := catalog.List[i]
@@ -161,7 +161,7 @@ func (catalog *Catalog) findClosestBackupFromTargetTime(
 ) (*BarmanBackup, error) {
 	targetTime, err := utils.ParseTargetTime(nil, targetTimeString)
 	if err != nil {
-		return nil, fmt.Errorf("while parsing recovery target targetTime: " + err.Error())
+		return nil, fmt.Errorf("while parsing recovery target targetTime: %s", err.Error())
 	}
 	for i := len(catalog.List) - 1; i >= 0; i-- {
 		barmanBackup := catalog.List[i]

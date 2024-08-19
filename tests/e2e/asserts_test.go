@@ -3098,7 +3098,7 @@ func assertMetrics(rawMetricsOutput string, expectedMetrics map[string]*regexp.R
 	}
 
 	for key, valueRe := range expectedMetrics {
-		re := regexp.MustCompile(fmt.Sprintf(`(?m)^(` + key + `).*$`))
+		re := regexp.MustCompile(fmt.Sprintf("(?m)^( %s ).*$", key))
 
 		// match a metric with the value of expectedMetrics key
 		match := re.FindString(rawMetricsOutput)
