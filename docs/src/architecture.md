@@ -175,16 +175,31 @@ Kubernetes cluster.
 ### Reserving Nodes for PostgreSQL Workloads
 
 Whether you're operating in a multi-availability zone environment or, more
-critically, within a single availability zone, we strongly recommend isolating
-PostgreSQL workloads by dedicating specific worker nodes exclusively to
-`postgres`. This approach ensures optimal performance and resource allocation
-for your database operations.
+critically, within a single availability zone, in production we strongly
+recommend isolating PostgreSQL workloads by dedicating specific worker nodes
+exclusively to `postgres`. This approach ensures optimal performance and
+resource allocation for your database operations.
+
+!!! Hint
+    As a general rule of thumb, deploy PostgreSQL nodes in multiples of
+    three—ideally, with one node per availability zone if possible. Three nodes is
+    an optimal number because it ensures that a PostgreSQL cluster with three
+    instances (one primary and two standby replicas) is distributed across
+    different nodes, enhancing fault tolerance and availability.
 
 In Kubernetes, this can be achieved using node labels and taints in a
 declarative manner, aligning with Infrastructure as Code (IaC) practices:
 labels ensure that a node is capable of running `postgres` workloads, while
 taints help prevent any non-`postgres` workloads from being scheduled on that
 node.
+
+!!! Important
+    This methodology is the most straightforward way to ensure that PostgreSQL
+    workloads are isolated from other workloads in terms of both computing
+    resources and, when using locally attached disks, storage. While different
+    PostgreSQL clusters may share the same node, you can take this a step further
+    by using labels and taints to ensure that a node is dedicated to a single
+    instance of a specific `Cluster`.
 
 #### Proposed Node Label
 
@@ -206,6 +221,7 @@ Here’s an example:
 spec:
   # <snip>
   affinity:
+    # <snip>
     nodeSelector:
       node-role.kubernetes.io/postgres: ""
 ```
@@ -227,6 +243,7 @@ Here’s an example:
 spec:
   # <snip>
   affinity:
+    # <snip>
     tolerations:
     - key: node-role.kubernetes.io/postgres
       operator: Exists
