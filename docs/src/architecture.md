@@ -6,9 +6,9 @@
     This article provides valuable insights into best practices and design
     considerations for PostgreSQL deployments in Kubernetes.
 
-This section outlines the key architectural considerations for implementing a
-robust business continuity strategy when deploying PostgreSQL in Kubernetes.
-These considerations include:
+This documentation page provides an overview of the key architectural
+considerations for implementing a robust business continuity strategy when
+deploying PostgreSQL in Kubernetes. These considerations include:
 
 - **[Deployments in Stretched](#multi-availability-zone-kubernetes-clusters)
   vs. [Non-Stretched Clusters](#single-availability-zone-kubernetes-clusters)**:
