@@ -16,9 +16,8 @@ more `ConfigMap` or `Secret` resources (see the
 ["User defined metrics" section](#user-defined-metrics) below for details).
 
 !!! Important
-    Starting from version 1.11, CloudNativePG already installs
-    [by default a set of predefined metrics](#default-set-of-metrics) in
-    a `ConfigMap` called `default-monitoring`.
+    CloudNativePG, by default, installs a set of [predefined metrics](#default-set-of-metrics)
+    in a `ConfigMap` named `default-monitoring`.
 
 !!! Info
     You can inspect the exported metrics by following the instructions in
