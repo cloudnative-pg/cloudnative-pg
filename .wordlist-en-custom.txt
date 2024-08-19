@@ -2,6 +2,8 @@ AES
 API's
 APIs
 ARMv
+AZ
+AZs
 AcolumnName
 AdditionalCommandArgs
 AdditionalPodAffinity
