@@ -1095,6 +1095,10 @@ func AssertDetachReplicaModeCluster(
 		}, 20, 1).Should(Succeed())
 	})
 
+	By("checking the cluster recovers", func() {
+		AssertClusterIsReady(namespace, replicaClusterName, testTimeouts[testsUtils.ClusterIsReady], env)
+	})
+
 	By("verifying write operation on the replica cluster primary pod", func() {
 		query := "CREATE TABLE IF NOT EXISTS replica_cluster_primary AS VALUES (1),(2);"
 		// Expect write operation to succeed
