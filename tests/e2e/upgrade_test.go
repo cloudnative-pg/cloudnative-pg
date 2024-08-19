@@ -419,7 +419,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			Expect(err).NotTo(HaveOccurred())
 			lines := strings.Split(lgs, "\n")
 			Expect(lines).ShouldNot(BeEmpty())
-			GinkgoWriter.Println(lines[0])
+			GinkgoWriter.Println("init log", lines[0])
 		})
 	}
 
