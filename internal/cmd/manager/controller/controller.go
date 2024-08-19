@@ -495,7 +495,7 @@ func startPprofDebugServer(ctx context.Context) {
 			}
 		}()
 
-		if err := pprofServer.ListenAndServe(); !errors.Is(http.ErrServerClosed, err) {
+		if err := pprofServer.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 			setupLog.Error(err, "Failed to start pprof HTTP server")
 		}
 	}()
