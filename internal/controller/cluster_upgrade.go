@@ -794,5 +794,5 @@ func upgradeInstanceManagerOnPod(
 		return err
 	}
 
-	return fmt.Errorf(string(body))
+	return fmt.Errorf("%s", string(body))
 }
