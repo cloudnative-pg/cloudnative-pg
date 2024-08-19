@@ -103,12 +103,10 @@ func RunController(
 ) error {
 	ctx := context.Background()
 
-	var operatorHash string
-	h, err := executablehash.Get()
+	operatorHash, err := executablehash.Get()
 	if err != nil {
 		setupLog.Error(err, "could not get executable hash")
-	} else {
-		operatorHash = h
+		return err
 	}
 
 	setupLog.Info("Starting CloudNativePG Operator",
