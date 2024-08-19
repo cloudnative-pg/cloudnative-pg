@@ -1,16 +1,29 @@
 # Architecture
 
-This section covers the main architectural aspects you need to consider
-when deploying PostgreSQL in Kubernetes.
-
 !!! Hint
-    We encourage you to read an article that we've written for the CNCF blog
-    titled ["Recommended Architectures for PostgreSQL in Kubernetes"](https://www.cncf.io/blog/2023/09/29/recommended-architectures-for-postgresql-in-kubernetes/).
+    For a deeper understanding, we recommend reading our article on the CNCF
+    blog titled ["Recommended Architectures for PostgreSQL in Kubernetes"](https://www.cncf.io/blog/2023/09/29/recommended-architectures-for-postgresql-in-kubernetes/).
+    This article provides valuable insights into best practices and design
+    considerations for PostgreSQL deployments in Kubernetes.
 
-!!! Important
-    If you are deploying PostgreSQL in a self-managed Kubernetes environment,
-    please make sure you read the [Kubernetes architecture](#kubernetes-architecture)
-    section below when you start planning your journey to the Cloud Native world.
+This section outlines the key architectural considerations for implementing a
+robust business continuity strategy when deploying PostgreSQL in Kubernetes.
+These considerations include:
+
+- **[Deployments in Stretched](#multi-availability-zone-kubernetes-clusters)
+  vs. [Non-Stretched Clusters](#single-availability-zone-kubernetes-clusters)**:
+  Evaluating the differences between deploying in stretched clusters (across 3
+  or more availability zones) versus non-stretched clusters (within a single
+  availability zone).
+- [**Reservation of `postgres` Worker Nodes**](#reserving-nodes-for-postgresql-workloads): Isolating PostgreSQL workloads by
+  dedicating specific worker nodes to `postgres` tasks, ensuring optimal
+  performance and minimizing interference from other workloads.
+- [**PostgreSQL Architectures Within a Single Kubernetes Cluster**](#postgresql-architecture):
+  Designing effective PostgreSQL deployments within a single Kubernetes cluster
+  to meet high availability and performance requirements.
+- [**PostgreSQL Architectures Across Kubernetes Clusters for Disaster Recovery**](#deployments-across-kubernetes-clusters):
+  Planning and implementing PostgreSQL architectures that span multiple
+  Kubernetes clusters to provide comprehensive disaster recovery capabilities.
 
 ## Synchronizing the state
 
@@ -158,6 +171,67 @@ Kubernetes cluster.
     CloudNativePG provides all the necessary primitives and probes to
     coordinate PostgreSQL active/passive topologies across different Kubernetes
     clusters through a higher-level operator or management tool.
+
+### Reserving Nodes for PostgreSQL Workloads
+
+Whether you're operating in a multi-availability zone environment or, more
+critically, within a single availability zone, we strongly recommend isolating
+PostgreSQL workloads by dedicating specific worker nodes exclusively to
+`postgres`. This approach ensures optimal performance and resource allocation
+for your database operations.
+
+In Kubernetes, this can be achieved using node labels and taints in a
+declarative manner, aligning with Infrastructure as Code (IaC) practices:
+labels ensure that a node is capable of running `postgres` workloads, while
+taints help prevent any non-`postgres` workloads from being scheduled on that
+node.
+
+#### Proposed Node Label
+
+CloudNativePG recommends using the `node-role.kubernetes.io/postgres` label.
+Since this is a reserved label (`*.kubernetes.io`), it can only be applied
+after a worker node is created.
+
+To assign the `postgres` label to a node, use the following command:
+
+```sh
+kubectl label node <NODE-NAME> node-role.kubernetes.io/postgres=
+```
+
+To ensure that a `Cluster` resource is scheduled on a `postgres` node, you must
+correctly configure the `.spec.affinity.nodeSelector` stanza in your manifests.
+Here’s an example:
+
+```yaml
+spec:
+  # <snip>
+  affinity:
+    nodeSelector:
+      node-role.kubernetes.io/postgres: ""
+```
+
+#### Proposed Node Taint
+
+CloudNativePG recommends using the `node-role.kubernetes.io/postgres` taint.
+
+To assign the `postgres` taint to a node, use the following command:
+
+```sh
+kubectl taint node <NODE-NAME> node-role.kubernetes.io/postgres=:noSchedule
+```
+
+To ensure that a `Cluster` resource is scheduled on a node with a `postgres` taint, you must correctly configure the `.spec.affinity.tolerations` stanza in your manifests.
+Here’s an example:
+
+```yaml
+spec:
+  # <snip>
+  affinity:
+    tolerations:
+    - key: node-role.kubernetes.io/postgres
+      operator: Exists
+      effect: NoSchedule
+```
 
 ## PostgreSQL architecture
 
