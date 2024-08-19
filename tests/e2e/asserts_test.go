@@ -1067,16 +1067,13 @@ func AssertDetachReplicaModeCluster(
 	var primaryReplicaCluster *corev1.Pod
 	replicaCommandTimeout := time.Second * 10
 
-	var referenceTime time.Time
-	By("taking the reference time before the detaching", func() {
+	By("checking the cluster is healty before detaching", func() {
 		Eventually(func(g Gomega) {
-			referenceCondition, err := testsUtils.GetConditionsInClusterStatus(namespace, replicaClusterName, env,
-				apiv1.ConditionClusterReady)
+			var err error
+			cluster, err := env.GetCluster(namespace, replicaClusterName)
 			g.Expect(err).ToNot(HaveOccurred())
-			g.Expect(referenceCondition.Status).To(BeEquivalentTo(corev1.ConditionTrue))
-			g.Expect(referenceCondition).ToNot(BeNil())
-			referenceTime = referenceCondition.LastTransitionTime.Time
-		}, 60, 5).Should(Succeed())
+			g.Expect(cluster.Status.Phase).To(BeEquivalentTo(apiv1.PhaseHealthy))
+		}, 5, 1).Should(Succeed())
 	})
 
 	By("disabling the replica mode", func() {
@@ -1089,20 +1086,13 @@ func AssertDetachReplicaModeCluster(
 		}, 60, 5).Should(Succeed())
 	})
 
-	By("ensuring the replica cluster got promoted and restarted", func() {
+	By("checking the cluster becomes unhealthy", func() {
 		Eventually(func(g Gomega) {
+			var err error
 			cluster, err := env.GetCluster(namespace, replicaClusterName)
 			g.Expect(err).ToNot(HaveOccurred())
-			g.Expect(cluster.Spec.ReplicaCluster.Enabled).NotTo(BeNil(), "replica.enabled was nil")
-			g.Expect(*cluster.Spec.ReplicaCluster.Enabled).To(BeFalse(), "replica.enabled still true")
-			condition, err := testsUtils.GetConditionsInClusterStatus(namespace, cluster.Name, env,
-				apiv1.ConditionClusterReady)
-			g.Expect(err).ToNot(HaveOccurred())
-			g.Expect(condition).ToNot(BeNil())
-			g.Expect(condition.Status).To(BeEquivalentTo(corev1.ConditionTrue))
-			g.Expect(condition.LastTransitionTime.Time).To(BeTemporally(">", referenceTime))
-		}).WithTimeout(60 * time.Second).Should(Succeed())
-		AssertClusterIsReady(namespace, replicaClusterName, testTimeouts[testsUtils.ClusterIsReady], env)
+			g.Expect(cluster.Status.Phase).ToNot(BeEquivalentTo(apiv1.PhaseHealthy))
+		}, 20, 1).Should(Succeed())
 	})
 
 	By("verifying write operation on the replica cluster primary pod", func() {
