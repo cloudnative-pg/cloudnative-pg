@@ -94,11 +94,11 @@ func (data *data) MutateCluster(ctx context.Context, object client.Object, mutat
 }
 
 var (
-	errInvalidJSON      = errors.New("invalid json")
-	errSetClusterStatus = errors.New("set cluster status invokation failed")
+	errInvalidJSON        = errors.New("invalid json")
+	errSetStatusInCluster = errors.New("SetStatusInCluster invocation failed")
 )
 
-func (data *data) SetClusterStatus(ctx context.Context, cluster client.Object) (map[string]string, error) {
+func (data *data) SetStatusInCluster(ctx context.Context, cluster client.Object) (map[string]string, error) {
 	contextLogger := log.FromContext(ctx)
 	serializedObject, err := json.Marshal(cluster)
 	if err != nil {
@@ -113,20 +113,20 @@ func (data *data) SetClusterStatus(ctx context.Context, cluster client.Object) (
 	for idx := range data.plugins {
 		plugin := data.plugins[idx]
 
-		if !slices.Contains(plugin.OperatorCapabilities(), operator.OperatorCapability_RPC_TYPE_SET_CLUSTER_STATUS) {
+		if !slices.Contains(plugin.OperatorCapabilities(), operator.OperatorCapability_RPC_TYPE_SET_STATUS_IN_CLUSTER) {
 			continue
 		}
 
 		pluginLogger := contextLogger.WithValues("pluginName", plugin.Name())
-		request := operator.SetClusterStatusRequest{
+		request := operator.SetStatusInClusterRequest{
 			Cluster: serializedObject,
 		}
 
-		pluginLogger.Trace("Calling SetClusterStatus endpoint")
-		response, err := plugin.OperatorClient().SetClusterStatus(ctx, &request)
+		pluginLogger.Trace("Calling SetStatusInCluster endpoint")
+		response, err := plugin.OperatorClient().SetStatusInCluster(ctx, &request)
 		if err != nil {
-			pluginLogger.Error(err, "Error while calling SetClusterStatus")
-			return nil, fmt.Errorf("%w: %w", errSetClusterStatus, err)
+			pluginLogger.Error(err, "Error while calling SetStatusInCluster")
+			return nil, fmt.Errorf("%w: %w", errSetStatusInCluster, err)
 		}
 
 		if len(response.JsonStatus) == 0 {
@@ -134,7 +134,7 @@ func (data *data) SetClusterStatus(ctx context.Context, cluster client.Object) (
 			continue
 		}
 		if err := json.Unmarshal(response.JsonStatus, &map[string]interface{}{}); err != nil {
-			contextLogger.Error(err, "found a malformed json while evaluating SetClusterStatus response",
+			contextLogger.Error(err, "found a malformed json while evaluating SetStatusInCluster response",
 				"pluginName", plugin.Name())
 			return nil, fmt.Errorf("%w: %w", errInvalidJSON, err)
 		}

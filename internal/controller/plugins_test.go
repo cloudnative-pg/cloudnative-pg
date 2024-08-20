@@ -37,7 +37,7 @@ type fakePluginClient struct {
 	setClusterStatus map[string]string
 }
 
-func (f *fakePluginClient) SetClusterStatus(
+func (f *fakePluginClient) SetStatusInCluster(
 	_ context.Context,
 	_ k8client.Object,
 ) (map[string]string, error) {

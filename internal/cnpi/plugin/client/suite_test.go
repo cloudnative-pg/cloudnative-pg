@@ -40,9 +40,9 @@ func TestClient(t *testing.T) {
 }
 
 type fakeOperatorClient struct {
-	capabilities        *operator.OperatorCapabilitiesResult
-	status              *operator.SetClusterStatusResponse
-	errSetClusterStatus error
+	capabilities          *operator.OperatorCapabilitiesResult
+	status                *operator.SetStatusInClusterResponse
+	errSetStatusInCluster error
 }
 
 func (f *fakeOperatorClient) GetCapabilities(
@@ -77,13 +77,13 @@ func (f *fakeOperatorClient) MutateCluster(
 	panic("implement me")
 }
 
-func (f *fakeOperatorClient) SetClusterStatus(
+func (f *fakeOperatorClient) SetStatusInCluster(
 	_ context.Context,
-	_ *operator.SetClusterStatusRequest,
+	_ *operator.SetStatusInClusterRequest,
 	_ ...grpc.CallOption,
-) (*operator.SetClusterStatusResponse, error) {
-	if f.errSetClusterStatus != nil {
-		return nil, f.errSetClusterStatus
+) (*operator.SetStatusInClusterResponse, error) {
+	if f.errSetStatusInCluster != nil {
+		return nil, f.errSetStatusInCluster
 	}
 	return f.status, nil
 }
@@ -104,7 +104,7 @@ type fakeConnection struct {
 }
 
 func (f *fakeConnection) setStatusResponse(status []byte) {
-	f.operatorClient.status = &operator.SetClusterStatusResponse{
+	f.operatorClient.status = &operator.SetStatusInClusterResponse{
 		JsonStatus: status,
 	}
 }

@@ -407,7 +407,7 @@ ServiceSelectorType
 ServiceSpec
 ServiceTemplateSpec
 ServiceUpdateStrategy
-SetClusterStatus
+SetStatusInCluster
 ShutdownCheckpointToken
 Silvela
 Slonik

@@ -59,9 +59,9 @@ func setStatusPluginHook(
 	contextLogger := log.FromContext(ctx).WithName("set_status_plugin_hook")
 
 	origCluster := cluster.DeepCopy()
-	statuses, err := pluginClient.SetClusterStatus(ctx, cluster)
+	statuses, err := pluginClient.SetStatusInCluster(ctx, cluster)
 	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("while calling SetClusterStatus: %w", err)
+		return ctrl.Result{}, fmt.Errorf("while calling SetStatusInCluster: %w", err)
 	}
 	if len(statuses) == 0 {
 		return ctrl.Result{}, nil

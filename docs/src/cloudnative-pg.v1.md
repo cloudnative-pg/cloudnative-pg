@@ -3727,7 +3727,7 @@ plugin regarding the Backup management</p>
 <i>string</i>
 </td>
 <td>
-   <p>Status contain the status reported by the plugin through the SetClusterStatus interface</p>
+   <p>Status contain the status reported by the plugin through the SetStatusInCluster interface</p>
 </td>
 </tr>
 </tbody>

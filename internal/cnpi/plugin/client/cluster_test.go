@@ -29,7 +29,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("SetClusterStatus", func() {
+var _ = Describe("SetStatusInCluster", func() {
 	const pluginName = "fake-plugin"
 	const pluginName2 = "fake-plugin2"
 
@@ -47,7 +47,7 @@ var _ = Describe("SetClusterStatus", func() {
 				newFakeClusterClient(pluginName, payload),
 			},
 		}
-		values, err := d.SetClusterStatus(ctx, cluster)
+		values, err := d.SetStatusInCluster(ctx, cluster)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(values[pluginName]).To(BeEquivalentTo(string(payload)))
 	})
@@ -56,7 +56,7 @@ var _ = Describe("SetClusterStatus", func() {
 		d := data{
 			plugins: []connection.Interface{newFakeClusterClient(pluginName, nil)},
 		}
-		values, err := d.SetClusterStatus(ctx, cluster)
+		values, err := d.SetStatusInCluster(ctx, cluster)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(values).To(BeEquivalentTo(map[string]string{}))
 	})
@@ -76,7 +76,7 @@ var _ = Describe("SetClusterStatus", func() {
 				newFakeClusterClient(pluginName2, payload2),
 			},
 		}
-		values, err := d.SetClusterStatus(ctx, cluster)
+		values, err := d.SetStatusInCluster(ctx, cluster)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(values).To(BeEquivalentTo(map[string]string{
 			pluginName:  string(payload1),
@@ -90,21 +90,21 @@ var _ = Describe("SetClusterStatus", func() {
 				newFakeClusterClient(pluginName, []byte("random")),
 			},
 		}
-		_, err := d.SetClusterStatus(ctx, cluster)
+		_, err := d.SetStatusInCluster(ctx, cluster)
 		Expect(err).To(HaveOccurred())
 		Expect(err).To(MatchError(errInvalidJSON))
 	})
 
-	It("should report an error in case of an error returned by the underlying SetClusterStatus", func(ctx SpecContext) {
+	It("should report an error in case of an error returned by the underlying SetStatusInCluster", func(ctx SpecContext) {
 		cli := newFakeClusterClient(pluginName, []byte("random"))
 		expectedErr := errors.New("bad request")
-		cli.operatorClient.errSetClusterStatus = expectedErr
+		cli.operatorClient.errSetStatusInCluster = expectedErr
 		d := data{
 			plugins: []connection.Interface{cli},
 		}
-		_, err := d.SetClusterStatus(ctx, cluster)
+		_, err := d.SetStatusInCluster(ctx, cluster)
 		Expect(err).To(HaveOccurred())
-		Expect(err).To(MatchError(errSetClusterStatus))
+		Expect(err).To(MatchError(errSetStatusInCluster))
 		Expect(err).To(MatchError(expectedErr))
 	})
 })
@@ -118,7 +118,7 @@ func newFakeClusterClient(name string, jsonStatus []byte) *fakeConnection {
 					{
 						Type: &operator.OperatorCapability_Rpc{
 							Rpc: &operator.OperatorCapability_RPC{
-								Type: operator.OperatorCapability_RPC_TYPE_SET_CLUSTER_STATUS,
+								Type: operator.OperatorCapability_RPC_TYPE_SET_STATUS_IN_CLUSTER,
 							},
 						},
 					},

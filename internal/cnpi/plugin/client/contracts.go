@@ -71,8 +71,8 @@ type ClusterCapabilities interface {
 		mutatedCluster client.Object,
 	) (field.ErrorList, error)
 
-	// SetClusterStatus returns a map of [pluginName]: statuses to be assigned to the cluster
-	SetClusterStatus(ctx context.Context, cluster client.Object) (map[string]string, error)
+	// SetStatusInCluster returns a map of [pluginName]: statuses to be assigned to the cluster
+	SetStatusInCluster(ctx context.Context, cluster client.Object) (map[string]string, error)
 }
 
 // ReconcilerHookResult is the result of a reconciliation loop
