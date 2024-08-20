@@ -182,8 +182,6 @@ PostgreSQL workloads is referred to as a **Postgres node** or `postgres` node.
 This approach ensures optimal performance and resource allocation for your
 database operations.
 
-This revision should help ensure that your message is clear and professional.
-
 !!! Hint
     As a general rule of thumb, deploy Postgres nodes in multiples of
     three—ideally, with one node per availability zone if possible. Three nodes is
