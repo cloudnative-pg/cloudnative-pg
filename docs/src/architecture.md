@@ -10,18 +10,18 @@ This documentation page provides an overview of the key architectural
 considerations for implementing a robust business continuity strategy when
 deploying PostgreSQL in Kubernetes. These considerations include:
 
-- **[Deployments in Stretched](#multi-availability-zone-kubernetes-clusters)
-  vs. [Non-Stretched Clusters](#single-availability-zone-kubernetes-clusters)**:
+- **[Deployments in _stretched_](#multi-availability-zone-kubernetes-clusters)
+  vs. [_non-stretched_ clusters](#single-availability-zone-kubernetes-clusters)**:
   Evaluating the differences between deploying in stretched clusters (across 3
   or more availability zones) versus non-stretched clusters (within a single
   availability zone).
-- [**Reservation of `postgres` Worker Nodes**](#reserving-nodes-for-postgresql-workloads): Isolating PostgreSQL workloads by
+- [**Reservation of `postgres` worker nodes**](#reserving-nodes-for-postgresql-workloads): Isolating PostgreSQL workloads by
   dedicating specific worker nodes to `postgres` tasks, ensuring optimal
   performance and minimizing interference from other workloads.
-- [**PostgreSQL Architectures Within a Single Kubernetes Cluster**](#postgresql-architecture):
+- [**PostgreSQL architectures within a single Kubernetes cluster**](#postgresql-architecture):
   Designing effective PostgreSQL deployments within a single Kubernetes cluster
   to meet high availability and performance requirements.
-- [**PostgreSQL Architectures Across Kubernetes Clusters for Disaster Recovery**](#deployments-across-kubernetes-clusters):
+- [**PostgreSQL architectures across Kubernetes clusters for disaster recovery**](#deployments-across-kubernetes-clusters):
   Planning and implementing PostgreSQL architectures that span multiple
   Kubernetes clusters to provide comprehensive disaster recovery capabilities.
 
@@ -172,7 +172,7 @@ Kubernetes cluster.
     coordinate PostgreSQL active/passive topologies across different Kubernetes
     clusters through a higher-level operator or management tool.
 
-### Reserving Nodes for PostgreSQL Workloads
+### Reserving nodes for PostgreSQL workloads
 
 Whether you're operating in a multi-availability zone environment or, more
 critically, within a single availability zone, we strongly recommend isolating
@@ -203,7 +203,7 @@ node.
     by using labels and taints to ensure that a node is dedicated to a single
     instance of a specific `Cluster`.
 
-#### Proposed Node Label
+#### Proposed node label
 
 CloudNativePG recommends using the `node-role.kubernetes.io/postgres` label.
 Since this is a reserved label (`*.kubernetes.io`), it can only be applied
@@ -228,7 +228,7 @@ spec:
       node-role.kubernetes.io/postgres: ""
 ```
 
-#### Proposed Node Taint
+#### Proposed node taint
 
 CloudNativePG recommends using the `node-role.kubernetes.io/postgres` taint.
 
@@ -395,7 +395,7 @@ This is typically triggered by:
   data sets), you first demote the current primary, then promote the designated
   primary using the API provided by CloudNativePG.
 - **Unexpected failure:** If the entire Kubernetes cluster fails, you might
-  experience data loss, but you need to failover to the other Kubernetes
+  experience data loss, but you need to fail over to the other Kubernetes
   cluster by promoting the PostgreSQL replica cluster.
 
 !!! Warning
