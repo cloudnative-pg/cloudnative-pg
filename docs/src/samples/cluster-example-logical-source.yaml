@@ -30,3 +30,15 @@ spec:
       - name: app
         login: true
         replication: true
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Publication
+metadata:
+  name: cluster-example-pub
+spec:
+  name: pub
+  dbname: app
+  cluster:
+    name: cluster-example
+  target:
+    allTables: {}

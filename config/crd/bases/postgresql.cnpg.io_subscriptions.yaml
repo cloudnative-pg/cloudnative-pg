@@ -1,0 +1,135 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.15.0
+  name: subscriptions.postgresql.cnpg.io
+spec:
+  group: postgresql.cnpg.io
+  names:
+    kind: Subscription
+    listKind: SubscriptionList
+    plural: subscriptions
+    singular: subscription
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    - jsonPath: .spec.cluster.name
+      name: Cluster
+      type: string
+    - jsonPath: .spec.name
+      name: PG Name
+      type: string
+    - jsonPath: .status.ready
+      name: Ready
+      type: boolean
+    - description: Latest error message
+      jsonPath: .status.error
+      name: Error
+      type: string
+    name: v1
+    schema:
+      openAPIV3Schema:
+        description: Subscription is the Schema for the subscriptions API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: SubscriptionSpec defines the desired state of Subscription
+            properties:
+              cluster:
+                description: The corresponding cluster
+                properties:
+                  name:
+                    default: ""
+                    description: |-
+                      Name of the referent.
+                      This field is effectively required, but due to backwards compatibility is
+                      allowed to be empty. Instances of this type with an empty value here are
+                      almost certainly wrong.
+                      TODO: Add other useful fields. apiVersion, kind, uid?
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                      TODO: Drop `kubebuilder:default` when controller-gen doesn't need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.
+                    type: string
+                type: object
+                x-kubernetes-map-type: atomic
+              dbname:
+                description: The name of the database
+                type: string
+                x-kubernetes-validations:
+                - message: dbname is immutable
+                  rule: self == oldSelf
+              externalClusterName:
+                description: The name of the external cluster with the publication
+                type: string
+              name:
+                description: The name inside PostgreSQL
+                type: string
+                x-kubernetes-validations:
+                - message: name is immutable
+                  rule: self == oldSelf
+              owner:
+                description: The owner
+                type: string
+              parameters:
+                additionalProperties:
+                  type: string
+                description: Parameters
+                type: object
+              publicationName:
+                description: The name of the publication
+                type: string
+              subscriptionReclaimPolicy:
+                default: retain
+                description: The policy for end-of-life maintenance of this subscription
+                enum:
+                - delete
+                - retain
+                type: string
+            required:
+            - cluster
+            - dbname
+            - externalClusterName
+            - name
+            - publicationName
+            type: object
+          status:
+            description: SubscriptionStatus defines the observed state of Subscription
+            properties:
+              error:
+                description: Error is the reconciliation error message
+                type: string
+              observedGeneration:
+                description: |-
+                  A sequence number representing the latest
+                  desired state that was synchronized
+                format: int64
+                type: integer
+              ready:
+                description: Ready is true if the database was reconciled correctly
+                type: boolean
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
