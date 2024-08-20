@@ -298,6 +298,16 @@ func (cmd *generateExecutor) reconcileOperatorDeployment(dep *appsv1.Deployment)
 		return nil
 	}
 
+	if dep.Spec.Template.Spec.Affinity == nil {
+		dep.Spec.Template.Spec.Affinity = &corev1.Affinity{}
+	}
+	if dep.Spec.Template.Spec.Affinity.NodeAffinity == nil {
+		dep.Spec.Template.Spec.Affinity.NodeAffinity = &corev1.NodeAffinity{}
+	}
+	if dep.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil {
+		dep.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution = &corev1.NodeSelector{}
+	}
+
 	nodeSelectorMap := make(map[string]string)
 	for _, ns := range cmd.nodeSelector {
 		parts := strings.SplitN(ns, "=", 2)
