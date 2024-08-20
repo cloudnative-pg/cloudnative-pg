@@ -1,16 +1,29 @@
 # Architecture
 
-This section covers the main architectural aspects you need to consider
-when deploying PostgreSQL in Kubernetes.
-
 !!! Hint
-    We encourage you to read an article that we've written for the CNCF blog
-    titled ["Recommended Architectures for PostgreSQL in Kubernetes"](https://www.cncf.io/blog/2023/09/29/recommended-architectures-for-postgresql-in-kubernetes/).
+    For a deeper understanding, we recommend reading our article on the CNCF
+    blog post titled ["Recommended Architectures for PostgreSQL in Kubernetes"](https://www.cncf.io/blog/2023/09/29/recommended-architectures-for-postgresql-in-kubernetes/),
+    which provides valuable insights into best practices and design
+    considerations for PostgreSQL deployments in Kubernetes.
 
-!!! Important
-    If you are deploying PostgreSQL in a self-managed Kubernetes environment,
-    please make sure you read the [Kubernetes architecture](#kubernetes-architecture)
-    section below when you start planning your journey to the Cloud Native world.
+This documentation page provides an overview of the key architectural
+considerations for implementing a robust business continuity strategy when
+deploying PostgreSQL in Kubernetes. These considerations include:
+
+- **[Deployments in _stretched_](#multi-availability-zone-kubernetes-clusters)
+  vs. [_non-stretched_ clusters](#single-availability-zone-kubernetes-clusters)**:
+  Evaluating the differences between deploying in stretched clusters (across 3
+  or more availability zones) versus non-stretched clusters (within a single
+  availability zone).
+- [**Reservation of `postgres` worker nodes**](#reserving-nodes-for-postgresql-workloads): Isolating PostgreSQL workloads by
+  dedicating specific worker nodes to `postgres` tasks, ensuring optimal
+  performance and minimizing interference from other workloads.
+- [**PostgreSQL architectures within a single Kubernetes cluster**](#postgresql-architecture):
+  Designing effective PostgreSQL deployments within a single Kubernetes cluster
+  to meet high availability and performance requirements.
+- [**PostgreSQL architectures across Kubernetes clusters for disaster recovery**](#deployments-across-kubernetes-clusters):
+  Planning and implementing PostgreSQL architectures that span multiple
+  Kubernetes clusters to provide comprehensive disaster recovery capabilities.
 
 ## Synchronizing the state
 
@@ -159,6 +172,86 @@ Kubernetes cluster.
     coordinate PostgreSQL active/passive topologies across different Kubernetes
     clusters through a higher-level operator or management tool.
 
+### Reserving nodes for PostgreSQL workloads
+
+Whether you're operating in a multi-availability zone environment or, more
+critically, within a single availability zone, we strongly recommend isolating
+PostgreSQL workloads by dedicating specific worker nodes exclusively to
+`postgres` in production. A Kubernetes worker node dedicated to running
+PostgreSQL workloads is referred to as a **Postgres node** or `postgres` node.
+This approach ensures optimal performance and resource allocation for your
+database operations.
+
+!!! Hint
+    As a general rule of thumb, deploy Postgres nodes in multiples of
+    three—ideally with one node per availability zone. Three nodes is
+    an optimal number because it ensures that a PostgreSQL cluster with three
+    instances (one primary and two standby replicas) is distributed across
+    different nodes, enhancing fault tolerance and availability.
+
+In Kubernetes, this can be achieved using node labels and taints in a
+declarative manner, aligning with Infrastructure as Code (IaC) practices:
+labels ensure that a node is capable of running `postgres` workloads, while
+taints help prevent any non-`postgres` workloads from being scheduled on that
+node.
+
+!!! Important
+    This methodology is the most straightforward way to ensure that PostgreSQL
+    workloads are isolated from other workloads in terms of both computing
+    resources and, when using locally attached disks, storage. While different
+    PostgreSQL clusters may share the same node, you can take this a step further
+    by using labels and taints to ensure that a node is dedicated to a single
+    instance of a specific `Cluster`.
+
+#### Proposed node label
+
+CloudNativePG recommends using the `node-role.kubernetes.io/postgres` label.
+Since this is a reserved label (`*.kubernetes.io`), it can only be applied
+after a worker node is created.
+
+To assign the `postgres` label to a node, use the following command:
+
+```sh
+kubectl label node <NODE-NAME> node-role.kubernetes.io/postgres=
+```
+
+To ensure that a `Cluster` resource is scheduled on a `postgres` node, you must
+correctly configure the `.spec.affinity.nodeSelector` stanza in your manifests.
+Here’s an example:
+
+```yaml
+spec:
+  # <snip>
+  affinity:
+    # <snip>
+    nodeSelector:
+      node-role.kubernetes.io/postgres: ""
+```
+
+#### Proposed node taint
+
+CloudNativePG recommends using the `node-role.kubernetes.io/postgres` taint.
+
+To assign the `postgres` taint to a node, use the following command:
+
+```sh
+kubectl taint node <NODE-NAME> node-role.kubernetes.io/postgres=:noSchedule
+```
+
+To ensure that a `Cluster` resource is scheduled on a node with a `postgres` taint, you must correctly configure the `.spec.affinity.tolerations` stanza in your manifests.
+Here’s an example:
+
+```yaml
+spec:
+  # <snip>
+  affinity:
+    # <snip>
+    tolerations:
+    - key: node-role.kubernetes.io/postgres
+      operator: Exists
+      effect: NoSchedule
+```
+
 ## PostgreSQL architecture
 
 CloudNativePG supports clusters based on asynchronous and synchronous
@@ -302,7 +395,7 @@ This is typically triggered by:
   data sets), you first demote the current primary, then promote the designated
   primary using the API provided by CloudNativePG.
 - **Unexpected failure:** If the entire Kubernetes cluster fails, you might
-  experience data loss, but you need to failover to the other Kubernetes
+  experience data loss, but you need to fail over to the other Kubernetes
   cluster by promoting the PostgreSQL replica cluster.
 
 !!! Warning
