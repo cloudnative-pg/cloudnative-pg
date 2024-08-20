@@ -2,8 +2,8 @@
 
 !!! Hint
     For a deeper understanding, we recommend reading our article on the CNCF
-    blog titled ["Recommended Architectures for PostgreSQL in Kubernetes"](https://www.cncf.io/blog/2023/09/29/recommended-architectures-for-postgresql-in-kubernetes/).
-    This article provides valuable insights into best practices and design
+    blog post titled ["Recommended Architectures for PostgreSQL in Kubernetes"](https://www.cncf.io/blog/2023/09/29/recommended-architectures-for-postgresql-in-kubernetes/),
+    which provides valuable insights into best practices and design
     considerations for PostgreSQL deployments in Kubernetes.
 
 This documentation page provides an overview of the key architectural

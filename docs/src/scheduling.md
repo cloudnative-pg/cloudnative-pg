@@ -29,7 +29,29 @@ affinity/anti-affinity**.
 
 By default, CloudNativePG configures cluster instances to preferably be
 scheduled on different nodes, while `pgBouncer` instances might still run on
-the same nodes. This results in the following `affinity` configuration:
+the same nodes.
+
+For example, given the following `Cluster` specification:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example
+spec:
+  instances: 3
+  imageName: ghcr.io/cloudnative-pg/postgresql:16.4
+
+  affinity:
+    enablePodAntiAffinity: true # Default value
+    topologyKey: kubernetes.io/hostname # Default value
+    podAntiAffinityType: preferred # Default value
+
+  storage:
+    size: 1Gi
+```
+
+The `affinity` configuration applied in the instance pods will be:
 
 ```yaml
 affinity:
@@ -48,26 +70,6 @@ affinity:
                   - instance
           topologyKey: kubernetes.io/hostname
         weight: 100
-```
-
-Given the following `Cluster` specification:
-
-```yaml
-apiVersion: postgresql.cnpg.io/v1
-kind: Cluster
-metadata:
-  name: cluster-example
-spec:
-  instances: 3
-  imageName: ghcr.io/cloudnative-pg/postgresql:16.4
-
-  affinity:
-    enablePodAntiAffinity: true # Default value
-    topologyKey: kubernetes.io/hostname # Default value
-    podAntiAffinityType: preferred # Default value
-
-  storage:
-    size: 1Gi
 ```
 
 With this setup, Kubernetes will *prefer* to schedule a 3-node PostgreSQL
