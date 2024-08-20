@@ -54,7 +54,7 @@ func Destroy(ctx context.Context, clusterName, instanceName string, keepPVC bool
 			ctx,
 			&jobList.Items[idx],
 			client.PropagationPolicy(metav1.DeletePropagationBackground),
-		); err != nil {
+		); err != nil && !apierrs.IsNotFound(err) {
 			return fmt.Errorf("deleting job %s: %w", jobList.Items[idx].Name, err)
 		}
 	}
