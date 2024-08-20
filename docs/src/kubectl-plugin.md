@@ -198,7 +198,7 @@ The main options are:
   install the latest `MAJOR.MINOR.PATCH` version of the operator.
 - `--watch-namespace`: comma separated string containing the namespaces to
   watch (by default all namespaces)
-- `--node-selector`: set of node labels that the target nodes must have in
+- `--node-selector`: set of node labels that the target nodes are required to have in
   order to schedule the operator's `Deployment` object onto them (by default,
   this is empty, meaning that the deployment can be scheduled on any available
   node)
