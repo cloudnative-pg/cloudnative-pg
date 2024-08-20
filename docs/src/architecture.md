@@ -175,13 +175,17 @@ Kubernetes cluster.
 ### Reserving Nodes for PostgreSQL Workloads
 
 Whether you're operating in a multi-availability zone environment or, more
-critically, within a single availability zone, in production we strongly
-recommend isolating PostgreSQL workloads by dedicating specific worker nodes
-exclusively to `postgres`. This approach ensures optimal performance and
-resource allocation for your database operations.
+critically, within a single availability zone, we strongly recommend isolating
+PostgreSQL workloads by dedicating specific worker nodes exclusively to
+`postgres` in production. A Kubernetes worker node dedicated to running
+PostgreSQL workloads is referred to as a **Postgres node** or `postgres` node.
+This approach ensures optimal performance and resource allocation for your
+database operations.
+
+This revision should help ensure that your message is clear and professional.
 
 !!! Hint
-    As a general rule of thumb, deploy PostgreSQL nodes in multiples of
+    As a general rule of thumb, deploy Postgres nodes in multiples of
     three—ideally, with one node per availability zone if possible. Three nodes is
     an optimal number because it ensures that a PostgreSQL cluster with three
     instances (one primary and two standby replicas) is distributed across

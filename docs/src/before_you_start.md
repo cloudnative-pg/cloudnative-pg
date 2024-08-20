@@ -9,6 +9,12 @@ specific to Kubernetes and PostgreSQL.
 : A *node* is a worker machine in Kubernetes, either virtual or physical, where
   all services necessary to run pods are managed by the control plane node(s).
 
+[Postgres Node](architecture.md#reserving-nodes-for-postgresql-workloads)
+: A *Postgres node* is a Kubernetes worker node dedicated to running PostgreSQL
+  workloads. This is achieved by applying the `node-role.kubernetes.io` label and
+  taint, as [proposed by CloudNativePG](architecture.md#reserving-nodes-for-postgresql-workloads).
+  It is also referred to as a `postgres` node.
+
 [Pod](https://kubernetes.io/docs/concepts/workloads/pods/pod/)
 : A *pod* is the smallest computing unit that can be deployed in a Kubernetes
   cluster and is composed of one or more containers that share network and
