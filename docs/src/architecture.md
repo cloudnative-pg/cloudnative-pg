@@ -184,7 +184,7 @@ database operations.
 
 !!! Hint
     As a general rule of thumb, deploy Postgres nodes in multiples of
-    three—ideally, with one node per availability zone if possible. Three nodes is
+    three—ideally with one node per availability zone. Three nodes is
     an optimal number because it ensures that a PostgreSQL cluster with three
     instances (one primary and two standby replicas) is distributed across
     different nodes, enhancing fault tolerance and availability.
