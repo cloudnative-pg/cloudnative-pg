@@ -309,16 +309,12 @@ func (r *InstanceReconciler) restartPrimaryInplaceIfRequested(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 ) (bool, error) {
-	isPrimary, err := r.instance.IsPrimary()
-	if err != nil {
-		return false, err
-	}
-
-	// Restart both the designated primary and actual primary
-	isPrimary = isPrimary || (cluster.IsReplica() && cluster.Status.CurrentPrimary == r.instance.PodName)
-
+	isPrimary := cluster.Status.CurrentPrimary == r.instance.PodName
 	restartRequested := isPrimary && cluster.Status.Phase == apiv1.PhaseInplacePrimaryRestart
 	if restartRequested {
+		if cluster.Status.CurrentPrimary != cluster.Status.TargetPrimary {
+			return false, fmt.Errorf("cannot restart the primary in-place when a switchover is in progress")
+		}
 		restartTimeout := cluster.GetRestartTimeout()
 
 		if err := r.instance.RequestAndWaitRestartSmartFast(
