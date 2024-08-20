@@ -88,6 +88,14 @@ func (f *fakeOperatorClient) SetClusterStatus(
 	return f.status, nil
 }
 
+func (f *fakeOperatorClient) Deregister(
+	_ context.Context,
+	_ *operator.DeregisterRequest,
+	_ ...grpc.CallOption,
+) (*operator.DeregisterResponse, error) {
+	panic("implement me")
+}
+
 type fakeConnection struct {
 	lifecycleClient       lifecycle.OperatorLifecycleClient
 	lifecycleCapabilities []*lifecycle.OperatorLifecycleCapabilities
