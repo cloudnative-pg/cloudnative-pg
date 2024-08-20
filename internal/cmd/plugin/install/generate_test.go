@@ -57,8 +57,11 @@ var _ = Describe("generateExecutor", func() {
 				depSpec := dep.Spec.Template.Spec
 				Expect(depSpec.Containers[0].Args).To(ContainElement("--log-field-level=info"))
 				Expect(depSpec.Containers[0].Args).To(ContainElement("--log-field-timestamp=timestamp"))
-				Expect(depSpec.NodeSelector).To(HaveKeyWithValue("key1", "value1"))
-				Expect(depSpec.NodeSelector).To(HaveKeyWithValue("key2", "value2"))
+				Expect(depSpec.Affinity).NotTo(BeNil())
+				Expect(depSpec.Affinity.NodeAffinity).NotTo(BeNil())
+				Expect(depSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution).NotTo(BeNil())
+				Expect(depSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms).
+					To(HaveLen(2))
 			})
 		})
 
@@ -70,9 +73,8 @@ var _ = Describe("generateExecutor", func() {
 			It("should return an error", func() {
 				err := cmd.reconcileOperatorDeployment(dep)
 				Expect(err).To(HaveOccurred())
-				Expect(err).To(MatchError(
-					"invalid node-selector value: invalid-selector, must be in the format <labelName>=<labelValue>",
-				))
+				Expect(err).To(MatchError("invalid node-selector value: invalid-selector, " +
+					"must be in the format <labelName>=<labelValue>"))
 			})
 		})
 
@@ -81,14 +83,14 @@ var _ = Describe("generateExecutor", func() {
 				cmd.nodeSelector = []string{}
 			})
 
-			It("should not set node selector", func() {
+			It("should not set affinity", func() {
 				err := cmd.reconcileOperatorDeployment(dep)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(*dep.Spec.Replicas).To(Equal(int32(3)))
 				depSpec := dep.Spec.Template.Spec
 				Expect(depSpec.Containers[0].Args).To(ContainElement("--log-field-level=info"))
 				Expect(depSpec.Containers[0].Args).To(ContainElement("--log-field-timestamp=timestamp"))
-				Expect(depSpec.NodeSelector).To(BeNil())
+				Expect(depSpec.Affinity).To(BeNil())
 			})
 		})
 

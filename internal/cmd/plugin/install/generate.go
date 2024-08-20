@@ -308,16 +308,30 @@ func (cmd *generateExecutor) reconcileOperatorDeployment(dep *appsv1.Deployment)
 		dep.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution = &corev1.NodeSelector{}
 	}
 
-	nodeSelectorMap := make(map[string]string)
+	nodeSelectorMap := make(map[string][]string)
 	for _, ns := range cmd.nodeSelector {
 		parts := strings.SplitN(ns, "=", 2)
 		if len(parts) != 2 {
 			return fmt.Errorf("invalid node-selector value: %s, must be in the format <labelName>=<labelValue>", ns)
 		}
-		nodeSelectorMap[parts[0]] = parts[1]
+		nodeSelectorMap[parts[0]] = append(nodeSelectorMap[parts[0]], parts[1])
 	}
 
-	dep.Spec.Template.Spec.NodeSelector = nodeSelectorMap
+	for key, values := range nodeSelectorMap {
+		dep.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.
+			NodeSelectorTerms = append(
+			dep.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms,
+			corev1.NodeSelectorTerm{
+				MatchExpressions: []corev1.NodeSelectorRequirement{
+					{
+						Key:      key,
+						Operator: corev1.NodeSelectorOpIn,
+						Values:   values,
+					},
+				},
+			},
+		)
+	}
 	return nil
 }
 
