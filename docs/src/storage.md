@@ -480,7 +480,7 @@ to them, as explained in ["Synchronizing the state"](architecture.md#synchronizi
 As a result, defining additional replicas at the storage level can lead to
 write amplification, unnecessarily increasing disk I/O and space usage.
 
-In such cases, consider reducing the number of replicas at the block storage
+For CloudNativePG usage, consider reducing the number of replicas at the block storage
 level to one, while ensuring that no single point of failure (SPoF) exists at
 the storage level for the entire `Cluster` resource. This typically means
 ensuring that a single storage host—and ultimately, a physical disk—does not
