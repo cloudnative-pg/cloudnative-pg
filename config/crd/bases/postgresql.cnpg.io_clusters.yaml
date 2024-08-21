@@ -6032,6 +6032,10 @@ spec:
                       items:
                         type: string
                       type: array
+                    status:
+                      description: Status contain the status reported by the plugin
+                        through the SetStatusInCluster interface
+                      type: string
                     version:
                       description: |-
                         Version is the version of the plugin loaded by the

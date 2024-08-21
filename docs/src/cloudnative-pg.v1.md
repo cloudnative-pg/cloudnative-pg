@@ -3723,6 +3723,13 @@ plugin regarding the WAL management</p>
 plugin regarding the Backup management</p>
 </td>
 </tr>
+<tr><td><code>status</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Status contain the status reported by the plugin through the SetStatusInCluster interface</p>
+</td>
+</tr>
 </tbody>
 </table>
 

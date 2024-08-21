@@ -18,11 +18,15 @@ package controller
 
 import (
 	"context"
+	"fmt"
+	"time"
 
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	cnpgiClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -44,6 +48,40 @@ func postReconcilePluginHooks(
 ) cnpgiClient.ReconcilerHookResult {
 	pluginClient := getPluginClientFromContext(ctx)
 	return pluginClient.PostReconcile(ctx, cluster, object)
+}
+
+func setStatusPluginHook(
+	ctx context.Context,
+	cli client.Client,
+	pluginClient cnpgiClient.Client,
+	cluster *apiv1.Cluster,
+) (ctrl.Result, error) {
+	contextLogger := log.FromContext(ctx).WithName("set_status_plugin_hook")
+
+	origCluster := cluster.DeepCopy()
+	statuses, err := pluginClient.SetStatusInCluster(ctx, cluster)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("while calling SetStatusInCluster: %w", err)
+	}
+	if len(statuses) == 0 {
+		return ctrl.Result{}, nil
+	}
+	for idx := range cluster.Status.PluginStatus {
+		plugin := &cluster.Status.PluginStatus[idx]
+		val, ok := statuses[plugin.Name]
+		if !ok {
+			continue
+		}
+		plugin.Status = val
+	}
+
+	contextLogger.Info("patching cluster status with the updated plugin statuses")
+	contextLogger.Debug("diff detected",
+		"before", origCluster.Status.PluginStatus,
+		"after", cluster.Status.PluginStatus,
+	)
+
+	return ctrl.Result{RequeueAfter: 5 * time.Second}, cli.Status().Patch(ctx, cluster, client.MergeFrom(origCluster))
 }
 
 // setPluginClientInContext records the plugin client in the given context
