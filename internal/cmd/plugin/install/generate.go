@@ -22,7 +22,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"strings"
 
 	"github.com/spf13/cobra"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
@@ -57,26 +56,16 @@ type generateExecutor struct {
 	postgresImage          string
 	logFieldLevel          string
 	logFieldTimestamp      string
-	nodeSelector           []string
 	controlPlaneToleration bool
 }
 
 func newGenerateCmd() *cobra.Command {
 	var version, watchNamespaces, postgresImage, logFieldLevel, logFieldTimestamp string
 	var replicas int32
-	var nodeSelector []string
 	var controlPlaneToleration bool
 	cmd := &cobra.Command{
 		Use:   "generate",
 		Short: "generates the YAML manifests needed to install the CloudNativePG operator",
-		PreRunE: func(_ *cobra.Command, _ []string) error {
-			for _, ns := range nodeSelector {
-				if !strings.Contains(ns, "=") {
-					return fmt.Errorf("invalid node-selector value: %s, must be in the format <labelName>=<labelValue>", ns)
-				}
-			}
-			return nil
-		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			// we consider the namespace only if explicitly passed for this command
 			namespace := ""
@@ -93,7 +82,6 @@ func newGenerateCmd() *cobra.Command {
 				postgresImage:          postgresImage,
 				logFieldLevel:          logFieldLevel,
 				logFieldTimestamp:      logFieldTimestamp,
-				nodeSelector:           nodeSelector,
 				controlPlaneToleration: controlPlaneToleration,
 			}
 			return command.execute()
@@ -145,20 +133,11 @@ func newGenerateCmd() *cobra.Command {
 		"JSON log field to report timestamp in (default: ts)",
 	)
 
-	cmd.Flags().StringSliceVar(
-		&nodeSelector,
-		"node-selector",
-		[]string{},
-		"Node label selector of type required in the <labelName>=<labelValue> format. "+
-			"You can specify multiple values for the same label by passing them as separate arguments, "+
-			"e.g., x=value1, x=value2.",
-	)
-
 	cmd.Flags().BoolVar(
 		&controlPlaneToleration,
 		"control-plane",
 		false,
-		"if true, the operator deployment will have a toleration for the 'node-role.kubernetes.io/control-plane' taint",
+		"if true, the operator deployment will have a toleration and affinity for 'node-role.kubernetes.io/control-plane'",
 	)
 
 	return cmd
@@ -305,7 +284,7 @@ func (cmd *generateExecutor) reconcileOperatorDeployment(dep *appsv1.Deployment)
 		dep.Spec.Replicas = &cmd.replicas
 	}
 
-	if len(cmd.nodeSelector) != 0 {
+	if cmd.controlPlaneToleration {
 		if dep.Spec.Template.Spec.Affinity == nil {
 			dep.Spec.Template.Spec.Affinity = &corev1.Affinity{}
 		}
@@ -316,36 +295,23 @@ func (cmd *generateExecutor) reconcileOperatorDeployment(dep *appsv1.Deployment)
 			dep.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution = &corev1.NodeSelector{}
 		}
 
-		nodeSelectorMap := make(map[string][]string)
-		for _, ns := range cmd.nodeSelector {
-			parts := strings.SplitN(ns, "=", 2)
-			if len(parts) != 2 {
-				return fmt.Errorf("invalid node-selector value: %s, must be in the format <labelName>=<labelValue>", ns)
-			}
-			nodeSelectorMap[parts[0]] = append(nodeSelectorMap[parts[0]], parts[1])
-		}
-
-		for key, values := range nodeSelectorMap {
-			dep.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.
-				NodeSelectorTerms = append(
-				dep.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms,
-				corev1.NodeSelectorTerm{
-					MatchExpressions: []corev1.NodeSelectorRequirement{
-						{
-							Key:      key,
-							Operator: corev1.NodeSelectorOpIn,
-							Values:   values,
-						},
+		dep.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.
+			NodeSelectorTerms = append(
+			dep.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms,
+			corev1.NodeSelectorTerm{
+				MatchExpressions: []corev1.NodeSelectorRequirement{
+					{
+						Key:      "node-role.kubernetes.io/control-plane",
+						Operator: corev1.NodeSelectorOpIn,
+						Values:   []string{""},
 					},
 				},
-			)
-		}
-	}
-
-	if cmd.controlPlaneToleration {
+			},
+		)
 		dep.Spec.Template.Spec.Tolerations = append(dep.Spec.Template.Spec.Tolerations, corev1.Toleration{
 			Key:      "node-role.kubernetes.io/control-plane",
 			Operator: corev1.TolerationOpExists,
+			Value:    string(corev1.TaintEffectNoSchedule),
 		})
 	}
 	return nil
