@@ -21,6 +21,7 @@ import (
 	"context"
 	"fmt"
 
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,6 +37,26 @@ import (
 func Destroy(ctx context.Context, clusterName, instanceName string, keepPVC bool) error {
 	if err := ensurePodIsDeleted(ctx, instanceName, clusterName); err != nil {
 		return err
+	}
+
+	var jobList batchv1.JobList
+	if err := plugin.Client.List(
+		ctx,
+		&jobList,
+		client.MatchingLabels{
+			utils.InstanceNameLabelName: instanceName,
+		},
+	); err != nil {
+		return err
+	}
+	for idx := range jobList.Items {
+		if err := plugin.Client.Delete(
+			ctx,
+			&jobList.Items[idx],
+			client.PropagationPolicy(metav1.DeletePropagationBackground),
+		); err != nil && !apierrs.IsNotFound(err) {
+			return fmt.Errorf("deleting job %s: %w", jobList.Items[idx].Name, err)
+		}
 	}
 
 	pvcs, err := persistentvolumeclaim.GetInstancePVCs(ctx, plugin.Client, instanceName, plugin.Namespace)
@@ -98,7 +119,8 @@ func ensurePodIsDeleted(ctx context.Context, instanceName, clusterName string) e
 		Name:      instanceName,
 	}, &pod)
 	if apierrs.IsNotFound(err) {
-		return fmt.Errorf("could not found instance %s in cluster %s", instanceName, clusterName)
+		// The Pod doesn't exist, so we already did our job
+		return nil
 	}
 	if err != nil {
 		return err
