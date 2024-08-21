@@ -49,21 +49,23 @@ type installationResource struct {
 }
 
 type generateExecutor struct {
-	ctx                  context.Context
-	watchNamespace       string
-	namespace            string
-	replicas             int32
-	userRequestedVersion string
-	postgresImage        string
-	logFieldLevel        string
-	logFieldTimestamp    string
-	nodeSelector         []string
+	ctx                    context.Context
+	watchNamespace         string
+	namespace              string
+	replicas               int32
+	userRequestedVersion   string
+	postgresImage          string
+	logFieldLevel          string
+	logFieldTimestamp      string
+	nodeSelector           []string
+	controlPlaneToleration bool
 }
 
 func newGenerateCmd() *cobra.Command {
 	var version, watchNamespaces, postgresImage, logFieldLevel, logFieldTimestamp string
 	var replicas int32
 	var nodeSelector []string
+	var controlPlaneToleration bool
 	cmd := &cobra.Command{
 		Use:   "generate",
 		Short: "generates the YAML manifests needed to install the CloudNativePG operator",
@@ -83,15 +85,16 @@ func newGenerateCmd() *cobra.Command {
 			}
 
 			command := generateExecutor{
-				ctx:                  cmd.Context(),
-				watchNamespace:       watchNamespaces,
-				namespace:            namespace,
-				replicas:             replicas,
-				userRequestedVersion: version,
-				postgresImage:        postgresImage,
-				logFieldLevel:        logFieldLevel,
-				logFieldTimestamp:    logFieldTimestamp,
-				nodeSelector:         nodeSelector,
+				ctx:                    cmd.Context(),
+				watchNamespace:         watchNamespaces,
+				namespace:              namespace,
+				replicas:               replicas,
+				userRequestedVersion:   version,
+				postgresImage:          postgresImage,
+				logFieldLevel:          logFieldLevel,
+				logFieldTimestamp:      logFieldTimestamp,
+				nodeSelector:           nodeSelector,
+				controlPlaneToleration: controlPlaneToleration,
 			}
 			return command.execute()
 		},
@@ -150,6 +153,14 @@ func newGenerateCmd() *cobra.Command {
 			"You can specify multiple values for the same label by passing them as separate arguments, "+
 			"e.g., x=value1, x=value2.",
 	)
+
+	cmd.Flags().BoolVar(
+		&controlPlaneToleration,
+		"control-plane",
+		false,
+		"if true, the operator deployment will have a toleration for the 'node-role.kubernetes.io/control-plane' taint",
+	)
+
 	return cmd
 }
 
@@ -331,6 +342,13 @@ func (cmd *generateExecutor) reconcileOperatorDeployment(dep *appsv1.Deployment)
 				},
 			},
 		)
+	}
+
+	if cmd.controlPlaneToleration {
+		dep.Spec.Template.Spec.Tolerations = append(dep.Spec.Template.Spec.Tolerations, corev1.Toleration{
+			Key:      "node-role.kubernetes.io/control-plane",
+			Operator: corev1.TolerationOpExists,
+		})
 	}
 	return nil
 }

@@ -202,6 +202,7 @@ The main options are:
   order to schedule the operator's `Deployment` object onto them (by default,
   this is empty, meaning that the deployment can be scheduled on any available
   node)
+- `--control-plane`: if true, the operator deployment will have a toleration for the 'node-role.kubernetes.io/control-plane' taint
 
 An example of the `generate` command, which will generate a YAML manifest that
 will install the operator, is as follows:

@@ -105,6 +105,21 @@ var _ = Describe("generateExecutor", func() {
 				Expect(dep.Spec.Replicas).To(BeNil())
 			})
 		})
+
+		Context("with control plane toleration", func() {
+			BeforeEach(func() {
+				cmd.controlPlaneToleration = true
+			})
+
+			It("should set the control plane toleration", func() {
+				err := cmd.reconcileOperatorDeployment(dep)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(dep.Spec.Template.Spec.Tolerations).To(ContainElement(corev1.Toleration{
+					Key:      "node-role.kubernetes.io/control-plane",
+					Operator: corev1.TolerationOpExists,
+				}))
+			})
+		})
 	})
 
 	Describe("reconcileOperatorConfigMap", func() {
