@@ -305,43 +305,41 @@ func (cmd *generateExecutor) reconcileOperatorDeployment(dep *appsv1.Deployment)
 		dep.Spec.Replicas = &cmd.replicas
 	}
 
-	if len(cmd.nodeSelector) == 0 {
-		return nil
-	}
-
-	if dep.Spec.Template.Spec.Affinity == nil {
-		dep.Spec.Template.Spec.Affinity = &corev1.Affinity{}
-	}
-	if dep.Spec.Template.Spec.Affinity.NodeAffinity == nil {
-		dep.Spec.Template.Spec.Affinity.NodeAffinity = &corev1.NodeAffinity{}
-	}
-	if dep.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil {
-		dep.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution = &corev1.NodeSelector{}
-	}
-
-	nodeSelectorMap := make(map[string][]string)
-	for _, ns := range cmd.nodeSelector {
-		parts := strings.SplitN(ns, "=", 2)
-		if len(parts) != 2 {
-			return fmt.Errorf("invalid node-selector value: %s, must be in the format <labelName>=<labelValue>", ns)
+	if len(cmd.nodeSelector) != 0 {
+		if dep.Spec.Template.Spec.Affinity == nil {
+			dep.Spec.Template.Spec.Affinity = &corev1.Affinity{}
 		}
-		nodeSelectorMap[parts[0]] = append(nodeSelectorMap[parts[0]], parts[1])
-	}
+		if dep.Spec.Template.Spec.Affinity.NodeAffinity == nil {
+			dep.Spec.Template.Spec.Affinity.NodeAffinity = &corev1.NodeAffinity{}
+		}
+		if dep.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil {
+			dep.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution = &corev1.NodeSelector{}
+		}
 
-	for key, values := range nodeSelectorMap {
-		dep.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.
-			NodeSelectorTerms = append(
-			dep.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms,
-			corev1.NodeSelectorTerm{
-				MatchExpressions: []corev1.NodeSelectorRequirement{
-					{
-						Key:      key,
-						Operator: corev1.NodeSelectorOpIn,
-						Values:   values,
+		nodeSelectorMap := make(map[string][]string)
+		for _, ns := range cmd.nodeSelector {
+			parts := strings.SplitN(ns, "=", 2)
+			if len(parts) != 2 {
+				return fmt.Errorf("invalid node-selector value: %s, must be in the format <labelName>=<labelValue>", ns)
+			}
+			nodeSelectorMap[parts[0]] = append(nodeSelectorMap[parts[0]], parts[1])
+		}
+
+		for key, values := range nodeSelectorMap {
+			dep.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.
+				NodeSelectorTerms = append(
+				dep.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms,
+				corev1.NodeSelectorTerm{
+					MatchExpressions: []corev1.NodeSelectorRequirement{
+						{
+							Key:      key,
+							Operator: corev1.NodeSelectorOpIn,
+							Values:   values,
+						},
 					},
 				},
-			},
-		)
+			)
+		}
 	}
 
 	if cmd.controlPlaneToleration {
