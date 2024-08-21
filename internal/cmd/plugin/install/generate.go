@@ -302,8 +302,7 @@ func (cmd *generateExecutor) reconcileOperatorDeployment(dep *appsv1.Deployment)
 				MatchExpressions: []corev1.NodeSelectorRequirement{
 					{
 						Key:      "node-role.kubernetes.io/control-plane",
-						Operator: corev1.NodeSelectorOpIn,
-						Values:   []string{""},
+						Operator: corev1.NodeSelectorOpExists,
 					},
 				},
 			},
@@ -311,7 +310,6 @@ func (cmd *generateExecutor) reconcileOperatorDeployment(dep *appsv1.Deployment)
 		dep.Spec.Template.Spec.Tolerations = append(dep.Spec.Template.Spec.Tolerations, corev1.Toleration{
 			Key:      "node-role.kubernetes.io/control-plane",
 			Operator: corev1.TolerationOpExists,
-			Value:    string(corev1.TaintEffectNoSchedule),
 		})
 	}
 	return nil
