@@ -166,14 +166,17 @@ kubectl cnpg install generate --help
 
 The main options are:
 
-- `-n`: the namespace in which to install the operator (by default: `cnpg-system`)
-- `--replicas`: number of replicas in the deployment
-- `--version`: minor version of the operator to be installed, such as `1.17`.
-  If a minor version is specified, the plugin will install the latest patch
-  version of that minor version. If no version is supplied the plugin will
-  install the latest `MAJOR.MINOR.PATCH` version of the operator.
-- `--watch-namespace`: comma separated string containing the namespaces to
-  watch (by default all namespaces)
+- `-n`: specifies the namespace in which to install the operator (default:
+  `cnpg-system`).
+- `--control-plane`: if set to true, the operator deployment will include a
+  toleration and affinity for `node-role.kubernetes.io/control-plane`.
+- `--replicas`: sets the number of replicas in the deployment.
+- `--watch-namespace`: specifies a comma-separated list of namespaces to watch
+  (default: all namespaces).
+- `--version`: defines the minor version of the operator to be installed, such
+  as `1.23`. If a minor version is specified, the plugin installs the latest
+  patch version of that minor version. If no version is supplied, the plugin
+  installs the latest `MAJOR.MINOR.PATCH` version of the operator.
 
 An example of the `generate` command, which will generate a YAML manifest that
 will install the operator, is as follows:
@@ -189,7 +192,7 @@ kubectl cnpg install generate \
 
 The flags in the above command have the following meaning:
 - `-n king` install the CNPG operator into the `king` namespace
-- `--version 1.17` install the latest patch version for minor version 1.17
+- `--version 1.23` install the latest patch version for minor version 1.23
 - `--replicas 3` install the operator with 3 replicas
 - `--watch-namespace "albert, bb, freddie"` have the operator watch for
   changes in the `albert`, `bb` and `freddie` namespaces only
