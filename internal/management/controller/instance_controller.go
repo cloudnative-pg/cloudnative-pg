@@ -193,7 +193,7 @@ func (r *InstanceReconciler) Reconcile(
 	}
 
 	// Instance promotion will not automatically load the changed configuration files.
-	// Therefore it should not be counted as "a restart".
+	// Therefore, it should not be counted as "a restart".
 	if err := r.reconcilePrimary(ctx, cluster); err != nil {
 		var tokenError *promotiontoken.TokenVerificationError
 		if errors.As(err, &tokenError) {
@@ -258,6 +258,13 @@ func (r *InstanceReconciler) Reconcile(
 		return reconcile.Result{}, fmt.Errorf("while updating database owner password: %w", err)
 	}
 
+	if res, err := r.dropStaleReplicationConnections(ctx, cluster); err != nil || !res.IsZero() {
+		if err != nil {
+			return reconcile.Result{}, fmt.Errorf("while dropping stale replica connections: %w", err)
+		}
+		return res, nil
+	}
+
 	if err := r.reconcileDatabases(ctx, cluster); err != nil {
 		return reconcile.Result{}, fmt.Errorf("cannot reconcile database configurations: %w", err)
 	}
@@ -302,12 +309,12 @@ func (r *InstanceReconciler) restartPrimaryInplaceIfRequested(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 ) (bool, error) {
-	isPrimary, err := r.instance.IsPrimary()
-	if err != nil {
-		return false, err
-	}
+	isPrimary := cluster.Status.CurrentPrimary == r.instance.PodName
 	restartRequested := isPrimary && cluster.Status.Phase == apiv1.PhaseInplacePrimaryRestart
 	if restartRequested {
+		if cluster.Status.CurrentPrimary != cluster.Status.TargetPrimary {
+			return false, fmt.Errorf("cannot restart the primary in-place when a switchover is in progress")
+		}
 		restartTimeout := cluster.GetRestartTimeout()
 
 		if err := r.instance.RequestAndWaitRestartSmartFast(
@@ -1420,4 +1427,64 @@ func (r *InstanceReconciler) shouldRequeueForMissingTopology(cluster *apiv1.Clus
 	}
 
 	return false
+}
+
+// dropStaleReplicationConnections is responsible for terminating all existing
+// replication connections following a role change in a replica cluster.
+//
+// For context, demoting a PostgreSQL instance involves shutting it down,
+// adjusting the necessary signal files and configuration, and then
+// restarting it, which inherently disconnects all existing connections.
+//
+// In a replica cluster, demotion is unnecessary since it comprises replicas
+// only. In this scenario, only the primary_conninfo parameter needs to be
+// modified, which doesn't require a shutdown.
+// However, this also implies that replicas receiving data from the old
+// primary won't have their connections terminated.
+//
+// Consequently, high-availability replicas connected to the previous primary
+// will remain connected, necessitating manual intervention to terminate
+// those connections and re-establish them with the new endpoint.
+//
+// The dropStaleReplicationConnections function addresses this requirement.
+func (r *InstanceReconciler) dropStaleReplicationConnections(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+) (ctrl.Result, error) {
+	if !cluster.IsReplica() {
+		return ctrl.Result{}, nil
+	}
+
+	if cluster.Status.CurrentPrimary == r.instance.PodName {
+		return ctrl.Result{}, nil
+	}
+
+	conn, err := r.instance.GetSuperUserDB()
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	result, err := conn.ExecContext(
+		ctx,
+		`SELECT pg_terminate_backend(pid)
+		FROM pg_stat_replication
+		WHERE application_name LIKE $1`,
+		fmt.Sprintf("%v-%%", cluster.Name),
+	)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("while executing pg_terminate_backend: %w", err)
+	}
+
+	terminatedConnections, err := result.RowsAffected()
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	if terminatedConnections > 0 {
+		// given that we have executed a pg_terminate_backend, we request a new reconciliation loop to ensure that
+		// everything is in order and no leftovers that needs to be dropped are present.
+		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+	}
+
+	return ctrl.Result{}, nil
 }
