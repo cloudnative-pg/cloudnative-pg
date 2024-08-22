@@ -57,12 +57,6 @@ The namespace where the operator looks for the `PULL_SECRET_NAME` secret is wher
 you installed the operator. If the operator is not able to find that secret, it
 will ignore the configuration parameter.
 
-!!! Warning
-    Previous versions of the operator copied the `PULL_SECRET_NAME` secret inside
-    the namespaces where you deploy the PostgreSQL clusters. From version "1.11.0"
-    the behavior changed to match the previous description. The pull secrets
-    created by the previous versions of the operator are unused.
-
 ## Defining an operator config map
 
 The example below customizes the behavior of the operator, by defining

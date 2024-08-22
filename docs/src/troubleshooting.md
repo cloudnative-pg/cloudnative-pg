@@ -449,11 +449,6 @@ You can list the backups that have been created for a named cluster with:
 kubectl get backup -l cnpg.io/cluster=<CLUSTER>
 ```
 
-!!! Important
-    Backup labelling has been introduced in version 1.10.0 of CloudNativePG.
-    So only those resources that have been created with that version or
-    a higher one will contain such a label.
-
 ## Storage information
 
 Sometimes is useful to double-check the StorageClass used by the cluster to have

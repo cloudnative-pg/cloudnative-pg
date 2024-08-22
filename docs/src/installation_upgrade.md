@@ -167,10 +167,10 @@ plugin for `kubectl`.
     an upgrade of the operator will trigger a switchover on your PostgreSQL cluster,
     causing a (normally negligible) downtime.
 
-Since version 1.10.0, the rolling update behavior can be replaced with in-place
-updates of the instance manager. The latter don't require a restart of the
-PostgreSQL instance and, as a result, a switchover in the cluster.
-This behavior, which is disabled by default, is described below.
+The default rolling update behavior can be replaced with in-place updates of
+the instance manager. This approach does not require a restart of the
+PostgreSQL instance, thereby avoiding a switchover within the cluster. This
+feature, which is disabled by default, is described in detail below.
 
 ### In-place updates of the instance manager
 
@@ -182,11 +182,11 @@ However, this behavior can be changed via configuration to enable in-place
 updates of the instance manager, which is the PID 1 process that keeps the
 container alive.
 
-Internally, any instance manager from version 1.10 of CloudNativePG
-supports injection of a new executable that will replace the existing one,
-once the integrity verification phase is completed, as well as graceful
-termination of all the internal processes. When the new instance manager
-restarts using the new binary, it adopts the already running *postmaster*.
+Internally, each instance manager in CloudNativePG supports the injection of a
+new executable that replaces the existing one after successfully completing an
+integrity verification phase and gracefully terminating all internal processes.
+Upon restarting with the new binary, the instance manager seamlessly adopts the
+already running *postmaster*.
 
 As a result, the PostgreSQL process is unaffected by the update, refraining
 from the need to perform a switchover. The other side of the coin, is that
