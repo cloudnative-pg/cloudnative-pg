@@ -176,9 +176,8 @@ to solve the problem manually.
     In such cases, please do not perform any manual operation without
     [professional support](https://cloudnative-pg.io/support/).
 
-From version 1.11.0 of the operator, you can use the
-`cnpg.io/reconciliationLoop` annotation to temporarily disable the
-reconciliation loop on a selected PostgreSQL cluster, as follows:
+You can use the `cnpg.io/reconciliationLoop` annotation to temporarily disable
+the reconciliation loop for a specific PostgreSQL cluster, as shown below:
 
 ``` yaml
 metadata:

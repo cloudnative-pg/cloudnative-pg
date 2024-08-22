@@ -208,7 +208,7 @@ will install the operator, is as follows:
 ```shell
 kubectl cnpg install generate \
   -n king \
-  --version 1.17 \
+  --version 1.23 \
   --replicas 3 \
   --watch-namespace "albert, bb, freddie" \
   > operator.yaml

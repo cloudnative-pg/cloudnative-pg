@@ -67,7 +67,7 @@ activities:
 
 - **Release notes:** You should create/update the release note documents in
   `docs/src/release_notes/` for each version to release. Remember to
-  update `docs/src/release_notes.md`.
+  update `docs/src/release_notes.md` and `.github/ISSUE_TEMPLATE/bug.yml`.
   These changes should go in a PR against `main`, and get maintainer approval.
 
 - **Capabilities page:** in case of a new minor release, ensure that the
