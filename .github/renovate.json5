@@ -260,7 +260,7 @@
       "datasourceTemplate": "github-releases",
       "depNameTemplate": "golangci/golangci-lint",
       "versioningTemplate": "loose",
-      "extractVersionTemplate": "^v(?<version>\\d+\\.\\d+)"
+      "extractVersionTemplate": "^v(?<version>\\d+\\.\\d+\\.\\d+)"
     }
   ],
   "packageRules": [
