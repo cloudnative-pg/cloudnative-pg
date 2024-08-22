@@ -34,7 +34,6 @@ nav:
   - wal_archiving.md
   - backup_volumesnapshot.md
   - recovery.md
-  - service_management.md
   - postgresql_conf.md
   - declarative_role_management.md
   - tablespaces.md
