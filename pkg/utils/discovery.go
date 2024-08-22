@@ -61,19 +61,16 @@ func newAvailableArchitecture(goArch, binaryPath string) *AvailableArchitecture 
 
 // GetHash retrieves the hash for a given AvailableArchitecture
 func (arch *AvailableArchitecture) GetHash() string {
-	if arch.hash == "" {
-		arch.calculateHash()
-	}
-	return arch.hash
+	return arch.calculateHash()
 }
 
 // calculateHash calculates the hash for a given AvailableArchitecture
-func (arch *AvailableArchitecture) calculateHash() {
+func (arch *AvailableArchitecture) calculateHash() string {
 	arch.mx.Lock()
 	defer arch.mx.Unlock()
 
 	if arch.hash != "" {
-		return
+		return arch.hash
 	}
 
 	hash, err := arch.hashCalculator(arch.binaryPath)
@@ -82,6 +79,7 @@ func (arch *AvailableArchitecture) calculateHash() {
 	}
 
 	arch.hash = hash
+	return hash
 }
 
 // FileStream opens a stream reading from the manager's binary

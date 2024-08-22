@@ -708,9 +708,7 @@ func (r *ClusterReconciler) upgradeInstanceManager(
 				instanceManagerIsUpgrading,
 				operatorHash[:6],
 				instanceManagerHash[:6])
-
-			r.Recorder.Event(cluster, "Normal", "SkippedInstanceManagerUpgrade", message)
-			contextLogger.Info(message)
+			contextLogger.Debug(message)
 			continue
 		}
 
