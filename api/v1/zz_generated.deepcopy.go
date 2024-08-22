@@ -826,6 +826,11 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
 		*out = new(corev1.EphemeralVolumeSource)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.SmartShutdownTimeout != nil {
+		in, out := &in.SmartShutdownTimeout, &out.SmartShutdownTimeout
+		*out = new(int32)
+		**out = **in
+	}
 	if in.LivenessProbeTimeout != nil {
 		in, out := &in.LivenessProbeTimeout, &out.LivenessProbeTimeout
 		*out = new(int32)
