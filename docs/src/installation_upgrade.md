@@ -77,7 +77,7 @@ curl -sSfL \
 ```
 
 !!! Important
-    Snapshots are not supported by the CloudNativePG community, and are not
+    Snapshots are not supported by the CloudNativePG Community, and are not
     intended for use in production.
 
 ### Using the Helm Chart
