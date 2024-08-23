@@ -574,6 +574,12 @@ func (r *InstanceReconciler) reconcileDatabases(ctx context.Context, cluster *ap
 					fmt.Errorf("could not reconcile extensions for database %s: %w", databaseName, err))
 			}
 		}
+		if databaseName != "postgres" {
+			// We create reconcile pooler access only for 'postgres' database since
+			// it is set as 'auth_dbname' in pgbouncer for 'auth_query' purposes (for any database).
+			// TODO: pick the value from spec?
+			continue;
+		}
 		if err = r.reconcilePoolers(ctx, db, databaseName, cluster.Status.PoolerIntegrations); err != nil {
 			errors = append(errors,
 				fmt.Errorf("could not reconcile extensions for database %s: %w", databaseName, err))

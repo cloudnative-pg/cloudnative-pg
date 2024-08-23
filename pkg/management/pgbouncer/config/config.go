@@ -77,6 +77,7 @@ const (
 pool_mode = {{ .Pooler.Spec.PgBouncer.PoolMode }}
 auth_user = {{ .AuthQueryUser }}
 auth_query = {{ .AuthQuery }}
+auth_dbname = {{ .AuthQueryDb }}
 
 {{ .Parameters -}}
 `
@@ -187,12 +188,15 @@ func BuildConfigurationFiles(pooler *apiv1.Pooler, secrets *Secrets) (Configurat
 		AuthQuery         string
 		AuthQueryUser     string
 		AuthQueryPassword string
+		AuthQueryDb 	  string
 		Parameters        string
 		PgHba             []string
 	}{
 		Pooler:            pooler,
 		AuthQuery:         pooler.GetAuthQuery(),
 		AuthQueryUser:     authQueryUser,
+		// TODO: control from `pooler.Spec.PgBouncer.AuthQueryDb`
+		AuthQueryDb: 	   "postgres",
 		AuthQueryPassword: authQueryPassword,
 		// We are not directly passing the map of parameters inside the template
 		// because the iteration order of the entries inside a map is undefined
