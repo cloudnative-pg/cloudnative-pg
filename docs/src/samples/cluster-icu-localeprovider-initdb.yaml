@@ -1,0 +1,15 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-icu-localeprovider-initdb
+spec:
+  instances: 2
+
+  bootstrap:
+    initdb:
+      encoding: "UTF8"
+      localeProvider: "icu"
+      icuLocale: "und-x-icu"
+      icuRules: "&a < c < b < e < d"
+  storage:
+    size: 1Gi

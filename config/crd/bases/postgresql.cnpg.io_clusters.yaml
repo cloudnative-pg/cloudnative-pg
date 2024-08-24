@@ -1514,6 +1514,10 @@ spec:
                         description: The value to be passed as option `--encoding`
                           for initdb (default:`UTF8`)
                         type: string
+                      icuLocale:
+                        description: The value to be passed as option `--icu-locale`
+                          for initdb (by default empty)
+                        type: string
                       import:
                         description: |-
                           Bootstraps the new cluster by importing data from an existing PostgreSQL
@@ -1571,6 +1575,10 @@ spec:
                       localeCollate:
                         description: The value to be passed as option `--lc-collate`
                           for initdb (default:`C`)
+                        type: string
+                      localeProvider:
+                        description: The value to be passed as option `--locale-provider`
+                          for initdb (by default empty)
                         type: string
                       options:
                         description: |-

@@ -232,6 +232,19 @@ localeCType
     defined in ["Locale Support"](https://www.postgresql.org/docs/current/locale.html)
     from the PostgreSQL documentation (default: `C`).
 
+localeProvider
+:   When `localeProvider` is set to a value, CNPG passes it to the `--locale-provider` 
+    option in `initdb`. This option controls the locale provider, as defined in 
+    ["Locale Support"](https://www.postgresql.org/docs/current/locale.html) from the 
+    PostgreSQL documentation (default: empty, which means `libc` for PostgreSQL).
+
+icuLocale
+:   When `icuLocale` is set to a value, CNPG passes it to the `--icu-locale` option in 
+    `initdb`. This option controls the ICU locale, as defined in 
+    ["Locale Support"](https://www.postgresql.org/docs/current/locale.html) from the 
+    PostgreSQL documentation (default: empty).
+    Note that this option requires `localeProvider` to be set to `icu`.
+
 walSegmentSize
 :   When `walSegmentSize` is set to a value, CNPG passes it to the `--wal-segsize`
     option in `initdb` (default: not set - defined by PostgreSQL as 16 megabytes).

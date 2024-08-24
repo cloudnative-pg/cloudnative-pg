@@ -185,4 +185,42 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 			})
 		})
 	})
+
+	Context("use custom ICU locale", func() {
+		const (
+			clusterName                  = "p-icu-locale"
+			clusterWithICULocaleTemplate = fixturesInitdbDir + "/cluster-icu-locale.yaml.template"
+		)
+
+		var namespace string
+
+		It("use the custom ICU locale specified", func() {
+			// Create a cluster in a namespace we'll delete after the test
+			const namespacePrefix = "initdb-icu-locale"
+			var err error
+			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			Expect(err).ToNot(HaveOccurred())
+			DeferCleanup(func() error {
+				if CurrentSpecReport().Failed() {
+					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+				}
+				return env.DeleteNamespace(namespace)
+			})
+			AssertCreateCluster(namespace, clusterName, clusterWithICULocaleTemplate, env)
+
+			By("checking inside the database", func() {
+				primary, err := env.GetClusterPrimary(namespace, clusterName)
+				Expect(err).ToNot(HaveOccurred())
+
+				stdout, _, err := env.ExecQueryInInstancePod(
+					utils.PodLocator{
+						Namespace: namespace,
+						PodName:   primary.Name,
+					}, "postgres",
+					"select datcollate, datctype, datlocprovider, daticulocale from pg_database where datname='template0'")
+				Expect(err).ToNot(HaveOccurred())
+				Expect(stdout, err).To(Equal("en_US.utf8 | en_US.utf8 | i | und-x-icu\n"))
+			})
+		})
+	})
 })

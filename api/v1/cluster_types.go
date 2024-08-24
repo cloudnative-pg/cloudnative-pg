@@ -1683,6 +1683,14 @@ type BootstrapInitDB struct {
 	// +optional
 	LocaleCType string `json:"localeCType,omitempty"`
 
+	// The value to be passed as option `--locale-provider` for initdb (by default empty)
+	// +optional
+	LocaleProvider string `json:"localeProvider,omitempty"`
+
+	// The value to be passed as option `--icu-locale` for initdb (by default empty)
+	// +optional
+	ICULocale string `json:"icuLocale,omitempty"`
+
 	// The value in megabytes (1 to 1024) to be passed to the `--wal-segsize`
 	// option for initdb (default: empty, resulting in PostgreSQL default: 16MB)
 	// +kubebuilder:validation:Minimum=1
