@@ -43,6 +43,7 @@ func Destroy(ctx context.Context, clusterName, instanceName string, keepPVC bool
 	if err := plugin.Client.List(
 		ctx,
 		&jobList,
+		client.InNamespace(plugin.Namespace),
 		client.MatchingLabels{
 			utils.InstanceNameLabelName: instanceName,
 		},
