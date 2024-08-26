@@ -99,15 +99,18 @@ func ensureOrphanServicesAreNotPresent(ctx context.Context, cli client.Client, c
 		ctx,
 		cli,
 		client.ObjectKey{Name: cluster.GetServiceReadWriteName(), Namespace: cluster.Namespace},
+		cluster.Name,
 	); err != nil {
 		return err
 	}
 
 	if cluster.IsReadOnlyServiceEnabled() {
-		if err := ensureOrphanServiceIsNotPresent(ctx, cli, client.ObjectKey{
-			Name:      cluster.GetServiceReadOnlyName(),
-			Namespace: cluster.Namespace,
-		}); err != nil {
+		if err := ensureOrphanServiceIsNotPresent(
+			ctx,
+			cli,
+			client.ObjectKey{Name: cluster.GetServiceReadOnlyName(), Namespace: cluster.Namespace},
+			cluster.Name,
+		); err != nil {
 			return err
 		}
 	}
@@ -116,6 +119,7 @@ func ensureOrphanServicesAreNotPresent(ctx context.Context, cli client.Client, c
 			ctx,
 			cli,
 			client.ObjectKey{Name: cluster.GetServiceReadName(), Namespace: cluster.Namespace},
+			cluster.Name,
 		); err != nil {
 			return err
 		}
@@ -128,6 +132,7 @@ func ensureOrphanServiceIsNotPresent(
 	ctx context.Context,
 	cli client.Client,
 	objKey client.ObjectKey,
+	clusterName string,
 ) error {
 	contextLogger := log.FromContext(ctx).WithName("ensure_orphan_service_is_not_present")
 	var svc corev1.Service
@@ -137,6 +142,10 @@ func ensureOrphanServiceIsNotPresent(
 	}
 	if err != nil {
 		return err
+	}
+
+	if owner, _ := IsOwnedByCluster(&svc); owner == clusterName {
+		return nil
 	}
 
 	if len(svc.OwnerReferences) > 0 {
