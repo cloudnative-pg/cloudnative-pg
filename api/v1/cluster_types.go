@@ -563,7 +563,7 @@ const (
 
 	// PhaseUnknownPlugin is triggered when the required CNPG-i plugin have not been
 	// loaded still
-	PhaseUnknownPlugin = "Unknown plugin"
+	PhaseUnknownPlugin = "Cluster cannot proceed to reconciliation due to an unknown plugin being required"
 
 	// PhaseImageCatalogError is triggered when the cluster cannot select the image to
 	// apply because of an invalid or incomplete catalog

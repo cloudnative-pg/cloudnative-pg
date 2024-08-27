@@ -164,7 +164,9 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 					ctx,
 					cluster,
 					apiv1.PhaseUnknownPlugin,
-					fmt.Sprintf("Unknown plugin %s", errUnknownPlugin.Name),
+					fmt.Sprintf("Unknown plugin: '%s'. "+
+						"This may be caused by the plugin not being loaded correctly by the operator. "+
+						"Check the operator and plugin logs for errors", errUnknownPlugin.Name),
 				)
 		}
 
