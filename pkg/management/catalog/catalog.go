@@ -219,13 +219,15 @@ type BarmanBackup struct {
 	// The backup label
 	Label string `json:"backup_label"`
 
-	// The moment where the backup started
+	// The moment where the backup started, this value is retrieved from barman command output
+	// and is in the format "Mon Jan 2 15:04:05 2006" with the timezone being the local one
 	BeginTimeString string `json:"begin_time"`
 
-	// The moment where the backup ended
+	// The moment where the backup ended, his value is retrieved from barman command output
+	// and is in the format "Mon Jan 2 15:04:05 2006" with the timezone being the local one
 	EndTimeString string `json:"end_time"`
 
-	// The moment where the backup ended
+	// The moment where the backup started
 	BeginTime time.Time
 
 	// The moment where the backup ended
@@ -281,21 +283,19 @@ func (b *BarmanBackup) deserializeBackupTimeStrings() error {
 	const (
 		barmanTimeLayout = "Mon Jan 2 15:04:05 2006"
 	)
-
+	var err error
 	if b.BeginTimeString != "" {
-		ts, err := time.Parse(barmanTimeLayout, b.BeginTimeString)
+		b.BeginTime, err = time.ParseInLocation(barmanTimeLayout, b.BeginTimeString, time.Local)
 		if err != nil {
 			return err
 		}
-		b.BeginTime = time.Date(ts.Year(), ts.Month(), ts.Day(), ts.Hour(), ts.Minute(), ts.Second(), ts.Nanosecond(), time.Local)
 	}
 
 	if b.EndTimeString != "" {
-		ts, err := time.Parse(barmanTimeLayout, b.EndTimeString)
+		b.EndTime, err = time.ParseInLocation(barmanTimeLayout, b.EndTimeString, time.Local)
 		if err != nil {
 			return err
 		}
-		b.EndTime = time.Date(ts.Year(), ts.Month(), ts.Day(), ts.Hour(), ts.Minute(), ts.Second(), ts.Nanosecond(), time.Local)
 	}
 
 	return nil
