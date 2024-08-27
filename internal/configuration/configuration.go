@@ -21,6 +21,7 @@ package configuration
 import (
 	"path"
 	"strings"
+	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 
@@ -108,6 +109,12 @@ type Data struct {
 	// the <cluster-name>-any service. Defaults to false.
 	CreateAnyService bool `json:"createAnyService" env:"CREATE_ANY_SERVICE"`
 
+	// The amount of time to wait between rollouts of different clusters in seconds
+	ClustersRolloutDelay int `json:"clustersRolloutDelay" env:"CLUSTERS_ROLLOUT_DELAY"`
+
+	// The amount of time to wait between rollouts of instances of the same cluster in seconds
+	InstancesRolloutDelay int `json:"instancesRolloutDelay" env:"INSTANCES_ROLLOUT_DELAY"`
+
 	// IncludePlugins is a comma-separated list of plugins to always be
 	// included in the Cluster reconciliation
 	IncludePlugins string `json:"includePlugins" env:"INCLUDE_PLUGINS"`
@@ -152,6 +159,17 @@ func (config *Data) IsAnnotationInherited(name string) bool {
 // be inherited from the Cluster specification to the generated objects
 func (config *Data) IsLabelInherited(name string) bool {
 	return evaluateGlobPatterns(config.InheritedLabels, name)
+}
+
+// GetClustersRolloutDelay gets the delay between rollouts of different clusters
+func (config *Data) GetClustersRolloutDelay() time.Duration {
+	return time.Duration(config.ClustersRolloutDelay) * time.Second
+}
+
+// GetInstancesRolloutDelay gets the delay between rollouts of pods belonging
+// to the same cluster
+func (config *Data) GetInstancesRolloutDelay() time.Duration {
+	return time.Duration(config.InstancesRolloutDelay) * time.Second
 }
 
 // WatchedNamespaces get the list of additional watched namespaces.
