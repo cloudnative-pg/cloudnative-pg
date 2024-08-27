@@ -79,7 +79,12 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
-				return env.DeleteNamespace(namespace)
+				return env.CleanupNamespace(
+					namespace,
+					CurrentSpecReport().LeafNodeText,
+					CurrentSpecReport().Failed(),
+					GinkgoWriter,
+				)
 			})
 
 			By("create the certificates for MinIO", func() {
@@ -533,7 +538,12 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
-				return env.DeleteNamespace(namespace)
+				return env.CleanupNamespace(
+					namespace,
+					CurrentSpecReport().LeafNodeText,
+					CurrentSpecReport().Failed(),
+					GinkgoWriter,
+				)
 			})
 
 			// The Azure Blob Storage should have been created ad-hoc for the test.
@@ -673,7 +683,12 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
-				return env.DeleteNamespace(namespace)
+				return env.CleanupNamespace(
+					namespace,
+					CurrentSpecReport().LeafNodeText,
+					CurrentSpecReport().Failed(),
+					GinkgoWriter,
+				)
 			})
 
 			// Create and assert ca and tls certificate secrets on Azurite
@@ -809,7 +824,12 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
-				return env.DeleteNamespace(namespace)
+				return env.CleanupNamespace(
+					namespace,
+					CurrentSpecReport().LeafNodeText,
+					CurrentSpecReport().Failed(),
+					GinkgoWriter,
+				)
 			})
 
 			AssertStorageCredentialsAreCreated(namespace, "backup-storage-creds", "minio", "minio123")
@@ -968,7 +988,12 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 				namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
 				DeferCleanup(func() error {
-					return env.DeleteNamespace(namespace)
+					return env.CleanupNamespace(
+						namespace,
+						CurrentSpecReport().LeafNodeText,
+						CurrentSpecReport().Failed(),
+						GinkgoWriter,
+					)
 				})
 
 				// The Azure Blob Storage should have been created ad-hoc for the test.
@@ -1052,7 +1077,12 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 				namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
 				DeferCleanup(func() error {
-					return env.DeleteNamespace(namespace)
+					return env.CleanupNamespace(
+						namespace,
+						CurrentSpecReport().LeafNodeText,
+						CurrentSpecReport().Failed(),
+						GinkgoWriter,
+					)
 				})
 
 				// The Azure Blob Storage should have been created ad-hoc for the test,
@@ -1139,7 +1169,12 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
-				return env.DeleteNamespace(namespace)
+				return env.CleanupNamespace(
+					namespace,
+					CurrentSpecReport().LeafNodeText,
+					CurrentSpecReport().Failed(),
+					GinkgoWriter,
+				)
 			})
 
 			// Create and assert ca and tls certificate secrets on Azurite

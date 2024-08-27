@@ -72,10 +72,12 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			replicaNamespace, err := env.CreateUniqueNamespace(replicaNamespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
-				if CurrentSpecReport().Failed() {
-					env.DumpNamespaceObjects(replicaNamespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-				}
-				return env.DeleteNamespace(replicaNamespace)
+				return env.CleanupNamespace(
+					replicaNamespace,
+					CurrentSpecReport().LeafNodeText,
+					CurrentSpecReport().Failed(),
+					GinkgoWriter,
+				)
 			})
 			AssertCreateCluster(replicaNamespace, srcClusterName, srcClusterSample, env)
 
@@ -111,10 +113,12 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			replicaNamespace, err := env.CreateUniqueNamespace(replicaNamespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
-				if CurrentSpecReport().Failed() {
-					env.DumpNamespaceObjects(replicaNamespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-				}
-				return env.DeleteNamespace(replicaNamespace)
+				return env.CleanupNamespace(
+					replicaNamespace,
+					CurrentSpecReport().LeafNodeText,
+					CurrentSpecReport().Failed(),
+					GinkgoWriter,
+				)
 			})
 			AssertCreateCluster(replicaNamespace, srcClusterName, srcClusterSample, env)
 
@@ -150,10 +154,12 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			replicaNamespace, err := env.CreateUniqueNamespace(replicaNamespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
-				if CurrentSpecReport().Failed() {
-					env.DumpNamespaceObjects(replicaNamespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-				}
-				return env.DeleteNamespace(replicaNamespace)
+				return env.CleanupNamespace(
+					replicaNamespace,
+					CurrentSpecReport().LeafNodeText,
+					CurrentSpecReport().Failed(),
+					GinkgoWriter,
+				)
 			})
 			By("creating the credentials for minio", func() {
 				AssertStorageCredentialsAreCreated(replicaNamespace, "backup-storage-creds", "minio", "minio123")
@@ -213,7 +219,14 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			var err error
 			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error { return env.DeleteNamespace(namespace) })
+			DeferCleanup(func() error {
+				return env.CleanupNamespace(
+					namespace,
+					CurrentSpecReport().LeafNodeText,
+					CurrentSpecReport().Failed(),
+					GinkgoWriter,
+				)
+			})
 
 			By("creating the credentials for minio", func() {
 				AssertStorageCredentialsAreCreated(namespace, "backup-storage-creds", "minio", "minio123")

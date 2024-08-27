@@ -19,7 +19,6 @@ package e2e
 import (
 	"bufio"
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -38,7 +37,6 @@ import (
 	// +kubebuilder:scaffold:imports
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/logs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
@@ -256,27 +254,6 @@ var _ = BeforeEach(func() {
 
 	operatorPod, err := env.GetOperatorPod()
 	Expect(err).ToNot(HaveOccurred())
-
-	GinkgoWriter.Println("Putting Tail on the operator log")
-	var buf bytes.Buffer
-	go func() {
-		// get logs without timestamp parsing; for JSON parseability
-		err = logs.TailPodLogs(context.TODO(), env.Interface, operatorPod, &buf, false)
-		if err != nil {
-			_, _ = fmt.Fprintf(&buf, "Error tailing logs, dumping operator logs: %v\n", err)
-		}
-	}()
-	DeferCleanup(func(_ SpecContext) {
-		if CurrentSpecReport().Failed() {
-			specName := CurrentSpecReport().FullText()
-			capLines := 10
-			GinkgoWriter.Printf("DUMPING tailed Operator Logs with error/warning (at most %v lines ). Failed Spec: %v\n",
-				capLines, specName)
-			GinkgoWriter.Println("================================================================================")
-			saveLogs(&buf, "operator_logs", strings.ReplaceAll(specName, " ", "_"), GinkgoWriter, capLines)
-			GinkgoWriter.Println("================================================================================")
-		}
-	})
 
 	if operatorPodWasRenamed {
 		Skip("Skipping test. Operator was renamed")
