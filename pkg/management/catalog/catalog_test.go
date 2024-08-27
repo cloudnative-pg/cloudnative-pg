@@ -250,4 +250,39 @@ var _ = Describe("barman-cloud-backup-show parsing", func() {
 		Expect(result.BeginTime.Location()).To(Equal(time.Now().Location()))
 		Expect(result.EndTime.Location()).To(Equal(time.Now().Location()))
 	})
+
+	It("parses valid begin and end time strings correctly", func() {
+		backup := &BarmanBackup{
+			BeginTimeString: "Mon Jan 2 15:04:05 2006",
+			EndTimeString:   "Tue Jan 3 15:04:05 2006",
+		}
+		err := backup.deserializeBackupTimeStrings()
+		Expect(err).ToNot(HaveOccurred())
+		Expect(backup.BeginTime).To(Equal(time.Date(2006, time.January, 2, 15, 4, 5, 0, time.Local)))
+		Expect(backup.EndTime).To(Equal(time.Date(2006, time.January, 3, 15, 4, 5, 0, time.Local)))
+	})
+
+	It("returns an error for invalid begin time string", func() {
+		backup := &BarmanBackup{
+			BeginTimeString: "invalid time string",
+		}
+		err := backup.deserializeBackupTimeStrings()
+		Expect(err).To(HaveOccurred())
+	})
+
+	It("returns an error for invalid end time string", func() {
+		backup := &BarmanBackup{
+			EndTimeString: "invalid time string",
+		}
+		err := backup.deserializeBackupTimeStrings()
+		Expect(err).To(HaveOccurred())
+	})
+
+	It("handles empty begin and end time strings gracefully", func() {
+		backup := &BarmanBackup{}
+		err := backup.deserializeBackupTimeStrings()
+		Expect(err).ToNot(HaveOccurred())
+		Expect(backup.BeginTime.IsZero()).To(BeTrue())
+		Expect(backup.EndTime.IsZero()).To(BeTrue())
+	})
 })
