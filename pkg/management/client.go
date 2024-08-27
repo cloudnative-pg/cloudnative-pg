@@ -49,8 +49,8 @@ var (
 	// readinessCheckRetry is used to wait until the API server is reachable
 	readinessCheckRetry = wait.Backoff{
 		Steps:    5,
-		Duration: 10 * time.Millisecond,
-		Factor:   5.0,
+		Duration: 1 * time.Second,
+		Factor:   3.0,
 		Jitter:   0.1,
 	}
 )
@@ -141,6 +141,7 @@ func WaitKubernetesAPIServer(ctx context.Context, clusterObjectKey client.Object
 	}
 
 	if err := retry.OnError(readinessCheckRetry, resources.RetryAlways, func() (err error) {
+		logger.Info("attempting to reach the API server ...")
 		return cli.Get(ctx, clusterObjectKey, &apiv1.Cluster{})
 	}); err != nil {
 		const message = "error while waiting for the API server to be reachable"
