@@ -137,7 +137,7 @@ func ensureOrphanServiceIsNotPresent(
 	contextLogger := log.FromContext(ctx).WithName("ensure_orphan_service_is_not_present")
 	var svc corev1.Service
 	err := cli.Get(ctx, objKey, &svc)
-	if !apierrs.IsNotFound(err) {
+	if apierrs.IsNotFound(err) {
 		return nil
 	}
 	if err != nil {
