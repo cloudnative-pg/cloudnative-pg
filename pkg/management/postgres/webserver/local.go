@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"strings"
 
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -83,19 +84,24 @@ func (ws *localWebserverEndpoints) serveCache(w http.ResponseWriter, r *http.Req
 	var js []byte
 	switch requestedObject {
 	case cache.ClusterKey:
-		response, err := cache.LoadClusterUnsafe()
-		if errors.Is(err, cache.ErrCacheMiss) {
+		var cluster apiv1.Cluster
+		err := ws.typedClient.Get(
+			r.Context(),
+			client.ObjectKey{Name: ws.instance.ClusterName, Namespace: ws.instance.Namespace},
+			&cluster,
+		)
+		if apierrs.IsNotFound(err) {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		} else if err != nil {
-			log.Error(err, "while loading cached cluster")
+			log.Error(err, "while loading cluster")
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 
-		js, err = json.Marshal(response)
+		js, err = json.Marshal(&cluster)
 		if err != nil {
-			log.Error(err, "while unmarshalling cached cluster")
+			log.Error(err, "while marshalling the cluster")
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -112,7 +118,7 @@ func (ws *localWebserverEndpoints) serveCache(w http.ResponseWriter, r *http.Req
 
 		js, err = json.Marshal(response)
 		if err != nil {
-			log.Error(err, "while unmarshalling cached env")
+			log.Error(err, "while marshalling cached env")
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
