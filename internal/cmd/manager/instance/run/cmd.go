@@ -166,6 +166,9 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 				DisableFor: []client.Object{
 					&corev1.Secret{},
 					&corev1.ConfigMap{},
+					// we don't have the permission to cache backups given that the SA doesn't have watch permission
+					// on the object.
+					&apiv1.Backup{},
 				},
 			},
 		},
@@ -261,7 +264,11 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 		return err
 	}
 
-	localSrv, err := webserver.NewLocalWebServer(instance)
+	localSrv, err := webserver.NewLocalWebServer(
+		instance,
+		mgr.GetClient(),
+		mgr.GetEventRecorderFor("local-webserver"),
+	)
 	if err != nil {
 		return err
 	}

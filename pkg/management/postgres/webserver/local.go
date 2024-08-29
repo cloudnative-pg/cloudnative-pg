@@ -30,7 +30,6 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/cache"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
@@ -43,20 +42,15 @@ type localWebserverEndpoints struct {
 }
 
 // NewLocalWebServer returns a webserver that allows connection only from localhost
-func NewLocalWebServer(instance *postgres.Instance) (*Webserver, error) {
-	typedClient, err := management.NewControllerRuntimeClient()
-	if err != nil {
-		return nil, fmt.Errorf("creating controller-runtine client: %v", err)
-	}
-	eventRecorder, err := management.NewEventRecorder()
-	if err != nil {
-		return nil, fmt.Errorf("creating kubernetes event recorder: %v", err)
-	}
-
+func NewLocalWebServer(
+	instance *postgres.Instance,
+	cli client.Client,
+	recorder record.EventRecorder,
+) (*Webserver, error) {
 	endpoints := localWebserverEndpoints{
-		typedClient:   typedClient,
+		typedClient:   cli,
 		instance:      instance,
-		eventRecorder: eventRecorder,
+		eventRecorder: recorder,
 	}
 
 	serveMux := http.NewServeMux()
