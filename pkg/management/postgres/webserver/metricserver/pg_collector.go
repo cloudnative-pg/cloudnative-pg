@@ -28,6 +28,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/cache"
+	cacheClient "github.com/cloudnative-pg/cloudnative-pg/internal/management/cache/client"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	m "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/metrics"
@@ -430,7 +431,7 @@ func (e *Exporter) setTimestampMetric(
 	errorLabel string,
 	getTimestampFunc func(cluster *apiv1.Cluster) string,
 ) {
-	cluster, err := cache.LoadClusterUnsafe()
+	cluster, err := cacheClient.GetCluster()
 	// there isn't a cached object yet
 	if errors.Is(err, cache.ErrCacheMiss) {
 		return
@@ -472,7 +473,7 @@ func (e *Exporter) setTimestampMetric(
 func (e *Exporter) collectNodesUsed() {
 	const notExtractedValue float64 = -1
 
-	cluster, err := cache.LoadClusterUnsafe()
+	cluster, err := cacheClient.GetCluster()
 	if err != nil {
 		log.Error(err, "unable to collect metrics")
 		e.Metrics.Error.Set(1)
