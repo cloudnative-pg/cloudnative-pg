@@ -495,7 +495,6 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 					backupList, err := env.GetBackupList(namespace)
 					g.Expect(err).ToNot(HaveOccurred())
 					for _, backup := range backupList.Items {
-						backup := backup
 						if backup.Name != backupName {
 							continue
 						}
