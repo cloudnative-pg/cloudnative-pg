@@ -673,7 +673,7 @@ type Topology struct {
 	// be the same as the number of instances in the Postgres HA cluster, implying
 	// shared nothing architecture on the compute side.
 	// +optional
-	NodesUsed int32 `json:"nodesUsed,omitempty"`
+	NodesUsed int `json:"nodesUsed,omitempty"`
 
 	// SuccessfullyExtracted indicates if the topology data was extract. It is useful to enact fallback behaviors
 	// in synchronous replica election in case of failures
@@ -821,11 +821,11 @@ type ClusterStatus struct {
 
 	// How many PVCs have been created by this cluster
 	// +optional
-	PVCCount int32 `json:"pvcCount,omitempty"`
+	PVCCount int `json:"pvcCount,omitempty"`
 
 	// How many Jobs have been created by this cluster
 	// +optional
-	JobCount int32 `json:"jobCount,omitempty"`
+	JobCount int `json:"jobCount,omitempty"`
 
 	// List of all the PVCs created by this cluster and still available
 	// which are not attached to a Pod

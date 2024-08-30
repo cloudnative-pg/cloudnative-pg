@@ -17,6 +17,8 @@ limitations under the License.
 package specs
 
 import (
+	"fmt"
+
 	policyv1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -33,8 +35,8 @@ func BuildReplicasPodDisruptionBudget(cluster *apiv1.Cluster) *policyv1.PodDisru
 	if cluster == nil || cluster.Spec.Instances < 3 {
 		return nil
 	}
-	minAvailableReplicas := int32(cluster.Spec.Instances - 2)
-	allReplicasButOne := intstr.FromInt32(minAvailableReplicas)
+	minAvailableReplicas := cluster.Spec.Instances - 2
+	allReplicasButOne := intstr.FromString(fmt.Sprintf("%d", minAvailableReplicas))
 
 	pdb := &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{

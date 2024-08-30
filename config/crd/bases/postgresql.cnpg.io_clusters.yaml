@@ -5929,7 +5929,6 @@ spec:
                 type: object
               jobCount:
                 description: How many Jobs have been created by this cluster
-                format: int32
                 type: integer
               lastFailedBackup:
                 description: Stored as a date in RFC3339 format
@@ -6068,7 +6067,6 @@ spec:
                 type: object
               pvcCount:
                 description: How many PVCs have been created by this cluster
-                format: int32
                 type: integer
               readService:
                 description: Current list of read pods
@@ -6200,7 +6198,6 @@ spec:
                       implying the absence of High Availability (HA). Ideally, this value should
                       be the same as the number of instances in the Postgres HA cluster, implying
                       shared nothing architecture on the compute side.
-                    format: int32
                     type: integer
                   successfullyExtracted:
                     description: |-
