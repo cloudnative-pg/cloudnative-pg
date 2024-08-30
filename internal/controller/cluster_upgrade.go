@@ -708,14 +708,15 @@ func (r *ClusterReconciler) upgradeInstanceManager(
 				instanceManagerIsUpgrading,
 				operatorHash[:6],
 				instanceManagerHash[:6])
-			contextLogger.Debug(message)
+			contextLogger.Trace(message)
 			continue
 		}
 
 		// We need to upgrade this Pod
 		contextLogger.Info("Upgrading instance manager",
 			"pod", postgresqlStatus.Pod.Name,
-			"oldVersion", postgresqlStatus.ExecutableHash)
+			"oldHash", instanceManagerHash,
+			"newHash", operatorHash)
 
 		if cluster.Status.Phase != apiv1.PhaseOnlineUpgrading {
 			err := r.RegisterPhase(ctx, cluster, apiv1.PhaseOnlineUpgrading, "")
@@ -737,10 +738,10 @@ func (r *ClusterReconciler) upgradeInstanceManager(
 		}
 
 		message := fmt.Sprintf("Instance manager has been upgraded on %s "+
-			"(operator hash: %s — instance manager hash: %s)",
+			"(oldHash: %s — newHash: %s)",
 			postgresqlStatus.Pod.Name,
-			operatorHash[:6],
-			instanceManagerHash[:6])
+			instanceManagerHash[:6],
+			operatorHash[:6])
 
 		r.Recorder.Event(cluster, "Normal", "InstanceManagerUpgraded", message)
 		contextLogger.Info(message)
