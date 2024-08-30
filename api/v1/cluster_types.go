@@ -523,12 +523,14 @@ type ClusterSpec struct {
 // configuration parameters
 type PluginConfigurationList []PluginConfiguration
 
-// GetNames gets the name of the plugins that are involved
+// GetEnabledPluginNames gets the name of the plugins that are involved
 // in the reconciliation of this cluster
-func (pluginList PluginConfigurationList) GetNames() (result []string) {
-	pluginNames := make([]string, len(pluginList))
-	for i, pluginDeclaration := range pluginList {
-		pluginNames[i] = pluginDeclaration.Name
+func (pluginList PluginConfigurationList) GetEnabledPluginNames() (result []string) {
+	pluginNames := make([]string, 0, len(pluginList))
+	for _, pluginDeclaration := range pluginList {
+		if pluginDeclaration.IsEnabled() {
+			pluginNames = append(pluginNames, pluginDeclaration.Name)
+		}
 	}
 	return pluginNames
 }
@@ -2666,8 +2668,21 @@ type PluginConfiguration struct {
 	// Name is the plugin name
 	Name string `json:"name"`
 
+	// Enabled is true if this plugin will be used
+	// +kubebuilder:default:=true
+	// +optional
+	Enabled *bool `json:"enabled,omitempty"`
+
 	// Parameters is the configuration of the plugin
 	Parameters map[string]string `json:"parameters,omitempty"`
+}
+
+// IsEnabled returns true when this plugin is enabled
+func (config *PluginConfiguration) IsEnabled() bool {
+	if config.Enabled == nil {
+		return true
+	}
+	return *config.Enabled
 }
 
 // PluginStatus is the status of a loaded plugin

@@ -3945,6 +3945,10 @@ spec:
                     PluginConfiguration specifies a plugin that need to be loaded for this
                     cluster to be reconciled
                   properties:
+                    enabled:
+                      default: true
+                      description: Enabled is true if this plugin will be used
+                      type: boolean
                     name:
                       description: Name is the plugin name
                       type: string

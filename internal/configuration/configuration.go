@@ -106,6 +106,10 @@ type Data struct {
 	// CreateAnyService is true when the user wants the operator to create
 	// the <cluster-name>-any service. Defaults to false.
 	CreateAnyService bool `json:"createAnyService" env:"CREATE_ANY_SERVICE"`
+
+	// IncludePlugins is a comma-separated list of plugins to always be
+	// included in the Cluster reconciliation
+	IncludePlugins string `json:"includePlugins" env:"INCLUDE_PLUGINS"`
 }
 
 // Current is the configuration used by the operator
@@ -154,6 +158,21 @@ func (config *Data) IsLabelInherited(name string) bool {
 // each namespace is separated by comma
 func (config *Data) WatchedNamespaces() []string {
 	return cleanNamespaceList(config.WatchNamespace)
+}
+
+// GetIncludePlugins gets the list of plugins to be always
+// included in the operator reconciliation
+func (config *Data) GetIncludePlugins() []string {
+	rawList := strings.Split(config.IncludePlugins, ",")
+	result := make([]string, 0, len(rawList))
+	for _, pluginName := range rawList {
+		pluginName := strings.TrimSpace(pluginName)
+		if len(pluginName) > 0 {
+			result = append(result, pluginName)
+		}
+	}
+
+	return result
 }
 
 func cleanNamespaceList(namespaces string) (result []string) {
