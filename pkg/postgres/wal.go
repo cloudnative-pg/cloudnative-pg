@@ -80,13 +80,13 @@ var (
 // Segment contains the information inside a WAL segment name
 type Segment struct {
 	// Timeline number
-	Tli int32
+	Tli int64
 
 	// Log number
-	Log int32
+	Log int64
 
 	// Segment number
-	Seg int32
+	Seg int64
 }
 
 // IsWALFile check if the passed file name is a regular WAL file.
@@ -127,9 +127,9 @@ func SegmentFromName(name string) (Segment, error) {
 	}
 
 	return Segment{
-		Tli: int32(tli),
-		Log: int32(log),
-		Seg: int32(seg),
+		Tli: tli,
+		Log: log,
+		Seg: seg,
 	}, nil
 }
 
@@ -150,11 +150,11 @@ func (segment Segment) Name() string {
 }
 
 // WalSegmentsPerFile is the number of WAL Segments in a WAL File
-func WalSegmentsPerFile(walSegmentSize int64) int32 {
+func WalSegmentsPerFile(walSegmentSize int64) int64 {
 	// Given that segment section is represented by 8 hex characters,
 	// we compute the number of wal segments in a file, by dividing
 	// the "max segment number" by the wal segment size.
-	return int32(0xFFFFFFFF / walSegmentSize)
+	return 0xFFFFFFFF / walSegmentSize
 }
 
 // NextSegments generate the list of all possible segment names starting
@@ -165,7 +165,7 @@ func WalSegmentsPerFile(walSegmentSize int64) int32 {
 func (segment Segment) NextSegments(size int, postgresVersion *int, segmentSize *int64) []Segment {
 	result := make([]Segment, 0, size)
 
-	var walSegPerFile int32
+	var walSegPerFile int64
 	if segmentSize == nil {
 		walSegPerFile = WalSegmentsPerFile(DefaultWALSegmentSize)
 	} else {
