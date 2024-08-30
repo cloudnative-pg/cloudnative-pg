@@ -265,24 +265,6 @@ func createPostgresVolumeMounts(cluster apiv1.Cluster) []corev1.VolumeMount {
 		},
 	}
 
-	if cluster.GetEnableSuperuserAccess() {
-		volumeMounts = append(volumeMounts,
-			corev1.VolumeMount{
-				Name:      "superuser-secret",
-				MountPath: "/etc/superuser-secret",
-			},
-		)
-	}
-
-	if cluster.ShouldCreateApplicationDatabase() {
-		volumeMounts = append(volumeMounts,
-			corev1.VolumeMount{
-				Name:      "app-secret",
-				MountPath: "/etc/app-secret",
-			},
-		)
-	}
-
 	if cluster.ShouldCreateWalArchiveVolume() {
 		volumeMounts = append(volumeMounts,
 			corev1.VolumeMount{
