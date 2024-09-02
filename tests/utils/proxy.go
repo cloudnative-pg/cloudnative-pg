@@ -19,15 +19,19 @@ package utils
 import (
 	"strconv"
 
+
+	corev1 "k8s.io/api/core/v1"
+
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/instance"
 )
 
 // runProxyRequest makes a GET call on the pod interface proxy, and returns the raw response
-func runProxyRequest(env *TestingEnvironment, namespace, podName, path string, port int) ([]byte, error) {
+func runProxyRequest(env *TestingEnvironment, pod *corev1.Pod, namespace, path string, port int) ([]byte, error) {
 	portString := strconv.Itoa(port)
 
 	req := env.Interface.CoreV1().Pods(namespace).ProxyGet(
-		"http", podName, portString, path, map[string]string{})
+		instance.GetStatusSchemeFromPod(pod).ToString(), pod.Name, portString, path, map[string]string{})
 
 	return req.DoRaw(env.Ctx)
 }
@@ -36,9 +40,10 @@ func runProxyRequest(env *TestingEnvironment, namespace, podName, path string, p
 // using a GET request on the pod interface proxy
 func RetrieveMetricsFromInstance(
 	env *TestingEnvironment,
-	namespace, podName string,
+	namespace string,
+	pod *corev1.Pod,
 ) (string, error) {
-	body, err := runProxyRequest(env, namespace, podName, url.PathMetrics, int(url.PostgresMetricsPort))
+	body, err := runProxyRequest(env, pod, namespace, url.PathMetrics, int(url.PostgresMetricsPort))
 	return string(body), err
 }
 
@@ -46,8 +51,9 @@ func RetrieveMetricsFromInstance(
 // using a GET request on the pod interface proxy
 func RetrieveMetricsFromPgBouncer(
 	env *TestingEnvironment,
-	namespace, podName string,
+	namespace string,
+	pod *corev1.Pod,
 ) (string, error) {
-	body, err := runProxyRequest(env, namespace, podName, url.PathMetrics, int(url.PgBouncerMetricsPort))
+	body, err := runProxyRequest(env, pod, namespace, url.PathMetrics, int(url.PgBouncerMetricsPort))
 	return string(body), err
 }

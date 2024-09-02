@@ -126,7 +126,7 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 			// Gather metrics in each pod
 			for _, pod := range podList.Items {
 				By(fmt.Sprintf("checking metrics for pod: %s", pod.Name), func() {
-					out, err := utils.RetrieveMetricsFromInstance(env, namespace, pod.Name)
+					out, err := utils.RetrieveMetricsFromInstance(env, namespace, &pod)
 					Expect(err).ToNot(HaveOccurred(), "while getting pod metrics")
 					expectedMetrics := buildExpectedMetrics(metricsCluster, !specs.IsPodPrimary(pod))
 					assertIncludesMetrics(out, expectedMetrics)
@@ -241,7 +241,7 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 			// Gather metrics in each pod
 			for _, pod := range podList.Items {
 				By(fmt.Sprintf("checking metrics for pod: %s", pod.Name), func() {
-					out, err := utils.RetrieveMetricsFromInstance(env, namespace, pod.Name)
+					out, err := utils.RetrieveMetricsFromInstance(env, namespace, &pod)
 					Expect(err).ToNot(HaveOccurred(), "while getting pod metrics")
 					assertIncludesMetrics(out, expectedMetrics)
 					assertExcludesMetrics(out, nonCollectableMetrics)
@@ -343,7 +343,7 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 			// Gather metrics in each pod
 			expectedMetric := fmt.Sprintf("cnpg_%v_row_count 3", testTableName)
 			for _, pod := range podList.Items {
-				out, err := utils.RetrieveMetricsFromInstance(env, namespace, pod.Name)
+				out, err := utils.RetrieveMetricsFromInstance(env, namespace, &pod)
 				Expect(err).Should(Not(HaveOccurred()))
 				Expect(strings.Split(out, "\n")).Should(ContainElement(expectedMetric))
 			}

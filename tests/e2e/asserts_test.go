@@ -1442,7 +1442,7 @@ func AssertMetricsData(namespace, targetOne, targetTwo, targetSecret string, clu
 		Expect(err).ToNot(HaveOccurred())
 		for _, pod := range podList.Items {
 			podName := pod.GetName()
-			out, err := testsUtils.RetrieveMetricsFromInstance(env, namespace, podName)
+			out, err := testsUtils.RetrieveMetricsFromInstance(env, namespace, &pod)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(strings.Contains(out, fmt.Sprintf(`cnpg_some_query_rows{datname="%v"} 0`, targetOne))).Should(BeTrue(),
 				"Metric collection issues on %v.\nCollected metrics:\n%v", podName, out)
@@ -2621,7 +2621,7 @@ func collectAndAssertDefaultMetricsPresentOnEachPod(namespace, clusterName strin
 		Expect(err).ToNot(HaveOccurred())
 		for _, pod := range podList.Items {
 			podName := pod.GetName()
-			out, err := testsUtils.RetrieveMetricsFromInstance(env, namespace, podName)
+			out, err := testsUtils.RetrieveMetricsFromInstance(env, namespace, &pod)
 			Expect(err).ToNot(HaveOccurred())
 
 			// error should be zero on each pod metrics
@@ -2677,7 +2677,7 @@ func collectAndAssertCollectorMetricsPresentOnEachPod(namespace, clusterName str
 		Expect(err).ToNot(HaveOccurred())
 		for _, pod := range podList.Items {
 			podName := pod.GetName()
-			out, err := testsUtils.RetrieveMetricsFromInstance(env, namespace, podName)
+			out, err := testsUtils.RetrieveMetricsFromInstance(env, namespace, &pod)
 			Expect(err).ToNot(HaveOccurred())
 
 			// error should be zero on each pod metrics
