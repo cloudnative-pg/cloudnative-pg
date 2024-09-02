@@ -19,7 +19,6 @@ package utils
 
 import (
 	"errors"
-	"io/fs"
 	"os"
 	"os/exec"
 	"sort"
@@ -61,18 +60,17 @@ func GetAvailableReleases(releasesPath string) ([]*semver.Version, error) {
 		return nil, err
 	}
 
-	validFiles := make([]fs.DirEntry, 0, len(fileInfo))
-	for _, file := range fileInfo {
-		if strings.HasSuffix(file.Name(), ".yaml") && !strings.Contains(file.Name(), "-rc") {
-			validFiles = append(validFiles, file)
+	for i, file := range fileInfo {
+		if !strings.HasSuffix(file.Name(), ".yaml") {
+			fileInfo = append(fileInfo[:i], fileInfo[i+1:]...)
 		}
 	}
 
-	versions := make([]*semver.Version, len(validFiles))
+	versions := make([]*semver.Version, len(fileInfo))
 
 	// build the array that contains the versions
 	// found in the releasePath directory
-	for i, file := range validFiles {
+	for i, file := range fileInfo {
 		tag := extractTag(file.Name())
 		versions[i] = semver.MustParse(tag)
 	}

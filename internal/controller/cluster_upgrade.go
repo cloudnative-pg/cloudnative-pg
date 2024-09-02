@@ -701,50 +701,39 @@ func (r *ClusterReconciler) upgradeInstanceManager(
 		}
 		operatorHash := targetManager.GetHash()
 
-		if instanceManagerIsUpgrading || instanceManagerHash == "" || instanceManagerHash == operatorHash {
-			message := fmt.Sprintf("Instance manager will skip upgrade on %s (upgrading: %t) "+
-				"(operator hash: %s — instance manager hash: %s)",
+		if instanceManagerHash != "" && instanceManagerHash != operatorHash && !instanceManagerIsUpgrading {
+			// We need to upgrade this Pod
+			contextLogger.Info("Upgrading instance manager",
+				"pod", postgresqlStatus.Pod.Name,
+				"oldVersion", postgresqlStatus.ExecutableHash)
+
+			if cluster.Status.Phase != apiv1.PhaseOnlineUpgrading {
+				err := r.RegisterPhase(ctx, cluster, apiv1.PhaseOnlineUpgrading, "")
+				if err != nil {
+					return err
+				}
+			}
+
+			err = r.InstanceClient.UpgradeInstanceManager(ctx, postgresqlStatus.Pod, targetManager)
+			if err != nil {
+				enrichedError := fmt.Errorf("while upgrading instance manager on %s (hash: %s): %w",
+					postgresqlStatus.Pod.Name,
+					operatorHash[:6],
+					err)
+
+				r.Recorder.Event(cluster, "Warning", "InstanceManagerUpgradeFailed",
+					fmt.Sprintf("Error %s", enrichedError))
+				return enrichedError
+			}
+
+			message := fmt.Sprintf("Instance manager has been upgraded on %s (hash: %s — previous hash: %s)",
 				postgresqlStatus.Pod.Name,
-				instanceManagerIsUpgrading,
 				operatorHash[:6],
 				instanceManagerHash[:6])
-			contextLogger.Trace(message)
-			continue
+
+			r.Recorder.Event(cluster, "Normal", "InstanceManagerUpgraded", message)
+			contextLogger.Info(message)
 		}
-
-		// We need to upgrade this Pod
-		contextLogger.Info("Upgrading instance manager",
-			"pod", postgresqlStatus.Pod.Name,
-			"oldHash", instanceManagerHash,
-			"newHash", operatorHash)
-
-		if cluster.Status.Phase != apiv1.PhaseOnlineUpgrading {
-			err := r.RegisterPhase(ctx, cluster, apiv1.PhaseOnlineUpgrading, "")
-			if err != nil {
-				return err
-			}
-		}
-
-		err = r.InstanceClient.UpgradeInstanceManager(ctx, postgresqlStatus.Pod, targetManager)
-		if err != nil {
-			enrichedError := fmt.Errorf("while upgrading instance manager on %s (hash: %s): %w",
-				postgresqlStatus.Pod.Name,
-				operatorHash[:6],
-				err)
-
-			r.Recorder.Event(cluster, "Warning", "InstanceManagerUpgradeFailed",
-				fmt.Sprintf("Error %s", enrichedError))
-			return enrichedError
-		}
-
-		message := fmt.Sprintf("Instance manager has been upgraded on %s "+
-			"(oldHash: %s — newHash: %s)",
-			postgresqlStatus.Pod.Name,
-			instanceManagerHash[:6],
-			operatorHash[:6])
-
-		r.Recorder.Event(cluster, "Normal", "InstanceManagerUpgraded", message)
-		contextLogger.Info(message)
 	}
 
 	return nil
