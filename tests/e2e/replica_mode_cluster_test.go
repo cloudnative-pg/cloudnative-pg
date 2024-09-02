@@ -541,11 +541,10 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication), Ordered, f
 			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
-				return env.CleanupNamespaceAndWait(
+				return env.CleanupNamespace(
 					namespace,
 					CurrentSpecReport().LeafNodeText,
 					CurrentSpecReport().Failed(),
-					120,
 					GinkgoWriter,
 				)
 			})

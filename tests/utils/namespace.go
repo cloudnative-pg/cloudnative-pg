@@ -214,26 +214,6 @@ func (env TestingEnvironment) CleanupNamespace(
 	return env.DeleteNamespace(namespace)
 }
 
-// CleanupNamespaceAndWait does cleanup just like CleanupNamespace, but waits for
-// the namespace to be deleted, with a timeout
-func (env TestingEnvironment) CleanupNamespaceAndWait(
-	namespace string,
-	testName string,
-	testFailed bool,
-	timeoutSeconds int,
-	output io.Writer,
-) error {
-	lines, err := env.DumpOperatorLogs(false, 10)
-	if err != nil {
-		_, _ = fmt.Fprintf(output, "cleanupNamespace: error dumping opertor logs: %v\n", err)
-	}
-	_, _ = fmt.Fprintln(output, strings.Join(lines, "\n"))
-	if testFailed {
-		env.DumpNamespaceObjects(namespace, "out/"+testName+".log")
-	}
-	return env.DeleteNamespaceAndWait(namespace, timeoutSeconds)
-}
-
 // CreateUniqueNamespace creates a namespace by using the passed prefix.
 // Return the namespace name and any errors encountered.
 func (env TestingEnvironment) CreateUniqueNamespace(
