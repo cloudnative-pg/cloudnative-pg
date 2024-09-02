@@ -36,16 +36,7 @@ func runProxyRequest(env *TestingEnvironment, pod *corev1.Pod, tlsEnabled bool, 
 	req := env.Interface.CoreV1().Pods(pod.Namespace).ProxyGet(
 		schema, pod.Name, portString, path, map[string]string{})
 
-	bts, err := req.DoRaw(env.Ctx)
-	if err == nil {
-		return bts, nil
-	}
-	// (most of) the endpoints in the pods now use HTTPS. If the HTTP call failed,
-	// retry with HTTPS
-	reqTLS := env.Interface.CoreV1().Pods(namespace).ProxyGet(
-		"https", podName, portString, path, map[string]string{})
-
-	return reqTLS.DoRaw(env.Ctx)
+	return req.DoRaw(env.Ctx)
 }
 
 // RetrieveMetricsFromInstance aims to retrieve the metrics from a PostgreSQL instance pod
