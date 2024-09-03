@@ -61,7 +61,6 @@ var errSwitchoverInProgress = fmt.Errorf("switchover in progress, refusing archi
 func NewCmd() *cobra.Command {
 	var podName string
 	var pgData string
-
 	cmd := cobra.Command{
 		Use:           "wal-archive [name]",
 		SilenceErrors: true,
