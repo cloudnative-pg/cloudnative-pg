@@ -114,11 +114,27 @@ func ensureOrphanServicesAreNotPresent(ctx context.Context, cli client.Client, c
 			return err
 		}
 	}
+
 	if cluster.IsReadServiceEnabled() {
 		if err := ensureOrphanServiceIsNotPresent(
 			ctx,
 			cli,
 			client.ObjectKey{Name: cluster.GetServiceReadName(), Namespace: cluster.Namespace},
+			cluster.Name,
+		); err != nil {
+			return err
+		}
+	}
+
+	managedServices, err := specs.BuildManagedServices(*cluster)
+	if err != nil {
+		return err
+	}
+	for idx := range managedServices {
+		if err := ensureOrphanServiceIsNotPresent(
+			ctx,
+			cli,
+			client.ObjectKey{Name: managedServices[idx].Name, Namespace: cluster.Namespace},
 			cluster.Name,
 		); err != nil {
 			return err

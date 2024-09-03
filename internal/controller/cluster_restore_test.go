@@ -313,6 +313,23 @@ var _ = Describe("ensureOrphanServicesAreNotPresent", func() {
 				Name:      "test-cluster",
 				Namespace: "default",
 			},
+			Spec: apiv1.ClusterSpec{
+				Managed: &apiv1.ManagedConfiguration{
+					Services: &apiv1.ManagedServices{
+						Additional: []apiv1.ManagedService{
+							{
+								SelectorType:   apiv1.ServiceSelectorTypeRW,
+								UpdateStrategy: apiv1.ServiceUpdateStrategyPatch,
+								ServiceTemplate: apiv1.ServiceTemplateSpec{
+									ObjectMeta: apiv1.Metadata{
+										Name: "test-rw-service",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
 		}
 		mockCli = fake.NewClientBuilder().
 			WithScheme(k8scheme.BuildWithAllKnownScheme()).
@@ -401,6 +418,33 @@ var _ = Describe("ensureOrphanServicesAreNotPresent", func() {
 				var svc corev1.Service
 				err = mockCli.Get(ctx,
 					k8client.ObjectKey{Name: cluster.GetServiceReadOnlyName(), Namespace: cluster.Namespace},
+					&svc,
+				)
+				Expect(apierrs.IsNotFound(err)).To(BeTrue())
+			})
+		})
+
+		Context("when orphan additional services are present", func() {
+			BeforeEach(func() {
+				svc := &corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-rw-service",
+						Namespace: cluster.Namespace,
+					},
+				}
+				mockCli = fake.NewClientBuilder().
+					WithScheme(k8scheme.BuildWithAllKnownScheme()).
+					WithObjects(cluster, svc).
+					Build()
+			})
+
+			It("should delete the orphan additional services", func(ctx SpecContext) {
+				err := ensureOrphanServicesAreNotPresent(ctx, mockCli, cluster)
+				Expect(err).ToNot(HaveOccurred())
+
+				var svc corev1.Service
+				err = mockCli.Get(ctx,
+					k8client.ObjectKey{Name: "test-rw-service", Namespace: cluster.Namespace},
 					&svc,
 				)
 				Expect(apierrs.IsNotFound(err)).To(BeTrue())
