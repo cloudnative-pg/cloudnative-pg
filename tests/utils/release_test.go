@@ -69,3 +69,23 @@ var _ = Describe("Most recent tag", func() {
 		Expect(err).ToNot(HaveOccurred())
 	})
 })
+
+var _ = Describe("Fail on no-existing releases", func() {
+	It("properly error out if the release directory doesn't exists", func() {
+		currentDir, err := os.Getwd()
+		Expect(err).ToNot(HaveOccurred())
+		releaseDir := filepath.Join(filepath.Dir(currentDir), "does-no-exist")
+		versionList, err := GetAvailableReleases(releaseDir)
+		Expect(err).To(HaveOccurred())
+		Expect(versionList).To(BeEmpty())
+	})
+
+	It("properly fail if there's no tag", func() {
+		releaseDir, err := os.Getwd()
+		Expect(err).ToNot(HaveOccurred())
+
+		tag, err := GetMostRecentReleaseTag(releaseDir)
+		Expect(err).To(HaveOccurred())
+		Expect(tag).To(BeEmpty())
+	})
+})
