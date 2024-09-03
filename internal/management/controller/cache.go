@@ -34,8 +34,6 @@ import (
 //
 // returns true if the update was not total, and should be retried
 func (r *InstanceReconciler) updateCacheFromCluster(ctx context.Context, cluster *apiv1.Cluster) shoudRequeue {
-	cache.StoreCluster(cluster)
-
 	var missingPermissions shoudRequeue
 
 	// Populate the cache with the backup configuration

@@ -70,8 +70,10 @@ var _ = Describe("ensure timestamp metric it's set properly", func() {
 				LastFailedBackup:         "2023-02-16T22:44:56Z",
 			},
 		}
-		cache.Store(cache.ClusterKey, cluster)
 
+		exporter.getCluster = func() (*apiv1.Cluster, error) {
+			return cluster, nil
+		}
 		exporter.collectFromPrimaryFirstPointOnTimeRecovery()
 		exporter.collectFromPrimaryLastAvailableBackupTimestamp()
 		exporter.collectFromPrimaryLastFailedBackupTimestamp()
@@ -176,7 +178,9 @@ var _ = Describe("ensure timestamp metric it's set properly", func() {
 					},
 				},
 			}
-			cache.Store(cache.ClusterKey, cluster)
+			exporter.getCluster = func() (*apiv1.Cluster, error) {
+				return cluster, nil
+			}
 
 			exporter.collectNodesUsed()
 
@@ -212,7 +216,9 @@ var _ = Describe("ensure timestamp metric it's set properly", func() {
 					},
 				},
 			}
-			cache.Store(cache.ClusterKey, cluster)
+			exporter.getCluster = func() (*apiv1.Cluster, error) {
+				return cluster, nil
+			}
 
 			exporter.collectNodesUsed()
 
