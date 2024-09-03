@@ -104,7 +104,7 @@ var _ = Describe("PGBouncer Metrics", Label(tests.LabelObservability), func() {
 
 			for _, pod := range podList.Items {
 				podName := pod.GetName()
-				out, err := utils.RetrieveMetricsFromPgBouncer(env, namespace, podName)
+				out, err := utils.RetrieveMetricsFromPgBouncer(env, pod)
 				Expect(err).ToNot(HaveOccurred())
 				matches := metricsRegexp.FindAllString(out, -1)
 				Expect(matches).To(

@@ -75,7 +75,6 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 			var err error
 			clusterName, err = env.GetResourceNameFromYAML(clusterWithMinioSampleFile)
 			Expect(err).ToNot(HaveOccurred())
-
 			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			DeferCleanup(func() error {
