@@ -335,8 +335,10 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 
 		// Create the cluster
 		AssertCreateCluster(namespace, metricsClusterName, defaultMonitoringQueriesDisableSampleFile, env)
+
 		cluster, err := env.GetCluster(namespace, metricsClusterName)
 		Expect(err).ToNot(HaveOccurred())
+
 		metricsSchema := "http"
 		if cluster.IsMetricsTLSEnabled() {
 			metricsSchema = "https"

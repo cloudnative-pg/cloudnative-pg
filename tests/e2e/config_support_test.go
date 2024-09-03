@@ -23,7 +23,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
@@ -44,8 +44,9 @@ var _ = Describe("Config support", Serial, Ordered, Label(tests.LabelDisruptive,
 		level                          = tests.Low
 	)
 	var operatorNamespace, namespace string
-	var cluster *v1.Cluster
+	var cluster *apiv1.Cluster
 	var err error
+
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
