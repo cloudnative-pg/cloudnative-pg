@@ -126,4 +126,5 @@ issues:
       text: "ST1016:"
       path: api/
   exclude-use-default: false
-  exclude-files: "zz_generated.*"
+  exclude-files:
+    - zz_generated.*
