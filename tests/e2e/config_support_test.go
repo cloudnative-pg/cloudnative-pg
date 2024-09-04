@@ -23,7 +23,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
@@ -44,8 +43,6 @@ var _ = Describe("Config support", Serial, Ordered, Label(tests.LabelDisruptive,
 		level                          = tests.Low
 	)
 	var operatorNamespace, namespace string
-	var cluster *apiv1.Cluster
-	var err error
 
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
@@ -137,7 +134,7 @@ var _ = Describe("Config support", Serial, Ordered, Label(tests.LabelDisruptive,
 	})
 
 	It("verify label's and annotation's inheritance when global config-map changed", func() {
-		cluster, err = env.GetCluster(namespace, clusterName)
+		cluster, err := env.GetCluster(namespace, clusterName)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("checking the cluster has the requested labels", func() {
@@ -183,10 +180,9 @@ var _ = Describe("Config support", Serial, Ordered, Label(tests.LabelDisruptive,
 	// Setting MONITORING_QUERIES_CONFIGMAP: "" should disable monitoring
 	// queries on new cluster. We expect those metrics to be missing.
 	It("verify metrics details when updated default monitoring configMap queries parameter is set to be empty", func() {
-		metricSchema := "http"
-		if cluster.IsMetricsTLSEnabled() {
-			metricSchema = "https"
-		}
-		collectAndAssertDefaultMetricsPresentOnEachPod(namespace, clusterName, metricSchema, false)
+		cluster, err := env.GetCluster(namespace, clusterName)
+		Expect(err).NotTo(HaveOccurred())
+
+		collectAndAssertDefaultMetricsPresentOnEachPod(namespace, clusterName, cluster.IsMetricsTLSEnabled(), false)
 	})
 })

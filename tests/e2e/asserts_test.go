@@ -1445,13 +1445,9 @@ func AssertMetricsData(namespace, targetOne, targetTwo, targetSecret string, clu
 	By("collect and verify metric being exposed with target databases", func() {
 		podList, err := env.GetClusterPodList(namespace, cluster.Name)
 		Expect(err).ToNot(HaveOccurred())
-		metricsSchema := "http"
-		if cluster.IsMetricsTLSEnabled() {
-			metricsSchema = "https"
-		}
 		for _, pod := range podList.Items {
 			podName := pod.GetName()
-			out, err := testsUtils.RetrieveMetricsFromInstance(env, metricsSchema, pod)
+			out, err := testsUtils.RetrieveMetricsFromInstance(env, pod, cluster.IsMetricsTLSEnabled())
 			Expect(err).ToNot(HaveOccurred())
 			Expect(strings.Contains(out, fmt.Sprintf(`cnpg_some_query_rows{datname="%v"} 0`, targetOne))).Should(BeTrue(),
 				"Metric collection issues on %v.\nCollected metrics:\n%v", podName, out)
@@ -2608,7 +2604,11 @@ func DeleteTableUsingPgBouncerService(
 	Expect(err).ToNot(HaveOccurred())
 }
 
-func collectAndAssertDefaultMetricsPresentOnEachPod(namespace, clusterName, metricSchema string, expectPresent bool) {
+func collectAndAssertDefaultMetricsPresentOnEachPod(
+	namespace, clusterName string,
+	tlsEnabled bool,
+	expectPresent bool,
+) {
 	By("collecting and verifying a set of default metrics on each pod", func() {
 		defaultMetrics := []string{
 			"cnpg_pg_settings_setting",
@@ -2630,7 +2630,7 @@ func collectAndAssertDefaultMetricsPresentOnEachPod(namespace, clusterName, metr
 		Expect(err).ToNot(HaveOccurred())
 		for _, pod := range podList.Items {
 			podName := pod.GetName()
-			out, err := testsUtils.RetrieveMetricsFromInstance(env, metricSchema, pod)
+			out, err := testsUtils.RetrieveMetricsFromInstance(env, pod, tlsEnabled)
 			Expect(err).ToNot(HaveOccurred())
 
 			// error should be zero on each pod metrics
@@ -2684,15 +2684,9 @@ func collectAndAssertCollectorMetricsPresentOnEachPod(cluster *apiv1.Cluster) {
 	By("collecting and verify set of collector metrics on each pod", func() {
 		podList, err := env.GetClusterPodList(cluster.Namespace, cluster.Name)
 		Expect(err).ToNot(HaveOccurred())
-
-		metricsSchema := "http"
-		if cluster.IsMetricsTLSEnabled() {
-			metricsSchema = "https"
-		}
-
 		for _, pod := range podList.Items {
 			podName := pod.GetName()
-			out, err := testsUtils.RetrieveMetricsFromInstance(env, metricsSchema, pod)
+			out, err := testsUtils.RetrieveMetricsFromInstance(env, pod, cluster.IsMetricsTLSEnabled())
 			Expect(err).ToNot(HaveOccurred())
 
 			// error should be zero on each pod metrics

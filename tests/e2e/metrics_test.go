@@ -97,18 +97,13 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 
 	metricsPerPod := func(cluster *apiv1.Cluster) {
 		By("ensuring metrics are correct on each pod", func() {
-			metricsSchema := "http"
-			if cluster.IsMetricsTLSEnabled() {
-				metricsSchema = "https"
-			}
-
 			podList, err := env.GetClusterPodList(cluster.Namespace, cluster.Name)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Gather metrics in each pod
 			for _, pod := range podList.Items {
 				By(fmt.Sprintf("checking metrics for pod: %s", pod.Name), func() {
-					out, err := utils.RetrieveMetricsFromInstance(env, metricsSchema, pod)
+					out, err := utils.RetrieveMetricsFromInstance(env, pod, cluster.IsMetricsTLSEnabled())
 					Expect(err).ToNot(HaveOccurred(), "while getting pod metrics")
 					expectedMetrics := buildExpectedMetrics(cluster, !specs.IsPodPrimary(pod))
 					assertIncludesMetrics(out, expectedMetrics)
@@ -144,7 +139,7 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 		// Check metrics on each pod
 		metricsPerPod(cluster)
 
-		// verify cnpg_collector_x metrics is exists in each pod
+		// verify cnpg_collector_x metrics exists in each pod
 		collectAndAssertCollectorMetricsPresentOnEachPod(cluster)
 	})
 
@@ -174,12 +169,11 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 		cluster.Spec.Monitoring.TLSConfig = &apiv1.ClusterMonitoringTLSConfiguration{
 			Enabled: true,
 		}
-		metricsClusterName := cluster.Name
 		_, err = utils.CreateObject(env, cluster)
 		Expect(err).ToNot(HaveOccurred())
 		AssertClusterIsReady(namespace, cluster.Name, testTimeouts[utils.ClusterIsReady], env)
 
-		cluster, err = env.GetCluster(namespace, metricsClusterName)
+		cluster, err = env.GetCluster(namespace, cluster.Name)
 		Expect(err).NotTo(HaveOccurred())
 
 		// Check metrics on each pod
@@ -250,12 +244,8 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 		})
 		cluster, err := env.GetCluster(namespace, metricsClusterName)
 		Expect(err).ToNot(HaveOccurred())
-		metricsSchema := "http"
-		if cluster.IsMetricsTLSEnabled() {
-			metricsSchema = "https"
-		}
 
-		collectAndAssertDefaultMetricsPresentOnEachPod(namespace, metricsClusterName, metricsSchema, true)
+		collectAndAssertDefaultMetricsPresentOnEachPod(namespace, metricsClusterName, cluster.IsMetricsTLSEnabled(), true)
 	})
 
 	It("can gather metrics depending on the predicate query", func() {
@@ -285,10 +275,6 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 
 			cluster, err := env.GetCluster(namespace, metricsClusterName)
 			Expect(err).ToNot(HaveOccurred())
-			metricsSchema := "http"
-			if cluster.IsMetricsTLSEnabled() {
-				metricsSchema = "https"
-			}
 
 			// We expect only the metrics that have a predicate_query valid.
 			expectedMetrics := map[string]*regexp.Regexp{
@@ -306,7 +292,7 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 			// Gather metrics in each pod
 			for _, pod := range podList.Items {
 				By(fmt.Sprintf("checking metrics for pod: %s", pod.Name), func() {
-					out, err := utils.RetrieveMetricsFromInstance(env, metricsSchema, pod)
+					out, err := utils.RetrieveMetricsFromInstance(env, pod, cluster.IsMetricsTLSEnabled())
 					Expect(err).ToNot(HaveOccurred(), "while getting pod metrics")
 					assertIncludesMetrics(out, expectedMetrics)
 					assertExcludesMetrics(out, nonCollectableMetrics)
@@ -339,11 +325,7 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 		cluster, err := env.GetCluster(namespace, metricsClusterName)
 		Expect(err).ToNot(HaveOccurred())
 
-		metricsSchema := "http"
-		if cluster.IsMetricsTLSEnabled() {
-			metricsSchema = "https"
-		}
-		collectAndAssertDefaultMetricsPresentOnEachPod(namespace, metricsClusterName, metricsSchema, false)
+		collectAndAssertDefaultMetricsPresentOnEachPod(namespace, metricsClusterName, cluster.IsMetricsTLSEnabled(), false)
 	})
 
 	It("execute custom queries against the application database on replica clusters", func() {
@@ -410,10 +392,6 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 		})
 		replicaCluster, err := env.GetCluster(namespace, replicaClusterName)
 		Expect(err).ToNot(HaveOccurred())
-		metricsSchema := "http"
-		if replicaCluster.IsMetricsTLSEnabled() {
-			metricsSchema = "https"
-		}
 
 		By("collecting metrics on each pod and checking that the table has been found", func() {
 			podList, err := env.GetClusterPodList(namespace, replicaClusterName)
@@ -422,12 +400,17 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 			// Gather metrics in each pod
 			expectedMetric := fmt.Sprintf("cnpg_%v_row_count 3", testTableName)
 			for _, pod := range podList.Items {
-				out, err := utils.RetrieveMetricsFromInstance(env, metricsSchema, pod)
+				out, err := utils.RetrieveMetricsFromInstance(env, pod, replicaCluster.IsMetricsTLSEnabled())
 				Expect(err).Should(Not(HaveOccurred()))
 				Expect(strings.Split(out, "\n")).Should(ContainElement(expectedMetric))
 			}
 		})
 
-		collectAndAssertDefaultMetricsPresentOnEachPod(namespace, replicaClusterName, metricsSchema, true)
+		collectAndAssertDefaultMetricsPresentOnEachPod(
+			namespace,
+			replicaClusterName,
+			replicaCluster.IsMetricsTLSEnabled(),
+			true,
+		)
 	})
 })

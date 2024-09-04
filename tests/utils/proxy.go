@@ -25,8 +25,13 @@ import (
 )
 
 // runProxyRequest makes a GET call on the pod interface proxy, and returns the raw response
-func runProxyRequest(env *TestingEnvironment, pod *corev1.Pod, schema, path string, port int) ([]byte, error) {
+func runProxyRequest(env *TestingEnvironment, pod *corev1.Pod, tlsEnabled bool, path string, port int) ([]byte, error) {
 	portString := strconv.Itoa(port)
+
+	schema := "http"
+	if tlsEnabled {
+		schema = "https"
+	}
 
 	req := env.Interface.CoreV1().Pods(pod.Namespace).ProxyGet(
 		schema, pod.Name, portString, path, map[string]string{})
@@ -38,10 +43,10 @@ func runProxyRequest(env *TestingEnvironment, pod *corev1.Pod, schema, path stri
 // using a GET request on the pod interface proxy
 func RetrieveMetricsFromInstance(
 	env *TestingEnvironment,
-	schema string,
 	pod corev1.Pod,
+	tlsEnabled bool,
 ) (string, error) {
-	body, err := runProxyRequest(env, &pod, schema, url.PathMetrics, int(url.PostgresMetricsPort))
+	body, err := runProxyRequest(env, &pod, tlsEnabled, url.PathMetrics, int(url.PostgresMetricsPort))
 	return string(body), err
 }
 
@@ -51,7 +56,6 @@ func RetrieveMetricsFromPgBouncer(
 	env *TestingEnvironment,
 	pod corev1.Pod,
 ) (string, error) {
-	// The PgBouncer metrics only run on a fixed HTTP schema
-	body, err := runProxyRequest(env, &pod, "http", url.PathMetrics, int(url.PgBouncerMetricsPort))
+	body, err := runProxyRequest(env, &pod, false, url.PathMetrics, int(url.PgBouncerMetricsPort))
 	return string(body), err
 }
