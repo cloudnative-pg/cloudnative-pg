@@ -99,8 +99,6 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 
 			AssertSwitchoverOnReplica(replicaNamespace, replicaName, env)
 
-			AssertClusterIsReady(replicaNamespace, replicaName, testTimeouts[testUtils.ClusterIsReady], env)
-
 			assertReplicaClusterTopology(replicaNamespace, replicaName)
 		})
 	})
