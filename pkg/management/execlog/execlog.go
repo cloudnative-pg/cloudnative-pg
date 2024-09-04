@@ -139,6 +139,7 @@ func copyPipe(dst io.Writer, src io.ReadCloser, logger log.Logger) {
 	}()
 
 	scanner := bufio.NewScanner(src)
+	scanner.Buffer(make([]byte, 0, 4096), 1024*1024)
 
 	for scanner.Scan() {
 		line := scanner.Bytes()

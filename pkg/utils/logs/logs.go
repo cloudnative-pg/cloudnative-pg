@@ -172,6 +172,7 @@ func GetPodLogs(
 	rd := bufio.NewReader(logStream)
 	teedReader := io.TeeReader(rd, writer)
 	scanner := bufio.NewScanner(teedReader)
+	scanner.Buffer(make([]byte, 0, 4096), 1024*1024)
 
 	if requestedLineLength <= 0 {
 		requestedLineLength = 10
