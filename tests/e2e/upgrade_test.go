@@ -187,7 +187,6 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			commandTimeout := time.Second * 10
 			// Check that both parameters have been modified in each pod
 			for _, pod := range podList.Items {
-				pod := pod // pin the variable
 				Eventually(func() (int, error) {
 					stdout, stderr, err := env.ExecCommand(env.Ctx, pod, specs.PostgresContainerName, &commandTimeout,
 						"psql", "-U", "postgres", "-tAc", "show max_replication_slots")

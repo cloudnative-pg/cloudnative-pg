@@ -201,7 +201,6 @@ func DeleteCSV(env *TestingEnvironment) error {
 		return err
 	}
 	for _, o := range ol.Items {
-		o := o
 		err = DeleteObject(env, &o)
 		if err != nil {
 			if apierrors.IsNotFound(err) {

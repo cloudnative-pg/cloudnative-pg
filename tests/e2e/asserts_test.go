@@ -2809,7 +2809,6 @@ func AssertPostgresNoPendingRestart(namespace, clusterName string, cmdTimeout ti
 		Eventually(func() (bool, error) {
 			noPendingRestart := true
 			for _, pod := range podList.Items {
-				pod := pod
 				stdout, _, err := env.ExecCommand(env.Ctx, pod, specs.PostgresContainerName, &cmdTimeout,
 					"psql", "-U", "postgres", "-tAc", "SELECT EXISTS(SELECT 1 FROM pg_settings WHERE pending_restart)")
 				if err != nil {

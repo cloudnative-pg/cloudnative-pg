@@ -1156,7 +1156,6 @@ func (r *ClusterReconciler) markPVCReadyForCompletedJobs(
 
 	for _, job := range completeJobs {
 		for _, pvc := range resources.pvcs.Items {
-			pvc := pvc
 			if !persistentvolumeclaim.IsUsedByPodSpec(job.Spec.Template.Spec, pvc.Name) {
 				continue
 			}
