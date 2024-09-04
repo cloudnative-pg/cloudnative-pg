@@ -142,6 +142,11 @@ func AssertSwitchoverWithHistory(
 		}, timeout).Should(BeTrue())
 	})
 
+	// After we finish the switchover, we should wait for the cluster to be ready
+	// otherwise, anyone executing this may not wait and also, the following part of the function
+	// may fail because the switchover hasn't properly finish yet.
+	AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReady], env)
+
 	if !isReplica {
 		By("confirming that the all postgres containers have *.history file after switchover", func() {
 			pods = []string{}
