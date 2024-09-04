@@ -23,7 +23,7 @@ linters:
     - dupl
     - durationcheck
     - errcheck
-    - exportloopref
+    - copyloopvar
     - gci
     - gocognit
     - goconst

@@ -3805,7 +3805,6 @@ func (cluster *Cluster) IsInplaceRestartPhase() bool {
 // otherwise return nil
 func (cluster *Cluster) GetTablespaceConfiguration(name string) *TablespaceConfiguration {
 	for _, tbsConfig := range cluster.Spec.Tablespaces {
-		tbsConfig := tbsConfig
 		if name == tbsConfig.Name {
 			return &tbsConfig
 		}
