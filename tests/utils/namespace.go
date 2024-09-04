@@ -90,7 +90,7 @@ func saveNamespaceLogs(
 	capLines int,
 ) {
 	scanner := bufio.NewScanner(buf)
-	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	scanner.Buffer(make([]byte, 0, 4096), 1024*1024)
 	filename := fmt.Sprintf("out/%s_ns-%s_%s.log", logsType, namespace, specName)
 	f, createErr := os.Create(filepath.Clean(filename))
 	if createErr != nil {
