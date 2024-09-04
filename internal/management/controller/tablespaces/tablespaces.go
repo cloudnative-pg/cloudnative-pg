@@ -43,7 +43,6 @@ func evaluateNextSteps(
 	// we go through all the tablespaces in spec and create them if missing in DB
 	// NOTE: we do not at the moment support Dropping tablespaces
 	for idx, tbsInSpec := range tablespaceInSpecSlice {
-		tbsInSpec := tbsInSpec
 		dbTablespace, isTbsInDB := tbsInDBNamed[tbsInSpec.Name]
 
 		switch {
