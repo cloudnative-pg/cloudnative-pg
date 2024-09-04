@@ -139,7 +139,6 @@ func (r *TablespaceReconciler) applySteps(
 	result := make([]apiv1.TablespaceState, len(actions))
 
 	for idx, step := range actions {
-		step := step
 		result[idx] = step.execute(ctx, tbsManager, tbsStorageManager)
 	}
 
