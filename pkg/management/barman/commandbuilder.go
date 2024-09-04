@@ -18,6 +18,7 @@ package barman
 
 import (
 	"fmt"
+	barmanTypes "github.com/cloudnative-pg/plugin-barman-cloud/pkg/types"
 
 	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	barmanCapabilities "github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/capabilities"
@@ -26,7 +27,7 @@ import (
 
 // CloudWalRestoreOptions returns the options needed to execute the barman command successfully
 func CloudWalRestoreOptions(
-	configuration *v1.BarmanObjectStoreConfiguration,
+	configuration *barmanTypes.BarmanObjectStoreConfiguration,
 	clusterName string,
 ) ([]string, error) {
 	var options []string
@@ -57,7 +58,7 @@ func CloudWalRestoreOptions(
 // in the Barman configuration object
 func AppendCloudProviderOptionsFromConfiguration(
 	options []string,
-	barmanConfiguration *v1.BarmanObjectStoreConfiguration,
+	barmanConfiguration *barmanTypes.BarmanObjectStoreConfiguration,
 ) ([]string, error) {
 	return appendCloudProviderOptions(options, barmanConfiguration.BarmanCredentials)
 }
@@ -72,7 +73,7 @@ func AppendCloudProviderOptionsFromBackup(
 }
 
 // appendCloudProviderOptions takes an options array and adds the cloud provider specified as arguments
-func appendCloudProviderOptions(options []string, credentials v1.BarmanCredentials) ([]string, error) {
+func appendCloudProviderOptions(options []string, credentials barmanTypes.BarmanCredentials) ([]string, error) {
 	capabilities, err := barmanCapabilities.CurrentCapabilities()
 	if err != nil {
 		return nil, err

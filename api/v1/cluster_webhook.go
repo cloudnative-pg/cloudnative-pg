@@ -2156,17 +2156,17 @@ func (r *Cluster) validateBackupConfiguration() field.ErrorList {
 	credentialsCount := 0
 	if r.Spec.Backup.BarmanObjectStore.BarmanCredentials.Azure != nil {
 		credentialsCount++
-		allErrors = r.Spec.Backup.BarmanObjectStore.BarmanCredentials.Azure.validateAzureCredentials(
+		allErrors = r.Spec.Backup.BarmanObjectStore.BarmanCredentials.Azure.ValidateAzureCredentials(
 			field.NewPath("spec", "backupConfiguration", "azureCredentials"))
 	}
 	if r.Spec.Backup.BarmanObjectStore.BarmanCredentials.AWS != nil {
 		credentialsCount++
-		allErrors = r.Spec.Backup.BarmanObjectStore.BarmanCredentials.AWS.validateAwsCredentials(
+		allErrors = r.Spec.Backup.BarmanObjectStore.BarmanCredentials.AWS.ValidateAwsCredentials(
 			field.NewPath("spec", "backupConfiguration", "s3Credentials"))
 	}
 	if r.Spec.Backup.BarmanObjectStore.BarmanCredentials.Google != nil {
 		credentialsCount++
-		allErrors = r.Spec.Backup.BarmanObjectStore.BarmanCredentials.Google.validateGCSCredentials(
+		allErrors = r.Spec.Backup.BarmanObjectStore.BarmanCredentials.Google.ValidateGCSCredentials(
 			field.NewPath("spec", "backupConfiguration", "googleCredentials"))
 	}
 	if credentialsCount == 0 {
@@ -2307,116 +2307,6 @@ func (r *Cluster) validateWALLevelChange(old *Cluster) field.ErrorList {
 	}
 
 	return errs
-}
-
-// validateAzureCredentials checks and validates the azure credentials
-func (azure *AzureCredentials) validateAzureCredentials(path *field.Path) field.ErrorList {
-	allErrors := field.ErrorList{}
-
-	secrets := 0
-	if azure.InheritFromAzureAD {
-		secrets++
-	}
-	if azure.StorageKey != nil {
-		secrets++
-	}
-	if azure.StorageSasToken != nil {
-		secrets++
-	}
-
-	if secrets != 1 && azure.ConnectionString == nil {
-		allErrors = append(
-			allErrors,
-			field.Invalid(
-				path,
-				azure,
-				"when connection string is not specified, one and only one of "+
-					"storage key and storage SAS token is allowed"))
-	}
-
-	if secrets != 0 && azure.ConnectionString != nil {
-		allErrors = append(
-			allErrors,
-			field.Invalid(
-				path,
-				azure,
-				"when connection string is specified, the other parameters "+
-					"must be empty"))
-	}
-
-	return allErrors
-}
-
-func (s3 *S3Credentials) validateAwsCredentials(path *field.Path) field.ErrorList {
-	allErrors := field.ErrorList{}
-	credentials := 0
-
-	if s3.InheritFromIAMRole {
-		credentials++
-	}
-	if s3.AccessKeyIDReference != nil && s3.SecretAccessKeyReference != nil {
-		credentials++
-	} else if s3.AccessKeyIDReference != nil || s3.SecretAccessKeyReference != nil {
-		credentials++
-		allErrors = append(
-			allErrors,
-			field.Invalid(
-				path,
-				s3,
-				"when using AWS credentials both accessKeyId and secretAccessKey must be provided",
-			),
-		)
-	}
-
-	if credentials == 0 {
-		allErrors = append(
-			allErrors,
-			field.Invalid(
-				path,
-				s3,
-				"at least one AWS authentication method should be supplied",
-			),
-		)
-	}
-
-	if credentials > 1 {
-		allErrors = append(
-			allErrors,
-			field.Invalid(
-				path,
-				s3,
-				"only one AWS authentication method should be supplied",
-			),
-		)
-	}
-
-	return allErrors
-}
-
-func (gcs *GoogleCredentials) validateGCSCredentials(path *field.Path) field.ErrorList {
-	allErrors := field.ErrorList{}
-
-	if !gcs.GKEEnvironment && gcs.ApplicationCredentials == nil {
-		allErrors = append(
-			allErrors,
-			field.Invalid(
-				path,
-				gcs,
-				"if gkeEnvironment is false, secret with credentials must be provided",
-			))
-	}
-
-	if gcs.GKEEnvironment && gcs.ApplicationCredentials != nil {
-		allErrors = append(
-			allErrors,
-			field.Invalid(
-				path,
-				gcs,
-				"if gkeEnvironment is true, secret with credentials must not be provided",
-			))
-	}
-
-	return allErrors
 }
 
 func (r *Cluster) validateManagedServices() field.ErrorList {

@@ -26,6 +26,7 @@ import (
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/stringset"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	barmanTypes "github.com/cloudnative-pg/plugin-barman-cloud/pkg/types"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -348,7 +349,7 @@ var _ = Describe("external cluster list", func() {
 					ConnectionParameters: map[string]string{
 						"dbname": "test",
 					},
-					BarmanObjectStore: &BarmanObjectStoreConfiguration{
+					BarmanObjectStore: &barmanTypes.BarmanObjectStoreConfiguration{
 						ServerName: "testServerRealName",
 					},
 				},
@@ -692,9 +693,9 @@ var _ = Describe("A secret resource version", func() {
 			},
 			Spec: ClusterSpec{
 				Backup: &BackupConfiguration{
-					BarmanObjectStore: &BarmanObjectStoreConfiguration{
-						EndpointCA: &SecretKeySelector{
-							LocalObjectReference: LocalObjectReference{
+					BarmanObjectStore: &barmanTypes.BarmanObjectStoreConfiguration{
+						EndpointCA: &barmanTypes.SecretKeySelector{
+							LocalObjectReference: barmanTypes.LocalObjectReference{
 								Name: "barman-endpoint-ca-secret",
 							},
 							Key: "ca.crt",
@@ -864,10 +865,10 @@ var _ = Describe("Barman Endpoint CA for replica cluster", func() {
 					ConnectionParameters: map[string]string{
 						"dbname": "test",
 					},
-					BarmanObjectStore: &BarmanObjectStoreConfiguration{
+					BarmanObjectStore: &barmanTypes.BarmanObjectStoreConfiguration{
 						ServerName: "testServerRealName",
-						EndpointCA: &SecretKeySelector{
-							LocalObjectReference: LocalObjectReference{
+						EndpointCA: &barmanTypes.SecretKeySelector{
+							LocalObjectReference: barmanTypes.LocalObjectReference{
 								Name: "barman-endpoint-ca-secret",
 							},
 							Key: "ca.crt",
@@ -931,18 +932,6 @@ var _ = Describe("Fencing annotation", func() {
 		It("ensure no instances are fenced", func() {
 			Expect(cluster.IsInstanceFenced("one")).To(BeFalse())
 		})
-	})
-})
-
-var _ = Describe("Barman credentials", func() {
-	It("can check when they are empty", func() {
-		Expect(BarmanCredentials{}.ArePopulated()).To(BeFalse())
-	})
-
-	It("can check when they are not empty", func() {
-		Expect(BarmanCredentials{
-			Azure: &AzureCredentials{},
-		}.ArePopulated()).To(BeTrue())
 	})
 })
 
@@ -1354,87 +1343,6 @@ var _ = Describe("ShouldPromoteFromReplicaCluster", func() {
 			},
 		}
 		Expect(cluster.ShouldPromoteFromReplicaCluster()).To(BeTrue())
-	})
-})
-
-var _ = Describe("DataBackupConfiguration.AppendAdditionalCommandArgs", func() {
-	var options []string
-	var config DataBackupConfiguration
-	BeforeEach(func() {
-		options = []string{"--option1", "--option2"}
-		config = DataBackupConfiguration{
-			AdditionalCommandArgs: []string{"--option3", "--option4"},
-		}
-	})
-
-	It("should append additional command args to the options", func() {
-		updatedOptions := config.AppendAdditionalCommandArgs(options)
-		Expect(updatedOptions).To(Equal([]string{"--option1", "--option2", "--option3", "--option4"}))
-	})
-
-	It("should return the original options if there are no additional command args", func() {
-		config.AdditionalCommandArgs = nil
-		updatedOptions := config.AppendAdditionalCommandArgs(options)
-		Expect(updatedOptions).To(Equal(options))
-	})
-})
-
-var _ = Describe("WalBackupConfiguration.AppendAdditionalCommandArgs", func() {
-	var options []string
-	var config DataBackupConfiguration
-	BeforeEach(func() {
-		options = []string{"--option1", "--option2"}
-		config = DataBackupConfiguration{
-			AdditionalCommandArgs: []string{"--option3", "--option4"},
-		}
-	})
-
-	It("should append additional command args to the options", func() {
-		updatedOptions := config.AppendAdditionalCommandArgs(options)
-		Expect(updatedOptions).To(Equal([]string{"--option1", "--option2", "--option3", "--option4"}))
-	})
-
-	It("should return the original options if there are no additional command args", func() {
-		config.AdditionalCommandArgs = nil
-		updatedOptions := config.AppendAdditionalCommandArgs(options)
-		Expect(updatedOptions).To(Equal(options))
-	})
-})
-
-var _ = Describe("appendAdditionalCommandArgs", func() {
-	It("should append additional command args to the options", func() {
-		options := []string{"--option1", "--option2"}
-		additionalCommandArgs := []string{"--option3", "--option4"}
-
-		updatedOptions := appendAdditionalCommandArgs(additionalCommandArgs, options)
-		Expect(updatedOptions).To(Equal([]string{"--option1", "--option2", "--option3", "--option4"}))
-	})
-
-	It("should add key value pairs correctly", func() {
-		options := []string{"--option1", "--option2"}
-		additionalCommandArgs := []string{"--option3", "--option4=value", "--option5=value2"}
-
-		updatedOptions := appendAdditionalCommandArgs(additionalCommandArgs, options)
-		Expect(updatedOptions).To(Equal([]string{
-			"--option1", "--option2", "--option3",
-			"--option4=value", "--option5=value2",
-		}))
-	})
-
-	It("should not duplicate existing values", func() {
-		options := []string{"--option1", "--option2"}
-		additionalCommandArgs := []string{"--option2", "--option1"}
-
-		updatedOptions := appendAdditionalCommandArgs(additionalCommandArgs, options)
-		Expect(updatedOptions).To(Equal([]string{"--option1", "--option2"}))
-	})
-
-	It("should not overwrite existing key value pairs", func() {
-		options := []string{"--option1=abc", "--option2"}
-		additionalCommandArgs := []string{"--option2", "--option1=def"}
-
-		updatedOptions := appendAdditionalCommandArgs(additionalCommandArgs, options)
-		Expect(updatedOptions).To(Equal([]string{"--option1=abc", "--option2"}))
 	})
 })
 

@@ -21,6 +21,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	barmanTypes "github.com/cloudnative-pg/plugin-barman-cloud/pkg/types"
 	"math"
 	"os"
 	"path"
@@ -353,7 +354,7 @@ func barmanCloudWalArchiveOptions(
 
 	var options []string
 	if configuration.Wal != nil {
-		if configuration.Wal.Compression == apiv1.CompressionTypeSnappy && !capabilities.HasSnappy {
+		if configuration.Wal.Compression == barmanTypes.CompressionTypeSnappy && !capabilities.HasSnappy {
 			return nil, fmt.Errorf("snappy compression is not supported in Barman %v", capabilities.Version)
 		}
 		if len(configuration.Wal.Compression) != 0 {

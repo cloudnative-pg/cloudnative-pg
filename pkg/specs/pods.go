@@ -21,6 +21,7 @@ package specs
 import (
 	"encoding/json"
 	"fmt"
+	barmanTypes "github.com/cloudnative-pg/plugin-barman-cloud/pkg/types"
 	"math"
 	"reflect"
 	"slices"
@@ -459,7 +460,7 @@ func GetInstanceName(clusterName string, nodeSerial int) string {
 func AddBarmanEndpointCAToPodSpec(
 	podSpec *corev1.PodSpec,
 	caSecret *apiv1.SecretKeySelector,
-	credentials apiv1.BarmanCredentials,
+	credentials barmanTypes.BarmanCredentials,
 ) {
 	if caSecret == nil || caSecret.Name == "" || caSecret.Key == "" {
 		return

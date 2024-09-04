@@ -17,6 +17,7 @@ limitations under the License.
 package barman
 
 import (
+	barmanTypes "github.com/cloudnative-pg/plugin-barman-cloud/pkg/types"
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,7 +37,7 @@ var _ = Describe("barmanCloudWalRestoreOptions", func() {
 			ObjectMeta: metav1.ObjectMeta{Name: "test-cluster", Namespace: namespace},
 			Spec: apiv1.ClusterSpec{
 				Backup: &apiv1.BackupConfiguration{
-					BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{
+					BarmanObjectStore: &barmanTypes.BarmanObjectStoreConfiguration{
 						DestinationPath: "s3://bucket-name/",
 					},
 				},
@@ -56,7 +57,7 @@ var _ = Describe("barmanCloudWalRestoreOptions", func() {
 
 	It("should generate correct arguments", func() {
 		extraOptions := []string{"--read-timeout=60", "-vv"}
-		cluster.Spec.Backup.BarmanObjectStore.Wal = &apiv1.WalBackupConfiguration{
+		cluster.Spec.Backup.BarmanObjectStore.Wal = &barmanTypes.WalBackupConfiguration{
 			RestoreAdditionalCommandArgs: extraOptions,
 		}
 		options, err := CloudWalRestoreOptions(cluster.Spec.Backup.BarmanObjectStore, "test-cluster")

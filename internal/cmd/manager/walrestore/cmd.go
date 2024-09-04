@@ -21,6 +21,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	barmanTypes "github.com/cloudnative-pg/plugin-barman-cloud/pkg/types"
 	"os"
 	"path"
 	"strings"
@@ -314,7 +315,7 @@ func GetRecoverConfiguration(
 ) (
 	string,
 	[]string,
-	*apiv1.BarmanObjectStoreConfiguration,
+	*barmanTypes.BarmanObjectStoreConfiguration,
 	error,
 ) {
 	var env []string

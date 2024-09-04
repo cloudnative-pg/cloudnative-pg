@@ -341,74 +341,6 @@ by the operator if EnablePodAntiAffinity is set to true (default) or to be used 
 </tbody>
 </table>
 
-## AzureCredentials     {#postgresql-cnpg-io-v1-AzureCredentials}
-
-
-**Appears in:**
-
-- [BarmanCredentials](#postgresql-cnpg-io-v1-BarmanCredentials)
-
-
-<p>AzureCredentials is the type for the credentials to be used to upload
-files to Azure Blob Storage. The connection string contains every needed
-information. If the connection string is not specified, we'll need the
-storage account name and also one (and only one) of:</p>
-<ul>
-<li>
-<p>storageKey</p>
-</li>
-<li>
-<p>storageSasToken</p>
-</li>
-<li>
-<p>inheriting the credentials from the pod environment by setting inheritFromAzureAD to true</p>
-</li>
-</ul>
-
-
-<table class="table">
-<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
-<tbody>
-<tr><td><code>connectionString</code><br/>
-<a href="#postgresql-cnpg-io-v1-SecretKeySelector"><i>SecretKeySelector</i></a>
-</td>
-<td>
-   <p>The connection string to be used</p>
-</td>
-</tr>
-<tr><td><code>storageAccount</code><br/>
-<a href="#postgresql-cnpg-io-v1-SecretKeySelector"><i>SecretKeySelector</i></a>
-</td>
-<td>
-   <p>The storage account where to upload data</p>
-</td>
-</tr>
-<tr><td><code>storageKey</code><br/>
-<a href="#postgresql-cnpg-io-v1-SecretKeySelector"><i>SecretKeySelector</i></a>
-</td>
-<td>
-   <p>The storage account key to be used in conjunction
-with the storage account name</p>
-</td>
-</tr>
-<tr><td><code>storageSasToken</code><br/>
-<a href="#postgresql-cnpg-io-v1-SecretKeySelector"><i>SecretKeySelector</i></a>
-</td>
-<td>
-   <p>A shared-access-signature to be used in conjunction with
-the storage account name</p>
-</td>
-</tr>
-<tr><td><code>inheritFromAzureAD</code><br/>
-<i>bool</i>
-</td>
-<td>
-   <p>Use the Azure AD based authentication without providing explicitly the keys.</p>
-</td>
-</tr>
-</tbody>
-</table>
-
 ## BackupConfiguration     {#postgresql-cnpg-io-v1-BackupConfiguration}
 
 
@@ -434,7 +366,7 @@ documentation</p>
 </td>
 </tr>
 <tr><td><code>barmanObjectStore</code><br/>
-<a href="#postgresql-cnpg-io-v1-BarmanObjectStoreConfiguration"><i>BarmanObjectStoreConfiguration</i></a>
+<i>github.com/cloudnative-pg/plugin-barman-cloud/pkg/types.BarmanObjectStoreConfiguration</i>
 </td>
 <td>
    <p>The configuration for the barman-cloud tool suite</p>
@@ -711,7 +643,7 @@ Overrides the default settings specified in the cluster '.backup.volumeSnapshot.
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
 <tr><td><code>BarmanCredentials</code><br/>
-<a href="#postgresql-cnpg-io-v1-BarmanCredentials"><i>BarmanCredentials</i></a>
+<i>github.com/cloudnative-pg/plugin-barman-cloud/pkg/types.BarmanCredentials</i>
 </td>
 <td>(Members of <code>BarmanCredentials</code> are embedded into this type.)
    <p>The potential credentials for each cloud provider</p>
@@ -904,142 +836,6 @@ parameter is omitted</p>
 
 
 
-
-## BarmanCredentials     {#postgresql-cnpg-io-v1-BarmanCredentials}
-
-
-**Appears in:**
-
-- [BackupStatus](#postgresql-cnpg-io-v1-BackupStatus)
-
-- [BarmanObjectStoreConfiguration](#postgresql-cnpg-io-v1-BarmanObjectStoreConfiguration)
-
-
-<p>BarmanCredentials an object containing the potential credentials for each cloud provider</p>
-
-
-<table class="table">
-<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
-<tbody>
-<tr><td><code>googleCredentials</code><br/>
-<a href="#postgresql-cnpg-io-v1-GoogleCredentials"><i>GoogleCredentials</i></a>
-</td>
-<td>
-   <p>The credentials to use to upload data to Google Cloud Storage</p>
-</td>
-</tr>
-<tr><td><code>s3Credentials</code><br/>
-<a href="#postgresql-cnpg-io-v1-S3Credentials"><i>S3Credentials</i></a>
-</td>
-<td>
-   <p>The credentials to use to upload data to S3</p>
-</td>
-</tr>
-<tr><td><code>azureCredentials</code><br/>
-<a href="#postgresql-cnpg-io-v1-AzureCredentials"><i>AzureCredentials</i></a>
-</td>
-<td>
-   <p>The credentials to use to upload data to Azure Blob Storage</p>
-</td>
-</tr>
-</tbody>
-</table>
-
-## BarmanObjectStoreConfiguration     {#postgresql-cnpg-io-v1-BarmanObjectStoreConfiguration}
-
-
-**Appears in:**
-
-- [BackupConfiguration](#postgresql-cnpg-io-v1-BackupConfiguration)
-
-- [ExternalCluster](#postgresql-cnpg-io-v1-ExternalCluster)
-
-
-<p>BarmanObjectStoreConfiguration contains the backup configuration
-using Barman against an S3-compatible object storage</p>
-
-
-<table class="table">
-<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
-<tbody>
-<tr><td><code>BarmanCredentials</code><br/>
-<a href="#postgresql-cnpg-io-v1-BarmanCredentials"><i>BarmanCredentials</i></a>
-</td>
-<td>(Members of <code>BarmanCredentials</code> are embedded into this type.)
-   <p>The potential credentials for each cloud provider</p>
-</td>
-</tr>
-<tr><td><code>endpointURL</code><br/>
-<i>string</i>
-</td>
-<td>
-   <p>Endpoint to be used to upload data to the cloud,
-overriding the automatic endpoint discovery</p>
-</td>
-</tr>
-<tr><td><code>endpointCA</code><br/>
-<a href="#postgresql-cnpg-io-v1-SecretKeySelector"><i>SecretKeySelector</i></a>
-</td>
-<td>
-   <p>EndpointCA store the CA bundle of the barman endpoint.
-Useful when using self-signed certificates to avoid
-errors with certificate issuer and barman-cloud-wal-archive</p>
-</td>
-</tr>
-<tr><td><code>destinationPath</code> <B>[Required]</B><br/>
-<i>string</i>
-</td>
-<td>
-   <p>The path where to store the backup (i.e. s3://bucket/path/to/folder)
-this path, with different destination folders, will be used for WALs
-and for data</p>
-</td>
-</tr>
-<tr><td><code>serverName</code><br/>
-<i>string</i>
-</td>
-<td>
-   <p>The server name on S3, the cluster name is used if this
-parameter is omitted</p>
-</td>
-</tr>
-<tr><td><code>wal</code><br/>
-<a href="#postgresql-cnpg-io-v1-WalBackupConfiguration"><i>WalBackupConfiguration</i></a>
-</td>
-<td>
-   <p>The configuration for the backup of the WAL stream.
-When not defined, WAL files will be stored uncompressed and may be
-unencrypted in the object store, according to the bucket default policy.</p>
-</td>
-</tr>
-<tr><td><code>data</code><br/>
-<a href="#postgresql-cnpg-io-v1-DataBackupConfiguration"><i>DataBackupConfiguration</i></a>
-</td>
-<td>
-   <p>The configuration to be used to backup the data files
-When not defined, base backups files will be stored uncompressed and may
-be unencrypted in the object store, according to the bucket default
-policy.</p>
-</td>
-</tr>
-<tr><td><code>tags</code><br/>
-<i>map[string]string</i>
-</td>
-<td>
-   <p>Tags is a list of key value pairs that will be passed to the
-Barman --tags option.</p>
-</td>
-</tr>
-<tr><td><code>historyTags</code><br/>
-<i>map[string]string</i>
-</td>
-<td>
-   <p>HistoryTags is a list of key value pairs that will be passed to the
-Barman --history-tags option.</p>
-</td>
-</tr>
-</tbody>
-</table>
 
 ## BootstrapConfiguration     {#postgresql-cnpg-io-v1-BootstrapConfiguration}
 
@@ -2331,22 +2127,6 @@ WAL file, and Time of latest checkpoint</p>
 </tbody>
 </table>
 
-## CompressionType     {#postgresql-cnpg-io-v1-CompressionType}
-
-(Alias of `string`)
-
-**Appears in:**
-
-- [DataBackupConfiguration](#postgresql-cnpg-io-v1-DataBackupConfiguration)
-
-- [WalBackupConfiguration](#postgresql-cnpg-io-v1-WalBackupConfiguration)
-
-
-<p>CompressionType encapsulates the available types of compression</p>
-
-
-
-
 ## ConfigMapKeySelector     {#postgresql-cnpg-io-v1-ConfigMapKeySelector}
 
 
@@ -2402,80 +2182,6 @@ managed by the operator</p>
 <td>
    <p>A map with the versions of all the config maps used to pass metrics.
 Map keys are the config map names, map values are the versions</p>
-</td>
-</tr>
-</tbody>
-</table>
-
-## DataBackupConfiguration     {#postgresql-cnpg-io-v1-DataBackupConfiguration}
-
-
-**Appears in:**
-
-- [BarmanObjectStoreConfiguration](#postgresql-cnpg-io-v1-BarmanObjectStoreConfiguration)
-
-
-<p>DataBackupConfiguration is the configuration of the backup of
-the data directory</p>
-
-
-<table class="table">
-<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
-<tbody>
-<tr><td><code>compression</code><br/>
-<a href="#postgresql-cnpg-io-v1-CompressionType"><i>CompressionType</i></a>
-</td>
-<td>
-   <p>Compress a backup file (a tar file per tablespace) while streaming it
-to the object store. Available options are empty string (no
-compression, default), <code>gzip</code>, <code>bzip2</code> or <code>snappy</code>.</p>
-</td>
-</tr>
-<tr><td><code>encryption</code><br/>
-<a href="#postgresql-cnpg-io-v1-EncryptionType"><i>EncryptionType</i></a>
-</td>
-<td>
-   <p>Whenever to force the encryption of files (if the bucket is
-not already configured for that).
-Allowed options are empty string (use the bucket policy, default),
-<code>AES256</code> and <code>aws:kms</code></p>
-</td>
-</tr>
-<tr><td><code>jobs</code><br/>
-<i>int32</i>
-</td>
-<td>
-   <p>The number of parallel jobs to be used to upload the backup, defaults
-to 2</p>
-</td>
-</tr>
-<tr><td><code>immediateCheckpoint</code><br/>
-<i>bool</i>
-</td>
-<td>
-   <p>Control whether the I/O workload for the backup initial checkpoint will
-be limited, according to the <code>checkpoint_completion_target</code> setting on
-the PostgreSQL server. If set to true, an immediate checkpoint will be
-used, meaning PostgreSQL will complete the checkpoint as soon as
-possible. <code>false</code> by default.</p>
-</td>
-</tr>
-<tr><td><code>additionalCommandArgs</code> <B>[Required]</B><br/>
-<i>[]string</i>
-</td>
-<td>
-   <p>AdditionalCommandArgs represents additional arguments that can be appended
-to the 'barman-cloud-backup' command-line invocation. These arguments
-provide flexibility to customize the backup process further according to
-specific requirements or configurations.</p>
-<p>Example:
-In a scenario where specialized backup options are required, such as setting
-a specific timeout or defining custom behavior, users can use this field
-to specify additional command arguments.</p>
-<p>Note:
-It's essential to ensure that the provided arguments are valid and supported
-by the 'barman-cloud-backup' command, to avoid potential errors or unintended
-behavior during execution.</p>
 </td>
 </tr>
 </tbody>
@@ -2742,22 +2448,6 @@ desired state that was synchronized</p>
 </tbody>
 </table>
 
-## EncryptionType     {#postgresql-cnpg-io-v1-EncryptionType}
-
-(Alias of `string`)
-
-**Appears in:**
-
-- [DataBackupConfiguration](#postgresql-cnpg-io-v1-DataBackupConfiguration)
-
-- [WalBackupConfiguration](#postgresql-cnpg-io-v1-WalBackupConfiguration)
-
-
-<p>EncryptionType encapsulated the available types of encryption</p>
-
-
-
-
 ## EnsureOption     {#postgresql-cnpg-io-v1-EnsureOption}
 
 (Alias of `string`)
@@ -2872,43 +2562,10 @@ secure and efficient password management for external clusters.</p>
 </td>
 </tr>
 <tr><td><code>barmanObjectStore</code><br/>
-<a href="#postgresql-cnpg-io-v1-BarmanObjectStoreConfiguration"><i>BarmanObjectStoreConfiguration</i></a>
+<i>github.com/cloudnative-pg/plugin-barman-cloud/pkg/types.BarmanObjectStoreConfiguration</i>
 </td>
 <td>
    <p>The configuration for the barman-cloud tool suite</p>
-</td>
-</tr>
-</tbody>
-</table>
-
-## GoogleCredentials     {#postgresql-cnpg-io-v1-GoogleCredentials}
-
-
-**Appears in:**
-
-- [BarmanCredentials](#postgresql-cnpg-io-v1-BarmanCredentials)
-
-
-<p>GoogleCredentials is the type for the Google Cloud Storage credentials.
-This needs to be specified even if we run inside a GKE environment.</p>
-
-
-<table class="table">
-<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
-<tbody>
-<tr><td><code>applicationCredentials</code><br/>
-<a href="#postgresql-cnpg-io-v1-SecretKeySelector"><i>SecretKeySelector</i></a>
-</td>
-<td>
-   <p>The secret containing the Google Cloud Storage JSON file with the credentials</p>
-</td>
-</tr>
-<tr><td><code>gkeEnvironment</code><br/>
-<i>bool</i>
-</td>
-<td>
-   <p>If set to true, will presume that it's running inside a GKE environment,
-default to false.</p>
 </td>
 </tr>
 </tbody>
@@ -4688,67 +4345,6 @@ Default is <code>false</code>.</p>
 </tbody>
 </table>
 
-## S3Credentials     {#postgresql-cnpg-io-v1-S3Credentials}
-
-
-**Appears in:**
-
-- [BarmanCredentials](#postgresql-cnpg-io-v1-BarmanCredentials)
-
-
-<p>S3Credentials is the type for the credentials to be used to upload
-files to S3. It can be provided in two alternative ways:</p>
-<ul>
-<li>
-<p>explicitly passing accessKeyId and secretAccessKey</p>
-</li>
-<li>
-<p>inheriting the role from the pod environment by setting inheritFromIAMRole to true</p>
-</li>
-</ul>
-
-
-<table class="table">
-<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
-<tbody>
-<tr><td><code>accessKeyId</code><br/>
-<a href="#postgresql-cnpg-io-v1-SecretKeySelector"><i>SecretKeySelector</i></a>
-</td>
-<td>
-   <p>The reference to the access key id</p>
-</td>
-</tr>
-<tr><td><code>secretAccessKey</code><br/>
-<a href="#postgresql-cnpg-io-v1-SecretKeySelector"><i>SecretKeySelector</i></a>
-</td>
-<td>
-   <p>The reference to the secret access key</p>
-</td>
-</tr>
-<tr><td><code>region</code><br/>
-<a href="#postgresql-cnpg-io-v1-SecretKeySelector"><i>SecretKeySelector</i></a>
-</td>
-<td>
-   <p>The reference to the secret containing the region name</p>
-</td>
-</tr>
-<tr><td><code>sessionToken</code><br/>
-<a href="#postgresql-cnpg-io-v1-SecretKeySelector"><i>SecretKeySelector</i></a>
-</td>
-<td>
-   <p>The references to the session key</p>
-</td>
-</tr>
-<tr><td><code>inheritFromIAMRole</code><br/>
-<i>bool</i>
-</td>
-<td>
-   <p>Use the role based authentication without providing explicitly the keys.</p>
-</td>
-</tr>
-</tbody>
-</table>
-
 ## SQLRefs     {#postgresql-cnpg-io-v1-SQLRefs}
 
 
@@ -4930,19 +4526,11 @@ Overrides the default settings specified in the cluster '.backup.volumeSnapshot.
 
 **Appears in:**
 
-- [AzureCredentials](#postgresql-cnpg-io-v1-AzureCredentials)
-
 - [BackupSource](#postgresql-cnpg-io-v1-BackupSource)
 
 - [BackupStatus](#postgresql-cnpg-io-v1-BackupStatus)
 
-- [BarmanObjectStoreConfiguration](#postgresql-cnpg-io-v1-BarmanObjectStoreConfiguration)
-
-- [GoogleCredentials](#postgresql-cnpg-io-v1-GoogleCredentials)
-
 - [MonitoringConfiguration](#postgresql-cnpg-io-v1-MonitoringConfiguration)
-
-- [S3Credentials](#postgresql-cnpg-io-v1-S3Credentials)
 
 - [SQLRefs](#postgresql-cnpg-io-v1-SQLRefs)
 
@@ -5671,88 +5259,6 @@ online/hot (<code>true</code>, default) or offline/cold (<code>false</code>)</p>
 </td>
 <td>
    <p>Configuration parameters to control the online/hot backup with volume snapshots</p>
-</td>
-</tr>
-</tbody>
-</table>
-
-## WalBackupConfiguration     {#postgresql-cnpg-io-v1-WalBackupConfiguration}
-
-
-**Appears in:**
-
-- [BarmanObjectStoreConfiguration](#postgresql-cnpg-io-v1-BarmanObjectStoreConfiguration)
-
-
-<p>WalBackupConfiguration is the configuration of the backup of the
-WAL stream</p>
-
-
-<table class="table">
-<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
-<tbody>
-<tr><td><code>compression</code><br/>
-<a href="#postgresql-cnpg-io-v1-CompressionType"><i>CompressionType</i></a>
-</td>
-<td>
-   <p>Compress a WAL file before sending it to the object store. Available
-options are empty string (no compression, default), <code>gzip</code>, <code>bzip2</code> or <code>snappy</code>.</p>
-</td>
-</tr>
-<tr><td><code>encryption</code><br/>
-<a href="#postgresql-cnpg-io-v1-EncryptionType"><i>EncryptionType</i></a>
-</td>
-<td>
-   <p>Whenever to force the encryption of files (if the bucket is
-not already configured for that).
-Allowed options are empty string (use the bucket policy, default),
-<code>AES256</code> and <code>aws:kms</code></p>
-</td>
-</tr>
-<tr><td><code>maxParallel</code><br/>
-<i>int</i>
-</td>
-<td>
-   <p>Number of WAL files to be either archived in parallel (when the
-PostgreSQL instance is archiving to a backup object store) or
-restored in parallel (when a PostgreSQL standby is fetching WAL
-files from a recovery object store). If not specified, WAL files
-will be processed one at a time. It accepts a positive integer as a
-value - with 1 being the minimum accepted value.</p>
-</td>
-</tr>
-<tr><td><code>archiveAdditionalCommandArgs</code> <B>[Required]</B><br/>
-<i>[]string</i>
-</td>
-<td>
-   <p>Additional arguments that can be appended to the 'barman-cloud-wal-archive'
-command-line invocation. These arguments provide flexibility to customize
-the WAL archive process further, according to specific requirements or configurations.</p>
-<p>Example:
-In a scenario where specialized backup options are required, such as setting
-a specific timeout or defining custom behavior, users can use this field
-to specify additional command arguments.</p>
-<p>Note:
-It's essential to ensure that the provided arguments are valid and supported
-by the 'barman-cloud-wal-archive' command, to avoid potential errors or unintended
-behavior during execution.</p>
-</td>
-</tr>
-<tr><td><code>restoreAdditionalCommandArgs</code> <B>[Required]</B><br/>
-<i>[]string</i>
-</td>
-<td>
-   <p>Additional arguments that can be appended to the 'barman-cloud-wal-restore'
-command-line invocation. These arguments provide flexibility to customize
-the WAL restore process further, according to specific requirements or configurations.</p>
-<p>Example:
-In a scenario where specialized backup options are required, such as setting
-a specific timeout or defining custom behavior, users can use this field
-to specify additional command arguments.</p>
-<p>Note:
-It's essential to ensure that the provided arguments are valid and supported
-by the 'barman-cloud-wal-restore' command, to avoid potential errors or unintended
-behavior during execution.</p>
 </td>
 </tr>
 </tbody>

@@ -18,6 +18,7 @@ package specs
 
 import (
 	"fmt"
+	barmanTypes "github.com/cloudnative-pg/plugin-barman-cloud/pkg/types"
 
 	"github.com/kballard/go-shellquote"
 	batchv1 "k8s.io/api/batch/v1"
@@ -203,7 +204,7 @@ func CreatePrimaryJobViaRecovery(cluster apiv1.Cluster, nodeSerial int, backup *
 }
 
 func addBarmanEndpointCAToJobFromCluster(cluster apiv1.Cluster, backup *apiv1.Backup, job *batchv1.Job) {
-	var credentials apiv1.BarmanCredentials
+	var credentials barmanTypes.BarmanCredentials
 	var endpointCA *apiv1.SecretKeySelector
 	switch {
 	case cluster.Spec.Bootstrap.Recovery.Backup != nil && cluster.Spec.Bootstrap.Recovery.Backup.EndpointCA != nil:
@@ -216,7 +217,7 @@ func addBarmanEndpointCAToJobFromCluster(cluster apiv1.Cluster, backup *apiv1.Ba
 	case cluster.Spec.Bootstrap.Recovery.Source != "":
 		externalCluster, ok := cluster.ExternalCluster(cluster.Spec.Bootstrap.Recovery.Source)
 		if ok && externalCluster.BarmanObjectStore != nil && externalCluster.BarmanObjectStore.EndpointCA != nil {
-			endpointCA = externalCluster.BarmanObjectStore.EndpointCA
+			endpointCA = apiv1.ToSecretKeySelectors(externalCluster.BarmanObjectStore.EndpointCA)
 			credentials = externalCluster.BarmanObjectStore.BarmanCredentials
 		}
 	}

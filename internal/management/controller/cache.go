@@ -26,8 +26,8 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/walrestore"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/cache"
-	barmanCredentials "github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/credentials"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	barmanCredentials "github.com/cloudnative-pg/plugin-barman-cloud/pkg/credentials"
 )
 
 // updateCacheFromCluster will update the internal cache with the cluster

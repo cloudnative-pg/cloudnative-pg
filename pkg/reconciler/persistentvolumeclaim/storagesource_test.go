@@ -18,6 +18,7 @@ package persistentvolumeclaim
 
 import (
 	"context"
+	barmanTypes "github.com/cloudnative-pg/plugin-barman-cloud/pkg/types"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -74,7 +75,7 @@ var _ = Describe("Storage source", func() {
 				},
 			},
 			Backup: &apiv1.BackupConfiguration{
-				BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{
+				BarmanObjectStore: &barmanTypes.BarmanObjectStoreConfiguration{
 					DestinationPath: "s3://test",
 				},
 			},
@@ -86,7 +87,7 @@ var _ = Describe("Storage source", func() {
 			StorageConfiguration: apiv1.StorageConfiguration{},
 			WalStorage:           &apiv1.StorageConfiguration{},
 			Backup: &apiv1.BackupConfiguration{
-				BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{
+				BarmanObjectStore: &barmanTypes.BarmanObjectStoreConfiguration{
 					DestinationPath: "s3://test",
 				},
 			},

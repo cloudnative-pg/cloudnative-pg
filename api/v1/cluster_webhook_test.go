@@ -20,6 +20,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	barmanTypes "github.com/cloudnative-pg/plugin-barman-cloud/pkg/types"
 	"strings"
 	"time"
 
@@ -80,114 +81,6 @@ var _ = Describe("bootstrap methods validation", func() {
 		}
 		result := invalidCluster.validateBootstrapMethod()
 		Expect(result).To(HaveLen(1))
-	})
-})
-
-var _ = Describe("azure credentials", func() {
-	path := field.NewPath("spec", "backupConfiguration", "azureCredentials")
-
-	It("contain only one of storage account key and SAS token", func() {
-		azureCredentials := AzureCredentials{
-			StorageAccount: &SecretKeySelector{
-				LocalObjectReference: LocalObjectReference{
-					Name: "azure-config",
-				},
-				Key: "storageAccount",
-			},
-			StorageKey: &SecretKeySelector{
-				LocalObjectReference: LocalObjectReference{
-					Name: "azure-config",
-				},
-				Key: "storageKey",
-			},
-			StorageSasToken: &SecretKeySelector{
-				LocalObjectReference: LocalObjectReference{
-					Name: "azure-config",
-				},
-				Key: "sasToken",
-			},
-		}
-		Expect(azureCredentials.validateAzureCredentials(path)).ToNot(BeEmpty())
-
-		azureCredentials = AzureCredentials{
-			StorageAccount: &SecretKeySelector{
-				LocalObjectReference: LocalObjectReference{
-					Name: "azure-config",
-				},
-				Key: "storageAccount",
-			},
-			StorageKey:      nil,
-			StorageSasToken: nil,
-		}
-		Expect(azureCredentials.validateAzureCredentials(path)).ToNot(BeEmpty())
-	})
-
-	It("is correct when the storage key is used", func() {
-		azureCredentials := AzureCredentials{
-			StorageAccount: &SecretKeySelector{
-				LocalObjectReference: LocalObjectReference{
-					Name: "azure-config",
-				},
-				Key: "storageAccount",
-			},
-			StorageKey: &SecretKeySelector{
-				LocalObjectReference: LocalObjectReference{
-					Name: "azure-config",
-				},
-				Key: "storageKey",
-			},
-			StorageSasToken: nil,
-		}
-		Expect(azureCredentials.validateAzureCredentials(path)).To(BeEmpty())
-	})
-
-	It("is correct when the sas token is used", func() {
-		azureCredentials := AzureCredentials{
-			StorageAccount: &SecretKeySelector{
-				LocalObjectReference: LocalObjectReference{
-					Name: "azure-config",
-				},
-				Key: "storageAccount",
-			},
-			StorageKey: nil,
-			StorageSasToken: &SecretKeySelector{
-				LocalObjectReference: LocalObjectReference{
-					Name: "azure-config",
-				},
-				Key: "sasToken",
-			},
-		}
-		Expect(azureCredentials.validateAzureCredentials(path)).To(BeEmpty())
-	})
-
-	It("is correct even if only the connection string is specified", func() {
-		azureCredentials := AzureCredentials{
-			ConnectionString: &SecretKeySelector{
-				LocalObjectReference: LocalObjectReference{
-					Name: "azure-config",
-				},
-				Key: "connectionString",
-			},
-		}
-		Expect(azureCredentials.validateAzureCredentials(path)).To(BeEmpty())
-	})
-
-	It("it is not correct when the connection string is specified with other parameters", func() {
-		azureCredentials := AzureCredentials{
-			ConnectionString: &SecretKeySelector{
-				LocalObjectReference: LocalObjectReference{
-					Name: "azure-config",
-				},
-				Key: "connectionString",
-			},
-			StorageAccount: &SecretKeySelector{
-				LocalObjectReference: LocalObjectReference{
-					Name: "azure-config",
-				},
-				Key: "storageAccount",
-			},
-		}
-		Expect(azureCredentials.validateAzureCredentials(path)).To(BeEmpty())
 	})
 })
 
@@ -1076,9 +969,9 @@ var _ = Describe("configuration change validation", func() {
 		cluster := Cluster{
 			Spec: ClusterSpec{
 				Backup: &BackupConfiguration{
-					BarmanObjectStore: &BarmanObjectStoreConfiguration{
-						BarmanCredentials: BarmanCredentials{
-							AWS: &S3Credentials{},
+					BarmanObjectStore: &barmanTypes.BarmanObjectStoreConfiguration{
+						BarmanCredentials: barmanTypes.BarmanCredentials{
+							AWS: &barmanTypes.S3Credentials{},
 						},
 					},
 				},
@@ -1098,9 +991,9 @@ var _ = Describe("configuration change validation", func() {
 		cluster := Cluster{
 			Spec: ClusterSpec{
 				Backup: &BackupConfiguration{
-					BarmanObjectStore: &BarmanObjectStoreConfiguration{
-						BarmanCredentials: BarmanCredentials{
-							AWS: &S3Credentials{},
+					BarmanObjectStore: &barmanTypes.BarmanObjectStoreConfiguration{
+						BarmanCredentials: barmanTypes.BarmanCredentials{
+							AWS: &barmanTypes.S3Credentials{},
 						},
 					},
 				},
@@ -1119,9 +1012,9 @@ var _ = Describe("configuration change validation", func() {
 		cluster := Cluster{
 			Spec: ClusterSpec{
 				Backup: &BackupConfiguration{
-					BarmanObjectStore: &BarmanObjectStoreConfiguration{
-						BarmanCredentials: BarmanCredentials{
-							AWS: &S3Credentials{},
+					BarmanObjectStore: &barmanTypes.BarmanObjectStoreConfiguration{
+						BarmanCredentials: barmanTypes.BarmanCredentials{
+							AWS: &barmanTypes.S3Credentials{},
 						},
 					},
 				},
@@ -2233,7 +2126,7 @@ var _ = Describe("validation of an external cluster", func() {
 		Expect(cluster.validateExternalClusters()).To(BeEmpty())
 
 		cluster.Spec.ExternalClusters[0].ConnectionParameters = nil
-		cluster.Spec.ExternalClusters[0].BarmanObjectStore = &BarmanObjectStoreConfiguration{}
+		cluster.Spec.ExternalClusters[0].BarmanObjectStore = &barmanTypes.BarmanObjectStoreConfiguration{}
 		Expect(cluster.validateExternalClusters()).To(BeEmpty())
 	})
 })
@@ -3133,7 +3026,7 @@ var _ = Describe("Backup validation", func() {
 		cluster := &Cluster{
 			Spec: ClusterSpec{
 				Backup: &BackupConfiguration{
-					BarmanObjectStore: &BarmanObjectStoreConfiguration{},
+					BarmanObjectStore: &barmanTypes.BarmanObjectStoreConfiguration{},
 				},
 			},
 		}
@@ -3167,7 +3060,7 @@ var _ = Describe("Backup validation", func() {
 		cluster := &Cluster{
 			Spec: ClusterSpec{
 				Backup: &BackupConfiguration{
-					BarmanObjectStore: &BarmanObjectStoreConfiguration{},
+					BarmanObjectStore: &barmanTypes.BarmanObjectStoreConfiguration{},
 					RetentionPolicy:   "09",
 				},
 			},

@@ -19,6 +19,7 @@ package utils
 import (
 	"encoding/json"
 	"fmt"
+	barmanTypes "github.com/cloudnative-pg/plugin-barman-cloud/pkg/types"
 	"os"
 
 	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
@@ -212,18 +213,18 @@ func CreateClusterFromExternalClusterBackupWithPITROnAzure(
 			ExternalClusters: []apiv1.ExternalCluster{
 				{
 					Name: sourceClusterName,
-					BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{
+					BarmanObjectStore: &barmanTypes.BarmanObjectStoreConfiguration{
 						DestinationPath: destinationPath,
-						BarmanCredentials: apiv1.BarmanCredentials{
-							Azure: &apiv1.AzureCredentials{
-								StorageAccount: &apiv1.SecretKeySelector{
-									LocalObjectReference: apiv1.LocalObjectReference{
+						BarmanCredentials: barmanTypes.BarmanCredentials{
+							Azure: &barmanTypes.AzureCredentials{
+								StorageAccount: &barmanTypes.SecretKeySelector{
+									LocalObjectReference: barmanTypes.LocalObjectReference{
 										Name: storageCredentialsSecretName,
 									},
 									Key: "ID",
 								},
-								StorageKey: &apiv1.SecretKeySelector{
-									LocalObjectReference: apiv1.LocalObjectReference{
+								StorageKey: &barmanTypes.SecretKeySelector{
+									LocalObjectReference: barmanTypes.LocalObjectReference{
 										Name: storageCredentialsSecretName,
 									},
 									Key: "KEY",
@@ -294,25 +295,25 @@ func CreateClusterFromExternalClusterBackupWithPITROnMinio(
 			ExternalClusters: []apiv1.ExternalCluster{
 				{
 					Name: sourceClusterName,
-					BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{
+					BarmanObjectStore: &barmanTypes.BarmanObjectStoreConfiguration{
 						DestinationPath: "s3://cluster-backups/",
 						EndpointURL:     "https://minio-service.minio:9000",
-						EndpointCA: &apiv1.SecretKeySelector{
-							LocalObjectReference: apiv1.LocalObjectReference{
+						EndpointCA: &barmanTypes.SecretKeySelector{
+							LocalObjectReference: barmanTypes.LocalObjectReference{
 								Name: "minio-server-ca-secret",
 							},
 							Key: "ca.crt",
 						},
-						BarmanCredentials: apiv1.BarmanCredentials{
-							AWS: &apiv1.S3Credentials{
-								AccessKeyIDReference: &apiv1.SecretKeySelector{
-									LocalObjectReference: apiv1.LocalObjectReference{
+						BarmanCredentials: barmanTypes.BarmanCredentials{
+							AWS: &barmanTypes.S3Credentials{
+								AccessKeyIDReference: &barmanTypes.SecretKeySelector{
+									LocalObjectReference: barmanTypes.LocalObjectReference{
 										Name: "backup-storage-creds",
 									},
 									Key: "ID",
 								},
-								SecretAccessKeyReference: &apiv1.SecretKeySelector{
-									LocalObjectReference: apiv1.LocalObjectReference{
+								SecretAccessKeyReference: &barmanTypes.SecretKeySelector{
+									LocalObjectReference: barmanTypes.LocalObjectReference{
 										Name: "backup-storage-creds",
 									},
 									Key: "KEY",
@@ -384,18 +385,18 @@ func CreateClusterFromExternalClusterBackupWithPITROnAzurite(
 			ExternalClusters: []apiv1.ExternalCluster{
 				{
 					Name: sourceClusterName,
-					BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{
+					BarmanObjectStore: &barmanTypes.BarmanObjectStoreConfiguration{
 						DestinationPath: DestinationPath,
-						EndpointCA: &apiv1.SecretKeySelector{
-							LocalObjectReference: apiv1.LocalObjectReference{
+						EndpointCA: &barmanTypes.SecretKeySelector{
+							LocalObjectReference: barmanTypes.LocalObjectReference{
 								Name: "azurite-ca-secret",
 							},
 							Key: "ca.crt",
 						},
-						BarmanCredentials: apiv1.BarmanCredentials{
-							Azure: &apiv1.AzureCredentials{
-								ConnectionString: &apiv1.SecretKeySelector{
-									LocalObjectReference: apiv1.LocalObjectReference{
+						BarmanCredentials: barmanTypes.BarmanCredentials{
+							Azure: &barmanTypes.AzureCredentials{
+								ConnectionString: &barmanTypes.SecretKeySelector{
+									LocalObjectReference: barmanTypes.LocalObjectReference{
 										Name: "azurite",
 									},
 									Key: "AZURE_CONNECTION_STRING",

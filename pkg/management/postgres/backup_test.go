@@ -18,6 +18,7 @@ package postgres
 
 import (
 	"context"
+	barmanTypes "github.com/cloudnative-pg/plugin-barman-cloud/pkg/types"
 	"os"
 	"strings"
 	"time"
@@ -50,29 +51,29 @@ var _ = Describe("testing backup command", func() {
 			ObjectMeta: metav1.ObjectMeta{Name: "test-cluster", Namespace: namespace},
 			Spec: apiv1.ClusterSpec{
 				Backup: &apiv1.BackupConfiguration{
-					BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{
-						BarmanCredentials: apiv1.BarmanCredentials{
-							AWS: &apiv1.S3Credentials{
-								AccessKeyIDReference: &apiv1.SecretKeySelector{
-									LocalObjectReference: apiv1.LocalObjectReference{
+					BarmanObjectStore: &barmanTypes.BarmanObjectStoreConfiguration{
+						BarmanCredentials: barmanTypes.BarmanCredentials{
+							AWS: &barmanTypes.S3Credentials{
+								AccessKeyIDReference: &barmanTypes.SecretKeySelector{
+									LocalObjectReference: barmanTypes.LocalObjectReference{
 										Name: "",
 									},
 									Key: "",
 								},
-								SecretAccessKeyReference: &apiv1.SecretKeySelector{
-									LocalObjectReference: apiv1.LocalObjectReference{
+								SecretAccessKeyReference: &barmanTypes.SecretKeySelector{
+									LocalObjectReference: barmanTypes.LocalObjectReference{
 										Name: "",
 									},
 									Key: "",
 								},
-								RegionReference: &apiv1.SecretKeySelector{
-									LocalObjectReference: apiv1.LocalObjectReference{
+								RegionReference: &barmanTypes.SecretKeySelector{
+									LocalObjectReference: barmanTypes.LocalObjectReference{
 										Name: "",
 									},
 									Key: "",
 								},
-								SessionToken: &apiv1.SecretKeySelector{
-									LocalObjectReference: apiv1.LocalObjectReference{
+								SessionToken: &barmanTypes.SecretKeySelector{
+									LocalObjectReference: barmanTypes.LocalObjectReference{
 										Name: "",
 									},
 									Key: "",
@@ -81,20 +82,20 @@ var _ = Describe("testing backup command", func() {
 							},
 						},
 						EndpointURL: "",
-						EndpointCA: &apiv1.SecretKeySelector{
-							LocalObjectReference: apiv1.LocalObjectReference{
+						EndpointCA: &barmanTypes.SecretKeySelector{
+							LocalObjectReference: barmanTypes.LocalObjectReference{
 								Name: "",
 							},
 							Key: "",
 						},
 						DestinationPath: "",
 						ServerName:      "",
-						Wal: &apiv1.WalBackupConfiguration{
+						Wal: &barmanTypes.WalBackupConfiguration{
 							Compression: "",
 							Encryption:  "",
 							MaxParallel: 0,
 						},
-						Data: &apiv1.DataBackupConfiguration{
+						Data: &barmanTypes.DataBackupConfiguration{
 							Compression:         "",
 							Encryption:          "",
 							ImmediateCheckpoint: false,
@@ -278,8 +279,8 @@ var _ = Describe("generate backup options", func() {
 		ObjectMeta: metav1.ObjectMeta{Name: "test-cluster", Namespace: namespace},
 		Spec: apiv1.ClusterSpec{
 			Backup: &apiv1.BackupConfiguration{
-				BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{
-					Data: &apiv1.DataBackupConfiguration{
+				BarmanObjectStore: &barmanTypes.BarmanObjectStoreConfiguration{
+					Data: &barmanTypes.DataBackupConfiguration{
 						Compression:         "gzip",
 						Encryption:          "aes256",
 						ImmediateCheckpoint: true,

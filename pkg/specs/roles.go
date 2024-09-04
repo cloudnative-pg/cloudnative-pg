@@ -17,6 +17,7 @@ limitations under the License.
 package specs
 
 import (
+	barmanTypes "github.com/cloudnative-pg/plugin-barman-cloud/pkg/types"
 	"slices"
 
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -291,7 +292,7 @@ func backupSecrets(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) []string {
 	return result
 }
 
-func azureCredentialsSecrets(azureCredentials *apiv1.AzureCredentials) []string {
+func azureCredentialsSecrets(azureCredentials *barmanTypes.AzureCredentials) []string {
 	var result []string
 
 	if azureCredentials == nil {
@@ -318,7 +319,7 @@ func azureCredentialsSecrets(azureCredentials *apiv1.AzureCredentials) []string 
 	return result
 }
 
-func s3CredentialsSecrets(s3Credentials *apiv1.S3Credentials) []string {
+func s3CredentialsSecrets(s3Credentials *barmanTypes.S3Credentials) []string {
 	if s3Credentials == nil {
 		return nil
 	}
@@ -344,7 +345,7 @@ func s3CredentialsSecrets(s3Credentials *apiv1.S3Credentials) []string {
 	return secrets
 }
 
-func googleCredentialsSecrets(googleCredentials *apiv1.GoogleCredentials) []string {
+func googleCredentialsSecrets(googleCredentials *barmanTypes.GoogleCredentials) []string {
 	if googleCredentials == nil {
 		return nil
 	}

@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	barmanTypes "github.com/cloudnative-pg/plugin-barman-cloud/pkg/types"
 	"os"
 	"os/exec"
 	"reflect"
@@ -39,13 +40,13 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman"
 	barmanCapabilities "github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/capabilities"
-	barmanCredentials "github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/credentials"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/catalog"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	barmanCredentials "github.com/cloudnative-pg/plugin-barman-cloud/pkg/credentials"
 
 	// this is needed to correctly open the sql connection with the pgx driver
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -99,14 +100,14 @@ func NewBarmanBackupCommand(
 // getDataConfiguration gets the configuration in the `Data` object of the Barman configuration
 func getDataConfiguration(
 	options []string,
-	configuration *apiv1.BarmanObjectStoreConfiguration,
+	configuration *barmanTypes.BarmanObjectStoreConfiguration,
 	capabilities *barmanCapabilities.Capabilities,
 ) ([]string, error) {
 	if configuration.Data == nil {
 		return options, nil
 	}
 
-	if configuration.Data.Compression == apiv1.CompressionTypeSnappy && !capabilities.HasSnappy {
+	if configuration.Data.Compression == barmanTypes.CompressionTypeSnappy && !capabilities.HasSnappy {
 		return nil, fmt.Errorf("snappy compression is not supported in Barman %v", capabilities.Version)
 	}
 
@@ -142,7 +143,7 @@ func getDataConfiguration(
 // getBarmanCloudBackupOptions extract the list of command line options to be used with
 // barman-cloud-backup
 func (b *BackupCommand) getBarmanCloudBackupOptions(
-	configuration *apiv1.BarmanObjectStoreConfiguration,
+	configuration *barmanTypes.BarmanObjectStoreConfiguration,
 	serverName string,
 ) ([]string, error) {
 	options := []string{
@@ -473,7 +474,7 @@ func (b *BackupCommand) setupBackupStatus() {
 		backupStatus.BackupName = fmt.Sprintf("backup-%v", utils.ToCompactISO8601(time.Now()))
 	}
 	backupStatus.BarmanCredentials = barmanConfiguration.BarmanCredentials
-	backupStatus.EndpointCA = barmanConfiguration.EndpointCA
+	backupStatus.EndpointCA = apiv1.ToSecretKeySelectors(barmanConfiguration.EndpointCA)
 	backupStatus.EndpointURL = barmanConfiguration.EndpointURL
 	backupStatus.DestinationPath = barmanConfiguration.DestinationPath
 	if barmanConfiguration.Data != nil {
