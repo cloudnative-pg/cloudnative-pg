@@ -41,9 +41,11 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 		targetDBSecret                   = "secret_test"
 		testTableName                    = "test_table"
 		clusterMetricsFile               = fixturesDir + "/metrics/cluster-metrics.yaml.template"
+		clusterMetricsTLSFile            = fixturesDir + "/metrics/cluster-metrics-tls.yaml.template"
 		clusterMetricsDBFile             = fixturesDir + "/metrics/cluster-metrics-with-target-databases.yaml.template"
 		clusterMetricsPredicateQueryFile = fixturesDir + "/metrics/cluster-metrics-with-predicate-query.yaml.template"
-		customQueriesSampleFile          = fixturesDir + "/metrics/custom-queries-with-target-databases.yaml"
+		customQueriesSampleFile          = fixturesDir + "/metrics/custom-queries.yaml"
+		customQueriesTargetDBSampleFile  = fixturesDir + "/metrics/custom-queries-with-target-databases.yaml"
 		defaultMonitoringConfigMapName   = "cnpg-default-monitoring"
 		level                            = tests.Low
 	)
@@ -87,7 +89,6 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 
 	// Cluster identifiers
 	var namespace string
-	var err error
 
 	JustAfterEach(func() {
 		if CurrentSpecReport().Failed() {
@@ -95,10 +96,34 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 		}
 	})
 
-	metricsPerPod := func(cluster *apiv1.Cluster) {
+	AssertGatherMetrics := func(namespacePrefix, clusterFile string) {
+		// Create the cluster namespace
+		namespace, err := env.CreateUniqueNamespace(namespacePrefix)
+		Expect(err).ToNot(HaveOccurred())
+		DeferCleanup(func() error {
+			return env.CleanupNamespace(
+				namespace,
+				CurrentSpecReport().LeafNodeText,
+				CurrentSpecReport().Failed(),
+				GinkgoWriter,
+			)
+		})
+
+		AssertCustomMetricsResourcesExist(namespace, customQueriesSampleFile, 2, 1)
+
+		metricsClusterName, err := env.GetResourceNameFromYAML(clusterFile)
+		Expect(err).ToNot(HaveOccurred())
+
+		// Create the cluster
+		AssertCreateCluster(namespace, metricsClusterName, clusterFile, env)
+
+		cluster, err := env.GetCluster(namespace, metricsClusterName)
+		Expect(err).NotTo(HaveOccurred())
+
+		// Check metrics on each pod
 		By("ensuring metrics are correct on each pod", func() {
-			podList, err := env.GetClusterPodList(cluster.Namespace, cluster.Name)
-			Expect(err).NotTo(HaveOccurred())
+			podList, err := env.GetClusterPodList(namespace, metricsClusterName)
+			Expect(err).ToNot(HaveOccurred())
 
 			// Gather metrics in each pod
 			for _, pod := range podList.Items {
@@ -110,77 +135,21 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 				})
 			}
 		})
-	}
-
-	It("can gather metrics", func() {
-		// Create the cluster namespace
-		const namespacePrefix = "cluster-metrics-e2e"
-		metricsClusterName, err := env.GetResourceNameFromYAML(clusterMetricsFile)
-		Expect(err).ToNot(HaveOccurred())
-		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
-		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			return env.CleanupNamespace(
-				namespace,
-				CurrentSpecReport().LeafNodeText,
-				CurrentSpecReport().Failed(),
-				GinkgoWriter,
-			)
-		})
-
-		AssertCustomMetricsResourcesExist(namespace, fixturesDir+"/metrics/custom-queries.yaml", 2, 1)
-
-		// Create the cluster
-		AssertCreateCluster(namespace, metricsClusterName, clusterMetricsFile, env)
-
-		cluster, err := env.GetCluster(namespace, metricsClusterName)
-		Expect(err).NotTo(HaveOccurred())
-
-		// Check metrics on each pod
-		metricsPerPod(cluster)
 
 		// verify cnpg_collector_x metrics exists in each pod
 		collectAndAssertCollectorMetricsPresentOnEachPod(cluster)
+	}
+
+	It("can gather metrics", func() {
+		const namespacePrefix = "cluster-metrics-e2e"
+
+		AssertGatherMetrics(namespacePrefix, clusterMetricsFile)
 	})
 
 	It("can gather metrics with TLS enabled", func() {
-		// Create the cluster namespace
 		const namespacePrefix = "cluster-metrics-tls-e2e"
-		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
-		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			return env.CleanupNamespace(
-				namespace,
-				CurrentSpecReport().LeafNodeText,
-				CurrentSpecReport().Failed(),
-				GinkgoWriter,
-			)
-		})
 
-		AssertCustomMetricsResourcesExist(namespace, fixturesDir+"/metrics/custom-queries.yaml", 2, 1)
-
-		yaml, err := GetYAMLContent(clusterMetricsFile)
-		Expect(err).ToNot(HaveOccurred())
-
-		obj, err := utils.ParseObjectsFromYAML(yaml, namespace)
-		Expect(err).ToNot(HaveOccurred())
-
-		cluster := obj[0].(*apiv1.Cluster)
-		cluster.Spec.Monitoring.TLSConfig = &apiv1.ClusterMonitoringTLSConfiguration{
-			Enabled: true,
-		}
-		_, err = utils.CreateObject(env, cluster)
-		Expect(err).ToNot(HaveOccurred())
-		AssertClusterIsReady(namespace, cluster.Name, testTimeouts[utils.ClusterIsReady], env)
-
-		cluster, err = env.GetCluster(namespace, cluster.Name)
-		Expect(err).NotTo(HaveOccurred())
-
-		// Check metrics on each pod
-		metricsPerPod(cluster)
-
-		// verify cnpg_collector_x metrics is exists in each pod
-		collectAndAssertCollectorMetricsPresentOnEachPod(cluster)
+		AssertGatherMetrics(namespacePrefix, clusterMetricsTLSFile)
 	})
 
 	It("can gather metrics with multiple target databases", func() {
@@ -198,7 +167,7 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 				GinkgoWriter,
 			)
 		})
-		AssertCustomMetricsResourcesExist(namespace, customQueriesSampleFile, 1, 1)
+		AssertCustomMetricsResourcesExist(namespace, customQueriesTargetDBSampleFile, 1, 1)
 
 		// Create the cluster
 		AssertCreateCluster(namespace, metricsClusterName, clusterMetricsDBFile, env)
