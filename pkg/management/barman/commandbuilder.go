@@ -21,8 +21,8 @@ import (
 	barmanTypes "github.com/cloudnative-pg/plugin-barman-cloud/pkg/types"
 
 	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	barmanCapabilities "github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/capabilities"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	barmanCapabilities "github.com/cloudnative-pg/plugin-barman-cloud/pkg/capabilities"
 )
 
 // CloudWalRestoreOptions returns the options needed to execute the barman command successfully
