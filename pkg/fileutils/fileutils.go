@@ -266,6 +266,7 @@ func ReadFileLines(fileName string) (lines []string, err error) {
 	}()
 
 	fileScanner := bufio.NewScanner(readFile)
+	fileScanner.Buffer(make([]byte, 0, 4096), 1024*1024)
 	fileScanner.Split(bufio.ScanLines)
 
 	for fileScanner.Scan() {

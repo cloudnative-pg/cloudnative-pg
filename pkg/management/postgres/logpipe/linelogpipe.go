@@ -179,6 +179,7 @@ func (p *LineLogPipe) collectLogsFromFile(ctx context.Context) error {
 // decoded invalid line
 func (p *LineLogPipe) streamLogFromFile(ctx context.Context, reader io.Reader) error {
 	scanner := bufio.NewScanner(reader)
+	scanner.Buffer(make([]byte, 0, 4096), 1024*1024)
 	for scanner.Scan() {
 		line := scanner.Bytes()
 		p.handler(line)
