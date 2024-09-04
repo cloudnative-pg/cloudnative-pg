@@ -266,6 +266,10 @@ func isInstanceNeedingRollout(
 		}
 	}
 
+	if podRollout := isPodNeedingRollout(ctx, status.Pod, cluster); podRollout.required {
+		return podRollout
+	}
+
 	if status.PendingRestart {
 		return rollout{
 			required:     true,
@@ -274,7 +278,7 @@ func isInstanceNeedingRollout(
 		}
 	}
 
-	return isPodNeedingRollout(ctx, status.Pod, cluster)
+	return rollout{}
 }
 
 // isPodNeedingRollout checks if a given cluster instance needs a rollout by comparing its current state

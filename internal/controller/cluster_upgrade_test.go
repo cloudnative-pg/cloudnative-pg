@@ -105,6 +105,36 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 		Expect(rollout.reason).To(BeEmpty())
 	})
 
+	It("should prioritize full rollout over inplace restarts", func(ctx SpecContext) {
+		pod := specs.PodWithExistingStorage(cluster, 1)
+
+		status := postgres.PostgresqlStatus{
+			Pod:            pod,
+			IsPodReady:     true,
+			ExecutableHash: "test_hash",
+		}
+
+		rollout := isInstanceNeedingRollout(ctx, status, &cluster)
+		Expect(rollout.required).To(BeFalse())
+		Expect(rollout.reason).To(BeEmpty())
+
+		// Set a different image to trigger a full rollout
+		pod.Spec.Containers[0].Image = "postgres:13.10"
+
+		// Set pending restart to true in the status
+		status = postgres.PostgresqlStatus{
+			Pod:            pod,
+			IsPodReady:     true,
+			PendingRestart: true,
+			ExecutableHash: "test_hash",
+		}
+
+		rollout = isInstanceNeedingRollout(ctx, status, &cluster)
+		Expect(rollout.required).To(BeTrue())
+		Expect(rollout.canBeInPlace).To(BeFalse())
+		Expect(rollout.reason).To(Equal("the instance is using a different image: postgres:13.10 -> postgres:13.11"))
+	})
+
 	It("requires rollout when PostgreSQL needs to be restarted", func(ctx SpecContext) {
 		pod := specs.PodWithExistingStorage(cluster, 1)
 
