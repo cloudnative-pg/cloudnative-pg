@@ -40,6 +40,7 @@ var _ = Describe("Update user and superuser password", Label(tests.LabelServiceC
 		level           = tests.Low
 	)
 	var namespace string
+
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")

@@ -15,5 +15,5 @@ limitations under the License.
 */
 
 // Package sternmultitailer contains the required to handle the logs
-// of every pods in the tests
+// of every pod in the tests
 package sternmultitailer

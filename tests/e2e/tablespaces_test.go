@@ -381,6 +381,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 			table2                = "test_tbs2"
 		)
 		checkPointTimeout := time.Second * 10
+
 		BeforeAll(func() {
 			// Create a cluster in a namespace we'll delete after the test
 			namespace, err = env.CreateUniqueNamespace(namespacePrefix)

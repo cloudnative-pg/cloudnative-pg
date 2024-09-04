@@ -29,7 +29,7 @@ import (
 	"time"
 
 	"github.com/stern/stern/stern"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/kubernetes"
 
@@ -59,11 +59,11 @@ func (s *SternMultiTailer) Run(ctx context.Context, client kubernetes.Interface)
 	// Create the Stern configuration
 
 	// Select all the pods belonging to CNPG
-	selector, _ := v1.LabelSelectorAsSelector(&v1.LabelSelector{
-		MatchExpressions: []v1.LabelSelectorRequirement{
+	selector, _ := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
+		MatchExpressions: []metav1.LabelSelectorRequirement{
 			{
 				Key:      utils.ClusterLabelName,
-				Operator: v1.LabelSelectorOpExists,
+				Operator: metav1.LabelSelectorOpExists,
 			},
 		},
 	})

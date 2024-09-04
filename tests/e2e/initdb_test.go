@@ -98,6 +98,7 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 					GinkgoWriter,
 				)
 			})
+
 			CreateResourceFromFile(namespace, postInitSQLSecretRef)
 			CreateResourceFromFile(namespace, postInitSQLConfigMapRef)
 			CreateResourceFromFile(namespace, postInitApplicationSQLSecretRef)

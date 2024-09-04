@@ -219,6 +219,7 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 			}
 			testsUtils.ObjectMatchesAnnotations(&pvcInfo, expectedAnnotation)
 		}
+
 		assertHibernation := func(namespace, clusterName, tableName string) {
 			var beforeHibernationPgWalPvcUID types.UID
 			var beforeHibernationPgDataPvcUID types.UID
