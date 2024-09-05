@@ -78,16 +78,8 @@ var _ = Describe("Connection via services", Label(tests.LabelServiceConnectivity
 		It("can connect with auto-generated passwords", func() {
 			// Create a cluster in a namespace we'll delete after the test
 			var err error
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.CleanupNamespace(
-					namespace,
-					CurrentSpecReport().LeafNodeText,
-					CurrentSpecReport().Failed(),
-					GinkgoWriter,
-				)
-			})
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
 			// Get the superuser password from the -superuser secret
@@ -131,16 +123,8 @@ var _ = Describe("Connection via services", Label(tests.LabelServiceConnectivity
 
 			// Create a cluster in a namespace we'll delete after the test
 			var err error
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.CleanupNamespace(
-					namespace,
-					CurrentSpecReport().LeafNodeText,
-					CurrentSpecReport().Failed(),
-					GinkgoWriter,
-				)
-			})
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 			AssertServices(namespace, clusterName, appDBName, appDBUser,
 				suppliedAppUserPassword, suppliedSuperuserPassword, env)

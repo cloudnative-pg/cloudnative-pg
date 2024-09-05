@@ -48,16 +48,8 @@ var _ = Describe("nodeSelector", Label(tests.LabelPodScheduling), func() {
 			// We create a namespace and verify it exists
 			By(fmt.Sprintf("having a %v namespace", namespace), func() {
 				var err error
-				namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+				namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
-				DeferCleanup(func() error {
-					return env.CleanupNamespace(
-						namespace,
-						CurrentSpecReport().LeafNodeText,
-						CurrentSpecReport().Failed(),
-						GinkgoWriter,
-					)
-				})
 
 				// Creating a namespace should be quick
 				timeout := 20
@@ -115,16 +107,8 @@ var _ = Describe("nodeSelector", Label(tests.LabelPodScheduling), func() {
 			var nodeName string
 			var err error
 			// Create a cluster in a namespace we'll delete after the test
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.CleanupNamespace(
-					namespace,
-					CurrentSpecReport().LeafNodeText,
-					CurrentSpecReport().Failed(),
-					GinkgoWriter,
-				)
-			})
 
 			// We label one node with the label we have defined in the cluster
 			// YAML definition

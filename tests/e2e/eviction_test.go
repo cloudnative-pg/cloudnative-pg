@@ -119,16 +119,8 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 			}
 			const namespacePrefix = "single-instance-pod-eviction"
 			var err error
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.CleanupNamespace(
-					namespace,
-					CurrentSpecReport().LeafNodeText,
-					CurrentSpecReport().Failed(),
-					GinkgoWriter,
-				)
-			})
 			By("creating a cluster", func() {
 				// Create a cluster in a namespace we'll delete after the test
 				clusterName, err := env.GetResourceNameFromYAML(singleInstanceSampleFile)
@@ -184,16 +176,8 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 		BeforeAll(func() {
 			const namespacePrefix = "multi-instance-pod-eviction"
 			var err error
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.CleanupNamespace(
-					namespace,
-					CurrentSpecReport().LeafNodeText,
-					CurrentSpecReport().Failed(),
-					GinkgoWriter,
-				)
-			})
 			By("Creating a cluster with multiple instances", func() {
 				// Create a cluster in a namespace and shared in containers, we'll delete after the test
 				clusterName, err := env.GetResourceNameFromYAML(multiInstanceSampleFile)

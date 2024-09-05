@@ -191,16 +191,8 @@ var _ = Describe("Volume space unavailable", Label(tests.LabelStorage), func() {
 		func(sampleFile string) {
 			var err error
 			// Create a cluster in a namespace we'll delete after the test
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.CleanupNamespace(
-					namespace,
-					CurrentSpecReport().LeafNodeText,
-					CurrentSpecReport().Failed(),
-					GinkgoWriter,
-				)
-			})
 
 			clusterName, err := env.GetResourceNameFromYAML(sampleFile)
 			Expect(err).ToNot(HaveOccurred())

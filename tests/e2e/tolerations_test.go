@@ -57,16 +57,8 @@ var _ = Describe("E2E Tolerations Node", Serial, Label(tests.LabelDisruptive, te
 	It("can create a cluster with tolerations", func() {
 		var err error
 		// Initialize empty global namespace variable
-		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			return env.CleanupNamespace(
-				namespace,
-				CurrentSpecReport().LeafNodeText,
-				CurrentSpecReport().Failed(),
-				GinkgoWriter,
-			)
-		})
 
 		By("tainting all the nodes", func() {
 			nodes, _ := env.GetNodeList()

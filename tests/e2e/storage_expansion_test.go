@@ -63,16 +63,8 @@ var _ = Describe("Verify storage", Label(tests.LabelStorage), func() {
 		It("expands PVCs via online resize", func() {
 			var err error
 			// Creating namespace
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.CleanupNamespace(
-					namespace,
-					CurrentSpecReport().LeafNodeText,
-					CurrentSpecReport().Failed(),
-					GinkgoWriter,
-				)
-			})
 			// Creating a cluster with three nodes
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 			OnlineResizePVC(namespace, clusterName)
@@ -93,16 +85,8 @@ var _ = Describe("Verify storage", Label(tests.LabelStorage), func() {
 		It("expands PVCs via offline resize", func() {
 			var err error
 			// Creating namespace
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.CleanupNamespace(
-					namespace,
-					CurrentSpecReport().LeafNodeText,
-					CurrentSpecReport().Failed(),
-					GinkgoWriter,
-				)
-			})
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 			By("update cluster for resizeInUseVolumes as false", func() {
 				// Updating cluster with 'resizeInUseVolumes' sets to 'false' in storage.

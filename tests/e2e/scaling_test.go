@@ -47,16 +47,8 @@ var _ = Describe("Cluster scale up and down", Serial, Label(tests.LabelReplicati
 			const namespacePrefix = "cluster-scale-e2e-with-slots"
 			var err error
 			// Create a cluster in a namespace we'll delete after the test
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.CleanupNamespace(
-					namespace,
-					CurrentSpecReport().LeafNodeText,
-					CurrentSpecReport().Failed(),
-					GinkgoWriter,
-				)
-			})
 			AssertCreateCluster(namespace, clusterName, sampleFileWithReplicationSlots, env)
 
 			AssertClusterHAReplicationSlots(clusterName, namespace)
@@ -92,16 +84,8 @@ var _ = Describe("Cluster scale up and down", Serial, Label(tests.LabelReplicati
 			// Create a cluster in a namespace we'll delete after the test
 			const namespacePrefix = "cluster-scale-e2e"
 			var err error
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.CleanupNamespace(
-					namespace,
-					CurrentSpecReport().LeafNodeText,
-					CurrentSpecReport().Failed(),
-					GinkgoWriter,
-				)
-			})
 			AssertCreateCluster(namespace, clusterName, sampleFileWithoutReplicationSlots, env)
 
 			// Add a node to the cluster and verify the cluster has one more

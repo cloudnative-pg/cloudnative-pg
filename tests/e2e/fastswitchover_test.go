@@ -62,16 +62,8 @@ var _ = Describe("Fast switchover", Serial, Label(tests.LabelPerformance, tests.
 			// Create a cluster in a namespace we'll delete after the test
 			const namespacePrefix = "primary-switchover-time"
 			var err error
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.CleanupNamespace(
-					namespace,
-					CurrentSpecReport().LeafNodeText,
-					CurrentSpecReport().Failed(),
-					GinkgoWriter,
-				)
-			})
 			assertFastSwitchover(namespace, sampleFileWithoutReplicationSlots, clusterName, webTestFile, webTestJob)
 		})
 	})
@@ -80,16 +72,8 @@ var _ = Describe("Fast switchover", Serial, Label(tests.LabelPerformance, tests.
 			// Create a cluster in a namespace we'll delete after the test
 			const namespacePrefix = "primary-switchover-time-with-slots"
 			var err error
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.CleanupNamespace(
-					namespace,
-					CurrentSpecReport().LeafNodeText,
-					CurrentSpecReport().Failed(),
-					GinkgoWriter,
-				)
-			})
 			assertFastSwitchover(namespace, sampleFileWithReplicationSlots, clusterName, webTestFile, webTestJob)
 			AssertClusterHAReplicationSlots(namespace, clusterName)
 		})

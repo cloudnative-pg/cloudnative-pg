@@ -68,16 +68,8 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 			const namespacePrefix = "cluster-monolith"
 			sourceClusterName, err = env.GetResourceNameFromYAML(sourceClusterFile)
 			Expect(err).ToNot(HaveOccurred())
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.CleanupNamespace(
-					namespace,
-					CurrentSpecReport().LeafNodeText,
-					CurrentSpecReport().Failed(),
-					GinkgoWriter,
-				)
-			})
 			AssertCreateCluster(namespace, sourceClusterName, sourceClusterFile, env)
 		})
 

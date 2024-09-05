@@ -53,16 +53,8 @@ var _ = Describe("PGBouncer Types", Ordered, Label(tests.LabelServiceConnectivit
 	BeforeAll(func() {
 		// Create a cluster in a namespace we'll delete after the test
 		// This cluster will be shared by the next tests
-		namespace, err = env.CreateUniqueNamespace("pgbouncer-types")
+		namespace, err = env.CreateUniqueTestNamespace("pgbouncer-types")
 		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			return env.CleanupNamespace(
-				namespace,
-				CurrentSpecReport().LeafNodeText,
-				CurrentSpecReport().Failed(),
-				GinkgoWriter,
-			)
-		})
 		clusterName, err = env.GetResourceNameFromYAML(sampleFile)
 		Expect(err).ToNot(HaveOccurred())
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)

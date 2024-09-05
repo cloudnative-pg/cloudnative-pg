@@ -50,16 +50,8 @@ var _ = Describe("JSON log output", Label(tests.LabelObservability), func() {
 		const sampleFile = fixturesDir + "/json_logs/cluster-json-logs.yaml.template"
 		var namespaceErr error
 		// Create a cluster in a namespace we'll delete after the test
-		namespace, namespaceErr = env.CreateUniqueNamespace(namespacePrefix)
+		namespace, namespaceErr = env.CreateUniqueTestNamespace(namespacePrefix)
 		Expect(namespaceErr).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			return env.CleanupNamespace(
-				namespace,
-				CurrentSpecReport().LeafNodeText,
-				CurrentSpecReport().Failed(),
-				GinkgoWriter,
-			)
-		})
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
 		By("verifying the presence of possible logger values", func() {

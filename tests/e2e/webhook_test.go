@@ -75,16 +75,8 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive, tests.LabelOper
 		})
 
 		// Create a basic PG cluster
-		webhookNamespace, err := env.CreateUniqueNamespace(webhookNamespacePrefix)
+		webhookNamespace, err := env.CreateUniqueTestNamespace(webhookNamespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			return env.CleanupNamespace(
-				webhookNamespace,
-				CurrentSpecReport().LeafNodeText,
-				CurrentSpecReport().Failed(),
-				GinkgoWriter,
-			)
-		})
 		AssertCreateCluster(webhookNamespace, clusterName, sampleFile, env)
 		// Check if cluster is ready and the default values are populated
 		AssertClusterDefault(webhookNamespace, clusterName, clusterIsDefaulted, env)
@@ -121,16 +113,8 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive, tests.LabelOper
 		})
 
 		// Create a basic PG cluster
-		webhookNamespace, err = env.CreateUniqueNamespace(webhookNamespacePrefix)
+		webhookNamespace, err = env.CreateUniqueTestNamespace(webhookNamespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			return env.CleanupNamespace(
-				webhookNamespace,
-				CurrentSpecReport().LeafNodeText,
-				CurrentSpecReport().Failed(),
-				GinkgoWriter,
-			)
-		})
 		AssertCreateCluster(webhookNamespace, clusterName, sampleFile, env)
 		// Check if cluster is ready and has no default value in the object
 		AssertClusterDefault(webhookNamespace, clusterName, clusterIsDefaulted, env)

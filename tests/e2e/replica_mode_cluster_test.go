@@ -75,16 +75,8 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				testTableName           = "replica_mode_tls_auth"
 			)
 
-			replicaNamespace, err := env.CreateUniqueNamespace(replicaNamespacePrefix)
+			replicaNamespace, err := env.CreateUniqueTestNamespace(replicaNamespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.CleanupNamespace(
-					replicaNamespace,
-					CurrentSpecReport().LeafNodeText,
-					CurrentSpecReport().Failed(),
-					GinkgoWriter,
-				)
-			})
 			AssertCreateCluster(replicaNamespace, srcClusterName, srcClusterSample, env)
 
 			AssertReplicaModeCluster(
@@ -118,16 +110,8 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 
 			replicaClusterName, err := env.GetResourceNameFromYAML(replicaClusterSampleBasicAuth)
 			Expect(err).ToNot(HaveOccurred())
-			namespace, err = env.CreateUniqueNamespace(replicaNamespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(replicaNamespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.CleanupNamespace(
-					namespace,
-					CurrentSpecReport().LeafNodeText,
-					CurrentSpecReport().Failed(),
-					GinkgoWriter,
-				)
-			})
 			AssertCreateCluster(namespace, srcClusterName, srcClusterSample, env)
 
 			AssertReplicaModeCluster(
@@ -169,16 +153,8 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				return nil
 			}
 
-			namespace, err = env.CreateUniqueNamespace("replica-promotion-demotion")
+			namespace, err = env.CreateUniqueTestNamespace("replica-promotion-demotion")
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.CleanupNamespace(
-					namespace,
-					CurrentSpecReport().LeafNodeText,
-					CurrentSpecReport().Failed(),
-					GinkgoWriter,
-				)
-			})
 			AssertCreateCluster(namespace, clusterOneName, clusterOneFile, env)
 
 			AssertReplicaModeCluster(
@@ -261,16 +237,8 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 
 			replicaClusterName, err := env.GetResourceNameFromYAML(replicaClusterSample)
 			Expect(err).ToNot(HaveOccurred())
-			replicaNamespace, err := env.CreateUniqueNamespace(replicaNamespacePrefix)
+			replicaNamespace, err := env.CreateUniqueTestNamespace(replicaNamespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.CleanupNamespace(
-					replicaNamespace,
-					CurrentSpecReport().LeafNodeText,
-					CurrentSpecReport().Failed(),
-					GinkgoWriter,
-				)
-			})
 			By("creating the credentials for minio", func() {
 				AssertStorageCredentialsAreCreated(replicaNamespace, "backup-storage-creds", "minio", "minio123")
 			})
@@ -322,16 +290,8 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 
 		BeforeAll(func() {
 			var err error
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.CleanupNamespace(
-					namespace,
-					CurrentSpecReport().LeafNodeText,
-					CurrentSpecReport().Failed(),
-					GinkgoWriter,
-				)
-			})
 
 			By("creating the credentials for minio", func() {
 				AssertStorageCredentialsAreCreated(namespace, "backup-storage-creds", "minio", "minio123")
@@ -538,16 +498,8 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication), Ordered, f
 	DescribeTable("should demote and promote the clusters correctly",
 		func(clusterAFile string, clusterBFile string, expectedTimeline int) {
 			var err error
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.CleanupNamespace(
-					namespace,
-					CurrentSpecReport().LeafNodeText,
-					CurrentSpecReport().Failed(),
-					GinkgoWriter,
-				)
-			})
 			DeferCleanup(func() error {
 				// Since we use multiple times the same cluster names for the same minio instance, we need to clean it up
 				// between tests

@@ -27,6 +27,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/onsi/ginkgo/v2"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -214,21 +215,45 @@ func (env TestingEnvironment) CleanupNamespace(
 	return env.DeleteNamespace(namespace)
 }
 
-// CreateUniqueNamespace creates a namespace by using the passed prefix.
+// CreateUniqueTestNamespace creates a namespace by using the passed prefix.
 // Return the namespace name and any errors encountered.
-func (env TestingEnvironment) CreateUniqueNamespace(
+// The namespace is automatically cleaned up at the end of the test.
+func (env TestingEnvironment) CreateUniqueTestNamespace(
 	namespacePrefix string,
 	opts ...client.CreateOption,
 ) (string, error) {
 	name := env.createdNamespaces.generateUniqueName(namespacePrefix)
 
-	return name, env.CreateNamespace(name, opts...)
+	return name, env.CreateTestNamespace(name, opts...)
+}
+
+// CreateTestNamespace creates a namespace creates a namespace.
+// Prefer CreateUniqueTestNamespace instead, unless you need a
+// specific namespace name. If so, make sure there is no collision
+// potential.
+// The namespace is automatically cleaned up at the end of the test.
+func (env TestingEnvironment) CreateTestNamespace(
+	name string,
+	opts ...client.CreateOption,
+) error {
+	err := env.CreateNamespace(name, opts...)
+	if err != nil {
+		return err
+	}
+
+	ginkgo.DeferCleanup(func() error {
+		return env.CleanupNamespace(
+			name,
+			ginkgo.CurrentSpecReport().LeafNodeText,
+			ginkgo.CurrentSpecReport().Failed(),
+			ginkgo.GinkgoWriter,
+		)
+	})
+
+	return nil
 }
 
 // CreateNamespace creates a namespace.
-// Prefer CreateUniqueNamespace instead, unless you need a
-// specific namespace name. If so, make sure there is no collision
-// potential
 func (env TestingEnvironment) CreateNamespace(name string, opts ...client.CreateOption) error {
 	// Exit immediately if the name is empty
 	if name == "" {

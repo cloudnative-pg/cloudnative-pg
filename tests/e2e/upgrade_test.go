@@ -339,7 +339,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			namespacePrefix), func() {
 			var err error
 			// Create a upgradeNamespace for all the resources
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Creating a upgradeNamespace should be quick

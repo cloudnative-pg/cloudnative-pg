@@ -67,16 +67,8 @@ var _ = Describe("Imports with Microservice Approach", Label(tests.LabelImportin
 
 		oid := 16393
 		data := "large object test"
-		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			return env.CleanupNamespace(
-				namespace,
-				CurrentSpecReport().LeafNodeText,
-				CurrentSpecReport().Failed(),
-				GinkgoWriter,
-			)
-		})
 		AssertCreateCluster(namespace, sourceClusterName, sourceSampleFile, env)
 		AssertCreateTestData(namespace, sourceClusterName, tableName, psqlClientPod)
 		AssertCreateTestDataLargeObject(namespace, sourceClusterName, oid, data, psqlClientPod)
@@ -96,16 +88,8 @@ var _ = Describe("Imports with Microservice Approach", Label(tests.LabelImportin
 		sourceClusterName, err = env.GetResourceNameFromYAML(sourceSampleFile)
 		Expect(err).ToNot(HaveOccurred())
 
-		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			return env.CleanupNamespace(
-				namespace,
-				CurrentSpecReport().LeafNodeText,
-				CurrentSpecReport().Failed(),
-				GinkgoWriter,
-			)
-		})
 		AssertCreateCluster(namespace, sourceClusterName, sourceSampleFile, env)
 		assertCreateTableWithDataOnSourceCluster(namespace, tableName, sourceClusterName)
 
@@ -120,16 +104,8 @@ var _ = Describe("Imports with Microservice Approach", Label(tests.LabelImportin
 		const namespacePrefix = "microservice-different-db"
 		importedClusterName = "cluster-pgdump-different-db"
 		// create namespace
-		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			return env.CleanupNamespace(
-				namespace,
-				CurrentSpecReport().LeafNodeText,
-				CurrentSpecReport().Failed(),
-				GinkgoWriter,
-			)
-		})
 		assertImportRenamesSelectedDatabase(namespace, sourceSampleFile,
 			importedClusterName, tableName, "")
 	})
@@ -141,16 +117,8 @@ var _ = Describe("Imports with Microservice Approach", Label(tests.LabelImportin
 		const namespacePrefix = "cnpg-microservice-error"
 		sourceClusterName, err = env.GetResourceNameFromYAML(sourceSampleFile)
 		Expect(err).ToNot(HaveOccurred())
-		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			return env.CleanupNamespace(
-				namespace,
-				CurrentSpecReport().LeafNodeText,
-				CurrentSpecReport().Failed(),
-				GinkgoWriter,
-			)
-		})
 		AssertCreateCluster(namespace, sourceClusterName, sourceSampleFile, env)
 
 		importedClusterName = "cluster-pgdump-error"
@@ -193,16 +161,8 @@ var _ = Describe("Imports with Microservice Approach", Label(tests.LabelImportin
 		By(fmt.Sprintf("import cluster with different major, target version is %s", targetImage), func() {
 			var err error
 			// create namespace
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.CleanupNamespace(
-					namespace,
-					CurrentSpecReport().LeafNodeText,
-					CurrentSpecReport().Failed(),
-					GinkgoWriter,
-				)
-			})
 			assertImportRenamesSelectedDatabase(namespace, sourceSampleFile, importedClusterName,
 				tableName, targetImage)
 		})

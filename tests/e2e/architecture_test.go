@@ -74,16 +74,8 @@ var _ = Describe("Available Architectures", Label(tests.LabelBasic), func() {
 	var err error
 
 	It("manages each available architecture", func() {
-		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			return env.CleanupNamespace(
-				namespace,
-				CurrentSpecReport().LeafNodeText,
-				CurrentSpecReport().Failed(),
-				GinkgoWriter,
-			)
-		})
 
 		clusterName, err := env.GetResourceNameFromYAML(clusterManifest)
 		Expect(err).ToNot(HaveOccurred())

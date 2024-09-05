@@ -298,16 +298,8 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 				clusterName, err := env.GetResourceNameFromYAML(sampleFileClusterWithPGWalVolume)
 				Expect(err).ToNot(HaveOccurred())
 				// Create a cluster in a namespace we'll delete after the test
-				namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+				namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
-				DeferCleanup(func() error {
-					return env.CleanupNamespace(
-						namespace,
-						CurrentSpecReport().LeafNodeText,
-						CurrentSpecReport().Failed(),
-						GinkgoWriter,
-					)
-				})
 				AssertCreateCluster(namespace, clusterName, sampleFileClusterWithPGWalVolume, env)
 				assertHibernation(namespace, clusterName, tableName)
 			})
@@ -320,16 +312,8 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 				clusterName, err := env.GetResourceNameFromYAML(sampleFileClusterWithOutPGWalVolume)
 				Expect(err).ToNot(HaveOccurred())
 				// Create a cluster in a namespace we'll delete after the test
-				namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+				namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
-				DeferCleanup(func() error {
-					return env.CleanupNamespace(
-						namespace,
-						CurrentSpecReport().LeafNodeText,
-						CurrentSpecReport().Failed(),
-						GinkgoWriter,
-					)
-				})
 				AssertCreateCluster(namespace, clusterName, sampleFileClusterWithOutPGWalVolume, env)
 				// Write a table and some data on the "app" database
 				AssertCreateTestData(namespace, clusterName, tableName, psqlClientPod)
@@ -388,16 +372,8 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 				clusterName, err := env.GetResourceNameFromYAML(sampleFileClusterWithPGWalVolume)
 				Expect(err).ToNot(HaveOccurred())
 				// Create a cluster in a namespace we'll delete after the test
-				namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+				namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
-				DeferCleanup(func() error {
-					return env.CleanupNamespace(
-						namespace,
-						CurrentSpecReport().LeafNodeText,
-						CurrentSpecReport().Failed(),
-						GinkgoWriter,
-					)
-				})
 				AssertCreateCluster(namespace, clusterName, sampleFileClusterWithPGWalVolume, env)
 				AssertSwitchover(namespace, clusterName, env)
 				assertHibernation(namespace, clusterName, tableName)

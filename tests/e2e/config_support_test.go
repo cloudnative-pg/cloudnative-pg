@@ -114,16 +114,8 @@ var _ = Describe("Config support", Serial, Ordered, Label(tests.LabelDisruptive,
 
 	It("creates a cluster", func() {
 		var err error
-		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			return env.CleanupNamespace(
-				namespace,
-				CurrentSpecReport().LeafNodeText,
-				CurrentSpecReport().Failed(),
-				GinkgoWriter,
-			)
-		})
 
 		AssertCreateCluster(namespace, clusterName, clusterWithInheritedLabelsFile, env)
 	})

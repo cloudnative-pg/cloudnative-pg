@@ -70,16 +70,8 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 			clusterName, err = env.GetResourceNameFromYAML(clusterWithMinioSampleFile)
 			Expect(err).ToNot(HaveOccurred())
 
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.CleanupNamespace(
-					namespace,
-					CurrentSpecReport().LeafNodeText,
-					CurrentSpecReport().Failed(),
-					GinkgoWriter,
-				)
-			})
 
 			By("create the certificates for MinIO", func() {
 				err := minioEnv.CreateCaSecret(env, namespace)
@@ -524,16 +516,8 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			// Create a cluster in a namespace we'll delete after the test
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.CleanupNamespace(
-					namespace,
-					CurrentSpecReport().LeafNodeText,
-					CurrentSpecReport().Failed(),
-					GinkgoWriter,
-				)
-			})
 
 			// The Azure Blob Storage should have been created ad-hoc for the test.
 			// The credentials are retrieved from the environment variables, as we can't create
@@ -670,16 +654,8 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			// Create a cluster in a namespace we'll delete after the test
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.CleanupNamespace(
-					namespace,
-					CurrentSpecReport().LeafNodeText,
-					CurrentSpecReport().Failed(),
-					GinkgoWriter,
-				)
-			})
 
 			// Create and assert ca and tls certificate secrets on Azurite
 			By("creating ca and tls certificate secrets", func() {
@@ -806,16 +782,8 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 			clusterName, err = env.GetResourceNameFromYAML(clusterSourceFileMinio)
 			Expect(err).ToNot(HaveOccurred())
 			// Create a cluster in a namespace we'll delete after the test
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.CleanupNamespace(
-					namespace,
-					CurrentSpecReport().LeafNodeText,
-					CurrentSpecReport().Failed(),
-					GinkgoWriter,
-				)
-			})
 
 			AssertStorageCredentialsAreCreated(namespace, "backup-storage-creds", "minio", "minio123")
 
@@ -971,16 +939,8 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 				Expect(err).ToNot(HaveOccurred())
 
 				// Create a cluster in a namespace we'll delete after the test
-				namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+				namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
-				DeferCleanup(func() error {
-					return env.CleanupNamespace(
-						namespace,
-						CurrentSpecReport().LeafNodeText,
-						CurrentSpecReport().Failed(),
-						GinkgoWriter,
-					)
-				})
 
 				// The Azure Blob Storage should have been created ad-hoc for the test.
 				// The credentials are retrieved from the environment variables, as we can't create
@@ -1061,16 +1021,8 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 				Expect(err).ToNot(HaveOccurred())
 
 				// Create a cluster in a namespace we'll delete after the test
-				namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+				namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
-				DeferCleanup(func() error {
-					return env.CleanupNamespace(
-						namespace,
-						CurrentSpecReport().LeafNodeText,
-						CurrentSpecReport().Failed(),
-						GinkgoWriter,
-					)
-				})
 
 				// The Azure Blob Storage should have been created ad-hoc for the test,
 				// we get the credentials from the environment variables as we can't create
@@ -1154,16 +1106,8 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 			Expect(err).ToNot(HaveOccurred())
 
 			// Create a cluster in a namespace we'll delete after the test
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.CleanupNamespace(
-					namespace,
-					CurrentSpecReport().LeafNodeText,
-					CurrentSpecReport().Failed(),
-					GinkgoWriter,
-				)
-			})
 
 			// Create and assert ca and tls certificate secrets on Azurite
 			By("creating ca and tls certificate secrets", func() {
