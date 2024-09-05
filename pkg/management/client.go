@@ -147,7 +147,6 @@ func WaitKubernetesAPIServer(ctx context.Context, clusterObjectKey client.Object
 		}
 		return nil
 	})
-
 	if err != nil {
 		const message = "error while waiting for the API server to be reachable"
 		logger.Error(err, message)

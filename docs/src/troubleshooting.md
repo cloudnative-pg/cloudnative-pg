@@ -787,3 +787,15 @@ For example:
 Please remember that you must have enough hugepages memory available to schedule
 every Pod in the Cluster (in the example above, at least 512MiB per Pod must be
 free).
+
+
+### Bootstrap job hangs in running status 
+
+If your Cluster's initialization job hangs in running status with a 
+"error while waiting for the API server to be reachable", you probably have network issue
+to the kubernetes api server, initialization job (same for most of jobs) need access kubernetes 
+api during running. Please check if the kubernetes api server is reachable. 
+
+Another possible reason is you have sidecar injection configured, sidecar like istio make network 
+temporarily un-available during startup. In this case, try avoid sidecar injecting for pods of such 
+jobs. 
