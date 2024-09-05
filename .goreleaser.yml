@@ -98,7 +98,7 @@ checksum:
   name_template: '{{ .ProjectName }}-{{ .Version }}-checksums.txt'
 
 snapshot:
-  name_template: "{{ .Tag }}-next"
+  version_template: "{{ .Tag }}-next"
 
 changelog:
   disable: true
