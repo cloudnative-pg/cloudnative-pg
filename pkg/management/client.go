@@ -132,7 +132,7 @@ func NewEventRecorder() (record.EventRecorder, error) {
 // WaitKubernetesAPIServer will wait for the kubernetes API server to by ready.
 // Returns any error if it can't be reached.
 func WaitKubernetesAPIServer(ctx context.Context, clusterObjectKey client.ObjectKey) error {
-	logger := log.FromContext(ctx)
+	logger := log.FromContext(ctx).WithName("kube-api-server-check")
 
 	cli, err := NewControllerRuntimeClient()
 	if err != nil {
@@ -140,10 +140,15 @@ func WaitKubernetesAPIServer(ctx context.Context, clusterObjectKey client.Object
 		return err
 	}
 
-	if err := retry.OnError(readinessCheckRetry, resources.RetryAlways, func() (err error) {
-		logger.Info("attempting to reach the API server ...")
-		return cli.Get(ctx, clusterObjectKey, &apiv1.Cluster{})
-	}); err != nil {
+	err = retry.OnError(readinessCheckRetry, resources.RetryAlways, func() (err error) {
+		if err = cli.Get(ctx, clusterObjectKey, &apiv1.Cluster{}); err != nil {
+			logger.Info("The api server is currently unreachable, will wait and retry later")
+			return err
+		}
+		return nil
+	})
+
+	if err != nil {
 		const message = "error while waiting for the API server to be reachable"
 		logger.Error(err, message)
 		return fmt.Errorf("%s: %w", message, err)
