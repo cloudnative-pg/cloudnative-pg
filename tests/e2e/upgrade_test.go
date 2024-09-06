@@ -262,8 +262,9 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		})
 	}
 
-	getExecutableHashesFromInstances := func(upgradeNamespace, clusterName1 string, w io.Writer) error {
-		pods, err := env.GetClusterPodList(upgradeNamespace, clusterName1)
+	// getExecutableHashesFromInstances prints the manager's executable hash of each pod to a given IO writer
+	getExecutableHashesFromInstances := func(upgradeNamespace, clusterName string, w io.Writer) error {
+		pods, err := env.GetClusterPodList(upgradeNamespace, clusterName)
 		if err != nil {
 			return err
 		}
@@ -283,7 +284,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 	}
 
 	// assertOnlineManagerRollout checks for the presence of InstanceManagerUpgraded
-	// events, which are produced on online upgrades
+	// events, which are produced on online upgrades.
 	// returns a boolean indicating success
 	assertOnlineManagerRollout := func() bool {
 		backoffCheckingEvents := wait.Backoff{
@@ -329,7 +330,10 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		return err == nil
 	}
 
-	assertExpectedMatchigPodUIDs := func(namespace, clusterName string, podUIDs []types.UID, expectedMatches int) error {
+	// assertExpectedMatchingPodUIDs checks that the UID of each pod of a Cluster matches with a given list of UIDs.
+	// expectedMatches defines how many times, when comparing the elements of the 2 lists, you are expected to have
+	// common values
+	assertExpectedMatchingPodUIDs := func(namespace, clusterName string, podUIDs []types.UID, expectedMatches int) error {
 		backoffCheckingPodRestarts := wait.Backoff{
 			Duration: 10 * time.Second,
 			Steps:    30,
@@ -557,7 +561,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		if err != nil || operatorConfigMap.Data["ENABLE_INSTANCE_MANAGER_INPLACE_UPDATES"] == "false" {
 			GinkgoWriter.Printf("rolling upgrade\n")
 			// Wait for rolling update. We expect all the pods to change UID
-			errMatches := assertExpectedMatchigPodUIDs(upgradeNamespace, clusterName1, podUIDs, 0)
+			errMatches := assertExpectedMatchingPodUIDs(upgradeNamespace, clusterName1, podUIDs, 0)
 			Expect(errMatches).ShouldNot(HaveOccurred(), "No pods should have the same UID they had before the upgrade")
 		} else {
 			GinkgoWriter.Printf("online upgrade\n")
@@ -567,8 +571,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			if onlineUpgradeDone {
 				GinkgoWriter.Printf("online manager rollout is done\n")
 				// equivalent to waiting for 300 sec as before
-
-				err := assertExpectedMatchigPodUIDs(upgradeNamespace, clusterName1, podUIDs, 3)
+				err := assertExpectedMatchingPodUIDs(upgradeNamespace, clusterName1, podUIDs, 3)
 				if err != nil {
 					GinkgoWriter.Printf("online manager rollout not done. Some pods were restarted\n")
 					onlineUpgradeDone = false
