@@ -20,6 +20,7 @@ package postgres
 
 import (
 	"fmt"
+	barmanCatalog "github.com/cloudnative-pg/plugin-barman-cloud/pkg/catalog"
 	"strconv"
 	"strings"
 )
@@ -40,6 +41,10 @@ func (lsn LSN) Less(other LSN) bool {
 	}
 
 	return p1 < p2
+}
+
+func (lsn LSN) LessAdapter(other barmanCatalog.LsnAdapter) bool {
+	return lsn.Less(other.(LSN))
 }
 
 // Parse an LSN in its components

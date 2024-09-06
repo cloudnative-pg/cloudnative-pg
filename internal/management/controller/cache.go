@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"errors"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"os"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -60,6 +61,10 @@ func (r *InstanceReconciler) updateWALRestoreSettingsCache(ctx context.Context, 
 
 	envRestore, err := barmanCredentials.EnvSetBackupCloudCredentials(
 		ctx,
+		barmanCredentials.FileUtils{
+			RemoveFile:      fileutils.RemoveFile,
+			WriteFileAtomic: fileutils.WriteFileAtomic,
+		},
 		r.GetClient(),
 		cluster.Namespace,
 		barmanConfiguration,
@@ -87,6 +92,10 @@ func (r *InstanceReconciler) shouldUpdateWALArchiveSettingsCache(
 	// Populate the cache with the backup configuration
 	envArchive, err := barmanCredentials.EnvSetBackupCloudCredentials(
 		ctx,
+		barmanCredentials.FileUtils{
+			RemoveFile:      fileutils.RemoveFile,
+			WriteFileAtomic: fileutils.WriteFileAtomic,
+		},
 		r.GetClient(),
 		cluster.Namespace,
 		cluster.Spec.Backup.BarmanObjectStore,

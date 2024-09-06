@@ -1966,6 +1966,22 @@ type RecoveryTarget struct {
 	Exclusive *bool `json:"exclusive,omitempty"`
 }
 
+func (rt *RecoveryTarget) GetBackupID() string {
+	return rt.BackupID
+}
+
+func (rt *RecoveryTarget) GetTargetTime() string {
+	return rt.TargetTime
+}
+
+func (rt *RecoveryTarget) GetTargetLSN() string {
+	return rt.TargetLSN
+}
+
+func (rt *RecoveryTarget) GetTargetTLI() string {
+	return rt.TargetTLI
+}
+
 // StorageConfiguration is the configuration used to create and reconcile PVCs,
 // usable for WAL volumes, PGDATA volumes, or tablespaces
 type StorageConfiguration struct {

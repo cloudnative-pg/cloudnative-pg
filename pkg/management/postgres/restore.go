@@ -22,6 +22,9 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	barmanCatalog "github.com/cloudnative-pg/plugin-barman-cloud/pkg/catalog"
+	barmanCommand "github.com/cloudnative-pg/plugin-barman-cloud/pkg/command"
+	"github.com/cloudnative-pg/plugin-barman-cloud/pkg/spool"
 	barmanTypes "github.com/cloudnative-pg/plugin-barman-cloud/pkg/types"
 	"math"
 	"os"
@@ -45,7 +48,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/archiver"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/catalog"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/external"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
@@ -77,6 +79,11 @@ var (
 		"max_worker_processes setting": "max_worker_processes",
 		"max_prepared_xacts setting":   "max_prepared_transactions",
 		"max_locks_per_xact setting":   "max_locks_per_transaction",
+	}
+
+	barmanCredentialsUtils = barmanCredentials.FileUtils{
+		RemoveFile:      os.Remove,
+		WriteFileAtomic: fileutils.WriteFileAtomic,
 	}
 )
 
@@ -203,6 +210,7 @@ func (info InitInfo) createBackupObjectForSnapshotRestore(
 
 	env, err := barmanCredentials.EnvSetRestoreCloudCredentials(
 		ctx,
+		barmanCredentialsUtils,
 		typedClient,
 		cluster.Namespace,
 		server.BarmanObjectStore,
@@ -333,7 +341,11 @@ func (info InitInfo) ensureArchiveContainsLastCheckpointRedoWAL(
 		return err
 	}
 
-	rest, err := restorer.New(ctx, cluster, env, walarchive.SpoolDirectory)
+	rest, err := restorer.New(ctx, spool.FileUtils{
+		EnsureDirectoryExists: fileutils.EnsureDirectoryExists,
+		FileExists:            fileutils.FileExists,
+		MoveFile:              fileutils.MoveFile,
+	}, env, walarchive.SpoolDirectory)
 	if err != nil {
 		return err
 	}
@@ -349,7 +361,7 @@ func (info InitInfo) ensureArchiveContainsLastCheckpointRedoWAL(
 		return err
 	}
 
-	if err := rest.Restore(backup.Status.BeginWal, testWALPath, opts); err != nil {
+	if err := rest.Restore(execlog.RunStreaming, backup.Status.BeginWal, testWALPath, opts); err != nil {
 		return fmt.Errorf("encountered an error while checking the presence of first needed WAL in the archive: %w", err)
 	}
 
@@ -478,6 +490,7 @@ func (info InitInfo) loadBackupObjectFromExternalCluster(
 
 	env, err := barmanCredentials.EnvSetRestoreCloudCredentials(
 		ctx,
+		barmanCredentialsUtils,
 		typedClient,
 		cluster.Namespace,
 		server.BarmanObjectStore,
@@ -486,16 +499,21 @@ func (info InitInfo) loadBackupObjectFromExternalCluster(
 		return nil, nil, err
 	}
 
-	backupCatalog, err := barman.GetBackupList(ctx, server.BarmanObjectStore, serverName, env)
+	backupCatalog, err := barmanCommand.GetBackupList(ctx, server.BarmanObjectStore, serverName, env)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	// We are now choosing the right backup to restore
-	var targetBackup *catalog.BarmanBackup
+	var targetBackup *barmanCatalog.BarmanBackup
 	if cluster.Spec.Bootstrap.Recovery != nil &&
 		cluster.Spec.Bootstrap.Recovery.RecoveryTarget != nil {
-		targetBackup, err = backupCatalog.FindBackupInfo(cluster.Spec.Bootstrap.Recovery.RecoveryTarget)
+		targetBackup, err = backupCatalog.FindBackupInfo(
+			func(s string) barmanCatalog.LsnAdapter {
+				return postgresSpec.LSN(s)
+			},
+			cluster.Spec.Bootstrap.Recovery.RecoveryTarget,
+		)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -552,6 +570,7 @@ func (info InitInfo) loadBackupFromReference(
 
 	env, err := barmanCredentials.EnvSetRestoreCloudCredentials(
 		ctx,
+		barmanCredentialsUtils,
 		typedClient,
 		cluster.Namespace,
 		&barmanTypes.BarmanObjectStoreConfiguration{
@@ -921,6 +940,7 @@ func (info *InitInfo) checkBackupDestination(
 	}
 	// Get environment from cache
 	env, err := barmanCredentials.EnvSetRestoreCloudCredentials(ctx,
+		barmanCredentialsUtils,
 		client,
 		cluster.Namespace,
 		cluster.Spec.Backup.BarmanObjectStore,

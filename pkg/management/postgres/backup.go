@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman"
 	barmanTypes "github.com/cloudnative-pg/plugin-barman-cloud/pkg/types"
 	"os"
 	"os/exec"
@@ -38,14 +39,14 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/conditions"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/catalog"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	barmanCapabilities "github.com/cloudnative-pg/plugin-barman-cloud/pkg/capabilities"
+	barmanCatalog "github.com/cloudnative-pg/plugin-barman-cloud/pkg/catalog"
+	barmanCommand "github.com/cloudnative-pg/plugin-barman-cloud/pkg/command"
 	barmanCredentials "github.com/cloudnative-pg/plugin-barman-cloud/pkg/credentials"
 
 	// this is needed to correctly open the sql connection with the pgx driver
@@ -174,7 +175,7 @@ func (b *BackupCommand) getBarmanCloudBackupOptions(
 			configuration.EndpointURL)
 	}
 
-	options, err = barman.AppendCloudProviderOptionsFromConfiguration(options, configuration)
+	options, err = barmanCommand.AppendCloudProviderOptionsFromConfiguration(options, configuration)
 	if err != nil {
 		return nil, err
 	}
@@ -217,6 +218,10 @@ func (b *BackupCommand) Start(ctx context.Context) error {
 
 	b.Env, err = barmanCredentials.EnvSetBackupCloudCredentials(
 		ctx,
+		barmanCredentials.FileUtils{
+			RemoveFile:      fileutils.RemoveFile,
+			WriteFileAtomic: fileutils.WriteFileAtomic,
+		},
 		b.Client,
 		b.Cluster.Namespace,
 		b.Cluster.Spec.Backup.BarmanObjectStore,
@@ -366,9 +371,9 @@ func (b *BackupCommand) takeBackup(ctx context.Context) error {
 
 func (b *BackupCommand) getExecutedBackupInfo(
 	ctx context.Context,
-) (*catalog.BarmanBackup, error) {
+) (*barmanCatalog.BarmanBackup, error) {
 	if b.Capabilities.ShouldExecuteBackupWithName(b.Cluster) {
-		return barman.GetBackupByName(
+		return barmanCommand.GetBackupByName(
 			ctx,
 			b.Backup.Status.BackupName,
 			b.Backup.Status.ServerName,
@@ -378,7 +383,7 @@ func (b *BackupCommand) getExecutedBackupInfo(
 	}
 	// we don't know the id or the name of the executed backup so it fetches the last executed barman backup.
 	// it could create issues in case of concurrent backups. It is a deprecated way of detecting the backup.
-	return barman.GetLatestBackup(
+	return barmanCommand.GetLatestBackup(
 		ctx,
 		b.Backup.Status.ServerName,
 		b.Cluster.Spec.Backup.BarmanObjectStore,
@@ -399,7 +404,7 @@ func (b *BackupCommand) backupMaintenance(ctx context.Context) {
 	}
 
 	// Extracting the latest backup using barman-cloud-backup-list
-	backupList, err := barman.GetBackupList(
+	backupList, err := barmanCommand.GetBackupList(
 		ctx,
 		b.Cluster.Spec.Backup.BarmanObjectStore,
 		b.Backup.Status.ServerName,
@@ -431,7 +436,7 @@ func (b *BackupCommand) backupMaintenance(ctx context.Context) {
 
 // updateClusterStatusWithBackupTimes updates the last successful backup time and first
 // recoverability point for the cluster
-func updateClusterStatusWithBackupTimes(cluster *apiv1.Cluster, backupList *catalog.Catalog) {
+func updateClusterStatusWithBackupTimes(cluster *apiv1.Cluster, backupList *barmanCatalog.Catalog) {
 	firstRecoverabilityPoint := backupList.FirstRecoverabilityPoint()
 	var lastSuccessfulBackup *time.Time
 	if lastSuccessfulBackupInfo := backupList.LatestBackupInfo(); lastSuccessfulBackupInfo != nil {
@@ -489,7 +494,7 @@ func (b *BackupCommand) setupBackupStatus() {
 	backupStatus.Phase = apiv1.BackupPhaseRunning
 }
 
-func assignBarmanBackupToBackup(backup *apiv1.Backup, barmanBackup *catalog.BarmanBackup) {
+func assignBarmanBackupToBackup(backup *apiv1.Backup, barmanBackup *barmanCatalog.BarmanBackup) {
 	backupStatus := backup.GetStatus()
 
 	backupStatus.BackupName = barmanBackup.BackupName

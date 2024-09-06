@@ -44,10 +44,10 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	barmanCatalog "github.com/cloudnative-pg/plugin-barman-cloud/pkg/catalog"
 	barmanTypes "github.com/cloudnative-pg/plugin-barman-cloud/pkg/types"
 	"os/exec"
 
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/catalog"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	barmanCapabilities "github.com/cloudnative-pg/plugin-barman-cloud/pkg/capabilities"
 )
@@ -102,7 +102,7 @@ func GetBackupList(
 	barmanConfiguration *barmanTypes.BarmanObjectStoreConfiguration,
 	serverName string,
 	env []string,
-) (*catalog.Catalog, error) {
+) (*barmanCatalog.Catalog, error) {
 	contextLogger := log.FromContext(ctx).WithName("barman")
 
 	rawJSON, err := executeQueryCommand(
@@ -116,7 +116,7 @@ func GetBackupList(
 	if err != nil {
 		return nil, err
 	}
-	backupList, err := catalog.NewCatalogFromBarmanCloudBackupList(rawJSON)
+	backupList, err := barmanCatalog.NewCatalogFromBarmanCloudBackupList(rawJSON)
 	if err != nil {
 		contextLogger.Error(err, "Can't parse barman output",
 			"command", barmanCapabilities.BarmanCloudBackupList,
@@ -134,7 +134,7 @@ func GetBackupByName(
 	serverName string,
 	barmanConfiguration *barmanTypes.BarmanObjectStoreConfiguration,
 	env []string,
-) (*catalog.BarmanBackup, error) {
+) (*barmanCatalog.BarmanBackup, error) {
 	contextLogger := log.FromContext(ctx)
 
 	rawJSON, err := executeQueryCommand(
@@ -151,7 +151,7 @@ func GetBackupByName(
 
 	contextLogger.Debug("raw backup barman object", "rawBarmanObject", rawJSON)
 
-	return catalog.NewBackupFromBarmanCloudBackupShow(rawJSON)
+	return barmanCatalog.NewBackupFromBarmanCloudBackupShow(rawJSON)
 }
 
 // GetLatestBackup returns the latest executed backup
@@ -160,7 +160,7 @@ func GetLatestBackup(
 	serverName string,
 	barmanConfiguration *barmanTypes.BarmanObjectStoreConfiguration,
 	env []string,
-) (*catalog.BarmanBackup, error) {
+) (*barmanCatalog.BarmanBackup, error) {
 	contextLogger := log.FromContext(ctx)
 	// Extracting the latest backup using barman-cloud-backup-list
 	backupList, err := GetBackupList(ctx, barmanConfiguration, serverName, env)

@@ -21,6 +21,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
+	"github.com/cloudnative-pg/plugin-barman-cloud/pkg/spool"
 	barmanTypes "github.com/cloudnative-pg/plugin-barman-cloud/pkg/types"
 	"os"
 	"path"
@@ -150,7 +153,11 @@ func run(ctx context.Context, pgData string, podName string, args []string) erro
 
 	// Create the restorer
 	var walRestorer *restorer.WALRestorer
-	if walRestorer, err = restorer.New(ctx, cluster, env, SpoolDirectory); err != nil {
+	if walRestorer, err = restorer.New(ctx, spool.FileUtils{
+		EnsureDirectoryExists: fileutils.EnsureDirectoryExists,
+		FileExists:            fileutils.FileExists,
+		MoveFile:              fileutils.MoveFile,
+	}, env, SpoolDirectory); err != nil {
 		return fmt.Errorf("while creating the restorer: %w", err)
 	}
 
@@ -193,7 +200,7 @@ func run(ctx context.Context, pgData string, podName string, args []string) erro
 
 	// Step 4: download the WAL files into the required place
 	downloadStartTime := time.Now()
-	walStatus := walRestorer.RestoreList(ctx, walFilesList, destinationPath, options)
+	walStatus := walRestorer.RestoreList(ctx, walFilesList, destinationPath, options, execlog.RunStreaming)
 
 	// We return immediately if the first WAL has errors, because the first WAL
 	// is the one that PostgreSQL has requested to restore.

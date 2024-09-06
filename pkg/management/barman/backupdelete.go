@@ -20,13 +20,13 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	barmanCatalog "github.com/cloudnative-pg/plugin-barman-cloud/pkg/catalog"
 	"os/exec"
 	"reflect"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/catalog"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	barmanCapabilities "github.com/cloudnative-pg/plugin-barman-cloud/pkg/capabilities"
@@ -103,7 +103,7 @@ func DeleteBackupsNotInCatalog(
 	ctx context.Context,
 	cli client.Client,
 	cluster *v1.Cluster,
-	catalog *catalog.Catalog,
+	catalog *barmanCatalog.Catalog,
 ) error {
 	// We had two options:
 	//
