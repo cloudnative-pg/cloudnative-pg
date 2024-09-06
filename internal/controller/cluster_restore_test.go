@@ -20,6 +20,7 @@ import (
 	"context"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8client "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -291,5 +292,208 @@ var _ = Describe("getOrphanPVCs", func() {
 			Expect(pvc.OwnerReferences).ToNot(BeEmpty())
 			Expect(pvc.Annotations[utils.PVCStatusAnnotationName]).To(Equal(persistentvolumeclaim.StatusReady))
 		}
+	})
+})
+
+var _ = Describe("ensureOrphanServicesAreNotPresent", func() {
+	var (
+		mockCli k8client.Client
+		cluster *apiv1.Cluster
+	)
+
+	BeforeEach(func() {
+		cluster = &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-cluster",
+				Namespace: "default",
+			},
+			Spec: apiv1.ClusterSpec{
+				Managed: &apiv1.ManagedConfiguration{
+					Services: &apiv1.ManagedServices{
+						Additional: []apiv1.ManagedService{
+							{
+								SelectorType:   apiv1.ServiceSelectorTypeRW,
+								UpdateStrategy: apiv1.ServiceUpdateStrategyPatch,
+								ServiceTemplate: apiv1.ServiceTemplateSpec{
+									ObjectMeta: apiv1.Metadata{
+										Name: "test-rw-service",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+		mockCli = fake.NewClientBuilder().
+			WithScheme(k8scheme.BuildWithAllKnownScheme()).
+			WithObjects(cluster).
+			Build()
+	})
+
+	Context("when no orphan services are present", func() {
+		It("should not return an error", func(ctx SpecContext) {
+			err := ensureOrphanServicesAreNotPresent(ctx, mockCli, cluster)
+			Expect(err).ToNot(HaveOccurred())
+		})
+	})
+
+	Context("when orphan services are present", func() {
+		BeforeEach(func() {
+			svc := &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      cluster.GetServiceReadWriteName(),
+					Namespace: cluster.Namespace,
+				},
+			}
+			mockCli = fake.NewClientBuilder().
+				WithScheme(k8scheme.BuildWithAllKnownScheme()).
+				WithObjects(cluster, svc).
+				Build()
+		})
+
+		It("should delete the orphan services", func(ctx SpecContext) {
+			err := ensureOrphanServicesAreNotPresent(ctx, mockCli, cluster)
+			Expect(err).ToNot(HaveOccurred())
+
+			var svc corev1.Service
+			err = mockCli.Get(ctx,
+				k8client.ObjectKey{Name: cluster.GetServiceReadWriteName(), Namespace: cluster.Namespace},
+				&svc,
+			)
+			Expect(apierrs.IsNotFound(err)).To(BeTrue())
+		})
+
+		Context("when orphan read services are present", func() {
+			BeforeEach(func() {
+				svc := &corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      cluster.GetServiceReadName(),
+						Namespace: cluster.Namespace,
+					},
+				}
+				mockCli = fake.NewClientBuilder().
+					WithScheme(k8scheme.BuildWithAllKnownScheme()).
+					WithObjects(cluster, svc).
+					Build()
+			})
+
+			It("should delete the orphan read services", func(ctx SpecContext) {
+				err := ensureOrphanServicesAreNotPresent(ctx, mockCli, cluster)
+				Expect(err).ToNot(HaveOccurred())
+
+				var svc corev1.Service
+				err = mockCli.Get(ctx,
+					k8client.ObjectKey{Name: cluster.GetServiceReadName(), Namespace: cluster.Namespace},
+					&svc,
+				)
+				Expect(apierrs.IsNotFound(err)).To(BeTrue())
+			})
+		})
+
+		Context("when orphan read-only services are present", func() {
+			BeforeEach(func() {
+				svc := &corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      cluster.GetServiceReadOnlyName(),
+						Namespace: cluster.Namespace,
+					},
+				}
+				mockCli = fake.NewClientBuilder().
+					WithScheme(k8scheme.BuildWithAllKnownScheme()).
+					WithObjects(cluster, svc).
+					Build()
+			})
+
+			It("should delete the orphan read-only services", func(ctx SpecContext) {
+				err := ensureOrphanServicesAreNotPresent(ctx, mockCli, cluster)
+				Expect(err).ToNot(HaveOccurred())
+
+				var svc corev1.Service
+				err = mockCli.Get(ctx,
+					k8client.ObjectKey{Name: cluster.GetServiceReadOnlyName(), Namespace: cluster.Namespace},
+					&svc,
+				)
+				Expect(apierrs.IsNotFound(err)).To(BeTrue())
+			})
+		})
+
+		Context("when orphan additional services are present", func() {
+			BeforeEach(func() {
+				svc := &corev1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-rw-service",
+						Namespace: cluster.Namespace,
+					},
+				}
+				mockCli = fake.NewClientBuilder().
+					WithScheme(k8scheme.BuildWithAllKnownScheme()).
+					WithObjects(cluster, svc).
+					Build()
+			})
+
+			It("should delete the orphan additional services", func(ctx SpecContext) {
+				err := ensureOrphanServicesAreNotPresent(ctx, mockCli, cluster)
+				Expect(err).ToNot(HaveOccurred())
+
+				var svc corev1.Service
+				err = mockCli.Get(ctx,
+					k8client.ObjectKey{Name: "test-rw-service", Namespace: cluster.Namespace},
+					&svc,
+				)
+				Expect(apierrs.IsNotFound(err)).To(BeTrue())
+			})
+		})
+	})
+
+	Context("when services have owner references", func() {
+		BeforeEach(func() {
+			svc := &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      cluster.GetServiceReadWriteName(),
+					Namespace: cluster.Namespace,
+					OwnerReferences: []metav1.OwnerReference{
+						{
+							Name:       "some-controller",
+							Kind:       "any-kind",
+							UID:        "3241",
+							APIVersion: "v1",
+						},
+					},
+				},
+			}
+			mockCli = fake.NewClientBuilder().
+				WithScheme(k8scheme.BuildWithAllKnownScheme()).
+				WithObjects(cluster, svc).
+				Build()
+		})
+
+		It("should return an error", func(ctx SpecContext) {
+			err := ensureOrphanServicesAreNotPresent(ctx, mockCli, cluster)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("service has owner references and it is not orphan"))
+		})
+	})
+
+	Context("when services are owned by the cluster", func() {
+		BeforeEach(func() {
+			svc := &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      cluster.GetServiceReadWriteName(),
+					Namespace: cluster.Namespace,
+				},
+			}
+			cluster.TypeMeta = metav1.TypeMeta{Kind: apiv1.ClusterKind, APIVersion: apiv1.GroupVersion.String()}
+			cluster.SetInheritedDataAndOwnership(&svc.ObjectMeta)
+			mockCli = fake.NewClientBuilder().
+				WithScheme(k8scheme.BuildWithAllKnownScheme()).
+				WithObjects(cluster, svc).
+				Build()
+		})
+
+		It("should not return an error", func(ctx SpecContext) {
+			err := ensureOrphanServicesAreNotPresent(ctx, mockCli, cluster)
+			Expect(err).ToNot(HaveOccurred())
+		})
 	})
 })
