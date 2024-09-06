@@ -39,26 +39,12 @@ var _ = Describe("PGBouncer Connections", Label(tests.LabelServiceConnectivity),
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 	})
-	JustAfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			env.DumpPoolerResourcesInfo(namespace, CurrentSpecReport().LeafNodeText)
-		}
-	})
 
 	Context("no user-defined certificates", Ordered, func() {
 		BeforeAll(func() {
 			// Create a cluster in a namespace we'll delete after the test
-			namespace, err = env.CreateUniqueNamespace("pgbouncer-auth-no-user-certs")
+			namespace, err = env.CreateUniqueTestNamespace("pgbouncer-auth-no-user-certs")
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.CleanupNamespace(
-					namespace,
-					CurrentSpecReport().LeafNodeText,
-					CurrentSpecReport().Failed(),
-					GinkgoWriter,
-				)
-			})
 			clusterName, err = env.GetResourceNameFromYAML(sampleFile)
 			Expect(err).ToNot(HaveOccurred())
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
@@ -153,16 +139,8 @@ var _ = Describe("PGBouncer Connections", Label(tests.LabelServiceConnectivity),
 				caSecNameClient               = "my-postgresql-client-ca"
 			)
 			// Create a cluster in a namespace that will be deleted after the test
-			namespace, err = env.CreateUniqueNamespace("pgbouncer-separate-certificates")
+			namespace, err = env.CreateUniqueTestNamespace("pgbouncer-separate-certificates")
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.CleanupNamespace(
-					namespace,
-					CurrentSpecReport().LeafNodeText,
-					CurrentSpecReport().Failed(),
-					GinkgoWriter,
-				)
-			})
 			clusterName, err = env.GetResourceNameFromYAML(sampleFileWithCertificate)
 			Expect(err).ToNot(HaveOccurred())
 

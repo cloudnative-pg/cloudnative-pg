@@ -34,6 +34,8 @@ var _ = Describe("Cluster scale up and down", Serial, Label(tests.LabelReplicati
 		level                             = tests.Lowest
 		expectedPvcCount                  = 6
 	)
+
+	var namespace string
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
@@ -43,17 +45,10 @@ var _ = Describe("Cluster scale up and down", Serial, Label(tests.LabelReplicati
 	Context("with HA Replication Slots", func() {
 		It("can scale the cluster size", func() {
 			const namespacePrefix = "cluster-scale-e2e-with-slots"
+			var err error
 			// Create a cluster in a namespace we'll delete after the test
-			namespace, err := env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.CleanupNamespace(
-					namespace,
-					CurrentSpecReport().LeafNodeText,
-					CurrentSpecReport().Failed(),
-					GinkgoWriter,
-				)
-			})
 			AssertCreateCluster(namespace, clusterName, sampleFileWithReplicationSlots, env)
 
 			AssertClusterReplicationSlots(clusterName, namespace)
@@ -88,16 +83,9 @@ var _ = Describe("Cluster scale up and down", Serial, Label(tests.LabelReplicati
 		It("can scale the cluster size", func() {
 			// Create a cluster in a namespace we'll delete after the test
 			const namespacePrefix = "cluster-scale-e2e"
-			namespace, err := env.CreateUniqueNamespace(namespacePrefix)
+			var err error
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.CleanupNamespace(
-					namespace,
-					CurrentSpecReport().LeafNodeText,
-					CurrentSpecReport().Failed(),
-					GinkgoWriter,
-				)
-			})
 			AssertCreateCluster(namespace, clusterName, sampleFileWithoutReplicationSlots, env)
 
 			// Add a node to the cluster and verify the cluster has one more
