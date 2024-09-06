@@ -107,7 +107,6 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 
 			// Verify the parameter has been updated in every pod
 			for _, pod := range podList.Items {
-				pod := pod // pin the variable
 				Eventually(func() (string, error) {
 					stdout, _, err := env.ExecCommand(env.Ctx, pod, "postgres", &commandTimeout,
 						"psql", "-U", "postgres", "-tAc", "show synchronous_standby_names")
