@@ -27,11 +27,13 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/onsi/ginkgo/v2"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/logs"
 )
@@ -198,44 +200,60 @@ func (env TestingEnvironment) CleanupNamespace(
 		env.DumpNamespaceOperatorLogs(namespace, testName, output)
 		env.DumpNamespaceObjects(namespace, "out/"+testName+".log")
 	}
+
+	if len(namespace) == 0 {
+		return fmt.Errorf("namespace is empty")
+	}
+	exists, _ := fileutils.FileExists("cluster_logs/" + namespace)
+	if exists && !testFailed {
+		err := fileutils.RemoveDirectory("cluster_logs/" + namespace)
+		if err != nil {
+			return err
+		}
+	}
+
 	return env.DeleteNamespace(namespace)
 }
 
-// CleanupNamespaceAndWait does cleanup just like CleanupNamespace, but waits for
-// the namespace to be deleted, with a timeout
-func (env TestingEnvironment) CleanupNamespaceAndWait(
-	namespace string,
-	testName string,
-	testFailed bool,
-	timeoutSeconds int,
-	output io.Writer,
-) error {
-	lines, err := env.DumpOperatorLogs(false, 10)
-	if err != nil {
-		_, _ = fmt.Fprintf(output, "cleanupNamespace: error dumping opertor logs: %v\n", err)
-	}
-	_, _ = fmt.Fprintln(output, strings.Join(lines, "\n"))
-	if testFailed {
-		env.DumpNamespaceObjects(namespace, "out/"+testName+".log")
-	}
-	return env.DeleteNamespaceAndWait(namespace, timeoutSeconds)
-}
-
-// CreateUniqueNamespace creates a namespace by using the passed prefix.
+// CreateUniqueTestNamespace creates a namespace by using the passed prefix.
 // Return the namespace name and any errors encountered.
-func (env TestingEnvironment) CreateUniqueNamespace(
+// The namespace is automatically cleaned up at the end of the test.
+func (env TestingEnvironment) CreateUniqueTestNamespace(
 	namespacePrefix string,
 	opts ...client.CreateOption,
 ) (string, error) {
 	name := env.createdNamespaces.generateUniqueName(namespacePrefix)
 
-	return name, env.CreateNamespace(name, opts...)
+	return name, env.CreateTestNamespace(name, opts...)
+}
+
+// CreateTestNamespace creates a namespace creates a namespace.
+// Prefer CreateUniqueTestNamespace instead, unless you need a
+// specific namespace name. If so, make sure there is no collision
+// potential.
+// The namespace is automatically cleaned up at the end of the test.
+func (env TestingEnvironment) CreateTestNamespace(
+	name string,
+	opts ...client.CreateOption,
+) error {
+	err := env.CreateNamespace(name, opts...)
+	if err != nil {
+		return err
+	}
+
+	ginkgo.DeferCleanup(func() error {
+		return env.CleanupNamespace(
+			name,
+			ginkgo.CurrentSpecReport().LeafNodeText,
+			ginkgo.CurrentSpecReport().Failed(),
+			ginkgo.GinkgoWriter,
+		)
+	})
+
+	return nil
 }
 
 // CreateNamespace creates a namespace.
-// Prefer CreateUniqueNamespace instead, unless you need a
-// specific namespace name. If so, make sure there is no collision
-// potential
 func (env TestingEnvironment) CreateNamespace(name string, opts ...client.CreateOption) error {
 	// Exit immediately if the name is empty
 	if name == "" {

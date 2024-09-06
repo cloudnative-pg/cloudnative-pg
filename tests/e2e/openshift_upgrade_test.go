@@ -74,25 +74,13 @@ var _ = Describe("Upgrade Paths on OpenShift", Label(tests.LabelUpgrade), Ordere
 		return nil
 	}
 
-	cleanupNamespace := func(namespace string) error {
-		GinkgoWriter.Println("cleaning up")
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			// Dump the operator namespace, as operator is changing too
-			env.DumpOperator(operatorNamespace,
-				"out/"+CurrentSpecReport().LeafNodeText+"operator.log")
-		}
-		return env.DeleteNamespaceAndWait(namespace, 120)
-	}
-
-	cleanupOpenshift := func(namespace string) error {
+	cleanupOpenshift := func() {
 		err := cleanupOperator()
 		Expect(err).ToNot(HaveOccurred())
 		Eventually(func() error {
 			_, err = env.GetOperatorPod()
 			return err
 		}, 120).Should(HaveOccurred())
-		return cleanupNamespace(namespace)
 	}
 
 	assertClusterIsAligned := func(namespace, clusterName string) {
@@ -136,7 +124,7 @@ var _ = Describe("Upgrade Paths on OpenShift", Label(tests.LabelUpgrade), Ordere
 		Expect(err).ToNot(HaveOccurred())
 
 		// Create a Cluster in a namespace we'll delete at the end
-		namespace, err := env.CreateUniqueNamespace(namespacePrefix)
+		namespace, err := env.CreateUniqueTestNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 

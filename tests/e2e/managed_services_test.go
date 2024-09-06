@@ -42,12 +42,7 @@ var _ = Describe("Managed services tests", Label(tests.LabelSmoke, tests.LabelBa
 		namespacePrefix = "managed-services"
 	)
 	var namespace string
-
-	JustAfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-		}
-	})
+	var err error
 
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
@@ -58,16 +53,8 @@ var _ = Describe("Managed services tests", Label(tests.LabelSmoke, tests.LabelBa
 	It("should create and delete a rw managed service", func(ctx SpecContext) {
 		const clusterManifest = fixturesDir + "/managed_services/cluster-managed-services-rw.yaml.template"
 		const serviceName = "test-rw"
-		namespace, err := env.CreateUniqueNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			return env.CleanupNamespace(
-				namespace,
-				CurrentSpecReport().LeafNodeText,
-				CurrentSpecReport().Failed(),
-				GinkgoWriter,
-			)
-		})
 
 		clusterName, err := env.GetResourceNameFromYAML(clusterManifest)
 		Expect(err).ToNot(HaveOccurred())
@@ -109,16 +96,8 @@ var _ = Describe("Managed services tests", Label(tests.LabelSmoke, tests.LabelBa
 	It("should properly handle disabledDefaultServices field", func(ctx SpecContext) {
 		const clusterManifest = fixturesDir + "/managed_services/cluster-managed-services-no-default.yaml.template"
 
-		namespace, err := env.CreateUniqueNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			return env.CleanupNamespace(
-				namespace,
-				CurrentSpecReport().LeafNodeText,
-				CurrentSpecReport().Failed(),
-				GinkgoWriter,
-			)
-		})
 
 		clusterName, err := env.GetResourceNameFromYAML(clusterManifest)
 		Expect(err).ToNot(HaveOccurred())
@@ -176,16 +155,8 @@ var _ = Describe("Managed services tests", Label(tests.LabelSmoke, tests.LabelBa
 	It("should properly handle replace update strategy", func(ctx SpecContext) {
 		const clusterManifest = fixturesDir + "/managed_services/cluster-managed-services-replace-strategy.yaml.template"
 		const serviceName = "test-rw"
-		namespace, err := env.CreateUniqueNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			return env.CleanupNamespace(
-				namespace,
-				CurrentSpecReport().LeafNodeText,
-				CurrentSpecReport().Failed(),
-				GinkgoWriter,
-			)
-		})
 
 		clusterName, err := env.GetResourceNameFromYAML(clusterManifest)
 		Expect(err).ToNot(HaveOccurred())

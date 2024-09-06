@@ -55,7 +55,6 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 	)
 	var (
 		clusterName string
-		namespace   string
 		cluster     *apiv1.Cluster
 	)
 
@@ -67,7 +66,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 		}
 	})
 
-	clusterSetup := func(clusterManifest string) {
+	clusterSetup := func(namespace, clusterManifest string) {
 		var err error
 
 		clusterName, err = env.GetResourceNameFromYAML(clusterManifest)
@@ -106,7 +105,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 	}
 
 	Context("on a new cluster with tablespaces", Ordered, func() {
-		var backupName string
+		var namespace, backupName string
 		var err error
 		const (
 			clusterManifest = fixturesDir +
@@ -115,23 +114,11 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 				"/tablespaces/cluster-with-tablespaces-backup.yaml.template"
 			fullBackupName = "full-barman-backup"
 		)
-		JustAfterEach(func() {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-		})
 		BeforeAll(func() {
 			// Create a cluster in a namespace we'll delete after the test
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.CleanupNamespace(
-					namespace,
-					CurrentSpecReport().LeafNodeText,
-					CurrentSpecReport().Failed(),
-					GinkgoWriter,
-				)
-			})
+
 			// We create the MinIO credentials required to login into the system
 			AssertStorageCredentialsAreCreated(namespace, "backup-storage-creds", "minio", "minio123")
 
@@ -140,7 +127,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 				Expect(err).ToNot(HaveOccurred())
 			})
 
-			clusterSetup(clusterManifest)
+			clusterSetup(namespace, clusterManifest)
 		})
 
 		It("can verify tablespaces and PVC were created", func() {
@@ -363,7 +350,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 	})
 
 	Context("on a new cluster with tablespaces and volumesnapshot support", Ordered, func() {
-		var backupName string
+		var namespace, backupName string
 		var err error
 		var backupObject *apiv1.Backup
 		const (
@@ -386,23 +373,12 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 			table2                = "test_tbs2"
 		)
 		checkPointTimeout := time.Second * 10
-		JustAfterEach(func() {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-		})
+
 		BeforeAll(func() {
 			// Create a cluster in a namespace we'll delete after the test
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.CleanupNamespace(
-					namespace,
-					CurrentSpecReport().LeafNodeText,
-					CurrentSpecReport().Failed(),
-					GinkgoWriter,
-				)
-			})
+
 			// We create the required credentials for MinIO
 			AssertStorageCredentialsAreCreated(namespace, "backup-storage-creds", "minio", "minio123")
 
@@ -411,7 +387,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 				Expect(err).ToNot(HaveOccurred())
 			})
 
-			clusterSetup(clusterManifest)
+			clusterSetup(namespace, clusterManifest)
 		})
 
 		It("can verify tablespaces and PVC were created", func() {
@@ -625,27 +601,14 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 	})
 
 	Context("on a plain cluster with primaryUpdateMethod=restart", Ordered, func() {
-		JustAfterEach(func() {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-		})
-
+		var namespace string
 		clusterManifest := fixturesDir + "/tablespaces/cluster-without-tablespaces.yaml.template"
 		BeforeAll(func() {
 			var err error
 			// Create a cluster in a namespace we'll delete after the test
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.CleanupNamespace(
-					namespace,
-					CurrentSpecReport().LeafNodeText,
-					CurrentSpecReport().Failed(),
-					GinkgoWriter,
-				)
-			})
-			clusterSetup(clusterManifest)
+			clusterSetup(namespace, clusterManifest)
 		})
 
 		It("can update cluster by adding tablespaces", func() {
@@ -768,28 +731,16 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 	})
 
 	Context("on a plain cluster with primaryUpdateMethod=switchover", Ordered, func() {
-		JustAfterEach(func() {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-		})
-
+		var namespace string
 		clusterManifest := fixturesDir + "/tablespaces/cluster-without-tablespaces.yaml.template"
 		BeforeAll(func() {
 			var err error
 			// Create a cluster in a namespace we'll delete after the test
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.CleanupNamespace(
-					namespace,
-					CurrentSpecReport().LeafNodeText,
-					CurrentSpecReport().Failed(),
-					GinkgoWriter,
-				)
-			})
-			clusterSetup(clusterManifest)
+			clusterSetup(namespace, clusterManifest)
 		})
+
 		It("can update cluster adding tablespaces", func() {
 			By("patch cluster with primaryUpdateMethod=switchover", func() {
 				cluster, err := env.GetCluster(namespace, clusterName)

@@ -48,16 +48,8 @@ var _ = Describe("AppArmor support", Serial, Label(tests.LabelNoOpenshift, tests
 	})
 
 	It("sets up a cluster enabling AppArmor annotation feature", func() {
-		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			return env.CleanupNamespace(
-				namespace,
-				CurrentSpecReport().LeafNodeText,
-				CurrentSpecReport().Failed(),
-				GinkgoWriter,
-			)
-		})
 
 		AssertCreateCluster(namespace, clusterName, clusterAppArmorFile, env)
 

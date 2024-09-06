@@ -118,16 +118,8 @@ var _ = Describe("Separate pg_wal volume", Label(tests.LabelStorage), func() {
 		const namespacePrefix = "pg-wal-volume-e2e"
 		var err error
 		// Create a cluster in a namespace we'll delete after the test
-		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			return env.CleanupNamespace(
-				namespace,
-				CurrentSpecReport().LeafNodeText,
-				CurrentSpecReport().Failed(),
-				GinkgoWriter,
-			)
-		})
 		AssertCreateCluster(namespace, clusterName, sampleFileWithPgWal, env)
 		verifyPgWal(namespace)
 	})
@@ -136,16 +128,8 @@ var _ = Describe("Separate pg_wal volume", Label(tests.LabelStorage), func() {
 		const namespacePrefix = "add-pg-wal-volume-e2e"
 		var err error
 		// Create a cluster in a namespace we'll delete after the test
-		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			return env.CleanupNamespace(
-				namespace,
-				CurrentSpecReport().LeafNodeText,
-				CurrentSpecReport().Failed(),
-				GinkgoWriter,
-			)
-		})
 		AssertCreateCluster(namespace, clusterName, sampleFileWithoutPgWal, env)
 		By(fmt.Sprintf("adding pg_wal volume in existing cluster: %v", clusterName), func() {
 			updateWalStorage(namespace, clusterName)
