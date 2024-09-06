@@ -72,26 +72,14 @@ var _ = Describe("Connection via services", Label(tests.LabelServiceConnectivity
 		const sampleFile = fixturesDir + "/secrets/cluster-auto-generated.yaml.template"
 		const clusterName = "postgresql-auto-generated"
 		var namespace string
-		JustAfterEach(func() {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-		})
+
 		// If we don't specify secrets, the operator should autogenerate them.
 		// We check that we're able to use them
 		It("can connect with auto-generated passwords", func() {
 			// Create a cluster in a namespace we'll delete after the test
 			var err error
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.CleanupNamespace(
-					namespace,
-					CurrentSpecReport().LeafNodeText,
-					CurrentSpecReport().Failed(),
-					GinkgoWriter,
-				)
-			})
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
 			// Get the superuser password from the -superuser secret
@@ -126,11 +114,7 @@ var _ = Describe("Connection via services", Label(tests.LabelServiceConnectivity
 		const sampleFile = fixturesDir + "/secrets/cluster-user-supplied.yaml.template"
 		const clusterName = "postgresql-user-supplied"
 		var namespace string
-		JustAfterEach(func() {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-		})
+
 		// If we have specified secrets, we test that we're able to use them
 		// to connect
 		It("can connect with user-supplied passwords", func() {
@@ -139,16 +123,8 @@ var _ = Describe("Connection via services", Label(tests.LabelServiceConnectivity
 
 			// Create a cluster in a namespace we'll delete after the test
 			var err error
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.CleanupNamespace(
-					namespace,
-					CurrentSpecReport().LeafNodeText,
-					CurrentSpecReport().Failed(),
-					GinkgoWriter,
-				)
-			})
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 			AssertServices(namespace, clusterName, appDBName, appDBUser,
 				suppliedAppUserPassword, suppliedSuperuserPassword, env)

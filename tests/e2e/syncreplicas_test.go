@@ -79,6 +79,8 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 	}
 
 	Context("Legacy synchronous replication", func() {
+		var namespace string
+
 		It("can manage sync replicas", func() {
 			const (
 				namespacePrefix = "legacy-sync-replicas-e2e"
@@ -88,16 +90,8 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			// Create a cluster in a namespace we'll delete after the test
-			namespace, err := env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.CleanupNamespace(
-					namespace,
-					CurrentSpecReport().LeafNodeText,
-					CurrentSpecReport().Failed(),
-					GinkgoWriter,
-				)
-			})
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
 			// First we check that the starting situation is the expected one
@@ -162,16 +156,8 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 			// bootstrapping the cluster, the CREATE EXTENSION instruction will block
 			// the primary since the desired number of synchronous replicas (even when 1)
 			// is not met.
-			namespace, err := env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.CleanupNamespace(
-					namespace,
-					CurrentSpecReport().LeafNodeText,
-					CurrentSpecReport().Failed(),
-					GinkgoWriter,
-				)
-			})
 
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 			AssertClusterIsReady(namespace, clusterName, 30, env)
@@ -184,6 +170,8 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 	})
 
 	Context("Synchronous replication", func() {
+		var namespace string
+
 		It("can manage quorum/priority based synchronous replication", func() {
 			const (
 				namespacePrefix = "sync-replicas-e2e"
@@ -193,16 +181,8 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			// Create a cluster in a namespace we'll delete after the test
-			namespace, err := env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.CleanupNamespace(
-					namespace,
-					CurrentSpecReport().LeafNodeText,
-					CurrentSpecReport().Failed(),
-					GinkgoWriter,
-				)
-			})
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
 			By("verifying we have 2 quorum-based replicas", func() {

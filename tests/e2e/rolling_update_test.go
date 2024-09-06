@@ -476,16 +476,8 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 				// the image name has to be tagged as foo:MAJ.MIN. We'll update
 				// it to foo:MAJ, representing the latest minor.
 				// Create a cluster in a namespace we'll delete after the test
-				namespace, err := env.CreateUniqueNamespace(namespacePrefix)
+				namespace, err := env.CreateUniqueTestNamespace(namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
-				DeferCleanup(func() error {
-					return env.CleanupNamespace(
-						namespace,
-						CurrentSpecReport().LeafNodeText,
-						CurrentSpecReport().Failed(),
-						GinkgoWriter,
-					)
-				})
 				clusterName, err := env.GetResourceNameFromYAML(sampleFile)
 				Expect(err).ToNot(HaveOccurred())
 				AssertRollingUpdate(namespace, clusterName, sampleFile, true)
@@ -503,16 +495,8 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 				// the image name has to be tagged as foo:MAJ.MIN. We'll update
 				// it to foo:MAJ, representing the latest minor.
 				// Create a cluster in a namespace we'll delete after the test
-				namespace, err := env.CreateUniqueNamespace(namespacePrefix)
+				namespace, err := env.CreateUniqueTestNamespace(namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
-				DeferCleanup(func() error {
-					return env.CleanupNamespace(
-						namespace,
-						CurrentSpecReport().LeafNodeText,
-						CurrentSpecReport().Failed(),
-						GinkgoWriter,
-					)
-				})
 				clusterName, err := env.GetResourceNameFromYAML(sampleFile)
 				Expect(err).ToNot(HaveOccurred())
 				AssertRollingUpdate(namespace, clusterName, sampleFile, false)
@@ -525,16 +509,8 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 				sampleFile      = fixturesDir + "/rolling_updates/cluster-using-primary-update-method.yaml.template"
 			)
 			It("can do rolling update", func() {
-				namespace, err := env.CreateUniqueNamespace(namespacePrefix)
+				namespace, err := env.CreateUniqueTestNamespace(namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
-				DeferCleanup(func() error {
-					return env.CleanupNamespace(
-						namespace,
-						CurrentSpecReport().LeafNodeText,
-						CurrentSpecReport().Failed(),
-						GinkgoWriter,
-					)
-				})
 				clusterName, err := env.GetResourceNameFromYAML(sampleFile)
 				Expect(err).ToNot(HaveOccurred())
 				AssertRollingUpdate(namespace, clusterName, sampleFile, false)
@@ -578,16 +554,8 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 					// the image name has to be tagged as foo:MAJ.MIN. We'll update
 					// it to foo:MAJ, representing the latest minor.
 					// Create a cluster in a namespace we'll delete after the test
-					namespace, err := env.CreateUniqueNamespace(namespacePrefix)
+					namespace, err := env.CreateUniqueTestNamespace(namespacePrefix)
 					Expect(err).ToNot(HaveOccurred())
-					DeferCleanup(func() error {
-						return env.CleanupNamespace(
-							namespace,
-							CurrentSpecReport().LeafNodeText,
-							CurrentSpecReport().Failed(),
-							GinkgoWriter,
-						)
-					})
 
 					// Create a new image catalog and a new cluster
 					catalog := newImageCatalog(namespace, clusterName, major, preRollingImg)
@@ -606,16 +574,8 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 					// the image name has to be tagged as foo:MAJ.MIN. We'll update
 					// it to foo:MAJ, representing the latest minor.
 					// Create a cluster in a namespace we'll delete after the test
-					namespace, err := env.CreateUniqueNamespace(namespacePrefix)
+					namespace, err := env.CreateUniqueTestNamespace(namespacePrefix)
 					Expect(err).ToNot(HaveOccurred())
-					DeferCleanup(func() error {
-						return env.CleanupNamespace(
-							namespace,
-							CurrentSpecReport().LeafNodeText,
-							CurrentSpecReport().Failed(),
-							GinkgoWriter,
-						)
-					})
 
 					catalog := newImageCatalog(namespace, clusterName, major, preRollingImg)
 					cluster := newImageCatalogCluster(namespace, clusterName, major, 1, storageClass)
@@ -650,16 +610,8 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 					// the image name has to be tagged as foo:MAJ.MIN. We'll update
 					// it to foo:MAJ, representing the latest minor.
 					// Create a cluster in a namespace we'll delete after the test
-					namespace, err := env.CreateUniqueNamespace(namespacePrefix)
+					namespace, err := env.CreateUniqueTestNamespace(namespacePrefix)
 					Expect(err).ToNot(HaveOccurred())
-					DeferCleanup(func() error {
-						return env.CleanupNamespace(
-							namespace,
-							CurrentSpecReport().LeafNodeText,
-							CurrentSpecReport().Failed(),
-							GinkgoWriter,
-						)
-					})
 
 					cluster := newImageCatalogCluster(namespace, clusterName, major, 3, storageClass)
 					cluster.Spec.ImageCatalogRef.Kind = "ClusterImageCatalog"
@@ -676,16 +628,8 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 					// the image name has to be tagged as foo:MAJ.MIN. We'll update
 					// it to foo:MAJ, representing the latest minor.
 					// Create a cluster in a namespace we'll delete after the test
-					namespace, err := env.CreateUniqueNamespace(namespacePrefix)
+					namespace, err := env.CreateUniqueTestNamespace(namespacePrefix)
 					Expect(err).ToNot(HaveOccurred())
-					DeferCleanup(func() error {
-						return env.CleanupNamespace(
-							namespace,
-							CurrentSpecReport().LeafNodeText,
-							CurrentSpecReport().Failed(),
-							GinkgoWriter,
-						)
-					})
 
 					cluster := newImageCatalogCluster(namespace, clusterName, major, 1, storageClass)
 					cluster.Spec.ImageCatalogRef.Kind = "ClusterImageCatalog"

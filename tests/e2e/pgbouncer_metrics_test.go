@@ -49,16 +49,8 @@ var _ = Describe("PGBouncer Metrics", Label(tests.LabelObservability), func() {
 	It("should retrieve the metrics exposed by a freshly created pooler of type pgBouncer and validate its content",
 		func() {
 			var err error
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.CleanupNamespace(
-					namespace,
-					CurrentSpecReport().LeafNodeText,
-					CurrentSpecReport().Failed(),
-					GinkgoWriter,
-				)
-			})
 
 			clusterName, err = env.GetResourceNameFromYAML(cnpgCluster)
 			Expect(err).ToNot(HaveOccurred())
