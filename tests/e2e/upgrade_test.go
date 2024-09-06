@@ -298,20 +298,14 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		Expect(err).NotTo(HaveOccurred())
 	}
 
-	cleanupNamespace := func(namespace string) error {
+	cleanupOperatorAndMinio := func() error {
 		GinkgoWriter.Println("cleaning up")
 		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 			// Dump the minio namespace when failed
 			env.DumpNamespaceObjects(minioEnv.Namespace, "out/"+CurrentSpecReport().LeafNodeText+"minio.log")
 			// Dump the operator namespace, as operator is changing too
 			env.DumpOperator(operatorNamespace,
 				"out/"+CurrentSpecReport().LeafNodeText+"operator.log")
-		}
-
-		err := env.DeleteNamespace(namespace)
-		if err != nil {
-			return fmt.Errorf("could not cleanup. Failed to delete namespace: %v", err)
 		}
 
 		// Delete the operator's namespace in case that the previous test make corrupted changes to
@@ -641,9 +635,9 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 
 			GinkgoWriter.Printf("installing the recent CNPG tag %s\n", mostRecentTag)
 			testsUtils.InstallLatestCNPGOperator(mostRecentTag, env)
-			upgradeNamespace := assertCreateNamespace(upgradeNamespacePrefix)
-			DeferCleanup(cleanupNamespace, upgradeNamespace)
+			DeferCleanup(cleanupOperatorAndMinio)
 
+			upgradeNamespace := assertCreateNamespace(upgradeNamespacePrefix)
 			assertClustersWorkAfterOperatorUpgrade(upgradeNamespace, currentOperatorManifest)
 		})
 
@@ -658,9 +652,9 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 
 			GinkgoWriter.Printf("installing the recent CNPG tag %s\n", mostRecentTag)
 			testsUtils.InstallLatestCNPGOperator(mostRecentTag, env)
+			DeferCleanup(cleanupOperatorAndMinio)
 
 			upgradeNamespace := assertCreateNamespace(upgradeNamespacePrefix)
-			DeferCleanup(cleanupNamespace, upgradeNamespace)
 			assertClustersWorkAfterOperatorUpgrade(upgradeNamespace, currentOperatorManifest)
 			assertManagerRollout()
 		})
@@ -680,10 +674,9 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 
 			GinkgoWriter.Printf("installing the current operator %s\n", currentOperatorManifest)
 			deployOperator(currentOperatorManifest)
+			DeferCleanup(cleanupOperatorAndMinio)
 
 			upgradeNamespace := assertCreateNamespace(upgradeNamespacePrefix)
-			DeferCleanup(cleanupNamespace, upgradeNamespace)
-
 			assertClustersWorkAfterOperatorUpgrade(upgradeNamespace, primeOperatorManifest)
 		})
 
@@ -694,10 +687,9 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			})
 			GinkgoWriter.Printf("installing the current operator %s\n", currentOperatorManifest)
 			deployOperator(currentOperatorManifest)
+			DeferCleanup(cleanupOperatorAndMinio)
 
 			upgradeNamespace := assertCreateNamespace(upgradeNamespacePrefix)
-			DeferCleanup(cleanupNamespace, upgradeNamespace)
-
 			assertClustersWorkAfterOperatorUpgrade(upgradeNamespace, primeOperatorManifest)
 		})
 	})
