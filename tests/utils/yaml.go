@@ -28,7 +28,7 @@ import (
 )
 
 // ParseObjectsFromYAML parses a series of kubernetes objects defined in a YAML payload,
-// into the specified namespace
+// into the specified namespace.
 func ParseObjectsFromYAML(data []byte, namespace string) ([]client.Object, error) {
 	wrapErr := func(err error) error { return fmt.Errorf("while parsingObjectsFromYAML: %w", err) }
 	err := apiv1.AddToScheme(scheme.Scheme)

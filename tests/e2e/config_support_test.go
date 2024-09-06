@@ -180,6 +180,9 @@ var _ = Describe("Config support", Serial, Ordered, Label(tests.LabelDisruptive,
 	// Setting MONITORING_QUERIES_CONFIGMAP: "" should disable monitoring
 	// queries on new cluster. We expect those metrics to be missing.
 	It("verify metrics details when updated default monitoring configMap queries parameter is set to be empty", func() {
-		collectAndAssertDefaultMetricsPresentOnEachPod(namespace, clusterName, false)
+		cluster, err := env.GetCluster(namespace, clusterName)
+		Expect(err).NotTo(HaveOccurred())
+
+		collectAndAssertDefaultMetricsPresentOnEachPod(namespace, clusterName, cluster.IsMetricsTLSEnabled(), false)
 	})
 })
