@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
@@ -79,6 +80,11 @@ func (r *ClusterReconciler) reconcileRestoredCluster(
 		return nil, err
 	}
 
+	contextLogger.Debug("proceeding to remove orphan services if present")
+	if err := ensureOrphanServicesAreNotPresent(ctx, r.Client, cluster); err != nil {
+		return nil, err
+	}
+
 	contextLogger.Debug("proceeding to restore the cluster status")
 	if err := restoreClusterStatus(ctx, r.Client, cluster, highestSerial, primarySerial); err != nil {
 		return nil, err
@@ -86,6 +92,90 @@ func (r *ClusterReconciler) reconcileRestoredCluster(
 
 	contextLogger.Debug("restored the cluster status, proceeding to restore the orphan PVCS")
 	return nil, restoreOrphanPVCs(ctx, r.Client, cluster, pvcs)
+}
+
+func ensureOrphanServicesAreNotPresent(ctx context.Context, cli client.Client, cluster *apiv1.Cluster) error {
+	if err := ensureOrphanServiceIsNotPresent(
+		ctx,
+		cli,
+		client.ObjectKey{Name: cluster.GetServiceReadWriteName(), Namespace: cluster.Namespace},
+		cluster.Name,
+	); err != nil {
+		return err
+	}
+
+	if cluster.IsReadOnlyServiceEnabled() {
+		if err := ensureOrphanServiceIsNotPresent(
+			ctx,
+			cli,
+			client.ObjectKey{Name: cluster.GetServiceReadOnlyName(), Namespace: cluster.Namespace},
+			cluster.Name,
+		); err != nil {
+			return err
+		}
+	}
+
+	if cluster.IsReadServiceEnabled() {
+		if err := ensureOrphanServiceIsNotPresent(
+			ctx,
+			cli,
+			client.ObjectKey{Name: cluster.GetServiceReadName(), Namespace: cluster.Namespace},
+			cluster.Name,
+		); err != nil {
+			return err
+		}
+	}
+
+	managedServices, err := specs.BuildManagedServices(*cluster)
+	if err != nil {
+		return err
+	}
+	for idx := range managedServices {
+		if err := ensureOrphanServiceIsNotPresent(
+			ctx,
+			cli,
+			client.ObjectKey{Name: managedServices[idx].Name, Namespace: cluster.Namespace},
+			cluster.Name,
+		); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func ensureOrphanServiceIsNotPresent(
+	ctx context.Context,
+	cli client.Client,
+	objKey client.ObjectKey,
+	clusterName string,
+) error {
+	contextLogger := log.FromContext(ctx).WithName("ensure_orphan_service_is_not_present")
+	var svc corev1.Service
+	err := cli.Get(ctx, objKey, &svc)
+	if apierrs.IsNotFound(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	if owner, _ := IsOwnedByCluster(&svc); owner == clusterName {
+		return nil
+	}
+
+	if len(svc.OwnerReferences) > 0 {
+		contextLogger.Error(err, "while trying to ensure orphan services are deleted",
+			"serviceName", svc.Name, "ownerReferences", svc.OwnerReferences,
+		)
+		return errors.New("service has owner references and it is not orphan")
+	}
+
+	if err := cli.Delete(ctx, &svc); err != nil && !apierrs.IsNotFound(err) {
+		return err
+	}
+
+	return nil
 }
 
 // ensureClusterRestoreCanStart is a function where the plugins can inject their custom logic to tell the
