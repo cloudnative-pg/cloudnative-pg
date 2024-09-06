@@ -88,27 +88,13 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 	var namespace, metricsClusterName string
 	var err error
 
-	JustAfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-		}
-	})
-
 	It("can gather metrics", func() {
 		// Create the cluster namespace
 		const namespacePrefix = "cluster-metrics-e2e"
 		metricsClusterName, err = env.GetResourceNameFromYAML(clusterMetricsFile)
 		Expect(err).ToNot(HaveOccurred())
-		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			return env.CleanupNamespace(
-				namespace,
-				CurrentSpecReport().LeafNodeText,
-				CurrentSpecReport().Failed(),
-				GinkgoWriter,
-			)
-		})
 
 		AssertCustomMetricsResourcesExist(namespace, fixturesDir+"/metrics/custom-queries.yaml", 2, 1)
 
@@ -142,16 +128,9 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 		metricsClusterName, err = env.GetResourceNameFromYAML(clusterMetricsDBFile)
 		Expect(err).ToNot(HaveOccurred())
 		// Create the cluster namespace
-		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			return env.CleanupNamespace(
-				namespace,
-				CurrentSpecReport().LeafNodeText,
-				CurrentSpecReport().Failed(),
-				GinkgoWriter,
-			)
-		})
+
 		AssertCustomMetricsResourcesExist(namespace, customQueriesSampleFile, 1, 1)
 
 		// Create the cluster
@@ -171,16 +150,8 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 		const namespacePrefix = "default-metrics-details"
 		metricsClusterName, err = env.GetResourceNameFromYAML(clusterWithDefaultMetricsFile)
 		Expect(err).ToNot(HaveOccurred())
-		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			return env.CleanupNamespace(
-				namespace,
-				CurrentSpecReport().LeafNodeText,
-				CurrentSpecReport().Failed(),
-				GinkgoWriter,
-			)
-		})
 
 		AssertCreateCluster(namespace, metricsClusterName, clusterWithDefaultMetricsFile, env)
 
@@ -206,16 +177,8 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 		const namespacePrefix = "disable-default-metrics"
 		metricsClusterName, err = env.GetResourceNameFromYAML(defaultMonitoringQueriesDisableSampleFile)
 		Expect(err).ToNot(HaveOccurred())
-		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			return env.CleanupNamespace(
-				namespace,
-				CurrentSpecReport().LeafNodeText,
-				CurrentSpecReport().Failed(),
-				GinkgoWriter,
-			)
-		})
 
 		// Create the cluster
 		AssertCreateCluster(namespace, metricsClusterName, defaultMonitoringQueriesDisableSampleFile, env)
@@ -243,16 +206,8 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		// create namespace
-		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			return env.CleanupNamespace(
-				namespace,
-				CurrentSpecReport().LeafNodeText,
-				CurrentSpecReport().Failed(),
-				GinkgoWriter,
-			)
-		})
 
 		// Creating and verifying custom queries configmap
 		AssertCustomMetricsResourcesExist(namespace, configMapFIle, 1, 0)

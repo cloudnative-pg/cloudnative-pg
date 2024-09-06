@@ -53,16 +53,8 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 		var err error
 
 		// Create a cluster in a namespace we'll delete after the test
-		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			return env.CleanupNamespace(
-				namespace,
-				CurrentSpecReport().LeafNodeText,
-				CurrentSpecReport().Failed(),
-				GinkgoWriter,
-			)
-		})
 
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 		cluster, err := env.GetCluster(namespace, clusterName)
@@ -169,16 +161,8 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 		const namespacePrefix = "cluster-conditions"
 
 		var err error
-		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			return env.CleanupNamespace(
-				namespace,
-				CurrentSpecReport().LeafNodeText,
-				CurrentSpecReport().Failed(),
-				GinkgoWriter,
-			)
-		})
 
 		By(fmt.Sprintf("having a %v namespace", namespace), func() {
 			// Creating a namespace should be quick

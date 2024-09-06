@@ -82,12 +82,6 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 		const sampleFile = fixturesDir + "/drain-node/cluster-drain-node.yaml.template"
 		const clusterName = "cluster-drain-node"
 
-		JustAfterEach(func() {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-		})
-
 		// We cordon one node, so pods will run on one or two nodes. This
 		// is only to create a harder situation for the operator.
 		// We then drain the node containing the primary and expect the pod(s)
@@ -109,16 +103,8 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 			})
 			var err error
 			// Create a cluster in a namespace we'll delete after the test
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.CleanupNamespace(
-					namespace,
-					CurrentSpecReport().LeafNodeText,
-					CurrentSpecReport().Failed(),
-					GinkgoWriter,
-				)
-			})
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
 			By("waiting for the jobs to be removed", func() {
@@ -231,16 +217,8 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 				})
 				var err error
 				// Create a cluster in a namespace we'll delete after the test
-				namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+				namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
-				DeferCleanup(func() error {
-					return env.CleanupNamespace(
-						namespace,
-						CurrentSpecReport().LeafNodeText,
-						CurrentSpecReport().Failed(),
-						GinkgoWriter,
-					)
-				})
 				AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
 				By("waiting for the jobs to be removed", func() {
@@ -344,11 +322,6 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 				Skip("This test case is only applicable on clusters with local storage")
 			}
 		})
-		JustAfterEach(func() {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-		})
 
 		// With reusePVC set to off, draining a node should create new pods
 		// on different nodes. We expect to see the cluster pods having
@@ -365,16 +338,8 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 			})
 			var err error
 			// Create a cluster in a namespace we'll delete after the test
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.CleanupNamespace(
-					namespace,
-					CurrentSpecReport().LeafNodeText,
-					CurrentSpecReport().Failed(),
-					GinkgoWriter,
-				)
-			})
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
 			// Avoid pod from init jobs interfering with the tests
@@ -456,16 +421,8 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 		BeforeAll(func() {
 			var err error
 			// Create a cluster in a namespace we'll delete after the test
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.CleanupNamespace(
-					namespace,
-					CurrentSpecReport().LeafNodeText,
-					CurrentSpecReport().Failed(),
-					GinkgoWriter,
-				)
-			})
 		})
 
 		When("the PDB is disabled", func() {

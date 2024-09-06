@@ -53,16 +53,8 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 			// Create a cluster in a namespace we'll delete after the test
 			const namespacePrefix = "initdb-postqueries"
 			var err error
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.CleanupNamespace(
-					namespace,
-					CurrentSpecReport().LeafNodeText,
-					CurrentSpecReport().Failed(),
-					GinkgoWriter,
-				)
-			})
 
 			CreateResourceFromFile(namespace, postInitSQLSecretRef)
 			CreateResourceFromFile(namespace, postInitSQLConfigMapRef)
@@ -142,16 +134,8 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 			// Create a cluster in a namespace we'll delete after the test
 			const namespacePrefix = "initdb-locale"
 			var err error
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.CleanupNamespace(
-					namespace,
-					CurrentSpecReport().LeafNodeText,
-					CurrentSpecReport().Failed(),
-					GinkgoWriter,
-				)
-			})
 			AssertCreateCluster(namespace, clusterName, postInitSQLCluster, env)
 
 			primaryDst := clusterName + "-1"

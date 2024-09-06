@@ -793,6 +793,17 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
+      -
+        name: Archive e2e cluster logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cluster-logs-${{ matrix.id }}
+          path: |
+            tests/e2e/cluster_logs/**
+          retention-days: 7
+          if-no-files-found: ignore
+
   # AKS Secrets required
   # secrets.AZURE_CREDENTIALS
   # secrets.AZURE_SUBSCRIPTION
@@ -1088,6 +1099,16 @@ jobs:
           name: test-failure-contexts-${{ matrix.id }}
           path: |
             tests/*/out/
+          retention-days: 7
+          if-no-files-found: ignore
+      -
+        name: Archive e2e cluster logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cluster-logs-${{ matrix.id }}
+          path: |
+            tests/e2e/cluster_logs/**
           retention-days: 7
           if-no-files-found: ignore
       -
@@ -1450,6 +1471,16 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
       -
+        name: Archive e2e cluster logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cluster-logs-${{ matrix.id }}
+          path: |
+            tests/e2e/cluster_logs/**
+          retention-days: 7
+          if-no-files-found: ignore
+      -
         name: Clean up
         if: always()
         run: |
@@ -1772,6 +1803,16 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
       -
+        name: Archive e2e cluster logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cluster-logs-${{ matrix.id }}
+          path: |
+            tests/e2e/cluster_logs/**
+          retention-days: 7
+          if-no-files-found: ignore
+      -
         name: Clean up
         if: always()
         run: |
@@ -2016,6 +2057,16 @@ jobs:
           name: test-failure-contexts-${{ matrix.id }}
           path: |
             tests/*/out/
+          retention-days: 7
+          if-no-files-found: ignore
+      -
+        name: Archive e2e cluster logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cluster-logs-${{ matrix.id }}
+          path: |
+            tests/e2e/cluster_logs/**
           retention-days: 7
           if-no-files-found: ignore
       -

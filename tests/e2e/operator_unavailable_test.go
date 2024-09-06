@@ -40,6 +40,7 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 		sampleFile  = fixturesDir + "/operator-unavailable/operator-unavailable.yaml.template"
 		level       = tests.Medium
 	)
+	var namespace string
 
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
@@ -49,25 +50,11 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 
 	Context("Scale down operator replicas to zero and delete primary", func() {
 		const namespacePrefix = "op-unavailable-e2e-zero-replicas"
-		var namespace string
-		JustAfterEach(func() {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-		})
 		It("can survive operator failures", func() {
 			var err error
 			// Create the cluster namespace
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.CleanupNamespace(
-					namespace,
-					CurrentSpecReport().LeafNodeText,
-					CurrentSpecReport().Failed(),
-					GinkgoWriter,
-				)
-			})
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
 			// Load test data
@@ -144,26 +131,13 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 
 	Context("Delete primary and operator concurrently", func() {
 		const namespacePrefix = "op-unavailable-e2e-delete-operator"
-		var namespace string
-		JustAfterEach(func() {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-		})
+
 		It("can survive operator failures", func() {
 			var operatorPodName string
 			var err error
 			// Create the cluster namespace
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.CleanupNamespace(
-					namespace,
-					CurrentSpecReport().LeafNodeText,
-					CurrentSpecReport().Failed(),
-					GinkgoWriter,
-				)
-			})
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
 			// Load test data

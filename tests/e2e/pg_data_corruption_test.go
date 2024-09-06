@@ -44,16 +44,8 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), Ordered, func(
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 		var err error
-		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			return env.CleanupNamespace(
-				namespace,
-				CurrentSpecReport().LeafNodeText,
-				CurrentSpecReport().Failed(),
-				GinkgoWriter,
-			)
-		})
 	})
 
 	testDataCorruption := func(
@@ -198,12 +190,6 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), Ordered, func(
 		AssertDataExpectedCount(namespace, clusterName, tableName, 2, psqlClientPod)
 		AssertClusterStandbysAreStreaming(namespace, clusterName, 120)
 	}
-
-	JustAfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-		}
-	})
 
 	Context("plain cluster", func() {
 		It("can recover cluster after pgdata corruption on primary", func() {
