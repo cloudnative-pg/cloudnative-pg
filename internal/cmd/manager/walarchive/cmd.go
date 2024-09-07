@@ -402,9 +402,19 @@ func barmanCloudWalArchiveOptions(
 	if len(configuration.ServerName) != 0 {
 		serverName = configuration.ServerName
 	}
+
+	dstPath := configuration.DestinationPath
+	if configuration.IncludeNamespace {
+		ns := cluster.Namespace
+		if string(dstPath[len(dstPath)-1]) != "/" {
+			ns = "/" + ns
+		}
+		dstPath = dstPath + ns
+	}
+
 	options = append(
 		options,
-		configuration.DestinationPath,
+		dstPath,
 		serverName)
 	return options, nil
 }

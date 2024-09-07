@@ -199,3 +199,22 @@ spec:
         - "--max-concurrency=1"
         - "--read-timeout=60"
 ```
+
+## Unique naming for same name clusters in different namespaces
+
+In some cases users have the same name cluster but in different namespaces. You can automatically append the namespace to the end of
+the path for these clusters backup location by adding the `includeNamespace` option.
+
+For example with this config you have your cluster in namespace `app-dev1`. Your path will come out as `s3://bucket-name/app-dev1`.
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+[...]
+spec:
+  backup:
+    barmanObjectStore:
+      destinationPath: "s3://bucket-name/"
+      includeNamespace: true
+```
+
