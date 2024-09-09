@@ -31,6 +31,7 @@ import (
 	"github.com/cloudnative-pg/cnpg-i-machinery/pkg/logging"
 	barmanArchiver "github.com/cloudnative-pg/plugin-barman-cloud/pkg/archiver"
 	barmanCapabilities "github.com/cloudnative-pg/plugin-barman-cloud/pkg/capabilities"
+	barmanCommand "github.com/cloudnative-pg/plugin-barman-cloud/pkg/command"
 	barmanSpool "github.com/cloudnative-pg/plugin-barman-cloud/pkg/spool"
 	barmanTypes "github.com/cloudnative-pg/plugin-barman-cloud/pkg/types"
 	"github.com/spf13/cobra"
@@ -45,7 +46,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/conditions"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	pgManagement "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
@@ -412,7 +412,7 @@ func barmanCloudWalArchiveOptions(
 		options = append(options, historyTags...)
 	}
 
-	options, err = barman.AppendCloudProviderOptionsFromConfiguration(options, configuration)
+	options, err = barmanCommand.AppendCloudProviderOptionsFromConfiguration(options, configuration)
 	if err != nil {
 		return nil, err
 	}

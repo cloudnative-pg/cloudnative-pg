@@ -394,6 +394,7 @@ func (b *BackupCommand) getExecutedBackupInfo(
 func (b *BackupCommand) backupMaintenance(ctx context.Context) {
 	// Delete backups per policy
 	if b.Cluster.Spec.Backup.RetentionPolicy != "" {
+		// TODO: refactor retention policy and move it in the Barman library
 		b.Log.Info("Applying backup retention policy",
 			"retentionPolicy", b.Cluster.Spec.Backup.RetentionPolicy)
 		if err := barman.DeleteBackupsByPolicy(ctx, b.Cluster.Spec.Backup, b.Backup.Status.ServerName, b.Env); err != nil {

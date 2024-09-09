@@ -26,8 +26,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cloudnative-pg/plugin-barman-cloud/pkg/restorer"
-	"github.com/cloudnative-pg/plugin-barman-cloud/pkg/spool"
+	barmanCommand "github.com/cloudnative-pg/plugin-barman-cloud/pkg/command"
+	barmanRestorer "github.com/cloudnative-pg/plugin-barman-cloud/pkg/restorer"
+	barmanSpool "github.com/cloudnative-pg/plugin-barman-cloud/pkg/spool"
 	barmanTypes "github.com/cloudnative-pg/plugin-barman-cloud/pkg/types"
 	"github.com/spf13/cobra"
 
@@ -38,7 +39,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/cache"
 	cacheClient "github.com/cloudnative-pg/cloudnative-pg/internal/management/cache/client"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
@@ -81,7 +81,7 @@ func NewCmd() *cobra.Command {
 			}
 
 			switch {
-			case errors.Is(err, restorer.ErrWALNotFound):
+			case errors.Is(err, barmanRestorer.ErrWALNotFound):
 				// Nothing to log here. The failure has already been logged.
 			case errors.Is(err, ErrNoBackupConfigured):
 				contextLog.Info("tried restoring WALs, but no backup was configured")
@@ -139,7 +139,7 @@ func run(ctx context.Context, pgData string, podName string, args []string) erro
 		return fmt.Errorf("while getting recover configuration: %w", err)
 	}
 
-	options, err := barman.CloudWalRestoreOptions(barmanConfiguration, recoverClusterName)
+	options, err := barmanCommand.CloudWalRestoreOptions(barmanConfiguration, recoverClusterName)
 	if err != nil {
 		return fmt.Errorf("while getting barman-cloud-wal-restore options: %w", err)
 	}
@@ -152,8 +152,8 @@ func run(ctx context.Context, pgData string, podName string, args []string) erro
 	mergeEnv(env, recoverEnv)
 
 	// Create the restorer
-	var walRestorer *restorer.WALRestorer
-	if walRestorer, err = restorer.New(ctx, spool.FileUtils{
+	var walRestorer *barmanRestorer.WALRestorer
+	if walRestorer, err = barmanRestorer.New(ctx, barmanSpool.FileUtils{
 		EnsureDirectoryExists: fileutils.EnsureDirectoryExists,
 		FileExists:            fileutils.FileExists,
 		MoveFile:              fileutils.MoveFile,
@@ -272,7 +272,7 @@ func restoreWALViaPlugins(
 }
 
 // checkEndOfWALStreamFlag returns ErrEndOfWALStreamReached if the flag is set in the restorer
-func checkEndOfWALStreamFlag(walRestorer *restorer.WALRestorer) error {
+func checkEndOfWALStreamFlag(walRestorer *barmanRestorer.WALRestorer) error {
 	contain, err := walRestorer.IsEndOfWALStream()
 	if err != nil {
 		return err
@@ -291,9 +291,9 @@ func checkEndOfWALStreamFlag(walRestorer *restorer.WALRestorer) error {
 
 // isEndOfWALStream returns true if one of the downloads has returned
 // a file-not-found error
-func isEndOfWALStream(results []restorer.Result) bool {
+func isEndOfWALStream(results []barmanRestorer.Result) bool {
 	for _, result := range results {
-		if errors.Is(result.Err, restorer.ErrWALNotFound) {
+		if errors.Is(result.Err, barmanRestorer.ErrWALNotFound) {
 			return true
 		}
 	}

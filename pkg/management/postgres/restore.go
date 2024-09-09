@@ -350,7 +350,7 @@ func (info InitInfo) ensureArchiveContainsLastCheckpointRedoWAL(
 		return err
 	}
 
-	opts, err := barman.CloudWalRestoreOptions(&barmanTypes.BarmanObjectStoreConfiguration{
+	opts, err := barmanCommand.CloudWalRestoreOptions(&barmanTypes.BarmanObjectStoreConfiguration{
 		BarmanCredentials: backup.Status.BarmanCredentials,
 		EndpointCA:        apiv1.ToBarmanSecretKeySelectors(backup.Status.EndpointCA),
 		EndpointURL:       backup.Status.EndpointURL,
@@ -415,7 +415,7 @@ func (info InitInfo) restoreDataDir(backup *apiv1.Backup, env []string) error {
 	options = append(options, backup.Status.ServerName)
 	options = append(options, backup.Status.BackupID)
 
-	options, err := barman.AppendCloudProviderOptionsFromBackup(options, backup)
+	options, err := barmanCommand.AppendCloudProviderOptionsFromBackup(options, backup.Status.BarmanCredentials)
 	if err != nil {
 		return err
 	}
@@ -602,7 +602,7 @@ func (info InitInfo) writeRestoreWalConfig(backup *apiv1.Backup, cluster *apiv1.
 	cmd = append(cmd, backup.Status.DestinationPath)
 	cmd = append(cmd, backup.Status.ServerName)
 
-	cmd, err = barman.AppendCloudProviderOptionsFromBackup(cmd, backup)
+	cmd, err = barmanCommand.AppendCloudProviderOptionsFromBackup(cmd, backup.Status.BarmanCredentials)
 	if err != nil {
 		return err
 	}

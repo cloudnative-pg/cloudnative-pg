@@ -20,16 +20,17 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	barmanCatalog "github.com/cloudnative-pg/plugin-barman-cloud/pkg/catalog"
 	"os/exec"
 	"reflect"
 
+	barmanCapabilities "github.com/cloudnative-pg/plugin-barman-cloud/pkg/capabilities"
+	barmanCatalog "github.com/cloudnative-pg/plugin-barman-cloud/pkg/catalog"
+	barmanCommand "github.com/cloudnative-pg/plugin-barman-cloud/pkg/command"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
-	barmanCapabilities "github.com/cloudnative-pg/plugin-barman-cloud/pkg/capabilities"
 )
 
 // DeleteBackupsByPolicy executes a command that deletes backups, given the Barman object store configuration,
@@ -61,7 +62,7 @@ func DeleteBackupsByPolicy(
 		options = append(options, "--endpoint-url", barmanConfiguration.EndpointURL)
 	}
 
-	options, err = AppendCloudProviderOptionsFromConfiguration(options, barmanConfiguration)
+	options, err = barmanCommand.AppendCloudProviderOptionsFromConfiguration(options, barmanConfiguration)
 	if err != nil {
 		return err
 	}
