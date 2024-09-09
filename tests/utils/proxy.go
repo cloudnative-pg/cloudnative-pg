@@ -64,8 +64,9 @@ func RetrieveMetricsFromPgBouncer(
 // using a GET request on the pod interface proxy
 func RetrievePgStatusFromInstance(
 	env *TestingEnvironment,
-	namespace, podName string,
+	pod corev1.Pod,
+	tlsEnabled bool,
 ) (string, error) {
-	body, err := runProxyRequest(env, namespace, podName, url.PathPgStatus, int(url.StatusPort))
+	body, err := runProxyRequest(env, &pod, tlsEnabled, url.PathPgStatus, int(url.StatusPort))
 	return string(body), err
 }
