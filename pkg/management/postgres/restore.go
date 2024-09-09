@@ -961,10 +961,10 @@ func (info *InitInfo) checkBackupDestination(
 		postgresSpec.SpoolDirectory,
 		info.PgData,
 		barmanSpool.FileUtils{
-			EnsureDirectoryExists: nil,
-			FileExists:            nil,
-			MoveFile:              nil,
-			RemoveFile:            nil,
+			EnsureDirectoryExists: fileutils.EnsureDirectoryExists,
+			FileExists:            fileutils.FileExists,
+			MoveFile:              fileutils.MoveFile,
+			RemoveFile:            fileutils.RemoveFile,
 		},
 		execlog.RunStreaming,
 		func() error {
