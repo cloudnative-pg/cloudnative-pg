@@ -166,9 +166,8 @@ func (config *Data) GetIncludePlugins() []string {
 	rawList := strings.Split(config.IncludePlugins, ",")
 	result := make([]string, 0, len(rawList))
 	for _, pluginName := range rawList {
-		pluginName := strings.TrimSpace(pluginName)
-		if len(pluginName) > 0 {
-			result = append(result, pluginName)
+		if trimmedPluginName := strings.TrimSpace(pluginName); trimmedPluginName != "" {
+			result = append(result, trimmedPluginName)
 		}
 	}
 

@@ -165,13 +165,17 @@ func (r *Cluster) setDefaults(preserveUserSettings bool) {
 		r.defaultTablespaces()
 	}
 
+	r.setDefaultPlugins(configuration.Current)
+}
+
+func (r *Cluster) setDefaultPlugins(config *configuration.Data) {
 	// Add the list of pre-defined plugins
 	foundPlugins := stringset.New()
 	for _, plugin := range r.Spec.Plugins {
 		foundPlugins.Put(plugin.Name)
 	}
 
-	for _, pluginName := range configuration.Current.GetIncludePlugins() {
+	for _, pluginName := range config.GetIncludePlugins() {
 		if !foundPlugins.Has(pluginName) {
 			r.Spec.Plugins = append(r.Spec.Plugins, PluginConfiguration{
 				Name:    pluginName,
