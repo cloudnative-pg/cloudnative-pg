@@ -21,15 +21,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
-	"github.com/cloudnative-pg/plugin-barman-cloud/pkg/spool"
-	barmanTypes "github.com/cloudnative-pg/plugin-barman-cloud/pkg/types"
 	"os"
 	"path"
 	"strings"
 	"time"
 
+	"github.com/cloudnative-pg/plugin-barman-cloud/pkg/restorer"
+	"github.com/cloudnative-pg/plugin-barman-cloud/pkg/spool"
+	barmanTypes "github.com/cloudnative-pg/plugin-barman-cloud/pkg/types"
 	"github.com/spf13/cobra"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -38,10 +37,11 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/cache"
 	cacheClient "github.com/cloudnative-pg/cloudnative-pg/internal/management/cache/client"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
-	"github.com/cloudnative-pg/plugin-barman-cloud/pkg/restorer"
 )
 
 var (
@@ -157,6 +157,7 @@ func run(ctx context.Context, pgData string, podName string, args []string) erro
 		EnsureDirectoryExists: fileutils.EnsureDirectoryExists,
 		FileExists:            fileutils.FileExists,
 		MoveFile:              fileutils.MoveFile,
+		RemoveFile:            fileutils.RemoveFile,
 	}, env, SpoolDirectory); err != nil {
 		return fmt.Errorf("while creating the restorer: %w", err)
 	}

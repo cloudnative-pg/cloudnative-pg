@@ -22,10 +22,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	barmanCatalog "github.com/cloudnative-pg/plugin-barman-cloud/pkg/catalog"
-	barmanCommand "github.com/cloudnative-pg/plugin-barman-cloud/pkg/command"
-	"github.com/cloudnative-pg/plugin-barman-cloud/pkg/spool"
-	barmanTypes "github.com/cloudnative-pg/plugin-barman-cloud/pkg/types"
 	"math"
 	"os"
 	"os/exec"
@@ -35,19 +31,24 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cloudnative-pg/plugin-barman-cloud/pkg/restorer"
+	barmanArchiver "github.com/cloudnative-pg/plugin-barman-cloud/pkg/archiver"
+	barmanCapabilities "github.com/cloudnative-pg/plugin-barman-cloud/pkg/capabilities"
+	barmanCatalog "github.com/cloudnative-pg/plugin-barman-cloud/pkg/catalog"
+	barmanCommand "github.com/cloudnative-pg/plugin-barman-cloud/pkg/command"
+	barmanCredentials "github.com/cloudnative-pg/plugin-barman-cloud/pkg/credentials"
+	barmanRestorer "github.com/cloudnative-pg/plugin-barman-cloud/pkg/restorer"
+	barmanSpool "github.com/cloudnative-pg/plugin-barman-cloud/pkg/spool"
+	barmanTypes "github.com/cloudnative-pg/plugin-barman-cloud/pkg/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/walarchive"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/configfile"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/archiver"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/external"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
@@ -56,8 +57,6 @@ import (
 	postgresSpec "github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/system"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
-	barmanCapabilities "github.com/cloudnative-pg/plugin-barman-cloud/pkg/capabilities"
-	barmanCredentials "github.com/cloudnative-pg/plugin-barman-cloud/pkg/credentials"
 )
 
 var (
@@ -341,11 +340,12 @@ func (info InitInfo) ensureArchiveContainsLastCheckpointRedoWAL(
 		return err
 	}
 
-	rest, err := restorer.New(ctx, spool.FileUtils{
+	rest, err := barmanRestorer.New(ctx, barmanSpool.FileUtils{
 		EnsureDirectoryExists: fileutils.EnsureDirectoryExists,
 		FileExists:            fileutils.FileExists,
 		MoveFile:              fileutils.MoveFile,
-	}, env, walarchive.SpoolDirectory)
+		RemoveFile:            fileutils.RemoveFile,
+	}, env, postgresSpec.SpoolDirectory)
 	if err != nil {
 		return err
 	}
@@ -938,6 +938,7 @@ func (info *InitInfo) checkBackupDestination(
 	if !cluster.Spec.Backup.IsBarmanBackupConfigured() {
 		return nil
 	}
+
 	// Get environment from cache
 	env, err := barmanCredentials.EnvSetRestoreCloudCredentials(ctx,
 		barmanCredentialsUtils,
@@ -953,14 +954,29 @@ func (info *InitInfo) checkBackupDestination(
 	}
 
 	// Instantiate the WALArchiver to get the proper configuration
-	var walArchiver *archiver.WALArchiver
-	walArchiver, err = archiver.New(ctx, cluster, env, walarchive.SpoolDirectory, info.PgData)
+	var walArchiver *barmanArchiver.WALArchiver
+	walArchiver, err = barmanArchiver.New(
+		ctx,
+		env,
+		postgresSpec.SpoolDirectory,
+		info.PgData,
+		barmanSpool.FileUtils{
+			EnsureDirectoryExists: nil,
+			FileExists:            nil,
+			MoveFile:              nil,
+			RemoveFile:            nil,
+		},
+		execlog.RunStreaming,
+		func() error {
+			return nil
+		})
 	if err != nil {
 		return fmt.Errorf("while creating the archiver: %w", err)
 	}
 
 	// Get WAL archive options
-	checkWalOptions, err := walArchiver.BarmanCloudCheckWalArchiveOptions(cluster, cluster.Name)
+	checkWalOptions, err := walArchiver.BarmanCloudCheckWalArchiveOptions(
+		cluster.Spec.Backup.BarmanObjectStore, cluster.Name)
 	if err != nil {
 		log.Error(err, "while getting barman-cloud-wal-archive options")
 		return err

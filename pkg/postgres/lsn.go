@@ -20,9 +20,10 @@ package postgres
 
 import (
 	"fmt"
-	barmanCatalog "github.com/cloudnative-pg/plugin-barman-cloud/pkg/catalog"
 	"strconv"
 	"strings"
+
+	barmanCatalog "github.com/cloudnative-pg/plugin-barman-cloud/pkg/catalog"
 )
 
 // LSN is a string composed by two hexadecimal numbers, separated by "/"
