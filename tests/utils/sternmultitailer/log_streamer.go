@@ -29,15 +29,9 @@ import (
 	"time"
 
 	"github.com/stern/stern/stern"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
-
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
-)
-
-const (
-	clusterLogsDirectory = "cluster_logs/"
 )
 
 // SternMultiTailer contains the necessary data for the logs of every cluster
@@ -46,27 +40,21 @@ type SternMultiTailer struct {
 	openFilesMap map[string]*os.File
 }
 
-// Run opens a goroutine to execute stern on all the CNGP pods.
+// StreamLogs opens a goroutine to execute stern on all the pods that match
+// the labelSelector.
 // Close the ctx context to terminate stern execution.
 // Returns a channel that will be closed when all the logs have been written to disk
 // and the ones we asked to remove have been deleted.
-func (s *SternMultiTailer) Run(ctx context.Context, client kubernetes.Interface) chan struct{} {
+func (s *SternMultiTailer) streamLogs(
+	ctx context.Context,
+	client kubernetes.Interface,
+	labelSelector labels.Selector,
+	pathForLog string,
+) chan struct{} {
 	outPipeReader, outPipeWriter := io.Pipe()
 	s.openFilesMap = make(map[string]*os.File)
 	s.stdOut = outPipeReader
 	errOut := os.Stdout
-
-	// Create the Stern configuration
-
-	// Select all the pods belonging to CNPG
-	selector, _ := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
-		MatchExpressions: []metav1.LabelSelectorRequirement{
-			{
-				Key:      utils.ClusterLabelName,
-				Operator: metav1.LabelSelectorOpExists,
-			},
-		},
-	})
 
 	// JSON output
 	pod := regexp.MustCompile(".*")
@@ -85,6 +73,7 @@ func (s *SternMultiTailer) Run(ctx context.Context, client kubernetes.Interface)
 			return string(b), nil
 		},
 	}
+
 	parsedTemplate, _ := template.New("log").Funcs(funs).Parse(t)
 
 	config := &stern.Config{
@@ -106,7 +95,7 @@ func (s *SternMultiTailer) Run(ctx context.Context, client kubernetes.Interface)
 		EphemeralContainers: true,
 		Since:               48 * time.Hour,
 		AllNamespaces:       true,
-		LabelSelector:       selector,
+		LabelSelector:       labelSelector,
 		FieldSelector:       fields.Everything(),
 		TailLines:           nil,
 		Template:            parsedTemplate,
@@ -120,7 +109,6 @@ func (s *SternMultiTailer) Run(ctx context.Context, client kubernetes.Interface)
 		Out:    outPipeWriter,
 		ErrOut: errOut,
 	}
-
 	outputDone := make(chan struct{})
 	go func() {
 		err := stern.Run(ctx, client, config)
@@ -134,14 +122,14 @@ func (s *SternMultiTailer) Run(ctx context.Context, client kubernetes.Interface)
 	}()
 
 	go func() {
-		s.outputWriter()
+		s.outputWriter(pathForLog)
 		close(outputDone)
 	}()
 
 	return outputDone
 }
 
-func (s *SternMultiTailer) outputWriter() {
+func (s *SternMultiTailer) outputWriter(pathForLog string) {
 	r := bufio.NewReader(s.stdOut)
 	defer func() {
 		for k, file := range s.openFilesMap {
@@ -170,7 +158,7 @@ func (s *SternMultiTailer) outputWriter() {
 			continue
 		}
 
-		file, err := s.getLogFile(logLine)
+		file, err := s.getLogFile(pathForLog, logLine)
 		if err != nil {
 			fmt.Printf("no file to write log line %v: %v\n", logLine, err)
 			continue
@@ -185,8 +173,8 @@ func (s *SternMultiTailer) outputWriter() {
 }
 
 // Get an open file for the log, or open a new one
-func (s *SternMultiTailer) getLogFile(log stern.Log) (*os.File, error) {
-	filePath := path.Join(clusterLogsDirectory, log.Namespace, log.PodName, log.ContainerName+".log")
+func (s *SternMultiTailer) getLogFile(pathforLog string, log stern.Log) (*os.File, error) {
+	filePath := path.Join(pathforLog, log.Namespace, log.PodName, log.ContainerName+".log")
 	dirFile := path.Dir(filePath)
 
 	file, ok := s.openFilesMap[filePath]

@@ -17,11 +17,8 @@ limitations under the License.
 package utils
 
 import (
-	"bufio"
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -32,13 +29,11 @@ import (
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/thoas/go-funk"
-	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	eventsv1 "k8s.io/api/events/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
@@ -54,7 +49,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/logs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/sternmultitailer"
 
@@ -86,7 +80,8 @@ type TestingEnvironment struct {
 	PostgresVersion    int
 	createdNamespaces  *uniqueStringSlice
 	AzureConfiguration AzureConfiguration
-	SternMultiTailer   sternmultitailer.SternMultiTailer
+	SternClusters      sternmultitailer.SternMultiTailer
+	SternOperator      sternmultitailer.SternMultiTailer
 }
 
 type uniqueStringSlice struct {
@@ -326,114 +321,4 @@ func (env TestingEnvironment) GetResourceNameFromYAML(path string) (string, erro
 		return "", err
 	}
 	return namespacedName.Name, err
-}
-
-// GetResourceNamespaceFromYAML returns the namespace of a resource in a YAML file
-func (env TestingEnvironment) GetResourceNamespaceFromYAML(path string) (string, error) {
-	namespacedName, err := env.GetResourceNamespacedNameFromYAML(path)
-	if err != nil {
-		return "", err
-	}
-	return namespacedName.Namespace, err
-}
-
-// GetPoolerList gathers the current list of poolers in a namespace
-func (env TestingEnvironment) GetPoolerList(namespace string) (*apiv1.PoolerList, error) {
-	poolerList := &apiv1.PoolerList{}
-
-	err := env.Client.List(
-		env.Ctx, poolerList, client.InNamespace(namespace))
-
-	return poolerList, err
-}
-
-// DumpPoolerResourcesInfo logs the JSON for the pooler resources in a namespace, its pods, Deployment,
-// services and endpoints
-func (env TestingEnvironment) DumpPoolerResourcesInfo(namespace, currentTestName string) {
-	poolerList, err := env.GetPoolerList(namespace)
-	if err != nil {
-		return
-	}
-	if len(poolerList.Items) > 0 {
-		for _, pooler := range poolerList.Items {
-			// it will create a filename along with pooler name and currentTest name
-			fileName := "out/" + fmt.Sprintf("%v-%v.log", currentTestName, pooler.GetName())
-			f, err := os.Create(filepath.Clean(fileName))
-			if err != nil {
-				fmt.Println(err)
-				return
-			}
-			w := bufio.NewWriter(f)
-
-			// dump pooler info
-			out, _ := json.MarshalIndent(pooler, "", "    ")
-			_, _ = fmt.Fprintf(w, "Dumping %v/%v pooler\n", namespace, pooler.Name)
-			_, _ = fmt.Fprintln(w, string(out))
-
-			// pooler name used as resources name like Service, Deployment, EndPoints name info
-			poolerName := pooler.GetName()
-			namespacedName := types.NamespacedName{
-				Namespace: namespace,
-				Name:      poolerName,
-			}
-
-			// dump pooler endpoints info
-			endpoint := &corev1.Endpoints{}
-			_ = env.Client.Get(env.Ctx, namespacedName, endpoint)
-			out, _ = json.MarshalIndent(endpoint, "", "    ")
-			_, _ = fmt.Fprintf(w, "Dumping %v/%v endpoint\n", namespace, endpoint.Name)
-			_, _ = fmt.Fprintln(w, string(out))
-
-			// dump pooler Service info
-			service := &corev1.Service{}
-			_ = env.Client.Get(env.Ctx, namespacedName, service)
-			out, _ = json.MarshalIndent(service, "", "    ")
-			_, _ = fmt.Fprintf(w, "Dumping %v/%v Service\n", namespace, service.Name)
-			_, _ = fmt.Fprintln(w, string(out))
-
-			// dump pooler pods info
-			podList := &corev1.PodList{}
-			_ = env.Client.List(env.Ctx, podList, client.InNamespace(namespace),
-				client.MatchingLabels{utils.PgbouncerNameLabel: poolerName})
-			for _, pod := range podList.Items {
-				out, _ = json.MarshalIndent(pod, "", "    ")
-				_, _ = fmt.Fprintf(w, "Dumping %v/%v pod\n", namespace, pod.Name)
-				_, _ = fmt.Fprintln(w, string(out))
-			}
-
-			// dump Deployment info
-			deployment := &appsv1.Deployment{}
-			_ = env.Client.Get(env.Ctx, namespacedName, deployment)
-			out, _ = json.MarshalIndent(deployment, "", "    ")
-			_, _ = fmt.Fprintf(w, "Dumping %v/%v Deployment\n", namespace, deployment.Name)
-			_, _ = fmt.Fprintln(w, string(out))
-		}
-	} else {
-		return
-	}
-}
-
-// TailClusterLogs streams the cluster pod logs to a single output io.Writer,
-// starting from the current time, and watching for any new pods, and any new logs,
-// until the  context is cancelled or there are no pods left.
-//
-// If `parseTimestamps` is true, the log line will have the timestamp in
-// human-readable prepended. NOTE: this will make log-lines NON-JSON
-func (env TestingEnvironment) TailClusterLogs(
-	cluster *apiv1.Cluster,
-	writer io.Writer,
-	parseTimestamps bool,
-) error {
-	now := metav1.Now()
-	streamClusterLogs := logs.ClusterStreamingRequest{
-		Cluster: cluster,
-		Options: &corev1.PodLogOptions{
-			Timestamps: parseTimestamps,
-			Follow:     true,
-			SinceTime:  &now,
-		},
-		FollowWaiting: logs.DefaultFollowWaiting,
-		Client:        env.Interface,
-	}
-	return streamClusterLogs.SingleStream(env.Ctx, writer)
 }
