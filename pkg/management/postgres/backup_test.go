@@ -18,12 +18,13 @@ package postgres
 
 import (
 	"context"
-	"github.com/cloudnative-pg/plugin-barman-cloud/pkg/catalog"
-	barmanTypes "github.com/cloudnative-pg/plugin-barman-cloud/pkg/types"
 	"os"
 	"strings"
 	"time"
 
+	barmanBackup "github.com/cloudnative-pg/plugin-barman-cloud/pkg/backup"
+	barmanCatalog "github.com/cloudnative-pg/plugin-barman-cloud/pkg/catalog"
+	barmanTypes "github.com/cloudnative-pg/plugin-barman-cloud/pkg/types"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
@@ -153,7 +154,7 @@ var _ = Describe("update barman backup metadata", func() {
 	const namespace = "test"
 
 	var cluster *apiv1.Cluster
-	var barmanBackups *catalog.Catalog
+	var barmanBackups *barmanCatalog.Catalog
 
 	var (
 		now           = metav1.NewTime(time.Now().Local().Truncate(time.Second))
@@ -170,8 +171,8 @@ var _ = Describe("update barman backup metadata", func() {
 			},
 		}
 
-		barmanBackups = &catalog.Catalog{
-			List: []catalog.BarmanBackup{
+		barmanBackups = &barmanCatalog.Catalog{
+			List: []barmanCatalog.BarmanBackup{
 				{
 					BackupName: "twoHoursAgo",
 					BeginTime:  threeHoursAgo.Time,
@@ -294,8 +295,9 @@ var _ = Describe("generate backup options", func() {
 	It("should generate correct options", func() {
 		extraOptions := []string{"--min-chunk-size=5MB", "--read-timeout=60", "-vv"}
 		cluster.Spec.Backup.BarmanObjectStore.Data.AdditionalCommandArgs = extraOptions
-		options := []string{}
-		options, err := getDataConfiguration(options, cluster.Spec.Backup.BarmanObjectStore, &capabilities)
+
+		cmd := barmanBackup.NewBackupCommand(cluster.Spec.Backup.BarmanObjectStore, &capabilities)
+		options, err := cmd.GetDataConfiguration([]string{})
 		Expect(err).ToNot(HaveOccurred())
 
 		Expect(strings.Join(options, " ")).
@@ -315,8 +317,8 @@ var _ = Describe("generate backup options", func() {
 			"--encryption=aes256",
 		}
 		cluster.Spec.Backup.BarmanObjectStore.Data.AdditionalCommandArgs = extraOptions
-		options := []string{}
-		options, err := getDataConfiguration(options, cluster.Spec.Backup.BarmanObjectStore, &capabilities)
+		cmd := barmanBackup.NewBackupCommand(cluster.Spec.Backup.BarmanObjectStore, &capabilities)
+		options, err := cmd.GetDataConfiguration([]string{})
 		Expect(err).ToNot(HaveOccurred())
 
 		Expect(strings.Join(options, " ")).

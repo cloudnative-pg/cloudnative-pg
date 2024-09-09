@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"strings"
 
+	barmanUtils "github.com/cloudnative-pg/plugin-barman-cloud/pkg/utils"
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -2187,7 +2188,7 @@ func (r *Cluster) validateBackupConfiguration() field.ErrorList {
 	}
 
 	if r.Spec.Backup.RetentionPolicy != "" {
-		_, err := utils.ParsePolicy(r.Spec.Backup.RetentionPolicy)
+		_, err := barmanUtils.ParsePolicy(r.Spec.Backup.RetentionPolicy)
 		if err != nil {
 			allErrors = append(allErrors, field.Invalid(
 				field.NewPath("spec", "retentionPolicy"),

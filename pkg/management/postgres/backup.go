@@ -18,14 +18,9 @@ package postgres
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman"
-	barmanTypes "github.com/cloudnative-pg/plugin-barman-cloud/pkg/types"
 	"os"
-	"os/exec"
 	"reflect"
-	"strconv"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -39,11 +34,12 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/conditions"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	barmanBackup "github.com/cloudnative-pg/plugin-barman-cloud/pkg/backup"
 	barmanCapabilities "github.com/cloudnative-pg/plugin-barman-cloud/pkg/capabilities"
 	barmanCatalog "github.com/cloudnative-pg/plugin-barman-cloud/pkg/catalog"
 	barmanCommand "github.com/cloudnative-pg/plugin-barman-cloud/pkg/command"
@@ -69,6 +65,7 @@ type BackupCommand struct {
 	Log          log.Logger
 	Instance     *Instance
 	Capabilities *barmanCapabilities.Capabilities
+	barmanBackup *barmanBackup.Command
 }
 
 // NewBarmanBackupCommand initializes a BackupCommand object, taking a physical
@@ -95,103 +92,14 @@ func NewBarmanBackupCommand(
 		Instance:     instance,
 		Log:          log,
 		Capabilities: capabilities,
+		barmanBackup: barmanBackup.NewBackupCommand(cluster.Spec.Backup.BarmanObjectStore, capabilities),
 	}, nil
-}
-
-// getDataConfiguration gets the configuration in the `Data` object of the Barman configuration
-func getDataConfiguration(
-	options []string,
-	configuration *barmanTypes.BarmanObjectStoreConfiguration,
-	capabilities *barmanCapabilities.Capabilities,
-) ([]string, error) {
-	if configuration.Data == nil {
-		return options, nil
-	}
-
-	if configuration.Data.Compression == barmanTypes.CompressionTypeSnappy && !capabilities.HasSnappy {
-		return nil, fmt.Errorf("snappy compression is not supported in Barman %v", capabilities.Version)
-	}
-
-	if len(configuration.Data.Compression) != 0 {
-		options = append(
-			options,
-			fmt.Sprintf("--%v", configuration.Data.Compression))
-	}
-
-	if len(configuration.Data.Encryption) != 0 {
-		options = append(
-			options,
-			"--encryption",
-			string(configuration.Data.Encryption))
-	}
-
-	if configuration.Data.ImmediateCheckpoint {
-		options = append(
-			options,
-			"--immediate-checkpoint")
-	}
-
-	if configuration.Data.Jobs != nil {
-		options = append(
-			options,
-			"--jobs",
-			strconv.Itoa(int(*configuration.Data.Jobs)))
-	}
-
-	return configuration.Data.AppendAdditionalCommandArgs(options), nil
-}
-
-// getBarmanCloudBackupOptions extract the list of command line options to be used with
-// barman-cloud-backup
-func (b *BackupCommand) getBarmanCloudBackupOptions(
-	configuration *barmanTypes.BarmanObjectStoreConfiguration,
-	serverName string,
-) ([]string, error) {
-	options := []string{
-		"--user", "postgres",
-	}
-
-	if b.Capabilities.ShouldExecuteBackupWithName(b.Cluster) {
-		options = append(options, "--name", b.Backup.Status.BackupName)
-	}
-
-	options, err := getDataConfiguration(options, configuration, b.Capabilities)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(configuration.Tags) > 0 {
-		tags, err := utils.MapToBarmanTagsFormat("--tags", configuration.Tags)
-		if err != nil {
-			return nil, err
-		}
-		options = append(options, tags...)
-	}
-
-	if len(configuration.EndpointURL) > 0 {
-		options = append(
-			options,
-			"--endpoint-url",
-			configuration.EndpointURL)
-	}
-
-	options, err = barmanCommand.AppendCloudProviderOptionsFromConfiguration(options, configuration)
-	if err != nil {
-		return nil, err
-	}
-
-	options = append(
-		options,
-		configuration.DestinationPath,
-		serverName)
-
-	return options, nil
 }
 
 // Start initiates a backup for this instance using
 // barman-cloud-backup
 func (b *BackupCommand) Start(ctx context.Context) error {
-	if err := b.ensureBarmanCompatibility(); err != nil {
+	if err := b.ensureCompatibility(); err != nil {
 		return err
 	}
 
@@ -236,21 +144,13 @@ func (b *BackupCommand) Start(ctx context.Context) error {
 	return nil
 }
 
-func (b *BackupCommand) ensureBarmanCompatibility() error {
+func (b *BackupCommand) ensureCompatibility() error {
 	postgresVers, err := b.Instance.GetPgVersion()
 	if err != nil {
 		return err
 	}
-	switch {
-	case postgresVers.Major == 15 && b.Capabilities.Version.Major < 3:
-		return fmt.Errorf(
-			"PostgreSQL %d is not supported by Barman %d.x",
-			postgresVers.Major,
-			b.Capabilities.Version.Major,
-		)
-	default:
-		return nil
-	}
+
+	return b.barmanBackup.IsCompatible(postgresVers)
 }
 
 func (b *BackupCommand) retryWithRefreshedCluster(
@@ -298,17 +198,8 @@ func (b *BackupCommand) run(ctx context.Context) {
 }
 
 func (b *BackupCommand) takeBackup(ctx context.Context) error {
-	barmanConfiguration := b.Cluster.Spec.Backup.BarmanObjectStore
 	backupStatus := b.Backup.GetStatus()
 
-	options, backupErr := b.getBarmanCloudBackupOptions(barmanConfiguration, backupStatus.ServerName)
-	if backupErr != nil {
-		b.Log.Error(backupErr, "while getting barman-cloud-backup options")
-		return backupErr
-	}
-
-	// record the backup beginning
-	b.Log.Info("Starting barman-cloud-backup", "options", options)
 	b.Recorder.Event(b.Backup, "Normal", "Starting", "Backup started")
 
 	// Update backup status in cluster conditions on startup
@@ -326,18 +217,9 @@ func (b *BackupCommand) takeBackup(ctx context.Context) error {
 		return err
 	}
 
-	cmd := exec.Command(barmanCapabilities.BarmanCloudBackup, options...) // #nosec G204
-	cmd.Env = b.Env
-	cmd.Env = append(cmd.Env, "TMPDIR="+postgres.BackupTemporaryDirectory)
-	if err := execlog.RunStreaming(cmd, barmanCapabilities.BarmanCloudBackup); err != nil {
-		const badArgumentsErrorCode = "3"
-		if err.Error() == badArgumentsErrorCode {
-			descriptiveError := errors.New("invalid arguments for barman-cloud-backup. " +
-				"Ensure that the additionalCommandArgs field is correctly populated")
-			b.Log.Error(descriptiveError, "error while executing barman-cloud-backup",
-				"arguments", options)
-			return descriptiveError
-		}
+	err := b.barmanBackup.Take(ctx, b.Backup.Status.BackupName, backupStatus.ServerName, b.Env, b.Cluster)
+	if err != nil {
+		b.Log.Error(err, "Error while taking barman backup", "err", err)
 		return err
 	}
 
@@ -347,7 +229,8 @@ func (b *BackupCommand) takeBackup(ctx context.Context) error {
 	// Set the status to completed
 	b.Backup.Status.SetAsCompleted()
 
-	barmanBackup, err := b.getExecutedBackupInfo(ctx)
+	barmanBackup, err := b.barmanBackup.GetExecutedBackupInfo(
+		ctx, b.Backup.Status.BackupName, backupStatus.ServerName, b.Cluster, b.Env)
 	if err != nil {
 		return err
 	}
@@ -367,28 +250,6 @@ func (b *BackupCommand) takeBackup(ctx context.Context) error {
 	}
 
 	return nil
-}
-
-func (b *BackupCommand) getExecutedBackupInfo(
-	ctx context.Context,
-) (*barmanCatalog.BarmanBackup, error) {
-	if b.Capabilities.ShouldExecuteBackupWithName(b.Cluster) {
-		return barmanCommand.GetBackupByName(
-			ctx,
-			b.Backup.Status.BackupName,
-			b.Backup.Status.ServerName,
-			b.Cluster.Spec.Backup.BarmanObjectStore,
-			b.Env,
-		)
-	}
-	// we don't know the id or the name of the executed backup so it fetches the last executed barman backup.
-	// it could create issues in case of concurrent backups. It is a deprecated way of detecting the backup.
-	return barmanCommand.GetLatestBackup(
-		ctx,
-		b.Backup.Status.ServerName,
-		b.Cluster.Spec.Backup.BarmanObjectStore,
-		b.Env,
-	)
 }
 
 func (b *BackupCommand) backupMaintenance(ctx context.Context) {
