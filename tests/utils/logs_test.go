@@ -37,7 +37,6 @@ var _ = Describe("testing CheckOptionForBarmanCommand", func() {
 			parsedEntries,
 			"Starting barman-cloud-backup",
 			"pg-with-backup-20240304135929",
-			"pg-with-backup-1",
 			[]string{"--min-chunk-size=5MB", "--read-timeout=60"},
 		)
 		Expect(err).ToNot(HaveOccurred())
@@ -54,7 +53,6 @@ var _ = Describe("testing CheckOptionForBarmanCommand", func() {
 			parsedEntries,
 			"Starting barman-cloud-backup",
 			"pg-with-backup-20240304135929",
-			"pg-with-backup-1",
 			// the --vv option is not present in the log file
 			[]string{"--min-chunk-size=5MB", "--read-timeout=60", "--vv"},
 		)

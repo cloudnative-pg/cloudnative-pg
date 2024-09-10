@@ -19,7 +19,6 @@ package e2e
 import (
 	"fmt"
 	"path/filepath"
-
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -171,8 +170,7 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 				result, err := testUtils.CheckOptionsForBarmanCommand(
 					logEntries,
 					barmanCloudBackupLogEntry,
-					backup.Name,
-					backup.Status.InstanceID.PodName,
+					backup.Status.BackupName,
 					expectedBaseBackupOptions,
 				)
 				Expect(err).ToNot(HaveOccurred())

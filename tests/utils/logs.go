@@ -116,23 +116,21 @@ func CheckRecordForQuery(entry map[string]interface{}, errorTestQuery, user, dat
 // CheckOptionsForBarmanCommand checks if the expected options are used from the barman command execution log
 func CheckOptionsForBarmanCommand(
 	logEntries []map[string]interface{},
-	message, backupName, podName string,
+	message, backupName string,
 	optionsExpected []string,
 ) (bool, error) {
 	var optionsInLog interface{}
 	for _, logEntry := range logEntries {
 		if logEntry["msg"] == message &&
-			logEntry["backupName"] == backupName &&
-			logEntry["logging_pod"] == podName {
+			logEntry["backupName"] == backupName {
 			optionsInLog = logEntry["options"]
 			break // We only need to check the first occurrence of the message
 		}
 	}
 	if optionsInLog == nil {
-		return false, fmt.Errorf("no log entry found for message %v, backupName %v and logging_pod %v",
+		return false, fmt.Errorf("no log entry found for message %v, backupName %v",
 			message,
 			backupName,
-			podName,
 		)
 	}
 

@@ -28,6 +28,8 @@ github.com/cloudnative-pg/plugin-barman-cloud v0.0.0-20240909092332-e70fad41eaf9
 github.com/cloudnative-pg/plugin-barman-cloud v0.0.0-20240909092332-e70fad41eaf9/go.mod h1:SrVdWs3fhC/m6E7X9FsCx11MJYAyH44yGoJKFrfN7CY=
 github.com/cloudnative-pg/plugin-barman-cloud v0.0.0-20240909150913-fb0d61b1b5af h1:l91uhli2QlyECUrpzvv03qyzKbzLFTGOhLtFkuFTixo=
 github.com/cloudnative-pg/plugin-barman-cloud v0.0.0-20240909150913-fb0d61b1b5af/go.mod h1:SrVdWs3fhC/m6E7X9FsCx11MJYAyH44yGoJKFrfN7CY=
+github.com/cloudnative-pg/plugin-barman-cloud v0.0.0-20240910084718-0dc891982383 h1:2ERRTX/Up6wWqK+BzinnBjxeVAA59/zpgj3KK6Jior4=
+github.com/cloudnative-pg/plugin-barman-cloud v0.0.0-20240910084718-0dc891982383/go.mod h1:SrVdWs3fhC/m6E7X9FsCx11MJYAyH44yGoJKFrfN7CY=
 github.com/cpuguy83/go-md2man/v2 v2.0.4/go.mod h1:tgQtvFlXSQOSOSIRvRPT7W67SCa46tRHOmNcaadrF8o=
 github.com/creack/pty v1.1.18 h1:n56/Zwd5o6whRC5PMGretI4IdRLlmBXYNjScPaBgsbY=
 github.com/creack/pty v1.1.18/go.mod h1:MOBLtS5ELjhRRrroQr9kyvTxUAFNvYEK993ew/Vr4O4=
