@@ -44,6 +44,9 @@ func (lsn LSN) Less(other LSN) bool {
 	return p1 < p2
 }
 
+// LessAdapter is the same as Less, but implementing the
+// interface in the catalog. This method should be removed
+// when we have the cloudnative-pg-machinery library
 func (lsn LSN) LessAdapter(other barmanCatalog.LsnAdapter) bool {
 	return lsn.Less(other.(LSN))
 }

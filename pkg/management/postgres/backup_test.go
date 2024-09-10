@@ -23,6 +23,7 @@ import (
 	"time"
 
 	barmanBackup "github.com/cloudnative-pg/plugin-barman-cloud/pkg/backup"
+	barmanCapabilities "github.com/cloudnative-pg/plugin-barman-cloud/pkg/capabilities"
 	barmanCatalog "github.com/cloudnative-pg/plugin-barman-cloud/pkg/catalog"
 	barmanTypes "github.com/cloudnative-pg/plugin-barman-cloud/pkg/types"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -34,7 +35,6 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
-	barmanCapabilities "github.com/cloudnative-pg/plugin-barman-cloud/pkg/capabilities"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"

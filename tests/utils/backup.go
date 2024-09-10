@@ -19,9 +19,9 @@ package utils
 import (
 	"encoding/json"
 	"fmt"
-	barmanTypes "github.com/cloudnative-pg/plugin-barman-cloud/pkg/types"
 	"os"
 
+	barmanTypes "github.com/cloudnative-pg/plugin-barman-cloud/pkg/types"
 	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"

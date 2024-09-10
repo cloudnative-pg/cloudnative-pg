@@ -18,8 +18,8 @@ package specs
 
 import (
 	"fmt"
-	barmanTypes "github.com/cloudnative-pg/plugin-barman-cloud/pkg/types"
 
+	barmanTypes "github.com/cloudnative-pg/plugin-barman-cloud/pkg/types"
 	"github.com/kballard/go-shellquote"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"

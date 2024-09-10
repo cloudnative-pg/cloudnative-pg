@@ -23,6 +23,11 @@ import (
 	"reflect"
 	"time"
 
+	barmanBackup "github.com/cloudnative-pg/plugin-barman-cloud/pkg/backup"
+	barmanCapabilities "github.com/cloudnative-pg/plugin-barman-cloud/pkg/capabilities"
+	barmanCatalog "github.com/cloudnative-pg/plugin-barman-cloud/pkg/catalog"
+	barmanCommand "github.com/cloudnative-pg/plugin-barman-cloud/pkg/command"
+	barmanCredentials "github.com/cloudnative-pg/plugin-barman-cloud/pkg/credentials"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -39,11 +44,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
-	barmanBackup "github.com/cloudnative-pg/plugin-barman-cloud/pkg/backup"
-	barmanCapabilities "github.com/cloudnative-pg/plugin-barman-cloud/pkg/capabilities"
-	barmanCatalog "github.com/cloudnative-pg/plugin-barman-cloud/pkg/catalog"
-	barmanCommand "github.com/cloudnative-pg/plugin-barman-cloud/pkg/command"
-	barmanCredentials "github.com/cloudnative-pg/plugin-barman-cloud/pkg/credentials"
 
 	// this is needed to correctly open the sql connection with the pgx driver
 	_ "github.com/jackc/pgx/v5/stdlib"

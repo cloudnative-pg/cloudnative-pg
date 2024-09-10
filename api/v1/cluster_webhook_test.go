@@ -20,10 +20,10 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	barmanTypes "github.com/cloudnative-pg/plugin-barman-cloud/pkg/types"
 	"strings"
 	"time"
 
+	barmanTypes "github.com/cloudnative-pg/plugin-barman-cloud/pkg/types"
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
