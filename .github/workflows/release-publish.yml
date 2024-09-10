@@ -148,7 +148,7 @@ jobs:
         uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
-          version: latest
+          version: v2
           args: release --clean --timeout 60m
         env:
           DATE: ${{ env.DATE }}
@@ -351,7 +351,7 @@ jobs:
           rm -fr cloudnative-pg-catalog.yaml bundle.Dockerfile *.zip bundle/
 
       - name: Create Remote Pull Request
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ secrets.REPO_GHA_PAT }}
           commit-message: "operator cloudnative-pg (${{ env.VERSION }})"

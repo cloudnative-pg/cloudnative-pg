@@ -127,4 +127,22 @@ var _ = Describe("Annotation and label inheritance", func() {
 			}))
 		})
 	})
+
+	Context("included plugin list", func() {
+		It("is empty by default", func() {
+			Expect(newDefaultConfig().GetIncludePlugins()).To(BeEmpty())
+		})
+
+		It("contains a set of comma-separated plugins", func() {
+			Expect((&Data{
+				IncludePlugins: "a,b,c",
+			}).GetIncludePlugins()).To(ContainElements("a", "b", "c"))
+			Expect((&Data{
+				IncludePlugins: "a,,,b,c",
+			}).GetIncludePlugins()).To(ContainElements("a", "b", "c"))
+			Expect((&Data{
+				IncludePlugins: "a,,,b , c",
+			}).GetIncludePlugins()).To(ContainElements("a", "b", "c"))
+		})
+	})
 })

@@ -252,7 +252,7 @@ func restoreWALViaPlugins(
 	}
 	defer plugins.Close()
 
-	client, err := pluginClient.WithPlugins(ctx, plugins, cluster.Spec.Plugins.GetNames()...)
+	client, err := pluginClient.WithPlugins(ctx, plugins, cluster.Spec.Plugins.GetEnabledPluginNames()...)
 	if err != nil {
 		contextLogger.Error(err, "Error while loading required plugins")
 		return err
