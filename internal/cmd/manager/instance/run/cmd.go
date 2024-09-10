@@ -166,8 +166,8 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 				DisableFor: []client.Object{
 					&corev1.Secret{},
 					&corev1.ConfigMap{},
-					// we don't have the permission to cache backups given that the SA doesn't have watch permission
-					// on the object.
+					// we don't have the permissions to cache backups, as the ServiceAccount
+					// doesn't have watch permission on the backup status
 					&apiv1.Backup{},
 				},
 			},
