@@ -4925,3 +4925,61 @@ var _ = Describe("ServiceTemplate Validation", func() {
 		})
 	})
 })
+
+var _ = Describe("setDefaultPlugins", func() {
+	It("adds pre-defined plugins if not already present", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				Plugins: []PluginConfiguration{
+					{Name: "existing-plugin", Enabled: ptr.To(true)},
+				},
+			},
+		}
+		config := &configuration.Data{
+			IncludePlugins: "predefined-plugin1,predefined-plugin2",
+		}
+
+		cluster.setDefaultPlugins(config)
+
+		Expect(cluster.Spec.Plugins).To(
+			ContainElement(PluginConfiguration{Name: "existing-plugin", Enabled: ptr.To(true)}))
+		Expect(cluster.Spec.Plugins).To(
+			ContainElement(PluginConfiguration{Name: "predefined-plugin1", Enabled: ptr.To(true)}))
+		Expect(cluster.Spec.Plugins).To(
+			ContainElement(PluginConfiguration{Name: "predefined-plugin2", Enabled: ptr.To(true)}))
+	})
+
+	It("does not add pre-defined plugins if already present", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				Plugins: []PluginConfiguration{
+					{Name: "predefined-plugin1", Enabled: ptr.To(false)},
+				},
+			},
+		}
+		config := &configuration.Data{
+			IncludePlugins: "predefined-plugin1,predefined-plugin2",
+		}
+
+		cluster.setDefaultPlugins(config)
+
+		Expect(cluster.Spec.Plugins).To(HaveLen(2))
+		Expect(cluster.Spec.Plugins).To(
+			ContainElement(PluginConfiguration{Name: "predefined-plugin1", Enabled: ptr.To(false)}))
+		Expect(cluster.Spec.Plugins).To(
+			ContainElement(PluginConfiguration{Name: "predefined-plugin2", Enabled: ptr.To(true)}))
+	})
+
+	It("handles empty plugin list gracefully", func() {
+		cluster := &Cluster{}
+		config := &configuration.Data{
+			IncludePlugins: "predefined-plugin1",
+		}
+
+		cluster.setDefaultPlugins(config)
+
+		Expect(cluster.Spec.Plugins).To(HaveLen(1))
+		Expect(cluster.Spec.Plugins).To(
+			ContainElement(PluginConfiguration{Name: "predefined-plugin1", Enabled: ptr.To(true)}))
+	})
+})

@@ -90,7 +90,7 @@ func (b *PluginBackupCommand) invokeStart(ctx context.Context) {
 		"backupName", b.Backup.Name,
 		"backupNamespace", b.Backup.Name)
 
-	cli, err := pluginClient.WithPlugins(ctx, b.Plugins, b.Cluster.Spec.Plugins.GetNames()...)
+	cli, err := pluginClient.WithPlugins(ctx, b.Plugins, b.Cluster.Spec.Plugins.GetEnabledPluginNames()...)
 	if err != nil {
 		b.markBackupAsFailed(ctx, err)
 		return
