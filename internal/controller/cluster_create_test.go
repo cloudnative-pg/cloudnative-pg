@@ -1042,7 +1042,7 @@ var _ = Describe("createOrPatchOwnedPodDisruptionBudget", func() {
 	})
 })
 
-var _ = Describe("deletePodDisruptionBudgetIfExists", func() {
+var _ = Describe("deletePodDisruptionBudgetsIfExist", func() {
 	const namespace = "default"
 
 	var (
@@ -1116,7 +1116,7 @@ var _ = Describe("deletePodDisruptionBudgetIfExists", func() {
 		err = fakeClient.Get(ctx, k8client.ObjectKeyFromObject(pdbPrimary), &policyv1.PodDisruptionBudget{})
 		Expect(err).ToNot(HaveOccurred())
 
-		err = reconciler.deletePodDisruptionBudgetIfExists(ctx, cluster)
+		err = reconciler.deletePodDisruptionBudgetsIfExist(ctx, cluster)
 		Expect(err).ToNot(HaveOccurred())
 
 		err = fakeClient.Get(ctx, k8client.ObjectKeyFromObject(pdbPrimary), &policyv1.PodDisruptionBudget{})
@@ -1140,7 +1140,7 @@ var _ = Describe("deletePodDisruptionBudgetIfExists", func() {
 		err := fakeClient.Get(ctx, k8client.ObjectKeyFromObject(pdbPrimary), &policyv1.PodDisruptionBudget{})
 		Expect(apierrs.IsNotFound(err)).To(BeTrue())
 
-		err = reconciler.deletePodDisruptionBudgetIfExists(ctx, cluster)
+		err = reconciler.deletePodDisruptionBudgetsIfExist(ctx, cluster)
 		Expect(err).ToNot(HaveOccurred())
 
 		err = fakeClient.Get(ctx, k8client.ObjectKeyFromObject(pdb), &policyv1.PodDisruptionBudget{})
