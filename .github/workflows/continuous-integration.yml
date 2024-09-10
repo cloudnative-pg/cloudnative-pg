@@ -480,7 +480,7 @@ jobs:
           )
         with:
           distribution: goreleaser
-          version: latest
+          version: v2
           args: ${{ env.BUILD_PLUGIN_RELEASE_ARGS }}
         env:
           DATE: ${{ env.DATE }}
@@ -513,7 +513,7 @@ jobs:
         uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
-          version: latest
+          version: v2
           args: ${{ env.BUILD_MANAGER_RELEASE_ARGS }}
         env:
           DATE: ${{ env.DATE }}

@@ -342,7 +342,7 @@ jobs:
         uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
-          version: latest
+          version: v2
           args: ${{ env.BUILD_MANAGER_RELEASE_ARGS }}
         env:
           DATE: ${{ env.DATE }}
@@ -463,7 +463,7 @@ jobs:
           needs.evaluate_options.outputs.test_level == '4'
         with:
           distribution: goreleaser
-          version: latest
+          version: v2
           args: ${{ env.BUILD_MANAGER_RELEASE_ARGS }}
         env:
           DATE: ${{ env.DATE }}
