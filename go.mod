@@ -10,7 +10,7 @@ require (
 	github.com/cheynewallace/tabby v1.1.1
 	github.com/cloudnative-pg/cnpg-i v0.0.0-20240820123829-5844b833f4eb
 	github.com/cloudnative-pg/cnpg-i-machinery v0.0.0-20240903080817-f919c9abfe74
-	github.com/cloudnative-pg/plugin-barman-cloud v0.0.0-20240910084718-0dc891982383
+	github.com/cloudnative-pg/plugin-barman-cloud v0.0.0-20240910140313-dc46ec31e8c4
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/evanphx/json-patch/v5 v5.9.0
 	github.com/go-logr/logr v1.4.2

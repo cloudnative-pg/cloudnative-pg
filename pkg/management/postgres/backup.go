@@ -39,7 +39,6 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/conditions"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
@@ -258,7 +257,13 @@ func (b *BackupCommand) backupMaintenance(ctx context.Context) {
 		// TODO: refactor retention policy and move it in the Barman library
 		b.Log.Info("Applying backup retention policy",
 			"retentionPolicy", b.Cluster.Spec.Backup.RetentionPolicy)
-		if err := barman.DeleteBackupsByPolicy(ctx, b.Cluster.Spec.Backup, b.Backup.Status.ServerName, b.Env); err != nil {
+		if err := barmanCommand.DeleteBackupsByPolicy(
+			ctx,
+			b.Cluster.Spec.Backup.BarmanObjectStore,
+			b.Backup.Status.ServerName,
+			b.Env,
+			b.Cluster.Spec.Backup.RetentionPolicy,
+		); err != nil {
 			// Proper logging already happened inside DeleteBackupsByPolicy
 			b.Recorder.Event(b.Cluster, "Warning", "RetentionPolicyFailed", "Retention policy failed")
 			// We do not want to return here, we must go on to set the fist recoverability point
@@ -277,7 +282,7 @@ func (b *BackupCommand) backupMaintenance(ctx context.Context) {
 		return
 	}
 
-	if err := barman.DeleteBackupsNotInCatalog(ctx, b.Client, b.Cluster, backupList); err != nil {
+	if err := deleteBackupsNotInCatalog(ctx, b.Client, b.Cluster, backupList); err != nil {
 		b.Log.Error(err, "while deleting Backups not present in the catalog")
 	}
 
@@ -367,4 +372,88 @@ func assignBarmanBackupToBackup(backup *apiv1.Backup, barmanBackup *barmanCatalo
 	backupStatus.EndWal = barmanBackup.EndWal
 	backupStatus.BeginLSN = barmanBackup.BeginLSN
 	backupStatus.EndLSN = barmanBackup.EndLSN
+}
+
+// deleteBackupsNotInCatalog deletes all Backup objects pointing to the given cluster that are not
+// present in the backup anymore
+func deleteBackupsNotInCatalog(
+	ctx context.Context,
+	cli client.Client,
+	cluster *apiv1.Cluster,
+	catalog *barmanCatalog.Catalog,
+) error {
+	// We had two options:
+	//
+	// A. quicker
+	// get policy checker function
+	// get all backups in the namespace for this cluster
+	// check with policy checker function if backup should be deleted, then delete it if true
+	//
+	// B. more precise
+	// get the catalog (GetBackupList)
+	// get all backups in the namespace for this cluster
+	// go through all backups and delete them if not in the catalog
+	//
+	// 1: all backups in the bucket should be also in the cluster
+	// 2: all backups in the cluster should be in the bucket
+	//
+	// A can violate 1 and 2
+	// A + B can still violate 2
+	// B satisfies 1 and 2
+
+	// We chose to go with B
+
+	backups := apiv1.BackupList{}
+	err := cli.List(ctx, &backups, client.InNamespace(cluster.GetNamespace()))
+	if err != nil {
+		return fmt.Errorf("while getting backups: %w", err)
+	}
+
+	var errors []error
+	for id, backup := range backups.Items {
+		if backup.Spec.Cluster.Name != cluster.GetName() ||
+			backup.Status.Phase != apiv1.BackupPhaseCompleted ||
+			!useSameBackupLocation(&backup.Status, cluster) {
+			continue
+		}
+		var found bool
+		for _, barmanBackup := range catalog.List {
+			if backup.Status.BackupID == barmanBackup.ID {
+				found = true
+				break
+			}
+		}
+		// here we could add further checks, e.g. if the backup is not found but would still
+		// be in the retention policy we could either not delete it or update it is status
+		if !found {
+			err := cli.Delete(ctx, &backups.Items[id])
+			if err != nil {
+				errors = append(errors, fmt.Errorf(
+					"while deleting backup %s/%s: %w",
+					backup.Namespace,
+					backup.Name,
+					err,
+				))
+			}
+		}
+	}
+
+	if errors != nil {
+		return fmt.Errorf("got errors while deleting Backups not in the cluster: %v", errors)
+	}
+	return nil
+}
+
+// useSameBackupLocation checks whether the given backup was taken using the same configuration as provided
+func useSameBackupLocation(backup *apiv1.BackupStatus, cluster *apiv1.Cluster) bool {
+	if cluster.Spec.Backup == nil || cluster.Spec.Backup.BarmanObjectStore == nil {
+		return false
+	}
+	configuration := cluster.Spec.Backup.BarmanObjectStore
+	return backup.EndpointURL == configuration.EndpointURL &&
+		backup.DestinationPath == configuration.DestinationPath &&
+		(backup.ServerName == configuration.ServerName ||
+			// if not specified we use the cluster name as server name
+			(configuration.ServerName == "" && backup.ServerName == cluster.Name)) &&
+		reflect.DeepEqual(backup.BarmanCredentials, configuration.BarmanCredentials)
 }

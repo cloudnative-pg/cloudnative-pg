@@ -48,7 +48,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/configfile"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/external"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
@@ -431,7 +430,7 @@ func (info InitInfo) restoreDataDir(backup *apiv1.Backup, env []string) error {
 	if err != nil {
 		var exitError *exec.ExitError
 		if errors.As(err, &exitError) {
-			err = barman.UnmarshalBarmanCloudRestoreExitCode(exitError.ExitCode())
+			err = barmanCommand.UnmarshalBarmanCloudRestoreExitCode(exitError.ExitCode())
 		}
 
 		log.Error(err, "Can't restore backup")

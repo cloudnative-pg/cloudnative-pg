@@ -22,6 +22,7 @@ import (
 	"errors"
 	"os"
 
+	barmanCommand "github.com/cloudnative-pg/plugin-barman-cloud/pkg/command"
 	"github.com/spf13/cobra"
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -29,7 +30,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/linkerd"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
@@ -98,7 +98,7 @@ func restoreSubCommand(ctx context.Context, info postgres.InitInfo) error {
 }
 
 func cleanupDataDirectoryIfNeeded(restoreError error, dataDirectory string) {
-	var barmanError *barman.CloudRestoreError
+	var barmanError *barmanCommand.CloudRestoreError
 	if !errors.As(restoreError, &barmanError) {
 		return
 	}
