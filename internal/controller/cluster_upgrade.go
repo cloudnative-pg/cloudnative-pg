@@ -233,8 +233,10 @@ func (r *ClusterReconciler) updateRestartAnnotation(
 // rollout describes whether a rollout should happen, and if so whether it can
 // be done in-place, and what the reason for the rollout is
 type rollout struct {
-	required             bool
-	canBeInPlace         bool
+	required     bool
+	canBeInPlace bool
+	// if primaryForceRecreate is true, the old pod will be
+	// recreated no matter what primaryUpdateMethod is set
 	primaryForceRecreate bool
 	reason               string
 }
@@ -495,10 +497,12 @@ func checkPodInitContainerIsOutdated(pod *corev1.Pod, _ *apiv1.Cluster) (rollout
 }
 
 func checkHasMissingPVCs(pod *corev1.Pod, cluster *apiv1.Cluster) (rollout, error) {
-	if persistentvolumeclaim.InstanceHasMissingMounts(cluster, pod) {
+	missingPVC, missingTbsPVC := persistentvolumeclaim.InstanceHasMissingMounts(cluster, pod)
+	if missingPVC {
 		return rollout{
-			required:             true,
-			primaryForceRecreate: true,
+			required: true,
+			// we force the recreation of the primary pod if the tablespace PVC is missing
+			primaryForceRecreate: missingTbsPVC,
 			reason:               "attaching a new PVC to the instance Pod",
 		}, nil
 	}

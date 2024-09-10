@@ -25,6 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // FilterByPodSpec returns all the corev1.PersistentVolumeClaim that are used inside the podSpec
@@ -105,14 +106,19 @@ func getNamesFromPVCList(pvcs []corev1.PersistentVolumeClaim) []string {
 	return pvcNames
 }
 
-// InstanceHasMissingMounts returns true if the instance has expected PVCs that are not mounted
-func InstanceHasMissingMounts(cluster *apiv1.Cluster, instance *corev1.Pod) bool {
-	for _, pvcName := range getExpectedInstancePVCNamesFromCluster(cluster, instance.Name) {
+// InstanceHasMissingMounts returns if the instance has expected PVCs that are not mounted
+// and if the instance has missing tablespaces not mounted
+func InstanceHasMissingMounts(cluster *apiv1.Cluster, instance *corev1.Pod) (bool, bool) {
+	var missingMount, missingTbsMount bool
+	for pvcName, pvcRole := range getExpectedInstancePVCMapFromCluster(cluster, instance.Name) {
 		if !IsUsedByPodSpec(instance.Spec, pvcName) {
-			return true
+			missingMount = true
+			if pvcRole == string(utils.PVCRolePgTablespace) {
+				return true, true
+			}
 		}
 	}
-	return false
+	return missingMount, missingTbsMount
 }
 
 type expectedPVC struct {
@@ -146,6 +152,16 @@ func getExpectedPVCsFromCluster(cluster *apiv1.Cluster, instanceName string) []e
 		roles = append(roles, NewPgTablespaceCalculator(tbsConfig.Name))
 	}
 	return buildExpectedPVCs(instanceName, roles)
+}
+
+// getExpectedInstancePVCMapFromCluster gets all the PVC names and role map for a given instance
+func getExpectedInstancePVCMapFromCluster(cluster *apiv1.Cluster, instanceName string) map[string]string {
+	expectedPVCs := getExpectedPVCsFromCluster(cluster, instanceName)
+	expectedPVCNameMap := make(map[string]string, len(expectedPVCs))
+	for _, mount := range expectedPVCs {
+		expectedPVCNameMap[mount.name] = mount.calculator.GetRoleName()
+	}
+	return expectedPVCNameMap
 }
 
 // getExpectedInstancePVCNamesFromCluster gets all the PVC names for a given instance
