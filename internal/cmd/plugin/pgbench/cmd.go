@@ -61,6 +61,20 @@ func NewCmd() *cobra.Command {
 		"The name of the database that will be used by pgbench. Defaults to: app",
 	)
 
+	pgBenchCmd.Flags().StringVar(
+		&run.dbUser,
+		"db-user",
+		"app",
+		"The name of the database user that will be used by pgbench. Defaults to: app",
+	)
+
+	pgBenchCmd.Flags().StringVar(
+		&run.dbPassword,
+		"db-password",
+		"",
+		"The password of the database user that will be used by pgbench. Defaults to: Password in the clusters user secret.",
+	)
+
 	pgBenchCmd.Flags().BoolVar(
 		&run.dryRun,
 		"dry-run",
