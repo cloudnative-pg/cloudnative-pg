@@ -143,9 +143,14 @@ func (r *ClusterReconciler) reconcilePodDisruptionBudget(ctx context.Context, cl
 		return err
 	}
 
+	replicaPDB := specs.BuildReplicasPodDisruptionBudget(cluster)
+	if replicaPDB == nil {
+		return r.deleteReplicasPodDisruptionBudget(ctx, cluster)
+	}
+
 	return r.createOrPatchOwnedPodDisruptionBudget(ctx,
 		cluster,
-		specs.BuildReplicasPodDisruptionBudget(cluster),
+		replicaPDB,
 	)
 }
 

@@ -361,6 +361,30 @@ var _ = Describe("cluster_create unit tests", func() {
 			)
 		})
 
+		By("scaling the instances to 2", func() {
+			cluster.Spec.Instances = 2
+			cluster.Status.Instances = 2
+		})
+
+		By("reconciling pdb with two nodes", func() {
+			reconcilePDB()
+		})
+
+		By("making sure that only the replicas PDB has been deleted", func() {
+			expectResourceExists(
+				env.client,
+				pdbPrimaryName,
+				namespace,
+				&policyv1.PodDisruptionBudget{},
+			)
+			expectResourceDoesntExist(
+				env.client,
+				pdbReplicaName,
+				namespace,
+				&policyv1.PodDisruptionBudget{},
+			)
+		})
+
 		By("enabling the cluster maintenance mode", func() {
 			reusePVC := true
 			cluster.Spec.NodeMaintenanceWindow = &apiv1.NodeMaintenanceWindow{
@@ -373,7 +397,13 @@ var _ = Describe("cluster_create unit tests", func() {
 			reconcilePDB()
 		})
 
-		By("making sure that the replicas PDB are deleted", func() {
+		By("making sure that only the replicas PDB has been deleted", func() {
+			expectResourceExists(
+				env.client,
+				pdbPrimaryName,
+				namespace,
+				&policyv1.PodDisruptionBudget{},
+			)
 			expectResourceDoesntExist(
 				env.client,
 				pdbReplicaName,
