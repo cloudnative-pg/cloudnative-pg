@@ -140,9 +140,9 @@ func WaitKubernetesAPIServer(ctx context.Context, clusterObjectKey client.Object
 		return err
 	}
 
-	err = retry.OnError(readinessCheckRetry, resources.RetryAlways, func() (err error) {
-		if err = cli.Get(ctx, clusterObjectKey, &apiv1.Cluster{}); err != nil {
-			logger.Info("The api server is currently unreachable, will wait and retry later")
+	err = retry.OnError(readinessCheckRetry, resources.RetryAlways, func() error {
+		if err := cli.Get(ctx, clusterObjectKey, &apiv1.Cluster{}); err != nil {
+			logger.Warning("The API server is currently unreachable. Will wait and retry")
 			return err
 		}
 		return nil
