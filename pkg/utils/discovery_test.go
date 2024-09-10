@@ -231,7 +231,9 @@ var _ = Describe("AvailableArchitecture", func() {
 			})
 
 			It("should panic with an error", func() {
-				Expect(arch.calculateHash).To(Panic())
+				Expect(func() {
+					arch.calculateHash()
+				}).To(Panic())
 			})
 		})
 	})
