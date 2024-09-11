@@ -101,14 +101,6 @@ def convert_ginkgo_test(test, matrix):
         err_line = test["Failure"]["Location"]["LineNumber"]
 
     state = test["State"]
-    # If the test failed but had an Ignore label, mark it as ignoreFailed.
-    # In such case it doesn't count as FAILED, but we can still see how much it's failing
-    if (
-        state == "failed"
-        and "ContainerHierarchyLabels" in test
-        and "ignore-fails" in flatten(test["ContainerHierarchyLabels"])
-    ):
-        state = "ignoreFailed"
 
     branch = matrix["branch"]
     if branch == "":
