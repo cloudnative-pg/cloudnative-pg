@@ -18,6 +18,8 @@ package sternmultitailer
 
 import (
 	"context"
+	"io"
+	"os"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -32,6 +34,12 @@ const (
 	// OperatorLogsDirectory is the fixed path to store the logs of all the operator pods
 	OperatorLogsDirectory = "operator_logs/"
 )
+
+// SternMultiTailer contains the necessary data for the logs of every cluster
+type SternMultiTailer struct {
+	stdOut       *io.PipeReader
+	openFilesMap map[string]*os.File
+}
 
 // CatchClusterLogs execute StreamLogs with the specific labels to match
 // only the CNPG pods and send them to ClusterLogsDirectory path

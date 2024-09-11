@@ -34,12 +34,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-// SternMultiTailer contains the necessary data for the logs of every cluster
-type SternMultiTailer struct {
-	stdOut       *io.PipeReader
-	openFilesMap map[string]*os.File
-}
-
 // StreamLogs opens a goroutine to execute stern on all the pods that match
 // the labelSelector.
 // Close the ctx context to terminate stern execution.
@@ -109,6 +103,7 @@ func (s *SternMultiTailer) streamLogs(
 		Out:    outPipeWriter,
 		ErrOut: errOut,
 	}
+
 	outputDone := make(chan struct{})
 	go func() {
 		err := stern.Run(ctx, client, config)
