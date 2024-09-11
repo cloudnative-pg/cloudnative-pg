@@ -26,7 +26,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/cloudnative-pg/cnpg-i-machinery/pkg/logging"
 	barmanArchiver "github.com/cloudnative-pg/plugin-barman-cloud/pkg/archiver"
 	barmanSpool "github.com/cloudnative-pg/plugin-barman-cloud/pkg/spool"
 	"github.com/spf13/cobra"
@@ -285,7 +284,7 @@ func archiveWALViaPlugins(
 
 // isCheckWalArchiveFlagFilePresent returns true if the file CheckEmptyWalArchiveFile is present in the PGDATA directory
 func isCheckWalArchiveFlagFilePresent(ctx context.Context, pgDataDirectory string) bool {
-	contextLogger := logging.FromContext(ctx)
+	contextLogger := log.FromContext(ctx)
 	filePath := filepath.Join(pgDataDirectory, pgManagement.CheckEmptyWalArchiveFile)
 
 	exists, err := fileutils.FileExists(filePath)
@@ -294,7 +293,7 @@ func isCheckWalArchiveFlagFilePresent(ctx context.Context, pgDataDirectory strin
 	}
 	// If the check empty wal archive file doesn't exist this it's a no-op
 	if !exists {
-		contextLogger.V(4).Info("WAL check flag file not found, skipping check")
+		contextLogger.Debug("WAL check flag file not found, skipping check")
 		return false
 	}
 
