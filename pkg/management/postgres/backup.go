@@ -36,10 +36,10 @@ import (
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/fileutils"
+	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/log"
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/conditions"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -216,7 +216,13 @@ func (b *BackupCommand) takeBackup(ctx context.Context) error {
 		return err
 	}
 
-	err := b.barmanBackup.Take(ctx, b.Backup.Status.BackupName, backupStatus.ServerName, b.Env, b.Cluster)
+	err := b.barmanBackup.Take(
+		ctx, b.Backup.Status.BackupName,
+		backupStatus.ServerName,
+		b.Env,
+		b.Cluster,
+		postgres.BackupTemporaryDirectory,
+	)
 	if err != nil {
 		b.Log.Error(err, "Error while taking barman backup", "err", err)
 		return err

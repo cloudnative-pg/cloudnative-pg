@@ -26,7 +26,7 @@ import (
 	"go.uber.org/multierr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/log"
 )
 
 func (data *data) ArchiveWAL(

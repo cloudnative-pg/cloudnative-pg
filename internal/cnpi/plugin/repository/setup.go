@@ -25,8 +25,8 @@ import (
 
 	"github.com/jackc/puddle/v2"
 
+	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/log"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/connection"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
 // Interface is the interface to use a plugin repository

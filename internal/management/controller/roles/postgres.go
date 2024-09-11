@@ -26,7 +26,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/lib/pq"
 
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/log"
 )
 
 // PostgresRoleManager is a RoleManager for a database instance

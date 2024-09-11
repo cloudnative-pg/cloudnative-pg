@@ -24,8 +24,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 )
 
 // reportName produces a timestamped report string apt for file/folder naming

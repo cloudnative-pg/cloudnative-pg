@@ -25,6 +25,7 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
+	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/log"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/backup"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/certificate"
@@ -47,7 +48,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/snapshot"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/status"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/versions"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )

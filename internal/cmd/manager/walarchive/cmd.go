@@ -27,10 +27,11 @@ import (
 	"time"
 
 	barmanArchiver "github.com/cloudnative-pg/plugin-barman-cloud/pkg/archiver"
-	barmanSpool "github.com/cloudnative-pg/plugin-barman-cloud/pkg/spool"
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/fileutils"
+	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/log"
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	pluginClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
@@ -38,10 +39,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/cache"
 	cacheClient "github.com/cloudnative-pg/cloudnative-pg/internal/management/cache/client"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/conditions"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	pgManagement "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -189,13 +187,6 @@ func run(
 		env,
 		postgres.SpoolDirectory,
 		pgData,
-		barmanSpool.FileUtils{
-			EnsureDirectoryExists: fileutils.EnsureDirectoryExists,
-			FileExists:            fileutils.FileExists,
-			MoveFile:              fileutils.MoveFile,
-			RemoveFile:            fileutils.RemoveFile,
-		},
-		execlog.RunStreaming,
 		func() error {
 			// Removes the `.check-empty-wal-archive` file inside PGDATA after the
 			// first successful archival of a WAL file.
@@ -232,7 +223,8 @@ func run(
 	// Step 3: gather the WAL files names to archive
 	walFilesList := walArchiver.GatherWALFilesToArchive(ctx, walName, maxParallel)
 
-	options, err := walArchiver.BarmanCloudWalArchiveOptions(cluster.Spec.Backup.BarmanObjectStore, cluster.Name)
+	options, err := walArchiver.BarmanCloudWalArchiveOptions(
+		ctx, cluster.Spec.Backup.BarmanObjectStore, cluster.Name)
 	if err != nil {
 		return err
 	}
@@ -300,13 +292,14 @@ func isCheckWalArchiveFlagFilePresent(ctx context.Context, pgDataDirectory strin
 	return exists
 }
 
-func checkWalArchive(ctx context.Context,
+func checkWalArchive(
+	ctx context.Context,
 	cluster *apiv1.Cluster,
 	walArchiver *barmanArchiver.WALArchiver,
 	pgData string,
 ) error {
 	checkWalOptions, err := walArchiver.BarmanCloudCheckWalArchiveOptions(
-		cluster.Spec.Backup.BarmanObjectStore, cluster.Name)
+		ctx, cluster.Spec.Backup.BarmanObjectStore, cluster.Name)
 	if err != nil {
 		log.Error(err, "while getting barman-cloud-wal-archive options")
 		return err

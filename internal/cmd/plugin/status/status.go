@@ -36,6 +36,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	types "github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/types"
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/plugin/resources"
@@ -767,7 +768,7 @@ func (fullStatus *PostgresqlStatus) tryGetPrimaryInstance() *postgres.Postgresql
 	return nil
 }
 
-func getCurrentLSN(instance postgres.PostgresqlStatus) postgres.LSN {
+func getCurrentLSN(instance postgres.PostgresqlStatus) types.LSN {
 	if instance.IsPrimary {
 		return instance.CurrentLsn
 	}

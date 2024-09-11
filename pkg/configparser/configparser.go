@@ -53,7 +53,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/log"
 )
 
 var configparserLog = log.WithName("configparser")

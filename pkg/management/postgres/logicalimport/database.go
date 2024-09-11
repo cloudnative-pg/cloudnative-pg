@@ -24,9 +24,9 @@ import (
 	"github.com/jackc/pgx/v5"
 	"k8s.io/utils/strings/slices"
 
+	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/execlog"
+	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/log"
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pool"
 )
 

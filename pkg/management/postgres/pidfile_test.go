@@ -23,7 +23,7 @@ import (
 
 	"github.com/mitchellh/go-ps"
 
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
+	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/fileutils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"

@@ -24,8 +24,8 @@ import (
 	"github.com/thoas/go-funk"
 	"k8s.io/utils/strings/slices"
 
+	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/fileutils"
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"

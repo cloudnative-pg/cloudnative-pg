@@ -38,8 +38,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
+	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/log"
+	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/types"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/stringset"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -1424,7 +1425,7 @@ func (r *Cluster) validateRecoveryTarget() field.ErrorList {
 
 	// validate format of TargetTime
 	if recoveryTarget.TargetTime != "" {
-		if _, err := utils.ParseTargetTime(nil, recoveryTarget.TargetTime); err != nil {
+		if _, err := types.ParseTargetTime(nil, recoveryTarget.TargetTime); err != nil {
 			result = append(result, field.Invalid(
 				field.NewPath("spec", "bootstrap", "recovery", "recoveryTarget"),
 				recoveryTarget.TargetTime,
@@ -1434,7 +1435,7 @@ func (r *Cluster) validateRecoveryTarget() field.ErrorList {
 
 	// validate TargetLSN
 	if recoveryTarget.TargetLSN != "" {
-		if _, err := postgres.LSN(recoveryTarget.TargetLSN).Parse(); err != nil {
+		if _, err := types.LSN(recoveryTarget.TargetLSN).Parse(); err != nil {
 			result = append(result, field.Invalid(
 				field.NewPath("spec", "bootstrap", "recovery", "recoveryTarget"),
 				recoveryTarget.TargetLSN,

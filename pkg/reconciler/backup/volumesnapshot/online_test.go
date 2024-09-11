@@ -27,9 +27,9 @@ import (
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/types"
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -276,8 +276,8 @@ var _ = Describe("onlineExecutor finalize", func() {
 	})
 
 	It("should handle backup being in the Completed phase", func(ctx SpecContext) {
-		fakeBeginLSN := postgres.LSN("ABCDEF00")
-		fakeEndLSN := postgres.LSN("12345678")
+		fakeBeginLSN := types.LSN("ABCDEF00")
+		fakeEndLSN := types.LSN("12345678")
 		fakeLabelFile := []byte("test-label")
 		fakeSpcmapFile := []byte("test-spcamp")
 

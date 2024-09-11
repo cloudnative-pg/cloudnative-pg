@@ -36,8 +36,8 @@ import (
 	k8sscheme "k8s.io/client-go/kubernetes/scheme"
 
 	// +kubebuilder:scaffold:imports
+	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/log"
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
@@ -102,6 +102,7 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	minioClient, err := utils.MinioDeploy(minioEnv, env)
 	Expect(err).ToNot(HaveOccurred())
 
+	fmt.Println("true")
 	caSecret := minioEnv.CaPair.GenerateCASecret(minioEnv.Namespace, minioEnv.CaSecretName)
 	minioEnv.CaSecretObj = *caSecret
 	objs := map[string]corev1.Pod{

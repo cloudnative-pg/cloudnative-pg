@@ -20,7 +20,7 @@ package logtest
 import (
 	"github.com/go-logr/logr"
 
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/log"
 )
 
 // LogLevel is the type representing a set of log levels

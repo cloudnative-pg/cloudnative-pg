@@ -22,15 +22,16 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/log"
+	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/types"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // PostgresqlStatus defines a status for every instance in the cluster
 type PostgresqlStatus struct {
-	CurrentLsn                LSN         `json:"currentLsn,omitempty"`
-	ReceivedLsn               LSN         `json:"receivedLsn,omitempty"`
-	ReplayLsn                 LSN         `json:"replayLsn,omitempty"`
+	CurrentLsn                types.LSN   `json:"currentLsn,omitempty"`
+	ReceivedLsn               types.LSN   `json:"receivedLsn,omitempty"`
+	ReplayLsn                 types.LSN   `json:"replayLsn,omitempty"`
 	SystemID                  string      `json:"systemID"`
 	IsPrimary                 bool        `json:"isPrimary"`
 	ReplayPaused              bool        `json:"replayPaused"`
@@ -94,17 +95,17 @@ type PostgresqlStatus struct {
 
 // PgStatReplication contains the replications of replicas as reported by the primary instance
 type PgStatReplication struct {
-	ApplicationName string `json:"applicationName,omitempty"`
-	State           string `json:"state,omitempty"`
-	SentLsn         LSN    `json:"receivedLsn,omitempty"`
-	WriteLsn        LSN    `json:"writeLsn,omitempty"`
-	FlushLsn        LSN    `json:"flushLsn,omitempty"`
-	ReplayLsn       LSN    `json:"replayLsn,omitempty"`
-	WriteLag        string `json:"writeLag,omitempty"`
-	FlushLag        string `json:"flushLag,omitempty"`
-	ReplayLag       string `json:"replayLag,omitempty"`
-	SyncState       string `json:"syncState,omitempty"`
-	SyncPriority    string `json:"syncPriority,omitempty"`
+	ApplicationName string    `json:"applicationName,omitempty"`
+	State           string    `json:"state,omitempty"`
+	SentLsn         types.LSN `json:"receivedLsn,omitempty"`
+	WriteLsn        types.LSN `json:"writeLsn,omitempty"`
+	FlushLsn        types.LSN `json:"flushLsn,omitempty"`
+	ReplayLsn       types.LSN `json:"replayLsn,omitempty"`
+	WriteLag        string    `json:"writeLag,omitempty"`
+	FlushLag        string    `json:"flushLag,omitempty"`
+	ReplayLag       string    `json:"replayLag,omitempty"`
+	SyncState       string    `json:"syncState,omitempty"`
+	SyncPriority    string    `json:"syncPriority,omitempty"`
 }
 
 // PgStatBasebackup contains the information for progress of basebackup as reported by the primary instance

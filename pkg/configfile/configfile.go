@@ -24,7 +24,7 @@ import (
 
 	"github.com/lib/pq"
 
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
+	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/stringset"
 )
 

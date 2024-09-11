@@ -22,8 +22,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/fileutils"
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 
 	. "github.com/onsi/ginkgo/v2"

@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	cnpgTypes "github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/types"
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
@@ -91,23 +92,23 @@ var _ = Describe("Updating target primary", func() {
 		statusList := postgres.PostgresqlStatusList{
 			Items: []postgres.PostgresqlStatus{
 				{
-					CurrentLsn:  postgres.LSN("0/0"),
-					ReceivedLsn: postgres.LSN("0/0"),
-					ReplayLsn:   postgres.LSN("0/0"),
+					CurrentLsn:  cnpgTypes.LSN("0/0"),
+					ReceivedLsn: cnpgTypes.LSN("0/0"),
+					ReplayLsn:   cnpgTypes.LSN("0/0"),
 					IsPodReady:  true,
 					Pod:         &instances[1],
 				},
 				{
-					CurrentLsn:  postgres.LSN("0/0"),
-					ReceivedLsn: postgres.LSN("0/0"),
-					ReplayLsn:   postgres.LSN("0/0"),
+					CurrentLsn:  cnpgTypes.LSN("0/0"),
+					ReceivedLsn: cnpgTypes.LSN("0/0"),
+					ReplayLsn:   cnpgTypes.LSN("0/0"),
 					IsPodReady:  true,
 					Pod:         &instances[2],
 				},
 				{
-					CurrentLsn:  postgres.LSN("0/0"),
-					ReceivedLsn: postgres.LSN("0/0"),
-					ReplayLsn:   postgres.LSN("0/0"),
+					CurrentLsn:  cnpgTypes.LSN("0/0"),
+					ReceivedLsn: cnpgTypes.LSN("0/0"),
+					ReplayLsn:   cnpgTypes.LSN("0/0"),
 					IsPodReady:  false,
 					Pod:         &instances[0],
 				},
@@ -152,25 +153,25 @@ var _ = Describe("Updating target primary", func() {
 		statusList := postgres.PostgresqlStatusList{
 			Items: []postgres.PostgresqlStatus{
 				{
-					CurrentLsn:  postgres.LSN("0/0"),
-					ReceivedLsn: postgres.LSN("0/0"),
-					ReplayLsn:   postgres.LSN("0/0"),
+					CurrentLsn:  cnpgTypes.LSN("0/0"),
+					ReceivedLsn: cnpgTypes.LSN("0/0"),
+					ReplayLsn:   cnpgTypes.LSN("0/0"),
 					IsPodReady:  false,
 					IsPrimary:   false,
 					Pod:         &instances[0],
 				},
 				{
-					CurrentLsn:  postgres.LSN("0/0"),
-					ReceivedLsn: postgres.LSN("0/0"),
-					ReplayLsn:   postgres.LSN("0/0"),
+					CurrentLsn:  cnpgTypes.LSN("0/0"),
+					ReceivedLsn: cnpgTypes.LSN("0/0"),
+					ReplayLsn:   cnpgTypes.LSN("0/0"),
 					IsPodReady:  false,
 					IsPrimary:   true,
 					Pod:         &instances[1],
 				},
 				{
-					CurrentLsn:  postgres.LSN("0/0"),
-					ReceivedLsn: postgres.LSN("0/0"),
-					ReplayLsn:   postgres.LSN("0/0"),
+					CurrentLsn:  cnpgTypes.LSN("0/0"),
+					ReceivedLsn: cnpgTypes.LSN("0/0"),
+					ReplayLsn:   cnpgTypes.LSN("0/0"),
 					IsPodReady:  true,
 					Pod:         &instances[2],
 				},
@@ -236,18 +237,18 @@ var _ = Describe("Updating target primary", func() {
 		statusList := postgres.PostgresqlStatusList{
 			Items: []postgres.PostgresqlStatus{
 				{
-					CurrentLsn:         postgres.LSN("0/0"),
-					ReceivedLsn:        postgres.LSN("0/0"),
-					ReplayLsn:          postgres.LSN("0/0"),
+					CurrentLsn:         cnpgTypes.LSN("0/0"),
+					ReceivedLsn:        cnpgTypes.LSN("0/0"),
+					ReplayLsn:          cnpgTypes.LSN("0/0"),
 					IsPodReady:         true,
 					IsPrimary:          false,
 					Pod:                &instances[0],
 					MightBeUnavailable: false,
 				},
 				{
-					CurrentLsn:         postgres.LSN("0/0"),
-					ReceivedLsn:        postgres.LSN("0/0"),
-					ReplayLsn:          postgres.LSN("0/0"),
+					CurrentLsn:         cnpgTypes.LSN("0/0"),
+					ReceivedLsn:        cnpgTypes.LSN("0/0"),
+					ReplayLsn:          cnpgTypes.LSN("0/0"),
 					IsPodReady:         true,
 					IsPrimary:          true,
 					Pod:                &instances[1],

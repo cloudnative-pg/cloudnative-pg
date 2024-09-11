@@ -19,7 +19,7 @@ package logicalimport
 import (
 	"fmt"
 
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
+	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 )
 

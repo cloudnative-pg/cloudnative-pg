@@ -28,6 +28,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	cnpgTypes "github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/types"
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	devUtils "github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -497,7 +498,7 @@ var _ = Describe("Configuration update with primaryUpdateMethod", Label(tests.La
 					env)
 				Expect(cmdErr).ToNot(HaveOccurred())
 
-				primaryStartTime, err = devUtils.ParseTargetTime(nil, strings.Trim(stdout, "\n"))
+				primaryStartTime, err = cnpgTypes.ParseTargetTime(nil, strings.Trim(stdout, "\n"))
 				Expect(err).NotTo(HaveOccurred())
 				query = "show max_connections"
 				stdout, _, cmdErr = utils.RunQueryFromPod(
@@ -565,7 +566,7 @@ var _ = Describe("Configuration update with primaryUpdateMethod", Label(tests.La
 					"select to_char(pg_postmaster_start_time(), 'YYYY-MM-DD HH24:MI:SS');")
 				Expect(cmdErr).ToNot(HaveOccurred())
 
-				newStartTime, err := devUtils.ParseTargetTime(nil, strings.Trim(stdout, "\n"))
+				newStartTime, err := cnpgTypes.ParseTargetTime(nil, strings.Trim(stdout, "\n"))
 				Expect(err).NotTo(HaveOccurred())
 
 				// verify that pg postmaster start time is greater than currentTimestamp which was taken before restart

@@ -28,7 +28,7 @@ import (
 	"github.com/cloudnative-pg/cnpg-i/pkg/identity"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/log"
 )
 
 var (

@@ -28,19 +28,16 @@ import (
 
 	barmanCommand "github.com/cloudnative-pg/plugin-barman-cloud/pkg/command"
 	barmanRestorer "github.com/cloudnative-pg/plugin-barman-cloud/pkg/restorer"
-	barmanSpool "github.com/cloudnative-pg/plugin-barman-cloud/pkg/spool"
 	barmanTypes "github.com/cloudnative-pg/plugin-barman-cloud/pkg/types"
 	"github.com/spf13/cobra"
 
+	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/log"
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	pluginClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/cache"
 	cacheClient "github.com/cloudnative-pg/cloudnative-pg/internal/management/cache/client"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 )
 
@@ -139,7 +136,7 @@ func run(ctx context.Context, pgData string, podName string, args []string) erro
 		return fmt.Errorf("while getting recover configuration: %w", err)
 	}
 
-	options, err := barmanCommand.CloudWalRestoreOptions(barmanConfiguration, recoverClusterName)
+	options, err := barmanCommand.CloudWalRestoreOptions(ctx, barmanConfiguration, recoverClusterName)
 	if err != nil {
 		return fmt.Errorf("while getting barman-cloud-wal-restore options: %w", err)
 	}
@@ -153,12 +150,7 @@ func run(ctx context.Context, pgData string, podName string, args []string) erro
 
 	// Create the restorer
 	var walRestorer *barmanRestorer.WALRestorer
-	if walRestorer, err = barmanRestorer.New(ctx, barmanSpool.FileUtils{
-		EnsureDirectoryExists: fileutils.EnsureDirectoryExists,
-		FileExists:            fileutils.FileExists,
-		MoveFile:              fileutils.MoveFile,
-		RemoveFile:            fileutils.RemoveFile,
-	}, env, SpoolDirectory); err != nil {
+	if walRestorer, err = barmanRestorer.New(ctx, env, SpoolDirectory); err != nil {
 		return fmt.Errorf("while creating the restorer: %w", err)
 	}
 
@@ -201,7 +193,7 @@ func run(ctx context.Context, pgData string, podName string, args []string) erro
 
 	// Step 4: download the WAL files into the required place
 	downloadStartTime := time.Now()
-	walStatus := walRestorer.RestoreList(ctx, walFilesList, destinationPath, options, execlog.RunStreaming)
+	walStatus := walRestorer.RestoreList(ctx, walFilesList, destinationPath, options)
 
 	// We return immediately if the first WAL has errors, because the first WAL
 	// is the one that PostgreSQL has requested to restore.
