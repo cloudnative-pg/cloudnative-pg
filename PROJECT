@@ -56,4 +56,12 @@ resources:
     defaulting: true
     validation: true
     webhookVersion: v1
-version: "3"
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: cnpg.io
+  group: postgresql
+  kind: Database
+  path: github.com/cloudnative-pg/cloudnative-pg/api/v1
+  version: v1
