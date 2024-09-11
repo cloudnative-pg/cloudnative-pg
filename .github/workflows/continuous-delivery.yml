@@ -794,13 +794,13 @@ jobs:
           if-no-files-found: ignore
 
       -
-        name: Archive e2e cluster logs
+        name: Archive e2e logs
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: cluster-logs-${{ matrix.id }}
           path: |
-            tests/e2e/cluster_logs/**
+            tests/e2e/*_logs/**
           retention-days: 7
           if-no-files-found: ignore
 
@@ -1102,13 +1102,13 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
       -
-        name: Archive e2e cluster logs
+        name: Archive e2e logs
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: cluster-logs-${{ matrix.id }}
           path: |
-            tests/e2e/cluster_logs/**
+            tests/e2e/*_logs/**
           retention-days: 7
           if-no-files-found: ignore
       -
@@ -1471,13 +1471,13 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
       -
-        name: Archive e2e cluster logs
+        name: Archive e2e logs
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: cluster-logs-${{ matrix.id }}
           path: |
-            tests/e2e/cluster_logs/**
+            tests/e2e/*_logs/**
           retention-days: 7
           if-no-files-found: ignore
       -
@@ -1803,13 +1803,13 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
       -
-        name: Archive e2e cluster logs
+        name: Archive e2e logs
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: cluster-logs-${{ matrix.id }}
           path: |
-            tests/e2e/cluster_logs/**
+            tests/e2e/*_logs/**
           retention-days: 7
           if-no-files-found: ignore
       -
@@ -2060,13 +2060,13 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
       -
-        name: Archive e2e cluster logs
+        name: Archive e2e logs
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: cluster-logs-${{ matrix.id }}
           path: |
-            tests/e2e/cluster_logs/**
+            tests/e2e/*_logs/**
           retention-days: 7
           if-no-files-found: ignore
       -
