@@ -95,7 +95,7 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 				Name:      podName,
 			}
 			err := env.Client.Get(env.Ctx, namespacedName, pod)
-			Expect(err).ToNot(HaveOccurred())
+			Expect(err).To(HaveOccurred())
 
 			// Put something in the database. We'll check later if it still exists
 			appUser, appUserPass, err := testsUtils.GetCredentials(
