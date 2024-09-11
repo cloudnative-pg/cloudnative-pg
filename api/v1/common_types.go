@@ -44,8 +44,9 @@ type Metadata struct {
 	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
-// ToSecretKeySelectors TODO
-func ToSecretKeySelectors(selector *barmanTypes.SecretKeySelector) *SecretKeySelector {
+// ToSecretKeySelector converts the secretKeySelector CNPG API
+// to the relative Kubernetes API
+func ToSecretKeySelector(selector *barmanTypes.SecretKeySelector) *SecretKeySelector {
 	if selector == nil {
 		return nil
 	}
@@ -58,8 +59,9 @@ func ToSecretKeySelectors(selector *barmanTypes.SecretKeySelector) *SecretKeySel
 	}
 }
 
-// ToBarmanSecretKeySelectors TODO
-func ToBarmanSecretKeySelectors(selector *SecretKeySelector) *barmanTypes.SecretKeySelector {
+// ToBarmanSecretKeySelector converts the Kubernetes SecretKeySelector API
+// to the CNPG one
+func ToBarmanSecretKeySelector(selector *SecretKeySelector) *barmanTypes.SecretKeySelector {
 	if selector == nil {
 		return nil
 	}

@@ -346,7 +346,7 @@ func (b *BackupCommand) setupBackupStatus() {
 		backupStatus.BackupName = fmt.Sprintf("backup-%v", utils.ToCompactISO8601(time.Now()))
 	}
 	backupStatus.BarmanCredentials = barmanConfiguration.BarmanCredentials
-	backupStatus.EndpointCA = apiv1.ToSecretKeySelectors(barmanConfiguration.EndpointCA)
+	backupStatus.EndpointCA = apiv1.ToSecretKeySelector(barmanConfiguration.EndpointCA)
 	backupStatus.EndpointURL = barmanConfiguration.EndpointURL
 	backupStatus.DestinationPath = barmanConfiguration.DestinationPath
 	if barmanConfiguration.Data != nil {

@@ -217,7 +217,7 @@ func addBarmanEndpointCAToJobFromCluster(cluster apiv1.Cluster, backup *apiv1.Ba
 	case cluster.Spec.Bootstrap.Recovery.Source != "":
 		externalCluster, ok := cluster.ExternalCluster(cluster.Spec.Bootstrap.Recovery.Source)
 		if ok && externalCluster.BarmanObjectStore != nil && externalCluster.BarmanObjectStore.EndpointCA != nil {
-			endpointCA = apiv1.ToSecretKeySelectors(externalCluster.BarmanObjectStore.EndpointCA)
+			endpointCA = apiv1.ToSecretKeySelector(externalCluster.BarmanObjectStore.EndpointCA)
 			credentials = externalCluster.BarmanObjectStore.BarmanCredentials
 		}
 	}

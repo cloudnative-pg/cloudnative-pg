@@ -134,11 +134,11 @@ func (r *InstanceReconciler) refreshServerCA(ctx context.Context, cluster *apiv1
 func (r *InstanceReconciler) refreshBarmanEndpointCA(ctx context.Context, cluster *apiv1.Cluster) (bool, error) {
 	endpointCAs := map[string]*apiv1.SecretKeySelector{}
 	if cluster.Spec.Backup.IsBarmanEndpointCASet() {
-		endpointCAs[postgresSpec.BarmanBackupEndpointCACertificateLocation] = apiv1.ToSecretKeySelectors(
+		endpointCAs[postgresSpec.BarmanBackupEndpointCACertificateLocation] = apiv1.ToSecretKeySelector(
 			cluster.Spec.Backup.BarmanObjectStore.EndpointCA)
 	}
 	if replicaBarmanCA := cluster.GetBarmanEndpointCAForReplicaCluster(); replicaBarmanCA != nil {
-		endpointCAs[postgresSpec.BarmanRestoreEndpointCACertificateLocation] = apiv1.ToSecretKeySelectors(
+		endpointCAs[postgresSpec.BarmanRestoreEndpointCACertificateLocation] = apiv1.ToSecretKeySelector(
 			replicaBarmanCA)
 	}
 	if len(endpointCAs) == 0 {

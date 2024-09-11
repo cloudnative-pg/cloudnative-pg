@@ -225,7 +225,7 @@ func (info InitInfo) createBackupObjectForSnapshotRestore(
 		},
 		Status: apiv1.BackupStatus{
 			BarmanCredentials: server.BarmanObjectStore.BarmanCredentials,
-			EndpointCA:        apiv1.ToSecretKeySelectors(server.BarmanObjectStore.EndpointCA),
+			EndpointCA:        apiv1.ToSecretKeySelector(server.BarmanObjectStore.EndpointCA),
 			EndpointURL:       server.BarmanObjectStore.EndpointURL,
 			DestinationPath:   server.BarmanObjectStore.DestinationPath,
 			ServerName:        serverName,
@@ -351,7 +351,7 @@ func (info InitInfo) ensureArchiveContainsLastCheckpointRedoWAL(
 
 	opts, err := barmanCommand.CloudWalRestoreOptions(&barmanTypes.BarmanObjectStoreConfiguration{
 		BarmanCredentials: backup.Status.BarmanCredentials,
-		EndpointCA:        apiv1.ToBarmanSecretKeySelectors(backup.Status.EndpointCA),
+		EndpointCA:        apiv1.ToBarmanSecretKeySelector(backup.Status.EndpointCA),
 		EndpointURL:       backup.Status.EndpointURL,
 		DestinationPath:   backup.Status.DestinationPath,
 		ServerName:        backup.Status.ServerName,
@@ -533,7 +533,7 @@ func (info InitInfo) loadBackupObjectFromExternalCluster(
 		},
 		Status: apiv1.BackupStatus{
 			BarmanCredentials: server.BarmanObjectStore.BarmanCredentials,
-			EndpointCA:        apiv1.ToSecretKeySelectors(server.BarmanObjectStore.EndpointCA),
+			EndpointCA:        apiv1.ToSecretKeySelector(server.BarmanObjectStore.EndpointCA),
 			EndpointURL:       server.BarmanObjectStore.EndpointURL,
 			DestinationPath:   server.BarmanObjectStore.DestinationPath,
 			ServerName:        serverName,
@@ -574,7 +574,7 @@ func (info InitInfo) loadBackupFromReference(
 		cluster.Namespace,
 		&barmanTypes.BarmanObjectStoreConfiguration{
 			BarmanCredentials: backup.Status.BarmanCredentials,
-			EndpointCA:        apiv1.ToBarmanSecretKeySelectors(backup.Status.EndpointCA),
+			EndpointCA:        apiv1.ToBarmanSecretKeySelector(backup.Status.EndpointCA),
 			EndpointURL:       backup.Status.EndpointURL,
 			DestinationPath:   backup.Status.DestinationPath,
 			ServerName:        backup.Status.ServerName,
