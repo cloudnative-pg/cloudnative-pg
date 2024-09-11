@@ -32,23 +32,11 @@ indent() {
 function failure_summary {
   # Number of failures
   cnt=0
-  # whether the failures are ignorable
-  ignorable=false
-  if [ "$1" = "ignorable" ]; then
-    ignorable=true
-  fi
 
-  if ! ${ignorable}; then
-    highlight_color=${colorBoldRed}
-    printf "${highlight_color}%s\n\n" "Summarizing Non-Ignorable Failure(s):"
-    filter_file="hack/e2e/filter-failures.jq"
-    summary="Non Ignorable Failure(s) Found!"
-  else
-    highlight_color=${colorBoldYellow}
-    printf "${highlight_color}%s\n\n" "Summarizing Ignorable Failure(s):"
-    filter_file="hack/e2e/filter-ignorable-failures.jq"
-    summary="Ignorable Failure(s) Found!"
-  fi
+  highlight_color=${colorBoldRed}
+  printf "${highlight_color}%s\n\n" "Summarizing Failure(s):"
+  filter_file="hack/e2e/filter-failures.jq"
+  summary="Failure(s) Found!"
 
   for ff in "tests/e2e/out/upgrade_report.json" "tests/e2e/out/report.json"
   do
@@ -93,5 +81,4 @@ function failure_summary {
   echo
 }
 
-failure_summary "non-ignorable"
-failure_summary "ignorable"
+failure_summary
