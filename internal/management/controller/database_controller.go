@@ -154,7 +154,7 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		}
 	}
 
-	if err := r.alignPgDatabase(
+	if err = r.alignPgDatabase(
 		ctx,
 		&database,
 	); err != nil {
@@ -269,22 +269,18 @@ func (r *DatabaseReconciler) alignPgDatabase(ctx context.Context, obj *apiv1.Dat
 	}
 
 	var count int
-	if err := row.Scan(&count); err != nil {
+	if err = row.Scan(&count); err != nil {
 		return fmt.Errorf("while getting DB status (scan): %w", err)
 	}
 
 	if count > 0 {
-		if err := r.patchDatabase(ctx, db, obj); err != nil {
+		if err = r.patchDatabase(ctx, db, obj); err != nil {
 			return err
 		}
 		return nil
 	}
 
-	if err := r.createDatabase(ctx, db, obj); err != nil {
-		return err
-	}
-
-	return nil
+	return r.createDatabase(ctx, db, obj)
 }
 
 func (r *DatabaseReconciler) createDatabase(
@@ -309,11 +305,9 @@ func (r *DatabaseReconciler) createDatabase(
 		sqlCreateDatabase += fmt.Sprintf(" CONNECTION LIMIT %v", *obj.Spec.ConnectionLimit)
 	}
 
-	if _, err := db.ExecContext(ctx, sqlCreateDatabase); err != nil {
-		return err
-	}
+	_, err := db.ExecContext(ctx, sqlCreateDatabase)
 
-	return nil
+	return err
 }
 
 func (r *DatabaseReconciler) patchDatabase(
