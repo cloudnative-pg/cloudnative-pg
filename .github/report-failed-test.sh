@@ -18,7 +18,6 @@
 echo '::echo::off'
 
 colorBoldRed='\033[1;31m'
-colorBoldYellow='\033[1;33m'
 colorWhite='\033[37m'
 colorBoldWhite='\033[1;37m'
 colorGreen='\033[0;32m'
