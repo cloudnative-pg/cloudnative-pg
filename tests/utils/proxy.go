@@ -51,3 +51,13 @@ func RetrieveMetricsFromPgBouncer(
 	body, err := runProxyRequest(env, namespace, podName, url.PathMetrics, url.PgBouncerMetricsPort)
 	return string(body), err
 }
+
+// RetrievePgStatusFromInstance aims to retrieve the pgStatus from a PostgreSQL instance pod
+// using a GET request on the pod interface proxy
+func RetrievePgStatusFromInstance(
+	env *TestingEnvironment,
+	namespace, podName string,
+) (string, error) {
+	body, err := runProxyRequest(env, namespace, podName, url.PathPgStatus, url.StatusPort)
+	return string(body), err
+}
