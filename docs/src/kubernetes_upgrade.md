@@ -55,8 +55,8 @@ ahead of the drain. Once the instance in the node is downgraded to replica, the
 draining can resume.
 For single-instance clusters, a switchover is not possible, so CloudNativePG
 will prevent draining the node where the instance is housed.
-Additionally, in multi-instance clusters, CloudNativePG guarantees that only
-one replica at a time is gracefully shut down during a drain operation.
+Additionally, in clusters with 3 or more instances, CloudNativePG guarantees that
+only one replica at a time is gracefully shut down during a drain operation.
 
 Each PostgreSQL `Cluster` is equipped with two associated `PodDisruptionBudget`
 resources - you can easily confirm it with the `kubectl get pdb` command.
