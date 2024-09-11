@@ -81,7 +81,7 @@ func NewCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "run [flags]",
 		PreRunE: func(cmd *cobra.Command, _ []string) error {
-			return management.WaitKubernetesAPIServer(cmd.Context(), client.ObjectKey{
+			return management.WaitForGetCluster(cmd.Context(), client.ObjectKey{
 				Name:      clusterName,
 				Namespace: namespace,
 			})

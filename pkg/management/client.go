@@ -129,10 +129,10 @@ func NewEventRecorder() (record.EventRecorder, error) {
 	return recorder, nil
 }
 
-// WaitKubernetesAPIServer will wait for the kubernetes API server to by ready.
-// Returns any error if it can't be reached.
-func WaitKubernetesAPIServer(ctx context.Context, clusterObjectKey client.ObjectKey) error {
-	logger := log.FromContext(ctx).WithName("wait-kubernetes-api-server")
+// WaitForGetCluster will wait for a successful get cluster to be executed.
+// Returns any error encountered.
+func WaitForGetCluster(ctx context.Context, clusterObjectKey client.ObjectKey) error {
+	logger := log.FromContext(ctx).WithName("wait-for-get-cluster")
 
 	cli, err := NewControllerRuntimeClient()
 	if err != nil {
