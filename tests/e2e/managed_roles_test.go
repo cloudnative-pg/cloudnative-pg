@@ -39,7 +39,7 @@ import (
 
 // - spinning up a cluster with some post-init-sql query and verifying that they are really executed
 
-// Set of tests in which we check that the initdb options are really applied
+// Set of tests in which we exercise managed roles
 var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic), func() {
 	const (
 		clusterManifest = fixturesDir + "/managed_roles/cluster-managed-roles.yaml.template"

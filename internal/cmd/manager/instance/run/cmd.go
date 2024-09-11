@@ -157,6 +157,11 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 						instance.Namespace: {},
 					},
 				},
+				&apiv1.Database{}: {
+					Namespaces: map[string]cache.Config{
+						instance.Namespace: {},
+					},
+				},
 			},
 		},
 		// We don't need a cache for secrets and configmap, as all reloads
@@ -187,10 +192,20 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 		For(&apiv1.Cluster{}).
 		Complete(reconciler)
 	if err != nil {
-		setupLog.Error(err, "unable to create controller")
+		setupLog.Error(err, "unable to create instance controller")
 		return err
 	}
 	postgresStartConditions = append(postgresStartConditions, reconciler.GetExecutedCondition())
+
+	// database reconciler
+	dbReconciler := controller.NewDatabaseReconciler(mgr, instance)
+	err = ctrl.NewControllerManagedBy(mgr).
+		For(&apiv1.Database{}).
+		Complete(dbReconciler)
+	if err != nil {
+		setupLog.Error(err, "unable to create database controller")
+		return err
+	}
 
 	// postgres CSV logs handler (PGAudit too)
 	postgresLogPipe := logpipe.NewLogPipe()

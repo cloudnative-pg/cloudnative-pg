@@ -78,6 +78,8 @@ type Client interface {
 		availableArchitecture *utils.AvailableArchitecture,
 	) error
 
+	// ArchivePartialWAL trigger the archiver for the latest partial WAL
+	// file created in a specific Pod
 	ArchivePartialWAL(context.Context, *corev1.Pod) (string, error)
 }
 
