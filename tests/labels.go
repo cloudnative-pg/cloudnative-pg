@@ -32,9 +32,6 @@ const (
 	// LabelDisruptive is the string for labelling disruptive tests
 	LabelDisruptive = "disruptive"
 
-	// LabelIgnoreFails is the string for labelling tests that should not be considered when failing.
-	LabelIgnoreFails = "ignore-fails"
-
 	// LabelImportingDatabases is a label for selecting importing-databases test
 	LabelImportingDatabases = "importing-databases"
 
