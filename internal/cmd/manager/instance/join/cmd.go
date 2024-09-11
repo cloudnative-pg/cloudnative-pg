@@ -46,7 +46,7 @@ func NewCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "join [options]",
 		PreRunE: func(cmd *cobra.Command, _ []string) error {
-			return management.WaitKubernetesAPIServer(cmd.Context(), ctrl.ObjectKey{
+			return management.WaitForGetCluster(cmd.Context(), ctrl.ObjectKey{
 				Name:      clusterName,
 				Namespace: namespace,
 			})
