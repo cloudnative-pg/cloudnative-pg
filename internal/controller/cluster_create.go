@@ -128,23 +128,23 @@ func (r *ClusterReconciler) reconcilePodDisruptionBudget(ctx context.Context, cl
 		}
 	}
 
-	if primaryPDB != nil {
-		if err := r.createOrPatchOwnedPodDisruptionBudget(ctx, cluster, primaryPDB); err != nil {
-			return err
-		}
-	} else if err := r.deletePrimaryPodDisruptionBudgetIfExists(ctx, cluster); err != nil {
+	if err := r.handlePDB(ctx, cluster, primaryPDB, r.deletePrimaryPodDisruptionBudgetIfExists); err != nil {
 		return err
 	}
 
-	if replicaPDB != nil {
-		if err := r.createOrPatchOwnedPodDisruptionBudget(ctx, cluster, replicaPDB); err != nil {
-			return err
-		}
-	} else if err := r.deleteReplicasPodDisruptionBudgetIfExists(ctx, cluster); err != nil {
-		return err
-	}
+	return r.handlePDB(ctx, cluster, replicaPDB, r.deleteReplicasPodDisruptionBudgetIfExists)
+}
 
-	return nil
+func (r *ClusterReconciler) handlePDB(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	pdb *policyv1.PodDisruptionBudget,
+	deleteFunc func(context.Context, *apiv1.Cluster) error,
+) error {
+	if pdb != nil {
+		return r.createOrPatchOwnedPodDisruptionBudget(ctx, cluster, pdb)
+	}
+	return deleteFunc(ctx, cluster)
 }
 
 func (r *ClusterReconciler) reconcilePostgresSecrets(ctx context.Context, cluster *apiv1.Cluster) error {
@@ -508,11 +508,7 @@ func (r *ClusterReconciler) deletePodDisruptionBudgetsIfExist(ctx context.Contex
 		return err
 	}
 
-	if err := r.deleteReplicasPodDisruptionBudgetIfExists(ctx, cluster); err != nil {
-		return err
-	}
-
-	return nil
+	return r.deleteReplicasPodDisruptionBudgetIfExists(ctx, cluster)
 }
 
 func (r *ClusterReconciler) deletePrimaryPodDisruptionBudgetIfExists(
