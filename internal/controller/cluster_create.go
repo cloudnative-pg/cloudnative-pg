@@ -108,45 +108,43 @@ func (r *ClusterReconciler) createPostgresClusterObjects(ctx context.Context, cl
 
 func (r *ClusterReconciler) reconcilePodDisruptionBudget(ctx context.Context, cluster *apiv1.Cluster) error {
 	if !cluster.GetEnablePDB() {
-		return r.deletePodDisruptionBudgetIfExists(ctx, cluster)
+		return r.deletePodDisruptionBudgetsIfExist(ctx, cluster)
 	}
 
-	// The PDB should not be enforced if we are inside a maintenance
-	// window, and we chose to avoid allocating more storage space.
+	primaryPDB := specs.BuildPrimaryPodDisruptionBudget(cluster)
+	replicaPDB := specs.BuildReplicasPodDisruptionBudget(cluster)
+
 	if cluster.IsNodeMaintenanceWindowInProgress() && cluster.IsReusePVCEnabled() {
-		if err := r.deleteReplicasPodDisruptionBudget(ctx, cluster); err != nil {
-			return err
-		}
+		// The replica PDB should not be enforced if we are inside a maintenance
+		// window, and we chose to avoid allocating more storage space.
+		replicaPDB = nil
 
+		// If this a single-instance cluster, we need to delete
+		// the PodDisruptionBudget for the primary node too
+		// otherwise the user won't be able to drain the workloads
+		// from the underlying node.
 		if cluster.Spec.Instances == 1 {
-			// If this a single-instance cluster, we need to delete
-			// the PodDisruptionBudget for the primary node too
-			// otherwise the user won't be able to drain the workloads
-			// from the underlying node.
-			return r.deletePrimaryPodDisruptionBudget(ctx, cluster)
+			primaryPDB = nil
 		}
-
-		// Make sure that if the cluster was scaled down and scaled up
-		// we create the primary PDB even if we're under a maintenance window
-		return r.createOrPatchOwnedPodDisruptionBudget(ctx,
-			cluster,
-			specs.BuildPrimaryPodDisruptionBudget(cluster),
-		)
 	}
 
-	// Reconcile the primary PDB
-	err := r.createOrPatchOwnedPodDisruptionBudget(ctx,
-		cluster,
-		specs.BuildPrimaryPodDisruptionBudget(cluster),
-	)
-	if err != nil {
+	if err := r.handlePDB(ctx, cluster, primaryPDB, r.deletePrimaryPodDisruptionBudgetIfExists); err != nil {
 		return err
 	}
 
-	return r.createOrPatchOwnedPodDisruptionBudget(ctx,
-		cluster,
-		specs.BuildReplicasPodDisruptionBudget(cluster),
-	)
+	return r.handlePDB(ctx, cluster, replicaPDB, r.deleteReplicasPodDisruptionBudgetIfExists)
+}
+
+func (r *ClusterReconciler) handlePDB(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	pdb *policyv1.PodDisruptionBudget,
+	deleteFunc func(context.Context, *apiv1.Cluster) error,
+) error {
+	if pdb != nil {
+		return r.createOrPatchOwnedPodDisruptionBudget(ctx, cluster, pdb)
+	}
+	return deleteFunc(ctx, cluster)
 }
 
 func (r *ClusterReconciler) reconcilePostgresSecrets(ctx context.Context, cluster *apiv1.Cluster) error {
@@ -505,33 +503,36 @@ func (r *ClusterReconciler) createOrPatchOwnedPodDisruptionBudget(
 	return nil
 }
 
-func (r *ClusterReconciler) deletePodDisruptionBudgetIfExists(ctx context.Context, cluster *apiv1.Cluster) error {
-	if err := r.deletePrimaryPodDisruptionBudget(ctx, cluster); err != nil && !apierrs.IsNotFound(err) {
-		return fmt.Errorf("unable to retrieve primary PodDisruptionBudget: %w", err)
+func (r *ClusterReconciler) deletePodDisruptionBudgetsIfExist(ctx context.Context, cluster *apiv1.Cluster) error {
+	if err := r.deletePrimaryPodDisruptionBudgetIfExists(ctx, cluster); err != nil {
+		return err
 	}
 
-	if err := r.deleteReplicasPodDisruptionBudget(ctx, cluster); err != nil && !apierrs.IsNotFound(err) {
-		return fmt.Errorf("unable to retrieve replica PodDisruptionBudget: %w", err)
-	}
-
-	return nil
+	return r.deleteReplicasPodDisruptionBudgetIfExists(ctx, cluster)
 }
 
-// deleteReplicasPodDisruptionBudget ensures that we delete the PDB requiring to remove one node at a time
-func (r *ClusterReconciler) deletePrimaryPodDisruptionBudget(ctx context.Context, cluster *apiv1.Cluster) error {
-	return r.deletePodDisruptionBudget(
+func (r *ClusterReconciler) deletePrimaryPodDisruptionBudgetIfExists(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+) error {
+	return r.deletePodDisruptionBudgetIfExists(
 		ctx,
 		cluster,
 		client.ObjectKey{Name: cluster.Name + apiv1.PrimaryPodDisruptionBudgetSuffix, Namespace: cluster.Namespace})
 }
 
-// deleteReplicasPodDisruptionBudget ensures that we delete the PDB requiring to remove one node at a time
-func (r *ClusterReconciler) deleteReplicasPodDisruptionBudget(ctx context.Context, cluster *apiv1.Cluster) error {
-	return r.deletePodDisruptionBudget(ctx, cluster, client.ObjectKey{Name: cluster.Name, Namespace: cluster.Namespace})
+func (r *ClusterReconciler) deleteReplicasPodDisruptionBudgetIfExists(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+) error {
+	return r.deletePodDisruptionBudgetIfExists(
+		ctx,
+		cluster,
+		client.ObjectKey{Name: cluster.Name, Namespace: cluster.Namespace},
+	)
 }
 
-// deleteReplicasPodDisruptionBudget ensures that we delete the PDB requiring to remove one node at a time
-func (r *ClusterReconciler) deletePodDisruptionBudget(
+func (r *ClusterReconciler) deletePodDisruptionBudgetIfExists(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	key types.NamespacedName,
