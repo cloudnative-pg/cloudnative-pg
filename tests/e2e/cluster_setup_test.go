@@ -46,7 +46,7 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 		}
 	})
 
-	FIt("sets up a cluster", func(_ SpecContext) {
+	It("sets up a cluster", func(_ SpecContext) {
 		const namespacePrefix = "cluster-storageclass-e2e"
 		var err error
 
@@ -130,8 +130,6 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 				)
 				return err == nil, err
 			}, timeout).Should(BeTrue())
-
-			Fail("Artificial failure")
 		})
 	})
 
