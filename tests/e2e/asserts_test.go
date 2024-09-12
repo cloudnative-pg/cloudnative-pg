@@ -448,8 +448,6 @@ func AssertCreateTestData(env *testsUtils.TestingEnvironment, namespace, cluster
 		query := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %v AS VALUES (1),(2);", tableName)
 		_, err = conn.Exec(query)
 		Expect(err).ToNot(HaveOccurred())
-		err = conn.Close()
-		Expect(err).ToNot(HaveOccurred())
 		forward.Stop()
 	})
 }
@@ -474,8 +472,6 @@ func AssertCreateTestDataWithDatabaseName(
 		query := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %v AS VALUES (1),(2);", tableName)
 		_, err = conn.Exec(query)
 		Expect(err).ToNot(HaveOccurred())
-		err = conn.Close()
-		Expect(err).ToNot(HaveOccurred())
 		forward.Stop()
 	})
 }
@@ -499,7 +495,6 @@ func AssertCreateTestDataInTablespace(env *testsUtils.TestingEnvironment, tl Tab
 			apiv1.ApplicationUserSecretSuffix,
 		)
 		defer func() {
-			_ = conn.Close()
 			forward.Stop()
 		}()
 		Expect(err).ToNot(HaveOccurred())
@@ -550,7 +545,6 @@ func insertRecordIntoTableWithDatabaseName(
 		apiv1.ApplicationUserSecretSuffix,
 	)
 	defer func() {
-		_ = conn.Close()
 		forward.Stop()
 	}()
 	Expect(err).ToNot(HaveOccurred())
@@ -649,7 +643,6 @@ func AssertDataExpectedCount(
 			apiv1.ApplicationUserSecretSuffix,
 		)
 		defer func() {
-			_ = conn.Close()
 			forward.Stop()
 		}()
 		Expect(err).ToNot(HaveOccurred())
@@ -1402,8 +1395,6 @@ func AssertCreationOfTestDataForTargetDB(
 		Expect(err).ToNot(HaveOccurred())
 
 		// Close the connection and forward
-		err = conn.Close()
-		Expect(err).ToNot(HaveOccurred())
 		forward.Stop()
 	})
 }
@@ -1664,7 +1655,6 @@ func AssertClusterRestoreWithApplicationDB(namespace, restoreClusterFile, tableN
 			apiv1.ApplicationUserSecretSuffix,
 		)
 		defer func() {
-			_ = conn.Close()
 			forward.Stop()
 		}()
 		Expect(err).ToNot(HaveOccurred())
@@ -1893,7 +1883,6 @@ func AssertClusterWasRestoredWithPITRAndApplicationDB(namespace, clusterName, ta
 		apiv1.ApplicationUserSecretSuffix,
 	)
 	defer func() {
-		_ = conn.Close()
 		forward.Stop()
 	}()
 	Expect(err).ToNot(HaveOccurred())
@@ -1959,7 +1948,6 @@ func AssertClusterWasRestoredWithPITR(namespace, clusterName, tableName, lsn str
 		apiv1.ApplicationUserSecretSuffix,
 	)
 	defer func() {
-		_ = conn.Close()
 		forward.Stop()
 	}()
 	Expect(err).ToNot(HaveOccurred())
@@ -2095,7 +2083,6 @@ func prepareClusterForPITROnMinio(
 			apiv1.ApplicationUserSecretSuffix,
 		)
 		defer func() {
-			_ = conn.Close()
 			forward.Stop()
 		}()
 		Expect(err).ToNot(HaveOccurred())
@@ -2147,7 +2134,6 @@ func prepareClusterForPITROnAzureBlob(
 			apiv1.ApplicationUserSecretSuffix,
 		)
 		defer func() {
-			_ = conn.Close()
 			forward.Stop()
 		}()
 		Expect(err).ToNot(HaveOccurred())
@@ -2250,7 +2236,6 @@ func prepareClusterForPITROnAzurite(
 			apiv1.ApplicationUserSecretSuffix,
 		)
 		defer func() {
-			_ = conn.Close()
 			forward.Stop()
 		}()
 		Expect(err).ToNot(HaveOccurred())

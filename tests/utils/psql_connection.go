@@ -91,7 +91,7 @@ func (psqlc *PSQLConnection) StartAndWait() error {
 		ginkgo.GinkgoWriter.Printf("Starting port-forward\n")
 		psqlc.err = psqlc.PortForward.ForwardPorts()
 		if psqlc.err != nil {
-			ginkgo.GinkgoWriter.Printf("port-foward failed with error %s\n", psqlc.err.Error()) //nolint:misspell
+			ginkgo.GinkgoWriter.Printf("port-forward failed with error %s\n", psqlc.err.Error())
 			return
 		}
 	}()

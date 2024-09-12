@@ -99,7 +99,6 @@ var _ = Describe("Bootstrap with pg_basebackup", Label(tests.LabelRecovery), fun
 					apiv1.ApplicationUserSecretSuffix,
 				)
 				defer func() {
-					_ = conn.Close()
 					forward.Stop()
 				}()
 				Expect(err).ToNot(HaveOccurred())
@@ -132,7 +131,6 @@ var _ = Describe("Bootstrap with pg_basebackup", Label(tests.LabelRecovery), fun
 					apiv1.ApplicationUserSecretSuffix,
 				)
 				defer func() {
-					_ = conn.Close()
 					forward.Stop()
 				}()
 				Expect(err).ToNot(HaveOccurred())

@@ -262,7 +262,6 @@ var _ = Describe("Verify Volume Snapshot",
 						apiv1.ApplicationUserSecretSuffix,
 					)
 					defer func() {
-						_ = conn.Close()
 						forward.Stop()
 					}()
 					Expect(err).ToNot(HaveOccurred())
@@ -616,7 +615,6 @@ var _ = Describe("Verify Volume Snapshot",
 						apiv1.ApplicationUserSecretSuffix,
 					)
 					defer func() {
-						_ = conn.Close()
 						forward.Stop()
 					}()
 					Expect(err).ToNot(HaveOccurred())
@@ -702,7 +700,6 @@ var _ = Describe("Verify Volume Snapshot",
 						apiv1.ApplicationUserSecretSuffix,
 					)
 					defer func() {
-						_ = conn.Close()
 						forward.Stop()
 					}()
 					Expect(err).ToNot(HaveOccurred())

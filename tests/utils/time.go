@@ -30,7 +30,6 @@ func GetCurrentTimestamp(namespace, clusterName string, env *TestingEnvironment)
 		apiv1.ApplicationUserSecretSuffix,
 	)
 	defer func() {
-		_ = conn.Close()
 		forward.Stop()
 	}()
 	if err != nil {

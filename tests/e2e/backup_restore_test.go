@@ -882,7 +882,6 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 					apiv1.ApplicationUserSecretSuffix,
 				)
 				defer func() {
-					_ = conn.Close()
 					forward.Stop()
 				}()
 				Expect(err).ToNot(HaveOccurred())

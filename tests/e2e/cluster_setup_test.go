@@ -95,8 +95,6 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 			_, err = conn.Exec(query)
 			Expect(err).NotTo(HaveOccurred())
 
-			err = conn.Close()
-			Expect(err).NotTo(HaveOccurred())
 			forward.Stop()
 
 			// We kill the pid 1 process.
@@ -134,7 +132,6 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 				apiv1.ApplicationUserSecretSuffix,
 			)
 			defer func() {
-				_ = conn.Close()
 				forward.Stop()
 			}()
 			Expect(err).NotTo(HaveOccurred())
