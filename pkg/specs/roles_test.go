@@ -17,7 +17,6 @@ limitations under the License.
 package specs
 
 import (
-	barmanTypes "github.com/cloudnative-pg/barman-cloud/pkg/types"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -115,45 +114,45 @@ var _ = Describe("Roles", func() {
 
 	backupOrigin := apiv1.Backup{
 		Status: apiv1.BackupStatus{
-			BarmanCredentials: barmanTypes.BarmanCredentials{
-				Azure: &barmanTypes.AzureCredentials{
-					StorageAccount: &barmanTypes.SecretKeySelector{
-						LocalObjectReference: barmanTypes.LocalObjectReference{
+			BarmanCredentials: apiv1.BarmanCredentials{
+				Azure: &apiv1.AzureCredentials{
+					StorageAccount: &apiv1.SecretKeySelector{
+						LocalObjectReference: apiv1.LocalObjectReference{
 							Name: "testAzureStorageAccount",
 						},
 						Key: "storageAccount",
 					},
-					StorageKey: &barmanTypes.SecretKeySelector{
-						LocalObjectReference: barmanTypes.LocalObjectReference{
+					StorageKey: &apiv1.SecretKeySelector{
+						LocalObjectReference: apiv1.LocalObjectReference{
 							Name: "testAzureStorageKey",
 						},
 						Key: "storageKey",
 					},
-					StorageSasToken: &barmanTypes.SecretKeySelector{
-						LocalObjectReference: barmanTypes.LocalObjectReference{
+					StorageSasToken: &apiv1.SecretKeySelector{
+						LocalObjectReference: apiv1.LocalObjectReference{
 							Name: "testAzureStorageSasToken",
 						},
 						Key: "sasToken",
 					},
 				},
-				AWS: &barmanTypes.S3Credentials{
-					SecretAccessKeyReference: &barmanTypes.SecretKeySelector{
-						LocalObjectReference: barmanTypes.LocalObjectReference{
+				AWS: &apiv1.S3Credentials{
+					SecretAccessKeyReference: &apiv1.SecretKeySelector{
+						LocalObjectReference: apiv1.LocalObjectReference{
 							Name: "testS3Secret",
 						},
 					},
-					AccessKeyIDReference: &barmanTypes.SecretKeySelector{
-						LocalObjectReference: barmanTypes.LocalObjectReference{
+					AccessKeyIDReference: &apiv1.SecretKeySelector{
+						LocalObjectReference: apiv1.LocalObjectReference{
 							Name: "testS3Access",
 						},
 					},
-					RegionReference: &barmanTypes.SecretKeySelector{
-						LocalObjectReference: barmanTypes.LocalObjectReference{
+					RegionReference: &apiv1.SecretKeySelector{
+						LocalObjectReference: apiv1.LocalObjectReference{
 							Name: "testS3Region",
 						},
 					},
-					SessionToken: &barmanTypes.SecretKeySelector{
-						LocalObjectReference: barmanTypes.LocalObjectReference{
+					SessionToken: &apiv1.SecretKeySelector{
+						LocalObjectReference: apiv1.LocalObjectReference{
 							Name: "testS3Session",
 						},
 					},
@@ -217,24 +216,24 @@ var _ = Describe("Secrets", func() {
 				Namespace: "default",
 			},
 			Status: apiv1.BackupStatus{
-				BarmanCredentials: barmanTypes.BarmanCredentials{
-					AWS: &barmanTypes.S3Credentials{
-						AccessKeyIDReference: &barmanTypes.SecretKeySelector{
-							LocalObjectReference: barmanTypes.LocalObjectReference{
+				BarmanCredentials: apiv1.BarmanCredentials{
+					AWS: &apiv1.S3Credentials{
+						AccessKeyIDReference: &apiv1.SecretKeySelector{
+							LocalObjectReference: apiv1.LocalObjectReference{
 								Name: "aws-status-secret-test",
 							},
 						},
 					},
-					Azure: &barmanTypes.AzureCredentials{
-						StorageKey: &barmanTypes.SecretKeySelector{
-							LocalObjectReference: barmanTypes.LocalObjectReference{
+					Azure: &apiv1.AzureCredentials{
+						StorageKey: &apiv1.SecretKeySelector{
+							LocalObjectReference: apiv1.LocalObjectReference{
 								Name: "azure-storage-key-secret-test",
 							},
 						},
 					},
-					Google: &barmanTypes.GoogleCredentials{
-						ApplicationCredentials: &barmanTypes.SecretKeySelector{
-							LocalObjectReference: barmanTypes.LocalObjectReference{
+					Google: &apiv1.GoogleCredentials{
+						ApplicationCredentials: &apiv1.SecretKeySelector{
+							LocalObjectReference: apiv1.LocalObjectReference{
 								Name: "google-application-secret-test",
 							},
 						},
@@ -250,25 +249,25 @@ var _ = Describe("Secrets", func() {
 
 		cluster.Spec = apiv1.ClusterSpec{
 			Backup: &apiv1.BackupConfiguration{
-				BarmanObjectStore: &barmanTypes.BarmanObjectStoreConfiguration{
-					BarmanCredentials: barmanTypes.BarmanCredentials{
-						AWS: &barmanTypes.S3Credentials{
-							SecretAccessKeyReference: &barmanTypes.SecretKeySelector{
-								LocalObjectReference: barmanTypes.LocalObjectReference{Name: "test-secret"},
+				BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{
+					BarmanCredentials: apiv1.BarmanCredentials{
+						AWS: &apiv1.S3Credentials{
+							SecretAccessKeyReference: &apiv1.SecretKeySelector{
+								LocalObjectReference: apiv1.LocalObjectReference{Name: "test-secret"},
 							},
-							AccessKeyIDReference: &barmanTypes.SecretKeySelector{
-								LocalObjectReference: barmanTypes.LocalObjectReference{Name: "test-access"},
+							AccessKeyIDReference: &apiv1.SecretKeySelector{
+								LocalObjectReference: apiv1.LocalObjectReference{Name: "test-access"},
 							},
-							RegionReference: &barmanTypes.SecretKeySelector{
-								LocalObjectReference: barmanTypes.LocalObjectReference{Name: "test-region"},
+							RegionReference: &apiv1.SecretKeySelector{
+								LocalObjectReference: apiv1.LocalObjectReference{Name: "test-region"},
 							},
-							SessionToken: &barmanTypes.SecretKeySelector{
-								LocalObjectReference: barmanTypes.LocalObjectReference{Name: "test-session"},
+							SessionToken: &apiv1.SecretKeySelector{
+								LocalObjectReference: apiv1.LocalObjectReference{Name: "test-session"},
 							},
 						},
 					},
-					EndpointCA: &barmanTypes.SecretKeySelector{
-						LocalObjectReference: barmanTypes.LocalObjectReference{Name: "test-endpoint-ca-name"},
+					EndpointCA: &apiv1.SecretKeySelector{
+						LocalObjectReference: apiv1.LocalObjectReference{Name: "test-endpoint-ca-name"},
 						Key:                  "test-endpoint-ca-key",
 					},
 				},

@@ -28,7 +28,6 @@ import (
 
 	barmanCommand "github.com/cloudnative-pg/barman-cloud/pkg/command"
 	barmanRestorer "github.com/cloudnative-pg/barman-cloud/pkg/restorer"
-	barmanTypes "github.com/cloudnative-pg/barman-cloud/pkg/types"
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/spf13/cobra"
 
@@ -315,7 +314,7 @@ func GetRecoverConfiguration(
 ) (
 	string,
 	[]string,
-	*barmanTypes.BarmanObjectStoreConfiguration,
+	*apiv1.BarmanObjectStoreConfiguration,
 	error,
 ) {
 	var env []string

@@ -23,7 +23,6 @@ import (
 	"strings"
 	"time"
 
-	barmanTypes "github.com/cloudnative-pg/barman-cloud/pkg/types"
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -969,9 +968,9 @@ var _ = Describe("configuration change validation", func() {
 		cluster := Cluster{
 			Spec: ClusterSpec{
 				Backup: &BackupConfiguration{
-					BarmanObjectStore: &barmanTypes.BarmanObjectStoreConfiguration{
-						BarmanCredentials: barmanTypes.BarmanCredentials{
-							AWS: &barmanTypes.S3Credentials{},
+					BarmanObjectStore: &BarmanObjectStoreConfiguration{
+						BarmanCredentials: BarmanCredentials{
+							AWS: &S3Credentials{},
 						},
 					},
 				},
@@ -991,9 +990,9 @@ var _ = Describe("configuration change validation", func() {
 		cluster := Cluster{
 			Spec: ClusterSpec{
 				Backup: &BackupConfiguration{
-					BarmanObjectStore: &barmanTypes.BarmanObjectStoreConfiguration{
-						BarmanCredentials: barmanTypes.BarmanCredentials{
-							AWS: &barmanTypes.S3Credentials{},
+					BarmanObjectStore: &BarmanObjectStoreConfiguration{
+						BarmanCredentials: BarmanCredentials{
+							AWS: &S3Credentials{},
 						},
 					},
 				},
@@ -1012,9 +1011,9 @@ var _ = Describe("configuration change validation", func() {
 		cluster := Cluster{
 			Spec: ClusterSpec{
 				Backup: &BackupConfiguration{
-					BarmanObjectStore: &barmanTypes.BarmanObjectStoreConfiguration{
-						BarmanCredentials: barmanTypes.BarmanCredentials{
-							AWS: &barmanTypes.S3Credentials{},
+					BarmanObjectStore: &BarmanObjectStoreConfiguration{
+						BarmanCredentials: BarmanCredentials{
+							AWS: &S3Credentials{},
 						},
 					},
 				},
@@ -2126,7 +2125,7 @@ var _ = Describe("validation of an external cluster", func() {
 		Expect(cluster.validateExternalClusters()).To(BeEmpty())
 
 		cluster.Spec.ExternalClusters[0].ConnectionParameters = nil
-		cluster.Spec.ExternalClusters[0].BarmanObjectStore = &barmanTypes.BarmanObjectStoreConfiguration{}
+		cluster.Spec.ExternalClusters[0].BarmanObjectStore = &BarmanObjectStoreConfiguration{}
 		Expect(cluster.validateExternalClusters()).To(BeEmpty())
 	})
 })
@@ -3026,7 +3025,7 @@ var _ = Describe("Backup validation", func() {
 		cluster := &Cluster{
 			Spec: ClusterSpec{
 				Backup: &BackupConfiguration{
-					BarmanObjectStore: &barmanTypes.BarmanObjectStoreConfiguration{},
+					BarmanObjectStore: &BarmanObjectStoreConfiguration{},
 				},
 			},
 		}
@@ -3060,7 +3059,7 @@ var _ = Describe("Backup validation", func() {
 		cluster := &Cluster{
 			Spec: ClusterSpec{
 				Backup: &BackupConfiguration{
-					BarmanObjectStore: &barmanTypes.BarmanObjectStoreConfiguration{},
+					BarmanObjectStore: &BarmanObjectStoreConfiguration{},
 					RetentionPolicy:   "09",
 				},
 			},

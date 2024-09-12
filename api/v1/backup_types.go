@@ -62,6 +62,51 @@ const (
 	BackupPhaseWalArchivingFailing = "walArchivingFailing"
 )
 
+// BarmanCredentials an object containing the potential credentials for each cloud provider
+// +kubebuilder:object:generate:=false
+type BarmanCredentials = barmanTypes.BarmanCredentials
+
+// AzureCredentials is the type for the credentials to be used to upload
+// files to Azure Blob Storage. The connection string contains every needed
+// information. If the connection string is not specified, we'll need the
+// storage account name and also one (and only one) of:
+//
+// - storageKey
+// - storageSasToken
+//
+// - inheriting the credentials from the pod environment by setting inheritFromAzureAD to true
+// +kubebuilder:object:generate:=false
+type AzureCredentials = barmanTypes.AzureCredentials
+
+// BarmanObjectStoreConfiguration contains the backup configuration
+// using Barman against an S3-compatible object storage
+// +kubebuilder:object:generate:=false
+type BarmanObjectStoreConfiguration = barmanTypes.BarmanObjectStoreConfiguration
+
+// DataBackupConfiguration is the configuration of the backup of
+// the data directory
+// +kubebuilder:object:generate:=false
+type DataBackupConfiguration = barmanTypes.DataBackupConfiguration
+
+// GoogleCredentials is the type for the Google Cloud Storage credentials.
+// This needs to be specified even if we run inside a GKE environment.
+// +kubebuilder:object:generate:=false
+type GoogleCredentials = barmanTypes.GoogleCredentials
+
+// S3Credentials is the type for the credentials to be used to upload
+// files to S3. It can be provided in two alternative ways:
+//
+// - explicitly passing accessKeyId and secretAccessKey
+//
+// - inheriting the role from the pod environment by setting inheritFromIAMRole to true
+// +kubebuilder:object:generate:=false
+type S3Credentials = barmanTypes.S3Credentials
+
+// WalBackupConfiguration is the configuration of the backup of the
+// WAL stream
+// +kubebuilder:object:generate:=false
+type WalBackupConfiguration = barmanTypes.WalBackupConfiguration
+
 // BackupMethod defines the way of executing the physical base backups of
 // the selected PostgreSQL instance
 type BackupMethod string
@@ -153,7 +198,7 @@ type BackupSnapshotElementStatus struct {
 // BackupStatus defines the observed state of Backup
 type BackupStatus struct {
 	// The potential credentials for each cloud provider
-	barmanTypes.BarmanCredentials `json:",inline"`
+	BarmanCredentials `json:",inline"`
 
 	// EndpointCA store the CA bundle of the barman endpoint.
 	// Useful when using self-signed certificates to avoid

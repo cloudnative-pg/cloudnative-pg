@@ -16,8 +16,6 @@ limitations under the License.
 
 package v1
 
-import barmanTypes "github.com/cloudnative-pg/barman-cloud/pkg/types"
-
 // VolumeSnapshotKind this is a strongly typed reference to the kind used by the volumesnapshot package
 const VolumeSnapshotKind = "VolumeSnapshot"
 
@@ -42,34 +40,4 @@ type Metadata struct {
 	// More info: http://kubernetes.io/docs/user-guide/annotations
 	// +optional
 	Annotations map[string]string `json:"annotations,omitempty"`
-}
-
-// ToSecretKeySelector converts the secretKeySelector CNPG API
-// to the relative Kubernetes API
-func ToSecretKeySelector(selector *barmanTypes.SecretKeySelector) *SecretKeySelector {
-	if selector == nil {
-		return nil
-	}
-
-	return &SecretKeySelector{
-		Key: selector.Key,
-		LocalObjectReference: LocalObjectReference{
-			Name: selector.LocalObjectReference.Name,
-		},
-	}
-}
-
-// ToBarmanSecretKeySelector converts the Kubernetes SecretKeySelector API
-// to the CNPG one
-func ToBarmanSecretKeySelector(selector *SecretKeySelector) *barmanTypes.SecretKeySelector {
-	if selector == nil {
-		return nil
-	}
-
-	return &barmanTypes.SecretKeySelector{
-		Key: selector.Key,
-		LocalObjectReference: barmanTypes.LocalObjectReference{
-			Name: selector.LocalObjectReference.Name,
-		},
-	}
 }

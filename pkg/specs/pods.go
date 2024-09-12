@@ -26,7 +26,6 @@ import (
 	"slices"
 	"strconv"
 
-	barmanTypes "github.com/cloudnative-pg/barman-cloud/pkg/types"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -460,7 +459,7 @@ func GetInstanceName(clusterName string, nodeSerial int) string {
 func AddBarmanEndpointCAToPodSpec(
 	podSpec *corev1.PodSpec,
 	caSecret *apiv1.SecretKeySelector,
-	credentials barmanTypes.BarmanCredentials,
+	credentials apiv1.BarmanCredentials,
 ) {
 	if caSecret == nil || caSecret.Name == "" || caSecret.Key == "" {
 		return

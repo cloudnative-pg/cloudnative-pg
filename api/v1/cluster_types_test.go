@@ -19,7 +19,6 @@ package v1
 import (
 	"fmt"
 
-	barmanTypes "github.com/cloudnative-pg/barman-cloud/pkg/types"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -349,7 +348,7 @@ var _ = Describe("external cluster list", func() {
 					ConnectionParameters: map[string]string{
 						"dbname": "test",
 					},
-					BarmanObjectStore: &barmanTypes.BarmanObjectStoreConfiguration{
+					BarmanObjectStore: &BarmanObjectStoreConfiguration{
 						ServerName: "testServerRealName",
 					},
 				},
@@ -693,9 +692,9 @@ var _ = Describe("A secret resource version", func() {
 			},
 			Spec: ClusterSpec{
 				Backup: &BackupConfiguration{
-					BarmanObjectStore: &barmanTypes.BarmanObjectStoreConfiguration{
-						EndpointCA: &barmanTypes.SecretKeySelector{
-							LocalObjectReference: barmanTypes.LocalObjectReference{
+					BarmanObjectStore: &BarmanObjectStoreConfiguration{
+						EndpointCA: &SecretKeySelector{
+							LocalObjectReference: LocalObjectReference{
 								Name: "barman-endpoint-ca-secret",
 							},
 							Key: "ca.crt",
@@ -865,10 +864,10 @@ var _ = Describe("Barman Endpoint CA for replica cluster", func() {
 					ConnectionParameters: map[string]string{
 						"dbname": "test",
 					},
-					BarmanObjectStore: &barmanTypes.BarmanObjectStoreConfiguration{
+					BarmanObjectStore: &BarmanObjectStoreConfiguration{
 						ServerName: "testServerRealName",
-						EndpointCA: &barmanTypes.SecretKeySelector{
-							LocalObjectReference: barmanTypes.LocalObjectReference{
+						EndpointCA: &SecretKeySelector{
+							LocalObjectReference: LocalObjectReference{
 								Name: "barman-endpoint-ca-secret",
 							},
 							Key: "ca.crt",

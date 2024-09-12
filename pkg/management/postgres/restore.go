@@ -37,7 +37,6 @@ import (
 	barmanCommand "github.com/cloudnative-pg/barman-cloud/pkg/command"
 	barmanCredentials "github.com/cloudnative-pg/barman-cloud/pkg/credentials"
 	barmanRestorer "github.com/cloudnative-pg/barman-cloud/pkg/restorer"
-	barmanTypes "github.com/cloudnative-pg/barman-cloud/pkg/types"
 	"github.com/cloudnative-pg/machinery/pkg/execlog"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/log"
@@ -224,7 +223,7 @@ func (info InitInfo) createBackupObjectForSnapshotRestore(
 		},
 		Status: apiv1.BackupStatus{
 			BarmanCredentials: server.BarmanObjectStore.BarmanCredentials,
-			EndpointCA:        apiv1.ToSecretKeySelector(server.BarmanObjectStore.EndpointCA),
+			EndpointCA:        server.BarmanObjectStore.EndpointCA,
 			EndpointURL:       server.BarmanObjectStore.EndpointURL,
 			DestinationPath:   server.BarmanObjectStore.DestinationPath,
 			ServerName:        serverName,
@@ -343,9 +342,9 @@ func (info InitInfo) ensureArchiveContainsLastCheckpointRedoWAL(
 		return err
 	}
 
-	opts, err := barmanCommand.CloudWalRestoreOptions(ctx, &barmanTypes.BarmanObjectStoreConfiguration{
+	opts, err := barmanCommand.CloudWalRestoreOptions(ctx, &apiv1.BarmanObjectStoreConfiguration{
 		BarmanCredentials: backup.Status.BarmanCredentials,
-		EndpointCA:        apiv1.ToBarmanSecretKeySelector(backup.Status.EndpointCA),
+		EndpointCA:        backup.Status.EndpointCA,
 		EndpointURL:       backup.Status.EndpointURL,
 		DestinationPath:   backup.Status.DestinationPath,
 		ServerName:        backup.Status.ServerName,
@@ -524,7 +523,7 @@ func (info InitInfo) loadBackupObjectFromExternalCluster(
 		},
 		Status: apiv1.BackupStatus{
 			BarmanCredentials: server.BarmanObjectStore.BarmanCredentials,
-			EndpointCA:        apiv1.ToSecretKeySelector(server.BarmanObjectStore.EndpointCA),
+			EndpointCA:        server.BarmanObjectStore.EndpointCA,
 			EndpointURL:       server.BarmanObjectStore.EndpointURL,
 			DestinationPath:   server.BarmanObjectStore.DestinationPath,
 			ServerName:        serverName,
@@ -563,9 +562,9 @@ func (info InitInfo) loadBackupFromReference(
 		barmanCredentialsUtils,
 		typedClient,
 		cluster.Namespace,
-		&barmanTypes.BarmanObjectStoreConfiguration{
+		&apiv1.BarmanObjectStoreConfiguration{
 			BarmanCredentials: backup.Status.BarmanCredentials,
-			EndpointCA:        apiv1.ToBarmanSecretKeySelector(backup.Status.EndpointCA),
+			EndpointCA:        backup.Status.EndpointCA,
 			EndpointURL:       backup.Status.EndpointURL,
 			DestinationPath:   backup.Status.DestinationPath,
 			ServerName:        backup.Status.ServerName,

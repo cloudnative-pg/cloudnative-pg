@@ -19,7 +19,6 @@ package specs
 import (
 	"slices"
 
-	barmanTypes "github.com/cloudnative-pg/barman-cloud/pkg/types"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -292,7 +291,7 @@ func backupSecrets(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) []string {
 	return result
 }
 
-func azureCredentialsSecrets(azureCredentials *barmanTypes.AzureCredentials) []string {
+func azureCredentialsSecrets(azureCredentials *apiv1.AzureCredentials) []string {
 	var result []string
 
 	if azureCredentials == nil {
@@ -319,7 +318,7 @@ func azureCredentialsSecrets(azureCredentials *barmanTypes.AzureCredentials) []s
 	return result
 }
 
-func s3CredentialsSecrets(s3Credentials *barmanTypes.S3Credentials) []string {
+func s3CredentialsSecrets(s3Credentials *apiv1.S3Credentials) []string {
 	if s3Credentials == nil {
 		return nil
 	}
@@ -345,7 +344,7 @@ func s3CredentialsSecrets(s3Credentials *barmanTypes.S3Credentials) []string {
 	return secrets
 }
 
-func googleCredentialsSecrets(googleCredentials *barmanTypes.GoogleCredentials) []string {
+func googleCredentialsSecrets(googleCredentials *apiv1.GoogleCredentials) []string {
 	if googleCredentials == nil {
 		return nil
 	}
