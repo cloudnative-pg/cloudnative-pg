@@ -110,32 +110,6 @@ func createPostgresVolumes(cluster *apiv1.Cluster, podName string) []corev1.Volu
 		},
 	}
 
-	if cluster.GetEnableSuperuserAccess() {
-		result = append(result,
-			corev1.Volume{
-				Name: "superuser-secret",
-				VolumeSource: corev1.VolumeSource{
-					Secret: &corev1.SecretVolumeSource{
-						SecretName: cluster.GetSuperuserSecretName(),
-					},
-				},
-			},
-		)
-	}
-
-	if cluster.ShouldCreateApplicationDatabase() {
-		result = append(result,
-			corev1.Volume{
-				Name: "app-secret",
-				VolumeSource: corev1.VolumeSource{
-					Secret: &corev1.SecretVolumeSource{
-						SecretName: cluster.GetApplicationSecretName(),
-					},
-				},
-			},
-		)
-	}
-
 	if cluster.ShouldCreateWalArchiveVolume() {
 		result = append(result,
 			corev1.Volume{
