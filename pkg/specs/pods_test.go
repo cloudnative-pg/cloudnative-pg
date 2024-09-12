@@ -341,6 +341,10 @@ var _ = Describe("EnvConfig", func() {
 						Value: postgres.SocketDirectory,
 					},
 					{
+						Name:  "TMPDIR",
+						Value: "/controller",
+					},
+					{
 						Name:  "TEST_ENV",
 						Value: "EXPECTED",
 					},
@@ -384,6 +388,10 @@ var _ = Describe("EnvConfig", func() {
 					{
 						Name:  "PGHOST",
 						Value: postgres.SocketDirectory,
+					},
+					{
+						Name:  "TMPDIR",
+						Value: "/controller",
 					},
 					{
 						Name:  "TEST_ENV",

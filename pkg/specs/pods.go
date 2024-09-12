@@ -139,6 +139,10 @@ func CreatePodEnvConfig(cluster apiv1.Cluster, podName string) EnvConfig {
 				Name:  "PGHOST",
 				Value: postgres.SocketDirectory,
 			},
+			{
+				Name:  "TMPDIR",
+				Value: postgres.ScratchDataDirectory,
+			},
 		},
 		EnvFrom: cluster.Spec.EnvFrom,
 	}
