@@ -23,10 +23,9 @@ import (
 	"slices"
 
 	"github.com/cloudnative-pg/cnpg-i/pkg/wal"
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	"go.uber.org/multierr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/log"
 )
 
 func (data *data) ArchiveWAL(

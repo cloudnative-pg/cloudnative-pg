@@ -20,9 +20,9 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/jackc/puddle/v2"
 
-	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/log"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/connection"
 )
 

@@ -24,9 +24,9 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/log"
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/cache"
 	cacheClient "github.com/cloudnative-pg/cloudnative-pg/internal/management/cache/client"

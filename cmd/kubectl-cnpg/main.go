@@ -22,10 +22,10 @@ package main
 import (
 	"os"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
-	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/log"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/backup"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/certificate"

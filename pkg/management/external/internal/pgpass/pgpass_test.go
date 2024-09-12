@@ -19,7 +19,7 @@ package pgpass
 import (
 	"path/filepath"
 
-	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/fileutils"
+	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"

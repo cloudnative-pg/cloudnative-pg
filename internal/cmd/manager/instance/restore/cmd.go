@@ -22,12 +22,12 @@ import (
 	"errors"
 	"os"
 
-	barmanCommand "github.com/cloudnative-pg/plugin-barman-cloud/pkg/command"
+	barmanCommand "github.com/cloudnative-pg/barman-cloud/pkg/command"
+	"github.com/cloudnative-pg/machinery/pkg/fileutils"
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/spf13/cobra"
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/fileutils"
-	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/log"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/istio"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/linkerd"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"

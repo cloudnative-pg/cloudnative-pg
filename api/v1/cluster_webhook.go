@@ -23,7 +23,9 @@ import (
 	"strconv"
 	"strings"
 
-	barmanUtils "github.com/cloudnative-pg/plugin-barman-cloud/pkg/utils"
+	barmanUtils "github.com/cloudnative-pg/barman-cloud/pkg/utils"
+	"github.com/cloudnative-pg/machinery/pkg/log"
+	"github.com/cloudnative-pg/machinery/pkg/types"
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -38,8 +40,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/log"
-	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/types"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/stringset"

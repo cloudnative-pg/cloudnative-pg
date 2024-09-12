@@ -24,7 +24,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/fileutils"
+	"github.com/cloudnative-pg/machinery/pkg/fileutils"
+
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 )
 

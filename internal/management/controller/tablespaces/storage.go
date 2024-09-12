@@ -17,7 +17,8 @@ limitations under the License.
 package tablespaces
 
 import (
-	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/fileutils"
+	"github.com/cloudnative-pg/machinery/pkg/fileutils"
+
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 )
 

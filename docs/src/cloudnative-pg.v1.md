@@ -366,7 +366,7 @@ documentation</p>
 </td>
 </tr>
 <tr><td><code>barmanObjectStore</code><br/>
-<i>github.com/cloudnative-pg/plugin-barman-cloud/pkg/types.BarmanObjectStoreConfiguration</i>
+<i>github.com/cloudnative-pg/barman-cloud/pkg/types.BarmanObjectStoreConfiguration</i>
 </td>
 <td>
    <p>The configuration for the barman-cloud tool suite</p>
@@ -643,7 +643,7 @@ Overrides the default settings specified in the cluster '.backup.volumeSnapshot.
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
 <tr><td><code>BarmanCredentials</code><br/>
-<i>github.com/cloudnative-pg/plugin-barman-cloud/pkg/types.BarmanCredentials</i>
+<i>github.com/cloudnative-pg/barman-cloud/pkg/types.BarmanCredentials</i>
 </td>
 <td>(Members of <code>BarmanCredentials</code> are embedded into this type.)
    <p>The potential credentials for each cloud provider</p>
@@ -2562,7 +2562,7 @@ secure and efficient password management for external clusters.</p>
 </td>
 </tr>
 <tr><td><code>barmanObjectStore</code><br/>
-<i>github.com/cloudnative-pg/plugin-barman-cloud/pkg/types.BarmanObjectStoreConfiguration</i>
+<i>github.com/cloudnative-pg/barman-cloud/pkg/types.BarmanObjectStoreConfiguration</i>
 </td>
 <td>
    <p>The configuration for the barman-cloud tool suite</p>

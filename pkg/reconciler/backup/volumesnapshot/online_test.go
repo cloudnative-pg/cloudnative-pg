@@ -22,12 +22,12 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/cloudnative-pg/machinery/pkg/types"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/types"
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver"
 

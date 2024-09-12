@@ -19,7 +19,8 @@ package client
 import (
 	"context"
 
-	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/log"
+	"github.com/cloudnative-pg/machinery/pkg/log"
+
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/connection"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
 )

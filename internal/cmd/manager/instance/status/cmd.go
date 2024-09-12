@@ -26,9 +26,9 @@ import (
 	"os"
 	"time"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/spf13/cobra"
 
-	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/log"
 	cacheClient "github.com/cloudnative-pg/cloudnative-pg/internal/management/cache/client"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"

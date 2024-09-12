@@ -26,7 +26,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/log"
+	"github.com/cloudnative-pg/machinery/pkg/log"
 )
 
 // DBToFloat64 convert a dynamic value to float64s for Prometheus consumption. Null types are mapped to NaN. string

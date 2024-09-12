@@ -25,14 +25,14 @@ import (
 	"strings"
 	"time"
 
-	barmanTypes "github.com/cloudnative-pg/plugin-barman-cloud/pkg/types"
+	barmanTypes "github.com/cloudnative-pg/barman-cloud/pkg/types"
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/log"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/stringset"

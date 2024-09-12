@@ -21,11 +21,11 @@ import (
 	"errors"
 	"os"
 
-	barmanCredentials "github.com/cloudnative-pg/plugin-barman-cloud/pkg/credentials"
+	barmanCredentials "github.com/cloudnative-pg/barman-cloud/pkg/credentials"
+	"github.com/cloudnative-pg/machinery/pkg/fileutils"
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
-	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/fileutils"
-	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/log"
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/walrestore"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/cache"

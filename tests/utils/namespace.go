@@ -27,14 +27,14 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/cloudnative-pg/machinery/pkg/fileutils"
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/onsi/ginkgo/v2"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/fileutils"
-	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/logs"
 )
 

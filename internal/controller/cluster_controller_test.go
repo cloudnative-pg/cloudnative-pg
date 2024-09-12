@@ -20,12 +20,12 @@ import (
 	"context"
 	"time"
 
+	cnpgTypes "github.com/cloudnative-pg/machinery/pkg/types"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	cnpgTypes "github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/types"
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"

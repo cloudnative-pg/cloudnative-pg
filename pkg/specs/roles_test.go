@@ -17,7 +17,7 @@ limitations under the License.
 package specs
 
 import (
-	barmanTypes "github.com/cloudnative-pg/plugin-barman-cloud/pkg/types"
+	barmanTypes "github.com/cloudnative-pg/barman-cloud/pkg/types"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

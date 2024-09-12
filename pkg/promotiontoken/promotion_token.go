@@ -20,7 +20,8 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/types"
+	"github.com/cloudnative-pg/machinery/pkg/types"
+
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 

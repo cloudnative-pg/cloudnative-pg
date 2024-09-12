@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/cheynewallace/tabby"
+	types "github.com/cloudnative-pg/machinery/pkg/types"
 	"github.com/logrusorgru/aurora/v4"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
@@ -36,7 +37,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	types "github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/types"
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/plugin/resources"

@@ -19,7 +19,7 @@ package v1
 import (
 	"fmt"
 
-	barmanTypes "github.com/cloudnative-pg/plugin-barman-cloud/pkg/types"
+	barmanTypes "github.com/cloudnative-pg/barman-cloud/pkg/types"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

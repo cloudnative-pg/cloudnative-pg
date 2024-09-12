@@ -24,8 +24,9 @@ import (
 	"regexp"
 	"sync"
 
-	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/log"
-	types "github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/types"
+	"github.com/cloudnative-pg/machinery/pkg/log"
+	types "github.com/cloudnative-pg/machinery/pkg/types"
+
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
 )

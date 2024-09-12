@@ -24,10 +24,10 @@ import (
 	"time"
 
 	"github.com/cloudnative-pg/cnpg-i/pkg/reconciler"
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/log"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/connection"
 )
 

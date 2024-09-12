@@ -24,7 +24,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/log"
+	"github.com/cloudnative-pg/machinery/pkg/log"
 )
 
 // TryInvokeQuitEndpoint executes a post request on the /quitquitquit endpoint. Returns any errors encountered if

@@ -22,7 +22,8 @@ import (
 	"os"
 	"regexp"
 
-	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/log"
+	"github.com/cloudnative-pg/machinery/pkg/log"
+
 	cacheClient "github.com/cloudnative-pg/cloudnative-pg/internal/management/cache/client"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"

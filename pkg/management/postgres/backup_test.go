@@ -22,17 +22,17 @@ import (
 	"strings"
 	"time"
 
-	barmanBackup "github.com/cloudnative-pg/plugin-barman-cloud/pkg/backup"
-	barmanCapabilities "github.com/cloudnative-pg/plugin-barman-cloud/pkg/capabilities"
-	barmanCatalog "github.com/cloudnative-pg/plugin-barman-cloud/pkg/catalog"
-	barmanTypes "github.com/cloudnative-pg/plugin-barman-cloud/pkg/types"
+	barmanBackup "github.com/cloudnative-pg/barman-cloud/pkg/backup"
+	barmanCapabilities "github.com/cloudnative-pg/barman-cloud/pkg/capabilities"
+	barmanCatalog "github.com/cloudnative-pg/barman-cloud/pkg/catalog"
+	barmanTypes "github.com/cloudnative-pg/barman-cloud/pkg/types"
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/log"
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 

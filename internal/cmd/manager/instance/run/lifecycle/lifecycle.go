@@ -24,7 +24,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/log"
+	"github.com/cloudnative-pg/machinery/pkg/log"
+
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/concurrency"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )

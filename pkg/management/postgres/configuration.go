@@ -25,8 +25,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/fileutils"
-	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/log"
+	"github.com/cloudnative-pg/machinery/pkg/fileutils"
+	"github.com/cloudnative-pg/machinery/pkg/log"
+
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/configfile"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"

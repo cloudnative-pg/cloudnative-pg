@@ -22,11 +22,10 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/lib/pq"
-
-	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/log"
 )
 
 // PostgresRoleManager is a RoleManager for a database instance

@@ -22,9 +22,9 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/log"
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"

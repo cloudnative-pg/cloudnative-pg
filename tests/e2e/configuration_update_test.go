@@ -22,13 +22,13 @@ import (
 	"strings"
 	"time"
 
+	cnpgTypes "github.com/cloudnative-pg/machinery/pkg/types"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	cnpgTypes "github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/types"
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	devUtils "github.com/cloudnative-pg/cloudnative-pg/pkg/utils"

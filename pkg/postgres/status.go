@@ -20,10 +20,10 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
+	"github.com/cloudnative-pg/machinery/pkg/types"
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/log"
-	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/types"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 

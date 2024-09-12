@@ -16,7 +16,7 @@ limitations under the License.
 
 package v1
 
-import barmanTypes "github.com/cloudnative-pg/plugin-barman-cloud/pkg/types"
+import barmanTypes "github.com/cloudnative-pg/barman-cloud/pkg/types"
 
 // VolumeSnapshotKind this is a strongly typed reference to the kind used by the volumesnapshot package
 const VolumeSnapshotKind = "VolumeSnapshot"

@@ -21,8 +21,8 @@ limitations under the License.
 package v1
 
 import (
+	"github.com/cloudnative-pg/barman-cloud/pkg/types"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
-	"github.com/cloudnative-pg/plugin-barman-cloud/pkg/types"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"

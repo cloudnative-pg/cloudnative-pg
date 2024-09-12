@@ -22,11 +22,10 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/cloudnative-pg/machinery/pkg/fileutils"
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/mitchellh/go-ps"
 	"k8s.io/utils/strings/slices"
-
-	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/fileutils"
-	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/log"
 )
 
 // PostgresqlPidFile is the name of the file which contains

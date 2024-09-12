@@ -17,9 +17,8 @@ limitations under the License.
 package utils
 
 import (
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	corev1 "k8s.io/api/core/v1"
-
-	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/log"
 )
 
 var utilsLog = log.WithName("utils")

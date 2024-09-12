@@ -18,9 +18,8 @@ limitations under the License.
 package logtest
 
 import (
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/go-logr/logr"
-
-	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/log"
 )
 
 // LogLevel is the type representing a set of log levels

@@ -24,11 +24,10 @@ import (
 	"slices"
 
 	"github.com/cloudnative-pg/cnpg-i/pkg/operator"
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	jsonpatch "github.com/evanphx/json-patch/v5"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/log"
 )
 
 func (data *data) MutateCluster(ctx context.Context, object client.Object, mutatedObject client.Object) error {

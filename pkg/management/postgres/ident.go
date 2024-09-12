@@ -19,7 +19,7 @@ package postgres
 import (
 	"os/user"
 
-	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/log"
+	"github.com/cloudnative-pg/machinery/pkg/log"
 )
 
 // getCurrentUserOrDefaultToInsecureMapping retrieves the current system user's username.

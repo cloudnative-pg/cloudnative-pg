@@ -22,9 +22,9 @@ package main
 import (
 	"os"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/spf13/cobra"
 
-	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/log"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/backup"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/bootstrap"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/controller"

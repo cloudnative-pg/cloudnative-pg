@@ -26,12 +26,12 @@ import (
 	"strings"
 	"time"
 
-	barmanCommand "github.com/cloudnative-pg/plugin-barman-cloud/pkg/command"
-	barmanRestorer "github.com/cloudnative-pg/plugin-barman-cloud/pkg/restorer"
-	barmanTypes "github.com/cloudnative-pg/plugin-barman-cloud/pkg/types"
+	barmanCommand "github.com/cloudnative-pg/barman-cloud/pkg/command"
+	barmanRestorer "github.com/cloudnative-pg/barman-cloud/pkg/restorer"
+	barmanTypes "github.com/cloudnative-pg/barman-cloud/pkg/types"
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/spf13/cobra"
 
-	"github.com/cloudnative-pg/cloudnative-pg-machinery/pkg/log"
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	pluginClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
