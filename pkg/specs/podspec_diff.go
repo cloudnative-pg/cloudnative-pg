@@ -116,10 +116,17 @@ func compareMaps[V comparable](current, target map[string]V) (bool, string) {
 	return true, ""
 }
 
+func isCurrentVolumeToBeIgnored(name string) bool {
+	return name == "superuser-secret" || name == "app-secret"
+}
+
 func compareVolumes(currentVolumes, targetVolumes []corev1.Volume) (bool, string) {
 	current := make(map[string]corev1.Volume)
 	target := make(map[string]corev1.Volume)
 	for _, vol := range currentVolumes {
+		if isCurrentVolumeToBeIgnored(vol.Name) {
+			continue
+		}
 		current[vol.Name] = vol
 	}
 	for _, vol := range targetVolumes {
@@ -133,6 +140,9 @@ func compareVolumeMounts(currentMounts, targetMounts []corev1.VolumeMount) (bool
 	current := make(map[string]corev1.VolumeMount)
 	target := make(map[string]corev1.VolumeMount)
 	for _, mount := range currentMounts {
+		if isCurrentVolumeToBeIgnored(mount.Name) {
+			continue
+		}
 		current[mount.Name] = mount
 	}
 	for _, mount := range targetMounts {
