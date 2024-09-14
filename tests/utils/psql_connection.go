@@ -19,14 +19,14 @@ package utils
 import (
 	"database/sql"
 	"fmt"
-	"net/http"
-	"os"
-	"strconv"
-
 	"github.com/onsi/ginkgo/v2"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/portforward"
 	"k8s.io/client-go/transport/spdy"
+	"net/http"
+	"os"
+	"strconv"
+	"time"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/configfile"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pool"
@@ -182,5 +182,9 @@ func ForwardPSQLConnectionWithCreds(
 
 	forward.Pooler = pool.NewPostgresqlConnectionPool(configfile.CreateConnectionString(connParameters))
 	conn, err := forward.Pooler.Connection(dbname)
+	conn.SetMaxOpenConns(2)
+	conn.SetMaxIdleConns(2)
+	conn.SetConnMaxLifetime(time.Hour)
+	conn.SetConnMaxIdleTime(time.Hour)
 	return forward, conn, err
 }
