@@ -19,14 +19,15 @@ package utils
 import (
 	"database/sql"
 	"fmt"
-	"github.com/onsi/ginkgo/v2"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/portforward"
-	"k8s.io/client-go/transport/spdy"
 	"net/http"
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/onsi/ginkgo/v2"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/portforward"
+	"k8s.io/client-go/transport/spdy"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/configfile"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pool"

@@ -19,11 +19,13 @@ package e2e
 import (
 	"database/sql"
 	"fmt"
+	"os"
+
+	"github.com/lib/pq"
+
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
-	"github.com/lib/pq"
-	"os"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
