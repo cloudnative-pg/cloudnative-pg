@@ -48,13 +48,6 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 		}
 	})
 
-	AfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-		}
-		_ = env.DeleteNamespace(namespace)
-	})
-
 	It("sets up a cluster", func(_ SpecContext) {
 		const namespacePrefix = "cluster-storageclass-e2e"
 		var err error
@@ -127,6 +120,8 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 
 				return int32(-1), nil
 			}, timeout).Should(BeEquivalentTo(restart + 1))
+
+			AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReady], env)
 
 			forward, conn, err = testsUtils.ForwardPSQLConnection(
 				env,
