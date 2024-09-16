@@ -1,6 +1,6 @@
 module github.com/cloudnative-pg/cloudnative-pg
 
-go 1.23.0
+go 1.22.0
 
 toolchain go1.23.1
 
@@ -10,7 +10,7 @@ require (
 	github.com/avast/retry-go/v4 v4.6.0
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/cheynewallace/tabby v1.1.1
-	github.com/cloudnative-pg/barman-cloud v0.0.0-20240912144038-f8b9d79eb0f7
+	github.com/cloudnative-pg/barman-cloud v0.0.0-20240916132728-176a63e979c4
 	github.com/cloudnative-pg/cnpg-i v0.0.0-20240820123829-5844b833f4eb
 	github.com/cloudnative-pg/machinery v0.0.0-20240912141112-40ee690c0159
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc

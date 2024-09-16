@@ -76,11 +76,6 @@ var (
 		"max_prepared_xacts setting":   "max_prepared_transactions",
 		"max_locks_per_xact setting":   "max_locks_per_transaction",
 	}
-
-	barmanCredentialsUtils = barmanCredentials.FileUtils{
-		RemoveFile:      os.Remove,
-		WriteFileAtomic: fileutils.WriteFileAtomic,
-	}
 )
 
 // RestoreSnapshot restores a PostgreSQL cluster from a volumeSnapshot
@@ -206,7 +201,6 @@ func (info InitInfo) createBackupObjectForSnapshotRestore(
 
 	env, err := barmanCredentials.EnvSetRestoreCloudCredentials(
 		ctx,
-		barmanCredentialsUtils,
 		typedClient,
 		cluster.Namespace,
 		server.BarmanObjectStore,
@@ -482,7 +476,6 @@ func (info InitInfo) loadBackupObjectFromExternalCluster(
 
 	env, err := barmanCredentials.EnvSetRestoreCloudCredentials(
 		ctx,
-		barmanCredentialsUtils,
 		typedClient,
 		cluster.Namespace,
 		server.BarmanObjectStore,
@@ -559,7 +552,6 @@ func (info InitInfo) loadBackupFromReference(
 
 	env, err := barmanCredentials.EnvSetRestoreCloudCredentials(
 		ctx,
-		barmanCredentialsUtils,
 		typedClient,
 		cluster.Namespace,
 		&apiv1.BarmanObjectStoreConfiguration{
@@ -935,7 +927,6 @@ func (info *InitInfo) checkBackupDestination(
 
 	// Get environment from cache
 	env, err := barmanCredentials.EnvSetRestoreCloudCredentials(ctx,
-		barmanCredentialsUtils,
 		client,
 		cluster.Namespace,
 		cluster.Spec.Backup.BarmanObjectStore,

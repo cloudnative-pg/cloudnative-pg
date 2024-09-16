@@ -125,10 +125,6 @@ func (b *BackupCommand) Start(ctx context.Context) error {
 
 	b.Env, err = barmanCredentials.EnvSetBackupCloudCredentials(
 		ctx,
-		barmanCredentials.FileUtils{
-			RemoveFile:      fileutils.RemoveFile,
-			WriteFileAtomic: fileutils.WriteFileAtomic,
-		},
 		b.Client,
 		b.Cluster.Namespace,
 		b.Cluster.Spec.Backup.BarmanObjectStore,
