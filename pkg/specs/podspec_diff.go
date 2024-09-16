@@ -116,12 +116,12 @@ func compareMaps[V comparable](current, target map[string]V) (bool, string) {
 	return true, ""
 }
 
-// shoudlIgnoreCurrentVolume checks if a volume or mount is the superuser or app
+// shouldIgnoreCurrentVolume checks if a volume or mount is the superuser or app
 // mount, which had been added, superflously, in previous versions. If so, ignores
 // it for the PodSpec drift detector, to avoid unnecessary restarts
 //
 // TODO: delete this function after minor version 1.24 is discontinued
-func shoudlIgnoreCurrentVolume(name string) bool {
+func shouldIgnoreCurrentVolume(name string) bool {
 	return name == "superuser-secret" || name == "app-secret"
 }
 
@@ -129,7 +129,7 @@ func compareVolumes(currentVolumes, targetVolumes []corev1.Volume) (bool, string
 	current := make(map[string]corev1.Volume)
 	target := make(map[string]corev1.Volume)
 	for _, vol := range currentVolumes {
-		if shoudlIgnoreCurrentVolume(vol.Name) {
+		if shouldIgnoreCurrentVolume(vol.Name) {
 			continue
 		}
 		current[vol.Name] = vol
@@ -145,7 +145,7 @@ func compareVolumeMounts(currentMounts, targetMounts []corev1.VolumeMount) (bool
 	current := make(map[string]corev1.VolumeMount)
 	target := make(map[string]corev1.VolumeMount)
 	for _, mount := range currentMounts {
-		if shoudlIgnoreCurrentVolume(mount.Name) {
+		if shouldIgnoreCurrentVolume(mount.Name) {
 			continue
 		}
 		current[mount.Name] = mount

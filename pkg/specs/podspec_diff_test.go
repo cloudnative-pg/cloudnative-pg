@@ -23,18 +23,18 @@ import (
 
 var _ = Describe("PodSpecDiff", func() {
 	It("returns true for superuser-secret volume", func() {
-		Expect(isCurrentVolumeToBeIgnored("superuser-secret")).To(BeTrue())
+		Expect(shouldIgnoreCurrentVolume("superuser-secret")).To(BeTrue())
 	})
 
 	It("returns true for app-secret volume", func() {
-		Expect(isCurrentVolumeToBeIgnored("app-secret")).To(BeTrue())
+		Expect(shouldIgnoreCurrentVolume("app-secret")).To(BeTrue())
 	})
 
 	It("returns false for other volumes", func() {
-		Expect(isCurrentVolumeToBeIgnored("other-volume")).To(BeFalse())
+		Expect(shouldIgnoreCurrentVolume("other-volume")).To(BeFalse())
 	})
 
 	It("returns false for empty volume name", func() {
-		Expect(isCurrentVolumeToBeIgnored("")).To(BeFalse())
+		Expect(shouldIgnoreCurrentVolume("")).To(BeFalse())
 	})
 })
