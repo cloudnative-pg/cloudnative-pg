@@ -183,7 +183,7 @@ func (r *DatabaseReconciler) failedReconciliation(
 
 	var statusError *instance.StatusError
 	if errors.As(err, &statusError) {
-		// The body line of the instance manager contain the human
+		// The body line of the instance manager contains the human
 		// readable error
 		database.Status.Error = statusError.Body
 	}
@@ -381,7 +381,7 @@ func (r *DatabaseReconciler) dropPgDatabase(ctx context.Context, obj *apiv1.Data
 
 	_, err = db.ExecContext(
 		ctx,
-		fmt.Sprintf("DROP DATABASE %s", pgx.Identifier{obj.Spec.Name}.Sanitize()),
+		fmt.Sprintf("DROP DATABASE IF EXISTS %s", pgx.Identifier{obj.Spec.Name}.Sanitize()),
 	)
 	return err
 }

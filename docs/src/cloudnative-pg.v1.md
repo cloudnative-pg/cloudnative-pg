@@ -2540,13 +2540,18 @@ PostgreSQL cluster from an existing storage</p>
 <a href="#postgresql-cnpg-io-v1-DatabaseSpec"><i>DatabaseSpec</i></a>
 </td>
 <td>
-   <span class="text-muted">No description provided.</span></td>
+   <p>Specification of the desired Database.
+More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status</p>
+</td>
 </tr>
-<tr><td><code>status</code> <B>[Required]</B><br/>
+<tr><td><code>status</code><br/>
 <a href="#postgresql-cnpg-io-v1-DatabaseStatus"><i>DatabaseStatus</i></a>
 </td>
 <td>
-   <span class="text-muted">No description provided.</span></td>
+   <p>Most recently observed status of the Database. This data may not be up to
+date. Populated by the system. Read-only.
+More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status</p>
+</td>
 </tr>
 </tbody>
 </table>
