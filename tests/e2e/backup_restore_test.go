@@ -171,7 +171,8 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 				result, err := testUtils.CheckOptionsForBarmanCommand(
 					logEntries,
 					barmanCloudBackupLogEntry,
-					backup.Status.BackupName,
+					backup.Name,
+					backup.Status.InstanceID.PodName,
 					expectedBaseBackupOptions,
 				)
 				Expect(err).ToNot(HaveOccurred())
