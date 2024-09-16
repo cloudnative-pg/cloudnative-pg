@@ -427,7 +427,6 @@ var (
 		// The following parameters need a reload to be applied
 		"archive_cleanup_command":                blockedConfigurationParameter,
 		"archive_command":                        fixedConfigurationParameter,
-		"full_page_writes":                       fixedConfigurationParameter,
 		"log_destination":                        blockedConfigurationParameter,
 		"log_directory":                          blockedConfigurationParameter,
 		"log_file_mode":                          blockedConfigurationParameter,
@@ -463,6 +462,7 @@ var (
 	CnpgConfigurationSettings = ConfigurationSettings{
 		GlobalDefaultSettings: SettingsCollection{
 			"archive_timeout":            "5min",
+			"full_page_writes":           "on",
 			"max_parallel_workers":       "32",
 			"max_worker_processes":       "32",
 			"max_replication_slots":      "32",
@@ -508,7 +508,6 @@ var (
 				"/controller/manager wal-archive --log-destination %s/%s.json %%p",
 				LogPath, LogFileName),
 			"port":                fmt.Sprint(ServerPort),
-			"full_page_writes":    "on",
 			"ssl":                 "on",
 			"ssl_cert_file":       ServerCertificateLocation,
 			"ssl_key_file":        ServerKeyLocation,
