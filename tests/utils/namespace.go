@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"path"
 	"strings"
 
 	"github.com/onsi/ginkgo/v2"
@@ -30,7 +31,6 @@ import (
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/logs"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/sternmultitailer"
 )
 
 // GetOperatorLogs collects the operator logs
@@ -65,9 +65,9 @@ func (env TestingEnvironment) CleanupNamespace(
 	if len(namespace) == 0 {
 		return fmt.Errorf("namespace is empty")
 	}
-	exists, _ := fileutils.FileExists(sternmultitailer.ClusterLogsDirectory + namespace)
+	exists, _ := fileutils.FileExists(path.Join(env.SternLogDir, namespace))
 	if exists && !testFailed {
-		err := fileutils.RemoveDirectory(sternmultitailer.ClusterLogsDirectory + namespace)
+		err := fileutils.RemoveDirectory(path.Join(env.SternLogDir, namespace))
 		if err != nil {
 			return err
 		}

@@ -50,7 +50,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/sternmultitailer"
 
 	// Import the client auth plugin package to allow use gke or ake to run tests
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -65,6 +64,8 @@ const (
 	RetryAttempts = 5
 	// PollingTime polling interval (in seconds) between retries
 	PollingTime = 5
+	// sternLogDirectory contains the fixed path to store the cluster logs
+	sternLogDirectory = "cluster_logs/"
 )
 
 // TestingEnvironment struct for operator testing
@@ -80,8 +81,7 @@ type TestingEnvironment struct {
 	PostgresVersion    int
 	createdNamespaces  *uniqueStringSlice
 	AzureConfiguration AzureConfiguration
-	SternClusters      sternmultitailer.SternMultiTailer
-	SternOperator      sternmultitailer.SternMultiTailer
+	SternLogDir        string
 }
 
 type uniqueStringSlice struct {
@@ -111,6 +111,7 @@ func NewTestingEnvironment() (*TestingEnvironment, error) {
 	env.APIExtensionClient = apiextensionsclientset.NewForConfigOrDie(env.RestClientConfig)
 	env.Ctx = context.Background()
 	env.Scheme = runtime.NewScheme()
+	env.SternLogDir = sternLogDirectory
 
 	if err := storagesnapshotv1.AddToScheme(env.Scheme); err != nil {
 		return nil, err

@@ -25,11 +25,14 @@ import (
 	"github.com/onsi/ginkgo/v2/types"
 	"github.com/thoas/go-funk"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	k8sscheme "k8s.io/client-go/kubernetes/scheme"
 
 	// +kubebuilder:scaffold:imports
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
+	cnpgUtils "github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/sternmultitailer"
@@ -68,20 +71,22 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	env, err = utils.NewTestingEnvironment()
 	Expect(err).ShouldNot(HaveOccurred())
 
-	// Start stern to write the logs of every single pod we create under cluster_logs
-	sternCtx, sternCancel := context.WithCancel(env.Ctx)
-	done := env.SternClusters.CatchClusterLogs(sternCtx, env.Interface)
+	// Start stern to write the logs of every pod we are interested in. Since we don't have a way to have a selector
+	// matching both the operator's and the clusters' pods, we need to start stern twice.
+	stern := sternmultitailer.SternMultiTailer{}
+	sternClustersCtx, sternClusterCancel := context.WithCancel(env.Ctx)
+	sternClusterDoneChan := stern.StreamLogs(sternClustersCtx, env.Interface, clusterPodsLabelSelector(),
+		env.SternLogDir)
 	DeferCleanup(func() {
-		sternCancel()
-		<-done
+		sternClusterCancel()
+		<-sternClusterDoneChan
 	})
-
-	// Start stern on operator pods
 	sternOperatorCtx, sternOperatorCancel := context.WithCancel(env.Ctx)
-	operatorDoneChan := env.SternOperator.CatchOperatorLogs(sternOperatorCtx, env.Interface)
+	sternOperatorDoneChan := stern.StreamLogs(sternOperatorCtx, env.Interface, operatorPodsLabelSelector(),
+		env.SternLogDir)
 	DeferCleanup(func() {
 		sternOperatorCancel()
-		<-operatorDoneChan
+		<-sternOperatorDoneChan
 	})
 
 	psqlPod, err := utils.GetPsqlClient(psqlClientNamespace, env)
@@ -149,9 +154,7 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 
 var _ = ReportAfterSuite("Gathering failed reports", func(report Report) {
 	if report.SuiteSucceeded {
-		err := fileutils.RemoveDirectory(sternmultitailer.OperatorLogsDirectory)
-		Expect(err).ToNot(HaveOccurred())
-		err = fileutils.RemoveDirectory(sternmultitailer.ClusterLogsDirectory)
+		err := fileutils.RemoveDirectory(env.SternLogDir)
 		Expect(err).ToNot(HaveOccurred())
 	}
 })
@@ -211,3 +214,28 @@ var _ = AfterEach(func() {
 		Fail("operator was restarted")
 	}
 })
+
+const ()
+
+// clusterPodsLabelSelector returns a label selector to match all the pods belonging to the CNPG clusters
+func clusterPodsLabelSelector() labels.Selector {
+	labelSelector, _ := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
+		MatchExpressions: []metav1.LabelSelectorRequirement{
+			{
+				Key:      cnpgUtils.ClusterLabelName,
+				Operator: metav1.LabelSelectorOpExists,
+			},
+		},
+	})
+	return labelSelector
+}
+
+// operatorPodsLabelSelector returns a label selector to match all the pods belonging to the CNPG operator
+func operatorPodsLabelSelector() labels.Selector {
+	labelSelector, _ := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
+		MatchLabels: map[string]string{
+			"app.kubernetes.io/name": "cloudnative-pg",
+		},
+	})
+	return labelSelector
+}

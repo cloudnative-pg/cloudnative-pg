@@ -800,7 +800,7 @@ jobs:
         with:
           name: cluster-logs-${{ matrix.id }}
           path: |
-            tests/e2e/*_logs/**
+            tests/e2e/cluster_logs/**
           retention-days: 7
           if-no-files-found: ignore
 
@@ -1108,7 +1108,7 @@ jobs:
         with:
           name: cluster-logs-${{ matrix.id }}
           path: |
-            tests/e2e/*_logs/**
+            tests/e2e/cluster_logs/**
           retention-days: 7
           if-no-files-found: ignore
       -
@@ -1477,7 +1477,7 @@ jobs:
         with:
           name: cluster-logs-${{ matrix.id }}
           path: |
-            tests/e2e/*_logs/**
+            tests/e2e/cluster_logs/**
           retention-days: 7
           if-no-files-found: ignore
       -
@@ -1809,7 +1809,7 @@ jobs:
         with:
           name: cluster-logs-${{ matrix.id }}
           path: |
-            tests/e2e/*_logs/**
+            tests/e2e/cluster_logs/**
           retention-days: 7
           if-no-files-found: ignore
       -
@@ -2066,7 +2066,7 @@ jobs:
         with:
           name: cluster-logs-${{ matrix.id }}
           path: |
-            tests/e2e/*_logs/**
+            tests/e2e/cluster_logs/**
           retention-days: 7
           if-no-files-found: ignore
       -
