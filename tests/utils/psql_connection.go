@@ -183,8 +183,8 @@ func ForwardPSQLConnectionWithCreds(
 
 	forward.Pooler = pool.NewPostgresqlConnectionPool(configfile.CreateConnectionString(connParameters))
 	conn, err := forward.Pooler.Connection(dbname)
-	conn.SetMaxOpenConns(2)
-	conn.SetMaxIdleConns(2)
+	conn.SetMaxOpenConns(10)
+	conn.SetMaxIdleConns(10)
 	conn.SetConnMaxLifetime(time.Hour)
 	conn.SetConnMaxIdleTime(time.Hour)
 	return forward, conn, err
