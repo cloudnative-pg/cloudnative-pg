@@ -102,7 +102,6 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	minioClient, err := utils.MinioDeploy(minioEnv, env)
 	Expect(err).ToNot(HaveOccurred())
 
-	fmt.Println("true")
 	caSecret := minioEnv.CaPair.GenerateCASecret(minioEnv.Namespace, minioEnv.CaSecretName)
 	minioEnv.CaSecretObj = *caSecret
 	objs := map[string]corev1.Pod{
