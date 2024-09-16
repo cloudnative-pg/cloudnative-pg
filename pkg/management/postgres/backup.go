@@ -159,6 +159,15 @@ func (b *BackupCommand) retryWithRefreshedCluster(
 // This method will take long time and is supposed to run inside a dedicated
 // goroutine.
 func (b *BackupCommand) run(ctx context.Context) {
+	ctx = log.IntoContext(
+		ctx,
+		log.FromContext(ctx).
+			WithValues(
+				"backupName", b.Backup.Name,
+				"backupNamespace", b.Backup.Namespace,
+			),
+	)
+
 	if err := b.takeBackup(ctx); err != nil {
 		backupStatus := b.Backup.GetStatus()
 
@@ -213,7 +222,8 @@ func (b *BackupCommand) takeBackup(ctx context.Context) error {
 	}
 
 	err := b.barmanBackup.Take(
-		ctx, b.Backup.Status.BackupName,
+		ctx,
+		b.Backup.Status.BackupName,
 		backupStatus.ServerName,
 		b.Env,
 		b.Cluster,
