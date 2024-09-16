@@ -34,17 +34,13 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-// SternMultiTailer can tail logs from multiple pods at once using stern, and write them to disk
-// in a structured way.
-type SternMultiTailer struct{}
-
 // StreamLogs opens a goroutine to execute stern on all the pods that match
 // the labelSelector. Their logs will be written to disk in the outputBaseDir, split by namespace, pod and container,
 // using a namespace/pod/container.log file for each container of matching pods.
 // Close the ctx context to terminate stern execution.
 // Returns a channel that will be closed when all the logs have been written to disk
 // and the ones we asked to remove have been deleted.
-func (s *SternMultiTailer) StreamLogs(
+func StreamLogs(
 	ctx context.Context,
 	client kubernetes.Interface,
 	labelSelector labels.Selector,
@@ -120,14 +116,14 @@ func (s *SternMultiTailer) StreamLogs(
 	}()
 
 	go func() {
-		s.outputWriter(outputBaseDir, outPipeReader)
+		outputWriter(outputBaseDir, outPipeReader)
 		close(outputDone)
 	}()
 
 	return outputDone
 }
 
-func (s *SternMultiTailer) outputWriter(baseDir string, logReader io.Reader) {
+func outputWriter(baseDir string, logReader io.Reader) {
 	r := bufio.NewReader(logReader)
 	openFilesMap := make(map[string]*os.File)
 	defer func() {
@@ -157,7 +153,7 @@ func (s *SternMultiTailer) outputWriter(baseDir string, logReader io.Reader) {
 			continue
 		}
 
-		file, err := s.getLogFile(baseDir, logLine, openFilesMap)
+		file, err := getLogFile(baseDir, logLine, openFilesMap)
 		if err != nil {
 			fmt.Printf("no file to write log line %v: %v\n", logLine, err)
 			continue
@@ -172,8 +168,9 @@ func (s *SternMultiTailer) outputWriter(baseDir string, logReader io.Reader) {
 }
 
 // Get an open file for the log, or open a new one
-func (s *SternMultiTailer) getLogFile(baseDir string, log stern.Log, openFilesMap map[string]*os.File) (*os.File,
-	error) {
+func getLogFile(baseDir string, log stern.Log, openFilesMap map[string]*os.File) (*os.File,
+	error,
+) {
 	filePath := path.Join(baseDir, log.Namespace, log.PodName, log.ContainerName+".log")
 	dirFile := path.Dir(filePath)
 

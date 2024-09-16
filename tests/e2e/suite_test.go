@@ -73,16 +73,15 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 
 	// Start stern to write the logs of every pod we are interested in. Since we don't have a way to have a selector
 	// matching both the operator's and the clusters' pods, we need to start stern twice.
-	stern := sternmultitailer.SternMultiTailer{}
 	sternClustersCtx, sternClusterCancel := context.WithCancel(env.Ctx)
-	sternClusterDoneChan := stern.StreamLogs(sternClustersCtx, env.Interface, clusterPodsLabelSelector(),
+	sternClusterDoneChan := sternmultitailer.StreamLogs(sternClustersCtx, env.Interface, clusterPodsLabelSelector(),
 		env.SternLogDir)
 	DeferCleanup(func() {
 		sternClusterCancel()
 		<-sternClusterDoneChan
 	})
 	sternOperatorCtx, sternOperatorCancel := context.WithCancel(env.Ctx)
-	sternOperatorDoneChan := stern.StreamLogs(sternOperatorCtx, env.Interface, operatorPodsLabelSelector(),
+	sternOperatorDoneChan := sternmultitailer.StreamLogs(sternOperatorCtx, env.Interface, operatorPodsLabelSelector(),
 		env.SternLogDir)
 	DeferCleanup(func() {
 		sternOperatorCancel()
@@ -214,8 +213,6 @@ var _ = AfterEach(func() {
 		Fail("operator was restarted")
 	}
 })
-
-const ()
 
 // clusterPodsLabelSelector returns a label selector to match all the pods belonging to the CNPG clusters
 func clusterPodsLabelSelector() labels.Selector {
