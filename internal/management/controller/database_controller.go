@@ -165,7 +165,7 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		)
 	}
 
-	return r.succeededRenconciliation(
+	return r.succeededReconciliation(
 		ctx,
 		&database,
 	)
@@ -198,7 +198,7 @@ func (r *DatabaseReconciler) failedReconciliation(
 }
 
 // succeededReconciliation marks the reconciliation as succeeded
-func (r *DatabaseReconciler) succeededRenconciliation(
+func (r *DatabaseReconciler) succeededReconciliation(
 	ctx context.Context,
 	database *apiv1.Database,
 ) (ctrl.Result, error) {
@@ -216,7 +216,7 @@ func (r *DatabaseReconciler) succeededRenconciliation(
 	}, nil
 }
 
-// NewDatabaseReconciler creates a new databare reconciler
+// NewDatabaseReconciler creates a new database reconciler
 func NewDatabaseReconciler(
 	mgr manager.Manager,
 	instance *postgres.Instance,
