@@ -115,6 +115,12 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 			for _, database := range sourceDatabases {
 				query := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s AS VALUES (1),(2);", tableName)
 				conn, err := forward.Pooler.Connection(database)
+				// We need to set the max idle connection back to a higher number
+				// otherwise the conn.Exec() will close the connection
+				// and that will produce a RST packet from PostgreSQL that will kill the
+				// port-forward tunnel
+				// More about the RST packet here https://www.postgresql.org/message-id/165ba87e-fa48-4eae-b1f3-f9a831b4890b%40Spark
+				conn.SetMaxIdleConns(3)
 				Expect(err).ToNot(HaveOccurred())
 				_, err = conn.Exec(query)
 				Expect(err).ToNot(HaveOccurred())
@@ -175,6 +181,12 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 			for _, database := range sourceDatabases {
 				selectQuery := fmt.Sprintf("SELECT COUNT(*) FROM %s", tableName)
 				connTemp, err := forwardTarget.Pooler.Connection(database)
+				// We need to set the max idle connection back to a higher number
+				// otherwise the conn.Exec() will close the connection
+				// and that will produce a RST packet from PostgreSQL that will kill the
+				// port-forward tunnel
+				// More about the RST packet here https://www.postgresql.org/message-id/165ba87e-fa48-4eae-b1f3-f9a831b4890b%40Spark
+				connTemp.SetMaxIdleConns(3)
 				Expect(err).ToNot(HaveOccurred())
 				row := connTemp.QueryRow(selectQuery)
 				var count int
@@ -185,8 +197,6 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 		})
 
 		By("close connection to imported cluster", func() {
-			err = connTarget.Close()
-			Expect(err).ToNot(HaveOccurred())
 			forwardTarget.Stop()
 		})
 	})
