@@ -1,10 +1,10 @@
 # Declarative Database Management
 
-Declarative database management allows the user to handle databases via a new 
-separate CRD named `Database`.
+Declarative database management allows the user to handle the lifecycle of
+databases via a new separate CRD named `Database`.
 
-Database CRD is only controlled by the instance manager of primary instance.
-This feature works only with clusters that are not replica clusters.
+A `Database` object is only controlled by the instance manager of its primary instance.
+This feature doesn't work with replica clusters.
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -18,11 +18,15 @@ spec:
     name: cluster-example
 ```
 
-Once Database CRD reconciliation succeeded, its status shows `ready` field set to true and `error` field is empty.
+Once the Database reconciliation cycle succeeds, the status of the `Database` will
+show a `ready` field set to `true` and an empty `error` field.
 
-Database deletion is triggered by a finalizer which gets added by the reconciliation loop itself. 
-By default, the database reclaim policy is set to `retain`, preventing the controller from deleting the database.
-When the database reclaim policy is set to `delete` and the Database CRD is deleted, the database gets deleted too.
+Database deletion is controlled by a finalizer named `cnpg.io/deleteDatabase`, which is being added by the
+reconciliation loop itself on each `Database` pointing to an existing `Cluster`.
+By default, the `databaseReclaimPolicy` is set to `retain`, meaning that the PostgreSQL Database will be retained
+for manual reclamation by the administrator.
+When the `databaseReclaimPolicy` is set to `delete` and the `Database` object is deleted, the PostgreSQL Database
+gets deleted too.
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1

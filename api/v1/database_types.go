@@ -26,7 +26,7 @@ import (
 type DatabaseReclaimPolicy string
 
 const (
-	// DatabaseReclaimDelete means the database will be deleted from Kubernetes on release
+	// DatabaseReclaimDelete means the database will be deleted from its PostgreSQL Cluster on release
 	// from its claim.
 	DatabaseReclaimDelete DatabaseReclaimPolicy = "delete"
 
