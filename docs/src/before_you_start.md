@@ -123,7 +123,7 @@ Superuser
 PVC group
 : A PVC group in CloudNativePG's terminology is a group of related PVCs
   belonging to the same PostgreSQL instance, namely the main volume containing
-  the PGDATA (`storage`) and the volume for WALs (`walStorage`).|
+  the PGDATA (`storage`) and the volume for WALs (`walStorage`).
 
 
 ## Cloud terminology
