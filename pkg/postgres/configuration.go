@@ -427,7 +427,6 @@ var (
 		// The following parameters need a reload to be applied
 		"archive_cleanup_command":                blockedConfigurationParameter,
 		"archive_command":                        fixedConfigurationParameter,
-		"full_page_writes":                       fixedConfigurationParameter,
 		"log_destination":                        blockedConfigurationParameter,
 		"log_directory":                          blockedConfigurationParameter,
 		"log_file_mode":                          blockedConfigurationParameter,
@@ -482,6 +481,7 @@ var (
 			// a default value is not explicit in the postgresql.conf and
 			// the parameter cannot be changed without a restart.
 			SharedPreloadLibraries: "",
+			"full_page_writes":     "on",
 		},
 		DefaultSettings: map[MajorVersionRange]SettingsCollection{
 			{MajorVersionRangeUnlimited, 120000}: {
@@ -508,7 +508,6 @@ var (
 				"/controller/manager wal-archive --log-destination %s/%s.json %%p",
 				LogPath, LogFileName),
 			"port":                fmt.Sprint(ServerPort),
-			"full_page_writes":    "on",
 			"ssl":                 "on",
 			"ssl_cert_file":       ServerCertificateLocation,
 			"ssl_key_file":        ServerKeyLocation,
