@@ -32,10 +32,23 @@ generated outside CNPG.
     names in user-provided certificates for the `<cluster>-rw` service used for
     communication within the cluster.
 
-## Operator-managed mode
+## Operator-Managed Mode
 
-By default, the operator generates a single CA and uses it for both client and
-server certificates, which are then managed and renewed automatically.
+By default, the operator automatically generates a single Certificate Authority
+(CA) to issue both client and server certificates. These certificates are
+managed continuously by the operator, with automatic renewal 7 days before
+expiration (within a 90-day validity period).
+
+!!! Info
+    You can adjust this default behavior by configuring the
+    `CERTIFICATE_DURATION` and `EXPIRING_CHECK_THRESHOLD` environment variables.
+    For detailed guidance, refer to the [Operator Configuration](operator_conf.md).
+
+!!! Important
+    Certificate renewal does not cause any downtime for the PostgreSQL server,
+    as a simple reload operation is sufficient. However, any user-managed
+    certificates not controlled by CloudNativePG must be re-issued following the
+    renewal process.
 
 ### Server certificates
 
