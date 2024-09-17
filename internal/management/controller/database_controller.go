@@ -250,12 +250,11 @@ func (r *DatabaseReconciler) GetCluster(ctx context.Context) (*apiv1.Cluster, er
 	return &cluster, nil
 }
 
-func (r *DatabaseReconciler) alignPgDatabase(ctx context.Context, obj *apiv1.Database) error {
-	db, err := r.instance.GetSuperUserDB()
-	if err != nil {
-		return fmt.Errorf("while connecting to the database: %w", err)
-	}
-
+func (r *DatabaseReconciler) detectDatabase(
+	ctx context.Context,
+	db *sql.DB,
+	obj *apiv1.Database,
+) (bool, error) {
 	row := db.QueryRowContext(
 		ctx,
 		`
@@ -265,19 +264,30 @@ func (r *DatabaseReconciler) alignPgDatabase(ctx context.Context, obj *apiv1.Dat
 		`,
 		obj.Spec.Name)
 	if row.Err() != nil {
-		return fmt.Errorf("while getting DB status: %w", err)
+		return false, fmt.Errorf("while checking if database %q exists: %w", obj.Spec.Name, row.Err())
 	}
 
 	var count int
 	if err := row.Scan(&count); err != nil {
-		return fmt.Errorf("while getting DB status (scan): %w", err)
+		return false, fmt.Errorf("while scanning if database %q exists: %w", obj.Spec.Name, err)
 	}
 
-	if count > 0 {
-		if err := r.patchDatabase(ctx, db, obj); err != nil {
-			return err
-		}
-		return nil
+	return count > 0, nil
+}
+
+func (r *DatabaseReconciler) alignPgDatabase(ctx context.Context, obj *apiv1.Database) error {
+	db, err := r.instance.GetSuperUserDB()
+	if err != nil {
+		return fmt.Errorf("while connecting to the database %q: %w", obj.Spec.Name, err)
+	}
+
+	dbExists, err := r.detectDatabase(ctx, db, obj)
+	if err != nil {
+		return fmt.Errorf("while detecting the database %q: %w", obj.Spec.Name, err)
+	}
+
+	if dbExists {
+		return r.patchDatabase(ctx, db, obj)
 	}
 
 	return r.createDatabase(ctx, db, obj)
@@ -288,7 +298,7 @@ func (r *DatabaseReconciler) createDatabase(
 	db *sql.DB,
 	obj *apiv1.Database,
 ) error {
-	sqlCreateDatabase := fmt.Sprintf("CREATE DATABASE %s ", obj.Spec.Name)
+	sqlCreateDatabase := fmt.Sprintf("CREATE DATABASE %s ", pgx.Identifier{obj.Spec.Name}.Sanitize())
 	if obj.Spec.IsTemplate != nil {
 		sqlCreateDatabase += fmt.Sprintf(" IS_TEMPLATE %v", *obj.Spec.IsTemplate)
 	}
@@ -373,15 +383,27 @@ func (r *DatabaseReconciler) patchDatabase(
 	return nil
 }
 
-func (r *DatabaseReconciler) dropPgDatabase(ctx context.Context, obj *apiv1.Database) error {
-	db, err := r.instance.GetSuperUserDB()
-	if err != nil {
-		return fmt.Errorf("while connecting to the database: %w", err)
-	}
-
-	_, err = db.ExecContext(
+func (r *DatabaseReconciler) dropDatabase(
+	ctx context.Context,
+	db *sql.DB,
+	obj *apiv1.Database,
+) error {
+	_, err := db.ExecContext(
 		ctx,
 		fmt.Sprintf("DROP DATABASE IF EXISTS %s", pgx.Identifier{obj.Spec.Name}.Sanitize()),
 	)
-	return err
+	if err != nil {
+		return fmt.Errorf("while dropping database %q: %w", obj.Spec.Name, err)
+	}
+
+	return nil
+}
+
+func (r *DatabaseReconciler) dropPgDatabase(ctx context.Context, obj *apiv1.Database) error {
+	db, err := r.instance.GetSuperUserDB()
+	if err != nil {
+		return fmt.Errorf("while connecting to the database %q: %w", obj.Spec.Name, err)
+	}
+
+	return r.dropDatabase(ctx, db, obj)
 }
