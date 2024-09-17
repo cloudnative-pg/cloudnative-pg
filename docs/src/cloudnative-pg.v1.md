@@ -2520,6 +2520,56 @@ PostgreSQL cluster from an existing storage</p>
 </tbody>
 </table>
 
+## Database     {#postgresql-cnpg-io-v1-Database}
+
+
+
+<p>Database is the Schema for the databases API</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>metadata</code> <B>[Required]</B><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#objectmeta-v1-meta"><i>meta/v1.ObjectMeta</i></a>
+</td>
+<td>
+   <span class="text-muted">No description provided.</span>Refer to the Kubernetes API documentation for the fields of the <code>metadata</code> field.</td>
+</tr>
+<tr><td><code>spec</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-DatabaseSpec"><i>DatabaseSpec</i></a>
+</td>
+<td>
+   <p>Specification of the desired Database.
+More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status</p>
+</td>
+</tr>
+<tr><td><code>status</code><br/>
+<a href="#postgresql-cnpg-io-v1-DatabaseStatus"><i>DatabaseStatus</i></a>
+</td>
+<td>
+   <p>Most recently observed status of the Database. This data may not be up to
+date. Populated by the system. Read-only.
+More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## DatabaseReclaimPolicy     {#postgresql-cnpg-io-v1-DatabaseReclaimPolicy}
+
+(Alias of `string`)
+
+**Appears in:**
+
+- [DatabaseSpec](#postgresql-cnpg-io-v1-DatabaseSpec)
+
+
+<p>DatabaseReclaimPolicy describes a policy for end-of-life maintenance of databases.</p>
+
+
+
+
 ## DatabaseRoleRef     {#postgresql-cnpg-io-v1-DatabaseRoleRef}
 
 
@@ -2539,6 +2589,126 @@ PostgreSQL cluster from an existing storage</p>
 </td>
 <td>
    <span class="text-muted">No description provided.</span></td>
+</tr>
+</tbody>
+</table>
+
+## DatabaseSpec     {#postgresql-cnpg-io-v1-DatabaseSpec}
+
+
+**Appears in:**
+
+- [Database](#postgresql-cnpg-io-v1-Database)
+
+
+<p>DatabaseSpec is the specification of a Postgresql Database</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>cluster</code> <B>[Required]</B><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#localobjectreference-v1-core"><i>core/v1.LocalObjectReference</i></a>
+</td>
+<td>
+   <p>The corresponding cluster</p>
+</td>
+</tr>
+<tr><td><code>name</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The name inside PostgreSQL</p>
+</td>
+</tr>
+<tr><td><code>owner</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The owner</p>
+</td>
+</tr>
+<tr><td><code>encoding</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The encoding (cannot be changed)</p>
+</td>
+</tr>
+<tr><td><code>isTemplate</code><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>True when the database is a template</p>
+</td>
+</tr>
+<tr><td><code>allowConnections</code><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>True when connections to this database are allowed</p>
+</td>
+</tr>
+<tr><td><code>connectionLimit</code><br/>
+<i>int</i>
+</td>
+<td>
+   <p>Connection limit, -1 means no limit and -2 means the
+database is not valid</p>
+</td>
+</tr>
+<tr><td><code>tablespace</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The default tablespace of this database</p>
+</td>
+</tr>
+<tr><td><code>databaseReclaimPolicy</code><br/>
+<a href="#postgresql-cnpg-io-v1-DatabaseReclaimPolicy"><i>DatabaseReclaimPolicy</i></a>
+</td>
+<td>
+   <p>The policy for end-of-life maintenance of this database</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## DatabaseStatus     {#postgresql-cnpg-io-v1-DatabaseStatus}
+
+
+**Appears in:**
+
+- [Database](#postgresql-cnpg-io-v1-Database)
+
+
+<p>DatabaseStatus defines the observed state of Database</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>observedGeneration</code><br/>
+<i>int64</i>
+</td>
+<td>
+   <p>A sequence number representing the latest
+desired state that was synchronized</p>
+</td>
+</tr>
+<tr><td><code>ready</code> <B>[Required]</B><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>Ready is true if the database was reconciled correctly</p>
+</td>
+</tr>
+<tr><td><code>error</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Error is the reconciliation error message</p>
+</td>
 </tr>
 </tbody>
 </table>
