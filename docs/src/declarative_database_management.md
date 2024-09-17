@@ -1,13 +1,15 @@
 # Declarative Database Management
 
-Declarative database management allows the user to handle the lifecycle of
-databases via a new CRD named `Database`.
+Declarative database management enables users to control the lifecycle of
+databases using a new Custom Resource Definition (CRD) called `Database`.
 
-A `Database` object is only controlled by the instance manager of the cluster's
-primary instance.
-This feature doesn't work with replica clusters.
+A `Database` object is managed by the instance manager of the cluster's
+primary instance. This feature is not supported in replica clusters,
+as replica clusters lack a primary instance to manage the `Database` object.
 
-This is an example of a simple Database declaration:
+### Example: Simple Database Declaration
+
+Below is an example of a basic `Database` configuration:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -21,17 +23,26 @@ spec:
     name: cluster-example
 ```
 
-Once the Database reconciliation cycle succeeds, the status of the `Database`
-will show a `ready` field set to `true` and an empty `error` field.
+Once the reconciliation cycle is completed successfully, the `Database` 
+status will show a `ready` field set to `true` and an empty `error` field.
 
-Database deletion is controlled by a finalizer named `cnpg.io/deleteDatabase`,
-which is added by the controller on each `Database`.
-By default, the `databaseReclaimPolicy` is set to `retain`, meaning that if the
-Database object is deleted, the PostgreSQL Database will be retained
-for manual handling by the administrator.
-When the `databaseReclaimPolicy` is set to `delete` and the `Database` object
-is deleted, the PostgreSQL Database will be deleted too.
-The following example shows this:
+### Database Deletion and Reclaim Policies
+
+A finalizer named `cnpg.io/deleteDatabase` is automatically added
+to each `Database` object to control its deletion process.
+
+By default, the `databaseReclaimPolicy` is set to `retain`, which means
+that if the `Database` object is deleted, the actual PostgreSQL database
+is retained for manual management by an administrator.
+
+Alternatively, if the `databaseReclaimPolicy` is set to `delete`,
+the PostgreSQL database will be automatically deleted when the `Database`
+object is removed.
+
+### Example: Database with Delete Reclaim Policy
+
+The following example illustrates a `Database` object with a `delete`
+reclaim policy:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -45,3 +56,5 @@ spec:
   cluster:
     name: cluster-example
 ```
+
+In this case, when the `Database` object is deleted, the corresponding PostgreSQL database will also be removed automatically.
