@@ -21,7 +21,7 @@ limitations under the License.
 package v1
 
 import (
-	"github.com/cloudnative-pg/barman-cloud/pkg/types"
+	pkgapi "github.com/cloudnative-pg/barman-cloud/pkg/api"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/machinery/pkg/api"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -132,7 +132,7 @@ func (in *BackupConfiguration) DeepCopyInto(out *BackupConfiguration) {
 	}
 	if in.BarmanObjectStore != nil {
 		in, out := &in.BarmanObjectStore, &out.BarmanObjectStore
-		*out = new(types.BarmanObjectStoreConfiguration)
+		*out = new(pkgapi.BarmanObjectStoreConfiguration)
 		(*in).DeepCopyInto(*out)
 	}
 }
@@ -1222,7 +1222,7 @@ func (in *ExternalCluster) DeepCopyInto(out *ExternalCluster) {
 	}
 	if in.BarmanObjectStore != nil {
 		in, out := &in.BarmanObjectStore, &out.BarmanObjectStore
-		*out = new(types.BarmanObjectStoreConfiguration)
+		*out = new(pkgapi.BarmanObjectStoreConfiguration)
 		(*in).DeepCopyInto(*out)
 	}
 }
