@@ -48,7 +48,7 @@ type PSQLConnection struct {
 func PSQLConnectionNew(env *TestingEnvironment, namespace, pod string) (*PSQLConnection, error) {
 	psqlc := &PSQLConnection{}
 	if pod == "" {
-		return nil, fmt.Errorf("servicename or pod not provided")
+		return nil, fmt.Errorf("pod not provided")
 	}
 	psqlc.Namespace = namespace
 	psqlc.Pod = pod

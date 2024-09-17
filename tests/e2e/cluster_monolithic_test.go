@@ -196,7 +196,7 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 			}
 		})
 
-		By("close connection to imported cluster", func() {
+		By("close connection to imported and the source cluster", func() {
 			forwardTarget.Stop()
 		})
 	})

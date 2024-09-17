@@ -69,14 +69,6 @@ var _ = Describe("Imports with Microservice Approach", Label(tests.LabelImportin
 		data := "large object test"
 		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			return env.CleanupNamespace(
-				namespace,
-				CurrentSpecReport().LeafNodeText,
-				CurrentSpecReport().Failed(),
-				GinkgoWriter,
-			)
-		})
 
 		AssertCreateCluster(namespace, sourceClusterName, sourceSampleFile, env)
 		AssertCreateTestData(env, namespace, sourceClusterName, tableName)

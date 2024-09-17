@@ -88,9 +88,9 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 			_, err = conn.Exec(query)
 			Expect(err).NotTo(HaveOccurred())
 
-			// Here we need to close the connection and close the forwoard, if we don't do both steps
+			// Here we need to close the connection and close the forward, if we don't do both steps
 			// the PostgreSQL connection will be there and PostgreSQL will not restart in time because
-			// of the connection that wasn't close
+			// of the connection that wasn't close and stays idle
 			_ = conn.Close()
 			forward.Stop()
 
