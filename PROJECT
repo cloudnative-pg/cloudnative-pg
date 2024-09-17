@@ -1,4 +1,5 @@
 domain: cnpg.io
+version: "3"
 layout:
 - go.kubebuilder.io/v4
 projectName: cloudnative-pg-kubebuilderv4
