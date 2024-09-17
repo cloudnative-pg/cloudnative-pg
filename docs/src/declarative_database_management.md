@@ -1,7 +1,7 @@
 # Declarative Database Management
 
 Declarative database management enables users to control the lifecycle of
-databases using a new Custom Resource Definition (CRD) called `Database`.
+databases via a new Custom Resource Definition (CRD) called `Database`.
 
 A `Database` object is managed by the instance manager of the cluster's
 primary instance. This feature is not supported in replica clusters,
