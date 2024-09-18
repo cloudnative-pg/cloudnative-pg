@@ -14,6 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package sternmultitailer contains the required to handle the logs
-// of every pod in the tests
+// Package sternmultitailer handle the logs of every pod in the tests
+// saving them in a structured way within a directory.
 package sternmultitailer

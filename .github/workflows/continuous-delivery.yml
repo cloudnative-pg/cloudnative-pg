@@ -794,7 +794,7 @@ jobs:
           if-no-files-found: ignore
 
       -
-        name: Archive e2e cluster logs
+        name: Archive e2e logs
         if: failure()
         uses: actions/upload-artifact@v4
         with:
@@ -1102,7 +1102,7 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
       -
-        name: Archive e2e cluster logs
+        name: Archive e2e logs
         if: failure()
         uses: actions/upload-artifact@v4
         with:
@@ -1471,7 +1471,7 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
       -
-        name: Archive e2e cluster logs
+        name: Archive e2e logs
         if: failure()
         uses: actions/upload-artifact@v4
         with:
@@ -1803,7 +1803,7 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
       -
-        name: Archive e2e cluster logs
+        name: Archive e2e logs
         if: failure()
         uses: actions/upload-artifact@v4
         with:
@@ -2060,7 +2060,7 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
       -
-        name: Archive e2e cluster logs
+        name: Archive e2e logs
         if: failure()
         uses: actions/upload-artifact@v4
         with:
