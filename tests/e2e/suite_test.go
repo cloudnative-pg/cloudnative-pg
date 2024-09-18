@@ -152,7 +152,9 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 })
 
 var _ = ReportAfterSuite("Gathering failed reports", func(report Report) {
-	if report.SuiteSucceeded {
+	// Keep the logs of the operator and the clusters in case of failure
+	// If everything is skipped, env has not been initialized, and we'll have nothing to clean up
+	if report.SuiteSucceeded && env != nil {
 		err := fileutils.RemoveDirectory(env.SternLogDir)
 		Expect(err).ToNot(HaveOccurred())
 	}
