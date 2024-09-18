@@ -129,6 +129,7 @@ spec:
 
 In case you're using **Digital Ocean Spaces**, you will have to use the Path-style syntax.
 In this example, it will use the `bucket` from **Digital Ocean Spaces** in the region `SFO3`.
+
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
@@ -142,10 +143,31 @@ spec:
         [...]
 ```
 
-!!! Important
-    Suppose you configure an Object Storage provider which uses a certificate signed with a private CA,
-    like when using MinIO via HTTPS. In that case, you need to set the option `endpointCA`
-    referring to a secret containing the CA bundle so that Barman can verify the certificate correctly.
+### Using object storage with a private CA
+
+Suppose you configure an Object Storage provider which uses a certificate
+signed with a private CA, for example when using MinIO via HTTPS. In that case,
+you need to set the option `endpointCA` inside `barmanObjectStore` referring
+to a secret containing the CA bundle, so that Barman can verify the certificate
+correctly.
+You can find instructions on creating a secret using your cert files in the
+[certificates](../certificates.md#example) document.
+Once you have created the secret, you can populate the `endpointCA` as in the
+following example:
+
+``` yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+[...]
+spec:
+  [...]
+  backup:
+    barmanObjectStore:
+      endpointURL: <myEndpointURL>
+      endpointCA:
+        name: my-ca-secret
+        key: ca.crt
+```
 
 !!! Note
     If you want ConfigMaps and Secrets to be **automatically** reloaded by instances, you can
@@ -186,7 +208,7 @@ On the other side, using both **Storage account access key** or **Storage accoun
 the credentials need to be stored inside a Kubernetes Secret, adding data entries only when
 needed. The following command performs that:
 
-```
+``` sh
 kubectl create secret generic azure-creds \
   --from-literal=AZURE_STORAGE_ACCOUNT=<storage account name> \
   --from-literal=AZURE_STORAGE_KEY=<storage account key> \
@@ -226,7 +248,7 @@ spec:
 When using the Azure Blob Storage, the `destinationPath` fulfills the following
 structure:
 
-```
+``` terminal
 <http|https>://<account-name>.<service-name>.core.windows.net/<resource-path>
 ```
 
@@ -238,7 +260,7 @@ which is also called **storage account name**, is included in the used host name
 If you are using a different implementation of the Azure Blob Storage APIs,
 the `destinationPath` will have the following structure:
 
-```
+``` sh
 <http|https>://<local-machine-address>:<port>/<account-name>/<resource-path>
 ```
 
@@ -265,7 +287,6 @@ without having to set any credentials. In particular, you need to:
 - set the `iam.gke.io/gcp-service-account` annotation in the `serviceAccountTemplate` stanza
 
 Please use the following example as a reference:
-
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
