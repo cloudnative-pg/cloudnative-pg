@@ -143,7 +143,7 @@ spec:
         [...]
 ```
 
-### Using object storage with a private CA
+### Using Object Storage with a private CA
 
 Suppose you configure an Object Storage provider which uses a certificate
 signed with a private CA, for example when using MinIO via HTTPS. In that case,
