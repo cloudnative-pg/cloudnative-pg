@@ -44,7 +44,34 @@ type DatabaseReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 
+	instance instanceInterface
+}
+
+type instanceInterface interface {
+	GetSuperUserDB() (*sql.DB, error)
+	GetClusterName() string
+	GetPodName() string
+	GetNamespaceName() string
+}
+
+type instanceData struct {
 	instance *postgres.Instance
+}
+
+func (i *instanceData) GetSuperUserDB() (*sql.DB, error) {
+	return i.instance.GetSuperUserDB()
+}
+
+func (i *instanceData) GetClusterName() string {
+	return i.instance.ClusterName
+}
+
+func (i *instanceData) GetPodName() string {
+	return i.instance.PodName
+}
+
+func (i *instanceData) GetNamespaceName() string {
+	return i.instance.Namespace
 }
 
 // errClusterIsReplica is raised when the database object
@@ -86,7 +113,7 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 
 	// This is not for me!
-	if database.Spec.ClusterRef.Name != r.instance.ClusterName {
+	if database.Spec.ClusterRef.Name != r.instance.GetClusterName() {
 		return ctrl.Result{}, nil
 	}
 
@@ -109,7 +136,7 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 
 	// This is not for me, at least now
-	if cluster.Status.CurrentPrimary != r.instance.PodName {
+	if cluster.Status.CurrentPrimary != r.instance.GetPodName() {
 		return ctrl.Result{RequeueAfter: databaseReconciliationInterval}, nil
 	}
 
@@ -223,7 +250,7 @@ func NewDatabaseReconciler(
 ) *DatabaseReconciler {
 	return &DatabaseReconciler{
 		Client:   mgr.GetClient(),
-		instance: instance,
+		instance: &instanceData{instance: instance},
 	}
 }
 
@@ -239,8 +266,8 @@ func (r *DatabaseReconciler) GetCluster(ctx context.Context) (*apiv1.Cluster, er
 	var cluster apiv1.Cluster
 	err := r.Client.Get(ctx,
 		types.NamespacedName{
-			Namespace: r.instance.Namespace,
-			Name:      r.instance.ClusterName,
+			Namespace: r.instance.GetNamespaceName(),
+			Name:      r.instance.GetClusterName(),
 		},
 		&cluster)
 	if err != nil {
