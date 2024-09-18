@@ -25,6 +25,8 @@ import (
 	"strings"
 	"time"
 
+	machineryapi "github.com/cloudnative-pg/machinery/pkg/api"
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -32,13 +34,27 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/stringset"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/system"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
+
+// LocalObjectReference contains enough information to let you locate a
+// local object with a known type inside the same namespace
+// +kubebuilder:object:generate:=false
+type LocalObjectReference = machineryapi.LocalObjectReference
+
+// SecretKeySelector contains enough information to let you locate
+// the key of a Secret
+// +kubebuilder:object:generate:=false
+type SecretKeySelector = machineryapi.SecretKeySelector
+
+// ConfigMapKeySelector contains enough information to let you locate
+// the key of a ConfigMap
+// +kubebuilder:object:generate:=false
+type ConfigMapKeySelector = machineryapi.ConfigMapKeySelector
 
 const (
 	// PrimaryPodDisruptionBudgetSuffix is the suffix appended to the cluster name
@@ -1965,6 +1981,26 @@ type RecoveryTarget struct {
 	Exclusive *bool `json:"exclusive,omitempty"`
 }
 
+// GetBackupID gets the backup ID
+func (target *RecoveryTarget) GetBackupID() string {
+	return target.BackupID
+}
+
+// GetTargetTime gets the target time
+func (target *RecoveryTarget) GetTargetTime() string {
+	return target.TargetTime
+}
+
+// GetTargetLSN gets the target LSN
+func (target *RecoveryTarget) GetTargetLSN() string {
+	return target.TargetLSN
+}
+
+// GetTargetTLI gets the target timeline
+func (target *RecoveryTarget) GetTargetTLI() string {
+	return target.TargetTLI
+}
+
 // StorageConfiguration is the configuration used to create and reconcile PVCs,
 // usable for WAL volumes, PGDATA volumes, or tablespaces
 type StorageConfiguration struct {
@@ -2130,110 +2166,6 @@ const (
 	DefaultBackupTarget = BackupTargetStandby
 )
 
-// CompressionType encapsulates the available types of compression
-type CompressionType string
-
-const (
-	// CompressionTypeNone means no compression is performed
-	CompressionTypeNone = CompressionType("")
-
-	// CompressionTypeGzip means gzip compression is performed
-	CompressionTypeGzip = CompressionType("gzip")
-
-	// CompressionTypeBzip2 means bzip2 compression is performed
-	CompressionTypeBzip2 = CompressionType("bzip2")
-
-	// CompressionTypeSnappy means snappy compression is performed
-	CompressionTypeSnappy = CompressionType("snappy")
-)
-
-// EncryptionType encapsulated the available types of encryption
-type EncryptionType string
-
-const (
-	// EncryptionTypeNone means just use the bucket configuration
-	EncryptionTypeNone = EncryptionType("")
-
-	// EncryptionTypeAES256 means to use AES256 encryption
-	EncryptionTypeAES256 = EncryptionType("AES256")
-
-	// EncryptionTypeNoneAWSKMS means to use aws:kms encryption
-	EncryptionTypeNoneAWSKMS = EncryptionType("aws:kms")
-)
-
-// BarmanCredentials an object containing the potential credentials for each cloud provider
-type BarmanCredentials struct {
-	// The credentials to use to upload data to Google Cloud Storage
-	// +optional
-	Google *GoogleCredentials `json:"googleCredentials,omitempty"`
-
-	// The credentials to use to upload data to S3
-	// +optional
-	AWS *S3Credentials `json:"s3Credentials,omitempty"`
-
-	// The credentials to use to upload data to Azure Blob Storage
-	// +optional
-	Azure *AzureCredentials `json:"azureCredentials,omitempty"`
-}
-
-// ArePopulated checks if the passed set of credentials contains
-// something
-func (crendentials BarmanCredentials) ArePopulated() bool {
-	return crendentials.Azure != nil || crendentials.AWS != nil || crendentials.Google != nil
-}
-
-// BarmanObjectStoreConfiguration contains the backup configuration
-// using Barman against an S3-compatible object storage
-type BarmanObjectStoreConfiguration struct {
-	// The potential credentials for each cloud provider
-	BarmanCredentials `json:",inline"`
-
-	// Endpoint to be used to upload data to the cloud,
-	// overriding the automatic endpoint discovery
-	// +optional
-	EndpointURL string `json:"endpointURL,omitempty"`
-
-	// EndpointCA store the CA bundle of the barman endpoint.
-	// Useful when using self-signed certificates to avoid
-	// errors with certificate issuer and barman-cloud-wal-archive
-	// +optional
-	EndpointCA *SecretKeySelector `json:"endpointCA,omitempty"`
-
-	// The path where to store the backup (i.e. s3://bucket/path/to/folder)
-	// this path, with different destination folders, will be used for WALs
-	// and for data
-	// +kubebuilder:validation:MinLength=1
-	DestinationPath string `json:"destinationPath"`
-
-	// The server name on S3, the cluster name is used if this
-	// parameter is omitted
-	// +optional
-	ServerName string `json:"serverName,omitempty"`
-
-	// The configuration for the backup of the WAL stream.
-	// When not defined, WAL files will be stored uncompressed and may be
-	// unencrypted in the object store, according to the bucket default policy.
-	// +optional
-	Wal *WalBackupConfiguration `json:"wal,omitempty"`
-
-	// The configuration to be used to backup the data files
-	// When not defined, base backups files will be stored uncompressed and may
-	// be unencrypted in the object store, according to the bucket default
-	// policy.
-	// +optional
-	Data *DataBackupConfiguration `json:"data,omitempty"`
-
-	// Tags is a list of key value pairs that will be passed to the
-	// Barman --tags option.
-	// +optional
-	Tags map[string]string `json:"tags,omitempty"`
-
-	// HistoryTags is a list of key value pairs that will be passed to the
-	// Barman --history-tags option.
-	// +optional
-	HistoryTags map[string]string `json:"historyTags,omitempty"`
-}
-
 // BackupConfiguration defines how the backup of the cluster are taken.
 // The supported backup methods are BarmanObjectStore and VolumeSnapshot.
 // For details and examples refer to the Backup and Recovery section of the
@@ -2264,186 +2196,6 @@ type BackupConfiguration struct {
 	// +kubebuilder:default:=prefer-standby
 	// +optional
 	Target BackupTarget `json:"target,omitempty"`
-}
-
-// WalBackupConfiguration is the configuration of the backup of the
-// WAL stream
-type WalBackupConfiguration struct {
-	// Compress a WAL file before sending it to the object store. Available
-	// options are empty string (no compression, default), `gzip`, `bzip2` or `snappy`.
-	// +kubebuilder:validation:Enum=gzip;bzip2;snappy
-	// +optional
-	Compression CompressionType `json:"compression,omitempty"`
-
-	// Whenever to force the encryption of files (if the bucket is
-	// not already configured for that).
-	// Allowed options are empty string (use the bucket policy, default),
-	// `AES256` and `aws:kms`
-	// +kubebuilder:validation:Enum=AES256;"aws:kms"
-	// +optional
-	Encryption EncryptionType `json:"encryption,omitempty"`
-
-	// Number of WAL files to be either archived in parallel (when the
-	// PostgreSQL instance is archiving to a backup object store) or
-	// restored in parallel (when a PostgreSQL standby is fetching WAL
-	// files from a recovery object store). If not specified, WAL files
-	// will be processed one at a time. It accepts a positive integer as a
-	// value - with 1 being the minimum accepted value.
-	// +kubebuilder:validation:Minimum=1
-	// +optional
-	MaxParallel int `json:"maxParallel,omitempty"`
-	// Additional arguments that can be appended to the 'barman-cloud-wal-archive'
-	// command-line invocation. These arguments provide flexibility to customize
-	// the WAL archive process further, according to specific requirements or configurations.
-	//
-	// Example:
-	// In a scenario where specialized backup options are required, such as setting
-	// a specific timeout or defining custom behavior, users can use this field
-	// to specify additional command arguments.
-	//
-	// Note:
-	// It's essential to ensure that the provided arguments are valid and supported
-	// by the 'barman-cloud-wal-archive' command, to avoid potential errors or unintended
-	// behavior during execution.
-	ArchiveAdditionalCommandArgs []string `json:"archiveAdditionalCommandArgs,omitempty"`
-
-	// Additional arguments that can be appended to the 'barman-cloud-wal-restore'
-	// command-line invocation. These arguments provide flexibility to customize
-	// the WAL restore process further, according to specific requirements or configurations.
-	//
-	// Example:
-	// In a scenario where specialized backup options are required, such as setting
-	// a specific timeout or defining custom behavior, users can use this field
-	// to specify additional command arguments.
-	//
-	// Note:
-	// It's essential to ensure that the provided arguments are valid and supported
-	// by the 'barman-cloud-wal-restore' command, to avoid potential errors or unintended
-	// behavior during execution.
-	RestoreAdditionalCommandArgs []string `json:"restoreAdditionalCommandArgs,omitempty"`
-}
-
-// DataBackupConfiguration is the configuration of the backup of
-// the data directory
-type DataBackupConfiguration struct {
-	// Compress a backup file (a tar file per tablespace) while streaming it
-	// to the object store. Available options are empty string (no
-	// compression, default), `gzip`, `bzip2` or `snappy`.
-	// +kubebuilder:validation:Enum=gzip;bzip2;snappy
-	// +optional
-	Compression CompressionType `json:"compression,omitempty"`
-
-	// Whenever to force the encryption of files (if the bucket is
-	// not already configured for that).
-	// Allowed options are empty string (use the bucket policy, default),
-	// `AES256` and `aws:kms`
-	// +kubebuilder:validation:Enum=AES256;"aws:kms"
-	// +optional
-	Encryption EncryptionType `json:"encryption,omitempty"`
-
-	// The number of parallel jobs to be used to upload the backup, defaults
-	// to 2
-	// +kubebuilder:validation:Minimum=1
-	// +optional
-	Jobs *int32 `json:"jobs,omitempty"`
-
-	// Control whether the I/O workload for the backup initial checkpoint will
-	// be limited, according to the `checkpoint_completion_target` setting on
-	// the PostgreSQL server. If set to true, an immediate checkpoint will be
-	// used, meaning PostgreSQL will complete the checkpoint as soon as
-	// possible. `false` by default.
-	// +optional
-	ImmediateCheckpoint bool `json:"immediateCheckpoint,omitempty"`
-
-	// AdditionalCommandArgs represents additional arguments that can be appended
-	// to the 'barman-cloud-backup' command-line invocation. These arguments
-	// provide flexibility to customize the backup process further according to
-	// specific requirements or configurations.
-	//
-	// Example:
-	// In a scenario where specialized backup options are required, such as setting
-	// a specific timeout or defining custom behavior, users can use this field
-	// to specify additional command arguments.
-	//
-	// Note:
-	// It's essential to ensure that the provided arguments are valid and supported
-	// by the 'barman-cloud-backup' command, to avoid potential errors or unintended
-	// behavior during execution.
-	AdditionalCommandArgs []string `json:"additionalCommandArgs,omitempty"`
-}
-
-// S3Credentials is the type for the credentials to be used to upload
-// files to S3. It can be provided in two alternative ways:
-//
-// - explicitly passing accessKeyId and secretAccessKey
-//
-// - inheriting the role from the pod environment by setting inheritFromIAMRole to true
-type S3Credentials struct {
-	// The reference to the access key id
-	// +optional
-	AccessKeyIDReference *SecretKeySelector `json:"accessKeyId,omitempty"`
-
-	// The reference to the secret access key
-	// +optional
-	SecretAccessKeyReference *SecretKeySelector `json:"secretAccessKey,omitempty"`
-
-	// The reference to the secret containing the region name
-	// +optional
-	RegionReference *SecretKeySelector `json:"region,omitempty"`
-
-	// The references to the session key
-	// +optional
-	SessionToken *SecretKeySelector `json:"sessionToken,omitempty"`
-
-	// Use the role based authentication without providing explicitly the keys.
-	// +optional
-	InheritFromIAMRole bool `json:"inheritFromIAMRole,omitempty"`
-}
-
-// AzureCredentials is the type for the credentials to be used to upload
-// files to Azure Blob Storage. The connection string contains every needed
-// information. If the connection string is not specified, we'll need the
-// storage account name and also one (and only one) of:
-//
-// - storageKey
-// - storageSasToken
-//
-// - inheriting the credentials from the pod environment by setting inheritFromAzureAD to true
-type AzureCredentials struct {
-	// The connection string to be used
-	// +optional
-	ConnectionString *SecretKeySelector `json:"connectionString,omitempty"`
-
-	// The storage account where to upload data
-	// +optional
-	StorageAccount *SecretKeySelector `json:"storageAccount,omitempty"`
-
-	// The storage account key to be used in conjunction
-	// with the storage account name
-	// +optional
-	StorageKey *SecretKeySelector `json:"storageKey,omitempty"`
-
-	// A shared-access-signature to be used in conjunction with
-	// the storage account name
-	// +optional
-	StorageSasToken *SecretKeySelector `json:"storageSasToken,omitempty"`
-
-	// Use the Azure AD based authentication without providing explicitly the keys.
-	// +optional
-	InheritFromAzureAD bool `json:"inheritFromAzureAD,omitempty"`
-}
-
-// GoogleCredentials is the type for the Google Cloud Storage credentials.
-// This needs to be specified even if we run inside a GKE environment.
-type GoogleCredentials struct {
-	// The secret containing the Google Cloud Storage JSON file with the credentials
-	// +optional
-	ApplicationCredentials *SecretKeySelector `json:"applicationCredentials,omitempty"`
-
-	// If set to true, will presume that it's running inside a GKE environment,
-	// default to false.
-	// +optional
-	GKEEnvironment bool `json:"gkeEnvironment,omitempty"`
 }
 
 // MonitoringConfiguration is the type containing all the monitoring
@@ -2536,48 +2288,6 @@ type ExternalCluster struct {
 	// The configuration for the barman-cloud tool suite
 	// +optional
 	BarmanObjectStore *BarmanObjectStoreConfiguration `json:"barmanObjectStore,omitempty"`
-}
-
-// AppendAdditionalCommandArgs adds custom arguments as barman-cloud-backup command-line options
-func (cfg *DataBackupConfiguration) AppendAdditionalCommandArgs(options []string) []string {
-	if cfg == nil || len(cfg.AdditionalCommandArgs) == 0 {
-		return options
-	}
-	return appendAdditionalCommandArgs(cfg.AdditionalCommandArgs, options)
-}
-
-// AppendArchiveAdditionalCommandArgs adds custom arguments as barman-cloud-wal-archive command-line options
-func (cfg *WalBackupConfiguration) AppendArchiveAdditionalCommandArgs(options []string) []string {
-	if cfg == nil || len(cfg.ArchiveAdditionalCommandArgs) == 0 {
-		return options
-	}
-	return appendAdditionalCommandArgs(cfg.ArchiveAdditionalCommandArgs, options)
-}
-
-// AppendRestoreAdditionalCommandArgs adds custom arguments as barman-cloud-wal-restore command-line options
-func (cfg *WalBackupConfiguration) AppendRestoreAdditionalCommandArgs(options []string) []string {
-	if cfg == nil || len(cfg.RestoreAdditionalCommandArgs) == 0 {
-		return options
-	}
-	return appendAdditionalCommandArgs(cfg.RestoreAdditionalCommandArgs, options)
-}
-
-func appendAdditionalCommandArgs(additionalCommandArgs []string, options []string) []string {
-	optionKeys := map[string]bool{}
-	for _, option := range options {
-		key := strings.Split(option, "=")[0]
-		if key != "" {
-			optionKeys[key] = true
-		}
-	}
-	for _, additionalCommandArg := range additionalCommandArgs {
-		key := strings.Split(additionalCommandArg, "=")[0]
-		if key == "" || slices.Contains(options, key) || optionKeys[key] {
-			continue
-		}
-		options = append(options, additionalCommandArg)
-	}
-	return options
 }
 
 // GetServerName returns the server name, defaulting to the name of the external cluster or using the one specified

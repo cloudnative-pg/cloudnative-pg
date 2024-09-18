@@ -18,14 +18,18 @@ package postgres
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"reflect"
-	"strconv"
 	"time"
 
+	barmanBackup "github.com/cloudnative-pg/barman-cloud/pkg/backup"
+	barmanCapabilities "github.com/cloudnative-pg/barman-cloud/pkg/capabilities"
+	barmanCatalog "github.com/cloudnative-pg/barman-cloud/pkg/catalog"
+	barmanCommand "github.com/cloudnative-pg/barman-cloud/pkg/command"
+	barmanCredentials "github.com/cloudnative-pg/barman-cloud/pkg/credentials"
+	"github.com/cloudnative-pg/machinery/pkg/fileutils"
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -36,13 +40,6 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/conditions"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman"
-	barmanCapabilities "github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/capabilities"
-	barmanCredentials "github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/credentials"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/catalog"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -67,6 +64,7 @@ type BackupCommand struct {
 	Log          log.Logger
 	Instance     *Instance
 	Capabilities *barmanCapabilities.Capabilities
+	barmanBackup *barmanBackup.Command
 }
 
 // NewBarmanBackupCommand initializes a BackupCommand object, taking a physical
@@ -93,103 +91,14 @@ func NewBarmanBackupCommand(
 		Instance:     instance,
 		Log:          log,
 		Capabilities: capabilities,
+		barmanBackup: barmanBackup.NewBackupCommand(cluster.Spec.Backup.BarmanObjectStore, capabilities),
 	}, nil
-}
-
-// getDataConfiguration gets the configuration in the `Data` object of the Barman configuration
-func getDataConfiguration(
-	options []string,
-	configuration *apiv1.BarmanObjectStoreConfiguration,
-	capabilities *barmanCapabilities.Capabilities,
-) ([]string, error) {
-	if configuration.Data == nil {
-		return options, nil
-	}
-
-	if configuration.Data.Compression == apiv1.CompressionTypeSnappy && !capabilities.HasSnappy {
-		return nil, fmt.Errorf("snappy compression is not supported in Barman %v", capabilities.Version)
-	}
-
-	if len(configuration.Data.Compression) != 0 {
-		options = append(
-			options,
-			fmt.Sprintf("--%v", configuration.Data.Compression))
-	}
-
-	if len(configuration.Data.Encryption) != 0 {
-		options = append(
-			options,
-			"--encryption",
-			string(configuration.Data.Encryption))
-	}
-
-	if configuration.Data.ImmediateCheckpoint {
-		options = append(
-			options,
-			"--immediate-checkpoint")
-	}
-
-	if configuration.Data.Jobs != nil {
-		options = append(
-			options,
-			"--jobs",
-			strconv.Itoa(int(*configuration.Data.Jobs)))
-	}
-
-	return configuration.Data.AppendAdditionalCommandArgs(options), nil
-}
-
-// getBarmanCloudBackupOptions extract the list of command line options to be used with
-// barman-cloud-backup
-func (b *BackupCommand) getBarmanCloudBackupOptions(
-	configuration *apiv1.BarmanObjectStoreConfiguration,
-	serverName string,
-) ([]string, error) {
-	options := []string{
-		"--user", "postgres",
-	}
-
-	if b.Capabilities.ShouldExecuteBackupWithName(b.Cluster) {
-		options = append(options, "--name", b.Backup.Status.BackupName)
-	}
-
-	options, err := getDataConfiguration(options, configuration, b.Capabilities)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(configuration.Tags) > 0 {
-		tags, err := utils.MapToBarmanTagsFormat("--tags", configuration.Tags)
-		if err != nil {
-			return nil, err
-		}
-		options = append(options, tags...)
-	}
-
-	if len(configuration.EndpointURL) > 0 {
-		options = append(
-			options,
-			"--endpoint-url",
-			configuration.EndpointURL)
-	}
-
-	options, err = barman.AppendCloudProviderOptionsFromConfiguration(options, configuration)
-	if err != nil {
-		return nil, err
-	}
-
-	options = append(
-		options,
-		configuration.DestinationPath,
-		serverName)
-
-	return options, nil
 }
 
 // Start initiates a backup for this instance using
 // barman-cloud-backup
 func (b *BackupCommand) Start(ctx context.Context) error {
-	if err := b.ensureBarmanCompatibility(); err != nil {
+	if err := b.ensureCompatibility(); err != nil {
 		return err
 	}
 
@@ -230,21 +139,13 @@ func (b *BackupCommand) Start(ctx context.Context) error {
 	return nil
 }
 
-func (b *BackupCommand) ensureBarmanCompatibility() error {
+func (b *BackupCommand) ensureCompatibility() error {
 	postgresVers, err := b.Instance.GetPgVersion()
 	if err != nil {
 		return err
 	}
-	switch {
-	case postgresVers.Major == 15 && b.Capabilities.Version.Major < 3:
-		return fmt.Errorf(
-			"PostgreSQL %d is not supported by Barman %d.x",
-			postgresVers.Major,
-			b.Capabilities.Version.Major,
-		)
-	default:
-		return nil
-	}
+
+	return b.barmanBackup.IsCompatible(postgresVers)
 }
 
 func (b *BackupCommand) retryWithRefreshedCluster(
@@ -258,6 +159,15 @@ func (b *BackupCommand) retryWithRefreshedCluster(
 // This method will take long time and is supposed to run inside a dedicated
 // goroutine.
 func (b *BackupCommand) run(ctx context.Context) {
+	ctx = log.IntoContext(
+		ctx,
+		log.FromContext(ctx).
+			WithValues(
+				"backupName", b.Backup.Name,
+				"backupNamespace", b.Backup.Namespace,
+			),
+	)
+
 	if err := b.takeBackup(ctx); err != nil {
 		backupStatus := b.Backup.GetStatus()
 
@@ -292,17 +202,8 @@ func (b *BackupCommand) run(ctx context.Context) {
 }
 
 func (b *BackupCommand) takeBackup(ctx context.Context) error {
-	barmanConfiguration := b.Cluster.Spec.Backup.BarmanObjectStore
 	backupStatus := b.Backup.GetStatus()
 
-	options, backupErr := b.getBarmanCloudBackupOptions(barmanConfiguration, backupStatus.ServerName)
-	if backupErr != nil {
-		b.Log.Error(backupErr, "while getting barman-cloud-backup options")
-		return backupErr
-	}
-
-	// record the backup beginning
-	b.Log.Info("Starting barman-cloud-backup", "options", options)
 	b.Recorder.Event(b.Backup, "Normal", "Starting", "Backup started")
 
 	// Update backup status in cluster conditions on startup
@@ -320,18 +221,16 @@ func (b *BackupCommand) takeBackup(ctx context.Context) error {
 		return err
 	}
 
-	cmd := exec.Command(barmanCapabilities.BarmanCloudBackup, options...) // #nosec G204
-	cmd.Env = b.Env
-	cmd.Env = append(cmd.Env, "TMPDIR="+postgres.BackupTemporaryDirectory)
-	if err := execlog.RunStreaming(cmd, barmanCapabilities.BarmanCloudBackup); err != nil {
-		const badArgumentsErrorCode = "3"
-		if err.Error() == badArgumentsErrorCode {
-			descriptiveError := errors.New("invalid arguments for barman-cloud-backup. " +
-				"Ensure that the additionalCommandArgs field is correctly populated")
-			b.Log.Error(descriptiveError, "error while executing barman-cloud-backup",
-				"arguments", options)
-			return descriptiveError
-		}
+	err := b.barmanBackup.Take(
+		ctx,
+		b.Backup.Status.BackupName,
+		backupStatus.ServerName,
+		b.Env,
+		b.Cluster,
+		postgres.BackupTemporaryDirectory,
+	)
+	if err != nil {
+		b.Log.Error(err, "Error while taking barman backup", "err", err)
 		return err
 	}
 
@@ -341,7 +240,8 @@ func (b *BackupCommand) takeBackup(ctx context.Context) error {
 	// Set the status to completed
 	b.Backup.Status.SetAsCompleted()
 
-	barmanBackup, err := b.getExecutedBackupInfo(ctx)
+	barmanBackup, err := b.barmanBackup.GetExecutedBackupInfo(
+		ctx, b.Backup.Status.BackupName, backupStatus.ServerName, b.Cluster, b.Env)
 	if err != nil {
 		return err
 	}
@@ -363,34 +263,19 @@ func (b *BackupCommand) takeBackup(ctx context.Context) error {
 	return nil
 }
 
-func (b *BackupCommand) getExecutedBackupInfo(
-	ctx context.Context,
-) (*catalog.BarmanBackup, error) {
-	if b.Capabilities.ShouldExecuteBackupWithName(b.Cluster) {
-		return barman.GetBackupByName(
-			ctx,
-			b.Backup.Status.BackupName,
-			b.Backup.Status.ServerName,
-			b.Cluster.Spec.Backup.BarmanObjectStore,
-			b.Env,
-		)
-	}
-	// we don't know the id or the name of the executed backup so it fetches the last executed barman backup.
-	// it could create issues in case of concurrent backups. It is a deprecated way of detecting the backup.
-	return barman.GetLatestBackup(
-		ctx,
-		b.Backup.Status.ServerName,
-		b.Cluster.Spec.Backup.BarmanObjectStore,
-		b.Env,
-	)
-}
-
 func (b *BackupCommand) backupMaintenance(ctx context.Context) {
 	// Delete backups per policy
 	if b.Cluster.Spec.Backup.RetentionPolicy != "" {
+		// TODO: refactor retention policy and move it in the Barman library
 		b.Log.Info("Applying backup retention policy",
 			"retentionPolicy", b.Cluster.Spec.Backup.RetentionPolicy)
-		if err := barman.DeleteBackupsByPolicy(ctx, b.Cluster.Spec.Backup, b.Backup.Status.ServerName, b.Env); err != nil {
+		if err := barmanCommand.DeleteBackupsByPolicy(
+			ctx,
+			b.Cluster.Spec.Backup.BarmanObjectStore,
+			b.Backup.Status.ServerName,
+			b.Env,
+			b.Cluster.Spec.Backup.RetentionPolicy,
+		); err != nil {
 			// Proper logging already happened inside DeleteBackupsByPolicy
 			b.Recorder.Event(b.Cluster, "Warning", "RetentionPolicyFailed", "Retention policy failed")
 			// We do not want to return here, we must go on to set the fist recoverability point
@@ -398,7 +283,7 @@ func (b *BackupCommand) backupMaintenance(ctx context.Context) {
 	}
 
 	// Extracting the latest backup using barman-cloud-backup-list
-	backupList, err := barman.GetBackupList(
+	backupList, err := barmanCommand.GetBackupList(
 		ctx,
 		b.Cluster.Spec.Backup.BarmanObjectStore,
 		b.Backup.Status.ServerName,
@@ -409,7 +294,7 @@ func (b *BackupCommand) backupMaintenance(ctx context.Context) {
 		return
 	}
 
-	if err := barman.DeleteBackupsNotInCatalog(ctx, b.Client, b.Cluster, backupList); err != nil {
+	if err := deleteBackupsNotInCatalog(ctx, b.Client, b.Cluster, backupList); err != nil {
 		b.Log.Error(err, "while deleting Backups not present in the catalog")
 	}
 
@@ -430,7 +315,7 @@ func (b *BackupCommand) backupMaintenance(ctx context.Context) {
 
 // updateClusterStatusWithBackupTimes updates the last successful backup time and first
 // recoverability point for the cluster
-func updateClusterStatusWithBackupTimes(cluster *apiv1.Cluster, backupList *catalog.Catalog) {
+func updateClusterStatusWithBackupTimes(cluster *apiv1.Cluster, backupList *barmanCatalog.Catalog) {
 	firstRecoverabilityPoint := backupList.FirstRecoverabilityPoint()
 	var lastSuccessfulBackup *time.Time
 	if lastSuccessfulBackupInfo := backupList.LatestBackupInfo(); lastSuccessfulBackupInfo != nil {
@@ -488,7 +373,7 @@ func (b *BackupCommand) setupBackupStatus() {
 	backupStatus.Phase = apiv1.BackupPhaseRunning
 }
 
-func assignBarmanBackupToBackup(backup *apiv1.Backup, barmanBackup *catalog.BarmanBackup) {
+func assignBarmanBackupToBackup(backup *apiv1.Backup, barmanBackup *barmanCatalog.BarmanBackup) {
 	backupStatus := backup.GetStatus()
 
 	backupStatus.BackupName = barmanBackup.BackupName
@@ -499,4 +384,88 @@ func assignBarmanBackupToBackup(backup *apiv1.Backup, barmanBackup *catalog.Barm
 	backupStatus.EndWal = barmanBackup.EndWal
 	backupStatus.BeginLSN = barmanBackup.BeginLSN
 	backupStatus.EndLSN = barmanBackup.EndLSN
+}
+
+// deleteBackupsNotInCatalog deletes all Backup objects pointing to the given cluster that are not
+// present in the backup anymore
+func deleteBackupsNotInCatalog(
+	ctx context.Context,
+	cli client.Client,
+	cluster *apiv1.Cluster,
+	catalog *barmanCatalog.Catalog,
+) error {
+	// We had two options:
+	//
+	// A. quicker
+	// get policy checker function
+	// get all backups in the namespace for this cluster
+	// check with policy checker function if backup should be deleted, then delete it if true
+	//
+	// B. more precise
+	// get the catalog (GetBackupList)
+	// get all backups in the namespace for this cluster
+	// go through all backups and delete them if not in the catalog
+	//
+	// 1: all backups in the bucket should be also in the cluster
+	// 2: all backups in the cluster should be in the bucket
+	//
+	// A can violate 1 and 2
+	// A + B can still violate 2
+	// B satisfies 1 and 2
+
+	// We chose to go with B
+
+	backups := apiv1.BackupList{}
+	err := cli.List(ctx, &backups, client.InNamespace(cluster.GetNamespace()))
+	if err != nil {
+		return fmt.Errorf("while getting backups: %w", err)
+	}
+
+	var errors []error
+	for id, backup := range backups.Items {
+		if backup.Spec.Cluster.Name != cluster.GetName() ||
+			backup.Status.Phase != apiv1.BackupPhaseCompleted ||
+			!useSameBackupLocation(&backup.Status, cluster) {
+			continue
+		}
+		var found bool
+		for _, barmanBackup := range catalog.List {
+			if backup.Status.BackupID == barmanBackup.ID {
+				found = true
+				break
+			}
+		}
+		// here we could add further checks, e.g. if the backup is not found but would still
+		// be in the retention policy we could either not delete it or update it is status
+		if !found {
+			err := cli.Delete(ctx, &backups.Items[id])
+			if err != nil {
+				errors = append(errors, fmt.Errorf(
+					"while deleting backup %s/%s: %w",
+					backup.Namespace,
+					backup.Name,
+					err,
+				))
+			}
+		}
+	}
+
+	if errors != nil {
+		return fmt.Errorf("got errors while deleting Backups not in the cluster: %v", errors)
+	}
+	return nil
+}
+
+// useSameBackupLocation checks whether the given backup was taken using the same configuration as provided
+func useSameBackupLocation(backup *apiv1.BackupStatus, cluster *apiv1.Cluster) bool {
+	if cluster.Spec.Backup == nil || cluster.Spec.Backup.BarmanObjectStore == nil {
+		return false
+	}
+	configuration := cluster.Spec.Backup.BarmanObjectStore
+	return backup.EndpointURL == configuration.EndpointURL &&
+		backup.DestinationPath == configuration.DestinationPath &&
+		(backup.ServerName == configuration.ServerName ||
+			// if not specified we use the cluster name as server name
+			(configuration.ServerName == "" && backup.ServerName == cluster.Name)) &&
+		reflect.DeepEqual(backup.BarmanCredentials, configuration.BarmanCredentials)
 }
