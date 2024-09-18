@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/cheynewallace/tabby"
+	types "github.com/cloudnative-pg/machinery/pkg/types"
 	"github.com/logrusorgru/aurora/v4"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
@@ -682,7 +683,7 @@ func (fullStatus *PostgresqlStatus) tryGetPrimaryInstance() *postgres.Postgresql
 	return nil
 }
 
-func getCurrentLSN(instance postgres.PostgresqlStatus) postgres.LSN {
+func getCurrentLSN(instance postgres.PostgresqlStatus) types.LSN {
 	if instance.IsPrimary {
 		return instance.CurrentLsn
 	}

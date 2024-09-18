@@ -19,9 +19,8 @@ package metricsserver
 import (
 	"database/sql"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/prometheus/client_golang/prometheus"
-
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
 // ShowListsMetrics contains all the SHOW LISTS Metrics
