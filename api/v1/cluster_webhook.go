@@ -23,7 +23,7 @@ import (
 	"strconv"
 	"strings"
 
-	barmanUtils "github.com/cloudnative-pg/barman-cloud/pkg/utils"
+	"github.com/cloudnative-pg/barman-cloud/pkg/api/webhooks"
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/cloudnative-pg/machinery/pkg/types"
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
@@ -351,7 +351,7 @@ func (r *Cluster) Validate() (allErrs field.ErrorList) {
 		r.validateTolerations,
 		r.validateAntiAffinity,
 		r.validateReplicaMode,
-		r.validateBackupConfiguration,
+		func() field.ErrorList { return webhooks.ValidateBackupConfiguration(r) },
 		r.validateConfiguration,
 		r.validateLDAP,
 		r.validateReplicationSlots,
@@ -2144,61 +2144,6 @@ func (r *Cluster) validateAntiAffinity() field.ErrorList {
 				PodAntiAffinityTypePreferred, PodAntiAffinityTypeRequired),
 		))
 	}
-	return allErrors
-}
-
-// validateBackupConfiguration validates the backup configuration
-func (r *Cluster) validateBackupConfiguration() field.ErrorList {
-	allErrors := field.ErrorList{}
-
-	if r.Spec.Backup == nil || r.Spec.Backup.BarmanObjectStore == nil {
-		return nil
-	}
-
-	credentialsCount := 0
-	if r.Spec.Backup.BarmanObjectStore.BarmanCredentials.Azure != nil {
-		credentialsCount++
-		allErrors = r.Spec.Backup.BarmanObjectStore.BarmanCredentials.Azure.ValidateAzureCredentials(
-			field.NewPath("spec", "backupConfiguration", "azureCredentials"))
-	}
-	if r.Spec.Backup.BarmanObjectStore.BarmanCredentials.AWS != nil {
-		credentialsCount++
-		allErrors = r.Spec.Backup.BarmanObjectStore.BarmanCredentials.AWS.ValidateAwsCredentials(
-			field.NewPath("spec", "backupConfiguration", "s3Credentials"))
-	}
-	if r.Spec.Backup.BarmanObjectStore.BarmanCredentials.Google != nil {
-		credentialsCount++
-		allErrors = r.Spec.Backup.BarmanObjectStore.BarmanCredentials.Google.ValidateGCSCredentials(
-			field.NewPath("spec", "backupConfiguration", "googleCredentials"))
-	}
-	if credentialsCount == 0 {
-		allErrors = append(allErrors, field.Invalid(
-			field.NewPath("spec", "backupConfiguration"),
-			r.Spec.Backup.BarmanObjectStore,
-			"missing credentials. "+
-				"One and only one of azureCredentials, s3Credentials and googleCredentials are required",
-		))
-	}
-	if credentialsCount > 1 {
-		allErrors = append(allErrors, field.Invalid(
-			field.NewPath("spec", "backupConfiguration"),
-			r.Spec.Backup.BarmanObjectStore,
-			"too many credentials. "+
-				"One and only one of azureCredentials, s3Credentials and googleCredentials are required",
-		))
-	}
-
-	if r.Spec.Backup.RetentionPolicy != "" {
-		_, err := barmanUtils.ParsePolicy(r.Spec.Backup.RetentionPolicy)
-		if err != nil {
-			allErrors = append(allErrors, field.Invalid(
-				field.NewPath("spec", "retentionPolicy"),
-				r.Spec.Backup.RetentionPolicy,
-				"not a valid retention policy",
-			))
-		}
-	}
-
 	return allErrors
 }
 
