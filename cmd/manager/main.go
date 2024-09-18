@@ -22,6 +22,7 @@ package main
 import (
 	"os"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/spf13/cobra"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/backup"
@@ -34,7 +35,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/walarchive"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/walrestore"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/versions"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )

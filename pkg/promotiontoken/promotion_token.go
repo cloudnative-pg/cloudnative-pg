@@ -20,7 +20,8 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/machinery/pkg/types"
+
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -71,7 +72,7 @@ func ValidateAgainstInstanceStatus(
 // ValidateAgainstLSN checks if the promotion token is valid against the last replay LSN
 func ValidateAgainstLSN(promotionToken *utils.PgControldataTokenContent, replayLSNString string) error {
 	promotionTokenLSNString := promotionToken.LatestCheckpointREDOLocation
-	promotionTokenLSN, err := postgres.LSN(promotionTokenLSNString).Parse()
+	promotionTokenLSN, err := types.LSN(promotionTokenLSNString).Parse()
 	if err != nil {
 		return &TokenVerificationError{
 			msg: fmt.Sprintf("promotion token LSN is invalid: %s",
@@ -81,7 +82,7 @@ func ValidateAgainstLSN(promotionToken *utils.PgControldataTokenContent, replayL
 		}
 	}
 
-	replayLSN, err := postgres.LSN(replayLSNString).Parse()
+	replayLSN, err := types.LSN(replayLSNString).Parse()
 	if err != nil {
 		return &TokenVerificationError{
 			msg:          fmt.Sprintf("last replay LSN is invalid: %s", replayLSNString),
