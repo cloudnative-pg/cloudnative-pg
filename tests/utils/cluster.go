@@ -33,7 +33,6 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/logs"
 )
 
 // AllClusterPodsHaveLabels verifies if the labels defined in a map are included
@@ -118,39 +117,6 @@ func ClusterHasAnnotations(
 		}
 	}
 	return true
-}
-
-// DumpOperatorLogs dumps the operator logs to a file, and returns the log lines
-// as a slice.
-func (env TestingEnvironment) DumpOperatorLogs(getPrevious bool, requestedLineLength int) ([]string, error) {
-	pod, err := env.GetOperatorPod()
-	if err != nil {
-		fmt.Println(err)
-		return nil, err
-	}
-
-	filename := "out/operator_report_" + pod.Name + ".log"
-	if getPrevious {
-		filename = "out/operator_report_previous_" + pod.Name + ".log"
-	}
-	f, err := os.Create(filepath.Clean(filename))
-	if err != nil {
-		fmt.Println(err)
-		return nil, err
-	}
-	defer func() {
-		syncErr := f.Sync()
-		if err == nil && syncErr != nil {
-			err = syncErr
-		}
-		closeErr := f.Close()
-		if err == nil && closeErr != nil {
-			err = closeErr
-		}
-	}()
-
-	_, _ = fmt.Fprintf(f, "Dumping operator pod %v log\n", pod.Name)
-	return logs.GetPodLogs(env.Ctx, env.Interface, pod, getPrevious, f, requestedLineLength)
 }
 
 // DumpNamespaceObjects logs the clusters, pods, pvcs etc. found in a namespace as JSON sections
