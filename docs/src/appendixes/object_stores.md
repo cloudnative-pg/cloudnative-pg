@@ -248,7 +248,7 @@ spec:
 When using the Azure Blob Storage, the `destinationPath` fulfills the following
 structure:
 
-``` terminal
+``` sh
 <http|https>://<account-name>.<service-name>.core.windows.net/<resource-path>
 ```
 
