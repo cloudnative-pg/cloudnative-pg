@@ -21,10 +21,10 @@ import (
 	"context"
 	"reflect"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
 // updatePluginsStatus ensures that we load the plugins that are required to reconcile

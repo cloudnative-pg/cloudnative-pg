@@ -30,22 +30,28 @@ import (
 	"sort"
 	"time"
 
+	"github.com/cloudnative-pg/machinery/pkg/execlog"
+	"github.com/cloudnative-pg/machinery/pkg/fileutils"
+	"github.com/cloudnative-pg/machinery/pkg/fileutils/compatibility"
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/jackc/pgx/v5"
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/configfile"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils/compatibility"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/archiver"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/external"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/logicalimport"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pool"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/system"
+)
+
+const (
+	// CheckEmptyWalArchiveFile is the name of the file in the PGDATA that,
+	// if present, requires the WAL archiver to check that the backup object
+	// store is empty.
+	CheckEmptyWalArchiveFile = ".check-empty-wal-archive"
 )
 
 // InitInfo contains all the info needed to bootstrap a new PostgreSQL instance
@@ -319,7 +325,7 @@ func (info InitInfo) ConfigureNewInstance(instance *Instance) error {
 		return fmt.Errorf("could not execute post init application SQL refs: %w", err)
 	}
 
-	filePath := filepath.Join(info.PgData, archiver.CheckEmptyWalArchiveFile)
+	filePath := filepath.Join(info.PgData, CheckEmptyWalArchiveFile)
 	// We create the check empty wal archive file to tell that we should check if the
 	// destination path it is empty
 	if err := fileutils.CreateEmptyFile(filepath.Clean(filePath)); err != nil {
