@@ -82,7 +82,6 @@ var _ = Describe("Certificates", func() {
 			var err error
 			// Create a cluster in a namespace we'll delete after the test
 			const namespacePrefix = "postgresql-cert"
-			fmt.Println(namespace + " BeforeAll")
 			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			clusterName, err = env.GetResourceNameFromYAML(sampleFile)
