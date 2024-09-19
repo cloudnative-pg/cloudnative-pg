@@ -76,15 +76,18 @@ def env_to_json():
     return matrix
 
 
-def is_user_spec(test):
-    """Checks if the test contains a valid test description in the
-    ContainerHierarchyTexts. The JSON report produced by Ginkgo may contain
+def is_user_spec(spec):
+    """Checks if the spec contains the fields used to build the test name.
+    The JSON report produced by Ginkgo may contain
     SpecReports entries that are for internal Ginkgo purposes and will not
     reflect user-defined Specs. For these entries, ContainerHierarchyTexts may
-    be null
+    be null or the LeafNodeText may be blank
     """
+    if spec["LeafNodeText"] == "":
+        return False
+
     try:
-        _ = " - ".join(test["ContainerHierarchyTexts"])
+        _ = " - ".join(spec["ContainerHierarchyTexts"])
         return True
     except TypeError:
         return False
@@ -268,11 +271,7 @@ if __name__ == "__main__":
         with open(args.file) as json_file:
             testResults = json.load(json_file)
             for t in testResults[0]["SpecReports"]:
-                if (
-                    (t["State"] != "skipped")
-                    and (t["LeafNodeText"] != "")
-                    and is_user_spec(t)
-                ):
+                if (t["State"] != "skipped") and is_user_spec(t):
                     test1 = convert_ginkgo_test(t, matrix)
                     write_artifact(test1, outputDir, matrix)
     except Exception as e:
