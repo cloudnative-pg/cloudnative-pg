@@ -76,6 +76,20 @@ def env_to_json():
     return matrix
 
 
+def is_user_spec(test):
+    """Checks if the test contains a valid test description in the
+    ContainerHierarchyTexts. The JSON report produced by Ginkgo may contain
+    SpecReports entries that are for internal Ginkgo purposes and will not
+    reflect user-defined Specs. For these entries, ContainerHierarchyTexts may
+    be null
+    """
+    try:
+        _ = " - ".join(test["ContainerHierarchyTexts"])
+        return True
+    except TypeError:
+        return False
+
+
 def convert_ginkgo_test(test, matrix):
     """Converts a test spec in ginkgo JSON format into a normalized JSON object.
     The matrix arg will be passed from the GH Actions, and is expected to be
@@ -209,7 +223,7 @@ if __name__ == "__main__":
         "--environment",
         type=bool,
         help="get the matrix arguments from environment variables. "
-             "Variables defined with -m/--matrix take priority",
+        "Variables defined with -m/--matrix take priority",
     )
 
     args = parser.parse_args()
@@ -254,7 +268,11 @@ if __name__ == "__main__":
         with open(args.file) as json_file:
             testResults = json.load(json_file)
             for t in testResults[0]["SpecReports"]:
-                if (t["State"] != "skipped") and (t["LeafNodeText"] != ""):
+                if (
+                    (t["State"] != "skipped")
+                    and (t["LeafNodeText"] != "")
+                    and is_user_spec(test)
+                ):
                     test1 = convert_ginkgo_test(t, matrix)
                     write_artifact(test1, outputDir, matrix)
     except Exception as e:
