@@ -90,7 +90,8 @@ func updateDatabase(
 			pgx.Identifier{obj.Spec.Owner}.Sanitize())
 
 		if _, err := db.ExecContext(ctx, changeOwnerSQL); err != nil {
-			return fmt.Errorf("alter database owner to: %w", err)
+			return fmt.Errorf("while altering database %q owner %s to: %w",
+				obj.Spec.Name, obj.Spec.Owner, err)
 		}
 	}
 
@@ -101,7 +102,8 @@ func updateDatabase(
 			*obj.Spec.IsTemplate)
 
 		if _, err := db.ExecContext(ctx, changeIsTemplateSQL); err != nil {
-			return fmt.Errorf("alter database with is_template: %w", err)
+			return fmt.Errorf("while altering database %q with is_template %t: %w",
+				obj.Spec.Name, *obj.Spec.IsTemplate, err)
 		}
 	}
 
@@ -112,7 +114,8 @@ func updateDatabase(
 			*obj.Spec.AllowConnections)
 
 		if _, err := db.ExecContext(ctx, changeAllowConnectionsSQL); err != nil {
-			return fmt.Errorf("alter database with allow_connections: %w", err)
+			return fmt.Errorf("while altering database %q with allow_connections %t: %w",
+				obj.Spec.Name, *obj.Spec.AllowConnections, err)
 		}
 	}
 
@@ -123,7 +126,8 @@ func updateDatabase(
 			*obj.Spec.ConnectionLimit)
 
 		if _, err := db.ExecContext(ctx, changeConnectionsLimitSQL); err != nil {
-			return fmt.Errorf("alter database with connection limit: %w", err)
+			return fmt.Errorf("while altering database %q with connection limit %d: %w",
+				obj.Spec.Name, *obj.Spec.ConnectionLimit, err)
 		}
 	}
 
@@ -134,7 +138,8 @@ func updateDatabase(
 			pgx.Identifier{obj.Spec.Tablespace}.Sanitize())
 
 		if _, err := db.ExecContext(ctx, changeTablespaceSQL); err != nil {
-			return fmt.Errorf("alter database set tablespace: %w", err)
+			return fmt.Errorf("while altering database %q when setting tablespace %s: %w",
+				obj.Spec.Name, obj.Spec.Tablespace, err)
 		}
 	}
 
