@@ -22,8 +22,7 @@ import (
 	"regexp"
 
 	"github.com/blang/semver"
-
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/machinery/pkg/log"
 )
 
 // capabilities stores the current Barman capabilities

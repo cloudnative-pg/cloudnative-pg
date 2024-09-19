@@ -23,8 +23,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/machinery/pkg/execlog"
+	"github.com/cloudnative-pg/machinery/pkg/log"
 )
 
 // PromoteAndWait promotes this instance, and wait DefaultPgCtlTimeoutForPromotion

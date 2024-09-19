@@ -25,8 +25,9 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/cloudnative-pg/machinery/pkg/types"
+
 	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -136,7 +137,7 @@ func (catalog *Catalog) findClosestBackupFromTargetLSN(
 	targetLSNString string,
 	targetTLI string,
 ) (*BarmanBackup, error) {
-	targetLSN := postgres.LSN(targetLSNString)
+	targetLSN := types.LSN(targetLSNString)
 	if _, err := targetLSN.Parse(); err != nil {
 		return nil, fmt.Errorf("while parsing recovery target targetLSN: %s", err.Error())
 	}
@@ -148,7 +149,7 @@ func (catalog *Catalog) findClosestBackupFromTargetLSN(
 		if (strconv.Itoa(barmanBackup.TimeLine) == targetTLI ||
 			// if targetTLI is not an integer, it will be ignored actually
 			currentTLIRegex.MatchString(targetTLI)) &&
-			postgres.LSN(barmanBackup.BeginLSN).Less(targetLSN) {
+			types.LSN(barmanBackup.BeginLSN).Less(targetLSN) {
 			return &catalog.List[i], nil
 		}
 	}

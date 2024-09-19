@@ -22,6 +22,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
+	"github.com/cloudnative-pg/machinery/pkg/types"
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -38,7 +40,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/stringset"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -1382,7 +1383,7 @@ func (r *Cluster) validateRecoveryTarget() field.ErrorList {
 
 	// validate TargetLSN
 	if recoveryTarget.TargetLSN != "" {
-		if _, err := postgres.LSN(recoveryTarget.TargetLSN).Parse(); err != nil {
+		if _, err := types.LSN(recoveryTarget.TargetLSN).Parse(); err != nil {
 			result = append(result, field.Invalid(
 				field.NewPath("spec", "bootstrap", "recovery", "recoveryTarget"),
 				recoveryTarget.TargetLSN,
