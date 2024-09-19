@@ -3543,29 +3543,6 @@ func (cluster *Cluster) GetServerCASecretObjectKey() types.NamespacedName {
 	return types.NamespacedName{Namespace: cluster.Namespace, Name: cluster.GetServerCASecretName()}
 }
 
-func (cluster *Cluster) GetBarmanObjectStore() *BarmanObjectStoreConfiguration {
-	if cluster.Spec.Backup != nil {
-		return cluster.Spec.Backup.BarmanObjectStore
-	}
-
-	return nil
-}
-
-func (cluster *Cluster) GetRetentionPolicy() string {
-	if cluster.Spec.Backup != nil {
-		return cluster.Spec.Backup.RetentionPolicy
-	}
-	return ""
-}
-
-func (cluster *Cluster) GetBarmanObjectStorePath() []string {
-	return []string{"spec", "backup", "barmanObjectStore"}
-}
-
-func (cluster *Cluster) GetRetentionPolicyPath() []string {
-	return []string{"spec", "backup", "retentionPolicy"}
-}
-
 // IsBarmanBackupConfigured returns true if one of the possible backup destination
 // is configured, false otherwise
 func (backupConfiguration *BackupConfiguration) IsBarmanBackupConfigured() bool {

@@ -23,7 +23,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cloudnative-pg/barman-cloud/pkg/api/webhooks"
+	barmanWebhooks "github.com/cloudnative-pg/barman-cloud/pkg/api/webhooks"
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/cloudnative-pg/machinery/pkg/types"
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
@@ -351,7 +351,25 @@ func (r *Cluster) Validate() (allErrs field.ErrorList) {
 		r.validateTolerations,
 		r.validateAntiAffinity,
 		r.validateReplicaMode,
-		func() field.ErrorList { return webhooks.ValidateBackupConfiguration(r) },
+		func() field.ErrorList {
+			if r.Spec.Backup == nil {
+				return nil
+			}
+
+			result := barmanWebhooks.ValidateBackupConfiguration(
+				r.Spec.Backup.BarmanObjectStore,
+				field.NewPath("spec", "backup", "barmanObjectStore"),
+			)
+			result = append(
+				result,
+				barmanWebhooks.ValidateRetentionPolicy(
+					r.Spec.Backup.RetentionPolicy,
+					field.NewPath("spec", "backup", "retentionPolicy"),
+				)...,
+			)
+
+			return result
+		},
 		r.validateConfiguration,
 		r.validateLDAP,
 		r.validateReplicationSlots,
