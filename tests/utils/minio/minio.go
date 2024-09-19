@@ -22,50 +22,77 @@ SPDX-License-Identifier: Apache-2.0
 package minio
 
 import (
-	"encoding/json"
+	"context"
+	"crypto/tls"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
+	"regexp"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/avast/retry-go/v5"
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/environment"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/forwardconnection"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/namespaces"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
+	postgres2 "github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/secrets"
 )
 
 const (
 	// minioImage is the image used to run a MinIO server
-	minioImage = "docker.io/minio/minio:RELEASE.2025-09-07T16-13-09Z"
-	// minioClientImage is the image used to run a MinIO client
-	minioClientImage = "docker.io/minio/mc:RELEASE.2025-08-13T08-35-41Z"
+	minioImage          = "docker.io/minio/minio:RELEASE.2025-09-07T16-13-09Z"
+	minioDeploymentName = "minio"
+	minioNamespace      = "minio"
+	// minioAccessKey is the access key of the shared MinIO deployment
+	minioAccessKey = "minio"
+	// minioSecretKey is the secret key of the shared MinIO deployment
+	minioSecretKey = "minio123" // #nosec G101
+	// ObjectStorageCredentialsSecretName is the name of the secret that holds
+	// the MinIO credentials, referenced by the Cluster fixtures via
+	// spec.backup.barmanObjectStore.s3Credentials.
+	ObjectStorageCredentialsSecretName = "backup-storage-creds" // #nosec G101
 )
 
-// Env contains all the information related or required by MinIO deployment and
-// used by the functions on every test
-type Env struct {
-	Client       *corev1.Pod
-	CaPair       *certs.KeyPair
-	CaSecretObj  corev1.Secret
-	ServiceName  string
-	Namespace    string
-	CaSecretName string
-	TLSSecret    string
-	Timeout      uint
+// Instance carries everything an e2e spec needs to talk to the shared MinIO
+// deployment: the in-cluster coordinates of the service and its TLS material,
+// plus a port-forwarded MinIO API client.
+type Instance struct {
+	ServiceName      string
+	Namespace        string
+	CaSecretName     string
+	TLSSecret        string
+	ctx              context.Context
+	CrudClient       client.Client
+	Interface        kubernetes.Interface
+	RestClientConfig *rest.Config
+	MinioClient      *minio.Client
+	Forwarder        *forwardconnection.ForwardConnection
 }
 
 // Setup contains the resources needed for a working minio server deployment:
@@ -81,19 +108,42 @@ type TagSet struct {
 	Tags map[string]string `json:"tagset"`
 }
 
-// installMinio installs minio in a given namespace
+// installMinio installs minio in a given namespace.
 func installMinio(
 	env *environment.TestingEnvironment,
 	minioSetup Setup,
 	timeoutSeconds uint,
 ) error {
-	if err := env.Client.Create(env.Ctx, &minioSetup.PersistentVolumeClaim); err != nil {
+	if err := env.Client.Create(
+		env.Ctx, &minioSetup.PersistentVolumeClaim); err != nil &&
+		!apierrors.IsAlreadyExists(err) {
 		return err
 	}
-	if err := env.Client.Create(env.Ctx, &minioSetup.Deployment); err != nil {
+	if err := env.Client.Create(env.Ctx, &minioSetup.Deployment); err != nil && !apierrors.IsAlreadyExists(err) {
 		return err
 	}
-	err := retry.New(
+	if err := waitForDeploymentReady(
+		env, minioSetup.Deployment.Namespace, minioSetup.Deployment.Name, timeoutSeconds,
+	); err != nil {
+		return err
+	}
+	if err := env.Client.Create(env.Ctx, &minioSetup.Service); err != nil && !apierrors.IsAlreadyExists(err) {
+		return err
+	}
+	return nil
+}
+
+func waitForDeploymentReady(
+	env *environment.TestingEnvironment,
+	namespace,
+	deploymentName string,
+	timeoutSeconds uint,
+) error {
+	if timeoutSeconds == 0 {
+		timeoutSeconds = 240
+	}
+
+	return retry.New(
 		retry.Attempts(timeoutSeconds),
 		retry.Delay(time.Second),
 		retry.DelayType(retry.FixedDelay)).
@@ -102,25 +152,25 @@ func installMinio(
 				deployment := &appsv1.Deployment{}
 				if err := env.Client.Get(
 					env.Ctx,
-					client.ObjectKey{Namespace: minioSetup.Deployment.Namespace, Name: minioSetup.Deployment.Name},
+					client.ObjectKey{Namespace: namespace, Name: deploymentName},
 					deployment,
 				); err != nil {
 					return err
 				}
-				if deployment.Status.ReadyReplicas != *minioSetup.Deployment.Spec.Replicas {
+
+				expectedReplicas := int32(1)
+				if deployment.Spec.Replicas != nil {
+					expectedReplicas = *deployment.Spec.Replicas
+				}
+				if deployment.Status.ReadyReplicas != expectedReplicas {
 					return fmt.Errorf("not all replicas are ready. Expected %v, found %v",
-						*minioSetup.Deployment.Spec.Replicas,
+						expectedReplicas,
 						deployment.Status.ReadyReplicas,
 					)
 				}
 				return nil
 			},
 		)
-	if err != nil {
-		return err
-	}
-	err = env.Client.Create(env.Ctx, &minioSetup.Service)
-	return err
 }
 
 // defaultSetup returns the definition for the default minio setup
@@ -354,153 +404,180 @@ func sslSetup(namespace string) (Setup, error) {
 	return setup, nil
 }
 
-// defaultClient returns the default Pod definition for a minio client
-func defaultClient(namespace string) corev1.Pod {
-	seccompProfile := &corev1.SeccompProfile{
-		Type: corev1.SeccompProfileTypeRuntimeDefault,
+// CleanupSharedNamespace deletes the shared MinIO namespace if it exists.
+// It should be called from a defer at the end of the suite, never from a test
+func CleanupSharedNamespace(ctx context.Context, crudClient client.Client) error {
+	var ns corev1.Namespace
+	switch err := objects.Get(ctx, crudClient, client.ObjectKey{Name: minioNamespace}, &ns); {
+	case apierrors.IsNotFound(err):
+		return nil
+	case err != nil:
+		return err
 	}
-
-	minioClient := corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: namespace,
-			Name:      "mc",
-			Labels:    map[string]string{"run": "mc"},
-		},
-		Spec: corev1.PodSpec{
-			Volumes: []corev1.Volume{
-				{
-					Name: "mc",
-					VolumeSource: corev1.VolumeSource{
-						EmptyDir: &corev1.EmptyDirVolumeSource{},
-					},
-				},
-			},
-			Containers: []corev1.Container{
-				{
-					Name:  "mc",
-					Image: minioClientImage,
-					Env: []corev1.EnvVar{
-						{
-							Name:  "MC_HOST_minio",
-							Value: "http://minio:minio123@minio-service.minio:9000",
-						},
-						{
-							Name:  "MC_URL",
-							Value: "https://minio-service.minio:9000",
-						},
-						{
-							Name:  "HOME",
-							Value: "/mc",
-						},
-					},
-					VolumeMounts: []corev1.VolumeMount{
-						{
-							Name:      "mc",
-							MountPath: "/mc",
-						},
-					},
-					SecurityContext: &corev1.SecurityContext{
-						AllowPrivilegeEscalation: ptr.To(false),
-						SeccompProfile:           seccompProfile,
-					},
-					Command: []string{"sleep", "3600"},
-				},
-			},
-			SecurityContext: &corev1.PodSecurityContext{
-				SeccompProfile: seccompProfile,
-			},
-			DNSPolicy:     corev1.DNSClusterFirst,
-			RestartPolicy: corev1.RestartPolicyAlways,
-		},
-	}
-	return minioClient
+	return namespaces.DeleteNamespaceAndWait(ctx, crudClient, minioNamespace, 600)
 }
 
-// sslClient returns the Pod definition for a minio client using SSL
-func sslClient(namespace string) corev1.Pod {
-	const (
-		configVolumeMountPath = "/mc/.mc"
-		configVolumeName      = "mc-config"
-		minioServerCASecret   = "minio-server-ca-secret" // #nosec
-		tlsVolumeName         = "secret-volume"
-		tlsVolumeMountPath    = configVolumeMountPath + "/certs/CAs"
-	)
-	var secretMode int32 = 0o600
+// RequestInstance ensures a shared MinIO deployment exists and returns a MinIO API client for it.
+func RequestInstance(env *environment.TestingEnvironment, namespace string) (*Instance, error) {
+	inst := &Instance{
+		Namespace:        minioNamespace,
+		ServiceName:      "minio-service." + minioNamespace,
+		CaSecretName:     "minio-server-ca-secret",
+		TLSSecret:        "minio-server-tls-secret",
+		ctx:              env.Ctx,
+		CrudClient:       env.Client,
+		Interface:        env.Interface,
+		RestClientConfig: env.RestClientConfig,
+	}
 
-	minioClient := defaultClient(namespace)
-	minioClient.Spec.Volumes = append(minioClient.Spec.Volumes,
-		corev1.Volume{
-			Name: configVolumeName,
-			VolumeSource: corev1.VolumeSource{
-				EmptyDir: &corev1.EmptyDirVolumeSource{},
-			},
-		},
-		corev1.Volume{
-			Name: tlsVolumeName,
-			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName:  minioServerCASecret,
-					DefaultMode: &secretMode,
-				},
-			},
-		},
-	)
-	minioClient.Spec.Containers[0].VolumeMounts = append(
-		minioClient.Spec.Containers[0].VolumeMounts,
-		corev1.VolumeMount{
-			Name:      configVolumeName,
-			MountPath: configVolumeMountPath,
-		},
-		corev1.VolumeMount{
-			Name:      tlsVolumeName,
-			MountPath: tlsVolumeMountPath,
-		},
-	)
-	minioClient.Spec.Containers[0].Env[0].Value = "https://minio:minio123@minio-service.minio:9000"
+	// The minio namespace is shared across every spec that requests MinIO and
+	// kept alive for the whole suite — see CleanupSharedNamespace for the
+	// matching teardown. If a previous suite run was interrupted and left the
+	// namespace Terminating, wait for it to fully disappear before recreating.
+	if err := retry.New(retry.Attempts(120), retry.Delay(time.Second)).Do(func() error {
+		var ns corev1.Namespace
+		err := objects.Get(env.Ctx, env.Client, client.ObjectKey{Name: inst.Namespace}, &ns)
+		switch {
+		case apierrors.IsNotFound(err):
+			return namespaces.CreateNamespace(env.Ctx, env.Client, inst.Namespace)
+		case err != nil:
+			return err
+		case ns.Status.Phase == corev1.NamespaceTerminating:
+			return fmt.Errorf("namespace %q is terminating", inst.Namespace)
+		}
+		return nil
+	}); err != nil {
+		return nil, err
+	}
 
-	return minioClient
-}
+	var minioDeployment appsv1.Deployment
+	err := objects.Get(
+		env.Ctx,
+		env.Client,
+		client.ObjectKey{Namespace: inst.Namespace, Name: minioDeploymentName},
+		&minioDeployment,
+	)
+	if apierrors.IsNotFound(err) {
+		if err := deployServer(inst, env); err != nil {
+			return nil, err
+		}
+	} else if err != nil {
+		return nil, err
+	}
 
-// Deploy will create a full MinIO deployment defined inthe minioEnv variable
-func Deploy(minioEnv *Env, env *environment.TestingEnvironment) (*corev1.Pod, error) {
-	var err error
-	minioEnv.CaPair, err = certs.CreateRootCA(minioEnv.Namespace, "minio")
+	if err := waitForDeploymentReady(env, inst.Namespace, minioDeploymentName, 0); err != nil {
+		return nil, err
+	}
+
+	podList := &corev1.PodList{}
+	if err := objects.List(
+		env.Ctx,
+		env.Client,
+		podList,
+		client.InNamespace(inst.Namespace),
+		client.MatchingLabels{"app": "minio"},
+	); err != nil {
+		return nil, err
+	}
+	if len(podList.Items) == 0 {
+		return nil, fmt.Errorf("no MinIO pods found in namespace %s", inst.Namespace)
+	}
+
+	dialer, err := forwardconnection.NewDialer(
+		env.Interface,
+		env.RestClientConfig,
+		inst.Namespace,
+		podList.Items[0].Name,
+	)
 	if err != nil {
 		return nil, err
 	}
 
-	minioEnv.CaSecretObj = *minioEnv.CaPair.GenerateCASecret(minioEnv.Namespace, minioEnv.CaSecretName)
-	if _, err = objects.Create(env.Ctx, env.Client, &minioEnv.CaSecretObj); err != nil {
+	inst.Forwarder, err = forwardconnection.NewForwardConnection(
+		dialer,
+		[]string{"0:9000"},
+		io.Discard,
+		io.Discard,
+	)
+	if err != nil {
 		return nil, err
+	}
+
+	if err := inst.Forwarder.StartAndWait(env.Ctx); err != nil {
+		return nil, err
+	}
+	// Release the port-forward goroutine when the requesting spec finishes;
+	// otherwise every test that calls RequestInstance leaks one.
+	ginkgo.DeferCleanup(inst.Forwarder.Close)
+
+	port, err := inst.Forwarder.GetLocalPort()
+	if err != nil {
+		return nil, err
+	}
+
+	inst.MinioClient, err = minio.New(fmt.Sprintf("localhost:%s", port), &minio.Options{
+		Creds:  credentials.NewStaticV4(minioAccessKey, minioSecretKey, ""),
+		Secure: true,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true, //nolint:gosec
+			},
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if err := inst.createCaSecret(env, namespace); err != nil {
+		return nil, err
+	}
+
+	if _, err := secrets.CreateObjectStorageSecret(
+		env.Ctx,
+		env.Client,
+		namespace,
+		ObjectStorageCredentialsSecretName,
+		minioAccessKey,
+		minioSecretKey,
+	); err != nil {
+		return nil, err
+	}
+
+	return inst, nil
+}
+
+func deployServer(inst *Instance, env *environment.TestingEnvironment) error {
+	caPair, err := certs.CreateRootCA(inst.Namespace, "minio")
+	if err != nil {
+		return err
+	}
+
+	caSecret := caPair.GenerateCASecret(inst.Namespace, inst.CaSecretName)
+	if _, err = objects.Create(env.Ctx, env.Client, caSecret); err != nil && !apierrors.IsAlreadyExists(err) {
+		return err
 	}
 
 	// sign and create secret using CA certificate and key
-	serverPair, err := minioEnv.CaPair.CreateAndSignPair("minio-service", certs.CertTypeServer,
+	serverPair, err := caPair.CreateAndSignPair("minio-service", certs.CertTypeServer,
 		[]string{"minio.useless.domain.not.verified", "minio-service.minio"},
 	)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	serverSecret := serverPair.GenerateCertificateSecret(minioEnv.Namespace, minioEnv.TLSSecret)
-	if err = env.Client.Create(env.Ctx, serverSecret); err != nil {
-		return nil, err
+	serverSecret := serverPair.GenerateCertificateSecret(inst.Namespace, inst.TLSSecret)
+	if err = env.Client.Create(env.Ctx, serverSecret); err != nil && !apierrors.IsAlreadyExists(err) {
+		return err
 	}
 
-	setup, err := sslSetup(minioEnv.Namespace)
+	setup, err := sslSetup(inst.Namespace)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	if err = installMinio(env, setup, minioEnv.Timeout); err != nil {
-		return nil, err
-	}
-
-	minioClient := sslClient(minioEnv.Namespace)
-
-	return &minioClient, pods.CreateAndWaitForReady(env.Ctx, env.Client, &minioClient, 240)
+	return installMinio(env, setup, 0)
 }
 
-func (m *Env) getCaSecret(env *environment.TestingEnvironment, namespace string) (*corev1.Secret, error) {
+func (m *Instance) getCaSecret(env *environment.TestingEnvironment, namespace string) (*corev1.Secret, error) {
 	var certSecret corev1.Secret
 	if err := env.Client.Get(env.Ctx,
 		types.NamespacedName{
@@ -520,8 +597,8 @@ func (m *Env) getCaSecret(env *environment.TestingEnvironment, namespace string)
 	}, nil
 }
 
-// CreateCaSecret creates the certificates required to authenticate against the MinIO service
-func (m *Env) CreateCaSecret(env *environment.TestingEnvironment, namespace string) error {
+// createCaSecret creates the certificates required to authenticate against the MinIO service
+func (m *Instance) createCaSecret(env *environment.TestingEnvironment, namespace string) error {
 	caSecret, err := m.getCaSecret(env, namespace)
 	if err != nil {
 		return err
@@ -530,81 +607,266 @@ func (m *Env) CreateCaSecret(env *environment.TestingEnvironment, namespace stri
 	return err
 }
 
-// CountFiles uses the minioClient in the given `namespace` to count the
-// amount of files matching the given `path`
-func CountFiles(minioEnv *Env, path string) (value int, err error) {
-	var stdout string
-	stdout, _, err = run.Unchecked(fmt.Sprintf(
-		"kubectl exec -n %v %v -- %v",
-		minioEnv.Namespace,
-		minioEnv.Client.Name,
-		composeFindCmd(path, "minio")))
+// CountFiles counts objects matching the given MinIO path glob using the MinIO SDK.
+func (m *Instance) CountFiles(path string) (int, error) {
+	objects, err := m.listMatchingObjects(path)
 	if err != nil {
 		return -1, err
 	}
-	value, err = strconv.Atoi(strings.Trim(stdout, "\n"))
-	return value, err
+	return len(objects), nil
 }
 
-// ListFiles uses the minioClient in the given `namespace` to list the
-// paths matching the given `path`
-func ListFiles(minioEnv *Env, path string) (string, error) {
-	var stdout string
-	stdout, _, err := run.Unchecked(fmt.Sprintf(
-		"kubectl exec -n %v %v -- %v",
-		minioEnv.Namespace,
-		minioEnv.Client.Name,
-		composeListFiles(path, "minio")))
+// ListFiles lists object paths matching the given MinIO path glob using the MinIO SDK.
+func (m *Instance) ListFiles(path string) (string, error) {
+	objects, err := m.listMatchingObjects(path)
 	if err != nil {
 		return "", err
 	}
-	return strings.Trim(stdout, "\n"), nil
+	paths := make([]string, 0, len(objects))
+	for _, object := range objects {
+		paths = append(paths, minioObjectPath(object.bucket, object.key))
+	}
+	return strings.Join(paths, "\n"), nil
 }
 
-// composeListFiles builds the Minio command to list the filenames matching a given path
-func composeListFiles(path string, serviceName string) string {
-	return fmt.Sprintf("sh -c 'mc find %v --path %v'", serviceName, path)
-}
-
-// composeCleanFiles builds the Minio command to list the filenames matching a given path
-func composeCleanFiles(path string) string {
-	return fmt.Sprintf("sh -c 'mc rm --force --recursive %v'", path)
-}
-
-// composeFindCmd builds the Minio find command
-func composeFindCmd(path string, serviceName string) string {
-	return fmt.Sprintf("sh -c 'mc find %v --path %v | wc -l'", serviceName, path)
-}
-
-// GetFileTags will use the minioClient to retrieve the tags in a specified path
-func GetFileTags(minioEnv *Env, path string) (TagSet, error) {
+// GetFileTags retrieves object tags for the first object matching a specified path using the MinIO SDK.
+func (m *Instance) GetFileTags(path string) (TagSet, error) {
 	var output TagSet
-	// Make sure we have a registered backup to access
-	out, _, err := run.UncheckedRetry(fmt.Sprintf(
-		"kubectl exec -n %v %v -- sh -c 'mc find minio --path %v | head -n1'",
-		minioEnv.Namespace,
-		minioEnv.Client.Name,
-		path))
+	objects, err := m.listMatchingObjects(path)
 	if err != nil {
 		return output, err
 	}
+	if len(objects) == 0 {
+		return output, fmt.Errorf("no MinIO object found matching %q", path)
+	}
 
-	walFile := strings.Trim(out, "\n")
-
-	stdout, _, err := run.UncheckedRetry(fmt.Sprintf(
-		"kubectl exec -n %v %v -- sh -c 'mc --json tag list %v'",
-		minioEnv.Namespace,
-		minioEnv.Client.Name,
-		walFile))
+	tags, err := m.MinioClient.GetObjectTagging(
+		m.ctx,
+		objects[0].bucket,
+		objects[0].key,
+		minio.GetObjectTaggingOptions{},
+	)
 	if err != nil {
 		return output, err
 	}
-
-	err = json.Unmarshal([]byte(stdout), &output)
-	if err != nil {
-		return output, err
-	}
+	output.Tags = tags.ToMap()
 	return output, nil
+}
+
+// CleanFiles deletes objects under the given MinIO path using the MinIO SDK.
+func (m *Instance) CleanFiles(path string) (string, error) {
+	bucket, prefix, err := splitMinioPath(path)
+	if err != nil {
+		return "", err
+	}
+
+	exists, err := m.MinioClient.BucketExists(m.ctx, bucket)
+	if err != nil {
+		return "", err
+	}
+	if !exists {
+		return "", nil
+	}
+
+	if prefix != "" && !strings.HasSuffix(prefix, "/") {
+		prefix += "/"
+	}
+
+	var deletedPaths []string
+	objects := m.MinioClient.ListObjects(m.ctx, bucket, minio.ListObjectsOptions{
+		Prefix:    prefix,
+		Recursive: true,
+	})
+	for object := range objects {
+		if object.Err != nil {
+			return "", object.Err
+		}
+		if err := m.MinioClient.RemoveObject(
+			m.ctx,
+			bucket,
+			object.Key,
+			minio.RemoveObjectOptions{},
+		); err != nil {
+			return "", err
+		}
+		deletedPaths = append(deletedPaths, minioObjectPath(bucket, object.Key))
+	}
+
+	return strings.Join(deletedPaths, "\n"), nil
+}
+
+// ForgeArchiveWal copies an existing archived WAL object to a new WAL object name using the MinIO SDK.
+func (m *Instance) ForgeArchiveWal(clusterName, existingWALName, newWALName string) error {
+	const walSegmentPath = "wals/0000000100000000"
+
+	sourceObject := filepath.Join(clusterName, walSegmentPath, existingWALName+".gz")
+	destinationObject := filepath.Join(clusterName, walSegmentPath, newWALName)
+	_, err := m.MinioClient.CopyObject(
+		m.ctx,
+		minio.CopyDestOptions{
+			Bucket: clusterName,
+			Object: destinationObject,
+		},
+		minio.CopySrcOptions{
+			Bucket: clusterName,
+			Object: sourceObject,
+		},
+	)
+	return err
+}
+
+// matchedObject is the result row returned by listMatchingObjects.
+type matchedObject struct {
+	bucket string
+	key    string
+}
+
+// listingHint summarises the literal portion of a glob path so that we can
+// scope the MinIO listing instead of scanning every bucket end-to-end.
+type listingHint struct {
+	// bucket is non-empty when the leading path segment is a literal — we can
+	// then list only that single bucket and skip the BucketList call.
+	bucket string
+	// keyPrefix is the longest contiguous literal prefix of the key portion
+	// (everything after the bucket segment up to the first glob). It is fed
+	// to ListObjectsOptions.Prefix as a server-side filter; the matcher still
+	// runs to enforce the full pattern.
+	keyPrefix string
+}
+
+// extractLiteralPathHint walks the glob path and pulls out as much literal
+// prefix as is safe to feed to MinIO as a listing scope. It tolerates an
+// optional leading "minio/" alias.
+func extractLiteralPathHint(path string) listingHint {
+	segments := strings.Split(strings.TrimPrefix(path, "minio/"), "/")
+
+	isGlob := func(s string) bool { return strings.ContainsAny(s, "*?") }
+
+	var hint listingHint
+	if len(segments) == 0 || segments[0] == "" {
+		return hint
+	}
+	if !isGlob(segments[0]) {
+		hint.bucket = segments[0]
+	}
+
+	var keyParts []string
+	for _, s := range segments[1:] {
+		if isGlob(s) {
+			break
+		}
+		keyParts = append(keyParts, s)
+	}
+	hint.keyPrefix = strings.Join(keyParts, "/")
+	return hint
+}
+
+func (m *Instance) listMatchingObjects(path string) ([]matchedObject, error) {
+	matches, err := newMinioPathMatcher(path)
+	if err != nil {
+		return nil, err
+	}
+
+	hint := extractLiteralPathHint(path)
+
+	var bucketNames []string
+	if hint.bucket != "" {
+		exists, err := m.MinioClient.BucketExists(m.ctx, hint.bucket)
+		if err != nil {
+			return nil, err
+		}
+		if !exists {
+			return nil, nil
+		}
+		bucketNames = []string{hint.bucket}
+	} else {
+		buckets, err := m.MinioClient.ListBuckets(m.ctx)
+		if err != nil {
+			return nil, err
+		}
+		bucketNames = make([]string, len(buckets))
+		for i, b := range buckets {
+			bucketNames[i] = b.Name
+		}
+	}
+
+	var objects []matchedObject
+	for _, bucket := range bucketNames {
+		objectCh := m.MinioClient.ListObjects(m.ctx, bucket, minio.ListObjectsOptions{
+			Prefix:    hint.keyPrefix,
+			Recursive: true,
+		})
+		for object := range objectCh {
+			if object.Err != nil {
+				return nil, object.Err
+			}
+			if matches(bucket, object.Key) {
+				objects = append(objects, matchedObject{bucket: bucket, key: object.Key})
+			}
+		}
+	}
+
+	sort.Slice(objects, func(i, j int) bool {
+		return minioObjectPath(objects[i].bucket, objects[i].key) <
+			minioObjectPath(objects[j].bucket, objects[j].key)
+	})
+	return objects, nil
+}
+
+func newMinioPathMatcher(path string) (func(bucket, key string) bool, error) {
+	matcher, err := regexp.Compile(globToRegexp(path))
+	if err != nil {
+		return nil, err
+	}
+
+	return func(bucket, key string) bool {
+		return matcher.MatchString(minioObjectPath(bucket, key)) ||
+			matcher.MatchString(minioObjectPathWithoutAlias(bucket, key)) ||
+			matcher.MatchString(key)
+	}, nil
+}
+
+func minioObjectPath(bucket, key string) string {
+	return "minio/" + minioObjectPathWithoutAlias(bucket, key)
+}
+
+func minioObjectPathWithoutAlias(bucket, key string) string {
+	return bucket + "/" + key
+}
+
+func globToRegexp(pattern string) string {
+	var builder strings.Builder
+	builder.WriteString("^")
+	for _, char := range pattern {
+		switch char {
+		case '*':
+			builder.WriteString(".*")
+		case '?':
+			builder.WriteByte('.')
+		default:
+			builder.WriteString(regexp.QuoteMeta(string(char)))
+		}
+	}
+	builder.WriteString("$")
+	return builder.String()
+}
+
+// splitMinioPath parses a "minio/<bucket>/<prefix>" path into its bucket and
+// key-prefix parts. CleanFiles needs a concrete bucket name to drive the
+// MinIO API, so glob patterns on the bucket position are rejected explicitly
+// — leaving them through would silently no-op against a non-existent bucket
+// named "*".
+func splitMinioPath(minioPath string) (string, string, error) {
+	path := strings.Trim(strings.TrimPrefix(minioPath, "minio/"), "/")
+	if path == "" {
+		return "", "", fmt.Errorf("empty MinIO path")
+	}
+
+	bucket, prefix, _ := strings.Cut(path, "/")
+	if strings.ContainsAny(bucket, "*?") {
+		return "", "", fmt.Errorf("MinIO bucket name cannot contain glob characters: %q", minioPath)
+	}
+	return bucket, prefix, nil
 }
 
 // TestBarmanConnectivity validates the barman connectivity to the minio endpoint
@@ -637,20 +899,6 @@ func TestBarmanConnectivity(
 	return true, nil
 }
 
-// CleanFiles clean files on minio for a given path
-func CleanFiles(minioEnv *Env, path string) (string, error) {
-	var stdout string
-	stdout, _, err := run.Unchecked(fmt.Sprintf(
-		"kubectl exec -n %v %v -- %v",
-		minioEnv.Namespace,
-		minioEnv.Client.Name,
-		composeCleanFiles(path)))
-	if err != nil {
-		return "", err
-	}
-	return strings.Trim(stdout, "\n"), nil
-}
-
 // GetFilePath gets the MinIO file string for WAL/backup objects in a configured bucket
 func GetFilePath(serverName, fileName string) string {
 	// the * regexes enable matching these typical paths:
@@ -658,4 +906,65 @@ func GetFilePath(serverName, fileName string) string {
 	// 	minio/backups/serverName/wals/0000000100000000/000000010000000000000002.gz
 	//  minio/backups/serverName/wals/00000002.history.gz
 	return filepath.Join("*", serverName, "*", fileName)
+}
+
+// AssertArchiveWalOnMinio archives a WAL on the primary and verifies it lands
+// in this MinIO bucket within the given timeout (seconds).
+func (m *Instance) AssertArchiveWalOnMinio(namespace, clusterName, serverName string, timeout int) {
+	var latestWALPath string
+	// Create a WAL on the primary and check if it arrives at minio, within a short time
+	ginkgo.By("archiving WALs and verifying they exist", func() {
+		pod, err := clusterutils.GetPrimary(m.ctx, m.CrudClient, namespace, clusterName)
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		primary := pod.GetName()
+
+		latestWAL := SwitchWalAndGetLatestArchive(
+			m.ctx, m.CrudClient, m.Interface, m.RestClientConfig, namespace, primary,
+		)
+		latestWALPath = GetFilePath(serverName, latestWAL+".gz")
+	})
+
+	ginkgo.By(fmt.Sprintf("verify the existence of WAL %v in minio", latestWALPath), func() {
+		gomega.Eventually(func() (int, error) {
+			// WALs are compressed with gzip in the fixture
+			return m.CountFiles(latestWALPath)
+		}, timeout).Should(gomega.BeEquivalentTo(1))
+	})
+}
+
+// SwitchWalAndGetLatestArchive trigger a new wal and get the name of latest wal file
+func SwitchWalAndGetLatestArchive(
+	ctx context.Context,
+	crudClient client.Client,
+	kubeInterface kubernetes.Interface,
+	restConfig *rest.Config,
+	namespace, podName string,
+) string {
+	_, _, err := exec.QueryInInstancePodWithTimeout(
+		ctx, crudClient, kubeInterface, restConfig,
+		exec.PodLocator{
+			Namespace: namespace,
+			PodName:   podName,
+		},
+		postgres2.PostgresDBName,
+		"CHECKPOINT",
+		300*time.Second,
+	)
+	gomega.Expect(err).ToNot(gomega.HaveOccurred(),
+		"failed to trigger a new wal while executing 'switchWalAndGetLatestArchive'")
+
+	out, _, err := exec.QueryInInstancePod(
+		ctx, crudClient, kubeInterface, restConfig,
+		exec.PodLocator{
+			Namespace: namespace,
+			PodName:   podName,
+		},
+		postgres2.PostgresDBName,
+		"SELECT pg_catalog.pg_walfile_name(pg_switch_wal())",
+	)
+	gomega.Expect(err).ToNot(
+		gomega.HaveOccurred(),
+		"failed to get latest wal file name while executing 'switchWalAndGetLatestArchive")
+
+	return strings.TrimSpace(out)
 }

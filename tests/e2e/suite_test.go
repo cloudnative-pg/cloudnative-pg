@@ -21,7 +21,6 @@ package e2e
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -68,12 +67,6 @@ var (
 	operatorWasRestarted    bool
 	quickDeletionPeriod     = int64(1)
 	testTimeouts            map[timeouts.Timeout]int
-	minioEnv                = &minio.Env{
-		Namespace:    "minio",
-		ServiceName:  "minio-service.minio",
-		CaSecretName: "minio-server-ca-secret",
-		TLSSecret:    "minio-server-tls-secret",
-	}
 )
 
 var _ = SynchronizedBeforeSuite(func() []byte {
@@ -139,33 +132,19 @@ E2E test configuration:
 		<-sternOperatorDoneChan
 	})
 
+	DeferCleanup(func() error {
+		return minio.CleanupSharedNamespace(env.Ctx, env.Client)
+	})
+
 	_ = corev1.AddToScheme(env.Scheme)
 	_ = appsv1.AddToScheme(env.Scheme)
 
-	// Set up a global MinIO service on his own namespace
-	err = namespaces.CreateNamespace(env.Ctx, env.Client, minioEnv.Namespace)
-	Expect(err).ToNot(HaveOccurred())
-	DeferCleanup(func() {
-		err := namespaces.DeleteNamespaceAndWait(env.Ctx, env.Client, minioEnv.Namespace, 300)
-		Expect(err).ToNot(HaveOccurred())
-	})
-	minioEnv.Timeout = uint(testTimeouts[timeouts.MinioInstallation])
-	minioClient, err := minio.Deploy(minioEnv, env)
-	Expect(err).ToNot(HaveOccurred())
-
-	caSecret := minioEnv.CaPair.GenerateCASecret(minioEnv.Namespace, minioEnv.CaSecretName)
-	minioEnv.CaSecretObj = *caSecret
-	objs := map[string]corev1.Pod{
-		"minio": *minioClient,
-	}
-
-	jsonObjs, err := json.Marshal(objs)
 	if err != nil {
 		panic(err)
 	}
 
-	return jsonObjs
-}, func(jsonObjs []byte) {
+	return nil
+}, func() {
 	var err error
 	// We are creating new testing env object again because above testing env can not serialize and
 	// accessible to all nodes (specs)
@@ -200,13 +179,6 @@ E2E test configuration:
 	if testCloudVendorEnv, err = cloudvendors.TestCloudVendor(); err != nil {
 		panic(err)
 	}
-
-	var objs map[string]*corev1.Pod
-	if err := json.Unmarshal(jsonObjs, &objs); err != nil {
-		panic(err)
-	}
-
-	minioEnv.Client = objs["minio"]
 })
 
 var _ = BeforeEach(func() {

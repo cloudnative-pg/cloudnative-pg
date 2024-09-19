@@ -47,7 +47,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/minio"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/secrets"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/storage"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
@@ -122,6 +121,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 
 	Context("on a new cluster with tablespaces", Ordered, func() {
 		var namespace, backupName string
+		storageResource := &minio.Instance{}
 		var err error
 		const (
 			clusterManifest = fixturesDir +
@@ -135,21 +135,8 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 
-			// We create the MinIO credentials required to login into the system
-			By("creating the credentials for minio", func() {
-				_, err = secrets.CreateObjectStorageSecret(
-					env.Ctx,
-					env.Client,
-					namespace,
-					"backup-storage-creds",
-					"minio",
-					"minio123",
-				)
-				Expect(err).ToNot(HaveOccurred())
-			})
-
-			By("create the certificates for MinIO", func() {
-				err := minioEnv.CreateCaSecret(env, namespace)
+			By("request minio resources", func() {
+				storageResource, err = minio.RequestInstance(env, namespace)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
@@ -215,7 +202,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 			})
 
 			By("verifying the number of tars in minio", func() {
-				latestBaseBackupContainsExpectedTars(clusterName, 1, 3)
+				latestBaseBackupContainsExpectedTars(storageResource, clusterName, 1, 3)
 			})
 
 			By("verifying backup status", func() {
@@ -297,7 +284,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 
 				// TODO: this is to force a CHECKPOINT when we run the backup on standby.
 				// This should be better handled inside Execute
-				AssertArchiveWalOnMinio(namespace, clusterName, clusterName)
+				storageResource.AssertArchiveWalOnMinio(namespace, clusterName, clusterName, testTimeouts[timeouts.WalsInMinio])
 
 				backups.AssertBackupConditionInClusterStatus(env.Ctx, env.Client, namespace, clusterName)
 			})
@@ -307,7 +294,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 				eventuallyHasCompletedBackups(namespace, backups)
 				// in the latest base backup, we expect 4 tars
 				//   (data.tar + 3 tars for each of the 3 tablespaces)
-				latestBaseBackupContainsExpectedTars(clusterName, backups, 4)
+				latestBaseBackupContainsExpectedTars(storageResource, clusterName, backups, 4)
 			})
 
 			By("verifying backup status", func() {
@@ -371,6 +358,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 		var namespace, backupName string
 		var err error
 		var backupObject *apiv1.Backup
+		storageResource := &minio.Instance{}
 		const (
 			clusterManifest = fixturesDir +
 				"/tablespaces/cluster-volume-snapshot-tablespaces.yaml.template"
@@ -396,21 +384,8 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 
-			// We create the required credentials for MinIO
-			By("creating the credentials for minio", func() {
-				_, err = secrets.CreateObjectStorageSecret(
-					env.Ctx,
-					env.Client,
-					namespace,
-					"backup-storage-creds",
-					"minio",
-					"minio123",
-				)
-				Expect(err).ToNot(HaveOccurred())
-			})
-
-			By("create the certificates for MinIO", func() {
-				err := minioEnv.CreateCaSecret(env, namespace)
+			By("request minio resources", func() {
+				storageResource, err = minio.RequestInstance(env, namespace)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
@@ -504,7 +479,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 
 				// TODO: this is to force a CHECKPOINT when we run the backup on standby.
 				// This should probably be moved elsewhere
-				AssertArchiveWalOnMinio(namespace, clusterName, clusterName)
+				storageResource.AssertArchiveWalOnMinio(namespace, clusterName, clusterName, testTimeouts[timeouts.WalsInMinio])
 
 				Eventually(func(g Gomega) {
 					backupList, err := backups.List(env.Ctx, env.Client, namespace)
@@ -626,7 +601,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 					insertRecordIntoTable(table2, 6, conn)
 
 					// Close and archive the current WAL file
-					AssertArchiveWalOnMinio(namespace, clusterName, clusterName)
+					storageResource.AssertArchiveWalOnMinio(namespace, clusterName, clusterName, testTimeouts[timeouts.WalsInMinio])
 				})
 				By("fetching the volume snapshots", func() {
 					snapshotList, err := getSnapshots(backupName, clusterName, namespace)
@@ -1238,6 +1213,7 @@ func eventuallyHasCompletedBackups(namespace string, numBackups int) {
 }
 
 func latestBaseBackupContainsExpectedTars(
+	storageResource *minio.Instance,
 	clusterName string,
 	numBackups int,
 	expectedTars int,
@@ -1246,7 +1222,7 @@ func latestBaseBackupContainsExpectedTars(
 		// we list the backup.info files to get the listing of base backups
 		// directories in minio
 		backupInfoFiles := filepath.Join("*", clusterName, "base", "*", "*.info")
-		ls, err := minio.ListFiles(minioEnv, backupInfoFiles)
+		ls, err := storageResource.ListFiles(backupInfoFiles)
 		g.Expect(err).ShouldNot(HaveOccurred())
 		frags := strings.Split(ls, "\n")
 		slices.Sort(frags)
@@ -1254,10 +1230,10 @@ func latestBaseBackupContainsExpectedTars(
 		g.Expect(frags).To(HaveLen(numBackups), report)
 		latestBaseBackup := filepath.Dir(frags[numBackups-1])
 		tarsInLastBackup := strings.TrimPrefix(filepath.Join(latestBaseBackup, "*.tar"), "minio/")
-		listing, err := minio.ListFiles(minioEnv, tarsInLastBackup)
+		listing, err := storageResource.ListFiles(tarsInLastBackup)
 		g.Expect(err).ShouldNot(HaveOccurred())
 		report += fmt.Sprintf("tar listing:\n%s\n", listing)
-		numTars, err := minio.CountFiles(minioEnv, tarsInLastBackup)
+		numTars, err := storageResource.CountFiles(tarsInLastBackup)
 		g.Expect(err).ShouldNot(HaveOccurred())
 		g.Expect(numTars).To(Equal(expectedTars), report)
 	}, 120).Should(Succeed())

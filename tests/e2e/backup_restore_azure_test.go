@@ -26,6 +26,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/minio"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/secrets"
@@ -452,7 +453,10 @@ func assertArchiveWalOnAzureBlob(namespace, clusterName string, configuration ba
 	By("archiving WALs and verifying they exist", func() {
 		primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
-		latestWAL := switchWalAndGetLatestArchive(primary.Namespace, primary.Name)
+		latestWAL := minio.SwitchWalAndGetLatestArchive(
+			env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+			primary.Namespace, primary.Name,
+		)
 		// Define what file we are looking for in Azure.
 		// Escapes are required since az expects forward slashes to be escaped
 		path := fmt.Sprintf("wals\\/0000000100000000\\/%v.gz", latestWAL)

@@ -887,29 +887,12 @@ func CheckPointAndSwitchWalOnPrimary(namespace, clusterName string) string {
 		pod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 		primary := pod.GetName()
-		latestWAL = switchWalAndGetLatestArchive(namespace, primary)
+		latestWAL = minio.SwitchWalAndGetLatestArchive(
+			env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+			namespace, primary,
+		)
 	})
 	return latestWAL
-}
-
-// AssertArchiveWalOnMinio archives WALs and verifies that they are in the storage
-func AssertArchiveWalOnMinio(namespace, clusterName string, serverName string) {
-	var latestWALPath string
-	// Create a WAL on the primary and check if it arrives at minio, within a short time
-	By("archiving WALs and verifying they exist", func() {
-		pod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
-		Expect(err).ToNot(HaveOccurred())
-		primary := pod.GetName()
-		latestWAL := switchWalAndGetLatestArchive(namespace, primary)
-		latestWALPath = minio.GetFilePath(serverName, latestWAL+".gz")
-	})
-
-	By(fmt.Sprintf("verify the existence of WAL %v in minio", latestWALPath), func() {
-		Eventually(func() (int, error) {
-			// WALs are compressed with gzip in the fixture
-			return minio.CountFiles(minioEnv, latestWALPath)
-		}, testTimeouts[timeouts.WalsInMinio]).Should(BeEquivalentTo(1))
-	})
 }
 
 func AssertScheduledBackupsAreScheduled(namespace string, backupYAMLPath string, timeout int) {
@@ -1629,7 +1612,10 @@ func AssertSSLVerifyFullDBConnectionFromAppPod(namespace string, clusterName str
 	})
 }
 
-func AssertClusterAsyncReplica(namespace, sourceClusterFile, restoreClusterFile, tableName string) {
+func AssertClusterAsyncReplica(
+	storageResource *minio.Instance,
+	namespace, sourceClusterFile, restoreClusterFile, tableName string,
+) {
 	By("Async Replication into external cluster", func() {
 		restoredClusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, restoreClusterFile)
 		Expect(err).ToNot(HaveOccurred())
@@ -1696,7 +1682,10 @@ func AssertClusterAsyncReplica(namespace, sourceClusterFile, restoreClusterFile,
 
 		// Insert new data in the source cluster
 		insertRecordIntoTable(tableName, 3, connSource)
-		AssertArchiveWalOnMinio(namespace, sourceClusterName, sourceClusterName)
+		storageResource.AssertArchiveWalOnMinio(
+			namespace, sourceClusterName, sourceClusterName,
+			testTimeouts[timeouts.WalsInMinio],
+		)
 		tableLocator := TableLocator{
 			Namespace:    namespace,
 			ClusterName:  sourceClusterName,
@@ -2091,37 +2080,6 @@ func AssertArchiveConditionMet(namespace, clusterName, timeout string) {
 		outPut := strings.TrimSpace(out)
 		Expect(outPut).Should(ContainSubstring("condition met"))
 	})
-}
-
-// switchWalAndGetLatestArchive trigger a new wal and get the name of latest wal file
-func switchWalAndGetLatestArchive(namespace, podName string) string {
-	_, _, err := exec.QueryInInstancePodWithTimeout(
-		env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-		exec.PodLocator{
-			Namespace: namespace,
-			PodName:   podName,
-		},
-		postgres.PostgresDBName,
-		"CHECKPOINT",
-		300*time.Second,
-	)
-	Expect(err).ToNot(HaveOccurred(),
-		"failed to trigger a new wal while executing 'switchWalAndGetLatestArchive'")
-
-	out, _, err := exec.QueryInInstancePod(
-		env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-		exec.PodLocator{
-			Namespace: namespace,
-			PodName:   podName,
-		},
-		postgres.PostgresDBName,
-		"SELECT pg_catalog.pg_walfile_name(pg_switch_wal())",
-	)
-	Expect(err).ToNot(
-		HaveOccurred(),
-		"failed to get latest wal file name while executing 'switchWalAndGetLatestArchive")
-
-	return strings.TrimSpace(out)
 }
 
 func createAndAssertPgBouncerPoolerIsSetUp(namespace, poolerYamlFilePath string, expectedInstanceCount int) {

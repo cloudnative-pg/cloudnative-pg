@@ -49,7 +49,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/minio"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/secrets"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/storage"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
 
@@ -92,6 +91,7 @@ var _ = Describe("Postgres Major Upgrade", Ordered, ContinueOnFailure, Label(tes
 		targetMajor     int
 	}
 	scenarios := map[string]*scenario{}
+	storageResource := &minio.Instance{}
 
 	generateBaseCluster := func(namespace string, storageClass string, enableBackup bool) *apiv1.Cluster {
 		cluster := &apiv1.Cluster{
@@ -488,20 +488,8 @@ var _ = Describe("Postgres Major Upgrade", Ordered, ContinueOnFailure, Label(tes
 		storageClass := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
 		Expect(storageClass).ToNot(BeEmpty())
 
-		By("creating the certificates for MinIO", func() {
-			err := minioEnv.CreateCaSecret(env, namespace)
-			Expect(err).ToNot(HaveOccurred())
-		})
-
-		By("creating the credentials for minio", func() {
-			_, err = secrets.CreateObjectStorageSecret(
-				env.Ctx,
-				env.Client,
-				namespace,
-				"backup-storage-creds",
-				"minio",
-				"minio123",
-			)
+		By("request minio resources", func() {
+			storageResource, err = minio.RequestInstance(env, namespace)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
@@ -539,7 +527,7 @@ var _ = Describe("Postgres Major Upgrade", Ordered, ContinueOnFailure, Label(tes
 				Eventually(func() (bool, error) {
 					connectionStatus, err := minio.TestBarmanConnectivity(
 						cluster.Namespace, cluster.Name, primaryPod.Name,
-						"minio", "minio123", minioEnv.ServiceName)
+						"minio", "minio123", storageResource.ServiceName)
 					return connectionStatus, err
 				}, 60).Should(BeTrue())
 			})
@@ -651,7 +639,9 @@ var _ = Describe("Postgres Major Upgrade", Ordered, ContinueOnFailure, Label(tes
 		// Verify WAL archiving continues to work after the major upgrade
 		if cluster.Spec.Backup != nil {
 			By("Verifying WAL archiving works after the major upgrade")
-			AssertArchiveWalOnMinio(cluster.Namespace, cluster.Name, cluster.Name)
+			storageResource.AssertArchiveWalOnMinio(
+				cluster.Namespace, cluster.Name, cluster.Name, testTimeouts[timeouts.WalsInMinio],
+			)
 		}
 	},
 		Entry("PostGIS", postgisEntry),

@@ -35,7 +35,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/secrets"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
 
@@ -59,6 +58,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 		// namespace as the cluster. Since each cluster is installed in its
 		// own namespace, they can share the configuration file
 		var namespace, clusterName string
+		storageResource := &minio.Instance{}
 		const (
 			backupFile              = fixturesDir + "/backup/minio/backup-minio.yaml"
 			customQueriesSampleFile = fixturesDir + "/metrics/custom-queries-with-target-databases.yaml"
@@ -78,20 +78,8 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 
-			By("create the certificates for MinIO", func() {
-				err := minioEnv.CreateCaSecret(env, namespace)
-				Expect(err).ToNot(HaveOccurred())
-			})
-
-			By("creating the credentials for minio", func() {
-				_, err = secrets.CreateObjectStorageSecret(
-					env.Ctx,
-					env.Client,
-					namespace,
-					"backup-storage-creds",
-					"minio",
-					"minio123",
-				)
+			By("request minio resources", func() {
+				storageResource, err = minio.RequestInstance(env, namespace)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
@@ -107,7 +95,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 				Eventually(func() (bool, error) {
 					connectionStatus, err := minio.TestBarmanConnectivity(
 						namespace, clusterName, primaryPod.Name,
-						"minio", "minio123", minioEnv.ServiceName)
+						"minio", "minio123", storageResource.ServiceName)
 					return connectionStatus, err
 				}, 60).Should(BeTrue())
 			})
@@ -149,7 +137,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			}
 			AssertCreateTestData(env, tableLocator)
 
-			AssertArchiveWalOnMinio(namespace, clusterName, clusterName)
+			storageResource.AssertArchiveWalOnMinio(namespace, clusterName, clusterName, testTimeouts[timeouts.WalsInMinio])
 			latestTar := minio.GetFilePath(clusterName, "data.tar")
 
 			// There should be a backup resource and
@@ -159,7 +147,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 						testTimeouts[timeouts.BackupIsReady])
 					backups.AssertBackupConditionInClusterStatus(env.Ctx, env.Client, namespace, clusterName)
 					Eventually(func() (int, error) {
-						return minio.CountFiles(minioEnv, latestTar)
+						return storageResource.CountFiles(latestTar)
 					}, 60).Should(BeEquivalentTo(1))
 					Eventually(func() (string, error) {
 						cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
@@ -210,7 +198,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 
 			By("executing a second backup and verifying the number of backups on minio", func() {
 				Eventually(func() (int, error) {
-					return minio.CountFiles(minioEnv, latestTar)
+					return storageResource.CountFiles(latestTar)
 				}, 60).Should(BeEquivalentTo(1))
 
 				// delete the first backup and create a second backup
@@ -229,7 +217,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 				)
 				latestTar = minio.GetFilePath(clusterName, "data.tar")
 				Eventually(func() (int, error) {
-					return minio.CountFiles(minioEnv, latestTar)
+					return storageResource.CountFiles(latestTar)
 				}, 60).Should(BeEquivalentTo(2))
 			})
 
@@ -260,7 +248,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			latestGZ := filepath.Join("*", clusterName, "*", "*.history.gz")
 			By(fmt.Sprintf("checking the previous number of .history files in minio, history file name is %v",
 				latestGZ), func() {
-				previous, err = minio.CountFiles(minioEnv, latestGZ)
+				previous, err = storageResource.CountFiles(latestGZ)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
@@ -268,7 +256,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 
 			By("checking the number of .history after switchover", func() {
 				Eventually(func() (int, error) {
-					return minio.CountFiles(minioEnv, latestGZ)
+					return storageResource.CountFiles(latestGZ)
 				}, 60).Should(BeNumerically(">", previous))
 			})
 
@@ -310,7 +298,8 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			}
 			AssertCreateTestData(env, tableLocator)
 
-			AssertArchiveWalOnMinio(namespace, targetClusterName, targetClusterName)
+			storageResource.AssertArchiveWalOnMinio(
+				namespace, targetClusterName, targetClusterName, testTimeouts[timeouts.WalsInMinio])
 			latestTar := minio.GetFilePath(targetClusterName, "data.tar")
 
 			// There should be a backup resource and
@@ -323,7 +312,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 				)
 				backups.AssertBackupConditionInClusterStatus(env.Ctx, env.Client, namespace, targetClusterName)
 				Eventually(func() (int, error) {
-					return minio.CountFiles(minioEnv, latestTar)
+					return storageResource.CountFiles(latestTar)
 				}, 60).Should(BeEquivalentTo(1))
 				Eventually(func() (string, error) {
 					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, targetClusterName)
@@ -369,7 +358,8 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			}
 			AssertCreateTestData(env, tableLocator)
 
-			AssertArchiveWalOnMinio(namespace, targetClusterName, targetClusterName)
+			storageResource.AssertArchiveWalOnMinio(
+				namespace, targetClusterName, targetClusterName, testTimeouts[timeouts.WalsInMinio])
 			latestTar := minio.GetFilePath(targetClusterName, "data.tar")
 
 			// There should be a backup resource and
@@ -382,7 +372,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 				)
 				backups.AssertBackupConditionInClusterStatus(env.Ctx, env.Client, namespace, targetClusterName)
 				Eventually(func() (int, error) {
-					return minio.CountFiles(minioEnv, latestTar)
+					return storageResource.CountFiles(latestTar)
 				}, 60).Should(BeEquivalentTo(1))
 				Eventually(func() (string, error) {
 					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, targetClusterName)
@@ -432,7 +422,8 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			}
 			AssertCreateTestData(env, tableLocator)
 
-			AssertArchiveWalOnMinio(namespace, customClusterName, clusterServerName)
+			storageResource.AssertArchiveWalOnMinio(
+				namespace, customClusterName, clusterServerName, testTimeouts[timeouts.WalsInMinio])
 
 			// There should be a backup resource and
 			By("backing up a cluster and verifying it exists on minio", func() {
@@ -444,7 +435,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 				backups.AssertBackupConditionInClusterStatus(env.Ctx, env.Client, namespace, customClusterName)
 				latestBaseTar := minio.GetFilePath(clusterServerName, "data.tar")
 				Eventually(func() (int, error) {
-					return minio.CountFiles(minioEnv, latestBaseTar)
+					return storageResource.CountFiles(latestBaseTar)
 				}, 60).Should(BeEquivalentTo(1),
 					fmt.Sprintf("verify the number of backup %v is equals to 1", latestBaseTar))
 				// this is the second backup we take on the bucket
@@ -480,7 +471,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			// AssertScheduledBackupsImmediate creates at least two backups, we should find
 			// their base backups
 			Eventually(func() (int, error) {
-				return minio.CountFiles(minioEnv, latestBaseTar)
+				return storageResource.CountFiles(latestBaseTar)
 			}, 60).Should(BeNumerically(">=", 2),
 				fmt.Sprintf("verify the number of backup %v is >= 2", latestBaseTar))
 		})
@@ -497,6 +488,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 				backupFilePITR,
 				3,
 				currentTimestamp,
+				storageResource,
 			)
 
 			cluster, err := backups.CreateClusterFromBackupUsingPITR(
@@ -533,7 +525,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 				AssertScheduledBackupsAreScheduled(namespace, scheduledBackupSampleFile, 300)
 				latestTar := minio.GetFilePath(clusterName, "data.tar")
 				Eventually(func() (int, error) {
-					return minio.CountFiles(minioEnv, latestTar)
+					return storageResource.CountFiles(latestTar)
 				}, 60).Should(BeNumerically(">=", 2),
 					fmt.Sprintf("verify the number of backup %v is great than 2", latestTar))
 			})
@@ -542,8 +534,9 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 		})
 
 		It("verify tags in backed files", func() {
-			AssertArchiveWalOnMinio(namespace, clusterName, clusterName)
-			tags, err := minio.GetFileTags(minioEnv, minio.GetFilePath(clusterName, "*1.gz"))
+			storageResource.AssertArchiveWalOnMinio(
+				namespace, clusterName, clusterName, testTimeouts[timeouts.WalsInMinio])
+			tags, err := storageResource.GetFileTags(minio.GetFilePath(clusterName, "*1.gz"))
 			Expect(err).ToNot(HaveOccurred())
 			Expect(tags.Tags).ToNot(BeEmpty())
 
@@ -558,8 +551,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			Expect(err).ToNot(HaveOccurred())
 
 			AssertNewPrimary(namespace, clusterName, oldPrimary)
-
-			tags, err = minio.GetFileTags(minioEnv, minio.GetFilePath(clusterName, "*.history.gz"))
+			tags, err = storageResource.GetFileTags(minio.GetFilePath(clusterName, "*.history.gz"))
 			Expect(err).ToNot(HaveOccurred())
 			Expect(tags.Tags).ToNot(BeEmpty())
 		})
@@ -567,6 +559,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 
 	Context("timeline divergence protection", Ordered, func() {
 		var namespace string
+		storageResource := &minio.Instance{}
 
 		BeforeAll(func() {
 			if !(IsKind() || IsK3D()) {
@@ -578,20 +571,8 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 
-			By("create the certificates for MinIO", func() {
-				err := minioEnv.CreateCaSecret(env, namespace)
-				Expect(err).ToNot(HaveOccurred())
-			})
-
-			By("creating the credentials for minio", func() {
-				_, err = secrets.CreateObjectStorageSecret(
-					env.Ctx,
-					env.Client,
-					namespace,
-					"backup-storage-creds",
-					"minio",
-					"minio123",
-				)
+			By("request minio resources", func() {
+				storageResource, err = minio.RequestInstance(env, namespace)
 				Expect(err).ToNot(HaveOccurred())
 			})
 		})
@@ -627,9 +608,10 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			})
 
 			By("verifying timeline 2 history file is archived", func() {
-				AssertArchiveWalOnMinio(namespace, secondClusterName, "shared-timeline-test")
+				storageResource.AssertArchiveWalOnMinio(
+					namespace, secondClusterName, "shared-timeline-test", testTimeouts[timeouts.WalsInMinio])
 				Eventually(func() (int, error) {
-					return minio.CountFiles(minioEnv, minio.GetFilePath("shared-timeline-test", "00000002.history*"))
+					return storageResource.CountFiles(minio.GetFilePath("shared-timeline-test", "00000002.history*"))
 				}, 60).Should(BeNumerically(">", 0))
 			})
 
@@ -689,6 +671,7 @@ var _ = Describe("MinIO - Clusters Recovery from Barman Object Store", Label(tes
 	// created by Barman Cloud, and defined via the barmanObjectStore option in the externalClusters section
 	Context("using minio as object storage", Ordered, func() {
 		var namespace, clusterName string
+		storageResource := &minio.Instance{}
 
 		BeforeAll(func() {
 			if !(IsKind() || IsK3D()) {
@@ -702,20 +685,8 @@ var _ = Describe("MinIO - Clusters Recovery from Barman Object Store", Label(tes
 			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 
-			By("creating the credentials for minio", func() {
-				_, err = secrets.CreateObjectStorageSecret(
-					env.Ctx,
-					env.Client,
-					namespace,
-					"backup-storage-creds",
-					"minio",
-					"minio123",
-				)
-				Expect(err).ToNot(HaveOccurred())
-			})
-
-			By("create the certificates for MinIO", func() {
-				err := minioEnv.CreateCaSecret(env, namespace)
+			By("request minio resources", func() {
+				storageResource, err = minio.RequestInstance(env, namespace)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
@@ -728,7 +699,7 @@ var _ = Describe("MinIO - Clusters Recovery from Barman Object Store", Label(tes
 				Eventually(func() (bool, error) {
 					connectionStatus, err := minio.TestBarmanConnectivity(
 						namespace, clusterName, primaryPod.Name,
-						"minio", "minio123", minioEnv.ServiceName)
+						"minio", "minio123", storageResource.ServiceName)
 					return connectionStatus, err
 				}, 60).Should(BeTrue())
 			})
@@ -748,7 +719,8 @@ var _ = Describe("MinIO - Clusters Recovery from Barman Object Store", Label(tes
 				}
 				AssertCreateTestData(env, tableLocator)
 
-				AssertArchiveWalOnMinio(namespace, clusterName, clusterName)
+				storageResource.AssertArchiveWalOnMinio(
+					namespace, clusterName, clusterName, testTimeouts[timeouts.WalsInMinio])
 
 				// There should be a backup resource and
 				By("backing up a cluster and verifying it exists on minio", func() {
@@ -759,11 +731,12 @@ var _ = Describe("MinIO - Clusters Recovery from Barman Object Store", Label(tes
 
 					// TODO: this is to force a CHECKPOINT when we run the backup on standby.
 					// This should be better handled inside Execute
-					AssertArchiveWalOnMinio(namespace, clusterName, clusterName)
+					storageResource.AssertArchiveWalOnMinio(
+						namespace, clusterName, clusterName, testTimeouts[timeouts.WalsInMinio])
 
 					latestTar := minio.GetFilePath(clusterName, "data.tar")
 					Eventually(func() (int, error) {
-						return minio.CountFiles(minioEnv, latestTar)
+						return storageResource.CountFiles(latestTar)
 					}, 60).Should(BeEquivalentTo(1),
 						fmt.Sprintf("verify the number of backup %v is equals to 1", latestTar))
 					Eventually(func() (string, error) {
@@ -836,7 +809,7 @@ var _ = Describe("MinIO - Clusters Recovery from Barman Object Store", Label(tes
 				backups.AssertBackupConditionInClusterStatus(env.Ctx, env.Client, namespace, clusterName)
 				latestTar := minio.GetFilePath(clusterName, "data.tar")
 				Eventually(func() (int, error) {
-					return minio.CountFiles(minioEnv, latestTar)
+					return storageResource.CountFiles(latestTar)
 				}, 60).Should(BeEquivalentTo(2),
 					fmt.Sprintf("verify the number of backup %v is equals to 2", latestTar))
 			})
@@ -869,7 +842,8 @@ var _ = Describe("MinIO - Clusters Recovery from Barman Object Store", Label(tes
 			}
 			AssertCreateTestData(env, tableLocator)
 
-			AssertArchiveWalOnMinio(namespace, clusterName, clusterName)
+			storageResource.AssertArchiveWalOnMinio(
+				namespace, clusterName, clusterName, testTimeouts[timeouts.WalsInMinio])
 
 			By("backing up a cluster and verifying it exists on minio", func() {
 				backups.Execute(env.Ctx, env.Client, env.Scheme, namespace, sourceTakeThirdBackupFileMinio, false,
@@ -877,13 +851,14 @@ var _ = Describe("MinIO - Clusters Recovery from Barman Object Store", Label(tes
 				backups.AssertBackupConditionInClusterStatus(env.Ctx, env.Client, namespace, clusterName)
 				latestTar := minio.GetFilePath(clusterName, "data.tar")
 				Eventually(func() (int, error) {
-					return minio.CountFiles(minioEnv, latestTar)
+					return storageResource.CountFiles(latestTar)
 				}, 60).Should(BeEquivalentTo(3),
 					fmt.Sprintf("verify the number of backup %v is great than 3", latestTar))
 			})
 
 			// Replicating a cluster with asynchronous replication
 			AssertClusterAsyncReplica(
+				storageResource,
 				namespace,
 				clusterSourceFileMinio,
 				externalClusterFileMinioReplica,
@@ -899,6 +874,7 @@ func prepareClusterForPITROnMinio(
 	backupSampleFile string,
 	expectedVal int,
 	currentTimestamp *string,
+	storageResource *minio.Instance,
 ) {
 	const tableNamePitr = "for_restore"
 
@@ -910,7 +886,7 @@ func prepareClusterForPITROnMinio(
 		)
 		latestTar := minio.GetFilePath(clusterName, "data.tar")
 		Eventually(func() (int, error) {
-			return minio.CountFiles(minioEnv, latestTar)
+			return storageResource.CountFiles(latestTar)
 		}, 60).Should(BeNumerically(">=", expectedVal),
 			fmt.Sprintf("verify the number of backups %v is greater than or equal to %v", latestTar,
 				expectedVal))
@@ -957,7 +933,8 @@ func prepareClusterForPITROnMinio(
 
 		insertRecordIntoTable(tableNamePitr, 3, conn)
 	})
-	AssertArchiveWalOnMinio(namespace, clusterName, clusterName)
+	storageResource.AssertArchiveWalOnMinio(
+		namespace, clusterName, clusterName, testTimeouts[timeouts.WalsInMinio])
 	AssertArchiveConditionMet(namespace, clusterName, "5m")
 	backups.AssertBackupConditionInClusterStatus(env.Ctx, env.Client, namespace, clusterName)
 }
