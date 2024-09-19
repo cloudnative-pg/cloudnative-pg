@@ -351,25 +351,8 @@ func (r *Cluster) Validate() (allErrs field.ErrorList) {
 		r.validateTolerations,
 		r.validateAntiAffinity,
 		r.validateReplicaMode,
-		func() field.ErrorList {
-			if r.Spec.Backup == nil {
-				return nil
-			}
-
-			result := barmanWebhooks.ValidateBackupConfiguration(
-				r.Spec.Backup.BarmanObjectStore,
-				field.NewPath("spec", "backup", "barmanObjectStore"),
-			)
-			result = append(
-				result,
-				barmanWebhooks.ValidateRetentionPolicy(
-					r.Spec.Backup.RetentionPolicy,
-					field.NewPath("spec", "backup", "retentionPolicy"),
-				)...,
-			)
-
-			return result
-		},
+		r.validateBackupConfiguration,
+		r.validateRetentionPolicy,
 		r.validateConfiguration,
 		r.validateLDAP,
 		r.validateReplicationSlots,
@@ -2163,6 +2146,28 @@ func (r *Cluster) validateAntiAffinity() field.ErrorList {
 		))
 	}
 	return allErrors
+}
+
+// validateBackupConfiguration validates the backup configuration
+func (r *Cluster) validateBackupConfiguration() field.ErrorList {
+	if r.Spec.Backup == nil {
+		return nil
+	}
+	return barmanWebhooks.ValidateBackupConfiguration(
+		r.Spec.Backup.BarmanObjectStore,
+		field.NewPath("spec", "backup", "barmanObjectStore"),
+	)
+}
+
+// validateRetentionPolicy validates the retention policy configuration
+func (r *Cluster) validateRetentionPolicy() field.ErrorList {
+	if r.Spec.Backup == nil {
+		return nil
+	}
+	return barmanWebhooks.ValidateRetentionPolicy(
+		r.Spec.Backup.RetentionPolicy,
+		field.NewPath("spec", "backup", "retentionPolicy"),
+	)
 }
 
 func (r *Cluster) validateReplicationSlots() field.ErrorList {

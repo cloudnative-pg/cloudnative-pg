@@ -3020,6 +3020,56 @@ var _ = Describe("Validation changes", func() {
 	})
 })
 
+var _ = Describe("Backup validation", func() {
+	It("complain if there's no credentials", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				Backup: &BackupConfiguration{
+					BarmanObjectStore: &BarmanObjectStoreConfiguration{},
+				},
+			},
+		}
+		err := cluster.validateBackupConfiguration()
+		Expect(err).To(HaveLen(1))
+	})
+})
+
+var _ = Describe("Backup retention policy validation", func() {
+	It("doesn't complain if given policy is not provided", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				Backup: &BackupConfiguration{},
+			},
+		}
+		err := cluster.validateRetentionPolicy()
+		Expect(err).To(BeEmpty())
+	})
+
+	It("doesn't complain if given policy is valid", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				Backup: &BackupConfiguration{
+					RetentionPolicy: "90d",
+				},
+			},
+		}
+		err := cluster.validateRetentionPolicy()
+		Expect(err).To(BeEmpty())
+	})
+
+	It("complain if a given policy is not valid", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				Backup: &BackupConfiguration{
+					RetentionPolicy: "09",
+				},
+			},
+		}
+		err := cluster.validateRetentionPolicy()
+		Expect(err).To(HaveLen(1))
+	})
+})
+
 var _ = Describe("Default monitoring queries", func() {
 	It("correctly set the default monitoring queries configmap and secret when none is already specified", func() {
 		cluster := &Cluster{}
