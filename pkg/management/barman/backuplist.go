@@ -46,10 +46,11 @@ import (
 	"fmt"
 	"os/exec"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
+
 	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	barmanCapabilities "github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/capabilities"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/catalog"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
 func executeQueryCommand(

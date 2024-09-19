@@ -30,11 +30,10 @@ import (
 	"github.com/cloudnative-pg/cnpg-i/pkg/operator"
 	"github.com/cloudnative-pg/cnpg-i/pkg/reconciler"
 	"github.com/cloudnative-pg/cnpg-i/pkg/wal"
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/timeout"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
 // defaultTimeout is the timeout applied by default to every GRPC call

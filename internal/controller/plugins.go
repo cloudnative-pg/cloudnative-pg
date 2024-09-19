@@ -19,11 +19,11 @@ package controller
 import (
 	"context"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	cnpiClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
 // preReconcilePluginHooks ensures we call the pre-reconcile plugin hooks
