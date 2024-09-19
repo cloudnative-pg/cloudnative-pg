@@ -110,32 +110,6 @@ func createPostgresVolumes(cluster *apiv1.Cluster, podName string) []corev1.Volu
 		},
 	}
 
-	if cluster.GetEnableSuperuserAccess() {
-		result = append(result,
-			corev1.Volume{
-				Name: "superuser-secret",
-				VolumeSource: corev1.VolumeSource{
-					Secret: &corev1.SecretVolumeSource{
-						SecretName: cluster.GetSuperuserSecretName(),
-					},
-				},
-			},
-		)
-	}
-
-	if cluster.ShouldCreateApplicationDatabase() {
-		result = append(result,
-			corev1.Volume{
-				Name: "app-secret",
-				VolumeSource: corev1.VolumeSource{
-					Secret: &corev1.SecretVolumeSource{
-						SecretName: cluster.GetApplicationSecretName(),
-					},
-				},
-			},
-		)
-	}
-
 	if cluster.ShouldCreateWalArchiveVolume() {
 		result = append(result,
 			corev1.Volume{
@@ -252,24 +226,6 @@ func createPostgresVolumeMounts(cluster apiv1.Cluster) []corev1.VolumeMount {
 			Name:      "shm",
 			MountPath: "/dev/shm",
 		},
-	}
-
-	if cluster.GetEnableSuperuserAccess() {
-		volumeMounts = append(volumeMounts,
-			corev1.VolumeMount{
-				Name:      "superuser-secret",
-				MountPath: "/etc/superuser-secret",
-			},
-		)
-	}
-
-	if cluster.ShouldCreateApplicationDatabase() {
-		volumeMounts = append(volumeMounts,
-			corev1.VolumeMount{
-				Name:      "app-secret",
-				MountPath: "/etc/app-secret",
-			},
-		)
 	}
 
 	if cluster.ShouldCreateWalArchiveVolume() {
