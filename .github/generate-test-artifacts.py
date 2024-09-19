@@ -156,7 +156,7 @@ def write_artifact(artifact, artifact_dir, matrix):
     Repository, and with Repo + Run ID + MatrixID + Test Hash, gives a unique
     ID in Elastic to each object.
     """
-    whitespace = re.compile("\s")
+    whitespace = re.compile(r"\s")
     slug = whitespace.sub("_", artifact["name"])
     h = hashlib.sha224(slug.encode("utf-8")).hexdigest()
     filename = matrix["id"] + "_" + h + ".json"
@@ -271,7 +271,7 @@ if __name__ == "__main__":
                 if (
                     (t["State"] != "skipped")
                     and (t["LeafNodeText"] != "")
-                    and is_user_spec(test)
+                    and is_user_spec(t)
                 ):
                     test1 = convert_ginkgo_test(t, matrix)
                     write_artifact(test1, outputDir, matrix)
