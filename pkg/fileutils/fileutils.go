@@ -31,7 +31,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/machinery/pkg/log"
 )
 
 // excludedPathsFromRestore contains a list of files that should not be included into the restore process

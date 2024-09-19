@@ -19,8 +19,9 @@ package barman
 import (
 	"fmt"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
+
 	barmanCapabilities "github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/capabilities"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
 const (

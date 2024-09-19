@@ -370,21 +370,21 @@ storage account name and also one (and only one) of:</p>
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
 <tr><td><code>connectionString</code><br/>
-<a href="#postgresql-cnpg-io-v1-SecretKeySelector"><i>SecretKeySelector</i></a>
+<i>github.com/cloudnative-pg/machinery/pkg/api.SecretKeySelector</i>
 </td>
 <td>
    <p>The connection string to be used</p>
 </td>
 </tr>
 <tr><td><code>storageAccount</code><br/>
-<a href="#postgresql-cnpg-io-v1-SecretKeySelector"><i>SecretKeySelector</i></a>
+<i>github.com/cloudnative-pg/machinery/pkg/api.SecretKeySelector</i>
 </td>
 <td>
    <p>The storage account where to upload data</p>
 </td>
 </tr>
 <tr><td><code>storageKey</code><br/>
-<a href="#postgresql-cnpg-io-v1-SecretKeySelector"><i>SecretKeySelector</i></a>
+<i>github.com/cloudnative-pg/machinery/pkg/api.SecretKeySelector</i>
 </td>
 <td>
    <p>The storage account key to be used in conjunction
@@ -392,7 +392,7 @@ with the storage account name</p>
 </td>
 </tr>
 <tr><td><code>storageSasToken</code><br/>
-<a href="#postgresql-cnpg-io-v1-SecretKeySelector"><i>SecretKeySelector</i></a>
+<i>github.com/cloudnative-pg/machinery/pkg/api.SecretKeySelector</i>
 </td>
 <td>
    <p>A shared-access-signature to be used in conjunction with
@@ -611,13 +611,13 @@ information that could be needed to correctly restore it.</p>
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
 <tr><td><code>LocalObjectReference</code><br/>
-<a href="#postgresql-cnpg-io-v1-LocalObjectReference"><i>LocalObjectReference</i></a>
+<i>github.com/cloudnative-pg/machinery/pkg/api.LocalObjectReference</i>
 </td>
 <td>(Members of <code>LocalObjectReference</code> are embedded into this type.)
    <span class="text-muted">No description provided.</span></td>
 </tr>
 <tr><td><code>endpointCA</code><br/>
-<a href="#postgresql-cnpg-io-v1-SecretKeySelector"><i>SecretKeySelector</i></a>
+<i>github.com/cloudnative-pg/machinery/pkg/api.SecretKeySelector</i>
 </td>
 <td>
    <p>EndpointCA store the CA bundle of the barman endpoint.
@@ -643,7 +643,7 @@ errors with certificate issuer and barman-cloud-wal-archive.</p>
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
 <tr><td><code>cluster</code> <B>[Required]</B><br/>
-<a href="#postgresql-cnpg-io-v1-LocalObjectReference"><i>LocalObjectReference</i></a>
+<i>github.com/cloudnative-pg/machinery/pkg/api.LocalObjectReference</i>
 </td>
 <td>
    <p>The cluster to backup</p>
@@ -718,7 +718,7 @@ Overrides the default settings specified in the cluster '.backup.volumeSnapshot.
 </td>
 </tr>
 <tr><td><code>endpointCA</code><br/>
-<a href="#postgresql-cnpg-io-v1-SecretKeySelector"><i>SecretKeySelector</i></a>
+<i>github.com/cloudnative-pg/machinery/pkg/api.SecretKeySelector</i>
 </td>
 <td>
    <p>EndpointCA store the CA bundle of the barman endpoint.
@@ -978,7 +978,7 @@ overriding the automatic endpoint discovery</p>
 </td>
 </tr>
 <tr><td><code>endpointCA</code><br/>
-<a href="#postgresql-cnpg-io-v1-SecretKeySelector"><i>SecretKeySelector</i></a>
+<i>github.com/cloudnative-pg/machinery/pkg/api.SecretKeySelector</i>
 </td>
 <td>
    <p>EndpointCA store the CA bundle of the barman endpoint.
@@ -1116,7 +1116,7 @@ by applications. Defaults to the value of the <code>database</code> key.</p>
 </td>
 </tr>
 <tr><td><code>secret</code><br/>
-<a href="#postgresql-cnpg-io-v1-LocalObjectReference"><i>LocalObjectReference</i></a>
+<i>github.com/cloudnative-pg/machinery/pkg/api.LocalObjectReference</i>
 </td>
 <td>
    <p>Name of the secret containing the initial credentials for the
@@ -1286,7 +1286,7 @@ by applications. Defaults to the value of the <code>database</code> key.</p>
 </td>
 </tr>
 <tr><td><code>secret</code><br/>
-<a href="#postgresql-cnpg-io-v1-LocalObjectReference"><i>LocalObjectReference</i></a>
+<i>github.com/cloudnative-pg/machinery/pkg/api.LocalObjectReference</i>
 </td>
 <td>
    <p>Name of the secret containing the initial credentials for the
@@ -1382,7 +1382,7 @@ by applications. Defaults to the value of the <code>database</code> key.</p>
 </td>
 </tr>
 <tr><td><code>secret</code><br/>
-<a href="#postgresql-cnpg-io-v1-LocalObjectReference"><i>LocalObjectReference</i></a>
+<i>github.com/cloudnative-pg/machinery/pkg/api.LocalObjectReference</i>
 </td>
 <td>
    <p>Name of the secret containing the initial credentials for the
@@ -1694,7 +1694,7 @@ Undefined or 0 disable synchronous replication.</p>
 </td>
 </tr>
 <tr><td><code>superuserSecret</code><br/>
-<a href="#postgresql-cnpg-io-v1-LocalObjectReference"><i>LocalObjectReference</i></a>
+<i>github.com/cloudnative-pg/machinery/pkg/api.LocalObjectReference</i>
 </td>
 <td>
    <p>The secret containing the superuser password. If not defined a new
@@ -1721,7 +1721,7 @@ user by setting it to <code>NULL</code>. Disabled by default.</p>
 </td>
 </tr>
 <tr><td><code>imagePullSecrets</code><br/>
-<a href="#postgresql-cnpg-io-v1-LocalObjectReference"><i>[]LocalObjectReference</i></a>
+<i>[]github.com/cloudnative-pg/machinery/pkg/api.LocalObjectReference</i>
 </td>
 <td>
    <p>The list of pull secrets to be used to pull the images</p>
@@ -2347,40 +2347,6 @@ WAL file, and Time of latest checkpoint</p>
 
 
 
-## ConfigMapKeySelector     {#postgresql-cnpg-io-v1-ConfigMapKeySelector}
-
-
-**Appears in:**
-
-- [MonitoringConfiguration](#postgresql-cnpg-io-v1-MonitoringConfiguration)
-
-- [SQLRefs](#postgresql-cnpg-io-v1-SQLRefs)
-
-
-<p>ConfigMapKeySelector contains enough information to let you locate
-the key of a ConfigMap</p>
-
-
-<table class="table">
-<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
-<tbody>
-<tr><td><code>LocalObjectReference</code><br/>
-<a href="#postgresql-cnpg-io-v1-LocalObjectReference"><i>LocalObjectReference</i></a>
-</td>
-<td>(Members of <code>LocalObjectReference</code> are embedded into this type.)
-   <p>The name of the secret in the pod's namespace to select from.</p>
-</td>
-</tr>
-<tr><td><code>key</code> <B>[Required]</B><br/>
-<i>string</i>
-</td>
-<td>
-   <p>The key to select</p>
-</td>
-</tr>
-</tbody>
-</table>
-
 ## ConfigMapResourceVersion     {#postgresql-cnpg-io-v1-ConfigMapResourceVersion}
 
 
@@ -2727,7 +2693,7 @@ This needs to be specified even if we run inside a GKE environment.</p>
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
 <tr><td><code>applicationCredentials</code><br/>
-<a href="#postgresql-cnpg-io-v1-SecretKeySelector"><i>SecretKeySelector</i></a>
+<i>github.com/cloudnative-pg/machinery/pkg/api.SecretKeySelector</i>
 </td>
 <td>
    <p>The secret containing the Google Cloud Storage JSON file with the credentials</p>
@@ -3106,53 +3072,6 @@ the bind+search LDAP authentication process</p>
 
 
 
-## LocalObjectReference     {#postgresql-cnpg-io-v1-LocalObjectReference}
-
-
-**Appears in:**
-
-- [BackupSource](#postgresql-cnpg-io-v1-BackupSource)
-
-- [BackupSpec](#postgresql-cnpg-io-v1-BackupSpec)
-
-- [BootstrapInitDB](#postgresql-cnpg-io-v1-BootstrapInitDB)
-
-- [BootstrapPgBaseBackup](#postgresql-cnpg-io-v1-BootstrapPgBaseBackup)
-
-- [BootstrapRecovery](#postgresql-cnpg-io-v1-BootstrapRecovery)
-
-- [ClusterSpec](#postgresql-cnpg-io-v1-ClusterSpec)
-
-- [ConfigMapKeySelector](#postgresql-cnpg-io-v1-ConfigMapKeySelector)
-
-- [PgBouncerSpec](#postgresql-cnpg-io-v1-PgBouncerSpec)
-
-- [PoolerSpec](#postgresql-cnpg-io-v1-PoolerSpec)
-
-- [RoleConfiguration](#postgresql-cnpg-io-v1-RoleConfiguration)
-
-- [ScheduledBackupSpec](#postgresql-cnpg-io-v1-ScheduledBackupSpec)
-
-- [SecretKeySelector](#postgresql-cnpg-io-v1-SecretKeySelector)
-
-
-<p>LocalObjectReference contains enough information to let you locate a
-local object with a known type inside the same namespace</p>
-
-
-<table class="table">
-<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
-<tbody>
-<tr><td><code>name</code> <B>[Required]</B><br/>
-<i>string</i>
-</td>
-<td>
-   <p>Name of the referent.</p>
-</td>
-</tr>
-</tbody>
-</table>
-
 ## ManagedConfiguration     {#postgresql-cnpg-io-v1-ManagedConfiguration}
 
 
@@ -3372,14 +3291,14 @@ Default: false.</p>
 </td>
 </tr>
 <tr><td><code>customQueriesConfigMap</code><br/>
-<a href="#postgresql-cnpg-io-v1-ConfigMapKeySelector"><i>[]ConfigMapKeySelector</i></a>
+<i>[]github.com/cloudnative-pg/machinery/pkg/api.ConfigMapKeySelector</i>
 </td>
 <td>
    <p>The list of config maps containing the custom queries</p>
 </td>
 </tr>
 <tr><td><code>customQueriesSecret</code><br/>
-<a href="#postgresql-cnpg-io-v1-SecretKeySelector"><i>[]SecretKeySelector</i></a>
+<i>[]github.com/cloudnative-pg/machinery/pkg/api.SecretKeySelector</i>
 </td>
 <td>
    <p>The list of secrets containing the custom queries</p>
@@ -3614,7 +3533,7 @@ by pgbouncer</p>
 </td>
 </tr>
 <tr><td><code>authQuerySecret</code><br/>
-<a href="#postgresql-cnpg-io-v1-LocalObjectReference"><i>LocalObjectReference</i></a>
+<i>github.com/cloudnative-pg/machinery/pkg/api.LocalObjectReference</i>
 </td>
 <td>
    <p>The credentials of the user that need to be used for the authentication
@@ -3912,7 +3831,7 @@ part for now.</p>
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
 <tr><td><code>cluster</code> <B>[Required]</B><br/>
-<a href="#postgresql-cnpg-io-v1-LocalObjectReference"><i>LocalObjectReference</i></a>
+<i>github.com/cloudnative-pg/machinery/pkg/api.LocalObjectReference</i>
 </td>
 <td>
    <p>This is the cluster reference on which the Pooler will work.
@@ -4410,7 +4329,7 @@ Reference: https://www.postgresql.org/docs/current/sql-createrole.html</p>
 </td>
 </tr>
 <tr><td><code>passwordSecret</code><br/>
-<a href="#postgresql-cnpg-io-v1-LocalObjectReference"><i>LocalObjectReference</i></a>
+<i>github.com/cloudnative-pg/machinery/pkg/api.LocalObjectReference</i>
 </td>
 <td>
    <p>Secret containing the password of the role (if present)
@@ -4542,28 +4461,28 @@ files to S3. It can be provided in two alternative ways:</p>
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
 <tr><td><code>accessKeyId</code><br/>
-<a href="#postgresql-cnpg-io-v1-SecretKeySelector"><i>SecretKeySelector</i></a>
+<i>github.com/cloudnative-pg/machinery/pkg/api.SecretKeySelector</i>
 </td>
 <td>
    <p>The reference to the access key id</p>
 </td>
 </tr>
 <tr><td><code>secretAccessKey</code><br/>
-<a href="#postgresql-cnpg-io-v1-SecretKeySelector"><i>SecretKeySelector</i></a>
+<i>github.com/cloudnative-pg/machinery/pkg/api.SecretKeySelector</i>
 </td>
 <td>
    <p>The reference to the secret access key</p>
 </td>
 </tr>
 <tr><td><code>region</code><br/>
-<a href="#postgresql-cnpg-io-v1-SecretKeySelector"><i>SecretKeySelector</i></a>
+<i>github.com/cloudnative-pg/machinery/pkg/api.SecretKeySelector</i>
 </td>
 <td>
    <p>The reference to the secret containing the region name</p>
 </td>
 </tr>
 <tr><td><code>sessionToken</code><br/>
-<a href="#postgresql-cnpg-io-v1-SecretKeySelector"><i>SecretKeySelector</i></a>
+<i>github.com/cloudnative-pg/machinery/pkg/api.SecretKeySelector</i>
 </td>
 <td>
    <p>The references to the session key</p>
@@ -4598,14 +4517,14 @@ in their respective arrays.</p>
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
 <tr><td><code>secretRefs</code><br/>
-<a href="#postgresql-cnpg-io-v1-SecretKeySelector"><i>[]SecretKeySelector</i></a>
+<i>[]github.com/cloudnative-pg/machinery/pkg/api.SecretKeySelector</i>
 </td>
 <td>
    <p>SecretRefs holds a list of references to Secrets</p>
 </td>
 </tr>
 <tr><td><code>configMapRefs</code><br/>
-<a href="#postgresql-cnpg-io-v1-ConfigMapKeySelector"><i>[]ConfigMapKeySelector</i></a>
+<i>[]github.com/cloudnative-pg/machinery/pkg/api.ConfigMapKeySelector</i>
 </td>
 <td>
    <p>ConfigMapRefs holds a list of references to ConfigMaps</p>
@@ -4652,7 +4571,7 @@ see https://pkg.go.dev/github.com/robfig/cron#hdr-CRON_Expression_Format</p>
 </td>
 </tr>
 <tr><td><code>cluster</code> <B>[Required]</B><br/>
-<a href="#postgresql-cnpg-io-v1-LocalObjectReference"><i>LocalObjectReference</i></a>
+<i>github.com/cloudnative-pg/machinery/pkg/api.LocalObjectReference</i>
 </td>
 <td>
    <p>The cluster to backup</p>
@@ -4750,52 +4669,6 @@ Overrides the default settings specified in the cluster '.backup.volumeSnapshot.
 </td>
 <td>
    <p>Next time we will run a backup</p>
-</td>
-</tr>
-</tbody>
-</table>
-
-## SecretKeySelector     {#postgresql-cnpg-io-v1-SecretKeySelector}
-
-
-**Appears in:**
-
-- [AzureCredentials](#postgresql-cnpg-io-v1-AzureCredentials)
-
-- [BackupSource](#postgresql-cnpg-io-v1-BackupSource)
-
-- [BackupStatus](#postgresql-cnpg-io-v1-BackupStatus)
-
-- [BarmanObjectStoreConfiguration](#postgresql-cnpg-io-v1-BarmanObjectStoreConfiguration)
-
-- [GoogleCredentials](#postgresql-cnpg-io-v1-GoogleCredentials)
-
-- [MonitoringConfiguration](#postgresql-cnpg-io-v1-MonitoringConfiguration)
-
-- [S3Credentials](#postgresql-cnpg-io-v1-S3Credentials)
-
-- [SQLRefs](#postgresql-cnpg-io-v1-SQLRefs)
-
-
-<p>SecretKeySelector contains enough information to let you locate
-the key of a Secret</p>
-
-
-<table class="table">
-<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
-<tbody>
-<tr><td><code>LocalObjectReference</code><br/>
-<a href="#postgresql-cnpg-io-v1-LocalObjectReference"><i>LocalObjectReference</i></a>
-</td>
-<td>(Members of <code>LocalObjectReference</code> are embedded into this type.)
-   <p>The name of the secret in the pod's namespace to select from.</p>
-</td>
-</tr>
-<tr><td><code>key</code> <B>[Required]</B><br/>
-<i>string</i>
-</td>
-<td>
-   <p>The key to select</p>
 </td>
 </tr>
 </tbody>

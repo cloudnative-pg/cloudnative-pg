@@ -24,9 +24,8 @@ import (
 	"path"
 	"syscall"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/thoas/go-funk"
-
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
 const (
