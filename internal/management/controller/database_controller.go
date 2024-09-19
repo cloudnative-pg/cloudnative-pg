@@ -53,26 +53,6 @@ type instanceInterface interface {
 	GetNamespaceName() string
 }
 
-type instanceData struct {
-	instance *postgres.Instance
-}
-
-func (i *instanceData) GetSuperUserDB() (*sql.DB, error) {
-	return i.instance.GetSuperUserDB()
-}
-
-func (i *instanceData) GetClusterName() string {
-	return i.instance.ClusterName
-}
-
-func (i *instanceData) GetPodName() string {
-	return i.instance.PodName
-}
-
-func (i *instanceData) GetNamespaceName() string {
-	return i.instance.Namespace
-}
-
 // errClusterIsReplica is raised when the database object
 // cannot be reconciled because it belongs to a replica cluster
 var errClusterIsReplica = fmt.Errorf("waiting for the cluster to become primary")
@@ -249,7 +229,7 @@ func NewDatabaseReconciler(
 ) *DatabaseReconciler {
 	return &DatabaseReconciler{
 		Client:   mgr.GetClient(),
-		instance: &instanceData{instance: instance},
+		instance: instance,
 	}
 }
 

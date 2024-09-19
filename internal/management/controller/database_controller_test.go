@@ -38,7 +38,7 @@ import (
 )
 
 type fakeInstanceData struct {
-	instanceData
+	*postgres.Instance
 	db *sql.DB
 }
 
@@ -93,8 +93,8 @@ var _ = Describe("Managed Database status", func() {
 		}
 
 		f := fakeInstanceData{
-			instanceData: instanceData{instance: pgInstance},
-			db:           db,
+			Instance: pgInstance,
+			db:       db,
 		}
 
 		fakeClient = fake.NewClientBuilder().WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
