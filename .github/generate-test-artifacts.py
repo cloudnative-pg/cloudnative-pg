@@ -76,6 +76,23 @@ def env_to_json():
     return matrix
 
 
+def is_user_spec(spec):
+    """Checks if the spec contains the fields used to build the test name.
+    The JSON report produced by Ginkgo may contain
+    SpecReports entries that are for internal Ginkgo purposes and will not
+    reflect user-defined Specs. For these entries, ContainerHierarchyTexts may
+    be null or the LeafNodeText may be blank
+    """
+    if spec["LeafNodeText"] == "":
+        return False
+
+    try:
+        _ = " - ".join(spec["ContainerHierarchyTexts"])
+        return True
+    except TypeError:
+        return False
+
+
 def convert_ginkgo_test(test, matrix):
     """Converts a test spec in ginkgo JSON format into a normalized JSON object.
     The matrix arg will be passed from the GH Actions, and is expected to be
@@ -142,7 +159,7 @@ def write_artifact(artifact, artifact_dir, matrix):
     Repository, and with Repo + Run ID + MatrixID + Test Hash, gives a unique
     ID in Elastic to each object.
     """
-    whitespace = re.compile("\s")
+    whitespace = re.compile(r"\s")
     slug = whitespace.sub("_", artifact["name"])
     h = hashlib.sha224(slug.encode("utf-8")).hexdigest()
     filename = matrix["id"] + "_" + h + ".json"
@@ -209,7 +226,7 @@ if __name__ == "__main__":
         "--environment",
         type=bool,
         help="get the matrix arguments from environment variables. "
-             "Variables defined with -m/--matrix take priority",
+        "Variables defined with -m/--matrix take priority",
     )
 
     args = parser.parse_args()
@@ -254,7 +271,7 @@ if __name__ == "__main__":
         with open(args.file) as json_file:
             testResults = json.load(json_file)
             for t in testResults[0]["SpecReports"]:
-                if (t["State"] != "skipped") and (t["LeafNodeText"] != ""):
+                if (t["State"] != "skipped") and is_user_spec(t):
                     test1 = convert_ginkgo_test(t, matrix)
                     write_artifact(test1, outputDir, matrix)
     except Exception as e:
