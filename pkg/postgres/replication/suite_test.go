@@ -21,7 +21,6 @@ import (
 	"testing"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -41,9 +40,9 @@ func createFakeCluster(name string) *apiv1.Cluster {
 	cluster.Spec.MinSyncReplicas = 1
 	cluster.Status = apiv1.ClusterStatus{
 		CurrentPrimary: primaryPod,
-		InstancesStatus: map[utils.PodStatus][]string{
-			utils.PodHealthy: {primaryPod, fmt.Sprintf("%s-2", name), fmt.Sprintf("%s-3", name)},
-			utils.PodFailed:  {},
+		InstancesStatus: map[apiv1.PodStatus][]string{
+			apiv1.PodHealthy: {primaryPod, fmt.Sprintf("%s-2", name), fmt.Sprintf("%s-3", name)},
+			apiv1.PodFailed:  {},
 		},
 	}
 	return cluster

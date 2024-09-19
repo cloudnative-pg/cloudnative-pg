@@ -16,36 +16,16 @@ limitations under the License.
 
 package v1
 
-import (
-	corev1 "k8s.io/api/core/v1"
+// PodStatus represent the possible status of pods
+type PodStatus string
+
+const (
+	// PodHealthy means that a Pod is active and ready
+	PodHealthy = "healthy"
+
+	// PodReplicating means that a Pod is still not ready but still active
+	PodReplicating = "replicating"
+
+	// PodFailed means that a Pod will not be scheduled again (deleted or evicted)
+	PodFailed = "failed"
 )
-
-// SecretKeySelectorToCore transforms a SecretKeySelector structure to the
-// analogue one in the corev1 namespace
-func SecretKeySelectorToCore(selector *SecretKeySelector) *corev1.SecretKeySelector {
-	if selector == nil {
-		return nil
-	}
-
-	return &corev1.SecretKeySelector{
-		LocalObjectReference: corev1.LocalObjectReference{
-			Name: selector.LocalObjectReference.Name,
-		},
-		Key: selector.Key,
-	}
-}
-
-// ConfigMapKeySelectorToCore transforms a ConfigMapKeySelector structure to the analogue
-// one in the corev1 namespace
-func ConfigMapKeySelectorToCore(selector *ConfigMapKeySelector) *corev1.ConfigMapKeySelector {
-	if selector == nil {
-		return nil
-	}
-
-	return &corev1.ConfigMapKeySelector{
-		LocalObjectReference: corev1.LocalObjectReference{
-			Name: selector.Name,
-		},
-		Key: selector.Key,
-	}
-}
