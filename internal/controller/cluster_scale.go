@@ -42,8 +42,9 @@ func (r *ClusterReconciler) scaleDownCluster(
 	contextLogger := log.FromContext(ctx)
 
 	if cluster.Spec.MaxSyncReplicas > 0 && cluster.Spec.Instances < (cluster.Spec.MaxSyncReplicas+1) {
+		origCluster := cluster.DeepCopy()
 		cluster.Spec.Instances = cluster.Status.Instances
-		if err := r.Update(ctx, cluster); err != nil {
+		if err := r.Patch(ctx, cluster, client.MergeFrom(origCluster)); err != nil {
 			return err
 		}
 
