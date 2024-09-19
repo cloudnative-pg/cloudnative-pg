@@ -94,11 +94,11 @@ var _ = Describe("Managed Database SQL", func() {
 
 			expectedValue := sqlmock.NewResult(0, 1)
 			expectedQuery := fmt.Sprintf(
-				"CREATE DATABASE %s IS_TEMPLATE %v OWNER %s TABLESPACE %s "+
-					"ALLOW_CONNECTIONS %v CONNECTION LIMIT %v",
-				pgx.Identifier{database.Spec.Name}.Sanitize(), *database.Spec.IsTemplate,
-				pgx.Identifier{database.Spec.Owner}.Sanitize(), pgx.Identifier{database.Spec.Tablespace}.Sanitize(),
-				*database.Spec.AllowConnections, *database.Spec.ConnectionLimit,
+				"CREATE DATABASE %s OWNER %s TABLESPACE %s "+
+					"ALLOW_CONNECTIONS %t CONNECTION LIMIT %d IS_TEMPLATE %t",
+				pgx.Identifier{database.Spec.Name}.Sanitize(), pgx.Identifier{database.Spec.Owner}.Sanitize(),
+				pgx.Identifier{database.Spec.Tablespace}.Sanitize(), *database.Spec.AllowConnections,
+				*database.Spec.ConnectionLimit, *database.Spec.IsTemplate,
 			)
 			dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedValue)
 
@@ -117,22 +117,6 @@ var _ = Describe("Managed Database SQL", func() {
 
 			expectedValue := sqlmock.NewResult(0, 1)
 
-			// Mock Owner DDL
-			ownerExpectedQuery := fmt.Sprintf(
-				"ALTER DATABASE %s OWNER TO %s",
-				pgx.Identifier{database.Spec.Name}.Sanitize(),
-				pgx.Identifier{database.Spec.Owner}.Sanitize(),
-			)
-			dbMock.ExpectExec(ownerExpectedQuery).WillReturnResult(expectedValue)
-
-			// Mock IsTemplate DDL
-			isTemplateExpectedQuery := fmt.Sprintf(
-				"ALTER DATABASE %s WITH IS_TEMPLATE %v",
-				pgx.Identifier{database.Spec.Name}.Sanitize(),
-				*database.Spec.IsTemplate,
-			)
-			dbMock.ExpectExec(isTemplateExpectedQuery).WillReturnResult(expectedValue)
-
 			// Mock AllowConnections DDL
 			allowConnectionsExpectedQuery := fmt.Sprintf(
 				"ALTER DATABASE %s WITH ALLOW_CONNECTIONS %v",
@@ -148,6 +132,22 @@ var _ = Describe("Managed Database SQL", func() {
 				*database.Spec.ConnectionLimit,
 			)
 			dbMock.ExpectExec(connectionLimitExpectedQuery).WillReturnResult(expectedValue)
+
+			// Mock IsTemplate DDL
+			isTemplateExpectedQuery := fmt.Sprintf(
+				"ALTER DATABASE %s WITH IS_TEMPLATE %v",
+				pgx.Identifier{database.Spec.Name}.Sanitize(),
+				*database.Spec.IsTemplate,
+			)
+			dbMock.ExpectExec(isTemplateExpectedQuery).WillReturnResult(expectedValue)
+
+			// Mock Owner DDL
+			ownerExpectedQuery := fmt.Sprintf(
+				"ALTER DATABASE %s OWNER TO %s",
+				pgx.Identifier{database.Spec.Name}.Sanitize(),
+				pgx.Identifier{database.Spec.Owner}.Sanitize(),
+			)
+			dbMock.ExpectExec(ownerExpectedQuery).WillReturnResult(expectedValue)
 
 			// Mock Tablespace DDL
 			tablespaceExpectedQuery := fmt.Sprintf(

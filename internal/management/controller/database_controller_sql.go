@@ -57,9 +57,6 @@ func createDatabase(
 	obj *apiv1.Database,
 ) error {
 	sqlCreateDatabase := fmt.Sprintf("CREATE DATABASE %s ", pgx.Identifier{obj.Spec.Name}.Sanitize())
-	if obj.Spec.IsTemplate != nil {
-		sqlCreateDatabase += fmt.Sprintf(" IS_TEMPLATE %v", *obj.Spec.IsTemplate)
-	}
 	if len(obj.Spec.Owner) > 0 {
 		sqlCreateDatabase += fmt.Sprintf(" OWNER %s", pgx.Identifier{obj.Spec.Owner}.Sanitize())
 	}
@@ -72,6 +69,9 @@ func createDatabase(
 	if obj.Spec.ConnectionLimit != nil {
 		sqlCreateDatabase += fmt.Sprintf(" CONNECTION LIMIT %v", *obj.Spec.ConnectionLimit)
 	}
+	if obj.Spec.IsTemplate != nil {
+		sqlCreateDatabase += fmt.Sprintf(" IS_TEMPLATE %v", *obj.Spec.IsTemplate)
+	}
 
 	_, err := db.ExecContext(ctx, sqlCreateDatabase)
 
@@ -83,30 +83,6 @@ func updateDatabase(
 	db *sql.DB,
 	obj *apiv1.Database,
 ) error {
-	if len(obj.Spec.Owner) > 0 {
-		changeOwnerSQL := fmt.Sprintf(
-			"ALTER DATABASE %s OWNER TO %s",
-			pgx.Identifier{obj.Spec.Name}.Sanitize(),
-			pgx.Identifier{obj.Spec.Owner}.Sanitize())
-
-		if _, err := db.ExecContext(ctx, changeOwnerSQL); err != nil {
-			return fmt.Errorf("while altering database %q owner %s to: %w",
-				obj.Spec.Name, obj.Spec.Owner, err)
-		}
-	}
-
-	if obj.Spec.IsTemplate != nil {
-		changeIsTemplateSQL := fmt.Sprintf(
-			"ALTER DATABASE %s WITH IS_TEMPLATE %v",
-			pgx.Identifier{obj.Spec.Name}.Sanitize(),
-			*obj.Spec.IsTemplate)
-
-		if _, err := db.ExecContext(ctx, changeIsTemplateSQL); err != nil {
-			return fmt.Errorf("while altering database %q with is_template %t: %w",
-				obj.Spec.Name, *obj.Spec.IsTemplate, err)
-		}
-	}
-
 	if obj.Spec.AllowConnections != nil {
 		changeAllowConnectionsSQL := fmt.Sprintf(
 			"ALTER DATABASE %s WITH ALLOW_CONNECTIONS %v",
@@ -131,6 +107,30 @@ func updateDatabase(
 		}
 	}
 
+	if obj.Spec.IsTemplate != nil {
+		changeIsTemplateSQL := fmt.Sprintf(
+			"ALTER DATABASE %s WITH IS_TEMPLATE %v",
+			pgx.Identifier{obj.Spec.Name}.Sanitize(),
+			*obj.Spec.IsTemplate)
+
+		if _, err := db.ExecContext(ctx, changeIsTemplateSQL); err != nil {
+			return fmt.Errorf("while altering database %q with is_template %t: %w",
+				obj.Spec.Name, *obj.Spec.IsTemplate, err)
+		}
+	}
+
+	if len(obj.Spec.Owner) > 0 {
+		changeOwnerSQL := fmt.Sprintf(
+			"ALTER DATABASE %s OWNER TO %s",
+			pgx.Identifier{obj.Spec.Name}.Sanitize(),
+			pgx.Identifier{obj.Spec.Owner}.Sanitize())
+
+		if _, err := db.ExecContext(ctx, changeOwnerSQL); err != nil {
+			return fmt.Errorf("while altering database %q owner %s to: %w",
+				obj.Spec.Name, obj.Spec.Owner, err)
+		}
+	}
+
 	if len(obj.Spec.Tablespace) > 0 {
 		changeTablespaceSQL := fmt.Sprintf(
 			"ALTER DATABASE %s SET TABLESPACE %s",
@@ -138,7 +138,7 @@ func updateDatabase(
 			pgx.Identifier{obj.Spec.Tablespace}.Sanitize())
 
 		if _, err := db.ExecContext(ctx, changeTablespaceSQL); err != nil {
-			return fmt.Errorf("while altering database %q when setting tablespace %s: %w",
+			return fmt.Errorf("while altering database %q tablespace %s: %w",
 				obj.Spec.Name, obj.Spec.Tablespace, err)
 		}
 	}
