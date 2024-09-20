@@ -109,10 +109,17 @@ type Data struct {
 	// the <cluster-name>-any service. Defaults to false.
 	CreateAnyService bool `json:"createAnyService" env:"CREATE_ANY_SERVICE"`
 
-	// The amount of time to wait between rollouts of different clusters in seconds
+	// The duration (in seconds) to wait between the rollouts of different
+	// clusters during an operator upgrade. This setting controls the
+	// timing of upgrades across clusters, spreading them out to reduce
+	// system impact. The default value is 0, which means no delay between
+	// PostgreSQL cluster upgrades.
 	ClustersRolloutDelay int `json:"clustersRolloutDelay" env:"CLUSTERS_ROLLOUT_DELAY"`
 
-	// The amount of time to wait between rollouts of instances of the same cluster in seconds
+	// The duration (in seconds) to wait between rollouts of individual
+	// PostgreSQL instances within the same cluster during an operator
+	// upgrade. The default value is 0, meaning no delay between upgrades
+	// of instances in the same PostgreSQL cluster.
 	InstancesRolloutDelay int `json:"instancesRolloutDelay" env:"INSTANCES_ROLLOUT_DELAY"`
 
 	// IncludePlugins is a comma-separated list of plugins to always be
