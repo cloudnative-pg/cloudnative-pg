@@ -179,14 +179,14 @@ feature, which is disabled by default, is described in detail below.
 By default, all PostgreSQL clusters are rolled out simultaneously, which may
 lead to a spike in resource usage, especially when managing multiple clusters.
 CloudNativePG provides two configuration options at the [operator level](operator_conf.md)
-that allow you to introduce delays between cluster rollouts or even between
+that allow you to introduce delays between cluster roll-outs or even between
 instances within the same cluster, helping to distribute resource usage over
 time:
 
 - `CLUSTERS_ROLLOUT_DELAY`: Defines the number of seconds to wait between
-  rollouts of different PostgreSQL clusters (default: `0`).
+  roll-outs of different PostgreSQL clusters (default: `0`).
 - `INSTANCES_ROLLOUT_DELAY`: Defines the number of seconds to wait between
-  rollouts of individual instances within the same PostgreSQL cluster (default:
+  roll-outs of individual instances within the same PostgreSQL cluster (default:
   `0`).
 
 ### In-place updates of the instance manager
