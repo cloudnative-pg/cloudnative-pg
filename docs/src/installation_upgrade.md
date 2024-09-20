@@ -174,7 +174,7 @@ the instance manager. This approach does not require a restart of the
 PostgreSQL instance, thereby avoiding a switchover within the cluster. This
 feature, which is disabled by default, is described in detail below.
 
-## Spread Upgrades
+### Spread Upgrades
 
 By default, all PostgreSQL clusters are rolled out simultaneously, which may
 lead to a spike in resource usage, especially when managing multiple clusters.
