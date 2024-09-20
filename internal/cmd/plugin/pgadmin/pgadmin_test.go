@@ -45,6 +45,7 @@ var _ = Describe("command methods", func() {
 			PgadminUsername:               "example-username",
 			PgadminPassword:               "example-password",
 			Mode:                          ModeServer, // or ModeDesktop for the desktop mode
+			PgadminImage:                  "example-image",
 		}
 	})
 
@@ -64,7 +65,7 @@ var _ = Describe("command methods", func() {
 		Expect(podTemplate.Spec.Containers).To(HaveLen(1))
 
 		container := podTemplate.Spec.Containers[0]
-		Expect(container.Image).To(Equal("dpage/pgadmin4:latest"))
+		Expect(container.Image).To(Equal("example-image"))
 		Expect(container.Name).To(Equal("pgadmin4"))
 		Expect(container.Ports).To(HaveLen(1))
 		Expect(container.Ports[0].Name).To(Equal("http"))
