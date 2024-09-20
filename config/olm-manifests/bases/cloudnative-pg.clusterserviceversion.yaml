@@ -642,7 +642,6 @@ spec:
       - displayName: Last backup
         description: When the last backup was scheduled
         path: lastScheduleTime
-
     - kind: ImageCatalog
       name: imagecatalogs.postgresql.cnpg.io
       displayName: Image Catalog
