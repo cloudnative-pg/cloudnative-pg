@@ -72,6 +72,7 @@ kubectl cnpg pgadmin4 {{ .ClusterName }} --dry-run | kubectl delete -f -
 func NewCmd() *cobra.Command {
 	var dryRun bool
 	var mode string
+	var pgadminImage string
 
 	pgadminCmd := &cobra.Command{
 		Use:     "pgadmin4 [name]",
@@ -96,7 +97,7 @@ func NewCmd() *cobra.Command {
 				return fmt.Errorf("could not get cluster: %v", err)
 			}
 
-			pgAdminCmd, err := newCommand(&cluster, Mode(mode), dryRun)
+			pgAdminCmd, err := newCommand(&cluster, Mode(mode), dryRun, pgadminImage)
 			if err != nil {
 				return err
 			}
@@ -124,6 +125,13 @@ func NewCmd() *cobra.Command {
 		"mode",
 		"server",
 		"Chooses between 'server' and 'desktop' (insecure) mode.",
+	)
+
+	pgadminCmd.Flags().StringVar(
+		&pgadminImage,
+		"image",
+		"dpage/pgadmin4:latest",
+		"Specifes the pgadmin4 image to use, e.g. for internal registries.",
 	)
 
 	return pgadminCmd
