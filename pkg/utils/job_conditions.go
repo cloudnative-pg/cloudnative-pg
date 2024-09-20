@@ -39,16 +39,3 @@ func FilterJobsWithOneCompletion(jobList []batchv1.Job) []batchv1.Job {
 	}
 	return result
 }
-
-// CountJobsWithOneCompletion count the number complete jobs
-func CountJobsWithOneCompletion(jobList []batchv1.Job) int {
-	result := 0
-
-	for _, job := range jobList {
-		if JobHasOneCompletion(job) {
-			result++
-		}
-	}
-
-	return result
-}
