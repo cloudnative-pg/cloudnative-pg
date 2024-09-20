@@ -47,6 +47,10 @@ type DatabaseSpec struct {
 	// The owner
 	Owner string `json:"owner"`
 
+	// The name of the template from which to create the new database
+	// +optional
+	Template string `json:"template,omitempty"`
+
 	// The encoding (cannot be changed)
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="encoding is immutable"
 	// +optional

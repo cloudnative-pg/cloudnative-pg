@@ -2300,6 +2300,13 @@ More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-
    <p>The owner</p>
 </td>
 </tr>
+<tr><td><code>template</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The name of the template from which to create the new database</p>
+</td>
+</tr>
 <tr><td><code>encoding</code><br/>
 <i>string</i>
 </td>

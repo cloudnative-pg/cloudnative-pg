@@ -108,6 +108,10 @@ spec:
               tablespace:
                 description: The default tablespace of this database
                 type: string
+              template:
+                description: The name of the template from which to create the new
+                  database
+                type: string
             required:
             - cluster
             - name
