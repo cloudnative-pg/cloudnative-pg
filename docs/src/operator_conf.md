@@ -64,9 +64,10 @@ will ignore the configuration parameter.
 
 The example below customizes the behavior of the operator, by defining
 the label/annotation names to be inherited by the resources created by
-any `Cluster` object that is deployed at a later time, and by enabling
+any `Cluster` object that is deployed at a later time, by enabling
 [in-place updates for the instance
-manager](installation_upgrade.md#in-place-updates-of-the-instance-manager).
+manager](installation_upgrade.md#in-place-updates-of-the-instance-manager),
+and by spreading upgrades.
 
 ```yaml
 apiVersion: v1
@@ -75,9 +76,11 @@ metadata:
   name: cnpg-controller-manager-config
   namespace: cnpg-system
 data:
+  CLUSTERS_ROLLOUT_DELAY: 60
+  INSTANCES_ROLLOUT_DELAY: 10
+  ENABLE_INSTANCE_MANAGER_INPLACE_UPDATES: 'true'
   INHERITED_ANNOTATIONS: categories
   INHERITED_LABELS: environment, workload, app
-  ENABLE_INSTANCE_MANAGER_INPLACE_UPDATES: 'true'
 ```
 
 ## Defining an operator secret
@@ -86,7 +89,8 @@ The example below customizes the behavior of the operator, by defining
 the label/annotation names to be inherited by the resources created by
 any `Cluster` object that is deployed at a later time, and by enabling
 [in-place updates for the instance
-manager](installation_upgrade.md#in-place-updates-of-the-instance-manager).
+manager](installation_upgrade.md#in-place-updates-of-the-instance-manager),
+and by spreading upgrades.
 
 ```yaml
 apiVersion: v1
@@ -96,9 +100,11 @@ metadata:
   namespace: cnpg-system
 type: Opaque
 stringData:
+  CLUSTERS_ROLLOUT_DELAY: 60
+  INSTANCES_ROLLOUT_DELAY: 10
+  ENABLE_INSTANCE_MANAGER_INPLACE_UPDATES: 'true'
   INHERITED_ANNOTATIONS: categories
   INHERITED_LABELS: environment, workload, app
-  ENABLE_INSTANCE_MANAGER_INPLACE_UPDATES: 'true'
 ```
 
 ## Restarting the operator to reload configs
