@@ -1076,6 +1076,21 @@ func (instance *Instance) GetInstanceCommandChan() <-chan InstanceCommand {
 	return instance.instanceCommandChan
 }
 
+// GetClusterName returns the name of the cluster where this instance is running
+func (instance *Instance) GetClusterName() string {
+	return instance.ClusterName
+}
+
+// GetPodName returns the name of the pod where this instance is running
+func (instance *Instance) GetPodName() string {
+	return instance.PodName
+}
+
+// GetNamespaceName returns the name of the namespace where this instance is running
+func (instance *Instance) GetNamespaceName() string {
+	return instance.Namespace
+}
+
 // RequestFastImmediateShutdown request the lifecycle manager to shut down
 // PostgreSQL using the fast strategy and then the immediate strategy.
 func (instance *Instance) RequestFastImmediateShutdown() {
