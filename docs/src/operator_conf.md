@@ -76,11 +76,11 @@ metadata:
   name: cnpg-controller-manager-config
   namespace: cnpg-system
 data:
-  CLUSTERS_ROLLOUT_DELAY: 60
-  INSTANCES_ROLLOUT_DELAY: 10
+  CLUSTERS_ROLLOUT_DELAY: '60'
   ENABLE_INSTANCE_MANAGER_INPLACE_UPDATES: 'true'
   INHERITED_ANNOTATIONS: categories
   INHERITED_LABELS: environment, workload, app
+  INSTANCES_ROLLOUT_DELAY: '10'
 ```
 
 ## Defining an operator secret
@@ -100,11 +100,11 @@ metadata:
   namespace: cnpg-system
 type: Opaque
 stringData:
-  CLUSTERS_ROLLOUT_DELAY: 60
-  INSTANCES_ROLLOUT_DELAY: 10
+  CLUSTERS_ROLLOUT_DELAY: '60'
   ENABLE_INSTANCE_MANAGER_INPLACE_UPDATES: 'true'
   INHERITED_ANNOTATIONS: categories
   INHERITED_LABELS: environment, workload, app
+  INSTANCES_ROLLOUT_DELAY: '10'
 ```
 
 ## Restarting the operator to reload configs
