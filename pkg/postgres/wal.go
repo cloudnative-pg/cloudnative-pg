@@ -154,7 +154,7 @@ func WalSegmentsPerFile(walSegmentSize int64) int32 {
 	// Given that segment section is represented by 8 hex characters,
 	// we compute the number of wal segments in a file, by dividing
 	// the "max segment number" by the wal segment size.
-	return int32(0xFFFFFFFF / walSegmentSize)
+	return int32(0xFFFFFFFF / walSegmentSize) //nolint:gosec
 }
 
 // NextSegments generate the list of all possible segment names starting

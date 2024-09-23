@@ -72,11 +72,11 @@ func DBToUint64(t interface{}) (uint64, bool) {
 	case uint64:
 		return v, true
 	case int64:
-		return uint64(v), true
+		return uint64(v), true //nolint:gosec
 	case float64:
 		return uint64(v), true
 	case time.Time:
-		return uint64(v.Unix()), true
+		return uint64(v.Unix()), true //nolint:gosec
 	case []byte:
 		// Try and convert to string and then parse to a uint64
 		strV := string(v)
