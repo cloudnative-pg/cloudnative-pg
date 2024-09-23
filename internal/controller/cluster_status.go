@@ -260,7 +260,7 @@ func (r *ClusterReconciler) updateResourceStatus(
 	)
 
 	// Count jobs
-	newJobs := int32(len(resources.jobs.Items))
+	newJobs := int32(len(resources.jobs.Items)) //nolint:gosec
 	cluster.Status.JobCount = newJobs
 
 	cluster.Status.Topology = getPodsTopology(
@@ -794,7 +794,7 @@ func getPodsTopology(
 		}
 	}
 
-	return apiv1.Topology{SuccessfullyExtracted: true, Instances: data, NodesUsed: int32(len(nodesMap))}
+	return apiv1.Topology{SuccessfullyExtracted: true, Instances: data, NodesUsed: int32(len(nodesMap))} //nolint:gosec
 }
 
 // isWALSpaceAvailableOnPod check if a Pod terminated because it has no
