@@ -5,5 +5,7 @@ metadata:
 spec:
   name: declarative
   owner: app
+  locale: 'sv_SE.iso885915'
+  encoding: LATIN9
   cluster:
     name: cluster-with-declarative-databases
