@@ -38,6 +38,10 @@ const (
 	// the value could be import, initdb, join
 	JobRoleLabelName = MetadataNamespace + "/jobRole"
 
+	// JobFinalizerName is the name of the finalizer that is used by the operator
+	// to collect the status of a completed job
+	JobFinalizerName = MetadataNamespace + "/jobFinalizer"
+
 	// PvcRoleLabelName is the name of the label containing the purpose of the pvc
 	PvcRoleLabelName = MetadataNamespace + "/pvcRole"
 

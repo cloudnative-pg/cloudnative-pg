@@ -86,7 +86,7 @@ func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int) *batchv1.J
 	initCommand = append(initCommand, buildCommonInitJobFlags(cluster)...)
 
 	if cluster.Spec.Bootstrap.InitDB.Import != nil {
-		return createPrimaryJob(cluster, nodeSerial, jobRoleImport, initCommand)
+		return createInitializationJob(cluster, nodeSerial, jobRoleImport, initCommand)
 	}
 
 	if cluster.ShouldInitDBRunPostInitApplicationSQLRefs() {
@@ -104,7 +104,7 @@ func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int) *batchv1.J
 			"--post-init-sql-refs-folder", postInitSQLRefsFolder.toString())
 	}
 
-	return createPrimaryJob(cluster, nodeSerial, jobRoleInitDB, initCommand)
+	return createInitializationJob(cluster, nodeSerial, jobRoleInitDB, initCommand)
 }
 
 func buildInitDBFlags(cluster apiv1.Cluster) (initCommand []string) {
@@ -178,7 +178,7 @@ func CreatePrimaryJobViaRestoreSnapshot(
 
 	initCommand = append(initCommand, buildCommonInitJobFlags(cluster)...)
 
-	job := createPrimaryJob(cluster, nodeSerial, jobRoleSnapshotRecovery, initCommand)
+	job := createInitializationJob(cluster, nodeSerial, jobRoleSnapshotRecovery, initCommand)
 
 	addBarmanEndpointCAToJobFromCluster(cluster, backup, job)
 
@@ -195,7 +195,7 @@ func CreatePrimaryJobViaRecovery(cluster apiv1.Cluster, nodeSerial int, backup *
 
 	initCommand = append(initCommand, buildCommonInitJobFlags(cluster)...)
 
-	job := createPrimaryJob(cluster, nodeSerial, jobRoleFullRecovery, initCommand)
+	job := createInitializationJob(cluster, nodeSerial, jobRoleFullRecovery, initCommand)
 
 	addBarmanEndpointCAToJobFromCluster(cluster, backup, job)
 
@@ -236,7 +236,7 @@ func CreatePrimaryJobViaPgBaseBackup(cluster apiv1.Cluster, nodeSerial int) *bat
 
 	initCommand = append(initCommand, buildCommonInitJobFlags(cluster)...)
 
-	return createPrimaryJob(cluster, nodeSerial, jobRolePGBaseBackup, initCommand)
+	return createInitializationJob(cluster, nodeSerial, jobRolePGBaseBackup, initCommand)
 }
 
 // JoinReplicaInstance create a new PostgreSQL node, copying the contents from another Pod
@@ -250,7 +250,7 @@ func JoinReplicaInstance(cluster apiv1.Cluster, nodeSerial int) *batchv1.Job {
 
 	initCommand = append(initCommand, buildCommonInitJobFlags(cluster)...)
 
-	return createPrimaryJob(cluster, nodeSerial, jobRoleJoin, initCommand)
+	return createInitializationJob(cluster, nodeSerial, jobRoleJoin, initCommand)
 }
 
 // RestoreReplicaInstance creates a new PostgreSQL replica starting from a volume snapshot backup
@@ -264,7 +264,7 @@ func RestoreReplicaInstance(cluster apiv1.Cluster, nodeSerial int) *batchv1.Job 
 
 	initCommand = append(initCommand, buildCommonInitJobFlags(cluster)...)
 
-	job := createPrimaryJob(cluster, nodeSerial, jobRoleSnapshotRecovery, initCommand)
+	job := createInitializationJob(cluster, nodeSerial, jobRoleSnapshotRecovery, initCommand)
 	return job
 }
 
@@ -306,9 +306,9 @@ func GetPossibleJobNames(instanceName string) []string {
 	return res
 }
 
-// createPrimaryJob create a job that executes the provided command.
+// createInitializationJob create a job that executes the provided command.
 // The role should describe the purpose of the executed job
-func createPrimaryJob(cluster apiv1.Cluster, nodeSerial int, role jobRole, initCommand []string) *batchv1.Job {
+func createInitializationJob(cluster apiv1.Cluster, nodeSerial int, role jobRole, initCommand []string) *batchv1.Job {
 	instanceName := GetInstanceName(cluster.Name, nodeSerial)
 	jobName := role.getJobName(instanceName)
 
@@ -321,6 +321,9 @@ func createPrimaryJob(cluster apiv1.Cluster, nodeSerial int, role jobRole, initC
 			Labels: map[string]string{
 				utils.InstanceNameLabelName: instanceName,
 				utils.ClusterLabelName:      cluster.Name,
+			},
+			Finalizers: []string{
+				utils.JobFinalizerName,
 			},
 		},
 		Spec: batchv1.JobSpec{

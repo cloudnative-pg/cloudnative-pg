@@ -23,6 +23,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -44,8 +45,23 @@ func (r *ClusterReconciler) cleanupCompletedJobs(
 			continue
 		}
 
+		contextLogger.Debug("Removing finalizer from job", "job", job.Name)
+		jobWithoutFinalizer := job.DeepCopy()
+		if controllerutil.RemoveFinalizer(jobWithoutFinalizer, utils.JobFinalizerName) {
+			if err := r.Patch(ctx, jobWithoutFinalizer, client.MergeFrom(job)); err != nil {
+				contextLogger.Error(
+					err,
+					"error while removing finalizer from job",
+					"job", job.Name,
+					"oldFinalizerList", job.ObjectMeta.Finalizers,
+					"newFinalizerList", jobWithoutFinalizer.ObjectMeta.Finalizers,
+				)
+				continue
+			}
+		}
+
 		contextLogger.Debug("Removing job", "job", job.Name)
-		if err := r.Delete(ctx, job, &client.DeleteOptions{
+		if err := r.Delete(ctx, jobWithoutFinalizer, &client.DeleteOptions{
 			PropagationPolicy: &foreground,
 		}); err != nil {
 			contextLogger.Error(err, "cannot delete job", "job", job.Name)
