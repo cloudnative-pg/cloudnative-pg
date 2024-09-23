@@ -52,7 +52,7 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 	)
 
 	var namespace, sourceClusterName string
-	var forwardTarget *testsUtils.PSQLConnection
+	var forwardTarget *testsUtils.PSQLForwardConnection
 	var connTarget *sql.DB
 
 	BeforeEach(func() {
@@ -114,7 +114,7 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 			// create test data and insert some records in both databases
 			for _, database := range sourceDatabases {
 				query := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s AS VALUES (1),(2);", tableName)
-				conn, err := forward.Pooler.Connection(database)
+				conn, err := forward.GetPooler().Connection(database)
 				// We need to set the max idle connection back to a higher number
 				// otherwise the conn.Exec() will close the connection
 				// and that will produce a RST packet from PostgreSQL that will kill the
@@ -180,7 +180,7 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 		By("verifying the test data was imported from the source databases", func() {
 			for _, database := range sourceDatabases {
 				selectQuery := fmt.Sprintf("SELECT COUNT(*) FROM %s", tableName)
-				connTemp, err := forwardTarget.Pooler.Connection(database)
+				connTemp, err := forwardTarget.GetPooler().Connection(database)
 				// We need to set the max idle connection back to a higher number
 				// otherwise the conn.Exec() will close the connection
 				// and that will produce a RST packet from PostgreSQL that will kill the

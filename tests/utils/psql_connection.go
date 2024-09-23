@@ -33,25 +33,25 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pool"
 )
 
-// PSQLConnection manage the creation of a port forward to connect by psql client locally
-type PSQLConnection struct {
-	Namespace   string
-	Pod         string
+// PSQLForwardConnection manage the creation of a port forward to connect by psql client locally
+type PSQLForwardConnection struct {
+	namespace   string
+	pod         string
 	stopChan    chan struct{}
 	readyChan   chan struct{}
-	Pooler      *pool.ConnectionPool
-	PortForward *portforward.PortForwarder
+	pooler      *pool.ConnectionPool
+	portForward *portforward.PortForwarder
 	err         error
 }
 
-// PSQLConnectionNew initialize and create the proper forward configuration
-func PSQLConnectionNew(env *TestingEnvironment, namespace, pod string) (*PSQLConnection, error) {
-	psqlc := &PSQLConnection{}
+// PSQLForwardConnectionNew initialize and create the proper forward configuration
+func PSQLForwardConnectionNew(env *TestingEnvironment, namespace, pod string) (*PSQLForwardConnection, error) {
+	psqlc := &PSQLForwardConnection{}
 	if pod == "" {
 		return nil, fmt.Errorf("pod not provided")
 	}
-	psqlc.Namespace = namespace
-	psqlc.Pod = pod
+	psqlc.namespace = namespace
+	psqlc.pod = pod
 
 	req := psqlc.createRequest(env)
 
@@ -64,7 +64,7 @@ func PSQLConnectionNew(env *TestingEnvironment, namespace, pod string) (*PSQLCon
 	psqlc.readyChan = make(chan struct{}, 1)
 	psqlc.stopChan = make(chan struct{})
 
-	psqlc.PortForward, err = portforward.New(
+	psqlc.portForward, err = portforward.New(
 		dialer,
 		[]string{"0:5432"},
 		psqlc.stopChan,
@@ -76,21 +76,21 @@ func PSQLConnectionNew(env *TestingEnvironment, namespace, pod string) (*PSQLCon
 	return psqlc, err
 }
 
-func (psqlc *PSQLConnection) createRequest(env *TestingEnvironment) *rest.Request {
+func (psqlc *PSQLForwardConnection) createRequest(env *TestingEnvironment) *rest.Request {
 	return env.Interface.CoreV1().
 		RESTClient().
 		Post().
 		Resource("pods").
-		Namespace(psqlc.Namespace).
-		Name(psqlc.Pod).
+		Namespace(psqlc.namespace).
+		Name(psqlc.pod).
 		SubResource("portforward")
 }
 
 // StartAndWait will begin the forward and wait to be ready
-func (psqlc *PSQLConnection) StartAndWait() error {
+func (psqlc *PSQLForwardConnection) StartAndWait() error {
 	go func() {
 		ginkgo.GinkgoWriter.Printf("Starting port-forward\n")
-		psqlc.err = psqlc.PortForward.ForwardPorts()
+		psqlc.err = psqlc.portForward.ForwardPorts()
 		if psqlc.err != nil {
 			ginkgo.GinkgoWriter.Printf("port-forward failed with error %s\n", psqlc.err.Error())
 			return
@@ -106,28 +106,34 @@ func (psqlc *PSQLConnection) StartAndWait() error {
 	}
 }
 
+// GetPooler returns the connection Pooler
+func (psqlc *PSQLForwardConnection) GetPooler() *pool.ConnectionPool {
+	return psqlc.pooler
+}
+
 // GetLocalPort gets the local port needed to connect to Postgres
-func (psqlc *PSQLConnection) GetLocalPort() (string, error) {
-	forwardedPorts, err := psqlc.PortForward.GetPorts()
+func (psqlc *PSQLForwardConnection) GetLocalPort() (string, error) {
+	forwardedPorts, err := psqlc.portForward.GetPorts()
 	if err != nil {
 		return "", err
 	}
-	port := strconv.Itoa(int(forwardedPorts[0].Local))
-	return port, nil
+
+	return strconv.Itoa(int(forwardedPorts[0].Local)), nil
 }
 
 // Stop will stop the forward and exit
-func (psqlc *PSQLConnection) Stop() {
-	psqlc.PortForward.Close()
+func (psqlc *PSQLForwardConnection) Stop() {
+	psqlc.portForward.Close()
 }
 
 // createConnectionParameters return the parameters require to create a connection
 // to the current forwarded port
-func (psqlc *PSQLConnection) createConnectionParameters(user, password string) (map[string]string, error) {
+func (psqlc *PSQLForwardConnection) createConnectionParameters(user, password string) (map[string]string, error) {
 	port, err := psqlc.GetLocalPort()
 	if err != nil {
 		return nil, err
 	}
+
 	return map[string]string{
 		"host":     "localhost",
 		"port":     port,
@@ -143,7 +149,7 @@ func ForwardPSQLConnection(
 	clusterName,
 	dbname,
 	secretSuffix string,
-) (*PSQLConnection, *sql.DB, error) {
+) (*PSQLForwardConnection, *sql.DB, error) {
 	user, pass, err := GetCredentials(clusterName, namespace, secretSuffix, env)
 	if err != nil {
 		return nil, nil, err
@@ -161,18 +167,18 @@ func ForwardPSQLConnectionWithCreds(
 	dbname,
 	userApp,
 	passApp string,
-) (*PSQLConnection, *sql.DB, error) {
+) (*PSQLForwardConnection, *sql.DB, error) {
 	cluster, err := env.GetCluster(namespace, clusterName)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	forward, err := PSQLConnectionNew(env, namespace, cluster.Status.CurrentPrimary)
+	forward, err := PSQLForwardConnectionNew(env, namespace, cluster.Status.CurrentPrimary)
 	if err != nil {
 		return nil, nil, err
 	}
-	err = forward.StartAndWait()
-	if err != nil {
+
+	if err = forward.StartAndWait(); err != nil {
 		return nil, nil, err
 	}
 
@@ -181,11 +187,41 @@ func ForwardPSQLConnectionWithCreds(
 		return nil, nil, err
 	}
 
-	forward.Pooler = pool.NewPostgresqlConnectionPool(configfile.CreateConnectionString(connParameters))
-	conn, err := forward.Pooler.Connection(dbname)
+	forward.pooler = pool.NewPostgresqlConnectionPool(configfile.CreateConnectionString(connParameters))
+	conn, err := forward.pooler.Connection(dbname)
+	if err != nil {
+		return nil, nil, err
+	}
 	conn.SetMaxOpenConns(10)
 	conn.SetMaxIdleConns(10)
 	conn.SetConnMaxLifetime(time.Hour)
 	conn.SetConnMaxIdleTime(time.Hour)
+
 	return forward, conn, err
+}
+
+// RunQueryRowOverForward runs QueryRow with a given query, returning the result Row
+func RunQueryRowOverForward(
+	env *TestingEnvironment,
+	namespace,
+	clusterName,
+	dbname,
+	secretSuffix,
+	query string,
+) (*sql.Row, error) {
+	forward, conn, err := ForwardPSQLConnection(
+		env,
+		namespace,
+		clusterName,
+		dbname,
+		secretSuffix,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		forward.Stop()
+	}()
+
+	return conn.QueryRow(query), nil
 }

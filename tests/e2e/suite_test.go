@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/onsi/ginkgo/v2/types"
 	"github.com/thoas/go-funk"
 	appsv1 "k8s.io/api/apps/v1"
@@ -36,17 +37,15 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/sternmultitailer"
-	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
 const (
-	fixturesDir         = "./fixtures"
-	RetryTimeout        = utils.RetryTimeout
-	PollingTime         = utils.PollingTime
-	psqlClientNamespace = "psql-client-namespace"
+	fixturesDir  = "./fixtures"
+	RetryTimeout = utils.RetryTimeout
+	PollingTime  = utils.PollingTime
 )
 
 var (

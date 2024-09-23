@@ -635,20 +635,17 @@ func AssertDataExpectedCount(
 	expectedValue int,
 ) {
 	By(fmt.Sprintf("verifying test data in table %v", tableName), func() {
-		forward, conn, err := testsUtils.ForwardPSQLConnection(
+		row, err := testsUtils.RunQueryRowOverForward(
 			env,
 			namespace,
 			clusterName,
 			testsUtils.AppDBName,
 			apiv1.ApplicationUserSecretSuffix,
+			fmt.Sprintf("SELECT COUNT(*) FROM %s", tableName),
 		)
-		defer func() {
-			forward.Stop()
-		}()
 		Expect(err).ToNot(HaveOccurred())
 
 		var nRows int
-		row := conn.QueryRow(fmt.Sprintf("SELECT COUNT(*) FROM %s", tableName))
 		err = row.Scan(&nRows)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(nRows).Should(BeEquivalentTo(expectedValue))
@@ -1647,19 +1644,16 @@ func AssertClusterRestoreWithApplicationDB(namespace, restoreClusterFile, tableN
 	})
 
 	By("Ensuring the restored cluster is on timeline 2", func() {
-		forward, conn, err := testsUtils.ForwardPSQLConnection(
+		row, err := testsUtils.RunQueryRowOverForward(
 			env,
 			namespace,
 			restoredClusterName,
 			testsUtils.AppDBName,
 			apiv1.ApplicationUserSecretSuffix,
+			"SELECT substring(pg_walfile_name(pg_current_wal_lsn()), 1, 8)",
 		)
-		defer func() {
-			forward.Stop()
-		}()
 		Expect(err).ToNot(HaveOccurred())
 
-		row := conn.QueryRow("SELECT substring(pg_walfile_name(pg_current_wal_lsn()), 1, 8)")
 		var timeline string
 		err = row.Scan(&timeline)
 		Expect(err).ToNot(HaveOccurred())
@@ -1875,23 +1869,20 @@ func AssertClusterWasRestoredWithPITRAndApplicationDB(namespace, clusterName, ta
 	Expect(err).ToNot(HaveOccurred())
 	secretName := clusterName + apiv1.ApplicationUserSecretSuffix
 
-	forward, conn, err := testsUtils.ForwardPSQLConnection(
-		env,
-		namespace,
-		clusterName,
-		testsUtils.AppDBName,
-		apiv1.ApplicationUserSecretSuffix,
-	)
-	defer func() {
-		forward.Stop()
-	}()
-	Expect(err).ToNot(HaveOccurred())
-
 	By("Ensuring the restored cluster is on timeline 3", func() {
 		// Restored primary should be on timeline 3
-		row := conn.QueryRow("select substring(pg_walfile_name(pg_current_wal_lsn()), 1, 8)")
+		row, err := testsUtils.RunQueryRowOverForward(
+			env,
+			namespace,
+			clusterName,
+			testsUtils.AppDBName,
+			apiv1.ApplicationUserSecretSuffix,
+			"select substring(pg_walfile_name(pg_current_wal_lsn()), 1, 8)",
+		)
+		Expect(err).ToNot(HaveOccurred())
+
 		var currentWalLsn string
-		err := row.Scan(&currentWalLsn)
+		err = row.Scan(&currentWalLsn)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(currentWalLsn).To(Equal(lsn))
 
@@ -1937,29 +1928,23 @@ func AssertClusterWasRestoredWithPITRAndApplicationDB(namespace, clusterName, ta
 }
 
 func AssertClusterWasRestoredWithPITR(namespace, clusterName, tableName, lsn string) {
-	primaryInfo := &corev1.Pod{}
-	var err error
-
-	forward, conn, err := testsUtils.ForwardPSQLConnection(
-		env,
-		namespace,
-		clusterName,
-		testsUtils.AppDBName,
-		apiv1.ApplicationUserSecretSuffix,
-	)
-	defer func() {
-		forward.Stop()
-	}()
-	Expect(err).ToNot(HaveOccurred())
-
 	By("restoring a backup cluster with PITR in a new cluster", func() {
 		// We give more time than the usual 600s, since the recovery is slower
 		AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReadySlow], env)
-		primaryInfo, err = env.GetClusterPrimary(namespace, clusterName)
+		primaryInfo, err := env.GetClusterPrimary(namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 
 		// Restored primary should be on timeline 3
-		row := conn.QueryRow("select substring(pg_walfile_name(pg_current_wal_lsn()), 1, 8)")
+		row, err := testsUtils.RunQueryRowOverForward(
+			env,
+			namespace,
+			clusterName,
+			testsUtils.AppDBName,
+			apiv1.ApplicationUserSecretSuffix,
+			"select substring(pg_walfile_name(pg_current_wal_lsn()), 1, 8)",
+		)
+		Expect(err).ToNot(HaveOccurred())
+
 		var currentWalLsn string
 		err = row.Scan(&currentWalLsn)
 		Expect(err).ToNot(HaveOccurred())

@@ -22,24 +22,20 @@ import (
 
 // GetCurrentTimestamp getting current time stamp from postgres server
 func GetCurrentTimestamp(namespace, clusterName string, env *TestingEnvironment) (string, error) {
-	forward, conn, err := ForwardPSQLConnection(
+	row, err := RunQueryRowOverForward(
 		env,
 		namespace,
 		clusterName,
 		AppDBName,
 		apiv1.ApplicationUserSecretSuffix,
+		"select TO_CHAR(CURRENT_TIMESTAMP,'YYYY-MM-DD HH24:MI:SS.US');",
 	)
-	defer func() {
-		forward.Stop()
-	}()
 	if err != nil {
 		return "", err
 	}
 
 	var currentTimestamp string
-	query := "select TO_CHAR(CURRENT_TIMESTAMP,'YYYY-MM-DD HH24:MI:SS.US');"
-	rows := conn.QueryRowContext(env.Ctx, query)
-	if err = rows.Scan(&currentTimestamp); err != nil {
+	if err = row.Scan(&currentTimestamp); err != nil {
 		return "", err
 	}
 
