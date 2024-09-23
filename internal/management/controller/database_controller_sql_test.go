@@ -107,6 +107,23 @@ var _ = Describe("Managed Database SQL", func() {
 			err = createDatabase(ctx, db, database)
 			Expect(err).ToNot(HaveOccurred())
 		})
+
+		It("should create a new Database with locale type fields", func(ctx SpecContext) {
+			database.Spec.Encoding = "LATIN9"
+			database.Spec.Locale = "sv_SE.iso885915"
+
+			expectedValue := sqlmock.NewResult(0, 1)
+			expectedQuery := fmt.Sprintf(
+				"CREATE DATABASE %s OWNER %s "+
+					"ENCODING %s LOCALE %s",
+				pgx.Identifier{database.Spec.Name}.Sanitize(), pgx.Identifier{database.Spec.Owner}.Sanitize(),
+				pgx.Identifier{database.Spec.Encoding}.Sanitize(), pgx.Identifier{database.Spec.Locale}.Sanitize(),
+			)
+			dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedValue)
+
+			err = createDatabase(ctx, db, database)
+			Expect(err).ToNot(HaveOccurred())
+		})
 	})
 
 	Context("updateDatabase", func() {

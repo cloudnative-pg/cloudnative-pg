@@ -75,6 +75,21 @@ func createDatabase(
 	if obj.Spec.IsTemplate != nil {
 		sqlCreateDatabase += fmt.Sprintf(" IS_TEMPLATE %v", *obj.Spec.IsTemplate)
 	}
+	if obj.Spec.Encoding != "" {
+		sqlCreateDatabase += fmt.Sprintf(" ENCODING %s", pgx.Identifier{obj.Spec.Encoding}.Sanitize())
+	}
+	if obj.Spec.Locale != "" {
+		sqlCreateDatabase += fmt.Sprintf(" LOCALE %s", pgx.Identifier{obj.Spec.Locale}.Sanitize())
+	}
+	if obj.Spec.LocaleProvider != "" {
+		sqlCreateDatabase += fmt.Sprintf(" LOCALE_PROVIDER %s", pgx.Identifier{obj.Spec.LocaleProvider}.Sanitize())
+	}
+	if obj.Spec.LcCollate != "" {
+		sqlCreateDatabase += fmt.Sprintf(" LC_COLLATE %s", pgx.Identifier{obj.Spec.LcCollate}.Sanitize())
+	}
+	if obj.Spec.LcCtype != "" {
+		sqlCreateDatabase += fmt.Sprintf(" LC_CTYPE %s", pgx.Identifier{obj.Spec.LcCtype}.Sanitize())
+	}
 
 	_, err := db.ExecContext(ctx, sqlCreateDatabase)
 

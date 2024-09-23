@@ -96,6 +96,30 @@ spec:
               isTemplate:
                 description: True when the database is a template
                 type: boolean
+              lc_collate:
+                description: The LC_COLLATE (cannot be changed)
+                type: string
+                x-kubernetes-validations:
+                - message: lc_collate is immutable
+                  rule: self == oldSelf
+              lc_ctype:
+                description: The LC_CTYPE (cannot be changed)
+                type: string
+                x-kubernetes-validations:
+                - message: lc_ctype is immutable
+                  rule: self == oldSelf
+              locale:
+                description: The locale (cannot be changed)
+                type: string
+                x-kubernetes-validations:
+                - message: locale is immutable
+                  rule: self == oldSelf
+              locale_provider:
+                description: The locale provider (cannot be changed)
+                type: string
+                x-kubernetes-validations:
+                - message: locale_provider is immutable
+                  rule: self == oldSelf
               name:
                 description: The name inside PostgreSQL
                 type: string
