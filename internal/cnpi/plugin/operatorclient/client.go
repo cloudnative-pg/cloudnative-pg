@@ -65,7 +65,7 @@ func (e *extendedClient) invokePlugin(
 		return obj, nil
 	}
 
-	contextLogger.Debug("correctly loaded the plugin client")
+	contextLogger.Trace("correctly loaded the plugin client")
 
 	return pClient.LifecycleHook(ctx, operationVerb, cluster, obj)
 }

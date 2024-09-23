@@ -25,6 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
 // RegisterPhase update phase in the status cluster with the
@@ -50,6 +51,8 @@ func RegisterPhaseWithOrigCluster(
 	phase string,
 	reason string,
 ) error {
+	contextLogger := log.FromContext(ctx)
+
 	// we ensure that the modifiedCluster conditions aren't nil before operating
 	if modifiedCluster.Status.Conditions == nil {
 		modifiedCluster.Status.Conditions = []metav1.Condition{}
@@ -77,6 +80,15 @@ func RegisterPhaseWithOrigCluster(
 	meta.SetStatusCondition(&modifiedCluster.Status.Conditions, condition)
 
 	if !reflect.DeepEqual(origCluster, modifiedCluster) {
+		modifiedPhase := modifiedCluster.Status.Phase
+		origPhase := origCluster.Status.Phase
+
+		if modifiedPhase != apiv1.PhaseHealthy && origPhase == apiv1.PhaseHealthy {
+			contextLogger.Info("Cluster is not healthy")
+		}
+		if modifiedPhase == apiv1.PhaseHealthy && origPhase != apiv1.PhaseHealthy {
+			contextLogger.Info("Cluster is healthy")
+		}
 		if err := cli.Status().Patch(ctx, modifiedCluster, client.MergeFrom(origCluster)); err != nil {
 			return err
 		}
