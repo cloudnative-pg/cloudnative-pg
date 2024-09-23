@@ -460,11 +460,13 @@ func (r *ClusterReconciler) reconcileResources(
 	resources *managedResources, instancesStatus postgres.PostgresqlStatusList,
 ) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
+	runningJobs := resources.runningJobNames()
 
 	// Act on Pods and PVCs only if there is nothing that is currently being created or deleted
-	if runningJobs := resources.countRunningJobs(); runningJobs > 0 {
-		contextLogger.Debug("A job is currently running. Waiting", "count", runningJobs)
-		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+
+	if len(runningJobs) > 0 {
+		contextLogger.Debug("A job is currently running. Waiting", "runningJobs", runningJobs)
+		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 	}
 
 	if result, err := r.deleteTerminatedPods(ctx, cluster, resources); err != nil {
@@ -481,28 +483,22 @@ func (r *ClusterReconciler) reconcileResources(
 		return *result, err
 	}
 
-	// TODO: move into a central waiting phase
-	// If we are joining a node, we should wait for the process to finish
-	if resources.countRunningJobs() > 0 {
-		contextLogger.Debug("Waiting for jobs to finish",
-			"clusterName", cluster.Name,
-			"namespace", cluster.Namespace,
-			"jobs", len(resources.jobs.Items))
-		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
-	}
-
 	if !resources.allInstancesAreActive() {
-		contextLogger.Debug("Instance pod not active. Retrying in one second.")
+		contextLogger = contextLogger.WithValues(
+			"inactiveInstances", resources.inactiveInstanceNames())
 
 		// Preserve phases that handle the in-place restart behaviour for the following reasons:
 		// 1. Technically: The Inplace phases help determine if a switchover is required.
 		// 2. Descriptive: They precisely describe the cluster's current state externally.
 		if cluster.IsInplaceRestartPhase() {
-			contextLogger.Debug("Cluster is in an in-place restart phase. Waiting...", "phase", cluster.Status.Phase)
+			contextLogger.Debug(
+				"Cluster is in an in-place restart phase. Waiting...",
+				"phase", cluster.Status.Phase,
+			)
 		} else {
 			// If not in an Inplace phase, notify that the reconciliation is halted due
 			// to an unready instance.
-			contextLogger.Debug("An instance is not ready. Pausing reconciliation...")
+			contextLogger.Debug("Instance pod not active. Retrying...")
 
 			// Register a phase indicating some instances aren't active yet
 			if err := r.RegisterPhase(
@@ -695,7 +691,9 @@ func (r *ClusterReconciler) reconcilePods(ctx context.Context, cluster *apiv1.Cl
 	// The user have chosen to wait for the missing nodes to come up
 	if !(cluster.IsNodeMaintenanceWindowInProgress() && cluster.IsReusePVCEnabled()) &&
 		instancesStatus.InstancesReportingStatus() < cluster.Status.Instances {
-		contextLogger.Debug("Waiting for Pods to be ready")
+		contextLogger.Debug(
+			"Waiting for Pods to be ready",
+			"podStatus", cluster.Status.InstancesStatus)
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
 	}
 
@@ -1160,10 +1158,16 @@ func (r *ClusterReconciler) markPVCReadyForCompletedJobs(
 				continue
 			}
 
-			roleName := job.Labels[utils.JobRoleLabelName]
-			contextLogger.Info("job has been finished, setting PVC as ready",
+			if pvc.Annotations[utils.PVCStatusAnnotationName] == persistentvolumeclaim.StatusReady {
+				continue
+			}
+
+			roleName := job.Spec.Template.Labels[utils.JobRoleLabelName]
+			contextLogger.Info(
+				"The job finished, setting PVC as ready",
 				"pvcName", pvc.Name,
 				"role", roleName,
+				"jobName", job.Name,
 			)
 
 			if err := r.setPVCStatusReady(ctx, &pvc); err != nil {
