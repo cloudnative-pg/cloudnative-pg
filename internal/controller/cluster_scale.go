@@ -113,9 +113,8 @@ func (r *ClusterReconciler) ensureInstanceJobAreDeleted(
 			// Ignore if NotFound, otherwise report the error
 			if !apierrs.IsNotFound(err) {
 				return fmt.Errorf("scaling down node (job) %v: %w", instanceName, err)
-			} else {
-				contextLogger.Info("Deleted job", "jobName", job.Name)
 			}
+			contextLogger.Info("Deleted job", "jobName", job.Name)
 		}
 	}
 	return nil
