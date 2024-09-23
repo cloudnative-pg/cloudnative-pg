@@ -161,7 +161,7 @@ func getOrphanPVCs(
 }
 
 func ensureOrphanPodsAreDeleted(ctx context.Context, c client.Client, cluster *apiv1.Cluster) error {
-	contextLogger := log.FromContext(ctx).WithValues("orphan_pod_cleaner")
+	contextLogger := log.FromContext(ctx).WithName("orphan_pod_cleaner")
 
 	var podList corev1.PodList
 	if err := c.List(

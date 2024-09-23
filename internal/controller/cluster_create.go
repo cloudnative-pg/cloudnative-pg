@@ -29,6 +29,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -717,8 +718,8 @@ func (r *ClusterReconciler) createOrPatchRole(ctx context.Context, cluster *apiv
 	}
 
 	generatedRole := specs.CreateRole(*cluster, originBackup)
-	if reflect.DeepEqual(generatedRole.Rules, role.Rules) {
-		// Everything fine, the two config maps are exactly the same
+	if equality.Semantic.DeepEqual(generatedRole.Rules, role.Rules) {
+		// Everything fine, the two rules have the same content
 		return nil
 	}
 
@@ -726,9 +727,9 @@ func (r *ClusterReconciler) createOrPatchRole(ctx context.Context, cluster *apiv
 
 	// The configuration changed, and we need the patch the
 	// configMap we have
-	patchedRole := role
+	patchedRole := role.DeepCopy()
 	patchedRole.Rules = generatedRole.Rules
-	if err := r.Patch(ctx, &patchedRole, client.MergeFrom(&role)); err != nil {
+	if err := r.Patch(ctx, patchedRole, client.MergeFrom(&role)); err != nil {
 		return fmt.Errorf("while patching role: %w", err)
 	}
 
@@ -1309,7 +1310,7 @@ func (r *ClusterReconciler) ensureInstancesAreCreated(
 		return ctrl.Result{}, err
 	}
 	if instanceToCreate == nil {
-		contextLogger.Debug(
+		contextLogger.Trace(
 			"haven't found any instance to create",
 			"instances", instancesStatus.GetNames(),
 			"dangling", cluster.Status.DanglingPVC,
