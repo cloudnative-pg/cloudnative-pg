@@ -141,7 +141,7 @@ func EnrichStatus(
 	cluster.Status.ReadyInstances = utils.CountReadyPods(filteredPods)
 	cluster.Status.InstancesStatus = utils.ListStatusPods(runningInstances)
 
-	cluster.Status.PVCCount = int32(len(managedPVCs))
+	cluster.Status.PVCCount = int32(len(managedPVCs)) //nolint:gosec
 	cluster.Status.InitializingPVC = result.getSorted(initializing)
 	cluster.Status.ResizingPVC = result.getSorted(resizing)
 	cluster.Status.DanglingPVC = result.getSorted(dangling)
