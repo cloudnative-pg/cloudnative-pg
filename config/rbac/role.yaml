@@ -247,6 +247,26 @@ rules:
 - apiGroups:
   - postgresql.cnpg.io
   resources:
+  - databases
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - postgresql.cnpg.io
+  resources:
+  - databases/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - postgresql.cnpg.io
+  resources:
   - imagecatalogs
   verbs:
   - get

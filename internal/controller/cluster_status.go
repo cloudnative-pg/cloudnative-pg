@@ -23,6 +23,7 @@ import (
 	"runtime"
 	"sort"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -32,7 +33,6 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/hibernation"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
@@ -53,20 +53,30 @@ type managedResources struct {
 }
 
 // Count the number of jobs that are still running
-func (resources *managedResources) countRunningJobs() int {
-	jobCount := len(resources.jobs.Items)
-	completeJobs := utils.CountJobsWithOneCompletion(resources.jobs.Items)
-	return jobCount - completeJobs
+func (resources *managedResources) runningJobNames() []string {
+	result := make([]string, 0, len(resources.jobs.Items))
+	for _, job := range resources.jobs.Items {
+		if !utils.JobHasOneCompletion(job) {
+			result = append(result, job.Name)
+		}
+	}
+	return result
+}
+
+// Check if every managed Pod is active and will be schedules
+func (resources *managedResources) inactiveInstanceNames() []string {
+	result := make([]string, 0, len(resources.instances.Items))
+	for idx := range resources.instances.Items {
+		if !utils.IsPodActive(resources.instances.Items[idx]) {
+			result = append(result, resources.instances.Items[idx].Name)
+		}
+	}
+	return result
 }
 
 // Check if every managed Pod is active and will be schedules
 func (resources *managedResources) allInstancesAreActive() bool {
-	for idx := range resources.instances.Items {
-		if !utils.IsPodActive(resources.instances.Items[idx]) {
-			return false
-		}
-	}
-	return true
+	return len(resources.inactiveInstanceNames()) == 0
 }
 
 // Check if at least one Pod is alive (active and not crash-looping)
@@ -215,7 +225,7 @@ func (r *ClusterReconciler) setPVCStatusReady(
 		return nil
 	}
 
-	contextLogger.Debug("Marking PVC as ready", "pvcName", pvc.Name)
+	contextLogger.Trace("Marking PVC as ready", "pvcName", pvc.Name)
 
 	oldPvc := pvc.DeepCopy()
 

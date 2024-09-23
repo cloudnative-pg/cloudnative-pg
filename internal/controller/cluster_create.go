@@ -29,6 +29,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -40,12 +41,12 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
+	"github.com/cloudnative-pg/machinery/pkg/log"
 )
 
 // createPostgresClusterObjects ensures that we have the required global objects
@@ -717,8 +718,8 @@ func (r *ClusterReconciler) createOrPatchRole(ctx context.Context, cluster *apiv
 	}
 
 	generatedRole := specs.CreateRole(*cluster, originBackup)
-	if reflect.DeepEqual(generatedRole.Rules, role.Rules) {
-		// Everything fine, the two config maps are exactly the same
+	if equality.Semantic.DeepEqual(generatedRole.Rules, role.Rules) {
+		// Everything fine, the two rules have the same content
 		return nil
 	}
 
@@ -726,9 +727,9 @@ func (r *ClusterReconciler) createOrPatchRole(ctx context.Context, cluster *apiv
 
 	// The configuration changed, and we need the patch the
 	// configMap we have
-	patchedRole := role
+	patchedRole := role.DeepCopy()
 	patchedRole.Rules = generatedRole.Rules
-	if err := r.Patch(ctx, &patchedRole, client.MergeFrom(&role)); err != nil {
+	if err := r.Patch(ctx, patchedRole, client.MergeFrom(&role)); err != nil {
 		return fmt.Errorf("while patching role: %w", err)
 	}
 
@@ -1309,7 +1310,7 @@ func (r *ClusterReconciler) ensureInstancesAreCreated(
 		return ctrl.Result{}, err
 	}
 	if instanceToCreate == nil {
-		contextLogger.Debug(
+		contextLogger.Trace(
 			"haven't found any instance to create",
 			"instances", instancesStatus.GetNames(),
 			"dangling", cluster.Status.DanglingPVC,

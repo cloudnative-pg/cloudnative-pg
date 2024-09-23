@@ -23,6 +23,7 @@ import (
 	"slices"
 
 	"github.com/cloudnative-pg/cnpg-i/pkg/lifecycle"
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	jsonpatch "github.com/evanphx/json-patch/v5"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/json"
@@ -32,7 +33,6 @@ import (
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/connection"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
 var runtimeScheme = runtime.NewScheme()

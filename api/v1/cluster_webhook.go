@@ -23,6 +23,9 @@ import (
 	"strconv"
 	"strings"
 
+	barmanWebhooks "github.com/cloudnative-pg/barman-cloud/pkg/api/webhooks"
+	"github.com/cloudnative-pg/machinery/pkg/log"
+	"github.com/cloudnative-pg/machinery/pkg/types"
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -38,7 +41,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/stringset"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -350,6 +352,7 @@ func (r *Cluster) Validate() (allErrs field.ErrorList) {
 		r.validateAntiAffinity,
 		r.validateReplicaMode,
 		r.validateBackupConfiguration,
+		r.validateRetentionPolicy,
 		r.validateConfiguration,
 		r.validateLDAP,
 		r.validateReplicationSlots,
@@ -1423,7 +1426,7 @@ func (r *Cluster) validateRecoveryTarget() field.ErrorList {
 
 	// validate format of TargetTime
 	if recoveryTarget.TargetTime != "" {
-		if _, err := utils.ParseTargetTime(nil, recoveryTarget.TargetTime); err != nil {
+		if _, err := types.ParseTargetTime(nil, recoveryTarget.TargetTime); err != nil {
 			result = append(result, field.Invalid(
 				field.NewPath("spec", "bootstrap", "recovery", "recoveryTarget"),
 				recoveryTarget.TargetTime,
@@ -1433,7 +1436,7 @@ func (r *Cluster) validateRecoveryTarget() field.ErrorList {
 
 	// validate TargetLSN
 	if recoveryTarget.TargetLSN != "" {
-		if _, err := postgres.LSN(recoveryTarget.TargetLSN).Parse(); err != nil {
+		if _, err := types.LSN(recoveryTarget.TargetLSN).Parse(); err != nil {
 			result = append(result, field.Invalid(
 				field.NewPath("spec", "bootstrap", "recovery", "recoveryTarget"),
 				recoveryTarget.TargetLSN,
@@ -2147,57 +2150,24 @@ func (r *Cluster) validateAntiAffinity() field.ErrorList {
 
 // validateBackupConfiguration validates the backup configuration
 func (r *Cluster) validateBackupConfiguration() field.ErrorList {
-	allErrors := field.ErrorList{}
-
-	if r.Spec.Backup == nil || r.Spec.Backup.BarmanObjectStore == nil {
+	if r.Spec.Backup == nil {
 		return nil
 	}
+	return barmanWebhooks.ValidateBackupConfiguration(
+		r.Spec.Backup.BarmanObjectStore,
+		field.NewPath("spec", "backup", "barmanObjectStore"),
+	)
+}
 
-	credentialsCount := 0
-	if r.Spec.Backup.BarmanObjectStore.BarmanCredentials.Azure != nil {
-		credentialsCount++
-		allErrors = r.Spec.Backup.BarmanObjectStore.BarmanCredentials.Azure.validateAzureCredentials(
-			field.NewPath("spec", "backupConfiguration", "azureCredentials"))
+// validateRetentionPolicy validates the retention policy configuration
+func (r *Cluster) validateRetentionPolicy() field.ErrorList {
+	if r.Spec.Backup == nil {
+		return nil
 	}
-	if r.Spec.Backup.BarmanObjectStore.BarmanCredentials.AWS != nil {
-		credentialsCount++
-		allErrors = r.Spec.Backup.BarmanObjectStore.BarmanCredentials.AWS.validateAwsCredentials(
-			field.NewPath("spec", "backupConfiguration", "s3Credentials"))
-	}
-	if r.Spec.Backup.BarmanObjectStore.BarmanCredentials.Google != nil {
-		credentialsCount++
-		allErrors = r.Spec.Backup.BarmanObjectStore.BarmanCredentials.Google.validateGCSCredentials(
-			field.NewPath("spec", "backupConfiguration", "googleCredentials"))
-	}
-	if credentialsCount == 0 {
-		allErrors = append(allErrors, field.Invalid(
-			field.NewPath("spec", "backupConfiguration"),
-			r.Spec.Backup.BarmanObjectStore,
-			"missing credentials. "+
-				"One and only one of azureCredentials, s3Credentials and googleCredentials are required",
-		))
-	}
-	if credentialsCount > 1 {
-		allErrors = append(allErrors, field.Invalid(
-			field.NewPath("spec", "backupConfiguration"),
-			r.Spec.Backup.BarmanObjectStore,
-			"too many credentials. "+
-				"One and only one of azureCredentials, s3Credentials and googleCredentials are required",
-		))
-	}
-
-	if r.Spec.Backup.RetentionPolicy != "" {
-		_, err := utils.ParsePolicy(r.Spec.Backup.RetentionPolicy)
-		if err != nil {
-			allErrors = append(allErrors, field.Invalid(
-				field.NewPath("spec", "retentionPolicy"),
-				r.Spec.Backup.RetentionPolicy,
-				"not a valid retention policy",
-			))
-		}
-	}
-
-	return allErrors
+	return barmanWebhooks.ValidateRetentionPolicy(
+		r.Spec.Backup.RetentionPolicy,
+		field.NewPath("spec", "backup", "retentionPolicy"),
+	)
 }
 
 func (r *Cluster) validateReplicationSlots() field.ErrorList {
@@ -2307,116 +2277,6 @@ func (r *Cluster) validateWALLevelChange(old *Cluster) field.ErrorList {
 	}
 
 	return errs
-}
-
-// validateAzureCredentials checks and validates the azure credentials
-func (azure *AzureCredentials) validateAzureCredentials(path *field.Path) field.ErrorList {
-	allErrors := field.ErrorList{}
-
-	secrets := 0
-	if azure.InheritFromAzureAD {
-		secrets++
-	}
-	if azure.StorageKey != nil {
-		secrets++
-	}
-	if azure.StorageSasToken != nil {
-		secrets++
-	}
-
-	if secrets != 1 && azure.ConnectionString == nil {
-		allErrors = append(
-			allErrors,
-			field.Invalid(
-				path,
-				azure,
-				"when connection string is not specified, one and only one of "+
-					"storage key and storage SAS token is allowed"))
-	}
-
-	if secrets != 0 && azure.ConnectionString != nil {
-		allErrors = append(
-			allErrors,
-			field.Invalid(
-				path,
-				azure,
-				"when connection string is specified, the other parameters "+
-					"must be empty"))
-	}
-
-	return allErrors
-}
-
-func (s3 *S3Credentials) validateAwsCredentials(path *field.Path) field.ErrorList {
-	allErrors := field.ErrorList{}
-	credentials := 0
-
-	if s3.InheritFromIAMRole {
-		credentials++
-	}
-	if s3.AccessKeyIDReference != nil && s3.SecretAccessKeyReference != nil {
-		credentials++
-	} else if s3.AccessKeyIDReference != nil || s3.SecretAccessKeyReference != nil {
-		credentials++
-		allErrors = append(
-			allErrors,
-			field.Invalid(
-				path,
-				s3,
-				"when using AWS credentials both accessKeyId and secretAccessKey must be provided",
-			),
-		)
-	}
-
-	if credentials == 0 {
-		allErrors = append(
-			allErrors,
-			field.Invalid(
-				path,
-				s3,
-				"at least one AWS authentication method should be supplied",
-			),
-		)
-	}
-
-	if credentials > 1 {
-		allErrors = append(
-			allErrors,
-			field.Invalid(
-				path,
-				s3,
-				"only one AWS authentication method should be supplied",
-			),
-		)
-	}
-
-	return allErrors
-}
-
-func (gcs *GoogleCredentials) validateGCSCredentials(path *field.Path) field.ErrorList {
-	allErrors := field.ErrorList{}
-
-	if !gcs.GKEEnvironment && gcs.ApplicationCredentials == nil {
-		allErrors = append(
-			allErrors,
-			field.Invalid(
-				path,
-				gcs,
-				"if gkeEnvironment is false, secret with credentials must be provided",
-			))
-	}
-
-	if gcs.GKEEnvironment && gcs.ApplicationCredentials != nil {
-		allErrors = append(
-			allErrors,
-			field.Invalid(
-				path,
-				gcs,
-				"if gkeEnvironment is true, secret with credentials must not be provided",
-			))
-	}
-
-	return allErrors
 }
 
 func (r *Cluster) validateManagedServices() field.ErrorList {

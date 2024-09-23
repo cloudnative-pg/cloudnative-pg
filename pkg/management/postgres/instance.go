@@ -32,15 +32,15 @@ import (
 	"time"
 
 	"github.com/blang/semver"
+	"github.com/cloudnative-pg/machinery/pkg/execlog"
+	"github.com/cloudnative-pg/machinery/pkg/fileutils"
+	"github.com/cloudnative-pg/machinery/pkg/fileutils/compatibility"
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	"go.uber.org/atomic"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils/compatibility"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/logpipe"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pool"
 	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
@@ -1110,6 +1110,21 @@ func (instance *Instance) GetPgControldata() (string, error) {
 // wait for the operations requested on the instance
 func (instance *Instance) GetInstanceCommandChan() <-chan InstanceCommand {
 	return instance.instanceCommandChan
+}
+
+// GetClusterName returns the name of the cluster where this instance is running
+func (instance *Instance) GetClusterName() string {
+	return instance.ClusterName
+}
+
+// GetPodName returns the name of the pod where this instance is running
+func (instance *Instance) GetPodName() string {
+	return instance.PodName
+}
+
+// GetNamespaceName returns the name of the namespace where this instance is running
+func (instance *Instance) GetNamespaceName() string {
+	return instance.Namespace
 }
 
 // RequestFastImmediateShutdown request the lifecycle manager to shut down
