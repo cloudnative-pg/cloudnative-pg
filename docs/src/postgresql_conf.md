@@ -66,7 +66,7 @@ The **global default parameters** are:
 ```text
 archive_mode = 'on'
 dynamic_shared_memory_type = 'posix'
-full_page_writes= 'on'
+full_page_writes = 'on'
 logging_collector = 'on'
 log_destination = 'csvlog'
 log_directory = '/controller/log'

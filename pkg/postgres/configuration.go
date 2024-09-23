@@ -466,6 +466,7 @@ var (
 	CnpgConfigurationSettings = ConfigurationSettings{
 		GlobalDefaultSettings: SettingsCollection{
 			"archive_timeout":            "5min",
+			"full_page_writes":           "on",
 			"max_parallel_workers":       "32",
 			"max_worker_processes":       "32",
 			"max_replication_slots":      "32",
@@ -485,7 +486,6 @@ var (
 			// a default value is not explicit in the postgresql.conf and
 			// the parameter cannot be changed without a restart.
 			SharedPreloadLibraries: "",
-			"full_page_writes":     "on",
 		},
 		DefaultSettings: map[MajorVersionRange]SettingsCollection{
 			{MajorVersionRangeUnlimited, 120000}: {
