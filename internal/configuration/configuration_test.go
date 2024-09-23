@@ -153,9 +153,9 @@ var _ = Describe("Annotation and label inheritance", func() {
 		Expect(config.GetClustersRolloutDelay()).To(Equal(10 * time.Second))
 	})
 
-	It("returns zero delay for clusters rollout when not set", func() {
+	It("returns zero as default delay for clusters rollout when not set", func() {
 		config := Data{}
-		Expect(config.GetClustersRolloutDelay()).To(Equal(0 * time.Second))
+		Expect(config.GetClustersRolloutDelay()).To(BeZero())
 	})
 
 	It("returns correct delay for instances rollout", func() {
@@ -163,8 +163,8 @@ var _ = Describe("Annotation and label inheritance", func() {
 		Expect(config.GetInstancesRolloutDelay()).To(Equal(5 * time.Second))
 	})
 
-	It("returns zero delay for instances rollout when not set", func() {
+	It("returns zero as default delay for instances rollout when not set", func() {
 		config := Data{}
-		Expect(config.GetInstancesRolloutDelay()).To(Equal(0 * time.Second))
+		Expect(config.GetInstancesRolloutDelay()).To(BeZero())
 	})
 })
