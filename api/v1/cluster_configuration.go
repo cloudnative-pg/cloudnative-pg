@@ -17,7 +17,8 @@ limitations under the License.
 package v1
 
 import (
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/machinery/pkg/log"
+
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 

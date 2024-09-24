@@ -24,7 +24,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/machinery/pkg/log"
 )
 
 // TryInvokeShutdownEndpoint executes a post request on the /shutdown endpoint. Returns any errors encountered if
