@@ -45,9 +45,9 @@ func (r *ClusterReconciler) cleanupCompletedJobs(
 			continue
 		}
 
-		contextLogger.Debug("Removing finalizer from job", "job", job.Name)
 		jobWithoutFinalizer := job.DeepCopy()
 		if controllerutil.RemoveFinalizer(jobWithoutFinalizer, utils.JobFinalizerName) {
+			contextLogger.Debug("Removing finalizer from job", "job", job.Name)
 			if err := r.Patch(ctx, jobWithoutFinalizer, client.MergeFrom(job)); err != nil {
 				contextLogger.Error(
 					err,
