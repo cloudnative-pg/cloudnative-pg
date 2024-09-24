@@ -18,12 +18,12 @@ github.com/cespare/xxhash/v2 v2.3.0 h1:UL815xU9SqsFlibzuggzjXhog7bL6oX9BbNZnL2UF
 github.com/cespare/xxhash/v2 v2.3.0/go.mod h1:VGX0DQ3Q6kWi7AoAeZDth3/j3BFtOZR5XLFGgcrjCOs=
 github.com/cheynewallace/tabby v1.1.1 h1:JvUR8waht4Y0S3JF17G6Vhyt+FRhnqVCkk8l4YrOU54=
 github.com/cheynewallace/tabby v1.1.1/go.mod h1:Pba/6cUL8uYqvOc9RkyvFbHGrQ9wShyrn6/S/1OYVys=
-github.com/cloudnative-pg/barman-cloud v0.0.0-20240918151336-33725e855028 h1:Uiol3csbgaCKw1Cu/2fLGQj1v2KENfeS9vJtnePmfTo=
-github.com/cloudnative-pg/barman-cloud v0.0.0-20240918151336-33725e855028/go.mod h1:Vtn+EXciDVTvvvrd+QSMTeM0AhGj24KMSypPTWsg97k=
+github.com/cloudnative-pg/barman-cloud v0.0.0-20240924124724-92831d48562a h1:0v1ML9Eibfq3helbT9GtU0EstqFtG91k/MPO9azY5ME=
+github.com/cloudnative-pg/barman-cloud v0.0.0-20240924124724-92831d48562a/go.mod h1:Jm0tOp5oB7utpt8wz6RfSv31h1mThOtffjfyxVupriE=
 github.com/cloudnative-pg/cnpg-i v0.0.0-20240820123829-5844b833f4eb h1:kZQk+KUCTHQMEgcH8j2/ypcG2HY58zKocmVUvX6c1IA=
 github.com/cloudnative-pg/cnpg-i v0.0.0-20240820123829-5844b833f4eb/go.mod h1:UILpBDaWvXcYC5kY5DMaVEEQY5483CBApMuHIn0GJdg=
-github.com/cloudnative-pg/machinery v0.0.0-20240917142132-6c50ae1df10c h1:CqW51EFiTaduH11UETsxdjNzJQNLaP0rUEo3xBBRNsQ=
-github.com/cloudnative-pg/machinery v0.0.0-20240917142132-6c50ae1df10c/go.mod h1:bWp1Es5zlxElg4Z/c5f0RKOkDcyNvDHdYIvNcPQU4WM=
+github.com/cloudnative-pg/machinery v0.0.0-20240919131343-9dd62b9257c7 h1:glRSFwMeX1tb1wlN6ZxihPH3nMXL9ZlwU1/xvNFB0iE=
+github.com/cloudnative-pg/machinery v0.0.0-20240919131343-9dd62b9257c7/go.mod h1:bWp1Es5zlxElg4Z/c5f0RKOkDcyNvDHdYIvNcPQU4WM=
 github.com/cpuguy83/go-md2man/v2 v2.0.4/go.mod h1:tgQtvFlXSQOSOSIRvRPT7W67SCa46tRHOmNcaadrF8o=
 github.com/creack/pty v1.1.18 h1:n56/Zwd5o6whRC5PMGretI4IdRLlmBXYNjScPaBgsbY=
 github.com/creack/pty v1.1.18/go.mod h1:MOBLtS5ELjhRRrroQr9kyvTxUAFNvYEK993ew/Vr4O4=
