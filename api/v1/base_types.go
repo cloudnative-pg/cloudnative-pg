@@ -18,9 +18,6 @@ package v1
 
 import (
 	machineryapi "github.com/cloudnative-pg/machinery/pkg/api"
-	corev1 "k8s.io/api/core/v1"
-
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // PodStatus represent the possible status of pods
@@ -51,54 +48,3 @@ type SecretKeySelector = machineryapi.SecretKeySelector
 // the key of a ConfigMap
 // +kubebuilder:object:generate:=false
 type ConfigMapKeySelector = machineryapi.ConfigMapKeySelector
-
-// SecretKeySelectorToCore transforms a SecretKeySelector structure to the
-// analogue one in the corev1 namespace
-func SecretKeySelectorToCore(selector *SecretKeySelector) *corev1.SecretKeySelector {
-	if selector == nil {
-		return nil
-	}
-
-	return &corev1.SecretKeySelector{
-		LocalObjectReference: corev1.LocalObjectReference{
-			Name: selector.LocalObjectReference.Name,
-		},
-		Key: selector.Key,
-	}
-}
-
-// ConfigMapKeySelectorToCore transforms a ConfigMapKeySelector structure to the analogue
-// one in the corev1 namespace
-func ConfigMapKeySelectorToCore(selector *ConfigMapKeySelector) *corev1.ConfigMapKeySelector {
-	if selector == nil {
-		return nil
-	}
-
-	return &corev1.ConfigMapKeySelector{
-		LocalObjectReference: corev1.LocalObjectReference{
-			Name: selector.Name,
-		},
-		Key: selector.Key,
-	}
-}
-
-// ListStatusPods return a list of active Pods
-func ListStatusPods(podList []corev1.Pod) map[PodStatus][]string {
-	podsNames := make(map[PodStatus][]string)
-
-	for _, pod := range podList {
-		if !pod.DeletionTimestamp.IsZero() {
-			continue
-		}
-		switch {
-		case utils.IsPodReady(pod):
-			podsNames[PodHealthy] = append(podsNames[PodHealthy], pod.Name)
-		case utils.IsPodActive(pod):
-			podsNames[PodReplicating] = append(podsNames[PodReplicating], pod.Name)
-		default:
-			podsNames[PodFailed] = append(podsNames[PodFailed], pod.Name)
-		}
-	}
-
-	return podsNames
-}
