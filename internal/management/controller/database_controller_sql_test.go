@@ -108,16 +108,25 @@ var _ = Describe("Managed Database SQL", func() {
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		It("should create a new Database with locale type fields", func(ctx SpecContext) {
-			database.Spec.Encoding = "LATIN9"
-			database.Spec.Locale = "sv_SE.iso885915"
+		It("should create a new Database with locale and encoding kind fields", func(ctx SpecContext) {
+			database.Spec.Locale = "POSIX"
+			database.Spec.LocaleProvider = "icu"
+			database.Spec.LcCtype = "en_US.utf8"
+			database.Spec.LcCollate = "C"
+			database.Spec.Encoding = "LATIN1"
+			database.Spec.IcuLocale = "en"
+			database.Spec.IcuRules = "fr"
 
 			expectedValue := sqlmock.NewResult(0, 1)
 			expectedQuery := fmt.Sprintf(
 				"CREATE DATABASE %s OWNER %s "+
-					"ENCODING %s LOCALE %s",
+					"ENCODING %s LOCALE %s LOCALE_PROVIDER %s LC_COLLATE %s LC_CTYPE %s "+
+					"ICU_LOCALE %s ICU_RULES %s",
 				pgx.Identifier{database.Spec.Name}.Sanitize(), pgx.Identifier{database.Spec.Owner}.Sanitize(),
 				pgx.Identifier{database.Spec.Encoding}.Sanitize(), pgx.Identifier{database.Spec.Locale}.Sanitize(),
+				pgx.Identifier{database.Spec.LocaleProvider}.Sanitize(), pgx.Identifier{database.Spec.LcCollate}.Sanitize(),
+				pgx.Identifier{database.Spec.LcCtype}.Sanitize(),
+				pgx.Identifier{database.Spec.IcuLocale}.Sanitize(), pgx.Identifier{database.Spec.IcuRules}.Sanitize(),
 			)
 			dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedValue)
 

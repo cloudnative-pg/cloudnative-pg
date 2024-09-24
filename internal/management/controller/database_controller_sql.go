@@ -90,6 +90,12 @@ func createDatabase(
 	if obj.Spec.LcCtype != "" {
 		sqlCreateDatabase += fmt.Sprintf(" LC_CTYPE %s", pgx.Identifier{obj.Spec.LcCtype}.Sanitize())
 	}
+	if obj.Spec.IcuLocale != "" {
+		sqlCreateDatabase += fmt.Sprintf(" ICU_LOCALE %s", pgx.Identifier{obj.Spec.IcuLocale}.Sanitize())
+	}
+	if obj.Spec.IcuRules != "" {
+		sqlCreateDatabase += fmt.Sprintf(" ICU_RULES %s", pgx.Identifier{obj.Spec.IcuRules}.Sanitize())
+	}
 
 	_, err := db.ExecContext(ctx, sqlCreateDatabase)
 

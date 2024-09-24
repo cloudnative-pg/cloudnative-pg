@@ -796,6 +796,7 @@ http
 httpGet
 https
 hugepages
+icu
 ident
 imageCatalogRef
 imageName

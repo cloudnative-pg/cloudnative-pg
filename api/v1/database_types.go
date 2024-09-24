@@ -77,6 +77,16 @@ type DatabaseSpec struct {
 	// +optional
 	LcCtype string `json:"lc_ctype,omitempty"`
 
+	// The ICU_LOCALE (cannot be changed)
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="icu_locale is immutable"
+	// +optional
+	IcuLocale string `json:"icu_locale,omitempty"`
+
+	// The ICU_RULES (cannot be changed)
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="icu_rules is immutable"
+	// +optional
+	IcuRules string `json:"icu_rules,omitempty"`
+
 	// True when the database is a template
 	// +optional
 	IsTemplate *bool `json:"isTemplate,omitempty"`

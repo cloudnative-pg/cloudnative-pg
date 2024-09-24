@@ -93,6 +93,18 @@ spec:
                 x-kubernetes-validations:
                 - message: encoding is immutable
                   rule: self == oldSelf
+              icu_locale:
+                description: The ICU_LOCALE (cannot be changed)
+                type: string
+                x-kubernetes-validations:
+                - message: icu_locale is immutable
+                  rule: self == oldSelf
+              icu_rules:
+                description: The ICU_RULES (cannot be changed)
+                type: string
+                x-kubernetes-validations:
+                - message: icu_rules is immutable
+                  rule: self == oldSelf
               isTemplate:
                 description: True when the database is a template
                 type: boolean
