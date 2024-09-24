@@ -798,7 +798,7 @@ type ClusterStatus struct {
 
 	// InstancesStatus indicates in which status the instances are
 	// +optional
-	InstancesStatus map[utils.PodStatus][]string `json:"instancesStatus,omitempty"`
+	InstancesStatus map[PodStatus][]string `json:"instancesStatus,omitempty"`
 
 	// The reported state of the instances during the last reconciliation loop
 	// +optional
