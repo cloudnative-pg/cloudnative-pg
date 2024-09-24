@@ -137,6 +137,10 @@ local {{.Username}} postgres
 	// ScratchDataDirectory is the directory to be used for scratch data
 	ScratchDataDirectory = "/controller"
 
+	// SpoolDirectory is the directory where we spool the WAL files that
+	// were pre-archived in parallel
+	SpoolDirectory = ScratchDataDirectory + "/wal-archive-spool"
+
 	// CertificatesDir location to store the certificates
 	CertificatesDir = ScratchDataDirectory + "/certificates/"
 

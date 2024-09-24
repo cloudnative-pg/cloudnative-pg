@@ -19,8 +19,9 @@ package logicalimport
 import (
 	"context"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
+
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pool"
 )
 

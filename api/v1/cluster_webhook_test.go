@@ -23,7 +23,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/utils/ptr"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
@@ -76,114 +75,6 @@ var _ = Describe("bootstrap methods validation", func() {
 		}
 		result := invalidCluster.validateBootstrapMethod()
 		Expect(result).To(HaveLen(1))
-	})
-})
-
-var _ = Describe("azure credentials", func() {
-	path := field.NewPath("spec", "backupConfiguration", "azureCredentials")
-
-	It("contain only one of storage account key and SAS token", func() {
-		azureCredentials := AzureCredentials{
-			StorageAccount: &SecretKeySelector{
-				LocalObjectReference: LocalObjectReference{
-					Name: "azure-config",
-				},
-				Key: "storageAccount",
-			},
-			StorageKey: &SecretKeySelector{
-				LocalObjectReference: LocalObjectReference{
-					Name: "azure-config",
-				},
-				Key: "storageKey",
-			},
-			StorageSasToken: &SecretKeySelector{
-				LocalObjectReference: LocalObjectReference{
-					Name: "azure-config",
-				},
-				Key: "sasToken",
-			},
-		}
-		Expect(azureCredentials.validateAzureCredentials(path)).ToNot(BeEmpty())
-
-		azureCredentials = AzureCredentials{
-			StorageAccount: &SecretKeySelector{
-				LocalObjectReference: LocalObjectReference{
-					Name: "azure-config",
-				},
-				Key: "storageAccount",
-			},
-			StorageKey:      nil,
-			StorageSasToken: nil,
-		}
-		Expect(azureCredentials.validateAzureCredentials(path)).ToNot(BeEmpty())
-	})
-
-	It("is correct when the storage key is used", func() {
-		azureCredentials := AzureCredentials{
-			StorageAccount: &SecretKeySelector{
-				LocalObjectReference: LocalObjectReference{
-					Name: "azure-config",
-				},
-				Key: "storageAccount",
-			},
-			StorageKey: &SecretKeySelector{
-				LocalObjectReference: LocalObjectReference{
-					Name: "azure-config",
-				},
-				Key: "storageKey",
-			},
-			StorageSasToken: nil,
-		}
-		Expect(azureCredentials.validateAzureCredentials(path)).To(BeEmpty())
-	})
-
-	It("is correct when the sas token is used", func() {
-		azureCredentials := AzureCredentials{
-			StorageAccount: &SecretKeySelector{
-				LocalObjectReference: LocalObjectReference{
-					Name: "azure-config",
-				},
-				Key: "storageAccount",
-			},
-			StorageKey: nil,
-			StorageSasToken: &SecretKeySelector{
-				LocalObjectReference: LocalObjectReference{
-					Name: "azure-config",
-				},
-				Key: "sasToken",
-			},
-		}
-		Expect(azureCredentials.validateAzureCredentials(path)).To(BeEmpty())
-	})
-
-	It("is correct even if only the connection string is specified", func() {
-		azureCredentials := AzureCredentials{
-			ConnectionString: &SecretKeySelector{
-				LocalObjectReference: LocalObjectReference{
-					Name: "azure-config",
-				},
-				Key: "connectionString",
-			},
-		}
-		Expect(azureCredentials.validateAzureCredentials(path)).To(BeEmpty())
-	})
-
-	It("it is not correct when the connection string is specified with other parameters", func() {
-		azureCredentials := AzureCredentials{
-			ConnectionString: &SecretKeySelector{
-				LocalObjectReference: LocalObjectReference{
-					Name: "azure-config",
-				},
-				Key: "connectionString",
-			},
-			StorageAccount: &SecretKeySelector{
-				LocalObjectReference: LocalObjectReference{
-					Name: "azure-config",
-				},
-				Key: "storageAccount",
-			},
-		}
-		Expect(azureCredentials.validateAzureCredentials(path)).To(BeEmpty())
 	})
 })
 

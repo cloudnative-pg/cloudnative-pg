@@ -21,6 +21,7 @@ import (
 	"sort"
 	"strings"
 
+	barmanApi "github.com/cloudnative-pg/barman-cloud/pkg/api"
 	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -60,6 +61,51 @@ const (
 	// BackupPhaseWalArchivingFailing means wal archiving isn't properly working
 	BackupPhaseWalArchivingFailing = "walArchivingFailing"
 )
+
+// BarmanCredentials an object containing the potential credentials for each cloud provider
+// +kubebuilder:object:generate:=false
+type BarmanCredentials = barmanApi.BarmanCredentials
+
+// AzureCredentials is the type for the credentials to be used to upload
+// files to Azure Blob Storage. The connection string contains every needed
+// information. If the connection string is not specified, we'll need the
+// storage account name and also one (and only one) of:
+//
+// - storageKey
+// - storageSasToken
+//
+// - inheriting the credentials from the pod environment by setting inheritFromAzureAD to true
+// +kubebuilder:object:generate:=false
+type AzureCredentials = barmanApi.AzureCredentials
+
+// BarmanObjectStoreConfiguration contains the backup configuration
+// using Barman against an S3-compatible object storage
+// +kubebuilder:object:generate:=false
+type BarmanObjectStoreConfiguration = barmanApi.BarmanObjectStoreConfiguration
+
+// DataBackupConfiguration is the configuration of the backup of
+// the data directory
+// +kubebuilder:object:generate:=false
+type DataBackupConfiguration = barmanApi.DataBackupConfiguration
+
+// GoogleCredentials is the type for the Google Cloud Storage credentials.
+// This needs to be specified even if we run inside a GKE environment.
+// +kubebuilder:object:generate:=false
+type GoogleCredentials = barmanApi.GoogleCredentials
+
+// S3Credentials is the type for the credentials to be used to upload
+// files to S3. It can be provided in two alternative ways:
+//
+// - explicitly passing accessKeyId and secretAccessKey
+//
+// - inheriting the role from the pod environment by setting inheritFromIAMRole to true
+// +kubebuilder:object:generate:=false
+type S3Credentials = barmanApi.S3Credentials
+
+// WalBackupConfiguration is the configuration of the backup of the
+// WAL stream
+// +kubebuilder:object:generate:=false
+type WalBackupConfiguration = barmanApi.WalBackupConfiguration
 
 // BackupMethod defines the way of executing the physical base backups of
 // the selected PostgreSQL instance
