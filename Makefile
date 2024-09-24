@@ -337,38 +337,35 @@ kind-cluster-destroy: ## Destroy KinD cluster created using kind-cluster command
 	hack/setup-cluster.sh -n1 -r destroy
 
 .PHONY: operator-sdk
+OPERATOR_SDK = $(LOCALBIN)/operator-sdk
 operator-sdk: ## Install the operator-sdk app
-ifneq ($(shell PATH="$(LOCALBIN):$${PATH}" operator-sdk version 2>/dev/null | awk -F '"' '{print $$2}'), $(OPERATOR_SDK_VERSION))
+ifneq ($(shell $(OPERATOR_SDK) version 2>/dev/null | awk -F '"' '{print $$2}'), $(OPERATOR_SDK_VERSION))
 	@{ \
 	set -e ;\
 	mkdir -p $(LOCALBIN) ;\
 	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
-	curl -sSL "https://github.com/operator-framework/operator-sdk/releases/download/${OPERATOR_SDK_VERSION}/operator-sdk_$${OS}_$${ARCH}" -o "$(LOCALBIN)/operator-sdk" ;\
+	curl -sSL "https://github.com/operator-framework/operator-sdk/releases/download/${OPERATOR_SDK_VERSION}/operator-sdk_$${OS}_$${ARCH}" -o "$(OPERATOR_SDK)" ;\
 	chmod +x "$(LOCALBIN)/operator-sdk" ;\
 	}
-OPERATOR_SDK=$(LOCALBIN)/operator-sdk
-else
-OPERATOR_SDK=$(shell which operator-sdk)
 endif
 
 .PHONY: opm
+OPM = $(LOCALBIN)/opm
 opm: ## Download opm locally if necessary.
-ifneq ($(shell PATH="$(LOCALBIN):$${PATH}" opm version 2>/dev/null | awk -F '"' '{print $$2}'), $(OPM_VERSION))
+ifneq ($(shell $(OPM) version 2>/dev/null | awk -F '"' '{print $$2}'), $(OPM_VERSION))
 	@{ \
 	set -e ;\
 	mkdir -p $(LOCALBIN) ;\
 	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
-	curl -sSL https://github.com/operator-framework/operator-registry/releases/download/${OPM_VERSION}/$${OS}-$${ARCH}-opm -o "$(LOCALBIN)/opm";\
+	curl -sSL https://github.com/operator-framework/operator-registry/releases/download/${OPM_VERSION}/$${OS}-$${ARCH}-opm -o "$(OPM)";\
 	chmod +x $(LOCALBIN)/opm ;\
 	}
-OPM=$(LOCALBIN)/opm
-else
-OPM=$(shell which opm)
 endif
 
 .PHONY: preflight
+PREFLIGHT = $(LOCALBIN)/preflight
 preflight: ## Download preflight locally if necessary.
-ifneq ($(shell PATH="$(LOCALBIN):$${PATH}" preflight --version 2>/dev/null | awk '{print $$3}'), $(PREFLIGHT_VERSION))
+ifneq ($(shell $(PREFLIGHT) --version 2>/dev/null | awk '{print $$3}'), $(PREFLIGHT_VERSION))
 	@{ \
 	set -e ;\
 	mkdir -p $(LOCALBIN) ;\
@@ -376,11 +373,8 @@ ifneq ($(shell PATH="$(LOCALBIN):$${PATH}" preflight --version 2>/dev/null | awk
 	if [ "$${OS}" != "linux" ] ; then \
 		echo "Unsupported OS: $${OS}" ;\
 	else \
-		curl -sSL "https://github.com/redhat-openshift-ecosystem/openshift-preflight/releases/download/${PREFLIGHT_VERSION}/preflight-$${OS}-$${ARCH}" -o "$(LOCALBIN)/preflight" ;\
+		curl -sSL "https://github.com/redhat-openshift-ecosystem/openshift-preflight/releases/download/${PREFLIGHT_VERSION}/preflight-$${OS}-$${ARCH}" -o "$(PREFLIGHT)" ;\
 		chmod +x $(LOCALBIN)/preflight ;\
 	fi \
 	}
-PREFLIGHT=$(LOCALBIN)/preflight
-else
-PREFLIGHT=$(shell which PREFLIGHT)
 endif
