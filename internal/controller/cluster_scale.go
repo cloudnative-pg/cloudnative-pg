@@ -42,8 +42,9 @@ func (r *ClusterReconciler) scaleDownCluster(
 	contextLogger := log.FromContext(ctx)
 
 	if cluster.Spec.MaxSyncReplicas > 0 && cluster.Spec.Instances < (cluster.Spec.MaxSyncReplicas+1) {
+		origCluster := cluster.DeepCopy()
 		cluster.Spec.Instances = cluster.Status.Instances
-		if err := r.Update(ctx, cluster); err != nil {
+		if err := r.Patch(ctx, cluster, client.MergeFrom(origCluster)); err != nil {
 			return err
 		}
 
@@ -95,6 +96,8 @@ func (r *ClusterReconciler) ensureInstanceJobAreDeleted(
 	cluster *apiv1.Cluster,
 	instanceName string,
 ) error {
+	contextLogger := log.FromContext(ctx)
+
 	for _, jobName := range specs.GetPossibleJobNames(instanceName) {
 		job := &batchv1.Job{
 			ObjectMeta: metav1.ObjectMeta{
@@ -102,6 +105,7 @@ func (r *ClusterReconciler) ensureInstanceJobAreDeleted(
 				Namespace: cluster.Namespace,
 			},
 		}
+
 		// This job was working against the PVC of this Pod,
 		// let's remove it
 		foreground := metav1.DeletePropagationForeground
@@ -110,6 +114,7 @@ func (r *ClusterReconciler) ensureInstanceJobAreDeleted(
 			if !apierrs.IsNotFound(err) {
 				return fmt.Errorf("scaling down node (job) %v: %w", instanceName, err)
 			}
+			contextLogger.Info("Deleted job", "jobName", job.Name)
 		}
 	}
 	return nil

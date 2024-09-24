@@ -642,7 +642,6 @@ spec:
       - displayName: Last backup
         description: When the last backup was scheduled
         path: lastScheduleTime
-
     - kind: ImageCatalog
       name: imagecatalogs.postgresql.cnpg.io
       displayName: Image Catalog
@@ -675,3 +674,25 @@ spec:
       - path: images.image
         x-descriptors:
           - 'urn:alm:descriptor:com.tectonic.ui:text'
+    - kind: Database
+      name: databases.postgresql.cnpg.io
+      displayName: Database management
+      description: Declarative database management
+      version: v1
+      resources:
+      - kind: Cluster
+        name: ''
+        version: v1
+      specDescriptors:
+      - path: databaseReclaimPolicy
+        displayName: Database reclaim policy
+        description: Database reclame policy
+      - path: cluster
+        displayName: Cluster requested to create the database
+        description: Cluster requested to create the database
+      - path: name
+        displayName: Database name
+        description: Database name
+      - path: owner
+        displayName: Database Owner
+        description: Database Owner

@@ -53,7 +53,8 @@ activities:
   last few days without previous validation from the team.
 
 - **Supported releases:** Make sure that you update the supported releases page
-  in `docs/src/supported_releases.md`, and that the maintainers approve the changes.
+  in [`docs/src/supported_releases.md`](../docs/src/supported_releases.md),
+  and that the maintainers approve the changes.
 
 - **Check on backporting:** Make sure to cherry-pick any code that requires
   backporting to the various release branches ahead of time. Doing that will
@@ -67,11 +68,13 @@ activities:
 
 - **Release notes:** You should create/update the release note documents in
   `docs/src/release_notes/` for each version to release. Remember to
-  update `docs/src/release_notes.md` and `.github/ISSUE_TEMPLATE/bug.yml`.
+  update [`docs/src/release_notes.md`](../docs/src/release_notes.md)
+  and [`.github/ISSUE_TEMPLATE/bug.yml`](../.github/ISSUE_TEMPLATE/bug.yml).
   These changes should go in a PR against `main`, and get maintainer approval.
 
 - **Capabilities page:** in case of a new minor release, ensure that the
-  operator capability levels page in `docs/src/operator_capability_levels.md`
+  operator capability levels page in
+  [`docs/src/operator_capability_levels.md`](../docs/src/operator_capability_levels.md)
   is up-to-date and approved by the maintainers.
 
 - **Documentation on website:** Remember that after the release, you will
