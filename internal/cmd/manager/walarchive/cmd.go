@@ -184,15 +184,7 @@ func run(
 		env,
 		postgres.SpoolDirectory,
 		pgData,
-		func() error {
-			// Removes the `.check-empty-wal-archive` file inside PGDATA after the
-			// first successful archival of a WAL file.
-			filePath := path.Join(pgData, pgManagement.CheckEmptyWalArchiveFile)
-			if err := fileutils.RemoveFile(filePath); err != nil {
-				return fmt.Errorf("error while deleting the check WAL file flag: %w", err)
-			}
-			return nil
-		}); err != nil {
+		path.Join(pgData, pgManagement.CheckEmptyWalArchiveFile)); err != nil {
 		return fmt.Errorf("while creating the archiver: %w", err)
 	}
 
