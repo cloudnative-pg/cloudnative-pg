@@ -20,7 +20,9 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/jackc/pgx/v5"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -56,48 +58,54 @@ func createDatabase(
 	db *sql.DB,
 	obj *apiv1.Database,
 ) error {
-	sqlCreateDatabase := fmt.Sprintf("CREATE DATABASE %s ", pgx.Identifier{obj.Spec.Name}.Sanitize())
+	var sqlCreateDatabase strings.Builder
+	sqlCreateDatabase.WriteString(fmt.Sprintf("CREATE DATABASE %s ", pgx.Identifier{obj.Spec.Name}.Sanitize()))
 	if len(obj.Spec.Owner) > 0 {
-		sqlCreateDatabase += fmt.Sprintf(" OWNER %s", pgx.Identifier{obj.Spec.Owner}.Sanitize())
+		sqlCreateDatabase.WriteString(fmt.Sprintf(" OWNER %s", pgx.Identifier{obj.Spec.Owner}.Sanitize()))
 	}
 	if len(obj.Spec.Template) > 0 {
 		sqlCreateDatabase += fmt.Sprintf(" TEMPLATE %s", pgx.Identifier{obj.Spec.Template}.Sanitize())
 	}
 	if len(obj.Spec.Tablespace) > 0 {
-		sqlCreateDatabase += fmt.Sprintf(" TABLESPACE %s", pgx.Identifier{obj.Spec.Tablespace}.Sanitize())
+		sqlCreateDatabase.WriteString(fmt.Sprintf(" TABLESPACE %s", pgx.Identifier{obj.Spec.Tablespace}.Sanitize()))
 	}
 	if obj.Spec.AllowConnections != nil {
-		sqlCreateDatabase += fmt.Sprintf(" ALLOW_CONNECTIONS %v", *obj.Spec.AllowConnections)
+		sqlCreateDatabase.WriteString(fmt.Sprintf(" ALLOW_CONNECTIONS %v", *obj.Spec.AllowConnections))
 	}
 	if obj.Spec.ConnectionLimit != nil {
-		sqlCreateDatabase += fmt.Sprintf(" CONNECTION LIMIT %v", *obj.Spec.ConnectionLimit)
+		sqlCreateDatabase.WriteString(fmt.Sprintf(" CONNECTION LIMIT %v", *obj.Spec.ConnectionLimit))
 	}
 	if obj.Spec.IsTemplate != nil {
-		sqlCreateDatabase += fmt.Sprintf(" IS_TEMPLATE %v", *obj.Spec.IsTemplate)
+		sqlCreateDatabase.WriteString(fmt.Sprintf(" IS_TEMPLATE %v", *obj.Spec.IsTemplate))
 	}
 	if obj.Spec.Encoding != "" {
-		sqlCreateDatabase += fmt.Sprintf(" ENCODING %s", pgx.Identifier{obj.Spec.Encoding}.Sanitize())
+		sqlCreateDatabase.WriteString(fmt.Sprintf(" ENCODING %s", pgx.Identifier{obj.Spec.Encoding}.Sanitize()))
 	}
 	if obj.Spec.Locale != "" {
-		sqlCreateDatabase += fmt.Sprintf(" LOCALE %s", pgx.Identifier{obj.Spec.Locale}.Sanitize())
+		sqlCreateDatabase.WriteString(fmt.Sprintf(" LOCALE %s", pgx.Identifier{obj.Spec.Locale}.Sanitize()))
 	}
 	if obj.Spec.LocaleProvider != "" {
-		sqlCreateDatabase += fmt.Sprintf(" LOCALE_PROVIDER %s", pgx.Identifier{obj.Spec.LocaleProvider}.Sanitize())
+		sqlCreateDatabase.WriteString(fmt.Sprintf(" LOCALE_PROVIDER %s", pgx.Identifier{obj.Spec.LocaleProvider}.Sanitize()))
 	}
 	if obj.Spec.LcCollate != "" {
-		sqlCreateDatabase += fmt.Sprintf(" LC_COLLATE %s", pgx.Identifier{obj.Spec.LcCollate}.Sanitize())
+		sqlCreateDatabase.WriteString(fmt.Sprintf(" LC_COLLATE %s", pgx.Identifier{obj.Spec.LcCollate}.Sanitize()))
 	}
 	if obj.Spec.LcCtype != "" {
-		sqlCreateDatabase += fmt.Sprintf(" LC_CTYPE %s", pgx.Identifier{obj.Spec.LcCtype}.Sanitize())
+		sqlCreateDatabase.WriteString(fmt.Sprintf(" LC_CTYPE %s", pgx.Identifier{obj.Spec.LcCtype}.Sanitize()))
 	}
 	if obj.Spec.IcuLocale != "" {
-		sqlCreateDatabase += fmt.Sprintf(" ICU_LOCALE %s", pgx.Identifier{obj.Spec.IcuLocale}.Sanitize())
+		sqlCreateDatabase.WriteString(fmt.Sprintf(" ICU_LOCALE %s", pgx.Identifier{obj.Spec.IcuLocale}.Sanitize()))
 	}
 	if obj.Spec.IcuRules != "" {
-		sqlCreateDatabase += fmt.Sprintf(" ICU_RULES %s", pgx.Identifier{obj.Spec.IcuRules}.Sanitize())
+		sqlCreateDatabase.WriteString(fmt.Sprintf(" ICU_RULES %s", pgx.Identifier{obj.Spec.IcuRules}.Sanitize()))
 	}
 
-	_, err := db.ExecContext(ctx, sqlCreateDatabase)
+	contextLogger, ctx := log.SetupLogger(ctx)
+
+	_, err := db.ExecContext(ctx, sqlCreateDatabase.String())
+	if err != nil {
+		contextLogger.Error(err, "while creating database", "query", sqlCreateDatabase.String())
+	}
 
 	return err
 }
@@ -107,6 +115,8 @@ func updateDatabase(
 	db *sql.DB,
 	obj *apiv1.Database,
 ) error {
+	contextLogger, ctx := log.SetupLogger(ctx)
+
 	if obj.Spec.AllowConnections != nil {
 		changeAllowConnectionsSQL := fmt.Sprintf(
 			"ALTER DATABASE %s WITH ALLOW_CONNECTIONS %v",
@@ -114,6 +124,7 @@ func updateDatabase(
 			*obj.Spec.AllowConnections)
 
 		if _, err := db.ExecContext(ctx, changeAllowConnectionsSQL); err != nil {
+			contextLogger.Error(err, "while altering database", "query", changeAllowConnectionsSQL)
 			return fmt.Errorf("while altering database %q with allow_connections %t: %w",
 				obj.Spec.Name, *obj.Spec.AllowConnections, err)
 		}
@@ -126,6 +137,7 @@ func updateDatabase(
 			*obj.Spec.ConnectionLimit)
 
 		if _, err := db.ExecContext(ctx, changeConnectionsLimitSQL); err != nil {
+			contextLogger.Error(err, "while altering database", "query", changeConnectionsLimitSQL)
 			return fmt.Errorf("while altering database %q with connection limit %d: %w",
 				obj.Spec.Name, *obj.Spec.ConnectionLimit, err)
 		}
@@ -138,6 +150,7 @@ func updateDatabase(
 			*obj.Spec.IsTemplate)
 
 		if _, err := db.ExecContext(ctx, changeIsTemplateSQL); err != nil {
+			contextLogger.Error(err, "while altering database", "query", changeIsTemplateSQL)
 			return fmt.Errorf("while altering database %q with is_template %t: %w",
 				obj.Spec.Name, *obj.Spec.IsTemplate, err)
 		}
@@ -150,6 +163,7 @@ func updateDatabase(
 			pgx.Identifier{obj.Spec.Owner}.Sanitize())
 
 		if _, err := db.ExecContext(ctx, changeOwnerSQL); err != nil {
+			contextLogger.Error(err, "while altering database", "query", changeOwnerSQL)
 			return fmt.Errorf("while altering database %q owner %s to: %w",
 				obj.Spec.Name, obj.Spec.Owner, err)
 		}
@@ -162,6 +176,7 @@ func updateDatabase(
 			pgx.Identifier{obj.Spec.Tablespace}.Sanitize())
 
 		if _, err := db.ExecContext(ctx, changeTablespaceSQL); err != nil {
+			contextLogger.Error(err, "while altering database", "query", changeTablespaceSQL)
 			return fmt.Errorf("while altering database %q tablespace %s: %w",
 				obj.Spec.Name, obj.Spec.Tablespace, err)
 		}
@@ -175,11 +190,13 @@ func dropDatabase(
 	db *sql.DB,
 	obj *apiv1.Database,
 ) error {
+	contextLogger, ctx := log.SetupLogger(ctx)
+	query := fmt.Sprintf("DROP DATABASE IF EXISTS %s", pgx.Identifier{obj.Spec.Name}.Sanitize())
 	_, err := db.ExecContext(
 		ctx,
-		fmt.Sprintf("DROP DATABASE IF EXISTS %s", pgx.Identifier{obj.Spec.Name}.Sanitize()),
-	)
+		query)
 	if err != nil {
+		contextLogger.Error(err, "while dropping database", "query", query)
 		return fmt.Errorf("while dropping database %q: %w", obj.Spec.Name, err)
 	}
 

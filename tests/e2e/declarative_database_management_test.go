@@ -17,6 +17,7 @@ limitations under the License.
 package e2e
 
 import (
+	"fmt"
 	"time"
 
 	"k8s.io/apimachinery/pkg/types"
@@ -88,6 +89,23 @@ var _ = Describe("Declarative databases management test", Label(tests.LabelSmoke
 			}, 300).Should(Succeed())
 		}
 
+		assertDatabaseHasExpectedFields := func(namespace, primaryPod string, db apiv1.Database) {
+			query := fmt.Sprintf("select count(*) from pg_database where datname = '%s' "+
+				"and encoding = %s and datctype = '%s' and datcollate = '%s'",
+				db.Spec.Name, db.Spec.Encoding, db.Spec.LcCtype, db.Spec.LcCollate)
+			Eventually(func(g Gomega) {
+				stdout, _, err := env.ExecQueryInInstancePod(
+					utils.PodLocator{
+						Namespace: namespace,
+						PodName:   primaryPod,
+					},
+					"postgres",
+					query)
+				g.Expect(err).ToNot(HaveOccurred())
+				g.Expect(stdout).Should(ContainSubstring("1"))
+			}, 30).Should(Succeed())
+		}
+
 		When("Database CRD reclaim policy is set to retain (default) inside spec", func() {
 			It("can add a declarative database", func() {
 				By("applying Database CRD manifest", func() {
@@ -110,11 +128,25 @@ var _ = Describe("Declarative databases management test", Label(tests.LabelSmoke
 					}, 300).WithPolling(10 * time.Second).Should(Succeed())
 				})
 
-				By("verifying new database has been added", func() {
+				By("verifying new database has been created with the expected fields", func() {
 					primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
 					Expect(err).ToNot(HaveOccurred())
 
 					assertDatabaseExists(namespace, primaryPodInfo.Name, dbname, true)
+
+					// NOTE: the `pg_database` table in Postgres does not contain fields
+					// for the owner nor the template.
+					// Its fields are dependent on the version of Postgres, so we pick
+					// a subset that is available to check even on PG v12
+					expectedDatabaseFields := apiv1.Database{
+						Spec: apiv1.DatabaseSpec{
+							Name:      "declarative",
+							LcCtype:   "en_US.utf8",
+							LcCollate: "C", // this is the default value
+							Encoding:  "0", // corresponds to SQL_ASCII
+						},
+					}
+					assertDatabaseHasExpectedFields(namespace, primaryPodInfo.Name, expectedDatabaseFields)
 				})
 			})
 
