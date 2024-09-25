@@ -50,7 +50,7 @@ func (r *ClusterReconciler) deleteDatabaseFinalizers(ctx context.Context, namesp
 		}
 
 		// Database is in this cluster.
-		// Check if the finalizer is still there, otherwise patch the Database CRD
+		// Check if the finalizer is still there, if so, delete and patch the Database
 		currentDatabase := database.DeepCopy()
 		if controllerutil.RemoveFinalizer(currentDatabase, utils.DatabaseFinalizerName) {
 			contextLogger.Debug("Removing finalizer from database",
