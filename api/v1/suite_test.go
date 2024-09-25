@@ -20,8 +20,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -40,9 +38,9 @@ func createFakeCluster(name string) *Cluster {
 	cluster.Spec.MinSyncReplicas = 1
 	cluster.Status = ClusterStatus{
 		CurrentPrimary: primaryPod,
-		InstancesStatus: map[utils.PodStatus][]string{
-			utils.PodHealthy: {primaryPod, fmt.Sprintf("%s-2", name), fmt.Sprintf("%s-3", name)},
-			utils.PodFailed:  {},
+		InstancesStatus: map[PodStatus][]string{
+			PodHealthy: {primaryPod, fmt.Sprintf("%s-2", name), fmt.Sprintf("%s-3", name)},
+			PodFailed:  {},
 		},
 	}
 	return cluster
