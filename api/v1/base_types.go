@@ -17,35 +17,34 @@ limitations under the License.
 package v1
 
 import (
-	corev1 "k8s.io/api/core/v1"
+	machineryapi "github.com/cloudnative-pg/machinery/pkg/api"
 )
 
-// SecretKeySelectorToCore transforms a SecretKeySelector structure to the
-// analogue one in the corev1 namespace
-func SecretKeySelectorToCore(selector *SecretKeySelector) *corev1.SecretKeySelector {
-	if selector == nil {
-		return nil
-	}
+// PodStatus represent the possible status of pods
+type PodStatus string
 
-	return &corev1.SecretKeySelector{
-		LocalObjectReference: corev1.LocalObjectReference{
-			Name: selector.LocalObjectReference.Name,
-		},
-		Key: selector.Key,
-	}
-}
+const (
+	// PodHealthy means that a Pod is active and ready
+	PodHealthy = "healthy"
 
-// ConfigMapKeySelectorToCore transforms a ConfigMapKeySelector structure to the analogue
-// one in the corev1 namespace
-func ConfigMapKeySelectorToCore(selector *ConfigMapKeySelector) *corev1.ConfigMapKeySelector {
-	if selector == nil {
-		return nil
-	}
+	// PodReplicating means that a Pod is still not ready but still active
+	PodReplicating = "replicating"
 
-	return &corev1.ConfigMapKeySelector{
-		LocalObjectReference: corev1.LocalObjectReference{
-			Name: selector.Name,
-		},
-		Key: selector.Key,
-	}
-}
+	// PodFailed means that a Pod will not be scheduled again (deleted or evicted)
+	PodFailed = "failed"
+)
+
+// LocalObjectReference contains enough information to let you locate a
+// local object with a known type inside the same namespace
+// +kubebuilder:object:generate:=false
+type LocalObjectReference = machineryapi.LocalObjectReference
+
+// SecretKeySelector contains enough information to let you locate
+// the key of a Secret
+// +kubebuilder:object:generate:=false
+type SecretKeySelector = machineryapi.SecretKeySelector
+
+// ConfigMapKeySelector contains enough information to let you locate
+// the key of a ConfigMap
+// +kubebuilder:object:generate:=false
+type ConfigMapKeySelector = machineryapi.ConfigMapKeySelector

@@ -22,7 +22,6 @@ package v1
 
 import (
 	pkgapi "github.com/cloudnative-pg/barman-cloud/pkg/api"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/machinery/pkg/api"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -829,7 +828,7 @@ func (in *ClusterStatus) DeepCopyInto(out *ClusterStatus) {
 	*out = *in
 	if in.InstancesStatus != nil {
 		in, out := &in.InstancesStatus, &out.InstancesStatus
-		*out = make(map[utils.PodStatus][]string, len(*in))
+		*out = make(map[PodStatus][]string, len(*in))
 		for key, val := range *in {
 			var outVal []string
 			if val == nil {

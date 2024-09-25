@@ -17,8 +17,6 @@ limitations under the License.
 package v1
 
 import (
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -68,9 +66,9 @@ var _ = Describe("ensuring the correctness of synchronous replica data calculati
 		cluster := createFakeCluster("exampleOnePod")
 		cluster.Status = ClusterStatus{
 			CurrentPrimary: "exampleOnePod-1",
-			InstancesStatus: map[utils.PodStatus][]string{
-				utils.PodHealthy: {"exampleOnePod-1"},
-				utils.PodFailed:  {"exampleOnePod-2", "exampleOnePod-3"},
+			InstancesStatus: map[PodStatus][]string{
+				PodHealthy: {"exampleOnePod-1"},
+				PodFailed:  {"exampleOnePod-2", "exampleOnePod-3"},
 			},
 		}
 		number, names := cluster.GetSyncReplicasData()
@@ -84,8 +82,8 @@ var _ = Describe("ensuring the correctness of synchronous replica data calculati
 		cluster := createFakeCluster("exampleNoPods")
 		cluster.Status = ClusterStatus{
 			CurrentPrimary: "example-1",
-			InstancesStatus: map[utils.PodStatus][]string{
-				utils.PodFailed: {"exampleNoPods-1", "exampleNoPods-2", "exampleNoPods-3"},
+			InstancesStatus: map[PodStatus][]string{
+				PodFailed: {"exampleNoPods-1", "exampleNoPods-2", "exampleNoPods-3"},
 			},
 		}
 		number, names := cluster.GetSyncReplicasData()

@@ -18,8 +18,6 @@ package v1
 
 import (
 	"github.com/cloudnative-pg/machinery/pkg/log"
-
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // GetSyncReplicasData computes the actual number of required synchronous replicas and the names of
@@ -29,7 +27,7 @@ func (cluster *Cluster) GetSyncReplicasData() (syncReplicas int, electableSyncRe
 	// We start with the number of healthy replicas (healthy pods minus one)
 	// and verify it is greater than 0 and between minSyncReplicas and maxSyncReplicas.
 	// Formula: 1 <= minSyncReplicas <= SyncReplicas <= maxSyncReplicas < readyReplicas
-	readyReplicas := len(cluster.Status.InstancesStatus[utils.PodHealthy]) - 1
+	readyReplicas := len(cluster.Status.InstancesStatus[PodHealthy]) - 1
 
 	// If the number of ready replicas is negative,
 	// there are no healthy Pods so no sync replica can be configured
@@ -73,7 +71,7 @@ func (cluster *Cluster) GetSyncReplicasData() (syncReplicas int, electableSyncRe
 // getElectableSyncReplicas computes the names of the instances that can be elected to sync replicas
 func (cluster *Cluster) getElectableSyncReplicas() []string {
 	var nonPrimaryInstances []string
-	for _, instance := range cluster.Status.InstancesStatus[utils.PodHealthy] {
+	for _, instance := range cluster.Status.InstancesStatus[PodHealthy] {
 		if cluster.Status.CurrentPrimary != instance {
 			nonPrimaryInstances = append(nonPrimaryInstances, instance)
 		}
