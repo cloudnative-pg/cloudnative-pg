@@ -72,7 +72,7 @@ specific minor release, you can just run:
 
 ```sh
 curl -sSfL \
-  https://raw.githubusercontent.com/cloudnative-pg/artifacts/main/manifests/operator-manifest.yaml | \
+  https://raw.githubusercontent.com/cloudnative-pg/artifacts/release-1.24/manifests/operator-manifest.yaml | \
   kubectl apply --server-side -f -
 ```
 
