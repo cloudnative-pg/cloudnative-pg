@@ -25,7 +25,6 @@ import (
 	"strings"
 	"time"
 
-	machineryapi "github.com/cloudnative-pg/machinery/pkg/api"
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -40,21 +39,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
-
-// LocalObjectReference contains enough information to let you locate a
-// local object with a known type inside the same namespace
-// +kubebuilder:object:generate:=false
-type LocalObjectReference = machineryapi.LocalObjectReference
-
-// SecretKeySelector contains enough information to let you locate
-// the key of a Secret
-// +kubebuilder:object:generate:=false
-type SecretKeySelector = machineryapi.SecretKeySelector
-
-// ConfigMapKeySelector contains enough information to let you locate
-// the key of a ConfigMap
-// +kubebuilder:object:generate:=false
-type ConfigMapKeySelector = machineryapi.ConfigMapKeySelector
 
 const (
 	// PrimaryPodDisruptionBudgetSuffix is the suffix appended to the cluster name
@@ -796,7 +780,7 @@ type ClusterStatus struct {
 
 	// InstancesStatus indicates in which status the instances are
 	// +optional
-	InstancesStatus map[utils.PodStatus][]string `json:"instancesStatus,omitempty"`
+	InstancesStatus map[PodStatus][]string `json:"instancesStatus,omitempty"`
 
 	// The reported state of the instances during the last reconciliation loop
 	// +optional
