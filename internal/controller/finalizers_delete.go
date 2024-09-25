@@ -28,7 +28,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-// This method prune the Database CRD finalizers that are orphans.
+// deleteDatabaseFinalizers deletes Database object finalizers when the cluster they were in has been deleted
 func (r *ClusterReconciler) deleteDatabaseFinalizers(ctx context.Context, namespacedName types.NamespacedName) error {
 	databases := apiv1.DatabaseList{}
 	err := r.List(
