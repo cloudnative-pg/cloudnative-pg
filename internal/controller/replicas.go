@@ -186,7 +186,7 @@ func (r *ClusterReconciler) setPrimaryOnSchedulableNode(
 	contextLogger := log.FromContext(ctx)
 
 	// Checking failed pods, e.g. pending pods due to missing PVCs
-	_, hasFailedPods := cluster.Status.InstancesStatus[utils.PodFailed]
+	_, hasFailedPods := cluster.Status.InstancesStatus[apiv1.PodFailed]
 
 	// Checking whether there are pods on other nodes
 	podsOnOtherNodes := GetPodsNotOnPrimaryNode(status, primaryPod)

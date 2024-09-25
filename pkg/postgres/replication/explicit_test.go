@@ -20,7 +20,6 @@ import (
 	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -38,8 +37,8 @@ var _ = Describe("synchronous replica configuration with the new API", func() {
 		}
 		cluster.Status = apiv1.ClusterStatus{
 			CurrentPrimary: "one",
-			InstancesStatus: map[utils.PodStatus][]string{
-				utils.PodHealthy: {"one", "two", "three"},
+			InstancesStatus: map[apiv1.PodStatus][]string{
+				apiv1.PodHealthy: {"one", "two", "three"},
 			},
 		}
 
@@ -57,8 +56,8 @@ var _ = Describe("synchronous replica configuration with the new API", func() {
 		}
 		cluster.Status = apiv1.ClusterStatus{
 			CurrentPrimary: "one",
-			InstancesStatus: map[utils.PodStatus][]string{
-				utils.PodHealthy: {"one", "two", "three"},
+			InstancesStatus: map[apiv1.PodStatus][]string{
+				apiv1.PodHealthy: {"one", "two", "three"},
 			},
 		}
 
@@ -76,8 +75,8 @@ var _ = Describe("synchronous replica configuration with the new API", func() {
 		}
 		cluster.Status = apiv1.ClusterStatus{
 			CurrentPrimary: "one",
-			InstancesStatus: map[utils.PodStatus][]string{
-				utils.PodHealthy: {"one", "two", "three"},
+			InstancesStatus: map[apiv1.PodStatus][]string{
+				apiv1.PodHealthy: {"one", "two", "three"},
 			},
 		}
 
@@ -95,8 +94,8 @@ var _ = Describe("synchronous replica configuration with the new API", func() {
 		}
 		cluster.Status = apiv1.ClusterStatus{
 			CurrentPrimary: "one",
-			InstancesStatus: map[utils.PodStatus][]string{
-				utils.PodHealthy: {"one", "two", "three"},
+			InstancesStatus: map[apiv1.PodStatus][]string{
+				apiv1.PodHealthy: {"one", "two", "three"},
 			},
 		}
 
