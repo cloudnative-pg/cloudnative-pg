@@ -54,3 +54,4 @@ This list is sorted in chronological order, based on the submission date.
 | [Alpcot](https://alpcot.se) | @svenakela | 2024-09-24 | Alpcot uses CloudNativePG for both public-facing and internal applications deployed in the cloud and in-house Kubernetes. |
 | [GEICO Tech](https://www.geico.com/tech/) | Jeremy Schneider | 2024-09-24 | GEICO Tech is building the most consumer-centric insurance offerings in America. CloudNativePG is used to provide a highly available Kubernetes-based Postgres service, both in the cloud and on-premises. |
 | [Cambium](https://www.cambium.earth) | @Mmoncadaisla | 2024-09-25 | Cambium leverages CloudNativePG at its core to analyze and visualize geospatial data for carbon market applications, ranging from site selection to monitoring, reporting, and verification. |
+| [MIND Informatica srl](https://mind-informatica.com) | @simonerocchi | 2024-09-25 | We use CloudNativePG to run PostgreSQL clusters for our web applications. |
