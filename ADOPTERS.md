@@ -1,24 +1,29 @@
 # Adopters
 
-Below you can find a list of organizations and users who have agreed to
-tell the world that they are using PostgreSQL in Kubernetes with our
-CloudNativePG operator in a production environment.
+Below is a list of organizations and users who have publicly shared that
+they’re using PostgreSQL in Kubernetes with the CloudNativePG operator in a
+production environment.
 
-The goal of this list is to inspire others to do the same and to grow
-this open source community and project.
+The purpose of this list is to inspire others to join the movement and help
+grow our open-source community and project.
 
-Please add your organization to this list. It takes 5 minutes of your time,
-but it means a lot to us.
+Adding your organization takes just 5 minutes of your time, but it means a lot
+to us!
 
-## Updating this list
+## How to Add Your Organization
 
-To add your organization to this list, you can either:
+You can add your organization to this list in two ways:
 
-- [open a pull request](https://github.com/cloudnative-pg/cloudnative-pg/pulls) to directly update this file, or
-- [edit this file](https://github.com/cloudnative-pg/cloudnative-pg/blob/main/ADOPTERS.md) directly in GitHub
+- [Open a pull request](https://github.com/cloudnative-pg/cloudnative-pg/pulls)
+  to directly update this file.
+- [Edit the file](https://github.com/cloudnative-pg/cloudnative-pg/blob/main/ADOPTERS.md)
+  directly on GitHub.
 
-Feel free to ask in the Slack chat if you any questions and/or require
-assistance with updating this list.
+Use the commit title: **"docs: add <ORGANIZATION_NAME> to `ADOPTERS.md`"** and
+be sure to [sign off your work](contribute/README.md#sign-your-work).
+
+If you need any assistance, feel free to ask in our Slack chat—we’re here to
+help!
 
 ## CloudNativePG Adopters
 
