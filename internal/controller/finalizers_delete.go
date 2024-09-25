@@ -63,7 +63,6 @@ func (r *ClusterReconciler) deleteDatabaseFinalizers(ctx context.Context, namesp
 					"oldFinalizerList", database.ObjectMeta.Finalizers,
 					"newFinalizerList", dbWithoutFinalizer.ObjectMeta.Finalizers,
 				)
-				continue
 			}
 		}
 	}

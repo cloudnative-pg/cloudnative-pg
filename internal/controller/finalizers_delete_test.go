@@ -24,7 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	"github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
@@ -52,30 +52,32 @@ var _ = Describe("Database CRD finalizers", func() {
 
 	It("should be deleted when the cluster name matches with the database cluster ref name",
 		func(ctx SpecContext) {
-			databaseList := &v1.DatabaseList{
-				Items: []v1.Database{
+			databaseList := &apiv1.DatabaseList{
+				Items: []apiv1.Database{
 					{
 						ObjectMeta: metav1.ObjectMeta{
 							Finalizers: []string{
 								utils.DatabaseFinalizerName,
 							},
 							Name:      "db-1",
-							Namespace: "test"},
-						Spec: v1.DatabaseSpec{
+							Namespace: "test",
+						},
+						Spec: apiv1.DatabaseSpec{
 							Name: "db-test",
 							ClusterRef: corev1.LocalObjectReference{
 								Name: "cluster",
 							},
 						},
 					},
-				}}
+				},
+			}
 
 			cli := fake.NewClientBuilder().WithScheme(scheme).WithLists(databaseList).Build()
 			r.Client = cli
 			err := r.deleteDatabaseFinalizers(ctx, namespacedName)
 			Expect(err).ToNot(HaveOccurred())
 
-			database := &v1.Database{}
+			database := &apiv1.Database{}
 			err = cli.Get(ctx, client.ObjectKeyFromObject(&databaseList.Items[0]), database)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(database.Finalizers).To(BeZero())
@@ -83,30 +85,32 @@ var _ = Describe("Database CRD finalizers", func() {
 
 	It("should not be deleted when the cluster name does not  match with the database cluster ref name",
 		func(ctx SpecContext) {
-			databaseList := &v1.DatabaseList{
-				Items: []v1.Database{
+			databaseList := &apiv1.DatabaseList{
+				Items: []apiv1.Database{
 					{
 						ObjectMeta: metav1.ObjectMeta{
 							Finalizers: []string{
 								utils.DatabaseFinalizerName,
 							},
 							Name:      "db-1",
-							Namespace: "test"},
-						Spec: v1.DatabaseSpec{
+							Namespace: "test",
+						},
+						Spec: apiv1.DatabaseSpec{
 							Name: "db-test",
 							ClusterRef: corev1.LocalObjectReference{
 								Name: "wrong-cluster",
 							},
 						},
 					},
-				}}
+				},
+			}
 
 			cli := fake.NewClientBuilder().WithScheme(scheme).WithLists(databaseList).Build()
 			r.Client = cli
 			err := r.deleteDatabaseFinalizers(ctx, namespacedName)
 			Expect(err).ToNot(HaveOccurred())
 
-			database := &v1.Database{}
+			database := &apiv1.Database{}
 			err = cli.Get(ctx, client.ObjectKeyFromObject(&databaseList.Items[0]), database)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(database.Finalizers).To(BeEquivalentTo([]string{utils.DatabaseFinalizerName}))
