@@ -40,7 +40,7 @@ func (r *ClusterReconciler) deleteDatabaseFinalizers(ctx context.Context, namesp
 		return err
 	}
 
-	contextLogger := log.FromContext(ctx)
+	contextLogger, ctx := log.SetupLogger(ctx)
 
 	for idx := range databases.Items {
 		database := &databases.Items[idx]
