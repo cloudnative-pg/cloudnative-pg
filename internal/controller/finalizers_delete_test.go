@@ -50,7 +50,7 @@ var _ = Describe("Database CRD finalizers", func() {
 		}
 	})
 
-	It("should be deleted when the cluster name matches with the database cluster ref name",
+	It("should delete database finalizers for databases on the cluster",
 		func(ctx SpecContext) {
 			databaseList := &apiv1.DatabaseList{
 				Items: []apiv1.Database{
@@ -69,6 +69,21 @@ var _ = Describe("Database CRD finalizers", func() {
 							},
 						},
 					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Finalizers: []string{
+								utils.DatabaseFinalizerName,
+							},
+							Name:      "db-2",
+							Namespace: "test",
+						},
+						Spec: apiv1.DatabaseSpec{
+							Name: "db-test-2",
+							ClusterRef: corev1.LocalObjectReference{
+								Name: "cluster",
+							},
+						},
+					},
 				},
 			}
 
@@ -77,13 +92,15 @@ var _ = Describe("Database CRD finalizers", func() {
 			err := r.deleteDatabaseFinalizers(ctx, namespacedName)
 			Expect(err).ToNot(HaveOccurred())
 
-			database := &apiv1.Database{}
-			err = cli.Get(ctx, client.ObjectKeyFromObject(&databaseList.Items[0]), database)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(database.Finalizers).To(BeZero())
+			for _, db := range databaseList.Items {
+				database := &apiv1.Database{}
+				err = cli.Get(ctx, client.ObjectKeyFromObject(&db), database)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(database.Finalizers).To(BeZero())
+			}
 		})
 
-	It("should not be deleted when the cluster name does not  match with the database cluster ref name",
+	It("should not delete database finalizers for databases in another cluster",
 		func(ctx SpecContext) {
 			databaseList := &apiv1.DatabaseList{
 				Items: []apiv1.Database{
@@ -98,7 +115,7 @@ var _ = Describe("Database CRD finalizers", func() {
 						Spec: apiv1.DatabaseSpec{
 							Name: "db-test",
 							ClusterRef: corev1.LocalObjectReference{
-								Name: "wrong-cluster",
+								Name: "another-cluster",
 							},
 						},
 					},

@@ -49,19 +49,19 @@ func (r *ClusterReconciler) deleteDatabaseFinalizers(ctx context.Context, namesp
 			continue
 		}
 
-		// Database CRD name and cluster name match.
+		// Database is in this cluster.
 		// Check if the finalizer is still there, otherwise patch the Database CRD
-		dbWithoutFinalizer := database.DeepCopy()
-		if controllerutil.RemoveFinalizer(dbWithoutFinalizer, utils.DatabaseFinalizerName) {
-			contextLogger.Info("Removing finalizer from database",
+		currentDatabase := database.DeepCopy()
+		if controllerutil.RemoveFinalizer(currentDatabase, utils.DatabaseFinalizerName) {
+			contextLogger.Debug("Removing finalizer from database",
 				"finalizer", utils.DatabaseFinalizerName, "database", database.Name)
-			if err := r.Patch(ctx, dbWithoutFinalizer, client.MergeFrom(database)); err != nil {
+			if err := r.Patch(ctx, currentDatabase, client.MergeFrom(database)); err != nil {
 				contextLogger.Error(
 					err,
 					"error while removing finalizer from database",
 					"database", database.Name,
 					"oldFinalizerList", database.ObjectMeta.Finalizers,
-					"newFinalizerList", dbWithoutFinalizer.ObjectMeta.Finalizers,
+					"newFinalizerList", currentDatabase.ObjectMeta.Finalizers,
 				)
 			}
 		}
