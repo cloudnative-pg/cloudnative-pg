@@ -193,6 +193,7 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 	reconciler := controller.NewInstanceReconciler(instance, mgr.GetClient(), metricsExporter)
 	err = ctrl.NewControllerManagedBy(mgr).
 		For(&apiv1.Cluster{}).
+		Named("cluster-instance").
 		Complete(reconciler)
 	if err != nil {
 		setupLog.Error(err, "unable to create instance controller")
@@ -204,6 +205,7 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 	dbReconciler := controller.NewDatabaseReconciler(mgr, instance)
 	err = ctrl.NewControllerManagedBy(mgr).
 		For(&apiv1.Database{}).
+		Named("database-instance").
 		Complete(dbReconciler)
 	if err != nil {
 		setupLog.Error(err, "unable to create database controller")

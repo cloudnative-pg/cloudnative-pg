@@ -225,6 +225,7 @@ func (r *PluginReconciler) SetupWithManager(mgr ctrl.Manager, operatorNamespace 
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&corev1.Service{}).
+		Named("plugin").
 		WithEventFilter(pluginServicesPredicate).
 		Complete(r)
 }
