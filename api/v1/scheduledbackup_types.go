@@ -18,9 +18,6 @@ package v1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // ScheduledBackupSpec defines the desired state of ScheduledBackup
@@ -127,63 +124,6 @@ type ScheduledBackupList struct {
 	metav1.ListMeta `json:"metadata,omitempty"`
 	// List of clusters
 	Items []ScheduledBackup `json:"items"`
-}
-
-// IsSuspended check if a scheduled backup has been suspended or not
-func (scheduledBackup ScheduledBackup) IsSuspended() bool {
-	if scheduledBackup.Spec.Suspend == nil {
-		return false
-	}
-
-	return *scheduledBackup.Spec.Suspend
-}
-
-// IsImmediate check if a backup has to be issued immediately upon creation or not
-func (scheduledBackup ScheduledBackup) IsImmediate() bool {
-	if scheduledBackup.Spec.Immediate == nil {
-		return false
-	}
-
-	return *scheduledBackup.Spec.Immediate
-}
-
-// GetName gets the scheduled backup name
-func (scheduledBackup *ScheduledBackup) GetName() string {
-	return scheduledBackup.Name
-}
-
-// GetNamespace gets the scheduled backup name
-func (scheduledBackup *ScheduledBackup) GetNamespace() string {
-	return scheduledBackup.Namespace
-}
-
-// GetSchedule get the cron-like schedule of this scheduled backup
-func (scheduledBackup *ScheduledBackup) GetSchedule() string {
-	return scheduledBackup.Spec.Schedule
-}
-
-// GetStatus gets the status that the caller may update
-func (scheduledBackup *ScheduledBackup) GetStatus() *ScheduledBackupStatus {
-	return &scheduledBackup.Status
-}
-
-// CreateBackup creates a backup from this scheduled backup
-func (scheduledBackup *ScheduledBackup) CreateBackup(name string) *Backup {
-	backup := Backup{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: scheduledBackup.Namespace,
-		},
-		Spec: BackupSpec{
-			Cluster:             scheduledBackup.Spec.Cluster,
-			Target:              scheduledBackup.Spec.Target,
-			Method:              scheduledBackup.Spec.Method,
-			Online:              scheduledBackup.Spec.Online,
-			OnlineConfiguration: scheduledBackup.Spec.OnlineConfiguration,
-		},
-	}
-	utils.InheritAnnotations(&backup.ObjectMeta, scheduledBackup.Annotations, nil, configuration.Current)
-	return &backup
 }
 
 func init() {
