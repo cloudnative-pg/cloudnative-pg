@@ -19,6 +19,7 @@ package tablespaces
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"slices"
 
@@ -26,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
@@ -59,6 +61,14 @@ func (f fakeInstance) GetSuperUserDB() (*sql.DB, error) {
 	return f.db, nil
 }
 
+func (f fakeInstance) CanCheckReadiness() bool {
+	return true
+}
+
+func (f fakeInstance) IsPrimary() (bool, error) {
+	return true, nil
+}
+
 var _ = Describe("Tablespace synchronizer tests", func() {
 	expectedListStmt := `
 	SELECT
@@ -73,6 +83,13 @@ var _ = Describe("Tablespace synchronizer tests", func() {
 
 	expectedUpdateStmt := "ALTER TABLESPACE \"%s\" OWNER TO \"%s\""
 
+	expectedReadinessCheck := `
+		SELECT
+			NOT pg_is_in_recovery()
+			OR (SELECT coalesce(setting, '') = '' FROM pg_settings WHERE name = 'primary_conninfo')
+			OR pg_last_wal_replay_lsn() IS NOT NULL
+		`
+
 	var (
 		dbMock               sqlmock.Sqlmock
 		db                   *sql.DB
@@ -84,7 +101,7 @@ var _ = Describe("Tablespace synchronizer tests", func() {
 	)
 
 	BeforeEach(func() {
-		db, dbMock, err = sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+		db, dbMock, err = sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual), sqlmock.MonitorPingsOption(true))
 		Expect(err).ToNot(HaveOccurred())
 		cluster = &apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
@@ -98,7 +115,8 @@ var _ = Describe("Tablespace synchronizer tests", func() {
 			Build()
 		instance = fakeInstance{
 			Instance: &postgres.Instance{
-				Namespace: "myPod",
+				Namespace:   "default",
+				ClusterName: "cluster-example",
 			},
 			db: db,
 		}
@@ -106,6 +124,11 @@ var _ = Describe("Tablespace synchronizer tests", func() {
 			instance: &instance,
 			client:   fakeClient,
 		}
+
+		// these bits happen since the reconciler checks for instance readiness
+		dbMock.ExpectPing()
+		expectedReadiness := sqlmock.NewRows([]string{""}).AddRow("t")
+		dbMock.ExpectQuery(expectedReadinessCheck).WillReturnRows(expectedReadiness)
 	})
 
 	AfterEach(func() {
@@ -114,6 +137,7 @@ var _ = Describe("Tablespace synchronizer tests", func() {
 
 	When("tablespace configurations are realizable", func() {
 		It("will do nothing if the DB contains the tablespaces in spec", func(ctx context.Context) {
+			initialCluster := cluster.DeepCopy()
 			cluster.Spec.Tablespaces = []apiv1.TablespaceConfiguration{
 				{
 					Name: "foo",
@@ -125,15 +149,18 @@ var _ = Describe("Tablespace synchronizer tests", func() {
 					},
 				},
 			}
+			err := fakeClient.Patch(ctx, cluster, client.MergeFrom(initialCluster))
+			Expect(err).NotTo(HaveOccurred())
+
 			// we expect the reconciler to list the tablespaces on the DB
 			rows := sqlmock.NewRows(
 				[]string{"spcname", "rolname"}).
 				AddRow("foo", "app")
 			dbMock.ExpectQuery(expectedListStmt).WithArgs("pg_").WillReturnRows(rows)
 
-			results, err := tablespaceReconciler.reconcile(ctx, cluster)
+			results, err := tablespaceReconciler.Reconcile(ctx, reconcile.Request{})
 			Expect(err).ShouldNot(HaveOccurred())
-			Expect(results).To(BeNil())
+			Expect(results).To(BeZero())
 
 			var updatedCluster apiv1.Cluster
 			err = fakeClient.Get(ctx, client.ObjectKey{
@@ -152,6 +179,7 @@ var _ = Describe("Tablespace synchronizer tests", func() {
 		})
 
 		It("will change the owner when needed", func(ctx context.Context) {
+			initialCluster := cluster.DeepCopy()
 			cluster.Spec.Tablespaces = []apiv1.TablespaceConfiguration{
 				{
 					Name: "foo",
@@ -163,6 +191,9 @@ var _ = Describe("Tablespace synchronizer tests", func() {
 					},
 				},
 			}
+			err := fakeClient.Patch(ctx, cluster, client.MergeFrom(initialCluster))
+			Expect(err).NotTo(HaveOccurred())
+
 			rows := sqlmock.NewRows(
 				[]string{"spcname", "rolname"}).
 				AddRow("foo", "app")
@@ -171,9 +202,9 @@ var _ = Describe("Tablespace synchronizer tests", func() {
 			dbMock.ExpectExec(stmt).
 				WillReturnResult(sqlmock.NewResult(2, 1))
 
-			results, err := tablespaceReconciler.reconcile(ctx, cluster)
+			results, err := tablespaceReconciler.Reconcile(ctx, reconcile.Request{})
 			Expect(err).ShouldNot(HaveOccurred())
-			Expect(results).To(BeNil())
+			Expect(results).To(BeZero())
 
 			var updatedCluster apiv1.Cluster
 			err = fakeClient.Get(ctx, client.ObjectKey{
@@ -192,6 +223,7 @@ var _ = Describe("Tablespace synchronizer tests", func() {
 		})
 
 		It("will create a tablespace in spec that is missing from DB if mount point exists", func(ctx context.Context) {
+			initialCluster := cluster.DeepCopy()
 			cluster.Spec.Tablespaces = []apiv1.TablespaceConfiguration{
 				{
 					Name: "foo",
@@ -209,6 +241,8 @@ var _ = Describe("Tablespace synchronizer tests", func() {
 					},
 				},
 			}
+			err := fakeClient.Patch(ctx, cluster, client.MergeFrom(initialCluster))
+			Expect(err).NotTo(HaveOccurred())
 
 			// we expect the reconciler to list the tablespaces on DB, and to
 			// create a new tablespace
@@ -230,9 +264,9 @@ var _ = Describe("Tablespace synchronizer tests", func() {
 				},
 			}
 
-			results, err := tablespaceReconciler.reconcile(ctx, cluster)
+			results, err := tablespaceReconciler.Reconcile(ctx, reconcile.Request{})
 			Expect(err).ShouldNot(HaveOccurred())
-			Expect(results).To(BeNil())
+			Expect(results).To(BeZero())
 
 			var updatedCluster apiv1.Cluster
 			err = fakeClient.Get(ctx, client.ObjectKey{
@@ -255,7 +289,77 @@ var _ = Describe("Tablespace synchronizer tests", func() {
 			Expect(updatedCluster.Status.TablespacesStatus).To(Equal(expectedTablespaceStatus))
 		})
 
+		It("will mark tablespace status as pending with error when the DB CREATE fails", func(ctx context.Context) {
+			initialCluster := cluster.DeepCopy()
+			cluster.Spec.Tablespaces = []apiv1.TablespaceConfiguration{
+				{
+					Name: "foo",
+					Storage: apiv1.StorageConfiguration{
+						Size: "1Gi",
+					},
+				},
+				{
+					Name: "bar",
+					Storage: apiv1.StorageConfiguration{
+						Size: "1Gi",
+					},
+					Owner: apiv1.DatabaseRoleRef{
+						Name: "new_user",
+					},
+				},
+			}
+			err := fakeClient.Patch(ctx, cluster, client.MergeFrom(initialCluster))
+			Expect(err).NotTo(HaveOccurred())
+
+			// we expect the reconciler to list the tablespaces on DB, and to
+			// create a new tablespace
+			rows := sqlmock.NewRows(
+				[]string{"spcname", "rolname"}).
+				AddRow("foo", "")
+			dbMock.ExpectQuery(expectedListStmt).WithArgs("pg_").WillReturnRows(rows)
+			// we simulate DB command failure
+			stmt := fmt.Sprintf(expectedCreateStmt, "bar", "new_user", "/var/lib/postgresql/tablespaces/bar/data")
+			dbMock.ExpectExec(stmt).
+				WillReturnError(errors.New("boom"))
+
+			tablespaceReconciler = TablespaceReconciler{
+				instance: instance,
+				client:   fakeClient,
+				storageManager: mockTablespaceStorageManager{
+					unavailableStorageLocations: []string{
+						"/foo",
+					},
+				},
+			}
+
+			results, err := tablespaceReconciler.Reconcile(ctx, reconcile.Request{})
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(results).NotTo(BeZero())
+
+			var updatedCluster apiv1.Cluster
+			err = fakeClient.Get(ctx, client.ObjectKey{
+				Namespace: cluster.Namespace,
+				Name:      cluster.Name,
+			}, &updatedCluster)
+			Expect(err).ToNot(HaveOccurred())
+			expectedTablespaceStatus := []apiv1.TablespaceState{
+				{
+					Name:  "foo",
+					Owner: "",
+					State: "reconciled",
+				},
+				{
+					Name:  "bar",
+					Owner: "new_user",
+					State: "pending",
+					Error: "while creating tablespace bar: boom",
+				},
+			}
+			Expect(updatedCluster.Status.TablespacesStatus).To(Equal(expectedTablespaceStatus))
+		})
+
 		It("will requeue the tablespace creation if the mount path doesn't exist", func(ctx context.Context) {
+			initialCluster := cluster.DeepCopy()
 			cluster.Spec.Tablespaces = []apiv1.TablespaceConfiguration{
 				{
 					Name: "foo",
@@ -264,6 +368,9 @@ var _ = Describe("Tablespace synchronizer tests", func() {
 					},
 				},
 			}
+			err := fakeClient.Patch(ctx, cluster, client.MergeFrom(initialCluster))
+			Expect(err).NotTo(HaveOccurred())
+
 			rows := sqlmock.NewRows(
 				[]string{"spcname", "rolname"})
 			dbMock.ExpectQuery(expectedListStmt).WithArgs("pg_").WillReturnRows(rows)
@@ -278,7 +385,7 @@ var _ = Describe("Tablespace synchronizer tests", func() {
 				},
 			}
 
-			results, err := tablespaceReconciler.reconcile(ctx, cluster)
+			results, err := tablespaceReconciler.Reconcile(ctx, reconcile.Request{})
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(results).NotTo(BeNil())
 			Expect(results.RequeueAfter).NotTo(BeZero())
