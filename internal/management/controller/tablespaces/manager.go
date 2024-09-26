@@ -53,10 +53,10 @@ func (r *TablespaceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 // GetCluster gets the managed cluster through the client
 func (r *TablespaceReconciler) GetCluster(ctx context.Context) (*apiv1.Cluster, error) {
 	var cluster apiv1.Cluster
-	err := r.GetClient().Get(ctx,
+	err := r.client.Get(ctx,
 		types.NamespacedName{
-			Namespace: r.instance.Namespace,
-			Name:      r.instance.ClusterName,
+			Namespace: r.instance.GetNamespaceName(),
+			Name:      r.instance.GetClusterName(),
 		},
 		&cluster)
 	if err != nil {
@@ -64,14 +64,4 @@ func (r *TablespaceReconciler) GetCluster(ctx context.Context) (*apiv1.Cluster, 
 	}
 
 	return &cluster, nil
-}
-
-// GetClient returns the dynamic client that is being used for a certain reconciler
-func (r *TablespaceReconciler) GetClient() client.Client {
-	return r.client
-}
-
-// Instance returns the PostgreSQL instance that this reconciler is working on
-func (r *TablespaceReconciler) Instance() *postgres.Instance {
-	return r.instance
 }
