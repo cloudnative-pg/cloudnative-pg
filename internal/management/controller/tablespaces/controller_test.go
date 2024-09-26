@@ -37,6 +37,8 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+// mockTablespaceStorageManager is a storage manager where storage exists by
+// default unless explicitly mounted as unavailable
 type mockTablespaceStorageManager struct {
 	unavailableStorageLocations []string
 }
@@ -100,6 +102,8 @@ func getCluster(ctx context.Context, c client.Client, cluster *apiv1.Cluster) (*
 	return &updatedCluster, err
 }
 
+// tablespaceTest represents all the variable bits that go into a test of the
+// tablespace reconciler
 type tablespaceTest struct {
 	tablespacesInSpec        []apiv1.TablespaceConfiguration
 	postgresExpectations     func(sqlmock.Sqlmock)
@@ -108,9 +112,15 @@ type tablespaceTest struct {
 	expectedTablespaceStatus []apiv1.TablespaceState
 }
 
+// assertTablespaceReconciled is the full test, going from setting up the mocks
+// and the cluster to verifying all expectations are met
 func assertTablespaceReconciled(ctx context.Context, tt tablespaceTest) {
 	db, dbMock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual), sqlmock.MonitorPingsOption(true))
 	Expect(err).ToNot(HaveOccurred())
+
+	DeferCleanup(func() {
+		Expect(dbMock.ExpectationsWereMet()).To(Succeed())
+	})
 
 	cluster := &apiv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
@@ -155,8 +165,6 @@ func assertTablespaceReconciled(ctx context.Context, tt tablespaceTest) {
 	updatedCluster, err := getCluster(ctx, fakeClient, cluster)
 	Expect(err).ToNot(HaveOccurred())
 	Expect(updatedCluster.Status.TablespacesStatus).To(Equal(tt.expectedTablespaceStatus))
-
-	Expect(dbMock.ExpectationsWereMet()).To(Succeed())
 }
 
 var _ = Describe("Tablespace synchronizer tests", func() {
