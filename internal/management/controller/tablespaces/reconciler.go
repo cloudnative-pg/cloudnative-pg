@@ -18,6 +18,7 @@ package tablespaces
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"time"
 
@@ -96,9 +97,8 @@ func (r *TablespaceReconciler) reconcile(
 		return nil, fmt.Errorf("while reconcile tablespaces: %w", err)
 	}
 
-	tbsManager := infrastructure.NewPostgresTablespaceManager(superUserDB)
 	tbsStorageManager := instanceTablespaceStorageManager{}
-	tbsInDatabase, err := tbsManager.List(ctx)
+	tbsInDatabase, err := infrastructure.List(ctx, superUserDB)
 	if err != nil {
 		return nil, fmt.Errorf("could not fetch tablespaces from database: %w", err)
 	}
@@ -106,7 +106,7 @@ func (r *TablespaceReconciler) reconcile(
 	steps := evaluateNextSteps(ctx, tbsInDatabase, cluster.Spec.Tablespaces)
 	result := r.applySteps(
 		ctx,
-		tbsManager,
+		superUserDB,
 		tbsStorageManager,
 		steps,
 	)
@@ -114,7 +114,7 @@ func (r *TablespaceReconciler) reconcile(
 	// update the cluster status
 	updatedCluster := cluster.DeepCopy()
 	updatedCluster.Status.TablespacesStatus = result
-	if err := r.GetClient().Status().Patch(ctx, updatedCluster, client.MergeFrom(cluster)); err != nil {
+	if err := r.client.Status().Patch(ctx, updatedCluster, client.MergeFrom(cluster)); err != nil {
 		return nil, fmt.Errorf("while setting the tablespace reconciler status: %w", err)
 	}
 
@@ -132,14 +132,14 @@ func (r *TablespaceReconciler) reconcile(
 // if they arose when applying the steps
 func (r *TablespaceReconciler) applySteps(
 	ctx context.Context,
-	tbsManager infrastructure.TablespaceManager,
+	db *sql.DB,
 	tbsStorageManager tablespaceStorageManager,
 	actions []tablespaceReconcilerStep,
 ) []apiv1.TablespaceState {
 	result := make([]apiv1.TablespaceState, len(actions))
 
 	for idx, step := range actions {
-		result[idx] = step.execute(ctx, tbsManager, tbsStorageManager)
+		result[idx] = step.execute(ctx, db, tbsStorageManager)
 	}
 
 	return result

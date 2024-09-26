@@ -18,8 +18,11 @@ package tablespaces
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"slices"
+
+	"github.com/DATA-DOG/go-sqlmock"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/tablespaces/infrastructure"
@@ -28,41 +31,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
-
-type mockTablespaceManager struct {
-	tablespaces map[string]infrastructure.Tablespace
-	callHistory []string
-}
-
-func (m *mockTablespaceManager) List(_ context.Context) ([]infrastructure.Tablespace, error) {
-	m.callHistory = append(m.callHistory, "list")
-	re := make([]infrastructure.Tablespace, len(m.tablespaces))
-	i := 0
-	for _, r := range m.tablespaces {
-		re[i] = r
-		i++
-	}
-	return re, nil
-}
-
-func (m *mockTablespaceManager) Update(
-	_ context.Context, _ infrastructure.Tablespace,
-) error {
-	m.callHistory = append(m.callHistory, "update")
-	return nil
-}
-
-func (m *mockTablespaceManager) Create(
-	_ context.Context, tablespace infrastructure.Tablespace,
-) error {
-	m.callHistory = append(m.callHistory, "create")
-	_, found := m.tablespaces[tablespace.Name]
-	if found {
-		return fmt.Errorf("trying to create existing tablespace: %s", tablespace.Name)
-	}
-	m.tablespaces[tablespace.Name] = tablespace
-	return nil
-}
 
 type mockTablespaceStorageManager struct {
 	unavailableStorageLocations []string
@@ -83,6 +51,33 @@ var _ = Describe("Tablespace synchronizer tests", func() {
 	tablespaceReconciler := TablespaceReconciler{
 		instance: postgres.NewInstance().WithNamespace("myPod"),
 	}
+	expectedListStmt := `
+	SELECT
+		pg_tablespace.spcname spcname,
+		COALESCE(pg_roles.rolname, '') rolname
+	FROM pg_tablespace
+	LEFT JOIN pg_roles ON pg_tablespace.spcowner = pg_roles.oid
+	WHERE spcname NOT LIKE $1
+	`
+	expectedCreateStmt := "CREATE TABLESPACE \"%s\" OWNER \"%s\" " +
+		"LOCATION '%s'"
+
+	expectedUpdateStmt := "ALTER TABLESPACE \"%s\" OWNER TO \"%s\""
+
+	var (
+		dbMock sqlmock.Sqlmock
+		db     *sql.DB
+		err    error
+	)
+
+	BeforeEach(func() {
+		db, dbMock, err = sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	AfterEach(func() {
+		Expect(dbMock.ExpectationsWereMet()).To(Succeed())
+	})
 
 	When("tablespace configurations are realizable", func() {
 		It("will do nothing if the DB contains the tablespaces in spec", func(ctx context.Context) {
@@ -97,18 +92,14 @@ var _ = Describe("Tablespace synchronizer tests", func() {
 					},
 				},
 			}
-			tbsManager := mockTablespaceManager{
-				tablespaces: map[string]infrastructure.Tablespace{
-					"foo": {
-						Name:  "foo",
-						Owner: "app",
-					},
-				},
-			}
-			tbsInDatabase, err := tbsManager.List(ctx)
+			rows := sqlmock.NewRows(
+				[]string{"spcname", "rolname"}).
+				AddRow("foo", "app")
+			dbMock.ExpectQuery(expectedListStmt).WithArgs("pg_").WillReturnRows(rows)
+			tbsInDatabase, err := infrastructure.List(ctx, db)
 			Expect(err).ShouldNot(HaveOccurred())
 			tbsSteps := evaluateNextSteps(ctx, tbsInDatabase, tablespacesSpec)
-			result := tablespaceReconciler.applySteps(ctx, &tbsManager,
+			result := tablespaceReconciler.applySteps(ctx, db,
 				mockTablespaceStorageManager{}, tbsSteps)
 			Expect(result).To(ConsistOf(apiv1.TablespaceState{
 				Name:  "foo",
@@ -116,8 +107,6 @@ var _ = Describe("Tablespace synchronizer tests", func() {
 				State: apiv1.TablespaceStatusReconciled,
 				Error: "",
 			}))
-			Expect(tbsManager.callHistory).To(HaveLen(1))
-			Expect(tbsManager.callHistory).To(ConsistOf("list"))
 		})
 
 		It("will change the owner when needed", func(ctx context.Context) {
@@ -132,18 +121,17 @@ var _ = Describe("Tablespace synchronizer tests", func() {
 					},
 				},
 			}
-			tbsManager := mockTablespaceManager{
-				tablespaces: map[string]infrastructure.Tablespace{
-					"foo": {
-						Name:  "foo",
-						Owner: "app",
-					},
-				},
-			}
-			tbsInDatabase, err := tbsManager.List(ctx)
+			rows := sqlmock.NewRows(
+				[]string{"spcname", "rolname"}).
+				AddRow("foo", "app")
+			dbMock.ExpectQuery(expectedListStmt).WithArgs("pg_").WillReturnRows(rows)
+			stmt := fmt.Sprintf(expectedUpdateStmt, "foo", "new_user")
+			dbMock.ExpectExec(stmt).
+				WillReturnResult(sqlmock.NewResult(2, 1))
+			tbsInDatabase, err := infrastructure.List(ctx, db)
 			Expect(err).ShouldNot(HaveOccurred())
 			tbsByAction := evaluateNextSteps(ctx, tbsInDatabase, tablespacesSpec)
-			result := tablespaceReconciler.applySteps(ctx, &tbsManager,
+			result := tablespaceReconciler.applySteps(ctx, db,
 				mockTablespaceStorageManager{}, tbsByAction)
 			Expect(result).To(ConsistOf(
 				apiv1.TablespaceState{
@@ -153,8 +141,6 @@ var _ = Describe("Tablespace synchronizer tests", func() {
 					Error: "",
 				},
 			))
-			Expect(tbsManager.callHistory).To(HaveLen(2))
-			Expect(tbsManager.callHistory).To(ConsistOf("list", "update"))
 		})
 
 		It("will create a tablespace in spec that is missing from DB", func(ctx context.Context) {
@@ -170,19 +156,22 @@ var _ = Describe("Tablespace synchronizer tests", func() {
 					Storage: apiv1.StorageConfiguration{
 						Size: "1Gi",
 					},
-				},
-			}
-			tbsManager := mockTablespaceManager{
-				tablespaces: map[string]infrastructure.Tablespace{
-					"foo": {
-						Name: "foo",
+					Owner: apiv1.DatabaseRoleRef{
+						Name: "new_user",
 					},
 				},
 			}
-			tbsInDatabase, err := tbsManager.List(ctx)
+			rows := sqlmock.NewRows(
+				[]string{"spcname", "rolname"}).
+				AddRow("foo", "")
+			dbMock.ExpectQuery(expectedListStmt).WithArgs("pg_").WillReturnRows(rows)
+			stmt := fmt.Sprintf(expectedCreateStmt, "bar", "new_user", "/var/lib/postgresql/tablespaces/bar/data")
+			dbMock.ExpectExec(stmt).
+				WillReturnResult(sqlmock.NewResult(2, 1))
+			tbsInDatabase, err := infrastructure.List(ctx, db)
 			Expect(err).ShouldNot(HaveOccurred())
 			tbsSteps := evaluateNextSteps(ctx, tbsInDatabase, tablespacesSpec)
-			result := tablespaceReconciler.applySteps(ctx, &tbsManager,
+			result := tablespaceReconciler.applySteps(ctx, db,
 				mockTablespaceStorageManager{}, tbsSteps)
 			Expect(result).To(ConsistOf(
 				apiv1.TablespaceState{
@@ -192,12 +181,10 @@ var _ = Describe("Tablespace synchronizer tests", func() {
 				},
 				apiv1.TablespaceState{
 					Name:  "bar",
-					Owner: "",
+					Owner: "new_user",
 					State: apiv1.TablespaceStatusReconciled,
 				},
 			))
-			Expect(tbsManager.callHistory).To(HaveLen(2))
-			Expect(tbsManager.callHistory).To(ConsistOf("list", "create"))
 		})
 
 		It("will requeue the tablespace creation if the mount path doesn't exist", func(ctx context.Context) {
@@ -209,11 +196,13 @@ var _ = Describe("Tablespace synchronizer tests", func() {
 					},
 				},
 			}
-			tbsManager := mockTablespaceManager{}
-			tbsInDatabase, err := tbsManager.List(ctx)
+			rows := sqlmock.NewRows(
+				[]string{"spcname", "rolname"})
+			dbMock.ExpectQuery(expectedListStmt).WithArgs("pg_").WillReturnRows(rows)
+			tbsInDatabase, err := infrastructure.List(ctx, db)
 			Expect(err).ShouldNot(HaveOccurred())
 			tbsByAction := evaluateNextSteps(ctx, tbsInDatabase, tablespacesSpec)
-			result := tablespaceReconciler.applySteps(ctx, &tbsManager,
+			result := tablespaceReconciler.applySteps(ctx, db,
 				mockTablespaceStorageManager{
 					unavailableStorageLocations: []string{
 						"/foo",
@@ -227,8 +216,6 @@ var _ = Describe("Tablespace synchronizer tests", func() {
 					Error: "deferred until mount point is created",
 				},
 			))
-			Expect(tbsManager.callHistory).To(HaveLen(1))
-			Expect(tbsManager.callHistory).To(ConsistOf("list"))
 		})
 	})
 })
