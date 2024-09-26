@@ -18,6 +18,7 @@ package tablespaces
 
 import (
 	"context"
+	"database/sql"
 
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -27,18 +28,30 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
 
+// instanceInterface represents the behavior required for the reconciler for
+// instance operations
+type instanceInterface interface {
+	GetNamespaceName() string
+	GetClusterName() string
+	GetSuperUserDB() (*sql.DB, error)
+	IsPrimary() (bool, error)
+	CanCheckReadiness() bool
+}
+
 // TablespaceReconciler is a Kubernetes controller that ensures Tablespaces
 // are created in Postgres
 type TablespaceReconciler struct {
-	instance *postgres.Instance
-	client   client.Client
+	instance       instanceInterface
+	storageManager tablespaceStorageManager
+	client         client.Client
 }
 
 // NewTablespaceReconciler creates a new TablespaceReconciler
 func NewTablespaceReconciler(instance *postgres.Instance, client client.Client) *TablespaceReconciler {
 	controller := &TablespaceReconciler{
-		instance: instance,
-		client:   client,
+		instance:       instance,
+		client:         client,
+		storageManager: instanceTablespaceStorageManager{},
 	}
 	return controller
 }
