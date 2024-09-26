@@ -64,7 +64,7 @@ func createDatabase(
 		sqlCreateDatabase.WriteString(fmt.Sprintf(" OWNER %s", pgx.Identifier{obj.Spec.Owner}.Sanitize()))
 	}
 	if len(obj.Spec.Template) > 0 {
-		sqlCreateDatabase += fmt.Sprintf(" TEMPLATE %s", pgx.Identifier{obj.Spec.Template}.Sanitize())
+		sqlCreateDatabase.WriteString(fmt.Sprintf(" TEMPLATE %s", pgx.Identifier{obj.Spec.Template}.Sanitize()))
 	}
 	if len(obj.Spec.Tablespace) > 0 {
 		sqlCreateDatabase.WriteString(fmt.Sprintf(" TABLESPACE %s", pgx.Identifier{obj.Spec.Tablespace}.Sanitize()))
