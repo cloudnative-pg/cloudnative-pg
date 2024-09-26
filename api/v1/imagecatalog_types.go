@@ -64,11 +64,6 @@ type ImageCatalogList struct {
 	Items []ImageCatalog `json:"items"`
 }
 
-// GetObjectMeta returns the ObjectMeta of the ImageCatalog
-func (c *ImageCatalog) GetObjectMeta() *metav1.ObjectMeta {
-	return &c.ObjectMeta
-}
-
 // GetSpec returns the Spec of the ImageCatalog
 func (c *ImageCatalog) GetSpec() *ImageCatalogSpec {
 	return &c.Spec
