@@ -717,9 +717,10 @@ func (r *ClusterReconciler) setPrimaryInstance(
 	cluster *apiv1.Cluster,
 	podName string,
 ) error {
+	origCluster := cluster.DeepCopy()
 	cluster.Status.TargetPrimary = podName
 	cluster.Status.TargetPrimaryTimestamp = utils.GetCurrentTimestamp()
-	return r.Status().Update(ctx, cluster)
+	return r.Status().Patch(ctx, cluster, client.MergeFrom(origCluster))
 }
 
 // RegisterPhase update phase in the status cluster with the
