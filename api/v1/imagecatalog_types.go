@@ -64,11 +64,6 @@ type ImageCatalogList struct {
 	Items []ImageCatalog `json:"items"`
 }
 
-// GetSpec returns the Spec of the ImageCatalog
-func (c *ImageCatalog) GetSpec() *ImageCatalogSpec {
-	return &c.Spec
-}
-
 func init() {
 	SchemeBuilder.Register(&ImageCatalog{}, &ImageCatalogList{})
 }
