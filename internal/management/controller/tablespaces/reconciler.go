@@ -97,7 +97,6 @@ func (r *TablespaceReconciler) reconcile(
 		return nil, fmt.Errorf("while reconcile tablespaces: %w", err)
 	}
 
-	tbsStorageManager := instanceTablespaceStorageManager{}
 	tbsInDatabase, err := infrastructure.List(ctx, superUserDB)
 	if err != nil {
 		return nil, fmt.Errorf("could not fetch tablespaces from database: %w", err)
@@ -107,7 +106,6 @@ func (r *TablespaceReconciler) reconcile(
 	result := r.applySteps(
 		ctx,
 		superUserDB,
-		tbsStorageManager,
 		steps,
 	)
 
@@ -133,13 +131,12 @@ func (r *TablespaceReconciler) reconcile(
 func (r *TablespaceReconciler) applySteps(
 	ctx context.Context,
 	db *sql.DB,
-	tbsStorageManager tablespaceStorageManager,
 	actions []tablespaceReconcilerStep,
 ) []apiv1.TablespaceState {
 	result := make([]apiv1.TablespaceState, len(actions))
 
 	for idx, step := range actions {
-		result[idx] = step.execute(ctx, db, tbsStorageManager)
+		result[idx] = step.execute(ctx, db, r.storageManager)
 	}
 
 	return result
