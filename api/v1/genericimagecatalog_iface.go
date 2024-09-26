@@ -12,8 +12,6 @@ type GenericImageCatalog interface {
 	runtime.Object
 	metav1.Object
 
-	// GetObjectMeta returns the ObjectMeta of the GenericImageCatalog
-	GetObjectMeta() *metav1.ObjectMeta
 	// GetSpec returns the Spec of the GenericImageCatalog
 	GetSpec() *ImageCatalogSpec
 }
