@@ -108,6 +108,13 @@ spec:
               tablespace:
                 description: The default tablespace of this database
                 type: string
+              template:
+                description: The name of the template from which to create the new
+                  database
+                type: string
+                x-kubernetes-validations:
+                - message: template is immutable
+                  rule: self == oldSelf
             required:
             - cluster
             - name

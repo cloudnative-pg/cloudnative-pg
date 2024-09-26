@@ -13,6 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
 package controller
 
 import (
@@ -88,17 +89,18 @@ var _ = Describe("Managed Database SQL", func() {
 	Context("createDatabase", func() {
 		It("should create a new Database", func(ctx SpecContext) {
 			database.Spec.IsTemplate = ptr.To(true)
+			database.Spec.Template = "myTemplate"
 			database.Spec.Tablespace = "myTablespace"
 			database.Spec.AllowConnections = ptr.To(true)
 			database.Spec.ConnectionLimit = ptr.To(-1)
 
 			expectedValue := sqlmock.NewResult(0, 1)
 			expectedQuery := fmt.Sprintf(
-				"CREATE DATABASE %s OWNER %s TABLESPACE %s "+
+				"CREATE DATABASE %s OWNER %s TEMPLATE %s TABLESPACE %s "+
 					"ALLOW_CONNECTIONS %t CONNECTION LIMIT %d IS_TEMPLATE %t",
 				pgx.Identifier{database.Spec.Name}.Sanitize(), pgx.Identifier{database.Spec.Owner}.Sanitize(),
-				pgx.Identifier{database.Spec.Tablespace}.Sanitize(), *database.Spec.AllowConnections,
-				*database.Spec.ConnectionLimit, *database.Spec.IsTemplate,
+				pgx.Identifier{database.Spec.Template}.Sanitize(), pgx.Identifier{database.Spec.Tablespace}.Sanitize(),
+				*database.Spec.AllowConnections, *database.Spec.ConnectionLimit, *database.Spec.IsTemplate,
 			)
 			dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedValue)
 
