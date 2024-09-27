@@ -14,20 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1
-
-// GetSpec returns the Spec of the ImageCatalog
-func (c *ImageCatalog) GetSpec() *ImageCatalogSpec {
-	return &c.Spec
-}
-
-// FindImageForMajor finds the correct image for the selected major version
-func (spec *ImageCatalogSpec) FindImageForMajor(major int) (string, bool) {
-	for _, entry := range spec.Images {
-		if entry.Major == major {
-			return entry.Image, true
-		}
-	}
-
-	return "", false
-}
+// Package rollout contains the rollout manager, allowing
+// CloudNative-PG to spread Pod rollouts depending on
+// the passed configuration
+package rollout

@@ -945,10 +945,7 @@ func (info *InitInfo) checkBackupDestination(
 		env,
 		postgresSpec.SpoolDirectory,
 		info.PgData,
-		func() error {
-			// TODO: why?
-			return nil
-		})
+		path.Join(info.PgData, CheckEmptyWalArchiveFile))
 	if err != nil {
 		return fmt.Errorf("while creating the archiver: %w", err)
 	}

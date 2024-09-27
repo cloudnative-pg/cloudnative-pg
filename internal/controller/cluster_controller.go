@@ -47,6 +47,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/operatorclient"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
+	rolloutManager "github.com/cloudnative-pg/cloudnative-pg/internal/controller/rollout"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/hibernation"
@@ -78,6 +79,8 @@ type ClusterReconciler struct {
 	Recorder        record.EventRecorder
 	InstanceClient  instance.Client
 	Plugins         repository.Interface
+
+	rolloutManager *rolloutManager.Manager
 }
 
 // NewClusterReconciler creates a new ClusterReconciler initializing it
@@ -93,6 +96,10 @@ func NewClusterReconciler(
 		Scheme:          mgr.GetScheme(),
 		Recorder:        mgr.GetEventRecorderFor("cloudnative-pg"),
 		Plugins:         plugins,
+		rolloutManager: rolloutManager.New(
+			configuration.Current.GetClustersRolloutDelay(),
+			configuration.Current.GetInstancesRolloutDelay(),
+		),
 	}
 }
 
@@ -924,6 +931,21 @@ func (r *ClusterReconciler) handleRollingUpdate(
 				"not connected via streaming replication, waiting for 5 seconds",
 		)
 		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+	case errors.Is(err, errRolloutDelayed):
+		contextLogger.Warning(
+			"A Pod need to be rolled out, but the rollout is being delayed",
+		)
+		if err := r.RegisterPhase(
+			ctx,
+			cluster,
+			apiv1.PhaseUpgradeDelayed,
+			"The cluster need to be update, but the operator is configured to delay "+
+				"the operation",
+		); err != nil {
+			return ctrl.Result{}, err
+		}
+
+		return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
 	case err != nil:
 		return ctrl.Result{}, err
 	case done:

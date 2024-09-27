@@ -14,20 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1
+package rollout
 
-// GetSpec returns the Spec of the ImageCatalog
-func (c *ImageCatalog) GetSpec() *ImageCatalogSpec {
-	return &c.Spec
-}
+import (
+	"testing"
 
-// FindImageForMajor finds the correct image for the selected major version
-func (spec *ImageCatalogSpec) FindImageForMajor(major int) (string, bool) {
-	for _, entry := range spec.Images {
-		if entry.Major == major {
-			return entry.Image, true
-		}
-	}
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+)
 
-	return "", false
+func TestCerts(t *testing.T) {
+	RegisterFailHandler(Fail)
+
+	RunSpecs(t, "Rollout manager suite")
 }
