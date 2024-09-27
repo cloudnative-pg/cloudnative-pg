@@ -156,6 +156,22 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, nil
 	}
 
+	// Check if the target PG Database is already being managed by another
+	// Database Object
+	existingManager, err := r.isAlreadyManagedBy(ctx, &database)
+	if err != nil {
+		return ctrl.Result{}, nil
+	}
+
+	if len(existingManager) > 0 {
+		return r.failedReconciliation(
+			ctx,
+			&database,
+			fmt.Errorf("database %q is already managed by Database object %q",
+				database.Spec.Name, existingManager),
+		)
+	}
+
 	if err := r.reconcileDatabase(
 		ctx,
 		&database,
@@ -171,6 +187,43 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		ctx,
 		&database,
 	)
+}
+
+// isAlreadyManagedBy checks if the target PG Database of a given Database object is already
+// managed by an existing Database object. If it is, we return the name of the current owner
+func (r *DatabaseReconciler) isAlreadyManagedBy(
+	ctx context.Context,
+	database *apiv1.Database,
+) (string, error) {
+	contextLogger, ctx := log.SetupLogger(ctx)
+	var databaseList apiv1.DatabaseList
+
+	if err := r.Client.List(ctx, &databaseList,
+		client.InNamespace(r.instance.GetNamespaceName()),
+	); err != nil {
+		contextLogger.Error(err, "While getting database list", "namespace", r.instance.GetNamespaceName())
+		return "", err
+	}
+
+	for _, db := range databaseList.Items {
+		// This is not for me!
+		if db.Spec.ClusterRef.Name != r.instance.GetClusterName() {
+			continue
+		}
+
+		// This is ourselves, so just continue
+		if db.Name == database.Name {
+			continue
+		}
+
+		// We consider only Database objects for which the reconciler have
+		// succeeded at least once
+		if db.Spec.Name == database.Spec.Name && db.Status.ObservedGeneration > 0 {
+			return db.Name, nil
+		}
+	}
+
+	return "", nil
 }
 
 // failedReconciliation marks the reconciliation as failed and logs the corresponding error
