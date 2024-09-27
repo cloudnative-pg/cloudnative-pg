@@ -66,6 +66,7 @@ The **global default parameters** are:
 ```text
 archive_mode = 'on'
 dynamic_shared_memory_type = 'posix'
+full_page_writes = 'on'
 logging_collector = 'on'
 log_destination = 'csvlog'
 log_directory = '/controller/log'
@@ -111,7 +112,6 @@ The following parameters are **fixed** and exclusively controlled by the operato
 
 ```text
 archive_command = '/controller/manager wal-archive %p'
-full_page_writes = 'on'
 hot_standby = 'true'
 listen_addresses = '*'
 port = '5432'
@@ -592,7 +592,6 @@ Users are not allowed to set the following configuration parameters in the
 - `data_sync_retry`
 - `event_source`
 - `external_pid_file`
-- `full_page_writes`
 - `hba_file`
 - `hot_standby`
 - `ident_file`
