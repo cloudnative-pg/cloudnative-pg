@@ -202,12 +202,13 @@ Database object, directly on Postgres, for example by issuing commands on
 The fields `observedGeneration` and `generation` described above will ensure
 that once a Database has been reconciled to its defined `generation`, it will
 not be re-applied by the instance manager. Therefore, your manual changes will
-not be rolled back accidentally.
+not be rolled back inadvertently.
 
 !!! Note
     A Database manifest is applied to the fullest. A field included in a
     manifest may override a value that had been written previously on
     the database in Postgres
 
-The choice is yours to make alterations on your databases via Database manifests
-or using other mechanisms.
+CloudNativePG gives you the flexibility to make alterations on your databases
+via Database manifests, via direct changes, or mixing matching to fit your
+use case.
