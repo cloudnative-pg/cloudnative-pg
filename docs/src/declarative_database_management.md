@@ -121,14 +121,14 @@ As mentioned above, the Database CRD has the fields `metadata.name` and
 Database objects refer to the same Postgres database (i.e. they have
 identical `spec.name` and `spec.cluster.name`).
 
-The tablespace reconciler could simply apply them both. The first applied would
+The database reconciler could simply apply them both. The first applied would
 result in `CREATE` statements (assuming the database did not exist in Postgres),
 while the second one would result in `ALTER` statements.
 While this could work, it could lead to unexpected behavior: given two Database
 objects managing the same Postgres database, it would not be clear which one
 would be reflected in Postgres in the long term.
 
-For this reason, the tablespace reconciler will check, given a Database object,
+For this reason, the database reconciler will check, given a Database object,
 if there is already another Database object managing the same database.
 If so, it will mark it with an error explaining this, and will not apply any
 changes in Postgres:
@@ -156,7 +156,7 @@ The DDL for databases in Postgres keeps evolving. For example, the option
 [`ICU_RULES`](https://www.postgresql.org/docs/16/sql-createdatabase.html) has
 been introduced with Postgres 16 and is not available in previous versions.
 
-The tablespace reconciler will apply all the fields declared in the `spec`, and
+The database reconciler will apply all the fields declared in the `spec`, and
 will transparently relay back any error messages from Postgres, leaving it to
 the user to take appropriate steps.
 
