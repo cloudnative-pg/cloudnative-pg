@@ -188,6 +188,7 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 	reconciler := controller.NewInstanceReconciler(instance, mgr.GetClient(), metricsExporter)
 	err = ctrl.NewControllerManagedBy(mgr).
 		For(&apiv1.Cluster{}).
+		Named("instance-cluster").
 		Complete(reconciler)
 	if err != nil {
 		setupLog.Error(err, "unable to create controller")
