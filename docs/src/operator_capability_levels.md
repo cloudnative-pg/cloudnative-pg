@@ -136,8 +136,8 @@ PostgreSQL outside Kubernetes. This is particularly useful for DBaaS purposes.
 
 ### Database configuration
 
-The operator is designed to manage a PostgreSQL cluster with a single
-database. The operator transparently manages access to the database through
+The operator is designed to bootstrap a PostgreSQL cluster with a single
+database. The operator transparently manages access to the cluster through
 three Kubernetes services provisioned and managed for read-write,
 read, and read-only workloads.
 Using the convention-over-configuration approach, the operator creates a
@@ -148,6 +148,12 @@ required.
 Although no configuration is required to run the cluster, you can customize
 both PostgreSQL runtime configuration and PostgreSQL host-based
 authentication rules in the `postgresql` section of the CR.
+
+#### Additional databases
+
+Additional databases can be created or managed via
+[declarative database management](declarative_database_management.md) using
+the Database CRD.
 
 ### Configuration of Postgres roles, users, and groups
 
