@@ -258,6 +258,7 @@ jobs:
       author_email: ${{ steps.build-meta.outputs.author_email }}
       controller_img: ${{ env.CONTROLLER_IMG }}
       controller_img_ubi8: ${{ env.CONTROLLER_IMG_UBI8 }}
+      index_img: ${{ env.INDEX_IMG }}
       bundle_img: ${{ env.BUNDLE_IMG }}
       catalog_img: ${{ env.CATALOG_IMG }}
     steps:
@@ -433,6 +434,7 @@ jobs:
           echo "CONTROLLER_IMG=${LOWERCASE_OPERATOR_IMAGE_NAME}:${TAG}" >> $GITHUB_ENV
           echo "CONTROLLER_IMG_UBI8=${LOWERCASE_OPERATOR_IMAGE_NAME}:${TAG_UBI}" >> $GITHUB_ENV
           echo "BUNDLE_IMG=${LOWERCASE_OPERATOR_IMAGE_NAME}:bundle-${TAG}" >> $GITHUB_ENV
+          echo "INDEX_IMG=${LOWERCASE_OPERATOR_IMAGE_NAME}:index-${TAG}" >> $GITHUB_ENV
           echo "CATALOG_IMG=${LOWERCASE_OPERATOR_IMAGE_NAME}:catalog-${TAG}" >> $GITHUB_ENV
       -
         name: Generate manifest for operator deployment
@@ -1970,6 +1972,7 @@ jobs:
         env:
           CONTROLLER_IMG: ${{ needs.buildx.outputs.controller_img_ubi8 }}
           BUNDLE_IMG: ${{ needs.buildx.outputs.bundle_img }}
+          INDEX_IMG: ${{ needs.buildx.outputs.index_img }}
           CATALOG_IMG: ${{ needs.buildx.outputs.catalog_img }}
         run: |
           make olm-catalog
@@ -1985,6 +1988,34 @@ jobs:
         run: |
           envsubst < hack/install-config.yaml.template > hack/install-config.yaml
           openshift-install create cluster --dir hack/ --log-level warn
+      -
+        name: Install operator-sdk
+        run: |
+          make operator-sdk
+      -
+        name: Install preflight
+        run: |
+          make preflight
+      -
+        name: Run preflight operator test
+        env:
+          BUNDLE_IMG: ${{ needs.buildx.outputs.bundle_img }}
+          PFLT_INDEXIMAGE: ${{ needs.buildx.outputs.index_img }}
+          PFLT_SCORECARD_WAIT_TIME: "1200"
+          PFLT_ARTIFACTS: "preflight_operator_results"
+        run: |
+          PATH=$(pwd)/bin/:${PATH} \
+          KUBECONFIG=$(pwd)/hack/auth/kubeconfig \
+          bin/preflight check operator ${BUNDLE_IMG} \
+          --docker-config $HOME/.docker/config.json --loglevel trace
+      -
+        name: Check preflight operator results
+        run: |
+          PASS=`jq -r .passed preflight_operator_results/results.json`
+          if [[ "$PASS" == "false" ]]
+          then
+              exit 1
+          fi
       -
         name: Run E2E tests
         if: (always() && !cancelled())
