@@ -57,7 +57,7 @@ jobs:
         name: Get updated AKS versions
         run: |
           az aks get-versions --location westeurope  \
-            --query 'reverse(sort(values[? isPreview != `true`].patchVersions.keys(@)[]))' -o tsv | \
+            --query "reverse(sort(values[? isPreview != 'true' && contains(capabilities.supportPlan, 'KubernetesOfficial')].patchVersions.keys(@)[]))" -o tsv | \
             sort -urk 1,1.5 | \
             awk -vv=$MINIMAL_K8S '$0>=v {print $0}' | \
             jq -Rn '[inputs]' | tee .github/aks_versions.json
