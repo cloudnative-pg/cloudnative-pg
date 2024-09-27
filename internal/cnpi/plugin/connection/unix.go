@@ -21,11 +21,10 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/timeout"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
 // ProtocolUnix is for plugins that are reachable over a

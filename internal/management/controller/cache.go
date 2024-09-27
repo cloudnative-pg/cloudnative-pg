@@ -21,21 +21,19 @@ import (
 	"errors"
 	"os"
 
+	barmanCredentials "github.com/cloudnative-pg/barman-cloud/pkg/credentials"
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/walrestore"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/cache"
-	barmanCredentials "github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/credentials"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
 // updateCacheFromCluster will update the internal cache with the cluster
 //
 // returns true if the update was not total, and should be retried
 func (r *InstanceReconciler) updateCacheFromCluster(ctx context.Context, cluster *apiv1.Cluster) shoudRequeue {
-	cache.StoreCluster(cluster)
-
 	var missingPermissions shoudRequeue
 
 	// Populate the cache with the backup configuration

@@ -24,13 +24,13 @@ if [ "${DEBUG-}" = true ]; then
 fi
 
 # Defaults
-KIND_NODE_DEFAULT_VERSION=v1.30.2
-K3D_NODE_DEFAULT_VERSION=v1.30.2
-CSI_DRIVER_HOST_PATH_DEFAULT_VERSION=v1.14.1
-EXTERNAL_SNAPSHOTTER_VERSION=v8.0.1
-EXTERNAL_PROVISIONER_VERSION=v5.0.1
-EXTERNAL_RESIZER_VERSION=v1.11.2
-EXTERNAL_ATTACHER_VERSION=v4.6.1
+KIND_NODE_DEFAULT_VERSION=v1.31.0
+K3D_NODE_DEFAULT_VERSION=v1.30.3
+CSI_DRIVER_HOST_PATH_DEFAULT_VERSION=v1.15.0
+EXTERNAL_SNAPSHOTTER_VERSION=v8.1.0
+EXTERNAL_PROVISIONER_VERSION=v5.1.0
+EXTERNAL_RESIZER_VERSION=v1.12.0
+EXTERNAL_ATTACHER_VERSION=v4.7.0
 K8S_VERSION=${K8S_VERSION-}
 KUBECTL_VERSION=${KUBECTL_VERSION-}
 CSI_DRIVER_HOST_PATH_VERSION=${CSI_DRIVER_HOST_PATH_VERSION:-$CSI_DRIVER_HOST_PATH_DEFAULT_VERSION}
@@ -382,6 +382,10 @@ deploy_csi_host_path() {
 
   ## create volumesnapshotclass
   kubectl apply -f "${CSI_BASE_URL}"/csi-driver-host-path/"${CSI_DRIVER_HOST_PATH_VERSION}"/deploy/kubernetes-1.27/hostpath/csi-hostpath-snapshotclass.yaml
+
+  ## Prevent VolumeSnapshot E2e test to fail when taking a
+  ## snapshot of a running PostgreSQL instance
+  kubectl patch volumesnapshotclass csi-hostpath-snapclass -p '{"parameters":{"ignoreFailedRead":"true"}}' --type merge
 
   ## create storage class
   kubectl apply -f "${CSI_BASE_URL}"/csi-driver-host-path/"${CSI_DRIVER_HOST_PATH_VERSION}"/examples/csi-storageclass.yaml

@@ -34,6 +34,16 @@ import (
 )
 
 var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
+	var namespace string
+	const (
+		level = tests.Medium
+	)
+	BeforeEach(func() {
+		if testLevelEnv.Depth < int(level) {
+			Skip("Test depth is lower than the amount requested for this test")
+		}
+	})
+
 	failoverTest := func(namespace, clusterName string, hasDelay bool) {
 		var pods []string
 		var currentPrimary, targetPrimary, pausedReplica, pid string
@@ -190,15 +200,6 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 		})
 	}
 
-	const (
-		level = tests.Medium
-	)
-	BeforeEach(func() {
-		if testLevelEnv.Depth < int(level) {
-			Skip("Test depth is lower than the amount requested for this test")
-		}
-	})
-
 	// This tests only checks that after the failure of a primary the instance
 	// that has received/applied more WALs is promoted.
 	// To make sure that we know which instance is promoted, we pause the
@@ -211,18 +212,10 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 			sampleFile      = fixturesDir + "/failover/cluster-failover.yaml.template"
 			namespacePrefix = "failover-e2e"
 		)
-		var namespace string
 		var err error
 		// Create a cluster in a namespace we'll delete after the test
-		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-			return env.DeleteNamespace(namespace)
-		})
-
 		clusterName, err := env.GetResourceNameFromYAML(sampleFile)
 		Expect(err).ToNot(HaveOccurred())
 
@@ -236,16 +229,9 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 			sampleFile      = fixturesDir + "/failover/cluster-failover-delay.yaml.template"
 			namespacePrefix = "failover-e2e-delay"
 		)
-		var namespace string
 		var err error
-		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-			return env.DeleteNamespace(namespace)
-		})
 
 		clusterName, err := env.GetResourceNameFromYAML(sampleFile)
 		Expect(err).ToNot(HaveOccurred())

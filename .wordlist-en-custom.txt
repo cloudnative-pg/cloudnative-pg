@@ -2,6 +2,8 @@ AES
 API's
 APIs
 ARMv
+AZ
+AZs
 AcolumnName
 AdditionalCommandArgs
 AdditionalPodAffinity
@@ -117,7 +119,10 @@ DNS
 DataBackupConfiguration
 DataBase
 DataSource
+DatabaseReclaimPolicy
 DatabaseRoleRef
+DatabaseSpec
+DatabaseStatus
 DemotionToken
 DeploymentStrategy
 DevOps
@@ -405,6 +410,7 @@ ServiceSelectorType
 ServiceSpec
 ServiceTemplateSpec
 ServiceUpdateStrategy
+SetStatusInCluster
 ShutdownCheckpointToken
 Silvela
 Slonik
@@ -489,6 +495,7 @@ albert
 allnamespaces
 alloc
 allocator
+allowConnections
 allowPrivilegeEscalation
 allowVolumeExpansion
 amd
@@ -665,6 +672,7 @@ dT
 danglingPVC
 dataChecksums
 databackupconfiguration
+databaseReclaimPolicy
 datacenter
 datacenters
 datallowconn
@@ -742,6 +750,7 @@ ffd
 fieldPath
 fieldref
 filesystem
+finalizer
 findstr
 fio
 firstRecoverabilityPoint
@@ -818,6 +827,7 @@ ip
 ipcs
 ips
 isPrimary
+isTemplate
 issuecomment
 italy
 jdbc
@@ -940,6 +950,7 @@ objid
 objref
 objsubid
 observability
+observedGeneration
 oc
 ol
 olm

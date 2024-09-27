@@ -35,13 +35,15 @@ var _ = Describe("Verify storage", Label(tests.LabelStorage), func() {
 		clusterName = "storage-expansion"
 		level       = tests.Lowest
 	)
+	// Initializing a global namespace variable to be used in each test case
+	var namespace, namespacePrefix string
+
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 	})
-	// Initializing a global namespace variable to be used in each test case
-	var namespace, namespacePrefix string
+
 	// Gathering default storage class requires to check whether the value
 	// of 'allowVolumeExpansion' is true or false
 	defaultStorageClass := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
@@ -61,14 +63,8 @@ var _ = Describe("Verify storage", Label(tests.LabelStorage), func() {
 		It("expands PVCs via online resize", func() {
 			var err error
 			// Creating namespace
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				if CurrentSpecReport().Failed() {
-					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-				}
-				return env.DeleteNamespace(namespace)
-			})
 			// Creating a cluster with three nodes
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 			OnlineResizePVC(namespace, clusterName)
@@ -76,7 +72,6 @@ var _ = Describe("Verify storage", Label(tests.LabelStorage), func() {
 	})
 
 	Context("can not be expanded", func() {
-		var namespace string
 		BeforeEach(func() {
 			// Initializing namespace variable to be used in test case
 			namespacePrefix = "storage-expansion-false"
@@ -87,18 +82,11 @@ var _ = Describe("Verify storage", Label(tests.LabelStorage), func() {
 				Skip(fmt.Sprintf("AllowedVolumeExpansion is true on %v", defaultStorageClass))
 			}
 		})
-
 		It("expands PVCs via offline resize", func() {
 			var err error
 			// Creating namespace
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				if CurrentSpecReport().Failed() {
-					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-				}
-				return env.DeleteNamespace(namespace)
-			})
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 			By("update cluster for resizeInUseVolumes as false", func() {
 				// Updating cluster with 'resizeInUseVolumes' sets to 'false' in storage.

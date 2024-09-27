@@ -23,13 +23,13 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/instance"
@@ -41,6 +41,10 @@ import (
 // to select a new primary before upgrading the old primary, but the chosen
 // instance is not connected via streaming replication
 var errLogShippingReplicaElected = errors.New("log shipping replica elected as a new post-switchover primary")
+
+// errRolloutDelayed is raised the a pod rollout have been delayed because
+// of the operator configuration
+var errRolloutDelayed = errors.New("pod rollout delayed")
 
 type rolloutReason = string
 
@@ -70,6 +74,19 @@ func (r *ClusterReconciler) rolloutRequiredInstances(
 		podRollout := isInstanceNeedingRollout(ctx, postgresqlStatus, cluster)
 		if !podRollout.required {
 			continue
+		}
+
+		managerResult := r.rolloutManager.CoordinateRollout(client.ObjectKeyFromObject(cluster), postgresqlStatus.Pod.Name)
+		if !managerResult.RolloutAllowed {
+			r.Recorder.Eventf(
+				cluster,
+				"Normal",
+				"RolloutDelayed",
+				"Rollout of pod %s have been delayed for %s",
+				postgresqlStatus.Pod.Name,
+				managerResult.TimeToWait.String(),
+			)
+			return false, errRolloutDelayed
 		}
 
 		restartMessage := fmt.Sprintf("Restarting instance %s, because: %s",
@@ -103,6 +120,21 @@ func (r *ClusterReconciler) rolloutRequiredInstances(
 	// it should be restarted by the instance manager itself
 	if primaryPostgresqlStatus.PendingRestartForDecrease {
 		return false, nil
+	}
+
+	managerResult := r.rolloutManager.CoordinateRollout(
+		client.ObjectKeyFromObject(cluster),
+		primaryPostgresqlStatus.Pod.Name)
+	if !managerResult.RolloutAllowed {
+		r.Recorder.Eventf(
+			cluster,
+			"Normal",
+			"RolloutDelayed",
+			"Rollout of pod %s have been delayed for %s",
+			primaryPostgresqlStatus.Pod.Name,
+			managerResult.TimeToWait.String(),
+		)
+		return false, errRolloutDelayed
 	}
 
 	return r.updatePrimaryPod(ctx, cluster, podList, *primaryPostgresqlStatus.Pod,
@@ -236,7 +268,11 @@ type rollout struct {
 	required             bool
 	canBeInPlace         bool
 	primaryForceRecreate bool
-	reason               string
+
+	needsChangeOperatorImage bool
+	needsChangeOperandImage  bool
+
+	reason string
 }
 
 type rolloutChecker func(
@@ -260,7 +296,12 @@ func isInstanceNeedingRollout(
 			required: true,
 			reason: fmt.Sprintf("pod '%s' is not reporting the executable hash",
 				status.Pod.Name),
+			needsChangeOperatorImage: true,
 		}
+	}
+
+	if podRollout := isPodNeedingRollout(ctx, status.Pod, cluster); podRollout.required {
+		return podRollout
 	}
 
 	if status.PendingRestart {
@@ -271,7 +312,7 @@ func isInstanceNeedingRollout(
 		}
 	}
 
-	return isPodNeedingRollout(ctx, status.Pod, cluster)
+	return rollout{}
 }
 
 // isPodNeedingRollout checks if a given cluster instance needs a rollout by comparing its current state
@@ -465,6 +506,7 @@ func checkPodImageIsOutdated(pod *corev1.Pod, cluster *apiv1.Cluster) (rollout, 
 		required: true,
 		reason: fmt.Sprintf("the instance is using a different image: %s -> %s",
 			pgCurrentImageName, targetImageName),
+		needsChangeOperandImage: true,
 	}, nil
 }
 
@@ -487,6 +529,7 @@ func checkPodInitContainerIsOutdated(pod *corev1.Pod, _ *apiv1.Cluster) (rollout
 		required: true,
 		reason: fmt.Sprintf("the instance is using an old init container image: %s -> %s",
 			opCurrentImageName, configuration.Current.OperatorImageName),
+		needsChangeOperatorImage: true,
 	}, nil
 }
 
@@ -594,6 +637,7 @@ func checkPodSpecIsOutdated(pod *corev1.Pod, cluster *apiv1.Cluster) (rollout, e
 			required: true,
 			reason: fmt.Sprintf("the instance is using an old init container image: %s -> %s",
 				opCurrentImageName, configuration.Current.OperatorImageName),
+			needsChangeOperatorImage: true,
 		}, nil
 	}
 
@@ -697,39 +741,50 @@ func (r *ClusterReconciler) upgradeInstanceManager(
 		}
 		operatorHash := targetManager.GetHash()
 
-		if instanceManagerHash != "" && instanceManagerHash != operatorHash && !instanceManagerIsUpgrading {
-			// We need to upgrade this Pod
-			contextLogger.Info("Upgrading instance manager",
-				"pod", postgresqlStatus.Pod.Name,
-				"oldVersion", postgresqlStatus.ExecutableHash)
-
-			if cluster.Status.Phase != apiv1.PhaseOnlineUpgrading {
-				err := r.RegisterPhase(ctx, cluster, apiv1.PhaseOnlineUpgrading, "")
-				if err != nil {
-					return err
-				}
-			}
-
-			err = r.InstanceClient.UpgradeInstanceManager(ctx, postgresqlStatus.Pod, targetManager)
-			if err != nil {
-				enrichedError := fmt.Errorf("while upgrading instance manager on %s (hash: %s): %w",
-					postgresqlStatus.Pod.Name,
-					operatorHash[:6],
-					err)
-
-				r.Recorder.Event(cluster, "Warning", "InstanceManagerUpgradeFailed",
-					fmt.Sprintf("Error %s", enrichedError))
-				return enrichedError
-			}
-
-			message := fmt.Sprintf("Instance manager has been upgraded on %s (hash: %s — previous hash: %s)",
+		if instanceManagerIsUpgrading || instanceManagerHash == "" || instanceManagerHash == operatorHash {
+			message := fmt.Sprintf("Instance manager will skip upgrade on %s (upgrading: %t) "+
+				"(operator hash: %s — instance manager hash: %s)",
 				postgresqlStatus.Pod.Name,
+				instanceManagerIsUpgrading,
 				operatorHash[:6],
 				instanceManagerHash[:6])
-
-			r.Recorder.Event(cluster, "Normal", "InstanceManagerUpgraded", message)
-			contextLogger.Info(message)
+			contextLogger.Trace(message)
+			continue
 		}
+
+		// We need to upgrade this Pod
+		contextLogger.Info("Upgrading instance manager",
+			"pod", postgresqlStatus.Pod.Name,
+			"oldHash", instanceManagerHash,
+			"newHash", operatorHash)
+
+		if cluster.Status.Phase != apiv1.PhaseOnlineUpgrading {
+			err := r.RegisterPhase(ctx, cluster, apiv1.PhaseOnlineUpgrading, "")
+			if err != nil {
+				return err
+			}
+		}
+
+		err = r.InstanceClient.UpgradeInstanceManager(ctx, postgresqlStatus.Pod, targetManager)
+		if err != nil {
+			enrichedError := fmt.Errorf("while upgrading instance manager on %s (hash: %s): %w",
+				postgresqlStatus.Pod.Name,
+				operatorHash[:6],
+				err)
+
+			r.Recorder.Event(cluster, "Warning", "InstanceManagerUpgradeFailed",
+				fmt.Sprintf("Error %s", enrichedError))
+			return enrichedError
+		}
+
+		message := fmt.Sprintf("Instance manager has been upgraded on %s "+
+			"(oldHash: %s — newHash: %s)",
+			postgresqlStatus.Pod.Name,
+			instanceManagerHash[:6],
+			operatorHash[:6])
+
+		r.Recorder.Event(cluster, "Normal", "InstanceManagerUpgraded", message)
+		contextLogger.Info(message)
 	}
 
 	return nil

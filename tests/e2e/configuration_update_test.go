@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	cnpgTypes "github.com/cloudnative-pg/machinery/pkg/types"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -135,19 +136,10 @@ var _ = Describe("Configuration update", Ordered, Label(tests.LabelClusterMetada
 
 		By("create cluster with default configuration", func() {
 			var err error
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.DeleteNamespace(namespace)
-			})
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 		})
-	})
-
-	JustAfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-		}
 	})
 
 	It("01. reloading Pg when a parameter requiring reload is modified", func() {
@@ -164,7 +156,6 @@ var _ = Describe("Configuration update", Ordered, Label(tests.LabelClusterMetada
 		By("verify that work_mem result as expected", func() {
 			// Check that the parameter has been modified in every pod
 			for _, pod := range podList.Items {
-				pod := pod // pin the variable
 				Eventually(func() (int, error, error) {
 					stdout, _, err := env.ExecCommand(env.Ctx, pod, specs.PostgresContainerName, &commandTimeout,
 						"psql", "-U", "postgres", "-tAc", "show work_mem")
@@ -204,7 +195,6 @@ var _ = Describe("Configuration update", Ordered, Label(tests.LabelClusterMetada
 		By("verify that connection should success after pg_hba_reload", func() {
 			// The new pg_hba rule should be present in every pod
 			for _, pod := range podList.Items {
-				pod := pod // pin the variable
 				Eventually(func() (string, error) {
 					stdout, _, err := env.ExecCommand(env.Ctx, pod, specs.PostgresContainerName, &commandTimeout,
 						"psql", "-U", "postgres", "-tAc",
@@ -243,7 +233,6 @@ var _ = Describe("Configuration update", Ordered, Label(tests.LabelClusterMetada
 		By("verify that shared_buffers setting changed", func() {
 			// Check that the new parameter has been modified in every pod
 			for _, pod := range podList.Items {
-				pod := pod
 				Eventually(func() (int, error, error) {
 					stdout, _, err := env.ExecCommand(env.Ctx, pod, specs.PostgresContainerName, &commandTimeout,
 						"psql", "-U", "postgres", "-tAc", "show shared_buffers")
@@ -282,7 +271,6 @@ var _ = Describe("Configuration update", Ordered, Label(tests.LabelClusterMetada
 		By("verify that both parameters have been modified in each pod", func() {
 			// Check that both parameters have been modified in each pod
 			for _, pod := range podList.Items {
-				pod := pod // pin the variable
 				Eventually(func() (int, error, error) {
 					stdout, _, err := env.ExecCommand(env.Ctx, pod, specs.PostgresContainerName, &commandTimeout,
 						"psql", "-U", "postgres", "-tAc", "show max_replication_slots")
@@ -343,7 +331,6 @@ var _ = Describe("Configuration update", Ordered, Label(tests.LabelClusterMetada
 			By("verify that max_connections has been decreased in every pod", func() {
 				// Check that the new parameter has been modified in every pod
 				for _, pod := range podList.Items {
-					pod := pod
 					Eventually(func() (int, error, error) {
 						stdout, _, err := env.ExecCommand(env.Ctx, pod, specs.PostgresContainerName, &commandTimeout,
 							"psql", "-U", "postgres", "-tAc", "show max_connections")
@@ -385,7 +372,6 @@ var _ = Describe("Configuration update", Ordered, Label(tests.LabelClusterMetada
 			By("verify that the max_connections has been set to default in every pod", func() {
 				// Check that the new parameter has been modified in every pod
 				for _, pod := range podList.Items {
-					pod := pod
 					Eventually(func() (int, error, error) {
 						stdout, _, err := env.ExecCommand(env.Ctx, pod, specs.PostgresContainerName, &commandTimeout,
 							"psql", "-U", "postgres", "-tAc", "show max_connections")
@@ -415,7 +401,6 @@ var _ = Describe("Configuration update", Ordered, Label(tests.LabelClusterMetada
 
 		By("check that there is only one entry in pg_ident_file_mappings", func() {
 			for _, pod := range podList.Items {
-				pod := pod // pin the variable
 				if psqlHasIdentView {
 					Eventually(func() (string, error) {
 						stdout, _, err := env.ExecCommand(env.Ctx, pod, specs.PostgresContainerName, &commandTimeout,
@@ -435,7 +420,6 @@ var _ = Describe("Configuration update", Ordered, Label(tests.LabelClusterMetada
 
 		By("verify that there are now two entries in pg_ident_file_mappings", func() {
 			for _, pod := range podList.Items {
-				pod := pod // pin the variable
 				if psqlHasIdentView {
 					Eventually(func() (string, error) {
 						stdout, _, err := env.ExecCommand(env.Ctx, pod, specs.PostgresContainerName, &commandTimeout,
@@ -470,21 +454,12 @@ var _ = Describe("Configuration update with primaryUpdateMethod", Label(tests.La
 			"/config_update/primary_update_method/primary-update-restart.yaml.template"
 		var namespace, clusterName string
 
-		JustAfterEach(func() {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-		})
-
 		BeforeAll(func() {
 			const namespacePrefix = "config-change-primary-update-restart"
 			var err error
 			// Create a cluster in a namespace we'll delete after the test
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.DeleteNamespace(namespace)
-			})
 
 			clusterName, err = env.GetResourceNameFromYAML(clusterFileWithPrimaryUpdateRestart)
 			Expect(err).ToNot(HaveOccurred())
@@ -523,7 +498,7 @@ var _ = Describe("Configuration update with primaryUpdateMethod", Label(tests.La
 					env)
 				Expect(cmdErr).ToNot(HaveOccurred())
 
-				primaryStartTime, err = devUtils.ParseTargetTime(nil, strings.Trim(stdout, "\n"))
+				primaryStartTime, err = cnpgTypes.ParseTargetTime(nil, strings.Trim(stdout, "\n"))
 				Expect(err).NotTo(HaveOccurred())
 				query = "show max_connections"
 				stdout, _, cmdErr = utils.RunQueryFromPod(
@@ -591,7 +566,7 @@ var _ = Describe("Configuration update with primaryUpdateMethod", Label(tests.La
 					"select to_char(pg_postmaster_start_time(), 'YYYY-MM-DD HH24:MI:SS');")
 				Expect(cmdErr).ToNot(HaveOccurred())
 
-				newStartTime, err := devUtils.ParseTargetTime(nil, strings.Trim(stdout, "\n"))
+				newStartTime, err := cnpgTypes.ParseTargetTime(nil, strings.Trim(stdout, "\n"))
 				Expect(err).NotTo(HaveOccurred())
 
 				// verify that pg postmaster start time is greater than currentTimestamp which was taken before restart
@@ -619,7 +594,6 @@ var _ = Describe("Configuration update with primaryUpdateMethod", Label(tests.La
 
 				// Check that the parameter has been modified in every pod
 				for _, pod := range podList.Items {
-					pod := pod // pin the variable
 					Eventually(func() (int, error, error) {
 						stdout, _, err := env.ExecCommand(env.Ctx, pod, specs.PostgresContainerName, &commandTimeout,
 							"psql", "-U", "postgres", "-tAc", "show work_mem")

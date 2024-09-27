@@ -59,7 +59,6 @@ var _ = Describe("Verify Volume Snapshot",
 			return snapshotList, nil
 		}
 
-		// Initializing a global namespace variable to be used in each test case
 		var namespace string
 
 		Context("using the kubectl cnpg plugin", Ordered, func() {
@@ -79,15 +78,8 @@ var _ = Describe("Verify Volume Snapshot",
 				Expect(err).ToNot(HaveOccurred())
 
 				// Initializing namespace variable to be used in test case
-				namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+				namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
-
-				DeferCleanup(func() error {
-					if CurrentSpecReport().Failed() {
-						env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-					}
-					return env.DeleteNamespace(namespace)
-				})
 
 				// Creating a cluster with three nodes
 				AssertCreateCluster(namespace, clusterName, sampleFile, env)
@@ -167,15 +159,8 @@ var _ = Describe("Verify Volume Snapshot",
 				clusterToSnapshotName, err = env.GetResourceNameFromYAML(clusterToSnapshot)
 				Expect(err).ToNot(HaveOccurred())
 
-				namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+				namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
-
-				DeferCleanup(func() error {
-					if CurrentSpecReport().Failed() {
-						env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-					}
-					return env.DeleteNamespace(namespace)
-				})
 
 				By("create the certificates for MinIO", func() {
 					err := minioEnv.CreateCaSecret(env, namespace)
@@ -355,19 +340,11 @@ var _ = Describe("Verify Volume Snapshot",
 				}
 
 				var err error
-				namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+				namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
-				DeferCleanup(func() error {
-					if CurrentSpecReport().Failed() {
-						env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-					}
-					if err := os.Unsetenv(snapshotDataEnv); err != nil {
-						return err
-					}
-					if err := os.Unsetenv(snapshotWalEnv); err != nil {
-						return err
-					}
-					return env.DeleteNamespace(namespace)
+				DeferCleanup(func() {
+					_ = os.Unsetenv(snapshotDataEnv)
+					_ = os.Unsetenv(snapshotWalEnv)
 				})
 				clusterToBackupName, err = env.GetResourceNameFromYAML(clusterToBackupFilePath)
 				Expect(err).ToNot(HaveOccurred())
@@ -577,15 +554,8 @@ var _ = Describe("Verify Volume Snapshot",
 				clusterToSnapshotName, err = env.GetResourceNameFromYAML(clusterToSnapshot)
 				Expect(err).ToNot(HaveOccurred())
 
-				namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+				namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
-
-				DeferCleanup(func() error {
-					if CurrentSpecReport().Failed() {
-						env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-					}
-					return env.DeleteNamespace(namespace)
-				})
 
 				By("create the certificates for MinIO", func() {
 					err := minioEnv.CreateCaSecret(env, namespace)

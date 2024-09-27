@@ -31,25 +31,24 @@ import (
 	"strings"
 	"time"
 
+	barmanArchiver "github.com/cloudnative-pg/barman-cloud/pkg/archiver"
+	barmanCapabilities "github.com/cloudnative-pg/barman-cloud/pkg/capabilities"
+	barmanCatalog "github.com/cloudnative-pg/barman-cloud/pkg/catalog"
+	barmanCommand "github.com/cloudnative-pg/barman-cloud/pkg/command"
+	barmanCredentials "github.com/cloudnative-pg/barman-cloud/pkg/credentials"
+	barmanRestorer "github.com/cloudnative-pg/barman-cloud/pkg/restorer"
+	"github.com/cloudnative-pg/machinery/pkg/execlog"
+	"github.com/cloudnative-pg/machinery/pkg/fileutils"
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/walarchive"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/configfile"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/archiver"
-	barmanCapabilities "github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/capabilities"
-	barmanCredentials "github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/credentials"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/restorer"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/catalog"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/external"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
 	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
 	postgresSpec "github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
@@ -172,7 +171,7 @@ func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client, imm
 		return err
 	}
 
-	if err := info.writeRestoreWalConfig(backup, cluster); err != nil {
+	if err := info.writeRestoreWalConfig(ctx, backup, cluster); err != nil {
 		return err
 	}
 
@@ -266,7 +265,7 @@ func (info InitInfo) Restore(ctx context.Context) error {
 		return err
 	}
 
-	if err := info.restoreDataDir(backup, env); err != nil {
+	if err := info.restoreDataDir(ctx, backup, env); err != nil {
 		return err
 	}
 
@@ -305,7 +304,7 @@ func (info InitInfo) Restore(ctx context.Context) error {
 		return err
 	}
 
-	if err := info.writeRestoreWalConfig(backup, cluster); err != nil {
+	if err := info.writeRestoreWalConfig(ctx, backup, cluster); err != nil {
 		return err
 	}
 
@@ -332,12 +331,12 @@ func (info InitInfo) ensureArchiveContainsLastCheckpointRedoWAL(
 		return err
 	}
 
-	rest, err := restorer.New(ctx, cluster, env, walarchive.SpoolDirectory)
+	rest, err := barmanRestorer.New(ctx, env, postgresSpec.SpoolDirectory)
 	if err != nil {
 		return err
 	}
 
-	opts, err := barman.CloudWalRestoreOptions(&apiv1.BarmanObjectStoreConfiguration{
+	opts, err := barmanCommand.CloudWalRestoreOptions(ctx, &apiv1.BarmanObjectStoreConfiguration{
 		BarmanCredentials: backup.Status.BarmanCredentials,
 		EndpointCA:        backup.Status.EndpointCA,
 		EndpointURL:       backup.Status.EndpointURL,
@@ -392,7 +391,7 @@ func (info InitInfo) restoreCustomWalDir(ctx context.Context) (bool, error) {
 }
 
 // restoreDataDir restores PGDATA from an existing backup
-func (info InitInfo) restoreDataDir(backup *apiv1.Backup, env []string) error {
+func (info InitInfo) restoreDataDir(ctx context.Context, backup *apiv1.Backup, env []string) error {
 	var options []string
 
 	if backup.Status.EndpointURL != "" {
@@ -402,7 +401,7 @@ func (info InitInfo) restoreDataDir(backup *apiv1.Backup, env []string) error {
 	options = append(options, backup.Status.ServerName)
 	options = append(options, backup.Status.BackupID)
 
-	options, err := barman.AppendCloudProviderOptionsFromBackup(options, backup)
+	options, err := barmanCommand.AppendCloudProviderOptionsFromBackup(ctx, options, backup.Status.BarmanCredentials)
 	if err != nil {
 		return err
 	}
@@ -418,7 +417,7 @@ func (info InitInfo) restoreDataDir(backup *apiv1.Backup, env []string) error {
 	if err != nil {
 		var exitError *exec.ExitError
 		if errors.As(err, &exitError) {
-			err = barman.UnmarshalBarmanCloudRestoreExitCode(exitError.ExitCode())
+			err = barmanCommand.UnmarshalBarmanCloudRestoreExitCode(ctx, exitError.ExitCode())
 		}
 
 		log.Error(err, "Can't restore backup")
@@ -485,16 +484,18 @@ func (info InitInfo) loadBackupObjectFromExternalCluster(
 		return nil, nil, err
 	}
 
-	backupCatalog, err := barman.GetBackupList(ctx, server.BarmanObjectStore, serverName, env)
+	backupCatalog, err := barmanCommand.GetBackupList(ctx, server.BarmanObjectStore, serverName, env)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	// We are now choosing the right backup to restore
-	var targetBackup *catalog.BarmanBackup
+	var targetBackup *barmanCatalog.BarmanBackup
 	if cluster.Spec.Bootstrap.Recovery != nil &&
 		cluster.Spec.Bootstrap.Recovery.RecoveryTarget != nil {
-		targetBackup, err = backupCatalog.FindBackupInfo(cluster.Spec.Bootstrap.Recovery.RecoveryTarget)
+		targetBackup, err = backupCatalog.FindBackupInfo(
+			cluster.Spec.Bootstrap.Recovery.RecoveryTarget,
+		)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -572,7 +573,11 @@ func (info InitInfo) loadBackupFromReference(
 // writeRestoreWalConfig writes a `custom.conf` allowing PostgreSQL
 // to complete the WAL recovery from the object storage and then start
 // as a new primary
-func (info InitInfo) writeRestoreWalConfig(backup *apiv1.Backup, cluster *apiv1.Cluster) error {
+func (info InitInfo) writeRestoreWalConfig(
+	ctx context.Context,
+	backup *apiv1.Backup,
+	cluster *apiv1.Cluster,
+) error {
 	var err error
 
 	cmd := []string{barmanCapabilities.BarmanCloudWalRestore}
@@ -582,7 +587,8 @@ func (info InitInfo) writeRestoreWalConfig(backup *apiv1.Backup, cluster *apiv1.
 	cmd = append(cmd, backup.Status.DestinationPath)
 	cmd = append(cmd, backup.Status.ServerName)
 
-	cmd, err = barman.AppendCloudProviderOptionsFromBackup(cmd, backup)
+	cmd, err = barmanCommand.AppendCloudProviderOptionsFromBackup(
+		ctx, cmd, backup.Status.BarmanCredentials)
 	if err != nil {
 		return err
 	}
@@ -918,6 +924,7 @@ func (info *InitInfo) checkBackupDestination(
 	if !cluster.Spec.Backup.IsBarmanBackupConfigured() {
 		return nil
 	}
+
 	// Get environment from cache
 	env, err := barmanCredentials.EnvSetRestoreCloudCredentials(ctx,
 		client,
@@ -932,14 +939,20 @@ func (info *InitInfo) checkBackupDestination(
 	}
 
 	// Instantiate the WALArchiver to get the proper configuration
-	var walArchiver *archiver.WALArchiver
-	walArchiver, err = archiver.New(ctx, cluster, env, walarchive.SpoolDirectory, info.PgData)
+	var walArchiver *barmanArchiver.WALArchiver
+	walArchiver, err = barmanArchiver.New(
+		ctx,
+		env,
+		postgresSpec.SpoolDirectory,
+		info.PgData,
+		path.Join(info.PgData, CheckEmptyWalArchiveFile))
 	if err != nil {
 		return fmt.Errorf("while creating the archiver: %w", err)
 	}
 
 	// Get WAL archive options
-	checkWalOptions, err := walArchiver.BarmanCloudCheckWalArchiveOptions(cluster, cluster.Name)
+	checkWalOptions, err := walArchiver.BarmanCloudCheckWalArchiveOptions(
+		ctx, cluster.Spec.Backup.BarmanObjectStore, cluster.Name)
 	if err != nil {
 		log.Error(err, "while getting barman-cloud-wal-archive options")
 		return err

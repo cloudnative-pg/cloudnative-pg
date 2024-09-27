@@ -75,7 +75,7 @@ of the CloudNativePG deployment in your Kubernetes infrastructure.
 ### Self-contained instance manager
 
 Instead of relying on an external tool to
-coordinate PostgreSQL instances in the Kubernetes cluster pods, 
+coordinate PostgreSQL instances in the Kubernetes cluster pods,
 such as Patroni or Stolon, the operator
 injects the operator executable inside each pod, in a file named
 `/controller/manager`. The application is used to control the underlying
@@ -223,7 +223,7 @@ includes integration with cert-manager.
 
 ### Certificate authentication for streaming replication
 
-To authorize streaming replication connections from the standby servers, 
+To authorize streaming replication connections from the standby servers,
 the operator relies on TLS client certificate authentication. This method is used
 instead of relying on a password (and therefore a secret).
 
@@ -285,16 +285,20 @@ workload, in this case PostgreSQL servers. This includes PostgreSQL minor
 release updates (security and bug fixes normally) as well as major online
 upgrades.
 
-### Upgrade of the operator
+### Operator Upgrade
 
-You can upgrade the operator seamlessly as a new deployment. Because of the instance
-manager's injection, a change in the
-operator doesn't require a change in the operand. 
-The operator can manage older versions of the operand.
+Upgrading the operator is seamless and can be done as a new deployment. After
+upgrading the controller, a rolling update of all deployed PostgreSQL clusters
+is initiated. You can choose to update all clusters simultaneously or
+distribute their upgrades over time.
 
-CloudNativePG also supports [in-place updates of the instance manager](installation_upgrade.md#in-place-updates-of-the-instance-manager)
-following an upgrade of the operator. In-place updates don't require a rolling
-update (and subsequent switchover) of the cluster.
+Thanks to the instance manager's injection, upgrading the operator does not
+require changes to the operand, allowing the operator to manage older versions
+of it.
+
+Additionally, CloudNativePG supports [in-place updates of the instance manager](installation_upgrade.md#in-place-updates-of-the-instance-manager)
+following an operator upgrade. In-place updates do not require a rolling update
+or a subsequent switchover of the cluster.
 
 ### Upgrade of the managed workload
 
@@ -355,8 +359,8 @@ user action. The operator transparently sets
 the `archive_command` to rely on `barman-cloud-wal-archive` to ship WAL
 files to the defined endpoint. You can decide the compression algorithm,
 as well as the number of parallel jobs to concurrently upload WAL files
-in the archive. In addition, `Instance Manager` checks 
-the correctness of the archive destination by performing the `barman-cloud-check-wal-archive` 
+in the archive. In addition, `Instance Manager` checks
+the correctness of the archive destination by performing the `barman-cloud-check-wal-archive`
 command before beginning to ship the first set of WAL files.
 
 ### PostgreSQL backups
@@ -373,7 +377,7 @@ Base backups can be saved on:
 Base backups are defined at the cluster level, declaratively,
 through the `backup` parameter in the cluster definition.
 
-You can define base backups in two ways: 
+You can define base backups in two ways:
 
 - On-demand, through the `Backup` custom resource definition
 - Scheduled, through the `ScheduledBackup`custom resource definition, using a cron-like syntax

@@ -18,7 +18,6 @@ package replication
 
 import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -69,9 +68,9 @@ var _ = Describe("ensuring the correctness of synchronous replica data calculati
 		cluster := createFakeCluster("exampleOnePod")
 		cluster.Status = apiv1.ClusterStatus{
 			CurrentPrimary: "exampleOnePod-1",
-			InstancesStatus: map[utils.PodStatus][]string{
-				utils.PodHealthy: {"exampleOnePod-1"},
-				utils.PodFailed:  {"exampleOnePod-2", "exampleOnePod-3"},
+			InstancesStatus: map[apiv1.PodStatus][]string{
+				apiv1.PodHealthy: {"exampleOnePod-1"},
+				apiv1.PodFailed:  {"exampleOnePod-2", "exampleOnePod-3"},
 			},
 		}
 		number, names := getSyncReplicasData(cluster)
@@ -85,8 +84,8 @@ var _ = Describe("ensuring the correctness of synchronous replica data calculati
 		cluster := createFakeCluster("exampleNoPods")
 		cluster.Status = apiv1.ClusterStatus{
 			CurrentPrimary: "example-1",
-			InstancesStatus: map[utils.PodStatus][]string{
-				utils.PodFailed: {"exampleNoPods-1", "exampleNoPods-2", "exampleNoPods-3"},
+			InstancesStatus: map[apiv1.PodStatus][]string{
+				apiv1.PodFailed: {"exampleNoPods-1", "exampleNoPods-2", "exampleNoPods-3"},
 			},
 		}
 		number, names := getSyncReplicasData(cluster)
@@ -103,8 +102,8 @@ var _ = Describe("legacy synchronous_standby_names configuration", func() {
 		cluster.Spec.MaxSyncReplicas = 2
 		cluster.Status = apiv1.ClusterStatus{
 			CurrentPrimary: "example-1",
-			InstancesStatus: map[utils.PodStatus][]string{
-				utils.PodHealthy: {"one", "two", "three"},
+			InstancesStatus: map[apiv1.PodStatus][]string{
+				apiv1.PodHealthy: {"one", "two", "three"},
 			},
 		}
 		synchronousStandbyNames := legacySynchronousStandbyNames(cluster)

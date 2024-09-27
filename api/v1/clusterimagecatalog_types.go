@@ -45,16 +45,6 @@ type ClusterImageCatalogList struct {
 	Items []ClusterImageCatalog `json:"items"`
 }
 
-// GetObjectMeta returns the ObjectMeta of the ClusterImageCatalog
-func (c *ClusterImageCatalog) GetObjectMeta() *metav1.ObjectMeta {
-	return &c.ObjectMeta
-}
-
-// GetSpec returns the Spec of the ClusterImageCatalog
-func (c *ClusterImageCatalog) GetSpec() *ImageCatalogSpec {
-	return &c.Spec
-}
-
 func init() {
 	SchemeBuilder.Register(&ClusterImageCatalog{}, &ClusterImageCatalogList{})
 }

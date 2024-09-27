@@ -17,8 +17,10 @@ limitations under the License.
 package e2e
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -187,7 +189,6 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			commandTimeout := time.Second * 10
 			// Check that both parameters have been modified in each pod
 			for _, pod := range podList.Items {
-				pod := pod // pin the variable
 				Eventually(func() (int, error) {
 					stdout, stderr, err := env.ExecCommand(env.Ctx, pod, specs.PostgresContainerName, &commandTimeout,
 						"psql", "-U", "postgres", "-tAc", "show max_replication_slots")
@@ -261,15 +262,40 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		})
 	}
 
-	assertManagerRollout := func() {
-		retryCheckingEvents := wait.Backoff{
+	// getExecutableHashesFromInstances prints the manager's executable hash of each pod to a given IO writer
+	getExecutableHashesFromInstances := func(upgradeNamespace, clusterName string, w io.Writer) error {
+		pods, err := env.GetClusterPodList(upgradeNamespace, clusterName)
+		if err != nil {
+			return err
+		}
+		for _, pod := range pods.Items {
+			status, err := testsUtils.RetrievePgStatusFromInstance(env, pod, true)
+			if err != nil {
+				continue
+			}
+			var statusFields map[string]interface{}
+			err = json.Unmarshal([]byte(status), &statusFields)
+			if err != nil {
+				continue
+			}
+			_, _ = fmt.Fprintln(w, "Pod", pod.Name, "executableHash", statusFields["executableHash"])
+		}
+		return nil
+	}
+
+	// assertOnlineManagerRollout checks for the presence of InstanceManagerUpgraded
+	// events, which are produced on online upgrades.
+	// returns a boolean indicating success
+	assertOnlineManagerRollout := func() bool {
+		backoffCheckingEvents := wait.Backoff{
 			Duration: 10 * time.Second,
 			Steps:    5,
 		}
 		notUpdated := errors.New("notUpdated")
-		err := retry.OnError(retryCheckingEvents, func(err error) bool {
+		shouldRetry := func(err error) bool {
 			return errors.Is(err, notUpdated)
-		}, func() error {
+		}
+		err := retry.OnError(backoffCheckingEvents, shouldRetry, func() error {
 			eventList := corev1.EventList{}
 			err := env.Client.List(env.Ctx,
 				&eventList,
@@ -282,11 +308,16 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 				return err
 			}
 
-			var count int
+			var count, nonUpgradeCount int
+			By("checking cluster events for instance manager upgrades")
 			for _, event := range eventList.Items {
 				if event.Reason == "InstanceManagerUpgraded" {
 					count++
 					GinkgoWriter.Printf("%d: %s\n", count, event.Message)
+				}
+				if event.Reason == "InstanceManagerUpgradeFailed" {
+					nonUpgradeCount++
+					GinkgoWriter.Printf("%d: %s\n", nonUpgradeCount, event.Message)
 				}
 			}
 
@@ -296,23 +327,47 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 
 			return nil
 		})
-		Expect(err).NotTo(HaveOccurred())
+		return err == nil
 	}
 
-	cleanupNamespace := func(namespace string) error {
+	// assertExpectedMatchingPodUIDs checks that the UID of each pod of a Cluster matches with a given list of UIDs.
+	// expectedMatches defines how many times, when comparing the elements of the 2 lists, you are expected to have
+	// common values
+	assertExpectedMatchingPodUIDs := func(namespace, clusterName string, podUIDs []types.UID, expectedMatches int) error {
+		backoffCheckingPodRestarts := wait.Backoff{
+			Duration: 10 * time.Second,
+			Steps:    30,
+		}
+		shouldRetry := func(_ error) bool {
+			return true
+		}
+		err := retry.OnError(backoffCheckingPodRestarts, shouldRetry, func() error {
+			var currentUIDs []types.UID
+			currentPodList, err := env.GetClusterPodList(namespace, clusterName)
+			if err != nil {
+				return err
+			}
+			for _, pod := range currentPodList.Items {
+				currentUIDs = append(currentUIDs, pod.GetUID())
+			}
+			matchingPods := len(funk.Join(currentUIDs, podUIDs, funk.InnerJoin).([]types.UID))
+
+			if matchingPods != expectedMatches {
+				return fmt.Errorf("expected %d pods with unchanged UIDs, found %d", expectedMatches, matchingPods)
+			}
+			return nil
+		})
+		return err
+	}
+
+	cleanupOperatorAndMinio := func() error {
 		GinkgoWriter.Println("cleaning up")
 		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 			// Dump the minio namespace when failed
 			env.DumpNamespaceObjects(minioEnv.Namespace, "out/"+CurrentSpecReport().LeafNodeText+"minio.log")
 			// Dump the operator namespace, as operator is changing too
 			env.DumpOperator(operatorNamespace,
 				"out/"+CurrentSpecReport().LeafNodeText+"operator.log")
-		}
-
-		err := env.DeleteNamespace(namespace)
-		if err != nil {
-			return fmt.Errorf("could not cleanup. Failed to delete namespace: %v", err)
 		}
 
 		// Delete the operator's namespace in case that the previous test make corrupted changes to
@@ -340,7 +395,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			namespacePrefix), func() {
 			var err error
 			// Create a upgradeNamespace for all the resources
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Creating a upgradeNamespace should be quick
@@ -384,6 +439,11 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 
 				return err
 			}, timeout).ShouldNot(HaveOccurred())
+		})
+		By("getting the operator info", func() {
+			pod, err := env.GetOperatorPod()
+			Expect(err).NotTo(HaveOccurred())
+			GinkgoWriter.Println("image used for operator", pod.Spec.Containers[0].Image)
 		})
 	}
 
@@ -481,6 +541,10 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			podUIDs = append(podUIDs, pod.GetUID())
 		}
 
+		By("getting the executable hash from the cluster pods", func() {
+			_ = getExecutableHashesFromInstances(upgradeNamespace, clusterName1, GinkgoWriter)
+		})
+
 		deployOperator(operatorManifest)
 
 		operatorConfigMapNamespacedName := types.NamespacedName{
@@ -492,41 +556,29 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		// be it rolling or online
 		// We look for the setting in the operator configMap
 		operatorConfigMap := &corev1.ConfigMap{}
+		var testOnlineUpgrade, onlineUpgradeDone bool
 		err = env.Client.Get(env.Ctx, operatorConfigMapNamespacedName, operatorConfigMap)
 		if err != nil || operatorConfigMap.Data["ENABLE_INSTANCE_MANAGER_INPLACE_UPDATES"] == "false" {
 			GinkgoWriter.Printf("rolling upgrade\n")
 			// Wait for rolling update. We expect all the pods to change UID
-			Eventually(func() (int, error) {
-				var currentUIDs []types.UID
-				currentPodList, err := env.GetClusterPodList(upgradeNamespace, clusterName1)
-				if err != nil {
-					return 0, err
-				}
-				if len(currentPodList.Items) != len(podUIDs) {
-					return 0, fmt.Errorf("unexpected number of pods. Should have %d, has %d",
-						len(podUIDs), len(currentPodList.Items))
-				}
-				for _, pod := range currentPodList.Items {
-					currentUIDs = append(currentUIDs, pod.GetUID())
-				}
-				return len(funk.Join(currentUIDs, podUIDs, funk.InnerJoin).([]types.UID)), nil
-			}, 300).Should(BeEquivalentTo(0), "No pods should have the same UID they had before the upgrade")
+			errMatches := assertExpectedMatchingPodUIDs(upgradeNamespace, clusterName1, podUIDs, 0)
+			Expect(errMatches).ShouldNot(HaveOccurred(), "No pods should have the same UID they had before the upgrade")
 		} else {
 			GinkgoWriter.Printf("online upgrade\n")
+			testOnlineUpgrade = true
 			// Pods shouldn't change and there should be an event
-			assertManagerRollout()
-			GinkgoWriter.Printf("assertManagerRollout is done\n")
-			Eventually(func() (int, error) {
-				var currentUIDs []types.UID
-				currentPodList, err := env.GetClusterPodList(upgradeNamespace, clusterName1)
+			onlineUpgradeDone = assertOnlineManagerRollout()
+			if onlineUpgradeDone {
+				GinkgoWriter.Printf("online manager rollout is done\n")
+				// equivalent to waiting for 300 sec as before
+				err := assertExpectedMatchingPodUIDs(upgradeNamespace, clusterName1, podUIDs, 3)
 				if err != nil {
-					return 0, err
+					GinkgoWriter.Printf("online manager rollout not done. Some pods were restarted\n")
+					onlineUpgradeDone = false
 				}
-				for _, pod := range currentPodList.Items {
-					currentUIDs = append(currentUIDs, pod.GetUID())
-				}
-				return len(funk.Join(currentUIDs, podUIDs, funk.InnerJoin).([]types.UID)), nil
-			}, 300).Should(BeEquivalentTo(3))
+			} else {
+				GinkgoWriter.Printf("online manager rollout not done. Didn't find the expected Events\n")
+			}
 		}
 		AssertClusterIsReady(upgradeNamespace, clusterName1, 300, env)
 
@@ -618,6 +670,17 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 
 			assertPGBouncerPodsAreReady(upgradeNamespace, pgBouncerSampleFile, 0)
 		})
+
+		if testOnlineUpgrade {
+			By("checking whether the pods were restarted in an online upgrade", func() {
+				if !onlineUpgradeDone {
+					_ = getExecutableHashesFromInstances(upgradeNamespace, clusterName1, GinkgoWriter)
+					Fail("upgrade was successful, but was not an online upgrade")
+				} else {
+					Succeed()
+				}
+			})
+		}
 	}
 
 	assertManifestPresent := func(path string) {
@@ -642,9 +705,9 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 
 			GinkgoWriter.Printf("installing the recent CNPG tag %s\n", mostRecentTag)
 			testsUtils.InstallLatestCNPGOperator(mostRecentTag, env)
-			upgradeNamespace := assertCreateNamespace(upgradeNamespacePrefix)
-			DeferCleanup(cleanupNamespace, upgradeNamespace)
+			DeferCleanup(cleanupOperatorAndMinio)
 
+			upgradeNamespace := assertCreateNamespace(upgradeNamespacePrefix)
 			assertClustersWorkAfterOperatorUpgrade(upgradeNamespace, currentOperatorManifest)
 		})
 
@@ -659,11 +722,10 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 
 			GinkgoWriter.Printf("installing the recent CNPG tag %s\n", mostRecentTag)
 			testsUtils.InstallLatestCNPGOperator(mostRecentTag, env)
+			DeferCleanup(cleanupOperatorAndMinio)
 
 			upgradeNamespace := assertCreateNamespace(upgradeNamespacePrefix)
-			DeferCleanup(cleanupNamespace, upgradeNamespace)
 			assertClustersWorkAfterOperatorUpgrade(upgradeNamespace, currentOperatorManifest)
-			assertManagerRollout()
 		})
 	})
 
@@ -681,10 +743,9 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 
 			GinkgoWriter.Printf("installing the current operator %s\n", currentOperatorManifest)
 			deployOperator(currentOperatorManifest)
+			DeferCleanup(cleanupOperatorAndMinio)
 
 			upgradeNamespace := assertCreateNamespace(upgradeNamespacePrefix)
-			DeferCleanup(cleanupNamespace, upgradeNamespace)
-
 			assertClustersWorkAfterOperatorUpgrade(upgradeNamespace, primeOperatorManifest)
 		})
 
@@ -695,10 +756,9 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			})
 			GinkgoWriter.Printf("installing the current operator %s\n", currentOperatorManifest)
 			deployOperator(currentOperatorManifest)
+			DeferCleanup(cleanupOperatorAndMinio)
 
 			upgradeNamespace := assertCreateNamespace(upgradeNamespacePrefix)
-			DeferCleanup(cleanupNamespace, upgradeNamespace)
-
 			assertClustersWorkAfterOperatorUpgrade(upgradeNamespace, primeOperatorManifest)
 		})
 	})

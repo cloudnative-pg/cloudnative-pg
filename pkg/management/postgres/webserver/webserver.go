@@ -24,7 +24,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/machinery/pkg/log"
 )
 
 const (
@@ -98,7 +98,7 @@ func (ws *Webserver) Start(ctx context.Context) error {
 	// we exit with error code, potentially we could do a retry logic, but rarely a webserver that doesn't start will run
 	// on subsequent tries
 	case err := <-errChan:
-		if errors.Is(http.ErrServerClosed, err) {
+		if errors.Is(err, http.ErrServerClosed) {
 			log.Error(err, "Closing the web server", "address", ws.server.Addr)
 		} else {
 			log.Error(err, "Error while running the web server", "address", ws.server.Addr)

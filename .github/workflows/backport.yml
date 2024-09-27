@@ -9,7 +9,7 @@ on:
       - main
 
 env:
-  GOLANG_VERSION: "1.22.x"
+  GOLANG_VERSION: "1.23.x"
 
 jobs:
   # Label the source pull request with 'backport-requested' and all supported releases label, the goal is, by default
@@ -33,6 +33,7 @@ jobs:
             backport-requested :arrow_backward:
             release-1.22
             release-1.23
+            release-1.24
       -
         name: Create comment
         uses: peter-evans/create-or-update-comment@v4
@@ -56,6 +57,7 @@ jobs:
             backport-requested :arrow_backward:
             release-1.22
             release-1.23
+            release-1.24
 
   ## backport pull request in condition when pr contains 'backport-requested' label and contains target branches labels
   back-porting-pr:
@@ -71,7 +73,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        branch: [release-1.22, release-1.23]
+        branch: [release-1.22, release-1.23, release-1.24]
     env:
       PR: ${{ github.event.pull_request.number }}
     outputs:

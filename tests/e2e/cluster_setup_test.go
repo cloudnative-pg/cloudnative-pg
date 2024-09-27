@@ -17,9 +17,7 @@ limitations under the License.
 package e2e
 
 import (
-	"bytes"
 	"fmt"
-	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -53,38 +51,10 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 		var err error
 
 		// Create a cluster in a namespace we'll delete after the test
-		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-			return env.DeleteNamespace(namespace)
-		})
 
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
-		cluster, err := env.GetCluster(namespace, clusterName)
-		Expect(err).ToNot(HaveOccurred())
-
-		var buf bytes.Buffer
-		GinkgoWriter.Println("Putting Tail on the cluster logs")
-		go func() {
-			err = env.TailClusterLogs(cluster, &buf, false)
-			if err != nil {
-				_, _ = fmt.Fprintf(GinkgoWriter, "\nError tailing cluster logs: %v\n", err)
-			}
-		}()
-		DeferCleanup(func(_ SpecContext) {
-			if CurrentSpecReport().Failed() {
-				specName := CurrentSpecReport().FullText()
-				capLines := 10
-				GinkgoWriter.Printf("DUMPING tailed Cluster Logs with error/warning (at most %v lines). Failed Spec: %v\n",
-					capLines, specName)
-				GinkgoWriter.Println("================================================================================")
-				saveLogs(&buf, "cluster_logs_", strings.ReplaceAll(specName, " ", "_"), GinkgoWriter, capLines)
-				GinkgoWriter.Println("================================================================================")
-			}
-		})
 
 		By("having three PostgreSQL pods with status ready", func() {
 			podList, err := env.GetClusterPodList(namespace, clusterName)
@@ -167,14 +137,8 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 		const namespacePrefix = "cluster-conditions"
 
 		var err error
-		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-			return env.DeleteNamespace(namespace)
-		})
 
 		By(fmt.Sprintf("having a %v namespace", namespace), func() {
 			// Creating a namespace should be quick

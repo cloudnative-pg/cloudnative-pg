@@ -8,7 +8,7 @@ on:
       - v*
 
 env:
-  GOLANG_VERSION: "1.22.x"
+  GOLANG_VERSION: "1.23.x"
   CNPG_IMAGE_NAME: "ghcr.io/${{ github.repository }}"
 
 permissions:
@@ -140,15 +140,18 @@ jobs:
           passphrase: ${{ secrets.GPG_PASSPHRASE }}
       -
         name: Set GoReleaser environment
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
         run: |
           echo GOPATH=$(go env GOPATH) >> $GITHUB_ENV
           echo PWD=$(pwd) >> $GITHUB_ENV
+          echo "$GPG_PRIVATE_KEY" > gpg_signing_key.asc
       -
         name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
-          version: latest
+          version: v2
           args: release --clean --timeout 60m
         env:
           DATE: ${{ env.DATE }}
@@ -156,6 +159,7 @@ jobs:
           VERSION: ${{ steps.build-meta.outputs.version }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
+          NFPM_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
       -
         name: Publish Krew
         if: |
@@ -351,7 +355,7 @@ jobs:
           rm -fr cloudnative-pg-catalog.yaml bundle.Dockerfile *.zip bundle/
 
       - name: Create Remote Pull Request
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ secrets.REPO_GHA_PAT }}
           commit-message: "operator cloudnative-pg (${{ env.VERSION }})"

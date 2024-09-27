@@ -54,11 +54,6 @@ var _ = Describe("Config support", Serial, Ordered, Label(tests.LabelDisruptive,
 
 		operatorNamespace = operatorDeployment.GetNamespace()
 	})
-	JustAfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-		}
-	})
 
 	AfterAll(func() {
 		if CurrentSpecReport().State.Is(types.SpecStateSkipped) {
@@ -119,11 +114,8 @@ var _ = Describe("Config support", Serial, Ordered, Label(tests.LabelDisruptive,
 
 	It("creates a cluster", func() {
 		var err error
-		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			return env.DeleteNamespace(namespace)
-		})
 
 		AssertCreateCluster(namespace, clusterName, clusterWithInheritedLabelsFile, env)
 	})
@@ -175,6 +167,9 @@ var _ = Describe("Config support", Serial, Ordered, Label(tests.LabelDisruptive,
 	// Setting MONITORING_QUERIES_CONFIGMAP: "" should disable monitoring
 	// queries on new cluster. We expect those metrics to be missing.
 	It("verify metrics details when updated default monitoring configMap queries parameter is set to be empty", func() {
-		collectAndAssertDefaultMetricsPresentOnEachPod(namespace, clusterName, false)
+		cluster, err := env.GetCluster(namespace, clusterName)
+		Expect(err).NotTo(HaveOccurred())
+
+		collectAndAssertDefaultMetricsPresentOnEachPod(namespace, clusterName, cluster.IsMetricsTLSEnabled(), false)
 	})
 })

@@ -266,7 +266,6 @@ func (r pgTablespaceCalculator) GetName(instanceName string) string {
 func (r pgTablespaceCalculator) GetStorageConfiguration(cluster *apiv1.Cluster) (apiv1.StorageConfiguration, error) {
 	var storageConfiguration *apiv1.StorageConfiguration
 	for _, tbsConfig := range cluster.Spec.Tablespaces {
-		tbsConfig := tbsConfig
 		if tbsConfig.Name == r.tablespaceName {
 			storageConfiguration = &tbsConfig.Storage
 			break

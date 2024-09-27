@@ -28,25 +28,27 @@ import (
 	"os/exec"
 	"path"
 
+	"github.com/cloudnative-pg/machinery/pkg/execlog"
+	"github.com/cloudnative-pg/machinery/pkg/fileutils"
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/concurrency"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/readiness"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/upgrade"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 type remoteWebserverEndpoints struct {
-	typedClient   client.Client
-	instance      *postgres.Instance
-	currentBackup *backupConnection
+	typedClient      client.Client
+	instance         *postgres.Instance
+	currentBackup    *backupConnection
+	readinessChecker *readiness.Data
 }
 
 // StartBackupRequest the required data to execute the pg_start_backup
@@ -79,8 +81,9 @@ func NewRemoteWebServer(
 	}
 
 	endpoints := remoteWebserverEndpoints{
-		typedClient: typedClient,
-		instance:    instance,
+		typedClient:      typedClient,
+		instance:         instance,
+		readinessChecker: readiness.ForInstance(instance),
 	}
 
 	serveMux := http.NewServeMux()
@@ -133,8 +136,8 @@ func (ws *remoteWebserverEndpoints) isServerHealthy(w http.ResponseWriter, _ *ht
 }
 
 // This is the readiness probe
-func (ws *remoteWebserverEndpoints) isServerReady(w http.ResponseWriter, _ *http.Request) {
-	if err := ws.instance.IsServerReady(); err != nil {
+func (ws *remoteWebserverEndpoints) isServerReady(w http.ResponseWriter, r *http.Request) {
+	if err := ws.readinessChecker.IsServerReady(r.Context()); err != nil {
 		log.Debug("Readiness probe failing", "err", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

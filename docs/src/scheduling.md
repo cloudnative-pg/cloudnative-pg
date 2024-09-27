@@ -18,22 +18,40 @@ section in the definition of the cluster, which supports:
 - node selectors
 - tolerations
 
-!!! Info
-    CloudNativePG does not support pod templates for finer control
-    on the scheduling of workloads. While they were part of the initial concept,
-    the development team decided to postpone their introduction in a newer
-    version of the API (most likely v2 of CNPG).
+## Pod Affinity and Anti-Affinity
 
-## Pod affinity and anti-affinity
+Kubernetes provides mechanisms to control where pods are scheduled using
+*affinity* and *anti-affinity* rules. These rules allow you to specify whether
+a pod should be scheduled on particular nodes (*affinity*) or avoided on
+specific nodes (*anti-affinity*) based on the workloads already running there.
+This capability is technically referred to as **inter-pod
+affinity/anti-affinity**.
 
-Kubernetes allows you to control which nodes a pod should (*affinity*) or
-should not (*anti-affinity*) be scheduled, based on the actual workloads already
-running in those nodes.
-This is technically known as **inter-pod affinity/anti-affinity**.
+By default, CloudNativePG configures cluster instances to preferably be
+scheduled on different nodes, while `pgBouncer` instances might still run on
+the same nodes.
 
-CloudNativePG by default will configure the cluster's instances
-preferably on different nodes, while pgBouncer may still run on the same nodes,
-resulting in the following `affinity` definition:
+For example, given the following `Cluster` specification:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example
+spec:
+  instances: 3
+  imageName: ghcr.io/cloudnative-pg/postgresql:16.4
+
+  affinity:
+    enablePodAntiAffinity: true # Default value
+    topologyKey: kubernetes.io/hostname # Default value
+    podAntiAffinityType: preferred # Default value
+
+  storage:
+    size: 1Gi
+```
+
+The `affinity` configuration applied in the instance pods will be:
 
 ```yaml
 affinity:
@@ -54,64 +72,51 @@ affinity:
         weight: 100
 ```
 
-As a result of the following Cluster spec:
+With this setup, Kubernetes will *prefer* to schedule a 3-node PostgreSQL
+cluster across three different nodes, assuming sufficient resources are
+available.
 
-```yaml
-apiVersion: postgresql.cnpg.io/v1
-kind: Cluster
-metadata:
-  name: cluster-example
-spec:
-  instances: 3
-  imageName: ghcr.io/cloudnative-pg/postgresql:16.3
+### Requiring Pod Anti-Affinity
 
-  affinity:
-    enablePodAntiAffinity: true #default value
-    topologyKey: kubernetes.io/hostname #defaul value
-    podAntiAffinityType: preferred #default value
+You can modify the default behavior by adjusting the settings mentioned above.
 
-  storage:
-    size: 1Gi
-```
+For example, setting `podAntiAffinityType` to `required` will enforce
+`requiredDuringSchedulingIgnoredDuringExecution` instead of
+`preferredDuringSchedulingIgnoredDuringExecution`.
 
-Therefore, Kubernetes will *prefer* to schedule a 3-node PostgreSQL cluster over 3
-different nodes - resources permitting.
+However, be aware that this strict requirement may cause pods to remain pending
+if resources are insufficient—this is particularly relevant when using [Cluster Autoscaler](https://github.com/kubernetes/autoscaler/tree/master/cluster-autoscaler) <!-- wokeignore:rule=master -->
+for automated horizontal scaling in a Kubernetes cluster.
 
-The aforementioned default behavior can be changed by tweaking the above settings.
+!!! Seealso "Inter-pod Affinity and Anti-Affinity"
+    For more details, refer to the [Kubernetes documentation](https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#inter-pod-affinity-and-anti-affinity).
 
-`podAntiAffinityType` can be set to `required`: resulting in
-`requiredDuringSchedulingIgnoredDuringExecution` being used instead of
-`preferredDuringSchedulingIgnoredDuringExecution`. Please, be aware that such a
-strong requirement might result in pending instances in case resources are not
-available (which is an expected condition when using
-[Cluster Autoscaler](https://github.com/kubernetes/autoscaler/tree/master/cluster-autoscaler) <!-- wokeignore:rule=master -->
-for automated horizontal scaling of a Kubernetes cluster).
+### Topology Considerations
 
-!!! Seealso "Inter-pod affinity and anti-affinity"
-    More information on this topic is in the
-    [Kubernetes documentation](https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#inter-pod-affinity-and-anti-affinity).
+In cloud environments, you might consider using `topology.kubernetes.io/zone`
+as the `topologyKey` to ensure pods are distributed across different
+availability zones rather than just nodes. For more options, see
+[Well-Known Labels, Annotations, and Taints](https://kubernetes.io/docs/reference/labels-annotations-taints/).
 
-Another possible value for `topologyKey` in a cloud environment can be
-`topology.kubernetes.io/zone`, to be sure pods will be spread across
-availability zones and not just nodes.  Please refer to
-["Well-Known Labels, Annotations and Taints"](https://kubernetes.io/docs/reference/labels-annotations-taints/)
-for more options.
+### Disabling Anti-Affinity Policies
 
-You can disable the operator's generated anti-affinity policies by setting
-`enablePodAntiAffinity` to false.
+If needed, you can disable the operator-generated anti-affinity policies by
+setting `enablePodAntiAffinity` to `false`.
 
-Additionally, in case a more fine-grained control is needed, you can specify a
-list of custom pod affinity or anti-affinity rules via the
-`additionalPodAffinity` and `additionalPodAntiAffinity` configuration
-attributes. These rules will be added to the ones generated by the operator,
-if enabled, or passed transparently otherwise.
+### Fine-Grained Control with Custom Rules
+
+For scenarios requiring more precise control, you can specify custom pod
+affinity or anti-affinity rules using the `additionalPodAffinity` and
+`additionalPodAntiAffinity` configuration attributes. These custom rules will
+be added to those generated by the operator, if enabled, or used directly if
+the operator-generated rules are disabled.
 
 !!! Note
-    You have to pass to `additionalPodAntiAffinity` or `additionalPodAffinity`
-    the whole content of `podAntiAffinity` or `podAffinity` that is expected by the
-    Pod spec (please look at the following YAML as an example of having only one
-    instance of PostgreSQL running on every worker node, regardless of which
-    PostgreSQL cluster they belong to).
+    When using `additionalPodAntiAffinity` or `additionalPodAffinity`, you must
+    provide the full `podAntiAffinity` or `podAffinity` structure expected by the
+    Pod specification. The following YAML example demonstrates how to configure
+    only one instance of PostgreSQL per worker node, regardless of which PostgreSQL
+    cluster it belongs to:
 
 ```yaml
     additionalPodAntiAffinity:
@@ -150,3 +155,50 @@ for tolerations.
 !!! Seealso "Taints and Tolerations"
     More information on taints and tolerations can be found in the
     [Kubernetes documentation](https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/).
+
+## Isolating PostgreSQL workloads
+
+!!! Important
+    Before proceeding, please ensure you have read the
+    ["Architecture"](architecture.md) section of the documentation.
+
+While you can deploy PostgreSQL on Kubernetes in various ways, we recommend
+following these essential principles for production environments:
+
+- **Exploit Availability Zones:** If possible, take advantage of availability
+  zones (AZs) within the same Kubernetes cluster by distributing PostgreSQL
+  instances across different AZs.
+- **Dedicate Worker Nodes:** Allocate specific worker nodes for PostgreSQL
+  workloads through the `node-role.kubernetes.io/postgres` label and taint,
+  as detailed in the [Reserving Nodes for PostgreSQL Workloads](architecture.md#reserving-nodes-for-postgresql-workloads)
+  section.
+- **Avoid Node Overlap:** Ensure that no instances from the same PostgreSQL
+  cluster are running on the same node.
+
+As explained in greater detail in the previous sections, CloudNativePG
+provides the flexibility to configure pod anti-affinity, node selectors, and
+tolerations.
+
+Below is a sample configuration to ensure that a PostgreSQL `Cluster` is
+deployed on `postgres` nodes, with its instances distributed across different
+nodes:
+
+```yaml
+  # <snip>
+  affinity:
+    enablePodAntiAffinity: true
+    topologyKey: kubernetes.io/hostname
+    podAntiAffinityType: required
+    nodeSelector:
+      node-role.kubernetes.io/postgres: ""
+    tolerations:
+    - key: node-role.kubernetes.io/postgres
+      operator: Exists
+      effect: NoSchedule
+  # <snip>
+```
+
+Despite its simplicity, this setup ensures optimal distribution and isolation
+of PostgreSQL workloads, leading to enhanced performance and reliability in
+your production environment.
+

@@ -50,7 +50,6 @@ var _ = Describe("Fast switchover", Serial, Label(tests.LabelPerformance, tests.
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 	})
-
 	// Confirm that a standby closely following the primary doesn't need more
 	// than maxSwitchoverTime seconds to be promoted and be able to start
 	// inserting records. We then expect the old primary to be back in
@@ -63,14 +62,8 @@ var _ = Describe("Fast switchover", Serial, Label(tests.LabelPerformance, tests.
 			// Create a cluster in a namespace we'll delete after the test
 			const namespacePrefix = "primary-switchover-time"
 			var err error
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				if CurrentSpecReport().Failed() {
-					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-				}
-				return env.DeleteNamespace(namespace)
-			})
 			assertFastSwitchover(namespace, sampleFileWithoutReplicationSlots, clusterName, webTestFile, webTestJob)
 		})
 	})
@@ -79,14 +72,8 @@ var _ = Describe("Fast switchover", Serial, Label(tests.LabelPerformance, tests.
 			// Create a cluster in a namespace we'll delete after the test
 			const namespacePrefix = "primary-switchover-time-with-slots"
 			var err error
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				if CurrentSpecReport().Failed() {
-					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-				}
-				return env.DeleteNamespace(namespace)
-			})
 			assertFastSwitchover(namespace, sampleFileWithReplicationSlots, clusterName, webTestFile, webTestJob)
 			AssertClusterHAReplicationSlots(namespace, clusterName)
 		})

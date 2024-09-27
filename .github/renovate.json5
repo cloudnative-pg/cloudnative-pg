@@ -8,7 +8,7 @@
   "prConcurrentLimit": 5,
 // The branches renovate should target
 // PLEASE UPDATE THIS WHEN RELEASING.
-  "baseBranches": ["main","release-1.22", "release-1.23"],
+  "baseBranches": ["main","release-1.22", "release-1.23", "release-1.24"],
   "ignorePaths": ["docs/**", "releases/**", "contribute/**", "licenses/**", "pkg/versions/**"],
   "postUpdateOptions": ["gomodTidy"],
   "semanticCommits": "enabled",
@@ -260,7 +260,25 @@
       "datasourceTemplate": "github-releases",
       "depNameTemplate": "golangci/golangci-lint",
       "versioningTemplate": "loose",
-      "extractVersionTemplate": "^v(?<version>\\d+\\.\\d+)"
+      "extractVersionTemplate": "^v(?<version>\\d+\\.\\d+\\.\\d+)"
+    }, {
+      "fileMatch": ["^.github/workflows/continuous-delivery.yml",],
+      "matchStrings": [
+        "VELERO_VERSION: \"v(?<currentValue>.*?)\"",
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "vmware-tanzu/velero",
+      "versioningTemplate": "loose",
+      "extractVersionTemplate": "^(?<version>v\\d+\\.\\d+\\.\\d+)"
+    }, {
+      "fileMatch": ["^.github/workflows/continuous-delivery.yml",],
+      "matchStrings": [
+        "VELERO_AWS_PLUGIN_VERSION: \"v(?<currentValue>.*?)\"",
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "vmware-tanzu/velero-plugin-for-aws",
+      "versioningTemplate": "loose",
+      "extractVersionTemplate": "^(?<version>v\\d+\\.\\d+\\.\\d+)"
     }
   ],
   "packageRules": [
@@ -377,6 +395,14 @@
       ],
       "separateMajorMinor": "false",
       "pinDigests": false
+    }, {
+// PR group for backup test tools
+      "groupName": "backup test tools",
+      "matchPackagePrefixes": [
+        "vmware-tanzu",
+      ],
+      "separateMajorMinor": "false",
+      "pinDigests": false
     },
     {
 // PR group for all the operator framework related things
@@ -384,7 +410,7 @@
       "matchPackagePrefixes": [
         "operator-framework",
         "redhat-openshift-ecosystem",
-	"quay.io/operator-framework",
+        "quay.io/operator-framework",
       ],
       "separateMajorMinor": "false",
       "pinDigests": false

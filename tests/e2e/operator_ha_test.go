@@ -68,14 +68,8 @@ var _ = Describe("Operator High Availability", Serial,
 			Expect(err).ToNot(HaveOccurred())
 
 			// Create the cluster namespace
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				if CurrentSpecReport().Failed() {
-					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-				}
-				return env.DeleteNamespace(namespace)
-			})
 
 			// Create Cluster
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)

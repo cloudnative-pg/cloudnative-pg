@@ -40,17 +40,12 @@ var _ = Describe("Fencing", Label(tests.LabelPlugin), func() {
 		sampleFile = fixturesDir + "/base/cluster-storage-class.yaml.template"
 		level      = tests.Medium
 	)
-	BeforeEach(func() {
-		if testLevelEnv.Depth < int(level) {
-			Skip("Test depth is lower than the amount requested for this test")
-		}
-	})
 	var namespace, clusterName string
 	var pod corev1.Pod
 
-	JustAfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+	BeforeEach(func() {
+		if testLevelEnv.Depth < int(level) {
+			Skip("Test depth is lower than the amount requested for this test")
 		}
 	})
 
@@ -253,13 +248,11 @@ var _ = Describe("Fencing", Label(tests.LabelPlugin), func() {
 			clusterName, err = env.GetResourceNameFromYAML(sampleFile)
 			Expect(err).ToNot(HaveOccurred())
 			// Create a cluster in a namespace we'll delete after the test
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.DeleteNamespace(namespace)
-			})
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 		})
+
 		assertFencingPrimaryWorks(testUtils.UsingPlugin)
 		assertFencingFollowerWorks(testUtils.UsingPlugin)
 		assertFencingClusterWorks(testUtils.UsingPlugin)
@@ -272,13 +265,11 @@ var _ = Describe("Fencing", Label(tests.LabelPlugin), func() {
 			clusterName, err = env.GetResourceNameFromYAML(sampleFile)
 			Expect(err).ToNot(HaveOccurred())
 			// Create a cluster in a namespace we'll delete after the test
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.DeleteNamespace(namespace)
-			})
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 		})
+
 		assertFencingPrimaryWorks(testUtils.UsingAnnotation)
 		assertFencingFollowerWorks(testUtils.UsingAnnotation)
 		assertFencingClusterWorks(testUtils.UsingAnnotation)

@@ -44,14 +44,8 @@ var _ = Describe("E2E Affinity", Serial, Label(tests.LabelPodScheduling), func()
 	})
 
 	It("can create a cluster and a pooler with required affinity", func() {
-		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-			return env.DeleteNamespace(namespace)
-		})
 
 		AssertCreateCluster(namespace, clusterName, clusterFile, env)
 		createAndAssertPgBouncerPoolerIsSetUp(namespace, poolerFile, 3)

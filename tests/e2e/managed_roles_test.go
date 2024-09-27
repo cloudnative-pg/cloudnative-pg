@@ -39,7 +39,7 @@ import (
 
 // - spinning up a cluster with some post-init-sql query and verifying that they are really executed
 
-// Set of tests in which we check that the initdb options are really applied
+// Set of tests in which we exercise managed roles
 var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic), func() {
 	const (
 		clusterManifest = fixturesDir + "/managed_roles/cluster-managed-roles.yaml.template"
@@ -66,20 +66,12 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 		)
 		var clusterName, secretName, namespace string
 		var secretNameSpacedName *types.NamespacedName
-		JustAfterEach(func() {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-		})
 
 		BeforeAll(func() {
 			var err error
 			// Create a cluster in a namespace we'll delete after the test
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.DeleteNamespace(namespace)
-			})
 
 			clusterName, err = env.GetResourceNameFromYAML(clusterManifest)
 			Expect(err).ToNot(HaveOccurred())

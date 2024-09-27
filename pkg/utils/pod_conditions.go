@@ -17,26 +17,11 @@ limitations under the License.
 package utils
 
 import (
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	corev1 "k8s.io/api/core/v1"
-
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
 var utilsLog = log.WithName("utils")
-
-// PodStatus represent the possible status of pods
-type PodStatus string
-
-const (
-	// PodHealthy means that a Pod is active and ready
-	PodHealthy = "healthy"
-
-	// PodReplicating means that a Pod is still not ready but still active
-	PodReplicating = "replicating"
-
-	// PodFailed means that a Pod will not be scheduled again (deleted or evicted)
-	PodFailed = "failed"
-)
 
 // IsPodReady check if a Pod is ready or not
 func IsPodReady(pod corev1.Pod) bool {
@@ -117,25 +102,4 @@ func CountReadyPods(podList []corev1.Pod) int {
 		}
 	}
 	return readyPods
-}
-
-// ListStatusPods return a list of active Pods
-func ListStatusPods(podList []corev1.Pod) map[PodStatus][]string {
-	podsNames := make(map[PodStatus][]string)
-
-	for _, pod := range podList {
-		if !pod.DeletionTimestamp.IsZero() {
-			continue
-		}
-		switch {
-		case IsPodReady(pod):
-			podsNames[PodHealthy] = append(podsNames[PodHealthy], pod.Name)
-		case IsPodActive(pod):
-			podsNames[PodReplicating] = append(podsNames[PodReplicating], pod.Name)
-		default:
-			podsNames[PodFailed] = append(podsNames[PodFailed], pod.Name)
-		}
-	}
-
-	return podsNames
 }

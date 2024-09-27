@@ -24,13 +24,13 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/cache"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
 )
@@ -42,20 +42,15 @@ type localWebserverEndpoints struct {
 }
 
 // NewLocalWebServer returns a webserver that allows connection only from localhost
-func NewLocalWebServer(instance *postgres.Instance) (*Webserver, error) {
-	typedClient, err := management.NewControllerRuntimeClient()
-	if err != nil {
-		return nil, fmt.Errorf("creating controller-runtine client: %v", err)
-	}
-	eventRecorder, err := management.NewEventRecorder()
-	if err != nil {
-		return nil, fmt.Errorf("creating kubernetes event recorder: %v", err)
-	}
-
+func NewLocalWebServer(
+	instance *postgres.Instance,
+	cli client.Client,
+	recorder record.EventRecorder,
+) (*Webserver, error) {
 	endpoints := localWebserverEndpoints{
-		typedClient:   typedClient,
+		typedClient:   cli,
 		instance:      instance,
-		eventRecorder: eventRecorder,
+		eventRecorder: recorder,
 	}
 
 	serveMux := http.NewServeMux()
@@ -83,19 +78,24 @@ func (ws *localWebserverEndpoints) serveCache(w http.ResponseWriter, r *http.Req
 	var js []byte
 	switch requestedObject {
 	case cache.ClusterKey:
-		response, err := cache.LoadClusterUnsafe()
-		if errors.Is(err, cache.ErrCacheMiss) {
+		var cluster apiv1.Cluster
+		err := ws.typedClient.Get(
+			r.Context(),
+			client.ObjectKey{Name: ws.instance.ClusterName, Namespace: ws.instance.Namespace},
+			&cluster,
+		)
+		if apierrs.IsNotFound(err) {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		} else if err != nil {
-			log.Error(err, "while loading cached cluster")
+			log.Error(err, "while loading cluster")
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 
-		js, err = json.Marshal(response)
+		js, err = json.Marshal(&cluster)
 		if err != nil {
-			log.Error(err, "while unmarshalling cached cluster")
+			log.Error(err, "while marshalling the cluster")
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -112,7 +112,7 @@ func (ws *localWebserverEndpoints) serveCache(w http.ResponseWriter, r *http.Req
 
 		js, err = json.Marshal(response)
 		if err != nil {
-			log.Error(err, "while unmarshalling cached env")
+			log.Error(err, "while marshalling cached env")
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}

@@ -21,9 +21,9 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
+
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // legacySynchronousStandbyNames sets the standby node list with the
@@ -52,7 +52,7 @@ func getSyncReplicasData(cluster *apiv1.Cluster) (syncReplicas int, electableSyn
 	// We start with the number of healthy replicas (healthy pods minus one)
 	// and verify it is greater than 0 and between minSyncReplicas and maxSyncReplicas.
 	// Formula: 1 <= minSyncReplicas <= SyncReplicas <= maxSyncReplicas < readyReplicas
-	readyReplicas := len(cluster.Status.InstancesStatus[utils.PodHealthy]) - 1
+	readyReplicas := len(cluster.Status.InstancesStatus[apiv1.PodHealthy]) - 1
 
 	// If the number of ready replicas is negative,
 	// there are no healthy Pods so no sync replica can be configured
@@ -147,7 +147,7 @@ func getElectableSyncReplicas(cluster *apiv1.Cluster) []string {
 
 func getSortedNonPrimaryInstanceNames(cluster *apiv1.Cluster) []string {
 	var nonPrimaryInstances []string
-	for _, instance := range cluster.Status.InstancesStatus[utils.PodHealthy] {
+	for _, instance := range cluster.Status.InstancesStatus[apiv1.PodHealthy] {
 		if cluster.Status.CurrentPrimary != instance {
 			nonPrimaryInstances = append(nonPrimaryInstances, instance)
 		}

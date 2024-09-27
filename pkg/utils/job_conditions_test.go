@@ -40,11 +40,4 @@ var _ = Describe("Job conditions", func() {
 		Expect(JobHasOneCompletion(nonCompleteJob)).To(BeFalse())
 		Expect(JobHasOneCompletion(completeJob)).To(BeTrue())
 	})
-
-	It("can count the number of complete jobs", func() {
-		Expect(CountJobsWithOneCompletion([]batchv1.Job{nonCompleteJob, completeJob})).To(Equal(1))
-		Expect(CountJobsWithOneCompletion([]batchv1.Job{nonCompleteJob})).To(Equal(0))
-		Expect(CountJobsWithOneCompletion([]batchv1.Job{completeJob})).To(Equal(1))
-		Expect(CountJobsWithOneCompletion([]batchv1.Job{})).To(Equal(0))
-	})
 })

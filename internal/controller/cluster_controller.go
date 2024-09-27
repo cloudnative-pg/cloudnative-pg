@@ -24,6 +24,7 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
@@ -46,8 +47,8 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/operatorclient"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
+	rolloutManager "github.com/cloudnative-pg/cloudnative-pg/internal/controller/rollout"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/hibernation"
 	instanceReconciler "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/instance"
@@ -78,6 +79,8 @@ type ClusterReconciler struct {
 	Recorder        record.EventRecorder
 	InstanceClient  instance.Client
 	Plugins         repository.Interface
+
+	rolloutManager *rolloutManager.Manager
 }
 
 // NewClusterReconciler creates a new ClusterReconciler initializing it
@@ -93,6 +96,10 @@ func NewClusterReconciler(
 		Scheme:          mgr.GetScheme(),
 		Recorder:        mgr.GetEventRecorderFor("cloudnative-pg"),
 		Plugins:         plugins,
+		rolloutManager: rolloutManager.New(
+			configuration.Current.GetClustersRolloutDelay(),
+			configuration.Current.GetInstancesRolloutDelay(),
+		),
 	}
 }
 
@@ -154,7 +161,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	ctx = cluster.SetInContext(ctx)
 
 	// Load the required plugins
-	pluginClient, err := cnpgiClient.WithPlugins(ctx, r.Plugins, cluster.Spec.Plugins.GetNames()...)
+	pluginClient, err := cnpgiClient.WithPlugins(ctx, r.Plugins, cluster.Spec.Plugins.GetEnabledPluginNames()...)
 	if err != nil {
 		var errUnknownPlugin *repository.ErrUnknownPlugin
 		if errors.As(err, &errUnknownPlugin) {
@@ -164,7 +171,9 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 					ctx,
 					cluster,
 					apiv1.PhaseUnknownPlugin,
-					fmt.Sprintf("Unknown plugin %s", errUnknownPlugin.Name),
+					fmt.Sprintf("Unknown plugin: '%s'. "+
+						"This may be caused by the plugin not being loaded correctly by the operator. "+
+						"Check the operator and plugin logs for errors", errUnknownPlugin.Name),
 				)
 		}
 
@@ -457,8 +466,12 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	}
 
 	// Calls post-reconcile hooks
-	hookResult := postReconcilePluginHooks(ctx, cluster, cluster)
-	return hookResult.Result, hookResult.Err
+	if hookResult := postReconcilePluginHooks(ctx, cluster, cluster); hookResult.Err != nil ||
+		!hookResult.Result.IsZero() {
+		return hookResult.Result, hookResult.Err
+	}
+
+	return setStatusPluginHook(ctx, r.Client, getPluginClientFromContext(ctx), cluster)
 }
 
 func (r *ClusterReconciler) ensureNoFailoverOnFullDisk(
@@ -600,11 +613,13 @@ func (r *ClusterReconciler) reconcileResources(
 	resources *managedResources, instancesStatus postgres.PostgresqlStatusList,
 ) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
+	runningJobs := resources.runningJobNames()
 
 	// Act on Pods and PVCs only if there is nothing that is currently being created or deleted
-	if runningJobs := resources.countRunningJobs(); runningJobs > 0 {
-		contextLogger.Debug("A job is currently running. Waiting", "count", runningJobs)
-		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+
+	if len(runningJobs) > 0 {
+		contextLogger.Debug("A job is currently running. Waiting", "runningJobs", runningJobs)
+		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 	}
 
 	if result, err := r.deleteTerminatedPods(ctx, cluster, resources); err != nil {
@@ -621,28 +636,22 @@ func (r *ClusterReconciler) reconcileResources(
 		return *result, err
 	}
 
-	// TODO: move into a central waiting phase
-	// If we are joining a node, we should wait for the process to finish
-	if resources.countRunningJobs() > 0 {
-		contextLogger.Debug("Waiting for jobs to finish",
-			"clusterName", cluster.Name,
-			"namespace", cluster.Namespace,
-			"jobs", len(resources.jobs.Items))
-		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
-	}
-
 	if !resources.allInstancesAreActive() {
-		contextLogger.Debug("Instance pod not active. Retrying in one second.")
+		contextLogger = contextLogger.WithValues(
+			"inactiveInstances", resources.inactiveInstanceNames())
 
 		// Preserve phases that handle the in-place restart behaviour for the following reasons:
 		// 1. Technically: The Inplace phases help determine if a switchover is required.
 		// 2. Descriptive: They precisely describe the cluster's current state externally.
 		if cluster.IsInplaceRestartPhase() {
-			contextLogger.Debug("Cluster is in an in-place restart phase. Waiting...", "phase", cluster.Status.Phase)
+			contextLogger.Debug(
+				"Cluster is in an in-place restart phase. Waiting...",
+				"phase", cluster.Status.Phase,
+			)
 		} else {
 			// If not in an Inplace phase, notify that the reconciliation is halted due
 			// to an unready instance.
-			contextLogger.Debug("An instance is not ready. Pausing reconciliation...")
+			contextLogger.Debug("Instance pod not active. Retrying...")
 
 			// Register a phase indicating some instances aren't active yet
 			if err := r.RegisterPhase(
@@ -837,7 +846,9 @@ func (r *ClusterReconciler) reconcilePods(
 	// The user have chosen to wait for the missing nodes to come up
 	if !(cluster.IsNodeMaintenanceWindowInProgress() && cluster.IsReusePVCEnabled()) &&
 		instancesStatus.InstancesReportingStatus() < cluster.Status.Instances {
-		contextLogger.Debug("Waiting for Pods to be ready")
+		contextLogger.Debug(
+			"Waiting for Pods to be ready",
+			"podStatus", cluster.Status.InstancesStatus)
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
 	}
 
@@ -920,6 +931,21 @@ func (r *ClusterReconciler) handleRollingUpdate(
 				"not connected via streaming replication, waiting for 5 seconds",
 		)
 		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+	case errors.Is(err, errRolloutDelayed):
+		contextLogger.Warning(
+			"A Pod need to be rolled out, but the rollout is being delayed",
+		)
+		if err := r.RegisterPhase(
+			ctx,
+			cluster,
+			apiv1.PhaseUpgradeDelayed,
+			"The cluster need to be update, but the operator is configured to delay "+
+				"the operation",
+		); err != nil {
+			return ctrl.Result{}, err
+		}
+
+		return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
 	case err != nil:
 		return ctrl.Result{}, err
 	case done:
@@ -1322,15 +1348,20 @@ func (r *ClusterReconciler) markPVCReadyForCompletedJobs(
 
 	for _, job := range completeJobs {
 		for _, pvc := range resources.pvcs.Items {
-			pvc := pvc
 			if !persistentvolumeclaim.IsUsedByPodSpec(job.Spec.Template.Spec, pvc.Name) {
 				continue
 			}
 
-			roleName := job.Labels[utils.JobRoleLabelName]
-			contextLogger.Info("job has been finished, setting PVC as ready",
+			if pvc.Annotations[utils.PVCStatusAnnotationName] == persistentvolumeclaim.StatusReady {
+				continue
+			}
+
+			roleName := job.Spec.Template.Labels[utils.JobRoleLabelName]
+			contextLogger.Info(
+				"The job finished, setting PVC as ready",
 				"pvcName", pvc.Name,
 				"role", roleName,
+				"jobName", job.Name,
 			)
 
 			if err := r.setPVCStatusReady(ctx, &pvc); err != nil {

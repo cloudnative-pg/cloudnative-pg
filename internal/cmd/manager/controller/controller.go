@@ -25,6 +25,7 @@ import (
 	"net/http/pprof"
 	"time"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -40,7 +41,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/controller"
 	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/multicache"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -495,7 +495,7 @@ func startPprofDebugServer(ctx context.Context) {
 			}
 		}()
 
-		if err := pprofServer.ListenAndServe(); !errors.Is(http.ErrServerClosed, err) {
+		if err := pprofServer.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 			setupLog.Error(err, "Failed to start pprof HTTP server")
 		}
 	}()

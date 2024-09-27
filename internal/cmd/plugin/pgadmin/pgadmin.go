@@ -88,6 +88,7 @@ type command struct {
 	PgadminUsername string
 	PgadminPassword string
 	Mode            Mode
+	PgadminImage    string
 
 	dryRun bool
 }
@@ -97,6 +98,7 @@ func newCommand(
 	cluster *apiv1.Cluster,
 	mode Mode,
 	dryRun bool,
+	pgadminImage string,
 ) (*command, error) {
 	const defaultPgadminUsername = "user@pgadmin.com"
 
@@ -111,6 +113,7 @@ func newCommand(
 		ServiceName:                   fmt.Sprintf("%s-pgadmin4", clusterName),
 		SecretName:                    fmt.Sprintf("%s-pgadmin4", clusterName),
 		Mode:                          mode,
+		PgadminImage:                  pgadminImage,
 	}
 
 	pgadminPassword, err := password.Generate(32, 10, 0, false, true)
@@ -179,7 +182,6 @@ func (cmd *command) generateDeployment() *appsv1.Deployment {
 	const (
 		pgAdminCfgVolumeName      = "pgadmin-cfg"
 		pgAdminCfgVolumePath      = "/config"
-		pgAdminImage              = "dpage/pgadmin4:latest"
 		pgAdminPassFileVolumeName = "app-secret"
 		pgAdminPassFileVolumePath = "/secret"
 	)
@@ -214,7 +216,7 @@ func (cmd *command) generateDeployment() *appsv1.Deployment {
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Image: pgAdminImage,
+							Image: cmd.PgadminImage,
 							Name:  "pgadmin4",
 							Ports: []corev1.ContainerPort{
 								{

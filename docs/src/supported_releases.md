@@ -33,11 +33,12 @@ several additional tests and a thorough release qualification process. We
 release patch versions for issues found in supported minor releases.
 
 Before an official release, at least one Release Candidate (RC) is built for
-testing. Additional release candidates may be issued if new bugs are
-discovered. The Release Candidates are announced on the Slack channel to
-encourage community testing before the final release. The maintainers provide
-1-2 weeks for community testing, and if no objections are raised, the final
-release is announced.
+[preview testing](preview_version.md).
+Additional release candidates may be issued if new bugs are discovered.
+The Release Candidates are announced on the Slack channel to encourage
+community testing before the final release.
+The maintainers provide 1-2 weeks for community testing, and if no objections
+are raised, the final release is announced.
 
 Different types of releases represent varying levels of product quality and
 assistance from the CloudNativePG community. For details on the support
@@ -80,7 +81,8 @@ Git tags for versions are prefixed with `v`.
 
 | Version         | Currently supported  | Release date      | End of life         | Supported Kubernetes versions | Tested, but not supported | Supported Postgres versions |
 |-----------------|----------------------|-------------------|---------------------|-------------------------------|---------------------------|-----------------------------|
-| 1.23.x          | Yes                  | April 24, 2024    | ~ November, 2024    | 1.27, 1.28, 1.29              | 1.30                      | 12 - 16                     |
+| 1.24.x          | Yes                  | August 22, 2024   | ~ February, 2025    | 1.28, 1.29, 1.30, 1.31        | 1.27                      | 12 - 16                     |
+| 1.23.x          | Yes                  | April 24, 2024    | ~ November, 2024    | 1.27, 1.28, 1.29              | 1.30, 1.31                | 12 - 16                     |
 | main            | No, development only |                   |                     |                               |                           | 12 - 16                     |
 
 The list of supported Kubernetes versions in the table depends on what
@@ -101,7 +103,7 @@ See the PostgreSQL [Versioning Policy](https://www.postgresql.org/support/versio
 page for more information about supported versions.
 
 !!! Info
-    Starting from November 9, 2023, Postgres 11 is no longer supported.
+    Starting from November 14, 2024, [Postgres 12 is no longer supported](https://www.postgresql.org/about/news/postgresql-164-158-1413-1316-1220-and-17-beta-3-released-2910/).
 
 We also recommend that you regularly update your PostgreSQL operand images and
 use the latest minor release for the major version you have in use, as not upgrading
@@ -112,12 +114,14 @@ version of PostgreSQL, we might not be able to help you.
 
 | Version         | Release date          | End of life               |
 |-----------------|-----------------------|---------------------------|
-| 1.24.0          | August 22, 2024       | Feb/Mar, 2025             |
 | 1.25.0          | Nov/Dec, 2024         | May/Jun, 2025             |
 | 1.26.0          | Mar, 2025             | Aug/Sep, 2025             |
+| 1.27.0          | Jun, 2025             | Dec, 2025                 |
 
 !!! Note
-    Feature freeze happens one week before the release
+    Feature freeze occurs 1-2 weeks before the release, at which point a
+    release candidate version is built and distributed for testing, as described
+    earlier.
 
 !!! Important
     Dates in the future are uncertain and might change. This applies to Kubernetes versions, too.

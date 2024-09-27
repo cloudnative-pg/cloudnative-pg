@@ -65,14 +65,8 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 		clusterName, err := env.GetResourceNameFromYAML(clusterWithMinioSampleFile)
 		Expect(err).ToNot(HaveOccurred())
 
-		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-			return env.DeleteNamespace(namespace)
-		})
 
 		By("creating the credentials for minio", func() {
 			AssertStorageCredentialsAreCreated(namespace, "backup-storage-creds", "minio", "minio123")

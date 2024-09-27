@@ -19,15 +19,15 @@ package client
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"slices"
 
 	"github.com/cloudnative-pg/cnpg-i/pkg/operator"
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	jsonpatch "github.com/evanphx/json-patch/v5"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
 func (data *data) MutateCluster(ctx context.Context, object client.Object, mutatedObject client.Object) error {
@@ -90,6 +90,58 @@ func (data *data) MutateCluster(ctx context.Context, object client.Object, mutat
 	}
 
 	return nil
+}
+
+var (
+	errInvalidJSON        = errors.New("invalid json")
+	errSetStatusInCluster = errors.New("SetStatusInCluster invocation failed")
+)
+
+func (data *data) SetStatusInCluster(ctx context.Context, cluster client.Object) (map[string]string, error) {
+	contextLogger := log.FromContext(ctx)
+	serializedObject, err := json.Marshal(cluster)
+	if err != nil {
+		return nil, fmt.Errorf("while serializing %s %s/%s to JSON: %w",
+			cluster.GetObjectKind().GroupVersionKind().Kind,
+			cluster.GetNamespace(), cluster.GetName(),
+			err,
+		)
+	}
+
+	pluginStatuses := make(map[string]string)
+	for idx := range data.plugins {
+		plugin := data.plugins[idx]
+
+		if !slices.Contains(plugin.OperatorCapabilities(), operator.OperatorCapability_RPC_TYPE_SET_STATUS_IN_CLUSTER) {
+			continue
+		}
+
+		pluginLogger := contextLogger.WithValues("pluginName", plugin.Name())
+		request := operator.SetStatusInClusterRequest{
+			Cluster: serializedObject,
+		}
+
+		pluginLogger.Trace("Calling SetStatusInCluster endpoint")
+		response, err := plugin.OperatorClient().SetStatusInCluster(ctx, &request)
+		if err != nil {
+			pluginLogger.Error(err, "Error while calling SetStatusInCluster")
+			return nil, fmt.Errorf("%w: %w", errSetStatusInCluster, err)
+		}
+
+		if len(response.JsonStatus) == 0 {
+			contextLogger.Trace("json status is empty, skipping it", "pluginName", plugin.Name())
+			continue
+		}
+		if err := json.Unmarshal(response.JsonStatus, &map[string]interface{}{}); err != nil {
+			contextLogger.Error(err, "found a malformed json while evaluating SetStatusInCluster response",
+				"pluginName", plugin.Name())
+			return nil, fmt.Errorf("%w: %w", errInvalidJSON, err)
+		}
+
+		pluginStatuses[plugin.Name()] = string(response.JsonStatus)
+	}
+
+	return pluginStatuses, nil
 }
 
 func (data *data) ValidateClusterCreate(

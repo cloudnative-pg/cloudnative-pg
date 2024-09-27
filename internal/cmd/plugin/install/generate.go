@@ -48,19 +48,21 @@ type installationResource struct {
 }
 
 type generateExecutor struct {
-	ctx                  context.Context
-	watchNamespace       string
-	namespace            string
-	replicas             int32
-	userRequestedVersion string
-	postgresImage        string
-	logFieldLevel        string
-	logFieldTimestamp    string
+	ctx                    context.Context
+	watchNamespace         string
+	namespace              string
+	replicas               int32
+	userRequestedVersion   string
+	postgresImage          string
+	logFieldLevel          string
+	logFieldTimestamp      string
+	controlPlaneToleration bool
 }
 
 func newGenerateCmd() *cobra.Command {
 	var version, watchNamespaces, postgresImage, logFieldLevel, logFieldTimestamp string
 	var replicas int32
+	var controlPlaneToleration bool
 	cmd := &cobra.Command{
 		Use:   "generate",
 		Short: "generates the YAML manifests needed to install the CloudNativePG operator",
@@ -72,14 +74,15 @@ func newGenerateCmd() *cobra.Command {
 			}
 
 			command := generateExecutor{
-				ctx:                  cmd.Context(),
-				watchNamespace:       watchNamespaces,
-				namespace:            namespace,
-				replicas:             replicas,
-				userRequestedVersion: version,
-				postgresImage:        postgresImage,
-				logFieldLevel:        logFieldLevel,
-				logFieldTimestamp:    logFieldTimestamp,
+				ctx:                    cmd.Context(),
+				watchNamespace:         watchNamespaces,
+				namespace:              namespace,
+				replicas:               replicas,
+				userRequestedVersion:   version,
+				postgresImage:          postgresImage,
+				logFieldLevel:          logFieldLevel,
+				logFieldTimestamp:      logFieldTimestamp,
+				controlPlaneToleration: controlPlaneToleration,
 			}
 			return command.execute()
 		},
@@ -128,6 +131,13 @@ func newGenerateCmd() *cobra.Command {
 		"log-field-timestamp",
 		"ts",
 		"JSON log field to report timestamp in (default: ts)",
+	)
+
+	cmd.Flags().BoolVar(
+		&controlPlaneToleration,
+		"control-plane",
+		false,
+		"if true, the operator deployment will have a toleration and affinity for 'node-role.kubernetes.io/control-plane'",
 	)
 
 	return cmd
@@ -270,11 +280,38 @@ func (cmd *generateExecutor) reconcileOperatorDeployment(dep *appsv1.Deployment)
 
 	dep.Spec.Template.Spec.Containers[0].Args = args
 
-	if cmd.replicas == 0 {
-		return nil
+	if cmd.replicas != 0 {
+		dep.Spec.Replicas = &cmd.replicas
 	}
-	dep.Spec.Replicas = &cmd.replicas
 
+	if cmd.controlPlaneToleration {
+		if dep.Spec.Template.Spec.Affinity == nil {
+			dep.Spec.Template.Spec.Affinity = &corev1.Affinity{}
+		}
+		if dep.Spec.Template.Spec.Affinity.NodeAffinity == nil {
+			dep.Spec.Template.Spec.Affinity.NodeAffinity = &corev1.NodeAffinity{}
+		}
+		if dep.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil {
+			dep.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution = &corev1.NodeSelector{}
+		}
+
+		dep.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.
+			NodeSelectorTerms = append(
+			dep.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms,
+			corev1.NodeSelectorTerm{
+				MatchExpressions: []corev1.NodeSelectorRequirement{
+					{
+						Key:      "node-role.kubernetes.io/control-plane",
+						Operator: corev1.NodeSelectorOpExists,
+					},
+				},
+			},
+		)
+		dep.Spec.Template.Spec.Tolerations = append(dep.Spec.Template.Spec.Tolerations, corev1.Toleration{
+			Key:      "node-role.kubernetes.io/control-plane",
+			Operator: corev1.TolerationOpExists,
+		})
+	}
 	return nil
 }
 

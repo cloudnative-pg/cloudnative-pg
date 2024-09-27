@@ -24,11 +24,12 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/prometheus/client_golang/prometheus"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/cache"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	cacheClient "github.com/cloudnative-pg/cloudnative-pg/internal/management/cache/client"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	m "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/metrics"
 	postgresconf "github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
@@ -46,6 +47,10 @@ type Exporter struct {
 	instance *postgres.Instance
 	Metrics  *metrics
 	queries  *m.QueriesCollector
+	// this is used for two reasons:
+	// - to ensure we are able to unit test
+	// - to make the struct adhere to the composition pattern instead of hardcoding dependencies inside the functions
+	getCluster func() (*apiv1.Cluster, error)
 }
 
 // metrics here are related to the exporter itself, which is instrumented to
@@ -85,8 +90,9 @@ type PgStatWalMetrics struct {
 // NewExporter creates an exporter
 func NewExporter(instance *postgres.Instance) *Exporter {
 	return &Exporter{
-		instance: instance,
-		Metrics:  newMetrics(),
+		instance:   instance,
+		Metrics:    newMetrics(),
+		getCluster: cacheClient.GetCluster,
 	}
 }
 
@@ -430,7 +436,7 @@ func (e *Exporter) setTimestampMetric(
 	errorLabel string,
 	getTimestampFunc func(cluster *apiv1.Cluster) string,
 ) {
-	cluster, err := cache.LoadClusterUnsafe()
+	cluster, err := e.getCluster()
 	// there isn't a cached object yet
 	if errors.Is(err, cache.ErrCacheMiss) {
 		return
@@ -472,7 +478,7 @@ func (e *Exporter) setTimestampMetric(
 func (e *Exporter) collectNodesUsed() {
 	const notExtractedValue float64 = -1
 
-	cluster, err := cache.LoadClusterUnsafe()
+	cluster, err := e.getCluster()
 	if err != nil {
 		log.Error(err, "unable to collect metrics")
 		e.Metrics.Error.Set(1)

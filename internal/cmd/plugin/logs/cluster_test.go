@@ -58,11 +58,6 @@ var _ = Describe("Test the command", func() {
 		WithScheme(scheme.BuildWithAllKnownScheme()).
 		WithObjects(cluster).
 		Build()
-	It("should get the command help", func() {
-		cmd := clusterCmd()
-		// A panic happens when a tested function returns with os.Exit(0)
-		Expect(func() { _ = cmd.Execute() }).Should(Panic())
-	})
 
 	It("should not fail, with cluster name as argument", func() {
 		cmd := clusterCmd()

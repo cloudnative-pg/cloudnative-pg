@@ -142,6 +142,11 @@ func AssertSwitchoverWithHistory(
 		}, timeout).Should(BeTrue())
 	})
 
+	// After we finish the switchover, we should wait for the cluster to be ready
+	// otherwise, anyone executing this may not wait and also, the following part of the function
+	// may fail because the switchover hasn't properly finish yet.
+	AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReady], env)
+
 	if !isReplica {
 		By("confirming that the all postgres containers have *.history file after switchover", func() {
 			pods = []string{}
@@ -1442,7 +1447,7 @@ func AssertMetricsData(namespace, targetOne, targetTwo, targetSecret string, clu
 		Expect(err).ToNot(HaveOccurred())
 		for _, pod := range podList.Items {
 			podName := pod.GetName()
-			out, err := testsUtils.RetrieveMetricsFromInstance(env, namespace, podName)
+			out, err := testsUtils.RetrieveMetricsFromInstance(env, pod, cluster.IsMetricsTLSEnabled())
 			Expect(err).ToNot(HaveOccurred())
 			Expect(strings.Contains(out, fmt.Sprintf(`cnpg_some_query_rows{datname="%v"} 0`, targetOne))).Should(BeTrue(),
 				"Metric collection issues on %v.\nCollected metrics:\n%v", podName, out)
@@ -2599,7 +2604,11 @@ func DeleteTableUsingPgBouncerService(
 	Expect(err).ToNot(HaveOccurred())
 }
 
-func collectAndAssertDefaultMetricsPresentOnEachPod(namespace, clusterName string, expectPresent bool) {
+func collectAndAssertDefaultMetricsPresentOnEachPod(
+	namespace, clusterName string,
+	tlsEnabled bool,
+	expectPresent bool,
+) {
 	By("collecting and verifying a set of default metrics on each pod", func() {
 		defaultMetrics := []string{
 			"cnpg_pg_settings_setting",
@@ -2621,7 +2630,7 @@ func collectAndAssertDefaultMetricsPresentOnEachPod(namespace, clusterName strin
 		Expect(err).ToNot(HaveOccurred())
 		for _, pod := range podList.Items {
 			podName := pod.GetName()
-			out, err := testsUtils.RetrieveMetricsFromInstance(env, namespace, podName)
+			out, err := testsUtils.RetrieveMetricsFromInstance(env, pod, tlsEnabled)
 			Expect(err).ToNot(HaveOccurred())
 
 			// error should be zero on each pod metrics
@@ -2644,7 +2653,7 @@ func collectAndAssertDefaultMetricsPresentOnEachPod(namespace, clusterName strin
 }
 
 // collectAndAssertMetricsPresentOnEachPod verify a set of metrics is existed in each pod
-func collectAndAssertCollectorMetricsPresentOnEachPod(namespace, clusterName string) {
+func collectAndAssertCollectorMetricsPresentOnEachPod(cluster *apiv1.Cluster) {
 	cnpgCollectorMetrics := []string{
 		"cnpg_collector_collection_duration_seconds",
 		"cnpg_collector_fencing_on",
@@ -2673,11 +2682,11 @@ func collectAndAssertCollectorMetricsPresentOnEachPod(namespace, clusterName str
 		)
 	}
 	By("collecting and verify set of collector metrics on each pod", func() {
-		podList, err := env.GetClusterPodList(namespace, clusterName)
+		podList, err := env.GetClusterPodList(cluster.Namespace, cluster.Name)
 		Expect(err).ToNot(HaveOccurred())
 		for _, pod := range podList.Items {
 			podName := pod.GetName()
-			out, err := testsUtils.RetrieveMetricsFromInstance(env, namespace, podName)
+			out, err := testsUtils.RetrieveMetricsFromInstance(env, pod, cluster.IsMetricsTLSEnabled())
 			Expect(err).ToNot(HaveOccurred())
 
 			// error should be zero on each pod metrics
@@ -2809,7 +2818,6 @@ func AssertPostgresNoPendingRestart(namespace, clusterName string, cmdTimeout ti
 		Eventually(func() (bool, error) {
 			noPendingRestart := true
 			for _, pod := range podList.Items {
-				pod := pod
 				stdout, _, err := env.ExecCommand(env.Ctx, pod, specs.PostgresContainerName, &cmdTimeout,
 					"psql", "-U", "postgres", "-tAc", "SELECT EXISTS(SELECT 1 FROM pg_settings WHERE pending_restart)")
 				if err != nil {
@@ -3098,7 +3106,7 @@ func assertIncludesMetrics(rawMetricsOutput string, expectedMetrics map[string]*
 	}
 
 	for key, valueRe := range expectedMetrics {
-		re := regexp.MustCompile(fmt.Sprintf(`(?m)^(` + key + `).*$`))
+		re := regexp.MustCompile(fmt.Sprintf("(?m)^(%s).*$", key))
 
 		// match a metric with the value of expectedMetrics key
 		match := re.FindString(rawMetricsOutput)

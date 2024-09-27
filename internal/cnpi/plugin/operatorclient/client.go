@@ -20,12 +20,12 @@ import (
 	"context"
 	"reflect"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin"
 	cnpgiClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -59,7 +59,7 @@ func (e *extendedClient) invokePlugin(
 		return obj, nil
 	}
 
-	contextLogger.Debug("correctly loaded the plugin client")
+	contextLogger.Trace("correctly loaded the plugin client")
 	return pluginClient.LifecycleHook(ctx, operationVerb, cluster, obj)
 }
 

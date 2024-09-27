@@ -19,7 +19,7 @@ package pgpass
 import (
 	"strings"
 
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
+	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 )
 
 // Data represents the contents of a pgpass file

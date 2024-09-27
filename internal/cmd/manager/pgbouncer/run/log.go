@@ -22,7 +22,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/machinery/pkg/log"
 )
 
 var pgBouncerLogRegex = regexp.
@@ -39,6 +39,7 @@ func (p *pgBouncerLogWriter) Write(in []byte) (n int, err error) {
 	currentLogLine := ""
 
 	sc := bufio.NewScanner(bytes.NewReader(in))
+	sc.Buffer(make([]byte, 0, 4096), 1024*1024)
 	for sc.Scan() {
 		logLine := sc.Text()
 		if strings.HasPrefix(logLine, "\t") {

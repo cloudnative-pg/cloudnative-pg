@@ -16,9 +16,8 @@ more `ConfigMap` or `Secret` resources (see the
 ["User defined metrics" section](#user-defined-metrics) below for details).
 
 !!! Important
-    Starting from version 1.11, CloudNativePG already installs
-    [by default a set of predefined metrics](#default-set-of-metrics) in
-    a `ConfigMap` called `default-monitoring`.
+    CloudNativePG, by default, installs a set of [predefined metrics](#default-set-of-metrics)
+    in a `ConfigMap` named `default-monitoring`.
 
 !!! Info
     You can inspect the exported metrics by following the instructions in
@@ -218,7 +217,7 @@ cnpg_collector_up{cluster="cluster-example"} 1
 
 # HELP cnpg_collector_postgres_version Postgres version
 # TYPE cnpg_collector_postgres_version gauge
-cnpg_collector_postgres_version{cluster="cluster-example",full="16.3"} 16.3
+cnpg_collector_postgres_version{cluster="cluster-example",full="16.4"} 16.4
 
 # HELP cnpg_collector_last_failed_backup_timestamp The last failed backup as a unix timestamp
 # TYPE cnpg_collector_last_failed_backup_timestamp gauge

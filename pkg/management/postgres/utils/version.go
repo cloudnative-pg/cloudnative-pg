@@ -44,9 +44,9 @@ func parseVersionNum(versionNum string) (*semver.Version, error) {
 	}
 
 	return &semver.Version{
-		Major: uint64(versionInt / 10000),
-		Minor: uint64((versionInt / 100) % 100),
-		Patch: uint64(versionInt % 100),
+		Major: uint64(versionInt / 10000),       //nolint:gosec
+		Minor: uint64((versionInt / 100) % 100), //nolint:gosec
+		Patch: uint64(versionInt % 100),         //nolint:gosec
 	}, nil
 }
 

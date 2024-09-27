@@ -23,10 +23,10 @@ import (
 	"path"
 	"sync"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/jackc/puddle/v2"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/connection"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
 // Interface is the interface to use a plugin repository
@@ -84,7 +84,10 @@ func (r *data) setPluginProtocol(name string, protocol connection.Protocol) erro
 			}
 		}()
 
-		constructorLogger := log.FromContext(ctx).WithValues("pluginName", name)
+		constructorLogger := log.
+			FromContext(ctx).
+			WithName("setPluginProtocol").
+			WithValues("pluginName", name)
 		ctx = log.IntoContext(ctx, constructorLogger)
 
 		if handler, err = protocol.Dial(ctx); err != nil {
@@ -98,7 +101,9 @@ func (r *data) setPluginProtocol(name string, protocol connection.Protocol) erro
 	destructor := func(res connection.Interface) {
 		err := res.Close()
 		if err != nil {
-			destructorLogger := log.FromContext(context.Background()).WithValues("pluginName", res.Name())
+			destructorLogger := log.FromContext(context.Background()).
+				WithName("setPluginProtocol").
+				WithValues("pluginName", res.Name())
 			destructorLogger.Warning("Error while closing plugin connection", "err", err)
 		}
 	}
