@@ -18,6 +18,7 @@ package client
 
 import (
 	"context"
+	"errors"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 
@@ -42,9 +43,27 @@ func (data *data) getPlugin(pluginName string) (connection.Interface, error) {
 	return nil, ErrPluginNotLoaded
 }
 
+// load loads the plugins with the specified name
 func (data *data) load(ctx context.Context, names ...string) error {
 	for _, name := range names {
 		pluginData, err := data.repository.GetConnection(ctx, name)
+		if err != nil {
+			return err
+		}
+
+		data.plugins = append(data.plugins, pluginData)
+	}
+	return nil
+}
+
+// loadAvailable loads only the plugins that are actually available, matching the names
+func (data *data) loadAvailable(ctx context.Context, names ...string) error {
+	for _, name := range names {
+		pluginData, err := data.repository.GetConnection(ctx, name)
+		var unknownPluginErr *repository.ErrUnknownPlugin
+		if errors.As(err, &unknownPluginErr) {
+			continue
+		}
 		if err != nil {
 			return err
 		}
@@ -84,6 +103,20 @@ func WithPlugins(ctx context.Context, repository repository.Interface, names ...
 		repository: repository,
 	}
 	if err := result.load(ctx, names...); err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+// WithAvailablePlugins creates a new CNP-I client for plugins in a certain repository,
+// loading the available plugins with the specified name. If a plugin is not available,
+// it will be skipped.
+func WithAvailablePlugins(ctx context.Context, repository repository.Interface, names ...string) (Client, error) {
+	result := &data{
+		repository: repository,
+	}
+	if err := result.loadAvailable(ctx, names...); err != nil {
 		return nil, err
 	}
 
