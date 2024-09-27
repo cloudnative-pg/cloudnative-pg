@@ -192,3 +192,22 @@ status:
 The rationale is that this is exactly what will happen if you attempt to create
 a database directly on the `psql` command line. The database reconciler aims
 at transparency.
+
+## Making direct changes in Postgres
+
+It is possible to make changes to a database that was created or managed with a
+Database object, directly on Postgres, for example by issuing commands on
+`psql`.
+
+The fields `observedGeneration` and `generation` described above will ensure
+that once a Database has been reconciled to its defined `generation`, it will
+not be re-applied by the instance manager. Therefore, your manual changes will
+not be rolled back accidentally.
+
+!!! Note
+    A Database manifest is applied to the fullest. A field included in a
+    manifest may override a value that had been written previously on
+    the database in Postgres
+
+The choice is yours to make alterations on your databases via Database manifests
+or using other mechanisms.
