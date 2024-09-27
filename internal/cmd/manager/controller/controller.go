@@ -219,7 +219,7 @@ func RunController(
 	}
 
 	pluginRepository := repository.New()
-	if err := pluginRepository.RegisterUnixSocketPluginsInPath(
+	if _, err := pluginRepository.RegisterUnixSocketPluginsInPath(
 		conf.PluginSocketDir,
 	); err != nil {
 		setupLog.Error(err, "Unable to load sidecar CNPG-i plugins, skipping")

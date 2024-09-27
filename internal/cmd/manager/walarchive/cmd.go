@@ -251,12 +251,13 @@ func archiveWALViaPlugins(
 	contextLogger := log.FromContext(ctx)
 
 	plugins := repository.New()
-	if err := plugins.RegisterUnixSocketPluginsInPath(configuration.Current.PluginSocketDir); err != nil {
+	pluginNames, err := plugins.RegisterUnixSocketPluginsInPath(configuration.Current.PluginSocketDir)
+	if err != nil {
 		contextLogger.Error(err, "Error while loading local plugins")
 	}
 	defer plugins.Close()
 
-	client, err := pluginClient.WithAvailablePlugins(ctx, plugins, cluster.Spec.Plugins.GetEnabledPluginNames()...)
+	client, err := pluginClient.WithPlugins(ctx, plugins, pluginNames...)
 	if err != nil {
 		contextLogger.Error(err, "Error while loading required plugins")
 		return err
