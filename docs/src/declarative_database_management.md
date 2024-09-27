@@ -111,7 +111,8 @@ spec:
     name: cluster-example
 ```
 
-In this case, when the Database object is deleted, the corresponding PostgreSQL database will also be removed automatically.
+In this case, when the Database object is deleted, the corresponding PostgreSQL
+database will also be removed automatically.
 
 ## Collision of Database objects
 
