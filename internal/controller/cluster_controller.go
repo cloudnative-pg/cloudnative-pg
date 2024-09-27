@@ -819,6 +819,7 @@ func (r *ClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&apiv1.Cluster{}).
+		Named("cluster").
 		Owns(&corev1.Pod{}).
 		Owns(&batchv1.Job{}).
 		Owns(&corev1.Service{}).
