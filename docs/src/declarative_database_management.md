@@ -188,3 +188,7 @@ status:
   ready: false
   error: option "locale_provider" not recognized
 ```
+
+The rationale is that this is exactly what will happen if you attempt to create
+a database directly on the `psql` command line. The database reconciler aims
+at transparency.
