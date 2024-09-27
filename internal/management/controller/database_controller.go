@@ -237,6 +237,7 @@ func NewDatabaseReconciler(
 func (r *DatabaseReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&apiv1.Database{}).
+		Named("instance-database").
 		Complete(r)
 }
 
