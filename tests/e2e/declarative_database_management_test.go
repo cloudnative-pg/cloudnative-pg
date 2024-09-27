@@ -49,16 +49,15 @@ var _ = Describe("Declarative databases management test", Label(tests.LabelSmoke
 	Context("plain vanilla cluster", Ordered, func() {
 		const (
 			namespacePrefix = "declarative-db"
-			databaseCrdName = "db-declarative"
 			dbname          = "declarative"
 		)
 		var (
-			clusterName, namespace string
-			database               *apiv1.Database
+			clusterName, namespace, databaseObjectName string
+			database                                   *apiv1.Database
+			err                                        error
 		)
 
 		BeforeAll(func() {
-			var err error
 			// Create a cluster in a namespace we'll delete after the test
 			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
@@ -110,7 +109,7 @@ var _ = Describe("Declarative databases management test", Label(tests.LabelSmoke
 			It("can add a declarative database", func() {
 				By("applying Database CRD manifest", func() {
 					CreateResourceFromFile(namespace, databaseManifest)
-					_, err := env.GetResourceNameFromYAML(databaseManifest)
+					databaseObjectName, err = env.GetResourceNameFromYAML(databaseManifest)
 					Expect(err).NotTo(HaveOccurred())
 				})
 				By("ensuring the Database CRD succeeded reconciliation", func() {
@@ -118,7 +117,7 @@ var _ = Describe("Declarative databases management test", Label(tests.LabelSmoke
 					database = &apiv1.Database{}
 					databaseNamespacedName := types.NamespacedName{
 						Namespace: namespace,
-						Name:      databaseCrdName,
+						Name:      databaseObjectName,
 					}
 
 					Eventually(func(g Gomega) {
