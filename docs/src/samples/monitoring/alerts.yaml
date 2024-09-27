@@ -21,10 +21,10 @@ groups:
       severity: warning
   - alert: PGDatabase
     annotations:
-      description: Over 150,000,000 transactions from frozen xid on pod {{ $labels.pod  }}
+      description: Over 300,000,000 transactions from frozen xid on pod {{ $labels.pod  }}
       summary: Number of transactions from the frozen XID to the current one
     expr: |-
-      cnpg_pg_database_xid_age > 150000000
+      cnpg_pg_database_xid_age > 300000000
     for: 1m
     labels:
       severity: warning
