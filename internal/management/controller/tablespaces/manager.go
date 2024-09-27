@@ -47,7 +47,7 @@ func NewTablespaceReconciler(instance *postgres.Instance, client client.Client) 
 func (r *TablespaceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&apiv1.Cluster{}).
-		Named("cluster-tablespaces").
+		Named("instance-tablespaces").
 		Complete(r)
 }
 

@@ -46,7 +46,7 @@ func NewReconciler(instance *postgres.Instance, client client.Client) *Reconcile
 func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&apiv1.Cluster{}).
-		Named("cluster-external-server").
+		Named("instance-external-server").
 		Complete(r)
 }
 
