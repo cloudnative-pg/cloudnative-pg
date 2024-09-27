@@ -30,7 +30,7 @@ object.
 
 In the CRD, the `metadata.name` field represents the name the object
 will have in Kubernetes, which is guaranteed to be unique per namespace.
-There is also the field `spec.name` which is the name that will be used for
+There is also the field `spec.name`, which is the name that will be used for
 the database created in Postgres.
 
 !!! Note
@@ -43,7 +43,7 @@ the database created in Postgres.
     PostgreSQL database
     [CREATE](https://www.postgresql.org/docs/current/sql-createdatabase.html)
     and [ALTER](https://www.postgresql.org/docs/current/sql-alterdatabase.html)
-    commands, it does not support renaming of databases. Updating the
+    commands, it does not support renaming of databases. Changing the
     `spec.name` in a Database object will be rejected at the Kubernetes level.
 
 ### Reserved names
