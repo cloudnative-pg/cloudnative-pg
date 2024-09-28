@@ -19,7 +19,7 @@ jobs:
 
   check-version:
     name: Evaluate release tag
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     outputs:
       is_latest: ${{ env.IS_LATEST }}
       is_stable: ${{ env.IS_STABLE }}
@@ -49,7 +49,7 @@ jobs:
 
   release:
     name: Create Github release
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs:
       - check-version
     steps:
@@ -87,7 +87,7 @@ jobs:
 
   release-binaries:
     name: Build containers
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs:
       - check-version
     outputs:
@@ -260,7 +260,7 @@ jobs:
 
   olm-bundle:
     name: Create OLM bundle and catalog
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs:
       - check-version
       - release-binaries
@@ -326,7 +326,7 @@ jobs:
 
   operatorhub_pr:
     name: Create remote PR for OperatorHub
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs:
       - release-binaries
       - olm-bundle
@@ -410,7 +410,7 @@ jobs:
       github.repository_owner == 'cloudnative-pg'
     env:
       VERSION: ${{ needs.release-binaries.outputs.version }}
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       -
         name: Checkout artifact
