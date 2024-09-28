@@ -33,7 +33,7 @@ env:
 jobs:
 
   check-public-clouds-k8s-versions:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       -
         name: Checkout code
