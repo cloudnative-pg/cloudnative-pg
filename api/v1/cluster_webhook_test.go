@@ -20,6 +20,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -1440,6 +1441,8 @@ var _ = Describe("validate image name change", func() {
 			Expect(clusterNew.validateImageChange(&clusterOld)).To(HaveLen(1))
 		})
 		It("doesn't complain going from default imageName to same major imageCatalogRef", func() {
+			majorDefaultVersion, err := strconv.ParseFloat(utils.GetImageTag(versions.DefaultImageName), 32)
+			Expect(err).ToNot(HaveOccurred())
 			clusterOld := Cluster{
 				Spec: ClusterSpec{},
 			}
@@ -1450,7 +1453,7 @@ var _ = Describe("validate image name change", func() {
 							Name: "test",
 							Kind: "ImageCatalog",
 						},
-						Major: 16,
+						Major: int(majorDefaultVersion),
 					},
 				},
 			}
@@ -1515,6 +1518,8 @@ var _ = Describe("validate image name change", func() {
 			Expect(clusterNew.validateImageChange(&clusterOld)).To(HaveLen(1))
 		})
 		It("doesn't complain going from default imageName to same major imageCatalogRef", func() {
+			majorDefaultVersion, err := strconv.ParseFloat(utils.GetImageTag(versions.DefaultImageName), 32)
+			Expect(err).ToNot(HaveOccurred())
 			clusterOld := Cluster{
 				Spec: ClusterSpec{
 					ImageCatalogRef: &ImageCatalogRef{
@@ -1522,7 +1527,7 @@ var _ = Describe("validate image name change", func() {
 							Name: "test",
 							Kind: "ImageCatalog",
 						},
-						Major: 16,
+						Major: int(majorDefaultVersion),
 					},
 				},
 			}
