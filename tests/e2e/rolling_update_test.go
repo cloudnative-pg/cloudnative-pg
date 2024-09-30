@@ -535,7 +535,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 			// We automate the extraction of the major version from the image, because we don't want to keep maintaining
 			// the major version in the test
 			var err error
-			pgVersion, err = version.FromTag(reference.GetImageTag(preRollingImg))
+			pgVersion, err = version.FromTag(reference.New(preRollingImg).Tag)
 			if err != nil {
 				Expect(err).ToNot(HaveOccurred())
 			}

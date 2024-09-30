@@ -967,7 +967,7 @@ func (r *Cluster) validateImageName() field.ErrorList {
 	}
 
 	// We have to check if the image has a valid tag
-	tag := reference.GetImageTag(r.Spec.ImageName)
+	tag := reference.New(r.Spec.ImageName).Tag
 	switch tag {
 	case "latest":
 		result = append(

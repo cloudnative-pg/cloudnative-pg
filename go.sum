@@ -114,6 +114,8 @@ github.com/kubernetes-csi/external-snapshotter/client/v8 v8.0.0 h1:mjQG0Vakr2h24
 github.com/kubernetes-csi/external-snapshotter/client/v8 v8.0.0/go.mod h1:E3vdYxHj2C2q6qo8/Da4g7P+IcwqRZyy3gJBzYybV9Y=
 github.com/kylelemons/godebug v1.1.0 h1:RPNrshWIDI6G2gRW9EHilWtl7Z6Sb1BR0xunSBf0SNc=
 github.com/kylelemons/godebug v1.1.0/go.mod h1:9/0rRGxNHcop5bhtWyNeEfOS8JIWk580+fNqagV/RAw=
+github.com/leonardoce/machinery v0.0.0-20240930132717-28d5f7aef931 h1:I8OiGZ8HeyrNegw4lbefnZORIlBy59HRfxrG5RNW49U=
+github.com/leonardoce/machinery v0.0.0-20240930132717-28d5f7aef931/go.mod h1:bWp1Es5zlxElg4Z/c5f0RKOkDcyNvDHdYIvNcPQU4WM=
 github.com/lib/pq v1.10.9 h1:YXG7RB+JIjhP29X+OtkiDnYaXQwpS4JEWq7dtCCRUEw=
 github.com/lib/pq v1.10.9/go.mod h1:AlVN5x4E4T544tWzH6hKfbfQvm3HdbOxrmggDNAPY9o=
 github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de h1:9TO3cAIGXtEhnIaL+V+BEER86oLrvS+kWobKpbJuye0=

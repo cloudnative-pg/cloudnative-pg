@@ -408,7 +408,7 @@ func (cluster *Cluster) GetPostgresqlVersion() (version.Data, error) {
 	}
 
 	image := cluster.GetImageName()
-	tag := reference.GetImageTag(image)
+	tag := reference.New(image).Tag
 	return version.FromTag(tag)
 }
 

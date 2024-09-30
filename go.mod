@@ -126,4 +126,4 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 )
 
-replace github.com/cloudnative-pg/machinery => ../machinery/
+replace github.com/cloudnative-pg/machinery => github.com/leonardoce/machinery v0.0.0-20240930132717-28d5f7aef931

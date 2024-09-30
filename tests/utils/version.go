@@ -36,7 +36,7 @@ func BumpPostgresImageMajorVersion(postgresImage string) (string, error) {
 
 	targetPostgresImageMajorVersionInt := postgresImageVersion.Major() + 1
 
-	defaultImageVersion, err := version.FromTag(reference.GetImageTag(versions.DefaultImageName))
+	defaultImageVersion, err := version.FromTag(reference.New(versions.DefaultImageName).Tag)
 	if err != nil {
 		return "", err
 	}
