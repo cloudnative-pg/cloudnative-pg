@@ -24,6 +24,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cloudnative-pg/machinery/pkg/image/reference"
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -1441,7 +1442,7 @@ var _ = Describe("validate image name change", func() {
 			Expect(clusterNew.validateImageChange(&clusterOld)).To(HaveLen(1))
 		})
 		It("doesn't complain going from default imageName to same major imageCatalogRef", func() {
-			majorDefaultVersion, err := strconv.ParseFloat(utils.GetImageTag(versions.DefaultImageName), 32)
+			majorDefaultVersion, err := strconv.ParseFloat(reference.GetImageTag(versions.DefaultImageName), 32)
 			Expect(err).ToNot(HaveOccurred())
 			clusterOld := Cluster{
 				Spec: ClusterSpec{},
@@ -1518,7 +1519,7 @@ var _ = Describe("validate image name change", func() {
 			Expect(clusterNew.validateImageChange(&clusterOld)).To(HaveLen(1))
 		})
 		It("doesn't complain going from default imageName to same major imageCatalogRef", func() {
-			majorDefaultVersion, err := strconv.ParseFloat(utils.GetImageTag(versions.DefaultImageName), 32)
+			majorDefaultVersion, err := strconv.ParseFloat(reference.GetImageTag(versions.DefaultImageName), 32)
 			Expect(err).ToNot(HaveOccurred())
 			clusterOld := Cluster{
 				Spec: ClusterSpec{

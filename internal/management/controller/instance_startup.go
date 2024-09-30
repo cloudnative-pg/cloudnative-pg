@@ -236,7 +236,7 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(ctx context.Context
 			return err
 		}
 
-		pgMajorVersion, err := cluster.GetPostgresqlMajorVersion()
+		pgVersion, err := cluster.GetPostgresqlVersion()
 		if err != nil {
 			return err
 		}
@@ -262,7 +262,7 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(ctx context.Context
 		// The only way to check if we really need to start it up before
 		// invoking pg_rewind is to try using pg_rewind and, on failures,
 		// retrying after having started up the instance.
-		err = r.instance.Rewind(ctx, pgMajorVersion)
+		err = r.instance.Rewind(ctx, pgVersion)
 		if err != nil {
 			contextLogger.Info(
 				"pg_rewind failed, starting the server to complete the crash recovery",
@@ -277,7 +277,7 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(ctx context.Context
 			}
 
 			// Then let's go back to the point of the new primary
-			err = r.instance.Rewind(ctx, pgMajorVersion)
+			err = r.instance.Rewind(ctx, pgVersion)
 			if err != nil {
 				return err
 			}
