@@ -95,6 +95,7 @@ func RunController(
 	leaderConfig leaderElectionConfiguration,
 	pprofDebug bool,
 	port int,
+	maxConcurrentReconciles int,
 	conf *configuration.Data,
 ) error {
 	ctx := context.Background()
@@ -222,7 +223,7 @@ func RunController(
 		mgr,
 		discoveryClient,
 		pluginRepository,
-	).SetupWithManager(ctx, mgr); err != nil {
+	).SetupWithManager(ctx, mgr, maxConcurrentReconciles); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Cluster")
 		return err
 	}
