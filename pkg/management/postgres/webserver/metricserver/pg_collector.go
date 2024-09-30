@@ -358,13 +358,13 @@ func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric) {
 	// First, let's check the connection. No need to proceed if this fails.
 	if err := db.Ping(); err != nil {
 		log.Warning("Unable to collect metrics", "error", err)
-		e.Metrics.PostgreSQLUp.WithLabelValues(e.instance.ClusterName).Set(0)
+		e.Metrics.PostgreSQLUp.WithLabelValues(e.instance.GetClusterName()).Set(0)
 		e.Metrics.Error.Set(1)
 		e.Metrics.CollectionDuration.WithLabelValues("Collect.up").Set(time.Since(collectionStart).Seconds())
 		return
 	}
 
-	e.Metrics.PostgreSQLUp.WithLabelValues(e.instance.ClusterName).Set(1)
+	e.Metrics.PostgreSQLUp.WithLabelValues(e.instance.GetClusterName()).Set(1)
 	e.Metrics.Error.Set(0)
 	e.Metrics.CollectionDuration.WithLabelValues("Collect.up").Set(time.Since(collectionStart).Seconds())
 
@@ -541,7 +541,7 @@ func collectPGVersion(e *Exporter) error {
 	if err != nil {
 		return err
 	}
-	e.Metrics.PgVersion.WithLabelValues(majorMinor, e.instance.ClusterName).Set(version)
+	e.Metrics.PgVersion.WithLabelValues(majorMinor, e.instance.GetClusterName()).Set(version)
 
 	return nil
 }

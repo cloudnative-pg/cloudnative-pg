@@ -112,7 +112,7 @@ func joinSubCommand(ctx context.Context, instance *postgres.Instance, info postg
 	// Download the cluster definition from the API server
 	var cluster apiv1.Cluster
 	if err := reconciler.GetClient().Get(ctx,
-		ctrl.ObjectKey{Namespace: instance.Namespace, Name: instance.ClusterName},
+		ctrl.ObjectKey{Namespace: instance.GetNamespaceName(), Name: instance.GetClusterName()},
 		&cluster,
 	); err != nil {
 		log.Error(err, "Error while getting cluster")

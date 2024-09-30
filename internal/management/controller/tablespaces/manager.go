@@ -56,8 +56,8 @@ func (r *TablespaceReconciler) GetCluster(ctx context.Context) (*apiv1.Cluster, 
 	var cluster apiv1.Cluster
 	err := r.GetClient().Get(ctx,
 		types.NamespacedName{
-			Namespace: r.instance.Namespace,
-			Name:      r.instance.ClusterName,
+			Namespace: r.instance.GetNamespaceName(),
+			Name:      r.instance.GetClusterName(),
 		},
 		&cluster)
 	if err != nil {

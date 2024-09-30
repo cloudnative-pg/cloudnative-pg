@@ -152,7 +152,7 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 		Cache: cache.Options{
 			ByObject: map[client.Object]cache.ByObject{
 				&apiv1.Cluster{}: {
-					Field: fields.OneTermEqualSelector("metadata.name", instance.ClusterName),
+					Field: fields.OneTermEqualSelector("metadata.name", instance.GetClusterName()),
 					Namespaces: map[string]cache.Config{
 						instance.Namespace: {},
 					},

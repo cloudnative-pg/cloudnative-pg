@@ -777,7 +777,7 @@ func (instance *Instance) Demote(ctx context.Context, cluster *apiv1.Cluster) er
 	contextLogger := log.FromContext(ctx)
 
 	contextLogger.Info("Demoting instance", "pgpdata", instance.PgData)
-	slotName := cluster.GetSlotNameFromInstanceName(instance.PodName)
+	slotName := cluster.GetSlotNameFromInstanceName(instance.GetPodName())
 	_, err := UpdateReplicaConfiguration(instance.PgData, instance.GetPrimaryConnInfo(), slotName)
 	return err
 }
@@ -1250,7 +1250,7 @@ func (instance *Instance) DropConnections() error {
 
 // GetPrimaryConnInfo returns the DSN to reach the primary
 func (instance *Instance) GetPrimaryConnInfo() string {
-	return buildPrimaryConnInfo(instance.ClusterName+"-rw", instance.PodName)
+	return buildPrimaryConnInfo(instance.GetClusterName()+"-rw", instance.GetPodName())
 }
 
 // HandleInstanceCommandRequests execute a command requested by the reconciliation
