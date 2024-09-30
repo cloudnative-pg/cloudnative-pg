@@ -434,12 +434,15 @@ func (fullStatus *PostgresqlStatus) getStatus(isPrimaryFenced bool, cluster *api
 	}
 }
 
-func (fullStatus *PostgresqlStatus) printPostgresConfiguration(ctx context.Context, clientInterface kubernetes.Interface) []error {
+func (fullStatus *PostgresqlStatus) printPostgresConfiguration(
+	ctx context.Context,
+	client kubernetes.Interface,
+) []error {
 	timeout := time.Second * 10
 	var errs []error
 
 	// Read PostgreSQL configuration from custom.conf
-	customConf, _, err := utils.ExecCommand(ctx, clientInterface, plugin.Config, fullStatus.PrimaryPod,
+	customConf, _, err := utils.ExecCommand(ctx, client, plugin.Config, fullStatus.PrimaryPod,
 		specs.PostgresContainerName,
 		&timeout,
 		"cat",
@@ -449,7 +452,7 @@ func (fullStatus *PostgresqlStatus) printPostgresConfiguration(ctx context.Conte
 	}
 
 	// Read PostgreSQL HBA Rules from pg_hba.conf
-	pgHBAConf, _, err := utils.ExecCommand(ctx, clientInterface, plugin.Config, fullStatus.PrimaryPod,
+	pgHBAConf, _, err := utils.ExecCommand(ctx, client, plugin.Config, fullStatus.PrimaryPod,
 		specs.PostgresContainerName,
 		&timeout, "cat", path.Join(specs.PgDataPath, constants.PostgresqlHBARulesFile))
 	if err != nil {
