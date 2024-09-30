@@ -643,7 +643,7 @@ func startInstanceManagerBackup(
 }
 
 // SetupWithManager sets up this controller given a controller manager
-func (r *BackupReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
+func (r *BackupReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, maxConcurrentReconciles int) error {
 	if err := mgr.GetFieldIndexer().IndexField(
 		ctx,
 		&apiv1.Backup{},
@@ -663,6 +663,7 @@ func (r *BackupReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manage
 	}
 
 	controllerBuilder := ctrl.NewControllerManagedBy(mgr).
+		WithOptions(controller.Options{MaxConcurrentReconciles: maxConcurrentReconciles}).
 		For(&apiv1.Backup{}).
 		Named("backup").
 		Watches(&apiv1.Cluster{},

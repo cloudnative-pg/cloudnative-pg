@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
@@ -207,7 +208,11 @@ func (r *PluginReconciler) getSecret(
 }
 
 // SetupWithManager adds this PluginReconciler to the passed controller manager
-func (r *PluginReconciler) SetupWithManager(mgr ctrl.Manager, operatorNamespace string) error {
+func (r *PluginReconciler) SetupWithManager(
+	mgr ctrl.Manager,
+	operatorNamespace string,
+	maxConcurrentReconciles int,
+) error {
 	pluginServicesPredicate := predicate.Funcs{
 		CreateFunc: func(e event.CreateEvent) bool {
 			return isPluginService(e.Object, operatorNamespace)
@@ -224,6 +229,7 @@ func (r *PluginReconciler) SetupWithManager(mgr ctrl.Manager, operatorNamespace 
 	}
 
 	return ctrl.NewControllerManagedBy(mgr).
+		WithOptions(controller.Options{MaxConcurrentReconciles: maxConcurrentReconciles}).
 		For(&corev1.Service{}).
 		Named("plugin").
 		WithEventFilter(pluginServicesPredicate).
