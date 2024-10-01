@@ -127,3 +127,7 @@ and the following suite of E2E tests are performed on that cluster:
      * Declarative creation of temporary tablespaces
      * Backup / recovery from object storage
      * Backup / recovery from volume snapshots
+
+* **Declarative databases**
+  * Declarative creation of databases with default (retain) reclaim policy
+  * Declarative creation of databases with delete reclaim policy
