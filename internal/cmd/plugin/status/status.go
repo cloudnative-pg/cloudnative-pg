@@ -697,6 +697,7 @@ func (fullStatus *PostgresqlStatus) printInstancesStatus() {
 	//  else:
 	//  	if it is paused, print "Standby (paused)"
 	//  	else if SyncState = sync/quorum print "Standby (sync)"
+	//  	else if SyncState = potential print "Standby (potential sync)"
 	//  	else print "Standby (async)"
 
 	status := tabby.New()
@@ -852,6 +853,8 @@ func getReplicaRole(instance postgres.PostgresqlStatus, fullStatus *PostgresqlSt
 		switch state.SyncState {
 		case "quorum", "sync":
 			return "Standby (sync)"
+		case "potential":
+			return "Standby (potential sync)"
 		case "async":
 			return "Standby (async)"
 		default:
