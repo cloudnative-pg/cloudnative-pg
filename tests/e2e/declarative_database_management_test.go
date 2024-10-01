@@ -33,11 +33,14 @@ import (
 // - spinning up a cluster, apply a declarative database on it
 
 // Set of tests in which we use the declarative database CRD to add new databases on an existing cluster
-var _ = Describe("Declarative databases management test", Label(tests.LabelSmoke, tests.LabelBasic), func() {
+var _ = Describe("Declarative databases management test", Label(tests.LabelSmoke, tests.LabelBasic,
+	tests.LabelDeclarativeDatabases), func() {
 	const (
-		clusterManifest  = fixturesDir + "/declarative_databases/cluster.yaml.template"
-		databaseManifest = fixturesDir + "/declarative_databases/database.yaml.template"
-		level            = tests.Medium
+		clusterManifest                         = fixturesDir + "/declarative_databases/cluster.yaml.template"
+		databaseManifest                        = fixturesDir + "/declarative_databases/database.yaml.template"
+		databaseManifestWithDeleteReclaimPolicy = fixturesDir +
+			"/declarative_databases/database-with-delete-reclaim-policy.yaml.template"
+		level = tests.Medium
 	)
 
 	BeforeEach(func() {
@@ -54,7 +57,9 @@ var _ = Describe("Declarative databases management test", Label(tests.LabelSmoke
 		var (
 			clusterName, namespace, databaseObjectName string
 			database                                   *apiv1.Database
+			databaseWithDeleteRetainPolicy             *apiv1.Database
 			err                                        error
+			databaseWithDeleteRetainPolicyCrdName      = "db-declarative-delete"
 		)
 
 		BeforeAll(func() {
@@ -154,11 +159,81 @@ var _ = Describe("Declarative databases management test", Label(tests.LabelSmoke
 					Expect(utils.DeleteObject(env, database)).To(Succeed())
 				})
 
-				By("verifying database is still existing", func() {
+				By("verifying db is still existing", func() {
 					primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
 					Expect(err).ToNot(HaveOccurred())
 
 					assertDatabaseExists(namespace, primaryPodInfo.Name, dbname, true)
+				})
+			})
+		})
+		When("Database CRD reclaim policy is set to delete inside spec", func() {
+			It("can add a declarative database", func() {
+				By("applying Database CRD manifest", func() {
+					CreateResourceFromFile(namespace, databaseManifestWithDeleteReclaimPolicy)
+					_, err := env.GetResourceNameFromYAML(databaseManifestWithDeleteReclaimPolicy)
+					Expect(err).NotTo(HaveOccurred())
+				})
+				By("ensuring the Database CRD succeeded reconciliation", func() {
+					// get database object
+					databaseWithDeleteRetainPolicy = &apiv1.Database{}
+					databaseNamespacedName := types.NamespacedName{
+						Namespace: namespace,
+						Name:      databaseWithDeleteRetainPolicyCrdName,
+					}
+
+					Eventually(func(g Gomega) {
+						err := env.Client.Get(env.Ctx, databaseNamespacedName, databaseWithDeleteRetainPolicy)
+						Expect(err).ToNot(HaveOccurred())
+						g.Expect(databaseWithDeleteRetainPolicy.Status.Ready).Should(BeTrue())
+					}, 300).WithPolling(10 * time.Second).Should(Succeed())
+				})
+
+				By("verifying the db exists", func() {
+					primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
+					Expect(err).ToNot(HaveOccurred())
+
+					assertDatabaseExists(namespace, primaryPodInfo.Name, dbname, true)
+				})
+			})
+
+			It("maintains the db when Database CRD is removed", func() {
+				By("remove Database CRD", func() {
+					Expect(utils.DeleteObject(env, databaseWithDeleteRetainPolicy)).To(Succeed())
+				})
+
+				By("verifying db has been removed", func() {
+					primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
+					Expect(err).ToNot(HaveOccurred())
+
+					assertDatabaseExists(namespace, primaryPodInfo.Name, dbname, false)
+				})
+			})
+
+			It("applies the Database CRD one last time to exercise finalizers removal when the namespace "+
+				"will be deleted", func() {
+				By("applying Database CRD manifest", func() {
+					CreateResourceFromFile(namespace, databaseManifestWithDeleteReclaimPolicy)
+					_, err := env.GetResourceNameFromYAML(databaseManifestWithDeleteReclaimPolicy)
+					Expect(err).NotTo(HaveOccurred())
+				})
+				By("ensuring the Database CRD succeeded reconciliation", func() {
+					// get database object
+					databaseWithDeleteRetainPolicy = &apiv1.Database{}
+					databaseNamespacedName := types.NamespacedName{
+						Namespace: namespace,
+						Name:      databaseWithDeleteRetainPolicyCrdName,
+					}
+
+					Eventually(func(g Gomega) {
+						err := env.Client.Get(env.Ctx, databaseNamespacedName, databaseWithDeleteRetainPolicy)
+						Expect(err).ToNot(HaveOccurred())
+						g.Expect(databaseWithDeleteRetainPolicy.Status.Ready).Should(BeTrue())
+					}, 300).WithPolling(10 * time.Second).Should(Succeed())
+				})
+				By("deleting the namespace", func() {
+					err := env.DeleteNamespaceAndWait(namespace, 60)
+					Expect(err).ToNot(HaveOccurred())
 				})
 			})
 		})
