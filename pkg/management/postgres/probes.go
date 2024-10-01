@@ -92,10 +92,8 @@ func (instance *Instance) GetStatus() (result *postgres.PostgresqlStatus, err er
 			-- True if this is a primary instance
 			NOT pg_is_in_recovery() as primary,
 			-- True if at least one column requires a restart
-			EXISTS(SELECT 1 FROM pg_settings WHERE pending_restart),
-			-- The size of database in human readable format
-			(SELECT pg_size_pretty(SUM(pg_database_size(oid))) FROM pg_database)`)
-	err = row.Scan(&result.SystemID, &result.IsPrimary, &result.PendingRestart, &result.TotalInstanceSize)
+			EXISTS(SELECT 1 FROM pg_settings WHERE pending_restart)`)
+	err = row.Scan(&result.SystemID, &result.IsPrimary, &result.PendingRestart)
 	if err != nil {
 		return result, err
 	}
