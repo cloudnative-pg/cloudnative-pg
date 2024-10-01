@@ -43,7 +43,6 @@ type PostgresqlStatus struct {
 	IsArchivingWAL            bool        `json:"isArchivingWAL,omitempty"`
 	Node                      string      `json:"node"`
 	Pod                       *corev1.Pod `json:"pod"`
-	TotalInstanceSize         string      `json:"totalInstanceSize"`
 	// populated when MightBeUnavailable reported a healthy status even if it found an error
 	MightBeUnavailableMaskedError string `json:"mightBeUnavailableMaskedError,omitempty"`
 

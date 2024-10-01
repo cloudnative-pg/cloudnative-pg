@@ -66,6 +66,9 @@ type PostgresqlStatus struct {
 
 	// ErrorList store the possible errors while getting the PostgreSQL status
 	ErrorList []error
+
+	// The size of the cluster
+	TotalClusterSize string
 }
 
 func (fullStatus *PostgresqlStatus) getReplicationSlotList() postgres.PgReplicationSlotList {
@@ -99,6 +102,10 @@ func getPrintableIntegerPointer(i *int) string {
 func Status(ctx context.Context, clusterName string, verbose bool, format plugin.OutputFormat) error {
 	var cluster apiv1.Cluster
 	var errs []error
+
+	// Create a Kubernetes client suitable for calling the "Exec" subresource
+	clientInterface := kubernetes.NewForConfigOrDie(plugin.Config)
+
 	// Get the Cluster object
 	err := plugin.Client.Get(ctx, client.ObjectKey{Namespace: plugin.Namespace, Name: clusterName}, &cluster)
 	if err != nil {
@@ -112,10 +119,10 @@ func Status(ctx context.Context, clusterName string, verbose bool, format plugin
 	}
 	errs = append(errs, status.ErrorList...)
 
-	status.printBasicInfo()
+	status.printBasicInfo(ctx, clientInterface)
 	status.printHibernationInfo()
 	if verbose {
-		errs = append(errs, status.printPostgresConfiguration(ctx)...)
+		errs = append(errs, status.printPostgresConfiguration(ctx, clientInterface)...)
 	}
 	status.printCertificatesStatus()
 	status.printBackupStatus()
@@ -186,8 +193,32 @@ func listFencedInstances(fencedInstances *stringset.Data) string {
 	return strings.Join(fencedInstances.ToList(), ", ")
 }
 
-func (fullStatus *PostgresqlStatus) printBasicInfo() {
+func (fullStatus *PostgresqlStatus) getClusterSize(ctx context.Context, client kubernetes.Interface) (string, error) {
+	timeout := time.Second * 10
+
+	// Compute the disk space through `du`
+	output, _, err := utils.ExecCommand(
+		ctx,
+		client,
+		plugin.Config,
+		fullStatus.PrimaryPod,
+		specs.PostgresContainerName,
+		&timeout,
+		"du",
+		"-sLh",
+		specs.PgDataPath)
+	if err != nil {
+		return "", err
+	}
+
+	size, _, _ := strings.Cut(output, "\t")
+	return size, nil
+}
+
+func (fullStatus *PostgresqlStatus) printBasicInfo(ctx context.Context, client kubernetes.Interface) {
 	summary := tabby.New()
+
+	clusterSize, clusterSizeErr := fullStatus.getClusterSize(ctx, client)
 
 	cluster := fullStatus.Cluster
 
@@ -212,6 +243,7 @@ func (fullStatus *PostgresqlStatus) printBasicInfo() {
 
 	summary.AddLine("Name:", cluster.Name)
 	summary.AddLine("Namespace:", cluster.Namespace)
+
 	if primaryInstanceStatus != nil {
 		summary.AddLine("System ID:", primaryInstanceStatus.SystemID)
 	}
@@ -255,6 +287,13 @@ func (fullStatus *PostgresqlStatus) printBasicInfo() {
 			fmt.Println(aurora.Red("Switchover in progress"))
 		}
 	}
+
+	if clusterSizeErr != nil {
+		summary.AddLine("Size:", aurora.Red(clusterSizeErr.Error()))
+	} else {
+		summary.AddLine("Size:", clusterSize)
+	}
+
 	if !cluster.IsReplica() && primaryInstanceStatus != nil {
 		lsnInfo := fmt.Sprintf(
 			"%s (Timeline: %d - WAL File: %s)",
@@ -310,13 +349,15 @@ func (fullStatus *PostgresqlStatus) getStatus(isPrimaryFenced bool, cluster *api
 	}
 }
 
-func (fullStatus *PostgresqlStatus) printPostgresConfiguration(ctx context.Context) []error {
+func (fullStatus *PostgresqlStatus) printPostgresConfiguration(
+	ctx context.Context,
+	client kubernetes.Interface,
+) []error {
 	timeout := time.Second * 10
-	clientInterface := kubernetes.NewForConfigOrDie(plugin.Config)
 	var errs []error
 
 	// Read PostgreSQL configuration from custom.conf
-	customConf, _, err := utils.ExecCommand(ctx, clientInterface, plugin.Config, fullStatus.PrimaryPod,
+	customConf, _, err := utils.ExecCommand(ctx, client, plugin.Config, fullStatus.PrimaryPod,
 		specs.PostgresContainerName,
 		&timeout,
 		"cat",
@@ -326,7 +367,7 @@ func (fullStatus *PostgresqlStatus) printPostgresConfiguration(ctx context.Conte
 	}
 
 	// Read PostgreSQL HBA Rules from pg_hba.conf
-	pgHBAConf, _, err := utils.ExecCommand(ctx, clientInterface, plugin.Config, fullStatus.PrimaryPod,
+	pgHBAConf, _, err := utils.ExecCommand(ctx, client, plugin.Config, fullStatus.PrimaryPod,
 		specs.PostgresContainerName,
 		&timeout, "cat", path.Join(specs.PgDataPath, constants.PostgresqlHBARulesFile))
 	if err != nil {
@@ -577,7 +618,6 @@ func (fullStatus *PostgresqlStatus) printInstancesStatus() {
 	fmt.Println(aurora.Green("Instances status"))
 	status.AddHeader(
 		"Name",
-		"Database Size",
 		"Current LSN", // For standby use "Replay LSN"
 		"Replication role",
 		"Status",
@@ -608,7 +648,6 @@ func (fullStatus *PostgresqlStatus) printInstancesStatus() {
 		replicaRole := getReplicaRole(instance, fullStatus)
 		status.AddLine(
 			instance.Pod.Name,
-			instance.TotalInstanceSize,
 			getCurrentLSN(instance),
 			replicaRole,
 			statusMsg,
