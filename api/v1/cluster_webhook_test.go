@@ -24,6 +24,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cloudnative-pg/machinery/pkg/image/reference"
+	pgversion "github.com/cloudnative-pg/machinery/pkg/postgres/version"
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -1441,7 +1443,8 @@ var _ = Describe("validate image name change", func() {
 			Expect(clusterNew.validateImageChange(&clusterOld)).To(HaveLen(1))
 		})
 		It("doesn't complain going from default imageName to same major imageCatalogRef", func() {
-			majorDefaultVersion, err := strconv.ParseFloat(utils.GetImageTag(versions.DefaultImageName), 32)
+			defaultImageRef := reference.New(versions.DefaultImageName)
+			version, err := pgversion.FromTag(defaultImageRef.Tag)
 			Expect(err).ToNot(HaveOccurred())
 			clusterOld := Cluster{
 				Spec: ClusterSpec{},
@@ -1453,7 +1456,7 @@ var _ = Describe("validate image name change", func() {
 							Name: "test",
 							Kind: "ImageCatalog",
 						},
-						Major: int(majorDefaultVersion),
+						Major: int(version.Major()),
 					},
 				},
 			}
@@ -1500,7 +1503,7 @@ var _ = Describe("validate image name change", func() {
 			}
 			Expect(clusterNew.validateImageChange(&clusterOld)).To(HaveLen(1))
 		})
-		It("complains going from default imageName to different major imageCatalogRef", func() {
+		It("complains going from imageCatalogRef to different major default imageName", func() {
 			clusterOld := Cluster{
 				Spec: ClusterSpec{
 					ImageCatalogRef: &ImageCatalogRef{
@@ -1517,8 +1520,9 @@ var _ = Describe("validate image name change", func() {
 			}
 			Expect(clusterNew.validateImageChange(&clusterOld)).To(HaveLen(1))
 		})
-		It("doesn't complain going from default imageName to same major imageCatalogRef", func() {
-			majorDefaultVersion, err := strconv.ParseFloat(utils.GetImageTag(versions.DefaultImageName), 32)
+		It("doesn't complain going from imageCatalogRef to same major default imageName", func() {
+			imageNameRef := reference.New(versions.DefaultImageName)
+			version, err := pgversion.FromTag(imageNameRef.Tag)
 			Expect(err).ToNot(HaveOccurred())
 			clusterOld := Cluster{
 				Spec: ClusterSpec{
@@ -1527,7 +1531,7 @@ var _ = Describe("validate image name change", func() {
 							Name: "test",
 							Kind: "ImageCatalog",
 						},
-						Major: int(majorDefaultVersion),
+						Major: int(version.Major()),
 					},
 				},
 			}
