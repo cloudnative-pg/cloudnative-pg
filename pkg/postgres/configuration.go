@@ -246,7 +246,7 @@ var identTemplate = template.Must(template.New("pg_ident.conf").Parse(identTempl
 var MajorVersionRangeUnlimited = version.Data{}
 
 // VersionRange is used to represent a range of PostgreSQL versions
-type VersionRange = struct {
+type VersionRange struct {
 	// The minimum limit of PostgreSQL major version, extreme included
 	Min version.Data
 
