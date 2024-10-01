@@ -19,32 +19,33 @@ package utils
 import (
 	"fmt"
 
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/machinery/pkg/image/reference"
+	"github.com/cloudnative-pg/machinery/pkg/postgres/version"
+
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
 
 // BumpPostgresImageMajorVersion returns a postgresImage incrementing the major version of the argument (if available)
 func BumpPostgresImageMajorVersion(postgresImage string) (string, error) {
-	imageReference := utils.NewReference(postgresImage)
+	imageReference := reference.New(postgresImage)
 
-	postgresImageVersion, err := postgres.GetPostgresVersionFromTag(imageReference.Tag)
+	postgresImageVersion, err := version.FromTag(imageReference.Tag)
 	if err != nil {
 		return "", err
 	}
 
-	targetPostgresImageVersionInt := postgresImageVersion + 1_00_00
+	targetPostgresImageMajorVersionInt := postgresImageVersion.Major() + 1
 
-	defaultImageVersion, err := postgres.GetPostgresVersionFromTag(utils.GetImageTag(versions.DefaultImageName))
+	defaultImageVersion, err := version.FromTag(reference.New(versions.DefaultImageName).Tag)
 	if err != nil {
 		return "", err
 	}
 
-	if targetPostgresImageVersionInt >= defaultImageVersion {
+	if targetPostgresImageMajorVersionInt >= defaultImageVersion.Major() {
 		return postgresImage, nil
 	}
 
-	imageReference.Tag = fmt.Sprintf("%d", postgresImageVersion/10000+1)
+	imageReference.Tag = fmt.Sprintf("%d", postgresImageVersion.Major()+1)
 
 	return imageReference.GetNormalizedName(), nil
 }
