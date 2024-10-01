@@ -23,11 +23,14 @@ const (
 	// LabelBackupRestore is a label for only selecting backup and restore tests
 	LabelBackupRestore = "backup-restore"
 
-	// LabelBasic is a label for  selecting basic test
+	// LabelBasic is a label for selecting basic test
 	LabelBasic = "basic"
 
 	// LabelClusterMetadata is a label for selecting cluster-metadata test
 	LabelClusterMetadata = "cluster-metadata"
+
+	// LabelDeclarativeDatabases is a label for selecting the test exercising declarative databases
+	LabelDeclarativeDatabases = "declarative-databases"
 
 	// LabelDisruptive is the string for labelling disruptive tests
 	LabelDisruptive = "disruptive"
@@ -74,7 +77,7 @@ const (
 	// LabelServiceConnectivity is a label for selecting service connections test
 	LabelServiceConnectivity = "service-connectivity"
 
-	// LabelSmoke is a label for selecting  smoke test
+	// LabelSmoke is a label for selecting smoke test
 	LabelSmoke = "smoke"
 
 	// LabelSnapshot is a label for selecting snapshot tests
@@ -83,9 +86,9 @@ const (
 	// LabelStorage is a label for selecting storage test
 	LabelStorage = "storage"
 
-	// LabelTablespaces is a lable for selectin the tablespaces tests
+	// LabelTablespaces is a label for selecting the tablespaces tests
 	LabelTablespaces = "tablespaces"
 
-	// LabelUpgrade is the string for labelling upgrade tests
+	// LabelUpgrade is a label for upgrade tests
 	LabelUpgrade = "upgrade"
 )
