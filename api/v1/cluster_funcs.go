@@ -24,13 +24,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cloudnative-pg/machinery/pkg/image/reference"
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	"github.com/cloudnative-pg/machinery/pkg/postgres/version"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/stringset"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/system"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -348,26 +349,16 @@ func (cluster *Cluster) GetImageName() string {
 // image name or from the ImageCatalogRef.
 // Example:
 //
-// ghcr.io/cloudnative-pg/postgresql:14.0 corresponds to version 140000
-// ghcr.io/cloudnative-pg/postgresql:13.2 corresponds to version 130002
-// ghcr.io/cloudnative-pg/postgresql:9.6.3 corresponds to version 90603
-func (cluster *Cluster) GetPostgresqlVersion() (int, error) {
+// ghcr.io/cloudnative-pg/postgresql:14.0 corresponds to version (14,0)
+// ghcr.io/cloudnative-pg/postgresql:13.2 corresponds to version (13,2)
+func (cluster *Cluster) GetPostgresqlVersion() (version.Data, error) {
 	if cluster.Spec.ImageCatalogRef != nil {
-		return postgres.GetPostgresVersionFromTag(strconv.Itoa(cluster.Spec.ImageCatalogRef.Major))
+		return version.FromTag(strconv.Itoa(cluster.Spec.ImageCatalogRef.Major))
 	}
 
 	image := cluster.GetImageName()
-	tag := utils.GetImageTag(image)
-	return postgres.GetPostgresVersionFromTag(tag)
-}
-
-// GetPostgresqlMajorVersion gets the PostgreSQL image major version used in the Cluster
-func (cluster *Cluster) GetPostgresqlMajorVersion() (int, error) {
-	version, err := cluster.GetPostgresqlVersion()
-	if err != nil {
-		return 0, err
-	}
-	return postgres.GetPostgresMajorVersion(version), nil
+	tag := reference.New(image).Tag
+	return version.FromTag(tag)
 }
 
 // GetImagePullSecret get the name of the pull secret to use
