@@ -24,7 +24,9 @@ import (
 	"strings"
 
 	barmanWebhooks "github.com/cloudnative-pg/barman-cloud/pkg/api/webhooks"
+	"github.com/cloudnative-pg/machinery/pkg/image/reference"
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	"github.com/cloudnative-pg/machinery/pkg/postgres/version"
 	"github.com/cloudnative-pg/machinery/pkg/types"
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	v1 "k8s.io/api/core/v1"
@@ -126,7 +128,7 @@ func (r *Cluster) setDefaults(preserveUserSettings bool) {
 		// validateImageName function
 		info := postgres.ConfigurationInfo{
 			Settings:                      postgres.CnpgConfigurationSettings,
-			MajorVersion:                  psqlVersion,
+			Version:                       psqlVersion,
 			UserSettings:                  r.Spec.PostgresConfiguration.Parameters,
 			IsReplicaCluster:              r.IsReplica(),
 			PreserveFixedSettingsFromUser: preserveUserSettings,
@@ -946,7 +948,7 @@ func (r *Cluster) validateImageName() field.ErrorList {
 	}
 
 	// We have to check if the image has a valid tag
-	tag := utils.GetImageTag(r.Spec.ImageName)
+	tag := reference.New(r.Spec.ImageName).Tag
 	switch tag {
 	case "latest":
 		result = append(
@@ -963,7 +965,7 @@ func (r *Cluster) validateImageName() field.ErrorList {
 				r.Spec.ImageName,
 				"Can't use just the image sha as we can't detect upgrades"))
 	default:
-		_, err := postgres.GetPostgresVersionFromTag(tag)
+		_, err := version.FromTag(tag)
 		if err != nil {
 			result = append(
 				result,
@@ -1075,7 +1077,7 @@ func (r *Cluster) validateConfiguration() field.ErrorList {
 		// validateImageName function
 		return result
 	}
-	if pgVersion < 110000 {
+	if pgVersion.Major() < 11 {
 		result = append(result,
 			field.Invalid(
 				field.NewPath("spec", "imageName"),
@@ -1084,7 +1086,7 @@ func (r *Cluster) validateConfiguration() field.ErrorList {
 	}
 	info := postgres.ConfigurationInfo{
 		Settings:               postgres.CnpgConfigurationSettings,
-		MajorVersion:           pgVersion,
+		Version:                pgVersion,
 		UserSettings:           r.Spec.PostgresConfiguration.Parameters,
 		IsReplicaCluster:       r.IsReplica(),
 		IsWalArchivingDisabled: utils.IsWalArchivingDisabled(&r.ObjectMeta),
@@ -1350,7 +1352,7 @@ func validateSyncReplicaElectionConstraint(constraints SyncReplicaElectionConstr
 // to a new one.
 func (r *Cluster) validateImageChange(old *Cluster) field.ErrorList {
 	var result field.ErrorList
-	var newMajor, oldMajor int
+	var newVersion, oldVersion version.Data
 	var err error
 	var newImagePath *field.Path
 	if r.Spec.ImageCatalogRef != nil {
@@ -1360,7 +1362,7 @@ func (r *Cluster) validateImageChange(old *Cluster) field.ErrorList {
 	}
 
 	r.Status.Image = ""
-	newMajor, err = r.GetPostgresqlVersion()
+	newVersion, err = r.GetPostgresqlVersion()
 	if err != nil {
 		// The validation error will be already raised by the
 		// validateImageName function
@@ -1368,23 +1370,23 @@ func (r *Cluster) validateImageChange(old *Cluster) field.ErrorList {
 	}
 
 	old.Status.Image = ""
-	oldMajor, err = old.GetPostgresqlVersion()
+	oldVersion, err = old.GetPostgresqlVersion()
 	if err != nil {
 		// The validation error will be already raised by the
 		// validateImageName function
 		return result
 	}
 
-	status := postgres.IsUpgradePossible(oldMajor, newMajor)
+	status := version.IsUpgradePossible(oldVersion, newVersion)
 
 	if !status {
 		result = append(
 			result,
 			field.Invalid(
 				newImagePath,
-				newMajor,
+				newVersion,
 				fmt.Sprintf("can't upgrade between majors %v and %v",
-					oldMajor, newMajor)))
+					oldVersion, newVersion)))
 	}
 
 	return result
@@ -2175,7 +2177,7 @@ func (r *Cluster) validateReplicationSlots() field.ErrorList {
 		return nil
 	}
 
-	if psqlVersion < 110000 {
+	if psqlVersion.Major() < 11 {
 		if replicationSlots.HighAvailability.GetEnabled() {
 			return field.ErrorList{
 				field.Invalid(
