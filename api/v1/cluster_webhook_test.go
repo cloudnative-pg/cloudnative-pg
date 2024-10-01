@@ -1350,7 +1350,7 @@ var _ = Describe("validate image name change", func() {
 		Expect(clusterNew.validateImageChange(&clusterOld)).To(HaveLen(1))
 	})
 
-	It("doesn't complain if image change it's valid", func() {
+	It("doesn't complain if image change is valid", func() {
 		clusterOld := Cluster{
 			Spec: ClusterSpec{
 				ImageName: "postgres:12.1",

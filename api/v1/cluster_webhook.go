@@ -23,7 +23,9 @@ import (
 	"strings"
 
 	barmanWebhooks "github.com/cloudnative-pg/barman-cloud/pkg/api/webhooks"
+	"github.com/cloudnative-pg/machinery/pkg/image/reference"
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	"github.com/cloudnative-pg/machinery/pkg/postgres/version"
 	"github.com/cloudnative-pg/machinery/pkg/types"
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	v1 "k8s.io/api/core/v1"
@@ -126,7 +128,7 @@ func (r *Cluster) setDefaults(preserveUserSettings bool) {
 		// validateImageName function
 		info := postgres.ConfigurationInfo{
 			Settings:                      postgres.CnpgConfigurationSettings,
-			MajorVersion:                  psqlVersion,
+			Version:                       psqlVersion,
 			UserSettings:                  r.Spec.PostgresConfiguration.Parameters,
 			IsReplicaCluster:              r.IsReplica(),
 			PreserveFixedSettingsFromUser: preserveUserSettings,
@@ -933,7 +935,7 @@ func (r *Cluster) validateImageName() field.ErrorList {
 		return result
 	}
 
-	tag := utils.GetImageTag(r.Spec.ImageName)
+	tag := reference.New(r.Spec.ImageName).Tag
 	switch tag {
 	case "latest":
 		result = append(
@@ -950,7 +952,7 @@ func (r *Cluster) validateImageName() field.ErrorList {
 				r.Spec.ImageName,
 				"Can't use just the image sha as we can't detect upgrades"))
 	default:
-		_, err := postgres.GetPostgresVersionFromTag(tag)
+		_, err := version.FromTag(tag)
 		if err != nil {
 			result = append(
 				result,
@@ -1050,7 +1052,7 @@ func (r *Cluster) validateConfiguration() field.ErrorList {
 		// validateImageName function
 		return result
 	}
-	if pgVersion < 110000 {
+	if pgVersion.Major() < 11 {
 		result = append(result,
 			field.Invalid(
 				field.NewPath("spec", "imageName"),
@@ -1059,7 +1061,7 @@ func (r *Cluster) validateConfiguration() field.ErrorList {
 	}
 	info := postgres.ConfigurationInfo{
 		Settings:               postgres.CnpgConfigurationSettings,
-		MajorVersion:           pgVersion,
+		Version:                pgVersion,
 		UserSettings:           r.Spec.PostgresConfiguration.Parameters,
 		IsReplicaCluster:       r.IsReplica(),
 		IsWalArchivingDisabled: utils.IsWalArchivingDisabled(&r.ObjectMeta),
@@ -1325,33 +1327,33 @@ func validateSyncReplicaElectionConstraint(constraints SyncReplicaElectionConstr
 // to a new one.
 func (r *Cluster) validateImageChange(old *Cluster) field.ErrorList {
 	var result field.ErrorList
+	var newVersion, oldVersion version.Data
+	var err error
+	var newImagePath *field.Path
 
-	newVersion := r.Spec.ImageName
-	if newVersion == "" {
-		// We'll use the default one
-		newVersion = configuration.Current.PostgresImageName
-	}
-
-	oldVersion := old.Spec.ImageName
-	if oldVersion == "" {
-		oldVersion = configuration.Current.PostgresImageName
-	}
-
-	status, err := postgres.CanUpgrade(oldVersion, newVersion)
+	newVersion, err = r.GetPostgresqlVersion()
 	if err != nil {
+		// The validation error will be already raised by the
+		// validateImageName function
+		return result
+	}
+
+	oldVersion, err = old.GetPostgresqlVersion()
+	if err != nil {
+		// The validation error will be already raised by the
+		// validateImageName function
+		return result
+	}
+
+	status := version.IsUpgradePossible(oldVersion, newVersion)
+
+	if !status {
 		result = append(
 			result,
 			field.Invalid(
-				field.NewPath("spec", "imageName"),
-				r.Spec.ImageName,
-				fmt.Sprintf("wrong version: %v", err.Error())))
-	} else if !status {
-		result = append(
-			result,
-			field.Invalid(
-				field.NewPath("spec", "imageName"),
-				r.Spec.ImageName,
-				fmt.Sprintf("can't upgrade between %v and %v",
+				newImagePath,
+				newVersion,
+				fmt.Sprintf("can't upgrade between majors %v and %v",
 					oldVersion, newVersion)))
 	}
 
@@ -2029,7 +2031,7 @@ func (r *Cluster) validateReplicationSlots() field.ErrorList {
 		return nil
 	}
 
-	if psqlVersion >= 110000 {
+	if psqlVersion.Major() >= 11 {
 		return nil
 	}
 
@@ -2037,7 +2039,7 @@ func (r *Cluster) validateReplicationSlots() field.ErrorList {
 		field.Invalid(
 			field.NewPath("spec", "replicationSlots", "highAvailability", "enabled"),
 			replicationSlots.HighAvailability.GetEnabled(),
-			"Cannot enable replication slot high availability. It requires PostgreSQL 11 or above"),
+			"Cannot enable HA replication slots synchronization. PostgreSQL 11 or above required"),
 	}
 }
 

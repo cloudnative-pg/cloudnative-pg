@@ -80,7 +80,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 		}
 		rollout := isInstanceNeedingRollout(ctx, status, &cluster)
 		Expect(rollout.required).To(BeTrue())
-		Expect(rollout.reason).To(BeEquivalentTo("the instance is using an old image: postgres:13.10 -> postgres:13.11"))
+		Expect(rollout.reason).To(BeEquivalentTo("the instance is using a different image: postgres:13.10 -> postgres:13.11"))
 	})
 
 	It("does not ask for rollout when update is to a different major release", func(ctx SpecContext) {
@@ -145,7 +145,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 		rollout = isInstanceNeedingRollout(ctx, status, &cluster)
 		Expect(rollout.required).To(BeTrue())
 		Expect(rollout.canBeInPlace).To(BeFalse())
-		Expect(rollout.reason).To(Equal("the instance is using an old image: postgres:13.10 -> postgres:13.11"))
+		Expect(rollout.reason).To(Equal("the instance is using a different image: postgres:13.10 -> postgres:13.11"))
 	})
 
 	It("requires rollout when PostgreSQL needs to be restarted", func(ctx SpecContext) {

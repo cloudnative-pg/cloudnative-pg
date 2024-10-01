@@ -26,7 +26,9 @@ import (
 	neturl "net/url"
 	"reflect"
 
+	"github.com/cloudnative-pg/machinery/pkg/image/reference"
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	"github.com/cloudnative-pg/machinery/pkg/postgres/version"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -466,20 +468,26 @@ func checkPodImageIsOutdated(pod *corev1.Pod, cluster *apiv1.Cluster) (rollout, 
 		return rollout{}, nil
 	}
 
-	canUpgradeImage, err := postgres.CanUpgrade(pgCurrentImageName, targetImageName)
+	targetVersion, err := cluster.GetPostgresqlVersion()
+	if err != nil {
+		return rollout{}, err
+	}
+
+	currentTag := reference.New(pgCurrentImageName).Tag
+	currentVersion, err := version.FromTag(currentTag)
 	if err != nil {
 		return rollout{}, err
 	}
 
 	// We do not report anything here. The webhook should prevent the user to
 	// set an invalid target image
-	if !canUpgradeImage {
+	if !version.IsUpgradePossible(currentVersion, targetVersion) {
 		return rollout{}, nil
 	}
 
 	return rollout{
 		required: true,
-		reason: fmt.Sprintf("the instance is using an old image: %s -> %s",
+		reason: fmt.Sprintf("the instance is using a different image: %s -> %s",
 			pgCurrentImageName, targetImageName),
 	}, nil
 }
