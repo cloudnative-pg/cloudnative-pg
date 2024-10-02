@@ -24,9 +24,7 @@ spec:
 Note that the Database references a Cluster, on which the database will be
 created.
 The Database object is managed by the instance manager of the cluster's
-primary instance. Declarative database management is not supported in replica
-clusters, as replica clusters lack a primary instance to manage the Database
-object.
+primary instance.
 
 In the CRD, the `metadata.name` field represents the name the object
 will have in Kubernetes, which is guaranteed to be unique per namespace.
@@ -45,6 +43,13 @@ the database created in Postgres.
     and [ALTER](https://www.postgresql.org/docs/current/sql-alterdatabase.html)
     commands, it does not support renaming of databases. Changing the
     `spec.name` in a Database object will be rejected at the Kubernetes level.
+
+### Database objects defined on  replica clusters
+
+Database objects declared on a replica cluster cannot be enforced, since the
+replica does not have write privileges.
+Instead, a database object defined on a replica cluster will be periodically
+re-queued, and will be enforced once the cluster is promoted.
 
 ### Reserved names
 
