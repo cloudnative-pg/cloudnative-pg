@@ -81,6 +81,20 @@ type DatabaseSpec struct {
 	ReclaimPolicy DatabaseReclaimPolicy `json:"databaseReclaimPolicy,omitempty"`
 }
 
+// HasImmutableFields returns the list of fields in database spec that cannot
+// be set in an ALTER statement in Postgres
+func (db DatabaseSpec) HasImmutableFields() []string {
+	var fields []string
+	if db.Encoding != "" {
+		fields = append(fields, "encoding")
+	}
+	if db.Template != "" {
+		fields = append(fields, "template")
+	}
+
+	return fields
+}
+
 // DatabaseStatus defines the observed state of Database
 type DatabaseStatus struct {
 	// A sequence number representing the latest
@@ -93,6 +107,10 @@ type DatabaseStatus struct {
 
 	// Error is the reconciliation error message
 	Error string `json:"error,omitempty"`
+
+	// Comments contains information that may arise during object reconciliation
+	// that will make things more explicit to the user
+	Comments string `json:"comments,omitempty"`
 }
 
 // +kubebuilder:object:root=true

@@ -21,6 +21,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
@@ -160,10 +161,8 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, nil
 	}
 
-	if err := r.reconcileDatabase(
-		ctx,
-		&database,
-	); err != nil {
+	comments, err := r.reconcileDatabase(ctx, &database)
+	if err != nil {
 		return r.failedReconciliation(
 			ctx,
 			&database,
@@ -174,6 +173,7 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	return r.succeededReconciliation(
 		ctx,
 		&database,
+		comments,
 	)
 }
 
@@ -207,9 +207,11 @@ func (r *DatabaseReconciler) failedReconciliation(
 func (r *DatabaseReconciler) succeededReconciliation(
 	ctx context.Context,
 	database *apiv1.Database,
+	comments string,
 ) (ctrl.Result, error) {
 	oldDatabase := database.DeepCopy()
 	database.Status.Error = ""
+	database.Status.Comments = comments
 	database.Status.Ready = true
 	database.Status.ObservedGeneration = database.Generation
 
@@ -257,22 +259,29 @@ func (r *DatabaseReconciler) GetCluster(ctx context.Context) (*apiv1.Cluster, er
 	return &cluster, nil
 }
 
-func (r *DatabaseReconciler) reconcileDatabase(ctx context.Context, obj *apiv1.Database) error {
+func (r *DatabaseReconciler) reconcileDatabase(ctx context.Context, obj *apiv1.Database) (string, error) {
 	db, err := r.instance.GetSuperUserDB()
 	if err != nil {
-		return fmt.Errorf("while connecting to the database %q: %w", obj.Spec.Name, err)
+		return "", fmt.Errorf("while connecting to the database %q: %w", obj.Spec.Name, err)
 	}
 
 	dbExists, err := detectDatabase(ctx, db, obj)
 	if err != nil {
-		return fmt.Errorf("while detecting the database %q: %w", obj.Spec.Name, err)
+		return "", fmt.Errorf("while detecting the database %q: %w", obj.Spec.Name, err)
 	}
 
 	if dbExists {
-		return updateDatabase(ctx, db, obj)
+		comments := ""
+		constantFields := obj.Spec.HasImmutableFields()
+		if len(constantFields) > 0 {
+			comments = fmt.Sprintf("the database '%s' already exists. "+
+				"The following fields cannot be enforced and will be ignored: %s",
+				obj.Spec.Name, strings.Join(constantFields, ", "))
+		}
+		return comments, updateDatabase(ctx, db, obj)
 	}
 
-	return createDatabase(ctx, db, obj)
+	return "", createDatabase(ctx, db, obj)
 }
 
 func (r *DatabaseReconciler) deleteDatabase(ctx context.Context, obj *apiv1.Database) error {

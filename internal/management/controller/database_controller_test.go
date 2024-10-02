@@ -146,9 +146,10 @@ var _ = Describe("Managed Database status", func() {
 	})
 
 	It("properly marks the status on a succeeded reconciliation", func(ctx SpecContext) {
-		_, err := r.succeededReconciliation(ctx, database)
+		_, err := r.succeededReconciliation(ctx, database, "this is a comment")
 		Expect(err).ToNot(HaveOccurred())
 		Expect(database.Status.Ready).To(BeTrue())
+		Expect(database.Status.Comments).NotTo(BeEmpty())
 		Expect(database.Status.Error).To(BeEmpty())
 	})
 
