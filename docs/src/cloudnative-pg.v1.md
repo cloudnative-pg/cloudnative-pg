@@ -2389,6 +2389,14 @@ desired state that was synchronized</p>
    <p>Error is the reconciliation error message</p>
 </td>
 </tr>
+<tr><td><code>comments</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Comments contains information that may arise during object reconciliation
+that will make things more explicit to the user</p>
+</td>
+</tr>
 </tbody>
 </table>
 
