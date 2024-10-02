@@ -664,6 +664,7 @@ func (r *BackupReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manage
 
 	controllerBuilder := ctrl.NewControllerManagedBy(mgr).
 		For(&apiv1.Backup{}).
+		Named("backup").
 		Watches(&apiv1.Cluster{},
 			handler.EnqueueRequestsFromMapFunc(r.mapClustersToBackup()),
 			builder.WithPredicates(clustersWithBackupPredicate),

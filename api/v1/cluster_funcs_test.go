@@ -21,6 +21,7 @@ import (
 	"time"
 
 	barmanCatalog "github.com/cloudnative-pg/barman-cloud/pkg/catalog"
+	"github.com/cloudnative-pg/machinery/pkg/postgres/version"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -770,19 +771,15 @@ var _ = Describe("A config map resource version", func() {
 var _ = Describe("PostgreSQL version detection", func() {
 	tests := []struct {
 		imageName       string
-		postgresVersion int
+		postgresVersion version.Data
 	}{
 		{
 			"ghcr.io/cloudnative-pg/postgresql:14.0",
-			140000,
+			version.New(14, 0),
 		},
 		{
 			"ghcr.io/cloudnative-pg/postgresql:13.2",
-			130002,
-		},
-		{
-			"ghcr.io/cloudnative-pg/postgresql:9.6.3",
-			90603,
+			version.New(13, 2),
 		},
 	}
 
@@ -802,7 +799,7 @@ var _ = Describe("PostgreSQL version detection", func() {
 			},
 			Major: 16,
 		}
-		Expect(cluster.GetPostgresqlVersion()).To(Equal(160000))
+		Expect(cluster.GetPostgresqlVersion()).To(Equal(version.New(16, 0)))
 	})
 })
 

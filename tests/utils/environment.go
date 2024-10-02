@@ -25,7 +25,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cloudnative-pg/machinery/pkg/image/reference"
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	"github.com/cloudnative-pg/machinery/pkg/postgres/version"
 	"github.com/go-logr/logr"
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -46,7 +48,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
@@ -78,7 +79,7 @@ type TestingEnvironment struct {
 	Scheme             *runtime.Scheme
 	PreserveNamespaces []string
 	Log                logr.Logger
-	PostgresVersion    int
+	PostgresVersion    uint64
 	createdNamespaces  *uniqueStringSlice
 	AzureConfiguration AzureConfiguration
 	SternLogDir        string
@@ -137,12 +138,12 @@ func NewTestingEnvironment() (*TestingEnvironment, error) {
 	if postgresImageFromUser, exist := os.LookupEnv("POSTGRES_IMG"); exist {
 		postgresImage = postgresImageFromUser
 	}
-	imageReference := utils.NewReference(postgresImage)
-	postgresImageVersion, err := postgres.GetPostgresVersionFromTag(imageReference.Tag)
+	imageReference := reference.New(postgresImage)
+	postgresImageVersion, err := version.FromTag(imageReference.Tag)
 	if err != nil {
 		return nil, err
 	}
-	env.PostgresVersion = postgresImageVersion / 10000
+	env.PostgresVersion = postgresImageVersion.Major()
 
 	env.Client, err = client.New(env.RestClientConfig, client.Options{Scheme: env.Scheme})
 	if err != nil {

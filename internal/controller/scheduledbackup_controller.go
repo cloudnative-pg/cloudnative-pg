@@ -353,5 +353,6 @@ func (r *ScheduledBackupReconciler) SetupWithManager(ctx context.Context, mgr ct
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&apiv1.ScheduledBackup{}).
+		Named("scheduled-backup").
 		Complete(r)
 }

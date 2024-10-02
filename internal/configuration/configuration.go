@@ -21,6 +21,7 @@ package configuration
 import (
 	"path"
 	"strings"
+	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 
@@ -108,6 +109,19 @@ type Data struct {
 	// the <cluster-name>-any service. Defaults to false.
 	CreateAnyService bool `json:"createAnyService" env:"CREATE_ANY_SERVICE"`
 
+	// The duration (in seconds) to wait between the roll-outs of different
+	// clusters during an operator upgrade. This setting controls the
+	// timing of upgrades across clusters, spreading them out to reduce
+	// system impact. The default value is 0, which means no delay between
+	// PostgreSQL cluster upgrades.
+	ClustersRolloutDelay int `json:"clustersRolloutDelay" env:"CLUSTERS_ROLLOUT_DELAY"`
+
+	// The duration (in seconds) to wait between roll-outs of individual
+	// PostgreSQL instances within the same cluster during an operator
+	// upgrade. The default value is 0, meaning no delay between upgrades
+	// of instances in the same PostgreSQL cluster.
+	InstancesRolloutDelay int `json:"instancesRolloutDelay" env:"INSTANCES_ROLLOUT_DELAY"`
+
 	// IncludePlugins is a comma-separated list of plugins to always be
 	// included in the Cluster reconciliation
 	IncludePlugins string `json:"includePlugins" env:"INCLUDE_PLUGINS"`
@@ -152,6 +166,17 @@ func (config *Data) IsAnnotationInherited(name string) bool {
 // be inherited from the Cluster specification to the generated objects
 func (config *Data) IsLabelInherited(name string) bool {
 	return evaluateGlobPatterns(config.InheritedLabels, name)
+}
+
+// GetClustersRolloutDelay gets the delay between roll-outs of different clusters
+func (config *Data) GetClustersRolloutDelay() time.Duration {
+	return time.Duration(config.ClustersRolloutDelay) * time.Second
+}
+
+// GetInstancesRolloutDelay gets the delay between roll-outs of pods belonging
+// to the same cluster
+func (config *Data) GetInstancesRolloutDelay() time.Duration {
+	return time.Duration(config.InstancesRolloutDelay) * time.Second
 }
 
 // WatchedNamespaces get the list of additional watched namespaces.

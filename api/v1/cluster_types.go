@@ -496,6 +496,10 @@ const (
 	// PhaseUpgrade upgrade in process
 	PhaseUpgrade = "Upgrading cluster"
 
+	// PhaseUpgradeDelayed is set when a cluster need to be upgraded
+	// but the operation is being delayed by the operator configuration
+	PhaseUpgradeDelayed = "Cluster upgrade delayed"
+
 	// PhaseWaitingForUser set the status to wait for an action from the user
 	PhaseWaitingForUser = "Waiting for user action"
 

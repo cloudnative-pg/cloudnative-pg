@@ -100,7 +100,7 @@ func (instance *Instance) GeneratePostgresqlHBA(cluster *apiv1.Cluster, ldapBind
 	// See:
 	// https://www.postgresql.org/docs/14/release-14.html
 	defaultAuthenticationMethod := "scram-sha-256"
-	if version < 140000 {
+	if version.Major() < 14 {
 		defaultAuthenticationMethod = "md5"
 	}
 
@@ -429,7 +429,7 @@ func createPostgresqlConfiguration(cluster *apiv1.Cluster, preserveUserSettings 
 
 	info := postgres.ConfigurationInfo{
 		Settings:                         postgres.CnpgConfigurationSettings,
-		MajorVersion:                     fromVersion,
+		Version:                          fromVersion,
 		UserSettings:                     cluster.Spec.PostgresConfiguration.Parameters,
 		IncludingSharedPreloadLibraries:  true,
 		AdditionalSharedPreloadLibraries: cluster.Spec.PostgresConfiguration.AdditionalLibraries,

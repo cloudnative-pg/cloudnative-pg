@@ -152,13 +152,14 @@ by applying the manifest of the newer version for plain Kubernetes
 installations, or using the native package manager of the used distribution
 (please follow the instructions in the above sections).
 
-The second step is automatically executed after having updated the controller,
-by default triggering a rolling update of every deployed PostgreSQL instance to
-use the new instance manager. The rolling update procedure culminates with a
-switchover, which is controlled by the `primaryUpdateStrategy` option, by
-default set to `unsupervised`. When set to `supervised`, users need to complete
-the rolling update by manually promoting a new instance through the `cnpg`
-plugin for `kubectl`.
+
+The second step is automatically triggered after updating the controller. By
+default, this initiates a rolling update of every deployed PostgreSQL cluster,
+upgrading one instance at a time to use the new instance manager. The rolling
+update concludes with a switchover, which is governed by the
+`primaryUpdateStrategy` option. The default value, `unsupervised`, completes
+the switchover automatically. If set to `supervised`, the user must manually
+promote the new primary instance using the `cnpg` plugin for `kubectl`.
 
 !!! Seealso "Rolling updates"
     This process is discussed in-depth on the [Rolling Updates](rolling_update.md) page.
@@ -172,6 +173,21 @@ The default rolling update behavior can be replaced with in-place updates of
 the instance manager. This approach does not require a restart of the
 PostgreSQL instance, thereby avoiding a switchover within the cluster. This
 feature, which is disabled by default, is described in detail below.
+
+### Spread Upgrades
+
+By default, all PostgreSQL clusters are rolled out simultaneously, which may
+lead to a spike in resource usage, especially when managing multiple clusters.
+CloudNativePG provides two configuration options at the [operator level](operator_conf.md)
+that allow you to introduce delays between cluster roll-outs or even between
+instances within the same cluster, helping to distribute resource usage over
+time:
+
+- `CLUSTERS_ROLLOUT_DELAY`: Defines the number of seconds to wait between
+  roll-outs of different PostgreSQL clusters (default: `0`).
+- `INSTANCES_ROLLOUT_DELAY`: Defines the number of seconds to wait between
+  roll-outs of individual instances within the same PostgreSQL cluster (default:
+  `0`).
 
 ### In-place updates of the instance manager
 

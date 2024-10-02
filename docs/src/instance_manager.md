@@ -102,7 +102,7 @@ Please refer to the ["Failover" section](failover.md) for details.
 ## Disk Full Failure
 
 Storage exhaustion is a well known issue for PostgreSQL clusters.
-The [PostgreSQL documentation](https://www.postgresql.org/docs/current/disk-full.html)
+The [PostgreSQL documentation](https://www.postgresql.org/docs/current/diskusage.html#DISK-FULL)
 highlights the possible failure scenarios and the importance of monitoring disk
 usage to prevent it from becoming full.
 

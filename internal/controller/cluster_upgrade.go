@@ -42,6 +42,10 @@ import (
 // instance is not connected via streaming replication
 var errLogShippingReplicaElected = errors.New("log shipping replica elected as a new post-switchover primary")
 
+// errRolloutDelayed is raised the a pod rollout have been delayed because
+// of the operator configuration
+var errRolloutDelayed = errors.New("pod rollout delayed")
+
 type rolloutReason = string
 
 func (r *ClusterReconciler) rolloutRequiredInstances(
@@ -70,6 +74,19 @@ func (r *ClusterReconciler) rolloutRequiredInstances(
 		podRollout := isInstanceNeedingRollout(ctx, postgresqlStatus, cluster)
 		if !podRollout.required {
 			continue
+		}
+
+		managerResult := r.rolloutManager.CoordinateRollout(client.ObjectKeyFromObject(cluster), postgresqlStatus.Pod.Name)
+		if !managerResult.RolloutAllowed {
+			r.Recorder.Eventf(
+				cluster,
+				"Normal",
+				"RolloutDelayed",
+				"Rollout of pod %s have been delayed for %s",
+				postgresqlStatus.Pod.Name,
+				managerResult.TimeToWait.String(),
+			)
+			return false, errRolloutDelayed
 		}
 
 		restartMessage := fmt.Sprintf("Restarting instance %s, because: %s",
@@ -103,6 +120,21 @@ func (r *ClusterReconciler) rolloutRequiredInstances(
 	// it should be restarted by the instance manager itself
 	if primaryPostgresqlStatus.PendingRestartForDecrease {
 		return false, nil
+	}
+
+	managerResult := r.rolloutManager.CoordinateRollout(
+		client.ObjectKeyFromObject(cluster),
+		primaryPostgresqlStatus.Pod.Name)
+	if !managerResult.RolloutAllowed {
+		r.Recorder.Eventf(
+			cluster,
+			"Normal",
+			"RolloutDelayed",
+			"Rollout of pod %s have been delayed for %s",
+			primaryPostgresqlStatus.Pod.Name,
+			managerResult.TimeToWait.String(),
+		)
+		return false, errRolloutDelayed
 	}
 
 	return r.updatePrimaryPod(ctx, cluster, podList, *primaryPostgresqlStatus.Pod,
@@ -236,7 +268,11 @@ type rollout struct {
 	required             bool
 	canBeInPlace         bool
 	primaryForceRecreate bool
-	reason               string
+
+	needsChangeOperatorImage bool
+	needsChangeOperandImage  bool
+
+	reason string
 }
 
 type rolloutChecker func(
@@ -260,6 +296,7 @@ func isInstanceNeedingRollout(
 			required: true,
 			reason: fmt.Sprintf("pod '%s' is not reporting the executable hash",
 				status.Pod.Name),
+			needsChangeOperatorImage: true,
 		}
 	}
 
@@ -469,6 +506,7 @@ func checkPodImageIsOutdated(pod *corev1.Pod, cluster *apiv1.Cluster) (rollout, 
 		required: true,
 		reason: fmt.Sprintf("the instance is using a different image: %s -> %s",
 			pgCurrentImageName, targetImageName),
+		needsChangeOperandImage: true,
 	}, nil
 }
 
@@ -491,6 +529,7 @@ func checkPodInitContainerIsOutdated(pod *corev1.Pod, _ *apiv1.Cluster) (rollout
 		required: true,
 		reason: fmt.Sprintf("the instance is using an old init container image: %s -> %s",
 			opCurrentImageName, configuration.Current.OperatorImageName),
+		needsChangeOperatorImage: true,
 	}, nil
 }
 
@@ -598,6 +637,7 @@ func checkPodSpecIsOutdated(pod *corev1.Pod, cluster *apiv1.Cluster) (rollout, e
 			required: true,
 			reason: fmt.Sprintf("the instance is using an old init container image: %s -> %s",
 				opCurrentImageName, configuration.Current.OperatorImageName),
+			needsChangeOperatorImage: true,
 		}, nil
 	}
 
