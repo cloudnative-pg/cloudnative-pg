@@ -44,8 +44,8 @@ type PSQLForwardConnection struct {
 	err         error
 }
 
-// PSQLForwardConnectionNew initialize and create the proper forward configuration
-func PSQLForwardConnectionNew(env *TestingEnvironment, namespace, pod string) (*PSQLForwardConnection, error) {
+// psqlForwardConnectionNew initialize and create the proper forward configuration
+func psqlForwardConnectionNew(env *TestingEnvironment, namespace, pod string) (*PSQLForwardConnection, error) {
 	psqlc := &PSQLForwardConnection{}
 	if pod == "" {
 		return nil, fmt.Errorf("pod not provided")
@@ -86,8 +86,8 @@ func (psqlc *PSQLForwardConnection) createRequest(env *TestingEnvironment) *rest
 		SubResource("portforward")
 }
 
-// StartAndWait will begin the forward and wait to be ready
-func (psqlc *PSQLForwardConnection) StartAndWait() error {
+// startAndWait will begin the forward and wait to be ready
+func (psqlc *PSQLForwardConnection) startAndWait() error {
 	go func() {
 		ginkgo.GinkgoWriter.Printf("Starting port-forward\n")
 		psqlc.err = psqlc.portForward.ForwardPorts()
@@ -111,8 +111,8 @@ func (psqlc *PSQLForwardConnection) GetPooler() *pool.ConnectionPool {
 	return psqlc.pooler
 }
 
-// GetLocalPort gets the local port needed to connect to Postgres
-func (psqlc *PSQLForwardConnection) GetLocalPort() (string, error) {
+// getLocalPort gets the local port needed to connect to Postgres
+func (psqlc *PSQLForwardConnection) getLocalPort() (string, error) {
 	forwardedPorts, err := psqlc.portForward.GetPorts()
 	if err != nil {
 		return "", err
@@ -129,7 +129,7 @@ func (psqlc *PSQLForwardConnection) Close() {
 // createConnectionParameters return the parameters require to create a connection
 // to the current forwarded port
 func (psqlc *PSQLForwardConnection) createConnectionParameters(user, password string) (map[string]string, error) {
-	port, err := psqlc.GetLocalPort()
+	port, err := psqlc.getLocalPort()
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +142,7 @@ func (psqlc *PSQLForwardConnection) createConnectionParameters(user, password st
 	}, nil
 }
 
-// ForwardPSQLConnection simplify the creation of forwarded connection to PostgreSQL cluster
+// ForwardPSQLConnection simplifies the creation of forwarded connection to PostgreSQL cluster
 func ForwardPSQLConnection(
 	env *TestingEnvironment,
 	namespace,
@@ -173,12 +173,12 @@ func ForwardPSQLConnectionWithCreds(
 		return nil, nil, err
 	}
 
-	forward, err := PSQLForwardConnectionNew(env, namespace, cluster.Status.CurrentPrimary)
+	forward, err := psqlForwardConnectionNew(env, namespace, cluster.Status.CurrentPrimary)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	if err = forward.StartAndWait(); err != nil {
+	if err = forward.startAndWait(); err != nil {
 		return nil, nil, err
 	}
 
