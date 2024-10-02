@@ -209,11 +209,6 @@ that once a Database has been reconciled to its defined `generation`, it will
 not be re-applied by the instance manager. Therefore, your manual changes will
 not be rolled back inadvertently.
 
-!!! Note
-    A Database manifest is applied to the fullest. A field included in a
-    manifest may override a value that had been written previously on
-    the database in Postgres
-
 CloudNativePG gives you the flexibility to make alterations on your databases
 via Database manifests, via direct changes, or mixing matching to fit your
 use case.
