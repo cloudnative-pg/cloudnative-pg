@@ -364,6 +364,26 @@ type ClusterSpec struct {
 	// +optional
 	LivenessProbeTimeout *int32 `json:"livenessProbeTimeout,omitempty"`
 
+	// Number of seconds after the container has started before startup probes are initiated.
+	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
+	// +optional
+	StartupProbeInitialDelaySeconds int32 `json:"startupProbeInitialDelaySeconds,omitempty"`
+
+	// Number of seconds after the container has started before startup probes are initiated.
+	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
+	// +optional
+	StartupProbeTimeoutSeconds int32 `json:"startupProbeTimeoutSeconds,omitempty"`
+
+	// Number of seconds after which the probe times out. Defaults to 1 second. Minimum value is 1.
+	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
+	// +optional
+	LivenessProbeTimeoutSeconds int32 `json:"livenessProbeTimeoutSeconds,omitempty"`
+
+	// Number of seconds after which the probe times out. Defaults to 1 second. Minimum value is 1.
+	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
+	// +optional
+	ReadinessProbeTimeoutSeconds int32 `json:"readinessProbeTimeoutSeconds,omitempty"`
+
 	// Affinity/Anti-affinity rules for Pods
 	// +optional
 	Affinity AffinityConfiguration `json:"affinity,omitempty"`

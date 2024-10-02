@@ -3094,6 +3094,12 @@ spec:
                   ceiling(livenessProbe / 10).
                 format: int32
                 type: integer
+              livenessProbeTimeoutSeconds:
+                description: |-
+                  Number of seconds after which the probe times out. Defaults to 1 second. Minimum value is 1.
+                  More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
+                format: int32
+                type: integer
               logLevel:
                 default: info
                 description: 'The instances'' log level, one of the following values:
@@ -4523,6 +4529,12 @@ spec:
                     type: array
                     x-kubernetes-list-type: atomic
                 type: object
+              readinessProbeTimeoutSeconds:
+                description: |-
+                  Number of seconds after which the probe times out. Defaults to 1 second. Minimum value is 1.
+                  More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
+                format: int32
+                type: integer
               replica:
                 description: Replica cluster configuration
                 properties:
@@ -4764,6 +4776,18 @@ spec:
                   successfully start up (default 3600).
                   The startup probe failure threshold is derived from this value using the formula:
                   ceiling(startDelay / 10).
+                format: int32
+                type: integer
+              startupProbeInitialDelaySeconds:
+                description: |-
+                  Number of seconds after the container has started before startup probes are initiated.
+                  More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
+                format: int32
+                type: integer
+              startupProbeTimeoutSeconds:
+                description: |-
+                  Number of seconds after the container has started before startup probes are initiated.
+                  More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
                 format: int32
                 type: integer
               stopDelay:
