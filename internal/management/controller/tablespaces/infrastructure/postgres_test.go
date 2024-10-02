@@ -99,7 +99,7 @@ var _ = Describe("Postgres tablespaces functions test", func() {
 		stmt := fmt.Sprintf(expectedUpdateStmt, tbsName, ownerName)
 		mock.ExpectExec(stmt).
 			WillReturnResult(sqlmock.NewResult(2, 1))
-		err = Update(ctx, db, Tablespace{Name: tbsName, Owner: "postgres"})
+		err = Update(ctx, db, Tablespace{Name: tbsName, Owner: ownerName})
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(mock.ExpectationsWereMet()).To(Succeed())
 	})
