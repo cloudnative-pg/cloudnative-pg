@@ -92,7 +92,7 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 			// the PostgreSQL connection will be there and PostgreSQL will not restart in time because
 			// of the connection that wasn't close and stays idle
 			_ = conn.Close()
-			forward.Stop()
+			forward.Close()
 
 			// We kill the pid 1 process.
 			// The pod should be restarted and the count of the restarts
@@ -131,7 +131,7 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 				apiv1.ApplicationUserSecretSuffix,
 			)
 			defer func() {
-				forward.Stop()
+				forward.Close()
 			}()
 			Expect(err).NotTo(HaveOccurred())
 

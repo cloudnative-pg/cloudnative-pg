@@ -298,7 +298,7 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 				apiv1.ApplicationUserSecretSuffix,
 			)
 			defer func() {
-				forward.Stop()
+				forward.Close()
 			}()
 			Expect(err).ToNot(HaveOccurred())
 

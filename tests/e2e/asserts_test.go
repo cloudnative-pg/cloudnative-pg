@@ -448,7 +448,7 @@ func AssertCreateTestData(env *testsUtils.TestingEnvironment, namespace, cluster
 		query := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %v AS VALUES (1),(2);", tableName)
 		_, err = conn.Exec(query)
 		Expect(err).ToNot(HaveOccurred())
-		forward.Stop()
+		forward.Close()
 	})
 }
 
@@ -472,7 +472,7 @@ func AssertCreateTestDataWithDatabaseName(
 		query := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %v AS VALUES (1),(2);", tableName)
 		_, err = conn.Exec(query)
 		Expect(err).ToNot(HaveOccurred())
-		forward.Stop()
+		forward.Close()
 	})
 }
 
@@ -495,7 +495,7 @@ func AssertCreateTestDataInTablespace(env *testsUtils.TestingEnvironment, tl Tab
 			apiv1.ApplicationUserSecretSuffix,
 		)
 		defer func() {
-			forward.Stop()
+			forward.Close()
 		}()
 		Expect(err).ToNot(HaveOccurred())
 
@@ -545,7 +545,7 @@ func insertRecordIntoTableWithDatabaseName(
 		apiv1.ApplicationUserSecretSuffix,
 	)
 	defer func() {
-		forward.Stop()
+		forward.Close()
 	}()
 	Expect(err).ToNot(HaveOccurred())
 
@@ -1392,7 +1392,7 @@ func AssertCreationOfTestDataForTargetDB(
 		Expect(err).ToNot(HaveOccurred())
 
 		// Close the connection and forward
-		forward.Stop()
+		forward.Close()
 	})
 }
 
@@ -1573,7 +1573,7 @@ func AssertClusterAsyncReplica(namespace, sourceClusterFile, restoreClusterFile,
 		Expect(err).ToNot(HaveOccurred())
 
 		// We need the credentials from the source cluster because the replica cluster
-		// doesn't create the credentials on it's own namespace
+		// doesn't create the credentials on its own namespace
 		appUser, appUserPass, err := testsUtils.GetCredentials(
 			sourceClusterName,
 			namespace,
@@ -1592,7 +1592,7 @@ func AssertClusterAsyncReplica(namespace, sourceClusterFile, restoreClusterFile,
 		)
 		defer func() {
 			_ = connRestored.Close()
-			forwardRestored.Stop()
+			forwardRestored.Close()
 		}()
 		Expect(err).ToNot(HaveOccurred())
 
@@ -1611,7 +1611,7 @@ func AssertClusterAsyncReplica(namespace, sourceClusterFile, restoreClusterFile,
 		)
 		defer func() {
 			_ = connSource.Close()
-			forwardSource.Stop()
+			forwardSource.Close()
 		}()
 		Expect(err).ToNot(HaveOccurred())
 
@@ -2068,7 +2068,7 @@ func prepareClusterForPITROnMinio(
 			apiv1.ApplicationUserSecretSuffix,
 		)
 		defer func() {
-			forward.Stop()
+			forward.Close()
 		}()
 		Expect(err).ToNot(HaveOccurred())
 
@@ -2119,7 +2119,7 @@ func prepareClusterForPITROnAzureBlob(
 			apiv1.ApplicationUserSecretSuffix,
 		)
 		defer func() {
-			forward.Stop()
+			forward.Close()
 		}()
 		Expect(err).ToNot(HaveOccurred())
 		insertRecordIntoTable(tableNamePitr, 3, conn)
@@ -2221,7 +2221,7 @@ func prepareClusterForPITROnAzurite(
 			apiv1.ApplicationUserSecretSuffix,
 		)
 		defer func() {
-			forward.Stop()
+			forward.Close()
 		}()
 		Expect(err).ToNot(HaveOccurred())
 		insertRecordIntoTable("for_restore", 3, conn)

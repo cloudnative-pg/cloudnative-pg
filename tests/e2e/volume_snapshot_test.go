@@ -262,7 +262,7 @@ var _ = Describe("Verify Volume Snapshot",
 						apiv1.ApplicationUserSecretSuffix,
 					)
 					defer func() {
-						forward.Stop()
+						forward.Close()
 					}()
 					Expect(err).ToNot(HaveOccurred())
 					// Insert 2 more rows which we expect not to be present at the end of the recovery
@@ -615,7 +615,7 @@ var _ = Describe("Verify Volume Snapshot",
 						apiv1.ApplicationUserSecretSuffix,
 					)
 					defer func() {
-						forward.Stop()
+						forward.Close()
 					}()
 					Expect(err).ToNot(HaveOccurred())
 					// Create a "test" table with values 1,2
@@ -700,7 +700,7 @@ var _ = Describe("Verify Volume Snapshot",
 						apiv1.ApplicationUserSecretSuffix,
 					)
 					defer func() {
-						forward.Stop()
+						forward.Close()
 					}()
 					Expect(err).ToNot(HaveOccurred())
 					// Insert 2 more rows which we expect not to be present at the end of the recovery

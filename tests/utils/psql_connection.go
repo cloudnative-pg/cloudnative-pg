@@ -121,8 +121,8 @@ func (psqlc *PSQLForwardConnection) GetLocalPort() (string, error) {
 	return strconv.Itoa(int(forwardedPorts[0].Local)), nil
 }
 
-// Stop will stop the forward and exit
-func (psqlc *PSQLForwardConnection) Stop() {
+// Close will stop the forward and exit
+func (psqlc *PSQLForwardConnection) Close() {
 	psqlc.portForward.Close()
 }
 
@@ -220,7 +220,7 @@ func RunQueryRowOverForward(
 		return nil, err
 	}
 	defer func() {
-		forward.Stop()
+		forward.Close()
 	}()
 
 	return conn.QueryRow(query), nil

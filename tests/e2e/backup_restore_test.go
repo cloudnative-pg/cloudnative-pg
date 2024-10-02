@@ -882,7 +882,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 					apiv1.ApplicationUserSecretSuffix,
 				)
 				defer func() {
-					forward.Stop()
+					forward.Close()
 				}()
 				Expect(err).ToNot(HaveOccurred())
 				// insert 2 more rows entries 3,4 on the "app" database

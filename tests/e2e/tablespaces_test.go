@@ -525,7 +525,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 						apiv1.ApplicationUserSecretSuffix,
 					)
 					defer func() {
-						forward.Stop()
+						forward.Close()
 					}()
 					Expect(err).ToNot(HaveOccurred())
 

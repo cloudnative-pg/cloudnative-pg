@@ -84,7 +84,7 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 				apiv1.SuperUserSecretSuffix,
 			)
 			defer func() {
-				forward.Stop()
+				forward.Close()
 			}()
 			Expect(err).ToNot(HaveOccurred())
 
@@ -197,7 +197,7 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 		})
 
 		By("close connection to imported and the source cluster", func() {
-			forwardTarget.Stop()
+			forwardTarget.Close()
 		})
 	})
 })

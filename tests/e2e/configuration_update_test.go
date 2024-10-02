@@ -496,7 +496,7 @@ var _ = Describe("Configuration update with primaryUpdateMethod", Label(tests.La
 					// the PostgreSQL connection will be there and PostgreSQL will not restart in time because
 					// of the connection that wasn't close and stays idle
 					_ = conn.Close()
-					forward.Stop()
+					forward.Close()
 				}()
 
 				query := "SELECT TO_CHAR(pg_postmaster_start_time(), 'YYYY-MM-DD HH24:MI:SS');"
