@@ -28,7 +28,7 @@ containing the following information:
   professional support services (*maximum 400 characters*).
 
 [CloudNativePG maintainers will vet each submission](https://github.com/cloudnative-pg/governance/blob/main/GOVERNANCE.md#voting)
-and reserve the right to reject your request or request changes if your website
+and reserve the right to reject your application or request changes if your website
 doesn’t clearly mention CloudNativePG support, if it doesn't include at least
 one link back to [cloudnative-pg.io](https://cloudnative-pg.io), or if your
 claims cannot be objectively verified.
