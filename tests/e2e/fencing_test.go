@@ -70,7 +70,7 @@ var _ = Describe("Fencing", Label(tests.LabelPlugin), func() {
 	}
 
 	checkInstanceIsStreaming := func(instanceName, namespace string) {
-		timeout := time.Second * 10
+		query := "SELECT count(*) FROM pg_stat_wal_receiver"
 		Eventually(func() (int, error) {
 			err := env.Client.Get(env.Ctx,
 				ctrlclient.ObjectKey{Namespace: namespace, Name: instanceName},
@@ -78,8 +78,13 @@ var _ = Describe("Fencing", Label(tests.LabelPlugin), func() {
 			if err != nil {
 				return 0, err
 			}
-			out, _, err := env.ExecCommand(env.Ctx, pod, specs.PostgresContainerName, &timeout,
-				"psql", "-U", "postgres", "-tAc", "SELECT count(*) FROM pg_stat_wal_receiver")
+			out, _, err := env.ExecQueryInInstancePod(
+				testUtils.PodLocator{
+					Namespace: pod.Namespace,
+					PodName:   pod.Name,
+				},
+				testUtils.PostgresDBName,
+				query)
 			if err != nil {
 				return 0, err
 			}
