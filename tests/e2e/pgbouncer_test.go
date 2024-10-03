@@ -50,7 +50,9 @@ var _ = Describe("PGBouncer Connections", Label(tests.LabelServiceConnectivity),
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 		})
 		JustAfterEach(func() {
-			DeleteTableUsingPgBouncerService(namespace, clusterName, poolerBasicAuthRWSampleFile, env, psqlClientPod)
+			primaryPod, err := env.GetClusterPrimary(namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+			DeleteTableUsingPgBouncerService(namespace, clusterName, poolerBasicAuthRWSampleFile, env, primaryPod)
 		})
 
 		It("can connect to Postgres via pgbouncer service using basic authentication", func() {
