@@ -134,11 +134,6 @@ func (status *ClusterStatus) GetAvailableArchitecture(archName string) *Availabl
 	return nil
 }
 
-// DeepCopyInto needs to be manually added for the controller-gen compiler to work correctly, given that it cannot
-// generate the DeepCopyInto for the regexp type.
-// The method is empty because we don't want to transfer the cache when invoking DeepCopyInto
-func (receiver synchronizeReplicasCache) DeepCopyInto(*synchronizeReplicasCache) {}
-
 func (r *SynchronizeReplicasConfiguration) compileRegex() []error {
 	if r == nil {
 		return nil
