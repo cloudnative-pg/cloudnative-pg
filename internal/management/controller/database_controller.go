@@ -160,7 +160,7 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	// Database Object
 	existingManager, err := r.isAlreadyManagedBy(ctx, &database)
 	if err != nil {
-		return ctrl.Result{}, nil
+		return ctrl.Result{}, err
 	}
 
 	if len(existingManager) > 0 {
@@ -190,7 +190,7 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 }
 
 // isAlreadyManagedBy checks if the target PG Database of a given Database object is already
-// managed by an existing Database object. If it is, we return the name of the current owner
+// managed by an existing Database object. If it is, we return the name of that object
 func (r *DatabaseReconciler) isAlreadyManagedBy(
 	ctx context.Context,
 	database *apiv1.Database,
@@ -216,7 +216,7 @@ func (r *DatabaseReconciler) isAlreadyManagedBy(
 			continue
 		}
 
-		// We consider only Database objects for which the reconciler have
+		// We consider only Database objects for which the reconciler has
 		// succeeded at least once
 		if db.Spec.Name == database.Spec.Name && db.Status.ObservedGeneration > 0 {
 			return db.Name, nil

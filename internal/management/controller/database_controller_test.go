@@ -160,7 +160,7 @@ var _ = Describe("Managed Database status", func() {
 		Expect(database.Status.Error).To(BeEquivalentTo(exampleError.Error()))
 	})
 
-	It("reconciliation fails if the target Database is already being managed", func(ctx SpecContext) {
+	It("marks as failed if the target Database is already being managed", func(ctx SpecContext) {
 		// The Database obj currently managing "test-database"
 		currentManager := &apiv1.Database{
 			ObjectMeta: metav1.ObjectMeta{
@@ -196,8 +196,8 @@ var _ = Describe("Managed Database status", func() {
 			},
 		}
 
-		Expect(fakeClient.Create(ctx, currentManager)).ToNot(HaveOccurred())
-		Expect(fakeClient.Create(ctx, dbDuplicate)).ToNot(HaveOccurred())
+		Expect(fakeClient.Create(ctx, currentManager)).To(Succeed())
+		Expect(fakeClient.Create(ctx, dbDuplicate)).To(Succeed())
 
 		// Reconcile and get the updated object
 		_, err = r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{
