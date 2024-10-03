@@ -84,6 +84,7 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 				apiv1.SuperUserSecretSuffix,
 			)
 			defer func() {
+				_ = conn.Close()
 				forward.Close()
 			}()
 			Expect(err).ToNot(HaveOccurred())

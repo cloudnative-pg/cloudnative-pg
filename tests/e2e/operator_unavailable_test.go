@@ -26,6 +26,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -59,7 +60,13 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 
 			// Load test data
 			currentPrimary := clusterName + "-1"
-			AssertCreateTestData(env, namespace, clusterName, "test")
+			tableLocator := TableLocator{
+				Namespace:    namespace,
+				ClusterName:  clusterName,
+				DatabaseName: testsUtils.AppDBName,
+				TableName:    "test",
+			}
+			AssertCreateTestData(env, tableLocator)
 
 			By("scaling down operator replicas to zero", func() {
 				err := env.ScaleOperatorDeployment(0)
@@ -120,10 +127,7 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 					return specs.IsPodStandby(pod), err
 				}, timeout).Should(BeTrue())
 			})
-			// Expect the test data previously created to be available
-			primary, err := env.GetClusterPrimary(namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
-			AssertDataExpectedCountWithDatabaseName(namespace, primary.Name, "app", "test", 2)
+			AssertDataExpectedCount(env, tableLocator, 2)
 		})
 	})
 
@@ -140,7 +144,13 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 
 			// Load test data
 			currentPrimary := clusterName + "-1"
-			AssertCreateTestData(env, namespace, clusterName, "test")
+			tableLocator := TableLocator{
+				Namespace:    namespace,
+				ClusterName:  clusterName,
+				DatabaseName: testsUtils.AppDBName,
+				TableName:    "test",
+			}
+			AssertCreateTestData(env, tableLocator)
 
 			operatorNamespace, err := env.GetOperatorNamespaceName()
 			Expect(err).ToNot(HaveOccurred())
@@ -211,10 +221,7 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 					return specs.IsPodStandby(pod), err
 				}, timeout).Should(BeTrue())
 			})
-			// Expect the test data previously created to be available
-			primary, err := env.GetClusterPrimary(namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
-			AssertDataExpectedCountWithDatabaseName(namespace, primary.Name, "app", "test", 2)
+			AssertDataExpectedCount(env, tableLocator, 2)
 		})
 	})
 })

@@ -118,7 +118,13 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 
 			// Load test data
 			oldPrimary := clusterName + "-1"
-			AssertCreateTestData(env, namespace, clusterName, "test")
+			tableLocator := TableLocator{
+				Namespace:    namespace,
+				ClusterName:  clusterName,
+				DatabaseName: testsUtils.AppDBName,
+				TableName:    "test",
+			}
+			AssertCreateTestData(env, tableLocator)
 
 			// We create a mapping between the pod names and the UIDs of
 			// their volumes. We do not expect the UIDs to change.
@@ -178,10 +184,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 				}
 			})
 
-			// Expect the (previously created) test data to be available
-			primary, err := env.GetClusterPrimary(namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
-			AssertDataExpectedCountWithDatabaseName(namespace, primary.Name, "app", "test", 2)
+			AssertDataExpectedCount(env, tableLocator, 2)
 			AssertClusterStandbysAreStreaming(namespace, clusterName, 120)
 		})
 
@@ -230,7 +233,13 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 
 				// Load test data
 				oldPrimary := clusterName + "-1"
-				AssertCreateTestData(env, namespace, clusterName, "test")
+				tableLocator := TableLocator{
+					Namespace:    namespace,
+					ClusterName:  clusterName,
+					DatabaseName: testsUtils.AppDBName,
+					TableName:    "test",
+				}
+				AssertCreateTestData(env, tableLocator)
 
 				// We create a mapping between the pod names and the UIDs of
 				// their volumes. We do not expect the UIDs to change.
@@ -294,10 +303,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 					}
 				})
 
-				// Expect the (previously created) test data to be available
-				primary, err := env.GetClusterPrimary(namespace, clusterName)
-				Expect(err).ToNot(HaveOccurred())
-				AssertDataExpectedCountWithDatabaseName(namespace, primary.Name, "app", "test", 2)
+				AssertDataExpectedCount(env, tableLocator, 2)
 				AssertClusterStandbysAreStreaming(namespace, clusterName, 120)
 			})
 		})
@@ -360,7 +366,13 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 			})
 
 			// Load test data
-			AssertCreateTestData(env, namespace, clusterName, "test")
+			tableLocator := TableLocator{
+				Namespace:    namespace,
+				ClusterName:  clusterName,
+				DatabaseName: testsUtils.AppDBName,
+				TableName:    "test",
+			}
+			AssertCreateTestData(env, tableLocator)
 
 			// We uncordon a cordoned node. New pods can go there.
 			By("uncordon node for pod failover", func() {
@@ -396,10 +408,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 				}, timeout).Should(Succeed())
 			})
 
-			// Expect the (previously created) test data to be available
-			primary, err := env.GetClusterPrimary(namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
-			AssertDataExpectedCountWithDatabaseName(namespace, primary.Name, "app", "test", 2)
+			AssertDataExpectedCount(env, tableLocator, 2)
 			AssertClusterStandbysAreStreaming(namespace, clusterName, 120)
 			err = nodes.UncordonAllNodes(env)
 			Expect(err).ToNot(HaveOccurred())
@@ -433,9 +442,13 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 				})
 
 				// Load test data
-				primary, err := env.GetClusterPrimary(namespace, clusterName)
-				Expect(err).ToNot(HaveOccurred())
-				AssertCreateTestData(env, namespace, clusterName, "test")
+				tableLocator := TableLocator{
+					Namespace:    namespace,
+					ClusterName:  clusterName,
+					DatabaseName: testsUtils.AppDBName,
+					TableName:    "test",
+				}
+				AssertCreateTestData(env, tableLocator)
 
 				// Drain the node containing the primary pod and store the list of running pods
 				_ = nodes.DrainPrimaryNode(namespace, clusterName,
@@ -458,7 +471,8 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 					Expect(err).ToNot(HaveOccurred())
 				})
 
-				AssertDataExpectedCountWithDatabaseName(namespace, primary.Name, "app", "test", 2)
+				AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReady], env)
+				AssertDataExpectedCount(env, tableLocator, 2)
 			})
 		})
 

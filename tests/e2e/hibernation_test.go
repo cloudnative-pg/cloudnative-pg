@@ -225,7 +225,13 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 			var beforeHibernationPgDataPvcUID types.UID
 
 			// Write a table and some data on the "app" database
-			AssertCreateTestData(env, namespace, clusterName, tableName)
+			tableLocator := TableLocator{
+				Namespace:    namespace,
+				ClusterName:  clusterName,
+				DatabaseName: testsUtils.AppDBName,
+				TableName:    tableName,
+			}
+			AssertCreateTestData(env, tableLocator)
 			clusterManifest, currentPrimary := getPrimaryAndClusterManifest(namespace, clusterName)
 
 			By("collecting pgWal pvc details of current primary", func() {
@@ -289,7 +295,7 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 
 			AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReady], env)
 			// Test data should be present after hibernation off
-			AssertDataExpectedCount(env, namespace, clusterName, tableName, 2)
+			AssertDataExpectedCount(env, tableLocator, 2)
 		}
 
 		When("cluster setup with PG-WAL volume", func() {
@@ -316,7 +322,13 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 				Expect(err).ToNot(HaveOccurred())
 				AssertCreateCluster(namespace, clusterName, sampleFileClusterWithOutPGWalVolume, env)
 				// Write a table and some data on the "app" database
-				AssertCreateTestData(env, namespace, clusterName, tableName)
+				tableLocator := TableLocator{
+					Namespace:    namespace,
+					ClusterName:  clusterName,
+					DatabaseName: testsUtils.AppDBName,
+					TableName:    tableName,
+				}
+				AssertCreateTestData(env, tableLocator)
 				clusterManifest, currentPrimary := getPrimaryAndClusterManifest(namespace,
 					clusterName)
 
@@ -363,7 +375,7 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 
 				AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReady], env)
 				// Test data should be present after hibernation off
-				AssertDataExpectedCount(env, namespace, clusterName, tableName, 2)
+				AssertDataExpectedCount(env, tableLocator, 2)
 			})
 		})
 		When("cluster hibernation after switchover", func() {
