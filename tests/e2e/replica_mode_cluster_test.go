@@ -83,7 +83,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				sourceDBName,
 				replicaClusterSampleTLS,
 				testTableName,
-				psqlClientPod)
+			)
 
 			replicaName, err := env.GetResourceNameFromYAML(replicaClusterSampleTLS)
 			Expect(err).ToNot(HaveOccurred())
@@ -116,7 +116,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				sourceDBName,
 				replicaClusterSampleBasicAuth,
 				testTableName,
-				psqlClientPod)
+			)
 
 			AssertDetachReplicaModeCluster(
 				replicaNamespace,
@@ -159,7 +159,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				sourceDBName,
 				clusterTwoFile,
 				testTableName,
-				psqlClientPod)
+			)
 
 			// turn the src cluster into a replica
 			By("setting replica mode on the src cluster", func() {
@@ -207,8 +207,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			})
 
 			By("creating a new data in the new source cluster", func() {
-				AssertCreateTestDataWithDatabaseName(namespace, clusterTwoName, sourceDBName,
-					"new_test_table", clusterTwoPrimary)
+				AssertCreateTestDataWithDatabaseName(env, namespace, clusterTwoName, sourceDBName, "new_test_table")
 			})
 
 			By("checking that the data is present in the old src cluster", func() {
@@ -253,7 +252,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				sourceDBName,
 				replicaClusterSample,
 				testTableName,
-				psqlClientPod)
+			)
 
 			// Get primary from replica cluster
 			primaryReplicaCluster, err := env.GetClusterPrimary(replicaNamespace, replicaClusterName)
@@ -343,7 +342,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 					sourceDBName,
 					replicaClusterSample,
 					testTableName,
-					psqlClientPod)
+				)
 			})
 		})
 
@@ -414,7 +413,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 					sourceDBName,
 					replicaClusterSample,
 					testTableName,
-					psqlClientPod)
+				)
 			})
 		})
 	})
