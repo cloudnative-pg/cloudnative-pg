@@ -56,7 +56,7 @@ The database reconciler will transparently handle this on behalf of the user,
 making it easy to honor a Database manifest no matter the previous history
 of the cluster.
 
-There is however a difference regarding handling of "immutable" fields: on an
+There is however a difference regarding the handling of "immutable" fields: on an
 existing Database object, any modification that alters the immutable fields will
 be rejected at the Kubernetes level.
 On a newly declared Database manifest that references an existing database, the
