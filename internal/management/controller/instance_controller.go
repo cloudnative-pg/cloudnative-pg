@@ -246,7 +246,7 @@ func (r *InstanceReconciler) Reconcile(
 		return result, err
 	}
 
-	if r.instance.PodName == cluster.Status.CurrentPrimary {
+	if r.instance.GetPodName() == cluster.Status.CurrentPrimary {
 		result, err := roles.Reconcile(ctx, r.instance, cluster, r.client)
 		if err != nil || !result.IsZero() {
 			return result, err
