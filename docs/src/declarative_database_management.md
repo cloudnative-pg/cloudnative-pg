@@ -44,6 +44,31 @@ the database created in Postgres.
     commands, it does not support renaming of databases. Changing the
     `spec.name` in a Database object will be rejected at the Kubernetes level.
 
+### Managing an existing database via a Database manifest
+
+It is possible to declare a Database object that will handle an existing
+database. In such case, the Database's fields will be applied using `ALTER`
+statements, rather than `CREATE`. There are differences between these two
+Postgres commands. In particular, the options accepted by `ALTER` are a subset
+of those accepted by `CREATE`.
+
+The database reconciler will transparently handle this on behalf of the user,
+making it easy to honor a Database manifest no matter the previous history
+of the cluster.
+
+There is however a difference regarding handling of "immutable" fields: on an
+existing Database object, any modification that alters the immutable fields will
+be rejected at the Kubernetes level.
+On a newly declared Database manifest that references an existing database, the
+immutable fields will simply be ignored, as they are not valid options in the
+`ALTER DATABASE` command.
+
+!!! Warning
+    If a Database manifest references an existing database, any fields in the
+    manifest that cannot be set in `ALTER DATABASE` will be dropped silently.
+    Notably, the options around encoding and collations, as well as the template
+    used, are immutable and not supported in `ALTER`.
+
 ### Database objects defined on  replica clusters
 
 Database objects declared on a replica cluster cannot be enforced, since the
@@ -129,9 +154,8 @@ identical `spec.name` and `spec.cluster.name`).
 The database reconciler could simply apply them both. The first applied would
 result in `CREATE` statements (assuming the database did not exist in Postgres),
 while the second one would result in `ALTER` statements.
-While this could work, it could lead to unexpected behavior: given two Database
-objects managing the same Postgres database, it would not be clear which one
-would be reflected in Postgres in the long term.
+While this could work, it would make it much harder to reason about Database
+objects; there would be uncertainty as to the order of operations.
 
 For this reason, the database reconciler will check, given a Database object,
 if there is already another Database object managing the same database.
