@@ -57,7 +57,7 @@ making it easy to honor a Database manifest no matter the previous history
 of the cluster.
 
 There is however a difference regarding the handling of "immutable" fields: on an
-existing Database object, any modification that alters the immutable fields will
+existing Database object, any modification of the immutable fields will
 be rejected at the Kubernetes level.
 On a newly declared Database manifest that references an existing database, the
 immutable fields will simply be ignored, as they are not valid options in the
