@@ -13,8 +13,10 @@ or content provided by the listed companies or individuals.*
 
 ## How to Get Listed
 
-To have your company or personal services featured on this list, please follow
-these steps to submit a pull request to the CloudNativePG website:
+To have your company or personal services featured on this list, please submit
+a [pull request to the CloudNativePG website](https://github.com/cloudnative-pg/cloudnative-pg.github.io)
+by adding a `.md` file in the [`content/support` folder](https://github.com/cloudnative-pg/cloudnative-pg.github.io/tree/main/content/support)
+containing the following information:
 
 1. **Organisation Name**: Clearly specify the name of your company or entity.
 2. **Organisation Logo**: Provide your company logo in SVG format.
@@ -27,6 +29,6 @@ these steps to submit a pull request to the CloudNativePG website:
 
 [CloudNativePG maintainers will review each submission](https://github.com/cloudnative-pg/governance/blob/main/GOVERNANCE.md#voting)
 and reserve the right to vet your request if your website doesn’t clearly
-mention CloudNativePG support, includes at least one link back to
+mention CloudNativePG support, if it doesn't include at least one link back to
 [cloudnative-pg.io](https://cloudnative-pg.io), or if your claims cannot be
 objectively verified.
