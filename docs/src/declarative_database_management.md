@@ -65,7 +65,7 @@ immutable fields will simply be ignored, as they are not valid options in the
 
 !!! Warning
     If a Database manifest references an existing database, any fields in the
-    manifest that cannot be set in `ALTER DATABASE` will be dropped silently.
+    manifest that cannot be set in `ALTER DATABASE` will be ignored.
     Notably, the options around encoding and collations, as well as the template
     used, are immutable and not supported in `ALTER`.
 
