@@ -80,7 +80,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				sourceDBName,
 				replicaClusterSampleTLS,
 				testTableName,
-				psqlClientPod)
+			)
 
 			replicaName, err := env.GetResourceNameFromYAML(replicaClusterSampleTLS)
 			Expect(err).ToNot(HaveOccurred())
@@ -113,7 +113,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				sourceDBName,
 				replicaClusterSampleBasicAuth,
 				testTableName,
-				psqlClientPod)
+			)
 
 			AssertDetachReplicaModeCluster(
 				replicaNamespace,
@@ -156,7 +156,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				sourceDBName,
 				replicaClusterSample,
 				testTableName,
-				psqlClientPod)
+			)
 
 			// Get primary from replica cluster
 			primaryReplicaCluster, err := env.GetClusterPrimary(replicaNamespace, replicaClusterName)
@@ -246,7 +246,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 					sourceDBName,
 					replicaClusterSample,
 					testTableName,
-					psqlClientPod)
+				)
 			})
 		})
 
@@ -317,7 +317,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 					sourceDBName,
 					replicaClusterSample,
 					testTableName,
-					psqlClientPod)
+				)
 			})
 		})
 	})
