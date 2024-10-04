@@ -419,8 +419,8 @@ The primary use cases for this method include:
 !!! Warning
     In its current implementation, this method clones the source PostgreSQL
     instance, thereby creating a *snapshot*. Once the cloning process has finished,
-    the new cluster is immediately started. Refer to ["Current limitations"](#current-limitations) for more
-    details.
+    the new cluster is immediately started.
+    Refer to ["Current limitations"](#current-limitations) for more details.
 
 Similar to the `recovery` bootstrap method, once the cloning operation is
 complete, the operator takes full ownership of the target cluster, starting
