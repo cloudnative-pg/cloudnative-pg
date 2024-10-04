@@ -24,6 +24,7 @@ import (
 	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -228,6 +229,17 @@ func (backup *Backup) GetVolumeSnapshotConfiguration(
 	}
 
 	return config
+}
+
+// EnsureGVKIsPresent ensures that the GroupVersionKind (GVK) metadata is present in the Backup object.
+// This is necessary because informers do not automatically include metadata inside the object.
+// By setting the GVK, we ensure that components such as the plugins have enough metadata to typecheck the object.
+func (backup *Backup) EnsureGVKIsPresent() {
+	backup.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   GroupVersion.Group,
+		Version: GroupVersion.Version,
+		Kind:    BackupKind,
+	})
 }
 
 // IsEmpty checks if the plugin configuration is empty or not
