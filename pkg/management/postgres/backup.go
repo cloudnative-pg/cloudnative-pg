@@ -209,7 +209,6 @@ func (b *BackupCommand) takeBackup(ctx context.Context) error {
 
 	// Update backup status in cluster conditions on startup
 	if err := b.retryWithRefreshedCluster(ctx, func() error {
-		// TODO: this condition is set only here, never removed or handled?
 		return conditions.Patch(ctx, b.Client, b.Cluster, apiv1.BackupStartingCondition)
 	}); err != nil {
 		b.Log.Error(err, "Error changing backup condition (backup started)")
