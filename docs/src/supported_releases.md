@@ -93,7 +93,7 @@ Kubernetes distributions beyond the standard/vanilla one - such as Red Hat
 OpenShift. This may change in the future, and if it does, the CloudNativePG
 maintainers will update the official policy accordingly.
 
-If you plan to deploy CloudNativePG on Red Hat OpenShift, you can utilize the
+If you plan to deploy CloudNativePG on Red Hat OpenShift, you can use the
 [certified operator provided by EDB](https://catalog.redhat.com/software/container-stacks/detail/653fd4035eece8598f66d97b),
 which comes with full support from EDB.
 
