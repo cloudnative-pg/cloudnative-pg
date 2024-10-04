@@ -389,44 +389,59 @@ to the ["Recovery" section](recovery.md).
 
 ### Bootstrap from a live cluster (`pg_basebackup`)
 
-The `pg_basebackup` bootstrap mode lets you create a new cluster (*target*) as
-an exact physical copy of an existing and **binary compatible** PostgreSQL
-instance (*source*), through a valid *streaming replication* connection.
-The source instance can be either a primary or a standby PostgreSQL server.
+The `pg_basebackup` bootstrap mode allows you to create a new cluster
+(*target*) as an exact physical copy of an existing and **binary-compatible**
+PostgreSQL instance (*source*) managed by CloudNativePG, using a valid
+*streaming replication* connection. The source instance can either be a primary
+or a standby PostgreSQL server. It’s crucial to thoroughly review the
+requirements section below, as the pros and cons of PostgreSQL physical
+replication fully apply.
 
-The primary use case for this method is represented by **migrations** to CloudNativePG,
-either from outside Kubernetes or within Kubernetes (e.g., from another operator).
+The primary use cases for this method include:
 
-!!! Warning
-    The current implementation creates a *snapshot* of the origin PostgreSQL
-    instance when the cloning process terminates and immediately starts
-    the created cluster. See ["Current limitations"](#current-limitations) below for details.
-
-Similar to the case of the `recovery` bootstrap method, once the clone operation
-completes, the operator will take ownership of the target cluster, starting from
-the first instance. This includes overriding some configuration parameters, as
-required by CloudNativePG, resetting the superuser password, creating
-the `streaming_replica` user, managing the replicas, and so on. The resulting
-cluster will be completely independent of the source instance.
+- Reporting and business intelligence clusters that need to be regenerated
+  periodically (daily, weekly)
+- Test databases containing live data that require periodic regeneration
+  (daily, weekly, monthly) and anonymization
+- Rapid spin-up of a standalone replica cluster
+- Physical migrations of CloudNativePG clusters to different namespaces or
+  Kubernetes clusters
 
 !!! Important
-    Configuring the network between the target instance and the source instance
-    goes beyond the scope of CloudNativePG documentation, as it depends
-    on the actual context and environment.
+    Avoid using this method, based on physical replication, to migrate an
+    existing PostgreSQL cluster outside of Kubernetes into CloudNativePG unless you
+    are completely certain that all requirements are met and the operation has been
+    thoroughly tested. The CloudNativePG community does not endorse this approach
+    for such use cases and recommends using logical import instead. It is
+    exceedingly rare that all requirements for physical replication are met in a
+    way that seamlessly works with CloudNativePG.
 
-The streaming replication client on the target instance, which will be
-transparently managed by `pg_basebackup`, can authenticate itself on the source
-instance in any of the following ways:
+!!! Warning
+    In its current implementation, this method clones the source PostgreSQL
+    instance, thereby creating a *snapshot*. Once the cloning process has finished,
+    the new cluster is immediately started.
+    Refer to ["Current limitations"](#current-limitations) for more details.
 
-1. via [username/password](#usernamepassword-authentication)
-2. via [TLS client certificate](#tls-certificate-authentication)
+Similar to the `recovery` bootstrap method, once the cloning operation is
+complete, the operator takes full ownership of the target cluster, starting
+from the first instance. This includes overriding certain configuration
+parameters as required by CloudNativePG, resetting the superuser password,
+creating the `streaming_replica` user, managing replicas, and more. The
+resulting cluster operates independently from the source instance.
 
-The latter is the recommended one if you connect to a source managed
-by CloudNativePG or configured for TLS authentication.
-The first option is, however, the most common form of authentication to a
-PostgreSQL server in general, and might be the easiest way if the source
-instance is on a traditional environment outside Kubernetes.
-Both cases are explained below.
+!!! Important
+    Configuring the network connection between the target and source instances
+    lies outside the scope of CloudNativePG documentation, as it depends heavily on
+    the specific context and environment.
+
+The streaming replication client on the target instance, managed transparently
+by `pg_basebackup`, can authenticate on the source instance using one of the
+following methods:
+
+1. [Username/password](#usernamepassword-authentication)
+2. [TLS client certificate](#tls-certificate-authentication)
+
+Both authentication methods are detailed below.
 
 #### Requirements
 
@@ -650,7 +665,7 @@ instance using a second connection (see the `--wal-method=stream` option for
 Once the backup is completed, the new instance will be started on a new timeline
 and diverge from the source.
 For this reason, it is advised to stop all write operations to the source database
-before migrating to the target database in Kubernetes.
+before migrating to the target database.
 
 !!! Important
     Before you attempt a migration, you must test both the procedure

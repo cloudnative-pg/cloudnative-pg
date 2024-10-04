@@ -500,6 +500,7 @@ allowPrivilegeEscalation
 allowVolumeExpansion
 amd
 angus
+anonymization
 api
 apiGroup
 apiGroups
