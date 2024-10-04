@@ -27,6 +27,7 @@ import (
 
 	"github.com/cloudnative-pg/machinery/pkg/image/reference"
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	pgTime "github.com/cloudnative-pg/machinery/pkg/postgres/time"
 	"github.com/cloudnative-pg/machinery/pkg/postgres/version"
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	corev1 "k8s.io/api/core/v1"
@@ -1116,7 +1117,7 @@ func (cluster *Cluster) GetEnableSuperuserAccess() bool {
 func (cluster *Cluster) LogTimestampsWithMessage(ctx context.Context, logMessage string) {
 	contextLogger := log.FromContext(ctx)
 
-	currentTimestamp := utils.GetCurrentTimestamp()
+	currentTimestamp := pgTime.GetCurrentTimestamp()
 	keysAndValues := []interface{}{
 		"phase", cluster.Status.Phase,
 		"currentTimestamp", currentTimestamp,
@@ -1127,7 +1128,7 @@ func (cluster *Cluster) LogTimestampsWithMessage(ctx context.Context, logMessage
 	var errs []string
 
 	// Elapsed time since the last request of promotion (TargetPrimaryTimestamp)
-	if diff, err := utils.DifferenceBetweenTimestamps(
+	if diff, err := pgTime.DifferenceBetweenTimestamps(
 		currentTimestamp,
 		cluster.Status.TargetPrimaryTimestamp,
 	); err == nil {
@@ -1141,7 +1142,7 @@ func (cluster *Cluster) LogTimestampsWithMessage(ctx context.Context, logMessage
 	}
 
 	// Elapsed time since the last promotion (CurrentPrimaryTimestamp)
-	if currentPrimaryDifference, err := utils.DifferenceBetweenTimestamps(
+	if currentPrimaryDifference, err := pgTime.DifferenceBetweenTimestamps(
 		currentTimestamp,
 		cluster.Status.CurrentPrimaryTimestamp,
 	); err == nil {
@@ -1158,7 +1159,7 @@ func (cluster *Cluster) LogTimestampsWithMessage(ctx context.Context, logMessage
 	// When positive, it is the amount of time required in the last promotion
 	// of a standby to a primary. If negative, it means we have a failover/switchover
 	// in progress, and the value represents the last measured uptime of the primary.
-	if currentPrimaryTargetDifference, err := utils.DifferenceBetweenTimestamps(
+	if currentPrimaryTargetDifference, err := pgTime.DifferenceBetweenTimestamps(
 		cluster.Status.CurrentPrimaryTimestamp,
 		cluster.Status.TargetPrimaryTimestamp,
 	); err == nil {
@@ -1380,7 +1381,7 @@ func (target *RecoveryTarget) BuildPostgresOptions() string {
 	if target.TargetTime != "" {
 		result += fmt.Sprintf(
 			"recovery_target_time = '%v'\n",
-			utils.ConvertToPostgresFormat(target.TargetTime))
+			pgTime.ConvertToPostgresFormat(target.TargetTime))
 	}
 	if target.TargetImmediate != nil && *target.TargetImmediate {
 		result += "recovery_target = immediate\n"

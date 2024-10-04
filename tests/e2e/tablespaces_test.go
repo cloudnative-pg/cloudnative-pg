@@ -28,6 +28,7 @@ import (
 	"strings"
 	"time"
 
+	pgTime "github.com/cloudnative-pg/machinery/pkg/postgres/time"
 	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -440,7 +441,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 				Expect(err).ToNot(HaveOccurred())
 			})
 
-			backupName = clusterName + utils.GetCurrentTimestampWithFormat("20060102150405")
+			backupName = clusterName + pgTime.GetCurrentTimestampWithFormat("20060102150405")
 			By("creating a volumeSnapshot and waiting until it's completed", func() {
 				err := testUtils.CreateOnDemandBackupViaKubectlPlugin(
 					namespace,
