@@ -23,7 +23,6 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -54,16 +53,7 @@ func NewPluginBackupCommand(
 	client client.Client,
 	recorder record.EventRecorder,
 ) *PluginBackupCommand {
-	// This backup object may come from an informers, and
-	// informers do not put their metadata inside the object.
-	// Let's ensure the plugin has enough metadata to typecheck
-	// the object.
-	// For more info: https://github.com/kubernetes/client-go/issues/308
-	backup.SetGroupVersionKind(schema.GroupVersionKind{
-		Group:   apiv1.GroupVersion.Group,
-		Version: apiv1.GroupVersion.Version,
-		Kind:    apiv1.BackupKind,
-	})
+	backup.EnsureGVKIsPresent()
 
 	return &PluginBackupCommand{
 		Cluster:  cluster,
