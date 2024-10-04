@@ -417,9 +417,9 @@ The primary use cases for this method include:
     way that seamlessly works with CloudNativePG.
 
 !!! Warning
-    The current implementation creates a *snapshot* of the source PostgreSQL
-    instance when the cloning process finishes, and immediately starts the new
-    cluster. Refer to ["Current limitations"](#current-limitations) for more
+    In its current implementation, this method clones the source PostgreSQL
+    instance, thereby creating a *snapshot*. Once the cloning process has finished,
+    the new cluster is immediately started. Refer to ["Current limitations"](#current-limitations) for more
     details.
 
 Similar to the `recovery` bootstrap method, once the cloning operation is
