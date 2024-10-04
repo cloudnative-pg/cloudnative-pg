@@ -238,33 +238,6 @@ func (env TestingEnvironment) GetClusterPodList(namespace string, clusterName st
 	return podList, err
 }
 
-// GetClusterPrimary gets the primary pod of a cluster
-func (env TestingEnvironment) GetClusterPrimary(namespace string, clusterName string) (*corev1.Pod, error) {
-	podList := &corev1.PodList{}
-
-	err := GetObjectList(&env, podList, client.InNamespace(namespace),
-		client.MatchingLabels{
-			utils.ClusterLabelName:             clusterName,
-			utils.ClusterInstanceRoleLabelName: specs.ClusterRoleLabelPrimary,
-		},
-	)
-	if err != nil {
-		return &corev1.Pod{}, err
-	}
-	if len(podList.Items) > 0 {
-		// if there are multiple, get the one without deletion timestamp
-		for _, pod := range podList.Items {
-			if pod.DeletionTimestamp == nil {
-				return &pod, nil
-			}
-		}
-		err = fmt.Errorf("all pod with primary role has deletion timestamp")
-		return &(podList.Items[0]), err
-	}
-	err = fmt.Errorf("no primary found")
-	return &corev1.Pod{}, err
-}
-
 // GetClusterReplicas gets a slice containing all the replica pods of a cluster
 func (env TestingEnvironment) GetClusterReplicas(namespace string, clusterName string) (*corev1.PodList, error) {
 	podList := &corev1.PodList{}

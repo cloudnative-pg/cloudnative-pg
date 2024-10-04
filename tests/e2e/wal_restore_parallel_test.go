@@ -23,6 +23,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	testUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/minio"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -107,7 +108,7 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 			latestWALPath := minioPath(clusterName, latestWAL+".gz")
 			Eventually(func() (int, error) {
 				// WALs are compressed with gzip in the fixture
-				return testUtils.CountFilesOnMinio(minioEnv, latestWALPath)
+				return minio.CountFilesOnMinio(minioEnv, latestWALPath)
 			}, RetryTimeout).Should(BeEquivalentTo(1),
 				fmt.Sprintf("verify the existence of WAL %v in minio", latestWALPath))
 		})

@@ -37,6 +37,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/minio"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -146,10 +147,10 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 	AssertScheduledBackupsAreScheduled := func(serverName string) {
 		By("verifying scheduled backups are still happening", func() {
 			latestTar := minioPath(serverName, "data.tar.gz")
-			currentBackups, err := testsUtils.CountFilesOnMinio(minioEnv, latestTar)
+			currentBackups, err := minio.CountFilesOnMinio(minioEnv, latestTar)
 			Expect(err).ToNot(HaveOccurred())
 			Eventually(func() (int, error) {
-				return testsUtils.CountFilesOnMinio(minioEnv, latestTar)
+				return minio.CountFilesOnMinio(minioEnv, latestTar)
 			}, 120).Should(BeNumerically(">", currentBackups))
 		})
 	}
@@ -397,11 +398,11 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			return fmt.Errorf("could not cleanup, failed to delete operator namespace: %v", err)
 		}
 
-		if _, err := testsUtils.CleanFilesOnMinio(minioEnv, minioPath1); err != nil {
+		if _, err := minio.CleanFilesOnMinio(minioEnv, minioPath1); err != nil {
 			return fmt.Errorf("encountered an error while cleaning up minio: %v", err)
 		}
 
-		if _, err := testsUtils.CleanFilesOnMinio(minioEnv, minioPath2); err != nil {
+		if _, err := minio.CleanFilesOnMinio(minioEnv, minioPath2); err != nil {
 			return fmt.Errorf("encountered an error while cleaning up minio: %v", err)
 		}
 

@@ -17,6 +17,8 @@ limitations under the License.
 package utils
 
 import (
+	"encoding/json"
+	"fmt"
 	"os"
 
 	apiv1 "k8s.io/api/apps/v1"
@@ -25,8 +27,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
+	utils2 "github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 const (
@@ -119,7 +125,7 @@ func InstallAzCli(namespace string, env *TestingEnvironment) error {
 	return nil
 }
 
-// getAzuriteClientPod get the cli client pod
+// getAzuriteClientPod get the cli client pod/home/zeus/src/cloudnative-pg/pkg
 func getAzuriteClientPod(namespace string) corev1.Pod {
 	seccompProfile := &corev1.SeccompProfile{
 		Type: corev1.SeccompProfileTypeRuntimeDefault,
@@ -345,4 +351,255 @@ func getStorageCredentials(namespace string) corev1.Secret {
 		},
 	}
 	return azuriteStorageSecrets
+}
+
+// CreateClusterFromExternalClusterBackupWithPITROnAzure creates a cluster on Azure, starting from an external cluster
+// backup with PITR
+func CreateClusterFromExternalClusterBackupWithPITROnAzure(
+	namespace,
+	externalClusterName,
+	sourceClusterName,
+	targetTime,
+	storageCredentialsSecretName,
+	azStorageAccount,
+	azBlobContainer string,
+	env *TestingEnvironment,
+) (*v1.Cluster, error) {
+	storageClassName := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
+	destinationPath := fmt.Sprintf("https://%v.blob.core.windows.net/%v/",
+		azStorageAccount, azBlobContainer)
+
+	restoreCluster := &v1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      externalClusterName,
+			Namespace: namespace,
+		},
+		Spec: v1.ClusterSpec{
+			Instances: 3,
+
+			StorageConfiguration: v1.StorageConfiguration{
+				Size:         "1Gi",
+				StorageClass: &storageClassName,
+			},
+
+			PostgresConfiguration: v1.PostgresConfiguration{
+				Parameters: map[string]string{
+					"log_checkpoints":             "on",
+					"log_lock_waits":              "on",
+					"log_min_duration_statement":  "1000",
+					"log_statement":               "ddl",
+					"log_temp_files":              "1024",
+					"log_autovacuum_min_duration": "1s",
+					"log_replication_commands":    "on",
+				},
+			},
+
+			Bootstrap: &v1.BootstrapConfiguration{
+				Recovery: &v1.BootstrapRecovery{
+					Source: sourceClusterName,
+					RecoveryTarget: &v1.RecoveryTarget{
+						TargetTime: targetTime,
+					},
+				},
+			},
+
+			ExternalClusters: []v1.ExternalCluster{
+				{
+					Name: sourceClusterName,
+					BarmanObjectStore: &v1.BarmanObjectStoreConfiguration{
+						DestinationPath: destinationPath,
+						BarmanCredentials: v1.BarmanCredentials{
+							Azure: &v1.AzureCredentials{
+								StorageAccount: &v1.SecretKeySelector{
+									LocalObjectReference: v1.LocalObjectReference{
+										Name: storageCredentialsSecretName,
+									},
+									Key: "ID",
+								},
+								StorageKey: &v1.SecretKeySelector{
+									LocalObjectReference: v1.LocalObjectReference{
+										Name: storageCredentialsSecretName,
+									},
+									Key: "KEY",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	obj, err := CreateObject(env, restoreCluster)
+	if err != nil {
+		return nil, err
+	}
+	cluster, ok := obj.(*v1.Cluster)
+	if !ok {
+		return nil, fmt.Errorf("created object is not of type cluster: %T, %v", obj, obj)
+	}
+	return cluster, nil
+}
+
+// CreateClusterFromExternalClusterBackupWithPITROnAzurite creates a cluster with Azurite, starting from an external
+// cluster backup with PITR
+func CreateClusterFromExternalClusterBackupWithPITROnAzurite(
+	namespace,
+	externalClusterName,
+	sourceClusterName,
+	targetTime string,
+	env *TestingEnvironment,
+) (*v1.Cluster, error) {
+	storageClassName := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
+	DestinationPath := fmt.Sprintf("https://azurite:10000/storageaccountname/%v", sourceClusterName)
+
+	restoreCluster := &v1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      externalClusterName,
+			Namespace: namespace,
+		},
+		Spec: v1.ClusterSpec{
+			Instances: 3,
+
+			StorageConfiguration: v1.StorageConfiguration{
+				Size:         "1Gi",
+				StorageClass: &storageClassName,
+			},
+
+			PostgresConfiguration: v1.PostgresConfiguration{
+				Parameters: map[string]string{
+					"log_checkpoints":             "on",
+					"log_lock_waits":              "on",
+					"log_min_duration_statement":  "1000",
+					"log_statement":               "ddl",
+					"log_temp_files":              "1024",
+					"log_autovacuum_min_duration": "1s",
+					"log_replication_commands":    "on",
+				},
+			},
+
+			Bootstrap: &v1.BootstrapConfiguration{
+				Recovery: &v1.BootstrapRecovery{
+					Source: sourceClusterName,
+					RecoveryTarget: &v1.RecoveryTarget{
+						TargetTime: targetTime,
+					},
+				},
+			},
+
+			ExternalClusters: []v1.ExternalCluster{
+				{
+					Name: sourceClusterName,
+					BarmanObjectStore: &v1.BarmanObjectStoreConfiguration{
+						DestinationPath: DestinationPath,
+						EndpointCA: &v1.SecretKeySelector{
+							LocalObjectReference: v1.LocalObjectReference{
+								Name: "azurite-ca-secret",
+							},
+							Key: "ca.crt",
+						},
+						BarmanCredentials: v1.BarmanCredentials{
+							Azure: &v1.AzureCredentials{
+								ConnectionString: &v1.SecretKeySelector{
+									LocalObjectReference: v1.LocalObjectReference{
+										Name: "azurite",
+									},
+									Key: "AZURE_CONNECTION_STRING",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	obj, err := CreateObject(env, restoreCluster)
+	if err != nil {
+		return nil, err
+	}
+	cluster, ok := obj.(*v1.Cluster)
+	if !ok {
+		return nil, fmt.Errorf("created object is not of type cluster: %T, %v", obj, obj)
+	}
+	return cluster, nil
+}
+
+// ComposeAzBlobListAzuriteCmd builds the Azure storage blob list command for Azurite
+func ComposeAzBlobListAzuriteCmd(clusterName, path string) string {
+	return fmt.Sprintf("az storage blob list --container-name %v --query \"[?contains(@.name, \\`%v\\`)].name\" "+
+		"--connection-string $AZURE_CONNECTION_STRING",
+		clusterName, path)
+}
+
+// ComposeAzBlobListCmd builds the Azure storage blob list command
+func ComposeAzBlobListCmd(
+	configuration AzureConfiguration,
+	clusterName,
+	path string,
+) string {
+	return fmt.Sprintf("az storage blob list --account-name %v  "+
+		"--account-key %v  "+
+		"--container-name %v  "+
+		"--prefix %v/  "+
+		"--query \"[?contains(@.name, \\`%v\\`)].name\"",
+		configuration.StorageAccount, configuration.StorageKey, configuration.BlobContainer, clusterName, path)
+}
+
+// CountFilesOnAzureBlobStorage counts files on Azure Blob storage
+func CountFilesOnAzureBlobStorage(
+	configuration AzureConfiguration,
+	clusterName,
+	path string,
+) (int, error) {
+	azBlobListCmd := ComposeAzBlobListCmd(configuration, clusterName, path)
+	out, _, err := RunUnchecked(azBlobListCmd)
+	if err != nil {
+		return -1, err
+	}
+	var arr []string
+	err = json.Unmarshal([]byte(out), &arr)
+	return len(arr), err
+}
+
+// CountFilesOnAzuriteBlobStorage counts files on Azure Blob storage. using Azurite
+func CountFilesOnAzuriteBlobStorage(
+	namespace,
+	clusterName,
+	path string,
+) (int, error) {
+	azBlobListCmd := ComposeAzBlobListAzuriteCmd(clusterName, path)
+	out, _, err := RunUnchecked(fmt.Sprintf("kubectl exec -n %v az-cli "+
+		"-- /bin/bash -c '%v'", namespace, azBlobListCmd))
+	if err != nil {
+		return -1, err
+	}
+	var arr []string
+	err = json.Unmarshal([]byte(out), &arr)
+	return len(arr), err
+}
+
+// GetClusterPrimary gets the primary pod of a cluster
+func (env TestingEnvironment) GetClusterPrimary(namespace string, clusterName string) (*corev1.Pod, error) {
+	podList := &corev1.PodList{}
+
+	err := GetObjectList(&env, podList, client.InNamespace(namespace),
+		client.MatchingLabels{
+			utils2.ClusterLabelName:             clusterName,
+			utils2.ClusterInstanceRoleLabelName: specs.ClusterRoleLabelPrimary,
+		},
+	)
+	if err != nil {
+		return &corev1.Pod{}, err
+	}
+	if len(podList.Items) > 0 {
+		// if there are multiple, get the one without deletion timestamp
+		for _, pod := range podList.Items {
+			if pod.DeletionTimestamp == nil {
+				return &pod, nil
+			}
+		}
+		err = fmt.Errorf("all pod with primary role has deletion timestamp")
+		return &(podList.Items[0]), err
+	}
+	err = fmt.Errorf("no primary found")
+	return &corev1.Pod{}, err
 }

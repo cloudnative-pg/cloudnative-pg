@@ -14,7 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package utils
+// Package minio contains all the require functions to setup a MinIO deployment and
+// query this MinIO deployment using the MinIO API
+package minio
 
 import (
 	"encoding/json"
@@ -36,6 +38,7 @@ import (
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 )
 
 const (
@@ -43,9 +46,9 @@ const (
 	minioClientImage = "minio/mc:RELEASE.2022-06-11T21-10-36Z"
 )
 
-// MinioEnv contains all the information related or required by MinIO deployment and
+// Env contains all the information related or required by MinIO deployment and
 // used by the functions on every test
-type MinioEnv struct {
+type Env struct {
 	Client       *corev1.Pod
 	CaPair       *certs.KeyPair
 	CaSecretObj  corev1.Secret
@@ -56,9 +59,9 @@ type MinioEnv struct {
 	Timeout      uint
 }
 
-// MinioSetup contains the resources needed for a working minio server deployment:
+// Setup contains the resources needed for a working minio server deployment:
 // a PersistentVolumeClaim, a Deployment and a Service
-type MinioSetup struct {
+type Setup struct {
 	PersistentVolumeClaim corev1.PersistentVolumeClaim
 	Deployment            appsv1.Deployment
 	Service               corev1.Service
@@ -69,10 +72,10 @@ type TagSet struct {
 	Tags map[string]string `json:"tagset"`
 }
 
-// InstallMinio installs minio in a given namespace
-func InstallMinio(
-	env *TestingEnvironment,
-	minioSetup MinioSetup,
+// installMinio installs minio in a given namespace
+func installMinio(
+	env *utils.TestingEnvironment,
+	minioSetup Setup,
 	timeoutSeconds uint,
 ) error {
 	if err := env.Client.Create(env.Ctx, &minioSetup.PersistentVolumeClaim); err != nil {
@@ -110,15 +113,15 @@ func InstallMinio(
 	return err
 }
 
-// MinioDefaultSetup returns the definition for the default minio setup
-func MinioDefaultSetup(namespace string) (MinioSetup, error) {
-	pvc, err := MinioDefaultPVC(namespace)
+// DefaultSetup returns the definition for the default minio setup
+func DefaultSetup(namespace string) (Setup, error) {
+	pvc, err := DefaultPVC(namespace)
 	if err != nil {
-		return MinioSetup{}, err
+		return Setup{}, err
 	}
-	deployment := MinioDefaultDeployment(namespace, pvc)
-	service := MinioDefaultSVC(namespace)
-	setup := MinioSetup{
+	deployment := DefaultDeployment(namespace, pvc)
+	service := DefaultSVC(namespace)
+	setup := Setup{
 		PersistentVolumeClaim: pvc,
 		Deployment:            deployment,
 		Service:               service,
@@ -126,8 +129,8 @@ func MinioDefaultSetup(namespace string) (MinioSetup, error) {
 	return setup, nil
 }
 
-// MinioDefaultDeployment returns a default Deployment for minio
-func MinioDefaultDeployment(namespace string, minioPVC corev1.PersistentVolumeClaim) appsv1.Deployment {
+// DefaultDeployment returns a default Deployment for minio
+func DefaultDeployment(namespace string, minioPVC corev1.PersistentVolumeClaim) appsv1.Deployment {
 	seccompProfile := &corev1.SeccompProfile{
 		Type: corev1.SeccompProfileTypeRuntimeDefault,
 	}
@@ -222,8 +225,8 @@ func MinioDefaultDeployment(namespace string, minioPVC corev1.PersistentVolumeCl
 	return minioDeployment
 }
 
-// MinioDefaultSVC returns a default Service for minio
-func MinioDefaultSVC(namespace string) corev1.Service {
+// DefaultSVC returns a default Service for minio
+func DefaultSVC(namespace string) corev1.Service {
 	minioService := corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "minio-service",
@@ -245,8 +248,8 @@ func MinioDefaultSVC(namespace string) corev1.Service {
 	return minioService
 }
 
-// MinioDefaultPVC returns a default PVC for minio
-func MinioDefaultPVC(namespace string) (corev1.PersistentVolumeClaim, error) {
+// DefaultPVC returns a default PVC for minio
+func DefaultPVC(namespace string) (corev1.PersistentVolumeClaim, error) {
 	const claimName = "minio-pv-claim"
 	storageClass, ok := os.LookupEnv("E2E_DEFAULT_STORAGE_CLASS")
 	if !ok {
@@ -273,11 +276,11 @@ func MinioDefaultPVC(namespace string) (corev1.PersistentVolumeClaim, error) {
 	return minioPVC, nil
 }
 
-// MinioSSLSetup returns the definition for a minio setup using SSL
-func MinioSSLSetup(namespace string) (MinioSetup, error) {
-	setup, err := MinioDefaultSetup(namespace)
+// SSLSetup returns the definition for a minio setup using SSL
+func SSLSetup(namespace string) (Setup, error) {
+	setup, err := DefaultSetup(namespace)
 	if err != nil {
-		return MinioSetup{}, err
+		return Setup{}, err
 	}
 	const tlsVolumeName = "secret-volume"
 	const tlsVolumeMountPath = "/etc/secrets/certs"
@@ -341,8 +344,8 @@ func MinioSSLSetup(namespace string) (MinioSetup, error) {
 	return setup, nil
 }
 
-// MinioDefaultClient returns the default Pod definition for a minio client
-func MinioDefaultClient(namespace string) corev1.Pod {
+// DefaultClient returns the default Pod definition for a minio client
+func DefaultClient(namespace string) corev1.Pod {
 	seccompProfile := &corev1.SeccompProfile{
 		Type: corev1.SeccompProfileTypeRuntimeDefault,
 	}
@@ -403,8 +406,8 @@ func MinioDefaultClient(namespace string) corev1.Pod {
 	return minioClient
 }
 
-// MinioSSLClient returns the Pod definition for a minio client using SSL
-func MinioSSLClient(namespace string) corev1.Pod {
+// SSLClient returns the Pod definition for a minio client using SSL
+func SSLClient(namespace string) corev1.Pod {
 	const (
 		configVolumeMountPath = "/mc/.mc"
 		configVolumeName      = "mc-config"
@@ -414,7 +417,7 @@ func MinioSSLClient(namespace string) corev1.Pod {
 	)
 	var secretMode int32 = 0o600
 
-	minioClient := MinioDefaultClient(namespace)
+	minioClient := DefaultClient(namespace)
 	minioClient.Spec.Volumes = append(minioClient.Spec.Volumes,
 		corev1.Volume{
 			Name: configVolumeName,
@@ -448,8 +451,8 @@ func MinioSSLClient(namespace string) corev1.Pod {
 	return minioClient
 }
 
-// MinioDeploy will create a full MinIO deployment defined inthe minioEnv variable
-func MinioDeploy(minioEnv *MinioEnv, env *TestingEnvironment) (*corev1.Pod, error) {
+// Deploy will create a full MinIO deployment defined inthe minioEnv variable
+func Deploy(minioEnv *Env, env *utils.TestingEnvironment) (*corev1.Pod, error) {
 	var err error
 	minioEnv.CaPair, err = certs.CreateRootCA(minioEnv.Namespace, "minio")
 	if err != nil {
@@ -457,7 +460,7 @@ func MinioDeploy(minioEnv *MinioEnv, env *TestingEnvironment) (*corev1.Pod, erro
 	}
 
 	minioEnv.CaSecretObj = *minioEnv.CaPair.GenerateCASecret(minioEnv.Namespace, minioEnv.CaSecretName)
-	if _, err = CreateObject(env, &minioEnv.CaSecretObj); err != nil {
+	if _, err = utils.CreateObject(env, &minioEnv.CaSecretObj); err != nil {
 		return nil, err
 	}
 
@@ -474,20 +477,20 @@ func MinioDeploy(minioEnv *MinioEnv, env *TestingEnvironment) (*corev1.Pod, erro
 		return nil, err
 	}
 
-	setup, err := MinioSSLSetup(minioEnv.Namespace)
+	setup, err := SSLSetup(minioEnv.Namespace)
 	if err != nil {
 		return nil, err
 	}
-	if err = InstallMinio(env, setup, minioEnv.Timeout); err != nil {
+	if err = installMinio(env, setup, minioEnv.Timeout); err != nil {
 		return nil, err
 	}
 
-	minioClient := MinioSSLClient(minioEnv.Namespace)
+	minioClient := SSLClient(minioEnv.Namespace)
 
-	return &minioClient, PodCreateAndWaitForReady(env, &minioClient, 240)
+	return &minioClient, utils.PodCreateAndWaitForReady(env, &minioClient, 240)
 }
 
-func (m *MinioEnv) getCaSecret(env *TestingEnvironment, namespace string) (*corev1.Secret, error) {
+func (m *Env) getCaSecret(env *utils.TestingEnvironment, namespace string) (*corev1.Secret, error) {
 	var certSecret corev1.Secret
 	if err := env.Client.Get(env.Ctx,
 		types.NamespacedName{
@@ -508,20 +511,20 @@ func (m *MinioEnv) getCaSecret(env *TestingEnvironment, namespace string) (*core
 }
 
 // CreateCaSecret creates the certificates required to authenticate against the the MinIO service
-func (m *MinioEnv) CreateCaSecret(env *TestingEnvironment, namespace string) error {
+func (m *Env) CreateCaSecret(env *utils.TestingEnvironment, namespace string) error {
 	caSecret, err := m.getCaSecret(env, namespace)
 	if err != nil {
 		return err
 	}
-	_, err = CreateObject(env, caSecret)
+	_, err = utils.CreateObject(env, caSecret)
 	return err
 }
 
 // CountFilesOnMinio uses the minioClient in the given `namespace` to count  the
 // amount of files matching the given `path`
-func CountFilesOnMinio(minioEnv *MinioEnv, path string) (value int, err error) {
+func CountFilesOnMinio(minioEnv *Env, path string) (value int, err error) {
 	var stdout string
-	stdout, _, err = RunUnchecked(fmt.Sprintf(
+	stdout, _, err = utils.RunUnchecked(fmt.Sprintf(
 		"kubectl exec -n %v %v -- %v",
 		minioEnv.Namespace,
 		minioEnv.Client.Name,
@@ -535,9 +538,9 @@ func CountFilesOnMinio(minioEnv *MinioEnv, path string) (value int, err error) {
 
 // ListFilesOnMinio uses the minioClient in the given `namespace` to list the
 // paths matching the given `path`
-func ListFilesOnMinio(minioEnv *MinioEnv, path string) (string, error) {
+func ListFilesOnMinio(minioEnv *Env, path string) (string, error) {
 	var stdout string
-	stdout, _, err := RunUnchecked(fmt.Sprintf(
+	stdout, _, err := utils.RunUnchecked(fmt.Sprintf(
 		"kubectl exec -n %v %v -- %v",
 		minioEnv.Namespace,
 		minioEnv.Client.Name,
@@ -564,10 +567,10 @@ func composeFindMinioCmd(path string, serviceName string) string {
 }
 
 // GetFileTagsOnMinio will use the minioClient to retrieve the tags in a specified path
-func GetFileTagsOnMinio(minioEnv *MinioEnv, path string) (TagSet, error) {
+func GetFileTagsOnMinio(minioEnv *Env, path string) (TagSet, error) {
 	var output TagSet
 	// Make sure we have a registered backup to access
-	out, _, err := RunUncheckedRetry(fmt.Sprintf(
+	out, _, err := utils.RunUncheckedRetry(fmt.Sprintf(
 		"kubectl exec -n %v %v -- sh -c 'mc find minio --path %v | head -n1'",
 		minioEnv.Namespace,
 		minioEnv.Client.Name,
@@ -578,7 +581,7 @@ func GetFileTagsOnMinio(minioEnv *MinioEnv, path string) (TagSet, error) {
 
 	walFile := strings.Trim(out, "\n")
 
-	stdout, _, err := RunUncheckedRetry(fmt.Sprintf(
+	stdout, _, err := utils.RunUncheckedRetry(fmt.Sprintf(
 		"kubectl exec -n %v %v -- sh -c 'mc --json tag list %v'",
 		minioEnv.Namespace,
 		minioEnv.Client.Name,
@@ -594,8 +597,8 @@ func GetFileTagsOnMinio(minioEnv *MinioEnv, path string) (TagSet, error) {
 	return output, nil
 }
 
-// MinioTestConnectivityUsingBarmanCloudWalArchive returns true if test connection is successful else false
-func MinioTestConnectivityUsingBarmanCloudWalArchive(
+// TestConnectivityUsingBarmanCloudWalArchive returns true if test connection is successful else false
+func TestConnectivityUsingBarmanCloudWalArchive(
 	namespace,
 	clusterName,
 	podName,
@@ -609,7 +612,7 @@ func MinioTestConnectivityUsingBarmanCloudWalArchive(
 		"barman-cloud-wal-archive --cloud-provider aws-s3 --endpoint-url https://%s:9000 s3://cluster-backups/ %s "+
 		"000000010000000000000000 --test", postgres.BarmanBackupEndpointCACertificateLocation, id, key,
 		minioSvcName, clusterName)
-	_, _, err := RunUnchecked(fmt.Sprintf(
+	_, _, err := utils.RunUnchecked(fmt.Sprintf(
 		"kubectl exec -n %v %v -c postgres -- /bin/bash -c \"%v\"",
 		namespace,
 		podName,
@@ -621,9 +624,9 @@ func MinioTestConnectivityUsingBarmanCloudWalArchive(
 }
 
 // CleanFilesOnMinio clean files on minio for a given path
-func CleanFilesOnMinio(minioEnv *MinioEnv, path string) (string, error) {
+func CleanFilesOnMinio(minioEnv *Env, path string) (string, error) {
 	var stdout string
-	stdout, _, err := RunUnchecked(fmt.Sprintf(
+	stdout, _, err := utils.RunUnchecked(fmt.Sprintf(
 		"kubectl exec -n %v %v -- %v",
 		minioEnv.Namespace,
 		minioEnv.Client.Name,

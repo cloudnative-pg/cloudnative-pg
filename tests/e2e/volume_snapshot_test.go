@@ -32,6 +32,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	testUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/minio"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -190,7 +191,7 @@ var _ = Describe("Verify Volume Snapshot",
 					primaryPod, err := env.GetClusterPrimary(namespace, clusterToSnapshotName)
 					Expect(err).ToNot(HaveOccurred())
 					Eventually(func() (bool, error) {
-						connectionStatus, err := testUtils.MinioTestConnectivityUsingBarmanCloudWalArchive(
+						connectionStatus, err := minio.TestConnectivityUsingBarmanCloudWalArchive(
 							namespace, clusterToSnapshotName, primaryPod.GetName(), "minio", "minio123", minioEnv.ServiceName)
 						if err != nil {
 							return false, err
@@ -405,7 +406,7 @@ var _ = Describe("Verify Volume Snapshot",
 							"Backup should be completed correctly, error message is '%s'",
 							backup.Status.Error)
 					}, testTimeouts[testUtils.VolumeSnapshotIsReady]).Should(Succeed())
-					AssertBackupConditionInClusterStatus(namespace, clusterToBackupName)
+					testUtils.AssertBackupConditionInClusterStatus(env, namespace, clusterToBackupName)
 				})
 
 				By("checking that the backup status is correctly populated", func() {
@@ -473,7 +474,7 @@ var _ = Describe("Verify Volume Snapshot",
 							"Backup should be completed correctly, error message is '%s'",
 							backup.Status.Error)
 					}, testTimeouts[testUtils.VolumeSnapshotIsReady]).Should(Succeed())
-					AssertBackupConditionInClusterStatus(namespace, clusterToBackupName)
+					testUtils.AssertBackupConditionInClusterStatus(env, namespace, clusterToBackupName)
 				})
 
 				By("checking that the backup status is correctly populated", func() {
@@ -540,7 +541,7 @@ var _ = Describe("Verify Volume Snapshot",
 							"Backup should be completed correctly, error message is '%s'",
 							backup.Status.Error)
 					}, testTimeouts[testUtils.VolumeSnapshotIsReady]).Should(Succeed())
-					AssertBackupConditionInClusterStatus(namespace, clusterToBackupName)
+					testUtils.AssertBackupConditionInClusterStatus(env, namespace, clusterToBackupName)
 				})
 
 				By("checking that the backup status is correctly populated", func() {
@@ -612,7 +613,7 @@ var _ = Describe("Verify Volume Snapshot",
 					primaryPod, err := env.GetClusterPrimary(namespace, clusterToSnapshotName)
 					Expect(err).ToNot(HaveOccurred())
 					Eventually(func() (bool, error) {
-						connectionStatus, err := testUtils.MinioTestConnectivityUsingBarmanCloudWalArchive(
+						connectionStatus, err := minio.TestConnectivityUsingBarmanCloudWalArchive(
 							namespace, clusterToSnapshotName, primaryPod.GetName(), "minio", "minio123", minioEnv.ServiceName)
 						if err != nil {
 							return false, err
