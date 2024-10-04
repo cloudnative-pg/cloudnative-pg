@@ -154,12 +154,12 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 				&apiv1.Cluster{}: {
 					Field: fields.OneTermEqualSelector("metadata.name", instance.GetClusterName()),
 					Namespaces: map[string]cache.Config{
-						instance.Namespace: {},
+						instance.GetNamespaceName(): {},
 					},
 				},
 				&apiv1.Database{}: {
 					Namespaces: map[string]cache.Config{
-						instance.Namespace: {},
+						instance.GetNamespaceName(): {},
 					},
 				},
 			},
