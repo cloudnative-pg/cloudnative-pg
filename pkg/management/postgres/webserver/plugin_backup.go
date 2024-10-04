@@ -100,6 +100,15 @@ func (b *PluginBackupCommand) invokeStart(ctx context.Context) {
 	backupLog.Info("Plugin backup started")
 	b.Recorder.Event(b.Backup, "Normal", "Starting", "Backup started")
 
+	// Update backup status in cluster conditions on startup
+	if err := b.retryWithRefreshedCluster(ctx, func() error {
+		return conditions.Patch(ctx, b.Client, b.Cluster, apiv1.BackupStartingCondition)
+	}); err != nil {
+		backupLog.Error(err, "Error changing backup condition (backup started)")
+		// We do not terminate here because we could still have a good backup
+		// even if we are unable to communicate with the Kubernetes API server
+	}
+
 	response, err := cli.Backup(
 		ctx,
 		b.Cluster,
