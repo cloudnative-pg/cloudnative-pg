@@ -53,14 +53,13 @@ func NewCmd() *cobra.Command {
 		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
-			instance := postgres.NewInstance()
-
-			// The following are needed to correctly
+			// The fields in the instance are needed to correctly
 			// download the secret containing the TLS
 			// certificates
-			instance.Namespace = namespace
-			instance.PodName = podName
-			instance.ClusterName = clusterName
+			instance := postgres.NewInstance().
+				WithNamespace(namespace).
+				WithPodName(podName).
+				WithClusterName(clusterName)
 
 			info := postgres.InitInfo{
 				PgData:     pgData,

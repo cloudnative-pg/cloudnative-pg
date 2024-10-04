@@ -88,12 +88,12 @@ func NewCmd() *cobra.Command {
 		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := log.IntoContext(cmd.Context(), log.GetLogger())
-			instance := postgres.NewInstance()
+			instance := postgres.NewInstance().
+				WithPodName(podName).
+				WithClusterName(clusterName).
+				WithNamespace(namespace)
 
 			instance.PgData = pgData
-			instance.Namespace = namespace
-			instance.PodName = podName
-			instance.ClusterName = clusterName
 			instance.StatusPortTLS = statusPortTLS
 			instance.MetricsPortTLS = metricsPortTLS
 

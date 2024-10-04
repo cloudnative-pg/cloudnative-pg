@@ -81,9 +81,7 @@ func (mst mockTablespaceStorageManager) getStorageLocation(tablespaceName string
 
 var _ = Describe("Tablespace synchronizer tests", func() {
 	tablespaceReconciler := TablespaceReconciler{
-		instance: &postgres.Instance{
-			Namespace: "myPod",
-		},
+		instance: postgres.NewInstance().WithNamespace("myPod"),
 	}
 
 	When("tablespace configurations are realizable", func() {

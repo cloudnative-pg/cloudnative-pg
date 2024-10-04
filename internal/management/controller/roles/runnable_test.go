@@ -229,9 +229,7 @@ func (m *mockRoleManagerWithError) GetParentRoles(_ context.Context, role Databa
 
 var _ = Describe("Role synchronizer tests", func() {
 	roleSynchronizer := RoleSynchronizer{
-		instance: &postgres.Instance{
-			Namespace: "myPod",
-		},
+		instance: postgres.NewInstance().WithNamespace("myPod"),
 	}
 
 	When("role configurations are realizable", func() {
