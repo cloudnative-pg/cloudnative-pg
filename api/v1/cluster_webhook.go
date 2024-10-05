@@ -493,6 +493,9 @@ func isReservedEnvironmentVariable(name string) bool {
 
 	case name == "CLUSTER_NAME":
 		return true
+
+	case name == "IMAGE":
+		return true
 	}
 
 	return false
