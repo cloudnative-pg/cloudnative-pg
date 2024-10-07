@@ -19,19 +19,23 @@ package controller
 import (
 	"database/sql"
 	"fmt"
+
 	"github.com/DATA-DOG/go-sqlmock"
-	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/jackc/pgx/v5"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
 type fakeInstanceData struct {
@@ -139,7 +143,7 @@ var _ = Describe("Managed Database status", func() {
 		Expect(updatedDatabase.Status.Ready).Should(BeTrue())
 		Expect(updatedDatabase.Status.Error).Should(BeEmpty())
 	})
-	
+
 	It("database object inherits error after patching", func(ctx SpecContext) {
 		// Mocking DetectDB
 		expectedValue := sqlmock.NewRows([]string{""}).AddRow("1")
@@ -170,6 +174,30 @@ var _ = Describe("Managed Database status", func() {
 
 		Expect(updatedDatabase.Status.Ready).Should(BeFalse())
 		Expect(updatedDatabase.Status.Error).Should(ContainSubstring(expectedError.Error()))
+	})
+
+	It("database object skips reconciliation in a replica cluster", func(ctx SpecContext) {
+		originalCluster := cluster.DeepCopy()
+		cluster.Spec.ReplicaCluster = &apiv1.ReplicaClusterConfiguration{
+			Enabled: ptr.To(true),
+		}
+		Expect(fakeClient.Patch(ctx, cluster, client.MergeFrom(originalCluster))).To(Succeed())
+
+		_, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{
+			Namespace: database.Namespace,
+			Name:      database.Name,
+		}})
+		Expect(err).ToNot(HaveOccurred())
+
+		var updatedDatabase apiv1.Database
+		err = fakeClient.Get(ctx, client.ObjectKey{
+			Namespace: database.Namespace,
+			Name:      database.Name,
+		}, &updatedDatabase)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(updatedDatabase.Status.Ready).Should(BeFalse())
+		Expect(updatedDatabase.Status.Error).Should(ContainSubstring("waiting for the cluster to become primary"))
 	})
 
 	It("database object skips reconciliation if cluster isn't found (deleted cluster)", func(ctx SpecContext) {
