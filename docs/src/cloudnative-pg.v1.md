@@ -2286,6 +2286,13 @@ More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-
    <p>The corresponding cluster</p>
 </td>
 </tr>
+<tr><td><code>ensure</code><br/>
+<a href="#postgresql-cnpg-io-v1-EnsureOption"><i>EnsureOption</i></a>
+</td>
+<td>
+   <p>Ensure the Database is <code>present</code> or <code>absent</code> - defaults to &quot;present&quot;</p>
+</td>
+</tr>
 <tr><td><code>name</code> <B>[Required]</B><br/>
 <i>string</i>
 </td>
@@ -2417,18 +2424,18 @@ database is not valid</p>
 desired state that was synchronized</p>
 </td>
 </tr>
-<tr><td><code>ready</code> <B>[Required]</B><br/>
+<tr><td><code>applied</code> <B>[Required]</B><br/>
 <i>bool</i>
 </td>
 <td>
-   <p>Ready is true if the database was reconciled correctly</p>
+   <p>Applied is true if the database was reconciled correctly</p>
 </td>
 </tr>
-<tr><td><code>error</code> <B>[Required]</B><br/>
+<tr><td><code>message</code> <B>[Required]</B><br/>
 <i>string</i>
 </td>
 <td>
-   <p>Error is the reconciliation error message</p>
+   <p>Message is the reconciliation output message</p>
 </td>
 </tr>
 </tbody>
@@ -2468,6 +2475,8 @@ desired state that was synchronized</p>
 (Alias of `string`)
 
 **Appears in:**
+
+- [DatabaseSpec](#postgresql-cnpg-io-v1-DatabaseSpec)
 
 - [RoleConfiguration](#postgresql-cnpg-io-v1-RoleConfiguration)
 
