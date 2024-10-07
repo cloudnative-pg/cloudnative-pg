@@ -25,6 +25,7 @@ import (
 
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	pgTime "github.com/cloudnative-pg/machinery/pkg/postgres/time"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -33,7 +34,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/controller"
 	postgresSpec "github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
-	pkgUtils "github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // refreshServerCertificateFiles gets the latest server certificates files from the
@@ -194,7 +194,7 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(ctx context.Context
 
 			oldCluster := cluster.DeepCopy()
 			cluster.Status.CurrentPrimary = r.instance.PodName
-			cluster.Status.CurrentPrimaryTimestamp = pkgUtils.GetCurrentTimestamp()
+			cluster.Status.CurrentPrimaryTimestamp = pgTime.GetCurrentTimestamp()
 			return r.client.Status().Patch(ctx, cluster, client.MergeFrom(oldCluster))
 		}
 		return nil
