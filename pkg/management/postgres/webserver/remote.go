@@ -357,13 +357,17 @@ func (ws *remoteWebserverEndpoints) pgArchivePartial(w http.ResponseWriter, req 
 
 	var cluster apiv1.Cluster
 	if err := ws.typedClient.Get(req.Context(),
-		client.ObjectKey{Namespace: ws.instance.Namespace, Name: ws.instance.ClusterName},
+		client.ObjectKey{
+			Namespace: ws.instance.GetNamespaceName(),
+			Name:      ws.instance.GetClusterName(),
+		},
 		&cluster); err != nil {
 		sendBadRequestJSONResponse(w, "NO_CLUSTER_FOUND", err.Error())
 		return
 	}
 
-	if cluster.Status.TargetPrimary != ws.instance.PodName || cluster.Status.CurrentPrimary != ws.instance.PodName {
+	if cluster.Status.TargetPrimary != ws.instance.GetPodName() ||
+		cluster.Status.CurrentPrimary != ws.instance.GetPodName() {
 		sendBadRequestJSONResponse(w, "NOT_EXPECTED_PRIMARY", "")
 		return
 	}
