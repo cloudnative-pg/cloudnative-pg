@@ -24,12 +24,12 @@ spec:
     - jsonPath: .spec.name
       name: PG Name
       type: string
-    - jsonPath: .status.ready
-      name: Ready
+    - jsonPath: .status.applied
+      name: Applied
       type: boolean
-    - description: Latest error message
-      jsonPath: .status.error
-      name: Error
+    - description: Latest reconciliation message
+      jsonPath: .status.message
+      name: Message
       type: string
     name: v1
     schema:
@@ -105,6 +105,14 @@ spec:
                 x-kubernetes-validations:
                 - message: encoding is immutable
                   rule: self == oldSelf
+              ensure:
+                default: present
+                description: Ensure the Database is `present` or `absent` - defaults
+                  to "present"
+                enum:
+                - present
+                - absent
+                type: string
               icu_locale:
                 description: The ICU_LOCALE (cannot be changed)
                 type: string
@@ -180,8 +188,11 @@ spec:
               date. Populated by the system. Read-only.
               More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
             properties:
-              error:
-                description: Error is the reconciliation error message
+              applied:
+                description: Applied is true if the database was reconciled correctly
+                type: boolean
+              message:
+                description: Message is the reconciliation output message
                 type: string
               observedGeneration:
                 description: |-
@@ -189,9 +200,6 @@ spec:
                   desired state that was synchronized
                 format: int64
                 type: integer
-              ready:
-                description: Ready is true if the database was reconciled correctly
-                type: boolean
             type: object
         required:
         - metadata

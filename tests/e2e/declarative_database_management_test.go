@@ -110,7 +110,8 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 				Eventually(func(g Gomega) {
 					err := env.Client.Get(env.Ctx, databaseNamespacedName, &database)
 					g.Expect(err).ToNot(HaveOccurred())
-					g.Expect(database.Status.Ready).Should(BeTrue())
+					g.Expect(database.Status.Applied).Should(HaveValue(BeTrue()))
+					g.Expect(database.Status.Message).Should(BeEmpty())
 				}, 300).WithPolling(10 * time.Second).Should(Succeed())
 			})
 

@@ -40,6 +40,12 @@ type DatabaseSpec struct {
 	// The corresponding cluster
 	ClusterRef corev1.LocalObjectReference `json:"cluster"`
 
+	// Ensure the Database is `present` or `absent` - defaults to "present"
+	// +kubebuilder:default:="present"
+	// +kubebuilder:validation:Enum=present;absent
+	// +optional
+	Ensure EnsureOption `json:"ensure,omitempty"`
+
 	// The name inside PostgreSQL
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="name is immutable"
 	// +kubebuilder:validation:XValidation:rule="self != 'postgres'",message="the name postgres is reserved"
@@ -131,13 +137,13 @@ type DatabaseStatus struct {
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
-	// Ready is true if the database was reconciled correctly
+	// Applied is true if the database was reconciled correctly
 	// +optional
-	Ready bool `json:"ready,omitempty"`
+	Applied *bool `json:"applied,omitempty"`
 
-	// Error is the reconciliation error message
+	// Message is the reconciliation output message
 	// +optional
-	Error string `json:"error,omitempty"`
+	Message string `json:"message,omitempty"`
 }
 
 // +genclient
@@ -147,8 +153,8 @@ type DatabaseStatus struct {
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 // +kubebuilder:printcolumn:name="Cluster",type="string",JSONPath=".spec.cluster.name"
 // +kubebuilder:printcolumn:name="PG Name",type="string",JSONPath=".spec.name"
-// +kubebuilder:printcolumn:name="Ready",type="boolean",JSONPath=".status.ready"
-// +kubebuilder:printcolumn:name="Error",type="string",JSONPath=".status.error",description="Latest error message"
+// +kubebuilder:printcolumn:name="Applied",type="boolean",JSONPath=".status.applied"
+// +kubebuilder:printcolumn:name="Message",type="string",JSONPath=".status.message",description="Latest reconciliation message"
 
 // Database is the Schema for the databases API
 type Database struct {
