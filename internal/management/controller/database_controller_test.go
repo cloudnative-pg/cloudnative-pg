@@ -19,22 +19,19 @@ package controller
 import (
 	"database/sql"
 	"fmt"
-
 	"github.com/DATA-DOG/go-sqlmock"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/jackc/pgx/v5"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-
-	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
-
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
 )
 
 type fakeInstanceData struct {
@@ -112,6 +109,37 @@ var _ = Describe("Managed Database status", func() {
 		Expect(dbMock.ExpectationsWereMet()).To(Succeed())
 	})
 
+	It("database object shows ready on success", func(ctx SpecContext) {
+		// Mocking DetectDB
+		expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
+		dbMock.ExpectQuery(`SELECT count(*)
+		FROM pg_database
+		WHERE datname = $1`).WithArgs(database.Spec.Name).WillReturnRows(expectedValue)
+
+		expectedCreate := sqlmock.NewResult(0, 1)
+		expectedQuery := fmt.Sprintf(
+			"CREATE DATABASE %s OWNER %s",
+			pgx.Identifier{database.Spec.Name}.Sanitize(), pgx.Identifier{database.Spec.Owner}.Sanitize(),
+		)
+		dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
+
+		_, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{
+			Namespace: database.Namespace,
+			Name:      database.Name,
+		}})
+		Expect(err).ToNot(HaveOccurred())
+
+		var updatedDatabase apiv1.Database
+		err = fakeClient.Get(ctx, client.ObjectKey{
+			Namespace: database.Namespace,
+			Name:      database.Name,
+		}, &updatedDatabase)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(updatedDatabase.Status.Ready).Should(BeTrue())
+		Expect(updatedDatabase.Status.Error).Should(BeEmpty())
+	})
+	
 	It("database object inherits error after patching", func(ctx SpecContext) {
 		// Mocking DetectDB
 		expectedValue := sqlmock.NewRows([]string{""}).AddRow("1")
@@ -142,6 +170,72 @@ var _ = Describe("Managed Database status", func() {
 
 		Expect(updatedDatabase.Status.Ready).Should(BeFalse())
 		Expect(updatedDatabase.Status.Error).Should(ContainSubstring(expectedError.Error()))
+	})
+
+	It("database object skips reconciliation if cluster isn't found (deleted cluster)", func(ctx SpecContext) {
+		// since the fakeClient has the `cluster-example` cluster, let's reference
+		// another cluster `cluster-other` that is not found by the fakeClient
+		pgInstance := &postgres.Instance{
+			Namespace:   "default",
+			PodName:     "cluster-other-1",
+			ClusterName: "cluster-other",
+		}
+
+		f := fakeInstanceData{
+			Instance: pgInstance,
+			db:       db,
+		}
+
+		r = &DatabaseReconciler{
+			Client:   fakeClient,
+			Scheme:   schemeBuilder.BuildWithAllKnownScheme(),
+			instance: &f,
+		}
+		originalDatabase := database.DeepCopy()
+		database.Spec.ClusterRef.Name = "cluster-other"
+		Expect(fakeClient.Patch(ctx, database, client.MergeFrom(originalDatabase))).To(Succeed())
+
+		_, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{
+			Namespace: database.Namespace,
+			Name:      database.Name,
+		}})
+		Expect(err).ToNot(HaveOccurred())
+
+		var updatedDatabase apiv1.Database
+		err = fakeClient.Get(ctx, client.ObjectKey{
+			Namespace: database.Namespace,
+			Name:      database.Name,
+		}, &updatedDatabase)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(updatedDatabase.Status.Ready).Should(BeFalse())
+		Expect(updatedDatabase.Status.Error).Should(BeEmpty())
+	})
+
+	It("database skips reconciliation if database isn't found (deleted database)", func(ctx SpecContext) {
+		// since the fakeClient has the `cluster-example` cluster, let's reference
+		// another cluster `cluster-other` that is not found by the fakeClient
+		otherDatabase := &apiv1.Database{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       "db-other",
+				Namespace:  "default",
+				Generation: 1,
+			},
+			Spec: apiv1.DatabaseSpec{
+				ClusterRef: corev1.LocalObjectReference{
+					Name: cluster.Name,
+				},
+				Name:  "db-one",
+				Owner: "app",
+			},
+		}
+
+		result, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{
+			Namespace: otherDatabase.Namespace,
+			Name:      otherDatabase.Name,
+		}})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result).Should(BeZero()) // nothing to do, since the DB is being deleted
 	})
 
 	It("properly marks the status on a succeeded reconciliation", func(ctx SpecContext) {
