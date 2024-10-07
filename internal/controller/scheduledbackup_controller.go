@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	pgTime "github.com/cloudnative-pg/machinery/pkg/postgres/time"
 	"github.com/robfig/cron"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -238,7 +239,7 @@ func createBackup(
 	// So we have no backup running, let's create a backup.
 	// Let's have deterministic names to avoid creating the job two
 	// times
-	name := fmt.Sprintf("%s-%s", scheduledBackup.GetName(), utils.ToCompactISO8601(backupTime))
+	name := fmt.Sprintf("%s-%s", scheduledBackup.GetName(), pgTime.ToCompactISO8601(backupTime))
 	backup := scheduledBackup.CreateBackup(name)
 	metadata := &backup.ObjectMeta
 	if metadata.Labels == nil {
