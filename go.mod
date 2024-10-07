@@ -12,7 +12,7 @@ require (
 	github.com/cheynewallace/tabby v1.1.1
 	github.com/cloudnative-pg/barman-cloud v0.0.0-20240924124724-92831d48562a
 	github.com/cloudnative-pg/cnpg-i v0.0.0-20241001103001-7e24b2eccd50
-	github.com/cloudnative-pg/machinery v0.0.0-20241001153943-0e5ba4f9a0e1
+	github.com/cloudnative-pg/machinery v0.0.0-20241007084552-267a543ce26f
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/evanphx/json-patch/v5 v5.9.0
 	github.com/go-logr/logr v1.4.2
@@ -125,5 +125,3 @@ require (
 	sigs.k8s.io/kustomize/kyaml v0.17.1 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 )
-
-replace github.com/cloudnative-pg/machinery => ../machinery
