@@ -88,10 +88,14 @@ Git tags for versions are prefixed with `v`.
 The list of supported Kubernetes versions in the table depends on what
 the CloudNativePG maintainers think is reasonable to support and to test.
 
-At the moment, the CloudNativePG community doesn't support or test any
-additional Kubernetes distribution, like Red Hat OpenShift. This might change
-in the future and, in that case, that would be reflected in an official policy
-written by the CloudNativePG maintainers.
+Currently, the CloudNativePG community does not officially support or test any
+Kubernetes distributions beyond the standard/vanilla one - such as Red Hat
+OpenShift. This may change in the future, and if it does, the CloudNativePG
+maintainers will update the official policy accordingly.
+
+If you plan to deploy CloudNativePG on Red Hat OpenShift, you can use the
+[certified operator provided by EDB](https://catalog.redhat.com/software/container-stacks/detail/653fd4035eece8598f66d97b),
+which comes with full support from EDB.
 
 ### Supported PostgreSQL versions
 
