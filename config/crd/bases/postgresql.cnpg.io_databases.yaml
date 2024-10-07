@@ -61,6 +61,12 @@ spec:
               allowConnections:
                 description: True when connections to this database are allowed
                 type: boolean
+              builtin_locale:
+                description: The BUILTIN_LOCALE (cannot be changed)
+                type: string
+                x-kubernetes-validations:
+                - message: builtin_locale is immutable
+                  rule: self == oldSelf
               cluster:
                 description: The corresponding cluster
                 properties:
@@ -75,6 +81,12 @@ spec:
                     type: string
                 type: object
                 x-kubernetes-map-type: atomic
+              collation_version:
+                description: The COLLATION_VERSION (cannot be changed)
+                type: string
+                x-kubernetes-validations:
+                - message: collation_version is immutable
+                  rule: self == oldSelf
               connectionLimit:
                 description: |-
                   Connection limit, -1 means no limit and -2 means the
