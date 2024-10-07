@@ -86,9 +86,12 @@ The operator can be installed using the provided [Helm chart](https://github.com
 
 ### Using OLM
 
-CloudNativePG can also be installed using the
-[Operator Lifecycle Manager (OLM)](https://olm.operatorframework.io/docs/)
+CloudNativePG can also be installed via the [Operator Lifecycle Manager (OLM)](https://olm.operatorframework.io/docs/)
 directly from [OperatorHub.io](https://operatorhub.io/operator/cloudnative-pg).
+
+For deployments on Red Hat OpenShift, EDB offers and fully supports a certified
+version of CloudNativePG, available through the
+[Red Hat OpenShift Container Platform](https://catalog.redhat.com/software/container-stacks/detail/653fd4035eece8598f66d97b).
 
 ## Details about the deployment
 
