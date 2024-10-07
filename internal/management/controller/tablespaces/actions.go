@@ -18,6 +18,7 @@ package tablespaces
 
 import (
 	"context"
+	"database/sql"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 
@@ -27,7 +28,7 @@ import (
 
 type tablespaceReconcilerStep interface {
 	execute(ctx context.Context,
-		tbsManager infrastructure.TablespaceManager,
+		db *sql.DB,
 		tbsStorageManager tablespaceStorageManager,
 	) apiv1.TablespaceState
 }
@@ -38,7 +39,7 @@ type createTablespaceAction struct {
 
 func (r *createTablespaceAction) execute(
 	ctx context.Context,
-	tbsManager infrastructure.TablespaceManager,
+	db *sql.DB,
 	tbsStorageManager tablespaceStorageManager,
 ) apiv1.TablespaceState {
 	contextLog := log.FromContext(ctx).WithName("tbs_create_reconciler")
@@ -59,7 +60,7 @@ func (r *createTablespaceAction) execute(
 		Name:  r.tablespace.Name,
 		Owner: r.tablespace.Owner.Name,
 	}
-	err := tbsManager.Create(ctx, tablespace)
+	err := infrastructure.Create(ctx, db, tablespace)
 	if err != nil {
 		contextLog.Error(err, "while performing action", "tablespace", r.tablespace.Name)
 		return apiv1.TablespaceState{
@@ -83,7 +84,7 @@ type updateTablespaceAction struct {
 
 func (r *updateTablespaceAction) execute(
 	ctx context.Context,
-	tbsManager infrastructure.TablespaceManager,
+	db *sql.DB,
 	_ tablespaceStorageManager,
 ) apiv1.TablespaceState {
 	contextLog := log.FromContext(ctx).WithName("tbs_update_reconciler")
@@ -93,7 +94,7 @@ func (r *updateTablespaceAction) execute(
 		Name:  r.tablespace.Name,
 		Owner: r.tablespace.Owner.Name,
 	}
-	err := tbsManager.Update(ctx, tablespace)
+	err := infrastructure.Update(ctx, db, tablespace)
 	if err != nil {
 		contextLog.Error(
 			err, "while performing action",
@@ -119,7 +120,7 @@ type noopTablespaceAction struct {
 
 func (r *noopTablespaceAction) execute(
 	_ context.Context,
-	_ infrastructure.TablespaceManager,
+	_ *sql.DB,
 	_ tablespaceStorageManager,
 ) apiv1.TablespaceState {
 	return apiv1.TablespaceState{

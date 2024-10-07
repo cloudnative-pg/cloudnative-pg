@@ -16,8 +16,6 @@ limitations under the License.
 
 package infrastructure
 
-import "context"
-
 // Tablespace represents the tablespace information read from / written to the Database
 type Tablespace struct {
 	// Name is the name of the tablespace
@@ -25,16 +23,4 @@ type Tablespace struct {
 
 	// Owner is the owner of this tablespace
 	Owner string `json:"owner"`
-}
-
-// TablespaceManager abstracts the functionality of reconciling with PostgreSQL tablespaces
-type TablespaceManager interface {
-	// List the tablespace in the database
-	List(ctx context.Context) ([]Tablespace, error)
-
-	// Create the tablespace in the database
-	Create(ctx context.Context, tablespace Tablespace) error
-
-	// Update the tablespace in the database (change ownership)
-	Update(ctx context.Context, tablespace Tablespace) error
 }
