@@ -1,0 +1,16 @@
+# NOTE: this manifest will only work properly if the Postgres version supports
+# ICU locales and rules (version 16 and newer)
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: db-icu
+spec:
+  name: declarative-icu
+  owner: app
+  encoding: UTF8
+  locale_provider: icu
+  icu_locale: en
+  icu_rules: fr
+  template: template0
+  cluster:
+    name: cluster-example

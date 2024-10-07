@@ -42,6 +42,9 @@ type DatabaseSpec struct {
 
 	// The name inside PostgreSQL
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="name is immutable"
+	// +kubebuilder:validation:XValidation:rule="self != 'postgres'",message="the name postgres is reserved"
+	// +kubebuilder:validation:XValidation:rule="self != 'template0'",message="the name template0 is reserved"
+	// +kubebuilder:validation:XValidation:rule="self != 'template1'",message="the name template1 is reserved"
 	Name string `json:"name"`
 
 	// The owner
@@ -56,6 +59,36 @@ type DatabaseSpec struct {
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="encoding is immutable"
 	// +optional
 	Encoding string `json:"encoding,omitempty"`
+
+	// The locale (cannot be changed)
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="locale is immutable"
+	// +optional
+	Locale string `json:"locale,omitempty"`
+
+	// The locale provider (cannot be changed)
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="locale_provider is immutable"
+	// +optional
+	LocaleProvider string `json:"locale_provider,omitempty"`
+
+	// The LC_COLLATE (cannot be changed)
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="lc_collate is immutable"
+	// +optional
+	LcCollate string `json:"lc_collate,omitempty"`
+
+	// The LC_CTYPE (cannot be changed)
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="lc_ctype is immutable"
+	// +optional
+	LcCtype string `json:"lc_ctype,omitempty"`
+
+	// The ICU_LOCALE (cannot be changed)
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="icu_locale is immutable"
+	// +optional
+	IcuLocale string `json:"icu_locale,omitempty"`
+
+	// The ICU_RULES (cannot be changed)
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="icu_rules is immutable"
+	// +optional
+	IcuRules string `json:"icu_rules,omitempty"`
 
 	// True when the database is a template
 	// +optional

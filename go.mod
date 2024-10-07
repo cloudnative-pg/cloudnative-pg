@@ -1,6 +1,6 @@
 module github.com/cloudnative-pg/cloudnative-pg
 
-go 1.22.0
+go 1.23
 
 toolchain go1.23.2
 
@@ -12,7 +12,7 @@ require (
 	github.com/cheynewallace/tabby v1.1.1
 	github.com/cloudnative-pg/barman-cloud v0.0.0-20240924124724-92831d48562a
 	github.com/cloudnative-pg/cnpg-i v0.0.0-20241001103001-7e24b2eccd50
-	github.com/cloudnative-pg/machinery v0.0.0-20241001153943-0e5ba4f9a0e1
+	github.com/cloudnative-pg/machinery v0.0.0-20241007084552-267a543ce26f
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/evanphx/json-patch/v5 v5.9.0
 	github.com/go-logr/logr v1.4.2
@@ -27,7 +27,7 @@ require (
 	github.com/mitchellh/go-ps v1.0.0
 	github.com/onsi/ginkgo/v2 v2.20.2
 	github.com/onsi/gomega v1.34.2
-	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.75.2
+	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.77.1
 	github.com/prometheus/client_golang v1.20.4
 	github.com/robfig/cron v1.2.0
 	github.com/sethvargo/go-password v0.3.1

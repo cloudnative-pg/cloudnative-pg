@@ -5,5 +5,8 @@ metadata:
 spec:
   name: declarative
   owner: app
+  lc_ctype: "en_US.utf8"
+  encoding: SQL_ASCII
+  template: template0
   cluster:
     name: cluster-with-declarative-databases

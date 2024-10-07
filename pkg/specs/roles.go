@@ -19,11 +19,11 @@ package specs
 import (
 	"slices"
 
+	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/stringset"
 )
 
 // CreateRole create a role with the permissions needed by the instance manager
