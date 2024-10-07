@@ -53,14 +53,13 @@ func NewCmd() *cobra.Command {
 		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
-			instance := postgres.NewInstance()
-
-			// The following are needed to correctly
+			// The fields in the instance are needed to correctly
 			// download the secret containing the TLS
 			// certificates
-			instance.Namespace = namespace
-			instance.PodName = podName
-			instance.ClusterName = clusterName
+			instance := postgres.NewInstance().
+				WithNamespace(namespace).
+				WithPodName(podName).
+				WithClusterName(clusterName)
 
 			info := postgres.InitInfo{
 				PgData:     pgData,
@@ -112,7 +111,7 @@ func joinSubCommand(ctx context.Context, instance *postgres.Instance, info postg
 	// Download the cluster definition from the API server
 	var cluster apiv1.Cluster
 	if err := reconciler.GetClient().Get(ctx,
-		ctrl.ObjectKey{Namespace: instance.Namespace, Name: instance.ClusterName},
+		ctrl.ObjectKey{Namespace: instance.GetNamespaceName(), Name: instance.GetClusterName()},
 		&cluster,
 	); err != nil {
 		log.Error(err, "Error while getting cluster")
