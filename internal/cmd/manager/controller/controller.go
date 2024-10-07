@@ -98,6 +98,7 @@ func RunController(
 	leaderConfig leaderElectionConfiguration,
 	pprofDebug bool,
 	port int,
+	maxConcurrentReconciles int,
 	conf *configuration.Data,
 ) error {
 	ctx := context.Background()
@@ -229,7 +230,7 @@ func RunController(
 		mgr,
 		discoveryClient,
 		pluginRepository,
-	).SetupWithManager(ctx, mgr); err != nil {
+	).SetupWithManager(ctx, mgr, maxConcurrentReconciles); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Cluster")
 		return err
 	}
@@ -243,10 +244,8 @@ func RunController(
 		return err
 	}
 
-	if err = controller.NewPluginReconciler(
-		mgr,
-		pluginRepository,
-	).SetupWithManager(mgr, configuration.Current.OperatorNamespace); err != nil {
+	if err = controller.NewPluginReconciler(mgr, pluginRepository).
+		SetupWithManager(mgr, configuration.Current.OperatorNamespace, maxConcurrentReconciles); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Plugin")
 		return err
 	}
@@ -255,7 +254,7 @@ func RunController(
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
 		Recorder: mgr.GetEventRecorderFor("cloudnative-pg-scheduledbackup"),
-	}).SetupWithManager(ctx, mgr); err != nil {
+	}).SetupWithManager(ctx, mgr, maxConcurrentReconciles); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ScheduledBackup")
 		return err
 	}
@@ -265,7 +264,7 @@ func RunController(
 		DiscoveryClient: discoveryClient,
 		Scheme:          mgr.GetScheme(),
 		Recorder:        mgr.GetEventRecorderFor("cloudnative-pg-pooler"),
-	}).SetupWithManager(mgr); err != nil {
+	}).SetupWithManager(mgr, maxConcurrentReconciles); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Pooler")
 		return err
 	}
