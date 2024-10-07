@@ -53,18 +53,20 @@ var _ = Describe("Connection via services", Label(tests.LabelServiceConnectivity
 		superuserPassword string,
 		env *utils.TestingEnvironment,
 	) {
+		primaryPod, err := env.GetClusterPrimary(namespace, clusterName)
+		Expect(err).ToNot(HaveOccurred())
 		// We test -rw, -ro and -r services with the app user and the superuser
 		rwService := fmt.Sprintf("%v-rw.%v.svc", clusterName, namespace)
 		rService := fmt.Sprintf("%v-r.%v.svc", clusterName, namespace)
 		roService := fmt.Sprintf("%v-ro.%v.svc", clusterName, namespace)
 		services := []string{rwService, roService, rService}
 		for _, service := range services {
-			AssertConnection(service, "postgres", appDBName, superuserPassword, *psqlClientPod, 10, env)
-			AssertConnection(service, appDBUser, appDBName, appPassword, *psqlClientPod, 10, env)
+			AssertConnection(service, "postgres", appDBName, superuserPassword, primaryPod, 10, env)
+			AssertConnection(service, appDBUser, appDBName, appPassword, primaryPod, 10, env)
 		}
 
-		AssertWritesToReplicaFails(psqlClientPod, roService, appDBName, appDBUser, appPassword)
-		AssertWritesToPrimarySucceeds(psqlClientPod, rwService, appDBName, appDBUser, appPassword)
+		AssertWritesToReplicaFails(primaryPod, roService, appDBName, appDBUser, appPassword)
+		AssertWritesToPrimarySucceeds(primaryPod, rwService, appDBName, appDBUser, appPassword)
 	}
 
 	Context("Auto-generated passwords", func() {

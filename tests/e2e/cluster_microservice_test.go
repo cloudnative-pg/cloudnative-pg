@@ -22,13 +22,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cloudnative-pg/machinery/pkg/image/reference"
+	"github.com/cloudnative-pg/machinery/pkg/postgres/version"
 	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/types"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
@@ -69,14 +69,17 @@ var _ = Describe("Imports with Microservice Approach", Label(tests.LabelImportin
 		data := "large object test"
 		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
+
 		AssertCreateCluster(namespace, sourceClusterName, sourceSampleFile, env)
-		AssertCreateTestData(namespace, sourceClusterName, tableName, psqlClientPod)
-		AssertCreateTestDataLargeObject(namespace, sourceClusterName, oid, data, psqlClientPod)
+		AssertCreateTestData(env, namespace, sourceClusterName, tableName)
+		primaryPod, err := env.GetClusterPrimary(namespace, sourceClusterName)
+		Expect(err).ToNot(HaveOccurred())
+		AssertCreateTestDataLargeObject(namespace, sourceClusterName, oid, data, primaryPod)
 
 		importedClusterName = "cluster-pgdump-large-object"
 		cluster := AssertClusterImport(namespace, importedClusterName, sourceClusterName, "app")
-		AssertDataExpectedCount(namespace, importedClusterName, tableName, 2, psqlClientPod)
-		AssertLargeObjectValue(namespace, importedClusterName, oid, data, psqlClientPod)
+		AssertDataExpectedCount(env, namespace, importedClusterName, tableName, 2)
+		AssertLargeObjectValue(namespace, importedClusterName, oid, data, primaryPod)
 		By("deleting the imported database", func() {
 			Expect(testsUtils.DeleteObject(env, cluster)).To(Succeed())
 		})
@@ -95,7 +98,7 @@ var _ = Describe("Imports with Microservice Approach", Label(tests.LabelImportin
 
 		importedClusterName = "cluster-pgdump"
 		AssertClusterImport(namespace, importedClusterName, sourceClusterName, "app")
-		AssertDataExpectedCount(namespace, importedClusterName, tableName, 2, psqlClientPod)
+		AssertDataExpectedCount(env, namespace, importedClusterName, tableName, 2)
 		assertTableAndDataOnImportedCluster(namespace, tableName, importedClusterName)
 	})
 
@@ -172,15 +175,15 @@ var _ = Describe("Imports with Microservice Approach", Label(tests.LabelImportin
 // shouldSkip skip this test if the current POSTGRES_IMG is already the latest major
 func shouldSkip(postgresImage string) bool {
 	// Get the current tag
-	currentImageReference := utils.NewReference(postgresImage)
-	currentImageVersion, err := postgres.GetPostgresVersionFromTag(currentImageReference.Tag)
+	currentImageReference := reference.New(postgresImage)
+	currentImageVersion, err := version.FromTag(currentImageReference.Tag)
 	Expect(err).ToNot(HaveOccurred())
 	// Get the default tag
-	defaultImageReference := utils.NewReference(versions.DefaultImageName)
-	defaultImageVersion, err := postgres.GetPostgresVersionFromTag(defaultImageReference.Tag)
+	defaultImageReference := reference.New(versions.DefaultImageName)
+	defaultImageVersion, err := version.FromTag(defaultImageReference.Tag)
 	Expect(err).ToNot(HaveOccurred())
 
-	return currentImageVersion >= defaultImageVersion
+	return currentImageVersion.Major() >= defaultImageVersion.Major()
 }
 
 // assertCreateTableWithDataOnSourceCluster will create on the source Cluster, as postgres superUser:
@@ -317,7 +320,7 @@ func assertImportRenamesSelectedDatabase(
 		AssertClusterStandbysAreStreaming(namespace, importedClusterName, 120)
 	})
 
-	AssertDataExpectedCount(namespace, importedClusterName, tableName, 2, psqlClientPod)
+	AssertDataExpectedCount(env, namespace, importedClusterName, tableName, 2)
 
 	By("verifying that only 'app' DB exists in the imported cluster", func() {
 		importedPrimaryPod, err := env.GetClusterPrimary(namespace, importedClusterName)

@@ -39,7 +39,9 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 		clusterName = "postgresql-storage-class"
 		level       = tests.Highest
 	)
+
 	var namespace string
+
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
@@ -73,23 +75,24 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 			err := env.Client.Get(env.Ctx, namespacedName, pod)
 			Expect(err).ToNot(HaveOccurred())
 
-			// Put something in the database. We'll check later if it still exists
-			appUser, appUserPass, err := testsUtils.GetCredentials(
-				clusterName, namespace, apiv1.ApplicationUserSecretSuffix, env)
-			Expect(err).NotTo(HaveOccurred())
-			host, err := testsUtils.GetHostName(namespace, clusterName, env)
-			Expect(err).NotTo(HaveOccurred())
-			query := "CREATE TABLE IF NOT EXISTS test (id bigserial PRIMARY KEY, t text);"
-			_, _, err = testsUtils.RunQueryFromPod(
-				psqlClientPod,
-				host,
-				testsUtils.AppDBName,
-				appUser,
-				appUserPass,
-				query,
+			forward, conn, err := testsUtils.ForwardPSQLConnection(
 				env,
+				namespace,
+				clusterName,
+				testsUtils.AppDBName,
+				apiv1.ApplicationUserSecretSuffix,
 			)
-			Expect(err).ToNot(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
+
+			query := "CREATE TABLE IF NOT EXISTS test (id bigserial PRIMARY KEY, t text);"
+			_, err = conn.Exec(query)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Here we need to close the connection and close the forward, if we don't do both steps
+			// the PostgreSQL connection will be there and PostgreSQL will not restart in time because
+			// of the connection that wasn't close and stays idle
+			_ = conn.Close()
+			forward.Close()
 
 			// We kill the pid 1 process.
 			// The pod should be restarted and the count of the restarts
@@ -118,18 +121,22 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 				return int32(-1), nil
 			}, timeout).Should(BeEquivalentTo(restart + 1))
 
-			Eventually(func() (bool, error) {
-				query = "SELECT * FROM test"
-				_, _, err = env.ExecCommandWithPsqlClient(
-					namespace,
-					clusterName,
-					psqlClientPod,
-					apiv1.ApplicationUserSecretSuffix,
-					testsUtils.AppDBName,
-					query,
-				)
-				return err == nil, err
-			}, timeout).Should(BeTrue())
+			AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReady], env)
+
+			forward, conn, err = testsUtils.ForwardPSQLConnection(
+				env,
+				namespace,
+				clusterName,
+				testsUtils.AppDBName,
+				apiv1.ApplicationUserSecretSuffix,
+			)
+			defer func() {
+				forward.Close()
+			}()
+			Expect(err).NotTo(HaveOccurred())
+
+			_, err = conn.Exec("SELECT * FROM test")
+			Expect(err).NotTo(HaveOccurred())
 		})
 	})
 

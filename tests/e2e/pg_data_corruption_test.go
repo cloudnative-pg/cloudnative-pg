@@ -58,7 +58,7 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), Ordered, func(
 		clusterName, err := env.GetResourceNameFromYAML(sampleFile)
 		Expect(err).ToNot(HaveOccurred())
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
-		AssertCreateTestData(namespace, clusterName, tableName, psqlClientPod)
+		AssertCreateTestData(env, namespace, clusterName, tableName)
 
 		By("gathering current primary pod and pvc", func() {
 			oldPrimaryPod, err := env.GetClusterPrimary(namespace, clusterName)
@@ -187,7 +187,7 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), Ordered, func(
 			}, 300).Should(BeTrue())
 		})
 		AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReadyQuick], env)
-		AssertDataExpectedCount(namespace, clusterName, tableName, 2, psqlClientPod)
+		AssertDataExpectedCount(env, namespace, clusterName, tableName, 2)
 		AssertClusterStandbysAreStreaming(namespace, clusterName, 120)
 	}
 
