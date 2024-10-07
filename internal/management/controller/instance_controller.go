@@ -206,14 +206,14 @@ func (r *InstanceReconciler) Reconcile(
 
 	if result, err := reconciler.ReconcileReplicationSlots(
 		ctx,
-		r.instance.PodName,
+		r.instance.GetPodName(),
 		infrastructure.NewPostgresManager(r.instance.ConnectionPool()),
 		cluster,
 	); err != nil || !result.IsZero() {
 		return result, err
 	}
 
-	if r.instance.PodName == cluster.Status.CurrentPrimary {
+	if r.instance.GetPodName() == cluster.Status.CurrentPrimary {
 		result, err := roles.Reconcile(ctx, r.instance, cluster, r.client)
 		if err != nil || !result.IsZero() {
 			return result, err
@@ -263,7 +263,7 @@ func (r *InstanceReconciler) Reconcile(
 }
 
 func (r *InstanceReconciler) configureSlotReplicator(cluster *apiv1.Cluster) {
-	switch r.instance.PodName {
+	switch r.instance.GetPodName() {
 	case cluster.Status.CurrentPrimary, cluster.Status.TargetPrimary:
 		r.instance.ConfigureSlotReplicator(nil)
 	default:
@@ -275,7 +275,7 @@ func (r *InstanceReconciler) restartPrimaryInplaceIfRequested(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 ) (bool, error) {
-	isPrimary := cluster.Status.CurrentPrimary == r.instance.PodName
+	isPrimary := cluster.Status.CurrentPrimary == r.instance.GetPodName()
 	restartRequested := isPrimary && cluster.Status.Phase == apiv1.PhaseInplacePrimaryRestart
 	if restartRequested {
 		if cluster.Status.CurrentPrimary != cluster.Status.TargetPrimary {
@@ -333,7 +333,7 @@ func (r *InstanceReconciler) refreshConfigurationFiles(
 }
 
 func (r *InstanceReconciler) reconcileFencing(ctx context.Context, cluster *apiv1.Cluster) *reconcile.Result {
-	fencingRequired := cluster.IsInstanceFenced(r.instance.PodName)
+	fencingRequired := cluster.IsInstanceFenced(r.instance.GetPodName())
 	isFenced := r.instance.IsFenced()
 	switch {
 	case !isFenced && fencingRequired:
@@ -378,7 +378,7 @@ func (r *InstanceReconciler) initialize(ctx context.Context, cluster *apiv1.Clus
 		return err
 	}
 
-	r.instance.SetFencing(cluster.IsInstanceFenced(r.instance.PodName))
+	r.instance.SetFencing(cluster.IsInstanceFenced(r.instance.GetPodName()))
 
 	return nil
 }
@@ -395,7 +395,8 @@ func (r *InstanceReconciler) verifyParametersForFollower(cluster *apiv1.Cluster)
 
 	// we use a file as a flag to ensure the pod has been restarted already. I.e. on
 	// newly created pod we don't need to check the enforced parameters
-	filename := path.Join(r.instance.PgData, fmt.Sprintf("%s-%s", constants.Startup, r.instance.PodName))
+	filename := path.Join(r.instance.PgData, fmt.Sprintf("%s-%s",
+		constants.Startup, r.instance.GetPodName()))
 	exists, err := fileutils.FileExists(filename)
 	if err != nil {
 		return err
@@ -449,7 +450,7 @@ func (r *InstanceReconciler) reconcileOldPrimary(
 ) (restarted bool, err error) {
 	contextLogger := log.FromContext(ctx)
 
-	if cluster.Status.TargetPrimary == r.instance.PodName {
+	if cluster.Status.TargetPrimary == r.instance.GetPodName() {
 		return false, nil
 	}
 
@@ -711,7 +712,7 @@ func (r *InstanceReconciler) reconcileClusterRoleWithoutDB(
 		return false, err
 	}
 	// Reconcile replica role
-	if cluster.Status.TargetPrimary != r.instance.PodName {
+	if cluster.Status.TargetPrimary != r.instance.GetPodName() {
 		if !isPrimary {
 			// We need to ensure that this instance is replicating from the correct server
 			return r.instance.RefreshReplicaConfiguration(ctx, cluster, r.client)
@@ -734,7 +735,7 @@ func (r *InstanceReconciler) reconcileMetrics(
 	exporter := r.metricsServerExporter
 	// We should never reset the SwitchoverRequired metrics as it needs the primary instance restarts,
 	// however, if the cluster is healthy we make sure it is set to 0.
-	if cluster.Status.CurrentPrimary == r.instance.PodName {
+	if cluster.Status.CurrentPrimary == r.instance.GetPodName() {
 		if cluster.Status.Phase == apiv1.PhaseWaitingForUser {
 			exporter.Metrics.SwitchoverRequired.Set(1)
 		} else {
@@ -781,7 +782,7 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 		var configMap corev1.ConfigMap
 		err := r.GetClient().Get(
 			ctx,
-			client.ObjectKey{Namespace: r.instance.Namespace, Name: reference.Name},
+			client.ObjectKey{Namespace: r.instance.GetNamespaceName(), Name: reference.Name},
 			&configMap)
 		if err != nil {
 			contextLogger.Warning("Unable to get configMap containing custom monitoring queries",
@@ -808,7 +809,12 @@ func (r *InstanceReconciler) reconcileMonitoringQueries(
 
 	for _, reference := range cluster.Spec.Monitoring.CustomQueriesSecret {
 		var secret corev1.Secret
-		err := r.GetClient().Get(ctx, client.ObjectKey{Namespace: r.instance.Namespace, Name: reference.Name}, &secret)
+		err := r.GetClient().Get(ctx,
+			client.ObjectKey{
+				Namespace: r.instance.GetNamespaceName(),
+				Name:      reference.Name,
+			},
+			&secret)
 		if err != nil {
 			contextLogger.Warning("Unable to get secret containing custom monitoring queries",
 				"reference", reference,
@@ -1117,7 +1123,7 @@ func (r *InstanceReconciler) refreshFileFromSecret(
 
 // Reconciler primary logic. DB needed.
 func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv1.Cluster) error {
-	if cluster.Status.TargetPrimary != r.instance.PodName || cluster.IsReplica() {
+	if cluster.Status.TargetPrimary != r.instance.GetPodName() || cluster.IsReplica() {
 		return nil
 	}
 
@@ -1136,8 +1142,8 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 	}
 
 	// if the currentPrimary doesn't match the PodName we set the correct value.
-	if cluster.Status.CurrentPrimary != r.instance.PodName {
-		cluster.Status.CurrentPrimary = r.instance.PodName
+	if cluster.Status.CurrentPrimary != r.instance.GetPodName() {
+		cluster.Status.CurrentPrimary = r.instance.GetPodName()
 		cluster.Status.CurrentPrimaryTimestamp = pgTime.GetCurrentTimestamp()
 
 		if err := r.client.Status().Patch(ctx, cluster, client.MergeFrom(oldCluster)); err != nil {
@@ -1157,7 +1163,7 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 func (r *InstanceReconciler) handlePromotion(ctx context.Context, cluster *apiv1.Cluster) error {
 	contextLogger := log.FromContext(ctx)
 	contextLogger.Info("I'm the target primary, wait for the wal_receiver to be terminated")
-	if r.instance.PodName != cluster.Status.CurrentPrimary {
+	if r.instance.GetPodName() != cluster.Status.CurrentPrimary {
 		// if the cluster is not replicating it means it's doing a failover and
 		// we have to wait for wal receivers to be down
 		err := r.waitForWalReceiverDown()
@@ -1181,7 +1187,7 @@ func (r *InstanceReconciler) reconcileDesignatedPrimary(
 	cluster *apiv1.Cluster,
 ) (changed bool, err error) {
 	// If I'm already the current designated primary everything is ok.
-	if cluster.Status.CurrentPrimary == r.instance.PodName && !r.instance.RequiresDesignatedPrimaryTransition {
+	if cluster.Status.CurrentPrimary == r.instance.GetPodName() && !r.instance.RequiresDesignatedPrimaryTransition {
 		return false, nil
 	}
 
@@ -1195,7 +1201,7 @@ func (r *InstanceReconciler) reconcileDesignatedPrimary(
 	log.FromContext(ctx).Info("Setting myself as the current designated primary")
 
 	oldCluster := cluster.DeepCopy()
-	cluster.Status.CurrentPrimary = r.instance.PodName
+	cluster.Status.CurrentPrimary = r.instance.GetPodName()
 	cluster.Status.CurrentPrimaryTimestamp = pgTime.GetCurrentTimestamp()
 	if r.instance.RequiresDesignatedPrimaryTransition {
 		externalcluster.SetDesignatedPrimaryTransitionCompleted(cluster)
@@ -1269,7 +1275,7 @@ func (r *InstanceReconciler) reconcileUser(ctx context.Context, username string,
 	var secret corev1.Secret
 	err := r.GetClient().Get(
 		ctx,
-		client.ObjectKey{Namespace: r.instance.Namespace, Name: secretName},
+		client.ObjectKey{Namespace: r.instance.GetNamespaceName(), Name: secretName},
 		&secret)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
@@ -1312,7 +1318,7 @@ func (r *InstanceReconciler) refreshPGHBA(ctx context.Context, cluster *apiv1.Cl
 		err := r.GetClient().Get(ctx,
 			types.NamespacedName{
 				Name:      ldapSecretName,
-				Namespace: r.instance.Namespace,
+				Namespace: r.instance.GetNamespaceName(),
 			}, &ldapBindPasswordSecret)
 		if err != nil {
 			return false, err
@@ -1373,7 +1379,7 @@ func (r *InstanceReconciler) dropStaleReplicationConnections(
 		return ctrl.Result{}, nil
 	}
 
-	if cluster.Status.CurrentPrimary == r.instance.PodName {
+	if cluster.Status.CurrentPrimary == r.instance.GetPodName() {
 		return ctrl.Result{}, nil
 	}
 
