@@ -11,6 +11,8 @@ CloudNativePG was originally built and sponsored by [EDB](https://www.enterprise
 - [Code of conduct](CODE_OF_CONDUCT.md)
 - [Governance policies](https://github.com/cloudnative-pg/governance/blob/main/GOVERNANCE.md)
 - [Contributing](CONTRIBUTING.md)
+- [Adopters](ADOPTERS.md)
+- [Commercial Support](https://cloudnative-pg.io/support/)
 - [License](LICENSE)
 
 ## Getting Started
