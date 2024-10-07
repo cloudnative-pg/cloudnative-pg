@@ -138,6 +138,12 @@ spec:
                 x-kubernetes-validations:
                 - message: name is immutable
                   rule: self == oldSelf
+                - message: the name postgres is reserved
+                  rule: self != 'postgres'
+                - message: the name template0 is reserved
+                  rule: self != 'template0'
+                - message: the name template1 is reserved
+                  rule: self != 'template1'
               owner:
                 description: The owner
                 type: string
