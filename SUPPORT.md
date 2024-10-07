@@ -23,12 +23,8 @@ containing the following information:
 3. **Website Link**: Include a link to your homepage or a dedicated landing
   page that explicitly mentions CloudNativePG support and includes at least one
   link back to [cloudnative-pg.io](https://cloudnative-pg.io).
-4. **Organisation Description**: Submit a concise description of your company,
-  with a particular focus on your CloudNativePG and Kubernetes-related
-  professional support services (*maximum 400 characters*).
 
 [CloudNativePG maintainers will vet each submission](https://github.com/cloudnative-pg/governance/blob/main/GOVERNANCE.md#voting)
 and reserve the right to reject your application or request changes if your website
-doesn’t clearly mention CloudNativePG support, if it doesn't include at least
-one link back to [cloudnative-pg.io](https://cloudnative-pg.io), or if your
-claims cannot be objectively verified.
+doesn’t clearly mention CloudNativePG support or if it doesn't include at least
+one link back to [cloudnative-pg.io](https://cloudnative-pg.io).
