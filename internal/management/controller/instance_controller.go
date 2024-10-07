@@ -30,6 +30,7 @@ import (
 
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	pgTime "github.com/cloudnative-pg/machinery/pkg/postgres/time"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -58,7 +59,6 @@ import (
 	externalcluster "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/replicaclusterswitch"
 	clusterstatus "github.com/cloudnative-pg/cloudnative-pg/pkg/resources/status"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/system"
-	pkgUtils "github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 const (
@@ -1208,7 +1208,7 @@ func (r *InstanceReconciler) reconcilePrimary(ctx context.Context, cluster *apiv
 	// if the currentPrimary doesn't match the PodName we set the correct value.
 	if cluster.Status.CurrentPrimary != r.instance.PodName {
 		cluster.Status.CurrentPrimary = r.instance.PodName
-		cluster.Status.CurrentPrimaryTimestamp = pkgUtils.GetCurrentTimestamp()
+		cluster.Status.CurrentPrimaryTimestamp = pgTime.GetCurrentTimestamp()
 
 		if err := r.client.Status().Patch(ctx, cluster, client.MergeFrom(oldCluster)); err != nil {
 			return err
@@ -1277,7 +1277,7 @@ func (r *InstanceReconciler) reconcileDesignatedPrimary(
 
 	oldCluster := cluster.DeepCopy()
 	cluster.Status.CurrentPrimary = r.instance.PodName
-	cluster.Status.CurrentPrimaryTimestamp = pkgUtils.GetCurrentTimestamp()
+	cluster.Status.CurrentPrimaryTimestamp = pgTime.GetCurrentTimestamp()
 	if r.instance.RequiresDesignatedPrimaryTransition {
 		externalcluster.SetDesignatedPrimaryTransitionCompleted(cluster)
 	}
