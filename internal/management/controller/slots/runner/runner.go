@@ -112,7 +112,7 @@ func (sr *Replicator) reconcile(ctx context.Context, config *apiv1.ReplicationSl
 		ctx,
 		infrastructure.NewPostgresManager(primaryPool),
 		infrastructure.NewPostgresManager(localPool),
-		sr.instance.PodName,
+		sr.instance.GetPodName(),
 		config,
 	)
 	return err
