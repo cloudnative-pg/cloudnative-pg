@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"time"
 
+	pgTime "github.com/cloudnative-pg/machinery/pkg/postgres/time"
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
@@ -74,7 +75,7 @@ func NewCmd() *cobra.Command {
 				backupName = fmt.Sprintf(
 					"%s-%s",
 					clusterName,
-					utils.ToCompactISO8601(time.Now()),
+					pgTime.ToCompactISO8601(time.Now()),
 				)
 			}
 

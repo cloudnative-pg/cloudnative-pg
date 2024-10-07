@@ -21,6 +21,7 @@ import (
 	"context"
 	"fmt"
 
+	pgTime "github.com/cloudnative-pg/machinery/pkg/postgres/time"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -42,7 +43,7 @@ func Reload(ctx context.Context, clusterName string) error {
 	if clusterRestarted.Annotations == nil {
 		clusterRestarted.Annotations = make(map[string]string)
 	}
-	clusterRestarted.Annotations[utils.ClusterReloadAnnotationName] = utils.GetCurrentTimestamp()
+	clusterRestarted.Annotations[utils.ClusterReloadAnnotationName] = pgTime.GetCurrentTimestamp()
 	clusterRestarted.ManagedFields = nil
 
 	err = plugin.Client.Patch(ctx, clusterRestarted, client.MergeFrom(&cluster))
