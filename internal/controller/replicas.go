@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	pgTime "github.com/cloudnative-pg/machinery/pkg/postgres/time"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -350,13 +351,13 @@ func (r *ClusterReconciler) evaluateFailoverDelay(
 	}
 
 	if cluster.Status.CurrentPrimaryFailingSinceTimestamp == "" {
-		cluster.Status.CurrentPrimaryFailingSinceTimestamp = utils.GetCurrentTimestamp()
+		cluster.Status.CurrentPrimaryFailingSinceTimestamp = pgTime.GetCurrentTimestamp()
 		if err := r.Status().Update(ctx, cluster); err != nil {
 			return err
 		}
 	}
-	primaryFailingSince, err := utils.DifferenceBetweenTimestamps(
-		utils.GetCurrentTimestamp(),
+	primaryFailingSince, err := pgTime.DifferenceBetweenTimestamps(
+		pgTime.GetCurrentTimestamp(),
 		cluster.Status.CurrentPrimaryFailingSinceTimestamp,
 	)
 	if err != nil {
