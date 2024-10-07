@@ -2314,6 +2314,48 @@ More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-
    <p>The encoding (cannot be changed)</p>
 </td>
 </tr>
+<tr><td><code>locale</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The locale (cannot be changed)</p>
+</td>
+</tr>
+<tr><td><code>locale_provider</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The locale provider (cannot be changed)</p>
+</td>
+</tr>
+<tr><td><code>lc_collate</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The LC_COLLATE (cannot be changed)</p>
+</td>
+</tr>
+<tr><td><code>lc_ctype</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The LC_CTYPE (cannot be changed)</p>
+</td>
+</tr>
+<tr><td><code>icu_locale</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The ICU_LOCALE (cannot be changed)</p>
+</td>
+</tr>
+<tr><td><code>icu_rules</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The ICU_RULES (cannot be changed)</p>
+</td>
+</tr>
 <tr><td><code>isTemplate</code><br/>
 <i>bool</i>
 </td>
