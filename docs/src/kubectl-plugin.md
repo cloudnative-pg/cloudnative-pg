@@ -175,6 +175,7 @@ kubectl cnpg <command> <args...>
     The plugin automatically detects if the standard output channel is connected to a terminal.
     In such cases, it may add ANSI colors to the command output. To disable colors, use the
     `--color=never` option with the command.
+
 ### Generation of installation manifests
 
 The `cnpg` plugin can be used to generate the YAML manifest for the
@@ -779,6 +780,41 @@ kubectl cnpg logs cluster cluster-example --output my-cluster.log
 
 Successfully written logs to "my-cluster.log"
 ```
+
+#### Pretty
+
+The `pretty` sub-command reads a log stream from the process standard input
+and decodes and formats it in a human-readable format.
+
+It is designed to be used in a pipeline with `kubectl cnpg logs cluster` like in
+the following example:
+
+```
+$ kubectl cnpg logs cluster cluster-example | kubectl cnpg logs pretty
+2024-10-09T07:05:41Z cluster-example-1 setup Starting CloudNativePG Instance Manager
+2024-10-09T07:05:41Z cluster-example-1 setup Checking for free disk space for WALs before starting PostgreSQL
+2024-10-09T07:05:41Z cluster-example-1 setup starting tablespace manager
+[...]
+```
+
+The `pretty` sub-commands also support log selection, allowing the user to
+filter out the logs of the selected pods, of the selected loggers, and less
+important than a specified level. The following examples gives a glimpse of how
+to achieve that:
+
+```
+$ kubectl cnpg logs cluster cluster-example | kubectl cnpg logs pretty --pods cluster-example-1 --loggers postgres --log-level info
+2024-10-09T07:05:41Z cluster-example-1 postgres 2024-10-09 07:05:41.458 UTC [31] LOG:  redirecting log output to logging collector process
+2024-10-09T07:05:41Z cluster-example-1 postgres 2024-10-09 07:05:41.458 UTC [31] HINT:  Future log output will appear in directory "/controller/log".
+2024-10-09T07:05:41Z cluster-example-1 postgres LOG: ending log output to stderr
+2024-10-09T07:05:41Z cluster-example-1 postgres LOG: starting PostgreSQL 17.0 (Debian 17.0-1.pgdg110+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 10.2.1-6) 10.2.1 20210110, 64-bit
+2024-10-09T07:05:41Z cluster-example-1 postgres 2024-10-09 07:05:41.458 UTC [31] LOG:  ending log output to stderr
+2024-10-09T07:05:41Z cluster-example-1 postgres 2024-10-09 07:05:41.458 UTC [31] HINT:  Future log output will go to log destination "csvlog".
+[...]
+```
+
+The `-h` option can be used to get an explanation of all the available flags and
+their semantics.
 
 ### Destroy
 
