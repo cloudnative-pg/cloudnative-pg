@@ -30,7 +30,7 @@ import (
 
 // deleteDatabaseFinalizers deletes Database object finalizers when the cluster they were in has been deleted
 func (r *ClusterReconciler) deleteDatabaseFinalizers(ctx context.Context, namespacedName types.NamespacedName) error {
-	contextLogger, ctx := log.SetupLogger(ctx)
+	contextLogger := log.FromContext(ctx)
 
 	databases := apiv1.DatabaseList{}
 	if err := r.List(ctx,
