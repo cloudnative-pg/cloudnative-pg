@@ -158,7 +158,7 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	// Check if the target PG Database is already being managed by another
 	// Database Object
-	existingManager, err := r.isAlreadyManagedBy(ctx, &database)
+	existingManager, err := r.isAlreadyManagedBy(ctx, database)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -193,7 +193,7 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 // managed by an existing Database object. If it is, we return the name of that object
 func (r *DatabaseReconciler) isAlreadyManagedBy(
 	ctx context.Context,
-	database *apiv1.Database,
+	database apiv1.Database,
 ) (string, error) {
 	contextLogger, ctx := log.SetupLogger(ctx)
 	var databaseList apiv1.DatabaseList
@@ -201,7 +201,7 @@ func (r *DatabaseReconciler) isAlreadyManagedBy(
 	if err := r.Client.List(ctx, &databaseList,
 		client.InNamespace(r.instance.GetNamespaceName()),
 	); err != nil {
-		contextLogger.Error(err, "While getting database list", "namespace", r.instance.GetNamespaceName())
+		contextLogger.Error(err, "while getting database list", "namespace", r.instance.GetNamespaceName())
 		return "", err
 	}
 
@@ -216,8 +216,7 @@ func (r *DatabaseReconciler) isAlreadyManagedBy(
 			continue
 		}
 
-		// We consider only Database objects for which the reconciler has
-		// succeeded at least once
+		// We consider only Database objects for which the reconciler has succeeded at least once
 		if db.Spec.Name == database.Spec.Name && db.Status.ObservedGeneration > 0 {
 			return db.Name, nil
 		}
