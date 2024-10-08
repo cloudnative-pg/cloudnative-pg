@@ -43,23 +43,7 @@ func (r *ClusterReconciler) setupPostgresPKI(ctx context.Context, cluster *apiv1
 		return fmt.Errorf("generating server CA certificate: %w", err)
 	}
 
-	// This is the certificate for the server
-	serverCertificateName := client.ObjectKey{Namespace: cluster.GetNamespace(), Name: cluster.GetServerTLSSecretName()}
-	opts := x509.VerifyOptions{KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}}
-	err = r.ensureServerLeafCertificate(
-		ctx,
-		cluster,
-		serverCertificateName,
-		cluster.GetServiceReadWriteName(),
-		serverCaSecret,
-		certs.CertTypeServer,
-		cluster.GetClusterAltDNSNames(),
-		&opts)
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			return fmt.Errorf("missing specified server TLS secret %s: %w",
-				cluster.Status.Certificates.ServerTLSSecret, err)
-		}
+	if err = r.ensureServerLeafCertificate(ctx, cluster, serverCaSecret); err != nil {
 		return fmt.Errorf("generating server TLS certificate: %w", err)
 	}
 
@@ -71,20 +55,7 @@ func (r *ClusterReconciler) setupPostgresPKI(ctx context.Context, cluster *apiv1
 		return fmt.Errorf("generating client CA certificate: %w", err)
 	}
 
-	// Generating postgres client certificate
-	replicationSecretName := client.ObjectKey{
-		Namespace: cluster.GetNamespace(),
-		Name:      cluster.GetReplicationSecretName(),
-	}
-	err = r.ensureReplicationClientLeafCertificate(
-		ctx,
-		cluster,
-		replicationSecretName,
-		apiv1.StreamingReplicationUser,
-		clientCaSecret,
-		certs.CertTypeClient,
-		nil,
-		&x509.VerifyOptions{KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}})
+	err = r.ensureReplicationClientLeafCertificate(ctx, cluster, clientCaSecret)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return fmt.Errorf("missing specified streaming replication client TLS secret %s: %w",
@@ -253,24 +224,34 @@ func (r *ClusterReconciler) renewCASecret(ctx context.Context, secret *v1.Secret
 func (r *ClusterReconciler) ensureServerLeafCertificate(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
-	secretName client.ObjectKey,
-	commonName string,
 	caSecret *v1.Secret,
-	usage certs.CertType,
-	altDNSNames []string,
-	opts *x509.VerifyOptions,
 ) error {
+	// This is the certificate for the server
+	secretName := client.ObjectKey{Namespace: cluster.GetNamespace(), Name: cluster.GetServerTLSSecretName()}
+
 	// If not specified generate/renew
 	if cluster.Spec.Certificates == nil || cluster.Spec.Certificates.ServerTLSSecret == "" {
-		return r.ensureLeafCertificate(ctx, cluster, secretName, commonName, caSecret, usage, altDNSNames, nil)
+		return r.ensureLeafCertificate(
+			ctx,
+			cluster,
+			secretName,
+			cluster.GetServiceReadWriteName(),
+			caSecret,
+			certs.CertTypeServer,
+			cluster.GetClusterAltDNSNames(),
+			nil,
+		)
 	}
 
 	var serverSecret v1.Secret
-	err := r.Get(ctx, secretName, &serverSecret)
-	if err != nil {
+	if err := r.Get(ctx, secretName, &serverSecret); apierrors.IsNotFound(err) {
+		return fmt.Errorf("missing specified server TLS secret %s: %w",
+			cluster.Status.Certificates.ServerTLSSecret, err)
+	} else if err != nil {
 		return err
 	}
 
+	opts := &x509.VerifyOptions{KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}}
 	return validateLeafCertificate(caSecret, &serverSecret, opts)
 }
 
@@ -279,24 +260,37 @@ func (r *ClusterReconciler) ensureServerLeafCertificate(
 func (r *ClusterReconciler) ensureReplicationClientLeafCertificate(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
-	secretName client.ObjectKey,
-	commonName string,
 	caSecret *v1.Secret,
-	usage certs.CertType,
-	altDNSNames []string,
-	opts *x509.VerifyOptions,
 ) error {
+	// Generating postgres client certificate
+	replicationSecretName := client.ObjectKey{
+		Namespace: cluster.GetNamespace(),
+		Name:      cluster.GetReplicationSecretName(),
+	}
+
 	// If not specified generate/renew
 	if cluster.Spec.Certificates == nil || cluster.Spec.Certificates.ReplicationTLSSecret == "" {
-		return r.ensureLeafCertificate(ctx, cluster, secretName, commonName, caSecret, usage, altDNSNames, nil)
+		return r.ensureLeafCertificate(
+			ctx,
+			cluster,
+			replicationSecretName,
+			apiv1.StreamingReplicationUser,
+			caSecret,
+			certs.CertTypeClient,
+			nil,
+			nil,
+		)
 	}
 
 	var replicationClientSecret v1.Secret
-	err := r.Get(ctx, secretName, &replicationClientSecret)
-	if err != nil {
+	if err := r.Get(ctx, replicationSecretName, &replicationClientSecret); apierrors.IsNotFound(err) {
+		return fmt.Errorf("missing specified replication TLS secret %s: %w",
+			cluster.Status.Certificates.ServerTLSSecret, err)
+	} else if err != nil {
 		return err
 	}
 
+	opts := &x509.VerifyOptions{KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}}
 	return validateLeafCertificate(caSecret, &replicationClientSecret, opts)
 }
 
@@ -329,23 +323,26 @@ func (r *ClusterReconciler) ensureLeafCertificate(
 ) error {
 	var secret v1.Secret
 	err := r.Get(ctx, secretName, &secret)
-	if err == nil {
+	switch {
+	case err == nil:
 		return r.renewAndUpdateCertificate(ctx, caSecret, &secret, altDNSNames)
-	}
+	case apierrors.IsNotFound(err):
+		serverSecret, err := generateCertificateFromCA(caSecret, commonName, usage, altDNSNames, secretName)
+		if err != nil {
+			return err
+		}
 
-	serverSecret, err := generateCertificateFromCA(caSecret, commonName, usage, altDNSNames, secretName)
-	if err != nil {
+		utils.SetAsOwnedBy(&serverSecret.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
+		for k, v := range additionalLabels {
+			if serverSecret.Labels == nil {
+				serverSecret.Labels = make(map[string]string)
+			}
+			serverSecret.Labels[k] = v
+		}
+		return r.Create(ctx, serverSecret)
+	default:
 		return err
 	}
-
-	utils.SetAsOwnedBy(&serverSecret.ObjectMeta, cluster.ObjectMeta, cluster.TypeMeta)
-	for k, v := range additionalLabels {
-		if serverSecret.Labels == nil {
-			serverSecret.Labels = make(map[string]string)
-		}
-		serverSecret.Labels[k] = v
-	}
-	return r.Create(ctx, serverSecret)
 }
 
 // generateCertificateFromCA create a certificate secret using the provided CA secret
