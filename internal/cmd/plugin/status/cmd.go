@@ -49,7 +49,7 @@ func NewCmd() *cobra.Command {
 	}
 
 	statusCmd.Flags().CountP(
-		"verbose", "v", "Include PostgreSQL configuration, HBA rules, and full replication slots info")
+		"verbose", "v", "Increase verbosity to display more information")
 	statusCmd.Flags().StringP(
 		"output", "o", "text", "Output format. One of text|json")
 
