@@ -1997,6 +1997,14 @@ jobs:
         run: |
           make preflight
       -
+        name: Create Secret
+        run: |
+          export KUBECONFIG=$(pwd)/hack/auth/kubeconfig
+          oc create ns cloudnative-pg
+          oc -n cloudnative-pg create secret generic cnpg-pull-secret \
+          --from-file=.dockerconfigjson=$HOME/.docker/config.json \
+          --type=kubernetes.io/dockerconfigjson
+      -
         name: Run preflight operator test
         env:
           BUNDLE_IMG: ${{ needs.buildx.outputs.bundle_img }}
