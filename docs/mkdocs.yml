@@ -53,6 +53,7 @@ nav:
   - kubectl-plugin.md
   - failover.md
   - troubleshooting.md
+  - production_readiness.md
   - fencing.md
   - declarative_hibernation.md
   - postgis.md
