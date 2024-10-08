@@ -30,17 +30,15 @@ import (
 
 // deleteDatabaseFinalizers deletes Database object finalizers when the cluster they were in has been deleted
 func (r *ClusterReconciler) deleteDatabaseFinalizers(ctx context.Context, namespacedName types.NamespacedName) error {
+	contextLogger, ctx := log.SetupLogger(ctx)
+
 	databases := apiv1.DatabaseList{}
-	err := r.List(
-		ctx,
+	if err := r.List(ctx,
 		&databases,
 		client.InNamespace(namespacedName.Namespace),
-	)
-	if err != nil {
+	); err != nil {
 		return err
 	}
-
-	contextLogger, ctx := log.SetupLogger(ctx)
 
 	for idx := range databases.Items {
 		database := &databases.Items[idx]
@@ -49,20 +47,19 @@ func (r *ClusterReconciler) deleteDatabaseFinalizers(ctx context.Context, namesp
 			continue
 		}
 
-		// Database is in this cluster.
-		// Check if the finalizer is still there, if so, delete and patch the Database
-		currentDatabase := database.DeepCopy()
-		if controllerutil.RemoveFinalizer(currentDatabase, utils.DatabaseFinalizerName) {
+		origDatabase := database.DeepCopy()
+		if controllerutil.RemoveFinalizer(database, utils.DatabaseFinalizerName) {
 			contextLogger.Debug("Removing finalizer from database",
 				"finalizer", utils.DatabaseFinalizerName, "database", database.Name)
-			if err := r.Patch(ctx, currentDatabase, client.MergeFrom(database)); err != nil {
+			if err := r.Patch(ctx, database, client.MergeFrom(origDatabase)); err != nil {
 				contextLogger.Error(
 					err,
 					"error while removing finalizer from database",
 					"database", database.Name,
-					"oldFinalizerList", database.ObjectMeta.Finalizers,
-					"newFinalizerList", currentDatabase.ObjectMeta.Finalizers,
+					"oldFinalizerList", origDatabase.ObjectMeta.Finalizers,
+					"newFinalizerList", database.ObjectMeta.Finalizers,
 				)
+				return err
 			}
 		}
 	}

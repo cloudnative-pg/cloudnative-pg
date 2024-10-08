@@ -50,55 +50,54 @@ var _ = Describe("Database CRD finalizers", func() {
 		}
 	})
 
-	It("should delete database finalizers for databases on the cluster",
-		func(ctx SpecContext) {
-			databaseList := &apiv1.DatabaseList{
-				Items: []apiv1.Database{
-					{
-						ObjectMeta: metav1.ObjectMeta{
-							Finalizers: []string{
-								utils.DatabaseFinalizerName,
-							},
-							Name:      "db-1",
-							Namespace: "test",
+	It("should delete database finalizers for databases on the cluster", func(ctx SpecContext) {
+		databaseList := &apiv1.DatabaseList{
+			Items: []apiv1.Database{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Finalizers: []string{
+							utils.DatabaseFinalizerName,
 						},
-						Spec: apiv1.DatabaseSpec{
-							Name: "db-test",
-							ClusterRef: corev1.LocalObjectReference{
-								Name: "cluster",
-							},
-						},
+						Name:      "db-1",
+						Namespace: "test",
 					},
-					{
-						ObjectMeta: metav1.ObjectMeta{
-							Finalizers: []string{
-								utils.DatabaseFinalizerName,
-							},
-							Name:      "db-2",
-							Namespace: "test",
-						},
-						Spec: apiv1.DatabaseSpec{
-							Name: "db-test-2",
-							ClusterRef: corev1.LocalObjectReference{
-								Name: "cluster",
-							},
+					Spec: apiv1.DatabaseSpec{
+						Name: "db-test",
+						ClusterRef: corev1.LocalObjectReference{
+							Name: "cluster",
 						},
 					},
 				},
-			}
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Finalizers: []string{
+							utils.DatabaseFinalizerName,
+						},
+						Name:      "db-2",
+						Namespace: "test",
+					},
+					Spec: apiv1.DatabaseSpec{
+						Name: "db-test-2",
+						ClusterRef: corev1.LocalObjectReference{
+							Name: "cluster",
+						},
+					},
+				},
+			},
+		}
 
-			cli := fake.NewClientBuilder().WithScheme(scheme).WithLists(databaseList).Build()
-			r.Client = cli
-			err := r.deleteDatabaseFinalizers(ctx, namespacedName)
+		cli := fake.NewClientBuilder().WithScheme(scheme).WithLists(databaseList).Build()
+		r.Client = cli
+		err := r.deleteDatabaseFinalizers(ctx, namespacedName)
+		Expect(err).ToNot(HaveOccurred())
+
+		for _, db := range databaseList.Items {
+			database := &apiv1.Database{}
+			err = cli.Get(ctx, client.ObjectKeyFromObject(&db), database)
 			Expect(err).ToNot(HaveOccurred())
-
-			for _, db := range databaseList.Items {
-				database := &apiv1.Database{}
-				err = cli.Get(ctx, client.ObjectKeyFromObject(&db), database)
-				Expect(err).ToNot(HaveOccurred())
-				Expect(database.Finalizers).To(BeZero())
-			}
-		})
+			Expect(database.Finalizers).To(BeZero())
+		}
+	})
 
 	It("should not delete database finalizers for databases in another cluster",
 		func(ctx SpecContext) {
