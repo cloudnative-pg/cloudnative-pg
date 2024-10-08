@@ -99,7 +99,7 @@ func getPrintableIntegerPointer(i *int) string {
 }
 
 // Status implements the "status" subcommand
-func Status(ctx context.Context, clusterName string, verbose bool, format plugin.OutputFormat) error {
+func Status(ctx context.Context, clusterName string, verbose int, format plugin.OutputFormat) error {
 	var cluster apiv1.Cluster
 	var errs []error
 
@@ -123,17 +123,21 @@ func Status(ctx context.Context, clusterName string, verbose bool, format plugin
 	status.printHibernationInfo()
 	status.printDemotionTokenInfo()
 	status.printPromotionTokenInfo()
-	if verbose {
+	if verbose > 1 {
 		errs = append(errs, status.printPostgresConfiguration(ctx, clientInterface)...)
 	}
-	status.printCertificatesStatus()
+	if verbose > 1 {
+		status.printCertificatesStatus()
+	}
 	status.printBackupStatus()
-	status.printBasebackupStatus()
+	status.printBasebackupStatus(verbose)
 	status.printReplicaStatus(verbose)
-	status.printUnmanagedReplicationSlotStatus()
-	status.printRoleManagerStatus()
-	status.printTablespacesStatus()
-	status.printPodDisruptionBudgetStatus()
+	if verbose > 0 {
+		status.printUnmanagedReplicationSlotStatus()
+		status.printRoleManagerStatus()
+		status.printTablespacesStatus()
+		status.printPodDisruptionBudgetStatus()
+	}
 	status.printInstancesStatus()
 
 	if len(errs) > 0 {
@@ -243,8 +247,7 @@ func (fullStatus *PostgresqlStatus) printBasicInfo(ctx context.Context, client k
 	isPrimaryFenced := cluster.IsInstanceFenced(cluster.Status.CurrentPrimary)
 	primaryInstanceStatus := fullStatus.tryGetPrimaryInstance()
 
-	summary.AddLine("Name:", cluster.Name)
-	summary.AddLine("Namespace:", cluster.Namespace)
+	summary.AddLine("Name:", fmt.Sprintf("%s/%s", cluster.Namespace, cluster.Name))
 
 	if primaryInstanceStatus != nil {
 		summary.AddLine("System ID:", primaryInstanceStatus.SystemID)
@@ -529,9 +532,9 @@ func (fullStatus *PostgresqlStatus) areReplicationSlotsEnabled() bool {
 		fullStatus.Cluster.Spec.ReplicationSlots.HighAvailability.GetEnabled()
 }
 
-func (fullStatus *PostgresqlStatus) printReplicaStatusTableHeader(table *tabby.Tabby, verbose bool) {
+func (fullStatus *PostgresqlStatus) printReplicaStatusTableHeader(table *tabby.Tabby, verbose int) {
 	switch {
-	case fullStatus.areReplicationSlotsEnabled() && verbose:
+	case fullStatus.areReplicationSlotsEnabled() && verbose > 0:
 		table.AddHeader(
 			"Name",
 			"Sent LSN",
@@ -549,7 +552,7 @@ func (fullStatus *PostgresqlStatus) printReplicaStatusTableHeader(table *tabby.T
 			"Slot WAL Status",
 			"Slot Safe WAL Size",
 		)
-	case fullStatus.areReplicationSlotsEnabled() && !verbose:
+	case fullStatus.areReplicationSlotsEnabled() && verbose == 0:
 		table.AddHeader(
 			"Name",
 			"Sent LSN",
@@ -585,7 +588,7 @@ func (fullStatus *PostgresqlStatus) printReplicaStatusTableHeader(table *tabby.T
 func (fullStatus *PostgresqlStatus) addReplicationSlotsColumns(
 	applicationName string,
 	columns *[]interface{},
-	verbose bool,
+	verbose int,
 ) {
 	printSlotActivity := func(isActive bool) string {
 		if isActive {
@@ -595,18 +598,18 @@ func (fullStatus *PostgresqlStatus) addReplicationSlotsColumns(
 	}
 	slot := fullStatus.getPrintableReplicationSlotInfo(applicationName)
 	switch {
-	case slot != nil && verbose:
+	case slot != nil && verbose > 0:
 		*columns = append(*columns,
 			printSlotActivity(slot.Active),
 			slot.RestartLsn,
 			slot.WalStatus,
 			getPrintableIntegerPointer(slot.SafeWalSize),
 		)
-	case slot != nil && !verbose:
+	case slot != nil && verbose == 0:
 		*columns = append(*columns,
 			printSlotActivity(slot.Active),
 		)
-	case slot == nil && verbose:
+	case slot == nil && verbose > 0:
 		*columns = append(*columns,
 			"-",
 			"-",
@@ -620,7 +623,7 @@ func (fullStatus *PostgresqlStatus) addReplicationSlotsColumns(
 	}
 }
 
-func (fullStatus *PostgresqlStatus) printReplicaStatus(verbose bool) {
+func (fullStatus *PostgresqlStatus) printReplicaStatus(verbose int) {
 	if fullStatus.Cluster.IsReplica() {
 		return
 	}
@@ -977,7 +980,7 @@ func (fullStatus *PostgresqlStatus) printPodDisruptionBudgetStatus() {
 	fmt.Println()
 }
 
-func (fullStatus *PostgresqlStatus) printBasebackupStatus() {
+func (fullStatus *PostgresqlStatus) printBasebackupStatus(verbose int) {
 	const header = "Physical backups"
 
 	primaryInstanceStatus := fullStatus.tryGetPrimaryInstance()
@@ -989,9 +992,11 @@ func (fullStatus *PostgresqlStatus) printBasebackupStatus() {
 	}
 
 	if len(primaryInstanceStatus.PgStatBasebackupsInfo) == 0 {
-		fmt.Println(aurora.Green(header))
-		fmt.Println(aurora.Yellow("No running physical backups found").String())
-		fmt.Println()
+		if verbose > 0 {
+			fmt.Println(aurora.Green(header))
+			fmt.Println(aurora.Yellow("No running physical backups found").String())
+			fmt.Println()
+		}
 		return
 	}
 
