@@ -190,9 +190,10 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig, enable
 			EnvFrom:         envConfig.EnvFrom,
 			VolumeMounts:    createPostgresVolumeMounts(cluster),
 			StartupProbe: &corev1.Probe{
-				FailureThreshold: getStartupProbeFailureThreshold(cluster.GetMaxStartDelay()),
-				PeriodSeconds:    StartupProbePeriod,
-				TimeoutSeconds:   5,
+				FailureThreshold:    getStartupProbeFailureThreshold(cluster.GetMaxStartDelay()),
+				PeriodSeconds:       StartupProbePeriod,
+				InitialDelaySeconds: cluster.Spec.StartupProbeInitialDelaySeconds,
+				TimeoutSeconds:      cluster.Spec.StartupProbeTimeoutSeconds,
 				ProbeHandler: corev1.ProbeHandler{
 					HTTPGet: &corev1.HTTPGetAction{
 						Path: url.PathHealth,
@@ -201,7 +202,7 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig, enable
 				},
 			},
 			ReadinessProbe: &corev1.Probe{
-				TimeoutSeconds: 5,
+				TimeoutSeconds: cluster.Spec.ReadinessProbeTimeoutSeconds,
 				PeriodSeconds:  ReadinessProbePeriod,
 				ProbeHandler: corev1.ProbeHandler{
 					HTTPGet: &corev1.HTTPGetAction{
@@ -212,7 +213,7 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig, enable
 			},
 			LivenessProbe: &corev1.Probe{
 				PeriodSeconds:  LivenessProbePeriod,
-				TimeoutSeconds: 5,
+				TimeoutSeconds: cluster.Spec.LivenessProbeTimeoutSeconds,
 				ProbeHandler: corev1.ProbeHandler{
 					HTTPGet: &corev1.HTTPGetAction{
 						Path: url.PathHealth,
