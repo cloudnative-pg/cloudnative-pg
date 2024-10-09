@@ -107,8 +107,8 @@ spec:
                   rule: self == oldSelf
               ensure:
                 default: present
-                description: Ensure the Database is `present` or `absent` - defaults
-                  to "present"
+                description: Ensure the PostgreSQL database is `present` or `absent`
+                  - defaults to "present"
                 enum:
                 - present
                 - absent
