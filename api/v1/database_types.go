@@ -40,7 +40,7 @@ type DatabaseSpec struct {
 	// The corresponding cluster
 	ClusterRef corev1.LocalObjectReference `json:"cluster"`
 
-	// Ensure the Database is `present` or `absent` - defaults to "present"
+	// Ensure the PostgreSQL database is `present` or `absent` - defaults to "present"
 	// +kubebuilder:default:="present"
 	// +kubebuilder:validation:Enum=present;absent
 	// +optional

@@ -2290,7 +2290,7 @@ More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-
 <a href="#postgresql-cnpg-io-v1-EnsureOption"><i>EnsureOption</i></a>
 </td>
 <td>
-   <p>Ensure the Database is <code>present</code> or <code>absent</code> - defaults to &quot;present&quot;</p>
+   <p>Ensure the PostgreSQL database is <code>present</code> or <code>absent</code> - defaults to &quot;present&quot;</p>
 </td>
 </tr>
 <tr><td><code>name</code> <B>[Required]</B><br/>
