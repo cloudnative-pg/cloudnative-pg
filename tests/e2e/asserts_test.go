@@ -406,32 +406,6 @@ func AssertOperatorIsReady() {
 	}, testTimeouts[testsUtils.OperatorIsReady]).Should(BeTrue(), "Operator pod is not ready")
 }
 
-// AssertDatabaseIsReady checks the database on the primary is ready to run queries
-//
-// NOTE: even if we checked AssertClusterIsReady, a temporary DB connectivity issue would take
-// failureThreshold x periodSeconds to be detected
-func AssertDatabaseIsReady(namespace, clusterName, dbName string) {
-	By(fmt.Sprintf("checking the database on %s is ready", clusterName), func() {
-		Eventually(func(g Gomega) {
-			primary, err := env.GetClusterPrimary(namespace, clusterName)
-			g.Expect(err).ToNot(HaveOccurred())
-
-			stdout, stderr, err := env.ExecCommandInInstancePod(testsUtils.PodLocator{
-				Namespace: namespace,
-				PodName:   primary.GetName(),
-			}, nil, "pg_isready")
-			g.Expect(err).ShouldNot(HaveOccurred())
-			g.Expect(stderr).To(BeEmpty(), "while checking pg_isready")
-			g.Expect(stdout).To(ContainSubstring("accepting"), "while checking pg_isready: Not accepting connections")
-			_, _, err = env.ExecQueryInInstancePod(testsUtils.PodLocator{
-				Namespace: namespace,
-				PodName:   primary.GetName(),
-			}, testsUtils.DatabaseName(dbName), "select 1")
-			g.Expect(err).ShouldNot(HaveOccurred())
-		}, RetryTimeout, PollingTime).Should(Succeed())
-	})
-}
-
 type TableLocator struct {
 	Namespace    string
 	ClusterName  string
@@ -448,7 +422,6 @@ func AssertCreateTestData(env *testsUtils.TestingEnvironment, tl TableLocator) {
 	if tl.Tablespace == "" {
 		tl.Tablespace = testsUtils.TablespaceDefaultName
 	}
-	AssertDatabaseIsReady(tl.Namespace, tl.ClusterName, tl.DatabaseName)
 
 	By(fmt.Sprintf("creating test data in table %v (cluster %v, database %v, tablespace %v)",
 		tl.TableName, tl.ClusterName, tl.DatabaseName, tl.Tablespace), func() {
@@ -928,8 +901,6 @@ func AssertReplicaModeCluster(
 ) {
 	var primaryReplicaCluster *corev1.Pod
 	checkQuery := fmt.Sprintf("SELECT count(*) FROM %v", testTableName)
-
-	AssertDatabaseIsReady(namespace, srcClusterName, srcClusterDBName)
 
 	tableLocator := TableLocator{
 		Namespace:    namespace,
