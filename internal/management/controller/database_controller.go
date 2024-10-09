@@ -195,7 +195,7 @@ func (r *DatabaseReconciler) isAlreadyManagedBy(
 	ctx context.Context,
 	database apiv1.Database,
 ) (string, error) {
-	contextLogger, ctx := log.SetupLogger(ctx)
+	contextLogger := log.FromContext(ctx)
 	var databaseList apiv1.DatabaseList
 
 	if err := r.Client.List(ctx, &databaseList,
