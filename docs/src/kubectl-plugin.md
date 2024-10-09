@@ -280,8 +280,8 @@ sandbox-2  0/604DE38    Standby (async)   OK      BestEffort  1.24.0           k
 sandbox-3  0/604DE38    Standby (async)   OK      BestEffort  1.24.0           k8s-eu-worker
 ```
 
-If you require more detailed status information, use the `--verbose` option or
-`-v`. The level of detail increases with each additional `-v`:
+If you require more detailed status information, use the `--verbose` option (or
+`-v` for short). The level of detail increases each time the flag is repeated:
 
 ```shell
 kubectl cnpg status sandbox --verbose
