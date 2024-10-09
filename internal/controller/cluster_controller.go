@@ -155,6 +155,14 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 				"namespace", req.Namespace,
 			)
 		}
+		if err := r.deleteDatabaseFinalizers(ctx, req.NamespacedName); err != nil {
+			contextLogger.Error(
+				err,
+				"error while deleting finalizers of Databases on the cluster",
+				"clusterName", req.Name,
+				"namespace", req.Namespace,
+			)
+		}
 		return ctrl.Result{}, err
 	}
 
