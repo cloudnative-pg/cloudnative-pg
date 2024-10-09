@@ -118,7 +118,7 @@ func (r *PgBouncerReconciler) GetClient() ctrl.Client {
 
 // Reconcile is the main reconciliation loop for the pgbouncer instance
 func (r *PgBouncerReconciler) Reconcile(ctx context.Context, event *watch.Event) error {
-	contextLogger, _ := log.SetupLogger(ctx)
+	contextLogger := log.FromContext(ctx)
 	contextLogger.Debug(
 		"Reconciliation loop",
 		"eventType", event.Type,
@@ -205,7 +205,7 @@ func (r *PgBouncerReconciler) writePgBouncerConfig(ctx context.Context, pooler *
 		return false, fmt.Errorf("while generating pgbouncer configuration: %w", err)
 	}
 
-	return refreshConfigurationFiles(configFiles)
+	return refreshConfigurationFiles(ctx, configFiles)
 }
 
 // Init ensures that all PgBouncer requirement are met.

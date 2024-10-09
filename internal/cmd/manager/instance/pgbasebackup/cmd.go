@@ -141,7 +141,7 @@ func (env *CloneInfo) bootstrapUsingPgbasebackup(ctx context.Context) error {
 		connectionString += " options='-c wal_sender_timeout=0s'"
 	}
 
-	err = postgres.ClonePgData(connectionString, env.info.PgData, env.info.PgWal)
+	err = postgres.ClonePgData(ctx, connectionString, env.info.PgData, env.info.PgWal)
 	if err != nil {
 		return err
 	}
@@ -158,11 +158,11 @@ func (env *CloneInfo) bootstrapUsingPgbasebackup(ctx context.Context) error {
 // configureInstanceAsNewPrimary sets up this instance as a new primary server, using
 // the configuration created by the user and setting up the global objects as needed
 func (env *CloneInfo) configureInstanceAsNewPrimary(ctx context.Context, cluster *apiv1.Cluster) error {
-	if err := env.info.WriteInitialPostgresqlConf(cluster); err != nil {
+	if err := env.info.WriteInitialPostgresqlConf(ctx, cluster); err != nil {
 		return err
 	}
 
-	if err := env.info.WriteRestoreHbaConf(); err != nil {
+	if err := env.info.WriteRestoreHbaConf(ctx); err != nil {
 		return err
 	}
 

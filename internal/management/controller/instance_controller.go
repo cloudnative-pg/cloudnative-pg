@@ -89,7 +89,7 @@ func (r *InstanceReconciler) Reconcile(
 	_ reconcile.Request,
 ) (reconcile.Result, error) {
 	// set up a convenient contextLog object so we don't have to type request over and over again
-	contextLogger, ctx := log.SetupLogger(ctx)
+	contextLogger := log.FromContext(ctx)
 
 	// if the context has already been cancelled,
 	// trying to reconcile would just lead to misleading errors being reported
@@ -344,7 +344,7 @@ func (r *InstanceReconciler) refreshConfigurationFiles(
 		return false, err
 	}
 
-	reloadIdent, err := r.instance.RefreshPGIdent(cluster.Spec.PostgresConfiguration.PgIdent)
+	reloadIdent, err := r.instance.RefreshPGIdent(ctx, cluster.Spec.PostgresConfiguration.PgIdent)
 	if err != nil {
 		return false, err
 	}
@@ -352,7 +352,7 @@ func (r *InstanceReconciler) refreshConfigurationFiles(
 
 	// Reconcile PostgreSQL configuration
 	// This doesn't need the PG connection, but it needs to reload it in case of changes
-	reloadConfig, err := r.instance.RefreshConfigurationFilesFromCluster(cluster, false)
+	reloadConfig, err := r.instance.RefreshConfigurationFilesFromCluster(ctx, cluster, false)
 	if err != nil {
 		return false, err
 	}
@@ -1425,7 +1425,7 @@ func (r *InstanceReconciler) refreshPGHBA(ctx context.Context, cluster *apiv1.Cl
 		ldapBindPassword = string(ldapBindPasswordByte)
 	}
 	// Generate pg_hba.conf file
-	return r.instance.RefreshPGHBA(cluster, ldapBindPassword)
+	return r.instance.RefreshPGHBA(ctx, cluster, ldapBindPassword)
 }
 
 func (r *InstanceReconciler) shouldRequeueForMissingTopology(cluster *apiv1.Cluster) shoudRequeue {

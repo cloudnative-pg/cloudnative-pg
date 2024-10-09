@@ -429,7 +429,7 @@ func (info InitInfo) Bootstrap(ctx context.Context) error {
 		cluster.Spec.Bootstrap.InitDB != nil &&
 		cluster.Spec.Bootstrap.InitDB.Import != nil
 
-	if applied, err := instance.RefreshConfigurationFilesFromCluster(cluster, true); err != nil {
+	if applied, err := instance.RefreshConfigurationFilesFromCluster(ctx, cluster, true); err != nil {
 		return fmt.Errorf("while writing the config: %w", err)
 	} else if !applied {
 		return fmt.Errorf("could not apply the config")

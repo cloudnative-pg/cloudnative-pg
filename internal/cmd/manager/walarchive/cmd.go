@@ -162,7 +162,7 @@ func run(
 	// Request Barman Cloud to archive this WAL
 	if cluster.Spec.Backup == nil || cluster.Spec.Backup.BarmanObjectStore == nil {
 		// Backup not configured, skipping WAL
-		contextLog.Info("Backup not configured, skip WAL archiving via Barman Cloud",
+		contextLog.Debug("Backup not configured, skip WAL archiving via Barman Cloud",
 			"walName", walName,
 			"currentPrimary", cluster.Status.CurrentPrimary,
 			"targetPrimary", cluster.Status.TargetPrimary,

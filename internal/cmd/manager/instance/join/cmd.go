@@ -130,7 +130,7 @@ func joinSubCommand(ctx context.Context, instance *postgres.Instance, info postg
 	reconciler.RefreshSecrets(ctx, &cluster)
 
 	// Run "pg_basebackup" to download the data directory from the primary
-	if err := info.Join(&cluster); err != nil {
+	if err := info.Join(ctx, &cluster); err != nil {
 		log.Error(err, "Error joining node")
 		return err
 	}

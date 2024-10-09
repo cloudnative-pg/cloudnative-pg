@@ -331,7 +331,7 @@ func (instance *Instance) VerifyPgDataCoherence(ctx context.Context) error {
 	}
 
 	// creates a bare pg_ident.conf that only grants local access
-	_, err := instance.RefreshPGIdent(nil)
+	_, err := instance.RefreshPGIdent(ctx, nil)
 	return err
 }
 
@@ -477,7 +477,8 @@ func (instance *Instance) ShutdownConnections() {
 // with Startup.
 // This function will return an error whether PostgreSQL is still up
 // after the shutdown request.
-func (instance *Instance) Shutdown(options shutdownOptions) error {
+func (instance *Instance) Shutdown(ctx context.Context, options shutdownOptions) error {
+	contextLogger := log.FromContext(ctx)
 	instance.ShutdownConnections()
 
 	// check instance status
@@ -503,7 +504,7 @@ func (instance *Instance) Shutdown(options shutdownOptions) error {
 		pgCtlOptions = append(pgCtlOptions, "-t", fmt.Sprintf("%v", *options.Timeout))
 	}
 
-	log.Info("Shutting down instance",
+	contextLogger.Info("Shutting down instance",
 		"pgdata", instance.PgData,
 		"mode", options.Mode,
 		"timeout", options.Timeout,
@@ -537,11 +538,14 @@ func (instance *Instance) TryShuttingDownSmartFast(ctx context.Context) error {
 
 	if smartTimeout > 0 {
 		contextLogger.Info("Requesting smart shutdown of the PostgreSQL instance")
-		err = instance.Shutdown(shutdownOptions{
-			Mode:    shutdownModeSmart,
-			Wait:    true,
-			Timeout: &smartTimeout,
-		})
+		err = instance.Shutdown(
+			ctx,
+			shutdownOptions{
+				Mode:    shutdownModeSmart,
+				Wait:    true,
+				Timeout: &smartTimeout,
+			},
+		)
 		if err != nil {
 			contextLogger.Warning("Error while handling the smart shutdown request", "err", err)
 		}
@@ -549,10 +553,12 @@ func (instance *Instance) TryShuttingDownSmartFast(ctx context.Context) error {
 
 	if err != nil || smartTimeout == 0 {
 		contextLogger.Info("Requesting fast shutdown of the PostgreSQL instance")
-		err = instance.Shutdown(shutdownOptions{
-			Mode: shutdownModeFast,
-			Wait: true,
-		})
+		err = instance.Shutdown(ctx,
+			shutdownOptions{
+				Mode: shutdownModeFast,
+				Wait: true,
+			},
+		)
 	}
 	if err != nil {
 		contextLogger.Error(err, "Error while shutting down the PostgreSQL instance")
@@ -571,19 +577,24 @@ func (instance *Instance) TryShuttingDownFastImmediate(ctx context.Context) erro
 	contextLogger := log.FromContext(ctx)
 
 	contextLogger.Info("Requesting fast shutdown of the PostgreSQL instance")
-	err := instance.Shutdown(shutdownOptions{
-		Mode:    shutdownModeFast,
-		Wait:    true,
-		Timeout: &instance.MaxSwitchoverDelay,
-	})
+	err := instance.Shutdown(
+		ctx,
+		shutdownOptions{
+			Mode:    shutdownModeFast,
+			Wait:    true,
+			Timeout: &instance.MaxSwitchoverDelay,
+		},
+	)
 	var exitError *exec.ExitError
 	if errors.As(err, &exitError) {
 		contextLogger.Info("Graceful shutdown failed. Issuing immediate shutdown",
 			"exitCode", exitError.ExitCode())
-		err = instance.Shutdown(shutdownOptions{
-			Mode: shutdownModeImmediate,
-			Wait: true,
-		})
+		err = instance.Shutdown(ctx,
+			shutdownOptions{
+				Mode: shutdownModeImmediate,
+				Wait: true,
+			},
+		)
 	}
 	return err
 }
@@ -700,7 +711,7 @@ func (instance *Instance) WithActiveInstance(inner func() error) error {
 	}
 
 	defer func() {
-		if err := instance.Shutdown(defaultShutdownOptions); err != nil {
+		if err := instance.Shutdown(ctx, defaultShutdownOptions); err != nil {
 			log.Info("Error while deactivating instance", "err", err)
 		}
 	}()
@@ -847,18 +858,19 @@ func (instance *Instance) WaitForSuperuserConnectionAvailable(ctx context.Contex
 
 // waitForConnectionAvailable waits until we can connect to the passed
 // sql.DB connection
-func waitForConnectionAvailable(context context.Context, db *sql.DB) error {
+func waitForConnectionAvailable(ctx context.Context, db *sql.DB) error {
+	contextLogger := log.FromContext(ctx)
 	errorIsRetryable := func(err error) bool {
-		if context.Err() != nil {
+		if ctx.Err() != nil {
 			return false
 		}
 		return err != nil
 	}
 
 	return retry.OnError(RetryUntilServerAvailable, errorIsRetryable, func() error {
-		err := db.PingContext(context)
+		err := db.PingContext(ctx)
 		if err != nil {
-			log.Info("DB not available, will retry", "err", err)
+			contextLogger.Info("DB not available, will retry", "err", err)
 		}
 		return err
 	})
@@ -924,7 +936,9 @@ func (instance *Instance) WaitForConfigReload(ctx context.Context) (*postgres.Po
 
 // waitForStreamingConnectionAvailable waits until we can connect to the passed
 // sql.DB connection using streaming protocol
-func waitForStreamingConnectionAvailable(db *sql.DB) error {
+func waitForStreamingConnectionAvailable(ctx context.Context, db *sql.DB) error {
+	contextLogger := log.FromContext(ctx)
+
 	errorIsRetryable := func(err error) bool {
 		return err != nil
 	}
@@ -932,7 +946,7 @@ func waitForStreamingConnectionAvailable(db *sql.DB) error {
 	return retry.OnError(RetryUntilServerAvailable, errorIsRetryable, func() error {
 		result, err := db.Query("IDENTIFY_SYSTEM")
 		if err != nil || result.Err() != nil {
-			log.Info("DB not available, will retry", "err", err)
+			contextLogger.Info("DB not available, will retry", "err", err)
 			return err
 		}
 		defer func() {

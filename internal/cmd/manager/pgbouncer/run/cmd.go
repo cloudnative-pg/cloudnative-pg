@@ -64,7 +64,12 @@ func NewCmd() *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if err := runSubCommand(cmd.Context(), poolerNamespacedName); err != nil {
+			ctx := log.IntoContext(
+				cmd.Context(),
+				log.GetLogger().WithValues("logger", "pgbouncer-manager"),
+			)
+
+			if err := runSubCommand(ctx, poolerNamespacedName); err != nil {
 				log.Error(err, "Error while running manager")
 				return err
 			}
@@ -91,7 +96,8 @@ func NewCmd() *cobra.Command {
 func runSubCommand(ctx context.Context, poolerNamespacedName types.NamespacedName) error {
 	var err error
 
-	log.Info("Starting CloudNativePG PgBouncer Instance Manager",
+	contextLogger := log.FromContext(ctx)
+	contextLogger.Info("Starting CloudNativePG PgBouncer Instance Manager",
 		"version", versions.Version,
 		"build", versions.Info)
 
@@ -114,10 +120,10 @@ func runSubCommand(ctx context.Context, poolerNamespacedName types.NamespacedNam
 	pgBouncerIni := filepath.Join(config.ConfigsDir, config.PgBouncerIniFileName)
 	pgBouncerCmd := exec.Command(pgBouncerCommandName, pgBouncerIni) //nolint:gosec
 	stdoutWriter := &execlog.LogWriter{
-		Logger: log.WithValues(execlog.PipeKey, execlog.StdOut),
+		Logger: contextLogger.WithValues(execlog.PipeKey, execlog.StdOut),
 	}
 	stderrWriter := &pgBouncerLogWriter{
-		Logger: log.WithValues(execlog.PipeKey, execlog.StdErr),
+		Logger: contextLogger.WithValues(execlog.PipeKey, execlog.StdErr),
 	}
 	streamingCmd, err := execlog.RunStreamingNoWaitWithWriter(
 		pgBouncerCmd, pgBouncerCommandName, stdoutWriter, stderrWriter)
@@ -131,9 +137,9 @@ func runSubCommand(ctx context.Context, poolerNamespacedName types.NamespacedNam
 	if err = streamingCmd.Wait(); err != nil {
 		var exitError *exec.ExitError
 		if !errors.As(err, &exitError) {
-			log.Error(err, "Error waiting on pgbouncer process")
+			contextLogger.Error(err, "Error waiting on pgbouncer process")
 		} else {
-			log.Error(exitError, "pgbouncer process exited with errors")
+			contextLogger.Error(exitError, "pgbouncer process exited with errors")
 		}
 		return err
 	}
