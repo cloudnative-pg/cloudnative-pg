@@ -336,8 +336,8 @@ sandbox-2  0/6053720    Standby (async)   OK      BestEffort  1.24.0           k
 sandbox-3  0/6053720    Standby (async)   OK      BestEffort  1.24.0           k8s-eu-worker
 ```
 
-With an additional `-v`, you can also view PostgreSQL configuration, HBA
-settings, and certificates.
+With an additional `-v` (e.g. `kubectl cnpg status sandbox -v -v`), you can
+also view PostgreSQL configuration, HBA settings, and certificates.
 
 The command also supports output in `yaml` and `json` format.
 
