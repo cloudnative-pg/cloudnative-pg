@@ -156,6 +156,15 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, nil
 	}
 
+	// Make sure the target PG Database is not being managed by another Database Object
+	if err := r.ensureOnlyOneManager(ctx, database); err != nil {
+		return r.failedReconciliation(
+			ctx,
+			&database,
+			err,
+		)
+	}
+
 	if err := r.reconcileDatabase(
 		ctx,
 		&database,
@@ -171,6 +180,50 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		ctx,
 		&database,
 	)
+}
+
+// ensureOnlyOneManager verifies that the target PostgreSQL Database specified by the given Database object
+// is not already managed by another Database object within the same namespace and cluster.
+// If another Database object is found to be managing the same PostgreSQL database, this method returns an error.
+func (r *DatabaseReconciler) ensureOnlyOneManager(
+	ctx context.Context,
+	database apiv1.Database,
+) error {
+	contextLogger := log.FromContext(ctx)
+
+	if database.Status.ObservedGeneration > 0 {
+		return nil
+	}
+
+	var databaseList apiv1.DatabaseList
+	if err := r.Client.List(ctx, &databaseList,
+		client.InNamespace(r.instance.GetNamespaceName()),
+	); err != nil {
+		contextLogger.Error(err, "while getting database list", "namespace", r.instance.GetNamespaceName())
+		return fmt.Errorf("impossible to list database objects in namespace %s: %w",
+			r.instance.GetNamespaceName(), err)
+	}
+
+	for _, item := range databaseList.Items {
+		if item.Name == database.Name {
+			continue
+		}
+
+		if item.Spec.ClusterRef.Name != r.instance.GetClusterName() {
+			continue
+		}
+
+		if item.Status.ObservedGeneration == 0 {
+			continue
+		}
+
+		if item.Spec.Name == database.Spec.Name {
+			return fmt.Errorf("database %q is already managed by Database object %q",
+				database.Spec.Name, item.Name)
+		}
+	}
+
+	return nil
 }
 
 // failedReconciliation marks the reconciliation as failed and logs the corresponding error
