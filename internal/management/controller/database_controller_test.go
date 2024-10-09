@@ -216,6 +216,6 @@ var _ = Describe("Managed Database status", func() {
 			dbDuplicate.Spec.Name, currentManager.Name)
 		Expect(dbDuplicate.Status.Ready).To(BeFalse())
 		Expect(dbDuplicate.Status.Error).To(BeEquivalentTo(expectedError))
-		Expect(dbDuplicate.Status.ObservedGeneration).To(BeEquivalentTo(0))
+		Expect(dbDuplicate.Status.ObservedGeneration).To(BeZero())
 	})
 })
