@@ -182,8 +182,9 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	)
 }
 
-// ensureOnlyOneManager checks if the target PG Database of a given Database object is already
-// managed by an existing Database object. If it is, we return an error.
+// ensureOnlyOneManager verifies that the target PostgreSQL Database specified by the given Database object
+// is not already managed by another Database object within the same namespace and cluster.
+// If another Database object is found to be managing the same PostgreSQL database, this method returns an error.
 func (r *DatabaseReconciler) ensureOnlyOneManager(
 	ctx context.Context,
 	database apiv1.Database,
