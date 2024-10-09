@@ -816,6 +816,13 @@ parameter is omitted</p>
    <p>Whether the backup was online/hot (<code>true</code>) or offline/cold (<code>false</code>)</p>
 </td>
 </tr>
+<tr><td><code>pluginMetadata</code> <B>[Required]</B><br/>
+<i>map[string]string</i>
+</td>
+<td>
+   <p>A map containing the plugin metadata</p>
+</td>
+</tr>
 </tbody>
 </table>
 
