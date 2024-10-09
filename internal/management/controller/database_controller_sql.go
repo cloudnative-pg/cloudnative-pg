@@ -58,6 +58,8 @@ func createDatabase(
 	db *sql.DB,
 	obj *apiv1.Database,
 ) error {
+	contextLogger := log.FromContext(ctx)
+
 	var sqlCreateDatabase strings.Builder
 	sqlCreateDatabase.WriteString(fmt.Sprintf("CREATE DATABASE %s ", pgx.Identifier{obj.Spec.Name}.Sanitize()))
 	if len(obj.Spec.Owner) > 0 {
@@ -100,8 +102,6 @@ func createDatabase(
 		sqlCreateDatabase.WriteString(fmt.Sprintf(" ICU_RULES %s", pgx.Identifier{obj.Spec.IcuRules}.Sanitize()))
 	}
 
-	contextLogger, ctx := log.SetupLogger(ctx)
-
 	_, err := db.ExecContext(ctx, sqlCreateDatabase.String())
 	if err != nil {
 		contextLogger.Error(err, "while creating database", "query", sqlCreateDatabase.String())
@@ -115,7 +115,7 @@ func updateDatabase(
 	db *sql.DB,
 	obj *apiv1.Database,
 ) error {
-	contextLogger, ctx := log.SetupLogger(ctx)
+	contextLogger := log.FromContext(ctx)
 
 	if obj.Spec.AllowConnections != nil {
 		changeAllowConnectionsSQL := fmt.Sprintf(
@@ -190,7 +190,7 @@ func dropDatabase(
 	db *sql.DB,
 	obj *apiv1.Database,
 ) error {
-	contextLogger, ctx := log.SetupLogger(ctx)
+	contextLogger := log.FromContext(ctx)
 	query := fmt.Sprintf("DROP DATABASE IF EXISTS %s", pgx.Identifier{obj.Spec.Name}.Sanitize())
 	_, err := db.ExecContext(
 		ctx,
