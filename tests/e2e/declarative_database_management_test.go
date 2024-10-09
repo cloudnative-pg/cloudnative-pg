@@ -51,20 +51,21 @@ var _ = Describe("Declarative databases management test", Label(tests.LabelSmoke
 
 	Context("plain vanilla cluster", Ordered, func() {
 		const (
-			namespacePrefix = "declarative-db"
-			dbname          = "declarative"
+			namespace = "declarative-db"
+			dbname    = "declarative"
 		)
 		var (
-			clusterName, namespace, databaseObjectName string
-			database                                   *apiv1.Database
-			databaseWithDeleteRetainPolicy             *apiv1.Database
-			err                                        error
-			databaseWithDeleteRetainPolicyCrdName      = "db-declarative-delete"
+			clusterName, databaseObjectName       string
+			database                              *apiv1.Database
+			databaseWithDeleteRetainPolicy        *apiv1.Database
+			err                                   error
+			databaseWithDeleteRetainPolicyCrdName = "db-declarative-delete"
 		)
 
 		BeforeAll(func() {
-			// Create a cluster in a namespace we'll delete after the test
-			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+			// We set the namespace name as a constant, as we are going to test the namespace deletion inside
+			// the suite (not after), in order to check the finalizers removal
+			err = env.CreateNamespace(namespace)
 			Expect(err).ToNot(HaveOccurred())
 
 			clusterName, err = env.GetResourceNameFromYAML(clusterManifest)
