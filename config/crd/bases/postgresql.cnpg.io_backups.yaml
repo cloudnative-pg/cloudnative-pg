@@ -318,6 +318,11 @@ spec:
               phase:
                 description: The last backup status
                 type: string
+              pluginMetadata:
+                additionalProperties:
+                  type: string
+                description: A map containing the plugin metadata
+                type: object
               s3Credentials:
                 description: The credentials to use to upload data to S3
                 properties:

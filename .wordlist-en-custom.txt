@@ -1004,6 +1004,7 @@ pitr
 plpgsql
 pluggable
 pluginConfiguration
+pluginMetadata
 pluginStatus
 png
 podAffinityTerm
