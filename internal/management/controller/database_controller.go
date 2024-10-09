@@ -203,21 +203,22 @@ func (r *DatabaseReconciler) ensureOnlyOneManager(
 			r.instance.GetNamespaceName(), err)
 	}
 
-	for _, db := range databaseList.Items {
-		// This is not for me!
-		if db.Spec.ClusterRef.Name != r.instance.GetClusterName() {
+	for _, item := range databaseList.Items {
+		if item.Name == database.Name {
 			continue
 		}
 
-		// This is ourselves, so just continue
-		if db.Name == database.Name {
+		if item.Spec.ClusterRef.Name != r.instance.GetClusterName() {
 			continue
 		}
 
-		// We consider only Database objects for which the reconciler has succeeded at least once
-		if db.Spec.Name == database.Spec.Name && db.Status.ObservedGeneration > 0 {
+		if item.Status.ObservedGeneration == 0 {
+			continue
+		}
+
+		if item.Spec.Name == database.Spec.Name {
 			return fmt.Errorf("database %q is already managed by Database object %q",
-				database.Spec.Name, db.Name)
+				database.Spec.Name, item.Name)
 		}
 	}
 
