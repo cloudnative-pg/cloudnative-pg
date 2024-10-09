@@ -156,9 +156,8 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, nil
 	}
 
-	// If Check if the target PG Database is already being managed by another
-	// Database Object
-	if err := r.isAlreadyManagedBy(ctx, database); err != nil {
+	// Make sure the target PG Database is not being managed by another Database Object
+	if err := r.ensureOnlyOneManager(ctx, database); err != nil {
 		return r.failedReconciliation(
 			ctx,
 			&database,
@@ -183,15 +182,19 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	)
 }
 
-// isAlreadyManagedBy checks if the target PG Database of a given Database object is already
-// managed by an existing Database object. If it is, we return the name of that object
-func (r *DatabaseReconciler) isAlreadyManagedBy(
+// ensureOnlyOneManager checks if the target PG Database of a given Database object is already
+// managed by an existing Database object. If it is, we return an error.
+func (r *DatabaseReconciler) ensureOnlyOneManager(
 	ctx context.Context,
 	database apiv1.Database,
 ) error {
 	contextLogger := log.FromContext(ctx)
-	var databaseList apiv1.DatabaseList
 
+	if database.Status.ObservedGeneration > 0 {
+		return nil
+	}
+
+	var databaseList apiv1.DatabaseList
 	if err := r.Client.List(ctx, &databaseList,
 		client.InNamespace(r.instance.GetNamespaceName()),
 	); err != nil {
