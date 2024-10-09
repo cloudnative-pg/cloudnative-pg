@@ -17,6 +17,7 @@ limitations under the License.
 package controller
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
@@ -27,8 +28,10 @@ import (
 
 // refreshConfigurationFiles writes the configuration files, returning a
 // flag indicating if something is changed or not and an error status
-func refreshConfigurationFiles(files config.ConfigurationFiles) (bool, error) {
+func refreshConfigurationFiles(ctx context.Context, files config.ConfigurationFiles) (bool, error) {
 	var changed bool
+
+	contextLogger := log.FromContext(ctx)
 
 	for fileName, content := range files {
 		changedFile, err := fileutils.WriteFileAtomic(fileName, content, 0o600)
@@ -36,7 +39,7 @@ func refreshConfigurationFiles(files config.ConfigurationFiles) (bool, error) {
 			return false, fmt.Errorf("while recreating configs:%w", err)
 		}
 		if changedFile {
-			log.Info("updated configuration file", "name", fileName)
+			contextLogger.Info("updated configuration file", "name", fileName)
 			changed = true
 		}
 	}

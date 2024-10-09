@@ -81,7 +81,7 @@ func NewCmd() *cobra.Command {
 			case errors.Is(err, barmanRestorer.ErrWALNotFound):
 				// Nothing to log here. The failure has already been logged.
 			case errors.Is(err, ErrNoBackupConfigured):
-				contextLog.Info("tried restoring WALs, but no backup was configured")
+				contextLog.Debug("tried restoring WALs, but no backup was configured")
 			case errors.Is(err, ErrEndOfWALStreamReached):
 				contextLog.Info(
 					"end-of-wal-stream flag found." +
