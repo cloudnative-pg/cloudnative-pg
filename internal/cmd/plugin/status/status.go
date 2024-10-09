@@ -99,7 +99,12 @@ func getPrintableIntegerPointer(i *int) string {
 }
 
 // Status implements the "status" subcommand
-func Status(ctx context.Context, clusterName string, verbose int, format plugin.OutputFormat) error {
+func Status(
+	ctx context.Context,
+	clusterName string,
+	verbose int,
+	format plugin.OutputFormat,
+) error {
 	var cluster apiv1.Cluster
 	var errs []error
 
@@ -125,8 +130,6 @@ func Status(ctx context.Context, clusterName string, verbose int, format plugin.
 	status.printPromotionTokenInfo()
 	if verbose > 1 {
 		errs = append(errs, status.printPostgresConfiguration(ctx, clientInterface)...)
-	}
-	if verbose > 1 {
 		status.printCertificatesStatus()
 	}
 	status.printBackupStatus()
@@ -221,10 +224,10 @@ func (fullStatus *PostgresqlStatus) getClusterSize(ctx context.Context, client k
 	return size, nil
 }
 
-func (fullStatus *PostgresqlStatus) printBasicInfo(ctx context.Context, client kubernetes.Interface) {
+func (fullStatus *PostgresqlStatus) printBasicInfo(ctx context.Context, k8sClient kubernetes.Interface) {
 	summary := tabby.New()
 
-	clusterSize, clusterSizeErr := fullStatus.getClusterSize(ctx, client)
+	clusterSize, clusterSizeErr := fullStatus.getClusterSize(ctx, k8sClient)
 
 	cluster := fullStatus.Cluster
 
@@ -247,7 +250,7 @@ func (fullStatus *PostgresqlStatus) printBasicInfo(ctx context.Context, client k
 	isPrimaryFenced := cluster.IsInstanceFenced(cluster.Status.CurrentPrimary)
 	primaryInstanceStatus := fullStatus.tryGetPrimaryInstance()
 
-	summary.AddLine("Name:", fmt.Sprintf("%s/%s", cluster.Namespace, cluster.Name))
+	summary.AddLine("Name", client.ObjectKeyFromObject(cluster).String())
 
 	if primaryInstanceStatus != nil {
 		summary.AddLine("System ID:", primaryInstanceStatus.SystemID)
@@ -991,12 +994,10 @@ func (fullStatus *PostgresqlStatus) printBasebackupStatus(verbose int) {
 		return
 	}
 
-	if len(primaryInstanceStatus.PgStatBasebackupsInfo) == 0 {
-		if verbose > 0 {
-			fmt.Println(aurora.Green(header))
-			fmt.Println(aurora.Yellow("No running physical backups found").String())
-			fmt.Println()
-		}
+	if verbose > 0 && len(primaryInstanceStatus.PgStatBasebackupsInfo) == 0 {
+		fmt.Println(aurora.Green(header))
+		fmt.Println(aurora.Yellow("No running physical backups found").String())
+		fmt.Println()
 		return
 	}
 
