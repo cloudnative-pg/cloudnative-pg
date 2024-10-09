@@ -85,8 +85,8 @@ func (r *InstanceReconciler) GetCluster(ctx context.Context) (*apiv1.Cluster, er
 	var cluster apiv1.Cluster
 	err := r.GetClient().Get(ctx,
 		types.NamespacedName{
-			Namespace: r.instance.Namespace,
-			Name:      r.instance.ClusterName,
+			Namespace: r.instance.GetNamespaceName(),
+			Name:      r.instance.GetClusterName(),
 		},
 		&cluster)
 	if err != nil {
@@ -102,7 +102,7 @@ func (r *InstanceReconciler) GetSecret(ctx context.Context, name string) (*corev
 	err := r.GetClient().Get(ctx,
 		types.NamespacedName{
 			Name:      name,
-			Namespace: r.instance.Namespace,
+			Namespace: r.instance.GetNamespaceName(),
 		}, &secret)
 	if err != nil {
 		return nil, fmt.Errorf("while getting secret: %w", err)

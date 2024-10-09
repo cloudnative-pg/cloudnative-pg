@@ -53,7 +53,7 @@ func (instance *Instance) IsServerHealthy() error {
 // GetStatus Extract the status of this PostgreSQL database
 func (instance *Instance) GetStatus() (result *postgres.PostgresqlStatus, err error) {
 	result = &postgres.PostgresqlStatus{
-		Pod:                    &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: instance.PodName}},
+		Pod:                    &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: instance.GetPodName()}},
 		InstanceManagerVersion: versions.Version,
 		MightBeUnavailable:     instance.MightBeUnavailable(),
 	}
@@ -468,7 +468,7 @@ func (instance *Instance) fillWalStatusFromConnection(result *postgres.Postgresq
 			coalesce(sync_priority, 0)
 		FROM pg_catalog.pg_stat_replication
 		WHERE application_name ~ $1 AND usename = $2`,
-		fmt.Sprintf("%s-[0-9]+$", instance.ClusterName),
+		fmt.Sprintf("%s-[0-9]+$", instance.GetClusterName()),
 		v1.StreamingReplicationUser,
 	)
 	if err != nil {

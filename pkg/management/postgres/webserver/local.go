@@ -81,7 +81,10 @@ func (ws *localWebserverEndpoints) serveCache(w http.ResponseWriter, r *http.Req
 		var cluster apiv1.Cluster
 		err := ws.typedClient.Get(
 			r.Context(),
-			client.ObjectKey{Name: ws.instance.ClusterName, Namespace: ws.instance.Namespace},
+			client.ObjectKey{
+				Name:      ws.instance.GetClusterName(),
+				Namespace: ws.instance.GetNamespaceName(),
+			},
 			&cluster,
 		)
 		if apierrs.IsNotFound(err) {
@@ -140,8 +143,8 @@ func (ws *localWebserverEndpoints) requestBackup(w http.ResponseWriter, r *http.
 	}
 
 	if err := ws.typedClient.Get(ctx, client.ObjectKey{
-		Namespace: ws.instance.Namespace,
-		Name:      ws.instance.ClusterName,
+		Namespace: ws.instance.GetNamespaceName(),
+		Name:      ws.instance.GetClusterName(),
 	}, &cluster); err != nil {
 		http.Error(
 			w,
@@ -151,7 +154,7 @@ func (ws *localWebserverEndpoints) requestBackup(w http.ResponseWriter, r *http.
 	}
 
 	if err := ws.typedClient.Get(ctx, client.ObjectKey{
-		Namespace: ws.instance.Namespace,
+		Namespace: ws.instance.GetNamespaceName(),
 		Name:      backupName,
 	}, &backup); err != nil {
 		http.Error(

@@ -790,9 +790,9 @@ func (info InitInfo) WriteInitialPostgresqlConf(cluster *apiv1.Cluster) error {
 		return fmt.Errorf("while creating a temporary data directory: %w", err)
 	}
 
-	temporaryInstance := temporaryInitInfo.GetInstance()
-	temporaryInstance.Namespace = info.Namespace
-	temporaryInstance.ClusterName = info.ClusterName
+	temporaryInstance := temporaryInitInfo.GetInstance().
+		WithNamespace(info.Namespace).
+		WithClusterName(info.ClusterName)
 
 	_, err = temporaryInstance.RefreshPGHBA(cluster, "")
 	if err != nil {

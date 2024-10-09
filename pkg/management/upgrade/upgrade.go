@@ -82,7 +82,8 @@ func FromReader(
 	}
 
 	// Validate the hash of this instance manager
-	if err := validateInstanceManagerHash(typedClient, instance.ClusterName, instance.Namespace,
+	if err := validateInstanceManagerHash(typedClient,
+		instance.GetClusterName(), instance.GetNamespaceName(),
 		instanceStatus.InstanceArch, newHash); err != nil {
 		return fmt.Errorf("while validating instance manager binary: %w", err)
 	}

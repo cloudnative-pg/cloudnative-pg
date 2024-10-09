@@ -88,12 +88,12 @@ func NewCmd() *cobra.Command {
 		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := log.IntoContext(cmd.Context(), log.GetLogger())
-			instance := postgres.NewInstance()
+			instance := postgres.NewInstance().
+				WithPodName(podName).
+				WithClusterName(clusterName).
+				WithNamespace(namespace)
 
 			instance.PgData = pgData
-			instance.Namespace = namespace
-			instance.PodName = podName
-			instance.ClusterName = clusterName
 			instance.StatusPortTLS = statusPortTLS
 			instance.MetricsPortTLS = metricsPortTLS
 
@@ -152,14 +152,14 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 		Cache: cache.Options{
 			ByObject: map[client.Object]cache.ByObject{
 				&apiv1.Cluster{}: {
-					Field: fields.OneTermEqualSelector("metadata.name", instance.ClusterName),
+					Field: fields.OneTermEqualSelector("metadata.name", instance.GetClusterName()),
 					Namespaces: map[string]cache.Config{
-						instance.Namespace: {},
+						instance.GetNamespaceName(): {},
 					},
 				},
 				&apiv1.Database{}: {
 					Namespaces: map[string]cache.Config{
-						instance.Namespace: {},
+						instance.GetNamespaceName(): {},
 					},
 				},
 			},

@@ -86,11 +86,10 @@ var _ = Describe("Managed Database status", func() {
 		db, dbMock, err = sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 		Expect(err).ToNot(HaveOccurred())
 
-		pgInstance := &postgres.Instance{
-			Namespace:   "default",
-			PodName:     "cluster-example-1",
-			ClusterName: "cluster-example",
-		}
+		pgInstance := postgres.NewInstance().
+			WithNamespace("default").
+			WithPodName("cluster-example-1").
+			WithClusterName("cluster-example")
 
 		f := fakeInstanceData{
 			Instance: pgInstance,

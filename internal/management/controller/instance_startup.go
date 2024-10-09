@@ -48,7 +48,7 @@ func (r *InstanceReconciler) refreshServerCertificateFiles(ctx context.Context, 
 		func() error {
 			err := r.GetClient().Get(
 				ctx,
-				client.ObjectKey{Namespace: r.instance.Namespace, Name: cluster.Status.Certificates.ServerTLSSecret},
+				client.ObjectKey{Namespace: r.instance.GetNamespaceName(), Name: cluster.Status.Certificates.ServerTLSSecret},
 				&secret)
 			if err != nil {
 				contextLogger.Info("Error accessing server TLS Certificate. Retrying with exponential backoff.",
@@ -86,7 +86,7 @@ func (r *InstanceReconciler) refreshReplicationUserCertificate(
 	var secret corev1.Secret
 	err := r.GetClient().Get(
 		ctx,
-		client.ObjectKey{Namespace: r.instance.Namespace, Name: cluster.Status.Certificates.ReplicationTLSSecret},
+		client.ObjectKey{Namespace: r.instance.GetNamespaceName(), Name: cluster.Status.Certificates.ReplicationTLSSecret},
 		&secret)
 	if err != nil {
 		return false, err
@@ -105,7 +105,7 @@ func (r *InstanceReconciler) refreshClientCA(ctx context.Context, cluster *apiv1
 	var secret corev1.Secret
 	err := r.GetClient().Get(
 		ctx,
-		client.ObjectKey{Namespace: r.instance.Namespace, Name: cluster.Status.Certificates.ClientCASecret},
+		client.ObjectKey{Namespace: r.instance.GetNamespaceName(), Name: cluster.Status.Certificates.ClientCASecret},
 		&secret)
 	if err != nil {
 		return false, err
@@ -120,7 +120,7 @@ func (r *InstanceReconciler) refreshServerCA(ctx context.Context, cluster *apiv1
 	var secret corev1.Secret
 	err := r.GetClient().Get(
 		ctx,
-		client.ObjectKey{Namespace: r.instance.Namespace, Name: cluster.Status.Certificates.ServerCASecret},
+		client.ObjectKey{Namespace: r.instance.GetNamespaceName(), Name: cluster.Status.Certificates.ServerCASecret},
 		&secret)
 	if err != nil {
 		return false, err
@@ -148,7 +148,7 @@ func (r *InstanceReconciler) refreshBarmanEndpointCA(ctx context.Context, cluste
 		var secret corev1.Secret
 		err := r.GetClient().Get(
 			ctx,
-			client.ObjectKey{Namespace: r.instance.Namespace, Name: secretKeySelector.Name},
+			client.ObjectKey{Namespace: r.instance.GetNamespaceName(), Name: secretKeySelector.Name},
 			&secret)
 		if err != nil {
 			return false, err
@@ -194,7 +194,7 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(ctx context.Context
 			"of the cluster is resumed, demoting immediately")
 		return r.instance.Demote(ctx, cluster)
 
-	case targetPrimary == r.instance.PodName:
+	case targetPrimary == r.instance.GetPodName():
 		if currentPrimary == "" {
 			// This means that this cluster has been just started up and the
 			// current primary still need to be written
@@ -203,7 +203,7 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(ctx context.Context
 				"targetPrimary", targetPrimary)
 
 			oldCluster := cluster.DeepCopy()
-			cluster.Status.CurrentPrimary = r.instance.PodName
+			cluster.Status.CurrentPrimary = r.instance.GetPodName()
 			cluster.Status.CurrentPrimaryTimestamp = pgTime.GetCurrentTimestamp()
 			return r.client.Status().Patch(ctx, cluster, client.MergeFrom(oldCluster))
 		}
@@ -349,12 +349,12 @@ func (r *InstanceReconciler) ReconcileTablespaces(
 		mountPoint := specs.MountForTablespace(tbsName)
 		if tbsMount, err := fileutils.FileExists(mountPoint); err != nil {
 			contextLogger.Error(err, "while checking for mountpoint", "instance",
-				r.instance.PodName, "tablespace", tbsName)
+				r.instance.GetPodName(), "tablespace", tbsName)
 			return err
 		} else if !tbsMount {
 			contextLogger.Error(fmt.Errorf("mountpoint not found"),
 				"mountpoint for tablespaces is missing",
-				"instance", r.instance.PodName, "tablespace", tbsName)
+				"instance", r.instance.GetPodName(), "tablespace", tbsName)
 			continue
 		}
 
@@ -369,7 +369,7 @@ func (r *InstanceReconciler) ReconcileTablespaces(
 		if err != nil {
 			contextLogger.Error(err,
 				"could not create data dir in tablespace mount",
-				"instance", r.instance.PodName, "tablespace", tbsName)
+				"instance", r.instance.GetPodName(), "tablespace", tbsName)
 			return fmt.Errorf("while creating data dir in tablespace %s: %w", mountPoint, err)
 		}
 	}

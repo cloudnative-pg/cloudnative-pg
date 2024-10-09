@@ -142,13 +142,13 @@ type Instance struct {
 	primaryPool *pool.ConnectionPool
 
 	// The namespace of the k8s object representing this cluster
-	Namespace string
+	namespace string
 
 	// The name of the Pod where the controller is executing
-	PodName string
+	podName string
 
-	// The name of the cluster of which this Pod is belonging
-	ClusterName string
+	// The name of the cluster this instance belongs in
+	clusterName string
 
 	// The sha256 of the config. It is computed on the config string, before
 	// adding the PostgreSQL CNPGConfigSha256 parameter
@@ -365,6 +365,24 @@ func NewInstance() *Instance {
 		roleSynchronizerChan:       make(chan *apiv1.ManagedConfiguration),
 		tablespaceSynchronizerChan: make(chan map[string]apiv1.TablespaceConfiguration),
 	}
+}
+
+// WithNamespace specifies the namespace for this Instance
+func (instance *Instance) WithNamespace(namespace string) *Instance {
+	instance.namespace = namespace
+	return instance
+}
+
+// WithPodName specifies the pod name for this Instance
+func (instance *Instance) WithPodName(podName string) *Instance {
+	instance.podName = podName
+	return instance
+}
+
+// WithClusterName specifies the name of the cluster this Instance belongs to
+func (instance *Instance) WithClusterName(clusterName string) *Instance {
+	instance.clusterName = clusterName
+	return instance
 }
 
 // RetryUntilServerAvailable is the default retry configuration that is used
@@ -777,7 +795,7 @@ func (instance *Instance) Demote(ctx context.Context, cluster *apiv1.Cluster) er
 	contextLogger := log.FromContext(ctx)
 
 	contextLogger.Info("Demoting instance", "pgpdata", instance.PgData)
-	slotName := cluster.GetSlotNameFromInstanceName(instance.PodName)
+	slotName := cluster.GetSlotNameFromInstanceName(instance.GetPodName())
 	_, err := UpdateReplicaConfiguration(instance.PgData, instance.GetPrimaryConnInfo(), slotName)
 	return err
 }
@@ -1113,19 +1131,19 @@ func (instance *Instance) GetInstanceCommandChan() <-chan InstanceCommand {
 	return instance.instanceCommandChan
 }
 
-// GetClusterName returns the name of the cluster where this instance is running
+// GetClusterName returns the name of the cluster where this instance belongs
 func (instance *Instance) GetClusterName() string {
-	return instance.ClusterName
+	return instance.clusterName
 }
 
 // GetPodName returns the name of the pod where this instance is running
 func (instance *Instance) GetPodName() string {
-	return instance.PodName
+	return instance.podName
 }
 
 // GetNamespaceName returns the name of the namespace where this instance is running
 func (instance *Instance) GetNamespaceName() string {
-	return instance.Namespace
+	return instance.namespace
 }
 
 // RequestFastImmediateShutdown request the lifecycle manager to shut down
@@ -1250,7 +1268,7 @@ func (instance *Instance) DropConnections() error {
 
 // GetPrimaryConnInfo returns the DSN to reach the primary
 func (instance *Instance) GetPrimaryConnInfo() string {
-	return buildPrimaryConnInfo(instance.ClusterName+"-rw", instance.PodName)
+	return buildPrimaryConnInfo(instance.GetClusterName()+"-rw", instance.GetPodName())
 }
 
 // HandleInstanceCommandRequests execute a command requested by the reconciliation

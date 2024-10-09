@@ -138,8 +138,8 @@ func (sr *RoleSynchronizer) reconcile(ctx context.Context, config *apiv1.Managed
 
 	var remoteCluster apiv1.Cluster
 	if err = sr.client.Get(ctx, types.NamespacedName{
-		Name:      sr.instance.ClusterName,
-		Namespace: sr.instance.Namespace,
+		Name:      sr.instance.GetClusterName(),
+		Namespace: sr.instance.GetNamespaceName(),
 	}, &remoteCluster); err != nil {
 		return err
 	}
@@ -154,8 +154,8 @@ func (sr *RoleSynchronizer) reconcile(ctx context.Context, config *apiv1.Managed
 	}
 
 	if err = sr.client.Get(ctx, types.NamespacedName{
-		Name:      sr.instance.ClusterName,
-		Namespace: sr.instance.Namespace,
+		Name:      sr.instance.GetClusterName(),
+		Namespace: sr.instance.GetNamespaceName(),
 	}, &remoteCluster); err != nil {
 		return err
 	}
@@ -181,7 +181,7 @@ func (sr *RoleSynchronizer) synchronizeRoles(
 	storedPasswordState map[string]apiv1.PasswordState,
 ) (map[string]apiv1.PasswordState, map[string][]string, error) {
 	latestSecretResourceVersion, err := getPasswordSecretResourceVersion(
-		ctx, sr.client, config.Roles, sr.instance.Namespace)
+		ctx, sr.client, config.Roles, sr.instance.GetNamespaceName())
 	if err != nil {
 		return nil, nil, err
 	}
@@ -320,7 +320,7 @@ func (sr *RoleSynchronizer) applyRoleCreateUpdate(
 			fmt.Errorf("cannot reconcile: password both provided and disabled: %s",
 				role.PasswordSecret.Name)
 	case role.PasswordSecret != nil && !role.DisablePassword:
-		passwordSecret, err := getPassword(ctx, sr.client, role, sr.instance.Namespace)
+		passwordSecret, err := getPassword(ctx, sr.client, role, sr.instance.GetNamespaceName())
 		if err != nil {
 			return apiv1.PasswordState{}, err
 		}

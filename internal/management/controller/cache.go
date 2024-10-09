@@ -47,7 +47,7 @@ func (r *InstanceReconciler) updateCacheFromCluster(ctx context.Context, cluster
 }
 
 func (r *InstanceReconciler) updateWALRestoreSettingsCache(ctx context.Context, cluster *apiv1.Cluster) {
-	_, env, barmanConfiguration, err := walrestore.GetRecoverConfiguration(cluster, r.instance.PodName)
+	_, env, barmanConfiguration, err := walrestore.GetRecoverConfiguration(cluster, r.instance.GetPodName())
 	if errors.Is(err, walrestore.ErrNoBackupConfigured) {
 		cache.Delete(cache.WALRestoreKey)
 		return
