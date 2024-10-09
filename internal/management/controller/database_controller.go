@@ -61,10 +61,6 @@ var errClusterIsReplica = fmt.Errorf("waiting for the cluster to become primary"
 // database reconciliation loop failures
 const databaseReconciliationInterval = 30 * time.Second
 
-// databaseFinalizerName is the name of the finalizer
-// triggering the deletion of the database
-const databaseFinalizerName = utils.MetadataNamespace + "/deleteDatabase"
-
 // +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=databases,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=databases/status,verbs=get;update;patch
 
@@ -136,14 +132,14 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	// Add the finalizer if we don't have it
 	// nolint:nestif
 	if database.DeletionTimestamp.IsZero() {
-		if controllerutil.AddFinalizer(&database, databaseFinalizerName) {
+		if controllerutil.AddFinalizer(&database, utils.DatabaseFinalizerName) {
 			if err := r.Update(ctx, &database); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
 	} else {
 		// This database is being deleted
-		if controllerutil.ContainsFinalizer(&database, databaseFinalizerName) {
+		if controllerutil.ContainsFinalizer(&database, utils.DatabaseFinalizerName) {
 			if database.Spec.ReclaimPolicy == apiv1.DatabaseReclaimDelete {
 				if err := r.deleteDatabase(ctx, &database); err != nil {
 					return ctrl.Result{}, err
@@ -151,7 +147,7 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 			}
 
 			// remove our finalizer from the list and update it.
-			controllerutil.RemoveFinalizer(&database, databaseFinalizerName)
+			controllerutil.RemoveFinalizer(&database, utils.DatabaseFinalizerName)
 			if err := r.Update(ctx, &database); err != nil {
 				return ctrl.Result{}, err
 			}
