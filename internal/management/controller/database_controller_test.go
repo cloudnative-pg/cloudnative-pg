@@ -129,7 +129,7 @@ var _ = Describe("Managed Database status", func() {
 
 		_, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{
 			Namespace: database.Namespace,
-			Name:      database.Spec.Name,
+			Name:      database.Name,
 		}})
 		Expect(err).ToNot(HaveOccurred())
 
@@ -158,5 +158,64 @@ var _ = Describe("Managed Database status", func() {
 		Expect(err).ToNot(HaveOccurred())
 		Expect(database.Status.Ready).To(BeFalse())
 		Expect(database.Status.Error).To(BeEquivalentTo(exampleError.Error()))
+	})
+
+	It("marks as failed if the target Database is already being managed", func(ctx SpecContext) {
+		// The Database obj currently managing "test-database"
+		currentManager := &apiv1.Database{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "current-manager",
+				Namespace: "default",
+			},
+			Spec: apiv1.DatabaseSpec{
+				ClusterRef: corev1.LocalObjectReference{
+					Name: cluster.Name,
+				},
+				Name:  "test-database",
+				Owner: "app",
+			},
+			Status: apiv1.DatabaseStatus{
+				Ready:              true,
+				ObservedGeneration: 1,
+			},
+		}
+
+		// A new Database Object targeting the same "test-database"
+		dbDuplicate := &apiv1.Database{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       "db-duplicate",
+				Namespace:  "default",
+				Generation: 1,
+			},
+			Spec: apiv1.DatabaseSpec{
+				ClusterRef: corev1.LocalObjectReference{
+					Name: cluster.Name,
+				},
+				Name:  "test-database",
+				Owner: "app",
+			},
+		}
+
+		Expect(fakeClient.Create(ctx, currentManager)).To(Succeed())
+		Expect(fakeClient.Create(ctx, dbDuplicate)).To(Succeed())
+
+		// Reconcile and get the updated object
+		_, err = r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{
+			Namespace: dbDuplicate.Namespace,
+			Name:      dbDuplicate.Name,
+		}})
+		Expect(err).ToNot(HaveOccurred())
+
+		err = fakeClient.Get(ctx, client.ObjectKey{
+			Namespace: dbDuplicate.Namespace,
+			Name:      dbDuplicate.Name,
+		}, dbDuplicate)
+		Expect(err).ToNot(HaveOccurred())
+
+		expectedError := fmt.Sprintf("database %q is already managed by Database object %q",
+			dbDuplicate.Spec.Name, currentManager.Name)
+		Expect(dbDuplicate.Status.Ready).To(BeFalse())
+		Expect(dbDuplicate.Status.Error).To(BeEquivalentTo(expectedError))
+		Expect(dbDuplicate.Status.ObservedGeneration).To(BeZero())
 	})
 })
