@@ -1,0 +1,34 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: p-icu-locale
+spec:
+  instances: 3
+
+  postgresql:
+    parameters:
+      work_mem: "8MB"
+      log_checkpoints: "on"
+      log_lock_waits: "on"
+      log_min_duration_statement: '1000'
+      log_statement: 'ddl'
+      log_temp_files: '1024'
+      log_autovacuum_min_duration: '1s'
+      log_replication_commands: 'on'
+    pg_hba:
+      - hostssl all all all cert
+
+  bootstrap:
+    initdb:
+      database: app
+      owner: app
+      encoding: UTF8
+      localeCollate: en_US.utf8
+      localeCType: en_US.utf8
+      localeProvider: icu
+      icuLocale: und-x-icu
+
+  # Persistent storage configuration
+  storage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    size: 1Gi
