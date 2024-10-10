@@ -41,15 +41,15 @@ func NewCmd() *cobra.Command {
 			ctx := cmd.Context()
 			clusterName := args[0]
 
-			verbose, _ := cmd.Flags().GetBool("verbose")
+			verbose, _ := cmd.Flags().GetCount("verbose")
 			output, _ := cmd.Flags().GetString("output")
 
 			return Status(ctx, clusterName, verbose, plugin.OutputFormat(output))
 		},
 	}
 
-	statusCmd.Flags().BoolP(
-		"verbose", "v", false, "Include PostgreSQL configuration, HBA rules, and full replication slots info")
+	statusCmd.Flags().CountP(
+		"verbose", "v", "Increase verbosity to display more information")
 	statusCmd.Flags().StringP(
 		"output", "o", "text", "Output format. One of text|json")
 
