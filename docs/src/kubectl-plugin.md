@@ -175,6 +175,7 @@ kubectl cnpg <command> <args...>
     The plugin automatically detects if the standard output channel is connected to a terminal.
     In such cases, it may add ANSI colors to the command output. To disable colors, use the
     `--color=never` option with the command.
+
 ### Generation of installation manifests
 
 The `cnpg` plugin can be used to generate the YAML manifest for the
@@ -779,6 +780,39 @@ kubectl cnpg logs cluster cluster-example --output my-cluster.log
 
 Successfully written logs to "my-cluster.log"
 ```
+
+#### Pretty
+
+The `pretty` sub-command reads a log stream from standard input and formats it
+into a human-readable output, and attempts to sort the entries by timestamp.
+
+It is intended to be used in combination with `kubectl cnpg logs cluster`, as
+shown in the following example:
+
+```
+$ kubectl cnpg logs cluster cluster-example | kubectl cnpg logs pretty
+2024-10-10T16:36:18.668100649Z INFO cluster-example-1 instance-manager Starting CloudNativePG Instance Manager {"build":{"Commit":"953f0b2cf","Date":"2024-10-09","Version":"1.24.0-dev128"},"version":"1.24.0"}
+2024-10-10T16:36:18.668268413Z INFO cluster-example-1 instance-manager Checking for free disk space for WALs before starting PostgreSQL
+2024-10-10T16:36:18.686309469Z INFO cluster-example-1 instance-manager starting tablespace manager
+2024-10-10T16:36:18.686375141Z INFO cluster-example-1 instance-manager starting external server manager
+[...]
+```
+
+The `pretty` sub-command also supports advanced log filtering, allowing users
+to display logs for specific pods, loggers, or filter logs by severity level.
+Here's an example:
+
+```
+$ kubectl cnpg logs cluster cluster-example | kubectl cnpg logs pretty --pods cluster-example-1 --loggers postgres --log-level info
+2024-10-10T16:36:18.853589475Z INFO cluster-example-1 postgres 2024-10-10 16:36:18.853 UTC [29] LOG:  redirecting log output to logging collector process {"pipe":"stderr"}
+2024-10-10T16:36:18.853641103Z INFO cluster-example-1 postgres 2024-10-10 16:36:18.853 UTC [29] HINT:  Future log output will appear in directory "/controller/log". {"pipe":"stderr"}
+2024-10-10T16:36:18.854004804Z INFO cluster-example-1 postgres 2024-10-10 16:36:18.853 UTC [29] LOG:  ending log output to stderr {"source":"/controller/log/postgres"}
+2024-10-10T16:36:18.854038757Z INFO cluster-example-1 postgres 2024-10-10 16:36:18.853 UTC [29] HINT:  Future log output will go to log destination "csvlog". {"source":"/controller/log/postgres"}
+[...]
+```
+
+To explore all available options, use the `-h` flag for detailed explanations
+of the supported flags and their usage.
 
 ### Destroy
 
