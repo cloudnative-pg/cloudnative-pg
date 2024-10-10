@@ -70,6 +70,10 @@ const (
 
 var apiGVString = apiv1.GroupVersion.String()
 
+// errSplitBrainDetected happens when a Pod lost connectivity with
+// the API server and retains its previous role.
+var errSplitBrainDetected = errors.New("split brain detected")
+
 // ClusterReconciler reconciles a Cluster objects
 type ClusterReconciler struct {
 	client.Client
@@ -338,6 +342,27 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 			return ctrl.Result{Requeue: true}, nil
 		}
 		return ctrl.Result{}, fmt.Errorf("cannot update the instances status on the cluster: %w", err)
+	}
+
+	// If a Pod loses connectivity, the operator will fail over but the faulty
+	// Pod would not receive a change of its role from primary to replica.
+	//
+	// When the connectivity resumes the operator will find two primaries:
+	// the previously faulting one and the new primary that has been
+	// promoted. The operator should just wait for the Pods to get its
+	// current role from auto-healing to proceed. Without this safety
+	// measure, the operator would just fail back to the first primary of
+	// the list.
+	if primaryNames := instancesStatus.PrimaryNames(); len(primaryNames) > 1 {
+		contextLogger.Error(
+			errSplitBrainDetected,
+			"Multiple primary Pods have been detected, waiting for Pods to notice their role",
+			"primaryNames", primaryNames,
+		)
+		instancesStatus.LogStatus(ctx)
+		return ctrl.Result{
+			RequeueAfter: 5 * time.Second,
+		}, nil
 	}
 
 	if err := persistentvolumeclaim.ReconcileMetadata(
