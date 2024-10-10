@@ -1,43 +1,50 @@
 # Logging
 
-The operator is designed to log in JSON format directly to standard output,
-including PostgreSQL logs.
+The operator outputs logs in JSON format directly to standard output, including
+PostgreSQL logs, without persisting them to storage for security reasons. This
+design facilitates seamless integration with most Kubernetes-compatible log
+management tools, including command line ones like
+[stern](https://github.com/stern/stern).
 
-Each log entry has the following fields:
-
-- `level` – Log level (`info`, `notice`, ...).
-- `ts` – The timestamp (epoch with microseconds).
-- `logger` – The type of the record (for example, `postgres` or `pg_controldata`).
-- `msg` – The actual message or the keyword `record` in case the message is parsed in JSON format.
-- `record` – The actual record with structure that varies depending on the
-  `logger` type.
-- `logging_podName` – The pod where the log was created.
-
-!!! Warning
-    Long-term storage and management of logs is outside the operator's purview,
-    and needs to be provided at the level of the Kubernetes installation.
-    See the
+!!! Important
+    Long-term storage and management of logs are outside the scope of the
+    operator and should be handled at the Kubernetes infrastructure level.
+    For more information, see the
     [Kubernetes Logging Architecture](https://kubernetes.io/docs/concepts/cluster-administration/logging/)
     documentation.
 
+Each log entry includes the following fields:
+
+- `level` – The log level (e.g., `info`, `notice`).
+- `ts` – The timestamp (epoch with microseconds).
+- `logger` – The type of log (e.g., `postgres`, `pg_controldata`).
+- `msg` – The log message, or the keyword `record` if the message is in JSON
+  format.
+- `record` – The actual record, with a structure that varies depending on the
+  `logger` type.
+- `logging_podName` – The name of the pod where the log was generated.
+
 !!! Info
-    If your log ingestion system requires it, you can rename the `level` and `ts` field names using the `log-field-level` and
-    `log-field-timestamp` flags of the operator controller. Edit the `Deployment` definition of the
-    `cloudnative-pg` operator.
+    If your log ingestion system requires custom field names, you can rename
+    the `level` and `ts` fields using the `log-field-level` and
+    `log-field-timestamp` flags in the operator controller. This can be configured
+    by editing the `Deployment` definition of the `cloudnative-pg` operator.
 
-## Operator log
+## Operator Logs
 
-You can specify a log level in the cluster spec with the option `logLevel`.
-You can set it to `error`, `warning`, `info`(default), `debug`, or `trace`.
+You can configure the log level for the operator in the cluster specification
+using the `logLevel` option. Available log levels are: `error`, `warning`,
+`info` (default), `debug`, and `trace`.
 
-Currently, you can set the log level only when an instance starts. You can't
-change it at runtime. If you change the value in the cluster spec after the cluster
-was started, it takes effect only in the new pods and not the old ones.
+!!! Important
+   Currently, the log level can only be set at the time the instance starts.
+   Changes to the log level in the cluster specification after the cluster has
+   started will only apply to new pods, not existing ones.
 
-## PostgreSQL log
+## PostgreSQL Logs
 
-Each entry in the PostgreSQL log is a JSON object having the `logger` key set
-to `postgres` and the structure described in the following example:
+Each PostgreSQL log entry is a JSON object with the `logger` key set to
+`postgres`. The structure of the log entries is as follows:
 
 ```json
 {
@@ -75,35 +82,33 @@ to `postgres` and the structure described in the following example:
 }
 ```
 
-Internally, the operator relies on the PostgreSQL CSV log format. See
-the PostgreSQL documentation for more information about the [CSV log
-format](https://www.postgresql.org/docs/current/runtime-config-logging.html).
+!!! Info
+    Internally, the operator uses PostgreSQL's CSV log format. For more details,
+    refer to the [PostgreSQL documentation on CSV log format](https://www.postgresql.org/docs/current/runtime-config-logging.html).
 
-## PGAudit logs
+## PGAudit Logs
 
-CloudNativePG has transparent and native support for
+CloudNativePG offers seamless and native support for
 [PGAudit](https://www.pgaudit.org/) on PostgreSQL clusters.
 
-To enable this support, add the required `pgaudit` parameters to the `postgresql`
-section in the configuration of the cluster.
+To enable PGAudit, add the necessary `pgaudit` parameters in the `postgresql`
+section of the cluster configuration.
 
 !!! Important
-    You need to add the PGAudit library to `shared_preload_libraries`.
-    CloudNativePG adds the library based on the
-    presence of `pgaudit.*` parameters in the postgresql configuration.
-    The operator detects and manages the addition and removal of the
-    library from `shared_preload_libraries`.
+    The PGAudit library must be added to `shared_preload_libraries`.
+    CloudNativePG automatically manages this based on the presence of `pgaudit.*`
+    parameters in the PostgreSQL configuration. The operator handles both the
+    addition and removal of the library from `shared_preload_libraries`.
 
-The operator also takes care of creating and removing the extension from all
-the available databases in the cluster.
+Additionally, the operator manages the creation and removal of the PGAudit
+extension across all databases within the cluster.
 
 !!! Important
-    CloudNativePG runs the `CREATE EXTENSION` and
-    `DROP EXTENSION` commands in all databases in the cluster that accept
-    connections.
+    CloudNativePG executes the `CREATE EXTENSION` and `DROP EXTENSION` commands
+    in all databases within the cluster that accept connections.
 
-This example shows a PostgreSQL 13 `Cluster` deployment that results in
-`pgaudit` being enabled with the requested configuration:
+The following example demonstrates a PostgreSQL `Cluster` deployment with
+PGAudit enabled and configured:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -112,7 +117,6 @@ metadata:
   name: cluster-example
 spec:
   instances: 3
-  imageName: ghcr.io/cloudnative-pg/postgresql:13
 
   postgresql:
     parameters:
@@ -125,14 +129,15 @@ spec:
     size: 1Gi
 ```
 
-The audit CSV logs entries returned by PGAudit are then parsed and routed to
-stdout in JSON format, similarly to all the remaining logs:
+The audit CSV log entries generated by PGAudit are parsed and routed to
+standard output in JSON format, similar to all other logs:
 
 - `.logger` is set to `pgaudit`.
 - `.msg` is set to `record`.
-- `.record` contains the whole parsed record as a JSON object. This is similar to
-  `logging_collector` logs, except for `.record.audit`, which contains the
-  PGAudit CSV message formatted as a JSON object.
+- `.record` contains the entire parsed record as a JSON object. This structure
+  resembles that of `logging_collector` logs, with the exception of
+  `.record.audit`, which contains the PGAudit CSV message formatted as a JSON
+  object.
 
 This example shows sample log entries:
 
@@ -175,24 +180,25 @@ See the
 [PGAudit documentation](https://github.com/pgaudit/pgaudit/blob/master/README.md#format) <!-- wokeignore:rule=master -->
 for more details about each field in a record.
 
-## Other logs
+## Other Logs
 
-All logs that are produced by the operator and its instances are in JSON
-format, with `logger` set according to the process that produced them.
-Therefore, all the possible `logger` values are the following:
+All logs generated by the operator and its instances are in JSON format, with
+the `logger` field indicating the process that produced them. The possible
+`logger` values are as follows:
 
-- `barman-cloud-wal-archive`: from `barman-cloud-wal-archive` directly
-- `barman-cloud-wal-restore`: from `barman-cloud-wal-restore` directly
-- `initdb`: from running `initdb`
-- `pg_basebackup`: from running `pg_basebackup`
-- `pg_controldata`: from running `pg_controldata`
-- `pg_ctl`: from running any `pg_ctl` subcommand
-- `pg_rewind`: from running `pg_rewind`
-- `pgaudit`: from PGAudit extension
-- `postgres`: from the `postgres` instance (having `msg` different than `record`)
-- `wal-archive`: from the `wal-archive` subcommand of the instance manager
-- `wal-restore`: from the `wal-restore` subcommand of the instance manager
+- `barman-cloud-wal-archive`: logs from `barman-cloud-wal-archive`
+- `barman-cloud-wal-restore`: logs from `barman-cloud-wal-restore`
+- `initdb`: logs from running `initdb`
+- `pg_basebackup`: logs from running `pg_basebackup`
+- `pg_controldata`: logs from running `pg_controldata`
+- `pg_ctl`: logs from running any `pg_ctl` subcommand
+- `pg_rewind`: logs from running `pg_rewind`
+- `pgaudit`: logs from the PGAudit extension
+- `postgres`: logs from the `postgres` instance (with `msg` distinct from
+  `record`)
+- `wal-archive`: logs from the `wal-archive` subcommand of the instance manager
+- `wal-restore`: logs from the `wal-restore` subcommand of the instance manager
 
-Except for `postgres`, which has the aforementioned structures,
-all other possible values have `msg` set to the escaped message that's
+With the exception of `postgres`, which follows a specific structure, all other
+`logger` values contain the `msg` field with the escaped message that is
 logged.
