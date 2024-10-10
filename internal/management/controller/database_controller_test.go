@@ -23,6 +23,7 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/jackc/pgx/v5"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -78,8 +79,9 @@ var _ = Describe("Managed Database status", func() {
 				ClusterRef: corev1.LocalObjectReference{
 					Name: cluster.Name,
 				},
-				Name:  "db-one",
-				Owner: "app",
+				ReclaimPolicy: apiv1.DatabaseReclaimDelete,
+				Name:          "db-one",
+				Owner:         "app",
 			},
 		}
 
@@ -112,7 +114,8 @@ var _ = Describe("Managed Database status", func() {
 		Expect(dbMock.ExpectationsWereMet()).To(Succeed())
 	})
 
-	It("database object shows ready on success", func(ctx SpecContext) {
+	It("adds finalizer and sets status ready on success", func(ctx SpecContext) {
+		Expect(database.Finalizers).To(BeEmpty())
 		// Mocking DetectDB
 		expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
 		dbMock.ExpectQuery(`SELECT count(*)
@@ -141,6 +144,7 @@ var _ = Describe("Managed Database status", func() {
 
 		Expect(updatedDatabase.Status.Ready).Should(BeTrue())
 		Expect(updatedDatabase.Status.Error).Should(BeEmpty())
+		Expect(updatedDatabase.Finalizers).NotTo(BeEmpty())
 	})
 
 	It("database object inherits error after patching", func(ctx SpecContext) {
@@ -175,7 +179,83 @@ var _ = Describe("Managed Database status", func() {
 		Expect(updatedDatabase.Status.Error).Should(ContainSubstring(expectedError.Error()))
 	})
 
-	It("database object skips reconciliation if cluster isn't found (deleted cluster)", func(ctx SpecContext) {
+	It("on deleting it removes finalizers and drops DB", func(ctx SpecContext) {
+		Expect(database.Finalizers).To(BeEmpty())
+		// Mocking DetectDB
+		expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
+		dbMock.ExpectQuery(`SELECT count(*)
+		FROM pg_database
+		WHERE datname = $1`).WithArgs(database.Spec.Name).WillReturnRows(expectedValue)
+
+		expectedCreate := sqlmock.NewResult(0, 1)
+		expectedQuery := fmt.Sprintf(
+			"CREATE DATABASE %s OWNER %s",
+			pgx.Identifier{database.Spec.Name}.Sanitize(), pgx.Identifier{database.Spec.Owner}.Sanitize(),
+		)
+		dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
+
+		_, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{
+			Namespace: database.Namespace,
+			Name:      database.Name,
+		}})
+		Expect(err).ToNot(HaveOccurred())
+
+		var updatedDatabase apiv1.Database
+		err = fakeClient.Get(ctx, client.ObjectKey{
+			Namespace: database.Namespace,
+			Name:      database.Name,
+		}, &updatedDatabase)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(updatedDatabase.Status.Ready).Should(BeTrue())
+		Expect(updatedDatabase.Status.Error).Should(BeEmpty())
+
+		Expect(updatedDatabase.Finalizers).NotTo(BeEmpty())
+
+		// the next 3 lines are a hacky bit to make sure the next reconciler
+		// call doesn't skip on account of Generation == ObservedGeneration.
+		// See fake.Client known issues with `Generation`
+		// https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/client/fake@v0.19.0#NewClientBuilder
+		currentDatabase := updatedDatabase.DeepCopy()
+		updatedDatabase.Status.ObservedGeneration = 2
+		Expect(fakeClient.Status().Patch(ctx, &updatedDatabase, client.MergeFrom(currentDatabase))).To(Succeed())
+
+		// We now look at the behavior when we delete the Database object
+
+		Expect(fakeClient.Delete(ctx, database)).To(Succeed())
+		// the Database object is Deleted, but its finalizer prevents removal from
+		// the API
+		var fadingDatabase apiv1.Database
+		err = fakeClient.Get(ctx, client.ObjectKey{
+			Namespace: database.Namespace,
+			Name:      database.Name,
+		}, &fadingDatabase)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(fadingDatabase.DeletionTimestamp).NotTo(BeZero())
+		Expect(fadingDatabase.Finalizers).NotTo(BeEmpty())
+
+		// Mocking Drop Database
+		expectedDrop := fmt.Sprintf("DROP DATABASE IF EXISTS %s",
+			pgx.Identifier{database.Spec.Name}.Sanitize(),
+		)
+		dbMock.ExpectExec(expectedDrop).WillReturnResult(sqlmock.NewResult(0, 1))
+
+		_, err = r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{
+			Namespace: database.Namespace,
+			Name:      database.Name,
+		}})
+		Expect(err).ToNot(HaveOccurred())
+
+		var finalDatabase apiv1.Database
+		err = fakeClient.Get(ctx, client.ObjectKey{
+			Namespace: database.Namespace,
+			Name:      database.Name,
+		}, &finalDatabase)
+		Expect(err).To(HaveOccurred())
+		Expect(apierrors.IsNotFound(err)).To(BeTrue())
+	})
+
+	It("skips reconciliation if cluster isn't found (deleted cluster)", func(ctx SpecContext) {
 		// since the fakeClient has the `cluster-example` cluster, let's reference
 		// another cluster `cluster-other` that is not found by the fakeClient
 		pgInstance := postgres.NewInstance().
@@ -214,7 +294,7 @@ var _ = Describe("Managed Database status", func() {
 		Expect(updatedDatabase.Status.Error).Should(BeEmpty())
 	})
 
-	It("database skips reconciliation if database isn't found (deleted database)", func(ctx SpecContext) {
+	It("skips reconciliation if database object isn't found (deleted database)", func(ctx SpecContext) {
 		// since the fakeClient has the `cluster-example` cluster, let's reference
 		// another cluster `cluster-other` that is not found by the fakeClient
 		otherDatabase := &apiv1.Database{
