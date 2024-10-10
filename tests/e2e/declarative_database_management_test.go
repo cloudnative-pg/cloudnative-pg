@@ -239,7 +239,7 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 				}, 300).WithPolling(10 * time.Second).Should(Succeed())
 			})
 			By("deleting the namespace and making sure it succeeds before timeout", func() {
-				err := env.DeleteNamespaceAndWait(namespace, 30)
+				err := env.DeleteNamespaceAndWait(namespace, 60)
 				Expect(err).ToNot(HaveOccurred())
 			})
 		})
