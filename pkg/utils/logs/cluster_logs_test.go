@@ -71,7 +71,7 @@ var _ = Describe("Cluster logging tests", func() {
 		}()
 		ctx.Done()
 		wait.Wait()
-		Expect(logBuffer.String()).To(BeEquivalentTo("fake logs"))
+		Expect(logBuffer.String()).To(BeEquivalentTo("fake logs\n"))
 	})
 
 	It("should catch extra logs if given the follow option", func(ctx context.Context) {
@@ -98,6 +98,6 @@ var _ = Describe("Cluster logging tests", func() {
 		time.Sleep(350 * time.Millisecond)
 		cancel()
 		// the fake pod will be seen twice
-		Expect(logBuffer.String()).To(BeEquivalentTo("fake logsfake logs"))
+		Expect(logBuffer.String()).To(BeEquivalentTo("fake logs\nfake logs\n"))
 	})
 })
