@@ -146,7 +146,7 @@ func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client, imm
 		return err
 	}
 
-	if err := info.WriteInitialPostgresqlConf(cluster); err != nil {
+	if err := info.WriteInitialPostgresqlConf(ctx, cluster); err != nil {
 		return err
 	}
 
@@ -167,7 +167,7 @@ func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client, imm
 		return err
 	}
 
-	if err := info.WriteRestoreHbaConf(); err != nil {
+	if err := info.WriteRestoreHbaConf(ctx); err != nil {
 		return err
 	}
 
@@ -273,7 +273,7 @@ func (info InitInfo) Restore(ctx context.Context) error {
 		return err
 	}
 
-	if err := info.WriteInitialPostgresqlConf(cluster); err != nil {
+	if err := info.WriteInitialPostgresqlConf(ctx, cluster); err != nil {
 		return err
 	}
 	// we need a migration here, otherwise the server will not start up if
@@ -300,7 +300,7 @@ func (info InitInfo) Restore(ctx context.Context) error {
 		return err
 	}
 
-	if err := info.WriteRestoreHbaConf(); err != nil {
+	if err := info.WriteRestoreHbaConf(ctx); err != nil {
 		return err
 	}
 
@@ -763,7 +763,7 @@ func LoadEnforcedParametersFromCluster(
 
 // WriteInitialPostgresqlConf resets the postgresql.conf that there is in the instance using
 // a new bootstrapped instance as reference
-func (info InitInfo) WriteInitialPostgresqlConf(cluster *apiv1.Cluster) error {
+func (info InitInfo) WriteInitialPostgresqlConf(ctx context.Context, cluster *apiv1.Cluster) error {
 	if err := fileutils.EnsureDirectoryExists(postgresSpec.RecoveryTemporaryDirectory); err != nil {
 		return err
 	}
@@ -794,15 +794,15 @@ func (info InitInfo) WriteInitialPostgresqlConf(cluster *apiv1.Cluster) error {
 		WithNamespace(info.Namespace).
 		WithClusterName(info.ClusterName)
 
-	_, err = temporaryInstance.RefreshPGHBA(cluster, "")
+	_, err = temporaryInstance.RefreshPGHBA(ctx, cluster, "")
 	if err != nil {
 		return fmt.Errorf("while generating pg_hba.conf: %w", err)
 	}
-	_, err = temporaryInstance.RefreshPGIdent(cluster.Spec.PostgresConfiguration.PgIdent)
+	_, err = temporaryInstance.RefreshPGIdent(ctx, cluster.Spec.PostgresConfiguration.PgIdent)
 	if err != nil {
 		return fmt.Errorf("while generating pg_ident.conf: %w", err)
 	}
-	_, err = temporaryInstance.RefreshConfigurationFilesFromCluster(cluster, false)
+	_, err = temporaryInstance.RefreshConfigurationFilesFromCluster(ctx, cluster, false)
 	if err != nil {
 		return fmt.Errorf("while generating Postgres configuration: %w", err)
 	}
@@ -841,7 +841,7 @@ func (info InitInfo) WriteInitialPostgresqlConf(cluster *apiv1.Cluster) error {
 
 // WriteRestoreHbaConf writes basic pg_hba.conf and pg_ident.conf allowing access without password from localhost.
 // This is needed to set the PostgreSQL password after the postgres server is started and active
-func (info InitInfo) WriteRestoreHbaConf() error {
+func (info InitInfo) WriteRestoreHbaConf(ctx context.Context) error {
 	// We allow every access from localhost, and this is needed to correctly restore
 	// the database
 	_, err := fileutils.WriteStringToFile(
@@ -852,7 +852,7 @@ func (info InitInfo) WriteRestoreHbaConf() error {
 	}
 
 	// Create only the local map referred in the HBA configuration
-	_, err = info.GetInstance().RefreshPGIdent(nil)
+	_, err = info.GetInstance().RefreshPGIdent(ctx, nil)
 	return err
 }
 

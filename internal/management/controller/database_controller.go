@@ -66,7 +66,7 @@ const databaseReconciliationInterval = 30 * time.Second
 
 // Reconcile is the database reconciliation loop
 func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	contextLogger, ctx := log.SetupLogger(ctx)
+	contextLogger := log.FromContext(ctx)
 
 	contextLogger.Debug("Reconciliation loop start")
 	defer func() {
