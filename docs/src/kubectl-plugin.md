@@ -250,142 +250,94 @@ kubectl cnpg status sandbox
 ```
 
 ```shell
-Cluster in healthy state
-Name:               sandbox
-Namespace:          default
-System ID:          7039966298120953877
-PostgreSQL Image:   ghcr.io/cloudnative-pg/postgresql:17.0
-Primary instance:   sandbox-2
-Instances:          3
-Ready instances:    3
-Current Write LSN:  3AF/EAFA6168 (Timeline: 8 - WAL File: 00000008000003AF00000075)
+Cluster Summary
+Name:                default/sandbox
+System ID:           7423474350493388827
+PostgreSQL Image:    ghcr.io/cloudnative-pg/postgresql:16.4
+Primary instance:    sandbox-1
+Primary start time:  2024-10-08 18:31:57 +0000 UTC (uptime 1m14s)
+Status:              Cluster in healthy state
+Instances:           3
+Ready instances:     3
+Size:                126M
+Current Write LSN:   0/604DE38 (Timeline: 1 - WAL File: 000000010000000000000006)
 
 Continuous Backup status
-First Point of Recoverability:  Not Available
-Working WAL archiving:          OK
-Last Archived WAL:              00000008000003AE00000079   @   2021-12-14T10:16:29.340047Z
-Last Failed WAL: -
-
-Certificates Status
-Certificate Name             Expiration Date                Days Left Until Expiration
-----------------             ---------------                --------------------------
-cluster-example-ca           2022-05-05 15:02:42 +0000 UTC  87.23
-cluster-example-replication  2022-05-05 15:02:42 +0000 UTC  87.23
-cluster-example-server       2022-05-05 15:02:42 +0000 UTC  87.23
+Not configured
 
 Streaming Replication status
-Name       Sent LSN      Write LSN     Flush LSN     Replay LSN    Write Lag        Flush Lag        Replay Lag       State      Sync State  Sync Priority
-----       --------      ---------     ---------     ----------    ---------        ---------        ----------       -----      ----------  -------------
-sandbox-1  3AF/EB0524F0  3AF/EB011760  3AF/EAFEDE50  3AF/EAFEDE50  00:00:00.004461  00:00:00.007901  00:00:00.007901  streaming  quorum      1
-sandbox-3  3AF/EB0524F0  3AF/EB030B00  3AF/EB030B00  3AF/EB011760  00:00:00.000977  00:00:00.004194  00:00:00.008252  streaming  quorum      1
+Replication Slots Enabled
+Name       Sent LSN   Write LSN  Flush LSN  Replay LSN  Write Lag  Flush Lag  Replay Lag  State      Sync State  Sync Priority  Replication Slot
+----       --------   ---------  ---------  ----------  ---------  ---------  ----------  -----      ----------  -------------  ----------------
+sandbox-2  0/604DE38  0/604DE38  0/604DE38  0/604DE38   00:00:00   00:00:00   00:00:00    streaming  async       0              active
+sandbox-3  0/604DE38  0/604DE38  0/604DE38  0/604DE38   00:00:00   00:00:00   00:00:00    streaming  async       0              active
 
 Instances status
-Name       Database Size  Current LSN   Replication role  Status  QoS         Manager Version
-----       -------------  -----------   ----------------  ------  ---         ---------------
-sandbox-1  302 GB         3AF/E9FFFFE0  Standby (sync)    OK      Guaranteed  1.11.0
-sandbox-2  302 GB         3AF/EAFA6168  Primary           OK      Guaranteed  1.11.0
-sandbox-3  302 GB         3AF/EBAD5D18  Standby (sync)    OK      Guaranteed  1.11.0
+Name       Current LSN  Replication role  Status  QoS         Manager Version  Node
+----       -----------  ----------------  ------  ---         ---------------  ----
+sandbox-1  0/604DE38    Primary           OK      BestEffort  1.24.0           k8s-eu-worker
+sandbox-2  0/604DE38    Standby (async)   OK      BestEffort  1.24.0           k8s-eu-worker2
+sandbox-3  0/604DE38    Standby (async)   OK      BestEffort  1.24.0           k8s-eu-worker
 ```
 
-You can also get a more verbose version of the status by adding
-`--verbose` or just `-v`
+If you require more detailed status information, use the `--verbose` option (or
+`-v` for short). The level of detail increases each time the flag is repeated:
 
 ```shell
 kubectl cnpg status sandbox --verbose
 ```
 
 ```shell
-Cluster in healthy state
-Name:               sandbox
-Namespace:          default
-System ID:          7039966298120953877
-PostgreSQL Image:   ghcr.io/cloudnative-pg/postgresql:17.0
-Primary instance:   sandbox-2
-Instances:          3
-Ready instances:    3
-Current Write LSN:  3B1/61DE3158 (Timeline: 8 - WAL File: 00000008000003B100000030)
-
-PostgreSQL Configuration
-archive_command = '/controller/manager wal-archive --log-destination /controller/log/postgres.json %p'
-archive_mode = 'on'
-archive_timeout = '5min'
-checkpoint_completion_target = '0.9'
-checkpoint_timeout = '900s'
-cluster_name = 'sandbox'
-dynamic_shared_memory_type = 'sysv'
-full_page_writes = 'on'
-hot_standby = 'true'
-jit = 'on'
-listen_addresses = '*'
-log_autovacuum_min_duration = '1s'
-log_checkpoints = 'on'
-log_destination = 'csvlog'
-log_directory = '/controller/log'
-log_filename = 'postgres'
-log_lock_waits = 'on'
-log_min_duration_statement = '1000'
-log_rotation_age = '0'
-log_rotation_size = '0'
-log_statement = 'ddl'
-log_temp_files = '1024'
-log_truncate_on_rotation = 'false'
-logging_collector = 'on'
-maintenance_work_mem = '2GB'
-max_connections = '1000'
-max_parallel_workers = '32'
-max_replication_slots = '32'
-max_wal_size = '15GB'
-max_worker_processes = '32'
-pg_stat_statements.max = '10000'
-pg_stat_statements.track = 'all'
-port = '5432'
-shared_buffers = '16GB'
-shared_memory_type = 'sysv'
-shared_preload_libraries = 'pg_stat_statements'
-ssl = 'on'
-ssl_ca_file = '/controller/certificates/client-ca.crt'
-ssl_cert_file = '/controller/certificates/server.crt'
-ssl_key_file = '/controller/certificates/server.key'
-synchronous_standby_names = 'ANY 1 ("sandbox-1","sandbox-3")'
-unix_socket_directories = '/controller/run'
-wal_keep_size = '512MB'
-wal_level = 'logical'
-wal_log_hints = 'on'
-cnpg.config_sha256 = '3cfa683e23fe513afaee7c97b50ce0628e0cc634bca8b096517538a9a4428efc'
-
-PostgreSQL HBA Rules
-
-# Grant local access
-local all all peer map=local
-
-# Require client certificate authentication for the streaming_replica user
-hostssl postgres streaming_replica all cert
-hostssl replication streaming_replica all cert
-hostssl all cnpg_pooler_pgbouncer all cert
-
-# Otherwise use the default authentication method
-host all all all scram-sha-256
-
+Cluster Summary
+Name:                default/sandbox
+System ID:           7423474350493388827
+PostgreSQL Image:    ghcr.io/cloudnative-pg/postgresql:16.4
+Primary instance:    sandbox-1
+Primary start time:  2024-10-08 18:31:57 +0000 UTC (uptime 2m4s)
+Status:              Cluster in healthy state
+Instances:           3
+Ready instances:     3
+Size:                126M
+Current Write LSN:   0/6053720 (Timeline: 1 - WAL File: 000000010000000000000006)
 
 Continuous Backup status
-First Point of Recoverability:  Not Available
-Working WAL archiving:          OK
-Last Archived WAL:              00000008000003B00000001D   @   2021-12-14T10:20:42.272815Z
-Last Failed WAL: -
+Not configured
+
+Physical backups
+No running physical backups found
 
 Streaming Replication status
-Name       Sent LSN      Write LSN     Flush LSN     Replay LSN    Write Lag        Flush Lag        Replay Lag       State      Sync State  Sync Priority
-----       --------      ---------     ---------     ----------    ---------        ---------        ----------       -----      ----------  -------------
-sandbox-1  3B1/61E26448  3B1/61DF82F0  3B1/61DF82F0  3B1/61DF82F0  00:00:00.000333  00:00:00.000333  00:00:00.005484  streaming  quorum      1
-sandbox-3  3B1/61E26448  3B1/61E26448  3B1/61DF82F0  3B1/61DF82F0  00:00:00.000756  00:00:00.000756  00:00:00.000756  streaming  quorum      1
+Replication Slots Enabled
+Name       Sent LSN   Write LSN  Flush LSN  Replay LSN  Write Lag  Flush Lag  Replay Lag  State      Sync State  Sync Priority  Replication Slot  Slot Restart LSN  Slot WAL Status  Slot Safe WAL Size
+----       --------   ---------  ---------  ----------  ---------  ---------  ----------  -----      ----------  -------------  ----------------  ----------------  ---------------  ------------------
+sandbox-2  0/6053720  0/6053720  0/6053720  0/6053720   00:00:00   00:00:00   00:00:00    streaming  async       0              active            0/6053720         reserved         NULL
+sandbox-3  0/6053720  0/6053720  0/6053720  0/6053720   00:00:00   00:00:00   00:00:00    streaming  async       0              active            0/6053720         reserved         NULL
+
+Unmanaged Replication Slot Status
+No unmanaged replication slots found
+
+Managed roles status
+No roles managed
+
+Tablespaces status
+No managed tablespaces
+
+Pod Disruption Budgets status
+Name             Role     Expected Pods  Current Healthy  Minimum Desired Healthy  Disruptions Allowed
+----             ----     -------------  ---------------  -----------------------  -------------------
+sandbox          replica  2              2                1                        1
+sandbox-primary  primary  1              1                1                        0
 
 Instances status
-Name       Database Size  Current LSN   Replication role  Status  QoS         Manager Version
-----       -------------  -----------   ----------------  ------  ---         ---------------
-sandbox-1                 3B1/610204B8  Standby (sync)    OK      Guaranteed  1.11.0
-sandbox-2                 3B1/61DE3158  Primary           OK      Guaranteed  1.11.0
-sandbox-3                 3B1/62618470  Standby (sync)    OK      Guaranteed  1.11.0
+Name       Current LSN  Replication role  Status  QoS         Manager Version  Node
+----       -----------  ----------------  ------  ---         ---------------  ----
+sandbox-1  0/6053720    Primary           OK      BestEffort  1.24.0           k8s-eu-worker
+sandbox-2  0/6053720    Standby (async)   OK      BestEffort  1.24.0           k8s-eu-worker2
+sandbox-3  0/6053720    Standby (async)   OK      BestEffort  1.24.0           k8s-eu-worker
 ```
+
+With an additional `-v` (e.g. `kubectl cnpg status sandbox -v -v`), you can
+also view PostgreSQL configuration, HBA settings, and certificates.
 
 The command also supports output in `yaml` and `json` format.
 
