@@ -120,11 +120,13 @@ func NewShowListsMetrics(subsystem string) ShowListsMetrics {
 }
 
 func (e *Exporter) collectShowLists(ch chan<- prometheus.Metric, db *sql.DB) {
+	contextLogger := log.FromContext(e.ctx)
+
 	e.Metrics.ShowLists.Reset()
 	// First, let's check the connection. No need to proceed if this fails.
 	rows, err := db.Query("SHOW LISTS;")
 	if err != nil {
-		log.Error(err, "Error while executing SHOW LISTS")
+		contextLogger.Error(err, "Error while executing SHOW LISTS")
 		e.Metrics.PgbouncerUp.Set(0)
 		e.Metrics.Error.Set(1)
 		return
@@ -135,7 +137,7 @@ func (e *Exporter) collectShowLists(ch chan<- prometheus.Metric, db *sql.DB) {
 	defer func() {
 		err = rows.Close()
 		if err != nil {
-			log.Error(err, "while closing rows for SHOW LISTS")
+			contextLogger.Error(err, "while closing rows for SHOW LISTS")
 		}
 	}()
 
@@ -146,14 +148,14 @@ func (e *Exporter) collectShowLists(ch chan<- prometheus.Metric, db *sql.DB) {
 
 	for rows.Next() {
 		if err = rows.Scan(&list, &item); err != nil {
-			log.Error(err, "Error while executing SHOW LISTS")
+			contextLogger.Error(err, "Error while executing SHOW LISTS")
 			e.Metrics.Error.Set(1)
 			e.Metrics.PgCollectionErrors.WithLabelValues(err.Error()).Inc()
 		}
 		m, ok := e.Metrics.ShowLists[list]
 		if !ok {
 			e.Metrics.Error.Set(1)
-			log.Info("Missing metric", "query", "SHOW LISTS", "metric", list)
+			contextLogger.Info("Missing metric", "query", "SHOW LISTS", "metric", list)
 			continue
 		}
 		m.Set(float64(item))

@@ -116,7 +116,11 @@ func (i *PostgresLifecycle) runPostgresAndWait(ctx context.Context) <-chan error
 		defer i.instance.SetCanCheckReadiness(false)
 
 		postmasterExitStatus := streamingCmd.Wait()
-		log.Info("postmaster exited", "postmasterExitStatus", postmasterExitStatus, "postMasterPID", postMasterPID)
+		contextLogger.Info(
+			"postmaster exited",
+			"postmasterExitStatus", postmasterExitStatus,
+			"postMasterPID", postMasterPID,
+		)
 		return postmasterExitStatus
 	}
 

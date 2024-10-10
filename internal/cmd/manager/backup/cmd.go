@@ -33,18 +33,19 @@ import (
 func NewCmd() *cobra.Command {
 	cmd := cobra.Command{
 		Use: "backup [backup_name]",
-		RunE: func(_ *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, args []string) error {
+			contextLogger := log.FromContext(cmd.Context())
 			backupURL := url.Local(url.PathPgBackup, url.LocalPort)
 			resp, err := http.Get(backupURL + "?name=" + args[0])
 			if err != nil {
-				log.Error(err, "Error while requesting backup")
+				contextLogger.Error(err, "Error while requesting backup")
 				return err
 			}
 
 			defer func() {
 				err := resp.Body.Close()
 				if err != nil {
-					log.Error(err, "Can't close the connection",
+					contextLogger.Error(err, "Can't close the connection",
 						"backupURL", backupURL,
 						"statusCode", resp.StatusCode,
 					)
@@ -53,7 +54,7 @@ func NewCmd() *cobra.Command {
 
 			body, err := io.ReadAll(resp.Body)
 			if err != nil {
-				log.Error(err, "Error while reading backup response body",
+				contextLogger.Error(err, "Error while reading backup response body",
 					"backupURL", backupURL,
 					"statusCode", resp.StatusCode,
 				)
@@ -61,7 +62,7 @@ func NewCmd() *cobra.Command {
 			}
 
 			if resp.StatusCode != 200 {
-				log.Info(
+				contextLogger.Info(
 					"Error while requesting backup",
 					"backupURL", backupURL,
 					"statusCode", resp.StatusCode,
@@ -72,7 +73,7 @@ func NewCmd() *cobra.Command {
 
 			_, err = os.Stderr.Write(body)
 			if err != nil {
-				log.Error(err, "Error while starting a backup")
+				contextLogger.Error(err, "Error while starting a backup")
 				return err
 			}
 

@@ -289,7 +289,7 @@ func (r *InstanceReconciler) Reconcile(
 	//    operator. Without another reconciliation loop we would have an incoherent
 	//    state of electable synchronous_names inside the configuration.
 	//    (this is only relevant if syncReplicaElectionConstraint is enabled)
-	if requeueOnMissingPermissions || r.shouldRequeueForMissingTopology(cluster) {
+	if requeueOnMissingPermissions || r.shouldRequeueForMissingTopology(ctx, cluster) {
 		return reconcile.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 
@@ -367,6 +367,8 @@ func (r *InstanceReconciler) refreshConfigurationFiles(
 }
 
 func (r *InstanceReconciler) reconcileFencing(ctx context.Context, cluster *apiv1.Cluster) *reconcile.Result {
+	contextLogger := log.FromContext(ctx)
+
 	fencingRequired := cluster.IsInstanceFenced(r.instance.GetPodName())
 	isFenced := r.instance.IsFenced()
 	switch {
@@ -379,7 +381,7 @@ func (r *InstanceReconciler) reconcileFencing(ctx context.Context, cluster *apiv
 		timeout := time.Second * time.Duration(cluster.GetMaxStartDelay())
 		err := r.instance.RequestAndWaitFencingOff(ctx, timeout)
 		if err != nil {
-			log.Error(err, "while waiting for the instance to be restarted after lifting the fence")
+			contextLogger.Error(err, "while waiting for the instance to be restarted after lifting the fence")
 		}
 		return &reconcile.Result{}
 	}
@@ -396,7 +398,7 @@ func handleErrNextLoop(err error) (reconcile.Result, error) {
 // initialize will handle initialization tasks
 func (r *InstanceReconciler) initialize(ctx context.Context, cluster *apiv1.Cluster) error {
 	// we check there are no parameters that would prevent a follower to start
-	if err := r.verifyParametersForFollower(cluster); err != nil {
+	if err := r.verifyParametersForFollower(ctx, cluster); err != nil {
 		return err
 	}
 
@@ -422,7 +424,12 @@ func (r *InstanceReconciler) initialize(ctx context.Context, cluster *apiv1.Clus
 // This could not be the case if the cluster spec value for one of those parameters
 // is decreased shortly after having been increased. The follower would be restarting
 // towards a high level, then write the lower value to the local config
-func (r *InstanceReconciler) verifyParametersForFollower(cluster *apiv1.Cluster) error {
+func (r *InstanceReconciler) verifyParametersForFollower(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+) error {
+	contextLogger := log.FromContext(ctx)
+
 	if isPrimary, _ := r.instance.IsPrimary(); isPrimary {
 		return nil
 	}
@@ -440,7 +447,7 @@ func (r *InstanceReconciler) verifyParametersForFollower(cluster *apiv1.Cluster)
 		_, err := fileutils.WriteFileAtomic(filename, []byte(nil), 0o600)
 		return err
 	}
-	log.Info("Found previous run flag", "filename", filename)
+	contextLogger.Info("Found previous run flag", "filename", filename)
 	controldataParams, err := postgresManagement.LoadEnforcedParametersFromPgControldata(r.instance.PgData)
 	if err != nil {
 		return err
@@ -465,7 +472,7 @@ func (r *InstanceReconciler) verifyParametersForFollower(cluster *apiv1.Cluster)
 	if len(options) == 0 {
 		return nil
 	}
-	log.Info("Updating some enforced parameters that would prevent the instance to start",
+	contextLogger.Info("Updating some enforced parameters that would prevent the instance to start",
 		"parameters", options, "clusterParams", clusterParams)
 	// we write the safer enforced parameter values to pod config as safety
 	// in the face of cluster specs going up and down from nervous users
@@ -1248,7 +1255,7 @@ func (r *InstanceReconciler) handlePromotion(ctx context.Context, cluster *apiv1
 	if r.instance.GetPodName() != cluster.Status.CurrentPrimary {
 		// if the cluster is not replicating it means it's doing a failover and
 		// we have to wait for wal receivers to be down
-		err := r.waitForWalReceiverDown()
+		err := r.waitForWalReceiverDown(ctx)
 		if err != nil {
 			return err
 		}
@@ -1305,7 +1312,9 @@ func (r *InstanceReconciler) reconcileDesignatedPrimary(
 
 // waitForWalReceiverDown wait until the wal receiver is down, and it's used
 // to grab all the WAL files from a replica
-func (r *InstanceReconciler) waitForWalReceiverDown() error {
+func (r *InstanceReconciler) waitForWalReceiverDown(ctx context.Context) error {
+	contextLogger := log.FromContext(ctx)
+
 	// This is not really exponential backoff as RetryUntilWalReceiverDown
 	// doesn't contain any increment
 	return wait.ExponentialBackoff(RetryUntilWalReceiverDown, func() (done bool, err error) {
@@ -1318,7 +1327,7 @@ func (r *InstanceReconciler) waitForWalReceiverDown() error {
 			return true, nil
 		}
 
-		log.Info("WAL receiver is still active, waiting")
+		contextLogger.Info("WAL receiver is still active, waiting")
 		return false, nil
 	})
 }
@@ -1428,7 +1437,12 @@ func (r *InstanceReconciler) refreshPGHBA(ctx context.Context, cluster *apiv1.Cl
 	return r.instance.RefreshPGHBA(ctx, cluster, ldapBindPassword)
 }
 
-func (r *InstanceReconciler) shouldRequeueForMissingTopology(cluster *apiv1.Cluster) shoudRequeue {
+func (r *InstanceReconciler) shouldRequeueForMissingTopology(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+) shoudRequeue {
+	contextLogger := log.FromContext(ctx)
+
 	syncReplicaConstraint := cluster.Spec.PostgresConfiguration.SyncReplicaElectionConstraint
 	if !syncReplicaConstraint.Enabled {
 		return false
@@ -1439,7 +1453,7 @@ func (r *InstanceReconciler) shouldRequeueForMissingTopology(cluster *apiv1.Clus
 
 	topologyStatus := cluster.Status.Topology
 	if !topologyStatus.SuccessfullyExtracted || len(topologyStatus.Instances) != cluster.Spec.Instances {
-		log.Info("missing topology information while syncReplicaElectionConstraint are enabled, " +
+		contextLogger.Info("missing topology information while syncReplicaElectionConstraint are enabled, " +
 			"will requeue to calculate correctly the synchronous names")
 		return true
 	}

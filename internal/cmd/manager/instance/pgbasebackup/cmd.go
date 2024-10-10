@@ -57,7 +57,10 @@ func NewCmd() *cobra.Command {
 				Namespace: namespace,
 			})
 		},
-		RunE: func(_ *cobra.Command, _ []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			ctx := cmd.Context()
+			contextLogger := log.FromContext(ctx)
+
 			client, err := management.NewControllerRuntimeClient()
 			if err != nil {
 				return err
@@ -73,10 +76,8 @@ func NewCmd() *cobra.Command {
 				client: client,
 			}
 
-			ctx := context.Background()
-
 			if err = env.bootstrapUsingPgbasebackup(ctx); err != nil {
-				log.Error(err, "Unable to boostrap cluster")
+				contextLogger.Error(err, "Unable to boostrap cluster")
 			}
 			return err
 		},
@@ -101,6 +102,8 @@ func NewCmd() *cobra.Command {
 
 // bootstrapUsingPgbasebackup creates a new data dir from the configuration
 func (env *CloneInfo) bootstrapUsingPgbasebackup(ctx context.Context) error {
+	contextLogger := log.FromContext(ctx)
+
 	var cluster apiv1.Cluster
 	err := env.client.Get(ctx, ctrl.ObjectKey{Namespace: env.info.Namespace, Name: env.info.ClusterName}, &cluster)
 	if err != nil {
@@ -130,7 +133,7 @@ func (env *CloneInfo) bootstrapUsingPgbasebackup(ctx context.Context) error {
 
 	pgVersion, err := cluster.GetPostgresqlVersion()
 	if err != nil {
-		log.Warning(
+		contextLogger.Warning(
 			"Error while parsing PostgreSQL server version to define connection options, defaulting to PostgreSQL 11",
 			"imageName", cluster.GetImageName(),
 			"err", err)

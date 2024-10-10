@@ -45,10 +45,10 @@ var (
 
 // Setup configure the web statusServer for a certain PostgreSQL instance, and
 // must be invoked before starting the real web statusServer
-func Setup() error {
+func Setup(ctx context.Context) error {
 	// create the exporter and serve it on the /metrics endpoint
 	registry = prometheus.NewRegistry()
-	exporter = NewExporter()
+	exporter = NewExporter(ctx)
 	if err := registry.Register(exporter); err != nil {
 		return fmt.Errorf("while registering PgBouncer exporters: %w", err)
 	}

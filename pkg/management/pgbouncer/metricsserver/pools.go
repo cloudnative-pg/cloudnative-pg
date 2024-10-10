@@ -184,11 +184,13 @@ func NewShowPoolsMetrics(subsystem string) *ShowPoolsMetrics {
 }
 
 func (e *Exporter) collectShowPools(ch chan<- prometheus.Metric, db *sql.DB) {
+	contextLogger := log.FromContext(e.ctx)
+
 	e.Metrics.ShowPools.Reset()
 	// First, let's check the connection. No need to proceed if this fails.
 	rows, err := db.Query("SHOW POOLS;")
 	if err != nil {
-		log.Error(err, "Error while executing SHOW POOLS")
+		contextLogger.Error(err, "Error while executing SHOW POOLS")
 		e.Metrics.PgbouncerUp.Set(0)
 		e.Metrics.Error.Set(1)
 		return
@@ -199,7 +201,7 @@ func (e *Exporter) collectShowPools(ch chan<- prometheus.Metric, db *sql.DB) {
 	defer func() {
 		err = rows.Close()
 		if err != nil {
-			log.Error(err, "while closing rows for SHOW POOLS")
+			contextLogger.Error(err, "while closing rows for SHOW POOLS")
 		}
 	}()
 
@@ -234,7 +236,7 @@ func (e *Exporter) collectShowPools(ch chan<- prometheus.Metric, db *sql.DB) {
 
 	cols, err := rows.Columns()
 	if err != nil {
-		log.Error(err, "Error while getting number of columns")
+		contextLogger.Error(err, "Error while getting number of columns")
 		e.Metrics.PgbouncerUp.Set(0)
 		e.Metrics.Error.Set(1)
 		return
@@ -259,7 +261,7 @@ func (e *Exporter) collectShowPools(ch chan<- prometheus.Metric, db *sql.DB) {
 				&maxWaitUs,
 				&poolMode,
 			); err != nil {
-				log.Error(err, "Error while executing SHOW POOLS")
+				contextLogger.Error(err, "Error while executing SHOW POOLS")
 				e.Metrics.Error.Set(1)
 				e.Metrics.PgCollectionErrors.WithLabelValues(err.Error()).Inc()
 			}
@@ -277,7 +279,7 @@ func (e *Exporter) collectShowPools(ch chan<- prometheus.Metric, db *sql.DB) {
 				&maxWaitUs,
 				&poolMode,
 			); err != nil {
-				log.Error(err, "Error while executing SHOW POOLS")
+				contextLogger.Error(err, "Error while executing SHOW POOLS")
 				e.Metrics.Error.Set(1)
 				e.Metrics.PgCollectionErrors.WithLabelValues(err.Error()).Inc()
 			}
