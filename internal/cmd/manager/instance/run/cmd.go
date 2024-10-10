@@ -167,12 +167,12 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 				},
 				&apiv1.Publication{}: {
 					Namespaces: map[string]cache.Config{
-						instance.Namespace: {},
+						instance.GetNamespaceName(): {},
 					},
 				},
 				&apiv1.Subscription{}: {
 					Namespaces: map[string]cache.Config{
-						instance.Namespace: {},
+						instance.GetNamespaceName(): {},
 					},
 				},
 			},

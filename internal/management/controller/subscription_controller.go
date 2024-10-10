@@ -91,12 +91,12 @@ func (r *SubscriptionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	// This is not for me!
-	if subscription.Spec.ClusterRef.Name != r.instance.ClusterName {
+	if subscription.Spec.ClusterRef.Name != r.instance.GetClusterName() {
 		return ctrl.Result{}, nil
 	}
 
 	// This is not for me, at least now
-	if cluster.Status.CurrentPrimary != r.instance.PodName {
+	if cluster.Status.CurrentPrimary != r.instance.GetPodName() {
 		return ctrl.Result{RequeueAfter: databaseReconciliationInterval}, nil
 	}
 
@@ -246,8 +246,8 @@ func (r *SubscriptionReconciler) GetCluster(ctx context.Context) (*apiv1.Cluster
 	var cluster apiv1.Cluster
 	err := r.Client.Get(ctx,
 		types.NamespacedName{
-			Namespace: r.instance.Namespace,
-			Name:      r.instance.ClusterName,
+			Namespace: r.instance.GetNamespaceName(),
+			Name:      r.instance.GetClusterName(),
 		},
 		&cluster)
 	if err != nil {
