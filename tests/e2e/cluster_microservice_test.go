@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/image/reference"
 	"github.com/cloudnative-pg/machinery/pkg/postgres/version"
@@ -28,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
@@ -71,15 +69,25 @@ var _ = Describe("Imports with Microservice Approach", Label(tests.LabelImportin
 		Expect(err).ToNot(HaveOccurred())
 
 		AssertCreateCluster(namespace, sourceClusterName, sourceSampleFile, env)
-		AssertCreateTestData(env, namespace, sourceClusterName, tableName)
-		primaryPod, err := env.GetClusterPrimary(namespace, sourceClusterName)
-		Expect(err).ToNot(HaveOccurred())
-		AssertCreateTestDataLargeObject(namespace, sourceClusterName, oid, data, primaryPod)
+		tableLocator := TableLocator{
+			Namespace:    namespace,
+			ClusterName:  sourceClusterName,
+			DatabaseName: testsUtils.AppDBName,
+			TableName:    tableName,
+		}
+		AssertCreateTestData(env, tableLocator)
+		AssertCreateTestDataLargeObject(namespace, sourceClusterName, oid, data)
 
 		importedClusterName = "cluster-pgdump-large-object"
 		cluster := AssertClusterImport(namespace, importedClusterName, sourceClusterName, "app")
-		AssertDataExpectedCount(env, namespace, importedClusterName, tableName, 2)
-		AssertLargeObjectValue(namespace, importedClusterName, oid, data, primaryPod)
+		tableLocator = TableLocator{
+			Namespace:    namespace,
+			ClusterName:  importedClusterName,
+			DatabaseName: testsUtils.AppDBName,
+			TableName:    tableName,
+		}
+		AssertDataExpectedCount(env, tableLocator, 2)
+		AssertLargeObjectValue(namespace, importedClusterName, oid, data)
 		By("deleting the imported database", func() {
 			Expect(testsUtils.DeleteObject(env, cluster)).To(Succeed())
 		})
@@ -98,7 +106,13 @@ var _ = Describe("Imports with Microservice Approach", Label(tests.LabelImportin
 
 		importedClusterName = "cluster-pgdump"
 		AssertClusterImport(namespace, importedClusterName, sourceClusterName, "app")
-		AssertDataExpectedCount(env, namespace, importedClusterName, tableName, 2)
+		tableLocator := TableLocator{
+			Namespace:    namespace,
+			ClusterName:  importedClusterName,
+			DatabaseName: testsUtils.AppDBName,
+			TableName:    tableName,
+		}
+		AssertDataExpectedCount(env, tableLocator, 2)
 		assertTableAndDataOnImportedCluster(namespace, tableName, importedClusterName)
 	})
 
@@ -199,7 +213,6 @@ func assertCreateTableWithDataOnSourceCluster(
 		"and grant read only to app user", func() {
 		pod, err := env.GetClusterPrimary(namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
-		commandTimeout := time.Second * 10
 
 		query := fmt.Sprintf(
 			"DROP USER IF EXISTS micro; "+
@@ -209,12 +222,13 @@ func assertCreateTableWithDataOnSourceCluster(
 				"GRANT SELECT ON %[1]v TO app;",
 			tableName)
 
-		_, _, err = env.ExecCommand(
-			env.Ctx,
-			*pod,
-			specs.PostgresContainerName,
-			&commandTimeout,
-			"psql", "-U", "postgres", "app", "-tAc", query)
+		_, _, err = env.ExecQueryInInstancePod(
+			testsUtils.PodLocator{
+				Namespace: pod.Namespace,
+				PodName:   pod.Name,
+			},
+			testsUtils.AppDBName,
+			query)
 		Expect(err).ToNot(HaveOccurred())
 	})
 }
@@ -235,29 +249,19 @@ func assertTableAndDataOnImportedCluster(
 				tableName,
 				testsUtils.AppUser,
 			)
-			out, _, err := env.ExecCommandWithPsqlClient(
-				namespace,
-				importedClusterName,
-				pod,
-				apiv1.ApplicationUserSecretSuffix,
+			out, _, err := env.ExecQueryInInstancePod(
+				testsUtils.PodLocator{
+					Namespace: pod.Namespace,
+					PodName:   pod.Name,
+				},
 				testsUtils.AppDBName,
-				queryImported,
-			)
+				queryImported)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(strings.Contains(out, tableName), err).Should(BeTrue())
 		})
 
 		By("verifying the user named 'micro' on source is not in imported database", func() {
-			outUser, _, err := env.ExecCommandWithPsqlClient(
-				namespace,
-				importedClusterName,
-				pod,
-				apiv1.ApplicationUserSecretSuffix,
-				testsUtils.AppDBName,
-				"\\du",
-			)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(strings.Contains(outUser, "micro"), err).Should(BeFalse())
+			AssertUserExists(pod, "micro", false)
 		})
 	})
 }
@@ -280,18 +284,18 @@ func assertImportRenamesSelectedDatabase(
 	AssertCreateCluster(namespace, clusterName, sampleFile, env)
 	primaryPod, err := env.GetClusterPrimary(namespace, clusterName)
 	Expect(err).ToNot(HaveOccurred())
-	commandTimeout := time.Second * 10
 
 	By("creating multiple dbs on source and set ownership to app", func() {
 		for _, db := range dbList {
 			// Create database
 			createDBQuery := fmt.Sprintf("CREATE DATABASE %v OWNER app", db)
-			_, _, err = env.ExecCommand(
-				env.Ctx,
-				*primaryPod,
-				specs.PostgresContainerName,
-				&commandTimeout,
-				"psql", "-U", "postgres", "-tAc", createDBQuery)
+			_, _, err = env.ExecQueryInInstancePod(
+				testsUtils.PodLocator{
+					Namespace: primaryPod.Namespace,
+					PodName:   primaryPod.Name,
+				},
+				testsUtils.PostgresDBName,
+				createDBQuery)
 			Expect(err).ToNot(HaveOccurred())
 		}
 	})
@@ -299,14 +303,8 @@ func assertImportRenamesSelectedDatabase(
 	By(fmt.Sprintf("creating table '%s' and insert records on selected db %v", tableName, dbToImport), func() {
 		// create a table with two records
 		query := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s AS VALUES (1),(2);", tableName)
-		_, _, err := env.ExecCommandWithPsqlClient(
-			namespace,
-			clusterName,
-			primaryPod,
-			apiv1.ApplicationUserSecretSuffix,
-			dbToImport,
-			query,
-		)
+		_, err = testsUtils.RunExecOverForward(env, namespace, clusterName, dbToImport,
+			apiv1.ApplicationUserSecretSuffix, query)
 		Expect(err).ToNot(HaveOccurred())
 	})
 
@@ -320,22 +318,20 @@ func assertImportRenamesSelectedDatabase(
 		AssertClusterStandbysAreStreaming(namespace, importedClusterName, 120)
 	})
 
-	AssertDataExpectedCount(env, namespace, importedClusterName, tableName, 2)
+	tableLocator := TableLocator{
+		Namespace:    namespace,
+		ClusterName:  importedClusterName,
+		DatabaseName: testsUtils.AppDBName,
+		TableName:    tableName,
+	}
+	AssertDataExpectedCount(env, tableLocator, 2)
 
 	By("verifying that only 'app' DB exists in the imported cluster", func() {
 		importedPrimaryPod, err := env.GetClusterPrimary(namespace, importedClusterName)
 		Expect(err).ToNot(HaveOccurred())
-		out, _, err := env.ExecCommandWithPsqlClient(
-			namespace,
-			importedClusterName,
-			importedPrimaryPod,
-			apiv1.ApplicationUserSecretSuffix,
-			testsUtils.AppDBName,
-			"\\l",
-		)
-		Expect(err).ToNot(HaveOccurred(), err)
-		Expect(strings.Contains(out, "db2"), err).Should(BeFalse())
-		Expect(strings.Contains(out, "app"), err).Should(BeTrue())
+
+		AssertUserExists(importedPrimaryPod, "db2", false)
+		AssertUserExists(importedPrimaryPod, "app", true)
 	})
 
 	By("cleaning up the clusters", func() {

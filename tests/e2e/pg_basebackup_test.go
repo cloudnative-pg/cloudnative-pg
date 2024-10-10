@@ -52,7 +52,13 @@ var _ = Describe("Bootstrap with pg_basebackup", Label(tests.LabelRecovery), fun
 			srcClusterName, err = env.GetResourceNameFromYAML(srcCluster)
 			Expect(err).ToNot(HaveOccurred())
 			AssertCreateCluster(namespace, srcClusterName, srcCluster, env)
-			AssertCreateTestData(env, namespace, srcClusterName, tableName)
+			tableLocator := TableLocator{
+				Namespace:    namespace,
+				ClusterName:  srcClusterName,
+				DatabaseName: utils.AppDBName,
+				TableName:    tableName,
+			}
+			AssertCreateTestData(env, tableLocator)
 		})
 
 		It("using basic authentication", func() {
@@ -87,7 +93,13 @@ var _ = Describe("Bootstrap with pg_basebackup", Label(tests.LabelRecovery), fun
 			})
 
 			By("checking data have been copied correctly", func() {
-				AssertDataExpectedCount(env, namespace, dstClusterName, tableName, 2)
+				tableLocator := TableLocator{
+					Namespace:    namespace,
+					ClusterName:  dstClusterName,
+					DatabaseName: utils.AppDBName,
+					TableName:    tableName,
+				}
+				AssertDataExpectedCount(env, tableLocator, 2)
 			})
 
 			By("writing some new data to the dst cluster", func() {
@@ -99,6 +111,7 @@ var _ = Describe("Bootstrap with pg_basebackup", Label(tests.LabelRecovery), fun
 					apiv1.ApplicationUserSecretSuffix,
 				)
 				defer func() {
+					_ = conn.Close()
 					forward.Close()
 				}()
 				Expect(err).ToNot(HaveOccurred())
@@ -106,7 +119,13 @@ var _ = Describe("Bootstrap with pg_basebackup", Label(tests.LabelRecovery), fun
 			})
 
 			By("checking the src cluster was not modified", func() {
-				AssertDataExpectedCount(env, namespace, srcClusterName, tableName, 2)
+				tableLocator := TableLocator{
+					Namespace:    namespace,
+					ClusterName:  srcClusterName,
+					DatabaseName: utils.AppDBName,
+					TableName:    tableName,
+				}
+				AssertDataExpectedCount(env, tableLocator, 2)
 			})
 		})
 
@@ -119,7 +138,13 @@ var _ = Describe("Bootstrap with pg_basebackup", Label(tests.LabelRecovery), fun
 			AssertClusterIsReady(namespace, dstClusterName, testTimeouts[utils.ClusterIsReadySlow], env)
 
 			By("checking data have been copied correctly", func() {
-				AssertDataExpectedCount(env, namespace, dstClusterName, tableName, 2)
+				tableLocator := TableLocator{
+					Namespace:    namespace,
+					ClusterName:  dstClusterName,
+					DatabaseName: utils.AppDBName,
+					TableName:    tableName,
+				}
+				AssertDataExpectedCount(env, tableLocator, 2)
 			})
 
 			By("writing some new data to the dst cluster", func() {
@@ -131,6 +156,7 @@ var _ = Describe("Bootstrap with pg_basebackup", Label(tests.LabelRecovery), fun
 					apiv1.ApplicationUserSecretSuffix,
 				)
 				defer func() {
+					_ = conn.Close()
 					forward.Close()
 				}()
 				Expect(err).ToNot(HaveOccurred())
@@ -138,7 +164,13 @@ var _ = Describe("Bootstrap with pg_basebackup", Label(tests.LabelRecovery), fun
 			})
 
 			By("checking the src cluster was not modified", func() {
-				AssertDataExpectedCount(env, namespace, srcClusterName, tableName, 2)
+				tableLocator := TableLocator{
+					Namespace:    namespace,
+					ClusterName:  srcClusterName,
+					DatabaseName: utils.AppDBName,
+					TableName:    tableName,
+				}
+				AssertDataExpectedCount(env, tableLocator, 2)
 			})
 		})
 	})

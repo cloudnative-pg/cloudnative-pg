@@ -109,10 +109,14 @@ var _ = Describe("Replication Slot", Label(tests.LabelReplication), func() {
 			primaryPod, err := env.GetClusterPrimary(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 
-			_, _, err = testsUtils.RunQueryFromPod(primaryPod, testsUtils.PGLocalSocketDir,
-				"app", "postgres", "''",
-				fmt.Sprintf("SELECT pg_create_physical_replication_slot('%s');", userPhysicalSlot),
-				env)
+			query := fmt.Sprintf("SELECT pg_create_physical_replication_slot('%s');", userPhysicalSlot)
+			_, _, err = env.ExecQueryInInstancePod(
+				testsUtils.PodLocator{
+					Namespace: primaryPod.Namespace,
+					PodName:   primaryPod.Name,
+				},
+				testsUtils.PostgresDBName,
+				query)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
