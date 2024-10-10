@@ -153,7 +153,7 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, nil
 	}
 
-  // Make sure the target PG Database is not being managed by another Database Object
+	// Make sure the target PG Database is not being managed by another Database Object
 	if err := r.ensureOnlyOneManager(ctx, database); err != nil {
 		return r.failedReconciliation(
 			ctx,
