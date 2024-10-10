@@ -286,6 +286,9 @@ type BackupStatus struct {
 
 	// Whether the backup was online/hot (`true`) or offline/cold (`false`)
 	Online *bool `json:"online,omitempty"`
+
+	// A map containing the plugin metadata
+	PluginMetadata map[string]string `json:"pluginMetadata,omitempty"`
 }
 
 // InstanceID contains the information to identify an instance
