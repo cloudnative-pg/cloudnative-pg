@@ -244,7 +244,7 @@ func (r *DatabaseReconciler) failedReconciliation(
 	err error,
 ) (ctrl.Result, error) {
 	oldDatabase := database.DeepCopy()
-	database.Status.Message = err.Error()
+	database.Status.Message = fmt.Sprintf("reconciliation error: %s", err.Error())
 	database.Status.Applied = ptr.To(false)
 
 	var statusError *instance.StatusError

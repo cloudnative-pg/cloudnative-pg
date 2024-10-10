@@ -26,6 +26,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -345,7 +346,7 @@ var _ = Describe("Managed Database status", func() {
 		_, err := r.failedReconciliation(ctx, database, exampleError)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(database.Status.Applied).To(HaveValue(BeFalse()))
-		Expect(database.Status.Message).To(BeEquivalentTo(exampleError.Error()))
+		Expect(database.Status.Message).To(ContainSubstring(exampleError.Error()))
 	})
 
 	It("properly marks the status on a replica Cluster reconciliation", func(ctx SpecContext) {
@@ -443,5 +444,29 @@ var _ = Describe("Managed Database status", func() {
 		Expect(dbDuplicate.Status.Ready).To(BeFalse())
 		Expect(dbDuplicate.Status.Error).To(BeEquivalentTo(expectedError))
 		Expect(dbDuplicate.Status.ObservedGeneration).To(BeZero())
+	})
+
+	It("properly signals a database is on a replica cluster", func(ctx SpecContext) {
+		initialCluster := cluster.DeepCopy()
+		cluster.Spec.ReplicaCluster = &apiv1.ReplicaClusterConfiguration{
+			Enabled: ptr.To(true),
+		}
+		Expect(fakeClient.Patch(ctx, cluster, client.MergeFrom(initialCluster))).To(Succeed())
+
+		_, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{
+			Namespace: database.Namespace,
+			Name:      database.Spec.Name,
+		}})
+		Expect(err).ToNot(HaveOccurred())
+
+		var updatedDatabase apiv1.Database
+		err = fakeClient.Get(ctx, client.ObjectKey{
+			Namespace: database.Namespace,
+			Name:      database.Name,
+		}, &updatedDatabase)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(updatedDatabase.Status.Applied).Should(BeNil())
+		Expect(updatedDatabase.Status.Message).Should(ContainSubstring("waiting for the cluster to become primary"))
 	})
 })
