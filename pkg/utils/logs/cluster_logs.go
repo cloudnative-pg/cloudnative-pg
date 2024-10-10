@@ -17,6 +17,7 @@ limitations under the License.
 package logs
 
 import (
+	"bufio"
 	"context"
 	"io"
 	"log"
@@ -237,9 +238,26 @@ func (csr *ClusterStreamingRequest) streamInGoroutine(
 		}
 	}()
 
-	_, err = io.Copy(output, logStream)
-	if err != nil {
-		log.Printf("error sending logs to writer, pod %s: %v", podName, err)
-		return
+	scanner := bufio.NewScanner(logStream)
+	scanner.Buffer(make([]byte, 0, 4096), 1024*1024)
+	bufferedOutput := bufio.NewWriter(output)
+
+readLoop:
+	for scanner.Scan() {
+		select {
+		case <-ctx.Done():
+			break readLoop
+		default:
+			data := scanner.Text()
+			if _, err := bufferedOutput.Write([]byte(data)); err != nil {
+				log.Printf("error writing log line to output: %v", err)
+			}
+			if err := bufferedOutput.WriteByte('\n'); err != nil {
+				log.Printf("error writing newline to output: %v", err)
+			}
+			if err := bufferedOutput.Flush(); err != nil {
+				log.Printf("error flushing output: %v", err)
+			}
+		}
 	}
 }
