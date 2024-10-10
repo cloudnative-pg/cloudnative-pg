@@ -162,20 +162,6 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		)
 	}
 
-	if database.Spec.Ensure == apiv1.EnsureAbsent {
-		if err := r.deleteDatabase(ctx, &database); err != nil {
-			return r.failedReconciliation(
-				ctx,
-				&database,
-				err,
-			)
-		}
-		return r.succeededReconciliation(
-			ctx,
-			&database,
-		)
-	}
-
 	if err := r.reconcileDatabase(
 		ctx,
 		&database,
@@ -340,6 +326,10 @@ func (r *DatabaseReconciler) reconcileDatabase(ctx context.Context, obj *apiv1.D
 	db, err := r.instance.GetSuperUserDB()
 	if err != nil {
 		return fmt.Errorf("while connecting to the database %q: %w", obj.Spec.Name, err)
+	}
+
+	if obj.Spec.Ensure == apiv1.EnsureAbsent {
+		return dropDatabase(ctx, db, obj)
 	}
 
 	dbExists, err := detectDatabase(ctx, db, obj)
