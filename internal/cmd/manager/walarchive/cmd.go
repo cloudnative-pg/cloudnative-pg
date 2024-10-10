@@ -29,6 +29,7 @@ import (
 	barmanArchiver "github.com/cloudnative-pg/barman-cloud/pkg/archiver"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -251,12 +252,20 @@ func archiveWALViaPlugins(
 	contextLogger := log.FromContext(ctx)
 
 	plugins := repository.New()
-	if err := plugins.RegisterUnixSocketPluginsInPath(configuration.Current.PluginSocketDir); err != nil {
+	availablePluginNames, err := plugins.RegisterUnixSocketPluginsInPath(configuration.Current.PluginSocketDir)
+	if err != nil {
 		contextLogger.Error(err, "Error while loading local plugins")
 	}
 	defer plugins.Close()
 
-	client, err := pluginClient.WithPlugins(ctx, plugins, cluster.Spec.Plugins.GetEnabledPluginNames()...)
+	availablePluginNamesSet := stringset.From(availablePluginNames)
+	enabledPluginNamesSet := stringset.From(cluster.Spec.Plugins.GetEnabledPluginNames())
+
+	client, err := pluginClient.WithPlugins(
+		ctx,
+		plugins,
+		availablePluginNamesSet.Intersect(enabledPluginNamesSet).ToList()...,
+	)
 	if err != nil {
 		contextLogger.Error(err, "Error while loading required plugins")
 		return err
