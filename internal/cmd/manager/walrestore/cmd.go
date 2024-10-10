@@ -29,6 +29,7 @@ import (
 	barmanCommand "github.com/cloudnative-pg/barman-cloud/pkg/command"
 	barmanRestorer "github.com/cloudnative-pg/barman-cloud/pkg/restorer"
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	"github.com/spf13/cobra"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -38,7 +39,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/cache"
 	cacheClient "github.com/cloudnative-pg/cloudnative-pg/internal/management/cache/client"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/stringset"
 )
 
 var (
