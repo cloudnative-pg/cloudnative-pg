@@ -101,6 +101,13 @@ func createDatabase(
 	if obj.Spec.IcuRules != "" {
 		sqlCreateDatabase.WriteString(fmt.Sprintf(" ICU_RULES %s", pgx.Identifier{obj.Spec.IcuRules}.Sanitize()))
 	}
+	if obj.Spec.BuiltinLocale != "" {
+		sqlCreateDatabase.WriteString(fmt.Sprintf(" BUILTIN_LOCALE %s", pgx.Identifier{obj.Spec.BuiltinLocale}.Sanitize()))
+	}
+	if obj.Spec.CollationVersion != "" {
+		sqlCreateDatabase.WriteString(fmt.Sprintf(" COLLATION_VERSION %s",
+			pgx.Identifier{obj.Spec.CollationVersion}.Sanitize()))
+	}
 
 	_, err := db.ExecContext(ctx, sqlCreateDatabase.String())
 	if err != nil {
