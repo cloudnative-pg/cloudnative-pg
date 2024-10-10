@@ -402,7 +402,7 @@ var _ = Describe("Managed Database status", func() {
 				Owner: "app",
 			},
 			Status: apiv1.DatabaseStatus{
-				Ready:              true,
+				Applied:            ptr.To(true),
 				ObservedGeneration: 1,
 			},
 		}
@@ -441,8 +441,8 @@ var _ = Describe("Managed Database status", func() {
 
 		expectedError := fmt.Sprintf("database %q is already managed by Database object %q",
 			dbDuplicate.Spec.Name, currentManager.Name)
-		Expect(dbDuplicate.Status.Ready).To(BeFalse())
-		Expect(dbDuplicate.Status.Error).To(BeEquivalentTo(expectedError))
+		Expect(dbDuplicate.Status.Applied).To(HaveValue(BeFalse()))
+		Expect(dbDuplicate.Status.Message).To(ContainSubstring(expectedError))
 		Expect(dbDuplicate.Status.ObservedGeneration).To(BeZero())
 	})
 
