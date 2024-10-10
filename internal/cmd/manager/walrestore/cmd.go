@@ -29,6 +29,7 @@ import (
 	barmanCommand "github.com/cloudnative-pg/barman-cloud/pkg/command"
 	barmanRestorer "github.com/cloudnative-pg/barman-cloud/pkg/restorer"
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	"github.com/spf13/cobra"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -247,12 +248,20 @@ func restoreWALViaPlugins(
 	contextLogger := log.FromContext(ctx)
 
 	plugins := repository.New()
-	if err := plugins.RegisterUnixSocketPluginsInPath(configuration.Current.PluginSocketDir); err != nil {
+	availablePluginNames, err := plugins.RegisterUnixSocketPluginsInPath(configuration.Current.PluginSocketDir)
+	if err != nil {
 		contextLogger.Error(err, "Error while loading local plugins")
 	}
 	defer plugins.Close()
 
-	client, err := pluginClient.WithPlugins(ctx, plugins, cluster.Spec.Plugins.GetEnabledPluginNames()...)
+	availablePluginNamesSet := stringset.From(availablePluginNames)
+	enabledPluginNamesSet := stringset.From(cluster.Spec.Plugins.GetEnabledPluginNames())
+
+	client, err := pluginClient.WithPlugins(
+		ctx,
+		plugins,
+		availablePluginNamesSet.Intersect(enabledPluginNamesSet).ToList()...,
+	)
 	if err != nil {
 		contextLogger.Error(err, "Error while loading required plugins")
 		return err
