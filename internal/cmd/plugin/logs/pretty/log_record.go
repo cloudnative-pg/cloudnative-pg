@@ -31,7 +31,6 @@ import (
 var colorizers = []func(any) aurora.Value{
 	aurora.Red,
 	aurora.Green,
-	aurora.Blue,
 	aurora.Magenta,
 	aurora.Cyan,
 	aurora.Yellow,
@@ -130,8 +129,8 @@ func (record *logRecord) print(writer io.Writer) error {
 
 	_, err := fmt.Fprintln(
 		writer,
-		aurora.Green(record.TS),
-		strings.ToUpper(level),
+		record.TS,
+		aurora.Blue(strings.ToUpper(level)),
 		colorizers[colorIdx](record.LoggingPod),
 		aurora.Blue(record.Logger),
 		message,

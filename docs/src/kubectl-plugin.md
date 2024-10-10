@@ -783,38 +783,36 @@ Successfully written logs to "my-cluster.log"
 
 #### Pretty
 
-The `pretty` sub-command reads a log stream from the process standard input
-and decodes and formats it in a human-readable format.
+The `pretty` sub-command reads a log stream from standard input and formats it
+into a human-readable output, and attempts to sort the entries by timestamp.
 
-It is designed to be used in a pipeline with `kubectl cnpg logs cluster` like in
-the following example:
+It is intended to be used in combination with `kubectl cnpg logs cluster`, as
+shown in the following example:
 
 ```
 $ kubectl cnpg logs cluster cluster-example | kubectl cnpg logs pretty
-2024-10-09T07:05:41Z cluster-example-1 setup Starting CloudNativePG Instance Manager
-2024-10-09T07:05:41Z cluster-example-1 setup Checking for free disk space for WALs before starting PostgreSQL
-2024-10-09T07:05:41Z cluster-example-1 setup starting tablespace manager
+2024-10-10T16:36:18.668100649Z INFO cluster-example-1 instance-manager Starting CloudNativePG Instance Manager {"build":{"Commit":"953f0b2cf","Date":"2024-10-09","Version":"1.24.0-dev128"},"version":"1.24.0"}
+2024-10-10T16:36:18.668268413Z INFO cluster-example-1 instance-manager Checking for free disk space for WALs before starting PostgreSQL
+2024-10-10T16:36:18.686309469Z INFO cluster-example-1 instance-manager starting tablespace manager
+2024-10-10T16:36:18.686375141Z INFO cluster-example-1 instance-manager starting external server manager
 [...]
 ```
 
-The `pretty` sub-commands also support log selection, allowing the user to
-filter out the logs of the selected pods, of the selected loggers, and less
-important than a specified level. The following examples gives a glimpse of how
-to achieve that:
+The `pretty` sub-command also supports advanced log filtering, allowing users
+to display logs for specific pods, loggers, or filter logs by severity level.
+Here's an example:
 
 ```
 $ kubectl cnpg logs cluster cluster-example | kubectl cnpg logs pretty --pods cluster-example-1 --loggers postgres --log-level info
-2024-10-09T07:05:41Z cluster-example-1 postgres 2024-10-09 07:05:41.458 UTC [31] LOG:  redirecting log output to logging collector process
-2024-10-09T07:05:41Z cluster-example-1 postgres 2024-10-09 07:05:41.458 UTC [31] HINT:  Future log output will appear in directory "/controller/log".
-2024-10-09T07:05:41Z cluster-example-1 postgres LOG: ending log output to stderr
-2024-10-09T07:05:41Z cluster-example-1 postgres LOG: starting PostgreSQL 17.0 (Debian 17.0-1.pgdg110+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 10.2.1-6) 10.2.1 20210110, 64-bit
-2024-10-09T07:05:41Z cluster-example-1 postgres 2024-10-09 07:05:41.458 UTC [31] LOG:  ending log output to stderr
-2024-10-09T07:05:41Z cluster-example-1 postgres 2024-10-09 07:05:41.458 UTC [31] HINT:  Future log output will go to log destination "csvlog".
+2024-10-10T16:36:18.853589475Z INFO cluster-example-1 postgres 2024-10-10 16:36:18.853 UTC [29] LOG:  redirecting log output to logging collector process {"pipe":"stderr"}
+2024-10-10T16:36:18.853641103Z INFO cluster-example-1 postgres 2024-10-10 16:36:18.853 UTC [29] HINT:  Future log output will appear in directory "/controller/log". {"pipe":"stderr"}
+2024-10-10T16:36:18.854004804Z INFO cluster-example-1 postgres 2024-10-10 16:36:18.853 UTC [29] LOG:  ending log output to stderr {"source":"/controller/log/postgres"}
+2024-10-10T16:36:18.854038757Z INFO cluster-example-1 postgres 2024-10-10 16:36:18.853 UTC [29] HINT:  Future log output will go to log destination "csvlog". {"source":"/controller/log/postgres"}
 [...]
 ```
 
-The `-h` option can be used to get an explanation of all the available flags and
-their semantics.
+To explore all available options, use the `-h` flag for detailed explanations
+of the supported flags and their usage.
 
 ### Destroy
 
