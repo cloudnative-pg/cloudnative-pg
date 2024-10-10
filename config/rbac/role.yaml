@@ -141,7 +141,9 @@ rules:
   - clusters
   - databases
   - poolers
+  - publications
   - scheduledbackups
+  - subscriptions
   verbs:
   - create
   - delete
@@ -155,7 +157,9 @@ rules:
   resources:
   - backups/status
   - databases/status
+  - publications/status
   - scheduledbackups/status
+  - subscriptions/status
   verbs:
   - get
   - patch
