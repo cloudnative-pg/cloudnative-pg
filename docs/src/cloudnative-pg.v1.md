@@ -2356,6 +2356,20 @@ More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-
    <p>The ICU_RULES (cannot be changed)</p>
 </td>
 </tr>
+<tr><td><code>builtin_locale</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The BUILTIN_LOCALE (cannot be changed)</p>
+</td>
+</tr>
+<tr><td><code>collation_version</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The COLLATION_VERSION (cannot be changed)</p>
+</td>
+</tr>
 <tr><td><code>isTemplate</code><br/>
 <i>bool</i>
 </td>

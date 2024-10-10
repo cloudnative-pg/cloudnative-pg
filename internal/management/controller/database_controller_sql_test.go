@@ -133,6 +133,25 @@ var _ = Describe("Managed Database SQL", func() {
 			err = createDatabase(ctx, db, database)
 			Expect(err).ToNot(HaveOccurred())
 		})
+
+		It("should create a new Database with builtin locale", func(ctx SpecContext) {
+			database.Spec.LocaleProvider = "builtin"
+			database.Spec.BuiltinLocale = "C"
+			database.Spec.CollationVersion = "1.2.3"
+
+			expectedValue := sqlmock.NewResult(0, 1)
+			expectedQuery := fmt.Sprintf(
+				"CREATE DATABASE %s OWNER %s "+
+					"LOCALE_PROVIDER %s BUILTIN_LOCALE %s COLLATION_VERSION %s",
+				pgx.Identifier{database.Spec.Name}.Sanitize(), pgx.Identifier{database.Spec.Owner}.Sanitize(),
+				pgx.Identifier{database.Spec.LocaleProvider}.Sanitize(), pgx.Identifier{database.Spec.BuiltinLocale}.Sanitize(),
+				pgx.Identifier{database.Spec.CollationVersion}.Sanitize(),
+			)
+			dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedValue)
+
+			err = createDatabase(ctx, db, database)
+			Expect(err).ToNot(HaveOccurred())
+		})
 	})
 
 	Context("updateDatabase", func() {
