@@ -306,7 +306,7 @@ documentation</p>
 </td>
 </tr>
 <tr><td><code>barmanObjectStore</code><br/>
-<i>github.com/cloudnative-pg/barman-cloud/pkg/api.BarmanObjectStoreConfiguration</i>
+<a href="https://pkg.go.dev/github.com/cloudnative-pg/barman-cloud/pkg/api/#BarmanObjectStoreConfiguration"><i>github.com/cloudnative-pg/barman-cloud/pkg/api.BarmanObjectStoreConfiguration</i></a>
 </td>
 <td>
    <p>The configuration for the barman-cloud tool suite</p>
@@ -448,13 +448,13 @@ information that could be needed to correctly restore it.</p>
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
 <tr><td><code>LocalObjectReference</code><br/>
-<i>github.com/cloudnative-pg/machinery/pkg/api.LocalObjectReference</i>
+<a href="https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api/#LocalObjectReference"><i>github.com/cloudnative-pg/machinery/pkg/api.LocalObjectReference</i></a>
 </td>
 <td>(Members of <code>LocalObjectReference</code> are embedded into this type.)
    <span class="text-muted">No description provided.</span></td>
 </tr>
 <tr><td><code>endpointCA</code><br/>
-<i>github.com/cloudnative-pg/machinery/pkg/api.SecretKeySelector</i>
+<a href="https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api/#SecretKeySelector"><i>github.com/cloudnative-pg/machinery/pkg/api.SecretKeySelector</i></a>
 </td>
 <td>
    <p>EndpointCA store the CA bundle of the barman endpoint.
@@ -480,7 +480,7 @@ errors with certificate issuer and barman-cloud-wal-archive.</p>
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
 <tr><td><code>cluster</code> <B>[Required]</B><br/>
-<i>github.com/cloudnative-pg/machinery/pkg/api.LocalObjectReference</i>
+<a href="https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api/#LocalObjectReference"><i>github.com/cloudnative-pg/machinery/pkg/api.LocalObjectReference</i></a>
 </td>
 <td>
    <p>The cluster to backup</p>
@@ -541,14 +541,14 @@ Overrides the default settings specified in the cluster '.backup.volumeSnapshot.
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
 <tr><td><code>BarmanCredentials</code><br/>
-<i>github.com/cloudnative-pg/barman-cloud/pkg/api.BarmanCredentials</i>
+<a href="https://pkg.go.dev/github.com/cloudnative-pg/barman-cloud/pkg/api/#BarmanCredentials"><i>github.com/cloudnative-pg/barman-cloud/pkg/api.BarmanCredentials</i></a>
 </td>
 <td>(Members of <code>BarmanCredentials</code> are embedded into this type.)
    <p>The potential credentials for each cloud provider</p>
 </td>
 </tr>
 <tr><td><code>endpointCA</code><br/>
-<i>github.com/cloudnative-pg/machinery/pkg/api.SecretKeySelector</i>
+<a href="https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api/#SecretKeySelector"><i>github.com/cloudnative-pg/machinery/pkg/api.SecretKeySelector</i></a>
 </td>
 <td>
    <p>EndpointCA store the CA bundle of the barman endpoint.
@@ -810,7 +810,7 @@ by applications. Defaults to the value of the <code>database</code> key.</p>
 </td>
 </tr>
 <tr><td><code>secret</code><br/>
-<i>github.com/cloudnative-pg/machinery/pkg/api.LocalObjectReference</i>
+<a href="https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api/#LocalObjectReference"><i>github.com/cloudnative-pg/machinery/pkg/api.LocalObjectReference</i></a>
 </td>
 <td>
    <p>Name of the secret containing the initial credentials for the
@@ -952,7 +952,7 @@ by applications. Defaults to the value of the <code>database</code> key.</p>
 </td>
 </tr>
 <tr><td><code>secret</code><br/>
-<i>github.com/cloudnative-pg/machinery/pkg/api.LocalObjectReference</i>
+<a href="https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api/#LocalObjectReference"><i>github.com/cloudnative-pg/machinery/pkg/api.LocalObjectReference</i></a>
 </td>
 <td>
    <p>Name of the secret containing the initial credentials for the
@@ -1048,7 +1048,7 @@ by applications. Defaults to the value of the <code>database</code> key.</p>
 </td>
 </tr>
 <tr><td><code>secret</code><br/>
-<i>github.com/cloudnative-pg/machinery/pkg/api.LocalObjectReference</i>
+<a href="https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api/#LocalObjectReference"><i>github.com/cloudnative-pg/machinery/pkg/api.LocalObjectReference</i></a>
 </td>
 <td>
    <p>Name of the secret containing the initial credentials for the
@@ -1296,7 +1296,7 @@ Undefined or 0 disable synchronous replication.</p>
 </td>
 </tr>
 <tr><td><code>superuserSecret</code><br/>
-<i>github.com/cloudnative-pg/machinery/pkg/api.LocalObjectReference</i>
+<a href="https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api/#LocalObjectReference"><i>github.com/cloudnative-pg/machinery/pkg/api.LocalObjectReference</i></a>
 </td>
 <td>
    <p>The secret containing the superuser password. If not defined a new
@@ -1323,7 +1323,7 @@ user by setting it to <code>NULL</code>. Disabled by default.</p>
 </td>
 </tr>
 <tr><td><code>imagePullSecrets</code><br/>
-<i>[]github.com/cloudnative-pg/machinery/pkg/api.LocalObjectReference</i>
+<a href="https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api/#LocalObjectReference"><i>[]github.com/cloudnative-pg/machinery/pkg/api.LocalObjectReference</i></a>
 </td>
 <td>
    <p>The list of pull secrets to be used to pull the images</p>
@@ -2117,7 +2117,7 @@ secure and efficient password management for external clusters.</p>
 </td>
 </tr>
 <tr><td><code>barmanObjectStore</code><br/>
-<i>github.com/cloudnative-pg/barman-cloud/pkg/api.BarmanObjectStoreConfiguration</i>
+<a href="https://pkg.go.dev/github.com/cloudnative-pg/barman-cloud/pkg/api/#BarmanObjectStoreConfiguration"><i>github.com/cloudnative-pg/barman-cloud/pkg/api.BarmanObjectStoreConfiguration</i></a>
 </td>
 <td>
    <p>The configuration for the barman-cloud tool suite</p>
@@ -2563,14 +2563,14 @@ Default: false.</p>
 </td>
 </tr>
 <tr><td><code>customQueriesConfigMap</code><br/>
-<i>[]github.com/cloudnative-pg/machinery/pkg/api.ConfigMapKeySelector</i>
+<a href="https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api/#ConfigMapKeySelector"><i>[]github.com/cloudnative-pg/machinery/pkg/api.ConfigMapKeySelector</i></a>
 </td>
 <td>
    <p>The list of config maps containing the custom queries</p>
 </td>
 </tr>
 <tr><td><code>customQueriesSecret</code><br/>
-<i>[]github.com/cloudnative-pg/machinery/pkg/api.SecretKeySelector</i>
+<a href="https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api/#SecretKeySelector"><i>[]github.com/cloudnative-pg/machinery/pkg/api.SecretKeySelector</i></a>
 </td>
 <td>
    <p>The list of secrets containing the custom queries</p>
@@ -2797,7 +2797,7 @@ by pgbouncer</p>
 </td>
 </tr>
 <tr><td><code>authQuerySecret</code><br/>
-<i>github.com/cloudnative-pg/machinery/pkg/api.LocalObjectReference</i>
+<a href="https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api/#LocalObjectReference"><i>github.com/cloudnative-pg/machinery/pkg/api.LocalObjectReference</i></a>
 </td>
 <td>
    <p>The credentials of the user that need to be used for the authentication
@@ -3024,7 +3024,7 @@ part for now.</p>
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
 <tr><td><code>cluster</code> <B>[Required]</B><br/>
-<i>github.com/cloudnative-pg/machinery/pkg/api.LocalObjectReference</i>
+<a href="https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api/#LocalObjectReference"><i>github.com/cloudnative-pg/machinery/pkg/api.LocalObjectReference</i></a>
 </td>
 <td>
    <p>This is the cluster reference on which the Pooler will work.
@@ -3140,14 +3140,14 @@ the implementation order is same as the order of each array</p>
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
 <tr><td><code>secretRefs</code><br/>
-<i>[]github.com/cloudnative-pg/machinery/pkg/api.SecretKeySelector</i>
+<a href="https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api/#SecretKeySelector"><i>[]github.com/cloudnative-pg/machinery/pkg/api.SecretKeySelector</i></a>
 </td>
 <td>
    <p>SecretRefs holds a list of references to Secrets</p>
 </td>
 </tr>
 <tr><td><code>configMapRefs</code><br/>
-<i>[]github.com/cloudnative-pg/machinery/pkg/api.ConfigMapKeySelector</i>
+<a href="https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api/#ConfigMapKeySelector"><i>[]github.com/cloudnative-pg/machinery/pkg/api.ConfigMapKeySelector</i></a>
 </td>
 <td>
    <p>ConfigMapRefs holds a list of references to ConfigMaps</p>
@@ -3500,7 +3500,7 @@ Reference: https://www.postgresql.org/docs/current/sql-createrole.html</p>
 </td>
 </tr>
 <tr><td><code>passwordSecret</code><br/>
-<i>github.com/cloudnative-pg/machinery/pkg/api.LocalObjectReference</i>
+<a href="https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api/#LocalObjectReference"><i>github.com/cloudnative-pg/machinery/pkg/api.LocalObjectReference</i></a>
 </td>
 <td>
    <p>Secret containing the password of the role (if present)
@@ -3646,7 +3646,7 @@ see https://pkg.go.dev/github.com/robfig/cron#hdr-CRON_Expression_Format</p>
 </td>
 </tr>
 <tr><td><code>cluster</code> <B>[Required]</B><br/>
-<i>github.com/cloudnative-pg/machinery/pkg/api.LocalObjectReference</i>
+<a href="https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api/#LocalObjectReference"><i>github.com/cloudnative-pg/machinery/pkg/api.LocalObjectReference</i></a>
 </td>
 <td>
    <p>The cluster to backup</p>
