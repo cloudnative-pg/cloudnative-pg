@@ -94,7 +94,7 @@ func NewCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "hibernate",
 		Short:   `Hibernation related commands`,
-		GroupID: "admin",
+		GroupID: "pg-cluster",
 	}
 
 	cmd.AddCommand(hibernateOnCmd)

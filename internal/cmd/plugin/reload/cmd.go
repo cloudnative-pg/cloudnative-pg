@@ -28,9 +28,9 @@ import (
 func NewCmd() *cobra.Command {
 	restartCmd := &cobra.Command{
 		Use:     "reload [clusterName]",
-		Short:   `Reload the cluster`,
+		Short:   `Reload a cluster`,
 		Long:    `Triggers a reconciliation loop for all the cluster's instances, rolling out new configurations if present.`,
-		GroupID: "admin",
+		GroupID: "pg-cluster",
 		Args:    plugin.RequiresArguments(1),
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			return plugin.CompleteClusters(cmd.Context(), args, toComplete), cobra.ShellCompDirectiveNoFileComp

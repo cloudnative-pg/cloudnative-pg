@@ -24,8 +24,8 @@ import (
 func NewCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "install",
-		Short:   "CNPG installation commands",
-		GroupID: "tools",
+		Short:   "CloudNativePG installation-related commands",
+		GroupID: "cnpg-level",
 	}
 	cmd.AddCommand(newGenerateCmd())
 

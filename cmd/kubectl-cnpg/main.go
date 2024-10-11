@@ -83,22 +83,22 @@ func main() {
 	configFlags.AddFlags(rootCmd.PersistentFlags())
 
 	adminGroup := &cobra.Group{
-		ID:    "admin",
-		Title: "Administration tasks",
+		ID:    "cnpg-level",
+		Title: "CNPG Operator level Administration",
 	}
 	dbaGroup := &cobra.Group{
-		ID:    "dba",
-		Title: "Database Administrator",
+		ID:    "pg-cluster",
+		Title: "PostgreSQL Cluster Administration",
 	}
 
 	benchmarkGroup := &cobra.Group{
-		ID:    "benchmark",
-		Title: "Benchmarking Tools",
+		ID:    "pg-db",
+		Title: "PostgreSQL Database Administration",
 	}
 
 	toolsGroup := &cobra.Group{
-		ID:    "tools",
-		Title: "Tools",
+		ID:    "misc",
+		Title: "Miscellaneous",
 	}
 
 	rootCmd.AddGroup(adminGroup, dbaGroup, benchmarkGroup, toolsGroup)

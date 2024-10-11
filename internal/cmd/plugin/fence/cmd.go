@@ -61,7 +61,7 @@ func NewCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "fencing",
 		Short:   `Fencing related commands`,
-		GroupID: "admin",
+		GroupID: "pg-cluster",
 	}
 	cmd.AddCommand(fenceOnCmd)
 	cmd.AddCommand(fenceOffCmd)
