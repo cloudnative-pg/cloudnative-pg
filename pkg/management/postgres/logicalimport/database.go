@@ -88,6 +88,7 @@ func (ds *databaseSnapshotter) exportDatabases(
 	ctx context.Context,
 	target pool.Pooler,
 	databases []string,
+	extraOptions []string,
 ) error {
 	contextLogger := log.FromContext(ctx)
 	sectionsToExport := []string{}
@@ -106,6 +107,7 @@ func (ds *databaseSnapshotter) exportDatabases(
 			"-v",
 		}
 		options = append(options, sectionsToExport...)
+		options = append(options, extraOptions...)
 
 		contextLogger.Info("Running pg_dump", "cmd", pgDump,
 			"options", options)
@@ -123,6 +125,7 @@ func (ds *databaseSnapshotter) importDatabases(
 	ctx context.Context,
 	target pool.Pooler,
 	databases []string,
+	extraOptions []string,
 ) error {
 	contextLogger := log.FromContext(ctx)
 
@@ -157,6 +160,7 @@ func (ds *databaseSnapshotter) importDatabases(
 			}
 
 			options = append(options, alwaysPresentOptions...)
+			options = append(options, extraOptions...)
 
 			contextLogger.Info("Running pg_restore",
 				"cmd", pgRestore,
@@ -179,6 +183,7 @@ func (ds *databaseSnapshotter) importDatabaseContent(
 	database string,
 	targetDatabase string,
 	owner string,
+	extraOptions []string,
 ) error {
 	contextLogger := log.FromContext(ctx)
 
@@ -213,6 +218,7 @@ func (ds *databaseSnapshotter) importDatabaseContent(
 			"--section", section,
 			generateFileNameForDatabase(database),
 		}
+		options = append(options, extraOptions...)
 
 		contextLogger.Info("Running pg_restore",
 			"cmd", pgRestore,

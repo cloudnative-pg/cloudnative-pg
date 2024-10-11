@@ -1518,6 +1518,18 @@ spec:
                             items:
                               type: string
                             type: array
+                          pgDumpExtraOptions:
+                            description: List of options to append to the pg_dump
+                              command
+                            items:
+                              type: string
+                            type: array
+                          pgRestoreExtraOptions:
+                            description: List of options to append to the pg_restore
+                              command
+                            items:
+                              type: string
+                            type: array
                           postImportApplicationSQL:
                             description: |-
                               List of SQL queries to be executed as a superuser in the application
