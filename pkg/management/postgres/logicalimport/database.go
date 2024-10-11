@@ -159,8 +159,8 @@ func (ds *databaseSnapshotter) importDatabases(
 				generateFileNameForDatabase(database),
 			}
 
-			options = append(options, alwaysPresentOptions...)
 			options = append(options, extraOptions...)
+			options = append(options, alwaysPresentOptions...)
 
 			contextLogger.Info("Running pg_restore",
 				"cmd", pgRestore,
@@ -209,7 +209,9 @@ func (ds *databaseSnapshotter) importDatabaseContent(
 			"section", section,
 		)
 
-		options := []string{
+		var options []string
+
+		alwaysPresentOptions := []string{
 			"-U", "postgres",
 			"--no-owner",
 			"--no-privileges",
@@ -218,7 +220,9 @@ func (ds *databaseSnapshotter) importDatabaseContent(
 			"--section", section,
 			generateFileNameForDatabase(database),
 		}
+
 		options = append(options, extraOptions...)
+		options = append(options, alwaysPresentOptions...)
 
 		contextLogger.Info("Running pg_restore",
 			"cmd", pgRestore,
