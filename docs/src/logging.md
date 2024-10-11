@@ -22,7 +22,7 @@ Each log entry includes the following fields:
   format.
 - `record` – The actual record, with a structure that varies depending on the
   `logger` type.
-- `logging_podName` – The name of the pod where the log was generated.
+- `logging_pod` – The name of the pod where the log was generated.
 
 !!! Info
     If your log ingestion system requires custom field names, you can rename
