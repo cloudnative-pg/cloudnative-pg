@@ -23,8 +23,9 @@ import (
 // NewCmd returns the installation root cmd
 func NewCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "install",
-		Short: "CNPG installation commands",
+		Use:     "install",
+		Short:   "CNPG installation commands",
+		GroupID: "tools",
 	}
 	cmd.AddCommand(newGenerateCmd())
 

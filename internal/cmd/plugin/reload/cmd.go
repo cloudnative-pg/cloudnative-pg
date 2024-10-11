@@ -27,10 +27,11 @@ import (
 // NewCmd creates the new "reset" command
 func NewCmd() *cobra.Command {
 	restartCmd := &cobra.Command{
-		Use:   "reload [clusterName]",
-		Short: `Reload the cluster`,
-		Long:  `Triggers a reconciliation loop for all the cluster's instances, rolling out new configurations if present.`,
-		Args:  plugin.RequiresArguments(1),
+		Use:     "reload [clusterName]",
+		Short:   `Reload the cluster`,
+		Long:    `Triggers a reconciliation loop for all the cluster's instances, rolling out new configurations if present.`,
+		GroupID: "admin",
+		Args:    plugin.RequiresArguments(1),
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			return plugin.CompleteClusters(cmd.Context(), args, toComplete), cobra.ShellCompDirectiveNoFileComp
 		},

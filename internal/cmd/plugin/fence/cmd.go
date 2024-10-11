@@ -59,8 +59,9 @@ var (
 // NewCmd creates the new "fencing" command
 func NewCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "fencing",
-		Short: `Fencing related commands`,
+		Use:     "fencing",
+		Short:   `Fencing related commands`,
+		GroupID: "admin",
 	}
 	cmd.AddCommand(fenceOnCmd)
 	cmd.AddCommand(fenceOffCmd)

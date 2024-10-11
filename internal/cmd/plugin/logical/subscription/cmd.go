@@ -27,8 +27,9 @@ import (
 // NewCmd initializes the subscription command
 func NewCmd() *cobra.Command {
 	subscriptionCmd := &cobra.Command{
-		Use:   "subscription",
-		Short: "Logical subscription management commands",
+		Use:     "subscription",
+		Short:   "Logical subscription management commands",
+		GroupID: "dba",
 	}
 	subscriptionCmd.AddCommand(create.NewCmd())
 	subscriptionCmd.AddCommand(drop.NewCmd())

@@ -23,8 +23,9 @@ import (
 // NewCmd creates the new "report" command
 func NewCmd() *cobra.Command {
 	reportCmd := &cobra.Command{
-		Use:   "report operator/cluster",
-		Short: "Report on the operator",
+		Use:     "report operator/cluster",
+		Short:   "Report on the operator",
+		GroupID: "tools",
 	}
 
 	reportCmd.AddCommand(operatorCmd())

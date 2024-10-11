@@ -31,6 +31,7 @@ func NewCmd() *cobra.Command {
 		Short:   "Creates a pgbench job",
 		Args:    validateCommandArgs,
 		Long:    "Creates a pgbench job to run against the specified Postgres Cluster.",
+		GroupID: "benchmark",
 		Example: jobExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			run.clusterName = args[0]

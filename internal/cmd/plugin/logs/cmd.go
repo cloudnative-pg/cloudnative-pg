@@ -23,8 +23,9 @@ import (
 // NewCmd creates the new "report" command
 func NewCmd() *cobra.Command {
 	logsCmd := &cobra.Command{
-		Use:   "logs cluster",
-		Short: "Collect cluster logs",
+		Use:     "logs cluster",
+		Short:   "Collect cluster logs",
+		GroupID: "tools",
 	}
 
 	logsCmd.AddCommand(clusterCmd())

@@ -35,6 +35,7 @@ func NewCmd() *cobra.Command {
 		Args:    cobra.MinimumNArgs(1),
 		Long:    `Creates a fio deployment that will execute a fio job on the specified pvc.`,
 		Example: jobExample,
+		GroupID: "benchmark",
 		RunE: func(_ *cobra.Command, args []string) error {
 			ctx := context.Background()
 			fioArgs := args[1:]

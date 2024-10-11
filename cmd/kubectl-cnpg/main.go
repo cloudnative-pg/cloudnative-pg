@@ -82,6 +82,27 @@ func main() {
 	logFlags.AddFlags(rootCmd.PersistentFlags())
 	configFlags.AddFlags(rootCmd.PersistentFlags())
 
+	adminGroup := &cobra.Group{
+		ID:    "admin",
+		Title: "Administration tasks",
+	}
+	dbaGroup := &cobra.Group{
+		ID:    "dba",
+		Title: "Database Administrator",
+	}
+
+	benchmarkGroup := &cobra.Group{
+		ID:    "benchmark",
+		Title: "Benchmarking Tools",
+	}
+
+	toolsGroup := &cobra.Group{
+		ID:    "tools",
+		Title: "Tools",
+	}
+
+	rootCmd.AddGroup(adminGroup, dbaGroup, benchmarkGroup, toolsGroup)
+
 	subcommands := []*cobra.Command{
 		backup.NewCmd(),
 		certificate.NewCmd(),

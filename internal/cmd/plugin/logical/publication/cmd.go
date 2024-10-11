@@ -26,8 +26,9 @@ import (
 // NewCmd initializes the publication command
 func NewCmd() *cobra.Command {
 	publicationCmd := &cobra.Command{
-		Use:   "publication",
-		Short: "Logical publication management commands",
+		Use:     "publication",
+		Short:   "Logical publication management commands",
+		GroupID: "dba",
 	}
 	publicationCmd.AddCommand(create.NewCmd())
 	publicationCmd.AddCommand(drop.NewCmd())
