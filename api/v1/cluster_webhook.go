@@ -2196,26 +2196,6 @@ func (r *Cluster) validateReplicationSlots() field.ErrorList {
 		return nil
 	}
 
-	if psqlVersion.Major() < 12 {
-		if replicationSlots.HighAvailability.GetEnabled() {
-			return field.ErrorList{
-				field.Invalid(
-					field.NewPath("spec", "replicationSlots", "highAvailability", "enabled"),
-					replicationSlots.HighAvailability.GetEnabled(),
-					"Cannot enable HA replication slots synchronization. PostgreSQL 12 or above required"),
-			}
-		}
-
-		if replicationSlots.SynchronizeReplicas.GetEnabled() {
-			return field.ErrorList{
-				field.Invalid(
-					field.NewPath("spec", "replicationSlots", "synchronizeReplicas", "enabled"),
-					replicationSlots.SynchronizeReplicas.GetEnabled(),
-					"Cannot enable user defined replication slots synchronization. PostgreSQL 11 or above required"),
-			}
-		}
-	}
-
 	if errs := r.Spec.ReplicationSlots.SynchronizeReplicas.compileRegex(); len(errs) > 0 {
 		return field.ErrorList{
 			field.Invalid(
