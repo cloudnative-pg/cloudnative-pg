@@ -26,6 +26,7 @@ import (
 	"github.com/sethvargo/go-password/password"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
@@ -273,6 +274,14 @@ func (cmd *command) generateDeployment() *appsv1.Deployment {
 									Name:      pgAdminPassFileVolumeName,
 									MountPath: pgAdminPassFileVolumePath,
 								},
+								{
+									Name:      "tmp",
+									MountPath: "/tmp",
+								},
+								{
+									Name:      "home",
+									MountPath: "/home/pgadmin",
+								},
 							},
 							ReadinessProbe: &corev1.Probe{
 								ProbeHandler: corev1.ProbeHandler{
@@ -300,6 +309,21 @@ func (cmd *command) generateDeployment() *appsv1.Deployment {
 							VolumeSource: corev1.VolumeSource{
 								Secret: &corev1.SecretVolumeSource{
 									SecretName: cmd.ApplicationDatabaseSecretName,
+								},
+							},
+						},
+						{
+							Name: "home",
+							VolumeSource: corev1.VolumeSource{
+								EmptyDir: &corev1.EmptyDirVolumeSource{},
+							},
+						},
+						{
+							Name: "tmp",
+							VolumeSource: corev1.VolumeSource{
+								EmptyDir: &corev1.EmptyDirVolumeSource{
+									Medium:    corev1.StorageMediumMemory,
+									SizeLimit: ptr.To(resource.MustParse("100Mi")),
 								},
 							},
 						},
