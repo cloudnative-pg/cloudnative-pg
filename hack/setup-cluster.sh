@@ -299,7 +299,7 @@ install_kubectl() {
 
   local binary="${bindir}/kubectl"
 
-  curl -sL "https://storage.googleapis.com/kubernetes-release/release/v${KUBECTL_VERSION#v}/bin/${OS}/${ARCH}/kubectl" -o "${binary}"
+  curl -sL "https://dl.k8s.io/release/v${KUBECTL_VERSION#v}/bin/${OS}/${ARCH}/kubectl" -o "${binary}"
   chmod +x "${binary}"
 }
 
