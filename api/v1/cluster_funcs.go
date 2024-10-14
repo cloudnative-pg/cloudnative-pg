@@ -103,7 +103,6 @@ func (st *ServiceAccountTemplate) MergeMetadata(sa *corev1.ServiceAccount) {
 // matchesTopology checks if the two topologies have
 // the same label values (labels are specified in SyncReplicaElectionConstraints.NodeLabelsAntiAffinity)
 func (topologyLabels PodTopologyLabels) matchesTopology(instanceTopology PodTopologyLabels) bool {
-	log.Debug("matching topology", "main", topologyLabels, "second", instanceTopology)
 	for mainLabelName, mainLabelValue := range topologyLabels {
 		if mainLabelValue != instanceTopology[mainLabelName] {
 			return false

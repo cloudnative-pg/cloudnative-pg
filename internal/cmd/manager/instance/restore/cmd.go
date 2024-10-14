@@ -82,6 +82,7 @@ func NewCmd() *cobra.Command {
 }
 
 func restoreSubCommand(ctx context.Context, info postgres.InitInfo) error {
+	contextLogger := log.FromContext(ctx)
 	err := info.CheckTargetDataDirectory(ctx)
 	if err != nil {
 		return err
@@ -89,15 +90,17 @@ func restoreSubCommand(ctx context.Context, info postgres.InitInfo) error {
 
 	err = info.Restore(ctx)
 	if err != nil {
-		log.Error(err, "Error while restoring a backup")
-		cleanupDataDirectoryIfNeeded(err, info.PgData)
+		contextLogger.Error(err, "Error while restoring a backup")
+		cleanupDataDirectoryIfNeeded(ctx, err, info.PgData)
 		return err
 	}
 
 	return nil
 }
 
-func cleanupDataDirectoryIfNeeded(restoreError error, dataDirectory string) {
+func cleanupDataDirectoryIfNeeded(ctx context.Context, restoreError error, dataDirectory string) {
+	contextLogger := log.FromContext(ctx)
+
 	var barmanError *barmanCommand.CloudRestoreError
 	if !errors.As(restoreError, &barmanError) {
 		return
@@ -107,9 +110,9 @@ func cleanupDataDirectoryIfNeeded(restoreError error, dataDirectory string) {
 		return
 	}
 
-	log.Info("Cleaning up data directory", "directory", dataDirectory)
+	contextLogger.Info("Cleaning up data directory", "directory", dataDirectory)
 	if err := fileutils.RemoveDirectory(dataDirectory); err != nil && !os.IsNotExist(err) {
-		log.Error(
+		contextLogger.Error(
 			err,
 			"error occurred cleaning up data directory",
 			"directory", dataDirectory)

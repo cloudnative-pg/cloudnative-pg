@@ -83,9 +83,11 @@ func NewWebServer(instance *postgres.Instance, server *http.Server) *Webserver {
 
 // Start implements the runnable interface
 func (ws *Webserver) Start(ctx context.Context) error {
+	contextLogger := log.FromContext(ctx)
+
 	errChan := make(chan error, 1)
 	go func() {
-		log.Info("Starting webserver", "address", ws.server.Addr)
+		contextLogger.Info("Starting webserver", "address", ws.server.Addr)
 
 		err := ws.server.ListenAndServe()
 		if err != nil {
@@ -97,16 +99,16 @@ func (ws *Webserver) Start(ctx context.Context) error {
 	// we exit with error code, potentially we could do a retry logic, but rarely a webserver that doesn't start will run
 	// on subsequent tries
 	case err := <-errChan:
-		log.Error(err, "Error while starting the web server", "address", ws.server.Addr)
+		contextLogger.Error(err, "Error while starting the web server", "address", ws.server.Addr)
 		return err
 	case <-ctx.Done():
 		if err := ws.server.Shutdown(context.Background()); err != nil {
-			log.Error(err, "Error while shutting down the web server", "address", ws.server.Addr)
+			contextLogger.Error(err, "Error while shutting down the web server", "address", ws.server.Addr)
 			return err
 		}
 	}
 
-	log.Info("Webserver exited", "address", ws.server.Addr)
+	contextLogger.Info("Webserver exited", "address", ws.server.Addr)
 
 	return nil
 }

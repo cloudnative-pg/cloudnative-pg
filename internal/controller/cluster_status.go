@@ -242,6 +242,7 @@ func (r *ClusterReconciler) updateResourceStatus(
 	cluster *apiv1.Cluster,
 	resources *managedResources,
 ) error {
+	contextLogger := log.FromContext(ctx)
 	// Retrieve the cluster key
 
 	existingClusterStatus := cluster.Status
@@ -316,7 +317,7 @@ func (r *ClusterReconciler) updateResourceStatus(
 	if poolerIntegrations, err := r.getPoolerIntegrationsNeeded(ctx, cluster); err == nil {
 		cluster.Status.PoolerIntegrations = poolerIntegrations
 	} else {
-		log.Error(err, "while checking pooler integrations were needed, ignored")
+		contextLogger.Error(err, "while checking pooler integrations were needed, ignored")
 	}
 
 	// Set the current hash code of the operator binary inside the status.
