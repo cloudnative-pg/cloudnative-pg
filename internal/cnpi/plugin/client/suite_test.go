@@ -25,6 +25,7 @@ import (
 	"github.com/cloudnative-pg/cnpg-i/pkg/lifecycle"
 	"github.com/cloudnative-pg/cnpg-i/pkg/operator"
 	"github.com/cloudnative-pg/cnpg-i/pkg/reconciler"
+	restore "github.com/cloudnative-pg/cnpg-i/pkg/restore/job"
 	"github.com/cloudnative-pg/cnpg-i/pkg/wal"
 	"google.golang.org/grpc"
 
@@ -101,6 +102,14 @@ type fakeConnection struct {
 	lifecycleCapabilities []*lifecycle.OperatorLifecycleCapabilities
 	name                  string
 	operatorClient        *fakeOperatorClient
+}
+
+func (f *fakeConnection) RestoreJobHooksClient() restore.RestoreJobHooksClient {
+	panic("implement me")
+}
+
+func (f *fakeConnection) RestoreJobHooksCapabilities() []restore.RestoreJobHooksCapability_Kind {
+	panic("implement me")
 }
 
 func (f *fakeConnection) setStatusResponse(status []byte) {

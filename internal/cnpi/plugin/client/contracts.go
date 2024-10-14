@@ -18,8 +18,8 @@ package client
 
 import (
 	"context"
-	restore "github.com/cloudnative-pg/cnpg-i/pkg/restore/job"
 
+	restore "github.com/cloudnative-pg/cnpg-i/pkg/restore/job"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -146,6 +146,7 @@ type BackupCapabilities interface {
 	) (*BackupResponse, error)
 }
 
+// RestoreJobHooksCapabilities describes a set of behaviour needed to run the Restore
 type RestoreJobHooksCapabilities interface {
 	Restore(ctx context.Context) (*restore.RestoreResponse, error)
 	CanRunRestoreJobHooks() bool
