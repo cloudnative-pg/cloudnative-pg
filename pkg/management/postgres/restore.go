@@ -255,12 +255,14 @@ func (info InitInfo) Restore(ctx context.Context) error {
 
 	var envs []string
 	var config string
-	found, err := tryRestoreViaPlugin(ctx, cluster)
+	res, err := tryRestoreViaPlugin(ctx, cluster)
 	if err != nil {
 		return err
 	}
-
-	if !found {
+	if res != nil {
+		envs = res.Envs
+		config = res.RestoreConfig
+	} else {
 		// Before starting the restore we check if the archive destination is safe to use
 		// otherwise, we stop creating the cluster
 		err = info.checkBackupDestination(ctx, typedClient, cluster)
@@ -285,6 +287,13 @@ func (info InitInfo) Restore(ctx context.Context) error {
 		if _, err := info.restoreCustomWalDir(ctx); err != nil {
 			return err
 		}
+
+		conf, err := getRestoreWalConfig(ctx, backup)
+		if err != nil {
+			return err
+		}
+		config = conf
+		envs = env
 	}
 
 	if err := info.WriteInitialPostgresqlConf(ctx, cluster); err != nil {
@@ -318,13 +327,11 @@ func (info InitInfo) Restore(ctx context.Context) error {
 		return err
 	}
 
-	if !found {
-		if err := info.writeRestoreWalConfig(ctx, backup, cluster); err != nil {
-			return err
-		}
+	if err := info.writeCustomRestoreWalConfig(cluster, config); err != nil {
+		return err
 	}
 
-	return info.ConfigureInstanceAfterRestore(ctx, cluster, env)
+	return info.ConfigureInstanceAfterRestore(ctx, cluster, envs)
 }
 
 func (info InitInfo) ensureArchiveContainsLastCheckpointRedoWAL(
@@ -597,6 +604,33 @@ func (info InitInfo) writeRestoreWalConfig(
 	backup *apiv1.Backup,
 	cluster *apiv1.Cluster,
 ) error {
+	conf, err := getRestoreWalConfig(ctx, backup)
+	if err != nil {
+		return err
+	}
+	recoveryFileContents := fmt.Sprintf(
+		"%s\n"+
+			"%s",
+		conf,
+		cluster.Spec.Bootstrap.Recovery.RecoveryTarget.BuildPostgresOptions())
+
+	return info.writeRecoveryConfiguration(cluster, recoveryFileContents)
+}
+
+func (info InitInfo) writeCustomRestoreWalConfig(cluster *apiv1.Cluster, conf string) error {
+	recoveryFileContents := fmt.Sprintf(
+		"%s\n"+
+			"%s",
+		conf,
+		cluster.Spec.Bootstrap.Recovery.RecoveryTarget.BuildPostgresOptions())
+
+	return info.writeRecoveryConfiguration(cluster, recoveryFileContents)
+}
+
+// getRestoreWalConfig obtains the content to append to `custom.conf` allowing PostgreSQL
+// to complete the WAL recovery from the object storage and then start
+// as a new primary
+func getRestoreWalConfig(ctx context.Context, backup *apiv1.Backup) (string, error) {
 	var err error
 
 	cmd := []string{barmanCapabilities.BarmanCloudWalRestore}
@@ -609,19 +643,17 @@ func (info InitInfo) writeRestoreWalConfig(
 	cmd, err = barmanCommand.AppendCloudProviderOptionsFromBackup(
 		ctx, cmd, backup.Status.BarmanCredentials)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	cmd = append(cmd, "%f", "%p")
 
 	recoveryFileContents := fmt.Sprintf(
 		"recovery_target_action = promote\n"+
-			"restore_command = '%s'\n"+
-			"%s",
-		strings.Join(cmd, " "),
-		cluster.Spec.Bootstrap.Recovery.RecoveryTarget.BuildPostgresOptions())
+			"restore_command = '%s'\n",
+		strings.Join(cmd, " "))
 
-	return info.writeRecoveryConfiguration(cluster, recoveryFileContents)
+	return recoveryFileContents, nil
 }
 
 func (info InitInfo) writeRecoveryConfiguration(cluster *apiv1.Cluster, recoveryFileContents string) error {
