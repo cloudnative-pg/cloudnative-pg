@@ -70,9 +70,10 @@ const (
 
 var apiGVString = apiv1.GroupVersion.String()
 
-// errSplitBrainDetected happens when a Pod lost connectivity with
-// the API server and retains its previous role.
-var errSplitBrainDetected = errors.New("split brain detected")
+// errOldPrimaryDetected occurs when a primary Pod loses connectivity with the
+// API server and, upon reconnection, attempts to retain its previous primary
+// role.
+var errOldPrimaryDetected = errors.New("old primary detected")
 
 // ClusterReconciler reconciles a Cluster objects
 type ClusterReconciler struct {
@@ -355,8 +356,8 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	// the list.
 	if primaryNames := instancesStatus.PrimaryNames(); len(primaryNames) > 1 {
 		contextLogger.Error(
-			errSplitBrainDetected,
-			"Multiple primary Pods have been detected, waiting for Pods to notice their role",
+			errOldPrimaryDetected,
+			"An old primary pod has been detected. Awaiting its recognition of the new role",
 			"primaryNames", primaryNames,
 		)
 		instancesStatus.LogStatus(ctx)
