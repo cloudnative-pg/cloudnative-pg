@@ -69,27 +69,9 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 			})
 		})
 
-		assertDatabaseExists := func(namespace, primaryPod, dbname string, shouldContain bool) {
-			Eventually(func(g Gomega) {
-				stdout, _, err := env.ExecQueryInInstancePod(
-					utils.PodLocator{
-						Namespace: namespace,
-						PodName:   primaryPod,
-					},
-					"postgres",
-					"\\l")
-				g.Expect(err).ToNot(HaveOccurred())
-				if shouldContain {
-					g.Expect(stdout).Should(ContainSubstring(dbname))
-				} else {
-					g.Expect(stdout).ShouldNot(ContainSubstring(dbname))
-				}
-			}, 300).Should(Succeed())
-		}
-
 		assertDatabaseHasExpectedFields := func(namespace, primaryPod string, db apiv1.Database) {
 			query := fmt.Sprintf("select count(*) from pg_database where datname = '%s' "+
-				"and encoding = %s and datctype = '%s' and datcollate = '%s'",
+				"and encoding = pg_char_to_encoding('%s') and datctype = '%s' and datcollate = '%s'",
 				db.Spec.Name, db.Spec.Encoding, db.Spec.LcCtype, db.Spec.LcCollate)
 			Eventually(func(g Gomega) {
 				stdout, _, err := env.ExecQueryInInstancePod(
@@ -107,10 +89,9 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 		assertTestDeclarativeDatabase := func(
 			databaseManifest string,
 			retainOnDeletion bool,
-			expectedDatabaseFields apiv1.Database,
 		) {
 			var (
-				database           *apiv1.Database
+				database           apiv1.Database
 				databaseObjectName string
 			)
 			By("applying Database CRD manifest", func() {
@@ -120,14 +101,14 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 			})
 			By("ensuring the Database CRD succeeded reconciliation", func() {
 				// get database object
-				database = &apiv1.Database{}
+				database = apiv1.Database{}
 				databaseNamespacedName := types.NamespacedName{
 					Namespace: namespace,
 					Name:      databaseObjectName,
 				}
 
 				Eventually(func(g Gomega) {
-					err := env.Client.Get(env.Ctx, databaseNamespacedName, database)
+					err := env.Client.Get(env.Ctx, databaseNamespacedName, &database)
 					g.Expect(err).ToNot(HaveOccurred())
 					g.Expect(database.Status.Ready).Should(BeTrue())
 				}, 300).WithPolling(10 * time.Second).Should(Succeed())
@@ -137,64 +118,36 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 				primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 
-				assertDatabaseExists(namespace, primaryPodInfo.Name, dbname, true)
+				AssertDatabaseExists(namespace, primaryPodInfo.Name, dbname, true)
 
-				assertDatabaseHasExpectedFields(namespace, primaryPodInfo.Name, expectedDatabaseFields)
+				assertDatabaseHasExpectedFields(namespace, primaryPodInfo.Name, database)
 			})
 
 			By("removing the Database object", func() {
-				Expect(utils.DeleteObject(env, database)).To(Succeed())
+				Expect(utils.DeleteObject(env, &database)).To(Succeed())
 			})
 
 			By("verifying the retention policy in the postgres database", func() {
 				primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 
-				assertDatabaseExists(namespace, primaryPodInfo.Name, dbname, retainOnDeletion)
+				AssertDatabaseExists(namespace, primaryPodInfo.Name, dbname, retainOnDeletion)
 			})
 		}
+
+		When("Database CRD reclaim policy is set to delete", func() {
+			It("can manage a declarative database and delete it in Postgres", func() {
+				databaseManifest := fixturesDir +
+					"/declarative_databases/database-with-delete-reclaim-policy.yaml.template"
+				assertTestDeclarativeDatabase(databaseManifest,
+					false)
+			})
+		})
 
 		When("Database CRD reclaim policy is set to retain", func() {
 			It("can manage a declarative database and release it", func() {
 				databaseManifest := fixturesDir + "/declarative_databases/database.yaml.template"
-				shouldPgDatabaseBeRetained := true
-				// NOTE: the `pg_database` table in Postgres does not contain fields
-				// for the owner nor the template.
-				// Its fields are dependent on the version of Postgres, so we pick
-				// a subset that is available to check even on PG v12
-				expectedDatabaseFields := apiv1.Database{
-					Spec: apiv1.DatabaseSpec{
-						Name:      "declarative",
-						LcCtype:   "en_US.utf8",
-						LcCollate: "C", // this is the default value
-						Encoding:  "0", // corresponds to SQL_ASCII
-					},
-				}
-
-				assertTestDeclarativeDatabase(databaseManifest,
-					shouldPgDatabaseBeRetained, expectedDatabaseFields)
-			})
-		})
-
-		When("Database CRD reclaim policy is set to delete", func() {
-			It("can manage a declarative database and delete it in Postgres", func() {
-				// NOTE: the Postgres database 'declarative' created in the previous spec
-				// was retained after deletion.
-				// This manifest adopts the existing database and only changes the retention policy
-				databaseManifest := fixturesDir +
-					"/declarative_databases/database-with-delete-reclaim-policy.yaml.template"
-				shouldPgDatabaseBeRetained := false
-				expectedDatabaseFields := apiv1.Database{
-					Spec: apiv1.DatabaseSpec{
-						Name:      "declarative",
-						LcCtype:   "en_US.utf8",
-						LcCollate: "C", // this is the default value
-						Encoding:  "0", // corresponds to SQL_ASCII
-					},
-				}
-
-				assertTestDeclarativeDatabase(databaseManifest,
-					shouldPgDatabaseBeRetained, expectedDatabaseFields)
+				assertTestDeclarativeDatabase(databaseManifest, true)
 			})
 		})
 	})
