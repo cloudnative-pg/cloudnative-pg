@@ -255,12 +255,7 @@ func UpdateReplicaConfiguration(pgData, primaryConnInfo, slotName string) (chang
 // replication information
 func configurePostgresOverrideConfFile(pgData, primaryConnInfo, slotName string) (changed bool, err error) {
 	targetFile := path.Join(pgData, constants.PostgresqlOverrideConfigurationFile)
-
-	options := make(map[string]string)
-
-	// Write replication control as GUCs (from PostgreSQL 12 or above)
-
-	options = map[string]string{
+	options := map[string]string{
 		"restore_command": fmt.Sprintf(
 			"/controller/manager wal-restore --log-destination %s/%s.json %%f %%p",
 			postgres.LogPath, postgres.LogFileName),

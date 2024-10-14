@@ -2189,13 +2189,6 @@ func (r *Cluster) validateReplicationSlots() field.ErrorList {
 		return nil
 	}
 
-	psqlVersion, err := r.GetPostgresqlVersion()
-	if err != nil {
-		// The validation error will be already raised by the
-		// validateImageName function
-		return nil
-	}
-
 	if errs := r.Spec.ReplicationSlots.SynchronizeReplicas.compileRegex(); len(errs) > 0 {
 		return field.ErrorList{
 			field.Invalid(
