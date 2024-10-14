@@ -6,6 +6,7 @@ spec:
   name: declarative
   owner: app
   lc_ctype: "en_US.utf8"
+  lc_collate: C
   encoding: SQL_ASCII
   template: template0
   cluster:
