@@ -87,7 +87,10 @@ func NewCmd() *cobra.Command {
 			})
 		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			ctx := log.IntoContext(cmd.Context(), log.GetLogger())
+			ctx := log.IntoContext(
+				cmd.Context(),
+				log.GetLogger().WithValues("logger", "instance-manager"),
+			)
 			instance := postgres.NewInstance().
 				WithPodName(podName).
 				WithClusterName(clusterName).
@@ -132,18 +135,18 @@ func NewCmd() *cobra.Command {
 
 func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 	var err error
-	setupLog := log.WithName("setup")
 
-	setupLog.Info("Starting CloudNativePG Instance Manager",
+	contextLogger := log.FromContext(ctx)
+	contextLogger.Info("Starting CloudNativePG Instance Manager",
 		"version", versions.Version,
 		"build", versions.Info)
 
-	setupLog.Info("Checking for free disk space for WALs before starting PostgreSQL")
+	contextLogger.Info("Checking for free disk space for WALs before starting PostgreSQL")
 	hasDiskSpaceForWals, err := instance.CheckHasDiskSpaceForWAL(ctx)
 	if err != nil {
-		setupLog.Error(err, "Error while checking if there is enough disk space for WALs, skipping")
+		contextLogger.Error(err, "Error while checking if there is enough disk space for WALs, skipping")
 	} else if !hasDiskSpaceForWals {
-		setupLog.Info("Detected low-disk space condition, avoid starting the instance")
+		contextLogger.Info("Detected low-disk space condition, avoid starting the instance")
 		return errNoFreeWALSpace
 	}
 
@@ -180,9 +183,13 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 		Metrics: server.Options{
 			BindAddress: "0", // TODO: merge metrics to the manager one
 		},
+		BaseContext: func() context.Context {
+			return ctx
+		},
+		Logger: contextLogger.WithValues("logging_pod", os.Getenv("POD_NAME")).GetLogger(),
 	})
 	if err != nil {
-		setupLog.Error(err, "unable to set up overall controller manager")
+		contextLogger.Error(err, "unable to set up overall controller manager")
 		return err
 	}
 
@@ -196,7 +203,7 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 		Named("instance-cluster").
 		Complete(reconciler)
 	if err != nil {
-		setupLog.Error(err, "unable to create instance controller")
+		contextLogger.Error(err, "unable to create instance controller")
 		return err
 	}
 	postgresStartConditions = append(postgresStartConditions, reconciler.GetExecutedCondition())
@@ -204,7 +211,7 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 	// database reconciler
 	dbReconciler := controller.NewDatabaseReconciler(mgr, instance)
 	if err := dbReconciler.SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create database controller")
+		contextLogger.Error(err, "unable to create database controller")
 		return err
 	}
 
@@ -239,24 +246,24 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 
 	postgresLifecycleManager := lifecycle.NewPostgres(ctx, instance, postgresStartConditions)
 	if err = mgr.Add(postgresLifecycleManager); err != nil {
-		setupLog.Error(err, "unable to create instance runnable")
+		contextLogger.Error(err, "unable to create instance runnable")
 		return err
 	}
 
 	if err = mgr.Add(lifecycle.NewPostgresOrphansReaper(instance)); err != nil {
-		setupLog.Error(err, "unable to create zombie reaper")
+		contextLogger.Error(err, "unable to create zombie reaper")
 		return err
 	}
 
 	slotReplicator := runner.NewReplicator(instance)
 	if err = mgr.Add(slotReplicator); err != nil {
-		setupLog.Error(err, "unable to create slot replicator")
+		contextLogger.Error(err, "unable to create slot replicator")
 		return err
 	}
 
 	roleSynchronizer := roles.NewRoleSynchronizer(instance, reconciler.GetClient())
 	if err = mgr.Add(roleSynchronizer); err != nil {
-		setupLog.Error(err, "unable to create role synchronizer")
+		contextLogger.Error(err, "unable to create role synchronizer")
 		return err
 	}
 
@@ -273,7 +280,7 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 		return err
 	}
 	if err = mgr.Add(remoteSrv); err != nil {
-		setupLog.Error(err, "unable to add remote webserver runnable")
+		contextLogger.Error(err, "unable to add remote webserver runnable")
 		return err
 	}
 
@@ -286,7 +293,7 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 		return err
 	}
 	if err = mgr.Add(localSrv); err != nil {
-		setupLog.Error(err, "unable to add local webserver runnable")
+		contextLogger.Error(err, "unable to add local webserver runnable")
 		return err
 	}
 
@@ -295,36 +302,36 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 		return err
 	}
 	if err = mgr.Add(metricsServer); err != nil {
-		setupLog.Error(err, "unable to add local webserver runnable")
+		contextLogger.Error(err, "unable to add local webserver runnable")
 		return err
 	}
 
-	setupLog.Info("starting tablespace manager")
+	contextLogger.Info("starting tablespace manager")
 	if err := tablespaces.NewTablespaceReconciler(instance, mgr.GetClient()).
 		SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create tablespace reconciler")
+		contextLogger.Error(err, "unable to create tablespace reconciler")
 		return err
 	}
 
-	setupLog.Info("starting external server manager")
+	contextLogger.Info("starting external server manager")
 	if err := externalservers.NewReconciler(instance, mgr.GetClient()).
 		SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create external servers reconciler")
+		contextLogger.Error(err, "unable to create external servers reconciler")
 		return err
 	}
 
-	setupLog.Info("starting controller-runtime manager")
+	contextLogger.Info("starting controller-runtime manager")
 	if err := mgr.Start(onlineUpgradeCtx); err != nil {
-		setupLog.Error(err, "unable to run controller-runtime manager")
+		contextLogger.Error(err, "unable to run controller-runtime manager")
 		return makeUnretryableError(err)
 	}
 
-	setupLog.Info("Checking for free disk space for WALs after PostgreSQL finished")
+	contextLogger.Info("Checking for free disk space for WALs after PostgreSQL finished")
 	hasDiskSpaceForWals, err = instance.CheckHasDiskSpaceForWAL(ctx)
 	if err != nil {
-		setupLog.Error(err, "Error while checking if there is enough disk space for WALs, skipping")
+		contextLogger.Error(err, "Error while checking if there is enough disk space for WALs, skipping")
 	} else if !hasDiskSpaceForWals {
-		setupLog.Info("Detected low-disk space condition")
+		contextLogger.Info("Detected low-disk space condition")
 		return errNoFreeWALSpace
 	}
 

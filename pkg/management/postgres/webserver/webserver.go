@@ -79,9 +79,11 @@ func NewWebServer(server *http.Server) *Webserver {
 
 // Start starts a webserver listener, implementing the K8s runnable interface
 func (ws *Webserver) Start(ctx context.Context) error {
+	contextLogger := log.FromContext(ctx)
+
 	errChan := make(chan error, 1)
 	go func() {
-		log.Info("Starting webserver", "address", ws.server.Addr, "hasTLS", ws.server.TLSConfig != nil)
+		contextLogger.Info("Starting webserver", "address", ws.server.Addr, "hasTLS", ws.server.TLSConfig != nil)
 
 		var err error
 		if ws.server.TLSConfig != nil {
@@ -99,19 +101,19 @@ func (ws *Webserver) Start(ctx context.Context) error {
 	// on subsequent tries
 	case err := <-errChan:
 		if errors.Is(err, http.ErrServerClosed) {
-			log.Error(err, "Closing the web server", "address", ws.server.Addr)
+			contextLogger.Error(err, "Closing the web server", "address", ws.server.Addr)
 		} else {
-			log.Error(err, "Error while running the web server", "address", ws.server.Addr)
+			contextLogger.Error(err, "Error while running the web server", "address", ws.server.Addr)
 		}
 		return err
 	case <-ctx.Done():
 		if err := ws.server.Shutdown(context.Background()); err != nil {
-			log.Error(err, "Error while shutting down the web server", "address", ws.server.Addr)
+			contextLogger.Error(err, "Error while shutting down the web server", "address", ws.server.Addr)
 			return err
 		}
 	}
 
-	log.Info("Webserver exited", "address", ws.server.Addr)
+	contextLogger.Info("Webserver exited", "address", ws.server.Addr)
 
 	return nil
 }

@@ -60,28 +60,29 @@ func NewCmd() *cobra.Command {
 		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
+			contextLogger := log.FromContext(ctx)
 
 			initDBFlags, err := shellquote.Split(initDBFlagsString)
 			if err != nil {
-				log.Error(err, "Error while parsing initdb flags")
+				contextLogger.Error(err, "Error while parsing initdb flags")
 				return err
 			}
 
 			postInitSQL, err := shellquote.Split(postInitSQLStr)
 			if err != nil {
-				log.Error(err, "Error while parsing post init SQL queries")
+				contextLogger.Error(err, "Error while parsing post init SQL queries")
 				return err
 			}
 
 			postInitApplicationSQL, err := shellquote.Split(postInitApplicationSQLStr)
 			if err != nil {
-				log.Error(err, "Error while parsing post init template SQL queries")
+				contextLogger.Error(err, "Error while parsing post init template SQL queries")
 				return err
 			}
 
 			postInitTemplateSQL, err := shellquote.Split(postInitTemplateSQLStr)
 			if err != nil {
-				log.Error(err, "Error while parsing post init template SQL queries")
+				contextLogger.Error(err, "Error while parsing post init template SQL queries")
 				return err
 			}
 
@@ -148,6 +149,7 @@ func NewCmd() *cobra.Command {
 }
 
 func initSubCommand(ctx context.Context, info postgres.InitInfo) error {
+	contextLogger := log.FromContext(ctx)
 	err := info.CheckTargetDataDirectory(ctx)
 	if err != nil {
 		return err
@@ -155,7 +157,7 @@ func initSubCommand(ctx context.Context, info postgres.InitInfo) error {
 
 	err = info.Bootstrap(ctx)
 	if err != nil {
-		log.Error(err, "Error while bootstrapping data directory")
+		contextLogger.Error(err, "Error while bootstrapping data directory")
 		return err
 	}
 
