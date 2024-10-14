@@ -40,7 +40,7 @@ var _ = Describe("MetricsServer", func() {
 		ch       chan prometheus.Metric
 	)
 
-	BeforeEach(func() {
+	BeforeEach(func(ctx SpecContext) {
 		var err error
 		db, mock, err = sqlmock.New()
 		Expect(err).NotTo(HaveOccurred())
@@ -48,6 +48,7 @@ var _ = Describe("MetricsServer", func() {
 		exp = &Exporter{
 			Metrics: newMetrics(),
 			pool:    fakePooler{db: db},
+			ctx:     ctx,
 		}
 		registry = prometheus.NewRegistry()
 		registry.MustRegister(exp.Metrics.Error)
