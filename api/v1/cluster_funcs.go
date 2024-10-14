@@ -33,6 +33,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
@@ -1345,6 +1346,26 @@ func (cluster *Cluster) IsReadOnlyServiceEnabled() bool {
 	}
 
 	return !slices.Contains(cluster.Spec.Managed.Services.DisabledDefaultServices, ServiceSelectorTypeRO)
+}
+
+// UsePluginForBootstrapRecoveryBackup returns true if the recovery from backup should use a plugin.
+func (cluster *Cluster) UsePluginForBootstrapRecoveryBackup() bool {
+	if cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.Recovery != nil &&
+		cluster.Spec.Bootstrap.Recovery.Backup != nil && cluster.Spec.Bootstrap.Recovery.Backup.UsePlugin != nil {
+		return *cluster.Spec.Bootstrap.Recovery.Backup.UsePlugin
+	}
+	return false
+}
+
+// EnsureGVKIsPresent ensures that the GroupVersionKind (GVK) metadata is present in the Backup object.
+// This is necessary because informers do not automatically include metadata inside the object.
+// By setting the GVK, we ensure that components such as the plugins have enough metadata to typecheck the object.
+func (cluster *Cluster) EnsureGVKIsPresent() {
+	cluster.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   GroupVersion.Group,
+		Version: GroupVersion.Version,
+		Kind:    ClusterKind,
+	})
 }
 
 // BuildPostgresOptions create the list of options that

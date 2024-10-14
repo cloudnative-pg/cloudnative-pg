@@ -596,6 +596,13 @@ Useful when using self-signed certificates to avoid
 errors with certificate issuer and barman-cloud-wal-archive.</p>
 </td>
 </tr>
+<tr><td><code>usePlugin</code> <B>[Required]</B><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>When set to true the operator will delegate the restore process to the registered restore plugin.</p>
+</td>
+</tr>
 </tbody>
 </table>
 

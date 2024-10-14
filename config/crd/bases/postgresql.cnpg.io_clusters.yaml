@@ -1833,6 +1833,10 @@ spec:
                           name:
                             description: Name of the referent.
                             type: string
+                          usePlugin:
+                            description: When set to true the operator will delegate
+                              the restore process to the registered restore plugin.
+                            type: boolean
                         required:
                         - name
                         type: object

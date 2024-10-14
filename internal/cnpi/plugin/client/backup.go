@@ -28,6 +28,8 @@ import (
 	"github.com/cloudnative-pg/cnpg-i/pkg/identity"
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
 
 var (
@@ -88,6 +90,13 @@ type BackupResponse struct {
 	Online bool
 
 	Metadata map[string]string
+
+	ServerName string
+
+	EndpointCA      *apiv1.SecretKeySelector
+	DestinationPath string
+	Encryption      string
+	EndpointURL     string
 }
 
 func (data *data) Backup(
@@ -165,5 +174,22 @@ func (data *data) Backup(
 		InstanceID:        result.InstanceId,
 		Online:            result.Online,
 		Metadata:          result.Metadata,
+		ServerName:        result.ServerName,
+		EndpointCA:        keyNameToSecretKeySelector(result.EndpointCa),
+		DestinationPath:   result.DestinationPath,
+		Encryption:        result.Encryption,
+		EndpointURL:       result.EndpointUrl,
 	}, nil
+}
+
+func keyNameToSecretKeySelector(keyName *backup.KeyName) *apiv1.SecretKeySelector {
+	if keyName != nil {
+		return &apiv1.SecretKeySelector{
+			LocalObjectReference: apiv1.LocalObjectReference{
+				Name: keyName.Name,
+			},
+			Key: keyName.Key,
+		}
+	}
+	return nil
 }

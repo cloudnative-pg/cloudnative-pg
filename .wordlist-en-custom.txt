@@ -1280,6 +1280,7 @@ updateStrategy
 upgradable
 uptime
 uri
+usePlugin
 usename
 usernamepassword
 usr
