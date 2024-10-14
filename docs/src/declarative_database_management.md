@@ -29,7 +29,7 @@ primary instance.
 In the CRD, the `metadata.name` field represents the name the object
 will have in Kubernetes, which is guaranteed to be unique per namespace.
 There is also the field `spec.name`, which is the name that will be used for
-the database created in Postgres.
+the database in Postgres.
 
 !!! Note
     Having separate `metadata.name` and `spec.name` makes it possible to have
@@ -56,8 +56,8 @@ The database reconciler will transparently handle this on behalf of the user,
 making it easy to honor a Database manifest no matter the previous history
 of the cluster.
 
-There is however a difference regarding the handling of "immutable" fields: on an
-existing Database object, any modification of the immutable fields will
+There is however a difference regarding the handling of "immutable" fields: on
+an existing Database object, any modification of the immutable fields will
 be rejected at the Kubernetes level.
 On a newly declared Database manifest that references an existing database, the
 immutable fields will simply be ignored, as they are not valid options in the
@@ -73,7 +73,7 @@ immutable fields will simply be ignored, as they are not valid options in the
 
 Database objects declared on a replica cluster cannot be enforced, since the
 replica does not have write privileges.
-Instead, a database object defined on a replica cluster will be periodically
+Instead, a Database object defined on a replica cluster will be periodically
 re-queued, and will be enforced once the cluster is promoted.
 
 ### Reserved names
@@ -85,12 +85,12 @@ be allowed to create a Database with any of `postgres`, `template0`, or
 
 ### Status sub-resource
 
-Once the instance manager has completed the reconciliation of a Database,
-the Database status will be updated with a `ready` field set to `true`, and an
-`observedGeneration` field which keeps track of the last applied `generation`.
-If there were errors during the reconciliation of a database, the `ready` field
-would show `false`, and an additional field `error` would be displayed in the
-status.
+Once the reconciliation of a Database has been performed,
+the Database status will be updated with a field,  `applied`, set to `true`,
+and an `observedGeneration` field which tracks the last applied `generation`.
+If there were errors during the reconciliation of a database, the `applied`
+field would show `false`, and an additional field `message` would be displayed
+in the status.
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -107,7 +107,7 @@ spec:
   template: template0
 status:
   observedGeneration: 1
-  ready: true
+  applied: true
 ```
 
 ## Database Deletion and Reclaim Policies
@@ -144,6 +144,41 @@ spec:
 In this case, when the Database object is deleted, the corresponding PostgreSQL
 database will also be removed automatically.
 
+## Imperative deletion of a PostgreSQL database
+
+In the previous section, the database Reclaim Policy was discussed, which serves
+in case the Postgres database should be dropped once the Database object is
+deleted.
+
+For the purpose of deleting an existing Postgres database via a Database
+declaration, the `ensure` field may be use. By default its value is `present`.
+Setting it to `absent` will have the effect of dropping the database in the next
+reconciliation cycle.
+
+### Example deletion of a Postgres database
+
+In the following example, `ensure: absent` has the effect of dropping the
+Postgres database. Since `applied` is true, we know the database was
+successfully dropped.
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  [... snipped ...]
+  generation: 1
+  name: db-one-deleter
+spec:
+  cluster:
+    name: cluster-example
+  name: database-to-drop
+  owner: app
+  ensure: absent
+status:
+  observedGeneration: 1
+  applied: true
+```
+
 ## Collision of Database objects
 
 As mentioned above, the Database CRD has the fields `metadata.name` and
@@ -155,12 +190,12 @@ The database reconciler could simply apply them both. The first applied would
 result in `CREATE` statements (assuming the database did not exist in Postgres),
 while the second one would result in `ALTER` statements.
 While this could work, it would make it much harder to reason about Database
-objects; there would be uncertainty as to the order of operations.
+objects. There would be uncertainty as to the order of operations.
 
 For this reason, the database reconciler will check, given a Database object,
 if there is already another Database object managing the same database.
-If so, it will mark it with an error explaining this, and will not apply any
-changes in Postgres:
+If so, it will update its status with a message explaining this, and will not
+apply any changes in Postgres:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -175,8 +210,8 @@ spec:
   name: declarative
   owner: app
 status:
-  ready: false
-  error: this Database clashes with the previous `db-one` managing database `declarative`
+  applied: false
+  message: this Database clashes with the previous `db-one` managing database `declarative`
 ```
 
 ## Support of different Postgres versions
@@ -214,7 +249,7 @@ Database object's status:
 ```yaml
 [...]
 status:
-  ready: false
+  applied: false
   error: option "locale_provider" not recognized
 ```
 
@@ -224,15 +259,13 @@ at transparency.
 
 ## Making direct changes in Postgres
 
-It is possible to make changes to a database that was created or managed with a
-Database object, directly on Postgres, for example by issuing commands on
-`psql`.
+It is possible to make changes directly in Postgres to a database that was
+created or managed with a Database object.
 
 The fields `observedGeneration` and `generation` described above will ensure
 that once a Database has been reconciled to its defined `generation`, it will
 not be re-applied by the instance manager. Therefore, your manual changes will
 not be rolled back inadvertently.
 
-CloudNativePG gives you the flexibility to make alterations on your databases
-via Database manifests, via direct changes, or mixing matching to fit your
-use case.
+CloudNativePG gives you the flexibility to make your databases via Database
+manifests, via direct changes, or mixing matching to fit your use case.
