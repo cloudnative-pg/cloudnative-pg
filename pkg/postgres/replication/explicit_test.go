@@ -42,7 +42,7 @@ var _ = Describe("synchronous replica configuration with the new API", func() {
 			},
 		}
 
-		Expect(explicitSynchronousStandbyNames(cluster)).To(Equal("ANY 2 (\"three\",\"two\")"))
+		Expect(explicitSynchronousStandbyNames(cluster)).To(Equal("ANY 2 (\"three\",\"two\",\"one\")"))
 	})
 
 	It("creates configuration with the FIRST clause", func() {
@@ -61,7 +61,7 @@ var _ = Describe("synchronous replica configuration with the new API", func() {
 			},
 		}
 
-		Expect(explicitSynchronousStandbyNames(cluster)).To(Equal("FIRST 2 (\"three\",\"two\")"))
+		Expect(explicitSynchronousStandbyNames(cluster)).To(Equal("FIRST 2 (\"three\",\"two\",\"one\")"))
 	})
 
 	It("consider the maximum number of standby names", func() {
@@ -112,6 +112,7 @@ var _ = Describe("synchronous replica configuration with the new API", func() {
 		}
 		cluster.Status = apiv1.ClusterStatus{}
 
-		Expect(explicitSynchronousStandbyNames(cluster)).To(BeEmpty())
+		Expect(explicitSynchronousStandbyNames(cluster)).To(
+			Equal("FIRST 2 (\"example-placeholder\")"))
 	})
 })
