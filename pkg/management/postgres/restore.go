@@ -22,6 +22,11 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	pluginClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
+	restore "github.com/cloudnative-pg/cnpg-i/pkg/restore/job"
+	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	"math"
 	"os"
 	"os/exec"
@@ -248,29 +253,38 @@ func (info InitInfo) Restore(ctx context.Context) error {
 		info.ApplicationDatabase = cluster.GetApplicationDatabaseName()
 	}
 
-	// Before starting the restore we check if the archive destination is safe to use
-	// otherwise, we stop creating the cluster
-	err = info.checkBackupDestination(ctx, typedClient, cluster)
+	var envs []string
+	var config string
+	found, err := tryRestoreViaPlugin(ctx, cluster)
 	if err != nil {
 		return err
 	}
 
-	// If we need to download data from a backup, we do it
-	backup, env, err := info.loadBackup(ctx, typedClient, cluster)
-	if err != nil {
-		return err
-	}
+	if !found {
+		// Before starting the restore we check if the archive destination is safe to use
+		// otherwise, we stop creating the cluster
+		err = info.checkBackupDestination(ctx, typedClient, cluster)
+		if err != nil {
+			return err
+		}
 
-	if err := info.ensureArchiveContainsLastCheckpointRedoWAL(ctx, cluster, env, backup); err != nil {
-		return err
-	}
+		// If we need to download data from a backup, we do it
+		backup, env, err := info.loadBackup(ctx, typedClient, cluster)
+		if err != nil {
+			return err
+		}
 
-	if err := info.restoreDataDir(ctx, backup, env); err != nil {
-		return err
-	}
+		if err := info.ensureArchiveContainsLastCheckpointRedoWAL(ctx, cluster, env, backup); err != nil {
+			return err
+		}
 
-	if _, err := info.restoreCustomWalDir(ctx); err != nil {
-		return err
+		if err := info.restoreDataDir(ctx, backup, env); err != nil {
+			return err
+		}
+
+		if _, err := info.restoreCustomWalDir(ctx); err != nil {
+			return err
+		}
 	}
 
 	if err := info.WriteInitialPostgresqlConf(ctx, cluster); err != nil {
@@ -304,8 +318,10 @@ func (info InitInfo) Restore(ctx context.Context) error {
 		return err
 	}
 
-	if err := info.writeRestoreWalConfig(ctx, backup, cluster); err != nil {
-		return err
+	if !found {
+		if err := info.writeRestoreWalConfig(ctx, backup, cluster); err != nil {
+			return err
+		}
 	}
 
 	return info.ConfigureInstanceAfterRestore(ctx, cluster, env)
@@ -984,4 +1000,37 @@ func waitUntilRecoveryFinishes(db *sql.DB) error {
 
 		return nil
 	})
+}
+
+// tryRestoreViaPlugin tries to restore the cluster using a plugin if available and enabled.
+// Returns true if a restore plugin was found and any error encountered.
+func tryRestoreViaPlugin(ctx context.Context, cluster *apiv1.Cluster) (*restore.RestoreResponse, error) {
+	contextLogger := log.FromContext(ctx)
+
+	plugins := repository.New()
+	availablePluginNames, err := plugins.RegisterUnixSocketPluginsInPath(configuration.Current.PluginSocketDir)
+	if err != nil {
+		contextLogger.Error(err, "Error while loading local plugins")
+	}
+	defer plugins.Close()
+
+	availablePluginNamesSet := stringset.From(availablePluginNames)
+	enabledPluginNamesSet := stringset.From(cluster.Spec.Plugins.GetEnabledPluginNames())
+
+	client, err := pluginClient.WithPlugins(
+		ctx,
+		plugins,
+		availablePluginNamesSet.Intersect(enabledPluginNamesSet).ToList()...,
+	)
+	if err != nil {
+		contextLogger.Error(err, "Error while loading required plugins")
+		return nil, err
+	}
+	defer client.Close(ctx)
+
+	if !client.CanRunRestoreJobHooks() {
+		return nil, nil
+	}
+
+	return client.Restore(ctx)
 }

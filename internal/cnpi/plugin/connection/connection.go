@@ -28,6 +28,7 @@ import (
 	"github.com/cloudnative-pg/cnpg-i/pkg/lifecycle"
 	"github.com/cloudnative-pg/cnpg-i/pkg/operator"
 	"github.com/cloudnative-pg/cnpg-i/pkg/reconciler"
+	restore "github.com/cloudnative-pg/cnpg-i/pkg/restore/job"
 	"github.com/cloudnative-pg/cnpg-i/pkg/wal"
 	"google.golang.org/grpc"
 )
@@ -57,6 +58,7 @@ type Interface interface {
 	WALClient() wal.WALClient
 	BackupClient() backup.BackupClient
 	ReconcilerHooksClient() reconciler.ReconcilerHooksClient
+	RestoreJobHooksClient() restore.RestoreJobHooksClient
 
 	PluginCapabilities() []identity.PluginCapability_Service_Type
 	OperatorCapabilities() []operator.OperatorCapability_RPC_Type
@@ -64,6 +66,7 @@ type Interface interface {
 	LifecycleCapabilities() []*lifecycle.OperatorLifecycleCapabilities
 	BackupCapabilities() []backup.BackupCapability_RPC_Type
 	ReconcilerCapabilities() []reconciler.ReconcilerHooksCapability_Kind
+	RestoreJobHooksCapabilities() []restore.RestoreJobHooksCapability_Kind
 
 	Ping(ctx context.Context) error
 	Close() error
@@ -77,15 +80,17 @@ type data struct {
 	walClient             wal.WALClient
 	backupClient          backup.BackupClient
 	reconcilerHooksClient reconciler.ReconcilerHooksClient
+	restoreJobHooksClient restore.RestoreJobHooksClient
 
-	name                   string
-	version                string
-	capabilities           []identity.PluginCapability_Service_Type
-	operatorCapabilities   []operator.OperatorCapability_RPC_Type
-	walCapabilities        []wal.WALCapability_RPC_Type
-	lifecycleCapabilities  []*lifecycle.OperatorLifecycleCapabilities
-	backupCapabilities     []backup.BackupCapability_RPC_Type
-	reconcilerCapabilities []reconciler.ReconcilerHooksCapability_Kind
+	name                        string
+	version                     string
+	capabilities                []identity.PluginCapability_Service_Type
+	operatorCapabilities        []operator.OperatorCapability_RPC_Type
+	walCapabilities             []wal.WALCapability_RPC_Type
+	lifecycleCapabilities       []*lifecycle.OperatorLifecycleCapabilities
+	backupCapabilities          []backup.BackupCapability_RPC_Type
+	reconcilerCapabilities      []reconciler.ReconcilerHooksCapability_Kind
+	restoreJobHooksCapabilities []restore.RestoreJobHooksCapability_Kind
 }
 
 func newPluginDataFromConnection(ctx context.Context, connection Handler) (data, error) {
@@ -102,16 +107,18 @@ func newPluginDataFromConnection(ctx context.Context, connection Handler) (data,
 		return data{}, fmt.Errorf("while querying plugin identity: %w", err)
 	}
 
-	result := data{}
-	result.connection = connection
-	result.name = pluginInfoResponse.Name
-	result.version = pluginInfoResponse.Version
-	result.identityClient = identity.NewIdentityClient(connection)
-	result.operatorClient = operator.NewOperatorClient(connection)
-	result.lifecycleClient = lifecycle.NewOperatorLifecycleClient(connection)
-	result.walClient = wal.NewWALClient(connection)
-	result.backupClient = backup.NewBackupClient(connection)
-	result.reconcilerHooksClient = reconciler.NewReconcilerHooksClient(connection)
+	result := data{
+		connection:            connection,
+		name:                  pluginInfoResponse.Name,
+		version:               pluginInfoResponse.Version,
+		identityClient:        identity.NewIdentityClient(connection),
+		operatorClient:        operator.NewOperatorClient(connection),
+		lifecycleClient:       lifecycle.NewOperatorLifecycleClient(connection),
+		walClient:             wal.NewWALClient(connection),
+		backupClient:          backup.NewBackupClient(connection),
+		reconcilerHooksClient: reconciler.NewReconcilerHooksClient(connection),
+		restoreJobHooksClient: restore.NewRestoreJobHooksClient(connection),
+	}
 
 	return result, err
 }
@@ -232,6 +239,27 @@ func (pluginData *data) loadBackupCapabilities(ctx context.Context) error {
 	return nil
 }
 
+func (pluginData *data) loadRestoreJobHooksCapabilities(ctx context.Context) error {
+	var restoreJobHooksCapabilitiesResponse *restore.RestoreJobHooksCapabilitiesResult
+	var err error
+
+	if restoreJobHooksCapabilitiesResponse, err = pluginData.restoreJobHooksClient.GetCapabilities(
+		ctx,
+		&restore.RestoreJobHooksCapabilitiesRequest{},
+	); err != nil {
+		return fmt.Errorf("while querying plugin operator capabilities: %w", err)
+	}
+
+	pluginData.restoreJobHooksCapabilities = make(
+		[]restore.RestoreJobHooksCapability_Kind,
+		len(restoreJobHooksCapabilitiesResponse.Capabilities))
+	for i := range pluginData.restoreJobHooksCapabilities {
+		pluginData.restoreJobHooksCapabilities[i] = restoreJobHooksCapabilitiesResponse.Capabilities[i].Kind
+	}
+
+	return nil
+}
+
 // Metadata extracts the plugin metadata reading from
 // the internal metadata
 func (pluginData *data) Metadata() Metadata {
@@ -288,6 +316,10 @@ func (pluginData *data) BackupClient() backup.BackupClient {
 	return pluginData.backupClient
 }
 
+func (pluginData *data) RestoreJobHooksClient() restore.RestoreJobHooksClient {
+	return pluginData.restoreJobHooksClient
+}
+
 func (pluginData *data) ReconcilerHooksClient() reconciler.ReconcilerHooksClient {
 	return pluginData.reconcilerHooksClient
 }
@@ -314,6 +346,10 @@ func (pluginData *data) BackupCapabilities() []backup.BackupCapability_RPC_Type 
 
 func (pluginData *data) ReconcilerCapabilities() []reconciler.ReconcilerHooksCapability_Kind {
 	return pluginData.reconcilerCapabilities
+}
+
+func (pluginData *data) RestoreJobHooksCapabilities() []restore.RestoreJobHooksCapability_Kind {
+	return pluginData.restoreJobHooksCapabilities
 }
 
 func (pluginData *data) Ping(ctx context.Context) error {
@@ -370,6 +406,14 @@ func LoadPlugin(ctx context.Context, handler Handler) (Interface, error) {
 	// capabilities
 	if slices.Contains(result.capabilities, identity.PluginCapability_Service_TYPE_RECONCILER_HOOKS) {
 		if err = result.loadReconcilerHooksCapabilities(ctx); err != nil {
+			return nil, err
+		}
+	}
+
+	// If the plugin implements the restore job hooks, load its
+	// capabilities
+	if slices.Contains(result.capabilities, identity.PluginCapability_Service_TYPE_RESTORE_JOB) {
+		if err = result.loadRestoreJobHooksCapabilities(ctx); err != nil {
 			return nil, err
 		}
 	}
