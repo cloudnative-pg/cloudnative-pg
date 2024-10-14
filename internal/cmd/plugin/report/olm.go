@@ -46,7 +46,7 @@ func getOlmResourceList(
 	resourceList, err := dynamicClient.Resource(gvr).Namespace(namespace).
 		List(ctx, metav1.ListOptions{LabelSelector: getLabelOperatorsNamespace()})
 	if err != nil {
-		return nil, fmt.Errorf("could note get resource: %v, %v", gvr, err)
+		return nil, fmt.Errorf("could not list resource: %v, %v", gvr, err)
 	}
 
 	return resourceList, nil
