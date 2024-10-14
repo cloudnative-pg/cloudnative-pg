@@ -17,6 +17,7 @@ limitations under the License.
 package postgres
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 
@@ -33,7 +34,7 @@ import (
 
 // ClonePgData clones an existing server, given its connection string,
 // to a certain data directory
-func ClonePgData(connectionString, targetPgData, walDir string) error {
+func ClonePgData(ctx context.Context, connectionString, targetPgData, walDir string) error {
 	log.Info("Waiting for server to be available", "connectionString", connectionString)
 
 	db, err := pool.NewDBConnection(connectionString, pool.ConnectionProfilePostgresqlPhysicalReplication)
@@ -44,7 +45,7 @@ func ClonePgData(connectionString, targetPgData, walDir string) error {
 		_ = db.Close()
 	}()
 
-	err = waitForStreamingConnectionAvailable(db)
+	err = waitForStreamingConnectionAvailable(ctx, db)
 	if err != nil {
 		return fmt.Errorf("source server not available: %v", connectionString)
 	}
@@ -70,7 +71,7 @@ func ClonePgData(connectionString, targetPgData, walDir string) error {
 }
 
 // Join creates a new instance joined to an existing PostgreSQL cluster
-func (info InitInfo) Join(cluster *apiv1.Cluster) error {
+func (info InitInfo) Join(ctx context.Context, cluster *apiv1.Cluster) error {
 	primaryConnInfo := buildPrimaryConnInfo(info.ParentNode, info.PodName) + " dbname=postgres connect_timeout=5"
 
 	pgVersion, err := cluster.GetPostgresqlVersion()
@@ -91,7 +92,7 @@ func (info InitInfo) Join(cluster *apiv1.Cluster) error {
 		return err
 	}
 
-	if err = ClonePgData(primaryConnInfo, info.PgData, info.PgWal); err != nil {
+	if err = ClonePgData(ctx, primaryConnInfo, info.PgData, info.PgWal); err != nil {
 		return err
 	}
 

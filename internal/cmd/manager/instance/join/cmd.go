@@ -93,13 +93,15 @@ func NewCmd() *cobra.Command {
 }
 
 func joinSubCommand(ctx context.Context, instance *postgres.Instance, info postgres.InitInfo) error {
+	contextLogger := log.FromContext(ctx)
+
 	if err := info.CheckTargetDataDirectory(ctx); err != nil {
 		return err
 	}
 
 	client, err := management.NewControllerRuntimeClient()
 	if err != nil {
-		log.Error(err, "Error creating Kubernetes client")
+		contextLogger.Error(err, "Error creating Kubernetes client")
 		return err
 	}
 
@@ -118,7 +120,7 @@ func joinSubCommand(ctx context.Context, instance *postgres.Instance, info postg
 		ctrl.ObjectKey{Namespace: instance.GetNamespaceName(), Name: instance.GetClusterName()},
 		&cluster,
 	); err != nil {
-		log.Error(err, "Error while getting cluster")
+		contextLogger.Error(err, "Error while getting cluster")
 		return err
 	}
 
@@ -134,8 +136,8 @@ func joinSubCommand(ctx context.Context, instance *postgres.Instance, info postg
 	reconciler.RefreshSecrets(ctx, &cluster)
 
 	// Run "pg_basebackup" to download the data directory from the primary
-	if err := info.Join(&cluster); err != nil {
-		log.Error(err, "Error joining node")
+	if err := info.Join(ctx, &cluster); err != nil {
+		contextLogger.Error(err, "Error joining node")
 		return err
 	}
 

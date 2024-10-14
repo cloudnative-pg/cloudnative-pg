@@ -93,7 +93,7 @@ func NewCmd() *cobra.Command {
 					Message: err.Error(),
 				}
 				if errCond := conditions.Patch(ctx, typedClient, cluster, &condition); errCond != nil {
-					log.Error(errCond, "Error changing wal archiving condition (wal archiving failed)")
+					contextLog.Error(errCond, "Error changing wal archiving condition (wal archiving failed)")
 				}
 				return err
 			}
@@ -106,7 +106,7 @@ func NewCmd() *cobra.Command {
 				Message: "Continuous archiving is working",
 			}
 			if errCond := conditions.Patch(ctx, typedClient, cluster, &condition); errCond != nil {
-				log.Error(errCond, "Error changing wal archiving condition (wal archiving succeeded)")
+				contextLog.Error(errCond, "Error changing wal archiving condition (wal archiving succeeded)")
 			}
 
 			return nil
@@ -158,7 +158,7 @@ func run(
 	// Request Barman Cloud to archive this WAL
 	if cluster.Spec.Backup == nil || cluster.Spec.Backup.BarmanObjectStore == nil {
 		// Backup not configured, skipping WAL
-		contextLog.Info("Backup not configured, skip WAL archiving via Barman Cloud",
+		contextLog.Debug("Backup not configured, skip WAL archiving via Barman Cloud",
 			"walName", walName,
 			"currentPrimary", cluster.Status.CurrentPrimary,
 			"targetPrimary", cluster.Status.TargetPrimary,
@@ -281,10 +281,11 @@ func checkWalArchive(
 	walArchiver *barmanArchiver.WALArchiver,
 	pgData string,
 ) error {
+	contextLogger := log.FromContext(ctx)
 	checkWalOptions, err := walArchiver.BarmanCloudCheckWalArchiveOptions(
 		ctx, cluster.Spec.Backup.BarmanObjectStore, cluster.Name)
 	if err != nil {
-		log.Error(err, "while getting barman-cloud-wal-archive options")
+		contextLogger.Error(err, "while getting barman-cloud-wal-archive options")
 		return err
 	}
 
@@ -293,7 +294,7 @@ func checkWalArchive(
 	}
 
 	if err := walArchiver.CheckWalArchiveDestination(ctx, checkWalOptions); err != nil {
-		log.Error(err, "while barman-cloud-check-wal-archive")
+		contextLogger.Error(err, "while barman-cloud-check-wal-archive")
 		return err
 	}
 

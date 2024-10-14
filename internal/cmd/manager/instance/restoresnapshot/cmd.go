@@ -55,6 +55,7 @@ func NewCmd() *cobra.Command {
 		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
+			contextLogger := log.FromContext(ctx)
 
 			info := postgres.InitInfo{
 				ClusterName: clusterName,
@@ -81,7 +82,7 @@ func NewCmd() *cobra.Command {
 
 			err := execute(ctx, info, immediate)
 			if err != nil {
-				log.Error(err, "Error while recovering Volume Snapshot backup")
+				contextLogger.Error(err, "Error while recovering Volume Snapshot backup")
 			}
 			return err
 		},

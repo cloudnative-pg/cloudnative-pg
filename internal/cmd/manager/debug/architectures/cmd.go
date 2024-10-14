@@ -32,9 +32,10 @@ func NewCmd() *cobra.Command {
 	cmd := cobra.Command{
 		Use:   "show-architectures",
 		Short: "Lists all the CPU architectures supported by this image",
-		RunE: func(_ *cobra.Command, _ []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			contextLogger := log.FromContext(cmd.Context())
 			if err := run(); err != nil {
-				log.Error(err, "Error while extracting the list of supported architectures")
+				contextLogger.Error(err, "Error while extracting the list of supported architectures")
 				return err
 			}
 

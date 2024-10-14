@@ -40,6 +40,8 @@ import (
 )
 
 func main() {
+	cobra.EnableTraverseRunHooks = true
+
 	logFlags := &log.Flags{}
 
 	cmd := &cobra.Command{

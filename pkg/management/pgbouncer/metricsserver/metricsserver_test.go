@@ -29,8 +29,8 @@ var _ = Describe("MetricsServer", func() {
 			exporter = nil
 		})
 
-		It("should register exporters and collectors successfully", func() {
-			err := Setup()
+		It("should register exporters and collectors successfully", func(ctx SpecContext) {
+			err := Setup(ctx)
 			Expect(err).NotTo(HaveOccurred())
 
 			mfs, err := registry.Gather()

@@ -38,7 +38,9 @@ import (
 
 // InstallPgDataFileContent installs a file in PgData, returning true/false if
 // the file has been changed and an error state
-func InstallPgDataFileContent(pgdata, contents, destinationFile string) (bool, error) {
+func InstallPgDataFileContent(ctx context.Context, pgdata, contents, destinationFile string) (bool, error) {
+	contextLogger := log.FromContext(ctx)
+
 	targetFile := path.Join(pgdata, destinationFile)
 	result, err := fileutils.WriteStringToFile(targetFile, contents)
 	if err != nil {
@@ -46,7 +48,7 @@ func InstallPgDataFileContent(pgdata, contents, destinationFile string) (bool, e
 	}
 
 	if result {
-		log.Info(
+		contextLogger.Info(
 			"Installed configuration file",
 			"pgdata", pgdata,
 			"filename", destinationFile)
@@ -59,6 +61,7 @@ func InstallPgDataFileContent(pgdata, contents, destinationFile string) (bool, e
 // PostgreSQL configuration and rewrites the file in the PGDATA if needed. This
 // function will return "true" if the configuration has been really changed.
 func (instance *Instance) RefreshConfigurationFilesFromCluster(
+	ctx context.Context,
 	cluster *apiv1.Cluster,
 	preserveUserSettings bool,
 ) (bool, error) {
@@ -68,6 +71,7 @@ func (instance *Instance) RefreshConfigurationFilesFromCluster(
 	}
 
 	postgresConfigurationChanged, err := InstallPgDataFileContent(
+		ctx,
 		instance.PgData,
 		postgresConfiguration,
 		constants.PostgresqlCustomConfigurationFile)
@@ -110,7 +114,7 @@ func (instance *Instance) GeneratePostgresqlHBA(cluster *apiv1.Cluster, ldapBind
 }
 
 // RefreshPGHBA generates and writes down the pg_hba.conf file
-func (instance *Instance) RefreshPGHBA(cluster *apiv1.Cluster, ldapBindPassword string) (
+func (instance *Instance) RefreshPGHBA(ctx context.Context, cluster *apiv1.Cluster, ldapBindPassword string) (
 	postgresHBAChanged bool,
 	err error,
 ) {
@@ -120,6 +124,7 @@ func (instance *Instance) RefreshPGHBA(cluster *apiv1.Cluster, ldapBindPassword 
 		return false, nil
 	}
 	postgresHBAChanged, err = InstallPgDataFileContent(
+		ctx,
 		instance.PgData,
 		pgHBAContent,
 		constants.PostgresqlHBARulesFile)
@@ -212,13 +217,17 @@ func (instance *Instance) generatePostgresqlIdent(additionalLines []string) (str
 // RefreshPGIdent generates and writes down the pg_ident.conf file given
 // a set of additional pg_ident lines that is usually taken from the
 // Cluster configuration
-func (instance *Instance) RefreshPGIdent(additionalLines []string) (postgresIdentChanged bool, err error) {
+func (instance *Instance) RefreshPGIdent(
+	ctx context.Context,
+	additionalLines []string,
+) (postgresIdentChanged bool, err error) {
 	// Generate pg_ident.conf file
 	pgIdentContent, err := instance.generatePostgresqlIdent(additionalLines)
 	if err != nil {
 		return false, nil
 	}
 	postgresIdentChanged, err = InstallPgDataFileContent(
+		ctx,
 		instance.PgData,
 		pgIdentContent,
 		constants.PostgresqlIdentFile)

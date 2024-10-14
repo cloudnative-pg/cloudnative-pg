@@ -18,6 +18,7 @@ limitations under the License.
 package status
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -33,26 +34,27 @@ import (
 func NewCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "status",
-		RunE: func(_ *cobra.Command, _ []string) error {
-			return statusSubCommand()
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return statusSubCommand(cmd.Context())
 		},
 	}
 
 	return cmd
 }
 
-func statusSubCommand() error {
+func statusSubCommand(ctx context.Context) error {
+	contextLogger := log.FromContext(ctx)
 	statusURL := url.Local(url.PathPgStatus, url.StatusPort)
 	resp, err := http.Get(statusURL) // nolint:gosec
 	if err != nil {
-		log.Error(err, "Error while requesting instance status")
+		contextLogger.Error(err, "Error while requesting instance status")
 		return err
 	}
 
 	defer func() {
 		err = resp.Body.Close()
 		if err != nil {
-			log.Error(err, "Can't close the connection",
+			contextLogger.Error(err, "Can't close the connection",
 				"statusURL", statusURL,
 				"statusCode", resp.StatusCode,
 			)
@@ -61,7 +63,7 @@ func statusSubCommand() error {
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.Error(err, "Error while reading status response body",
+		contextLogger.Error(err, "Error while reading status response body",
 			"statusURL", statusURL,
 			"statusCode", resp.StatusCode,
 		)
@@ -69,7 +71,7 @@ func statusSubCommand() error {
 	}
 
 	if resp.StatusCode != 200 {
-		log.Info(
+		contextLogger.Info(
 			"Error while extracting status",
 			"statusURL", statusURL,
 			"statusCode", resp.StatusCode,
@@ -80,7 +82,7 @@ func statusSubCommand() error {
 
 	_, err = os.Stdout.Write(body)
 	if err != nil {
-		log.Error(err, "Error while showing status info")
+		contextLogger.Error(err, "Error while showing status info")
 		return err
 	}
 

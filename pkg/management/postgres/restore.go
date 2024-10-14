@@ -146,7 +146,7 @@ func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client, imm
 		return err
 	}
 
-	if err := info.WriteInitialPostgresqlConf(cluster); err != nil {
+	if err := info.WriteInitialPostgresqlConf(ctx, cluster); err != nil {
 		return err
 	}
 
@@ -167,7 +167,7 @@ func (info InitInfo) RestoreSnapshot(ctx context.Context, cli client.Client, imm
 		return err
 	}
 
-	if err := info.WriteRestoreHbaConf(); err != nil {
+	if err := info.WriteRestoreHbaConf(ctx); err != nil {
 		return err
 	}
 
@@ -185,13 +185,14 @@ func (info InitInfo) createBackupObjectForSnapshotRestore(
 	typedClient client.Client,
 	cluster *apiv1.Cluster,
 ) (*apiv1.Backup, []string, error) {
+	contextLogger := log.FromContext(ctx)
 	sourceName := cluster.Spec.Bootstrap.Recovery.Source
 
 	if sourceName == "" {
 		return nil, nil, fmt.Errorf("recovery source not specified")
 	}
 
-	log.Info("Recovering from external cluster", "sourceName", sourceName)
+	contextLogger.Info("Recovering from external cluster", "sourceName", sourceName)
 
 	server, found := cluster.ExternalCluster(sourceName)
 	if !found {
@@ -273,7 +274,7 @@ func (info InitInfo) Restore(ctx context.Context) error {
 		return err
 	}
 
-	if err := info.WriteInitialPostgresqlConf(cluster); err != nil {
+	if err := info.WriteInitialPostgresqlConf(ctx, cluster); err != nil {
 		return err
 	}
 	// we need a migration here, otherwise the server will not start up if
@@ -300,7 +301,7 @@ func (info InitInfo) Restore(ctx context.Context) error {
 		return err
 	}
 
-	if err := info.WriteRestoreHbaConf(); err != nil {
+	if err := info.WriteRestoreHbaConf(ctx); err != nil {
 		return err
 	}
 
@@ -392,6 +393,7 @@ func (info InitInfo) restoreCustomWalDir(ctx context.Context) (bool, error) {
 
 // restoreDataDir restores PGDATA from an existing backup
 func (info InitInfo) restoreDataDir(ctx context.Context, backup *apiv1.Backup, env []string) error {
+	contextLogger := log.FromContext(ctx)
 	var options []string
 
 	if backup.Status.EndpointURL != "" {
@@ -408,7 +410,7 @@ func (info InitInfo) restoreDataDir(ctx context.Context, backup *apiv1.Backup, e
 
 	options = append(options, info.PgData)
 
-	log.Info("Starting barman-cloud-restore",
+	contextLogger.Info("Starting barman-cloud-restore",
 		"options", options)
 
 	cmd := exec.Command(barmanCapabilities.BarmanCloudRestore, options...) // #nosec G204
@@ -420,10 +422,10 @@ func (info InitInfo) restoreDataDir(ctx context.Context, backup *apiv1.Backup, e
 			err = barmanCommand.UnmarshalBarmanCloudRestoreExitCode(ctx, exitError.ExitCode())
 		}
 
-		log.Error(err, "Can't restore backup")
+		contextLogger.Error(err, "Can't restore backup")
 		return err
 	}
-	log.Info("Restore completed")
+	contextLogger.Info("Restore completed")
 	return nil
 }
 
@@ -460,13 +462,14 @@ func (info InitInfo) loadBackupObjectFromExternalCluster(
 	typedClient client.Client,
 	cluster *apiv1.Cluster,
 ) (*apiv1.Backup, []string, error) {
+	contextLogger := log.FromContext(ctx)
 	sourceName := cluster.Spec.Bootstrap.Recovery.Source
 
 	if sourceName == "" {
 		return nil, nil, fmt.Errorf("recovery source not specified")
 	}
 
-	log.Info("Recovering from external cluster", "sourceName", sourceName)
+	contextLogger.Info("Recovering from external cluster", "sourceName", sourceName)
 
 	server, found := cluster.ExternalCluster(sourceName)
 	if !found {
@@ -506,7 +509,7 @@ func (info InitInfo) loadBackupObjectFromExternalCluster(
 		return nil, nil, fmt.Errorf("no target backup found")
 	}
 
-	log.Info("Target backup found", "backup", targetBackup)
+	contextLogger.Info("Target backup found", "backup", targetBackup)
 
 	return &apiv1.Backup{
 		Spec: apiv1.BackupSpec{
@@ -541,6 +544,7 @@ func (info InitInfo) loadBackupFromReference(
 	typedClient client.Client,
 	cluster *apiv1.Cluster,
 ) (*apiv1.Backup, []string, error) {
+	contextLogger := log.FromContext(ctx)
 	var backup apiv1.Backup
 	err := typedClient.Get(
 		ctx,
@@ -566,7 +570,7 @@ func (info InitInfo) loadBackupFromReference(
 		return nil, nil, err
 	}
 
-	log.Info("Recovering existing backup", "backup", backup)
+	contextLogger.Info("Recovering existing backup", "backup", backup)
 	return &backup, env, nil
 }
 
@@ -763,7 +767,8 @@ func LoadEnforcedParametersFromCluster(
 
 // WriteInitialPostgresqlConf resets the postgresql.conf that there is in the instance using
 // a new bootstrapped instance as reference
-func (info InitInfo) WriteInitialPostgresqlConf(cluster *apiv1.Cluster) error {
+func (info InitInfo) WriteInitialPostgresqlConf(ctx context.Context, cluster *apiv1.Cluster) error {
+	contextLogger := log.FromContext(ctx)
 	if err := fileutils.EnsureDirectoryExists(postgresSpec.RecoveryTemporaryDirectory); err != nil {
 		return err
 	}
@@ -775,7 +780,7 @@ func (info InitInfo) WriteInitialPostgresqlConf(cluster *apiv1.Cluster) error {
 	defer func() {
 		err = os.RemoveAll(tempDataDir)
 		if err != nil {
-			log.Error(
+			contextLogger.Error(
 				err,
 				"skipping error while deleting temporary data directory")
 		}
@@ -794,15 +799,15 @@ func (info InitInfo) WriteInitialPostgresqlConf(cluster *apiv1.Cluster) error {
 		WithNamespace(info.Namespace).
 		WithClusterName(info.ClusterName)
 
-	_, err = temporaryInstance.RefreshPGHBA(cluster, "")
+	_, err = temporaryInstance.RefreshPGHBA(ctx, cluster, "")
 	if err != nil {
 		return fmt.Errorf("while generating pg_hba.conf: %w", err)
 	}
-	_, err = temporaryInstance.RefreshPGIdent(cluster.Spec.PostgresConfiguration.PgIdent)
+	_, err = temporaryInstance.RefreshPGIdent(ctx, cluster.Spec.PostgresConfiguration.PgIdent)
 	if err != nil {
 		return fmt.Errorf("while generating pg_ident.conf: %w", err)
 	}
-	_, err = temporaryInstance.RefreshConfigurationFilesFromCluster(cluster, false)
+	_, err = temporaryInstance.RefreshConfigurationFilesFromCluster(ctx, cluster, false)
 	if err != nil {
 		return fmt.Errorf("while generating Postgres configuration: %w", err)
 	}
@@ -841,7 +846,7 @@ func (info InitInfo) WriteInitialPostgresqlConf(cluster *apiv1.Cluster) error {
 
 // WriteRestoreHbaConf writes basic pg_hba.conf and pg_ident.conf allowing access without password from localhost.
 // This is needed to set the PostgreSQL password after the postgres server is started and active
-func (info InitInfo) WriteRestoreHbaConf() error {
+func (info InitInfo) WriteRestoreHbaConf(ctx context.Context) error {
 	// We allow every access from localhost, and this is needed to correctly restore
 	// the database
 	_, err := fileutils.WriteStringToFile(
@@ -852,7 +857,7 @@ func (info InitInfo) WriteRestoreHbaConf() error {
 	}
 
 	// Create only the local map referred in the HBA configuration
-	_, err = info.GetInstance().RefreshPGIdent(nil)
+	_, err = info.GetInstance().RefreshPGIdent(ctx, nil)
 	return err
 }
 
@@ -921,6 +926,7 @@ func (info *InitInfo) checkBackupDestination(
 	client client.Client,
 	cluster *apiv1.Cluster,
 ) error {
+	contextLogger := log.FromContext(ctx)
 	if !cluster.Spec.Backup.IsBarmanBackupConfigured() {
 		return nil
 	}
@@ -954,7 +960,7 @@ func (info *InitInfo) checkBackupDestination(
 	checkWalOptions, err := walArchiver.BarmanCloudCheckWalArchiveOptions(
 		ctx, cluster.Spec.Backup.BarmanObjectStore, cluster.Name)
 	if err != nil {
-		log.Error(err, "while getting barman-cloud-wal-archive options")
+		contextLogger.Error(err, "while getting barman-cloud-wal-archive options")
 		return err
 	}
 
