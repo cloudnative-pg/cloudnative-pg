@@ -86,6 +86,8 @@ type BackupResponse struct {
 
 	// This field is set to true for online/hot backups and to false otherwise.
 	Online bool
+
+	Metadata map[string]string
 }
 
 func (data *data) Backup(
@@ -162,5 +164,6 @@ func (data *data) Backup(
 		TablespaceMapFile: result.TablespaceMapFile,
 		InstanceID:        result.InstanceId,
 		Online:            result.Online,
+		Metadata:          result.Metadata,
 	}, nil
 }
