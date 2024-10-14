@@ -192,6 +192,7 @@ Therefore, all the possible `logger` values are the following:
 - `postgres`: from the `postgres` instance (having `msg` different than `record`)
 - `wal-archive`: from the `wal-archive` subcommand of the instance manager
 - `wal-restore`: from the `wal-restore` subcommand of the instance manager
+- `instance-manager`: from the [PostgreSQL instance manager](./instance_manager.md)
 
 Except for `postgres`, which has the aforementioned structures,
 all other possible values have `msg` set to the escaped message that's
