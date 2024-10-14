@@ -50,6 +50,41 @@ var _ = Describe("Cluster logging tests", func() {
 				utils.ClusterLabelName: clusterName,
 			},
 		},
+		Status: v1.PodStatus{
+			ContainerStatuses: []v1.ContainerStatus{
+				{
+					Name: "postgresql",
+					State: v1.ContainerState{
+						Running: &v1.ContainerStateRunning{},
+					},
+				},
+			},
+		},
+	}
+	podWithSidecars := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: clusterNamespace,
+			Name:      clusterName + "-1",
+			Labels: map[string]string{
+				utils.ClusterLabelName: clusterName,
+			},
+		},
+		Status: v1.PodStatus{
+			ContainerStatuses: []v1.ContainerStatus{
+				{
+					Name: "postgresql",
+					State: v1.ContainerState{
+						Running: &v1.ContainerStateRunning{},
+					},
+				},
+				{
+					Name: "sidecar",
+					State: v1.ContainerState{
+						Running: &v1.ContainerStateRunning{},
+					},
+				},
+			},
+		},
 	}
 	It("should exit on ended pod logs with the non-follow option", func(ctx context.Context) {
 		client := fake.NewSimpleClientset(pod)
@@ -72,6 +107,29 @@ var _ = Describe("Cluster logging tests", func() {
 		ctx.Done()
 		wait.Wait()
 		Expect(logBuffer.String()).To(BeEquivalentTo("fake logs\n"))
+	})
+
+	It("should catch the logs of the sidecar too", func(ctx context.Context) {
+		client := fake.NewSimpleClientset(podWithSidecars)
+		var logBuffer bytes.Buffer
+		var wait sync.WaitGroup
+		wait.Add(1)
+		go func() {
+			defer GinkgoRecover()
+			defer wait.Done()
+			streamClusterLogs := ClusterStreamingRequest{
+				Cluster: cluster,
+				Options: &v1.PodLogOptions{
+					Follow: false,
+				},
+				Client: client,
+			}
+			err := streamClusterLogs.SingleStream(ctx, &logBuffer)
+			Expect(err).NotTo(HaveOccurred())
+		}()
+		ctx.Done()
+		wait.Wait()
+		Expect(logBuffer.String()).To(BeEquivalentTo("fake logs\nfake logs\n"))
 	})
 
 	It("should catch extra logs if given the follow option", func(ctx context.Context) {
