@@ -235,7 +235,7 @@ CloudNativePG recommends using the `node-role.kubernetes.io/postgres` taint.
 To assign the `postgres` taint to a node, use the following command:
 
 ```sh
-kubectl taint node <NODE-NAME> node-role.kubernetes.io/postgres=:noSchedule
+kubectl taint node <NODE-NAME> node-role.kubernetes.io/postgres=:NoSchedule
 ```
 
 To ensure that a `Cluster` resource is scheduled on a node with a `postgres` taint, you must correctly configure the `.spec.affinity.tolerations` stanza in your manifests.
