@@ -31,7 +31,6 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/configfile"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
-	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres/replication"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -39,7 +38,9 @@ import (
 
 // InstallPgDataFileContent installs a file in PgData, returning true/false if
 // the file has been changed and an error state
-func InstallPgDataFileContent(pgdata, contents, destinationFile string) (bool, error) {
+func InstallPgDataFileContent(ctx context.Context, pgdata, contents, destinationFile string) (bool, error) {
+	contextLogger := log.FromContext(ctx)
+
 	targetFile := path.Join(pgdata, destinationFile)
 	result, err := fileutils.WriteStringToFile(targetFile, contents)
 	if err != nil {
@@ -47,7 +48,7 @@ func InstallPgDataFileContent(pgdata, contents, destinationFile string) (bool, e
 	}
 
 	if result {
-		log.Info(
+		contextLogger.Info(
 			"Installed configuration file",
 			"pgdata", pgdata,
 			"filename", destinationFile)
@@ -60,6 +61,7 @@ func InstallPgDataFileContent(pgdata, contents, destinationFile string) (bool, e
 // PostgreSQL configuration and rewrites the file in the PGDATA if needed. This
 // function will return "true" if the configuration has been really changed.
 func (instance *Instance) RefreshConfigurationFilesFromCluster(
+	ctx context.Context,
 	cluster *apiv1.Cluster,
 	preserveUserSettings bool,
 ) (bool, error) {
@@ -69,6 +71,7 @@ func (instance *Instance) RefreshConfigurationFilesFromCluster(
 	}
 
 	postgresConfigurationChanged, err := InstallPgDataFileContent(
+		ctx,
 		instance.PgData,
 		postgresConfiguration,
 		constants.PostgresqlCustomConfigurationFile)
@@ -111,7 +114,7 @@ func (instance *Instance) GeneratePostgresqlHBA(cluster *apiv1.Cluster, ldapBind
 }
 
 // RefreshPGHBA generates and writes down the pg_hba.conf file
-func (instance *Instance) RefreshPGHBA(cluster *apiv1.Cluster, ldapBindPassword string) (
+func (instance *Instance) RefreshPGHBA(ctx context.Context, cluster *apiv1.Cluster, ldapBindPassword string) (
 	postgresHBAChanged bool,
 	err error,
 ) {
@@ -121,6 +124,7 @@ func (instance *Instance) RefreshPGHBA(cluster *apiv1.Cluster, ldapBindPassword 
 		return false, nil
 	}
 	postgresHBAChanged, err = InstallPgDataFileContent(
+		ctx,
 		instance.PgData,
 		pgHBAContent,
 		constants.PostgresqlHBARulesFile)
@@ -213,13 +217,17 @@ func (instance *Instance) generatePostgresqlIdent(additionalLines []string) (str
 // RefreshPGIdent generates and writes down the pg_ident.conf file given
 // a set of additional pg_ident lines that is usually taken from the
 // Cluster configuration
-func (instance *Instance) RefreshPGIdent(additionalLines []string) (postgresIdentChanged bool, err error) {
+func (instance *Instance) RefreshPGIdent(
+	ctx context.Context,
+	additionalLines []string,
+) (postgresIdentChanged bool, err error) {
 	// Generate pg_ident.conf file
 	pgIdentContent, err := instance.generatePostgresqlIdent(additionalLines)
 	if err != nil {
 		return false, nil
 	}
 	postgresIdentChanged, err = InstallPgDataFileContent(
+		ctx,
 		instance.PgData,
 		pgIdentContent,
 		constants.PostgresqlIdentFile)
@@ -240,77 +248,20 @@ func UpdateReplicaConfiguration(pgData, primaryConnInfo, slotName string) (chang
 		return changed, err
 	}
 
-	major, err := postgresutils.GetMajorVersion(pgData)
-	if err != nil {
-		return false, err
-	}
-
-	if major < 12 {
-		return configureRecoveryConfFile(pgData, primaryConnInfo, slotName)
-	}
-
 	return changed, createStandbySignal(pgData)
-}
-
-// configureRecoveryConfFile configures replication in the recovery.conf file
-// for PostgreSQL 11 and earlier
-func configureRecoveryConfFile(pgData, primaryConnInfo, slotName string) (changed bool, err error) {
-	targetFile := path.Join(pgData, "recovery.conf")
-
-	options := map[string]string{
-		"standby_mode": "on",
-		"restore_command": fmt.Sprintf(
-			"/controller/manager wal-restore --log-destination %s/%s.json %%f %%p",
-			postgres.LogPath, postgres.LogFileName),
-		"recovery_target_timeline": "latest",
-	}
-
-	if slotName != "" {
-		options["primary_slot_name"] = slotName
-	}
-
-	if primaryConnInfo != "" {
-		options["primary_conninfo"] = primaryConnInfo
-	}
-
-	changed, err = configfile.UpdatePostgresConfigurationFile(
-		targetFile,
-		options,
-		"primary_slot_name",
-		"primary_conninfo",
-	)
-	if err != nil {
-		return false, err
-	}
-	if changed {
-		log.Info("Updated replication settings", "filename", "recovery.conf")
-	}
-
-	return changed, nil
 }
 
 // configurePostgresOverrideConfFile writes the content of override.conf file, including
 // replication information
 func configurePostgresOverrideConfFile(pgData, primaryConnInfo, slotName string) (changed bool, err error) {
 	targetFile := path.Join(pgData, constants.PostgresqlOverrideConfigurationFile)
-
-	major, err := postgresutils.GetMajorVersion(pgData)
-	if err != nil {
-		return false, err
-	}
-
-	options := make(map[string]string)
-
-	// Write replication control as GUCs (from PostgreSQL 12 or above)
-	if major >= 12 {
-		options = map[string]string{
-			"restore_command": fmt.Sprintf(
-				"/controller/manager wal-restore --log-destination %s/%s.json %%f %%p",
-				postgres.LogPath, postgres.LogFileName),
-			"recovery_target_timeline": "latest",
-			"primary_slot_name":        slotName,
-			"primary_conninfo":         primaryConnInfo,
-		}
+	options := map[string]string{
+		"restore_command": fmt.Sprintf(
+			"/controller/manager wal-restore --log-destination %s/%s.json %%f %%p",
+			postgres.LogPath, postgres.LogFileName),
+		"recovery_target_timeline": "latest",
+		"primary_slot_name":        slotName,
+		"primary_conninfo":         primaryConnInfo,
 	}
 
 	// Ensure that override.conf file contains just the above options

@@ -208,6 +208,7 @@ the `logger` field indicating the process that produced them. The possible
   `record`)
 - `wal-archive`: logs from the `wal-archive` subcommand of the instance manager
 - `wal-restore`: logs from the `wal-restore` subcommand of the instance manager
+- `instance-manager`: from the [PostgreSQL instance manager](./instance_manager.md)
 
 With the exception of `postgres`, which follows a specific structure, all other
 `logger` values contain the `msg` field with the escaped message that is

@@ -83,7 +83,7 @@ func (r *ClusterReconciler) ensureClientCASecret(ctx context.Context, cluster *a
 		return nil, err
 	}
 
-	err = r.verifyCAValidity(secret, cluster)
+	err = r.verifyCAValidity(ctx, secret, cluster)
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +120,7 @@ func (r *ClusterReconciler) ensureServerCASecret(ctx context.Context, cluster *a
 		return nil, err
 	}
 
-	err = r.verifyCAValidity(secret, cluster)
+	err = r.verifyCAValidity(ctx, secret, cluster)
 	if err != nil {
 		return nil, err
 	}
@@ -139,7 +139,9 @@ func (r *ClusterReconciler) ensureServerCASecret(ctx context.Context, cluster *a
 	return &secret, nil
 }
 
-func (r *ClusterReconciler) verifyCAValidity(secret v1.Secret, cluster *apiv1.Cluster) error {
+func (r *ClusterReconciler) verifyCAValidity(ctx context.Context, secret v1.Secret, cluster *apiv1.Cluster) error {
+	contextLogger := log.FromContext(ctx)
+
 	// Verify validity of the CA and expiration (only ca.crt)
 	publicKey, ok := secret.Data[certs.CACertKey]
 	if !ok {
@@ -156,7 +158,7 @@ func (r *ClusterReconciler) verifyCAValidity(secret v1.Secret, cluster *apiv1.Cl
 	} else if isExpiring {
 		r.Recorder.Event(cluster, "Warning", "SecretIsExpiring",
 			"Checking expiring date of secret "+secret.Name)
-		log.Info("CA certificate is expiring or is already expired", "secret", secret.Name)
+		contextLogger.Info("CA certificate is expiring or is already expired", "secret", secret.Name)
 	}
 
 	return nil

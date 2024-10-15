@@ -45,8 +45,8 @@ var _ = Describe("RefreshConfigurationFiles", func() {
 	})
 
 	Context("when no files are passed", func() {
-		It("should return false and no error", func() {
-			changed, err := refreshConfigurationFiles(files)
+		It("should return false and no error", func(ctx SpecContext) {
+			changed, err := refreshConfigurationFiles(ctx, files)
 			Expect(changed).To(BeFalse())
 			Expect(err).NotTo(HaveOccurred())
 		})
@@ -58,8 +58,8 @@ var _ = Describe("RefreshConfigurationFiles", func() {
 			files[filepath.Join(tmpDir, "config2")] = []byte("content2")
 		})
 
-		It("should write content to files and return true", func() {
-			changed, err := refreshConfigurationFiles(files)
+		It("should write content to files and return true", func(ctx SpecContext) {
+			changed, err := refreshConfigurationFiles(ctx, files)
 			Expect(changed).To(BeTrue())
 			Expect(err).NotTo(HaveOccurred())
 
@@ -76,8 +76,8 @@ var _ = Describe("RefreshConfigurationFiles", func() {
 			files["/proc/you-cannot-write-here.conf"] = []byte("content")
 		})
 
-		It("should return an error", func() {
-			_, err := refreshConfigurationFiles(files)
+		It("should return an error", func(ctx SpecContext) {
+			_, err := refreshConfigurationFiles(ctx, files)
 			Expect(err).To(HaveOccurred())
 		})
 	})
