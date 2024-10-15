@@ -1,6 +1,6 @@
 # Logging
 
-The operator outputs logs in JSON format directly to standard output, including
+CloudNativePG outputs logs in JSON format directly to standard output, including
 PostgreSQL logs, without persisting them to storage for security reasons. This
 design facilitates seamless integration with most Kubernetes-compatible log
 management tools, including command line ones like
