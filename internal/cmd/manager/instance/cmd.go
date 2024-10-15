@@ -19,6 +19,7 @@ package instance
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 
@@ -29,6 +30,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/instance/restoresnapshot"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/instance/run"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/instance/status"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 )
 
 // NewCmd creates the "instance" command
@@ -38,6 +40,9 @@ func NewCmd() *cobra.Command {
 		Short: "Instance management subfeatures",
 		RunE: func(_ *cobra.Command, _ []string) error {
 			return fmt.Errorf("missing subcommand")
+		},
+		PersistentPreRunE: func(_ *cobra.Command, _ []string) error {
+			return os.MkdirAll(postgres.TemporaryDirectory, 0o1777) //nolint:gosec
 		},
 	}
 

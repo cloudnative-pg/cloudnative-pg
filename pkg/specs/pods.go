@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"path"
 	"reflect"
 	"slices"
 	"strconv"
@@ -132,12 +133,20 @@ func CreatePodEnvConfig(cluster apiv1.Cluster, podName string) EnvConfig {
 				Value: cluster.Name,
 			},
 			{
+				Name:  "PSQL_HISTORY",
+				Value: path.Join(postgres.TemporaryDirectory, ".psql_history"),
+			},
+			{
 				Name:  "PGPORT",
 				Value: strconv.Itoa(postgres.ServerPort),
 			},
 			{
 				Name:  "PGHOST",
 				Value: postgres.SocketDirectory,
+			},
+			{
+				Name:  "TMPDIR",
+				Value: postgres.TemporaryDirectory,
 			},
 		},
 		EnvFrom: cluster.Spec.EnvFrom,
