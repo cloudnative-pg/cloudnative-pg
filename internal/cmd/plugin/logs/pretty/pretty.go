@@ -34,14 +34,16 @@ import (
 )
 
 type prettyCmd struct {
-	loggers  *stringset.Data
-	pods     *stringset.Data
-	minLevel LogLevel
+	loggers   *stringset.Data
+	pods      *stringset.Data
+	groupSize int
+	minLevel  LogLevel
 }
 
 // NewCmd creates a new `kubectl cnpg logs pretty` command
 func NewCmd() *cobra.Command {
 	var loggers, pods []string
+	var groupSize int
 	bf := prettyCmd{}
 
 	cmd := &cobra.Command{
@@ -55,6 +57,7 @@ func NewCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			bf.loggers = stringset.From(loggers)
 			bf.pods = stringset.From(pods)
+			bf.groupSize = groupSize
 
 			recordChannel := make(chan logRecord)
 			recordGroupsChannel := make(chan []logRecord)
@@ -84,6 +87,8 @@ func NewCmd() *cobra.Command {
 		},
 	}
 
+	cmd.Flags().IntVar(&groupSize, "group-size", 200,
+		"The maximum size of the log section to be sorted")
 	cmd.Flags().StringSliceVar(&loggers, "loggers", nil,
 		"The list of loggers to receive. Defaults to all.")
 	cmd.Flags().StringSliceVar(&pods, "pods", nil,
@@ -129,8 +134,7 @@ func (bf *prettyCmd) decode(ctx context.Context, reader io.Reader, recordChannel
 
 // group transforms a stream of logs in a stream of log groups
 func (bf *prettyCmd) group(ctx context.Context, logChannel <-chan logRecord, groupChannel chan<- []logRecord) {
-	const bufferMaxEntries = 200
-	var bufferArray [bufferMaxEntries]logRecord
+	bufferArray := make([]logRecord, bf.groupSize)
 
 	buffer := bufferArray[0:0]
 
@@ -164,7 +168,7 @@ logLoop:
 			}
 
 			buffer = append(buffer, logRecord)
-			if len(buffer) == bufferMaxEntries {
+			if len(buffer) == bf.groupSize {
 				pushLogGroup()
 			}
 		}
