@@ -38,7 +38,7 @@ func NewCmd() *cobra.Command {
 			return plugin.CompleteClusters(cmd.Context(), args, toComplete), cobra.ShellCompDirectiveNoFileComp
 		},
 		Long:    "This command will start an interactive psql session inside a PostgreSQL Pod created by CloudNativePG.",
-		GroupID: "misc",
+		GroupID: plugin.GroupIDMiscellaneous,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			clusterName := args[0]
 			psqlArgs := args[1:]

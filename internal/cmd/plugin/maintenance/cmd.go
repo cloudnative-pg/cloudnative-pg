@@ -33,7 +33,7 @@ func NewCmd() *cobra.Command {
 	maintenanceCmd := &cobra.Command{
 		Use:     "maintenance [set/unset]",
 		Short:   "Sets or removes maintenance mode from clusters",
-		GroupID: "pg-cluster",
+		GroupID: plugin.GroupIDPgCluster,
 	}
 
 	maintenanceCmd.AddCommand(&cobra.Command{

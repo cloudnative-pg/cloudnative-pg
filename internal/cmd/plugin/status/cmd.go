@@ -31,7 +31,7 @@ func NewCmd() *cobra.Command {
 		Use:     "status [cluster]",
 		Short:   "Get the status of a PostgreSQL cluster",
 		Args:    plugin.RequiresArguments(1),
-		GroupID: "pg-db",
+		GroupID: plugin.GroupIDPgDatabase,
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			if strings.HasPrefix(toComplete, "-") {
 				fmt.Printf("%+v\n", toComplete)

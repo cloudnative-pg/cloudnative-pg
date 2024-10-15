@@ -31,7 +31,7 @@ func NewCmd() *cobra.Command {
 	destroyCmd := &cobra.Command{
 		Use:     "destroy [cluster] [node]",
 		Short:   "Destroy the instance named [cluster]-[node] or [node] with the associated PVC",
-		GroupID: "pg-cluster",
+		GroupID: plugin.GroupIDPgCluster,
 		Args:    plugin.RequiresArguments(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := context.Background()

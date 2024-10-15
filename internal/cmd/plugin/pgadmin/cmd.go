@@ -79,7 +79,7 @@ func NewCmd() *cobra.Command {
 		Short:   "Creates a pgadmin deployment",
 		Args:    cobra.MinimumNArgs(1),
 		Long:    `Creates a pgadmin deployment configured to work with a CNPG Cluster.`,
-		GroupID: "misc",
+		GroupID: plugin.GroupIDMiscellaneous,
 		Example: pgadminExample,
 		RunE: func(_ *cobra.Command, args []string) error {
 			ctx := context.Background()

@@ -31,7 +31,7 @@ func NewCmd() *cobra.Command {
 	promoteCmd := &cobra.Command{
 		Use:     "promote [cluster] [node]",
 		Short:   "Promote the pod named [cluster]-[node] or [node] to primary",
-		GroupID: "pg-cluster",
+		GroupID: plugin.GroupIDPgCluster,
 		Args:    plugin.RequiresArguments(2),
 		RunE: func(_ *cobra.Command, args []string) error {
 			ctx := context.Background()

@@ -18,6 +18,8 @@ package install
 
 import (
 	"github.com/spf13/cobra"
+
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 )
 
 // NewCmd returns the installation root cmd
@@ -25,7 +27,7 @@ func NewCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "install",
 		Short:   "CloudNativePG installation-related commands",
-		GroupID: "cnpg-level",
+		GroupID: plugin.GroupIDCnpg,
 	}
 	cmd.AddCommand(newGenerateCmd())
 

@@ -18,6 +18,8 @@ package logs
 
 import (
 	"github.com/spf13/cobra"
+
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 )
 
 // NewCmd creates the new "report" command
@@ -25,7 +27,7 @@ func NewCmd() *cobra.Command {
 	logsCmd := &cobra.Command{
 		Use:     "logs cluster",
 		Short:   "Collect cluster logs",
-		GroupID: "pg-db",
+		GroupID: plugin.GroupIDPgDatabase,
 	}
 
 	logsCmd.AddCommand(clusterCmd())

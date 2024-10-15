@@ -56,6 +56,20 @@ var (
 	ClientInterface kubernetes.Interface
 )
 
+const (
+	// GroupIDCnpg represents an ID to group up CNPG commands
+	GroupIDCnpg = "cnpg-level"
+
+	// GroupIDPgCluster represents an ID to group up Postgres Cluster commands
+	GroupIDPgCluster = "pg-cluster"
+
+	// GroupIDPgDatabase represents an ID to group up Postgres Database commands
+	GroupIDPgDatabase = "pg-db"
+
+	// GroupIDMiscellaneous represents an ID to group up miscellaneous commands
+	GroupIDMiscellaneous = "misc"
+)
+
 // SetupKubernetesClient creates a k8s client to be used inside the kubectl-cnpg
 // utility
 func SetupKubernetesClient(configFlags *genericclioptions.ConfigFlags) error {

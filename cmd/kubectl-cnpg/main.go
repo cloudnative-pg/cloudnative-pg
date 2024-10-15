@@ -83,21 +83,22 @@ func main() {
 	configFlags.AddFlags(rootCmd.PersistentFlags())
 
 	adminGroup := &cobra.Group{
-		ID:    "cnpg-level",
+		ID:    plugin.GroupIDCnpg,
 		Title: "CNPG Operator level Administration",
 	}
+
 	dbaGroup := &cobra.Group{
-		ID:    "pg-cluster",
+		ID:    plugin.GroupIDPgCluster,
 		Title: "PostgreSQL Cluster Administration",
 	}
 
 	benchmarkGroup := &cobra.Group{
-		ID:    "pg-db",
+		ID:    plugin.GroupIDPgDatabase,
 		Title: "PostgreSQL Database Administration",
 	}
 
 	toolsGroup := &cobra.Group{
-		ID:    "misc",
+		ID:    plugin.GroupIDMiscellaneous,
 		Title: "Miscellaneous",
 	}
 
