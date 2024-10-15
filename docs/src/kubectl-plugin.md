@@ -825,6 +825,25 @@ $ kubectl cnpg logs cluster cluster-example | kubectl cnpg logs pretty --pods cl
 [...]
 ```
 
+The `pretty` sub-command will try to sort the log stream,
+to make logs easier to reason about. In order to achieve this, it gathers the
+logs into groups, and within groups it sorts by timestamp. This is the only
+way to sort interactively, as `pretty` may be piped from a command in "follow"
+mode. The sub-command will add a group separator line, `---`, at the end of
+each sorted group. The size of the grouping can be configured via the
+`--sorting-group-size` flag, as illustrated in the following example:
+
+``` sh
+$ kubectl logs cluster-example-1 | kubectl cnpg logs pretty --sorting-group-size=3
+2024-10-15T13:50:53Z INFO     cluster-example-1 setup            Starting CloudNativePG Instance Manager
+2024-10-15T13:50:53Z INFO     cluster-example-1 setup            Checking for free disk space for WALs before starting PostgreSQL
+2024-10-15T13:50:53Z INFO     cluster-example-1 setup            starting tablespace manager
+---
+2024-10-15T13:50:53Z INFO                       Starting EventSource
+2024-10-15T13:50:53Z INFO     cluster-example-1 setup            starting external server manager
+[...]
+```
+
 To explore all available options, use the `-h` flag for detailed explanations
 of the supported flags and their usage.
 

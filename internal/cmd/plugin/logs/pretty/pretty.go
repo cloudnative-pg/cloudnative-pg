@@ -136,7 +136,7 @@ func (bf *prettyCmd) decode(ctx context.Context, reader io.Reader, recordChannel
 	close(recordChannel)
 }
 
-// group transforms a stream of logs in a stream of log groups, so that the groups
+// group transforms a stream of logs into a stream of log groups, so that the groups
 // can then be sorted
 func (bf *prettyCmd) group(ctx context.Context, logChannel <-chan logRecord, groupChannel chan<- []logRecord) {
 	bufferArray := make([]logRecord, bf.groupSize)
