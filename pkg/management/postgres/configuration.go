@@ -31,7 +31,6 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/configfile"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
-	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres/replication"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -249,77 +248,20 @@ func UpdateReplicaConfiguration(pgData, primaryConnInfo, slotName string) (chang
 		return changed, err
 	}
 
-	major, err := postgresutils.GetMajorVersion(pgData)
-	if err != nil {
-		return false, err
-	}
-
-	if major < 12 {
-		return configureRecoveryConfFile(pgData, primaryConnInfo, slotName)
-	}
-
 	return changed, createStandbySignal(pgData)
-}
-
-// configureRecoveryConfFile configures replication in the recovery.conf file
-// for PostgreSQL 11 and earlier
-func configureRecoveryConfFile(pgData, primaryConnInfo, slotName string) (changed bool, err error) {
-	targetFile := path.Join(pgData, "recovery.conf")
-
-	options := map[string]string{
-		"standby_mode": "on",
-		"restore_command": fmt.Sprintf(
-			"/controller/manager wal-restore --log-destination %s/%s.json %%f %%p",
-			postgres.LogPath, postgres.LogFileName),
-		"recovery_target_timeline": "latest",
-	}
-
-	if slotName != "" {
-		options["primary_slot_name"] = slotName
-	}
-
-	if primaryConnInfo != "" {
-		options["primary_conninfo"] = primaryConnInfo
-	}
-
-	changed, err = configfile.UpdatePostgresConfigurationFile(
-		targetFile,
-		options,
-		"primary_slot_name",
-		"primary_conninfo",
-	)
-	if err != nil {
-		return false, err
-	}
-	if changed {
-		log.Info("Updated replication settings", "filename", "recovery.conf")
-	}
-
-	return changed, nil
 }
 
 // configurePostgresOverrideConfFile writes the content of override.conf file, including
 // replication information
 func configurePostgresOverrideConfFile(pgData, primaryConnInfo, slotName string) (changed bool, err error) {
 	targetFile := path.Join(pgData, constants.PostgresqlOverrideConfigurationFile)
-
-	major, err := postgresutils.GetMajorVersion(pgData)
-	if err != nil {
-		return false, err
-	}
-
-	options := make(map[string]string)
-
-	// Write replication control as GUCs (from PostgreSQL 12 or above)
-	if major >= 12 {
-		options = map[string]string{
-			"restore_command": fmt.Sprintf(
-				"/controller/manager wal-restore --log-destination %s/%s.json %%f %%p",
-				postgres.LogPath, postgres.LogFileName),
-			"recovery_target_timeline": "latest",
-			"primary_slot_name":        slotName,
-			"primary_conninfo":         primaryConnInfo,
-		}
+	options := map[string]string{
+		"restore_command": fmt.Sprintf(
+			"/controller/manager wal-restore --log-destination %s/%s.json %%f %%p",
+			postgres.LogPath, postgres.LogFileName),
+		"recovery_target_timeline": "latest",
+		"primary_slot_name":        slotName,
+		"primary_conninfo":         primaryConnInfo,
 	}
 
 	// Ensure that override.conf file contains just the above options
