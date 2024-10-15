@@ -82,6 +82,33 @@ func main() {
 	logFlags.AddFlags(rootCmd.PersistentFlags())
 	configFlags.AddFlags(rootCmd.PersistentFlags())
 
+	adminGroup := &cobra.Group{
+		ID:    plugin.GroupIDAdmin,
+		Title: "Operator-level administration",
+	}
+
+	troubleshootingGroup := &cobra.Group{
+		ID:    plugin.GroupIDTroubleshooting,
+		Title: "Troubleshooting",
+	}
+
+	pgClusterGroup := &cobra.Group{
+		ID:    plugin.GroupIDCluster,
+		Title: "Cluster administration",
+	}
+
+	pgDatabaseGroup := &cobra.Group{
+		ID:    plugin.GroupIDDatabase,
+		Title: "Database administration",
+	}
+
+	miscGroup := &cobra.Group{
+		ID:    plugin.GroupIDMiscellaneous,
+		Title: "Miscellaneous",
+	}
+
+	rootCmd.AddGroup(adminGroup, troubleshootingGroup, pgClusterGroup, pgDatabaseGroup, miscGroup)
+
 	subcommands := []*cobra.Command{
 		backup.NewCmd(),
 		certificate.NewCmd(),

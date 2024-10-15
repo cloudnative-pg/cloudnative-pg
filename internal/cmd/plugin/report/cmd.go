@@ -18,13 +18,16 @@ package report
 
 import (
 	"github.com/spf13/cobra"
+
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 )
 
 // NewCmd creates the new "report" command
 func NewCmd() *cobra.Command {
 	reportCmd := &cobra.Command{
-		Use:   "report operator/cluster",
-		Short: "Report on the operator",
+		Use:     "report operator/cluster",
+		Short:   "Report on the operator or a cluster for troubleshooting",
+		GroupID: plugin.GroupIDTroubleshooting,
 	}
 
 	reportCmd.AddCommand(operatorCmd())
