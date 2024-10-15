@@ -129,9 +129,16 @@ func (record *logRecord) print(writer io.Writer) error {
 	_, _ = hasher.Write([]byte(record.LoggingPod))
 	colorIdx := int(hasher.Sum32()) % len(colorizers)
 
+	// truncate the timestamp to microsecond
+	// precision
+	ts := record.TS
+	if len(ts) > 23 {
+		ts = record.TS[:23]
+	}
+
 	_, err := fmt.Fprintln(
 		writer,
-		record.TS,
+		ts,
 		aurora.Blue(strings.ToUpper(level)),
 		colorizers[colorIdx](record.LoggingPod),
 		aurora.Blue(record.Logger),
