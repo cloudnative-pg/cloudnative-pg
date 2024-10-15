@@ -405,3 +405,17 @@ func (list PostgresqlStatusList) InstancesReportingStatus() int {
 
 	return n
 }
+
+// PrimaryNames get the names of each primary instance of this Cluster. Under
+// normal conditions, this list is composed by one and only one name.
+func (list PostgresqlStatusList) PrimaryNames() []string {
+	result := make([]string, 0, 1)
+
+	for _, item := range list.Items {
+		if item.IsPrimary {
+			result = append(result, item.Pod.Name)
+		}
+	}
+
+	return result
+}
