@@ -798,7 +798,7 @@ $ kubectl cnpg logs cluster cluster-example | kubectl cnpg logs pretty
 [...]
 ```
 
-Alternatively, it can be used in combination with other commands producing
+Alternatively, it can be used in combination with other commands that produce
 CNPG logs in JSON format, such as `stern`, or `kubectl logs`, as in the
 following example:
 
