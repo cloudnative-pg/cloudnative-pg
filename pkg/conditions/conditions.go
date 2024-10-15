@@ -18,7 +18,6 @@ package conditions
 
 import (
 	"context"
-	"reflect"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,10 +36,9 @@ func Patch(
 	if cluster == nil || condition == nil {
 		return nil
 	}
-	existingCluster := cluster.DeepCopy()
-	meta.SetStatusCondition(&cluster.Status.Conditions, *condition)
 
-	if !reflect.DeepEqual(existingCluster.Status.Conditions, cluster.Status.Conditions) {
+	existingCluster := cluster.DeepCopy()
+	if changed := meta.SetStatusCondition(&cluster.Status.Conditions, *condition); changed {
 		// To avoid conflict using patch instead of update
 		if err := c.Status().Patch(ctx, cluster, client.MergeFrom(existingCluster)); err != nil {
 			return err
