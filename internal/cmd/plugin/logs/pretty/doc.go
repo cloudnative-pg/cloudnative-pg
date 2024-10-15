@@ -14,17 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package logs
-
-import (
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-)
-
-var _ = Describe("Get the proper command", func() {
-	It("get the proper command", func() {
-		logsCmd := NewCmd()
-		Expect(logsCmd.Use).To(BeEquivalentTo("logs"))
-		Expect(logsCmd.Short).To(BeEquivalentTo("Logging utilities"))
-	})
-})
+// Package pretty contains the implementation of `kubectl cnpg logs pretty`
+package pretty
