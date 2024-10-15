@@ -174,7 +174,8 @@ func AssertSwitchoverWithHistory(
 					}
 
 					numHistory := len(strings.Split(strings.TrimSpace(out), "\n"))
-					GinkgoWriter.Printf("count %d: pod: %s, the number of history file in pg_wal: %d\n", count, pod, numHistory)
+					GinkgoWriter.Printf("count %d: pod: %s, the number of history file in pg_wal: %d\n", count, pod,
+						numHistory)
 					count++
 					if numHistory > 0 {
 						continue
@@ -292,8 +293,11 @@ func AssertClusterIsReady(namespace string, clusterName string, timeout int, env
 	})
 }
 
-func AssertClusterDefault(namespace string, clusterName string,
-	isExpectedToDefault bool, env *testsUtils.TestingEnvironment,
+func AssertClusterDefault(
+	namespace string,
+	clusterName string,
+	isExpectedToDefault bool,
+	env *testsUtils.TestingEnvironment,
 ) {
 	By("having a Cluster object populated with default values", func() {
 		// Eventually the number of ready instances should be equal to the
@@ -335,8 +339,14 @@ func AssertWebhookEnabled(env *testsUtils.TestingEnvironment, mutating, validati
 }
 
 // Update the secrets and verify cluster reference the updated resource version of secrets
-func AssertUpdateSecret(field string, value string, secretName string, namespace string,
-	clusterName string, timeout int, env *testsUtils.TestingEnvironment,
+func AssertUpdateSecret(
+	field string,
+	value string,
+	secretName string,
+	namespace string,
+	clusterName string,
+	timeout int,
+	env *testsUtils.TestingEnvironment,
 ) {
 	var secret corev1.Secret
 	Eventually(func(g Gomega) {
@@ -377,8 +387,14 @@ func AssertUpdateSecret(field string, value string, secretName string, namespace
 
 // AssertConnection is used if a connection from a pod to a postgresql
 // database works
-func AssertConnection(host string, user string, dbname string,
-	password string, queryingPod *corev1.Pod, timeout int, env *testsUtils.TestingEnvironment,
+func AssertConnection(
+	host string,
+	user string,
+	dbname string,
+	password string,
+	queryingPod *corev1.Pod,
+	timeout int,
+	env *testsUtils.TestingEnvironment,
 ) {
 	By(fmt.Sprintf("connecting to the %v service as %v", host, user), func() {
 		Eventually(func() string {
@@ -513,7 +529,8 @@ func AssertCreateTestDataLargeObject(namespace, clusterName string, oid int, dat
 	By("creating large object", func() {
 		query := fmt.Sprintf("CREATE TABLE IF NOT EXISTS image (name text,raster oid); "+
 			"INSERT INTO image (name, raster) VALUES ('beautiful image', lo_from_bytea(%d, '%s'));", oid, data)
-		appUser, appUserPass, err := testsUtils.GetCredentials(clusterName, namespace, apiv1.ApplicationUserSecretSuffix, env)
+		appUser, appUserPass, err := testsUtils.GetCredentials(clusterName, namespace,
+			apiv1.ApplicationUserSecretSuffix, env)
 		Expect(err).ToNot(HaveOccurred())
 		host, err := testsUtils.GetHostName(namespace, clusterName, env)
 		Expect(err).ToNot(HaveOccurred())
@@ -565,7 +582,8 @@ func AssertDatabaseExists(namespace, podName, databaseName string, expectedValue
 	By(fmt.Sprintf("verifying if database %v exists", databaseName), func() {
 		pod := &corev1.Pod{}
 		commandTimeout := time.Second * 10
-		query := fmt.Sprintf("SELECT EXISTS(SELECT 1 FROM pg_database WHERE lower(datname) = lower('%v'));", databaseName)
+		query := fmt.Sprintf("SELECT EXISTS(SELECT 1 FROM pg_database WHERE lower(datname) = lower('%v'));",
+			databaseName)
 		err := env.Client.Get(env.Ctx, ctrlclient.ObjectKey{Namespace: namespace, Name: podName}, pod)
 		Expect(err).ToNot(HaveOccurred())
 		stdout, _, err := env.ExecCommand(env.Ctx, *pod, specs.PostgresContainerName,
@@ -602,8 +620,10 @@ func AssertUserExists(namespace, podName, userName string, expectedValue bool) {
 }
 
 // AssertDataExpectedCountWithDatabaseName verifies that an expected amount of rows exists on the table
-func AssertDataExpectedCountWithDatabaseName(namespace, podName, databaseName string,
-	tableName string, expectedValue int,
+func AssertDataExpectedCountWithDatabaseName(
+	namespace, podName, databaseName string,
+	tableName string,
+	expectedValue int,
 ) {
 	By(fmt.Sprintf("verifying test data on pod %v", podName), func() {
 		query := fmt.Sprintf("select count(*) from %v", tableName)
@@ -890,7 +910,7 @@ func AssertArchiveWalOnMinio(namespace, clusterName string, serverName string) {
 	By(fmt.Sprintf("verify the existence of WAL %v in minio", latestWALPath), func() {
 		Eventually(func() (int, error) {
 			// WALs are compressed with gzip in the fixture
-			return minio.CountFilesOnMinio(minioEnv, latestWALPath)
+			return minio.CountFiles(minioEnv, latestWALPath)
 		}, testTimeouts[testsUtils.WalsInMinio]).Should(BeEquivalentTo(1))
 	})
 }
@@ -1123,7 +1143,8 @@ func AssertDetachReplicaModeCluster(
 	})
 
 	By("verifying that replica cluster was not modified", func() {
-		outTables, stdErr, err := env.EventuallyExecCommand(env.Ctx, *primaryReplicaCluster, specs.PostgresContainerName,
+		outTables, stdErr, err := env.EventuallyExecCommand(env.Ctx, *primaryReplicaCluster,
+			specs.PostgresContainerName,
 			&replicaCommandTimeout, "psql", "-U", "postgres", srcDatabaseName, "-tAc", "\\dt")
 		if err != nil {
 			GinkgoWriter.Printf("stdout: %v\nstderr: %v\n", outTables, stdErr)
@@ -1437,9 +1458,11 @@ func AssertMetricsData(namespace, targetOne, targetTwo, targetSecret string, clu
 			podName := pod.GetName()
 			out, err := testsUtils.RetrieveMetricsFromInstance(env, pod, cluster.IsMetricsTLSEnabled())
 			Expect(err).ToNot(HaveOccurred())
-			Expect(strings.Contains(out, fmt.Sprintf(`cnpg_some_query_rows{datname="%v"} 0`, targetOne))).Should(BeTrue(),
+			Expect(strings.Contains(out,
+				fmt.Sprintf(`cnpg_some_query_rows{datname="%v"} 0`, targetOne))).Should(BeTrue(),
 				"Metric collection issues on %v.\nCollected metrics:\n%v", podName, out)
-			Expect(strings.Contains(out, fmt.Sprintf(`cnpg_some_query_rows{datname="%v"} 0`, targetTwo))).Should(BeTrue(),
+			Expect(strings.Contains(out,
+				fmt.Sprintf(`cnpg_some_query_rows{datname="%v"} 0`, targetTwo))).Should(BeTrue(),
 				"Metric collection issues on %v.\nCollected metrics:\n%v", podName, out)
 			Expect(strings.Contains(out, fmt.Sprintf(`cnpg_some_query_test_rows{datname="%v"} 1`,
 				targetSecret))).Should(BeTrue(),
@@ -1897,7 +1920,8 @@ func AssertClusterWasRestoredWithPITRAndApplicationDB(namespace, clusterName, ta
 	})
 
 	// Gather credentials
-	appUser, appUserPass, err := testsUtils.GetCredentials(clusterName, namespace, apiv1.ApplicationUserSecretSuffix, env)
+	appUser, appUserPass, err := testsUtils.GetCredentials(clusterName, namespace, apiv1.ApplicationUserSecretSuffix,
+		env)
 	Expect(err).ToNot(HaveOccurred())
 
 	primaryPod, err := env.GetClusterPrimary(namespace, clusterName)
@@ -2887,7 +2911,8 @@ func AssertClusterHAReplicationSlots(namespace, clusterName string) {
 		podList, err := env.GetClusterPodList(namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 		for _, pod := range podList.Items {
-			expectedSlots, err := testsUtils.GetExpectedHAReplicationSlotsOnPod(namespace, clusterName, pod.GetName(), env)
+			expectedSlots, err := testsUtils.GetExpectedHAReplicationSlotsOnPod(namespace, clusterName, pod.GetName(),
+				env)
 			Expect(err).ToNot(HaveOccurred())
 			AssertReplicationSlotsOnPod(namespace, clusterName, pod, expectedSlots, true, false)
 		}
