@@ -151,6 +151,7 @@ kubectl cnpg <command> <args...>
     The plugin automatically detects if the standard output channel is connected to a terminal.
     In such cases, it may add ANSI colors to the command output. To disable colors, use the
     `--color=never` option with the command.
+
 ### Generation of installation manifests
 
 The `cnpg` plugin can be used to generate the YAML manifest for the
@@ -755,6 +756,77 @@ kubectl cnpg logs cluster cluster-example --output my-cluster.log
 
 Successfully written logs to "my-cluster.log"
 ```
+
+#### Pretty
+
+The `pretty` sub-command reads a log stream from standard input, formats it
+into a human-readable output, and attempts to sort the entries by timestamp.
+
+It can be used in combination with `kubectl cnpg logs cluster`, as
+shown in the following example:
+
+``` sh
+$ kubectl cnpg logs cluster cluster-example | kubectl cnpg logs pretty
+2024-10-15T17:35:00.336 INFO     cluster-example-1 instance-manager Starting CloudNativePG Instance Manager
+2024-10-15T17:35:00.336 INFO     cluster-example-1 instance-manager Checking for free disk space for WALs before starting PostgreSQL
+2024-10-15T17:35:00.347 INFO     cluster-example-1 instance-manager starting tablespace manager
+2024-10-15T17:35:00.347 INFO     cluster-example-1 instance-manager starting external server manager
+[...]
+```
+
+Alternatively, it can be used in combination with other commands that produce
+CNPG logs in JSON format, such as `stern`, or `kubectl logs`, as in the
+following example:
+
+``` sh
+$ kubectl logs cluster-example-1 | kubectl cnpg logs pretty
+2024-10-15T17:35:00.336 INFO     cluster-example-1 instance-manager Starting CloudNativePG Instance Manager
+2024-10-15T17:35:00.336 INFO     cluster-example-1 instance-manager Checking for free disk space for WALs before starting PostgreSQL
+2024-10-15T17:35:00.347 INFO     cluster-example-1 instance-manager starting tablespace manager
+2024-10-15T17:35:00.347 INFO     cluster-example-1 instance-manager starting external server manager
+[...]
+```
+
+The `pretty` sub-command also supports advanced log filtering, allowing users
+to display logs for specific pods or loggers, or to filter logs by severity
+level.
+Here's an example:
+
+``` sh
+$ kubectl cnpg logs cluster cluster-example | kubectl cnpg logs pretty --pods cluster-example-1 --loggers postgres --log-level info
+2024-10-15T17:35:00.509 INFO     cluster-example-1 postgres         2024-10-15 17:35:00.509 UTC [29] LOG:  redirecting log output to logging collector process
+2024-10-15T17:35:00.509 INFO     cluster-example-1 postgres         2024-10-15 17:35:00.509 UTC [29] HINT:  Future log output will appear in directory "/controller/log"...
+2024-10-15T17:35:00.510 INFO     cluster-example-1 postgres         2024-10-15 17:35:00.509 UTC [29] LOG:  ending log output to stderr
+2024-10-15T17:35:00.510 INFO     cluster-example-1 postgres         ending log output to stderr
+[...]
+```
+
+The `pretty` sub-command will try to sort the log stream,
+to make logs easier to reason about. In order to achieve this, it gathers the
+logs into groups, and within groups it sorts by timestamp. This is the only
+way to sort interactively, as `pretty` may be piped from a command in "follow"
+mode. The sub-command will add a group separator line, `---`, at the end of
+each sorted group. The size of the grouping can be configured via the
+`--sorting-group-size` flag (default: 1000), as illustrated in the following example:
+
+``` sh
+$ kubectl cnpg logs cluster cluster-example | kubectl cnpg logs pretty --sorting-group-size=3
+2024-10-15T17:35:20.426 INFO     cluster-example-2 instance-manager Starting CloudNativePG Instance Manager
+2024-10-15T17:35:20.426 INFO     cluster-example-2 instance-manager Checking for free disk space for WALs before starting PostgreSQL
+2024-10-15T17:35:20.438 INFO     cluster-example-2 instance-manager starting tablespace manager
+---
+2024-10-15T17:35:20.438 INFO     cluster-example-2 instance-manager starting external server manager
+2024-10-15T17:35:20.438 INFO     cluster-example-2 instance-manager starting controller-runtime manager
+2024-10-15T17:35:20.439 INFO     cluster-example-2 instance-manager Starting EventSource
+---
+[...]
+```
+
+To explore all available options, use the `-h` flag for detailed explanations
+of the supported flags and their usage.
+
+!!! Info
+    You can also increase the verbosity of the log by adding more `-v` options.
 
 ### Destroy
 

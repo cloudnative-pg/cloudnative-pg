@@ -20,17 +20,19 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/logs/pretty"
 )
 
-// NewCmd creates the new "report" command
+// NewCmd creates the new "logs" command
 func NewCmd() *cobra.Command {
 	logsCmd := &cobra.Command{
-		Use:     "logs cluster",
-		Short:   "Collect cluster logs",
+		Use:     "logs",
+		Short:   "Logging utilities",
 		GroupID: plugin.GroupIDTroubleshooting,
 	}
 
 	logsCmd.AddCommand(clusterCmd())
+	logsCmd.AddCommand(pretty.NewCmd())
 
 	return logsCmd
 }
