@@ -28,9 +28,10 @@ import (
 // NewCmd implements the `snapshot` subcommand
 func NewCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "snapshot <cluster-name>",
-		Short: "command removed",
-		Long:  "Replaced by `kubectl cnpg backup <cluster-name> -m volumeSnapshot`",
+		Use:     "snapshot <cluster-name>",
+		Short:   "DEPRECATED (use `backup -m volumeSnapshot` instead)",
+		Long:    "Replaced by `kubectl cnpg backup <cluster-name> -m volumeSnapshot`",
+		GroupID: plugin.GroupIDDatabase,
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			return plugin.CompleteClusters(cmd.Context(), args, toComplete), cobra.ShellCompDirectiveNoFileComp
 		},
