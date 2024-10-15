@@ -253,17 +253,6 @@ Here follows a brief description of the main options:
   replication slots with the position on the current primary, expressed in
   seconds (default: 30)
 
-!!! Important
-    This capability requires PostgreSQL 11 or higher, as it relies on the
-    [`pg_replication_slot_advance()` administration function](https://www.postgresql.org/docs/current/functions-admin.html)
-    to directly manipulate the position of a replication slot.
-
-!!! Warning
-    In PostgreSQL 11, enabling replication slots if initially disabled, or conversely
-    disabling them if initially enabled, will require a rolling update of the
-    cluster (due to the presence of the `recovery.conf` file that is only read
-    at startup).
-
 Although it is not recommended, if you desire a different behavior, you can
 customize the above options.
 
