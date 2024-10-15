@@ -69,7 +69,7 @@ func explicitSynchronousStandbyNames(cluster *apiv1.Cluster) string {
 // The result is composed by:
 //
 //   - the list of non-primary ready instances - these are most likely the
-//     instances to be used as a potential synchonous replicas
+//     instances to be used as a potential synchronous replicas
 //   - the list of non-primary non-ready instances
 //   - the name of the primary instance
 //
