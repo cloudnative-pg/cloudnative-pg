@@ -169,7 +169,8 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 			Expect(err).ToNot(HaveOccurred())
 
 			By(fmt.Sprintf("creating backup %s and verifying backup is ready", backupName), func() {
-				testUtils.ExecuteBackup(namespace, clusterBackupManifest, false, testTimeouts[testUtils.BackupIsReady], env)
+				testUtils.ExecuteBackup(namespace, clusterBackupManifest, false, testTimeouts[testUtils.BackupIsReady],
+					env)
 				testUtils.AssertBackupConditionInClusterStatus(env, namespace, clusterName)
 			})
 
@@ -1215,7 +1216,7 @@ func latestBaseBackupContainsExpectedTars(
 		// we list the backup.info files to get the listing of base backups
 		// directories in minio
 		backupInfoFiles := filepath.Join("*", clusterName, "base", "*", "*.info")
-		ls, err := minio.ListFilesOnMinio(minioEnv, backupInfoFiles)
+		ls, err := minio.ListFiles(minioEnv, backupInfoFiles)
 		g.Expect(err).ShouldNot(HaveOccurred())
 		frags := strings.Split(ls, "\n")
 		slices.Sort(frags)
@@ -1223,10 +1224,10 @@ func latestBaseBackupContainsExpectedTars(
 		g.Expect(frags).To(HaveLen(numBackups), report)
 		latestBaseBackup := filepath.Dir(frags[numBackups-1])
 		tarsInLastBackup := strings.TrimPrefix(filepath.Join(latestBaseBackup, "*.tar"), "minio/")
-		listing, err := minio.ListFilesOnMinio(minioEnv, tarsInLastBackup)
+		listing, err := minio.ListFiles(minioEnv, tarsInLastBackup)
 		g.Expect(err).ShouldNot(HaveOccurred())
 		report += fmt.Sprintf("tar listing:\n%s\n", listing)
-		numTars, err := minio.CountFilesOnMinio(minioEnv, tarsInLastBackup)
+		numTars, err := minio.CountFiles(minioEnv, tarsInLastBackup)
 		g.Expect(err).ShouldNot(HaveOccurred())
 		g.Expect(numTars).To(Equal(expectedTars), report)
 	}, 120).Should(Succeed())

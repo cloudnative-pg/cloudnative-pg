@@ -27,12 +27,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
-	utils2 "github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 const (
@@ -575,31 +572,4 @@ func CountFilesOnAzuriteBlobStorage(
 	var arr []string
 	err = json.Unmarshal([]byte(out), &arr)
 	return len(arr), err
-}
-
-// GetClusterPrimary gets the primary pod of a cluster
-func (env TestingEnvironment) GetClusterPrimary(namespace string, clusterName string) (*corev1.Pod, error) {
-	podList := &corev1.PodList{}
-
-	err := GetObjectList(&env, podList, client.InNamespace(namespace),
-		client.MatchingLabels{
-			utils2.ClusterLabelName:             clusterName,
-			utils2.ClusterInstanceRoleLabelName: specs.ClusterRoleLabelPrimary,
-		},
-	)
-	if err != nil {
-		return &corev1.Pod{}, err
-	}
-	if len(podList.Items) > 0 {
-		// if there are multiple, get the one without deletion timestamp
-		for _, pod := range podList.Items {
-			if pod.DeletionTimestamp == nil {
-				return &pod, nil
-			}
-		}
-		err = fmt.Errorf("all pod with primary role has deletion timestamp")
-		return &(podList.Items[0]), err
-	}
-	err = fmt.Errorf("no primary found")
-	return &corev1.Pod{}, err
 }
