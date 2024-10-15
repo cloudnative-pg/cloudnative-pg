@@ -791,10 +791,10 @@ shown in the following example:
 
 ``` sh
 $ kubectl cnpg logs cluster cluster-example | kubectl cnpg logs pretty
-2024-10-10T16:36:18.668100649Z INFO cluster-example-1 instance-manager Starting CloudNativePG Instance Manager {"build":{"Commit":"953f0b2cf","Date":"2024-10-09","Version":"1.24.0-dev128"},"version":"1.24.0"}
-2024-10-10T16:36:18.668268413Z INFO cluster-example-1 instance-manager Checking for free disk space for WALs before starting PostgreSQL
-2024-10-10T16:36:18.686309469Z INFO cluster-example-1 instance-manager starting tablespace manager
-2024-10-10T16:36:18.686375141Z INFO cluster-example-1 instance-manager starting external server manager
+2024-10-15T17:35:00.336 INFO     cluster-example-1 instance-manager Starting CloudNativePG Instance Manager
+2024-10-15T17:35:00.336 INFO     cluster-example-1 instance-manager Checking for free disk space for WALs before starting PostgreSQL
+2024-10-15T17:35:00.347 INFO     cluster-example-1 instance-manager starting tablespace manager
+2024-10-15T17:35:00.347 INFO     cluster-example-1 instance-manager starting external server manager
 [...]
 ```
 
@@ -804,10 +804,10 @@ following example:
 
 ``` sh
 $ kubectl logs cluster-example-1 | kubectl cnpg logs pretty
-2024-10-10T16:36:18.668100649Z INFO cluster-example-1 instance-manager Starting CloudNativePG Instance Manager {"build":{"Commit":"953f0b2cf","Date":"2024-10-09","Version":"1.24.0-dev128"},"version":"1.24.0"}
-2024-10-10T16:36:18.668268413Z INFO cluster-example-1 instance-manager Checking for free disk space for WALs before starting PostgreSQL
-2024-10-10T16:36:18.686309469Z INFO cluster-example-1 instance-manager starting tablespace manager
-2024-10-10T16:36:18.686375141Z INFO cluster-example-1 instance-manager starting external server manager
+2024-10-15T17:35:00.336 INFO     cluster-example-1 instance-manager Starting CloudNativePG Instance Manager
+2024-10-15T17:35:00.336 INFO     cluster-example-1 instance-manager Checking for free disk space for WALs before starting PostgreSQL
+2024-10-15T17:35:00.347 INFO     cluster-example-1 instance-manager starting tablespace manager
+2024-10-15T17:35:00.347 INFO     cluster-example-1 instance-manager starting external server manager
 [...]
 ```
 
@@ -818,10 +818,10 @@ Here's an example:
 
 ``` sh
 $ kubectl cnpg logs cluster cluster-example | kubectl cnpg logs pretty --pods cluster-example-1 --loggers postgres --log-level info
-2024-10-10T16:36:18.853589475Z INFO cluster-example-1 postgres 2024-10-10 16:36:18.853 UTC [29] LOG:  redirecting log output to logging collector process {"pipe":"stderr"}
-2024-10-10T16:36:18.853641103Z INFO cluster-example-1 postgres 2024-10-10 16:36:18.853 UTC [29] HINT:  Future log output will appear in directory "/controller/log". {"pipe":"stderr"}
-2024-10-10T16:36:18.854004804Z INFO cluster-example-1 postgres 2024-10-10 16:36:18.853 UTC [29] LOG:  ending log output to stderr {"source":"/controller/log/postgres"}
-2024-10-10T16:36:18.854038757Z INFO cluster-example-1 postgres 2024-10-10 16:36:18.853 UTC [29] HINT:  Future log output will go to log destination "csvlog". {"source":"/controller/log/postgres"}
+2024-10-15T17:35:00.509 INFO     cluster-example-1 postgres         2024-10-15 17:35:00.509 UTC [29] LOG:  redirecting log output to logging collector process
+2024-10-15T17:35:00.509 INFO     cluster-example-1 postgres         2024-10-15 17:35:00.509 UTC [29] HINT:  Future log output will appear in directory "/controller/log"...
+2024-10-15T17:35:00.510 INFO     cluster-example-1 postgres         2024-10-15 17:35:00.509 UTC [29] LOG:  ending log output to stderr
+2024-10-15T17:35:00.510 INFO     cluster-example-1 postgres         ending log output to stderr
 [...]
 ```
 
@@ -834,18 +834,23 @@ each sorted group. The size of the grouping can be configured via the
 `--sorting-group-size` flag (default: 1000), as illustrated in the following example:
 
 ``` sh
-$ kubectl logs cluster-example-1 | kubectl cnpg logs pretty --sorting-group-size=3
-2024-10-15T13:50:53Z INFO     cluster-example-1 setup            Starting CloudNativePG Instance Manager
-2024-10-15T13:50:53Z INFO     cluster-example-1 setup            Checking for free disk space for WALs before starting PostgreSQL
-2024-10-15T13:50:53Z INFO     cluster-example-1 setup            starting tablespace manager
+$ kubectl cnpg logs cluster cluster-example | kubectl cnpg logs pretty --sorting-group-size=3
+2024-10-15T17:35:20.426 INFO     cluster-example-2 instance-manager Starting CloudNativePG Instance Manager
+2024-10-15T17:35:20.426 INFO     cluster-example-2 instance-manager Checking for free disk space for WALs before starting PostgreSQL
+2024-10-15T17:35:20.438 INFO     cluster-example-2 instance-manager starting tablespace manager
 ---
-2024-10-15T13:50:53Z INFO                       Starting EventSource
-2024-10-15T13:50:53Z INFO     cluster-example-1 setup            starting external server manager
+2024-10-15T17:35:20.438 INFO     cluster-example-2 instance-manager starting external server manager
+2024-10-15T17:35:20.438 INFO     cluster-example-2 instance-manager starting controller-runtime manager
+2024-10-15T17:35:20.439 INFO     cluster-example-2 instance-manager Starting EventSource
+---
 [...]
 ```
 
 To explore all available options, use the `-h` flag for detailed explanations
 of the supported flags and their usage.
+
+!!! Info
+    You can also increase the verbosity of the log by adding more `-v` options.
 
 ### Destroy
 
