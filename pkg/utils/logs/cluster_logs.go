@@ -19,6 +19,7 @@ package logs
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"io"
 	"log"
 	"sync"
@@ -61,9 +62,11 @@ func (csr *ClusterStreamingRequest) getClusterNamespace() string {
 	return csr.Cluster.Namespace
 }
 
-func (csr *ClusterStreamingRequest) getLogOptions() *v1.PodLogOptions {
+func (csr *ClusterStreamingRequest) getLogOptions(containerName string) *v1.PodLogOptions {
 	if csr.Options == nil {
-		csr.Options = &v1.PodLogOptions{}
+		csr.Options = &v1.PodLogOptions{
+			Container: containerName,
+		}
 	}
 	csr.Options.Previous = csr.Previous
 	return csr.Options
@@ -187,13 +190,24 @@ func (csr *ClusterStreamingRequest) SingleStream(ctx context.Context, writer io.
 		}
 
 		for _, pod := range podList.Items {
-			if streamSet.has(pod.Name) {
-				continue
-			}
+			for _, container := range pod.Status.ContainerStatuses {
+				if container.State.Running != nil {
+					streamName := fmt.Sprintf("%s-%s", pod.Name, container.Name)
+					if streamSet.has(streamName) {
+						continue
+					}
 
-			streamSet.add(pod.Name)
-			go csr.streamInGoroutine(ctx, pod.Name, client, streamSet,
-				safeWriterFrom(writer))
+					streamSet.add(streamName)
+					go csr.streamInGoroutine(
+						ctx,
+						pod.Name,
+						container.Name,
+						client,
+						streamSet,
+						safeWriterFrom(writer),
+					)
+				}
+			}
 		}
 		if streamSet.isZero() {
 			return nil
@@ -211,18 +225,19 @@ func (csr *ClusterStreamingRequest) SingleStream(ctx context.Context, writer io.
 func (csr *ClusterStreamingRequest) streamInGoroutine(
 	ctx context.Context,
 	podName string,
+	containerName string,
 	client kubernetes.Interface,
 	streamSet *activeSet,
 	output io.Writer,
 ) {
 	defer func() {
-		streamSet.drop(podName)
+		streamSet.drop(fmt.Sprintf("%s-%s", podName, containerName))
 	}()
 
 	pods := client.CoreV1().Pods(csr.getClusterNamespace())
 	logsRequest := pods.GetLogs(
 		podName,
-		csr.getLogOptions())
+		csr.getLogOptions(containerName))
 
 	logStream, err := logsRequest.Stream(ctx)
 	if err != nil {
