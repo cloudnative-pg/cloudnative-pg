@@ -153,7 +153,8 @@ You can do this by executing these commands:
 kubectl edit deployment -n cnpg-system cnpg-controller-manager
 ```
 
-Then on the edit page scroll down the container args and add `--pprof-server=true`, example:
+Then on the edit page scroll down the container args and add
+`--pprof-server=true`, as in this example:
 
 ```yaml
       containers:
@@ -168,7 +169,8 @@ Then on the edit page scroll down the container args and add `--pprof-server=tru
         - /manager
 ```
 
-Save the changes, the deployment now will execute a roll-out and the new pod will have the PPROF server enabled.
+Save the changes; the deployment now will execute a roll-out, and the new pod
+will have the PPROF server enabled.
 
 Once the pod is running you can exec inside the container by doing:
 

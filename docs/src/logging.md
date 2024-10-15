@@ -16,7 +16,7 @@ management tools, including command line ones like
 Each log entry includes the following fields:
 
 - `level` – The log level (e.g., `info`, `notice`).
-- `ts` – The timestamp (epoch with microseconds).
+- `ts` – The timestamp.
 - `logger` – The type of log (e.g., `postgres`, `pg_controldata`).
 - `msg` – The log message, or the keyword `record` if the message is in JSON
   format.
@@ -30,16 +30,27 @@ Each log entry includes the following fields:
     `log-field-timestamp` flags in the operator controller. This can be configured
     by editing the `Deployment` definition of the `cloudnative-pg` operator.
 
-## Operator Logs
+## Cluster Logs
 
-You can configure the log level for the operator in the cluster specification
-using the `logLevel` option. Available log levels are: `error`, `warning`,
-`info` (default), `debug`, and `trace`.
+You can configure the log level for the instance pods in the cluster
+specification using the `logLevel` option. Available log levels are: `error`,
+`warning`, `info` (default), `debug`, and `trace`.
 
 !!! Important
    Currently, the log level can only be set at the time the instance starts.
    Changes to the log level in the cluster specification after the cluster has
    started will only apply to new pods, not existing ones.
+
+## Operator Logs
+
+The logs produced by the operator pod can be configured with log
+levels, same as instance pods: `error`, `warning`, `info` (default), `debug`,
+and `trace`.
+
+The log level for the operator is controlled by the `--log_level` command line
+argument in the deployment. This value can be configured by editing the
+controller container in the deployment manifest, as shown for example in the
+[operator configuration](operator_conf.md#pprof-http-server) page.
 
 ## PostgreSQL Logs
 
