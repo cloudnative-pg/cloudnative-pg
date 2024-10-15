@@ -44,7 +44,7 @@ type prettyCmd struct {
 // NewCmd creates a new `kubectl cnpg logs pretty` command
 func NewCmd() *cobra.Command {
 	var loggers, pods []string
-	var groupSize, verbosity int
+	var sortingGroupSize, verbosity int
 	bf := prettyCmd{}
 
 	cmd := &cobra.Command{
@@ -58,7 +58,7 @@ func NewCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			bf.loggers = stringset.From(loggers)
 			bf.pods = stringset.From(pods)
-			bf.groupSize = groupSize
+			bf.groupSize = sortingGroupSize
 			bf.verbosity = verbosity
 
 			recordChannel := make(chan logRecord)
@@ -89,8 +89,8 @@ func NewCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().IntVar(&groupSize, "group-size", 200,
-		"The maximum size of the log section to be sorted")
+	cmd.Flags().IntVar(&sortingGroupSize, "sorting-group-size", 200,
+		"The maximum size of the window where logs are collected for sorting")
 	cmd.Flags().StringSliceVar(&loggers, "loggers", nil,
 		"The list of loggers to receive. Defaults to all.")
 	cmd.Flags().StringSliceVar(&pods, "pods", nil,
