@@ -36,7 +36,7 @@ var colorizers = []func(any) aurora.Value{
 	aurora.Yellow,
 }
 
-// logRecord is the portion of the structure of a CNPG logging
+// logRecord is the portion of the structure of a CNPG log
 // that is handled by the beautifier
 type logRecord struct {
 	Level      LogLevel `json:"level"`
@@ -78,6 +78,8 @@ func newLogRecordFromBytes(bytes []byte) (*logRecord, error) {
 	return &record, nil
 }
 
+// normalize converts the error_severity into one of the acceptable
+// LogLevel values
 func (record *logRecord) normalize() {
 	message := record.Msg
 	level := string(record.Level)
@@ -107,7 +109,7 @@ func (record *logRecord) normalize() {
 	record.Level = LogLevel(level)
 }
 
-// prints dumps the formatted record to the specified writer
+// print dumps the formatted record to the specified writer
 func (record *logRecord) print(writer io.Writer) error {
 	message := record.Msg
 	level := string(record.Level)

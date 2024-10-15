@@ -47,7 +47,7 @@ func NewCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "pretty",
 		Short: "Prettify CNPG logs",
-		Long:  "Reads CNPG logs from the standard input and pretty-print them for human consumption",
+		Long:  "Reads CNPG logs from standard input and pretty-prints them for human consumption",
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			return plugin.CompleteClusters(cmd.Context(), args, toComplete), cobra.ShellCompDirectiveNoFileComp
 		},
@@ -95,7 +95,7 @@ Should be empty or one of error, warning, info, debug, or trace.`)
 	return cmd
 }
 
-// decode progressively decode the logs
+// decode progressively decodes the logs
 func (bf *prettyCmd) decode(ctx context.Context, reader io.Reader, recordChannel chan<- logRecord) {
 	scanner := bufio.NewScanner(reader)
 
@@ -174,7 +174,7 @@ logLoop:
 	close(groupChannel)
 }
 
-// write write the logs on the output
+// write writes the logs on the output
 func (bf *prettyCmd) write(ctx context.Context, recordGroupChannel <-chan []logRecord, writer io.Writer) {
 	logRecordComparison := func(l1, l2 logRecord) int {
 		if l1.TS < l2.TS {
@@ -219,7 +219,7 @@ logLoop:
 	}
 }
 
-// isRelevant is true when the passed log record is matched
+// isRecordRelevant is true when the passed log record is matched
 // by the filters set by the user
 func (bf *prettyCmd) isRecordRelevant(record *logRecord) bool {
 	if bf.loggers.Len() > 0 && !bf.loggers.Has(record.Logger) {

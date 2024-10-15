@@ -27,10 +27,10 @@ import (
 // of a log level is used
 var ErrUnknownLogLevel = errors.New("unknown log level")
 
-// LogLevel represent a log level such as error, warning, info, debug, or trace.
+// LogLevel represents a log level such as error, warning, info, debug, or trace.
 type LogLevel string
 
-// Less return true when the received event is less than
+// Less returns true when the received event is less than
 // the passed one
 func (l LogLevel) Less(o LogLevel) bool {
 	return l.toInt() < o.toInt()

@@ -783,13 +783,13 @@ Successfully written logs to "my-cluster.log"
 
 #### Pretty
 
-The `pretty` sub-command reads a log stream from standard input and formats it
+The `pretty` sub-command reads a log stream from standard input, formats it
 into a human-readable output, and attempts to sort the entries by timestamp.
 
-It is intended to be used in combination with `kubectl cnpg logs cluster`, as
+It can be used in combination with `kubectl cnpg logs cluster`, as
 shown in the following example:
 
-```
+``` sh
 $ kubectl cnpg logs cluster cluster-example | kubectl cnpg logs pretty
 2024-10-10T16:36:18.668100649Z INFO cluster-example-1 instance-manager Starting CloudNativePG Instance Manager {"build":{"Commit":"953f0b2cf","Date":"2024-10-09","Version":"1.24.0-dev128"},"version":"1.24.0"}
 2024-10-10T16:36:18.668268413Z INFO cluster-example-1 instance-manager Checking for free disk space for WALs before starting PostgreSQL
@@ -798,11 +798,25 @@ $ kubectl cnpg logs cluster cluster-example | kubectl cnpg logs pretty
 [...]
 ```
 
+Alternatively, it can be used in combination with other commands producing
+CNPG logs in JSON format, such as `stern`, or `kubectl logs`, as in the
+following example:
+
+``` sh
+$ kubectl logs cluster-example-1 | kubectl cnpg logs pretty
+2024-10-10T16:36:18.668100649Z INFO cluster-example-1 instance-manager Starting CloudNativePG Instance Manager {"build":{"Commit":"953f0b2cf","Date":"2024-10-09","Version":"1.24.0-dev128"},"version":"1.24.0"}
+2024-10-10T16:36:18.668268413Z INFO cluster-example-1 instance-manager Checking for free disk space for WALs before starting PostgreSQL
+2024-10-10T16:36:18.686309469Z INFO cluster-example-1 instance-manager starting tablespace manager
+2024-10-10T16:36:18.686375141Z INFO cluster-example-1 instance-manager starting external server manager
+[...]
+```
+
 The `pretty` sub-command also supports advanced log filtering, allowing users
-to display logs for specific pods, loggers, or filter logs by severity level.
+to display logs for specific pods or loggers, or to filter logs by severity
+level.
 Here's an example:
 
-```
+``` sh
 $ kubectl cnpg logs cluster cluster-example | kubectl cnpg logs pretty --pods cluster-example-1 --loggers postgres --log-level info
 2024-10-10T16:36:18.853589475Z INFO cluster-example-1 postgres 2024-10-10 16:36:18.853 UTC [29] LOG:  redirecting log output to logging collector process {"pipe":"stderr"}
 2024-10-10T16:36:18.853641103Z INFO cluster-example-1 postgres 2024-10-10 16:36:18.853 UTC [29] HINT:  Future log output will appear in directory "/controller/log". {"pipe":"stderr"}
