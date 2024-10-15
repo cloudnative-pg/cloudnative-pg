@@ -231,7 +231,7 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 		For(&apiv1.Publication{}).
 		Complete(publicationReconciler)
 	if err != nil {
-		setupLog.Error(err, "unable to create publication controller")
+		contextLogger.Error(err, "unable to create publication controller")
 		return err
 	}
 
@@ -241,7 +241,7 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 		For(&apiv1.Subscription{}).
 		Complete(subscriptionReconciler)
 	if err != nil {
-		setupLog.Error(err, "unable to create subscription controller")
+		contextLogger.Error(err, "unable to create subscription controller")
 		return err
 	}
 

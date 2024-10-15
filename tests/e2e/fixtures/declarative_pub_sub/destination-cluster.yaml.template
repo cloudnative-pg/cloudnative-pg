@@ -4,6 +4,13 @@ metadata:
   name: destination-cluster
 spec:
   instances: 3
+  externalClusters:
+    - name: source-cluster
+      connectionParameters:
+        host: source-cluster-rw
+        user: app
+        dbname: declarative
+        port: "5432"
 
   postgresql:
     parameters:

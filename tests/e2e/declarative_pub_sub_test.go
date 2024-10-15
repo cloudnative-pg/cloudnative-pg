@@ -86,20 +86,6 @@ var _ = Describe("Declarative publication and subscription test", Label(tests.La
 			})
 		})
 
-		assertDatabaseExists := func(namespace, primaryPod, dbname string) {
-			Eventually(func(g Gomega) {
-				stdout, _, err := env.ExecQueryInInstancePod(
-					utils.PodLocator{
-						Namespace: namespace,
-						PodName:   primaryPod,
-					},
-					"postgres",
-					"\\l")
-				g.Expect(err).ToNot(HaveOccurred())
-				g.Expect(stdout).Should(ContainSubstring(dbname))
-			}, 300).Should(Succeed())
-		}
-
 		assertPublicationExists := func(namespace, primaryPod string, pub *apiv1.Publication) {
 			query := fmt.Sprintf("select count(*) from pg_publication where pubname = '%s'",
 				pub.Spec.Name)
@@ -132,7 +118,7 @@ var _ = Describe("Declarative publication and subscription test", Label(tests.La
 			}, 30).Should(Succeed())
 		}
 
-		It("can add a declarative database", func() { //nolint:dupl
+		It("can add a declarative database, publication and subscription", func() { //nolint:dupl
 			By("applying Database CRD manifest", func() {
 				CreateResourceFromFile(namespace, databaseManifest)
 				databaseObjectName, err = env.GetResourceNameFromYAML(databaseManifest)
@@ -152,15 +138,12 @@ var _ = Describe("Declarative publication and subscription test", Label(tests.La
 					g.Expect(database.Status.Ready).Should(BeTrue())
 				}, 300).WithPolling(10 * time.Second).Should(Succeed())
 			})
-
 			By("verifying new database has been created", func() {
 				primaryPodInfo, err := env.GetClusterPrimary(namespace, sourceClusterName)
 				Expect(err).ToNot(HaveOccurred())
 
-				assertDatabaseExists(namespace, primaryPodInfo.Name, dbname)
+				AssertDatabaseExists(namespace, primaryPodInfo.Name, dbname, true)
 			})
-		})
-		It("can add a declarative publication", func() { //nolint:dupl
 			By("applying Publication CRD manifest", func() {
 				CreateResourceFromFile(namespace, pubManifest)
 				pubObjectName, err = env.GetResourceNameFromYAML(pubManifest)
@@ -180,15 +163,12 @@ var _ = Describe("Declarative publication and subscription test", Label(tests.La
 					g.Expect(pub.Status.Ready).Should(BeTrue())
 				}, 300).WithPolling(10 * time.Second).Should(Succeed())
 			})
-
 			By("verifying new publication has been created", func() {
 				primaryPodInfo, err := env.GetClusterPrimary(namespace, sourceClusterName)
 				Expect(err).ToNot(HaveOccurred())
 
 				assertPublicationExists(namespace, primaryPodInfo.Name, pub)
 			})
-		})
-		It("can add a declarative subscription", func() { //nolint:dupl
 			By("applying Subscription CRD manifest", func() {
 				CreateResourceFromFile(namespace, subManifest)
 				subObjectName, err = env.GetResourceNameFromYAML(subManifest)
@@ -208,7 +188,6 @@ var _ = Describe("Declarative publication and subscription test", Label(tests.La
 					g.Expect(sub.Status.Ready).Should(BeTrue())
 				}, 300).WithPolling(10 * time.Second).Should(Succeed())
 			})
-
 			By("verifying new subscription has been created", func() {
 				primaryPodInfo, err := env.GetClusterPrimary(namespace, destinationClusterName)
 				Expect(err).ToNot(HaveOccurred())

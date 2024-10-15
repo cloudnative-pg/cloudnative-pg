@@ -109,7 +109,7 @@ func toPublicationCreateSQL(obj *apiv1.Publication) []string {
 			fmt.Sprintf(
 				"ALTER PUBLICATION %s OWNER to %s",
 				pgx.Identifier{obj.Spec.Name}.Sanitize(),
-				toPublicationTargetSQL(&obj.Spec.Target),
+				pgx.Identifier{obj.Spec.Owner}.Sanitize(),
 			),
 		)
 	}

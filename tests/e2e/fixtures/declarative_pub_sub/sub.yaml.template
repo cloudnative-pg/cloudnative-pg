@@ -5,6 +5,7 @@ metadata:
 spec:
   name: sub
   dbname: declarative
+  owner: app
   publicationName: pub
   cluster:
     name: destination-cluster
