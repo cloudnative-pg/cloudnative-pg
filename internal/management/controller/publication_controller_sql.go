@@ -125,13 +125,16 @@ func toPublicationCreateSQL(obj *apiv1.Publication) []string {
 
 func toPublicationAlterSQL(obj *apiv1.Publication) []string {
 	result := make([]string, 0, 3)
-	result = append(result,
-		fmt.Sprintf(
-			"ALTER PUBLICATION %s SET %s",
-			pgx.Identifier{obj.Spec.Name}.Sanitize(),
-			toPublicationTargetSQL(&obj.Spec.Target),
-		),
-	)
+
+	if len(obj.Spec.Target.Objects) > 0 {
+		result = append(result,
+			fmt.Sprintf(
+				"ALTER PUBLICATION %s SET %s",
+				pgx.Identifier{obj.Spec.Name}.Sanitize(),
+				toPublicationTargetObjectsSQL(&obj.Spec.Target),
+			),
+		)
+	}
 
 	if len(obj.Spec.Owner) > 0 {
 		result = append(result,
@@ -177,6 +180,10 @@ func toPublicationTargetSQL(obj *apiv1.PublicationTarget) string {
 		return "FOR ALL TABLES"
 	}
 
+	return toPublicationTargetObjectsSQL(obj)
+}
+
+func toPublicationTargetObjectsSQL(obj *apiv1.PublicationTarget) string {
 	result := ""
 	for _, object := range obj.Objects {
 		if len(result) > 0 {

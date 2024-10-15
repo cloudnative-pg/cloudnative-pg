@@ -11,6 +11,9 @@ spec:
         user: app
         dbname: declarative
         port: "5432"
+      password:
+        name: source-cluster-app
+        key: password
 
   postgresql:
     parameters:

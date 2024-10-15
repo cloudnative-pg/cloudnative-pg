@@ -36,12 +36,13 @@ import (
 var _ = Describe("Declarative publication and subscription test", Label(tests.LabelSmoke, tests.LabelBasic,
 	tests.LabelDeclarativePubSub), func() {
 	const (
-		sourceClusterManifest      = fixturesDir + "/declarative_pub_sub/source-cluster.yaml.template"
-		destinationClusterManifest = fixturesDir + "/declarative_pub_sub/destination-cluster.yaml.template"
-		databaseManifest           = fixturesDir + "/declarative_pub_sub/database.yaml.template"
-		pubManifest                = fixturesDir + "/declarative_pub_sub/pub.yaml.template"
-		subManifest                = fixturesDir + "/declarative_pub_sub/sub.yaml.template"
-		level                      = tests.Medium
+		sourceClusterManifest       = fixturesDir + "/declarative_pub_sub/source-cluster.yaml.template"
+		destinationClusterManifest  = fixturesDir + "/declarative_pub_sub/destination-cluster.yaml.template"
+		sourceDatabaseManifest      = fixturesDir + "/declarative_pub_sub/source-database.yaml.template"
+		destinationDatabaseManifest = fixturesDir + "/declarative_pub_sub/destination-database.yaml.template"
+		pubManifest                 = fixturesDir + "/declarative_pub_sub/pub.yaml.template"
+		subManifest                 = fixturesDir + "/declarative_pub_sub/sub.yaml.template"
+		level                       = tests.Medium
 	)
 
 	BeforeEach(func() {
@@ -54,13 +55,11 @@ var _ = Describe("Declarative publication and subscription test", Label(tests.La
 		const (
 			namespacePrefix = "declarative-pub-sub"
 			dbname          = "declarative"
-			pubName         = "declarative-pub"
-			subName         = "declarative-sub"
 		)
 		var (
 			sourceClusterName, destinationClusterName, namespace string
 			databaseObjectName, pubObjectName, subObjectName     string
-			database                                             *apiv1.Database
+			sourceDatabase, destinationDatabase                  *apiv1.Database
 			pub                                                  *apiv1.Publication
 			sub                                                  *apiv1.Subscription
 			err                                                  error
@@ -95,7 +94,7 @@ var _ = Describe("Declarative publication and subscription test", Label(tests.La
 						Namespace: namespace,
 						PodName:   primaryPod,
 					},
-					"postgres",
+					dbname,
 					query)
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(stdout).Should(ContainSubstring("1"), "expected publication not found")
@@ -103,7 +102,7 @@ var _ = Describe("Declarative publication and subscription test", Label(tests.La
 		}
 
 		assertSubscriptionExists := func(namespace, primaryPod string, sub *apiv1.Subscription) {
-			query := fmt.Sprintf("select count(*) from subscription where subname = '%s'",
+			query := fmt.Sprintf("select count(*) from pg_subscription where subname = '%s'",
 				sub.Spec.Name)
 			Eventually(func(g Gomega) {
 				stdout, _, err := env.ExecQueryInInstancePod(
@@ -111,35 +110,60 @@ var _ = Describe("Declarative publication and subscription test", Label(tests.La
 						Namespace: namespace,
 						PodName:   primaryPod,
 					},
-					"postgres",
+					dbname,
 					query)
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(stdout).Should(ContainSubstring("1"), "expected subscription not found")
 			}, 30).Should(Succeed())
 		}
 
-		It("can add a declarative database, publication and subscription", func() { //nolint:dupl
-			By("applying Database CRD manifest", func() {
-				CreateResourceFromFile(namespace, databaseManifest)
-				databaseObjectName, err = env.GetResourceNameFromYAML(databaseManifest)
+		It("can add declarative databases, publication and subscription", func() { //nolint:dupl
+			By("applying source Database CRD manifest", func() {
+				CreateResourceFromFile(namespace, sourceDatabaseManifest)
+				databaseObjectName, err = env.GetResourceNameFromYAML(sourceDatabaseManifest)
 				Expect(err).NotTo(HaveOccurred())
 			})
-			By("ensuring the Database CRD succeeded reconciliation", func() {
-				// get database object
-				database = &apiv1.Database{}
+			By("ensuring the source Database CRD succeeded reconciliation", func() {
+				// get source database object
+				sourceDatabase = &apiv1.Database{}
 				databaseNamespacedName := types.NamespacedName{
 					Namespace: namespace,
 					Name:      databaseObjectName,
 				}
 
 				Eventually(func(g Gomega) {
-					err := env.Client.Get(env.Ctx, databaseNamespacedName, database)
+					err := env.Client.Get(env.Ctx, databaseNamespacedName, sourceDatabase)
 					Expect(err).ToNot(HaveOccurred())
-					g.Expect(database.Status.Ready).Should(BeTrue())
+					g.Expect(sourceDatabase.Status.Ready).Should(BeTrue())
 				}, 300).WithPolling(10 * time.Second).Should(Succeed())
 			})
-			By("verifying new database has been created", func() {
+			By("verifying source database has been created", func() {
 				primaryPodInfo, err := env.GetClusterPrimary(namespace, sourceClusterName)
+				Expect(err).ToNot(HaveOccurred())
+
+				AssertDatabaseExists(namespace, primaryPodInfo.Name, dbname, true)
+			})
+			By("applying destination Database CRD manifest", func() {
+				CreateResourceFromFile(namespace, destinationDatabaseManifest)
+				databaseObjectName, err = env.GetResourceNameFromYAML(destinationDatabaseManifest)
+				Expect(err).NotTo(HaveOccurred())
+			})
+			By("ensuring the destination Database CRD succeeded reconciliation", func() {
+				// get destination database object
+				destinationDatabase = &apiv1.Database{}
+				databaseNamespacedName := types.NamespacedName{
+					Namespace: namespace,
+					Name:      databaseObjectName,
+				}
+
+				Eventually(func(g Gomega) {
+					err := env.Client.Get(env.Ctx, databaseNamespacedName, destinationDatabase)
+					Expect(err).ToNot(HaveOccurred())
+					g.Expect(destinationDatabase.Status.Ready).Should(BeTrue())
+				}, 300).WithPolling(10 * time.Second).Should(Succeed())
+			})
+			By("verifying destination database has been created", func() {
+				primaryPodInfo, err := env.GetClusterPrimary(namespace, destinationClusterName)
 				Expect(err).ToNot(HaveOccurred())
 
 				AssertDatabaseExists(namespace, primaryPodInfo.Name, dbname, true)

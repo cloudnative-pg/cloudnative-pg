@@ -15,6 +15,16 @@ spec:
       log_temp_files: '1024'
       log_autovacuum_min_duration: '1s'
       log_replication_commands: 'on'
+    pg_hba:
+      - hostssl replication app all scram-sha-256
+
+  managed:
+    roles:
+    - name: app
+      ensure: present
+      login: true
+      replication: true
+
 
   # Example of rolling update strategy:
   # - unsupervised: automated update of the primary once all

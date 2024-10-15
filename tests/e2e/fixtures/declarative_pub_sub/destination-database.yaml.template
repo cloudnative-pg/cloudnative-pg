@@ -1,9 +1,9 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Database
 metadata:
-  name: db-declarative
+  name: destination-db-declarative
 spec:
   name: declarative
   owner: app
   cluster:
-    name: source-cluster
+    name: destination-cluster
