@@ -65,6 +65,7 @@ func newLogRecordFromBytes(bytes []byte) (*logRecord, error) {
 	}
 
 	delete(extraFields, "level")
+	delete(extraFields, "pipe")
 	delete(extraFields, "msg")
 	delete(extraFields, "logger")
 	delete(extraFields, "ts")
@@ -110,7 +111,11 @@ func (record *logRecord) normalize() {
 }
 
 // print dumps the formatted record to the specified writer
-func (record *logRecord) print(writer io.Writer) error {
+func (record *logRecord) print(writer io.Writer, verbosity int) error {
+	const jsonPrefix = "    "
+	const jsonIndent = "  "
+	const maxRowLen = 100
+
 	message := record.Msg
 	level := string(record.Level)
 
@@ -121,7 +126,7 @@ func (record *logRecord) print(writer io.Writer) error {
 
 	additionalFields := ""
 	if len(record.AdditionalFields) > 0 {
-		v, _ := json.Marshal(record.AdditionalFields)
+		v, _ := json.MarshalIndent(record.AdditionalFields, jsonPrefix, jsonIndent)
 		additionalFields = string(v)
 	}
 
@@ -129,21 +134,37 @@ func (record *logRecord) print(writer io.Writer) error {
 	_, _ = hasher.Write([]byte(record.LoggingPod))
 	colorIdx := int(hasher.Sum32()) % len(colorizers)
 
-	// truncate the timestamp to microsecond
-	// precision
 	ts := record.TS
-	if len(ts) > 23 {
+	if verbosity == 0 && len(ts) > 23 {
 		ts = record.TS[:23]
+	}
+	if verbosity > 0 {
+		ts = fmt.Sprintf("%-30s", ts)
+	}
+
+	if verbosity == 0 {
+		firstLine, suffix, _ := strings.Cut(message, "\n")
+		if len(firstLine) > maxRowLen || len(suffix) > 0 {
+			if len(firstLine) > maxRowLen {
+				firstLine = firstLine[:maxRowLen]
+			}
+			firstLine += "..."
+		}
+		message = firstLine
 	}
 
 	_, err := fmt.Fprintln(
 		writer,
 		ts,
-		aurora.Blue(strings.ToUpper(level)),
+		fmt.Sprintf("%-8s", aurora.Blue(strings.ToUpper(level))),
 		colorizers[colorIdx](record.LoggingPod),
-		aurora.Blue(record.Logger),
-		message,
-		additionalFields,
-	)
+		fmt.Sprintf("%-16s", aurora.Blue(record.Logger)),
+		message)
+	if len(additionalFields) > 0 && verbosity > 1 {
+		_, err = fmt.Fprintln(
+			writer,
+			jsonPrefix+additionalFields,
+		)
+	}
 	return err
 }

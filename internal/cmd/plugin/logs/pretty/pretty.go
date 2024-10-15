@@ -37,13 +37,14 @@ type prettyCmd struct {
 	loggers   *stringset.Data
 	pods      *stringset.Data
 	groupSize int
+	verbosity int
 	minLevel  LogLevel
 }
 
 // NewCmd creates a new `kubectl cnpg logs pretty` command
 func NewCmd() *cobra.Command {
 	var loggers, pods []string
-	var groupSize int
+	var groupSize, verbosity int
 	bf := prettyCmd{}
 
 	cmd := &cobra.Command{
@@ -58,6 +59,7 @@ func NewCmd() *cobra.Command {
 			bf.loggers = stringset.From(loggers)
 			bf.pods = stringset.From(pods)
 			bf.groupSize = groupSize
+			bf.verbosity = verbosity
 
 			recordChannel := make(chan logRecord)
 			recordGroupsChannel := make(chan []logRecord)
@@ -96,6 +98,8 @@ func NewCmd() *cobra.Command {
 	cmd.Flags().Var(&bf.minLevel, "min-level",
 		`Hides the messages whose log level is less important than the specified one.
 Should be empty or one of error, warning, info, debug, or trace.`)
+	cmd.Flags().CountVarP(&verbosity, "verbosity", "v",
+		"The logs verbosity level. More verbose means more information will be printed")
 
 	return cmd
 }
@@ -214,7 +218,7 @@ logLoop:
 				_, _ = writer.Write([]byte("---\n"))
 			}
 			for _, record := range logGroupRecord {
-				if err := record.print(writer); err != nil {
+				if err := record.print(writer, bf.verbosity); err != nil {
 					bf.emergencyLog(err, "Dumping a log entry")
 				}
 			}
