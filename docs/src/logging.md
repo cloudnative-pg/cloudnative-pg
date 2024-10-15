@@ -47,10 +47,9 @@ The logs produced by the operator pod can be configured with log
 levels, same as instance pods: `error`, `warning`, `info` (default), `debug`,
 and `trace`.
 
-The log level for the operator is controlled by the `--log_level` command line
-argument in the deployment. This value can be configured by editing the
-controller container in the deployment manifest, as shown for example in the
-[operator configuration](operator_conf.md#pprof-http-server) page.
+The log level for the operator can be configured by editing the `Deployment`
+definition of the operator and setting the `--log-level` command line argument
+to the desired value.
 
 ## PostgreSQL Logs
 
