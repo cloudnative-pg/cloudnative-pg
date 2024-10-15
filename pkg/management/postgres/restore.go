@@ -50,7 +50,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/external"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
-	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
 	postgresSpec "github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/system"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -612,16 +611,12 @@ func (info InitInfo) writeRestoreWalConfig(
 func (info InitInfo) writeRecoveryConfiguration(cluster *apiv1.Cluster, recoveryFileContents string) error {
 	// Ensure restore_command is used to correctly recover WALs
 	// from the object storage
-	major, err := postgresutils.GetMajorVersion(info.PgData)
-	if err != nil {
-		return fmt.Errorf("cannot detect major version: %w", err)
-	}
 
 	log.Info("Generated recovery configuration", "configuration", recoveryFileContents)
 	// Temporarily suspend WAL archiving. We set it to `false` (which means failure
 	// of the archiver) in order to defer the decision about archiving to PostgreSQL
 	// itself once the recovery job is completed and the instance is regularly started.
-	err = fileutils.AppendStringToFile(
+	err := fileutils.AppendStringToFile(
 		path.Join(info.PgData, constants.PostgresqlCustomConfigurationFile),
 		"archive_command = 'false'\n")
 	if err != nil {
@@ -671,35 +666,27 @@ func (info InitInfo) writeRecoveryConfiguration(cluster *apiv1.Cluster, recovery
 		return fmt.Errorf("cannot write recovery config for enforced parameters: %w", err)
 	}
 
-	if major >= 12 {
-		// Append restore_command to the end of the
-		// custom configs file
-		err = fileutils.AppendStringToFile(
-			path.Join(info.PgData, constants.PostgresqlCustomConfigurationFile),
-			recoveryFileContents)
-		if err != nil {
-			return fmt.Errorf("cannot write recovery config: %w", err)
-		}
-
-		err = os.WriteFile(
-			path.Join(info.PgData, constants.PostgresqlOverrideConfigurationFile),
-			[]byte(""),
-			0o600)
-		if err != nil {
-			return fmt.Errorf("cannot erase auto config: %w", err)
-		}
-
-		// Create recovery signal file
-		return os.WriteFile(
-			path.Join(info.PgData, "recovery.signal"),
-			[]byte(""),
-			0o600)
+	// Append restore_command to the end of the
+	// custom configs file
+	err = fileutils.AppendStringToFile(
+		path.Join(info.PgData, constants.PostgresqlCustomConfigurationFile),
+		recoveryFileContents)
+	if err != nil {
+		return fmt.Errorf("cannot write recovery config: %w", err)
 	}
 
-	// We need to generate a recovery.conf
+	err = os.WriteFile(
+		path.Join(info.PgData, constants.PostgresqlOverrideConfigurationFile),
+		[]byte(""),
+		0o600)
+	if err != nil {
+		return fmt.Errorf("cannot erase auto config: %w", err)
+	}
+
+	// Create recovery signal file
 	return os.WriteFile(
-		path.Join(info.PgData, "recovery.conf"),
-		[]byte(recoveryFileContents),
+		path.Join(info.PgData, "recovery.signal"),
+		[]byte(""),
 		0o600)
 }
 
