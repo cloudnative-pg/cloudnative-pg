@@ -17,6 +17,8 @@ limitations under the License.
 package specs
 
 import (
+	"slices"
+
 	v1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -164,5 +166,31 @@ var _ = Describe("Job created via InitDB", func() {
 		Expect(job.Spec.Template.Spec.Containers[0].Command).Should(ContainElement("testPostInitApplicationSql"))
 		Expect(job.Spec.Template.Spec.Containers[0].Command).Should(ContainElement(
 			postInitApplicationSQLRefsFolder.toString()))
+	})
+
+	It("sets provided locale information to initdb flags", func() {
+		cluster := apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Bootstrap: &apiv1.BootstrapConfiguration{
+					InitDB: &apiv1.BootstrapInitDB{
+						LocaleCollate:  "en_US.UTF-8",
+						LocaleCType:    "en_US.UTF-8",
+						LocaleProvider: "icu",
+						ICULocale:      "und-x-icu",
+					},
+				},
+			},
+		}
+
+		job := CreatePrimaryJobViaInitdb(cluster, 0)
+		initDBJobCommand := job.Spec.Template.Spec.Containers[0].Command
+		initdbFlagsIndex := slices.Index(initDBJobCommand, "--initdb-flags")
+		Expect(initdbFlagsIndex).ShouldNot(Equal(-1), "--initdb-flags should be present in the datadbase primary create job")
+		Expect(len(initDBJobCommand)).Should(BeNumerically(">", initdbFlagsIndex+1), "--initdb-flags should have a value")
+		initdbFlagsContent := initDBJobCommand[initdbFlagsIndex+1]
+		Expect(initdbFlagsContent).Should(ContainSubstring("--lc-collate=en_US.UTF-8"))
+		Expect(initdbFlagsContent).Should(ContainSubstring("--lc-ctype=en_US.UTF-8"))
+		Expect(initdbFlagsContent).Should(ContainSubstring("--locale-provider=icu"))
+		Expect(initdbFlagsContent).Should(ContainSubstring("--icu-locale=und-x-icu"))
 	})
 })
