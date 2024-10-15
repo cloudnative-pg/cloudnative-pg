@@ -64,7 +64,7 @@ var _ = Describe("synchronous replica configuration with the new API", func() {
 		Expect(explicitSynchronousStandbyNames(cluster)).To(Equal("FIRST 2 (\"three\",\"two\",\"one\")"))
 	})
 
-	It("consider the maximum number of standby names", func() {
+	It("considers the maximum number of standby names", func() {
 		cluster := createFakeCluster("example")
 		cluster.Spec.PostgresConfiguration.Synchronous = &apiv1.SynchronousReplicaConfiguration{
 			Method:                     apiv1.SynchronousReplicaConfigurationMethodFirst,
@@ -83,7 +83,7 @@ var _ = Describe("synchronous replica configuration with the new API", func() {
 		Expect(explicitSynchronousStandbyNames(cluster)).To(Equal("FIRST 2 (\"three\")"))
 	})
 
-	It("prepend the prefix and append the suffix", func() {
+	It("prepends the prefix and append the suffix", func() {
 		cluster := createFakeCluster("example")
 		cluster.Spec.PostgresConfiguration.Synchronous = &apiv1.SynchronousReplicaConfiguration{
 			Method:                     apiv1.SynchronousReplicaConfigurationMethodFirst,
@@ -114,5 +114,24 @@ var _ = Describe("synchronous replica configuration with the new API", func() {
 
 		Expect(explicitSynchronousStandbyNames(cluster)).To(
 			Equal("FIRST 2 (\"example-placeholder\")"))
+	})
+
+	It("includes pods that do not report the status", func() {
+		cluster := createFakeCluster("example")
+		cluster.Spec.PostgresConfiguration.Synchronous = &apiv1.SynchronousReplicaConfiguration{
+			Method:                     apiv1.SynchronousReplicaConfigurationMethodFirst,
+			Number:                     2,
+			MaxStandbyNamesFromCluster: nil,
+			StandbyNamesPre:            []string{},
+			StandbyNamesPost:           []string{},
+		}
+		cluster.Status = apiv1.ClusterStatus{
+			CurrentPrimary: "one",
+			InstancesStatus: map[apiv1.PodStatus][]string{
+				apiv1.PodHealthy: {"one", "three"},
+			},
+			InstanceNames: []string{"one", "two", "three"},
+		}
+		Expect(explicitSynchronousStandbyNames(cluster)).To(Equal("FIRST 2 (\"three\",\"two\",\"one\")"))
 	})
 })

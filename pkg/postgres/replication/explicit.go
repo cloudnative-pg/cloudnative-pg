@@ -18,6 +18,7 @@ package replication
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -88,16 +89,22 @@ func getSortedInstanceNames(cluster *apiv1.Cluster) []string {
 
 			case state == apiv1.PodHealthy:
 				nonPrimaryReadyInstances = append(nonPrimaryReadyInstances, instance)
-
-			default:
-				otherInstances = append(otherInstances, instance)
 			}
+		}
+	}
+
+	for _, instance := range cluster.Status.InstanceNames {
+		if instance == primaryInstance {
+			continue
+		}
+
+		if !slices.Contains(nonPrimaryReadyInstances, instance) {
+			otherInstances = append(otherInstances, instance)
 		}
 	}
 
 	sort.Strings(nonPrimaryReadyInstances)
 	sort.Strings(otherInstances)
-
 	result := make([]string, 0, cluster.Spec.Instances)
 	result = append(result, nonPrimaryReadyInstances...)
 	result = append(result, otherInstances...)
