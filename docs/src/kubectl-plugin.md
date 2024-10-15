@@ -831,7 +831,7 @@ logs into groups, and within groups it sorts by timestamp. This is the only
 way to sort interactively, as `pretty` may be piped from a command in "follow"
 mode. The sub-command will add a group separator line, `---`, at the end of
 each sorted group. The size of the grouping can be configured via the
-`--sorting-group-size` flag, as illustrated in the following example:
+`--sorting-group-size` flag (default: 1000), as illustrated in the following example:
 
 ``` sh
 $ kubectl logs cluster-example-1 | kubectl cnpg logs pretty --sorting-group-size=3

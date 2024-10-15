@@ -89,7 +89,7 @@ func NewCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().IntVar(&sortingGroupSize, "sorting-group-size", 200,
+	cmd.Flags().IntVar(&sortingGroupSize, "sorting-group-size", 1000,
 		"The maximum size of the window where logs are collected for sorting")
 	cmd.Flags().StringSliceVar(&loggers, "loggers", nil,
 		"The list of loggers to receive. Defaults to all.")
