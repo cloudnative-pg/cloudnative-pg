@@ -24,7 +24,7 @@ import (
 var _ = Describe("Get the proper command", func() {
 	It("get the proper command", func() {
 		logsCmd := NewCmd()
-		Expect(logsCmd.Use).To(BeEquivalentTo("logs cluster"))
-		Expect(logsCmd.Short).To(BeEquivalentTo("Collect cluster logs"))
+		Expect(logsCmd.Use).To(BeEquivalentTo("logs"))
+		Expect(logsCmd.Short).To(BeEquivalentTo("Logging utilities"))
 	})
 })
