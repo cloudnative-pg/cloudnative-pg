@@ -110,7 +110,7 @@ var _ = Describe("Cluster logging tests", func() {
 	})
 
 	It("should catch the logs of the sidecar too", func(ctx context.Context) {
-		client := fake.NewSimpleClientset(podWithSidecars)
+		client := fake.NewClientset(podWithSidecars)
 		var logBuffer bytes.Buffer
 		var wait sync.WaitGroup
 		wait.Add(1)
