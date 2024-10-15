@@ -27,7 +27,7 @@ func NewCmd() *cobra.Command {
 	logsCmd := &cobra.Command{
 		Use:     "logs cluster",
 		Short:   "Collect cluster logs",
-		GroupID: plugin.GroupIDPgDatabase,
+		GroupID: plugin.GroupIDTroubleshooting,
 	}
 
 	logsCmd.AddCommand(clusterCmd())

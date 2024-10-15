@@ -76,9 +76,9 @@ func NewCmd() *cobra.Command {
 
 	pgadminCmd := &cobra.Command{
 		Use:     "pgadmin4 [name]",
-		Short:   "Creates a pgadmin deployment",
+		Short:   "Creates a pgAdmin deployment",
 		Args:    cobra.MinimumNArgs(1),
-		Long:    `Creates a pgadmin deployment configured to work with a CNPG Cluster.`,
+		Long:    `Creates a pgAdmin deployment configured to work with a CNPG Cluster.`,
 		GroupID: plugin.GroupIDMiscellaneous,
 		Example: pgadminExample,
 		RunE: func(_ *cobra.Command, args []string) error {

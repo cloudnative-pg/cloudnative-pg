@@ -27,7 +27,7 @@ func NewCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "install",
 		Short:   "CloudNativePG installation-related commands",
-		GroupID: plugin.GroupIDCnpg,
+		GroupID: plugin.GroupIDAdmin,
 	}
 	cmd.AddCommand(newGenerateCmd())
 

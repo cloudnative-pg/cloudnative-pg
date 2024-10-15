@@ -61,7 +61,7 @@ func NewCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "fencing",
 		Short:   `Fencing related commands`,
-		GroupID: plugin.GroupIDPgCluster,
+		GroupID: plugin.GroupIDCluster,
 	}
 	cmd.AddCommand(fenceOnCmd)
 	cmd.AddCommand(fenceOffCmd)

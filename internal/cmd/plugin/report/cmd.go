@@ -27,7 +27,7 @@ func NewCmd() *cobra.Command {
 	reportCmd := &cobra.Command{
 		Use:     "report operator/cluster",
 		Short:   "Report on the operator or a cluster for troubleshooting",
-		GroupID: plugin.GroupIDCnpg,
+		GroupID: plugin.GroupIDTroubleshooting,
 	}
 
 	reportCmd.AddCommand(operatorCmd())

@@ -57,14 +57,18 @@ var (
 )
 
 const (
-	// GroupIDCnpg represents an ID to group up CNPG commands
-	GroupIDCnpg = "cnpg-level"
+	// GroupIDAdmin represents an ID to group up CNPG commands
+	GroupIDAdmin = "admin"
 
-	// GroupIDPgCluster represents an ID to group up Postgres Cluster commands
-	GroupIDPgCluster = "pg-cluster"
+	// GroupIDTroubleshooting represent an ID to group up troubleshooting
+	// commands
+	GroupIDTroubleshooting = "troubleshooting"
 
-	// GroupIDPgDatabase represents an ID to group up Postgres Database commands
-	GroupIDPgDatabase = "pg-db"
+	// GroupIDCluster represents an ID to group up Postgres Cluster commands
+	GroupIDCluster = "cluster"
+
+	// GroupIDDatabase represents an ID to group up Postgres Database commands
+	GroupIDDatabase = "db"
 
 	// GroupIDMiscellaneous represents an ID to group up miscellaneous commands
 	GroupIDMiscellaneous = "misc"

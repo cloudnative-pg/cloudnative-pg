@@ -29,7 +29,7 @@ func NewCmd() *cobra.Command {
 	publicationCmd := &cobra.Command{
 		Use:     "publication",
 		Short:   "Logical publication management commands",
-		GroupID: plugin.GroupIDPgDatabase,
+		GroupID: plugin.GroupIDDatabase,
 	}
 	publicationCmd.AddCommand(create.NewCmd())
 	publicationCmd.AddCommand(drop.NewCmd())

@@ -31,7 +31,7 @@ func NewCmd() *cobra.Command {
 		Use:     "snapshot <cluster-name>",
 		Short:   "DEPRECATED (use `backup -m volumeSnapshot` instead)",
 		Long:    "Replaced by `kubectl cnpg backup <cluster-name> -m volumeSnapshot`",
-		GroupID: plugin.GroupIDPgDatabase,
+		GroupID: plugin.GroupIDDatabase,
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			return plugin.CompleteClusters(cmd.Context(), args, toComplete), cobra.ShellCompDirectiveNoFileComp
 		},

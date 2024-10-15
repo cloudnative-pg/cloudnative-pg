@@ -30,7 +30,7 @@ func NewCmd() *cobra.Command {
 	subscriptionCmd := &cobra.Command{
 		Use:     "subscription",
 		Short:   "Logical subscription management commands",
-		GroupID: plugin.GroupIDPgDatabase,
+		GroupID: plugin.GroupIDDatabase,
 	}
 	subscriptionCmd.AddCommand(create.NewCmd())
 	subscriptionCmd.AddCommand(drop.NewCmd())
