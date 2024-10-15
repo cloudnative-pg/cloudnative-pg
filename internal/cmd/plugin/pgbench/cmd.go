@@ -20,6 +20,8 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 )
 
 // NewCmd initializes the pgBench command
@@ -31,6 +33,7 @@ func NewCmd() *cobra.Command {
 		Short:   "Creates a pgbench job",
 		Args:    validateCommandArgs,
 		Long:    "Creates a pgbench job to run against the specified Postgres Cluster.",
+		GroupID: plugin.GroupIDMiscellaneous,
 		Example: jobExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			run.clusterName = args[0]

@@ -21,6 +21,8 @@ import (
 	"strconv"
 
 	"github.com/spf13/cobra"
+
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 )
 
 // NewCmd creates the new "reset" command
@@ -32,7 +34,8 @@ func NewCmd() *cobra.Command {
 rolling out new configurations if present.
 If a specific instance is specified, only that instance will be restarted, 
 in-place if it is a primary, deleting the pod if it is a replica.`,
-		Args: cobra.RangeArgs(1, 2),
+		Args:    cobra.RangeArgs(1, 2),
+		GroupID: plugin.GroupIDCluster,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
 			clusterName := args[0]
