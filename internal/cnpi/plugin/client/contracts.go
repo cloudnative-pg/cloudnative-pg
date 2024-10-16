@@ -77,9 +77,10 @@ type ClusterCapabilities interface {
 
 // ReconcilerHookResult is the result of a reconciliation loop
 type ReconcilerHookResult struct {
-	Result             ctrl.Result
-	Err                error
-	StopReconciliation bool
+	Result             ctrl.Result `json:"result"`
+	Err                error       `json:"err"`
+	StopReconciliation bool        `json:"stopReconciliation"`
+	Identifier         string      `json:"identifier"`
 }
 
 // ClusterReconcilerHooks decsribes a set of behavior needed to enhance
