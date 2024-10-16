@@ -6,7 +6,6 @@ spec:
   name: sub
   dbname: declarative
   publicationName: pub
-  owner: app
   cluster:
     name: destination-cluster
   externalClusterName: source-cluster
