@@ -794,3 +794,68 @@ API. Please check your networking.
 Another possible cause is when you have sidecar injection configured. Sidecars
 such as Istio may make the network temporarily unavailable during startup. If
 you have sidecar injection enabled, retry with injection disabled.
+
+### Bootstrap Job Stuck in running status due to Linkerd sidecar
+
+If your Cluster's initialization job is stuck in the `Running` status, it may be due to the Linkerd sidecar remaining active after the job has completed. Linkerd's proxy `/shutdown` endpoint is **disabled by default**, which prevents the sidecar from gracefully terminating, leaving the job in a stalled state.
+
+When the CNPG operator completes its `import` or `bootstrap` task, it attempts to shut down the sidecars to complete the job. However, without the `/shutdown` endpoint being enabled, Linkerd's proxy remains active, causing the job to never fully exit.
+
+#### Debugging the Issue
+
+To diagnose this issue, you can:
+
+1. **Port-forward** to the `-join1` pod to access the Linkerd proxy.
+
+    ```bash
+    kubectl port-forward pod/postgresql-join1 4191:4191 -n <namespace>
+    ```
+
+2. **Check the `/shutdown` endpoint**:
+
+    ```bash
+    curl -X POST http://localhost:4191/shutdown
+    ```
+
+   If you receive the response `shutdown endpoint is not enabled`, this confirms that the shutdown endpoint is disabled by default.
+
+#### Enabling the `/shutdown` Endpoint
+
+There are two ways to resolve this:
+
+1. **Adding an Annotation to the CNPG Cluster Resource**:
+
+   You can add the following annotation to your CNPG `Cluster` manifest to enable the shutdown endpoint in the Linkerd proxy:
+
+    ```yaml
+    apiVersion: postgresql.cnpg.io/v1
+    kind: Cluster
+    metadata:
+      name: postgresql
+      namespace: dev
+    spec:
+      inheritedMetadata:
+        annotations:
+          config.linkerd.io/proxy-admin-shutdown: enabled  # Enable Linkerd's shutdown endpoint
+    ```
+
+2. **Enabling the Shutdown Endpoint via Helm in ArgoCD**:
+
+   If you are managing Linkerd with ArgoCD and Helm, you can modify your Helm values to enable the shutdown endpoint globally across all proxies:
+
+    ```yaml
+    helm:
+      values: |
+        proxy:
+          enableShutdownEndpoint: true  # Enable the shutdown endpoint globally
+    ```
+
+   This will configure Linkerd to allow the CNPG operator to successfully shut down the proxy when needed.
+
+#### Summary
+
+If the Linkerd `/shutdown` endpoint is not enabled, it will prevent the CNPG bootstrap job from completing successfully, leaving the job in a `Running` state indefinitely. To fix this:
+- Enable the shutdown endpoint via an annotation (`config.linkerd.io/proxy-admin-shutdown: enabled`) or
+- Modify your Helm installation (`proxy.enableShutdownEndpoint: true`) if using ArgoCD and Helm.
+
+By ensuring that the `/shutdown` endpoint is enabled, you can allow the CNPG bootstrap process to complete without the Linkerd proxy blocking the job.
