@@ -55,6 +55,7 @@ var _ = Describe("Declarative publication and subscription test", Label(tests.La
 		const (
 			namespacePrefix = "declarative-pub-sub"
 			dbname          = "declarative"
+			tableName       = "test"
 		)
 		var (
 			sourceClusterName, destinationClusterName, namespace string
@@ -217,6 +218,23 @@ var _ = Describe("Declarative publication and subscription test", Label(tests.La
 				Expect(err).ToNot(HaveOccurred())
 
 				assertSubscriptionExists(namespace, primaryPodInfo.Name, sub)
+			})
+			By("creating a new data in the source cluster database", func() {
+				AssertCreateTestDataWithDatabaseName(env, namespace, sourceClusterName, dbname, tableName)
+			})
+
+			By("checking that the data is present inside the destination cluster database", func() {
+				// Expect the (previously created) test data to be available
+				primary, err := env.GetClusterPrimary(namespace, destinationClusterName)
+				Expect(err).ToNot(HaveOccurred())
+
+				AssertDataExpectedCountWithDatabaseName(
+					namespace,
+					primary.Name,
+					dbname,
+					tableName,
+					2,
+				)
 			})
 		})
 	})
