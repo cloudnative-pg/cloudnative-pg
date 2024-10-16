@@ -107,8 +107,10 @@ spec:
   maintainers:
     - email: jonathan.gonzalez@enterprisedb.com
       name: Jonathan Gonzalez V.
-    - email: john.long@enterprisedb.com
-      name: John Long
+    - email: jonathan.battiato@enterprisedb.com
+      name: Jonathan Battiato
+    - email: niccolo.fei@enterprisedb.com
+      name: Niccolo Fei
     - email: gabriele.bartolini@enterprisedb.com
       name: Gabriele Bartolini
   maturity: stable
