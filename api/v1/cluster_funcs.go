@@ -1347,12 +1347,13 @@ func (cluster *Cluster) IsReadOnlyServiceEnabled() bool {
 	return !slices.Contains(cluster.Spec.Managed.Services.DisabledDefaultServices, ServiceSelectorTypeRO)
 }
 
-// GetBootstrapRecoveryBackup returns the backup source for the bootstrap recovery
-func (cluster *Cluster) GetBootstrapRecoveryBackup() *BackupSource {
-	if cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.Recovery != nil {
-		return cluster.Spec.Bootstrap.Recovery.Backup
+// GetBootstrapRecoveryBackupUsePlugin returns true if the recovery from backup should use a plugin.
+func (cluster *Cluster) GetBootstrapRecoveryBackupUsePlugin() bool {
+	if cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.Recovery != nil &&
+		cluster.Spec.Bootstrap.Recovery.Backup != nil && cluster.Spec.Bootstrap.Recovery.Backup.UsePlugin != nil {
+		return *cluster.Spec.Bootstrap.Recovery.Backup.UsePlugin
 	}
-	return nil
+	return false
 }
 
 // BuildPostgresOptions create the list of options that

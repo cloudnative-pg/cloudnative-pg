@@ -258,7 +258,7 @@ func (info InitInfo) Restore(ctx context.Context) error {
 	var config string
 
 	// nolint: nestif
-	if cluster.GetBootstrapRecoveryBackup() != nil && cluster.GetBootstrapRecoveryBackup().UsePlugin {
+	if cluster.GetBootstrapRecoveryBackupUsePlugin() {
 		contextLogger.Info("Restore through plugin detected, proceeding...")
 		res, err := tryRestoreViaPlugin(ctx, cluster)
 		if err != nil {
