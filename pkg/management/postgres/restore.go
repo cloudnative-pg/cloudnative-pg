@@ -233,6 +233,7 @@ func (info InitInfo) createBackupObjectForSnapshotRestore(
 
 // Restore restores a PostgreSQL cluster from a backup into the object storage
 func (info InitInfo) Restore(ctx context.Context) error {
+	contextLogger := log.FromContext(ctx)
 	typedClient, err := management.NewControllerRuntimeClient()
 	if err != nil {
 		return err
@@ -255,12 +256,17 @@ func (info InitInfo) Restore(ctx context.Context) error {
 
 	var envs []string
 	var config string
-	res, err := tryRestoreViaPlugin(ctx, cluster)
-	if err != nil {
-		return err
-	}
+
 	// nolint: nestif
-	if res != nil {
+	if cluster.GetBootstrapRecoveryBackup() != nil && cluster.GetBootstrapRecoveryBackup().UsePlugin {
+		contextLogger.Info("Restore through plugin detected, proceeding...")
+		res, err := tryRestoreViaPlugin(ctx, cluster)
+		if err != nil {
+			return err
+		}
+		if res == nil {
+			return errors.New("no plugin available to restore the cluster")
+		}
 		envs = res.Envs
 		config = res.RestoreConfig
 	} else {
