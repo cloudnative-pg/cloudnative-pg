@@ -1347,6 +1347,15 @@ func (cluster *Cluster) IsReadOnlyServiceEnabled() bool {
 	return !slices.Contains(cluster.Spec.Managed.Services.DisabledDefaultServices, ServiceSelectorTypeRO)
 }
 
+// GetBootstrapRecoveryBackupUsePlugin returns true if the recovery from backup should use a plugin.
+func (cluster *Cluster) GetBootstrapRecoveryBackupUsePlugin() bool {
+	if cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.Recovery != nil &&
+		cluster.Spec.Bootstrap.Recovery.Backup != nil && cluster.Spec.Bootstrap.Recovery.Backup.UsePlugin != nil {
+		return *cluster.Spec.Bootstrap.Recovery.Backup.UsePlugin
+	}
+	return false
+}
+
 // BuildPostgresOptions create the list of options that
 // should be added to the PostgreSQL configuration to
 // recover given a certain target
