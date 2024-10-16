@@ -1366,3 +1366,107 @@ The `cnpg` plugin can be easily integrated in [K9s](https://k9scli.io/), a
 popular terminal-based UI to interact with Kubernetes clusters.
 
 See [`k9s/plugins.yml`](samples/k9s/plugins.yml) for details.
+
+## Plugin Permissions per command
+
+The plugin will require a different set of permissions in the Kubernetes cluster
+depending on the command that is required to execute, these permissions goes from
+non (only local execution) to permissions over resources and sub-resources like Pods,
+PDB, PVCs, etc. these permission may go from get to patch a sub resource, this
+will be detailed as follow:
+
+| Command        | Resources Permission                                                                                                          |
+|:---------------|:------------------------------------------------------------------------------------------------------------------------------|
+| backup         | clusters: get<br/>backups: create
+| destroy        | pods: get,delete<br/>jobs: list<br/>PVC:list,delete                                                                           |
+| fencing        | clusters: get,patch<br/>pods:get                                                                                              |
+| fio            | PVC: create<br/>configmaps: create<br/>deployment: create                                                                     |
+| hibernate      | clusters: get,patch,delete<br/>pods: list,get,delete<br/>pods/exec: create<br/>jobs: list<br/>PVC:get,list,update,patch,delete |
+| logs           | clusters: get<br/>pods:list<br/>pods/log: get                                                                                 |
+| maintenance    | clusters: get,patch<br/>                                                                                                      |
+| pgadmin4       | clusters: get<br/>configmaps: create<br/>deployments: create<br/>services: create<br/>secrets: create                         |
+| pgbench        | clusters: get<br/>jobs:create<br/>                                                                                            |
+| promote        | clusters:get<br/>clusters/status: patch<br/>pods: get                                                                         |
+| psql           | pods: get,list<br/>pods/exec: create                                                                                          |
+| publication    | clusters: get<br/>pods: get,list<br/>pods/exec: create                                                                        |
+| reload         | clusters: get,patch                                                                                                           |
+| report         | clusters: get<br/>pods: list<br/>pods/log: get<br/>jobs: list<br/>events: list                                                |
+| restart        | clusters: get,patch                                                                                                           |
+| status         | clusters: get<br/>pods: list<br/>pods/exec: create<br/>pods/proxy: create<br/>PDB: list                                       |
+| subscription   | clusters: get<br/>pods: get,list<br/>pods/exec: create                                                                        |
+
+### Role example
+
+If we want that a user has access to only get the logs of a cluster we can assign the following role:
+
+```yaml
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: cnpg-log-user
+  namespace: jg
+rules:
+  - verbs:
+      - get
+    apiGroups:
+      - postgresql.cnpg.io
+    resources:
+      - clusters
+  - verbs:
+      - list
+    apiGroups:
+      - ''
+    resources:
+      - pods
+  - verbs:
+      - get
+    apiGroups:
+      - ''
+    resources:
+      - pods/log
+```
+
+A user that able to get the status of the cluster will require the following role
+
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: cnpg-status-user
+rules:
+  - verbs:
+      - get
+    apiGroups:
+      - postgresql.cnpg.io
+    resources:
+      - clusters
+  - verbs:
+      - list
+    apiGroups:
+      - ''
+    resources:
+      - pods
+  - verbs:
+      - create
+    apiGroups:
+      - ''
+    resources:
+      - pods/exec
+  - verbs:
+      - create
+    apiGroups:
+      - ''
+    resources:
+      - pods/proxy
+  - verbs:
+      - list
+    apiGroups:
+      - policy
+    resources:
+      - poddisruptionbudgets
+```
+
+!!! Important
+    Keeping the verbs per `resources` and per `apiGroups` helps to make sure that a user will not have access to create
+    a PDB or a Pod due to a joint of the `resources` and `verbs`
