@@ -26,11 +26,12 @@ native connection pooler based on PgBouncer.
 
 CloudNativePG was originally built by [EDB](https://www.enterprisedb.com), then
 released open source under Apache License 2.0.
+It has been submitted for the [CNCF Sandbox in September 2024](https://github.com/cncf/sandbox/issues/128).
 The [source code repository is in Github](https://github.com/cloudnative-pg/cloudnative-pg).
 
 !!! Note
     Based on the [Operator Capability Levels model](operator_capability_levels.md),
-    users can expect a **"Level V - Auto Pilot"** set of capabilities from the
+    users can expect a **"Level V - Auto Pilot"** subset of capabilities from the
     CloudNativePG Operator.
 
 ## Supported Kubernetes distributions
