@@ -200,7 +200,7 @@ func (env TestingEnvironment) DeleteNamespaceAndWait(name string, timeoutSeconds
 
 	for _, pod := range pods.Items {
 		err = env.DeletePod(name, pod.Name, client.GracePeriodSeconds(1), client.PropagationPolicy("Background"))
-		if err != nil {
+		if err != nil && !apierrs.IsNotFound(err) {
 			return err
 		}
 	}
