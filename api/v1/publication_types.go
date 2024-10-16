@@ -68,14 +68,11 @@ type PublicationSpec struct {
 // +kubebuilder:validation:XValidation:rule="(has(self.allTables) && !has(self.objects)) || (!has(self.allTables) && has(self.objects))",message="allTables and objects are not compatible"
 type PublicationTarget struct {
 	// All tables should be publicated
-	AllTables *PublicationTargetAllTables `json:"allTables,omitempty"`
+	AllTables bool `json:"allTables,omitempty"`
 
 	// Just the following schema objects
 	Objects []PublicationTargetObject `json:"objects,omitempty"`
 }
-
-// PublicationTargetAllTables means all tables should be publicated
-type PublicationTargetAllTables struct{}
 
 // PublicationTargetObject is an object to publicate
 type PublicationTargetObject struct {

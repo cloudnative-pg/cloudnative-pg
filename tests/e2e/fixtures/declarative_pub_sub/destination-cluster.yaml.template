@@ -3,7 +3,7 @@ kind: Cluster
 metadata:
   name: destination-cluster
 spec:
-  instances: 3
+  instances: 1
   externalClusters:
     - name: source-cluster
       connectionParameters:

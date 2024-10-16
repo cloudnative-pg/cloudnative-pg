@@ -176,7 +176,7 @@ func (r *PublicationReconciler) dropPublication(ctx context.Context, obj *apiv1.
 }
 
 func toPublicationTargetSQL(obj *apiv1.PublicationTarget) string {
-	if obj.AllTables != nil {
+	if obj.AllTables {
 		return "FOR ALL TABLES"
 	}
 

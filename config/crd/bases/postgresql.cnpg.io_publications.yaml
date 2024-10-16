@@ -102,7 +102,7 @@ spec:
                 properties:
                   allTables:
                     description: All tables should be publicated
-                    type: object
+                    type: boolean
                   objects:
                     description: Just the following schema objects
                     items:

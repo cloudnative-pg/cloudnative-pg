@@ -118,7 +118,7 @@ var _ = Describe("Declarative publication and subscription test", Label(tests.La
 			}, 30).Should(Succeed())
 		}
 
-		It("can add declarative databases, publication and subscription", func() { //nolint:dupl
+		It("can perform logical replication", func() { //nolint:dupl
 			By("applying source Database CRD manifest", func() {
 				CreateResourceFromFile(namespace, sourceDatabaseManifest)
 				databaseObjectName, err = env.GetResourceNameFromYAML(sourceDatabaseManifest)
@@ -144,6 +144,10 @@ var _ = Describe("Declarative publication and subscription test", Label(tests.La
 
 				AssertDatabaseExists(namespace, primaryPodInfo.Name, dbname, true)
 			})
+			By("creating new data in the source cluster database", func() {
+				AssertCreateTableAndInsertValues(env, namespace, sourceClusterName, dbname, tableName)
+			})
+
 			By("applying destination Database CRD manifest", func() {
 				CreateResourceFromFile(namespace, destinationDatabaseManifest)
 				databaseObjectName, err = env.GetResourceNameFromYAML(destinationDatabaseManifest)
@@ -169,6 +173,10 @@ var _ = Describe("Declarative publication and subscription test", Label(tests.La
 
 				AssertDatabaseExists(namespace, primaryPodInfo.Name, dbname, true)
 			})
+			By("creating empty table inside destination database", func() {
+				AssertCreateTableWithDatabaseName(env, namespace, destinationClusterName, dbname, tableName)
+			})
+
 			By("applying Publication CRD manifest", func() {
 				CreateResourceFromFile(namespace, pubManifest)
 				pubObjectName, err = env.GetResourceNameFromYAML(pubManifest)
@@ -219,10 +227,6 @@ var _ = Describe("Declarative publication and subscription test", Label(tests.La
 
 				assertSubscriptionExists(namespace, primaryPodInfo.Name, sub)
 			})
-			By("creating a new data in the source cluster database", func() {
-				AssertCreateTestDataWithDatabaseName(env, namespace, sourceClusterName, dbname, tableName)
-			})
-
 			By("checking that the data is present inside the destination cluster database", func() {
 				// Expect the (previously created) test data to be available
 				primary, err := env.GetClusterPrimary(namespace, destinationClusterName)

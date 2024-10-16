@@ -3,7 +3,7 @@ kind: Cluster
 metadata:
   name: source-cluster
 spec:
-  instances: 3
+  instances: 1
 
   postgresql:
     parameters:

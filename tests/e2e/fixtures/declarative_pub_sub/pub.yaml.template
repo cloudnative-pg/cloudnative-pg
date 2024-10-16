@@ -8,4 +8,4 @@ spec:
   cluster:
     name: source-cluster
   target:
-    allTables: {}
+    allTables: true

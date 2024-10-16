@@ -4120,7 +4120,7 @@ desired state that was synchronized</p>
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
 <tr><td><code>allTables</code> <B>[Required]</B><br/>
-<a href="#postgresql-cnpg-io-v1-PublicationTargetAllTables"><i>PublicationTargetAllTables</i></a>
+<i>bool</i>
 </td>
 <td>
    <p>All tables should be publicated</p>
@@ -4135,19 +4135,6 @@ desired state that was synchronized</p>
 </tr>
 </tbody>
 </table>
-
-## PublicationTargetAllTables     {#postgresql-cnpg-io-v1-PublicationTargetAllTables}
-
-
-**Appears in:**
-
-- [PublicationTarget](#postgresql-cnpg-io-v1-PublicationTarget)
-
-
-<p>PublicationTargetAllTables means all tables should be publicated</p>
-
-
-
 
 ## PublicationTargetObject     {#postgresql-cnpg-io-v1-PublicationTargetObject}
 
