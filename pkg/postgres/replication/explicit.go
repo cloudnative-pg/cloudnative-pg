@@ -53,7 +53,8 @@ func explicitSynchronousStandbyNamesDataDurabilityRequired(cluster *apiv1.Cluste
 	}
 
 	// Add prefix and suffix
-	instancesList := make([]string, 0, len(clusterInstancesList)+len(config.StandbyNamesPre)+len(config.StandbyNamesPost))
+	instancesList := make([]string, 0,
+		len(clusterInstancesList)+len(config.StandbyNamesPre)+len(config.StandbyNamesPost))
 	instancesList = append(instancesList, config.StandbyNamesPre...)
 	instancesList = append(instancesList, clusterInstancesList...)
 	instancesList = append(instancesList, config.StandbyNamesPost...)
@@ -61,6 +62,7 @@ func explicitSynchronousStandbyNamesDataDurabilityRequired(cluster *apiv1.Cluste
 	// An empty instances list would generate a PostgreSQL syntax error
 	// because configuring synchronous replication with an empty replica
 	// list is not allowed.
+	// Adding this as a safeguard, but this should never get into a postgres configuration.
 	if len(instancesList) == 0 {
 		instancesList = []string{
 			cluster.Name + placeholderInstanceNameSuffix,
@@ -84,7 +86,7 @@ func explicitSynchronousStandbyNamesDataDurabilityPreferred(cluster *apiv1.Clust
 	config := cluster.Spec.PostgresConfiguration.Synchronous
 
 	// Create the list of pod names
-	instancesList := getReadyReplicasNames(cluster)
+	instancesList := getSortedNonPrimaryInstanceNames(cluster)
 
 	// Cap the number of standby names using the configuration on the
 	// cluster
@@ -166,24 +168,5 @@ func getSortedInstanceNames(cluster *apiv1.Cluster) []string {
 		result = append(result, primaryInstance)
 	}
 
-	return result
-}
-
-// getReadyReplicasNames gets a list of all the known PostgreSQL replicas that
-// are ready.
-// This is used to create the list in synchronous_standby_names when data
-// durability is not enforced.
-//
-// Important: non-ready replicas are not included and the name of the current
-// primary is not included.
-func getReadyReplicasNames(cluster *apiv1.Cluster) []string {
-	result := make([]string, 0, cluster.Spec.Instances)
-	for _, instance := range cluster.Status.InstancesStatus[apiv1.PodHealthy] {
-		if cluster.Status.CurrentPrimary != instance {
-			result = append(result, instance)
-		}
-	}
-
-	sort.Strings(result)
 	return result
 }
