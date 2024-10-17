@@ -24,6 +24,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/connection"
 )
@@ -149,5 +150,5 @@ type BackupCapabilities interface {
 
 // RestoreJobHooksCapabilities describes a set of behaviour needed to run the Restore
 type RestoreJobHooksCapabilities interface {
-	Restore(ctx context.Context) (*restore.RestoreResponse, error)
+	Restore(ctx context.Context, cluster *apiv1.Cluster, backup *apiv1.Backup) (*restore.RestoreResponse, error)
 }

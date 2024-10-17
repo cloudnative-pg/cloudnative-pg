@@ -18,16 +18,23 @@ package client
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"slices"
 
 	restore "github.com/cloudnative-pg/cnpg-i/pkg/restore/job"
+
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
 
 // ErrNoPluginSupportsRestoreJobHooksCapability is raised when no plugin supports the restore job hooks capability
 var ErrNoPluginSupportsRestoreJobHooksCapability = errors.New("no plugin supports the restore job hooks capability")
 
-func (data *data) Restore(ctx context.Context) (*restore.RestoreResponse, error) {
+func (data *data) Restore(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	backup *apiv1.Backup,
+) (*restore.RestoreResponse, error) {
 	for idx := range data.plugins {
 		plugin := data.plugins[idx]
 
@@ -35,7 +42,18 @@ func (data *data) Restore(ctx context.Context) (*restore.RestoreResponse, error)
 			continue
 		}
 
-		request := restore.RestoreRequest{}
+		clusterDefinition, err := json.Marshal(cluster)
+		if err != nil {
+			return nil, err
+		}
+		backDefinition, err := json.Marshal(backup)
+		if err != nil {
+			return nil, err
+		}
+		request := restore.RestoreRequest{
+			ClusterDefinition: clusterDefinition,
+			BackupDefinition:  backDefinition,
+		}
 		res, err := plugin.RestoreJobHooksClient().Restore(ctx, &request)
 		if err != nil {
 			return nil, err

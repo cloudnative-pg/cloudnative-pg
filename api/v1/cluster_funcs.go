@@ -1347,8 +1347,8 @@ func (cluster *Cluster) IsReadOnlyServiceEnabled() bool {
 	return !slices.Contains(cluster.Spec.Managed.Services.DisabledDefaultServices, ServiceSelectorTypeRO)
 }
 
-// GetBootstrapRecoveryBackupUsePlugin returns true if the recovery from backup should use a plugin.
-func (cluster *Cluster) GetBootstrapRecoveryBackupUsePlugin() bool {
+// UsePluginForBootstrapRecoveryBackup returns true if the recovery from backup should use a plugin.
+func (cluster *Cluster) UsePluginForBootstrapRecoveryBackup() bool {
 	if cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.Recovery != nil &&
 		cluster.Spec.Bootstrap.Recovery.Backup != nil && cluster.Spec.Bootstrap.Recovery.Backup.UsePlugin != nil {
 		return *cluster.Spec.Bootstrap.Recovery.Backup.UsePlugin

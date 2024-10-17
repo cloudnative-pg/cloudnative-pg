@@ -258,14 +258,14 @@ func (info InitInfo) Restore(ctx context.Context) error {
 	var config string
 
 	// nolint: nestif
-	if cluster.GetBootstrapRecoveryBackupUsePlugin() {
+	if cluster.UsePluginForBootstrapRecoveryBackup() {
 		contextLogger.Info("Restore through plugin detected, proceeding...")
-		res, err := tryRestoreViaPlugin(ctx, cluster)
+		res, err := restoreViaPlugin(ctx, typedClient, cluster)
 		if err != nil {
 			return err
 		}
 		if res == nil {
-			return errors.New("no plugin available to restore the cluster")
+			return errors.New("empty response from restoreViaPlugin, programmatic error")
 		}
 		envs = res.Envs
 		config = res.RestoreConfig
@@ -1041,9 +1041,13 @@ func waitUntilRecoveryFinishes(db *sql.DB) error {
 	})
 }
 
-// tryRestoreViaPlugin tries to restore the cluster using a plugin if available and enabled.
+// restoreViaPlugin tries to restore the cluster using a plugin if available and enabled.
 // Returns true if a restore plugin was found and any error encountered.
-func tryRestoreViaPlugin(ctx context.Context, cluster *apiv1.Cluster) (*restore.RestoreResponse, error) {
+func restoreViaPlugin(
+	ctx context.Context,
+	cli client.Client,
+	cluster *apiv1.Cluster,
+) (*restore.RestoreResponse, error) {
 	contextLogger := log.FromContext(ctx)
 
 	backoff := wait.Backoff{
@@ -1052,7 +1056,16 @@ func tryRestoreViaPlugin(ctx context.Context, cluster *apiv1.Cluster) (*restore.
 		Factor:   3.0,
 		Jitter:   0.1,
 	}
-	var err error
+
+	var backup apiv1.Backup
+	if err := cli.Get(
+		ctx,
+		client.ObjectKey{Namespace: cluster.Namespace, Name: cluster.Spec.Bootstrap.Recovery.Backup.Name},
+		&backup,
+	); err != nil {
+		return nil, err
+	}
+
 	var res *restore.RestoreResponse
 	if resErr := retry.OnError(backoff, func(err error) bool {
 		if errors.Is(err, pluginClient.ErrNoPluginSupportsRestoreJobHooksCapability) {
@@ -1061,7 +1074,6 @@ func tryRestoreViaPlugin(ctx context.Context, cluster *apiv1.Cluster) (*restore.
 		}
 		return false
 	}, func() error {
-
 		plugins := repository.New()
 		availablePluginNames, err := plugins.RegisterUnixSocketPluginsInPath(configuration.Current.PluginSocketDir)
 		if err != nil {
@@ -1074,7 +1086,7 @@ func tryRestoreViaPlugin(ctx context.Context, cluster *apiv1.Cluster) (*restore.
 		enabledPluginNamesSet := stringset.From(cluster.Spec.Plugins.GetEnabledPluginNames())
 		contextLogger.Info("enabled plugins", "plugins", enabledPluginNamesSet)
 
-		client, err := pluginClient.WithPlugins(
+		pluginClient, err := pluginClient.WithPlugins(
 			ctx,
 			plugins,
 			availablePluginNamesSet.Intersect(enabledPluginNamesSet).ToList()...,
@@ -1083,12 +1095,12 @@ func tryRestoreViaPlugin(ctx context.Context, cluster *apiv1.Cluster) (*restore.
 			contextLogger.Error(err, "Error while loading required plugins")
 			return err
 		}
-		defer client.Close(ctx)
+		defer pluginClient.Close(ctx)
 
-		res, err = client.Restore(ctx)
+		res, err = pluginClient.Restore(ctx, cluster, &backup)
 		return err
 	}); resErr != nil {
-		return nil, err
+		return nil, resErr
 	}
 
 	return res, nil
