@@ -1054,7 +1054,9 @@ func tryRestoreViaPlugin(ctx context.Context, cluster *apiv1.Cluster) (*restore.
 	defer plugins.Close()
 
 	availablePluginNamesSet := stringset.From(availablePluginNames)
+	contextLogger.Info("available plugins", "plugins", availablePluginNamesSet)
 	enabledPluginNamesSet := stringset.From(cluster.Spec.Plugins.GetEnabledPluginNames())
+	contextLogger.Info("enabled plugins", "plugins", enabledPluginNamesSet)
 
 	client, err := pluginClient.WithPlugins(
 		ctx,
@@ -1066,10 +1068,6 @@ func tryRestoreViaPlugin(ctx context.Context, cluster *apiv1.Cluster) (*restore.
 		return nil, err
 	}
 	defer client.Close(ctx)
-
-	if !client.CanRunRestoreJobHooks() {
-		return nil, nil
-	}
 
 	return client.Restore(ctx)
 }

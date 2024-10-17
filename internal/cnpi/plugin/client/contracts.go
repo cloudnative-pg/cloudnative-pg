@@ -150,5 +150,4 @@ type BackupCapabilities interface {
 // RestoreJobHooksCapabilities describes a set of behaviour needed to run the Restore
 type RestoreJobHooksCapabilities interface {
 	Restore(ctx context.Context) (*restore.RestoreResponse, error)
-	CanRunRestoreJobHooks() bool
 }

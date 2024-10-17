@@ -24,17 +24,6 @@ import (
 	restore "github.com/cloudnative-pg/cnpg-i/pkg/restore/job"
 )
 
-func (data *data) CanRunRestoreJobHooks() bool {
-	for idx := range data.plugins {
-		plugin := data.plugins[idx]
-
-		if slices.Contains(plugin.RestoreJobHooksCapabilities(), restore.RestoreJobHooksCapability_KIND_RESTORE) {
-			return true
-		}
-	}
-	return false
-}
-
 func (data *data) Restore(ctx context.Context) (*restore.RestoreResponse, error) {
 	for idx := range data.plugins {
 		plugin := data.plugins[idx]
