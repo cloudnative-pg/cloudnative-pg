@@ -1173,10 +1173,24 @@ const (
 	SynchronousReplicaConfigurationMethodAny = SynchronousReplicaConfigurationMethod("any")
 )
 
+// DataDurabilityMethod can be `required` or `preferred` and allows the user to
+// relax strict enforcement
+type DataDurabilityMethod string
+
+const (
+	// DataDurabilityMethodRequired means that data durability is enforced always
+	DataDurabilityMethodRequired DataDurabilityMethod = DataDurabilityMethod("required")
+
+	// DataDurabilityMethodPreferred means that data durability is enforced
+	// only when healthy replicas are available
+	DataDurabilityMethodPreferred DataDurabilityMethod = DataDurabilityMethod("preferred")
+)
+
 // SynchronousReplicaConfiguration contains the configuration of the
 // PostgreSQL synchronous replication feature.
 // Important: at this moment, also `.spec.minSyncReplicas` and `.spec.maxSyncReplicas`
 // need to be considered.
+// +kubebuilder:validation:XValidation:rule="self.dataDurability!='preferred' || ((!has(self.standbyNamesPre) || self.standbyNamesPre.size()==0) && (!has(self.standbyNamesPost) || self.standbyNamesPost.size()==0))",message="dataDurability set to 'preferred' requires empty 'standbyNamesPre' and empty 'standbyNamesPost'"
 type SynchronousReplicaConfiguration struct {
 	// Method to select synchronous replication standbys from the listed
 	// servers, accepting 'any' (quorum-based synchronous replication) or
@@ -1206,6 +1220,17 @@ type SynchronousReplicaConfiguration struct {
 	// only useful for priority-based synchronous replication).
 	// +optional
 	StandbyNamesPost []string `json:"standbyNamesPost,omitempty"`
+
+	// If "required", strict enforcement of data durability is enforced and
+	// write operations with synchronous commit set to `on`, `remote_write`
+	// or `remote_apply` will hang if there are no sufficient number of
+	// healthy replicas.
+	// If "preferred" data durability will be enforced whenever healthy
+	// replicas are available. This can only be set if both
+	// `standbyNamesPre` and `standbyNamesPost` are empty.
+	// +kubebuilder:validation:Enum=required;preferred
+	// +kubebuilder:default:=required
+	DataDurability DataDurabilityMethod `json:"dataDurability,omitempty"`
 }
 
 // PostgresConfiguration defines the PostgreSQL configuration

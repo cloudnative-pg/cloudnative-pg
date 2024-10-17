@@ -4058,6 +4058,20 @@ spec:
                     description: Configuration of the PostgreSQL synchronous replication
                       feature
                     properties:
+                      dataDurability:
+                        default: required
+                        description: |-
+                          If "required", strict enforcement of data durability is enforced and
+                          write operations with synchronous commit set to `on`, `remote_write`
+                          or `remote_apply` will hang if there are no sufficient number of
+                          healthy replicas.
+                          If "preferred" data durability will be enforced whenever healthy
+                          replicas are available. This can only be set if both
+                          `standbyNamesPre` and `standbyNamesPost` are empty.
+                        enum:
+                        - required
+                        - preferred
+                        type: string
                       maxStandbyNamesFromCluster:
                         description: |-
                           Specifies the maximum number of local cluster pods that can be
@@ -4102,6 +4116,12 @@ spec:
                     - method
                     - number
                     type: object
+                    x-kubernetes-validations:
+                    - message: dataDurability set to 'preferred' requires empty 'standbyNamesPre'
+                        and empty 'standbyNamesPost'
+                      rule: self.dataDurability!='preferred' || ((!has(self.standbyNamesPre)
+                        || self.standbyNamesPre.size()==0) && (!has(self.standbyNamesPost)
+                        || self.standbyNamesPost.size()==0))
                 type: object
               primaryUpdateMethod:
                 default: restart
