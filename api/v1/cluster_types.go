@@ -1173,12 +1173,12 @@ const (
 	SynchronousReplicaConfigurationMethodAny = SynchronousReplicaConfigurationMethod("any")
 )
 
-// DataDurabilityMethod specifies how to enforce synchronous replication when cluster instances
-// are unavailable. Options are `required` or `preferred`.
+// DataDurabilityMethod specifies how strictly to enforce synchronous replication
+// when cluster instances are unavailable. Options are `required` or `preferred`.
 type DataDurabilityMethod string
 
 const (
-	// DataDurabilityMethodRequired means that data durability is enforced always
+	// DataDurabilityMethodRequired means that data durability is strictly enforced
 	DataDurabilityMethodRequired DataDurabilityMethod = DataDurabilityMethod("required")
 
 	// DataDurabilityMethodPreferred means that data durability is enforced

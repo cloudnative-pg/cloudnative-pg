@@ -2208,8 +2208,8 @@ Map keys are the config map names, map values are the versions</p>
 - [SynchronousReplicaConfiguration](#postgresql-cnpg-io-v1-SynchronousReplicaConfiguration)
 
 
-<p>DataDurabilityMethod specifies how to enforce synchronous replication when cluster instances
-are unavailable. Options are <code>required</code> or <code>preferred</code>.</p>
+<p>DataDurabilityMethod specifies how strictly to enforce synchronous replication
+when cluster instances are unavailable. Options are <code>required</code> or <code>preferred</code>.</p>
 
 
 
