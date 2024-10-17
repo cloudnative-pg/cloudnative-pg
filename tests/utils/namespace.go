@@ -18,16 +18,20 @@ package utils
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/onsi/ginkgo/v2"
 	corev1 "k8s.io/api/core/v1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/logs"
@@ -181,7 +185,33 @@ func (env TestingEnvironment) DeleteNamespaceAndWait(name string, timeoutSeconds
 		}
 	}
 
-	_, _, err := Run(fmt.Sprintf("kubectl delete namespace %v --wait=true --timeout %vs", name, timeoutSeconds))
+	ctx, cancel := context.WithTimeout(env.Ctx, time.Duration(timeoutSeconds)*time.Second)
+	defer cancel()
 
-	return err
+	err := env.DeleteNamespace(name, client.PropagationPolicy("Background"))
+	if err != nil {
+		return err
+	}
+
+	pods, err := env.GetPodList(name)
+	if err != nil {
+		return err
+	}
+
+	for _, pod := range pods.Items {
+		err = env.DeletePod(name, pod.Name, client.GracePeriodSeconds(1), client.PropagationPolicy("Background"))
+		if err != nil && !apierrs.IsNotFound(err) {
+			return err
+		}
+	}
+
+	return wait.PollUntilContextCancel(ctx, time.Second, true,
+		func(ctx context.Context) (bool, error) {
+			err := env.Client.Get(ctx, client.ObjectKey{Name: name}, &corev1.Namespace{})
+			if apierrs.IsNotFound(err) {
+				return true, nil
+			}
+			return false, err
+		},
+	)
 }
