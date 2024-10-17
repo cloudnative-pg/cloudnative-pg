@@ -110,9 +110,16 @@ as a fallback option whenever pulling WALs via streaming replication fails.
 CloudNativePG supports both
 [quorum-based and priority-based synchronous replication for PostgreSQL](https://www.postgresql.org/docs/current/warm-standby.html#SYNCHRONOUS-REPLICATION).
 
+The field `dataDurability` in the `.spec.postgresql.synchronous` stanza allows
+configuring how strictly to enforce synchronous replication.
+The default value, `required`, enforces synchronous replication strictly,
+as standard in PostgreSQL. The value `preferred` allows to prioritize
+self-healing, in line with expectations in some cloud-native use cases.
+
 !!! Warning
-    Please be aware that synchronous replication will halt your write
-    operations if the required number of standby nodes to replicate WAL data for
+    Please be aware that with `dataDurability` set to `required` (the default
+    value), synchronous replication will halt your write operations if the
+    required number of standby nodes to replicate WAL data for
     transaction commits is unavailable. In such cases, write operations for your
     applications will hang. This behavior differs from the previous implementation
     in CloudNativePG but aligns with the expectations of a PostgreSQL DBA for this
