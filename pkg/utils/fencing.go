@@ -192,7 +192,7 @@ func (fb *FencingMetadataExecutor) Execute(ctx context.Context, key types.Namesp
 		if name != FenceAllInstances {
 			var pod corev1.Pod
 			if err := fb.cli.Get(ctx, client.ObjectKey{Namespace: key.Namespace, Name: name}, &pod); err != nil {
-				return fmt.Errorf("node %s not found in namespace %s", name, key.Namespace)
+				return fmt.Errorf("node %s not found in namespace %s: %w", name, key.Namespace, err)
 			}
 		}
 	}
