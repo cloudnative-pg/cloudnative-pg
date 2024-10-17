@@ -38,6 +38,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/minio"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -147,10 +148,10 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 	AssertScheduledBackupsAreScheduled := func(serverName string) {
 		By("verifying scheduled backups are still happening", func() {
 			latestTar := minioPath(serverName, "data.tar.gz")
-			currentBackups, err := testsUtils.CountFilesOnMinio(minioEnv, latestTar)
+			currentBackups, err := minio.CountFiles(minioEnv, latestTar)
 			Expect(err).ToNot(HaveOccurred())
 			Eventually(func() (int, error) {
-				return testsUtils.CountFilesOnMinio(minioEnv, latestTar)
+				return minio.CountFiles(minioEnv, latestTar)
 			}, 120).Should(BeNumerically(">", currentBackups))
 		})
 	}
@@ -333,7 +334,9 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 	// assertExpectedMatchingPodUIDs checks that the UID of each pod of a Cluster matches with a given list of UIDs.
 	// expectedMatches defines how many times, when comparing the elements of the 2 lists, you are expected to have
 	// common values
-	assertExpectedMatchingPodUIDs := func(namespace, clusterName string, podUIDs []types.UID, expectedMatches int) error {
+	assertExpectedMatchingPodUIDs := func(
+		namespace, clusterName string, podUIDs []types.UID, expectedMatches int,
+	) error {
 		backoffCheckingPodRestarts := wait.Backoff{
 			Duration: 10 * time.Second,
 			Steps:    30,
@@ -376,11 +379,11 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			return fmt.Errorf("could not cleanup, failed to delete operator namespace: %v", err)
 		}
 
-		if _, err := testsUtils.CleanFilesOnMinio(minioEnv, minioPath1); err != nil {
+		if _, err := minio.CleanFiles(minioEnv, minioPath1); err != nil {
 			return fmt.Errorf("encountered an error while cleaning up minio: %v", err)
 		}
 
-		if _, err := testsUtils.CleanFilesOnMinio(minioEnv, minioPath2); err != nil {
+		if _, err := minio.CleanFiles(minioEnv, minioPath2); err != nil {
 			return fmt.Errorf("encountered an error while cleaning up minio: %v", err)
 		}
 
@@ -627,7 +630,8 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		By("restoring the backup taken from the first Cluster in a new cluster", func() {
 			restoredClusterName := "cluster-restore"
 			CreateResourceFromFile(upgradeNamespace, restoreFile)
-			AssertClusterIsReady(upgradeNamespace, restoredClusterName, testTimeouts[testsUtils.ClusterIsReadySlow], env)
+			AssertClusterIsReady(upgradeNamespace, restoredClusterName, testTimeouts[testsUtils.ClusterIsReadySlow],
+				env)
 
 			// Test data should be present on restored primary
 			primary := restoredClusterName + "-1"

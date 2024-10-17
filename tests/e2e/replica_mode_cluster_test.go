@@ -37,6 +37,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	testUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/minio"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -502,11 +503,11 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication), Ordered, f
 			DeferCleanup(func() error {
 				// Since we use multiple times the same cluster names for the same minio instance, we need to clean it up
 				// between tests
-				_, err = testUtils.CleanFilesOnMinio(minioEnv, path.Join("minio", "cluster-backups", clusterAName))
+				_, err = minio.CleanFiles(minioEnv, path.Join("minio", "cluster-backups", clusterAName))
 				if err != nil {
 					return err
 				}
-				_, err = testUtils.CleanFilesOnMinio(minioEnv, path.Join("minio", "cluster-backups", clusterBName))
+				_, err = minio.CleanFiles(minioEnv, path.Join("minio", "cluster-backups", clusterBName))
 				if err != nil {
 					return err
 				}
@@ -645,7 +646,8 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication), Ordered, f
 				Consistently(func(g Gomega) {
 					pod, err := env.GetClusterPrimary(namespace, clusterBName)
 					g.Expect(err).ToNot(HaveOccurred())
-					stdOut, _, err := env.ExecCommand(env.Ctx, *pod, specs.PostgresContainerName, ptr.To(time.Second*10),
+					stdOut, _, err := env.ExecCommand(env.Ctx, *pod, specs.PostgresContainerName,
+						ptr.To(time.Second*10),
 						"psql", "-U", "postgres", "postgres", "-tAc", "select pg_is_in_recovery();")
 					g.Expect(err).ToNot(HaveOccurred())
 					g.Expect(strings.Trim(stdOut, "\n")).To(Equal("t"))
