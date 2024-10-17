@@ -41,7 +41,7 @@ LOCALBIN ?= $(shell pwd)/bin
 
 BUILD_IMAGE ?= true
 POSTGRES_IMAGE_NAME ?= $(shell grep 'DefaultImageName.*=' "pkg/versions/versions.go" | cut -f 2 -d \")
-KUSTOMIZE_VERSION ?= v5.4.3
+KUSTOMIZE_VERSION ?= v5.5.0
 CONTROLLER_TOOLS_VERSION ?= v0.16.4
 GORELEASER_VERSION ?= v2.3.2
 SPELLCHECK_VERSION ?= 0.43.0
