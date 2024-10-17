@@ -35,6 +35,9 @@ func (data *data) Restore(
 	cluster *apiv1.Cluster,
 	backup *apiv1.Backup,
 ) (*restore.RestoreResponse, error) {
+	backup.EnsureGVKIsPresent()
+	cluster.EnsureGVKIsPresent()
+
 	for idx := range data.plugins {
 		plugin := data.plugins[idx]
 
