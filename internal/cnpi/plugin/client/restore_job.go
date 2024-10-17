@@ -24,6 +24,9 @@ import (
 	restore "github.com/cloudnative-pg/cnpg-i/pkg/restore/job"
 )
 
+// ErrNoPluginSupportsRestoreJobHooksCapability is raised when no plugin supports the restore job hooks capability
+var ErrNoPluginSupportsRestoreJobHooksCapability = errors.New("no plugin supports the restore job hooks capability")
+
 func (data *data) Restore(ctx context.Context) (*restore.RestoreResponse, error) {
 	for idx := range data.plugins {
 		plugin := data.plugins[idx]
@@ -40,5 +43,5 @@ func (data *data) Restore(ctx context.Context) (*restore.RestoreResponse, error)
 		return res, nil
 	}
 
-	return nil, errors.New("no plugin supports the restore job hooks capability")
+	return nil, ErrNoPluginSupportsRestoreJobHooksCapability
 }

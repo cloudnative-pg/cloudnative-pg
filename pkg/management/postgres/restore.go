@@ -1046,28 +1046,50 @@ func waitUntilRecoveryFinishes(db *sql.DB) error {
 func tryRestoreViaPlugin(ctx context.Context, cluster *apiv1.Cluster) (*restore.RestoreResponse, error) {
 	contextLogger := log.FromContext(ctx)
 
-	plugins := repository.New()
-	availablePluginNames, err := plugins.RegisterUnixSocketPluginsInPath(configuration.Current.PluginSocketDir)
-	if err != nil {
-		contextLogger.Error(err, "Error while loading local plugins")
+	backoff := wait.Backoff{
+		Steps:    5,
+		Duration: 1 * time.Second,
+		Factor:   3.0,
+		Jitter:   0.1,
 	}
-	defer plugins.Close()
+	var err error
+	var res *restore.RestoreResponse
+	if resErr := retry.OnError(backoff, func(err error) bool {
+		if errors.Is(err, pluginClient.ErrNoPluginSupportsRestoreJobHooksCapability) {
+			contextLogger.Info("No plugin supports restore job hooks capability encountered, retrying...")
+			return true
+		}
+		return false
+	}, func() error {
 
-	availablePluginNamesSet := stringset.From(availablePluginNames)
-	contextLogger.Info("available plugins", "plugins", availablePluginNamesSet)
-	enabledPluginNamesSet := stringset.From(cluster.Spec.Plugins.GetEnabledPluginNames())
-	contextLogger.Info("enabled plugins", "plugins", enabledPluginNamesSet)
+		plugins := repository.New()
+		availablePluginNames, err := plugins.RegisterUnixSocketPluginsInPath(configuration.Current.PluginSocketDir)
+		if err != nil {
+			contextLogger.Error(err, "Error while loading local plugins")
+		}
+		defer plugins.Close()
 
-	client, err := pluginClient.WithPlugins(
-		ctx,
-		plugins,
-		availablePluginNamesSet.Intersect(enabledPluginNamesSet).ToList()...,
-	)
-	if err != nil {
-		contextLogger.Error(err, "Error while loading required plugins")
+		availablePluginNamesSet := stringset.From(availablePluginNames)
+		contextLogger.Info("available plugins", "plugins", availablePluginNamesSet)
+		enabledPluginNamesSet := stringset.From(cluster.Spec.Plugins.GetEnabledPluginNames())
+		contextLogger.Info("enabled plugins", "plugins", enabledPluginNamesSet)
+
+		client, err := pluginClient.WithPlugins(
+			ctx,
+			plugins,
+			availablePluginNamesSet.Intersect(enabledPluginNamesSet).ToList()...,
+		)
+		if err != nil {
+			contextLogger.Error(err, "Error while loading required plugins")
+			return err
+		}
+		defer client.Close(ctx)
+
+		res, err = client.Restore(ctx)
+		return err
+	}); resErr != nil {
 		return nil, err
 	}
-	defer client.Close(ctx)
 
-	return client.Restore(ctx)
+	return res, nil
 }
