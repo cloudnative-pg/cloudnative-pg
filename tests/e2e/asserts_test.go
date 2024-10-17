@@ -476,6 +476,60 @@ func AssertCreateTestDataWithDatabaseName(
 	})
 }
 
+// AssertCreateTableAndInsertValues create a table inside a given database with one int column
+// and add (1) and (2) values.
+func AssertCreateTableAndInsertValues(
+	env *testsUtils.TestingEnvironment,
+	namespace,
+	clusterName,
+	databaseName,
+	tableName string,
+) {
+	By(fmt.Sprintf("creating table and insert values in cluster %v", clusterName), func() {
+		forward, conn, err := testsUtils.ForwardPSQLConnection(
+			env,
+			namespace,
+			clusterName,
+			databaseName,
+			apiv1.ApplicationUserSecretSuffix,
+		)
+		Expect(err).ToNot(HaveOccurred())
+		query := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %v (column1 INT) ;", tableName)
+		_, err = conn.Exec(query)
+		Expect(err).ToNot(HaveOccurred())
+
+		query = fmt.Sprintf("INSERT INTO %v VALUES (1), (2) ;", tableName)
+		_, err = conn.Exec(query)
+		Expect(err).ToNot(HaveOccurred())
+
+		forward.Close()
+	})
+}
+
+// AssertCreateTableWithDatabaseName create an empty table with just one column of integer
+func AssertCreateTableWithDatabaseName(
+	env *testsUtils.TestingEnvironment,
+	namespace,
+	clusterName,
+	databaseName,
+	tableName string,
+) {
+	By(fmt.Sprintf("creating table in cluster %v", clusterName), func() {
+		forward, conn, err := testsUtils.ForwardPSQLConnection(
+			env,
+			namespace,
+			clusterName,
+			databaseName,
+			apiv1.ApplicationUserSecretSuffix,
+		)
+		Expect(err).ToNot(HaveOccurred())
+		query := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %v (column1 int) ;", tableName)
+		_, err = conn.Exec(query)
+		Expect(err).ToNot(HaveOccurred())
+		forward.Close()
+	})
+}
+
 type TableLocator struct {
 	Namespace   string
 	ClusterName string
