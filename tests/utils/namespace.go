@@ -208,7 +208,7 @@ func (env TestingEnvironment) DeleteNamespaceAndWait(name string, timeoutSeconds
 	return wait.PollUntilContextCancel(ctx, time.Second, true,
 		func(ctx context.Context) (bool, error) {
 			err := env.Client.Get(ctx, client.ObjectKey{Name: name}, &corev1.Namespace{})
-			if err != nil && apierrs.IsNotFound(err) {
+			if apierrs.IsNotFound(err) {
 				return true, nil
 			}
 			return false, err
