@@ -2160,6 +2160,21 @@ Map keys are the config map names, map values are the versions</p>
 </tbody>
 </table>
 
+## DataDurabilityMethod     {#postgresql-cnpg-io-v1-DataDurabilityMethod}
+
+(Alias of `string`)
+
+**Appears in:**
+
+- [SynchronousReplicaConfiguration](#postgresql-cnpg-io-v1-SynchronousReplicaConfiguration)
+
+
+<p>DataDurabilityMethod specifies how strictly to enforce synchronous replication
+when cluster instances are unavailable. Options are <code>required</code> or <code>preferred</code>.</p>
+
+
+
+
 ## DataSource     {#postgresql-cnpg-io-v1-DataSource}
 
 
@@ -4968,6 +4983,18 @@ only useful for priority-based synchronous replication).</p>
    <p>A user-defined list of application names to be added to
 <code>synchronous_standby_names</code> after local cluster pods (the order is
 only useful for priority-based synchronous replication).</p>
+</td>
+</tr>
+<tr><td><code>dataDurability</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-DataDurabilityMethod"><i>DataDurabilityMethod</i></a>
+</td>
+<td>
+   <p>If &quot;required&quot;, data durability is strictly enforced. Write operations with
+synchronous commit set to <code>on</code>, <code>remote_write</code>, or <code>remote_apply</code> will hang
+if there are not enough healthy replicas.
+If &quot;preferred&quot;, data durability is enforced when healthy replicas are available.
+The required number of instances is reduced if there are not enough healthy replicas.
+This can only be set if both <code>standbyNamesPre</code> and <code>standbyNamesPost</code> are empty.</p>
 </td>
 </tr>
 </tbody>
