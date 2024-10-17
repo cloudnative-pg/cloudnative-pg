@@ -361,7 +361,6 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 			tablespace2           = "tbs2"
 			table2                = "test_tbs2"
 		)
-		checkPointTimeout := time.Second * 10
 
 		BeforeAll(func() {
 			// Create a cluster in a namespace we'll delete after the test
@@ -418,26 +417,34 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 			By("inserting test data and creating WALs on the cluster to be snapshotted", func() {
 				// Create a table and insert data 1,2 in each tablespace
 				tl1 := TableLocator{
-					Namespace:   namespace,
-					ClusterName: clusterName,
-					TableName:   table1,
-					Tablespace:  tablespace1,
+					Namespace:    namespace,
+					ClusterName:  clusterName,
+					DatabaseName: testUtils.AppDBName,
+					TableName:    table1,
+					Tablespace:   tablespace1,
 				}
-				AssertCreateTestDataInTablespace(env, tl1)
+				AssertCreateTestData(env, tl1)
 				tl2 := TableLocator{
-					Namespace:   namespace,
-					ClusterName: clusterName,
-					TableName:   table2,
-					Tablespace:  tablespace2,
+					Namespace:    namespace,
+					ClusterName:  clusterName,
+					DatabaseName: testUtils.AppDBName,
+					TableName:    table2,
+					Tablespace:   tablespace2,
 				}
-				AssertCreateTestDataInTablespace(env, tl2)
+				AssertCreateTestData(env, tl2)
 
 				primaryPod, err := env.GetClusterPrimary(namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 				// Execute a checkpoint
-				_, _, err = env.EventuallyExecCommand(
-					env.Ctx, *primaryPod, specs.PostgresContainerName, &checkPointTimeout,
-					"psql", "-U", "postgres", "-tAc", "CHECKPOINT")
+				_, _, err = env.EventuallyExecQueryInInstancePod(
+					testUtils.PodLocator{
+						Namespace: primaryPod.Namespace,
+						PodName:   primaryPod.Name,
+					}, testUtils.PostgresDBName,
+					"CHECKPOINT",
+					RetryTimeout,
+					PollingTime,
+				)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
@@ -510,8 +517,20 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 				})
 
 				By("verifying the correct data exists in the restored cluster", func() {
-					AssertDataExpectedCount(env, namespace, clusterToRestoreName, table1, 2)
-					AssertDataExpectedCount(env, namespace, clusterToRestoreName, table2, 2)
+					tableLocator := TableLocator{
+						Namespace:    namespace,
+						ClusterName:  clusterToRestoreName,
+						DatabaseName: testUtils.AppDBName,
+						TableName:    table1,
+					}
+					AssertDataExpectedCount(env, tableLocator, 2)
+					tableLocator = TableLocator{
+						Namespace:    namespace,
+						ClusterName:  clusterToRestoreName,
+						DatabaseName: testUtils.AppDBName,
+						TableName:    table2,
+					}
+					AssertDataExpectedCount(env, tableLocator, 2)
 				})
 			})
 
@@ -526,6 +545,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 						apiv1.ApplicationUserSecretSuffix,
 					)
 					defer func() {
+						_ = conn.Close()
 						forward.Close()
 					}()
 					Expect(err).ToNot(HaveOccurred())
@@ -590,8 +610,20 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 				})
 
 				By("verifying the correct data exists in the restored cluster", func() {
-					AssertDataExpectedCount(env, namespace, clusterToPITRName, table1, 4)
-					AssertDataExpectedCount(env, namespace, clusterToPITRName, table2, 4)
+					tableLocator := TableLocator{
+						Namespace:    namespace,
+						ClusterName:  clusterToPITRName,
+						DatabaseName: testUtils.AppDBName,
+						TableName:    table1,
+					}
+					AssertDataExpectedCount(env, tableLocator, 4)
+					tableLocator = TableLocator{
+						Namespace:    namespace,
+						ClusterName:  clusterToPITRName,
+						DatabaseName: testUtils.AppDBName,
+						TableName:    table2,
+					}
+					AssertDataExpectedCount(env, tableLocator, 4)
 				})
 			})
 	})
@@ -1004,7 +1036,7 @@ func AssertDatabaseContainsTablespaces(cluster *apiv1.Cluster, timeout int) {
 					testUtils.PodLocator{
 						Namespace: namespace,
 						PodName:   instance.Name,
-					}, testUtils.DatabaseName("app"),
+					}, testUtils.AppDBName,
 					"SELECT oid, spcname, pg_get_userbyid(spcowner) FROM pg_tablespace;",
 				)
 				g.Expect(stdErr).To(BeEmpty())
@@ -1032,7 +1064,7 @@ func AssertTempTablespaceContent(cluster *apiv1.Cluster, timeout int, content st
 				testUtils.PodLocator{
 					Namespace: namespace,
 					PodName:   primary.Name,
-				}, testUtils.DatabaseName("app"),
+				}, testUtils.AppDBName,
 				"SHOW temp_tablespaces",
 			)
 			g.Expect(stdErr).To(BeEmpty())
@@ -1057,7 +1089,7 @@ func AssertTempTablespaceBehavior(cluster *apiv1.Cluster, expectedTempTablespace
 			testUtils.PodLocator{
 				Namespace: namespace,
 				PodName:   primary.Name,
-			}, testUtils.DatabaseName("app"),
+			}, testUtils.AppDBName,
 			"CREATE TEMPORARY TABLE cnp_e2e_test_table (i INTEGER); "+
 				"SELECT spcname FROM pg_tablespace WHERE OID="+
 				"(SELECT reltablespace FROM pg_class WHERE oid = 'cnp_e2e_test_table'::regclass)",
@@ -1079,7 +1111,7 @@ func AssertTablespaceAndOwnerExist(cluster *apiv1.Cluster, tablespace, owner str
 		testUtils.PodLocator{
 			Namespace: namespace,
 			PodName:   primaryPod.Name,
-		}, testUtils.DatabaseName("app"),
+		}, testUtils.AppDBName,
 		fmt.Sprintf("SELECT 1 FROM pg_tablespace WHERE spcname = '%s' AND pg_get_userbyid(spcowner) = '%s';",
 			tablespace,
 			owner),

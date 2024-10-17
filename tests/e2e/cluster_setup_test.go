@@ -131,6 +131,7 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 				apiv1.ApplicationUserSecretSuffix,
 			)
 			defer func() {
+				_ = conn.Close()
 				forward.Close()
 			}()
 			Expect(err).NotTo(HaveOccurred())

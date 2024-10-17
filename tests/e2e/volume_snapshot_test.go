@@ -242,7 +242,13 @@ var _ = Describe("Verify Volume Snapshot",
 
 				By("inserting test data and creating WALs on the cluster to be snapshotted", func() {
 					// Create a "test" table with values 1,2
-					AssertCreateTestData(env, namespace, clusterToSnapshotName, tableName)
+					tableLocator := TableLocator{
+						Namespace:    namespace,
+						ClusterName:  clusterToSnapshotName,
+						DatabaseName: testUtils.AppDBName,
+						TableName:    tableName,
+					}
+					AssertCreateTestData(env, tableLocator)
 
 					// Because GetCurrentTimestamp() rounds down to the second and is executed
 					// right after the creation of the test data, we wait for 1s to avoid not
@@ -262,6 +268,7 @@ var _ = Describe("Verify Volume Snapshot",
 						apiv1.ApplicationUserSecretSuffix,
 					)
 					defer func() {
+						_ = conn.Close()
 						forward.Close()
 					}()
 					Expect(err).ToNot(HaveOccurred())
@@ -282,7 +289,13 @@ var _ = Describe("Verify Volume Snapshot",
 				})
 
 				By("verifying the correct data exists in the restored cluster", func() {
-					AssertDataExpectedCount(env, namespace, clusterToRestoreName, tableName, 2)
+					tableLocator := TableLocator{
+						Namespace:    namespace,
+						ClusterName:  clusterToRestoreName,
+						DatabaseName: testUtils.AppDBName,
+						TableName:    tableName,
+					}
+					AssertDataExpectedCount(env, tableLocator, 2)
 				})
 			})
 		})
@@ -366,7 +379,13 @@ var _ = Describe("Verify Volume Snapshot",
 
 			It("can create a declarative cold backup and restoring using it", func() {
 				By("inserting test data", func() {
-					AssertCreateTestData(env, namespace, clusterToBackupName, tableName)
+					tableLocator := TableLocator{
+						Namespace:    namespace,
+						ClusterName:  clusterToBackupName,
+						DatabaseName: testUtils.AppDBName,
+						TableName:    tableName,
+					}
+					AssertCreateTestData(env, tableLocator)
 				})
 
 				backupName, err := env.GetResourceNameFromYAML(backupFileFilePath)
@@ -426,7 +445,13 @@ var _ = Describe("Verify Volume Snapshot",
 				})
 
 				By("checking that the data is present on the restored cluster", func() {
-					AssertDataExpectedCount(env, namespace, clusterToRestoreName, tableName, 2)
+					tableLocator := TableLocator{
+						Namespace:    namespace,
+						ClusterName:  clusterToRestoreName,
+						DatabaseName: testUtils.AppDBName,
+						TableName:    tableName,
+					}
+					AssertDataExpectedCount(env, tableLocator, 2)
 				})
 			})
 			It("can take a snapshot targeting the primary", func() {
@@ -615,11 +640,18 @@ var _ = Describe("Verify Volume Snapshot",
 						apiv1.ApplicationUserSecretSuffix,
 					)
 					defer func() {
+						_ = conn.Close()
 						forward.Close()
 					}()
 					Expect(err).ToNot(HaveOccurred())
 					// Create a "test" table with values 1,2
-					AssertCreateTestData(env, namespace, clusterToSnapshotName, tableName)
+					tableLocator := TableLocator{
+						Namespace:    namespace,
+						ClusterName:  clusterToSnapshotName,
+						DatabaseName: testUtils.AppDBName,
+						TableName:    tableName,
+					}
+					AssertCreateTestData(env, tableLocator)
 
 					// Insert 2 more rows which we expect not to be present at the end of the recovery
 					insertRecordIntoTable(tableName, 3, conn)
@@ -684,7 +716,13 @@ var _ = Describe("Verify Volume Snapshot",
 				})
 
 				By("verifying the correct data exists in the restored cluster", func() {
-					AssertDataExpectedCount(env, namespace, clusterToRestoreName, tableName, 4)
+					tableLocator := TableLocator{
+						Namespace:    namespace,
+						ClusterName:  clusterToRestoreName,
+						DatabaseName: testUtils.AppDBName,
+						TableName:    tableName,
+					}
+					AssertDataExpectedCount(env, tableLocator, 4)
 				})
 			})
 
@@ -700,6 +738,7 @@ var _ = Describe("Verify Volume Snapshot",
 						apiv1.ApplicationUserSecretSuffix,
 					)
 					defer func() {
+						_ = conn.Close()
 						forward.Close()
 					}()
 					Expect(err).ToNot(HaveOccurred())
@@ -740,8 +779,13 @@ var _ = Describe("Verify Volume Snapshot",
 					podList, err := env.GetClusterReplicas(namespace, clusterToSnapshotName)
 					Expect(err).ToNot(HaveOccurred())
 					Expect(podList.Items).To(HaveLen(2))
-					AssertDataExpectedCount(env, namespace, clusterToSnapshotName, tableName, 6)
-					AssertDataExpectedCount(env, namespace, clusterToSnapshotName, tableName, 6)
+					tableLocator := TableLocator{
+						Namespace:    namespace,
+						ClusterName:  clusterToSnapshotName,
+						DatabaseName: testUtils.AppDBName,
+						TableName:    tableName,
+					}
+					AssertDataExpectedCount(env, tableLocator, 6)
 				})
 			})
 		})

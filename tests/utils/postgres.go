@@ -19,11 +19,8 @@ package utils
 import (
 	"strconv"
 	"strings"
-	"time"
 
 	corev1 "k8s.io/api/core/v1"
-
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 )
 
 const (
@@ -37,32 +34,22 @@ const (
 	AppDBName = "app"
 	// PostgresDBName database name postgres
 	PostgresDBName = "postgres"
+	// TablespaceDefaultName is the default tablespace location
+	TablespaceDefaultName = "pg_default"
 )
-
-// RunQueryFromPod executes a query from a pod to a host
-func RunQueryFromPod(
-	connectingPod *corev1.Pod,
-	host string,
-	dbname string,
-	user string,
-	password string,
-	query string,
-	env *TestingEnvironment,
-) (string, string, error) {
-	timeout := time.Second * 10
-	dsn := CreateDSN(host, user, dbname, password, Prefer, 5432)
-
-	stdout, stderr, err := env.EventuallyExecCommand(env.Ctx, *connectingPod, specs.PostgresContainerName, &timeout,
-		"psql", dsn, "-tAc", query)
-	return stdout, stderr, err
-}
 
 // CountReplicas counts the number of replicas attached to an instance
 func CountReplicas(env *TestingEnvironment, pod *corev1.Pod) (int, error) {
 	query := "SELECT count(*) FROM pg_stat_replication"
-	commandTimeout := time.Second * 10
-	stdOut, _, err := env.EventuallyExecCommand(env.Ctx, *pod, specs.PostgresContainerName,
-		&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", query)
+	stdOut, _, err := env.EventuallyExecQueryInInstancePod(
+		PodLocator{
+			Namespace: pod.Namespace,
+			PodName:   pod.Name,
+		}, AppDBName,
+		query,
+		RetryTimeout,
+		PollingTime,
+	)
 	if err != nil {
 		return 0, nil
 	}
