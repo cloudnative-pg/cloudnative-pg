@@ -99,7 +99,12 @@ func getPrintableIntegerPointer(i *int) string {
 }
 
 // Status implements the "status" subcommand
-func Status(ctx context.Context, clusterName string, verbose bool, format plugin.OutputFormat) error {
+func Status(
+	ctx context.Context,
+	clusterName string,
+	verbosity int,
+	format plugin.OutputFormat,
+) error {
 	var cluster apiv1.Cluster
 	var errs []error
 
@@ -123,17 +128,19 @@ func Status(ctx context.Context, clusterName string, verbose bool, format plugin
 	status.printHibernationInfo()
 	status.printDemotionTokenInfo()
 	status.printPromotionTokenInfo()
-	if verbose {
+	if verbosity > 1 {
 		errs = append(errs, status.printPostgresConfiguration(ctx, clientInterface)...)
+		status.printCertificatesStatus()
 	}
-	status.printCertificatesStatus()
 	status.printBackupStatus()
-	status.printBasebackupStatus()
-	status.printReplicaStatus(verbose)
-	status.printUnmanagedReplicationSlotStatus()
-	status.printRoleManagerStatus()
-	status.printTablespacesStatus()
-	status.printPodDisruptionBudgetStatus()
+	status.printBasebackupStatus(verbosity)
+	status.printReplicaStatus(verbosity)
+	if verbosity > 0 {
+		status.printUnmanagedReplicationSlotStatus()
+		status.printRoleManagerStatus()
+		status.printTablespacesStatus()
+		status.printPodDisruptionBudgetStatus()
+	}
 	status.printInstancesStatus()
 
 	if len(errs) > 0 {
@@ -217,10 +224,10 @@ func (fullStatus *PostgresqlStatus) getClusterSize(ctx context.Context, client k
 	return size, nil
 }
 
-func (fullStatus *PostgresqlStatus) printBasicInfo(ctx context.Context, client kubernetes.Interface) {
+func (fullStatus *PostgresqlStatus) printBasicInfo(ctx context.Context, k8sClient kubernetes.Interface) {
 	summary := tabby.New()
 
-	clusterSize, clusterSizeErr := fullStatus.getClusterSize(ctx, client)
+	clusterSize, clusterSizeErr := fullStatus.getClusterSize(ctx, k8sClient)
 
 	cluster := fullStatus.Cluster
 
@@ -243,8 +250,7 @@ func (fullStatus *PostgresqlStatus) printBasicInfo(ctx context.Context, client k
 	isPrimaryFenced := cluster.IsInstanceFenced(cluster.Status.CurrentPrimary)
 	primaryInstanceStatus := fullStatus.tryGetPrimaryInstance()
 
-	summary.AddLine("Name:", cluster.Name)
-	summary.AddLine("Namespace:", cluster.Namespace)
+	summary.AddLine("Name", client.ObjectKeyFromObject(cluster).String())
 
 	if primaryInstanceStatus != nil {
 		summary.AddLine("System ID:", primaryInstanceStatus.SystemID)
@@ -529,9 +535,9 @@ func (fullStatus *PostgresqlStatus) areReplicationSlotsEnabled() bool {
 		fullStatus.Cluster.Spec.ReplicationSlots.HighAvailability.GetEnabled()
 }
 
-func (fullStatus *PostgresqlStatus) printReplicaStatusTableHeader(table *tabby.Tabby, verbose bool) {
+func (fullStatus *PostgresqlStatus) printReplicaStatusTableHeader(table *tabby.Tabby, verbosity int) {
 	switch {
-	case fullStatus.areReplicationSlotsEnabled() && verbose:
+	case fullStatus.areReplicationSlotsEnabled() && verbosity > 0:
 		table.AddHeader(
 			"Name",
 			"Sent LSN",
@@ -549,7 +555,7 @@ func (fullStatus *PostgresqlStatus) printReplicaStatusTableHeader(table *tabby.T
 			"Slot WAL Status",
 			"Slot Safe WAL Size",
 		)
-	case fullStatus.areReplicationSlotsEnabled() && !verbose:
+	case fullStatus.areReplicationSlotsEnabled() && verbosity == 0:
 		table.AddHeader(
 			"Name",
 			"Sent LSN",
@@ -585,7 +591,7 @@ func (fullStatus *PostgresqlStatus) printReplicaStatusTableHeader(table *tabby.T
 func (fullStatus *PostgresqlStatus) addReplicationSlotsColumns(
 	applicationName string,
 	columns *[]interface{},
-	verbose bool,
+	verbosity int,
 ) {
 	printSlotActivity := func(isActive bool) string {
 		if isActive {
@@ -595,18 +601,18 @@ func (fullStatus *PostgresqlStatus) addReplicationSlotsColumns(
 	}
 	slot := fullStatus.getPrintableReplicationSlotInfo(applicationName)
 	switch {
-	case slot != nil && verbose:
+	case slot != nil && verbosity > 0:
 		*columns = append(*columns,
 			printSlotActivity(slot.Active),
 			slot.RestartLsn,
 			slot.WalStatus,
 			getPrintableIntegerPointer(slot.SafeWalSize),
 		)
-	case slot != nil && !verbose:
+	case slot != nil && verbosity == 0:
 		*columns = append(*columns,
 			printSlotActivity(slot.Active),
 		)
-	case slot == nil && verbose:
+	case slot == nil && verbosity > 0:
 		*columns = append(*columns,
 			"-",
 			"-",
@@ -620,7 +626,7 @@ func (fullStatus *PostgresqlStatus) addReplicationSlotsColumns(
 	}
 }
 
-func (fullStatus *PostgresqlStatus) printReplicaStatus(verbose bool) {
+func (fullStatus *PostgresqlStatus) printReplicaStatus(verbosity int) {
 	if fullStatus.Cluster.IsReplica() {
 		return
 	}
@@ -650,13 +656,13 @@ func (fullStatus *PostgresqlStatus) printReplicaStatus(verbose bool) {
 	}
 
 	status := tabby.New()
-	fullStatus.printReplicaStatusTableHeader(status, verbose)
+	fullStatus.printReplicaStatusTableHeader(status, verbosity)
 
 	// print Replication Slots columns only if the cluster has replication slots enabled
 	addReplicationSlotsColumns := func(_ string, _ *[]interface{}) {}
 	if fullStatus.areReplicationSlotsEnabled() {
 		addReplicationSlotsColumns = func(applicationName string, columns *[]interface{}) {
-			fullStatus.addReplicationSlotsColumns(applicationName, columns, verbose)
+			fullStatus.addReplicationSlotsColumns(applicationName, columns, verbosity)
 		}
 	}
 
@@ -977,7 +983,7 @@ func (fullStatus *PostgresqlStatus) printPodDisruptionBudgetStatus() {
 	fmt.Println()
 }
 
-func (fullStatus *PostgresqlStatus) printBasebackupStatus() {
+func (fullStatus *PostgresqlStatus) printBasebackupStatus(verbosity int) {
 	const header = "Physical backups"
 
 	primaryInstanceStatus := fullStatus.tryGetPrimaryInstance()
@@ -988,7 +994,7 @@ func (fullStatus *PostgresqlStatus) printBasebackupStatus() {
 		return
 	}
 
-	if len(primaryInstanceStatus.PgStatBasebackupsInfo) == 0 {
+	if verbosity > 0 && len(primaryInstanceStatus.PgStatBasebackupsInfo) == 0 {
 		fmt.Println(aurora.Green(header))
 		fmt.Println(aurora.Yellow("No running physical backups found").String())
 		fmt.Println()

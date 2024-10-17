@@ -29,6 +29,7 @@ import (
 	barmanArchiver "github.com/cloudnative-pg/barman-cloud/pkg/archiver"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -96,7 +97,7 @@ func NewCmd() *cobra.Command {
 					Message: err.Error(),
 				}
 				if errCond := conditions.Patch(ctx, typedClient, cluster, &condition); errCond != nil {
-					log.Error(errCond, "Error changing wal archiving condition (wal archiving failed)")
+					contextLog.Error(errCond, "Error changing wal archiving condition (wal archiving failed)")
 				}
 				return err
 			}
@@ -109,7 +110,7 @@ func NewCmd() *cobra.Command {
 				Message: "Continuous archiving is working",
 			}
 			if errCond := conditions.Patch(ctx, typedClient, cluster, &condition); errCond != nil {
-				log.Error(errCond, "Error changing wal archiving condition (wal archiving succeeded)")
+				contextLog.Error(errCond, "Error changing wal archiving condition (wal archiving succeeded)")
 			}
 
 			return nil
@@ -161,7 +162,7 @@ func run(
 	// Request Barman Cloud to archive this WAL
 	if cluster.Spec.Backup == nil || cluster.Spec.Backup.BarmanObjectStore == nil {
 		// Backup not configured, skipping WAL
-		contextLog.Info("Backup not configured, skip WAL archiving via Barman Cloud",
+		contextLog.Debug("Backup not configured, skip WAL archiving via Barman Cloud",
 			"walName", walName,
 			"currentPrimary", cluster.Status.CurrentPrimary,
 			"targetPrimary", cluster.Status.TargetPrimary,
@@ -251,12 +252,20 @@ func archiveWALViaPlugins(
 	contextLogger := log.FromContext(ctx)
 
 	plugins := repository.New()
-	if err := plugins.RegisterUnixSocketPluginsInPath(configuration.Current.PluginSocketDir); err != nil {
+	availablePluginNames, err := plugins.RegisterUnixSocketPluginsInPath(configuration.Current.PluginSocketDir)
+	if err != nil {
 		contextLogger.Error(err, "Error while loading local plugins")
 	}
 	defer plugins.Close()
 
-	client, err := pluginClient.WithPlugins(ctx, plugins, cluster.Spec.Plugins.GetEnabledPluginNames()...)
+	availablePluginNamesSet := stringset.From(availablePluginNames)
+	enabledPluginNamesSet := stringset.From(cluster.Spec.Plugins.GetEnabledPluginNames())
+
+	client, err := pluginClient.WithPlugins(
+		ctx,
+		plugins,
+		availablePluginNamesSet.Intersect(enabledPluginNamesSet).ToList()...,
+	)
 	if err != nil {
 		contextLogger.Error(err, "Error while loading required plugins")
 		return err
@@ -290,10 +299,11 @@ func checkWalArchive(
 	walArchiver *barmanArchiver.WALArchiver,
 	pgData string,
 ) error {
+	contextLogger := log.FromContext(ctx)
 	checkWalOptions, err := walArchiver.BarmanCloudCheckWalArchiveOptions(
 		ctx, cluster.Spec.Backup.BarmanObjectStore, cluster.Name)
 	if err != nil {
-		log.Error(err, "while getting barman-cloud-wal-archive options")
+		contextLogger.Error(err, "while getting barman-cloud-wal-archive options")
 		return err
 	}
 
@@ -302,7 +312,7 @@ func checkWalArchive(
 	}
 
 	if err := walArchiver.CheckWalArchiveDestination(ctx, checkWalOptions); err != nil {
-		log.Error(err, "while barman-cloud-check-wal-archive")
+		contextLogger.Error(err, "while barman-cloud-check-wal-archive")
 		return err
 	}
 

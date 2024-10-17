@@ -55,6 +55,16 @@ func NewPluginBackupCommand(
 ) *PluginBackupCommand {
 	backup.EnsureGVKIsPresent()
 
+	logger := log.WithValues(
+		"pluginConfiguration", backup.Spec.PluginConfiguration,
+		"backupName", backup.Name,
+		"backupNamespace", backup.Name)
+
+	plugins := repository.New()
+	if _, err := plugins.RegisterUnixSocketPluginsInPath(configuration.Current.PluginSocketDir); err != nil {
+		logger.Error(err, "Error while discovering plugins")
+	}
+
 	return &PluginBackupCommand{
 		Cluster:  cluster,
 		Backup:   backup,
@@ -75,7 +85,7 @@ func (b *PluginBackupCommand) invokeStart(ctx context.Context) {
 		"backupNamespace", b.Backup.Name)
 
 	plugins := repository.New()
-	if err := plugins.RegisterUnixSocketPluginsInPath(configuration.Current.PluginSocketDir); err != nil {
+	if _, err := plugins.RegisterUnixSocketPluginsInPath(configuration.Current.PluginSocketDir); err != nil {
 		contextLogger.Error(err, "Error while discovering plugins")
 	}
 	defer plugins.Close()
@@ -127,6 +137,7 @@ func (b *PluginBackupCommand) invokeStart(ctx context.Context) {
 	b.Backup.Status.BackupLabelFile = response.BackupLabelFile
 	b.Backup.Status.TablespaceMapFile = response.TablespaceMapFile
 	b.Backup.Status.Online = ptr.To(response.Online)
+	b.Backup.Status.PluginMetadata = response.Metadata
 
 	if !response.StartedAt.IsZero() {
 		b.Backup.Status.StartedAt = ptr.To(metav1.NewTime(response.StartedAt))

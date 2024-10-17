@@ -19,6 +19,7 @@ package publication
 import (
 	"github.com/spf13/cobra"
 
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/logical/publication/create"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/logical/publication/drop"
 )
@@ -26,8 +27,9 @@ import (
 // NewCmd initializes the publication command
 func NewCmd() *cobra.Command {
 	publicationCmd := &cobra.Command{
-		Use:   "publication",
-		Short: "Logical publication management commands",
+		Use:     "publication",
+		Short:   "Logical publication management commands",
+		GroupID: plugin.GroupIDDatabase,
 	}
 	publicationCmd.AddCommand(create.NewCmd())
 	publicationCmd.AddCommand(drop.NewCmd())

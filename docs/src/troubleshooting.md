@@ -132,25 +132,27 @@ The above steps might be integrated into the `cnpg` plugin at some stage in the 
 
 ## Logs
 
-Every resource created and controlled by CloudNativePG logs to
-standard output, as expected by Kubernetes, and directly in [JSON
-format](logging.md). As a result, you should rely on the `kubectl logs`
-command to retrieve logs from a given resource.
+All resources created and managed by CloudNativePG log to standard output in
+accordance with Kubernetes conventions, using [JSON format](logging.md).
 
-For more information, type:
+While logs are typically processed at the infrastructure level and include
+those from CloudNativePG, accessing logs directly from the command line
+interface is critical during troubleshooting. You have three primary options
+for doing so:
 
-```shell
-kubectl logs --help
-```
-
-!!! Hint
-    JSON logs are great for machine reading, but hard to read for human beings.
-    Our recommendation is to use the `jq` command to improve usability. For
-    example, you can *pipe* the `kubectl logs` command with `| jq -C`.
+- Use the `kubectl logs` command to retrieve logs from a specific resource, and
+  apply `jq` for better readability.
+- Use the [`kubectl cnpg logs` command](kubectl-plugin.md#logs) for
+  CloudNativePG-specific logging.
+- Leverage specialized open-source tools like
+  [stern](https://github.com/stern/stern), which can aggregate logs from
+  multiple resources (e.g., all pods in a PostgreSQL cluster by selecting the
+  `cnpg.io/clusterName` label), filter log entries, customize output formats,
+  and more.
 
 !!! Note
-    In the sections below, we will show some examples on how to retrieve logs
-    about different resources when it comes to troubleshooting CloudNativePG.
+    The following sections provide examples of how to retrieve logs for various
+    resources when troubleshooting CloudNativePG.
 
 ## Operator information
 
@@ -276,14 +278,6 @@ kubectl cnpg status -n <NAMESPACE> <CLUSTER>
 
 !!! Tip
     You can print more information by adding the `--verbose` option.
-
-!!! Note
-    Besides knowing cluster status, you can also do the following things with the cnpg plugin:
-    Promote a replica.<br />
-    Manage certificates.<br />
-    Make a rollout restart cluster to apply configuration changes.<br />
-    Make a reconciliation loop to reload and apply configuration changes.<br />
-    For more information, please see [`cnpg` plugin](kubectl-plugin.md) documentation.
 
 Get PostgreSQL container image version:
 

@@ -34,6 +34,7 @@ func TestReplication(t *testing.T) {
 func createFakeCluster(name string) *apiv1.Cluster {
 	primaryPod := fmt.Sprintf("%s-1", name)
 	cluster := &apiv1.Cluster{}
+	cluster.Name = name
 	cluster.Default()
 	cluster.Spec.Instances = 3
 	cluster.Spec.MaxSyncReplicas = 2

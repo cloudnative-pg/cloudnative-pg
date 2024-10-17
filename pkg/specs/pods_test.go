@@ -333,12 +333,20 @@ var _ = Describe("EnvConfig", func() {
 						Value: cluster.Name,
 					},
 					{
+						Name:  "PSQL_HISTORY",
+						Value: postgres.TemporaryDirectory + "/.psql_history",
+					},
+					{
 						Name:  "PGPORT",
 						Value: strconv.Itoa(postgres.ServerPort),
 					},
 					{
 						Name:  "PGHOST",
 						Value: postgres.SocketDirectory,
+					},
+					{
+						Name:  "TMPDIR",
+						Value: postgres.TemporaryDirectory,
 					},
 					{
 						Name:  "TEST_ENV",
@@ -384,6 +392,10 @@ var _ = Describe("EnvConfig", func() {
 					{
 						Name:  "PGHOST",
 						Value: postgres.SocketDirectory,
+					},
+					{
+						Name:  "TMPDIR",
+						Value: postgres.TemporaryDirectory,
 					},
 					{
 						Name:  "TEST_ENV",

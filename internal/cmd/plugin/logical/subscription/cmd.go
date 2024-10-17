@@ -19,6 +19,7 @@ package subscription
 import (
 	"github.com/spf13/cobra"
 
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/logical/subscription/create"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/logical/subscription/drop"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/logical/subscription/syncsequences"
@@ -27,8 +28,9 @@ import (
 // NewCmd initializes the subscription command
 func NewCmd() *cobra.Command {
 	subscriptionCmd := &cobra.Command{
-		Use:   "subscription",
-		Short: "Logical subscription management commands",
+		Use:     "subscription",
+		Short:   "Logical subscription management commands",
+		GroupID: plugin.GroupIDDatabase,
 	}
 	subscriptionCmd.AddCommand(create.NewCmd())
 	subscriptionCmd.AddCommand(drop.NewCmd())

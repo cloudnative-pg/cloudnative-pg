@@ -190,11 +190,13 @@ func NewShowStatsMetrics(subsystem string) *ShowStatsMetrics {
 }
 
 func (e *Exporter) collectShowStats(ch chan<- prometheus.Metric, db *sql.DB) {
+	contextLogger := log.FromContext(e.ctx)
+
 	e.Metrics.ShowStats.Reset()
 	// First, let's check the connection. No need to proceed if this fails.
 	rows, err := db.Query("SHOW STATS;")
 	if err != nil {
-		log.Error(err, "Error while executing SHOW STATS")
+		contextLogger.Error(err, "Error while executing SHOW STATS")
 		e.Metrics.PgbouncerUp.Set(0)
 		e.Metrics.Error.Set(1)
 		return
@@ -205,7 +207,7 @@ func (e *Exporter) collectShowStats(ch chan<- prometheus.Metric, db *sql.DB) {
 	defer func() {
 		err = rows.Close()
 		if err != nil {
-			log.Error(err, "while closing rows for SHOW STATS")
+			contextLogger.Error(err, "while closing rows for SHOW STATS")
 		}
 	}()
 	var (
@@ -234,7 +236,7 @@ func (e *Exporter) collectShowStats(ch chan<- prometheus.Metric, db *sql.DB) {
 
 	statCols, err := rows.Columns()
 	if err != nil {
-		log.Error(err, "Error while reading SHOW STATS")
+		contextLogger.Error(err, "Error while reading SHOW STATS")
 		return
 	}
 
@@ -280,7 +282,7 @@ func (e *Exporter) collectShowStats(ch chan<- prometheus.Metric, db *sql.DB) {
 			)
 		}
 		if err != nil {
-			log.Error(err, "Error while executing SHOW STATS")
+			contextLogger.Error(err, "Error while executing SHOW STATS")
 			e.Metrics.Error.Set(1)
 			e.Metrics.PgCollectionErrors.WithLabelValues(err.Error()).Inc()
 		}

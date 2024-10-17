@@ -1333,12 +1333,12 @@ var _ = Describe("validate image name change", func() {
 		It("complains if it can't upgrade between mayor versions", func() {
 			clusterOld := Cluster{
 				Spec: ClusterSpec{
-					ImageName: "postgres:12.0",
+					ImageName: "postgres:17.0",
 				},
 			}
 			clusterNew := Cluster{
 				Spec: ClusterSpec{
-					ImageName: "postgres:11.0",
+					ImageName: "postgres:16.0",
 				},
 			}
 			Expect(clusterNew.validateImageChange(&clusterOld)).To(HaveLen(1))
@@ -1347,12 +1347,12 @@ var _ = Describe("validate image name change", func() {
 		It("doesn't complain if image change is valid", func() {
 			clusterOld := Cluster{
 				Spec: ClusterSpec{
-					ImageName: "postgres:12.1",
+					ImageName: "postgres:17.1",
 				},
 			}
 			clusterNew := Cluster{
 				Spec: ClusterSpec{
-					ImageName: "postgres:12.0",
+					ImageName: "postgres:17.0",
 				},
 			}
 			Expect(clusterNew.validateImageChange(&clusterOld)).To(BeEmpty())
@@ -1408,7 +1408,7 @@ var _ = Describe("validate image name change", func() {
 		It("complains on major upgrades", func() {
 			clusterOld := Cluster{
 				Spec: ClusterSpec{
-					ImageName: "postgres:15.1",
+					ImageName: "postgres:16.1",
 				},
 			}
 			clusterNew := Cluster{
@@ -1418,7 +1418,7 @@ var _ = Describe("validate image name change", func() {
 							Name: "test",
 							Kind: "ImageCatalog",
 						},
-						Major: 16,
+						Major: 17,
 					},
 				},
 			}
@@ -1435,7 +1435,7 @@ var _ = Describe("validate image name change", func() {
 							Name: "test",
 							Kind: "ImageCatalog",
 						},
-						Major: 14,
+						Major: 16,
 					},
 				},
 			}
@@ -1472,13 +1472,13 @@ var _ = Describe("validate image name change", func() {
 							Name: "test",
 							Kind: "ImageCatalog",
 						},
-						Major: 16,
+						Major: 17,
 					},
 				},
 			}
 			clusterNew := Cluster{
 				Spec: ClusterSpec{
-					ImageName: "postgres:16.1",
+					ImageName: "postgres:17.1",
 				},
 			}
 			Expect(clusterNew.validateImageChange(&clusterOld)).To(BeEmpty())
@@ -1491,13 +1491,13 @@ var _ = Describe("validate image name change", func() {
 							Name: "test",
 							Kind: "ImageCatalog",
 						},
-						Major: 15,
+						Major: 16,
 					},
 				},
 			}
 			clusterNew := Cluster{
 				Spec: ClusterSpec{
-					ImageName: "postgres:16.1",
+					ImageName: "postgres:17.1",
 				},
 			}
 			Expect(clusterNew.validateImageChange(&clusterOld)).To(HaveLen(1))
@@ -1510,7 +1510,7 @@ var _ = Describe("validate image name change", func() {
 							Name: "test",
 							Kind: "ImageCatalog",
 						},
-						Major: 14,
+						Major: 16,
 					},
 				},
 			}
@@ -3380,24 +3380,6 @@ var _ = Describe("validation of imports", func() {
 })
 
 var _ = Describe("validation of replication slots configuration", func() {
-	It("prevents using replication slots on PostgreSQL 10 and older", func() {
-		cluster := &Cluster{
-			Spec: ClusterSpec{
-				ImageName: "ghcr.io/cloudnative-pg/postgresql:10.5",
-				ReplicationSlots: &ReplicationSlotsConfiguration{
-					HighAvailability: &ReplicationSlotsHAConfiguration{
-						Enabled: ptr.To(true),
-					},
-					UpdateInterval: 0,
-				},
-			},
-		}
-		cluster.Default()
-
-		result := cluster.validateReplicationSlots()
-		Expect(result).To(HaveLen(1))
-	})
-
 	It("can be enabled on the default PostgreSQL image", func() {
 		cluster := &Cluster{
 			Spec: ClusterSpec{

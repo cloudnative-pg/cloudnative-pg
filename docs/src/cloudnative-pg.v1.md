@@ -816,6 +816,13 @@ parameter is omitted</p>
    <p>Whether the backup was online/hot (<code>true</code>) or offline/cold (<code>false</code>)</p>
 </td>
 </tr>
+<tr><td><code>pluginMetadata</code> <B>[Required]</B><br/>
+<i>map[string]string</i>
+</td>
+<td>
+   <p>A map containing the plugin metadata</p>
+</td>
+</tr>
 </tbody>
 </table>
 
@@ -2354,6 +2361,20 @@ More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-
 </td>
 <td>
    <p>The ICU_RULES (cannot be changed)</p>
+</td>
+</tr>
+<tr><td><code>builtin_locale</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The BUILTIN_LOCALE (cannot be changed)</p>
+</td>
+</tr>
+<tr><td><code>collation_version</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The COLLATION_VERSION (cannot be changed)</p>
 </td>
 </tr>
 <tr><td><code>isTemplate</code><br/>

@@ -92,8 +92,9 @@ var (
 // NewCmd initializes the hibernate command
 func NewCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "hibernate",
-		Short: `Hibernation related commands`,
+		Use:     "hibernate",
+		Short:   `Hibernation related commands`,
+		GroupID: plugin.GroupIDCluster,
 	}
 
 	cmd.AddCommand(hibernateOnCmd)

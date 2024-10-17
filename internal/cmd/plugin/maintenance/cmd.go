@@ -31,8 +31,9 @@ func NewCmd() *cobra.Command {
 		confirmationRequired bool
 
 	maintenanceCmd := &cobra.Command{
-		Use:   "maintenance [set/unset]",
-		Short: "Sets or removes maintenance mode from clusters",
+		Use:     "maintenance [set/unset]",
+		Short:   "Sets or removes maintenance mode from clusters",
+		GroupID: plugin.GroupIDCluster,
 	}
 
 	maintenanceCmd.AddCommand(&cobra.Command{

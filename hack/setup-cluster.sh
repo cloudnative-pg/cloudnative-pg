@@ -24,7 +24,7 @@ if [ "${DEBUG-}" = true ]; then
 fi
 
 # Defaults
-KIND_NODE_DEFAULT_VERSION=v1.31.0
+KIND_NODE_DEFAULT_VERSION=v1.31.1
 K3D_NODE_DEFAULT_VERSION=v1.30.3
 CSI_DRIVER_HOST_PATH_DEFAULT_VERSION=v1.15.0
 EXTERNAL_SNAPSHOTTER_VERSION=v8.1.0
@@ -299,7 +299,7 @@ install_kubectl() {
 
   local binary="${bindir}/kubectl"
 
-  curl -sL "https://storage.googleapis.com/kubernetes-release/release/v${KUBECTL_VERSION#v}/bin/${OS}/${ARCH}/kubectl" -o "${binary}"
+  curl -sL "https://dl.k8s.io/release/v${KUBECTL_VERSION#v}/bin/${OS}/${ARCH}/kubectl" -o "${binary}"
   chmod +x "${binary}"
 }
 

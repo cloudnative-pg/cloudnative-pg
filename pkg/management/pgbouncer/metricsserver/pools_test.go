@@ -53,7 +53,7 @@ var _ = Describe("Exporter", func() {
 		}
 	)
 
-	BeforeEach(func() {
+	BeforeEach(func(ctx SpecContext) {
 		var err error
 		db, mock, err = sqlmock.New()
 		Expect(err).ShouldNot(HaveOccurred())
@@ -61,6 +61,7 @@ var _ = Describe("Exporter", func() {
 		exp = &Exporter{
 			Metrics: newMetrics(),
 			pool:    fakePooler{db: db},
+			ctx:     ctx,
 		}
 
 		registry = prometheus.NewRegistry()

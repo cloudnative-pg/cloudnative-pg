@@ -14,24 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package report
-
-import (
-	"github.com/spf13/cobra"
-
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
-)
-
-// NewCmd creates the new "report" command
-func NewCmd() *cobra.Command {
-	reportCmd := &cobra.Command{
-		Use:     "report operator/cluster",
-		Short:   "Report on the operator or a cluster for troubleshooting",
-		GroupID: plugin.GroupIDTroubleshooting,
-	}
-
-	reportCmd.AddCommand(operatorCmd())
-	reportCmd.AddCommand(clusterCmd())
-
-	return reportCmd
-}
+// Package pretty contains the implementation of `kubectl cnpg logs pretty`
+package pretty

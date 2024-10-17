@@ -22,6 +22,8 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 )
 
 // NewCmd initializes the fio command
@@ -35,6 +37,7 @@ func NewCmd() *cobra.Command {
 		Args:    cobra.MinimumNArgs(1),
 		Long:    `Creates a fio deployment that will execute a fio job on the specified pvc.`,
 		Example: jobExample,
+		GroupID: plugin.GroupIDMiscellaneous,
 		RunE: func(_ *cobra.Command, args []string) error {
 			ctx := context.Background()
 			fioArgs := args[1:]

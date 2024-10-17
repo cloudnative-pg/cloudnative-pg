@@ -1096,12 +1096,12 @@ func (r *Cluster) validateConfiguration() field.ErrorList {
 		// validateImageName function
 		return result
 	}
-	if pgVersion.Major() < 11 {
+	if pgVersion.Major() < 12 {
 		result = append(result,
 			field.Invalid(
 				field.NewPath("spec", "imageName"),
 				r.Spec.ImageName,
-				"Unsupported PostgreSQL version. Versions 11 or newer are supported"))
+				"Unsupported PostgreSQL version. Versions 12 or newer are supported"))
 	}
 	info := postgres.ConfigurationInfo{
 		Settings:               postgres.CnpgConfigurationSettings,
@@ -2187,33 +2187,6 @@ func (r *Cluster) validateReplicationSlots() field.ErrorList {
 
 	if !replicationSlots.GetEnabled() {
 		return nil
-	}
-
-	psqlVersion, err := r.GetPostgresqlVersion()
-	if err != nil {
-		// The validation error will be already raised by the
-		// validateImageName function
-		return nil
-	}
-
-	if psqlVersion.Major() < 11 {
-		if replicationSlots.HighAvailability.GetEnabled() {
-			return field.ErrorList{
-				field.Invalid(
-					field.NewPath("spec", "replicationSlots", "highAvailability", "enabled"),
-					replicationSlots.HighAvailability.GetEnabled(),
-					"Cannot enable HA replication slots synchronization. PostgreSQL 11 or above required"),
-			}
-		}
-
-		if replicationSlots.SynchronizeReplicas.GetEnabled() {
-			return field.ErrorList{
-				field.Invalid(
-					field.NewPath("spec", "replicationSlots", "synchronizeReplicas", "enabled"),
-					replicationSlots.SynchronizeReplicas.GetEnabled(),
-					"Cannot enable user defined replication slots synchronization. PostgreSQL 11 or above required"),
-			}
-		}
 	}
 
 	if errs := r.Spec.ReplicationSlots.SynchronizeReplicas.compileRegex(); len(errs) > 0 {

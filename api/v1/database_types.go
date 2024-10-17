@@ -90,6 +90,16 @@ type DatabaseSpec struct {
 	// +optional
 	IcuRules string `json:"icu_rules,omitempty"`
 
+	// The BUILTIN_LOCALE (cannot be changed)
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="builtin_locale is immutable"
+	// +optional
+	BuiltinLocale string `json:"builtin_locale,omitempty"`
+
+	// The COLLATION_VERSION (cannot be changed)
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="collation_version is immutable"
+	// +optional
+	CollationVersion string `json:"collation_version,omitempty"`
+
 	// True when the database is a template
 	// +optional
 	IsTemplate *bool `json:"isTemplate,omitempty"`

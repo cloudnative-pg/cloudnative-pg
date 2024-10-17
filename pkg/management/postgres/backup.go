@@ -99,6 +99,7 @@ func NewBarmanBackupCommand(
 // Start initiates a backup for this instance using
 // barman-cloud-backup
 func (b *BackupCommand) Start(ctx context.Context) error {
+	contextLogger := log.FromContext(ctx)
 	if err := b.ensureCompatibility(); err != nil {
 		return err
 	}
@@ -111,7 +112,7 @@ func (b *BackupCommand) Start(ctx context.Context) error {
 	}
 
 	if err := ensureWalArchiveIsWorking(b.Instance); err != nil {
-		log.Warning("WAL archiving is not working", "err", err)
+		contextLogger.Warning("WAL archiving is not working", "err", err)
 		b.Backup.GetStatus().Phase = apiv1.BackupPhaseWalArchivingFailing
 		return PatchBackupStatusAndRetry(ctx, b.Client, b.Backup)
 	}
@@ -120,7 +121,7 @@ func (b *BackupCommand) Start(ctx context.Context) error {
 		b.Backup.GetStatus().Phase = apiv1.BackupPhaseRunning
 		err := PatchBackupStatusAndRetry(ctx, b.Client, b.Backup)
 		if err != nil {
-			log.Error(err, "can't set backup as WAL archiving failing")
+			contextLogger.Error(err, "can't set backup as WAL archiving failing")
 		}
 	}
 

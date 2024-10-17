@@ -47,13 +47,15 @@ func (r *InstanceReconciler) updateCacheFromCluster(ctx context.Context, cluster
 }
 
 func (r *InstanceReconciler) updateWALRestoreSettingsCache(ctx context.Context, cluster *apiv1.Cluster) {
+	contextLogger := log.FromContext(ctx)
+
 	_, env, barmanConfiguration, err := walrestore.GetRecoverConfiguration(cluster, r.instance.GetPodName())
 	if errors.Is(err, walrestore.ErrNoBackupConfigured) {
 		cache.Delete(cache.WALRestoreKey)
 		return
 	}
 	if err != nil {
-		log.Error(err, "while getting recover configuration")
+		contextLogger.Error(err, "while getting recover configuration")
 		return
 	}
 	env = append(env, os.Environ()...)
@@ -66,7 +68,7 @@ func (r *InstanceReconciler) updateWALRestoreSettingsCache(ctx context.Context, 
 		env,
 	)
 	if err != nil {
-		log.Error(err, "while getting recover credentials")
+		contextLogger.Error(err, "while getting recover credentials")
 	}
 	cache.Store(cache.WALRestoreKey, envRestore)
 }
@@ -79,6 +81,8 @@ func (r *InstanceReconciler) shouldUpdateWALArchiveSettingsCache(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 ) (shouldRetry bool) {
+	contextLogger := log.FromContext(ctx)
+
 	if cluster.Spec.Backup == nil || cluster.Spec.Backup.BarmanObjectStore == nil {
 		cache.Delete(cache.WALArchiveKey)
 		return false
@@ -92,12 +96,12 @@ func (r *InstanceReconciler) shouldUpdateWALArchiveSettingsCache(
 		cluster.Spec.Backup.BarmanObjectStore,
 		os.Environ())
 	if apierrors.IsForbidden(err) {
-		log.Info("backup credentials don't yet have access permissions. Will retry reconciliation loop")
+		contextLogger.Info("backup credentials don't yet have access permissions. Will retry reconciliation loop")
 		return true
 	}
 
 	if err != nil {
-		log.Error(err, "while getting backup credentials")
+		contextLogger.Error(err, "while getting backup credentials")
 		return false
 	}
 

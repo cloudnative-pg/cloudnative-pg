@@ -25,6 +25,7 @@ import (
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/jackc/puddle/v2"
+	"go.uber.org/multierr"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/connection"
 )
@@ -41,8 +42,9 @@ type Interface interface {
 	RegisterRemotePlugin(name string, address string, tlsConfig *tls.Config) error
 
 	// RegisterUnixSocketPluginsInPath scans the passed directory
-	// for plugins that are deployed with unix sockets
-	RegisterUnixSocketPluginsInPath(pluginsPath string) error
+	// for plugins that are deployed with unix sockets.
+	// Return the list of loaded plugin names
+	RegisterUnixSocketPluginsInPath(pluginsPath string) ([]string, error)
 
 	// GetConnection gets a connection to the plugin with specified name
 	GetConnection(ctx context.Context, name string) (connection.Interface, error)
@@ -149,30 +151,34 @@ func (r *data) RegisterRemotePlugin(name string, address string, tlsConfig *tls.
 	})
 }
 
-func (r *data) RegisterUnixSocketPluginsInPath(pluginsPath string) error {
+func (r *data) RegisterUnixSocketPluginsInPath(pluginsPath string) ([]string, error) {
 	entries, err := os.ReadDir(pluginsPath)
 	if err != nil {
 		// There's no need to complain if the plugin folder doesn't exist
 		if os.IsNotExist(err) {
-			return nil
+			return nil, nil
 		}
 
 		// Otherwise, this means we can't read that folder and
 		// is a real problem
-		return err
+		return nil, err
 	}
 
+	pluginsNames := make([]string, 0, len(entries))
+	var errors error
 	for _, entry := range entries {
 		name := entry.Name()
 		if err := r.registerUnixSocketPlugin(
 			name,
 			path.Join(pluginsPath, name),
 		); err != nil {
-			return err
+			errors = multierr.Append(errors, err)
+		} else {
+			pluginsNames = append(pluginsNames, name)
 		}
 	}
 
-	return nil
+	return pluginsNames, errors
 }
 
 // New creates a new plugin repository

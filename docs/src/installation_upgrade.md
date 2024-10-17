@@ -7,12 +7,12 @@
 The operator can be installed like any other resource in Kubernetes,
 through a YAML manifest applied via `kubectl`.
 
-You can install the [latest operator manifest](https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/main/releases/cnpg-1.24.0.yaml)
+You can install the [latest operator manifest](https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.24/releases/cnpg-1.24.1.yaml)
 for this minor release as follows:
 
 ```sh
 kubectl apply --server-side -f \
-  https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/main/releases/cnpg-1.24.0.yaml
+  https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.24/releases/cnpg-1.24.1.yaml
 ```
 
 You can verify that with:
@@ -248,12 +248,16 @@ When versions are not directly upgradable, the old version needs to be
 removed before installing the new one. This won't affect user data but
 only the operator itself.
 
-### Upgrading to 1.24.0 or 1.23.4
+<!--
+### Upgrading to 1.25.0 or 1.24.x
 
 !!! Important
     We encourage all existing users of CloudNativePG to upgrade to version
-    1.24.0 or at least to the latest stable version of the minor release you are
-    currently using (namely 1.23.4).
+    1.25.0 or at least to the latest stable version of the minor release you are
+    currently using (namely 1.24.x).
+-->
+
+### Upgrading to 1.24 from a previous minor version
 
 !!! Warning
     Every time you are upgrading to a higher minor release, make sure you
