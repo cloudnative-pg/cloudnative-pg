@@ -2208,8 +2208,8 @@ Map keys are the config map names, map values are the versions</p>
 - [SynchronousReplicaConfiguration](#postgresql-cnpg-io-v1-SynchronousReplicaConfiguration)
 
 
-<p>DataDurabilityMethod can be <code>required</code> or <code>preferred</code> and allows the user to
-relax strict enforcement</p>
+<p>DataDurabilityMethod specifies how to enforce synchronous replication when cluster instances
+are unavailable. Options are <code>required</code> or <code>preferred</code>.</p>
 
 
 
@@ -5010,13 +5010,12 @@ only useful for priority-based synchronous replication).</p>
 <a href="#postgresql-cnpg-io-v1-DataDurabilityMethod"><i>DataDurabilityMethod</i></a>
 </td>
 <td>
-   <p>If &quot;required&quot;, strict enforcement of data durability is enforced and
-write operations with synchronous commit set to <code>on</code>, <code>remote_write</code>
-or <code>remote_apply</code> will hang if there are no sufficient number of
-healthy replicas.
-If &quot;preferred&quot; data durability will be enforced whenever healthy
-replicas are available. This can only be set if both
-<code>standbyNamesPre</code> and <code>standbyNamesPost</code> are empty.</p>
+   <p>If &quot;required&quot;, data durability is strictly enforced. Write operations with
+synchronous commit set to <code>on</code>, <code>remote_write</code>, or <code>remote_apply</code> will hang
+if there are not enough healthy replicas.
+If &quot;preferred&quot;, data durability is enforced when healthy replicas are available.
+The required number of instances is reduced if there are not enough healthy replicas.
+This can only be set if both <code>standbyNamesPre</code> and <code>standbyNamesPost</code> are empty.</p>
 </td>
 </tr>
 </tbody>

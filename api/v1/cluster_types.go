@@ -1173,8 +1173,8 @@ const (
 	SynchronousReplicaConfigurationMethodAny = SynchronousReplicaConfigurationMethod("any")
 )
 
-// DataDurabilityMethod can be `required` or `preferred` and allows the user to
-// relax strict enforcement
+// DataDurabilityMethod specifies how to enforce synchronous replication when cluster instances
+// are unavailable. Options are `required` or `preferred`.
 type DataDurabilityMethod string
 
 const (
@@ -1221,13 +1221,12 @@ type SynchronousReplicaConfiguration struct {
 	// +optional
 	StandbyNamesPost []string `json:"standbyNamesPost,omitempty"`
 
-	// If "required", strict enforcement of data durability is enforced and
-	// write operations with synchronous commit set to `on`, `remote_write`
-	// or `remote_apply` will hang if there are no sufficient number of
-	// healthy replicas.
-	// If "preferred" data durability will be enforced whenever healthy
-	// replicas are available. This can only be set if both
-	// `standbyNamesPre` and `standbyNamesPost` are empty.
+	// If "required", data durability is strictly enforced. Write operations with
+	// synchronous commit set to `on`, `remote_write`, or `remote_apply` will hang
+	// if there are not enough healthy replicas.
+	// If "preferred", data durability is enforced when healthy replicas are available.
+	// The required number of instances is reduced if there are not enough healthy replicas.
+	// This can only be set if both `standbyNamesPre` and `standbyNamesPost` are empty.
 	// +kubebuilder:validation:Enum=required;preferred
 	// +kubebuilder:default:=required
 	DataDurability DataDurabilityMethod `json:"dataDurability,omitempty"`
