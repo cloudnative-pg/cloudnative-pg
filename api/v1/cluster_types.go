@@ -1179,11 +1179,11 @@ type DataDurabilityMethod string
 
 const (
 	// DataDurabilityMethodRequired means that data durability is strictly enforced
-	DataDurabilityMethodRequired DataDurabilityMethod = DataDurabilityMethod("required")
+	DataDurabilityMethodRequired DataDurabilityMethod = "required"
 
 	// DataDurabilityMethodPreferred means that data durability is enforced
 	// only when healthy replicas are available
-	DataDurabilityMethodPreferred DataDurabilityMethod = DataDurabilityMethod("preferred")
+	DataDurabilityMethodPreferred DataDurabilityMethod = "preferred"
 )
 
 // SynchronousReplicaConfiguration contains the configuration of the
