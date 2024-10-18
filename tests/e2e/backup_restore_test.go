@@ -123,7 +123,13 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 			AssertCreationOfTestDataForTargetDB(env, namespace, clusterName, targetDBSecret, testTableName)
 
 			// Write a table and some data on the "app" database
-			AssertCreateTestData(env, namespace, clusterName, tableName)
+			tableLocator := TableLocator{
+				Namespace:    namespace,
+				ClusterName:  clusterName,
+				DatabaseName: testUtils.AppDBName,
+				TableName:    tableName,
+			}
+			AssertCreateTestData(env, tableLocator)
 
 			AssertArchiveWalOnMinio(namespace, clusterName, clusterName)
 			latestTar := minioPath(clusterName, "data.tar")
@@ -269,7 +275,13 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 			AssertCreationOfTestDataForTargetDB(env, namespace, targetClusterName, targetDBSecret, testTableName)
 
 			// Write a table and some data on the "app" database
-			AssertCreateTestData(env, namespace, targetClusterName, tableName)
+			tableLocator := TableLocator{
+				Namespace:    namespace,
+				ClusterName:  targetClusterName,
+				DatabaseName: testUtils.AppDBName,
+				TableName:    tableName,
+			}
+			AssertCreateTestData(env, tableLocator)
 
 			AssertArchiveWalOnMinio(namespace, targetClusterName, targetClusterName)
 			latestTar := minioPath(targetClusterName, "data.tar")
@@ -313,7 +325,13 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 			AssertCreationOfTestDataForTargetDB(env, namespace, targetClusterName, targetDBSecret, testTableName)
 
 			// Write a table and some data on the "app" database
-			AssertCreateTestData(env, namespace, targetClusterName, tableName)
+			tableLocator := TableLocator{
+				Namespace:    namespace,
+				ClusterName:  targetClusterName,
+				DatabaseName: testUtils.AppDBName,
+				TableName:    tableName,
+			}
+			AssertCreateTestData(env, tableLocator)
 
 			AssertArchiveWalOnMinio(namespace, targetClusterName, targetClusterName)
 			latestTar := minioPath(targetClusterName, "data.tar")
@@ -366,7 +384,13 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 			AssertCreationOfTestDataForTargetDB(env, namespace, customClusterName, targetDBSecret, testTableName)
 
 			// Write a table and some data on the "app" database
-			AssertCreateTestData(env, namespace, customClusterName, tableName)
+			tableLocator := TableLocator{
+				Namespace:    namespace,
+				ClusterName:  customClusterName,
+				DatabaseName: testUtils.AppDBName,
+				TableName:    tableName,
+			}
+			AssertCreateTestData(env, tableLocator)
 
 			AssertArchiveWalOnMinio(namespace, customClusterName, clusterServerName)
 
@@ -539,7 +563,13 @@ var _ = Describe("Backup and restore", Label(tests.LabelBackupRestore), func() {
 		// be there
 		It("backs up and restore a cluster", func() {
 			// Write a table and some data on the "app" database
-			AssertCreateTestData(env, namespace, clusterName, tableName)
+			tableLocator := TableLocator{
+				Namespace:    namespace,
+				ClusterName:  clusterName,
+				DatabaseName: testUtils.AppDBName,
+				TableName:    tableName,
+			}
+			AssertCreateTestData(env, tableLocator)
 			AssertArchiveWalOnAzureBlob(namespace, clusterName, env.AzureConfiguration)
 			By("uploading a backup", func() {
 				// We create a backup
@@ -821,7 +851,13 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 			Expect(err).ToNot(HaveOccurred())
 
 			// Write a table and some data on the "app" database
-			AssertCreateTestData(env, namespace, clusterName, tableName)
+			tableLocator := TableLocator{
+				Namespace:    namespace,
+				ClusterName:  clusterName,
+				DatabaseName: testUtils.AppDBName,
+				TableName:    tableName,
+			}
+			AssertCreateTestData(env, tableLocator)
 
 			AssertArchiveWalOnMinio(namespace, clusterName, clusterName)
 
@@ -854,7 +890,13 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 			AssertClusterRestore(namespace, externalClusterFileMinio, tableName)
 
 			// verify test data on restored external cluster
-			AssertDataExpectedCount(env, namespace, externalClusterName, tableName, 2)
+			tableLocator = TableLocator{
+				Namespace:    namespace,
+				ClusterName:  externalClusterName,
+				DatabaseName: testUtils.AppDBName,
+				TableName:    tableName,
+			}
+			AssertDataExpectedCount(env, tableLocator, 2)
 
 			By("deleting the restored cluster", func() {
 				err = DeleteResourcesFromFile(namespace, externalClusterFileMinio)
@@ -882,6 +924,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 					apiv1.ApplicationUserSecretSuffix,
 				)
 				defer func() {
+					_ = conn.Close()
 					forward.Close()
 				}()
 				Expect(err).ToNot(HaveOccurred())
@@ -919,7 +962,13 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 
 		It("restore cluster from barman object using replica option in spec", func() {
 			// Write a table and some data on the "app" database
-			AssertCreateTestData(env, namespace, clusterName, "for_restore_repl")
+			tableLocator := TableLocator{
+				Namespace:    namespace,
+				ClusterName:  clusterName,
+				DatabaseName: testUtils.AppDBName,
+				TableName:    "for_restore_repl",
+			}
+			AssertCreateTestData(env, tableLocator)
 
 			AssertArchiveWalOnMinio(namespace, clusterName, clusterName)
 
@@ -974,7 +1023,13 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 
 			It("restores a cluster from barman object using 'barmanObjectStore' option in 'externalClusters' section", func() {
 				// Write a table and some data on the "app" database
-				AssertCreateTestData(env, namespace, clusterName, tableName)
+				tableLocator := TableLocator{
+					Namespace:    namespace,
+					ClusterName:  clusterName,
+					DatabaseName: testUtils.AppDBName,
+					TableName:    tableName,
+				}
+				AssertCreateTestData(env, tableLocator)
 				AssertArchiveWalOnAzureBlob(namespace, clusterName, env.AzureConfiguration)
 
 				By("backing up a cluster and verifying it exists on azure blob storage", func() {
@@ -1060,7 +1115,13 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 
 			It("restores cluster from barman object using 'barmanObjectStore' option in 'externalClusters' section", func() {
 				// Write a table and some data on the "app" database
-				AssertCreateTestData(env, namespace, clusterName, tableName)
+				tableLocator := TableLocator{
+					Namespace:    namespace,
+					ClusterName:  clusterName,
+					DatabaseName: testUtils.AppDBName,
+					TableName:    tableName,
+				}
+				AssertCreateTestData(env, tableLocator)
 
 				// Create a WAL on the primary and check if it arrives in the
 				// Azure Blob Storage within a short time

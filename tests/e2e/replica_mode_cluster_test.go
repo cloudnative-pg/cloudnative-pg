@@ -33,7 +33,6 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/replicaclusterswitch"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	testUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
@@ -211,17 +210,35 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			})
 
 			By("creating a new data in the new source cluster", func() {
-				AssertCreateTestDataWithDatabaseName(env, namespace, clusterTwoName, sourceDBName, "new_test_table")
+				tableLocator := TableLocator{
+					Namespace:    namespace,
+					ClusterName:  clusterTwoName,
+					DatabaseName: sourceDBName,
+					TableName:    "new_test_table",
+				}
+				AssertCreateTestData(env, tableLocator)
+			})
+
+			// The dst Cluster gets promoted to primary, hence the new appUser password will
+			// be updated to reflect its "-app" secret.
+			// We need to copy the password changes over to the src Cluster, which is now a Replica
+			// Cluster, in order to connect using the "-app" secret.
+			By("updating the appUser secret of the src cluster", func() {
+				_, appSecretPassword, err := testUtils.GetCredentials(clusterTwoName, namespace,
+					apiv1.ApplicationUserSecretSuffix, env)
+				Expect(err).ToNot(HaveOccurred())
+				AssertUpdateSecret("password", appSecretPassword, clusterOneName+apiv1.ApplicationUserSecretSuffix,
+					namespace, clusterOneName, 30, env)
 			})
 
 			By("checking that the data is present in the old src cluster", func() {
-				AssertDataExpectedCountWithDatabaseName(
-					namespace,
-					clusterOnePrimary.Name,
-					sourceDBName,
-					"new_test_table",
-					2,
-				)
+				tableLocator := TableLocator{
+					Namespace:    namespace,
+					ClusterName:  clusterOneName,
+					DatabaseName: sourceDBName,
+					TableName:    "new_test_table",
+				}
+				AssertDataExpectedCount(env, tableLocator, 2)
 			})
 		})
 	})
@@ -261,13 +278,16 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			primaryReplicaCluster, err := env.GetClusterPrimary(replicaNamespace, replicaClusterName)
 			Expect(err).ToNot(HaveOccurred())
 
-			commandTimeout := time.Second * 10
-
 			By("verify archive mode is set to 'always on' designated primary", func() {
 				query := "show archive_mode;"
 				Eventually(func() (string, error) {
-					stdOut, _, err := env.ExecCommand(env.Ctx, *primaryReplicaCluster, specs.PostgresContainerName,
-						&commandTimeout, "psql", "-U", "postgres", sourceDBName, "-tAc", query)
+					stdOut, _, err := env.ExecQueryInInstancePod(
+						testUtils.PodLocator{
+							Namespace: primaryReplicaCluster.Namespace,
+							PodName:   primaryReplicaCluster.Name,
+						},
+						sourceDBName,
+						query)
 					return strings.Trim(stdOut, "\n"), err
 				}, 30).Should(BeEquivalentTo("always"))
 			})
@@ -645,8 +665,13 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication), Ordered, f
 				Consistently(func(g Gomega) {
 					pod, err := env.GetClusterPrimary(namespace, clusterBName)
 					g.Expect(err).ToNot(HaveOccurred())
-					stdOut, _, err := env.ExecCommand(env.Ctx, *pod, specs.PostgresContainerName, ptr.To(time.Second*10),
-						"psql", "-U", "postgres", "postgres", "-tAc", "select pg_is_in_recovery();")
+					stdOut, _, err := env.ExecQueryInInstancePod(
+						testUtils.PodLocator{
+							Namespace: pod.Namespace,
+							PodName:   pod.Name,
+						},
+						testUtils.PostgresDBName,
+						"select pg_is_in_recovery();")
 					g.Expect(err).ToNot(HaveOccurred())
 					g.Expect(strings.Trim(stdOut, "\n")).To(Equal("t"))
 				}, 60, 10).Should(Succeed())
