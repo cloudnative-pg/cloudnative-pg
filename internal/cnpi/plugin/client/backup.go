@@ -88,6 +88,8 @@ type BackupResponse struct {
 	Online bool
 
 	Metadata map[string]string
+
+	ServerName string
 }
 
 func (data *data) Backup(
@@ -165,5 +167,6 @@ func (data *data) Backup(
 		InstanceID:        result.InstanceId,
 		Online:            result.Online,
 		Metadata:          result.Metadata,
+		ServerName:        result.ServerName,
 	}, nil
 }
