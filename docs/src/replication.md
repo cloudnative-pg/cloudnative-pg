@@ -110,20 +110,14 @@ as a fallback option whenever pulling WALs via streaming replication fails.
 CloudNativePG supports both
 [quorum-based and priority-based synchronous replication for PostgreSQL](https://www.postgresql.org/docs/current/warm-standby.html#SYNCHRONOUS-REPLICATION).
 
-The field `dataDurability` in the `.spec.postgresql.synchronous` stanza allows
-configuring how strictly to enforce synchronous replication.
-The default value, `required`, enforces synchronous replication strictly,
-as standard in PostgreSQL. The value `preferred` allows to prioritize
-self-healing, in line with expectations in some cloud-native use cases.
-
 !!! Warning
-    Please be aware that with `dataDurability` set to `required` (the default
-    value), synchronous replication will halt your write operations if the
-    required number of standby nodes to replicate WAL data for
+    Please be aware that synchronous replication by default will halt your write
+    operations if the required number of standby nodes to replicate WAL data for
     transaction commits is unavailable. In such cases, write operations for your
     applications will hang. This behavior differs from the previous implementation
     in CloudNativePG but aligns with the expectations of a PostgreSQL DBA for this
-    capability.
+    capability. See the ["Data Durability"](#data-durability) section to learn
+    how to control this behavior.
 
 While direct configuration of the `synchronous_standby_names` option is
 prohibited, CloudNativePG allows you to customize its content and extend
@@ -183,14 +177,8 @@ spec:
     synchronous:
       method: any
       number: 1
+      dataDurability: required
 ```
-
-!!! Important
-    The primary difference with the new capability is that PostgreSQL will
-    always prioritize data durability over high availability. Consequently, if no
-    replica is available, write operations on the primary will be blocked. However,
-    this behavior is consistent with the expectations of a PostgreSQL DBA for this
-    capability.
 
 ### Priority-based Synchronous Replication
 
@@ -249,7 +237,7 @@ postgresql:
 The content of `synchronous_standby_names` will be:
 
 ```console
-ANY 1 (cluster-example-2, cluster-example-3)
+ANY 1 (cluster-example-2, cluster-example-3, cluster-example-1)
 ```
 
 If you set:
@@ -308,6 +296,131 @@ The `synchronous_standby_names` option will look like:
 ```console
 FIRST 2 (angus, cluster-example-2, malcolm)
 ```
+
+### Data Durability
+
+The `dataDurability` option in the `.spec.postgresql.synchronous` stanza
+controls the behavior of synchronous replication in terms of data safety and
+availability. It can be set to either `required` or `preferred`. If unset, the
+default value is `required`. `preferred` is only available when
+`standbyNamesPre` and `standbyNamesPost` are not set.
+
+- **required**: when `dataDurability` is set to `required`, PostgreSQL ensures
+    that transactions are only considered committed when the WAL (Write-Ahead Log)
+    records are replicated to the specified number of synchronous standbys. This
+    setting prioritizes data safety over availability, meaning that if the
+    required number of synchronous standbys is not available, write operations
+    will be blocked until the condition is met. This guarantees zero data loss (
+    RPO=0) but may impact the availability of the database during network
+    partitions or standby failures.
+
+    The names of the synchronous standbys from the cluster are populated by in the
+    following order:
+
+    - healthy instances
+    - unhealthy instances
+    - primary
+
+    and then cut off at `maxStandbyNamesFromCluster` if the value is set. This
+    allows prioritizing healthy instances when choosing synchronous standbys and
+    guarantees that `synchronous_standby_names` is always populated.
+
+- **preferred**: when `dataDurability` is set to `preferred`, the operator will
+    change the requested number of synchronous instances depending on the number
+    of available instances. This means that PostgreSQL attempts to replicate WAL
+    records to the specified number of synchronous standbys, but it won't
+    block write operations if amount of available standbys is less than the
+    requested number. This setting provides a balance between data safety and
+    availability, allowing write operations to continue even if some synchronous
+    standbys are temporarily unavailable. However, this may result in potential
+    data loss when no standbys are available.
+
+    Only healthy standbys are included in the `synchronous_standby_names` option.
+
+#### Examples
+
+With `dataDurability: required`:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: foo
+spec:
+  instances: 3
+  postgresql:
+    synchronous:
+      method: any
+      number: 1
+      dataDurability: required
+```
+
+1. Initial state. The content of `synchronous_standby_names` is:
+
+    ```
+    ANY 1 ("foo-2","foo-3","foo-1")
+    ```
+
+2. `foo-2` becomes unavailable. It gets pushed back in priority:
+
+    ```
+    ANY 1 ("foo-3","foo-2","foo-1")
+    ```
+
+3. `foo-3` also becomes unavailable. The list contains no healthy standbys:
+
+    ```
+    ANY 1 ("foo-2","foo-3","foo-1")
+    ```
+
+    At this point no write operations will be allowed until at least one of the
+    standbys is available again.
+
+4. When the standbys are available again, the `synchronous_standby_names` will be
+    back to the initial state.
+
+Let's see a similar example with `dataDurability: preferred`. For the sake of the example,
+we will consider a cluster with 5 instances, and 2 synchronous standbys:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: bar
+spec:
+  instances: 5
+  postgresql:
+    synchronous:
+      method: any
+      number: 2
+      dataDurability: required
+```
+
+1. Initial state. The content of `synchronous_standby_names` is:
+
+    ```
+    ANY 2 ("bar-2","bar-3", "bar-4", "bar-5")
+    ```
+
+2. `bar-2` and `bar-3` become unavailable. They are removed from the list:
+
+    ```
+    ANY 2 ("bar-4", "bar-5")
+    ```
+
+3. `bar-4` also becomes unavailable. It gets removed from the list. Since the
+    number of available standbys is less than the requested number, the
+    requested amount gets reduced:
+
+    ```
+    ANY 1 ("bar-5")
+    ```
+
+4. `bar-5` also becomes unavailable. `synchronous_standby_names` becomes empty,
+disabling synchronous replication completely. Write operations will continue,
+but with the risk of potential data loss in case of a primary failure.
+5. When the standbys are back, the `synchronous_standby_names` will be back to the
+initial state.
 
 ## Synchronous Replication (Deprecated)
 
