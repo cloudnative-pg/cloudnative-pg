@@ -43,6 +43,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/minio"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -173,7 +174,8 @@ func AssertSwitchoverWithHistory(
 					}
 
 					numHistory := len(strings.Split(strings.TrimSpace(out), "\n"))
-					GinkgoWriter.Printf("count %d: pod: %s, the number of history file in pg_wal: %d\n", count, pod, numHistory)
+					GinkgoWriter.Printf("count %d: pod: %s, the number of history file in pg_wal: %d\n", count, pod,
+						numHistory)
 					count++
 					if numHistory > 0 {
 						continue
@@ -291,8 +293,11 @@ func AssertClusterIsReady(namespace string, clusterName string, timeout int, env
 	})
 }
 
-func AssertClusterDefault(namespace string, clusterName string,
-	isExpectedToDefault bool, env *testsUtils.TestingEnvironment,
+func AssertClusterDefault(
+	namespace string,
+	clusterName string,
+	isExpectedToDefault bool,
+	env *testsUtils.TestingEnvironment,
 ) {
 	By("having a Cluster object populated with default values", func() {
 		// Eventually the number of ready instances should be equal to the
@@ -334,8 +339,14 @@ func AssertWebhookEnabled(env *testsUtils.TestingEnvironment, mutating, validati
 }
 
 // Update the secrets and verify cluster reference the updated resource version of secrets
-func AssertUpdateSecret(field string, value string, secretName string, namespace string,
-	clusterName string, timeout int, env *testsUtils.TestingEnvironment,
+func AssertUpdateSecret(
+	field string,
+	value string,
+	secretName string,
+	namespace string,
+	clusterName string,
+	timeout int,
+	env *testsUtils.TestingEnvironment,
 ) {
 	var secret corev1.Secret
 	Eventually(func(g Gomega) {
@@ -376,8 +387,14 @@ func AssertUpdateSecret(field string, value string, secretName string, namespace
 
 // AssertConnection is used if a connection from a pod to a postgresql
 // database works
-func AssertConnection(host string, user string, dbname string,
-	password string, queryingPod *corev1.Pod, timeout int, env *testsUtils.TestingEnvironment,
+func AssertConnection(
+	host string,
+	user string,
+	dbname string,
+	password string,
+	queryingPod *corev1.Pod,
+	timeout int,
+	env *testsUtils.TestingEnvironment,
 ) {
 	By(fmt.Sprintf("connecting to the %v service as %v", host, user), func() {
 		Eventually(func() string {
@@ -512,7 +529,8 @@ func AssertCreateTestDataLargeObject(namespace, clusterName string, oid int, dat
 	By("creating large object", func() {
 		query := fmt.Sprintf("CREATE TABLE IF NOT EXISTS image (name text,raster oid); "+
 			"INSERT INTO image (name, raster) VALUES ('beautiful image', lo_from_bytea(%d, '%s'));", oid, data)
-		appUser, appUserPass, err := testsUtils.GetCredentials(clusterName, namespace, apiv1.ApplicationUserSecretSuffix, env)
+		appUser, appUserPass, err := testsUtils.GetCredentials(clusterName, namespace,
+			apiv1.ApplicationUserSecretSuffix, env)
 		Expect(err).ToNot(HaveOccurred())
 		host, err := testsUtils.GetHostName(namespace, clusterName, env)
 		Expect(err).ToNot(HaveOccurred())
@@ -564,7 +582,8 @@ func AssertDatabaseExists(namespace, podName, databaseName string, expectedValue
 	By(fmt.Sprintf("verifying if database %v exists", databaseName), func() {
 		pod := &corev1.Pod{}
 		commandTimeout := time.Second * 10
-		query := fmt.Sprintf("SELECT EXISTS(SELECT 1 FROM pg_database WHERE lower(datname) = lower('%v'));", databaseName)
+		query := fmt.Sprintf("SELECT EXISTS(SELECT 1 FROM pg_database WHERE lower(datname) = lower('%v'));",
+			databaseName)
 		err := env.Client.Get(env.Ctx, ctrlclient.ObjectKey{Namespace: namespace, Name: podName}, pod)
 		Expect(err).ToNot(HaveOccurred())
 		stdout, _, err := env.ExecCommand(env.Ctx, *pod, specs.PostgresContainerName,
@@ -601,8 +620,10 @@ func AssertUserExists(namespace, podName, userName string, expectedValue bool) {
 }
 
 // AssertDataExpectedCountWithDatabaseName verifies that an expected amount of rows exists on the table
-func AssertDataExpectedCountWithDatabaseName(namespace, podName, databaseName string,
-	tableName string, expectedValue int,
+func AssertDataExpectedCountWithDatabaseName(
+	namespace, podName, databaseName string,
+	tableName string,
+	expectedValue int,
 ) {
 	By(fmt.Sprintf("verifying test data on pod %v", podName), func() {
 		query := fmt.Sprintf("select count(*) from %v", tableName)
@@ -889,7 +910,7 @@ func AssertArchiveWalOnMinio(namespace, clusterName string, serverName string) {
 	By(fmt.Sprintf("verify the existence of WAL %v in minio", latestWALPath), func() {
 		Eventually(func() (int, error) {
 			// WALs are compressed with gzip in the fixture
-			return testsUtils.CountFilesOnMinio(minioEnv, latestWALPath)
+			return minio.CountFiles(minioEnv, latestWALPath)
 		}, testTimeouts[testsUtils.WalsInMinio]).Should(BeEquivalentTo(1))
 	})
 }
@@ -1122,7 +1143,8 @@ func AssertDetachReplicaModeCluster(
 	})
 
 	By("verifying that replica cluster was not modified", func() {
-		outTables, stdErr, err := env.EventuallyExecCommand(env.Ctx, *primaryReplicaCluster, specs.PostgresContainerName,
+		outTables, stdErr, err := env.EventuallyExecCommand(env.Ctx, *primaryReplicaCluster,
+			specs.PostgresContainerName,
 			&replicaCommandTimeout, "psql", "-U", "postgres", srcDatabaseName, "-tAc", "\\dt")
 		if err != nil {
 			GinkgoWriter.Printf("stdout: %v\nstderr: %v\n", outTables, stdErr)
@@ -1436,9 +1458,11 @@ func AssertMetricsData(namespace, targetOne, targetTwo, targetSecret string, clu
 			podName := pod.GetName()
 			out, err := testsUtils.RetrieveMetricsFromInstance(env, pod, cluster.IsMetricsTLSEnabled())
 			Expect(err).ToNot(HaveOccurred())
-			Expect(strings.Contains(out, fmt.Sprintf(`cnpg_some_query_rows{datname="%v"} 0`, targetOne))).Should(BeTrue(),
+			Expect(strings.Contains(out,
+				fmt.Sprintf(`cnpg_some_query_rows{datname="%v"} 0`, targetOne))).Should(BeTrue(),
 				"Metric collection issues on %v.\nCollected metrics:\n%v", podName, out)
-			Expect(strings.Contains(out, fmt.Sprintf(`cnpg_some_query_rows{datname="%v"} 0`, targetTwo))).Should(BeTrue(),
+			Expect(strings.Contains(out,
+				fmt.Sprintf(`cnpg_some_query_rows{datname="%v"} 0`, targetTwo))).Should(BeTrue(),
 				"Metric collection issues on %v.\nCollected metrics:\n%v", podName, out)
 			Expect(strings.Contains(out, fmt.Sprintf(`cnpg_some_query_test_rows{datname="%v"} 1`,
 				targetSecret))).Should(BeTrue(),
@@ -1896,7 +1920,8 @@ func AssertClusterWasRestoredWithPITRAndApplicationDB(namespace, clusterName, ta
 	})
 
 	// Gather credentials
-	appUser, appUserPass, err := testsUtils.GetCredentials(clusterName, namespace, apiv1.ApplicationUserSecretSuffix, env)
+	appUser, appUserPass, err := testsUtils.GetCredentials(clusterName, namespace, apiv1.ApplicationUserSecretSuffix,
+		env)
 	Expect(err).ToNot(HaveOccurred())
 
 	primaryPod, err := env.GetClusterPrimary(namespace, clusterName)
@@ -1971,22 +1996,6 @@ func AssertArchiveConditionMet(namespace, clusterName, timeout string) {
 	})
 }
 
-func AssertArchiveWalOnAzurite(namespace, clusterName string) {
-	// Create a WAL on the primary and check if it arrives at the Azure Blob Storage within a short time
-	By("archiving WALs and verifying they exist", func() {
-		primary := clusterName + "-1"
-		latestWAL := switchWalAndGetLatestArchive(namespace, primary)
-		// verifying on blob storage using az
-		// Define what file we are looking for in Azurite.
-		// Escapes are required since az expects forward slashes to be escaped
-		path := fmt.Sprintf("%v\\/wals\\/0000000100000000\\/%v.gz", clusterName, latestWAL)
-		// verifying on blob storage using az
-		Eventually(func() (int, error) {
-			return testsUtils.CountFilesOnAzuriteBlobStorage(namespace, clusterName, path)
-		}, 60).Should(BeEquivalentTo(1))
-	})
-}
-
 func AssertArchiveWalOnAzureBlob(namespace, clusterName string, configuration testsUtils.AzureConfiguration) {
 	// Create a WAL on the primary and check if it arrives at the Azure Blob Storage, within a short time
 	By("archiving WALs and verifying they exist", func() {
@@ -2024,59 +2033,6 @@ func switchWalAndGetLatestArchive(namespace, podName string) string {
 	Expect(err).ToNot(HaveOccurred())
 
 	return strings.TrimSpace(out)
-}
-
-func prepareClusterForPITROnMinio(
-	namespace,
-	clusterName,
-	backupSampleFile string,
-	expectedVal int,
-	currentTimestamp *string,
-) {
-	const tableNamePitr = "for_restore"
-
-	By("backing up a cluster and verifying it exists on minio", func() {
-		testsUtils.ExecuteBackup(namespace, backupSampleFile, false, testTimeouts[testsUtils.BackupIsReady], env)
-		latestTar := minioPath(clusterName, "data.tar")
-		Eventually(func() (int, error) {
-			return testsUtils.CountFilesOnMinio(minioEnv, latestTar)
-		}, 60).Should(BeNumerically(">=", expectedVal),
-			fmt.Sprintf("verify the number of backups %v is greater than or equal to %v", latestTar,
-				expectedVal))
-		Eventually(func() (string, error) {
-			cluster, err := env.GetCluster(namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
-			return cluster.Status.FirstRecoverabilityPoint, err
-		}, 30).ShouldNot(BeEmpty())
-	})
-
-	// Write a table and insert 2 entries on the "app" database
-	AssertCreateTestData(env, namespace, clusterName, tableNamePitr)
-
-	By("getting currentTimestamp", func() {
-		ts, err := testsUtils.GetCurrentTimestamp(namespace, clusterName, env)
-		*currentTimestamp = ts
-		Expect(err).ToNot(HaveOccurred())
-	})
-
-	By(fmt.Sprintf("writing 3rd entry into test table '%v'", tableNamePitr), func() {
-		forward, conn, err := testsUtils.ForwardPSQLConnection(
-			env,
-			namespace,
-			clusterName,
-			testsUtils.AppDBName,
-			apiv1.ApplicationUserSecretSuffix,
-		)
-		defer func() {
-			forward.Close()
-		}()
-		Expect(err).ToNot(HaveOccurred())
-
-		insertRecordIntoTable(tableNamePitr, 3, conn)
-	})
-	AssertArchiveWalOnMinio(namespace, clusterName, clusterName)
-	AssertArchiveConditionMet(namespace, clusterName, "5m")
-	AssertBackupConditionInClusterStatus(namespace, clusterName)
 }
 
 func prepareClusterForPITROnAzureBlob(
@@ -2126,107 +2082,7 @@ func prepareClusterForPITROnAzureBlob(
 	})
 	AssertArchiveWalOnAzureBlob(namespace, clusterName, env.AzureConfiguration)
 	AssertArchiveConditionMet(namespace, clusterName, "5m")
-	AssertBackupConditionInClusterStatus(namespace, clusterName)
-}
-
-func prepareClusterOnAzurite(namespace, clusterName, clusterSampleFile string) {
-	By("creating the Azurite storage credentials", func() {
-		err := testsUtils.CreateStorageCredentialsOnAzurite(namespace, env)
-		Expect(err).ToNot(HaveOccurred())
-	})
-
-	By("setting up Azurite to hold the backups", func() {
-		// Deploying azurite for blob storage
-		err := testsUtils.InstallAzurite(namespace, env)
-		Expect(err).ToNot(HaveOccurred())
-	})
-
-	By("setting up az-cli", func() {
-		// This is required as we have a service of Azurite running locally.
-		// In order to connect, we need az cli inside the namespace
-		err := testsUtils.InstallAzCli(namespace, env)
-		Expect(err).ToNot(HaveOccurred())
-	})
-
-	// Creating cluster
-	AssertCreateCluster(namespace, clusterName, clusterSampleFile, env)
-
-	AssertArchiveConditionMet(namespace, clusterName, "5m")
-}
-
-func prepareClusterBackupOnAzurite(
-	namespace,
-	clusterName,
-	clusterSampleFile,
-	backupFile,
-	tableName string,
-) {
-	// Setting up Azurite and az cli along with Postgresql cluster
-	prepareClusterOnAzurite(namespace, clusterName, clusterSampleFile)
-	// Write a table and some data on the "app" database
-	AssertCreateTestData(env, namespace, clusterName, tableName)
-	AssertArchiveWalOnAzurite(namespace, clusterName)
-
-	By("backing up a cluster and verifying it exists on azurite", func() {
-		// We create a Backup
-		testsUtils.ExecuteBackup(namespace, backupFile, false, testTimeouts[testsUtils.BackupIsReady], env)
-		// Verifying file called data.tar should be available on Azurite blob storage
-		Eventually(func() (int, error) {
-			return testsUtils.CountFilesOnAzuriteBlobStorage(namespace, clusterName, "data.tar")
-		}, 30).Should(BeNumerically(">=", 1))
-		Eventually(func() (string, error) {
-			cluster, err := env.GetCluster(namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
-			return cluster.Status.FirstRecoverabilityPoint, err
-		}, 30).ShouldNot(BeEmpty())
-	})
-	AssertBackupConditionInClusterStatus(namespace, clusterName)
-}
-
-func prepareClusterForPITROnAzurite(
-	namespace,
-	clusterName,
-	backupSampleFile string,
-	currentTimestamp *string,
-) {
-	By("backing up a cluster and verifying it exists on azurite", func() {
-		// We create a Backup
-		testsUtils.ExecuteBackup(namespace, backupSampleFile, false, testTimeouts[testsUtils.BackupIsReady], env)
-		// Verifying file called data.tar should be available on Azurite blob storage
-		Eventually(func() (int, error) {
-			return testsUtils.CountFilesOnAzuriteBlobStorage(namespace, clusterName, "data.tar")
-		}, 30).Should(BeNumerically(">=", 1))
-		Eventually(func() (string, error) {
-			cluster, err := env.GetCluster(namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
-			return cluster.Status.FirstRecoverabilityPoint, err
-		}, 30).ShouldNot(BeEmpty())
-	})
-
-	// Write a table and insert 2 entries on the "app" database
-	AssertCreateTestData(env, namespace, clusterName, "for_restore")
-
-	By("getting currentTimestamp", func() {
-		ts, err := testsUtils.GetCurrentTimestamp(namespace, clusterName, env)
-		*currentTimestamp = ts
-		Expect(err).ToNot(HaveOccurred())
-	})
-
-	By(fmt.Sprintf("writing 3rd entry into test table '%v'", "for_restore"), func() {
-		forward, conn, err := testsUtils.ForwardPSQLConnection(
-			env,
-			namespace,
-			clusterName,
-			testsUtils.AppDBName,
-			apiv1.ApplicationUserSecretSuffix,
-		)
-		defer func() {
-			forward.Close()
-		}()
-		Expect(err).ToNot(HaveOccurred())
-		insertRecordIntoTable("for_restore", 3, conn)
-	})
-	AssertArchiveWalOnAzurite(namespace, clusterName)
+	testsUtils.AssertBackupConditionInClusterStatus(env, namespace, clusterName)
 }
 
 func createAndAssertPgBouncerPoolerIsSetUp(namespace, poolerYamlFilePath string, expectedInstanceCount int) {
@@ -2917,19 +2773,6 @@ func AssertBackupConditionTimestampChangedInClusterStatus(
 	})
 }
 
-func AssertBackupConditionInClusterStatus(namespace, clusterName string) {
-	By(fmt.Sprintf("waiting for backup condition status in cluster '%v'", clusterName), func() {
-		Eventually(func() (string, error) {
-			getBackupCondition, err := testsUtils.GetConditionsInClusterStatus(
-				namespace, clusterName, env, apiv1.ConditionBackup)
-			if err != nil {
-				return "", err
-			}
-			return string(getBackupCondition.Status), nil
-		}, 300, 5).Should(BeEquivalentTo("True"))
-	})
-}
-
 func AssertClusterReadinessStatusIsReached(
 	namespace,
 	clusterName string,
@@ -3068,7 +2911,8 @@ func AssertClusterHAReplicationSlots(namespace, clusterName string) {
 		podList, err := env.GetClusterPodList(namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 		for _, pod := range podList.Items {
-			expectedSlots, err := testsUtils.GetExpectedHAReplicationSlotsOnPod(namespace, clusterName, pod.GetName(), env)
+			expectedSlots, err := testsUtils.GetExpectedHAReplicationSlotsOnPod(namespace, clusterName, pod.GetName(),
+				env)
 			Expect(err).ToNot(HaveOccurred())
 			AssertReplicationSlotsOnPod(namespace, clusterName, pod, expectedSlots, true, false)
 		}
