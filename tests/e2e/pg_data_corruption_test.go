@@ -58,7 +58,13 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), Ordered, func(
 		clusterName, err := env.GetResourceNameFromYAML(sampleFile)
 		Expect(err).ToNot(HaveOccurred())
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
-		AssertCreateTestData(env, namespace, clusterName, tableName)
+		tableLocator := TableLocator{
+			Namespace:    namespace,
+			ClusterName:  clusterName,
+			DatabaseName: testsUtils.AppDBName,
+			TableName:    tableName,
+		}
+		AssertCreateTestData(env, tableLocator)
 
 		By("gathering current primary pod and pvc", func() {
 			oldPrimaryPod, err := env.GetClusterPrimary(namespace, clusterName)
@@ -187,7 +193,7 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), Ordered, func(
 			}, 300).Should(BeTrue())
 		})
 		AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReadyQuick], env)
-		AssertDataExpectedCount(env, namespace, clusterName, tableName, 2)
+		AssertDataExpectedCount(env, tableLocator, 2)
 		AssertClusterStandbysAreStreaming(namespace, clusterName, 120)
 	}
 
