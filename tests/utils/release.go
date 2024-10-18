@@ -110,5 +110,6 @@ func extractTag(releaseFile string) (string, error) {
 	if len(matches) == 0 {
 		return "", fmt.Errorf("could not extract tag from filename %s", releaseFile)
 	}
+	// since the regex is matched, the second fragment contains the submatch
 	return matches[1], nil
 }

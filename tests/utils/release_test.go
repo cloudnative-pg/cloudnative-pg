@@ -32,6 +32,11 @@ var _ = Describe("Release tag extraction", func() {
 		Expect(err).ToNot(HaveOccurred())
 		Expect(tag).To(Equal("0.5.0"))
 	})
+	It("properly works with another project prefix", func() {
+		tag, err := extractTag("cnp-0.5.0.yaml")
+		Expect(err).ToNot(HaveOccurred())
+		Expect(tag).To(Equal("0.5.0"))
+	})
 })
 
 var _ = Describe("Most recent tag", func() {
