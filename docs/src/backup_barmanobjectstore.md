@@ -96,9 +96,9 @@ algorithms via `barman-cloud-backup` (for backups) and
 * snappy
 
 The compression settings for backups and WALs are independent. See the
-[DataBackupConfiguration](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-DataBackupConfiguration) and
-[WALBackupConfiguration](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-WalBackupConfiguration) sections in
-the API reference.
+[DataBackupConfiguration](https://pkg.go.dev/github.com/cloudnative-pg/barman-cloud/pkg/api#DataBackupConfiguration) and
+[WALBackupConfiguration](https://pkg.go.dev/github.com/cloudnative-pg/barman-cloud/pkg/api#WalBackupConfiguration) sections in
+the barman-cloud API reference.
 
 It is important to note that archival time, restore time, and size change
 between the algorithms, so the compression algorithm should be chosen according

@@ -182,6 +182,7 @@ type BackupSnapshotElementStatus struct {
 
 	// TablespaceName is the name of the snapshotted tablespace. Only set
 	// when type is PG_TABLESPACE
+	// +optional
 	TablespaceName string `json:"tablespaceName,omitempty"`
 }
 
@@ -285,6 +286,7 @@ type BackupStatus struct {
 	Method BackupMethod `json:"method,omitempty"`
 
 	// Whether the backup was online/hot (`true`) or offline/cold (`false`)
+	// +optional
 	Online *bool `json:"online,omitempty"`
 
 	// A map containing the plugin metadata

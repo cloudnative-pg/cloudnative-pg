@@ -25,6 +25,7 @@ const VolumeSnapshotKind = "VolumeSnapshot"
 // not using the core data types.
 type Metadata struct {
 	// The name of the resource. Only supported for certain types
+	// +optional
 	Name string `json:"name,omitempty"`
 
 	// Map of string keys and values that can be used to organize and categorize
