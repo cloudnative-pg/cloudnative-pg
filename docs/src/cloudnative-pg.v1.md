@@ -2160,7 +2160,7 @@ Map keys are the config map names, map values are the versions</p>
 </tbody>
 </table>
 
-## DataDurabilityMethod     {#postgresql-cnpg-io-v1-DataDurabilityMethod}
+## DataDurabilityLevel     {#postgresql-cnpg-io-v1-DataDurabilityLevel}
 
 (Alias of `string`)
 
@@ -2169,7 +2169,7 @@ Map keys are the config map names, map values are the versions</p>
 - [SynchronousReplicaConfiguration](#postgresql-cnpg-io-v1-SynchronousReplicaConfiguration)
 
 
-<p>DataDurabilityMethod specifies how strictly to enforce synchronous replication
+<p>DataDurabilityLevel specifies how strictly to enforce synchronous replication
 when cluster instances are unavailable. Options are <code>required</code> or <code>preferred</code>.</p>
 
 
@@ -4986,7 +4986,7 @@ only useful for priority-based synchronous replication).</p>
 </td>
 </tr>
 <tr><td><code>dataDurability</code><br/>
-<a href="#postgresql-cnpg-io-v1-DataDurabilityMethod"><i>DataDurabilityMethod</i></a>
+<a href="#postgresql-cnpg-io-v1-DataDurabilityLevel"><i>DataDurabilityLevel</i></a>
 </td>
 <td>
    <p>If &quot;required&quot;, data durability is strictly enforced. Write operations with
