@@ -102,7 +102,7 @@ var _ = Describe("GetAvailableReleases fails on wrong release directory", func()
 			"cnpg-0.6.0.yaml",
 			"mangled-cnpg-0.5.1.yaml",
 		} {
-			f, err := os.Create(filepath.Join(tmpDir, file))
+			f, err := os.Create(filepath.Clean(filepath.Join(tmpDir, file)))
 			Expect(err).ToNot(HaveOccurred())
 			Expect(f.Close()).ToNot(HaveOccurred())
 		}
@@ -123,7 +123,7 @@ var _ = Describe("GetAvailableReleases fails on wrong release directory", func()
 			"cnpg-0.5.1.yaml",
 			"cnpg-0.6.0-rc1.yaml",
 		} {
-			f, err := os.Create(filepath.Join(tmpDir, file))
+			f, err := os.Create(filepath.Clean(filepath.Join(tmpDir, file)))
 			Expect(err).ToNot(HaveOccurred())
 			Expect(f.Close()).ToNot(HaveOccurred())
 		}
