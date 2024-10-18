@@ -19,14 +19,12 @@ package e2e
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
@@ -137,17 +135,8 @@ func assertFastSwitchover(namespace, sampleFile, clusterName, webTestFile, webTe
 			", PRIMARY KEY (id)" +
 			")"
 
-		primaryPod, err := env.GetClusterPrimary(namespace, clusterName)
-		Expect(err).ToNot(HaveOccurred())
-
-		_, _, err = env.ExecCommandWithPsqlClient(
-			namespace,
-			clusterName,
-			primaryPod,
-			apiv1.ApplicationUserSecretSuffix,
-			utils.AppDBName,
-			query,
-		)
+		_, err := utils.RunExecOverForward(env, namespace, clusterName, utils.AppDBName,
+			apiv1.ApplicationUserSecretSuffix, query)
 		Expect(err).ToNot(HaveOccurred())
 	})
 
@@ -164,23 +153,26 @@ func assertFastSwitchover(namespace, sampleFile, clusterName, webTestFile, webTe
 			" -f " + webTestJob)
 		Expect(err).ToNot(HaveOccurred())
 
-		commandTimeout := time.Second * 10
-		timeout := 60
 		primaryPodNamespacedName := types.NamespacedName{
 			Namespace: namespace,
 			Name:      oldPrimary,
 		}
+		query := "SELECT count(*) > 0 FROM tps.tl"
 		Eventually(func() (string, error) {
 			primaryPod := &corev1.Pod{}
 			err := env.Client.Get(env.Ctx, primaryPodNamespacedName, primaryPod)
 			if err != nil {
 				return "", err
 			}
-			out, _, err := env.ExecCommand(env.Ctx, *primaryPod, specs.PostgresContainerName,
-				&commandTimeout, "psql", "-U", "postgres", "app", "-tAc",
-				"SELECT count(*) > 0 FROM tps.tl")
+			out, _, err := env.ExecQueryInInstancePod(
+				utils.PodLocator{
+					Namespace: primaryPod.Namespace,
+					PodName:   primaryPod.Name,
+				},
+				utils.AppDBName,
+				query)
 			return strings.TrimSpace(out), err
-		}, timeout).Should(BeEquivalentTo("t"))
+		}, RetryTimeout).Should(BeEquivalentTo("t"))
 	})
 
 	By("setting the TargetPrimary to node2 to trigger a switchover", func() {

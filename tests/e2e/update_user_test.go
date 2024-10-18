@@ -126,6 +126,12 @@ var _ = Describe("Enable superuser password", Label(tests.LabelServiceConnectivi
 	)
 	var namespace string
 
+	BeforeEach(func() {
+		if testLevelEnv.Depth < int(level) {
+			Skip("Test depth is lower than the amount requested for this test")
+		}
+	})
+
 	It("enable and disable superuser access", func() {
 		var err error
 		// Create a cluster in a namespace we'll delete after the test
@@ -152,13 +158,16 @@ var _ = Describe("Enable superuser password", Label(tests.LabelServiceConnectivi
 				g.Expect(apierrors.IsNotFound(err)).To(BeTrue())
 			}, 200).Should(Succeed())
 
-			timeout := time.Second * 10
-
+			query := "SELECT rolpassword IS NULL FROM pg_authid WHERE rolname='postgres'"
 			// We should have the `postgres` user with a null password
 			Eventually(func() string {
-				stdout, _, err := env.ExecCommand(env.Ctx, *primaryPod, specs.PostgresContainerName, &timeout,
-					"psql", "-U", "postgres", "-tAc",
-					"SELECT rolpassword IS NULL FROM pg_authid WHERE rolname='postgres'")
+				stdout, _, err := env.ExecQueryInInstancePod(
+					testsUtils.PodLocator{
+						Namespace: primaryPod.Namespace,
+						PodName:   primaryPod.Name,
+					},
+					testsUtils.PostgresDBName,
+					query)
 				if err != nil {
 					return ""
 				}

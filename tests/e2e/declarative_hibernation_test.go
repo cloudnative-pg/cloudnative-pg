@@ -24,6 +24,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/hibernation"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -55,7 +56,13 @@ var _ = Describe("Cluster declarative hibernation", func() {
 		By("creating a new cluster", func() {
 			AssertCreateCluster(namespace, clusterName, sampleFileCluster, env)
 			// Write a table and some data on the "app" database
-			AssertCreateTestData(env, namespace, clusterName, tableName)
+			tableLocator := TableLocator{
+				Namespace:    namespace,
+				ClusterName:  clusterName,
+				DatabaseName: testsUtils.AppDBName,
+				TableName:    tableName,
+			}
+			AssertCreateTestData(env, tableLocator)
 		})
 
 		By("hibernating the new cluster", func() {
@@ -114,7 +121,13 @@ var _ = Describe("Cluster declarative hibernation", func() {
 		})
 
 		By("verifying the data has been preserved", func() {
-			AssertDataExpectedCount(env, namespace, clusterName, tableName, 2)
+			tableLocator := TableLocator{
+				Namespace:    namespace,
+				ClusterName:  clusterName,
+				DatabaseName: testsUtils.AppDBName,
+				TableName:    tableName,
+			}
+			AssertDataExpectedCount(env, tableLocator, 2)
 		})
 	})
 })
