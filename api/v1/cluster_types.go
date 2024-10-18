@@ -1218,6 +1218,7 @@ type SynchronousReplicaConfiguration struct {
 	// This can only be set if both `standbyNamesPre` and `standbyNamesPost` are empty.
 	// +kubebuilder:validation:Enum=required;preferred
 	// +kubebuilder:default:=required
+	// +optional
 	DataDurability DataDurabilityMethod `json:"dataDurability,omitempty"`
 }
 
