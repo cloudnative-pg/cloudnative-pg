@@ -18,14 +18,13 @@ package e2e
 
 import (
 	"fmt"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
 
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
-	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -81,7 +80,7 @@ var _ = Describe("Probes configuration tests", Label(tests.LabelBasic), func() {
 			// Create a cluster in a namespace we'll delete after the test
 			const namespacePrefix = "probes"
 			var err error
-			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
@@ -119,7 +118,7 @@ var _ = Describe("Probes configuration tests", Label(tests.LabelBasic), func() {
 		By("waiting for the cluster to restart", func() {
 			AssertClusterEventuallyReachesPhase(namespace, clusterName,
 				[]string{apiv1.PhaseUpgrade, apiv1.PhaseWaitingForInstancesToBeActive}, 120)
-			AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReadyQuick], env)
+			AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick], env)
 		})
 
 		By("checking the applied settings", func() {
@@ -161,7 +160,7 @@ var _ = Describe("Probes configuration tests", Label(tests.LabelBasic), func() {
 		By("waiting for the cluster to restart", func() {
 			AssertClusterEventuallyReachesPhase(namespace, clusterName,
 				[]string{apiv1.PhaseUpgrade, apiv1.PhaseWaitingForInstancesToBeActive}, 120)
-			AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReadyQuick], env)
+			AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick], env)
 		})
 
 		By("checking the applied settings", func() {

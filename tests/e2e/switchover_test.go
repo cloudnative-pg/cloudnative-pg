@@ -18,6 +18,7 @@ package e2e
 
 import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -41,9 +42,9 @@ var _ = Describe("Switchover", Serial, Label(tests.LabelSelfHealing), func() {
 			// Create a cluster in a namespace we'll delete after the test
 			const namespacePrefix = "switchover-e2e-with-slots"
 			var err error
-			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			clusterName, err := env.GetResourceNameFromYAML(sampleFileWithReplicationSlots)
+			clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, sampleFileWithReplicationSlots)
 			Expect(err).ToNot(HaveOccurred())
 
 			AssertCreateCluster(namespace, clusterName, sampleFileWithReplicationSlots, env)
@@ -57,9 +58,9 @@ var _ = Describe("Switchover", Serial, Label(tests.LabelSelfHealing), func() {
 			// Create a cluster in a namespace we'll delete after the test
 			const namespacePrefix = "switchover-e2e"
 			var err error
-			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			clusterName, err := env.GetResourceNameFromYAML(sampleFileWithoutReplicationSlots)
+			clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, sampleFileWithoutReplicationSlots)
 			Expect(err).ToNot(HaveOccurred())
 
 			AssertCreateCluster(namespace, clusterName, sampleFileWithoutReplicationSlots, env)

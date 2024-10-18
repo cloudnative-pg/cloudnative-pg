@@ -22,7 +22,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/operator"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -57,7 +58,7 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive, tests.LabelOper
 	})
 
 	BeforeAll(func() {
-		clusterName, err = env.GetResourceNameFromYAML(sampleFile)
+		clusterName, err = yaml.GetResourceNameFromYAML(env.Scheme, sampleFile)
 		Expect(err).ToNot(HaveOccurred())
 	})
 
@@ -66,16 +67,16 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive, tests.LabelOper
 		clusterIsDefaulted = true
 		By("having a deployment for the operator in state ready", func() {
 			// Make sure that we have at least one operator already working
-			err := env.ScaleOperatorDeployment(1)
+			err := operator.ScaleOperatorDeployment(env.Ctx, env.Client, 1)
 			Expect(err).ToNot(HaveOccurred())
 
-			ready, err := env.IsOperatorDeploymentReady()
+			ready, err := operator.IsOperatorDeploymentReady(env.Ctx, env.Client)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(ready).To(BeTrue())
 		})
 
 		// Create a basic PG cluster
-		webhookNamespace, err := env.CreateUniqueTestNamespace(webhookNamespacePrefix)
+		webhookNamespace, err := env.CreateUniqueTestNamespace(env.Ctx, env.Client, webhookNamespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		AssertCreateCluster(webhookNamespace, clusterName, sampleFile, env)
 		// Check if cluster is ready and the default values are populated
@@ -86,7 +87,7 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive, tests.LabelOper
 		webhookNamespacePrefix := "no-webhook-test"
 		clusterIsDefaulted = true
 
-		mWebhook, admissionNumber, err := utils.GetCNPGsMutatingWebhookByName(env, mutatingWebhook)
+		mWebhook, admissionNumber, err := operator.GetCNPGsMutatingWebhookByName(env.Ctx, env.Client, mutatingWebhook)
 		Expect(err).ToNot(HaveOccurred())
 
 		// Add a namespace selector to MutatingWebhooks and ValidatingWebhook, this will assign the webhooks
@@ -96,11 +97,13 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive, tests.LabelOper
 			newWebhook.Webhooks[admissionNumber].NamespaceSelector = &metav1.LabelSelector{
 				MatchLabels: map[string]string{"test": "value"},
 			}
-			err := utils.UpdateCNPGsMutatingWebhookConf(env, newWebhook)
+			err := operator.UpdateCNPGsMutatingWebhookConf(env.Ctx, env.Interface, newWebhook)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		vWebhook, admissionNumber, err := utils.GetCNPGsValidatingWebhookByName(env, validatingWebhook)
+		vWebhook, admissionNumber, err := operator.GetCNPGsValidatingWebhookByName(
+			env.Ctx, env.Client, validatingWebhook,
+		)
 		Expect(err).ToNot(HaveOccurred())
 
 		By(fmt.Sprintf("Disabling the validating webhook %v namespace", operatorNamespace), func() {
@@ -108,12 +111,12 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive, tests.LabelOper
 			newWebhook.Webhooks[admissionNumber].NamespaceSelector = &metav1.LabelSelector{
 				MatchLabels: map[string]string{"test": "value"},
 			}
-			err := utils.UpdateCNPGsValidatingWebhookConf(env, newWebhook)
+			err := operator.UpdateCNPGsValidatingWebhookConf(env.Ctx, env.Interface, newWebhook)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
 		// Create a basic PG cluster
-		webhookNamespace, err = env.CreateUniqueTestNamespace(webhookNamespacePrefix)
+		webhookNamespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, webhookNamespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		AssertCreateCluster(webhookNamespace, clusterName, sampleFile, env)
 		// Check if cluster is ready and has no default value in the object
@@ -121,7 +124,7 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive, tests.LabelOper
 
 		// Make sure the operator is intact and not crashing
 		By("having a deployment for the operator in state ready", func() {
-			ready, err := env.IsOperatorDeploymentReady()
+			ready, err := operator.IsOperatorDeploymentReady(env.Ctx, env.Client)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(ready).To(BeTrue())
 		})
