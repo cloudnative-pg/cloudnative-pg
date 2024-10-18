@@ -73,22 +73,22 @@ var _ = Describe("Volume space unavailable", Label(tests.LabelStorage), func() {
 		By("writing something when no space is available", func() {
 			// Create the table used by the scenario
 			query := "CREATE TABLE diskspace AS SELECT generate_series(1, 1000000);"
-			_, _, err := env.ExecCommandWithPsqlClient(
-				namespace,
-				clusterName,
-				primaryPod,
-				apiv1.ApplicationUserSecretSuffix,
+			_, _, err := env.ExecQueryInInstancePod(
+				testsUtils.PodLocator{
+					Namespace: primaryPod.Namespace,
+					PodName:   primaryPod.Name,
+				},
 				testsUtils.AppDBName,
-				query,
-			)
+				query)
 			Expect(err).To(HaveOccurred())
+
 			query = "CHECKPOINT; SELECT pg_switch_wal(); CHECKPOINT"
 			_, _, err = env.ExecQueryInInstancePod(
 				testsUtils.PodLocator{
 					Namespace: primaryPod.Namespace,
 					PodName:   primaryPod.Name,
 				},
-				testsUtils.DatabaseName("postgres"),
+				testsUtils.PostgresDBName,
 				query)
 			Expect(err).To(HaveOccurred())
 		})
@@ -171,7 +171,7 @@ var _ = Describe("Volume space unavailable", Label(tests.LabelStorage), func() {
 					Namespace: primaryPod.Namespace,
 					PodName:   primaryPod.Name,
 				},
-				testsUtils.DatabaseName("postgres"),
+				testsUtils.PostgresDBName,
 				query)
 			Expect(err).NotTo(HaveOccurred())
 		})

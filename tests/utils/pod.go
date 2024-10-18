@@ -33,6 +33,8 @@ import (
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	pkgutils "github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+
+	. "github.com/onsi/gomega" // nolint
 )
 
 // PodCreateAndWaitForReady creates a given pod object and wait for it to be ready
@@ -245,4 +247,30 @@ func (env TestingEnvironment) ExecQueryInInstancePod(
 			Namespace: podLocator.Namespace,
 			PodName:   podLocator.PodName,
 		}, &timeout, "psql", "-U", "postgres", string(dbname), "-tAc", query)
+}
+
+// EventuallyExecQueryInInstancePod wraps ExecQueryInInstancePod with an Eventually clause
+func (env TestingEnvironment) EventuallyExecQueryInInstancePod(
+	podLocator PodLocator,
+	dbname DatabaseName,
+	query string,
+	retryTimeout int,
+	pollingTime int,
+) (string, string, error) {
+	var stdOut, stdErr string
+	var err error
+
+	Eventually(func() error {
+		stdOut, stdErr, err = env.ExecQueryInInstancePod(
+			PodLocator{
+				Namespace: podLocator.Namespace,
+				PodName:   podLocator.PodName,
+			}, dbname, query)
+		if err != nil {
+			return err
+		}
+		return nil
+	}, retryTimeout, pollingTime).Should(BeNil())
+
+	return stdOut, stdErr, err
 }
