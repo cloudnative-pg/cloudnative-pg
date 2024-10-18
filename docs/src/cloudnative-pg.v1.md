@@ -5006,7 +5006,7 @@ only useful for priority-based synchronous replication).</p>
 only useful for priority-based synchronous replication).</p>
 </td>
 </tr>
-<tr><td><code>dataDurability</code> <B>[Required]</B><br/>
+<tr><td><code>dataDurability</code><br/>
 <a href="#postgresql-cnpg-io-v1-DataDurabilityMethod"><i>DataDurabilityMethod</i></a>
 </td>
 <td>
