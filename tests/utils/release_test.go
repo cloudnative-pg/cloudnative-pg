@@ -28,7 +28,8 @@ import (
 
 var _ = Describe("Release tag extraction", func() {
 	It("properly works with expected filename", func() {
-		tag := extractTag("cnpg-0.5.0.yaml")
+		tag, err := extractTag("cnpg-0.5.0.yaml")
+		Expect(err).ToNot(HaveOccurred())
 		Expect(tag).To(Equal("0.5.0"))
 	})
 })
