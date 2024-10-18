@@ -94,7 +94,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 						Namespace: namespace,
 						PodName:   primaryPod,
 					},
-					utils.DatabaseName("postgres"),
+					utils.PostgresDBName,
 					"\\du")
 				g.Expect(err).ToNot(HaveOccurred())
 				if shouldExists {
@@ -121,7 +121,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 						Namespace: namespace,
 						PodName:   primaryPod,
 					},
-					utils.DatabaseName("postgres"),
+					utils.PostgresDBName,
 					query)
 				if err != nil {
 					return []string{ERROR}
@@ -163,7 +163,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 							Namespace: namespace,
 							PodName:   primaryPodInfo.Name,
 						},
-						utils.DatabaseName("postgres"),
+						utils.PostgresDBName,
 						q)
 					Expect(err).ToNot(HaveOccurred())
 					Expect(stdout).To(Equal("t\n"))
@@ -195,7 +195,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 						Namespace: namespace,
 						PodName:   primaryPodInfo.Name,
 					},
-					utils.DatabaseName("postgres"),
+					utils.PostgresDBName,
 					query)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(stdout).To(Equal("t\n"))
@@ -274,7 +274,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 							Namespace: namespace,
 							PodName:   primaryPod.Name,
 						},
-						utils.DatabaseName("postgres"),
+						utils.PostgresDBName,
 						query)
 					if err != nil {
 						return ""
@@ -348,7 +348,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 							Namespace: namespace,
 							PodName:   primaryPodInfo.Name,
 						},
-						utils.DatabaseName("postgres"),
+						utils.PostgresDBName,
 						query)
 					if err != nil {
 						return ""
@@ -390,7 +390,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 							Namespace: namespace,
 							PodName:   primaryPodInfo.Name,
 						},
-						utils.DatabaseName("postgres"),
+						utils.PostgresDBName,
 						query)
 					if err != nil {
 						return ERROR
@@ -410,7 +410,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 							Namespace: namespace,
 							PodName:   primaryPodInfo.Name,
 						},
-						utils.DatabaseName("postgres"),
+						utils.PostgresDBName,
 						query)
 					if err != nil {
 						return ERROR
@@ -556,7 +556,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 						Namespace: namespace,
 						PodName:   primaryPod.Name,
 					},
-					utils.DatabaseName("postgres"),
+					utils.PostgresDBName,
 					query)
 				Expect(err).ToNot(HaveOccurred())
 			})
@@ -603,7 +603,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 							Namespace: namespace,
 							PodName:   primaryPodInfo.Name,
 						},
-						utils.DatabaseName("postgres"),
+						utils.PostgresDBName,
 						query)
 					if err != nil {
 						return ERROR
@@ -623,7 +623,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 							Namespace: namespace,
 							PodName:   primaryPodInfo.Name,
 						},
-						utils.DatabaseName("postgres"),
+						utils.PostgresDBName,
 						query)
 					if err != nil {
 						return ERROR

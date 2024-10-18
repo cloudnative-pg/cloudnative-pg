@@ -53,13 +53,14 @@ func PrintReplicationSlots(
 		}
 		m := make(map[string]string)
 		for _, slot := range slots {
-			restartLsn, _, err := RunQueryFromPod(
-				&podList.Items[i], PGLocalSocketDir,
-				"app",
-				"postgres",
-				"''",
-				fmt.Sprintf("SELECT restart_lsn FROM pg_replication_slots WHERE slot_name = '%v'", slot),
-				env)
+			query := fmt.Sprintf("SELECT restart_lsn FROM pg_replication_slots WHERE slot_name = '%v'", slot)
+			restartLsn, _, err := env.ExecQueryInInstancePod(
+				PodLocator{
+					Namespace: podList.Items[i].Namespace,
+					PodName:   podList.Items[i].Name,
+				},
+				AppDBName,
+				query)
 			if err != nil {
 				output.WriteString(fmt.Sprintf("Couldn't retrieve restart_lsn for slot %v: %v\n", slot, err))
 			}
@@ -124,9 +125,14 @@ func GetReplicationSlotsOnPod(namespace, podName string, env *TestingEnvironment
 		return nil, err
 	}
 
-	stdout, _, err := RunQueryFromPod(targetPod, PGLocalSocketDir,
-		"app", "postgres", "''",
-		"SELECT slot_name FROM pg_replication_slots  WHERE temporary = 'f' AND slot_type = 'physical'", env)
+	query := "SELECT slot_name FROM pg_replication_slots WHERE temporary = 'f' AND slot_type = 'physical'"
+	stdout, _, err := env.ExecQueryInInstancePod(
+		PodLocator{
+			Namespace: targetPod.Namespace,
+			PodName:   targetPod.Name,
+		},
+		AppDBName,
+		query)
 	if err != nil {
 		return nil, err
 	}
@@ -156,8 +162,13 @@ func GetReplicationSlotLsnsOnPod(
 	for _, slot := range slots {
 		query := fmt.Sprintf("SELECT restart_lsn FROM pg_replication_slots WHERE slot_name = '%v'",
 			slot)
-		restartLsn, _, err := RunQueryFromPod(&pod, PGLocalSocketDir,
-			"app", "postgres", "''", query, env)
+		restartLsn, _, err := env.ExecQueryInInstancePod(
+			PodLocator{
+				Namespace: pod.Namespace,
+				PodName:   pod.Name,
+			},
+			AppDBName,
+			query)
 		if err != nil {
 			return nil, err
 		}

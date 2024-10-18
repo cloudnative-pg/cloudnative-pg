@@ -200,7 +200,7 @@ func ForwardPSQLConnectionWithCreds(
 	return forward, conn, err
 }
 
-// RunQueryRowOverForward runs QueryRow with a given query, returning the result Row
+// RunQueryRowOverForward runs QueryRow with a given query, returning the Row of the SQL command
 func RunQueryRowOverForward(
 	env *TestingEnvironment,
 	namespace,
@@ -220,8 +220,36 @@ func RunQueryRowOverForward(
 		return nil, err
 	}
 	defer func() {
+		_ = conn.Close()
 		forward.Close()
 	}()
 
 	return conn.QueryRow(query), nil
+}
+
+// RunExecOverForward runs Exec with a given query, returning the Result of the SQL command
+func RunExecOverForward(
+	env *TestingEnvironment,
+	namespace,
+	clusterName,
+	dbname,
+	secretSuffix,
+	query string,
+) (sql.Result, error) {
+	forward, conn, err := ForwardPSQLConnection(
+		env,
+		namespace,
+		clusterName,
+		dbname,
+		secretSuffix,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_ = conn.Close()
+		forward.Close()
+	}()
+
+	return conn.Exec(query)
 }
