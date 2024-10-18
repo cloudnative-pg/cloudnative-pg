@@ -716,6 +716,8 @@ jobs:
           cat config/manager/env_override.yaml
       -
         name: Run Kind End-to-End tests
+        env:
+          ENABLE_APISERVER_AUDIT: true
         run:
           make e2e-test-kind
       -
