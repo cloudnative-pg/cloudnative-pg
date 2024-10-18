@@ -26,8 +26,12 @@ import (
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
-	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/nodes"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
+	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -43,7 +47,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
-		nodes, _ := env.GetNodeList()
+		nodes, _ := nodes.GetNodeList(env.Ctx, env.Client)
 		// We label three nodes where we could run the workloads, and ignore
 		// the others. The pods of the clusters created in this test run only
 		// where the drain label exists.
@@ -51,7 +55,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 			if (node.Spec.Unschedulable != true) && (len(node.Spec.Taints) == 0) {
 				nodesWithLabels = append(nodesWithLabels, node.Name)
 				cmd := fmt.Sprintf("kubectl label node %v drain=drain --overwrite", node.Name)
-				_, stderr, err := testsUtils.Run(cmd)
+				_, stderr, err := run.Run(cmd)
 				Expect(stderr).To(BeEmpty())
 				Expect(err).ToNot(HaveOccurred())
 			}
@@ -66,11 +70,11 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 	AfterEach(func() {
 		// Uncordon the cordoned nodes and remove the labels we added in the
 		// BeforeEach section
-		err := nodes.UncordonAllNodes(env)
+		err := nodes.UncordonAllNodes(env.Ctx, env.Client)
 		Expect(err).ToNot(HaveOccurred())
 		for _, node := range nodesWithLabels {
 			cmd := fmt.Sprintf("kubectl label node %v drain- ", node)
-			_, _, err := testsUtils.Run(cmd)
+			_, _, err := run.Run(cmd)
 			Expect(err).ToNot(HaveOccurred())
 		}
 		nodesWithLabels = nil
@@ -97,13 +101,13 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 				// mark a node unschedulable so the pods will be distributed only on two nodes
 				for _, cordonNode := range nodesWithLabels[:len(nodesWithLabels)-2] {
 					cmd := fmt.Sprintf("kubectl cordon %v", cordonNode)
-					_, _, err := testsUtils.Run(cmd)
+					_, _, err := run.Run(cmd)
 					Expect(err).ToNot(HaveOccurred())
 				}
 			})
 			var err error
 			// Create a cluster in a namespace we'll delete after the test
-			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
@@ -111,7 +115,10 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 				// Wait for jobs to be removed
 				timeout := 180
 				Eventually(func() (int, error) {
-					podList, err := env.GetPodList(namespace)
+					podList, err := pods.GetPodList(env.Ctx, env.Client, namespace)
+					if err != nil {
+						return 0, err
+					}
 					return len(podList.Items), err
 				}, timeout).Should(BeEquivalentTo(3))
 			})
@@ -121,7 +128,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 			tableLocator := TableLocator{
 				Namespace:    namespace,
 				ClusterName:  clusterName,
-				DatabaseName: testsUtils.AppDBName,
+				DatabaseName: postgres.AppDBName,
 				TableName:    "test",
 			}
 			AssertCreateTestData(env, tableLocator)
@@ -130,7 +137,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 			// their volumes. We do not expect the UIDs to change.
 			// We take advantage of the fact that related PVCs and Pods have
 			// the same name.
-			podList, err := env.GetClusterPodList(namespace, clusterName)
+			podList, err := clusterutils.GetClusterPodList(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			pvcUIDMap := make(map[string]types.UID)
 			for _, pod := range podList.Items {
@@ -145,20 +152,26 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 			}
 
 			// Drain the node containing the primary pod and store the list of running pods
-			podsOnPrimaryNode := nodes.DrainPrimaryNode(namespace, clusterName,
-				testTimeouts[testsUtils.DrainNode], env)
+			podsOnPrimaryNode := nodes.DrainPrimaryNode(
+				env.Ctx, env.Client,
+				namespace, clusterName,
+				testTimeouts[testsUtils.DrainNode],
+			)
 
 			By("verifying failover after drain", func() {
 				timeout := 180
 				// Expect a failover to have happened
 				Eventually(func() (string, error) {
-					pod, err := env.GetClusterPrimary(namespace, clusterName)
+					pod, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
+					if err != nil {
+						return "", err
+					}
 					return pod.Name, err
 				}, timeout).ShouldNot(BeEquivalentTo(oldPrimary))
 			})
 
 			By("uncordon nodes and check new pods use old pvcs", func() {
-				err := nodes.UncordonAllNodes(env)
+				err := nodes.UncordonAllNodes(env.Ctx, env.Client)
 				Expect(err).ToNot(HaveOccurred())
 				// Ensure evicted pods have restarted and are running.
 				// one of them could have become the new primary.
@@ -212,13 +225,13 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 					for _, cordonNode := range nodesWithLabels[:len(nodesWithLabels)-1] {
 						cordonNodes = append(cordonNodes, cordonNode)
 						cmd := fmt.Sprintf("kubectl cordon %v", cordonNode)
-						_, _, err := testsUtils.Run(cmd)
+						_, _, err := run.Run(cmd)
 						Expect(err).ToNot(HaveOccurred())
 					}
 				})
 				var err error
 				// Create a cluster in a namespace we'll delete after the test
-				namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+				namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
 				AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
@@ -226,7 +239,10 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 					// Wait for jobs to be removed
 					timeout := 180
 					Eventually(func() (int, error) {
-						podList, err := env.GetPodList(namespace)
+						podList, err := pods.GetPodList(env.Ctx, env.Client, namespace)
+						if err != nil {
+							return 0, err
+						}
 						return len(podList.Items), err
 					}, timeout).Should(BeEquivalentTo(3))
 				})
@@ -236,7 +252,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 				tableLocator := TableLocator{
 					Namespace:    namespace,
 					ClusterName:  clusterName,
-					DatabaseName: testsUtils.AppDBName,
+					DatabaseName: postgres.AppDBName,
 					TableName:    "test",
 				}
 				AssertCreateTestData(env, tableLocator)
@@ -245,7 +261,9 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 				// their volumes. We do not expect the UIDs to change.
 				// We take advantage of the fact that related PVCs and Pods have
 				// the same name.
-				podList, err := env.GetClusterPodList(namespace, clusterName)
+				podList, err := clusterutils.GetClusterPodList(env.Ctx, env.Client, namespace, clusterName)
+				Expect(err).ToNot(HaveOccurred())
+
 				pvcUIDMap := make(map[string]types.UID)
 				for _, pod := range podList.Items {
 					pvcNamespacedName := types.NamespacedName{
@@ -262,19 +280,25 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 				// to move to.
 				By(fmt.Sprintf("uncordon one more node '%v'", cordonNodes[0]), func() {
 					cmd := fmt.Sprintf("kubectl uncordon %v", cordonNodes[0])
-					_, _, err = testsUtils.Run(cmd)
+					_, _, err = run.Run(cmd)
 					Expect(err).ToNot(HaveOccurred())
 				})
 
 				// Drain the node containing the primary pod and store the list of running pods
-				podsOnPrimaryNode := nodes.DrainPrimaryNode(namespace, clusterName,
-					testTimeouts[testsUtils.DrainNode], env)
+				podsOnPrimaryNode := nodes.DrainPrimaryNode(
+					env.Ctx, env.Client,
+					namespace, clusterName,
+					testTimeouts[testsUtils.DrainNode],
+				)
 
 				By("verifying failover after drain", func() {
 					timeout := 180
 					// Expect a failover to have happened
 					Eventually(func() (string, error) {
-						pod, err := env.GetClusterPrimary(namespace, clusterName)
+						pod, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
+						if err != nil {
+							return "", err
+						}
 						return pod.Name, err
 					}, timeout).ShouldNot(BeEquivalentTo(oldPrimary))
 				})
@@ -334,13 +358,13 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 			By("leaving a single uncordoned", func() {
 				for _, cordonNode := range nodesWithLabels[:len(nodesWithLabels)-1] {
 					cmd := fmt.Sprintf("kubectl cordon %v", cordonNode)
-					_, _, err := testsUtils.Run(cmd)
+					_, _, err := run.Run(cmd)
 					Expect(err).ToNot(HaveOccurred())
 				}
 			})
 			var err error
 			// Create a cluster in a namespace we'll delete after the test
-			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
@@ -349,7 +373,10 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 				// Wait for jobs to be removed
 				timeout := 180
 				Eventually(func() (int, error) {
-					podList, err := env.GetPodList(namespace)
+					podList, err := pods.GetPodList(env.Ctx, env.Client, namespace)
+					if err != nil {
+						return 0, err
+					}
 					return len(podList.Items), err
 				}, timeout).Should(BeEquivalentTo(3))
 			})
@@ -358,7 +385,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 			// not exist anymore after the drain
 			var podsBeforeDrain []string
 			By("retrieving the current pods' names", func() {
-				podList, err := env.GetClusterPodList(namespace, clusterName)
+				podList, err := clusterutils.GetClusterPodList(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 				for _, pod := range podList.Items {
 					podsBeforeDrain = append(podsBeforeDrain, pod.Name)
@@ -369,7 +396,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 			tableLocator := TableLocator{
 				Namespace:    namespace,
 				ClusterName:  clusterName,
-				DatabaseName: testsUtils.AppDBName,
+				DatabaseName: postgres.AppDBName,
 				TableName:    "test",
 			}
 			AssertCreateTestData(env, tableLocator)
@@ -377,13 +404,16 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 			// We uncordon a cordoned node. New pods can go there.
 			By("uncordon node for pod failover", func() {
 				cmd := fmt.Sprintf("kubectl uncordon %v", nodesWithLabels[0])
-				_, _, err := testsUtils.Run(cmd)
+				_, _, err := run.Run(cmd)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
 			// Drain the node containing the primary pod. Pods should be moved
 			// to the node we've just uncordoned
-			nodes.DrainPrimaryNode(namespace, clusterName, testTimeouts[testsUtils.DrainNode], env)
+			nodes.DrainPrimaryNode(
+				env.Ctx, env.Client,
+				namespace, clusterName, testTimeouts[testsUtils.DrainNode],
+			)
 
 			// Expect pods to be recreated and to be ready
 			AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReady], env)
@@ -393,7 +423,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 				timeout := 600
 				Eventually(func(g Gomega) {
 					matchingNames := 0
-					podList, err := env.GetClusterPodList(namespace, clusterName)
+					podList, err := clusterutils.GetClusterPodList(env.Ctx, env.Client, namespace, clusterName)
 					g.Expect(err).ToNot(HaveOccurred())
 					for _, pod := range podList.Items {
 						// compare the old pod list with the current pod names
@@ -410,7 +440,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 
 			AssertDataExpectedCount(env, tableLocator, 2)
 			AssertClusterStandbysAreStreaming(namespace, clusterName, 120)
-			err = nodes.UncordonAllNodes(env)
+			err = nodes.UncordonAllNodes(env.Ctx, env.Client)
 			Expect(err).ToNot(HaveOccurred())
 		})
 	})
@@ -424,7 +454,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 		BeforeAll(func() {
 			var err error
 			// Create a cluster in a namespace we'll delete after the test
-			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
@@ -436,7 +466,10 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 					// Wait for jobs to be removed
 					timeout := 180
 					Eventually(func() (int, error) {
-						podList, err := env.GetPodList(namespace)
+						podList, err := pods.GetPodList(env.Ctx, env.Client, namespace)
+						if err != nil {
+							return 0, err
+						}
 						return len(podList.Items), err
 					}, timeout).Should(BeEquivalentTo(1))
 				})
@@ -445,20 +478,23 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 				tableLocator := TableLocator{
 					Namespace:    namespace,
 					ClusterName:  clusterName,
-					DatabaseName: testsUtils.AppDBName,
+					DatabaseName: postgres.AppDBName,
 					TableName:    "test",
 				}
 				AssertCreateTestData(env, tableLocator)
 
 				// Drain the node containing the primary pod and store the list of running pods
-				_ = nodes.DrainPrimaryNode(namespace, clusterName,
-					testTimeouts[testsUtils.DrainNode], env)
+				_ = nodes.DrainPrimaryNode(
+					env.Ctx, env.Client,
+					namespace, clusterName,
+					testTimeouts[testsUtils.DrainNode],
+				)
 
 				By("verifying the primary is now pending", func() {
 					timeout := 180
 					// Expect a failover to have happened
 					Eventually(func() (string, error) {
-						pod, err := env.GetPod(namespace, clusterName+"-1")
+						pod, err := pods.GetPod(env.Ctx, env.Client, namespace, clusterName+"-1")
 						if err != nil {
 							return "", err
 						}
@@ -467,7 +503,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 				})
 
 				By("uncordoning all nodes", func() {
-					err := nodes.UncordonAllNodes(env)
+					err := nodes.UncordonAllNodes(env.Ctx, env.Client)
 					Expect(err).ToNot(HaveOccurred())
 				})
 
@@ -479,7 +515,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 		When("the PDB is enabled", func() {
 			It("prevents the primary node from being drained", func() {
 				By("enabling PDB", func() {
-					cluster, err := env.GetCluster(namespace, clusterName)
+					cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
 					Expect(err).ToNot(HaveOccurred())
 
 					updated := cluster.DeepCopy()
@@ -491,7 +527,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 				By("having the draining of the primary node rejected", func() {
 					var primaryNode string
 					Eventually(func(g Gomega) {
-						pod, err := env.GetClusterPrimary(namespace, clusterName)
+						pod, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
 						g.Expect(err).ToNot(HaveOccurred())
 						primaryNode = pod.Spec.NodeName
 					}, 60).Should(Succeed())
@@ -501,14 +537,14 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 						cmd := fmt.Sprintf(
 							"kubectl drain %v --ignore-daemonsets --delete-emptydir-data --force --timeout=%ds",
 							primaryNode, 60)
-						_, stderr, err := testsUtils.RunUnchecked(cmd)
+						_, stderr, err := run.Unchecked(cmd)
 						g.Expect(err).To(HaveOccurred())
 						g.Expect(stderr).To(ContainSubstring("Cannot evict pod as it would violate the pod's disruption budget"))
 					}, 60).Should(Succeed())
 				})
 
 				By("uncordoning all nodes", func() {
-					err := nodes.UncordonAllNodes(env)
+					err := nodes.UncordonAllNodes(env.Ctx, env.Client)
 					Expect(err).ToNot(HaveOccurred())
 				})
 			})

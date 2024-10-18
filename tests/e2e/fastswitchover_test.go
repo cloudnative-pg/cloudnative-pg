@@ -27,6 +27,11 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -60,7 +65,7 @@ var _ = Describe("Fast switchover", Serial, Label(tests.LabelPerformance, tests.
 			// Create a cluster in a namespace we'll delete after the test
 			const namespacePrefix = "primary-switchover-time"
 			var err error
-			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			assertFastSwitchover(namespace, sampleFileWithoutReplicationSlots, clusterName, webTestFile, webTestJob)
 		})
@@ -70,7 +75,7 @@ var _ = Describe("Fast switchover", Serial, Label(tests.LabelPerformance, tests.
 			// Create a cluster in a namespace we'll delete after the test
 			const namespacePrefix = "primary-switchover-time-with-slots"
 			var err error
-			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			assertFastSwitchover(namespace, sampleFileWithReplicationSlots, clusterName, webTestFile, webTestJob)
 			AssertClusterHAReplicationSlots(namespace, clusterName)
@@ -99,7 +104,7 @@ func assertFastSwitchover(namespace, sampleFile, clusterName, webTestFile, webTe
 		CreateResourceFromFile(namespace, sampleFile)
 	})
 	By("having a Cluster with three instances ready", func() {
-		AssertClusterIsReady(namespace, clusterName, testTimeouts[utils.ClusterIsReady], env)
+		AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReady], env)
 	})
 	// Node 1 should be the primary, so the -rw service should
 	// point there. We verify this.
@@ -135,7 +140,9 @@ func assertFastSwitchover(namespace, sampleFile, clusterName, webTestFile, webTe
 			", PRIMARY KEY (id)" +
 			")"
 
-		_, err := utils.RunExecOverForward(env, namespace, clusterName, utils.AppDBName,
+		_, err := postgres.RunExecOverForward(
+			env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+			namespace, clusterName, postgres.AppDBName,
 			apiv1.ApplicationUserSecretSuffix, query)
 		Expect(err).ToNot(HaveOccurred())
 	})
@@ -146,10 +153,10 @@ func assertFastSwitchover(namespace, sampleFile, clusterName, webTestFile, webTe
 		// on the postgres primary. We make sure that the first
 		// records appear on the database before moving to the next
 		// step.
-		_, _, err := utils.Run("kubectl create -n " + namespace +
+		_, _, err := run.Run("kubectl create -n " + namespace +
 			" -f " + webTestFile)
 		Expect(err).ToNot(HaveOccurred())
-		_, _, err = utils.Run("kubectl create -n " + namespace +
+		_, _, err = run.Run("kubectl create -n " + namespace +
 			" -f " + webTestJob)
 		Expect(err).ToNot(HaveOccurred())
 
@@ -164,12 +171,13 @@ func assertFastSwitchover(namespace, sampleFile, clusterName, webTestFile, webTe
 			if err != nil {
 				return "", err
 			}
-			out, _, err := env.ExecQueryInInstancePod(
-				utils.PodLocator{
+			out, _, err := exec.QueryInInstancePod(
+				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+				exec.PodLocator{
 					Namespace: primaryPod.Namespace,
 					PodName:   primaryPod.Name,
 				},
-				utils.AppDBName,
+				postgres.AppDBName,
 				query)
 			return strings.TrimSpace(out), err
 		}, RetryTimeout).Should(BeEquivalentTo("t"))
@@ -178,7 +186,7 @@ func assertFastSwitchover(namespace, sampleFile, clusterName, webTestFile, webTe
 	By("setting the TargetPrimary to node2 to trigger a switchover", func() {
 		targetPrimary = clusterName + "-2"
 		err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-			cluster, err := env.GetCluster(namespace, clusterName)
+			cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			cluster.Status.TargetPrimary = targetPrimary
 			return env.Client.Status().Update(env.Ctx, cluster)

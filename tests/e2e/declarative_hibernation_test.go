@@ -24,7 +24,9 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/hibernation"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
-	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
+	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -47,10 +49,10 @@ var _ = Describe("Cluster declarative hibernation", func() {
 	It("hibernates an existing cluster", func(ctx SpecContext) {
 		const namespacePrefix = "declarative-hibernation"
 
-		clusterName, err := env.GetResourceNameFromYAML(sampleFileCluster)
+		clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, sampleFileCluster)
 		Expect(err).ToNot(HaveOccurred())
 		// Create a cluster in a namespace we'll delete after the test
-		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 
 		By("creating a new cluster", func() {
@@ -66,7 +68,7 @@ var _ = Describe("Cluster declarative hibernation", func() {
 		})
 
 		By("hibernating the new cluster", func() {
-			cluster, err := env.GetCluster(namespace, clusterName)
+			cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).NotTo(HaveOccurred())
 			if cluster.Annotations == nil {
 				cluster.Annotations = make(map[string]string)
@@ -79,19 +81,19 @@ var _ = Describe("Cluster declarative hibernation", func() {
 
 		By("waiting for the cluster to be hibernated correctly", func() {
 			Eventually(func(g Gomega) {
-				cluster, err := env.GetCluster(namespace, clusterName)
+				cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(meta.IsStatusConditionTrue(cluster.Status.Conditions, hibernation.HibernationConditionType)).To(BeTrue())
 			}, 300).Should(Succeed())
 		})
 
 		By("verifying that the Pods have been deleted for the cluster", func() {
-			podList, _ := env.GetClusterPodList(namespace, clusterName)
+			podList, _ := clusterutils.GetClusterPodList(env.Ctx, env.Client, namespace, clusterName)
 			Expect(len(podList.Items)).Should(BeEquivalentTo(0))
 		})
 
 		By("rehydrating the cluster", func() {
-			cluster, err := env.GetCluster(namespace, clusterName)
+			cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).NotTo(HaveOccurred())
 			if cluster.Annotations == nil {
 				cluster.Annotations = make(map[string]string)
@@ -105,7 +107,7 @@ var _ = Describe("Cluster declarative hibernation", func() {
 		By("waiting for the condition to be removed", func() {
 			Eventually(func(g Gomega) {
 				var err error
-				cluster, err = env.GetCluster(namespace, clusterName)
+				cluster, err = clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
 				g.Expect(err).ToNot(HaveOccurred())
 
 				condition := meta.FindStatusCondition(cluster.Status.Conditions, hibernation.HibernationConditionType)
@@ -115,7 +117,7 @@ var _ = Describe("Cluster declarative hibernation", func() {
 
 		By("waiting for the Pods to be recreated", func() {
 			Eventually(func(g Gomega) {
-				podList, _ := env.GetClusterPodList(namespace, clusterName)
+				podList, _ := clusterutils.GetClusterPodList(env.Ctx, env.Client, namespace, clusterName)
 				g.Expect(len(podList.Items)).Should(BeEquivalentTo(cluster.Spec.Instances))
 			}, 300).Should(Succeed())
 		})
