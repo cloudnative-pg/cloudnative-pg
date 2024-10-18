@@ -36,8 +36,18 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
-	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/minio"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/namespaces"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/operator"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/proxy"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/release"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/secrets"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/upgrade"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -120,14 +130,14 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		// Since the 'cnpg-system' namespace is deleted after each spec is completed,
 		// we should create it and then create the pull image secret
 
-		err := env.EnsureNamespace(operatorNamespace)
+		err := namespaces.EnsureNamespace(env.Ctx, env.Client, operatorNamespace)
 		Expect(err).NotTo(HaveOccurred())
 
 		dockerServer := os.Getenv("DOCKER_SERVER")
 		dockerUsername := os.Getenv("DOCKER_USERNAME")
 		dockerPassword := os.Getenv("DOCKER_PASSWORD")
 		if dockerServer != "" && dockerUsername != "" && dockerPassword != "" {
-			_, _, err := testsUtils.Run(fmt.Sprintf(`kubectl -n %v create secret docker-registry
+			_, _, err := run.Run(fmt.Sprintf(`kubectl -n %v create secret docker-registry
 			cnpg-pull-secret
 			--docker-server="%v"
 			--docker-username="%v"
@@ -170,10 +180,10 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		databaseName := "appdb"
 
 		By("checking basic functionality performing a configuration upgrade on the cluster", func() {
-			podList, err := env.GetClusterPodList(upgradeNamespace, clusterName)
+			podList, err := clusterutils.GetClusterPodList(env.Ctx, env.Client, upgradeNamespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			// Gather current primary
-			cluster, err := env.GetCluster(upgradeNamespace, clusterName)
+			cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, upgradeNamespace, clusterName)
 			Expect(cluster.Status.CurrentPrimary, err).To(BeEquivalentTo(cluster.Status.TargetPrimary))
 
 			oldPrimary := cluster.Status.CurrentPrimary
@@ -191,12 +201,13 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			// Check that both parameters have been modified in each pod
 			for _, pod := range podList.Items {
 				Eventually(func() (int, error) {
-					stdout, stderr, err := env.ExecQueryInInstancePod(
-						testsUtils.PodLocator{
+					stdout, stderr, err := exec.QueryInInstancePod(
+						env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+						exec.PodLocator{
 							Namespace: pod.Namespace,
 							PodName:   pod.Name,
 						},
-						testsUtils.PostgresDBName,
+						postgres.PostgresDBName,
 						"show max_replication_slots")
 					if err != nil {
 						return 0, err
@@ -210,12 +221,13 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 					"Pod %v should have updated its config", pod.Name)
 
 				Eventually(func() (int, error, error) {
-					stdout, _, err := env.ExecQueryInInstancePod(
-						testsUtils.PodLocator{
+					stdout, _, err := exec.QueryInInstancePod(
+						env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+						exec.PodLocator{
 							Namespace: pod.Namespace,
 							PodName:   pod.Name,
 						},
-						testsUtils.PostgresDBName,
+						postgres.PostgresDBName,
 						"show maintenance_work_mem")
 					value, atoiErr := strconv.Atoi(strings.Trim(stdout, "MB\n"))
 					return value, err, atoiErr
@@ -224,7 +236,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			}
 			// Check that a switchover happened
 			Eventually(func() (bool, error) {
-				c, err := env.GetCluster(upgradeNamespace, clusterName)
+				c, err := clusterutils.GetCluster(env.Ctx, env.Client, upgradeNamespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 
 				GinkgoWriter.Printf("Current Primary: %s, Current Primary timestamp: %s\n",
@@ -243,15 +255,16 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		By("verifying that all the standbys streams from the primary", func() {
 			// To check this we find the primary and create a table on it.
 			// The table should be replicated on the standbys.
-			primary, err := env.GetClusterPrimary(upgradeNamespace, clusterName)
+			primary, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, upgradeNamespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 
 			query := "CREATE TABLE IF NOT EXISTS postswitch(i int);"
-			_, _, err = env.EventuallyExecQueryInInstancePod(
-				testsUtils.PodLocator{
+			_, _, err = exec.EventuallyExecQueryInInstancePod(
+				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+				exec.PodLocator{
 					Namespace: primary.Namespace,
 					PodName:   primary.Name,
-				}, testsUtils.DatabaseName(databaseName),
+				}, exec.DatabaseName(databaseName),
 				query,
 				RetryTimeout,
 				PollingTime,
@@ -270,12 +283,13 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 						return "", err
 					}
 
-					out, _, err := env.ExecQueryInInstancePod(
-						testsUtils.PodLocator{
+					out, _, err := exec.QueryInInstancePod(
+						env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+						exec.PodLocator{
 							Namespace: pod.Namespace,
 							PodName:   pod.Name,
 						},
-						testsUtils.DatabaseName(databaseName),
+						exec.DatabaseName(databaseName),
 						"SELECT count(*) = 0 FROM postswitch")
 					return strings.TrimSpace(out), err
 				}, 240).Should(BeEquivalentTo("t"),
@@ -286,12 +300,12 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 
 	// getExecutableHashesFromInstances prints the manager's executable hash of each pod to a given IO writer
 	getExecutableHashesFromInstances := func(upgradeNamespace, clusterName string, w io.Writer) error {
-		pods, err := env.GetClusterPodList(upgradeNamespace, clusterName)
+		pods, err := clusterutils.GetClusterPodList(env.Ctx, env.Client, upgradeNamespace, clusterName)
 		if err != nil {
 			return err
 		}
 		for _, pod := range pods.Items {
-			status, err := testsUtils.RetrievePgStatusFromInstance(env, pod, true)
+			status, err := proxy.RetrievePgStatusFromInstance(env.Ctx, env.Interface, pod, true)
 			if err != nil {
 				continue
 			}
@@ -367,7 +381,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		}
 		err := retry.OnError(backoffCheckingPodRestarts, shouldRetry, func() error {
 			var currentUIDs []types.UID
-			currentPodList, err := env.GetClusterPodList(namespace, clusterName)
+			currentPodList, err := clusterutils.GetClusterPodList(env.Ctx, env.Client, namespace, clusterName)
 			if err != nil {
 				return err
 			}
@@ -388,15 +402,20 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		GinkgoWriter.Println("cleaning up")
 		if CurrentSpecReport().Failed() {
 			// Dump the minio namespace when failed
-			env.DumpNamespaceObjects(minioEnv.Namespace, "out/"+CurrentSpecReport().LeafNodeText+"minio.log")
+			namespaces.DumpNamespaceObjects(
+				env.Ctx, env.Client,
+				minioEnv.Namespace, "out/"+CurrentSpecReport().LeafNodeText+"minio.log",
+			)
 			// Dump the operator namespace, as operator is changing too
-			env.DumpOperator(operatorNamespace,
+			operator.DumpOperator(
+				env.Ctx, env.Client,
+				operatorNamespace,
 				"out/"+CurrentSpecReport().LeafNodeText+"operator.log")
 		}
 
 		// Delete the operator's namespace in case that the previous test make corrupted changes to
 		// the operator's namespace so that affects subsequent test
-		if err := env.DeleteNamespaceAndWait(operatorNamespace, 60); err != nil {
+		if err := namespaces.DeleteNamespaceAndWait(env.Ctx, env.Client, operatorNamespace, 60); err != nil {
 			return fmt.Errorf("could not cleanup, failed to delete operator namespace: %v", err)
 		}
 
@@ -419,7 +438,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			namespacePrefix), func() {
 			var err error
 			// Create a upgradeNamespace for all the resources
-			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Creating a upgradeNamespace should be quick
@@ -440,18 +459,18 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 	deployOperator := func(operatorManifestFile string) {
 		By(fmt.Sprintf("applying manager manifest %s", operatorManifestFile), func() {
 			// Upgrade to the new version
-			_, stderr, err := testsUtils.Run(
+			_, stderr, err := run.Run(
 				fmt.Sprintf("kubectl apply --server-side --force-conflicts -f %v", operatorManifestFile))
 			Expect(err).NotTo(HaveOccurred(), "stderr: "+stderr)
 		})
 
 		By("waiting for the deployment to be rolled out", func() {
-			deployment, err := env.GetOperatorDeployment()
+			deployment, err := operator.GetOperatorDeployment(env.Ctx, env.Client)
 			Expect(err).NotTo(HaveOccurred())
 
 			timeout := 240
 			Eventually(func() error {
-				_, stderr, err := testsUtils.Run(fmt.Sprintf(
+				_, stderr, err := run.Run(fmt.Sprintf(
 					"kubectl -n %v rollout status deployment %v -w --timeout=%vs",
 					operatorNamespace,
 					deployment.Name,
@@ -465,7 +484,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			}, timeout).ShouldNot(HaveOccurred())
 		})
 		By("getting the operator info", func() {
-			pod, err := env.GetOperatorPod()
+			pod, err := operator.GetOperatorPod(env.Ctx, env.Client)
 			Expect(err).NotTo(HaveOccurred())
 			GinkgoWriter.Println("image used for operator", pod.Spec.Containers[0].Image)
 		})
@@ -481,12 +500,13 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			CreateResourceFromFile(upgradeNamespace, pgSecrets)
 		})
 		By("creating the cloud storage credentials", func() {
-			_, err := testsUtils.CreateObjectStorageSecret(
+			_, err := secrets.CreateObjectStorageSecret(
+				env.Ctx,
+				env.Client,
 				upgradeNamespace,
 				"aws-creds",
 				"minio",
 				"minio123",
-				env,
 			)
 			Expect(err).NotTo(HaveOccurred())
 		})
@@ -516,7 +536,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 				// By doing that we don't test that the online upgrade won't
 				// trigger any Pod restart. We still test that the operator
 				// is upgraded in this case too.
-				_, stderr, err := testsUtils.Run(
+				_, stderr, err := run.Run(
 					fmt.Sprintf("kubectl annotate -n %s cluster/%s cnpg.io/reconcilePodSpec=disabled",
 						upgradeNamespace, clusterName1))
 				Expect(err).NotTo(HaveOccurred(), "stderr: "+stderr)
@@ -525,7 +545,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 
 		// Cluster ready happens after minio is ready
 		By("having a Cluster with three instances ready", func() {
-			AssertClusterIsReady(upgradeNamespace, clusterName1, testTimeouts[testsUtils.ClusterIsReady], env)
+			AssertClusterIsReady(upgradeNamespace, clusterName1, testTimeouts[timeouts.ClusterIsReady], env)
 		})
 
 		By("creating a Pooler with two instances", func() {
@@ -535,15 +555,16 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		// Now that everything is in place, we add a bit of data we'll use to
 		// check if the backup is working
 		By("creating data on the database", func() {
-			primary, err := env.GetClusterPrimary(upgradeNamespace, clusterName1)
+			primary, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, upgradeNamespace, clusterName1)
 			Expect(err).ToNot(HaveOccurred())
 
 			query := "CREATE TABLE IF NOT EXISTS to_restore AS VALUES (1),(2);"
-			_, _, err = env.EventuallyExecQueryInInstancePod(
-				testsUtils.PodLocator{
+			_, _, err = exec.EventuallyExecQueryInInstancePod(
+				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+				exec.PodLocator{
 					Namespace: primary.Namespace,
 					PodName:   primary.Name,
-				}, testsUtils.DatabaseName(databaseName),
+				}, exec.DatabaseName(databaseName),
 				query,
 				RetryTimeout,
 				PollingTime,
@@ -571,8 +592,9 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 
 			// A file called data.tar.gz should be available on minio
 			Eventually(func() (int, error, error) {
-				out, _, err := env.ExecCommandInContainer(
-					testsUtils.ContainerLocator{
+				out, _, err := exec.CommandInContainer(
+					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+					exec.ContainerLocator{
 						Namespace:     minioEnv.Namespace,
 						PodName:       minioEnv.Client.Name,
 						ContainerName: "mc",
@@ -592,7 +614,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		assertPGBouncerPodsAreReady(upgradeNamespace, pgBouncerSampleFile, 2)
 
 		var podUIDs []types.UID
-		podList, err := env.GetClusterPodList(upgradeNamespace, clusterName1)
+		podList, err := clusterutils.GetClusterPodList(env.Ctx, env.Client, upgradeNamespace, clusterName1)
 		Expect(err).ToNot(HaveOccurred())
 		for _, pod := range podList.Items {
 			podUIDs = append(podUIDs, pod.GetUID())
@@ -641,7 +663,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 
 		// the instance pods should not restart
 		By("verifying that the instance pods are not restarted", func() {
-			podList, err := env.GetClusterPodList(upgradeNamespace, clusterName1)
+			podList, err := clusterutils.GetClusterPodList(env.Ctx, env.Client, upgradeNamespace, clusterName1)
 			Expect(err).ToNot(HaveOccurred())
 			for _, pod := range podList.Items {
 				Expect(pod.Status.ContainerStatuses).NotTo(BeEmpty())
@@ -656,7 +678,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			err := os.Setenv("SERVER_NAME", serverName2)
 			Expect(err).ToNot(HaveOccurred())
 			CreateResourceFromFile(upgradeNamespace, sampleFile2)
-			AssertClusterIsReady(upgradeNamespace, clusterName2, testTimeouts[testsUtils.ClusterIsReady], env)
+			AssertClusterIsReady(upgradeNamespace, clusterName2, testTimeouts[timeouts.ClusterIsReady], env)
 		})
 
 		AssertConfUpgrade(clusterName2, upgradeNamespace)
@@ -666,17 +688,18 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		By("restoring the backup taken from the first Cluster in a new cluster", func() {
 			restoredClusterName := "cluster-restore"
 			CreateResourceFromFile(upgradeNamespace, restoreFile)
-			AssertClusterIsReady(upgradeNamespace, restoredClusterName, testTimeouts[testsUtils.ClusterIsReadySlow],
+			AssertClusterIsReady(upgradeNamespace, restoredClusterName, testTimeouts[timeouts.ClusterIsReadySlow],
 				env)
 
 			// Test data should be present on restored primary
 			primary := restoredClusterName + "-1"
-			out, _, err := env.ExecQueryInInstancePod(
-				testsUtils.PodLocator{
+			out, _, err := exec.QueryInInstancePod(
+				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+				exec.PodLocator{
 					Namespace: upgradeNamespace,
 					PodName:   primary,
 				},
-				testsUtils.DatabaseName(databaseName),
+				exec.DatabaseName(databaseName),
 				"SELECT count(*) FROM to_restore")
 			Expect(strings.Trim(out, "\n"), err).To(BeEquivalentTo("2"))
 
@@ -684,12 +707,13 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			// we expect a promotion. We can't enforce "2" because the timeline
 			// ID will also depend on the history files existing in the cloud
 			// storage and we don't know the status of that.
-			out, _, err = env.ExecQueryInInstancePod(
-				testsUtils.PodLocator{
+			out, _, err = exec.QueryInInstancePod(
+				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+				exec.PodLocator{
 					Namespace: upgradeNamespace,
 					PodName:   primary,
 				},
-				testsUtils.DatabaseName(databaseName),
+				exec.DatabaseName(databaseName),
 				"select substring(pg_walfile_name(pg_current_wal_lsn()), 1, 8)")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(strconv.Atoi(strings.Trim(out, "\n"))).To(
@@ -697,12 +721,13 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 
 			// Restored standbys should soon attach themselves to restored primary
 			Eventually(func() (string, error) {
-				out, _, err = env.ExecQueryInInstancePod(
-					testsUtils.PodLocator{
+				out, _, err = exec.QueryInInstancePod(
+					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+					exec.PodLocator{
 						Namespace: upgradeNamespace,
 						PodName:   primary,
 					},
-					testsUtils.DatabaseName(databaseName),
+					exec.DatabaseName(databaseName),
 					"SELECT count(*) FROM pg_stat_replication")
 				return strings.Trim(out, "\n"), err
 			}, 180).Should(BeEquivalentTo("2"))
@@ -756,13 +781,13 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		It("keeps clusters working after a rolling upgrade", func() {
 			upgradeNamespacePrefix := rollingUpgradeNamespace
 			By("applying environment changes for current upgrade to be performed", func() {
-				testsUtils.CreateOperatorConfigurationMap(operatorNamespace, configName, false, env)
+				upgrade.CreateOperatorConfigurationMap(env.Ctx, env.Client, operatorNamespace, configName, false)
 			})
-			mostRecentTag, err := testsUtils.GetMostRecentReleaseTag("../../releases")
+			mostRecentTag, err := release.GetMostRecentReleaseTag("../../releases")
 			Expect(err).NotTo(HaveOccurred())
 
 			GinkgoWriter.Printf("installing the recent CNPG tag %s\n", mostRecentTag)
-			testsUtils.InstallLatestCNPGOperator(mostRecentTag, env)
+			upgrade.InstallLatestCNPGOperator(env.Client, mostRecentTag)
 			DeferCleanup(cleanupOperatorAndMinio)
 
 			upgradeNamespace := assertCreateNamespace(upgradeNamespacePrefix)
@@ -772,14 +797,14 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		It("keeps clusters working after an online upgrade", func() {
 			upgradeNamespacePrefix := onlineUpgradeNamespace
 			By("applying environment changes for current upgrade to be performed", func() {
-				testsUtils.CreateOperatorConfigurationMap(operatorNamespace, configName, true, env)
+				upgrade.CreateOperatorConfigurationMap(env.Ctx, env.Client, operatorNamespace, configName, true)
 			})
 
-			mostRecentTag, err := testsUtils.GetMostRecentReleaseTag("../../releases")
+			mostRecentTag, err := release.GetMostRecentReleaseTag("../../releases")
 			Expect(err).NotTo(HaveOccurred())
 
 			GinkgoWriter.Printf("installing the recent CNPG tag %s\n", mostRecentTag)
-			testsUtils.InstallLatestCNPGOperator(mostRecentTag, env)
+			upgrade.InstallLatestCNPGOperator(env.Client, mostRecentTag)
 			DeferCleanup(cleanupOperatorAndMinio)
 
 			upgradeNamespace := assertCreateNamespace(upgradeNamespacePrefix)
@@ -796,7 +821,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		It("keeps clusters working after an online upgrade", func() {
 			upgradeNamespacePrefix := onlineUpgradeNamespace
 			By("applying environment changes for current upgrade to be performed", func() {
-				testsUtils.CreateOperatorConfigurationMap(operatorNamespace, configName, true, env)
+				upgrade.CreateOperatorConfigurationMap(env.Ctx, env.Client, operatorNamespace, configName, true)
 			})
 
 			GinkgoWriter.Printf("installing the current operator %s\n", currentOperatorManifest)
@@ -810,7 +835,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 		It("keeps clusters working after a rolling upgrade", func() {
 			upgradeNamespacePrefix := rollingUpgradeNamespace
 			By("applying environment changes for current upgrade to be performed", func() {
-				testsUtils.CreateOperatorConfigurationMap(operatorNamespace, configName, false, env)
+				upgrade.CreateOperatorConfigurationMap(env.Ctx, env.Client, operatorNamespace, configName, false)
 			})
 			GinkgoWriter.Printf("installing the current operator %s\n", currentOperatorManifest)
 			deployOperator(currentOperatorManifest)

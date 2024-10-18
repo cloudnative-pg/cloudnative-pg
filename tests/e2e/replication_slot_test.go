@@ -24,7 +24,10 @@ import (
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
-	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/replicationslot"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -47,17 +50,19 @@ var _ = Describe("Replication Slot", Label(tests.LabelReplication), func() {
 
 	It("Can enable and disable replication slots", func() {
 		var err error
-		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
 		By("enabling replication slot on cluster", func() {
-			err := testsUtils.ToggleHAReplicationSlots(namespace, clusterName, true, env)
+			err := replicationslot.ToggleHAReplicationSlots(
+				env.Ctx, env.Client,
+				namespace, clusterName, true)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Replication slots should be Enabled
 			Consistently(func() (bool, error) {
-				cluster, err := env.GetCluster(namespace, clusterName)
+				cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
 				if err != nil {
 					return false, err
 				}
@@ -73,13 +78,13 @@ var _ = Describe("Replication Slot", Label(tests.LabelReplication), func() {
 		}
 
 		By("checking Primary HA slots exist and are active", func() {
-			primaryPod, err := env.GetClusterPrimary(namespace, clusterName)
+			primaryPod, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
-			expectedSlots, err := testsUtils.GetExpectedHAReplicationSlotsOnPod(
+			expectedSlots, err := replicationslot.GetExpectedHAReplicationSlotsOnPod(
+				env.Ctx, env.Client,
 				namespace,
 				clusterName,
 				primaryPod.GetName(),
-				env,
 			)
 			Expect(err).ToNot(HaveOccurred())
 			AssertReplicationSlotsOnPod(namespace, clusterName, *primaryPod, expectedSlots, true, false)
@@ -90,12 +95,15 @@ var _ = Describe("Replication Slot", Label(tests.LabelReplication), func() {
 			var err error
 			before := time.Now()
 			Eventually(func(g Gomega) {
-				replicaPods, err = env.GetClusterReplicas(namespace, clusterName)
+				replicaPods, err = clusterutils.GetClusterReplicas(env.Ctx, env.Client, namespace, clusterName)
 				g.Expect(len(replicaPods.Items), err).To(BeEquivalentTo(2))
 			}, 90, 2).Should(Succeed())
 			GinkgoWriter.Println("standby slot check succeeded in", time.Since(before))
 			for _, pod := range replicaPods.Items {
-				expectedSlots, err := testsUtils.GetExpectedHAReplicationSlotsOnPod(namespace, clusterName, pod.GetName(), env)
+				expectedSlots, err := replicationslot.GetExpectedHAReplicationSlotsOnPod(
+					env.Ctx, env.Client,
+					namespace, clusterName, pod.GetName(),
+				)
 				Expect(err).ToNot(HaveOccurred())
 				AssertReplicationSlotsOnPod(namespace, clusterName, pod, expectedSlots, true, false)
 			}
@@ -106,16 +114,17 @@ var _ = Describe("Replication Slot", Label(tests.LabelReplication), func() {
 		})
 
 		By("creating a physical replication slots on the primary", func() {
-			primaryPod, err := env.GetClusterPrimary(namespace, clusterName)
+			primaryPod, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 
 			query := fmt.Sprintf("SELECT pg_create_physical_replication_slot('%s');", userPhysicalSlot)
-			_, _, err = env.ExecQueryInInstancePod(
-				testsUtils.PodLocator{
+			_, _, err = exec.QueryInInstancePod(
+				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+				exec.PodLocator{
 					Namespace: primaryPod.Namespace,
 					PodName:   primaryPod.Name,
 				},
-				testsUtils.PostgresDBName,
+				postgres.PostgresDBName,
 				query)
 			Expect(err).ToNot(HaveOccurred())
 		})
@@ -125,7 +134,7 @@ var _ = Describe("Replication Slot", Label(tests.LabelReplication), func() {
 			var err error
 			before := time.Now()
 			Eventually(func(g Gomega) {
-				replicaPods, err = env.GetClusterReplicas(namespace, clusterName)
+				replicaPods, err = clusterutils.GetClusterReplicas(env.Ctx, env.Client, namespace, clusterName)
 				g.Expect(len(replicaPods.Items), err).To(BeEquivalentTo(2))
 			}, 90, 2).Should(Succeed())
 			GinkgoWriter.Println("standby slot check succeeded in", time.Since(before))
@@ -136,14 +145,18 @@ var _ = Describe("Replication Slot", Label(tests.LabelReplication), func() {
 		})
 
 		By("disabling replication slot from running cluster", func() {
-			err := testsUtils.ToggleHAReplicationSlots(namespace, clusterName, false, env)
+			err := replicationslot.ToggleHAReplicationSlots(
+				env.Ctx, env.Client,
+				namespace, clusterName, false)
 			Expect(err).ToNot(HaveOccurred())
-			err = testsUtils.ToggleSynchronizeReplicationSlots(namespace, clusterName, false, env)
+			err = replicationslot.ToggleSynchronizeReplicationSlots(
+				env.Ctx, env.Client,
+				namespace, clusterName, false)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Replication slots should be Disabled
 			Consistently(func() (bool, error) {
-				cluster, err := env.GetCluster(namespace, clusterName)
+				cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
 				if err != nil {
 					return false, err
 				}
@@ -159,11 +172,13 @@ var _ = Describe("Replication Slot", Label(tests.LabelReplication), func() {
 		}
 
 		By("verifying slots have been removed from the cluster's pods", func() {
-			pods, err := env.GetClusterPodList(namespace, clusterName)
+			pods, err := clusterutils.GetClusterPodList(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			for _, pod := range pods.Items {
 				Eventually(func(g Gomega) error {
-					slotOnPod, err := testsUtils.GetReplicationSlotsOnPod(namespace, pod.GetName(), env)
+					slotOnPod, err := replicationslot.GetReplicationSlotsOnPod(
+						env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+						namespace, pod.GetName(), postgres.AppDBName)
 					if err != nil {
 						return err
 					}

@@ -30,7 +30,13 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
-	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/storage"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -67,7 +73,7 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 			var clusterManifest []byte
 			var beforeHibernationCurrentPrimary string
 			By("collecting current primary details", func() {
-				beforeHibernationClusterInfo, err = env.GetCluster(namespace, clusterName)
+				beforeHibernationClusterInfo, err = clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 				beforeHibernationCurrentPrimary = beforeHibernationClusterInfo.Status.CurrentPrimary
 				// collect expected cluster manifesto info
@@ -79,19 +85,19 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 		getPvc := func(role persistentvolumeclaim.Meta, instanceName string) corev1.PersistentVolumeClaim {
 			pvcName := role.GetName(instanceName)
 			pvcInfo := corev1.PersistentVolumeClaim{}
-			err = testsUtils.GetObject(env, ctrlclient.ObjectKey{Namespace: namespace, Name: pvcName}, &pvcInfo)
+			err = objects.GetObject(env.Ctx, env.Client, ctrlclient.ObjectKey{Namespace: namespace, Name: pvcName}, &pvcInfo)
 			Expect(err).ToNot(HaveOccurred())
 			return pvcInfo
 		}
 		performHibernation := func(mode mode, namespace, clusterName string) {
 			By(fmt.Sprintf("performing hibernation %v", mode), func() {
-				_, _, err := testsUtils.Run(fmt.Sprintf("kubectl cnpg hibernate %v %v -n %v",
+				_, _, err := run.Run(fmt.Sprintf("kubectl cnpg hibernate %v %v -n %v",
 					mode, clusterName, namespace))
 				Expect(err).ToNot(HaveOccurred())
 			})
 			By(fmt.Sprintf("verifying cluster %v pods are removed", clusterName), func() {
 				Eventually(func(g Gomega) {
-					podList, _ := env.GetClusterPodList(namespace, clusterName)
+					podList, _ := clusterutils.GetClusterPodList(env.Ctx, env.Client, namespace, clusterName)
 					g.Expect(len(podList.Items)).Should(BeEquivalentTo(0))
 				}, 300).Should(Succeed())
 			})
@@ -100,7 +106,7 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 		getHibernationStatusInJSON := func(namespace, clusterName string) map[string]interface{} {
 			var data map[string]interface{}
 			By("getting hibernation status", func() {
-				stdOut, _, err := testsUtils.Run(fmt.Sprintf("kubectl cnpg hibernate %v %v -n %v -ojson",
+				stdOut, _, err := run.Run(fmt.Sprintf("kubectl cnpg hibernate %v %v -n %v -ojson",
 					HibernateStatus, clusterName, namespace))
 				Expect(err).ToNot(HaveOccurred(), stdOut)
 				err = json.Unmarshal([]byte(stdOut), &data)
@@ -122,7 +128,7 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 
 				By(fmt.Sprintf("verifying cluster %v is removed", clusterName), func() {
 					Eventually(func() (bool, apiv1.Cluster) {
-						cluster, err := env.GetCluster(namespace, clusterName)
+						cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
 						if err != nil {
 							return true, apiv1.Cluster{}
 						}
@@ -132,7 +138,7 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 
 				By(fmt.Sprintf("verifying cluster %v PVCs are removed", clusterName), func() {
 					Eventually(func() (int, error) {
-						pvcList, err := env.GetPVCList(namespace)
+						pvcList, err := storage.GetPVCList(env.Ctx, env.Client, namespace)
 						if err != nil {
 							return -1, err
 						}
@@ -212,12 +218,12 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 				utils.PgControldataAnnotationName,
 				utils.ClusterManifestAnnotationName,
 			}
-			testsUtils.ObjectHasAnnotations(&pvcInfo, expectedAnnotationKeyPresent)
+			storage.ObjectHasAnnotations(&pvcInfo, expectedAnnotationKeyPresent)
 			expectedAnnotation := map[string]string{
 				utils.HibernateClusterManifestAnnotationName: string(clusterManifest),
 				utils.ClusterManifestAnnotationName:          string(clusterManifest),
 			}
-			testsUtils.ObjectMatchesAnnotations(&pvcInfo, expectedAnnotation)
+			storage.ObjectMatchesAnnotations(&pvcInfo, expectedAnnotation)
 		}
 
 		assertHibernation := func(namespace, clusterName, tableName string) {
@@ -228,7 +234,7 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 			tableLocator := TableLocator{
 				Namespace:    namespace,
 				ClusterName:  clusterName,
-				DatabaseName: testsUtils.AppDBName,
+				DatabaseName: postgres.AppDBName,
 				TableName:    tableName,
 			}
 			AssertCreateTestData(env, tableLocator)
@@ -293,7 +299,7 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 				verifySummaryInHibernationStatus(clusterName, clusterOffStatusMessage)
 			})
 
-			AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReady], env)
+			AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReady], env)
 			// Test data should be present after hibernation off
 			AssertDataExpectedCount(env, tableLocator, 2)
 		}
@@ -301,10 +307,10 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 		When("cluster setup with PG-WAL volume", func() {
 			It("hibernation process should work", func() {
 				const namespacePrefix = "hibernation-on-with-pg-wal"
-				clusterName, err := env.GetResourceNameFromYAML(sampleFileClusterWithPGWalVolume)
+				clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, sampleFileClusterWithPGWalVolume)
 				Expect(err).ToNot(HaveOccurred())
 				// Create a cluster in a namespace we'll delete after the test
-				namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+				namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
 				AssertCreateCluster(namespace, clusterName, sampleFileClusterWithPGWalVolume, env)
 				assertHibernation(namespace, clusterName, tableName)
@@ -315,17 +321,17 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 				var beforeHibernationPgDataPvcUID types.UID
 
 				const namespacePrefix = "hibernation-without-pg-wal"
-				clusterName, err := env.GetResourceNameFromYAML(sampleFileClusterWithOutPGWalVolume)
+				clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, sampleFileClusterWithOutPGWalVolume)
 				Expect(err).ToNot(HaveOccurred())
 				// Create a cluster in a namespace we'll delete after the test
-				namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+				namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
 				AssertCreateCluster(namespace, clusterName, sampleFileClusterWithOutPGWalVolume, env)
 				// Write a table and some data on the "app" database
 				tableLocator := TableLocator{
 					Namespace:    namespace,
 					ClusterName:  clusterName,
-					DatabaseName: testsUtils.AppDBName,
+					DatabaseName: postgres.AppDBName,
 					TableName:    tableName,
 				}
 				AssertCreateTestData(env, tableLocator)
@@ -373,7 +379,7 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 					verifySummaryInHibernationStatus(clusterName, clusterOffStatusMessage)
 				})
 
-				AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReady], env)
+				AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReady], env)
 				// Test data should be present after hibernation off
 				AssertDataExpectedCount(env, tableLocator, 2)
 			})
@@ -381,10 +387,10 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 		When("cluster hibernation after switchover", func() {
 			It("hibernation process should work", func() {
 				const namespacePrefix = "hibernation-with-switchover"
-				clusterName, err := env.GetResourceNameFromYAML(sampleFileClusterWithPGWalVolume)
+				clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, sampleFileClusterWithPGWalVolume)
 				Expect(err).ToNot(HaveOccurred())
 				// Create a cluster in a namespace we'll delete after the test
-				namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+				namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
 				AssertCreateCluster(namespace, clusterName, sampleFileClusterWithPGWalVolume, env)
 				AssertSwitchover(namespace, clusterName, env)

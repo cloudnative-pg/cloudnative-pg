@@ -30,7 +30,9 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
-	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -46,7 +48,7 @@ var _ = Describe("Separate pg_wal volume", Label(tests.LabelStorage), func() {
 	)
 	var namespace string
 	verifyPgWal := func(namespace string) {
-		podList, err := env.GetClusterPodList(namespace, clusterName)
+		podList, err := clusterutils.GetClusterPodList(env.Ctx, env.Client, namespace, clusterName)
 		Expect(len(podList.Items), err).To(BeEquivalentTo(3))
 		By("checking that pg_wal PVC has been created", func() {
 			for _, pod := range podList.Items {
@@ -77,8 +79,9 @@ var _ = Describe("Separate pg_wal volume", Label(tests.LabelStorage), func() {
 					".*[0-9]$")
 				timeout := 300
 				Eventually(func() (int, error, error) {
-					out, _, err := env.ExecCommandInInstancePod(
-						testsUtils.PodLocator{
+					out, _, err := exec.CommandInInstancePod(
+						env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+						exec.PodLocator{
 							Namespace: namespace,
 							PodName:   pod.GetName(),
 						}, nil,
@@ -93,7 +96,7 @@ var _ = Describe("Separate pg_wal volume", Label(tests.LabelStorage), func() {
 	// Inline function to patch walStorage in existing cluster
 	updateWalStorage := func(namespace, clusterName string) {
 		err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-			cluster, err := env.GetCluster(namespace, clusterName)
+			cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).NotTo(HaveOccurred())
 			WalStorageClass := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
 			cluster.Spec.WalStorage = &apiv1.StorageConfiguration{
@@ -118,7 +121,7 @@ var _ = Describe("Separate pg_wal volume", Label(tests.LabelStorage), func() {
 		const namespacePrefix = "pg-wal-volume-e2e"
 		var err error
 		// Create a cluster in a namespace we'll delete after the test
-		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		AssertCreateCluster(namespace, clusterName, sampleFileWithPgWal, env)
 		verifyPgWal(namespace)
@@ -128,7 +131,7 @@ var _ = Describe("Separate pg_wal volume", Label(tests.LabelStorage), func() {
 		const namespacePrefix = "add-pg-wal-volume-e2e"
 		var err error
 		// Create a cluster in a namespace we'll delete after the test
-		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		AssertCreateCluster(namespace, clusterName, sampleFileWithoutPgWal, env)
 		By(fmt.Sprintf("adding pg_wal volume in existing cluster: %v", clusterName), func() {
@@ -137,7 +140,7 @@ var _ = Describe("Separate pg_wal volume", Label(tests.LabelStorage), func() {
 		AssertPVCCount(namespace, clusterName, expectedPvcCount, 120)
 		AssertClusterEventuallyReachesPhase(namespace, clusterName,
 			[]string{apiv1.PhaseUpgrade, apiv1.PhaseWaitingForInstancesToBeActive}, 30)
-		AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReadyQuick], env)
+		AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick], env)
 		AssertClusterPhaseIsConsistent(namespace, clusterName, []string{apiv1.PhaseHealthy}, 30)
 		verifyPgWal(namespace)
 	})

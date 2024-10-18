@@ -21,7 +21,12 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
-	testUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
+	testUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -61,17 +66,20 @@ var _ = Describe("Azurite - Backup and restore", Label(tests.LabelBackupRestore)
 		BeforeAll(func() {
 			const namespacePrefix = "cluster-backup-azurite"
 			var err error
-			clusterName, err = env.GetResourceNameFromYAML(azuriteBlobSampleFile)
+			clusterName, err = yaml.GetResourceNameFromYAML(env.Scheme, azuriteBlobSampleFile)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Create a cluster in a namespace we'll delete after the test
-			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Create and assert ca and tls certificate secrets on Azurite
 			By("creating ca and tls certificate secrets", func() {
-				err := testUtils.CreateCertificateSecretsOnAzurite(namespace, clusterName,
-					azuriteCaSecName, azuriteTLSSecName, env)
+				err := backups.CreateCertificateSecretsOnAzurite(
+					env.Ctx, env.Client,
+					namespace, clusterName,
+					azuriteCaSecName, azuriteTLSSecName,
+				)
 				Expect(err).ToNot(HaveOccurred())
 			})
 			// Setup Azurite and az cli along with Postgresql cluster
@@ -86,7 +94,7 @@ var _ = Describe("Azurite - Backup and restore", Label(tests.LabelBackupRestore)
 		// Create a scheduled backup with the 'immediate' option enabled.
 		// We expect the backup to be available
 		It("immediately starts a backup using ScheduledBackups immediate option", func() {
-			scheduledBackupName, err := env.GetResourceNameFromYAML(scheduledBackupImmediateSampleFile)
+			scheduledBackupName, err := yaml.GetResourceNameFromYAML(env.Scheme, scheduledBackupImmediateSampleFile)
 			Expect(err).ToNot(HaveOccurred())
 
 			AssertScheduledBackupsImmediate(namespace, scheduledBackupImmediateSampleFile, scheduledBackupName)
@@ -94,7 +102,7 @@ var _ = Describe("Azurite - Backup and restore", Label(tests.LabelBackupRestore)
 			// AssertScheduledBackupsImmediate creates at least two backups, we should find
 			// their base backups
 			Eventually(func() (int, error) {
-				return testUtils.CountFilesOnAzuriteBlobStorage(namespace, clusterName, "data.tar")
+				return backups.CountFilesOnAzuriteBlobStorage(namespace, clusterName, "data.tar")
 			}, 30).Should(BeNumerically("==", 2))
 		})
 
@@ -107,12 +115,14 @@ var _ = Describe("Azurite - Backup and restore", Label(tests.LabelBackupRestore)
 
 			prepareClusterForPITROnAzurite(namespace, clusterName, backupFilePITR, currentTimestamp)
 
-			cluster, err := testUtils.CreateClusterFromBackupUsingPITR(
+			cluster, err := backups.CreateClusterFromBackupUsingPITR(
+				env.Ctx,
+				env.Client,
+				env.Scheme,
 				namespace,
 				restoredClusterName,
 				backupFilePITR,
 				*currentTimestamp,
-				env,
 			)
 			Expect(err).NotTo(HaveOccurred())
 			AssertClusterIsReady(namespace, restoredClusterName, testTimeouts[testUtils.ClusterIsReady], env)
@@ -121,7 +131,7 @@ var _ = Describe("Azurite - Backup and restore", Label(tests.LabelBackupRestore)
 			AssertClusterWasRestoredWithPITR(namespace, restoredClusterName, tableName, "00000002")
 
 			By("deleting the restored cluster", func() {
-				Expect(testUtils.DeleteObject(env, cluster)).To(Succeed())
+				Expect(objects.DeleteObject(env.Ctx, env.Client, cluster)).To(Succeed())
 			})
 		})
 
@@ -130,13 +140,13 @@ var _ = Describe("Azurite - Backup and restore", Label(tests.LabelBackupRestore)
 		// We then patch it again back to its initial state and verify that
 		// the amount of backups keeps increasing again
 		It("verifies that scheduled backups can be suspended", func() {
-			scheduledBackupName, err := env.GetResourceNameFromYAML(scheduledBackupSampleFile)
+			scheduledBackupName, err := yaml.GetResourceNameFromYAML(env.Scheme, scheduledBackupSampleFile)
 			Expect(err).ToNot(HaveOccurred())
 
 			By("scheduling backups", func() {
 				AssertScheduledBackupsAreScheduled(namespace, scheduledBackupSampleFile, 300)
 				Eventually(func() (int, error) {
-					return testUtils.CountFilesOnAzuriteBlobStorage(namespace, clusterName, "data.tar")
+					return backups.CountFilesOnAzuriteBlobStorage(namespace, clusterName, "data.tar")
 				}, 60).Should(BeNumerically(">=", 3))
 			})
 
@@ -164,21 +174,23 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 			}
 			const namespacePrefix = "recovery-barman-object-azurite"
 			var err error
-			clusterName, err = env.GetResourceNameFromYAML(azuriteBlobSampleFile)
+			clusterName, err = yaml.GetResourceNameFromYAML(env.Scheme, azuriteBlobSampleFile)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Create a cluster in a namespace we'll delete after the test
-			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Create and assert ca and tls certificate secrets on Azurite
 			By("creating ca and tls certificate secrets", func() {
-				err := testUtils.CreateCertificateSecretsOnAzurite(
+				err := backups.CreateCertificateSecretsOnAzurite(
+					env.Ctx,
+					env.Client,
 					namespace,
 					clusterName,
 					azuriteCaSecName,
 					azuriteTLSSecName,
-					env)
+				)
 				Expect(err).ToNot(HaveOccurred())
 			})
 			// Setup Azurite and az cli along with PostgreSQL cluster
@@ -206,8 +218,9 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 			prepareClusterForPITROnAzurite(namespace, clusterName, backupFileAzuritePITR, currentTimestamp)
 
 			//  Create a cluster from a particular time using external backup.
-			restoredCluster, err := testUtils.CreateClusterFromExternalClusterBackupWithPITROnAzurite(
-				namespace, externalClusterRestoreName, clusterName, *currentTimestamp, env)
+			restoredCluster, err := backups.CreateClusterFromExternalClusterBackupWithPITROnAzurite(
+				env.Ctx, env.Client,
+				namespace, externalClusterRestoreName, clusterName, *currentTimestamp)
 			Expect(err).NotTo(HaveOccurred())
 
 			AssertClusterWasRestoredWithPITRAndApplicationDB(
@@ -218,7 +231,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 			)
 
 			By("delete restored cluster", func() {
-				Expect(testUtils.DeleteObject(env, restoredCluster)).To(Succeed())
+				Expect(objects.DeleteObject(env.Ctx, env.Client, restoredCluster)).To(Succeed())
 			})
 		})
 	})
@@ -226,20 +239,20 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 
 func prepareClusterOnAzurite(namespace, clusterName, clusterSampleFile string) {
 	By("creating the Azurite storage credentials", func() {
-		err := testUtils.CreateStorageCredentialsOnAzurite(namespace, env)
+		err := backups.CreateStorageCredentialsOnAzurite(env.Ctx, env.Client, namespace)
 		Expect(err).ToNot(HaveOccurred())
 	})
 
 	By("setting up Azurite to hold the backups", func() {
 		// Deploying azurite for blob storage
-		err := testUtils.InstallAzurite(namespace, env)
+		err := backups.InstallAzurite(env.Ctx, env.Client, namespace)
 		Expect(err).ToNot(HaveOccurred())
 	})
 
 	By("setting up az-cli", func() {
 		// This is required as we have a service of Azurite running locally.
 		// In order to connect, we need az cli inside the namespace
-		err := testUtils.InstallAzCli(namespace, env)
+		err := backups.InstallAzCli(env.Ctx, env.Client, namespace)
 		Expect(err).ToNot(HaveOccurred())
 	})
 
@@ -262,7 +275,7 @@ func prepareClusterBackupOnAzurite(
 	tableLocator := TableLocator{
 		Namespace:    namespace,
 		ClusterName:  clusterName,
-		DatabaseName: testUtils.AppDBName,
+		DatabaseName: postgres.AppDBName,
 		TableName:    tableName,
 	}
 	AssertCreateTestData(env, tableLocator)
@@ -270,18 +283,22 @@ func prepareClusterBackupOnAzurite(
 
 	By("backing up a cluster and verifying it exists on azurite", func() {
 		// We create a Backup
-		testUtils.ExecuteBackup(namespace, backupFile, false, testTimeouts[testUtils.BackupIsReady], env)
+		backups.ExecuteBackup(
+			env.Ctx, env.Client, env.Scheme,
+			namespace, backupFile, false,
+			testTimeouts[testUtils.BackupIsReady],
+		)
 		// Verifying file called data.tar should be available on Azurite blob storage
 		Eventually(func() (int, error) {
-			return testUtils.CountFilesOnAzuriteBlobStorage(namespace, clusterName, "data.tar")
+			return backups.CountFilesOnAzuriteBlobStorage(namespace, clusterName, "data.tar")
 		}, 30).Should(BeNumerically(">=", 1))
 		Eventually(func() (string, error) {
-			cluster, err := env.GetCluster(namespace, clusterName)
+			cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			return cluster.Status.FirstRecoverabilityPoint, err
 		}, 30).ShouldNot(BeEmpty())
 	})
-	testUtils.AssertBackupConditionInClusterStatus(env, namespace, clusterName)
+	backups.AssertBackupConditionInClusterStatus(env.Ctx, env.Client, namespace, clusterName)
 }
 
 func prepareClusterForPITROnAzurite(
@@ -292,13 +309,17 @@ func prepareClusterForPITROnAzurite(
 ) {
 	By("backing up a cluster and verifying it exists on azurite", func() {
 		// We create a Backup
-		testUtils.ExecuteBackup(namespace, backupSampleFile, false, testTimeouts[testUtils.BackupIsReady], env)
+		backups.ExecuteBackup(
+			env.Ctx, env.Client, env.Scheme,
+			namespace, backupSampleFile, false,
+			testTimeouts[testUtils.BackupIsReady],
+		)
 		// Verifying file called data.tar should be available on Azurite blob storage
 		Eventually(func() (int, error) {
-			return testUtils.CountFilesOnAzuriteBlobStorage(namespace, clusterName, "data.tar")
+			return backups.CountFilesOnAzuriteBlobStorage(namespace, clusterName, "data.tar")
 		}, 30).Should(BeNumerically(">=", 1))
 		Eventually(func() (string, error) {
-			cluster, err := env.GetCluster(namespace, clusterName)
+			cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			return cluster.Status.FirstRecoverabilityPoint, err
 		}, 30).ShouldNot(BeEmpty())
@@ -308,23 +329,29 @@ func prepareClusterForPITROnAzurite(
 	tableLocator := TableLocator{
 		Namespace:    namespace,
 		ClusterName:  clusterName,
-		DatabaseName: testUtils.AppDBName,
+		DatabaseName: postgres.AppDBName,
 		TableName:    "for_restore",
 	}
 	AssertCreateTestData(env, tableLocator)
 
 	By("getting currentTimestamp", func() {
-		ts, err := testUtils.GetCurrentTimestamp(namespace, clusterName, env)
+		ts, err := postgres.GetCurrentTimestamp(
+			env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+			namespace, clusterName,
+		)
 		*currentTimestamp = ts
 		Expect(err).ToNot(HaveOccurred())
 	})
 
 	By(fmt.Sprintf("writing 3rd entry into test table '%v'", "for_restore"), func() {
-		forward, conn, err := testUtils.ForwardPSQLConnection(
-			env,
+		forward, conn, err := postgres.ForwardPSQLConnection(
+			env.Ctx,
+			env.Client,
+			env.Interface,
+			env.RestClientConfig,
 			namespace,
 			clusterName,
-			testUtils.AppDBName,
+			postgres.AppDBName,
 			apiv1.ApplicationUserSecretSuffix,
 		)
 		defer func() {
@@ -347,7 +374,7 @@ func assertArchiveWalOnAzurite(namespace, clusterName string) {
 		path := fmt.Sprintf("%v\\/wals\\/0000000100000000\\/%v.gz", clusterName, latestWAL)
 		// verifying on blob storage using az
 		Eventually(func() (int, error) {
-			return testUtils.CountFilesOnAzuriteBlobStorage(namespace, clusterName, path)
+			return backups.CountFilesOnAzuriteBlobStorage(namespace, clusterName, path)
 		}, 60).Should(BeEquivalentTo(1))
 	})
 }

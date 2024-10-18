@@ -22,6 +22,9 @@ import (
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -47,14 +50,14 @@ var _ = Describe("PGBouncer Connections", Label(tests.LabelServiceConnectivity),
 	Context("no user-defined certificates", Ordered, func() {
 		BeforeAll(func() {
 			// Create a cluster in a namespace we'll delete after the test
-			namespace, err = env.CreateUniqueTestNamespace("pgbouncer-auth-no-user-certs")
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, "pgbouncer-auth-no-user-certs")
 			Expect(err).ToNot(HaveOccurred())
-			clusterName, err = env.GetResourceNameFromYAML(sampleFile)
+			clusterName, err = yaml.GetResourceNameFromYAML(env.Scheme, sampleFile)
 			Expect(err).ToNot(HaveOccurred())
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 		})
 		JustAfterEach(func() {
-			primaryPod, err := env.GetClusterPrimary(namespace, clusterName)
+			primaryPod, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			DeleteTableUsingPgBouncerService(namespace, clusterName, poolerBasicAuthRWSampleFile, env, primaryPod)
 		})
@@ -155,9 +158,9 @@ var _ = Describe("PGBouncer Connections", Label(tests.LabelServiceConnectivity),
 				caSecNameClient               = "my-postgresql-client-ca"
 			)
 			// Create a cluster in a namespace that will be deleted after the test
-			namespace, err = env.CreateUniqueTestNamespace("pgbouncer-separate-certificates")
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, "pgbouncer-separate-certificates")
 			Expect(err).ToNot(HaveOccurred())
-			clusterName, err = env.GetResourceNameFromYAML(sampleFileWithCertificate)
+			clusterName, err = yaml.GetResourceNameFromYAML(env.Scheme, sampleFileWithCertificate)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Create certificates secret for server
@@ -192,7 +195,7 @@ var _ = Describe("PGBouncer Connections", Label(tests.LabelServiceConnectivity),
 })
 
 func getPgbouncerPod(sampleFile string) (*corev1.Pod, error) {
-	poolerKey, err := env.GetResourceNamespacedNameFromYAML(sampleFile)
+	poolerKey, err := yaml.GetResourceNameFromYAML(env.Scheme, sampleFile)
 	if err != nil {
 		return nil, err
 	}
@@ -200,14 +203,17 @@ func getPgbouncerPod(sampleFile string) (*corev1.Pod, error) {
 	Expect(err).ToNot(HaveOccurred())
 
 	var podList corev1.PodList
-	err = env.Client.List(env.Ctx, &podList, ctrlclient.InNamespace(poolerKey.Namespace),
-		ctrlclient.MatchingLabels{utils.PgbouncerNameLabel: poolerKey.Name})
+	err = env.Client.List(env.Ctx, &podList, ctrlclient.InNamespace(""),
+		ctrlclient.MatchingLabels{utils.PgbouncerNameLabel: poolerKey})
 	Expect(err).ToNot(HaveOccurred())
 	Expect(len(podList.Items)).Should(BeEquivalentTo(1))
 	return &podList.Items[0], nil
 }
 
 func runShowHelpInPod(pod *corev1.Pod) error {
-	_, _, err := env.ExecCommand(env.Ctx, *pod, "pgbouncer", nil, "psql", "-c", "SHOW HELP")
+	_, _, err := exec.Command(
+		env.Ctx, env.Interface, env.RestClientConfig, *pod,
+		"pgbouncer", nil, "psql", "-c", "SHOW HELP",
+	)
 	return err
 }

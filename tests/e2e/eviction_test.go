@@ -28,7 +28,11 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
-	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/environment"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -59,7 +63,7 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 		multiInstanceSampleFile  = fixturesDir + "/eviction/multi-instance-cluster.yaml.template"
 	)
 
-	evictPod := func(podName string, namespace string, env *testsUtils.TestingEnvironment, timeoutSeconds uint) error {
+	evictPod := func(podName string, namespace string, env *environment.TestingEnvironment, timeoutSeconds uint) error {
 		var pod corev1.Pod
 		err := env.Client.Get(env.Ctx,
 			ctrlclient.ObjectKey{Namespace: namespace, Name: podName},
@@ -119,18 +123,18 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 			}
 			const namespacePrefix = "single-instance-pod-eviction"
 			var err error
-			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			By("creating a cluster", func() {
 				// Create a cluster in a namespace we'll delete after the test
-				clusterName, err := env.GetResourceNameFromYAML(singleInstanceSampleFile)
+				clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, singleInstanceSampleFile)
 				Expect(err).ToNot(HaveOccurred())
 				AssertCreateCluster(namespace, clusterName, singleInstanceSampleFile, env)
 			})
 		})
 
 		It("evicts the primary pod in single instance cluster", func() {
-			clusterName, err := env.GetResourceNameFromYAML(singleInstanceSampleFile)
+			clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, singleInstanceSampleFile)
 			Expect(err).ToNot(HaveOccurred())
 			podName := clusterName + "-1"
 			err = evictPod(podName, namespace, env, 60)
@@ -152,7 +156,7 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 			})
 
 			By("checking the cluster is healthy", func() {
-				AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReadyQuick], env)
+				AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick], env)
 			})
 		})
 	})
@@ -176,20 +180,20 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 		BeforeAll(func() {
 			const namespacePrefix = "multi-instance-pod-eviction"
 			var err error
-			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			By("Creating a cluster with multiple instances", func() {
 				// Create a cluster in a namespace and shared in containers, we'll delete after the test
-				clusterName, err := env.GetResourceNameFromYAML(multiInstanceSampleFile)
+				clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, multiInstanceSampleFile)
 				Expect(err).ToNot(HaveOccurred())
 				AssertCreateCluster(namespace, clusterName, multiInstanceSampleFile, env)
 			})
 
 			By("retrieving the nodeName for primary pod", func() {
 				var primaryPod *corev1.Pod
-				clusterName, err := env.GetResourceNameFromYAML(multiInstanceSampleFile)
+				clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, multiInstanceSampleFile)
 				Expect(err).ToNot(HaveOccurred())
-				primaryPod, err = env.GetClusterPrimary(namespace, clusterName)
+				primaryPod, err = clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 				taintNodeName = primaryPod.Spec.NodeName
 			})
@@ -198,7 +202,7 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 			if needRemoveTaint {
 				By("cleaning the taint on node", func() {
 					cmd := fmt.Sprintf("kubectl taint nodes %v node.kubernetes.io/memory-pressure:NoExecute-", taintNodeName)
-					_, _, err := testsUtils.Run(cmd)
+					_, _, err := run.Run(cmd)
 					Expect(err).ToNot(HaveOccurred())
 				})
 			}
@@ -207,12 +211,12 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 		It("evicts the replica pod in multiple instance cluster", func() {
 			var podName string
 
-			clusterName, err := env.GetResourceNameFromYAML(multiInstanceSampleFile)
+			clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, multiInstanceSampleFile)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Find the standby pod
 			By("getting standby pod to evict", func() {
-				podList, _ := env.GetClusterPodList(namespace, clusterName)
+				podList, _ := clusterutils.GetClusterPodList(env.Ctx, env.Client, namespace, clusterName)
 				Expect(len(podList.Items)).To(BeEquivalentTo(3))
 				for _, pod := range podList.Items {
 					// Avoid parting non ready nodes, non active nodes, or primary nodes
@@ -243,16 +247,16 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 			})
 
 			By("checking the cluster is healthy", func() {
-				AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReadyQuick], env)
+				AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick], env)
 			})
 		})
 
 		It("evicts the primary pod in multiple instance cluster", func() {
 			var primaryPod *corev1.Pod
 
-			clusterName, err := env.GetResourceNameFromYAML(multiInstanceSampleFile)
+			clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, multiInstanceSampleFile)
 			Expect(err).ToNot(HaveOccurred())
-			primaryPod, err = env.GetClusterPrimary(namespace, clusterName)
+			primaryPod, err = clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 
 			// We can not use patch to simulate the eviction of a primary pod;
@@ -260,21 +264,21 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 
 			By("taint the node to simulate pod been evicted", func() {
 				cmd := fmt.Sprintf("kubectl taint nodes %v node.kubernetes.io/memory-pressure:NoExecute", taintNodeName)
-				_, _, err = testsUtils.Run(cmd)
+				_, _, err = run.Run(cmd)
 				Expect(err).ToNot(HaveOccurred())
 				needRemoveTaint = true
 
 				time.Sleep(3 * time.Second)
 
 				cmd = fmt.Sprintf("kubectl taint nodes %v node.kubernetes.io/memory-pressure:NoExecute-", taintNodeName)
-				_, _, err = testsUtils.Run(cmd)
+				_, _, err = run.Run(cmd)
 				Expect(err).ToNot(HaveOccurred())
 				needRemoveTaint = false
 			})
 
 			By("checking switchover happens", func() {
 				Eventually(func() bool {
-					podList, err := env.GetClusterPodList(namespace, clusterName)
+					podList, err := clusterutils.GetClusterPodList(env.Ctx, env.Client, namespace, clusterName)
 					Expect(err).ToNot(HaveOccurred())
 					for _, p := range podList.Items {
 						if specs.IsPodPrimary(p) && primaryPod.GetName() != p.GetName() {
@@ -287,7 +291,7 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 
 			// Pod need rejoin, need more time
 			By("checking the cluster is healthy", func() {
-				AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReadyQuick], env)
+				AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick], env)
 			})
 		})
 	})

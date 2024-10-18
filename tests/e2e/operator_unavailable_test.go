@@ -26,14 +26,16 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
-	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/operator"
+	podutils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
 // Set of tests in which we test the concurrent disruption of both the primary
-// and the operator pods, asserting that the latter is able to perform a pending
+// and the operator podutils, asserting that the latter is able to perform a pending
 // failover once a new operator pod comes back available.
 var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, tests.LabelOperator), func() {
 	const (
@@ -54,7 +56,7 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 		It("can survive operator failures", func() {
 			var err error
 			// Create the cluster namespace
-			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
@@ -63,13 +65,13 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 			tableLocator := TableLocator{
 				Namespace:    namespace,
 				ClusterName:  clusterName,
-				DatabaseName: testsUtils.AppDBName,
+				DatabaseName: postgres.AppDBName,
 				TableName:    "test",
 			}
 			AssertCreateTestData(env, tableLocator)
 
 			By("scaling down operator replicas to zero", func() {
-				err := env.ScaleOperatorDeployment(0)
+				err := operator.ScaleOperatorDeployment(env.Ctx, env.Client, 0)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
@@ -78,7 +80,7 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 				quickDelete := &ctrlclient.DeleteOptions{
 					GracePeriodSeconds: &quickDeletionPeriod,
 				}
-				err = env.DeletePod(namespace, currentPrimary, quickDelete)
+				err = podutils.DeletePod(env.Ctx, env.Client, namespace, currentPrimary, quickDelete)
 				Expect(err).ToNot(HaveOccurred())
 
 				// Expect only 2 instances to be up and running
@@ -108,7 +110,7 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 
 			By("scaling up the operator replicas to 1", func() {
 				// Scale up operator deployment to one replica
-				err := env.ScaleOperatorDeployment(1)
+				err := operator.ScaleOperatorDeployment(env.Ctx, env.Client, 1)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
@@ -138,7 +140,7 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 			var operatorPodName string
 			var err error
 			// Create the cluster namespace
-			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
@@ -147,12 +149,12 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 			tableLocator := TableLocator{
 				Namespace:    namespace,
 				ClusterName:  clusterName,
-				DatabaseName: testsUtils.AppDBName,
+				DatabaseName: postgres.AppDBName,
 				TableName:    "test",
 			}
 			AssertCreateTestData(env, tableLocator)
 
-			operatorNamespace, err := env.GetOperatorNamespaceName()
+			operatorNamespace, err := operator.GetOperatorNamespaceName(env.Ctx, env.Client)
 			Expect(err).ToNot(HaveOccurred())
 
 			By("deleting primary and operator pod", func() {
@@ -171,11 +173,11 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 				wg.Add(1)
 				wg.Add(1)
 				go func() {
-					_ = env.DeletePod(operatorNamespace, operatorPodName, quickDelete)
+					_ = podutils.DeletePod(env.Ctx, env.Client, operatorNamespace, operatorPodName, quickDelete)
 					wg.Done()
 				}()
 				go func() {
-					_ = env.DeletePod(namespace, currentPrimary, quickDelete)
+					_ = podutils.DeletePod(env.Ctx, env.Client, namespace, currentPrimary, quickDelete)
 					wg.Done()
 				}()
 				wg.Wait()
@@ -202,7 +204,7 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 					g.Expect(podList.Items[0].Name).NotTo(BeEquivalentTo(operatorPodName))
 				}, timeout).Should(Succeed())
 				Eventually(func() (bool, error) {
-					return env.IsOperatorDeploymentReady()
+					return operator.IsOperatorDeploymentReady(env.Ctx, env.Client)
 				}, timeout).Should(BeTrue())
 			})
 

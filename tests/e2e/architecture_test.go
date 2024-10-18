@@ -19,7 +19,9 @@ package e2e
 import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/operator"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -74,21 +76,21 @@ var _ = Describe("Available Architectures", Label(tests.LabelBasic), func() {
 	var err error
 
 	It("manages each available architecture", func() {
-		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 
-		clusterName, err := env.GetResourceNameFromYAML(clusterManifest)
+		clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, clusterManifest)
 		Expect(err).ToNot(HaveOccurred())
 		AssertCreateCluster(namespace, clusterName, clusterManifest, env)
 
 		// Fetch the operator's available architectures
-		operatorPod, err := env.GetOperatorPod()
+		operatorPod, err := operator.GetOperatorPod(env.Ctx, env.Client)
 		Expect(err).ToNot(HaveOccurred())
-		imageArchitectures, err := utils.GetOperatorArchitectures(&operatorPod)
+		imageArchitectures, err := operator.GetOperatorArchitectures(&operatorPod)
 		Expect(err).ToNot(HaveOccurred())
 
 		// Fetch the Cluster status
-		cluster, err := env.GetCluster(namespace, clusterName)
+		cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 		archStatus := cluster.Status.AvailableArchitectures
 

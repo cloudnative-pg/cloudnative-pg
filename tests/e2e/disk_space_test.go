@@ -28,7 +28,11 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
-	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -48,19 +52,20 @@ var _ = Describe("Volume space unavailable", Label(tests.LabelStorage), func() {
 		var primaryPod *corev1.Pod
 		By("finding cluster resources", func() {
 			var err error
-			cluster, err = env.GetCluster(namespace, clusterName)
+			cluster, err = clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(cluster).ToNot(BeNil())
 
-			primaryPod, err = env.GetClusterPrimary(namespace, clusterName)
+			primaryPod, err = clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(primaryPod).ToNot(BeNil())
 		})
 		By("filling the WAL volume", func() {
 			timeout := time.Minute * 5
 
-			_, _, err := env.ExecCommandInInstancePod(
-				testsUtils.PodLocator{
+			_, _, err := exec.CommandInInstancePod(
+				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+				exec.PodLocator{
 					Namespace: namespace,
 					PodName:   primaryPod.Name,
 				},
@@ -73,35 +78,37 @@ var _ = Describe("Volume space unavailable", Label(tests.LabelStorage), func() {
 		By("writing something when no space is available", func() {
 			// Create the table used by the scenario
 			query := "CREATE TABLE diskspace AS SELECT generate_series(1, 1000000);"
-			_, _, err := env.ExecQueryInInstancePod(
-				testsUtils.PodLocator{
+			_, _, err := exec.QueryInInstancePod(
+				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+				exec.PodLocator{
 					Namespace: primaryPod.Namespace,
 					PodName:   primaryPod.Name,
 				},
-				testsUtils.AppDBName,
+				postgres.AppDBName,
 				query)
 			Expect(err).To(HaveOccurred())
 
 			query = "CHECKPOINT; SELECT pg_switch_wal(); CHECKPOINT"
-			_, _, err = env.ExecQueryInInstancePod(
-				testsUtils.PodLocator{
+			_, _, err = exec.QueryInInstancePod(
+				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+				exec.PodLocator{
 					Namespace: primaryPod.Namespace,
 					PodName:   primaryPod.Name,
 				},
-				testsUtils.PostgresDBName,
+				postgres.PostgresDBName,
 				query)
 			Expect(err).To(HaveOccurred())
 		})
 		By("waiting for the primary to become not ready", func() {
 			Eventually(func(g Gomega) bool {
-				primaryPod, err := env.GetPod(namespace, primaryPod.Name)
+				primaryPod, err := pods.GetPod(env.Ctx, env.Client, namespace, primaryPod.Name)
 				g.Expect(err).ToNot(HaveOccurred())
-				return testsUtils.PodHasCondition(primaryPod, corev1.PodReady, corev1.ConditionFalse)
+				return clusterutils.PodHasCondition(primaryPod, corev1.PodReady, corev1.ConditionFalse)
 			}).WithTimeout(time.Minute).Should(BeTrue())
 		})
 		By("checking if the operator detects the issue", func() {
 			Eventually(func(g Gomega) string {
-				cluster, err := env.GetCluster(namespace, clusterName)
+				cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
 				g.Expect(err).ToNot(HaveOccurred())
 				return cluster.Status.Phase
 			}).WithTimeout(time.Minute).Should(Equal("Not enough disk space"))
@@ -114,11 +121,11 @@ var _ = Describe("Volume space unavailable", Label(tests.LabelStorage), func() {
 		primaryWALPVC := &corev1.PersistentVolumeClaim{}
 		By("finding cluster resources", func() {
 			var err error
-			cluster, err = env.GetCluster(namespace, clusterName)
+			cluster, err = clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(cluster).ToNot(BeNil())
 
-			primaryPod, err = env.GetClusterPrimary(namespace, clusterName)
+			primaryPod, err = clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(primaryPod).ToNot(BeNil())
 
@@ -159,19 +166,20 @@ var _ = Describe("Volume space unavailable", Label(tests.LabelStorage), func() {
 			// We can't delete the Pod, as this will trigger
 			// a failover.
 			Eventually(func(g Gomega) bool {
-				primaryPod, err := env.GetPod(namespace, primaryPod.Name)
+				primaryPod, err := pods.GetPod(env.Ctx, env.Client, namespace, primaryPod.Name)
 				g.Expect(err).ToNot(HaveOccurred())
-				return testsUtils.PodHasCondition(primaryPod, corev1.PodReady, corev1.ConditionTrue)
+				return clusterutils.PodHasCondition(primaryPod, corev1.PodReady, corev1.ConditionTrue)
 			}).WithTimeout(10 * time.Minute).Should(BeTrue())
 		})
 		By("writing some WAL", func() {
 			query := "CHECKPOINT; SELECT pg_switch_wal(); CHECKPOINT"
-			_, _, err := env.ExecQueryInInstancePod(
-				testsUtils.PodLocator{
+			_, _, err := exec.QueryInInstancePod(
+				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+				exec.PodLocator{
 					Namespace: primaryPod.Namespace,
 					PodName:   primaryPod.Name,
 				},
-				testsUtils.PostgresDBName,
+				postgres.PostgresDBName,
 				query)
 			Expect(err).NotTo(HaveOccurred())
 		})
@@ -191,10 +199,10 @@ var _ = Describe("Volume space unavailable", Label(tests.LabelStorage), func() {
 		func(sampleFile string) {
 			var err error
 			// Create a cluster in a namespace we'll delete after the test
-			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 
-			clusterName, err := env.GetResourceNameFromYAML(sampleFile)
+			clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, sampleFile)
 			Expect(err).ToNot(HaveOccurred())
 
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)

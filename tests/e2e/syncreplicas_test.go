@@ -27,7 +27,11 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/fencing"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -43,11 +47,12 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 
 	getSyncReplicationCount := func(namespace, clusterName, syncState string, expectedCount int) {
 		Eventually(func() (int, error, error) {
-			primaryPod, err := env.GetClusterPrimary(namespace, clusterName)
+			primaryPod, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 
-			out, stdErr, err := env.ExecQueryInInstancePod(
-				utils.PodLocator{
+			out, stdErr, err := exec.QueryInInstancePod(
+				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+				exec.PodLocator{
 					Namespace: namespace,
 					PodName:   primaryPod.GetName(),
 				},
@@ -63,11 +68,12 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 
 	compareSynchronousStandbyNames := func(namespace, clusterName, element string) {
 		Eventually(func() string {
-			primaryPod, err := env.GetClusterPrimary(namespace, clusterName)
+			primaryPod, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 
-			out, stdErr, err := env.ExecQueryInInstancePod(
-				utils.PodLocator{
+			out, stdErr, err := exec.QueryInInstancePod(
+				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+				exec.PodLocator{
 					Namespace: namespace,
 					PodName:   primaryPod.GetName(),
 				},
@@ -88,11 +94,11 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 				namespacePrefix = "legacy-sync-replicas-e2e"
 				sampleFile      = fixturesDir + "/sync_replicas/cluster-sync-replica-legacy.yaml.template"
 			)
-			clusterName, err := env.GetResourceNameFromYAML(sampleFile)
+			clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, sampleFile)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Create a cluster in a namespace we'll delete after the test
-			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
@@ -104,7 +110,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 			By("checking that synchronous_standby_names reflects cluster's changes", func() {
 				// Set MaxSyncReplicas to 1
 				Eventually(func(g Gomega) error {
-					cluster, err := env.GetCluster(namespace, clusterName)
+					cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
 					g.Expect(err).ToNot(HaveOccurred())
 
 					cluster.Spec.MaxSyncReplicas = 1
@@ -112,13 +118,13 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 				}, RetryTimeout, 5).Should(Succeed())
 
 				// Scale the cluster down to 2 pods
-				_, _, err := utils.Run(fmt.Sprintf("kubectl scale --replicas=2 -n %v cluster/%v", namespace,
+				_, _, err := run.Run(fmt.Sprintf("kubectl scale --replicas=2 -n %v cluster/%v", namespace,
 					clusterName))
 				Expect(err).ToNot(HaveOccurred())
 				timeout := 120
 				// Wait for pod 3 to be completely terminated
 				Eventually(func() (int, error) {
-					podList, err := env.GetClusterPodList(namespace, clusterName)
+					podList, err := clusterutils.GetClusterPodList(env.Ctx, env.Client, namespace, clusterName)
 					return len(podList.Items), err
 				}, timeout).Should(BeEquivalentTo(2))
 
@@ -127,14 +133,14 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 				compareSynchronousStandbyNames(namespace, clusterName, "ANY 1")
 			})
 			By("failing when SyncReplicas fields are invalid", func() {
-				cluster, err := env.GetCluster(namespace, clusterName)
+				cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 				// Expect an error. MaxSyncReplicas must be lower than the number of instances
 				cluster.Spec.MaxSyncReplicas = 2
 				err = env.Client.Update(env.Ctx, cluster)
 				Expect(err).To(HaveOccurred())
 
-				cluster, err = env.GetCluster(namespace, clusterName)
+				cluster, err = clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 				// Expect an error. MinSyncReplicas must be lower than MaxSyncReplicas
 				cluster.Spec.MinSyncReplicas = 2
@@ -148,7 +154,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 				namespacePrefix = "sync-replicas-statstatements"
 				sampleFile      = fixturesDir + "/sync_replicas/cluster-pgstatstatements.yaml.template"
 			)
-			clusterName, err := env.GetResourceNameFromYAML(sampleFile)
+			clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, sampleFile)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Are extensions a problem with synchronous replication? No, absolutely not,
@@ -159,7 +165,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 			// bootstrapping the cluster, the CREATE EXTENSION instruction will block
 			// the primary since the desired number of synchronous replicas (even when 1)
 			// is not met.
-			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
@@ -180,11 +186,11 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 				namespacePrefix = "sync-replicas-e2e"
 				sampleFile      = fixturesDir + "/sync_replicas/cluster-sync-replica.yaml.template"
 			)
-			clusterName, err := env.GetResourceNameFromYAML(sampleFile)
+			clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, sampleFile)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Create a cluster in a namespace we'll delete after the test
-			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
@@ -195,7 +201,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 
 			By("setting MaxStandbyNamesFromCluster to 1 and decreasing to 1 the sync replicas required", func() {
 				Eventually(func(g Gomega) error {
-					cluster, err := env.GetCluster(namespace, clusterName)
+					cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
 					g.Expect(err).ToNot(HaveOccurred())
 					cluster.Spec.PostgresConfiguration.Synchronous.MaxStandbyNamesFromCluster = ptr.To(1)
 					cluster.Spec.PostgresConfiguration.Synchronous.Number = 1
@@ -208,7 +214,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 
 			By("switching to MethodFirst (priority-based)", func() {
 				Eventually(func(g Gomega) error {
-					cluster, err := env.GetCluster(namespace, clusterName)
+					cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
 					g.Expect(err).ToNot(HaveOccurred())
 					cluster.Spec.PostgresConfiguration.Synchronous.Method = apiv1.SynchronousReplicaConfigurationMethodFirst
 					return env.Client.Update(env.Ctx, cluster)
@@ -220,7 +226,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 
 			By("by properly setting standbyNamesPre and standbyNamesPost", func() {
 				Eventually(func(g Gomega) error {
-					cluster, err := env.GetCluster(namespace, clusterName)
+					cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
 					g.Expect(err).ToNot(HaveOccurred())
 					cluster.Spec.PostgresConfiguration.Synchronous.MaxStandbyNamesFromCluster = nil
 					cluster.Spec.PostgresConfiguration.Synchronous.StandbyNamesPre = []string{"preSyncReplica"}
@@ -238,10 +244,10 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 					namespacePrefix = "sync-replicas-preferred"
 					sampleFile      = fixturesDir + "/sync_replicas/preferred.yaml.template"
 				)
-				clusterName, err := env.GetResourceNameFromYAML(sampleFile)
+				clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, sampleFile)
 				Expect(err).ToNot(HaveOccurred())
 
-				namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+				namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
 				AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
@@ -251,31 +257,33 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 				})
 
 				By("fencing a replica and verifying we have only 1 quorum-based replica", func() {
-					Expect(utils.FencingOn(env, fmt.Sprintf("%v-3", clusterName),
-						namespace, clusterName, utils.UsingAnnotation)).Should(Succeed())
+					Expect(fencing.On(env.Ctx, env.Client, fmt.Sprintf("%v-3", clusterName),
+						namespace, clusterName, fencing.UsingAnnotation)).Should(Succeed())
 					getSyncReplicationCount(namespace, clusterName, "quorum", 1)
 					compareSynchronousStandbyNames(namespace, clusterName, "ANY 1")
 				})
 				By("fencing the second replica and verifying we unset synchronous_standby_names", func() {
-					Expect(utils.FencingOn(env, fmt.Sprintf("%v-2", clusterName),
-						namespace, clusterName, utils.UsingAnnotation)).Should(Succeed())
+					Expect(fencing.On(env.Ctx, env.Client, fmt.Sprintf("%v-2", clusterName),
+						namespace, clusterName, fencing.UsingAnnotation)).Should(Succeed())
 					Eventually(func() string {
 						commandTimeout := time.Second * 10
-						primary, err := env.GetClusterPrimary(namespace, clusterName)
+						primary, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
 						Expect(err).ToNot(HaveOccurred())
 
-						stdout, _, err := env.ExecCommand(env.Ctx, *primary, specs.PostgresContainerName,
-							&commandTimeout,
-							"psql", "-U", "postgres", "-tAc", "show synchronous_standby_names")
+						stdout, _, err := exec.Command(
+							env.Ctx, env.Interface, env.RestClientConfig,
+							*primary, specs.PostgresContainerName, &commandTimeout,
+							"psql", "-U", "postgres", "-tAc", "show synchronous_standby_names",
+						)
 						Expect(err).ToNot(HaveOccurred())
 						return strings.Trim(stdout, "\n")
 					}, 160).Should(BeEmpty())
 				})
 				By("unfenicing the replicas and verifying we have 2 quorum-based replicas", func() {
-					Expect(utils.FencingOff(env, fmt.Sprintf("%v-3", clusterName),
-						namespace, clusterName, utils.UsingAnnotation)).Should(Succeed())
-					Expect(utils.FencingOff(env, fmt.Sprintf("%v-2", clusterName),
-						namespace, clusterName, utils.UsingAnnotation)).Should(Succeed())
+					Expect(fencing.Off(env.Ctx, env.Client, fmt.Sprintf("%v-3", clusterName),
+						namespace, clusterName, fencing.UsingAnnotation)).Should(Succeed())
+					Expect(fencing.Off(env.Ctx, env.Client, fmt.Sprintf("%v-2", clusterName),
+						namespace, clusterName, fencing.UsingAnnotation)).Should(Succeed())
 					getSyncReplicationCount(namespace, clusterName, "quorum", 2)
 					compareSynchronousStandbyNames(namespace, clusterName, "ANY 2")
 				})

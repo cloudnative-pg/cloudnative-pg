@@ -23,7 +23,11 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	testUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/minio"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/secrets"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -63,19 +67,20 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 		)
 
 		const namespacePrefix = "pg-backup-minio-wal-max-parallel"
-		clusterName, err := env.GetResourceNameFromYAML(clusterWithMinioSampleFile)
+		clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, clusterWithMinioSampleFile)
 		Expect(err).ToNot(HaveOccurred())
 
-		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 
 		By("creating the credentials for minio", func() {
-			_, err = testUtils.CreateObjectStorageSecret(
+			_, err = secrets.CreateObjectStorageSecret(
+				env.Ctx,
+				env.Client,
 				namespace,
 				"backup-storage-creds",
 				"minio",
 				"minio123",
-				env,
 			)
 			Expect(err).ToNot(HaveOccurred())
 		})
@@ -89,12 +94,12 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 		AssertCreateCluster(namespace, clusterName, clusterWithMinioSampleFile, env)
 
 		// Get the primary
-		pod, err := env.GetClusterPrimary(namespace, clusterName)
+		pod, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 		primary = pod.GetName()
 
 		// Get the standby
-		podList, err := env.GetClusterPodList(namespace, clusterName)
+		podList, err := clusterutils.GetClusterPodList(env.Ctx, env.Client, namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 		for _, po := range podList.Items {
 			if po.Name != primary {
@@ -108,7 +113,7 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 		// Make sure both Wal-archive and Minio work
 		// Create a WAL on the primary and check if it arrives at minio, within a short time
 		By("archiving WALs and verifying they exist", func() {
-			pod, err := env.GetClusterPrimary(namespace, clusterName)
+			pod, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			primary := pod.GetName()
 			latestWAL = switchWalAndGetLatestArchive(namespace, primary)
@@ -146,8 +151,9 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 		By("asserting the spool directory is empty on the standby", func() {
 			if !testUtils.TestDirectoryEmpty(namespace, standby, SpoolDirectory) {
 				purgeSpoolDirectoryCmd := "rm " + SpoolDirectory + "/*"
-				_, _, err := env.ExecCommandInInstancePod(
-					testUtils.PodLocator{
+				_, _, err := exec.CommandInInstancePod(
+					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+					exec.PodLocator{
 						Namespace: namespace,
 						PodName:   standby,
 					}, nil,
@@ -161,8 +167,9 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 		// 		exit code 0, #1 is in the output location, #2 and #3 are in the spool directory.
 		// 		The flag is unset.
 		By("invoking the wal-restore command requesting #1 wal", func() {
-			_, _, err := env.ExecCommandInInstancePod(
-				testUtils.PodLocator{
+			_, _, err := exec.CommandInInstancePod(
+				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+				exec.PodLocator{
 					Namespace: namespace,
 					PodName:   standby,
 				}, nil,
@@ -194,8 +201,9 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 		// 		exit code 0, #2 is in the output location, #3 is in the spool directory.
 		// 		The flag is unset.
 		By("invoking the wal-restore command requesting #2 wal", func() {
-			_, _, err := env.ExecCommandInInstancePod(
-				testUtils.PodLocator{
+			_, _, err := exec.CommandInInstancePod(
+				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+				exec.PodLocator{
 					Namespace: namespace,
 					PodName:   standby,
 				}, nil,
@@ -223,8 +231,9 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 		// 		exit code 0, #3 is in the output location, spool directory is empty.
 		// 		The flag is unset.
 		By("invoking the wal-restore command requesting #3 wal", func() {
-			_, _, err := env.ExecCommandInInstancePod(
-				testUtils.PodLocator{
+			_, _, err := exec.CommandInInstancePod(
+				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+				exec.PodLocator{
 					Namespace: namespace,
 					PodName:   standby,
 				}, nil,
@@ -245,8 +254,9 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 		// 		exit code 0, #4 is in the output location, #5 is in the spool directory.
 		// 		The flag is set because #6 file not present.
 		By("invoking the wal-restore command requesting #4 wal", func() {
-			_, _, err := env.ExecCommandInInstancePod(
-				testUtils.PodLocator{
+			_, _, err := exec.CommandInInstancePod(
+				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+				exec.PodLocator{
 					Namespace: namespace,
 					PodName:   standby,
 				}, nil,
@@ -281,8 +291,9 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 		// Expected outcome:
 		//		exit code 0, #5 is in the output location, no files in the spool directory. The flag is still present.
 		By("invoking the wal-restore command requesting #5 wal", func() {
-			_, _, err := env.ExecCommandInInstancePod(
-				testUtils.PodLocator{
+			_, _, err := exec.CommandInInstancePod(
+				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+				exec.PodLocator{
 					Namespace: namespace,
 					PodName:   standby,
 				}, nil,
@@ -309,8 +320,9 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 		// Expected outcome:
 		//		exit code 1, output location untouched, no files in the spool directory. The flag is unset.
 		By("invoking the wal-restore command requesting #6 wal", func() {
-			_, _, err := env.ExecCommandInInstancePod(
-				testUtils.PodLocator{
+			_, _, err := exec.CommandInInstancePod(
+				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+				exec.PodLocator{
 					Namespace: namespace,
 					PodName:   standby,
 				}, nil,
@@ -332,8 +344,9 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 		//		exit code 0, #6 is in the output location, no files in the spool directory.
 		//		The flag is present again because #7 and #8 are unavailable.
 		By("invoking the wal-restore command requesting #6 wal again", func() {
-			_, _, err := env.ExecCommandInInstancePod(
-				testUtils.PodLocator{
+			_, _, err := exec.CommandInInstancePod(
+				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+				exec.PodLocator{
 					Namespace: namespace,
 					PodName:   standby,
 				}, nil,

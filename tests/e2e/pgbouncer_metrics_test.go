@@ -26,7 +26,8 @@ import (
 
 	pkgutils "github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/proxy"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -49,16 +50,16 @@ var _ = Describe("PGBouncer Metrics", Label(tests.LabelObservability), func() {
 	It("should retrieve the metrics exposed by a freshly created pooler of type pgBouncer and validate its content",
 		func() {
 			var err error
-			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 
-			clusterName, err = env.GetResourceNameFromYAML(cnpgCluster)
+			clusterName, err = yaml.GetResourceNameFromYAML(env.Scheme, cnpgCluster)
 			Expect(err).ToNot(HaveOccurred())
 			AssertCreateCluster(namespace, clusterName, cnpgCluster, env)
 
 			createAndAssertPgBouncerPoolerIsSetUp(namespace, poolerBasicAuthRWSampleFile, 1)
 
-			poolerName, err := env.GetResourceNameFromYAML(poolerBasicAuthRWSampleFile)
+			poolerName, err := yaml.GetResourceNameFromYAML(env.Scheme, poolerBasicAuthRWSampleFile)
 			Expect(err).ToNot(HaveOccurred())
 			podList := &corev1.PodList{}
 			err = env.Client.List(env.Ctx, podList, ctrlclient.InNamespace(namespace),
@@ -96,7 +97,7 @@ var _ = Describe("PGBouncer Metrics", Label(tests.LabelObservability), func() {
 
 			for _, pod := range podList.Items {
 				podName := pod.GetName()
-				out, err := utils.RetrieveMetricsFromPgBouncer(env, pod)
+				out, err := proxy.RetrieveMetricsFromPgBouncer(env.Ctx, env.Interface, pod)
 				Expect(err).ToNot(HaveOccurred())
 				matches := metricsRegexp.FindAllString(out, -1)
 				Expect(matches).To(

@@ -27,7 +27,13 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
-	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	podutils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/storage"
+	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -44,7 +50,7 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), Ordered, func(
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 		var err error
-		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 	})
 
@@ -55,19 +61,19 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), Ordered, func(
 		var oldPrimaryPodName, oldPrimaryPVCName string
 		var err error
 		tableName := "test_pg_data_corruption"
-		clusterName, err := env.GetResourceNameFromYAML(sampleFile)
+		clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, sampleFile)
 		Expect(err).ToNot(HaveOccurred())
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 		tableLocator := TableLocator{
 			Namespace:    namespace,
 			ClusterName:  clusterName,
-			DatabaseName: testsUtils.AppDBName,
+			DatabaseName: postgres.AppDBName,
 			TableName:    tableName,
 		}
 		AssertCreateTestData(env, tableLocator)
 
 		By("gathering current primary pod and pvc", func() {
-			oldPrimaryPod, err := env.GetClusterPrimary(namespace, clusterName)
+			oldPrimaryPod, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			oldPrimaryPodName = oldPrimaryPod.GetName()
 			// Get the PVC related to the pod
@@ -84,8 +90,9 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), Ordered, func(
 
 		By("corrupting primary pod by removing PGDATA", func() {
 			cmd := fmt.Sprintf("find %v/base/* -type f -delete", specs.PgDataPath)
-			_, _, err = env.ExecCommandInInstancePod(
-				testsUtils.PodLocator{
+			_, _, err = exec.CommandInInstancePod(
+				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+				exec.PodLocator{
 					Namespace: namespace,
 					PodName:   oldPrimaryPodName,
 				}, nil,
@@ -95,7 +102,7 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), Ordered, func(
 
 		By("verifying failover happened after the primary pod PGDATA got corrupted", func() {
 			Eventually(func() (string, error) {
-				newPrimaryPod, err := env.GetClusterPrimary(namespace, clusterName)
+				newPrimaryPod, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
 				if err != nil {
 					return "", err
 				}
@@ -126,7 +133,10 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), Ordered, func(
 
 		By("removing the old primary pod and its pvc", func() {
 			// Check if walStorage is enabled
-			walStorageEnabled, err := testsUtils.IsWalStorageEnabled(namespace, clusterName, env)
+			walStorageEnabled, err := storage.IsWalStorageEnabled(
+				env.Ctx, env.Client,
+				namespace, clusterName,
+			)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Force delete setting
@@ -160,7 +170,7 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), Ordered, func(
 			}
 
 			// Deleting old primary pod
-			err = env.DeletePod(namespace, oldPrimaryPodName, quickDelete)
+			err = podutils.DeletePod(env.Ctx, env.Client, namespace, oldPrimaryPodName, quickDelete)
 			Expect(err).ToNot(HaveOccurred())
 
 			// checking that the old primary pod is eventually gone

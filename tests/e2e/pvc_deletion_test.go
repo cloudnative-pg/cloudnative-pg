@@ -25,7 +25,8 @@ import (
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
-	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	podutils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/storage"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -48,7 +49,7 @@ var _ = Describe("PVC Deletion", Label(tests.LabelSelfHealing), func() {
 	It("correctly manages PVCs", func() {
 		var err error
 		// Create a cluster in a namespace we'll delete after the test
-		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
@@ -79,7 +80,7 @@ var _ = Describe("PVC Deletion", Label(tests.LabelSelfHealing), func() {
 			quickDelete := &ctrlclient.DeleteOptions{
 				GracePeriodSeconds: &quickDeletionPeriod,
 			}
-			err = env.DeletePod(namespace, podName, quickDelete)
+			err = podutils.DeletePod(env.Ctx, env.Client, namespace, podName, quickDelete)
 			Expect(err).ToNot(HaveOccurred())
 
 			// The pod should be back
@@ -122,7 +123,10 @@ var _ = Describe("PVC Deletion", Label(tests.LabelSelfHealing), func() {
 			originalPVCUID := pvc.GetUID()
 
 			// Check if walStorage is enabled
-			walStorageEnabled, err := testsUtils.IsWalStorageEnabled(namespace, clusterName, env)
+			walStorageEnabled, err := storage.IsWalStorageEnabled(
+				env.Ctx, env.Client,
+				namespace, clusterName,
+			)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Force delete setting
@@ -149,7 +153,7 @@ var _ = Describe("PVC Deletion", Label(tests.LabelSelfHealing), func() {
 			}
 
 			// Deleting primary pod
-			err = env.DeletePod(namespace, podName, quickDelete)
+			err = podutils.DeletePod(env.Ctx, env.Client, namespace, podName, quickDelete)
 			Expect(err).ToNot(HaveOccurred())
 
 			// A new pod should be created

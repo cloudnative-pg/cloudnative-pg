@@ -24,7 +24,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/nodes"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -48,7 +50,7 @@ var _ = Describe("nodeSelector", Label(tests.LabelPodScheduling), func() {
 			// We create a namespace and verify it exists
 			By(fmt.Sprintf("having a %v namespace", namespace), func() {
 				var err error
-				namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+				namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
 
 				// Creating a namespace should be quick
@@ -76,7 +78,7 @@ var _ = Describe("nodeSelector", Label(tests.LabelPodScheduling), func() {
 				timeout := 120
 				Eventually(func() bool {
 					isPending := false
-					podList, err := env.GetPodList(namespace)
+					podList, err := pods.GetPodList(env.Ctx, env.Client, namespace)
 					Expect(err).ToNot(HaveOccurred())
 					if len(podList.Items) > 0 {
 						if len(podList.Items[0].Status.Conditions) > 0 {
@@ -107,13 +109,13 @@ var _ = Describe("nodeSelector", Label(tests.LabelPodScheduling), func() {
 			var nodeName string
 			var err error
 			// Create a cluster in a namespace we'll delete after the test
-			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 
 			// We label one node with the label we have defined in the cluster
 			// YAML definition
 			By("labelling a node", func() {
-				nodeList, err := env.GetNodeList()
+				nodeList, err := nodes.GetNodeList(env.Ctx, env.Client)
 				Expect(err).ToNot(HaveOccurred())
 
 				// We want to label a node that is uncordoned and untainted,
@@ -126,14 +128,14 @@ var _ = Describe("nodeSelector", Label(tests.LabelPodScheduling), func() {
 					}
 				}
 				cmd := fmt.Sprintf("kubectl label node %v nodeselectortest=exists --overwrite", nodeName)
-				_, _, err = utils.Run(cmd)
+				_, _, err = run.Run(cmd)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
 			// All the pods should be running on the labeled node
 			By("confirm pods run on the labelled node", func() {
 				AssertCreateCluster(namespace, clusterName, sampleFile, env)
-				podList, err := env.GetPodList(namespace)
+				podList, err := pods.GetPodList(env.Ctx, env.Client, namespace)
 				Expect(err).ToNot(HaveOccurred())
 				for _, podDetails := range podList.Items {
 					if podDetails.Status.Phase == "Running" {
