@@ -33,8 +33,7 @@ import (
 // - spinning up a cluster, apply a declarative publication/subscription on it
 
 // Set of tests in which we use the declarative publication and subscription CRDs on an existing cluster
-var _ = Describe("Declarative publication and subscription test", Label(tests.LabelSmoke, tests.LabelBasic,
-	tests.LabelDeclarativePubSub), func() {
+var _ = Describe("Publication and Subscription", Label(tests.LabelDeclarativePubSub), func() {
 	const (
 		sourceClusterManifest       = fixturesDir + "/declarative_pub_sub/source-cluster.yaml.template"
 		destinationClusterManifest  = fixturesDir + "/declarative_pub_sub/destination-cluster.yaml.template"
@@ -60,7 +59,6 @@ var _ = Describe("Declarative publication and subscription test", Label(tests.La
 		var (
 			sourceClusterName, destinationClusterName, namespace string
 			databaseObjectName, pubObjectName, subObjectName     string
-			sourceDatabase, destinationDatabase                  *apiv1.Database
 			pub                                                  *apiv1.Publication
 			sub                                                  *apiv1.Subscription
 			err                                                  error
@@ -85,6 +83,36 @@ var _ = Describe("Declarative publication and subscription test", Label(tests.La
 				AssertCreateCluster(namespace, destinationClusterName, destinationClusterManifest, env)
 			})
 		})
+
+		assertCreateDatabase := func(namespace, clusterName, databaseManifest, databaseName string) {
+			databaseObjectName, err = env.GetResourceNameFromYAML(databaseManifest)
+			Expect(err).NotTo(HaveOccurred())
+
+			By(fmt.Sprintf("applying the %s Database CRD manifest", databaseObjectName), func() {
+				CreateResourceFromFile(namespace, databaseManifest)
+			})
+
+			By(fmt.Sprintf("ensuring the %s Database CRD succeeded reconciliation", databaseObjectName), func() {
+				databaseObject := &apiv1.Database{}
+				databaseNamespacedName := types.NamespacedName{
+					Namespace: namespace,
+					Name:      databaseObjectName,
+				}
+
+				Eventually(func(g Gomega) {
+					err := env.Client.Get(env.Ctx, databaseNamespacedName, databaseObject)
+					Expect(err).ToNot(HaveOccurred())
+					g.Expect(databaseObject.Status.Applied).Should(HaveValue(BeTrue()))
+				}, 300).WithPolling(10 * time.Second).Should(Succeed())
+			})
+
+			By(fmt.Sprintf("verifying the %s database has been created", databaseName), func() {
+				primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
+				Expect(err).ToNot(HaveOccurred())
+
+				AssertDatabaseExists(namespace, primaryPodInfo.Name, databaseName, true)
+			})
+		}
 
 		assertPublicationExists := func(namespace, primaryPod string, pub *apiv1.Publication) {
 			query := fmt.Sprintf("select count(*) from pg_publication where pubname = '%s'",
@@ -118,63 +146,29 @@ var _ = Describe("Declarative publication and subscription test", Label(tests.La
 			}, 30).Should(Succeed())
 		}
 
-		It("can perform logical replication", func() { //nolint:dupl
-			By("applying source Database CRD manifest", func() {
-				CreateResourceFromFile(namespace, sourceDatabaseManifest)
-				databaseObjectName, err = env.GetResourceNameFromYAML(sourceDatabaseManifest)
-				Expect(err).NotTo(HaveOccurred())
-			})
-			By("ensuring the source Database CRD succeeded reconciliation", func() {
-				// get source database object
-				sourceDatabase = &apiv1.Database{}
-				databaseNamespacedName := types.NamespacedName{
-					Namespace: namespace,
-					Name:      databaseObjectName,
-				}
+		It("can perform logical replication", func() {
+			assertCreateDatabase(namespace, sourceClusterName, sourceDatabaseManifest, dbname)
 
-				Eventually(func(g Gomega) {
-					err := env.Client.Get(env.Ctx, databaseNamespacedName, sourceDatabase)
-					Expect(err).ToNot(HaveOccurred())
-					g.Expect(sourceDatabase.Status.Ready).Should(BeTrue())
-				}, 300).WithPolling(10 * time.Second).Should(Succeed())
-			})
-			By("verifying source database has been created", func() {
-				primaryPodInfo, err := env.GetClusterPrimary(namespace, sourceClusterName)
-				Expect(err).ToNot(HaveOccurred())
+			AssertCreateTestDataWithDatabaseName(env, namespace, sourceClusterName, dbname, tableName)
 
-				AssertDatabaseExists(namespace, primaryPodInfo.Name, dbname, true)
-			})
-			By("creating new data in the source cluster database", func() {
-				AssertCreateTableAndInsertValues(env, namespace, sourceClusterName, dbname, tableName)
-			})
+			assertCreateDatabase(namespace, destinationClusterName, destinationDatabaseManifest, dbname)
 
-			By("applying destination Database CRD manifest", func() {
-				CreateResourceFromFile(namespace, destinationDatabaseManifest)
-				databaseObjectName, err = env.GetResourceNameFromYAML(destinationDatabaseManifest)
-				Expect(err).NotTo(HaveOccurred())
-			})
-			By("ensuring the destination Database CRD succeeded reconciliation", func() {
-				// get destination database object
-				destinationDatabase = &apiv1.Database{}
-				databaseNamespacedName := types.NamespacedName{
-					Namespace: namespace,
-					Name:      databaseObjectName,
-				}
-
-				Eventually(func(g Gomega) {
-					err := env.Client.Get(env.Ctx, databaseNamespacedName, destinationDatabase)
-					Expect(err).ToNot(HaveOccurred())
-					g.Expect(destinationDatabase.Status.Ready).Should(BeTrue())
-				}, 300).WithPolling(10 * time.Second).Should(Succeed())
-			})
-			By("verifying destination database has been created", func() {
-				primaryPodInfo, err := env.GetClusterPrimary(namespace, destinationClusterName)
-				Expect(err).ToNot(HaveOccurred())
-
-				AssertDatabaseExists(namespace, primaryPodInfo.Name, dbname, true)
-			})
 			By("creating empty table inside destination database", func() {
-				AssertCreateTableWithDatabaseName(env, namespace, destinationClusterName, dbname, tableName)
+				query := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %v (column1 int) ;", tableName)
+				forward, conn, err := utils.ForwardPSQLConnection(
+					env,
+					namespace,
+					destinationClusterName,
+					dbname,
+					apiv1.ApplicationUserSecretSuffix,
+				)
+				defer func() {
+					_ = conn.Close()
+					forward.Close()
+				}()
+				Expect(err).ToNot(HaveOccurred())
+				_, err = conn.Exec(query)
+				Expect(err).ToNot(HaveOccurred())
 			})
 
 			By("applying Publication CRD manifest", func() {
@@ -182,6 +176,7 @@ var _ = Describe("Declarative publication and subscription test", Label(tests.La
 				pubObjectName, err = env.GetResourceNameFromYAML(pubManifest)
 				Expect(err).NotTo(HaveOccurred())
 			})
+
 			By("ensuring the Publication CRD succeeded reconciliation", func() {
 				// get publication object
 				pub = &apiv1.Publication{}
@@ -196,17 +191,20 @@ var _ = Describe("Declarative publication and subscription test", Label(tests.La
 					g.Expect(pub.Status.Ready).Should(BeTrue())
 				}, 300).WithPolling(10 * time.Second).Should(Succeed())
 			})
+
 			By("verifying new publication has been created", func() {
 				primaryPodInfo, err := env.GetClusterPrimary(namespace, sourceClusterName)
 				Expect(err).ToNot(HaveOccurred())
 
 				assertPublicationExists(namespace, primaryPodInfo.Name, pub)
 			})
+
 			By("applying Subscription CRD manifest", func() {
 				CreateResourceFromFile(namespace, subManifest)
 				subObjectName, err = env.GetResourceNameFromYAML(subManifest)
 				Expect(err).NotTo(HaveOccurred())
 			})
+
 			By("ensuring the Subscription CRD succeeded reconciliation", func() {
 				// get subscription object
 				sub = &apiv1.Subscription{}
@@ -221,12 +219,14 @@ var _ = Describe("Declarative publication and subscription test", Label(tests.La
 					g.Expect(sub.Status.Ready).Should(BeTrue())
 				}, 300).WithPolling(10 * time.Second).Should(Succeed())
 			})
+
 			By("verifying new subscription has been created", func() {
 				primaryPodInfo, err := env.GetClusterPrimary(namespace, destinationClusterName)
 				Expect(err).ToNot(HaveOccurred())
 
 				assertSubscriptionExists(namespace, primaryPodInfo.Name, sub)
 			})
+
 			By("checking that the data is present inside the destination cluster database", func() {
 				// Expect the (previously created) test data to be available
 				primary, err := env.GetClusterPrimary(namespace, destinationClusterName)
