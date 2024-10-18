@@ -17,6 +17,7 @@ limitations under the License.
 package utils
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -28,7 +29,13 @@ import (
 
 var _ = Describe("Release tag extraction", func() {
 	It("properly works with expected filename", func() {
-		tag := extractTag("cnpg-0.5.0.yaml")
+		tag, err := extractTag("cnpg-0.5.0.yaml")
+		Expect(err).ToNot(HaveOccurred())
+		Expect(tag).To(Equal("0.5.0"))
+	})
+	It("properly works with a different prefix", func() {
+		tag, err := extractTag("modified-manifest-0.5.0.yaml")
+		Expect(err).ToNot(HaveOccurred())
 		Expect(tag).To(Equal("0.5.0"))
 	})
 })
@@ -84,5 +91,45 @@ var _ = Describe("GetAvailableReleases fails on wrong release directory", func()
 
 		_, err := GetMostRecentReleaseTag(tmpDir)
 		Expect(err).To(HaveOccurred())
+	})
+
+	It("properly deduplicate releases", func() {
+		tmpDir := GinkgoT().TempDir()
+
+		for _, file := range []string{
+			"cnpg-0.5.0.yaml",
+			"cnpg-0.5.1.yaml",
+			"cnpg-0.6.0.yaml",
+			"mangled-cnpg-0.5.1.yaml",
+		} {
+			f, err := os.Create(filepath.Clean(filepath.Join(tmpDir, file)))
+			Expect(err).ToNot(HaveOccurred())
+			Expect(f.Close()).ToNot(HaveOccurred())
+		}
+
+		versions, err := GetAvailableReleases(tmpDir)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(versions).To(HaveLen(3))
+		Expect(versions[0].String()).To(Equal("0.6.0"))
+		Expect(versions[1].String()).To(Equal("0.5.1"))
+		Expect(versions[2].String()).To(Equal("0.5.0"))
+	})
+
+	It("properly ignore rc versions", func() {
+		tmpDir := GinkgoT().TempDir()
+
+		for _, file := range []string{
+			"cnpg-0.5.0.yaml",
+			"cnpg-0.5.1.yaml",
+			"cnpg-0.6.0-rc1.yaml",
+		} {
+			f, err := os.Create(filepath.Clean(filepath.Join(tmpDir, file)))
+			Expect(err).ToNot(HaveOccurred())
+			Expect(f.Close()).ToNot(HaveOccurred())
+		}
+
+		latest, err := GetMostRecentReleaseTag(tmpDir)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(latest).To(Equal("0.5.1"))
 	})
 })
