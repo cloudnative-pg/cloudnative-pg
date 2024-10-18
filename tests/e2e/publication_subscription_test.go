@@ -110,7 +110,7 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelDeclarativePub
 				primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 
-				AssertDatabaseExists(namespace, primaryPodInfo.Name, databaseName, true)
+				AssertDatabaseExists(primaryPodInfo, databaseName, true)
 			})
 		}
 
@@ -149,25 +149,20 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelDeclarativePub
 		It("can perform logical replication", func() {
 			assertCreateDatabase(namespace, sourceClusterName, sourceDatabaseManifest, dbname)
 
-			AssertCreateTestDataWithDatabaseName(env, namespace, sourceClusterName, dbname, tableName)
+			tableLocator := TableLocator{
+				Namespace:    namespace,
+				ClusterName:  sourceClusterName,
+				DatabaseName: dbname,
+				TableName:    tableName,
+			}
+			AssertCreateTestData(env, tableLocator)
 
 			assertCreateDatabase(namespace, destinationClusterName, destinationDatabaseManifest, dbname)
 
-			By("creating empty table inside destination database", func() {
+			By("creating an empty table inside the destination database", func() {
 				query := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %v (column1 int) ;", tableName)
-				forward, conn, err := utils.ForwardPSQLConnection(
-					env,
-					namespace,
-					destinationClusterName,
-					dbname,
-					apiv1.ApplicationUserSecretSuffix,
-				)
-				defer func() {
-					_ = conn.Close()
-					forward.Close()
-				}()
-				Expect(err).ToNot(HaveOccurred())
-				_, err = conn.Exec(query)
+				_, err = utils.RunExecOverForward(env, namespace, destinationClusterName, dbname,
+					apiv1.ApplicationUserSecretSuffix, query)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
@@ -228,17 +223,13 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelDeclarativePub
 			})
 
 			By("checking that the data is present inside the destination cluster database", func() {
-				// Expect the (previously created) test data to be available
-				primary, err := env.GetClusterPrimary(namespace, destinationClusterName)
-				Expect(err).ToNot(HaveOccurred())
-
-				AssertDataExpectedCountWithDatabaseName(
-					namespace,
-					primary.Name,
-					dbname,
-					tableName,
-					2,
-				)
+				tableLocator := TableLocator{
+					Namespace:    namespace,
+					ClusterName:  destinationClusterName,
+					DatabaseName: dbname,
+					TableName:    tableName,
+				}
+				AssertDataExpectedCount(env, tableLocator, 2)
 			})
 		})
 	})
