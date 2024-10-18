@@ -1066,6 +1066,8 @@ func restoreViaPlugin(
 		return nil, err
 	}
 
+	ctx = context.WithValue(ctx, utils.GRPCTimeoutKey, 100*time.Minute)
+
 	var res *restore.RestoreResponse
 	if resErr := retry.OnError(backoff, func(err error) bool {
 		if errors.Is(err, pluginClient.ErrNoPluginSupportsRestoreJobHooksCapability) {
