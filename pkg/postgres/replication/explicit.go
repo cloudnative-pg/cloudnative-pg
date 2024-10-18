@@ -32,7 +32,7 @@ const placeholderInstanceNameSuffix = "-placeholder"
 
 func explicitSynchronousStandbyNames(cluster *apiv1.Cluster) string {
 	switch cluster.Spec.PostgresConfiguration.Synchronous.DataDurability {
-	case apiv1.DataDurabilityMethodPreferred:
+	case apiv1.DataDurabilityLevelPreferred:
 		return explicitSynchronousStandbyNamesDataDurabilityPreferred(cluster)
 
 	default:

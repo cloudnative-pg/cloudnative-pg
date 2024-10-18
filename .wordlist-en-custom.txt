@@ -118,7 +118,7 @@ DISA
 DNS
 DataBackupConfiguration
 DataBase
-DataDurabilityMethod
+DataDurabilityLevel
 DataSource
 DatabaseReclaimPolicy
 DatabaseRoleRef

@@ -1173,17 +1173,17 @@ const (
 	SynchronousReplicaConfigurationMethodAny = SynchronousReplicaConfigurationMethod("any")
 )
 
-// DataDurabilityMethod specifies how strictly to enforce synchronous replication
+// DataDurabilityLevel specifies how strictly to enforce synchronous replication
 // when cluster instances are unavailable. Options are `required` or `preferred`.
-type DataDurabilityMethod string
+type DataDurabilityLevel string
 
 const (
-	// DataDurabilityMethodRequired means that data durability is strictly enforced
-	DataDurabilityMethodRequired DataDurabilityMethod = "required"
+	// DataDurabilityLevelRequired means that data durability is strictly enforced
+	DataDurabilityLevelRequired DataDurabilityLevel = "required"
 
-	// DataDurabilityMethodPreferred means that data durability is enforced
+	// DataDurabilityLevelPreferred means that data durability is enforced
 	// only when healthy replicas are available
-	DataDurabilityMethodPreferred DataDurabilityMethod = "preferred"
+	DataDurabilityLevelPreferred DataDurabilityLevel = "preferred"
 )
 
 // SynchronousReplicaConfiguration contains the configuration of the
@@ -1230,7 +1230,7 @@ type SynchronousReplicaConfiguration struct {
 	// +kubebuilder:validation:Enum=required;preferred
 	// +kubebuilder:default:=required
 	// +optional
-	DataDurability DataDurabilityMethod `json:"dataDurability,omitempty"`
+	DataDurability DataDurabilityLevel `json:"dataDurability,omitempty"`
 }
 
 // PostgresConfiguration defines the PostgreSQL configuration

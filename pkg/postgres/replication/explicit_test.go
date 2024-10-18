@@ -141,7 +141,7 @@ var _ = Describe("synchronous replica configuration with the new API", func() {
 		It("creates configuration with the ANY clause", func() {
 			cluster := createFakeCluster("example")
 			cluster.Spec.PostgresConfiguration.Synchronous = &apiv1.SynchronousReplicaConfiguration{
-				DataDurability:             apiv1.DataDurabilityMethodPreferred,
+				DataDurability:             apiv1.DataDurabilityLevelPreferred,
 				Method:                     apiv1.SynchronousReplicaConfigurationMethodAny,
 				Number:                     2,
 				MaxStandbyNamesFromCluster: nil,
@@ -162,7 +162,7 @@ var _ = Describe("synchronous replica configuration with the new API", func() {
 		It("creates configuration with the FIRST clause", func() {
 			cluster := createFakeCluster("example")
 			cluster.Spec.PostgresConfiguration.Synchronous = &apiv1.SynchronousReplicaConfiguration{
-				DataDurability:             apiv1.DataDurabilityMethodPreferred,
+				DataDurability:             apiv1.DataDurabilityLevelPreferred,
 				Method:                     apiv1.SynchronousReplicaConfigurationMethodFirst,
 				Number:                     2,
 				MaxStandbyNamesFromCluster: nil,
@@ -183,7 +183,7 @@ var _ = Describe("synchronous replica configuration with the new API", func() {
 		It("considers the maximum number of standby names", func() {
 			cluster := createFakeCluster("example")
 			cluster.Spec.PostgresConfiguration.Synchronous = &apiv1.SynchronousReplicaConfiguration{
-				DataDurability:             apiv1.DataDurabilityMethodPreferred,
+				DataDurability:             apiv1.DataDurabilityLevelPreferred,
 				Method:                     apiv1.SynchronousReplicaConfigurationMethodFirst,
 				Number:                     2,
 				MaxStandbyNamesFromCluster: ptr.To(1),
@@ -203,7 +203,7 @@ var _ = Describe("synchronous replica configuration with the new API", func() {
 		It("ignores the prefix and the suffix", func() {
 			cluster := createFakeCluster("example")
 			cluster.Spec.PostgresConfiguration.Synchronous = &apiv1.SynchronousReplicaConfiguration{
-				DataDurability:   apiv1.DataDurabilityMethodPreferred,
+				DataDurability:   apiv1.DataDurabilityLevelPreferred,
 				Method:           apiv1.SynchronousReplicaConfigurationMethodFirst,
 				Number:           2,
 				StandbyNamesPre:  []string{"prefix", "here"},
@@ -223,7 +223,7 @@ var _ = Describe("synchronous replica configuration with the new API", func() {
 		It("disables synchronous replication when no instance is available", func() {
 			cluster := createFakeCluster("example")
 			cluster.Spec.PostgresConfiguration.Synchronous = &apiv1.SynchronousReplicaConfiguration{
-				DataDurability:             apiv1.DataDurabilityMethodPreferred,
+				DataDurability:             apiv1.DataDurabilityLevelPreferred,
 				Method:                     apiv1.SynchronousReplicaConfigurationMethodFirst,
 				Number:                     2,
 				MaxStandbyNamesFromCluster: ptr.To(1),
@@ -236,7 +236,7 @@ var _ = Describe("synchronous replica configuration with the new API", func() {
 		It("does not include pods that do not report the status", func() {
 			cluster := createFakeCluster("example")
 			cluster.Spec.PostgresConfiguration.Synchronous = &apiv1.SynchronousReplicaConfiguration{
-				DataDurability:             apiv1.DataDurabilityMethodPreferred,
+				DataDurability:             apiv1.DataDurabilityLevelPreferred,
 				Method:                     apiv1.SynchronousReplicaConfigurationMethodFirst,
 				Number:                     2,
 				MaxStandbyNamesFromCluster: nil,
