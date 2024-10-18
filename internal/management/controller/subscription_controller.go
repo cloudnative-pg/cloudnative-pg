@@ -191,6 +191,7 @@ func NewSubscriptionReconciler(
 func (r *SubscriptionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&apiv1.Subscription{}).
+		Named("instance-subscription").
 		Complete(r)
 }
 

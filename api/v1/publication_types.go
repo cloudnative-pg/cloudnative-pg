@@ -108,9 +108,9 @@ type PublicationStatus struct {
 // Publication is the Schema for the publications API
 type Publication struct {
 	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
+	metav1.ObjectMeta `json:"metadata"`
 
-	Spec   PublicationSpec   `json:"spec,omitempty"`
+	Spec   PublicationSpec   `json:"spec"`
 	Status PublicationStatus `json:"status,omitempty"`
 }
 

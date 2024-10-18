@@ -183,6 +183,7 @@ func NewPublicationReconciler(
 func (r *PublicationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&apiv1.Publication{}).
+		Named("instance-publication").
 		Complete(r)
 }
 

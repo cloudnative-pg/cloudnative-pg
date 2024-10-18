@@ -7,5 +7,5 @@ spec:
   dbname: app
   publicationName: pub
   cluster:
-    name: cluster-example-dest
-  externalClusterName: cluster-example
+    name: cluster-sample-dest
+  externalClusterName: cluster-sample

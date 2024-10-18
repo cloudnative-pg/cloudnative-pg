@@ -126,6 +126,9 @@ spec:
                 description: Ready is true if the database was reconciled correctly
                 type: boolean
             type: object
+        required:
+        - metadata
+        - spec
         type: object
     served: true
     storage: true

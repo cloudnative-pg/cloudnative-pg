@@ -6,6 +6,6 @@ spec:
   name: pub
   dbname: app
   cluster:
-    name: cluster-example
+    name: cluster-sample
   target:
     allTables: {}

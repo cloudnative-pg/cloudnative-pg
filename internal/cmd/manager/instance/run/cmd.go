@@ -227,20 +227,14 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 
 	// database publication reconciler
 	publicationReconciler := controller.NewPublicationReconciler(mgr, instance)
-	err = ctrl.NewControllerManagedBy(mgr).
-		For(&apiv1.Publication{}).
-		Complete(publicationReconciler)
-	if err != nil {
+	if err := publicationReconciler.SetupWithManager(mgr); err != nil {
 		contextLogger.Error(err, "unable to create publication controller")
 		return err
 	}
 
 	// database subscription reconciler
 	subscriptionReconciler := controller.NewSubscriptionReconciler(mgr, instance)
-	err = ctrl.NewControllerManagedBy(mgr).
-		For(&apiv1.Subscription{}).
-		Complete(subscriptionReconciler)
-	if err != nil {
+	if err := subscriptionReconciler.SetupWithManager(mgr); err != nil {
 		contextLogger.Error(err, "unable to create subscription controller")
 		return err
 	}
