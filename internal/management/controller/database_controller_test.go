@@ -25,6 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -140,15 +141,15 @@ var _ = Describe("Managed Database status", func() {
 		}, &updatedDatabase)
 		Expect(err).ToNot(HaveOccurred())
 
-		Expect(updatedDatabase.Status.Ready).Should(BeFalse())
-		Expect(updatedDatabase.Status.Error).Should(ContainSubstring(expectedError.Error()))
+		Expect(updatedDatabase.Status.Applied).Should(HaveValue(BeFalse()))
+		Expect(updatedDatabase.Status.Message).Should(ContainSubstring(expectedError.Error()))
 	})
 
 	It("properly marks the status on a succeeded reconciliation", func(ctx SpecContext) {
 		_, err := r.succeededReconciliation(ctx, database)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(database.Status.Ready).To(BeTrue())
-		Expect(database.Status.Error).To(BeEmpty())
+		Expect(database.Status.Applied).To(HaveValue(BeTrue()))
+		Expect(database.Status.Message).To(BeEmpty())
 	})
 
 	It("properly marks the status on a failed reconciliation", func(ctx SpecContext) {
@@ -156,8 +157,70 @@ var _ = Describe("Managed Database status", func() {
 
 		_, err := r.failedReconciliation(ctx, database, exampleError)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(database.Status.Ready).To(BeFalse())
-		Expect(database.Status.Error).To(BeEquivalentTo(exampleError.Error()))
+		Expect(database.Status.Applied).To(HaveValue(BeFalse()))
+		Expect(database.Status.Message).To(ContainSubstring(exampleError.Error()))
+	})
+
+	It("properly marks the status on a replica Cluster reconciliation", func(ctx SpecContext) {
+		_, err := r.replicaClusterReconciliation(ctx, database)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(database.Status.Applied).To(BeNil())
+		Expect(database.Status.Message).To(BeEquivalentTo(errClusterIsReplica.Error()))
+	})
+
+	It("drops database with ensure absent option", func(ctx SpecContext) {
+		// Mocking dropDatabase
+		expectedValue := sqlmock.NewResult(0, 1)
+		expectedQuery := fmt.Sprintf(
+			"DROP DATABASE IF EXISTS %s",
+			pgx.Identifier{database.Spec.Name}.Sanitize(),
+		)
+		dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedValue)
+
+		// Update the obj to set EnsureAbsent
+		database.Spec.Ensure = apiv1.EnsureAbsent
+		Expect(fakeClient.Update(ctx, database)).To(Succeed())
+
+		// Reconcile and get the updated object
+		_, err = r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{
+			Namespace: database.Namespace,
+			Name:      database.Name,
+		}})
+		Expect(err).ToNot(HaveOccurred())
+
+		err = fakeClient.Get(ctx, client.ObjectKey{
+			Namespace: database.Namespace,
+			Name:      database.Name,
+		}, database)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(database.Status.Applied).To(HaveValue(BeTrue()))
+		Expect(database.Status.Message).To(BeEmpty())
+		Expect(database.Status.ObservedGeneration).To(BeEquivalentTo(1))
+	})
+
+	It("properly signals a database is on a replica cluster", func(ctx SpecContext) {
+		initialCluster := cluster.DeepCopy()
+		cluster.Spec.ReplicaCluster = &apiv1.ReplicaClusterConfiguration{
+			Enabled: ptr.To(true),
+		}
+		Expect(fakeClient.Patch(ctx, cluster, client.MergeFrom(initialCluster))).To(Succeed())
+
+		_, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{
+			Namespace: database.Namespace,
+			Name:      database.Spec.Name,
+		}})
+		Expect(err).ToNot(HaveOccurred())
+
+		var updatedDatabase apiv1.Database
+		err = fakeClient.Get(ctx, client.ObjectKey{
+			Namespace: database.Namespace,
+			Name:      database.Name,
+		}, &updatedDatabase)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(updatedDatabase.Status.Applied).Should(BeNil())
+		Expect(updatedDatabase.Status.Message).Should(ContainSubstring("waiting for the cluster to become primary"))
 	})
 
 	It("marks as failed if the target Database is already being managed", func(ctx SpecContext) {
@@ -175,7 +238,7 @@ var _ = Describe("Managed Database status", func() {
 				Owner: "app",
 			},
 			Status: apiv1.DatabaseStatus{
-				Ready:              true,
+				Applied:            ptr.To(true),
 				ObservedGeneration: 1,
 			},
 		}
@@ -214,8 +277,8 @@ var _ = Describe("Managed Database status", func() {
 
 		expectedError := fmt.Sprintf("database %q is already managed by Database object %q",
 			dbDuplicate.Spec.Name, currentManager.Name)
-		Expect(dbDuplicate.Status.Ready).To(BeFalse())
-		Expect(dbDuplicate.Status.Error).To(BeEquivalentTo(expectedError))
+		Expect(dbDuplicate.Status.Applied).To(HaveValue(BeFalse()))
+		Expect(dbDuplicate.Status.Message).To(ContainSubstring(expectedError))
 		Expect(dbDuplicate.Status.ObservedGeneration).To(BeZero())
 	})
 })
