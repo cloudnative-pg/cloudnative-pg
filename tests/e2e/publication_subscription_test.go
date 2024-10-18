@@ -21,10 +21,13 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	testUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -119,7 +122,7 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelDeclarativePub
 				pub.Spec.Name)
 			Eventually(func(g Gomega) {
 				stdout, _, err := env.ExecQueryInInstancePod(
-					utils.PodLocator{
+					testUtils.PodLocator{
 						Namespace: namespace,
 						PodName:   primaryPod,
 					},
@@ -135,7 +138,7 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelDeclarativePub
 				sub.Spec.Name)
 			Eventually(func(g Gomega) {
 				stdout, _, err := env.ExecQueryInInstancePod(
-					utils.PodLocator{
+					testUtils.PodLocator{
 						Namespace: namespace,
 						PodName:   primaryPod,
 					},
@@ -161,7 +164,7 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelDeclarativePub
 
 			By("creating an empty table inside the destination database", func() {
 				query := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %v (column1 int) ;", tableName)
-				_, err = utils.RunExecOverForward(env, namespace, destinationClusterName, dbname,
+				_, err = testUtils.RunExecOverForward(env, namespace, destinationClusterName, dbname,
 					apiv1.ApplicationUserSecretSuffix, query)
 				Expect(err).ToNot(HaveOccurred())
 			})
@@ -231,6 +234,19 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelDeclarativePub
 				}
 				AssertDataExpectedCount(env, tableLocator, 2)
 			})
+
+			// TODO: remove once finalizers cleanup is handled by the operator
+			Expect(testUtils.DeleteObject(env, sub)).To(Succeed())
+			updatedSub := sub.DeepCopy()
+			controllerutil.RemoveFinalizer(updatedSub, utils.SubscriptionFinalizerName)
+			err = env.Client.Patch(env.Ctx, updatedSub, client.MergeFrom(sub))
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(testUtils.DeleteObject(env, pub)).To(Succeed())
+			updatedPub := pub.DeepCopy()
+			controllerutil.RemoveFinalizer(updatedPub, utils.PublicationFinalizerName)
+			err = env.Client.Patch(env.Ctx, updatedPub, client.MergeFrom(pub))
+			Expect(err).ToNot(HaveOccurred())
 		})
 	})
 })

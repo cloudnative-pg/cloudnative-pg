@@ -49,10 +49,6 @@ type PublicationReconciler struct {
 // publication reconciliation loop failures
 const publicationReconciliationInterval = 30 * time.Second
 
-// publicationFinalizerName is the name of the finalizer
-// triggering the deletion of the publication
-const publicationFinalizerName = utils.MetadataNamespace + "/deletePublication"
-
 // +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=publications,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=publications/status,verbs=get;update;patch
 
@@ -122,14 +118,14 @@ func (r *PublicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	// Add the finalizer if we don't have it
 	// nolint:nestif
 	if publication.DeletionTimestamp.IsZero() {
-		if controllerutil.AddFinalizer(&publication, publicationFinalizerName) {
+		if controllerutil.AddFinalizer(&publication, utils.PublicationFinalizerName) {
 			if err := r.Update(ctx, &publication); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
 	} else {
 		// This publication is being deleted
-		if controllerutil.ContainsFinalizer(&publication, publicationFinalizerName) {
+		if controllerutil.ContainsFinalizer(&publication, utils.PublicationFinalizerName) {
 			if publication.Spec.ReclaimPolicy == apiv1.PublicationReclaimDelete {
 				if err := r.dropPublication(ctx, &publication); err != nil {
 					return ctrl.Result{}, err
@@ -137,7 +133,7 @@ func (r *PublicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 			}
 
 			// remove our finalizer from the list and update it.
-			controllerutil.RemoveFinalizer(&publication, publicationFinalizerName)
+			controllerutil.RemoveFinalizer(&publication, utils.PublicationFinalizerName)
 			if err := r.Update(ctx, &publication); err != nil {
 				return ctrl.Result{}, err
 			}

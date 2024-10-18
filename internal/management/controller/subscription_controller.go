@@ -50,10 +50,6 @@ type SubscriptionReconciler struct {
 // subscription reconciliation loop failures
 const subscriptionReconciliationInterval = 30 * time.Second
 
-// subscriptionFinalizerName is the name of the finalizer
-// triggering the deletion of the subscription
-const subscriptionFinalizerName = utils.MetadataNamespace + "/deleteSubscription"
-
 // +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=subscriptions,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=subscriptions/status,verbs=get;update;patch
 
@@ -115,14 +111,14 @@ func (r *SubscriptionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// Add the finalizer if we don't have it
 	// nolint:nestif
 	if subscription.DeletionTimestamp.IsZero() {
-		if controllerutil.AddFinalizer(&subscription, subscriptionFinalizerName) {
+		if controllerutil.AddFinalizer(&subscription, utils.SubscriptionFinalizerName) {
 			if err := r.Update(ctx, &subscription); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
 	} else {
 		// This subscription is being deleted
-		if controllerutil.ContainsFinalizer(&subscription, subscriptionFinalizerName) {
+		if controllerutil.ContainsFinalizer(&subscription, utils.SubscriptionFinalizerName) {
 			if subscription.Spec.ReclaimPolicy == apiv1.SubscriptionReclaimDelete {
 				if err := r.dropSubscription(ctx, &subscription); err != nil {
 					return ctrl.Result{}, err
@@ -130,7 +126,7 @@ func (r *SubscriptionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			}
 
 			// remove our finalizer from the list and update it.
-			controllerutil.RemoveFinalizer(&subscription, subscriptionFinalizerName)
+			controllerutil.RemoveFinalizer(&subscription, utils.SubscriptionFinalizerName)
 			if err := r.Update(ctx, &subscription); err != nil {
 				return ctrl.Result{}, err
 			}
