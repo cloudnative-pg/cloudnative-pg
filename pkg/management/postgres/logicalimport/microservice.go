@@ -41,7 +41,7 @@ func Microservice(
 		return nil
 	}
 
-	if err := ds.exportDatabases(ctx, origin, databases); err != nil {
+	if err := ds.exportDatabases(ctx, origin, databases, cluster.Spec.Bootstrap.InitDB.Import.PgDumpExtraOptions); err != nil {
 		return err
 	}
 
@@ -55,6 +55,7 @@ func Microservice(
 		databases[0],
 		cluster.Spec.Bootstrap.InitDB.Database,
 		cluster.Spec.Bootstrap.InitDB.Owner,
+		cluster.Spec.Bootstrap.InitDB.Import.PgRestoreExtraOptions,
 	); err != nil {
 		return err
 	}
