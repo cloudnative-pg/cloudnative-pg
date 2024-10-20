@@ -18,6 +18,7 @@ package utils
 
 import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 )
 
 // GetCurrentTimestamp getting current time stamp from postgres server
@@ -26,7 +27,7 @@ func GetCurrentTimestamp(namespace, clusterName string, env *TestingEnvironment)
 		env,
 		namespace,
 		clusterName,
-		AppDBName,
+		postgres.AppDBName,
 		apiv1.ApplicationUserSecretSuffix,
 		"select TO_CHAR(CURRENT_TIMESTAMP,'YYYY-MM-DD HH24:MI:SS.US');",
 	)

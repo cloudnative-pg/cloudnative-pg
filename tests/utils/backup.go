@@ -21,11 +21,14 @@ import (
 	"fmt"
 	"os"
 
-	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
 
 	. "github.com/onsi/gomega" // nolint
 )
@@ -38,15 +41,15 @@ func ExecuteBackup(
 	timeoutSeconds int,
 	env *TestingEnvironment,
 ) *apiv1.Backup {
-	backupName, err := env.GetResourceNameFromYAML(backupFile)
+	backupName, err := yaml.GetResourceNameFromYAML(env.Scheme, backupFile)
 	Expect(err).ToNot(HaveOccurred())
 	Eventually(func() error {
-		_, stderr, err := RunUnchecked("kubectl apply -n " + namespace + " -f " + backupFile)
+		_, stderr, err := run.Unchecked("kubectl apply -n " + namespace + " -f " + backupFile)
 		if err != nil {
 			return fmt.Errorf("could not create backup.\nStdErr: %v\nError: %v", stderr, err)
 		}
 		return nil
-	}, RetryTimeout, PollingTime).Should(BeNil())
+	}, RetryTimeout, objects.PollingTime).Should(BeNil())
 	backupNamespacedName := types.NamespacedName{
 		Namespace: namespace,
 		Name:      backupName,
@@ -69,7 +72,7 @@ func ExecuteBackup(
 	var cluster *apiv1.Cluster
 	Eventually(func() error {
 		var err error
-		cluster, err = env.GetCluster(namespace, backup.Spec.Cluster.Name)
+		cluster, err = clusterutils.GetCluster(env.Ctx, env.Client, namespace, backup.Spec.Cluster.Name)
 		return err
 	}, timeoutSeconds).ShouldNot(HaveOccurred())
 
@@ -104,7 +107,7 @@ func CreateClusterFromBackupUsingPITR(
 	targetTime string,
 	env *TestingEnvironment,
 ) (*apiv1.Cluster, error) {
-	backupName, err := env.GetResourceNameFromYAML(backupFilePath)
+	backupName, err := yaml.GetResourceNameFromYAML(env.Scheme, backupFilePath)
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +151,7 @@ func CreateClusterFromBackupUsingPITR(
 			},
 		},
 	}
-	obj, err := CreateObject(env, restoreCluster)
+	obj, err := objects.CreateObject(env.Ctx, env.Client, restoreCluster)
 	if err != nil {
 		return nil, err
 	}
@@ -235,7 +238,7 @@ func CreateClusterFromExternalClusterBackupWithPITROnAzure(
 			},
 		},
 	}
-	obj, err := CreateObject(env, restoreCluster)
+	obj, err := objects.CreateObject(env.Ctx, env.Client, restoreCluster)
 	if err != nil {
 		return nil, err
 	}
@@ -324,7 +327,7 @@ func CreateClusterFromExternalClusterBackupWithPITROnMinio(
 			},
 		},
 	}
-	obj, err := CreateObject(env, restoreCluster)
+	obj, err := objects.CreateObject(env.Ctx, env.Client, restoreCluster)
 	if err != nil {
 		return nil, err
 	}
@@ -407,7 +410,7 @@ func CreateClusterFromExternalClusterBackupWithPITROnAzurite(
 			},
 		},
 	}
-	obj, err := CreateObject(env, restoreCluster)
+	obj, err := objects.CreateObject(env.Ctx, env.Client, restoreCluster)
 	if err != nil {
 		return nil, err
 	}
@@ -446,7 +449,7 @@ func CountFilesOnAzureBlobStorage(
 	path string,
 ) (int, error) {
 	azBlobListCmd := ComposeAzBlobListCmd(configuration, clusterName, path)
-	out, _, err := RunUnchecked(azBlobListCmd)
+	out, _, err := run.Unchecked(azBlobListCmd)
 	if err != nil {
 		return -1, err
 	}
@@ -462,7 +465,7 @@ func CountFilesOnAzuriteBlobStorage(
 	path string,
 ) (int, error) {
 	azBlobListCmd := ComposeAzBlobListAzuriteCmd(clusterName, path)
-	out, _, err := RunUnchecked(fmt.Sprintf("kubectl exec -n %v az-cli "+
+	out, _, err := run.Unchecked(fmt.Sprintf("kubectl exec -n %v az-cli "+
 		"-- /bin/bash -c '%v'", namespace, azBlobListCmd))
 	if err != nil {
 		return -1, err
@@ -482,7 +485,7 @@ func GetConditionsInClusterStatus(
 	var cluster *apiv1.Cluster
 	var err error
 
-	cluster, err = env.GetCluster(namespace, clusterName)
+	cluster, err = clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
 	if err != nil {
 		return nil, err
 	}
@@ -516,7 +519,7 @@ func CreateOnDemandBackupViaKubectlPlugin(
 		command = fmt.Sprintf("%v --method %v", command, method)
 	}
 
-	_, _, err := Run(command)
+	_, _, err := run.Run(command)
 	return err
 }
 
@@ -550,7 +553,7 @@ func CreateOnDemandBackup(
 		targetBackup.Spec.Method = method
 	}
 
-	obj, err := CreateObject(env, targetBackup)
+	obj, err := objects.CreateObject(env.Ctx, env.Client, targetBackup)
 	if err != nil {
 		return nil, err
 	}
@@ -559,37 +562,4 @@ func CreateOnDemandBackup(
 		return nil, fmt.Errorf("created object is not of Backup type: %T %v", obj, obj)
 	}
 	return backup, nil
-}
-
-// CreateBackup creates a Backup resource for a given cluster name
-func CreateBackup(
-	targetBackup apiv1.Backup,
-	env *TestingEnvironment,
-) (*apiv1.Backup, error) {
-	obj, err := CreateObject(env, &targetBackup)
-	if err != nil {
-		return nil, err
-	}
-	backup, ok := obj.(*apiv1.Backup)
-	if !ok {
-		return nil, fmt.Errorf("created object is not of Backup type: %T %v", obj, obj)
-	}
-	return backup, nil
-}
-
-// GetVolumeSnapshot gets a VolumeSnapshot given name and namespace
-func (env TestingEnvironment) GetVolumeSnapshot(
-	namespace,
-	name string,
-) (*volumesnapshot.VolumeSnapshot, error) {
-	namespacedName := types.NamespacedName{
-		Namespace: namespace,
-		Name:      name,
-	}
-	volumeSnapshot := &volumesnapshot.VolumeSnapshot{}
-	err := GetObject(&env, namespacedName, volumeSnapshot)
-	if err != nil {
-		return nil, err
-	}
-	return volumeSnapshot, nil
 }

@@ -24,7 +24,10 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -59,10 +62,10 @@ var _ = Describe("Declarative databases management test", Label(tests.LabelSmoke
 
 		BeforeAll(func() {
 			// Create a cluster in a namespace we'll delete after the test
-			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 
-			clusterName, err = env.GetResourceNameFromYAML(clusterManifest)
+			clusterName, err = yaml.GetResourceNameFromYAML(env.Scheme, clusterManifest)
 			Expect(err).ToNot(HaveOccurred())
 
 			By("setting up cluster and declarative database CRD", func() {
@@ -72,8 +75,9 @@ var _ = Describe("Declarative databases management test", Label(tests.LabelSmoke
 
 		assertDatabaseExists := func(namespace, primaryPod, dbname string, shouldContain bool) {
 			Eventually(func(g Gomega) {
-				stdout, _, err := env.ExecQueryInInstancePod(
-					utils.PodLocator{
+				stdout, _, err := exec.QueryInInstancePod(
+					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+					exec.PodLocator{
 						Namespace: namespace,
 						PodName:   primaryPod,
 					},
@@ -93,8 +97,9 @@ var _ = Describe("Declarative databases management test", Label(tests.LabelSmoke
 				"and encoding = %s and datctype = '%s' and datcollate = '%s'",
 				db.Spec.Name, db.Spec.Encoding, db.Spec.LcCtype, db.Spec.LcCollate)
 			Eventually(func(g Gomega) {
-				stdout, _, err := env.ExecQueryInInstancePod(
-					utils.PodLocator{
+				stdout, _, err := exec.QueryInInstancePod(
+					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+					exec.PodLocator{
 						Namespace: namespace,
 						PodName:   primaryPod,
 					},
@@ -109,7 +114,7 @@ var _ = Describe("Declarative databases management test", Label(tests.LabelSmoke
 			It("can add a declarative database", func() {
 				By("applying Database CRD manifest", func() {
 					CreateResourceFromFile(namespace, databaseManifest)
-					databaseObjectName, err = env.GetResourceNameFromYAML(databaseManifest)
+					databaseObjectName, err = yaml.GetResourceNameFromYAML(env.Scheme, databaseManifest)
 					Expect(err).NotTo(HaveOccurred())
 				})
 				By("ensuring the Database CRD succeeded reconciliation", func() {
@@ -128,7 +133,7 @@ var _ = Describe("Declarative databases management test", Label(tests.LabelSmoke
 				})
 
 				By("verifying new database has been created with the expected fields", func() {
-					primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
+					primaryPodInfo, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
 					Expect(err).ToNot(HaveOccurred())
 
 					assertDatabaseExists(namespace, primaryPodInfo.Name, dbname, true)
@@ -151,11 +156,11 @@ var _ = Describe("Declarative databases management test", Label(tests.LabelSmoke
 
 			It("keeps the db when Database CRD is removed", func() {
 				By("remove Database CRD", func() {
-					Expect(utils.DeleteObject(env, database)).To(Succeed())
+					Expect(objects.DeleteObject(env.Ctx, env.Client, database)).To(Succeed())
 				})
 
 				By("verifying database is still existing", func() {
-					primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
+					primaryPodInfo, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
 					Expect(err).ToNot(HaveOccurred())
 
 					assertDatabaseExists(namespace, primaryPodInfo.Name, dbname, true)

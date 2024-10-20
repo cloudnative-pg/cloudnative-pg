@@ -26,6 +26,8 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -68,9 +70,9 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 
 		By("creating the source cluster", func() {
 			const namespacePrefix = "cluster-monolith"
-			sourceClusterName, err = env.GetResourceNameFromYAML(sourceClusterFile)
+			sourceClusterName, err = yaml.GetResourceNameFromYAML(env.Scheme, sourceClusterFile)
 			Expect(err).ToNot(HaveOccurred())
-			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			AssertCreateCluster(namespace, sourceClusterName, sourceClusterFile, env)
 		})
@@ -80,7 +82,7 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 				env,
 				namespace,
 				sourceClusterName,
-				testsUtils.PostgresDBName,
+				postgres.PostgresDBName,
 				apiv1.SuperUserSecretSuffix,
 			)
 			defer func() {
@@ -116,13 +118,13 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 			for _, database := range sourceDatabases {
 				query := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s AS VALUES (1),(2);", tableName)
 				conn, err := forward.GetPooler().Connection(database)
+				Expect(err).ToNot(HaveOccurred())
 				// We need to set the max idle connection back to a higher number
 				// otherwise the conn.Exec() will close the connection
 				// and that will produce a RST packet from PostgreSQL that will kill the
 				// port-forward tunnel
 				// More about the RST packet here https://www.postgresql.org/message-id/165ba87e-fa48-4eae-b1f3-f9a831b4890b%40Spark
 				conn.SetMaxIdleConns(3)
-				Expect(err).ToNot(HaveOccurred())
 				_, err = conn.Exec(query)
 				Expect(err).ToNot(HaveOccurred())
 			}
@@ -150,7 +152,7 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 				env,
 				namespace,
 				targetClusterName,
-				testsUtils.PostgresDBName,
+				postgres.PostgresDBName,
 				apiv1.SuperUserSecretSuffix,
 			)
 			Expect(err).ToNot(HaveOccurred())
@@ -182,13 +184,13 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 			for _, database := range sourceDatabases {
 				selectQuery := fmt.Sprintf("SELECT COUNT(*) FROM %s", tableName)
 				connTemp, err := forwardTarget.GetPooler().Connection(database)
+				Expect(err).ToNot(HaveOccurred())
 				// We need to set the max idle connection back to a higher number
 				// otherwise the conn.Exec() will close the connection
 				// and that will produce a RST packet from PostgreSQL that will kill the
 				// port-forward tunnel
 				// More about the RST packet here https://www.postgresql.org/message-id/165ba87e-fa48-4eae-b1f3-f9a831b4890b%40Spark
 				connTemp.SetMaxIdleConns(3)
-				Expect(err).ToNot(HaveOccurred())
 				row := connTemp.QueryRow(selectQuery)
 				var count int
 				err = row.Scan(&count)

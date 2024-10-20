@@ -36,6 +36,9 @@ import (
 	cnpgUtils "github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/namespace"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/operator"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/sternmultitailer"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -45,7 +48,7 @@ import (
 const (
 	fixturesDir  = "./fixtures"
 	RetryTimeout = utils.RetryTimeout
-	PollingTime  = utils.PollingTime
+	PollingTime  = objects.PollingTime
 )
 
 var (
@@ -74,14 +77,14 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	// matching both the operator's and the clusters' pods, we need to start stern twice.
 	sternClustersCtx, sternClusterCancel := context.WithCancel(env.Ctx)
 	sternClusterDoneChan := sternmultitailer.StreamLogs(sternClustersCtx, env.Interface, clusterPodsLabelSelector(),
-		env.SternLogDir)
+		namespace.SternLogDirectory)
 	DeferCleanup(func() {
 		sternClusterCancel()
 		<-sternClusterDoneChan
 	})
 	sternOperatorCtx, sternOperatorCancel := context.WithCancel(env.Ctx)
 	sternOperatorDoneChan := sternmultitailer.StreamLogs(sternOperatorCtx, env.Interface, operatorPodsLabelSelector(),
-		env.SternLogDir)
+		namespace.SternLogDirectory)
 	DeferCleanup(func() {
 		sternOperatorCancel()
 		<-sternOperatorDoneChan
@@ -91,10 +94,10 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	_ = appsv1.AddToScheme(env.Scheme)
 
 	// Set up a global MinIO service on his own namespace
-	err = env.CreateNamespace(minioEnv.Namespace)
+	err = namespace.CreateNamespace(env.Ctx, env.Client, minioEnv.Namespace)
 	Expect(err).ToNot(HaveOccurred())
 	DeferCleanup(func() {
-		err := env.DeleteNamespaceAndWait(minioEnv.Namespace, 300)
+		err := namespace.DeleteNamespaceAndWait(env.Ctx, env.Client, minioEnv.Namespace, 300)
 		Expect(err).ToNot(HaveOccurred())
 	})
 	minioEnv.Timeout = uint(testTimeouts[utils.MinioInstallation])
@@ -148,7 +151,7 @@ var _ = ReportAfterSuite("Gathering failed reports", func(report Report) {
 	// Keep the logs of the operator and the clusters in case of failure
 	// If everything is skipped, env has not been initialized, and we'll have nothing to clean up
 	if report.SuiteSucceeded && env != nil {
-		err := fileutils.RemoveDirectory(env.SternLogDir)
+		err := fileutils.RemoveDirectory(namespace.SternLogDirectory)
 		Expect(err).ToNot(HaveOccurred())
 	}
 })
@@ -162,7 +165,7 @@ var _ = BeforeEach(func() {
 		return
 	}
 
-	operatorPod, err := env.GetOperatorPod()
+	operatorPod, err := operator.GetOperatorPod(env.Ctx, env.Client)
 	Expect(err).ToNot(HaveOccurred())
 
 	if operatorPodWasRenamed {
@@ -195,14 +198,14 @@ var _ = AfterEach(func() {
 	if len(breakingLabelsInCurrentTest.([]string)) != 0 {
 		return
 	}
-	operatorPod, err := env.GetOperatorPod()
+	operatorPod, err := operator.GetOperatorPod(env.Ctx, env.Client)
 	Expect(err).ToNot(HaveOccurred())
-	wasRenamed := utils.OperatorPodRenamed(operatorPod, expectedOperatorPodName)
+	wasRenamed := operator.PodRenamed(operatorPod, expectedOperatorPodName)
 	if wasRenamed {
 		operatorPodWasRenamed = true
 		Fail("operator was renamed")
 	}
-	wasRestarted := utils.OperatorPodRestarted(operatorPod)
+	wasRestarted := operator.PodRestarted(operatorPod)
 	if wasRestarted {
 		operatorWasRestarted = true
 		Fail("operator was restarted")

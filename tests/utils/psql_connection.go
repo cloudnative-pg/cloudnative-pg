@@ -31,6 +31,8 @@ import (
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/configfile"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pool"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/secrets"
 )
 
 // PSQLForwardConnection manage the creation of a port forward to connect by psql client locally
@@ -150,7 +152,7 @@ func ForwardPSQLConnection(
 	dbname,
 	secretSuffix string,
 ) (*PSQLForwardConnection, *sql.DB, error) {
-	user, pass, err := GetCredentials(clusterName, namespace, secretSuffix, env)
+	user, pass, err := secrets.GetCredentials(env.Ctx, env.Client, clusterName, namespace, secretSuffix)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -168,7 +170,7 @@ func ForwardPSQLConnectionWithCreds(
 	userApp,
 	passApp string,
 ) (*PSQLForwardConnection, *sql.DB, error) {
-	cluster, err := env.GetCluster(namespace, clusterName)
+	cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
 	if err != nil {
 		return nil, nil, err
 	}

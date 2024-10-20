@@ -36,6 +36,9 @@ import (
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
 )
 
 const (
@@ -457,7 +460,7 @@ func MinioDeploy(minioEnv *MinioEnv, env *TestingEnvironment) (*corev1.Pod, erro
 	}
 
 	minioEnv.CaSecretObj = *minioEnv.CaPair.GenerateCASecret(minioEnv.Namespace, minioEnv.CaSecretName)
-	if _, err = CreateObject(env, &minioEnv.CaSecretObj); err != nil {
+	if _, err = objects.CreateObject(env.Ctx, env.Client, &minioEnv.CaSecretObj); err != nil {
 		return nil, err
 	}
 
@@ -484,7 +487,7 @@ func MinioDeploy(minioEnv *MinioEnv, env *TestingEnvironment) (*corev1.Pod, erro
 
 	minioClient := MinioSSLClient(minioEnv.Namespace)
 
-	return &minioClient, PodCreateAndWaitForReady(env, &minioClient, 240)
+	return &minioClient, pods.CreateAndWaitForReady(env.Ctx, env.Client, &minioClient, 240)
 }
 
 func (m *MinioEnv) getCaSecret(env *TestingEnvironment, namespace string) (*corev1.Secret, error) {
@@ -513,7 +516,7 @@ func (m *MinioEnv) CreateCaSecret(env *TestingEnvironment, namespace string) err
 	if err != nil {
 		return err
 	}
-	_, err = CreateObject(env, caSecret)
+	_, err = objects.CreateObject(env.Ctx, env.Client, caSecret)
 	return err
 }
 
@@ -521,7 +524,7 @@ func (m *MinioEnv) CreateCaSecret(env *TestingEnvironment, namespace string) err
 // amount of files matching the given `path`
 func CountFilesOnMinio(minioEnv *MinioEnv, path string) (value int, err error) {
 	var stdout string
-	stdout, _, err = RunUnchecked(fmt.Sprintf(
+	stdout, _, err = run.Unchecked(fmt.Sprintf(
 		"kubectl exec -n %v %v -- %v",
 		minioEnv.Namespace,
 		minioEnv.Client.Name,
@@ -537,7 +540,7 @@ func CountFilesOnMinio(minioEnv *MinioEnv, path string) (value int, err error) {
 // paths matching the given `path`
 func ListFilesOnMinio(minioEnv *MinioEnv, path string) (string, error) {
 	var stdout string
-	stdout, _, err := RunUnchecked(fmt.Sprintf(
+	stdout, _, err := run.Unchecked(fmt.Sprintf(
 		"kubectl exec -n %v %v -- %v",
 		minioEnv.Namespace,
 		minioEnv.Client.Name,
@@ -567,7 +570,7 @@ func composeFindMinioCmd(path string, serviceName string) string {
 func GetFileTagsOnMinio(minioEnv *MinioEnv, path string) (TagSet, error) {
 	var output TagSet
 	// Make sure we have a registered backup to access
-	out, _, err := RunUncheckedRetry(fmt.Sprintf(
+	out, _, err := run.UncheckedRetry(fmt.Sprintf(
 		"kubectl exec -n %v %v -- sh -c 'mc find minio --path %v | head -n1'",
 		minioEnv.Namespace,
 		minioEnv.Client.Name,
@@ -578,7 +581,7 @@ func GetFileTagsOnMinio(minioEnv *MinioEnv, path string) (TagSet, error) {
 
 	walFile := strings.Trim(out, "\n")
 
-	stdout, _, err := RunUncheckedRetry(fmt.Sprintf(
+	stdout, _, err := run.UncheckedRetry(fmt.Sprintf(
 		"kubectl exec -n %v %v -- sh -c 'mc --json tag list %v'",
 		minioEnv.Namespace,
 		minioEnv.Client.Name,
@@ -609,7 +612,7 @@ func MinioTestConnectivityUsingBarmanCloudWalArchive(
 		"barman-cloud-wal-archive --cloud-provider aws-s3 --endpoint-url https://%s:9000 s3://cluster-backups/ %s "+
 		"000000010000000000000000 --test", postgres.BarmanBackupEndpointCACertificateLocation, id, key,
 		minioSvcName, clusterName)
-	_, _, err := RunUnchecked(fmt.Sprintf(
+	_, _, err := run.Unchecked(fmt.Sprintf(
 		"kubectl exec -n %v %v -c postgres -- /bin/bash -c \"%v\"",
 		namespace,
 		podName,
@@ -623,7 +626,7 @@ func MinioTestConnectivityUsingBarmanCloudWalArchive(
 // CleanFilesOnMinio clean files on minio for a given path
 func CleanFilesOnMinio(minioEnv *MinioEnv, path string) (string, error) {
 	var stdout string
-	stdout, _, err := RunUnchecked(fmt.Sprintf(
+	stdout, _, err := run.Unchecked(fmt.Sprintf(
 		"kubectl exec -n %v %v -- %v",
 		minioEnv.Namespace,
 		minioEnv.Client.Name,

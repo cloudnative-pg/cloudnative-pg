@@ -25,6 +25,9 @@ import (
 	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/services"
 )
 
 // ImportDatabaseMicroservice creates a cluster, starting from an external cluster
@@ -43,7 +46,7 @@ func ImportDatabaseMicroservice(
 		imageName = os.Getenv("POSTGRES_IMG")
 	}
 	storageClassName := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
-	host, err := GetHostName(namespace, sourceClusterName, env)
+	host, err := services.GetHostName(env.Ctx, env.Client, namespace, sourceClusterName)
 	if err != nil {
 		return nil, err
 	}
@@ -80,8 +83,8 @@ func ImportDatabaseMicroservice(
 					Name: sourceClusterName,
 					ConnectionParameters: map[string]string{
 						"host":   host,
-						"user":   AppUser,
-						"dbname": AppDBName,
+						"user":   postgres.AppUser,
+						"dbname": postgres.AppDBName,
 					},
 					Password: &corev1.SecretKeySelector{
 						LocalObjectReference: corev1.LocalObjectReference{
@@ -94,7 +97,7 @@ func ImportDatabaseMicroservice(
 		},
 	}
 
-	obj, err := CreateObject(env, restoreCluster)
+	obj, err := objects.CreateObject(env.Ctx, env.Client, restoreCluster)
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +125,7 @@ func ImportDatabasesMonolith(
 		imageName = os.Getenv("POSTGRES_IMG")
 	}
 	storageClassName := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
-	host, err := GetHostName(namespace, sourceClusterName, env)
+	host, err := services.GetHostName(env.Ctx, env.Client, namespace, sourceClusterName)
 	if err != nil {
 		return nil, err
 	}
@@ -159,8 +162,8 @@ func ImportDatabasesMonolith(
 					Name: sourceClusterName,
 					ConnectionParameters: map[string]string{
 						"host":   host,
-						"user":   PostgresUser,
-						"dbname": PostgresDBName,
+						"user":   postgres.PostgresUser,
+						"dbname": postgres.PostgresDBName,
 					},
 					Password: &corev1.SecretKeySelector{
 						LocalObjectReference: corev1.LocalObjectReference{
@@ -173,7 +176,7 @@ func ImportDatabasesMonolith(
 		},
 	}
 
-	obj, err := CreateObject(env, targetCluster)
+	obj, err := objects.CreateObject(env.Ctx, env.Client, targetCluster)
 	if err != nil {
 		return nil, err
 	}

@@ -19,6 +19,7 @@ package e2e
 import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/monitoring"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -53,13 +54,13 @@ var _ = Describe("PodMonitor support", Serial, Label(tests.LabelObservability), 
 	})
 
 	It("sets up a cluster enabling PodMonitor feature", func() {
-		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 
 		AssertCreateCluster(namespace, clusterDefaultName, clusterDefaultMonitoringFile, env)
 
 		By("verifying PodMonitor existence", func() {
-			podMonitor, err := env.GetPodMonitor(namespace, clusterDefaultName)
+			podMonitor, err := monitoring.GetPodMonitor(env.Ctx, env.Client, namespace, clusterDefaultName)
 			Expect(err).ToNot(HaveOccurred())
 
 			endpoints := podMonitor.Spec.PodMetricsEndpoints

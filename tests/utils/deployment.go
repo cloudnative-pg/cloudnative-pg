@@ -17,6 +17,7 @@ limitations under the License.
 package utils
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -25,22 +26,27 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// DeploymentIsReady checks if a Deployment is ready
-func DeploymentIsReady(deployment appsv1.Deployment) bool {
+// deploymentIsReady checks if a Deployment is ready
+func deploymentIsReady(deployment appsv1.Deployment) bool {
 	return deployment.Status.ReadyReplicas == *deployment.Spec.Replicas
 }
 
 // DeploymentWaitForReady waits for a Deployment to be ready
-func DeploymentWaitForReady(env *TestingEnvironment, deployment *appsv1.Deployment, timeoutSeconds uint) error {
+func DeploymentWaitForReady(
+	ctx context.Context,
+	crudClient client.Client,
+	deployment *appsv1.Deployment,
+	timeoutSeconds uint,
+) error {
 	err := retry.Do(
 		func() error {
-			if err := env.Client.Get(env.Ctx, client.ObjectKey{
+			if err := crudClient.Get(ctx, client.ObjectKey{
 				Namespace: deployment.Namespace,
 				Name:      deployment.Name,
 			}, deployment); err != nil {
 				return err
 			}
-			if !DeploymentIsReady(*deployment) {
+			if !deploymentIsReady(*deployment) {
 				return fmt.Errorf(
 					"deployment not ready. Namespace: %v, Name: %v",
 					deployment.Namespace,

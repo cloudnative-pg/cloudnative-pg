@@ -28,7 +28,9 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
-	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/logs"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -50,23 +52,26 @@ var _ = Describe("JSON log output", Label(tests.LabelObservability), func() {
 		const sampleFile = fixturesDir + "/json_logs/cluster-json-logs.yaml.template"
 		var namespaceErr error
 		// Create a cluster in a namespace we'll delete after the test
-		namespace, namespaceErr = env.CreateUniqueTestNamespace(namespacePrefix)
+		namespace, namespaceErr = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 		Expect(namespaceErr).ToNot(HaveOccurred())
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
 		By("verifying the presence of possible logger values", func() {
-			podList, _ := env.GetClusterPodList(namespace, clusterName)
+			podList, _ := clusterutils.GetClusterPodList(env.Ctx, env.Client, namespace, clusterName)
 			for _, pod := range podList.Items {
 				// Gather pod logs in the form of a Json Array
-				logEntries, err := testsUtils.ParseJSONLogs(namespace, pod.GetName(), env)
+				logEntries, err := logs.ParseJSONLogs(
+					env.Ctx, env.Interface,
+					namespace, pod.GetName(),
+				)
 				Expect(err).NotTo(HaveOccurred(), "unable to parse json logs")
 				Expect(logEntries).ToNot(BeEmpty(), "no logs found")
 
 				// Logger field Assertions
-				isPgControlDataLoggerFound := testsUtils.HasLogger(logEntries, "pg_controldata")
+				isPgControlDataLoggerFound := logs.HasLogger(logEntries, "pg_controldata")
 				Expect(isPgControlDataLoggerFound).To(BeTrue(),
 					fmt.Sprintf("pg_controldata logger not found in pod %v logs", pod.GetName()))
-				isPostgresLoggerFound := testsUtils.HasLogger(logEntries, "postgres")
+				isPostgresLoggerFound := logs.HasLogger(logEntries, "postgres")
 				Expect(isPostgresLoggerFound).To(BeTrue(),
 					fmt.Sprintf("postgres logger not found in pod %v logs", pod.GetName()))
 			}
@@ -74,7 +79,7 @@ var _ = Describe("JSON log output", Label(tests.LabelObservability), func() {
 
 		By("verifying the format of error queries being logged", func() {
 			errorTestQuery := "selecct 1\nwith newlines\n"
-			podList, _ := env.GetClusterPodList(namespace, clusterName)
+			podList, _ := clusterutils.GetClusterPodList(env.Ctx, env.Client, namespace, clusterName)
 			timeout := 300
 
 			for _, pod := range podList.Items {
@@ -91,11 +96,14 @@ var _ = Describe("JSON log output", Label(tests.LabelObservability), func() {
 				// Eventually the error log line will be logged
 				Eventually(func(g Gomega) bool {
 					// Gather pod logs in the form of a Json Array
-					logEntries, err := testsUtils.ParseJSONLogs(namespace, pod.GetName(), env)
+					logEntries, err := logs.ParseJSONLogs(
+						env.Ctx, env.Interface,
+						namespace, pod.GetName(),
+					)
 					g.Expect(err).ToNot(HaveOccurred())
 
 					// Gather the record containing the wrong query result
-					return testsUtils.AssertQueryRecord(
+					return logs.AssertQueryRecord(
 						logEntries,
 						errorTestQuery,
 						queryError.Error(),
@@ -107,7 +115,7 @@ var _ = Describe("JSON log output", Label(tests.LabelObservability), func() {
 
 		By("verifying only the primary instance logs write queries", func() {
 			errorTestQuery := "ccreate table test(var text)"
-			primaryPod, _ := env.GetClusterPrimary(namespace, clusterName)
+			primaryPod, _ := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
 			timeout := 300
 
 			var queryError error
@@ -123,14 +131,17 @@ var _ = Describe("JSON log output", Label(tests.LabelObservability), func() {
 			// Expect the query to be eventually logged on the primary
 			Eventually(func() (bool, error) {
 				// Gather pod logs in the form of a Json Array
-				logEntries, err := testsUtils.ParseJSONLogs(namespace, primaryPod.GetName(), env)
+				logEntries, err := logs.ParseJSONLogs(
+					env.Ctx, env.Interface,
+					namespace, primaryPod.GetName(),
+				)
 				if err != nil {
 					GinkgoWriter.Printf("Error reported while gathering primary pod log %s\n", err.Error())
 					return false, err
 				}
 
 				// Gather the record containing the wrong query result
-				return testsUtils.AssertQueryRecord(logEntries, errorTestQuery, queryError.Error(),
+				return logs.AssertQueryRecord(logEntries, errorTestQuery, queryError.Error(),
 					logpipe.LoggingCollectorRecordName), nil
 			}, timeout).Should(BeTrue())
 
@@ -146,12 +157,15 @@ var _ = Describe("JSON log output", Label(tests.LabelObservability), func() {
 			// Expect the query not to be logged on replicas
 			for _, pod := range podList.Items {
 				// Gather pod logs in the form of a Json Array
-				logEntries, err := testsUtils.ParseJSONLogs(namespace, pod.GetName(), env)
+				logEntries, err := logs.ParseJSONLogs(
+					env.Ctx, env.Interface,
+					namespace, pod.GetName(),
+				)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(logEntries).ToNot(BeEmpty())
 
 				// No record should be returned in this case
-				isQueryRecordContained := testsUtils.AssertQueryRecord(
+				isQueryRecordContained := logs.AssertQueryRecord(
 					logEntries,
 					queryError.Error(),
 					errorTestQuery,
@@ -164,18 +178,18 @@ var _ = Describe("JSON log output", Label(tests.LabelObservability), func() {
 
 		By("verifying pg_rewind logs after deleting the old primary pod", func() {
 			// Force-delete the primary
-			currentPrimary, _ := env.GetClusterPrimary(namespace, clusterName)
+			currentPrimary, _ := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
 			quickDelete := &client.DeleteOptions{
 				GracePeriodSeconds: &quickDeletionPeriod,
 			}
 
-			deletePodError := env.DeletePod(namespace, currentPrimary.GetName(), quickDelete)
+			deletePodError := pods.DeletePod(env.Ctx, env.Client, namespace, currentPrimary.GetName(), quickDelete)
 			Expect(deletePodError).ToNot(HaveOccurred())
 
 			// Expect a new primary to be elected
 			timeout := 180
 			Eventually(func() (string, error) {
-				cluster, err := env.GetCluster(namespace, clusterName)
+				cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
 				if err != nil {
 					GinkgoWriter.Printf("Error reported while getting current primary %s\n", err.Error())
 					return "", err
@@ -189,14 +203,17 @@ var _ = Describe("JSON log output", Label(tests.LabelObservability), func() {
 
 			Eventually(func() (bool, error) {
 				// Gather pod logs in the form of a JSON slice
-				logEntries, err := testsUtils.ParseJSONLogs(namespace, currentPrimary.GetName(), env)
+				logEntries, err := logs.ParseJSONLogs(
+					env.Ctx, env.Interface,
+					namespace, currentPrimary.GetName(),
+				)
 				if err != nil {
 					GinkgoWriter.Printf("Error reported while getting the 'pg_rewind' logger in old primary %s, %s\n",
 						currentPrimary, err.Error())
 					return false, err
 				}
 				// Expect pg_rewind logger to eventually be present on the old primary logs
-				return testsUtils.HasLogger(logEntries, "pg_rewind"), nil
+				return logs.HasLogger(logEntries, "pg_rewind"), nil
 			}, timeout).Should(BeTrue())
 		})
 	})
@@ -221,10 +238,10 @@ var _ = Describe("JSON log output unit tests", Label(tests.LabelObservability), 
 	Expect(err).ToNot(HaveOccurred())
 	It("Can check valid logging_collector record for query", func() {
 		Expect(parsedRecord).NotTo(BeNil())
-		Expect(testsUtils.CheckRecordForQuery(parsedRecord, errorTestQuery, user, database, message)).To(BeTrue())
+		Expect(logs.CheckRecordForQuery(parsedRecord, errorTestQuery, user, database, message)).To(BeTrue())
 	})
 	It("Can check valid logging_collector ", func() {
 		Expect(parsedRecord).NotTo(BeNil())
-		Expect(testsUtils.IsWellFormedLogForLogger(parsedRecord, "postgres")).To(BeTrue())
+		Expect(logs.IsWellFormedLogForLogger(parsedRecord, "postgres")).To(BeTrue())
 	})
 })

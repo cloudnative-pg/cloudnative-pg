@@ -27,6 +27,8 @@ import (
 	"k8s.io/utils/ptr"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/secrets"
 )
 
 const (
@@ -58,7 +60,11 @@ func CreateCertificateSecretsOnAzurite(
 	env *TestingEnvironment,
 ) error {
 	// create CA certificates
-	_, caPair, err := CreateSecretCA(namespace, clusterName, azuriteCaSecName, true, env)
+	_, caPair, err := secrets.CreateSecretCA(
+		env.Ctx, env.Client,
+		namespace, clusterName, azuriteCaSecName,
+		true,
+	)
 	if err != nil {
 		return err
 	}
@@ -100,7 +106,7 @@ func InstallAzurite(namespace string, env *TestingEnvironment) error {
 	if err != nil {
 		return err
 	}
-	err = DeploymentWaitForReady(env, deployment, 300)
+	err = DeploymentWaitForReady(env.Ctx, env.Client, deployment, 300)
 	if err != nil {
 		return err
 	}
@@ -112,7 +118,7 @@ func InstallAzurite(namespace string, env *TestingEnvironment) error {
 // InstallAzCli will install Az cli
 func InstallAzCli(namespace string, env *TestingEnvironment) error {
 	azCLiPod := getAzuriteClientPod(namespace)
-	err := PodCreateAndWaitForReady(env, &azCLiPod, 180)
+	err := pods.CreateAndWaitForReady(env.Ctx, env.Client, &azCLiPod, 180)
 	if err != nil {
 		return err
 	}
