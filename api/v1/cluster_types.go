@@ -1634,6 +1634,9 @@ type BackupSource struct {
 	// errors with certificate issuer and barman-cloud-wal-archive.
 	// +optional
 	EndpointCA *SecretKeySelector `json:"endpointCA,omitempty"`
+
+	// When set to true the operator will delegate the restore process to the registered restore plugin.
+	UsePlugin *bool `json:"usePlugin,omitempty"`
 }
 
 // BootstrapPgBaseBackup contains the configuration required to take

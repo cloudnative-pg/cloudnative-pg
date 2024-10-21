@@ -24,3 +24,6 @@ const ContextKeyCluster contextKey = "cluster"
 
 // PluginClientKey is the context key holding cluster data
 const PluginClientKey contextKey = "pluginClient"
+
+// GRPCTimeoutKey is the context key holding the gRPC timeout
+const GRPCTimeoutKey contextKey = "grpcTimeout"
