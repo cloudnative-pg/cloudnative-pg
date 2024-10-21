@@ -34,14 +34,8 @@ var _ = Describe("Executable hash detection", func() {
 	It("retrieves a hash from a given filename", func() {
 		const expectedHash = "d6672ee3a93d0d6e3c30bdef89f310799c2f3ab781098a9792040d5541ce3ed3"
 		const fileName = "test-hash"
-		var tempDir string
 
-		DeferCleanup(func() {
-			Expect(os.RemoveAll(tempDir)).To(Succeed())
-		})
-
-		tempDir, err := os.MkdirTemp("", "test")
-		Expect(err).NotTo(HaveOccurred())
+		tempDir := GinkgoT().TempDir()
 		Expect(os.WriteFile(filepath.Join(tempDir, fileName), []byte(fileName), 0o600)).To(Succeed())
 
 		result, err := GetByName(filepath.Join(tempDir, fileName))
