@@ -855,7 +855,7 @@ parameter is omitted</p>
    <p>Whether the backup was online/hot (<code>true</code>) or offline/cold (<code>false</code>)</p>
 </td>
 </tr>
-<tr><td><code>pluginMetadata</code> <B>[Required]</B><br/>
+<tr><td><code>pluginMetadata</code><br/>
 <i>map[string]string</i>
 </td>
 <td>
@@ -1911,7 +1911,7 @@ any plugin to be loaded with the corresponding configuration</p>
 during a switchover or a failover</p>
 </td>
 </tr>
-<tr><td><code>lastPromotionToken</code> <B>[Required]</B><br/>
+<tr><td><code>lastPromotionToken</code><br/>
 <i>string</i>
 </td>
 <td>
