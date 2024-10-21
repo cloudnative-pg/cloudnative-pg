@@ -46,7 +46,7 @@ the database in Postgres.
 
 ### Managing an existing database via a Database manifest
 
-It is possible to declare a Database object that will handle an existing
+It is possible to declare a Database object that references an existing
 database. In such case, the Database's fields will be applied using `ALTER`
 statements, rather than `CREATE`. There are differences between these two
 Postgres commands. In particular, the options accepted by `ALTER` are a subset
