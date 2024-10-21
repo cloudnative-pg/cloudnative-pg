@@ -256,16 +256,14 @@ var _ = Describe("AvailableArchitecture", func() {
 		})
 
 		It("should retrieve an existing available architecture", func() {
-			tempDir, err := os.MkdirTemp("", "test")
-			Expect(err).NotTo(HaveOccurred())
+			tempDir := GinkgoT().TempDir()
 			DeferCleanup(func() {
-				Expect(os.RemoveAll(tempDir)).To(Succeed())
 				availableArchitectures = nil
 			})
 
 			// Create a sample file
 			Expect(os.WriteFile(filepath.Join(tempDir, "manager_amd64"), []byte("amd64"), 0o600)).To(Succeed())
-			err = detectAvailableArchitectures(filepath.Join(tempDir, "manager_*"))
+			err := detectAvailableArchitectures(filepath.Join(tempDir, "manager_*"))
 			Expect(err).ToNot(HaveOccurred())
 			Expect(availableArchitectures).To(HaveLen(1))
 
