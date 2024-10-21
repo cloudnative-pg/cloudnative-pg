@@ -260,6 +260,7 @@ type Pooler struct {
 // PoolerList contains a list of Pooler
 type PoolerList struct {
 	metav1.TypeMeta `json:",inline"`
+	// +optional
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []Pooler `json:"items"`
 }
