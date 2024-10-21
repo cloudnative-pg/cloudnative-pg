@@ -24,6 +24,7 @@ nav:
   - image_catalog.md
   - bootstrap.md
   - database_import.md
+  - declarative_publication_subscription_management.md
   - security.md
   - instance_manager.md
   - scheduling.md

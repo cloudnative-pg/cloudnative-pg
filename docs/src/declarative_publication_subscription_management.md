@@ -1,21 +1,48 @@
-# Declarative Publication/Subscription Management 
+# Declarative Publication/Subscription Management
 
 Declarative publication/subscription management enables users to set up
-logical replication via new Custom Resource Definitions (CRD)
+logical replication via the following Custom Resource Definitions (CRD):
+
 - `Database` ,
 - `Publication`,
 - `Subscription`,
 
-Database CRD is widely discussed in
+The Database CRD is discussed in depth in the
 ["Declarative database management"](declarative_database_management.md) section.
+In this section we describe `Publication` and `Subscription` in more detail.
 
-Logical replication is set up between one source cluster with publication 
-and one destination cluster that is subscribed to that publication.
+## Overview
+
+The procedure to set up logical replication:
+
+- Begins with two CloudNativePG clusters.
+    - One of them will be the "source"
+    - The "destination" cluster should have an `externalClusters` stanza
+      containing the connection information to the source cluster
+- A Database object creating a database (e.g. named `sample`) in the source
+  cluster
+- A Database object creating a database with the same name in the destination
+  cluster
+- A Publication in the source cluster referencing the database
+- A Subscription in the destination cluster, referencing the Publication that
+  was created in the previous step
+
+Once these objects are reconciled, PostgreSQL will replicate the data from
+the source cluster to the destination cluster using logical replication. There
+are many use cases for logical replication; please refer to the
+[PostgreSQL documentation](https://www.postgresql.org/docs/current/logical-replication.html)
+for detailed discussion.
+
+!!! Note
+    the `externalClusters` section in the destination cluster has the same
+    structure used in [database import](database_import.md) as well as for
+    replica clusters. However, the destination cluster does not necessarily
+    have to be bootstrapped via replication nor import.
 
 ### Example: Simple Publication Declaration
 
-A `Publication` object is managed by the instance manager of the source cluster's
-primary instance.
+A `Publication` object is managed by the instance manager of the source
+cluster's primary instance.
 Below is an example of a basic `Publication` configuration:
 
 ```yaml
@@ -33,8 +60,8 @@ spec:
 ```
 
 The `dbname` field specifies the database the publication is applied to.
-Once the reconciliation cycle is completed successfully, the `Publication` 
-status will show a `ready` field set to `true` and an empty `error` field.
+Once the reconciliation cycle is completed successfully, the `Publication`
+status will show a `ready` field set to `true`, and an empty `error` field.
 
 ### Publication Deletion and Reclaim Policies
 
@@ -71,11 +98,10 @@ spec:
 
 In this case, when the `Publication` object is deleted, the corresponding PostgreSQL publication will also be removed automatically.
 
-
 ### Example: Simple Subscription Declaration
 
-A `Subscription` object is managed by the instance manager of the destination cluster's
-primary instance.
+A `Subscription` object is managed by the instance manager of the destination
+cluster's primary instance.
 Below is an example of a basic `Subscription` configuration:
 
 ```yaml
@@ -99,7 +125,7 @@ The `externalClusterName` field specifies the external cluster the publication b
 Once the reconciliation cycle is completed successfully, the `Subscription`
 status will show a `ready` field set to `true` and an empty `error` field.
 
-### Subscription Deletion and Reclaim Policies
+## Subscription Deletion and Reclaim Policies
 
 A finalizer named `cnpg.io/deleteSubscription` is automatically added
 to each `Subscription` object to control its deletion process.

@@ -260,7 +260,7 @@ func getSubscriptionConnectionString(
 ) (string, error) {
 	externalCluster, ok := cluster.ExternalCluster(externalClusterName)
 	if !ok {
-		return "", fmt.Errorf("external cluster %s not found in the cluster %s", externalClusterName, cluster.Name)
+		return "", fmt.Errorf("externalCluster '%s' not declared in cluster %s", externalClusterName, cluster.Name)
 	}
 
 	return external.GetServerConnectionString(&externalCluster, databaseName), nil
