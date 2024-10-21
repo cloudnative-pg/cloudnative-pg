@@ -507,7 +507,8 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 				// trigger any Pod restart. We still test that the operator
 				// is upgraded in this case too.
 				_, stderr, err := testsUtils.Run(
-					fmt.Sprintf("kubectl annotate -n %s cluster/%s cnpg.io/reconcilePodSpec=disabled", upgradeNamespace, clusterName1))
+					fmt.Sprintf("kubectl annotate -n %s cluster/%s cnpg.io/reconcilePodSpec=disabled",
+						upgradeNamespace, clusterName1))
 				Expect(err).NotTo(HaveOccurred(), "stderr: "+stderr)
 			}
 		})
