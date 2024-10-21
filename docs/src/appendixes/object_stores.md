@@ -282,10 +282,11 @@ spec:
   serviceAccountTemplate:
     metadata:
       annotations:
-        iam.gke.io/gcp-service-account:  [...].iam.gserviceaccount.com
+        iam.gke.io/gcp-service-account:  service-[your numerical project number]@container-engine-robot.iam.gserviceaccount.com
         [...]
 ```
 
+Relevant info on GCP Service Account: https://cloud.google.com/kubernetes-engine/docs/how-to/service-accounts#gke-service-agents
 ### Using authentication
 
 Following the [instruction from Google](https://cloud.google.com/docs/authentication/getting-started)
