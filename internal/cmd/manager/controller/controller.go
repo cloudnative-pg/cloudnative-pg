@@ -305,7 +305,9 @@ func getNamespacesToWatch(conf *configuration.Data) map[string]cache.Config {
 		setupLog.Info("Listening for changes on all namespaces")
 		return nil
 	}
-	namespaces := map[string]cache.Config{}
+	namespaces := map[string]cache.Config{
+		conf.OperatorNamespace: {},
+	}
 	for _, namespace := range conf.WatchedNamespaces() {
 		namespaces[namespace] = cache.Config{}
 	}
