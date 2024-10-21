@@ -259,7 +259,13 @@ func prepareClusterBackupOnAzurite(
 	// Setting up Azurite and az cli along with Postgresql cluster
 	prepareClusterOnAzurite(namespace, clusterName, clusterSampleFile)
 	// Write a table and some data on the "app" database
-	AssertCreateTestData(env, namespace, clusterName, tableName)
+	tableLocator := TableLocator{
+		Namespace:    namespace,
+		ClusterName:  clusterName,
+		DatabaseName: testUtils.AppDBName,
+		TableName:    tableName,
+	}
+	AssertCreateTestData(env, tableLocator)
 	AssertArchiveWalOnAzurite(namespace, clusterName)
 
 	By("backing up a cluster and verifying it exists on azurite", func() {
@@ -299,7 +305,13 @@ func prepareClusterForPITROnAzurite(
 	})
 
 	// Write a table and insert 2 entries on the "app" database
-	AssertCreateTestData(env, namespace, clusterName, "for_restore")
+	tableLocator := TableLocator{
+		Namespace:    namespace,
+		ClusterName:  clusterName,
+		DatabaseName: testUtils.AppDBName,
+		TableName:    "for_restore",
+	}
+	AssertCreateTestData(env, tableLocator)
 
 	By("getting currentTimestamp", func() {
 		ts, err := testUtils.GetCurrentTimestamp(namespace, clusterName, env)

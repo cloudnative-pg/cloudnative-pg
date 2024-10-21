@@ -18,7 +18,6 @@ package utils
 
 import (
 	"fmt"
-	"github.com/onsi/ginkgo/v2"
 	"os"
 
 	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
@@ -27,7 +26,8 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 
-	. "github.com/onsi/gomega" // nolint
+	. "github.com/onsi/ginkgo/v2" // nolint
+	. "github.com/onsi/gomega"    // nolint
 )
 
 // ExecuteBackup performs a backup and checks the backup status
@@ -370,8 +370,10 @@ func (env TestingEnvironment) GetVolumeSnapshot(
 	return volumeSnapshot, nil
 }
 
+// AssertBackupConditionInClusterStatus check that the backup condition in the Cluster's Status
+// eventually returns true
 func AssertBackupConditionInClusterStatus(env *TestingEnvironment, namespace, clusterName string) {
-	ginkgo.By(fmt.Sprintf("waiting for backup condition status in cluster '%v'", clusterName), func() {
+	By(fmt.Sprintf("waiting for backup condition status in cluster '%v'", clusterName), func() {
 		Eventually(func() (string, error) {
 			getBackupCondition, err := GetConditionsInClusterStatus(
 				namespace, clusterName, env, apiv1.ConditionBackup)

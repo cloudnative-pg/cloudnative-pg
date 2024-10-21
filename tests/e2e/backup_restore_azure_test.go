@@ -79,7 +79,13 @@ var _ = Describe("Azure - Backup and restore", Label(tests.LabelBackupRestore), 
 		// be there
 		It("backs up and restore a cluster", func() {
 			// Write a table and some data on the "app" database
-			AssertCreateTestData(env, namespace, clusterName, tableName)
+			tableLocator := TableLocator{
+				Namespace:    namespace,
+				ClusterName:  clusterName,
+				DatabaseName: testUtils.AppDBName,
+				TableName:    tableName,
+			}
+			AssertCreateTestData(env, tableLocator)
 			AssertArchiveWalOnAzureBlob(namespace, clusterName, env.AzureConfiguration)
 			By("uploading a backup", func() {
 				// We create a backup
@@ -232,7 +238,13 @@ var _ = Describe("Azure - Clusters Recovery From Barman Object Store", Label(tes
 
 			It("restores a cluster from barman object using 'barmanObjectStore' option in 'externalClusters' section", func() {
 				// Write a table and some data on the "app" database
-				AssertCreateTestData(env, namespace, clusterName, tableName)
+				tableLocator := TableLocator{
+					Namespace:    namespace,
+					ClusterName:  clusterName,
+					DatabaseName: testUtils.AppDBName,
+					TableName:    tableName,
+				}
+				AssertCreateTestData(env, tableLocator)
 				AssertArchiveWalOnAzureBlob(namespace, clusterName, env.AzureConfiguration)
 
 				By("backing up a cluster and verifying it exists on azure blob storage", func() {
@@ -318,7 +330,13 @@ var _ = Describe("Azure - Clusters Recovery From Barman Object Store", Label(tes
 
 			It("restores cluster from barman object using 'barmanObjectStore' option in 'externalClusters' section", func() {
 				// Write a table and some data on the "app" database
-				AssertCreateTestData(env, namespace, clusterName, tableName)
+				tableLocator := TableLocator{
+					Namespace:    namespace,
+					ClusterName:  clusterName,
+					DatabaseName: testUtils.AppDBName,
+					TableName:    tableName,
+				}
+				AssertCreateTestData(env, tableLocator)
 
 				// Create a WAL on the primary and check if it arrives in the
 				// Azure Blob Storage within a short time
