@@ -70,7 +70,14 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 		Expect(err).ToNot(HaveOccurred())
 
 		By("creating the credentials for minio", func() {
-			AssertStorageCredentialsAreCreated(namespace, "backup-storage-creds", "minio", "minio123")
+			_, err = testUtils.CreateObjectStorageSecret(
+				namespace,
+				"backup-storage-creds",
+				"minio",
+				"minio123",
+				env,
+			)
+			Expect(err).ToNot(HaveOccurred())
 		})
 
 		By("create the certificates for MinIO", func() {

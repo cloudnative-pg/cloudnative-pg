@@ -110,7 +110,16 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 			Expect(err).ToNot(HaveOccurred())
 
 			// We create the MinIO credentials required to login into the system
-			AssertStorageCredentialsAreCreated(namespace, "backup-storage-creds", "minio", "minio123")
+			By("creating the credentials for minio", func() {
+				_, err = testUtils.CreateObjectStorageSecret(
+					namespace,
+					"backup-storage-creds",
+					"minio",
+					"minio123",
+					env,
+				)
+				Expect(err).ToNot(HaveOccurred())
+			})
 
 			By("create the certificates for MinIO", func() {
 				err := minioEnv.CreateCaSecret(env, namespace)
@@ -370,7 +379,16 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 			Expect(err).ToNot(HaveOccurred())
 
 			// We create the required credentials for MinIO
-			AssertStorageCredentialsAreCreated(namespace, "backup-storage-creds", "minio", "minio123")
+			By("creating the credentials for minio", func() {
+				_, err = testUtils.CreateObjectStorageSecret(
+					namespace,
+					"backup-storage-creds",
+					"minio",
+					"minio123",
+					env,
+				)
+				Expect(err).ToNot(HaveOccurred())
+			})
 
 			By("create the certificates for MinIO", func() {
 				err := minioEnv.CreateCaSecret(env, namespace)

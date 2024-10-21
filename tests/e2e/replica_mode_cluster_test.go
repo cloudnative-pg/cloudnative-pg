@@ -256,8 +256,16 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			Expect(err).ToNot(HaveOccurred())
 			replicaNamespace, err := env.CreateUniqueTestNamespace(replicaNamespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
+
 			By("creating the credentials for minio", func() {
-				AssertStorageCredentialsAreCreated(replicaNamespace, "backup-storage-creds", "minio", "minio123")
+				_, err = testUtils.CreateObjectStorageSecret(
+					replicaNamespace,
+					"backup-storage-creds",
+					"minio",
+					"minio123",
+					env,
+				)
+				Expect(err).ToNot(HaveOccurred())
 			})
 
 			By("create the certificates for MinIO", func() {
@@ -314,7 +322,14 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			By("creating the credentials for minio", func() {
-				AssertStorageCredentialsAreCreated(namespace, "backup-storage-creds", "minio", "minio123")
+				_, err = testUtils.CreateObjectStorageSecret(
+					namespace,
+					"backup-storage-creds",
+					"minio",
+					"minio123",
+					env,
+				)
+				Expect(err).ToNot(HaveOccurred())
 			})
 
 			By("create the certificates for MinIO", func() {
@@ -538,7 +553,14 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication), Ordered, f
 			DeferCleanup(func() { close(stopLoad) })
 
 			By("creating the credentials for minio", func() {
-				AssertStorageCredentialsAreCreated(namespace, "backup-storage-creds", "minio", "minio123")
+				_, err = testUtils.CreateObjectStorageSecret(
+					namespace,
+					"backup-storage-creds",
+					"minio",
+					"minio123",
+					env,
+				)
+				Expect(err).ToNot(HaveOccurred())
 			})
 
 			By("create the certificates for MinIO", func() {

@@ -20,6 +20,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
+	"time"
 
 	apiv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -572,4 +574,72 @@ func CountFilesOnAzuriteBlobStorage(
 	var arr []string
 	err = json.Unmarshal([]byte(out), &arr)
 	return len(arr), err
+}
+
+// verifySASTokenWriteActivity returns true if the given token has RW permissions,
+// otherwise it returns false
+func verifySASTokenWriteActivity(containerName string, id string, key string) bool {
+	_, _, err := RunUnchecked(fmt.Sprintf("az storage container create "+
+		"--name %v --account-name %v "+
+		"--sas-token %v", containerName, id, key))
+
+	return err == nil
+}
+
+// CreateSASTokenCredentials generates Secrets for the Azure Blob Storage
+func CreateSASTokenCredentials(namespace string, id string, key string, env *TestingEnvironment) error {
+	// Adding 24 hours to the current time
+	date := time.Now().UTC().Add(time.Hour * 24)
+	// Creating date time format for az command
+	expiringDate := fmt.Sprintf("%v"+"-"+"%d"+"-"+"%v"+"T"+"%v"+":"+"%v"+"Z",
+		date.Year(),
+		date.Month(),
+		date.Day(),
+		date.Hour(),
+		date.Minute())
+
+	out, _, err := Run(fmt.Sprintf(
+		// SAS Token at Blob Container level does not currently work in Barman Cloud
+		// https://github.com/EnterpriseDB/barman/issues/388
+		// we will use SAS Token at Storage Account level
+		// ( "az storage container generate-sas --account-name %v "+
+		// "--name %v "+
+		// "--https-only --permissions racwdl --auth-mode key --only-show-errors "+
+		// "--expiry \"$(date -u -d \"+4 hours\" '+%%Y-%%m-%%dT%%H:%%MZ')\"",
+		// id, blobContainerName )
+		"az storage account generate-sas --account-name %v "+
+			"--https-only --permissions cdlruwap --account-key %v "+
+			"--resource-types co --services b --expiry %v -o tsv",
+		id, key, expiringDate))
+	if err != nil {
+		return err
+	}
+	SASTokenRW := strings.TrimRight(out, "\n")
+
+	out, _, err = Run(fmt.Sprintf(
+		"az storage account generate-sas --account-name %v "+
+			"--https-only --permissions lr --account-key %v "+
+			"--resource-types co --services b --expiry %v -o tsv",
+		id, key, expiringDate))
+	if err != nil {
+		return err
+	}
+
+	SASTokenRO := strings.TrimRight(out, "\n")
+	isReadWrite := verifySASTokenWriteActivity("restore-cluster-sas", id, SASTokenRO)
+	if isReadWrite {
+		return fmt.Errorf("expected token to be ready only")
+	}
+
+	_, err = CreateObjectStorageSecret(namespace, "backup-storage-creds-sas", id, SASTokenRW, env)
+	if err != nil {
+		return err
+	}
+
+	_, err = CreateObjectStorageSecret(namespace, "restore-storage-creds-sas", id, SASTokenRO, env)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

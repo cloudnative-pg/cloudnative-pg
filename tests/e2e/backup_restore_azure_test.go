@@ -66,12 +66,14 @@ var _ = Describe("Azure - Backup and restore", Label(tests.LabelBackupRestore), 
 			// The credentials are retrieved from the environment variables, as we can't create
 			// a fixture for them
 			By("creating the Azure Blob Storage credentials", func() {
-				AssertStorageCredentialsAreCreated(
+				_, err = testUtils.CreateObjectStorageSecret(
 					namespace,
 					"backup-storage-creds",
 					env.AzureConfiguration.StorageAccount,
 					env.AzureConfiguration.StorageKey,
+					env,
 				)
+				Expect(err).ToNot(HaveOccurred())
 			})
 
 			// Create the cluster
@@ -231,8 +233,13 @@ var _ = Describe("Azure - Clusters Recovery From Barman Object Store", Label(tes
 				// The credentials are retrieved from the environment variables, as we can't create
 				// a fixture for them
 				By("creating the Azure Blob Storage credentials", func() {
-					AssertStorageCredentialsAreCreated(namespace, "backup-storage-creds",
-						env.AzureConfiguration.StorageAccount, env.AzureConfiguration.StorageKey)
+					_, err = testUtils.CreateObjectStorageSecret(
+						namespace,
+						"backup-storage-creds",
+						env.AzureConfiguration.StorageAccount,
+						env.AzureConfiguration.StorageKey,
+						env)
+					Expect(err).ToNot(HaveOccurred())
 				})
 
 				// Create the cluster
@@ -323,8 +330,13 @@ var _ = Describe("Azure - Clusters Recovery From Barman Object Store", Label(tes
 				// we get the credentials from the environment variables as we can't create
 				// a fixture for them
 				By("creating the Azure Blob Container SAS Token credentials", func() {
-					AssertCreateSASTokenCredentials(namespace, env.AzureConfiguration.StorageAccount,
-						env.AzureConfiguration.StorageKey)
+					err = testUtils.CreateSASTokenCredentials(
+						namespace,
+						env.AzureConfiguration.StorageAccount,
+						env.AzureConfiguration.StorageKey,
+						env,
+					)
+					Expect(err).ToNot(HaveOccurred())
 				})
 
 				// Create the Cluster

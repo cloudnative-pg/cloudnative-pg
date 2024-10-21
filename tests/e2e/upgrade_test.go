@@ -481,7 +481,14 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 			CreateResourceFromFile(upgradeNamespace, pgSecrets)
 		})
 		By("creating the cloud storage credentials", func() {
-			AssertStorageCredentialsAreCreated(upgradeNamespace, "aws-creds", "minio", "minio123")
+			_, err := testsUtils.CreateObjectStorageSecret(
+				upgradeNamespace,
+				"aws-creds",
+				"minio",
+				"minio123",
+				env,
+			)
+			Expect(err).NotTo(HaveOccurred())
 		})
 		By("create the certificates for MinIO", func() {
 			err := minioEnv.CreateCaSecret(env, upgradeNamespace)

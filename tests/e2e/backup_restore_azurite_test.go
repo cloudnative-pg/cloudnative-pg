@@ -266,7 +266,7 @@ func prepareClusterBackupOnAzurite(
 		TableName:    tableName,
 	}
 	AssertCreateTestData(env, tableLocator)
-	AssertArchiveWalOnAzurite(namespace, clusterName)
+	assertArchiveWalOnAzurite(namespace, clusterName)
 
 	By("backing up a cluster and verifying it exists on azurite", func() {
 		// We create a Backup
@@ -333,10 +333,10 @@ func prepareClusterForPITROnAzurite(
 		Expect(err).ToNot(HaveOccurred())
 		insertRecordIntoTable("for_restore", 3, conn)
 	})
-	AssertArchiveWalOnAzurite(namespace, clusterName)
+	assertArchiveWalOnAzurite(namespace, clusterName)
 }
 
-func AssertArchiveWalOnAzurite(namespace, clusterName string) {
+func assertArchiveWalOnAzurite(namespace, clusterName string) {
 	// Create a WAL on the primary and check if it arrives at the Azure Blob Storage within a short time
 	By("archiving WALs and verifying they exist", func() {
 		primary := clusterName + "-1"

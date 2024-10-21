@@ -168,7 +168,13 @@ var _ = Describe("Verify Volume Snapshot",
 					Expect(err).ToNot(HaveOccurred())
 				})
 
-				AssertStorageCredentialsAreCreated(namespace, "backup-storage-creds", "minio", "minio123")
+				_, err = testUtils.CreateObjectStorageSecret(
+					namespace,
+					"backup-storage-creds",
+					"minio",
+					"minio123",
+					env)
+				Expect(err).ToNot(HaveOccurred())
 			})
 
 			It("correctly executes PITR with a cold snapshot", func() {
@@ -603,7 +609,16 @@ var _ = Describe("Verify Volume Snapshot",
 					Expect(err).ToNot(HaveOccurred())
 				})
 
-				AssertStorageCredentialsAreCreated(namespace, "backup-storage-creds", "minio", "minio123")
+				By("creating the credentials for minio", func() {
+					_, err = testUtils.CreateObjectStorageSecret(
+						namespace,
+						"backup-storage-creds",
+						"minio",
+						"minio123",
+						env,
+					)
+					Expect(err).ToNot(HaveOccurred())
+				})
 
 				By("creating the cluster to snapshot", func() {
 					AssertCreateCluster(namespace, clusterToSnapshotName, clusterToSnapshot, env)

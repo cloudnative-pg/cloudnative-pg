@@ -763,16 +763,6 @@ func AssertNewPrimary(namespace string, clusterName string, oldPrimary string) {
 	})
 }
 
-func AssertStorageCredentialsAreCreated(namespace string, name string, id string, key string) {
-	Eventually(func() error {
-		_, _, err := testsUtils.Run(fmt.Sprintf("kubectl create secret generic %v -n %v "+
-			"--from-literal='ID=%v' "+
-			"--from-literal='KEY=%v'",
-			name, namespace, id, key))
-		return err
-	}, 60, 5).Should(BeNil())
-}
-
 // CheckPointAndSwitchWalOnPrimary trigger a checkpoint and switch wal on primary pod and returns the latest WAL file
 func CheckPointAndSwitchWalOnPrimary(namespace, clusterName string) string {
 	var latestWAL string
@@ -1461,54 +1451,6 @@ func AssertSSLVerifyFullDBConnectionFromAppPod(namespace string, clusterName str
 			return stdout, stderr, err
 		}, 360).Should(BeEquivalentTo("1\n"))
 	})
-}
-
-func AssertCreateSASTokenCredentials(namespace string, id string, key string) {
-	// Adding 24 hours to the current time
-	date := time.Now().UTC().Add(time.Hour * 24)
-	// Creating date time format for az command
-	expiringDate := fmt.Sprintf("%v"+"-"+"%d"+"-"+"%v"+"T"+"%v"+":"+"%v"+"Z",
-		date.Year(),
-		date.Month(),
-		date.Day(),
-		date.Hour(),
-		date.Minute())
-
-	out, _, err := testsUtils.Run(fmt.Sprintf(
-		// SAS Token at Blob Container level does not currently work in Barman Cloud
-		// https://github.com/EnterpriseDB/barman/issues/388
-		// we will use SAS Token at Storage Account level
-		// ( "az storage container generate-sas --account-name %v "+
-		// "--name %v "+
-		// "--https-only --permissions racwdl --auth-mode key --only-show-errors "+
-		// "--expiry \"$(date -u -d \"+4 hours\" '+%%Y-%%m-%%dT%%H:%%MZ')\"",
-		// id, blobContainerName )
-		"az storage account generate-sas --account-name %v "+
-			"--https-only --permissions cdlruwap --account-key %v "+
-			"--resource-types co --services b --expiry %v -o tsv",
-		id, key, expiringDate))
-	Expect(err).ToNot(HaveOccurred())
-	SASTokenRW := strings.TrimRight(out, "\n")
-
-	out, _, err = testsUtils.Run(fmt.Sprintf(
-		"az storage account generate-sas --account-name %v "+
-			"--https-only --permissions lr --account-key %v "+
-			"--resource-types co --services b --expiry %v -o tsv",
-		id, key, expiringDate))
-	Expect(err).ToNot(HaveOccurred())
-	SASTokenRO := strings.TrimRight(out, "\n")
-
-	AssertROSASTokenUnableToWrite("restore-cluster-sas", id, SASTokenRO)
-
-	AssertStorageCredentialsAreCreated(namespace, "backup-storage-creds-sas", id, SASTokenRW)
-	AssertStorageCredentialsAreCreated(namespace, "restore-storage-creds-sas", id, SASTokenRO)
-}
-
-func AssertROSASTokenUnableToWrite(containerName string, id string, key string) {
-	_, _, err := testsUtils.RunUnchecked(fmt.Sprintf("az storage container create "+
-		"--name %v --account-name %v "+
-		"--sas-token %v", containerName, id, key))
-	Expect(err).To(HaveOccurred())
 }
 
 func AssertClusterAsyncReplica(namespace, sourceClusterFile, restoreClusterFile, tableName string) {

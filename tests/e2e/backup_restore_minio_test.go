@@ -72,7 +72,14 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			})
 
 			By("creating the credentials for minio", func() {
-				AssertStorageCredentialsAreCreated(namespace, "backup-storage-creds", "minio", "minio123")
+				_, err = testUtils.CreateObjectStorageSecret(
+					namespace,
+					"backup-storage-creds",
+					"minio",
+					"minio123",
+					env,
+				)
+				Expect(err).ToNot(HaveOccurred())
 			})
 
 			// Create ConfigMap and secrets to verify metrics for target database after backup restore
@@ -550,7 +557,16 @@ var _ = Describe("MinIO - Clusters Recovery from Barman Object Store", Label(tes
 			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 
-			AssertStorageCredentialsAreCreated(namespace, "backup-storage-creds", "minio", "minio123")
+			By("creating the credentials for minio", func() {
+				_, err = testUtils.CreateObjectStorageSecret(
+					namespace,
+					"backup-storage-creds",
+					"minio",
+					"minio123",
+					env,
+				)
+				Expect(err).ToNot(HaveOccurred())
+			})
 
 			By("create the certificates for MinIO", func() {
 				err := minioEnv.CreateCaSecret(env, namespace)
