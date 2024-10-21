@@ -1956,22 +1956,6 @@ func AssertArchiveConditionMet(namespace, clusterName, timeout string) {
 	})
 }
 
-func AssertArchiveWalOnAzureBlob(namespace, clusterName string, configuration testsUtils.AzureConfiguration) {
-	// Create a WAL on the primary and check if it arrives at the Azure Blob Storage, within a short time
-	By("archiving WALs and verifying they exist", func() {
-		primary, err := env.GetClusterPrimary(namespace, clusterName)
-		Expect(err).ToNot(HaveOccurred())
-		latestWAL := switchWalAndGetLatestArchive(primary.Namespace, primary.Name)
-		// Define what file we are looking for in Azure.
-		// Escapes are required since az expects forward slashes to be escaped
-		path := fmt.Sprintf("wals\\/0000000100000000\\/%v.gz", latestWAL)
-		// Verifying on blob storage using az
-		Eventually(func() (int, error) {
-			return testsUtils.CountFilesOnAzureBlobStorage(configuration, clusterName, path)
-		}, 60).Should(BeEquivalentTo(1))
-	})
-}
-
 // switchWalAndGetLatestArchive trigger a new wal and get the name of latest wal file
 func switchWalAndGetLatestArchive(namespace, podName string) string {
 	_, _, err := env.ExecQueryInInstancePod(
@@ -1993,63 +1977,6 @@ func switchWalAndGetLatestArchive(namespace, podName string) string {
 	Expect(err).ToNot(HaveOccurred())
 
 	return strings.TrimSpace(out)
-}
-
-func prepareClusterForPITROnAzureBlob(
-	namespace string,
-	clusterName string,
-	backupSampleFile string,
-	azureConfig testsUtils.AzureConfiguration,
-	expectedVal int,
-	currentTimestamp *string,
-) {
-	const tableNamePitr = "for_restore"
-	By("backing up a cluster and verifying it exists on Azure Blob", func() {
-		testsUtils.ExecuteBackup(namespace, backupSampleFile, false, testTimeouts[testsUtils.BackupIsReady], env)
-
-		Eventually(func() (int, error) {
-			return testsUtils.CountFilesOnAzureBlobStorage(azureConfig, clusterName, "data.tar")
-		}, 30).Should(BeEquivalentTo(expectedVal))
-		Eventually(func() (string, error) {
-			cluster, err := env.GetCluster(namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
-			return cluster.Status.FirstRecoverabilityPoint, err
-		}, 30).ShouldNot(BeEmpty())
-	})
-
-	// Write a table and insert 2 entries on the "app" database
-	tableLocator := TableLocator{
-		Namespace:    namespace,
-		ClusterName:  clusterName,
-		DatabaseName: testsUtils.AppDBName,
-		TableName:    tableNamePitr,
-	}
-	AssertCreateTestData(env, tableLocator)
-
-	By("getting currentTimestamp", func() {
-		ts, err := testsUtils.GetCurrentTimestamp(namespace, clusterName, env)
-		*currentTimestamp = ts
-		Expect(err).ToNot(HaveOccurred())
-	})
-
-	By(fmt.Sprintf("writing 3rd entry into test table '%v'", tableNamePitr), func() {
-		forward, conn, err := testsUtils.ForwardPSQLConnection(
-			env,
-			namespace,
-			clusterName,
-			testsUtils.AppDBName,
-			apiv1.ApplicationUserSecretSuffix,
-		)
-		defer func() {
-			_ = conn.Close()
-			forward.Close()
-		}()
-		Expect(err).ToNot(HaveOccurred())
-		insertRecordIntoTable(tableNamePitr, 3, conn)
-	})
-	AssertArchiveWalOnAzureBlob(namespace, clusterName, env.AzureConfiguration)
-	AssertArchiveConditionMet(namespace, clusterName, "5m")
-	testsUtils.AssertBackupConditionInClusterStatus(env, namespace, clusterName)
 }
 
 func createAndAssertPgBouncerPoolerIsSetUp(namespace, poolerYamlFilePath string, expectedInstanceCount int) {

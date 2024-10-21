@@ -17,6 +17,9 @@ limitations under the License.
 package e2e
 
 import (
+	"fmt"
+
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	testUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
@@ -86,7 +89,7 @@ var _ = Describe("Azure - Backup and restore", Label(tests.LabelBackupRestore), 
 				TableName:    tableName,
 			}
 			AssertCreateTestData(env, tableLocator)
-			AssertArchiveWalOnAzureBlob(namespace, clusterName, env.AzureConfiguration)
+			assertArchiveWalOnAzureBlob(namespace, clusterName, env.AzureConfiguration)
 			By("uploading a backup", func() {
 				// We create a backup
 				testUtils.ExecuteBackup(namespace, backupFile, false, testTimeouts[testUtils.BackupIsReady], env)
@@ -138,7 +141,7 @@ var _ = Describe("Azure - Backup and restore", Label(tests.LabelBackupRestore), 
 				currentTimestamp,
 			)
 
-			AssertArchiveWalOnAzureBlob(namespace, clusterName, env.AzureConfiguration)
+			assertArchiveWalOnAzureBlob(namespace, clusterName, env.AzureConfiguration)
 
 			cluster, err := testUtils.CreateClusterFromBackupUsingPITR(
 				namespace,
@@ -245,7 +248,7 @@ var _ = Describe("Azure - Clusters Recovery From Barman Object Store", Label(tes
 					TableName:    tableName,
 				}
 				AssertCreateTestData(env, tableLocator)
-				AssertArchiveWalOnAzureBlob(namespace, clusterName, env.AzureConfiguration)
+				assertArchiveWalOnAzureBlob(namespace, clusterName, env.AzureConfiguration)
 
 				By("backing up a cluster and verifying it exists on azure blob storage", func() {
 					// Create the backup
@@ -340,7 +343,7 @@ var _ = Describe("Azure - Clusters Recovery From Barman Object Store", Label(tes
 
 				// Create a WAL on the primary and check if it arrives in the
 				// Azure Blob Storage within a short time
-				AssertArchiveWalOnAzureBlob(namespace, clusterName, env.AzureConfiguration)
+				assertArchiveWalOnAzureBlob(namespace, clusterName, env.AzureConfiguration)
 
 				By("backing up a cluster and verifying it exists on azure blob storage", func() {
 					// We create a Backup
@@ -396,3 +399,76 @@ var _ = Describe("Azure - Clusters Recovery From Barman Object Store", Label(tes
 		})
 	})
 })
+
+func assertArchiveWalOnAzureBlob(namespace, clusterName string, configuration testUtils.AzureConfiguration) {
+	// Create a WAL on the primary and check if it arrives at the Azure Blob Storage, within a short time
+	By("archiving WALs and verifying they exist", func() {
+		primary, err := env.GetClusterPrimary(namespace, clusterName)
+		Expect(err).ToNot(HaveOccurred())
+		latestWAL := switchWalAndGetLatestArchive(primary.Namespace, primary.Name)
+		// Define what file we are looking for in Azure.
+		// Escapes are required since az expects forward slashes to be escaped
+		path := fmt.Sprintf("wals\\/0000000100000000\\/%v.gz", latestWAL)
+		// Verifying on blob storage using az
+		Eventually(func() (int, error) {
+			return testUtils.CountFilesOnAzureBlobStorage(configuration, clusterName, path)
+		}, 60).Should(BeEquivalentTo(1))
+	})
+}
+
+func prepareClusterForPITROnAzureBlob(
+	namespace string,
+	clusterName string,
+	backupSampleFile string,
+	azureConfig testUtils.AzureConfiguration,
+	expectedVal int,
+	currentTimestamp *string,
+) {
+	const tableNamePitr = "for_restore"
+	By("backing up a cluster and verifying it exists on Azure Blob", func() {
+		testUtils.ExecuteBackup(namespace, backupSampleFile, false, testTimeouts[testUtils.BackupIsReady], env)
+
+		Eventually(func() (int, error) {
+			return testUtils.CountFilesOnAzureBlobStorage(azureConfig, clusterName, "data.tar")
+		}, 30).Should(BeEquivalentTo(expectedVal))
+		Eventually(func() (string, error) {
+			cluster, err := env.GetCluster(namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+			return cluster.Status.FirstRecoverabilityPoint, err
+		}, 30).ShouldNot(BeEmpty())
+	})
+
+	// Write a table and insert 2 entries on the "app" database
+	tableLocator := TableLocator{
+		Namespace:    namespace,
+		ClusterName:  clusterName,
+		DatabaseName: testUtils.AppDBName,
+		TableName:    tableNamePitr,
+	}
+	AssertCreateTestData(env, tableLocator)
+
+	By("getting currentTimestamp", func() {
+		ts, err := testUtils.GetCurrentTimestamp(namespace, clusterName, env)
+		*currentTimestamp = ts
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	By(fmt.Sprintf("writing 3rd entry into test table '%v'", tableNamePitr), func() {
+		forward, conn, err := testUtils.ForwardPSQLConnection(
+			env,
+			namespace,
+			clusterName,
+			testUtils.AppDBName,
+			apiv1.ApplicationUserSecretSuffix,
+		)
+		defer func() {
+			_ = conn.Close()
+			forward.Close()
+		}()
+		Expect(err).ToNot(HaveOccurred())
+		insertRecordIntoTable(tableNamePitr, 3, conn)
+	})
+	assertArchiveWalOnAzureBlob(namespace, clusterName, env.AzureConfiguration)
+	AssertArchiveConditionMet(namespace, clusterName, "5m")
+	testUtils.AssertBackupConditionInClusterStatus(env, namespace, clusterName)
+}
