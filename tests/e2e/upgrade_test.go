@@ -146,7 +146,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 	// but a single scheduled backups during the check
 	AssertScheduledBackupsAreScheduled := func(serverName string) {
 		By("verifying scheduled backups are still happening", func() {
-			latestTar := minioPath(serverName, "data.tar.gz")
+			latestTar := minio.GetFilePath(serverName, "data.tar.gz")
 			currentBackups, err := minio.CountFiles(minioEnv, latestTar)
 			Expect(err).ToNot(HaveOccurred())
 			Eventually(func() (int, error) {

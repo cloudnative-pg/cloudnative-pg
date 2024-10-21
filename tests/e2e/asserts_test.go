@@ -773,15 +773,6 @@ func AssertStorageCredentialsAreCreated(namespace string, name string, id string
 	}, 60, 5).Should(BeNil())
 }
 
-// minioPath gets the MinIO file string for WAL/backup objects in a configured bucket
-func minioPath(serverName, fileName string) string {
-	// the * regexes enable matching these typical paths:
-	// 	minio/backups/serverName/base/20220618T140300/data.tar
-	// 	minio/backups/serverName/wals/0000000100000000/000000010000000000000002.gz
-	//  minio/backups/serverName/wals/00000002.history.gz
-	return filepath.Join("*", serverName, "*", fileName)
-}
-
 // CheckPointAndSwitchWalOnPrimary trigger a checkpoint and switch wal on primary pod and returns the latest WAL file
 func CheckPointAndSwitchWalOnPrimary(namespace, clusterName string) string {
 	var latestWAL string
@@ -803,7 +794,7 @@ func AssertArchiveWalOnMinio(namespace, clusterName string, serverName string) {
 		Expect(err).ToNot(HaveOccurred())
 		primary := pod.GetName()
 		latestWAL := switchWalAndGetLatestArchive(namespace, primary)
-		latestWALPath = minioPath(serverName, latestWAL+".gz")
+		latestWALPath = minio.GetFilePath(serverName, latestWAL+".gz")
 	})
 
 	By(fmt.Sprintf("verify the existence of WAL %v in minio", latestWALPath), func() {

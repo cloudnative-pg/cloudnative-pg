@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -635,4 +636,13 @@ func CleanFiles(minioEnv *Env, path string) (string, error) {
 		return "", err
 	}
 	return strings.Trim(stdout, "\n"), nil
+}
+
+// GetFilePath gets the MinIO file string for WAL/backup objects in a configured bucket
+func GetFilePath(serverName, fileName string) string {
+	// the * regexes enable matching these typical paths:
+	// 	minio/backups/serverName/base/20220618T140300/data.tar
+	// 	minio/backups/serverName/wals/0000000100000000/000000010000000000000002.gz
+	//  minio/backups/serverName/wals/00000002.history.gz
+	return filepath.Join("*", serverName, "*", fileName)
 }

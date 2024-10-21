@@ -105,7 +105,7 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 			Expect(err).ToNot(HaveOccurred())
 			primary := pod.GetName()
 			latestWAL = switchWalAndGetLatestArchive(namespace, primary)
-			latestWALPath := minioPath(clusterName, latestWAL+".gz")
+			latestWALPath := minio.GetFilePath(clusterName, latestWAL+".gz")
 			Eventually(func() (int, error) {
 				// WALs are compressed with gzip in the fixture
 				return minio.CountFiles(minioEnv, latestWALPath)
