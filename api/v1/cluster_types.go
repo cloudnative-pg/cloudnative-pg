@@ -716,6 +716,7 @@ type ClusterStatus struct {
 
 	// LastPromotionToken is the last verified promotion token that
 	// was used to promote a replica cluster
+	// +optional
 	LastPromotionToken string `json:"lastPromotionToken,omitempty"`
 
 	// How many PVCs have been created by this cluster
@@ -2222,6 +2223,7 @@ type ClusterList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+	// +optional
 	metav1.ListMeta `json:"metadata,omitempty"`
 	// List of clusters
 	Items []Cluster `json:"items"`

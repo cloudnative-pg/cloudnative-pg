@@ -290,6 +290,7 @@ type BackupStatus struct {
 	Online *bool `json:"online,omitempty"`
 
 	// A map containing the plugin metadata
+	// +optional
 	PluginMetadata map[string]string `json:"pluginMetadata,omitempty"`
 }
 
@@ -335,6 +336,7 @@ type BackupList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+	// +optional
 	metav1.ListMeta `json:"metadata,omitempty"`
 	// List of backups
 	Items []Backup `json:"items"`
