@@ -338,6 +338,12 @@ PrimaryUpdateStrategy
 PriorityClass
 PriorityClassName
 ProjectedVolumeSource
+PublicationReclaimPolicy
+PublicationSpec
+PublicationStatus
+PublicationTarget
+PublicationTargetAllTables
+PublicationTargetObject
 PullPolicy
 QoS
 Quaresima
@@ -423,6 +429,9 @@ StatefulSets
 StorageClass
 StorageConfiguration
 Storages
+SubscriptionReclaimPolicy
+SubscriptionSpec
+SubscriptionStatus
 SuccessfullyExtracted
 SwitchReplicaClusterStatus
 SyncReplicaElectionConstraints
@@ -492,6 +501,7 @@ addons
 affinityconfiguration
 aks
 albert
+allTables
 allnamespaces
 alloc
 allocator
@@ -736,6 +746,7 @@ executables
 expirations
 extensibility
 externalCluster
+externalClusterName
 externalClusterSecretVersion
 externalClusters
 externalclusters
@@ -1056,6 +1067,10 @@ promotionTimeout
 promotionToken
 provisioner
 psql
+publicate
+publicated
+publicationName
+publicationReclaimPolicy
 pv
 pvc
 pvcCount
@@ -1200,6 +1215,7 @@ subcommand
 subcommands
 subdirectory
 subresource
+subscriptionReclaimPolicy
 substatement
 successfullyExtracted
 sudo
@@ -1218,6 +1234,7 @@ syslog
 systemd
 sysv
 tAc
+tableExpression
 tablespace
 tablespaceClassName
 tablespaceMapFile
