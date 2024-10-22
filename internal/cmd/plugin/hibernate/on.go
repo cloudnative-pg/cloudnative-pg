@@ -214,9 +214,11 @@ func (on *onCommand) rollbackFenceClusterIfNeeded() {
 
 // waitInstancesToBeFenced waits for all instances to be shut down
 func (on *onCommand) waitInstancesToBeFencedStep() error {
-	retryOnlyNonForbbiden := func(err error) bool { return !apierrors.IsForbidden(err) }
+	isRetryable := func(err error) bool {
+		return !apierrors.IsForbidden(err) && !apierrors.IsUnauthorized(err)
+	}
 	for _, instance := range on.managedInstances {
-		if err := retry.OnError(hibernationBackoff, retryOnlyNonForbbiden, func() error {
+		if err := retry.OnError(hibernationBackoff, isRetryable, func() error {
 			running, err := pluginresources.IsInstanceRunning(on.ctx, instance)
 			if err != nil {
 				return fmt.Errorf("error checking instance status (%v): %w", instance.Name, err)
