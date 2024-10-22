@@ -298,6 +298,8 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 
 	// Calls pre-reconcile hooks
 	if hookResult := preReconcilePluginHooks(ctx, cluster, cluster); hookResult.StopReconciliation {
+		contextLogger.Info("Pre-reconcile hook stopped the reconciliation loop",
+			"hookResult", hookResult)
 		return hookResult.Result, hookResult.Err
 	}
 
@@ -502,6 +504,8 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	// Calls post-reconcile hooks
 	if hookResult := postReconcilePluginHooks(ctx, cluster, cluster); hookResult.Err != nil ||
 		!hookResult.Result.IsZero() {
+		contextLogger.Info("Post-reconcile hook stopped the reconciliation loop",
+			"hookResult", hookResult)
 		return hookResult.Result, hookResult.Err
 	}
 
