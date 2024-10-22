@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -91,14 +90,7 @@ func (r *PublicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	// Fetch the Cluster from the cache
 	cluster, err := r.GetCluster(ctx)
 	if err != nil {
-		if apierrors.IsNotFound(err) {
-			// The cluster has been deleted.
-			// We just need to wait for this instance manager to be terminated
-			contextLogger.Debug("Could not find Cluster")
-			return ctrl.Result{}, nil
-		}
-
-		return ctrl.Result{}, fmt.Errorf("could not fetch Cluster: %w", err)
+		return ctrl.Result{}, r.markAsFailed(ctx, &publication, fmt.Errorf("while fetching the cluster: %w", err))
 	}
 
 	// Still not for me, we're waiting for a switchover
@@ -113,7 +105,8 @@ func (r *PublicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	// Cannot do anything on a replica cluster
 	if cluster.IsReplica() {
-		return r.failedReconciliation(ctx, &publication, errClusterIsReplica)
+		markErr := r.markAsFailed(ctx, &publication, errClusterIsReplica)
+		return ctrl.Result{RequeueAfter: databaseReconciliationInterval}, markErr
 	}
 
 	if err := r.reconcileFinalizer(ctx, publication); err != nil {
@@ -125,21 +118,11 @@ func (r *PublicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, nil
 	}
 
-	if err := r.alignPublication(
-		ctx,
-		&publication,
-	); err != nil {
-		return r.failedReconciliation(
-			ctx,
-			&publication,
-			err,
-		)
+	if err := r.alignPublication(ctx, &publication); err != nil {
+		return ctrl.Result{RequeueAfter: databaseReconciliationInterval}, r.markAsFailed(ctx, &publication, err)
 	}
 
-	return r.succeededReconciliation(
-		ctx,
-		&publication,
-	)
+	return r.succeededReconciliation(ctx, &publication)
 }
 
 func (r *PublicationReconciler) reconcileFinalizer(ctx context.Context, publication apiv1.Publication) error {
@@ -187,12 +170,12 @@ func (r *PublicationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-// failedReconciliation marks the reconciliation as failed and logs the corresponding error
-func (r *PublicationReconciler) failedReconciliation(
+// markAsFailed marks the reconciliation as failed and logs the corresponding error
+func (r *PublicationReconciler) markAsFailed(
 	ctx context.Context,
 	publication *apiv1.Publication,
 	err error,
-) (ctrl.Result, error) {
+) error {
 	oldPublication := publication.DeepCopy()
 	publication.Status.Error = err.Error()
 	publication.Status.Ready = false
@@ -203,13 +186,7 @@ func (r *PublicationReconciler) failedReconciliation(
 		publication.Status.Error = statusError.Body
 	}
 
-	if err := r.Client.Status().Patch(ctx, publication, client.MergeFrom(oldPublication)); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	return ctrl.Result{
-		RequeueAfter: databaseReconciliationInterval,
-	}, nil
+	return r.Client.Status().Patch(ctx, publication, client.MergeFrom(oldPublication))
 }
 
 // succeededReconciliation marks the reconciliation as succeeded
