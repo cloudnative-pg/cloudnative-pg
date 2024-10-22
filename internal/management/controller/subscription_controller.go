@@ -18,12 +18,10 @@ package controller
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -34,7 +32,6 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/external"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/instance"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -74,14 +71,7 @@ func (r *SubscriptionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// Fetch the Cluster from the cache
 	cluster, err := r.GetCluster(ctx)
 	if err != nil {
-		if apierrors.IsNotFound(err) {
-			// The cluster has been deleted.
-			// We just need to wait for this instance manager to be terminated
-			contextLogger.Debug("Could not find Cluster")
-			return ctrl.Result{}, nil
-		}
-
-		return ctrl.Result{}, fmt.Errorf("could not fetch Cluster: %w", err)
+		return ctrl.Result{}, markAsFailed(ctx, r.Client, &subscription, fmt.Errorf("while fetching the cluster: %w", err))
 	}
 
 	// This is not for me!
@@ -101,8 +91,9 @@ func (r *SubscriptionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	// Cannot do anything on a replica cluster
 	if cluster.IsReplica() {
-		return r.failedReconciliation(
+		return ctrl.Result{RequeueAfter: databaseReconciliationInterval}, markAsFailed(
 			ctx,
+			r.Client,
 			&subscription,
 			errClusterIsReplica,
 		)
@@ -147,8 +138,9 @@ func (r *SubscriptionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		"", // TODO: should we have a way to force dbname?
 	)
 	if err != nil {
-		return r.failedReconciliation(
+		return ctrl.Result{RequeueAfter: databaseReconciliationInterval}, markAsFailed(
 			ctx,
+			r.Client,
 			&subscription,
 			err,
 		)
@@ -159,8 +151,9 @@ func (r *SubscriptionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		&subscription,
 		connString,
 	); err != nil {
-		return r.failedReconciliation(
+		return ctrl.Result{RequeueAfter: databaseReconciliationInterval}, markAsFailed(
 			ctx,
+			r.Client,
 			&subscription,
 			err,
 		)
@@ -189,31 +182,6 @@ func (r *SubscriptionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&apiv1.Subscription{}).
 		Named("instance-subscription").
 		Complete(r)
-}
-
-// failedReconciliation marks the reconciliation as failed and logs the corresponding error
-func (r *SubscriptionReconciler) failedReconciliation(
-	ctx context.Context,
-	subscription *apiv1.Subscription,
-	err error,
-) (ctrl.Result, error) {
-	oldSubscription := subscription.DeepCopy()
-	subscription.Status.Error = err.Error()
-	subscription.Status.Ready = false
-
-	var statusError *instance.StatusError
-	if errors.As(err, &statusError) {
-		// The body line of the instance manager contain the human-readable error
-		subscription.Status.Error = statusError.Body
-	}
-
-	if err := r.Client.Status().Patch(ctx, subscription, client.MergeFrom(oldSubscription)); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	return ctrl.Result{
-		RequeueAfter: databaseReconciliationInterval,
-	}, nil
 }
 
 // succeededReconciliation marks the reconciliation as succeeded

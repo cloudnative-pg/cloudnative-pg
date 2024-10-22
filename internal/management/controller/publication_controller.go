@@ -18,7 +18,6 @@ package controller
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -32,7 +31,6 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/instance"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -90,7 +88,7 @@ func (r *PublicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	// Fetch the Cluster from the cache
 	cluster, err := r.GetCluster(ctx)
 	if err != nil {
-		return ctrl.Result{}, r.markAsFailed(ctx, &publication, fmt.Errorf("while fetching the cluster: %w", err))
+		return ctrl.Result{}, markAsFailed(ctx, r.Client, &publication, fmt.Errorf("while fetching the cluster: %w", err))
 	}
 
 	// Still not for me, we're waiting for a switchover
@@ -105,7 +103,7 @@ func (r *PublicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	// Cannot do anything on a replica cluster
 	if cluster.IsReplica() {
-		markErr := r.markAsFailed(ctx, &publication, errClusterIsReplica)
+		markErr := markAsFailed(ctx, r.Client, &publication, errClusterIsReplica)
 		return ctrl.Result{RequeueAfter: databaseReconciliationInterval}, markErr
 	}
 
@@ -119,7 +117,7 @@ func (r *PublicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 
 	if err := r.alignPublication(ctx, &publication); err != nil {
-		return ctrl.Result{RequeueAfter: databaseReconciliationInterval}, r.markAsFailed(ctx, &publication, err)
+		return ctrl.Result{RequeueAfter: databaseReconciliationInterval}, markAsFailed(ctx, r.Client, &publication, err)
 	}
 
 	return r.succeededReconciliation(ctx, &publication)
@@ -168,25 +166,6 @@ func (r *PublicationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&apiv1.Publication{}).
 		Named("instance-publication").
 		Complete(r)
-}
-
-// markAsFailed marks the reconciliation as failed and logs the corresponding error
-func (r *PublicationReconciler) markAsFailed(
-	ctx context.Context,
-	publication *apiv1.Publication,
-	err error,
-) error {
-	oldPublication := publication.DeepCopy()
-	publication.Status.Error = err.Error()
-	publication.Status.Ready = false
-
-	var statusError *instance.StatusError
-	if errors.As(err, &statusError) {
-		// The body line of the instance manager contain the human-readable error
-		publication.Status.Error = statusError.Body
-	}
-
-	return r.Client.Status().Patch(ctx, publication, client.MergeFrom(oldPublication))
 }
 
 // succeededReconciliation marks the reconciliation as succeeded
