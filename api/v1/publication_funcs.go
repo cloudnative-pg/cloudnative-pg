@@ -21,3 +21,10 @@ func (pub *Publication) SetAsFailed(err error) {
 	pub.Status.Ready = false
 	pub.Status.Error = err.Error()
 }
+
+// SetAsReady sets the subscription as working correctly
+func (pub *Publication) SetAsReady() {
+	pub.Status.Error = ""
+	pub.Status.Ready = true
+	pub.Status.ObservedGeneration = pub.Generation
+}

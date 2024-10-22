@@ -21,3 +21,10 @@ func (sub *Subscription) SetAsFailed(err error) {
 	sub.Status.Ready = false
 	sub.Status.Error = err.Error()
 }
+
+// SetAsReady sets the subscription as working correctly
+func (sub *Subscription) SetAsReady() {
+	sub.Status.Error = ""
+	sub.Status.Ready = true
+	sub.Status.ObservedGeneration = sub.Generation
+}

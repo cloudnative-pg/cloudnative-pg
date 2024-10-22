@@ -120,7 +120,7 @@ func (r *PublicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{RequeueAfter: databaseReconciliationInterval}, markAsFailed(ctx, r.Client, &publication, err)
 	}
 
-	return r.succeededReconciliation(ctx, &publication)
+	return ctrl.Result{RequeueAfter: subscriptionReconciliationInterval}, markAsReady(ctx, r.Client, &publication)
 }
 
 func (r *PublicationReconciler) reconcileFinalizer(ctx context.Context, publication apiv1.Publication) error {
@@ -166,25 +166,6 @@ func (r *PublicationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&apiv1.Publication{}).
 		Named("instance-publication").
 		Complete(r)
-}
-
-// succeededReconciliation marks the reconciliation as succeeded
-func (r *PublicationReconciler) succeededReconciliation(
-	ctx context.Context,
-	publication *apiv1.Publication,
-) (ctrl.Result, error) {
-	oldPublication := publication.DeepCopy()
-	publication.Status.Error = ""
-	publication.Status.Ready = true
-	publication.Status.ObservedGeneration = publication.Generation
-
-	if err := r.Client.Status().Patch(ctx, publication, client.MergeFrom(oldPublication)); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	return ctrl.Result{
-		RequeueAfter: publicationReconciliationInterval,
-	}, nil
 }
 
 // GetCluster gets the managed cluster through the client

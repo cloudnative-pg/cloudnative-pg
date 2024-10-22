@@ -159,8 +159,9 @@ func (r *SubscriptionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		)
 	}
 
-	return r.succeededReconciliation(
+	return ctrl.Result{RequeueAfter: subscriptionReconciliationInterval}, markAsReady(
 		ctx,
+		r.Client,
 		&subscription,
 	)
 }
@@ -182,25 +183,6 @@ func (r *SubscriptionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&apiv1.Subscription{}).
 		Named("instance-subscription").
 		Complete(r)
-}
-
-// succeededReconciliation marks the reconciliation as succeeded
-func (r *SubscriptionReconciler) succeededReconciliation(
-	ctx context.Context,
-	subscription *apiv1.Subscription,
-) (ctrl.Result, error) {
-	oldSubscription := subscription.DeepCopy()
-	subscription.Status.Error = ""
-	subscription.Status.Ready = true
-	subscription.Status.ObservedGeneration = subscription.Generation
-
-	if err := r.Client.Status().Patch(ctx, subscription, client.MergeFrom(oldSubscription)); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	return ctrl.Result{
-		RequeueAfter: subscriptionReconciliationInterval,
-	}, nil
 }
 
 // GetCluster gets the managed cluster through the client

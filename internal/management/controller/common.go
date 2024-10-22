@@ -18,7 +18,6 @@ package controller
 
 import (
 	"context"
-
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -36,5 +35,22 @@ func markAsFailed(
 ) error {
 	oldResource := resource.DeepCopyObject().(markableAsFailed)
 	resource.SetAsFailed(err)
+	return cli.Status().Patch(ctx, resource, client.MergeFrom(oldResource))
+}
+
+type markableAsReady interface {
+	client.Object
+	SetAsReady()
+}
+
+// markAsReady marks the reconciliation as succeeded inside the resource
+func markAsReady(
+	ctx context.Context,
+	cli client.Client,
+	resource markableAsReady,
+) error {
+	oldResource := resource.DeepCopyObject().(markableAsReady)
+	resource.SetAsReady()
+
 	return cli.Status().Patch(ctx, resource, client.MergeFrom(oldResource))
 }
