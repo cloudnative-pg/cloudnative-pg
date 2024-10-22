@@ -75,7 +75,17 @@ func (r *PublicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		Namespace: req.Namespace,
 		Name:      req.Name,
 	}, &publication); err != nil {
+		contextLogger.Trace("Could not fetch Publication", "error", err)
 		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	// This is not for me!
+	if publication.Spec.ClusterRef.Name != r.instance.GetClusterName() {
+		contextLogger.Trace("Publication is not for this cluster",
+			"cluster", publication.Spec.ClusterRef.Name,
+			"expected", r.instance.GetClusterName(),
+		)
+		return ctrl.Result{}, nil
 	}
 
 	// Fetch the Cluster from the cache
@@ -91,9 +101,9 @@ func (r *PublicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, fmt.Errorf("could not fetch Cluster: %w", err)
 	}
 
-	// This is not for me!
-	if publication.Spec.ClusterRef.Name != r.instance.GetClusterName() {
-		return ctrl.Result{}, nil
+	// Still not for me, we're waiting for a switchover
+	if cluster.Status.CurrentPrimary != cluster.Status.TargetPrimary {
+		return ctrl.Result{RequeueAfter: databaseReconciliationInterval}, nil
 	}
 
 	// This is not for me, at least now
