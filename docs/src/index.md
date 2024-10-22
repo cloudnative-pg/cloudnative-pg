@@ -87,6 +87,7 @@ Additionally, the community provides images for the [PostGIS extension](postgis.
   Postgres extensions through the cluster `spec`: `pgaudit`, `auto_explain`,
   `pg_stat_statements`, and `pg_failover_slots`
 * Declarative management of Postgres roles, users and groups
+* Declarative management of Postgres databases
 * Support for Local Persistent Volumes with PVC templates
 * Reuse of Persistent Volumes storage in Pods
 * Separate volumes for WAL files and tablespaces
