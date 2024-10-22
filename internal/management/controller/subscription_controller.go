@@ -81,17 +81,17 @@ func (r *SubscriptionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	// This is not for me, at least now
 	if cluster.Status.CurrentPrimary != r.instance.GetPodName() {
-		return ctrl.Result{RequeueAfter: databaseReconciliationInterval}, nil
+		return ctrl.Result{RequeueAfter: subscriptionReconciliationInterval}, nil
 	}
 
 	// Still not for me, we're waiting for a switchover
 	if cluster.Status.CurrentPrimary != cluster.Status.TargetPrimary {
-		return ctrl.Result{RequeueAfter: databaseReconciliationInterval}, nil
+		return ctrl.Result{RequeueAfter: subscriptionReconciliationInterval}, nil
 	}
 
 	// Cannot do anything on a replica cluster
 	if cluster.IsReplica() {
-		return ctrl.Result{RequeueAfter: databaseReconciliationInterval}, markAsFailed(
+		return ctrl.Result{RequeueAfter: subscriptionReconciliationInterval}, markAsFailed(
 			ctx,
 			r.Client,
 			&subscription,
@@ -138,7 +138,7 @@ func (r *SubscriptionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		"", // TODO: should we have a way to force dbname?
 	)
 	if err != nil {
-		return ctrl.Result{RequeueAfter: databaseReconciliationInterval}, markAsFailed(
+		return ctrl.Result{RequeueAfter: subscriptionReconciliationInterval}, markAsFailed(
 			ctx,
 			r.Client,
 			&subscription,
@@ -151,7 +151,7 @@ func (r *SubscriptionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		&subscription,
 		connString,
 	); err != nil {
-		return ctrl.Result{RequeueAfter: databaseReconciliationInterval}, markAsFailed(
+		return ctrl.Result{RequeueAfter: subscriptionReconciliationInterval}, markAsFailed(
 			ctx,
 			r.Client,
 			&subscription,
@@ -187,18 +187,10 @@ func (r *SubscriptionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 // GetCluster gets the managed cluster through the client
 func (r *SubscriptionReconciler) GetCluster(ctx context.Context) (*apiv1.Cluster, error) {
-	var cluster apiv1.Cluster
-	err := r.Client.Get(ctx,
-		types.NamespacedName{
-			Namespace: r.instance.GetNamespaceName(),
-			Name:      r.instance.GetClusterName(),
-		},
-		&cluster)
-	if err != nil {
-		return nil, err
-	}
-
-	return &cluster, nil
+	return getCluster(ctx, r.Client, types.NamespacedName{
+		Name:      r.instance.GetClusterName(),
+		Namespace: r.instance.GetNamespaceName(),
+	})
 }
 
 // getSubscriptionConnectionString gets the connection string to be used to connect to

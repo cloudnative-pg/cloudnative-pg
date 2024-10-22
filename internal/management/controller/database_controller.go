@@ -308,18 +308,10 @@ func (r *DatabaseReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 // GetCluster gets the managed cluster through the client
 func (r *DatabaseReconciler) GetCluster(ctx context.Context) (*apiv1.Cluster, error) {
-	var cluster apiv1.Cluster
-	err := r.Client.Get(ctx,
-		types.NamespacedName{
-			Namespace: r.instance.GetNamespaceName(),
-			Name:      r.instance.GetClusterName(),
-		},
-		&cluster)
-	if err != nil {
-		return nil, err
-	}
-
-	return &cluster, nil
+	return getCluster(ctx, r.Client, types.NamespacedName{
+		Name:      r.instance.GetClusterName(),
+		Namespace: r.instance.GetNamespaceName(),
+	})
 }
 
 func (r *DatabaseReconciler) reconcileDatabase(ctx context.Context, obj *apiv1.Database) error {

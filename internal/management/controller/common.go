@@ -18,7 +18,11 @@ package controller
 
 import (
 	"context"
+
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
 
 type markableAsFailed interface {
@@ -53,4 +57,10 @@ func markAsReady(
 	resource.SetAsReady()
 
 	return cli.Status().Patch(ctx, resource, client.MergeFrom(oldResource))
+}
+
+func getCluster(ctx context.Context, cli client.Client, namespacedName types.NamespacedName) (*apiv1.Cluster, error) {
+	var cluster apiv1.Cluster
+	err := cli.Get(ctx, namespacedName, &cluster)
+	return &cluster, err
 }

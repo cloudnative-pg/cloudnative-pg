@@ -93,18 +93,18 @@ func (r *PublicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	// Still not for me, we're waiting for a switchover
 	if cluster.Status.CurrentPrimary != cluster.Status.TargetPrimary {
-		return ctrl.Result{RequeueAfter: databaseReconciliationInterval}, nil
+		return ctrl.Result{RequeueAfter: publicationReconciliationInterval}, nil
 	}
 
 	// This is not for me, at least now
 	if cluster.Status.CurrentPrimary != r.instance.GetPodName() {
-		return ctrl.Result{RequeueAfter: databaseReconciliationInterval}, nil
+		return ctrl.Result{RequeueAfter: publicationReconciliationInterval}, nil
 	}
 
 	// Cannot do anything on a replica cluster
 	if cluster.IsReplica() {
 		markErr := markAsFailed(ctx, r.Client, &publication, errClusterIsReplica)
-		return ctrl.Result{RequeueAfter: databaseReconciliationInterval}, markErr
+		return ctrl.Result{RequeueAfter: publicationReconciliationInterval}, markErr
 	}
 
 	if err := r.reconcileFinalizer(ctx, publication); err != nil {
@@ -117,10 +117,10 @@ func (r *PublicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 
 	if err := r.alignPublication(ctx, &publication); err != nil {
-		return ctrl.Result{RequeueAfter: databaseReconciliationInterval}, markAsFailed(ctx, r.Client, &publication, err)
+		return ctrl.Result{RequeueAfter: publicationReconciliationInterval}, markAsFailed(ctx, r.Client, &publication, err)
 	}
 
-	return ctrl.Result{RequeueAfter: subscriptionReconciliationInterval}, markAsReady(ctx, r.Client, &publication)
+	return ctrl.Result{RequeueAfter: publicationReconciliationInterval}, markAsReady(ctx, r.Client, &publication)
 }
 
 func (r *PublicationReconciler) reconcileFinalizer(ctx context.Context, publication apiv1.Publication) error {
@@ -170,16 +170,8 @@ func (r *PublicationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 // GetCluster gets the managed cluster through the client
 func (r *PublicationReconciler) GetCluster(ctx context.Context) (*apiv1.Cluster, error) {
-	var cluster apiv1.Cluster
-	err := r.Client.Get(ctx,
-		types.NamespacedName{
-			Namespace: r.instance.GetNamespaceName(),
-			Name:      r.instance.GetClusterName(),
-		},
-		&cluster)
-	if err != nil {
-		return nil, err
-	}
-
-	return &cluster, nil
+	return getCluster(ctx, r.Client, types.NamespacedName{
+		Name:      r.instance.GetClusterName(),
+		Namespace: r.instance.GetNamespaceName(),
+	})
 }
