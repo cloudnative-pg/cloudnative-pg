@@ -41,10 +41,10 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelDeclarativePub
 	const (
 		sourceClusterManifest       = fixturesDir + "/declarative_pub_sub/source-cluster.yaml.template"
 		destinationClusterManifest  = fixturesDir + "/declarative_pub_sub/destination-cluster.yaml.template"
-		sourceDatabaseManifest      = fixturesDir + "/declarative_pub_sub/source-database.yaml.template"
-		destinationDatabaseManifest = fixturesDir + "/declarative_pub_sub/destination-database.yaml.template"
-		pubManifest                 = fixturesDir + "/declarative_pub_sub/pub.yaml.template"
-		subManifest                 = fixturesDir + "/declarative_pub_sub/sub.yaml.template"
+		sourceDatabaseManifest      = fixturesDir + "/declarative_pub_sub/source-database.yaml"
+		destinationDatabaseManifest = fixturesDir + "/declarative_pub_sub/destination-database.yaml"
+		pubManifest                 = fixturesDir + "/declarative_pub_sub/pub.yaml"
+		subManifest                 = fixturesDir + "/declarative_pub_sub/sub.yaml"
 		level                       = tests.Medium
 	)
 
