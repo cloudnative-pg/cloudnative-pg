@@ -111,45 +111,13 @@ func (r *PublicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{RequeueAfter: databaseReconciliationInterval}, nil
 	}
 
-	// Still not for me, we're waiting for a switchover
-	if cluster.Status.CurrentPrimary != cluster.Status.TargetPrimary {
-		return ctrl.Result{RequeueAfter: databaseReconciliationInterval}, nil
-	}
-
 	// Cannot do anything on a replica cluster
 	if cluster.IsReplica() {
-		return r.failedReconciliation(
-			ctx,
-			&publication,
-			errClusterIsReplica,
-		)
+		return r.failedReconciliation(ctx, &publication, errClusterIsReplica)
 	}
 
-	// Add the finalizer if we don't have it
-	// nolint:nestif
-	if publication.DeletionTimestamp.IsZero() {
-		if controllerutil.AddFinalizer(&publication, utils.PublicationFinalizerName) {
-			if err := r.Update(ctx, &publication); err != nil {
-				return ctrl.Result{}, err
-			}
-		}
-	} else {
-		// This publication is being deleted
-		if controllerutil.ContainsFinalizer(&publication, utils.PublicationFinalizerName) {
-			if publication.Spec.ReclaimPolicy == apiv1.PublicationReclaimDelete {
-				if err := r.dropPublication(ctx, &publication); err != nil {
-					return ctrl.Result{}, err
-				}
-			}
-
-			// remove our finalizer from the list and update it.
-			controllerutil.RemoveFinalizer(&publication, utils.PublicationFinalizerName)
-			if err := r.Update(ctx, &publication); err != nil {
-				return ctrl.Result{}, err
-			}
-
-			return ctrl.Result{}, nil
-		}
+	if err := r.reconcileFinalizer(ctx, publication); err != nil {
+		return ctrl.Result{}, fmt.Errorf("while reconciling the finalizer: %w", err)
 	}
 
 	// If everything is reconciled, we're done here
@@ -172,6 +140,32 @@ func (r *PublicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		ctx,
 		&publication,
 	)
+}
+
+func (r *PublicationReconciler) reconcileFinalizer(ctx context.Context, publication apiv1.Publication) error {
+	// add finalizer in non-deleted publications if not present
+	if publication.DeletionTimestamp.IsZero() {
+		if !controllerutil.AddFinalizer(&publication, utils.PublicationFinalizerName) {
+			return nil
+		}
+		return r.Update(ctx, &publication)
+	}
+
+	// the publication is being deleted but no finalizer is present, we can quit
+	if !controllerutil.ContainsFinalizer(&publication, utils.PublicationFinalizerName) {
+		return nil
+	}
+
+	// This publication is being deleted but we still have work to do
+	if publication.Spec.ReclaimPolicy == apiv1.PublicationReclaimDelete {
+		if err := r.dropPublication(ctx, &publication); err != nil {
+			return err
+		}
+	}
+
+	// remove our finalizer from the list and update it.
+	controllerutil.RemoveFinalizer(&publication, utils.PublicationFinalizerName)
+	return r.Update(ctx, &publication)
 }
 
 // NewPublicationReconciler creates a new publication reconciler
