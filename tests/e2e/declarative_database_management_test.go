@@ -118,7 +118,7 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 				primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 
-				AssertDatabaseExists(namespace, primaryPodInfo.Name, dbname, true)
+				AssertDatabaseExists(primaryPodInfo, dbname, true)
 
 				assertDatabaseHasExpectedFields(namespace, primaryPodInfo.Name, database)
 			})
@@ -131,7 +131,7 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 				primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 
-				AssertDatabaseExists(namespace, primaryPodInfo.Name, dbname, retainOnDeletion)
+				AssertDatabaseExists(primaryPodInfo, dbname, retainOnDeletion)
 			})
 		}
 
