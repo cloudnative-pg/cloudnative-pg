@@ -1059,6 +1059,7 @@ func restoreViaPlugin(
 		return nil, err
 	}
 
+	// TODO: timeout should be configurable by the user
 	ctx = context.WithValue(ctx, utils.GRPCTimeoutKey, 100*time.Minute)
 
 	plugins := repository.New()

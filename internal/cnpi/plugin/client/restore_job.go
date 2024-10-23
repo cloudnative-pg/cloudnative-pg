@@ -49,13 +49,13 @@ func (data *data) Restore(
 		if err != nil {
 			return nil, err
 		}
-		backDefinition, err := json.Marshal(backup)
+		backupDefinition, err := json.Marshal(backup)
 		if err != nil {
 			return nil, err
 		}
 		request := restore.RestoreRequest{
 			ClusterDefinition: clusterDefinition,
-			BackupDefinition:  backDefinition,
+			BackupDefinition:  backupDefinition,
 		}
 		res, err := plugin.RestoreJobHooksClient().Restore(ctx, &request)
 		if err != nil {
