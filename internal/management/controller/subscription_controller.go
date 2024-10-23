@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -40,7 +39,8 @@ type SubscriptionReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 
-	instance *postgres.Instance
+	instance            *postgres.Instance
+	finalizerReconciler *finalizerReconciler[*apiv1.Subscription]
 }
 
 // subscriptionReconciliationInterval is the time between the
@@ -91,39 +91,13 @@ func (r *SubscriptionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	// Cannot do anything on a replica cluster
 	if cluster.IsReplica() {
-		return ctrl.Result{RequeueAfter: subscriptionReconciliationInterval}, markAsFailed(
-			ctx,
-			r.Client,
-			&subscription,
-			errClusterIsReplica,
-		)
+		err := markAsFailed(ctx, r.Client, &subscription, errClusterIsReplica)
+		return ctrl.Result{RequeueAfter: subscriptionReconciliationInterval}, err
 	}
 
-	// Add the finalizer if we don't have it
-	// nolint:nestif
-	if subscription.DeletionTimestamp.IsZero() {
-		if controllerutil.AddFinalizer(&subscription, utils.SubscriptionFinalizerName) {
-			if err := r.Update(ctx, &subscription); err != nil {
-				return ctrl.Result{}, err
-			}
-		}
-	} else {
-		// This subscription is being deleted
-		if controllerutil.ContainsFinalizer(&subscription, utils.SubscriptionFinalizerName) {
-			if subscription.Spec.ReclaimPolicy == apiv1.SubscriptionReclaimDelete {
-				if err := r.dropSubscription(ctx, &subscription); err != nil {
-					return ctrl.Result{}, err
-				}
-			}
-
-			// remove our finalizer from the list and update it.
-			controllerutil.RemoveFinalizer(&subscription, utils.SubscriptionFinalizerName)
-			if err := r.Update(ctx, &subscription); err != nil {
-				return ctrl.Result{}, err
-			}
-
-			return ctrl.Result{}, nil
-		}
+	if err := r.finalizerReconciler.reconcile(ctx, &subscription); err != nil {
+		return ctrl.Result{RequeueAfter: subscriptionReconciliationInterval},
+			fmt.Errorf("while reconciling the finalizer: %w", err)
 	}
 
 	// If everything is reconciled, we're done here
@@ -171,9 +145,16 @@ func NewSubscriptionReconciler(
 	mgr manager.Manager,
 	instance *postgres.Instance,
 ) *SubscriptionReconciler {
+	onFinalizerDelete := func(ctx context.Context, sub *apiv1.Subscription) error {
+		if sub.Spec.ReclaimPolicy == apiv1.SubscriptionReclaimDelete {
+			return dropSubscription(ctx, instance, sub)
+		}
+		return nil
+	}
 	return &SubscriptionReconciler{
-		Client:   mgr.GetClient(),
-		instance: instance,
+		Client:              mgr.GetClient(),
+		instance:            instance,
+		finalizerReconciler: newFinalizerReconciler(mgr.GetClient(), utils.SubscriptionFinalizerName, onFinalizerDelete),
 	}
 }
 

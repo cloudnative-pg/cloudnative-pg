@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -39,7 +38,8 @@ type PublicationReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 
-	instance *postgres.Instance
+	instance            *postgres.Instance
+	finalizerReconciler *finalizerReconciler[*apiv1.Publication]
 }
 
 // publicationReconciliationInterval is the time between the
@@ -107,8 +107,9 @@ func (r *PublicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{RequeueAfter: publicationReconciliationInterval}, markErr
 	}
 
-	if err := r.reconcileFinalizer(ctx, publication); err != nil {
-		return ctrl.Result{}, fmt.Errorf("while reconciling the finalizer: %w", err)
+	if err := r.finalizerReconciler.reconcile(ctx, &publication); err != nil {
+		return ctrl.Result{RequeueAfter: publicationReconciliationInterval},
+			fmt.Errorf("while reconciling the finalizer: %w", err)
 	}
 
 	// If everything is reconciled, we're done here
@@ -123,40 +124,21 @@ func (r *PublicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	return ctrl.Result{RequeueAfter: publicationReconciliationInterval}, markAsReady(ctx, r.Client, &publication)
 }
 
-func (r *PublicationReconciler) reconcileFinalizer(ctx context.Context, publication apiv1.Publication) error {
-	// add finalizer in non-deleted publications if not present
-	if publication.DeletionTimestamp.IsZero() {
-		if !controllerutil.AddFinalizer(&publication, utils.PublicationFinalizerName) {
-			return nil
-		}
-		return r.Update(ctx, &publication)
-	}
-
-	// the publication is being deleted but no finalizer is present, we can quit
-	if !controllerutil.ContainsFinalizer(&publication, utils.PublicationFinalizerName) {
-		return nil
-	}
-
-	// This publication is being deleted but we still have work to do
-	if publication.Spec.ReclaimPolicy == apiv1.PublicationReclaimDelete {
-		if err := r.dropPublication(ctx, &publication); err != nil {
-			return err
-		}
-	}
-
-	// remove our finalizer from the list and update it.
-	controllerutil.RemoveFinalizer(&publication, utils.PublicationFinalizerName)
-	return r.Update(ctx, &publication)
-}
-
 // NewPublicationReconciler creates a new publication reconciler
 func NewPublicationReconciler(
 	mgr manager.Manager,
 	instance *postgres.Instance,
 ) *PublicationReconciler {
+	onFinalizerDelete := func(ctx context.Context, pub *apiv1.Publication) error {
+		if pub.Spec.ReclaimPolicy == apiv1.PublicationReclaimDelete {
+			return dropPublication(ctx, instance, pub)
+		}
+		return nil
+	}
 	return &PublicationReconciler{
-		Client:   mgr.GetClient(),
-		instance: instance,
+		Client:              mgr.GetClient(),
+		instance:            instance,
+		finalizerReconciler: newFinalizerReconciler(mgr.GetClient(), utils.PublicationFinalizerName, onFinalizerDelete),
 	}
 }
 

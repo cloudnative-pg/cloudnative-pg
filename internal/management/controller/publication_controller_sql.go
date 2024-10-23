@@ -25,6 +25,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
 
 func (r *PublicationReconciler) alignPublication(ctx context.Context, obj *apiv1.Publication) error {
@@ -159,8 +160,8 @@ func toPublicationAlterSQL(obj *apiv1.Publication) []string {
 	return result
 }
 
-func (r *PublicationReconciler) dropPublication(ctx context.Context, obj *apiv1.Publication) error {
-	db, err := r.instance.ConnectionPool().Connection(obj.Spec.DBName)
+func dropPublication(ctx context.Context, instance *postgres.Instance, obj *apiv1.Publication) error {
+	db, err := instance.ConnectionPool().Connection(obj.Spec.DBName)
 	if err != nil {
 		return fmt.Errorf("while getting DB connection: %w", err)
 	}
