@@ -556,7 +556,7 @@ func getSynchronousStandbysNumber(db *sql.DB) (int, error) {
 	if !synchronousStandbyNamesRegex.MatchString(syncReplicasFromConfig) {
 		return 0, fmt.Errorf("not matching synchronous standby names regex: %s", syncReplicasFromConfig)
 	}
-	return strconv.Atoi(synchronousStandbyNamesRegex.FindStringSubmatch(syncReplicasFromConfig)[1])
+	return strconv.Atoi(synchronousStandbyNamesRegex.FindStringSubmatch(syncReplicasFromConfig)[2])
 }
 
 // PgCollector is the interface for all the collectors that need to do queries
