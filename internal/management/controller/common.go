@@ -59,8 +59,15 @@ func markAsReady(
 	return cli.Status().Patch(ctx, resource, client.MergeFrom(oldResource))
 }
 
-func getCluster(ctx context.Context, cli client.Client, namespacedName types.NamespacedName) (*apiv1.Cluster, error) {
+func getClusterFromInstance(
+	ctx context.Context,
+	cli client.Client,
+	instance instanceInterface,
+) (*apiv1.Cluster, error) {
 	var cluster apiv1.Cluster
-	err := cli.Get(ctx, namespacedName, &cluster)
+	err := cli.Get(ctx, types.NamespacedName{
+		Name:      instance.GetClusterName(),
+		Namespace: instance.GetNamespaceName(),
+	}, &cluster)
 	return &cluster, err
 }

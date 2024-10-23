@@ -23,7 +23,6 @@ import (
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -152,8 +151,5 @@ func (r *PublicationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 // GetCluster gets the managed cluster through the client
 func (r *PublicationReconciler) GetCluster(ctx context.Context) (*apiv1.Cluster, error) {
-	return getCluster(ctx, r.Client, types.NamespacedName{
-		Name:      r.instance.GetClusterName(),
-		Namespace: r.instance.GetNamespaceName(),
-	})
+	return getClusterFromInstance(ctx, r.Client, r.instance)
 }

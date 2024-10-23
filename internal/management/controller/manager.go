@@ -82,10 +82,7 @@ func (r *InstanceReconciler) Instance() *postgres.Instance {
 
 // GetCluster gets the managed cluster through the client
 func (r *InstanceReconciler) GetCluster(ctx context.Context) (*apiv1.Cluster, error) {
-	return getCluster(ctx, r.client, types.NamespacedName{
-		Name:      r.instance.GetClusterName(),
-		Namespace: r.instance.GetNamespaceName(),
-	})
+	return getClusterFromInstance(ctx, r.client, r.instance)
 }
 
 // GetSecret will get a named secret in the instance namespace
