@@ -1,0 +1,200 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.16.4
+  name: roles.postgresql.cnpg.io
+spec:
+  group: postgresql.cnpg.io
+  names:
+    kind: Role
+    listKind: RoleList
+    plural: roles
+    singular: role
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    - jsonPath: .spec.cluster.name
+      name: Cluster
+      type: string
+    - jsonPath: .spec.name
+      name: PG Name
+      type: string
+    - jsonPath: .status.applied
+      name: Applied
+      type: boolean
+    - description: Latest message
+      jsonPath: .status.message
+      name: Message
+      type: string
+    name: v1
+    schema:
+      openAPIV3Schema:
+        description: Role is the Schema for the databases API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: RoleSpec represents a role in Postgres
+            properties:
+              bypassrls:
+                description: |-
+                  Whether a role bypasses every row-level security (RLS) policy.
+                  Default is `false`.
+                type: boolean
+              cluster:
+                description: The corresponding cluster
+                properties:
+                  name:
+                    default: ""
+                    description: |-
+                      Name of the referent.
+                      This field is effectively required, but due to backwards compatibility is
+                      allowed to be empty. Instances of this type with an empty value here are
+                      almost certainly wrong.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    type: string
+                type: object
+                x-kubernetes-map-type: atomic
+              comment:
+                description: Description of the role
+                type: string
+              connectionLimit:
+                default: -1
+                description: |-
+                  If the role can log in, this specifies how many concurrent
+                  connections the role can make. `-1` (the default) means no limit.
+                format: int64
+                type: integer
+              createdb:
+                description: |-
+                  When set to `true`, the role being defined will be allowed to create
+                  new databases. Specifying `false` (default) will deny a role the
+                  ability to create databases.
+                type: boolean
+              createrole:
+                description: |-
+                  Whether the role will be permitted to create, alter, drop, comment
+                  on, change the security label for, and grant or revoke membership in
+                  other roles. Default is `false`.
+                type: boolean
+              disablePassword:
+                description: DisablePassword indicates that a role's password should
+                  be set to NULL in Postgres
+                type: boolean
+              ensure:
+                default: present
+                description: Ensure the role is `present` or `absent` - defaults to
+                  "present"
+                enum:
+                - present
+                - absent
+                type: string
+              inRoles:
+                description: |-
+                  List of one or more existing roles to which this role will be
+                  immediately added as a new member. Default empty.
+                items:
+                  type: string
+                type: array
+              inherit:
+                default: true
+                description: |-
+                  Whether a role "inherits" the privileges of roles it is a member of.
+                  Defaults is `true`.
+                type: boolean
+              login:
+                description: |-
+                  Whether the role is allowed to log in. A role having the `login`
+                  attribute can be thought of as a user. Roles without this attribute
+                  are useful for managing database privileges, but are not users in
+                  the usual sense of the word. Default is `false`.
+                type: boolean
+              name:
+                description: Name of the role
+                type: string
+              passwordSecret:
+                description: |-
+                  Secret containing the password of the role (if present)
+                  If null, the password will be ignored unless DisablePassword is set
+                properties:
+                  name:
+                    description: Name of the referent.
+                    type: string
+                required:
+                - name
+                type: object
+              replication:
+                description: |-
+                  Whether a role is a replication role. A role must have this
+                  attribute (or be a superuser) in order to be able to connect to the
+                  server in replication mode (physical or logical replication) and in
+                  order to be able to create or drop replication slots. A role having
+                  the `replication` attribute is a very highly privileged role, and
+                  should only be used on roles actually used for replication. Default
+                  is `false`.
+                type: boolean
+              roleReclaimPolicy:
+                default: retain
+                description: The policy for end-of-life maintenance of this role
+                enum:
+                - delete
+                - retain
+                type: string
+              superuser:
+                description: |-
+                  Whether the role is a `superuser` who can override all access
+                  restrictions within the database - superuser status is dangerous and
+                  should be used only when really needed. You must yourself be a
+                  superuser to create a new superuser. Defaults is `false`.
+                type: boolean
+              validUntil:
+                description: |-
+                  Date and time after which the role's password is no longer valid.
+                  When omitted, the password will never expire (default).
+                format: date-time
+                type: string
+            required:
+            - cluster
+            - name
+            type: object
+          status:
+            description: RoleState defines the observed state of a Role
+            properties:
+              message:
+                description: Message is the reconciliation error message
+                type: string
+              observedGeneration:
+                description: |-
+                  A sequence number representing the latest
+                  desired state that was synchronized
+                format: int64
+                type: integer
+              ready:
+                description: Applied is true if the role was reconciled correctly
+                type: boolean
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
