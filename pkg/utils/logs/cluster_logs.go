@@ -25,7 +25,7 @@ import (
 	"sync"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -46,7 +46,7 @@ const DefaultFollowWaiting time.Duration = 1 * time.Second
 // streaming
 type ClusterStreamingRequest struct {
 	Cluster       *apiv1.Cluster
-	Options       *v1.PodLogOptions
+	Options       *corev1.PodLogOptions
 	Previous      bool `json:"previous,omitempty"`
 	FollowWaiting time.Duration
 	// NOTE: the Client argument may be omitted, but it is good practice to pass it
@@ -62,8 +62,8 @@ func (csr *ClusterStreamingRequest) getClusterNamespace() string {
 	return csr.Cluster.Namespace
 }
 
-func (csr *ClusterStreamingRequest) getLogOptions(containerName string) *v1.PodLogOptions {
-	options := &v1.PodLogOptions{}
+func (csr *ClusterStreamingRequest) getLogOptions(containerName string) *corev1.PodLogOptions {
+	options := &corev1.PodLogOptions{}
 	if csr.Options != nil {
 		options = csr.Options.DeepCopy()
 	}
@@ -173,7 +173,7 @@ func (csr *ClusterStreamingRequest) SingleStream(ctx context.Context, writer io.
 
 	for {
 		var (
-			podList *v1.PodList
+			podList *corev1.PodList
 			err     error
 		)
 		if isFirstScan || csr.Options.Follow {
