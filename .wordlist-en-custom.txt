@@ -432,6 +432,8 @@ RetentionPolicy
 RevokeUsageSpecType
 RoleBinding
 RoleConfiguration
+RoleSpec
+RoleState
 RoleStatus
 RoleStatusNotManaged
 RoleStatusPendingReconciliation
@@ -1361,6 +1363,7 @@ retryable
 reusePVC
 ro
 robfig
+roleReclaimPolicy
 roleRef
 roleconfiguration
 rolestatus
