@@ -84,7 +84,6 @@ var _ = Describe("testing the building of the ldap config string", func() {
 	})
 	It("correctly builds a bindSearchAuth string", func() {
 		str := buildLDAPConfigString(&cluster, ldapPassword)
-		fmt.Printf("here %s\n", str)
 		Expect(str).To(Equal(fmt.Sprintf(`host all all 0.0.0.0/0 ldap ldapserver="%s" ldapport=%d `+
 			`ldapscheme="%s" ldaptls=1 ldapbasedn="%s" ldapbinddn="%s" `+
 			`ldapbindpasswd="%s" ldapsearchfilter="%s" ldapsearchattribute="%s"`,

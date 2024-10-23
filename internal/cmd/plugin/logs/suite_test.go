@@ -17,27 +17,13 @@ limitations under the License.
 package logs
 
 import (
-	"os"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
-var tempDir string
-
 func TestPgbench(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Logs Suite")
 }
-
-var _ = BeforeSuite(func() {
-	var err error
-	tempDir, err = os.MkdirTemp(os.TempDir(), "logs_")
-	Expect(err).ToNot(HaveOccurred())
-})
-
-var _ = AfterSuite(func() {
-	err := os.RemoveAll(tempDir)
-	Expect(err).ToNot(HaveOccurred())
-})
