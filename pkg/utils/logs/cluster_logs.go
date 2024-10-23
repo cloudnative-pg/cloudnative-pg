@@ -63,10 +63,13 @@ func (csr *ClusterStreamingRequest) getClusterNamespace() string {
 }
 
 func (csr *ClusterStreamingRequest) getLogOptions(containerName string) *corev1.PodLogOptions {
-	options := &corev1.PodLogOptions{}
-	if csr.Options != nil {
-		options = csr.Options.DeepCopy()
+	if csr.Options == nil {
+		return &corev1.PodLogOptions{
+			Container: containerName,
+			Previous:  csr.Previous,
+		}
 	}
+	options := csr.Options.DeepCopy()
 	options.Container = containerName
 	options.Previous = csr.Previous
 	return options
