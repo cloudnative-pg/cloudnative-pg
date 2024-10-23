@@ -17,7 +17,11 @@ limitations under the License.
 package utils
 
 import (
+	"encoding/json"
+	"fmt"
 	"os"
+	"strings"
+	"time"
 
 	apiv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -26,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
 
+	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 )
 
@@ -119,7 +124,7 @@ func InstallAzCli(namespace string, env *TestingEnvironment) error {
 	return nil
 }
 
-// getAzuriteClientPod get the cli client pod
+// getAzuriteClientPod get the cli client pod/home/zeus/src/cloudnative-pg/pkg
 func getAzuriteClientPod(namespace string) corev1.Pod {
 	seccompProfile := &corev1.SeccompProfile{
 		Type: corev1.SeccompProfileTypeRuntimeDefault,
@@ -345,4 +350,296 @@ func getStorageCredentials(namespace string) corev1.Secret {
 		},
 	}
 	return azuriteStorageSecrets
+}
+
+// CreateClusterFromExternalClusterBackupWithPITROnAzure creates a cluster on Azure, starting from an external cluster
+// backup with PITR
+func CreateClusterFromExternalClusterBackupWithPITROnAzure(
+	namespace,
+	externalClusterName,
+	sourceClusterName,
+	targetTime,
+	storageCredentialsSecretName,
+	azStorageAccount,
+	azBlobContainer string,
+	env *TestingEnvironment,
+) (*v1.Cluster, error) {
+	storageClassName := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
+	destinationPath := fmt.Sprintf("https://%v.blob.core.windows.net/%v/",
+		azStorageAccount, azBlobContainer)
+
+	restoreCluster := &v1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      externalClusterName,
+			Namespace: namespace,
+		},
+		Spec: v1.ClusterSpec{
+			Instances: 3,
+
+			StorageConfiguration: v1.StorageConfiguration{
+				Size:         "1Gi",
+				StorageClass: &storageClassName,
+			},
+
+			PostgresConfiguration: v1.PostgresConfiguration{
+				Parameters: map[string]string{
+					"log_checkpoints":             "on",
+					"log_lock_waits":              "on",
+					"log_min_duration_statement":  "1000",
+					"log_statement":               "ddl",
+					"log_temp_files":              "1024",
+					"log_autovacuum_min_duration": "1s",
+					"log_replication_commands":    "on",
+				},
+			},
+
+			Bootstrap: &v1.BootstrapConfiguration{
+				Recovery: &v1.BootstrapRecovery{
+					Source: sourceClusterName,
+					RecoveryTarget: &v1.RecoveryTarget{
+						TargetTime: targetTime,
+					},
+				},
+			},
+
+			ExternalClusters: []v1.ExternalCluster{
+				{
+					Name: sourceClusterName,
+					BarmanObjectStore: &v1.BarmanObjectStoreConfiguration{
+						DestinationPath: destinationPath,
+						BarmanCredentials: v1.BarmanCredentials{
+							Azure: &v1.AzureCredentials{
+								StorageAccount: &v1.SecretKeySelector{
+									LocalObjectReference: v1.LocalObjectReference{
+										Name: storageCredentialsSecretName,
+									},
+									Key: "ID",
+								},
+								StorageKey: &v1.SecretKeySelector{
+									LocalObjectReference: v1.LocalObjectReference{
+										Name: storageCredentialsSecretName,
+									},
+									Key: "KEY",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	obj, err := CreateObject(env, restoreCluster)
+	if err != nil {
+		return nil, err
+	}
+	cluster, ok := obj.(*v1.Cluster)
+	if !ok {
+		return nil, fmt.Errorf("created object is not of type cluster: %T, %v", obj, obj)
+	}
+	return cluster, nil
+}
+
+// CreateClusterFromExternalClusterBackupWithPITROnAzurite creates a cluster with Azurite, starting from an external
+// cluster backup with PITR
+func CreateClusterFromExternalClusterBackupWithPITROnAzurite(
+	namespace,
+	externalClusterName,
+	sourceClusterName,
+	targetTime string,
+	env *TestingEnvironment,
+) (*v1.Cluster, error) {
+	storageClassName := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
+	DestinationPath := fmt.Sprintf("https://azurite:10000/storageaccountname/%v", sourceClusterName)
+
+	restoreCluster := &v1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      externalClusterName,
+			Namespace: namespace,
+		},
+		Spec: v1.ClusterSpec{
+			Instances: 3,
+
+			StorageConfiguration: v1.StorageConfiguration{
+				Size:         "1Gi",
+				StorageClass: &storageClassName,
+			},
+
+			PostgresConfiguration: v1.PostgresConfiguration{
+				Parameters: map[string]string{
+					"log_checkpoints":             "on",
+					"log_lock_waits":              "on",
+					"log_min_duration_statement":  "1000",
+					"log_statement":               "ddl",
+					"log_temp_files":              "1024",
+					"log_autovacuum_min_duration": "1s",
+					"log_replication_commands":    "on",
+				},
+			},
+
+			Bootstrap: &v1.BootstrapConfiguration{
+				Recovery: &v1.BootstrapRecovery{
+					Source: sourceClusterName,
+					RecoveryTarget: &v1.RecoveryTarget{
+						TargetTime: targetTime,
+					},
+				},
+			},
+
+			ExternalClusters: []v1.ExternalCluster{
+				{
+					Name: sourceClusterName,
+					BarmanObjectStore: &v1.BarmanObjectStoreConfiguration{
+						DestinationPath: DestinationPath,
+						EndpointCA: &v1.SecretKeySelector{
+							LocalObjectReference: v1.LocalObjectReference{
+								Name: "azurite-ca-secret",
+							},
+							Key: "ca.crt",
+						},
+						BarmanCredentials: v1.BarmanCredentials{
+							Azure: &v1.AzureCredentials{
+								ConnectionString: &v1.SecretKeySelector{
+									LocalObjectReference: v1.LocalObjectReference{
+										Name: "azurite",
+									},
+									Key: "AZURE_CONNECTION_STRING",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	obj, err := CreateObject(env, restoreCluster)
+	if err != nil {
+		return nil, err
+	}
+	cluster, ok := obj.(*v1.Cluster)
+	if !ok {
+		return nil, fmt.Errorf("created object is not of type cluster: %T, %v", obj, obj)
+	}
+	return cluster, nil
+}
+
+// ComposeAzBlobListAzuriteCmd builds the Azure storage blob list command for Azurite
+func ComposeAzBlobListAzuriteCmd(clusterName, path string) string {
+	return fmt.Sprintf("az storage blob list --container-name %v --query \"[?contains(@.name, \\`%v\\`)].name\" "+
+		"--connection-string $AZURE_CONNECTION_STRING",
+		clusterName, path)
+}
+
+// ComposeAzBlobListCmd builds the Azure storage blob list command
+func ComposeAzBlobListCmd(
+	configuration AzureConfiguration,
+	clusterName,
+	path string,
+) string {
+	return fmt.Sprintf("az storage blob list --account-name %v  "+
+		"--account-key %v  "+
+		"--container-name %v  "+
+		"--prefix %v/  "+
+		"--query \"[?contains(@.name, \\`%v\\`)].name\"",
+		configuration.StorageAccount, configuration.StorageKey, configuration.BlobContainer, clusterName, path)
+}
+
+// CountFilesOnAzureBlobStorage counts files on Azure Blob storage
+func CountFilesOnAzureBlobStorage(
+	configuration AzureConfiguration,
+	clusterName,
+	path string,
+) (int, error) {
+	azBlobListCmd := ComposeAzBlobListCmd(configuration, clusterName, path)
+	out, _, err := RunUnchecked(azBlobListCmd)
+	if err != nil {
+		return -1, err
+	}
+	var arr []string
+	err = json.Unmarshal([]byte(out), &arr)
+	return len(arr), err
+}
+
+// CountFilesOnAzuriteBlobStorage counts files on Azure Blob storage. using Azurite
+func CountFilesOnAzuriteBlobStorage(
+	namespace,
+	clusterName,
+	path string,
+) (int, error) {
+	azBlobListCmd := ComposeAzBlobListAzuriteCmd(clusterName, path)
+	out, _, err := RunUnchecked(fmt.Sprintf("kubectl exec -n %v az-cli "+
+		"-- /bin/bash -c '%v'", namespace, azBlobListCmd))
+	if err != nil {
+		return -1, err
+	}
+	var arr []string
+	err = json.Unmarshal([]byte(out), &arr)
+	return len(arr), err
+}
+
+// verifySASTokenWriteActivity returns true if the given token has RW permissions,
+// otherwise it returns false
+func verifySASTokenWriteActivity(containerName string, id string, key string) bool {
+	_, _, err := RunUnchecked(fmt.Sprintf("az storage container create "+
+		"--name %v --account-name %v "+
+		"--sas-token %v", containerName, id, key))
+
+	return err == nil
+}
+
+// CreateSASTokenCredentials generates Secrets for the Azure Blob Storage
+func CreateSASTokenCredentials(namespace string, id string, key string, env *TestingEnvironment) error {
+	// Adding 24 hours to the current time
+	date := time.Now().UTC().Add(time.Hour * 24)
+	// Creating date time format for az command
+	expiringDate := fmt.Sprintf("%v"+"-"+"%d"+"-"+"%v"+"T"+"%v"+":"+"%v"+"Z",
+		date.Year(),
+		date.Month(),
+		date.Day(),
+		date.Hour(),
+		date.Minute())
+
+	out, _, err := Run(fmt.Sprintf(
+		// SAS Token at Blob Container level does not currently work in Barman Cloud
+		// https://github.com/EnterpriseDB/barman/issues/388
+		// we will use SAS Token at Storage Account level
+		// ( "az storage container generate-sas --account-name %v "+
+		// "--name %v "+
+		// "--https-only --permissions racwdl --auth-mode key --only-show-errors "+
+		// "--expiry \"$(date -u -d \"+4 hours\" '+%%Y-%%m-%%dT%%H:%%MZ')\"",
+		// id, blobContainerName )
+		"az storage account generate-sas --account-name %v "+
+			"--https-only --permissions cdlruwap --account-key %v "+
+			"--resource-types co --services b --expiry %v -o tsv",
+		id, key, expiringDate))
+	if err != nil {
+		return err
+	}
+	SASTokenRW := strings.TrimRight(out, "\n")
+
+	out, _, err = Run(fmt.Sprintf(
+		"az storage account generate-sas --account-name %v "+
+			"--https-only --permissions lr --account-key %v "+
+			"--resource-types co --services b --expiry %v -o tsv",
+		id, key, expiringDate))
+	if err != nil {
+		return err
+	}
+
+	SASTokenRO := strings.TrimRight(out, "\n")
+	isReadWrite := verifySASTokenWriteActivity("restore-cluster-sas", id, SASTokenRO)
+	if isReadWrite {
+		return fmt.Errorf("expected token to be ready only")
+	}
+
+	_, err = CreateObjectStorageSecret(namespace, "backup-storage-creds-sas", id, SASTokenRW, env)
+	if err != nil {
+		return err
+	}
+
+	_, err = CreateObjectStorageSecret(namespace, "restore-storage-creds-sas", id, SASTokenRO, env)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
