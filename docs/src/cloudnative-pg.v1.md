@@ -2667,6 +2667,8 @@ desired state that was synchronized</p>
 
 - [RoleConfiguration](#postgresql-cnpg-io-v1-RoleConfiguration)
 
+- [RoleSpec](#postgresql-cnpg-io-v1-RoleSpec)
+
 
 <p>EnsureOption represents whether we should enforce the presence or absence of
 a Role in a PostgreSQL instance</p>
@@ -4778,6 +4780,37 @@ This can only be set at creation time. By default set to <code>_cnpg_</code>.</p
 </tbody>
 </table>
 
+## Role     {#postgresql-cnpg-io-v1-Role}
+
+
+
+<p>Role is the Schema for the databases API</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>metadata</code> <B>[Required]</B><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#objectmeta-v1-meta"><i>meta/v1.ObjectMeta</i></a>
+</td>
+<td>
+   <span class="text-muted">No description provided.</span>Refer to the Kubernetes API documentation for the fields of the <code>metadata</code> field.</td>
+</tr>
+<tr><td><code>spec</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-RoleSpec"><i>RoleSpec</i></a>
+</td>
+<td>
+   <span class="text-muted">No description provided.</span></td>
+</tr>
+<tr><td><code>status</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-RoleState"><i>RoleState</i></a>
+</td>
+<td>
+   <span class="text-muted">No description provided.</span></td>
+</tr>
+</tbody>
+</table>
+
 ## RoleConfiguration     {#postgresql-cnpg-io-v1-RoleConfiguration}
 
 
@@ -4921,6 +4954,218 @@ is <code>false</code>.</p>
 <td>
    <p>Whether a role bypasses every row-level security (RLS) policy.
 Default is <code>false</code>.</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## RoleReclaimPolicy     {#postgresql-cnpg-io-v1-RoleReclaimPolicy}
+
+(Alias of `string`)
+
+**Appears in:**
+
+- [RoleSpec](#postgresql-cnpg-io-v1-RoleSpec)
+
+
+<p>RoleReclaimPolicy describes a policy for end-of-life maintenance of Roles.</p>
+
+
+
+
+## RoleSpec     {#postgresql-cnpg-io-v1-RoleSpec}
+
+
+**Appears in:**
+
+- [Role](#postgresql-cnpg-io-v1-Role)
+
+
+<p>RoleSpec represents a role in Postgres</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>cluster</code> <B>[Required]</B><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#localobjectreference-v1-core"><i>core/v1.LocalObjectReference</i></a>
+</td>
+<td>
+   <p>The corresponding cluster</p>
+</td>
+</tr>
+<tr><td><code>roleReclaimPolicy</code><br/>
+<a href="#postgresql-cnpg-io-v1-RoleReclaimPolicy"><i>RoleReclaimPolicy</i></a>
+</td>
+<td>
+   <p>The policy for end-of-life maintenance of this role</p>
+</td>
+</tr>
+<tr><td><code>name</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Name of the role</p>
+</td>
+</tr>
+<tr><td><code>comment</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Description of the role</p>
+</td>
+</tr>
+<tr><td><code>ensure</code><br/>
+<a href="#postgresql-cnpg-io-v1-EnsureOption"><i>EnsureOption</i></a>
+</td>
+<td>
+   <p>Ensure the role is <code>present</code> or <code>absent</code> - defaults to &quot;present&quot;</p>
+</td>
+</tr>
+<tr><td><code>passwordSecret</code><br/>
+<a href="https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api/#LocalObjectReference"><i>github.com/cloudnative-pg/machinery/pkg/api.LocalObjectReference</i></a>
+</td>
+<td>
+   <p>Secret containing the password of the role (if present)
+If null, the password will be ignored unless DisablePassword is set</p>
+</td>
+</tr>
+<tr><td><code>connectionLimit</code><br/>
+<i>int64</i>
+</td>
+<td>
+   <p>If the role can log in, this specifies how many concurrent
+connections the role can make. <code>-1</code> (the default) means no limit.</p>
+</td>
+</tr>
+<tr><td><code>validUntil</code><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#time-v1-meta"><i>meta/v1.Time</i></a>
+</td>
+<td>
+   <p>Date and time after which the role's password is no longer valid.
+When omitted, the password will never expire (default).</p>
+</td>
+</tr>
+<tr><td><code>inRoles</code><br/>
+<i>[]string</i>
+</td>
+<td>
+   <p>List of one or more existing roles to which this role will be
+immediately added as a new member. Default empty.</p>
+</td>
+</tr>
+<tr><td><code>inherit</code><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>Whether a role &quot;inherits&quot; the privileges of roles it is a member of.
+Defaults is <code>true</code>.</p>
+</td>
+</tr>
+<tr><td><code>disablePassword</code><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>DisablePassword indicates that a role's password should be set to NULL in Postgres</p>
+</td>
+</tr>
+<tr><td><code>superuser</code><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>Whether the role is a <code>superuser</code> who can override all access
+restrictions within the database - superuser status is dangerous and
+should be used only when really needed. You must yourself be a
+superuser to create a new superuser. Defaults is <code>false</code>.</p>
+</td>
+</tr>
+<tr><td><code>createdb</code><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>When set to <code>true</code>, the role being defined will be allowed to create
+new databases. Specifying <code>false</code> (default) will deny a role the
+ability to create databases.</p>
+</td>
+</tr>
+<tr><td><code>createrole</code><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>Whether the role will be permitted to create, alter, drop, comment
+on, change the security label for, and grant or revoke membership in
+other roles. Default is <code>false</code>.</p>
+</td>
+</tr>
+<tr><td><code>login</code><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>Whether the role is allowed to log in. A role having the <code>login</code>
+attribute can be thought of as a user. Roles without this attribute
+are useful for managing database privileges, but are not users in
+the usual sense of the word. Default is <code>false</code>.</p>
+</td>
+</tr>
+<tr><td><code>replication</code><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>Whether a role is a replication role. A role must have this
+attribute (or be a superuser) in order to be able to connect to the
+server in replication mode (physical or logical replication) and in
+order to be able to create or drop replication slots. A role having
+the <code>replication</code> attribute is a very highly privileged role, and
+should only be used on roles actually used for replication. Default
+is <code>false</code>.</p>
+</td>
+</tr>
+<tr><td><code>bypassrls</code><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>Whether a role bypasses every row-level security (RLS) policy.
+Default is <code>false</code>.</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## RoleState     {#postgresql-cnpg-io-v1-RoleState}
+
+
+**Appears in:**
+
+- [Role](#postgresql-cnpg-io-v1-Role)
+
+
+<p>RoleState defines the observed state of a Role
+TODO: the existing RoleStatus in the cluster managed roles, does more than we need</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>observedGeneration</code><br/>
+<i>int64</i>
+</td>
+<td>
+   <p>A sequence number representing the latest
+desired state that was synchronized</p>
+</td>
+</tr>
+<tr><td><code>ready</code> <B>[Required]</B><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>Applied is true if the role was reconciled correctly</p>
+</td>
+</tr>
+<tr><td><code>message</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Message is the reconciliation error message</p>
 </td>
 </tr>
 </tbody>

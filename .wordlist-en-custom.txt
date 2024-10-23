@@ -380,6 +380,8 @@ RetentionPolicy
 RoleBinding
 RoleConfiguration
 RolePasswordStatus
+RoleSpec
+RoleState
 RoleStatus
 RollingUpdateStatus
 RunningBackupStatus
@@ -1165,6 +1167,7 @@ retentionPolicy
 reusePVC
 ro
 robfig
+roleReclaimPolicy
 roleRef
 rollingupdatestatus
 rollout
