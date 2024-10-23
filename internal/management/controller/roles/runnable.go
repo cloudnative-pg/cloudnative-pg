@@ -185,7 +185,11 @@ func (sr *RoleSynchronizer) synchronizeRoles(
 	if err != nil {
 		return nil, nil, err
 	}
-	rolesInDB, err := roleManager.List(ctx)
+	db, err := sr.instance.GetSuperUserDB()
+	if err != nil {
+		return nil, nil, fmt.Errorf("while connecting to the database: %w", err)
+	}
+	rolesInDB, err := roleManager.List(ctx, db)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -197,6 +201,7 @@ func (sr *RoleSynchronizer) synchronizeRoles(
 
 	passwordStates, irreconcilableRoles := sr.applyRoleActions(
 		ctx,
+		db,
 		roleManager,
 		rolesByAction,
 	)
@@ -218,6 +223,7 @@ func (sr *RoleSynchronizer) synchronizeRoles(
 // cannot stop the reconciliation loop and prevent other roles from being applied
 func (sr *RoleSynchronizer) applyRoleActions(
 	ctx context.Context,
+	db *sql.DB,
 	roleManager RoleManager,
 	rolesByAction rolesByAction,
 ) (map[string]apiv1.PasswordState, map[string][]string) {
@@ -253,27 +259,27 @@ func (sr *RoleSynchronizer) applyRoleActions(
 		for _, role := range roles {
 			switch action {
 			case roleCreate, roleUpdate:
-				appliedState, err := sr.applyRoleCreateUpdate(ctx, roleManager, role, action)
+				appliedState, err := sr.applyRoleCreateUpdate(ctx, db, roleManager, role, action)
 				if err == nil {
 					appliedChanges[role.Name] = appliedState
 				}
 				handleRoleError(err, role.Name, action)
 			case roleDelete:
-				err := roleManager.Delete(ctx, role.toDatabaseRole())
+				err := roleManager.Delete(ctx, db, role.toDatabaseRole())
 				handleRoleError(err, role.Name, action)
 			case roleSetComment:
 				// NOTE: adding/updating a comment on a role does not alter its TransactionID
-				err := roleManager.UpdateComment(ctx, role.toDatabaseRole())
+				err := roleManager.UpdateComment(ctx, db, role.toDatabaseRole())
 				handleRoleError(err, role.Name, action)
 			case roleUpdateMemberships:
 				// NOTE: revoking / granting to a role does not alter its TransactionID
 				dbRole := role.toDatabaseRole()
-				grants, revokes, err := getRoleMembershipDiff(ctx, roleManager, role, dbRole)
+				grants, revokes, err := getRoleMembershipDiff(ctx, db, roleManager, role, dbRole)
 				if err != nil {
 					contextLog.Error(err, "while performing "+string(action), "role", role.Name)
 					continue
 				}
-				err = roleManager.UpdateMembership(ctx, dbRole, grants, revokes)
+				err = roleManager.UpdateMembership(ctx, db, dbRole, grants, revokes)
 				handleRoleError(err, role.Name, action)
 			}
 		}
@@ -284,11 +290,12 @@ func (sr *RoleSynchronizer) applyRoleActions(
 
 func getRoleMembershipDiff(
 	ctx context.Context,
+	db *sql.DB,
 	roleManager RoleManager,
 	role roleConfigurationAdapter,
 	dbRole DatabaseRole,
 ) ([]string, []string, error) {
-	inRoleInDB, err := roleManager.GetParentRoles(ctx, dbRole)
+	inRoleInDB, err := roleManager.GetParentRoles(ctx, db, dbRole)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -302,6 +309,7 @@ func getRoleMembershipDiff(
 // Returns the PasswordState, as well as any error encountered
 func (sr *RoleSynchronizer) applyRoleCreateUpdate(
 	ctx context.Context,
+	db *sql.DB,
 	roleManager RoleManager,
 	role roleConfigurationAdapter,
 	action roleAction,
@@ -332,15 +340,15 @@ func (sr *RoleSynchronizer) applyRoleCreateUpdate(
 	var err error
 	switch action {
 	case roleCreate:
-		err = roleManager.Create(ctx, databaseRole)
+		err = roleManager.Create(ctx, db, databaseRole)
 	case roleUpdate:
-		err = roleManager.Update(ctx, databaseRole)
+		err = roleManager.Update(ctx, db, databaseRole)
 	}
 	if err != nil {
 		return apiv1.PasswordState{}, err
 	}
 
-	transactionID, err := roleManager.GetLastTransactionID(ctx, databaseRole)
+	transactionID, err := roleManager.GetLastTransactionID(ctx, db, databaseRole)
 	if err != nil {
 		return apiv1.PasswordState{}, err
 	}
