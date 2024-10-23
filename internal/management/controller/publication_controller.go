@@ -123,22 +123,35 @@ func (r *PublicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	return ctrl.Result{RequeueAfter: publicationReconciliationInterval}, markAsReady(ctx, r.Client, &publication)
 }
 
+func (r *PublicationReconciler) evaluateDropPublication(ctx context.Context, pub *apiv1.Publication) error {
+	if pub.Spec.ReclaimPolicy != apiv1.PublicationReclaimDelete {
+		return nil
+	}
+	db, err := r.instance.ConnectionPool().Connection(pub.Spec.DBName)
+	if err != nil {
+		return fmt.Errorf("while getting DB connection: %w", err)
+	}
+
+	return executeDropPublication(ctx, db, pub.Spec.Name)
+}
+
 // NewPublicationReconciler creates a new publication reconciler
 func NewPublicationReconciler(
 	mgr manager.Manager,
 	instance *postgres.Instance,
 ) *PublicationReconciler {
-	onFinalizerDelete := func(ctx context.Context, pub *apiv1.Publication) error {
-		if pub.Spec.ReclaimPolicy == apiv1.PublicationReclaimDelete {
-			return dropPublication(ctx, instance, pub)
-		}
-		return nil
+	pr := &PublicationReconciler{
+		Client:   mgr.GetClient(),
+		instance: instance,
 	}
-	return &PublicationReconciler{
-		Client:              mgr.GetClient(),
-		instance:            instance,
-		finalizerReconciler: newFinalizerReconciler(mgr.GetClient(), utils.PublicationFinalizerName, onFinalizerDelete),
-	}
+
+	pr.finalizerReconciler = newFinalizerReconciler(
+		mgr.GetClient(),
+		utils.PublicationFinalizerName,
+		pr.evaluateDropPublication,
+	)
+
+	return pr
 }
 
 // SetupWithManager sets up the controller with the Manager.

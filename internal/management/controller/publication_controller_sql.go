@@ -25,7 +25,6 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
 
 func (r *PublicationReconciler) alignPublication(ctx context.Context, obj *apiv1.Publication) error {
@@ -160,15 +159,10 @@ func toPublicationAlterSQL(obj *apiv1.Publication) []string {
 	return result
 }
 
-func dropPublication(ctx context.Context, instance *postgres.Instance, obj *apiv1.Publication) error {
-	db, err := instance.ConnectionPool().Connection(obj.Spec.DBName)
-	if err != nil {
-		return fmt.Errorf("while getting DB connection: %w", err)
-	}
-
+func executeDropPublication(ctx context.Context, db *sql.DB, name string) error {
 	if _, err := db.ExecContext(
 		ctx,
-		fmt.Sprintf("DROP PUBLICATION IF EXISTS %s", pgx.Identifier{obj.Spec.Name}.Sanitize()),
+		fmt.Sprintf("DROP PUBLICATION IF EXISTS %s", pgx.Identifier{name}.Sanitize()),
 	); err != nil {
 		return fmt.Errorf("while dropping publication: %w", err)
 	}

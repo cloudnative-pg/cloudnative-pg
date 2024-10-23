@@ -139,22 +139,31 @@ func (r *SubscriptionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	)
 }
 
+func (r *SubscriptionReconciler) evaluateDropSubscription(ctx context.Context, sub *apiv1.Subscription) error {
+	if sub.Spec.ReclaimPolicy != apiv1.SubscriptionReclaimDelete {
+		return nil
+	}
+
+	db, err := r.instance.ConnectionPool().Connection(sub.Spec.DBName)
+	if err != nil {
+		return fmt.Errorf("while getting DB connection: %w", err)
+	}
+	return executeDropSubscription(ctx, db, sub.Spec.Name)
+}
+
 // NewSubscriptionReconciler creates a new subscription reconciler
 func NewSubscriptionReconciler(
 	mgr manager.Manager,
 	instance *postgres.Instance,
 ) *SubscriptionReconciler {
-	onFinalizerDelete := func(ctx context.Context, sub *apiv1.Subscription) error {
-		if sub.Spec.ReclaimPolicy == apiv1.SubscriptionReclaimDelete {
-			return dropSubscription(ctx, instance, sub)
-		}
-		return nil
-	}
-	return &SubscriptionReconciler{
-		Client:              mgr.GetClient(),
-		instance:            instance,
-		finalizerReconciler: newFinalizerReconciler(mgr.GetClient(), utils.SubscriptionFinalizerName, onFinalizerDelete),
-	}
+	sr := &SubscriptionReconciler{Client: mgr.GetClient(), instance: instance}
+	sr.finalizerReconciler = newFinalizerReconciler(
+		mgr.GetClient(),
+		utils.SubscriptionFinalizerName,
+		sr.evaluateDropSubscription,
+	)
+
+	return sr
 }
 
 // SetupWithManager sets up the controller with the Manager

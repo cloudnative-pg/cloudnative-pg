@@ -26,7 +26,6 @@ import (
 	"github.com/lib/pq"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
 
 func (r *SubscriptionReconciler) alignSubscription(
@@ -178,15 +177,10 @@ func toSubscriptionAlterSQL(obj *apiv1.Subscription, connString string) []string
 	return result
 }
 
-func dropSubscription(ctx context.Context, instance *postgres.Instance, obj *apiv1.Subscription) error {
-	db, err := instance.ConnectionPool().Connection(obj.Spec.DBName)
-	if err != nil {
-		return fmt.Errorf("while getting DB connection: %w", err)
-	}
-
+func executeDropSubscription(ctx context.Context, db *sql.DB, name string) error {
 	if _, err := db.ExecContext(
 		ctx,
-		fmt.Sprintf("DROP SUBSCRIPTION IF EXISTS %s", pgx.Identifier{obj.Spec.Name}.Sanitize()),
+		fmt.Sprintf("DROP SUBSCRIPTION IF EXISTS %s", pgx.Identifier{name}.Sanitize()),
 	); err != nil {
 		return fmt.Errorf("while dropping subscription: %w", err)
 	}
