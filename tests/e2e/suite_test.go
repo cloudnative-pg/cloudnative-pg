@@ -36,6 +36,7 @@ import (
 	cnpgUtils "github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/minio"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/sternmultitailer"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -57,7 +58,7 @@ var (
 	operatorWasRestarted    bool
 	quickDeletionPeriod     = int64(1)
 	testTimeouts            map[utils.Timeout]int
-	minioEnv                = &utils.MinioEnv{
+	minioEnv                = &minio.Env{
 		Namespace:    "minio",
 		ServiceName:  "minio-service.minio",
 		CaSecretName: "minio-server-ca-secret",
@@ -98,7 +99,7 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 		Expect(err).ToNot(HaveOccurred())
 	})
 	minioEnv.Timeout = uint(testTimeouts[utils.MinioInstallation])
-	minioClient, err := utils.MinioDeploy(minioEnv, env)
+	minioClient, err := minio.Deploy(minioEnv, env)
 	Expect(err).ToNot(HaveOccurred())
 
 	caSecret := minioEnv.CaPair.GenerateCASecret(minioEnv.Namespace, minioEnv.CaSecretName)
