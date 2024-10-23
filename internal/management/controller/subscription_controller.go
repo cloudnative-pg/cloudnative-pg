@@ -64,7 +64,17 @@ func (r *SubscriptionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		Namespace: req.Namespace,
 		Name:      req.Name,
 	}, &subscription); err != nil {
+		contextLogger.Trace("Could not fetch Subscription", "error", err)
 		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	// This is not for me!
+	if subscription.Spec.ClusterRef.Name != r.instance.GetClusterName() {
+		contextLogger.Trace("Subscription is not for this cluster",
+			"cluster", subscription.Spec.ClusterRef.Name,
+			"expected", r.instance.GetClusterName(),
+		)
+		return ctrl.Result{}, nil
 	}
 
 	// Fetch the Cluster from the cache
@@ -73,18 +83,13 @@ func (r *SubscriptionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, markAsFailed(ctx, r.Client, &subscription, fmt.Errorf("while fetching the cluster: %w", err))
 	}
 
-	// This is not for me!
-	if subscription.Spec.ClusterRef.Name != r.instance.GetClusterName() {
-		return ctrl.Result{}, nil
+	// Still not for me, we're waiting for a switchover
+	if cluster.Status.CurrentPrimary != cluster.Status.TargetPrimary {
+		return ctrl.Result{RequeueAfter: subscriptionReconciliationInterval}, nil
 	}
 
 	// This is not for me, at least now
 	if cluster.Status.CurrentPrimary != r.instance.GetPodName() {
-		return ctrl.Result{RequeueAfter: subscriptionReconciliationInterval}, nil
-	}
-
-	// Still not for me, we're waiting for a switchover
-	if cluster.Status.CurrentPrimary != cluster.Status.TargetPrimary {
 		return ctrl.Result{RequeueAfter: subscriptionReconciliationInterval}, nil
 	}
 
@@ -111,32 +116,14 @@ func (r *SubscriptionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		"", // TODO: should we have a way to force dbname?
 	)
 	if err != nil {
-		return ctrl.Result{RequeueAfter: subscriptionReconciliationInterval}, markAsFailed(
-			ctx,
-			r.Client,
-			&subscription,
-			err,
-		)
+		return ctrl.Result{RequeueAfter: subscriptionReconciliationInterval}, markAsFailed(ctx, r.Client, &subscription, err)
 	}
 
-	if err := r.alignSubscription(
-		ctx,
-		&subscription,
-		connString,
-	); err != nil {
-		return ctrl.Result{RequeueAfter: subscriptionReconciliationInterval}, markAsFailed(
-			ctx,
-			r.Client,
-			&subscription,
-			err,
-		)
+	if err := r.alignSubscription(ctx, &subscription, connString); err != nil {
+		return ctrl.Result{RequeueAfter: subscriptionReconciliationInterval}, markAsFailed(ctx, r.Client, &subscription, err)
 	}
 
-	return ctrl.Result{RequeueAfter: subscriptionReconciliationInterval}, markAsReady(
-		ctx,
-		r.Client,
-		&subscription,
-	)
+	return ctrl.Result{RequeueAfter: subscriptionReconciliationInterval}, markAsReady(ctx, r.Client, &subscription)
 }
 
 func (r *SubscriptionReconciler) evaluateDropSubscription(ctx context.Context, sub *apiv1.Subscription) error {
