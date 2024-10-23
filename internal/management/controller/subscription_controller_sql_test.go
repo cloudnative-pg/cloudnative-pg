@@ -24,6 +24,8 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/jackc/pgx/v5"
 
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -68,5 +70,132 @@ var _ = Describe("subscription sql", func() {
 
 		err := executeDropSubscription(ctx, db, "sanitized_name")
 		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("generates correct SQL for creating subscription with publication and connection string", func() {
+		obj := &apiv1.Subscription{
+			Spec: apiv1.SubscriptionSpec{
+				Name:            "test_sub",
+				PublicationName: "test_pub",
+			},
+		}
+		connString := "host=localhost user=test dbname=test"
+
+		sqls := toSubscriptionCreateSQL(obj, connString)
+		Expect(sqls).To(ContainElement(
+			"CREATE SUBSCRIPTION \"test_sub\" CONNECTION 'host=localhost user=test dbname=test' PUBLICATION \"test_pub\""))
+	})
+
+	It("generates correct SQL for creating subscription with parameters", func() {
+		obj := &apiv1.Subscription{
+			Spec: apiv1.SubscriptionSpec{
+				Name:            "test_sub",
+				PublicationName: "test_pub",
+				Parameters: map[string]string{
+					"param1": "value1",
+					"param2": "value2",
+				},
+			},
+		}
+		connString := "host=localhost user=test dbname=test"
+
+		sqls := toSubscriptionCreateSQL(obj, connString)
+		expectedElement := "CREATE SUBSCRIPTION \"test_sub\" " +
+			"CONNECTION 'host=localhost user=test dbname=test' " +
+			"PUBLICATION \"test_pub\" WITH (param1 = 'value1', param2 = 'value2')"
+		Expect(sqls).To(ContainElement(expectedElement))
+	})
+
+	It("generates correct SQL for creating subscription with owner", func() {
+		obj := &apiv1.Subscription{
+			Spec: apiv1.SubscriptionSpec{
+				Name:            "test_sub",
+				PublicationName: "test_pub",
+				Owner:           "new_owner",
+			},
+		}
+		connString := "host=localhost user=test dbname=test"
+
+		sqls := toSubscriptionCreateSQL(obj, connString)
+		Expect(sqls).To(ContainElement(
+			"CREATE SUBSCRIPTION \"test_sub\" CONNECTION 'host=localhost user=test dbname=test' PUBLICATION \"test_pub\""))
+		Expect(sqls).To(ContainElement("ALTER SUBSCRIPTION \"test_sub\" OWNER TO \"new_owner\""))
+	})
+
+	It("returns correct SQL for creating subscription with no owner or parameters", func() {
+		obj := &apiv1.Subscription{
+			Spec: apiv1.SubscriptionSpec{
+				Name:            "test_sub",
+				PublicationName: "test_pub",
+			},
+		}
+		connString := "host=localhost user=test dbname=test"
+
+		sqls := toSubscriptionCreateSQL(obj, connString)
+		Expect(sqls).To(ContainElement(
+			"CREATE SUBSCRIPTION \"test_sub\" CONNECTION 'host=localhost user=test dbname=test' PUBLICATION \"test_pub\""))
+	})
+
+	It("generates correct SQL for altering subscription with publication and connection string", func() {
+		obj := &apiv1.Subscription{
+			Spec: apiv1.SubscriptionSpec{
+				Name:            "test_sub",
+				PublicationName: "test_pub",
+			},
+		}
+		connString := "host=localhost user=test dbname=test"
+
+		sqls := toSubscriptionAlterSQL(obj, connString)
+		Expect(sqls).To(ContainElement("ALTER SUBSCRIPTION \"test_sub\" SET PUBLICATION \"test_pub\""))
+		Expect(sqls).To(ContainElement("ALTER SUBSCRIPTION \"test_sub\" CONNECTION 'host=localhost user=test dbname=test'"))
+	})
+
+	It("generates correct SQL for altering subscription with owner", func() {
+		obj := &apiv1.Subscription{
+			Spec: apiv1.SubscriptionSpec{
+				Name:            "test_sub",
+				PublicationName: "test_pub",
+				Owner:           "new_owner",
+			},
+		}
+		connString := "host=localhost user=test dbname=test"
+
+		sqls := toSubscriptionAlterSQL(obj, connString)
+		Expect(sqls).To(ContainElement("ALTER SUBSCRIPTION \"test_sub\" SET PUBLICATION \"test_pub\""))
+		Expect(sqls).To(ContainElement("ALTER SUBSCRIPTION \"test_sub\" CONNECTION 'host=localhost user=test dbname=test'"))
+		Expect(sqls).To(ContainElement("ALTER SUBSCRIPTION \"test_sub\" OWNER TO \"new_owner\""))
+	})
+
+	It("generates correct SQL for altering subscription with parameters", func() {
+		obj := &apiv1.Subscription{
+			Spec: apiv1.SubscriptionSpec{
+				Name:            "test_sub",
+				PublicationName: "test_pub",
+				Parameters: map[string]string{
+					"param1": "value1",
+					"param2": "value2",
+				},
+			},
+		}
+		connString := "host=localhost user=test dbname=test"
+
+		sqls := toSubscriptionAlterSQL(obj, connString)
+		Expect(sqls).To(ContainElement("ALTER SUBSCRIPTION \"test_sub\" SET PUBLICATION \"test_pub\""))
+		Expect(sqls).To(ContainElement("ALTER SUBSCRIPTION \"test_sub\" CONNECTION 'host=localhost user=test dbname=test'"))
+		Expect(sqls).To(ContainElement("ALTER SUBSCRIPTION \"test_sub\" SET (param1 = 'value1', param2 = 'value2')"))
+	})
+
+	It("returns correct SQL for altering subscription with no owner or parameters", func() {
+		obj := &apiv1.Subscription{
+			Spec: apiv1.SubscriptionSpec{
+				Name:            "test_sub",
+				PublicationName: "test_pub",
+			},
+		}
+		connString := "host=localhost user=test dbname=test"
+
+		sqls := toSubscriptionAlterSQL(obj, connString)
+		Expect(sqls).To(ContainElement("ALTER SUBSCRIPTION \"test_sub\" SET PUBLICATION \"test_pub\""))
+		Expect(sqls).To(ContainElement("ALTER SUBSCRIPTION \"test_sub\" CONNECTION 'host=localhost user=test dbname=test'"))
 	})
 })
