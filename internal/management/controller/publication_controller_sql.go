@@ -96,13 +96,15 @@ func (r *PublicationReconciler) createPublication(
 func toPublicationCreateSQL(obj *apiv1.Publication) []string {
 	result := make([]string, 0, 2)
 
-	result = append(result,
-		fmt.Sprintf(
-			"CREATE PUBLICATION %s %s",
-			pgx.Identifier{obj.Spec.Name}.Sanitize(),
-			toPublicationTargetSQL(&obj.Spec.Target),
-		),
+	createQuery := fmt.Sprintf(
+		"CREATE PUBLICATION %s %s",
+		pgx.Identifier{obj.Spec.Name}.Sanitize(),
+		toPublicationTargetSQL(&obj.Spec.Target),
 	)
+	if len(obj.Spec.Parameters) > 0 {
+		createQuery = fmt.Sprintf("%s WITH (%s)", createQuery, toPostgresParameters(obj.Spec.Parameters))
+	}
+	result = append(result, createQuery)
 
 	if len(obj.Spec.Owner) > 0 {
 		result = append(result,
@@ -111,12 +113,6 @@ func toPublicationCreateSQL(obj *apiv1.Publication) []string {
 				pgx.Identifier{obj.Spec.Name}.Sanitize(),
 				pgx.Identifier{obj.Spec.Owner}.Sanitize(),
 			),
-		)
-	}
-
-	if len(obj.Spec.Parameters) > 0 {
-		result = append(result,
-			fmt.Sprintf("%s WITH (%s)", result, obj.Spec.Parameters),
 		)
 	}
 

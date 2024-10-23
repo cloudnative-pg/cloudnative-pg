@@ -126,4 +126,54 @@ var _ = Describe("publication sql", func() {
 		sqls := toPublicationAlterSQL(obj)
 		Expect(sqls).To(BeEmpty())
 	})
+
+	It("generates correct SQL for creating publication with target objects", func() {
+		obj := &apiv1.Publication{
+			Spec: apiv1.PublicationSpec{
+				Name: "test_pub",
+				Target: apiv1.PublicationTarget{
+					Objects: []apiv1.PublicationTargetObject{
+						{Schema: "public"},
+					},
+				},
+			},
+		}
+
+		sqls := toPublicationCreateSQL(obj)
+		Expect(sqls).To(ContainElement("CREATE PUBLICATION \"test_pub\" FOR TABLES IN SCHEMA \"public\""))
+	})
+
+	It("generates correct SQL for creating publication with owner", func() {
+		obj := &apiv1.Publication{
+			Spec: apiv1.PublicationSpec{
+				Name:  "test_pub",
+				Owner: "new_owner",
+			},
+		}
+
+		sqls := toPublicationCreateSQL(obj)
+		Expect(sqls).To(ContainElement("ALTER PUBLICATION \"test_pub\" OWNER to \"new_owner\""))
+	})
+
+	It("generates correct SQL for creating publication with parameters", func() {
+		obj := &apiv1.Publication{
+			Spec: apiv1.PublicationSpec{
+				Name: "test_pub",
+				Parameters: map[string]string{
+					"param1": "value1",
+					"param2": "value2",
+				},
+				Target: apiv1.PublicationTarget{
+					Objects: []apiv1.PublicationTargetObject{
+						{Schema: "public"},
+					},
+				},
+			},
+		}
+
+		sqls := toPublicationCreateSQL(obj)
+		Expect(sqls).To(ContainElement(
+			"CREATE PUBLICATION \"test_pub\" FOR TABLES IN SCHEMA \"public\" WITH (param1 = 'value1', param2 = 'value2')",
+		))
+	})
 })
