@@ -150,8 +150,8 @@ func toPublicationAlterSQL(obj *apiv1.Publication) []string {
 		result = append(result,
 			fmt.Sprintf(
 				"ALTER PUBLICATION %s SET (%s)",
-				result,
-				obj.Spec.Parameters,
+				pgx.Identifier{obj.Spec.Name}.Sanitize(),
+				toPostgresParameters(obj.Spec.Parameters),
 			),
 		)
 	}

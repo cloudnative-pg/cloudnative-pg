@@ -17,8 +17,12 @@ limitations under the License.
 package controller
 
 import (
+	"bytes"
 	"context"
+	"fmt"
+	"sort"
 
+	"github.com/lib/pq"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -70,4 +74,25 @@ func getClusterFromInstance(
 		Namespace: instance.GetNamespaceName(),
 	}, &cluster)
 	return &cluster, err
+}
+
+func toPostgresParameters(parameters map[string]string) string {
+	// create slice and store keys
+	keys := make([]string, 0, len(parameters))
+	for k := range parameters {
+		keys = append(keys, k)
+	}
+
+	// sort the slice by keys
+	sort.Strings(keys)
+
+	b := new(bytes.Buffer)
+	for _, key := range keys {
+		// TODO(armru): should we sanitize the key?
+		// TODO(armru): any alternative to pg.QuoteLiteral?
+		_, _ = fmt.Fprintf(b, "%s = %s, ", key, pq.QuoteLiteral(parameters[key]))
+	}
+
+	// pruning last 2 chars `, `
+	return b.String()[:len(b.String())-2]
 }

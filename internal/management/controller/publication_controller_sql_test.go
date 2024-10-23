@@ -24,6 +24,8 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/jackc/pgx/v5"
 
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -69,5 +71,59 @@ var _ = Describe("publication sql", func() {
 
 		err := executeDropPublication(ctx, db, "sanitized_name")
 		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("generates correct SQL for altering publication with target objects", func() {
+		obj := &apiv1.Publication{
+			Spec: apiv1.PublicationSpec{
+				Name: "test_pub",
+				Target: apiv1.PublicationTarget{
+					Objects: []apiv1.PublicationTargetObject{
+						{Schema: "public"},
+					},
+				},
+			},
+		}
+
+		sqls := toPublicationAlterSQL(obj)
+		Expect(sqls).To(ContainElement("ALTER PUBLICATION \"test_pub\" SET FOR TABLES IN SCHEMA \"public\""))
+	})
+
+	It("generates correct SQL for altering publication with owner", func() {
+		obj := &apiv1.Publication{
+			Spec: apiv1.PublicationSpec{
+				Name:  "test_pub",
+				Owner: "new_owner",
+			},
+		}
+
+		sqls := toPublicationAlterSQL(obj)
+		Expect(sqls).To(ContainElement("ALTER PUBLICATION \"test_pub\" OWNER TO \"new_owner\""))
+	})
+
+	It("generates correct SQL for altering publication with parameters", func() {
+		obj := &apiv1.Publication{
+			Spec: apiv1.PublicationSpec{
+				Name: "test_pub",
+				Parameters: map[string]string{
+					"param1": "value1",
+					"param2": "value2",
+				},
+			},
+		}
+
+		sqls := toPublicationAlterSQL(obj)
+		Expect(sqls).To(ContainElement("ALTER PUBLICATION \"test_pub\" SET (param1 = 'value1', param2 = 'value2')"))
+	})
+
+	It("returns empty SQL list when no alterations are needed", func() {
+		obj := &apiv1.Publication{
+			Spec: apiv1.PublicationSpec{
+				Name: "test_pub",
+			},
+		}
+
+		sqls := toPublicationAlterSQL(obj)
+		Expect(sqls).To(BeEmpty())
 	})
 })

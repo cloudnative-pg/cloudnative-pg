@@ -17,7 +17,6 @@ limitations under the License.
 package controller
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
 	"fmt"
@@ -128,16 +127,6 @@ func toSubscriptionCreateSQL(obj *apiv1.Subscription, connString string) []strin
 	return result
 }
 
-func toPostgresParameters(parameters map[string]string) string {
-	b := new(bytes.Buffer)
-	for key, value := range parameters {
-		_, _ = fmt.Fprintf(b, "%s = '%s', ", key, value)
-	}
-
-	// pruning last 2 chars `, `
-	return b.String()[:len(b.String())-2]
-}
-
 func toSubscriptionAlterSQL(obj *apiv1.Subscription, connString string) []string {
 	result := make([]string, 0, 4)
 
@@ -168,7 +157,7 @@ func toSubscriptionAlterSQL(obj *apiv1.Subscription, connString string) []string
 		result = append(result,
 			fmt.Sprintf(
 				"ALTER SUBSCRIPTION %s SET (%s)",
-				result,
+				pgx.Identifier{obj.Spec.Name}.Sanitize(),
 				toPostgresParameters(obj.Spec.Parameters),
 			),
 		)
