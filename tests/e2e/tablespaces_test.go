@@ -17,8 +17,6 @@ limitations under the License.
 package e2e
 
 import (
-	"bytes"
-	"context"
 	"fmt"
 	"os"
 	"path"
@@ -36,7 +34,6 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/logs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	testUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/minio"
@@ -79,19 +76,6 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 		})
 		cluster, err = env.GetCluster(namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
-
-		clusterLogs := logs.ClusterStreamingRequest{
-			Cluster: cluster,
-			Options: &corev1.PodLogOptions{
-				Follow: true,
-			},
-		}
-		var buffer bytes.Buffer
-		go func() {
-			defer GinkgoRecover()
-			err = clusterLogs.SingleStream(context.TODO(), &buffer)
-			Expect(err).ToNot(HaveOccurred())
-		}()
 	}
 
 	Context("on a new cluster with tablespaces", Ordered, func() {
