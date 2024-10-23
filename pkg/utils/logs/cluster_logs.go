@@ -63,13 +63,13 @@ func (csr *ClusterStreamingRequest) getClusterNamespace() string {
 }
 
 func (csr *ClusterStreamingRequest) getLogOptions(containerName string) *v1.PodLogOptions {
-	if csr.Options == nil {
-		csr.Options = &v1.PodLogOptions{
-			Container: containerName,
-		}
+	options := &v1.PodLogOptions{}
+	if csr.Options != nil {
+		options = csr.Options.DeepCopy()
 	}
-	csr.Options.Previous = csr.Previous
-	return csr.Options
+	options.Container = containerName
+	options.Previous = csr.Previous
+	return options
 }
 
 func (csr *ClusterStreamingRequest) getKubernetesClient() kubernetes.Interface {
@@ -135,6 +135,8 @@ func (as *activeSet) add(name string) {
 
 // has returns true if and only if name is active
 func (as *activeSet) has(name string) bool {
+	as.m.Lock()
+	defer as.m.Unlock()
 	_, found := as.set[name]
 	return found
 }
@@ -149,6 +151,8 @@ func (as *activeSet) drop(name string) {
 
 // isZero checks if there are any active processes
 func (as *activeSet) isZero() bool {
+	as.m.Lock()
+	defer as.m.Unlock()
 	return len(as.set) == 0
 }
 
@@ -189,6 +193,7 @@ func (csr *ClusterStreamingRequest) SingleStream(ctx context.Context, writer io.
 			return nil
 		}
 
+		wrappedWriter := safeWriterFrom(writer)
 		for _, pod := range podList.Items {
 			for _, container := range pod.Status.ContainerStatuses {
 				if container.State.Running != nil {
@@ -204,7 +209,7 @@ func (csr *ClusterStreamingRequest) SingleStream(ctx context.Context, writer io.
 						container.Name,
 						client,
 						streamSet,
-						safeWriterFrom(writer),
+						wrappedWriter,
 					)
 				}
 			}

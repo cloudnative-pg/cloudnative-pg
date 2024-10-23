@@ -33,6 +33,23 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+type syncBuffer struct {
+	b bytes.Buffer
+	m sync.Mutex
+}
+
+func (b *syncBuffer) Write(p []byte) (n int, err error) {
+	b.m.Lock()
+	defer b.m.Unlock()
+	return b.b.Write(p)
+}
+
+func (b *syncBuffer) String() string {
+	b.m.Lock()
+	defer b.m.Unlock()
+	return b.b.String()
+}
+
 var _ = Describe("Cluster logging tests", func() {
 	clusterNamespace := "cluster-test"
 	clusterName := "myTestCluster"
@@ -134,7 +151,7 @@ var _ = Describe("Cluster logging tests", func() {
 
 	It("should catch extra logs if given the follow option", func(ctx context.Context) {
 		client := fake.NewSimpleClientset(pod)
-		var logBuffer bytes.Buffer
+		var logBuffer syncBuffer
 		// let's set a short follow-wait, and keep the cluster streaming for two
 		// cycles
 		followWaiting := 200 * time.Millisecond
