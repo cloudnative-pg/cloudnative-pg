@@ -43,11 +43,12 @@ func NewPostgresRoleManager(superDB *sql.DB) RoleManager {
 // List the available roles excluding all the roles that start with `pg_`
 func (sm PostgresRoleManager) List(
 	ctx context.Context,
+	db *sql.DB,
 ) ([]DatabaseRole, error) {
 	logger := log.FromContext(ctx).WithName("roles_reconciler")
 	wrapErr := func(err error) error { return fmt.Errorf("while listing DB roles for DRM: %w", err) }
 
-	rows, err := sm.superUserDB.QueryContext(
+	rows, err := db.QueryContext(
 		ctx,
 		`SELECT rolname, rolsuper, rolinherit, rolcreaterole, rolcreatedb, 
        			rolcanlogin, rolreplication, rolconnlimit, rolpassword, rolvaliduntil, rolbypassrls,
@@ -109,7 +110,7 @@ func (sm PostgresRoleManager) List(
 }
 
 // Update the role
-func (sm PostgresRoleManager) Update(ctx context.Context, role DatabaseRole) error {
+func (sm PostgresRoleManager) Update(ctx context.Context, db *sql.DB, role DatabaseRole) error {
 	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
 	contextLog.Trace("Invoked", "role", role)
 	wrapErr := func(err error) error {
@@ -124,7 +125,7 @@ func (sm PostgresRoleManager) Update(ctx context.Context, role DatabaseRole) err
 	// will change no matter what, the next reconciliation cycle we would update the password
 	appendPasswordOption(role, &query)
 
-	_, err := sm.superUserDB.ExecContext(ctx, query.String())
+	_, err := db.ExecContext(ctx, query.String())
 	if err != nil {
 		return wrapErr(err)
 	}
@@ -133,7 +134,7 @@ func (sm PostgresRoleManager) Update(ctx context.Context, role DatabaseRole) err
 
 // Create the role
 // TODO: do we give the role any database-level permissions?
-func (sm PostgresRoleManager) Create(ctx context.Context, role DatabaseRole) error {
+func (sm PostgresRoleManager) Create(ctx context.Context, db *sql.DB, role DatabaseRole) error {
 	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
 	contextLog.Trace("Invoked", "role", role)
 	wrapErr := func(err error) error {
@@ -150,7 +151,7 @@ func (sm PostgresRoleManager) Create(ctx context.Context, role DatabaseRole) err
 	// NOTE: defensively we might think of doing CREATE ... IF EXISTS
 	// but at least during development, we want to catch the error
 	// Even after, this may be "the kubernetes way"
-	if _, err := sm.superUserDB.ExecContext(ctx, query.String()); err != nil {
+	if _, err := db.ExecContext(ctx, query.String()); err != nil {
 		return wrapErr(err)
 	}
 
@@ -159,7 +160,7 @@ func (sm PostgresRoleManager) Create(ctx context.Context, role DatabaseRole) err
 		query.WriteString(fmt.Sprintf("COMMENT ON ROLE %s IS %s",
 			pgx.Identifier{role.Name}.Sanitize(), pq.QuoteLiteral(role.Comment)))
 
-		if _, err := sm.superUserDB.ExecContext(ctx, query.String()); err != nil {
+		if _, err := db.ExecContext(ctx, query.String()); err != nil {
 			return wrapErr(err)
 		}
 	}
@@ -168,7 +169,7 @@ func (sm PostgresRoleManager) Create(ctx context.Context, role DatabaseRole) err
 }
 
 // Delete the role
-func (sm PostgresRoleManager) Delete(ctx context.Context, role DatabaseRole) error {
+func (sm PostgresRoleManager) Delete(ctx context.Context, db *sql.DB, role DatabaseRole) error {
 	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
 	contextLog.Trace("Invoked", "role", role)
 	wrapErr := func(err error) error {
@@ -177,7 +178,7 @@ func (sm PostgresRoleManager) Delete(ctx context.Context, role DatabaseRole) err
 
 	query := fmt.Sprintf("DROP ROLE %s", pgx.Identifier{role.Name}.Sanitize())
 	contextLog.Debug("Dropping", "query", query)
-	_, err := sm.superUserDB.ExecContext(ctx, query)
+	_, err := db.ExecContext(ctx, query)
 	if err != nil {
 		return wrapErr(err)
 	}
@@ -187,7 +188,7 @@ func (sm PostgresRoleManager) Delete(ctx context.Context, role DatabaseRole) err
 
 // GetLastTransactionID get the last xmin for the role, to help keep track of
 // whether the role has been changed in on the Database since last reconciliation
-func (sm PostgresRoleManager) GetLastTransactionID(ctx context.Context, role DatabaseRole) (int64, error) {
+func (sm PostgresRoleManager) GetLastTransactionID(ctx context.Context, db *sql.DB, role DatabaseRole) (int64, error) {
 	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
 	contextLog.Trace("Invoked", "role", role)
 	wrapErr := func(err error) error {
@@ -195,7 +196,7 @@ func (sm PostgresRoleManager) GetLastTransactionID(ctx context.Context, role Dat
 	}
 
 	var xmin int64
-	err := sm.superUserDB.QueryRowContext(ctx,
+	err := db.QueryRowContext(ctx,
 		`SELECT xmin FROM pg_catalog.pg_authid WHERE rolname = $1`,
 		role.Name).Scan(&xmin)
 	if err == sql.ErrNoRows {
@@ -209,7 +210,7 @@ func (sm PostgresRoleManager) GetLastTransactionID(ctx context.Context, role Dat
 }
 
 // UpdateComment of the role
-func (sm PostgresRoleManager) UpdateComment(ctx context.Context, role DatabaseRole) error {
+func (sm PostgresRoleManager) UpdateComment(ctx context.Context, db *sql.DB, role DatabaseRole) error {
 	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
 	contextLog.Trace("Invoked", "role", role)
 	wrapErr := func(err error) error {
@@ -219,7 +220,7 @@ func (sm PostgresRoleManager) UpdateComment(ctx context.Context, role DatabaseRo
 	query := fmt.Sprintf("COMMENT ON ROLE %s IS %s",
 		pgx.Identifier{role.Name}.Sanitize(), pq.QuoteLiteral(role.Comment))
 	contextLog.Debug("Updating comment", "query", query)
-	_, err := sm.superUserDB.ExecContext(ctx, query)
+	_, err := db.ExecContext(ctx, query)
 	if err != nil {
 		return wrapErr(err)
 	}
@@ -234,6 +235,7 @@ func (sm PostgresRoleManager) UpdateComment(ctx context.Context, role DatabaseRo
 // of them fails, the role will not get updated
 func (sm PostgresRoleManager) UpdateMembership(
 	ctx context.Context,
+	db *sql.DB,
 	role DatabaseRole,
 	rolesToGrant []string,
 	rolesToRevoke []string,
@@ -261,7 +263,7 @@ func (sm PostgresRoleManager) UpdateMembership(
 		)
 	}
 
-	tx, err := sm.superUserDB.BeginTx(ctx, nil)
+	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return wrapErr(err)
 	}
@@ -274,7 +276,7 @@ func (sm PostgresRoleManager) UpdateMembership(
 
 	for _, sqlQuery := range queries {
 		contextLog.Debug("Executing query", "sqlQuery", sqlQuery)
-		if _, err := sm.superUserDB.ExecContext(ctx, sqlQuery); err != nil {
+		if _, err := db.ExecContext(ctx, sqlQuery); err != nil {
 			contextLog.Error(err, "executing query", "sqlQuery", sqlQuery, "err", err)
 			return wrapErr(err)
 		}
@@ -285,6 +287,7 @@ func (sm PostgresRoleManager) UpdateMembership(
 // GetParentRoles get the in roles of this role
 func (sm PostgresRoleManager) GetParentRoles(
 	ctx context.Context,
+	db *sql.DB,
 	role DatabaseRole,
 ) ([]string, error) {
 	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
@@ -301,7 +304,7 @@ func (sm PostgresRoleManager) GetParentRoles(
 		WHERE rolname = $1`
 	contextLog.Debug("get parent role", "query", query)
 	var parentRoles pq.StringArray
-	err := sm.superUserDB.QueryRowContext(ctx, query, role.Name).Scan(&parentRoles)
+	err := db.QueryRowContext(ctx, query, role.Name).Scan(&parentRoles)
 	if err == sql.ErrNoRows {
 		return nil, wrapErr(err)
 	}

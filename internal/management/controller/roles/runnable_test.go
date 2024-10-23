@@ -18,6 +18,7 @@ package roles
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 
 	"github.com/jackc/pgx/v5/pgconn"
@@ -40,7 +41,7 @@ type mockRoleManager struct {
 	callHistory []funcCall
 }
 
-func (m *mockRoleManager) List(_ context.Context) ([]DatabaseRole, error) {
+func (m *mockRoleManager) List(_ context.Context, _ *sql.DB) ([]DatabaseRole, error) {
 	m.callHistory = append(m.callHistory, funcCall{"list", ""})
 	re := make([]DatabaseRole, len(m.roles))
 	i := 0
@@ -52,7 +53,7 @@ func (m *mockRoleManager) List(_ context.Context) ([]DatabaseRole, error) {
 }
 
 func (m *mockRoleManager) Update(
-	_ context.Context, role DatabaseRole,
+	_ context.Context, _ *sql.DB, role DatabaseRole,
 ) error {
 	m.callHistory = append(m.callHistory, funcCall{"update", role.Name})
 	_, found := m.roles[role.Name]
@@ -64,7 +65,7 @@ func (m *mockRoleManager) Update(
 }
 
 func (m *mockRoleManager) UpdateComment(
-	_ context.Context, role DatabaseRole,
+	_ context.Context, _ *sql.DB, role DatabaseRole,
 ) error {
 	m.callHistory = append(m.callHistory, funcCall{"updateComment", role.Name})
 	_, found := m.roles[role.Name]
@@ -76,7 +77,7 @@ func (m *mockRoleManager) UpdateComment(
 }
 
 func (m *mockRoleManager) Create(
-	_ context.Context, role DatabaseRole,
+	_ context.Context, _ *sql.DB, role DatabaseRole,
 ) error {
 	m.callHistory = append(m.callHistory, funcCall{"create", role.Name})
 	_, found := m.roles[role.Name]
@@ -88,7 +89,7 @@ func (m *mockRoleManager) Create(
 }
 
 func (m *mockRoleManager) Delete(
-	_ context.Context, role DatabaseRole,
+	_ context.Context, _ *sql.DB, role DatabaseRole,
 ) error {
 	m.callHistory = append(m.callHistory, funcCall{"delete", role.Name})
 	_, found := m.roles[role.Name]
@@ -99,12 +100,13 @@ func (m *mockRoleManager) Delete(
 	return nil
 }
 
-func (m *mockRoleManager) GetLastTransactionID(_ context.Context, _ DatabaseRole) (int64, error) {
+func (m *mockRoleManager) GetLastTransactionID(_ context.Context, _ *sql.DB, _ DatabaseRole) (int64, error) {
 	return 0, nil
 }
 
 func (m *mockRoleManager) UpdateMembership(
 	_ context.Context,
+	_ *sql.DB,
 	role DatabaseRole,
 	_ []string,
 	_ []string,
@@ -118,7 +120,7 @@ func (m *mockRoleManager) UpdateMembership(
 	return nil
 }
 
-func (m *mockRoleManager) GetParentRoles(_ context.Context, role DatabaseRole) ([]string, error) {
+func (m *mockRoleManager) GetParentRoles(_ context.Context, _ *sql.DB, role DatabaseRole) ([]string, error) {
 	m.callHistory = append(m.callHistory, funcCall{"getParentRoles", role.Name})
 	_, found := m.roles[role.Name]
 	if !found {
@@ -136,7 +138,7 @@ type mockRoleManagerWithError struct {
 	callHistory []funcCall
 }
 
-func (m *mockRoleManagerWithError) List(_ context.Context) ([]DatabaseRole, error) {
+func (m *mockRoleManagerWithError) List(_ context.Context, _ *sql.DB) ([]DatabaseRole, error) {
 	m.callHistory = append(m.callHistory, funcCall{"list", ""})
 	re := make([]DatabaseRole, len(m.roles))
 	i := 0
@@ -148,7 +150,7 @@ func (m *mockRoleManagerWithError) List(_ context.Context) ([]DatabaseRole, erro
 }
 
 func (m *mockRoleManagerWithError) Update(
-	_ context.Context, role DatabaseRole,
+	_ context.Context, _ *sql.DB, role DatabaseRole,
 ) error {
 	m.callHistory = append(m.callHistory, funcCall{"update", role.Name})
 	_, found := m.roles[role.Name]
@@ -160,7 +162,7 @@ func (m *mockRoleManagerWithError) Update(
 }
 
 func (m *mockRoleManagerWithError) UpdateComment(
-	_ context.Context, role DatabaseRole,
+	_ context.Context, _ *sql.DB, role DatabaseRole,
 ) error {
 	m.callHistory = append(m.callHistory, funcCall{"updateComment", role.Name})
 	_, found := m.roles[role.Name]
@@ -172,7 +174,7 @@ func (m *mockRoleManagerWithError) UpdateComment(
 }
 
 func (m *mockRoleManagerWithError) Create(
-	_ context.Context, role DatabaseRole,
+	_ context.Context, _ *sql.DB, role DatabaseRole,
 ) error {
 	m.callHistory = append(m.callHistory, funcCall{"create", role.Name})
 	_, found := m.roles[role.Name]
@@ -184,7 +186,7 @@ func (m *mockRoleManagerWithError) Create(
 }
 
 func (m *mockRoleManagerWithError) Delete(
-	_ context.Context, role DatabaseRole,
+	_ context.Context, _ *sql.DB, role DatabaseRole,
 ) error {
 	m.callHistory = append(m.callHistory, funcCall{"delete", role.Name})
 	_, found := m.roles[role.Name]
@@ -198,12 +200,13 @@ func (m *mockRoleManagerWithError) Delete(
 		})
 }
 
-func (m *mockRoleManagerWithError) GetLastTransactionID(_ context.Context, _ DatabaseRole) (int64, error) {
+func (m *mockRoleManagerWithError) GetLastTransactionID(_ context.Context, _ *sql.DB, _ DatabaseRole) (int64, error) {
 	return 0, nil
 }
 
 func (m *mockRoleManagerWithError) UpdateMembership(
 	_ context.Context,
+	_ *sql.DB,
 	role DatabaseRole,
 	_ []string,
 	_ []string,
@@ -217,7 +220,7 @@ func (m *mockRoleManagerWithError) UpdateMembership(
 	return &pgconn.PgError{Code: "42704", Message: "unknown role 'blah'"}
 }
 
-func (m *mockRoleManagerWithError) GetParentRoles(_ context.Context, role DatabaseRole) ([]string, error) {
+func (m *mockRoleManagerWithError) GetParentRoles(_ context.Context, _ *sql.DB, role DatabaseRole) ([]string, error) {
 	m.callHistory = append(m.callHistory, funcCall{"getParentRoles", role.Name})
 	_, found := m.roles[role.Name]
 	if !found {
@@ -591,10 +594,11 @@ var _ = Describe("Role synchronizer tests", func() {
 })
 
 var _ = DescribeTable("Role status getter tests",
-	func(spec *apiv1.ManagedConfiguration, db mockRoleManager, expected map[string]apiv1.RoleStatus) {
+	func(spec *apiv1.ManagedConfiguration, rm mockRoleManager, expected map[string]apiv1.RoleStatus) {
 		ctx := context.TODO()
 
-		roles, err := db.List(ctx)
+		db := &sql.DB{}
+		roles, err := rm.List(ctx, db)
 		Expect(err).ToNot(HaveOccurred())
 
 		statusMap := evaluateNextRoleActions(ctx, spec, roles, map[string]apiv1.PasswordState{
