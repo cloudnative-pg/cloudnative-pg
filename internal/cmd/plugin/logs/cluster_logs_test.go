@@ -17,7 +17,6 @@ limitations under the License.
 package logs
 
 import (
-	"context"
 	"path"
 
 	corev1 "k8s.io/api/core/v1"
@@ -54,19 +53,23 @@ var _ = Describe("Get the logs", Ordered, func() {
 		},
 		Spec: apiv1.ClusterSpec{},
 	}
-	cl := clusterLogs{
-		ctx:         context.TODO(),
-		clusterName: clusterName,
-		namespace:   namespace,
-		follow:      true,
-		timestamp:   true,
-		tailLines:   -1,
-		client:      client,
-	}
+	var cl clusterLogs
 	plugin.Client = fake.NewClientBuilder().
 		WithScheme(scheme.BuildWithAllKnownScheme()).
 		WithObjects(cluster).
 		Build()
+
+	BeforeEach(func(ctx SpecContext) {
+		cl = clusterLogs{
+			ctx:         ctx,
+			clusterName: clusterName,
+			namespace:   namespace,
+			follow:      true,
+			timestamp:   true,
+			tailLines:   -1,
+			client:      client,
+		}
+	})
 
 	It("should get a proper cluster", func() {
 		cluster, err := getCluster(cl)

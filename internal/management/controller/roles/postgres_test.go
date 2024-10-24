@@ -548,7 +548,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		Expect(queryValidUntil.String()).To(BeEquivalentTo(expectedQueryValidUntil))
 	})
 
-	It("Getting the proper TransactionID per rol", func() {
+	It("Getting the proper TransactionID per rol", func(ctx SpecContext) {
 		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 		Expect(err).ToNot(HaveOccurred())
 		prm := NewPostgresRoleManager(db)
@@ -558,16 +558,16 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		dbRole := roleConfigurationAdapter{RoleConfiguration: wantedRole}.toDatabaseRole()
 
 		mock.ExpectQuery(lastTransactionQuery).WithArgs("foo").WillReturnError(errors.New("Kaboom"))
-		_, err = prm.GetLastTransactionID(context.TODO(), dbRole)
+		_, err = prm.GetLastTransactionID(ctx, dbRole)
 		Expect(err).To(HaveOccurred())
 
 		mock.ExpectQuery(lastTransactionQuery).WithArgs("foo").WillReturnError(sql.ErrNoRows)
-		_, err = prm.GetLastTransactionID(context.TODO(), dbRole)
+		_, err = prm.GetLastTransactionID(ctx, dbRole)
 		Expect(err).To(HaveOccurred())
 
 		rows.AddRow("1321")
 		mock.ExpectQuery(lastTransactionQuery).WithArgs("foo").WillReturnRows(rows)
-		transID, err := prm.GetLastTransactionID(context.TODO(), dbRole)
+		transID, err := prm.GetLastTransactionID(ctx, dbRole)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(transID).To(BeEquivalentTo(1321))
 	})
