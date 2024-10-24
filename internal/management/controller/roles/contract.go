@@ -17,7 +17,6 @@ limitations under the License.
 package roles
 
 import (
-	"context"
 	"database/sql"
 	"reflect"
 	"sort"
@@ -120,31 +119,4 @@ func (d *DatabaseRole) isEquivalentTo(inSpec apiv1.RoleConfiguration) bool {
 	}
 
 	return reflect.DeepEqual(role, spec) && d.hasSameValidUntilAs(inSpec)
-}
-
-// RoleManager abstracts the functionality of reconciling with PostgreSQL roles
-type RoleManager interface {
-	// List the roles in the database
-	List(ctx context.Context, db *sql.DB) ([]DatabaseRole, error)
-	// Update the role in the database
-	Update(ctx context.Context, db *sql.DB, role DatabaseRole) error
-	// Create the role in the database
-	Create(ctx context.Context, db *sql.DB, role DatabaseRole) error
-	// Delete the role in the database
-	Delete(ctx context.Context, db *sql.DB, role DatabaseRole) error
-	// GetLastTransactionID returns the last TransactionID as the `xmin`
-	// from the database
-	// See https://www.postgresql.org/docs/current/datatype-oid.html for reference
-	GetLastTransactionID(ctx context.Context, db *sql.DB, role DatabaseRole) (int64, error)
-	// UpdateComment Update the comment of role in the database
-	UpdateComment(ctx context.Context, db *sql.DB, role DatabaseRole) error
-	// UpdateMembership Update the In Role membership of role in the database
-	UpdateMembership(
-		ctx context.Context,
-		db *sql.DB, role DatabaseRole,
-		rolesToGrant []string,
-		rolesToRevoke []string,
-	) error
-	// GetParentRoles returns the roles the given role is a member of
-	GetParentRoles(ctx context.Context, db *sql.DB, role DatabaseRole) ([]string, error)
 }
