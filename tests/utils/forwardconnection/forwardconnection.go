@@ -128,7 +128,7 @@ func newForward(
 func (fc *ForwardConnection) StartAndWait() error {
 	var err error
 	go func() {
-		ginkgo.GinkgoWriter.Printf("Starting port-forward\n")
+		ginkgo.GinkgoWriter.Println("Starting port-forward")
 		err = fc.Forwarder.ForwardPorts()
 		if err != nil {
 			ginkgo.GinkgoWriter.Printf("port-forward failed with error %s\n", err.Error())
@@ -137,10 +137,10 @@ func (fc *ForwardConnection) StartAndWait() error {
 	}()
 	select {
 	case <-fc.readyChannel:
-		ginkgo.GinkgoWriter.Printf("port-forward ready\n")
+		ginkgo.GinkgoWriter.Println("port-forward ready")
 		return nil
 	case <-fc.stopChannel:
-		ginkgo.GinkgoWriter.Printf("port-forward closed\n")
+		ginkgo.GinkgoWriter.Println("port-forward closed")
 		return err
 	}
 }
