@@ -140,12 +140,6 @@ func (sr *RoleSynchronizer) reconcile(ctx context.Context, config *apiv1.Managed
 		return nil
 	}
 
-	superUserDB, err := sr.instance.GetSuperUserDB()
-	if err != nil {
-		return fmt.Errorf("while reconciling managed roles: %w", err)
-	}
-	roleManager := NewPostgresRoleManager(superUserDB)
-
 	var remoteCluster apiv1.Cluster
 	if err = sr.client.Get(ctx, types.NamespacedName{
 		Name:      sr.instance.GetClusterName(),
@@ -158,7 +152,11 @@ func (sr *RoleSynchronizer) reconcile(ctx context.Context, config *apiv1.Managed
 	if rolePasswords == nil {
 		rolePasswords = map[string]apiv1.PasswordState{}
 	}
-	appliedState, irreconcilableRoles, err := sr.synchronizeRoles(ctx, roleManager, config, rolePasswords)
+	superUserDB, err := sr.instance.GetSuperUserDB()
+	if err != nil {
+		return fmt.Errorf("while reconciling managed roles: %w", err)
+	}
+	appliedState, irreconcilableRoles, err := sr.synchronizeRoles(ctx, superUserDB, config, rolePasswords)
 	if err != nil {
 		return fmt.Errorf("while syncrhonizing managed roles: %w", err)
 	}
@@ -190,7 +188,7 @@ func getRoleNames(roles []roleConfigurationAdapter) []string {
 //   - any unexpeted error
 func (sr *RoleSynchronizer) synchronizeRoles(
 	ctx context.Context,
-	roleManager RoleManager,
+	db *sql.DB,
 	config *apiv1.ManagedConfiguration,
 	storedPasswordState map[string]apiv1.PasswordState,
 ) (map[string]apiv1.PasswordState, map[string][]string, error) {
@@ -199,11 +197,8 @@ func (sr *RoleSynchronizer) synchronizeRoles(
 	if err != nil {
 		return nil, nil, err
 	}
-	db, err := sr.instance.GetSuperUserDB()
-	if err != nil {
-		return nil, nil, fmt.Errorf("while connecting to the database: %w", err)
-	}
-	rolesInDB, err := roleManager.List(ctx, db)
+
+	rolesInDB, err := List(ctx, db)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -213,7 +208,6 @@ func (sr *RoleSynchronizer) synchronizeRoles(
 	passwordStates, irreconcilableRoles, err := sr.applyRoleActions(
 		ctx,
 		db,
-		roleManager,
 		rolesByAction,
 	)
 	if err != nil {
@@ -239,7 +233,6 @@ func (sr *RoleSynchronizer) synchronizeRoles(
 func (sr *RoleSynchronizer) applyRoleActions(
 	ctx context.Context,
 	db *sql.DB,
-	roleManager RoleManager,
 	rolesByAction rolesByAction,
 ) (map[string]apiv1.PasswordState, map[string][]string, error) {
 	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
@@ -280,24 +273,24 @@ func (sr *RoleSynchronizer) applyRoleActions(
 			)
 			switch action {
 			case roleCreate, roleUpdate:
-				appliedState, err = sr.applyRoleCreateUpdate(ctx, db, roleManager, role, action)
+				appliedState, err = sr.applyRoleCreateUpdate(ctx, db, role, action)
 				if err == nil {
 					appliedChanges[role.Name] = appliedState
 				}
 			case roleDelete:
-				err = roleManager.Delete(ctx, db, role.toDatabaseRole())
+				err = Delete(ctx, db, role.toDatabaseRole())
 			case roleSetComment:
 				// NOTE: adding/updating a comment on a role does not alter its TransactionID
-				err = roleManager.UpdateComment(ctx, db, role.toDatabaseRole())
+				err = UpdateComment(ctx, db, role.toDatabaseRole())
 			case roleUpdateMemberships:
 				// NOTE: revoking / granting to a role does not alter its TransactionID
 				dbRole := role.toDatabaseRole()
-				grants, revokes, err = getRoleMembershipDiff(ctx, db, roleManager, role, dbRole)
+				grants, revokes, err = getRoleMembershipDiff(ctx, db, role, dbRole)
 				if unhandledErr := handleRoleError(err, role.Name, action); unhandledErr != nil {
 					return nil, nil, unhandledErr
 				}
 
-				err = roleManager.UpdateMembership(ctx, db, dbRole, grants, revokes)
+				err = UpdateMembership(ctx, db, dbRole, grants, revokes)
 			}
 			if unhandledErr := handleRoleError(err, role.Name, action); unhandledErr != nil {
 				return nil, nil, unhandledErr
@@ -311,11 +304,10 @@ func (sr *RoleSynchronizer) applyRoleActions(
 func getRoleMembershipDiff(
 	ctx context.Context,
 	db *sql.DB,
-	roleManager RoleManager,
 	role roleConfigurationAdapter,
 	dbRole DatabaseRole,
 ) ([]string, []string, error) {
-	inRoleInDB, err := roleManager.GetParentRoles(ctx, db, dbRole)
+	inRoleInDB, err := GetParentRoles(ctx, db, dbRole)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, nil, err
 	}
@@ -330,7 +322,6 @@ func getRoleMembershipDiff(
 func (sr *RoleSynchronizer) applyRoleCreateUpdate(
 	ctx context.Context,
 	db *sql.DB,
-	roleManager RoleManager,
 	role roleConfigurationAdapter,
 	action roleAction,
 ) (apiv1.PasswordState, error) {
@@ -360,15 +351,15 @@ func (sr *RoleSynchronizer) applyRoleCreateUpdate(
 	var err error
 	switch action {
 	case roleCreate:
-		err = roleManager.Create(ctx, db, databaseRole)
+		err = Create(ctx, db, databaseRole)
 	case roleUpdate:
-		err = roleManager.Update(ctx, db, databaseRole)
+		err = Update(ctx, db, databaseRole)
 	}
 	if err != nil {
 		return apiv1.PasswordState{}, err
 	}
 
-	transactionID, err := roleManager.GetLastTransactionID(ctx, db, databaseRole)
+	transactionID, err := GetLastTransactionID(ctx, db, databaseRole)
 	if err != nil {
 		return apiv1.PasswordState{}, err
 	}

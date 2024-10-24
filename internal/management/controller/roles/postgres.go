@@ -28,20 +28,8 @@ import (
 	"github.com/lib/pq"
 )
 
-// PostgresRoleManager is a RoleManager for a database instance
-type PostgresRoleManager struct {
-	superUserDB *sql.DB
-}
-
-// NewPostgresRoleManager returns an implementation of RoleManager for postgres
-func NewPostgresRoleManager(superDB *sql.DB) RoleManager {
-	return PostgresRoleManager{
-		superUserDB: superDB,
-	}
-}
-
 // List the available roles excluding all the roles that start with `pg_`
-func (sm PostgresRoleManager) List(
+func List(
 	ctx context.Context,
 	db *sql.DB,
 ) ([]DatabaseRole, error) {
@@ -112,7 +100,7 @@ func (sm PostgresRoleManager) List(
 }
 
 // Update the role
-func (sm PostgresRoleManager) Update(ctx context.Context, db *sql.DB, role DatabaseRole) error {
+func Update(ctx context.Context, db *sql.DB, role DatabaseRole) error {
 	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
 	contextLog.Trace("Invoked", "role", role)
 	wrapErr := func(err error) error {
@@ -136,7 +124,7 @@ func (sm PostgresRoleManager) Update(ctx context.Context, db *sql.DB, role Datab
 
 // Create the role
 // TODO: do we give the role any database-level permissions?
-func (sm PostgresRoleManager) Create(ctx context.Context, db *sql.DB, role DatabaseRole) error {
+func Create(ctx context.Context, db *sql.DB, role DatabaseRole) error {
 	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
 	contextLog.Trace("Invoked", "role", role)
 	wrapErr := func(err error) error {
@@ -171,7 +159,7 @@ func (sm PostgresRoleManager) Create(ctx context.Context, db *sql.DB, role Datab
 }
 
 // Delete the role
-func (sm PostgresRoleManager) Delete(ctx context.Context, db *sql.DB, role DatabaseRole) error {
+func Delete(ctx context.Context, db *sql.DB, role DatabaseRole) error {
 	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
 	contextLog.Trace("Invoked", "role", role)
 	wrapErr := func(err error) error {
@@ -190,7 +178,7 @@ func (sm PostgresRoleManager) Delete(ctx context.Context, db *sql.DB, role Datab
 
 // GetLastTransactionID get the last xmin for the role, to help keep track of
 // whether the role has been changed in on the Database since last reconciliation
-func (sm PostgresRoleManager) GetLastTransactionID(ctx context.Context, db *sql.DB, role DatabaseRole) (int64, error) {
+func GetLastTransactionID(ctx context.Context, db *sql.DB, role DatabaseRole) (int64, error) {
 	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
 	contextLog.Trace("Invoked", "role", role)
 	wrapErr := func(err error) error {
@@ -212,7 +200,7 @@ func (sm PostgresRoleManager) GetLastTransactionID(ctx context.Context, db *sql.
 }
 
 // UpdateComment of the role
-func (sm PostgresRoleManager) UpdateComment(ctx context.Context, db *sql.DB, role DatabaseRole) error {
+func UpdateComment(ctx context.Context, db *sql.DB, role DatabaseRole) error {
 	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
 	contextLog.Trace("Invoked", "role", role)
 	wrapErr := func(err error) error {
@@ -235,7 +223,7 @@ func (sm PostgresRoleManager) UpdateComment(ctx context.Context, db *sql.DB, rol
 // IMPORTANT: the various REVOKE and GRANT commands that may be required to
 // reconcile the role will be done in a single transaction. So, if any one
 // of them fails, the role will not get updated
-func (sm PostgresRoleManager) UpdateMembership(
+func UpdateMembership(
 	ctx context.Context,
 	db *sql.DB,
 	role DatabaseRole,
@@ -287,7 +275,7 @@ func (sm PostgresRoleManager) UpdateMembership(
 }
 
 // GetParentRoles get the in roles of this role
-func (sm PostgresRoleManager) GetParentRoles(
+func GetParentRoles(
 	ctx context.Context,
 	db *sql.DB,
 	role DatabaseRole,
