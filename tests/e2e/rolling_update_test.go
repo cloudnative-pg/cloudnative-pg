@@ -33,6 +33,10 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
+	podutils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -45,12 +49,12 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 	})
-	// gatherClusterInfo returns the current lists of pods, pod UIDs and pvc UIDs in a given cluster
+	// gatherClusterInfo returns the current lists of podutils, pod UIDs and pvc UIDs in a given cluster
 	gatherClusterInfo := func(namespace string, clusterName string) ([]string, []types.UID, []types.UID, error) {
 		var podNames []string
 		var podUIDs []types.UID
 		var pvcUIDs []types.UID
-		podList, err := env.GetClusterPodList(namespace, clusterName)
+		podList, err := clusterutils.GetClusterPodList(env.Ctx, env.Client, namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 		for _, pod := range podList.Items {
 			podNames = append(podNames, pod.GetName())
@@ -73,7 +77,10 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		namespace string, clusterName string, imageName string, expectedInstances int, timeout int,
 	) {
 		Eventually(func() (int32, error) {
-			podList, err := env.GetClusterPodList(namespace, clusterName)
+			podList, err := clusterutils.GetClusterPodList(env.Ctx, env.Client, namespace, clusterName)
+			if err != nil {
+				return 0, err
+			}
 			updatedPods := int32(0)
 			for _, pod := range podList.Items {
 				// We need to check if a pod is ready, otherwise we
@@ -95,7 +102,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		}, timeout).Should(BeEquivalentTo(expectedInstances))
 	}
 
-	// Verify that after an update all the pods are ready and running
+	// Verify that after an update all the podutils are ready and running
 	// an updated image
 	AssertUpdateImage := func(namespace string, clusterName string) {
 		// TODO: the nodes are downloading the image sequentially,
@@ -113,7 +120,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		var cluster *apiv1.Cluster
 		Eventually(func(g Gomega) error {
 			var err error
-			cluster, err = env.GetCluster(namespace, clusterName)
+			cluster, err = clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
 			g.Expect(err).ToNot(HaveOccurred())
 
 			cluster.Spec.ImageName = updatedImageName
@@ -123,15 +130,15 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		// All the postgres containers should have the updated image
 		AssertPodsRunOnImage(namespace, clusterName, updatedImageName, cluster.Spec.Instances, timeout)
 
-		// Setting up a cluster with three pods is slow, usually 200-600s
-		AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReady], env)
+		// Setting up a cluster with three podutils is slow, usually 200-600s
+		AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReady], env)
 	}
 
 	// Verify that the pod name changes amount to an expected number
 	AssertChangedNames := func(namespace string, clusterName string,
 		originalPodNames []string, expectedUnchangedNames int,
 	) {
-		podList, err := env.GetClusterPodList(namespace, clusterName)
+		podList, err := clusterutils.GetClusterPodList(env.Ctx, env.Client, namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 		matchingNames := 0
 		for _, pod := range podList.Items {
@@ -150,7 +157,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 	AssertNewPodsUID := func(namespace string, clusterName string,
 		originalPodUID []types.UID, expectedUnchangedUIDs int,
 	) {
-		podList, err := env.GetClusterPodList(namespace, clusterName)
+		podList, err := clusterutils.GetClusterPodList(env.Ctx, env.Client, namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 		matchingUID := 0
 		for _, pod := range podList.Items {
@@ -169,7 +176,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 	AssertChangedPvcUID := func(namespace string, clusterName string,
 		originalPVCUID []types.UID, expectedUnchangedPvcUIDs int,
 	) {
-		podList, err := env.GetClusterPodList(namespace, clusterName)
+		podList, err := clusterutils.GetClusterPodList(env.Ctx, env.Client, namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 		matchingPVC := 0
 		for _, pod := range podList.Items {
@@ -199,7 +206,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		var err error
 
 		Eventually(func(g Gomega) {
-			cluster, err = env.GetCluster(namespace, clusterName)
+			cluster, err = clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
 			g.Expect(err).ToNot(HaveOccurred())
 			if expectNewPrimaryIdx {
 				g.Expect(cluster.Status.CurrentPrimary).ToNot(BeEquivalentTo(oldPrimaryPod.Name))
@@ -209,7 +216,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		}, RetryTimeout).Should(Succeed())
 
 		// Get the new current primary Pod
-		currentPrimaryPod, err := env.GetPod(namespace, cluster.Status.CurrentPrimary)
+		currentPrimaryPod, err := podutils.GetPod(env.Ctx, env.Client, namespace, cluster.Status.CurrentPrimary)
 		Expect(err).ToNot(HaveOccurred())
 
 		endpointName := clusterName + "-rw"
@@ -226,8 +233,8 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		}, timeout).Should(BeEquivalentTo(currentPrimaryPod.Status.PodIP))
 	}
 
-	// Verify that the IPs of the pods match the ones in the -r endpoint and
-	// that the amount of pods is the expected one
+	// Verify that the IPs of the podutils match the ones in the -r endpoint and
+	// that the amount of podutils is the expected one
 	AssertReadyEndpoint := func(namespace string, clusterName string, expectedEndpoints int) {
 		endpointName := clusterName + "-r"
 		endpoint := &corev1.Endpoints{}
@@ -238,7 +245,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		err := env.Client.Get(env.Ctx, endpointNamespacedName,
 			endpoint)
 		Expect(err).ToNot(HaveOccurred())
-		podList, err := env.GetClusterPodList(namespace, clusterName)
+		podList, err := clusterutils.GetClusterPodList(env.Ctx, env.Client, namespace, clusterName)
 		Expect(expectedEndpoints, err).To(BeEquivalentTo(len(podList.Items)))
 		matchingIP := 0
 		for _, pod := range podList.Items {
@@ -262,12 +269,12 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
 		// Gather the number of instances in this Cluster
-		cluster, err := env.GetCluster(namespace, clusterName)
+		cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 		clusterInstances := cluster.Spec.Instances
 
 		// Gather the original primary Pod
-		originalPrimaryPod, err := env.GetClusterPrimary(namespace, clusterName)
+		originalPrimaryPod, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 
 		By("Gathering info on the current state", func() {
@@ -277,18 +284,18 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		By("updating the cluster definition", func() {
 			AssertUpdateImage(namespace, clusterName)
 		})
-		// Since we're using a pvc, after the update the pods should
+		// Since we're using a pvc, after the update the podutils should
 		// have been created with the same name using the same pvc.
 		// Here we check that the names we've saved at the beginning
-		// of the It are the same names of the current pods.
-		By("checking that the names of the pods have not changed", func() {
+		// of the It are the same names of the current podutils.
+		By("checking that the names of the podutils have not changed", func() {
 			AssertChangedNames(namespace, clusterName, originalPodNames, clusterInstances)
 		})
 		// Even if they have the same names, they should have different
-		// UIDs, as the pods are new. Here we check that the UID
+		// UIDs, as the podutils are new. Here we check that the UID
 		// we've saved at the beginning of the It don't match the
 		// current ones.
-		By("checking that the pods are new ones", func() {
+		By("checking that the podutils are new ones", func() {
 			AssertNewPodsUID(namespace, clusterName, originalPodUID, 0)
 		})
 		// The PVC get reused, so they should have the same UID
@@ -303,7 +310,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		By("having the current primary on the new TargetPrimary", func() {
 			AssertPrimary(namespace, clusterName, originalPrimaryPod, expectNewPrimaryIdx)
 		})
-		// Check that the new pods are included in the endpoint
+		// Check that the new podutils are included in the endpoint
 		By("having each pod included in the -r service", func() {
 			AssertReadyEndpoint(namespace, clusterName, clusterInstances)
 		})
@@ -409,15 +416,15 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		Expect(err).ToNot(HaveOccurred())
 		err = env.Client.Create(env.Ctx, cluster)
 		Expect(err).ToNot(HaveOccurred())
-		AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReady], env)
+		AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReady], env)
 
 		// Gather the number of instances in this Cluster
-		cluster, err = env.GetCluster(namespace, clusterName)
+		cluster, err = clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 		clusterInstances := cluster.Spec.Instances
 
 		// Gather the original primary Pod
-		originalPrimaryPod, err := env.GetClusterPrimary(namespace, clusterName)
+		originalPrimaryPod, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 
 		By("Gathering info on the current state", func() {
@@ -431,20 +438,20 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 			Expect(err).ToNot(HaveOccurred())
 		})
 		AssertPodsRunOnImage(namespace, clusterName, updatedImageName, cluster.Spec.Instances, 900)
-		AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReady], env)
+		AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReady], env)
 
-		// Since we're using a pvc, after the update the pods should
+		// Since we're using a pvc, after the update the podutils should
 		// have been created with the same name using the same pvc.
 		// Here we check that the names we've saved at the beginning
-		// of the It are the same names of the current pods.
-		By("checking that the names of the pods have not changed", func() {
+		// of the It are the same names of the current podutils.
+		By("checking that the names of the podutils have not changed", func() {
 			AssertChangedNames(namespace, clusterName, originalPodNames, clusterInstances)
 		})
 		// Even if they have the same names, they should have different
-		// UIDs, as the pods are new. Here we check that the UID
+		// UIDs, as the podutils are new. Here we check that the UID
 		// we've saved at the beginning of the It don't match the
 		// current ones.
-		By("checking that the pods are new ones", func() {
+		By("checking that the podutils are new ones", func() {
 			AssertNewPodsUID(namespace, clusterName, originalPodUID, 0)
 		})
 		// The PVC get reused, so they should have the same UID
@@ -459,7 +466,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		By("having the current primary on the new TargetPrimary", func() {
 			AssertPrimary(namespace, clusterName, originalPrimaryPod, expectNewPrimaryIdx)
 		})
-		// Check that the new pods are included in the endpoint
+		// Check that the new podutils are included in the endpoint
 		By("having each pod included in the -r service", func() {
 			AssertReadyEndpoint(namespace, clusterName, clusterInstances)
 		})
@@ -477,9 +484,9 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 				// the image name has to be tagged as foo:MAJ.MIN. We'll update
 				// it to foo:MAJ, representing the latest minor.
 				// Create a cluster in a namespace we'll delete after the test
-				namespace, err := env.CreateUniqueTestNamespace(namespacePrefix)
+				namespace, err := env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
-				clusterName, err := env.GetResourceNameFromYAML(sampleFile)
+				clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, sampleFile)
 				Expect(err).ToNot(HaveOccurred())
 				AssertRollingUpdate(namespace, clusterName, sampleFile, true)
 			})
@@ -496,9 +503,9 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 				// the image name has to be tagged as foo:MAJ.MIN. We'll update
 				// it to foo:MAJ, representing the latest minor.
 				// Create a cluster in a namespace we'll delete after the test
-				namespace, err := env.CreateUniqueTestNamespace(namespacePrefix)
+				namespace, err := env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
-				clusterName, err := env.GetResourceNameFromYAML(sampleFile)
+				clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, sampleFile)
 				Expect(err).ToNot(HaveOccurred())
 				AssertRollingUpdate(namespace, clusterName, sampleFile, false)
 			})
@@ -510,9 +517,9 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 				sampleFile      = fixturesDir + "/rolling_updates/cluster-using-primary-update-method.yaml.template"
 			)
 			It("can do rolling update", func() {
-				namespace, err := env.CreateUniqueTestNamespace(namespacePrefix)
+				namespace, err := env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
-				clusterName, err := env.GetResourceNameFromYAML(sampleFile)
+				clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, sampleFile)
 				Expect(err).ToNot(HaveOccurred())
 				AssertRollingUpdate(namespace, clusterName, sampleFile, false)
 			})
@@ -555,7 +562,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 					// the image name has to be tagged as foo:MAJ.MIN. We'll update
 					// it to foo:MAJ, representing the latest minor.
 					// Create a cluster in a namespace we'll delete after the test
-					namespace, err := env.CreateUniqueTestNamespace(namespacePrefix)
+					namespace, err := env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 					Expect(err).ToNot(HaveOccurred())
 
 					// Create a new image catalog and a new cluster
@@ -575,7 +582,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 					// the image name has to be tagged as foo:MAJ.MIN. We'll update
 					// it to foo:MAJ, representing the latest minor.
 					// Create a cluster in a namespace we'll delete after the test
-					namespace, err := env.CreateUniqueTestNamespace(namespacePrefix)
+					namespace, err := env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 					Expect(err).ToNot(HaveOccurred())
 
 					catalog := newImageCatalog(namespace, clusterName, pgVersion.Major(), preRollingImg)
@@ -611,7 +618,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 					// the image name has to be tagged as foo:MAJ.MIN. We'll update
 					// it to foo:MAJ, representing the latest minor.
 					// Create a cluster in a namespace we'll delete after the test
-					namespace, err := env.CreateUniqueTestNamespace(namespacePrefix)
+					namespace, err := env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 					Expect(err).ToNot(HaveOccurred())
 
 					cluster := newImageCatalogCluster(namespace, clusterName, pgVersion.Major(), 3, storageClass)
@@ -629,7 +636,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 					// the image name has to be tagged as foo:MAJ.MIN. We'll update
 					// it to foo:MAJ, representing the latest minor.
 					// Create a cluster in a namespace we'll delete after the test
-					namespace, err := env.CreateUniqueTestNamespace(namespacePrefix)
+					namespace, err := env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 					Expect(err).ToNot(HaveOccurred())
 
 					cluster := newImageCatalogCluster(namespace, clusterName, pgVersion.Major(), 1, storageClass)

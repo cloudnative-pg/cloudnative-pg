@@ -23,7 +23,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/environment"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -51,9 +52,9 @@ var _ = Describe("Connection via services", Label(tests.LabelServiceConnectivity
 		appDBUser string,
 		appPassword string,
 		superuserPassword string,
-		env *utils.TestingEnvironment,
+		env *environment.TestingEnvironment,
 	) {
-		primaryPod, err := env.GetClusterPrimary(namespace, clusterName)
+		primaryPod, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 		// We test -rw, -ro and -r services with the app user and the superuser
 		rwService := fmt.Sprintf("%v-rw.%v.svc", clusterName, namespace)
@@ -80,7 +81,7 @@ var _ = Describe("Connection via services", Label(tests.LabelServiceConnectivity
 		It("can connect with auto-generated passwords", func() {
 			// Create a cluster in a namespace we'll delete after the test
 			var err error
-			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
@@ -125,7 +126,7 @@ var _ = Describe("Connection via services", Label(tests.LabelServiceConnectivity
 
 			// Create a cluster in a namespace we'll delete after the test
 			var err error
-			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 			AssertServices(namespace, clusterName, appDBName, appDBUser,

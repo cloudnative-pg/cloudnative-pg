@@ -24,7 +24,11 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/namespaces"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -58,10 +62,10 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 
 		BeforeAll(func() {
 			// Create a cluster in a namespace we'll delete after the test
-			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 
-			clusterName, err = env.GetResourceNameFromYAML(clusterManifest)
+			clusterName, err = yaml.GetResourceNameFromYAML(env.Scheme, clusterManifest)
 			Expect(err).ToNot(HaveOccurred())
 
 			By("setting up cluster and declarative database CRD", func() {
@@ -74,8 +78,9 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 				"and encoding = pg_char_to_encoding('%s') and datctype = '%s' and datcollate = '%s'",
 				db.Spec.Name, db.Spec.Encoding, db.Spec.LcCtype, db.Spec.LcCollate)
 			Eventually(func(g Gomega) {
-				stdout, _, err := env.ExecQueryInInstancePod(
-					utils.PodLocator{
+				stdout, _, err := exec.QueryInInstancePod(
+					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+					exec.PodLocator{
 						Namespace: namespace,
 						PodName:   primaryPod,
 					},
@@ -96,7 +101,7 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 			)
 			By("applying Database CRD manifest", func() {
 				CreateResourceFromFile(namespace, databaseManifest)
-				databaseObjectName, err = env.GetResourceNameFromYAML(databaseManifest)
+				databaseObjectName, err = yaml.GetResourceNameFromYAML(env.Scheme, databaseManifest)
 				Expect(err).NotTo(HaveOccurred())
 			})
 			By("ensuring the Database CRD succeeded reconciliation", func() {
@@ -115,7 +120,7 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 			})
 
 			By("verifying new database has been created with the expected fields", func() {
-				primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
+				primaryPodInfo, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 
 				AssertDatabaseExists(primaryPodInfo, dbname, true)
@@ -124,11 +129,11 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 			})
 
 			By("removing the Database object", func() {
-				Expect(utils.DeleteObject(env, &database)).To(Succeed())
+				Expect(objects.DeleteObject(env.Ctx, env.Client, &database)).To(Succeed())
 			})
 
 			By("verifying the retention policy in the postgres database", func() {
-				primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
+				primaryPodInfo, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 
 				AssertDatabaseExists(primaryPodInfo, dbname, retainOnDeletion)
@@ -163,10 +168,10 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 		)
 		It("will not prevent the deletion of the namespace with lagging finalizers", func() {
 			By("setting up the new namespace and cluster", func() {
-				err = env.CreateNamespace(namespace)
+				err = namespaces.CreateNamespace(env.Ctx, env.Client, namespace)
 				Expect(err).ToNot(HaveOccurred())
 
-				clusterName, err = env.GetResourceNameFromYAML(clusterManifest)
+				clusterName, err = yaml.GetResourceNameFromYAML(env.Scheme, clusterManifest)
 				Expect(err).ToNot(HaveOccurred())
 
 				AssertCreateCluster(namespace, clusterName, clusterManifest, env)
@@ -174,7 +179,7 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 			By("creating the database", func() {
 				databaseManifest := fixturesDir +
 					"/declarative_databases/database-with-delete-reclaim-policy.yaml.template"
-				databaseObjectName, err = env.GetResourceNameFromYAML(databaseManifest)
+				databaseObjectName, err = yaml.GetResourceNameFromYAML(env.Scheme, databaseManifest)
 				Expect(err).NotTo(HaveOccurred())
 				CreateResourceFromFile(namespace, databaseManifest)
 			})
@@ -192,7 +197,7 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 				}, 300).WithPolling(10 * time.Second).Should(Succeed())
 			})
 			By("deleting the namespace and making sure it succeeds before timeout", func() {
-				err := env.DeleteNamespaceAndWait(namespace, 60)
+				err := namespaces.DeleteNamespaceAndWait(env.Ctx, env.Client, namespace, 60)
 				Expect(err).ToNot(HaveOccurred())
 			})
 		})

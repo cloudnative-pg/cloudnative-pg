@@ -19,7 +19,10 @@ package e2e
 import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -46,16 +49,16 @@ var _ = Describe("Bootstrap with pg_basebackup", Label(tests.LabelRecovery), fun
 	Context("can bootstrap via pg_basebackup", Ordered, func() {
 		BeforeAll(func() {
 			// Create a cluster in a namespace we'll delete after the test
-			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			// Create the source Cluster
-			srcClusterName, err = env.GetResourceNameFromYAML(srcCluster)
+			srcClusterName, err = yaml.GetResourceNameFromYAML(env.Scheme, srcCluster)
 			Expect(err).ToNot(HaveOccurred())
 			AssertCreateCluster(namespace, srcClusterName, srcCluster, env)
 			tableLocator := TableLocator{
 				Namespace:    namespace,
 				ClusterName:  srcClusterName,
-				DatabaseName: utils.AppDBName,
+				DatabaseName: postgres.AppDBName,
 				TableName:    tableName,
 			}
 			AssertCreateTestData(env, tableLocator)
@@ -63,20 +66,20 @@ var _ = Describe("Bootstrap with pg_basebackup", Label(tests.LabelRecovery), fun
 
 		It("using basic authentication", func() {
 			// Create the destination Cluster
-			dstClusterName, err := env.GetResourceNameFromYAML(dstClusterBasic)
+			dstClusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, dstClusterBasic)
 			Expect(err).ToNot(HaveOccurred())
 			AssertCreateCluster(namespace, dstClusterName, dstClusterBasic, env)
 			// We give more time than the usual 600s, since the recovery is slower
-			AssertClusterIsReady(namespace, dstClusterName, testTimeouts[utils.ClusterIsReadySlow], env)
+			AssertClusterIsReady(namespace, dstClusterName, testTimeouts[timeouts.ClusterIsReadySlow], env)
 
 			secretName := dstClusterName + apiv1.ApplicationUserSecretSuffix
 
-			primaryPod, err := env.GetClusterPrimary(namespace, dstClusterName)
+			primaryPod, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, dstClusterName)
 			Expect(err).ToNot(HaveOccurred())
 
 			By("checking the dst cluster with auto generated app password connectable", func() {
 				AssertApplicationDatabaseConnection(namespace, dstClusterName,
-					appUser, utils.AppDBName, "", secretName, primaryPod)
+					appUser, postgres.AppDBName, "", secretName, primaryPod)
 			})
 
 			By("update user application password for dst cluster and verify connectivity", func() {
@@ -86,7 +89,7 @@ var _ = Describe("Bootstrap with pg_basebackup", Label(tests.LabelRecovery), fun
 					namespace,
 					dstClusterName,
 					appUser,
-					utils.AppDBName,
+					postgres.AppDBName,
 					newPassword,
 					secretName,
 					primaryPod)
@@ -96,18 +99,21 @@ var _ = Describe("Bootstrap with pg_basebackup", Label(tests.LabelRecovery), fun
 				tableLocator := TableLocator{
 					Namespace:    namespace,
 					ClusterName:  dstClusterName,
-					DatabaseName: utils.AppDBName,
+					DatabaseName: postgres.AppDBName,
 					TableName:    tableName,
 				}
 				AssertDataExpectedCount(env, tableLocator, 2)
 			})
 
 			By("writing some new data to the dst cluster", func() {
-				forward, conn, err := utils.ForwardPSQLConnection(
-					env,
+				forward, conn, err := postgres.ForwardPSQLConnection(
+					env.Ctx,
+					env.Client,
+					env.Interface,
+					env.RestClientConfig,
 					namespace,
 					dstClusterName,
-					utils.AppDBName,
+					postgres.AppDBName,
 					apiv1.ApplicationUserSecretSuffix,
 				)
 				defer func() {
@@ -122,7 +128,7 @@ var _ = Describe("Bootstrap with pg_basebackup", Label(tests.LabelRecovery), fun
 				tableLocator := TableLocator{
 					Namespace:    namespace,
 					ClusterName:  srcClusterName,
-					DatabaseName: utils.AppDBName,
+					DatabaseName: postgres.AppDBName,
 					TableName:    tableName,
 				}
 				AssertDataExpectedCount(env, tableLocator, 2)
@@ -131,28 +137,31 @@ var _ = Describe("Bootstrap with pg_basebackup", Label(tests.LabelRecovery), fun
 
 		It("using TLS authentication", func() {
 			// Create the destination Cluster
-			dstClusterName, err := env.GetResourceNameFromYAML(dstClusterTLS)
+			dstClusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, dstClusterTLS)
 			Expect(err).ToNot(HaveOccurred())
 			AssertCreateCluster(namespace, dstClusterName, dstClusterTLS, env)
 			// We give more time than the usual 600s, since the recovery is slower
-			AssertClusterIsReady(namespace, dstClusterName, testTimeouts[utils.ClusterIsReadySlow], env)
+			AssertClusterIsReady(namespace, dstClusterName, testTimeouts[timeouts.ClusterIsReadySlow], env)
 
 			By("checking data have been copied correctly", func() {
 				tableLocator := TableLocator{
 					Namespace:    namespace,
 					ClusterName:  dstClusterName,
-					DatabaseName: utils.AppDBName,
+					DatabaseName: postgres.AppDBName,
 					TableName:    tableName,
 				}
 				AssertDataExpectedCount(env, tableLocator, 2)
 			})
 
 			By("writing some new data to the dst cluster", func() {
-				forward, conn, err := utils.ForwardPSQLConnection(
-					env,
+				forward, conn, err := postgres.ForwardPSQLConnection(
+					env.Ctx,
+					env.Client,
+					env.Interface,
+					env.RestClientConfig,
 					namespace,
 					dstClusterName,
-					utils.AppDBName,
+					postgres.AppDBName,
 					apiv1.ApplicationUserSecretSuffix,
 				)
 				defer func() {
@@ -167,7 +176,7 @@ var _ = Describe("Bootstrap with pg_basebackup", Label(tests.LabelRecovery), fun
 				tableLocator := TableLocator{
 					Namespace:    namespace,
 					ClusterName:  srcClusterName,
-					DatabaseName: utils.AppDBName,
+					DatabaseName: postgres.AppDBName,
 					TableName:    tableName,
 				}
 				AssertDataExpectedCount(env, tableLocator, 2)

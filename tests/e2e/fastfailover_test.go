@@ -68,7 +68,7 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance, tests.La
 			clusterName = "cluster-fast-failover"
 			var err error
 			// Create a cluster in a namespace we'll delete after the test
-			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			AssertFastFailOver(namespace, sampleFileWithoutReplicationSlots, clusterName,
 				webTestFile, webTestJob, maxReattachTime, maxFailoverTime)
@@ -86,7 +86,7 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance, tests.La
 			clusterName = "cluster-fast-failover"
 			var err error
 			// Create a cluster in a namespace we'll delete after the test
-			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			AssertFastFailOver(namespace, sampleFileWithReplicationSlots,
 				clusterName, webTestFile, webTestJob, maxReattachTime, maxFailoverTime)
@@ -100,7 +100,7 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance, tests.La
 			clusterName = "cluster-syncreplicas-fast-failover"
 			var err error
 			// Create a cluster in a namespace we'll delete after the test
-			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			AssertFastFailOver(
 				namespace, sampleFileSyncReplicas, clusterName, webTestSyncReplicas, webTestJob, maxReattachTime, maxFailoverTime)

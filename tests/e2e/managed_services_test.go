@@ -27,7 +27,9 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -53,14 +55,14 @@ var _ = Describe("Managed services tests", Label(tests.LabelSmoke, tests.LabelBa
 	It("should create and delete a rw managed service", func(ctx SpecContext) {
 		const clusterManifest = fixturesDir + "/managed_services/cluster-managed-services-rw.yaml.template"
 		const serviceName = "test-rw"
-		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 
-		clusterName, err := env.GetResourceNameFromYAML(clusterManifest)
+		clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, clusterManifest)
 		Expect(err).ToNot(HaveOccurred())
 		AssertCreateCluster(namespace, clusterName, clusterManifest, env)
 
-		cluster, err := env.GetCluster(namespace, clusterName)
+		cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 
 		By("ensuring the service is created", func() {
@@ -78,32 +80,32 @@ var _ = Describe("Managed services tests", Label(tests.LabelSmoke, tests.LabelBa
 
 		By("ensuring the service is deleted when removed from the additional field", func() {
 			Eventually(func(g Gomega) error {
-				cluster, err := env.GetCluster(namespace, clusterName)
+				cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
 				g.Expect(err).ToNot(HaveOccurred())
 				cluster.Spec.Managed.Services.Additional = []apiv1.ManagedService{}
 				return env.Client.Update(ctx, cluster)
 			}, RetryTimeout, PollingTime).Should(BeNil())
 
-			AssertClusterIsReady(namespace, clusterName, testTimeouts[utils.ManagedServices], env)
+			AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ManagedServices], env)
 			Eventually(func(g Gomega) {
 				var serviceRW corev1.Service
 				err = env.Client.Get(ctx, types.NamespacedName{Name: serviceName, Namespace: namespace}, &serviceRW)
 				g.Expect(apierrs.IsNotFound(err)).To(BeTrue())
-			}, testTimeouts[utils.ManagedServices]).Should(Succeed())
+			}, testTimeouts[timeouts.ManagedServices]).Should(Succeed())
 		})
 	})
 
 	It("should properly handle disabledDefaultServices field", func(ctx SpecContext) {
 		const clusterManifest = fixturesDir + "/managed_services/cluster-managed-services-no-default.yaml.template"
 
-		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 
-		clusterName, err := env.GetResourceNameFromYAML(clusterManifest)
+		clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, clusterManifest)
 		Expect(err).ToNot(HaveOccurred())
 		AssertCreateCluster(namespace, clusterName, clusterManifest, env)
 
-		cluster, err := env.GetCluster(namespace, clusterName)
+		cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 
 		ro := specs.CreateClusterReadOnlyService(*cluster)
@@ -124,45 +126,45 @@ var _ = Describe("Managed services tests", Label(tests.LabelSmoke, tests.LabelBa
 
 		By("creating them when they are re-enabled", func() {
 			Eventually(func(g Gomega) error {
-				cluster, err := env.GetCluster(namespace, clusterName)
+				cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
 				g.Expect(err).ToNot(HaveOccurred())
 				cluster.Spec.Managed.Services.DisabledDefaultServices = []apiv1.ServiceSelectorType{}
 				return env.Client.Update(ctx, cluster)
 			}, RetryTimeout, PollingTime).Should(BeNil())
 
-			AssertClusterIsReady(namespace, clusterName, testTimeouts[utils.ManagedServices], env)
+			AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ManagedServices], env)
 
 			Eventually(func(g Gomega) {
 				var service corev1.Service
 				err = env.Client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: rw.Name}, &service)
 				g.Expect(err).ToNot(HaveOccurred())
-			}, testTimeouts[utils.ManagedServices]).Should(Succeed())
+			}, testTimeouts[timeouts.ManagedServices]).Should(Succeed())
 
 			Eventually(func(g Gomega) {
 				var service corev1.Service
 				err = env.Client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: ro.Name}, &service)
 				g.Expect(err).ToNot(HaveOccurred())
-			}, testTimeouts[utils.ManagedServices]).Should(Succeed())
+			}, testTimeouts[timeouts.ManagedServices]).Should(Succeed())
 
 			Eventually(func(g Gomega) {
 				var service corev1.Service
 				err = env.Client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: r.Name}, &service)
 				g.Expect(err).ToNot(HaveOccurred())
-			}, testTimeouts[utils.ManagedServices]).Should(Succeed())
+			}, testTimeouts[timeouts.ManagedServices]).Should(Succeed())
 		})
 	})
 
 	It("should properly handle replace update strategy", func(ctx SpecContext) {
 		const clusterManifest = fixturesDir + "/managed_services/cluster-managed-services-replace-strategy.yaml.template"
 		const serviceName = "test-rw"
-		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 
-		clusterName, err := env.GetResourceNameFromYAML(clusterManifest)
+		clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, clusterManifest)
 		Expect(err).ToNot(HaveOccurred())
 		AssertCreateCluster(namespace, clusterName, clusterManifest, env)
 
-		cluster, err := env.GetCluster(namespace, clusterName)
+		cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 
 		var creationTimestamp metav1.Time
@@ -185,7 +187,7 @@ var _ = Describe("Managed services tests", Label(tests.LabelSmoke, tests.LabelBa
 
 		By("updating the service definition", func() {
 			Eventually(func(g Gomega) error {
-				cluster, err := env.GetCluster(namespace, clusterName)
+				cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
 				g.Expect(err).ToNot(HaveOccurred())
 				cluster.Spec.Managed.Services.Additional[0].ServiceTemplate.ObjectMeta.Labels["new-label"] = "new"
 				return env.Client.Update(ctx, cluster)
@@ -200,7 +202,7 @@ var _ = Describe("Managed services tests", Label(tests.LabelSmoke, tests.LabelBa
 				g.Expect(service.Labels["new-label"]).To(Equal("new"))
 				g.Expect(service.UID).ToNot(Equal(uid))
 				g.Expect(service.CreationTimestamp).ToNot(Equal(creationTimestamp))
-			}, testTimeouts[utils.ManagedServices]).Should(Succeed())
+			}, testTimeouts[timeouts.ManagedServices]).Should(Succeed())
 		})
 	})
 })

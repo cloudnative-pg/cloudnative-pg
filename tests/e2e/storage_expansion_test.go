@@ -21,7 +21,8 @@ import (
 	"os"
 
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/storage"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -53,7 +54,10 @@ var _ = Describe("Verify storage", Label(tests.LabelStorage), func() {
 			// Initializing namespace variable to be used in test case
 			namespacePrefix = "storage-expansion-true"
 			// Extracting bool value of AllowVolumeExpansion
-			allowExpansion, err := utils.GetStorageAllowExpansion(defaultStorageClass, env)
+			allowExpansion, err := storage.GetStorageAllowExpansion(
+				env.Ctx, env.Client,
+				defaultStorageClass,
+			)
 			Expect(err).ToNot(HaveOccurred())
 			if (allowExpansion == nil) || (*allowExpansion == false) {
 				Skip(fmt.Sprintf("AllowedVolumeExpansion is false on %v", defaultStorageClass))
@@ -63,7 +67,7 @@ var _ = Describe("Verify storage", Label(tests.LabelStorage), func() {
 		It("expands PVCs via online resize", func() {
 			var err error
 			// Creating namespace
-			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			// Creating a cluster with three nodes
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
@@ -76,7 +80,10 @@ var _ = Describe("Verify storage", Label(tests.LabelStorage), func() {
 			// Initializing namespace variable to be used in test case
 			namespacePrefix = "storage-expansion-false"
 			// Extracting bool value of AllowVolumeExpansion
-			allowExpansion, err := utils.GetStorageAllowExpansion(defaultStorageClass, env)
+			allowExpansion, err := storage.GetStorageAllowExpansion(
+				env.Ctx, env.Client,
+				defaultStorageClass,
+			)
 			Expect(err).ToNot(HaveOccurred())
 			if (allowExpansion != nil) && (*allowExpansion == true) {
 				Skip(fmt.Sprintf("AllowedVolumeExpansion is true on %v", defaultStorageClass))
@@ -85,14 +92,14 @@ var _ = Describe("Verify storage", Label(tests.LabelStorage), func() {
 		It("expands PVCs via offline resize", func() {
 			var err error
 			// Creating namespace
-			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 			By("update cluster for resizeInUseVolumes as false", func() {
 				// Updating cluster with 'resizeInUseVolumes' sets to 'false' in storage.
 				// Check if operator does not return error
 				Eventually(func() error {
-					_, _, err = utils.RunUnchecked("kubectl patch cluster " + clusterName + " -n " + namespace +
+					_, _, err = run.Unchecked("kubectl patch cluster " + clusterName + " -n " + namespace +
 						" -p '{\"spec\":{\"storage\":{\"resizeInUseVolumes\":false}}}' --type=merge")
 					if err != nil {
 						return err

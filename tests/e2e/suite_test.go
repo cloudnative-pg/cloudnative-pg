@@ -35,9 +35,14 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	cnpgUtils "github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/cloudvendors"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/environment"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/minio"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/namespaces"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/operator"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/sternmultitailer"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -45,19 +50,19 @@ import (
 
 const (
 	fixturesDir  = "./fixtures"
-	RetryTimeout = utils.RetryTimeout
-	PollingTime  = utils.PollingTime
+	RetryTimeout = environment.RetryTimeout
+	PollingTime  = objects.PollingTime
 )
 
 var (
-	env                     *utils.TestingEnvironment
+	env                     *environment.TestingEnvironment
 	testLevelEnv            *tests.TestEnvLevel
-	testCloudVendorEnv      *utils.TestEnvVendor
+	testCloudVendorEnv      *cloudvendors.TestEnvVendor
 	expectedOperatorPodName string
 	operatorPodWasRenamed   bool
 	operatorWasRestarted    bool
 	quickDeletionPeriod     = int64(1)
-	testTimeouts            map[utils.Timeout]int
+	testTimeouts            map[timeouts.Timeout]int
 	minioEnv                = &minio.Env{
 		Namespace:    "minio",
 		ServiceName:  "minio-service.minio",
@@ -68,21 +73,21 @@ var (
 
 var _ = SynchronizedBeforeSuite(func() []byte {
 	var err error
-	env, err = utils.NewTestingEnvironment()
+	env, err = environment.NewTestingEnvironment()
 	Expect(err).ShouldNot(HaveOccurred())
 
 	// Start stern to write the logs of every pod we are interested in. Since we don't have a way to have a selector
 	// matching both the operator's and the clusters' pods, we need to start stern twice.
 	sternClustersCtx, sternClusterCancel := context.WithCancel(env.Ctx)
 	sternClusterDoneChan := sternmultitailer.StreamLogs(sternClustersCtx, env.Interface, clusterPodsLabelSelector(),
-		env.SternLogDir)
+		namespaces.SternLogDirectory)
 	DeferCleanup(func() {
 		sternClusterCancel()
 		<-sternClusterDoneChan
 	})
 	sternOperatorCtx, sternOperatorCancel := context.WithCancel(env.Ctx)
 	sternOperatorDoneChan := sternmultitailer.StreamLogs(sternOperatorCtx, env.Interface, operatorPodsLabelSelector(),
-		env.SternLogDir)
+		namespaces.SternLogDirectory)
 	DeferCleanup(func() {
 		sternOperatorCancel()
 		<-sternOperatorDoneChan
@@ -92,13 +97,13 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	_ = appsv1.AddToScheme(env.Scheme)
 
 	// Set up a global MinIO service on his own namespace
-	err = env.CreateNamespace(minioEnv.Namespace)
+	err = namespaces.CreateNamespace(env.Ctx, env.Client, minioEnv.Namespace)
 	Expect(err).ToNot(HaveOccurred())
 	DeferCleanup(func() {
-		err := env.DeleteNamespaceAndWait(minioEnv.Namespace, 300)
+		err := namespaces.DeleteNamespaceAndWait(env.Ctx, env.Client, minioEnv.Namespace, 300)
 		Expect(err).ToNot(HaveOccurred())
 	})
-	minioEnv.Timeout = uint(testTimeouts[utils.MinioInstallation])
+	minioEnv.Timeout = uint(testTimeouts[timeouts.MinioInstallation])
 	minioClient, err := minio.Deploy(minioEnv, env)
 	Expect(err).ToNot(HaveOccurred())
 
@@ -118,7 +123,7 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	var err error
 	// We are creating new testing env object again because above testing env can not serialize and
 	// accessible to all nodes (specs)
-	if env, err = utils.NewTestingEnvironment(); err != nil {
+	if env, err = environment.NewTestingEnvironment(); err != nil {
 		panic(err)
 	}
 
@@ -129,11 +134,11 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 		panic(err)
 	}
 
-	if testTimeouts, err = utils.Timeouts(); err != nil {
+	if testTimeouts, err = timeouts.Timeouts(); err != nil {
 		panic(err)
 	}
 
-	if testCloudVendorEnv, err = utils.TestCloudVendor(); err != nil {
+	if testCloudVendorEnv, err = cloudvendors.TestCloudVendor(); err != nil {
 		panic(err)
 	}
 
@@ -149,7 +154,7 @@ var _ = ReportAfterSuite("Gathering failed reports", func(report Report) {
 	// Keep the logs of the operator and the clusters in case of failure
 	// If everything is skipped, env has not been initialized, and we'll have nothing to clean up
 	if report.SuiteSucceeded && env != nil {
-		err := fileutils.RemoveDirectory(env.SternLogDir)
+		err := fileutils.RemoveDirectory(namespaces.SternLogDirectory)
 		Expect(err).ToNot(HaveOccurred())
 	}
 })
@@ -163,7 +168,7 @@ var _ = BeforeEach(func() {
 		return
 	}
 
-	operatorPod, err := env.GetOperatorPod()
+	operatorPod, err := operator.GetOperatorPod(env.Ctx, env.Client)
 	Expect(err).ToNot(HaveOccurred())
 
 	if operatorPodWasRenamed {
@@ -196,14 +201,14 @@ var _ = AfterEach(func() {
 	if len(breakingLabelsInCurrentTest.([]string)) != 0 {
 		return
 	}
-	operatorPod, err := env.GetOperatorPod()
+	operatorPod, err := operator.GetOperatorPod(env.Ctx, env.Client)
 	Expect(err).ToNot(HaveOccurred())
-	wasRenamed := utils.OperatorPodRenamed(operatorPod, expectedOperatorPodName)
+	wasRenamed := operator.PodRenamed(operatorPod, expectedOperatorPodName)
 	if wasRenamed {
 		operatorPodWasRenamed = true
 		Fail("operator was renamed")
 	}
-	wasRestarted := utils.OperatorPodRestarted(operatorPod)
+	wasRestarted := operator.PodRestarted(operatorPod)
 	if wasRestarted {
 		operatorWasRestarted = true
 		Fail("operator was restarted")

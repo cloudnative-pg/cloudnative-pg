@@ -22,6 +22,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	pkgutils "github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -48,14 +49,14 @@ var _ = Describe("AppArmor support", Serial, Label(tests.LabelNoOpenshift, tests
 	})
 
 	It("sets up a cluster enabling AppArmor annotation feature", func() {
-		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 
 		AssertCreateCluster(namespace, clusterName, clusterAppArmorFile, env)
 
 		By("verifying AppArmor annotations on cluster and pods", func() {
 			// Gathers the pod list using annotations
-			podList, _ := env.GetClusterPodList(namespace, clusterName)
+			podList, _ := clusterutils.GetClusterPodList(env.Ctx, env.Client, namespace, clusterName)
 			for _, pod := range podList.Items {
 				annotation := pod.ObjectMeta.Annotations[pkgutils.AppArmorAnnotationPrefix+"/"+specs.PostgresContainerName]
 				Expect(annotation).ShouldNot(BeEmpty(),

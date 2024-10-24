@@ -20,7 +20,8 @@ import (
 	"fmt"
 
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/nodes"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -48,7 +49,7 @@ var _ = Describe("E2E Tolerations Node", Serial, Label(tests.LabelDisruptive, te
 	AfterEach(func() {
 		for _, node := range taintedNodes {
 			cmd := fmt.Sprintf("kubectl taint node %v %s=test:NoSchedule-", node, tolerationKey)
-			_, _, err := utils.Run(cmd)
+			_, _, err := run.Run(cmd)
 			Expect(err).ToNot(HaveOccurred())
 		}
 		taintedNodes = nil
@@ -57,16 +58,16 @@ var _ = Describe("E2E Tolerations Node", Serial, Label(tests.LabelDisruptive, te
 	It("can create a cluster with tolerations", func() {
 		var err error
 		// Initialize empty global namespace variable
-		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 
 		By("tainting all the nodes", func() {
-			nodes, _ := env.GetNodeList()
+			nodes, _ := nodes.GetNodeList(env.Ctx, env.Client)
 			// We taint all the nodes where we could run the workloads
 			for _, node := range nodes.Items {
 				if (node.Spec.Unschedulable != true) && (len(node.Spec.Taints) == 0) {
 					cmd := fmt.Sprintf("kubectl taint node %v %s=test:NoSchedule", node.Name, tolerationKey)
-					_, _, err := utils.Run(cmd)
+					_, _, err := run.Run(cmd)
 					Expect(err).ToNot(HaveOccurred())
 					taintedNodes = append(taintedNodes, node.Name)
 				}
