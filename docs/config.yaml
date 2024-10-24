@@ -1,5 +1,6 @@
 hiddenMemberFields:
   - "TypeMeta"
+  - "synchronizeReplicasCache"
 
 externalPackages:
   - match: ^github\.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1\.RelabelConfig$
@@ -31,7 +32,14 @@ externalPackages:
 
 hideTypePatterns:
   - "ParseError$"
-  - "List$"
+  # We cannot exclude all `List$` because we declare PluginConfigurationList
+  - "BackupList$"
+  - "ClusterList$"
+  - "ClusterImageCatalogList$"
+  - "DatabaseList$"
+  - "ImageCatalogList$"
+  - "PoolerList$"
+  - "ScheduledBackupList$"
 
 markdownDisabled: false
 

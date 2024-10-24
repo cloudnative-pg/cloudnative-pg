@@ -492,7 +492,7 @@ plugin for this backup</p>
    <p>Type is tho role of the snapshot in the cluster, such as PG_DATA, PG_WAL and PG_TABLESPACE</p>
 </td>
 </tr>
-<tr><td><code>tablespaceName</code> <B>[Required]</B><br/>
+<tr><td><code>tablespaceName</code><br/>
 <i>string</i>
 </td>
 <td>
@@ -809,7 +809,7 @@ parameter is omitted</p>
    <p>The backup method being used</p>
 </td>
 </tr>
-<tr><td><code>online</code> <B>[Required]</B><br/>
+<tr><td><code>online</code><br/>
 <i>bool</i>
 </td>
 <td>
@@ -1577,7 +1577,7 @@ https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
 for more information.</p>
 </td>
 </tr>
-<tr><td><code>ephemeralVolumesSizeLimit</code> <B>[Required]</B><br/>
+<tr><td><code>ephemeralVolumesSizeLimit</code><br/>
 <a href="#postgresql-cnpg-io-v1-EphemeralVolumesSizeLimitConfiguration"><i>EphemeralVolumesSizeLimitConfiguration</i></a>
 </td>
 <td>
@@ -1708,7 +1708,7 @@ advisable for any PostgreSQL cluster employed for
 development/staging purposes.</p>
 </td>
 </tr>
-<tr><td><code>plugins</code> <B>[Required]</B><br/>
+<tr><td><code>plugins</code><br/>
 <a href="#postgresql-cnpg-io-v1-PluginConfigurationList"><i>PluginConfigurationList</i></a>
 </td>
 <td>
@@ -2038,7 +2038,7 @@ This field is reported when <code>.spec.failoverDelay</code> is populated or dur
    <p>Image contains the image name used by the pods</p>
 </td>
 </tr>
-<tr><td><code>pluginStatus</code> <B>[Required]</B><br/>
+<tr><td><code>pluginStatus</code><br/>
 <a href="#postgresql-cnpg-io-v1-PluginStatus"><i>[]PluginStatus</i></a>
 </td>
 <td>
@@ -2202,14 +2202,14 @@ storage</p>
 <table class="table">
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td><code>shm</code> <B>[Required]</B><br/>
+<tr><td><code>shm</code><br/>
 <a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/api/resource#Quantity"><i>k8s.io/apimachinery/pkg/api/resource.Quantity</i></a>
 </td>
 <td>
    <p>Shm is the size limit of the shared memory volume</p>
 </td>
 </tr>
-<tr><td><code>temporaryData</code> <B>[Required]</B><br/>
+<tr><td><code>temporaryData</code><br/>
 <a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/api/resource#Quantity"><i>k8s.io/apimachinery/pkg/api/resource.Quantity</i></a>
 </td>
 <td>
@@ -3072,6 +3072,21 @@ the operator calls PgBouncer's <code>PAUSE</code> and <code>RESUME</code> comman
 </tbody>
 </table>
 
+## PluginConfigurationList     {#postgresql-cnpg-io-v1-PluginConfigurationList}
+
+(Alias of `[]github.com/cloudnative-pg/cloudnative-pg/api/v1.PluginConfiguration`)
+
+**Appears in:**
+
+- [ClusterSpec](#postgresql-cnpg-io-v1-ClusterSpec)
+
+
+<p>PluginConfigurationList represent a set of plugin with their
+configuration parameters</p>
+
+
+
+
 ## PluginStatus     {#postgresql-cnpg-io-v1-PluginStatus}
 
 
@@ -3101,7 +3116,7 @@ the operator calls PgBouncer's <code>PAUSE</code> and <code>RESUME</code> comman
 latest reconciliation loop</p>
 </td>
 </tr>
-<tr><td><code>capabilities</code> <B>[Required]</B><br/>
+<tr><td><code>capabilities</code><br/>
 <i>[]string</i>
 </td>
 <td>
@@ -3109,7 +3124,7 @@ latest reconciliation loop</p>
 plugin</p>
 </td>
 </tr>
-<tr><td><code>operatorCapabilities</code> <B>[Required]</B><br/>
+<tr><td><code>operatorCapabilities</code><br/>
 <i>[]string</i>
 </td>
 <td>
@@ -3117,7 +3132,7 @@ plugin</p>
 plugin regarding the reconciler</p>
 </td>
 </tr>
-<tr><td><code>walCapabilities</code> <B>[Required]</B><br/>
+<tr><td><code>walCapabilities</code><br/>
 <i>[]string</i>
 </td>
 <td>
@@ -3125,7 +3140,7 @@ plugin regarding the reconciler</p>
 plugin regarding the WAL management</p>
 </td>
 </tr>
-<tr><td><code>backupCapabilities</code> <B>[Required]</B><br/>
+<tr><td><code>backupCapabilities</code><br/>
 <i>[]string</i>
 </td>
 <td>
@@ -4410,12 +4425,6 @@ physical replication slots</p>
 <td>
    <p>List of regular expression patterns to match the names of replication slots to be excluded (by default empty)</p>
 </td>
-</tr>
-<tr><td><code>-</code> <B>[Required]</B><br/>
-<a href="#postgresql-cnpg-io-v1-synchronizeReplicasCache"><i>synchronizeReplicasCache</i></a>
-</td>
-<td>
-   <span class="text-muted">No description provided.</span></td>
 </tr>
 </tbody>
 </table>

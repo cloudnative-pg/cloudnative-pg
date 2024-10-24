@@ -378,6 +378,7 @@ type ClusterSpec struct {
 
 	// EphemeralVolumesSizeLimit allows the user to set the limits for the ephemeral
 	// volumes
+	// +optional
 	EphemeralVolumesSizeLimit *EphemeralVolumesSizeLimitConfiguration `json:"ephemeralVolumesSizeLimit,omitempty"`
 
 	// Name of the priority class which will be used in every generated Pod, if the PriorityClass
@@ -469,6 +470,7 @@ type ClusterSpec struct {
 
 	// The plugins configuration, containing
 	// any plugin to be loaded with the corresponding configuration
+	// +optional
 	Plugins PluginConfigurationList `json:"plugins,omitempty"`
 }
 
@@ -529,9 +531,11 @@ const (
 // storage
 type EphemeralVolumesSizeLimitConfiguration struct {
 	// Shm is the size limit of the shared memory volume
+	// +optional
 	Shm *resource.Quantity `json:"shm,omitempty"`
 
 	// TemporaryData is the size limit of the temporary data volume
+	// +optional
 	TemporaryData *resource.Quantity `json:"temporaryData,omitempty"`
 }
 
@@ -827,6 +831,7 @@ type ClusterStatus struct {
 	Image string `json:"image,omitempty"`
 
 	// PluginStatus is the status of the loaded plugins
+	// +optional
 	PluginStatus []PluginStatus `json:"pluginStatus,omitempty"`
 
 	// SwitchReplicaClusterStatus is the status of the switch to replica cluster
@@ -1850,6 +1855,7 @@ type PluginConfiguration struct {
 	Name string `json:"name"`
 
 	// Parameters is the configuration of the plugin
+	// +optional
 	Parameters map[string]string `json:"parameters,omitempty"`
 }
 
@@ -1864,18 +1870,22 @@ type PluginStatus struct {
 
 	// Capabilities are the list of capabilities of the
 	// plugin
+	// +optional
 	Capabilities []string `json:"capabilities,omitempty"`
 
 	// OperatorCapabilities are the list of capabilities of the
 	// plugin regarding the reconciler
+	// +optional
 	OperatorCapabilities []string `json:"operatorCapabilities,omitempty"`
 
 	// WALCapabilities are the list of capabilities of the
 	// plugin regarding the WAL management
+	// +optional
 	WALCapabilities []string `json:"walCapabilities,omitempty"`
 
 	// BackupCapabilities are the list of capabilities of the
 	// plugin regarding the Backup management
+	// +optional
 	BackupCapabilities []string `json:"backupCapabilities,omitempty"`
 }
 
@@ -2004,6 +2014,7 @@ type ClusterList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+	// +optional
 	metav1.ListMeta `json:"metadata,omitempty"`
 	// List of clusters
 	Items []Cluster `json:"items"`
