@@ -101,7 +101,13 @@ test: generate fmt vet manifests envtest ## Run tests.
 	source <(${ENVTEST} use -p env --bin-dir ${ENVTEST_ASSETS_DIR} ${ENVTEST_K8S_VERSION}) ;\
 	export KUBEBUILDER_CONTROLPLANE_STOP_TIMEOUT=60s ;\
 	export KUBEBUILDER_CONTROLPLANE_START_TIMEOUT=60s ;\
-	go test -coverpkg=./... --count=1 -coverprofile=cover.out ./api/... ./cmd/... ./internal/... ./pkg/... ./tests/utils ;
+	go test -coverpkg=./... -coverprofile=cover.out ./api/... ./cmd/... ./internal/... ./pkg/... ./tests/utils
+
+test-race: generate fmt vet manifests envtest ## Run tests enabling race detection.
+	mkdir -p ${ENVTEST_ASSETS_DIR} ;\
+	source <(${ENVTEST} use -p env --bin-dir ${ENVTEST_ASSETS_DIR} ${ENVTEST_K8S_VERSION}) ;\
+	go run github.com/onsi/ginkgo/v2/ginkgo -r -p --skip-package=e2e \
+	  --race --keep-going --fail-on-empty --randomize-all --randomize-suites
 
 e2e-test-kind: ## Run e2e tests locally using kind.
 	hack/e2e/run-e2e-kind.sh

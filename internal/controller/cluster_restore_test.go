@@ -36,19 +36,17 @@ import (
 
 var _ = Describe("ensureClusterIsNotFenced", func() {
 	var (
-		ctx     context.Context
 		mockCli k8client.Client
 		cluster *apiv1.Cluster
 	)
 
-	getCluster := func(clusterKey k8client.ObjectKey) (*apiv1.Cluster, error) {
+	getCluster := func(ctx context.Context, clusterKey k8client.ObjectKey) (*apiv1.Cluster, error) {
 		remoteCluster := &apiv1.Cluster{}
 		err := mockCli.Get(ctx, clusterKey, remoteCluster)
 		return remoteCluster, err
 	}
 
 	BeforeEach(func() {
-		ctx = context.TODO()
 		cluster = &apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test",
@@ -66,14 +64,14 @@ var _ = Describe("ensureClusterIsNotFenced", func() {
 	})
 
 	Context("when no instances are fenced", func() {
-		It("should not modify the object", func() {
-			origCluster, err := getCluster(k8client.ObjectKeyFromObject(cluster))
+		It("should not modify the object", func(ctx SpecContext) {
+			origCluster, err := getCluster(ctx, k8client.ObjectKeyFromObject(cluster))
 			Expect(err).ToNot(HaveOccurred())
 
 			err = ensureClusterIsNotFenced(ctx, mockCli, cluster)
 			Expect(err).ToNot(HaveOccurred())
 
-			remoteCluster, err := getCluster(k8client.ObjectKeyFromObject(cluster))
+			remoteCluster, err := getCluster(ctx, k8client.ObjectKeyFromObject(cluster))
 			Expect(err).ToNot(HaveOccurred())
 			Expect(remoteCluster.ObjectMeta).To(Equal(origCluster.ObjectMeta))
 		})
@@ -90,15 +88,15 @@ var _ = Describe("ensureClusterIsNotFenced", func() {
 				Build()
 		})
 
-		It("should patch the cluster and remove fenced instances", func() {
-			origCluster, err := getCluster(k8client.ObjectKeyFromObject(cluster))
+		It("should patch the cluster and remove fenced instances", func(ctx SpecContext) {
+			origCluster, err := getCluster(ctx, k8client.ObjectKeyFromObject(cluster))
 			Expect(err).ToNot(HaveOccurred())
 			Expect(origCluster.Annotations).To(HaveKey(utils.FencedInstanceAnnotation))
 
 			err = ensureClusterIsNotFenced(ctx, mockCli, cluster)
 			Expect(err).ToNot(HaveOccurred())
 
-			remoteCluster, err := getCluster(k8client.ObjectKeyFromObject(cluster))
+			remoteCluster, err := getCluster(ctx, k8client.ObjectKeyFromObject(cluster))
 			Expect(err).ToNot(HaveOccurred())
 
 			Expect(remoteCluster.ObjectMeta).ToNot(Equal(origCluster.ObjectMeta))
@@ -109,13 +107,11 @@ var _ = Describe("ensureClusterIsNotFenced", func() {
 
 var _ = Describe("restoreClusterStatus", func() {
 	var (
-		ctx     context.Context
 		mockCli k8client.Client
 		cluster *apiv1.Cluster
 	)
 
 	BeforeEach(func() {
-		ctx = context.TODO()
 		cluster = &apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test",
@@ -130,7 +126,7 @@ var _ = Describe("restoreClusterStatus", func() {
 	})
 
 	Context("when restoring cluster status", func() {
-		It("should patch the cluster with the updated status", func() {
+		It("should patch the cluster with the updated status", func(ctx SpecContext) {
 			latestNodeSerial := 10
 			targetPrimaryNodeSerial := 3
 
@@ -150,7 +146,6 @@ var _ = Describe("restoreClusterStatus", func() {
 
 var _ = Describe("getOrphanPVCs", func() {
 	var (
-		ctx      context.Context
 		mockCli  k8client.Client
 		cluster  *apiv1.Cluster
 		goodPvcs []corev1.PersistentVolumeClaim
@@ -158,7 +153,6 @@ var _ = Describe("getOrphanPVCs", func() {
 	)
 
 	BeforeEach(func() {
-		ctx = context.TODO()
 		cluster = &apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test",
@@ -267,7 +261,7 @@ var _ = Describe("getOrphanPVCs", func() {
 			Build()
 	})
 
-	It("should fetch only the pvcs that belong to the cluster and without an owner", func() {
+	It("should fetch only the pvcs that belong to the cluster and without an owner", func(ctx SpecContext) {
 		remotePvcs, err := getOrphanPVCs(ctx, mockCli, cluster)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(remotePvcs).To(HaveLen(len(goodPvcs)))
@@ -289,7 +283,7 @@ var _ = Describe("getOrphanPVCs", func() {
 		Expect(primary).To(Equal(2))
 	})
 
-	It("should correctly restore the orphan pvcs", func() {
+	It("should correctly restore the orphan pvcs", func(ctx SpecContext) {
 		err := restoreOrphanPVCs(ctx, mockCli, cluster, goodPvcs)
 		Expect(err).ToNot(HaveOccurred())
 

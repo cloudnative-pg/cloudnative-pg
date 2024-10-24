@@ -23,7 +23,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Set default queries", func() {
+var _ = Describe("Set default queries", Ordered, func() {
 	q := NewQueriesCollector("test", nil, "db")
 
 	It("does assign nothing with empty default queries", func() {
