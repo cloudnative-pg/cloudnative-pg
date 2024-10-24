@@ -19,6 +19,7 @@ package roles
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -49,12 +50,21 @@ const (
 	roleUpdateMemberships roleAction = "UPDATE_MEMBERSHIPS"
 )
 
+type instanceInterface interface {
+	GetSuperUserDB() (*sql.DB, error)
+	IsPrimary() (bool, error)
+	RoleSynchronizerChan() <-chan *apiv1.ManagedConfiguration
+	IsServerHealthy() error
+	GetClusterName() string
+	GetNamespaceName() string
+}
+
 // A RoleSynchronizer is a Kubernetes manager.Runnable
 // that makes sure the Roles in the PostgreSQL databases are in sync with the spec
 //
 // c.f. https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/manager#Runnable
 type RoleSynchronizer struct {
-	instance *postgres.Instance
+	instance instanceInterface
 	client   client.Client
 }
 
@@ -174,6 +184,10 @@ func getRoleNames(roles []roleConfigurationAdapter) []string {
 }
 
 // synchronizeRoles aligns roles in the database to the spec
+// It returns
+//   - the PasswordState for any updated roles
+//   - any roles that had expectable postgres errors
+//   - any unexpeted error
 func (sr *RoleSynchronizer) synchronizeRoles(
 	ctx context.Context,
 	roleManager RoleManager,
@@ -195,16 +209,16 @@ func (sr *RoleSynchronizer) synchronizeRoles(
 	}
 	rolesByAction := evaluateNextRoleActions(
 		ctx, config, rolesInDB, storedPasswordState, latestSecretResourceVersion)
-	if err != nil {
-		return nil, nil, fmt.Errorf("while syncrhonizing managed roles: %w", err)
-	}
 
-	passwordStates, irreconcilableRoles := sr.applyRoleActions(
+	passwordStates, irreconcilableRoles, err := sr.applyRoleActions(
 		ctx,
 		db,
 		roleManager,
 		rolesByAction,
 	)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	// Merge the status from database into spec. We should keep all the status
 	// otherwise in the next loop the user without status will be marked as need update
@@ -218,32 +232,34 @@ func (sr *RoleSynchronizer) synchronizeRoles(
 // It returns the apiv1.PasswordState for each role, as well as a map of roles that
 // cannot be reconciled for expectable errors, e.g. dropping a role owning content
 //
-// NOTE: applyRoleActions will not error out if a single role operation fails.
-// This is designed so that a role configuration that cannot be honored by PostgreSQL
-// cannot stop the reconciliation loop and prevent other roles from being applied
+// NOTE: applyRoleActions will carry on after an expectable error, i.e. an error
+// due to an invalid request for postgres. This is so that other actions will not
+// be blocked by a user error.
+// It will, however, error out on unexpected errors.
 func (sr *RoleSynchronizer) applyRoleActions(
 	ctx context.Context,
 	db *sql.DB,
 	roleManager RoleManager,
 	rolesByAction rolesByAction,
-) (map[string]apiv1.PasswordState, map[string][]string) {
+) (map[string]apiv1.PasswordState, map[string][]string, error) {
 	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
 	contextLog.Debug("applying role actions")
 
 	irreconcilableRoles := make(map[string][]string)
 	appliedChanges := make(map[string]apiv1.PasswordState)
-	handleRoleError := func(errToEvaluate error, roleName string, action roleAction) {
+	handleRoleError := func(errToEvaluate error, roleName string, action roleAction) error {
 		// log unexpected errors, collect expectable PostgreSQL errors
 		if errToEvaluate == nil {
-			return
+			return nil
 		}
 		roleError, err := parseRoleError(errToEvaluate, roleName, action)
 		if err != nil {
 			contextLog.Error(err, "while performing "+string(action), "role", roleName)
-			return
+			return err
 		}
 
 		irreconcilableRoles[roleName] = append(irreconcilableRoles[roleName], roleError.Error())
+		return nil
 	}
 
 	for action, roles := range rolesByAction {
@@ -257,35 +273,39 @@ func (sr *RoleSynchronizer) applyRoleActions(
 			"roles", getRoleNames(roles), "action", action)
 
 		for _, role := range roles {
+			var (
+				err             error
+				appliedState    apiv1.PasswordState
+				grants, revokes []string
+			)
 			switch action {
 			case roleCreate, roleUpdate:
-				appliedState, err := sr.applyRoleCreateUpdate(ctx, db, roleManager, role, action)
+				appliedState, err = sr.applyRoleCreateUpdate(ctx, db, roleManager, role, action)
 				if err == nil {
 					appliedChanges[role.Name] = appliedState
 				}
-				handleRoleError(err, role.Name, action)
 			case roleDelete:
-				err := roleManager.Delete(ctx, db, role.toDatabaseRole())
-				handleRoleError(err, role.Name, action)
+				err = roleManager.Delete(ctx, db, role.toDatabaseRole())
 			case roleSetComment:
 				// NOTE: adding/updating a comment on a role does not alter its TransactionID
-				err := roleManager.UpdateComment(ctx, db, role.toDatabaseRole())
-				handleRoleError(err, role.Name, action)
+				err = roleManager.UpdateComment(ctx, db, role.toDatabaseRole())
 			case roleUpdateMemberships:
 				// NOTE: revoking / granting to a role does not alter its TransactionID
 				dbRole := role.toDatabaseRole()
-				grants, revokes, err := getRoleMembershipDiff(ctx, db, roleManager, role, dbRole)
-				if err != nil {
-					contextLog.Error(err, "while performing "+string(action), "role", role.Name)
-					continue
+				grants, revokes, err = getRoleMembershipDiff(ctx, db, roleManager, role, dbRole)
+				if unhandledErr := handleRoleError(err, role.Name, action); unhandledErr != nil {
+					return nil, nil, unhandledErr
 				}
+
 				err = roleManager.UpdateMembership(ctx, db, dbRole, grants, revokes)
-				handleRoleError(err, role.Name, action)
+			}
+			if unhandledErr := handleRoleError(err, role.Name, action); unhandledErr != nil {
+				return nil, nil, unhandledErr
 			}
 		}
 	}
 
-	return appliedChanges, irreconcilableRoles
+	return appliedChanges, irreconcilableRoles, nil
 }
 
 func getRoleMembershipDiff(
@@ -296,7 +316,7 @@ func getRoleMembershipDiff(
 	dbRole DatabaseRole,
 ) ([]string, []string, error) {
 	inRoleInDB, err := roleManager.GetParentRoles(ctx, db, dbRole)
-	if err != nil {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, nil, err
 	}
 	rolesToGrant := getRolesToGrant(inRoleInDB, role.InRoles)

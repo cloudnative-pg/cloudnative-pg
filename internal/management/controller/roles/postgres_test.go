@@ -36,6 +36,18 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+const (
+	expectedMembershipStmt = `SELECT mem.inroles 
+	FROM pg_catalog.pg_authid as auth
+	LEFT JOIN (
+		SELECT array_agg(pg_get_userbyid(roleid)) as inroles, member
+		FROM pg_auth_members GROUP BY member
+	) mem ON member = oid
+	WHERE rolname = $1`
+
+	wantedRoleCommentTpl = "COMMENT ON ROLE \"%s\" IS %s"
+)
+
 var _ = Describe("Postgres RoleManager implementation test", func() {
 	falseValue := false
 	validUntil := metav1.Date(2100, 0o1, 0o1, 0o0, 0o0, 0o0, 0o0, time.UTC)
@@ -127,7 +139,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		wantedRoleWithDefaultConnectionLimit.Name)
 
 	wantedRoleCommentStmt := fmt.Sprintf(
-		"COMMENT ON ROLE \"%s\" IS %s",
+		wantedRoleCommentTpl,
 		wantedRole.Name, pq.QuoteLiteral(wantedRole.Comment))
 
 	wantedRoleExpectedAltStmt := fmt.Sprintf(
@@ -144,14 +156,6 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 			FROM pg_auth_members GROUP BY member
 		) mem ON member = oid
 		WHERE rolname not like 'pg\_%'`
-
-	expectedMembershipStmt := `SELECT mem.inroles 
-		FROM pg_catalog.pg_authid as auth
-		LEFT JOIN (
-			SELECT array_agg(pg_get_userbyid(roleid)) as inroles, member
-			FROM pg_auth_members GROUP BY member
-		) mem ON member = oid
-		WHERE rolname = $1`
 
 	// Testing List
 	It("List can read the list of roles from the DB", func(ctx context.Context) {
@@ -237,7 +241,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		mock.ExpectQuery(expectedSelStmt).WillReturnError(dbError)
 		roles, err := prm.List(ctx, db)
 		Expect(err).To(HaveOccurred())
-		Expect(err.Error()).To(BeEquivalentTo("while listing DB roles for DRM: Kaboom"))
+		Expect(err.Error()).To(BeEquivalentTo("while listing DB roles for role reconciler: Kaboom"))
 		Expect(roles).To(BeEmpty())
 	})
 	// Testing Create
