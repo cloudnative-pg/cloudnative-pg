@@ -30,7 +30,7 @@ import (
 
 // PSQLForwardConnection manage the creation of a port forward to connect by psql client locally
 type PSQLForwardConnection struct {
-	pooler      *pool.ConnectionPool
+	pooler      pool.Pooler
 	portForward *portforward.PortForwarder
 }
 
@@ -40,7 +40,7 @@ func (psqlc *PSQLForwardConnection) Close() {
 }
 
 // GetPooler returns the connection Pooler
-func (psqlc *PSQLForwardConnection) GetPooler() *pool.ConnectionPool {
+func (psqlc *PSQLForwardConnection) GetPooler() pool.Pooler {
 	return psqlc.pooler
 }
 
