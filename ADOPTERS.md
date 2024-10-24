@@ -55,3 +55,5 @@ This list is sorted in chronological order, based on the submission date.
 | [GEICO Tech](https://www.geico.com/tech/) | @ardentperf | 2024-09-24 | GEICO Tech is building the most consumer-centric insurance offerings in America. CloudNativePG is used to provide a highly available Kubernetes-based Postgres service, both in the cloud and on-premises. |
 | [Cambium](https://www.cambium.earth) | @Mmoncadaisla | 2024-09-25 | Cambium leverages CloudNativePG at its core to analyze and visualize geospatial data for carbon market applications, ranging from site selection to monitoring, reporting, and verification. |
 | [MIND Informatica srl](https://mind-informatica.com) | @simonerocchi | 2024-09-25 | We use CloudNativePG to run PostgreSQL clusters for our web applications. |
+| [Walkbase](https://walkbase.com/) | @LinAnt | 2024-10-24 | CNPG manages all our postgres instances running on Kubernetes, and we are looking into managing our main databases using GitOps |
+
