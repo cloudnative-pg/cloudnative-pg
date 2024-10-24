@@ -27,6 +27,8 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+const releaseDirectoryPath = "../../../releases"
+
 var _ = Describe("Release tag extraction", func() {
 	It("properly works with expected filename", func() {
 		tag, err := extractTag("cnpg-0.5.0.yaml")
@@ -42,7 +44,7 @@ var _ = Describe("Release tag extraction", func() {
 
 var _ = Describe("Most recent tag", func() {
 	It("properly works with release branch", func() {
-		releasesDir, err := filepath.Abs("../../releases")
+		releasesDir, err := filepath.Abs(releaseDirectoryPath)
 		Expect(err).ToNot(HaveOccurred())
 
 		versionList, err := GetAvailableReleases(releasesDir)
@@ -60,7 +62,7 @@ var _ = Describe("Most recent tag", func() {
 	})
 
 	It("properly works with dev branch", func() {
-		releasesDir, err := filepath.Abs("../../releases")
+		releasesDir, err := filepath.Abs(releaseDirectoryPath)
 		Expect(err).ToNot(HaveOccurred())
 
 		GinkgoT().Setenv("BRANCH_NAME", "dev/"+versions.Version)

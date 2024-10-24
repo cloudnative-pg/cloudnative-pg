@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package utils
+package environment
 
 import (
 	"testing"
@@ -25,5 +25,5 @@ import (
 
 func TestUtils(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Utils test suite")
+	RunSpecs(t, "Utils test environment suite")
 }
