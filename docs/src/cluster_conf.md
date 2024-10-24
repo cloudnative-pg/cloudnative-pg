@@ -47,7 +47,7 @@ CloudNativePG relies on [ephemeral volumes](https://kubernetes.io/docs/concepts/
 for part of the internal activities. Ephemeral volumes exist for the sole
 duration of a pod's life, without persisting across pod restarts.
 
-# Volume Claim Template for Temporary Storage
+### Volume Claim Template for Temporary Storage
 
 The operator uses  by default an `emptyDir` volume, which can be customized by using the `.spec.ephemeralVolumesSizeLimit field`.
 This can be overridden by specifying a volume claim template in the `.spec.ephemeralVolumeSource` field.
