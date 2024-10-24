@@ -86,12 +86,20 @@ func ForwardPSQLConnectionWithCreds(
 		return nil, nil, err
 	}
 
-	forwarder, err := forwardconnection.NewPodForward(
-		env.Ctx,
+	dialer, err := forwardconnection.NewDialer(
 		env.Interface,
 		env.RestClientConfig,
-		namespace, cluster.Status.CurrentPrimary, "5432",
-		io.Discard, io.Discard,
+		namespace,
+		cluster.Status.CurrentPrimary,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+	forwarder, err := forwardconnection.NewForwardConnection(
+		dialer,
+		[]string{forwardconnection.PostgresPortMap},
+		io.Discard,
+		io.Discard,
 	)
 	if err != nil {
 		return nil, nil, err

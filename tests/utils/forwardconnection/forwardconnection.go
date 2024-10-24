@@ -26,11 +26,15 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/portforward"
 	"k8s.io/client-go/transport/spdy"
 )
+
+// PostgresPortMap is the default port map for the PostgreSQL Pod
+const PostgresPortMap = "0:5432"
 
 // ForwardConnection holds the necessary information to manage a port-forward
 // against a service of pod inside Kubernetes
@@ -40,75 +44,39 @@ type ForwardConnection struct {
 	readyChannel chan struct{}
 }
 
-// NewServiceForward returns a PortForwarder against the service specified
-func NewServiceForward(
+// NewDialerFromService returns a Dialer against the service specified
+func NewDialerFromService(
 	ctx context.Context,
 	kubeInterface kubernetes.Interface,
 	config *rest.Config,
 	namespace, service string,
-	outWriter, errWriter io.Writer,
-) (*ForwardConnection, error) {
-	return newForward(ctx, kubeInterface, config, namespace, service, "", "", outWriter, errWriter)
-}
-
-// NewPodForward returns a PortForwarder against the pod specified
-func NewPodForward(
-	ctx context.Context,
-	kubeInterface kubernetes.Interface,
-	config *rest.Config,
-	namespace, pod, podPort string,
-	outWriter, errWriter io.Writer,
-) (*ForwardConnection, error) {
-	return newForward(ctx, kubeInterface, config, namespace, "", pod, podPort, outWriter, errWriter)
-}
-
-// newForward returns a PortForwarder against the service or pod specified
-// in the giving namespace, service takes precedence over pod
-func newForward(
-	ctx context.Context,
-	kubeInterface kubernetes.Interface,
-	config *rest.Config,
-	namespace, service, pod, podPort string,
-	outWriter, errWriter io.Writer,
-) (*ForwardConnection, error) {
-	var err error
-	var portMaps []string
-
-	if service != "" {
-		pod, portMaps, err = getPodAndPortsFromService(ctx, kubeInterface, namespace, service)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	// Since pod is not empty we assume that we're passing the podPort, if that's not
-	// the case we should error out
-	if pod != "" {
-		if podPort == "" {
-			return nil, fmt.Errorf("podPort is required when pod is specified")
-		}
-		portMaps = []string{fmt.Sprintf("0:%s", podPort)}
-	}
-
-	req := kubeInterface.CoreV1().
-		RESTClient().
-		Post().
-		Resource("pods").
-		Namespace(namespace).
-		Name(pod).
-		SubResource("portforward")
-
-	transport, upgrader, err := spdy.RoundTripperFor(config)
+) (dialer httpstream.Dialer, portMaps []string, err error) {
+	pod, portMap, err := getPodAndPortsFromService(ctx, kubeInterface, namespace, service)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, "POST", req.URL())
 
+	dial, err := NewDialer(kubeInterface, config, namespace, pod)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return dial, portMap, nil
+}
+
+// NewForwardConnection returns a PortForwarder against the  pod specified
+func NewForwardConnection(
+	dialer httpstream.Dialer,
+	portMaps []string,
+	outWriter,
+	errWriter io.Writer,
+) (*ForwardConnection, error) {
 	fc := &ForwardConnection{
 		stopChannel:  make(chan struct{}),
 		readyChannel: make(chan struct{}, 1),
 	}
 
+	var err error
 	fc.Forwarder, err = portforward.New(
 		dialer,
 		portMaps,
@@ -122,6 +90,29 @@ func newForward(
 	}
 
 	return fc, nil
+}
+
+// NewDialer returns a Dialer to be used with a PortForwarder
+func NewDialer(
+	kubeInterface kubernetes.Interface,
+	config *rest.Config,
+	namespace string,
+	pod string,
+) (httpstream.Dialer, error) {
+	req := kubeInterface.CoreV1().
+		RESTClient().
+		Post().
+		Resource("pods").
+		Namespace(namespace).
+		Name(pod).
+		SubResource("portforward")
+
+	transport, upgrader, err := spdy.RoundTripperFor(config)
+	if err != nil {
+		return nil, err
+	}
+	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, "POST", req.URL())
+	return dialer, nil
 }
 
 // StartAndWait beings the port forward and wait for it to be ready
