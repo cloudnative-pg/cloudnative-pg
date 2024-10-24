@@ -129,14 +129,14 @@ Given the following files:
 
 Create a secret containing the CA certificate:
 
-```
+``` sh
 kubectl create secret generic my-postgresql-server-ca \
   --from-file=ca.crt=./server-ca.crt
 ```
 
 Create a secret with the TLS certificate:
 
-```
+``` sh
 kubectl create secret tls my-postgresql-server \
   --cert=./server.crt --key=./server.key
 ```
