@@ -56,4 +56,3 @@ This list is sorted in chronological order, based on the submission date.
 | [Cambium](https://www.cambium.earth) | @Mmoncadaisla | 2024-09-25 | Cambium leverages CloudNativePG at its core to analyze and visualize geospatial data for carbon market applications, ranging from site selection to monitoring, reporting, and verification. |
 | [MIND Informatica srl](https://mind-informatica.com) | @simonerocchi | 2024-09-25 | We use CloudNativePG to run PostgreSQL clusters for our web applications. |
 | [Walkbase](https://walkbase.com/) | @LinAnt | 2024-10-24 | CNPG manages all our postgres instances running on Kubernetes, and we are looking into managing our main databases using GitOps |
-
