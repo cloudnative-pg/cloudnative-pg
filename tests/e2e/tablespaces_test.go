@@ -17,8 +17,6 @@ limitations under the License.
 package e2e
 
 import (
-	"bytes"
-	"context"
 	"fmt"
 	"os"
 	"path"
@@ -36,9 +34,9 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/logs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	testUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/minio"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -78,19 +76,6 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 		})
 		cluster, err = env.GetCluster(namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
-
-		clusterLogs := logs.ClusterStreamingRequest{
-			Cluster: cluster,
-			Options: &corev1.PodLogOptions{
-				Follow: true,
-			},
-		}
-		var buffer bytes.Buffer
-		go func() {
-			defer GinkgoRecover()
-			err = clusterLogs.SingleStream(context.TODO(), &buffer)
-			Expect(err).ToNot(HaveOccurred())
-		}()
 	}
 
 	Context("on a new cluster with tablespaces", Ordered, func() {
@@ -109,7 +94,16 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 			Expect(err).ToNot(HaveOccurred())
 
 			// We create the MinIO credentials required to login into the system
-			AssertStorageCredentialsAreCreated(namespace, "backup-storage-creds", "minio", "minio123")
+			By("creating the credentials for minio", func() {
+				_, err = testUtils.CreateObjectStorageSecret(
+					namespace,
+					"backup-storage-creds",
+					"minio",
+					"minio123",
+					env,
+				)
+				Expect(err).ToNot(HaveOccurred())
+			})
 
 			By("create the certificates for MinIO", func() {
 				err := minioEnv.CreateCaSecret(env, namespace)
@@ -168,8 +162,9 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 			Expect(err).ToNot(HaveOccurred())
 
 			By(fmt.Sprintf("creating backup %s and verifying backup is ready", backupName), func() {
-				testUtils.ExecuteBackup(namespace, clusterBackupManifest, false, testTimeouts[testUtils.BackupIsReady], env)
-				AssertBackupConditionInClusterStatus(namespace, clusterName)
+				testUtils.ExecuteBackup(namespace, clusterBackupManifest, false, testTimeouts[testUtils.BackupIsReady],
+					env)
+				testUtils.AssertBackupConditionInClusterStatus(env, namespace, clusterName)
 			})
 
 			By("verifying the number of tars in minio", func() {
@@ -270,7 +265,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 				// This should be better handled inside ExecuteBackup
 				AssertArchiveWalOnMinio(namespace, clusterName, clusterName)
 
-				AssertBackupConditionInClusterStatus(namespace, clusterName)
+				testUtils.AssertBackupConditionInClusterStatus(env, namespace, clusterName)
 			})
 
 			By("verifying the number of tars in the latest base backup", func() {
@@ -368,7 +363,16 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 			Expect(err).ToNot(HaveOccurred())
 
 			// We create the required credentials for MinIO
-			AssertStorageCredentialsAreCreated(namespace, "backup-storage-creds", "minio", "minio123")
+			By("creating the credentials for minio", func() {
+				_, err = testUtils.CreateObjectStorageSecret(
+					namespace,
+					"backup-storage-creds",
+					"minio",
+					"minio123",
+					env,
+				)
+				Expect(err).ToNot(HaveOccurred())
+			})
 
 			By("create the certificates for MinIO", func() {
 				err := minioEnv.CreateCaSecret(env, namespace)
@@ -396,7 +400,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 					testTimeouts[testUtils.VolumeSnapshotIsReady],
 					env,
 				)
-				AssertBackupConditionInClusterStatus(namespace, clusterName)
+				testUtils.AssertBackupConditionInClusterStatus(env, namespace, clusterName)
 			})
 
 			By("checking that volumeSnapshots are properly labeled", func() {
@@ -1214,7 +1218,7 @@ func latestBaseBackupContainsExpectedTars(
 		// we list the backup.info files to get the listing of base backups
 		// directories in minio
 		backupInfoFiles := filepath.Join("*", clusterName, "base", "*", "*.info")
-		ls, err := testUtils.ListFilesOnMinio(minioEnv, backupInfoFiles)
+		ls, err := minio.ListFiles(minioEnv, backupInfoFiles)
 		g.Expect(err).ShouldNot(HaveOccurred())
 		frags := strings.Split(ls, "\n")
 		slices.Sort(frags)
@@ -1222,10 +1226,10 @@ func latestBaseBackupContainsExpectedTars(
 		g.Expect(frags).To(HaveLen(numBackups), report)
 		latestBaseBackup := filepath.Dir(frags[numBackups-1])
 		tarsInLastBackup := strings.TrimPrefix(filepath.Join(latestBaseBackup, "*.tar"), "minio/")
-		listing, err := testUtils.ListFilesOnMinio(minioEnv, tarsInLastBackup)
+		listing, err := minio.ListFiles(minioEnv, tarsInLastBackup)
 		g.Expect(err).ShouldNot(HaveOccurred())
 		report += fmt.Sprintf("tar listing:\n%s\n", listing)
-		numTars, err := testUtils.CountFilesOnMinio(minioEnv, tarsInLastBackup)
+		numTars, err := minio.CountFiles(minioEnv, tarsInLastBackup)
 		g.Expect(err).ShouldNot(HaveOccurred())
 		g.Expect(numTars).To(Equal(expectedTars), report)
 	}, 120).Should(Succeed())

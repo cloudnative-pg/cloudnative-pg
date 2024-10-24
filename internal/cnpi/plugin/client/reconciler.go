@@ -31,27 +31,34 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/connection"
 )
 
+const cnpgOperatorKey = "cnpg-operator"
+
 // newContinueResult returns a result instructing the reconciliation loop
 // to continue its operation
-func newContinueResult() ReconcilerHookResult { return ReconcilerHookResult{} }
+func newContinueResult(identifier string) ReconcilerHookResult {
+	return ReconcilerHookResult{Identifier: identifier}
+}
 
 // newTerminateResult returns a result instructing the reconciliation loop to stop
 // reconciliation
-func newTerminateResult() ReconcilerHookResult { return ReconcilerHookResult{StopReconciliation: true} }
+func newTerminateResult(identifier string) ReconcilerHookResult {
+	return ReconcilerHookResult{StopReconciliation: true, Identifier: identifier}
+}
 
 // newReconcilerRequeueResult creates a new result instructing
 // a reconciler to schedule a loop in the passed time frame
-func newReconcilerRequeueResult(after int64) ReconcilerHookResult {
+func newReconcilerRequeueResult(identifier string, after int64) ReconcilerHookResult {
 	return ReconcilerHookResult{
 		Err:                nil,
 		StopReconciliation: true,
 		Result:             ctrl.Result{Requeue: true, RequeueAfter: time.Second * time.Duration(after)},
+		Identifier:         identifier,
 	}
 }
 
 // newReconcilerErrorResult creates a new result from an error
-func newReconcilerErrorResult(err error) ReconcilerHookResult {
-	return ReconcilerHookResult{Err: err, StopReconciliation: true}
+func newReconcilerErrorResult(identifier string, err error) ReconcilerHookResult {
+	return ReconcilerHookResult{Err: err, StopReconciliation: true, Identifier: identifier}
 }
 
 func (data *data) PreReconcile(ctx context.Context, cluster client.Object, object client.Object) ReconcilerHookResult {
@@ -104,6 +111,7 @@ func reconcilerHook(
 	serializedCluster, err := json.Marshal(cluster)
 	if err != nil {
 		return newReconcilerErrorResult(
+			cnpgOperatorKey,
 			fmt.Errorf("while serializing %s %s/%s to JSON: %w",
 				cluster.GetObjectKind().GroupVersionKind().Kind,
 				cluster.GetNamespace(), cluster.GetName(),
@@ -115,6 +123,7 @@ func reconcilerHook(
 	serializedObject, err := json.Marshal(object)
 	if err != nil {
 		return newReconcilerErrorResult(
+			cnpgOperatorKey,
 			fmt.Errorf(
 				"while serializing %s %s/%s to JSON: %w",
 				cluster.GetObjectKind().GroupVersionKind().Kind,
@@ -139,7 +148,7 @@ func reconcilerHook(
 		contextLogger.Info(
 			"Skipping reconciler hooks for unknown group",
 			"objectGvk", object.GetObjectKind())
-		return newContinueResult()
+		return newContinueResult(cnpgOperatorKey)
 	}
 
 	for idx := range plugins {
@@ -151,20 +160,20 @@ func reconcilerHook(
 
 		result, err := executeRequest(ctx, plugin.ReconcilerHooksClient(), request)
 		if err != nil {
-			return newReconcilerErrorResult(err)
+			return newReconcilerErrorResult(plugin.Name(), err)
 		}
 
 		switch result.Behavior {
 		case reconciler.ReconcilerHooksResult_BEHAVIOR_TERMINATE:
-			return newTerminateResult()
+			return newTerminateResult(plugin.Name())
 
 		case reconciler.ReconcilerHooksResult_BEHAVIOR_REQUEUE:
-			return newReconcilerRequeueResult(result.GetRequeueAfter())
+			return newReconcilerRequeueResult(plugin.Name(), result.GetRequeueAfter())
 
 		case reconciler.ReconcilerHooksResult_BEHAVIOR_CONTINUE:
-			return newContinueResult()
+			return newContinueResult(plugin.Name())
 		}
 	}
 
-	return newContinueResult()
+	return newContinueResult(cnpgOperatorKey)
 }

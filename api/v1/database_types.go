@@ -132,13 +132,17 @@ type DatabaseStatus struct {
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
 	// Ready is true if the database was reconciled correctly
+	// +optional
 	Ready bool `json:"ready,omitempty"`
 
 	// Error is the reconciliation error message
+	// +optional
 	Error string `json:"error,omitempty"`
 }
 
+// +genclient
 // +kubebuilder:object:root=true
+// +kubebuilder:storageversion
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 // +kubebuilder:printcolumn:name="Cluster",type="string",JSONPath=".spec.cluster.name"

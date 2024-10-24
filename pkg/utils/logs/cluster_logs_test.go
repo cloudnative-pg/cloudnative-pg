@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 
@@ -33,6 +33,23 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+type syncBuffer struct {
+	b bytes.Buffer
+	m sync.Mutex
+}
+
+func (b *syncBuffer) Write(p []byte) (n int, err error) {
+	b.m.Lock()
+	defer b.m.Unlock()
+	return b.b.Write(p)
+}
+
+func (b *syncBuffer) String() string {
+	b.m.Lock()
+	defer b.m.Unlock()
+	return b.b.String()
+}
+
 var _ = Describe("Cluster logging tests", func() {
 	clusterNamespace := "cluster-test"
 	clusterName := "myTestCluster"
@@ -42,7 +59,7 @@ var _ = Describe("Cluster logging tests", func() {
 			Name:      clusterName,
 		},
 	}
-	pod := &v1.Pod{
+	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: clusterNamespace,
 			Name:      clusterName + "-1",
@@ -50,18 +67,18 @@ var _ = Describe("Cluster logging tests", func() {
 				utils.ClusterLabelName: clusterName,
 			},
 		},
-		Status: v1.PodStatus{
-			ContainerStatuses: []v1.ContainerStatus{
+		Status: corev1.PodStatus{
+			ContainerStatuses: []corev1.ContainerStatus{
 				{
 					Name: "postgresql",
-					State: v1.ContainerState{
-						Running: &v1.ContainerStateRunning{},
+					State: corev1.ContainerState{
+						Running: &corev1.ContainerStateRunning{},
 					},
 				},
 			},
 		},
 	}
-	podWithSidecars := &v1.Pod{
+	podWithSidecars := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: clusterNamespace,
 			Name:      clusterName + "-1",
@@ -69,18 +86,18 @@ var _ = Describe("Cluster logging tests", func() {
 				utils.ClusterLabelName: clusterName,
 			},
 		},
-		Status: v1.PodStatus{
-			ContainerStatuses: []v1.ContainerStatus{
+		Status: corev1.PodStatus{
+			ContainerStatuses: []corev1.ContainerStatus{
 				{
 					Name: "postgresql",
-					State: v1.ContainerState{
-						Running: &v1.ContainerStateRunning{},
+					State: corev1.ContainerState{
+						Running: &corev1.ContainerStateRunning{},
 					},
 				},
 				{
 					Name: "sidecar",
-					State: v1.ContainerState{
-						Running: &v1.ContainerStateRunning{},
+					State: corev1.ContainerState{
+						Running: &corev1.ContainerStateRunning{},
 					},
 				},
 			},
@@ -96,7 +113,7 @@ var _ = Describe("Cluster logging tests", func() {
 			defer wait.Done()
 			streamClusterLogs := ClusterStreamingRequest{
 				Cluster: cluster,
-				Options: &v1.PodLogOptions{
+				Options: &corev1.PodLogOptions{
 					Follow: false,
 				},
 				Client: client,
@@ -119,7 +136,7 @@ var _ = Describe("Cluster logging tests", func() {
 			defer wait.Done()
 			streamClusterLogs := ClusterStreamingRequest{
 				Cluster: cluster,
-				Options: &v1.PodLogOptions{
+				Options: &corev1.PodLogOptions{
 					Follow: false,
 				},
 				Client: client,
@@ -134,7 +151,7 @@ var _ = Describe("Cluster logging tests", func() {
 
 	It("should catch extra logs if given the follow option", func(ctx context.Context) {
 		client := fake.NewSimpleClientset(pod)
-		var logBuffer bytes.Buffer
+		var logBuffer syncBuffer
 		// let's set a short follow-wait, and keep the cluster streaming for two
 		// cycles
 		followWaiting := 200 * time.Millisecond
@@ -143,7 +160,7 @@ var _ = Describe("Cluster logging tests", func() {
 			defer GinkgoRecover()
 			streamClusterLogs := ClusterStreamingRequest{
 				Cluster: cluster,
-				Options: &v1.PodLogOptions{
+				Options: &corev1.PodLogOptions{
 					Follow: true,
 				},
 				FollowWaiting: followWaiting,

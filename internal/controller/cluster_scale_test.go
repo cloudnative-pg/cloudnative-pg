@@ -190,7 +190,7 @@ var _ = Describe("cluster scale pod and job deletion logic", func() {
 		cancel()
 	})
 
-	It("should delete all the jobs", func() {
+	It("should delete all the jobs", func(ctx SpecContext) {
 		for _, jobName := range specs.GetPossibleJobNames(instanceName) {
 			job := &batchv1.Job{
 				ObjectMeta: metav1.ObjectMeta{
@@ -198,7 +198,7 @@ var _ = Describe("cluster scale pod and job deletion logic", func() {
 					Namespace: cluster.Namespace,
 				},
 			}
-			err := fakeClientSet.Create(context.TODO(), job)
+			err := fakeClientSet.Create(ctx, job)
 			Expect(err).NotTo(HaveOccurred())
 		}
 

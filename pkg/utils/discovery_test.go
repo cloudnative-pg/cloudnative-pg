@@ -43,8 +43,13 @@ var _ = DescribeTable("Kubernetes minor version detection",
 )
 
 var _ = Describe("Detect resources properly when", func() {
-	client := fakeClient.NewSimpleClientset()
-	fakeDiscovery := client.Discovery().(*discoveryFake.FakeDiscovery)
+	var client *fakeClient.Clientset
+	var fakeDiscovery *discoveryFake.FakeDiscovery
+
+	BeforeEach(func() {
+		client = fakeClient.NewSimpleClientset()
+		fakeDiscovery = client.Discovery().(*discoveryFake.FakeDiscovery)
+	})
 
 	It("should not detect PodMonitor resource", func() {
 		exists, err := PodMonitorExist(client.Discovery())
@@ -256,16 +261,14 @@ var _ = Describe("AvailableArchitecture", func() {
 		})
 
 		It("should retrieve an existing available architecture", func() {
-			tempDir, err := os.MkdirTemp("", "test")
-			Expect(err).NotTo(HaveOccurred())
+			tempDir := GinkgoT().TempDir()
 			DeferCleanup(func() {
-				Expect(os.RemoveAll(tempDir)).To(Succeed())
 				availableArchitectures = nil
 			})
 
 			// Create a sample file
 			Expect(os.WriteFile(filepath.Join(tempDir, "manager_amd64"), []byte("amd64"), 0o600)).To(Succeed())
-			err = detectAvailableArchitectures(filepath.Join(tempDir, "manager_*"))
+			err := detectAvailableArchitectures(filepath.Join(tempDir, "manager_*"))
 			Expect(err).ToNot(HaveOccurred())
 			Expect(availableArchitectures).To(HaveLen(1))
 

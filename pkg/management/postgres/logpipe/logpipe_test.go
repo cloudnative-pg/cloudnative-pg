@@ -17,7 +17,6 @@ limitations under the License.
 package logpipe
 
 import (
-	"context"
 	"errors"
 	"os"
 	"strings"
@@ -39,9 +38,7 @@ func (writer *SpyRecordWriter) Write(record NamedRecord) {
 
 var _ = Describe("CSV file reader", func() {
 	When("given CSV logs from logging_collector", func() {
-		ctx := context.TODO()
-
-		It("can read multiple CSV lines", func() {
+		It("can read multiple CSV lines", func(ctx SpecContext) {
 			f, err := os.Open("testdata/two_lines.csv")
 			defer func() {
 				_ = f.Close()
@@ -57,7 +54,7 @@ var _ = Describe("CSV file reader", func() {
 			Expect(spy.records).To(HaveLen(2))
 		})
 
-		It("can read multiple CSV lines on PostgreSQL version <= 12", func() {
+		It("can read multiple CSV lines on PostgreSQL version <= 12", func(ctx SpecContext) {
 			f, err := os.Open("testdata/two_lines_12.csv")
 			defer func() {
 				_ = f.Close()
@@ -73,7 +70,7 @@ var _ = Describe("CSV file reader", func() {
 			Expect(spy.records).To(HaveLen(2))
 		})
 
-		It("can read multiple CSV lines on PostgreSQL version == 14", func() {
+		It("can read multiple CSV lines on PostgreSQL version == 14", func(ctx SpecContext) {
 			f, err := os.Open("testdata/two_lines_14.csv")
 			defer func() {
 				_ = f.Close()
@@ -89,7 +86,7 @@ var _ = Describe("CSV file reader", func() {
 			Expect(spy.records).To(HaveLen(2))
 		})
 
-		It("can read pgAudit CSV lines", func() {
+		It("can read pgAudit CSV lines", func(ctx SpecContext) {
 			f, err := os.Open("testdata/pgaudit.csv")
 			defer func() {
 				_ = f.Close()
@@ -110,7 +107,7 @@ var _ = Describe("CSV file reader", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 			input := strings.TrimRight(string(inputBuffer), " \n")
 
-			It("there are too many fields", func() {
+			It("there are too many fields", func(ctx SpecContext) {
 				spy := SpyRecordWriter{}
 
 				longerInput := input + ",test"
@@ -128,7 +125,7 @@ var _ = Describe("CSV file reader", func() {
 				Expect(extendedError.Fields).To(HaveLen(FieldsPerRecord13 + 1))
 			})
 
-			It("there are not enough fields", func() {
+			It("there are not enough fields", func(ctx SpecContext) {
 				spy := SpyRecordWriter{}
 
 				shorterInput := "one,two,three"
@@ -146,7 +143,7 @@ var _ = Describe("CSV file reader", func() {
 				Expect(extendedError.Fields).To(HaveLen(3))
 			})
 
-			It("there is a trailing comma", func() {
+			It("there is a trailing comma", func(ctx SpecContext) {
 				spy := SpyRecordWriter{}
 
 				trailingCommaInput := input + ","
@@ -164,7 +161,7 @@ var _ = Describe("CSV file reader", func() {
 				Expect(extendedError.Fields).To(HaveLen(FieldsPerRecord13 + 1))
 			})
 
-			It("there is a wrong number of fields on a line that is not the first", func() {
+			It("there is a wrong number of fields on a line that is not the first", func(ctx SpecContext) {
 				spy := SpyRecordWriter{}
 
 				longerInput := input + "\none,two,three"
@@ -183,7 +180,7 @@ var _ = Describe("CSV file reader", func() {
 			})
 		})
 
-		It("correctly handles an empty stream", func() {
+		It("correctly handles an empty stream", func(ctx SpecContext) {
 			spy := SpyRecordWriter{}
 			p := LogPipe{
 				record:          &LoggingRecord{},

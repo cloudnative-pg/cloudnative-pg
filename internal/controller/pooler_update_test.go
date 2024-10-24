@@ -362,7 +362,6 @@ var _ = Describe("unit test of pooler_update reconciliation logic", func() {
 
 var _ = Describe("ensureServiceAccountPullSecret", func() {
 	var (
-		ctx              context.Context
 		r                *PoolerReconciler
 		pooler           *apiv1.Pooler
 		conf             *configuration.Data
@@ -385,8 +384,6 @@ var _ = Describe("ensureServiceAccountPullSecret", func() {
 	}
 
 	BeforeEach(func() {
-		ctx = context.TODO()
-
 		pullSecret = generateOperatorPullSecret()
 
 		conf = &configuration.Data{
@@ -417,13 +414,13 @@ var _ = Describe("ensureServiceAccountPullSecret", func() {
 		}
 	})
 
-	It("should create the pull secret", func() {
+	It("should create the pull secret", func(ctx SpecContext) {
 		name, err := r.ensureServiceAccountPullSecret(ctx, pooler, conf)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(name).To(Equal(poolerSecretName))
 	})
 
-	It("should not change the pull secret if it matches", func() {
+	It("should not change the pull secret if it matches", func(ctx SpecContext) {
 		By("creating the secret before triggering the reconcile")
 		secret := generateOperatorPullSecret()
 		secret.Name = poolerSecretName
@@ -450,7 +447,7 @@ var _ = Describe("ensureServiceAccountPullSecret", func() {
 		Expect(remoteSecret).To(BeEquivalentTo(remoteSecret))
 	})
 
-	It("should reconcile the secret if it doesn't match", func() {
+	It("should reconcile the secret if it doesn't match", func(ctx SpecContext) {
 		By("creating the secret before triggering the reconcile")
 		secret := generateOperatorPullSecret()
 		secret.Name = poolerSecretName

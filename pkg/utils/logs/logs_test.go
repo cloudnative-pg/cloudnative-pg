@@ -125,10 +125,9 @@ var _ = Describe("Pod logging tests", func() {
 		Expect(logBuffer.String()).To(BeEquivalentTo("fake logs"))
 	})
 
-	It("can follow pod logs", func() {
+	It("can follow pod logs", func(ctx SpecContext) {
 		client := fake.NewSimpleClientset(pod)
 		var logBuffer bytes.Buffer
-		ctx := context.TODO()
 		var wait sync.WaitGroup
 		wait.Add(1)
 		go func() {

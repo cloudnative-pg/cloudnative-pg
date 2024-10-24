@@ -35,13 +35,11 @@ import (
 
 var _ = Describe("newTLSConfigFromSecret", func() {
 	var (
-		ctx      context.Context
 		c        client.Client
 		caSecret types.NamespacedName
 	)
 
 	BeforeEach(func() {
-		ctx = context.TODO()
 		caSecret = types.NamespacedName{Name: "test-secret", Namespace: "default"}
 	})
 
@@ -276,7 +274,7 @@ MQCKGqId+Xj6O6gnoi9xhu0rbzSnMjrURoa1v2d5+O5XssE7LGtJdIKrd2p7EuwE
 			c = fake.NewClientBuilder().Build()
 		})
 
-		It("should return an error", func() {
+		It("should return an error", func(ctx SpecContext) {
 			tlsConfig, err := newTLSConfigFromSecret(ctx, c, caSecret)
 			Expect(err).To(HaveOccurred())
 			Expect(tlsConfig).To(BeNil())
@@ -295,7 +293,7 @@ MQCKGqId+Xj6O6gnoi9xhu0rbzSnMjrURoa1v2d5+O5XssE7LGtJdIKrd2p7EuwE
 			c = fake.NewClientBuilder().WithObjects(secret).Build()
 		})
 
-		It("should return an error", func() {
+		It("should return an error", func(ctx SpecContext) {
 			tlsConfig, err := newTLSConfigFromSecret(ctx, c, caSecret)
 			Expect(err).To(HaveOccurred())
 			Expect(tlsConfig).To(BeNil())
