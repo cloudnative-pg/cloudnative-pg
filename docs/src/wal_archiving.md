@@ -13,8 +13,8 @@ the ["Backup on object stores" section](backup_barmanobjectstore.md) to set up
 the WAL archive.
 
 !!! Info
-    Please refer to [`BarmanObjectStoreConfiguration`](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-barmanobjectstoreconfiguration)
-    in the API reference for a full list of options.
+    Please refer to [`BarmanObjectStoreConfiguration`](https://pkg.go.dev/github.com/cloudnative-pg/barman-cloud/pkg/api#BarmanObjectStoreConfiguration)
+    in the barman-cloud API for a full list of options.
 
 If required, you can choose to compress WAL files as soon as they
 are uploaded and/or encrypt them:

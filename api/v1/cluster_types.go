@@ -360,6 +360,7 @@ type ClusterSpec struct {
 
 	// EphemeralVolumesSizeLimit allows the user to set the limits for the ephemeral
 	// volumes
+	// +optional
 	EphemeralVolumesSizeLimit *EphemeralVolumesSizeLimitConfiguration `json:"ephemeralVolumesSizeLimit,omitempty"`
 
 	// Name of the priority class which will be used in every generated Pod, if the PriorityClass
@@ -499,9 +500,11 @@ const (
 // storage
 type EphemeralVolumesSizeLimitConfiguration struct {
 	// Shm is the size limit of the shared memory volume
+	// +optional
 	Shm *resource.Quantity `json:"shm,omitempty"`
 
 	// TemporaryData is the size limit of the temporary data volume
+	// +optional
 	TemporaryData *resource.Quantity `json:"temporaryData,omitempty"`
 }
 
@@ -1892,6 +1895,7 @@ type ClusterList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+	// +optional
 	metav1.ListMeta `json:"metadata,omitempty"`
 	// List of clusters
 	Items []Cluster `json:"items"`

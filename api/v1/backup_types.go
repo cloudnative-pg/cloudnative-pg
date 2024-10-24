@@ -162,6 +162,7 @@ type BackupSnapshotElementStatus struct {
 
 	// TablespaceName is the name of the snapshotted tablespace. Only set
 	// when type is PG_TABLESPACE
+	// +optional
 	TablespaceName string `json:"tablespaceName,omitempty"`
 }
 
@@ -265,6 +266,7 @@ type BackupStatus struct {
 	Method BackupMethod `json:"method,omitempty"`
 
 	// Whether the backup was online/hot (`true`) or offline/cold (`false`)
+	// +optional
 	Online *bool `json:"online,omitempty"`
 }
 
@@ -310,6 +312,7 @@ type BackupList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+	// +optional
 	metav1.ListMeta `json:"metadata,omitempty"`
 	// List of backups
 	Items []Backup `json:"items"`
