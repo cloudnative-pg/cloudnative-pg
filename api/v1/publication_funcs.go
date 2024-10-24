@@ -14,18 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package utils
+package v1
 
-const (
-	// DatabaseFinalizerName is the name of the finalizer
-	// triggering the deletion of the database
-	DatabaseFinalizerName = MetadataNamespace + "/deleteDatabase"
+// SetAsFailed sets the publication as failed with the given error
+func (pub *Publication) SetAsFailed(err error) {
+	pub.Status.Ready = false
+	pub.Status.Error = err.Error()
+}
 
-	// PublicationFinalizerName is the name of the finalizer
-	// triggering the deletion of the publication
-	PublicationFinalizerName = MetadataNamespace + "/deletePublication"
-
-	// SubscriptionFinalizerName is the name of the finalizer
-	// triggering the deletion of the subscription
-	SubscriptionFinalizerName = MetadataNamespace + "/deleteSubscription"
-)
+// SetAsReady sets the subscription as working correctly
+func (pub *Publication) SetAsReady() {
+	pub.Status.Error = ""
+	pub.Status.Ready = true
+	pub.Status.ObservedGeneration = pub.Generation
+}

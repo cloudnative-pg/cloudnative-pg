@@ -60,6 +60,7 @@ and the following suite of E2E tests are performed on that cluster:
      * Replication Slots
      * Synchronous replication
      * Scale-up and scale-down of a Cluster
+     * Logical replication via declarative Publication / Subscription
 
 * **Replica clusters**
      * Bootstrapping a replica cluster from backup

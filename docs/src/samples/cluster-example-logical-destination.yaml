@@ -31,3 +31,15 @@ spec:
     password:
       name: cluster-example-superuser
       key: password
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Subscription
+metadata:
+  name: cluster-example-dest-sub
+spec:
+  name: sub
+  dbname: app
+  publicationName: pub
+  cluster:
+    name: cluster-example-dest
+  externalClusterName: cluster-example
