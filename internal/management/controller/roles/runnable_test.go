@@ -152,7 +152,8 @@ var _ = Describe("Role synchronizer tests", func() {
 					},
 				},
 			}
-			mock.ExpectQuery(expectedMembershipStmt).WithArgs("role_to_test1").WillReturnError(sql.ErrNoRows)
+			noParents := sqlmock.NewRows([]string{"inroles"}).AddRow([]byte(`{}`))
+			mock.ExpectQuery(expectedMembershipStmt).WithArgs("role_to_test1").WillReturnRows(noParents)
 			mock.ExpectBegin()
 			expectedMembershipExecs := []string{
 				`GRANT "role1" TO "role_to_test1"`,
@@ -333,7 +334,8 @@ var _ = Describe("Role synchronizer tests", func() {
 				},
 			}
 
-			mock.ExpectQuery(expectedMembershipStmt).WithArgs("role_to_test1").WillReturnError(sql.ErrNoRows)
+			noParents := sqlmock.NewRows([]string{"inroles"}).AddRow([]byte(`{}`))
+			mock.ExpectQuery(expectedMembershipStmt).WithArgs("role_to_test1").WillReturnRows(noParents)
 			mock.ExpectBegin()
 
 			mock.ExpectExec(`GRANT "role1" TO "role_to_test1"`).

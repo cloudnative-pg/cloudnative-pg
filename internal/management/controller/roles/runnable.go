@@ -19,7 +19,6 @@ package roles
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"strings"
 
@@ -308,7 +307,7 @@ func getRoleMembershipDiff(
 	dbRole DatabaseRole,
 ) ([]string, []string, error) {
 	inRoleInDB, err := GetParentRoles(ctx, db, dbRole)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+	if err != nil {
 		return nil, nil, err
 	}
 	rolesToGrant := getRolesToGrant(inRoleInDB, role.InRoles)
