@@ -46,7 +46,9 @@ func (sm PostgresRoleManager) List(
 	db *sql.DB,
 ) ([]DatabaseRole, error) {
 	logger := log.FromContext(ctx).WithName("roles_reconciler")
-	wrapErr := func(err error) error { return fmt.Errorf("while listing DB roles for DRM: %w", err) }
+	wrapErr := func(err error) error {
+		return fmt.Errorf("while listing DB roles for role reconciler: %w", err)
+	}
 
 	rows, err := db.QueryContext(
 		ctx,
@@ -114,7 +116,7 @@ func (sm PostgresRoleManager) Update(ctx context.Context, db *sql.DB, role Datab
 	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
 	contextLog.Trace("Invoked", "role", role)
 	wrapErr := func(err error) error {
-		return fmt.Errorf("while updating role %s with DRM: %w", role.Name, err)
+		return fmt.Errorf("while updating role %s with role reconciler: %w", role.Name, err)
 	}
 	var query strings.Builder
 
@@ -138,7 +140,7 @@ func (sm PostgresRoleManager) Create(ctx context.Context, db *sql.DB, role Datab
 	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
 	contextLog.Trace("Invoked", "role", role)
 	wrapErr := func(err error) error {
-		return fmt.Errorf("while creating role %s with DRM: %w", role.Name, err)
+		return fmt.Errorf("while creating role %s with role reconciler: %w", role.Name, err)
 	}
 
 	var query strings.Builder
@@ -173,7 +175,7 @@ func (sm PostgresRoleManager) Delete(ctx context.Context, db *sql.DB, role Datab
 	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
 	contextLog.Trace("Invoked", "role", role)
 	wrapErr := func(err error) error {
-		return fmt.Errorf("while deleting role %s with DRM: %w", role.Name, err)
+		return fmt.Errorf("while deleting role %s with role reconciler: %w", role.Name, err)
 	}
 
 	query := fmt.Sprintf("DROP ROLE %s", pgx.Identifier{role.Name}.Sanitize())
@@ -192,7 +194,7 @@ func (sm PostgresRoleManager) GetLastTransactionID(ctx context.Context, db *sql.
 	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
 	contextLog.Trace("Invoked", "role", role)
 	wrapErr := func(err error) error {
-		return fmt.Errorf("while getting last xmin for role %s with DRM: %w", role.Name, err)
+		return fmt.Errorf("while getting last xmin for role %s with role reconciler: %w", role.Name, err)
 	}
 
 	var xmin int64
@@ -214,7 +216,7 @@ func (sm PostgresRoleManager) UpdateComment(ctx context.Context, db *sql.DB, rol
 	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
 	contextLog.Trace("Invoked", "role", role)
 	wrapErr := func(err error) error {
-		return fmt.Errorf("while updating comment for role %s with DRM: %w", role.Name, err)
+		return fmt.Errorf("while updating comment for role %s with role reconciler: %w", role.Name, err)
 	}
 
 	query := fmt.Sprintf("COMMENT ON ROLE %s IS %s",
@@ -243,7 +245,7 @@ func (sm PostgresRoleManager) UpdateMembership(
 	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
 	contextLog.Trace("Invoked", "role", role)
 	wrapErr := func(err error) error {
-		return fmt.Errorf("while updating memberships for role %s with DRM: %w", role.Name, err)
+		return fmt.Errorf("while updating memberships for role %s with role reconciler: %w", role.Name, err)
 	}
 	if len(rolesToRevoke)+len(rolesToGrant) == 0 {
 		contextLog.Debug("No membership change query to execute for role")
@@ -293,7 +295,7 @@ func (sm PostgresRoleManager) GetParentRoles(
 	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
 	contextLog.Trace("Invoked", "role", role)
 	wrapErr := func(err error) error {
-		return fmt.Errorf("while getting parents for role %s with DRM: %w", role.Name, err)
+		return fmt.Errorf("while getting parents for role %s with role reconciler: %w", role.Name, err)
 	}
 	query := `SELECT mem.inroles 
 		FROM pg_catalog.pg_authid as auth
