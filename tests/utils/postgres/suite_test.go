@@ -25,5 +25,5 @@ import (
 
 func TestUtils(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Utils test suite")
+	RunSpecs(t, "Utils test postgres suite")
 }
