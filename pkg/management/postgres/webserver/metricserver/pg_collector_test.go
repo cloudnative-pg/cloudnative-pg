@@ -117,6 +117,26 @@ var _ = Describe("ensure timestamp metric it's set properly", func() {
 		}
 	})
 
+	It("It correctly parses the sync replicas when preferential", func() {
+		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+		Expect(err).ToNot(HaveOccurred())
+
+		rows := sqlmock.NewRows([]string{"synchronous_standby_names"}).
+			AddRow("FIRST 2 ( \"cluster-example-2\",\"cluster-example-3\")")
+		mock.ExpectQuery(fmt.Sprintf("SHOW %s", postgresconf.SynchronousStandbyNames)).WillReturnRows(rows)
+
+		exporter.collectFromPrimarySynchronousStandbysNumber(db)
+
+		registry := prometheus.NewRegistry()
+		registry.MustRegister(exporter.Metrics.SyncReplicas)
+		metrics, _ := registry.Gather()
+
+		for _, metric := range metrics {
+			m := metric.GetMetric()
+			Expect(m[0].GetGauge().GetValue()).To(BeEquivalentTo(2))
+		}
+	})
+
 	It("register -1 in case it can't parse the sync replicas string", func() {
 		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 		Expect(err).ToNot(HaveOccurred())

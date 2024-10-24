@@ -40,7 +40,7 @@ import (
 // or the operator
 const PrometheusNamespace = "cnpg"
 
-var synchronousStandbyNamesRegex = regexp.MustCompile(`ANY ([0-9]+) \(.*\)`)
+var synchronousStandbyNamesRegex = regexp.MustCompile(`(ANY|FIRST) ([0-9]+) \(.*\)`)
 
 // Exporter exports a set of metrics and collectors on a given postgres instance
 type Exporter struct {
@@ -556,7 +556,7 @@ func getSynchronousStandbysNumber(db *sql.DB) (int, error) {
 	if !synchronousStandbyNamesRegex.MatchString(syncReplicasFromConfig) {
 		return 0, fmt.Errorf("not matching synchronous standby names regex: %s", syncReplicasFromConfig)
 	}
-	return strconv.Atoi(synchronousStandbyNamesRegex.FindStringSubmatch(syncReplicasFromConfig)[1])
+	return strconv.Atoi(synchronousStandbyNamesRegex.FindStringSubmatch(syncReplicasFromConfig)[2])
 }
 
 // PgCollector is the interface for all the collectors that need to do queries
