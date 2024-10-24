@@ -89,7 +89,7 @@ func (sm *fakeSlotManager) Delete(_ context.Context, slot infrastructure.Replica
 	return nil
 }
 
-var _ = Describe("Slot synchronization", func() {
+var _ = Describe("Slot synchronization", Ordered, func() {
 	localPodName := "cluster-2"
 	localSlotName := "_cnpg_cluster_2"
 	slot3 := "cluster-3"
@@ -127,6 +127,7 @@ var _ = Describe("Slot synchronization", func() {
 		Expect(localSlotsAfter.Has(slot4)).To(BeTrue())
 		Expect(local.slotsCreated).To(Equal(2))
 	})
+
 	It("can update slots in local when ReplayLSN in primary advanced", func(ctx SpecContext) {
 		// advance slot3 in primary
 		newLSN := "0/308C4D8"
@@ -144,6 +145,7 @@ var _ = Describe("Slot synchronization", func() {
 		Expect(slot.RestartLSN).To(Equal(newLSN))
 		Expect(local.slotsUpdated).To(Equal(1))
 	})
+
 	It("can drop slots in local when they are no longer in primary", func(ctx SpecContext) {
 		err := primary.Delete(ctx, infrastructure.ReplicationSlot{SlotName: slot4})
 		Expect(err).ShouldNot(HaveOccurred())
@@ -157,6 +159,7 @@ var _ = Describe("Slot synchronization", func() {
 		Expect(localSlotsAfter.Has(slot3)).To(BeTrue())
 		Expect(local.slotsDeleted).To(Equal(1))
 	})
+
 	It("can drop slots in local that hold xmin", func(ctx SpecContext) {
 		slotWithXmin := "_cnpg_xmin"
 		err := primary.Create(ctx, infrastructure.ReplicationSlot{SlotName: slotWithXmin})

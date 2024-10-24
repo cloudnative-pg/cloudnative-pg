@@ -163,7 +163,7 @@ var _ = Describe("Root CA secret generation", func() {
 })
 
 var _ = Describe("Webhook certificate validation", func() {
-	When("we have a valid CA secret", func() {
+	When("we have a valid CA secret", Ordered, func() {
 		kubeClient := generateFakeClient()
 		pki := pkiEnvironmentTemplate
 
@@ -196,7 +196,7 @@ var _ = Describe("Webhook certificate validation", func() {
 		})
 	})
 
-	When("we have a valid CA and webhook secret", func() {
+	When("we have a valid CA and webhook secret", Ordered, func() {
 		kubeClient := generateFakeClient()
 		pki := pkiEnvironmentTemplate
 		var caSecret, webhookSecret *corev1.Secret
@@ -220,7 +220,7 @@ var _ = Describe("Webhook certificate validation", func() {
 		})
 	})
 
-	When("we have a valid CA secret and expired webhook secret", func() {
+	When("we have a valid CA secret and expired webhook secret", Ordered, func() {
 		kubeClient := generateFakeClient()
 		pki := pkiEnvironmentTemplate
 
