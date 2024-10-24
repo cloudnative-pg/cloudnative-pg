@@ -17,7 +17,6 @@ limitations under the License.
 package postgres
 
 import (
-	"context"
 	"os"
 	"path"
 
@@ -44,13 +43,13 @@ var _ = Describe("testing restore InitInfo methods", func() {
 		_ = fileutils.RemoveFile(tempDir)
 	})
 
-	It("should correctly restore a custom PgWal folder without data", func() {
+	It("should correctly restore a custom PgWal folder without data", func(ctx SpecContext) {
 		initInfo := InitInfo{
 			PgData: pgData,
 			PgWal:  newPgWal,
 		}
 
-		chg, err := initInfo.restoreCustomWalDir(context.TODO())
+		chg, err := initInfo.restoreCustomWalDir(ctx)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(chg).To(BeTrue())
 
@@ -59,7 +58,7 @@ var _ = Describe("testing restore InitInfo methods", func() {
 		Expect(exists).To(BeTrue())
 	})
 
-	It("should correctly migrate an existing wal folder to the new one", func() {
+	It("should correctly migrate an existing wal folder to the new one", func(ctx SpecContext) {
 		initInfo := InitInfo{
 			PgData: pgData,
 			PgWal:  newPgWal,
@@ -93,7 +92,7 @@ var _ = Describe("testing restore InitInfo methods", func() {
 		})
 
 		By("executing the restore custom wal dir function", func() {
-			chg, err := initInfo.restoreCustomWalDir(context.TODO())
+			chg, err := initInfo.restoreCustomWalDir(ctx)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(chg).To(BeTrue())
 		})
@@ -120,7 +119,7 @@ var _ = Describe("testing restore InitInfo methods", func() {
 		})
 	})
 
-	It("should not do any changes if the symlink is already present", func() {
+	It("should not do any changes if the symlink is already present", func(ctx SpecContext) {
 		initInfo := InitInfo{
 			PgData: pgData,
 			PgWal:  newPgWal,
@@ -135,16 +134,16 @@ var _ = Describe("testing restore InitInfo methods", func() {
 		err = os.Symlink(newPgWal, pgWal)
 		Expect(err).ToNot(HaveOccurred())
 
-		chg, err := initInfo.restoreCustomWalDir(context.TODO())
+		chg, err := initInfo.restoreCustomWalDir(ctx)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(chg).To(BeFalse())
 	})
 
-	It("should not do any changes if pgWal is not set", func() {
+	It("should not do any changes if pgWal is not set", func(ctx SpecContext) {
 		initInfo := InitInfo{
 			PgData: pgData,
 		}
-		chg, err := initInfo.restoreCustomWalDir(context.TODO())
+		chg, err := initInfo.restoreCustomWalDir(ctx)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(chg).To(BeFalse())
 	})

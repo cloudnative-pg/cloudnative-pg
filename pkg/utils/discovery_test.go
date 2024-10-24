@@ -82,8 +82,13 @@ var _ = Describe("Detect Seccomp support depending on", func() {
 })
 
 var _ = Describe("Detect resources properly when", func() {
-	client := fakeClient.NewSimpleClientset()
-	fakeDiscovery := client.Discovery().(*discoveryFake.FakeDiscovery)
+	var client *fakeClient.Clientset
+	var fakeDiscovery *discoveryFake.FakeDiscovery
+
+	BeforeEach(func() {
+		client = fakeClient.NewSimpleClientset()
+		fakeDiscovery = client.Discovery().(*discoveryFake.FakeDiscovery)
+	})
 
 	It("should not detect PodMonitor resource", func() {
 		exists, err := PodMonitorExist(client.Discovery())

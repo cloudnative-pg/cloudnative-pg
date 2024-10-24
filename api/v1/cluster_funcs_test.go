@@ -447,7 +447,7 @@ var _ = Describe("external cluster list", func() {
 	})
 })
 
-var _ = Describe("look up for secrets", func() {
+var _ = Describe("look up for secrets", Ordered, func() {
 	cluster := Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "clustername",
@@ -456,15 +456,19 @@ var _ = Describe("look up for secrets", func() {
 	It("retrieves client CA secret name", func() {
 		Expect(cluster.GetClientCASecretName()).To(Equal("clustername-ca"))
 	})
+
 	It("retrieves server CA secret name", func() {
 		Expect(cluster.GetServerCASecretName()).To(Equal("clustername-ca"))
 	})
+
 	It("retrieves replication secret name", func() {
 		Expect(cluster.GetReplicationSecretName()).To(Equal("clustername-replication"))
 	})
+
 	It("retrieves replication secret name", func() {
 		Expect(cluster.GetReplicationSecretName()).To(Equal("clustername-replication"))
 	})
+
 	It("retrieves all names needed to build a server CA certificate are 9", func() {
 		Expect(cluster.GetClusterAltDNSNames()).To(HaveLen(9))
 	})

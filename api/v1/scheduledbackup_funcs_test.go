@@ -26,8 +26,12 @@ import (
 )
 
 var _ = Describe("Scheduled backup", func() {
-	scheduledBackup := &ScheduledBackup{}
+	var scheduledBackup *ScheduledBackup
 	backupName := "test"
+
+	BeforeEach(func() {
+		scheduledBackup = &ScheduledBackup{}
+	})
 
 	It("properly creates a backup with no annotations", func() {
 		backup := scheduledBackup.CreateBackup("test")
