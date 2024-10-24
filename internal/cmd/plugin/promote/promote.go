@@ -37,7 +37,7 @@ func Promote(ctx context.Context, clusterName string, serverName string) error {
 	// Get the Cluster object
 	err := plugin.Client.Get(ctx, client.ObjectKey{Namespace: plugin.Namespace, Name: clusterName}, &cluster)
 	if err != nil {
-		return fmt.Errorf("cluster %s not found in namespace %s", clusterName, plugin.Namespace)
+		return fmt.Errorf("cluster %s not found in namespace %s: %w", clusterName, plugin.Namespace, err)
 	}
 
 	// If server name is equal to target primary, there is no need to promote
@@ -51,7 +51,7 @@ func Promote(ctx context.Context, clusterName string, serverName string) error {
 	var pod v1.Pod
 	err = plugin.Client.Get(ctx, client.ObjectKey{Namespace: plugin.Namespace, Name: serverName}, &pod)
 	if err != nil {
-		return fmt.Errorf("new primary node %s not found in namespace %s", serverName, plugin.Namespace)
+		return fmt.Errorf("new primary node %s not found in namespace %s: %w", serverName, plugin.Namespace, err)
 	}
 
 	// The Pod exists, let's update status fields

@@ -40,7 +40,7 @@ func GetApplicationDatabaseName(ctx context.Context, clusterName string) (string
 		&cluster,
 	)
 	if err != nil {
-		return "", fmt.Errorf("cluster %s not found in namespace %s", clusterName, plugin.Namespace)
+		return "", fmt.Errorf("cluster %s not found in namespace %s: %w", clusterName, plugin.Namespace, err)
 	}
 
 	return cluster.GetApplicationDatabaseName(), nil
