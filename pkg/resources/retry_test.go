@@ -17,8 +17,6 @@ limitations under the License.
 package resources
 
 import (
-	"context"
-
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,11 +39,9 @@ var _ = Describe("RetryWithRefreshedResource", func() {
 	var (
 		fakeClient   client.Client
 		testResource *appsv1.Deployment
-		ctx          context.Context
 	)
 
 	BeforeEach(func() {
-		ctx = context.TODO()
 		fakeClient = fake.NewClientBuilder().WithScheme(schemeBuilder.BuildWithAllKnownScheme()).Build()
 		testResource = &appsv1.Deployment{
 			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
@@ -70,7 +66,7 @@ var _ = Describe("RetryWithRefreshedResource", func() {
 	})
 
 	Context("when client.Get succeeds", func() {
-		BeforeEach(func() {
+		BeforeEach(func(ctx SpecContext) {
 			// Set up the fake client to return the resource without error
 			Expect(fakeClient.Create(ctx, testResource)).To(Succeed())
 
@@ -80,7 +76,7 @@ var _ = Describe("RetryWithRefreshedResource", func() {
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		It("should invoke the callback without error and update the resource", func() {
+		It("should invoke the callback without error and update the resource", func(ctx SpecContext) {
 			// ensure that the local deployment contains the old value
 			Expect(*testResource.Spec.Replicas).To(Equal(int32(1)))
 

@@ -17,7 +17,6 @@ limitations under the License.
 package logicalimport
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/DATA-DOG/go-sqlmock"
@@ -32,14 +31,12 @@ import (
 
 var _ = Describe("databaseSnapshotter methods test", func() {
 	var (
-		ctx  context.Context
 		ds   databaseSnapshotter
 		fp   fakePooler
 		mock sqlmock.Sqlmock
 	)
 
 	BeforeEach(func() {
-		ctx = context.TODO()
 		ds = databaseSnapshotter{
 			cluster: &apiv1.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
@@ -109,13 +106,13 @@ var _ = Describe("databaseSnapshotter methods test", func() {
 			}
 		})
 
-		It("should execute the query properly", func() {
+		It("should execute the query properly", func(ctx SpecContext) {
 			mock.ExpectExec(createQuery).WillReturnResult(sqlmock.NewResult(0, 0))
 			err := ds.executePostImportQueries(ctx, fp, "test")
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		It("should return any error encountered", func() {
+		It("should return any error encountered", func(ctx SpecContext) {
 			expectedErr := fmt.Errorf("will fail")
 			mock.ExpectExec(createQuery).WillReturnError(expectedErr)
 			err := ds.executePostImportQueries(ctx, fp, "test")
@@ -123,7 +120,7 @@ var _ = Describe("databaseSnapshotter methods test", func() {
 		})
 	})
 
-	It("should run analyze", func() {
+	It("should run analyze", func(ctx SpecContext) {
 		mock.ExpectExec("ANALYZE VERBOSE").WillReturnResult(sqlmock.NewResult(0, 0))
 		err := ds.analyze(ctx, fp, []string{"test"})
 		Expect(err).ToNot(HaveOccurred())
@@ -136,7 +133,7 @@ var _ = Describe("databaseSnapshotter methods test", func() {
 			expectedQuery = mock.ExpectQuery("SELECT extname FROM pg_extension WHERE oid >= 16384")
 		})
 
-		It("should drop the user-defined extensions successfully", func() {
+		It("should drop the user-defined extensions successfully", func(ctx SpecContext) {
 			extensions := []string{"extension1", "extension2"}
 
 			rows := sqlmock.NewRows([]string{"extname"})
@@ -150,7 +147,7 @@ var _ = Describe("databaseSnapshotter methods test", func() {
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		It("should correctly handle an error when querying for extensions", func() {
+		It("should correctly handle an error when querying for extensions", func(ctx SpecContext) {
 			expectedErr := fmt.Errorf("querying error")
 			expectedQuery.WillReturnError(expectedErr)
 
@@ -158,7 +155,7 @@ var _ = Describe("databaseSnapshotter methods test", func() {
 			Expect(err).To(Equal(expectedErr))
 		})
 
-		It("should correctly handle an error when dropping an extension", func() {
+		It("should correctly handle an error when dropping an extension", func(ctx SpecContext) {
 			rows := sqlmock.NewRows([]string{"extname"}).AddRow("extension1")
 			expectedQuery.WillReturnRows(rows)
 
@@ -184,7 +181,7 @@ var _ = Describe("databaseSnapshotter methods test", func() {
 			}
 		})
 
-		It("should return the explicit database list if present", func() {
+		It("should return the explicit database list if present", func(ctx SpecContext) {
 			explicitDatabaseList := []string{"db1", "db2"}
 			ds.cluster.Spec.Bootstrap.InitDB.Import.Databases = explicitDatabaseList
 
@@ -193,7 +190,7 @@ var _ = Describe("databaseSnapshotter methods test", func() {
 			Expect(dbs).To(Equal(explicitDatabaseList))
 		})
 
-		It("should query for databases if explicit list is not present", func() {
+		It("should query for databases if explicit list is not present", func(ctx SpecContext) {
 			expectedQuery := mock.ExpectQuery(query)
 			ds.cluster.Spec.Bootstrap.InitDB.Import.Databases = []string{"*"}
 
@@ -209,7 +206,7 @@ var _ = Describe("databaseSnapshotter methods test", func() {
 			Expect(dbs).To(Equal(queryDatabaseList))
 		})
 
-		It("should return any error encountered when querying for databases", func() {
+		It("should return any error encountered when querying for databases", func(ctx SpecContext) {
 			expectedErr := fmt.Errorf("querying error")
 			expectedQuery := mock.ExpectQuery(query)
 			ds.cluster.Spec.Bootstrap.InitDB.Import.Databases = []string{"*"}
