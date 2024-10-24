@@ -53,7 +53,7 @@ var _ = Describe("Role reconciler test", func() {
 				},
 			},
 		}
-		pgStringError := "while listing DB roles for DRM: " +
+		pgStringError := "while listing DB roles for role reconciler: " +
 			"failed to connect to `user=postgres database=postgres`: " +
 			"/controller/run/.s.PGSQL.5432 (/controller/run): " +
 			"dial error: dial unix /controller/run/.s.PGSQL.5432: connect: no such file or directory"
