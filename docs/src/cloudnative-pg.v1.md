@@ -492,7 +492,7 @@ plugin for this backup</p>
    <p>Type is tho role of the snapshot in the cluster, such as PG_DATA, PG_WAL and PG_TABLESPACE</p>
 </td>
 </tr>
-<tr><td><code>tablespaceName</code> <B>[Required]</B><br/>
+<tr><td><code>tablespaceName</code><br/>
 <i>string</i>
 </td>
 <td>
@@ -809,7 +809,7 @@ parameter is omitted</p>
    <p>The backup method being used</p>
 </td>
 </tr>
-<tr><td><code>online</code> <B>[Required]</B><br/>
+<tr><td><code>online</code><br/>
 <i>bool</i>
 </td>
 <td>
@@ -1631,7 +1631,7 @@ https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
 for more information.</p>
 </td>
 </tr>
-<tr><td><code>ephemeralVolumesSizeLimit</code> <B>[Required]</B><br/>
+<tr><td><code>ephemeralVolumesSizeLimit</code><br/>
 <a href="#postgresql-cnpg-io-v1-EphemeralVolumesSizeLimitConfiguration"><i>EphemeralVolumesSizeLimitConfiguration</i></a>
 </td>
 <td>
@@ -1762,7 +1762,7 @@ advisable for any PostgreSQL cluster employed for
 development/staging purposes.</p>
 </td>
 </tr>
-<tr><td><code>plugins</code> <B>[Required]</B><br/>
+<tr><td><code>plugins</code><br/>
 <a href="#postgresql-cnpg-io-v1-PluginConfigurationList"><i>PluginConfigurationList</i></a>
 </td>
 <td>
@@ -1865,7 +1865,7 @@ any plugin to be loaded with the corresponding configuration</p>
 during a switchover or a failover</p>
 </td>
 </tr>
-<tr><td><code>lastPromotionToken</code> <B>[Required]</B><br/>
+<tr><td><code>lastPromotionToken</code><br/>
 <i>string</i>
 </td>
 <td>
@@ -2100,7 +2100,7 @@ This field is reported when <code>.spec.failoverDelay</code> is populated or dur
    <p>Image contains the image name used by the pods</p>
 </td>
 </tr>
-<tr><td><code>pluginStatus</code> <B>[Required]</B><br/>
+<tr><td><code>pluginStatus</code><br/>
 <a href="#postgresql-cnpg-io-v1-PluginStatus"><i>[]PluginStatus</i></a>
 </td>
 <td>
@@ -2274,14 +2274,14 @@ storage</p>
 <table class="table">
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td><code>shm</code> <B>[Required]</B><br/>
+<tr><td><code>shm</code><br/>
 <a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/api/resource#Quantity"><i>k8s.io/apimachinery/pkg/api/resource.Quantity</i></a>
 </td>
 <td>
    <p>Shm is the size limit of the shared memory volume</p>
 </td>
 </tr>
-<tr><td><code>temporaryData</code> <B>[Required]</B><br/>
+<tr><td><code>temporaryData</code><br/>
 <a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/api/resource#Quantity"><i>k8s.io/apimachinery/pkg/api/resource.Quantity</i></a>
 </td>
 <td>
@@ -2823,7 +2823,7 @@ It includes the type of service and its associated template specification.</p>
 Valid values are &quot;rw&quot;, &quot;r&quot;, and &quot;ro&quot;, representing read-write, read, and read-only services.</p>
 </td>
 </tr>
-<tr><td><code>updateStrategy</code> <B>[Required]</B><br/>
+<tr><td><code>updateStrategy</code><br/>
 <a href="#postgresql-cnpg-io-v1-ServiceUpdateStrategy"><i>ServiceUpdateStrategy</i></a>
 </td>
 <td>
@@ -2862,7 +2862,7 @@ Valid values are &quot;rw&quot;, &quot;r&quot;, and &quot;ro&quot;, representing
 Valid values are &quot;r&quot;, and &quot;ro&quot;, representing read, and read-only services.</p>
 </td>
 </tr>
-<tr><td><code>additional</code> <B>[Required]</B><br/>
+<tr><td><code>additional</code><br/>
 <a href="#postgresql-cnpg-io-v1-ManagedService"><i>[]ManagedService</i></a>
 </td>
 <td>
@@ -2893,7 +2893,7 @@ not using the core data types.</p>
 <table class="table">
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td><code>name</code> <B>[Required]</B><br/>
+<tr><td><code>name</code><br/>
 <i>string</i>
 </td>
 <td>
@@ -3238,6 +3238,21 @@ the operator calls PgBouncer's <code>PAUSE</code> and <code>RESUME</code> comman
 </tbody>
 </table>
 
+## PluginConfigurationList     {#postgresql-cnpg-io-v1-PluginConfigurationList}
+
+(Alias of `[]github.com/cloudnative-pg/cloudnative-pg/api/v1.PluginConfiguration`)
+
+**Appears in:**
+
+- [ClusterSpec](#postgresql-cnpg-io-v1-ClusterSpec)
+
+
+<p>PluginConfigurationList represent a set of plugin with their
+configuration parameters</p>
+
+
+
+
 ## PluginStatus     {#postgresql-cnpg-io-v1-PluginStatus}
 
 
@@ -3267,7 +3282,7 @@ the operator calls PgBouncer's <code>PAUSE</code> and <code>RESUME</code> comman
 latest reconciliation loop</p>
 </td>
 </tr>
-<tr><td><code>capabilities</code> <B>[Required]</B><br/>
+<tr><td><code>capabilities</code><br/>
 <i>[]string</i>
 </td>
 <td>
@@ -3275,7 +3290,7 @@ latest reconciliation loop</p>
 plugin</p>
 </td>
 </tr>
-<tr><td><code>operatorCapabilities</code> <B>[Required]</B><br/>
+<tr><td><code>operatorCapabilities</code><br/>
 <i>[]string</i>
 </td>
 <td>
@@ -3283,7 +3298,7 @@ plugin</p>
 plugin regarding the reconciler</p>
 </td>
 </tr>
-<tr><td><code>walCapabilities</code> <B>[Required]</B><br/>
+<tr><td><code>walCapabilities</code><br/>
 <i>[]string</i>
 </td>
 <td>
@@ -3291,7 +3306,7 @@ plugin regarding the reconciler</p>
 plugin regarding the WAL management</p>
 </td>
 </tr>
-<tr><td><code>backupCapabilities</code> <B>[Required]</B><br/>
+<tr><td><code>backupCapabilities</code><br/>
 <i>[]string</i>
 </td>
 <td>
@@ -3299,7 +3314,7 @@ plugin regarding the WAL management</p>
 plugin regarding the Backup management</p>
 </td>
 </tr>
-<tr><td><code>status</code> <B>[Required]</B><br/>
+<tr><td><code>status</code><br/>
 <i>string</i>
 </td>
 <td>
@@ -3805,7 +3820,7 @@ cluster</p>
 <table class="table">
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td><code>self</code> <B>[Required]</B><br/>
+<tr><td><code>self</code><br/>
 <i>string</i>
 </td>
 <td>
@@ -3813,7 +3828,7 @@ cluster</p>
 or a replica cluster, comparing it with <code>primary</code></p>
 </td>
 </tr>
-<tr><td><code>primary</code> <B>[Required]</B><br/>
+<tr><td><code>primary</code><br/>
 <i>string</i>
 </td>
 <td>
@@ -3828,7 +3843,7 @@ topology specified in externalClusters</p>
    <p>The name of the external cluster which is the replication origin</p>
 </td>
 </tr>
-<tr><td><code>enabled</code> <B>[Required]</B><br/>
+<tr><td><code>enabled</code><br/>
 <i>bool</i>
 </td>
 <td>
@@ -3838,7 +3853,7 @@ object store or via streaming through pg_basebackup.
 Refer to the Replica clusters page of the documentation for more information.</p>
 </td>
 </tr>
-<tr><td><code>promotionToken</code> <B>[Required]</B><br/>
+<tr><td><code>promotionToken</code><br/>
 <i>string</i>
 </td>
 <td>
@@ -3846,7 +3861,7 @@ Refer to the Replica clusters page of the documentation for more information.</p
 check if the promotion requirements are met.</p>
 </td>
 </tr>
-<tr><td><code>minApplyDelay</code> <B>[Required]</B><br/>
+<tr><td><code>minApplyDelay</code><br/>
 <a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/apis/meta/v1#Duration"><i>meta/v1.Duration</i></a>
 </td>
 <td>
@@ -4659,12 +4674,6 @@ physical replication slots</p>
 <td>
    <p>List of regular expression patterns to match the names of replication slots to be excluded (by default empty)</p>
 </td>
-</tr>
-<tr><td><code>-</code> <B>[Required]</B><br/>
-<a href="#postgresql-cnpg-io-v1-synchronizeReplicasCache"><i>synchronizeReplicasCache</i></a>
-</td>
-<td>
-   <span class="text-muted">No description provided.</span></td>
 </tr>
 </tbody>
 </table>
