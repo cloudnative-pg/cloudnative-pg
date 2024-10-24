@@ -96,8 +96,6 @@ var _ = Describe("Role synchronizer tests", func() {
 
 	When("role configurations are realizable", func() {
 		It("it will Create ensure:present roles in spec missing from DB", func(ctx context.Context) {
-			prm := NewPostgresRoleManager(db)
-
 			mock.ExpectExec("CREATE ROLE \"foo_bar\" NOBYPASSRLS NOCREATEDB NOCREATEROLE INHERIT " +
 				"NOLOGIN NOREPLICATION NOSUPERUSER CONNECTION LIMIT 0").
 				WillReturnResult(sqlmock.NewResult(11, 1))
@@ -112,7 +110,7 @@ var _ = Describe("Role synchronizer tests", func() {
 			rows := mock.NewRows([]string{"xmin"}).AddRow("12")
 			lastTransactionQuery := "SELECT xmin FROM pg_catalog.pg_authid WHERE rolname = $1"
 			mock.ExpectQuery(lastTransactionQuery).WithArgs("foo_bar").WillReturnRows(rows)
-			passwordState, rolesWithErrors, err := roleSynchronizer.synchronizeRoles(ctx, prm, &managedConf,
+			passwordState, rolesWithErrors, err := roleSynchronizer.synchronizeRoles(ctx, db, &managedConf,
 				map[string]apiv1.PasswordState{})
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(rolesWithErrors).To(BeEmpty())
@@ -133,9 +131,8 @@ var _ = Describe("Role synchronizer tests", func() {
 					},
 				},
 			}
-			prm := NewPostgresRoleManager(db)
 
-			_, _, err := roleSynchronizer.synchronizeRoles(ctx, prm, &managedConf, map[string]apiv1.PasswordState{})
+			_, _, err := roleSynchronizer.synchronizeRoles(ctx, db, &managedConf, map[string]apiv1.PasswordState{})
 			Expect(err).ShouldNot(HaveOccurred())
 		})
 
@@ -169,8 +166,7 @@ var _ = Describe("Role synchronizer tests", func() {
 
 			mock.ExpectCommit()
 
-			prm := NewPostgresRoleManager(db)
-			_, rolesWithErrors, err := roleSynchronizer.synchronizeRoles(ctx, prm, &managedConf, map[string]apiv1.PasswordState{
+			_, rolesWithErrors, err := roleSynchronizer.synchronizeRoles(ctx, db, &managedConf, map[string]apiv1.PasswordState{
 				"role_to_test1": {
 					TransactionID: 11, // defined in the mock query to the DB above
 				},
@@ -204,8 +200,7 @@ var _ = Describe("Role synchronizer tests", func() {
 
 			mock.ExpectCommit()
 
-			prm := NewPostgresRoleManager(db)
-			_, rolesWithErrors, err := roleSynchronizer.synchronizeRoles(ctx, prm, &managedConf, map[string]apiv1.PasswordState{
+			_, rolesWithErrors, err := roleSynchronizer.synchronizeRoles(ctx, db, &managedConf, map[string]apiv1.PasswordState{
 				"role_to_test2": {
 					TransactionID: 11, // defined in the mock query to the DB above
 				},
@@ -230,8 +225,7 @@ var _ = Describe("Role synchronizer tests", func() {
 				wantedRoleCommentTpl,
 				managedConf.Roles[0].Name, pq.QuoteLiteral(managedConf.Roles[0].Comment))
 			mock.ExpectExec(wantedRoleCommentStmt).WillReturnResult(sqlmock.NewResult(2, 3))
-			prm := NewPostgresRoleManager(db)
-			_, _, err := roleSynchronizer.synchronizeRoles(ctx, prm, &managedConf, map[string]apiv1.PasswordState{
+			_, _, err := roleSynchronizer.synchronizeRoles(ctx, db, &managedConf, map[string]apiv1.PasswordState{
 				"role_to_test1": {
 					TransactionID: 11, // defined in the mock query to the DB above
 				},
@@ -251,8 +245,7 @@ var _ = Describe("Role synchronizer tests", func() {
 					},
 				},
 			}
-			prm := NewPostgresRoleManager(db)
-			_, _, err := roleSynchronizer.synchronizeRoles(ctx, prm, &managedConf, map[string]apiv1.PasswordState{
+			_, _, err := roleSynchronizer.synchronizeRoles(ctx, db, &managedConf, map[string]apiv1.PasswordState{
 				"role_to_test1": {
 					TransactionID: 11, // defined in the mock query to the DB above
 				},
@@ -271,8 +264,7 @@ var _ = Describe("Role synchronizer tests", func() {
 			}
 			roleDeletionStmt := fmt.Sprintf("DROP ROLE \"%s\"", "role_to_test1")
 			mock.ExpectExec(roleDeletionStmt).WillReturnResult(sqlmock.NewResult(2, 3))
-			prm := NewPostgresRoleManager(db)
-			_, _, err := roleSynchronizer.synchronizeRoles(ctx, prm, &managedConf, map[string]apiv1.PasswordState{
+			_, _, err := roleSynchronizer.synchronizeRoles(ctx, db, &managedConf, map[string]apiv1.PasswordState{
 				"role_to_test1": {
 					TransactionID: 11, // defined in the mock query to the DB above
 				},
@@ -302,8 +294,7 @@ var _ = Describe("Role synchronizer tests", func() {
 			rows := mock.NewRows([]string{"xmin"}).AddRow("12")
 			lastTransactionQuery := "SELECT xmin FROM pg_catalog.pg_authid WHERE rolname = $1"
 			mock.ExpectQuery(lastTransactionQuery).WithArgs("role_to_test1").WillReturnRows(rows)
-			prm := NewPostgresRoleManager(db)
-			passwordState, rolesWithErrors, err := roleSynchronizer.synchronizeRoles(ctx, prm, &managedConf,
+			passwordState, rolesWithErrors, err := roleSynchronizer.synchronizeRoles(ctx, db, &managedConf,
 				map[string]apiv1.PasswordState{
 					"role_to_test1": {
 						TransactionID: 11, // defined in the mock query to the DB above
@@ -365,8 +356,7 @@ var _ = Describe("Role synchronizer tests", func() {
 			roleDeletionStmt := fmt.Sprintf("DROP ROLE \"%s\"", "role_to_test2")
 			mock.ExpectExec(roleDeletionStmt).WillReturnError(&impossibleDeleteError)
 
-			prm := NewPostgresRoleManager(db)
-			_, unrealizable, err := roleSynchronizer.synchronizeRoles(ctx, prm, &managedConf, map[string]apiv1.PasswordState{
+			_, unrealizable, err := roleSynchronizer.synchronizeRoles(ctx, db, &managedConf, map[string]apiv1.PasswordState{
 				"role_to_test1": {
 					TransactionID: 11, // defined in the mock query to the DB above
 				},
