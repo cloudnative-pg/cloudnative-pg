@@ -17,8 +17,8 @@ limitations under the License.
 package logs
 
 import (
-	v1 "k8s.io/api/core/v1"
-	v12 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	fakeClient "k8s.io/client-go/kubernetes/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -35,14 +35,14 @@ var _ = Describe("Test the command", func() {
 	clusterName := "test-cluster"
 	namespace := "default"
 	var cluster *apiv1.Cluster
-	pod := &v1.Pod{
-		ObjectMeta: v12.ObjectMeta{
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
 			Name:      clusterName + "-1",
 		},
 	}
 	cluster = &apiv1.Cluster{
-		ObjectMeta: v12.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
 			Name:      clusterName,
 			Labels: map[string]string{
@@ -62,14 +62,18 @@ var _ = Describe("Test the command", func() {
 	It("should not fail, with cluster name as argument", func() {
 		cmd := clusterCmd()
 		cmd.SetArgs([]string{clusterName})
+		PauseOutputInterception()
 		err := cmd.Execute()
+		ResumeOutputInterception()
 		Expect(err).ToNot(HaveOccurred())
 	})
 
 	It("could follow the logs", func() {
 		cmd := clusterCmd()
 		cmd.SetArgs([]string{clusterName, "-f"})
+		PauseOutputInterception()
 		err := cmd.Execute()
+		ResumeOutputInterception()
 		Expect(err).ToNot(HaveOccurred())
 	})
 })

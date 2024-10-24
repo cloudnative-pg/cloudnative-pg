@@ -48,8 +48,6 @@ func TestPlugin(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
-	By("bootstrapping test environment")
-
 	if os.Getenv("USE_EXISTING_CLUSTER") == "true" {
 		By("using existing config for test environment")
 		testEnv = &envtest.Environment{}
@@ -65,6 +63,12 @@ var _ = BeforeSuite(func() {
 	Expect(err).ToNot(HaveOccurred())
 	Expect(cfg).ToNot(BeNil())
 
+	DeferCleanup(func() {
+		By("tearing down the test environment")
+		err := testEnv.Stop()
+		Expect(err).ToNot(HaveOccurred())
+	})
+
 	err = apiv1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
@@ -73,10 +77,4 @@ var _ = BeforeSuite(func() {
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
 	Expect(err).ToNot(HaveOccurred())
 	Expect(k8sClient).ToNot(BeNil())
-})
-
-var _ = AfterSuite(func() {
-	By("tearing down the test environment")
-	err := testEnv.Stop()
-	Expect(err).ToNot(HaveOccurred())
 })

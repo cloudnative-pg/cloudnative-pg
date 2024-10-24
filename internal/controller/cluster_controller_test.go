@@ -17,7 +17,6 @@ limitations under the License.
 package controller
 
 import (
-	"context"
 	"time"
 
 	cnpgTypes "github.com/cloudnative-pg/machinery/pkg/types"
@@ -73,8 +72,7 @@ var _ = Describe("Updating target primary", func() {
 		env = buildTestEnvironment()
 	})
 
-	It("selects the new target primary right away", func() {
-		ctx := context.TODO()
+	It("selects the new target primary right away", func(ctx SpecContext) {
 		namespace := newFakeNamespace(env.client)
 		cluster := newFakeCNPGCluster(env.client, namespace)
 
@@ -132,8 +130,7 @@ var _ = Describe("Updating target primary", func() {
 		})
 	})
 
-	It("it should wait the failover delay to select the new target primary", func() {
-		ctx := context.TODO()
+	It("it should wait the failover delay to select the new target primary", func(ctx SpecContext) {
 		namespace := newFakeNamespace(env.client)
 		cluster := newFakeCNPGCluster(env.client, namespace, func(cluster *apiv1.Cluster) {
 			cluster.Spec.FailoverDelay = 2
@@ -210,8 +207,7 @@ var _ = Describe("Updating target primary", func() {
 		})
 	})
 
-	It("Issue #1783: ensure that the scale-down behaviour remain consistent", func() {
-		ctx := context.TODO()
+	It("Issue #1783: ensure that the scale-down behaviour remain consistent", func(ctx SpecContext) {
 		namespace := newFakeNamespace(env.client)
 		cluster := newFakeCNPGCluster(env.client, namespace, func(cluster *apiv1.Cluster) {
 			cluster.Spec.Instances = 2
