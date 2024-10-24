@@ -37,6 +37,17 @@ import (
 )
 
 const (
+	expectedSelStmt = `SELECT rolname, rolsuper, rolinherit, rolcreaterole, rolcreatedb, 
+		rolcanlogin, rolreplication, rolconnlimit, rolpassword, rolvaliduntil, rolbypassrls,
+		pg_catalog.shobj_description(auth.oid, 'pg_authid') as comment, auth.xmin,
+		mem.inroles
+	FROM pg_catalog.pg_authid as auth
+	LEFT JOIN (
+		SELECT array_agg(pg_get_userbyid(roleid)) as inroles, member
+		FROM pg_auth_members GROUP BY member
+	) mem ON member = oid
+	WHERE rolname not like 'pg\_%'`
+
 	expectedMembershipStmt = `SELECT mem.inroles 
 	FROM pg_catalog.pg_authid as auth
 	LEFT JOIN (
@@ -146,16 +157,6 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		"ALTER ROLE \"%s\" BYPASSRLS NOCREATEDB CREATEROLE NOINHERIT LOGIN NOREPLICATION NOSUPERUSER CONNECTION LIMIT 2 ",
 		wantedRole.Name)
 	unWantedRoleExpectedDelStmt := fmt.Sprintf("DROP ROLE \"%s\"", unWantedRole.Name)
-	expectedSelStmt := `SELECT rolname, rolsuper, rolinherit, rolcreaterole, rolcreatedb, 
-       			rolcanlogin, rolreplication, rolconnlimit, rolpassword, rolvaliduntil, rolbypassrls,
-				pg_catalog.shobj_description(auth.oid, 'pg_authid') as comment, auth.xmin,
-				mem.inroles
-		FROM pg_catalog.pg_authid as auth
-		LEFT JOIN (
-			SELECT array_agg(pg_get_userbyid(roleid)) as inroles, member
-			FROM pg_auth_members GROUP BY member
-		) mem ON member = oid
-		WHERE rolname not like 'pg\_%'`
 
 	// Testing List
 	It("List can read the list of roles from the DB", func(ctx context.Context) {
