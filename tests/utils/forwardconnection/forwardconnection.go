@@ -160,7 +160,7 @@ func getPodAndPortsFromService(
 	kubeInterface kubernetes.Interface,
 	namespace, service string,
 ) (string, []string, error) {
-	serviceObj, err := getServiceObject(kubeInterface, namespace, service)
+	serviceObj, err := getServiceObject(ctx, kubeInterface, namespace, service)
 	if err != nil {
 		return "", nil, err
 	}
@@ -179,10 +179,11 @@ func getPodAndPortsFromService(
 }
 
 func getServiceObject(
+	ctx context.Context,
 	kubeInterface kubernetes.Interface,
 	namespace, service string,
 ) (*corev1.Service, error) {
-	return kubeInterface.CoreV1().Services(namespace).Get(context.Background(), service, metav1.GetOptions{})
+	return kubeInterface.CoreV1().Services(namespace).Get(ctx, service, metav1.GetOptions{})
 }
 
 func getPodFromService(

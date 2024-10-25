@@ -95,6 +95,7 @@ func ForwardPSQLConnectionWithCreds(
 	if err != nil {
 		return nil, nil, err
 	}
+
 	forwarder, err := forwardconnection.NewForwardConnection(
 		dialer,
 		[]string{forwardconnection.PostgresPortMap},
