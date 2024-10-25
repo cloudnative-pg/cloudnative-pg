@@ -137,6 +137,32 @@ var _ = Describe("test metrics parsing", func() {
 		}
 	})
 
+	It("should return an error when encountering unexpected results", func() {
+		By("not matching the synchronous standby names regex", func() {
+			db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+			Expect(err).ToNot(HaveOccurred())
+
+			// This row will generate only two strings in the array
+			rows := sqlmock.NewRows([]string{"synchronous_standby_names"}).AddRow("ANY q (xx)")
+			mock.ExpectQuery(fmt.Sprintf("SHOW %s", postgresconf.SynchronousStandbyNames)).WillReturnRows(rows)
+			_, err = getRequestedSynchronousStandbysNumber(db)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("not matching synchronous standby names regex: ANY q (xx)"))
+		})
+
+		By("not matching the number of sync replicas", func() {
+			db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+			Expect(err).ToNot(HaveOccurred())
+
+			// This row will generate only two strings in the array
+			rows := sqlmock.NewRows([]string{"synchronous_standby_names"}).AddRow("ANY 2 (xx, ")
+			mock.ExpectQuery(fmt.Sprintf("SHOW %s", postgresconf.SynchronousStandbyNames)).WillReturnRows(rows)
+			_, err = getRequestedSynchronousStandbysNumber(db)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("not matching synchronous standby names regex: ANY 2 (xx"))
+		})
+	})
+
 	It("sets the number of sync replicas as -1 if it can't parse the sync replicas string", func() {
 		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 		Expect(err).ToNot(HaveOccurred())
