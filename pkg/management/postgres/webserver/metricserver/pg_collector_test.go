@@ -33,7 +33,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("ensure timestamp metric it's set properly", func() {
+var _ = Describe("ensure timestamp metric is set properly", func() {
 	var exporter *Exporter
 
 	BeforeEach(func() {
@@ -97,7 +97,7 @@ var _ = Describe("ensure timestamp metric it's set properly", func() {
 		}
 	})
 
-	It("It correctly parse the sync replicas", func() {
+	It("correctly parses the number of sync replicas when quorum-based", func() {
 		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 		Expect(err).ToNot(HaveOccurred())
 
@@ -117,7 +117,7 @@ var _ = Describe("ensure timestamp metric it's set properly", func() {
 		}
 	})
 
-	It("It correctly parses the sync replicas when preferential", func() {
+	It("correctly parses the number of sync replicas when preferential", func() {
 		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 		Expect(err).ToNot(HaveOccurred())
 
@@ -137,7 +137,7 @@ var _ = Describe("ensure timestamp metric it's set properly", func() {
 		}
 	})
 
-	It("register -1 in case it can't parse the sync replicas string", func() {
+	It("sets the number of sync replicas as -1 if it can't parse the sync replicas string", func() {
 		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 		Expect(err).ToNot(HaveOccurred())
 
