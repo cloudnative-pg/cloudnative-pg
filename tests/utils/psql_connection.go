@@ -28,13 +28,13 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/forwardconnection"
 )
 
-// PSQLForwardConnection manage the creation of a port forward to connect by psql client locally
+// PSQLForwardConnection manages the creation of a port-forwarding to open a new database connection
 type PSQLForwardConnection struct {
 	pooler      pool.Pooler
 	portForward *portforward.PortForwarder
 }
 
-// Close will stop the forward and exit
+// Close will stop the port-forwarding and exit
 func (psqlc *PSQLForwardConnection) Close() {
 	psqlc.portForward.Close()
 }
@@ -44,8 +44,7 @@ func (psqlc *PSQLForwardConnection) GetPooler() pool.Pooler {
 	return psqlc.pooler
 }
 
-// createConnectionParameters return the parameters require to create a connection
-// to the current forwarded port
+// createConnectionParameters returns a map of parameters required to perform a connection
 func createConnectionParameters(user, password, localPort string) map[string]string {
 	return map[string]string{
 		"host":     "localhost",

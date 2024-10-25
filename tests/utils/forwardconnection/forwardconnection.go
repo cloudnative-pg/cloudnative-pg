@@ -49,7 +49,8 @@ func NewDialerFromService(
 	ctx context.Context,
 	kubeInterface kubernetes.Interface,
 	config *rest.Config,
-	namespace, service string,
+	namespace,
+	service string,
 ) (dialer httpstream.Dialer, portMaps []string, err error) {
 	pod, portMap, err := getPodAndPortsFromService(ctx, kubeInterface, namespace, service)
 	if err != nil {
@@ -64,7 +65,7 @@ func NewDialerFromService(
 	return dial, portMap, nil
 }
 
-// NewForwardConnection returns a PortForwarder against the  pod specified
+// NewForwardConnection returns a PortForwarder against the pod specified
 func NewForwardConnection(
 	dialer httpstream.Dialer,
 	portMaps []string,
@@ -115,7 +116,7 @@ func NewDialer(
 	return dialer, nil
 }
 
-// StartAndWait beings the port forward and wait for it to be ready
+// StartAndWait begins the port-forwarding and waits until it's ready
 func (fc *ForwardConnection) StartAndWait() error {
 	var err error
 	go func() {
@@ -136,7 +137,7 @@ func (fc *ForwardConnection) StartAndWait() error {
 	}
 }
 
-// GetLocalPort will return the local port were the forward has started
+// GetLocalPort will return the local port where the forward has started
 func (fc *ForwardConnection) GetLocalPort() (string, error) {
 	ports, err := fc.Forwarder.GetPorts()
 	if err != nil {
@@ -145,8 +146,8 @@ func (fc *ForwardConnection) GetLocalPort() (string, error) {
 	return strconv.Itoa(int(ports[0].Local)), nil
 }
 
-// getPortMap takes the first port in the list of ports and return as a map
-// with a 0 as the local port for auto-assignment of the local port
+// getPortMap takes the first port between the list of ports exposed by the given service, and
+// returns a map with 0 as the local port for auto-assignment
 func getPortMap(serviceObj *corev1.Service) ([]string, error) {
 	if len(serviceObj.Spec.Ports) == 0 {
 		return []string{}, fmt.Errorf("service %s has no ports", serviceObj.Name)
@@ -158,7 +159,8 @@ func getPortMap(serviceObj *corev1.Service) ([]string, error) {
 func getPodAndPortsFromService(
 	ctx context.Context,
 	kubeInterface kubernetes.Interface,
-	namespace, service string,
+	namespace,
+	service string,
 ) (string, []string, error) {
 	serviceObj, err := getServiceObject(ctx, kubeInterface, namespace, service)
 	if err != nil {
@@ -181,7 +183,8 @@ func getPodAndPortsFromService(
 func getServiceObject(
 	ctx context.Context,
 	kubeInterface kubernetes.Interface,
-	namespace, service string,
+	namespace,
+	service string,
 ) (*corev1.Service, error) {
 	return kubeInterface.CoreV1().Services(namespace).Get(ctx, service, metav1.GetOptions{})
 }

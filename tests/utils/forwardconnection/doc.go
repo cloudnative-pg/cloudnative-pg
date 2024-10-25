@@ -15,6 +15,6 @@ limitations under the License.
 */
 
 // Package forwardconnection provides an easy interface to create
-// a port forward from the local test to a services or pod
+// a port forward from the local test to a service or pod
 // inside the testing k8s cluster
 package forwardconnection
