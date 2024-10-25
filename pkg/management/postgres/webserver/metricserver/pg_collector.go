@@ -556,6 +556,8 @@ func getSynchronousStandbysNumber(db *sql.DB) (int, error) {
 	if !synchronousStandbyNamesRegex.MatchString(syncReplicasFromConfig) {
 		return 0, fmt.Errorf("not matching synchronous standby names regex: %s", syncReplicasFromConfig)
 	}
+	// since we know the regex was matched, and it contains two sub-matches, we know
+	// that 3 strings were returned, so [2] is safe
 	return strconv.Atoi(synchronousStandbyNamesRegex.FindStringSubmatch(syncReplicasFromConfig)[2])
 }
 
