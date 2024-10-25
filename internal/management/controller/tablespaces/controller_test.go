@@ -134,13 +134,16 @@ func assertTablespaceReconciled(ctx context.Context, tt tablespaceTest) {
 		WithObjects(cluster).
 		WithStatusSubresource(&apiv1.Cluster{}).
 		Build()
+
+	pgInstance := postgres.NewInstance().
+		WithNamespace("default").
+		WithClusterName("cluster-example")
+
 	instance := fakeInstance{
-		Instance: &postgres.Instance{
-			Namespace:   "default",
-			ClusterName: "cluster-example",
-		},
-		db: db,
+		Instance: pgInstance,
+		db:       db,
 	}
+
 	tablespaceReconciler := TablespaceReconciler{
 		instance:       &instance,
 		client:         fakeClient,
