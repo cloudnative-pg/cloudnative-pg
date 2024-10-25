@@ -189,7 +189,7 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 				Eventually(func(g Gomega) {
 					err := env.Client.Get(env.Ctx, databaseNamespacedName, dbObj)
 					g.Expect(err).ToNot(HaveOccurred())
-					g.Expect(dbObj.Status.Ready).Should(BeTrue())
+					g.Expect(dbObj.Status.Applied).Should(HaveValue(BeTrue()))
 				}, 300).WithPolling(10 * time.Second).Should(Succeed())
 			})
 			By("deleting the namespace and making sure it succeeds before timeout", func() {

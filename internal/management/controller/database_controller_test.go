@@ -146,8 +146,8 @@ var _ = Describe("Managed Database status", func() {
 		}, &updatedDatabase)
 		Expect(err).ToNot(HaveOccurred())
 
-		Expect(updatedDatabase.Status.Ready).Should(BeTrue())
-		Expect(updatedDatabase.Status.Error).Should(BeEmpty())
+		Expect(updatedDatabase.Status.Applied).Should(HaveValue(BeTrue()))
+		Expect(updatedDatabase.Status.Message).Should(BeEmpty())
 		Expect(updatedDatabase.Finalizers).NotTo(BeEmpty())
 	})
 
@@ -215,8 +215,8 @@ var _ = Describe("Managed Database status", func() {
 		}, &updatedDatabase)
 		Expect(err).ToNot(HaveOccurred())
 
-		Expect(updatedDatabase.Status.Ready).Should(BeTrue())
-		Expect(updatedDatabase.Status.Error).Should(BeEmpty())
+		Expect(updatedDatabase.Status.Applied).Should(HaveValue(BeTrue()))
+		Expect(updatedDatabase.Status.Message).Should(BeEmpty())
 		Expect(updatedDatabase.Finalizers).NotTo(BeEmpty())
 
 		// the next 3 lines are a hacky bit to make sure the next reconciler
@@ -301,8 +301,8 @@ var _ = Describe("Managed Database status", func() {
 		}, &updatedDatabase)
 		Expect(err).ToNot(HaveOccurred())
 
-		Expect(updatedDatabase.Status.Ready).Should(BeFalse())
-		Expect(updatedDatabase.Status.Error).Should(BeEmpty())
+		Expect(updatedDatabase.Status.Applied).Should(BeNil())
+		Expect(updatedDatabase.Status.Message).Should(BeEmpty())
 	})
 
 	It("skips reconciliation if database object isn't found (deleted database)", func(ctx SpecContext) {

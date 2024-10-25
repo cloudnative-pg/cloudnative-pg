@@ -24,7 +24,7 @@ spec:
 ```
 
 Once the reconciliation cycle is completed successfully, the `Database` 
-status will show a `ready` field set to `true` and an empty `error` field.
+status will show a `applied` field set to `true` and an empty `message` field.
 
 ### Database Deletion and Reclaim Policies
 
