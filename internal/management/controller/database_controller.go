@@ -27,6 +27,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -122,11 +123,7 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	// Cannot do anything on a replica cluster
 	if cluster.IsReplica() {
-		return r.failedReconciliation(
-			ctx,
-			&database,
-			errClusterIsReplica,
-		)
+		return r.replicaClusterReconciliation(ctx, &database)
 	}
 
 	// Add the finalizer if we don't have it
@@ -233,14 +230,14 @@ func (r *DatabaseReconciler) failedReconciliation(
 	err error,
 ) (ctrl.Result, error) {
 	oldDatabase := database.DeepCopy()
-	database.Status.Error = err.Error()
-	database.Status.Ready = false
+	database.Status.Message = fmt.Sprintf("reconciliation error: %s", err.Error())
+	database.Status.Applied = ptr.To(false)
 
 	var statusError *instance.StatusError
 	if errors.As(err, &statusError) {
 		// The body line of the instance manager contains the human
 		// readable error
-		database.Status.Error = statusError.Body
+		database.Status.Message = statusError.Body
 	}
 
 	if err := r.Client.Status().Patch(ctx, database, client.MergeFrom(oldDatabase)); err != nil {
@@ -258,9 +255,28 @@ func (r *DatabaseReconciler) succeededReconciliation(
 	database *apiv1.Database,
 ) (ctrl.Result, error) {
 	oldDatabase := database.DeepCopy()
-	database.Status.Error = ""
-	database.Status.Ready = true
+	database.Status.Message = ""
+	database.Status.Applied = ptr.To(true)
 	database.Status.ObservedGeneration = database.Generation
+
+	if err := r.Client.Status().Patch(ctx, database, client.MergeFrom(oldDatabase)); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	return ctrl.Result{
+		RequeueAfter: databaseReconciliationInterval,
+	}, nil
+}
+
+// replicaClusterReconciliation sets the status for a reconciliation that's
+// executed in a replica Cluster
+func (r *DatabaseReconciler) replicaClusterReconciliation(
+	ctx context.Context,
+	database *apiv1.Database,
+) (ctrl.Result, error) {
+	oldDatabase := database.DeepCopy()
+	database.Status.Message = errClusterIsReplica.Error()
+	database.Status.Applied = nil
 
 	if err := r.Client.Status().Patch(ctx, database, client.MergeFrom(oldDatabase)); err != nil {
 		return ctrl.Result{}, err
@@ -310,6 +326,10 @@ func (r *DatabaseReconciler) reconcileDatabase(ctx context.Context, obj *apiv1.D
 	db, err := r.instance.GetSuperUserDB()
 	if err != nil {
 		return fmt.Errorf("while connecting to the database %q: %w", obj.Spec.Name, err)
+	}
+
+	if obj.Spec.Ensure == apiv1.EnsureAbsent {
+		return dropDatabase(ctx, db, obj)
 	}
 
 	dbExists, err := detectDatabase(ctx, db, obj)

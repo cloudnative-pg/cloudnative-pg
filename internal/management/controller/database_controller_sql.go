@@ -114,7 +114,11 @@ func createDatabase(
 		contextLogger.Error(err, "while creating database", "query", sqlCreateDatabase.String())
 	}
 
-	return err
+	if err != nil {
+		return fmt.Errorf("while creating database %q: %w",
+			obj.Spec.Name, err)
+	}
+	return nil
 }
 
 func updateDatabase(
@@ -171,7 +175,7 @@ func updateDatabase(
 
 		if _, err := db.ExecContext(ctx, changeOwnerSQL); err != nil {
 			contextLogger.Error(err, "while altering database", "query", changeOwnerSQL)
-			return fmt.Errorf("while altering database %q owner %s to: %w",
+			return fmt.Errorf("while altering database %q owner to %s: %w",
 				obj.Spec.Name, obj.Spec.Owner, err)
 		}
 	}
@@ -184,7 +188,7 @@ func updateDatabase(
 
 		if _, err := db.ExecContext(ctx, changeTablespaceSQL); err != nil {
 			contextLogger.Error(err, "while altering database", "query", changeTablespaceSQL)
-			return fmt.Errorf("while altering database %q tablespace %s: %w",
+			return fmt.Errorf("while altering database %q tablespace to %s: %w",
 				obj.Spec.Name, obj.Spec.Tablespace, err)
 		}
 	}
