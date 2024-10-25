@@ -33,7 +33,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("ensure timestamp metric is set properly", func() {
+var _ = Describe("test metrics parsing", func() {
 	var exporter *Exporter
 
 	BeforeEach(func() {
