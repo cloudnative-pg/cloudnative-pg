@@ -40,7 +40,7 @@ import (
 // or the operator
 const PrometheusNamespace = "cnpg"
 
-var synchronousStandbyNamesRegex = regexp.MustCompile(`ANY ([0-9]+) \(.*\)`)
+var synchronousStandbyNamesRegex = regexp.MustCompile(`(?:ANY|FIRST) ([0-9]+) \(.*\)`)
 
 // Exporter exports a set of metrics and collectors on a given postgres instance
 type Exporter struct {
@@ -517,7 +517,7 @@ func (e *Exporter) collectFromPrimaryFirstPointOnTimeRecovery() {
 }
 
 func (e *Exporter) collectFromPrimarySynchronousStandbysNumber(db *sql.DB) {
-	nStandbys, err := getSynchronousStandbysNumber(db)
+	nStandbys, err := getRequestedSynchronousStandbysNumber(db)
 	if err != nil {
 		log.Error(err, "unable to collect metrics")
 		e.Metrics.Error.Set(1)
@@ -546,7 +546,10 @@ func collectPGVersion(e *Exporter) error {
 	return nil
 }
 
-func getSynchronousStandbysNumber(db *sql.DB) (int, error) {
+// getRequestedSynchronousStandbysNumber returns the number of requested synchronous standbys
+// Example: FIRST 2 (node1,node2) will return 2, ANY 4 (node1) will return 4.
+// If the query fails, it will return 0 and an error.
+func getRequestedSynchronousStandbysNumber(db *sql.DB) (int, error) {
 	var syncReplicasFromConfig string
 	err := db.QueryRow(fmt.Sprintf("SHOW %s", postgresconf.SynchronousStandbyNames)).
 		Scan(&syncReplicasFromConfig)
