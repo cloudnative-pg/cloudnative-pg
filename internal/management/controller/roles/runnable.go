@@ -153,7 +153,7 @@ func (sr *RoleSynchronizer) reconcile(ctx context.Context, config *apiv1.Managed
 	}
 	superUserDB, err := sr.instance.GetSuperUserDB()
 	if err != nil {
-		return fmt.Errorf("while reconciling managed roles: %w", err)
+		return fmt.Errorf("while getting superuser connection: %w", err)
 	}
 	appliedState, irreconcilableRoles, err := sr.synchronizeRoles(ctx, superUserDB, config, rolePasswords)
 	if err != nil {
@@ -196,7 +196,6 @@ func (sr *RoleSynchronizer) synchronizeRoles(
 	if err != nil {
 		return nil, nil, err
 	}
-
 	rolesInDB, err := List(ctx, db)
 	if err != nil {
 		return nil, nil, err
@@ -204,11 +203,7 @@ func (sr *RoleSynchronizer) synchronizeRoles(
 	rolesByAction := evaluateNextRoleActions(
 		ctx, config, rolesInDB, storedPasswordState, latestSecretResourceVersion)
 
-	passwordStates, irreconcilableRoles, err := sr.applyRoleActions(
-		ctx,
-		db,
-		rolesByAction,
-	)
+	passwordStates, irreconcilableRoles, err := sr.applyRoleActions(ctx, db, rolesByAction)
 	if err != nil {
 		return nil, nil, err
 	}
