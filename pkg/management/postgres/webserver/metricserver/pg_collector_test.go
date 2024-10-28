@@ -33,7 +33,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("ensure timestamp metric it's set properly", func() {
+var _ = Describe("test metrics parsing", func() {
 	var exporter *Exporter
 
 	BeforeEach(func() {
@@ -97,12 +97,12 @@ var _ = Describe("ensure timestamp metric it's set properly", func() {
 		}
 	})
 
-	It("It correctly parse the sync replicas", func() {
+	It("correctly parses the number of sync replicas when quorum-based", func() {
 		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 		Expect(err).ToNot(HaveOccurred())
 
 		rows := sqlmock.NewRows([]string{"synchronous_standby_names"}).
-			AddRow("ANY 2 ( \"cluster-example-2\",\"cluster-example-3\")")
+			AddRow(`ANY 2 ( "cluster-example-2","cluster-example-3")`)
 		mock.ExpectQuery(fmt.Sprintf("SHOW %s", postgresconf.SynchronousStandbyNames)).WillReturnRows(rows)
 
 		exporter.collectFromPrimarySynchronousStandbysNumber(db)
@@ -117,12 +117,58 @@ var _ = Describe("ensure timestamp metric it's set properly", func() {
 		}
 	})
 
-	It("register -1 in case it can't parse the sync replicas string", func() {
+	It("correctly parses the number of sync replicas when preferential", func() {
 		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 		Expect(err).ToNot(HaveOccurred())
 
 		rows := sqlmock.NewRows([]string{"synchronous_standby_names"}).
-			AddRow("( \"cluster-example-2\",\"cluster-example-3\")")
+			AddRow(`FIRST 2 ( "cluster-example-2","cluster-example-3")`)
+		mock.ExpectQuery(fmt.Sprintf("SHOW %s", postgresconf.SynchronousStandbyNames)).WillReturnRows(rows)
+
+		exporter.collectFromPrimarySynchronousStandbysNumber(db)
+
+		registry := prometheus.NewRegistry()
+		registry.MustRegister(exporter.Metrics.SyncReplicas)
+		metrics, _ := registry.Gather()
+
+		for _, metric := range metrics {
+			m := metric.GetMetric()
+			Expect(m[0].GetGauge().GetValue()).To(BeEquivalentTo(2))
+		}
+	})
+
+	It("should return an error when encountering unexpected results", func() {
+		By("not matching the synchronous standby names regex", func() {
+			db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+			Expect(err).ToNot(HaveOccurred())
+
+			// This row will generate only two strings in the array
+			rows := sqlmock.NewRows([]string{"synchronous_standby_names"}).AddRow("ANY q (xx)")
+			mock.ExpectQuery(fmt.Sprintf("SHOW %s", postgresconf.SynchronousStandbyNames)).WillReturnRows(rows)
+			_, err = getRequestedSynchronousStandbysNumber(db)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("not matching synchronous standby names regex: ANY q (xx)"))
+		})
+
+		By("not matching the number of sync replicas", func() {
+			db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+			Expect(err).ToNot(HaveOccurred())
+
+			// This row will generate only two strings in the array
+			rows := sqlmock.NewRows([]string{"synchronous_standby_names"}).AddRow("ANY 2 (xx, ")
+			mock.ExpectQuery(fmt.Sprintf("SHOW %s", postgresconf.SynchronousStandbyNames)).WillReturnRows(rows)
+			_, err = getRequestedSynchronousStandbysNumber(db)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("not matching synchronous standby names regex: ANY 2 (xx"))
+		})
+	})
+
+	It("sets the number of sync replicas as -1 if it can't parse the sync replicas string", func() {
+		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+		Expect(err).ToNot(HaveOccurred())
+
+		rows := sqlmock.NewRows([]string{"synchronous_standby_names"}).
+			AddRow(`( "cluster-example-2","cluster-example-3")`)
 		mock.ExpectQuery(fmt.Sprintf("SHOW %s", postgresconf.SynchronousStandbyNames)).WillReturnRows(rows)
 
 		exporter.collectFromPrimarySynchronousStandbysNumber(db)
