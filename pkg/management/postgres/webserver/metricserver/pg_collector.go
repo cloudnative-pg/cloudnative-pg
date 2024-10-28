@@ -40,7 +40,7 @@ import (
 // or the operator
 const PrometheusNamespace = "cnpg"
 
-var synchronousStandbyNamesRegex = regexp.MustCompile(`(ANY|FIRST) ([0-9]+) \(.*\)`)
+var synchronousStandbyNamesRegex = regexp.MustCompile(`(?:ANY|FIRST) ([0-9]+) \(.*\)`)
 
 // Exporter exports a set of metrics and collectors on a given postgres instance
 type Exporter struct {
@@ -547,7 +547,7 @@ func collectPGVersion(e *Exporter) error {
 }
 
 // getRequestedSynchronousStandbysNumber returns the number of requested synchronous standbys
-// Example: ANY 2 (node1,node2) will return 2, ANY 4 (node1) will return 4.
+// Example: FIRST 2 (node1,node2) will return 2, ANY 4 (node1) will return 4.
 // If the query fails, it will return 0 and an error.
 func getRequestedSynchronousStandbysNumber(db *sql.DB) (int, error) {
 	var syncReplicasFromConfig string
@@ -559,9 +559,7 @@ func getRequestedSynchronousStandbysNumber(db *sql.DB) (int, error) {
 	if !synchronousStandbyNamesRegex.MatchString(syncReplicasFromConfig) {
 		return 0, fmt.Errorf("not matching synchronous standby names regex: %s", syncReplicasFromConfig)
 	}
-	// since we know the regex was matched, and it contains two sub-matches, we know
-	// that 3 strings were returned, so [2] is safe
-	return strconv.Atoi(synchronousStandbyNamesRegex.FindStringSubmatch(syncReplicasFromConfig)[2])
+	return strconv.Atoi(synchronousStandbyNamesRegex.FindStringSubmatch(syncReplicasFromConfig)[1])
 }
 
 // PgCollector is the interface for all the collectors that need to do queries

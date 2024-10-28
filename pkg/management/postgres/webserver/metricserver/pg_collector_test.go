@@ -102,7 +102,7 @@ var _ = Describe("test metrics parsing", func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		rows := sqlmock.NewRows([]string{"synchronous_standby_names"}).
-			AddRow("ANY 2 ( \"cluster-example-2\",\"cluster-example-3\")")
+			AddRow(`ANY 2 ( "cluster-example-2","cluster-example-3")`)
 		mock.ExpectQuery(fmt.Sprintf("SHOW %s", postgresconf.SynchronousStandbyNames)).WillReturnRows(rows)
 
 		exporter.collectFromPrimarySynchronousStandbysNumber(db)
@@ -122,7 +122,7 @@ var _ = Describe("test metrics parsing", func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		rows := sqlmock.NewRows([]string{"synchronous_standby_names"}).
-			AddRow("FIRST 2 ( \"cluster-example-2\",\"cluster-example-3\")")
+			AddRow(`FIRST 2 ( "cluster-example-2","cluster-example-3")`)
 		mock.ExpectQuery(fmt.Sprintf("SHOW %s", postgresconf.SynchronousStandbyNames)).WillReturnRows(rows)
 
 		exporter.collectFromPrimarySynchronousStandbysNumber(db)
@@ -168,7 +168,7 @@ var _ = Describe("test metrics parsing", func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		rows := sqlmock.NewRows([]string{"synchronous_standby_names"}).
-			AddRow("( \"cluster-example-2\",\"cluster-example-3\")")
+			AddRow(`( "cluster-example-2","cluster-example-3")`)
 		mock.ExpectQuery(fmt.Sprintf("SHOW %s", postgresconf.SynchronousStandbyNames)).WillReturnRows(rows)
 
 		exporter.collectFromPrimarySynchronousStandbysNumber(db)
