@@ -141,6 +141,7 @@ rules:
   - clusters
   - databases
   - poolers
+  - roles
   - scheduledbackups
   verbs:
   - create
@@ -155,6 +156,7 @@ rules:
   resources:
   - backups/status
   - databases/status
+  - roles/status
   - scheduledbackups/status
   verbs:
   - get
