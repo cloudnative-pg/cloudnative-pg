@@ -24,12 +24,12 @@ spec:
     - jsonPath: .spec.name
       name: PG Name
       type: string
-    - jsonPath: .status.ready
-      name: Ready
+    - jsonPath: .status.applied
+      name: Applied
       type: boolean
-    - description: Latest error message
-      jsonPath: .status.error
-      name: Error
+    - description: Latest reconciliation message
+      jsonPath: .status.message
+      name: Message
       type: string
     name: v1
     schema:
@@ -101,22 +101,42 @@ spec:
                 description: Publication target
                 properties:
                   allTables:
-                    description: All tables should be publicated
+                    description: All tables should be published
                     type: boolean
                   objects:
                     description: Just the following schema objects
                     items:
-                      description: PublicationTargetObject is an object to publicate
+                      description: PublicationTargetObject is an object to publish
                       properties:
                         schema:
-                          description: The schema to publicate
+                          description: The schema to publish
                           type: string
-                        tableExpression:
-                          description: A list of table expressions
-                          items:
-                            type: string
-                          type: array
+                        table:
+                          description: A table to publish
+                          properties:
+                            columns:
+                              description: The columns to publish
+                              items:
+                                type: string
+                              type: array
+                            name:
+                              description: The table name
+                              type: string
+                            only:
+                              description: Whether to limit to the table only or include
+                                all its descendants
+                              type: boolean
+                            schema:
+                              description: The schema name
+                              type: string
+                          required:
+                          - name
+                          type: object
                       type: object
+                      x-kubernetes-validations:
+                      - message: schema and table are not compatible
+                        rule: (has(self.schema) && !has(self.table)) || (!has(self.schema)
+                          && has(self.table))
                     type: array
                 type: object
                 x-kubernetes-validations:
@@ -127,12 +147,16 @@ spec:
             - cluster
             - dbname
             - name
+            - target
             type: object
           status:
             description: PublicationStatus defines the observed state of Publication
             properties:
-              error:
-                description: Error is the reconciliation error message
+              applied:
+                description: Applied is true if the publication was reconciled correctly
+                type: boolean
+              message:
+                description: Message is the reconciliation output message
                 type: string
               observedGeneration:
                 description: |-
@@ -140,9 +164,6 @@ spec:
                   desired state that was synchronized
                 format: int64
                 type: integer
-              ready:
-                description: Ready is true if the database was reconciled correctly
-                type: boolean
             type: object
         required:
         - metadata

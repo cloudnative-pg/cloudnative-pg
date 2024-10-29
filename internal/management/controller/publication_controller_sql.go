@@ -171,7 +171,11 @@ func toPublicationTargetSQL(obj *apiv1.PublicationTarget) string {
 		return "FOR ALL TABLES"
 	}
 
-	return toPublicationTargetObjectsSQL(obj)
+	result := toPublicationTargetObjectsSQL(obj)
+	if len(result) > 0 {
+		result = fmt.Sprintf("FOR %s", result)
+	}
+	return result
 }
 
 func toPublicationTargetObjectsSQL(obj *apiv1.PublicationTarget) string {
@@ -183,9 +187,6 @@ func toPublicationTargetObjectsSQL(obj *apiv1.PublicationTarget) string {
 		result += toPublicationObjectSQL(&object)
 	}
 
-	if len(result) > 0 {
-		result = fmt.Sprintf("FOR %s", result)
-	}
 	return result
 }
 
@@ -194,5 +195,26 @@ func toPublicationObjectSQL(obj *apiv1.PublicationTargetObject) string {
 		return fmt.Sprintf("TABLES IN SCHEMA %s", pgx.Identifier{obj.Schema}.Sanitize())
 	}
 
-	return fmt.Sprintf("TABLE %s", strings.Join(obj.TableExpression, ", "))
+	result := strings.Builder{}
+	result.WriteString("TABLE ")
+
+	if obj.Table.Only {
+		result.WriteString("ONLY ")
+	}
+
+	if len(obj.Table.Schema) > 0 {
+		result.WriteString(fmt.Sprintf("%s.", pgx.Identifier{obj.Table.Schema}.Sanitize()))
+	}
+
+	result.WriteString(pgx.Identifier{obj.Table.Name}.Sanitize())
+
+	if len(obj.Table.Columns) > 0 {
+		sanitizedColumns := make([]string, 0, len(obj.Table.Columns))
+		for _, column := range obj.Table.Columns {
+			sanitizedColumns = append(sanitizedColumns, pgx.Identifier{column}.Sanitize())
+		}
+		result.WriteString(fmt.Sprintf(" (%s)", strings.Join(sanitizedColumns, ", ")))
+	}
+
+	return result.String()
 }

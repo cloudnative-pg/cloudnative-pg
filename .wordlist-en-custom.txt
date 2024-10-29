@@ -1074,8 +1074,6 @@ promotionTimeout
 promotionToken
 provisioner
 psql
-publicate
-publicated
 publicationName
 publicationReclaimPolicy
 pv

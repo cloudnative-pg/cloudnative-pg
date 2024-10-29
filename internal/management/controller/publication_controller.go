@@ -58,7 +58,7 @@ const publicationReconciliationInterval = 30 * time.Second
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.18.4/pkg/reconcile
 func (r *PublicationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	contextLogger, ctx := log.SetupLogger(ctx)
+	contextLogger := log.FromContext(ctx)
 
 	contextLogger.Debug("Reconciliation loop start")
 	defer func() {
@@ -84,6 +84,11 @@ func (r *PublicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, nil
 	}
 
+	// If everything is reconciled, we're done here
+	if publication.Generation == publication.Status.ObservedGeneration {
+		return ctrl.Result{}, nil
+	}
+
 	// Fetch the Cluster from the cache
 	cluster, err := r.GetCluster(ctx)
 	if err != nil {
@@ -102,25 +107,30 @@ func (r *PublicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	// Cannot do anything on a replica cluster
 	if cluster.IsReplica() {
-		markErr := markAsFailed(ctx, r.Client, &publication, errClusterIsReplica)
-		return ctrl.Result{RequeueAfter: publicationReconciliationInterval}, markErr
+		if err := markAsUnknown(ctx, r.Client, &publication, errClusterIsReplica); err != nil {
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{RequeueAfter: publicationReconciliationInterval}, nil
 	}
 
 	if err := r.finalizerReconciler.reconcile(ctx, &publication); err != nil {
-		return ctrl.Result{RequeueAfter: publicationReconciliationInterval},
-			fmt.Errorf("while reconciling the finalizer: %w", err)
+		return ctrl.Result{}, fmt.Errorf("while reconciling the finalizer: %w", err)
 	}
-
-	// If everything is reconciled, we're done here
-	if publication.Generation == publication.Status.ObservedGeneration {
+	if !publication.GetDeletionTimestamp().IsZero() {
 		return ctrl.Result{}, nil
 	}
 
 	if err := r.alignPublication(ctx, &publication); err != nil {
-		return ctrl.Result{RequeueAfter: publicationReconciliationInterval}, markAsFailed(ctx, r.Client, &publication, err)
+		if err := markAsFailed(ctx, r.Client, &publication, errClusterIsReplica); err != nil {
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{RequeueAfter: publicationReconciliationInterval}, nil
 	}
 
-	return ctrl.Result{RequeueAfter: publicationReconciliationInterval}, markAsReady(ctx, r.Client, &publication)
+	if err := markAsReady(ctx, r.Client, &publication); err != nil {
+		return ctrl.Result{}, err
+	}
+	return ctrl.Result{RequeueAfter: publicationReconciliationInterval}, nil
 }
 
 func (r *PublicationReconciler) evaluateDropPublication(ctx context.Context, pub *apiv1.Publication) error {

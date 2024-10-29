@@ -24,12 +24,12 @@ spec:
     - jsonPath: .spec.name
       name: PG Name
       type: string
-    - jsonPath: .status.ready
-      name: Ready
+    - jsonPath: .status.applied
+      name: Applied
       type: boolean
-    - description: Latest error message
-      jsonPath: .status.error
-      name: Error
+    - description: Latest reconciliation message
+      jsonPath: .status.message
+      name: Message
       type: string
     name: v1
     schema:
@@ -93,6 +93,11 @@ spec:
                   type: string
                 description: Parameters
                 type: object
+              publicationDBName:
+                description: |-
+                  The name of the database containing the publication on the external cluster.
+                  Defaults to the one in the external cluster definition
+                type: string
               publicationName:
                 description: The name of the publication
                 type: string
@@ -113,8 +118,11 @@ spec:
           status:
             description: SubscriptionStatus defines the observed state of Subscription
             properties:
-              error:
-                description: Error is the reconciliation error message
+              applied:
+                description: Applied is true if the subscription was reconciled correctly
+                type: boolean
+              message:
+                description: Message is the reconciliation output message
                 type: string
               observedGeneration:
                 description: |-
@@ -122,9 +130,6 @@ spec:
                   desired state that was synchronized
                 format: int64
                 type: integer
-              ready:
-                description: Ready is true if the database was reconciled correctly
-                type: boolean
             type: object
         required:
         - metadata

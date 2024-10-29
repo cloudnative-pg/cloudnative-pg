@@ -16,15 +16,23 @@ limitations under the License.
 
 package v1
 
+import "k8s.io/utils/ptr"
+
 // SetAsFailed sets the publication as failed with the given error
 func (pub *Publication) SetAsFailed(err error) {
-	pub.Status.Ready = false
-	pub.Status.Error = err.Error()
+	pub.Status.Applied = ptr.To(false)
+	pub.Status.Message = err.Error()
+}
+
+// SetAsUnknown sets the publication as unknown with the given error
+func (pub *Publication) SetAsUnknown(err error) {
+	pub.Status.Applied = nil
+	pub.Status.Message = err.Error()
 }
 
 // SetAsReady sets the subscription as working correctly
 func (pub *Publication) SetAsReady() {
-	pub.Status.Error = ""
-	pub.Status.Ready = true
+	pub.Status.Applied = ptr.To(true)
+	pub.Status.Message = ""
 	pub.Status.ObservedGeneration = pub.Generation
 }

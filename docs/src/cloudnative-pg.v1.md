@@ -12,7 +12,9 @@
 - [Database](#postgresql-cnpg-io-v1-Database)
 - [ImageCatalog](#postgresql-cnpg-io-v1-ImageCatalog)
 - [Pooler](#postgresql-cnpg-io-v1-Pooler)
+- [Publication](#postgresql-cnpg-io-v1-Publication)
 - [ScheduledBackup](#postgresql-cnpg-io-v1-ScheduledBackup)
+- [Subscription](#postgresql-cnpg-io-v1-Subscription)
 
 ## Backup     {#postgresql-cnpg-io-v1-Backup}
 
@@ -224,6 +226,42 @@ More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-
 </tbody>
 </table>
 
+## Publication     {#postgresql-cnpg-io-v1-Publication}
+
+
+**Appears in:**
+
+
+
+<p>Publication is the Schema for the publications API</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>apiVersion</code> <B>[Required]</B><br/>string</td><td><code>postgresql.cnpg.io/v1</code></td></tr>
+<tr><td><code>kind</code> <B>[Required]</B><br/>string</td><td><code>Publication</code></td></tr>
+<tr><td><code>metadata</code> <B>[Required]</B><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#objectmeta-v1-meta"><i>meta/v1.ObjectMeta</i></a>
+</td>
+<td>
+   <span class="text-muted">No description provided.</span>Refer to the Kubernetes API documentation for the fields of the <code>metadata</code> field.</td>
+</tr>
+<tr><td><code>spec</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-PublicationSpec"><i>PublicationSpec</i></a>
+</td>
+<td>
+   <span class="text-muted">No description provided.</span></td>
+</tr>
+<tr><td><code>status</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-PublicationStatus"><i>PublicationStatus</i></a>
+</td>
+<td>
+   <span class="text-muted">No description provided.</span></td>
+</tr>
+</tbody>
+</table>
+
 ## ScheduledBackup     {#postgresql-cnpg-io-v1-ScheduledBackup}
 
 
@@ -258,6 +296,42 @@ More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-
 to date. Populated by the system. Read-only.
 More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status</p>
 </td>
+</tr>
+</tbody>
+</table>
+
+## Subscription     {#postgresql-cnpg-io-v1-Subscription}
+
+
+**Appears in:**
+
+
+
+<p>Subscription is the Schema for the subscriptions API</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>apiVersion</code> <B>[Required]</B><br/>string</td><td><code>postgresql.cnpg.io/v1</code></td></tr>
+<tr><td><code>kind</code> <B>[Required]</B><br/>string</td><td><code>Subscription</code></td></tr>
+<tr><td><code>metadata</code> <B>[Required]</B><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#objectmeta-v1-meta"><i>meta/v1.ObjectMeta</i></a>
+</td>
+<td>
+   <span class="text-muted">No description provided.</span>Refer to the Kubernetes API documentation for the fields of the <code>metadata</code> field.</td>
+</tr>
+<tr><td><code>spec</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-SubscriptionSpec"><i>SubscriptionSpec</i></a>
+</td>
+<td>
+   <span class="text-muted">No description provided.</span></td>
+</tr>
+<tr><td><code>status</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-SubscriptionStatus"><i>SubscriptionStatus</i></a>
+</td>
+<td>
+   <span class="text-muted">No description provided.</span></td>
 </tr>
 </tbody>
 </table>
@@ -3955,37 +4029,6 @@ the primary server of the cluster as part of rolling updates</p>
 
 
 
-## Publication     {#postgresql-cnpg-io-v1-Publication}
-
-
-
-<p>Publication is the Schema for the publications API</p>
-
-
-<table class="table">
-<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
-<tbody>
-<tr><td><code>metadata</code> <B>[Required]</B><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#objectmeta-v1-meta"><i>meta/v1.ObjectMeta</i></a>
-</td>
-<td>
-   <span class="text-muted">No description provided.</span>Refer to the Kubernetes API documentation for the fields of the <code>metadata</code> field.</td>
-</tr>
-<tr><td><code>spec</code> <B>[Required]</B><br/>
-<a href="#postgresql-cnpg-io-v1-PublicationSpec"><i>PublicationSpec</i></a>
-</td>
-<td>
-   <span class="text-muted">No description provided.</span></td>
-</tr>
-<tr><td><code>status</code> <B>[Required]</B><br/>
-<a href="#postgresql-cnpg-io-v1-PublicationStatus"><i>PublicationStatus</i></a>
-</td>
-<td>
-   <span class="text-muted">No description provided.</span></td>
-</tr>
-</tbody>
-</table>
-
 ## PublicationReclaimPolicy     {#postgresql-cnpg-io-v1-PublicationReclaimPolicy}
 
 (Alias of `string`)
@@ -4035,14 +4078,14 @@ the primary server of the cluster as part of rolling updates</p>
    <p>The name of the database</p>
 </td>
 </tr>
-<tr><td><code>owner</code> <B>[Required]</B><br/>
+<tr><td><code>owner</code><br/>
 <i>string</i>
 </td>
 <td>
    <p>The owner</p>
 </td>
 </tr>
-<tr><td><code>parameters</code> <B>[Required]</B><br/>
+<tr><td><code>parameters</code><br/>
 <i>map[string]string</i>
 </td>
 <td>
@@ -4088,18 +4131,18 @@ the primary server of the cluster as part of rolling updates</p>
 desired state that was synchronized</p>
 </td>
 </tr>
-<tr><td><code>ready</code> <B>[Required]</B><br/>
+<tr><td><code>applied</code><br/>
 <i>bool</i>
 </td>
 <td>
-   <p>Ready is true if the database was reconciled correctly</p>
+   <p>Applied is true if the publication was reconciled correctly</p>
 </td>
 </tr>
-<tr><td><code>error</code> <B>[Required]</B><br/>
+<tr><td><code>message</code><br/>
 <i>string</i>
 </td>
 <td>
-   <p>Error is the reconciliation error message</p>
+   <p>Message is the reconciliation output message</p>
 </td>
 </tr>
 </tbody>
@@ -4119,14 +4162,14 @@ desired state that was synchronized</p>
 <table class="table">
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td><code>allTables</code> <B>[Required]</B><br/>
+<tr><td><code>allTables</code><br/>
 <i>bool</i>
 </td>
 <td>
-   <p>All tables should be publicated</p>
+   <p>All tables should be published</p>
 </td>
 </tr>
-<tr><td><code>objects</code> <B>[Required]</B><br/>
+<tr><td><code>objects</code><br/>
 <a href="#postgresql-cnpg-io-v1-PublicationTargetObject"><i>[]PublicationTargetObject</i></a>
 </td>
 <td>
@@ -4144,24 +4187,62 @@ desired state that was synchronized</p>
 - [PublicationTarget](#postgresql-cnpg-io-v1-PublicationTarget)
 
 
-<p>PublicationTargetObject is an object to publicate</p>
+<p>PublicationTargetObject is an object to publish</p>
 
 
 <table class="table">
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td><code>schema</code> <B>[Required]</B><br/>
+<tr><td><code>schema</code><br/>
 <i>string</i>
 </td>
 <td>
-   <p>The schema to publicate</p>
+   <p>The schema to publish</p>
 </td>
 </tr>
-<tr><td><code>tableExpression</code> <B>[Required]</B><br/>
+<tr><td><code>table</code><br/>
+<a href="#postgresql-cnpg-io-v1-PublicationTargetTable"><i>PublicationTargetTable</i></a>
+</td>
+<td>
+   <p>A table to publish</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## PublicationTargetTable     {#postgresql-cnpg-io-v1-PublicationTargetTable}
+
+
+**Appears in:**
+
+- [PublicationTargetObject](#postgresql-cnpg-io-v1-PublicationTargetObject)
+
+
+<p>PublicationTargetTable is a table to publish</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>only</code><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>Whether to limit to the table only or include all its descendants</p>
+</td>
+</tr>
+<tr><td><code>name</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The table name</p>
+</td>
+</tr>
+<tr><td><code>columns</code><br/>
 <i>[]string</i>
 </td>
 <td>
-   <p>A list of table expressions</p>
+   <p>The columns to publish</p>
 </td>
 </tr>
 </tbody>
@@ -5029,37 +5110,6 @@ Size cannot be decreased.</p>
 </tbody>
 </table>
 
-## Subscription     {#postgresql-cnpg-io-v1-Subscription}
-
-
-
-<p>Subscription is the Schema for the subscriptions API</p>
-
-
-<table class="table">
-<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
-<tbody>
-<tr><td><code>metadata</code> <B>[Required]</B><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#objectmeta-v1-meta"><i>meta/v1.ObjectMeta</i></a>
-</td>
-<td>
-   <span class="text-muted">No description provided.</span>Refer to the Kubernetes API documentation for the fields of the <code>metadata</code> field.</td>
-</tr>
-<tr><td><code>spec</code> <B>[Required]</B><br/>
-<a href="#postgresql-cnpg-io-v1-SubscriptionSpec"><i>SubscriptionSpec</i></a>
-</td>
-<td>
-   <span class="text-muted">No description provided.</span></td>
-</tr>
-<tr><td><code>status</code> <B>[Required]</B><br/>
-<a href="#postgresql-cnpg-io-v1-SubscriptionStatus"><i>SubscriptionStatus</i></a>
-</td>
-<td>
-   <span class="text-muted">No description provided.</span></td>
-</tr>
-</tbody>
-</table>
-
 ## SubscriptionReclaimPolicy     {#postgresql-cnpg-io-v1-SubscriptionReclaimPolicy}
 
 (Alias of `string`)
@@ -5130,6 +5180,14 @@ Size cannot be decreased.</p>
    <p>The name of the publication</p>
 </td>
 </tr>
+<tr><td><code>publicationDBName</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The name of the database containing the publication on the external cluster.
+Defaults to the one in the external cluster definition</p>
+</td>
+</tr>
 <tr><td><code>externalClusterName</code> <B>[Required]</B><br/>
 <i>string</i>
 </td>
@@ -5169,18 +5227,18 @@ Size cannot be decreased.</p>
 desired state that was synchronized</p>
 </td>
 </tr>
-<tr><td><code>ready</code> <B>[Required]</B><br/>
+<tr><td><code>applied</code><br/>
 <i>bool</i>
 </td>
 <td>
-   <p>Ready is true if the database was reconciled correctly</p>
+   <p>Applied is true if the subscription was reconciled correctly</p>
 </td>
 </tr>
-<tr><td><code>error</code> <B>[Required]</B><br/>
+<tr><td><code>message</code><br/>
 <i>string</i>
 </td>
 <td>
-   <p>Error is the reconciliation error message</p>
+   <p>Message is the reconciliation output message</p>
 </td>
 </tr>
 </tbody>

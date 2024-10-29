@@ -187,7 +187,7 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelDeclarativePub
 				Eventually(func(g Gomega) {
 					err := env.Client.Get(env.Ctx, pubNamespacedName, pub)
 					Expect(err).ToNot(HaveOccurred())
-					g.Expect(pub.Status.Ready).Should(BeTrue())
+					g.Expect(pub.Status.Applied).Should(HaveValue(BeTrue()))
 				}, 300).WithPolling(10 * time.Second).Should(Succeed())
 			})
 
@@ -215,7 +215,7 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelDeclarativePub
 				Eventually(func(g Gomega) {
 					err := env.Client.Get(env.Ctx, pubNamespacedName, sub)
 					Expect(err).ToNot(HaveOccurred())
-					g.Expect(sub.Status.Ready).Should(BeTrue())
+					g.Expect(sub.Status.Applied).Should(HaveValue(BeTrue()))
 				}, 300).WithPolling(10 * time.Second).Should(Succeed())
 			})
 

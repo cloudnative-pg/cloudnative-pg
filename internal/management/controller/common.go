@@ -20,7 +20,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"sort"
+	"maps"
+	"slices"
 
 	"github.com/lib/pq"
 	"k8s.io/apimachinery/pkg/types"
@@ -43,6 +44,23 @@ func markAsFailed(
 ) error {
 	oldResource := resource.DeepCopyObject().(markableAsFailed)
 	resource.SetAsFailed(err)
+	return cli.Status().Patch(ctx, resource, client.MergeFrom(oldResource))
+}
+
+type markableAsUnknown interface {
+	client.Object
+	SetAsUnknown(err error)
+}
+
+// markAsFailed marks the reconciliation as failed and logs the corresponding error
+func markAsUnknown(
+	ctx context.Context,
+	cli client.Client,
+	resource markableAsUnknown,
+	err error,
+) error {
+	oldResource := resource.DeepCopyObject().(markableAsUnknown)
+	resource.SetAsUnknown(err)
 	return cli.Status().Patch(ctx, resource, client.MergeFrom(oldResource))
 }
 
@@ -77,14 +95,7 @@ func getClusterFromInstance(
 }
 
 func toPostgresParameters(parameters map[string]string) string {
-	// create slice and store keys
-	keys := make([]string, 0, len(parameters))
-	for k := range parameters {
-		keys = append(keys, k)
-	}
-
-	// sort the slice by keys
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(parameters))
 
 	b := new(bytes.Buffer)
 	for _, key := range keys {

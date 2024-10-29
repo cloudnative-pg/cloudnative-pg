@@ -49,13 +49,15 @@ type PublicationSpec struct {
 	DBName string `json:"dbname"`
 
 	// The owner
+	// +optional
 	Owner string `json:"owner,omitempty"`
 
 	// Parameters
+	// +optional
 	Parameters map[string]string `json:"parameters,omitempty"`
 
 	// Publication target
-	Target PublicationTarget `json:"target,omitempty"`
+	Target PublicationTarget `json:"target"`
 
 	// The policy for end-of-life maintenance of this publication
 	// +kubebuilder:validation:Enum=delete;retain
@@ -67,20 +69,43 @@ type PublicationSpec struct {
 // PublicationTarget is what this publication should publish
 // +kubebuilder:validation:XValidation:rule="(has(self.allTables) && !has(self.objects)) || (!has(self.allTables) && has(self.objects))",message="allTables and objects are not compatible"
 type PublicationTarget struct {
-	// All tables should be publicated
+	// All tables should be published
+	// +optional
 	AllTables bool `json:"allTables,omitempty"`
 
 	// Just the following schema objects
+	// +optional
 	Objects []PublicationTargetObject `json:"objects,omitempty"`
 }
 
-// PublicationTargetObject is an object to publicate
+// PublicationTargetObject is an object to publish
+// +kubebuilder:validation:XValidation:rule="(has(self.schema) && !has(self.table)) || (!has(self.schema) && has(self.table))",message="schema and table are not compatible"
 type PublicationTargetObject struct {
-	// The schema to publicate
+	// The schema to publish
+	// +optional
 	Schema string `json:"schema,omitempty"`
 
-	// A list of table expressions
-	TableExpression []string `json:"tableExpression,omitempty"`
+	// A table to publish
+	// +optional
+	Table *PublicationTargetTable `json:"table,omitempty"`
+}
+
+// PublicationTargetTable is a table to publish
+type PublicationTargetTable struct {
+	// Whether to limit to the table only or include all its descendants
+	// +optional
+	Only bool `json:"only,omitempty"`
+
+	// The table name
+	Name string `json:"name"`
+
+	// The schema name
+	// +optional
+	Schema string `json:"schema,omitempty"`
+
+	// The columns to publish
+	// +optional
+	Columns []string `json:"columns,omitempty"`
 }
 
 // PublicationStatus defines the observed state of Publication
@@ -90,20 +115,23 @@ type PublicationStatus struct {
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
-	// Ready is true if the database was reconciled correctly
-	Ready bool `json:"ready,omitempty"`
+	// Applied is true if the publication was reconciled correctly
+	// +optional
+	Applied *bool `json:"applied,omitempty"`
 
-	// Error is the reconciliation error message
-	Error string `json:"error,omitempty"`
+	// Message is the reconciliation output message
+	// +optional
+	Message string `json:"message,omitempty"`
 }
 
+// +genclient
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 // +kubebuilder:printcolumn:name="Cluster",type="string",JSONPath=".spec.cluster.name"
 // +kubebuilder:printcolumn:name="PG Name",type="string",JSONPath=".spec.name"
-// +kubebuilder:printcolumn:name="Ready",type="boolean",JSONPath=".status.ready"
-// +kubebuilder:printcolumn:name="Error",type="string",JSONPath=".status.error",description="Latest error message"
+// +kubebuilder:printcolumn:name="Applied",type="boolean",JSONPath=".status.applied"
+// +kubebuilder:printcolumn:name="Message",type="string",JSONPath=".status.message",description="Latest reconciliation message"
 
 // Publication is the Schema for the publications API
 type Publication struct {

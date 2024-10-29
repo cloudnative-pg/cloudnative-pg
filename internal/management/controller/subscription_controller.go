@@ -51,7 +51,7 @@ const subscriptionReconciliationInterval = 30 * time.Second
 
 // Reconcile is the subscription reconciliation loop
 func (r *SubscriptionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	contextLogger, ctx := log.SetupLogger(ctx)
+	contextLogger := log.FromContext(ctx)
 
 	contextLogger.Debug("Reconciliation loop start")
 	defer func() {
@@ -77,6 +77,11 @@ func (r *SubscriptionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, nil
 	}
 
+	// If everything is reconciled, we're done here
+	if subscription.Generation == subscription.Status.ObservedGeneration {
+		return ctrl.Result{}, nil
+	}
+
 	// Fetch the Cluster from the cache
 	cluster, err := r.GetCluster(ctx)
 	if err != nil {
@@ -95,17 +100,16 @@ func (r *SubscriptionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	// Cannot do anything on a replica cluster
 	if cluster.IsReplica() {
-		err := markAsFailed(ctx, r.Client, &subscription, errClusterIsReplica)
-		return ctrl.Result{RequeueAfter: subscriptionReconciliationInterval}, err
+		if err := markAsUnknown(ctx, r.Client, &subscription, errClusterIsReplica); err != nil {
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{RequeueAfter: subscriptionReconciliationInterval}, nil
 	}
 
 	if err := r.finalizerReconciler.reconcile(ctx, &subscription); err != nil {
-		return ctrl.Result{RequeueAfter: subscriptionReconciliationInterval},
-			fmt.Errorf("while reconciling the finalizer: %w", err)
+		return ctrl.Result{}, fmt.Errorf("while reconciling the finalizer: %w", err)
 	}
-
-	// If everything is reconciled, we're done here
-	if subscription.Generation == subscription.Status.ObservedGeneration {
+	if !subscription.GetDeletionTimestamp().IsZero() {
 		return ctrl.Result{}, nil
 	}
 
@@ -113,17 +117,26 @@ func (r *SubscriptionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	connString, err := getSubscriptionConnectionString(
 		cluster,
 		subscription.Spec.ExternalClusterName,
-		"", // TODO: should we have a way to force dbname?
+		subscription.Spec.PublicationDBName,
 	)
 	if err != nil {
-		return ctrl.Result{RequeueAfter: subscriptionReconciliationInterval}, markAsFailed(ctx, r.Client, &subscription, err)
+		if err := markAsFailed(ctx, r.Client, &subscription, err); err != nil {
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{RequeueAfter: subscriptionReconciliationInterval}, nil
 	}
 
 	if err := r.alignSubscription(ctx, &subscription, connString); err != nil {
-		return ctrl.Result{RequeueAfter: subscriptionReconciliationInterval}, markAsFailed(ctx, r.Client, &subscription, err)
+		if err := markAsFailed(ctx, r.Client, &subscription, err); err != nil {
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{RequeueAfter: subscriptionReconciliationInterval}, nil
 	}
 
-	return ctrl.Result{RequeueAfter: subscriptionReconciliationInterval}, markAsReady(ctx, r.Client, &subscription)
+	if err := markAsReady(ctx, r.Client, &subscription); err != nil {
+		return ctrl.Result{}, err
+	}
+	return ctrl.Result{RequeueAfter: subscriptionReconciliationInterval}, nil
 }
 
 func (r *SubscriptionReconciler) evaluateDropSubscription(ctx context.Context, sub *apiv1.Subscription) error {

@@ -58,6 +58,11 @@ type SubscriptionSpec struct {
 	// The name of the publication
 	PublicationName string `json:"publicationName"`
 
+	// The name of the database containing the publication on the external cluster.
+	// Defaults to the one in the external cluster definition
+	// +optional
+	PublicationDBName string `json:"publicationDBName,omitempty"`
+
 	// The name of the external cluster with the publication
 	ExternalClusterName string `json:"externalClusterName"`
 
@@ -75,20 +80,23 @@ type SubscriptionStatus struct {
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
-	// Ready is true if the database was reconciled correctly
-	Ready bool `json:"ready,omitempty"`
+	// Applied is true if the subscription was reconciled correctly
+	// +optional
+	Applied *bool `json:"applied,omitempty"`
 
-	// Error is the reconciliation error message
-	Error string `json:"error,omitempty"`
+	// Message is the reconciliation output message
+	// +optional
+	Message string `json:"message,omitempty"`
 }
 
+// +genclient
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 // +kubebuilder:printcolumn:name="Cluster",type="string",JSONPath=".spec.cluster.name"
 // +kubebuilder:printcolumn:name="PG Name",type="string",JSONPath=".spec.name"
-// +kubebuilder:printcolumn:name="Ready",type="boolean",JSONPath=".status.ready"
-// +kubebuilder:printcolumn:name="Error",type="string",JSONPath=".status.error",description="Latest error message"
+// +kubebuilder:printcolumn:name="Applied",type="boolean",JSONPath=".status.applied"
+// +kubebuilder:printcolumn:name="Message",type="string",JSONPath=".status.message",description="Latest reconciliation message"
 
 // Subscription is the Schema for the subscriptions API
 type Subscription struct {

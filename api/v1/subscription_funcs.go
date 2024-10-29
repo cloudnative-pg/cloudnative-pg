@@ -16,15 +16,23 @@ limitations under the License.
 
 package v1
 
+import "k8s.io/utils/ptr"
+
 // SetAsFailed sets the subscription as failed with the given error
 func (sub *Subscription) SetAsFailed(err error) {
-	sub.Status.Ready = false
-	sub.Status.Error = err.Error()
+	sub.Status.Applied = ptr.To(false)
+	sub.Status.Message = err.Error()
+}
+
+// SetAsUnknown sets the subscription as unknown with the given error
+func (sub *Subscription) SetAsUnknown(err error) {
+	sub.Status.Applied = nil
+	sub.Status.Message = err.Error()
 }
 
 // SetAsReady sets the subscription as working correctly
 func (sub *Subscription) SetAsReady() {
-	sub.Status.Error = ""
-	sub.Status.Ready = true
+	sub.Status.Applied = ptr.To(true)
+	sub.Status.Message = ""
 	sub.Status.ObservedGeneration = sub.Generation
 }

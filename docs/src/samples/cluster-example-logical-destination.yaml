@@ -37,9 +37,9 @@ kind: Subscription
 metadata:
   name: cluster-example-dest-sub
 spec:
+  cluster:
+    name: cluster-example-dest
   name: sub
   dbname: app
   publicationName: pub
-  cluster:
-    name: cluster-example-dest
   externalClusterName: cluster-example
