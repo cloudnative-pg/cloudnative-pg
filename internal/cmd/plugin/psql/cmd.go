@@ -92,7 +92,7 @@ func validatePsqlArgs(cmd *cobra.Command, args []string) error {
 	}
 
 	if cmd.ArgsLenAtDash() > 1 {
-		return fmt.Errorf("psqlArgs should be passed after -- delimitator")
+		return fmt.Errorf("psqlArgs should be passed after the -- delimiter")
 	}
 
 	return nil
