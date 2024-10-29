@@ -142,6 +142,7 @@ rules:
   - databases
   - poolers
   - publications
+  - roles
   - scheduledbackups
   - subscriptions
   verbs:
@@ -158,6 +159,7 @@ rules:
   - backups/status
   - databases/status
   - publications/status
+  - roles/status
   - scheduledbackups/status
   - subscriptions/status
   verbs:
