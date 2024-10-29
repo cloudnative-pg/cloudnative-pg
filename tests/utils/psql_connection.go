@@ -21,6 +21,7 @@ import (
 	"io"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/client-go/tools/portforward"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/configfile"
@@ -54,6 +55,52 @@ func createConnectionParameters(user, password, localPort string) map[string]str
 	}
 }
 
+func startForwardConnection(
+	dialer httpstream.Dialer,
+	portMap []string,
+	dbname,
+	userApp,
+	passApp string,
+) (*PSQLForwardConnection, *sql.DB, error) {
+	forwarder, err := forwardconnection.NewForwardConnection(
+		dialer,
+		portMap,
+		io.Discard,
+		io.Discard,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if err = forwarder.StartAndWait(); err != nil {
+		return nil, nil, err
+	}
+
+	localPort, err := forwarder.GetLocalPort()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	connParameters := createConnectionParameters(userApp, passApp, localPort)
+
+	pooler := pool.NewPostgresqlConnectionPool(configfile.CreateConnectionString(connParameters))
+
+	conn, err := pooler.Connection(dbname)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	conn.SetMaxOpenConns(10)
+	conn.SetMaxIdleConns(10)
+	conn.SetConnMaxLifetime(time.Hour)
+	conn.SetConnMaxIdleTime(time.Hour)
+
+	return &PSQLForwardConnection{
+		portForward: forwarder.Forwarder,
+		pooler:      pooler,
+	}, conn, err
+}
+
 // ForwardPSQLConnection simplifies the creation of forwarded connection to PostgreSQL cluster
 func ForwardPSQLConnection(
 	env *TestingEnvironment,
@@ -70,8 +117,8 @@ func ForwardPSQLConnection(
 	return ForwardPSQLConnectionWithCreds(env, namespace, clusterName, dbname, user, pass)
 }
 
-// ForwardPSQLConnectionWithCreds does the same as ForwardPSQLConnection but without trying to
-// get the credentials using the cluster
+// ForwardPSQLConnectionWithCreds creates a forwarded connection to a PostgreSQL cluster
+// using the given credentials
 func ForwardPSQLConnectionWithCreds(
 	env *TestingEnvironment,
 	namespace,
@@ -95,41 +142,47 @@ func ForwardPSQLConnectionWithCreds(
 		return nil, nil, err
 	}
 
-	forwarder, err := forwardconnection.NewForwardConnection(
+	psqlForwardConn, conn, err := startForwardConnection(
 		dialer,
 		[]string{forwardconnection.PostgresPortMap},
-		io.Discard,
-		io.Discard,
+		dbname,
+		userApp,
+		passApp,
 	)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	if err = forwarder.StartAndWait(); err != nil {
-		return nil, nil, err
-	}
+	return psqlForwardConn, conn, err
+}
 
-	localPort, err := forwarder.GetLocalPort()
+// ForwardPSQLServiceConnection creates a forwarded connection to a PostgreSQL service
+// using the given credentials
+func ForwardPSQLServiceConnection(
+	env *TestingEnvironment,
+	namespace,
+	serviceName,
+	dbname,
+	userApp,
+	passApp string,
+) (*PSQLForwardConnection, *sql.DB, error) {
+	dialer, portMap, err := forwardconnection.NewDialerFromService(
+		env.Ctx,
+		env.Interface,
+		env.RestClientConfig,
+		namespace,
+		serviceName,
+	)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	connParameters := createConnectionParameters(userApp, passApp, localPort)
-
-	pooler := pool.NewPostgresqlConnectionPool(configfile.CreateConnectionString(connParameters))
-	conn, err := pooler.Connection(dbname)
+	psqlForwardConn, conn, err := startForwardConnection(dialer, portMap, dbname, userApp, passApp)
 	if err != nil {
 		return nil, nil, err
 	}
-	conn.SetMaxOpenConns(10)
-	conn.SetMaxIdleConns(10)
-	conn.SetConnMaxLifetime(time.Hour)
-	conn.SetConnMaxIdleTime(time.Hour)
 
-	return &PSQLForwardConnection{
-		portForward: forwarder.Forwarder,
-		pooler:      pooler,
-	}, conn, err
+	return psqlForwardConn, conn, err
 }
 
 // RunQueryRowOverForward runs QueryRow with a given query, returning the Row of the SQL command
