@@ -76,11 +76,11 @@ func List(ctx context.Context, db *sql.DB) ([]DatabaseRole, error) {
 			&role.Login,
 			&role.Replication,
 			&role.ConnectionLimit,
-			&role.password,
+			&role.Password,
 			&role.ValidUntil,
 			&role.BypassRLS,
 			&comment,
-			&role.transactionID,
+			&role.TransactionID,
 			&inRoles,
 		)
 		if err != nil {
@@ -377,14 +377,14 @@ func roleHasPassword(role DatabaseRole) bool {
 
 func appendPasswordOption(role DatabaseRole, query *strings.Builder) {
 	switch {
-	case role.ignorePassword:
+	case role.IgnorePassword:
 		// Postgres may allow to set the VALID UNTIL of a role independently of
 		// having a password or not, so we mimic the behavior by not returning
 		// directly
-	case !role.password.Valid:
+	case !role.Password.Valid:
 		query.WriteString(" PASSWORD NULL")
 	default:
-		fmt.Fprintf(query, " PASSWORD %s", pq.QuoteLiteral(role.password.String))
+		query.WriteString(fmt.Sprintf(" PASSWORD %s", pq.QuoteLiteral(role.Password.String)))
 	}
 
 	if role.ValidUntil.Valid {
