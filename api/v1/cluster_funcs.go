@@ -336,12 +336,23 @@ func (config *PluginConfiguration) IsEnabled() bool {
 	return *config.Enabled
 }
 
+// GetRoleName gets the name of the role
+func (roleConfiguration *RoleConfiguration) GetRoleName() string {
+	return roleConfiguration.Name
+}
+
 // GetRoleSecretsName gets the name of the secret which is used to store the role's password
 func (roleConfiguration *RoleConfiguration) GetRoleSecretsName() string {
 	if roleConfiguration.PasswordSecret != nil {
 		return roleConfiguration.PasswordSecret.Name
 	}
 	return ""
+}
+
+// ShouldDisablePassword determines if the role password should be dropped in
+// the database
+func (roleConfiguration *RoleConfiguration) ShouldDisablePassword() bool {
+	return roleConfiguration.DisablePassword
 }
 
 // GetRoleInherit return the inherit attribute of a roleConfiguration
