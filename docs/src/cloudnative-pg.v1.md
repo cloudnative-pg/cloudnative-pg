@@ -3275,6 +3275,8 @@ possible. <code>false</code> by default.</p>
 
 - [ManagedRoles](#postgresql-cnpg-io-v1-ManagedRoles)
 
+- [RoleState](#postgresql-cnpg-io-v1-RoleState)
+
 
 <p>PasswordState represents the state of the password of a managed RoleConfiguration</p>
 
@@ -4195,6 +4197,9 @@ This can only be set at creation time. By default set to <code>_cnpg_</code>.</p
 ## Role     {#postgresql-cnpg-io-v1-Role}
 
 
+**Appears in:**
+
+
 
 <p>Role is the Schema for the databases API</p>
 
@@ -4566,18 +4571,26 @@ TODO: the existing RoleStatus in the cluster managed roles, does more than we ne
 desired state that was synchronized</p>
 </td>
 </tr>
-<tr><td><code>ready</code> <B>[Required]</B><br/>
+<tr><td><code>applied</code><br/>
 <i>bool</i>
 </td>
 <td>
    <p>Applied is true if the role was reconciled correctly</p>
 </td>
 </tr>
-<tr><td><code>message</code> <B>[Required]</B><br/>
+<tr><td><code>message</code><br/>
 <i>string</i>
 </td>
 <td>
    <p>Message is the reconciliation error message</p>
+</td>
+</tr>
+<tr><td><code>passwordStatus</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-PasswordState"><i>PasswordState</i></a>
+</td>
+<td>
+   <p>PasswordState holds the last applied version of the passwordSecret, and
+the last transaction ID of the role in postgres</p>
 </td>
 </tr>
 </tbody>

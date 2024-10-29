@@ -136,10 +136,16 @@ type RoleState struct {
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
 	// Applied is true if the role was reconciled correctly
-	Applied bool `json:"ready,omitempty"`
+	// +optional
+	Applied *bool `json:"applied,omitempty"`
 
 	// Message is the reconciliation error message
+	// +optional
 	Message string `json:"message,omitempty"`
+
+	// PasswordState holds the last applied version of the passwordSecret, and
+	// the last transaction ID of the role in postgres
+	PasswordState PasswordState `json:"passwordStatus,omitempty"`
 }
 
 // +kubebuilder:object:root=true

@@ -20,4 +20,8 @@ const (
 	// DatabaseFinalizerName is the name of the finalizer
 	// triggering the deletion of the database
 	DatabaseFinalizerName = MetadataNamespace + "/deleteDatabase"
+
+	// RoleFinalizerName is the name of the finalizer
+	// triggering the deletion of the role
+	RoleFinalizerName = MetadataNamespace + "/deleteRole"
 )
