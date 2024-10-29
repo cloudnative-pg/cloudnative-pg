@@ -1618,6 +1618,7 @@ PasswordState represents the state of the password of a managed RoleConfiguratio
 _Appears in:_
 
 - [ManagedRoles](#managedroles)
+- [RoleState](#rolestate)
 
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
@@ -2520,8 +2521,9 @@ _Appears in:_
 | Field | Description | Required | Default | Validation |
 | --- | --- | --- | --- | --- |
 | `observedGeneration` _integer_ | A sequence number representing the latest<br />desired state that was synchronized |  |  |  |
-| `ready` _boolean_ | Applied is true if the role was reconciled correctly | True |  |  |
-| `message` _string_ | Message is the reconciliation error message | True |  |  |
+| `applied` _boolean_ | Applied is true if the role was reconciled correctly |  |  |  |
+| `message` _string_ | Message is the reconciliation error message |  |  |  |
+| `passwordStatus` _[PasswordState](#passwordstate)_ | PasswordState holds the last applied version of the passwordSecret, and<br />the last transaction ID of the role in postgres | True |  |  |
 
 
 #### RoleStatus

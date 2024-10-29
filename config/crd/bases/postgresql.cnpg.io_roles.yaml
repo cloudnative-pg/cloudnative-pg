@@ -180,6 +180,9 @@ spec:
           status:
             description: RoleState defines the observed state of a Role
             properties:
+              applied:
+                description: Applied is true if the role was reconciled correctly
+                type: boolean
               message:
                 description: Message is the reconciliation error message
                 type: string
@@ -189,9 +192,20 @@ spec:
                   desired state that was synchronized
                 format: int64
                 type: integer
-              ready:
-                description: Applied is true if the role was reconciled correctly
-                type: boolean
+              passwordStatus:
+                description: |-
+                  PasswordState holds the last applied version of the passwordSecret, and
+                  the last transaction ID of the role in postgres
+                properties:
+                  resourceVersion:
+                    description: the resource version of the password secret
+                    type: string
+                  transactionID:
+                    description: the last transaction ID to affect the role definition
+                      in PostgreSQL
+                    format: int64
+                    type: integer
+                type: object
             type: object
         type: object
     served: true
