@@ -20,11 +20,14 @@ SPDX-License-Identifier: Apache-2.0
 package roles
 
 import (
+	"context"
 	"database/sql"
+	"fmt"
 	"reflect"
 	"sort"
 
 	"github.com/jackc/pgx/v5/pgtype"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
@@ -128,4 +131,39 @@ func (d *DatabaseRole) isEquivalentTo(inSpec apiv1.RoleConfiguration) bool {
 	}
 
 	return reflect.DeepEqual(role, spec) && d.hasSameValidUntilAs(inSpec)
+}
+
+// ApplyPassword updates a database role with the password located in the Secret
+// it returns the resource version of the Secret
+func (d *DatabaseRole) ApplyPassword(
+	ctx context.Context,
+	cl client.Client,
+	rolePassword passwordManager,
+	namespace string,
+) (string, error) {
+	var passVersion string
+	switch {
+	case rolePassword.GetRoleSecretsName() == "" && !rolePassword.ShouldDisablePassword():
+		d.ignorePassword = true
+		return "", nil
+	case rolePassword.GetRoleSecretsName() == "" && rolePassword.ShouldDisablePassword():
+		d.password = sql.NullString{}
+		return "", nil
+	case rolePassword.GetRoleSecretsName() != "" && rolePassword.ShouldDisablePassword():
+		// this case should be prevented by the validation webhook,
+		// and is an error
+		return "",
+			fmt.Errorf("cannot reconcile: password both provided and disabled: %s",
+				rolePassword.GetRoleSecretsName())
+	default: // role.PasswordSecret != nil && !rolePassword.ShouldDisablePassword():
+		passwordSecret, err := getPassword(ctx, cl, rolePassword, namespace)
+		if err != nil {
+			return "", err
+		}
+
+		d.password = sql.NullString{Valid: true, String: passwordSecret.password}
+		d.passwordPassthrough = passwordSecret.passthrough
+		passVersion = passwordSecret.version
+		return passVersion, nil
+	}
 }

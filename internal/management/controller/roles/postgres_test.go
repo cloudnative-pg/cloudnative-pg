@@ -201,8 +201,8 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 			ConnectionLimit: -1,
 			ValidUntil:      pgtype.Timestamp{},
 			Comment:         "This is postgres user",
-			password:        password1,
-			transactionID:   11,
+			Password:        password1,
+			TransactionID:   11,
 			InRoles:         []string{},
 		}, DatabaseRole{
 			Name:            "streaming_replica",
@@ -216,8 +216,8 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 			ConnectionLimit: 10,
 			ValidUntil:      pgtype.Timestamp{Valid: true, Time: testDate},
 			Comment:         "This is streaming_replica user",
-			password:        password2,
-			transactionID:   22,
+			Password:        password2,
+			TransactionID:   22,
 			InRoles: []string{
 				"role1",
 				"role2",
