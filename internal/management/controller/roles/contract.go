@@ -17,11 +17,14 @@ limitations under the License.
 package roles
 
 import (
+	"context"
 	"database/sql"
+	"fmt"
 	"reflect"
 	"sort"
 
 	"github.com/jackc/pgx/v5/pgtype"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
@@ -39,12 +42,12 @@ type DatabaseRole struct {
 	Login           bool             `json:"login,omitempty"`
 	Replication     bool             `json:"replication,omitempty"`
 	BypassRLS       bool             `json:"bypassrls,omitempty"` // Row-Level Security
-	ignorePassword  bool             `json:"-"`
+	IgnorePassword  bool             `json:"-"`
 	ConnectionLimit int64            `json:"connectionLimit,omitempty"` // default is -1
 	ValidUntil      pgtype.Timestamp `json:"validUntil,omitempty"`
 	InRoles         []string         `json:"inRoles,omitempty"`
-	password        sql.NullString   `json:"-"`
-	transactionID   int64            `json:"-"`
+	Password        sql.NullString   `json:"-"`
+	TransactionID   int64            `json:"-"`
 }
 
 // passwordNeedsUpdating evaluates whether a DatabaseRole needs to be updated
@@ -53,7 +56,7 @@ func (d *DatabaseRole) passwordNeedsUpdating(
 	latestSecretResourceVersion map[string]string,
 ) bool {
 	return storedPasswordState[d.Name].SecretResourceVersion != latestSecretResourceVersion[d.Name] ||
-		storedPasswordState[d.Name].TransactionID != d.transactionID
+		storedPasswordState[d.Name].TransactionID != d.TransactionID
 }
 
 func (d *DatabaseRole) hasSameCommentAs(inSpec apiv1.RoleConfiguration) bool {
@@ -119,4 +122,38 @@ func (d *DatabaseRole) isEquivalentTo(inSpec apiv1.RoleConfiguration) bool {
 	}
 
 	return reflect.DeepEqual(role, spec) && d.hasSameValidUntilAs(inSpec)
+}
+
+// ApplyPassword updates a database role with the password located in the Secret
+// it returns the resource version of the Secret
+func (d *DatabaseRole) ApplyPassword(
+	ctx context.Context,
+	cl client.Client,
+	rolePassword passwordManager,
+	namespace string,
+) (string, error) {
+	var passVersion string
+	switch {
+	case rolePassword.GetRoleSecretsName() == "" && !rolePassword.ShouldDisablePassword():
+		d.IgnorePassword = true
+		return "", nil
+	case rolePassword.GetRoleSecretsName() == "" && rolePassword.ShouldDisablePassword():
+		d.Password = sql.NullString{}
+		return "", nil
+	case rolePassword.GetRoleSecretsName() != "" && rolePassword.ShouldDisablePassword():
+		// this case should be prevented by the validation webhook,
+		// and is an error
+		return "",
+			fmt.Errorf("cannot reconcile: password both provided and disabled: %s",
+				rolePassword.GetRoleSecretsName())
+	default: // role.PasswordSecret != nil && !rolePassword.ShouldDisablePassword():
+		passwordSecret, err := getPassword(ctx, cl, rolePassword, namespace)
+		if err != nil {
+			return "", err
+		}
+
+		d.Password = sql.NullString{Valid: true, String: passwordSecret.password}
+		passVersion = passwordSecret.version
+		return passVersion, nil
+	}
 }

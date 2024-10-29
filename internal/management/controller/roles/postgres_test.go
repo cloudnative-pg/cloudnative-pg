@@ -186,8 +186,8 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 			ConnectionLimit: -1,
 			ValidUntil:      pgtype.Timestamp{},
 			Comment:         "This is postgres user",
-			password:        password1,
-			transactionID:   11,
+			Password:        password1,
+			TransactionID:   11,
 			InRoles:         []string{},
 		}, DatabaseRole{
 			Name:            "streaming_replica",
@@ -201,8 +201,8 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 			ConnectionLimit: 10,
 			ValidUntil:      pgtype.Timestamp{Valid: true, Time: testDate},
 			Comment:         "This is streaming_replica user",
-			password:        password2,
-			transactionID:   22,
+			Password:        password2,
+			TransactionID:   22,
 			InRoles: []string{
 				"role1",
 				"role2",
@@ -257,7 +257,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		dbRole := roleConfigurationAdapter{RoleConfiguration: wantedRoleWithPass}.toDatabaseRole()
 		// In this unit test we are not testing the retrieval of secrets, so let's
 		// fetch the password content by hand
-		dbRole.password = sql.NullString{Valid: true, String: "myPassword"}
+		dbRole.Password = sql.NullString{Valid: true, String: "myPassword"}
 		err = Create(ctx, db, dbRole)
 		Expect(err).ShouldNot(HaveOccurred())
 	})
@@ -275,7 +275,7 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		}.toDatabaseRole()
 		// In this unit test we are not testing the retrieval of secrets, so let's
 		// fetch the password content by hand
-		dbRole.password = sql.NullString{Valid: true, String: "myPassword"}
+		dbRole.Password = sql.NullString{Valid: true, String: "myPassword"}
 		err = Create(ctx, db, dbRole)
 		Expect(err).ShouldNot(HaveOccurred())
 	})
@@ -485,9 +485,9 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 	It("Password with null and with valid until password", func() {
 		role := apiv1.RoleConfiguration{}
 		dbRole := roleConfigurationAdapter{RoleConfiguration: role}.toDatabaseRole()
-		dbRole.password = sql.NullString{Valid: true, String: "divine comedy"}
-		dbRole.ignorePassword = false
-		Expect(dbRole.password.Valid).To(BeTrue())
+		dbRole.Password = sql.NullString{Valid: true, String: "divine comedy"}
+		dbRole.IgnorePassword = false
+		Expect(dbRole.Password.Valid).To(BeTrue())
 
 		var query strings.Builder
 		expectedQuery := "ALTER ROLE \"alighieri\" PASSWORD 'divine comedy'"
@@ -506,8 +506,8 @@ var _ = Describe("Postgres RoleManager implementation test", func() {
 		role.ValidUntil = &validUntil
 
 		dbRole := roleConfigurationAdapter{RoleConfiguration: role}.toDatabaseRole()
-		dbRole.password = sql.NullString{Valid: true, String: "divine comedy"}
-		dbRole.ignorePassword = false
+		dbRole.Password = sql.NullString{Valid: true, String: "divine comedy"}
+		dbRole.IgnorePassword = false
 		appendPasswordOption(dbRole, &queryValidUntil)
 		Expect(queryValidUntil.String()).To(BeEquivalentTo(expectedQueryValidUntil))
 	})

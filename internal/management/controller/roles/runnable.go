@@ -279,7 +279,7 @@ func (sr *RoleSynchronizer) applyRoleActions(
 			case roleUpdateMemberships:
 				// NOTE: revoking / granting to a role does not alter its TransactionID
 				dbRole := role.toDatabaseRole()
-				grants, revokes, err = getRoleMembershipDiff(ctx, db, role, dbRole)
+				grants, revokes, err = GetRoleMembershipDiff(ctx, db, role.InRoles, dbRole)
 				if unhandledErr := handleRoleError(err, role.Name, action); unhandledErr != nil {
 					return nil, nil, unhandledErr
 				}
@@ -295,18 +295,19 @@ func (sr *RoleSynchronizer) applyRoleActions(
 	return appliedChanges, irreconcilableRoles, nil
 }
 
-func getRoleMembershipDiff(
+// GetRoleMembershipDiff returns two lists of roles: those to be granted, and revoked
+func GetRoleMembershipDiff(
 	ctx context.Context,
 	db *sql.DB,
-	role roleConfigurationAdapter,
+	desiredRoleMemberships []string,
 	dbRole DatabaseRole,
-) ([]string, []string, error) {
+) (toGrant []string, toRevoke []string, err error) {
 	inRoleInDB, err := GetParentRoles(ctx, db, dbRole)
 	if err != nil {
 		return nil, nil, err
 	}
-	rolesToGrant := getRolesToGrant(inRoleInDB, role.InRoles)
-	rolesToRevoke := getRolesToRevoke(inRoleInDB, role.InRoles)
+	rolesToGrant := getRolesToGrant(inRoleInDB, desiredRoleMemberships)
+	rolesToRevoke := getRolesToRevoke(inRoleInDB, desiredRoleMemberships)
 	return rolesToGrant, rolesToRevoke, nil
 }
 
@@ -319,30 +320,13 @@ func (sr *RoleSynchronizer) applyRoleCreateUpdate(
 	role roleConfigurationAdapter,
 	action roleAction,
 ) (apiv1.PasswordState, error) {
-	var passVersion string
 	databaseRole := role.toDatabaseRole()
-	switch {
-	case role.PasswordSecret == nil && !role.DisablePassword:
-		databaseRole.ignorePassword = true
-	case role.PasswordSecret == nil && role.DisablePassword:
-		databaseRole.password = sql.NullString{}
-	case role.PasswordSecret != nil && role.DisablePassword:
-		// this case should be prevented by the validation webhook,
-		// and is an error
-		return apiv1.PasswordState{},
-			fmt.Errorf("cannot reconcile: password both provided and disabled: %s",
-				role.PasswordSecret.Name)
-	case role.PasswordSecret != nil && !role.DisablePassword:
-		passwordSecret, err := getPassword(ctx, sr.client, role, sr.instance.GetNamespaceName())
-		if err != nil {
-			return apiv1.PasswordState{}, err
-		}
-
-		databaseRole.password = sql.NullString{Valid: true, String: passwordSecret.password}
-		passVersion = passwordSecret.version
+	passVersion, err := databaseRole.ApplyPassword(ctx, sr.client,
+		&role, sr.instance.GetNamespaceName())
+	if err != nil {
+		return apiv1.PasswordState{}, err
 	}
 
-	var err error
 	switch action {
 	case roleCreate:
 		err = Create(ctx, db, databaseRole)
@@ -371,16 +355,22 @@ type passwordSecret struct {
 	version  string
 }
 
+type passwordManager interface {
+	GetRoleSecretsName() string
+	GetRoleName() string
+	ShouldDisablePassword() bool
+}
+
 // getPassword retrieves the password stored in the Kubernetes secret for the
 // RoleConfiguration
 func getPassword(
 	ctx context.Context,
 	cl client.Client,
-	roleInSpec roleConfigurationAdapter,
+	rolePassword passwordManager,
 	namespace string,
 ) (passwordSecret, error) {
-	secretName := roleInSpec.GetRoleSecretsName()
-	// no secrets defined, will keep roleInSpec.Password nil
+	secretName := rolePassword.GetRoleSecretsName()
+	// no secrets defined, will keep rolePassword.Password nil
 	if secretName == "" {
 		return passwordSecret{}, nil
 	}
@@ -399,8 +389,8 @@ func getPassword(
 	if err != nil {
 		return passwordSecret{}, err
 	}
-	if strings.TrimSpace(roleInSpec.Name) != strings.TrimSpace(usernameFromSecret) {
-		err := fmt.Errorf("wrong username '%v' in secret, expected '%v'", usernameFromSecret, roleInSpec.Name)
+	if strings.TrimSpace(rolePassword.GetRoleName()) != strings.TrimSpace(usernameFromSecret) {
+		err := fmt.Errorf("wrong username '%v' in secret, expected '%v'", usernameFromSecret, rolePassword.GetRoleName())
 		return passwordSecret{}, err
 	}
 	return passwordSecret{
@@ -424,7 +414,7 @@ func getPasswordSecretResourceVersion(
 		if role.PasswordSecret == nil || role.DisablePassword {
 			continue
 		}
-		passwordSecret, err := getPassword(ctx, client, roleConfigurationAdapter{RoleConfiguration: role}, namespace)
+		passwordSecret, err := getPassword(ctx, client, &(roleConfigurationAdapter{RoleConfiguration: role}), namespace)
 		if err != nil {
 			return nil, err
 		}
