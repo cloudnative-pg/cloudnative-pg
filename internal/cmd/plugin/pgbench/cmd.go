@@ -88,7 +88,7 @@ func validateCommandArgs(cmd *cobra.Command, args []string) error {
 	}
 
 	if cmd.ArgsLenAtDash() > 1 {
-		return fmt.Errorf("pgBenchCommands should be passed after -- delimiter")
+		return fmt.Errorf("pgBenchCommands should be passed after the -- delimiter")
 	}
 
 	return nil

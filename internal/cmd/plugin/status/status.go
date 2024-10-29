@@ -114,7 +114,8 @@ func Status(
 	// Get the Cluster object
 	err := plugin.Client.Get(ctx, client.ObjectKey{Namespace: plugin.Namespace, Name: clusterName}, &cluster)
 	if err != nil {
-		return err
+		return fmt.Errorf("while trying to get cluster %s in namespace %s: %w",
+			clusterName, plugin.Namespace, err)
 	}
 
 	status := extractPostgresqlStatus(ctx, cluster)
