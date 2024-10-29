@@ -25,6 +25,7 @@ import (
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
@@ -213,8 +214,11 @@ func (on *onCommand) rollbackFenceClusterIfNeeded() {
 
 // waitInstancesToBeFenced waits for all instances to be shut down
 func (on *onCommand) waitInstancesToBeFencedStep() error {
+	isRetryable := func(err error) bool {
+		return !apierrors.IsForbidden(err) && !apierrors.IsUnauthorized(err)
+	}
 	for _, instance := range on.managedInstances {
-		if err := retry.OnError(hibernationBackoff, resources.RetryAlways, func() error {
+		if err := retry.OnError(hibernationBackoff, isRetryable, func() error {
 			running, err := pluginresources.IsInstanceRunning(on.ctx, instance)
 			if err != nil {
 				return fmt.Errorf("error checking instance status (%v): %w", instance.Name, err)
