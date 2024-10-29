@@ -5010,12 +5010,14 @@ only useful for priority-based synchronous replication).</p>
 <a href="#postgresql-cnpg-io-v1-DataDurabilityLevel"><i>DataDurabilityLevel</i></a>
 </td>
 <td>
-   <p>If &quot;required&quot;, data durability is strictly enforced. Write operations with
-synchronous commit set to <code>on</code>, <code>remote_write</code>, or <code>remote_apply</code> will hang
-if there are not enough healthy replicas.
-If &quot;preferred&quot;, data durability is enforced when healthy replicas are available.
-The required number of instances is reduced if there are not enough healthy replicas.
-This can only be set if both <code>standbyNamesPre</code> and <code>standbyNamesPost</code> are empty.</p>
+   <p>If set to &quot;required&quot;, data durability is strictly enforced. Write operations
+with synchronous commit settings (<code>on</code>, <code>remote_write</code>, or <code>remote_apply</code>) will
+block if there are insufficient healthy replicas, ensuring data persistence.
+If set to &quot;preferred&quot;, data durability is maintained when healthy replicas
+are available, but the required number of instances will adjust dynamically
+if replicas become unavailable. This setting relaxes strict durability enforcement
+to allow for operational continuity. This setting is only applicable if both
+<code>standbyNamesPre</code> and <code>standbyNamesPost</code> are unset (empty).</p>
 </td>
 </tr>
 </tbody>

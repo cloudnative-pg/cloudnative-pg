@@ -1221,12 +1221,14 @@ type SynchronousReplicaConfiguration struct {
 	// +optional
 	StandbyNamesPost []string `json:"standbyNamesPost,omitempty"`
 
-	// If "required", data durability is strictly enforced. Write operations with
-	// synchronous commit set to `on`, `remote_write`, or `remote_apply` will hang
-	// if there are not enough healthy replicas.
-	// If "preferred", data durability is enforced when healthy replicas are available.
-	// The required number of instances is reduced if there are not enough healthy replicas.
-	// This can only be set if both `standbyNamesPre` and `standbyNamesPost` are empty.
+	// If set to "required", data durability is strictly enforced. Write operations
+	// with synchronous commit settings (`on`, `remote_write`, or `remote_apply`) will
+	// block if there are insufficient healthy replicas, ensuring data persistence.
+	// If set to "preferred", data durability is maintained when healthy replicas
+	// are available, but the required number of instances will adjust dynamically
+	// if replicas become unavailable. This setting relaxes strict durability enforcement
+	// to allow for operational continuity. This setting is only applicable if both
+	// `standbyNamesPre` and `standbyNamesPost` are unset (empty).
 	// +kubebuilder:validation:Enum=required;preferred
 	// +kubebuilder:default:=required
 	// +optional
