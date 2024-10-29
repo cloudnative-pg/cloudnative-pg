@@ -45,6 +45,20 @@ func GetReadWriteServiceName(clusterName string) string {
 	return fmt.Sprintf("%v%v", clusterName, apiv1.ServiceReadWriteSuffix)
 }
 
+// GetService gets a service given name and namespace
+func GetService(namespace, name string, env *TestingEnvironment) (*corev1.Service, error) {
+	namespacedName := types.NamespacedName{
+		Namespace: namespace,
+		Name:      name,
+	}
+	service := &corev1.Service{}
+	err := GetObject(env, namespacedName, service)
+	if err != nil {
+		return nil, err
+	}
+	return service, nil
+}
+
 // GetRwServiceObject return read write service object
 func GetRwServiceObject(namespace, clusterName string, env *TestingEnvironment) (*corev1.Service, error) {
 	svcName := GetReadWriteServiceName(clusterName)

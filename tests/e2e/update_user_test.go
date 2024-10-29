@@ -56,8 +56,7 @@ var _ = Describe("Update user and superuser password", Label(tests.LabelServiceC
 		Expect(err).ToNot(HaveOccurred())
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
-		host, err := testsUtils.GetHostName(namespace, clusterName, env)
-		Expect(err).ToNot(HaveOccurred())
+		rwService := testsUtils.GetReadWriteServiceName(clusterName)
 
 		appSecretName := clusterName + apiv1.ApplicationUserSecretSuffix
 		superUserSecretName := clusterName + apiv1.SuperUserSecretSuffix
@@ -69,7 +68,7 @@ var _ = Describe("Update user and superuser password", Label(tests.LabelServiceC
 			const newPassword = "eeh2Zahohx" //nolint:gosec
 
 			AssertUpdateSecret("password", newPassword, appSecretName, namespace, clusterName, 30, env)
-			AssertConnection(host, testsUtils.AppUser, testsUtils.AppDBName, newPassword, primaryPod, 60, env)
+			AssertConnection(namespace, rwService, testsUtils.AppDBName, testsUtils.AppUser, newPassword, env)
 		})
 
 		By("fail updating user application password with wrong user in secret", func() {
@@ -80,7 +79,7 @@ var _ = Describe("Update user and superuser password", Label(tests.LabelServiceC
 			AssertUpdateSecret("username", newUser, appSecretName, namespace, clusterName, 30, env)
 
 			timeout := time.Second * 10
-			dsn := testsUtils.CreateDSN(host, newUser, testsUtils.AppDBName, newPassword, testsUtils.Require, 5432)
+			dsn := testsUtils.CreateDSN(rwService, newUser, testsUtils.AppDBName, newPassword, testsUtils.Require, 5432)
 
 			_, _, err := env.ExecCommand(env.Ctx, *primaryPod,
 				specs.PostgresContainerName, &timeout,
@@ -113,7 +112,7 @@ var _ = Describe("Update user and superuser password", Label(tests.LabelServiceC
 
 			const newPassword = "fi6uCae7" //nolint:gosec
 			AssertUpdateSecret("password", newPassword, superUserSecretName, namespace, clusterName, 30, env)
-			AssertConnection(host, testsUtils.PostgresUser, testsUtils.PostgresDBName, newPassword, primaryPod, 60, env)
+			AssertConnection(namespace, rwService, testsUtils.PostgresDBName, testsUtils.PostgresUser, newPassword, env)
 		})
 	})
 })
@@ -140,6 +139,8 @@ var _ = Describe("Enable superuser password", Label(tests.LabelServiceConnectivi
 		clusterName, err := env.GetResourceNameFromYAML(sampleFile)
 		Expect(err).ToNot(HaveOccurred())
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
+
+		rwService := testsUtils.GetReadWriteServiceName(clusterName)
 
 		secretName := clusterName + apiv1.SuperUserSecretSuffix
 		var secret corev1.Secret
@@ -190,12 +191,10 @@ var _ = Describe("Enable superuser password", Label(tests.LabelServiceConnectivi
 				g.Expect(err).ToNot(HaveOccurred())
 			}, 90).WithPolling(time.Second).Should(Succeed())
 
-			host, err := testsUtils.GetHostName(namespace, clusterName, env)
-			Expect(err).ToNot(HaveOccurred())
 			superUser, superUserPass, err := testsUtils.GetCredentials(clusterName, namespace,
 				apiv1.SuperUserSecretSuffix, env)
 			Expect(err).ToNot(HaveOccurred())
-			AssertConnection(host, superUser, testsUtils.PostgresDBName, superUserPass, primaryPod, 60, env)
+			AssertConnection(namespace, rwService, testsUtils.PostgresDBName, superUser, superUserPass, env)
 		})
 
 		By("disable superuser access", func() {

@@ -171,14 +171,10 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 			})
 
 			By("Verifying connectivity of new managed role", func() {
-				primaryPod, err := env.GetClusterPrimary(namespace, clusterName)
-				Expect(err).ToNot(HaveOccurred())
-
-				rwService := fmt.Sprintf("%v-rw.%v.svc", clusterName, namespace)
+				rwService := utils.GetReadWriteServiceName(clusterName)
 				// assert connectable use username and password defined in secrets
-				AssertConnection(rwService, username, "postgres", password, primaryPod, 30, env)
-
-				AssertConnection(rwService, userWithHashedPassword, "postgres", userWithHashedPassword, primaryPod, 30, env)
+				AssertConnection(namespace, rwService, utils.PostgresDBName, username, password, env)
+				AssertConnection(namespace, rwService, utils.PostgresDBName, userWithHashedPassword, userWithHashedPassword, env)
 			})
 
 			By("ensuring the app role has been granted createdb in the managed stanza", func() {
@@ -213,13 +209,10 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 				)
 				Expect(err).NotTo(HaveOccurred())
 
-				primaryPod, err := env.GetClusterPrimary(namespace, clusterName)
-				Expect(err).ToNot(HaveOccurred())
-
 				pass := string(appUserSecret.Data["password"])
-				rwService := fmt.Sprintf("%v-rw.%v.svc", clusterName, namespace)
+				rwService := utils.GetReadWriteServiceName(clusterName)
 				// assert connectable use username and password defined in secrets
-				AssertConnection(rwService, appUsername, "postgres", pass, primaryPod, 30, env)
+				AssertConnection(namespace, rwService, utils.PostgresDBName, appUsername, pass, env)
 			})
 
 			By("Verify show unrealizable role configurations in the status", func() {
@@ -302,9 +295,9 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 			})
 
 			By("the connectivity should be success again", func() {
-				rwService := fmt.Sprintf("%v-rw.%v.svc", clusterName, namespace)
+				rwService := utils.GetReadWriteServiceName(clusterName)
 				// assert connectable use username and password defined in secrets
-				AssertConnection(rwService, username, "postgres", password, primaryPod, 30, env)
+				AssertConnection(namespace, rwService, utils.PostgresDBName, username, password, env)
 			})
 		})
 
@@ -539,15 +532,15 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 			})
 
 			By("Verify connectivity using changed password in secret", func() {
-				primaryPod, err = env.GetClusterPrimary(namespace, clusterName)
-				Expect(err).ToNot(HaveOccurred())
-
-				rwService := fmt.Sprintf("%v-rw.%v.svc", clusterName, namespace)
+				rwService := utils.GetReadWriteServiceName(clusterName)
 				// assert connectable use username and password defined in secrets
-				AssertConnection(rwService, username, "postgres", newPassword, primaryPod, 30, env)
+				AssertConnection(namespace, rwService, utils.PostgresDBName, username, newPassword, env)
 			})
 
 			By("Update password in database", func() {
+				primaryPod, err = env.GetClusterPrimary(namespace, clusterName)
+				Expect(err).ToNot(HaveOccurred())
+
 				query := fmt.Sprintf("ALTER ROLE %s WITH PASSWORD %s",
 					username, pq.QuoteLiteral(newPassword))
 
@@ -562,8 +555,8 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 			})
 
 			By("Verify password in secrets could still valid", func() {
-				rwService := fmt.Sprintf("%v-rw.%v.svc", clusterName, namespace)
-				AssertConnection(rwService, username, "postgres", newPassword, primaryPod, 60, env)
+				rwService := utils.GetReadWriteServiceName(clusterName)
+				AssertConnection(namespace, rwService, utils.PostgresDBName, username, newPassword, env)
 			})
 		})
 
