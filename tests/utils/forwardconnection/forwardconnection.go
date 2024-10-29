@@ -196,9 +196,13 @@ func getPodFromService(
 ) (*corev1.Pod, error) {
 	namespace := serviceObj.Namespace
 
-	labelSelector := metav1.LabelSelector{
+	labelSelector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
 		MatchLabels: serviceObj.Spec.Selector,
+	})
+	if err != nil {
+		return nil, err
 	}
+
 	podList, err := kubeInterface.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
 		LabelSelector: labelSelector.String(),
 	})
