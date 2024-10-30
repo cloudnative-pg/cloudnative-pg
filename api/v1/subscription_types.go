@@ -45,6 +45,7 @@ type SubscriptionSpec struct {
 	Name string `json:"name"`
 
 	// The owner
+	// +optional
 	Owner string `json:"owner,omitempty"`
 
 	// The name of the database

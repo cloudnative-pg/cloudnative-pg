@@ -5,7 +5,7 @@ metadata:
 spec:
   name: sub
   dbname: app
-  publicationName: pub
+  publicationName: pub-all
   cluster:
     name: cluster-example-dest
   externalClusterName: cluster-example

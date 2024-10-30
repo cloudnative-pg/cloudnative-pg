@@ -121,7 +121,7 @@ func (r *PublicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 
 	if err := r.alignPublication(ctx, &publication); err != nil {
-		if err := markAsFailed(ctx, r.Client, &publication, errClusterIsReplica); err != nil {
+		if err := markAsFailed(ctx, r.Client, &publication, err); err != nil {
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{RequeueAfter: publicationReconciliationInterval}, nil
