@@ -111,14 +111,13 @@ CloudNativePG supports both
 [quorum-based and priority-based synchronous replication for PostgreSQL](https://www.postgresql.org/docs/current/warm-standby.html#SYNCHRONOUS-REPLICATION).
 
 !!! Warning
-    Please be aware that synchronous replication by default will halt your write
-    operations if the required number of standby nodes to replicate WAL data for
-    transaction commits is unavailable. In such cases, write operations for your
-    applications will hang. This behavior differs from the previous
-    implementation in CloudNativePG but aligns with the expectations of a
-    PostgreSQL DBA for this capability. See the
-    ["Data Durability"](#data-durability) section to learn how to control this
-    behavior.
+    By default, synchronous replication will pause write operations if the
+    necessary number of standby nodes for WAL replication during transaction
+    commits is unavailable. This behavior ensures data durability and aligns with
+    the expectations of PostgreSQL DBAs. However, if your priority is self-healing
+    over strict data durability, you can adjust this setting.
+    Refer to the ["Data Durability"](#data-durability) section for guidance on
+    how to manage this behavior.
 
 While direct configuration of the `synchronous_standby_names` option is
 prohibited, CloudNativePG allows you to customize its content and extend
@@ -138,13 +137,13 @@ PostgreSQL's quorum-based synchronous replication makes transaction commits wait
 until their WAL records are replicated to at least a certain number of standbys.
 To use this method, set `method` to `any`.
 
-#### Migrating from the Deprecated Synchronous Replication Implementation
+#### Migrating from Deprecated Synchronous Replication Implementation
 
-This section provides instructions on migrating your existing quorum-based
-synchronous replication, defined using the deprecated form, to the new and more
-robust capability in CloudNativePG.
+This section outlines how to migrate from the deprecated quorum-based
+synchronous replication format to the newer, more robust implementation in
+CloudNativePG.
 
-Suppose you have the following manifest:
+Given the following manifest:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -153,7 +152,6 @@ metadata:
   name: angus
 spec:
   instances: 3
-
   minSyncReplicas: 1
   maxSyncReplicas: 1
 
@@ -161,7 +159,7 @@ spec:
     size: 1G
 ```
 
-You can convert it to the new quorum-based format as follows:
+You can update it to the new format as follows:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -180,6 +178,9 @@ spec:
       number: 1
       dataDurability: required
 ```
+
+To prioritize self-healing over strict data durability, set `dataDurability`
+to `preferred` instead.
 
 ### Priority-based Synchronous Replication
 
