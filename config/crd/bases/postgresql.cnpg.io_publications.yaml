@@ -103,6 +103,9 @@ spec:
                   allTables:
                     description: All tables should be published
                     type: boolean
+                    x-kubernetes-validations:
+                    - message: allTables is immutable
+                      rule: self == oldSelf
                   objects:
                     description: Just the following schema objects
                     items:

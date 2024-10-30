@@ -70,13 +70,14 @@ type PublicationSpec struct {
 // +kubebuilder:validation:XValidation:rule="(has(self.allTables) && !has(self.objects)) || (!has(self.allTables) && has(self.objects))",message="allTables and objects are mutually exclusive"
 type PublicationTarget struct {
 	// All tables should be published
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="allTables is immutable"
 	// +optional
 	AllTables bool `json:"allTables,omitempty"`
 
 	// Just the following schema objects
-	// +optional
 	// +kubebuilder:validation:XValidation:rule="!(self.exists(o, has(o.table) && has(o.table.columns)) && self.exists(o, has(o.tablesInSchema)))",message="specifying a column list when the publication also publishes tablesInSchema is not supported"
 	// +kubebuilder:validation:MaxItems=100000
+	// +optional
 	Objects []PublicationTargetObject `json:"objects,omitempty"`
 }
 

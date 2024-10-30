@@ -27,9 +27,6 @@ var _ = Describe("Conversion of PG parameters from map to string of key/value pa
 			"a": "1", "b": "2",
 		}
 		res := toPostgresParameters(m)
-		Expect(res).To(BeElementOf([]string{
-			`a = '1', b = '2'`,
-			`b = '2', a = '1'`,
-		}))
+		Expect(res).To(Equal(`a = '1', b = '2'`))
 	})
 })

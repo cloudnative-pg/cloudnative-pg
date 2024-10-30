@@ -83,7 +83,7 @@ var _ = Describe("subscription sql", func() {
 
 		sqls := toSubscriptionCreateSQL(obj, connString)
 		Expect(sqls).To(ContainElement(
-			"CREATE SUBSCRIPTION \"test_sub\" CONNECTION 'host=localhost user=test dbname=test' PUBLICATION \"test_pub\""))
+			`CREATE SUBSCRIPTION "test_sub" CONNECTION 'host=localhost user=test dbname=test' PUBLICATION "test_pub"`))
 	})
 
 	It("generates correct SQL for creating subscription with parameters", func() {
@@ -100,9 +100,9 @@ var _ = Describe("subscription sql", func() {
 		connString := "host=localhost user=test dbname=test"
 
 		sqls := toSubscriptionCreateSQL(obj, connString)
-		expectedElement := "CREATE SUBSCRIPTION \"test_sub\" " +
-			"CONNECTION 'host=localhost user=test dbname=test' " +
-			"PUBLICATION \"test_pub\" WITH (param1 = 'value1', param2 = 'value2')"
+		expectedElement := `CREATE SUBSCRIPTION "test_sub" ` +
+			`CONNECTION 'host=localhost user=test dbname=test' ` +
+			`PUBLICATION "test_pub" WITH (param1 = 'value1', param2 = 'value2')`
 		Expect(sqls).To(ContainElement(expectedElement))
 	})
 
@@ -118,8 +118,8 @@ var _ = Describe("subscription sql", func() {
 
 		sqls := toSubscriptionCreateSQL(obj, connString)
 		Expect(sqls).To(ContainElement(
-			"CREATE SUBSCRIPTION \"test_sub\" CONNECTION 'host=localhost user=test dbname=test' PUBLICATION \"test_pub\""))
-		Expect(sqls).To(ContainElement("ALTER SUBSCRIPTION \"test_sub\" OWNER TO \"new_owner\""))
+			`CREATE SUBSCRIPTION "test_sub" CONNECTION 'host=localhost user=test dbname=test' PUBLICATION "test_pub"`))
+		Expect(sqls).To(ContainElement(`ALTER SUBSCRIPTION "test_sub" OWNER TO "new_owner"`))
 	})
 
 	It("returns correct SQL for creating subscription with no owner or parameters", func() {
@@ -133,7 +133,7 @@ var _ = Describe("subscription sql", func() {
 
 		sqls := toSubscriptionCreateSQL(obj, connString)
 		Expect(sqls).To(ContainElement(
-			"CREATE SUBSCRIPTION \"test_sub\" CONNECTION 'host=localhost user=test dbname=test' PUBLICATION \"test_pub\""))
+			`CREATE SUBSCRIPTION "test_sub" CONNECTION 'host=localhost user=test dbname=test' PUBLICATION "test_pub"`))
 	})
 
 	It("generates correct SQL for altering subscription with publication and connection string", func() {
@@ -146,8 +146,8 @@ var _ = Describe("subscription sql", func() {
 		connString := "host=localhost user=test dbname=test"
 
 		sqls := toSubscriptionAlterSQL(obj, connString)
-		Expect(sqls).To(ContainElement("ALTER SUBSCRIPTION \"test_sub\" SET PUBLICATION \"test_pub\""))
-		Expect(sqls).To(ContainElement("ALTER SUBSCRIPTION \"test_sub\" CONNECTION 'host=localhost user=test dbname=test'"))
+		Expect(sqls).To(ContainElement(`ALTER SUBSCRIPTION "test_sub" SET PUBLICATION "test_pub"`))
+		Expect(sqls).To(ContainElement(`ALTER SUBSCRIPTION "test_sub" CONNECTION 'host=localhost user=test dbname=test'`))
 	})
 
 	It("generates correct SQL for altering subscription with owner", func() {
@@ -161,9 +161,9 @@ var _ = Describe("subscription sql", func() {
 		connString := "host=localhost user=test dbname=test"
 
 		sqls := toSubscriptionAlterSQL(obj, connString)
-		Expect(sqls).To(ContainElement("ALTER SUBSCRIPTION \"test_sub\" SET PUBLICATION \"test_pub\""))
-		Expect(sqls).To(ContainElement("ALTER SUBSCRIPTION \"test_sub\" CONNECTION 'host=localhost user=test dbname=test'"))
-		Expect(sqls).To(ContainElement("ALTER SUBSCRIPTION \"test_sub\" OWNER TO \"new_owner\""))
+		Expect(sqls).To(ContainElement(`ALTER SUBSCRIPTION "test_sub" SET PUBLICATION "test_pub"`))
+		Expect(sqls).To(ContainElement(`ALTER SUBSCRIPTION "test_sub" CONNECTION 'host=localhost user=test dbname=test'`))
+		Expect(sqls).To(ContainElement(`ALTER SUBSCRIPTION "test_sub" OWNER TO "new_owner"`))
 	})
 
 	It("generates correct SQL for altering subscription with parameters", func() {
@@ -180,9 +180,9 @@ var _ = Describe("subscription sql", func() {
 		connString := "host=localhost user=test dbname=test"
 
 		sqls := toSubscriptionAlterSQL(obj, connString)
-		Expect(sqls).To(ContainElement("ALTER SUBSCRIPTION \"test_sub\" SET PUBLICATION \"test_pub\""))
-		Expect(sqls).To(ContainElement("ALTER SUBSCRIPTION \"test_sub\" CONNECTION 'host=localhost user=test dbname=test'"))
-		Expect(sqls).To(ContainElement("ALTER SUBSCRIPTION \"test_sub\" SET (param1 = 'value1', param2 = 'value2')"))
+		Expect(sqls).To(ContainElement(`ALTER SUBSCRIPTION "test_sub" SET PUBLICATION "test_pub"`))
+		Expect(sqls).To(ContainElement(`ALTER SUBSCRIPTION "test_sub" CONNECTION 'host=localhost user=test dbname=test'`))
+		Expect(sqls).To(ContainElement(`ALTER SUBSCRIPTION "test_sub" SET (param1 = 'value1', param2 = 'value2')`))
 	})
 
 	It("returns correct SQL for altering subscription with no owner or parameters", func() {
@@ -195,7 +195,7 @@ var _ = Describe("subscription sql", func() {
 		connString := "host=localhost user=test dbname=test"
 
 		sqls := toSubscriptionAlterSQL(obj, connString)
-		Expect(sqls).To(ContainElement("ALTER SUBSCRIPTION \"test_sub\" SET PUBLICATION \"test_pub\""))
-		Expect(sqls).To(ContainElement("ALTER SUBSCRIPTION \"test_sub\" CONNECTION 'host=localhost user=test dbname=test'"))
+		Expect(sqls).To(ContainElement(`ALTER SUBSCRIPTION "test_sub" SET PUBLICATION "test_pub"`))
+		Expect(sqls).To(ContainElement(`ALTER SUBSCRIPTION "test_sub" CONNECTION 'host=localhost user=test dbname=test'`))
 	})
 })
