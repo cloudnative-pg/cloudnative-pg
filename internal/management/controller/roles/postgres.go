@@ -19,6 +19,7 @@ package roles
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -29,10 +30,7 @@ import (
 )
 
 // List the available roles excluding all the roles that start with `pg_`
-func List(
-	ctx context.Context,
-	db *sql.DB,
-) ([]DatabaseRole, error) {
+func List(ctx context.Context, db *sql.DB) ([]DatabaseRole, error) {
 	logger := log.FromContext(ctx).WithName("roles_reconciler")
 	wrapErr := func(err error) error {
 		return fmt.Errorf("while listing DB roles for role reconciler: %w", err)
@@ -189,7 +187,7 @@ func GetLastTransactionID(ctx context.Context, db *sql.DB, role DatabaseRole) (i
 	err := db.QueryRowContext(ctx,
 		`SELECT xmin FROM pg_catalog.pg_authid WHERE rolname = $1`,
 		role.Name).Scan(&xmin)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return 0, wrapErr(err)
 	}
 	if err != nil {
@@ -259,7 +257,7 @@ func UpdateMembership(
 	}
 	defer func() {
 		rollbackErr := tx.Rollback()
-		if rollbackErr != nil && rollbackErr != sql.ErrTxDone {
+		if rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
 			contextLog.Error(rollbackErr, "rolling back transaction")
 		}
 	}()
@@ -275,11 +273,7 @@ func UpdateMembership(
 }
 
 // GetParentRoles get the in roles of this role
-func GetParentRoles(
-	ctx context.Context,
-	db *sql.DB,
-	role DatabaseRole,
-) ([]string, error) {
+func GetParentRoles(ctx context.Context, db *sql.DB, role DatabaseRole) ([]string, error) {
 	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
 	contextLog.Trace("Invoked", "role", role)
 	wrapErr := func(err error) error {
@@ -295,7 +289,7 @@ func GetParentRoles(
 	contextLog.Debug("get parent role", "query", query)
 	var parentRoles pq.StringArray
 	err := db.QueryRowContext(ctx, query, role.Name).Scan(&parentRoles)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, wrapErr(err)
 	}
 	if err != nil {
@@ -357,9 +351,7 @@ func appendRoleOptions(role DatabaseRole, query *strings.Builder) {
 	query.WriteString(fmt.Sprintf(" CONNECTION LIMIT %d", role.ConnectionLimit))
 }
 
-func appendPasswordOption(role DatabaseRole,
-	query *strings.Builder,
-) {
+func appendPasswordOption(role DatabaseRole, query *strings.Builder) {
 	switch {
 	case role.ignorePassword:
 		// Postgres may allow to set the VALID UNTIL of a role independently of

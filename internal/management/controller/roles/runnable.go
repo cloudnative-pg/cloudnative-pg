@@ -184,7 +184,7 @@ func getRoleNames(roles []roleConfigurationAdapter) []string {
 // It returns
 //   - the PasswordState for any updated roles
 //   - any roles that had expectable postgres errors
-//   - any unexpeted error
+//   - any unexpected error
 func (sr *RoleSynchronizer) synchronizeRoles(
 	ctx context.Context,
 	db *sql.DB,
