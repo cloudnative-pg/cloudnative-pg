@@ -108,9 +108,6 @@ spec:
                     items:
                       description: PublicationTargetObject is an object to publish
                       properties:
-                        schema:
-                          description: The schema to publish
-                          type: string
                         table:
                           description: A table to publish
                           properties:
@@ -132,15 +129,24 @@ spec:
                           required:
                           - name
                           type: object
+                        tablesInSchema:
+                          description: The schema to publish
+                          type: string
                       type: object
                       x-kubernetes-validations:
-                      - message: schema and table are not compatible
-                        rule: (has(self.schema) && !has(self.table)) || (!has(self.schema)
+                      - message: tablesInSchema and table are mutually exclusive
+                        rule: (has(self.tablesInSchema) && !has(self.table)) || (!has(self.tablesInSchema)
                           && has(self.table))
+                    maxItems: 100000
                     type: array
+                    x-kubernetes-validations:
+                    - message: specifying a column list when the publication also
+                        publishes tablesInSchema is not supported
+                      rule: '!(self.exists(o, has(o.table) && has(o.table.columns))
+                        && self.exists(o, has(o.tablesInSchema)))'
                 type: object
                 x-kubernetes-validations:
-                - message: allTables and objects are not compatible
+                - message: allTables and objects are mutually exclusive
                   rule: (has(self.allTables) && !has(self.objects)) || (!has(self.allTables)
                     && has(self.objects))
             required:

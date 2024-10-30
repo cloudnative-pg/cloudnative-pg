@@ -67,7 +67,7 @@ type PublicationSpec struct {
 }
 
 // PublicationTarget is what this publication should publish
-// +kubebuilder:validation:XValidation:rule="(has(self.allTables) && !has(self.objects)) || (!has(self.allTables) && has(self.objects))",message="allTables and objects are not compatible"
+// +kubebuilder:validation:XValidation:rule="(has(self.allTables) && !has(self.objects)) || (!has(self.allTables) && has(self.objects))",message="allTables and objects are mutually exclusive"
 type PublicationTarget struct {
 	// All tables should be published
 	// +optional
@@ -75,15 +75,17 @@ type PublicationTarget struct {
 
 	// Just the following schema objects
 	// +optional
+	// +kubebuilder:validation:XValidation:rule="!(self.exists(o, has(o.table) && has(o.table.columns)) && self.exists(o, has(o.tablesInSchema)))",message="specifying a column list when the publication also publishes tablesInSchema is not supported"
+	// +kubebuilder:validation:MaxItems=100000
 	Objects []PublicationTargetObject `json:"objects,omitempty"`
 }
 
 // PublicationTargetObject is an object to publish
-// +kubebuilder:validation:XValidation:rule="(has(self.schema) && !has(self.table)) || (!has(self.schema) && has(self.table))",message="schema and table are not compatible"
+// +kubebuilder:validation:XValidation:rule="(has(self.tablesInSchema) && !has(self.table)) || (!has(self.tablesInSchema) && has(self.table))",message="tablesInSchema and table are mutually exclusive"
 type PublicationTargetObject struct {
 	// The schema to publish
 	// +optional
-	Schema string `json:"schema,omitempty"`
+	TablesInSchema string `json:"tablesInSchema,omitempty"`
 
 	// A table to publish
 	// +optional

@@ -4193,7 +4193,7 @@ desired state that was synchronized</p>
 <table class="table">
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td><code>schema</code><br/>
+<tr><td><code>tablesInSchema</code><br/>
 <i>string</i>
 </td>
 <td>
@@ -4236,6 +4236,13 @@ desired state that was synchronized</p>
 </td>
 <td>
    <p>The table name</p>
+</td>
+</tr>
+<tr><td><code>schema</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The schema name</p>
 </td>
 </tr>
 <tr><td><code>columns</code><br/>

@@ -346,6 +346,7 @@ PublicationStatus
 PublicationTarget
 PublicationTargetAllTables
 PublicationTargetObject
+PublicationTargetTable
 PullPolicy
 QoS
 Quaresima
@@ -1074,6 +1075,7 @@ promotionTimeout
 promotionToken
 provisioner
 psql
+publicationDBName
 publicationName
 publicationReclaimPolicy
 pv
@@ -1241,6 +1243,7 @@ systemd
 sysv
 tAc
 tableExpression
+tablesInSchema
 tablespace
 tablespaceClassName
 tablespaceMapFile

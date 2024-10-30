@@ -9,10 +9,8 @@ spec:
   dbname: app
   target:
     objects:
+      - tablesInSchema: public
       - table:
           schema: another_schema
           name: numbers_three
           only: true
-          columns:
-            - i
-            - m

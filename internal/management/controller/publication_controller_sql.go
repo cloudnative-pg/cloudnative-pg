@@ -191,8 +191,8 @@ func toPublicationTargetObjectsSQL(obj *apiv1.PublicationTarget) string {
 }
 
 func toPublicationObjectSQL(obj *apiv1.PublicationTargetObject) string {
-	if len(obj.Schema) > 0 {
-		return fmt.Sprintf("TABLES IN SCHEMA %s", pgx.Identifier{obj.Schema}.Sanitize())
+	if len(obj.TablesInSchema) > 0 {
+		return fmt.Sprintf("TABLES IN SCHEMA %s", pgx.Identifier{obj.TablesInSchema}.Sanitize())
 	}
 
 	result := strings.Builder{}

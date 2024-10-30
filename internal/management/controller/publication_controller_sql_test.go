@@ -79,7 +79,7 @@ var _ = Describe("publication sql", func() {
 				Name: "test_pub",
 				Target: apiv1.PublicationTarget{
 					Objects: []apiv1.PublicationTargetObject{
-						{Schema: "public"},
+						{TablesInSchema: "public"},
 					},
 				},
 			},
@@ -133,7 +133,7 @@ var _ = Describe("publication sql", func() {
 				Name: "test_pub",
 				Target: apiv1.PublicationTarget{
 					Objects: []apiv1.PublicationTargetObject{
-						{Schema: "public"},
+						{TablesInSchema: "public"},
 					},
 				},
 			},
@@ -181,7 +181,7 @@ var _ = Describe("publication sql", func() {
 				},
 				Target: apiv1.PublicationTarget{
 					Objects: []apiv1.PublicationTargetObject{
-						{Schema: "public"},
+						{TablesInSchema: "public"},
 					},
 				},
 			},
