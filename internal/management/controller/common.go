@@ -23,6 +23,7 @@ import (
 	"maps"
 	"slices"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/lib/pq"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -95,13 +96,14 @@ func getClusterFromInstance(
 }
 
 func toPostgresParameters(parameters map[string]string) string {
-	keys := slices.Sorted(maps.Keys(parameters))
+	if len(parameters) == 0 {
+		return ""
+	}
 
 	b := new(bytes.Buffer)
-	for _, key := range keys {
-		// TODO(armru): should we sanitize the key?
+	for _, key := range slices.Sorted(maps.Keys(parameters)) {
 		// TODO(armru): any alternative to pg.QuoteLiteral?
-		_, _ = fmt.Fprintf(b, "%s = %s, ", key, pq.QuoteLiteral(parameters[key]))
+		_, _ = fmt.Fprintf(b, "%s = %s, ", pgx.Identifier{key}.Sanitize(), pq.QuoteLiteral(parameters[key]))
 	}
 
 	// pruning last 2 chars `, `

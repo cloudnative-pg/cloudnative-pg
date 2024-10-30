@@ -113,7 +113,7 @@ var _ = Describe("publication sql", func() {
 		}
 
 		sqls := toPublicationAlterSQL(obj)
-		Expect(sqls).To(ContainElement(`ALTER PUBLICATION "test_pub" SET (param1 = 'value1', param2 = 'value2')`))
+		Expect(sqls).To(ContainElement(`ALTER PUBLICATION "test_pub" SET ("param1" = 'value1', "param2" = 'value2')`))
 	})
 
 	It("returns empty SQL list when no alterations are needed", func() {
@@ -191,7 +191,7 @@ var _ = Describe("publication sql", func() {
 
 		sqls := toPublicationCreateSQL(obj)
 		Expect(sqls).To(ContainElement(
-			`CREATE PUBLICATION "test_pub" FOR TABLES IN SCHEMA "public" WITH (param1 = 'value1', param2 = 'value2')`,
+			`CREATE PUBLICATION "test_pub" FOR TABLES IN SCHEMA "public" WITH ("param1" = 'value1', "param2" = 'value2')`,
 		))
 	})
 })

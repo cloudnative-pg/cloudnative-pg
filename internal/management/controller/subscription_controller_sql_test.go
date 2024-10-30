@@ -102,7 +102,7 @@ var _ = Describe("subscription sql", func() {
 		sqls := toSubscriptionCreateSQL(obj, connString)
 		expectedElement := `CREATE SUBSCRIPTION "test_sub" ` +
 			`CONNECTION 'host=localhost user=test dbname=test' ` +
-			`PUBLICATION "test_pub" WITH (param1 = 'value1', param2 = 'value2')`
+			`PUBLICATION "test_pub" WITH ("param1" = 'value1', "param2" = 'value2')`
 		Expect(sqls).To(ContainElement(expectedElement))
 	})
 
@@ -182,7 +182,7 @@ var _ = Describe("subscription sql", func() {
 		sqls := toSubscriptionAlterSQL(obj, connString)
 		Expect(sqls).To(ContainElement(`ALTER SUBSCRIPTION "test_sub" SET PUBLICATION "test_pub"`))
 		Expect(sqls).To(ContainElement(`ALTER SUBSCRIPTION "test_sub" CONNECTION 'host=localhost user=test dbname=test'`))
-		Expect(sqls).To(ContainElement(`ALTER SUBSCRIPTION "test_sub" SET (param1 = 'value1', param2 = 'value2')`))
+		Expect(sqls).To(ContainElement(`ALTER SUBSCRIPTION "test_sub" SET ("param1" = 'value1', "param2" = 'value2')`))
 	})
 
 	It("returns correct SQL for altering subscription with no owner or parameters", func() {
