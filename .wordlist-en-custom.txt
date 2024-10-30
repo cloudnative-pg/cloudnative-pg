@@ -479,6 +479,7 @@ authQuery
 authQuerySecret
 authn
 authz
+autocompletion
 autoscaler
 autovacuum
 availableArchitectures
@@ -560,6 +561,7 @@ clusterBackup
 clusterName
 clusterlist
 clusterrole
+clusterserviceversions
 clusterspec
 clusterstatus
 cmd
@@ -756,6 +758,8 @@ initDB
 initdb
 initialise
 initializingPVC
+inplace
+installplans
 instanceID
 instanceName
 instanceNames
@@ -856,6 +860,7 @@ mountPath
 msg
 mspan
 multinamespace
+mutatingwebhookconfigurations
 myAKSCluster
 myResourceGroup
 namespace
@@ -1194,6 +1199,7 @@ usernamepassword
 usr
 utils
 validUntil
+validatingwebhookconfigurations
 valueFrom
 viceversa
 virtualized
