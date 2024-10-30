@@ -111,17 +111,19 @@ CloudNativePG supports both
 [quorum-based and priority-based synchronous replication for PostgreSQL](https://www.postgresql.org/docs/current/warm-standby.html#SYNCHRONOUS-REPLICATION).
 
 !!! Warning
-    By default, synchronous replication will pause write operations if the
-    necessary number of standby nodes for WAL replication during transaction
-    commits is unavailable. This behavior ensures data durability and aligns with
-    the expectations of PostgreSQL DBAs. However, if your priority is self-healing
-    over strict data durability, you can adjust this setting.
-    Refer to the ["Data Durability"](#data-durability) section for guidance on
-    how to manage this behavior.
+    By default, synchronous replication pauses write operations if the required
+    number of standby nodes for WAL replication during transaction commits is
+    unavailable. This behavior prioritizes data durability and aligns with
+    PostgreSQL DBA best practices. However, if self-healing is a higher priority
+    than strict data durability in your setup, this setting can be adjusted. For
+    details on managing this behavior, refer to the [Data Durability and Synchronous Replication](##data-durability-and-synchronous-replication)
+    section.
 
-While direct configuration of the `synchronous_standby_names` option is
-prohibited, CloudNativePG allows you to customize its content and extend
-synchronous replication beyond the `Cluster` resource through the
+Direct configuration of the `synchronous_standby_names` option is not
+permitted. However, CloudNativePG automatically populates this option with the
+names of local pods, while also allowing customization to extend synchronous
+replication beyond the `Cluster` resource.
+This can be achieved through the
 [`.spec.postgresql.synchronous` stanza](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-SynchronousReplicaConfiguration).
 
 Synchronous replication is disabled by default (the `synchronous` stanza is not
@@ -133,9 +135,31 @@ defined). When defined, two options are mandatory:
 
 ### Quorum-based Synchronous Replication
 
-PostgreSQL's quorum-based synchronous replication makes transaction commits wait
-until their WAL records are replicated to at least a certain number of standbys.
-To use this method, set `method` to `any`.
+In PostgreSQL, quorum-based synchronous replication ensures that transaction
+commits wait until their WAL records are replicated to a specified number of
+standbys. To enable this, set the `method` to `any`.
+
+This replication method is the most common setup for a CloudNativePG cluster.
+
+#### Example
+
+The example below, based on a typical `cluster-example` configuration with
+three instances, sets up quorum-based synchronous replication with at least one
+instance:
+
+```yaml
+postgresql:
+  synchronous:
+    method: any
+    number: 1
+```
+
+With this configuration, CloudNativePG automatically sets the content of
+`synchronous_standby_names` as follows:
+
+```console
+ANY 1 (cluster-example-2, cluster-example-3, cluster-example-1)
+```
 
 #### Migrating from Deprecated Synchronous Replication Implementation
 
@@ -223,24 +247,9 @@ the PostgreSQL cluster. You can customize the content of
     an `application_name` listed here, ensuring their high availability.
     Incorrect entries can jeopardize your PostgreSQL database uptime.
 
-### Examples
+#### Examples
 
 Here are some examples, all based on a `cluster-example` with three instances:
-
-If you set:
-
-```yaml
-postgresql:
-  synchronous:
-    method: any
-    number: 1
-```
-
-The content of `synchronous_standby_names` will be:
-
-```console
-ANY 1 (cluster-example-2, cluster-example-3, cluster-example-1)
-```
 
 If you set:
 
@@ -299,49 +308,40 @@ The `synchronous_standby_names` option will look like:
 FIRST 2 (angus, cluster-example-2, malcolm)
 ```
 
-### Data Durability
+### Data Durability and Synchronous Replication
 
 The `dataDurability` option in the `.spec.postgresql.synchronous` stanza
-controls the behavior of synchronous replication in terms of data safety and
-availability. It can be set to either `required` or `preferred`. If unset, the
-default value is `required`. `preferred` is only available when
-`standbyNamesPre` and `standbyNamesPost` are not set.
+controls the trade-off between data safety and availability for synchronous
+replication. It can be set to `required` or `preferred`, with the default being
+`required` if not specified.
 
-- **required**: when `dataDurability` is set to `required`, PostgreSQL ensures
-  that transactions are only considered committed when the WAL (Write-Ahead Log)
-  records are replicated to the specified number of synchronous standbys. This
-  setting prioritizes data safety over availability, meaning that if the
-  required number of synchronous standbys is not available, write operations
-  will be blocked until the condition is met. This guarantees zero data loss (
-  RPO=0) but may impact the availability of the database during network
-  partitions or standby failures.
+!!! Important
+    `preferred` can only be used when `standbyNamesPre` and `standbyNamesPost`
+    are unset.
 
-  The names of the synchronous standbys from the cluster are populated by in the
-  following order:
+#### Required Data Durability
 
-    - healthy instances
-    - unhealthy instances
-    - primary
+When `dataDurability` is set to `required`, PostgreSQL only considers
+transactions committed once WAL (Write-Ahead Log) records have been replicated
+to the specified number of synchronous standbys. This setting prioritizes data
+safety over availability, meaning write operations will pause if the required
+number of synchronous standbys is unavailable. This ensures zero data loss
+(RPO=0) but may reduce database availability during network disruptions or
+standby failures.
 
-  and then cut off at `maxStandbyNamesFromCluster` if the value is set. This
-  allows prioritizing healthy instances when choosing synchronous standbys and
-  guarantees that `synchronous_standby_names` is always populated.
+Synchronous standbys are selected in this priority order:
 
-- **preferred**: when `dataDurability` is set to `preferred`, the operator will
-  change the requested number of synchronous instances depending on the number
-  of available instances. This means that PostgreSQL attempts to replicate WAL
-  records to the specified number of synchronous standbys, but it won't block
-  write operations if amount of available standbys is less than the requested
-  number. This setting provides a balance between data safety and availability,
-  allowing write operations to continue even if some synchronous standbys are
-  temporarily unavailable. However, this may result in potential data loss when
-  no standbys are available.
+1. Healthy instances
+2. Unhealthy instances
+3. Primary
 
-  Only healthy standbys are included in the `synchronous_standby_names` option.
+The list is then truncated based on `maxStandbyNamesFromCluster` if this value
+is set, prioritizing healthy instances and ensuring `synchronous_standby_names`
+is populated.
 
-#### Examples
+##### Example
 
-With `dataDurability: required`:
+Consider the following example:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -374,16 +374,35 @@ spec:
     ```
     ANY 1 ("foo-2","foo-3","foo-1")
     ```
+    
+    At this point no write operations will be allowed until at least one of the
+    standbys is available again.
 
-   At this point no write operations will be allowed until at least one of the
-   standbys is available again.
-
-4. When the standbys are available again, the `synchronous_standby_names` will
+4. When the standbys are available again, `synchronous_standby_names` will
    be back to the initial state.
 
-Let's see a similar example with `dataDurability: preferred`. For the sake of
-the example, we will consider a cluster with 5 instances, and 2 synchronous
-standbys:
+#### Preferred Data Durability
+
+When `dataDurability` is set to `preferred`, the required number of synchronous
+instances adjusts based on the number of available standbys. PostgreSQL will
+attempt to replicate WAL records to the designated number of synchronous
+standbys, but write operations will continue even if fewer than the requested
+number of standbys are available.
+
+This setting balances data safety with availability, enabling applications to
+continue writing during temporary standby unavailability—hence, it’s also known
+as *self-healing mode*.
+
+!!! Warning
+    This mode may result in data loss if all standbys become unavailable.
+
+With `preferred` data durability, **only healthy replicas** are included in
+`synchronous_standby_names`.
+
+##### Example
+
+Consider the following example. For demonstration, we’ll use a cluster named
+`bar` with 5 instances and 2 synchronous standbys:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -422,7 +441,7 @@ spec:
 4. `bar-5` also becomes unavailable. `synchronous_standby_names` becomes empty,
    disabling synchronous replication completely. Write operations will continue,
    but with the risk of potential data loss in case of a primary failure.
-5. When the standbys are back, the `synchronous_standby_names` will be back to
+5. When the replicas are back, `synchronous_standby_names` will be back to
    the initial state.
 
 ## Synchronous Replication (Deprecated)
