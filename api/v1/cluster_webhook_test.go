@@ -1940,6 +1940,48 @@ var _ = Describe("Number of synchronous replicas", func() {
 	})
 })
 
+var _ = Describe("validateSynchronousReplicaConfiguration", func() {
+	It("returns an error when instances is 1 and synchronous configuration is set", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				Instances: 1,
+				PostgresConfiguration: PostgresConfiguration{
+					Synchronous: &SynchronousReplicaConfiguration{},
+				},
+			},
+		}
+		errors := cluster.validateSynchronousReplicaConfiguration()
+		Expect(errors).To(HaveLen(1))
+		Expect(errors[0].Detail).To(Equal("synchronous configuration is not allowed when instances is set to 1"))
+	})
+
+	It("returns no error when instances is greater than 1 and synchronous configuration is set", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				Instances: 2,
+				PostgresConfiguration: PostgresConfiguration{
+					Synchronous: &SynchronousReplicaConfiguration{},
+				},
+			},
+		}
+		errors := cluster.validateSynchronousReplicaConfiguration()
+		Expect(errors).To(BeEmpty())
+	})
+
+	It("returns no error when instances is 1 and synchronous configuration is not set", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				Instances: 1,
+				PostgresConfiguration: PostgresConfiguration{
+					Synchronous: nil,
+				},
+			},
+		}
+		errors := cluster.validateSynchronousReplicaConfiguration()
+		Expect(errors).To(BeEmpty())
+	})
+})
+
 var _ = Describe("storage configuration validation", func() {
 	It("complains if the size is being reduced", func() {
 		clusterOld := Cluster{
