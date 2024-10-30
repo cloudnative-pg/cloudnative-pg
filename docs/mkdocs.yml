@@ -2,7 +2,8 @@ site_name: CloudNativePG
 site_author: The CloudNativePG Contributors
 docs_dir: src
 
-theme: readthedocs
+theme:
+  name: readthedocs
 
 extra_css:
   - css/override.css
@@ -11,6 +12,7 @@ markdown_extensions:
   - admonition
   - def_list
   - attr_list
+  - footnotes
 
 nav:
   - index.md

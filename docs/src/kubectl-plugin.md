@@ -1371,3 +1371,118 @@ The `cnpg` plugin can be easily integrated in [K9s](https://k9scli.io/), a
 popular terminal-based UI to interact with Kubernetes clusters.
 
 See [`k9s/plugins.yml`](samples/k9s/plugins.yml) for details.
+
+## Permissions required by the plugin
+
+The plugin requires a set of Kubernetes permissions that depends on the command
+to execute. These permissions may affect resources and sub-resources like Pods,
+PDBs, PVCs, and enable actions like `get`, `delete`, `patch`. The following
+table contains the full details:
+
+| Command         | Resource Permissions                                                                                                                                                                                                                                                                                                                                  |
+|:----------------|:------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| backup          | clusters: get<br/>backups: create                                                                                                                                                                                                                                                                                                                     |
+| certificate     | clusters: get<br/>secrets: get,create                                                                                                                                                                                                                                                                                                                 |
+| destroy         | pods: get,delete<br/>jobs: delete,list<br/>PVCs: list,delete,update                                                                                                                                                                                                                                                                                   |
+| fencing         | clusters: get,patch<br/>pods: get                                                                                                                                                                                                                                                                                                                     |
+| fio             | PVCs: create<br/>configmaps: create<br/>deployment: create                                                                                                                                                                                                                                                                                            |
+| hibernate       | clusters: get,patch,delete<br/>pods: list,get,delete<br/>pods/exec: create<br/>jobs: list<br/>PVCs: get,list,update,patch,delete                                                                                                                                                                                                                      |
+| install         | none                                                                                                                                                                                                                                                                                                                                                  |
+| logs            | clusters: get<br/>pods: list<br/>pods/log: get                                                                                                                                                                                                                                                                                                        |
+| maintenance     | clusters: get,patch,list<br/>                                                                                                                                                                                                                                                                                                                         |
+| pgadmin4        | clusters: get<br/>configmaps: create<br/>deployments: create<br/>services: create<br/>secrets: create                                                                                                                                                                                                                                                 |
+| pgbench         | clusters: get<br/>jobs: create<br/>                                                                                                                                                                                                                                                                                                                   |
+| promote         | clusters: get<br/>clusters/status: patch<br/>pods: get                                                                                                                                                                                                                                                                                                |
+| psql            | pods: get,list<br/>pods/exec: create                                                                                                                                                                                                                                                                                                                  |
+| publication     | clusters: get<br/>pods: get,list<br/>pods/exec: create                                                                                                                                                                                                                                                                                                |
+| reload          | clusters: get,patch                                                                                                                                                                                                                                                                                                                                   |
+| report cluster  | clusters: get<br/>pods: list<br/>pods/log: get<br/>jobs: list<br/>events: list<br/>PVCs: list                                                                                                                                                                                                                                                         |
+| report operator | configmaps: get<br/>deployments: get<br/>events: list<br/>pods: list<br/>pods/log: get<br/>secrets: get<br/>services: get<br/>mutatingwebhookconfigurations: list[^1]<br/> validatingwebhookconfigurations: list[^1]<br/> If OLM is present on the K8s cluster, also:<br/>clusterserviceversions: list<br/>installplans: list<br/>subscriptions: list |
+| restart         | clusters: get,patch<br/>pods: get,delete                                                                                                                                                                                                                                                                                                              |
+| status          | clusters: get<br/>pods: list<br/>pods/exec: create<br/>pods/proxy: create<br/>PDBs: list                                                                                                                                                                                                                                                              |
+| subscription    | clusters: get<br/>pods: get,list<br/>pods/exec: create                                                                                                                                                                                                                                                                                                |
+| version         | none                                                                                                                                                                                                                                                                                                                                                  |
+
+[^1]: The permissions are cluster scope ClusterRole resources.
+
+///Footnotes Go Here///
+
+Additionally, assigning the `list` permission on the `clusters` will enable
+autocompletion for multiple commands.
+
+### Role examples
+
+It is possible to create roles with restricted permissions.
+The following example creates a role that only has access to the cluster logs:
+
+```yaml
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: cnpg-log
+rules:
+  - verbs:
+      - get
+    apiGroups:
+      - postgresql.cnpg.io
+    resources:
+      - clusters
+  - verbs:
+      - list
+    apiGroups:
+      - ''
+    resources:
+      - pods
+  - verbs:
+      - get
+    apiGroups:
+      - ''
+    resources:
+      - pods/log
+```
+
+The next example shows a role with the minimal permissions required to get
+the cluster status using the plugin's `status` command:
+
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: cnpg-status
+rules:
+  - verbs:
+      - get
+    apiGroups:
+      - postgresql.cnpg.io
+    resources:
+      - clusters
+  - verbs:
+      - list
+    apiGroups:
+      - ''
+    resources:
+      - pods
+  - verbs:
+      - create
+    apiGroups:
+      - ''
+    resources:
+      - pods/exec
+  - verbs:
+      - create
+    apiGroups:
+      - ''
+    resources:
+      - pods/proxy
+  - verbs:
+      - list
+    apiGroups:
+      - policy
+    resources:
+      - poddisruptionbudgets
+```
+
+!!! Important
+    Keeping the verbs restricted per `resources` and per `apiGroups` helps to
+    prevent inadvertently granting more than intended permissions.
