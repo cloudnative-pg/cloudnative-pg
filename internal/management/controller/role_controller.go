@@ -54,7 +54,7 @@ type RoleReconciler struct {
 // 	GetNamespaceName() string
 // }
 
-// errClusterIsReplica is raised when the database object
+// errClusterIsReplica is raised when the role object
 // cannot be reconciled because it belongs to a replica cluster
 // var errClusterIsReplica = fmt.Errorf("waiting for the cluster to become primary")
 
@@ -65,7 +65,7 @@ const roleReconciliationInterval = 30 * time.Second
 // +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=roles,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=roles/status,verbs=get;update;patch
 
-// Reconcile is the database reconciliation loop
+// Reconcile is the role reconciliation loop
 func (r *RoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
@@ -139,13 +139,13 @@ func (r *RoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	// Add the finalizer if we don't have it
 	// nolint:nestif
 	if role.DeletionTimestamp.IsZero() {
-		if controllerutil.AddFinalizer(&role, utils.DatabaseFinalizerName) {
+		if controllerutil.AddFinalizer(&role, utils.RoleFinalizerName) {
 			if err := r.Update(ctx, &role); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
 	} else {
-		// This database is being deleted
+		// This role is being deleted
 		if controllerutil.ContainsFinalizer(&role, utils.RoleFinalizerName) {
 			if role.Spec.ReclaimPolicy == apiv1.RoleReclaimDelete {
 				dbRole := roleAdapter{
@@ -157,7 +157,7 @@ func (r *RoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 			}
 
 			// remove our finalizer from the list and update it.
-			controllerutil.RemoveFinalizer(&role, utils.DatabaseFinalizerName)
+			controllerutil.RemoveFinalizer(&role, utils.RoleFinalizerName)
 			if err := r.Update(ctx, &role); err != nil {
 				return ctrl.Result{}, err
 			}
@@ -167,7 +167,7 @@ func (r *RoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	}
 
 	// TODO: the logic to ensure only one manager can be done after the POC
-	// Make sure the target PG Database is not being managed by another Database Object
+	// Make sure the target PG Role is not being managed by another Role Object
 	// if err := r.ensureOnlyOneManager(ctx, role); err != nil {
 	// 	return r.failedReconciliation(
 	// 		ctx,
@@ -248,8 +248,8 @@ func NewRoleReconciler(
 // SetupWithManager sets up the controller with the Manager.
 func (r *RoleReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&apiv1.Database{}).
-		Named("instance-database").
+		For(&apiv1.Role{}).
+		Named("instance-role-reconciler").
 		Complete(r)
 }
 
