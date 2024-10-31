@@ -100,7 +100,7 @@ func (r *SubscriptionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	// Cannot do anything on a replica cluster
 	if cluster.IsReplica() {
-		if err := markAsFailed(ctx, r.Client, &subscription, errClusterIsReplica); err != nil {
+		if err := markAsUnknown(ctx, r.Client, &subscription, errClusterIsReplica); err != nil {
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{RequeueAfter: subscriptionReconciliationInterval}, nil

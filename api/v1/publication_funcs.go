@@ -24,6 +24,12 @@ func (pub *Publication) SetAsFailed(err error) {
 	pub.Status.Message = err.Error()
 }
 
+// SetAsUnknown sets the publication as unknown with the given error
+func (pub *Publication) SetAsUnknown(err error) {
+	pub.Status.Applied = nil
+	pub.Status.Message = err.Error()
+}
+
 // SetAsReady sets the subscription as working correctly
 func (pub *Publication) SetAsReady() {
 	pub.Status.Applied = ptr.To(true)

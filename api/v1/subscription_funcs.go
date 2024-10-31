@@ -24,6 +24,12 @@ func (sub *Subscription) SetAsFailed(err error) {
 	sub.Status.Message = err.Error()
 }
 
+// SetAsUnknown sets the subscription as unknown with the given error
+func (sub *Subscription) SetAsUnknown(err error) {
+	sub.Status.Applied = nil
+	sub.Status.Message = err.Error()
+}
+
 // SetAsReady sets the subscription as working correctly
 func (sub *Subscription) SetAsReady() {
 	sub.Status.Applied = ptr.To(true)
