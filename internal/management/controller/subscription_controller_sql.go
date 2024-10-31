@@ -101,8 +101,6 @@ func (r *SubscriptionReconciler) createSubscription(
 }
 
 func toSubscriptionCreateSQL(obj *apiv1.Subscription, connString string) []string {
-	result := make([]string, 0, 2)
-
 	createQuery := fmt.Sprintf(
 		"CREATE SUBSCRIPTION %s CONNECTION %s PUBLICATION %s",
 		pgx.Identifier{obj.Spec.Name}.Sanitize(),
@@ -112,23 +110,12 @@ func toSubscriptionCreateSQL(obj *apiv1.Subscription, connString string) []strin
 	if len(obj.Spec.Parameters) > 0 {
 		createQuery = fmt.Sprintf("%s WITH (%s)", createQuery, toPostgresParameters(obj.Spec.Parameters))
 	}
-	result = append(result, createQuery)
 
-	if len(obj.Spec.Owner) > 0 {
-		result = append(result,
-			fmt.Sprintf(
-				"ALTER SUBSCRIPTION %s OWNER TO %s",
-				pgx.Identifier{obj.Spec.Name}.Sanitize(),
-				pgx.Identifier{obj.Spec.Owner}.Sanitize(),
-			),
-		)
-	}
-
-	return result
+	return []string{createQuery}
 }
 
 func toSubscriptionAlterSQL(obj *apiv1.Subscription, connString string) []string {
-	result := make([]string, 0, 4)
+	result := make([]string, 0, 3)
 
 	setPublicationSQL := fmt.Sprintf(
 		"ALTER SUBSCRIPTION %s SET PUBLICATION %s",
@@ -142,16 +129,6 @@ func toSubscriptionAlterSQL(obj *apiv1.Subscription, connString string) []string
 		pq.QuoteLiteral(connString),
 	)
 	result = append(result, setPublicationSQL, setConnStringSQL)
-
-	if len(obj.Spec.Owner) > 0 {
-		result = append(result,
-			fmt.Sprintf(
-				"ALTER SUBSCRIPTION %s OWNER TO %s",
-				pgx.Identifier{obj.Spec.Name}.Sanitize(),
-				pgx.Identifier{obj.Spec.Owner}.Sanitize(),
-			),
-		)
-	}
 
 	if len(obj.Spec.Parameters) > 0 {
 		result = append(result,

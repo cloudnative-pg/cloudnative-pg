@@ -85,9 +85,6 @@ spec:
                 x-kubernetes-validations:
                 - message: name is immutable
                   rule: self == oldSelf
-              owner:
-                description: The owner
-                type: string
               parameters:
                 additionalProperties:
                   type: string

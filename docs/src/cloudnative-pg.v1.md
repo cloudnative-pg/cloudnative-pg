@@ -4078,13 +4078,6 @@ the primary server of the cluster as part of rolling updates</p>
    <p>The name of the database</p>
 </td>
 </tr>
-<tr><td><code>owner</code><br/>
-<i>string</i>
-</td>
-<td>
-   <p>The owner</p>
-</td>
-</tr>
 <tr><td><code>parameters</code><br/>
 <i>map[string]string</i>
 </td>
@@ -5157,13 +5150,6 @@ Size cannot be decreased.</p>
 </td>
 <td>
    <p>The name inside PostgreSQL</p>
-</td>
-</tr>
-<tr><td><code>owner</code> <B>[Required]</B><br/>
-<i>string</i>
-</td>
-<td>
-   <p>The owner</p>
 </td>
 </tr>
 <tr><td><code>dbname</code> <B>[Required]</B><br/>

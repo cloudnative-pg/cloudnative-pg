@@ -94,8 +94,6 @@ func (r *PublicationReconciler) createPublication(
 }
 
 func toPublicationCreateSQL(obj *apiv1.Publication) []string {
-	result := make([]string, 0, 2)
-
 	createQuery := fmt.Sprintf(
 		"CREATE PUBLICATION %s %s",
 		pgx.Identifier{obj.Spec.Name}.Sanitize(),
@@ -104,23 +102,12 @@ func toPublicationCreateSQL(obj *apiv1.Publication) []string {
 	if len(obj.Spec.Parameters) > 0 {
 		createQuery = fmt.Sprintf("%s WITH (%s)", createQuery, toPostgresParameters(obj.Spec.Parameters))
 	}
-	result = append(result, createQuery)
 
-	if len(obj.Spec.Owner) > 0 {
-		result = append(result,
-			fmt.Sprintf(
-				"ALTER PUBLICATION %s OWNER to %s",
-				pgx.Identifier{obj.Spec.Name}.Sanitize(),
-				pgx.Identifier{obj.Spec.Owner}.Sanitize(),
-			),
-		)
-	}
-
-	return result
+	return []string{createQuery}
 }
 
 func toPublicationAlterSQL(obj *apiv1.Publication) []string {
-	result := make([]string, 0, 3)
+	result := make([]string, 0, 2)
 
 	if len(obj.Spec.Target.Objects) > 0 {
 		result = append(result,
@@ -128,16 +115,6 @@ func toPublicationAlterSQL(obj *apiv1.Publication) []string {
 				"ALTER PUBLICATION %s SET %s",
 				pgx.Identifier{obj.Spec.Name}.Sanitize(),
 				toPublicationTargetObjectsSQL(&obj.Spec.Target),
-			),
-		)
-	}
-
-	if len(obj.Spec.Owner) > 0 {
-		result = append(result,
-			fmt.Sprintf(
-				"ALTER PUBLICATION %s OWNER TO %s",
-				pgx.Identifier{obj.Spec.Name}.Sanitize(),
-				pgx.Identifier{obj.Spec.Owner}.Sanitize(),
 			),
 		)
 	}

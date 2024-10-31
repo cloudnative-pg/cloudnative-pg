@@ -48,10 +48,6 @@ type PublicationSpec struct {
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="dbname is immutable"
 	DBName string `json:"dbname"`
 
-	// The owner
-	// +optional
-	Owner string `json:"owner,omitempty"`
-
 	// Parameters
 	// +optional
 	Parameters map[string]string `json:"parameters,omitempty"`

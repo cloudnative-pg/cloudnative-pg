@@ -44,10 +44,6 @@ type SubscriptionSpec struct {
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="name is immutable"
 	Name string `json:"name"`
 
-	// The owner
-	// +optional
-	Owner string `json:"owner,omitempty"`
-
 	// The name of the database
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="dbname is immutable"
 	DBName string `json:"dbname"`
