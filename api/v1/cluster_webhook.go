@@ -1088,8 +1088,8 @@ func (r *Cluster) validateSynchronousReplicaConfiguration() field.ErrorList {
 		err := field.Invalid(
 			field.NewPath("spec", "postgresql", "synchronous"),
 			r.Spec.PostgresConfiguration.Synchronous,
-			"synchronous configuration incorrect - number of synchronous replicas must be less than the total "+
-				"number of instances and user specified standbys",
+			"Invalid synchronous configuration: the number of synchronous replicas must be less than the "+
+				"total number of instances and the provided standby names.",
 		)
 		result = append(result, err)
 	}
