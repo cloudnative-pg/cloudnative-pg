@@ -31,19 +31,37 @@ import (
 const placeholderInstanceNameSuffix = "-placeholder"
 
 func explicitSynchronousStandbyNames(cluster *apiv1.Cluster) string {
+	switch cluster.Spec.PostgresConfiguration.Synchronous.DataDurability {
+	case apiv1.DataDurabilityLevelPreferred:
+		return explicitSynchronousStandbyNamesDataDurabilityPreferred(cluster)
+
+	default:
+		return explicitSynchronousStandbyNamesDataDurabilityRequired(cluster)
+	}
+}
+
+func explicitSynchronousStandbyNamesDataDurabilityRequired(cluster *apiv1.Cluster) string {
 	config := cluster.Spec.PostgresConfiguration.Synchronous
 
 	// Create the list of pod names
 	clusterInstancesList := getSortedInstanceNames(cluster)
+
+	// Cap the number of standby names using the configuration on the cluster
 	if config.MaxStandbyNamesFromCluster != nil && len(clusterInstancesList) > *config.MaxStandbyNamesFromCluster {
 		clusterInstancesList = clusterInstancesList[:*config.MaxStandbyNamesFromCluster]
 	}
 
 	// Add prefix and suffix
-	instancesList := config.StandbyNamesPre
+	instancesList := make([]string, 0,
+		len(clusterInstancesList)+len(config.StandbyNamesPre)+len(config.StandbyNamesPost))
+	instancesList = append(instancesList, config.StandbyNamesPre...)
 	instancesList = append(instancesList, clusterInstancesList...)
 	instancesList = append(instancesList, config.StandbyNamesPost...)
 
+	// An empty instances list would generate a PostgreSQL syntax error
+	// because configuring synchronous replication with an empty replica
+	// list is not allowed.
+	// Adding this as a safeguard, but this should never get into a postgres configuration.
 	if len(instancesList) == 0 {
 		instancesList = []string{
 			cluster.Name + placeholderInstanceNameSuffix,
@@ -60,6 +78,42 @@ func explicitSynchronousStandbyNames(cluster *apiv1.Cluster) string {
 		"%s %v (%v)",
 		config.Method.ToPostgreSQLConfigurationKeyword(),
 		config.Number,
+		strings.Join(escapedReplicas, ","))
+}
+
+func explicitSynchronousStandbyNamesDataDurabilityPreferred(cluster *apiv1.Cluster) string {
+	config := cluster.Spec.PostgresConfiguration.Synchronous
+
+	// Create the list of healthy replicas
+	instancesList := getSortedNonPrimaryHealthyInstanceNames(cluster)
+
+	// Cap the number of standby names using the configuration on the cluster
+	if config.MaxStandbyNamesFromCluster != nil && len(instancesList) > *config.MaxStandbyNamesFromCluster {
+		instancesList = instancesList[:*config.MaxStandbyNamesFromCluster]
+	}
+
+	// Escape the pod list
+	escapedReplicas := make([]string, len(instancesList))
+	for idx, name := range instancesList {
+		escapedReplicas[idx] = escapePostgresConfLiteral(name)
+	}
+
+	// If data durability is not enforced, we cap the number of synchronous
+	// replicas to be required to the number or available replicas.
+	syncReplicaNumber := config.Number
+	if syncReplicaNumber > len(instancesList) {
+		syncReplicaNumber = len(instancesList)
+	}
+
+	// An empty instances list is not allowed in synchronous_standby_names
+	if len(instancesList) == 0 {
+		return ""
+	}
+
+	return fmt.Sprintf(
+		"%s %v (%v)",
+		config.Method.ToPostgreSQLConfigurationKeyword(),
+		syncReplicaNumber,
 		strings.Join(escapedReplicas, ","))
 }
 

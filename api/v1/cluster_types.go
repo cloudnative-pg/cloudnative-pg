@@ -1173,10 +1173,24 @@ const (
 	SynchronousReplicaConfigurationMethodAny = SynchronousReplicaConfigurationMethod("any")
 )
 
+// DataDurabilityLevel specifies how strictly to enforce synchronous replication
+// when cluster instances are unavailable. Options are `required` or `preferred`.
+type DataDurabilityLevel string
+
+const (
+	// DataDurabilityLevelRequired means that data durability is strictly enforced
+	DataDurabilityLevelRequired DataDurabilityLevel = "required"
+
+	// DataDurabilityLevelPreferred means that data durability is enforced
+	// only when healthy replicas are available
+	DataDurabilityLevelPreferred DataDurabilityLevel = "preferred"
+)
+
 // SynchronousReplicaConfiguration contains the configuration of the
 // PostgreSQL synchronous replication feature.
 // Important: at this moment, also `.spec.minSyncReplicas` and `.spec.maxSyncReplicas`
 // need to be considered.
+// +kubebuilder:validation:XValidation:rule="self.dataDurability!='preferred' || ((!has(self.standbyNamesPre) || self.standbyNamesPre.size()==0) && (!has(self.standbyNamesPost) || self.standbyNamesPost.size()==0))",message="dataDurability set to 'preferred' requires empty 'standbyNamesPre' and empty 'standbyNamesPost'"
 type SynchronousReplicaConfiguration struct {
 	// Method to select synchronous replication standbys from the listed
 	// servers, accepting 'any' (quorum-based synchronous replication) or
@@ -1206,6 +1220,19 @@ type SynchronousReplicaConfiguration struct {
 	// only useful for priority-based synchronous replication).
 	// +optional
 	StandbyNamesPost []string `json:"standbyNamesPost,omitempty"`
+
+	// If set to "required", data durability is strictly enforced. Write operations
+	// with synchronous commit settings (`on`, `remote_write`, or `remote_apply`) will
+	// block if there are insufficient healthy replicas, ensuring data persistence.
+	// If set to "preferred", data durability is maintained when healthy replicas
+	// are available, but the required number of instances will adjust dynamically
+	// if replicas become unavailable. This setting relaxes strict durability enforcement
+	// to allow for operational continuity. This setting is only applicable if both
+	// `standbyNamesPre` and `standbyNamesPost` are unset (empty).
+	// +kubebuilder:validation:Enum=required;preferred
+	// +kubebuilder:default:=required
+	// +optional
+	DataDurability DataDurabilityLevel `json:"dataDurability,omitempty"`
 }
 
 // PostgresConfiguration defines the PostgreSQL configuration

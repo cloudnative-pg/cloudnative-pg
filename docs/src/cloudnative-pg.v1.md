@@ -2199,6 +2199,21 @@ Map keys are the config map names, map values are the versions</p>
 </tbody>
 </table>
 
+## DataDurabilityLevel     {#postgresql-cnpg-io-v1-DataDurabilityLevel}
+
+(Alias of `string`)
+
+**Appears in:**
+
+- [SynchronousReplicaConfiguration](#postgresql-cnpg-io-v1-SynchronousReplicaConfiguration)
+
+
+<p>DataDurabilityLevel specifies how strictly to enforce synchronous replication
+when cluster instances are unavailable. Options are <code>required</code> or <code>preferred</code>.</p>
+
+
+
+
 ## DataSource     {#postgresql-cnpg-io-v1-DataSource}
 
 
@@ -4989,6 +5004,20 @@ only useful for priority-based synchronous replication).</p>
    <p>A user-defined list of application names to be added to
 <code>synchronous_standby_names</code> after local cluster pods (the order is
 only useful for priority-based synchronous replication).</p>
+</td>
+</tr>
+<tr><td><code>dataDurability</code><br/>
+<a href="#postgresql-cnpg-io-v1-DataDurabilityLevel"><i>DataDurabilityLevel</i></a>
+</td>
+<td>
+   <p>If set to &quot;required&quot;, data durability is strictly enforced. Write operations
+with synchronous commit settings (<code>on</code>, <code>remote_write</code>, or <code>remote_apply</code>) will
+block if there are insufficient healthy replicas, ensuring data persistence.
+If set to &quot;preferred&quot;, data durability is maintained when healthy replicas
+are available, but the required number of instances will adjust dynamically
+if replicas become unavailable. This setting relaxes strict durability enforcement
+to allow for operational continuity. This setting is only applicable if both
+<code>standbyNamesPre</code> and <code>standbyNamesPost</code> are unset (empty).</p>
 </td>
 </tr>
 </tbody>

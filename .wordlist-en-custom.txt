@@ -118,6 +118,7 @@ DISA
 DNS
 DataBackupConfiguration
 DataBase
+DataDurabilityLevel
 DataSource
 DatabaseReclaimPolicy
 DatabaseRoleRef
@@ -674,6 +675,7 @@ cyber
 dT
 danglingPVC
 dataChecksums
+dataDurability
 databackupconfiguration
 databaseReclaimPolicy
 datacenter

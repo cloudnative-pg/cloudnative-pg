@@ -4058,6 +4058,21 @@ spec:
                     description: Configuration of the PostgreSQL synchronous replication
                       feature
                     properties:
+                      dataDurability:
+                        default: required
+                        description: |-
+                          If set to "required", data durability is strictly enforced. Write operations
+                          with synchronous commit settings (`on`, `remote_write`, or `remote_apply`) will
+                          block if there are insufficient healthy replicas, ensuring data persistence.
+                          If set to "preferred", data durability is maintained when healthy replicas
+                          are available, but the required number of instances will adjust dynamically
+                          if replicas become unavailable. This setting relaxes strict durability enforcement
+                          to allow for operational continuity. This setting is only applicable if both
+                          `standbyNamesPre` and `standbyNamesPost` are unset (empty).
+                        enum:
+                        - required
+                        - preferred
+                        type: string
                       maxStandbyNamesFromCluster:
                         description: |-
                           Specifies the maximum number of local cluster pods that can be
@@ -4102,6 +4117,12 @@ spec:
                     - method
                     - number
                     type: object
+                    x-kubernetes-validations:
+                    - message: dataDurability set to 'preferred' requires empty 'standbyNamesPre'
+                        and empty 'standbyNamesPost'
+                      rule: self.dataDurability!='preferred' || ((!has(self.standbyNamesPre)
+                        || self.standbyNamesPre.size()==0) && (!has(self.standbyNamesPost)
+                        || self.standbyNamesPost.size()==0))
                 type: object
               primaryUpdateMethod:
                 default: restart

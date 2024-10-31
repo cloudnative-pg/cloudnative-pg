@@ -95,7 +95,7 @@ func getSyncReplicasData(cluster *apiv1.Cluster) (syncReplicas int, electableSyn
 
 // getElectableSyncReplicas computes the names of the instances that can be elected to sync replicas
 func getElectableSyncReplicas(cluster *apiv1.Cluster) []string {
-	nonPrimaryInstances := getSortedNonPrimaryInstanceNames(cluster)
+	nonPrimaryInstances := getSortedNonPrimaryHealthyInstanceNames(cluster)
 
 	topology := cluster.Status.Topology
 	// We need to include every replica inside the list of possible synchronous standbys if we have no constraints
@@ -145,7 +145,7 @@ func getElectableSyncReplicas(cluster *apiv1.Cluster) []string {
 	return electableReplicas
 }
 
-func getSortedNonPrimaryInstanceNames(cluster *apiv1.Cluster) []string {
+func getSortedNonPrimaryHealthyInstanceNames(cluster *apiv1.Cluster) []string {
 	var nonPrimaryInstances []string
 	for _, instance := range cluster.Status.InstancesStatus[apiv1.PodHealthy] {
 		if cluster.Status.CurrentPrimary != instance {

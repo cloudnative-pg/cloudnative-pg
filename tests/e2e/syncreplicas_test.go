@@ -20,10 +20,12 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
@@ -110,7 +112,8 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 				}, RetryTimeout, 5).Should(BeNil())
 
 				// Scale the cluster down to 2 pods
-				_, _, err := utils.Run(fmt.Sprintf("kubectl scale --replicas=2 -n %v cluster/%v", namespace, clusterName))
+				_, _, err := utils.Run(fmt.Sprintf("kubectl scale --replicas=2 -n %v cluster/%v", namespace,
+					clusterName))
 				Expect(err).ToNot(HaveOccurred())
 				timeout := 120
 				// Wait for pod 3 to be completely terminated
@@ -226,6 +229,56 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 				}, RetryTimeout, 5).Should(BeNil())
 				compareSynchronousStandbyNames(namespace, clusterName, "FIRST 1 (\"preSyncReplica\"")
 				compareSynchronousStandbyNames(namespace, clusterName, "\"postSyncReplica\")")
+			})
+		})
+
+		Context("data durability is preferred", func() {
+			It("will decrease the number of sync replicas to the number of available replicas", func() {
+				const (
+					namespacePrefix = "sync-replicas-preferred"
+					sampleFile      = fixturesDir + "/sync_replicas/preferred.yaml.template"
+				)
+				clusterName, err := env.GetResourceNameFromYAML(sampleFile)
+				Expect(err).ToNot(HaveOccurred())
+
+				namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+				Expect(err).ToNot(HaveOccurred())
+				AssertCreateCluster(namespace, clusterName, sampleFile, env)
+
+				By("verifying we have 2 quorum-based replicas", func() {
+					getSyncReplicationCount(namespace, clusterName, "quorum", 2)
+					compareSynchronousStandbyNames(namespace, clusterName, "ANY 2")
+				})
+
+				By("fencing a replica and verifying we have only 1 quorum-based replica", func() {
+					Expect(utils.FencingOn(env, fmt.Sprintf("%v-3", clusterName),
+						namespace, clusterName, utils.UsingAnnotation)).Should(Succeed())
+					getSyncReplicationCount(namespace, clusterName, "quorum", 1)
+					compareSynchronousStandbyNames(namespace, clusterName, "ANY 1")
+				})
+				By("fencing the second replica and verifying we unset synchronous_standby_names", func() {
+					Expect(utils.FencingOn(env, fmt.Sprintf("%v-2", clusterName),
+						namespace, clusterName, utils.UsingAnnotation)).Should(Succeed())
+					Eventually(func() string {
+						commandTimeout := time.Second * 10
+						primary, err := env.GetClusterPrimary(namespace, clusterName)
+						Expect(err).ToNot(HaveOccurred())
+
+						stdout, _, err := env.ExecCommand(env.Ctx, *primary, specs.PostgresContainerName,
+							&commandTimeout,
+							"psql", "-U", "postgres", "-tAc", "show synchronous_standby_names")
+						Expect(err).ToNot(HaveOccurred())
+						return strings.Trim(stdout, "\n")
+					}, 160).Should(BeEmpty())
+				})
+				By("unfenicing the replicas and verifying we have 2 quorum-based replicas", func() {
+					Expect(utils.FencingOff(env, fmt.Sprintf("%v-3", clusterName),
+						namespace, clusterName, utils.UsingAnnotation)).Should(Succeed())
+					Expect(utils.FencingOff(env, fmt.Sprintf("%v-2", clusterName),
+						namespace, clusterName, utils.UsingAnnotation)).Should(Succeed())
+					getSyncReplicationCount(namespace, clusterName, "quorum", 2)
+					compareSynchronousStandbyNames(namespace, clusterName, "ANY 2")
+				})
 			})
 		})
 	})
