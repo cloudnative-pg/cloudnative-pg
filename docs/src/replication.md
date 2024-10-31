@@ -116,7 +116,7 @@ CloudNativePG supports both
     unavailable. This behavior prioritizes data durability and aligns with
     PostgreSQL DBA best practices. However, if self-healing is a higher priority
     than strict data durability in your setup, this setting can be adjusted. For
-    details on managing this behavior, refer to the [Data Durability and Synchronous Replication](##data-durability-and-synchronous-replication)
+    details on managing this behavior, refer to the [Data Durability and Synchronous Replication](#data-durability-and-synchronous-replication)
     section.
 
 Direct configuration of the `synchronous_standby_names` option is not
