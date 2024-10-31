@@ -46,8 +46,7 @@ func explicitSynchronousStandbyNamesDataDurabilityRequired(cluster *apiv1.Cluste
 	// Create the list of pod names
 	clusterInstancesList := getSortedInstanceNames(cluster)
 
-	// Cap the number of standby names using the configuration on the
-	// cluster
+	// Cap the number of standby names using the configuration on the cluster
 	if config.MaxStandbyNamesFromCluster != nil && len(clusterInstancesList) > *config.MaxStandbyNamesFromCluster {
 		clusterInstancesList = clusterInstancesList[:*config.MaxStandbyNamesFromCluster]
 	}
@@ -85,11 +84,10 @@ func explicitSynchronousStandbyNamesDataDurabilityRequired(cluster *apiv1.Cluste
 func explicitSynchronousStandbyNamesDataDurabilityPreferred(cluster *apiv1.Cluster) string {
 	config := cluster.Spec.PostgresConfiguration.Synchronous
 
-	// Create the list of pod names
-	instancesList := getSortedNonPrimaryInstanceNames(cluster)
+	// Create the list of healthy replicas
+	instancesList := getSortedNonPrimaryHealthyInstanceNames(cluster)
 
-	// Cap the number of standby names using the configuration on the
-	// cluster
+	// Cap the number of standby names using the configuration on the cluster
 	if config.MaxStandbyNamesFromCluster != nil && len(instancesList) > *config.MaxStandbyNamesFromCluster {
 		instancesList = instancesList[:*config.MaxStandbyNamesFromCluster]
 	}
