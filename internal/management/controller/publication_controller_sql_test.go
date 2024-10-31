@@ -169,3 +169,57 @@ var _ = Describe("publication sql", func() {
 		))
 	})
 })
+
+var _ = Describe("toPublicationObjectSQL", func() {
+	It("returns correct SQL for tables in schema", func() {
+		obj := &apiv1.PublicationTargetObject{
+			TablesInSchema: "public",
+		}
+		result := toPublicationObjectSQL(obj)
+		Expect(result).To(Equal(`TABLES IN SCHEMA "public"`))
+	})
+
+	It("returns correct SQL for table with schema and columns", func() {
+		obj := &apiv1.PublicationTargetObject{
+			Table: &apiv1.PublicationTargetTable{
+				Name:    "table",
+				Schema:  "test",
+				Columns: []string{"a", "b"},
+			},
+		}
+		result := toPublicationObjectSQL(obj)
+		Expect(result).To(Equal(`TABLE "test"."table" ("a", "b")`))
+	})
+
+	It("returns correct SQL for table with only clause", func() {
+		obj := &apiv1.PublicationTargetObject{
+			Table: &apiv1.PublicationTargetTable{
+				Name: "table",
+				Only: true,
+			},
+		}
+		result := toPublicationObjectSQL(obj)
+		Expect(result).To(Equal(`TABLE ONLY "table"`))
+	})
+
+	It("returns correct SQL for table without schema and columns", func() {
+		obj := &apiv1.PublicationTargetObject{
+			Table: &apiv1.PublicationTargetTable{
+				Name: "table",
+			},
+		}
+		result := toPublicationObjectSQL(obj)
+		Expect(result).To(Equal(`TABLE "table"`))
+	})
+
+	It("returns correct SQL for table with schema but without columns", func() {
+		obj := &apiv1.PublicationTargetObject{
+			Table: &apiv1.PublicationTargetTable{
+				Name:   "table",
+				Schema: "test",
+			},
+		}
+		result := toPublicationObjectSQL(obj)
+		Expect(result).To(Equal(`TABLE "test"."table"`))
+	})
+})

@@ -81,8 +81,8 @@ var _ = Describe("subscription sql", func() {
 		}
 		connString := "host=localhost user=test dbname=test"
 
-		sqls := toSubscriptionCreateSQL(obj, connString)
-		Expect(sqls).To(ContainElement(
+		sql := toSubscriptionCreateSQL(obj, connString)
+		Expect(sql).To(Equal(
 			`CREATE SUBSCRIPTION "test_sub" CONNECTION 'host=localhost user=test dbname=test' PUBLICATION "test_pub"`))
 	})
 
@@ -99,11 +99,11 @@ var _ = Describe("subscription sql", func() {
 		}
 		connString := "host=localhost user=test dbname=test"
 
-		sqls := toSubscriptionCreateSQL(obj, connString)
+		sql := toSubscriptionCreateSQL(obj, connString)
 		expectedElement := `CREATE SUBSCRIPTION "test_sub" ` +
 			`CONNECTION 'host=localhost user=test dbname=test' ` +
 			`PUBLICATION "test_pub" WITH ("param1" = 'value1', "param2" = 'value2')`
-		Expect(sqls).To(ContainElement(expectedElement))
+		Expect(sql).To(Equal(expectedElement))
 	})
 
 	It("returns correct SQL for creating subscription with no owner or parameters", func() {
@@ -115,8 +115,8 @@ var _ = Describe("subscription sql", func() {
 		}
 		connString := "host=localhost user=test dbname=test"
 
-		sqls := toSubscriptionCreateSQL(obj, connString)
-		Expect(sqls).To(ContainElement(
+		sql := toSubscriptionCreateSQL(obj, connString)
+		Expect(sql).To(Equal(
 			`CREATE SUBSCRIPTION "test_sub" CONNECTION 'host=localhost user=test dbname=test' PUBLICATION "test_pub"`))
 	})
 

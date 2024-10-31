@@ -90,17 +90,12 @@ func (r *SubscriptionReconciler) createSubscription(
 	obj *apiv1.Subscription,
 	connString string,
 ) error {
-	sqls := toSubscriptionCreateSQL(obj, connString)
-	for _, sqlQuery := range sqls {
-		if _, err := db.ExecContext(ctx, sqlQuery); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	sqlQuery := toSubscriptionCreateSQL(obj, connString)
+	_, err := db.ExecContext(ctx, sqlQuery)
+	return err
 }
 
-func toSubscriptionCreateSQL(obj *apiv1.Subscription, connString string) []string {
+func toSubscriptionCreateSQL(obj *apiv1.Subscription, connString string) string {
 	createQuery := fmt.Sprintf(
 		"CREATE SUBSCRIPTION %s CONNECTION %s PUBLICATION %s",
 		pgx.Identifier{obj.Spec.Name}.Sanitize(),
@@ -111,7 +106,7 @@ func toSubscriptionCreateSQL(obj *apiv1.Subscription, connString string) []strin
 		createQuery = fmt.Sprintf("%s WITH (%s)", createQuery, toPostgresParameters(obj.Spec.Parameters))
 	}
 
-	return []string{createQuery}
+	return createQuery
 }
 
 func toSubscriptionAlterSQL(obj *apiv1.Subscription, connString string) []string {
