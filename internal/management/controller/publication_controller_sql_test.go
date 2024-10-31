@@ -127,8 +127,8 @@ var _ = Describe("publication sql", func() {
 			},
 		}
 
-		sqls := toPublicationCreateSQL(obj)
-		Expect(sqls).To(ContainElement(`CREATE PUBLICATION "test_pub" FOR TABLES IN SCHEMA "public"`))
+		sql := toPublicationCreateSQL(obj)
+		Expect(sql).To(Equal(`CREATE PUBLICATION "test_pub" FOR TABLES IN SCHEMA "public"`))
 	})
 
 	It("generates correct SQL for creating publication with target table", func() {
@@ -143,8 +143,8 @@ var _ = Describe("publication sql", func() {
 			},
 		}
 
-		sqls := toPublicationCreateSQL(obj)
-		Expect(sqls).To(ContainElement(`CREATE PUBLICATION "test_pub" FOR TABLE "test"."table" ("a", "b")`))
+		sql := toPublicationCreateSQL(obj)
+		Expect(sql).To(Equal(`CREATE PUBLICATION "test_pub" FOR TABLE "test"."table" ("a", "b")`))
 	})
 
 	It("generates correct SQL for creating publication with parameters", func() {
@@ -163,8 +163,8 @@ var _ = Describe("publication sql", func() {
 			},
 		}
 
-		sqls := toPublicationCreateSQL(obj)
-		Expect(sqls).To(ContainElement(
+		sql := toPublicationCreateSQL(obj)
+		Expect(sql).To(Equal(
 			`CREATE PUBLICATION "test_pub" FOR TABLES IN SCHEMA "public" WITH ("param1" = 'value1', "param2" = 'value2')`,
 		))
 	})

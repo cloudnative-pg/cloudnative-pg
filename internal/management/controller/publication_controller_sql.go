@@ -84,16 +84,12 @@ func (r *PublicationReconciler) createPublication(
 	db *sql.DB,
 	obj *apiv1.Publication,
 ) error {
-	sqls := toPublicationCreateSQL(obj)
-	for _, sqlQuery := range sqls {
-		if _, err := db.ExecContext(ctx, sqlQuery); err != nil {
-			return err
-		}
-	}
-	return nil
+	sqlQuery := toPublicationCreateSQL(obj)
+	_, err := db.ExecContext(ctx, sqlQuery)
+	return err
 }
 
-func toPublicationCreateSQL(obj *apiv1.Publication) []string {
+func toPublicationCreateSQL(obj *apiv1.Publication) string {
 	createQuery := fmt.Sprintf(
 		"CREATE PUBLICATION %s %s",
 		pgx.Identifier{obj.Spec.Name}.Sanitize(),
@@ -103,7 +99,7 @@ func toPublicationCreateSQL(obj *apiv1.Publication) []string {
 		createQuery = fmt.Sprintf("%s WITH (%s)", createQuery, toPostgresParameters(obj.Spec.Parameters))
 	}
 
-	return []string{createQuery}
+	return createQuery
 }
 
 func toPublicationAlterSQL(obj *apiv1.Publication) []string {
