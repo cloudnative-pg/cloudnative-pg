@@ -233,7 +233,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 		})
 
 		Context("data durability is preferred", func() {
-			FIt("will decrease the number of sync replicas to the number of available replicas", func() {
+			It("will decrease the number of sync replicas to the number of available replicas", func() {
 				const (
 					namespacePrefix = "sync-replicas-preferred"
 					sampleFile      = fixturesDir + "/sync_replicas/preferred.yaml.template"
