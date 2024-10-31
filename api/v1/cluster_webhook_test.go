@@ -1969,8 +1969,8 @@ var _ = Describe("validateSynchronousReplicaConfiguration", func() {
 		errors := cluster.validateSynchronousReplicaConfiguration()
 		Expect(errors).To(HaveLen(1))
 		Expect(errors[0].Detail).To(
-			Equal("synchronous configuration incorrect - number of synchronous replicas must be less than the " +
-				"total number of instances and user specified standbys"))
+			Equal("Invalid synchronous configuration: the number of synchronous replicas must be less than the " +
+				"total number of instances and the provided standby names."))
 	})
 
 	It("returns an error when number of synchronous replicas is equal to total instances and standbys", func() {
@@ -1988,8 +1988,8 @@ var _ = Describe("validateSynchronousReplicaConfiguration", func() {
 		}
 		errors := cluster.validateSynchronousReplicaConfiguration()
 		Expect(errors).To(HaveLen(1))
-		Expect(errors[0].Detail).To(Equal("synchronous configuration incorrect - number of synchronous replicas " +
-			"must be less than the total number of instances and user specified standbys"))
+		Expect(errors[0].Detail).To(Equal("Invalid synchronous configuration: the number of synchronous replicas " +
+			"must be less than the total number of instances and the provided standby names."))
 	})
 
 	It("returns no error when number of synchronous replicas is less than total instances and standbys", func() {
