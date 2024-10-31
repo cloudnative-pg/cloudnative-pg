@@ -37,9 +37,9 @@ specification using the `logLevel` option. Available log levels are: `error`,
 `warning`, `info` (default), `debug`, and `trace`.
 
 !!! Important
-   Currently, the log level can only be set at the time the instance starts.
-   Changes to the log level in the cluster specification after the cluster has
-   started will only apply to new pods, not existing ones.
+    Currently, the log level can only be set at the time the instance starts.
+    Changes to the log level in the cluster specification after the cluster has
+    started will only apply to new pods, not existing ones.
 
 ## Operator Logs
 
