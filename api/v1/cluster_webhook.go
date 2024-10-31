@@ -1076,13 +1076,20 @@ func (r *Cluster) validateResources() field.ErrorList {
 }
 
 func (r *Cluster) validateSynchronousReplicaConfiguration() field.ErrorList {
+	if r.Spec.PostgresConfiguration.Synchronous == nil {
+		return nil
+	}
+
 	var result field.ErrorList
 
-	if r.Spec.Instances <= 1 && r.Spec.PostgresConfiguration.Synchronous != nil {
+	if r.Spec.PostgresConfiguration.Synchronous.Number >= (r.Spec.Instances +
+		len(r.Spec.PostgresConfiguration.Synchronous.StandbyNamesPost) +
+		len(r.Spec.PostgresConfiguration.Synchronous.StandbyNamesPre)) {
 		err := field.Invalid(
 			field.NewPath("spec", "postgresql", "synchronous"),
 			r.Spec.PostgresConfiguration.Synchronous,
-			"synchronous configuration is not allowed when instances is set to 1 or less",
+			"synchronous configuration incorrect - number of synchronous replicas must be less than the total "+
+				"number of instances and user specified standbys",
 		)
 		result = append(result, err)
 	}
