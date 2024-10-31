@@ -337,6 +337,7 @@ func (r *Cluster) Validate() (allErrs field.ErrorList) {
 		r.validateBackupConfiguration,
 		r.validateRetentionPolicy,
 		r.validateConfiguration,
+		r.validateSynchronousReplicaConfiguration,
 		r.validateLDAP,
 		r.validateReplicationSlots,
 		r.validateEnv,
@@ -1050,6 +1051,28 @@ func (r *Cluster) validateResources() field.ErrorList {
 				"Ephemeral storage request is greater than the limit",
 			))
 		}
+	}
+
+	return result
+}
+
+func (r *Cluster) validateSynchronousReplicaConfiguration() field.ErrorList {
+	if r.Spec.PostgresConfiguration.Synchronous == nil {
+		return nil
+	}
+
+	var result field.ErrorList
+
+	if r.Spec.PostgresConfiguration.Synchronous.Number >= (r.Spec.Instances +
+		len(r.Spec.PostgresConfiguration.Synchronous.StandbyNamesPost) +
+		len(r.Spec.PostgresConfiguration.Synchronous.StandbyNamesPre)) {
+		err := field.Invalid(
+			field.NewPath("spec", "postgresql", "synchronous"),
+			r.Spec.PostgresConfiguration.Synchronous,
+			"Invalid synchronous configuration: the number of synchronous replicas must be less than the "+
+				"total number of instances and the provided standby names.",
+		)
+		result = append(result, err)
 	}
 
 	return result
