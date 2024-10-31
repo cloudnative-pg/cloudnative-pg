@@ -1,0 +1,44 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Role
+metadata:
+  name: role-app
+spec:
+  cluster:
+    name: cluster-example
+  name: app
+  createdb: true
+  login: true
+---    
+apiVersion: postgresql.cnpg.io/v1
+kind: Role
+metadata:
+  name: role-dante
+spec:
+  cluster:
+    name: cluster-example
+  name: dante
+  ensure: present
+  comment: my database-side comment
+  login: true
+  superuser: false
+  createdb: true
+  createrole: false
+  inherit: false
+  replication: false
+  bypassrls: false
+  connectionLimit: 4
+  validUntil: "2053-04-12T15:04:05Z"
+  inRoles:
+    - pg_monitor
+    - pg_signal_backend
+  passwordSecret:
+    name: cluster-example-dante
+---
+apiVersion: v1
+data:
+  username: ZGFudGU=
+  password: ZGFudGU=
+kind: Secret
+metadata:
+  name: cluster-example-dante
+type: kubernetes.io/basic-auth
