@@ -48,23 +48,6 @@ func markAsFailed(
 	return cli.Status().Patch(ctx, resource, client.MergeFrom(oldResource))
 }
 
-type markableAsUnknown interface {
-	client.Object
-	SetAsUnknown(err error)
-}
-
-// markAsFailed marks the reconciliation as failed and logs the corresponding error
-func markAsUnknown(
-	ctx context.Context,
-	cli client.Client,
-	resource markableAsUnknown,
-	err error,
-) error {
-	oldResource := resource.DeepCopyObject().(markableAsUnknown)
-	resource.SetAsUnknown(err)
-	return cli.Status().Patch(ctx, resource, client.MergeFrom(oldResource))
-}
-
 type markableAsReady interface {
 	client.Object
 	SetAsReady()

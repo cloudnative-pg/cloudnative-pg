@@ -107,7 +107,7 @@ func (r *PublicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	// Cannot do anything on a replica cluster
 	if cluster.IsReplica() {
-		if err := markAsUnknown(ctx, r.Client, &publication, errClusterIsReplica); err != nil {
+		if err := markAsFailed(ctx, r.Client, &publication, errClusterIsReplica); err != nil {
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{RequeueAfter: publicationReconciliationInterval}, nil
