@@ -422,7 +422,7 @@ type ClusterSpec struct {
 
 	// The list of external clusters which are used in the configuration
 	// +optional
-	ExternalClusters []ExternalCluster `json:"externalClusters,omitempty"`
+	ExternalClusters ExternalClusterList `json:"externalClusters,omitempty"`
 
 	// The instances' log level, one of the following values: error, warning, info (default), debug, trace
 	// +kubebuilder:default:=info
@@ -1672,10 +1672,6 @@ type BackupSource struct {
 	// errors with certificate issuer and barman-cloud-wal-archive.
 	// +optional
 	EndpointCA *SecretKeySelector `json:"endpointCA,omitempty"`
-
-	// When set to true the operator will delegate the restore process to the registered restore plugin.
-	// +optional
-	UsePlugin *bool `json:"usePlugin,omitempty"`
 }
 
 // BootstrapPgBaseBackup contains the configuration required to take
@@ -1964,6 +1960,9 @@ type ClusterMonitoringTLSConfiguration struct {
 	Enabled bool `json:"enabled,omitempty"`
 }
 
+// ExternalClusterList is a list of external clusters
+type ExternalClusterList []ExternalCluster
+
 // ExternalCluster represents the connection parameters to an
 // external cluster which is used in the other sections of the configuration
 type ExternalCluster struct {
@@ -2002,6 +2001,10 @@ type ExternalCluster struct {
 	// The configuration for the barman-cloud tool suite
 	// +optional
 	BarmanObjectStore *BarmanObjectStoreConfiguration `json:"barmanObjectStore,omitempty"`
+
+	// The configuration of the plugin that is taking care
+	// of WAL archiving and backups for this external cluster
+	PluginConfiguration *PluginConfiguration `json:"plugin,omitempty"`
 }
 
 // EnsureOption represents whether we should enforce the presence or absence of

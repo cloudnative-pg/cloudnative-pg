@@ -82,6 +82,20 @@ func (pluginList PluginConfigurationList) GetEnabledPluginNames() (result []stri
 	return pluginNames
 }
 
+// GetEnabledPluginNames gets the name of the plugins that are
+// involved in the reconciliation of this external cluster list. This
+// list is usually composed by the plugins that need to be active to
+// recover data from the external clusters.
+func (externalClusterList ExternalClusterList) GetEnabledPluginNames() (result []string) {
+	pluginNames := make([]string, 0, len(externalClusterList))
+	for _, externalCluster := range externalClusterList {
+		if externalCluster.PluginConfiguration != nil {
+			pluginNames = append(pluginNames, externalCluster.PluginConfiguration.Name)
+		}
+	}
+	return pluginNames
+}
+
 // GetShmLimit gets the `/dev/shm` memory size limit
 func (e *EphemeralVolumesSizeLimitConfiguration) GetShmLimit() *resource.Quantity {
 	if e == nil {
@@ -1348,13 +1362,29 @@ func (cluster *Cluster) IsReadOnlyServiceEnabled() bool {
 	return !slices.Contains(cluster.Spec.Managed.Services.DisabledDefaultServices, ServiceSelectorTypeRO)
 }
 
-// UsePluginForBootstrapRecoveryBackup returns true if the recovery from backup should use a plugin.
-func (cluster *Cluster) UsePluginForBootstrapRecoveryBackup() bool {
-	if cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.Recovery != nil &&
-		cluster.Spec.Bootstrap.Recovery.Backup != nil && cluster.Spec.Bootstrap.Recovery.Backup.UsePlugin != nil {
-		return *cluster.Spec.Bootstrap.Recovery.Backup.UsePlugin
+// GetRecoverySourcePlugin returns the configuration of the plugin being
+// the recovery source of the cluster. If no such plugin have been configured,
+// nil is returned
+func (cluster *Cluster) GetRecoverySourcePlugin() *PluginConfiguration {
+	if cluster.Spec.Bootstrap == nil || cluster.Spec.Bootstrap.Recovery == nil {
+		return nil
 	}
-	return false
+
+	recoveryConfig := cluster.Spec.Bootstrap.Recovery
+	if len(recoveryConfig.Source) == 0 {
+		// Plugin-based recovery is supported only with
+		// An external cluster definition
+		return nil
+	}
+
+	recoveryExternalCluster, found := cluster.ExternalCluster(recoveryConfig.Source)
+	if !found {
+		// This error should have already been detected
+		// by the validating webhook.
+		return nil
+	}
+
+	return recoveryExternalCluster.PluginConfiguration
 }
 
 // EnsureGVKIsPresent ensures that the GroupVersionKind (GVK) metadata is present in the Backup object.

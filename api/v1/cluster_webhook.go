@@ -1876,12 +1876,14 @@ func (r *Cluster) validateExternalClusters() field.ErrorList {
 func (r *Cluster) validateExternalCluster(externalCluster *ExternalCluster, path *field.Path) field.ErrorList {
 	var result field.ErrorList
 
-	if externalCluster.ConnectionParameters == nil && externalCluster.BarmanObjectStore == nil {
+	if externalCluster.ConnectionParameters == nil &&
+		externalCluster.BarmanObjectStore == nil &&
+		externalCluster.PluginConfiguration == nil {
 		result = append(result,
 			field.Invalid(
 				path,
 				externalCluster,
-				"one of connectionParameters and barmanObjectStore is required"))
+				"one of connectionParameters, plugin and barmanObjectStore is required"))
 	}
 
 	return result

@@ -173,8 +173,10 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	ctx = cluster.SetInContext(ctx)
 
-	// Load the required plugins
-	pluginClient, err := cnpgiClient.WithPlugins(ctx, r.Plugins, cluster.Spec.Plugins.GetEnabledPluginNames()...)
+	// Load the plugins required to bootstrap and reconcile this cluster
+	enabledPluginNames := cluster.Spec.Plugins.GetEnabledPluginNames()
+	enabledPluginNames = append(enabledPluginNames, cluster.Spec.ExternalClusters.GetEnabledPluginNames()...)
+	pluginClient, err := cnpgiClient.WithPlugins(ctx, r.Plugins, enabledPluginNames...)
 	if err != nil {
 		var errUnknownPlugin *repository.ErrUnknownPlugin
 		if errors.As(err, &errUnknownPlugin) {

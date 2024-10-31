@@ -1833,10 +1833,6 @@ spec:
                           name:
                             description: Name of the referent.
                             type: string
-                          usePlugin:
-                            description: When set to true the operator will delegate
-                              the restore process to the registered restore plugin.
-                            type: boolean
                         required:
                         - name
                         type: object
@@ -2882,6 +2878,26 @@ spec:
                       - key
                       type: object
                       x-kubernetes-map-type: atomic
+                    plugin:
+                      description: |-
+                        The configuration of the plugin that is taking care
+                        of WAL archiving and backups for this external cluster
+                      properties:
+                        enabled:
+                          default: true
+                          description: Enabled is true if this plugin will be used
+                          type: boolean
+                        name:
+                          description: Name is the plugin name
+                          type: string
+                        parameters:
+                          additionalProperties:
+                            type: string
+                          description: Parameters is the configuration of the plugin
+                          type: object
+                      required:
+                      - name
+                      type: object
                     sslCert:
                       description: |-
                         The reference to an SSL certificate to be used to connect to this

@@ -255,7 +255,10 @@ func restoreWALViaPlugins(
 	defer plugins.Close()
 
 	availablePluginNamesSet := stringset.From(availablePluginNames)
-	enabledPluginNamesSet := stringset.From(cluster.Spec.Plugins.GetEnabledPluginNames())
+
+	enabledPluginNames := cluster.Spec.Plugins.GetEnabledPluginNames()
+	enabledPluginNames = append(enabledPluginNames, cluster.Spec.ExternalClusters.GetEnabledPluginNames()...)
+	enabledPluginNamesSet := stringset.From(enabledPluginNames)
 
 	client, err := pluginClient.WithPlugins(
 		ctx,

@@ -154,6 +154,7 @@ EphemeralVolumeSource
 EphemeralVolumesSizeLimit
 EphemeralVolumesSizeLimitConfiguration
 ExternalCluster
+ExternalClusterList
 FQDN
 Fei
 Filesystem
@@ -1280,7 +1281,6 @@ updateStrategy
 upgradable
 uptime
 uri
-usePlugin
 usename
 usernamepassword
 usr

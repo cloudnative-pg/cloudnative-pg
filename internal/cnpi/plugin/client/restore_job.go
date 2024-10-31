@@ -33,9 +33,7 @@ var ErrNoPluginSupportsRestoreJobHooksCapability = errors.New("no plugin support
 func (data *data) Restore(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
-	backup *apiv1.Backup,
 ) (*restore.RestoreResponse, error) {
-	backup.EnsureGVKIsPresent()
 	cluster.EnsureGVKIsPresent()
 
 	for idx := range data.plugins {
@@ -49,13 +47,8 @@ func (data *data) Restore(
 		if err != nil {
 			return nil, err
 		}
-		backupDefinition, err := json.Marshal(backup)
-		if err != nil {
-			return nil, err
-		}
 		request := restore.RestoreRequest{
 			ClusterDefinition: clusterDefinition,
-			BackupDefinition:  backupDefinition,
 		}
 		res, err := plugin.RestoreJobHooksClient().Restore(ctx, &request)
 		if err != nil {

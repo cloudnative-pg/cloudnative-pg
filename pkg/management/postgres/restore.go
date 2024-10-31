@@ -257,10 +257,10 @@ func (info InitInfo) Restore(ctx context.Context) error {
 	var envs []string
 	var config string
 
-	// nolint: nestif
-	if cluster.UsePluginForBootstrapRecoveryBackup() {
+	// nolint:nestif
+	if pluginConfiguration := cluster.GetRecoverySourcePlugin(); pluginConfiguration != nil {
 		contextLogger.Info("Restore through plugin detected, proceeding...")
-		res, err := restoreViaPlugin(ctx, typedClient, cluster)
+		res, err := restoreViaPlugin(ctx, cluster, pluginConfiguration)
 		if err != nil {
 			return err
 		}
@@ -1045,19 +1045,10 @@ func waitUntilRecoveryFinishes(db *sql.DB) error {
 // Returns true if a restore plugin was found and any error encountered.
 func restoreViaPlugin(
 	ctx context.Context,
-	cli client.Client,
 	cluster *apiv1.Cluster,
+	plugin *apiv1.PluginConfiguration,
 ) (*restore.RestoreResponse, error) {
 	contextLogger := log.FromContext(ctx)
-
-	var backup apiv1.Backup
-	if err := cli.Get(
-		ctx,
-		client.ObjectKey{Namespace: cluster.Namespace, Name: cluster.Spec.Bootstrap.Recovery.Backup.Name},
-		&backup,
-	); err != nil {
-		return nil, err
-	}
 
 	// TODO: timeout should be configurable by the user
 	ctx = context.WithValue(ctx, utils.GRPCTimeoutKey, 100*time.Minute)
@@ -1071,13 +1062,11 @@ func restoreViaPlugin(
 
 	availablePluginNamesSet := stringset.From(availablePluginNames)
 	contextLogger.Info("available plugins", "plugins", availablePluginNamesSet)
-	enabledPluginNamesSet := stringset.From(cluster.Spec.Plugins.GetEnabledPluginNames())
-	contextLogger.Info("enabled plugins", "plugins", enabledPluginNamesSet)
 
 	pClient, err := pluginClient.WithPlugins(
 		ctx,
 		plugins,
-		availablePluginNamesSet.Intersect(enabledPluginNamesSet).ToList()...,
+		plugin.Name,
 	)
 	if err != nil {
 		contextLogger.Error(err, "Error while loading required plugins")
@@ -1085,5 +1074,5 @@ func restoreViaPlugin(
 	}
 	defer pClient.Close(ctx)
 
-	return pClient.Restore(ctx, cluster, &backup)
+	return pClient.Restore(ctx, cluster)
 }

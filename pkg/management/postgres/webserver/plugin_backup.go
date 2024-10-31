@@ -138,11 +138,6 @@ func (b *PluginBackupCommand) invokeStart(ctx context.Context) {
 	b.Backup.Status.TablespaceMapFile = response.TablespaceMapFile
 	b.Backup.Status.Online = ptr.To(response.Online)
 	b.Backup.Status.PluginMetadata = response.Metadata
-	b.Backup.Status.ServerName = response.ServerName
-	b.Backup.Status.EndpointCA = response.EndpointCA
-	b.Backup.Status.DestinationPath = response.DestinationPath
-	b.Backup.Status.Encryption = response.Encryption
-	b.Backup.Status.EndpointURL = response.EndpointURL
 
 	if !response.StartedAt.IsZero() {
 		b.Backup.Status.StartedAt = ptr.To(metav1.NewTime(response.StartedAt))
