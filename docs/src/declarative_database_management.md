@@ -44,7 +44,7 @@ the database in Postgres.
     commands, it does not support renaming of databases. Changing the
     `spec.name` in a Database object will be rejected at the Kubernetes level.
 
-### Managing an existing database via a Database manifest
+## Managing an existing database via a Database manifest
 
 It is possible to declare a Database object that references an existing
 database. In such case, the Database's fields will be applied using `ALTER`
@@ -69,25 +69,25 @@ immutable fields will simply be ignored, as they are not valid options in the
     Notably, the options around encoding and collations, as well as the template
     used, are immutable and not supported in `ALTER`.
 
-### Database objects defined on  replica clusters
+## Database objects defined on  replica clusters
 
 Database objects declared on a replica cluster cannot be enforced, since the
 replica does not have write privileges.
 Instead, a Database object defined on a replica cluster will be periodically
 re-queued, and will be enforced once the cluster is promoted.
 
-### Reserved names
+## Reserved names
 
 PostgreSQL creates the `postgres` database, as well as `template0` and
 `template1`. Those names are therefore reserved for Postgres use. You will not
 be allowed to create a Database with any of `postgres`, `template0`, or
 `template1` as the `spec.name`.
 
-### Status sub-resource
+## Status sub-resource
 
 Once the reconciliation of a Database has been performed,
-the Database status will be updated with a field,  `applied`, set to `true`,
-and an `observedGeneration` field which tracks the last applied `generation`.
+the Database status will be updated with the field  `applied` set to `true`,
+and the field `observedGeneration` set to the last applied `generation`.
 If there were errors during the reconciliation of a database, the `applied`
 field would show `false`, and an additional field `message` would be displayed
 in the status.
@@ -117,7 +117,7 @@ to each Database object to control its deletion process.
 
 By default, the `databaseReclaimPolicy` is set to `retain`, which means
 that if the Database object is deleted, the underlying PostgreSQL database
-is retained for manual management by an administrator.
+will be retained for manual management by an administrator.
 
 Alternatively, if the `databaseReclaimPolicy` is set to `delete`,
 the PostgreSQL database will be automatically deleted when the Database
@@ -141,17 +141,17 @@ spec:
     name: cluster-example
 ```
 
-In this case, when the Database object is deleted, the corresponding PostgreSQL
-database will also be removed automatically.
+In this case, when the Database object is deleted, the database `two` will
+be removed automatically in PostgreSQL.
 
 ## Imperative deletion of a PostgreSQL database
 
-In the previous section, the database Reclaim Policy was discussed, which serves
-in case the Postgres database should be dropped once the Database object is
-deleted.
+In the previous section, the database Reclaim Policy was discussed, which
+determines whether the Postgres database should be dropped once the Database
+object is deleted.
 
-For the purpose of deleting an existing Postgres database via a Database
-declaration, the `ensure` field may be use. By default its value is `present`.
+It is also possible to use the `ensure` field to delete an existing Postgres
+database via a Database declaration. The default value of `ensure` is `present`.
 Setting it to `absent` will have the effect of dropping the database in the next
 reconciliation cycle.
 
@@ -195,7 +195,7 @@ objects. There would be uncertainty as to the order of operations.
 For this reason, the database reconciler will check, given a Database object,
 if there is already another Database object managing the same database.
 If so, it will update its status with a message explaining this, and will not
-apply any changes in Postgres:
+apply any changes in Postgres, as shown in the following example:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -211,8 +211,12 @@ spec:
   owner: app
 status:
   applied: false
-  message: this Database clashes with the previous `db-one` managing database `declarative`
+  message: 'reconciliation error: database "declarative" is already managed by Database object "db-one"'
 ```
+
+!!! Warning
+    A Database object referring to a Postgres database that is already being
+    managed by a Database object will be rejected.
 
 ## Support of different Postgres versions
 
@@ -250,12 +254,12 @@ Database object's status:
 [...]
 status:
   applied: false
-  error: option "locale_provider" not recognized
+  error: 'reconciliation error: while creating database "declarative-icu": ERROR:
+    option "locale_provider" not recognized (SQLSTATE 42601)'
 ```
 
-The rationale is that this is exactly what will happen if you attempt to create
-a database directly on the `psql` command line. The database reconciler aims
-at transparency.
+This is exactly what would happen if you attempted to create the database
+directly using `psql`. The database reconciler aims for transparency.
 
 ## Making direct changes in Postgres
 
