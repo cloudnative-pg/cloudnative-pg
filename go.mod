@@ -11,7 +11,7 @@ require (
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/cheynewallace/tabby v1.1.1
 	github.com/cloudnative-pg/barman-cloud v0.0.0-20241016085606-44f56f711a5c
-	github.com/cloudnative-pg/cnpg-i v0.0.0-20241016132832-8d61352831c6
+	github.com/cloudnative-pg/cnpg-i v0.0.0-20241031183132-ac20c72b8fc3
 	github.com/cloudnative-pg/machinery v0.0.0-20241014090714-c27747f9974b
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/evanphx/json-patch/v5 v5.9.0
