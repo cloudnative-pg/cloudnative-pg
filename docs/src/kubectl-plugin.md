@@ -30,30 +30,32 @@ them in your systems.
 
 #### Debian packages
 
-For example, let's install the 1.22.2 release of the plugin, for an Intel based
+For example, let's install the 1.24.1 release of the plugin, for an Intel based
 64 bit server. First, we download the right `.deb` file.
 
 ``` sh
-$ wget https://github.com/cloudnative-pg/cloudnative-pg/releases/download/v1.22.1/kubectl-cnpg_1.22.2_linux_x86_64.deb
+$ wget https://github.com/cloudnative-pg/cloudnative-pg/releases/download/v1.24.1/kubectl-cnpg_1.24.1_linux_x86_64.deb \
+  --output-document kube-plugin.deb
 ```
 
 Then, install from the local file using `dpkg`:
 
 ``` sh
-$ dpkg -i kubectl-cnpg_1.22.2_linux_x86_64.deb
-(Reading database ... 702524 files and directories currently installed.)
-Preparing to unpack kubectl-cnpg_1.22.2_linux_x86_64.deb ...
-Unpacking cnpg (1.22.2) over (1.22.2) ...
-Setting up cnpg (1.22.2) ..
+$ dpkg -i kube-plugin.deb
+Selecting previously unselected package cnpg.
+(Reading database ... 6688 files and directories currently installed.)
+Preparing to unpack kube-plugin.deb ...
+Unpacking cnpg (1.24.1) ...
+Setting up cnpg (1.24.1) ...
 ```
 
 #### RPM packages
 
-As in the example for `.deb` packages, let's install the 1.22.2 release for an
+As in the example for `.deb` packages, let's install the 1.24.1 release for an
 Intel 64 bit machine. Note the `--output` flag to provide a file name.
 
 ``` sh
-curl -L https://github.com/cloudnative-pg/cloudnative-pg/releases/download/v1.22.2/kubectl-cnpg_1.22.2_linux_x86_64.rpm \
+curl -L https://github.com/cloudnative-pg/cloudnative-pg/releases/download/v1.24.1/kubectl-cnpg_1.24.1_linux_x86_64.rpm \
   --output kube-plugin.rpm
 ```
 
@@ -61,21 +63,20 @@ Then install with `yum`, and you're ready to use:
 
 ``` sh
 $ yum --disablerepo=* localinstall kube-plugin.rpm
-yum --disablerepo=* localinstall kube-plugin.rpm    
 Failed to set locale, defaulting to C.UTF-8
 Dependencies resolved.
 ====================================================================================================
  Package            Architecture         Version                   Repository                  Size
 ====================================================================================================
 Installing:
- cnpg               x86_64               1.22.2-1                  @commandline                17 M
+ cnpg               x86_64               1.24.1-1                  @commandline                20 M
 
 Transaction Summary
 ====================================================================================================
 Install  1 Package
 
-Total size: 14 M
-Installed size: 43 M
+Total size: 20 M
+Installed size: 78 M
 Is this ok [y/N]: y
 ```
 
@@ -126,19 +127,19 @@ CloudNativePG Plugin is currently built for the following
 operating system and architectures:
 
 * Linux
-  * amd64
-  * arm 5/6/7
-  * arm64
-  * s390x
-  * ppc64le
+    * amd64
+    * arm 5/6/7
+    * arm64
+    * s390x
+    * ppc64le
 * macOS
-  * amd64
-  * arm64
+    * amd64
+    * arm64
 * Windows
-  * 386
-  * amd64
-  * arm 5/6/7
-  * arm64
+    * 386
+    * amd64
+    * arm 5/6/7
+    * arm64
 
 ### Configuring auto-completion
 
