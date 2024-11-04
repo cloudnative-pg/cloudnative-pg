@@ -52,8 +52,9 @@ var _ = Describe("PostgresManager", func() {
 	})
 
 	Context("Create", func() {
+		const expectedSQL = "SELECT pg_create_physical_replication_slot"
 		It("should successfully create a replication slot", func(ctx SpecContext) {
-			mock.ExpectExec("SELECT pg_create_physical_replication_slot").
+			mock.ExpectExec(expectedSQL).
 				WithArgs(slot.SlotName, slot.RestartLSN != "").
 				WillReturnResult(sqlmock.NewResult(1, 1))
 
@@ -62,7 +63,7 @@ var _ = Describe("PostgresManager", func() {
 		})
 
 		It("should return error when the database execution fails", func(ctx SpecContext) {
-			mock.ExpectExec("SELECT pg_create_physical_replication_slot").
+			mock.ExpectExec(expectedSQL).
 				WithArgs(slot.SlotName, slot.RestartLSN != "").
 				WillReturnError(errors.New("mock error"))
 
@@ -72,6 +73,8 @@ var _ = Describe("PostgresManager", func() {
 	})
 
 	Context("List", func() {
+		const expectedSQL = "^SELECT (.+) FROM pg_replication_slots"
+
 		var config *v1.ReplicationSlotsConfiguration
 		BeforeEach(func() {
 			config = &v1.ReplicationSlotsConfiguration{
@@ -88,7 +91,7 @@ var _ = Describe("PostgresManager", func() {
 				AddRow("_cnpg_slot1", string(SlotTypePhysical), true, "lsn1", false).
 				AddRow("slot2", string(SlotTypePhysical), true, "lsn2", false)
 
-			mock.ExpectQuery("^SELECT (.+) FROM pg_replication_slots").
+			mock.ExpectQuery(expectedSQL).
 				WillReturnRows(rows)
 
 			result, err := List(ctx, db, config)
@@ -111,7 +114,7 @@ var _ = Describe("PostgresManager", func() {
 		})
 
 		It("should return error when database query fails", func(ctx SpecContext) {
-			mock.ExpectQuery("^SELECT (.+) FROM pg_replication_slots").
+			mock.ExpectQuery(expectedSQL).
 				WillReturnError(errors.New("mock error"))
 
 			_, err := List(ctx, db, config)
@@ -120,8 +123,10 @@ var _ = Describe("PostgresManager", func() {
 	})
 
 	Context("Update", func() {
+		const expectedSQL = "SELECT pg_replication_slot_advance"
+
 		It("should successfully update a replication slot", func(ctx SpecContext) {
-			mock.ExpectExec("SELECT pg_replication_slot_advance").
+			mock.ExpectExec(expectedSQL).
 				WithArgs(slot.SlotName, slot.RestartLSN).
 				WillReturnResult(sqlmock.NewResult(1, 1))
 
@@ -130,7 +135,7 @@ var _ = Describe("PostgresManager", func() {
 		})
 
 		It("should return error when the database execution fails", func(ctx SpecContext) {
-			mock.ExpectExec("SELECT pg_replication_slot_advance").
+			mock.ExpectExec(expectedSQL).
 				WithArgs(slot.SlotName, slot.RestartLSN).
 				WillReturnError(errors.New("mock error"))
 
@@ -146,10 +151,12 @@ var _ = Describe("PostgresManager", func() {
 	})
 
 	Context("Delete", func() {
+		const expectedSQL = "SELECT pg_drop_replication_slot"
+
 		It("should successfully delete a replication slot", func(ctx SpecContext) {
 			slot.Active = false
 
-			mock.ExpectExec("SELECT pg_drop_replication_slot").WithArgs(slot.SlotName).
+			mock.ExpectExec(expectedSQL).WithArgs(slot.SlotName).
 				WillReturnResult(sqlmock.NewResult(1, 1))
 
 			err := Delete(ctx, db, slot)
@@ -158,7 +165,7 @@ var _ = Describe("PostgresManager", func() {
 
 		It("should return error when the database execution fails", func(ctx SpecContext) {
 			slot.Active = false
-			mock.ExpectExec("SELECT pg_drop_replication_slot").WithArgs(slot.SlotName).
+			mock.ExpectExec(expectedSQL).WithArgs(slot.SlotName).
 				WillReturnError(errors.New("mock error"))
 
 			err := Delete(ctx, db, slot)

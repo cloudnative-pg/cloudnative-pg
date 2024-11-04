@@ -18,6 +18,7 @@ package reconciler
 
 import (
 	"database/sql"
+	"database/sql/driver"
 	"errors"
 	"time"
 
@@ -32,6 +33,8 @@ import (
 )
 
 const slotPrefix = "_cnpg_"
+
+var repSlotColumns = []string{"slot_name", "slot_type", "active", "restart_lsn", "holds_xmin"}
 
 func makeClusterWithInstanceNames(instanceNames []string, primary string) apiv1.Cluster {
 	return apiv1.Cluster{
@@ -51,6 +54,12 @@ func makeClusterWithInstanceNames(instanceNames []string, primary string) apiv1.
 	}
 }
 
+func newRepSlot(name string, active bool, restartLSN string) []driver.Value {
+	return []driver.Value{
+		slotPrefix + name, string(infrastructure.SlotTypePhysical), active, restartLSN, false,
+	}
+}
+
 var _ = Describe("HA Replication Slots reconciliation in Primary", func() {
 	var (
 		db   *sql.DB
@@ -65,9 +74,9 @@ var _ = Describe("HA Replication Slots reconciliation in Primary", func() {
 		Expect(mock.ExpectationsWereMet()).To(Succeed())
 	})
 	It("can create a new replication slot for a new cluster instance", func(ctx SpecContext) {
-		rows := sqlmock.NewRows([]string{"slot_name", "slot_type", "active", "restart_lsn", "holds_xmin"}).
-			AddRow(slotPrefix+"instance1", string(infrastructure.SlotTypePhysical), true, "lsn1", false).
-			AddRow(slotPrefix+"instance2", string(infrastructure.SlotTypePhysical), true, "lsn2", false)
+		rows := sqlmock.NewRows(repSlotColumns).
+			AddRow(newRepSlot("instance1", true, "lsn1")...).
+			AddRow(newRepSlot("instance2", true, "lsn2")...)
 
 		mock.ExpectQuery("^SELECT (.+) FROM pg_replication_slots").
 			WillReturnRows(rows)
@@ -83,10 +92,10 @@ var _ = Describe("HA Replication Slots reconciliation in Primary", func() {
 	})
 
 	It("can delete an inactive HA replication slot that is not in the cluster", func(ctx SpecContext) {
-		rows := sqlmock.NewRows([]string{"slot_name", "slot_type", "active", "restart_lsn", "holds_xmin"}).
-			AddRow(slotPrefix+"instance1", string(infrastructure.SlotTypePhysical), true, "lsn1", false).
-			AddRow(slotPrefix+"instance2", string(infrastructure.SlotTypePhysical), true, "lsn2", false).
-			AddRow(slotPrefix+"instance3", string(infrastructure.SlotTypePhysical), false, "lsn2", false)
+		rows := sqlmock.NewRows(repSlotColumns).
+			AddRow(newRepSlot("instance1", true, "lsn1")...).
+			AddRow(newRepSlot("instance2", true, "lsn2")...).
+			AddRow(newRepSlot("instance3", false, "lsn2")...)
 
 		mock.ExpectQuery("^SELECT (.+) FROM pg_replication_slots").
 			WillReturnRows(rows)
@@ -101,10 +110,10 @@ var _ = Describe("HA Replication Slots reconciliation in Primary", func() {
 	})
 
 	It("will not delete an active HA replication slot that is not in the cluster", func(ctx SpecContext) {
-		rows := sqlmock.NewRows([]string{"slot_name", "slot_type", "active", "restart_lsn", "holds_xmin"}).
-			AddRow(slotPrefix+"instance1", string(infrastructure.SlotTypePhysical), true, "lsn1", false).
-			AddRow(slotPrefix+"instance2", string(infrastructure.SlotTypePhysical), true, "lsn2", false).
-			AddRow(slotPrefix+"instance3", string(infrastructure.SlotTypePhysical), true, "lsn2", false)
+		rows := sqlmock.NewRows(repSlotColumns).
+			AddRow(newRepSlot("instance1", true, "lsn1")...).
+			AddRow(newRepSlot("instance2", true, "lsn2")...).
+			AddRow(newRepSlot("instance3", true, "lsn2")...)
 
 		mock.ExpectQuery("^SELECT (.+) FROM pg_replication_slots").
 			WillReturnRows(rows)
@@ -117,6 +126,8 @@ var _ = Describe("HA Replication Slots reconciliation in Primary", func() {
 })
 
 var _ = Describe("dropReplicationSlots", func() {
+	const selectPgRepSlot = "^SELECT (.+) FROM pg_replication_slots"
+
 	var (
 		db   *sql.DB
 		mock sqlmock.Sqlmock
@@ -133,8 +144,7 @@ var _ = Describe("dropReplicationSlots", func() {
 	It("returns error when listing slots fails", func(ctx SpecContext) {
 		cluster := makeClusterWithInstanceNames([]string{}, "")
 
-		mock.ExpectQuery("^SELECT (.+) FROM pg_replication_slots").
-			WillReturnError(errors.New("triggered list error"))
+		mock.ExpectQuery(selectPgRepSlot).WillReturnError(errors.New("triggered list error"))
 
 		_, err := dropReplicationSlots(ctx, db, &cluster, true)
 		Expect(err).To(HaveOccurred())
@@ -142,10 +152,9 @@ var _ = Describe("dropReplicationSlots", func() {
 	})
 
 	It("skips deletion of active HA slots and reschedules", func(ctx SpecContext) {
-		rows := sqlmock.NewRows([]string{"slot_name", "slot_type", "active", "restart_lsn", "holds_xmin"}).
-			AddRow(slotPrefix+"instance1", string(infrastructure.SlotTypePhysical), true, "lsn1", false)
-		mock.ExpectQuery("^SELECT (.+) FROM pg_replication_slots").
-			WillReturnRows(rows)
+		rows := sqlmock.NewRows(repSlotColumns).
+			AddRow(newRepSlot("instance1", true, "lsn1")...)
+		mock.ExpectQuery(selectPgRepSlot).WillReturnRows(rows)
 
 		cluster := makeClusterWithInstanceNames([]string{}, "")
 
@@ -155,7 +164,7 @@ var _ = Describe("dropReplicationSlots", func() {
 	})
 
 	It("skips the deletion of user defined replication slots on the primary", func(ctx SpecContext) {
-		rows := sqlmock.NewRows([]string{"slot_name", "slot_type", "active", "restart_lsn", "holds_xmin"}).
+		rows := sqlmock.NewRows(repSlotColumns).
 			AddRow("custom-slot", string(infrastructure.SlotTypePhysical), true, "lsn1", false)
 		mock.ExpectQuery("^SELECT (.+) FROM pg_replication_slots").
 			WillReturnRows(rows)
@@ -169,10 +178,9 @@ var _ = Describe("dropReplicationSlots", func() {
 	})
 
 	It("returns error when deleting a slot fails", func(ctx SpecContext) {
-		rows := sqlmock.NewRows([]string{"slot_name", "slot_type", "active", "restart_lsn", "holds_xmin"}).
-			AddRow(slotPrefix+"instance1", string(infrastructure.SlotTypePhysical), false, "lsn1", false)
-		mock.ExpectQuery("^SELECT (.+) FROM pg_replication_slots").
-			WillReturnRows(rows)
+		rows := sqlmock.NewRows(repSlotColumns).
+			AddRow(newRepSlot("instance1", false, "lsn1")...)
+		mock.ExpectQuery(selectPgRepSlot).WillReturnRows(rows)
 
 		mock.ExpectExec("SELECT pg_drop_replication_slot").WithArgs(slotPrefix + "instance1").
 			WillReturnError(errors.New("delete error"))
@@ -185,10 +193,9 @@ var _ = Describe("dropReplicationSlots", func() {
 	})
 
 	It("deletes inactive slots and does not reschedule", func(ctx SpecContext) {
-		rows := sqlmock.NewRows([]string{"slot_name", "slot_type", "active", "restart_lsn", "holds_xmin"}).
-			AddRow(slotPrefix+"instance1", string(infrastructure.SlotTypePhysical), false, "lsn1", false)
-		mock.ExpectQuery("^SELECT (.+) FROM pg_replication_slots").
-			WillReturnRows(rows)
+		rows := sqlmock.NewRows(repSlotColumns).
+			AddRow(newRepSlot("instance1", false, "lsn1")...)
+		mock.ExpectQuery(selectPgRepSlot).WillReturnRows(rows)
 
 		mock.ExpectExec("SELECT pg_drop_replication_slot").WithArgs(slotPrefix + "instance1").
 			WillReturnResult(sqlmock.NewResult(1, 1))

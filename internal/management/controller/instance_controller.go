@@ -239,7 +239,7 @@ func (r *InstanceReconciler) Reconcile(
 
 	postgresDB, err := r.instance.ConnectionPool().Connection("postgres")
 	if err != nil {
-		return reconcile.Result{}, fmt.Errorf("while getting the local db pool: %w", err)
+		return reconcile.Result{}, fmt.Errorf("while getting the postgres connection: %w", err)
 	}
 	if result, err := reconciler.ReconcileReplicationSlots(
 		ctx,
