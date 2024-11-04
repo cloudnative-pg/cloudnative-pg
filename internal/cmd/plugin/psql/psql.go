@@ -83,6 +83,11 @@ func NewCommand(
 		return nil, err
 	}
 
+	// Check if the pod list is empty
+	if len(pods.Items) == 0 {
+		return nil, fmt.Errorf("cluster does not exist or is not accessible")
+	}
+
 	kubectlPath, err := exec.LookPath(kubectlCommand)
 	if err != nil {
 		return nil, fmt.Errorf("while getting kubectl path: %w", err)
