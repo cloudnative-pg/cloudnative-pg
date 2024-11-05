@@ -38,10 +38,10 @@ wget https://github.com/cloudnative-pg/cloudnative-pg/releases/download/v1.24.1/
   --output-document kube-plugin.deb
 ```
 
-Then, install from the local file using `dpkg`:
+Then, with super user privileges, install from the local file using `dpkg`:
 
 ```console
-$ dpkg -i kube-plugin.deb
+$ sudo dpkg -i kube-plugin.deb
 Selecting previously unselected package cnpg.
 (Reading database ... 6688 files and directories currently installed.)
 Preparing to unpack kube-plugin.deb ...
@@ -59,10 +59,10 @@ curl -L https://github.com/cloudnative-pg/cloudnative-pg/releases/download/v1.24
   --output kube-plugin.rpm
 ```
 
-Then install with `yum`, and you're ready to use:
+Then, with super user privileges, install with `yum`, and you're ready to use:
 
 ```console
-$ yum --disablerepo=* localinstall kube-plugin.rpm
+$ sudo yum --disablerepo=* localinstall kube-plugin.rpm
 Failed to set locale, defaulting to C.UTF-8
 Dependencies resolved.
 ====================================================================================================
