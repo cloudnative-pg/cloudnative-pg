@@ -16,7 +16,10 @@ limitations under the License.
 
 package v1
 
-import "k8s.io/utils/ptr"
+import (
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/utils/ptr"
+)
 
 // SetAsFailed sets the subscription as failed with the given error
 func (sub *Subscription) SetAsFailed(err error) {
@@ -35,4 +38,9 @@ func (sub *Subscription) SetAsReady() {
 	sub.Status.Applied = ptr.To(true)
 	sub.Status.Message = ""
 	sub.Status.ObservedGeneration = sub.Generation
+}
+
+// GetClusterRef returns the cluster reference of the subscription
+func (sub *Subscription) GetClusterRef() corev1.LocalObjectReference {
+	return sub.Spec.ClusterRef
 }

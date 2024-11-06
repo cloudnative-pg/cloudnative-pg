@@ -16,7 +16,10 @@ limitations under the License.
 
 package v1
 
-import "k8s.io/utils/ptr"
+import (
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/utils/ptr"
+)
 
 // SetAsFailed sets the publication as failed with the given error
 func (pub *Publication) SetAsFailed(err error) {
@@ -35,4 +38,9 @@ func (pub *Publication) SetAsReady() {
 	pub.Status.Applied = ptr.To(true)
 	pub.Status.Message = ""
 	pub.Status.ObservedGeneration = pub.Generation
+}
+
+// GetClusterRef returns the cluster reference of the publication
+func (pub *Publication) GetClusterRef() corev1.LocalObjectReference {
+	return pub.Spec.ClusterRef
 }
