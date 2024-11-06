@@ -277,9 +277,9 @@ sandbox-3  0/604DE38  0/604DE38  0/604DE38  0/604DE38   00:00:00   00:00:00   00
 Instances status
 Name       Current LSN  Replication role  Status  QoS         Manager Version  Node
 ----       -----------  ----------------  ------  ---         ---------------  ----
-sandbox-1  0/604DE38    Primary           OK      BestEffort  1.24.0           k8s-eu-worker
-sandbox-2  0/604DE38    Standby (async)   OK      BestEffort  1.24.0           k8s-eu-worker2
-sandbox-3  0/604DE38    Standby (async)   OK      BestEffort  1.24.0           k8s-eu-worker
+sandbox-1  0/604DE38    Primary           OK      BestEffort  1.24.1           k8s-eu-worker
+sandbox-2  0/604DE38    Standby (async)   OK      BestEffort  1.24.1           k8s-eu-worker2
+sandbox-3  0/604DE38    Standby (async)   OK      BestEffort  1.24.1           k8s-eu-worker
 ```
 
 If you require more detailed status information, use the `--verbose` option (or
@@ -333,9 +333,9 @@ sandbox-primary  primary  1              1                1                     
 Instances status
 Name       Current LSN  Replication role  Status  QoS         Manager Version  Node
 ----       -----------  ----------------  ------  ---         ---------------  ----
-sandbox-1  0/6053720    Primary           OK      BestEffort  1.24.0           k8s-eu-worker
-sandbox-2  0/6053720    Standby (async)   OK      BestEffort  1.24.0           k8s-eu-worker2
-sandbox-3  0/6053720    Standby (async)   OK      BestEffort  1.24.0           k8s-eu-worker
+sandbox-1  0/6053720    Primary           OK      BestEffort  1.24.1           k8s-eu-worker
+sandbox-2  0/6053720    Standby (async)   OK      BestEffort  1.24.1           k8s-eu-worker2
+sandbox-3  0/6053720    Standby (async)   OK      BestEffort  1.24.1           k8s-eu-worker
 ```
 
 With an additional `-v` (e.g. `kubectl cnpg status sandbox -v -v`), you can
@@ -558,12 +558,12 @@ Archive:  report_operator_<TIMESTAMP>.zip
 
 ```output
 ====== Begin of Previous Log =====
-2023-03-28T12:56:41.251711811Z {"level":"info","ts":"2023-03-28T12:56:41Z","logger":"setup","msg":"Starting CloudNativePG Operator","version":"1.19.1","build":{"Version":"1.19.0+dev107","Commit":"cc9bab17","Date":"2023-03-28"}}
+2023-03-28T12:56:41.251711811Z {"level":"info","ts":"2023-03-28T12:56:41Z","logger":"setup","msg":"Starting CloudNativePG Operator","version":"1.24.1","build":{"Version":"1.24.1+dev107","Commit":"cc9bab17","Date":"2023-03-28"}}
 2023-03-28T12:56:41.251851909Z {"level":"info","ts":"2023-03-28T12:56:41Z","logger":"setup","msg":"Starting pprof HTTP server","addr":"0.0.0.0:6060"}
   <snipped …>
 
 ====== End of Previous Log =====
-2023-03-28T12:57:09.854306024Z {"level":"info","ts":"2023-03-28T12:57:09Z","logger":"setup","msg":"Starting CloudNativePG Operator","version":"1.19.1","build":{"Version":"1.19.0+dev107","Commit":"cc9bab17","Date":"2023-03-28"}}
+2023-03-28T12:57:09.854306024Z {"level":"info","ts":"2023-03-28T12:57:09Z","logger":"setup","msg":"Starting CloudNativePG Operator","version":"1.24.1","build":{"Version":"1.24.1+dev107","Commit":"cc9bab17","Date":"2023-03-28"}}
 2023-03-28T12:57:09.854363943Z {"level":"info","ts":"2023-03-28T12:57:09Z","logger":"setup","msg":"Starting pprof HTTP server","addr":"0.0.0.0:6060"}
 ```
 
