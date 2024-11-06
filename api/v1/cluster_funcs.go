@@ -33,6 +33,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
@@ -76,6 +77,20 @@ func (pluginList PluginConfigurationList) GetEnabledPluginNames() (result []stri
 	for _, pluginDeclaration := range pluginList {
 		if pluginDeclaration.IsEnabled() {
 			pluginNames = append(pluginNames, pluginDeclaration.Name)
+		}
+	}
+	return pluginNames
+}
+
+// GetEnabledPluginNames gets the name of the plugins that are
+// involved in the reconciliation of this external cluster list. This
+// list is usually composed by the plugins that need to be active to
+// recover data from the external clusters.
+func (externalClusterList ExternalClusterList) GetEnabledPluginNames() (result []string) {
+	pluginNames := make([]string, 0, len(externalClusterList))
+	for _, externalCluster := range externalClusterList {
+		if externalCluster.PluginConfiguration != nil {
+			pluginNames = append(pluginNames, externalCluster.PluginConfiguration.Name)
 		}
 	}
 	return pluginNames
@@ -1345,6 +1360,42 @@ func (cluster *Cluster) IsReadOnlyServiceEnabled() bool {
 	}
 
 	return !slices.Contains(cluster.Spec.Managed.Services.DisabledDefaultServices, ServiceSelectorTypeRO)
+}
+
+// GetRecoverySourcePlugin returns the configuration of the plugin being
+// the recovery source of the cluster. If no such plugin have been configured,
+// nil is returned
+func (cluster *Cluster) GetRecoverySourcePlugin() *PluginConfiguration {
+	if cluster.Spec.Bootstrap == nil || cluster.Spec.Bootstrap.Recovery == nil {
+		return nil
+	}
+
+	recoveryConfig := cluster.Spec.Bootstrap.Recovery
+	if len(recoveryConfig.Source) == 0 {
+		// Plugin-based recovery is supported only with
+		// An external cluster definition
+		return nil
+	}
+
+	recoveryExternalCluster, found := cluster.ExternalCluster(recoveryConfig.Source)
+	if !found {
+		// This error should have already been detected
+		// by the validating webhook.
+		return nil
+	}
+
+	return recoveryExternalCluster.PluginConfiguration
+}
+
+// EnsureGVKIsPresent ensures that the GroupVersionKind (GVK) metadata is present in the Backup object.
+// This is necessary because informers do not automatically include metadata inside the object.
+// By setting the GVK, we ensure that components such as the plugins have enough metadata to typecheck the object.
+func (cluster *Cluster) EnsureGVKIsPresent() {
+	cluster.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   GroupVersion.Group,
+		Version: GroupVersion.Version,
+		Kind:    ClusterKind,
+	})
 }
 
 // BuildPostgresOptions create the list of options that

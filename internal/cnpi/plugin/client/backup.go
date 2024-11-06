@@ -87,6 +87,7 @@ type BackupResponse struct {
 	// This field is set to true for online/hot backups and to false otherwise.
 	Online bool
 
+	// This field contains the metadata to be associated with this backup
 	Metadata map[string]string
 }
 

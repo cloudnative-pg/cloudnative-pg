@@ -19,10 +19,12 @@ package client
 import (
 	"context"
 
+	restore "github.com/cloudnative-pg/cnpg-i/pkg/restore/job"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/connection"
 )
@@ -35,6 +37,7 @@ type Client interface {
 	LifecycleCapabilities
 	WalCapabilities
 	BackupCapabilities
+	RestoreJobHooksCapabilities
 }
 
 // Connection describes a set of behaviour needed to properly handle the plugin connections
@@ -143,4 +146,9 @@ type BackupCapabilities interface {
 		pluginName string,
 		parameters map[string]string,
 	) (*BackupResponse, error)
+}
+
+// RestoreJobHooksCapabilities describes a set of behaviour needed to run the Restore
+type RestoreJobHooksCapabilities interface {
+	Restore(ctx context.Context, cluster *apiv1.Cluster) (*restore.RestoreResponse, error)
 }

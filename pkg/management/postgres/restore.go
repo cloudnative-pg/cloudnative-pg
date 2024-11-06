@@ -37,15 +37,20 @@ import (
 	barmanCommand "github.com/cloudnative-pg/barman-cloud/pkg/command"
 	barmanCredentials "github.com/cloudnative-pg/barman-cloud/pkg/credentials"
 	barmanRestorer "github.com/cloudnative-pg/barman-cloud/pkg/restorer"
+	restore "github.com/cloudnative-pg/cnpg-i/pkg/restore/job"
 	"github.com/cloudnative-pg/machinery/pkg/execlog"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	pluginClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/configfile"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/external"
@@ -228,6 +233,7 @@ func (info InitInfo) createBackupObjectForSnapshotRestore(
 
 // Restore restores a PostgreSQL cluster from a backup into the object storage
 func (info InitInfo) Restore(ctx context.Context) error {
+	contextLogger := log.FromContext(ctx)
 	typedClient, err := management.NewControllerRuntimeClient()
 	if err != nil {
 		return err
@@ -248,29 +254,53 @@ func (info InitInfo) Restore(ctx context.Context) error {
 		info.ApplicationDatabase = cluster.GetApplicationDatabaseName()
 	}
 
-	// Before starting the restore we check if the archive destination is safe to use
-	// otherwise, we stop creating the cluster
-	err = info.checkBackupDestination(ctx, typedClient, cluster)
-	if err != nil {
-		return err
-	}
+	var envs []string
+	var config string
 
-	// If we need to download data from a backup, we do it
-	backup, env, err := info.loadBackup(ctx, typedClient, cluster)
-	if err != nil {
-		return err
-	}
+	// nolint:nestif
+	if pluginConfiguration := cluster.GetRecoverySourcePlugin(); pluginConfiguration != nil {
+		contextLogger.Info("Restore through plugin detected, proceeding...")
+		res, err := restoreViaPlugin(ctx, cluster, pluginConfiguration)
+		if err != nil {
+			return err
+		}
+		if res == nil {
+			return errors.New("empty response from restoreViaPlugin, programmatic error")
+		}
+		envs = res.Envs
+		config = res.RestoreConfig
+	} else {
+		// Before starting the restore we check if the archive destination is safe to use
+		// otherwise, we stop creating the cluster
+		err = info.checkBackupDestination(ctx, typedClient, cluster)
+		if err != nil {
+			return err
+		}
 
-	if err := info.ensureArchiveContainsLastCheckpointRedoWAL(ctx, cluster, env, backup); err != nil {
-		return err
-	}
+		// If we need to download data from a backup, we do it
+		backup, env, err := info.loadBackup(ctx, typedClient, cluster)
+		if err != nil {
+			return err
+		}
 
-	if err := info.restoreDataDir(ctx, backup, env); err != nil {
-		return err
-	}
+		if err := info.ensureArchiveContainsLastCheckpointRedoWAL(ctx, cluster, env, backup); err != nil {
+			return err
+		}
 
-	if _, err := info.restoreCustomWalDir(ctx); err != nil {
-		return err
+		if err := info.restoreDataDir(ctx, backup, env); err != nil {
+			return err
+		}
+
+		if _, err := info.restoreCustomWalDir(ctx); err != nil {
+			return err
+		}
+
+		conf, err := getRestoreWalConfig(ctx, backup)
+		if err != nil {
+			return err
+		}
+		config = conf
+		envs = env
 	}
 
 	if err := info.WriteInitialPostgresqlConf(ctx, cluster); err != nil {
@@ -304,11 +334,11 @@ func (info InitInfo) Restore(ctx context.Context) error {
 		return err
 	}
 
-	if err := info.writeRestoreWalConfig(ctx, backup, cluster); err != nil {
+	if err := info.writeCustomRestoreWalConfig(cluster, config); err != nil {
 		return err
 	}
 
-	return info.ConfigureInstanceAfterRestore(ctx, cluster, env)
+	return info.ConfigureInstanceAfterRestore(ctx, cluster, envs)
 }
 
 func (info InitInfo) ensureArchiveContainsLastCheckpointRedoWAL(
@@ -581,6 +611,33 @@ func (info InitInfo) writeRestoreWalConfig(
 	backup *apiv1.Backup,
 	cluster *apiv1.Cluster,
 ) error {
+	conf, err := getRestoreWalConfig(ctx, backup)
+	if err != nil {
+		return err
+	}
+	recoveryFileContents := fmt.Sprintf(
+		"%s\n"+
+			"%s",
+		conf,
+		cluster.Spec.Bootstrap.Recovery.RecoveryTarget.BuildPostgresOptions())
+
+	return info.writeRecoveryConfiguration(cluster, recoveryFileContents)
+}
+
+func (info InitInfo) writeCustomRestoreWalConfig(cluster *apiv1.Cluster, conf string) error {
+	recoveryFileContents := fmt.Sprintf(
+		"%s\n"+
+			"%s",
+		conf,
+		cluster.Spec.Bootstrap.Recovery.RecoveryTarget.BuildPostgresOptions())
+
+	return info.writeRecoveryConfiguration(cluster, recoveryFileContents)
+}
+
+// getRestoreWalConfig obtains the content to append to `custom.conf` allowing PostgreSQL
+// to complete the WAL recovery from the object storage and then start
+// as a new primary
+func getRestoreWalConfig(ctx context.Context, backup *apiv1.Backup) (string, error) {
 	var err error
 
 	cmd := []string{barmanCapabilities.BarmanCloudWalRestore}
@@ -593,19 +650,17 @@ func (info InitInfo) writeRestoreWalConfig(
 	cmd, err = barmanCommand.AppendCloudProviderOptionsFromBackup(
 		ctx, cmd, backup.Status.BarmanCredentials)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	cmd = append(cmd, "%f", "%p")
 
 	recoveryFileContents := fmt.Sprintf(
 		"recovery_target_action = promote\n"+
-			"restore_command = '%s'\n"+
-			"%s",
-		strings.Join(cmd, " "),
-		cluster.Spec.Bootstrap.Recovery.RecoveryTarget.BuildPostgresOptions())
+			"restore_command = '%s'\n",
+		strings.Join(cmd, " "))
 
-	return info.writeRecoveryConfiguration(cluster, recoveryFileContents)
+	return recoveryFileContents, nil
 }
 
 func (info InitInfo) writeRecoveryConfiguration(cluster *apiv1.Cluster, recoveryFileContents string) error {
@@ -984,4 +1039,40 @@ func waitUntilRecoveryFinishes(db *sql.DB) error {
 
 		return nil
 	})
+}
+
+// restoreViaPlugin tries to restore the cluster using a plugin if available and enabled.
+// Returns true if a restore plugin was found and any error encountered.
+func restoreViaPlugin(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	plugin *apiv1.PluginConfiguration,
+) (*restore.RestoreResponse, error) {
+	contextLogger := log.FromContext(ctx)
+
+	// TODO: timeout should be configurable by the user
+	ctx = context.WithValue(ctx, utils.GRPCTimeoutKey, 100*time.Minute)
+
+	plugins := repository.New()
+	availablePluginNames, err := plugins.RegisterUnixSocketPluginsInPath(configuration.Current.PluginSocketDir)
+	if err != nil {
+		contextLogger.Error(err, "Error while loading local plugins")
+	}
+	defer plugins.Close()
+
+	availablePluginNamesSet := stringset.From(availablePluginNames)
+	contextLogger.Info("available plugins", "plugins", availablePluginNamesSet)
+
+	pClient, err := pluginClient.WithPlugins(
+		ctx,
+		plugins,
+		plugin.Name,
+	)
+	if err != nil {
+		contextLogger.Error(err, "Error while loading required plugins")
+		return nil, err
+	}
+	defer pClient.Close(ctx)
+
+	return pClient.Restore(ctx, cluster)
 }

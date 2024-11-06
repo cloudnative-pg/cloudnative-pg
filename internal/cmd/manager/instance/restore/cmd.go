@@ -95,6 +95,8 @@ func restoreSubCommand(ctx context.Context, info postgres.InitInfo) error {
 		return err
 	}
 
+	contextLogger.Info("restore command execution completed without errors")
+
 	return nil
 }
 
