@@ -83,7 +83,7 @@ func startForwardConnection(
 
 	connParameters := createConnectionParameters(userApp, passApp, localPort)
 
-	pooler := pool.NewPostgresqlConnectionPool(configfile.CreateConnectionString(connParameters))
+	pooler := pool.NewPgbouncerConnectionPool(configfile.CreateConnectionString(connParameters))
 
 	conn, err := pooler.Connection(dbname)
 	if err != nil {
