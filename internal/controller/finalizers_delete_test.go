@@ -32,7 +32,8 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Database CRD finalizers", func() {
+// nolint: dupl
+var _ = Describe("CRD finalizers", func() {
 	var (
 		r              ClusterReconciler
 		scheme         *runtime.Scheme
@@ -88,7 +89,7 @@ var _ = Describe("Database CRD finalizers", func() {
 
 		cli := fake.NewClientBuilder().WithScheme(scheme).WithLists(databaseList).Build()
 		r.Client = cli
-		err := r.deleteDatabaseFinalizers(ctx, namespacedName)
+		err := r.deleteFinalizers(ctx, namespacedName)
 		Expect(err).ToNot(HaveOccurred())
 
 		for _, db := range databaseList.Items {
@@ -123,7 +124,7 @@ var _ = Describe("Database CRD finalizers", func() {
 
 			cli := fake.NewClientBuilder().WithScheme(scheme).WithLists(databaseList).Build()
 			r.Client = cli
-			err := r.deleteDatabaseFinalizers(ctx, namespacedName)
+			err := r.deleteFinalizers(ctx, namespacedName)
 			Expect(err).ToNot(HaveOccurred())
 
 			database := &apiv1.Database{}
@@ -131,4 +132,166 @@ var _ = Describe("Database CRD finalizers", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(database.Finalizers).To(BeEquivalentTo([]string{utils.DatabaseFinalizerName}))
 		})
+
+	It("should delete publication finalizers for publications on the cluster", func(ctx SpecContext) {
+		publicationList := &apiv1.PublicationList{
+			Items: []apiv1.Publication{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Finalizers: []string{
+							utils.PublicationFinalizerName,
+						},
+						Name:      "pub-1",
+						Namespace: "test",
+					},
+					Spec: apiv1.PublicationSpec{
+						Name: "pub-test",
+						ClusterRef: corev1.LocalObjectReference{
+							Name: "cluster",
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Finalizers: []string{
+							utils.PublicationFinalizerName,
+						},
+						Name:      "pub-2",
+						Namespace: "test",
+					},
+					Spec: apiv1.PublicationSpec{
+						Name: "pub-test-2",
+						ClusterRef: corev1.LocalObjectReference{
+							Name: "cluster",
+						},
+					},
+				},
+			},
+		}
+
+		cli := fake.NewClientBuilder().WithScheme(scheme).WithLists(publicationList).Build()
+		r.Client = cli
+		err := r.deleteFinalizers(ctx, namespacedName)
+		Expect(err).ToNot(HaveOccurred())
+
+		for _, pub := range publicationList.Items {
+			publication := &apiv1.Publication{}
+			err = cli.Get(ctx, client.ObjectKeyFromObject(&pub), publication)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(publication.Finalizers).To(BeZero())
+		}
+	})
+
+	It("should not delete publication finalizers for publications in another cluster", func(ctx SpecContext) {
+		publicationList := &apiv1.PublicationList{
+			Items: []apiv1.Publication{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Finalizers: []string{
+							utils.PublicationFinalizerName,
+						},
+						Name:      "pub-1",
+						Namespace: "test",
+					},
+					Spec: apiv1.PublicationSpec{
+						Name: "pub-test",
+						ClusterRef: corev1.LocalObjectReference{
+							Name: "another-cluster",
+						},
+					},
+				},
+			},
+		}
+
+		cli := fake.NewClientBuilder().WithScheme(scheme).WithLists(publicationList).Build()
+		r.Client = cli
+		err := r.deleteFinalizers(ctx, namespacedName)
+		Expect(err).ToNot(HaveOccurred())
+
+		publication := &apiv1.Publication{}
+		err = cli.Get(ctx, client.ObjectKeyFromObject(&publicationList.Items[0]), publication)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(publication.Finalizers).To(BeEquivalentTo([]string{utils.PublicationFinalizerName}))
+	})
+
+	It("should delete subscription finalizers for subscriptions on the cluster", func(ctx SpecContext) {
+		subscriptionList := &apiv1.SubscriptionList{
+			Items: []apiv1.Subscription{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Finalizers: []string{
+							utils.SubscriptionFinalizerName,
+						},
+						Name:      "sub-1",
+						Namespace: "test",
+					},
+					Spec: apiv1.SubscriptionSpec{
+						Name: "sub-test",
+						ClusterRef: corev1.LocalObjectReference{
+							Name: "cluster",
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Finalizers: []string{
+							utils.SubscriptionFinalizerName,
+						},
+						Name:      "sub-2",
+						Namespace: "test",
+					},
+					Spec: apiv1.SubscriptionSpec{
+						Name: "sub-test-2",
+						ClusterRef: corev1.LocalObjectReference{
+							Name: "cluster",
+						},
+					},
+				},
+			},
+		}
+
+		cli := fake.NewClientBuilder().WithScheme(scheme).WithLists(subscriptionList).Build()
+		r.Client = cli
+		err := r.deleteFinalizers(ctx, namespacedName)
+		Expect(err).ToNot(HaveOccurred())
+
+		for _, sub := range subscriptionList.Items {
+			subscription := &apiv1.Subscription{}
+			err = cli.Get(ctx, client.ObjectKeyFromObject(&sub), subscription)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(subscription.Finalizers).To(BeZero())
+		}
+	})
+
+	It("should not delete subscription finalizers for subscriptions in another cluster", func(ctx SpecContext) {
+		subscriptionList := &apiv1.SubscriptionList{
+			Items: []apiv1.Subscription{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Finalizers: []string{
+							utils.SubscriptionFinalizerName,
+						},
+						Name:      "sub-1",
+						Namespace: "test",
+					},
+					Spec: apiv1.SubscriptionSpec{
+						Name: "sub-test",
+						ClusterRef: corev1.LocalObjectReference{
+							Name: "another-cluster",
+						},
+					},
+				},
+			},
+		}
+
+		cli := fake.NewClientBuilder().WithScheme(scheme).WithLists(subscriptionList).Build()
+		r.Client = cli
+		err := r.deleteFinalizers(ctx, namespacedName)
+		Expect(err).ToNot(HaveOccurred())
+
+		subscription := &apiv1.Subscription{}
+		err = cli.Get(ctx, client.ObjectKeyFromObject(&subscriptionList.Items[0]), subscription)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(subscription.Finalizers).To(BeEquivalentTo([]string{utils.SubscriptionFinalizerName}))
+	})
 })

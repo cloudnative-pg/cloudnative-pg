@@ -28,8 +28,26 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
+// deleteFinalizers deletes object finalizers when the cluster they were in has been deleted
+func (r *ClusterReconciler) deleteFinalizers(ctx context.Context, namespacedName types.NamespacedName) error {
+	if err := r.deleteDatabaseFinalizers(ctx, namespacedName); err != nil {
+		return err
+	}
+	if err := r.deletePublicationFinalizers(ctx, namespacedName); err != nil {
+		return err
+	}
+	if err := r.deleteSubscriptionFinalizers(ctx, namespacedName); err != nil {
+		return err
+	}
+	return nil
+}
+
 // deleteDatabaseFinalizers deletes Database object finalizers when the cluster they were in has been deleted
-func (r *ClusterReconciler) deleteDatabaseFinalizers(ctx context.Context, namespacedName types.NamespacedName) error {
+// nolint: dupl
+func (r *ClusterReconciler) deleteDatabaseFinalizers(
+	ctx context.Context,
+	namespacedName types.NamespacedName,
+) error {
 	contextLogger := log.FromContext(ctx)
 
 	databases := apiv1.DatabaseList{}
@@ -58,6 +76,92 @@ func (r *ClusterReconciler) deleteDatabaseFinalizers(ctx context.Context, namesp
 					"database", database.Name,
 					"oldFinalizerList", origDatabase.ObjectMeta.Finalizers,
 					"newFinalizerList", database.ObjectMeta.Finalizers,
+				)
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+// deletePublicationFinalizers deletes Publication object finalizers when the cluster they were in has been deleted
+// nolint: dupl
+func (r *ClusterReconciler) deletePublicationFinalizers(
+	ctx context.Context,
+	namespacedName types.NamespacedName,
+) error {
+	contextLogger := log.FromContext(ctx)
+
+	publications := apiv1.PublicationList{}
+	if err := r.List(ctx,
+		&publications,
+		client.InNamespace(namespacedName.Namespace),
+	); err != nil {
+		return err
+	}
+
+	for idx := range publications.Items {
+		publication := &publications.Items[idx]
+
+		if publication.Spec.ClusterRef.Name != namespacedName.Name {
+			continue
+		}
+
+		origPublication := publication.DeepCopy()
+		if controllerutil.RemoveFinalizer(publication, utils.PublicationFinalizerName) {
+			contextLogger.Debug("Removing finalizer from publication",
+				"finalizer", utils.PublicationFinalizerName, "publication", publication.Name)
+			if err := r.Patch(ctx, publication, client.MergeFrom(origPublication)); err != nil {
+				contextLogger.Error(
+					err,
+					"error while removing finalizer from publication",
+					"publication", publication.Name,
+					"oldFinalizerList", origPublication.ObjectMeta.Finalizers,
+					"newFinalizerList", publication.ObjectMeta.Finalizers,
+				)
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+// deleteSubscriptionFinalizers deletes Subscription object finalizers when the cluster they were in has been deleted
+// nolint: dupl
+func (r *ClusterReconciler) deleteSubscriptionFinalizers(
+	ctx context.Context,
+	namespacedName types.NamespacedName,
+) error {
+	contextLogger := log.FromContext(ctx)
+
+	subscriptions := apiv1.SubscriptionList{}
+	if err := r.List(ctx,
+		&subscriptions,
+		client.InNamespace(namespacedName.Namespace),
+	); err != nil {
+		return err
+	}
+
+	for idx := range subscriptions.Items {
+		subscription := &subscriptions.Items[idx]
+
+		if subscription.Spec.ClusterRef.Name != namespacedName.Name {
+			continue
+		}
+
+		origSubscription := subscription.DeepCopy()
+		if controllerutil.RemoveFinalizer(subscription, utils.SubscriptionFinalizerName) {
+			contextLogger.Debug("Removing finalizer from subscription",
+				"finalizer", utils.SubscriptionFinalizerName, "subscription", subscription.Name)
+			if err := r.Patch(ctx, subscription, client.MergeFrom(origSubscription)); err != nil {
+				contextLogger.Error(
+					err,
+					"error while removing finalizer from subscription",
+					"subscription", subscription.Name,
+					"oldFinalizerList", origSubscription.ObjectMeta.Finalizers,
+					"newFinalizerList", subscription.ObjectMeta.Finalizers,
 				)
 				return err
 			}

@@ -20,15 +20,10 @@ import (
 	"fmt"
 	"time"
 
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	testUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	"k8s.io/apimachinery/pkg/types"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -235,30 +230,6 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelDeclarativePub
 				}
 				AssertDataExpectedCount(env, tableLocator, 2)
 			})
-
-			// TODO: remove once finalizers cleanup is handled by the operator
-			deleteObjectWithFinalizer := func(object client.Object, finalizerName string) error {
-				if err := testUtils.DeleteObject(env, object); err != nil {
-					return err
-				}
-
-				updatedObj := object.DeepCopyObject().(client.Object)
-				controllerutil.RemoveFinalizer(updatedObj, finalizerName)
-				if err := env.Client.Patch(env.Ctx, updatedObj, client.MergeFrom(object)); err != nil {
-					if apierrs.IsNotFound(err) {
-						return nil
-					}
-					return err
-				}
-
-				return nil
-			}
-
-			err = deleteObjectWithFinalizer(pub, utils.PublicationFinalizerName)
-			Expect(err).ToNot(HaveOccurred())
-
-			err = deleteObjectWithFinalizer(sub, utils.SubscriptionFinalizerName)
-			Expect(err).ToNot(HaveOccurred())
 		})
 	})
 })
