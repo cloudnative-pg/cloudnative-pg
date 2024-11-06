@@ -38,7 +38,7 @@ wget https://github.com/cloudnative-pg/cloudnative-pg/releases/download/v1.24.1/
   --output-document kube-plugin.deb
 ```
 
-Then, with super user privileges, install from the local file using `dpkg`:
+Then, with superuser privileges, install from the local file using `dpkg`:
 
 ```console
 $ sudo dpkg -i kube-plugin.deb
@@ -59,7 +59,7 @@ curl -L https://github.com/cloudnative-pg/cloudnative-pg/releases/download/v1.24
   --output kube-plugin.rpm
 ```
 
-Then, with super user privileges, install with `yum`, and you're ready to use:
+Then, with superuser privileges, install with `yum`, and you're ready to use:
 
 ```console
 $ sudo yum --disablerepo=* localinstall kube-plugin.rpm
@@ -162,11 +162,11 @@ sudo mv kubectl_complete-cnpg /usr/local/bin
 ```
 
 !!! Important
-    The name of the script needs to be exactly the one provided since is used by the kubectl auto-complete process
+    The name of the script needs to be exactly the one provided since it's used by the kubectl auto-complete process
 
 ## Use
 
-Once the plugin was installed and deployed, you can start using it like this:
+Once the plugin is installed and deployed, you can start using it like this:
 
 ```sh
 kubectl cnpg <command> <args...>
@@ -719,7 +719,7 @@ the `-h` flag:
 `kubectl cnpg logs cluster -h`
 
 The `logs` command will display logs in  JSON-lines format, unless the
-`--timestamps` flag is used, in which case, a human readable timestamp will be
+`--timestamps` flag is used, in which case, a human-readable timestamp will be
 prepended to each line. In this case, lines will no longer be valid JSON,
 and tools such as `jq` may not work as desired.
 
@@ -742,7 +742,7 @@ The `--tail` flag can be used to specify how many log lines will be retrieved
 from each pod in the cluster. By default, the `logs cluster` sub-command will
 display all the logs from each pod in the cluster. If combined with the "follow"
 flag `-f`, the number of logs specified by `--tail` will be retrieved until the
-current time, and and from then the new logs will be followed.
+current time, and from then the new logs will be followed.
 
 NOTE: unlike other `cnpg` plugin commands, the `-f` is used to denote "follow"
 rather than specify a file. This keeps with the convention of `kubectl logs`,
