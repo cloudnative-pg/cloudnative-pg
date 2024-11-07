@@ -17,8 +17,6 @@ limitations under the License.
 package infrastructure
 
 import (
-	"database/sql"
-	"errors"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -28,24 +26,4 @@ import (
 func TestReconciler(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Internal Management Controller Slots Infrastructure Suite")
-}
-
-// mockPooler is a mock implementation of the Pooler interface
-type mockPooler struct {
-	db *sql.DB
-}
-
-func (mp *mockPooler) Connection(_ string) (*sql.DB, error) {
-	if mp.db == nil {
-		return nil, errors.New("connection error")
-	}
-	return mp.db, nil
-}
-
-func (mp *mockPooler) GetDsn(_ string) string {
-	return "mocked DSN"
-}
-
-func (mp *mockPooler) ShutdownConnections() {
-	// no-op in mock
 }

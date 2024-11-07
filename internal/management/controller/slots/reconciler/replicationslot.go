@@ -18,6 +18,7 @@ package reconciler
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"time"
 
@@ -32,7 +33,7 @@ import (
 func ReconcileReplicationSlots(
 	ctx context.Context,
 	instanceName string,
-	manager infrastructure.Manager,
+	db *sql.DB,
 	cluster *apiv1.Cluster,
 ) (reconcile.Result, error) {
 	if cluster.Spec.ReplicationSlots == nil ||
@@ -43,11 +44,11 @@ func ReconcileReplicationSlots(
 	// if the replication slots feature was deactivated, ensure any existing
 	// replication slots get cleaned up
 	if !cluster.Spec.ReplicationSlots.HighAvailability.GetEnabled() {
-		return dropReplicationSlots(ctx, manager, cluster)
+		return dropReplicationSlots(ctx, db, cluster)
 	}
 
 	if cluster.Status.CurrentPrimary == instanceName || cluster.Status.TargetPrimary == instanceName {
-		return reconcilePrimaryReplicationSlots(ctx, manager, cluster)
+		return reconcilePrimaryReplicationSlots(ctx, db, cluster)
 	}
 
 	return reconcile.Result{}, nil
@@ -55,13 +56,13 @@ func ReconcileReplicationSlots(
 
 func reconcilePrimaryReplicationSlots(
 	ctx context.Context,
-	manager infrastructure.Manager,
+	db *sql.DB,
 	cluster *apiv1.Cluster,
 ) (reconcile.Result, error) {
 	contextLogger := log.FromContext(ctx)
 	contextLogger.Debug("Updating primary HA replication slots")
 
-	currentSlots, err := manager.List(ctx, cluster.Spec.ReplicationSlots)
+	currentSlots, err := infrastructure.List(ctx, db, cluster.Spec.ReplicationSlots)
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("reconciling primary replication slots: %w", err)
 	}
@@ -82,7 +83,7 @@ func reconcilePrimaryReplicationSlots(
 		}
 
 		// at this point, the cluster instance does not have a replication slot
-		if err := manager.Create(ctx, infrastructure.ReplicationSlot{SlotName: slotName}); err != nil {
+		if err := infrastructure.Create(ctx, db, infrastructure.ReplicationSlot{SlotName: slotName}); err != nil {
 			return reconcile.Result{}, fmt.Errorf("creating primary HA replication slots: %w", err)
 		}
 	}
@@ -105,7 +106,7 @@ func reconcilePrimaryReplicationSlots(
 			}
 			contextLogger.Trace("Attempt to delete replication slot",
 				"slot", slot)
-			if err := manager.Delete(ctx, slot); err != nil {
+			if err := infrastructure.Delete(ctx, db, slot); err != nil {
 				return reconcile.Result{}, fmt.Errorf("failure deleting replication slot %q: %w", slot.SlotName, err)
 			}
 		}
@@ -120,13 +121,13 @@ func reconcilePrimaryReplicationSlots(
 
 func dropReplicationSlots(
 	ctx context.Context,
-	manager infrastructure.Manager,
+	db *sql.DB,
 	cluster *apiv1.Cluster,
 ) (reconcile.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
 	// we fetch all replication slots
-	slots, err := manager.List(ctx, cluster.Spec.ReplicationSlots)
+	slots, err := infrastructure.List(ctx, db, cluster.Spec.ReplicationSlots)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
@@ -141,7 +142,7 @@ func dropReplicationSlots(
 		}
 		contextLogger.Trace("Attempt to delete replication slot",
 			"slot", slot)
-		if err := manager.Delete(ctx, slot); err != nil {
+		if err := infrastructure.Delete(ctx, db, slot); err != nil {
 			return reconcile.Result{}, fmt.Errorf("while disabling standby HA replication slots: %w", err)
 		}
 	}
