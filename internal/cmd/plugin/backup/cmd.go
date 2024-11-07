@@ -44,6 +44,8 @@ type backupCommandOptions struct {
 	online              *bool
 	immediateCheckpoint *bool
 	waitForArchive      *bool
+	pluginName          string
+	pluginParameters    pluginParameters
 }
 
 func (options backupCommandOptions) getOnlineConfiguration() *apiv1.OnlineConfiguration {
@@ -59,7 +61,8 @@ func (options backupCommandOptions) getOnlineConfiguration() *apiv1.OnlineConfig
 
 // NewCmd creates the new "backup" subcommand
 func NewCmd() *cobra.Command {
-	var backupName, backupTarget, backupMethod, online, immediateCheckpoint, waitForArchive string
+	var backupName, backupTarget, backupMethod, online, immediateCheckpoint, waitForArchive, pluginName string
+	var pluginParameters pluginParameters
 
 	backupSubcommand := &cobra.Command{
 		Use:     "backup [cluster]",
@@ -95,9 +98,20 @@ func NewCmd() *cobra.Command {
 				"",
 				string(apiv1.BackupMethodBarmanObjectStore),
 				string(apiv1.BackupMethodVolumeSnapshot),
+				string(apiv1.BackupMethodPlugin),
 			}
 			if !slices.Contains(allowedBackupMethods, backupMethod) {
 				return fmt.Errorf("backup-method: %s is not supported by the backup command", backupMethod)
+			}
+
+			if backupMethod != "plugin" {
+				if len(pluginName) > 0 {
+					return fmt.Errorf("plugin-name is allowed only when backup method in 'plugin'")
+				}
+
+				if len(pluginParameters) > 0 {
+					return fmt.Errorf("plugin-parameters is allowed only when backup method in 'plugin'")
+				}
 			}
 
 			var cluster apiv1.Cluster
@@ -137,6 +151,8 @@ func NewCmd() *cobra.Command {
 					online:              parsedOnline,
 					immediateCheckpoint: parsedImmediateCheckpoint,
 					waitForArchive:      parsedWaitForArchive,
+					pluginName:          pluginName,
+					pluginParameters:    pluginParameters,
 				})
 		},
 	}
@@ -162,7 +178,7 @@ func NewCmd() *cobra.Command {
 		"m",
 		"",
 		"If present, will override the backup method defined in backup resource, "+
-			"valid values are volumeSnapshot and barmanObjectStore.",
+			"valid values are volumeSnapshot, barmanObjectStore and plugin.",
 	)
 
 	const optionalAcceptedValues = "Optional. Accepted values: true|false|\"\"."
@@ -188,6 +204,16 @@ func NewCmd() *cobra.Command {
 			optionalAcceptedValues,
 	)
 
+	backupSubcommand.Flags().StringVar(&pluginName, "plugin-name", "",
+		"Set the name of the plugin that should take the backup. This option "+
+			"is allowed only when the backup method is set to 'plugin'",
+	)
+
+	backupSubcommand.Flags().VarP(&pluginParameters, "plugin-parameters", "",
+		"The set of plugin parameters that should be passed to the backup plugin "+
+			" i.e. param-one=value,param-two=value",
+	)
+
 	return backupSubcommand
 }
 
@@ -209,6 +235,13 @@ func createBackup(ctx context.Context, options backupCommandOptions) error {
 		},
 	}
 	utils.LabelClusterName(&backup.ObjectMeta, options.clusterName)
+
+	if len(options.pluginName) > 0 {
+		backup.Spec.PluginConfiguration = &apiv1.BackupPluginConfiguration{
+			Name:       options.pluginName,
+			Parameters: options.pluginParameters,
+		}
+	}
 
 	err := plugin.Client.Create(ctx, &backup)
 	if err == nil {
