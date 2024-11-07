@@ -106,6 +106,8 @@ sed -i -e "s@release-[0-9.]*/releases/cnpg-[0-9.]*.yaml@${branch}/releases/cnpg-
     -e "s@artifacts/release-[0-9.]*/@artifacts/${branch}/@g" \
     docs/src/installation_upgrade.md
 
+sed -i -e "s@1\.[0-9]\+\.[0-9]\+@${release_version}@g" docs/src/kubectl-plugin.md
+
 CONFIG_TMP_DIR=$(mktemp -d)
 cp -r config/* "${CONFIG_TMP_DIR}"
 (
