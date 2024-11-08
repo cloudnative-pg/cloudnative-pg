@@ -4493,7 +4493,7 @@ Defaults is <code>true</code>.</p>
    <p>Whether the role is a <code>superuser</code> who can override all access
 restrictions within the database - superuser status is dangerous and
 should be used only when really needed. You must yourself be a
-superuser to create a new superuser. Defaults is <code>false</code>.</p>
+superuser to create a new superuser. Default is <code>false</code>.</p>
 </td>
 </tr>
 <tr><td><code>createdb</code><br/>
@@ -4518,10 +4518,10 @@ other roles. Default is <code>false</code>.</p>
 <i>bool</i>
 </td>
 <td>
-   <p>Whether the role is allowed to log in. A role having the <code>login</code>
-attribute can be thought of as a user. Roles without this attribute
-are useful for managing database privileges, but are not users in
-the usual sense of the word. Default is <code>false</code>.</p>
+   <p>Whether the role is allowed to log in.
+A role having the <code>login</code> attribute can be thought of as a user.
+Roles without this attribute are useful for managing database privileges,
+but are not users in the usual sense of the word. Default is <code>false</code>.</p>
 </td>
 </tr>
 <tr><td><code>replication</code><br/>
@@ -4533,8 +4533,8 @@ attribute (or be a superuser) in order to be able to connect to the
 server in replication mode (physical or logical replication) and in
 order to be able to create or drop replication slots. A role having
 the <code>replication</code> attribute is a very highly privileged role, and
-should only be used on roles actually used for replication. Default
-is <code>false</code>.</p>
+should only be used on roles actually used for replication.
+Default is <code>false</code>.</p>
 </td>
 </tr>
 <tr><td><code>bypassrls</code><br/>
@@ -4585,7 +4585,7 @@ desired state that was synchronized</p>
    <p>Message is the reconciliation error message</p>
 </td>
 </tr>
-<tr><td><code>passwordStatus</code> <B>[Required]</B><br/>
+<tr><td><code>passwordState</code> <B>[Required]</B><br/>
 <a href="#postgresql-cnpg-io-v1-PasswordState"><i>PasswordState</i></a>
 </td>
 <td>

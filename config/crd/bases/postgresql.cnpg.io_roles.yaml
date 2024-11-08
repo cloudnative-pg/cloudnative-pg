@@ -124,10 +124,10 @@ spec:
                 type: boolean
               login:
                 description: |-
-                  Whether the role is allowed to log in. A role having the `login`
-                  attribute can be thought of as a user. Roles without this attribute
-                  are useful for managing database privileges, but are not users in
-                  the usual sense of the word. Default is `false`.
+                  Whether the role is allowed to log in.
+                  A role having the `login` attribute can be thought of as a user.
+                  Roles without this attribute are useful for managing database privileges,
+                  but are not users in the usual sense of the word. Default is `false`.
                 type: boolean
               name:
                 description: Name of the role
@@ -150,8 +150,8 @@ spec:
                   server in replication mode (physical or logical replication) and in
                   order to be able to create or drop replication slots. A role having
                   the `replication` attribute is a very highly privileged role, and
-                  should only be used on roles actually used for replication. Default
-                  is `false`.
+                  should only be used on roles actually used for replication.
+                  Default is `false`.
                 type: boolean
               roleReclaimPolicy:
                 default: retain
@@ -165,7 +165,7 @@ spec:
                   Whether the role is a `superuser` who can override all access
                   restrictions within the database - superuser status is dangerous and
                   should be used only when really needed. You must yourself be a
-                  superuser to create a new superuser. Defaults is `false`.
+                  superuser to create a new superuser. Default is `false`.
                 type: boolean
               validUntil:
                 description: |-
@@ -192,7 +192,7 @@ spec:
                   desired state that was synchronized
                 format: int64
                 type: integer
-              passwordStatus:
+              passwordState:
                 description: |-
                   PasswordState holds the last applied version of the passwordSecret, and
                   the last transaction ID of the role in postgres

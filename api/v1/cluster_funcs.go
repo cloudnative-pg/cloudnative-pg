@@ -341,8 +341,8 @@ func (roleConfiguration *RoleConfiguration) GetRoleName() string {
 	return roleConfiguration.Name
 }
 
-// GetRoleSecretsName gets the name of the secret which is used to store the role's password
-func (roleConfiguration *RoleConfiguration) GetRoleSecretsName() string {
+// GetRoleSecretName gets the name of the secret which is used to store the role's password
+func (roleConfiguration *RoleConfiguration) GetRoleSecretName() string {
 	if roleConfiguration.PasswordSecret != nil {
 		return roleConfiguration.PasswordSecret.Name
 	}

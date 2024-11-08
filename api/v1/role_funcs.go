@@ -28,7 +28,7 @@ func (r *Role) SetAsApplied() {
 	r.Status.ObservedGeneration = r.Generation
 }
 
-// GetRoleInherit return the inherit attribute of a roleConfiguration
+// GetRoleInherit returns the inherit attribute of a roleConfiguration
 func (roleSpec *RoleSpec) GetRoleInherit() bool {
 	if roleSpec.Inherit != nil {
 		return *roleSpec.Inherit
@@ -36,8 +36,8 @@ func (roleSpec *RoleSpec) GetRoleInherit() bool {
 	return true
 }
 
-// GetRoleSecretsName gets the name of the secret holding the role password
-func (roleSpec *RoleSpec) GetRoleSecretsName() string {
+// GetRoleSecretName gets the name of the secret holding the role password
+func (roleSpec *RoleSpec) GetRoleSecretName() string {
 	if roleSpec.PasswordSecret == nil {
 		return ""
 	}
