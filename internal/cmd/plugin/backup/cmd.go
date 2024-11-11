@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	pgTime "github.com/cloudnative-pg/machinery/pkg/postgres/time"
@@ -64,6 +65,12 @@ func NewCmd() *cobra.Command {
 	var backupName, backupTarget, backupMethod, online, immediateCheckpoint, waitForArchive, pluginName string
 	var pluginParameters pluginParameters
 
+	backupMethods := []string{
+		string(apiv1.BackupMethodBarmanObjectStore),
+		string(apiv1.BackupMethodVolumeSnapshot),
+		string(apiv1.BackupMethodPlugin),
+	}
+
 	backupSubcommand := &cobra.Command{
 		Use:     "backup [cluster]",
 		Short:   "Request an on-demand backup for a PostgreSQL Cluster",
@@ -94,12 +101,8 @@ func NewCmd() *cobra.Command {
 			}
 
 			// Check if the backup method is correct
-			allowedBackupMethods := []string{
-				"",
-				string(apiv1.BackupMethodBarmanObjectStore),
-				string(apiv1.BackupMethodVolumeSnapshot),
-				string(apiv1.BackupMethodPlugin),
-			}
+			allowedBackupMethods := backupMethods
+			allowedBackupMethods = append(allowedBackupMethods, "")
 			if !slices.Contains(allowedBackupMethods, backupMethod) {
 				return fmt.Errorf("backup-method: %s is not supported by the backup command", backupMethod)
 			}
@@ -177,8 +180,8 @@ func NewCmd() *cobra.Command {
 		"method",
 		"m",
 		"",
-		"If present, will override the backup method defined in backup resource, "+
-			"valid values are volumeSnapshot, barmanObjectStore and plugin.",
+		fmt.Sprintf("If present, will override the backup method defined in backup resource, "+
+			"valid values are: %s.", strings.Join(backupMethods, ", ")),
 	)
 
 	const optionalAcceptedValues = "Optional. Accepted values: true|false|\"\"."
@@ -205,7 +208,7 @@ func NewCmd() *cobra.Command {
 	)
 
 	backupSubcommand.Flags().StringVar(&pluginName, "plugin-name", "",
-		"Set the name of the plugin that should take the backup. This option "+
+		"Sets the name of the plugin that should take the backup. This option "+
 			"is allowed only when the backup method is set to 'plugin'",
 	)
 
