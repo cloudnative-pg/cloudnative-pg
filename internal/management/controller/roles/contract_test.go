@@ -80,11 +80,29 @@ var _ = Describe("DatabaseRole implementation test", func() {
 				"Userrole2", "role1", "TestroleABC",
 			},
 		}
-		res := role.isInSameRolesAs(config)
+		res := role.isInRolesInDB(config)
 		Expect(res).To(BeTrue())
 	})
 
-	It("should return false when the in roles are not equal", func() {
+	It("should return true when the in roles in database is more than in spec", func() {
+		role := DatabaseRole{
+			Name:    "abc",
+			Inherit: true,
+			InRoles: []string{
+				"role1", "role2", "Userrole2", "TestroleABC",
+			},
+		}
+		config := apiv1.RoleConfiguration{
+			Name: "abc",
+			InRoles: []string{
+				"Userrole2", "role1", "TestroleABC",
+			},
+		}
+		res := role.isInRolesInDB(config)
+		Expect(res).To(BeTrue())
+	})
+
+	It("should return false when the in roles are not in database", func() {
 		role := DatabaseRole{
 			Name:    "abc",
 			Inherit: true,
@@ -98,7 +116,7 @@ var _ = Describe("DatabaseRole implementation test", func() {
 				"Userrole2", "role1x", "TestroleABC",
 			},
 		}
-		res := role.isInSameRolesAs(config)
+		res := role.isInRolesInDB(config)
 		Expect(res).To(BeFalse())
 	})
 

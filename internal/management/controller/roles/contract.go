@@ -19,11 +19,11 @@ package roles
 import (
 	"database/sql"
 	"reflect"
-	"sort"
 
 	"github.com/jackc/pgx/v5/pgtype"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/machinery/pkg/stringset"
 )
 
 // DatabaseRole represents the role information read from / written to the Database
@@ -60,18 +60,22 @@ func (d *DatabaseRole) hasSameCommentAs(inSpec apiv1.RoleConfiguration) bool {
 	return d.Comment == inSpec.Comment
 }
 
-func (d *DatabaseRole) isInSameRolesAs(inSpec apiv1.RoleConfiguration) bool {
+// isInRolesNotInDB checks if the InRoles in the spec are a subset of the InRoles in the DB
+func (d *DatabaseRole) isInRolesInDB(inSpec apiv1.RoleConfiguration) bool {
 	if len(d.InRoles) == 0 && len(inSpec.InRoles) == 0 {
 		return true
 	}
 
-	if len(d.InRoles) != len(inSpec.InRoles) {
+	if len(d.InRoles) < len(inSpec.InRoles) {
 		return false
 	}
 
-	sort.Strings(d.InRoles)
-	sort.Strings(inSpec.InRoles)
-	return reflect.DeepEqual(d.InRoles, inSpec.InRoles)
+	for _, role := range inSpec.InRoles {
+		if !stringset.From(d.InRoles).Has(role) {
+			return false
+		}
+	}
+	return true
 }
 
 func (d *DatabaseRole) hasSameValidUntilAs(inSpec apiv1.RoleConfiguration) bool {
