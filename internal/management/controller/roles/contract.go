@@ -20,10 +20,10 @@ import (
 	"database/sql"
 	"reflect"
 
+	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/machinery/pkg/stringset"
 )
 
 // DatabaseRole represents the role information read from / written to the Database
