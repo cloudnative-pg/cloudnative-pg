@@ -249,23 +249,16 @@ func (sr *RoleSynchronizer) applyRoleActions(
 		return nil
 	}
 
-	for _, role := range rolesByAction[roleCreate] {
-		appliedState, err := sr.applyRoleCreateUpdate(ctx, db, role, roleCreate)
-		if err == nil {
-			appliedChanges[role.Name] = appliedState
-		}
-		if unhandledErr := handleRoleError(err, role.Name, roleCreate); unhandledErr != nil {
-			return nil, nil, unhandledErr
-		}
-	}
-
-	for _, role := range rolesByAction[roleUpdate] {
-		appliedState, err := sr.applyRoleCreateUpdate(ctx, db, role, roleUpdate)
-		if err == nil {
-			appliedChanges[role.Name] = appliedState
-		}
-		if unhandledErr := handleRoleError(err, role.Name, roleUpdate); unhandledErr != nil {
-			return nil, nil, unhandledErr
+	actionsCreateUpdate := []roleAction{roleCreate, roleUpdate}
+	for _, action := range actionsCreateUpdate {
+		for _, role := range rolesByAction[action] {
+			appliedState, err := sr.applyRoleCreateUpdate(ctx, db, role, action)
+			if err == nil {
+				appliedChanges[role.Name] = appliedState
+			}
+			if unhandledErr := handleRoleError(err, role.Name, action); unhandledErr != nil {
+				return nil, nil, unhandledErr
+			}
 		}
 	}
 
