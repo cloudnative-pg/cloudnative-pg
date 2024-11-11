@@ -98,14 +98,9 @@ func RunController(
 	conf *configuration.Data,
 ) error {
 	ctx := context.Background()
-	pprofAddress := ""
 	setupLog.Info("Starting CloudNativePG Operator",
 		"version", versions.Version,
 		"build", versions.Info)
-
-	if pprofDebug {
-		pprofAddress = "0.0.0.0:6060"
-	}
 
 	managerOptions := ctrl.Options{
 		Scheme: scheme,
@@ -120,7 +115,7 @@ func RunController(
 			Port:    port,
 			CertDir: defaultWebhookCertDir,
 		}),
-		PprofBindAddress: pprofAddress,
+		PprofBindAddress: getPprofServerAddress(pprofDebug),
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the
 		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly
@@ -460,4 +455,12 @@ func readSecret(
 	}
 
 	return data, nil
+}
+
+func getPprofServerAddress(enabled bool) string {
+	if enabled {
+		return "0.0.0.0:6060"
+	}
+
+	return ""
 }
