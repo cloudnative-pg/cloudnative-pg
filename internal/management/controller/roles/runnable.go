@@ -249,46 +249,52 @@ func (sr *RoleSynchronizer) applyRoleActions(
 		return nil
 	}
 
-	for action, roles := range rolesByAction {
-		switch action {
-		case roleIgnore, roleIsReconciled, roleIsReserved:
-			contextLog.Debug("no action required", "action", action)
-			continue
+	for _, role := range rolesByAction[roleCreate] {
+		appliedState, err := sr.applyRoleCreateUpdate(ctx, db, role, roleCreate)
+		if err == nil {
+			appliedChanges[role.Name] = appliedState
+		}
+		if unhandledErr := handleRoleError(err, role.Name, roleCreate); unhandledErr != nil {
+			return nil, nil, unhandledErr
+		}
+	}
+
+	for _, role := range rolesByAction[roleUpdate] {
+		appliedState, err := sr.applyRoleCreateUpdate(ctx, db, role, roleUpdate)
+		if err == nil {
+			appliedChanges[role.Name] = appliedState
+		}
+		if unhandledErr := handleRoleError(err, role.Name, roleUpdate); unhandledErr != nil {
+			return nil, nil, unhandledErr
+		}
+	}
+
+	for _, role := range rolesByAction[roleSetComment] {
+		// NOTE: adding/updating a comment on a role does not alter its TransactionID
+		err := UpdateComment(ctx, db, role.toDatabaseRole())
+		if unhandledErr := handleRoleError(err, role.Name, roleSetComment); unhandledErr != nil {
+			return nil, nil, unhandledErr
+		}
+	}
+
+	for _, role := range rolesByAction[roleUpdateMemberships] {
+		// NOTE: revoking / granting to a role does not alter its TransactionID
+		dbRole := role.toDatabaseRole()
+		grants, revokes, err := getRoleMembershipDiff(ctx, db, role, dbRole)
+		if unhandledErr := handleRoleError(err, role.Name, roleUpdateMemberships); unhandledErr != nil {
+			return nil, nil, unhandledErr
 		}
 
-		contextLog.Info("roles in DB out of sync with Spec, evaluating action",
-			"roles", getRoleNames(roles), "action", action)
+		err = UpdateMembership(ctx, db, dbRole, grants, revokes)
+		if unhandledErr := handleRoleError(err, role.Name, roleUpdateMemberships); unhandledErr != nil {
+			return nil, nil, unhandledErr
+		}
+	}
 
-		for _, role := range roles {
-			var (
-				err             error
-				appliedState    apiv1.PasswordState
-				grants, revokes []string
-			)
-			switch action {
-			case roleCreate, roleUpdate:
-				appliedState, err = sr.applyRoleCreateUpdate(ctx, db, role, action)
-				if err == nil {
-					appliedChanges[role.Name] = appliedState
-				}
-			case roleDelete:
-				err = Delete(ctx, db, role.toDatabaseRole())
-			case roleSetComment:
-				// NOTE: adding/updating a comment on a role does not alter its TransactionID
-				err = UpdateComment(ctx, db, role.toDatabaseRole())
-			case roleUpdateMemberships:
-				// NOTE: revoking / granting to a role does not alter its TransactionID
-				dbRole := role.toDatabaseRole()
-				grants, revokes, err = getRoleMembershipDiff(ctx, db, role, dbRole)
-				if unhandledErr := handleRoleError(err, role.Name, action); unhandledErr != nil {
-					return nil, nil, unhandledErr
-				}
-
-				err = UpdateMembership(ctx, db, dbRole, grants, revokes)
-			}
-			if unhandledErr := handleRoleError(err, role.Name, action); unhandledErr != nil {
-				return nil, nil, unhandledErr
-			}
+	for _, role := range rolesByAction[roleDelete] {
+		err := Delete(ctx, db, role.toDatabaseRole())
+		if unhandledErr := handleRoleError(err, role.Name, roleDelete); unhandledErr != nil {
+			return nil, nil, unhandledErr
 		}
 	}
 
