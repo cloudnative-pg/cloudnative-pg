@@ -147,6 +147,146 @@ spec:
         path: phase
         x-descriptors:
         - 'urn:alm:descriptor:io.kubernetes.phase'
+      - displayName: Azure Credentials
+        description: The credentials to use to upload data to Azure Blob Storage
+        path: azureCredentials
+        x-descriptors:
+          - 'urn:alm:descriptor:hidden'
+      - displayName: Backup ID
+        description: The ID of the Barman backup
+        path: backupId
+        x-descriptors:
+          - 'urn:alm:descriptor:text'
+      - displayName: Backup Label File
+        description: Backup label file content as returned by Postgres in case of online (hot) backups
+        path: backupLabelFile
+        x-descriptors:
+          - 'urn:alm:descriptor:hidden'
+      - displayName: Backup Name
+        description: The Name of the Barman backup
+        path: backupName
+        x-descriptors:
+          - 'urn:alm:descriptor:text'
+      - displayName: Begin LSN
+        description: The starting xlog
+        path: beginLSN
+        x-descriptors:
+          - 'urn:alm:descriptor:hidden'
+      - displayName: Begin Wal
+        description: The starting WAL
+        path: beginWal
+        x-descriptors:
+          - 'urn:alm:descriptor:hidden'
+      - displayName: Command Error
+        description: The backup command output in case of error
+        path: commandError
+        x-descriptors:
+          - 'urn:alm:descriptor:hidden'
+      - displayName: Command Output
+        description: Unused. Retained for compatibility with old versions.
+        path: commandOutput
+        x-descriptors:
+          - 'urn:alm:descriptor:hidden'
+      - displayName: Destination Path
+        description: |-
+          The path where to store the backup (i.e. s3://bucket/path/to/folder)
+          this path, with different destination folders, will be used for WALs
+          and for data. This may not be populated in case of errors.
+        path: destinationPath
+        x-descriptors:
+          - 'urn:alm:descriptor:hidden'
+      - displayName: Encryption
+        description: Encryption method required to S3 API
+        path: encryption
+        x-descriptors:
+          - 'urn:alm:descriptor:text'
+      - displayName: End LSN
+        description: The ending xlog
+        path: endLSN
+        x-descriptors:
+          - 'urn:alm:descriptor:hidden'
+      - displayName: End Wal
+        description: The ending WAL
+        path: endWal
+        x-descriptors:
+          - 'urn:alm:descriptor:hidden'
+      - displayName: Endpoint CA
+        description: |-
+          EndpointCA store the CA bundle of the barman endpoint.
+          Useful when using self-signed certificates to avoid
+          errors with certificate issuer and barman-cloud-wal-archive.
+        path: endpointCA
+        x-descriptors:
+          - 'urn:alm:descriptor:hidden'
+      - displayName: Endpoint URL
+        description: |-
+          Endpoint to be used to upload data to the cloud,
+          overriding the automatic endpoint discovery
+        path: endpointURL
+        x-descriptors:
+          - 'urn:alm:descriptor:hidden'
+      - displayName: Error
+        description: The detected error
+        path: error
+        x-descriptors:
+          - 'urn:alm:descriptor:text'
+      - displayName: Google Credentials
+        description: The credentials to use to upload data to Google Cloud Storage
+        path: googleCredentials
+        x-descriptors:
+          - 'urn:alm:descriptor:hidden'
+      - displayName: Instance ID
+        description: Information to identify the instance where the backup has been taken from
+        path: instanceID
+        x-descriptors:
+          - 'urn:alm:descriptor:text'
+      - displayName: Method
+        description: The backup method being used
+        path: method
+        x-descriptors:
+          - 'urn:alm:descriptor:text'
+      - displayName: Online
+        description: Whether the backup was online/hot (`true`) or offline/cold (`false`)
+        path: online
+        x-descriptors:
+          - 'urn:alm:descriptor:text'
+      - displayName: Plugin Metadata
+        description: A map containing the plugin metadata
+        path: pluginMetadata
+        x-descriptors:
+          - 'urn:alm:descriptor:hidden'
+      - displayName: S3 Credentials
+        description: The credentials to use to upload data to S3
+        path: s3Credentials
+        x-descriptors:
+          - 'urn:alm:descriptor:hidden'
+      - displayName: Server Name
+        description: |-
+          The server name on S3, the cluster name is used if this
+          parameter is omitted
+        path: serverName
+        x-descriptors:
+          - 'urn:alm:descriptor:hidden'
+      - displayName: Snapshot Backup Status
+        description: Status of the volumeSnapshot backup
+        path: snapshotBackupStatus
+        x-descriptors:
+          - 'urn:alm:descriptor:text'
+      - displayName: Started At
+        description: When the backup was started
+        path: startedAt
+        x-descriptors:
+          - 'urn:alm:descriptor:text'
+      - displayName: Stopped At
+        description: When the backup was terminated
+        path: stoppedAt
+        x-descriptors:
+          - 'urn:alm:descriptor:text'
+      - displayName: Tablespace Map File
+        description: Tablespace map file content as returned by Postgres in case of online (hot) backups
+        path: tablespaceMapFile
+        x-descriptors:
+          - 'urn:alm:descriptor:hidden'
     - kind: Cluster
       name: clusters.postgresql.cnpg.io
       version: v1
@@ -483,52 +623,297 @@ spec:
         description: Status Pods
         path: instancesStatus
         x-descriptors:
-        - 'urn:alm:descriptor:com.tectonic.ui:podStatuses'
+          - 'urn:alm:descriptor:com.tectonic.ui:podStatuses'
       - displayName: Current Primary Pod
         description: Current Primary Pod
         path: currentPrimary
         x-descriptors:
-        - 'urn:alm:descriptor:io.kubernetes:Pod'
+          - 'urn:alm:descriptor:io.kubernetes:Pod'
+      - displayName: Target Primary
+        description: |-
+          Target primary instance, this is different from the previous one
+          during a switchover or a failover
+        path: targetPrimary
+        x-descriptors:
+          - 'urn:alm:descriptor:text'
+      - displayName: Timeline ID
+        description: The timeline of the Postgres cluster
+        path: timelineID
+        x-descriptors:
+          - 'urn:alm:descriptor:text'
       - displayName: Current Primary election date
         description: Shows the date when the current primary was elected
         path: currentPrimaryTimestamp
         x-descriptors:
-        - 'urn:alm:descriptor:text'
+          - 'urn:alm:descriptor:text'
+      - displayName: Primary Failing Since
+        description: |-
+          The timestamp when the primary was detected to be unhealthy
+        path: currentPrimaryFailingSinceTimestamp
+        x-descriptors:
+          - 'urn:alm:descriptor:text'
       - displayName: Write Service
         description: Service for written process
         path: writeService
         x-descriptors:
-        - 'urn:alm:descriptor:io.kubernetes:Service'
+          - 'urn:alm:descriptor:io.kubernetes:Service'
       - displayName: Read Service
         description: Service for read process
         path: readService
         x-descriptors:
-        - 'urn:alm:descriptor:io.kubernetes:Service'
+          - 'urn:alm:descriptor:io.kubernetes:Service'
       - displayName: Phase
         description: Current cluster phase
         path: phase
         x-descriptors:
-        - 'urn:alm:descriptor:io.kubernetes.phase'
+          - 'urn:alm:descriptor:io.kubernetes.phase'
       - displayName: Phase Reason
         description: Current phase reason
         path: phaseReason
         x-descriptors:
-        - 'urn:alm:descriptor:io.kubernetes.phase:reason'
-      - path: postgresUID
-        displayName: Postgres UID
-        description: Postgres user Id used inside the container
-        x-descriptors:
-          - 'urn:alm:descriptor:com.tectonic.ui:hidden'
-      - path: postgresGID
-        displayName: Postgres GID
-        description: Postgres group Id used inside the container
-        x-descriptors:
-          - 'urn:alm:descriptor:com.tectonic.ui:hidden'
-      - path: conditions
-        displayName: Cluster Condition
-        description: Show the current condition of the cluster
+          - 'urn:alm:descriptor:io.kubernetes.phase:reason'
+      - displayname: Cluster Condition
+        description: show the current condition of the cluster
+        path: conditions
         x-descriptors:
           - 'urn:alm:descriptor:io.kubernetes.conditions'
+      - displayName: Available Architectures
+        description: Reports the available architectures of a cluster
+        path: availableArchitectures
+        x-descriptors:
+          - 'urn:alm:descriptor:text'
+      - displayName: Healthy PVCs
+        description: List of all the PVCs not dangling nor initializing
+        path: healthyPVC
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:podStatuses'
+      - displayName: PVCs Count
+        description: How many PVCs have been created by this cluster
+        path: pvcCount
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:podStatuses'
+      - displayName: Resizing PVCs
+        description: List of all the PVCs that have ResizingPVC condition.
+        path: resizingPVC
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:podStatuses'
+      - displayName: Dangling PVCs
+        description: |-
+          List of all the PVCs created by this cluster and still available
+          which are not attached to a Pod
+        path: danglingPVC
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:podStatuses'
+      - displayName: Unusable PVC
+        description: List of all the PVCs that are unusable because another PVC is missing
+        path: unusablePVC
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:podStatuses'
+      - displayName: Initializing PVCs
+        description: List of all the PVCs that are being initialized by this cluster
+        path: initializingPVC
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:podStatuses'
+      - displayName: Client CA Secret
+        description: |-
+          The secret containing the Client CA certificate. If not defined, a new secret will be created
+          with a self-signed CA and will be used to generate all the client certificates.<br />
+          <br />
+          Contains:<br />
+          <br />
+          - `ca.crt`: CA that should be used to validate the client certificates,
+          used as `ssl_ca_file` of all the instances.<br />
+          - `ca.key`: key used to generate client certificates, if ReplicationTLSSecret is provided,
+          this can be omitted.<br />
+        path: certificates.clientCASecret
+        x-descriptors:
+          - 'urn:alm:descriptor:text'
+      - displayName: Server CA Secret
+        description: |-
+          The secret containing the Server CA certificate. If not defined, a new secret will be created
+          with a self-signed CA and will be used to generate the TLS certificate ServerTLSSecret.<br />
+          <br />
+          Contains:<br />
+          <br />
+          - `ca.crt`: CA that should be used to validate the server certificate,
+          used as `sslrootcert` in client connection strings.<br />
+          - `ca.key`: key used to generate Server SSL certs, if ServerTLSSecret is provided,
+          this can be omitted.<br />
+        path: certificates.serverCASecret
+        x-descriptors:
+          - 'urn:alm:descriptor:text'
+      - displayName: Certificates Expiration
+        description: Expiration dates for all certificates.
+        path: certificates.expirations
+        x-descriptors:
+          - 'urn:alm:descriptor:text'
+      - displayName: CNPG Commit Hash
+        description: The commit hash number of which this operator running
+        path: cloudNativePGCommitHash
+        x-descriptors:
+          - 'urn:alm:descriptor:text'
+      - displayName: CNPG Operator Hash
+        description: The hash of the binary of the operator
+        path: cloudNativePGOperatorHash
+        x-descriptors:
+          - 'urn:alm:descriptor:text'
+      - displayName: Last Promotion Token
+        description: |-
+          LastPromotionToken is the last verified promotion token that
+          was used to promote a replica cluster
+        path: lastPromotionToken
+        x-descriptors:
+          - 'urn:alm:descriptor:hidden'
+      - displayName: Demotion Token
+        description: |-
+          DemotionToken is a JSON token containing the information
+          from pg_controldata such as Database system identifier, Latest checkpoint's
+          TimeLineID, Latest checkpoint's REDO location, Latest checkpoint's REDO
+          WAL file, and Time of latest checkpoint
+        path: demotionToken
+        x-descriptors:
+          - 'urn:alm:descriptor:text'
+      - displayName: First Recoverability Point By Method
+        description: The first recoverability point, stored as a date in RFC3339 format, per backup method type
+        path: firstRecoverabilityPointByMethod
+        x-descriptors:
+          - 'urn:alm:descriptor:text'
+      - displayName: POD Image
+        description: Image contains the image name used by the pods
+        path: image
+        x-descriptors:
+          - 'urn:alm:descriptor:text'
+      - displayName: Last Failed Backup
+        description: Stored as a date in RFC3339 format
+        path: lastFailedBackup
+        x-descriptors:
+          - 'urn:alm:descriptor:text'
+      - displayName: Last Successful Backup By Method
+        description: Last successful backup, stored as a date in RFC3339 format, per backup method type
+        path: lastSuccessfulBackupByMethod
+        x-descriptors:
+          - 'urn:alm:descriptor:text'
+      - displayName: Managed Roles Status
+        description: Reports the state of the managed roles in the cluster
+        path: managedRolesStatus
+        x-descriptors:
+          - 'urn:alm:descriptor:text'
+      - displayName: Online Update Enabled
+        description: Shows if the online upgrade is enabled inside the cluster
+        path: onlineUpdateEnabled
+        x-descriptors:
+          - 'urn:alm:descriptor:text'
+      - displayName: Plugin Status
+        description: Shows the status of the loaded plugins
+        path: pluginStatus
+        x-descriptors:
+          - 'urn:alm:descriptor:text'
+      - displayName: Switch Replica Cluster Status
+        description: Shows the status of the switch to replica cluster
+        path: switchReplicaClusterStatus
+        x-descriptors:
+          - 'urn:alm:descriptor:text'
+      - displayName: Tablespaces Status
+        description: Reports the state of the declarative tablespaces in the cluster
+        path: tablespacesStatus
+        x-descriptors:
+          - 'urn:alm:descriptor:text'
+      - displayName: Postgres UID
+        description: Postgres user Id used inside the container
+        path: postgresUID
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:hidden'
+      - displayName: Postgres GID
+        description: Postgres group Id used inside the container
+        path: postgresGID
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:hidden'
+      - displayname: Secrets Resource version
+        description: |-
+          The list of resource versions of the secrets
+          managed by the operator. Every change here is done in the
+          interest of the instance manager, which will refresh the
+          secret data
+        path: secretsResourceVersion
+        x-descriptors:
+          - 'urn:alm:descriptor:hidden'
+      - displayname: ConfigMap Resource version
+        description: |-
+          The list of resource versions of the configmaps,
+          managed by the operator. Every change here is done in the
+          interest of the instance manager, which will refresh the
+          configmap data
+        path: configMapResourceVersion
+        x-descriptors:
+          - 'urn:alm:descriptor:hidden'
+      - displayname: Azure PVC Update Enabled
+        description: AzurePVCUpdateEnabled shows if the PVC online upgrade is enabled for this cluster
+        path: azurePVCUpdateEnabled
+        x-descriptors:
+          - 'urn:alm:descriptor:hidden'
+      - displayname: First Recoverability Point
+        description: |-
+          The first recoverability point, stored as a date in RFC3339 format.
+          This field is calculated from the content of FirstRecoverabilityPointByMethod
+        path: firstRecoverabilityPoint
+        x-descriptors:
+          - 'urn:alm:descriptor:hidden'
+      - displayName: Certificates
+        description: The configuration for the CA and related certificates, initialized with defaults.
+        path: certificates
+        x-descriptors:
+          - 'urn:alm:descriptor:hidden'
+      - displayName: Instance Names
+        description: List of instance names in the cluster
+        path: instanceNames
+        x-descriptors:
+          - 'urn:alm:descriptor:hidden'
+      - displayName: Instances
+        description: |-
+          The total number of PVC Groups detected in the cluster.
+          It may differ from the number of existing instance pods.
+        path: instances
+        x-descriptors:
+          - 'urn:alm:descriptor:hidden'
+      - displayName: Instances Reported State
+        description: The reported state of the instances during the last reconciliation loop
+        path: instancesReportedState
+        x-descriptors:
+          - 'urn:alm:descriptor:hidden'
+      - displayName: Job Count
+        description: How many Jobs have been created by this cluster
+        path: jobCount
+        x-descriptors:
+          - 'urn:alm:descriptor:hidden'
+      - displayName: Last Successful Backup
+        description: |-
+          Last successful backup, stored as a date in RFC3339 format
+          This field is calculated from the content of LastSuccessfulBackupByMethod
+        path: lastSuccessfulBackup
+        x-descriptors:
+          - 'urn:alm:descriptor:hidden'
+      - displayName: Latest Generated Node
+        description: ID of the latest generated node (used to avoid node name clashing)
+        path: latestGeneratedNode
+        x-descriptors:
+          - 'urn:alm:descriptor:hidden'
+      - displayName: Pooler Integrations
+        description: The integration needed by poolers referencing the cluster
+        path: poolerIntegrations
+        x-descriptors:
+          - 'urn:alm:descriptor:hidden'
+      - displayName: Ready Instances
+        description: |-
+          The total number of ready instances in the cluster.
+          It is equal to the number of ready instance pods.
+        path: readyInstances
+        x-descriptors:
+          - 'urn:alm:descriptor:hidden'
+      - displayName: Topology
+        description: Instances topology.
+        path: topology
+        x-descriptors:
+          - 'urn:alm:descriptor:hidden'
     - kind: Pooler
       name: poolers.postgresql.cnpg.io
       displayName: Pooler
@@ -595,6 +980,11 @@ spec:
         x-descriptors:
           - 'urn:alm:descriptor:com.tectonic.ui:booleanSwitch'
       statusDescriptors:
+      - displayName: Instances
+        description: The number of pods trying to be scheduled
+        path: instances
+        x-descriptors:
+          - 'urn:alm:descriptor:podStatuses'
       - path: secrets.serverTLS.name
         description: The name of the secret for server TLS
       - path: secrets.serverCA.name
@@ -638,6 +1028,11 @@ spec:
           - 'urn:alm:descriptor:com.tectonic.ui:booleanSwitch'
           - 'urn:alm:descriptor:com.tectonic.ui:advanced'
       statusDescriptors:
+      - displayName: Last Check Time
+        description: The latest time the schedule
+        path: lastCheckTime
+        x-descriptors:
+          - 'urn:alm:descriptor:hidden'
       - displayName: Next backup
         description: When the next backup is scheduled
         path: nextScheduleTime
@@ -688,7 +1083,7 @@ spec:
       specDescriptors:
       - path: databaseReclaimPolicy
         displayName: Database reclaim policy
-        description: Database reclame policy
+        description: Database reclaim policy
       - path: cluster
         displayName: Cluster requested to create the database
         description: Cluster requested to create the database
@@ -698,3 +1093,21 @@ spec:
       - path: owner
         displayName: Database Owner
         description: Database Owner
+      statusDescriptors:
+      - displayName: Error
+        description: Error is the reconciliation error message
+        path: error
+        x-descriptors:
+          - 'urn:alm:descriptor:text'
+      - displayName: Observed Generation
+        description: |-
+          A sequence number representing the latest
+          desired state that was synchronized
+        path: observedGeneration
+        x-descriptors:
+          - 'urn:alm:descriptor:hidden'
+      - displayName: Ready
+        description: Ready is true if the database was reconciled correctly
+        path: ready
+        x-descriptors:
+          - 'urn:alm:descriptor:text'
