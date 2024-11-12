@@ -168,7 +168,7 @@ spec:
           - 'urn:alm:descriptor:hidden'
       statusDescriptors:
       - displayName: Phase
-        description: Current backupphase
+        description: Current backup phase
         path: phase
         x-descriptors:
         - 'urn:alm:descriptor:io.kubernetes.phase'
@@ -254,7 +254,7 @@ spec:
         description: The detected error
         path: error
         x-descriptors:
-          - 'urn:alm:descriptor:text'
+          - 'urn:alm:descriptor:hidden'
       - displayName: Google Credentials
         description: The credentials to use to upload data to Google Cloud Storage
         path: googleCredentials
@@ -269,12 +269,12 @@ spec:
         description: The backup method being used
         path: method
         x-descriptors:
-          - 'urn:alm:descriptor:text'
+          - 'urn:alm:descriptor:hidden'
       - displayName: Online
         description: Whether the backup was online/hot (`true`) or offline/cold (`false`)
         path: online
         x-descriptors:
-          - 'urn:alm:descriptor:text'
+          - 'urn:alm:descriptor:hidden'
       - displayName: Plugin Metadata
         description: A map containing the plugin metadata
         path: pluginMetadata
@@ -716,54 +716,50 @@ spec:
         description: How many PVCs have been created by this cluster
         path: pvcCount
         x-descriptors:
-          - 'urn:alm:descriptor:com.tectonic.ui:podStatuses'
+          - 'urn:alm:descriptor:hidden'
       - displayName: Resizing PVCs
         description: List of all the PVCs that have ResizingPVC condition.
         path: resizingPVC
         x-descriptors:
-          - 'urn:alm:descriptor:com.tectonic.ui:podStatuses'
+          - 'urn:alm:descriptor:hidden'
       - displayName: Dangling PVCs
         description: |-
           List of all the PVCs created by this cluster and still available
           which are not attached to a Pod
         path: danglingPVC
         x-descriptors:
-          - 'urn:alm:descriptor:com.tectonic.ui:podStatuses'
+          - 'urn:alm:descriptor:hidden'
       - displayName: Unusable PVC
         description: List of all the PVCs that are unusable because another PVC is missing
         path: unusablePVC
         x-descriptors:
-          - 'urn:alm:descriptor:com.tectonic.ui:podStatuses'
+          - 'urn:alm:descriptor:hidden'
       - displayName: Initializing PVCs
         description: List of all the PVCs that are being initialized by this cluster
         path: initializingPVC
         x-descriptors:
-          - 'urn:alm:descriptor:com.tectonic.ui:podStatuses'
+          - 'urn:alm:descriptor:hidden'
       - displayName: Client CA Secret
         description: |-
           The secret containing the Client CA certificate. If not defined, a new secret will be created
-          with a self-signed CA and will be used to generate all the client certificates.<br />
-          <br />
-          Contains:<br />
-          <br />
-          - `ca.crt`: CA that should be used to validate the client certificates,
-          used as `ssl_ca_file` of all the instances.<br />
-          - `ca.key`: key used to generate client certificates, if ReplicationTLSSecret is provided,
-          this can be omitted.<br />
+          with a self-signed CA and will be used to generate all the client certificates.
+          Contains:
+          - ca.crt: CA that should be used to validate the client certificates,
+          used as ssl_ca_file of all the instances.
+          - ca.key: key used to generate client certificates, if ReplicationTLSSecret is provided,
+          this can be omitted.
         path: certificates.clientCASecret
         x-descriptors:
           - 'urn:alm:descriptor:text'
       - displayName: Server CA Secret
         description: |-
           The secret containing the Server CA certificate. If not defined, a new secret will be created
-          with a self-signed CA and will be used to generate the TLS certificate ServerTLSSecret.<br />
-          <br />
-          Contains:<br />
-          <br />
-          - `ca.crt`: CA that should be used to validate the server certificate,
-          used as `sslrootcert` in client connection strings.<br />
-          - `ca.key`: key used to generate Server SSL certs, if ServerTLSSecret is provided,
-          this can be omitted.<br />
+          with a self-signed CA and will be used to generate the TLS certificate ServerTLSSecret.
+          Contains:
+          - ca.crt: CA that should be used to validate the server certificate,
+          used as sslrootcert in client connection strings.
+          - ca.key: key used to generate Server SSL certs, if ServerTLSSecret is provided,
+          this can be omitted.
         path: certificates.serverCASecret
         x-descriptors:
           - 'urn:alm:descriptor:text'

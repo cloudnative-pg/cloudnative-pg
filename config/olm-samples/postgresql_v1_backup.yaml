@@ -5,3 +5,4 @@ metadata:
 spec:
   cluster:
     name: cluster-sample
+status: {}
