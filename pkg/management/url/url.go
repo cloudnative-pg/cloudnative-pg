@@ -43,6 +43,9 @@ const (
 	// PathPgStatus is the URL path for PostgreSQL Status
 	PathPgStatus string = "/pg/status"
 
+	// PathPgStatusArchive is the URL path for PostgreSQL Archive Status
+	PathPgStatusArchive string = "/pg/status/archive"
+
 	// PathPgBackup is the URL path for PostgreSQL Backup
 	PathPgBackup string = "/pg/backup"
 

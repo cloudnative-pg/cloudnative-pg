@@ -27,11 +27,13 @@ import (
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/cache"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/conditions"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -58,6 +60,7 @@ func NewLocalWebServer(
 	serveMux := http.NewServeMux()
 	serveMux.HandleFunc(url.PathCache, endpoints.serveCache)
 	serveMux.HandleFunc(url.PathPgBackup, endpoints.requestBackup)
+	serveMux.HandleFunc(url.PathPgStatusArchive, endpoints.archiveStatus)
 
 	server := &http.Server{
 		Addr:              fmt.Sprintf("localhost:%d", url.LocalPort),
@@ -80,15 +83,7 @@ func (ws *localWebserverEndpoints) serveCache(w http.ResponseWriter, r *http.Req
 	var js []byte
 	switch requestedObject {
 	case cache.ClusterKey:
-		var cluster apiv1.Cluster
-		err := ws.typedClient.Get(
-			r.Context(),
-			client.ObjectKey{
-				Name:      ws.instance.GetClusterName(),
-				Namespace: ws.instance.GetNamespaceName(),
-			},
-			&cluster,
-		)
+		cluster, err := ws.getCluster(r.Context())
 		if apierrs.IsNotFound(err) {
 			w.WriteHeader(http.StatusNotFound)
 			return
@@ -98,7 +93,7 @@ func (ws *localWebserverEndpoints) serveCache(w http.ResponseWriter, r *http.Req
 			return
 		}
 
-		js, err = json.Marshal(&cluster)
+		js, err = json.Marshal(cluster)
 		if err != nil {
 			log.Error(err, "while marshalling the cluster")
 			w.WriteHeader(http.StatusInternalServerError)
@@ -133,7 +128,6 @@ func (ws *localWebserverEndpoints) serveCache(w http.ResponseWriter, r *http.Req
 
 // This function schedule a backup
 func (ws *localWebserverEndpoints) requestBackup(w http.ResponseWriter, r *http.Request) {
-	var cluster apiv1.Cluster
 	var backup apiv1.Backup
 
 	ctx := context.Background()
@@ -144,10 +138,8 @@ func (ws *localWebserverEndpoints) requestBackup(w http.ResponseWriter, r *http.
 		return
 	}
 
-	if err := ws.typedClient.Get(ctx, client.ObjectKey{
-		Namespace: ws.instance.GetNamespaceName(),
-		Name:      ws.instance.GetClusterName(),
-	}, &cluster); err != nil {
+	cluster, err := ws.getCluster(ctx)
+	if err != nil {
 		http.Error(
 			w,
 			fmt.Sprintf("error while getting cluster: %v", err.Error()),
@@ -173,7 +165,7 @@ func (ws *localWebserverEndpoints) requestBackup(w http.ResponseWriter, r *http.
 			return
 		}
 
-		if err := ws.startBarmanBackup(ctx, &cluster, &backup); err != nil {
+		if err := ws.startBarmanBackup(ctx, cluster, &backup); err != nil {
 			http.Error(
 				w,
 				fmt.Sprintf("error while requesting backup: %v", err.Error()),
@@ -188,7 +180,7 @@ func (ws *localWebserverEndpoints) requestBackup(w http.ResponseWriter, r *http.
 			return
 		}
 
-		ws.startPluginBackup(ctx, &cluster, &backup)
+		ws.startPluginBackup(ctx, cluster, &backup)
 		_, _ = fmt.Fprint(w, "OK")
 
 	default:
@@ -197,6 +189,17 @@ func (ws *localWebserverEndpoints) requestBackup(w http.ResponseWriter, r *http.
 			fmt.Sprintf("Unknown backup method: %v", backup.Spec.Method),
 			http.StatusBadRequest)
 	}
+}
+
+func (ws *localWebserverEndpoints) getCluster(ctx context.Context) (*apiv1.Cluster, error) {
+	var cluster apiv1.Cluster
+	if err := ws.typedClient.Get(ctx, client.ObjectKey{
+		Namespace: ws.instance.GetNamespaceName(),
+		Name:      ws.instance.GetClusterName(),
+	}, &cluster); err != nil {
+		return nil, err
+	}
+	return &cluster, nil
 }
 
 func (ws *localWebserverEndpoints) startBarmanBackup(
@@ -235,4 +238,64 @@ func (ws *localWebserverEndpoints) startPluginBackup(
 	// TODO: timeout should be configurable by the user
 	ctx = context.WithValue(ctx, utils.GRPCTimeoutKey, 100*time.Minute)
 	NewPluginBackupCommand(cluster, backup, ws.typedClient, ws.eventRecorder).Start(ctx)
+}
+
+type archiveStatusRequest struct {
+	Error string `json:"error,omitempty"`
+}
+
+func (ws *localWebserverEndpoints) archiveStatus(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	contextLogger := log.FromContext(ctx)
+	// decode body req
+	var asr archiveStatusRequest
+	if err := json.NewDecoder(r.Body).Decode(&asr); err != nil {
+		http.Error(w, fmt.Sprintf("error while decoding request: %v", err.Error()), http.StatusBadRequest)
+		return
+	}
+
+	cluster, err := ws.getCluster(ctx)
+	if err != nil {
+		http.Error(
+			w,
+			fmt.Sprintf("error while getting cluster: %v", err.Error()),
+			http.StatusInternalServerError)
+		return
+	}
+
+	if asr.Error != "" {
+		condition := metav1.Condition{
+			Type:    string(apiv1.ConditionContinuousArchiving),
+			Status:  metav1.ConditionFalse,
+			Reason:  string(apiv1.ConditionReasonContinuousArchivingFailing),
+			Message: asr.Error,
+		}
+		if errCond := conditions.Patch(ctx, ws.typedClient, cluster, &condition); errCond != nil {
+			contextLogger.Error(errCond, "Error changing wal archiving condition (wal archiving failed)")
+			http.Error(
+				w,
+				fmt.Sprintf("error while updating wal archiving failed condition: %v", errCond.Error()),
+				http.StatusInternalServerError)
+			return
+		}
+		_, _ = fmt.Fprint(w, "OK")
+		return
+	}
+
+	condition := metav1.Condition{
+		Type:    string(apiv1.ConditionContinuousArchiving),
+		Status:  metav1.ConditionTrue,
+		Reason:  string(apiv1.ConditionReasonContinuousArchivingSuccess),
+		Message: "Continuous archiving is working",
+	}
+	if errCond := conditions.Patch(ctx, ws.typedClient, cluster, &condition); errCond != nil {
+		contextLogger.Error(errCond, "Error changing wal archiving condition (wal archiving succeeded)")
+		http.Error(
+			w,
+			fmt.Sprintf("error while updating wal archiving condition: %v", errCond.Error()),
+			http.StatusInternalServerError)
+		return
+	}
+
+	_, _ = fmt.Fprint(w, "OK")
 }
