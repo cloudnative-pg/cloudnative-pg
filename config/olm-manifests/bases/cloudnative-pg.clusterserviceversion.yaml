@@ -141,6 +141,31 @@ spec:
         description: The name of the cluster to backup
         x-descriptors:
           - 'urn:alm:descriptor:io.kubernetes:Clusters'
+      - displayName: method
+        description: The backup method being used
+        path: method
+        x-descriptors:
+          - 'urn:alm:descriptor:hidden'
+      - displayName: online
+        description: Whether the backup was online/hot (`true`) or offline/cold (`false`)
+        path: online
+        x-descriptors:
+          - 'urn:alm:descriptor:hidden'
+      - displayName: onlineConfiguration
+        description: null
+        path: onlineConfiguration
+        x-descriptors:
+          - 'urn:alm:descriptor:hidden'
+      - displayName: pluginConfiguration
+        description: null
+        path: pluginConfiguration
+        x-descriptors:
+          - 'urn:alm:descriptor:hidden'
+      - displayName: target
+        description: null
+        path: target
+        x-descriptors:
+          - 'urn:alm:descriptor:hidden'
       statusDescriptors:
       - displayName: Phase
         description: Current backupphase

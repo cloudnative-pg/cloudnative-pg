@@ -1,3 +1,4 @@
+apiVersion: postgresql.cnpg.io/v1
 kind: ImageCatalog
 metadata:
   name: postgresql
