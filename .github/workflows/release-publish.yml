@@ -165,7 +165,7 @@ jobs:
         if: |
           needs.check-version.outputs.is_latest == 'true' &&
           needs.check-version.outputs.is_stable == 'true'
-        uses: rajatjindal/krew-release-bot@v0.0.46
+        uses: rajatjindal/krew-release-bot@v0.0.47
         with:
           krew_template_file: dist/krew/cnpg.yaml
       -
