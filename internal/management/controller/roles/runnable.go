@@ -216,6 +216,16 @@ func (sr *RoleSynchronizer) synchronizeRoles(
 	return storedPasswordState, irreconcilableRoles, nil
 }
 
+// sanitizeSQLidentifiers makes strings safe to include into a SQL query that
+// will surround them with double quotes, as an identifier
+func sanitizeSQLidentifiers(in []string) []string {
+	sanitized := make([]string, len(in))
+	for i, id := range in {
+		sanitized[i] = strings.ReplaceAll(id, `"`, `""`)
+	}
+	return sanitized
+}
+
 // applyRoleActions applies the actions to reconcile roles in the DB with the Spec
 // It returns the apiv1.PasswordState for each role, as well as a map of roles that
 // cannot be reconciled for expectable errors, e.g. dropping a role owning content
@@ -278,7 +288,7 @@ func (sr *RoleSynchronizer) applyRoleActions(
 			return nil, nil, unhandledErr
 		}
 
-		err = UpdateMembership(ctx, db, dbRole, grants, revokes)
+		err = UpdateMembership(ctx, db, dbRole, sanitizeSQLidentifiers(grants), sanitizeSQLidentifiers(revokes))
 		if unhandledErr := handleRoleError(err, role.Name, roleUpdateMemberships); unhandledErr != nil {
 			return nil, nil, unhandledErr
 		}

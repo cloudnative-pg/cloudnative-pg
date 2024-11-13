@@ -216,6 +216,12 @@ func UpdateComment(ctx context.Context, db *sql.DB, role DatabaseRole) error {
 	return nil
 }
 
+func safeMembershipOperation(statement, membership, user string) string {
+	return fmt.Sprintf(statement,
+		strings.ReplaceAll(membership, `"`, `""`),
+		strings.ReplaceAll(user, `"`, `""`))
+}
+
 // UpdateMembership of the role
 //
 // IMPORTANT: the various REVOKE and GRANT commands that may be required to
@@ -239,16 +245,10 @@ func UpdateMembership(
 	}
 	queries := make([]string, 0, len(rolesToRevoke)+len(rolesToGrant))
 	for _, r := range rolesToGrant {
-		queries = append(queries, fmt.Sprintf(`GRANT %s TO %s`,
-			pgx.Identifier{r}.Sanitize(),
-			pgx.Identifier{role.Name}.Sanitize()),
-		)
+		queries = append(queries, safeMembershipOperation(`GRANT "%s" TO "%s"`, r, role.Name))
 	}
 	for _, r := range rolesToRevoke {
-		queries = append(queries, fmt.Sprintf(`REVOKE %s FROM %s`,
-			pgx.Identifier{r}.Sanitize(),
-			pgx.Identifier{role.Name}.Sanitize()),
-		)
+		queries = append(queries, safeMembershipOperation(`REVOKE "%s" FROM "%s"`, r, role.Name))
 	}
 
 	tx, err := db.BeginTx(ctx, nil)
