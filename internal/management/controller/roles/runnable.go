@@ -273,7 +273,7 @@ func (sr *RoleSynchronizer) applyRoleActions(
 	for _, role := range rolesByAction[roleUpdateMemberships] {
 		// NOTE: revoking / granting to a role does not alter its TransactionID
 		dbRole := role.toDatabaseRole()
-		grants, revokes, err := getRoleMembershipDiff(ctx, db, role, dbRole)
+		grants, revokes, err := GetRoleMembershipDiff(ctx, db, role.InRoles, dbRole)
 		if unhandledErr := handleRoleError(err, role.Name, roleUpdateMemberships); unhandledErr != nil {
 			return nil, nil, unhandledErr
 		}
