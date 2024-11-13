@@ -264,7 +264,7 @@ func UpdateMembership(
 
 	for _, sqlQuery := range queries {
 		contextLog.Debug("Executing query", "sqlQuery", sqlQuery)
-		if _, err := db.ExecContext(ctx, sqlQuery); err != nil {
+		if _, err := tx.ExecContext(ctx, sqlQuery); err != nil {
 			contextLog.Error(err, "executing query", "sqlQuery", sqlQuery, "err", err)
 			return wrapErr(err)
 		}
