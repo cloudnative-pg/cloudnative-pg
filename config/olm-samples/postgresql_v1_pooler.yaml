@@ -9,3 +9,5 @@ spec:
   type: rw
   pgbouncer:
     poolMode: session
+status:
+  instances: 1
