@@ -2073,7 +2073,6 @@ type ManagedServices struct {
 type ManagedService struct {
 	// SelectorType specifies the type of selectors that the service will have.
 	// Valid values are "rw", "r", and "ro", representing read-write, read, and read-only services.
-	// +kubebuilder:validation:Enum=rw;r;ro
 	SelectorType ServiceSelectorType `json:"selectorType"`
 
 	// UpdateStrategy describes how the service differences should be reconciled
