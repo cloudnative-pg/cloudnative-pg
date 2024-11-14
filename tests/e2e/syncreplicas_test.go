@@ -109,7 +109,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 
 					cluster.Spec.MaxSyncReplicas = 1
 					return env.Client.Update(env.Ctx, cluster)
-				}, RetryTimeout, 5).Should(BeNil())
+				}, RetryTimeout, 5).Should(Succeed())
 
 				// Scale the cluster down to 2 pods
 				_, _, err := utils.Run(fmt.Sprintf("kubectl scale --replicas=2 -n %v cluster/%v", namespace,
@@ -200,7 +200,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 					cluster.Spec.PostgresConfiguration.Synchronous.MaxStandbyNamesFromCluster = ptr.To(1)
 					cluster.Spec.PostgresConfiguration.Synchronous.Number = 1
 					return env.Client.Update(env.Ctx, cluster)
-				}, RetryTimeout, 5).Should(BeNil())
+				}, RetryTimeout, 5).Should(Succeed())
 
 				getSyncReplicationCount(namespace, clusterName, "quorum", 1)
 				compareSynchronousStandbyNames(namespace, clusterName, "ANY 1")
@@ -212,7 +212,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 					g.Expect(err).ToNot(HaveOccurred())
 					cluster.Spec.PostgresConfiguration.Synchronous.Method = apiv1.SynchronousReplicaConfigurationMethodFirst
 					return env.Client.Update(env.Ctx, cluster)
-				}, RetryTimeout, 5).Should(BeNil())
+				}, RetryTimeout, 5).Should(Succeed())
 
 				getSyncReplicationCount(namespace, clusterName, "sync", 1)
 				compareSynchronousStandbyNames(namespace, clusterName, "FIRST 1")
@@ -226,7 +226,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 					cluster.Spec.PostgresConfiguration.Synchronous.StandbyNamesPre = []string{"preSyncReplica"}
 					cluster.Spec.PostgresConfiguration.Synchronous.StandbyNamesPost = []string{"postSyncReplica"}
 					return env.Client.Update(env.Ctx, cluster)
-				}, RetryTimeout, 5).Should(BeNil())
+				}, RetryTimeout, 5).Should(Succeed())
 				compareSynchronousStandbyNames(namespace, clusterName, "FIRST 1 (\"preSyncReplica\"")
 				compareSynchronousStandbyNames(namespace, clusterName, "\"postSyncReplica\")")
 			})

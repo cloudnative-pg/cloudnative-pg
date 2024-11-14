@@ -135,7 +135,7 @@ var _ = Describe("Certificates", func() {
 					return err
 				}
 				return nil
-			}, 60, 5).Should(BeNil())
+			}, 60, 5).Should(Succeed())
 
 			Eventually(func() (bool, error) {
 				certUpdateStatus := false
@@ -176,7 +176,7 @@ var _ = Describe("Certificates", func() {
 					return err
 				}
 				return nil
-			}, 60, 5).Should(BeNil())
+			}, 60, 5).Should(Succeed())
 
 			Eventually(func() (bool, error) {
 				cluster, err := env.GetCluster(namespace, clusterName)
@@ -212,7 +212,7 @@ var _ = Describe("Certificates", func() {
 						return err
 					}
 					return nil
-				}, 60, 5).Should(BeNil())
+				}, 60, 5).Should(Succeed())
 
 				Eventually(func() (bool, error) {
 					cluster, err := env.GetCluster(namespace, clusterName)

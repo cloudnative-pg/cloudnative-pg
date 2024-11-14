@@ -188,7 +188,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				Eventually(func() error {
 					clusterOnePrimary, err = env.GetClusterPrimary(namespace, clusterOneName)
 					return err
-				}, 30, 3).Should(BeNil())
+				}, 30, 3).Should(Succeed())
 				AssertPgRecoveryMode(clusterOnePrimary, true)
 			})
 
@@ -206,7 +206,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				Eventually(func() error {
 					clusterTwoPrimary, err = env.GetClusterPrimary(namespace, clusterTwoName)
 					return err
-				}, 30, 3).Should(BeNil())
+				}, 30, 3).Should(Succeed())
 				AssertPgRecoveryMode(clusterTwoPrimary, false)
 			})
 

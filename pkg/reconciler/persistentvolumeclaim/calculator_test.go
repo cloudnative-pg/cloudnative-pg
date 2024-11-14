@@ -98,7 +98,8 @@ var _ = Describe("pvc role test", func() {
 				Size: "5Gi",
 			}))
 		Expect(role.GetSource(nil)).To(BeNil())
-		Expect(role.GetSource(&StorageSource{})).Error().Should(HaveOccurred())
+		_, err := role.GetSource(&StorageSource{})
+		Expect(err).Should(HaveOccurred())
 		Expect(role.GetSource(&storageSource)).To(BeEquivalentTo(&walSource))
 	})
 
@@ -151,7 +152,8 @@ var _ = Describe("pvc role test", func() {
 				Size: "5Gi",
 			}))
 		Expect(role.GetSource(nil)).To(BeNil())
-		Expect(role.GetSource(&storageSource2)).Error().Should(HaveOccurred())
+		_, err := role.GetSource(&storageSource2)
+		Expect(err).Should(HaveOccurred())
 		Expect(role.GetSource(&storageSource1)).To(BeEquivalentTo(&corev1.TypedLocalObjectReference{Name: "test"}))
 	})
 })
