@@ -107,13 +107,15 @@ func NewCmd() *cobra.Command {
 				return fmt.Errorf("backup-method: %s is not supported by the backup command", backupMethod)
 			}
 
-			if backupMethod != "plugin" {
+			if backupMethod != string(apiv1.BackupMethodPlugin) {
 				if len(pluginName) > 0 {
-					return fmt.Errorf("plugin-name is allowed only when backup method in 'plugin'")
+					return fmt.Errorf("plugin-name is allowed only when backup method in %s",
+						apiv1.BackupMethodPlugin)
 				}
 
 				if len(pluginParameters) > 0 {
-					return fmt.Errorf("plugin-parameters is allowed only when backup method in 'plugin'")
+					return fmt.Errorf("plugin-parameters is allowed only when backup method in %s",
+						apiv1.BackupMethodPlugin)
 				}
 			}
 
@@ -208,13 +210,14 @@ func NewCmd() *cobra.Command {
 	)
 
 	backupSubcommand.Flags().StringVar(&pluginName, "plugin-name", "",
-		"Sets the name of the plugin that should take the backup. This option "+
+		"The name of the plugin that should take the backup. This option "+
 			"is allowed only when the backup method is set to 'plugin'",
 	)
 
 	backupSubcommand.Flags().VarP(&pluginParameters, "plugin-parameters", "",
 		"The set of plugin parameters that should be passed to the backup plugin "+
-			" i.e. param-one=value,param-two=value",
+			" i.e. param-one=value,param-two=value. This option "+
+			"is allowed only when the backup method is set to 'plugin'",
 	)
 
 	return backupSubcommand
