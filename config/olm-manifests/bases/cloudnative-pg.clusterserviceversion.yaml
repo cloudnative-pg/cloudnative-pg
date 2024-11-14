@@ -454,7 +454,7 @@ spec:
           - 'urn:alm:descriptor:com.tectonic.ui:selector:core:v1:Node'
       # Resources section
       - path: resources
-        display: PostgreSQL Resources
+        displayName: PostgreSQL Resources requirement
         description: Resources requirement for the PostgreSQL instances
         x-descriptors:
           - 'urn:alm:descriptor:com.tectonic.ui:resourceRequirements'
