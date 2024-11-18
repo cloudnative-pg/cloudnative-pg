@@ -19,10 +19,8 @@ package controller
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
-	"net/http/pprof"
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
@@ -40,7 +38,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/controller"
 	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/multicache"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
@@ -99,14 +96,9 @@ func RunController(
 	port int,
 ) error {
 	ctx := context.Background()
-
 	setupLog.Info("Starting CloudNativePG Operator",
 		"version", versions.Version,
 		"build", versions.Info)
-
-	if pprofDebug {
-		startPprofDebugServer(ctx)
-	}
 
 	managerOptions := ctrl.Options{
 		Scheme: scheme,
@@ -121,6 +113,7 @@ func RunController(
 			Port:    port,
 			CertDir: defaultWebhookCertDir,
 		}),
+		PprofBindAddress: getPprofServerAddress(pprofDebug),
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the
 		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly
@@ -449,39 +442,10 @@ func readSecret(
 	return data, nil
 }
 
-// startPprofDebugServer exposes pprof debug server if the pprof-server env variable is set to true
-func startPprofDebugServer(ctx context.Context) {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/debug/pprof/", pprof.Index)
-	mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
-	mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
-	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
-	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
-
-	pprofServer := http.Server{
-		Addr:              "0.0.0.0:6060",
-		Handler:           mux,
-		ReadTimeout:       webserver.DefaultReadTimeout,
-		ReadHeaderTimeout: webserver.DefaultReadHeaderTimeout,
+func getPprofServerAddress(enabled bool) string {
+	if enabled {
+		return "0.0.0.0:6060"
 	}
 
-	setupLog.Info("Starting pprof HTTP server", "addr", pprofServer.Addr)
-
-	go func() {
-		go func() {
-			<-ctx.Done()
-
-			setupLog.Info("shutting down pprof HTTP server")
-			ctx, cancelFunc := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancelFunc()
-
-			if err := pprofServer.Shutdown(ctx); err != nil {
-				setupLog.Error(err, "Failed to shutdown pprof HTTP server")
-			}
-		}()
-
-		if err := pprofServer.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
-			setupLog.Error(err, "Failed to start pprof HTTP server")
-		}
-	}()
+	return ""
 }
