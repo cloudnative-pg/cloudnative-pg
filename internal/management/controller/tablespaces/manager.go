@@ -18,6 +18,7 @@ package tablespaces
 
 import (
 	"context"
+	"database/sql"
 
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -27,18 +28,31 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
 
+// instanceInterface represents the behavior required for the reconciler for
+// instance operations
+type instanceInterface interface {
+	GetNamespaceName() string
+	GetClusterName() string
+	GetSuperUserDB() (*sql.DB, error)
+	IsPrimary() (bool, error)
+	CanCheckReadiness() bool
+	IsServerReady() error
+}
+
 // TablespaceReconciler is a Kubernetes controller that ensures Tablespaces
 // are created in Postgres
 type TablespaceReconciler struct {
-	instance *postgres.Instance
-	client   client.Client
+	instance       instanceInterface
+	storageManager tablespaceStorageManager
+	client         client.Client
 }
 
 // NewTablespaceReconciler creates a new TablespaceReconciler
 func NewTablespaceReconciler(instance *postgres.Instance, client client.Client) *TablespaceReconciler {
 	controller := &TablespaceReconciler{
-		instance: instance,
-		client:   client,
+		instance:       instance,
+		client:         client,
+		storageManager: instanceTablespaceStorageManager{},
 	}
 	return controller
 }
@@ -54,7 +68,7 @@ func (r *TablespaceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 // GetCluster gets the managed cluster through the client
 func (r *TablespaceReconciler) GetCluster(ctx context.Context) (*apiv1.Cluster, error) {
 	var cluster apiv1.Cluster
-	err := r.GetClient().Get(ctx,
+	err := r.client.Get(ctx,
 		types.NamespacedName{
 			Namespace: r.instance.GetNamespaceName(),
 			Name:      r.instance.GetClusterName(),
@@ -65,14 +79,4 @@ func (r *TablespaceReconciler) GetCluster(ctx context.Context) (*apiv1.Cluster, 
 	}
 
 	return &cluster, nil
-}
-
-// GetClient returns the dynamic client that is being used for a certain reconciler
-func (r *TablespaceReconciler) GetClient() client.Client {
-	return r.client
-}
-
-// Instance returns the PostgreSQL instance that this reconciler is working on
-func (r *TablespaceReconciler) Instance() *postgres.Instance {
-	return r.instance
 }
