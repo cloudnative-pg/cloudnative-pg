@@ -20,3 +20,7 @@ spec:
         - --webhook-port=9443
         - --log-level=debug
         - --pprof-server=true
+        ports:
+          - containerPort: 6060
+            name: pprof
+            protocol: TCP
