@@ -240,7 +240,8 @@ func (ws *localWebserverEndpoints) startPluginBackup(
 	NewPluginBackupCommand(cluster, backup, ws.typedClient, ws.eventRecorder).Start(ctx)
 }
 
-type archiveStatusRequest struct {
+// ArchiveStatusRequest is the request body for the archive status endpoint
+type ArchiveStatusRequest struct {
 	Error string `json:"error,omitempty"`
 }
 
@@ -248,7 +249,7 @@ func (ws *localWebserverEndpoints) archiveStatus(w http.ResponseWriter, r *http.
 	ctx := r.Context()
 	contextLogger := log.FromContext(ctx)
 	// decode body req
-	var asr archiveStatusRequest
+	var asr ArchiveStatusRequest
 	if err := json.NewDecoder(r.Body).Decode(&asr); err != nil {
 		http.Error(w, fmt.Sprintf("error while decoding request: %v", err.Error()), http.StatusBadRequest)
 		return

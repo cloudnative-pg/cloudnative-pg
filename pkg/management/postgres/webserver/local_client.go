@@ -36,7 +36,7 @@ func NewLocalClient() LocalClient {
 func (c *localClient) SetPgStatusArchive(ctx context.Context, errMessage string) error {
 	contextLogger := log.FromContext(ctx)
 
-	asr := archiveStatusRequest{
+	asr := ArchiveStatusRequest{
 		Error: errMessage,
 	}
 

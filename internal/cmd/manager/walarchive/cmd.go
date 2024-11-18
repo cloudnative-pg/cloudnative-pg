@@ -73,13 +73,11 @@ func NewCmd() *cobra.Command {
 			}
 
 			err = run(ctx, podName, pgData, cluster, args)
-
-			cli := webserver.NewLocalClient()
 			var errMessage string
 			if err != nil {
 				errMessage = err.Error()
 			}
-			if err := cli.SetPgStatusArchive(ctx, errMessage); err != nil {
+			if err := webserver.NewLocalClient().SetPgStatusArchive(ctx, errMessage); err != nil {
 				contextLog.Error(err, "while invoking the set archive condition endpoint")
 			}
 
