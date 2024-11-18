@@ -18,23 +18,28 @@ package readiness
 
 import (
 	"context"
+	"database/sql"
 	"errors"
-
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
 
 // ErrStreamingReplicaNotConnected is raised for streaming replicas that never connected to its primary
 var ErrStreamingReplicaNotConnected = errors.New("streaming replica was never connected to the primary node")
 
+// instanceInterface represents the required behavior for use in the readiness probe
+type instanceInterface interface {
+	CanCheckReadiness() bool
+	GetSuperUserDB() (*sql.DB, error)
+}
+
 // Data is the readiness checker structure
 type Data struct {
-	instance *postgres.Instance
+	instance instanceInterface
 
 	streamingReplicaValidated bool
 }
 
 // ForInstance creates a readiness checker for a certain instance
-func ForInstance(instance *postgres.Instance) *Data {
+func ForInstance(instance instanceInterface) *Data {
 	return &Data{
 		instance: instance,
 	}
