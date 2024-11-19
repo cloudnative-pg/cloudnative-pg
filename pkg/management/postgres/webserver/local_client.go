@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"io"
 	"net/http"
 	"time"
 
@@ -34,14 +33,22 @@ func NewLocalClient() LocalClient {
 }
 
 func (c *localClient) SetPgStatusArchive(ctx context.Context, errMessage string) error {
-	contextLogger := log.FromContext(ctx)
+	contextLogger := log.FromContext(ctx).WithValues("endpoint", url.PathPgStatusArchive)
 
-	body, err := c.createSetPgStatusArchiveRequestBody(errMessage)
+	asr := ArchiveStatusRequest{
+		Error: errMessage,
+	}
+
+	encoded, err := json.Marshal(&asr)
 	if err != nil {
 		return err
 	}
 
-	resp, err := http.Post(url.Local(url.PathPgStatusArchive, url.LocalPort), "application/json", body)
+	resp, err := http.Post(
+		url.Local(url.PathPgStatusArchive, url.LocalPort),
+		"application/json",
+		bytes.NewBuffer(encoded),
+	)
 	if err != nil {
 		return err
 	}
@@ -52,16 +59,4 @@ func (c *localClient) SetPgStatusArchive(ctx context.Context, errMessage string)
 	}()
 
 	return nil
-}
-
-func (c *localClient) createSetPgStatusArchiveRequestBody(errMessage string) (io.Reader, error) {
-	asr := ArchiveStatusRequest{
-		Error: errMessage,
-	}
-
-	encoded, err := json.Marshal(&asr)
-	if err != nil {
-		return nil, err
-	}
-	return bytes.NewBuffer(encoded), nil
 }
