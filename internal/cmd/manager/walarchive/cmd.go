@@ -80,8 +80,8 @@ func NewCmd() *cobra.Command {
 				} else {
 					contextLog.Error(err, logErrorMessage)
 				}
-				if condErr := webserver.NewLocalClient().SetPgStatusArchive(ctx, err.Error()); err != nil {
-					contextLog.Error(condErr, "while invoking the set archive condition endpoint")
+				if reqErr := webserver.NewLocalClient().SetPgStatusArchive(ctx, err.Error()); err != nil {
+					contextLog.Error(reqErr, "while invoking the set archive condition endpoint")
 				}
 				return err
 			}

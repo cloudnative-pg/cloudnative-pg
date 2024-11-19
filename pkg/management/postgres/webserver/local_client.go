@@ -13,10 +13,11 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 )
 
-// LocalClient is a struct capable of interacting with the local webserver endpoints
+// LocalClient is an entity capable of interacting with the local webserver endpoints
 type LocalClient interface {
-	// SetPgStatusArchive sets the status of the archive, an empty errMessage means that the archive process
-	// was successful
+	// SetPgStatusArchive sets the wal-archive status condition.
+	// An empty errMessage means that the archive process was successful.
+	// Returns any error encountered during the request.
 	SetPgStatusArchive(ctx context.Context, errMessage string) error
 }
 
@@ -24,7 +25,7 @@ type localClient struct {
 	cli *http.Client
 }
 
-// NewLocalClient creates a client capable of interacting with the instance backup endpoints
+// NewLocalClient returns a new instance of LocalClient
 func NewLocalClient() LocalClient {
 	const connectionTimeout = 2 * time.Second
 	const requestTimeout = 30 * time.Second

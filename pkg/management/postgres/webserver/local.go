@@ -60,7 +60,7 @@ func NewLocalWebServer(
 	serveMux := http.NewServeMux()
 	serveMux.HandleFunc(url.PathCache, endpoints.serveCache)
 	serveMux.HandleFunc(url.PathPgBackup, endpoints.requestBackup)
-	serveMux.HandleFunc(url.PathPgStatusArchive, endpoints.archiveStatus)
+	serveMux.HandleFunc(url.PathPgStatusArchive, endpoints.setWALArchiveStatusCondition)
 
 	server := &http.Server{
 		Addr:              fmt.Sprintf("localhost:%d", url.LocalPort),
@@ -263,7 +263,7 @@ func (asr *ArchiveStatusRequest) getArchiveStatusCondition() *metav1.Condition {
 	}
 }
 
-func (ws *localWebserverEndpoints) archiveStatus(w http.ResponseWriter, r *http.Request) {
+func (ws *localWebserverEndpoints) setWALArchiveStatusCondition(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	contextLogger := log.FromContext(ctx)
 	// decode body req
