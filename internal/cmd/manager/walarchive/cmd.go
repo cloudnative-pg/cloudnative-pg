@@ -19,6 +19,7 @@ package walarchive
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -67,20 +68,27 @@ func NewCmd() *cobra.Command {
 				return err
 			}
 
-			cluster, err := cacheClient.GetCluster()
-			if err != nil {
-				return fmt.Errorf("failed to get cluster: %w", err)
+			cluster, errCluster := cacheClient.GetCluster()
+			if errCluster != nil {
+				return fmt.Errorf("failed to get cluster: %w", errCluster)
 			}
 
-			err = run(ctx, podName, pgData, cluster, args)
-			var errMessage string
-			if err != nil {
-				errMessage = err.Error()
+			if err := run(ctx, podName, pgData, cluster, args); err != nil {
+				if errors.Is(err, errSwitchoverInProgress) {
+					contextLog.Warning("Refusing to archive WALs until the switchover is not completed",
+						"err", err)
+				} else {
+					contextLog.Error(err, logErrorMessage)
+				}
+				if condErr := webserver.NewLocalClient().SetPgStatusArchive(ctx, err.Error()); err != nil {
+					contextLog.Error(condErr, "while invoking the set archive condition endpoint")
+				}
+				return err
 			}
-			if err := webserver.NewLocalClient().SetPgStatusArchive(ctx, errMessage); err != nil {
+
+			if err := webserver.NewLocalClient().SetPgStatusArchive(ctx, ""); err != nil {
 				contextLog.Error(err, "while invoking the set archive condition endpoint")
 			}
-
 			return nil
 		},
 	}

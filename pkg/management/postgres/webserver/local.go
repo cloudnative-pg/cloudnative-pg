@@ -245,12 +245,31 @@ type ArchiveStatusRequest struct {
 	Error string `json:"error,omitempty"`
 }
 
+func (asr *ArchiveStatusRequest) getArchiveStatusCondition() *metav1.Condition {
+	if asr.Error != "" {
+		return &metav1.Condition{
+			Type:    string(apiv1.ConditionContinuousArchiving),
+			Status:  metav1.ConditionFalse,
+			Reason:  string(apiv1.ConditionReasonContinuousArchivingFailing),
+			Message: asr.Error,
+		}
+	}
+
+	return &metav1.Condition{
+		Type:    string(apiv1.ConditionContinuousArchiving),
+		Status:  metav1.ConditionTrue,
+		Reason:  string(apiv1.ConditionReasonContinuousArchivingSuccess),
+		Message: "Continuous archiving is working",
+	}
+}
+
 func (ws *localWebserverEndpoints) archiveStatus(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	contextLogger := log.FromContext(ctx)
 	// decode body req
 	var asr ArchiveStatusRequest
 	if err := json.NewDecoder(r.Body).Decode(&asr); err != nil {
+		contextLogger.Error(err, "error while decoding request")
 		http.Error(w, fmt.Sprintf("error while decoding request: %v", err.Error()), http.StatusBadRequest)
 		return
 	}
@@ -264,33 +283,9 @@ func (ws *localWebserverEndpoints) archiveStatus(w http.ResponseWriter, r *http.
 		return
 	}
 
-	if asr.Error != "" {
-		condition := metav1.Condition{
-			Type:    string(apiv1.ConditionContinuousArchiving),
-			Status:  metav1.ConditionFalse,
-			Reason:  string(apiv1.ConditionReasonContinuousArchivingFailing),
-			Message: asr.Error,
-		}
-		if errCond := conditions.Patch(ctx, ws.typedClient, cluster, &condition); errCond != nil {
-			contextLogger.Error(errCond, "Error changing wal archiving condition (wal archiving failed)")
-			http.Error(
-				w,
-				fmt.Sprintf("error while updating wal archiving failed condition: %v", errCond.Error()),
-				http.StatusInternalServerError)
-			return
-		}
-		_, _ = fmt.Fprint(w, "OK")
-		return
-	}
-
-	condition := metav1.Condition{
-		Type:    string(apiv1.ConditionContinuousArchiving),
-		Status:  metav1.ConditionTrue,
-		Reason:  string(apiv1.ConditionReasonContinuousArchivingSuccess),
-		Message: "Continuous archiving is working",
-	}
-	if errCond := conditions.Patch(ctx, ws.typedClient, cluster, &condition); errCond != nil {
-		contextLogger.Error(errCond, "Error changing wal archiving condition (wal archiving succeeded)")
+	if errCond := conditions.Patch(ctx, ws.typedClient, cluster, asr.getArchiveStatusCondition()); errCond != nil {
+		contextLogger.Error(errCond, "Error changing wal archiving condition",
+			"condition", asr.getArchiveStatusCondition())
 		http.Error(
 			w,
 			fmt.Sprintf("error while updating wal archiving condition: %v", errCond.Error()),
