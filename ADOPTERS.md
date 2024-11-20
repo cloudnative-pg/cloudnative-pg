@@ -56,4 +56,5 @@ This list is sorted in chronological order, based on the submission date.
 | [Cambium](https://www.cambium.earth) | @Mmoncadaisla | 2024-09-25 | Cambium leverages CloudNativePG at its core to analyze and visualize geospatial data for carbon market applications, ranging from site selection to monitoring, reporting, and verification. |
 | [MIND Informatica srl](https://mind-informatica.com) | @simonerocchi | 2024-09-25 | We use CloudNativePG to run PostgreSQL clusters for our web applications. |
 | [Walkbase](https://walkbase.com/) | @LinAnt | 2024-10-24 | CloudNativePG currently manages all our Postgres instances on Kubernetes via GitOps. |
+| [Akamai Technologies](https://www.akamai.com/) | @srodenhuis | 2024-11-20 | CloudNativePG is used in the [Akamai App PLatform](https://github.com/linode/apl-core) for all platform managed PostgreSQL databases. |
 | [Novo Nordisk](https://www.novonordisk.com/) | [scni@novonordisk.com](mailto:scni@novonordisk.com) ([@CasperGN](https://github.com/CasperGN)) | Backing of Grafana UI states for central Observability platform and datastore for our Developer Portal based off Backstage. |
