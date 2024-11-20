@@ -21,6 +21,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path"
 	"path/filepath"
@@ -73,7 +74,7 @@ func NewCmd() *cobra.Command {
 				return fmt.Errorf("failed to get cluster: %w", errCluster)
 			}
 
-			if err := run(ctx, podName, pgData, cluster, args); err != nil {
+			if err := run(ctx, podName, pgData, cluster, args[0], false); err != nil {
 				if errors.Is(err, errSwitchoverInProgress) {
 					contextLog.Warning("Refusing to archive WALs until the switchover is not completed",
 						"err", err)
@@ -99,15 +100,55 @@ func NewCmd() *cobra.Command {
 	return &cmd
 }
 
+// EnsureAllWALArchived ensures that all WAL files are archived
+func EnsureAllWALArchived(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	podName string,
+	pgData string,
+) error {
+	noWALLeft := errors.New("no wal files to archive")
+
+	iterator := func() error {
+		walList := fileutils.GatherReadyWALFiles(ctx, fileutils.GatherReadyWALFilesConfig{
+			MaxResults: math.MaxInt32 - 1,
+			PgDataPath: pgData,
+		})
+
+		for _, wal := range walList.ReadyItemsToSlice() {
+			if err := run(ctx, podName, pgData, cluster, wal, true); err != nil {
+				return err
+			}
+
+			walList.MarkAsDone(ctx, wal)
+		}
+
+		if !walList.HasMoreResults {
+			return noWALLeft
+		}
+
+		return nil
+	}
+
+	for {
+		if err := iterator(); err != nil {
+			if errors.Is(err, noWALLeft) {
+				return nil
+			}
+			return err
+		}
+	}
+}
+
 func run(
 	ctx context.Context,
 	podName, pgData string,
 	cluster *apiv1.Cluster,
-	args []string,
+	walName string,
+	force bool,
 ) error {
 	startTime := time.Now()
 	contextLog := log.FromContext(ctx)
-	walName := args[0]
 
 	if cluster.IsReplica() {
 		if podName != cluster.Status.CurrentPrimary && podName != cluster.Status.TargetPrimary {
@@ -122,7 +163,7 @@ func run(
 		}
 	}
 
-	if cluster.Status.CurrentPrimary != podName {
+	if !force && cluster.Status.CurrentPrimary != podName {
 		contextLog.Info("Refusing to archive WAL when there is a switchover in progress",
 			"currentPrimary", cluster.Status.CurrentPrimary,
 			"targetPrimary", cluster.Status.TargetPrimary,
@@ -190,7 +231,10 @@ func run(
 	}
 
 	// Step 3: gather the WAL files names to archive
-	walFilesList := walArchiver.GatherWALFilesToArchive(ctx, walName, maxParallel)
+	walFilesList := fileutils.GatherReadyWALFiles(
+		ctx,
+		fileutils.GatherReadyWALFilesConfig{MaxResults: maxParallel, SkipWALs: []string{walName}, PgDataPath: pgData},
+	)
 
 	options, err := walArchiver.BarmanCloudWalArchiveOptions(
 		ctx, cluster.Spec.Backup.BarmanObjectStore, cluster.Name)
@@ -200,7 +244,7 @@ func run(
 
 	// Step 5: archive the WAL files in parallel
 	uploadStartTime := time.Now()
-	walStatus := walArchiver.ArchiveList(ctx, walFilesList, options)
+	walStatus := walArchiver.ArchiveList(ctx, walFilesList.ReadyItemsToSlice(), options)
 	if len(walStatus) > 1 {
 		contextLog.Info("Completed archive command (parallel)",
 			"walsCount", len(walStatus),

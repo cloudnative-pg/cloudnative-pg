@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/walarchive"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/controller"
 	postgresSpec "github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
@@ -254,6 +255,10 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(ctx context.Context
 		if err != nil {
 			contextLogger.Error(
 				err, "Error while changing mode of the postgresql.auto.conf file before pg_rewind, skipped")
+		}
+
+		if err := walarchive.EnsureAllWALArchived(ctx, cluster, r.instance.GetPodName(), r.instance.PgData); err != nil {
+			return fmt.Errorf("while ensuring all WAL files are archived: %w", err)
 		}
 
 		// pg_rewind could require a clean shutdown of the old primary to
