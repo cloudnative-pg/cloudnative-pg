@@ -15,10 +15,10 @@ import (
 
 // LocalClient is an entity capable of interacting with the local webserver endpoints
 type LocalClient interface {
-	// SetPgStatusArchive sets the wal-archive status condition.
+	// SetWALArchiveStatusCondition sets the wal-archive status condition.
 	// An empty errMessage means that the archive process was successful.
 	// Returns any error encountered during the request.
-	SetPgStatusArchive(ctx context.Context, errMessage string) error
+	SetWALArchiveStatusCondition(ctx context.Context, errMessage string) error
 }
 
 type localClient struct {
@@ -33,8 +33,8 @@ func NewLocalClient() LocalClient {
 	return &localClient{cli: resources.NewHTTPClient(connectionTimeout, requestTimeout)}
 }
 
-func (c *localClient) SetPgStatusArchive(ctx context.Context, errMessage string) error {
-	contextLogger := log.FromContext(ctx).WithValues("endpoint", url.PathPgStatusArchive)
+func (c *localClient) SetWALArchiveStatusCondition(ctx context.Context, errMessage string) error {
+	contextLogger := log.FromContext(ctx).WithValues("endpoint", url.PathWALArchiveStatusCondition)
 
 	asr := ArchiveStatusRequest{
 		Error: errMessage,
@@ -46,7 +46,7 @@ func (c *localClient) SetPgStatusArchive(ctx context.Context, errMessage string)
 	}
 
 	resp, err := http.Post(
-		url.Local(url.PathPgStatusArchive, url.LocalPort),
+		url.Local(url.PathWALArchiveStatusCondition, url.LocalPort),
 		"application/json",
 		bytes.NewBuffer(encoded),
 	)

@@ -60,7 +60,7 @@ func NewLocalWebServer(
 	serveMux := http.NewServeMux()
 	serveMux.HandleFunc(url.PathCache, endpoints.serveCache)
 	serveMux.HandleFunc(url.PathPgBackup, endpoints.requestBackup)
-	serveMux.HandleFunc(url.PathPgStatusArchive, endpoints.setWALArchiveStatusCondition)
+	serveMux.HandleFunc(url.PathWALArchiveStatusCondition, endpoints.setWALArchiveStatusCondition)
 
 	server := &http.Server{
 		Addr:              fmt.Sprintf("localhost:%d", url.LocalPort),
@@ -245,7 +245,7 @@ type ArchiveStatusRequest struct {
 	Error string `json:"error,omitempty"`
 }
 
-func (asr *ArchiveStatusRequest) getArchiveStatusCondition() *metav1.Condition {
+func (asr *ArchiveStatusRequest) getContinuousArchivingCondition() *metav1.Condition {
 	if asr.Error != "" {
 		return &metav1.Condition{
 			Type:    string(apiv1.ConditionContinuousArchiving),
@@ -283,9 +283,9 @@ func (ws *localWebserverEndpoints) setWALArchiveStatusCondition(w http.ResponseW
 		return
 	}
 
-	if errCond := conditions.Patch(ctx, ws.typedClient, cluster, asr.getArchiveStatusCondition()); errCond != nil {
+	if errCond := conditions.Patch(ctx, ws.typedClient, cluster, asr.getContinuousArchivingCondition()); errCond != nil {
 		contextLogger.Error(errCond, "Error changing wal archiving condition",
-			"condition", asr.getArchiveStatusCondition())
+			"condition", asr.getContinuousArchivingCondition())
 		http.Error(
 			w,
 			fmt.Sprintf("error while updating wal archiving condition: %v", errCond.Error()),

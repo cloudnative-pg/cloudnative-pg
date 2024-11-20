@@ -43,8 +43,8 @@ const (
 	// PathPgStatus is the URL path for PostgreSQL Status
 	PathPgStatus string = "/pg/status"
 
-	// PathPgStatusArchive is the URL path for setting the wal-archive condition on the Cluster object
-	PathPgStatusArchive string = "/pg/status/wal/archive"
+	// PathWALArchiveStatusCondition is the URL path for setting the wal-archive condition on the Cluster object
+	PathWALArchiveStatusCondition string = "/cluster/status/condition/wal/archive"
 
 	// PathPgBackup is the URL path for PostgreSQL Backup
 	PathPgBackup string = "/pg/backup"
