@@ -37,6 +37,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
 
 var (
@@ -88,6 +89,8 @@ func SetupKubernetesClient(configFlags *genericclioptions.ConfigFlags) error {
 	if err != nil {
 		return err
 	}
+
+	Config.UserAgent = fmt.Sprintf("kubectl-cnpg/v%s (%s)", versions.Version, versions.Info.Commit)
 
 	err = createClient(Config)
 	if err != nil {
