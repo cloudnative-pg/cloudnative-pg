@@ -657,7 +657,7 @@ spec:
         x-descriptors:
           - 'urn:alm:descriptor:com.tectonic.ui:text'
       - path: type
-        description: Service type of the cluster to connect to ('rw' or 'rw')
+        description: Service type of the cluster to connect to ('rw' or 'ro')
         x-descriptors:
           - 'urn:alm:descriptor:io.kubernetes:text'
       - path: instances
