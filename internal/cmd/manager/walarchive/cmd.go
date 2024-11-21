@@ -233,8 +233,16 @@ func run(
 	// Step 3: gather the WAL files names to archive
 	walFilesList := fileutils.GatherReadyWALFiles(
 		ctx,
-		fileutils.GatherReadyWALFilesConfig{MaxResults: maxParallel, SkipWALs: []string{walName}, PgDataPath: pgData},
+		fileutils.GatherReadyWALFilesConfig{
+			MaxResults: maxParallel,
+			SkipWALs:   []string{walName},
+			PgDataPath: pgData,
+		},
 	)
+
+	// Ensure the requested WAL file is always the first one being
+	// archived
+	walFilesList.Ready = append([]string{walName}, walFilesList.Ready...)
 
 	options, err := walArchiver.BarmanCloudWalArchiveOptions(
 		ctx, cluster.Spec.Backup.BarmanObjectStore, cluster.Name)
