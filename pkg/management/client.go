@@ -140,7 +140,14 @@ func WaitForGetCluster(ctx context.Context, clusterObjectKey client.ObjectKey) e
 		return err
 	}
 
-	err = retry.OnError(readinessCheckRetry, resources.RetryAlways, func() error {
+	return WaitForGetClusterWithClient(ctx, cli, clusterObjectKey)
+}
+
+// WaitForGetClusterWithClient will wait for a successful get cluster to be executed
+func WaitForGetClusterWithClient(ctx context.Context, cli client.Client, clusterObjectKey client.ObjectKey) error {
+	logger := log.FromContext(ctx).WithName("wait-for-get-cluster")
+
+	err := retry.OnError(readinessCheckRetry, resources.RetryAlways, func() error {
 		if err := cli.Get(ctx, clusterObjectKey, &apiv1.Cluster{}); err != nil {
 			logger.Warning("Encountered an error while executing get cluster. Will wait and retry", "error", err.Error())
 			return err
