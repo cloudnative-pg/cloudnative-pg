@@ -22,17 +22,22 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"strings"
 	"time"
 
+	barmanCommand "github.com/cloudnative-pg/barman-cloud/pkg/command"
+	barmanRestorer "github.com/cloudnative-pg/barman-cloud/pkg/restorer"
+	"github.com/cloudnative-pg/machinery/pkg/log"
+	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	"github.com/spf13/cobra"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	pluginClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/cache"
 	cacheClient "github.com/cloudnative-pg/cloudnative-pg/internal/management/cache/client"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/restorer"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 )
 
@@ -58,6 +63,7 @@ const (
 // NewCmd creates a new cobra command
 func NewCmd() *cobra.Command {
 	var podName string
+	var pgData string
 
 	cmd := cobra.Command{
 		Use:           "wal-restore [name]",
@@ -66,16 +72,16 @@ func NewCmd() *cobra.Command {
 		RunE: func(cobraCmd *cobra.Command, args []string) error {
 			contextLog := log.WithName("wal-restore")
 			ctx := log.IntoContext(cobraCmd.Context(), contextLog)
-			err := run(ctx, podName, args)
+			err := run(ctx, pgData, podName, args)
 			if err == nil {
 				return nil
 			}
 
 			switch {
-			case errors.Is(err, restorer.ErrWALNotFound):
+			case errors.Is(err, barmanRestorer.ErrWALNotFound):
 				// Nothing to log here. The failure has already been logged.
 			case errors.Is(err, ErrNoBackupConfigured):
-				contextLog.Info("tried restoring WALs, but no backup was configured")
+				contextLog.Debug("tried restoring WALs, but no backup was configured")
 			case errors.Is(err, ErrEndOfWALStreamReached):
 				contextLog.Info(
 					"end-of-wal-stream flag found." +
@@ -93,11 +99,12 @@ func NewCmd() *cobra.Command {
 
 	cmd.Flags().StringVar(&podName, "pod-name", os.Getenv("POD_NAME"), "The name of the "+
 		"current pod in k8s")
+	cmd.Flags().StringVar(&pgData, "pg-data", os.Getenv("PGDATA"), "The PGDATA to be used")
 
 	return &cmd
 }
 
-func run(ctx context.Context, podName string, args []string) error {
+func run(ctx context.Context, pgData string, podName string, args []string) error {
 	contextLog := log.FromContext(ctx)
 	startTime := time.Now()
 	walName := args[0]
@@ -109,6 +116,10 @@ func run(ctx context.Context, podName string, args []string) error {
 	cluster, err = cacheClient.GetCluster()
 	if err != nil {
 		return fmt.Errorf("failed to get cluster: %w", err)
+	}
+
+	if err := restoreWALViaPlugins(ctx, cluster, walName, path.Join(pgData, destinationPath)); err != nil {
+		return err
 	}
 
 	recoverClusterName, recoverEnv, barmanConfiguration, err := GetRecoverConfiguration(cluster, podName)
@@ -125,7 +136,7 @@ func run(ctx context.Context, podName string, args []string) error {
 		return fmt.Errorf("while getting recover configuration: %w", err)
 	}
 
-	options, err := barman.CloudWalRestoreOptions(barmanConfiguration, recoverClusterName)
+	options, err := barmanCommand.CloudWalRestoreOptions(ctx, barmanConfiguration, recoverClusterName)
 	if err != nil {
 		return fmt.Errorf("while getting barman-cloud-wal-restore options: %w", err)
 	}
@@ -138,8 +149,8 @@ func run(ctx context.Context, podName string, args []string) error {
 	mergeEnv(env, recoverEnv)
 
 	// Create the restorer
-	var walRestorer *restorer.WALRestorer
-	if walRestorer, err = restorer.New(ctx, cluster, env, SpoolDirectory); err != nil {
+	var walRestorer *barmanRestorer.WALRestorer
+	if walRestorer, err = barmanRestorer.New(ctx, env, SpoolDirectory); err != nil {
 		return fmt.Errorf("while creating the restorer: %w", err)
 	}
 
@@ -225,8 +236,46 @@ func run(ctx context.Context, podName string, args []string) error {
 	return nil
 }
 
+// restoreWALViaPlugins requests every capable plugin to restore the passed
+// WAL file, and returns an error if every plugin failed. It will not return
+// an error if there's no plugin capable of WAL archiving too
+func restoreWALViaPlugins(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	walName string,
+	destinationPathName string,
+) error {
+	contextLogger := log.FromContext(ctx)
+
+	plugins := repository.New()
+	availablePluginNames, err := plugins.RegisterUnixSocketPluginsInPath(configuration.Current.PluginSocketDir)
+	if err != nil {
+		contextLogger.Error(err, "Error while loading local plugins")
+	}
+	defer plugins.Close()
+
+	availablePluginNamesSet := stringset.From(availablePluginNames)
+
+	enabledPluginNames := cluster.Spec.Plugins.GetEnabledPluginNames()
+	enabledPluginNames = append(enabledPluginNames, cluster.Spec.ExternalClusters.GetEnabledPluginNames()...)
+	enabledPluginNamesSet := stringset.From(enabledPluginNames)
+
+	client, err := pluginClient.WithPlugins(
+		ctx,
+		plugins,
+		availablePluginNamesSet.Intersect(enabledPluginNamesSet).ToList()...,
+	)
+	if err != nil {
+		contextLogger.Error(err, "Error while loading required plugins")
+		return err
+	}
+	defer client.Close(ctx)
+
+	return client.RestoreWAL(ctx, cluster, walName, destinationPathName)
+}
+
 // checkEndOfWALStreamFlag returns ErrEndOfWALStreamReached if the flag is set in the restorer
-func checkEndOfWALStreamFlag(walRestorer *restorer.WALRestorer) error {
+func checkEndOfWALStreamFlag(walRestorer *barmanRestorer.WALRestorer) error {
 	contain, err := walRestorer.IsEndOfWALStream()
 	if err != nil {
 		return err
@@ -245,9 +294,9 @@ func checkEndOfWALStreamFlag(walRestorer *restorer.WALRestorer) error {
 
 // isEndOfWALStream returns true if one of the downloads has returned
 // a file-not-found error
-func isEndOfWALStream(results []restorer.Result) bool {
+func isEndOfWALStream(results []barmanRestorer.Result) bool {
 	for _, result := range results {
-		if errors.Is(result.Err, restorer.ErrWALNotFound) {
+		if errors.Is(result.Err, barmanRestorer.ErrWALNotFound) {
 			return true
 		}
 	}

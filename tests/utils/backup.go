@@ -17,17 +17,17 @@ limitations under the License.
 package utils
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 
-	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 
-	. "github.com/onsi/gomega" // nolint
+	. "github.com/onsi/ginkgo/v2" // nolint
+	. "github.com/onsi/gomega"    // nolint
 )
 
 // ExecuteBackup performs a backup and checks the backup status
@@ -159,93 +159,6 @@ func CreateClusterFromBackupUsingPITR(
 	return cluster, nil
 }
 
-// CreateClusterFromExternalClusterBackupWithPITROnAzure creates a cluster on Azure, starting from an external cluster
-// backup with PITR
-func CreateClusterFromExternalClusterBackupWithPITROnAzure(
-	namespace,
-	externalClusterName,
-	sourceClusterName,
-	targetTime,
-	storageCredentialsSecretName,
-	azStorageAccount,
-	azBlobContainer string,
-	env *TestingEnvironment,
-) (*apiv1.Cluster, error) {
-	storageClassName := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
-	destinationPath := fmt.Sprintf("https://%v.blob.core.windows.net/%v/",
-		azStorageAccount, azBlobContainer)
-
-	restoreCluster := &apiv1.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      externalClusterName,
-			Namespace: namespace,
-		},
-		Spec: apiv1.ClusterSpec{
-			Instances: 3,
-
-			StorageConfiguration: apiv1.StorageConfiguration{
-				Size:         "1Gi",
-				StorageClass: &storageClassName,
-			},
-
-			PostgresConfiguration: apiv1.PostgresConfiguration{
-				Parameters: map[string]string{
-					"log_checkpoints":             "on",
-					"log_lock_waits":              "on",
-					"log_min_duration_statement":  "1000",
-					"log_statement":               "ddl",
-					"log_temp_files":              "1024",
-					"log_autovacuum_min_duration": "1s",
-					"log_replication_commands":    "on",
-				},
-			},
-
-			Bootstrap: &apiv1.BootstrapConfiguration{
-				Recovery: &apiv1.BootstrapRecovery{
-					Source: sourceClusterName,
-					RecoveryTarget: &apiv1.RecoveryTarget{
-						TargetTime: targetTime,
-					},
-				},
-			},
-
-			ExternalClusters: []apiv1.ExternalCluster{
-				{
-					Name: sourceClusterName,
-					BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{
-						DestinationPath: destinationPath,
-						BarmanCredentials: apiv1.BarmanCredentials{
-							Azure: &apiv1.AzureCredentials{
-								StorageAccount: &apiv1.SecretKeySelector{
-									LocalObjectReference: apiv1.LocalObjectReference{
-										Name: storageCredentialsSecretName,
-									},
-									Key: "ID",
-								},
-								StorageKey: &apiv1.SecretKeySelector{
-									LocalObjectReference: apiv1.LocalObjectReference{
-										Name: storageCredentialsSecretName,
-									},
-									Key: "KEY",
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-	obj, err := CreateObject(env, restoreCluster)
-	if err != nil {
-		return nil, err
-	}
-	cluster, ok := obj.(*apiv1.Cluster)
-	if !ok {
-		return nil, fmt.Errorf("created object is not of type cluster: %T, %v", obj, obj)
-	}
-	return cluster, nil
-}
-
 // CreateClusterFromExternalClusterBackupWithPITROnMinio creates a cluster on Minio, starting from an external cluster
 // backup with PITR
 func CreateClusterFromExternalClusterBackupWithPITROnMinio(
@@ -296,7 +209,7 @@ func CreateClusterFromExternalClusterBackupWithPITROnMinio(
 					Name: sourceClusterName,
 					BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{
 						DestinationPath: "s3://cluster-backups/",
-						EndpointURL:     "https://minio-service:9000",
+						EndpointURL:     "https://minio-service.minio:9000",
 						EndpointCA: &apiv1.SecretKeySelector{
 							LocalObjectReference: apiv1.LocalObjectReference{
 								Name: "minio-server-ca-secret",
@@ -333,143 +246,6 @@ func CreateClusterFromExternalClusterBackupWithPITROnMinio(
 		return nil, fmt.Errorf("created object is not of type cluster: %T, %v", obj, obj)
 	}
 	return cluster, nil
-}
-
-// CreateClusterFromExternalClusterBackupWithPITROnAzurite creates a cluster with Azurite, starting from an external
-// cluster backup with PITR
-func CreateClusterFromExternalClusterBackupWithPITROnAzurite(
-	namespace,
-	externalClusterName,
-	sourceClusterName,
-	targetTime string,
-	env *TestingEnvironment,
-) (*apiv1.Cluster, error) {
-	storageClassName := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
-	DestinationPath := fmt.Sprintf("https://azurite:10000/storageaccountname/%v", sourceClusterName)
-
-	restoreCluster := &apiv1.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      externalClusterName,
-			Namespace: namespace,
-		},
-		Spec: apiv1.ClusterSpec{
-			Instances: 3,
-
-			StorageConfiguration: apiv1.StorageConfiguration{
-				Size:         "1Gi",
-				StorageClass: &storageClassName,
-			},
-
-			PostgresConfiguration: apiv1.PostgresConfiguration{
-				Parameters: map[string]string{
-					"log_checkpoints":             "on",
-					"log_lock_waits":              "on",
-					"log_min_duration_statement":  "1000",
-					"log_statement":               "ddl",
-					"log_temp_files":              "1024",
-					"log_autovacuum_min_duration": "1s",
-					"log_replication_commands":    "on",
-				},
-			},
-
-			Bootstrap: &apiv1.BootstrapConfiguration{
-				Recovery: &apiv1.BootstrapRecovery{
-					Source: sourceClusterName,
-					RecoveryTarget: &apiv1.RecoveryTarget{
-						TargetTime: targetTime,
-					},
-				},
-			},
-
-			ExternalClusters: []apiv1.ExternalCluster{
-				{
-					Name: sourceClusterName,
-					BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{
-						DestinationPath: DestinationPath,
-						EndpointCA: &apiv1.SecretKeySelector{
-							LocalObjectReference: apiv1.LocalObjectReference{
-								Name: "azurite-ca-secret",
-							},
-							Key: "ca.crt",
-						},
-						BarmanCredentials: apiv1.BarmanCredentials{
-							Azure: &apiv1.AzureCredentials{
-								ConnectionString: &apiv1.SecretKeySelector{
-									LocalObjectReference: apiv1.LocalObjectReference{
-										Name: "azurite",
-									},
-									Key: "AZURE_CONNECTION_STRING",
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-	obj, err := CreateObject(env, restoreCluster)
-	if err != nil {
-		return nil, err
-	}
-	cluster, ok := obj.(*apiv1.Cluster)
-	if !ok {
-		return nil, fmt.Errorf("created object is not of type cluster: %T, %v", obj, obj)
-	}
-	return cluster, nil
-}
-
-// ComposeAzBlobListAzuriteCmd builds the Azure storage blob list command for Azurite
-func ComposeAzBlobListAzuriteCmd(clusterName, path string) string {
-	return fmt.Sprintf("az storage blob list --container-name %v --query \"[?contains(@.name, \\`%v\\`)].name\" "+
-		"--connection-string $AZURE_CONNECTION_STRING",
-		clusterName, path)
-}
-
-// ComposeAzBlobListCmd builds the Azure storage blob list command
-func ComposeAzBlobListCmd(
-	configuration AzureConfiguration,
-	clusterName,
-	path string,
-) string {
-	return fmt.Sprintf("az storage blob list --account-name %v  "+
-		"--account-key %v  "+
-		"--container-name %v  "+
-		"--prefix %v/  "+
-		"--query \"[?contains(@.name, \\`%v\\`)].name\"",
-		configuration.StorageAccount, configuration.StorageKey, configuration.BlobContainer, clusterName, path)
-}
-
-// CountFilesOnAzureBlobStorage counts files on Azure Blob storage
-func CountFilesOnAzureBlobStorage(
-	configuration AzureConfiguration,
-	clusterName,
-	path string,
-) (int, error) {
-	azBlobListCmd := ComposeAzBlobListCmd(configuration, clusterName, path)
-	out, _, err := RunUnchecked(azBlobListCmd)
-	if err != nil {
-		return -1, err
-	}
-	var arr []string
-	err = json.Unmarshal([]byte(out), &arr)
-	return len(arr), err
-}
-
-// CountFilesOnAzuriteBlobStorage counts files on Azure Blob storage. using Azurite
-func CountFilesOnAzuriteBlobStorage(
-	namespace,
-	clusterName,
-	path string,
-) (int, error) {
-	azBlobListCmd := ComposeAzBlobListAzuriteCmd(clusterName, path)
-	out, _, err := RunUnchecked(fmt.Sprintf("kubectl exec -n %v az-cli "+
-		"-- /bin/bash -c '%v'", namespace, azBlobListCmd))
-	if err != nil {
-		return -1, err
-	}
-	var arr []string
-	err = json.Unmarshal([]byte(out), &arr)
-	return len(arr), err
 }
 
 // GetConditionsInClusterStatus get conditions values as given type from cluster object status
@@ -592,4 +368,19 @@ func (env TestingEnvironment) GetVolumeSnapshot(
 		return nil, err
 	}
 	return volumeSnapshot, nil
+}
+
+// AssertBackupConditionInClusterStatus check that the backup condition in the Cluster's Status
+// eventually returns true
+func AssertBackupConditionInClusterStatus(env *TestingEnvironment, namespace, clusterName string) {
+	By(fmt.Sprintf("waiting for backup condition status in cluster '%v'", clusterName), func() {
+		Eventually(func() (string, error) {
+			getBackupCondition, err := GetConditionsInClusterStatus(
+				namespace, clusterName, env, apiv1.ConditionBackup)
+			if err != nil {
+				return "", err
+			}
+			return string(getBackupCondition.Status), nil
+		}, 300, 5).Should(BeEquivalentTo("True"))
+	})
 }

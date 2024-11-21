@@ -87,6 +87,11 @@ deletion of the pooler, and vice versa.
     possible architectures. You can have clusters without poolers, clusters with
     a single pooler, or clusters with several poolers, that is, one per application.
 
+!!! Important
+    When the operator is upgraded, the pooler pods will undergo a rolling
+    upgrade. This is necessary to ensure that the instance manager within the
+    pooler pods is also upgraded.
+
 ## Security
 
 Any PgBouncer pooler is transparently integrated with CloudNativePG support for
@@ -156,21 +161,26 @@ Then, for each application database, grant the permission for
 GRANT CONNECT ON DATABASE { database name here } TO cnpg_pooler_pgbouncer;
 ```
 
-Finally, connect in each application database, and then create the authentication
-function inside each of the application databases:
+Finally, as a *superuser* connect in each application database, and then create
+the authentication function inside each of the application databases:
 
 ```sql
-CREATE OR REPLACE FUNCTION user_search(uname TEXT)
+CREATE OR REPLACE FUNCTION public.user_search(uname TEXT)
   RETURNS TABLE (usename name, passwd text)
   LANGUAGE sql SECURITY DEFINER AS
-  'SELECT usename, passwd FROM pg_shadow WHERE usename=$1;';
+  'SELECT usename, passwd FROM pg_catalog.pg_shadow WHERE usename=$1;';
 
-REVOKE ALL ON FUNCTION user_search(text)
+REVOKE ALL ON FUNCTION public.user_search(text)
   FROM public;
 
-GRANT EXECUTE ON FUNCTION user_search(text)
+GRANT EXECUTE ON FUNCTION public.user_search(text)
   TO cnpg_pooler_pgbouncer;
 ```
+
+!!! Important
+    Given that `user_search` is a `SECURITY DEFINER` function, you need to
+    create it through a role with `SUPERUSER` privileges, such as the `postgres`
+    user.
 
 ## Pod templates
 
@@ -250,6 +260,46 @@ spec:
               cpu: "0.5"
               memory: 500Mi
 ```
+
+## Service Template
+
+Sometimes, your pooler will require some different labels, annotations, or even change
+the type of the service, you can achieve that by using the `serviceTemplate` field:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Pooler
+metadata:
+  name: pooler-example-rw
+spec:
+  cluster:
+    name: cluster-example
+  instances: 3
+  type: rw
+  serviceTemplate:
+    metadata:
+      labels:
+        app: pooler
+    spec:
+      type: LoadBalancer
+  pgbouncer:
+    poolMode: session
+    parameters:
+      max_client_conn: "1000"
+      default_pool_size: "10"
+```
+The operator by default adds a `ServicePort` with the following data:
+```
+  ports:
+  - name: pgbouncer
+    port: 5432
+    protocol: TCP
+    targetPort: pgbouncer
+```
+
+!!! Warning
+    Specifying a `ServicePort` with the name `pgbouncer` or the port `5432`  will prevent the default `ServicePort` from being added.
+    This because `ServicePort` entries with the same `name` or `port` are not allowed on Kubernetes and result in errors.
 
 ## High availability (HA)
 

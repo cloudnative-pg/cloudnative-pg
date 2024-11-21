@@ -23,7 +23,9 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
@@ -33,7 +35,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/destroy"
 	pluginresources "github.com/cloudnative-pg/cloudnative-pg/internal/plugin/resources"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
@@ -177,14 +178,14 @@ func (on *onCommand) fenceClusterStep() error {
 	contextLogger := log.FromContext(on.ctx)
 
 	contextLogger.Debug("applying the fencing annotation to the cluster manifest")
-	if err := resources.ApplyFenceFunc(
-		on.ctx,
-		plugin.Client,
-		on.cluster.Name,
-		plugin.Namespace,
-		utils.FenceAllServers,
-		utils.AddFencedInstance,
-	); err != nil {
+	if err := utils.NewFencingMetadataExecutor(plugin.Client).
+		AddFencing().
+		ForAllInstances().
+		Execute(
+			on.ctx,
+			types.NamespacedName{Name: on.cluster.Name, Namespace: plugin.Namespace},
+			&apiv1.Cluster{},
+		); err != nil {
 		return err
 	}
 	contextLogger.Debug("fencing annotation set on the cluster manifest")
@@ -202,23 +203,22 @@ func (on *onCommand) rollbackFenceClusterIfNeeded() {
 	contextLogger := log.FromContext(on.ctx)
 
 	fmt.Println("rolling back hibernation: removing the fencing annotation")
-	err := resources.ApplyFenceFunc(
-		on.ctx,
-		plugin.Client,
-		on.cluster.Name,
-		plugin.Namespace,
-		utils.FenceAllServers,
-		utils.RemoveFencedInstance,
-	)
-	if err != nil {
+	if err := utils.NewFencingMetadataExecutor(plugin.Client).
+		RemoveFencing().
+		ForAllInstances().
+		Execute(on.ctx,
+			types.NamespacedName{Name: on.cluster.Name, Namespace: plugin.Namespace}, &apiv1.Cluster{}); err != nil {
 		contextLogger.Error(err, "Rolling back from hibernation failed")
 	}
 }
 
 // waitInstancesToBeFenced waits for all instances to be shut down
 func (on *onCommand) waitInstancesToBeFencedStep() error {
+	isRetryable := func(err error) bool {
+		return !apierrors.IsForbidden(err) && !apierrors.IsUnauthorized(err)
+	}
 	for _, instance := range on.managedInstances {
-		if err := retry.OnError(hibernationBackoff, resources.RetryAlways, func() error {
+		if err := retry.OnError(hibernationBackoff, isRetryable, func() error {
 			running, err := pluginresources.IsInstanceRunning(on.ctx, instance)
 			if err != nil {
 				return fmt.Errorf("error checking instance status (%v): %w", instance.Name, err)
@@ -271,7 +271,8 @@ func (on *onCommand) deleteResourcesStep() error {
 	if err := destroy.Destroy(
 		on.ctx,
 		on.cluster.Name,
-		strconv.Itoa(on.primaryInstanceSerial), true,
+		fmt.Sprintf("%s-%s", on.cluster.Name, strconv.Itoa(on.primaryInstanceSerial)),
+		true,
 	); err != nil {
 		return fmt.Errorf("error destroying primary instance: %w", err)
 	}

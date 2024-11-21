@@ -17,36 +17,27 @@ limitations under the License.
 package utils
 
 import (
-	"strings"
-
-	corev1 "k8s.io/api/core/v1"
-
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
 
 // GetCurrentTimestamp getting current time stamp from postgres server
-func GetCurrentTimestamp(namespace, clusterName string, env *TestingEnvironment, podName *corev1.Pod) (string, error) {
-	host, err := GetHostName(namespace, clusterName, env)
-	if err != nil {
-		return "", err
-	}
-	appUser, appUserPass, err := GetCredentials(clusterName, namespace, apiv1.ApplicationUserSecretSuffix, env)
-	if err != nil {
-		return "", err
-	}
-	query := "select TO_CHAR(CURRENT_TIMESTAMP,'YYYY-MM-DD HH24:MI:SS.US');"
-	stdOut, _, err := RunQueryFromPod(
-		podName,
-		host,
-		AppDBName,
-		appUser,
-		appUserPass,
-		query,
+func GetCurrentTimestamp(namespace, clusterName string, env *TestingEnvironment) (string, error) {
+	row, err := RunQueryRowOverForward(
 		env,
+		namespace,
+		clusterName,
+		AppDBName,
+		apiv1.ApplicationUserSecretSuffix,
+		"select TO_CHAR(CURRENT_TIMESTAMP,'YYYY-MM-DD HH24:MI:SS.US');",
 	)
 	if err != nil {
 		return "", err
 	}
-	currentTimestamp := strings.Trim(stdOut, "\n")
+
+	var currentTimestamp string
+	if err = row.Scan(&currentTimestamp); err != nil {
+		return "", err
+	}
+
 	return currentTimestamp, nil
 }

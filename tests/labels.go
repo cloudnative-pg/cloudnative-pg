@@ -20,72 +20,75 @@ package tests
 // List of the labels we use for labeling test specs
 // See https://github.com/onsi/ginkgo/blob/c70867a9661d9eb6eeb706dd7580bf510a99f35b/docs/MIGRATING_TO_V2.md
 const (
-	// LabelDisruptive is the string for labelling disruptive tests
-	LabelDisruptive = "disruptive"
-
-	// LabelPerformance is the string for labelling performance tests
-	LabelPerformance = "performance"
-
-	// LabelUpgrade is the string for labelling upgrade tests
-	LabelUpgrade = "upgrade"
-
-	// LabelNoOpenshift is the string for labelling tests that don't run on Openshift
-	LabelNoOpenshift = "no-openshift"
-
-	// LabelIgnoreFails is the string for labelling tests that should not be considered when failing.
-	LabelIgnoreFails = "ignore-fails"
-
-	// LabelSmoke is a label for selecting  smoke test
-	LabelSmoke = "smoke"
-
-	// LabelBasic is a label for  selecting basic test
-	LabelBasic = "basic"
-
-	// LabelServiceConnectivity is a label for selecting service connections test
-	LabelServiceConnectivity = "service-connectivity"
-
-	// LabelSelfHealing is a label for selecting self-healing test
-	LabelSelfHealing = "self-healing"
-
 	// LabelBackupRestore is a label for only selecting backup and restore tests
 	LabelBackupRestore = "backup-restore"
 
-	// LabelSnapshot is a label for selecting snapshot tests
-	LabelSnapshot = "snapshot"
+	// LabelBasic is a label for selecting basic tests
+	LabelBasic = "basic"
+
+	// LabelClusterMetadata is a label for selecting cluster-metadata tests
+	LabelClusterMetadata = "cluster-metadata"
+
+	// LabelDeclarativeDatabases is a label for selecting the declarative databases test
+	LabelDeclarativeDatabases = "declarative-databases"
+
+	// LabelDisruptive is the string for labelling disruptive tests
+	LabelDisruptive = "disruptive"
+
+	// LabelImportingDatabases is a label for selecting the importing-databases test
+	LabelImportingDatabases = "importing-databases"
+
+	// LabelMaintenance is a label for selecting maintenance tests
+	LabelMaintenance = "maintenance"
+
+	// LabelNoOpenshift is the string for selecting tests that don't run on Openshift
+	LabelNoOpenshift = "no-openshift"
+
+	// LabelObservability is a label for selecting observability tests
+	LabelObservability = "observability"
 
 	// LabelOperator is a label for only selecting operator tests
 	LabelOperator = "operator"
 
-	// LabelObservability is a label for selecting observability test
-	LabelObservability = "observability"
+	// LabelPerformance is the string for labelling performance tests
+	LabelPerformance = "performance"
 
-	// LabelReplication is a label for selecting replication test
-	LabelReplication = "replication"
-
-	// LabelPlugin is a label for selecting plugin test
+	// LabelPlugin is a label for selecting plugin tests
 	LabelPlugin = "plugin"
-
-	// LabelPostgresConfiguration is a label for selecting postgres-configuration test
-	LabelPostgresConfiguration = "postgres-configuration"
 
 	// LabelPodScheduling is a label for selecting pod-scheduling test
 	LabelPodScheduling = "pod-scheduling"
 
-	// LabelClusterMetadata is a label for selecting cluster-metadata test
-	LabelClusterMetadata = "cluster-metadata"
+	// LabelPostgresConfiguration is a label for selecting postgres-configuration test
+	LabelPostgresConfiguration = "postgres-configuration"
 
-	// LabelRecovery is a label for selecting cluster-metadata test
+	// LabelRecovery is a label for selecting recovery tests
 	LabelRecovery = "recovery"
 
-	// LabelImportingDatabases is a label for selecting importing-databases test
-	LabelImportingDatabases = "importing-databases"
+	// LabelReplication is a label for selecting replication tests
+	LabelReplication = "replication"
 
-	// LabelStorage is a label for selecting storage test
-	LabelStorage = "storage"
-
-	// LabelSecurity is a label for selecting security test
+	// LabelSecurity is a label for selecting security tests
 	LabelSecurity = "security"
 
-	// LabelMaintenance is a label for selecting importing-databases test
-	LabelMaintenance = "maintenance"
+	// LabelSelfHealing is a label for selecting self-healing tests
+	LabelSelfHealing = "self-healing"
+
+	// LabelServiceConnectivity is a label for selecting service connections tests
+	LabelServiceConnectivity = "service-connectivity"
+
+	// LabelSmoke is a label for selecting smoke tests
+	LabelSmoke = "smoke"
+
+	// LabelSnapshot is a label for selecting snapshot tests
+	LabelSnapshot = "snapshot"
+
+	// LabelStorage is a label for selecting storage tests
+	LabelStorage = "storage"
+
+	// LabelTablespaces is a label for selecting the tablespaces test
+	LabelTablespaces = "tablespaces"
+
+	// LabelUpgrade is a label for upgrade tests
+	LabelUpgrade = "upgrade"
 )

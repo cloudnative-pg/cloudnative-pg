@@ -61,6 +61,10 @@ primary/standby architecture directly by setting the `imageName`
 attribute in the CR. The operator also supports `imagePullSecrets`
 to access private container registries, and it supports digests and
 tags for finer control of container image immutability.
+If you prefer not to specify an image name, you can leverage
+[image catalogs](image_catalog.md) by simply referencing the PostgreSQL
+major version. Moreover, image catalogs enable you to effortlessly create
+custom catalogs, directing to images based on your specific requirements.
 
 ### Labels and annotations
 
@@ -71,7 +75,7 @@ of the CloudNativePG deployment in your Kubernetes infrastructure.
 ### Self-contained instance manager
 
 Instead of relying on an external tool to
-coordinate PostgreSQL instances in the Kubernetes cluster pods, 
+coordinate PostgreSQL instances in the Kubernetes cluster pods,
 such as Patroni or Stolon, the operator
 injects the operator executable inside each pod, in a file named
 `/controller/manager`. The application is used to control the underlying
@@ -96,9 +100,10 @@ PVC template in the CR's `storage` parameter.
 For better performance and finer control, you can also choose to host your
 cluster's write-ahead log (WAL, also known as `pg_wal`) on a separate volume,
 preferably on different storage.
-The [`cnp-bench`](https://github.com/EnterpriseDB/cnp-bench) open source
-project can be used to benchmark both the storage and the database prior to
-production.
+The ["Benchmarking"](benchmarking.md) section of the documentation provides
+detailed instructions on benchmarking both storage and the database before
+production. It relies on the `cnpg` plugin to ensure optimal performance and
+reliability.
 
 ### Replica configuration
 
@@ -112,7 +117,22 @@ switchover operations.
 CloudNativePG manages replication slots for all the replicas
 in the HA cluster. The implementation is inspired by the previously
 proposed patch for PostgreSQL, called
-[failover slots](https://wiki.postgresql.org/wiki/Failover_slots).
+[failover slots](https://wiki.postgresql.org/wiki/Failover_slots), and
+also supports user defined physical replication slots on the primary.
+
+### Service Configuration
+
+By default, CloudNativePG creates three Kubernetes [services](service_management.md)
+for applications to access the cluster via the network:
+
+- One pointing to the primary for read/write operations.
+- One pointing to replicas for read-only queries.
+- A generic one pointing to any instance for read operations.
+
+You can disable the read-only and read services via configuration.
+Additionally, you can leverage the service template capability
+to create custom service resources, including load balancers, to access
+PostgreSQL outside Kubernetes. This is particularly useful for DBaaS purposes.
 
 ### Database configuration
 
@@ -203,7 +223,7 @@ includes integration with cert-manager.
 
 ### Certificate authentication for streaming replication
 
-To authorize streaming replication connections from the standby servers, 
+To authorize streaming replication connections from the standby servers,
 the operator relies on TLS client certificate authentication. This method is used
 instead of relying on a password (and therefore a secret).
 
@@ -265,16 +285,20 @@ workload, in this case PostgreSQL servers. This includes PostgreSQL minor
 release updates (security and bug fixes normally) as well as major online
 upgrades.
 
-### Upgrade of the operator
+### Operator Upgrade
 
-You can upgrade the operator seamlessly as a new deployment. Because of the instance
-manager's injection, a change in the
-operator doesn't require a change in the operand. 
-The operator can manage older versions of the operand.
+Upgrading the operator is seamless and can be done as a new deployment. After
+upgrading the controller, a rolling update of all deployed PostgreSQL clusters
+is initiated. You can choose to update all clusters simultaneously or
+distribute their upgrades over time.
 
-CloudNativePG also supports [in-place updates of the instance manager](installation_upgrade.md#in-place-updates-of-the-instance-manager)
-following an upgrade of the operator. In-place updates don't require a rolling
-update (and subsequent switchover) of the cluster.
+Thanks to the instance manager's injection, upgrading the operator does not
+require changes to the operand, allowing the operator to manage older versions
+of it.
+
+Additionally, CloudNativePG supports [in-place updates of the instance manager](installation_upgrade.md#in-place-updates-of-the-instance-manager)
+following an operator upgrade. In-place updates do not require a rolling update
+or a subsequent switchover of the cluster.
 
 ### Upgrade of the managed workload
 
@@ -335,8 +359,8 @@ user action. The operator transparently sets
 the `archive_command` to rely on `barman-cloud-wal-archive` to ship WAL
 files to the defined endpoint. You can decide the compression algorithm,
 as well as the number of parallel jobs to concurrently upload WAL files
-in the archive. In addition, `Instance Manager` checks 
-the correctness of the archive destination by performing the `barman-cloud-check-wal-archive` 
+in the archive. In addition, `Instance Manager` checks
+the correctness of the archive destination by performing the `barman-cloud-check-wal-archive`
 command before beginning to ship the first set of WAL files.
 
 ### PostgreSQL backups
@@ -353,7 +377,7 @@ Base backups can be saved on:
 Base backups are defined at the cluster level, declaratively,
 through the `backup` parameter in the cluster definition.
 
-You can define base backups in two ways: 
+You can define base backups in two ways:
 
 - On-demand, through the `Backup` custom resource definition
 - Scheduled, through the `ScheduledBackup`custom resource definition, using a cron-like syntax
@@ -400,39 +424,60 @@ label, or a transaction ID. This capability is built on top of the full restore
 one and supports all the options available in
 [PostgreSQL for PITR](https://www.postgresql.org/docs/current/runtime-config-wal.html#RUNTIME-CONFIG-WAL-RECOVERY-TARGET).
 
-### Zero-data-loss clusters through synchronous replication
+### Zero-Data-Loss Clusters Through Synchronous Replication
 
-Achieve  *zero data loss* (RPO=0) in your local high-availability CloudNativePG
-cluster through quorum-based synchronous replication support. The operator provides
-two configuration options that control the minimum and maximum number of
-expected synchronous standby replicas available at any time. The operator
-reacts accordingly, based on the number of available and ready PostgreSQL
-instances in the cluster. It uses the following formula for the quorum (`q`):
-
-```
-1 <= minSyncReplicas <= q <= maxSyncReplicas <= readyReplicas
-```
+Achieve *zero data loss* (RPO=0) in your local high-availability CloudNativePG
+cluster with support for both quorum-based and priority-based synchronous
+replication. The operator offers a flexible way to define the number of
+expected synchronous standby replicas available at any time, and allows
+customization of the `synchronous_standby_names` option as needed.
 
 ### Replica clusters
 
-Define a cross-Kubernetes cluster topology of PostgreSQL clusters by taking
-advantage of PostgreSQL native streaming and cascading replication.
-Using the `replica` option, you can set up an independent cluster to
-continuously replicate data from another PostgreSQL source of the same major
-version. Such a source can be anywhere, as long as a direct streaming
-connection by way of TLS is allowed from the two endpoints.
+Establish a robust cross-Kubernetes cluster topology for PostgreSQL clusters,
+harnessing the power of native streaming and cascading replication. With the
+`replica` option, you can configure an autonomous cluster to consistently
+replicate data from another PostgreSQL source of the same major version. This
+source can be located anywhere, provided you have access to a WAL archive for
+fetching WAL files or a direct streaming connection via TLS between the two
+endpoints.
 
-Moreover, the source can be even outside Kubernetes, running in a physical or
-virtual environment.
+Notably, the source PostgreSQL instance can exist outside the Kubernetes
+environment, whether in a physical or virtual setting.
 
-Replica clusters can be created from a volume snapshot, a recovery object store
-(backup in Barman Cloud format), or by way of streaming using `pg_basebackup`.
-Both WAL file shipping and WAL streaming are allowed.
-Replica clusters dramatically improve the business continuity posture of your
-PostgreSQL databases in Kubernetes, spanning over multiple data centers and
-opening up for hybrid and multi-cloud setups. (Currently, while waiting for Kubernetes 
-federation native capabilities, manual switchover
-across data centers is required.)
+Replica clusters can be instantiated through various methods, including volume
+snapshots, a recovery object store (using the Barman Cloud backup format),
+or streaming using `pg_basebackup`. Both WAL file shipping and WAL streaming
+are supported. The deployment of replica clusters significantly elevates the
+business continuity posture of PostgreSQL databases within Kubernetes,
+extending across multiple data centers and facilitating hybrid and multi-cloud
+setups. (While anticipating Kubernetes federation native capabilities, manual
+switchover across data centers remains necessary.)
+
+Additionally, the flexibility extends to creating delayed replica clusters
+intentionally lagging behind the primary cluster. This intentional lag aims to
+minimize the Recovery Time Objective (RTO) in the event of unintended errors,
+such as incorrect `DELETE` or `UPDATE` SQL operations.
+
+### Distributed Database Topologies
+
+Leverage replica clusters to
+define [distributed database topologies](replica_cluster.md#distributed-topology)
+for PostgreSQL that span across various Kubernetes clusters, facilitating hybrid
+and multi-cloud deployments. With CloudNativePG, you gain powerful capabilities,
+including:
+
+- **Declarative Primary Control**: Easily specify which PostgreSQL cluster acts
+  as the primary.
+- **Seamless Primary Switchover**: Effortlessly demote the current primary and
+  promote another PostgreSQL cluster, typically located in a different region,
+  without needing to re-clone the former primary.
+
+This setup can efficiently operate across two or more regions, can rely entirely
+on object stores for replication, and guarantees a maximum RPO (Recovery Point
+Objective) of 5 minutes. This advanced feature is uniquely provided by
+CloudNativePG, ensuring robust data integrity and continuity across diverse
+environments.
 
 ### Tablespace support
 
@@ -443,6 +488,7 @@ across a diverse array of storage devices. Through the transparent
 orchestration of tablespaces, CloudNativePG enhances the performance and
 scalability of PostgreSQL databases, ensuring a streamlined and optimized
 experience for managing large scale data storage in cloud-native environments.
+Support for temporary tablespaces is also included.
 
 ### Liveness and readiness probes
 
@@ -561,6 +607,11 @@ or `Secret` objects using a syntax that's compatible with
 [`postgres_exporter` for Prometheus](https://github.com/prometheus-community/postgres_exporter).
 CloudNativePG provides a set of basic monitoring queries for
 PostgreSQL that can be integrated and adapted to your context.
+
+### Grafana dashboard
+
+CloudNativePG comes with a Grafana dashboard that you can use as a base to
+monitor all critical aspects of a PostgreSQL cluster, and customize.
 
 ### Standard output logging of PostgreSQL error messages in JSON format
 

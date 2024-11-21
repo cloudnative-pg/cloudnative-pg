@@ -8,7 +8,7 @@ on:
       - v*
 
 env:
-  GOLANG_VERSION: "1.21.x"
+  GOLANG_VERSION: "1.23.x"
   CNPG_IMAGE_NAME: "ghcr.io/${{ github.repository }}"
 
 permissions:
@@ -17,9 +17,41 @@ permissions:
 
 jobs:
 
+  check-version:
+    name: Evaluate release tag
+    runs-on: ubuntu-24.04
+    outputs:
+      is_latest: ${{ env.IS_LATEST }}
+      is_stable: ${{ env.IS_STABLE }}
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # To identify the commit we need the history and all the tags.
+          fetch-depth: 0
+      -
+        name: Check release version
+        run: |
+          tag="${GITHUB_REF#refs/tags/v}"
+          latest_release_branch=$(git branch -rl 'origin/release-*' | sort -r | head -n1 | sed -e 's/^.*\(release-.*\)/\1/')
+          current_release_branch=$(echo "${tag}" | sed -e 's/\([0-9]\+.[0-9]\+\).*/release-\1/')
+          is_latest="false"
+          if [[ "$latest_release_branch" == "$current_release_branch" ]]; then
+            is_latest="true"
+          fi
+          is_stable="false"
+          if [[ "$tag" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            is_stable="true"
+          fi
+          echo "IS_LATEST=${is_latest}" >> $GITHUB_ENV
+          echo "IS_STABLE=${is_stable}" >> $GITHUB_ENV
+
   release:
     name: Create Github release
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
+    needs:
+      - check-version
     steps:
       -
         name: Checkout
@@ -42,20 +74,26 @@ jobs:
             /src/docs/src/${{ env.FILE }}
       -
         name: Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           body_path: release_notes.md
           draft: false
-          name: Release ${{ env.TAG }}
+          name: v${{ env.TAG }}
           files: releases/cnpg-${{ env.VERSION }}.yaml
+          make_latest: ${{ needs.check-version.outputs.is_latest == 'true' && needs.check-version.outputs.is_stable == 'true' }}
+          prerelease: ${{ needs.check-version.outputs.is_stable == 'false' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   release-binaries:
     name: Build containers
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
+    needs:
+      - check-version
     outputs:
       version: ${{ steps.build-meta.outputs.version }}
+      author_name: ${{ steps.build-meta.outputs.author_name }}
+      author_email: ${{ steps.build-meta.outputs.author_email }}
       digest: ${{ steps.build.outputs.digest }}
       platforms: ${{ env.PLATFORMS }}
     steps:
@@ -79,13 +117,11 @@ jobs:
           images="${images},ghcr.io/cloudnative-pg/cloudnative-pg-testing"
           commit_sha=${{ github.sha }}
           commit_date=$(git log -1 --pretty=format:'%ad' --date short "${commit_sha}")
-          tag="${GITHUB_REF#refs/tags/v}"
-          skip_krew="false"
-          latest_release_branch=$(git branch -rl 'origin/release-*' | sort -r | head -n1 | sed -e 's/^.*\(release-.*\)/\1/')
-          current_release_branch=$(echo "${tag}" | sed -e 's/\([0-9]\+.[0-9]\+\).*/release-\1/')
-          if [[ "$latest_release_branch" != "$current_release_branch" ]]; then
-            skip_krew="true"
-          fi
+
+          # get git user and email
+          author_name=$(git show -s --format='%an' "${commit_sha}")
+          author_email=$(git show -s --format='%ae' "${commit_sha}")
+
           # use git describe to get the nearest tag and use that to build the version (e.g. 1.4.0-dev24 or 1.4.0)
           commit_version=$(git describe --tags --match 'v*' "${commit_sha}"| sed -e 's/^v//; s/-g[0-9a-f]\+$//; s/-\([0-9]\+\)$/-dev\1/')
           commit_short=$(git rev-parse --short "${commit_sha}")
@@ -93,7 +129,8 @@ jobs:
           echo "DATE=${commit_date}" >> $GITHUB_ENV
           echo "version=${commit_version}" >> $GITHUB_OUTPUT
           echo "COMMIT=${commit_short}" >> $GITHUB_ENV
-          echo "SKIP_KREW=${skip_krew}" >> $GITHUB_ENV
+          echo "author_name=${author_name}" >> $GITHUB_OUTPUT
+          echo "author_email=${author_email}" >> $GITHUB_OUTPUT
       -
         name: Import GPG key
         id: import_gpg
@@ -103,44 +140,66 @@ jobs:
           passphrase: ${{ secrets.GPG_PASSPHRASE }}
       -
         name: Set GoReleaser environment
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
         run: |
           echo GOPATH=$(go env GOPATH) >> $GITHUB_ENV
           echo PWD=$(pwd) >> $GITHUB_ENV
+          echo "$GPG_PRIVATE_KEY" > gpg_signing_key.asc
       -
         name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v5
+        uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
-          version: latest
-          args: release --rm-dist --timeout 60m
+          version: v2
+          args: release --clean --timeout 60m
         env:
           DATE: ${{ env.DATE }}
           COMMIT: ${{ env.COMMIT }}
           VERSION: ${{ steps.build-meta.outputs.version }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
+          NFPM_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
       -
         name: Publish Krew
-        if: ${{ env.SKIP_KREW == 'false' }}
-        uses: rajatjindal/krew-release-bot@v0.0.46
+        if: |
+          needs.check-version.outputs.is_latest == 'true' &&
+          needs.check-version.outputs.is_stable == 'true'
+        uses: rajatjindal/krew-release-bot@v0.0.47
         with:
           krew_template_file: dist/krew/cnpg.yaml
       -
         name: Docker meta
         id: docker-meta
         uses: docker/metadata-action@v5
+        env:
+          IS_LATEST: ${{ needs.check-version.outputs.is_latest == 'true' && needs.check-version.outputs.is_stable == 'true' }}
         with:
           images: ${{ env.IMAGES }}
+          flavor: |
+            latest=${{ env.IS_LATEST }}
           tags: |
             type=semver,pattern={{version}}
       -
-        name: Docker meta UBI
-        id: docker-meta-ubi
+        name: Docker meta UBI8
+        id: docker-meta-ubi8
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.IMAGES }}
           flavor: |
+            latest=false
             suffix=-ubi8
+          tags: |
+            type=semver,pattern={{version}}
+      -
+        name: Docker meta UBI9
+        id: docker-meta-ubi9
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGES }}
+          flavor: |
+            latest=false
+            suffix=-ubi9
           tags: |
             type=semver,pattern={{version}}
       -
@@ -167,34 +226,49 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       -
         name: Build and push
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           platforms: ${{ env.PLATFORMS }}
           context: .
+          file: Dockerfile
           push: true
           build-args: |
             VERSION=${{ steps.build-meta.outputs.version }}
           tags: ${{ steps.docker-meta.outputs.tags }}
       -
-        name: Build and push UBI
-        uses: docker/build-push-action@v5
+        name: Build and push UBI8
+        uses: docker/build-push-action@v6
         with:
           platforms: ${{ env.PLATFORMS }}
           context: .
-          file: Dockerfile-ubi
+          file: Dockerfile-ubi8
           push: true
           build-args: |
             VERSION=${{ steps.build-meta.outputs.version }}
-          tags: ${{ steps.docker-meta-ubi.outputs.tags }}
+          tags: ${{ steps.docker-meta-ubi8.outputs.tags }}
+      -
+        name: Build and push UBI9
+        uses: docker/build-push-action@v6
+        with:
+          platforms: ${{ env.PLATFORMS }}
+          context: .
+          file: Dockerfile-ubi9
+          push: true
+          build-args: |
+            VERSION=${{ steps.build-meta.outputs.version }}
+          tags: ${{ steps.docker-meta-ubi9.outputs.tags }}
 
   olm-bundle:
     name: Create OLM bundle and catalog
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs:
+      - check-version
       - release-binaries
     if: |
       (always() && !cancelled()) &&
-      needs.release-binaries.result == 'success'
+      needs.release-binaries.result == 'success' &&
+      needs.check-version.outputs.is_latest == 'true' &&
+      needs.check-version.outputs.is_stable == 'true'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -205,6 +279,12 @@ jobs:
         uses: docker/setup-qemu-action@v3
         with:
           platforms: ${{ needs.release-binaries.outputs.platforms }}
+
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GOLANG_VERSION }}
+          check-latest: true
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -222,19 +302,21 @@ jobs:
           version="${tag#v}"
           LOWERCASE_CNPG_IMAGE_NAME=${CNPG_IMAGE_NAME,,}
           echo "IMAGE_NAME=${LOWERCASE_CNPG_IMAGE_NAME}" >> $GITHUB_ENV
-          echo "CONTROLLER_IMG=${LOWERCASE_CNPG_IMAGE_NAME}:${version}-ubi" >> $GITHUB_ENV
+          echo "CONTROLLER_IMG=${LOWERCASE_CNPG_IMAGE_NAME}:${version}-ubi8" >> $GITHUB_ENV
           echo "BUNDLE_IMG=${LOWERCASE_CNPG_IMAGE_NAME}:bundle-${version}" >> $GITHUB_ENV
+          echo "CATALOG_IMG=${LOWERCASE_CNPG_IMAGE_NAME}:catalog-${version}" >> $GITHUB_ENV
 
       - name: Create bundle
         env:
           IMAGE_NAME: ${{ env.IMAGE_NAME }}
           CONTROLLER_IMG: ${{ env.CONTROLLER_IMG }}
           BUNDLE_IMG: ${{ env.BUNDLE_IMG }}
+          CATALOG_IMG: ${{ env.CATALOG_IMG }}
         run: |
           make olm-catalog
 
       - name: Archive the bundle manifests
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: bundle
           path: |
@@ -244,7 +326,7 @@ jobs:
 
   operatorhub_pr:
     name: Create remote PR for OperatorHub
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs:
       - release-binaries
       - olm-bundle
@@ -262,7 +344,7 @@ jobs:
           persist-credentials: false
 
       - name: Download the bundle
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: bundle
 
@@ -273,7 +355,7 @@ jobs:
           rm -fr cloudnative-pg-catalog.yaml bundle.Dockerfile *.zip bundle/
 
       - name: Create Remote Pull Request
-        uses: peter-evans/create-pull-request@v5
+        uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ secrets.REPO_GHA_PAT }}
           commit-message: "operator cloudnative-pg (${{ env.VERSION }})"
@@ -316,3 +398,59 @@ jobs:
             --
             <sup>1</sup> If you feel your Operator does not fit any of the pre-defined categories, file an issue against this repo and explain your need
             <sup>2</sup> For more information see [here](https://sdk.operatorframework.io/docs/overview/#operator-capability-level)
+
+  publish_bundle:
+    name: Publish OLM Bundle
+    needs:
+      - olm-bundle
+      - release-binaries
+    if: |
+      (always() && !cancelled()) &&
+      needs.olm-bundle.result == 'success' &&
+      github.repository_owner == 'cloudnative-pg'
+    env:
+      VERSION: ${{ needs.release-binaries.outputs.version }}
+    runs-on: ubuntu-24.04
+    steps:
+      -
+        name: Checkout artifact
+        uses: actions/checkout@v4
+        with:
+          repository: cloudnative-pg/artifacts
+          token: ${{ secrets.REPO_GHA_PAT }}
+          ref: main
+          fetch-depth: 0
+      -
+        name: Configure git user
+        run: |
+          git config user.email "${{ needs.release-binaries.outputs.author_email }}"
+          git config user.name "${{ needs.release-binaries.outputs.author_name }}"
+      -
+        name: Download the bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: bundle
+      -
+        name: Copy the bundle
+        run: |
+          mkdir -p "bundles/${{ env.VERSION }}"
+          cp -R bundle/* "bundles/${{ env.VERSION }}"
+          rm -fr cloudnative-pg-catalog.yaml bundle.Dockerfile *.zip bundle/
+      -
+        name: Prepare commit message
+        env:
+          COMMIT_MESSAGE: |
+            operator cloudnative-pg (${{ env.VERSION }})
+        run: |
+          # Skip creating the commit if there are no changes
+          [ -n "$(git status -s)" ] || exit 0
+
+          git add bundles/${{ env.VERSION }}
+          git commit -sm "${COMMIT_MESSAGE}"
+      -
+        name: Push commit
+        uses: ad-m/github-push-action@v0.8.0
+        with:
+          github_token: ${{ secrets.REPO_GHA_PAT }}
+          repository: cloudnative-pg/artifacts
+          branch: "main"

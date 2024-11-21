@@ -1,10 +1,13 @@
 # CloudNativePG
 
-**CloudNativePG** is an open source
+**CloudNativePG** is an open-source
 [operator](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/)
 designed to manage [PostgreSQL](https://www.postgresql.org/) workloads on any
-supported [Kubernetes](https://kubernetes.io) cluster running in private,
-public, hybrid, or multi-cloud environments.
+supported [Kubernetes](https://kubernetes.io) cluster. It supports deployment in
+private, public, hybrid, and multi-cloud environments, thanks to
+its [distributed topology](replica_cluster.md#distributed-topology)
+feature.
+
 CloudNativePG adheres to DevOps principles and concepts such as declarative
 configuration and immutable infrastructure.
 
@@ -14,19 +17,21 @@ in a chosen Kubernetes namespace for High Availability and offloading of
 read-only queries.
 
 Applications that reside in the same Kubernetes cluster can access the
-PostgreSQL database using a service which is solely managed by the operator,
-without having to worry about changes of the primary role following a failover
-or a switchover. Applications that reside outside the Kubernetes cluster, need
-to configure a Service or Ingress object to expose the Postgres via TCP.
-Web applications can take advantage of the native connection pooler based on PgBouncer.
+PostgreSQL database using a service solely managed by the operator, without
+needing to worry about changes in the primary role following a failover or
+switchover. Applications that reside outside the Kubernetes cluster can
+leverage the service template capability and a `LoadBalancer` service to expose
+PostgreSQL via TCP. Additionally, web applications can take advantage of the
+native connection pooler based on PgBouncer.
 
 CloudNativePG was originally built by [EDB](https://www.enterprisedb.com), then
-released open source under Apache License 2.0 and submitted for CNCF Sandbox in April 2022.
+released open source under Apache License 2.0.
+It has been submitted for the [CNCF Sandbox in September 2024](https://github.com/cncf/sandbox/issues/128).
 The [source code repository is in Github](https://github.com/cloudnative-pg/cloudnative-pg).
 
 !!! Note
     Based on the [Operator Capability Levels model](operator_capability_levels.md),
-    users can expect a **"Level V - Auto Pilot"** set of capabilities from the
+    users can expect a **"Level V - Auto Pilot"** subset of capabilities from the
     CloudNativePG Operator.
 
 ## Supported Kubernetes distributions
@@ -39,23 +44,32 @@ Please refer to the ["Supported releases"](supported_releases.md) page for detai
 
 ## Container images
 
-The [CloudNativePG community](https://github.com/cloudnative-pg)  maintains
-container images for both the operator and the operand, that is PostgreSQL.
+The [CloudNativePG community](https://github.com/cloudnative-pg) maintains
+container images for both the operator and PostgreSQL (the operand).
 
-The CloudNativePG operator container images are [distroless](https://github.com/GoogleContainerTools/distroless)
-and available on the [`cloudnative-pg` project's GitHub Container Registry](https://github.com/cloudnative-pg/cloudnative-pg/pkgs/container/cloudnative-pg).
+### Operator
 
-The PostgreSQL operand container images are available for all the
+The CloudNativePG operator container images are available on the
+[`cloudnative-pg` project's GitHub Container Registry](https://github.com/cloudnative-pg/cloudnative-pg/pkgs/container/cloudnative-pg)
+in three different flavors:
+
+- Debian 12 distroless
+- Red Hat UBI 9 micro (suffix `-ubi9`)
+- Red Hat UBI 8 micro (suffix `-ubi8`)
+
+Red Hat UBI images are primarily intended for OLM consumption.
+
+### Operands
+
+The PostgreSQL operand container images are available for all
 [PGDG supported versions of PostgreSQL](https://www.postgresql.org/),
-on multiple architectures, directly from the
+across multiple architectures, directly from the
 [`postgres-containers` project's GitHub Container Registry](https://github.com/cloudnative-pg/postgres-containers/pkgs/container/postgresql).
 
-Additionally, the Community provides images for the [PostGIS extension](postgis.md).
+Daily jobs ensure that critical vulnerabilities (CVEs) in the entire stack are
+promptly addressed.
 
-!!! Warning
-    CloudNativePG requires that all nodes in a Kubernetes cluster have the
-    same CPU architecture, thus a hybrid CPU architecture Kubernetes cluster is not
-    supported.
+Additionally, the community provides images for the [PostGIS extension](postgis.md).
 
 ## Main features
 
@@ -76,7 +90,7 @@ Additionally, the Community provides images for the [PostGIS extension](postgis.
 * Support for Local Persistent Volumes with PVC templates
 * Reuse of Persistent Volumes storage in Pods
 * Separate volumes for WAL files and tablespaces
-* Declarative management of Postgres tablespaces
+* Declarative management of Postgres tablespaces, including temporary tablespaces
 * Rolling updates for PostgreSQL minor versions
 * In-place or rolling updates for operator upgrades
 * TLS connections and client certificate authentication
@@ -86,18 +100,22 @@ Additionally, the Community provides images for the [PostGIS extension](postgis.
 * Backups on object stores (AWS S3 and S3-compatible, Azure Blob Storage, and Google Cloud Storage)
 * Full recovery and Point-In-Time recovery from an existing backup on volume snapshots or object stores
 * Offline import of existing PostgreSQL databases, including major upgrades of PostgreSQL
+* Online import of existing PostgreSQL databases, including major upgrades of PostgreSQL, through PostgreSQL native logical replication (imperative, via the `cnpg` plugin)
 * Fencing of an entire PostgreSQL cluster, or a subset of the instances in a declarative way
 * Hibernation of a PostgreSQL cluster in a declarative way
-* Support for Synchronous Replicas
+* Support for quorum-based and priority-based Synchronous Replication
 * Support for HA physical replication slots at cluster level
+* Synchronization of user defined physical replication slots
 * Backup from a standby
 * Backup retention policies (based on recovery window, only on object stores)
 * Parallel WAL archiving and restore to allow the database to keep up with WAL
   generation on high write systems
 * Support tagging backup files uploaded to an object store to enable optional
-  retention management at the object store layer Replica clusters for
-* PostgreSQL deployments across multiple Kubernetes
-  clusters, enabling private, public, hybrid, and multi-cloud architectures
+  retention management at the object store layer
+* Replica clusters for PostgreSQL distributed topologies spanning multiple
+  Kubernetes clusters, enabling private, public, hybrid, and multi-cloud
+  architectures with support for controlled switchover.
+* Delayed Replica clusters
 * Connection pooling with PgBouncer
 * Support for node affinity via `nodeSelector`
 * Native customizable exporter of user defined metrics for Prometheus through the `metrics` port (9187)

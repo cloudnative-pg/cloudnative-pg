@@ -18,6 +18,7 @@ package postgres
 
 import (
 	"context"
+	"crypto/tls"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -31,20 +32,22 @@ import (
 	"time"
 
 	"github.com/blang/semver"
+	"github.com/cloudnative-pg/machinery/pkg/execlog"
+	"github.com/cloudnative-pg/machinery/pkg/fileutils"
+	"github.com/cloudnative-pg/machinery/pkg/fileutils/compatibility"
+	"github.com/cloudnative-pg/machinery/pkg/log"
+	"github.com/cloudnative-pg/machinery/pkg/postgres/version"
 	"go.uber.org/atomic"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils/compatibility"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/logpipe"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pool"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
+	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	// this is needed to correctly open the sql connection with the pgx driver
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -139,13 +142,13 @@ type Instance struct {
 	primaryPool *pool.ConnectionPool
 
 	// The namespace of the k8s object representing this cluster
-	Namespace string
+	namespace string
 
 	// The name of the Pod where the controller is executing
-	PodName string
+	podName string
 
-	// The name of the cluster of which this Pod is belonging
-	ClusterName string
+	// The name of the cluster this instance belongs in
+	clusterName string
 
 	// The sha256 of the config. It is computed on the config string, before
 	// adding the PostgreSQL CNPGConfigSha256 parameter
@@ -175,6 +178,10 @@ type Instance struct {
 	// SmartStopDelay is used to control PostgreSQL smart shutdown timeout
 	SmartStopDelay int32
 
+	// RequiresDesignatedPrimaryTransition indicates if this instance is a primary that needs to become
+	// a designatedPrimary
+	RequiresDesignatedPrimaryTransition bool
+
 	// canCheckReadiness specifies whether the instance can start being checked for readiness
 	// Is set to true before the instance is run and to false once it exits,
 	// it's used by the readiness probe to know whether it should be short-circuited
@@ -195,16 +202,24 @@ type Instance struct {
 
 	// tablespaceSynchronizerChan is used to send tablespace configuration to the tablespace synchronizer
 	tablespaceSynchronizerChan chan map[string]apiv1.TablespaceConfiguration
+
+	// StatusPortTLS enables TLS on the status port used to communicate with the operator
+	StatusPortTLS bool
+
+	// MetricsPortTLS enables TLS on the port used to publish metrics over HTTP/HTTPS
+	MetricsPortTLS bool
+
+	// ServerCertificate is the certificate we use to serve https connections
+	ServerCertificate *tls.Certificate
 }
 
-// SetAlterSystemEnabled allows or deny writes to the
-// `postgresql.auto.conf` file in PGDATA, allowing and denying the
-// usage of the ALTER SYSTEM SQL command
-func (instance *Instance) SetAlterSystemEnabled(enabled bool) error {
+// SetPostgreSQLAutoConfWritable allows or deny writes to the
+// `postgresql.auto.conf` file in PGDATA
+func (instance *Instance) SetPostgreSQLAutoConfWritable(writeable bool) error {
 	autoConfFileName := path.Join(instance.PgData, "postgresql.auto.conf")
 
 	mode := fs.FileMode(0o600)
-	if !enabled {
+	if !writeable {
 		mode = 0o400
 	}
 	return os.Chmod(autoConfFileName, mode)
@@ -236,6 +251,31 @@ func (instance *Instance) SetFencing(enabled bool) {
 // SetCanCheckReadiness marks whether the instance should be checked for readiness
 func (instance *Instance) SetCanCheckReadiness(enabled bool) {
 	instance.canCheckReadiness.Store(enabled)
+}
+
+// CheckHasDiskSpaceForWAL checks if we have enough disk space to store two WAL files,
+// and returns true if we have free disk space for 2 WAL segments, false otherwise
+func (instance *Instance) CheckHasDiskSpaceForWAL(ctx context.Context) (bool, error) {
+	pgControlDataString, err := instance.GetPgControldata()
+	if err != nil {
+		return false, fmt.Errorf("while running pg_controldata to detect WAL segment size: %w", err)
+	}
+
+	pgControlData := utils.ParsePgControldataOutput(pgControlDataString)
+	walSegmentSizeString, ok := pgControlData["Bytes per WAL segment"]
+	if !ok {
+		return false, fmt.Errorf("no 'Bytes per WAL segment' section into pg_controldata output")
+	}
+
+	walSegmentSize, err := strconv.Atoi(walSegmentSizeString)
+	if err != nil {
+		return false, fmt.Errorf(
+			"wrong 'Bytes per WAL segment' pg_controldata value (not an integer): '%s' %w",
+			walSegmentSizeString, err)
+	}
+
+	walDirectory := path.Join(instance.PgData, pgWalDirectory)
+	return fileutils.NewDiskProbe(walDirectory).HasStorageAvailable(ctx, walSegmentSize)
 }
 
 // SetMightBeUnavailable marks whether the instance being down should be tolerated
@@ -290,7 +330,9 @@ func (instance *Instance) VerifyPgDataCoherence(ctx context.Context) error {
 		return err
 	}
 
-	return WritePostgresUserMaps(instance.PgData)
+	// creates a bare pg_ident.conf that only grants local access
+	_, err := instance.RefreshPGIdent(ctx, nil)
+	return err
 }
 
 // InstanceCommand are commands for the goroutine managing postgres
@@ -323,6 +365,24 @@ func NewInstance() *Instance {
 		roleSynchronizerChan:       make(chan *apiv1.ManagedConfiguration),
 		tablespaceSynchronizerChan: make(chan map[string]apiv1.TablespaceConfiguration),
 	}
+}
+
+// WithNamespace specifies the namespace for this Instance
+func (instance *Instance) WithNamespace(namespace string) *Instance {
+	instance.namespace = namespace
+	return instance
+}
+
+// WithPodName specifies the pod name for this Instance
+func (instance *Instance) WithPodName(podName string) *Instance {
+	instance.podName = podName
+	return instance
+}
+
+// WithClusterName specifies the name of the cluster this Instance belongs to
+func (instance *Instance) WithClusterName(clusterName string) *Instance {
+	instance.clusterName = clusterName
+	return instance
 }
 
 // RetryUntilServerAvailable is the default retry configuration that is used
@@ -417,7 +477,8 @@ func (instance *Instance) ShutdownConnections() {
 // with Startup.
 // This function will return an error whether PostgreSQL is still up
 // after the shutdown request.
-func (instance *Instance) Shutdown(options shutdownOptions) error {
+func (instance *Instance) Shutdown(ctx context.Context, options shutdownOptions) error {
+	contextLogger := log.FromContext(ctx)
 	instance.ShutdownConnections()
 
 	// check instance status
@@ -443,7 +504,7 @@ func (instance *Instance) Shutdown(options shutdownOptions) error {
 		pgCtlOptions = append(pgCtlOptions, "-t", fmt.Sprintf("%v", *options.Timeout))
 	}
 
-	log.Info("Shutting down instance",
+	contextLogger.Info("Shutting down instance",
 		"pgdata", instance.PgData,
 		"mode", options.Mode,
 		"timeout", options.Timeout,
@@ -477,11 +538,14 @@ func (instance *Instance) TryShuttingDownSmartFast(ctx context.Context) error {
 
 	if smartTimeout > 0 {
 		contextLogger.Info("Requesting smart shutdown of the PostgreSQL instance")
-		err = instance.Shutdown(shutdownOptions{
-			Mode:    shutdownModeSmart,
-			Wait:    true,
-			Timeout: &smartTimeout,
-		})
+		err = instance.Shutdown(
+			ctx,
+			shutdownOptions{
+				Mode:    shutdownModeSmart,
+				Wait:    true,
+				Timeout: &smartTimeout,
+			},
+		)
 		if err != nil {
 			contextLogger.Warning("Error while handling the smart shutdown request", "err", err)
 		}
@@ -489,10 +553,12 @@ func (instance *Instance) TryShuttingDownSmartFast(ctx context.Context) error {
 
 	if err != nil || smartTimeout == 0 {
 		contextLogger.Info("Requesting fast shutdown of the PostgreSQL instance")
-		err = instance.Shutdown(shutdownOptions{
-			Mode: shutdownModeFast,
-			Wait: true,
-		})
+		err = instance.Shutdown(ctx,
+			shutdownOptions{
+				Mode: shutdownModeFast,
+				Wait: true,
+			},
+		)
 	}
 	if err != nil {
 		contextLogger.Error(err, "Error while shutting down the PostgreSQL instance")
@@ -511,19 +577,24 @@ func (instance *Instance) TryShuttingDownFastImmediate(ctx context.Context) erro
 	contextLogger := log.FromContext(ctx)
 
 	contextLogger.Info("Requesting fast shutdown of the PostgreSQL instance")
-	err := instance.Shutdown(shutdownOptions{
-		Mode:    shutdownModeFast,
-		Wait:    true,
-		Timeout: &instance.MaxSwitchoverDelay,
-	})
+	err := instance.Shutdown(
+		ctx,
+		shutdownOptions{
+			Mode:    shutdownModeFast,
+			Wait:    true,
+			Timeout: &instance.MaxSwitchoverDelay,
+		},
+	)
 	var exitError *exec.ExitError
 	if errors.As(err, &exitError) {
 		contextLogger.Info("Graceful shutdown failed. Issuing immediate shutdown",
 			"exitCode", exitError.ExitCode())
-		err = instance.Shutdown(shutdownOptions{
-			Mode: shutdownModeImmediate,
-			Wait: true,
-		})
+		err = instance.Shutdown(ctx,
+			shutdownOptions{
+				Mode: shutdownModeImmediate,
+				Wait: true,
+			},
+		)
 	}
 	return err
 }
@@ -553,6 +624,11 @@ func (instance *Instance) Reload(ctx context.Context) error {
 
 	contextLogger.Info("Requesting configuration reload",
 		"pgdata", instance.PgData)
+
+	// Need to reload certificates if they changed
+	if instance.primaryPool != nil {
+		instance.primaryPool.ShutdownConnections()
+	}
 
 	pgCtlCmd := exec.Command(pgCtlName, options...) // #nosec
 	err := execlog.RunStreaming(pgCtlCmd, pgCtlName)
@@ -635,7 +711,7 @@ func (instance *Instance) WithActiveInstance(inner func() error) error {
 	}
 
 	defer func() {
-		if err := instance.Shutdown(defaultShutdownOptions); err != nil {
+		if err := instance.Shutdown(ctx, defaultShutdownOptions); err != nil {
 			log.Info("Error while deactivating instance", "err", err)
 		}
 	}()
@@ -665,7 +741,7 @@ func (instance *Instance) GetPgVersion() (semver.Version, error) {
 		return semver.Version{}, err
 	}
 
-	parsedVersion, err := utils.GetPgVersion(db)
+	parsedVersion, err := postgresutils.GetPgVersion(db)
 	if err != nil {
 		return semver.Version{}, err
 	}
@@ -730,13 +806,13 @@ func (instance *Instance) Demote(ctx context.Context, cluster *apiv1.Cluster) er
 	contextLogger := log.FromContext(ctx)
 
 	contextLogger.Info("Demoting instance", "pgpdata", instance.PgData)
-	slotName := cluster.GetSlotNameFromInstanceName(instance.PodName)
+	slotName := cluster.GetSlotNameFromInstanceName(instance.GetPodName())
 	_, err := UpdateReplicaConfiguration(instance.PgData, instance.GetPrimaryConnInfo(), slotName)
 	return err
 }
 
 // WaitForPrimaryAvailable waits until we can connect to the primary
-func (instance *Instance) WaitForPrimaryAvailable() error {
+func (instance *Instance) WaitForPrimaryAvailable(ctx context.Context) error {
 	primaryConnInfo := instance.GetPrimaryConnInfo() + " dbname=postgres connect_timeout=5"
 
 	log.Info("Waiting for the new primary to be available",
@@ -750,45 +826,51 @@ func (instance *Instance) WaitForPrimaryAvailable() error {
 		_ = db.Close()
 	}()
 
-	return waitForConnectionAvailable(db)
+	return waitForConnectionAvailable(ctx, db)
 }
 
 // CompleteCrashRecovery temporary starts up the server and wait for it
 // to be fully available for queries. This will ensure that the crash recovery
 // is fully done.
 // Important: this function must be called only when the instance isn't started
-func (instance *Instance) CompleteCrashRecovery() error {
+func (instance *Instance) CompleteCrashRecovery(ctx context.Context) error {
 	log.Info("Waiting for server to complete crash recovery")
 
 	defer func() {
 		instance.ShutdownConnections()
 	}()
 
-	return instance.WithActiveInstance(instance.WaitForSuperuserConnectionAvailable)
+	return instance.WithActiveInstance(func() error {
+		return instance.WaitForSuperuserConnectionAvailable(ctx)
+	})
 }
 
 // WaitForSuperuserConnectionAvailable waits until we can connect to this
 // instance using the superuser account
-func (instance *Instance) WaitForSuperuserConnectionAvailable() error {
+func (instance *Instance) WaitForSuperuserConnectionAvailable(ctx context.Context) error {
 	db, err := instance.GetSuperUserDB()
 	if err != nil {
 		return err
 	}
 
-	return waitForConnectionAvailable(db)
+	return waitForConnectionAvailable(ctx, db)
 }
 
 // waitForConnectionAvailable waits until we can connect to the passed
 // sql.DB connection
-func waitForConnectionAvailable(db *sql.DB) error {
+func waitForConnectionAvailable(ctx context.Context, db *sql.DB) error {
+	contextLogger := log.FromContext(ctx)
 	errorIsRetryable := func(err error) bool {
+		if ctx.Err() != nil {
+			return false
+		}
 		return err != nil
 	}
 
 	return retry.OnError(RetryUntilServerAvailable, errorIsRetryable, func() error {
-		err := db.Ping()
+		err := db.PingContext(ctx)
 		if err != nil {
-			log.Info("DB not available, will retry", "err", err)
+			contextLogger.Info("DB not available, will retry", "err", err)
 		}
 		return err
 	})
@@ -819,7 +901,7 @@ func (instance *Instance) waitUntilConfigShaMatches() error {
 }
 
 // WaitForConfigReload returns the postgresqlStatus and any error encountered
-func (instance *Instance) WaitForConfigReload() (*postgres.PostgresqlStatus, error) {
+func (instance *Instance) WaitForConfigReload(ctx context.Context) (*postgres.PostgresqlStatus, error) {
 	// This function could also be called while the server is being
 	// started up, so we are not sure that the server is really active.
 	// Let's wait for that.
@@ -827,7 +909,7 @@ func (instance *Instance) WaitForConfigReload() (*postgres.PostgresqlStatus, err
 		return nil, nil
 	}
 
-	err := instance.WaitForSuperuserConnectionAvailable()
+	err := instance.WaitForSuperuserConnectionAvailable(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("while applying new configuration: %w", err)
 	}
@@ -854,7 +936,9 @@ func (instance *Instance) WaitForConfigReload() (*postgres.PostgresqlStatus, err
 
 // waitForStreamingConnectionAvailable waits until we can connect to the passed
 // sql.DB connection using streaming protocol
-func waitForStreamingConnectionAvailable(db *sql.DB) error {
+func waitForStreamingConnectionAvailable(ctx context.Context, db *sql.DB) error {
+	contextLogger := log.FromContext(ctx)
+
 	errorIsRetryable := func(err error) bool {
 		return err != nil
 	}
@@ -862,7 +946,7 @@ func waitForStreamingConnectionAvailable(db *sql.DB) error {
 	return retry.OnError(RetryUntilServerAvailable, errorIsRetryable, func() error {
 		result, err := db.Query("IDENTIFY_SYSTEM")
 		if err != nil || result.Err() != nil {
-			log.Info("DB not available, will retry", "err", err)
+			contextLogger.Info("DB not available, will retry", "err", err)
 			return err
 		}
 		defer func() {
@@ -931,7 +1015,7 @@ func (instance *Instance) removePgControlFileBackup() error {
 
 // Rewind uses pg_rewind to align this data directory with the contents of the primary node.
 // If postgres major version is >= 13, add "--restore-target-wal" option
-func (instance *Instance) Rewind(ctx context.Context, postgresMajorVersion int) error {
+func (instance *Instance) Rewind(ctx context.Context, postgresVersion version.Data) error {
 	contextLogger := log.FromContext(ctx)
 
 	// Signal the liveness probe that we are running pg_rewind before starting postgres
@@ -951,7 +1035,7 @@ func (instance *Instance) Rewind(ctx context.Context, postgresMajorVersion int) 
 
 	// As PostgreSQL 13 introduces support of restore from the WAL archive in pg_rewind,
 	// let’s automatically use it, if possible
-	if postgresMajorVersion >= 13 {
+	if postgresVersion.Major() >= 13 {
 		options = append(options, "--restore-target-wal")
 	}
 
@@ -1061,6 +1145,21 @@ func (instance *Instance) GetInstanceCommandChan() <-chan InstanceCommand {
 	return instance.instanceCommandChan
 }
 
+// GetClusterName returns the name of the cluster where this instance belongs
+func (instance *Instance) GetClusterName() string {
+	return instance.clusterName
+}
+
+// GetPodName returns the name of the pod where this instance is running
+func (instance *Instance) GetPodName() string {
+	return instance.podName
+}
+
+// GetNamespaceName returns the name of the namespace where this instance is running
+func (instance *Instance) GetNamespaceName() string {
+	return instance.namespace
+}
+
 // RequestFastImmediateShutdown request the lifecycle manager to shut down
 // PostgreSQL using the fast strategy and then the immediate strategy.
 func (instance *Instance) RequestFastImmediateShutdown() {
@@ -1069,13 +1168,19 @@ func (instance *Instance) RequestFastImmediateShutdown() {
 
 // RequestAndWaitRestartSmartFast requests the lifecycle manager to
 // restart the postmaster, and wait for the postmaster to be restarted
-func (instance *Instance) RequestAndWaitRestartSmartFast() error {
+func (instance *Instance) RequestAndWaitRestartSmartFast(ctx context.Context, timeout time.Duration) error {
 	instance.SetMightBeUnavailable(true)
 	defer instance.SetMightBeUnavailable(false)
+
+	restartCtx, cancel := context.WithTimeoutCause(
+		ctx,
+		timeout,
+		fmt.Errorf("timeout while restarting PostgreSQL"))
+	defer cancel()
+
 	now := time.Now()
 	instance.requestRestartSmartFast()
-	err := instance.waitForInstanceRestarted(now)
-	if err != nil {
+	if err := instance.waitForInstanceRestarted(restartCtx, now); err != nil {
 		return fmt.Errorf("while waiting for instance restart: %w", err)
 	}
 
@@ -1095,13 +1200,29 @@ func (instance *Instance) RequestFencingOn() {
 
 // RequestAndWaitFencingOff will request to remove the fencing
 // and wait for the instance to be restarted
-func (instance *Instance) RequestAndWaitFencingOff() error {
-	defer instance.SetMightBeUnavailable(false)
-	now := time.Now()
-	instance.requestFencingOff()
-	err := instance.waitForInstanceRestarted(now)
-	if err != nil {
-		return fmt.Errorf("while waiting for instance restart: %w", err)
+func (instance *Instance) RequestAndWaitFencingOff(ctx context.Context, timeout time.Duration) error {
+	liftFencing := func() error {
+		ctxWithTimeout, cancel := context.WithTimeoutCause(
+			ctx,
+			timeout,
+			fmt.Errorf("timeout while resuming PostgreSQL from fencing"),
+		)
+		defer cancel()
+
+		defer instance.SetMightBeUnavailable(false)
+		now := time.Now()
+		instance.requestFencingOff()
+		err := instance.waitForInstanceRestarted(ctxWithTimeout, now)
+		if err != nil {
+			return fmt.Errorf("while waiting for instance restart: %w", err)
+		}
+
+		return nil
+	}
+
+	// let PostgreSQL start up
+	if err := liftFencing(); err != nil {
+		return err
 	}
 
 	// sleep enough for the pod to be ready again
@@ -1117,17 +1238,18 @@ func (instance *Instance) requestFencingOff() {
 
 // waitForInstanceRestarted waits until the instance reports being started
 // after the given time
-func (instance *Instance) waitForInstanceRestarted(after time.Time) error {
-	retryOnEveryError := func(err error) bool {
-		return true
+func (instance *Instance) waitForInstanceRestarted(ctx context.Context, after time.Time) error {
+	retryUntilContextCancelled := func(_ error) bool {
+		return ctx.Err() == nil
 	}
-	return retry.OnError(RetryUntilServerAvailable, retryOnEveryError, func() error {
+
+	return retry.OnError(RetryUntilServerAvailable, retryUntilContextCancelled, func() error {
 		db, err := instance.GetSuperUserDB()
 		if err != nil {
 			return err
 		}
 		var startTime time.Time
-		row := db.QueryRow("SELECT pg_postmaster_start_time()")
+		row := db.QueryRowContext(ctx, "SELECT pg_postmaster_start_time()")
 		err = row.Scan(&startTime)
 		if err != nil {
 			return err
@@ -1160,7 +1282,7 @@ func (instance *Instance) DropConnections() error {
 
 // GetPrimaryConnInfo returns the DSN to reach the primary
 func (instance *Instance) GetPrimaryConnInfo() string {
-	return buildPrimaryConnInfo(instance.ClusterName+"-rw", instance.PodName)
+	return buildPrimaryConnInfo(instance.GetClusterName()+"-rw", instance.GetPodName())
 }
 
 // HandleInstanceCommandRequests execute a command requested by the reconciliation

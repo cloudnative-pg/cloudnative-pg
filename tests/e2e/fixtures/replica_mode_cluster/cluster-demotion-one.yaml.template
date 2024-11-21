@@ -1,0 +1,51 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-one
+spec:
+  instances: 2
+
+  replica:
+    enabled: false
+    source: cluster-two
+
+  postgresql:
+    parameters:
+      log_checkpoints: "on"
+      log_lock_waits: "on"
+      log_min_duration_statement: '1000'
+      log_statement: 'ddl'
+      log_temp_files: '1024'
+      log_autovacuum_min_duration: '1s'
+      log_replication_commands: 'on'
+    pg_hba:
+      - hostssl replication streaming-replica 0.0.0.0/0 cert
+
+
+  bootstrap:
+    initdb:
+      database: appSrc
+      owner: userSrc
+      postInitApplicationSQL:
+        - ALTER ROLE "userSrc" REPLICATION
+
+  storage:
+    size: 1Gi
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+
+  externalClusters:
+    - name: cluster-two
+      connectionParameters:
+        host: cluster-two-rw
+        user: streaming_replica
+        sslmode: verify-full
+        dbname: appSrc
+      sslKey:
+        name: cluster-two-replication
+        key: tls.key
+      sslCert:
+        name: cluster-two-replication
+        key: tls.crt
+      sslRootCert:
+        name: cluster-two-ca
+        key: ca.crt

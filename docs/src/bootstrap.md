@@ -271,10 +271,43 @@ spec:
     `-d`), this technique is deprecated and will be removed from future versions of
     the API.
 
-You can also specify a custom list of queries that will be executed
-once, just after the database is created and configured. These queries will
-be executed as the *superuser* (`postgres`), connected to the `postgres`
-database:
+### Executing Queries After Initialization
+
+You can specify a custom list of queries that will be executed once,
+immediately after the cluster is created and configured. These queries will be
+executed as the *superuser* (`postgres`) against three different databases, in
+this specific order:
+
+1. The `postgres` database (`postInit` section)
+2. The `template1` database (`postInitTemplate` section)
+3. The application database (`postInitApplication` section)
+
+For each of these sections, CloudNativePG provides two ways to specify custom
+queries, executed in the following order:
+
+- As a list of SQL queries in the cluster's definition (`postInitSQL`,
+  `postInitTemplateSQL`, and `postInitApplicationSQL` stanzas)
+- As a list of Secrets and/or ConfigMaps, each containing a SQL script to be
+  executed (`postInitSQLRefs`, `postInitTemplateSQLRefs`, and
+  `postInitApplicationSQLRefs` stanzas). Secrets are processed before ConfigMaps.
+
+Objects in each list will be processed sequentially.
+
+!!! Warning
+    Use the `postInit`, `postInitTemplate`, and `postInitApplication` options
+    with extreme care, as queries are run as a superuser and can disrupt the entire
+    cluster. An error in any of those queries will interrupt the bootstrap phase,
+    leaving the cluster incomplete and requiring manual intervention.
+
+!!! Important
+    Ensure the existence of entries inside the ConfigMaps or Secrets specified
+    in `postInitSQLRefs`, `postInitTemplateSQLRefs`, and
+    `postInitApplicationSQLRefs`, otherwise the bootstrap will fail. Errors in any
+    of those SQL files will prevent the bootstrap phase from completing
+    successfully.
+
+The following example runs a single SQL query as part of the `postInitSQL`
+stanza:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -297,18 +330,9 @@ spec:
     size: 1Gi
 ```
 
-!!! Warning
-    Please use the `postInitSQL`, `postInitApplicationSQL` and
-    `postInitTemplateSQL` options with extreme care, as queries are run as a
-    superuser and can disrupt the entire cluster.  An error in any of those queries
-    interrupts the bootstrap phase, leaving the cluster incomplete.
-
-### Executing queries after initialization
-
-Moreover, you can specify a list of Secrets and/or ConfigMaps which contains
-SQL script that will be executed after the database is created and configured.
-These SQL script will be executed using the **superuser** role (`postgres`),
-connected to the database specified in the `initdb` section:
+The example below relies on `postInitApplicationSQLRefs` to specify a secret
+and a ConfigMap containing the queries to run after the initialization on the
+application database:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -334,18 +358,9 @@ spec:
 ```
 
 !!! Note
-    The SQL scripts referenced in `secretRefs` will be executed before the ones
-    referenced in `configMapRefs`. For both sections the SQL scripts will be
-    executed respecting the order in the list.  Inside SQL scripts, each SQL
-    statement is executed in a single exec on the server according to the
-    [PostgreSQL semantics](https://www.postgresql.org/docs/current/protocol-flow.html#PROTOCOL-FLOW-MULTI-STATEMENT),
-    comments can be included, but internal command like `psql` cannot.
-
-!!! Warning
-    Please make sure the existence of the entries inside the ConfigMaps or
-    Secrets specified in `postInitApplicationSQLRefs`, otherwise the bootstrap will
-    fail. Errors in any of those SQL files will prevent the bootstrap phase to
-    complete successfully.
+    Within SQL scripts, each SQL statement is executed in a single exec on the
+    server according to the [PostgreSQL semantics](https://www.postgresql.org/docs/current/protocol-flow.html#PROTOCOL-FLOW-MULTI-STATEMENT).
+    Comments can be included, but internal commands like `psql` cannot.
 
 ## Bootstrap from another cluster
 
@@ -374,44 +389,59 @@ to the ["Recovery" section](recovery.md).
 
 ### Bootstrap from a live cluster (`pg_basebackup`)
 
-The `pg_basebackup` bootstrap mode lets you create a new cluster (*target*) as
-an exact physical copy of an existing and **binary compatible** PostgreSQL
-instance (*source*), through a valid *streaming replication* connection.
-The source instance can be either a primary or a standby PostgreSQL server.
+The `pg_basebackup` bootstrap mode allows you to create a new cluster
+(*target*) as an exact physical copy of an existing and **binary-compatible**
+PostgreSQL instance (*source*) managed by CloudNativePG, using a valid
+*streaming replication* connection. The source instance can either be a primary
+or a standby PostgreSQL server. It’s crucial to thoroughly review the
+requirements section below, as the pros and cons of PostgreSQL physical
+replication fully apply.
 
-The primary use case for this method is represented by **migrations** to CloudNativePG,
-either from outside Kubernetes or within Kubernetes (e.g., from another operator).
+The primary use cases for this method include:
 
-!!! Warning
-    The current implementation creates a *snapshot* of the origin PostgreSQL
-    instance when the cloning process terminates and immediately starts
-    the created cluster. See ["Current limitations"](#current-limitations) below for details.
-
-Similar to the case of the `recovery` bootstrap method, once the clone operation
-completes, the operator will take ownership of the target cluster, starting from
-the first instance. This includes overriding some configuration parameters, as
-required by CloudNativePG, resetting the superuser password, creating
-the `streaming_replica` user, managing the replicas, and so on. The resulting
-cluster will be completely independent of the source instance.
+- Reporting and business intelligence clusters that need to be regenerated
+  periodically (daily, weekly)
+- Test databases containing live data that require periodic regeneration
+  (daily, weekly, monthly) and anonymization
+- Rapid spin-up of a standalone replica cluster
+- Physical migrations of CloudNativePG clusters to different namespaces or
+  Kubernetes clusters
 
 !!! Important
-    Configuring the network between the target instance and the source instance
-    goes beyond the scope of CloudNativePG documentation, as it depends
-    on the actual context and environment.
+    Avoid using this method, based on physical replication, to migrate an
+    existing PostgreSQL cluster outside of Kubernetes into CloudNativePG unless you
+    are completely certain that all requirements are met and the operation has been
+    thoroughly tested. The CloudNativePG community does not endorse this approach
+    for such use cases and recommends using logical import instead. It is
+    exceedingly rare that all requirements for physical replication are met in a
+    way that seamlessly works with CloudNativePG.
 
-The streaming replication client on the target instance, which will be
-transparently managed by `pg_basebackup`, can authenticate itself on the source
-instance in any of the following ways:
+!!! Warning
+    In its current implementation, this method clones the source PostgreSQL
+    instance, thereby creating a *snapshot*. Once the cloning process has finished,
+    the new cluster is immediately started.
+    Refer to ["Current limitations"](#current-limitations) for more details.
 
-1. via [username/password](#usernamepassword-authentication)
-2. via [TLS client certificate](#tls-certificate-authentication)
+Similar to the `recovery` bootstrap method, once the cloning operation is
+complete, the operator takes full ownership of the target cluster, starting
+from the first instance. This includes overriding certain configuration
+parameters as required by CloudNativePG, resetting the superuser password,
+creating the `streaming_replica` user, managing replicas, and more. The
+resulting cluster operates independently from the source instance.
 
-The latter is the recommended one if you connect to a source managed
-by CloudNativePG or configured for TLS authentication.
-The first option is, however, the most common form of authentication to a
-PostgreSQL server in general, and might be the easiest way if the source
-instance is on a traditional environment outside Kubernetes.
-Both cases are explained below.
+!!! Important
+    Configuring the network connection between the target and source instances
+    lies outside the scope of CloudNativePG documentation, as it depends heavily on
+    the specific context and environment.
+
+The streaming replication client on the target instance, managed transparently
+by `pg_basebackup`, can authenticate on the source instance using one of the
+following methods:
+
+1. [Username/password](#usernamepassword-authentication)
+2. [TLS client certificate](#tls-certificate-authentication)
+
+Both authentication methods are detailed below.
 
 #### Requirements
 
@@ -489,7 +519,7 @@ file on the source PostgreSQL instance:
 host replication streaming_replica all md5
 ```
 
-The following manifest creates a new PostgreSQL 16.1 cluster,
+The following manifest creates a new PostgreSQL 17.0 cluster,
 called `target-db`, using the `pg_basebackup` bootstrap method
 to clone an external PostgreSQL cluster defined as `source-db`
 (in the `externalClusters` array). As you can see, the `source-db`
@@ -504,7 +534,7 @@ metadata:
   name: target-db
 spec:
   instances: 3
-  imageName: ghcr.io/cloudnative-pg/postgresql:16.1
+  imageName: ghcr.io/cloudnative-pg/postgresql:17.0
 
   bootstrap:
     pg_basebackup:
@@ -524,7 +554,7 @@ spec:
 ```
 
 All the requirements must be met for the clone operation to work, including
-the same PostgreSQL version (in our case 16.1).
+the same PostgreSQL version (in our case 17.0).
 
 #### TLS certificate authentication
 
@@ -539,7 +569,7 @@ in the same Kubernetes cluster.
     This example can be easily adapted to cover an instance that resides
     outside the Kubernetes cluster.
 
-The manifest defines a new PostgreSQL 16.1 cluster called `cluster-clone-tls`,
+The manifest defines a new PostgreSQL 17.0 cluster called `cluster-clone-tls`,
 which is bootstrapped using the `pg_basebackup` method from the `cluster-example`
 external cluster. The host is identified by the read/write service
 in the same cluster, while the `streaming_replica` user is authenticated
@@ -554,7 +584,7 @@ metadata:
   name: cluster-clone-tls
 spec:
   instances: 3
-  imageName: ghcr.io/cloudnative-pg/postgresql:16.1
+  imageName: ghcr.io/cloudnative-pg/postgresql:17.0
 
   bootstrap:
     pg_basebackup:
@@ -579,6 +609,7 @@ spec:
       name: cluster-example-ca
       key: ca.crt
 ```
+
 #### Configure the application database
 
 We also support to configure the application database for cluster which bootstrap
@@ -586,8 +617,15 @@ from a live cluster, just like the case of `initdb` and  `recovery` bootstrap me
 If the new cluster is created as a replica cluster (with replica mode enabled), application
 database configuration will be skipped.
 
-The following example configure the application database `app` with password in
-supplied secret `app-secret` after bootstrap from a live cluster.
+!!! Important
+    While the `Cluster` is in recovery mode, no changes to the database,
+    including the catalog, are permitted. This restriction includes any role
+    overrides, which are deferred until the `Cluster` transitions to primary.
+    During the recovery phase, roles remain as defined in the source cluster.
+
+The example below configures the `app` database with the owner `app` and
+the password stored in the provided secret `app-secret`, following the
+bootstrap from a live cluster.
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -603,19 +641,16 @@ spec:
       source: cluster-example
 ```
 
-With the above configuration, the following will happen after recovery is completed:
+With the above configuration, the following will happen only **after recovery is
+completed**:
 
-1. if database `app` does not exist, a new database `app` will be created.
-2. if user `app` does not exist, a new user `app` will be created.
-3. if user `app` is not the owner of database, user `app` will be granted
-   as owner of database `app`.
-4. If value of `username` match value of `owner` in secret, the password of
-   application database will be changed to the value of `password` in secret.
-
-!!! Important
-    For a replica cluster with replica mode enabled, the operator will not
-    create any database or user in the PostgreSQL instance, as these will be
-    recovered from the original cluster.
+1. If the `app` database does not exist, it will be created.
+2. If the `app` user does not exist, it will be created.
+3. If the `app` user is not the owner of the `app` database, ownership will be
+   granted to the `app` user.
+4. If the `username` value matches the `owner` value in the secret, the
+   password for the application user (the `app` user in this case) will be
+   updated to the `password` value in the secret.
 
 #### Current limitations
 
@@ -630,10 +665,10 @@ instance using a second connection (see the `--wal-method=stream` option for
 Once the backup is completed, the new instance will be started on a new timeline
 and diverge from the source.
 For this reason, it is advised to stop all write operations to the source database
-before migrating to the target database in Kubernetes.
+before migrating to the target database.
 
 !!! Important
     Before you attempt a migration, you must test both the procedure
     and the applications. In particular, it is fundamental that you run the migration
     procedure as many times as needed to systematically measure the downtime of your
-    applications in production. Feel free to contact EDB for assistance.
+    applications in production.

@@ -88,7 +88,7 @@ func SnapshotBackupNameForTablespace(backupName, tablespaceName string) string {
 	return backupName + apiv1.TablespaceVolumeInfix + convertPostgresIDToK8sName(tablespaceName)
 }
 
-func createPostgresVolumes(cluster apiv1.Cluster, podName string) []corev1.Volume {
+func createPostgresVolumes(cluster *apiv1.Cluster, podName string) []corev1.Volume {
 	result := []corev1.Volume{
 		{
 			Name: "pgdata",
@@ -98,14 +98,7 @@ func createPostgresVolumes(cluster apiv1.Cluster, podName string) []corev1.Volum
 				},
 			},
 		},
-		{
-			Name: "scratch-data",
-			VolumeSource: corev1.VolumeSource{
-				EmptyDir: &corev1.EmptyDirVolumeSource{
-					SizeLimit: cluster.Spec.EphemeralVolumesSizeLimit.GetTemporaryDataLimit(),
-				},
-			},
-		},
+		createEphemeralVolume(cluster),
 		{
 			Name: "shm",
 			VolumeSource: corev1.VolumeSource{
@@ -115,32 +108,6 @@ func createPostgresVolumes(cluster apiv1.Cluster, podName string) []corev1.Volum
 				},
 			},
 		},
-	}
-
-	if cluster.GetEnableSuperuserAccess() {
-		result = append(result,
-			corev1.Volume{
-				Name: "superuser-secret",
-				VolumeSource: corev1.VolumeSource{
-					Secret: &corev1.SecretVolumeSource{
-						SecretName: cluster.GetSuperuserSecretName(),
-					},
-				},
-			},
-		)
-	}
-
-	if cluster.ShouldCreateApplicationDatabase() {
-		result = append(result,
-			corev1.Volume{
-				Name: "app-secret",
-				VolumeSource: corev1.VolumeSource{
-					Secret: &corev1.SecretVolumeSource{
-						SecretName: cluster.GetApplicationSecretName(),
-					},
-				},
-			},
-		)
 	}
 
 	if cluster.ShouldCreateWalArchiveVolume() {
@@ -180,9 +147,20 @@ func createPostgresVolumes(cluster apiv1.Cluster, podName string) []corev1.Volum
 	return result
 }
 
-func createVolumesAndVolumeMountsForPostInitApplicationSQLRefs(
-	refs *apiv1.PostInitApplicationSQLRefs,
+func createVolumesAndVolumeMountsForSQLRefs(
+	folder postInitFolder,
+	refs *apiv1.SQLRefs,
 ) ([]corev1.Volume, []corev1.VolumeMount) {
+	var suffix string
+	switch folder {
+	case postInitApplicationSQLRefsFolder:
+		suffix = "post-init-application"
+	case postInitTemplateQLRefsFolder:
+		suffix = "post-init-template"
+	case postInitSQLRefsFolder:
+		suffix = "post-init"
+	}
+
 	length := len(refs.ConfigMapRefs) + len(refs.SecretRefs)
 	digitsCount := len(fmt.Sprintf("%d", length))
 	volumes := make([]corev1.Volume, 0, length)
@@ -190,7 +168,7 @@ func createVolumesAndVolumeMountsForPostInitApplicationSQLRefs(
 
 	for i := range refs.SecretRefs {
 		volumes = append(volumes, corev1.Volume{
-			Name: fmt.Sprintf("%0*d-post-init-application-sql", digitsCount, i),
+			Name: fmt.Sprintf("%0*d-%s-sql", digitsCount, i, suffix),
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
 					SecretName: refs.SecretRefs[i].Name,
@@ -205,8 +183,8 @@ func createVolumesAndVolumeMountsForPostInitApplicationSQLRefs(
 		})
 
 		volumeMounts = append(volumeMounts, corev1.VolumeMount{
-			Name:      fmt.Sprintf("%0*d-post-init-application-sql", digitsCount, i),
-			MountPath: fmt.Sprintf("%s/%0*d.sql", postInitApplicationSQLRefsFolder, digitsCount, i),
+			Name:      fmt.Sprintf("%0*d-%s-sql", digitsCount, i, suffix),
+			MountPath: fmt.Sprintf("%s/%0*d.sql", folder, digitsCount, i),
 			SubPath:   fmt.Sprintf("%0*d.sql", digitsCount, i),
 			ReadOnly:  true,
 		})
@@ -214,7 +192,7 @@ func createVolumesAndVolumeMountsForPostInitApplicationSQLRefs(
 
 	for i := range refs.ConfigMapRefs {
 		volumes = append(volumes, corev1.Volume{
-			Name: fmt.Sprintf("%0*d-post-init-application-sql", digitsCount, i+len(refs.SecretRefs)),
+			Name: fmt.Sprintf("%0*d-%s-sql", digitsCount, i+len(refs.SecretRefs), suffix),
 			VolumeSource: corev1.VolumeSource{
 				ConfigMap: &corev1.ConfigMapVolumeSource{
 					LocalObjectReference: corev1.LocalObjectReference{
@@ -231,8 +209,8 @@ func createVolumesAndVolumeMountsForPostInitApplicationSQLRefs(
 		})
 
 		volumeMounts = append(volumeMounts, corev1.VolumeMount{
-			Name:      fmt.Sprintf("%0*d-post-init-application-sql", digitsCount, i+len(refs.SecretRefs)),
-			MountPath: fmt.Sprintf("%s/%0*d.sql", postInitApplicationSQLRefsFolder, digitsCount, i+len(refs.SecretRefs)),
+			Name:      fmt.Sprintf("%0*d-%s-sql", digitsCount, i+len(refs.SecretRefs), suffix),
+			MountPath: fmt.Sprintf("%s/%0*d.sql", folder, digitsCount, i+len(refs.SecretRefs)),
 			SubPath:   fmt.Sprintf("%0*d.sql", digitsCount, i+len(refs.SecretRefs)),
 			ReadOnly:  true,
 		})
@@ -261,24 +239,6 @@ func createPostgresVolumeMounts(cluster apiv1.Cluster) []corev1.VolumeMount {
 		},
 	}
 
-	if cluster.GetEnableSuperuserAccess() {
-		volumeMounts = append(volumeMounts,
-			corev1.VolumeMount{
-				Name:      "superuser-secret",
-				MountPath: "/etc/superuser-secret",
-			},
-		)
-	}
-
-	if cluster.ShouldCreateApplicationDatabase() {
-		volumeMounts = append(volumeMounts,
-			corev1.VolumeMount{
-				Name:      "app-secret",
-				MountPath: "/etc/app-secret",
-			},
-		)
-	}
-
 	if cluster.ShouldCreateWalArchiveVolume() {
 		volumeMounts = append(volumeMounts,
 			corev1.VolumeMount{
@@ -300,7 +260,7 @@ func createPostgresVolumeMounts(cluster apiv1.Cluster) []corev1.VolumeMount {
 	// we should create volumeMounts in fixed sequence as podSpec will store it in annotation and
 	// later it will be  retrieved to do deepEquals
 	if cluster.ContainsTablespaces() {
-		tbsNames := getSortedTablespaceList(cluster)
+		tbsNames := getSortedTablespaceList(&cluster)
 		for i := range tbsNames {
 			volumeMounts = append(volumeMounts,
 				corev1.VolumeMount{
@@ -313,7 +273,7 @@ func createPostgresVolumeMounts(cluster apiv1.Cluster) []corev1.VolumeMount {
 	return volumeMounts
 }
 
-func getSortedTablespaceList(cluster apiv1.Cluster) []string {
+func getSortedTablespaceList(cluster *apiv1.Cluster) []string {
 	// Try to get a fix order of name
 	tbsNames := make([]string, len(cluster.Spec.Tablespaces))
 	i := 0
@@ -325,7 +285,22 @@ func getSortedTablespaceList(cluster apiv1.Cluster) []string {
 	return tbsNames
 }
 
-func createProjectedVolume(cluster apiv1.Cluster) corev1.Volume {
+func createEphemeralVolume(cluster *apiv1.Cluster) corev1.Volume {
+	scratchVolumeSource := corev1.VolumeSource{}
+	if cluster.Spec.EphemeralVolumeSource != nil {
+		scratchVolumeSource.Ephemeral = cluster.Spec.EphemeralVolumeSource
+	} else {
+		scratchVolumeSource.EmptyDir = &corev1.EmptyDirVolumeSource{
+			SizeLimit: cluster.Spec.EphemeralVolumesSizeLimit.GetTemporaryDataLimit(),
+		}
+	}
+	return corev1.Volume{
+		Name:         "scratch-data",
+		VolumeSource: scratchVolumeSource,
+	}
+}
+
+func createProjectedVolume(cluster *apiv1.Cluster) corev1.Volume {
 	return corev1.Volume{
 		Name: "projected",
 		VolumeSource: corev1.VolumeSource{

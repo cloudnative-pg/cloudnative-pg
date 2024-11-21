@@ -31,7 +31,7 @@ import (
 var _ = Describe("Hibernation annotation management", func() {
 	It("classifies clusters with no annotation as not hibernated", func() {
 		cluster := apiv1.Cluster{}
-		Expect(getHibernationAnnotationValue(&cluster)).To(BeFalse())
+		Expect(isHibernationEnabled(&cluster)).To(BeFalse())
 	})
 
 	It("correctly handles on/off values", func() {
@@ -42,22 +42,10 @@ var _ = Describe("Hibernation annotation management", func() {
 				},
 			},
 		}
-		Expect(getHibernationAnnotationValue(&cluster)).To(BeTrue())
+		Expect(isHibernationEnabled(&cluster)).To(BeTrue())
 
 		cluster.ObjectMeta.Annotations[utils.HibernationAnnotationName] = HibernationOff
-		Expect(getHibernationAnnotationValue(&cluster)).To(BeFalse())
-	})
-
-	It("fails when the value of the annotation is not correct", func() {
-		cluster := apiv1.Cluster{
-			ObjectMeta: metav1.ObjectMeta{
-				Annotations: map[string]string{
-					utils.HibernationAnnotationName: "not-correct",
-				},
-			},
-		}
-		_, err := getHibernationAnnotationValue(&cluster)
-		Expect(err).ToNot(Succeed())
+		Expect(isHibernationEnabled(&cluster)).To(BeFalse())
 	})
 })
 
@@ -66,25 +54,6 @@ var _ = Describe("Status enrichment", func() {
 		cluster := apiv1.Cluster{}
 		EnrichStatus(ctx, &cluster, nil)
 		Expect(cluster.Status.Conditions).To(BeEmpty())
-	})
-
-	It("adds an error condition when the hibernation annotation has a wrong value", func(ctx SpecContext) {
-		cluster := apiv1.Cluster{
-			ObjectMeta: metav1.ObjectMeta{
-				Annotations: map[string]string{
-					utils.HibernationAnnotationName: "not-correct",
-				},
-			},
-			Status: apiv1.ClusterStatus{
-				Phase: apiv1.PhaseHealthy,
-			},
-		}
-		EnrichStatus(ctx, &cluster, nil)
-
-		hibernationCondition := meta.FindStatusCondition(cluster.Status.Conditions, HibernationConditionType)
-		Expect(hibernationCondition).ToNot(BeNil())
-		Expect(hibernationCondition.Status).To(Equal(metav1.ConditionFalse))
-		Expect(hibernationCondition.Reason).To(Equal(HibernationConditionReasonWrongAnnotationValue))
 	})
 
 	It("removes the hibernation condition when hibernation is turned off", func(ctx SpecContext) {

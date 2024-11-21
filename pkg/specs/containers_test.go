@@ -21,7 +21,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -56,25 +55,11 @@ var _ = Describe("Bootstrap Container creation", func() {
 })
 
 var _ = Describe("Container Security Context creation", func() {
-	It("with nil SeccompProfile", func() {
-		cluster := &apiv1.Cluster{}
-		utils.SetSeccompSupport(false)
-		securityContext := CreateContainerSecurityContext(cluster.GetSeccompProfile())
-
-		Expect(*securityContext.RunAsNonRoot).To(BeTrue())
-		Expect(*securityContext.AllowPrivilegeEscalation).To(BeFalse())
-		Expect(*securityContext.Privileged).To(BeFalse())
-		Expect(*securityContext.ReadOnlyRootFilesystem).To(BeTrue())
-
-		Expect(securityContext.SeccompProfile).To(BeNil())
-	})
-
 	It("with valid SeccompProfile", func() {
 		cluster := &apiv1.Cluster{}
 		runtimeProfile := &corev1.SeccompProfile{
 			Type: corev1.SeccompProfileTypeRuntimeDefault,
 		}
-		utils.SetSeccompSupport(true)
 		securityContext := CreateContainerSecurityContext(cluster.GetSeccompProfile())
 
 		Expect(securityContext.SeccompProfile).ToNot(BeNil())
@@ -91,7 +76,6 @@ var _ = Describe("Container Security Context creation", func() {
 			SeccompProfile: localhostProfile,
 		}}
 
-		utils.SetSeccompSupport(true)
 		securityContext := CreateContainerSecurityContext(cluster.GetSeccompProfile())
 		Expect(securityContext.SeccompProfile).ToNot(BeNil())
 		Expect(securityContext.SeccompProfile).To(BeEquivalentTo(localhostProfile))

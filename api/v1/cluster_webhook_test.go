@@ -17,9 +17,15 @@ limitations under the License.
 package v1
 
 import (
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
 	"strings"
+	"time"
 
-	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+	"github.com/cloudnative-pg/machinery/pkg/image/reference"
+	pgversion "github.com/cloudnative-pg/machinery/pkg/postgres/version"
+	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,6 +33,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -75,114 +82,6 @@ var _ = Describe("bootstrap methods validation", func() {
 		}
 		result := invalidCluster.validateBootstrapMethod()
 		Expect(result).To(HaveLen(1))
-	})
-})
-
-var _ = Describe("azure credentials", func() {
-	path := field.NewPath("spec", "backupConfiguration", "azureCredentials")
-
-	It("contain only one of storage account key and SAS token", func() {
-		azureCredentials := AzureCredentials{
-			StorageAccount: &SecretKeySelector{
-				LocalObjectReference: LocalObjectReference{
-					Name: "azure-config",
-				},
-				Key: "storageAccount",
-			},
-			StorageKey: &SecretKeySelector{
-				LocalObjectReference: LocalObjectReference{
-					Name: "azure-config",
-				},
-				Key: "storageKey",
-			},
-			StorageSasToken: &SecretKeySelector{
-				LocalObjectReference: LocalObjectReference{
-					Name: "azure-config",
-				},
-				Key: "sasToken",
-			},
-		}
-		Expect(azureCredentials.validateAzureCredentials(path)).ToNot(BeEmpty())
-
-		azureCredentials = AzureCredentials{
-			StorageAccount: &SecretKeySelector{
-				LocalObjectReference: LocalObjectReference{
-					Name: "azure-config",
-				},
-				Key: "storageAccount",
-			},
-			StorageKey:      nil,
-			StorageSasToken: nil,
-		}
-		Expect(azureCredentials.validateAzureCredentials(path)).ToNot(BeEmpty())
-	})
-
-	It("is correct when the storage key is used", func() {
-		azureCredentials := AzureCredentials{
-			StorageAccount: &SecretKeySelector{
-				LocalObjectReference: LocalObjectReference{
-					Name: "azure-config",
-				},
-				Key: "storageAccount",
-			},
-			StorageKey: &SecretKeySelector{
-				LocalObjectReference: LocalObjectReference{
-					Name: "azure-config",
-				},
-				Key: "storageKey",
-			},
-			StorageSasToken: nil,
-		}
-		Expect(azureCredentials.validateAzureCredentials(path)).To(BeEmpty())
-	})
-
-	It("is correct when the sas token is used", func() {
-		azureCredentials := AzureCredentials{
-			StorageAccount: &SecretKeySelector{
-				LocalObjectReference: LocalObjectReference{
-					Name: "azure-config",
-				},
-				Key: "storageAccount",
-			},
-			StorageKey: nil,
-			StorageSasToken: &SecretKeySelector{
-				LocalObjectReference: LocalObjectReference{
-					Name: "azure-config",
-				},
-				Key: "sasToken",
-			},
-		}
-		Expect(azureCredentials.validateAzureCredentials(path)).To(BeEmpty())
-	})
-
-	It("is correct even if only the connection string is specified", func() {
-		azureCredentials := AzureCredentials{
-			ConnectionString: &SecretKeySelector{
-				LocalObjectReference: LocalObjectReference{
-					Name: "azure-config",
-				},
-				Key: "connectionString",
-			},
-		}
-		Expect(azureCredentials.validateAzureCredentials(path)).To(BeEmpty())
-	})
-
-	It("it is not correct when the connection string is specified with other parameters", func() {
-		azureCredentials := AzureCredentials{
-			ConnectionString: &SecretKeySelector{
-				LocalObjectReference: LocalObjectReference{
-					Name: "azure-config",
-				},
-				Key: "connectionString",
-			},
-			StorageAccount: &SecretKeySelector{
-				LocalObjectReference: LocalObjectReference{
-					Name: "azure-config",
-				},
-				Key: "storageAccount",
-			},
-		}
-		Expect(azureCredentials.validateAzureCredentials(path)).To(BeEmpty())
 	})
 })
 
@@ -290,7 +189,7 @@ var _ = Describe("initdb options validation", func() {
 					InitDB: &BootstrapInitDB{
 						Database: "app",
 						Owner:    "app",
-						PostInitApplicationSQLRefs: &PostInitApplicationSQLRefs{
+						PostInitApplicationSQLRefs: &SQLRefs{
 							SecretRefs: []SecretKeySelector{
 								{
 									LocalObjectReference: LocalObjectReference{Name: "secret1"},
@@ -313,7 +212,7 @@ var _ = Describe("initdb options validation", func() {
 					InitDB: &BootstrapInitDB{
 						Database: "app",
 						Owner:    "app",
-						PostInitApplicationSQLRefs: &PostInitApplicationSQLRefs{
+						PostInitApplicationSQLRefs: &SQLRefs{
 							SecretRefs: []SecretKeySelector{
 								{
 									Key: "key",
@@ -336,7 +235,7 @@ var _ = Describe("initdb options validation", func() {
 					InitDB: &BootstrapInitDB{
 						Database: "app",
 						Owner:    "app",
-						PostInitApplicationSQLRefs: &PostInitApplicationSQLRefs{
+						PostInitApplicationSQLRefs: &SQLRefs{
 							ConfigMapRefs: []ConfigMapKeySelector{
 								{
 									LocalObjectReference: LocalObjectReference{Name: "configmap1"},
@@ -359,7 +258,7 @@ var _ = Describe("initdb options validation", func() {
 					InitDB: &BootstrapInitDB{
 						Database: "app",
 						Owner:    "app",
-						PostInitApplicationSQLRefs: &PostInitApplicationSQLRefs{
+						PostInitApplicationSQLRefs: &SQLRefs{
 							ConfigMapRefs: []ConfigMapKeySelector{
 								{
 									Key: "key",
@@ -382,7 +281,7 @@ var _ = Describe("initdb options validation", func() {
 					InitDB: &BootstrapInitDB{
 						Database: "app",
 						Owner:    "app",
-						PostInitApplicationSQLRefs: &PostInitApplicationSQLRefs{
+						PostInitApplicationSQLRefs: &SQLRefs{
 							ConfigMapRefs: []ConfigMapKeySelector{
 								{
 									LocalObjectReference: LocalObjectReference{Name: "configmap1"},
@@ -1066,59 +965,581 @@ var _ = Describe("configuration change validation", func() {
 
 		Expect(cluster.validateConfiguration()).To(HaveLen(1))
 	})
+
+	It("should reject minimal wal_level when backup is configured", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Backup: &BackupConfiguration{
+					BarmanObjectStore: &BarmanObjectStoreConfiguration{
+						BarmanCredentials: BarmanCredentials{
+							AWS: &S3Credentials{},
+						},
+					},
+				},
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"wal_level":       "minimal",
+						"max_wal_senders": "0",
+					},
+				},
+			},
+		}
+		Expect(cluster.Spec.Backup.IsBarmanBackupConfigured()).To(BeTrue())
+		Expect(cluster.validateConfiguration()).To(HaveLen(1))
+	})
+
+	It("should allow replica wal_level when backup is configured", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Backup: &BackupConfiguration{
+					BarmanObjectStore: &BarmanObjectStoreConfiguration{
+						BarmanCredentials: BarmanCredentials{
+							AWS: &S3Credentials{},
+						},
+					},
+				},
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"wal_level": "replica",
+					},
+				},
+			},
+		}
+		Expect(cluster.Spec.Backup.IsBarmanBackupConfigured()).To(BeTrue())
+		Expect(cluster.validateConfiguration()).To(BeEmpty())
+	})
+
+	It("should allow logical wal_level when backup is configured", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Backup: &BackupConfiguration{
+					BarmanObjectStore: &BarmanObjectStoreConfiguration{
+						BarmanCredentials: BarmanCredentials{
+							AWS: &S3Credentials{},
+						},
+					},
+				},
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"wal_level": "logical",
+					},
+				},
+			},
+		}
+		Expect(cluster.Spec.Backup.IsBarmanBackupConfigured()).To(BeTrue())
+		Expect(cluster.validateConfiguration()).To(BeEmpty())
+	})
+
+	It("should reject minimal wal_level when instances is greater than one", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Instances: 2,
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"wal_level":       "minimal",
+						"max_wal_senders": "0",
+					},
+				},
+			},
+		}
+
+		Expect(cluster.validateConfiguration()).To(HaveLen(1))
+	})
+
+	It("should allow replica wal_level when instances is greater than one", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Instances: 2,
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"wal_level": "replica",
+					},
+				},
+			},
+		}
+		Expect(cluster.validateConfiguration()).To(BeEmpty())
+	})
+
+	It("should allow logical wal_level when instances is greater than one", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Instances: 2,
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"wal_level": "logical",
+					},
+				},
+			},
+		}
+		Expect(cluster.validateConfiguration()).To(BeEmpty())
+	})
+
+	It("should reject an unknown wal_level value", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Instances: 1,
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"wal_level": "test",
+					},
+				},
+			},
+		}
+
+		errs := cluster.validateConfiguration()
+		Expect(errs).To(HaveLen(1))
+		Expect(errs[0].Detail).To(ContainSubstring("unrecognized `wal_level` value - allowed values"))
+	})
+
+	It("should reject minimal if it is a replica cluster", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				Instances: 1,
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled: ptr.To(true),
+				},
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"wal_level":       "minimal",
+						"max_wal_senders": "0",
+					},
+				},
+			},
+		}
+		Expect(cluster.IsReplica()).To(BeTrue())
+		Expect(cluster.validateConfiguration()).To(HaveLen(1))
+	})
+
+	It("should allow minimal wal_level with one instance and without archive mode", func() {
+		cluster := Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					utils.SkipWalArchiving: "enabled",
+				},
+			},
+			Spec: ClusterSpec{
+				Instances: 1,
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"wal_level":       "minimal",
+						"max_wal_senders": "0",
+					},
+				},
+			},
+		}
+		Expect(cluster.validateConfiguration()).To(BeEmpty())
+	})
+
+	It("should disallow minimal wal_level with one instance, without max_wal_senders being specified", func() {
+		cluster := Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					utils.SkipWalArchiving: "enabled",
+				},
+			},
+			Spec: ClusterSpec{
+				Instances: 1,
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"wal_level": "minimal",
+					},
+				},
+			},
+		}
+		Expect(cluster.validateConfiguration()).To(HaveLen(1))
+	})
+
+	It("should disallow changing wal_level to minimal for existing clusters", func() {
+		oldCluster := Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					utils.SkipWalArchiving: "enabled",
+				},
+			},
+			Spec: ClusterSpec{
+				Instances: 1,
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"max_wal_senders": "0",
+					},
+				},
+			},
+		}
+		oldCluster.setDefaults(true)
+
+		cluster := Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					utils.SkipWalArchiving: "enabled",
+				},
+			},
+			Spec: ClusterSpec{
+				Instances: 1,
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"wal_level":       "minimal",
+						"max_wal_senders": "0",
+					},
+				},
+			},
+		}
+		Expect(cluster.validateWALLevelChange(&oldCluster)).To(HaveLen(1))
+	})
+
+	It("should allow retaining wal_level to minimal for existing clusters", func() {
+		oldCluster := Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					utils.SkipWalArchiving: "enabled",
+				},
+			},
+			Spec: ClusterSpec{
+				Instances: 1,
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"wal_level":       "minimal",
+						"max_wal_senders": "0",
+					},
+				},
+			},
+		}
+		oldCluster.setDefaults(true)
+
+		cluster := Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					utils.SkipWalArchiving: "enabled",
+				},
+			},
+			Spec: ClusterSpec{
+				Instances: 1,
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"wal_level":       "minimal",
+						"max_wal_senders": "0",
+						"shared_buffers":  "512MB",
+					},
+				},
+			},
+		}
+		Expect(cluster.validateWALLevelChange(&oldCluster)).To(BeEmpty())
+	})
+
+	Describe("wal_log_hints", func() {
+		It("should reject wal_log_hints set to an invalid value", func() {
+			cluster := Cluster{
+				Spec: ClusterSpec{
+					Instances: 1,
+					PostgresConfiguration: PostgresConfiguration{
+						Parameters: map[string]string{
+							"wal_log_hints": "foo",
+						},
+					},
+				},
+			}
+			Expect(cluster.validateConfiguration()).To(HaveLen(1))
+		})
+
+		It("should allow wal_log_hints set to off for clusters having just one instance", func() {
+			cluster := Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						utils.SkipWalArchiving: "enabled",
+					},
+				},
+				Spec: ClusterSpec{
+					Instances: 1,
+					PostgresConfiguration: PostgresConfiguration{
+						Parameters: map[string]string{
+							"wal_log_hints": "off",
+						},
+					},
+				},
+			}
+			Expect(cluster.validateConfiguration()).To(BeEmpty())
+		})
+
+		It("should not allow wal_log_hints set to off for clusters having more than one instance", func() {
+			cluster := Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						utils.SkipWalArchiving: "enabled",
+					},
+				},
+				Spec: ClusterSpec{
+					Instances: 3,
+					PostgresConfiguration: PostgresConfiguration{
+						Parameters: map[string]string{
+							"wal_log_hints": "off",
+						},
+					},
+				},
+			}
+			Expect(cluster.validateConfiguration()).ToNot(BeEmpty())
+		})
+
+		It("should allow wal_log_hints set to on for clusters having just one instance", func() {
+			cluster := Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						utils.SkipWalArchiving: "enabled",
+					},
+				},
+				Spec: ClusterSpec{
+					Instances: 1,
+					PostgresConfiguration: PostgresConfiguration{
+						Parameters: map[string]string{
+							"wal_log_hints": "on",
+						},
+					},
+				},
+			}
+			Expect(cluster.validateConfiguration()).To(BeEmpty())
+		})
+
+		It("should not allow wal_log_hints set to on for clusters having more than one instance", func() {
+			cluster := Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						utils.SkipWalArchiving: "enabled",
+					},
+				},
+				Spec: ClusterSpec{
+					Instances: 3,
+					PostgresConfiguration: PostgresConfiguration{
+						Parameters: map[string]string{
+							"wal_log_hints": "true",
+						},
+					},
+				},
+			}
+			Expect(cluster.validateConfiguration()).To(BeEmpty())
+		})
+	})
 })
 
 var _ = Describe("validate image name change", func() {
-	It("doesn't complain with no changes", func() {
-		clusterOld := Cluster{
-			Spec: ClusterSpec{},
-		}
-		clusterNew := Cluster{
-			Spec: ClusterSpec{},
-		}
-		Expect(clusterNew.validateImageChange(&clusterOld)).To(BeEmpty())
+	Context("using image name", func() {
+		It("doesn't complain with no changes", func() {
+			clusterOld := Cluster{
+				Spec: ClusterSpec{},
+			}
+			clusterNew := Cluster{
+				Spec: ClusterSpec{},
+			}
+			Expect(clusterNew.validateImageChange(&clusterOld)).To(BeEmpty())
+		})
+
+		It("complains if it can't upgrade between mayor versions", func() {
+			clusterOld := Cluster{
+				Spec: ClusterSpec{
+					ImageName: "postgres:17.0",
+				},
+			}
+			clusterNew := Cluster{
+				Spec: ClusterSpec{
+					ImageName: "postgres:16.0",
+				},
+			}
+			Expect(clusterNew.validateImageChange(&clusterOld)).To(HaveLen(1))
+		})
+
+		It("doesn't complain if image change is valid", func() {
+			clusterOld := Cluster{
+				Spec: ClusterSpec{
+					ImageName: "postgres:17.1",
+				},
+			}
+			clusterNew := Cluster{
+				Spec: ClusterSpec{
+					ImageName: "postgres:17.0",
+				},
+			}
+			Expect(clusterNew.validateImageChange(&clusterOld)).To(BeEmpty())
+		})
+	})
+	Context("using image catalog", func() {
+		It("complains on major upgrades", func() {
+			clusterOld := Cluster{
+				Spec: ClusterSpec{
+					ImageCatalogRef: &ImageCatalogRef{
+						TypedLocalObjectReference: corev1.TypedLocalObjectReference{
+							Name: "test",
+							Kind: "ImageCatalog",
+						},
+						Major: 15,
+					},
+				},
+			}
+			clusterNew := Cluster{
+				Spec: ClusterSpec{
+					ImageCatalogRef: &ImageCatalogRef{
+						TypedLocalObjectReference: corev1.TypedLocalObjectReference{
+							Name: "test",
+							Kind: "ImageCatalog",
+						},
+						Major: 16,
+					},
+				},
+			}
+			Expect(clusterNew.validateImageChange(&clusterOld)).To(HaveLen(1))
+		})
+	})
+	Context("changing from imageName to imageCatalogRef", func() {
+		It("doesn't complain when the major is the same", func() {
+			clusterOld := Cluster{
+				Spec: ClusterSpec{
+					ImageName: "postgres:16.1",
+				},
+			}
+			clusterNew := Cluster{
+				Spec: ClusterSpec{
+					ImageCatalogRef: &ImageCatalogRef{
+						TypedLocalObjectReference: corev1.TypedLocalObjectReference{
+							Name: "test",
+							Kind: "ImageCatalog",
+						},
+						Major: 16,
+					},
+				},
+			}
+			Expect(clusterNew.validateImageChange(&clusterOld)).To(BeEmpty())
+		})
+		It("complains on major upgrades", func() {
+			clusterOld := Cluster{
+				Spec: ClusterSpec{
+					ImageName: "postgres:16.1",
+				},
+			}
+			clusterNew := Cluster{
+				Spec: ClusterSpec{
+					ImageCatalogRef: &ImageCatalogRef{
+						TypedLocalObjectReference: corev1.TypedLocalObjectReference{
+							Name: "test",
+							Kind: "ImageCatalog",
+						},
+						Major: 17,
+					},
+				},
+			}
+			Expect(clusterNew.validateImageChange(&clusterOld)).To(HaveLen(1))
+		})
+		It("complains going from default imageName to different major imageCatalogRef", func() {
+			clusterOld := Cluster{
+				Spec: ClusterSpec{},
+			}
+			clusterNew := Cluster{
+				Spec: ClusterSpec{
+					ImageCatalogRef: &ImageCatalogRef{
+						TypedLocalObjectReference: corev1.TypedLocalObjectReference{
+							Name: "test",
+							Kind: "ImageCatalog",
+						},
+						Major: 16,
+					},
+				},
+			}
+			Expect(clusterNew.validateImageChange(&clusterOld)).To(HaveLen(1))
+		})
+		It("doesn't complain going from default imageName to same major imageCatalogRef", func() {
+			defaultImageRef := reference.New(versions.DefaultImageName)
+			version, err := pgversion.FromTag(defaultImageRef.Tag)
+			Expect(err).ToNot(HaveOccurred())
+			clusterOld := Cluster{
+				Spec: ClusterSpec{},
+			}
+			clusterNew := Cluster{
+				Spec: ClusterSpec{
+					ImageCatalogRef: &ImageCatalogRef{
+						TypedLocalObjectReference: corev1.TypedLocalObjectReference{
+							Name: "test",
+							Kind: "ImageCatalog",
+						},
+						Major: int(version.Major()),
+					},
+				},
+			}
+			Expect(clusterNew.validateImageChange(&clusterOld)).To(BeEmpty())
+		})
 	})
 
-	It("complains if versions are wrong", func() {
-		clusterOld := Cluster{
-			Spec: ClusterSpec{
-				ImageName: "12:1",
-			},
-		}
-		clusterNew := Cluster{
-			Spec: ClusterSpec{
-				ImageName: "postgres:12.0",
-			},
-		}
-		Expect(clusterNew.validateImageChange(&clusterOld)).To(HaveLen(1))
-	})
+	Context("changing from imageCatalogRef to imageName", func() {
+		It("doesn't complain when the major is the same", func() {
+			clusterOld := Cluster{
+				Spec: ClusterSpec{
+					ImageCatalogRef: &ImageCatalogRef{
+						TypedLocalObjectReference: corev1.TypedLocalObjectReference{
+							Name: "test",
+							Kind: "ImageCatalog",
+						},
+						Major: 17,
+					},
+				},
+			}
+			clusterNew := Cluster{
+				Spec: ClusterSpec{
+					ImageName: "postgres:17.1",
+				},
+			}
+			Expect(clusterNew.validateImageChange(&clusterOld)).To(BeEmpty())
+		})
+		It("complains on major upgrades", func() {
+			clusterOld := Cluster{
+				Spec: ClusterSpec{
+					ImageCatalogRef: &ImageCatalogRef{
+						TypedLocalObjectReference: corev1.TypedLocalObjectReference{
+							Name: "test",
+							Kind: "ImageCatalog",
+						},
+						Major: 16,
+					},
+				},
+			}
+			clusterNew := Cluster{
+				Spec: ClusterSpec{
+					ImageName: "postgres:17.1",
+				},
+			}
+			Expect(clusterNew.validateImageChange(&clusterOld)).To(HaveLen(1))
+		})
+		It("complains going from imageCatalogRef to different major default imageName", func() {
+			clusterOld := Cluster{
+				Spec: ClusterSpec{
+					ImageCatalogRef: &ImageCatalogRef{
+						TypedLocalObjectReference: corev1.TypedLocalObjectReference{
+							Name: "test",
+							Kind: "ImageCatalog",
+						},
+						Major: 16,
+					},
+				},
+			}
+			clusterNew := Cluster{
+				Spec: ClusterSpec{},
+			}
+			Expect(clusterNew.validateImageChange(&clusterOld)).To(HaveLen(1))
+		})
+		It("doesn't complain going from imageCatalogRef to same major default imageName", func() {
+			imageNameRef := reference.New(versions.DefaultImageName)
+			version, err := pgversion.FromTag(imageNameRef.Tag)
+			Expect(err).ToNot(HaveOccurred())
 
-	It("complains if can't upgrade between mayor versions", func() {
-		clusterOld := Cluster{
-			Spec: ClusterSpec{
-				ImageName: "postgres:12.0",
-			},
-		}
-		clusterNew := Cluster{
-			Spec: ClusterSpec{
-				ImageName: "postgres:11.0",
-			},
-		}
-		Expect(clusterNew.validateImageChange(&clusterOld)).To(HaveLen(1))
-	})
-
-	It("doesn't complain if image change it's valid", func() {
-		clusterOld := Cluster{
-			Spec: ClusterSpec{
-				ImageName: "postgres:12.1",
-			},
-		}
-		clusterNew := Cluster{
-			Spec: ClusterSpec{
-				ImageName: "postgres:12.0",
-			},
-		}
-		Expect(clusterNew.validateImageChange(&clusterOld)).To(BeEmpty())
+			clusterOld := Cluster{
+				Spec: ClusterSpec{
+					ImageCatalogRef: &ImageCatalogRef{
+						TypedLocalObjectReference: corev1.TypedLocalObjectReference{
+							Name: "test",
+							Kind: "ImageCatalog",
+						},
+						Major: int(version.Major()),
+					},
+				},
+			}
+			clusterNew := Cluster{
+				Spec: ClusterSpec{},
+			}
+			Expect(clusterNew.validateImageChange(&clusterOld)).To(BeEmpty())
+		})
 	})
 })
 
@@ -1448,54 +1869,144 @@ var _ = Describe("primary update strategy", func() {
 })
 
 var _ = Describe("Number of synchronous replicas", func() {
-	It("should be a positive integer", func() {
-		cluster := Cluster{
-			Spec: ClusterSpec{
-				Instances:       3,
-				MaxSyncReplicas: -3,
-			},
-		}
-		Expect(cluster.validateMaxSyncReplicas()).ToNot(BeEmpty())
+	Context("new-style configuration", func() {
+		It("can't have both new-style configuration and legacy one", func() {
+			cluster := Cluster{
+				Spec: ClusterSpec{
+					Instances:       3,
+					MinSyncReplicas: 1,
+					MaxSyncReplicas: 2,
+					PostgresConfiguration: PostgresConfiguration{
+						Synchronous: &SynchronousReplicaConfiguration{
+							Number: 2,
+						},
+					},
+				},
+			}
+			Expect(cluster.validateConfiguration()).ToNot(BeEmpty())
+		})
 	})
 
-	It("should not be equal than the number of replicas", func() {
-		cluster := Cluster{
+	Context("legacy configuration", func() {
+		It("should be a positive integer", func() {
+			cluster := Cluster{
+				Spec: ClusterSpec{
+					Instances:       3,
+					MaxSyncReplicas: -3,
+				},
+			}
+			Expect(cluster.validateMaxSyncReplicas()).ToNot(BeEmpty())
+		})
+
+		It("should not be equal than the number of replicas", func() {
+			cluster := Cluster{
+				Spec: ClusterSpec{
+					Instances:       3,
+					MaxSyncReplicas: 3,
+				},
+			}
+			Expect(cluster.validateMaxSyncReplicas()).ToNot(BeEmpty())
+		})
+
+		It("should not be greater than the number of replicas", func() {
+			cluster := Cluster{
+				Spec: ClusterSpec{
+					Instances:       3,
+					MaxSyncReplicas: 5,
+				},
+			}
+			Expect(cluster.validateMaxSyncReplicas()).ToNot(BeEmpty())
+		})
+
+		It("can be zero", func() {
+			cluster := Cluster{
+				Spec: ClusterSpec{
+					Instances:       3,
+					MaxSyncReplicas: 0,
+				},
+			}
+			Expect(cluster.validateMaxSyncReplicas()).To(BeEmpty())
+		})
+
+		It("can be lower than the number of replicas", func() {
+			cluster := Cluster{
+				Spec: ClusterSpec{
+					Instances:       3,
+					MaxSyncReplicas: 2,
+				},
+			}
+			Expect(cluster.validateMaxSyncReplicas()).To(BeEmpty())
+		})
+	})
+})
+
+var _ = Describe("validateSynchronousReplicaConfiguration", func() {
+	It("returns no error when synchronous configuration is nil", func() {
+		cluster := &Cluster{
 			Spec: ClusterSpec{
-				Instances:       3,
-				MaxSyncReplicas: 3,
+				PostgresConfiguration: PostgresConfiguration{
+					Synchronous: nil,
+				},
 			},
 		}
-		Expect(cluster.validateMaxSyncReplicas()).ToNot(BeEmpty())
+		errors := cluster.validateSynchronousReplicaConfiguration()
+		Expect(errors).To(BeEmpty())
 	})
 
-	It("should not be greater than the number of replicas", func() {
-		cluster := Cluster{
+	It("returns an error when number of synchronous replicas is greater than the total instances and standbys", func() {
+		cluster := &Cluster{
 			Spec: ClusterSpec{
-				Instances:       3,
-				MaxSyncReplicas: 5,
+				Instances: 2,
+				PostgresConfiguration: PostgresConfiguration{
+					Synchronous: &SynchronousReplicaConfiguration{
+						Number:           5,
+						StandbyNamesPost: []string{"standby1"},
+						StandbyNamesPre:  []string{"standby2"},
+					},
+				},
 			},
 		}
-		Expect(cluster.validateMaxSyncReplicas()).ToNot(BeEmpty())
+		errors := cluster.validateSynchronousReplicaConfiguration()
+		Expect(errors).To(HaveLen(1))
+		Expect(errors[0].Detail).To(
+			Equal("Invalid synchronous configuration: the number of synchronous replicas must be less than the " +
+				"total number of instances and the provided standby names."))
 	})
 
-	It("can be zero", func() {
-		cluster := Cluster{
+	It("returns an error when number of synchronous replicas is equal to total instances and standbys", func() {
+		cluster := &Cluster{
 			Spec: ClusterSpec{
-				Instances:       3,
-				MaxSyncReplicas: 0,
+				Instances: 3,
+				PostgresConfiguration: PostgresConfiguration{
+					Synchronous: &SynchronousReplicaConfiguration{
+						Number:           5,
+						StandbyNamesPost: []string{"standby1"},
+						StandbyNamesPre:  []string{"standby2"},
+					},
+				},
 			},
 		}
-		Expect(cluster.validateMaxSyncReplicas()).To(BeEmpty())
+		errors := cluster.validateSynchronousReplicaConfiguration()
+		Expect(errors).To(HaveLen(1))
+		Expect(errors[0].Detail).To(Equal("Invalid synchronous configuration: the number of synchronous replicas " +
+			"must be less than the total number of instances and the provided standby names."))
 	})
 
-	It("can be lower than the number of replicas", func() {
-		cluster := Cluster{
+	It("returns no error when number of synchronous replicas is less than total instances and standbys", func() {
+		cluster := &Cluster{
 			Spec: ClusterSpec{
-				Instances:       3,
-				MaxSyncReplicas: 2,
+				Instances: 2,
+				PostgresConfiguration: PostgresConfiguration{
+					Synchronous: &SynchronousReplicaConfiguration{
+						Number:           2,
+						StandbyNamesPost: []string{"standby1"},
+						StandbyNamesPre:  []string{"standby2"},
+					},
+				},
 			},
 		}
-		Expect(cluster.validateMaxSyncReplicas()).To(BeEmpty())
+		errors := cluster.validateSynchronousReplicaConfiguration()
+		Expect(errors).To(BeEmpty())
 	})
 })
 
@@ -2092,12 +2603,206 @@ var _ = Describe("unix permissions identifiers change validation", func() {
 	})
 })
 
+var _ = Describe("promotion token validation", func() {
+	It("complains if the replica token is not formatted in base64", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled:        ptr.To(false),
+					Source:         "test",
+					PromotionToken: "this-is-a-wrong-token",
+				},
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{},
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "test",
+					},
+				},
+			},
+		}
+
+		result := cluster.validatePromotionToken()
+		Expect(result).ToNot(BeEmpty())
+	})
+
+	It("complains if the replica token is not valid", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled:        ptr.To(false),
+					Source:         "test",
+					PromotionToken: base64.StdEncoding.EncodeToString([]byte("{}")),
+				},
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{},
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "test",
+					},
+				},
+			},
+		}
+
+		result := cluster.validatePromotionToken()
+		Expect(result).ToNot(BeEmpty())
+	})
+
+	It("doesn't complain if the replica token is valid", func() {
+		tokenContent := utils.PgControldataTokenContent{
+			LatestCheckpointTimelineID:   "3",
+			REDOWALFile:                  "this-wal-file",
+			DatabaseSystemIdentifier:     "231231212",
+			LatestCheckpointREDOLocation: "33322232",
+			TimeOfLatestCheckpoint:       "we don't know",
+			OperatorVersion:              "version info",
+		}
+		jsonToken, err := json.Marshal(tokenContent)
+		Expect(err).ToNot(HaveOccurred())
+
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled:        ptr.To(false),
+					Source:         "test",
+					PromotionToken: base64.StdEncoding.EncodeToString(jsonToken),
+				},
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{},
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "test",
+					},
+				},
+			},
+		}
+
+		result := cluster.validatePromotionToken()
+		Expect(result).To(BeEmpty())
+	})
+
+	It("complains if the token is set on a replica cluster (enabled)", func() {
+		tokenContent := utils.PgControldataTokenContent{
+			LatestCheckpointTimelineID:   "1",
+			REDOWALFile:                  "0000000100000001000000A1",
+			DatabaseSystemIdentifier:     "231231212",
+			LatestCheckpointREDOLocation: "0/1000000",
+			TimeOfLatestCheckpoint:       "we don't know",
+			OperatorVersion:              "version info",
+		}
+		jsonToken, err := json.Marshal(tokenContent)
+		Expect(err).ToNot(HaveOccurred())
+
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled:        ptr.To(true),
+					Source:         "test",
+					PromotionToken: base64.StdEncoding.EncodeToString(jsonToken),
+				},
+			},
+		}
+
+		result := cluster.validatePromotionToken()
+		Expect(result).NotTo(BeEmpty())
+	})
+
+	It("complains if the token is set on a replica cluster (primary, default name)", func() {
+		tokenContent := utils.PgControldataTokenContent{
+			LatestCheckpointTimelineID:   "1",
+			REDOWALFile:                  "0000000100000001000000A1",
+			DatabaseSystemIdentifier:     "231231212",
+			LatestCheckpointREDOLocation: "0/1000000",
+			TimeOfLatestCheckpoint:       "we don't know",
+			OperatorVersion:              "version info",
+		}
+		jsonToken, err := json.Marshal(tokenContent)
+		Expect(err).ToNot(HaveOccurred())
+
+		cluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test2",
+			},
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Primary:        "test",
+					Source:         "test",
+					PromotionToken: base64.StdEncoding.EncodeToString(jsonToken),
+				},
+			},
+		}
+
+		result := cluster.validatePromotionToken()
+		Expect(result).NotTo(BeEmpty())
+	})
+
+	It("complains if the token is set on a replica cluster (primary, self)", func() {
+		tokenContent := utils.PgControldataTokenContent{
+			LatestCheckpointTimelineID:   "1",
+			REDOWALFile:                  "0000000100000001000000A1",
+			DatabaseSystemIdentifier:     "231231212",
+			LatestCheckpointREDOLocation: "0/1000000",
+			TimeOfLatestCheckpoint:       "we don't know",
+			OperatorVersion:              "version info",
+		}
+		jsonToken, err := json.Marshal(tokenContent)
+		Expect(err).ToNot(HaveOccurred())
+
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Primary:        "test",
+					Self:           "test2",
+					Source:         "test",
+					PromotionToken: base64.StdEncoding.EncodeToString(jsonToken),
+				},
+			},
+		}
+
+		result := cluster.validatePromotionToken()
+		Expect(result).NotTo(BeEmpty())
+	})
+
+	It("complains it the token is set when minApplyDelay is being used", func() {
+		tokenContent := utils.PgControldataTokenContent{
+			LatestCheckpointTimelineID:   "1",
+			REDOWALFile:                  "0000000100000001000000A1",
+			DatabaseSystemIdentifier:     "231231212",
+			LatestCheckpointREDOLocation: "0/1000000",
+			TimeOfLatestCheckpoint:       "we don't know",
+			OperatorVersion:              "version info",
+		}
+		jsonToken, err := json.Marshal(tokenContent)
+		Expect(err).ToNot(HaveOccurred())
+
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Primary:        "test",
+					Self:           "test",
+					Source:         "test",
+					PromotionToken: base64.StdEncoding.EncodeToString(jsonToken),
+					MinApplyDelay: &metav1.Duration{
+						Duration: 1 * time.Hour,
+					},
+				},
+			},
+		}
+
+		result := cluster.validatePromotionToken()
+		Expect(result).NotTo(BeEmpty())
+	})
+})
+
 var _ = Describe("replica mode validation", func() {
 	It("complains if the bootstrap method is not specified", func() {
 		cluster := &Cluster{
 			Spec: ClusterSpec{
 				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled: true,
+					Enabled: ptr.To(true),
 					Source:  "test",
 				},
 				ExternalClusters: []ExternalCluster{
@@ -2114,7 +2819,7 @@ var _ = Describe("replica mode validation", func() {
 		cluster := &Cluster{
 			Spec: ClusterSpec{
 				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled: true,
+					Enabled: ptr.To(true),
 					Source:  "test",
 				},
 				Bootstrap: &BootstrapConfiguration{
@@ -2130,11 +2835,92 @@ var _ = Describe("replica mode validation", func() {
 		Expect(cluster.validateReplicaMode()).ToNot(BeEmpty())
 	})
 
+	It("doesn't complain about initdb if we enable the external cluster on an existing cluster", func() {
+		cluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				ResourceVersion: "existing",
+			},
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled: ptr.To(true),
+					Source:  "test",
+				},
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{},
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "test",
+					},
+				},
+			},
+		}
+		result := cluster.validateReplicaMode()
+		Expect(result).To(BeEmpty())
+	})
+
+	It("should complain if enabled is set to off during a transition", func() {
+		old := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				ResourceVersion: "existing",
+			},
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled: ptr.To(true),
+					Source:  "test",
+				},
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{},
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "test",
+					},
+				},
+			},
+			Status: ClusterStatus{
+				SwitchReplicaClusterStatus: SwitchReplicaClusterStatus{
+					InProgress: true,
+				},
+			},
+		}
+
+		cluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				ResourceVersion: "existing",
+			},
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled: ptr.To(false),
+					Source:  "test",
+				},
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{},
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "test",
+					},
+				},
+			},
+			Status: ClusterStatus{
+				SwitchReplicaClusterStatus: SwitchReplicaClusterStatus{
+					InProgress: true,
+				},
+			},
+		}
+
+		result := cluster.validateReplicaClusterChange(old)
+		Expect(result).To(HaveLen(1))
+		Expect(result[0].Type).To(Equal(field.ErrorTypeForbidden))
+		Expect(result[0].Field).To(Equal("spec.replica.enabled"))
+	})
+
 	It("is valid when the pg_basebackup bootstrap option is used", func() {
 		cluster := &Cluster{
 			Spec: ClusterSpec{
 				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled: true,
+					Enabled: ptr.To(true),
 					Source:  "test",
 				},
 				Bootstrap: &BootstrapConfiguration{
@@ -2155,7 +2941,7 @@ var _ = Describe("replica mode validation", func() {
 		cluster := &Cluster{
 			Spec: ClusterSpec{
 				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled: true,
+					Enabled: ptr.To(true),
 					Source:  "test",
 				},
 				Bootstrap: &BootstrapConfiguration{
@@ -2172,11 +2958,79 @@ var _ = Describe("replica mode validation", func() {
 		Expect(result).To(BeEmpty())
 	})
 
-	It("complains when the external cluster doesn't exist", func() {
+	It("complains when the primary field is used with the enabled field", func() {
 		cluster := &Cluster{
 			Spec: ClusterSpec{
 				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled: true,
+					Enabled: ptr.To(true),
+					Primary: "toast",
+					Source:  "test",
+				},
+				Bootstrap: &BootstrapConfiguration{
+					PgBaseBackup: &BootstrapPgBaseBackup{},
+				},
+				ExternalClusters: []ExternalCluster{},
+			},
+		}
+		result := cluster.validateReplicaMode()
+		Expect(result).ToNot(BeEmpty())
+	})
+
+	It("doesn't complain when the enabled field is not specified", func() {
+		cluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-2",
+			},
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Primary: "test",
+					Source:  "test",
+				},
+				Bootstrap: &BootstrapConfiguration{
+					PgBaseBackup: &BootstrapPgBaseBackup{},
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "test",
+					},
+				},
+			},
+		}
+		result := cluster.validateReplicaMode()
+		Expect(result).To(BeEmpty())
+	})
+
+	It("doesn't complain when creating a new primary cluster with the replication stanza set", func() {
+		cluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test",
+			},
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Primary: "test",
+					Source:  "test",
+				},
+				Bootstrap: &BootstrapConfiguration{
+					InitDB: &BootstrapInitDB{},
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "test",
+					},
+				},
+			},
+		}
+		result := cluster.validateReplicaMode()
+		Expect(result).To(BeEmpty())
+	})
+})
+
+var _ = Describe("validate the replica cluster external clusters", func() {
+	It("complains when the external cluster doesn't exist (source)", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Enabled: ptr.To(true),
 					Source:  "test",
 				},
 				Bootstrap: &BootstrapConfiguration{
@@ -2187,63 +3041,53 @@ var _ = Describe("replica mode validation", func() {
 		}
 
 		cluster.Spec.Bootstrap.PgBaseBackup = nil
-		result := cluster.validateReplicaMode()
+		result := cluster.validateReplicaClusterExternalClusters()
 		Expect(result).ToNot(BeEmpty())
 	})
 
-	It("complains when enabled on an existing cluster with no replica mode configured", func() {
-		oldCluster := &Cluster{
-			Spec: ClusterSpec{},
-		}
+	It("complains when the external cluster doesn't exist (primary)", func() {
 		cluster := &Cluster{
 			Spec: ClusterSpec{
 				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled: true,
+					Primary: "test2",
 					Source:  "test",
 				},
 				Bootstrap: &BootstrapConfiguration{
 					PgBaseBackup: &BootstrapPgBaseBackup{},
 				},
 				ExternalClusters: []ExternalCluster{
-					{Name: "test"},
+					{
+						Name: "test",
+					},
 				},
 			},
 		}
-		Expect(cluster.validateReplicaMode()).To(BeEmpty())
-		Expect(cluster.validateReplicaModeChange(oldCluster)).ToNot(BeEmpty())
+
+		result := cluster.validateReplicaClusterExternalClusters()
+		Expect(result).ToNot(BeEmpty())
 	})
 
-	It("complains when enabled on an existing cluster with replica mode disabled", func() {
-		oldCluster := &Cluster{
-			Spec: ClusterSpec{
-				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled: false,
-					Source:  "test",
-				},
-				Bootstrap: &BootstrapConfiguration{
-					PgBaseBackup: &BootstrapPgBaseBackup{},
-				},
-				ExternalClusters: []ExternalCluster{
-					{Name: "test"},
-				},
-			},
-		}
+	It("complains when the external cluster doesn't exist (self)", func() {
 		cluster := &Cluster{
 			Spec: ClusterSpec{
 				ReplicaCluster: &ReplicaClusterConfiguration{
-					Enabled: true,
+					Self:    "test2",
+					Primary: "test",
 					Source:  "test",
 				},
 				Bootstrap: &BootstrapConfiguration{
 					PgBaseBackup: &BootstrapPgBaseBackup{},
 				},
 				ExternalClusters: []ExternalCluster{
-					{Name: "test"},
+					{
+						Name: "test",
+					},
 				},
 			},
 		}
-		Expect(cluster.validateReplicaMode()).To(BeEmpty())
-		Expect(cluster.validateReplicaModeChange(oldCluster)).ToNot(BeEmpty())
+
+		result := cluster.validateReplicaClusterExternalClusters()
+		Expect(result).ToNot(BeEmpty())
 	})
 })
 
@@ -2267,15 +3111,17 @@ var _ = Describe("Backup validation", func() {
 		err := cluster.validateBackupConfiguration()
 		Expect(err).To(HaveLen(1))
 	})
+})
 
+var _ = Describe("Backup retention policy validation", func() {
 	It("doesn't complain if given policy is not provided", func() {
 		cluster := &Cluster{
 			Spec: ClusterSpec{
 				Backup: &BackupConfiguration{},
 			},
 		}
-		err := cluster.validateBackupConfiguration()
-		Expect(err).To(BeNil())
+		err := cluster.validateRetentionPolicy()
+		Expect(err).To(BeEmpty())
 	})
 
 	It("doesn't complain if given policy is valid", func() {
@@ -2286,21 +3132,20 @@ var _ = Describe("Backup validation", func() {
 				},
 			},
 		}
-		err := cluster.validateBackupConfiguration()
-		Expect(err).To(BeNil())
+		err := cluster.validateRetentionPolicy()
+		Expect(err).To(BeEmpty())
 	})
 
 	It("complain if a given policy is not valid", func() {
 		cluster := &Cluster{
 			Spec: ClusterSpec{
 				Backup: &BackupConfiguration{
-					BarmanObjectStore: &BarmanObjectStoreConfiguration{},
-					RetentionPolicy:   "09",
+					RetentionPolicy: "09",
 				},
 			},
 		}
-		err := cluster.validateBackupConfiguration()
-		Expect(err).To(HaveLen(2))
+		err := cluster.validateRetentionPolicy()
+		Expect(err).To(HaveLen(1))
 	})
 })
 
@@ -2605,24 +3450,6 @@ var _ = Describe("validation of imports", func() {
 })
 
 var _ = Describe("validation of replication slots configuration", func() {
-	It("prevents using replication slots on PostgreSQL 10 and older", func() {
-		cluster := &Cluster{
-			Spec: ClusterSpec{
-				ImageName: "ghcr.io/cloudnative-pg/postgresql:10.5",
-				ReplicationSlots: &ReplicationSlotsConfiguration{
-					HighAvailability: &ReplicationSlotsHAConfiguration{
-						Enabled: ptr.To(true),
-					},
-					UpdateInterval: 0,
-				},
-			},
-		}
-		cluster.Default()
-
-		result := cluster.validateReplicationSlots()
-		Expect(result).To(HaveLen(1))
-	})
-
 	It("can be enabled on the default PostgreSQL image", func() {
 		cluster := &Cluster{
 			Spec: ClusterSpec{
@@ -2753,6 +3580,50 @@ var _ = Describe("validation of replication slots configuration", func() {
 		newCluster.Spec.ReplicationSlots.HighAvailability.Enabled = ptr.To(false)
 		Expect(newCluster.validateReplicationSlotsChange(oldCluster)).To(BeEmpty())
 	})
+
+	It("should return an error when SynchronizeReplicasConfiguration is not nil and has invalid regex", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ImageName: versions.DefaultImageName,
+				ReplicationSlots: &ReplicationSlotsConfiguration{
+					SynchronizeReplicas: &SynchronizeReplicasConfiguration{
+						ExcludePatterns: []string{"([a-zA-Z]+"},
+					},
+				},
+			},
+		}
+		errors := cluster.validateReplicationSlots()
+		Expect(errors).To(HaveLen(1))
+		Expect(errors[0].Detail).To(Equal("Cannot configure synchronizeReplicas. Invalid regexes were found"))
+	})
+
+	It("should not return an error when SynchronizeReplicasConfiguration is not nil and regex is valid", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ImageName: versions.DefaultImageName,
+				ReplicationSlots: &ReplicationSlotsConfiguration{
+					SynchronizeReplicas: &SynchronizeReplicasConfiguration{
+						ExcludePatterns: []string{"validpattern"},
+					},
+				},
+			},
+		}
+		errors := cluster.validateReplicationSlots()
+		Expect(errors).To(BeEmpty())
+	})
+
+	It("should not return an error when SynchronizeReplicasConfiguration is nil", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ImageName: versions.DefaultImageName,
+				ReplicationSlots: &ReplicationSlotsConfiguration{
+					SynchronizeReplicas: nil,
+				},
+			},
+		}
+		errors := cluster.validateReplicationSlots()
+		Expect(errors).To(BeEmpty())
+	})
 })
 
 var _ = Describe("Environment variables validation", func() {
@@ -2830,7 +3701,7 @@ var _ = Describe("Storage configuration validation", func() {
 				Spec: ClusterSpec{
 					StorageConfiguration: StorageConfiguration{
 						PersistentVolumeClaimTemplate: &corev1.PersistentVolumeClaimSpec{
-							Resources: corev1.ResourceRequirements{
+							Resources: corev1.VolumeResourceRequirements{
 								Requests: corev1.ResourceList{"storage": resource.MustParse("1Gi")},
 							},
 						},
@@ -2839,6 +3710,62 @@ var _ = Describe("Storage configuration validation", func() {
 			}
 			Expect(cluster.validateStorageSize()).To(BeEmpty())
 		})
+	})
+})
+
+var _ = Describe("Ephemeral volume configuration validation", func() {
+	It("succeeds if no ephemeral configuration is present", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{},
+		}
+		Expect(cluster.validateEphemeralVolumeSource()).To(BeEmpty())
+	})
+
+	It("succeeds if ephemeralVolumeSource is set", func() {
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				EphemeralVolumeSource: &corev1.EphemeralVolumeSource{},
+			},
+		}
+		Expect(cluster.validateEphemeralVolumeSource()).To(BeEmpty())
+	})
+
+	It("succeeds if ephemeralVolumesSizeLimit.temporaryData is set", func() {
+		onegi := resource.MustParse("1Gi")
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				EphemeralVolumesSizeLimit: &EphemeralVolumesSizeLimitConfiguration{
+					TemporaryData: &onegi,
+				},
+			},
+		}
+		Expect(cluster.validateEphemeralVolumeSource()).To(BeEmpty())
+	})
+
+	It("succeeds if ephemeralVolumeSource and ephemeralVolumesSizeLimit.shm are set", func() {
+		onegi := resource.MustParse("1Gi")
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				EphemeralVolumeSource: &corev1.EphemeralVolumeSource{},
+				EphemeralVolumesSizeLimit: &EphemeralVolumesSizeLimitConfiguration{
+					Shm: &onegi,
+				},
+			},
+		}
+		Expect(cluster.validateEphemeralVolumeSource()).To(BeEmpty())
+	})
+
+	It("produces one error if conflicting ephemeral storage options are set", func() {
+		onegi := resource.MustParse("1Gi")
+		cluster := Cluster{
+			Spec: ClusterSpec{
+				EphemeralVolumeSource: &corev1.EphemeralVolumeSource{},
+				EphemeralVolumesSizeLimit: &EphemeralVolumesSizeLimitConfiguration{
+					TemporaryData: &onegi,
+				},
+			},
+		}
+		Expect(cluster.validateEphemeralVolumeSource()).To(HaveLen(1))
 	})
 })
 
@@ -2964,6 +3891,25 @@ var _ = Describe("Managed Extensions validation", func() {
 		Expect(cluster.validateManagedExtensions()).To(BeEmpty())
 	})
 
+	It("should fail if hot_standby_feedback is set to an invalid value", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ReplicationSlots: &ReplicationSlotsConfiguration{
+					HighAvailability: &ReplicationSlotsHAConfiguration{
+						Enabled: ptr.To(true),
+					},
+				},
+				PostgresConfiguration: PostgresConfiguration{
+					Parameters: map[string]string{
+						"hot_standby_feedback":                     "foo",
+						"pg_failover_slots.synchronize_slot_names": "my_slot",
+					},
+				},
+			},
+		}
+		Expect(cluster.validatePgFailoverSlots()).To(HaveLen(2))
+	})
+
 	It("should succeed if pg_failover_slots and its prerequisites are enabled", func() {
 		cluster := &Cluster{
 			Spec: ClusterSpec{
@@ -3001,7 +3947,7 @@ var _ = Describe("Managed Extensions validation", func() {
 			Spec: ClusterSpec{
 				PostgresConfiguration: PostgresConfiguration{
 					Parameters: map[string]string{
-						"hot_standby_feedback":                     "on",
+						"hot_standby_feedback":                     "yes",
 						"pg_failover_slots.synchronize_slot_names": "my_slot",
 					},
 				},
@@ -3686,5 +4632,308 @@ var _ = Describe("Tablespaces validation", func() {
 			},
 		}
 		Expect(cluster.validateTablespaceBackupSnapshot()).To(HaveLen(1))
+	})
+})
+
+var _ = Describe("Validate hibernation", func() {
+	It("should succeed if hibernation is set to 'on'", func() {
+		cluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					utils.HibernationAnnotationName: string(utils.HibernationAnnotationValueOn),
+				},
+			},
+		}
+		Expect(cluster.validateHibernationAnnotation()).To(BeEmpty())
+	})
+
+	It("should succeed if hibernation is set to 'off'", func() {
+		cluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					utils.HibernationAnnotationName: string(utils.HibernationAnnotationValueOff),
+				},
+			},
+		}
+		Expect(cluster.validateHibernationAnnotation()).To(BeEmpty())
+	})
+
+	It("should fail if hibernation is set to an invalid value", func() {
+		cluster := &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					utils.HibernationAnnotationName: "",
+				},
+			},
+		}
+		Expect(cluster.validateHibernationAnnotation()).To(HaveLen(1))
+	})
+})
+
+var _ = Describe("validateManagedServices", func() {
+	var cluster *Cluster
+
+	BeforeEach(func() {
+		cluster = &Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test",
+			},
+			Spec: ClusterSpec{
+				Managed: &ManagedConfiguration{
+					Services: &ManagedServices{
+						Additional: []ManagedService{},
+					},
+				},
+			},
+		}
+	})
+
+	Context("when Managed or Services is nil", func() {
+		It("should return no errors", func() {
+			cluster.Spec.Managed = nil
+			Expect(cluster.validateManagedServices()).To(BeNil())
+
+			cluster.Spec.Managed = &ManagedConfiguration{}
+			cluster.Spec.Managed.Services = nil
+			Expect(cluster.validateManagedServices()).To(BeNil())
+		})
+	})
+
+	Context("when there are no duplicate names", func() {
+		It("should return no errors", func() {
+			cluster.Spec.Managed.Services.Additional = []ManagedService{
+				{
+					ServiceTemplate: ServiceTemplateSpec{
+						ObjectMeta: Metadata{Name: "service1"},
+					},
+				},
+				{
+					ServiceTemplate: ServiceTemplateSpec{
+						ObjectMeta: Metadata{Name: "service2"},
+					},
+				},
+			}
+			Expect(cluster.validateManagedServices()).To(BeNil())
+		})
+	})
+
+	Context("when there are duplicate names", func() {
+		It("should return an error", func() {
+			cluster.Spec.Managed.Services.Additional = []ManagedService{
+				{
+					ServiceTemplate: ServiceTemplateSpec{
+						ObjectMeta: Metadata{Name: "service1"},
+					},
+				},
+				{
+					ServiceTemplate: ServiceTemplateSpec{
+						ObjectMeta: Metadata{Name: "service1"},
+					},
+				},
+			}
+			errs := cluster.validateManagedServices()
+			Expect(errs).To(HaveLen(1))
+			Expect(errs[0].Type).To(Equal(field.ErrorTypeInvalid))
+			Expect(errs[0].Field).To(Equal("spec.managed.services.additional"))
+			Expect(errs[0].Detail).To(ContainSubstring("contains services with the same .metadata.name"))
+		})
+	})
+
+	Context("when service template validation fails", func() {
+		It("should return an error", func() {
+			cluster.Spec.Managed.Services.Additional = []ManagedService{
+				{
+					ServiceTemplate: ServiceTemplateSpec{
+						ObjectMeta: Metadata{Name: ""},
+					},
+				},
+			}
+			errs := cluster.validateManagedServices()
+			Expect(errs).To(HaveLen(1))
+			Expect(errs[0].Type).To(Equal(field.ErrorTypeInvalid))
+			Expect(errs[0].Field).To(Equal("spec.managed.services.additional[0]"))
+		})
+
+		It("should not allow reserved service names", func() {
+			assertError := func(name string, index int, err *field.Error) {
+				expectedDetail := fmt.Sprintf("the service name: '%s' is reserved for operator use", name)
+				Expect(err.Type).To(Equal(field.ErrorTypeInvalid))
+				Expect(err.Field).To(Equal(fmt.Sprintf("spec.managed.services.additional[%d]", index)))
+				Expect(err.Detail).To(Equal(expectedDetail))
+			}
+			cluster.Spec.Managed.Services.Additional = []ManagedService{
+				{ServiceTemplate: ServiceTemplateSpec{ObjectMeta: Metadata{Name: cluster.GetServiceReadWriteName()}}},
+				{ServiceTemplate: ServiceTemplateSpec{ObjectMeta: Metadata{Name: cluster.GetServiceReadName()}}},
+				{ServiceTemplate: ServiceTemplateSpec{ObjectMeta: Metadata{Name: cluster.GetServiceReadOnlyName()}}},
+				{ServiceTemplate: ServiceTemplateSpec{ObjectMeta: Metadata{Name: cluster.GetServiceAnyName()}}},
+			}
+			errs := cluster.validateManagedServices()
+			Expect(errs).To(HaveLen(4))
+			assertError("test-rw", 0, errs[0])
+			assertError("test-r", 1, errs[1])
+			assertError("test-ro", 2, errs[2])
+			assertError("test-any", 3, errs[3])
+		})
+	})
+
+	Context("disabledDefault service validation", func() {
+		It("should allow the disablement of ro and r service", func() {
+			cluster.Spec.Managed.Services.DisabledDefaultServices = []ServiceSelectorType{
+				ServiceSelectorTypeR,
+				ServiceSelectorTypeRO,
+			}
+			errs := cluster.validateManagedServices()
+			Expect(errs).To(BeEmpty())
+		})
+
+		It("should not allow the disablement of rw service", func() {
+			cluster.Spec.Managed.Services.DisabledDefaultServices = []ServiceSelectorType{
+				ServiceSelectorTypeRW,
+			}
+			errs := cluster.validateManagedServices()
+			Expect(errs).To(HaveLen(1))
+			Expect(errs[0].Type).To(Equal(field.ErrorTypeInvalid))
+			Expect(errs[0].Field).To(Equal("spec.managed.services.disabledDefaultServices"))
+		})
+	})
+})
+
+var _ = Describe("ServiceTemplate Validation", func() {
+	var (
+		path         *field.Path
+		serviceSpecs ServiceTemplateSpec
+	)
+
+	BeforeEach(func() {
+		path = field.NewPath("spec")
+	})
+
+	Describe("validateServiceTemplate", func() {
+		Context("when name is required", func() {
+			It("should return an error if the name is empty", func() {
+				serviceSpecs = ServiceTemplateSpec{
+					ObjectMeta: Metadata{Name: ""},
+				}
+
+				errs := validateServiceTemplate(path, true, serviceSpecs)
+				Expect(errs).To(HaveLen(1))
+				Expect(errs[0].Error()).To(ContainSubstring("name is required"))
+			})
+
+			It("should not return an error if the name is present", func() {
+				serviceSpecs = ServiceTemplateSpec{
+					ObjectMeta: Metadata{Name: "valid-name"},
+				}
+
+				errs := validateServiceTemplate(path, true, serviceSpecs)
+				Expect(errs).To(BeEmpty())
+			})
+		})
+
+		Context("when name is not allowed", func() {
+			It("should return an error if the name is present", func() {
+				serviceSpecs = ServiceTemplateSpec{
+					ObjectMeta: Metadata{Name: "invalid-name"},
+				}
+
+				errs := validateServiceTemplate(path, false, serviceSpecs)
+				Expect(errs).To(HaveLen(1))
+				Expect(errs[0].Error()).To(ContainSubstring("name is not allowed"))
+			})
+
+			It("should not return an error if the name is empty", func() {
+				serviceSpecs = ServiceTemplateSpec{
+					ObjectMeta: Metadata{Name: ""},
+				}
+
+				errs := validateServiceTemplate(path, false, serviceSpecs)
+				Expect(errs).To(BeEmpty())
+			})
+		})
+
+		Context("when selector is present", func() {
+			It("should return an error if the selector is present", func() {
+				serviceSpecs = ServiceTemplateSpec{
+					ObjectMeta: Metadata{Name: "valid-name"},
+					Spec: corev1.ServiceSpec{
+						Selector: map[string]string{"app": "test"},
+					},
+				}
+
+				errs := validateServiceTemplate(path, true, serviceSpecs)
+				Expect(errs).To(HaveLen(1))
+				Expect(errs[0].Error()).To(ContainSubstring("selector field is managed by the operator"))
+			})
+
+			It("should not return an error if the selector is absent", func() {
+				serviceSpecs = ServiceTemplateSpec{
+					ObjectMeta: Metadata{Name: "valid-name"},
+					Spec: corev1.ServiceSpec{
+						Selector: map[string]string{},
+					},
+				}
+
+				errs := validateServiceTemplate(path, true, serviceSpecs)
+				Expect(errs).To(BeEmpty())
+			})
+		})
+	})
+})
+
+var _ = Describe("setDefaultPlugins", func() {
+	It("adds pre-defined plugins if not already present", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				Plugins: []PluginConfiguration{
+					{Name: "existing-plugin", Enabled: ptr.To(true)},
+				},
+			},
+		}
+		config := &configuration.Data{
+			IncludePlugins: "predefined-plugin1,predefined-plugin2",
+		}
+
+		cluster.setDefaultPlugins(config)
+
+		Expect(cluster.Spec.Plugins).To(
+			ContainElement(PluginConfiguration{Name: "existing-plugin", Enabled: ptr.To(true)}))
+		Expect(cluster.Spec.Plugins).To(
+			ContainElement(PluginConfiguration{Name: "predefined-plugin1", Enabled: ptr.To(true)}))
+		Expect(cluster.Spec.Plugins).To(
+			ContainElement(PluginConfiguration{Name: "predefined-plugin2", Enabled: ptr.To(true)}))
+	})
+
+	It("does not add pre-defined plugins if already present", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				Plugins: []PluginConfiguration{
+					{Name: "predefined-plugin1", Enabled: ptr.To(false)},
+				},
+			},
+		}
+		config := &configuration.Data{
+			IncludePlugins: "predefined-plugin1,predefined-plugin2",
+		}
+
+		cluster.setDefaultPlugins(config)
+
+		Expect(cluster.Spec.Plugins).To(HaveLen(2))
+		Expect(cluster.Spec.Plugins).To(
+			ContainElement(PluginConfiguration{Name: "predefined-plugin1", Enabled: ptr.To(false)}))
+		Expect(cluster.Spec.Plugins).To(
+			ContainElement(PluginConfiguration{Name: "predefined-plugin2", Enabled: ptr.To(true)}))
+	})
+
+	It("handles empty plugin list gracefully", func() {
+		cluster := &Cluster{}
+		config := &configuration.Data{
+			IncludePlugins: "predefined-plugin1",
+		}
+
+		cluster.setDefaultPlugins(config)
+
+		Expect(cluster.Spec.Plugins).To(HaveLen(1))
+		Expect(cluster.Spec.Plugins).To(
+			ContainElement(PluginConfiguration{Name: "predefined-plugin1", Enabled: ptr.To(true)}))
 	})
 })

@@ -19,6 +19,10 @@ package logpipe
 // PgAuditFieldsPerRecord is the number of fields in a pgaudit log line
 const PgAuditFieldsPerRecord int = 9
 
+// PgAuditFieldsPerRecordWithRows is the number of fields in a pgaudit log line
+// when "pgaudit.log_rows" is set to "on"
+const PgAuditFieldsPerRecordWithRows int = 10
+
 // PgAuditRecordName is the value of the logger field for pgaudit
 const PgAuditRecordName = "pgaudit"
 
@@ -34,7 +38,7 @@ func NewPgAuditLoggingDecorator() *PgAuditLoggingDecorator {
 	return &PgAuditLoggingDecorator{
 		LoggingRecord: &LoggingRecord{},
 		Audit:         &PgAuditRecord{},
-		CSVReadWriter: NewCSVRecordReadWriter(PgAuditFieldsPerRecord),
+		CSVReadWriter: NewCSVRecordReadWriter(PgAuditFieldsPerRecord, PgAuditFieldsPerRecordWithRows),
 	}
 }
 
@@ -84,6 +88,11 @@ func (r *PgAuditRecord) fromCSV(auditContent []string) {
 	r.ObjectName = auditContent[6]
 	r.Statement = auditContent[7]
 	r.Parameter = auditContent[8]
+	if len(auditContent) >= PgAuditFieldsPerRecordWithRows {
+		r.Rows = auditContent[9]
+	} else {
+		r.Rows = ""
+	}
 }
 
 // PgAuditRecord stores all the fields of a pgaudit log line
@@ -97,4 +106,5 @@ type PgAuditRecord struct {
 	ObjectName     string `json:"object_name,omitempty"`
 	Statement      string `json:"statement,omitempty"`
 	Parameter      string `json:"parameter,omitempty"`
+	Rows           string `json:"rows,omitempty"`
 }

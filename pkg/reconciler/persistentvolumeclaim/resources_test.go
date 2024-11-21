@@ -17,8 +17,6 @@ limitations under the License.
 package persistentvolumeclaim
 
 import (
-	"context"
-
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,10 +29,10 @@ import (
 )
 
 var _ = Describe("PVC detection", func() {
-	It("will list PVCs with Jobs or Pods or which are Ready", func() {
+	It("will list PVCs with Jobs or Pods or which are Ready", func(ctx SpecContext) {
 		clusterName := "myCluster"
 		makeClusterPVC := func(serial string, isResizing bool) corev1.PersistentVolumeClaim {
-			return makePVC(clusterName, serial, NewPgDataCalculator(), isResizing)
+			return makePVC(clusterName, serial, serial, NewPgDataCalculator(), isResizing)
 		}
 		pvcs := []corev1.PersistentVolumeClaim{
 			makeClusterPVC("1", false), // has a Pod
@@ -48,7 +46,7 @@ var _ = Describe("PVC detection", func() {
 			},
 		}
 		EnrichStatus(
-			context.TODO(),
+			ctx,
 			cluster,
 			[]corev1.Pod{
 				makePod(clusterName, "1", specs.ClusterRoleLabelPrimary),

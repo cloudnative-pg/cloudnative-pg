@@ -24,8 +24,9 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
+
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/concurrency"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
 
@@ -78,9 +79,15 @@ func (i *PostgresLifecycle) Start(ctx context.Context) error {
 
 	signalLoop:
 		for {
-			contextLogger.Debug("starting signal loop")
-			select {
-			case err := <-postMasterErrChan:
+			pgStopHandler := func(pgExitStatus error) {
+				// The postmaster error channel will send an error value, possibly being nil,
+				// corresponding to the postmaster exit status.
+				// Having done that, it will be closed.
+				//
+				// Closed channels are always ready for communication and to avoid a spin
+				// loop we need to ensure it is never selected again.
+				postMasterErrChan = nil
+
 				// We didn't request postmaster to shut down or to restart, nevertheless
 				// the postmaster is terminated. This can happen in the following
 				// conditions:
@@ -90,17 +97,24 @@ func (i *PostgresLifecycle) Start(ctx context.Context) error {
 				//
 				// In this case we want to terminate the instance manager and let the Kubelet
 				// restart the Pod.
-				if err != nil {
+				if pgExitStatus != nil {
 					var exitError *exec.ExitError
-					if !errors.As(err, &exitError) {
-						contextLogger.Error(err, "Error waiting on the PostgreSQL process")
+					if !errors.As(pgExitStatus, &exitError) {
+						contextLogger.Error(pgExitStatus, "Error waiting on the PostgreSQL process")
 					} else {
 						contextLogger.Error(exitError, "PostgreSQL process exited with errors")
 					}
 				}
+			}
+
+			contextLogger.Debug("starting signal loop")
+			select {
+			case err := <-postMasterErrChan:
+				pgStopHandler(err)
 				if !i.instance.MightBeUnavailable() {
 					return err
 				}
+
 			case <-ctx.Done():
 				// The controller manager asked us to terminate our operations.
 				// We shut down PostgreSQL and terminate using the smart
@@ -141,7 +155,12 @@ func (i *PostgresLifecycle) Start(ctx context.Context) error {
 					contextLogger.Error(err, "while handling instance command request")
 				}
 				if restartNeeded {
-					contextLogger.Info("Restarting the instance")
+					contextLogger.Info("Instance restart requested, waiting for PostgreSQL to shut down")
+					if postMasterErrChan != nil {
+						err := <-postMasterErrChan
+						pgStopHandler(err)
+					}
+					contextLogger.Info("PostgreSQL is shut down, starting the postmaster")
 					break signalLoop
 				}
 			}

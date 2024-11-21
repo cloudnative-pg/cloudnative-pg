@@ -21,16 +21,29 @@ package configuration
 import (
 	"path"
 	"strings"
+	"time"
+
+	"github.com/cloudnative-pg/machinery/pkg/log"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/configparser"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
 
 var configurationLog = log.WithName("configuration")
 
-// DefaultOperatorPullSecretName is implicitly copied into newly created clusters.
-const DefaultOperatorPullSecretName = "cnpg-pull-secret" // #nosec
+const (
+	// DefaultOperatorPullSecretName is implicitly copied into newly created clusters.
+	DefaultOperatorPullSecretName = "cnpg-pull-secret" // #nosec
+
+	// CertificateDuration is the default value for the lifetime of the generated certificates
+	CertificateDuration = 90
+
+	// ExpiringCheckThreshold is the default threshold to consider a certificate as expiring
+	ExpiringCheckThreshold = 7
+)
+
+// DefaultPluginSocketDir is the default directory where the plugin sockets are located.
+const DefaultPluginSocketDir = "/plugins"
 
 // Data is the struct containing the configuration of the operator.
 // Usually the operator code will use the "Current" configuration.
@@ -38,6 +51,10 @@ type Data struct {
 	// WebhookCertDir is the directory where the certificates for the webhooks
 	// need to written. This is different between plain Kubernetes and OpenShift
 	WebhookCertDir string `json:"webhookCertDir" env:"WEBHOOK_CERT_DIR"`
+
+	// PluginSocketDir is the directory where the plugins sockets are to be
+	// found
+	PluginSocketDir string `json:"pluginSocketDir" env:"PLUGIN_SOCKET_DIR"`
 
 	// WatchNamespace is the namespace where the operator should watch and
 	// is configurable via environment variables in the OpenShift console.
@@ -82,12 +99,32 @@ type Data struct {
 	// EnableAzurePVCUpdates enables the live update of PVC in Azure environment
 	EnableAzurePVCUpdates bool `json:"enableAzurePVCUpdates" env:"ENABLE_AZURE_PVC_UPDATES"`
 
-	// EnablePodDebugging enable debugging mode in new generated pods
-	EnablePodDebugging bool `json:"enablePodDebugging" env:"POD_DEBUG"`
+	// This is the lifetime of the generated certificates
+	CertificateDuration int `json:"certificateDuration" env:"CERTIFICATE_DURATION"`
+
+	// Threshold to consider a certificate as expiring
+	ExpiringCheckThreshold int `json:"expiringCheckThreshold" env:"EXPIRING_CHECK_THRESHOLD"`
 
 	// CreateAnyService is true when the user wants the operator to create
 	// the <cluster-name>-any service. Defaults to false.
 	CreateAnyService bool `json:"createAnyService" env:"CREATE_ANY_SERVICE"`
+
+	// The duration (in seconds) to wait between the roll-outs of different
+	// clusters during an operator upgrade. This setting controls the
+	// timing of upgrades across clusters, spreading them out to reduce
+	// system impact. The default value is 0, which means no delay between
+	// PostgreSQL cluster upgrades.
+	ClustersRolloutDelay int `json:"clustersRolloutDelay" env:"CLUSTERS_ROLLOUT_DELAY"`
+
+	// The duration (in seconds) to wait between roll-outs of individual
+	// PostgreSQL instances within the same cluster during an operator
+	// upgrade. The default value is 0, meaning no delay between upgrades
+	// of instances in the same PostgreSQL cluster.
+	InstancesRolloutDelay int `json:"instancesRolloutDelay" env:"INSTANCES_ROLLOUT_DELAY"`
+
+	// IncludePlugins is a comma-separated list of plugins to always be
+	// included in the Cluster reconciliation
+	IncludePlugins string `json:"includePlugins" env:"INCLUDE_PLUGINS"`
 }
 
 // Current is the configuration used by the operator
@@ -99,7 +136,10 @@ func newDefaultConfig() *Data {
 		OperatorPullSecretName: DefaultOperatorPullSecretName,
 		OperatorImageName:      versions.DefaultOperatorImageName,
 		PostgresImageName:      versions.DefaultImageName,
+		PluginSocketDir:        DefaultPluginSocketDir,
 		CreateAnyService:       false,
+		CertificateDuration:    CertificateDuration,
+		ExpiringCheckThreshold: ExpiringCheckThreshold,
 	}
 }
 
@@ -128,11 +168,36 @@ func (config *Data) IsLabelInherited(name string) bool {
 	return evaluateGlobPatterns(config.InheritedLabels, name)
 }
 
+// GetClustersRolloutDelay gets the delay between roll-outs of different clusters
+func (config *Data) GetClustersRolloutDelay() time.Duration {
+	return time.Duration(config.ClustersRolloutDelay) * time.Second
+}
+
+// GetInstancesRolloutDelay gets the delay between roll-outs of pods belonging
+// to the same cluster
+func (config *Data) GetInstancesRolloutDelay() time.Duration {
+	return time.Duration(config.InstancesRolloutDelay) * time.Second
+}
+
 // WatchedNamespaces get the list of additional watched namespaces.
 // The result is a list of namespaces specified in the WATCHED_NAMESPACE where
 // each namespace is separated by comma
 func (config *Data) WatchedNamespaces() []string {
 	return cleanNamespaceList(config.WatchNamespace)
+}
+
+// GetIncludePlugins gets the list of plugins to be always
+// included in the operator reconciliation
+func (config *Data) GetIncludePlugins() []string {
+	rawList := strings.Split(config.IncludePlugins, ",")
+	result := make([]string, 0, len(rawList))
+	for _, pluginName := range rawList {
+		if trimmedPluginName := strings.TrimSpace(pluginName); trimmedPluginName != "" {
+			result = append(result, trimmedPluginName)
+		}
+	}
+
+	return result
 }
 
 func cleanNamespaceList(namespaces string) (result []string) {

@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -30,8 +31,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -44,7 +43,7 @@ func newOfflineExecutor(cli client.Client, recorder record.EventRecorder) *offli
 	return &offlineExecutor{cli: cli, recorder: recorder}
 }
 
-func (o offlineExecutor) finalize(
+func (o *offlineExecutor) finalize(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	backup *apiv1.Backup,
@@ -53,7 +52,7 @@ func (o offlineExecutor) finalize(
 	return nil, EnsurePodIsUnfenced(ctx, o.cli, o.recorder, cluster, backup, targetPod)
 }
 
-func (o offlineExecutor) prepare(
+func (o *offlineExecutor) prepare(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	backup *apiv1.Backup,
@@ -124,19 +123,10 @@ func (o *offlineExecutor) ensurePodIsFenced(
 			"targetBackup", backup.Name, "targetPod", targetPodName,
 		)
 	}
-
-	err = resources.ApplyFenceFunc(
-		ctx,
-		o.cli,
-		cluster.Name,
-		cluster.Namespace,
-		targetPodName,
-		utils.AddFencedInstance,
-	)
-	if errors.Is(err, utils.ErrorServerAlreadyFenced) {
-		return nil
-	}
-	if err != nil {
+	if err = utils.NewFencingMetadataExecutor(o.cli).
+		AddFencing().
+		ForInstance(targetPodName).
+		Execute(ctx, client.ObjectKeyFromObject(cluster), cluster); err != nil {
 		return err
 	}
 

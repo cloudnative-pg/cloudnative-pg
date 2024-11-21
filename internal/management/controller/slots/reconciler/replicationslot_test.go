@@ -17,10 +17,12 @@ limitations under the License.
 package reconciler
 
 import (
-	"context"
+	"database/sql"
+	"database/sql/driver"
 	"errors"
 	"time"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -30,55 +32,9 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-type fakeSlot struct {
-	name   string
-	active bool
-}
-
-type fakeReplicationSlotManager struct {
-	replicationSlots   map[fakeSlot]bool
-	triggerListError   bool
-	triggerDeleteError bool
-}
-
 const slotPrefix = "_cnpg_"
 
-func (fk fakeReplicationSlotManager) Create(_ context.Context, slot infrastructure.ReplicationSlot) error {
-	fk.replicationSlots[fakeSlot{name: slot.SlotName}] = true
-	return nil
-}
-
-func (fk fakeReplicationSlotManager) Delete(_ context.Context, slot infrastructure.ReplicationSlot) error {
-	if fk.triggerDeleteError {
-		return errors.New("triggered delete error")
-	}
-	delete(fk.replicationSlots, fakeSlot{name: slot.SlotName})
-	return nil
-}
-
-func (fk fakeReplicationSlotManager) Update(_ context.Context, _ infrastructure.ReplicationSlot) error {
-	return nil
-}
-
-func (fk fakeReplicationSlotManager) List(
-	_ context.Context,
-	_ *apiv1.ReplicationSlotsConfiguration,
-) (infrastructure.ReplicationSlotList, error) {
-	var slotList infrastructure.ReplicationSlotList
-	if fk.triggerListError {
-		return slotList, errors.New("triggered list error")
-	}
-
-	for slot := range fk.replicationSlots {
-		slotList.Items = append(slotList.Items, infrastructure.ReplicationSlot{
-			SlotName:   slot.name,
-			RestartLSN: "",
-			Type:       infrastructure.SlotTypePhysical,
-			Active:     slot.active,
-		})
-	}
-	return slotList, nil
-}
+var repSlotColumns = []string{"slot_name", "slot_type", "active", "restart_lsn", "holds_xmin"}
 
 func makeClusterWithInstanceNames(instanceNames []string, primary string) apiv1.Cluster {
 	return apiv1.Cluster{
@@ -98,119 +54,156 @@ func makeClusterWithInstanceNames(instanceNames []string, primary string) apiv1.
 	}
 }
 
+func newRepSlot(name string, active bool, restartLSN string) []driver.Value {
+	return []driver.Value{
+		slotPrefix + name, string(infrastructure.SlotTypePhysical), active, restartLSN, false,
+	}
+}
+
 var _ = Describe("HA Replication Slots reconciliation in Primary", func() {
-	It("can create a new replication slot for a new cluster instance", func() {
-		fakeSlotManager := fakeReplicationSlotManager{
-			replicationSlots: map[fakeSlot]bool{
-				{name: slotPrefix + "instance1"}: true,
-				{name: slotPrefix + "instance2"}: true,
-			},
-		}
+	var (
+		db   *sql.DB
+		mock sqlmock.Sqlmock
+	)
+	BeforeEach(func() {
+		var err error
+		db, mock, err = sqlmock.New()
+		Expect(err).NotTo(HaveOccurred())
+	})
+	AfterEach(func() {
+		Expect(mock.ExpectationsWereMet()).To(Succeed())
+	})
+	It("can create a new replication slot for a new cluster instance", func(ctx SpecContext) {
+		rows := sqlmock.NewRows(repSlotColumns).
+			AddRow(newRepSlot("instance1", true, "lsn1")...).
+			AddRow(newRepSlot("instance2", true, "lsn2")...)
+
+		mock.ExpectQuery("^SELECT (.+) FROM pg_replication_slots").
+			WillReturnRows(rows)
+
+		mock.ExpectExec("SELECT pg_create_physical_replication_slot").
+			WithArgs(slotPrefix+"instance3", false).
+			WillReturnResult(sqlmock.NewResult(1, 1))
 
 		cluster := makeClusterWithInstanceNames([]string{"instance1", "instance2", "instance3"}, "instance1")
 
-		Expect(fakeSlotManager.replicationSlots).To(HaveLen(2))
-		Expect(fakeSlotManager.replicationSlots[fakeSlot{name: "_cnpg_instance1"}]).To(BeTrue())
-		Expect(fakeSlotManager.replicationSlots[fakeSlot{name: "_cnpg_instance2"}]).To(BeTrue())
-
-		_, err := ReconcileReplicationSlots(context.TODO(), "instance1", fakeSlotManager, &cluster)
+		_, err := ReconcileReplicationSlots(ctx, "instance1", db, &cluster)
 		Expect(err).ShouldNot(HaveOccurred())
-		Expect(fakeSlotManager.replicationSlots[fakeSlot{name: "_cnpg_instance1"}]).To(BeFalse())
-		Expect(fakeSlotManager.replicationSlots[fakeSlot{name: "_cnpg_instance3"}]).To(BeTrue())
-		Expect(fakeSlotManager.replicationSlots[fakeSlot{name: "_cnpg_instance2"}]).To(BeTrue())
-		Expect(fakeSlotManager.replicationSlots).To(HaveLen(2))
 	})
 
-	It("can delete an inactive replication slot that is not in the cluster", func() {
-		fakeSlotManager := fakeReplicationSlotManager{
-			replicationSlots: map[fakeSlot]bool{
-				{name: slotPrefix + "instance1"}: true,
-				{name: slotPrefix + "instance2"}: true,
-				{name: slotPrefix + "instance3"}: true,
-			},
-		}
+	It("can delete an inactive HA replication slot that is not in the cluster", func(ctx SpecContext) {
+		rows := sqlmock.NewRows(repSlotColumns).
+			AddRow(newRepSlot("instance1", true, "lsn1")...).
+			AddRow(newRepSlot("instance2", true, "lsn2")...).
+			AddRow(newRepSlot("instance3", false, "lsn2")...)
+
+		mock.ExpectQuery("^SELECT (.+) FROM pg_replication_slots").
+			WillReturnRows(rows)
+
+		mock.ExpectExec("SELECT pg_drop_replication_slot").WithArgs(slotPrefix + "instance3").
+			WillReturnResult(sqlmock.NewResult(1, 1))
 
 		cluster := makeClusterWithInstanceNames([]string{"instance1", "instance2"}, "instance1")
 
-		Expect(fakeSlotManager.replicationSlots).To(HaveLen(3))
-
-		_, err := ReconcileReplicationSlots(context.TODO(), "instance1", fakeSlotManager, &cluster)
+		_, err := ReconcileReplicationSlots(ctx, "instance1", db, &cluster)
 		Expect(err).ShouldNot(HaveOccurred())
-		Expect(fakeSlotManager.replicationSlots[fakeSlot{name: "_cnpg_instance3"}]).To(BeFalse())
-		Expect(fakeSlotManager.replicationSlots).To(HaveLen(1))
 	})
 
-	It("will not delete an active replication slot that is not in the cluster", func() {
-		fakeSlotManager := fakeReplicationSlotManager{
-			replicationSlots: map[fakeSlot]bool{
-				{name: slotPrefix + "instance1"}:               true,
-				{name: slotPrefix + "instance2"}:               true,
-				{name: slotPrefix + "instance3", active: true}: true,
-			},
-		}
+	It("will not delete an active HA replication slot that is not in the cluster", func(ctx SpecContext) {
+		rows := sqlmock.NewRows(repSlotColumns).
+			AddRow(newRepSlot("instance1", true, "lsn1")...).
+			AddRow(newRepSlot("instance2", true, "lsn2")...).
+			AddRow(newRepSlot("instance3", true, "lsn2")...)
+
+		mock.ExpectQuery("^SELECT (.+) FROM pg_replication_slots").
+			WillReturnRows(rows)
 
 		cluster := makeClusterWithInstanceNames([]string{"instance1", "instance2"}, "instance1")
 
-		Expect(fakeSlotManager.replicationSlots).To(HaveLen(3))
-
-		_, err := ReconcileReplicationSlots(context.TODO(), "instance1", fakeSlotManager, &cluster)
+		_, err := ReconcileReplicationSlots(ctx, "instance1", db, &cluster)
 		Expect(err).ShouldNot(HaveOccurred())
-		Expect(fakeSlotManager.replicationSlots[fakeSlot{name: slotPrefix + "instance3", active: true}]).To(BeTrue())
-		Expect(fakeSlotManager.replicationSlots).To(HaveLen(2))
 	})
 })
 
 var _ = Describe("dropReplicationSlots", func() {
-	It("returns error when listing slots fails", func() {
-		fakeManager := &fakeReplicationSlotManager{
-			replicationSlots: make(map[fakeSlot]bool),
-			triggerListError: true,
-		}
+	const selectPgRepSlot = "^SELECT (.+) FROM pg_replication_slots"
+
+	var (
+		db   *sql.DB
+		mock sqlmock.Sqlmock
+	)
+	BeforeEach(func() {
+		var err error
+		db, mock, err = sqlmock.New()
+		Expect(err).NotTo(HaveOccurred())
+	})
+	AfterEach(func() {
+		Expect(mock.ExpectationsWereMet()).To(Succeed())
+	})
+
+	It("returns error when listing slots fails", func(ctx SpecContext) {
 		cluster := makeClusterWithInstanceNames([]string{}, "")
 
-		_, err := dropReplicationSlots(context.Background(), fakeManager, &cluster)
+		mock.ExpectQuery(selectPgRepSlot).WillReturnError(errors.New("triggered list error"))
+
+		_, err := dropReplicationSlots(ctx, db, &cluster, true)
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("triggered list error"))
 	})
 
-	It("skips deletion of active slots and reschedules", func() {
-		fakeManager := &fakeReplicationSlotManager{
-			replicationSlots: map[fakeSlot]bool{
-				{name: "slot1", active: true}: true,
-			},
-		}
+	It("skips deletion of active HA slots and reschedules", func(ctx SpecContext) {
+		rows := sqlmock.NewRows(repSlotColumns).
+			AddRow(newRepSlot("instance1", true, "lsn1")...)
+		mock.ExpectQuery(selectPgRepSlot).WillReturnRows(rows)
+
 		cluster := makeClusterWithInstanceNames([]string{}, "")
 
-		res, err := dropReplicationSlots(context.Background(), fakeManager, &cluster)
+		res, err := dropReplicationSlots(ctx, db, &cluster, true)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(res.RequeueAfter).To(Equal(time.Second))
 	})
 
-	It("returns error when deleting a slot fails", func() {
-		fakeManager := &fakeReplicationSlotManager{
-			replicationSlots: map[fakeSlot]bool{
-				{name: "slot1", active: false}: true,
-			},
-			triggerDeleteError: true,
-		}
+	It("skips the deletion of user defined replication slots on the primary", func(ctx SpecContext) {
+		rows := sqlmock.NewRows(repSlotColumns).
+			AddRow("custom-slot", string(infrastructure.SlotTypePhysical), true, "lsn1", false)
+		mock.ExpectQuery("^SELECT (.+) FROM pg_replication_slots").
+			WillReturnRows(rows)
+
 		cluster := makeClusterWithInstanceNames([]string{}, "")
 
-		_, err := dropReplicationSlots(context.Background(), fakeManager, &cluster)
-		Expect(err).To(HaveOccurred())
-		Expect(err.Error()).To(ContainSubstring("triggered delete error"))
-	})
-
-	It("deletes inactive slots and does not reschedule", func() {
-		fakeManager := &fakeReplicationSlotManager{
-			replicationSlots: map[fakeSlot]bool{
-				{name: "slot1", active: false}: true,
-			},
-		}
-		cluster := makeClusterWithInstanceNames([]string{}, "")
-
-		res, err := dropReplicationSlots(context.Background(), fakeManager, &cluster)
+		res, err := dropReplicationSlots(ctx, db, &cluster, true)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(res.RequeueAfter).To(Equal(time.Duration(0)))
-		Expect(fakeManager.replicationSlots).NotTo(HaveKey(fakeSlot{name: "slot1", active: false}))
+		Expect(res.IsZero()).To(BeTrue())
+	})
+
+	It("returns error when deleting a slot fails", func(ctx SpecContext) {
+		rows := sqlmock.NewRows(repSlotColumns).
+			AddRow(newRepSlot("instance1", false, "lsn1")...)
+		mock.ExpectQuery(selectPgRepSlot).WillReturnRows(rows)
+
+		mock.ExpectExec("SELECT pg_drop_replication_slot").WithArgs(slotPrefix + "instance1").
+			WillReturnError(errors.New("delete error"))
+
+		cluster := makeClusterWithInstanceNames([]string{}, "")
+
+		_, err := dropReplicationSlots(ctx, db, &cluster, true)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("delete error"))
+	})
+
+	It("deletes inactive slots and does not reschedule", func(ctx SpecContext) {
+		rows := sqlmock.NewRows(repSlotColumns).
+			AddRow(newRepSlot("instance1", false, "lsn1")...)
+		mock.ExpectQuery(selectPgRepSlot).WillReturnRows(rows)
+
+		mock.ExpectExec("SELECT pg_drop_replication_slot").WithArgs(slotPrefix + "instance1").
+			WillReturnResult(sqlmock.NewResult(1, 1))
+
+		cluster := makeClusterWithInstanceNames([]string{}, "")
+
+		res, err := dropReplicationSlots(ctx, db, &cluster, true)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(res.RequeueAfter).To(Equal(time.Duration(0)))
 	})
 })

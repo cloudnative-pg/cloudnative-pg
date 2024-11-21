@@ -17,8 +17,6 @@ limitations under the License.
 package roles
 
 import (
-	"context"
-
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -30,17 +28,17 @@ import (
 )
 
 var _ = Describe("Role reconciler test", func() {
-	It("reconcile an empty cluster", func() {
+	It("reconcile an empty cluster", func(ctx SpecContext) {
 		cluster := &v1.Cluster{}
 		instance := &postgres.Instance{}
 		mockClient := fake.NewClientBuilder().Build()
 
-		result, err := Reconcile(context.TODO(), instance, cluster, mockClient)
+		result, err := Reconcile(ctx, instance, cluster, mockClient)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(result).To(BeEquivalentTo(reconcile.Result{}))
 	})
 
-	It("reconcile fails with no database connection", func() {
+	It("reconcile fails with no database connection", func(ctx SpecContext) {
 		instance := &postgres.Instance{}
 		mockClient := fake.NewClientBuilder().Build()
 		cluster := &v1.Cluster{
@@ -55,10 +53,11 @@ var _ = Describe("Role reconciler test", func() {
 				},
 			},
 		}
-		pgStringError := "while listing DB roles for DRM: " +
-			"failed to connect to `host=/controller/run user=postgres database=postgres`: dial " +
-			"error (dial unix /controller/run/.s.PGSQL.5432: connect: no such file or directory)"
-		result, err := Reconcile(context.TODO(), instance, cluster, mockClient)
+		pgStringError := "while listing DB roles for role reconciler: " +
+			"failed to connect to `user=postgres database=postgres`: " +
+			"/controller/run/.s.PGSQL.5432 (/controller/run): " +
+			"dial error: dial unix /controller/run/.s.PGSQL.5432: connect: no such file or directory"
+		result, err := Reconcile(ctx, instance, cluster, mockClient)
 		Expect(err.Error()).To(BeEquivalentTo(pgStringError))
 		Expect(result).To(BeEquivalentTo(reconcile.Result{}))
 	})

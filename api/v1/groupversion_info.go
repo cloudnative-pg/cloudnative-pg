@@ -51,6 +51,12 @@ var (
 	// PoolerKind is the kind name of Poolers
 	PoolerKind = "Pooler"
 
+	// ImageCatalogKind is the kind name of namespaced image catalogs
+	ImageCatalogKind = "ImageCatalog"
+
+	// ClusterImageCatalogKind is the kind name of the cluster-wide image catalogs
+	ClusterImageCatalogKind = "ClusterImageCatalog"
+
 	// SchemeBuilder is used to add go types to the GroupVersionKind scheme
 	SchemeBuilder = &scheme.Builder{GroupVersion: GroupVersion}
 

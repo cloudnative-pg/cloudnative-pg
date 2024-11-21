@@ -111,7 +111,7 @@ func (cmd *fioCommand) generatePVCObject() (*corev1.PersistentVolumeClaim, error
 			return nil, err
 		}
 
-		result.Spec.Resources = corev1.ResourceRequirements{
+		result.Spec.Resources = corev1.VolumeResourceRequirements{
 			Requests: corev1.ResourceList{
 				"storage": parsedSize,
 			},

@@ -21,33 +21,29 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"os"
 	"path"
 	"path/filepath"
-	"strings"
 	"time"
 
+	barmanArchiver "github.com/cloudnative-pg/barman-cloud/pkg/archiver"
+	"github.com/cloudnative-pg/machinery/pkg/fileutils"
+	"github.com/cloudnative-pg/machinery/pkg/log"
+	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	pluginClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/cache"
 	cacheClient "github.com/cloudnative-pg/cloudnative-pg/internal/management/cache/client"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/conditions"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/archiver"
-	barmanCapabilities "github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/capabilities"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	pgManagement "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
-)
-
-const (
-	// SpoolDirectory is the directory where we spool the WAL files that
-	// were pre-archived in parallel
-	SpoolDirectory = postgres.ScratchDataDirectory + "/wal-archive-spool"
 )
 
 // errSwitchoverInProgress is raised when there is a switchover in progress
@@ -58,7 +54,6 @@ var errSwitchoverInProgress = fmt.Errorf("switchover in progress, refusing archi
 func NewCmd() *cobra.Command {
 	var podName string
 	var pgData string
-
 	cmd := cobra.Command{
 		Use:           "wal-archive [name]",
 		SilenceErrors: true,
@@ -102,7 +97,7 @@ func NewCmd() *cobra.Command {
 					Message: err.Error(),
 				}
 				if errCond := conditions.Patch(ctx, typedClient, cluster, &condition); errCond != nil {
-					log.Error(errCond, "Error changing wal archiving condition (wal archiving failed)")
+					contextLog.Error(errCond, "Error changing wal archiving condition (wal archiving failed)")
 				}
 				return err
 			}
@@ -115,7 +110,7 @@ func NewCmd() *cobra.Command {
 				Message: "Continuous archiving is working",
 			}
 			if errCond := conditions.Patch(ctx, typedClient, cluster, &condition); errCond != nil {
-				log.Error(errCond, "Error changing wal archiving condition (wal archiving succeeded)")
+				contextLog.Error(errCond, "Error changing wal archiving condition (wal archiving succeeded)")
 			}
 
 			return nil
@@ -123,7 +118,7 @@ func NewCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&podName, "pod-name", os.Getenv("POD_NAME"), "The name of the "+
 		"current pod in k8s")
-	cmd.Flags().StringVar(&pgData, "pg-data", os.Getenv("PGDATA"), "The PGDATA to be created")
+	cmd.Flags().StringVar(&pgData, "pg-data", os.Getenv("PGDATA"), "The PGDATA to be used")
 
 	return &cmd
 }
@@ -138,17 +133,7 @@ func run(
 	contextLog := log.FromContext(ctx)
 	walName := args[0]
 
-	if cluster.Spec.Backup == nil || cluster.Spec.Backup.BarmanObjectStore == nil {
-		// Backup not configured, skipping WAL
-		contextLog.Info("Backup not configured, skip WAL archiving",
-			"walName", walName,
-			"currentPrimary", cluster.Status.CurrentPrimary,
-			"targetPrimary", cluster.Status.TargetPrimary,
-		)
-		return nil
-	}
-
-	if cluster.Spec.ReplicaCluster != nil && cluster.Spec.ReplicaCluster.Enabled {
+	if cluster.IsReplica() {
 		if podName != cluster.Status.CurrentPrimary && podName != cluster.Status.TargetPrimary {
 			contextLog.Debug("WAL archiving on a replica cluster, "+
 				"but this node is not the target primary nor the current one. "+
@@ -169,9 +154,20 @@ func run(
 		return errSwitchoverInProgress
 	}
 
-	maxParallel := 1
-	if cluster.Spec.Backup.BarmanObjectStore.Wal != nil {
-		maxParallel = cluster.Spec.Backup.BarmanObjectStore.Wal.MaxParallel
+	// Request the plugins to archive this WAL
+	if err := archiveWALViaPlugins(ctx, cluster, path.Join(pgData, walName)); err != nil {
+		return err
+	}
+
+	// Request Barman Cloud to archive this WAL
+	if cluster.Spec.Backup == nil || cluster.Spec.Backup.BarmanObjectStore == nil {
+		// Backup not configured, skipping WAL
+		contextLog.Debug("Backup not configured, skip WAL archiving via Barman Cloud",
+			"walName", walName,
+			"currentPrimary", cluster.Status.CurrentPrimary,
+			"targetPrimary", cluster.Status.TargetPrimary,
+		)
+		return nil
 	}
 
 	// Get environment from cache
@@ -180,13 +176,30 @@ func run(
 		return fmt.Errorf("failed to get envs: %w", err)
 	}
 
+	maxParallel := 1
+	if cluster.Spec.Backup.BarmanObjectStore.Wal != nil {
+		maxParallel = cluster.Spec.Backup.BarmanObjectStore.Wal.MaxParallel
+	}
+
 	// Create the archiver
-	var walArchiver *archiver.WALArchiver
-	if walArchiver, err = archiver.New(ctx, cluster, env, SpoolDirectory, pgData); err != nil {
+	var walArchiver *barmanArchiver.WALArchiver
+	if walArchiver, err = barmanArchiver.New(
+		ctx,
+		env,
+		postgres.SpoolDirectory,
+		pgData,
+		path.Join(pgData, pgManagement.CheckEmptyWalArchiveFile)); err != nil {
 		return fmt.Errorf("while creating the archiver: %w", err)
 	}
 
-	// Step 1: check if this WAL file has not been already archived
+	// Step 1: Check if the archive location is safe to perform archiving
+	if utils.IsEmptyWalArchiveCheckEnabled(&cluster.ObjectMeta) {
+		if err := checkWalArchive(ctx, cluster, walArchiver, pgData); err != nil {
+			return err
+		}
+	}
+
+	// Step 2: check if this WAL file has not been already archived
 	var isDeletedFromSpool bool
 	isDeletedFromSpool, err = walArchiver.DeleteFromSpool(walName)
 	if err != nil {
@@ -201,16 +214,10 @@ func run(
 	}
 
 	// Step 3: gather the WAL files names to archive
-	walFilesList := gatherWALFilesToArchive(ctx, walName, maxParallel)
+	walFilesList := walArchiver.GatherWALFilesToArchive(ctx, walName, maxParallel)
 
-	// Step 4: Check if the archive location is safe to perform archiving
-	if utils.IsEmptyWalArchiveCheckEnabled(&cluster.ObjectMeta) {
-		if err := checkWalArchive(ctx, cluster, walArchiver, pgData); err != nil {
-			return err
-		}
-	}
-
-	options, err := barmanCloudWalArchiveOptions(cluster, cluster.Name)
+	options, err := walArchiver.BarmanCloudWalArchiveOptions(
+		ctx, cluster.Spec.Backup.BarmanObjectStore, cluster.Name)
 	if err != nil {
 		return err
 	}
@@ -234,162 +241,78 @@ func run(
 	return walStatus[0].Err
 }
 
-// gatherWALFilesToArchive reads from the archived status the list of WAL files
-// that can be archived in parallel way.
-// `requestedWALFile` is the name of the file whose archiving was requested by
-// PostgreSQL, and that file is always the first of the list and is always included.
-// `parallel` is the maximum number of WALs that we can archive in parallel
-func gatherWALFilesToArchive(ctx context.Context, requestedWALFile string, parallel int) (walList []string) {
-	contextLog := log.FromContext(ctx)
-	pgWalDirectory := path.Join(os.Getenv("PGDATA"), "pg_wal")
-	archiveStatusPath := path.Join(pgWalDirectory, "archive_status")
-	noMoreWALFilesNeeded := errors.New("no more files needed")
+// archiveWALViaPlugins requests every capable plugin to archive the passed
+// WAL file, and returns an error if a configured plugin fails to do so.
+// It will not return an error if there's no plugin capable of WAL archiving
+func archiveWALViaPlugins(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	walName string,
+) error {
+	contextLogger := log.FromContext(ctx)
 
-	// allocate parallel + 1 only if it does not overflow. Cap otherwise
-	var walListLength int
-	if parallel < math.MaxInt-1 {
-		walListLength = parallel + 1
-	} else {
-		walListLength = math.MaxInt - 1
+	plugins := repository.New()
+	availablePluginNames, err := plugins.RegisterUnixSocketPluginsInPath(configuration.Current.PluginSocketDir)
+	if err != nil {
+		contextLogger.Error(err, "Error while loading local plugins")
 	}
-	// slightly more optimized, but equivalent to:
-	// walList = []string{requestedWALFile}
-	walList = make([]string, 1, walListLength)
-	walList[0] = requestedWALFile
+	defer plugins.Close()
 
-	err := filepath.WalkDir(archiveStatusPath, func(path string, d os.DirEntry, err error) error {
-		// If err is set, it means the current path is a directory and the readdir raised an error
-		// The only available option here is to skip the path and log the error.
-		if err != nil {
-			contextLog.Error(err, "failed reading path", "path", path)
-			return filepath.SkipDir
-		}
+	availablePluginNamesSet := stringset.From(availablePluginNames)
+	enabledPluginNamesSet := stringset.From(cluster.Spec.Plugins.GetEnabledPluginNames())
 
-		if len(walList) >= parallel {
-			return noMoreWALFilesNeeded
-		}
-
-		// We don't process directories beside the archive status path
-		if d.IsDir() {
-			// We want to proceed exploring the archive status folder
-			if path == archiveStatusPath {
-				return nil
-			}
-
-			return filepath.SkipDir
-		}
-
-		// We only process ready files
-		if !strings.HasSuffix(path, ".ready") {
-			return nil
-		}
-
-		walFileName := strings.TrimSuffix(filepath.Base(path), ".ready")
-
-		// We are already archiving the requested WAL file,
-		// and we need to avoid archiving it twice.
-		// requestedWALFile is usually "pg_wal/wal_file_name" and
-		// we compare it with the path we read
-		if strings.HasSuffix(requestedWALFile, walFileName) {
-			return nil
-		}
-
-		walList = append(walList, filepath.Join("pg_wal", walFileName))
-		return nil
-	})
-
-	// In this point err must be nil or noMoreWALFilesNeeded, if it is something different
-	// there is a programming error
-	if err != nil && err != noMoreWALFilesNeeded {
-		contextLog.Error(err, "unexpected error while reading the list of WAL files to archive")
+	client, err := pluginClient.WithPlugins(
+		ctx,
+		plugins,
+		availablePluginNamesSet.Intersect(enabledPluginNamesSet).ToList()...,
+	)
+	if err != nil {
+		contextLogger.Error(err, "Error while loading required plugins")
+		return err
 	}
+	defer client.Close(ctx)
 
-	return walList
+	return client.ArchiveWAL(ctx, cluster, walName)
 }
 
-func barmanCloudWalArchiveOptions(
-	cluster *apiv1.Cluster,
-	clusterName string,
-) ([]string, error) {
-	capabilities, err := barmanCapabilities.CurrentCapabilities()
+// isCheckWalArchiveFlagFilePresent returns true if the file CheckEmptyWalArchiveFile is present in the PGDATA directory
+func isCheckWalArchiveFlagFilePresent(ctx context.Context, pgDataDirectory string) bool {
+	contextLogger := log.FromContext(ctx)
+	filePath := filepath.Join(pgDataDirectory, pgManagement.CheckEmptyWalArchiveFile)
+
+	exists, err := fileutils.FileExists(filePath)
 	if err != nil {
-		return nil, err
+		contextLogger.Error(err, "error while checking for the existence of the CheckEmptyWalArchiveFile")
 	}
-	configuration := cluster.Spec.Backup.BarmanObjectStore
-
-	var options []string
-	if configuration.Wal != nil {
-		if configuration.Wal.Compression == apiv1.CompressionTypeSnappy && !capabilities.HasSnappy {
-			return nil, fmt.Errorf("snappy compression is not supported in Barman %v", capabilities.Version)
-		}
-		if len(configuration.Wal.Compression) != 0 {
-			options = append(
-				options,
-				fmt.Sprintf("--%v", configuration.Wal.Compression))
-		}
-		if len(configuration.Wal.Encryption) != 0 {
-			options = append(
-				options,
-				"-e",
-				string(configuration.Wal.Encryption))
-		}
-	}
-	if len(configuration.EndpointURL) > 0 {
-		options = append(
-			options,
-			"--endpoint-url",
-			configuration.EndpointURL)
+	// If the check empty wal archive file doesn't exist this it's a no-op
+	if !exists {
+		contextLogger.Debug("WAL check flag file not found, skipping check")
+		return false
 	}
 
-	if len(configuration.Tags) > 0 {
-		tags, err := utils.MapToBarmanTagsFormat("--tags", configuration.Tags)
-		if err != nil {
-			return nil, err
-		}
-		options = append(options, tags...)
-	}
-
-	if len(configuration.HistoryTags) > 0 {
-		historyTags, err := utils.MapToBarmanTagsFormat("--history-tags", configuration.HistoryTags)
-		if err != nil {
-			return nil, err
-		}
-		options = append(options, historyTags...)
-	}
-
-	options, err = barman.AppendCloudProviderOptionsFromConfiguration(options, configuration)
-	if err != nil {
-		return nil, err
-	}
-
-	serverName := clusterName
-	if len(configuration.ServerName) != 0 {
-		serverName = configuration.ServerName
-	}
-	options = append(
-		options,
-		configuration.DestinationPath,
-		serverName)
-	return options, nil
+	return exists
 }
 
-func checkWalArchive(ctx context.Context,
+func checkWalArchive(
+	ctx context.Context,
 	cluster *apiv1.Cluster,
-	walArchiver *archiver.WALArchiver,
+	walArchiver *barmanArchiver.WALArchiver,
 	pgData string,
 ) error {
-	checkWalOptions, err := walArchiver.BarmanCloudCheckWalArchiveOptions(cluster, cluster.Name)
+	contextLogger := log.FromContext(ctx)
+	checkWalOptions, err := walArchiver.BarmanCloudCheckWalArchiveOptions(
+		ctx, cluster.Spec.Backup.BarmanObjectStore, cluster.Name)
 	if err != nil {
-		log.Error(err, "while getting barman-cloud-wal-archive options")
+		contextLogger.Error(err, "while getting barman-cloud-wal-archive options")
 		return err
 	}
 
-	if !walArchiver.IsCheckWalArchiveFlagFilePresent(ctx, pgData) {
+	if !isCheckWalArchiveFlagFilePresent(ctx, pgData) {
 		return nil
 	}
 
 	if err := walArchiver.CheckWalArchiveDestination(ctx, checkWalOptions); err != nil {
-		log.Error(err, "while barman-cloud-check-wal-archive")
+		contextLogger.Error(err, "while barman-cloud-check-wal-archive")
 		return err
 	}
 

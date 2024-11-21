@@ -33,8 +33,8 @@ func BuildReplicasPodDisruptionBudget(cluster *apiv1.Cluster) *policyv1.PodDisru
 	if cluster == nil || cluster.Spec.Instances < 3 {
 		return nil
 	}
-	minAvailableReplicas := cluster.Spec.Instances - 2
-	allReplicasButOne := intstr.FromInt(minAvailableReplicas)
+	minAvailableReplicas := int32(cluster.Spec.Instances - 2) //nolint:gosec
+	allReplicasButOne := intstr.FromInt32(minAvailableReplicas)
 
 	pdb := &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
@@ -44,8 +44,8 @@ func BuildReplicasPodDisruptionBudget(cluster *apiv1.Cluster) *policyv1.PodDisru
 		Spec: policyv1.PodDisruptionBudgetSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					utils.ClusterLabelName:     cluster.Name,
-					utils.ClusterRoleLabelName: ClusterRoleLabelReplica,
+					utils.ClusterLabelName:             cluster.Name,
+					utils.ClusterInstanceRoleLabelName: ClusterRoleLabelReplica,
 				},
 			},
 			MinAvailable: &allReplicasButOne,
@@ -63,7 +63,7 @@ func BuildPrimaryPodDisruptionBudget(cluster *apiv1.Cluster) *policyv1.PodDisrup
 	if cluster == nil {
 		return nil
 	}
-	one := intstr.FromInt(1)
+	one := intstr.FromInt32(1)
 
 	pdb := &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
@@ -73,8 +73,8 @@ func BuildPrimaryPodDisruptionBudget(cluster *apiv1.Cluster) *policyv1.PodDisrup
 		Spec: policyv1.PodDisruptionBudgetSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					utils.ClusterLabelName:     cluster.Name,
-					utils.ClusterRoleLabelName: ClusterRoleLabelPrimary,
+					utils.ClusterLabelName:             cluster.Name,
+					utils.ClusterInstanceRoleLabelName: ClusterRoleLabelPrimary,
 				},
 			},
 			MinAvailable: &one,

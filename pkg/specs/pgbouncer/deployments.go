@@ -37,13 +37,15 @@ import (
 
 const (
 	// DefaultPgbouncerImage is the name of the pgbouncer image used by default
-	DefaultPgbouncerImage = "ghcr.io/cloudnative-pg/pgbouncer:1.21.0"
+	DefaultPgbouncerImage = "ghcr.io/cloudnative-pg/pgbouncer:1.23.0"
 )
 
 // Deployment create the deployment of pgbouncer, given
 // the configurations we have in the pooler specifications
 func Deployment(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*appsv1.Deployment, error) {
-	poolerHash, err := hash.ComputeVersionedHash(pooler.Spec, 3)
+	operatorImageName := config.Current.OperatorImageName
+
+	poolerHash, err := computeTemplateHash(pooler, operatorImageName)
 	if err != nil {
 		return nil, err
 	}
@@ -76,14 +78,14 @@ func Deployment(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*appsv1.Deploymen
 			"run",
 		}, false).
 		WithContainerPort("pgbouncer", &corev1.ContainerPort{
-			Name:          "pgbouncer",
+			Name:          pgBouncerConfig.PgBouncerPortName,
 			ContainerPort: pgBouncerConfig.PgBouncerPort,
 		}).
 		WithContainerPort("pgbouncer", &corev1.ContainerPort{
 			Name:          "metrics",
-			ContainerPort: int32(url.PgBouncerMetricsPort),
+			ContainerPort: url.PgBouncerMetricsPort,
 		}).
-		WithInitContainerImage(specs.BootstrapControllerContainerName, config.Current.OperatorImageName, true).
+		WithInitContainerImage(specs.BootstrapControllerContainerName, operatorImageName, true).
 		WithInitContainerCommand(specs.BootstrapControllerContainerName,
 			[]string{"/manager", "bootstrap", "/controller/manager"},
 			true).
@@ -112,7 +114,7 @@ func Deployment(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*appsv1.Deploymen
 			TimeoutSeconds: 5,
 			ProbeHandler: corev1.ProbeHandler{
 				TCPSocket: &corev1.TCPSocketAction{
-					Port: intstr.FromInt(pgBouncerConfig.PgBouncerPort),
+					Port: intstr.FromInt32(pgBouncerConfig.PgBouncerPort),
 				},
 			},
 		}, false).
@@ -148,6 +150,20 @@ func Deployment(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*appsv1.Deploymen
 			Strategy: getDeploymentStrategy(pooler.Spec.DeploymentStrategy),
 		},
 	}, nil
+}
+
+func computeTemplateHash(pooler *apiv1.Pooler, operatorImageName string) (string, error) {
+	type deploymentHash struct {
+		poolerSpec                      apiv1.PoolerSpec
+		operatorImageName               string
+		isPodSpecReconciliationDisabled bool
+	}
+
+	return hash.ComputeHash(deploymentHash{
+		poolerSpec:                      pooler.Spec,
+		operatorImageName:               operatorImageName,
+		isPodSpecReconciliationDisabled: utils.IsPodSpecReconciliationDisabled(&pooler.ObjectMeta),
+	})
 }
 
 func getDeploymentStrategy(strategy *appsv1.DeploymentStrategy) appsv1.DeploymentStrategy {

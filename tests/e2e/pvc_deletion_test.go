@@ -48,14 +48,8 @@ var _ = Describe("PVC Deletion", Label(tests.LabelSelfHealing), func() {
 	It("correctly manages PVCs", func() {
 		var err error
 		// Create a cluster in a namespace we'll delete after the test
-		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-			return env.DeleteNamespace(namespace)
-		})
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
 		// Reuse the same pvc after a deletion

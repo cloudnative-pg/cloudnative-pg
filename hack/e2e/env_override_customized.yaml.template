@@ -24,3 +24,13 @@ spec:
         - --pprof-server=true
         livenessProbe:
           failureThreshold: ${LIVENESS_PROBE_THRESHOLD}
+        # The resources section is just something we should remove
+        # once the operator had a better way to handle the calculation
+        # of the hash of the binary files
+        resources:
+          limits:
+            cpu: 500m
+            memory: 200Mi
+          requests:
+            cpu: 500m
+            memory: 100Mi

@@ -25,22 +25,7 @@ spec:
 
   bootstrap:
     recovery:
-      volumeSnapshots:
-        storage:
-          name: ${SNAPSHOT_PITR_PGDATA}
-          kind: VolumeSnapshot
-          apiGroup: snapshot.storage.k8s.io
-        walStorage:
-          name: ${SNAPSHOT_PITR_PGWAL}
-          kind: VolumeSnapshot
-          apiGroup: snapshot.storage.k8s.io
-        tablespaceStorage:
-          tbs1:
-            name: ${SNAPSHOT_PITR_PGTABLESPACE_tbs1}
-            kind: VolumeSnapshot
-            apiGroup: snapshot.storage.k8s.io
-          tbs2:
-            name: ${SNAPSHOT_PITR_PGTABLESPACE_tbs2}
-            kind: VolumeSnapshot
-            apiGroup: snapshot.storage.k8s.io
+      backup:
+        name: ${BACKUP_NAME}
+
 

@@ -18,6 +18,8 @@ limitations under the License.
 package metrics
 
 import (
+	"database/sql"
+	"errors"
 	"fmt"
 
 	"gopkg.in/yaml.v3"
@@ -29,12 +31,15 @@ type UserQueries map[string]UserQuery
 // UserQuery represent a query created by the user
 type UserQuery struct {
 	Query           string    `yaml:"query"`
+	PredicateQuery  string    `yaml:"predicate_query"`
 	Metrics         []Mapping `yaml:"metrics"`
 	Master          bool      `yaml:"master"` // wokeignore:rule=master
 	Primary         bool      `yaml:"primary"`
 	CacheSeconds    uint64    `yaml:"cache_seconds"`
 	RunOnServer     string    `yaml:"runonserver"`
 	TargetDatabases []string  `yaml:"target_databases"`
+	// Name allows overriding the key name in the metric namespace
+	Name string `yaml:"name"`
 }
 
 // Mapping decide how a certain field, extracted from the query's result, should be used
@@ -50,6 +55,9 @@ type ColumnMapping struct {
 
 	// SupportedVersions are the semantic version ranges which are supported.
 	SupportedVersions string `yaml:"pg_version"`
+
+	// Name allows overriding the key name when naming the column
+	Name string `yaml:"name"`
 }
 
 // ColumnUsage represent how a certain column should be used
@@ -87,4 +95,30 @@ func ParseQueries(content []byte) (UserQueries, error) {
 	}
 
 	return result, nil
+}
+
+// isCollectable checks if a query to collect metrics should be executed.
+// The method tests the query provided in the PredicateQuery property within the same transaction
+// used to collect metrics.
+// PredicateQuery should return at most a single row with a single column with type bool.
+// If no PredicateQuery is provided, the query is considered collectable by default
+func (userQuery UserQuery) isCollectable(tx *sql.Tx) (bool, error) {
+	if userQuery.PredicateQuery == "" {
+		return true, nil
+	}
+
+	var isCollectable sql.NullBool
+	if err := tx.QueryRow(userQuery.PredicateQuery).Scan(&isCollectable); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
+
+		return false, err
+	}
+
+	if !isCollectable.Valid {
+		return false, nil
+	}
+
+	return isCollectable.Bool, nil
 }

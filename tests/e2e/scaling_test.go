@@ -34,6 +34,8 @@ var _ = Describe("Cluster scale up and down", Serial, Label(tests.LabelReplicati
 		level                             = tests.Lowest
 		expectedPvcCount                  = 6
 	)
+
+	var namespace string
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
@@ -43,18 +45,13 @@ var _ = Describe("Cluster scale up and down", Serial, Label(tests.LabelReplicati
 	Context("with HA Replication Slots", func() {
 		It("can scale the cluster size", func() {
 			const namespacePrefix = "cluster-scale-e2e-with-slots"
+			var err error
 			// Create a cluster in a namespace we'll delete after the test
-			namespace, err := env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				if CurrentSpecReport().Failed() {
-					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-				}
-				return env.DeleteNamespaceAndWait(namespace, 60)
-			})
 			AssertCreateCluster(namespace, clusterName, sampleFileWithReplicationSlots, env)
 
-			AssertClusterReplicationSlots(clusterName, namespace)
+			AssertClusterHAReplicationSlots(clusterName, namespace)
 			// Add a node to the cluster and verify the cluster has one more
 			// element
 			By("adding an instance to the cluster", func() {
@@ -64,7 +61,7 @@ var _ = Describe("Cluster scale up and down", Serial, Label(tests.LabelReplicati
 				AssertClusterIsReady(namespace, clusterName, timeout, env)
 			})
 			AssertPvcHasLabels(namespace, clusterName)
-			AssertClusterReplicationSlots(clusterName, namespace)
+			AssertClusterHAReplicationSlots(clusterName, namespace)
 
 			// Remove a node from the cluster and verify the cluster has one
 			// element less
@@ -74,7 +71,7 @@ var _ = Describe("Cluster scale up and down", Serial, Label(tests.LabelReplicati
 				timeout := 60
 				AssertClusterIsReady(namespace, clusterName, timeout, env)
 			})
-			AssertClusterReplicationSlots(clusterName, namespace)
+			AssertClusterHAReplicationSlots(clusterName, namespace)
 
 			By("verify pvc pgWal and pgData are deleted after scale down", func() {
 				AssertPVCCount(namespace, clusterName, expectedPvcCount, 60)
@@ -86,14 +83,9 @@ var _ = Describe("Cluster scale up and down", Serial, Label(tests.LabelReplicati
 		It("can scale the cluster size", func() {
 			// Create a cluster in a namespace we'll delete after the test
 			const namespacePrefix = "cluster-scale-e2e"
-			namespace, err := env.CreateUniqueNamespace(namespacePrefix)
+			var err error
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				if CurrentSpecReport().Failed() {
-					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-				}
-				return env.DeleteNamespaceAndWait(namespace, 60)
-			})
 			AssertCreateCluster(namespace, clusterName, sampleFileWithoutReplicationSlots, env)
 
 			// Add a node to the cluster and verify the cluster has one more

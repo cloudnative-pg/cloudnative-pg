@@ -17,7 +17,6 @@ limitations under the License.
 package logicalimport
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/DATA-DOG/go-sqlmock"
@@ -35,7 +34,6 @@ var _ = Describe("", func() {
 		"WHERE ur.oid >= 16384 AND um.oid >= 16384"
 
 	var (
-		ctx  context.Context
 		fp   fakePooler
 		mock sqlmock.Sqlmock
 		ri   []RoleInheritance
@@ -43,7 +41,6 @@ var _ = Describe("", func() {
 	)
 
 	BeforeEach(func() {
-		ctx = context.TODO()
 		db, dbMock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 		Expect(err).ToNot(HaveOccurred())
 		mock = dbMock
@@ -66,7 +63,7 @@ var _ = Describe("", func() {
 		Expect(expectationErr).ToNot(HaveOccurred())
 	})
 
-	It("should clone role inheritance successfully", func() {
+	It("should clone role inheritance successfully", func(ctx SpecContext) {
 		// Define the RoleInheritance result for getRoleInheritance
 		ri := []RoleInheritance{
 			{
@@ -95,7 +92,7 @@ var _ = Describe("", func() {
 		Expect(err).ToNot(HaveOccurred())
 	})
 
-	It("should return any error encountered when getting role inheritance", func() {
+	It("should return any error encountered when getting role inheritance", func(ctx SpecContext) {
 		expectedErr := fmt.Errorf("querying error")
 		mock.ExpectQuery(inhQuery).WillReturnError(expectedErr)
 
@@ -103,7 +100,7 @@ var _ = Describe("", func() {
 		Expect(err).To(Equal(expectedErr))
 	})
 
-	It("should import role inheritance successfully", func() {
+	It("should import role inheritance successfully", func(ctx SpecContext) {
 		query := fmt.Sprintf(`GRANT %s TO %s WITH ADMIN OPTION GRANTED BY %s`,
 			pgx.Identifier{ri[0].RoleID}.Sanitize(),
 			pgx.Identifier{ri[0].Member}.Sanitize(),
@@ -117,7 +114,7 @@ var _ = Describe("", func() {
 		Expect(err).ToNot(HaveOccurred())
 	})
 
-	It("should return the correct role inheritances", func() {
+	It("should return the correct role inheritances", func(ctx SpecContext) {
 		mock.ExpectQuery(inhQuery).
 			WillReturnRows(sqlmock.NewRows([]string{"roleid", "member", "admin_option", "grantor"}).
 				AddRow("role1", "member1", true, "grantor1"))
@@ -127,7 +124,7 @@ var _ = Describe("", func() {
 		Expect(ris).To(Equal(ri))
 	})
 
-	It("should return any error encountered when getting role inheritances", func() {
+	It("should return any error encountered when getting role inheritances", func(ctx SpecContext) {
 		expectedErr := fmt.Errorf("querying error")
 		mock.ExpectQuery(inhQuery).WillReturnError(expectedErr)
 
@@ -135,7 +132,7 @@ var _ = Describe("", func() {
 		Expect(err).To(Equal(expectedErr))
 	})
 
-	It("should return any error encountered when scanning the result", func() {
+	It("should return any error encountered when scanning the result", func(ctx SpecContext) {
 		mock.ExpectQuery(inhQuery).WillReturnRows(sqlmock.NewRows([]string{"wrongColumnName"}).AddRow("role1"))
 
 		_, err := rm.getRoleInheritance(ctx)

@@ -28,6 +28,7 @@ PG_VERSIONS_FILE = ".github/pg_versions.json"
 AKS_VERSIONS_FILE = ".github/aks_versions.json"
 EKS_VERSIONS_FILE = ".github/eks_versions.json"
 GKE_VERSIONS_FILE = ".github/gke_versions.json"
+OPENSHIFT_VERSIONS_FILE = ".github/openshift_versions.json"
 KIND_VERSIONS_FILE = ".github/kind_versions.json"
 VERSION_SCOPE_FILE = ".github/k8s_versions_scope.json"
 E2E_TEST_TIMEOUT = ".github/e2e_test_timeout.json"
@@ -82,39 +83,75 @@ def filter_version(versions_list, version_range):
 
 
 # Default timeout for the e2e test
-with open(E2E_TEST_TIMEOUT) as json_file:
-    timeout_list = json.load(json_file)
-TIMEOUT_LIST = timeout_list
+try:
+    with open(E2E_TEST_TIMEOUT) as json_file:
+        timeout_list = json.load(json_file)
+    TIMEOUT_LIST = timeout_list
+except:
+    print(f"Failed opening file: {E2E_TEST_TIMEOUT}")
+    exit(1)
 
 # Minimum support k8s version (include) in different cloud vendor
-with open(VERSION_SCOPE_FILE) as json_file:
-    version_list = json.load(json_file)
-SUPPORT_K8S_VERSION = version_list["e2e_test"]
-print(SUPPORT_K8S_VERSION)
+try:
+    with open(VERSION_SCOPE_FILE) as json_file:
+        version_list = json.load(json_file)
+    SUPPORT_K8S_VERSION = version_list["e2e_test"]
+    print(SUPPORT_K8S_VERSION)
+except:
+    print(f"Failed opening file: {VERSION_SCOPE_FILE}")
+    exit(1)
 
 # Kubernetes versions on kind to use during the tests
-with open(KIND_VERSIONS_FILE) as json_file:
-    version_list = json.load(json_file)
-    kind_versions = filter_version(version_list, SUPPORT_K8S_VERSION["KIND"])
-KIND_K8S = VersionList(kind_versions)
+try:
+    with open(KIND_VERSIONS_FILE) as json_file:
+        version_list = json.load(json_file)
+        kind_versions = filter_version(version_list, SUPPORT_K8S_VERSION["KIND"])
+    KIND_K8S = VersionList(kind_versions)
+except:
+    print(f"Failed opening file: {KIND_VERSIONS_FILE}")
+    exit(1)
 
 # Kubernetes versions on EKS to use during the tests
-with open(EKS_VERSIONS_FILE) as json_file:
-    version_list = json.load(json_file)
-    eks_versions = filter_version(version_list, SUPPORT_K8S_VERSION["EKS"])
-EKS_K8S = VersionList(eks_versions)
+try:
+    with open(EKS_VERSIONS_FILE) as json_file:
+        version_list = json.load(json_file)
+        eks_versions = filter_version(version_list, SUPPORT_K8S_VERSION["EKS"])
+    EKS_K8S = VersionList(eks_versions)
+except:
+    print(f"Failed opening file: {EKS_VERSIONS_FILE}")
+    exit(1)
 
 # Kubernetes versions on AKS to use during the tests
-with open(AKS_VERSIONS_FILE) as json_file:
-    version_list = json.load(json_file)
-    aks_versions = filter_version(version_list, SUPPORT_K8S_VERSION["AKS"])
-AKS_K8S = VersionList(aks_versions)
+try:
+    with open(AKS_VERSIONS_FILE) as json_file:
+        version_list = json.load(json_file)
+        aks_versions = filter_version(version_list, SUPPORT_K8S_VERSION["AKS"])
+    AKS_K8S = VersionList(aks_versions)
+except:
+    print(f"Failed opening file: {AKS_VERSIONS_FILE}")
+    exit(1)
 
 # Kubernetes versions on GKE to use during the tests
-with open(GKE_VERSIONS_FILE) as json_file:
-    version_list = json.load(json_file)
-    gke_versions = filter_version(version_list, SUPPORT_K8S_VERSION["GKE"])
-GKE_K8S = VersionList(gke_versions)
+try:
+    with open(GKE_VERSIONS_FILE) as json_file:
+        version_list = json.load(json_file)
+        gke_versions = filter_version(version_list, SUPPORT_K8S_VERSION["GKE"])
+    GKE_K8S = VersionList(gke_versions)
+except:
+    print(f"Failed opening file: {GKE_VERSIONS_FILE}")
+    exit(1)
+
+# OpenShift version to use during the tests
+try:
+    with open(OPENSHIFT_VERSIONS_FILE) as json_file:
+        version_list = json.load(json_file)
+        openshift_versions = filter_version(
+            version_list, SUPPORT_K8S_VERSION["OPENSHIFT"]
+        )
+    OPENSHIFT_K8S = VersionList(openshift_versions)
+except:
+    print(f"Failed opening file: {OPENSHIFT_VERSIONS_FILE}")
+    exit(1)
 
 # PostgreSQL versions to use during the tests
 # Entries are expected to be ordered from newest to oldest
@@ -122,9 +159,13 @@ GKE_K8S = VersionList(gke_versions)
 # Entries format:
 # MAJOR: [VERSION, PRE_ROLLING_UPDATE_VERSION],
 
-with open(PG_VERSIONS_FILE, "r") as json_file:
-    postgres_versions = json.load(json_file)
-POSTGRES = MajorVersionList(postgres_versions)
+try:
+    with open(PG_VERSIONS_FILE, "r") as json_file:
+        postgres_versions = json.load(json_file)
+    POSTGRES = MajorVersionList(postgres_versions)
+except:
+    print(f"Failed opening file: {PG_VERSIONS_FILE}")
+    exit(1)
 
 
 class E2EJob(dict):
@@ -227,10 +268,6 @@ def build_schedule_include_cloud(engine_version_list):
             E2EJob(k8s_version, POSTGRES.latest, "pg"),
         }
 
-    # Iterate over PostgreSQL versions
-    for postgres_version in POSTGRES.values():
-        result |= {E2EJob(engine_version_list.latest, postgres_version, "pg")}
-
     return result
 
 
@@ -267,17 +304,31 @@ ENGINE_MODES = {
         "main": lambda: build_main_include_cloud(GKE_K8S),
         "schedule": lambda: build_schedule_include_cloud(GKE_K8S),
     },
+    "openshift": {
+        "push": lambda: build_push_include_cloud(OPENSHIFT_K8S),
+        "pull_request": lambda: build_pull_request_include_cloud(OPENSHIFT_K8S),
+        "issue_comment": lambda: build_pull_request_include_cloud(OPENSHIFT_K8S),
+        "workflow_dispatch": lambda: build_pull_request_include_cloud(OPENSHIFT_K8S),
+        "main": lambda: build_main_include_cloud(OPENSHIFT_K8S),
+        "schedule": lambda: build_schedule_include_cloud(OPENSHIFT_K8S),
+    },
 }
 
 
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser(description="Create the job matrix")
     parser.add_argument(
         "-m",
         "--mode",
         type=str,
-        choices={"push", "pull_request", "issue_comment",  "workflow_dispatch", "main", "schedule"},
+        choices={
+            "push",
+            "pull_request",
+            "issue_comment",
+            "workflow_dispatch",
+            "main",
+            "schedule",
+        },
         default="push",
         help="set of tests to run",
     )
@@ -310,7 +361,19 @@ if __name__ == "__main__":
         for job in include:
             job["id"] = engine + "-" + job["id"]
             print(f"Generating {engine}: {job['id']}", file=sys.stderr)
-        with open(os.getenv("GITHUB_OUTPUT"), 'a') as env:
-            print(f"{engine}Matrix=" + json.dumps({"include": include}), file=env)
-            print(f"{engine}Enabled=" + str(len(include) > 0), file=env)
-            print(f"{engine}E2ETimeout=" + json.dumps(TIMEOUT_LIST.get(engine, {})), file=env)
+        try:
+            with open(os.getenv("GITHUB_OUTPUT"), "a") as github_output:
+                print(
+                    f"{engine}Matrix=" + json.dumps({"include": include}),
+                    file=github_output,
+                )
+                print(f"{engine}Enabled=" + str(len(include) > 0), file=github_output)
+                print(
+                    f"{engine}E2ETimeout=" + json.dumps(TIMEOUT_LIST.get(engine, {})),
+                    file=github_output,
+                )
+        except:
+            print(
+                f"Output file GITHUB_OUTPUT is not defined, can't write output matrix"
+            )
+            exit(1)

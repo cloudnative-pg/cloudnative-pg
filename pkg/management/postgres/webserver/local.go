@@ -23,16 +23,18 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/cache"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 type localWebserverEndpoints struct {
@@ -42,20 +44,15 @@ type localWebserverEndpoints struct {
 }
 
 // NewLocalWebServer returns a webserver that allows connection only from localhost
-func NewLocalWebServer(instance *postgres.Instance) (*Webserver, error) {
-	typedClient, err := management.NewControllerRuntimeClient()
-	if err != nil {
-		return nil, fmt.Errorf("creating controller-runtine client: %v", err)
-	}
-	eventRecorder, err := management.NewEventRecorder()
-	if err != nil {
-		return nil, fmt.Errorf("creating kubernetes event recorder: %v", err)
-	}
-
+func NewLocalWebServer(
+	instance *postgres.Instance,
+	cli client.Client,
+	recorder record.EventRecorder,
+) (*Webserver, error) {
 	endpoints := localWebserverEndpoints{
-		typedClient:   typedClient,
+		typedClient:   cli,
 		instance:      instance,
-		eventRecorder: eventRecorder,
+		eventRecorder: recorder,
 	}
 
 	serveMux := http.NewServeMux()
@@ -69,7 +66,7 @@ func NewLocalWebServer(instance *postgres.Instance) (*Webserver, error) {
 		ReadTimeout:       DefaultReadTimeout,
 	}
 
-	webserver := NewWebServer(instance, server)
+	webserver := NewWebServer(server)
 
 	return webserver, nil
 }
@@ -83,19 +80,27 @@ func (ws *localWebserverEndpoints) serveCache(w http.ResponseWriter, r *http.Req
 	var js []byte
 	switch requestedObject {
 	case cache.ClusterKey:
-		response, err := cache.LoadClusterUnsafe()
-		if errors.Is(err, cache.ErrCacheMiss) {
+		var cluster apiv1.Cluster
+		err := ws.typedClient.Get(
+			r.Context(),
+			client.ObjectKey{
+				Name:      ws.instance.GetClusterName(),
+				Namespace: ws.instance.GetNamespaceName(),
+			},
+			&cluster,
+		)
+		if apierrs.IsNotFound(err) {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		} else if err != nil {
-			log.Error(err, "while loading cached cluster")
+			log.Error(err, "while loading cluster")
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 
-		js, err = json.Marshal(response)
+		js, err = json.Marshal(&cluster)
 		if err != nil {
-			log.Error(err, "while unmarshalling cached cluster")
+			log.Error(err, "while marshalling the cluster")
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -112,7 +117,7 @@ func (ws *localWebserverEndpoints) serveCache(w http.ResponseWriter, r *http.Req
 
 		js, err = json.Marshal(response)
 		if err != nil {
-			log.Error(err, "while unmarshalling cached env")
+			log.Error(err, "while marshalling cached env")
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -140,8 +145,8 @@ func (ws *localWebserverEndpoints) requestBackup(w http.ResponseWriter, r *http.
 	}
 
 	if err := ws.typedClient.Get(ctx, client.ObjectKey{
-		Namespace: ws.instance.Namespace,
-		Name:      ws.instance.ClusterName,
+		Namespace: ws.instance.GetNamespaceName(),
+		Name:      ws.instance.GetClusterName(),
 	}, &cluster); err != nil {
 		http.Error(
 			w,
@@ -151,7 +156,7 @@ func (ws *localWebserverEndpoints) requestBackup(w http.ResponseWriter, r *http.
 	}
 
 	if err := ws.typedClient.Get(ctx, client.ObjectKey{
-		Namespace: ws.instance.Namespace,
+		Namespace: ws.instance.GetNamespaceName(),
 		Name:      backupName,
 	}, &backup); err != nil {
 		http.Error(
@@ -161,38 +166,73 @@ func (ws *localWebserverEndpoints) requestBackup(w http.ResponseWriter, r *http.
 		return
 	}
 
-	if cluster.Spec.Backup == nil || cluster.Spec.Backup.BarmanObjectStore == nil {
-		http.Error(w, "Backup not configured in the cluster", http.StatusConflict)
-		return
-	}
+	switch backup.Spec.Method {
+	case apiv1.BackupMethodBarmanObjectStore:
+		if cluster.Spec.Backup == nil || cluster.Spec.Backup.BarmanObjectStore == nil {
+			http.Error(w, "Barman backup not configured in the cluster", http.StatusConflict)
+			return
+		}
 
+		if err := ws.startBarmanBackup(ctx, &cluster, &backup); err != nil {
+			http.Error(
+				w,
+				fmt.Sprintf("error while requesting backup: %v", err.Error()),
+				http.StatusInternalServerError)
+			return
+		}
+		_, _ = fmt.Fprint(w, "OK")
+
+	case apiv1.BackupMethodPlugin:
+		if backup.Spec.PluginConfiguration.IsEmpty() {
+			http.Error(w, "Plugin backup not configured in the cluster", http.StatusConflict)
+			return
+		}
+
+		ws.startPluginBackup(ctx, &cluster, &backup)
+		_, _ = fmt.Fprint(w, "OK")
+
+	default:
+		http.Error(
+			w,
+			fmt.Sprintf("Unknown backup method: %v", backup.Spec.Method),
+			http.StatusBadRequest)
+	}
+}
+
+func (ws *localWebserverEndpoints) startBarmanBackup(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	backup *apiv1.Backup,
+) error {
 	backupLog := log.WithValues(
 		"backupName", backup.Name,
 		"backupNamespace", backup.Name)
 
-	backupCommand, err := postgres.NewBackupCommand(
-		&cluster,
-		&backup,
+	backupCommand, err := postgres.NewBarmanBackupCommand(
+		cluster,
+		backup,
 		ws.typedClient,
 		ws.eventRecorder,
 		ws.instance,
 		backupLog,
 	)
 	if err != nil {
-		http.Error(
-			w,
-			fmt.Sprintf("error while initializing backup: %v", err.Error()),
-			http.StatusInternalServerError)
-		return
+		return fmt.Errorf("while initializing backup: %w", err)
 	}
 
 	if err := backupCommand.Start(ctx); err != nil {
-		http.Error(
-			w,
-			fmt.Sprintf("error while starting backup: %v", err.Error()),
-			http.StatusInternalServerError)
-		return
+		return fmt.Errorf("while starting backup: %w", err)
 	}
 
-	_, _ = fmt.Fprint(w, "OK")
+	return nil
+}
+
+func (ws *localWebserverEndpoints) startPluginBackup(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	backup *apiv1.Backup,
+) {
+	// TODO: timeout should be configurable by the user
+	ctx = context.WithValue(ctx, utils.GRPCTimeoutKey, 100*time.Minute)
+	NewPluginBackupCommand(cluster, backup, ws.typedClient, ws.eventRecorder).Start(ctx)
 }

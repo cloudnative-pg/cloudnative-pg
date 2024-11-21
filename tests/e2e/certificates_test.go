@@ -59,11 +59,6 @@ var _ = Describe("Certificates", func() {
 	})
 
 	var namespace, clusterName string
-	JustAfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-		}
-	})
 
 	Context("Operator managed mode", Ordered, func() {
 		const (
@@ -87,12 +82,8 @@ var _ = Describe("Certificates", func() {
 			var err error
 			// Create a cluster in a namespace we'll delete after the test
 			const namespacePrefix = "postgresql-cert"
-			fmt.Println(namespace + " BeforeAll")
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.DeleteNamespace(namespace)
-			})
 			clusterName, err = env.GetResourceNameFromYAML(sampleFile)
 			Expect(err).ToNot(HaveOccurred())
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
@@ -251,11 +242,8 @@ var _ = Describe("Certificates", func() {
 
 			var err error
 			// Create a cluster in a namespace that will be deleted after the test
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.DeleteNamespace(namespace)
-			})
 			CreateAndAssertServerCertificatesSecrets(
 				namespace,
 				clusterName,
@@ -299,11 +287,8 @@ var _ = Describe("Certificates", func() {
 
 				var err error
 				// Create a cluster in a namespace that will be deleted after the test
-				namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+				namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
-				DeferCleanup(func() error {
-					return env.DeleteNamespace(namespace)
-				})
 
 				// Create certificates secret for client
 				CreateAndAssertClientCertificatesSecrets(
@@ -335,11 +320,8 @@ var _ = Describe("Certificates", func() {
 
 				// Create a cluster in a namespace that will be deleted after the test
 				var err error
-				namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+				namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
-				DeferCleanup(func() error {
-					return env.DeleteNamespace(namespace)
-				})
 
 				// Create certificates secret for server
 				CreateAndAssertServerCertificatesSecrets(

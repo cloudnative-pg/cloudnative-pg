@@ -17,14 +17,14 @@ limitations under the License.
 package postgres
 
 import (
-	"context"
 	"os"
 	"path"
 
+	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/thoas/go-funk"
 	"k8s.io/utils/strings/slices"
 
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -35,21 +35,21 @@ var _ = Describe("testing restore InitInfo methods", func() {
 	Expect(err).ToNot(HaveOccurred())
 
 	pgData := path.Join(tempDir, "postgres", "data", "pgdata")
-	pgWal := path.Join(pgData, "pg_wal")
-	newPgWal := path.Join(tempDir, "postgres", "wal", "pg_wal")
+	pgWal := path.Join(pgData, pgWalDirectory)
+	newPgWal := path.Join(tempDir, "postgres", "wal", pgWalDirectory)
 
 	AfterEach(func() {
 		_ = fileutils.RemoveDirectoryContent(tempDir)
 		_ = fileutils.RemoveFile(tempDir)
 	})
 
-	It("should correctly restore a custom PgWal folder without data", func() {
+	It("should correctly restore a custom PgWal folder without data", func(ctx SpecContext) {
 		initInfo := InitInfo{
 			PgData: pgData,
 			PgWal:  newPgWal,
 		}
 
-		chg, err := initInfo.restoreCustomWalDir(context.TODO())
+		chg, err := initInfo.restoreCustomWalDir(ctx)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(chg).To(BeTrue())
 
@@ -58,7 +58,7 @@ var _ = Describe("testing restore InitInfo methods", func() {
 		Expect(exists).To(BeTrue())
 	})
 
-	It("should correctly migrate an existing wal folder to the new one", func() {
+	It("should correctly migrate an existing wal folder to the new one", func(ctx SpecContext) {
 		initInfo := InitInfo{
 			PgData: pgData,
 			PgWal:  newPgWal,
@@ -92,7 +92,7 @@ var _ = Describe("testing restore InitInfo methods", func() {
 		})
 
 		By("executing the restore custom wal dir function", func() {
-			chg, err := initInfo.restoreCustomWalDir(context.TODO())
+			chg, err := initInfo.restoreCustomWalDir(ctx)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(chg).To(BeTrue())
 		})
@@ -119,7 +119,7 @@ var _ = Describe("testing restore InitInfo methods", func() {
 		})
 	})
 
-	It("should not do any changes if the symlink is already present", func() {
+	It("should not do any changes if the symlink is already present", func(ctx SpecContext) {
 		initInfo := InitInfo{
 			PgData: pgData,
 			PgWal:  newPgWal,
@@ -134,17 +134,73 @@ var _ = Describe("testing restore InitInfo methods", func() {
 		err = os.Symlink(newPgWal, pgWal)
 		Expect(err).ToNot(HaveOccurred())
 
-		chg, err := initInfo.restoreCustomWalDir(context.TODO())
+		chg, err := initInfo.restoreCustomWalDir(ctx)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(chg).To(BeFalse())
 	})
 
-	It("should not do any changes if pgWal is not set", func() {
+	It("should not do any changes if pgWal is not set", func(ctx SpecContext) {
 		initInfo := InitInfo{
 			PgData: pgData,
 		}
-		chg, err := initInfo.restoreCustomWalDir(context.TODO())
+		chg, err := initInfo.restoreCustomWalDir(ctx)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(chg).To(BeFalse())
+	})
+
+	It("should parse enforced params from cluster", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Parameters: map[string]string{
+						"max_connections":           "200",
+						"max_wal_senders":           "20",
+						"max_worker_processes":      "18",
+						"max_prepared_transactions": "50",
+					},
+				},
+			},
+		}
+		enforcedParamsInPGData, err := LoadEnforcedParametersFromCluster(cluster)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(enforcedParamsInPGData).To(HaveLen(4))
+		Expect(enforcedParamsInPGData["max_connections"]).To(Equal(200))
+		Expect(enforcedParamsInPGData["max_wal_senders"]).To(Equal(20))
+		Expect(enforcedParamsInPGData["max_worker_processes"]).To(Equal(18))
+		Expect(enforcedParamsInPGData["max_prepared_transactions"]).To(Equal(50))
+	})
+
+	It("report error if user given one in incorrect value in the cluster", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Parameters: map[string]string{
+						"max_connections":           "200s",
+						"max_wal_senders":           "20",
+						"max_worker_processes":      "18",
+						"max_prepared_transactions": "50",
+					},
+				},
+			},
+		}
+		_, err := LoadEnforcedParametersFromCluster(cluster)
+		Expect(err).To(HaveOccurred())
+	})
+
+	It("ignore the non-enforced params user give", func() {
+		cluster := &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				PostgresConfiguration: apiv1.PostgresConfiguration{
+					Parameters: map[string]string{
+						"max_connections":    "200",
+						"wal_sender_timeout": "10min",
+					},
+				},
+			},
+		}
+		enforcedParamsInPGData, err := LoadEnforcedParametersFromCluster(cluster)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(enforcedParamsInPGData).To(HaveLen(1))
+		Expect(enforcedParamsInPGData["max_connections"]).To(Equal(200))
 	})
 })

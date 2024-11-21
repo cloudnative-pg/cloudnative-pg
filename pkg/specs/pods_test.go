@@ -17,6 +17,7 @@ limitations under the License.
 package specs
 
 import (
+	"encoding/json"
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
@@ -25,7 +26,6 @@ import (
 
 	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -60,24 +60,9 @@ var (
 	}
 )
 
-var _ = Describe("The PostgreSQL security context with nil SeccompProfile", func() {
-	cluster := v1.Cluster{}
-	utils.SetSeccompSupport(false)
-	securityContext := CreatePodSecurityContext(cluster.GetSeccompProfile(), 26, 26)
-
-	It("allows the container to create its own PGDATA", func() {
-		Expect(securityContext.RunAsUser).To(Equal(securityContext.FSGroup))
-	})
-
-	It("by default it should be nil", func() {
-		Expect(securityContext.SeccompProfile).To(BeNil())
-	})
-})
-
 var _ = Describe("The PostgreSQL security context with", func() {
 	It("default RuntimeDefault profile", func() {
 		cluster := v1.Cluster{}
-		utils.SetSeccompSupport(true)
 		securityContext := CreatePodSecurityContext(cluster.GetSeccompProfile(), 26, 26)
 
 		Expect(securityContext.SeccompProfile).ToNot(BeNil())
@@ -91,7 +76,6 @@ var _ = Describe("The PostgreSQL security context with", func() {
 			LocalhostProfile: &profilePath,
 		}
 		cluster := v1.Cluster{Spec: v1.ClusterSpec{SeccompProfile: localhostProfile}}
-		utils.SetSeccompSupport(true)
 		securityContext := CreatePodSecurityContext(cluster.GetSeccompProfile(), 26, 26)
 
 		Expect(securityContext.SeccompProfile).ToNot(BeNil())
@@ -349,12 +333,20 @@ var _ = Describe("EnvConfig", func() {
 						Value: cluster.Name,
 					},
 					{
+						Name:  "PSQL_HISTORY",
+						Value: postgres.TemporaryDirectory + "/.psql_history",
+					},
+					{
 						Name:  "PGPORT",
 						Value: strconv.Itoa(postgres.ServerPort),
 					},
 					{
 						Name:  "PGHOST",
 						Value: postgres.SocketDirectory,
+					},
+					{
+						Name:  "TMPDIR",
+						Value: postgres.TemporaryDirectory,
 					},
 					{
 						Name:  "TEST_ENV",
@@ -400,6 +392,10 @@ var _ = Describe("EnvConfig", func() {
 					{
 						Name:  "PGHOST",
 						Value: postgres.SocketDirectory,
+					},
+					{
+						Name:  "TMPDIR",
+						Value: postgres.TemporaryDirectory,
 					},
 					{
 						Name:  "TEST_ENV",
@@ -828,6 +824,95 @@ var _ = Describe("PodSpec drift detection", func() {
 			"containers: container postgres differs in resources"))
 		Expect(specsMatch).To(BeFalse())
 	})
+
+	It("detects if resource quantities for containers are equivalent", func() {
+		podSpec1 := `{
+			"containers": [
+				{
+					"name": "postgres",
+					"resources": {
+						"limits": {
+							"cpu": "1000m",
+							"memory": "3Gi"
+						},
+						"requests": {
+							"cpu": "850m",
+							"memory": "3072Mi"
+						}
+					}
+				}
+			]
+		}`
+		var storedPodSpec1, podSpec2 corev1.PodSpec
+		err := json.Unmarshal([]byte(podSpec1), &storedPodSpec1)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(storedPodSpec1.Containers).To(HaveLen(1))
+
+		podSpec2 = corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name: "postgres",
+					Resources: corev1.ResourceRequirements{
+						Limits: corev1.ResourceList{
+							"cpu":    resource.MustParse("1"),
+							"memory": resource.MustParse("3Gi"),
+						},
+						Requests: corev1.ResourceList{
+							"cpu":    resource.MustParse("850m"),
+							"memory": resource.MustParse("3Gi"),
+						},
+					},
+				},
+			},
+		}
+
+		// NOTE: the object representations of the specs are different, even
+		// though they represent equivalent quantities
+		// i.e. reflect.DeepEqual(podSpec2, storedPodSpec1) is likely false
+		// Let's make sure the comparison function can recognize equivalent quantities
+		specsMatch, diff := ComparePodSpecs(storedPodSpec1, podSpec2)
+		Expect(diff).To(Equal(""))
+		Expect(specsMatch).To(BeTrue())
+	})
+
+	It("detects if resource quantities for containers are equivalent if one is nil and one is empty", func() {
+		// empty map
+		podSpec1 := `{
+			"containers": [
+				{
+					"name": "postgres",
+					"resources": {
+						"limits": {},
+						"requests": {}
+					}
+				}
+			]
+		}`
+		var storedPodSpec1, podSpec2 corev1.PodSpec
+		err := json.Unmarshal([]byte(podSpec1), &storedPodSpec1)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(storedPodSpec1.Containers).To(HaveLen(1))
+
+		podSpec2 = corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name: "postgres",
+					Resources: corev1.ResourceRequirements{
+						Limits:   nil,
+						Requests: nil,
+					},
+				},
+			},
+		}
+
+		// NOTE: the object representations of the specs are different, even
+		// though they represent equivalent quantities
+		// i.e. reflect.DeepEqual(podSpec2, storedPodSpec1) is likely false
+		// Let's make sure the comparison function can recognize equivalent quantities
+		specsMatch, diff := ComparePodSpecs(storedPodSpec1, podSpec2)
+		Expect(diff).To(Equal(""))
+		Expect(specsMatch).To(BeTrue())
+	})
 })
 
 var _ = Describe("Compute startup probe failure threshold", func() {
@@ -837,5 +922,15 @@ var _ = Describe("Compute startup probe failure threshold", func() {
 
 	It("should take the value from 'startDelay / periodSeconds'", func() {
 		Expect(getStartupProbeFailureThreshold(109)).To(BeNumerically("==", 11))
+	})
+})
+
+var _ = Describe("Compute liveness probe failure threshold", func() {
+	It("should take the minimum value 1", func() {
+		Expect(getLivenessProbeFailureThreshold(5)).To(BeNumerically("==", 1))
+	})
+
+	It("should take the value from 'startDelay / periodSeconds'", func() {
+		Expect(getLivenessProbeFailureThreshold(31)).To(BeNumerically("==", 4))
 	})
 })

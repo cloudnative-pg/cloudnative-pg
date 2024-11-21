@@ -35,26 +35,21 @@ var _ = Describe("Switchover", Serial, Label(tests.LabelSelfHealing), func() {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 	})
+
 	Context("with HA Replication slots", func() {
 		It("reacts to switchover requests", func() {
 			// Create a cluster in a namespace we'll delete after the test
 			const namespacePrefix = "switchover-e2e-with-slots"
 			var err error
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				if CurrentSpecReport().Failed() {
-					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-				}
-				return env.DeleteNamespace(namespace)
-			})
 			clusterName, err := env.GetResourceNameFromYAML(sampleFileWithReplicationSlots)
 			Expect(err).ToNot(HaveOccurred())
 
 			AssertCreateCluster(namespace, clusterName, sampleFileWithReplicationSlots, env)
 			AssertSwitchover(namespace, clusterName, env)
 			AssertPvcHasLabels(namespace, clusterName)
-			AssertClusterReplicationSlots(namespace, clusterName)
+			AssertClusterHAReplicationSlots(namespace, clusterName)
 		})
 	})
 	Context("without HA Replication slots", func() {
@@ -62,14 +57,8 @@ var _ = Describe("Switchover", Serial, Label(tests.LabelSelfHealing), func() {
 			// Create a cluster in a namespace we'll delete after the test
 			const namespacePrefix = "switchover-e2e"
 			var err error
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				if CurrentSpecReport().Failed() {
-					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-				}
-				return env.DeleteNamespace(namespace)
-			})
 			clusterName, err := env.GetResourceNameFromYAML(sampleFileWithoutReplicationSlots)
 			Expect(err).ToNot(HaveOccurred())
 

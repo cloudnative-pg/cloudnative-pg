@@ -17,33 +17,22 @@ limitations under the License.
 package postgres
 
 import (
-	"fmt"
 	"os/user"
-	"path/filepath"
 
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
+	"github.com/cloudnative-pg/machinery/pkg/log"
 )
 
-// WritePostgresUserMaps creates a pg_ident.conf file containing only one map called "local" that
-// maps the current user to "postgres" user.
-func WritePostgresUserMaps(pgData string) error {
-	var username string
-
+// getCurrentUserOrDefaultToInsecureMapping retrieves the current system user's username.
+// If the retrieval fails, it falls back to an insecure mapping using the root ("/") as the default username.
+//
+// Returns:
+// - string: The current system user's username or the default insecure mapping if retrieval fails.
+func getCurrentUserOrDefaultToInsecureMapping() string {
 	currentUser, err := user.Current()
 	if err != nil {
 		log.Info("Unable to identify the current user. Falling back to insecure mapping.")
-		username = "/"
-	} else {
-		username = currentUser.Username
+		return "/"
 	}
 
-	_, err = fileutils.WriteStringToFile(filepath.Join(pgData, constants.PostgresqlIdentFile),
-		fmt.Sprintf("local %s postgres\n", username))
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return currentUser.Username
 }

@@ -19,12 +19,13 @@ package persistentvolumeclaim
 import (
 	"context"
 
-	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+	"github.com/cloudnative-pg/machinery/pkg/log"
+	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -37,7 +38,7 @@ type StorageSource struct {
 	// The (optional) data source that should be used for WALs
 	WALSource *corev1.TypedLocalObjectReference `json:"walSource"`
 
-	// The (optional) data source that should be used for WALs
+	// The (optional) data source that should be used for TABLESPACE
 	TablespaceSource map[string]corev1.TypedLocalObjectReference `json:"tablespaceSource"`
 }
 
@@ -86,7 +87,11 @@ func GetCandidateStorageSourceForReplica(
 		return nil
 	}
 
-	if result := getCandidateSourceFromBackupList(ctx, backupList); result != nil {
+	if result := getCandidateSourceFromBackupList(
+		ctx,
+		cluster.ObjectMeta.CreationTimestamp,
+		backupList,
+	); result != nil {
 		return result
 	}
 
@@ -104,20 +109,31 @@ func GetCandidateStorageSourceForReplica(
 
 // getCandidateSourceFromBackupList gets a candidate storage source
 // given a backup list
-func getCandidateSourceFromBackupList(ctx context.Context, backupList apiv1.BackupList) *StorageSource {
+func getCandidateSourceFromBackupList(
+	ctx context.Context,
+	clusterCreationTime metav1.Time,
+	backupList apiv1.BackupList,
+) *StorageSource {
 	contextLogger := log.FromContext(ctx)
 
 	backupList.SortByReverseCreationTime()
 	for idx := range backupList.Items {
 		backup := &backupList.Items[idx]
+		contextLogger := contextLogger.WithValues()
+
 		if !backup.IsCompletedVolumeSnapshot() {
-			contextLogger.Trace("skipping backup, not a valid storage source candidate",
-				"backupName", backup.Name)
+			contextLogger.Trace("skipping backup, not a valid storage source candidate")
 			continue
 		}
 
-		contextLogger.Debug("found a backup that is a valid storage source candidate",
-			"backupName", backup.Name)
+		if backup.ObjectMeta.CreationTimestamp.Before(&clusterCreationTime) {
+			contextLogger.Info(
+				"skipping backup as a potential recovery storage source candidate " +
+					"because if was created before the Cluster object")
+			continue
+		}
+
+		contextLogger.Debug("found a backup that is a valid storage source candidate")
 
 		return getCandidateSourceFromBackup(backup)
 	}
@@ -138,6 +154,11 @@ func getCandidateSourceFromBackup(backup *apiv1.Backup) *StorageSource {
 			result.DataSource = reference
 		case utils.PVCRolePgWal:
 			result.WALSource = &reference
+		case utils.PVCRolePgTablespace:
+			if result.TablespaceSource == nil {
+				result.TablespaceSource = map[string]corev1.TypedLocalObjectReference{}
+			}
+			result.TablespaceSource[element.TablespaceName] = reference
 		}
 	}
 
@@ -148,15 +169,9 @@ func getCandidateSourceFromBackup(backup *apiv1.Backup) *StorageSource {
 // from a Cluster definition, taking into consideration the backup that the
 // cluster has been bootstrapped from
 func getCandidateSourceFromClusterDefinition(cluster *apiv1.Cluster) *StorageSource {
-	if cluster.Spec.Bootstrap == nil {
-		return nil
-	}
-
-	if cluster.Spec.Bootstrap.Recovery == nil {
-		return nil
-	}
-
-	if cluster.Spec.Bootstrap.Recovery.VolumeSnapshots == nil {
+	if cluster.Spec.Bootstrap == nil ||
+		cluster.Spec.Bootstrap.Recovery == nil ||
+		cluster.Spec.Bootstrap.Recovery.VolumeSnapshots == nil {
 		return nil
 	}
 

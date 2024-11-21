@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -25,7 +26,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -105,6 +105,14 @@ func (r *Backup) validate() field.ErrorList {
 			field.NewPath("spec", "onlineConfiguration"),
 			r.Spec.OnlineConfiguration,
 			"OnlineConfiguration parameter can be specified only if the backup method is volumeSnapshot",
+		))
+	}
+
+	if r.Spec.Method == BackupMethodPlugin && r.Spec.PluginConfiguration.IsEmpty() {
+		result = append(result, field.Invalid(
+			field.NewPath("spec", "pluginConfiguration"),
+			r.Spec.OnlineConfiguration,
+			"cannot be empty when the backup method is plugin",
 		))
 	}
 

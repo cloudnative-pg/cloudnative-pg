@@ -21,23 +21,43 @@ import (
 	"context"
 	"fmt"
 
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/cloudnative-pg/cloudnative-pg/controllers"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/controller"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-// Destroy implements the destroy subcommand
-func Destroy(ctx context.Context, clusterName, instanceID string, keepPVC bool) error {
-	instanceName := fmt.Sprintf("%s-%s", clusterName, instanceID)
-
+// Destroy implements destroy subcommand
+func Destroy(ctx context.Context, clusterName, instanceName string, keepPVC bool) error {
 	if err := ensurePodIsDeleted(ctx, instanceName, clusterName); err != nil {
-		return fmt.Errorf("error deleting instance %s: %v", instanceName, err)
+		return err
+	}
+
+	var jobList batchv1.JobList
+	if err := plugin.Client.List(
+		ctx,
+		&jobList,
+		client.InNamespace(plugin.Namespace),
+		client.MatchingLabels{
+			utils.InstanceNameLabelName: instanceName,
+		},
+	); err != nil {
+		return err
+	}
+	for idx := range jobList.Items {
+		if err := plugin.Client.Delete(
+			ctx,
+			&jobList.Items[idx],
+			client.PropagationPolicy(metav1.DeletePropagationBackground),
+		); err != nil && !apierrs.IsNotFound(err) {
+			return fmt.Errorf("deleting job %s: %w", jobList.Items[idx].Name, err)
+		}
 	}
 
 	pvcs, err := persistentvolumeclaim.GetInstancePVCs(ctx, plugin.Client, instanceName, plugin.Namespace)
@@ -48,7 +68,7 @@ func Destroy(ctx context.Context, clusterName, instanceID string, keepPVC bool) 
 	if keepPVC {
 		// we remove the ownership from the pvcs if present
 		for i := range pvcs {
-			if _, isOwned := controllers.IsOwnedByCluster(&pvcs[i]); !isOwned {
+			if _, isOwned := controller.IsOwnedByCluster(&pvcs[i]); !isOwned {
 				continue
 			}
 
@@ -61,6 +81,10 @@ func Destroy(ctx context.Context, clusterName, instanceID string, keepPVC bool) 
 					clusterName, err)
 			}
 		}
+		fmt.Printf("Instance %s of cluster %s has been destroyed and the PVC was kept\n",
+			instanceName,
+			clusterName,
+		)
 		return nil
 	}
 
@@ -69,7 +93,7 @@ func Destroy(ctx context.Context, clusterName, instanceID string, keepPVC bool) 
 			pvcs[i].Labels = map[string]string{}
 		}
 
-		_, isOwned := controllers.IsOwnedByCluster(&pvcs[i])
+		_, isOwned := controller.IsOwnedByCluster(&pvcs[i])
 		// if it is requested for deletion and it is owned by the cluster, we delete it. If it is not owned by the cluster
 		// but it does have the instance label and the detached annotation then we can still delete it
 		// We will only skip the iteration and not delete the pvc if it is not owned by the cluster, and it does not have
@@ -83,6 +107,8 @@ func Destroy(ctx context.Context, clusterName, instanceID string, keepPVC bool) 
 		}
 	}
 
+	fmt.Printf("Instance %s of cluster %s is destroyed\n", instanceName, clusterName)
+
 	return nil
 }
 
@@ -94,13 +120,14 @@ func ensurePodIsDeleted(ctx context.Context, instanceName, clusterName string) e
 		Name:      instanceName,
 	}, &pod)
 	if apierrs.IsNotFound(err) {
+		// The Pod doesn't exist, so we already did our job
 		return nil
 	}
 	if err != nil {
 		return err
 	}
 
-	if _, isOwned := controllers.IsOwnedByCluster(&pod); !isOwned {
+	if _, isOwned := controller.IsOwnedByCluster(&pod); !isOwned {
 		return fmt.Errorf("instance %s is not owned by cluster %s", pod.Name, clusterName)
 	}
 

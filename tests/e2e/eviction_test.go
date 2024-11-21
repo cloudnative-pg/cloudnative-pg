@@ -52,7 +52,7 @@ import (
 // so we choose to use patch and drain to simulate the eviction. The patch status issued one problem,
 // when evicting the primary pod of multiple clusters.
 
-var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive, tests.LabelOperator), func() {
+var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 	const (
 		level                    = tests.Low
 		singleInstanceSampleFile = fixturesDir + "/eviction/single-instance-cluster.yaml.template"
@@ -110,11 +110,7 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive, tests.Labe
 				Skip("Test depth is lower than the amount requested for this test")
 			}
 		})
-		JustAfterEach(func() {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-		})
+
 		BeforeAll(func() {
 			// limit the case running on local kind env as we are using taint to simulate the eviction
 			// we do not know if other cloud vendor crd controller is running on the node been evicted
@@ -123,11 +119,8 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive, tests.Labe
 			}
 			const namespacePrefix = "single-instance-pod-eviction"
 			var err error
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.DeleteNamespace(namespace)
-			})
 			By("creating a cluster", func() {
 				// Create a cluster in a namespace we'll delete after the test
 				clusterName, err := env.GetResourceNameFromYAML(singleInstanceSampleFile)
@@ -179,19 +172,12 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive, tests.Labe
 				Skip("This test is only run on local cluster")
 			}
 		})
-		JustAfterEach(func() {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-		})
+
 		BeforeAll(func() {
 			const namespacePrefix = "multi-instance-pod-eviction"
 			var err error
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.DeleteNamespace(namespace)
-			})
 			By("Creating a cluster with multiple instances", func() {
 				// Create a cluster in a namespace and shared in containers, we'll delete after the test
 				clusterName, err := env.GetResourceNameFromYAML(multiInstanceSampleFile)

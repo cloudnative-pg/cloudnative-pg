@@ -27,7 +27,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-// CreateSecret create a secret with the PostgreSQL and the owner passwords
+// CreateSecret creates a secret with the PostgreSQL and the owner passwords
 func CreateSecret(
 	name string,
 	namespace string,
@@ -36,7 +36,7 @@ func CreateSecret(
 	username string,
 	password string,
 ) *corev1.Secret {
-	uriBuilder := newConnectionStringBuilder(hostname, dbname, username, password)
+	uriBuilder := newConnectionStringBuilder(hostname, dbname, username, password, namespace)
 
 	return &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -68,18 +68,20 @@ func CreateSecret(
 }
 
 type connectionStringBuilder struct {
-	host     string
-	dbname   string
-	username string
-	password string
+	host      string
+	dbname    string
+	username  string
+	password  string
+	namespace string
 }
 
-func newConnectionStringBuilder(hostname, dbname, username, password string) *connectionStringBuilder {
+func newConnectionStringBuilder(hostname, dbname, username, password, namespace string) *connectionStringBuilder {
 	return &connectionStringBuilder{
-		host:     fmt.Sprintf("%s:%d", hostname, postgres.ServerPort),
-		dbname:   dbname,
-		username: username,
-		password: password,
+		host:      fmt.Sprintf("%s.%s:%d", hostname, namespace, postgres.ServerPort),
+		dbname:    dbname,
+		username:  username,
+		password:  password,
+		namespace: namespace,
 	}
 }
 

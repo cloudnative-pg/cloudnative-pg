@@ -20,16 +20,72 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 	"text/template"
+	"time"
+
+	"github.com/cloudnative-pg/machinery/pkg/postgres/version"
 )
+
+// WalLevelValue a value that is assigned to the 'wal_level' configuration field
+type WalLevelValue string
+
+const (
+	// ParameterWalLevel the configuration key containing the wal_level value
+	ParameterWalLevel = "wal_level"
+
+	// ParameterMaxWalSenders the configuration key containing the max_wal_senders value
+	ParameterMaxWalSenders = "max_wal_senders"
+
+	// ParameterArchiveMode the configuration key containing the archive_mode value
+	ParameterArchiveMode = "archive_mode"
+
+	// ParameterWalLogHints the configuration key containing the wal_log_hints value
+	ParameterWalLogHints = "wal_log_hints"
+
+	// ParameterRecoveyMinApplyDelay is the configuration key containing the recovery_min_apply_delay parameter
+	ParameterRecoveyMinApplyDelay = "recovery_min_apply_delay"
+)
+
+// An acceptable wal_level value
+const (
+	WalLevelValueLogical WalLevelValue = "logical"
+	WalLevelValueReplica WalLevelValue = "replica"
+	WalLevelValueMinimal WalLevelValue = "minimal"
+)
+
+// IsKnownValue returns a bool indicating if the contained value is a well-know value
+func (w WalLevelValue) IsKnownValue() bool {
+	switch w {
+	case WalLevelValueLogical, WalLevelValueReplica, WalLevelValueMinimal:
+		return true
+	default:
+		return false
+	}
+}
+
+// IsStricterThanMinimal returns a boolean indicating if the contained value is stricter than the minimal
+// wal_level
+func (w WalLevelValue) IsStricterThanMinimal() bool {
+	switch w {
+	case WalLevelValueLogical, WalLevelValueReplica:
+		return true
+	default:
+		return false
+	}
+}
 
 const (
 	// hbaTemplateString is the template used to generate the pg_hba.conf
 	// configuration file
 	hbaTemplateString = `
-# Grant local access
+#
+# FIXED RULES
+#
+
+# Grant local access ('local' user map)
 local all all peer map=local
 
 # Require client certificate authentication for the streaming_replica user
@@ -37,17 +93,44 @@ hostssl postgres streaming_replica all cert
 hostssl replication streaming_replica all cert
 hostssl all cnpg_pooler_pgbouncer all cert
 
+#
+# USER-DEFINED RULES
+#
+
 {{ range $rule := .UserRules }}
 {{ $rule -}}
 {{ end }}
-{{ if .LDAPConfiguration }}
 
-# LDAP Configuration
+{{ if .LDAPConfiguration }}
+#
+# LDAP CONFIGURATION (optional)
+#
 {{.LDAPConfiguration}}
 {{ end }}
 
-# Otherwise use the default authentication method
+#
+# DEFAULT RULES
+#
 host all all all {{.DefaultAuthenticationMethod}}
+`
+
+	// identTemplateString is the template used to generate the pg_ident.conf
+	// configuration file
+	identTemplateString = `
+#
+# FIXED RULES
+#
+
+# Grant local access ('local' user map)
+local {{.Username}} postgres
+
+#
+# USER-DEFINED RULES
+#
+
+{{ range $rule := .Mappings }}
+{{ $rule -}}
+{{ end }}
 `
 
 	// fixedConfigurationParameter are the configuration parameters
@@ -62,6 +145,14 @@ host all all all {{.DefaultAuthenticationMethod}}
 
 	// ScratchDataDirectory is the directory to be used for scratch data
 	ScratchDataDirectory = "/controller"
+
+	// TemporaryDirectory is the directory that is used to create
+	// temporary files, and configured as TMPDIR in PostgreSQL Pods
+	TemporaryDirectory = "/controller/tmp"
+
+	// SpoolDirectory is the directory where we spool the WAL files that
+	// were pre-archived in parallel
+	SpoolDirectory = ScratchDataDirectory + "/wal-archive-spool"
 
 	// CertificatesDir location to store the certificates
 	CertificatesDir = ScratchDataDirectory + "/certificates/"
@@ -152,16 +243,19 @@ host all all all {{.DefaultAuthenticationMethod}}
 // hbaTemplate is the template used to create the HBA configuration
 var hbaTemplate = template.Must(template.New("pg_hba.conf").Parse(hbaTemplateString))
 
-// MajorVersionRangeUnlimited is used to represent an unbound limit in a MajorVersionRange
-const MajorVersionRangeUnlimited = 0
+// identTemplate is the template used to create the HBA configuration
+var identTemplate = template.Must(template.New("pg_ident.conf").Parse(identTemplateString))
 
-// MajorVersionRange is used to represent a range of PostgreSQL versions
-type MajorVersionRange = struct {
+// MajorVersionRangeUnlimited is used to represent an unbound limit in a MajorVersionRange
+var MajorVersionRangeUnlimited = version.Data{}
+
+// VersionRange is used to represent a range of PostgreSQL versions
+type VersionRange struct {
 	// The minimum limit of PostgreSQL major version, extreme included
-	Min int
+	Min version.Data
 
 	// The maximum limit of PostgreSQL version, extreme excluded, or MajorVersionRangeUnlimited
-	Max int
+	Max version.Data
 }
 
 // SettingsCollection is a collection of PostgreSQL settings
@@ -177,7 +271,7 @@ type ConfigurationSettings struct {
 
 	// The following settings are like GlobalPostgresSettings
 	// but are relative only to certain PostgreSQL versions
-	DefaultSettings map[MajorVersionRange]SettingsCollection
+	DefaultSettings map[VersionRange]SettingsCollection
 
 	// The following settings are applied to the final PostgreSQL configuration,
 	// even if the user specified something different
@@ -196,17 +290,15 @@ type ConfigurationInfo struct {
 	// The database settings to be used
 	Settings ConfigurationSettings
 
-	// The major version
-	MajorVersion int
+	// The PostgreSQL version
+	Version version.Data
 
 	// The list of user-level settings
 	UserSettings map[string]string
 
-	// The list of replicas
-	SyncReplicasElectable []string
+	// The synchronous_standby_names configuration to be applied
+	SynchronousStandbyNames string
 
-	// The number of desired number of synchronous replicas
-	SyncReplicas int
 	// List of additional sharedPreloadLibraries to be loaded
 	AdditionalSharedPreloadLibraries []string
 
@@ -229,6 +321,24 @@ type ConfigurationInfo struct {
 
 	// TemporaryTablespaces is the list of temporary tablespaces
 	TemporaryTablespaces []string
+
+	// IsWalArchivingDisabled is true when user requested to disable WAL archiving
+	IsWalArchivingDisabled bool
+
+	// IsAlterSystemEnabled is true when 'allow_alter_system' should be set to on
+	IsAlterSystemEnabled bool
+
+	// Minimum apply delay of transaction
+	RecoveryMinApplyDelay time.Duration
+}
+
+// getAlterSystemEnabledValue returns a config compatible value for IsAlterSystemEnabled
+func (c ConfigurationInfo) getAlterSystemEnabledValue() string {
+	if c.IsAlterSystemEnabled {
+		return "on"
+	}
+
+	return "off"
 }
 
 // ManagedExtension defines all the information about a managed extension
@@ -323,13 +433,10 @@ var (
 		"unix_socket_directories":   blockedConfigurationParameter,
 		"unix_socket_group":         blockedConfigurationParameter,
 		"unix_socket_permissions":   blockedConfigurationParameter,
-		"wal_level":                 fixedConfigurationParameter,
-		"wal_log_hints":             fixedConfigurationParameter,
 
 		// The following parameters need a reload to be applied
 		"archive_cleanup_command":                blockedConfigurationParameter,
 		"archive_command":                        fixedConfigurationParameter,
-		"full_page_writes":                       fixedConfigurationParameter,
 		"log_destination":                        blockedConfigurationParameter,
 		"log_directory":                          blockedConfigurationParameter,
 		"log_file_mode":                          blockedConfigurationParameter,
@@ -365,6 +472,7 @@ var (
 	CnpgConfigurationSettings = ConfigurationSettings{
 		GlobalDefaultSettings: SettingsCollection{
 			"archive_timeout":            "5min",
+			"full_page_writes":           "on",
 			"max_parallel_workers":       "32",
 			"max_worker_processes":       "32",
 			"max_replication_slots":      "32",
@@ -378,24 +486,26 @@ var (
 			"dynamic_shared_memory_type": "posix",
 			"wal_sender_timeout":         "5s",
 			"wal_receiver_timeout":       "5s",
+			"wal_level":                  "logical",
+			ParameterWalLogHints:         "on",
 			// Workaround for PostgreSQL not behaving correctly when
 			// a default value is not explicit in the postgresql.conf and
 			// the parameter cannot be changed without a restart.
 			SharedPreloadLibraries: "",
 		},
-		DefaultSettings: map[MajorVersionRange]SettingsCollection{
-			{MajorVersionRangeUnlimited, 120000}: {
+		DefaultSettings: map[VersionRange]SettingsCollection{
+			{MajorVersionRangeUnlimited, version.New(12, 0)}: {
 				"wal_keep_segments": "32",
 			},
-			{120000, 130000}: {
+			{version.New(12, 0), version.New(13, 0)}: {
 				"wal_keep_segments":  "32",
 				"shared_memory_type": "mmap",
 			},
-			{130000, MajorVersionRangeUnlimited}: {
+			{version.New(13, 0), MajorVersionRangeUnlimited}: {
 				"wal_keep_size":      "512MB",
 				"shared_memory_type": "mmap",
 			},
-			{120000, MajorVersionRangeUnlimited}: {
+			{version.New(12, 0), MajorVersionRangeUnlimited}: {
 				"ssl_max_protocol_version": "TLSv1.3",
 				"ssl_min_protocol_version": "TLSv1.3",
 			},
@@ -408,9 +518,6 @@ var (
 				"/controller/manager wal-archive --log-destination %s/%s.json %%p",
 				LogPath, LogFileName),
 			"port":                fmt.Sprint(ServerPort),
-			"wal_level":           "logical",
-			"wal_log_hints":       "on",
-			"full_page_writes":    "on",
 			"ssl":                 "on",
 			"ssl_cert_file":       ServerCertificateLocation,
 			"ssl_key_file":        ServerKeyLocation,
@@ -442,6 +549,26 @@ func CreateHBARules(hba []string,
 	}
 
 	return hbaContent.String(), nil
+}
+
+// CreateIdentRules will create the content of pg_ident.conf file given
+// the rules set by the cluster spec
+func CreateIdentRules(ident []string, username string) (string, error) {
+	var identContent bytes.Buffer
+
+	templateData := struct {
+		Mappings []string
+		Username string
+	}{
+		Mappings: ident,
+		Username: username,
+	}
+
+	if err := identTemplate.Execute(&identContent, templateData); err != nil {
+		return "", err
+	}
+
+	return identContent.String(), nil
 }
 
 // PgConfiguration wraps configuration parameters with some checks
@@ -523,17 +650,49 @@ func CreatePostgresqlConfiguration(info ConfigurationInfo) *PgConfiguration {
 		for key, value := range info.Settings.MandatorySettings {
 			configuration.OverwriteConfig(key, value)
 		}
+
+		if info.Version.Major() >= 17 {
+			configuration.OverwriteConfig("allow_alter_system", info.getAlterSystemEnabledValue())
+		}
 	}
 
 	// Apply the correct archive_mode
-	if info.IsReplicaCluster {
+	switch {
+	case info.IsWalArchivingDisabled:
+		configuration.OverwriteConfig("archive_mode", "off")
+
+	case info.IsReplicaCluster:
 		configuration.OverwriteConfig("archive_mode", "always")
-	} else {
+
+	default:
 		configuration.OverwriteConfig("archive_mode", "on")
 	}
 
-	// Apply the list of replicas
-	setReplicasListConfigurations(info, configuration)
+	// Apply the synchronous replication settings
+	syncStandbyNames := info.SynchronousStandbyNames
+	if len(syncStandbyNames) > 0 {
+		configuration.OverwriteConfig(SynchronousStandbyNames, syncStandbyNames)
+	}
+
+	if info.ClusterName != "" {
+		configuration.OverwriteConfig("cluster_name", info.ClusterName)
+	}
+
+	// Apply the replication delay
+	if info.RecoveryMinApplyDelay != 0 {
+		// We set recovery_min_apply_delay on every instance
+		// of a replica cluster and not just on the primary.
+		// PostgreSQL will look at the difference between the
+		// current timestamp and the timestamp when the commit
+		// was created (by the primary instance).
+		//
+		// Since both timestamps are the same on the designed
+		// primary and on the replicas, setting it on both
+		// is a safe approach.
+		configuration.OverwriteConfig(
+			ParameterRecoveyMinApplyDelay,
+			fmt.Sprintf("%vs", math.Floor(info.RecoveryMinApplyDelay.Seconds())))
+	}
 
 	if info.IncludingSharedPreloadLibraries {
 		// Set all managed shared preload libraries
@@ -561,8 +720,11 @@ func setDefaultConfigurations(info ConfigurationInfo, configuration *PgConfigura
 
 	// apply settings relative to a certain PostgreSQL version
 	for constraints, settings := range info.Settings.DefaultSettings {
-		if constraints.Min == MajorVersionRangeUnlimited || (constraints.Min <= info.MajorVersion) {
-			if constraints.Max == MajorVersionRangeUnlimited || (info.MajorVersion < constraints.Max) {
+		if constraints.Min == MajorVersionRangeUnlimited ||
+			constraints.Min == info.Version ||
+			constraints.Min.Less(info.Version) {
+			if constraints.Max == MajorVersionRangeUnlimited ||
+				info.Version.Less(constraints.Max) {
 				for key, value := range settings {
 					configuration.OverwriteConfig(key, value)
 				}
@@ -605,25 +767,6 @@ func setUserSharedPreloadLibraries(info ConfigurationInfo, configuration *PgConf
 	}
 }
 
-// setReplicasListConfigurations sets the standby node list
-func setReplicasListConfigurations(info ConfigurationInfo, configuration *PgConfiguration) {
-	if info.SyncReplicasElectable != nil && info.SyncReplicas > 0 {
-		escapedReplicas := make([]string, len(info.SyncReplicasElectable))
-		for idx, name := range info.SyncReplicasElectable {
-			escapedReplicas[idx] = escapePostgresConfLiteral(name)
-		}
-		configuration.OverwriteConfig(SynchronousStandbyNames, fmt.Sprintf(
-			"ANY %v (%v)",
-			info.SyncReplicas,
-			strings.Join(escapedReplicas, ",")))
-	}
-
-	if info.ClusterName != "" {
-		// Apply the cluster name
-		configuration.OverwriteConfig("cluster_name", info.ClusterName)
-	}
-}
-
 // CreatePostgresqlConfFile creates the contents of the postgresql.conf file
 func CreatePostgresqlConfFile(configuration *PgConfiguration) (string, string) {
 	// We need to be able to compare two configurations generated
@@ -650,10 +793,4 @@ func CreatePostgresqlConfFile(configuration *PgConfiguration) (string, string) {
 // directly embeddable in the PostgreSQL configuration file
 func escapePostgresConfValue(value string) string {
 	return fmt.Sprintf("'%v'", strings.ReplaceAll(value, "'", "''"))
-}
-
-// escapePostgresLiteral escapes a value to make its representation
-// similar to the literals in PostgreSQL
-func escapePostgresConfLiteral(value string) string {
-	return fmt.Sprintf("\"%v\"", strings.ReplaceAll(value, "\"", "\"\""))
 }

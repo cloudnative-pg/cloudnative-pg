@@ -22,6 +22,8 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 )
 
 // NewCmd initializes the fio command
@@ -31,18 +33,19 @@ func NewCmd() *cobra.Command {
 
 	fioCmd := &cobra.Command{
 		Use:     "fio [name]",
-		Short:   "Creates a fio deployment,pvc and configmap.",
+		Short:   "Creates a fio deployment, pvc and configmap",
 		Args:    cobra.MinimumNArgs(1),
 		Long:    `Creates a fio deployment that will execute a fio job on the specified pvc.`,
 		Example: jobExample,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		GroupID: plugin.GroupIDMiscellaneous,
+		RunE: func(_ *cobra.Command, args []string) error {
 			ctx := context.Background()
 			fioArgs := args[1:]
 			deploymentName = args[0]
 			fioCommand := newFioCommand(deploymentName, storageClassName, pvcSize, dryRun, fioArgs)
 			return fioCommand.execute(ctx)
 		},
-		PreRun: func(cmd *cobra.Command, args []string) {
+		PreRun: func(_ *cobra.Command, _ []string) {
 			if !dryRun {
 				fmt.Println("Running this directly to the cluster may produce a disruption in the service, " +
 					"are you sure you want to proceed? (y/n)")
@@ -56,7 +59,7 @@ func NewCmd() *cobra.Command {
 				}
 			}
 		},
-		PostRun: func(cmd *cobra.Command, args []string) {
+		PostRun: func(_ *cobra.Command, _ []string) {
 			if !dryRun {
 				fmt.Printf("To remove this test you need to delete the Deployment, ConfigMap "+
 					"and PVC with the name %v\n\nThe most simple way to do this is to re-run the command that was run"+

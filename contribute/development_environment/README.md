@@ -66,7 +66,7 @@ In addition, check that the following packages are installed in your system:
 The previous list assumes that you are using a Debian-based distribution. For
 other distributions the name of the packages may vary.
 
-## Microsoft WSL2
+### Microsoft WSL2
 
 To setup a development environment you can use the same instructions discussed
 for GNU/Linux.
@@ -116,30 +116,36 @@ brew install jq \
 ```
 
 You can then follow the provided instructions. As you'll see, you need to add
-the following lines to the profile of your shell (eg `~/.bash_profile`):
+the following lines to the profile of your shell (eg `~/.bash_profile` or
+`~/.zprofile`):
+
+**Warning**: for Apple Silicon macs, the new default location for homebrew
+is `/opt/homebrew`, not `/usr/local`. See [discussion](https://github.com/Homebrew/brew/issues/9177).
 
 ``` bash
 # Go settings
 export GOPATH="${HOME}/go"
 # Homebrew settings
-export PATH="/usr/local/opt/gettext/bin:$PATH"
-export PATH="/usr/local/opt/coreutils/libexec/gnubin:$PATH"
-export PATH="/usr/local/opt/findutils/libexec/gnubin:$PATH"
-export PATH="/usr/local/opt/gnu-getopt/bin:$PATH"
-export PATH="/usr/local/opt/gnu-sed/libexec/gnubin:$PATH"
-export PATH="/usr/local/opt/gnu-tar/libexec/gnubin:$PATH"
-export MANPATH="/usr/local/opt/coreutils/libexec/gnuman:$MANPATH"
-export MANPATH="/usr/local/opt/findutils/libexec/gnuman:$MANPATH"
-export MANPATH="/usr/local/opt/gnu-getopt/share/man:$MANPATH"
-export MANPATH="/usr/local/opt/gnu-sed/libexec/gnuman:$MANPATH"
-export MANPATH="/usr/local/opt/gnu-tar/libexec/gnuman:$MANPATH"
-export LDFLAGS="-L/usr/local/opt/zlib/lib $LDFLAGS"
-export LDFLAGS="-L/usr/local/opt/gettext/lib $LDFLAGS"
-export LDFLAGS="-L/usr/local/opt/readline/lib $LDFLAGS"
-export CPPFLAGS="-I/usr/local/opt/zlib/include $CPPFLAGS"
-export CPPFLAGS="-I/usr/local/opt/gettext/include $CPPFLAGS"
-export CPPFLAGS="-I/usr/local/opt/readline/include $CPPFLAGS"
-export PKG_CONFIG_PATH="/usr/local/opt/readline/lib/pkgconfig"
+HOMEBREW_PREFIX=$(brew --prefix)
+export PATH="${HOMEBREW_PREFIX}/opt/gettext/bin:$PATH"
+export PATH="${HOMEBREW_PREFIX}/opt/coreutils/libexec/gnubin:$PATH"
+export PATH="${HOMEBREW_PREFIX}/opt/findutils/libexec/gnubin:$PATH"
+export PATH="${HOMEBREW_PREFIX}/opt/gnu-getopt/bin:$PATH"
+export PATH="${HOMEBREW_PREFIX}/opt/gnu-sed/libexec/gnubin:$PATH"
+export PATH="${HOMEBREW_PREFIX}/opt/gnu-tar/libexec/gnubin:$PATH"
+export MANPATH="${HOMEBREW_PREFIX}/opt/coreutils/libexec/gnuman:$MANPATH"
+export MANPATH="${HOMEBREW_PREFIX}/opt/findutils/libexec/gnuman:$MANPATH"
+export MANPATH="${HOMEBREW_PREFIX}/opt/gnu-getopt/share/man:$MANPATH"
+export MANPATH="${HOMEBREW_PREFIX}/opt/gnu-sed/libexec/gnuman:$MANPATH"
+export MANPATH="${HOMEBREW_PREFIX}/opt/gnu-tar/libexec/gnuman:$MANPATH"
+export LDFLAGS="-L${HOMEBREW_PREFIX}/opt/zlib/lib $LDFLAGS"
+export LDFLAGS="-L${HOMEBREW_PREFIX}/opt/gettext/lib $LDFLAGS"
+export LDFLAGS="-L${HOMEBREW_PREFIX}/opt/readline/lib $LDFLAGS"
+export CPPFLAGS="-I${HOMEBREW_PREFIX}/opt/zlib/include $CPPFLAGS"
+export CPPFLAGS="-I${HOMEBREW_PREFIX}/opt/gettext/include $CPPFLAGS"
+export CPPFLAGS="-I${HOMEBREW_PREFIX}/opt/readline/include $CPPFLAGS"
+export PKG_CONFIG_PATH="${HOMEBREW_PREFIX}/opt/readline/lib/pkgconfig"
+unset HOMEBREW_PREFIX
 # GPGv2 backward compatibility
 export GPG_AGENT_INFO=~/.gnupg/S.gpg-agent::1
 export GPG_TTY=$(tty)

@@ -68,6 +68,17 @@ func readSecretKeyRef(
 	return string(value), err
 }
 
+// getSecretKeyRefFileName get the name of the file where the content of the
+// connection secret will be dumped
+func getSecretKeyRefFileName(
+	serverName string,
+	selector *corev1.SecretKeySelector,
+) string {
+	directory := path.Join(getExternalSecretsPath(), serverName)
+	filePath := path.Join(directory, fmt.Sprintf("%v_%v", selector.Name, selector.Key))
+	return filePath
+}
+
 // dumpSecretKeyRefToFile dumps a certain secret to a file inside a temporary folder
 // using 0600 as permission bits.
 //
@@ -110,6 +121,13 @@ func dumpSecretKeyRefToFile(
 	}
 
 	return f.Name(), nil
+}
+
+// getPgPassFilePath gets the path where the pgpass file will be stored
+func getPgPassFilePath(serverName string) string {
+	directory := path.Join(getExternalSecretsPath(), serverName)
+	filePath := path.Join(directory, "pgpass")
+	return filePath
 }
 
 // createPgPassFile creates a pgpass file inside the user home directory

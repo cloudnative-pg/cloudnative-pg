@@ -20,6 +20,8 @@ package client
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"net/http"
 
@@ -88,8 +90,15 @@ func get(urlPath string) ([]byte, error) {
 		_ = resp.Body.Close()
 	}()
 
-	if resp.StatusCode != http.StatusOK {
+	switch resp.StatusCode {
+	case http.StatusOK:
+		break
+	case http.StatusNotFound:
 		return nil, cache.ErrCacheMiss
+	case http.StatusInternalServerError:
+		return nil, errors.New("encountered an internal server error while fetching cluster cache")
+	default:
+		return nil, fmt.Errorf("encountered an unexpected status code while fetching cluster cache: %d", resp.StatusCode)
 	}
 
 	bytes, err := io.ReadAll(resp.Body)

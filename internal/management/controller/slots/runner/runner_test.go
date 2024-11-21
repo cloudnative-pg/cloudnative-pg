@@ -17,9 +17,9 @@ limitations under the License.
 package runner
 
 import (
-	"context"
-	"fmt"
+	"database/sql"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -29,131 +29,138 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-type fakeSlot struct {
-	name       string
-	restartLSN string
-}
+var _ = Describe("Slot synchronization", Ordered, func() {
+	const (
+		selectPgReplicationSlots = "^SELECT (.+) FROM pg_replication_slots"
+		selectPgSlotAdvance      = "SELECT pg_replication_slot_advance"
 
-type fakeSlotManager struct {
-	slots        map[string]fakeSlot
-	slotsUpdated int
-	slotsCreated int
-	slotsDeleted int
-}
+		localPodName  = "cluster-2"
+		localSlotName = "_cnpg_cluster_2"
+		slot3         = "cluster-3"
+		slot4         = "cluster-4"
+		lsnSlot3      = "0/302C4D8"
+		lsnSlot4      = "0/303C4D8"
+	)
 
-func (sm *fakeSlotManager) List(
-	_ context.Context,
-	_ *apiv1.ReplicationSlotsConfiguration,
-) (infrastructure.ReplicationSlotList, error) {
-	var slotList infrastructure.ReplicationSlotList
-	for _, slot := range sm.slots {
-		slotList.Items = append(slotList.Items, infrastructure.ReplicationSlot{
-			SlotName:   slot.name,
-			RestartLSN: slot.restartLSN,
-			Type:       infrastructure.SlotTypePhysical,
-			Active:     false,
-		})
-	}
-	return slotList, nil
-}
+	var (
+		config = apiv1.ReplicationSlotsConfiguration{
+			HighAvailability: &apiv1.ReplicationSlotsHAConfiguration{
+				Enabled:    ptr.To(true),
+				SlotPrefix: "_cnpg_",
+			},
+		}
+		columns = []string{"slot_name", "slot_type", "active", "restart_lsn", "holds_xmin"}
+	)
 
-func (sm *fakeSlotManager) Update(_ context.Context, slot infrastructure.ReplicationSlot) error {
-	localSlot, found := sm.slots[slot.SlotName]
-	if !found {
-		return fmt.Errorf("while updating slot: Slot %s not found", slot.SlotName)
-	}
-	if localSlot.restartLSN != slot.RestartLSN {
-		sm.slots[slot.SlotName] = fakeSlot{name: slot.SlotName, restartLSN: slot.RestartLSN}
-		sm.slotsUpdated++
-	}
-	return nil
-}
+	var (
+		dbLocal, dbPrimary     *sql.DB
+		mockLocal, mockPrimary sqlmock.Sqlmock
+	)
 
-func (sm *fakeSlotManager) Create(_ context.Context, slot infrastructure.ReplicationSlot) error {
-	if _, found := sm.slots[slot.SlotName]; found {
-		return fmt.Errorf("while creating slot: Slot %s already exists", slot.SlotName)
-	}
-	sm.slots[slot.SlotName] = fakeSlot{name: slot.SlotName, restartLSN: slot.RestartLSN}
-	sm.slotsCreated++
-	return nil
-}
-
-func (sm *fakeSlotManager) Delete(_ context.Context, slot infrastructure.ReplicationSlot) error {
-	if _, found := sm.slots[slot.SlotName]; !found {
-		return fmt.Errorf("while deleting slot: Slot %s not found", slot.SlotName)
-	}
-	delete(sm.slots, slot.SlotName)
-	sm.slotsDeleted++
-	return nil
-}
-
-var _ = Describe("Slot synchronization", func() {
-	ctx := context.TODO()
-	localPodName := "cluster-2"
-	localSlotName := "_cnpg_cluster_2"
-	slot3 := "cluster-3"
-	slot4 := "cluster-4"
-
-	primary := &fakeSlotManager{
-		slots: map[string]fakeSlot{
-			localSlotName: {name: localSlotName, restartLSN: "0/301C4D8"},
-			slot3:         {name: slot3, restartLSN: "0/302C4D8"},
-			slot4:         {name: slot4, restartLSN: "0/303C4D8"},
-		},
-	}
-	local := &fakeSlotManager{
-		slots: map[string]fakeSlot{},
-	}
-	config := apiv1.ReplicationSlotsConfiguration{
-		HighAvailability: &apiv1.ReplicationSlotsHAConfiguration{
-			Enabled:    ptr.To(true),
-			SlotPrefix: "_cnpg_",
-		},
-	}
-
-	It("can create slots in local from those on primary", func() {
-		localSlotsBefore, err := local.List(ctx, &config)
-		Expect(err).ShouldNot(HaveOccurred())
-		Expect(localSlotsBefore.Items).Should(BeEmpty())
-
-		err = synchronizeReplicationSlots(context.TODO(), primary, local, localPodName, &config)
-		Expect(err).ShouldNot(HaveOccurred())
-
-		localSlotsAfter, err := local.List(ctx, &config)
-		Expect(err).ShouldNot(HaveOccurred())
-		Expect(localSlotsAfter.Items).Should(HaveLen(2))
-		Expect(localSlotsAfter.Has(slot3)).To(BeTrue())
-		Expect(localSlotsAfter.Has(slot4)).To(BeTrue())
-		Expect(local.slotsCreated).To(Equal(2))
+	BeforeEach(func() {
+		var err error
+		dbLocal, mockLocal, err = sqlmock.New()
+		Expect(err).NotTo(HaveOccurred())
+		dbPrimary, mockPrimary, err = sqlmock.New()
+		Expect(err).NotTo(HaveOccurred())
 	})
-	It("can update slots in local when ReplayLSN in primary advanced", func() {
-		// advance slot3 in primary
+	AfterEach(func() {
+		Expect(mockLocal.ExpectationsWereMet()).To(Succeed(), "failed expectations in LOCAL")
+		Expect(mockPrimary.ExpectationsWereMet()).To(Succeed(), "failed expectations in PRIMARY")
+	})
+
+	It("can create slots in local from those on primary", func(ctx SpecContext) {
+		// the primary contains slots
+		mockPrimary.ExpectQuery(selectPgReplicationSlots).
+			WillReturnRows(sqlmock.NewRows(columns).
+				AddRow(localSlotName, string(infrastructure.SlotTypePhysical), true, "0/301C4D8", false).
+				AddRow(slot3, string(infrastructure.SlotTypePhysical), true, lsnSlot3, false).
+				AddRow(slot4, string(infrastructure.SlotTypePhysical), true, lsnSlot4, false))
+
+		// but the local contains none
+		mockLocal.ExpectQuery(selectPgReplicationSlots).
+			WillReturnRows(sqlmock.NewRows(columns))
+
+		mockLocal.ExpectExec("SELECT pg_create_physical_replication_slot").
+			WithArgs(slot3, true).
+			WillReturnResult(sqlmock.NewResult(1, 1))
+
+		mockLocal.ExpectExec(selectPgSlotAdvance).
+			WithArgs(slot3, lsnSlot3).
+			WillReturnResult(sqlmock.NewResult(1, 1))
+
+		mockLocal.ExpectExec("SELECT pg_create_physical_replication_slot").
+			WithArgs(slot4, true).
+			WillReturnResult(sqlmock.NewResult(1, 1))
+
+		mockLocal.ExpectExec(selectPgSlotAdvance).
+			WithArgs(slot4, lsnSlot4).
+			WillReturnResult(sqlmock.NewResult(1, 1))
+
+		err := synchronizeReplicationSlots(ctx, dbPrimary, dbLocal, localPodName, &config)
+		Expect(err).ShouldNot(HaveOccurred())
+	})
+
+	It("can update slots in local when ReplayLSN in primary advanced", func(ctx SpecContext) {
 		newLSN := "0/308C4D8"
-		err := primary.Update(ctx, infrastructure.ReplicationSlot{SlotName: slot3, RestartLSN: newLSN})
-		Expect(err).ShouldNot(HaveOccurred())
 
-		err = synchronizeReplicationSlots(context.TODO(), primary, local, localPodName, &config)
-		Expect(err).ShouldNot(HaveOccurred())
+		// Simulate we advance slot3 in primary
+		mockPrimary.ExpectQuery(selectPgReplicationSlots).
+			WillReturnRows(sqlmock.NewRows(columns).
+				AddRow(localSlotName, string(infrastructure.SlotTypePhysical), true, "0/301C4D8", false).
+				AddRow(slot3, string(infrastructure.SlotTypePhysical), true, newLSN, false).
+				AddRow(slot4, string(infrastructure.SlotTypePhysical), true, lsnSlot4, false))
+		// But local has the old values
+		mockLocal.ExpectQuery(selectPgReplicationSlots).
+			WillReturnRows(sqlmock.NewRows(columns).
+				AddRow(slot3, string(infrastructure.SlotTypePhysical), true, lsnSlot3, false).
+				AddRow(slot4, string(infrastructure.SlotTypePhysical), true, lsnSlot4, false))
 
-		localSlotsAfter, err := local.List(ctx, &config)
+		mockLocal.ExpectExec(selectPgSlotAdvance).
+			WithArgs(slot3, newLSN).
+			WillReturnResult(sqlmock.NewResult(1, 1))
+		mockLocal.ExpectExec(selectPgSlotAdvance).
+			WithArgs(slot4, lsnSlot4).
+			WillReturnResult(sqlmock.NewResult(1, 1))
+
+		err := synchronizeReplicationSlots(ctx, dbPrimary, dbLocal, localPodName, &config)
 		Expect(err).ShouldNot(HaveOccurred())
-		Expect(localSlotsAfter.Items).Should(HaveLen(2))
-		Expect(localSlotsAfter.Has(slot3)).To(BeTrue())
-		slot := localSlotsAfter.Get(slot3)
-		Expect(slot.RestartLSN).To(Equal(newLSN))
-		Expect(local.slotsUpdated).To(Equal(1))
 	})
-	It("can drop slots in local when they are no longer in primary", func() {
-		err := primary.Delete(ctx, infrastructure.ReplicationSlot{SlotName: slot4})
-		Expect(err).ShouldNot(HaveOccurred())
 
-		err = synchronizeReplicationSlots(context.TODO(), primary, local, localPodName, &config)
-		Expect(err).ShouldNot(HaveOccurred())
+	It("can drop inactive slots in local when they are no longer in primary", func(ctx SpecContext) {
+		// Simulate primary has no longer slot4
+		mockPrimary.ExpectQuery(selectPgReplicationSlots).
+			WillReturnRows(sqlmock.NewRows(columns).
+				AddRow(localSlotName, string(infrastructure.SlotTypePhysical), true, "0/301C4D8", false))
+		// But local still has it
+		mockLocal.ExpectQuery(selectPgReplicationSlots).
+			WillReturnRows(sqlmock.NewRows(columns).
+				AddRow(slot4, string(infrastructure.SlotTypePhysical), false, lsnSlot4, false))
 
-		localSlotsAfter, err := local.List(ctx, &config)
+		mockLocal.ExpectExec("SELECT pg_drop_replication_slot").WithArgs(slot4).
+			WillReturnResult(sqlmock.NewResult(1, 1))
+
+		err := synchronizeReplicationSlots(ctx, dbPrimary, dbLocal, localPodName, &config)
 		Expect(err).ShouldNot(HaveOccurred())
-		Expect(localSlotsAfter.Items).Should(HaveLen(1))
-		Expect(localSlotsAfter.Has(slot3)).To(BeTrue())
-		Expect(local.slotsDeleted).To(Equal(1))
+	})
+
+	It("can drop slots in local that hold xmin", func(ctx SpecContext) {
+		slotWithXmin := "_cnpg_xmin"
+		mockPrimary.ExpectQuery(selectPgReplicationSlots).
+			WillReturnRows(sqlmock.NewRows(columns).
+				AddRow(localSlotName, string(infrastructure.SlotTypePhysical), true, "0/301C4D8", false).
+				AddRow(slotWithXmin, string(infrastructure.SlotTypePhysical), true, "0/301C4D8", true))
+		mockLocal.ExpectQuery(selectPgReplicationSlots).
+			WillReturnRows(sqlmock.NewRows(columns).
+				AddRow(localSlotName, string(infrastructure.SlotTypePhysical), true, "0/301C4D8", false).
+				AddRow(slotWithXmin, string(infrastructure.SlotTypePhysical), false, "0/301C4D8", true)) // inactive but with Xmin
+
+		mockLocal.ExpectExec(selectPgSlotAdvance).WithArgs(slotWithXmin, "0/301C4D8").
+			WillReturnResult(sqlmock.NewResult(1, 1))
+		mockLocal.ExpectExec("SELECT pg_drop_replication_slot").WithArgs(slotWithXmin).
+			WillReturnResult(sqlmock.NewResult(1, 1))
+
+		err := synchronizeReplicationSlots(ctx, dbPrimary, dbLocal, localPodName, &config)
+		Expect(err).ShouldNot(HaveOccurred())
 	})
 })

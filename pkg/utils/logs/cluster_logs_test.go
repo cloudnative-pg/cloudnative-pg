@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 
@@ -33,6 +33,23 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+type syncBuffer struct {
+	b bytes.Buffer
+	m sync.Mutex
+}
+
+func (b *syncBuffer) Write(p []byte) (n int, err error) {
+	b.m.Lock()
+	defer b.m.Unlock()
+	return b.b.Write(p)
+}
+
+func (b *syncBuffer) String() string {
+	b.m.Lock()
+	defer b.m.Unlock()
+	return b.b.String()
+}
+
 var _ = Describe("Cluster logging tests", func() {
 	clusterNamespace := "cluster-test"
 	clusterName := "myTestCluster"
@@ -42,12 +59,47 @@ var _ = Describe("Cluster logging tests", func() {
 			Name:      clusterName,
 		},
 	}
-	pod := &v1.Pod{
+	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: clusterNamespace,
 			Name:      clusterName + "-1",
 			Labels: map[string]string{
 				utils.ClusterLabelName: clusterName,
+			},
+		},
+		Status: corev1.PodStatus{
+			ContainerStatuses: []corev1.ContainerStatus{
+				{
+					Name: "postgresql",
+					State: corev1.ContainerState{
+						Running: &corev1.ContainerStateRunning{},
+					},
+				},
+			},
+		},
+	}
+	podWithSidecars := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: clusterNamespace,
+			Name:      clusterName + "-1",
+			Labels: map[string]string{
+				utils.ClusterLabelName: clusterName,
+			},
+		},
+		Status: corev1.PodStatus{
+			ContainerStatuses: []corev1.ContainerStatus{
+				{
+					Name: "postgresql",
+					State: corev1.ContainerState{
+						Running: &corev1.ContainerStateRunning{},
+					},
+				},
+				{
+					Name: "sidecar",
+					State: corev1.ContainerState{
+						Running: &corev1.ContainerStateRunning{},
+					},
+				},
 			},
 		},
 	}
@@ -61,7 +113,7 @@ var _ = Describe("Cluster logging tests", func() {
 			defer wait.Done()
 			streamClusterLogs := ClusterStreamingRequest{
 				Cluster: cluster,
-				Options: &v1.PodLogOptions{
+				Options: &corev1.PodLogOptions{
 					Follow: false,
 				},
 				Client: client,
@@ -71,12 +123,35 @@ var _ = Describe("Cluster logging tests", func() {
 		}()
 		ctx.Done()
 		wait.Wait()
-		Expect(logBuffer.String()).To(BeEquivalentTo("fake logs"))
+		Expect(logBuffer.String()).To(BeEquivalentTo("fake logs\n"))
+	})
+
+	It("should catch the logs of the sidecar too", func(ctx context.Context) {
+		client := fake.NewClientset(podWithSidecars)
+		var logBuffer bytes.Buffer
+		var wait sync.WaitGroup
+		wait.Add(1)
+		go func() {
+			defer GinkgoRecover()
+			defer wait.Done()
+			streamClusterLogs := ClusterStreamingRequest{
+				Cluster: cluster,
+				Options: &corev1.PodLogOptions{
+					Follow: false,
+				},
+				Client: client,
+			}
+			err := streamClusterLogs.SingleStream(ctx, &logBuffer)
+			Expect(err).NotTo(HaveOccurred())
+		}()
+		ctx.Done()
+		wait.Wait()
+		Expect(logBuffer.String()).To(BeEquivalentTo("fake logs\nfake logs\n"))
 	})
 
 	It("should catch extra logs if given the follow option", func(ctx context.Context) {
 		client := fake.NewSimpleClientset(pod)
-		var logBuffer bytes.Buffer
+		var logBuffer syncBuffer
 		// let's set a short follow-wait, and keep the cluster streaming for two
 		// cycles
 		followWaiting := 200 * time.Millisecond
@@ -85,7 +160,7 @@ var _ = Describe("Cluster logging tests", func() {
 			defer GinkgoRecover()
 			streamClusterLogs := ClusterStreamingRequest{
 				Cluster: cluster,
-				Options: &v1.PodLogOptions{
+				Options: &corev1.PodLogOptions{
 					Follow: true,
 				},
 				FollowWaiting: followWaiting,
@@ -98,6 +173,6 @@ var _ = Describe("Cluster logging tests", func() {
 		time.Sleep(350 * time.Millisecond)
 		cancel()
 		// the fake pod will be seen twice
-		Expect(logBuffer.String()).To(BeEquivalentTo("fake logsfake logs"))
+		Expect(logBuffer.String()).To(BeEquivalentTo("fake logs\nfake logs\n"))
 	})
 })

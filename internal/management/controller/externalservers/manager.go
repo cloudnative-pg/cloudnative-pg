@@ -27,14 +27,13 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
 
-// Reconciler is a Kubernetes controller that ensures Tablespaces
-// are created in Postgres
+// Reconciler is a Kubernetes controller that ensures pgpass file for external servers is synchronized
 type Reconciler struct {
 	instance *postgres.Instance
 	client   client.Client
 }
 
-// NewReconciler creates a new TablespaceReconciler
+// NewReconciler creates a new ExternalServerReconciler
 func NewReconciler(instance *postgres.Instance, client client.Client) *Reconciler {
 	controller := &Reconciler{
 		instance: instance,
@@ -47,6 +46,7 @@ func NewReconciler(instance *postgres.Instance, client client.Client) *Reconcile
 func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&apiv1.Cluster{}).
+		Named("instance-external-server").
 		Complete(r)
 }
 
@@ -55,8 +55,8 @@ func (r *Reconciler) getCluster(ctx context.Context) (*apiv1.Cluster, error) {
 	var cluster apiv1.Cluster
 	err := r.client.Get(ctx,
 		types.NamespacedName{
-			Namespace: r.instance.Namespace,
-			Name:      r.instance.ClusterName,
+			Namespace: r.instance.GetNamespaceName(),
+			Name:      r.instance.GetClusterName(),
 		},
 		&cluster)
 	if err != nil {

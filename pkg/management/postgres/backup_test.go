@@ -19,18 +19,19 @@ package postgres
 import (
 	"context"
 	"os"
-	"time"
+	"strings"
 
+	barmanBackup "github.com/cloudnative-pg/barman-cloud/pkg/backup"
+	barmanCapabilities "github.com/cloudnative-pg/barman-cloud/pkg/capabilities"
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
-	barmanCapabilities "github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/capabilities"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/catalog"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -146,114 +147,70 @@ var _ = Describe("testing backup command", func() {
 	})
 })
 
-var _ = Describe("update barman backup metadata", func() {
+var _ = Describe("generate backup options", func() {
 	const namespace = "test"
-
-	var cluster *apiv1.Cluster
-	var barmanBackups *catalog.Catalog
-
-	var (
-		now           = metav1.NewTime(time.Now().Local().Truncate(time.Second))
-		oneHourAgo    = metav1.NewTime(now.Add(-1 * time.Hour))
-		twoHoursAgo   = metav1.NewTime(now.Add(-2 * time.Hour))
-		threeHoursAgo = metav1.NewTime(now.Add(-3 * time.Hour))
-	)
-
-	BeforeEach(func() {
-		cluster = &apiv1.Cluster{
-			ObjectMeta: metav1.ObjectMeta{Name: "test-cluster", Namespace: namespace},
-			Spec: apiv1.ClusterSpec{
-				Backup: &apiv1.BackupConfiguration{},
-			},
-		}
-
-		barmanBackups = &catalog.Catalog{
-			List: []catalog.BarmanBackup{
-				{
-					BackupName: "twoHoursAgo",
-					BeginTime:  threeHoursAgo.Time,
-					EndTime:    twoHoursAgo.Time,
-				},
-				{
-					BackupName: "youngest",
-					BeginTime:  twoHoursAgo.Time,
-					EndTime:    oneHourAgo.Time,
+	capabilities := barmanCapabilities.Capabilities{
+		Version:                    nil,
+		HasAzure:                   true,
+		HasS3:                      true,
+		HasGoogle:                  true,
+		HasRetentionPolicy:         true,
+		HasTags:                    true,
+		HasCheckWalArchive:         true,
+		HasSnappy:                  true,
+		HasErrorCodesForWALRestore: true,
+		HasAzureManagedIdentity:    true,
+	}
+	cluster := &apiv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-cluster", Namespace: namespace},
+		Spec: apiv1.ClusterSpec{
+			Backup: &apiv1.BackupConfiguration{
+				BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{
+					Data: &apiv1.DataBackupConfiguration{
+						Compression:         "gzip",
+						Encryption:          "aes256",
+						ImmediateCheckpoint: true,
+						Jobs:                ptr.To(int32(2)),
+					},
 				},
 			},
-		}
+		},
+	}
+
+	It("should generate correct options", func() {
+		extraOptions := []string{"--min-chunk-size=5MB", "--read-timeout=60", "-vv"}
+		cluster.Spec.Backup.BarmanObjectStore.Data.AdditionalCommandArgs = extraOptions
+
+		cmd := barmanBackup.NewBackupCommand(cluster.Spec.Backup.BarmanObjectStore, &capabilities)
+		options, err := cmd.GetDataConfiguration([]string{})
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(strings.Join(options, " ")).
+			To(
+				Equal(
+					"--gzip --encryption aes256 --immediate-checkpoint --jobs 2 " +
+						"--min-chunk-size=5MB --read-timeout=60 -vv",
+				))
 	})
 
-	It("should update cluster with no metadata", func() {
-		Expect(cluster.Status.FirstRecoverabilityPoint).To(BeEmpty())
-		Expect(cluster.Status.FirstRecoverabilityPointByMethod).To(BeEmpty())
-		Expect(cluster.Status.LastSuccessfulBackup).To(BeEmpty())
-		Expect(cluster.Status.LastSuccessfulBackupByMethod).To(BeEmpty())
-
-		updateClusterStatusWithBackupTimes(cluster, barmanBackups)
-
-		Expect(cluster.Status.FirstRecoverabilityPoint).To(Equal(twoHoursAgo.Format(time.RFC3339)))
-		Expect(cluster.Status.FirstRecoverabilityPointByMethod[apiv1.BackupMethodBarmanObjectStore]).
-			To(Equal(twoHoursAgo))
-		Expect(cluster.Status.FirstRecoverabilityPointByMethod).
-			ToNot(HaveKey(apiv1.BackupMethodVolumeSnapshot))
-		Expect(cluster.Status.LastSuccessfulBackup).To(Equal(oneHourAgo.Format(time.RFC3339)))
-		Expect(cluster.Status.LastSuccessfulBackupByMethod[apiv1.BackupMethodBarmanObjectStore]).
-			To(Equal(oneHourAgo))
-		Expect(cluster.Status.LastSuccessfulBackupByMethod).
-			ToNot(HaveKey(apiv1.BackupMethodVolumeSnapshot))
-	})
-
-	It("will update the metadata if they are outdated", func() {
-		cluster.Status = apiv1.ClusterStatus{
-			FirstRecoverabilityPoint: now.Format(time.RFC3339),
-			FirstRecoverabilityPointByMethod: map[apiv1.BackupMethod]metav1.Time{
-				apiv1.BackupMethodBarmanObjectStore: now,
-			},
-			LastSuccessfulBackup: threeHoursAgo.Format(time.RFC3339),
-			LastSuccessfulBackupByMethod: map[apiv1.BackupMethod]metav1.Time{
-				apiv1.BackupMethodBarmanObjectStore: threeHoursAgo,
-			},
+	It("should not overwrite declared options if conflict", func() {
+		extraOptions := []string{
+			"--min-chunk-size=5MB",
+			"--read-timeout=60",
+			"-vv",
+			"--immediate-checkpoint=false",
+			"--encryption=aes256",
 		}
+		cluster.Spec.Backup.BarmanObjectStore.Data.AdditionalCommandArgs = extraOptions
+		cmd := barmanBackup.NewBackupCommand(cluster.Spec.Backup.BarmanObjectStore, &capabilities)
+		options, err := cmd.GetDataConfiguration([]string{})
+		Expect(err).ToNot(HaveOccurred())
 
-		updateClusterStatusWithBackupTimes(cluster, barmanBackups)
-
-		Expect(cluster.Status.FirstRecoverabilityPoint).To(Equal(twoHoursAgo.Format(time.RFC3339)))
-		Expect(cluster.Status.FirstRecoverabilityPointByMethod[apiv1.BackupMethodBarmanObjectStore]).
-			To(Equal(twoHoursAgo))
-		Expect(cluster.Status.FirstRecoverabilityPointByMethod).
-			ToNot(HaveKey(apiv1.BackupMethodVolumeSnapshot))
-		Expect(cluster.Status.LastSuccessfulBackup).To(Equal(oneHourAgo.Format(time.RFC3339)))
-		Expect(cluster.Status.LastSuccessfulBackupByMethod[apiv1.BackupMethodBarmanObjectStore]).
-			To(Equal(oneHourAgo))
-		Expect(cluster.Status.LastSuccessfulBackupByMethod).
-			ToNot(HaveKey(apiv1.BackupMethodVolumeSnapshot))
-	})
-
-	It("will keep metadata from other methods if appropriate", func() {
-		cluster.Status = apiv1.ClusterStatus{
-			FirstRecoverabilityPoint: now.Format(time.RFC3339),
-			FirstRecoverabilityPointByMethod: map[apiv1.BackupMethod]metav1.Time{
-				apiv1.BackupMethodBarmanObjectStore: now,
-				apiv1.BackupMethodVolumeSnapshot:    threeHoursAgo,
-			},
-			LastSuccessfulBackup: threeHoursAgo.Format(time.RFC3339),
-			LastSuccessfulBackupByMethod: map[apiv1.BackupMethod]metav1.Time{
-				apiv1.BackupMethodBarmanObjectStore: threeHoursAgo,
-				apiv1.BackupMethodVolumeSnapshot:    now,
-			},
-		}
-
-		updateClusterStatusWithBackupTimes(cluster, barmanBackups)
-
-		Expect(cluster.Status.FirstRecoverabilityPoint).To(Equal(threeHoursAgo.Format(time.RFC3339)))
-		Expect(cluster.Status.FirstRecoverabilityPointByMethod[apiv1.BackupMethodBarmanObjectStore]).
-			To(Equal(twoHoursAgo))
-		Expect(cluster.Status.FirstRecoverabilityPointByMethod[apiv1.BackupMethodVolumeSnapshot]).
-			To(Equal(threeHoursAgo))
-		Expect(cluster.Status.LastSuccessfulBackup).To(Equal(now.Format(time.RFC3339)))
-		Expect(cluster.Status.LastSuccessfulBackupByMethod[apiv1.BackupMethodBarmanObjectStore]).
-			To(Equal(oneHourAgo))
-		Expect(cluster.Status.LastSuccessfulBackupByMethod[apiv1.BackupMethodVolumeSnapshot]).
-			To(Equal(now))
+		Expect(strings.Join(options, " ")).
+			To(
+				Equal(
+					"--gzip --encryption aes256 --immediate-checkpoint --jobs 2 " +
+						"--min-chunk-size=5MB --read-timeout=60 -vv",
+				))
 	})
 })

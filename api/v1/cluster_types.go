@@ -17,23 +17,12 @@ limitations under the License.
 package v1
 
 import (
-	"context"
-	"fmt"
 	"regexp"
-	"strings"
-	"time"
 
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/system"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
 
 const (
@@ -118,6 +107,10 @@ const (
 
 	// PGBouncerPoolerUserName is the name of the role to be used for
 	PGBouncerPoolerUserName = "cnpg_pooler_pgbouncer"
+
+	// MissingWALDiskSpaceExitCode is the exit code the instance manager
+	// will use to signal that there's no more WAL disk space
+	MissingWALDiskSpaceExitCode = 4
 )
 
 // SnapshotOwnerReference defines the reference type for the owner of the snapshot.
@@ -171,16 +164,6 @@ type VolumeSnapshotConfiguration struct {
 	OnlineConfiguration OnlineConfiguration `json:"onlineConfiguration,omitempty"`
 }
 
-// GetOnline tells whether this volume snapshot configuration allows
-// online backups
-func (configuration *VolumeSnapshotConfiguration) GetOnline() bool {
-	if configuration.Online == nil {
-		return true
-	}
-
-	return *configuration.Online
-}
-
 // OnlineConfiguration contains the configuration parameters for the online volume snapshot
 type OnlineConfiguration struct {
 	// If false, the function will return immediately after the backup is completed,
@@ -205,23 +188,17 @@ type OnlineConfiguration struct {
 	ImmediateCheckpoint *bool `json:"immediateCheckpoint,omitempty"`
 }
 
-// GetWaitForArchive tells whether to wait for archive or not
-func (o OnlineConfiguration) GetWaitForArchive() bool {
-	if o.WaitForArchive == nil {
-		return true
-	}
-
-	return *o.WaitForArchive
+// ImageCatalogRef defines the reference to a major version in an ImageCatalog
+type ImageCatalogRef struct {
+	// +kubebuilder:validation:XValidation:rule="self.kind == 'ImageCatalog' || self.kind == 'ClusterImageCatalog'",message="Only image catalogs are supported"
+	// +kubebuilder:validation:XValidation:rule="self.apiGroup == 'postgresql.cnpg.io'",message="Only image catalogs are supported"
+	corev1.TypedLocalObjectReference `json:",inline"`
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Major is immutable"
+	// The major version of PostgreSQL we want to use from the ImageCatalog
+	Major int `json:"major"`
 }
 
-// GetImmediateCheckpoint tells whether to execute an immediate checkpoint
-func (o OnlineConfiguration) GetImmediateCheckpoint() bool {
-	if o.ImmediateCheckpoint == nil {
-		return false
-	}
-
-	return *o.ImmediateCheckpoint
-}
+// +kubebuilder:validation:XValidation:rule="!(has(self.imageCatalogRef) && has(self.imageName))",message="imageName and imageCatalogRef are mutually exclusive"
 
 // ClusterSpec defines the desired state of Cluster
 type ClusterSpec struct {
@@ -238,6 +215,10 @@ type ClusterSpec struct {
 	// (`<image>:<tag>@sha256:<digestValue>`)
 	// +optional
 	ImageName string `json:"imageName,omitempty"`
+
+	// Defines the major PostgreSQL version we want to use within an ImageCatalog
+	// +optional
+	ImageCatalogRef *ImageCatalogRef `json:"imageCatalogRef,omitempty"`
 
 	// Image pull policy.
 	// One of `Always`, `Never` or `IfNotPresent`.
@@ -337,6 +318,10 @@ type ClusterSpec struct {
 	// +optional
 	WalStorage *StorageConfiguration `json:"walStorage,omitempty"`
 
+	// EphemeralVolumeSource allows the user to configure the source of ephemeral volumes.
+	// +optional
+	EphemeralVolumeSource *corev1.EphemeralVolumeSource `json:"ephemeralVolumeSource,omitempty"`
+
 	// The time in seconds that is allowed for a PostgreSQL instance to
 	// successfully start up (default 3600).
 	// The startup probe failure threshold is derived from this value using the formula:
@@ -356,7 +341,7 @@ type ClusterSpec struct {
 	// (that is: `stopDelay` - `smartShutdownTimeout`).
 	// +kubebuilder:default:=180
 	// +optional
-	SmartShutdownTimeout int32 `json:"smartShutdownTimeout,omitempty"`
+	SmartShutdownTimeout *int32 `json:"smartShutdownTimeout,omitempty"`
 
 	// The time in seconds that is allowed for a primary PostgreSQL instance
 	// to gracefully shutdown during a switchover.
@@ -371,6 +356,13 @@ type ClusterSpec struct {
 	// +kubebuilder:default:=0
 	// +optional
 	FailoverDelay int32 `json:"failoverDelay,omitempty"`
+
+	// LivenessProbeTimeout is the time (in seconds) that is allowed for a PostgreSQL instance
+	// to successfully respond to the liveness probe (default 30).
+	// The Liveness probe failure threshold is derived from this value using the formula:
+	// ceiling(livenessProbe / 10).
+	// +optional
+	LivenessProbeTimeout *int32 `json:"livenessProbeTimeout,omitempty"`
 
 	// Affinity/Anti-affinity rules for Pods
 	// +optional
@@ -390,6 +382,7 @@ type ClusterSpec struct {
 
 	// EphemeralVolumesSizeLimit allows the user to set the limits for the ephemeral
 	// volumes
+	// +optional
 	EphemeralVolumesSizeLimit *EphemeralVolumesSizeLimitConfiguration `json:"ephemeralVolumesSizeLimit,omitempty"`
 
 	// Name of the priority class which will be used in every generated Pod, if the PriorityClass
@@ -429,7 +422,7 @@ type ClusterSpec struct {
 
 	// The list of external clusters which are used in the configuration
 	// +optional
-	ExternalClusters []ExternalCluster `json:"externalClusters,omitempty"`
+	ExternalClusters ExternalClusterList `json:"externalClusters,omitempty"`
 
 	// The instances' log level, one of the following values: error, warning, info (default), debug, trace
 	// +kubebuilder:default:=info
@@ -466,7 +459,28 @@ type ClusterSpec struct {
 	// The tablespaces configuration
 	// +optional
 	Tablespaces []TablespaceConfiguration `json:"tablespaces,omitempty"`
+
+	// Manage the `PodDisruptionBudget` resources within the cluster. When
+	// configured as `true` (default setting), the pod disruption budgets
+	// will safeguard the primary node from being terminated. Conversely,
+	// setting it to `false` will result in the absence of any
+	// `PodDisruptionBudget` resource, permitting the shutdown of all nodes
+	// hosting the PostgreSQL cluster. This latter configuration is
+	// advisable for any PostgreSQL cluster employed for
+	// development/staging purposes.
+	// +kubebuilder:default:=true
+	// +optional
+	EnablePDB *bool `json:"enablePDB,omitempty"`
+
+	// The plugins configuration, containing
+	// any plugin to be loaded with the corresponding configuration
+	// +optional
+	Plugins PluginConfigurationList `json:"plugins,omitempty"`
 }
+
+// PluginConfigurationList represent a set of plugin with their
+// configuration parameters
+type PluginConfigurationList []PluginConfiguration
 
 const (
 	// PhaseSwitchover when a cluster is changing the primary node
@@ -484,6 +498,10 @@ const (
 	// PhaseUpgrade upgrade in process
 	PhaseUpgrade = "Upgrading cluster"
 
+	// PhaseUpgradeDelayed is set when a cluster need to be upgraded
+	// but the operation is being delayed by the operator configuration
+	PhaseUpgradeDelayed = "Cluster upgrade delayed"
+
 	// PhaseWaitingForUser set the status to wait for an action from the user
 	PhaseWaitingForUser = "Waiting for user action"
 
@@ -496,8 +514,19 @@ const (
 	// PhaseHealthy for a cluster doing nothing
 	PhaseHealthy = "Cluster in healthy state"
 
+	// PhaseUnknownPlugin is triggered when the required CNPG-i plugin have not been
+	// loaded still
+	PhaseUnknownPlugin = "Cluster cannot proceed to reconciliation due to an unknown plugin being required"
+
+	// PhaseImageCatalogError is triggered when the cluster cannot select the image to
+	// apply because of an invalid or incomplete catalog
+	PhaseImageCatalogError = "Cluster has incomplete or invalid image catalog"
+
 	// PhaseUnrecoverable for an unrecoverable cluster
 	PhaseUnrecoverable = "Cluster is in an unrecoverable state, needs manual intervention"
+
+	// PhaseArchitectureBinaryMissing is the error phase describing a missing architecture
+	PhaseArchitectureBinaryMissing = "Cluster cannot execute instance online upgrade due to missing architecture binary"
 
 	// PhaseWaitingForInstancesToBeActive is a waiting phase that is triggered when an instance pod is not active
 	PhaseWaitingForInstancesToBeActive = "Waiting for the instances to become active"
@@ -508,34 +537,24 @@ const (
 	// PhaseApplyingConfiguration is set by the instance manager when a configuration
 	// change is being detected
 	PhaseApplyingConfiguration = "Applying configuration"
+
+	// PhaseReplicaClusterPromotion is the phase
+	PhaseReplicaClusterPromotion = "Promoting to primary cluster"
+
+	// PhaseCannotCreateClusterObjects is set by the operator when is unable to create cluster resources
+	PhaseCannotCreateClusterObjects = "Unable to create required cluster objects"
 )
 
 // EphemeralVolumesSizeLimitConfiguration contains the configuration of the ephemeral
 // storage
 type EphemeralVolumesSizeLimitConfiguration struct {
 	// Shm is the size limit of the shared memory volume
+	// +optional
 	Shm *resource.Quantity `json:"shm,omitempty"`
 
 	// TemporaryData is the size limit of the temporary data volume
+	// +optional
 	TemporaryData *resource.Quantity `json:"temporaryData,omitempty"`
-}
-
-// GetShmLimit gets the `/dev/shm` memory size limit
-func (e *EphemeralVolumesSizeLimitConfiguration) GetShmLimit() *resource.Quantity {
-	if e == nil {
-		return nil
-	}
-
-	return e.Shm
-}
-
-// GetTemporaryDataLimit gets the temporary storage size limit
-func (e *EphemeralVolumesSizeLimitConfiguration) GetTemporaryDataLimit() *resource.Quantity {
-	if e == nil {
-		return nil
-	}
-
-	return e.TemporaryData
 }
 
 // ServiceAccountTemplate contains the template needed to generate the service accounts
@@ -545,36 +564,8 @@ type ServiceAccountTemplate struct {
 	Metadata Metadata `json:"metadata"`
 }
 
-// MergeMetadata adds the passed custom annotations and labels in the service account.
-func (st *ServiceAccountTemplate) MergeMetadata(sa *corev1.ServiceAccount) {
-	if st == nil {
-		return
-	}
-	if sa.Labels == nil {
-		sa.Labels = map[string]string{}
-	}
-	if sa.Annotations == nil {
-		sa.Annotations = map[string]string{}
-	}
-
-	utils.MergeMap(sa.Labels, st.Metadata.Labels)
-	utils.MergeMap(sa.Annotations, st.Metadata.Annotations)
-}
-
 // PodTopologyLabels represent the topology of a Pod. map[labelName]labelValue
 type PodTopologyLabels map[string]string
-
-// matchesTopology checks if the two topologies have
-// the same label values (labels are specified in SyncReplicaElectionConstraints.NodeLabelsAntiAffinity)
-func (topologyLabels PodTopologyLabels) matchesTopology(instanceTopology PodTopologyLabels) bool {
-	log.Debug("matching topology", "main", topologyLabels, "second", instanceTopology)
-	for mainLabelName, mainLabelValue := range topologyLabels {
-		if mainLabelValue != instanceTopology[mainLabelName] {
-			return false
-		}
-	}
-	return true
-}
 
 // PodName is the name of a Pod
 type PodName string
@@ -667,6 +658,15 @@ const (
 	TablespaceStatusPendingReconciliation TablespaceStatus = "pending"
 )
 
+// AvailableArchitecture represents the state of a cluster's architecture
+type AvailableArchitecture struct {
+	// GoArch is the name of the executable architecture
+	GoArch string `json:"goArch"`
+
+	// Hash is the hash of the executable
+	Hash string `json:"hash"`
+}
+
 // ClusterStatus defines the observed state of Cluster
 type ClusterStatus struct {
 	// The total number of PVC Groups detected in the cluster. It may differ from the number of existing instance pods.
@@ -679,7 +679,7 @@ type ClusterStatus struct {
 
 	// InstancesStatus indicates in which status the instances are
 	// +optional
-	InstancesStatus map[utils.PodStatus][]string `json:"instancesStatus,omitempty"`
+	InstancesStatus map[PodStatus][]string `json:"instancesStatus,omitempty"`
 
 	// The reported state of the instances during the last reconciliation loop
 	// +optional
@@ -713,6 +713,11 @@ type ClusterStatus struct {
 	// during a switchover or a failover
 	// +optional
 	TargetPrimary string `json:"targetPrimary,omitempty"`
+
+	// LastPromotionToken is the last verified promotion token that
+	// was used to promote a replica cluster
+	// +optional
+	LastPromotionToken string `json:"lastPromotionToken,omitempty"`
 
 	// How many PVCs have been created by this cluster
 	// +optional
@@ -824,6 +829,10 @@ type ClusterStatus struct {
 	// +optional
 	OperatorHash string `json:"cloudNativePGOperatorHash,omitempty"`
 
+	// AvailableArchitectures reports the available architectures of a cluster
+	// +optional
+	AvailableArchitectures []AvailableArchitecture `json:"availableArchitectures,omitempty"`
+
 	// Conditions for cluster object
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
@@ -839,6 +848,32 @@ type ClusterStatus struct {
 	// AzurePVCUpdateEnabled shows if the PVC online upgrade is enabled for this cluster
 	// +optional
 	AzurePVCUpdateEnabled bool `json:"azurePVCUpdateEnabled,omitempty"`
+
+	// Image contains the image name used by the pods
+	// +optional
+	Image string `json:"image,omitempty"`
+
+	// PluginStatus is the status of the loaded plugins
+	// +optional
+	PluginStatus []PluginStatus `json:"pluginStatus,omitempty"`
+
+	// SwitchReplicaClusterStatus is the status of the switch to replica cluster
+	// +optional
+	SwitchReplicaClusterStatus SwitchReplicaClusterStatus `json:"switchReplicaClusterStatus,omitempty"`
+
+	// DemotionToken is a JSON token containing the information
+	// from pg_controldata such as Database system identifier, Latest checkpoint's
+	// TimeLineID, Latest checkpoint's REDO location, Latest checkpoint's REDO
+	// WAL file, and Time of latest checkpoint
+	// +optional
+	DemotionToken string `json:"demotionToken,omitempty"`
+}
+
+// SwitchReplicaClusterStatus contains all the statuses regarding the switch of a cluster to a replica cluster
+type SwitchReplicaClusterStatus struct {
+	// InProgress indicates if there is an ongoing procedure of switching a cluster to a replica cluster.
+	// +optional
+	InProgress bool `json:"inProgress,omitempty"`
 }
 
 // InstanceReportedState describes the last reported state of an instance during a reconciliation loop
@@ -862,38 +897,6 @@ const (
 	ConditionBackup ClusterConditionType = "LastBackupSucceeded"
 	// ConditionClusterReady represents whether a cluster is Ready
 	ConditionClusterReady ClusterConditionType = "Ready"
-)
-
-// A Condition that can be used to communicate the Backup progress
-var (
-	// BackupSucceededCondition is added to a backup
-	// when it was completed correctly
-	BackupSucceededCondition = &metav1.Condition{
-		Type:    string(ConditionBackup),
-		Status:  metav1.ConditionTrue,
-		Reason:  string(ConditionReasonLastBackupSucceeded),
-		Message: "Backup was successful",
-	}
-
-	// BackupStartingCondition is added to a backup
-	// when it started
-	BackupStartingCondition = &metav1.Condition{
-		Type:    string(ConditionBackup),
-		Status:  metav1.ConditionFalse,
-		Reason:  string(ConditionBackupStarted),
-		Message: "New Backup starting up",
-	}
-
-	// BuildClusterBackupFailedCondition builds
-	// ConditionReasonLastBackupFailed condition
-	BuildClusterBackupFailedCondition = func(err error) *metav1.Condition {
-		return &metav1.Condition{
-			Type:    string(ConditionBackup),
-			Status:  metav1.ConditionFalse,
-			Reason:  string(ConditionReasonLastBackupFailed),
-			Message: err.Error(),
-		}
-	}
 )
 
 // ConditionStatus defines conditions of resources
@@ -968,6 +971,16 @@ type PgBouncerIntegrationStatus struct {
 // ReplicaClusterConfiguration encapsulates the configuration of a replica
 // cluster
 type ReplicaClusterConfiguration struct {
+	// Self defines the name of this cluster. It is used to determine if this is a primary
+	// or a replica cluster, comparing it with `primary`
+	// +optional
+	Self string `json:"self,omitempty"`
+
+	// Primary defines which Cluster is defined to be the primary in the distributed PostgreSQL cluster, based on the
+	// topology specified in externalClusters
+	// +optional
+	Primary string `json:"primary,omitempty"`
+
 	// The name of the external cluster which is the replication origin
 	// +kubebuilder:validation:MinLength=1
 	Source string `json:"source"`
@@ -976,7 +989,21 @@ type ReplicaClusterConfiguration struct {
 	// existing cluster. Replica cluster can be created from a recovery
 	// object store or via streaming through pg_basebackup.
 	// Refer to the Replica clusters page of the documentation for more information.
-	Enabled bool `json:"enabled"`
+	// +optional
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// A demotion token generated by an external cluster used to
+	// check if the promotion requirements are met.
+	// +optional
+	PromotionToken string `json:"promotionToken,omitempty"`
+
+	// When replica mode is enabled, this parameter allows you to replay
+	// transactions only when the system time is at least the configured
+	// time past the commit time. This provides an opportunity to correct
+	// data loss errors. Note that when this parameter is set, a promotion
+	// token cannot be used.
+	// +optional
+	MinApplyDelay *metav1.Duration `json:"minApplyDelay,omitempty"`
 }
 
 // DefaultReplicationSlotsUpdateInterval is the default in seconds for the replication slots update interval
@@ -984,6 +1011,30 @@ const DefaultReplicationSlotsUpdateInterval = 30
 
 // DefaultReplicationSlotsHASlotPrefix is the default prefix for names of replication slots used for HA.
 const DefaultReplicationSlotsHASlotPrefix = "_cnpg_"
+
+// SynchronizeReplicasConfiguration contains the configuration for the synchronization of user defined
+// physical replication slots
+type SynchronizeReplicasConfiguration struct {
+	// When set to true, every replication slot that is on the primary is synchronized on each standby
+	// +kubebuilder:default:=true
+	Enabled *bool `json:"enabled"`
+
+	// List of regular expression patterns to match the names of replication slots to be excluded (by default empty)
+	// +optional
+	ExcludePatterns []string `json:"excludePatterns,omitempty"`
+
+	synchronizeReplicasCache `json:"-"`
+}
+
+// synchronizeReplicasCache contains the result of the regex compilation
+// +kubebuilder:object:generate:=false
+type synchronizeReplicasCache struct {
+	compiledPatterns []regexp.Regexp `json:"-"`
+
+	compiled bool `json:"-"`
+
+	compileErrors []error `json:"-"`
+}
 
 // ReplicationSlotsConfiguration encapsulates the configuration
 // of replication slots
@@ -999,14 +1050,10 @@ type ReplicationSlotsConfiguration struct {
 	// +kubebuilder:validation:Minimum=1
 	// +optional
 	UpdateInterval int `json:"updateInterval,omitempty"`
-}
 
-// GetUpdateInterval returns the update interval, defaulting to DefaultReplicationSlotsUpdateInterval if empty
-func (r *ReplicationSlotsConfiguration) GetUpdateInterval() time.Duration {
-	if r == nil || r.UpdateInterval <= 0 {
-		return DefaultReplicationSlotsUpdateInterval
-	}
-	return time.Duration(r.UpdateInterval) * time.Second
+	// Configures the synchronization of the user defined physical replication slots
+	// +optional
+	SynchronizeReplicas *SynchronizeReplicasConfiguration `json:"synchronizeReplicas,omitempty"`
 }
 
 // ReplicationSlotsHAConfiguration encapsulates the configuration
@@ -1036,39 +1083,6 @@ type ReplicationSlotsHAConfiguration struct {
 	// +kubebuilder:validation:Pattern=^[0-9a-z_]*$
 	// +optional
 	SlotPrefix string `json:"slotPrefix,omitempty"`
-}
-
-// GetSlotPrefix returns the HA slot prefix, defaulting to DefaultReplicationSlotsHASlotPrefix if empty
-func (r *ReplicationSlotsHAConfiguration) GetSlotPrefix() string {
-	if r == nil || r.SlotPrefix == "" {
-		return DefaultReplicationSlotsHASlotPrefix
-	}
-	return r.SlotPrefix
-}
-
-// GetSlotNameFromInstanceName returns the slot name, given the instance name.
-// It returns an empty string if High Availability Replication Slots are disabled
-func (r *ReplicationSlotsHAConfiguration) GetSlotNameFromInstanceName(instanceName string) string {
-	if r == nil || !r.GetEnabled() {
-		return ""
-	}
-
-	slotName := fmt.Sprintf(
-		"%s%s",
-		r.GetSlotPrefix(),
-		instanceName,
-	)
-	sanitizedName := slotNameNegativeRegex.ReplaceAllString(strings.ToLower(slotName), "_")
-
-	return sanitizedName
-}
-
-// GetEnabled returns false if replication slots are disabled, default is true
-func (r *ReplicationSlotsHAConfiguration) GetEnabled() bool {
-	if r != nil && r.Enabled != nil {
-		return *r.Enabled
-	}
-	return true
 }
 
 // KubernetesUpgradeStrategy tells the operator if the user want to
@@ -1139,7 +1153,6 @@ const (
 
 	// DefaultMaxSwitchoverDelay is the default for the pg_ctl timeout in seconds when a primary PostgreSQL instance
 	// is gracefully shutdown during a switchover.
-	// It is greater than one year in seconds, big enough to simulate an infinite timeout
 	DefaultMaxSwitchoverDelay = 3600
 
 	// DefaultStartupDelay is the default value for startupDelay, startupDelay will be used to calculate the
@@ -1148,16 +1161,99 @@ const (
 	DefaultStartupDelay = 3600
 )
 
+// SynchronousReplicaConfigurationMethod configures whether to use
+// quorum based replication or a priority list
+type SynchronousReplicaConfigurationMethod string
+
+const (
+	// SynchronousReplicaConfigurationMethodFirst means a priority list should be used
+	SynchronousReplicaConfigurationMethodFirst = SynchronousReplicaConfigurationMethod("first")
+
+	// SynchronousReplicaConfigurationMethodAny means that quorum based replication should be used
+	SynchronousReplicaConfigurationMethodAny = SynchronousReplicaConfigurationMethod("any")
+)
+
+// DataDurabilityLevel specifies how strictly to enforce synchronous replication
+// when cluster instances are unavailable. Options are `required` or `preferred`.
+type DataDurabilityLevel string
+
+const (
+	// DataDurabilityLevelRequired means that data durability is strictly enforced
+	DataDurabilityLevelRequired DataDurabilityLevel = "required"
+
+	// DataDurabilityLevelPreferred means that data durability is enforced
+	// only when healthy replicas are available
+	DataDurabilityLevelPreferred DataDurabilityLevel = "preferred"
+)
+
+// SynchronousReplicaConfiguration contains the configuration of the
+// PostgreSQL synchronous replication feature.
+// Important: at this moment, also `.spec.minSyncReplicas` and `.spec.maxSyncReplicas`
+// need to be considered.
+// +kubebuilder:validation:XValidation:rule="self.dataDurability!='preferred' || ((!has(self.standbyNamesPre) || self.standbyNamesPre.size()==0) && (!has(self.standbyNamesPost) || self.standbyNamesPost.size()==0))",message="dataDurability set to 'preferred' requires empty 'standbyNamesPre' and empty 'standbyNamesPost'"
+type SynchronousReplicaConfiguration struct {
+	// Method to select synchronous replication standbys from the listed
+	// servers, accepting 'any' (quorum-based synchronous replication) or
+	// 'first' (priority-based synchronous replication) as values.
+	// +kubebuilder:validation:Enum=any;first
+	Method SynchronousReplicaConfigurationMethod `json:"method"`
+
+	// Specifies the number of synchronous standby servers that
+	// transactions must wait for responses from.
+	// +kubebuilder:validation:XValidation:rule="self > 0",message="The number of synchronous replicas should be greater than zero"
+	Number int `json:"number"`
+
+	// Specifies the maximum number of local cluster pods that can be
+	// automatically included in the `synchronous_standby_names` option in
+	// PostgreSQL.
+	// +optional
+	MaxStandbyNamesFromCluster *int `json:"maxStandbyNamesFromCluster,omitempty"`
+
+	// A user-defined list of application names to be added to
+	// `synchronous_standby_names` before local cluster pods (the order is
+	// only useful for priority-based synchronous replication).
+	// +optional
+	StandbyNamesPre []string `json:"standbyNamesPre,omitempty"`
+
+	// A user-defined list of application names to be added to
+	// `synchronous_standby_names` after local cluster pods (the order is
+	// only useful for priority-based synchronous replication).
+	// +optional
+	StandbyNamesPost []string `json:"standbyNamesPost,omitempty"`
+
+	// If set to "required", data durability is strictly enforced. Write operations
+	// with synchronous commit settings (`on`, `remote_write`, or `remote_apply`) will
+	// block if there are insufficient healthy replicas, ensuring data persistence.
+	// If set to "preferred", data durability is maintained when healthy replicas
+	// are available, but the required number of instances will adjust dynamically
+	// if replicas become unavailable. This setting relaxes strict durability enforcement
+	// to allow for operational continuity. This setting is only applicable if both
+	// `standbyNamesPre` and `standbyNamesPost` are unset (empty).
+	// +kubebuilder:validation:Enum=required;preferred
+	// +kubebuilder:default:=required
+	// +optional
+	DataDurability DataDurabilityLevel `json:"dataDurability,omitempty"`
+}
+
 // PostgresConfiguration defines the PostgreSQL configuration
 type PostgresConfiguration struct {
 	// PostgreSQL configuration options (postgresql.conf)
 	// +optional
 	Parameters map[string]string `json:"parameters,omitempty"`
 
+	// Configuration of the PostgreSQL synchronous replication feature
+	// +optional
+	Synchronous *SynchronousReplicaConfiguration `json:"synchronous,omitempty"`
+
 	// PostgreSQL Host Based Authentication rules (lines to be appended
 	// to the pg_hba.conf file)
 	// +optional
 	PgHBA []string `json:"pg_hba,omitempty"`
+
+	// PostgreSQL User Name Maps rules (lines to be appended
+	// to the pg_ident.conf file)
+	// +optional
+	PgIdent []string `json:"pg_ident,omitempty"`
 
 	// Requirements to be met by sync replicas. This will affect how the "synchronous_standby_names" parameter will be
 	// set up.
@@ -1181,8 +1277,7 @@ type PostgresConfiguration struct {
 	// If this parameter is true, the user will be able to invoke `ALTER SYSTEM`
 	// on this CloudNativePG Cluster.
 	// This should only be used for debugging and troubleshooting.
-	// Defaults to true.
-	// +kubebuilder:default:=true
+	// Defaults to false.
 	// +optional
 	EnableAlterSystem bool `json:"enableAlterSystem,omitempty"`
 }
@@ -1380,20 +1475,20 @@ type BootstrapInitDB struct {
 	// +optional
 	WalSegmentSize int `json:"walSegmentSize,omitempty"`
 
-	// List of SQL queries to be executed as a superuser immediately
-	// after the cluster has been created - to be used with extreme care
+	// List of SQL queries to be executed as a superuser in the `postgres`
+	// database right after the cluster has been created - to be used with extreme care
 	// (by default empty)
 	// +optional
 	PostInitSQL []string `json:"postInitSQL,omitempty"`
 
 	// List of SQL queries to be executed as a superuser in the application
-	// database right after is created - to be used with extreme care
+	// database right after the cluster has been created - to be used with extreme care
 	// (by default empty)
 	// +optional
 	PostInitApplicationSQL []string `json:"postInitApplicationSQL,omitempty"`
 
 	// List of SQL queries to be executed as a superuser in the `template1`
-	// after the cluster has been created - to be used with extreme care
+	// database right after the cluster has been created - to be used with extreme care
 	// (by default empty)
 	// +optional
 	PostInitTemplateSQL []string `json:"postInitTemplateSQL,omitempty"`
@@ -1403,13 +1498,35 @@ type BootstrapInitDB struct {
 	// +optional
 	Import *Import `json:"import,omitempty"`
 
-	// PostInitApplicationSQLRefs points references to ConfigMaps or Secrets which
-	// contain SQL files, the general implementation order to these references is
-	// from all Secrets to all ConfigMaps, and inside Secrets or ConfigMaps,
-	// the implementation order is same as the order of each array
+	// List of references to ConfigMaps or Secrets containing SQL files
+	// to be executed as a superuser in the application database right after
+	// the cluster has been created. The references are processed in a specific order:
+	// first, all Secrets are processed, followed by all ConfigMaps.
+	// Within each group, the processing order follows the sequence specified
+	// in their respective arrays.
 	// (by default empty)
 	// +optional
-	PostInitApplicationSQLRefs *PostInitApplicationSQLRefs `json:"postInitApplicationSQLRefs,omitempty"`
+	PostInitApplicationSQLRefs *SQLRefs `json:"postInitApplicationSQLRefs,omitempty"`
+
+	// List of references to ConfigMaps or Secrets containing SQL files
+	// to be executed as a superuser in the `template1` database right after
+	// the cluster has been created. The references are processed in a specific order:
+	// first, all Secrets are processed, followed by all ConfigMaps.
+	// Within each group, the processing order follows the sequence specified
+	// in their respective arrays.
+	// (by default empty)
+	// +optional
+	PostInitTemplateSQLRefs *SQLRefs `json:"postInitTemplateSQLRefs,omitempty"`
+
+	// List of references to ConfigMaps or Secrets containing SQL files
+	// to be executed as a superuser in the `postgres` database right after
+	// the cluster has been created. The references are processed in a specific order:
+	// first, all Secrets are processed, followed by all ConfigMaps.
+	// Within each group, the processing order follows the sequence specified
+	// in their respective arrays.
+	// (by default empty)
+	// +optional
+	PostInitSQLRefs *SQLRefs `json:"postInitSQLRefs,omitempty"`
 }
 
 // SnapshotType is a type of allowed import
@@ -1457,11 +1574,12 @@ type ImportSource struct {
 	ExternalCluster string `json:"externalCluster"`
 }
 
-// PostInitApplicationSQLRefs points references to ConfigMaps or Secrets which
-// contain SQL files, the general implementation order to these references is
-// from all Secrets to all ConfigMaps, and inside Secrets or ConfigMaps,
-// the implementation order is same as the order of each array
-type PostInitApplicationSQLRefs struct {
+// SQLRefs holds references to ConfigMaps or Secrets
+// containing SQL files. The references are processed in a specific order:
+// first, all Secrets are processed, followed by all ConfigMaps.
+// Within each group, the processing order follows the sequence specified
+// in their respective arrays.
+type SQLRefs struct {
 	// SecretRefs holds a list of references to Secrets
 	// +optional
 	SecretRefs []SecretKeySelector `json:"secretRefs,omitempty"`
@@ -1646,28 +1764,6 @@ type StorageConfiguration struct {
 	PersistentVolumeClaimTemplate *corev1.PersistentVolumeClaimSpec `json:"pvcTemplate,omitempty"`
 }
 
-// GetSizeOrNil returns the requests storage size
-func (s *StorageConfiguration) GetSizeOrNil() *resource.Quantity {
-	if s == nil {
-		return nil
-	}
-
-	if s.Size != "" {
-		quantity, err := resource.ParseQuantity(s.Size)
-		if err != nil {
-			return nil
-		}
-
-		return &quantity
-	}
-
-	if s.PersistentVolumeClaimTemplate != nil {
-		return s.PersistentVolumeClaimTemplate.Resources.Requests.Storage()
-	}
-
-	return nil
-}
-
 // TablespaceConfiguration is the configuration of a tablespace, and includes
 // the storage specification for the tablespace
 type TablespaceConfiguration struct {
@@ -1785,110 +1881,6 @@ const (
 	DefaultBackupTarget = BackupTargetStandby
 )
 
-// CompressionType encapsulates the available types of compression
-type CompressionType string
-
-const (
-	// CompressionTypeNone means no compression is performed
-	CompressionTypeNone = CompressionType("")
-
-	// CompressionTypeGzip means gzip compression is performed
-	CompressionTypeGzip = CompressionType("gzip")
-
-	// CompressionTypeBzip2 means bzip2 compression is performed
-	CompressionTypeBzip2 = CompressionType("bzip2")
-
-	// CompressionTypeSnappy means snappy compression is performed
-	CompressionTypeSnappy = CompressionType("snappy")
-)
-
-// EncryptionType encapsulated the available types of encryption
-type EncryptionType string
-
-const (
-	// EncryptionTypeNone means just use the bucket configuration
-	EncryptionTypeNone = EncryptionType("")
-
-	// EncryptionTypeAES256 means to use AES256 encryption
-	EncryptionTypeAES256 = EncryptionType("AES256")
-
-	// EncryptionTypeNoneAWSKMS means to use aws:kms encryption
-	EncryptionTypeNoneAWSKMS = EncryptionType("aws:kms")
-)
-
-// BarmanCredentials an object containing the potential credentials for each cloud provider
-type BarmanCredentials struct {
-	// The credentials to use to upload data to Google Cloud Storage
-	// +optional
-	Google *GoogleCredentials `json:"googleCredentials,omitempty"`
-
-	// The credentials to use to upload data to S3
-	// +optional
-	AWS *S3Credentials `json:"s3Credentials,omitempty"`
-
-	// The credentials to use to upload data to Azure Blob Storage
-	// +optional
-	Azure *AzureCredentials `json:"azureCredentials,omitempty"`
-}
-
-// ArePopulated checks if the passed set of credentials contains
-// something
-func (crendentials BarmanCredentials) ArePopulated() bool {
-	return crendentials.Azure != nil || crendentials.AWS != nil || crendentials.Google != nil
-}
-
-// BarmanObjectStoreConfiguration contains the backup configuration
-// using Barman against an S3-compatible object storage
-type BarmanObjectStoreConfiguration struct {
-	// The potential credentials for each cloud provider
-	BarmanCredentials `json:",inline"`
-
-	// Endpoint to be used to upload data to the cloud,
-	// overriding the automatic endpoint discovery
-	// +optional
-	EndpointURL string `json:"endpointURL,omitempty"`
-
-	// EndpointCA store the CA bundle of the barman endpoint.
-	// Useful when using self-signed certificates to avoid
-	// errors with certificate issuer and barman-cloud-wal-archive
-	// +optional
-	EndpointCA *SecretKeySelector `json:"endpointCA,omitempty"`
-
-	// The path where to store the backup (i.e. s3://bucket/path/to/folder)
-	// this path, with different destination folders, will be used for WALs
-	// and for data
-	// +kubebuilder:validation:MinLength=1
-	DestinationPath string `json:"destinationPath"`
-
-	// The server name on S3, the cluster name is used if this
-	// parameter is omitted
-	// +optional
-	ServerName string `json:"serverName,omitempty"`
-
-	// The configuration for the backup of the WAL stream.
-	// When not defined, WAL files will be stored uncompressed and may be
-	// unencrypted in the object store, according to the bucket default policy.
-	// +optional
-	Wal *WalBackupConfiguration `json:"wal,omitempty"`
-
-	// The configuration to be used to backup the data files
-	// When not defined, base backups files will be stored uncompressed and may
-	// be unencrypted in the object store, according to the bucket default
-	// policy.
-	// +optional
-	Data *DataBackupConfiguration `json:"data,omitempty"`
-
-	// Tags is a list of key value pairs that will be passed to the
-	// Barman --tags option.
-	// +optional
-	Tags map[string]string `json:"tags,omitempty"`
-
-	// HistoryTags is a list of key value pairs that will be passed to the
-	// Barman --history-tags option.
-	// +optional
-	HistoryTags map[string]string `json:"historyTags,omitempty"`
-}
-
 // BackupConfiguration defines how the backup of the cluster are taken.
 // The supported backup methods are BarmanObjectStore and VolumeSnapshot.
 // For details and examples refer to the Backup and Recovery section of the
@@ -1921,141 +1913,6 @@ type BackupConfiguration struct {
 	Target BackupTarget `json:"target,omitempty"`
 }
 
-// WalBackupConfiguration is the configuration of the backup of the
-// WAL stream
-type WalBackupConfiguration struct {
-	// Compress a WAL file before sending it to the object store. Available
-	// options are empty string (no compression, default), `gzip`, `bzip2` or `snappy`.
-	// +kubebuilder:validation:Enum=gzip;bzip2;snappy
-	// +optional
-	Compression CompressionType `json:"compression,omitempty"`
-
-	// Whenever to force the encryption of files (if the bucket is
-	// not already configured for that).
-	// Allowed options are empty string (use the bucket policy, default),
-	// `AES256` and `aws:kms`
-	// +kubebuilder:validation:Enum=AES256;"aws:kms"
-	// +optional
-	Encryption EncryptionType `json:"encryption,omitempty"`
-
-	// Number of WAL files to be either archived in parallel (when the
-	// PostgreSQL instance is archiving to a backup object store) or
-	// restored in parallel (when a PostgreSQL standby is fetching WAL
-	// files from a recovery object store). If not specified, WAL files
-	// will be processed one at a time. It accepts a positive integer as a
-	// value - with 1 being the minimum accepted value.
-	// +kubebuilder:validation:Minimum=1
-	// +optional
-	MaxParallel int `json:"maxParallel,omitempty"`
-}
-
-// DataBackupConfiguration is the configuration of the backup of
-// the data directory
-type DataBackupConfiguration struct {
-	// Compress a backup file (a tar file per tablespace) while streaming it
-	// to the object store. Available options are empty string (no
-	// compression, default), `gzip`, `bzip2` or `snappy`.
-	// +kubebuilder:validation:Enum=gzip;bzip2;snappy
-	// +optional
-	Compression CompressionType `json:"compression,omitempty"`
-
-	// Whenever to force the encryption of files (if the bucket is
-	// not already configured for that).
-	// Allowed options are empty string (use the bucket policy, default),
-	// `AES256` and `aws:kms`
-	// +kubebuilder:validation:Enum=AES256;"aws:kms"
-	// +optional
-	Encryption EncryptionType `json:"encryption,omitempty"`
-
-	// The number of parallel jobs to be used to upload the backup, defaults
-	// to 2
-	// +kubebuilder:validation:Minimum=1
-	// +optional
-	Jobs *int32 `json:"jobs,omitempty"`
-
-	// Control whether the I/O workload for the backup initial checkpoint will
-	// be limited, according to the `checkpoint_completion_target` setting on
-	// the PostgreSQL server. If set to true, an immediate checkpoint will be
-	// used, meaning PostgreSQL will complete the checkpoint as soon as
-	// possible. `false` by default.
-	// +optional
-	ImmediateCheckpoint bool `json:"immediateCheckpoint,omitempty"`
-}
-
-// S3Credentials is the type for the credentials to be used to upload
-// files to S3. It can be provided in two alternative ways:
-//
-// - explicitly passing accessKeyId and secretAccessKey
-//
-// - inheriting the role from the pod environment by setting inheritFromIAMRole to true
-type S3Credentials struct {
-	// The reference to the access key id
-	// +optional
-	AccessKeyIDReference *SecretKeySelector `json:"accessKeyId,omitempty"`
-
-	// The reference to the secret access key
-	// +optional
-	SecretAccessKeyReference *SecretKeySelector `json:"secretAccessKey,omitempty"`
-
-	// The reference to the secret containing the region name
-	// +optional
-	RegionReference *SecretKeySelector `json:"region,omitempty"`
-
-	// The references to the session key
-	// +optional
-	SessionToken *SecretKeySelector `json:"sessionToken,omitempty"`
-
-	// Use the role based authentication without providing explicitly the keys.
-	// +optional
-	InheritFromIAMRole bool `json:"inheritFromIAMRole,omitempty"`
-}
-
-// AzureCredentials is the type for the credentials to be used to upload
-// files to Azure Blob Storage. The connection string contains every needed
-// information. If the connection string is not specified, we'll need the
-// storage account name and also one (and only one) of:
-//
-// - storageKey
-// - storageSasToken
-//
-// - inheriting the credentials from the pod environment by setting inheritFromAzureAD to true
-type AzureCredentials struct {
-	// The connection string to be used
-	// +optional
-	ConnectionString *SecretKeySelector `json:"connectionString,omitempty"`
-
-	// The storage account where to upload data
-	// +optional
-	StorageAccount *SecretKeySelector `json:"storageAccount,omitempty"`
-
-	// The storage account key to be used in conjunction
-	// with the storage account name
-	// +optional
-	StorageKey *SecretKeySelector `json:"storageKey,omitempty"`
-
-	// A shared-access-signature to be used in conjunction with
-	// the storage account name
-	// +optional
-	StorageSasToken *SecretKeySelector `json:"storageSasToken,omitempty"`
-
-	// Use the Azure AD based authentication without providing explicitly the keys.
-	// +optional
-	InheritFromAzureAD bool `json:"inheritFromAzureAD,omitempty"`
-}
-
-// GoogleCredentials is the type for the Google Cloud Storage credentials.
-// This needs to be specified even if we run inside a GKE environment.
-type GoogleCredentials struct {
-	// The secret containing the Google Cloud Storage JSON file with the credentials
-	// +optional
-	ApplicationCredentials *SecretKeySelector `json:"applicationCredentials,omitempty"`
-
-	// If set to true, will presume that it's running inside a GKE environment,
-	// default to false.
-	// +optional
-	GKEEnvironment bool `json:"gkeEnvironment,omitempty"`
-}
-
 // MonitoringConfiguration is the type containing all the monitoring
 // configuration for a certain cluster
 type MonitoringConfiguration struct {
@@ -2079,19 +1936,32 @@ type MonitoringConfiguration struct {
 	// +optional
 	EnablePodMonitor bool `json:"enablePodMonitor,omitempty"`
 
+	// Configure TLS communication for the metrics endpoint.
+	// Changing tls.enabled option will force a rollout of all instances.
+	// +optional
+	TLSConfig *ClusterMonitoringTLSConfiguration `json:"tls,omitempty"`
+
 	// The list of metric relabelings for the `PodMonitor`. Applied to samples before ingestion.
 	// +optional
-	PodMonitorMetricRelabelConfigs []*monitoringv1.RelabelConfig `json:"podMonitorMetricRelabelings,omitempty"`
+	PodMonitorMetricRelabelConfigs []monitoringv1.RelabelConfig `json:"podMonitorMetricRelabelings,omitempty"`
 
 	// The list of relabelings for the `PodMonitor`. Applied to samples before scraping.
 	// +optional
-	PodMonitorRelabelConfigs []*monitoringv1.RelabelConfig `json:"podMonitorRelabelings,omitempty"`
+	PodMonitorRelabelConfigs []monitoringv1.RelabelConfig `json:"podMonitorRelabelings,omitempty"`
 }
 
-// AreDefaultQueriesDisabled checks whether default monitoring queries should be disabled
-func (m *MonitoringConfiguration) AreDefaultQueriesDisabled() bool {
-	return m != nil && m.DisableDefaultQueries != nil && *m.DisableDefaultQueries
+// ClusterMonitoringTLSConfiguration is the type containing the TLS configuration
+// for the cluster's monitoring
+type ClusterMonitoringTLSConfiguration struct {
+	// Enable TLS for the monitoring endpoint.
+	// Changing this option will force a rollout of all instances.
+	// +kubebuilder:default:=false
+	// +optional
+	Enabled bool `json:"enabled,omitempty"`
 }
+
+// ExternalClusterList is a list of external clusters
+type ExternalClusterList []ExternalCluster
 
 // ExternalCluster represents the connection parameters to an
 // external cluster which is used in the other sections of the configuration
@@ -2131,15 +2001,10 @@ type ExternalCluster struct {
 	// The configuration for the barman-cloud tool suite
 	// +optional
 	BarmanObjectStore *BarmanObjectStoreConfiguration `json:"barmanObjectStore,omitempty"`
-}
 
-// GetServerName returns the server name, defaulting to the name of the external cluster or using the one specified
-// in the BarmanObjectStore
-func (in ExternalCluster) GetServerName() string {
-	if in.BarmanObjectStore != nil && in.BarmanObjectStore.ServerName != "" {
-		return in.BarmanObjectStore.ServerName
-	}
-	return in.Name
+	// The configuration of the plugin that is taking care
+	// of WAL archiving and backups for this external cluster
+	PluginConfiguration *PluginConfiguration `json:"plugin,omitempty"`
 }
 
 // EnsureOption represents whether we should enforce the presence or absence of
@@ -2152,12 +2017,119 @@ const (
 	EnsureAbsent  EnsureOption = "absent"
 )
 
+// ServiceSelectorType describes a valid value for generating the service selectors.
+// It indicates which type of service the selector applies to, such as read-write, read, or read-only
+// +kubebuilder:validation:Enum=rw;r;ro
+type ServiceSelectorType string
+
+// Constants representing the valid values for ServiceSelectorType.
+const (
+	// ServiceSelectorTypeRW selects the read-write service.
+	ServiceSelectorTypeRW ServiceSelectorType = "rw"
+	// ServiceSelectorTypeR selects the read service.
+	ServiceSelectorTypeR ServiceSelectorType = "r"
+	// ServiceSelectorTypeRO selects the read-only service.
+	ServiceSelectorTypeRO ServiceSelectorType = "ro"
+)
+
+// ServiceUpdateStrategy describes how the changes to the managed service should be handled
+// +kubebuilder:validation:Enum=patch;replace
+type ServiceUpdateStrategy string
+
+const (
+	// ServiceUpdateStrategyPatch applies a patch deriving from the differences of the actual service and the expect one
+	ServiceUpdateStrategyPatch = "patch"
+	// ServiceUpdateStrategyReplace deletes the existing service and recreates it when a difference is detected
+	ServiceUpdateStrategyReplace = "replace"
+)
+
+// ManagedServices represents the services managed by the cluster.
+type ManagedServices struct {
+	// DisabledDefaultServices is a list of service types that are disabled by default.
+	// Valid values are "r", and "ro", representing read, and read-only services.
+	// +optional
+	DisabledDefaultServices []ServiceSelectorType `json:"disabledDefaultServices,omitempty"`
+	// Additional is a list of additional managed services specified by the user.
+	// +optional
+	Additional []ManagedService `json:"additional,omitempty"`
+}
+
+// ManagedService represents a specific service managed by the cluster.
+// It includes the type of service and its associated template specification.
+type ManagedService struct {
+	// SelectorType specifies the type of selectors that the service will have.
+	// Valid values are "rw", "r", and "ro", representing read-write, read, and read-only services.
+	// +kubebuilder:validation:Enum=rw;r;ro
+	SelectorType ServiceSelectorType `json:"selectorType"`
+
+	// UpdateStrategy describes how the service differences should be reconciled
+	// +kubebuilder:default:="patch"
+	// +optional
+	UpdateStrategy ServiceUpdateStrategy `json:"updateStrategy,omitempty"`
+
+	// ServiceTemplate is the template specification for the service.
+	ServiceTemplate ServiceTemplateSpec `json:"serviceTemplate"`
+}
+
 // ManagedConfiguration represents the portions of PostgreSQL that are managed
 // by the instance manager
 type ManagedConfiguration struct {
 	// Database roles managed by the `Cluster`
 	// +optional
 	Roles []RoleConfiguration `json:"roles,omitempty"`
+	// Services roles managed by the `Cluster`
+	// +optional
+	Services *ManagedServices `json:"services,omitempty"`
+}
+
+// PluginConfiguration specifies a plugin that need to be loaded for this
+// cluster to be reconciled
+type PluginConfiguration struct {
+	// Name is the plugin name
+	Name string `json:"name"`
+
+	// Enabled is true if this plugin will be used
+	// +kubebuilder:default:=true
+	// +optional
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// Parameters is the configuration of the plugin
+	// +optional
+	Parameters map[string]string `json:"parameters,omitempty"`
+}
+
+// PluginStatus is the status of a loaded plugin
+type PluginStatus struct {
+	// Name is the name of the plugin
+	Name string `json:"name"`
+
+	// Version is the version of the plugin loaded by the
+	// latest reconciliation loop
+	Version string `json:"version"`
+
+	// Capabilities are the list of capabilities of the
+	// plugin
+	// +optional
+	Capabilities []string `json:"capabilities,omitempty"`
+
+	// OperatorCapabilities are the list of capabilities of the
+	// plugin regarding the reconciler
+	// +optional
+	OperatorCapabilities []string `json:"operatorCapabilities,omitempty"`
+
+	// WALCapabilities are the list of capabilities of the
+	// plugin regarding the WAL management
+	// +optional
+	WALCapabilities []string `json:"walCapabilities,omitempty"`
+
+	// BackupCapabilities are the list of capabilities of the
+	// plugin regarding the Backup management
+	// +optional
+	BackupCapabilities []string `json:"backupCapabilities,omitempty"`
+
+	// Status contain the status reported by the plugin through the SetStatusInCluster interface
+	// +optional
+	Status string `json:"status,omitempty"`
 }
 
 // RoleConfiguration is the representation, in Kubernetes, of a PostgreSQL role
@@ -2252,22 +2224,6 @@ type RoleConfiguration struct {
 	BypassRLS bool `json:"bypassrls,omitempty"` // Row-Level Security
 }
 
-// GetRoleSecretsName gets the name of the secret which is used to store the role's password
-func (roleConfiguration *RoleConfiguration) GetRoleSecretsName() string {
-	if roleConfiguration.PasswordSecret != nil {
-		return roleConfiguration.PasswordSecret.Name
-	}
-	return ""
-}
-
-// GetRoleInherit return the inherit attribute of a roleConfiguration
-func (roleConfiguration *RoleConfiguration) GetRoleInherit() bool {
-	if roleConfiguration.Inherit != nil {
-		return *roleConfiguration.Inherit
-	}
-	return true
-}
-
 // +genclient
 // +kubebuilder:object:root=true
 // +kubebuilder:storageversion
@@ -2301,6 +2257,7 @@ type ClusterList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+	// +optional
 	metav1.ListMeta `json:"metadata,omitempty"`
 	// List of clusters
 	Items []Cluster `json:"items"`
@@ -2345,6 +2302,10 @@ type SecretsResourceVersion struct {
 	// +optional
 	BarmanEndpointCA string `json:"barmanEndpointCA,omitempty"`
 
+	// The resource versions of the external cluster secrets
+	// +optional
+	ExternalClusterSecretVersions map[string]string `json:"externalClusterSecretVersion,omitempty"`
+
 	// A map with the versions of all the secrets used to pass metrics.
 	// Map keys are the secret names, map values are the versions
 	// +optional
@@ -2358,871 +2319,6 @@ type ConfigMapResourceVersion struct {
 	// Map keys are the config map names, map values are the versions
 	// +optional
 	Metrics map[string]string `json:"metrics,omitempty"`
-}
-
-// SetManagedRoleSecretVersion Add or update or delete the resource version of the managed role secret
-func (secretResourceVersion *SecretsResourceVersion) SetManagedRoleSecretVersion(secret string, version *string) {
-	if secretResourceVersion.ManagedRoleSecretVersions == nil {
-		secretResourceVersion.ManagedRoleSecretVersions = make(map[string]string)
-	}
-	if version == nil {
-		delete(secretResourceVersion.ManagedRoleSecretVersions, secret)
-	} else {
-		secretResourceVersion.ManagedRoleSecretVersions[secret] = *version
-	}
-}
-
-// GetImageName get the name of the image that should be used
-// to create the pods
-func (cluster *Cluster) GetImageName() string {
-	if len(cluster.Spec.ImageName) > 0 {
-		return cluster.Spec.ImageName
-	}
-
-	return configuration.Current.PostgresImageName
-}
-
-// GetPostgresqlVersion gets the PostgreSQL image version detecting it from the
-// image name.
-// Example:
-//
-// ghcr.io/cloudnative-pg/postgresql:14.0 corresponds to version 140000
-// ghcr.io/cloudnative-pg/postgresql:13.2 corresponds to version 130002
-// ghcr.io/cloudnative-pg/postgresql:9.6.3 corresponds to version 90603
-func (cluster *Cluster) GetPostgresqlVersion() (int, error) {
-	image := cluster.GetImageName()
-	tag := utils.GetImageTag(image)
-	return postgres.GetPostgresVersionFromTag(tag)
-}
-
-// GetImagePullSecret get the name of the pull secret to use
-// to download the PostgreSQL image
-func (cluster *Cluster) GetImagePullSecret() string {
-	return cluster.Name + ClusterSecretSuffix
-}
-
-// GetSuperuserSecretName get the secret name of the PostgreSQL superuser
-func (cluster *Cluster) GetSuperuserSecretName() string {
-	if cluster.Spec.SuperuserSecret != nil &&
-		cluster.Spec.SuperuserSecret.Name != "" {
-		return cluster.Spec.SuperuserSecret.Name
-	}
-
-	return fmt.Sprintf("%v%v", cluster.Name, SuperUserSecretSuffix)
-}
-
-// GetEnableLDAPAuth return true if bind or bind+search method are
-// configured in the cluster configuration
-func (cluster *Cluster) GetEnableLDAPAuth() bool {
-	if cluster.Spec.PostgresConfiguration.LDAP != nil &&
-		(cluster.Spec.PostgresConfiguration.LDAP.BindAsAuth != nil ||
-			cluster.Spec.PostgresConfiguration.LDAP.BindSearchAuth != nil) {
-		return true
-	}
-	return false
-}
-
-// GetLDAPSecretName gets the secret name containing the LDAP password
-func (cluster *Cluster) GetLDAPSecretName() string {
-	if cluster.Spec.PostgresConfiguration.LDAP != nil &&
-		cluster.Spec.PostgresConfiguration.LDAP.BindSearchAuth != nil &&
-		cluster.Spec.PostgresConfiguration.LDAP.BindSearchAuth.BindPassword != nil {
-		return cluster.Spec.PostgresConfiguration.LDAP.BindSearchAuth.BindPassword.Name
-	}
-	return ""
-}
-
-// ContainsManagedRolesConfiguration returns true iff there are managed roles configured
-func (cluster *Cluster) ContainsManagedRolesConfiguration() bool {
-	return cluster.Spec.Managed != nil && len(cluster.Spec.Managed.Roles) > 0
-}
-
-// UsesSecretInManagedRoles checks if the given secret name is used in a managed role
-func (cluster *Cluster) UsesSecretInManagedRoles(secretName string) bool {
-	if !cluster.ContainsManagedRolesConfiguration() {
-		return false
-	}
-	for _, role := range cluster.Spec.Managed.Roles {
-		if role.PasswordSecret != nil && role.PasswordSecret.Name == secretName {
-			return true
-		}
-	}
-	return false
-}
-
-// GetApplicationSecretName get the name of the application secret for any bootstrap type
-func (cluster *Cluster) GetApplicationSecretName() string {
-	bootstrap := cluster.Spec.Bootstrap
-	if bootstrap == nil {
-		return fmt.Sprintf("%v%v", cluster.Name, ApplicationUserSecretSuffix)
-	}
-	recovery := bootstrap.Recovery
-	if recovery != nil && recovery.Secret != nil && recovery.Secret.Name != "" {
-		return recovery.Secret.Name
-	}
-
-	pgBaseBackup := bootstrap.PgBaseBackup
-	if pgBaseBackup != nil && pgBaseBackup.Secret != nil && pgBaseBackup.Secret.Name != "" {
-		return pgBaseBackup.Secret.Name
-	}
-
-	initDB := bootstrap.InitDB
-	if initDB != nil && initDB.Secret != nil && initDB.Secret.Name != "" {
-		return initDB.Secret.Name
-	}
-
-	return fmt.Sprintf("%v%v", cluster.Name, ApplicationUserSecretSuffix)
-}
-
-// GetApplicationDatabaseName get the name of the application database for a specific bootstrap
-func (cluster *Cluster) GetApplicationDatabaseName() string {
-	bootstrap := cluster.Spec.Bootstrap
-	if bootstrap == nil {
-		return ""
-	}
-
-	if bootstrap.Recovery != nil && bootstrap.Recovery.Database != "" {
-		return bootstrap.Recovery.Database
-	}
-
-	if bootstrap.PgBaseBackup != nil && bootstrap.PgBaseBackup.Database != "" {
-		return bootstrap.PgBaseBackup.Database
-	}
-
-	if bootstrap.InitDB != nil && bootstrap.InitDB.Database != "" {
-		return bootstrap.InitDB.Database
-	}
-
-	return ""
-}
-
-// GetApplicationDatabaseOwner get the owner user of the application database for a specific bootstrap
-func (cluster *Cluster) GetApplicationDatabaseOwner() string {
-	bootstrap := cluster.Spec.Bootstrap
-	if bootstrap == nil {
-		return ""
-	}
-
-	if bootstrap.Recovery != nil && bootstrap.Recovery.Owner != "" {
-		return bootstrap.Recovery.Owner
-	}
-
-	if bootstrap.PgBaseBackup != nil && bootstrap.PgBaseBackup.Owner != "" {
-		return bootstrap.PgBaseBackup.Owner
-	}
-
-	if bootstrap.InitDB != nil && bootstrap.InitDB.Owner != "" {
-		return bootstrap.InitDB.Owner
-	}
-
-	return ""
-}
-
-// GetServerCASecretName get the name of the secret containing the CA
-// of the cluster
-func (cluster *Cluster) GetServerCASecretName() string {
-	if cluster.Spec.Certificates != nil && cluster.Spec.Certificates.ServerCASecret != "" {
-		return cluster.Spec.Certificates.ServerCASecret
-	}
-	return fmt.Sprintf("%v%v", cluster.Name, DefaultServerCaSecretSuffix)
-}
-
-// GetServerTLSSecretName get the name of the secret containing the
-// certificate that is used for the PostgreSQL servers
-func (cluster *Cluster) GetServerTLSSecretName() string {
-	if cluster.Spec.Certificates != nil && cluster.Spec.Certificates.ServerTLSSecret != "" {
-		return cluster.Spec.Certificates.ServerTLSSecret
-	}
-	return fmt.Sprintf("%v%v", cluster.Name, ServerSecretSuffix)
-}
-
-// GetClientCASecretName get the name of the secret containing the CA
-// of the cluster
-func (cluster *Cluster) GetClientCASecretName() string {
-	if cluster.Spec.Certificates != nil && cluster.Spec.Certificates.ClientCASecret != "" {
-		return cluster.Spec.Certificates.ClientCASecret
-	}
-	return fmt.Sprintf("%v%v", cluster.Name, ClientCaSecretSuffix)
-}
-
-// GetFixedInheritedAnnotations gets the annotations that should be
-// inherited by all resources according the cluster spec
-func (cluster *Cluster) GetFixedInheritedAnnotations() map[string]string {
-	if cluster.Spec.InheritedMetadata == nil || cluster.Spec.InheritedMetadata.Annotations == nil {
-		return nil
-	}
-	return cluster.Spec.InheritedMetadata.Annotations
-}
-
-// GetFixedInheritedLabels gets the labels that should be
-// inherited by all resources according the cluster spec
-func (cluster *Cluster) GetFixedInheritedLabels() map[string]string {
-	if cluster.Spec.InheritedMetadata == nil || cluster.Spec.InheritedMetadata.Labels == nil {
-		return nil
-	}
-	return cluster.Spec.InheritedMetadata.Labels
-}
-
-// GetReplicationSecretName get the name of the secret for the replication user
-func (cluster *Cluster) GetReplicationSecretName() string {
-	if cluster.Spec.Certificates != nil && cluster.Spec.Certificates.ReplicationTLSSecret != "" {
-		return cluster.Spec.Certificates.ReplicationTLSSecret
-	}
-	return fmt.Sprintf("%v%v", cluster.Name, ReplicationSecretSuffix)
-}
-
-// GetServiceAnyName return the name of the service that is used as DNS
-// domain for all the nodes, even if they are not ready
-func (cluster *Cluster) GetServiceAnyName() string {
-	return fmt.Sprintf("%v%v", cluster.Name, ServiceAnySuffix)
-}
-
-// GetServiceReadName return the name of the service that is used for
-// read transactions (including the primary)
-func (cluster *Cluster) GetServiceReadName() string {
-	return fmt.Sprintf("%v%v", cluster.Name, ServiceReadSuffix)
-}
-
-// GetServiceReadOnlyName return the name of the service that is used for
-// read-only transactions (excluding the primary)
-func (cluster *Cluster) GetServiceReadOnlyName() string {
-	return fmt.Sprintf("%v%v", cluster.Name, ServiceReadOnlySuffix)
-}
-
-// GetServiceReadWriteName return the name of the service that is used for
-// read-write transactions
-func (cluster *Cluster) GetServiceReadWriteName() string {
-	return fmt.Sprintf("%v%v", cluster.Name, ServiceReadWriteSuffix)
-}
-
-// GetMaxStartDelay get the amount of time of startDelay config option
-func (cluster *Cluster) GetMaxStartDelay() int32 {
-	if cluster.Spec.MaxStartDelay > 0 {
-		return cluster.Spec.MaxStartDelay
-	}
-	return DefaultStartupDelay
-}
-
-// GetMaxStopDelay get the amount of time PostgreSQL has to stop
-func (cluster *Cluster) GetMaxStopDelay() int32 {
-	if cluster.Spec.MaxStopDelay > 0 {
-		return cluster.Spec.MaxStopDelay
-	}
-	return 1800
-}
-
-// GetSmartShutdownTimeout is used to ensure that smart shutdown timeout is a positive integer
-func (cluster *Cluster) GetSmartShutdownTimeout() int32 {
-	if cluster.Spec.SmartShutdownTimeout > 0 {
-		return cluster.Spec.SmartShutdownTimeout
-	}
-	return 180
-}
-
-// GetMaxSwitchoverDelay get the amount of time PostgreSQL has to stop before switchover
-func (cluster *Cluster) GetMaxSwitchoverDelay() int32 {
-	if cluster.Spec.MaxSwitchoverDelay > 0 {
-		return cluster.Spec.MaxSwitchoverDelay
-	}
-	return DefaultMaxSwitchoverDelay
-}
-
-// GetPrimaryUpdateStrategy get the cluster primary update strategy,
-// defaulting to unsupervised
-func (cluster *Cluster) GetPrimaryUpdateStrategy() PrimaryUpdateStrategy {
-	strategy := cluster.Spec.PrimaryUpdateStrategy
-	if strategy == "" {
-		return PrimaryUpdateStrategyUnsupervised
-	}
-
-	return strategy
-}
-
-// GetPrimaryUpdateMethod get the cluster primary update method,
-// defaulting to restart
-func (cluster *Cluster) GetPrimaryUpdateMethod() PrimaryUpdateMethod {
-	strategy := cluster.Spec.PrimaryUpdateMethod
-	if strategy == "" {
-		return PrimaryUpdateMethodRestart
-	}
-
-	return strategy
-}
-
-// IsNodeMaintenanceWindowInProgress check if the upgrade mode is active or not
-func (cluster *Cluster) IsNodeMaintenanceWindowInProgress() bool {
-	return cluster.Spec.NodeMaintenanceWindow != nil && cluster.Spec.NodeMaintenanceWindow.InProgress
-}
-
-// GetPgCtlTimeoutForPromotion returns the timeout that should be waited for an instance to be promoted
-// to primary. As default, DefaultPgCtlTimeoutForPromotion is big enough to simulate an infinite timeout
-func (cluster *Cluster) GetPgCtlTimeoutForPromotion() int32 {
-	timeout := cluster.Spec.PostgresConfiguration.PgCtlTimeoutForPromotion
-	if timeout == 0 {
-		return DefaultPgCtlTimeoutForPromotion
-	}
-	return timeout
-}
-
-// IsReusePVCEnabled check if in a maintenance window we should reuse PVCs
-func (cluster *Cluster) IsReusePVCEnabled() bool {
-	reusePVC := true
-	if cluster.Spec.NodeMaintenanceWindow != nil && cluster.Spec.NodeMaintenanceWindow.ReusePVC != nil {
-		reusePVC = *cluster.Spec.NodeMaintenanceWindow.ReusePVC
-	}
-	return reusePVC
-}
-
-// IsInstanceFenced check if in a given instance should be fenced
-func (cluster *Cluster) IsInstanceFenced(instance string) bool {
-	fencedInstances, err := utils.GetFencedInstances(cluster.Annotations)
-	if err != nil {
-		return false
-	}
-
-	if fencedInstances.Has(utils.FenceAllServers) {
-		return true
-	}
-	return fencedInstances.Has(instance)
-}
-
-// ShouldResizeInUseVolumes is true when we should resize PVC we already
-// created
-func (cluster *Cluster) ShouldResizeInUseVolumes() bool {
-	if cluster.Spec.StorageConfiguration.ResizeInUseVolumes == nil {
-		return true
-	}
-
-	return *cluster.Spec.StorageConfiguration.ResizeInUseVolumes
-}
-
-// ShouldCreateApplicationSecret returns true if for this cluster,
-// during the bootstrap phase, we need to create a secret to store application credentials
-func (cluster *Cluster) ShouldCreateApplicationSecret() bool {
-	return cluster.ShouldInitDBCreateApplicationSecret() ||
-		cluster.ShouldPgBaseBackupCreateApplicationSecret() ||
-		cluster.ShouldRecoveryCreateApplicationSecret()
-}
-
-// ShouldInitDBCreateApplicationSecret returns true if for this cluster,
-// during the bootstrap phase using initDB, we need to create an new application secret
-func (cluster *Cluster) ShouldInitDBCreateApplicationSecret() bool {
-	return cluster.ShouldInitDBCreateApplicationDatabase() &&
-		(cluster.Spec.Bootstrap.InitDB.Secret == nil ||
-			cluster.Spec.Bootstrap.InitDB.Secret.Name == "")
-}
-
-// ShouldPgBaseBackupCreateApplicationSecret returns true if for this cluster,
-// during the bootstrap phase using pg_basebackup, we need to create an application secret
-func (cluster *Cluster) ShouldPgBaseBackupCreateApplicationSecret() bool {
-	return cluster.ShouldPgBaseBackupCreateApplicationDatabase() &&
-		(cluster.Spec.Bootstrap.PgBaseBackup.Secret == nil ||
-			cluster.Spec.Bootstrap.PgBaseBackup.Secret.Name == "")
-}
-
-// ShouldRecoveryCreateApplicationSecret returns true if for this cluster,
-// during the bootstrap phase using recovery, we need to create an application secret
-func (cluster *Cluster) ShouldRecoveryCreateApplicationSecret() bool {
-	return cluster.ShouldRecoveryCreateApplicationDatabase() &&
-		(cluster.Spec.Bootstrap.Recovery.Secret == nil ||
-			cluster.Spec.Bootstrap.Recovery.Secret.Name == "")
-}
-
-// ShouldCreateApplicationDatabase returns true if for this cluster,
-// during the bootstrap phase, we need to create an application database
-func (cluster *Cluster) ShouldCreateApplicationDatabase() bool {
-	return cluster.ShouldInitDBCreateApplicationDatabase() ||
-		cluster.ShouldRecoveryCreateApplicationDatabase() ||
-		cluster.ShouldPgBaseBackupCreateApplicationDatabase()
-}
-
-// ShouldInitDBRunPostInitApplicationSQLRefs returns true if for this cluster,
-// during the bootstrap phase using initDB, we need to run post application
-// SQL files from provided references.
-func (cluster *Cluster) ShouldInitDBRunPostInitApplicationSQLRefs() bool {
-	if cluster.Spec.Bootstrap == nil {
-		return false
-	}
-
-	if cluster.Spec.Bootstrap.InitDB == nil {
-		return false
-	}
-
-	if cluster.Spec.Bootstrap.InitDB.PostInitApplicationSQLRefs == nil {
-		return false
-	}
-
-	return (len(cluster.Spec.Bootstrap.InitDB.PostInitApplicationSQLRefs.ConfigMapRefs) != 0 ||
-		len(cluster.Spec.Bootstrap.InitDB.PostInitApplicationSQLRefs.SecretRefs) != 0)
-}
-
-// ShouldInitDBCreateApplicationDatabase returns true if the application database needs to be created during initdb
-// job
-func (cluster *Cluster) ShouldInitDBCreateApplicationDatabase() bool {
-	if cluster.Spec.Bootstrap == nil {
-		return false
-	}
-
-	if cluster.Spec.Bootstrap.InitDB == nil {
-		return false
-	}
-
-	initDBParameters := cluster.Spec.Bootstrap.InitDB
-	return initDBParameters.Owner != "" && initDBParameters.Database != ""
-}
-
-// ShouldPgBaseBackupCreateApplicationDatabase returns true if the application database needs to be created during the
-// pg_basebackup job
-func (cluster *Cluster) ShouldPgBaseBackupCreateApplicationDatabase() bool {
-	// we skip creating the application database if cluster is a replica
-	if cluster.IsReplica() {
-		return false
-	}
-	if cluster.Spec.Bootstrap == nil {
-		return false
-	}
-
-	if cluster.Spec.Bootstrap.PgBaseBackup == nil {
-		return false
-	}
-
-	pgBaseBackupParameters := cluster.Spec.Bootstrap.PgBaseBackup
-	return pgBaseBackupParameters.Owner != "" && pgBaseBackupParameters.Database != ""
-}
-
-// ShouldRecoveryCreateApplicationDatabase returns true if the application database needs to be created during the
-// recovery job
-func (cluster *Cluster) ShouldRecoveryCreateApplicationDatabase() bool {
-	// we skip creating the application database if cluster is a replica
-	if cluster.IsReplica() {
-		return false
-	}
-
-	if cluster.Spec.Bootstrap == nil {
-		return false
-	}
-
-	if cluster.Spec.Bootstrap.Recovery == nil {
-		return false
-	}
-
-	recoveryParameters := cluster.Spec.Bootstrap.Recovery
-	return recoveryParameters.Owner != "" && recoveryParameters.Database != ""
-}
-
-// ShouldCreateProjectedVolume returns whether we should create the projected all in one volume
-func (cluster *Cluster) ShouldCreateProjectedVolume() bool {
-	return cluster.Spec.ProjectedVolumeTemplate != nil
-}
-
-// ShouldCreateWalArchiveVolume returns whether we should create the wal archive volume
-func (cluster *Cluster) ShouldCreateWalArchiveVolume() bool {
-	return cluster.Spec.WalStorage != nil
-}
-
-// ContainsTablespaces returns true if for this cluster, we need to create tablespaces
-func (cluster *Cluster) ContainsTablespaces() bool {
-	return len(cluster.Spec.Tablespaces) != 0
-}
-
-// GetPostgresUID returns the UID that is being used for the "postgres"
-// user
-func (cluster Cluster) GetPostgresUID() int64 {
-	if cluster.Spec.PostgresUID == 0 {
-		return defaultPostgresUID
-	}
-	return cluster.Spec.PostgresUID
-}
-
-// GetPostgresGID returns the GID that is being used for the "postgres"
-// user
-func (cluster Cluster) GetPostgresGID() int64 {
-	if cluster.Spec.PostgresGID == 0 {
-		return defaultPostgresGID
-	}
-	return cluster.Spec.PostgresGID
-}
-
-// ExternalCluster gets the external server with a known name, returning
-// true if the server was found and false otherwise
-func (cluster Cluster) ExternalCluster(name string) (ExternalCluster, bool) {
-	for _, server := range cluster.Spec.ExternalClusters {
-		if server.Name == name {
-			return server, true
-		}
-	}
-
-	return ExternalCluster{}, false
-}
-
-// IsReplica checks if this is a replica cluster or not
-func (cluster Cluster) IsReplica() bool {
-	return cluster.Spec.ReplicaCluster != nil && cluster.Spec.ReplicaCluster.Enabled
-}
-
-var slotNameNegativeRegex = regexp.MustCompile("[^a-z0-9_]+")
-
-// GetSlotNameFromInstanceName returns the slot name, given the instance name.
-// It returns an empty string if High Availability Replication Slots are disabled
-func (cluster Cluster) GetSlotNameFromInstanceName(instanceName string) string {
-	if cluster.Spec.ReplicationSlots == nil ||
-		cluster.Spec.ReplicationSlots.HighAvailability == nil ||
-		!cluster.Spec.ReplicationSlots.HighAvailability.GetEnabled() {
-		return ""
-	}
-
-	return cluster.Spec.ReplicationSlots.HighAvailability.GetSlotNameFromInstanceName(instanceName)
-}
-
-// GetBarmanEndpointCAForReplicaCluster checks if this is a replica cluster which needs barman endpoint CA
-func (cluster Cluster) GetBarmanEndpointCAForReplicaCluster() *SecretKeySelector {
-	if !cluster.IsReplica() {
-		return nil
-	}
-	sourceName := cluster.Spec.ReplicaCluster.Source
-	externalCluster, found := cluster.ExternalCluster(sourceName)
-	if !found || externalCluster.BarmanObjectStore == nil {
-		return nil
-	}
-	return externalCluster.BarmanObjectStore.EndpointCA
-}
-
-// GetClusterAltDNSNames returns all the names needed to build a valid Server Certificate
-func (cluster *Cluster) GetClusterAltDNSNames() []string {
-	defaultAltDNSNames := []string{
-		cluster.GetServiceReadWriteName(),
-		fmt.Sprintf("%v.%v", cluster.GetServiceReadWriteName(), cluster.Namespace),
-		fmt.Sprintf("%v.%v.svc", cluster.GetServiceReadWriteName(), cluster.Namespace),
-		cluster.GetServiceReadName(),
-		fmt.Sprintf("%v.%v", cluster.GetServiceReadName(), cluster.Namespace),
-		fmt.Sprintf("%v.%v.svc", cluster.GetServiceReadName(), cluster.Namespace),
-		cluster.GetServiceReadOnlyName(),
-		fmt.Sprintf("%v.%v", cluster.GetServiceReadOnlyName(), cluster.Namespace),
-		fmt.Sprintf("%v.%v.svc", cluster.GetServiceReadOnlyName(), cluster.Namespace),
-	}
-
-	if cluster.Spec.Certificates == nil {
-		return defaultAltDNSNames
-	}
-
-	return append(defaultAltDNSNames, cluster.Spec.Certificates.ServerAltDNSNames...)
-}
-
-// UsesSecret checks whether a given secret is used by a Cluster.
-//
-// This function is also used to discover the set of clusters that
-// should be reconciled when a certain secret changes.
-func (cluster *Cluster) UsesSecret(secret string) bool {
-	if _, ok := cluster.Status.SecretsResourceVersion.Metrics[secret]; ok {
-		return true
-	}
-	certificates := cluster.Status.Certificates
-	switch secret {
-	case cluster.GetSuperuserSecretName(),
-		cluster.GetApplicationSecretName(),
-		certificates.ClientCASecret,
-		certificates.ReplicationTLSSecret,
-		certificates.ServerCASecret,
-		certificates.ServerTLSSecret:
-		return true
-	}
-
-	if cluster.UsesSecretInManagedRoles(secret) {
-		return true
-	}
-
-	if cluster.Spec.Backup.IsBarmanEndpointCASet() && cluster.Spec.Backup.BarmanObjectStore.EndpointCA.Name == secret {
-		return true
-	}
-
-	if endpointCA := cluster.GetBarmanEndpointCAForReplicaCluster(); endpointCA != nil && endpointCA.Name == secret {
-		return true
-	}
-
-	if cluster.Status.PoolerIntegrations != nil {
-		for _, pgBouncerSecretName := range cluster.Status.PoolerIntegrations.PgBouncerIntegration.Secrets {
-			if pgBouncerSecretName == secret {
-				return true
-			}
-		}
-	}
-
-	return false
-}
-
-// UsesConfigMap checks whether a given secret is used by a Cluster
-func (cluster *Cluster) UsesConfigMap(config string) (ok bool) {
-	if _, ok := cluster.Status.ConfigMapResourceVersion.Metrics[config]; ok {
-		return true
-	}
-	return false
-}
-
-// IsPodMonitorEnabled checks if the PodMonitor object needs to be created
-func (cluster *Cluster) IsPodMonitorEnabled() bool {
-	if cluster.Spec.Monitoring != nil {
-		return cluster.Spec.Monitoring.EnablePodMonitor
-	}
-
-	return false
-}
-
-// GetEnableSuperuserAccess returns if the superuser access is enabled or not
-func (cluster *Cluster) GetEnableSuperuserAccess() bool {
-	if cluster.Spec.EnableSuperuserAccess != nil {
-		return *cluster.Spec.EnableSuperuserAccess
-	}
-
-	return true
-}
-
-// LogTimestampsWithMessage prints useful information about timestamps in stdout
-func (cluster *Cluster) LogTimestampsWithMessage(ctx context.Context, logMessage string) {
-	contextLogger := log.FromContext(ctx)
-
-	currentTimestamp := utils.GetCurrentTimestamp()
-	keysAndValues := []interface{}{
-		"phase", cluster.Status.Phase,
-		"currentTimestamp", currentTimestamp,
-		"targetPrimaryTimestamp", cluster.Status.TargetPrimaryTimestamp,
-		"currentPrimaryTimestamp", cluster.Status.CurrentPrimaryTimestamp,
-	}
-
-	var errs []string
-
-	// Elapsed time since the last request of promotion (TargetPrimaryTimestamp)
-	if diff, err := utils.DifferenceBetweenTimestamps(
-		currentTimestamp,
-		cluster.Status.TargetPrimaryTimestamp,
-	); err == nil {
-		keysAndValues = append(
-			keysAndValues,
-			"msPassedSinceTargetPrimaryTimestamp",
-			diff.Milliseconds(),
-		)
-	} else {
-		errs = append(errs, err.Error())
-	}
-
-	// Elapsed time since the last promotion (CurrentPrimaryTimestamp)
-	if currentPrimaryDifference, err := utils.DifferenceBetweenTimestamps(
-		currentTimestamp,
-		cluster.Status.CurrentPrimaryTimestamp,
-	); err == nil {
-		keysAndValues = append(
-			keysAndValues,
-			"msPassedSinceCurrentPrimaryTimestamp",
-			currentPrimaryDifference.Milliseconds(),
-		)
-	} else {
-		errs = append(errs, err.Error())
-	}
-
-	// Difference between the last promotion and the last request of promotion
-	// When positive, it is the amount of time required in the last promotion
-	// of a standby to a primary. If negative, it means we have a failover/switchover
-	// in progress, and the value represents the last measured uptime of the primary.
-	if currentPrimaryTargetDifference, err := utils.DifferenceBetweenTimestamps(
-		cluster.Status.CurrentPrimaryTimestamp,
-		cluster.Status.TargetPrimaryTimestamp,
-	); err == nil {
-		keysAndValues = append(
-			keysAndValues,
-			"msDifferenceBetweenCurrentAndTargetPrimary",
-			currentPrimaryTargetDifference.Milliseconds(),
-		)
-	} else {
-		errs = append(errs, err.Error())
-	}
-
-	if len(errs) > 0 {
-		keysAndValues = append(keysAndValues, "timestampParsingErrors", errs)
-	}
-
-	contextLogger.Info(logMessage, keysAndValues...)
-}
-
-// SetInheritedDataAndOwnership sets the cluster as owner of the passed object and then
-// sets all the needed annotations and labels
-func (cluster *Cluster) SetInheritedDataAndOwnership(obj *metav1.ObjectMeta) {
-	cluster.SetInheritedData(obj)
-	utils.SetAsOwnedBy(obj, cluster.ObjectMeta, cluster.TypeMeta)
-}
-
-// SetInheritedData sets all the needed annotations and labels
-func (cluster *Cluster) SetInheritedData(obj *metav1.ObjectMeta) {
-	utils.InheritAnnotations(obj, cluster.Annotations, cluster.GetFixedInheritedAnnotations(), configuration.Current)
-	utils.InheritLabels(obj, cluster.Labels, cluster.GetFixedInheritedLabels(), configuration.Current)
-	utils.LabelClusterName(obj, cluster.GetName())
-	utils.SetOperatorVersion(obj, versions.Version)
-}
-
-// ShouldForceLegacyBackup if present takes a backup without passing the name argument even on barman version 3.3.0+.
-// This is needed to test both backup system in the E2E suite
-func (cluster *Cluster) ShouldForceLegacyBackup() bool {
-	return cluster.Annotations[utils.LegacyBackupAnnotationName] == "true"
-}
-
-// GetSeccompProfile return the proper SeccompProfile set in the cluster for Pods and Containers
-func (cluster *Cluster) GetSeccompProfile() *corev1.SeccompProfile {
-	if cluster.Spec.SeccompProfile != nil {
-		return cluster.Spec.SeccompProfile
-	}
-
-	return &corev1.SeccompProfile{
-		Type: corev1.SeccompProfileTypeRuntimeDefault,
-	}
-}
-
-// GetCoredumpFilter get the coredump filter value from the cluster annotation
-func (cluster *Cluster) GetCoredumpFilter() string {
-	value, ok := cluster.Annotations[utils.CoredumpFilter]
-	if ok {
-		return value
-	}
-	return system.DefaultCoredumpFilter
-}
-
-// IsInplaceRestartPhase returns true if the cluster is in a phase that handles the Inplace restart
-func (cluster *Cluster) IsInplaceRestartPhase() bool {
-	return cluster.Status.Phase == PhaseInplacePrimaryRestart ||
-		cluster.Status.Phase == PhaseInplaceDeletePrimaryRestart
-}
-
-// GetTablespaceConfiguration returns the tablespaceConfiguration for the given name
-// otherwise return nil
-func (cluster *Cluster) GetTablespaceConfiguration(name string) *TablespaceConfiguration {
-	for _, tbsConfig := range cluster.Spec.Tablespaces {
-		tbsConfig := tbsConfig
-		if name == tbsConfig.Name {
-			return &tbsConfig
-		}
-	}
-
-	return nil
-}
-
-// IsBarmanBackupConfigured returns true if one of the possible backup destination
-// is configured, false otherwise
-func (backupConfiguration *BackupConfiguration) IsBarmanBackupConfigured() bool {
-	return backupConfiguration != nil && backupConfiguration.BarmanObjectStore != nil &&
-		backupConfiguration.BarmanObjectStore.BarmanCredentials.ArePopulated()
-}
-
-// IsBarmanEndpointCASet returns true if we have a CA bundle for the endpoint
-// false otherwise
-func (backupConfiguration *BackupConfiguration) IsBarmanEndpointCASet() bool {
-	return backupConfiguration != nil &&
-		backupConfiguration.BarmanObjectStore != nil &&
-		backupConfiguration.BarmanObjectStore.EndpointCA != nil &&
-		backupConfiguration.BarmanObjectStore.EndpointCA.Name != "" &&
-		backupConfiguration.BarmanObjectStore.EndpointCA.Key != ""
-}
-
-// UpdateBackupTimes sets the firstRecoverabilityPoint and lastSuccessfulBackup
-// for the provided method, as well as the overall firstRecoverabilityPoint and
-// lastSuccessfulBackup for the cluster
-func (cluster *Cluster) UpdateBackupTimes(
-	backupMethod BackupMethod,
-	firstRecoverabilityPoint *time.Time,
-	lastSuccessfulBackup *time.Time,
-) {
-	type comparer func(a metav1.Time, b metav1.Time) bool
-	// tryGetMaxTime gets either the newest or oldest time from a set of backup times,
-	// depending on the comparer argument passed to it
-	tryGetMaxTime := func(m map[BackupMethod]metav1.Time, compare comparer) string {
-		var maximum metav1.Time
-		for _, ts := range m {
-			if maximum.IsZero() || compare(ts, maximum) {
-				maximum = ts
-			}
-		}
-		result := ""
-		if !maximum.IsZero() {
-			result = maximum.Format(time.RFC3339)
-		}
-
-		return result
-	}
-
-	setTime := func(backupTimes map[BackupMethod]metav1.Time, value *time.Time) map[BackupMethod]metav1.Time {
-		if value == nil {
-			delete(backupTimes, backupMethod)
-			return backupTimes
-		}
-
-		if backupTimes == nil {
-			backupTimes = make(map[BackupMethod]metav1.Time)
-		}
-
-		backupTimes[backupMethod] = metav1.NewTime(*value)
-		return backupTimes
-	}
-
-	cluster.Status.FirstRecoverabilityPointByMethod = setTime(cluster.Status.FirstRecoverabilityPointByMethod,
-		firstRecoverabilityPoint)
-	cluster.Status.FirstRecoverabilityPoint = tryGetMaxTime(
-		cluster.Status.FirstRecoverabilityPointByMethod,
-		// we pass a comparer to get the first among the recoverability points
-		func(a metav1.Time, b metav1.Time) bool {
-			return a.Before(&b)
-		})
-
-	cluster.Status.LastSuccessfulBackupByMethod = setTime(cluster.Status.LastSuccessfulBackupByMethod,
-		lastSuccessfulBackup)
-	cluster.Status.LastSuccessfulBackup = tryGetMaxTime(
-		cluster.Status.LastSuccessfulBackupByMethod,
-		// we pass a comparer to get the last among the last backup times per method
-		func(a metav1.Time, b metav1.Time) bool {
-			return b.Before(&a)
-		})
-}
-
-// BuildPostgresOptions create the list of options that
-// should be added to the PostgreSQL configuration to
-// recover given a certain target
-func (target *RecoveryTarget) BuildPostgresOptions() string {
-	result := ""
-
-	if target == nil {
-		return result
-	}
-
-	if target.TargetTLI != "" {
-		result += fmt.Sprintf(
-			"recovery_target_timeline = '%v'\n",
-			target.TargetTLI)
-	}
-	if target.TargetXID != "" {
-		result += fmt.Sprintf(
-			"recovery_target_xid = '%v'\n",
-			target.TargetXID)
-	}
-	if target.TargetName != "" {
-		result += fmt.Sprintf(
-			"recovery_target_name = '%v'\n",
-			target.TargetName)
-	}
-	if target.TargetLSN != "" {
-		result += fmt.Sprintf(
-			"recovery_target_lsn = '%v'\n",
-			target.TargetLSN)
-	}
-	if target.TargetTime != "" {
-		result += fmt.Sprintf(
-			"recovery_target_time = '%v'\n",
-			utils.ConvertToPostgresFormat(target.TargetTime))
-	}
-	if target.TargetImmediate != nil && *target.TargetImmediate {
-		result += "recovery_target = immediate\n"
-	}
-	if target.Exclusive != nil && *target.Exclusive {
-		result += "recovery_target_inclusive = false\n"
-	} else {
-		result += "recovery_target_inclusive = true\n"
-	}
-
-	return result
 }
 
 func init() {

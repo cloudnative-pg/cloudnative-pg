@@ -161,6 +161,49 @@ var _ = Describe("PostgreSQL status", func() {
 			Expect(list.Items[5].Pod.Name).To(Equal("server-04"))
 		})
 	})
+
+	It("Correctly handles LSN parser errors", func() {
+		podList := PostgresqlStatusList{
+			Items: []PostgresqlStatus{
+				{
+					Pod:         &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p-1"}},
+					CurrentLsn:  "42A/E0F07C8",
+					CurrentWAL:  "0000001B0000042A0000000E",
+					ReceivedLsn: "",
+					ReplayLsn:   "",
+					IsPrimary:   true,
+					Error:       nil,
+				},
+				{
+					Pod:         &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p-2"}},
+					CurrentLsn:  "",
+					CurrentWAL:  "",
+					ReceivedLsn: "42A/E0F0AA0",
+					ReplayLsn:   "42A/E0F0AA0",
+					IsPrimary:   false,
+					Error:       nil,
+				},
+				{
+					Pod:         &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p-3"}},
+					CurrentLsn:  "",
+					CurrentWAL:  "",
+					ReceivedLsn: "",
+					ReplayLsn:   "42A/DFFFFF8",
+					IsPrimary:   false,
+					Error:       nil,
+				},
+			},
+		}
+		sort.Sort(&podList)
+
+		// p-1 is the first entry of the list because it is the primary node
+		// p-2 is the second entry of the list because it is more advanced
+		// from the replication point-of-view ("42A/E0F0AA0" > "42A/DFFFFF8")
+
+		Expect(podList.Items[0].Pod.Name).To(Equal("p-1"))
+		Expect(podList.Items[1].Pod.Name).To(Equal("p-2"))
+		Expect(podList.Items[2].Pod.Name).To(Equal("p-3"))
+	})
 })
 
 var _ = Describe("PostgreSQL status real", func() {

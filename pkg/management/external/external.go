@@ -26,6 +26,42 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/configfile"
 )
 
+// GetServerConnectionString gets the connection string to be
+// used to connect to this external server, without dumping
+// the required cryptographic material
+func GetServerConnectionString(
+	server *apiv1.ExternalCluster,
+	databaseName string,
+) string {
+	connectionParameters := maps.Clone(server.ConnectionParameters)
+
+	if server.SSLCert != nil {
+		name := getSecretKeyRefFileName(server.Name, server.SSLCert)
+		connectionParameters["sslcert"] = name
+	}
+
+	if server.SSLKey != nil {
+		name := getSecretKeyRefFileName(server.Name, server.SSLKey)
+		connectionParameters["sslkey"] = name
+	}
+
+	if server.SSLRootCert != nil {
+		name := getSecretKeyRefFileName(server.Name, server.SSLRootCert)
+		connectionParameters["sslrootcert"] = name
+	}
+
+	if server.Password != nil {
+		pgpassfile := getPgPassFilePath(server.Name)
+		connectionParameters["passfile"] = pgpassfile
+	}
+
+	if databaseName != "" {
+		connectionParameters["dbname"] = databaseName
+	}
+
+	return configfile.CreateConnectionString(connectionParameters)
+}
+
 // ConfigureConnectionToServer creates a connection string to the external
 // server, using the configuration inside the cluster and dumping the secret when
 // needed in a custom passfile.

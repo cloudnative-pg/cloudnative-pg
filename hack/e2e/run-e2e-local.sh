@@ -42,13 +42,20 @@ function get_default_storage_class() {
   kubectl get storageclass -o json | jq  -r 'first(.items[] | select (.metadata.annotations["storageclass.kubernetes.io/is-default-class"] == "true") | .metadata.name)'
 }
 
+function get_default_snapshot_class() {
+  local STORAGE_CLASS=${1:-${1:?STORAGE_CLASS is required}}
+  kubectl get storageclass "$STORAGE_CLASS" -o json | jq -r '.metadata.annotations["storage.kubernetes.io/default-snapshot-class"]'
+}
+
 function get_postgres_image() {
   grep 'DefaultImageName.*=' "${ROOT_DIR}/pkg/versions/versions.go" | cut -f 2 -d \"
 }
 
 export E2E_DEFAULT_STORAGE_CLASS=${E2E_DEFAULT_STORAGE_CLASS:-$(get_default_storage_class)}
-export E2E_CSI_STORAGE_CLASS=${E2E_CSI_STORAGE_CLASS:-}
+export E2E_CSI_STORAGE_CLASS=${E2E_CSI_STORAGE_CLASS:-csi-hostpath-sc}
+export E2E_DEFAULT_VOLUMESNAPSHOT_CLASS=${E2E_DEFAULT_VOLUMESNAPSHOT_CLASS:-$(get_default_snapshot_class "$E2E_CSI_STORAGE_CLASS")}
 export POSTGRES_IMG=${POSTGRES_IMG:-$(get_postgres_image)}
+export E2E_PRE_ROLLING_UPDATE_IMG=${E2E_PRE_ROLLING_UPDATE_IMG:-${POSTGRES_IMG%.*}}
 
 # Ensure GOBIN is in path, we'll use this to install and execute ginkgo
 go_bin="$(go env GOPATH)/bin"
@@ -77,20 +84,18 @@ RC_GINKGO=0
 export TEST_SKIP_UPGRADE=true
 ginkgo --nodes=4 --timeout 3h --poll-progress-after=1200s --poll-progress-interval=150s \
        ${LABEL_FILTERS:+--label-filter "${LABEL_FILTERS}"} \
+       --force-newlines \
        --output-dir "${ROOT_DIR}/tests/e2e/out/" \
        --json-report  "report.json" -v "${ROOT_DIR}/tests/e2e/..." || RC_GINKGO=$?
 
-# Report if there are any tests that failed and did NOT have an "ignore-fails" label
+# Report if there are any tests that failed
 RC=0
 jq -e -c -f "${ROOT_DIR}/hack/e2e/test-report.jq" "${ROOT_DIR}/tests/e2e/out/report.json" || RC=$?
 
-# The exit code reported depends on the two `jq` filter calls. In case we have
-# FAIL in the Ginkgo, but the `jq` succeeds because the failures are ignorable,
-# we should add some explanation
 set +x
 if [[ $RC == 0 ]]; then
   if [[ $RC_GINKGO != 0 ]]; then
-    printf "\033[0;32m%s\n" "SUCCESS. All the failures in Ginkgo are labelled 'ignore-fails'."
+    printf "\033[0;32m%s\n" "SUCCESS."
     echo
   fi
 fi

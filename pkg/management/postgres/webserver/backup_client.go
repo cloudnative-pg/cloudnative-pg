@@ -22,41 +22,42 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"time"
 
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/machinery/pkg/log"
+	corev1 "k8s.io/api/core/v1"
+
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/instance"
 )
 
-// BackupClient a client to interact with the instance backup endpoints
-type BackupClient struct {
+// backupClient a client to interact with the instance backup endpoints
+type backupClient struct {
 	cli *http.Client
 }
 
+// BackupClient is a struct capable of interacting with the instance backup endpoints
+type BackupClient interface {
+	StatusWithErrors(ctx context.Context, pod *corev1.Pod) (*Response[BackupResultData], error)
+	Start(ctx context.Context, pod *corev1.Pod, sbq StartBackupRequest) error
+	Stop(ctx context.Context, pod *corev1.Pod, sbq StopBackupRequest) error
+}
+
 // NewBackupClient creates a client capable of interacting with the instance backup endpoints
-func NewBackupClient() *BackupClient {
+func NewBackupClient() BackupClient {
 	const connectionTimeout = 2 * time.Second
 	const requestTimeout = 30 * time.Second
 
-	// We want a connection timeout to prevent waiting for the default
-	// TCP connection timeout (30 seconds) on lost SYN packets
-	timeoutClient := &http.Client{
-		Transport: &http.Transport{
-			DialContext: (&net.Dialer{
-				Timeout: connectionTimeout,
-			}).DialContext,
-		},
-		Timeout: requestTimeout,
-	}
-	return &BackupClient{cli: timeoutClient}
+	return &backupClient{cli: resources.NewHTTPClient(connectionTimeout, requestTimeout)}
 }
 
 // StatusWithErrors retrieves the current status of the backup.
 // Returns the response body in case there is an error in the request
-func (c *BackupClient) StatusWithErrors(ctx context.Context, podIP string) (*Response[BackupResultData], error) {
-	httpURL := url.Build(podIP, url.PathPgModeBackup, url.StatusPort)
+func (c *backupClient) StatusWithErrors(ctx context.Context, pod *corev1.Pod) (*Response[BackupResultData], error) {
+	scheme := instance.GetStatusSchemeFromPod(pod)
+	httpURL := url.Build(scheme.ToString(), pod.Status.PodIP, url.PathPgModeBackup, url.StatusPort)
 	req, err := http.NewRequestWithContext(ctx, "GET", httpURL, nil)
 	if err != nil {
 		return nil, err
@@ -66,12 +67,9 @@ func (c *BackupClient) StatusWithErrors(ctx context.Context, podIP string) (*Res
 }
 
 // Start runs the pg_start_backup
-func (c *BackupClient) Start(
-	ctx context.Context,
-	podIP string,
-	sbq StartBackupRequest,
-) error {
-	httpURL := url.Build(podIP, url.PathPgModeBackup, url.StatusPort)
+func (c *backupClient) Start(ctx context.Context, pod *corev1.Pod, sbq StartBackupRequest) error {
+	scheme := instance.GetStatusSchemeFromPod(pod)
+	httpURL := url.Build(scheme.ToString(), pod.Status.PodIP, url.PathPgModeBackup, url.StatusPort)
 
 	// Marshalling the payload to JSON
 	jsonBody, err := json.Marshal(sbq)
@@ -90,8 +88,9 @@ func (c *BackupClient) Start(
 }
 
 // Stop runs the command pg_stop_backup
-func (c *BackupClient) Stop(ctx context.Context, podIP string, sbq StopBackupRequest) error {
-	httpURL := url.Build(podIP, url.PathPgModeBackup, url.StatusPort)
+func (c *backupClient) Stop(ctx context.Context, pod *corev1.Pod, sbq StopBackupRequest) error {
+	scheme := instance.GetStatusSchemeFromPod(pod)
+	httpURL := url.Build(scheme.ToString(), pod.Status.PodIP, url.PathPgModeBackup, url.StatusPort)
 	// Marshalling the payload to JSON
 	jsonBody, err := json.Marshal(sbq)
 	if err != nil {

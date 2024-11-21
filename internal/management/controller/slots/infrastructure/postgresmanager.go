@@ -18,43 +18,22 @@ package infrastructure
 
 import (
 	"context"
+	"database/sql"
+	"strings"
+
+	"github.com/cloudnative-pg/machinery/pkg/log"
 
 	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pool"
 )
 
-// PostgresManager is a Manager for a database instance
-type PostgresManager struct {
-	pool pool.Pooler
-}
-
-// NewPostgresManager returns an implementation of Manager for postgres
-func NewPostgresManager(pool pool.Pooler) Manager {
-	return PostgresManager{
-		pool: pool,
-	}
-}
-
-func (sm PostgresManager) String() string {
-	return sm.pool.GetDsn("postgres")
-}
-
 // List the available replication slots
-func (sm PostgresManager) List(
-	ctx context.Context,
-	config *v1.ReplicationSlotsConfiguration,
-) (ReplicationSlotList, error) {
-	db, err := sm.pool.Connection("postgres")
-	if err != nil {
-		return ReplicationSlotList{}, err
-	}
-
+func List(ctx context.Context, db *sql.DB, config *v1.ReplicationSlotsConfiguration) (ReplicationSlotList, error) {
 	rows, err := db.QueryContext(
 		ctx,
-		`SELECT slot_name, slot_type, active, coalesce(restart_lsn::TEXT, '') AS restart_lsn FROM pg_replication_slots
-            WHERE NOT temporary AND slot_name ^@ $1 AND slot_type = 'physical'`,
-		config.HighAvailability.GetSlotPrefix(),
+		`SELECT slot_name, slot_type, active, coalesce(restart_lsn::TEXT, '') AS restart_lsn,
+            xmin IS NOT NULL OR catalog_xmin IS NOT NULL AS holds_xmin
+            FROM pg_replication_slots
+            WHERE NOT temporary AND slot_type = 'physical'`,
 	)
 	if err != nil {
 		return ReplicationSlotList{}, err
@@ -71,9 +50,19 @@ func (sm PostgresManager) List(
 			&slot.Type,
 			&slot.Active,
 			&slot.RestartLSN,
+			&slot.HoldsXmin,
 		)
 		if err != nil {
 			return ReplicationSlotList{}, err
+		}
+
+		slot.IsHA = strings.HasPrefix(slot.SlotName, config.HighAvailability.GetSlotPrefix())
+		isFilteredByUser, err := config.SynchronizeReplicas.IsExcludedByUser(slot.SlotName)
+		if err != nil {
+			return status, err
+		}
+		if !slot.IsHA && isFilteredByUser {
+			continue
 		}
 
 		status.Items = append(status.Items, slot)
@@ -87,49 +76,35 @@ func (sm PostgresManager) List(
 }
 
 // Update the replication slot
-func (sm PostgresManager) Update(ctx context.Context, slot ReplicationSlot) error {
+func Update(ctx context.Context, db *sql.DB, slot ReplicationSlot) error {
 	contextLog := log.FromContext(ctx).WithName("updateSlot")
 	contextLog.Trace("Invoked", "slot", slot)
 	if slot.RestartLSN == "" {
 		return nil
 	}
-	db, err := sm.pool.Connection("postgres")
-	if err != nil {
-		return err
-	}
 
-	_, err = db.ExecContext(ctx, "SELECT pg_replication_slot_advance($1, $2)", slot.SlotName, slot.RestartLSN)
+	_, err := db.ExecContext(ctx, "SELECT pg_replication_slot_advance($1, $2)", slot.SlotName, slot.RestartLSN)
 	return err
 }
 
 // Create the replication slot
-func (sm PostgresManager) Create(ctx context.Context, slot ReplicationSlot) error {
+func Create(ctx context.Context, db *sql.DB, slot ReplicationSlot) error {
 	contextLog := log.FromContext(ctx).WithName("createSlot")
 	contextLog.Trace("Invoked", "slot", slot)
 
-	db, err := sm.pool.Connection("postgres")
-	if err != nil {
-		return err
-	}
-
-	_, err = db.ExecContext(ctx, "SELECT pg_create_physical_replication_slot($1, $2)",
+	_, err := db.ExecContext(ctx, "SELECT pg_create_physical_replication_slot($1, $2)",
 		slot.SlotName, slot.RestartLSN != "")
 	return err
 }
 
 // Delete the replication slot
-func (sm PostgresManager) Delete(ctx context.Context, slot ReplicationSlot) error {
+func Delete(ctx context.Context, db *sql.DB, slot ReplicationSlot) error {
 	contextLog := log.FromContext(ctx).WithName("dropSlot")
 	contextLog.Trace("Invoked", "slot", slot)
 	if slot.Active {
 		return nil
 	}
 
-	db, err := sm.pool.Connection("postgres")
-	if err != nil {
-		return err
-	}
-
-	_, err = db.ExecContext(ctx, "SELECT pg_drop_replication_slot($1)", slot.SlotName)
+	_, err := db.ExecContext(ctx, "SELECT pg_drop_replication_slot($1)", slot.SlotName)
 	return err
 }

@@ -17,7 +17,6 @@ limitations under the License.
 package infrastructure
 
 import (
-	"context"
 	"database/sql"
 	"errors"
 
@@ -31,17 +30,15 @@ import (
 
 var _ = Describe("PostgresManager", func() {
 	var (
-		manager Manager
-		mock    sqlmock.Sqlmock
-		db      *sql.DB
-		slot    ReplicationSlot
+		mock sqlmock.Sqlmock
+		db   *sql.DB
+		slot ReplicationSlot
 	)
 
 	BeforeEach(func() {
 		var err error
 		db, mock, err = sqlmock.New()
 		Expect(err).NotTo(HaveOccurred())
-		manager = NewPostgresManager(&mockPooler{db: db})
 		slot = ReplicationSlot{
 			SlotName:   "slot1",
 			Type:       SlotTypePhysical,
@@ -55,26 +52,29 @@ var _ = Describe("PostgresManager", func() {
 	})
 
 	Context("Create", func() {
-		It("should successfully create a replication slot", func() {
-			mock.ExpectExec("SELECT pg_create_physical_replication_slot").
+		const expectedSQL = "SELECT pg_create_physical_replication_slot"
+		It("should successfully create a replication slot", func(ctx SpecContext) {
+			mock.ExpectExec(expectedSQL).
 				WithArgs(slot.SlotName, slot.RestartLSN != "").
 				WillReturnResult(sqlmock.NewResult(1, 1))
 
-			err := manager.Create(context.Background(), slot)
+			err := Create(ctx, db, slot)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		It("should return error when the database execution fails", func() {
-			mock.ExpectExec("SELECT pg_create_physical_replication_slot").
+		It("should return error when the database execution fails", func(ctx SpecContext) {
+			mock.ExpectExec(expectedSQL).
 				WithArgs(slot.SlotName, slot.RestartLSN != "").
 				WillReturnError(errors.New("mock error"))
 
-			err := manager.Create(context.Background(), slot)
+			err := Create(ctx, db, slot)
 			Expect(err).To(HaveOccurred())
 		})
 	})
 
 	Context("List", func() {
+		const expectedSQL = "^SELECT (.+) FROM pg_replication_slots"
+
 		var config *v1.ReplicationSlotsConfiguration
 		BeforeEach(func() {
 			config = &v1.ReplicationSlotsConfiguration{
@@ -86,92 +86,96 @@ var _ = Describe("PostgresManager", func() {
 			}
 		})
 
-		It("should successfully list replication slots", func() {
-			rows := sqlmock.NewRows([]string{"slot_name", "slot_type", "active", "restart_lsn"}).
-				AddRow("slot1", string(SlotTypePhysical), true, "lsn1").
-				AddRow("slot2", string(SlotTypePhysical), true, "lsn2")
+		It("should successfully list replication slots", func(ctx SpecContext) {
+			rows := sqlmock.NewRows([]string{"slot_name", "slot_type", "active", "restart_lsn", "holds_xmin"}).
+				AddRow("_cnpg_slot1", string(SlotTypePhysical), true, "lsn1", false).
+				AddRow("slot2", string(SlotTypePhysical), true, "lsn2", false)
 
-			mock.ExpectQuery("^SELECT (.+) FROM pg_replication_slots").
-				WithArgs(config.HighAvailability.SlotPrefix).
+			mock.ExpectQuery(expectedSQL).
 				WillReturnRows(rows)
 
-			result, err := manager.List(context.Background(), config)
+			result, err := List(ctx, db, config)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result.Items).To(HaveLen(2))
-			Expect(result.Has("slot1")).To(BeTrue())
+			Expect(result.Has("_cnpg_slot1")).To(BeTrue())
 			Expect(result.Has("slot2")).To(BeTrue())
 
-			slot1 := result.Get("slot1")
+			slot1 := result.Get("_cnpg_slot1")
 			Expect(slot1.Type).To(Equal(SlotTypePhysical))
 			Expect(slot1.Active).To(BeTrue())
 			Expect(slot1.RestartLSN).To(Equal("lsn1"))
+			Expect(slot1.IsHA).To(BeTrue())
 
 			slot2 := result.Get("slot2")
 			Expect(slot2.Type).To(Equal(SlotTypePhysical))
 			Expect(slot2.Active).To(BeTrue())
 			Expect(slot2.RestartLSN).To(Equal("lsn2"))
+			Expect(slot2.IsHA).To(BeFalse())
 		})
 
-		It("should return error when database query fails", func() {
-			mock.ExpectQuery("^SELECT (.+) FROM pg_replication_slots").
-				WithArgs(config.HighAvailability.SlotPrefix).
+		It("should return error when database query fails", func(ctx SpecContext) {
+			mock.ExpectQuery(expectedSQL).
 				WillReturnError(errors.New("mock error"))
 
-			_, err := manager.List(context.Background(), config)
+			_, err := List(ctx, db, config)
 			Expect(err).To(HaveOccurred())
 		})
 	})
 
 	Context("Update", func() {
-		It("should successfully update a replication slot", func() {
-			mock.ExpectExec("SELECT pg_replication_slot_advance").
+		const expectedSQL = "SELECT pg_replication_slot_advance"
+
+		It("should successfully update a replication slot", func(ctx SpecContext) {
+			mock.ExpectExec(expectedSQL).
 				WithArgs(slot.SlotName, slot.RestartLSN).
 				WillReturnResult(sqlmock.NewResult(1, 1))
 
-			err := manager.Update(context.Background(), slot)
+			err := Update(ctx, db, slot)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		It("should return error when the database execution fails", func() {
-			mock.ExpectExec("SELECT pg_replication_slot_advance").
+		It("should return error when the database execution fails", func(ctx SpecContext) {
+			mock.ExpectExec(expectedSQL).
 				WithArgs(slot.SlotName, slot.RestartLSN).
 				WillReturnError(errors.New("mock error"))
 
-			err := manager.Update(context.Background(), slot)
+			err := Update(ctx, db, slot)
 			Expect(err).To(HaveOccurred())
 		})
 
-		It("should not update a replication slot when RestartLSN is empty", func() {
+		It("should not update a replication slot when RestartLSN is empty", func(ctx SpecContext) {
 			slot.RestartLSN = ""
-			err := manager.Update(context.Background(), slot)
+			err := Update(ctx, db, slot)
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
 
 	Context("Delete", func() {
-		It("should successfully delete a replication slot", func() {
+		const expectedSQL = "SELECT pg_drop_replication_slot"
+
+		It("should successfully delete a replication slot", func(ctx SpecContext) {
 			slot.Active = false
 
-			mock.ExpectExec("SELECT pg_drop_replication_slot").WithArgs(slot.SlotName).
+			mock.ExpectExec(expectedSQL).WithArgs(slot.SlotName).
 				WillReturnResult(sqlmock.NewResult(1, 1))
 
-			err := manager.Delete(context.Background(), slot)
+			err := Delete(ctx, db, slot)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		It("should return error when the database execution fails", func() {
+		It("should return error when the database execution fails", func(ctx SpecContext) {
 			slot.Active = false
-			mock.ExpectExec("SELECT pg_drop_replication_slot").WithArgs(slot.SlotName).
+			mock.ExpectExec(expectedSQL).WithArgs(slot.SlotName).
 				WillReturnError(errors.New("mock error"))
 
-			err := manager.Delete(context.Background(), slot)
+			err := Delete(ctx, db, slot)
 			Expect(err).To(HaveOccurred())
 		})
 
-		It("should not delete an active replication slot", func() {
+		It("should not delete an active replication slot", func(ctx SpecContext) {
 			slot.RestartLSN = ""
 
-			err := manager.Delete(context.Background(), slot)
+			err := Delete(ctx, db, slot)
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})

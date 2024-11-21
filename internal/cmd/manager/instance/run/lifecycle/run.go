@@ -20,12 +20,12 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"os"
+	"sync"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/jackc/pgx/v5"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
 )
@@ -36,49 +36,101 @@ var identifierStreamingReplicationUser = pgx.Identifier{apiv1.StreamingReplicati
 // returning any error via the returned channel
 func (i *PostgresLifecycle) runPostgresAndWait(ctx context.Context) <-chan error {
 	contextLogger := log.FromContext(ctx)
-	errChan := make(chan error, 1)
 
-	go func() {
-		defer close(errChan)
-		err := i.instance.VerifyPgDataCoherence(ctx)
+	runPostmasterSession := func() error {
+		// Meanwhile PostgreSQL is starting, we'll start a goroutine
+		// that will configure its permission once the database system
+		// is ready to accept connection.
+		//
+		// This wait group ensures this goroutine to be finished when
+		// this function exits
+		var wg sync.WaitGroup
+		defer wg.Wait()
+
+		// We're creating a new Context for PostgreSQL, that will be cancelled
+		// as soon as the postmaster exits.
+		// The cancellation of this context will trigger the termination
+		// of the goroutine initialization function.
+		postgresContext, postgresContextCancel := context.WithCancel(ctx)
+		defer postgresContextCancel()
+
+		// Before starting the postmaster, we ensure we've the correct
+		// permissions and user maps to start it.
+		err := i.instance.VerifyPgDataCoherence(postgresContext)
 		if err != nil {
-			errChan <- err
-			return
+			return err
 		}
 
-		// here we need to wait for initialization to be executed before
-		// being able to start the instance
+		// Here we need to wait for initialization to be executed before
+		// being able to start the instance. Once this is done, we've executed
+		// the first part of the instance reconciliation loop that don't need
+		// a postmaster to be ready.
+		// That part of the reconciliation loop ensures the PGDATA contains
+		// the correct signal files to start in the correct replication role,
+		// being a primary or a replica.
+		//
+		// If we come here because PostgreSQL have been restarted or because
+		// fencing was lifted, this condition will be already met and the
+		// following will be a no-op.
 		i.systemInitialization.Wait()
 
-		// if the instance is marked as fenced we don't need to start it at all
+		// The lifecycle loop will call us even when PostgreSQL is fenced.
+		// In that case there's no need to proceed.
 		if i.instance.IsFenced() {
 			contextLogger.Info("Instance is fenced, won't start postgres right now")
-			return
+			return nil
 		}
 
-		i.instance.LogPgControldata(ctx, "postmaster start up")
-		defer i.instance.LogPgControldata(ctx, "postmaster has exited")
+		i.instance.LogPgControldata(postgresContext, "postmaster start up")
+		defer i.instance.LogPgControldata(postgresContext, "postmaster has exited")
 
 		streamingCmd, err := i.instance.Run()
 		if err != nil {
 			contextLogger.Error(err, "Unable to start PostgreSQL up")
-			errChan <- err
-			return
+			return err
 		}
 
-		// once the database will be up we'll connect and setup everything required
-		err = configureInstancePermissions(ctx, i.instance)
+		postMasterPID, err := streamingCmd.Pid()
 		if err != nil {
-			contextLogger.Error(err, "Unable to update PostgreSQL roles and permissions")
-			errChan <- err
-			return
+			contextLogger.Error(
+				err,
+				"Programmatic error: postmaster process was not set")
+			return err
 		}
 
-		// from now on the instance can be considered ready
+		contextLogger.Info("postmaster started", "postMasterPID", postMasterPID)
+
+		// Now we'll wait for PostgreSQL to accept connections, and setup everything required
+		// for replication and pg_rewind to work correctly.
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := configureInstancePermissions(postgresContext, i.instance); err != nil {
+				contextLogger.Error(err, "Unable to update PostgreSQL roles and permissions")
+			}
+		}()
+
+		// From now on the instance can be checked for readiness. This is
+		// used from the readiness probe to avoid testing PostgreSQL.
 		i.instance.SetCanCheckReadiness(true)
 		defer i.instance.SetCanCheckReadiness(false)
 
-		errChan <- streamingCmd.Wait()
+		postmasterExitStatus := streamingCmd.Wait()
+		contextLogger.Info(
+			"postmaster exited",
+			"postmasterExitStatus", postmasterExitStatus,
+			"postMasterPID", postMasterPID,
+		)
+		return postmasterExitStatus
+	}
+
+	errChan := make(chan error, 1)
+
+	// The following goroutine runs the postmaster process, and stops
+	// when the process exits.
+	go func() {
+		errChan <- runPostmasterSession()
+		close(errChan)
 	}()
 
 	return errChan
@@ -108,16 +160,15 @@ func configureInstancePermissions(ctx context.Context, instance *postgres.Instan
 	}
 
 	contextLogger.Debug("Verifying connection to DB")
-	err = instance.WaitForSuperuserConnectionAvailable()
-	if err != nil {
+	if err := instance.WaitForSuperuserConnectionAvailable(ctx); err != nil {
 		contextLogger.Error(err, "DB not available")
-		os.Exit(1)
+		return fmt.Errorf("while verifying super user DB connection: %w", err)
 	}
 
 	contextLogger.Debug("Validating DB configuration")
 
 	// A transaction is required to temporarily disable synchronous replication
-	tx, err := db.Begin()
+	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("creating a new transaction to setup the instance: %w", err)
 	}

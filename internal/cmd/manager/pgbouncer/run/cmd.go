@@ -27,12 +27,12 @@ import (
 	"path/filepath"
 	"syscall"
 
+	"github.com/cloudnative-pg/machinery/pkg/execlog"
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/pgbouncer/management/controller"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/pgbouncer/config"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/pgbouncer/metricsserver"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
@@ -54,18 +54,25 @@ func NewCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "run",
 		SilenceErrors: true,
-		PreRunE: func(cmd *cobra.Command, args []string) error {
+		PreRunE: func(cmd *cobra.Command, _ []string) error {
+			contextLogger := log.FromContext(cmd.Context())
 			if poolerNamespacedName.Name == "" || poolerNamespacedName.Namespace == "" {
-				log.Info(
+				contextLogger.Info(
 					"pooler object key not set",
 					"poolerNamespacedName", poolerNamespacedName)
 				return errorMissingPoolerNamespacedName
 			}
 			return nil
 		},
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := runSubCommand(cmd.Context(), poolerNamespacedName); err != nil {
-				log.Error(err, "Error while running manager")
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			ctx := log.IntoContext(
+				cmd.Context(),
+				log.GetLogger().WithValues("logger", "pgbouncer-manager"),
+			)
+			contextLogger := log.FromContext(ctx)
+
+			if err := runSubCommand(ctx, poolerNamespacedName); err != nil {
+				contextLogger.Error(err, "Error while running manager")
 				return err
 			}
 			return nil
@@ -91,11 +98,12 @@ func NewCmd() *cobra.Command {
 func runSubCommand(ctx context.Context, poolerNamespacedName types.NamespacedName) error {
 	var err error
 
-	log.Info("Starting CloudNativePG PgBouncer Instance Manager",
+	contextLogger := log.FromContext(ctx)
+	contextLogger.Info("Starting CloudNativePG PgBouncer Instance Manager",
 		"version", versions.Version,
 		"build", versions.Info)
 
-	if err = startWebServer(); err != nil {
+	if err = startWebServer(ctx); err != nil {
 		return fmt.Errorf("while starting the web server: %w", err)
 	}
 
@@ -114,10 +122,10 @@ func runSubCommand(ctx context.Context, poolerNamespacedName types.NamespacedNam
 	pgBouncerIni := filepath.Join(config.ConfigsDir, config.PgBouncerIniFileName)
 	pgBouncerCmd := exec.Command(pgBouncerCommandName, pgBouncerIni) //nolint:gosec
 	stdoutWriter := &execlog.LogWriter{
-		Logger: log.WithValues(execlog.PipeKey, execlog.StdOut),
+		Logger: contextLogger.WithValues(execlog.PipeKey, execlog.StdOut),
 	}
 	stderrWriter := &pgBouncerLogWriter{
-		Logger: log.WithValues(execlog.PipeKey, execlog.StdErr),
+		Logger: contextLogger.WithValues(execlog.PipeKey, execlog.StdErr),
 	}
 	streamingCmd, err := execlog.RunStreamingNoWaitWithWriter(
 		pgBouncerCmd, pgBouncerCommandName, stdoutWriter, stderrWriter)
@@ -126,14 +134,14 @@ func runSubCommand(ctx context.Context, poolerNamespacedName types.NamespacedNam
 	}
 
 	startReconciler(ctx, reconciler)
-	registerSignalHandler(reconciler, pgBouncerCmd)
+	registerSignalHandler(ctx, reconciler, pgBouncerCmd)
 
 	if err = streamingCmd.Wait(); err != nil {
 		var exitError *exec.ExitError
 		if !errors.As(err, &exitError) {
-			log.Error(err, "Error waiting on pgbouncer process")
+			contextLogger.Error(err, "Error waiting on pgbouncer process")
 		} else {
-			log.Error(exitError, "pgbouncer process exited with errors")
+			contextLogger.Error(exitError, "pgbouncer process exited with errors")
 		}
 		return err
 	}
@@ -143,29 +151,30 @@ func runSubCommand(ctx context.Context, poolerNamespacedName types.NamespacedNam
 
 // registerSignalHandler handles signals from k8s, notifying postgres as
 // needed
-func registerSignalHandler(reconciler *controller.PgBouncerReconciler, command *exec.Cmd) {
+func registerSignalHandler(ctx context.Context, reconciler *controller.PgBouncerReconciler, command *exec.Cmd) {
+	contextLogger := log.FromContext(ctx)
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
 		sig := <-signals
-		log.Info("Received termination signal", "signal", sig)
+		contextLogger.Info("Received termination signal", "signal", sig)
 
-		log.Info("Shutting down web server")
+		contextLogger.Info("Shutting down web server")
 		err := metricsserver.Shutdown()
 		if err != nil {
-			log.Error(err, "Error while shutting down the metrics server")
+			contextLogger.Error(err, "Error while shutting down the metrics server")
 		} else {
-			log.Info("Metrics server shut down")
+			contextLogger.Info("Metrics server shut down")
 		}
 
 		reconciler.Stop()
 
 		if command != nil {
-			log.Info("Shutting down pgbouncer instance")
+			contextLogger.Info("Shutting down pgbouncer instance")
 			err := command.Process.Signal(syscall.SIGINT)
 			if err != nil {
-				log.Error(err, "Unable to send SIGINT to pgbouncer instance")
+				contextLogger.Error(err, "Unable to send SIGINT to pgbouncer instance")
 			}
 		}
 	}()
@@ -173,15 +182,16 @@ func registerSignalHandler(reconciler *controller.PgBouncerReconciler, command *
 
 // startWebServer start the web server for handling probes given
 // a certain PostgreSQL instance
-func startWebServer() error {
-	if err := metricsserver.Setup(); err != nil {
+func startWebServer(ctx context.Context) error {
+	contextLogger := log.FromContext(ctx)
+	if err := metricsserver.Setup(ctx); err != nil {
 		return err
 	}
 
 	go func() {
 		err := metricsserver.ListenAndServe()
 		if err != nil {
-			log.Error(err, "Error while starting the metrics server")
+			contextLogger.Error(err, "Error while starting the metrics server")
 		}
 	}()
 

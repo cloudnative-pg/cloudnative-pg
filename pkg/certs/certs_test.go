@@ -22,6 +22,8 @@ import (
 	"encoding/pem"
 	"time"
 
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -72,7 +74,7 @@ var _ = Describe("Keypair generation", func() {
 		oldCert, err := ca.ParseCertificate()
 		Expect(err).ToNot(HaveOccurred())
 
-		err = ca.RenewCertificate(privateKey, nil)
+		err = ca.RenewCertificate(privateKey, nil, []string{})
 		Expect(err).ToNot(HaveOccurred())
 
 		newCert, err := ca.ParseCertificate()
@@ -106,6 +108,20 @@ var _ = Describe("Keypair generation", func() {
 		Expect(isExpiring, err).To(BeFalse())
 	})
 
+	It("marks matching alt DNS names as matching", func() {
+		ca, err := CreateRootCA("test", "namespace")
+		Expect(err).ToNot(HaveOccurred())
+		doAltDNSNamesMatch, err := ca.DoAltDNSNamesMatch([]string{})
+		Expect(doAltDNSNamesMatch, err).To(BeTrue())
+	})
+
+	It("doesn't mark different alt DNS names as matching", func() {
+		ca, err := CreateRootCA("test", "namespace")
+		Expect(err).ToNot(HaveOccurred())
+		doAltDNSNamesMatch, err := ca.DoAltDNSNamesMatch([]string{"foo.bar"})
+		Expect(doAltDNSNamesMatch, err).To(BeFalse())
+	})
+
 	When("we have a CA generated", func() {
 		It("should successfully generate a leaf certificate", func() {
 			rootCA, err := CreateRootCA("test", "namespace")
@@ -129,6 +145,7 @@ var _ = Describe("Keypair generation", func() {
 			Expect(cert.NotBefore).To(BeTemporally("<", time.Now()))
 			Expect(cert.NotAfter).To(BeTemporally(">", time.Now()))
 			Expect(cert.VerifyHostname("this.host.name.com")).To(Succeed())
+			Expect(cert.DNSNames).To(Equal([]string{"this.host.name.com"}))
 
 			caCert, err := rootCA.ParseCertificate()
 			Expect(err).ToNot(HaveOccurred())
@@ -150,7 +167,7 @@ var _ = Describe("Keypair generation", func() {
 			Expect(secret.Data["tls.key"]).To(Equal(pair.Private))
 		})
 
-		It("should be able to renew an existing certificate", func() {
+		It("should be able to renew an existing certificate with no DNS names provided", func() {
 			ca, err := CreateRootCA("test", "namespace")
 			Expect(err).ToNot(HaveOccurred())
 
@@ -169,7 +186,7 @@ var _ = Describe("Keypair generation", func() {
 			oldCert, err := pair.ParseCertificate()
 			Expect(err).ToNot(HaveOccurred())
 
-			err = pair.RenewCertificate(privateKey, caCert)
+			err = pair.RenewCertificate(privateKey, caCert, nil)
 			Expect(err).ToNot(HaveOccurred())
 
 			newCert, err := pair.ParseCertificate()
@@ -182,10 +199,52 @@ var _ = Describe("Keypair generation", func() {
 			Expect(newCert.Subject).To(Equal(oldCert.Subject))
 			Expect(newCert.Issuer).To(Equal(caCert.Subject))
 			Expect(newCert.IPAddresses).To(Equal(oldCert.IPAddresses))
-			Expect(newCert.DNSNames).To(Equal(oldCert.DNSNames))
 			Expect(newCert.IsCA).To(Equal(oldCert.IsCA))
 			Expect(newCert.KeyUsage).To(Equal(oldCert.KeyUsage))
 			Expect(newCert.ExtKeyUsage).To(Equal(oldCert.ExtKeyUsage))
+
+			Expect(newCert.DNSNames).To(Equal(oldCert.DNSNames))
+		})
+
+		It("should be able to renew an existing certificate with new DNS names provided", func() {
+			ca, err := CreateRootCA("test", "namespace")
+			Expect(err).ToNot(HaveOccurred())
+
+			notAfter := time.Now().Add(-10 * time.Hour)
+			notBefore := notAfter.Add(-90 * 24 * time.Hour)
+
+			privateKey, err := ca.ParseECPrivateKey()
+			Expect(err).ToNot(HaveOccurred())
+
+			caCert, err := ca.ParseCertificate()
+			Expect(err).ToNot(HaveOccurred())
+
+			pair, err := ca.createAndSignPairWithValidity("this.host.name.com", notBefore, notAfter, CertTypeClient, nil)
+			Expect(err).ToNot(HaveOccurred())
+
+			oldCert, err := pair.ParseCertificate()
+			Expect(err).ToNot(HaveOccurred())
+
+			newDNSNames := []string{"new.host.name.com"}
+			err = pair.RenewCertificate(privateKey, caCert, newDNSNames)
+			Expect(err).ToNot(HaveOccurred())
+
+			newCert, err := pair.ParseCertificate()
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(newCert.NotBefore).To(BeTemporally("<", time.Now()))
+			Expect(newCert.NotAfter).To(BeTemporally(">", time.Now()))
+			Expect(newCert.SerialNumber).ToNot(Equal(oldCert.SerialNumber))
+
+			Expect(newCert.Subject).To(Equal(oldCert.Subject))
+			Expect(newCert.Issuer).To(Equal(caCert.Subject))
+			Expect(newCert.IPAddresses).To(Equal(oldCert.IPAddresses))
+			Expect(newCert.IsCA).To(Equal(oldCert.IsCA))
+			Expect(newCert.KeyUsage).To(Equal(oldCert.KeyUsage))
+			Expect(newCert.ExtKeyUsage).To(Equal(oldCert.ExtKeyUsage))
+			Expect(newCert.DNSNames).NotTo(Equal(oldCert.DNSNames))
+
+			Expect(newCert.DNSNames).To(Equal(newDNSNames))
 		})
 
 		It("should be validated against the right server", func() {
@@ -276,5 +335,49 @@ var _ = Describe("Keypair generation", func() {
 			err = tlsCert.IsValid(caBundleIncomplete, nil)
 			Expect(err).Should(HaveOccurred())
 		})
+	})
+})
+
+var _ = Describe("Certicate duration and expiration threshold", func() {
+	defaultCertificateDuration := configuration.CertificateDuration * 24 * time.Hour
+	defaultExpiringThreshold := configuration.ExpiringCheckThreshold * 24 * time.Hour
+	tenDays := 10 * 24 * time.Hour
+
+	BeforeEach(func() {
+		configuration.Current = configuration.NewConfiguration()
+	})
+
+	It("returns the default duration", func() {
+		duration := getCertificateDuration()
+		Expect(duration).To(BeEquivalentTo(defaultCertificateDuration))
+	})
+
+	It("returns the default duration if the configuration is a negative value", func() {
+		configuration.Current.CertificateDuration = -1
+		duration := getCertificateDuration()
+		Expect(duration).To(BeEquivalentTo(defaultCertificateDuration))
+	})
+
+	It("returns a valid duration of 10 days", func() {
+		configuration.Current.CertificateDuration = 10
+		duration := getCertificateDuration()
+		Expect(duration).To(BeEquivalentTo(tenDays))
+	})
+
+	It("returns the default check threshold", func() {
+		threshold := getCheckThreshold()
+		Expect(threshold).To(BeEquivalentTo(defaultExpiringThreshold))
+	})
+
+	It("returns the default check threshold if the configuration is a negative value", func() {
+		configuration.Current.ExpiringCheckThreshold = -1
+		threshold := getCheckThreshold()
+		Expect(threshold).To(BeEquivalentTo(defaultExpiringThreshold))
+	})
+
+	It("returns a valid threshold of 10 days", func() {
+		configuration.Current.ExpiringCheckThreshold = 10
+		threshold := getCheckThreshold()
+		Expect(threshold).To(BeEquivalentTo(tenDays))
 	})
 })

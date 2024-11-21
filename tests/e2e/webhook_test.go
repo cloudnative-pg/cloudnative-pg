@@ -56,12 +56,6 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive, tests.LabelOper
 		}
 	})
 
-	JustAfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(webhookNamespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-		}
-	})
-
 	BeforeAll(func() {
 		clusterName, err = env.GetResourceNameFromYAML(sampleFile)
 		Expect(err).ToNot(HaveOccurred())
@@ -71,20 +65,18 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive, tests.LabelOper
 		webhookNamespacePrefix := "webhook-test"
 		clusterIsDefaulted = true
 		By("having a deployment for the operator in state ready", func() {
-			deployment, err := env.GetOperatorDeployment()
+			// Make sure that we have at least one operator already working
+			err := env.ScaleOperatorDeployment(1)
+			Expect(err).ToNot(HaveOccurred())
+
+			ready, err := env.IsOperatorDeploymentReady()
 			Expect(err).ShouldNot(HaveOccurred())
-			Expect(deployment.Status.ReadyReplicas).Should(BeEquivalentTo(1))
+			Expect(ready).To(BeTrue())
 		})
 
 		// Create a basic PG cluster
-		webhookNamespace, err = env.CreateUniqueNamespace(webhookNamespacePrefix)
+		webhookNamespace, err := env.CreateUniqueTestNamespace(webhookNamespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(webhookNamespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-			return env.DeleteNamespace(webhookNamespace)
-		})
 		AssertCreateCluster(webhookNamespace, clusterName, sampleFile, env)
 		// Check if cluster is ready and the default values are populated
 		AssertClusterDefault(webhookNamespace, clusterName, clusterIsDefaulted, env)
@@ -121,23 +113,17 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive, tests.LabelOper
 		})
 
 		// Create a basic PG cluster
-		webhookNamespace, err = env.CreateUniqueNamespace(webhookNamespacePrefix)
+		webhookNamespace, err = env.CreateUniqueTestNamespace(webhookNamespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(webhookNamespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-			return env.DeleteNamespace(webhookNamespace)
-		})
 		AssertCreateCluster(webhookNamespace, clusterName, sampleFile, env)
 		// Check if cluster is ready and has no default value in the object
 		AssertClusterDefault(webhookNamespace, clusterName, clusterIsDefaulted, env)
 
 		// Make sure the operator is intact and not crashing
 		By("having a deployment for the operator in state ready", func() {
-			deployment, err := env.GetOperatorDeployment()
+			ready, err := env.IsOperatorDeploymentReady()
 			Expect(err).ShouldNot(HaveOccurred())
-			Expect(deployment.Status.ReadyReplicas).Should(BeEquivalentTo(1))
+			Expect(ready).To(BeTrue())
 		})
 
 		By("by cleaning up the webhook configurations", func() {

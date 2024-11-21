@@ -3,5 +3,6 @@ kind: Backup
 metadata:
   name: cluster-backup
 spec:
+  target: primary
   cluster:
     name: cluster1

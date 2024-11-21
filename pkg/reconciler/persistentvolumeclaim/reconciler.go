@@ -19,13 +19,13 @@ package persistentvolumeclaim
 import (
 	"context"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
 // Reconcile reconciles the PVCs
@@ -37,10 +37,6 @@ func Reconcile(
 	pvcs []corev1.PersistentVolumeClaim,
 ) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
-
-	if err := reconcileMetadata(ctx, c, cluster, instances, pvcs); err != nil {
-		return ctrl.Result{}, err
-	}
 
 	if res, err := reconcileMultipleInstancesMissingPVCs(ctx, c, cluster, instances, pvcs); !res.IsZero() || err != nil {
 		return res, err

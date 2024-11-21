@@ -37,7 +37,7 @@ func (instance *Instance) RefreshReplicaConfiguration(
 	// TODO: Remove this code when enough time has passed since 1.21 release
 	//       This is due to the operator switching from postgresql.auto.conf
 	//       to override.conf for coordinating replication configuration
-	changed, err = migratePostgresAutoConfFile(ctx, instance, false)
+	changed, err = instance.migratePostgresAutoConfFile(ctx)
 	if err != nil {
 		return changed, err
 	}
@@ -47,11 +47,11 @@ func (instance *Instance) RefreshReplicaConfiguration(
 		return changed, err
 	}
 
-	if primary {
+	if primary && !instance.RequiresDesignatedPrimaryTransition {
 		return changed, nil
 	}
 
-	if cluster.IsReplica() && cluster.Status.TargetPrimary == instance.PodName {
+	if cluster.IsReplica() && cluster.Status.TargetPrimary == instance.GetPodName() {
 		result, err := instance.writeReplicaConfigurationForDesignatedPrimary(ctx, cli, cluster)
 		return changed || result, err
 	}
@@ -60,7 +60,7 @@ func (instance *Instance) RefreshReplicaConfiguration(
 }
 
 func (instance *Instance) writeReplicaConfigurationForReplica(cluster *apiv1.Cluster) (changed bool, err error) {
-	slotName := cluster.GetSlotNameFromInstanceName(instance.PodName)
+	slotName := cluster.GetSlotNameFromInstanceName(instance.GetPodName())
 	return UpdateReplicaConfiguration(instance.PgData, instance.GetPrimaryConnInfo(), slotName)
 }
 
@@ -75,7 +75,7 @@ func (instance *Instance) writeReplicaConfigurationForDesignatedPrimary(
 	}
 
 	connectionString, err := external.ConfigureConnectionToServer(
-		ctx, cli, instance.Namespace, &server)
+		ctx, cli, instance.GetNamespaceName(), &server)
 	if err != nil {
 		return false, err
 	}

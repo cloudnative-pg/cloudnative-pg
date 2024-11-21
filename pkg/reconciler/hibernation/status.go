@@ -29,13 +29,11 @@ import (
 )
 
 const (
-	// HibernationOff is the value of hibernation annotation when the hibernation
-	// has been deactivated for the cluster
-	HibernationOff = "off"
+	// HibernationOff is the shadow of utils.HibernationAnnotationValueOff, for compatibility
+	HibernationOff = string(utils.HibernationAnnotationValueOff)
 
-	// HibernationOn is the value of hibernation annotation when the hibernation
-	// has been requested for the cluster
-	HibernationOn = "on"
+	// HibernationOn is the shadow of utils.HibernationAnnotationValueOn, for compatibility
+	HibernationOn = string(utils.HibernationAnnotationValueOn)
 )
 
 const (
@@ -79,18 +77,7 @@ func EnrichStatus(
 	cluster *apiv1.Cluster,
 	podList []corev1.Pod,
 ) {
-	hibernationRequested, err := getHibernationAnnotationValue(cluster)
-	if err != nil {
-		meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
-			Type:    HibernationConditionType,
-			Status:  metav1.ConditionFalse,
-			Reason:  HibernationConditionReasonWrongAnnotationValue,
-			Message: err.Error(),
-		})
-		return
-	}
-
-	if !hibernationRequested {
+	if !isHibernationEnabled(cluster) {
 		meta.RemoveStatusCondition(&cluster.Status.Conditions, HibernationConditionType)
 		return
 	}
@@ -98,7 +85,8 @@ func EnrichStatus(
 	// We proceed to hibernate the cluster only when it is ready.
 	// Hibernating a non-ready cluster may be dangerous since the PVCs
 	// won't be completely created.
-	if cluster.Status.Phase != apiv1.PhaseHealthy {
+	// We should stop the enrich status only when the cluster is unhealthy and the process hasn't already started
+	if cluster.Status.Phase != apiv1.PhaseHealthy && !isHibernationOngoing(cluster) {
 		return
 	}
 
@@ -132,20 +120,11 @@ func EnrichStatus(
 	})
 }
 
-func getHibernationAnnotationValue(cluster *apiv1.Cluster) (bool, error) {
-	value, ok := cluster.Annotations[utils.HibernationAnnotationName]
-	if !ok {
-		return false, nil
-	}
+func isHibernationEnabled(cluster *apiv1.Cluster) bool {
+	return cluster.Annotations[utils.HibernationAnnotationName] == HibernationOn
+}
 
-	switch value {
-	case HibernationOn:
-		return true, nil
-
-	case HibernationOff:
-		return false, nil
-
-	default:
-		return false, &ErrInvalidHibernationValue{value: value}
-	}
+// isHibernationOngoing check if the cluster is doing the hibernation process
+func isHibernationOngoing(cluster *apiv1.Cluster) bool {
+	return meta.FindStatusCondition(cluster.Status.Conditions, HibernationConditionType) != nil
 }

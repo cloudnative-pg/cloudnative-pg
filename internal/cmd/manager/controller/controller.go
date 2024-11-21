@@ -25,6 +25,7 @@ import (
 	"net/http/pprof"
 	"time"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -35,11 +36,11 @@ import (
 
 	// +kubebuilder:scaffold:imports
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/controllers"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/controller"
 	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/multicache"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -97,6 +98,7 @@ func RunController(
 	leaderConfig leaderElectionConfiguration,
 	pprofDebug bool,
 	port int,
+	conf *configuration.Data,
 ) error {
 	ctx := context.Background()
 
@@ -134,20 +136,20 @@ func RunController(
 		LeaderElectionReleaseOnCancel: true,
 	}
 
-	if configuration.Current.WatchNamespace != "" {
-		namespaces := configuration.Current.WatchedNamespaces()
+	if conf.WatchNamespace != "" {
+		namespaces := conf.WatchedNamespaces()
 		managerOptions.NewCache = multicache.DelegatingMultiNamespacedCacheBuilder(
 			namespaces,
-			configuration.Current.OperatorNamespace)
+			conf.OperatorNamespace)
 		setupLog.Info("Listening for changes", "watchNamespaces", namespaces)
 	} else {
 		setupLog.Info("Listening for changes on all namespaces")
 	}
 
-	if configuration.Current.WebhookCertDir != "" {
+	if conf.WebhookCertDir != "" {
 		// If OLM will generate certificates for us, let's just
 		// use those
-		managerOptions.WebhookServer.(*webhook.DefaultServer).Options.CertDir = configuration.Current.WebhookCertDir
+		managerOptions.WebhookServer.(*webhook.DefaultServer).Options.CertDir = conf.WebhookCertDir
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), managerOptions)
@@ -157,7 +159,7 @@ func RunController(
 	}
 
 	webhookServer := mgr.GetWebhookServer().(*webhook.DefaultServer)
-	if configuration.Current.WebhookCertDir != "" {
+	if conf.WebhookCertDir != "" {
 		// Use certificate names compatible with OLM
 		webhookServer.Options.CertName = "apiserver.crt"
 		webhookServer.Options.KeyName = "apiserver.key"
@@ -176,12 +178,12 @@ func RunController(
 		return err
 	}
 
-	err = loadConfiguration(ctx, kubeClient, configMapName, secretName)
+	err = loadConfiguration(ctx, kubeClient, configMapName, secretName, conf)
 	if err != nil {
 		return err
 	}
 
-	setupLog.Info("Operator configuration loaded", "configuration", configuration.Current)
+	setupLog.Info("Operator configuration loaded", "configuration", conf)
 
 	discoveryClient, err := utils.GetDiscoveryClient()
 	if err != nil {
@@ -200,39 +202,56 @@ func RunController(
 		return err
 	}
 
-	// Detect if we support SeccompProfile
-	if err = utils.DetectSeccompSupport(discoveryClient); err != nil {
-		setupLog.Error(err, "unable to detect SeccompProfile support")
-		return err
-	}
-
-	// Retrieve the Kubernetes cluster system UID
-	if err = utils.DetectKubeSystemUID(ctx, kubeClient); err != nil {
-		setupLog.Error(err, "unable to retrieve the Kubernetes cluster system UID")
+	// Detect the available architectures
+	if err = utils.DetectAvailableArchitectures(); err != nil {
+		setupLog.Error(err, "unable to detect the available instance's architectures")
 		return err
 	}
 
 	setupLog.Info("Kubernetes system metadata",
-		"systemUID", utils.GetKubeSystemUID(),
 		"haveSCC", utils.HaveSecurityContextConstraints(),
-		"haveSeccompProfile", utils.HaveSeccompSupport(),
-		"haveVolumeSnapshot", utils.HaveVolumeSnapshot())
+		"haveVolumeSnapshot", utils.HaveVolumeSnapshot(),
+		"availableArchitectures", utils.GetAvailableArchitectures(),
+	)
 
-	if err := ensurePKI(ctx, kubeClient, webhookServer.Options.CertDir); err != nil {
+	if err := ensurePKI(ctx, kubeClient, webhookServer.Options.CertDir, conf); err != nil {
 		return err
 	}
 
-	if err = controllers.NewClusterReconciler(mgr, discoveryClient).SetupWithManager(ctx, mgr); err != nil {
+	pluginRepository := repository.New()
+	if _, err := pluginRepository.RegisterUnixSocketPluginsInPath(
+		conf.PluginSocketDir,
+	); err != nil {
+		setupLog.Error(err, "Unable to load sidecar CNPG-i plugins, skipping")
+	}
+
+	if err = controller.NewClusterReconciler(
+		mgr,
+		discoveryClient,
+		pluginRepository,
+	).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Cluster")
 		return err
 	}
 
-	if err = controllers.NewBackupReconciler(mgr, discoveryClient).SetupWithManager(ctx, mgr); err != nil {
+	if err = controller.NewBackupReconciler(
+		mgr,
+		discoveryClient,
+		pluginRepository,
+	).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Backup")
 		return err
 	}
 
-	if err = (&controllers.ScheduledBackupReconciler{
+	if err = controller.NewPluginReconciler(
+		mgr,
+		pluginRepository,
+	).SetupWithManager(mgr, configuration.Current.OperatorNamespace); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "Plugin")
+		return err
+	}
+
+	if err = (&controller.ScheduledBackupReconciler{
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
 		Recorder: mgr.GetEventRecorderFor("cloudnative-pg-scheduledbackup"),
@@ -241,7 +260,7 @@ func RunController(
 		return err
 	}
 
-	if err = (&controllers.PoolerReconciler{
+	if err = (&controller.PoolerReconciler{
 		Client:          mgr.GetClient(),
 		DiscoveryClient: discoveryClient,
 		Scheme:          mgr.GetScheme(),
@@ -301,15 +320,16 @@ func loadConfiguration(
 	kubeClient client.Client,
 	configMapName string,
 	secretName string,
+	conf *configuration.Data,
 ) error {
 	configData := make(map[string]string)
 
 	// First read the configmap if provided and store it in configData
 	if configMapName != "" {
-		configMapData, err := readConfigMap(ctx, kubeClient, configuration.Current.OperatorNamespace, configMapName)
+		configMapData, err := readConfigMap(ctx, kubeClient, conf.OperatorNamespace, configMapName)
 		if err != nil {
 			setupLog.Error(err, "unable to read ConfigMap",
-				"namespace", configuration.Current.OperatorNamespace,
+				"namespace", conf.OperatorNamespace,
 				"name", configMapName)
 			return err
 		}
@@ -320,10 +340,10 @@ func loadConfiguration(
 
 	// Then read the secret if provided and store it in configData, overwriting configmap's values
 	if secretName != "" {
-		secretData, err := readSecret(ctx, kubeClient, configuration.Current.OperatorNamespace, secretName)
+		secretData, err := readSecret(ctx, kubeClient, conf.OperatorNamespace, secretName)
 		if err != nil {
 			setupLog.Error(err, "unable to read Secret",
-				"namespace", configuration.Current.OperatorNamespace,
+				"namespace", conf.OperatorNamespace,
 				"name", secretName)
 			return err
 		}
@@ -334,7 +354,7 @@ func loadConfiguration(
 
 	// Finally, read the config if it was provided
 	if len(configData) > 0 {
-		configuration.Current.ReadConfigMap(configData)
+		conf.ReadConfigMap(configData)
 	}
 
 	return nil
@@ -351,8 +371,9 @@ func ensurePKI(
 	ctx context.Context,
 	kubeClient client.Client,
 	mgrCertDir string,
+	conf *configuration.Data,
 ) error {
-	if configuration.Current.WebhookCertDir != "" {
+	if conf.WebhookCertDir != "" {
 		// OLM is generating certificates for us, so we can avoid injecting/creating certificates.
 		return nil
 	}
@@ -364,15 +385,10 @@ func ensurePKI(
 		CertDir:                            mgrCertDir,
 		SecretName:                         WebhookSecretName,
 		ServiceName:                        WebhookServiceName,
-		OperatorNamespace:                  configuration.Current.OperatorNamespace,
+		OperatorNamespace:                  conf.OperatorNamespace,
 		MutatingWebhookConfigurationName:   MutatingWebhookConfigurationName,
 		ValidatingWebhookConfigurationName: ValidatingWebhookConfigurationName,
-		CustomResourceDefinitionsName: []string{
-			"backups.postgresql.cnpg.io",
-			"clusters.postgresql.cnpg.io",
-			"scheduledbackups.postgresql.cnpg.io",
-		},
-		OperatorDeploymentLabelSelector: "app.kubernetes.io/name=cloudnative-pg",
+		OperatorDeploymentLabelSelector:    "app.kubernetes.io/name=cloudnative-pg",
 	}
 	err := pkiConfig.Setup(ctx, kubeClient)
 	if err != nil {
@@ -448,7 +464,7 @@ func readSecret(
 	return data, nil
 }
 
-// startPprofDebugServer exposes pprof debug server if POD_DEBUG env variable is set to 1
+// startPprofDebugServer exposes pprof debug server if the pprof-server env variable is set to true
 func startPprofDebugServer(ctx context.Context) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/debug/pprof/", pprof.Index)
@@ -479,7 +495,7 @@ func startPprofDebugServer(ctx context.Context) {
 			}
 		}()
 
-		if err := pprofServer.ListenAndServe(); !errors.Is(http.ErrServerClosed, err) {
+		if err := pprofServer.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 			setupLog.Error(err, "Failed to start pprof HTTP server")
 		}
 	}()

@@ -9,7 +9,7 @@ on:
 
 jobs:
   pull-request:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       -
         name: Checkout
@@ -17,8 +17,12 @@ jobs:
       -
         name: Get tag
         run: |
-          TAG=${GITHUB_REF##*/}
-          DEST=$(echo ${TAG#v} | awk -F '[.]' '{print "release-"$1"."$2}')
+          TAG=${GITHUB_REF##*/v}
+          if [[ "${TAG}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            DEST=$(echo ${TAG} | awk -F '[.]' '{print "release-"$1"."$2}')
+          else
+            DEST="main"
+          fi
           echo "TAG=${TAG}" >> $GITHUB_ENV
           echo "DEST=${DEST}" >> $GITHUB_ENV
       -
@@ -30,4 +34,4 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           pr_body: "Automated PR. Will trigger the ${{ env.TAG }} release when approved."
           pr_label: release
-          pr_title: "feat: release ${{ env.TAG }}"
+          pr_title: "Version tag to ${{ env.TAG }}"

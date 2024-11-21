@@ -1,15 +1,10 @@
 # Connecting from an application
 
 Applications are supposed to work with the services created by CloudNativePG
-in the same Kubernetes cluster:
+in the same Kubernetes cluster.
 
-* `[cluster name]-rw`
-* `[cluster name]-ro`
-* `[cluster name]-r`
-
-Those services are entirely managed by the Kubernetes cluster and
-implement a form of Virtual IP as described in the
-["Service" page of the Kubernetes Documentation](https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies).
+For more information on services and how to manage them, please refer to the
+["Service management"](service_management.md) section.
 
 !!! Hint
     It is highly recommended using those services in your applications,
@@ -82,5 +77,8 @@ connecting to the PostgreSQL cluster, and correspond to the user *owning* the
 database.
 
 The `-superuser` ones are supposed to be used only for administrative purposes,
-and correspond to the `postgres` user. Since version 1.21, superuser access
-over the network is disabled by default.
+and correspond to the `postgres` user.
+
+!!! Important
+    Superuser access over the network is disabled by default.
+

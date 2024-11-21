@@ -50,6 +50,7 @@ const (
 	DrainNode                 Timeout = "drainNode"
 	VolumeSnapshotIsReady     Timeout = "volumeSnapshotIsReady"
 	Short                     Timeout = "short"
+	ManagedServices           Timeout = "managedServices"
 )
 
 // DefaultTestTimeouts contains the default timeout in seconds for various events
@@ -62,7 +63,7 @@ var DefaultTestTimeouts = map[Timeout]int{
 	NewPrimaryAfterSwitchover: 45,
 	NewPrimaryAfterFailover:   30,
 	NewTargetOnFailover:       120,
-	PodRollout:                120,
+	PodRollout:                180,
 	OperatorIsReady:           120,
 	LargeObject:               300,
 	WalsInMinio:               60,
@@ -71,9 +72,10 @@ var DefaultTestTimeouts = map[Timeout]int{
 	DrainNode:                 900,
 	VolumeSnapshotIsReady:     300,
 	Short:                     5,
+	ManagedServices:           30,
 }
 
-// Timeouts returns the map of timeouts, where each event gets the timeout specificed
+// Timeouts returns the map of timeouts, where each event gets the timeout specified
 // in the `TEST_TIMEOUTS` environment variable, or if not specified, takes the default
 // value
 func Timeouts() (map[Timeout]int, error) {

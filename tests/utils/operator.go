@@ -22,6 +22,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/avast/retry-go/v4"
@@ -29,6 +31,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/utils/ptr"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -98,7 +101,6 @@ func (env TestingEnvironment) DumpOperator(namespace string, filename string) {
 
 // GetOperatorDeployment returns the operator Deployment if there is a single one running, error otherwise
 func (env TestingEnvironment) GetOperatorDeployment() (appsv1.Deployment, error) {
-	const operatorDeploymentName = "cnpg-controller-manager"
 	deploymentList := &appsv1.DeploymentList{}
 	if err := GetObjectList(&env, deploymentList,
 		ctrlclient.MatchingLabels{"app.kubernetes.io/name": "cloudnative-pg"},
@@ -131,18 +133,6 @@ func (env TestingEnvironment) GetOperatorDeployment() (appsv1.Deployment, error)
 		return deploymentList.Items[0], nil
 	}
 
-	// This is for deployments created before 1.4.0
-
-	if err := GetObjectList(
-		&env, deploymentList, ctrlclient.MatchingFields{"metadata.name": operatorDeploymentName},
-	); err != nil {
-		return appsv1.Deployment{}, err
-	}
-
-	if len(deploymentList.Items) != 1 {
-		err := fmt.Errorf("number of %v deployments != 1", operatorDeploymentName)
-		return appsv1.Deployment{}, err
-	}
 	return deploymentList.Items[0], nil
 }
 
@@ -248,6 +238,50 @@ func (env TestingEnvironment) IsOperatorReady() (bool, error) {
 	return true, err
 }
 
+// IsOperatorDeploymentReady returns true if the operator deployment has the expected number
+// of ready pods.
+// It returns an error if there was a problem getting the operator deployment
+func (env *TestingEnvironment) IsOperatorDeploymentReady() (bool, error) {
+	operatorDeployment, err := env.GetOperatorDeployment()
+	if err != nil {
+		return false, err
+	}
+
+	if operatorDeployment.Spec.Replicas != nil &&
+		operatorDeployment.Status.ReadyReplicas != *operatorDeployment.Spec.Replicas {
+		return false, fmt.Errorf("deployment not ready %v of %v ready",
+			operatorDeployment.Status.ReadyReplicas, operatorDeployment.Status.ReadyReplicas)
+	}
+
+	return true, nil
+}
+
+// ScaleOperatorDeployment will scale the operator to n replicas and return error in case of failure
+func (env *TestingEnvironment) ScaleOperatorDeployment(replicas int32) error {
+	operatorDeployment, err := env.GetOperatorDeployment()
+	if err != nil {
+		return err
+	}
+
+	updatedOperatorDeployment := *operatorDeployment.DeepCopy()
+	updatedOperatorDeployment.Spec.Replicas = ptr.To(replicas)
+
+	// Scale down operator deployment to zero replicas
+	err = env.Client.Patch(env.Ctx, &updatedOperatorDeployment, ctrlclient.MergeFrom(&operatorDeployment))
+	if err != nil {
+		return err
+	}
+
+	return retry.Do(
+		func() error {
+			_, err := env.IsOperatorDeploymentReady()
+			return err
+		},
+		retry.Delay(time.Second),
+		retry.Attempts(120),
+	)
+}
+
 // OperatorPodRenamed checks if the operator pod was renamed
 func OperatorPodRenamed(operatorPod corev1.Pod, expectedOperatorPodName string) bool {
 	return operatorPod.GetName() != expectedOperatorPodName
@@ -262,4 +296,61 @@ func OperatorPodRestarted(operatorPod corev1.Pod) bool {
 		}
 	}
 	return restartCount != 0
+}
+
+// GetOperatorPodName returns the name of the current operator pod
+// NOTE: will return an error if the pod is being deleted
+func GetOperatorPodName(env *TestingEnvironment) (string, error) {
+	pod, err := env.GetOperatorPod()
+	if err != nil {
+		return "", err
+	}
+
+	if pod.GetDeletionTimestamp() != nil {
+		return "", fmt.Errorf("pod is being deleted")
+	}
+	return pod.GetName(), nil
+}
+
+// HasOperatorBeenUpgraded determines if the operator has been upgraded by checking
+// if there is a deletion timestamp. If there isn't, it returns true
+func HasOperatorBeenUpgraded(env *TestingEnvironment) bool {
+	_, err := GetOperatorPodName(env)
+	return err == nil
+}
+
+// GetOperatorVersion returns the current operator version
+func GetOperatorVersion(namespace, podName string) (string, error) {
+	out, _, err := RunUnchecked(fmt.Sprintf(
+		"kubectl -n %v exec %v -c manager -- /manager version",
+		namespace,
+		podName,
+	))
+	if err != nil {
+		return "", err
+	}
+	versionRegexp := regexp.MustCompile(`^Build: {Version:(\d+.*) Commit.*}$`)
+	ver := versionRegexp.FindStringSubmatch(strings.TrimSpace(out))[1]
+	return ver, nil
+}
+
+// GetOperatorArchitectures returns all the supported operator architectures
+func GetOperatorArchitectures(operatorPod *corev1.Pod) ([]string, error) {
+	out, _, err := RunUnchecked(fmt.Sprintf(
+		"kubectl -n %v exec %v -c manager -- /manager debug show-architectures",
+		operatorPod.Namespace,
+		operatorPod.Name,
+	))
+	if err != nil {
+		return nil, err
+	}
+
+	// `debug show-architectures` will print a JSON object
+	var res []string
+	err = json.Unmarshal([]byte(out), &res)
+	if err != nil {
+		return nil, err
+	}
+
+	return res, err
 }

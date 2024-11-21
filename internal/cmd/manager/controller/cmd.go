@@ -20,6 +20,8 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 )
 
 // NewCmd create a new cobra command
@@ -36,7 +38,7 @@ func NewCmd() *cobra.Command {
 	cmd := cobra.Command{
 		Use:           "controller [flags]",
 		SilenceErrors: true,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			return RunController(
 				metricsAddr,
 				configMapName,
@@ -48,6 +50,7 @@ func NewCmd() *cobra.Command {
 				},
 				pprofHTTPServer,
 				port,
+				configuration.Current,
 			)
 		},
 	}

@@ -17,12 +17,14 @@ limitations under the License.
 package postgres
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 
+	"github.com/cloudnative-pg/machinery/pkg/execlog"
+	"github.com/cloudnative-pg/machinery/pkg/log"
+
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pool"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/system"
 
@@ -32,7 +34,7 @@ import (
 
 // ClonePgData clones an existing server, given its connection string,
 // to a certain data directory
-func ClonePgData(connectionString, targetPgData, walDir string) error {
+func ClonePgData(ctx context.Context, connectionString, targetPgData, walDir string) error {
 	log.Info("Waiting for server to be available", "connectionString", connectionString)
 
 	db, err := pool.NewDBConnection(connectionString, pool.ConnectionProfilePostgresqlPhysicalReplication)
@@ -43,7 +45,7 @@ func ClonePgData(connectionString, targetPgData, walDir string) error {
 		_ = db.Close()
 	}()
 
-	err = waitForStreamingConnectionAvailable(db)
+	err = waitForStreamingConnectionAvailable(ctx, db)
 	if err != nil {
 		return fmt.Errorf("source server not available: %v", connectionString)
 	}
@@ -69,16 +71,28 @@ func ClonePgData(connectionString, targetPgData, walDir string) error {
 }
 
 // Join creates a new instance joined to an existing PostgreSQL cluster
-func (info InitInfo) Join(cluster *apiv1.Cluster) error {
+func (info InitInfo) Join(ctx context.Context, cluster *apiv1.Cluster) error {
 	primaryConnInfo := buildPrimaryConnInfo(info.ParentNode, info.PodName) + " dbname=postgres connect_timeout=5"
+
+	pgVersion, err := cluster.GetPostgresqlVersion()
+	if err != nil {
+		log.Warning(
+			"Error while parsing PostgreSQL server version to define connection options, defaulting to PostgreSQL 11",
+			"imageName", cluster.GetImageName(),
+			"err", err)
+	} else if pgVersion.Major() >= 12 {
+		// We explicitly disable wal_sender_timeout for join-related pg_basebackup executions.
+		// A short timeout could not be enough in case the instance is slow to send data,
+		// like when the I/O is overloaded.
+		primaryConnInfo += " options='-c wal_sender_timeout=0s'"
+	}
 
 	coredumpFilter := cluster.GetCoredumpFilter()
 	if err := system.SetCoredumpFilter(coredumpFilter); err != nil {
 		return err
 	}
 
-	err := ClonePgData(primaryConnInfo, info.PgData, info.PgWal)
-	if err != nil {
+	if err = ClonePgData(ctx, primaryConnInfo, info.PgData, info.PgWal); err != nil {
 		return err
 	}
 

@@ -10,6 +10,8 @@ Rolling upgrades are started when:
 
 - the user changes the `imageName` attribute of the cluster specification;
 
+- the [image catalog](image_catalog.md) is updated with a new image for the major used by the cluster;
+
 - a change in the PostgreSQL configuration requires a restart to be
   applied;
 

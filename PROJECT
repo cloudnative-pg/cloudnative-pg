@@ -1,7 +1,8 @@
 domain: cnpg.io
+version: "3"
 layout:
-- go.kubebuilder.io/v3
-projectName: cloudnative-pg-kubebuilderv3
+- go.kubebuilder.io/v4
+projectName: cloudnative-pg-kubebuilderv4
 repo: github.com/cloudnative-pg/cloudnative-pg
 resources:
 - api:
@@ -56,4 +57,12 @@ resources:
     defaulting: true
     validation: true
     webhookVersion: v1
-version: "3"
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: cnpg.io
+  group: postgresql
+  kind: Database
+  path: github.com/cloudnative-pg/cloudnative-pg/api/v1
+  version: v1

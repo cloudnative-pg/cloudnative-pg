@@ -22,8 +22,9 @@ import (
 	"os"
 	"regexp"
 
-	"github.com/cloudnative-pg/cloudnative-pg/internal/management/cache"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/machinery/pkg/log"
+
+	cacheClient "github.com/cloudnative-pg/cloudnative-pg/internal/management/cache/client"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -219,7 +220,7 @@ func collectPGWalSettings(exporter *Exporter, db *sql.DB) error {
 }
 
 func getWalVolumeSize() float64 {
-	cluster, err := cache.LoadClusterUnsafe()
+	cluster, err := cacheClient.GetCluster()
 	if err != nil || !cluster.ShouldCreateWalArchiveVolume() {
 		return 0
 	}

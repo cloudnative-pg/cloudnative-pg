@@ -22,10 +22,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"path"
 	"reflect"
+	"slices"
 	"strconv"
 
-	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -50,10 +51,6 @@ const (
 	// ClusterReloadAnnotationName is the name of the annotation containing the
 	// latest required restart time
 	ClusterReloadAnnotationName = utils.ClusterReloadAnnotationName
-
-	// ClusterRoleLabelName label is applied to Pods to mark primary ones
-	// Deprecated: Use utils.ClusterInstanceRoleLabelName
-	ClusterRoleLabelName = utils.ClusterRoleLabelName
 
 	// WatchedLabelName label is for Secrets or ConfigMaps that needs to be reloaded
 	WatchedLabelName = utils.WatchedLabelName
@@ -136,12 +133,20 @@ func CreatePodEnvConfig(cluster apiv1.Cluster, podName string) EnvConfig {
 				Value: cluster.Name,
 			},
 			{
+				Name:  "PSQL_HISTORY",
+				Value: path.Join(postgres.TemporaryDirectory, ".psql_history"),
+			},
+			{
 				Name:  "PGPORT",
 				Value: strconv.Itoa(postgres.ServerPort),
 			},
 			{
 				Name:  "PGHOST",
 				Value: postgres.SocketDirectory,
+			},
+			{
+				Name:  "TMPDIR",
+				Value: postgres.TemporaryDirectory,
 			},
 		},
 		EnvFrom: cluster.Spec.EnvFrom,
@@ -159,6 +164,7 @@ func CreateClusterPodSpec(
 	cluster apiv1.Cluster,
 	envConfig EnvConfig,
 	gracePeriod int64,
+	enableHTTPS bool,
 ) corev1.PodSpec {
 	return corev1.PodSpec{
 		Hostname: podName,
@@ -166,8 +172,8 @@ func CreateClusterPodSpec(
 			createBootstrapContainer(cluster),
 		},
 		SchedulerName: cluster.Spec.SchedulerName,
-		Containers:    createPostgresContainers(cluster, envConfig),
-		Volumes:       createPostgresVolumes(cluster, podName),
+		Containers:    createPostgresContainers(cluster, envConfig, enableHTTPS),
+		Volumes:       createPostgresVolumes(&cluster, podName),
 		SecurityContext: CreatePodSecurityContext(
 			cluster.GetSeccompProfile(),
 			cluster.GetPostgresUID(),
@@ -183,7 +189,7 @@ func CreateClusterPodSpec(
 
 // createPostgresContainers create the PostgreSQL containers that are
 // used for every instance
-func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig) []corev1.Container {
+func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig, enableHTTPS bool) []corev1.Container {
 	containers := []corev1.Container{
 		{
 			Name:            PostgresContainerName,
@@ -199,7 +205,7 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig) []core
 				ProbeHandler: corev1.ProbeHandler{
 					HTTPGet: &corev1.HTTPGetAction{
 						Path: url.PathHealth,
-						Port: intstr.FromInt32(int32(url.StatusPort)),
+						Port: intstr.FromInt32(url.StatusPort),
 					},
 				},
 			},
@@ -209,7 +215,7 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig) []core
 				ProbeHandler: corev1.ProbeHandler{
 					HTTPGet: &corev1.HTTPGetAction{
 						Path: url.PathReady,
-						Port: intstr.FromInt(url.StatusPort),
+						Port: intstr.FromInt32(url.StatusPort),
 					},
 				},
 			},
@@ -219,7 +225,7 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig) []core
 				ProbeHandler: corev1.ProbeHandler{
 					HTTPGet: &corev1.HTTPGetAction{
 						Path: url.PathHealth,
-						Port: intstr.FromInt(url.StatusPort),
+						Port: intstr.FromInt32(url.StatusPort),
 					},
 				},
 			},
@@ -237,12 +243,12 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig) []core
 				},
 				{
 					Name:          "metrics",
-					ContainerPort: int32(url.PostgresMetricsPort),
+					ContainerPort: url.PostgresMetricsPort,
 					Protocol:      "TCP",
 				},
 				{
 					Name:          "status",
-					ContainerPort: int32(url.StatusPort),
+					ContainerPort: url.StatusPort,
 					Protocol:      "TCP",
 				},
 			},
@@ -250,9 +256,31 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig) []core
 		},
 	}
 
+	if enableHTTPS {
+		containers[0].StartupProbe.ProbeHandler.HTTPGet.Scheme = corev1.URISchemeHTTPS
+		containers[0].LivenessProbe.ProbeHandler.HTTPGet.Scheme = corev1.URISchemeHTTPS
+		containers[0].ReadinessProbe.ProbeHandler.HTTPGet.Scheme = corev1.URISchemeHTTPS
+		containers[0].Command = append(containers[0].Command, "--status-port-tls")
+	}
+
+	if cluster.IsMetricsTLSEnabled() {
+		containers[0].Command = append(containers[0].Command, "--metrics-port-tls")
+	}
+
 	addManagerLoggingOptions(cluster, &containers[0])
 
+	// if user customizes the liveness probe timeout, we need to adjust the failure threshold
+	addLivenessProbeFailureThreshold(cluster, &containers[0])
+
 	return containers
+}
+
+// adjust the liveness probe failure threshold based on the `spec.livenessProbeTimeout` value
+func addLivenessProbeFailureThreshold(cluster apiv1.Cluster, container *corev1.Container) {
+	if cluster.Spec.LivenessProbeTimeout != nil {
+		timeout := *cluster.Spec.LivenessProbeTimeout
+		container.LivenessProbe.FailureThreshold = getLivenessProbeFailureThreshold(timeout)
+	}
 }
 
 // getStartupProbeFailureThreshold get the startup probe failure threshold
@@ -262,6 +290,15 @@ func getStartupProbeFailureThreshold(startupDelay int32) int32 {
 		return 1
 	}
 	return int32(math.Ceil(float64(startupDelay) / float64(StartupProbePeriod)))
+}
+
+// getLivenessProbeFailureThreshold get the liveness probe failure threshold
+// FAILURE_THRESHOLD = ceil(livenessTimeout / periodSeconds) and minimum value is 1
+func getLivenessProbeFailureThreshold(livenessTimeout int32) int32 {
+	if livenessTimeout <= LivenessProbePeriod {
+		return 1
+	}
+	return int32(math.Ceil(float64(livenessTimeout) / float64(LivenessProbePeriod)))
 }
 
 // CreateAffinitySection creates the affinity sections for Pods, given the configuration
@@ -326,6 +363,13 @@ func CreateGeneratedAntiAffinity(clusterName string, config apiv1.AffinityConfig
 						clusterName,
 					},
 				},
+				{
+					Key:      utils.PodRoleLabelName,
+					Operator: metav1.LabelSelectorOpIn,
+					Values: []string{
+						string(utils.PodRoleInstance),
+					},
+				},
 			},
 		},
 		TopologyKey: topologyKey,
@@ -360,10 +404,6 @@ func CreatePodSecurityContext(seccompProfile *corev1.SeccompProfile, user, group
 		return nil
 	}
 
-	if !utils.HaveSeccompSupport() {
-		seccompProfile = nil
-	}
-
 	trueValue := true
 	return &corev1.PodSecurityContext{
 		RunAsNonRoot:   &trueValue,
@@ -381,7 +421,8 @@ func PodWithExistingStorage(cluster apiv1.Cluster, nodeSerial int) *corev1.Pod {
 
 	envConfig := CreatePodEnvConfig(cluster, podName)
 
-	podSpec := CreateClusterPodSpec(podName, cluster, envConfig, gracePeriod)
+	tlsEnabled := true
+	podSpec := CreateClusterPodSpec(podName, cluster, envConfig, gracePeriod, tlsEnabled)
 
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{

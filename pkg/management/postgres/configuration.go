@@ -25,18 +25,22 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/cloudnative-pg/machinery/pkg/fileutils"
+	"github.com/cloudnative-pg/machinery/pkg/log"
+
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/configfile"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
-	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres/replication"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // InstallPgDataFileContent installs a file in PgData, returning true/false if
 // the file has been changed and an error state
-func InstallPgDataFileContent(pgdata, contents, destinationFile string) (bool, error) {
+func InstallPgDataFileContent(ctx context.Context, pgdata, contents, destinationFile string) (bool, error) {
+	contextLogger := log.FromContext(ctx)
+
 	targetFile := path.Join(pgdata, destinationFile)
 	result, err := fileutils.WriteStringToFile(targetFile, contents)
 	if err != nil {
@@ -44,7 +48,7 @@ func InstallPgDataFileContent(pgdata, contents, destinationFile string) (bool, e
 	}
 
 	if result {
-		log.Info(
+		contextLogger.Info(
 			"Installed configuration file",
 			"pgdata", pgdata,
 			"filename", destinationFile)
@@ -57,6 +61,7 @@ func InstallPgDataFileContent(pgdata, contents, destinationFile string) (bool, e
 // PostgreSQL configuration and rewrites the file in the PGDATA if needed. This
 // function will return "true" if the configuration has been really changed.
 func (instance *Instance) RefreshConfigurationFilesFromCluster(
+	ctx context.Context,
 	cluster *apiv1.Cluster,
 	preserveUserSettings bool,
 ) (bool, error) {
@@ -66,6 +71,7 @@ func (instance *Instance) RefreshConfigurationFilesFromCluster(
 	}
 
 	postgresConfigurationChanged, err := InstallPgDataFileContent(
+		ctx,
 		instance.PgData,
 		postgresConfiguration,
 		constants.PostgresqlCustomConfigurationFile)
@@ -97,7 +103,7 @@ func (instance *Instance) GeneratePostgresqlHBA(cluster *apiv1.Cluster, ldapBind
 	// See:
 	// https://www.postgresql.org/docs/14/release-14.html
 	defaultAuthenticationMethod := "scram-sha-256"
-	if version < 140000 {
+	if version.Major() < 14 {
 		defaultAuthenticationMethod = "md5"
 	}
 
@@ -108,7 +114,7 @@ func (instance *Instance) GeneratePostgresqlHBA(cluster *apiv1.Cluster, ldapBind
 }
 
 // RefreshPGHBA generates and writes down the pg_hba.conf file
-func (instance *Instance) RefreshPGHBA(cluster *apiv1.Cluster, ldapBindPassword string) (
+func (instance *Instance) RefreshPGHBA(ctx context.Context, cluster *apiv1.Cluster, ldapBindPassword string) (
 	postgresHBAChanged bool,
 	err error,
 ) {
@@ -118,6 +124,7 @@ func (instance *Instance) RefreshPGHBA(cluster *apiv1.Cluster, ldapBindPassword 
 		return false, nil
 	}
 	postgresHBAChanged, err = InstallPgDataFileContent(
+		ctx,
 		instance.PgData,
 		pgHBAContent,
 		constants.PostgresqlHBARulesFile)
@@ -197,80 +204,68 @@ func quoteHbaLiteral(literal string) string {
 	return fmt.Sprintf(`"%s"`, literal)
 }
 
+// generatePostgresqlIdent generates the pg_ident.conf content given
+// a set of additional pg_ident lines that is usually taken from the
+// Cluster configuration
+func (instance *Instance) generatePostgresqlIdent(additionalLines []string) (string, error) {
+	return postgres.CreateIdentRules(
+		additionalLines,
+		getCurrentUserOrDefaultToInsecureMapping(),
+	)
+}
+
+// RefreshPGIdent generates and writes down the pg_ident.conf file given
+// a set of additional pg_ident lines that is usually taken from the
+// Cluster configuration
+func (instance *Instance) RefreshPGIdent(
+	ctx context.Context,
+	additionalLines []string,
+) (postgresIdentChanged bool, err error) {
+	// Generate pg_ident.conf file
+	pgIdentContent, err := instance.generatePostgresqlIdent(additionalLines)
+	if err != nil {
+		return false, nil
+	}
+	postgresIdentChanged, err = InstallPgDataFileContent(
+		ctx,
+		instance.PgData,
+		pgIdentContent,
+		constants.PostgresqlIdentFile)
+	if err != nil {
+		return postgresIdentChanged, fmt.Errorf(
+			"installing postgresql Ident rules: %w",
+			err)
+	}
+
+	return postgresIdentChanged, err
+}
+
 // UpdateReplicaConfiguration updates the override.conf or recovery.conf file for the proper version
 // of PostgreSQL, using the specified connection string to connect to the primary server
 func UpdateReplicaConfiguration(pgData, primaryConnInfo, slotName string) (changed bool, err error) {
-	major, err := postgresutils.GetMajorVersion(pgData)
+	changed, err = configurePostgresOverrideConfFile(pgData, primaryConnInfo, slotName)
 	if err != nil {
-		return false, err
+		return changed, err
 	}
 
-	if major < 12 {
-		return configureRecoveryConfFile(pgData, primaryConnInfo, slotName)
-	}
-
-	if err := createStandbySignal(pgData); err != nil {
-		return false, err
-	}
-
-	return configurePostgresOverrideConfFile(pgData, primaryConnInfo, slotName)
+	return changed, createStandbySignal(pgData)
 }
 
-// configureRecoveryConfFile configures replication in the recovery.conf file
-// for PostgreSQL 11 and earlier
-func configureRecoveryConfFile(pgData, primaryConnInfo, slotName string) (changed bool, err error) {
-	targetFile := path.Join(pgData, "recovery.conf")
-
-	options := map[string]string{
-		"standby_mode": "on",
-		"restore_command": fmt.Sprintf(
-			"/controller/manager wal-restore --log-destination %s/%s.json %%f %%p",
-			postgres.LogPath, postgres.LogFileName),
-		"recovery_target_timeline": "latest",
-	}
-
-	if slotName != "" {
-		options["primary_slot_name"] = slotName
-	}
-
-	if primaryConnInfo != "" {
-		options["primary_conninfo"] = primaryConnInfo
-	}
-
-	changed, err = configfile.UpdatePostgresConfigurationFile(
-		targetFile,
-		options,
-		"primary_slot_name",
-		"primary_conninfo",
-	)
-	if err != nil {
-		return false, err
-	}
-	if changed {
-		log.Info("Updated replication settings", "filename", "recovery.conf")
-	}
-
-	return changed, nil
-}
-
-// configurePostgresOverrideConfFile configures replication in the override.conf file
-// for PostgreSQL 12 and newer
+// configurePostgresOverrideConfFile writes the content of override.conf file, including
+// replication information
 func configurePostgresOverrideConfFile(pgData, primaryConnInfo, slotName string) (changed bool, err error) {
 	targetFile := path.Join(pgData, constants.PostgresqlOverrideConfigurationFile)
-
 	options := map[string]string{
 		"restore_command": fmt.Sprintf(
 			"/controller/manager wal-restore --log-destination %s/%s.json %%f %%p",
 			postgres.LogPath, postgres.LogFileName),
 		"recovery_target_timeline": "latest",
 		"primary_slot_name":        slotName,
+		"primary_conninfo":         primaryConnInfo,
 	}
 
-	if primaryConnInfo != "" {
-		options["primary_conninfo"] = primaryConnInfo
-	}
-
-	changed, err = configfile.UpdatePostgresConfigurationFile(targetFile, options)
+	// Ensure that override.conf file contains just the above options
+	changed, err = configfile.WritePostgresConfiguration(targetFile, options)
 	if err != nil {
 		return false, err
 	}
@@ -316,54 +311,59 @@ var cleanupAutoConfOptions = []string{
 
 // migratePostgresAutoConfFile migrates options managed by the operator from `postgresql.auto.conf` file,
 // to `override.conf` file for an upgrade case.
-// forceMigrate: even the override.conf is existed, still do a migration, this is used in the restore case
-func migratePostgresAutoConfFile(ctx context.Context, instance *Instance, forceMigrate bool) (bool, error) {
-	contextLogger := log.FromContext(ctx)
+// Returns a boolean indicating if any changes were done and any errors encountered
+func (instance *Instance) migratePostgresAutoConfFile(ctx context.Context) (bool, error) {
+	contextLogger := log.FromContext(ctx).WithName("migratePostgresAutoConfFile")
 
-	targetFile := filepath.Join(instance.PgData, constants.PostgresqlOverrideConfigurationFile)
-	targetFileExists, _ := fileutils.FileExists(targetFile)
-	if targetFileExists && !forceMigrate {
+	overrideConfPath := filepath.Join(instance.PgData, constants.PostgresqlOverrideConfigurationFile)
+	autoConfFile := filepath.Join(instance.PgData, "postgresql.auto.conf")
+	autoConfContent, readLinesErr := fileutils.ReadFileLines(autoConfFile)
+	if readLinesErr != nil {
+		return false, fmt.Errorf("error while reading postgresql.auto.conf file: %w", readLinesErr)
+	}
+
+	overrideConfExists, _ := fileutils.FileExists(overrideConfPath)
+	options := configfile.ReadLinesFromConfigurationContents(autoConfContent, migrateAutoConfOptions...)
+	if len(options) == 0 && overrideConfExists {
+		contextLogger.Trace("no action taken, options slice is empty")
 		return false, nil
 	}
 
 	contextLogger.Info("Start to migrate replication settings",
 		"filename", constants.PostgresqlOverrideConfigurationFile,
-		"targetFileExists", targetFileExists,
-		"forceMigrate", forceMigrate,
+		"targetFileExists", overrideConfExists,
+		"options", options,
 	)
 
-	autoConfFile := filepath.Join(instance.PgData, "postgresql.auto.conf")
-	autoConfContent, err := fileutils.ReadFileLines(autoConfFile)
-	if err != nil {
-		return false, fmt.Errorf("error while reading postgresql.auto.conf file: %w", err)
+	// We create the override.conf file only if it doesn't exist (first-time migration).
+	// The instance manager manages the content of this file, and it will be overwritten
+	// later during the configuration update. We create it here just as a precaution.
+	if !overrideConfExists {
+		if _, err := fileutils.WriteLinesToFile(overrideConfPath, options); err != nil {
+			return false, fmt.Errorf("migrating replication settings: %w",
+				err)
+		}
+
+		if _, err := configfile.EnsureIncludes(
+			path.Join(instance.PgData, "postgresql.conf"),
+			constants.PostgresqlOverrideConfigurationFile,
+		); err != nil {
+			return false, fmt.Errorf("migrating replication settings: %w",
+				err)
+		}
 	}
 
-	options := configfile.ReadLinesFromConfigurationContents(autoConfContent, migrateAutoConfOptions...)
-	_, err = fileutils.WriteLinesToFile(targetFile, options)
-	if err != nil {
-		return false, fmt.Errorf("migrating replication settings: %w",
-			err)
-	}
-
-	_, err = configfile.EnsureIncludes(
-		path.Join(instance.PgData, "postgresql.conf"),
-		constants.PostgresqlOverrideConfigurationFile,
-	)
-	if err != nil {
-		return false, fmt.Errorf("migrating replication settings: %w",
-			err)
-	}
-
-	_, err = fileutils.WriteLinesToFile(autoConfFile,
+	if _, err := fileutils.WriteLinesToFile(autoConfFile,
 		configfile.RemoveOptionsFromConfigurationContents(
 			autoConfContent, cleanupAutoConfOptions...),
-	)
-	if err != nil {
+	); err != nil {
 		return true, fmt.Errorf("cleaning up postgresql.auto.conf file: %w", err)
 	}
 
 	contextLogger.Info("Migrated replication settings",
 		"filename", constants.PostgresqlOverrideConfigurationFile,
+		"overrideConfCreated", !overrideConfExists,
+		"options", options,
 	)
 
 	return true, nil
@@ -380,11 +380,14 @@ func createPostgresqlConfiguration(cluster *apiv1.Cluster, preserveUserSettings 
 
 	info := postgres.ConfigurationInfo{
 		Settings:                         postgres.CnpgConfigurationSettings,
-		MajorVersion:                     fromVersion,
+		Version:                          fromVersion,
 		UserSettings:                     cluster.Spec.PostgresConfiguration.Parameters,
 		IncludingSharedPreloadLibraries:  true,
 		AdditionalSharedPreloadLibraries: cluster.Spec.PostgresConfiguration.AdditionalLibraries,
 		IsReplicaCluster:                 cluster.IsReplica(),
+		IsWalArchivingDisabled:           utils.IsWalArchivingDisabled(&cluster.ObjectMeta),
+		IsAlterSystemEnabled:             cluster.Spec.PostgresConfiguration.EnableAlterSystem,
+		SynchronousStandbyNames:          replication.GetSynchronousStandbyNames(cluster),
 	}
 
 	if preserveUserSettings {
@@ -392,14 +395,6 @@ func createPostgresqlConfiguration(cluster *apiv1.Cluster, preserveUserSettings 
 	} else {
 		info.IncludingMandatory = true
 	}
-
-	// Compute the actual number of sync replicas
-	syncReplicas, electable := cluster.GetSyncReplicasData()
-	info.SyncReplicas = syncReplicas
-	info.SyncReplicasElectable = electable
-
-	// Ensure a consistent ordering to avoid spurious configuration changes
-	sort.Strings(info.SyncReplicasElectable)
 
 	// Set cluster name
 	info.ClusterName = cluster.Name
@@ -412,6 +407,40 @@ func createPostgresqlConfiguration(cluster *apiv1.Cluster, preserveUserSettings 
 	}
 	sort.Strings(info.TemporaryTablespaces)
 
+	// Setup minimum replay delay if we're on a replica cluster
+	if cluster.IsReplica() && cluster.Spec.ReplicaCluster.MinApplyDelay != nil {
+		info.RecoveryMinApplyDelay = cluster.Spec.ReplicaCluster.MinApplyDelay.Duration
+	}
+
 	conf, sha256 := postgres.CreatePostgresqlConfFile(postgres.CreatePostgresqlConfiguration(info))
 	return conf, sha256, nil
+}
+
+// configurePostgresForImport configures Postgres to be optimized for the firt import
+// process, by writing dedicated options the override.conf file just for this phase
+func configurePostgresForImport(ctx context.Context, pgData string) (changed bool, err error) {
+	contextLogger := log.FromContext(ctx)
+	targetFile := path.Join(pgData, constants.PostgresqlOverrideConfigurationFile)
+
+	// Force the following GUCs to optmize the loading process
+	options := map[string]string{
+		"archive_mode":     "off",
+		"fsync":            "off",
+		"wal_level":        "minimal",
+		"full_page_writes": "off",
+		"max_wal_senders":  "0",
+	}
+
+	// Ensure that override.conf file contains just the above options
+	changed, err = configfile.WritePostgresConfiguration(targetFile, options)
+	if err != nil {
+		return false, err
+	}
+
+	if changed {
+		contextLogger.Info("Configuration optimized for import",
+			"filename", constants.PostgresqlOverrideConfigurationFile)
+	}
+
+	return changed, nil
 }

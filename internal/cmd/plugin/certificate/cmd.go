@@ -32,7 +32,8 @@ func NewCmd() *cobra.Command {
 		Long: `This command creates a new Kubernetes secret containing the crypto-material.
 This is needed to configure TLS with Certificate authentication access for an application to
 connect to the PostgreSQL cluster.`,
-		Args: cobra.ExactArgs(1),
+		GroupID: plugin.GroupIDDatabase,
+		Args:    plugin.RequiresArguments(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := context.Background()
 			secretName := args[0]

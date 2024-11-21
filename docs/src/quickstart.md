@@ -1,7 +1,8 @@
 # Quickstart
 
-This section describes how to test a PostgreSQL cluster on your laptop/computer
-using CloudNativePG on a local Kubernetes cluster in [Kind](https://kind.sigs.k8s.io/) or
+This section guides you through testing a PostgreSQL cluster on your local machine by
+deploying CloudNativePG on a local Kubernetes cluster
+using either [Kind](https://kind.sigs.k8s.io/) or
 [Minikube](https://kubernetes.io/docs/setup/learning-environment/minikube/).
 
 !!! Warning
@@ -82,7 +83,6 @@ defines a simple `Cluster` using the default storage class to allocate
 disk space:
 
 ```yaml
-# Example of PostgreSQL cluster
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
@@ -90,14 +90,6 @@ metadata:
 spec:
   instances: 3
 
-  # Example of rolling update strategy:
-  # - unsupervised: automated update of the primary once all
-  #                 replicas have been upgraded (default)
-  # - supervised: requires manual supervision to perform
-  #               the switchover of the primary
-  primaryUpdateStrategy: unsupervised
-
-  # Require 1Gi of space
   storage:
     size: 1Gi
 ```
@@ -131,7 +123,7 @@ kubectl get pods -l cnpg.io/cluster=<CLUSTER>
 !!! Important
     Note that we are using `cnpg.io/cluster` as the label. In the past you may
     have seen or used `postgresql`. This label is being deprecated, and
-    will be dropped in the future. Please use `cngp.io/cluster`.
+    will be dropped in the future. Please use `cnpg.io/cluster`.
 
 By default, the operator will install the latest available minor version
 of the latest major version of PostgreSQL when the operator was released.
@@ -213,7 +205,7 @@ After completion, you will have Prometheus, Grafana and Alert Manager installed 
 - The Grafana installation will be watching for a Grafana dashboard `ConfigMap`.
 
 !!! Seealso
-    For further information about the above command see the [helm install](https://helm.sh/docs/helm/helm_install/) 
+    For further information about the above command, refer to the [helm install](https://helm.sh/docs/helm/helm_install/)
     documentation. 
 
 You can see several Custom Resources have been created:
@@ -274,7 +266,7 @@ kubectl port-forward svc/prometheus-community-kube-prometheus 9090
 
 Then access the Prometheus console locally at: [`http://localhost:9090/`](http://localhost:9090/)
 
-Assuming that the monitoring stack was successfully deployed, and you have a Cluster with `enablePodMonitor: true`
+Assuming that the monitoring stack was successfully deployed, and you have a Cluster with `enablePodMonitor: true`,
 you should find a series of metrics relating to CloudNativePG clusters. Again, please
 refer to the [*monitoring section*](monitoring.md) for more information.
 
@@ -311,15 +303,10 @@ kubectl port-forward svc/prometheus-community-grafana 3000:80
 And access Grafana locally at [`http://localhost:3000/`](http://localhost:3000/)
 providing the credentials `admin` as username, `prom-operator` as password (defined in `kube-stack-config.yaml`).
 
-We can now install our sample Grafana dashboard:
-
-``` sh
-kubectl apply -f \
-  https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/main/docs/src/samples/monitoring/grafana-configmap.yaml
-```
-
-Which will be picked up by the Grafana page in a few seconds. You should now
-see the `CloudNativePG` dashboard.
+CloudNativePG provides a default dashboard for Grafana as part of the official
+[Helm chart](https://github.com/cloudnative-pg/charts). You can also download the
+[grafana-dashboard.json](https://github.com/cloudnative-pg/grafana-dashboards/blob/main/charts/cluster/grafana-dashboard.json)
+file and manually importing it via the GUI.
 
 !!! Warning
     Some graphs in the previous dashboard make use of metrics that are in alpha stage by the time
@@ -328,5 +315,5 @@ see the `CloudNativePG` dashboard.
 
 ![local grafana](images/grafana-local.png)
 
-Note that in our example setup, both Prometheus and Grafana will pick up
-any other CloudNativePG clusters deployed with Monitoring activated.
+Note that in our local setup, Prometheus and Grafana are configured to automatically discover
+and monitor any CloudNativePG clusters deployed with the Monitoring feature enabled.

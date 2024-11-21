@@ -23,13 +23,12 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
+	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/stringset"
 )
 
 type multiNamespaceCache struct {
@@ -89,6 +88,13 @@ func (c *multiNamespaceCache) GetInformerForKind(
 	opts ...cache.InformerGetOption,
 ) (cache.Informer, error) {
 	return c.multiCache.GetInformerForKind(ctx, gvk, opts...)
+}
+
+func (c *multiNamespaceCache) RemoveInformer(
+	ctx context.Context,
+	obj client.Object,
+) error {
+	return c.multiCache.RemoveInformer(ctx, obj)
 }
 
 func (c *multiNamespaceCache) Start(ctx context.Context) error {

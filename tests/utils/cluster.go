@@ -32,8 +32,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/logs"
 )
 
 // AllClusterPodsHaveLabels verifies if the labels defined in a map are included
@@ -118,39 +118,6 @@ func ClusterHasAnnotations(
 		}
 	}
 	return true
-}
-
-// DumpOperatorLogs dumps the operator logs to a file, and returns the log lines
-// as a slice.
-func (env TestingEnvironment) DumpOperatorLogs(getPrevious bool, requestedLineLength int) ([]string, error) {
-	pod, err := env.GetOperatorPod()
-	if err != nil {
-		fmt.Println(err)
-		return nil, err
-	}
-
-	filename := "out/operator_report_" + pod.Name + ".log"
-	if getPrevious {
-		filename = "out/operator_report_previous_" + pod.Name + ".log"
-	}
-	f, err := os.Create(filepath.Clean(filename))
-	if err != nil {
-		fmt.Println(err)
-		return nil, err
-	}
-	defer func() {
-		syncErr := f.Sync()
-		if err == nil && syncErr != nil {
-			err = syncErr
-		}
-		closeErr := f.Close()
-		if err == nil && closeErr != nil {
-			err = closeErr
-		}
-	}()
-
-	_, _ = fmt.Fprintf(f, "Dumping operator pod %v log\n", pod.Name)
-	return logs.GetPodLogs(env.Ctx, env.Interface, pod, getPrevious, f, requestedLineLength)
 }
 
 // DumpNamespaceObjects logs the clusters, pods, pvcs etc. found in a namespace as JSON sections
@@ -272,15 +239,14 @@ func (env TestingEnvironment) GetClusterPodList(namespace string, clusterName st
 }
 
 // GetClusterPrimary gets the primary pod of a cluster
-// Once the release of 1.20.3 and 1.19.5 places the new role label into the public images,
-// we should use utils.ClusterInstanceRoleLabelName instead of "role"
 func (env TestingEnvironment) GetClusterPrimary(namespace string, clusterName string) (*corev1.Pod, error) {
 	podList := &corev1.PodList{}
 
-	// Deprecated: Use utils.ClusterInstanceRoleLabelName instead of "role"
-	// TODO: for backward compatibility, we are fetching the primary using the old "role" label.
 	err := GetObjectList(&env, podList, client.InNamespace(namespace),
-		client.MatchingLabels{utils.ClusterLabelName: clusterName, "role": "primary"},
+		client.MatchingLabels{
+			utils.ClusterLabelName:             clusterName,
+			utils.ClusterInstanceRoleLabelName: specs.ClusterRoleLabelPrimary,
+		},
 	)
 	if err != nil {
 		return &corev1.Pod{}, err
@@ -300,11 +266,13 @@ func (env TestingEnvironment) GetClusterPrimary(namespace string, clusterName st
 }
 
 // GetClusterReplicas gets a slice containing all the replica pods of a cluster
-// Deprecated: Use utils.ClusterInstanceRoleLabelName instead of "role"
 func (env TestingEnvironment) GetClusterReplicas(namespace string, clusterName string) (*corev1.PodList, error) {
 	podList := &corev1.PodList{}
 	err := GetObjectList(&env, podList, client.InNamespace(namespace),
-		client.MatchingLabels{utils.ClusterLabelName: clusterName, "role": "replica"},
+		client.MatchingLabels{
+			utils.ClusterLabelName:             clusterName,
+			utils.ClusterInstanceRoleLabelName: specs.ClusterRoleLabelReplica,
+		},
 	)
 	if err != nil {
 		return podList, err

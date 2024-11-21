@@ -17,6 +17,7 @@ limitations under the License.
 package metricserver
 
 import (
+	"crypto/tls"
 	"fmt"
 	"net/http"
 
@@ -40,9 +41,8 @@ type MetricsServer struct {
 
 // New configure the web statusServer for a certain PostgreSQL instance, and
 // must be invoked before starting the real web statusServer
-func New(serverInstance *postgres.Instance) (*MetricsServer, error) {
+func New(serverInstance *postgres.Instance, exporter *Exporter) (*MetricsServer, error) {
 	registry := prometheus.NewRegistry()
-	exporter := NewExporter(serverInstance)
 	if err := registry.Register(exporter); err != nil {
 		return nil, fmt.Errorf("while registering PostgreSQL exporters: %w", err)
 	}
@@ -59,16 +59,19 @@ func New(serverInstance *postgres.Instance) (*MetricsServer, error) {
 		ReadHeaderTimeout: webserver.DefaultReadHeaderTimeout,
 	}
 
+	if serverInstance.MetricsPortTLS {
+		server.TLSConfig = &tls.Config{
+			MinVersion: tls.VersionTLS13,
+			GetCertificate: func(_ *tls.ClientHelloInfo) (*tls.Certificate, error) {
+				return serverInstance.ServerCertificate, nil
+			},
+		}
+	}
+
 	metricServer := &MetricsServer{
-		Webserver: webserver.NewWebServer(serverInstance, server),
+		Webserver: webserver.NewWebServer(server),
 		exporter:  exporter,
 	}
 
 	return metricServer, nil
-}
-
-// GetExporter get the exporter used for metrics. If the web statusServer still
-// has not started, the exporter is nil
-func (ms *MetricsServer) GetExporter() *Exporter {
-	return ms.exporter
 }

@@ -23,7 +23,6 @@ import (
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
-	apiextensionv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -150,34 +149,6 @@ func CheckWebhookReady(env *TestingEnvironment, namespace string) error {
 		}
 	}
 
-	customResourceDefinitionsName := []string{
-		"backups.postgresql.cnpg.io",
-		"clusters.postgresql.cnpg.io",
-		"scheduledbackups.postgresql.cnpg.io",
-	}
-
-	ctx := context.Background()
-	for _, c := range customResourceDefinitionsName {
-		crd, err := env.APIExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(
-			ctx, c, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-
-		if crd.Spec.Conversion == nil {
-			continue
-		}
-
-		if crd.Spec.Conversion.Strategy == apiextensionv1.NoneConverter {
-			continue
-		}
-
-		if crd.Spec.Conversion.Webhook != nil && crd.Spec.Conversion.Webhook.ClientConfig != nil &&
-			!bytes.Equal(crd.Spec.Conversion.Webhook.ClientConfig.CABundle, ca) {
-			return fmt.Errorf("secret not match with ca bundle in %v; %v not equal to %v", c,
-				string(crd.Spec.Conversion.Webhook.ClientConfig.CABundle), string(ca))
-		}
-	}
 	return nil
 }
 

@@ -41,19 +41,14 @@ func (re RoleError) Error() string {
 		re.Action, re.RoleName, re.Cause)
 }
 
-// getRoleError matches an error to one of the expectable RoleError's
-// If it does not match, it will simply pass the original error along
+// parseRoleError matches an error to one of the expectable RoleError's
+// If it matches a known case it returns a RoleError object otherwise it returns an error.
 //
 // For PostgreSQL codes see https://www.postgresql.org/docs/current/errcodes-appendix.html
-func getRoleError(err error, roleName string, action roleAction) (bool, error) {
-	errPGX, ok := err.(*pgconn.PgError)
-	if !ok {
-		// before giving up, let's see if there is an un-wrapped error
-		coreErr := errors.Unwrap(err)
-		errPGX, ok = coreErr.(*pgconn.PgError)
-		if !ok {
-			return false, fmt.Errorf("while trying to %s: %w", action, err)
-		}
+func parseRoleError(err error, roleName string, action roleAction) (*RoleError, error) {
+	var errPGX *pgconn.PgError
+	if !errors.As(err, &errPGX) {
+		return nil, fmt.Errorf("while trying to %s: %w", action, err)
 	}
 
 	knownCauses := map[string]string{
@@ -63,11 +58,11 @@ func getRoleError(err error, roleName string, action roleAction) (bool, error) {
 	}
 
 	if cause, known := knownCauses[errPGX.Code]; known {
-		return true, RoleError{
+		return &RoleError{
 			Action:   string(action),
 			RoleName: roleName,
 			Cause:    cause,
-		}
+		}, nil
 	}
-	return false, fmt.Errorf("while trying to %s: %w", action, err)
+	return nil, fmt.Errorf("while trying to %s: %w", action, err)
 }

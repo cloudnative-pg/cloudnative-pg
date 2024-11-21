@@ -21,12 +21,13 @@ import (
 	"context"
 	"fmt"
 
+	pgTime "github.com/cloudnative-pg/machinery/pkg/postgres/time"
 	v1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/status"
 )
 
 // Promote command implementation
@@ -36,7 +37,7 @@ func Promote(ctx context.Context, clusterName string, serverName string) error {
 	// Get the Cluster object
 	err := plugin.Client.Get(ctx, client.ObjectKey{Namespace: plugin.Namespace, Name: clusterName}, &cluster)
 	if err != nil {
-		return fmt.Errorf("cluster %s not found in namespace %s", clusterName, plugin.Namespace)
+		return fmt.Errorf("cluster %s not found in namespace %s: %w", clusterName, plugin.Namespace, err)
 	}
 
 	// If server name is equal to target primary, there is no need to promote
@@ -50,20 +51,23 @@ func Promote(ctx context.Context, clusterName string, serverName string) error {
 	var pod v1.Pod
 	err = plugin.Client.Get(ctx, client.ObjectKey{Namespace: plugin.Namespace, Name: serverName}, &pod)
 	if err != nil {
-		return fmt.Errorf("new primary node %s not found in namespace %s", serverName, plugin.Namespace)
+		return fmt.Errorf("new primary node %s not found in namespace %s: %w", serverName, plugin.Namespace, err)
 	}
 
 	// The Pod exists, let's update status fields
+	origCluster := cluster.DeepCopy()
 	cluster.Status.TargetPrimary = serverName
-	cluster.Status.TargetPrimaryTimestamp = utils.GetCurrentTimestamp()
-	cluster.Status.Phase = apiv1.PhaseSwitchover
-	cluster.Status.PhaseReason = fmt.Sprintf("Switching over to %v", serverName)
-
-	err = plugin.Client.Status().Update(ctx, &cluster)
-	if err != nil {
+	cluster.Status.TargetPrimaryTimestamp = pgTime.GetCurrentTimestamp()
+	if err := status.RegisterPhaseWithOrigCluster(
+		ctx,
+		plugin.Client,
+		&cluster,
+		origCluster,
+		apiv1.PhaseSwitchover,
+		fmt.Sprintf("Switching over to %v", serverName),
+	); err != nil {
 		return err
 	}
-
 	fmt.Printf("Node %s in cluster %s will be promoted\n", serverName, clusterName)
 	return nil
 }

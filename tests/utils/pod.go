@@ -21,6 +21,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/avast/retry-go/v4"
@@ -31,6 +33,8 @@ import (
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	pkgutils "github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+
+	. "github.com/onsi/gomega" // nolint
 )
 
 // PodCreateAndWaitForReady creates a given pod object and wait for it to be ready
@@ -90,6 +94,16 @@ func PodHasAnnotations(pod corev1.Pod, annotations map[string]string) bool {
 	return true
 }
 
+// PodHasCondition verifies that a pod has a specified condition
+func PodHasCondition(pod *corev1.Pod, conditionType corev1.PodConditionType, status corev1.ConditionStatus) bool {
+	for _, cond := range pod.Status.Conditions {
+		if cond.Type == conditionType && cond.Status == status {
+			return true
+		}
+	}
+	return false
+}
+
 // DeletePod deletes a pod if existent
 func (env TestingEnvironment) DeletePod(namespace string, name string, opts ...client.DeleteOption) error {
 	u := &unstructured.Unstructured{}
@@ -136,6 +150,21 @@ func (env TestingEnvironment) GetPodList(namespace string) (*corev1.PodList, err
 	return podList, err
 }
 
+// GetManagerVersion returns the current manager version of a given pod
+func GetManagerVersion(namespace, podName string) (string, error) {
+	out, _, err := RunUnchecked(fmt.Sprintf(
+		"kubectl -n %v exec %v -c postgres -- /controller/manager version",
+		namespace,
+		podName,
+	))
+	if err != nil {
+		return "", err
+	}
+	versionRegexp := regexp.MustCompile(`^Build: {Version:(\d+.*) Commit.*}$`)
+	ver := versionRegexp.FindStringSubmatch(strings.TrimSpace(out))[1]
+	return ver, nil
+}
+
 // GetPod gets a pod by namespace and name
 func (env TestingEnvironment) GetPod(namespace, podName string) (*corev1.Pod, error) {
 	wrapErr := func(err error) error {
@@ -174,6 +203,9 @@ func (env TestingEnvironment) ExecCommandInContainer(
 	pod, err := env.GetPod(container.Namespace, container.PodName)
 	if err != nil {
 		return "", "", wrapErr(err)
+	}
+	if !pkgutils.IsPodReady(*pod) {
+		return "", "", fmt.Errorf("pod not ready. Namespace: %v, Name: %v", pod.Namespace, pod.Name)
 	}
 	return env.ExecCommand(env.Ctx, *pod, container.ContainerName, timeout, command...)
 }
@@ -215,4 +247,30 @@ func (env TestingEnvironment) ExecQueryInInstancePod(
 			Namespace: podLocator.Namespace,
 			PodName:   podLocator.PodName,
 		}, &timeout, "psql", "-U", "postgres", string(dbname), "-tAc", query)
+}
+
+// EventuallyExecQueryInInstancePod wraps ExecQueryInInstancePod with an Eventually clause
+func (env TestingEnvironment) EventuallyExecQueryInInstancePod(
+	podLocator PodLocator,
+	dbname DatabaseName,
+	query string,
+	retryTimeout int,
+	pollingTime int,
+) (string, string, error) {
+	var stdOut, stdErr string
+	var err error
+
+	Eventually(func() error {
+		stdOut, stdErr, err = env.ExecQueryInInstancePod(
+			PodLocator{
+				Namespace: podLocator.Namespace,
+				PodName:   podLocator.PodName,
+			}, dbname, query)
+		if err != nil {
+			return err
+		}
+		return nil
+	}, retryTimeout, pollingTime).Should(BeNil())
+
+	return stdOut, stdErr, err
 }

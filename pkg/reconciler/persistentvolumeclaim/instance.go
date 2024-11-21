@@ -18,9 +18,9 @@ package persistentvolumeclaim
 
 import (
 	"context"
+	"slices"
 	"time"
 
-	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -81,6 +81,7 @@ func reconcileSingleInstanceMissingPVCs(
 	var shouldReconcile bool
 	instanceName := specs.GetInstanceName(cluster.Name, serial)
 	for _, expectedPVC := range getExpectedPVCsFromCluster(cluster, instanceName) {
+		// Continue if the expectedPVC is in present in the current PVC list
 		if slices.ContainsFunc(pvcs, func(pvc corev1.PersistentVolumeClaim) bool { return expectedPVC.name == pvc.Name }) {
 			continue
 		}

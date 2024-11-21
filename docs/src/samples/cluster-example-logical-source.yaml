@@ -1,0 +1,32 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example
+spec:
+  instances: 1
+
+  imageName: ghcr.io/cloudnative-pg/postgresql:13
+
+  storage:
+    size: 1Gi
+
+  bootstrap:
+    initdb:
+      postInitApplicationSQL:
+        - CREATE TABLE numbers (i SERIAL PRIMARY KEY, m INTEGER)
+        - INSERT INTO numbers (m) (SELECT generate_series(1,10000))
+        - ALTER TABLE numbers OWNER TO app;
+        - CREATE TABLE numbers_two (i SERIAL PRIMARY KEY, m INTEGER)
+        - INSERT INTO numbers_two (m) (SELECT generate_series(1,10000))
+        - ALTER TABLE numbers_two OWNER TO app;
+        - CREATE TABLE numbers_three (i SERIAL PRIMARY KEY, m INTEGER)
+        - INSERT INTO numbers_three (m) (SELECT generate_series(1,10000))
+        - ALTER TABLE numbers_three OWNER TO app;
+
+  enableSuperuserAccess: true
+
+  managed:
+    roles:
+      - name: app
+        login: true
+        replication: true

@@ -1,13 +1,5 @@
 # Backup
 
-!!! Important
-    With version 1.21, backup and recovery capabilities in CloudNativePG
-    have sensibly changed due to the introduction of native support for
-    [Kubernetes Volume Snapshots](backup_volumesnapshot.md).
-    Up to that point, backup and recovery were available only for object
-    stores. Please carefully read this section and the [recovery](recovery.md)
-    one if you have been a user of CloudNativePG 1.15 through 1.20.
-
 PostgreSQL natively provides first class backup and recovery capabilities based
 on file system level (physical) copy. These have been successfully used for
 more than 15 years in mission critical production databases, helping

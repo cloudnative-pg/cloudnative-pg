@@ -19,11 +19,12 @@ package backup
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
 	"time"
 
+	pgTime "github.com/cloudnative-pg/machinery/pkg/postgres/time"
 	"github.com/spf13/cobra"
-	"golang.org/x/exp/slices"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -61,9 +62,13 @@ func NewCmd() *cobra.Command {
 	var backupName, backupTarget, backupMethod, online, immediateCheckpoint, waitForArchive string
 
 	backupSubcommand := &cobra.Command{
-		Use:   "backup [cluster]",
-		Short: "Request an on-demand backup for a PostgreSQL Cluster",
-		Args:  cobra.ExactArgs(1),
+		Use:     "backup [cluster]",
+		Short:   "Request an on-demand backup for a PostgreSQL Cluster",
+		GroupID: plugin.GroupIDDatabase,
+		Args:    plugin.RequiresArguments(1),
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return plugin.CompleteClusters(cmd.Context(), args, toComplete), cobra.ShellCompDirectiveNoFileComp
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			clusterName := args[0]
 
@@ -71,7 +76,7 @@ func NewCmd() *cobra.Command {
 				backupName = fmt.Sprintf(
 					"%s-%s",
 					clusterName,
-					utils.ToCompactISO8601(time.Now()),
+					pgTime.ToCompactISO8601(time.Now()),
 				)
 			}
 
@@ -163,13 +168,13 @@ func NewCmd() *cobra.Command {
 	const optionalAcceptedValues = "Optional. Accepted values: true|false|\"\"."
 	backupSubcommand.Flags().StringVar(&online, "online",
 		"",
-		"Set the `.spec.online` field of the Backup resource. If not specified, "+
+		"Set the '.spec.online' field of the Backup resource. If not specified, "+
 			"the value in the '.spec.backup.volumeSnapshot' field of the Cluster "+
 			"resource will be used. "+
 			optionalAcceptedValues)
 
 	backupSubcommand.Flags().StringVar(&immediateCheckpoint, "immediate-checkpoint", "",
-		"Set the `.spec.onlineConfiguration.immediateCheckpoint` field of the "+
+		"Set the '.spec.onlineConfiguration.immediateCheckpoint' field of the "+
 			"Backup resource. If not specified, the value in the "+
 			"'.spec.backup.volumeSnapshot.onlineConfiguration' field "+
 			"of the Cluster resource will be used. "+
@@ -177,7 +182,7 @@ func NewCmd() *cobra.Command {
 	)
 
 	backupSubcommand.Flags().StringVar(&waitForArchive, "wait-for-archive", "",
-		"Set the `.spec.onlineConfiguratoin.waitForArchive` field of the "+
+		"Set the '.spec.onlineConfiguratoin.waitForArchive' field of the "+
 			"Backup resource. If not specified, the value in the "+
 			"'.spec.backup.volumeSnapshot.onlineConfiguration' field will be used. "+
 			optionalAcceptedValues,
@@ -203,6 +208,7 @@ func createBackup(ctx context.Context, options backupCommandOptions) error {
 			OnlineConfiguration: options.getOnlineConfiguration(),
 		},
 	}
+	utils.LabelClusterName(&backup.ObjectMeta, options.clusterName)
 
 	err := plugin.Client.Create(ctx, &backup)
 	if err == nil {

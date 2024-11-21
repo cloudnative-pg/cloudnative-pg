@@ -1,0 +1,13 @@
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-default-monitoring
+spec:
+  instances: 1
+
+  monitoring:
+    enablePodMonitor: true
+
+  storage:
+    size: 1Gi

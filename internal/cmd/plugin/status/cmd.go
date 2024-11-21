@@ -17,7 +17,8 @@ limitations under the License.
 package status
 
 import (
-	"context"
+	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -27,22 +28,29 @@ import (
 // NewCmd create the new "status" subcommand
 func NewCmd() *cobra.Command {
 	statusCmd := &cobra.Command{
-		Use:   "status [cluster]",
-		Short: "Get the status of a PostgreSQL cluster",
-		Args:  cobra.ExactArgs(1),
+		Use:     "status [cluster]",
+		Short:   "Get the status of a PostgreSQL cluster",
+		Args:    plugin.RequiresArguments(1),
+		GroupID: plugin.GroupIDDatabase,
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			if strings.HasPrefix(toComplete, "-") {
+				fmt.Printf("%+v\n", toComplete)
+			}
+			return plugin.CompleteClusters(cmd.Context(), args, toComplete), cobra.ShellCompDirectiveNoFileComp
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			ctx := context.Background()
+			ctx := cmd.Context()
 			clusterName := args[0]
 
-			verbose, _ := cmd.Flags().GetBool("verbose")
+			verbose, _ := cmd.Flags().GetCount("verbose")
 			output, _ := cmd.Flags().GetString("output")
 
 			return Status(ctx, clusterName, verbose, plugin.OutputFormat(output))
 		},
 	}
 
-	statusCmd.Flags().BoolP(
-		"verbose", "v", false, "Include PostgreSQL configuration, HBA rules, and full replication slots info")
+	statusCmd.Flags().CountP(
+		"verbose", "v", "Increase verbosity to display more information")
 	statusCmd.Flags().StringP(
 		"output", "o", "text", "Output format. One of text|json")
 

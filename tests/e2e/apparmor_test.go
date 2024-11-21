@@ -42,20 +42,14 @@ var _ = Describe("AppArmor support", Serial, Label(tests.LabelNoOpenshift, tests
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
-		if !IsAKS() {
-			Skip("This test is only run on AKS clusters")
+		if !MustGetEnvProfile().CanRunAppArmor() {
+			Skip("environment does not support AppArmor")
 		}
 	})
 
 	It("sets up a cluster enabling AppArmor annotation feature", func() {
-		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-			return env.DeleteNamespace(namespace)
-		})
 
 		AssertCreateCluster(namespace, clusterName, clusterAppArmorFile, env)
 

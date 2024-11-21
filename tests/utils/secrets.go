@@ -21,6 +21,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -100,4 +101,31 @@ func GetCredentials(
 	username := string(secret.Data["username"])
 	password := string(secret.Data["password"])
 	return username, password, nil
+}
+
+// CreateObjectStorageSecret generates an Opaque Secret with a given ID and Key
+func CreateObjectStorageSecret(
+	namespace string,
+	secretName string,
+	id string,
+	key string,
+	env *TestingEnvironment,
+) (*corev1.Secret, error) {
+	targetSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      secretName,
+			Namespace: namespace,
+		},
+		StringData: map[string]string{
+			"ID":  id,
+			"KEY": key,
+		},
+		Type: corev1.SecretTypeOpaque,
+	}
+	obj, err := CreateObject(env, targetSecret)
+	if err != nil {
+		return nil, err
+	}
+
+	return obj.(*corev1.Secret), nil
 }

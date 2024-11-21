@@ -16,44 +16,78 @@ is analyzed at three different layers: code, container, and cluster.
 
 ## Code
 
-Source code of CloudNativePG is systematically scanned for static analysis purposes,
-including security, using a popular open-source *linter* for Go called
-[GolangCI-Lint](https://github.com/golangci/golangci-lint). You can run this linter directly in the CI/CD pipeline.
-GolangCI-Lint can run several linters on the same source code.
+CloudNativePG's source code undergoes systematic static analysis using the popular open-source linter for
+Go, [GolangCI-Lint](https://github.com/golangci/golangci-lint), directly
+integrated into the CI/CD pipeline. This analysis includes
+checks for security vulnerabilities. GolangCI-Lint can run multiple linters on
+the same source code.
 
-One of these is [Golang Security Checker](https://github.com/securego/gosec), or gosec,
-a linter that scans the abstract syntactic tree of the source against a set of rules aimed at
-discovering well-known vulnerabilities, threats, and weaknesses. These vulnerabilities include those hidden in
-the code, such as hard-coded credentials, integer overflows, and SQL injections, to name a few.
+The following tools are used to identify security issues:
+
+- **[Golang Security Checker](https://github.com/securego/gosec) (`gosec`):** A
+  linter that scans the abstract syntax tree of the source code against a set
+  of rules designed to detect known vulnerabilities, threats, and weaknesses,
+  such as hard-coded credentials, integer overflows, and SQL injections.
+  GolangCI-Lint runs `gosec` as part of its suite.
+
+- **[govulncheck](https://pkg.go.dev/golang.org/x/vuln/cmd/govulncheck):** This
+  tool runs in the CI/CD pipeline and reports known vulnerabilities affecting
+  Go code or the compiler. If the operator is built with a version of the Go
+  compiler containing a known vulnerability, `govulncheck` will detect it.
+
+- **[CodeQL](https://codeql.github.com/):** Provided by GitHub, this tool scans
+  for security issues and blocks any pull request with detected
+  vulnerabilities. CodeQL is configured to review only Go code, excluding other
+  languages in the repository such as Python or Bash.
+
+- **[Snyk](https://snyk.io/):** Conducts nightly code scans in a scheduled job
+  and generates weekly reports highlighting any new findings related to code
+  security and licensing issues.
+
+The CloudNativePG repository has the **Private vulnerability reporting** option
+enabled in the [Security section](https://github.com/cloudnative-pg/cloudnative-pg/security).
+This feature allows users to safely report security issues that require careful
+handling before being publicly disclosed. If you discover any security bug,
+use this medium to report it.
 
 !!! Important
-    A failure in the static-code-analysis phase of the CI/CD pipeline is a blocker
-    for the entire delivery of CloudNativePG. This means that each commit is validated
-    against all the linters defined by GolangCI-Lint.
+    A failure in the static code analysis phase of the CI/CD pipeline will
+    block the entire delivery process of CloudNativePG. Every commit must pass all
+    the linters defined by GolangCI-Lint.
 
 ## Container
 
-Every container image that's part of CloudNativePG is built by way of CI/CD pipelines following every commit.
-Such images include not only the operator's but also the operands', specifically every supported PostgreSQL version.
-In the pipelines, images are scanned with [Dockle](https://github.com/goodwithtech/dockle), for best practices in terms
-of the container build process.
+Every container image in CloudNativePG is built via CI/CD
+pipelines following every commit. These images include not only the operator's
+image but also the operands' images, specifically for every supported
+PostgreSQL version. During the CI/CD process, images undergo scanning with the
+following tools:
+
+- **[Dockle](https://github.com/goodwithtech/dockle):** Ensures best practices
+  in the container build process.
+- **[Snyk](https://snyk.io/):** Detects security issues within the container
+  and reports findings via the GitHub interface.
 
 !!! Important
-    All operand images are rebuilt once a day by our pipelines in case
-    of security updates at the base image and package level. This approach provides *patch-level updates*
-    for the container images that EDB distributes.
+    All operand images are rebuilt daily by our pipelines to
+    incorporate security updates at the base image and package level, providing
+    **patch-level updates** for the container images distributed to the community.
 
-The following guidelines and frameworks were taken into account for container-level security:
+### Guidelines and frameworks for container security
 
-- The [Container Image Creation and Deployment Guide](https://dl.dod.cyber.mil/wp-content/uploads/devsecops/pdf/DevSecOps_Enterprise_Container_Image_Creation_and_Deployment_Guide_2.6-Public-Release.pdf),
-  developed by the Defense Information Systems Agency (DISA) of the United States Department of Defense (DoD)
-- The [CIS Benchmark for Docker](https://www.cisecurity.org/benchmark/docker/),
-  developed by the Center for Internet Security (CIS)
+The following guidelines and frameworks have been considered for ensuring
+container-level security:
 
-!!! Seealso "About the container-level security"
-    See the [Security and Containers in CloudNativePG](https://www.enterprisedb.com/blog/security-and-containers-cloud-native-postgresql)
-    blog article for more information about the approach that EDB takes on
-    security at the container level in CloudNativePG.
+- **["Container Image Creation and Deployment Guide"](https://dl.dod.cyber.mil/wp-content/uploads/devsecops/pdf/DevSecOps_Enterprise_Container_Image_Creation_and_Deployment_Guide_2.6-Public-Release.pdf):**
+  Developed by the Defense Information Systems Agency (DISA) of the United States
+  Department of Defense (DoD).
+- **["CIS Benchmark for Docker"](https://www.cisecurity.org/benchmark/docker/):**
+  Developed by the Center for Internet Security (CIS).
+
+!!! Seealso "About container-level security"
+    For more information on the approach that EDB has taken regarding security
+    at the container level in CloudNativePG, see the blog article
+    ["Security and Containers in CloudNativePG"](https://www.enterprisedb.com/blog/security-and-containers-cloud-native-postgresql).
 
 ## Cluster
 
@@ -61,23 +95,30 @@ Security at the cluster level takes into account all Kubernetes components that
 form both the control plane and the nodes, as well as the applications that run in
 the cluster, including PostgreSQL.
 
-### Role based access control (RBAC)
+### Role-based access control (RBAC)
 
-The operator interacts with the Kubernetes API server with a dedicated service
-account called `cnpg-manager`. In Kubernetes, this account is installed
-by default in the `cnpg-system` namespace. A cluster role
-binds between this service account and the `cnpg-manager`
-cluster role and defines the set of rules/resources/verbs granted to the operator.
+The operator interacts with the Kubernetes API server using a dedicated service
+account named `cnpg-manager`. This service account is typically installed in
+the operator namespace, commonly `cnpg-system`. However, the namespace can vary
+based on the deployment method (see [Deployments and `ClusterRole` resources](#deployments-and-clusterrole-resources).
+
+In the same namespace, there's a binding between the `cnpg-manager` service
+account and a role. The specific name and type of this role (either `Role` or
+`ClusterRole`) also depend on the deployment method. This role defines the
+necessary permissions required by the operator to function correctly. To learn
+more about these roles, you can use the `kubectl describe clusterrole` or
+`kubectl describe role` commands, depending on the deployment method.
 
 !!! Important
     These permissions are exclusively reserved for the operator's service
     account to interact with the Kubernetes API server. They're not directly
     accessible by the users of the operator that interact only with `Cluster`,
-    `Pooler`, `Backup`, and `ScheduledBackup` resources.
+    `Pooler`, `Backup`, `ScheduledBackup`, `ImageCatalog` and
+    `ClusterImageCatalog` resources.
 
 The following are some examples and, most importantly, the reasons why
 CloudNativePG requires full or partial management of standard Kubernetes
-namespaced resources.
+namespaced or non-namespaced resources.
 
 `configmaps`
 : The operator needs to create and manage default config maps for
@@ -130,14 +171,55 @@ namespaced resources.
   validate them before starting the restore process.
 
 `nodes`
-: The operator needs to get the labels for `Affinity` and `AntiAffinity` so it can
-  decide in which nodes a pod can be scheduled. This behavior prevents the replicas from being
-  in the same node, especially if nodes are in different availability zones. This
-  permission is also used to determine if a node is scheduled, avoiding
-  the creation of pods that can't be created at all.
+: The operator needs to get the labels for Affinity and AntiAffinity so it can
+  decide in which nodes a pod can be scheduled. This is useful, for example, to
+  prevent the replicas from being scheduled in the same node. It's especially
+  important if nodes are in different availability zones. This
+  permission is also used to determine whether a node is scheduled, preventing
+  the creation of pods on unscheduled nodes, or triggering a switchover if
+  the primary lives in an unscheduled node.
 
-To see all the permissions required by the operator, you can run `kubectl
-describe clusterrole cnpg-manager`.
+#### Deployments and `ClusterRole` resources
+
+As mentioned previously, each deployment method can have variations in the namespace
+location of the service account, as well as the names and types of role
+bindings and respective roles.
+
+##### Via Kubernetes manifest
+
+When installing CloudNativePG using the Kubernetes manifest, permissions are
+set to `ClusterRoleBinding` by default. You can inspect the permissions
+required by the operator by running:
+
+```sh
+kubectl describe clusterrole cnpg-manager
+```
+
+##### Via OLM
+
+From a security perspective, the Operator Lifecycle Manager (OLM) provides a
+more flexible deployment method. It allows you to configure the operator to
+watch either all namespaces or specific namespaces, enabling more granular
+permission management.
+
+!!! Info
+   OLM allows you to deploy the operator in its own namespace and configure it
+   to watch specific namespaces used for CloudNativePG clusters. This setup helps
+   to contain permissions and restrict access more effectively.
+
+#### Why are ClusterRole permissions needed?
+
+The operator currently requires `ClusterRole` permissions to read `nodes` and
+`ClusterImageCatalog` objects. All other permissions can be namespace-scoped (for example, `Role`) or
+cluster-wide (for example, `ClusterRole`).
+
+Even with these permissions, if someone gains access to the `ServiceAccount`,
+they'll only have `get`, `list`, and `watch` permissions, which are limited
+to viewing resources. However, if an unauthorized user gains access to the
+`ServiceAccount`, it indicates a more significant security issue.
+
+Therefore, it's crucial to prevent users from accessing the operator's
+`ServiceAccount` and any other `ServiceAccount` with elevated permissions.
 
 ### Calls to the API server made by the instance manager
 
@@ -212,7 +294,14 @@ CloudNativePG.
 
 ### Pod security policies
 
-A [pod security policy](https://kubernetes.io/docs/concepts/policy/pod-security-policy/)
+!!! Important
+    Starting from Kubernetes v1.21, the use of `PodSecurityPolicy` was
+    deprecated; as of Kubernetes v1.25, it was completely removed. Despite
+    this deprecation, we acknowledge that the operator is currently undergoing
+    testing in older and unsupported versions of Kubernetes. Therefore, this
+    section is retained for those specific scenarios.
+
+A [Pod Security Policy](https://kubernetes.io/docs/concepts/policy/pod-security-policy/)
 is the Kubernetes way to define security rules and specifications that a pod needs to meet
 to run in a cluster.
 For InfoSec reasons, every Kubernetes platform must implement them.
@@ -285,28 +374,26 @@ in the Kubernetes documentation for more information.
 CloudNativePG exposes ports at operator, instance manager, and operand
 levels, as shown in the table.
 
-System           | Port number  | Exposing            |  Name               |  Certificates  |  Authentication
-:--------------- | :----------- | :------------------ | :------------------ | :------------  | :--------------
-operator         | 9443         | webhook server      | `webhook-server`    |  TLS           | Yes
-operator         | 8080         | metrics             | `metrics`           |  no TLS        | No
-instance manager | 9187         | metrics             | `metrics`           |  no TLS        | No
-instance manager | 8000         | status              | `status`            |  no TLS        | No
-operand          | 5432         | PostgreSQL instance | `postgresql`        |  optional TLS  | Yes
+| System           | Port number | Exposing            | Name             | TLS      | Authentication |
+|:-----------------|:------------|:--------------------|:-----------------|:---------|:---------------|
+| operator         | 9443        | webhook server      | `webhook-server` | Yes      | Yes            |
+| operator         | 8080        | metrics             | `metrics`        | No       | No             |
+| instance manager | 9187        | metrics             | `metrics`        | Optional | No             |
+| instance manager | 8000        | status              | `status`         | Yes      | No             |
+| operand          | 5432        | PostgreSQL instance | `postgresql`     | Optional | Yes            |
 
 ### PostgreSQL
 
 The current implementation of CloudNativePG creates
-passwords and `.pgpass` files for the the database owner and,
-if requested by setting `enableSuperuserAccess` to `true`, for the
-postgres superuser.
+passwords and `.pgpass` files for the database owner. It creates passwords and `pgpass` files
+for the postgres superuser only if you set `enableSuperuserAccess` to `true`.
 
 !!! Warning
-    Prior to CloudNativePG 1.21, `enableSuperuserAccess` was set to `true` by
-    default. This change was implemented to improve the security-by-default
-    posture of the operator. This approach fosters a microservice approach where changes to
-    PostgreSQL are performed in a declarative way through the `spec` of the
-    `Cluster` resource. At the same time, it provides developers with full powers inside the
-    database through the database owner user.
+    `enableSuperuserAccess` is set to `false` by default to improve the
+    security-by-default posture of the operator. This setting fosters a microservice approach
+    where changes to PostgreSQL are performed in a declarative way through the
+    `spec` of the `Cluster` resource. At the same time, it provides developers with full powers
+    inside the database through the database owner user.
 
 As far as password encryption is concerned, CloudNativePG follows
 the default behavior of PostgreSQL: starting with PostgreSQL 14,
@@ -340,6 +427,12 @@ manifest are added to a default `pg_hba.conf`.
 
 For details on how `pg_hba.conf` is managed by the operator, see
 [PostgreSQL configuration](postgresql_conf.md#the-pg_hba-section).
+
+The administrator can also customize the content of the `pg_ident.conf` file that by default
+only maps the local postgres user to the postgres user in the database.
+
+For further detail on how `pg_ident.conf` is managed by the operator, see the
+["PostgreSQL Configuration" page](postgresql_conf.md#the-pg_ident-section) of the documentation.
 
 !!! Important
     Examples assume that the Kubernetes cluster runs in a private and secure network.

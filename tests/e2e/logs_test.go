@@ -44,23 +44,14 @@ var _ = Describe("JSON log output", Label(tests.LabelObservability), func() {
 		}
 	})
 
-	JustAfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-		}
-	})
-
 	It("correctly produces logs in JSON format", func() {
 		const namespacePrefix = "json-logs-e2e"
 		clusterName = "postgresql-json-logs"
 		const sampleFile = fixturesDir + "/json_logs/cluster-json-logs.yaml.template"
 		var namespaceErr error
 		// Create a cluster in a namespace we'll delete after the test
-		namespace, namespaceErr = env.CreateUniqueNamespace(namespacePrefix)
+		namespace, namespaceErr = env.CreateUniqueTestNamespace(namespacePrefix)
 		Expect(namespaceErr).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			return env.DeleteNamespace(namespace)
-		})
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
 		By("verifying the presence of possible logger values", func() {
@@ -90,7 +81,7 @@ var _ = Describe("JSON log output", Label(tests.LabelObservability), func() {
 				var queryError error
 				// Run a wrong query and save its result
 				commandTimeout := time.Second * 10
-				Eventually(func(g Gomega) error {
+				Eventually(func(_ Gomega) error {
 					_, _, queryError = utils.ExecCommand(env.Ctx, env.Interface, env.RestClientConfig, pod,
 						specs.PostgresContainerName, &commandTimeout, "psql", "-U", "postgres", "app", "-tAc",
 						errorTestQuery)

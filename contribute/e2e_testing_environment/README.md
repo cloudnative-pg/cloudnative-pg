@@ -58,7 +58,7 @@ All flags have corresponding environment variables labeled `(Env:...` in the tab
 |-------|-------------------------------------------------------------------------------------------------------------------------------|
 | -r    |--registry                       | Enable local registry. (Env: `ENABLE_REGISTRY`)                                                                               |
 | -e    |--engine <CLUSTER_ENGINE>        | Use the provided ENGINE to run the cluster. Available options are 'kind' and 'k3d'. Default 'kind'. (Env: `CLUSTER_ENGINE`)   |
-| -k    |--k8s-version <K8S_VERSION>      | Use the specified Kubernetes full version number (e.g., `-k v1.26.0`). (Env: `K8S_VERSION`)                                   |
+| -k    |--k8s-version <K8S_VERSION>      | Use the specified Kubernetes full version number (e.g., `-k v1.30.0`). (Env: `K8S_VERSION`)                                   |
 | -n    |--nodes <NODES>                  | Create a cluster with the required number of nodes. Used only during "create" command. Default: 3 (Env: `NODES`)              |
 
 
@@ -121,7 +121,7 @@ It is a great tool to interactively monitor memory and CPU usage.
 ## E2E tests suite
 
 E2E testing is performed by running the
-[`hack/e2e/run-e2e.sh`](../../../hack/e2e/run-e2e.sh) bash script, making sure
+[`hack/e2e/run-e2e.sh`](../../hack/e2e/run-e2e.sh) bash script, making sure
 you have a Kubernetes cluster and `kubectl` is configured to point to it
 (this should be the default when you are running tests locally as per the
 instructions in the above section).
@@ -133,12 +133,18 @@ The script can be configured through the following environment variables:
 * `E2E_PRE_ROLLING_UPDATE_IMG`: test a rolling upgrade from this version to the
   latest minor
 * `E2E_DEFAULT_STORAGE_CLASS`: default storage class, depending on the provider
+* `E2E_CSI_STORAGE_CLASS`: csi storage class to be used together with volume snapshots, depending on the provider,
+  must be set if `E2E_DEFAULT_STORAGE_CLASS` is not a csi storage class
+* `E2E_DEFAULT_VOLUMESNAPSHOT_CLASS`: default volume snapshot class, depending on the provider,
+  need to match with `E2E_CSI_STORAGE_CLASS`
 * `AZURE_STORAGE_ACCOUNT`: Azure storage account to test backup and restore, using Barman Cloud on Azure
   blob storage
 * `AZURE_STORAGE_KEY`: Azure storage key to test backup and restore, using Barman Cloud on Azure
   blob storage
+* `TEST_DEPTH`: maximum test level included in the run.
+   From `0` (only critical tests) to `4` (all the tests), default `2`
 * `FEATURE_TYPE`: Feature type key to run e2e based on feature labels.Ex: smoke, basic, security... details
-  can be fetched from labels file [`tests/labels.go`](../../../tests/labels.go)
+  can be fetched from labels file [`tests/labels.go`](../../tests/labels.go)
 
 If the `CONTROLLER_IMG` is in a private registry, you'll also need to define
 the following variables to create a pull secret:
@@ -161,14 +167,18 @@ To run E2E testing you can also use:
 
 ### Wrapper scripts for E2E testing
 
-There are currently two available scripts that wrap setup of the cluster and
+There are currently two available scripts that wrap cluster setup and
 execution of tests. One is for `kind` and one is for `k3d`. They simply embed
 `hack/setup-cluster.sh` and `hack/e2e/run-e2e.sh` to create a local Kubernetes
 cluster and then run E2E tests on it.
 
+There is also a script to run E2E tests on an existing `local` Kubernetes cluster.
+It tries to detect the appropriate defaults for storage class and volume snapshot class environment variables
+by looking at the annotation of the default storage class and the volume snapshot class.
+
 ### Using feature type test selection/filter
 
-All the current test cases are labelled with features. Which can be selected
+All the current test cases are labeled with features. Which can be selected
 by exporting value `FEATURE_TYPE` and running any script. By default, if test level is not
 exported, it will select all medium test cases from the feature type provided.
 
@@ -195,6 +205,8 @@ exported, it will select all medium test cases from the feature type provided.
 | `storage`                         |
 | `security`                        |
 | `maintenance`                     |
+| `tablespaces`                     |
+| `declarative-databases`           |
 
 ex:
 ```shell
@@ -242,6 +254,33 @@ We have also provided a shortcut to this script in the main `Makefile`:
 make e2e-test-k3d
 ```
 
+#### On existing local cluster
+
+You can test the operator locally on `local` with:
+
+``` bash
+run-e2e-local.sh
+```
+
+The script will try detecting the storage class and volume snapshot class to use
+by looking at the following annotations and environment variables:
+
+* `storageclass.kubernetes.io/is-default-class: "true"` for the default storage class to use
+* `E2E_CSI_STORAGE_CLASS` variable for the default CSI storage class to use. The default is `csi-hostpath-sc`
+* `storage.kubernetes.io/default-snapshot-class: "$SNAPSHOT_CLASS_NAME"` for the default volume snapshot class
+   to use with the storage class provided in the `E2E_CSI_STORAGE_CLASS` environment variable.
+
+The clusters created by setup-cluster.sh script will have the correct storage class and volume snapshot class
+detected automatically.
+
+The script will then run the tests on the existing cluster.
+
+We have also provided a shortcut to this script in the main `Makefile`:
+
+```shell
+make e2e-test-local
+```
+
 #### Environment variables
 
 In addition to the environment variables for the script,
@@ -251,7 +290,7 @@ the following ones can be defined:
   Default: `false`
 * `PRESERVE_NAMESPACES`: space separated list of namespace to be kept after
   the tests. Only useful if specified with `PRESERVE_CLUSTER=true`
-* `K8S_VERSION`: the version of K8s to run. Default: `v1.26.0`
+* `K8S_VERSION`: the version of K8s to run. Default: `v1.30.0`
 * `KIND_VERSION`: the version of `kind`. Defaults to the latest release
 * `BUILD_IMAGE`: true to build the Dockerfile and load it on kind,
   false to get the image from a registry. Default: `false`
@@ -266,53 +305,67 @@ choosing between `kind` or K3d engine.
 
 ### Running E2E tests on a fork of the repository
 
-Additionally, if you fork the repository and want to run the tests on your fork, you can do so with the `/test` command.
-
-`/test` is used to trigger a run of the end-to-end tests in the GitHub Actions. Only users who have `write` permission
-to the repository can use this command. The format of `/test`
-
-      `/test options`
+Additionally, if you fork the repository and want to run the tests on your fork, you can do so
+by running the `/test` command in a Pull Request opened in your forked repository.
+`/test` is used to trigger a run of the end-to-end tests in the GitHub Actions.
+Only users who have `write` permission to the repository can use this command.
 
 Options supported are:
 
-- test_level (level or tl for short)  
-  The priority of test to run, If test level is set, all tests with that priority and higher will
-  be triggered. Default value for the test level is 4. Available values are:
+- test_level (`level` or `tl` for short)
+  Each e2e test defines its own importance from 0(highest) to 4(lowest).
+  With `test_level` you can choose which tests the suite should be running.
+  If `test_level` is set, all tests with that importance or higher will be triggered.
+  E.g. selecting `1` will only run level `1` (high) and `0` (highest) tests.
+  Available values are:
   - 0: highest
   - 1: high
   - 2: medium
   - 3: low
-  - 4: lowest
+  - 4: lowest (default)
 
-- depth (d for short)   
-  The type of test to run. Default value is `main`, available values
-  are:
-  - push
-  - main
-  - pull_request
-  - schedule
-- feature_type (type or ft for short)  
-  The label for the end-to-end test to be run, empty value means all labels. Default value is empty, available
-  type are: [listed above in the feature types section](https://github.com/cloudnative-pg/cloudnative-pg/tree/main/contribute/e2e_testing_environment#using-feature-type-test-selectionfilter)
-- log_level (ll for short)    
-  Defines the log value for cloudNativePG operator, which will be specified as the value for `--log-value` in the 
-  operator command.
-  Default value is info and available values are: `error, warning, info, debug, trace`
-- build_plugin (plugin or bp for short)  
-  Whether to run the build cnpg plugin job in the end-to-end test. Available values are true and false and default value
-  is false.
+- depth (`d` for short)
+  Depth determines the matrix of K8S_VERSION x POSTGRES_VERSION jobs where E2E tests will be executed.
+  Default value is `main`. Available values are:
+  - push:
+    * oldest K8S_VERSION x oldest POSTGRES_VERSION
+    * latest K8S_VERSION x latest POSTGRES_VERSION
+    * no cloud providers
+  - main:
+    * each K8S_VERSION x oldest POSTGRES_VERSION
+    * each K8S_VERSION x latest POSTGRES_VERSION
+    * latest K8S_VERSION x each POSTGRES_VERSION
+    * On cloud providers: latest K8S_VERSION x latest POSTGRES_VERSION
+  - pull_request:
+    * same as `main`
+  - schedule:
+    * same as `main`
+    * On cloud providers: each K8S_VERSION x latest POSTGRES_VERSION
+
+- feature_type (`type` or `ft` for short)
+  A label to select a subset of E2E tests to be run, divided by functionality.
+  Empty value means no filter is applied. Default value is empty.
+  Available options are: [Relate to the feature types section](#using-feature-type-test-selectionfilter)
+
+- log_level (`ll` for short)
+  Defines the log value for CloudNativePG operator, which will be specified as the value for the `--log-value`
+  argument in the operator command. Available values are:
+  - error
+  - warning
+  - info
+  - debug (default)
+  - trace
 
 Example:
-1. Trigger an e2e test to run all test cases with `highest` test level, we want
-   to cover most Kubernetes and Postgres metrics
-
-  ```
-     /test -tl=0 d=schedule
-  ```
-2. Run smoke and upgrade test for the pull request
-  ```
-     /test type=smoke,upgrade
-  ```
+1. Trigger an e2e test to run all test cases with `lowest` test level.
+   We want to cover most Kubernetes x Postgres combinations.
+   ```
+      /test tl=4 d=schedule
+   ```
+2. Run only smoke and upgrade tests
+   ```
+      /test type=smoke,upgrade
+   ```
 
 ## Storage class for volume snapshots on Kind
 

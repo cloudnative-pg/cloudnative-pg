@@ -17,53 +17,53 @@ limitations under the License.
 package e2e
 
 import (
-	"bufio"
-	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
-	"io"
-	"math"
-	"os"
-	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
+	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/onsi/ginkgo/v2/types"
 	"github.com/thoas/go-funk"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	k8sscheme "k8s.io/client-go/kubernetes/scheme"
 
 	// +kubebuilder:scaffold:imports
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/logs"
+	cnpgUtils "github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/minio"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/sternmultitailer"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
 const (
-	fixturesDir         = "./fixtures"
-	RetryTimeout        = utils.RetryTimeout
-	PollingTime         = utils.PollingTime
-	psqlClientNamespace = "psql-client-namespace"
+	fixturesDir  = "./fixtures"
+	RetryTimeout = utils.RetryTimeout
+	PollingTime  = utils.PollingTime
 )
 
 var (
 	env                     *utils.TestingEnvironment
 	testLevelEnv            *tests.TestEnvLevel
 	testCloudVendorEnv      *utils.TestEnvVendor
-	psqlClientPod           *corev1.Pod
 	expectedOperatorPodName string
 	operatorPodWasRenamed   bool
 	operatorWasRestarted    bool
-	operatorLogDumped       bool
 	quickDeletionPeriod     = int64(1)
 	testTimeouts            map[utils.Timeout]int
+	minioEnv                = &minio.Env{
+		Namespace:    "minio",
+		ServiceName:  "minio-service.minio",
+		CaSecretName: "minio-server-ca-secret",
+		TLSSecret:    "minio-server-tls-secret",
+	}
 )
 
 var _ = SynchronizedBeforeSuite(func() []byte {
@@ -71,122 +71,88 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	env, err = utils.NewTestingEnvironment()
 	Expect(err).ShouldNot(HaveOccurred())
 
-	pod, err := utils.GetPsqlClient(psqlClientNamespace, env)
-	Expect(err).ShouldNot(HaveOccurred())
+	// Start stern to write the logs of every pod we are interested in. Since we don't have a way to have a selector
+	// matching both the operator's and the clusters' pods, we need to start stern twice.
+	sternClustersCtx, sternClusterCancel := context.WithCancel(env.Ctx)
+	sternClusterDoneChan := sternmultitailer.StreamLogs(sternClustersCtx, env.Interface, clusterPodsLabelSelector(),
+		env.SternLogDir)
 	DeferCleanup(func() {
-		err := env.DeleteNamespaceAndWait(psqlClientNamespace, 300)
+		sternClusterCancel()
+		<-sternClusterDoneChan
+	})
+	sternOperatorCtx, sternOperatorCancel := context.WithCancel(env.Ctx)
+	sternOperatorDoneChan := sternmultitailer.StreamLogs(sternOperatorCtx, env.Interface, operatorPodsLabelSelector(),
+		env.SternLogDir)
+	DeferCleanup(func() {
+		sternOperatorCancel()
+		<-sternOperatorDoneChan
+	})
+
+	_ = corev1.AddToScheme(env.Scheme)
+	_ = appsv1.AddToScheme(env.Scheme)
+
+	// Set up a global MinIO service on his own namespace
+	err = env.CreateNamespace(minioEnv.Namespace)
+	Expect(err).ToNot(HaveOccurred())
+	DeferCleanup(func() {
+		err := env.DeleteNamespaceAndWait(minioEnv.Namespace, 300)
 		Expect(err).ToNot(HaveOccurred())
 	})
-	// here we serialized psql client pod object info and will be
-	// accessible to all nodes (specs)
-	psqlPodJSONObj, err := json.Marshal(pod)
+	minioEnv.Timeout = uint(testTimeouts[utils.MinioInstallation])
+	minioClient, err := minio.Deploy(minioEnv, env)
+	Expect(err).ToNot(HaveOccurred())
+
+	caSecret := minioEnv.CaPair.GenerateCASecret(minioEnv.Namespace, minioEnv.CaSecretName)
+	minioEnv.CaSecretObj = *caSecret
+	objs := map[string]corev1.Pod{
+		"minio": *minioClient,
+	}
+
+	jsonObjs, err := json.Marshal(objs)
 	if err != nil {
 		panic(err)
 	}
-	return psqlPodJSONObj
-}, func(data []byte) {
+
+	return jsonObjs
+}, func(jsonObjs []byte) {
 	var err error
 	// We are creating new testing env object again because above testing env can not serialize and
 	// accessible to all nodes (specs)
 	if env, err = utils.NewTestingEnvironment(); err != nil {
 		panic(err)
 	}
+
 	_ = k8sscheme.AddToScheme(env.Scheme)
 	_ = apiv1.AddToScheme(env.Scheme)
+
 	if testLevelEnv, err = tests.TestLevel(); err != nil {
 		panic(err)
 	}
+
 	if testTimeouts, err = utils.Timeouts(); err != nil {
 		panic(err)
 	}
+
 	if testCloudVendorEnv, err = utils.TestCloudVendor(); err != nil {
 		panic(err)
 	}
-	if err := json.Unmarshal(data, &psqlClientPod); err != nil {
+
+	var objs map[string]*corev1.Pod
+	if err := json.Unmarshal(jsonObjs, &objs); err != nil {
 		panic(err)
 	}
+
+	minioEnv.Client = objs["minio"]
 })
 
-var _ = SynchronizedAfterSuite(func() {
-}, func() {
+var _ = ReportAfterSuite("Gathering failed reports", func(report Report) {
+	// Keep the logs of the operator and the clusters in case of failure
+	// If everything is skipped, env has not been initialized, and we'll have nothing to clean up
+	if report.SuiteSucceeded && env != nil {
+		err := fileutils.RemoveDirectory(env.SternLogDir)
+		Expect(err).ToNot(HaveOccurred())
+	}
 })
-
-// saveLogs does 2 things:
-//   - displays the last `capLines` of error/warning logs on the `output` io.Writer (likely GinkgoWriter)
-//   - saves the full logs to a file
-//
-// along the way it parses the timestamps for convenience, BUT the lines
-// of output are not legal JSON
-func saveLogs(buf *bytes.Buffer, logsType, specName string, output io.Writer, capLines int) {
-	scanner := bufio.NewScanner(buf)
-	filename := fmt.Sprintf("out/%s_%s.log", logsType, specName)
-	f, err := os.Create(filepath.Clean(filename))
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	defer func() {
-		syncErr := f.Sync()
-		if syncErr != nil {
-			fmt.Fprintln(output, "ERROR while flushing file:", syncErr)
-		}
-		closeErr := f.Close()
-		if closeErr != nil {
-			fmt.Fprintln(output, "ERROR while closing file:", err)
-		}
-	}()
-
-	// circular buffer to hold the last `capLines` of non-DEBUG operator logs
-	lineBuffer := make([]string, capLines)
-	// count of lines to be shown in Ginkgo console (error or warning logs)
-	linesToShow := 0
-	// insertion point in the lineBuffer: values 0 to capLines - 1 (i.e. modulo capLines)
-	bufferIdx := 0
-
-	for scanner.Scan() {
-		lg := scanner.Text()
-
-		var js map[string]interface{}
-		err = json.Unmarshal([]byte(lg), &js)
-		if err != nil {
-			fmt.Fprintln(output, "ERROR parsing log:", err, lg)
-		}
-		timestamp, ok := js["ts"].(float64)
-		if ok {
-			ts := time.UnixMicro(int64(math.Floor(timestamp * 1000000)))
-			lg = ts.Format(time.Stamp) + " - " + lg
-		}
-
-		// store the latest line of error or warning log to the slice
-
-		if js["level"] == log.WarningLevelString || js["level"] == log.ErrorLevelString {
-			lineBuffer[bufferIdx] = lg
-			linesToShow++
-			// `bufferIdx` walks from `0` to `capLines-1` and then to `0` in a cycle
-			bufferIdx = linesToShow % capLines
-		}
-		// write every line to the file stream
-		fmt.Fprintln(f, lg)
-	}
-
-	// print the last `capLines` lines of logs to the `output`
-	switch {
-	case linesToShow == 0:
-		fmt.Fprintln(output, "-- no error / warning logs --")
-	case linesToShow <= capLines:
-		fmt.Fprintln(output, strings.Join(lineBuffer[:linesToShow], "\n"))
-	case bufferIdx == 0:
-		// if bufferIdx == 0, the buffer just finished filling and is in order
-		fmt.Fprintln(output, strings.Join(lineBuffer, "\n"))
-	default:
-		// the line buffer cycled back and the items 0 to bufferIdx - 1 are newer than the rest
-		fmt.Fprintln(output, strings.Join(append(lineBuffer[bufferIdx:], lineBuffer[:bufferIdx]...), "\n"))
-	}
-
-	if err := scanner.Err(); err != nil {
-		fmt.Fprintln(output, "ERROR while scanning:", err)
-	}
-}
 
 var _ = BeforeEach(func() {
 	labelsForTestsBreakingTheOperator := []string{"upgrade", "disruptive"}
@@ -199,27 +165,6 @@ var _ = BeforeEach(func() {
 
 	operatorPod, err := env.GetOperatorPod()
 	Expect(err).ToNot(HaveOccurred())
-
-	GinkgoWriter.Println("Putting Tail on the operator log")
-	var buf bytes.Buffer
-	go func() {
-		// get logs without timestamp parsing; for JSON parseability
-		err = logs.TailPodLogs(context.TODO(), env.Interface, operatorPod, &buf, false)
-		if err != nil {
-			_, _ = fmt.Fprintf(&buf, "Error tailing logs, dumping operator logs: %v\n", err)
-		}
-	}()
-	DeferCleanup(func(ctx SpecContext) {
-		if CurrentSpecReport().Failed() {
-			specName := CurrentSpecReport().FullText()
-			capLines := 10
-			GinkgoWriter.Printf("DUMPING tailed Operator Logs with error/warning (at most %v lines ). Failed Spec: %v\n",
-				capLines, specName)
-			GinkgoWriter.Println("================================================================================")
-			saveLogs(&buf, "operator_logs", strings.ReplaceAll(specName, " ", "_"), GinkgoWriter, capLines)
-			GinkgoWriter.Println("================================================================================")
-		}
-	})
 
 	if operatorPodWasRenamed {
 		Skip("Skipping test. Operator was renamed")
@@ -260,22 +205,30 @@ var _ = AfterEach(func() {
 	}
 	wasRestarted := utils.OperatorPodRestarted(operatorPod)
 	if wasRestarted {
-		if !operatorLogDumped {
-			// get the PREVIOUS operator logs
-			requestedLineLength := 10
-			lines, err := env.DumpOperatorLogs(wasRestarted, requestedLineLength)
-			if err == nil {
-				operatorLogDumped = true
-				// print out a sample of the last `requestedLineLength` lines of logs
-				GinkgoWriter.Println("DUMPING previous operator log due to operator restart:")
-				for _, line := range lines {
-					GinkgoWriter.Println(line)
-				}
-			} else {
-				GinkgoWriter.Printf("Failed getting the latest operator logs: %v\n", err)
-			}
-		}
 		operatorWasRestarted = true
 		Fail("operator was restarted")
 	}
 })
+
+// clusterPodsLabelSelector returns a label selector to match all the pods belonging to the CNPG clusters
+func clusterPodsLabelSelector() labels.Selector {
+	labelSelector, _ := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
+		MatchExpressions: []metav1.LabelSelectorRequirement{
+			{
+				Key:      cnpgUtils.ClusterLabelName,
+				Operator: metav1.LabelSelectorOpExists,
+			},
+		},
+	})
+	return labelSelector
+}
+
+// operatorPodsLabelSelector returns a label selector to match all the pods belonging to the CNPG operator
+func operatorPodsLabelSelector() labels.Selector {
+	labelSelector, _ := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
+		MatchLabels: map[string]string{
+			"app.kubernetes.io/name": "cloudnative-pg",
+		},
+	})
+	return labelSelector
+}

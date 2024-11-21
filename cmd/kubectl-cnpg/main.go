@@ -22,6 +22,7 @@ package main
 import (
 	"os"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
@@ -33,8 +34,11 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/fio"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/hibernate"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/install"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/logical/publication"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/logical/subscription"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/logs"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/maintenance"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/pgadmin"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/pgbench"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/promote"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/psql"
@@ -44,7 +48,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/snapshot"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/status"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/versions"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )
@@ -54,11 +57,16 @@ func main() {
 	configFlags := genericclioptions.NewConfigFlags(true)
 
 	rootCmd := &cobra.Command{
-		Use:          "kubectl-cnpg",
-		Short:        "A plugin to manage your CloudNativePG clusters",
+		Use:   "kubectl-cnpg",
+		Short: "A plugin to manage your CloudNativePG clusters",
+		Annotations: map[string]string{
+			cobra.CommandDisplayNameAnnotation: "kubectl cnpg",
+		},
 		SilenceUsage: true,
-		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
 			logFlags.ConfigureLogging()
+
+			plugin.ConfigureColor(cmd)
 
 			// If we're invoking the completion command we shouldn't try to create
 			// a Kubernetes client and we just let the Cobra flow to continue
@@ -74,24 +82,61 @@ func main() {
 	logFlags.AddFlags(rootCmd.PersistentFlags())
 	configFlags.AddFlags(rootCmd.PersistentFlags())
 
-	rootCmd.AddCommand(certificate.NewCmd())
-	rootCmd.AddCommand(destroy.NewCmd())
-	rootCmd.AddCommand(fence.NewCmd())
-	rootCmd.AddCommand(fio.NewCmd())
-	rootCmd.AddCommand(hibernate.NewCmd())
-	rootCmd.AddCommand(install.NewCmd())
-	rootCmd.AddCommand(maintenance.NewCmd())
-	rootCmd.AddCommand(pgbench.NewCmd())
-	rootCmd.AddCommand(promote.NewCmd())
-	rootCmd.AddCommand(reload.NewCmd())
-	rootCmd.AddCommand(report.NewCmd())
-	rootCmd.AddCommand(restart.NewCmd())
-	rootCmd.AddCommand(status.NewCmd())
-	rootCmd.AddCommand(versions.NewCmd())
-	rootCmd.AddCommand(backup.NewCmd())
-	rootCmd.AddCommand(psql.NewCmd())
-	rootCmd.AddCommand(snapshot.NewCmd())
-	rootCmd.AddCommand(logs.NewCmd())
+	adminGroup := &cobra.Group{
+		ID:    plugin.GroupIDAdmin,
+		Title: "Operator-level administration",
+	}
+
+	troubleshootingGroup := &cobra.Group{
+		ID:    plugin.GroupIDTroubleshooting,
+		Title: "Troubleshooting",
+	}
+
+	pgClusterGroup := &cobra.Group{
+		ID:    plugin.GroupIDCluster,
+		Title: "Cluster administration",
+	}
+
+	pgDatabaseGroup := &cobra.Group{
+		ID:    plugin.GroupIDDatabase,
+		Title: "Database administration",
+	}
+
+	miscGroup := &cobra.Group{
+		ID:    plugin.GroupIDMiscellaneous,
+		Title: "Miscellaneous",
+	}
+
+	rootCmd.AddGroup(adminGroup, troubleshootingGroup, pgClusterGroup, pgDatabaseGroup, miscGroup)
+
+	subcommands := []*cobra.Command{
+		backup.NewCmd(),
+		certificate.NewCmd(),
+		destroy.NewCmd(),
+		fence.NewCmd(),
+		fio.NewCmd(),
+		hibernate.NewCmd(),
+		install.NewCmd(),
+		logs.NewCmd(),
+		maintenance.NewCmd(),
+		pgadmin.NewCmd(),
+		pgbench.NewCmd(),
+		promote.NewCmd(),
+		psql.NewCmd(),
+		publication.NewCmd(),
+		reload.NewCmd(),
+		report.NewCmd(),
+		restart.NewCmd(),
+		snapshot.NewCmd(),
+		status.NewCmd(),
+		subscription.NewCmd(),
+		versions.NewCmd(),
+	}
+
+	for _, cmd := range subcommands {
+		plugin.AddColorControlFlag(cmd)
+		rootCmd.AddCommand(cmd)
+	}
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)

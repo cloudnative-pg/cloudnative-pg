@@ -18,13 +18,19 @@ package utils
 
 import (
 	"fmt"
+	"io"
+	"path/filepath"
 	"regexp"
 	"strconv"
+	"strings"
+	"sync"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/discovery"
 	ctrl "sigs.k8s.io/controller-runtime"
+
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/executablehash"
 )
 
 // haveSCC stores the result of the DetectSecurityContextConstraints check
@@ -33,8 +39,56 @@ var haveSCC bool
 // haveVolumeSnapshot stores the result of the VolumeSnapshotExist function
 var haveVolumeSnapshot bool
 
-// supportSeccomp specifies whether we should set the SeccompProfile or not in the pods
-var supportSeccomp bool
+// olmPlatform specifies whether we are running on a platform with OLM support
+var olmPlatform bool
+
+// AvailableArchitecture is a struct containing info about an available architecture
+type AvailableArchitecture struct {
+	GoArch         string
+	hash           string
+	mx             sync.Mutex
+	hashCalculator func(name string) (hash string, err error)
+	binaryPath     string
+}
+
+func newAvailableArchitecture(goArch, binaryPath string) *AvailableArchitecture {
+	return &AvailableArchitecture{
+		GoArch:         goArch,
+		hashCalculator: executablehash.GetByName,
+		binaryPath:     binaryPath,
+	}
+}
+
+// GetHash retrieves the hash for a given AvailableArchitecture
+func (arch *AvailableArchitecture) GetHash() string {
+	return arch.calculateHash()
+}
+
+// calculateHash calculates the hash for a given AvailableArchitecture
+func (arch *AvailableArchitecture) calculateHash() string {
+	arch.mx.Lock()
+	defer arch.mx.Unlock()
+
+	if arch.hash != "" {
+		return arch.hash
+	}
+
+	hash, err := arch.hashCalculator(arch.binaryPath)
+	if err != nil {
+		panic(fmt.Errorf("while calculating architecture hash: %w", err))
+	}
+
+	arch.hash = hash
+	return hash
+}
+
+// FileStream opens a stream reading from the manager's binary
+func (arch *AvailableArchitecture) FileStream() (io.ReadCloser, error) {
+	return executablehash.StreamByName(arch.binaryPath)
+}
+
+// availableArchitectures stores the result of DetectAvailableArchitectures function
+var availableArchitectures []*AvailableArchitecture
 
 // minorVersionRegexp is used to extract the minor version from
 // the Kubernetes API server version. Some providers, like AWS,
@@ -128,17 +182,6 @@ func PodMonitorExist(client discovery.DiscoveryInterface) (bool, error) {
 	return exist, nil
 }
 
-// HaveSeccompSupport returns true if Seccomp is supported. If it is, we should
-// set the SeccompProfile in the pods
-func HaveSeccompSupport() bool {
-	return supportSeccomp
-}
-
-// SetSeccompSupport set the supportSeccomp variable to a specific value for testing purposes
-func SetSeccompSupport(value bool) {
-	supportSeccomp = value
-}
-
 // extractK8sMinorVersion extracts and parses the Kubernetes minor version from
 // the version info that's been  detected by discovery client
 func extractK8sMinorVersion(info *version.Info) (int, error) {
@@ -151,23 +194,49 @@ func extractK8sMinorVersion(info *version.Info) (int, error) {
 	return strconv.Atoi(matches[1])
 }
 
-// DetectSeccompSupport checks the version of Kubernetes in the cluster to determine
-// whether Seccomp is supported
-func DetectSeccompSupport(client discovery.DiscoveryInterface) (err error) {
-	supportSeccomp = false
-	kubernetesVersion, err := client.ServerVersion()
+// GetAvailableArchitectures returns the available instance's architectures
+func GetAvailableArchitectures() []*AvailableArchitecture { return availableArchitectures }
+
+// GetAvailableArchitecture returns an available architecture given its goArch
+func GetAvailableArchitecture(goArch string) (*AvailableArchitecture, error) {
+	for _, a := range availableArchitectures {
+		if a.GoArch == goArch {
+			return a, nil
+		}
+	}
+	return nil, fmt.Errorf("invalid architecture: %s", goArch)
+}
+
+// detectAvailableArchitectures detects the architectures available in a given path
+func detectAvailableArchitectures(filepathGlob string) error {
+	binaries, err := filepath.Glob(filepathGlob)
 	if err != nil {
 		return err
 	}
-
-	minor, err := extractK8sMinorVersion(kubernetesVersion)
-	if err != nil {
-		return err
+	for _, b := range binaries {
+		goArch := strings.Split(filepath.Base(b), "manager_")[1]
+		arch := newAvailableArchitecture(goArch, b)
+		availableArchitectures = append(availableArchitectures, arch)
+		go arch.calculateHash()
 	}
 
-	if minor >= 24 {
-		supportSeccomp = true
-	}
+	return err
+}
 
+// DetectAvailableArchitectures detects the architectures available in the cluster
+func DetectAvailableArchitectures() error {
+	return detectAvailableArchitectures("bin/manager_*")
+}
+
+// DetectOLM looks for the operators.coreos.com operators resource in the current
+// Kubernetes cluster
+func DetectOLM(client discovery.DiscoveryInterface) (err error) {
+	olmPlatform = false
+	olmPlatform, err = resourceExist(client, "operators.coreos.com/v1", "operators")
 	return
+}
+
+// RunningOnOLM returns if we're running over a Kubernetes cluster with OLM support
+func RunningOnOLM() bool {
+	return olmPlatform
 }

@@ -23,6 +23,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/cloudnative-pg/machinery/pkg/fileutils"
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
@@ -32,9 +34,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/pgbouncer/config"
 )
 
@@ -63,10 +63,12 @@ func NewPgBouncerReconciler(poolerNamespacedName types.NamespacedName) (*PgBounc
 
 // Run runs the reconciliation loop for this resource
 func (r *PgBouncerReconciler) Run(ctx context.Context) {
+	contextLogger := log.FromContext(ctx)
+
 	for {
 		// Retry with exponential back-off, unless it is a connection refused error
 		err := retry.OnError(retry.DefaultBackoff, func(err error) bool {
-			log.Error(err, "Error calling Watch")
+			contextLogger.Error(err, "Error calling Watch")
 			return !utilnet.IsConnectionRefused(err)
 		}, func() error {
 			return r.watch(ctx)
@@ -81,6 +83,8 @@ func (r *PgBouncerReconciler) Run(ctx context.Context) {
 
 // watch contains the main reconciler loop
 func (r *PgBouncerReconciler) watch(ctx context.Context) error {
+	contextLogger := log.FromContext(ctx)
+
 	var err error
 
 	r.poolerWatch, err = r.client.Watch(ctx, &apiv1.PoolerList{}, &ctrl.ListOptions{
@@ -98,7 +102,7 @@ func (r *PgBouncerReconciler) watch(ctx context.Context) error {
 			return r.Reconcile(ctx, &receivedEvent)
 		})
 		if err != nil {
-			log.Error(err, "Reconciliation error")
+			contextLogger.Error(err, "Reconciliation error")
 		}
 	}
 	return nil
@@ -118,7 +122,7 @@ func (r *PgBouncerReconciler) GetClient() ctrl.Client {
 
 // Reconcile is the main reconciliation loop for the pgbouncer instance
 func (r *PgBouncerReconciler) Reconcile(ctx context.Context, event *watch.Event) error {
-	contextLogger, _ := log.SetupLogger(ctx)
+	contextLogger := log.FromContext(ctx)
 	contextLogger.Debug(
 		"Reconciliation loop",
 		"eventType", event.Type,
@@ -205,7 +209,7 @@ func (r *PgBouncerReconciler) writePgBouncerConfig(ctx context.Context, pooler *
 		return false, fmt.Errorf("while generating pgbouncer configuration: %w", err)
 	}
 
-	return refreshConfigurationFiles(configFiles)
+	return refreshConfigurationFiles(ctx, configFiles)
 }
 
 // Init ensures that all PgBouncer requirement are met.
@@ -214,6 +218,8 @@ func (r *PgBouncerReconciler) writePgBouncerConfig(ctx context.Context, pooler *
 // 1. create the pgbouncer configuration and the required secrets
 // 2. ensure that every needed folder is existent
 func (r *PgBouncerReconciler) Init(ctx context.Context) error {
+	contextLogger := log.FromContext(ctx)
+
 	var pooler apiv1.Pooler
 
 	// Get the pooler from the API Server
@@ -228,7 +234,7 @@ func (r *PgBouncerReconciler) Init(ctx context.Context) error {
 
 	// Ensure we have the directory to store the controlling socket
 	if err := fileutils.EnsureDirectoryExists(config.PgBouncerSocketDir); err != nil {
-		log.Error(err, "while checking socket directory existed", "dir", config.PgBouncerSocketDir)
+		contextLogger.Error(err, "while checking socket directory existed", "dir", config.PgBouncerSocketDir)
 		return err
 	}
 

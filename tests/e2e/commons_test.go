@@ -18,11 +18,9 @@ package e2e
 
 import "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
-const (
-	minioClientName = "mc"
-	checkPointCmd   = "psql -U postgres postgres -tAc 'CHECKPOINT;'"
-	getLatestWalCmd = "psql -U postgres postgres -tAc 'SELECT pg_walfile_name(pg_switch_wal());'"
-)
+func MustGetEnvProfile() utils.EnvProfile {
+	return utils.GetEnvProfile(*testCloudVendorEnv)
+}
 
 // IsAKS checks if the running cluster is on AKS
 func IsAKS() bool {
@@ -42,4 +40,9 @@ func IsGKE() bool {
 // IsLocal checks if the running cluster is on local
 func IsLocal() bool {
 	return *testCloudVendorEnv == utils.LOCAL
+}
+
+// IsOpenshift checks if the running cluster is on OpenShift
+func IsOpenshift() bool {
+	return *testCloudVendorEnv == utils.OCP
 }

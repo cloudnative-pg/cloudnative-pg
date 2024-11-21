@@ -23,13 +23,15 @@ ifeq (,$(CONTROLLER_IMG))
 IMAGE_TAG = $(shell (git symbolic-ref -q --short HEAD || git describe --tags --exact-match) | tr / -)
 ifneq (,${IMAGE_TAG})
 CONTROLLER_IMG = ${IMAGE_NAME}:${IMAGE_TAG}
-BUNDLE_IMG = ${IMAGE_NAME}:bundle-${IMAGE_TAG}
 endif
 endif
+CATALOG_IMG ?= $(shell echo "${CONTROLLER_IMG}" | sed -e 's/:/:catalog-/')
+BUNDLE_IMG ?= $(shell echo "${CONTROLLER_IMG}" | sed -e 's/:/:bundle-/')
 
 COMMIT := $(shell git rev-parse --short HEAD || echo unknown)
 DATE := $(shell git log -1 --pretty=format:'%ad' --date short)
 VERSION := $(shell git describe --tags --match 'v*' | sed -e 's/^v//; s/-g[0-9a-f]\+$$//; s/-\([0-9]\+\)$$/-dev\1/')
+REPLACE_VERSION := $(shell git describe --tags --abbrev=0 $(shell git describe --tags --match 'v*' --abbrev=0)^)
 LDFLAGS= "-X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildVersion=${VERSION} $\
 -X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildCommit=${COMMIT} $\
 -X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildDate=${DATE}"
@@ -39,15 +41,15 @@ LOCALBIN ?= $(shell pwd)/bin
 
 BUILD_IMAGE ?= true
 POSTGRES_IMAGE_NAME ?= $(shell grep 'DefaultImageName.*=' "pkg/versions/versions.go" | cut -f 2 -d \")
-KUSTOMIZE_VERSION ?= v5.3.0
-KIND_CLUSTER_NAME ?= pg
-KIND_CLUSTER_VERSION ?= v1.28.0
-CONTROLLER_TOOLS_VERSION ?= v0.13.0
-GORELEASER_VERSION ?= v1.22.1
-SPELLCHECK_VERSION ?= 0.35.0
+KUSTOMIZE_VERSION ?= v5.5.0
+CONTROLLER_TOOLS_VERSION ?= v0.16.5
+GORELEASER_VERSION ?= v2.4.4
+SPELLCHECK_VERSION ?= 0.45.0
 WOKE_VERSION ?= 0.19.0
-OPERATOR_SDK_VERSION ?= 1.31.0
-OPENSHIFT_VERSIONS ?= v4.11-v4.14
+OPERATOR_SDK_VERSION ?= v1.37.0
+OPM_VERSION ?= v1.48.0
+PREFLIGHT_VERSION ?= 1.10.2
+OPENSHIFT_VERSIONS ?= v4.12-v4.17
 ARCH ?= amd64
 
 export CONTROLLER_IMG
@@ -90,13 +92,22 @@ help: ## Display this help.
 
 ##@ Development
 
+print-version:
+	echo ${VERSION}
+
 ENVTEST_ASSETS_DIR=$$(pwd)/testbin
 test: generate fmt vet manifests envtest ## Run tests.
 	mkdir -p ${ENVTEST_ASSETS_DIR} ;\
 	source <(${ENVTEST} use -p env --bin-dir ${ENVTEST_ASSETS_DIR} ${ENVTEST_K8S_VERSION}) ;\
 	export KUBEBUILDER_CONTROLPLANE_STOP_TIMEOUT=60s ;\
 	export KUBEBUILDER_CONTROLPLANE_START_TIMEOUT=60s ;\
-	go test -coverpkg=./... --count=1 -coverprofile=cover.out ./api/... ./cmd/... ./controllers/... ./internal/... ./pkg/... ./tests/utils ;
+	go test -coverpkg=./... -coverprofile=cover.out ./api/... ./cmd/... ./internal/... ./pkg/... ./tests/utils
+
+test-race: generate fmt vet manifests envtest ## Run tests enabling race detection.
+	mkdir -p ${ENVTEST_ASSETS_DIR} ;\
+	source <(${ENVTEST} use -p env --bin-dir ${ENVTEST_ASSETS_DIR} ${ENVTEST_K8S_VERSION}) ;\
+	go run github.com/onsi/ginkgo/v2/ginkgo -r -p --skip-package=e2e \
+	  --race --keep-going --fail-on-empty --randomize-all --randomize-suites
 
 e2e-test-kind: ## Run e2e tests locally using kind.
 	hack/e2e/run-e2e-kind.sh
@@ -121,7 +132,7 @@ run: generate fmt vet manifests ## Run against the configured Kubernetes cluster
 
 docker-build: go-releaser ## Build the docker image.
 	GOOS=linux GOARCH=${ARCH} GOPATH=$(go env GOPATH) DATE=${DATE} COMMIT=${COMMIT} VERSION=${VERSION} \
-	  $(GO_RELEASER) build --skip-validate --clean --single-target $(if $(VERSION),,--snapshot)
+	  $(GO_RELEASER) build --skip=validate --clean --single-target $(if $(VERSION),,--snapshot)
 	DOCKER_BUILDKIT=1 docker build . -t ${CONTROLLER_IMG} --build-arg VERSION=${VERSION}
 
 docker-push: ## Push the docker image.
@@ -137,8 +148,9 @@ olm-bundle: manifests kustomize operator-sdk ## Build the bundle for OLM install
 		cd "$${CONFIG_TMP_DIR}" ;\
 	) ;\
 	rm -fr bundle bundle.Dockerfile ;\
+	sed -i -e "s/ClusterRole/Role/" "$${CONFIG_TMP_DIR}/config/rbac/role.yaml" "$${CONFIG_TMP_DIR}/config/rbac/role_binding.yaml"  ;\
 	($(KUSTOMIZE) build "$${CONFIG_TMP_DIR}/config/olm-manifests") | \
-	sed -e "s@\$${CREATED_AT}@$$(LANG=C date -Iseconds -u)@g" | \
+	sed -e "s@\$${VERSION}@${VERSION}@g; s@\$${REPLACE_VERSION}@${REPLACE_VERSION}@g" | \
 	$(OPERATOR_SDK) generate bundle --verbose --overwrite --manifests --metadata --package cloudnative-pg --channels stable-v1 --use-image-digests --default-channel stable-v1 --version "${VERSION}" ; \
 	echo -e "\n  # OpenShift annotations." >> bundle/metadata/annotations.yaml ;\
 	echo -e "  com.redhat.openshift.versions: $(OPENSHIFT_VERSIONS)" >> bundle/metadata/annotations.yaml ;\
@@ -158,7 +170,7 @@ olm-catalog: olm-bundle opm ## Build and push the index image for OLM Catalog
 	    - Image: ${BUNDLE_IMG}" | envsubst > cloudnative-pg-operator-template.yaml
 	$(OPM) alpha render-template semver -o yaml < cloudnative-pg-operator-template.yaml > catalog/catalog.yaml ;\
 	$(OPM) validate catalog/ ;\
-	DOCKER_BUILDKIT=1 docker build --push -f catalog.Dockerfile -t ${IMAGE_NAME}:catalog-${VERSION} . ;\
+	DOCKER_BUILDKIT=1 docker build --push -f catalog.Dockerfile -t ${CATALOG_IMG} . ;\
 	echo -e "apiVersion: operators.coreos.com/v1alpha1\n\
 	kind: CatalogSource\n\
 	metadata:\n\
@@ -166,17 +178,19 @@ olm-catalog: olm-bundle opm ## Build and push the index image for OLM Catalog
 	   namespace: operators\n\
 	spec:\n\
 	   sourceType: grpc\n\
-	   image: ${IMAGE_NAME}:catalog-${VERSION}" | envsubst > cloudnative-pg-catalog.yaml ;\
+	   image: ${CATALOG_IMG}\n\
+	   secrets:\n\
+       - cnpg-pull-secret" | envsubst > cloudnative-pg-catalog.yaml ;\
 
 ##@ Deployment
 install: manifests kustomize ## Install CRDs into a cluster.
-	$(KUSTOMIZE) build config/crd | kubectl apply -f -
+	$(KUSTOMIZE) build config/crd | kubectl apply --server-side -f -
 
 uninstall: manifests kustomize ## Uninstall CRDs from a cluster.
 	$(KUSTOMIZE) build config/crd | kubectl delete -f -
 
 deploy: generate-manifest ## Deploy controller in the configured Kubernetes cluster in ~/.kube/config.
-	kubectl apply -f ${OPERATOR_MANIFEST_PATH}
+	kubectl apply --server-side --force-conflicts -f ${OPERATOR_MANIFEST_PATH}
 
 generate-manifest: manifests kustomize ## Generate manifest used for deployment.
 	set -e ;\
@@ -226,10 +240,10 @@ shellcheck: ## Shellcheck for the hack directory.
 	}
 
 spellcheck: ## Runs the spellcheck on the project.
-	docker run --rm -v $(PWD):/tmp jonasbn/github-action-spellcheck:$(SPELLCHECK_VERSION)
+	docker run --rm -v $(PWD):/tmp:Z jonasbn/github-action-spellcheck:$(SPELLCHECK_VERSION)
 
 woke: ## Runs the woke checks on project.
-	docker run --rm -v $(PWD):/src -w /src getwoke/woke:$(WOKE_VERSION) woke -c .woke.yaml
+	docker run --rm -v $(PWD):/src:Z -w /src getwoke/woke:$(WOKE_VERSION) woke -c .woke.yaml
 
 wordlist-ordered: ## Order the wordlist using sort
 	LANG=C LC_ALL=C sort .wordlist-en-custom.txt > .wordlist-en-custom.txt.new && \
@@ -249,7 +263,7 @@ checks: go-mod-check generate manifests apidoc fmt spellcheck wordlist-ordered w
 licenses: go-licenses ## Generate the licenses folder.
 	# The following statement is expected to fail because our license is unrecognised
 	$(GO_LICENSES) \
-		save github.com/cloudnative-pg/cloudnative-pg \
+		save ./... \
 		--save_path licenses/go-licenses --force || true
 	chmod a+rw -R licenses/go-licenses
 	find licenses/go-licenses \( -name '*.mod' -or -name '*.go' \) -delete
@@ -263,7 +277,7 @@ apidoc: genref ## Update the API Reference section of the documentation.
 ##@ Cleanup
 
 clean: ## Clean-up the work tree from build/test artifacts
-	rm -rf $(LOCALBIN)/kubectl-cnpg $(LOCALBIN)/manager $(DIST_PATH) _*/ tests/e2e/out/ cover.out
+	rm -rf $(LOCALBIN)/kubectl-cnpg $(LOCALBIN)/manager $(DIST_PATH) _*/ tests/e2e/out/ tests/e2e/*_logs/ cover.out
 
 distclean: clean ## Clean-up the work tree removing also cached tools binaries
 	! [ -d "$(ENVTEST_ASSETS_DIR)" ] || chmod -R u+w $(ENVTEST_ASSETS_DIR)
@@ -303,7 +317,7 @@ go-licenses: ## Download go-licenses locally if necessary.
 
 GO_RELEASER = $(LOCALBIN)/goreleaser
 go-releaser: ## Download go-releaser locally if necessary.
-	$(call go-install-tool,$(GO_RELEASER),github.com/goreleaser/goreleaser@$(GORELEASER_VERSION))
+	$(call go-install-tool,$(GO_RELEASER),github.com/goreleaser/goreleaser/v2@$(GORELEASER_VERSION))
 
 .PHONY: govulncheck
 GOVULNCHECK = $(LOCALBIN)/govulncheck
@@ -329,33 +343,44 @@ kind-cluster-destroy: ## Destroy KinD cluster created using kind-cluster command
 	hack/setup-cluster.sh -n1 -r destroy
 
 .PHONY: operator-sdk
+OPERATOR_SDK = $(LOCALBIN)/operator-sdk
 operator-sdk: ## Install the operator-sdk app
-ifneq ($(shell PATH="$(LOCALBIN):$${PATH}" operator-sdk version 2>/dev/null | awk -F '"' '{print $$2}'), $(OPERATOR_SDK_VERSION))
+ifneq ($(shell $(OPERATOR_SDK) version 2>/dev/null | awk -F '"' '{print $$2}'), $(OPERATOR_SDK_VERSION))
 	@{ \
 	set -e ;\
 	mkdir -p $(LOCALBIN) ;\
-	GO_ARCH=$(shell go env GOARCH) ;\
-	SDK_OS="linux" ;\
-	if [ $$(uname) = "Darwin" ]; then SDK_OS="darwin"; fi ;\
-	curl -s -L "https://github.com/operator-framework/operator-sdk/releases/download/v${OPERATOR_SDK_VERSION}/operator-sdk_$${SDK_OS}_$${GO_ARCH}" -o "$(LOCALBIN)/operator-sdk" ;\
+	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
+	curl -sSL "https://github.com/operator-framework/operator-sdk/releases/download/${OPERATOR_SDK_VERSION}/operator-sdk_$${OS}_$${ARCH}" -o "$(OPERATOR_SDK)" ;\
 	chmod +x "$(LOCALBIN)/operator-sdk" ;\
 	}
-OPERATOR_SDK=$(LOCALBIN)/operator-sdk
-else
-OPERATOR_SDK=$(shell which operator-sdk)
 endif
 
 .PHONY: opm
+OPM = $(LOCALBIN)/opm
 opm: ## Download opm locally if necessary.
-ifeq (,$(shell PATH="$(LOCALBIN):$${PATH}" which opm 2>/dev/null))
+ifneq ($(shell $(OPM) version 2>/dev/null | awk -F '"' '{print $$2}'), $(OPM_VERSION))
 	@{ \
 	set -e ;\
+	mkdir -p $(LOCALBIN) ;\
 	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
-	OPM_VERSION=$$(curl -s -LH "Accept:application/json" -w "%(http_code)" https://github.com/operator-framework/operator-registry/releases/latest | sed 's/.*"tag_name":"\([^"]\+\)".*/\1/') ;\
-	curl -sSL https://github.com/operator-framework/operator-registry/releases/download/$${OPM_VERSION}/$${OS}-$${ARCH}-opm -o "$(LOCALBIN)/opm";\
+	curl -sSL https://github.com/operator-framework/operator-registry/releases/download/${OPM_VERSION}/$${OS}-$${ARCH}-opm -o "$(OPM)";\
 	chmod +x $(LOCALBIN)/opm ;\
 	}
-OPM=$(LOCALBIN)/opm
-else
-OPM=$(shell which opm)
+endif
+
+.PHONY: preflight
+PREFLIGHT = $(LOCALBIN)/preflight
+preflight: ## Download preflight locally if necessary.
+ifneq ($(shell $(PREFLIGHT) --version 2>/dev/null | awk '{print $$3}'), $(PREFLIGHT_VERSION))
+	@{ \
+	set -e ;\
+	mkdir -p $(LOCALBIN) ;\
+	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
+	if [ "$${OS}" != "linux" ] ; then \
+		echo "Unsupported OS: $${OS}" ;\
+	else \
+		curl -sSL "https://github.com/redhat-openshift-ecosystem/openshift-preflight/releases/download/${PREFLIGHT_VERSION}/preflight-$${OS}-$${ARCH}" -o "$(PREFLIGHT)" ;\
+		chmod +x $(LOCALBIN)/preflight ;\
+	fi \
+	}
 endif

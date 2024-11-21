@@ -17,12 +17,11 @@ limitations under the License.
 package logs
 
 import (
-	"context"
 	"path"
 
-	v1 "k8s.io/api/core/v1"
-	v12 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	fake2 "k8s.io/client-go/kubernetes/fake"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	fakeClient "k8s.io/client-go/kubernetes/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -34,18 +33,18 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Get the logs", func() {
+var _ = Describe("Get the logs", Ordered, func() {
 	namespace := "default"
 	clusterName := "test-cluster"
-	pod := &v1.Pod{
-		ObjectMeta: v12.ObjectMeta{
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
 			Name:      clusterName + "-1",
 		},
 	}
-	client := fake2.NewSimpleClientset(pod)
+	client := fakeClient.NewSimpleClientset(pod)
 	cluster := &apiv1.Cluster{
-		ObjectMeta: v12.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
 			Name:      clusterName,
 			Labels: map[string]string{
@@ -54,19 +53,23 @@ var _ = Describe("Get the logs", func() {
 		},
 		Spec: apiv1.ClusterSpec{},
 	}
-	cl := clusterLogs{
-		ctx:         context.TODO(),
-		clusterName: clusterName,
-		namespace:   namespace,
-		follow:      true,
-		timestamp:   true,
-		tailLines:   -1,
-		client:      client,
-	}
+	var cl clusterLogs
 	plugin.Client = fake.NewClientBuilder().
 		WithScheme(scheme.BuildWithAllKnownScheme()).
 		WithObjects(cluster).
 		Build()
+
+	BeforeEach(func(ctx SpecContext) {
+		cl = clusterLogs{
+			ctx:         ctx,
+			clusterName: clusterName,
+			namespace:   namespace,
+			follow:      true,
+			timestamp:   true,
+			tailLines:   -1,
+			client:      client,
+		}
+	})
 
 	It("should get a proper cluster", func() {
 		cluster, err := getCluster(cl)
@@ -95,18 +98,24 @@ var _ = Describe("Get the logs", func() {
 	})
 
 	It("should get the proper stream for logs", func() {
+		PauseOutputInterception()
 		err := followCluster(cl)
+		ResumeOutputInterception()
 		Expect(err).ToNot(HaveOccurred())
 	})
 
 	It("should save the logs to file", func() {
+		tempDir := GinkgoT().TempDir()
 		cl.outputFile = path.Join(tempDir, "test-file.logs")
+		PauseOutputInterception()
 		err := saveClusterLogs(cl)
+		ResumeOutputInterception()
 		Expect(err).ToNot(HaveOccurred())
 	})
 
 	It("should fail if can't write a file", func() {
-		cl.outputFile = "/this-does-not-exist/test-file.log"
+		tempDir := GinkgoT().TempDir()
+		cl.outputFile = path.Join(tempDir, "this-does-not-exist/test-file.log")
 		err := saveClusterLogs(cl)
 		Expect(err).To(HaveOccurred())
 	})

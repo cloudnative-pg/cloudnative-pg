@@ -27,9 +27,10 @@ ROOT_DIR=$(realpath "$(dirname "$0")/../../")
 CONTROLLER_IMG=${CONTROLLER_IMG:-$("${ROOT_DIR}/hack/setup-cluster.sh" print-image)}
 TEST_UPGRADE_TO_V1=${TEST_UPGRADE_TO_V1:-true}
 POSTGRES_IMG=${POSTGRES_IMG:-$(grep 'DefaultImageName.*=' "${ROOT_DIR}/pkg/versions/versions.go" | cut -f 2 -d \")}
-DOCKER_SERVER=${DOCKER_SERVER:-${REGISTRY:-}}
-DOCKER_USERNAME=${DOCKER_USERNAME:-${REGISTRY_USER:-}}
-DOCKER_PASSWORD=${DOCKER_PASSWORD:-${REGISTRY_PASSWORD:-}}
+# variable need export otherwise be invisible in e2e test case
+export DOCKER_SERVER=${DOCKER_SERVER:-${REGISTRY:-}}
+export DOCKER_USERNAME=${DOCKER_USERNAME:-${REGISTRY_USER:-}}
+export DOCKER_PASSWORD=${DOCKER_PASSWORD:-${REGISTRY_PASSWORD:-}}
 
 notinpath () {
     case "$PATH" in
@@ -74,54 +75,59 @@ if [ "${FEATURE_TYPE-}" ]; then
 fi
 echo "E2E tests are running with the following filters: ${LABEL_FILTERS}"
 # The RC return code will be non-zero iff either the two `jq` calls has a non-zero exit
-# NOTE: the ginkgo calls may have non-zero exits, with E2E tests that fail but could be 'ignore-fail'
 RC=0
 RC_GINKGO1=0
-if [[ "${TEST_UPGRADE_TO_V1}" != "false" ]]; then
-  # Getting the operator images need a pull secret
-  kubectl delete namespace cnpg-system || :
-  kubectl create namespace cnpg-system
-  ensure_image_pull_secret
-  # Generate a manifest for the operator after the api upgrade
-  # TODO: this is almost a "make deploy". Refactor.
-  make manifests kustomize
-  KUSTOMIZE="${ROOT_DIR}/bin/kustomize"
-  CONFIG_TMP_DIR=$(mktemp -d)
-  cp -r "${ROOT_DIR}/config"/* "${CONFIG_TMP_DIR}"
-  (
-      cd "${CONFIG_TMP_DIR}/default"
-      "${KUSTOMIZE}" edit add patch --path manager_image_pull_secret.yaml
-      cd "${CONFIG_TMP_DIR}/manager"
-      "${KUSTOMIZE}" edit set image "controller=${CONTROLLER_IMG}"
-      "${KUSTOMIZE}" edit add patch --path env_override.yaml
-      "${KUSTOMIZE}" edit add configmap controller-manager-env \
-        --from-literal="POSTGRES_IMAGE_NAME=${POSTGRES_IMG}"
-  )
-  "${KUSTOMIZE}" build "${CONFIG_TMP_DIR}/default" > "${ROOT_DIR}/tests/e2e/fixtures/upgrade/current-manifest.yaml"
+if [[ "${TEST_UPGRADE_TO_V1}" != "false" ]] && [[ "${TEST_CLOUD_VENDOR}" != "ocp" ]]; then
+  # Generate a manifest for the operator so we can upgrade to it in the upgrade tests.
+  # This manifest uses the default image and tag for the current operator build, and assumes
+  # the image has been either:
+  #   - built and pushed to nodes or the local registry (by setup-cluster.sh)
+  #   - built by the `buildx` step in continuous delivery and pushed to the test registry
+  make CONTROLLER_IMG="${CONTROLLER_IMG}" POSTGRES_IMG="${POSTGRES_IMG}" \
+   OPERATOR_MANIFEST_PATH="${ROOT_DIR}/tests/e2e/fixtures/upgrade/current-manifest.yaml" \
+   generate-manifest
+  # In order to test the case of upgrading from the current operator
+  # to a future one, we build and push an image with a different VERSION
+  # to force a different hash for the manager binary.
+  # (Otherwise the ONLINE upgrade won't trigger)
+  #
+  # We build and push the new image in the setup-cluster.sh `load` function, or
+  # in the `buildx` phase if we're running in the cloud CI/CD workflow.
+  #
+  # Here we build a manifest for the new controller, with the `-prime` suffix
+  # added to the tag by convention, which assumes the image is in place.
+  # This manifest is used to upgrade into in the upgrade_test E2E.
+  make CONTROLLER_IMG="${CONTROLLER_IMG}-prime" POSTGRES_IMG="${POSTGRES_IMG}" \
+   OPERATOR_MANIFEST_PATH="${ROOT_DIR}/tests/e2e/fixtures/upgrade/current-manifest-prime.yaml" \
+   generate-manifest
+
   # Run the upgrade tests
   mkdir -p "${ROOT_DIR}/tests/e2e/out"
   # Unset DEBUG to prevent k8s from spamming messages
   unset DEBUG
   unset TEST_SKIP_UPGRADE
-  ginkgo --nodes=1 --poll-progress-after=1200s --poll-progress-interval=150s --label-filter "${LABEL_FILTERS}" \
+  ginkgo --nodes=1 --timeout 90m --poll-progress-after=1200s --poll-progress-interval=150s --label-filter "${LABEL_FILTERS}" \
+   --github-output --force-newlines \
    --focus-file "${ROOT_DIR}/tests/e2e/upgrade_test.go" --output-dir "${ROOT_DIR}/tests/e2e/out" \
    --json-report  "upgrade_report.json" -v "${ROOT_DIR}/tests/e2e/..." || RC_GINKGO1=$?
 
-  # Report if there are any tests that failed and did NOT have an "ignore-fails" label
+  # Report if there are any tests that failed
   jq -e -c -f "${ROOT_DIR}/hack/e2e/test-report.jq" "${ROOT_DIR}/tests/e2e/out/upgrade_report.json" || RC=$?
 fi
 
-# Getting the operator images need a pull secret
-kubectl delete namespace cnpg-system || :
-kubectl create namespace cnpg-system
-ensure_image_pull_secret
+if [[ "${TEST_CLOUD_VENDOR}" != "ocp" ]]; then
+  # Getting the operator images need a pull secret
+  kubectl delete namespace cnpg-system || :
+  kubectl create namespace cnpg-system
+  ensure_image_pull_secret
 
-CONTROLLER_IMG="${CONTROLLER_IMG}" \
-  POSTGRES_IMAGE_NAME="${POSTGRES_IMG}" \
-  make -C "${ROOT_DIR}" deploy
-kubectl wait --for=condition=Available --timeout=2m \
-  -n cnpg-system deployments \
-  cnpg-controller-manager
+  CONTROLLER_IMG="${CONTROLLER_IMG}" \
+    POSTGRES_IMAGE_NAME="${POSTGRES_IMG}" \
+    make -C "${ROOT_DIR}" deploy
+  kubectl wait --for=condition=Available --timeout=2m \
+    -n cnpg-system deployments \
+    cnpg-controller-manager
+fi
 
 # Unset DEBUG to prevent k8s from spamming messages
 unset DEBUG
@@ -138,19 +144,17 @@ RC_GINKGO2=0
 export TEST_SKIP_UPGRADE=true
 ginkgo --nodes=4 --timeout 3h --poll-progress-after=1200s --poll-progress-interval=150s \
        ${LABEL_FILTERS:+--label-filter "${LABEL_FILTERS}"} \
+       --github-output --force-newlines \
        --output-dir "${ROOT_DIR}/tests/e2e/out/" \
        --json-report  "report.json" -v "${ROOT_DIR}/tests/e2e/..." || RC_GINKGO2=$?
 
-# Report if there are any tests that failed and did NOT have an "ignore-fails" label
+# Report if there are any tests that failed
 jq -e -c -f "${ROOT_DIR}/hack/e2e/test-report.jq" "${ROOT_DIR}/tests/e2e/out/report.json" || RC=$?
 
-# The exit code reported depends on the two `jq` filter calls. In case we have
-# FAIL in the Ginkgo, but the `jq` succeeds because the failures are ignorable,
-# we should add some explanation
 set +x
 if [[ $RC == 0 ]]; then
   if [[ $RC_GINKGO1 != 0 || $RC_GINKGO2 != 0 ]]; then
-    printf "\033[0;32m%s\n" "SUCCESS. All the failures in Ginkgo are labelled 'ignore-fails'."
+    printf "\033[0;32m%s\n" "SUCCESS."
     echo
   fi
 fi

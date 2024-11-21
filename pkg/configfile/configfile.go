@@ -22,10 +22,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/cloudnative-pg/machinery/pkg/fileutils"
+	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	"github.com/lib/pq"
-
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/stringset"
 )
 
 // UpdatePostgresConfigurationFile search and replace options in a Postgres configuration file.
@@ -75,7 +74,7 @@ func UpdateConfigurationContents(lines []string, options map[string]string) ([]s
 			}
 
 			foundKeys.Put(key)
-			lines[index] = key + " = " + pq.QuoteLiteral(value)
+			lines[index] = fmt.Sprintf("%s = %s", key, pq.QuoteLiteral(value))
 			index++
 			continue
 		}
@@ -86,13 +85,28 @@ func UpdateConfigurationContents(lines []string, options map[string]string) ([]s
 	lines = lines[:index]
 
 	// Append missing options to the end of the file
-	for key, value := range options {
+	keysList := stringset.FromKeys(options).ToSortedList()
+	for _, key := range keysList {
 		if !foundKeys.Has(key) {
-			lines = append(lines, key+" = "+pq.QuoteLiteral(value))
+			value := options[key]
+			lines = append(lines, fmt.Sprintf("%s = %s", key, pq.QuoteLiteral(value)))
 		}
 	}
 
 	return lines, nil
+}
+
+// WritePostgresConfiguration replaces the content of a PostgreSQL configuration
+// file with the provided options
+func WritePostgresConfiguration(
+	fileName string,
+	options map[string]string,
+) (changed bool, err error) {
+	lines, err := UpdateConfigurationContents(nil, options)
+	if err != nil {
+		return false, fmt.Errorf("error while writing configuration to %v: %w", fileName, err)
+	}
+	return fileutils.WriteLinesToFile(fileName, lines)
 }
 
 // RemoveOptionsFromConfigurationContents deletes all the lines containing one of the given options

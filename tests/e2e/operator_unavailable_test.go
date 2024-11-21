@@ -17,7 +17,6 @@ limitations under the License.
 package e2e
 
 import (
-	"fmt"
 	"sync"
 
 	corev1 "k8s.io/api/core/v1"
@@ -42,6 +41,7 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 		sampleFile  = fixturesDir + "/operator-unavailable/operator-unavailable.yaml.template"
 		level       = tests.Medium
 	)
+	var namespace string
 
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
@@ -51,46 +51,26 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 
 	Context("Scale down operator replicas to zero and delete primary", func() {
 		const namespacePrefix = "op-unavailable-e2e-zero-replicas"
-		var namespace string
-		JustAfterEach(func() {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-		})
 		It("can survive operator failures", func() {
 			var err error
 			// Create the cluster namespace
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.DeleteNamespace(namespace)
-			})
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
 			// Load test data
 			currentPrimary := clusterName + "-1"
-			primary, err := env.GetClusterPrimary(namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
-			AssertCreateTestData(namespace, clusterName, "test", primary)
-
-			operatorNamespace, err := env.GetOperatorNamespaceName()
-			Expect(err).ToNot(HaveOccurred())
+			tableLocator := TableLocator{
+				Namespace:    namespace,
+				ClusterName:  clusterName,
+				DatabaseName: testsUtils.AppDBName,
+				TableName:    "test",
+			}
+			AssertCreateTestData(env, tableLocator)
 
 			By("scaling down operator replicas to zero", func() {
-				operatorDeployment, err := env.GetOperatorDeployment()
+				err := env.ScaleOperatorDeployment(0)
 				Expect(err).ToNot(HaveOccurred())
-				// Scale down operator deployment to zero replicas
-				cmd := fmt.Sprintf("kubectl scale deploy %v --replicas=0 -n %v",
-					operatorDeployment.Name, operatorNamespace)
-				_, _, err = testsUtils.Run(cmd)
-				Expect(err).ToNot(HaveOccurred())
-
-				// Verify the operator pod is not present anymore
-				Eventually(func() (int, error) {
-					podList := &corev1.PodList{}
-					err := env.Client.List(env.Ctx, podList, ctrlclient.InNamespace(operatorNamespace))
-					return len(podList.Items), err
-				}, 120).Should(BeEquivalentTo(0))
 			})
 
 			By("deleting primary pod", func() {
@@ -128,18 +108,8 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 
 			By("scaling up the operator replicas to 1", func() {
 				// Scale up operator deployment to one replica
-				deployment, err := env.GetOperatorDeployment()
+				err := env.ScaleOperatorDeployment(1)
 				Expect(err).ToNot(HaveOccurred())
-				cmd := fmt.Sprintf("kubectl scale deploy %v --replicas=1 -n %v",
-					deployment.Name, operatorNamespace)
-				_, _, err = testsUtils.Run(cmd)
-				Expect(err).ToNot(HaveOccurred())
-				timeout := 120
-				Eventually(func() (int, error) {
-					podList := &corev1.PodList{}
-					err := env.Client.List(env.Ctx, podList, ctrlclient.InNamespace(operatorNamespace))
-					return utils.CountReadyPods(podList.Items), err
-				}, timeout).Should(BeEquivalentTo(1))
 			})
 
 			// Expect a new primary to be elected and promoted
@@ -157,37 +127,30 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 					return specs.IsPodStandby(pod), err
 				}, timeout).Should(BeTrue())
 			})
-			// Expect the test data previously created to be available
-			primary, err = env.GetClusterPrimary(namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
-			AssertDataExpectedCountWithDatabaseName(namespace, primary.Name, "app", "test", 2)
+			AssertDataExpectedCount(env, tableLocator, 2)
 		})
 	})
 
 	Context("Delete primary and operator concurrently", func() {
 		const namespacePrefix = "op-unavailable-e2e-delete-operator"
-		var namespace string
-		JustAfterEach(func() {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-		})
+
 		It("can survive operator failures", func() {
 			var operatorPodName string
 			var err error
 			// Create the cluster namespace
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.DeleteNamespace(namespace)
-			})
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
 			// Load test data
 			currentPrimary := clusterName + "-1"
-			primary, err := env.GetClusterPrimary(namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
-			AssertCreateTestData(namespace, clusterName, "test", primary)
+			tableLocator := TableLocator{
+				Namespace:    namespace,
+				ClusterName:  clusterName,
+				DatabaseName: testsUtils.AppDBName,
+				TableName:    "test",
+			}
+			AssertCreateTestData(env, tableLocator)
 
 			operatorNamespace, err := env.GetOperatorNamespaceName()
 			Expect(err).ToNot(HaveOccurred())
@@ -229,13 +192,17 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 				}, 120).Should(BeEquivalentTo(2))
 			})
 
-			By("verifying the operator pod is now back", func() {
+			By("verifying a new operator pod is now back", func() {
 				timeout := 120
-				Eventually(func() (bool, error) {
+				Eventually(func(g Gomega) {
 					podList := &corev1.PodList{}
 					err := env.Client.List(env.Ctx, podList, ctrlclient.InNamespace(operatorNamespace))
-					return utils.CountReadyPods(podList.Items) == 1 &&
-						podList.Items[0].ObjectMeta.Name != operatorPodName, err
+					g.Expect(err).ToNot(HaveOccurred())
+					g.Expect(podList.Items).To(HaveLen(1))
+					g.Expect(podList.Items[0].Name).NotTo(BeEquivalentTo(operatorPodName))
+				}, timeout).Should(Succeed())
+				Eventually(func() (bool, error) {
+					return env.IsOperatorDeploymentReady()
 				}, timeout).Should(BeTrue())
 			})
 
@@ -254,10 +221,7 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 					return specs.IsPodStandby(pod), err
 				}, timeout).Should(BeTrue())
 			})
-			// Expect the test data previously created to be available
-			primary, err = env.GetClusterPrimary(namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
-			AssertDataExpectedCountWithDatabaseName(namespace, primary.Name, "app", "test", 2)
+			AssertDataExpectedCount(env, tableLocator, 2)
 		})
 	})
 })

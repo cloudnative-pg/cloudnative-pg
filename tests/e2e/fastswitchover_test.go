@@ -19,14 +19,12 @@ package e2e
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
@@ -50,7 +48,6 @@ var _ = Describe("Fast switchover", Serial, Label(tests.LabelPerformance, tests.
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 	})
-
 	// Confirm that a standby closely following the primary doesn't need more
 	// than maxSwitchoverTime seconds to be promoted and be able to start
 	// inserting records. We then expect the old primary to be back in
@@ -63,14 +60,8 @@ var _ = Describe("Fast switchover", Serial, Label(tests.LabelPerformance, tests.
 			// Create a cluster in a namespace we'll delete after the test
 			const namespacePrefix = "primary-switchover-time"
 			var err error
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				if CurrentSpecReport().Failed() {
-					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-				}
-				return env.DeleteNamespace(namespace)
-			})
 			assertFastSwitchover(namespace, sampleFileWithoutReplicationSlots, clusterName, webTestFile, webTestJob)
 		})
 	})
@@ -79,16 +70,10 @@ var _ = Describe("Fast switchover", Serial, Label(tests.LabelPerformance, tests.
 			// Create a cluster in a namespace we'll delete after the test
 			const namespacePrefix = "primary-switchover-time-with-slots"
 			var err error
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				if CurrentSpecReport().Failed() {
-					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-				}
-				return env.DeleteNamespace(namespace)
-			})
 			assertFastSwitchover(namespace, sampleFileWithReplicationSlots, clusterName, webTestFile, webTestJob)
-			AssertClusterReplicationSlots(namespace, clusterName)
+			AssertClusterHAReplicationSlots(namespace, clusterName)
 		})
 	})
 })
@@ -150,17 +135,8 @@ func assertFastSwitchover(namespace, sampleFile, clusterName, webTestFile, webTe
 			", PRIMARY KEY (id)" +
 			")"
 
-		primaryPod, err := env.GetClusterPrimary(namespace, clusterName)
-		Expect(err).ToNot(HaveOccurred())
-
-		_, _, err = env.ExecCommandWithPsqlClient(
-			namespace,
-			clusterName,
-			primaryPod,
-			apiv1.ApplicationUserSecretSuffix,
-			utils.AppDBName,
-			query,
-		)
+		_, err := utils.RunExecOverForward(env, namespace, clusterName, utils.AppDBName,
+			apiv1.ApplicationUserSecretSuffix, query)
 		Expect(err).ToNot(HaveOccurred())
 	})
 
@@ -177,23 +153,26 @@ func assertFastSwitchover(namespace, sampleFile, clusterName, webTestFile, webTe
 			" -f " + webTestJob)
 		Expect(err).ToNot(HaveOccurred())
 
-		commandTimeout := time.Second * 10
-		timeout := 60
 		primaryPodNamespacedName := types.NamespacedName{
 			Namespace: namespace,
 			Name:      oldPrimary,
 		}
+		query := "SELECT count(*) > 0 FROM tps.tl"
 		Eventually(func() (string, error) {
 			primaryPod := &corev1.Pod{}
 			err := env.Client.Get(env.Ctx, primaryPodNamespacedName, primaryPod)
 			if err != nil {
 				return "", err
 			}
-			out, _, err := env.ExecCommand(env.Ctx, *primaryPod, specs.PostgresContainerName,
-				&commandTimeout, "psql", "-U", "postgres", "app", "-tAc",
-				"SELECT count(*) > 0 FROM tps.tl")
+			out, _, err := env.ExecQueryInInstancePod(
+				utils.PodLocator{
+					Namespace: primaryPod.Namespace,
+					PodName:   primaryPod.Name,
+				},
+				utils.AppDBName,
+				query)
 			return strings.TrimSpace(out), err
-		}, timeout).Should(BeEquivalentTo("t"))
+		}, RetryTimeout).Should(BeEquivalentTo("t"))
 	})
 
 	By("setting the TargetPrimary to node2 to trigger a switchover", func() {
@@ -210,11 +189,13 @@ func assertFastSwitchover(namespace, sampleFile, clusterName, webTestFile, webTe
 	var maxReattachTime int32 = 60
 	var maxSwitchoverTime int32 = 20
 
-	// GKE has an higher kube-proxy timeout, and the connections could try
-	// using a service for which the routing table hasn't changed, getting
-	// stuck for a while. We raise the timeout, since we can't intervene
-	// on GKE configuration.
-	if IsGKE() {
+	// The walreceiver of a standby that wasn't promoted may try to reconnect
+	// before the rw service endpoints are updated. In this case, the walreceiver
+	// can be stuck for waiting for the connection to be established for a time that
+	// depends on the tcp_syn_retries sysctl. Since by default
+	// net.ipv4.tcp_syn_retries=6, PostgreSQL can wait 2^7-1=127 seconds before
+	// restarting the walreceiver.
+	if !IsLocal() {
 		maxReattachTime = 180
 	}
 

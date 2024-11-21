@@ -22,29 +22,32 @@ package main
 import (
 	"os"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/spf13/cobra"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/backup"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/bootstrap"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/controller"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/debug"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/instance"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/pgbouncer"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/show"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/walarchive"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/walrestore"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/versions"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )
 
 func main() {
+	cobra.EnableTraverseRunHooks = true
+
 	logFlags := &log.Flags{}
 
 	cmd := &cobra.Command{
 		Use:          "manager [cmd]",
 		SilenceUsage: true,
-		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		PersistentPreRun: func(_ *cobra.Command, _ []string) {
 			logFlags.ConfigureLogging()
 		},
 	}
@@ -60,6 +63,7 @@ func main() {
 	cmd.AddCommand(walrestore.NewCmd())
 	cmd.AddCommand(versions.NewCmd())
 	cmd.AddCommand(pgbouncer.NewCmd())
+	cmd.AddCommand(debug.NewCmd())
 
 	if err := cmd.Execute(); err != nil {
 		os.Exit(1)

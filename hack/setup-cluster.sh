@@ -24,20 +24,30 @@ if [ "${DEBUG-}" = true ]; then
 fi
 
 # Defaults
-K8S_DEFAULT_VERSION=v1.28.0
-CSI_DRIVER_HOST_PATH_DEFAULT_VERSION=v1.11.0
-K8S_VERSION=${K8S_VERSION:-$K8S_DEFAULT_VERSION}
-KUBECTL_VERSION=${KUBECTL_VERSION:-$K8S_VERSION}
+KIND_NODE_DEFAULT_VERSION=v1.31.2
+K3D_NODE_DEFAULT_VERSION=v1.30.3
+CSI_DRIVER_HOST_PATH_DEFAULT_VERSION=v1.15.0
+EXTERNAL_SNAPSHOTTER_VERSION=v8.1.0
+EXTERNAL_PROVISIONER_VERSION=v5.1.0
+EXTERNAL_RESIZER_VERSION=v1.12.0
+EXTERNAL_ATTACHER_VERSION=v4.7.0
+K8S_VERSION=${K8S_VERSION-}
+KUBECTL_VERSION=${KUBECTL_VERSION-}
 CSI_DRIVER_HOST_PATH_VERSION=${CSI_DRIVER_HOST_PATH_VERSION:-$CSI_DRIVER_HOST_PATH_DEFAULT_VERSION}
 ENGINE=${CLUSTER_ENGINE:-kind}
 ENABLE_REGISTRY=${ENABLE_REGISTRY:-}
 ENABLE_PYROSCOPE=${ENABLE_PYROSCOPE:-}
 ENABLE_CSI_DRIVER=${ENABLE_CSI_DRIVER:-}
+ENABLE_APISERVER_AUDIT=${ENABLE_APISERVER_AUDIT:-}
 NODES=${NODES:-3}
 # This option is telling the docker to use node image with certain arch, i.e kindest/node in kind.
 # In M1/M2,  if enable amd64 emulation then we keep it as linux/amd64.
 # if did not enable amd64 emulation we need keep it as linux/arm64,  otherwise,  kind will not start success
 DOCKER_DEFAULT_PLATFORM=${DOCKER_DEFAULT_PLATFORM:-}
+# Testing the upgrade will require generating a second operator image, `-prime`
+# The `load()` function will build and push this second image by default.
+# The TEST_UPGRADE_TO_V1 can be set to false to skip this part of `load()`
+TEST_UPGRADE_TO_V1=${TEST_UPGRADE_TO_V1:-true}
 
 # Define the directories used by the script
 ROOT_DIR=$(cd "$(dirname "$0")/../"; pwd)
@@ -73,7 +83,7 @@ registry_name=registry.dev
 POSTGRES_IMG=${POSTGRES_IMG:-$(grep 'DefaultImageName.*=' "${ROOT_DIR}/pkg/versions/versions.go" | cut -f 2 -d \")}
 E2E_PRE_ROLLING_UPDATE_IMG=${E2E_PRE_ROLLING_UPDATE_IMG:-${POSTGRES_IMG%.*}}
 PGBOUNCER_IMG=${PGBOUNCER_IMG:-$(grep 'DefaultPgbouncerImage.*=' "${ROOT_DIR}/pkg/specs/pgbouncer/deployments.go" | cut -f 2 -d \")}
-MINIO_IMG=${MINIO_IMG:-$(grep 'minioImage.*=' "${ROOT_DIR}/tests/utils/minio.go"  | cut -f 2 -d \")}
+MINIO_IMG=${MINIO_IMG:-$(grep 'minioImage.*=' "${ROOT_DIR}/tests/utils/minio/minio.go"  | cut -f 2 -d \")}
 APACHE_IMG=${APACHE_IMG:-"httpd"}
 
 HELPER_IMGS=("$POSTGRES_IMG" "$E2E_PRE_ROLLING_UPDATE_IMG" "$PGBOUNCER_IMG" "$MINIO_IMG" "$APACHE_IMG")
@@ -137,6 +147,41 @@ kubeadmConfigPatchesJSON6902:
 nodes:
 - role: control-plane
 EOF
+  if [ "${ENABLE_APISERVER_AUDIT}" = "true" ]; then
+    # Create the apiserver audit log directory beforehand, otherwise it will be
+    # generated within docker with root permissions
+    mkdir -p "${LOG_DIR}/apiserver"
+    touch "${LOG_DIR}/apiserver/kube-apiserver-audit.log"
+    cat >>"${config_file}" <<-EOF
+  kubeadmConfigPatches:
+  - |
+    kind: ClusterConfiguration
+    apiServer:
+        # enable auditing flags on the API server
+        extraArgs:
+          audit-log-path: /var/log/kubernetes/kube-apiserver-audit.log
+          audit-policy-file: /etc/kubernetes/policies/audit-policy.yaml
+        # mount new files / directories on the control plane
+        extraVolumes:
+          - name: audit-policies
+            hostPath: /etc/kubernetes/policies
+            mountPath: /etc/kubernetes/policies
+            readOnly: true
+            pathType: "DirectoryOrCreate"
+          - name: "audit-logs"
+            hostPath: "/var/log/kubernetes"
+            mountPath: "/var/log/kubernetes"
+            readOnly: false
+            pathType: DirectoryOrCreate
+  # mount the local file on the control plane
+  extraMounts:
+  - hostPath: ${E2E_DIR}/audit-policy.yaml
+    containerPath: /etc/kubernetes/policies/audit-policy.yaml
+    readOnly: true
+  - hostPath: ${LOG_DIR}/apiserver/
+    containerPath: /var/log/kubernetes/
+EOF
+  fi
 
   if [ "$NODES" -gt 1 ]; then
     for ((i = 0; i < NODES; i++)); do
@@ -213,7 +258,7 @@ create_cluster_k3d() {
   local latest_k3s_tag
   latest_k3s_tag=$(k3d version list k3s | grep -- "^${k8s_version//./\\.}"'\+-k3s[0-9]$' | tail -n 1)
 
-  local volumes=()
+  local options=()
   if [ -n "${DOCKER_REGISTRY_MIRROR:-}" ] || [ -n "${ENABLE_REGISTRY:-}" ]; then
     config_file="${TEMP_DIR}/k3d-registries.yaml"
     cat >"${config_file}" <<-EOF
@@ -236,7 +281,7 @@ EOF
 EOF
     fi
 
-    volumes=(--volume "${config_file}:/etc/rancher/k3s/registries.yaml")
+    options+=(--registry-config "${config_file}")
   fi
 
   local agents=()
@@ -244,7 +289,7 @@ EOF
     agents=(-a "${NODES}")
   fi
 
-  k3d cluster create "${volumes[@]}" "${agents[@]}" -i "rancher/k3s:${latest_k3s_tag}" --no-lb "${cluster_name}" \
+  K3D_FIX_MOUNTS=1 k3d cluster create "${options[@]}" "${agents[@]}" -i "rancher/k3s:${latest_k3s_tag}" --no-lb "${cluster_name}" \
     --k3s-arg "--disable=traefik@server:0" --k3s-arg "--disable=metrics-server@server:0" \
     --k3s-arg "--node-taint=node-role.kubernetes.io/master:NoSchedule@server:0" #wokeignore:rule=master
 
@@ -290,7 +335,7 @@ install_kubectl() {
 
   local binary="${bindir}/kubectl"
 
-  curl -sL "https://storage.googleapis.com/kubernetes-release/release/v${KUBECTL_VERSION#v}/bin/${OS}/${ARCH}/kubectl" -o "${binary}"
+  curl -sL "https://dl.k8s.io/release/v${KUBECTL_VERSION#v}/bin/${OS}/${ARCH}/kubectl" -o "${binary}"
   chmod +x "${binary}"
 }
 
@@ -349,10 +394,6 @@ deploy_fluentd() {
 deploy_csi_host_path() {
   echo "${bright}Starting deployment of CSI driver plugin... ${reset}"
   CSI_BASE_URL=https://raw.githubusercontent.com/kubernetes-csi
-  EXTERNAL_SNAPSHOTTER_VERSION="v6.3.1"
-  EXTERNAL_PROVISIONER_VERSION="v3.6.1"
-  EXTERNAL_RESIZER_VERSION="v1.9.1"
-  EXTERNAL_ATTACHER_VERSION="v4.4.1"
 
   ## Install external snapshotter CRD
   kubectl apply -f "${CSI_BASE_URL}"/external-snapshotter/"${EXTERNAL_SNAPSHOTTER_VERSION}"/client/config/crd/snapshot.storage.k8s.io_volumesnapshotclasses.yaml
@@ -372,15 +413,19 @@ deploy_csi_host_path() {
   kubectl apply -f "${CSI_BASE_URL}"/external-resizer/"${EXTERNAL_RESIZER_VERSION}"/deploy/kubernetes/rbac.yaml
 
   ## Install driver and plugin
-  kubectl apply -f "${CSI_BASE_URL}"/csi-driver-host-path/"${CSI_DRIVER_HOST_PATH_VERSION}"/deploy/kubernetes-1.24/hostpath/csi-hostpath-driverinfo.yaml
-  kubectl apply -f "${CSI_BASE_URL}"/csi-driver-host-path/"${CSI_DRIVER_HOST_PATH_VERSION}"/deploy/kubernetes-1.24/hostpath/csi-hostpath-plugin.yaml
+  kubectl apply -f "${CSI_BASE_URL}"/csi-driver-host-path/"${CSI_DRIVER_HOST_PATH_VERSION}"/deploy/kubernetes-1.27/hostpath/csi-hostpath-driverinfo.yaml
+  kubectl apply -f "${CSI_BASE_URL}"/csi-driver-host-path/"${CSI_DRIVER_HOST_PATH_VERSION}"/deploy/kubernetes-1.27/hostpath/csi-hostpath-plugin.yaml
 
   ## create volumesnapshotclass
-  kubectl apply -f "${CSI_BASE_URL}"/csi-driver-host-path/"${CSI_DRIVER_HOST_PATH_VERSION}"/deploy/kubernetes-1.24/hostpath/csi-hostpath-snapshotclass.yaml
+  kubectl apply -f "${CSI_BASE_URL}"/csi-driver-host-path/"${CSI_DRIVER_HOST_PATH_VERSION}"/deploy/kubernetes-1.27/hostpath/csi-hostpath-snapshotclass.yaml
+
+  ## Prevent VolumeSnapshot E2e test to fail when taking a
+  ## snapshot of a running PostgreSQL instance
+  kubectl patch volumesnapshotclass csi-hostpath-snapclass -p '{"parameters":{"ignoreFailedRead":"true"}}' --type merge
 
   ## create storage class
   kubectl apply -f "${CSI_BASE_URL}"/csi-driver-host-path/"${CSI_DRIVER_HOST_PATH_VERSION}"/examples/csi-storageclass.yaml
-
+  kubectl annotate storageclass csi-hostpath-sc storage.kubernetes.io/default-snapshot-class=csi-hostpath-snapclass
 
   echo "${bright} CSI driver plugin deployment has started. Waiting for the CSI plugin to be ready... ${reset}"
   ITER=0
@@ -402,21 +447,12 @@ deploy_csi_host_path() {
 
 
 deploy_pyroscope() {
-  helm repo add pyroscope-io https://pyroscope-io.github.io/helm-chart
+  helm repo add pyroscope-io https://grafana.github.io/helm-charts
 
   values_file="${TEMP_DIR}/pyroscope_values.yaml"
   cat >"${values_file}" <<-EOF
 pyroscopeConfigs:
   log-level: "debug"
-  scrape-configs:
-    - job-name: cnpg
-      enabled-profiles: [cpu, mem]
-      static-configs:
-        - application: cloudnative-pg
-          targets:
-            - cnpg-pprof:6060
-          labels:
-            cnpg: cnpg
 EOF
   helm -n cnpg-system install pyroscope pyroscope-io/pyroscope -f "${values_file}"
 
@@ -438,6 +474,28 @@ spec:
     app.kubernetes.io/name: cloudnative-pg
 EOF
   kubectl -n cnpg-system apply -f "${service_file}"
+
+  annotations="${TEMP_DIR}/pyroscope_annotations.yaml"
+  cat >"${annotations}" <<- EOF
+spec:
+   template:
+      metadata:
+         annotations:
+            profiles.grafana.com/memory.scrape: "true"
+            profiles.grafana.com/memory.port: "6060"
+            profiles.grafana.com/cpu.scrape: "true"
+            profiles.grafana.com/cpu.port: "6060"
+            profiles.grafana.com/goroutine.scrape: "true"
+            profiles.grafana.com/goroutine.port: "6060"
+EOF
+
+  kubectl -n cnpg-system patch deployment cnpg-controller-manager --patch-file "${annotations}"
+}
+
+deploy_prometheus_crds() {
+  echo "${bright}Starting deployment of Prometheus CRDs... ${reset}"
+  helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+  helm -n kube-system install prometheus-operator-crds prometheus-community/prometheus-operator-crds
 }
 
 load_image_registry() {
@@ -498,8 +556,6 @@ Options:
 
     -r|--registry         Enable local registry. Env: ENABLE_REGISTRY
 
-    -p|--pyroscope        Enable Pyroscope in the operator namespace
-
 To use long options you need to have GNU enhanced getopt available, otherwise
 you can only use the short version of the options.
 EOF
@@ -530,6 +586,7 @@ create() {
 
   deploy_fluentd
   deploy_csi_host_path
+  deploy_prometheus_crds
 
   echo "${bright}Done creating ${ENGINE} cluster ${CLUSTER_NAME} with version ${K8S_VERSION}${reset}"
 }
@@ -548,6 +605,13 @@ load_helper_images() {
 }
 
 load() {
+  # NOTE: this function will build the operator from the current source
+  # tree and push it either to the local registry or the cluster nodes.
+  # It will do the same with a `prime` version for test purposes.
+  #
+  # This code will NEVER run in the cloud CI/CD workflows, as there we do
+  # the build and push (into GH test registry) once in `builds`, before
+  # the strategy matrix blows up the number of executables
   if [ -z "${ENABLE_REGISTRY}" ] && "check_registry_${ENGINE}"; then
     ENABLE_REGISTRY=true
   fi
@@ -562,6 +626,25 @@ load() {
   load_image "${CLUSTER_NAME}" "${CONTROLLER_IMG}"
 
   echo "${bright}Done loading new operator image on cluster ${CLUSTER_NAME}${reset}"
+
+  if [[ "${TEST_UPGRADE_TO_V1}" != "false" ]]; then
+    # In order to test the case of upgrading from the current operator
+    # to a future one, we build and push an image with a different VERSION
+    # to force a different hash for the manager binary.
+    # (Otherwise the ONLINE upgrade won't trigger)
+
+    echo "${bright}Building a 'prime' operator from current worktree${reset}"
+
+    PRIME_CONTROLLER_IMG="${CONTROLLER_IMG}-prime"
+    CURRENT_VERSION=$(make -C "${ROOT_DIR}" -s print-version)
+    PRIME_VERSION="${CURRENT_VERSION}-prime"
+    make -C "${ROOT_DIR}" CONTROLLER_IMG="${PRIME_CONTROLLER_IMG}"  VERSION="${PRIME_VERSION}" \
+      ARCH="${ARCH}" docker-build
+
+    load_image "${CLUSTER_NAME}" "${PRIME_CONTROLLER_IMG}"
+
+    echo "${bright}Done loading new 'prime' operator image on cluster ${CLUSTER_NAME}${reset}"
+  fi
 }
 
 deploy() {
@@ -670,6 +753,18 @@ main() {
     echo >&2
     usage
   fi
+
+  if [ -z "${K8S_VERSION}" ]; then
+    case "${ENGINE}" in
+    kind)
+      K8S_VERSION=${KIND_NODE_DEFAULT_VERSION}
+      ;;
+    k3d)
+      K8S_VERSION=${K3D_NODE_DEFAULT_VERSION}
+      ;;
+    esac
+  fi
+  KUBECTL_VERSION=${KUBECTL_VERSION:-$K8S_VERSION}
 
   # Only here the K8S_VERSION veriable contains its final value
   # so we can set the default cluster name
