@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	pgTime "github.com/cloudnative-pg/machinery/pkg/postgres/time"
@@ -44,6 +45,8 @@ type backupCommandOptions struct {
 	online              *bool
 	immediateCheckpoint *bool
 	waitForArchive      *bool
+	pluginName          string
+	pluginParameters    pluginParameters
 }
 
 func (options backupCommandOptions) getOnlineConfiguration() *apiv1.OnlineConfiguration {
@@ -59,7 +62,14 @@ func (options backupCommandOptions) getOnlineConfiguration() *apiv1.OnlineConfig
 
 // NewCmd creates the new "backup" subcommand
 func NewCmd() *cobra.Command {
-	var backupName, backupTarget, backupMethod, online, immediateCheckpoint, waitForArchive string
+	var backupName, backupTarget, backupMethod, online, immediateCheckpoint, waitForArchive, pluginName string
+	var pluginParameters pluginParameters
+
+	backupMethods := []string{
+		string(apiv1.BackupMethodBarmanObjectStore),
+		string(apiv1.BackupMethodVolumeSnapshot),
+		string(apiv1.BackupMethodPlugin),
+	}
 
 	backupSubcommand := &cobra.Command{
 		Use:     "backup [cluster]",
@@ -91,13 +101,22 @@ func NewCmd() *cobra.Command {
 			}
 
 			// Check if the backup method is correct
-			allowedBackupMethods := []string{
-				"",
-				string(apiv1.BackupMethodBarmanObjectStore),
-				string(apiv1.BackupMethodVolumeSnapshot),
-			}
+			allowedBackupMethods := backupMethods
+			allowedBackupMethods = append(allowedBackupMethods, "")
 			if !slices.Contains(allowedBackupMethods, backupMethod) {
 				return fmt.Errorf("backup-method: %s is not supported by the backup command", backupMethod)
+			}
+
+			if backupMethod != string(apiv1.BackupMethodPlugin) {
+				if len(pluginName) > 0 {
+					return fmt.Errorf("plugin-name is allowed only when backup method in %s",
+						apiv1.BackupMethodPlugin)
+				}
+
+				if len(pluginParameters) > 0 {
+					return fmt.Errorf("plugin-parameters is allowed only when backup method in %s",
+						apiv1.BackupMethodPlugin)
+				}
 			}
 
 			var cluster apiv1.Cluster
@@ -137,6 +156,8 @@ func NewCmd() *cobra.Command {
 					online:              parsedOnline,
 					immediateCheckpoint: parsedImmediateCheckpoint,
 					waitForArchive:      parsedWaitForArchive,
+					pluginName:          pluginName,
+					pluginParameters:    pluginParameters,
 				})
 		},
 	}
@@ -161,8 +182,8 @@ func NewCmd() *cobra.Command {
 		"method",
 		"m",
 		"",
-		"If present, will override the backup method defined in backup resource, "+
-			"valid values are volumeSnapshot and barmanObjectStore.",
+		fmt.Sprintf("If present, will override the backup method defined in backup resource, "+
+			"valid values are: %s.", strings.Join(backupMethods, ", ")),
 	)
 
 	const optionalAcceptedValues = "Optional. Accepted values: true|false|\"\"."
@@ -188,6 +209,17 @@ func NewCmd() *cobra.Command {
 			optionalAcceptedValues,
 	)
 
+	backupSubcommand.Flags().StringVar(&pluginName, "plugin-name", "",
+		"The name of the plugin that should take the backup. This option "+
+			"is allowed only when the backup method is set to 'plugin'",
+	)
+
+	backupSubcommand.Flags().VarP(&pluginParameters, "plugin-parameters", "",
+		"The set of plugin parameters that should be passed to the backup plugin "+
+			" i.e. param-one=value,param-two=value. This option "+
+			"is allowed only when the backup method is set to 'plugin'",
+	)
+
 	return backupSubcommand
 }
 
@@ -209,6 +241,13 @@ func createBackup(ctx context.Context, options backupCommandOptions) error {
 		},
 	}
 	utils.LabelClusterName(&backup.ObjectMeta, options.clusterName)
+
+	if len(options.pluginName) > 0 {
+		backup.Spec.PluginConfiguration = &apiv1.BackupPluginConfiguration{
+			Name:       options.pluginName,
+			Parameters: options.pluginParameters,
+		}
+	}
 
 	err := plugin.Client.Create(ctx, &backup)
 	if err == nil {
