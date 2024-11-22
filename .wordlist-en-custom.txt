@@ -1174,6 +1174,7 @@ paru
 passfile
 passwd
 passwordSecret
+passwordState
 passwordStatus
 passwordstate
 pc
