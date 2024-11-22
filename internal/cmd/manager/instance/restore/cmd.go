@@ -14,7 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package restore implements the "instance restore" subcommand of the operator
 package restore
 
 import (
@@ -22,8 +21,6 @@ import (
 	"errors"
 	"os"
 
-	barmanCommand "github.com/cloudnative-pg/barman-cloud/pkg/command"
-	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
@@ -37,7 +34,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/istio"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/linkerd"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver"
 )
@@ -48,46 +44,53 @@ func NewCmd() *cobra.Command {
 	var namespace string
 	var pgData string
 	var pgWal string
-	var cli client.Client
 
 	cmd := &cobra.Command{
 		Use:           "restore [flags]",
 		SilenceErrors: true,
-		PreRunE: func(cmd *cobra.Command, _ []string) error {
-			ctx := cmd.Context()
-			contextLogger := log.FromContext(ctx)
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			contextLogger := log.FromContext(cmd.Context())
+
+			// Canceling this context
+			ctx, cancel := context.WithCancel(cmd.Context())
+			defer cancel()
+
+			// Step 1: create a manager with the local web server
 			mgr, err := buildLocalWebserverMgr(ctx, clusterName, namespace)
 			if err != nil {
 				contextLogger.Error(err, "while building the manager")
 				return err
 			}
 
-			go func() {
-				if err := mgr.Start(ctx); err != nil {
-					contextLogger.Error(err, "unable to start local webserver manager")
-				}
-			}()
-
-			cli = mgr.GetClient()
-
-			// we will wait this way for the mgr and informers to be online
-			return management.WaitForGetClusterWithClient(cmd.Context(), cli, client.ObjectKey{
-				Name:      clusterName,
-				Namespace: namespace,
-			})
-		},
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			ctx := cmd.Context()
-
-			info := postgres.InitInfo{
-				ClusterName: clusterName,
-				Namespace:   namespace,
-				PgData:      pgData,
-				PgWal:       pgWal,
+			// Step 2: add the restore process to the manager
+			restoreProcess := restoreRunnable{
+				mgr:         mgr,
+				clusterName: clusterName,
+				namespace:   namespace,
+				pgData:      pgData,
+				pgWal:       pgWal,
+				cancel:      cancel,
+			}
+			if mgr.Add(&restoreProcess) != nil {
+				contextLogger.Error(err, "while building the restore process")
+				return err
 			}
 
-			return restoreSubCommand(ctx, info, cli)
+			// Step 3: start everything
+			if err := mgr.Start(ctx); err != nil {
+				contextLogger.Error(err, "restore error")
+				return err
+			}
+
+			if !errors.Is(ctx.Err(), context.Canceled) {
+				contextLogger.Error(err, "error while recoverying backup")
+				// TODO(leonardoce): controlla se l'errore arriva qua
+				return err
+			}
+
+			return nil
 		},
+
 		PostRunE: func(cmd *cobra.Command, _ []string) error {
 			if err := istio.TryInvokeQuitEndpoint(cmd.Context()); err != nil {
 				return err
@@ -151,44 +154,4 @@ func buildLocalWebserverMgr(ctx context.Context, clusterName string, namespace s
 	}
 
 	return mgr, nil
-}
-
-func restoreSubCommand(ctx context.Context, info postgres.InitInfo, cli client.Client) error {
-	contextLogger := log.FromContext(ctx)
-	err := info.CheckTargetDataDirectory(ctx)
-	if err != nil {
-		return err
-	}
-
-	err = info.Restore(ctx, cli)
-	if err != nil {
-		contextLogger.Error(err, "Error while restoring a backup")
-		cleanupDataDirectoryIfNeeded(ctx, err, info.PgData)
-		return err
-	}
-
-	contextLogger.Info("restore command execution completed without errors")
-
-	return nil
-}
-
-func cleanupDataDirectoryIfNeeded(ctx context.Context, restoreError error, dataDirectory string) {
-	contextLogger := log.FromContext(ctx)
-
-	var barmanError *barmanCommand.CloudRestoreError
-	if !errors.As(restoreError, &barmanError) {
-		return
-	}
-
-	if !barmanError.IsRetriable() {
-		return
-	}
-
-	contextLogger.Info("Cleaning up data directory", "directory", dataDirectory)
-	if err := fileutils.RemoveDirectory(dataDirectory); err != nil && !os.IsNotExist(err) {
-		contextLogger.Error(
-			err,
-			"error occurred cleaning up data directory",
-			"directory", dataDirectory)
-	}
 }
