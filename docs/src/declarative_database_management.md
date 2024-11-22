@@ -1,22 +1,29 @@
 # PostgreSQL Database Management
 
-CloudNativePG simplifies database provisioning by automatically creating an
-application database, named `app` by default. This behavior is outlined in the
-["Bootstrap an empty cluster"](bootstrap.md#bootstrap-an-empty-cluster-initdb)
+CloudNativePG simplifies PostgreSQL database provisioning by automatically
+creating an application database named `app` by default. This default behavior
+is explained in the ["Bootstrap an Empty Cluster"](bootstrap.md#bootstrap-an-empty-cluster-initdb)
 section.
 
-While this default setup suits many scenarios, CloudNativePG also offers a
-powerful feature called **declarative database management**. This feature
-enables users to define and control the entire lifecycle of PostgreSQL
-databases using the `Database` Custom Resource Definition (CRD).
+For more advanced use cases, CloudNativePG introduces **declarative database
+management**, which empowers users to define and control the lifecycle of
+PostgreSQL databases using the `Database` Custom Resource Definition (CRD).
+This method seamlessly integrates with Kubernetes, providing a scalable,
+automated, and consistent approach to managing PostgreSQL databases.
 
-Declarative database management integrates seamlessly with Kubernetes,
-providing a consistent, automated, and scalable approach to managing PostgreSQL
-databases.
+---
+
+## Key Concepts
+
+### Scope of Management
 
 !!! Important
-    Each `Database` resource must reference a specific `Cluster`, which
-    determines where the database will be created.
+    CloudNativePG manages **global objects** in PostgreSQL clusters, such as
+    databases, roles, and tablespaces. However, it does **not** manage the content
+    of databases (e.g., schemas and tables). For database content, specialized
+    tools or the applications themselves should be used.
+
+### Declarative `Database` Manifest
 
 The following example demonstrates how a `Database` resource interacts with a
 `Cluster`:
@@ -25,7 +32,7 @@ The following example demonstrates how a `Database` resource interacts with a
 apiVersion: postgresql.cnpg.io/v1
 kind: Database
 metadata:
-  name: db-one
+  name: cluster-example-one
 spec:
   name: one
   owner: app
@@ -33,124 +40,91 @@ spec:
     name: cluster-example
 ```
 
-When applied, this manifest requests the creation of a PostgreSQL database
-named `one`, owned by the `app` role, within the `cluster-example` PostgreSQL
-cluster. The `db-one` `Database` resource will reside in the Kubernetes
-`default` namespace, where the corresponding `cluster-example` `Cluster`
-resource must also exist.
+When applied, this manifest creates a `Database` object called
+`cluster-example-one` requesting a database named `one`, owned by the `app`
+role, in the `cluster-example` PostgreSQL cluster.
 
-In summary, the key options in the `Database` manifest are:
+!!! Info
+    Please refer to the [API reference](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-DatabaseSpec)
+    the full list of attributes you can define for each `Database` object.
 
-- `metadata.name`: the unique name of the Kubernetes object within its namespace.
-- `spec.name`: the name of the database as it will appear in PostgreSQL.
-- `owner`: the PostgreSQL role that owns the database.
-- `cluster.name`: the name of the target PostgreSQL cluster.
+### Required Fields in the `Database` Manifest
 
-The `Database` object is managed by the instance manager running on the primary
-instance of the cluster, ensuring the database is created or updated as needed.
+- `metadata.name`: Unique name of the Kubernetes object within its namespace.
+- `spec.name`: Name of the database as it will appear in PostgreSQL.
+- `spec.owner`: PostgreSQL role that owns the database.
+- `spec.cluster.name`: Name of the target PostgreSQL cluster.
+
+The `Database` object must reference a specific `Cluster`, determining where
+the database will be created. It is managed by the cluster's primary instance,
+ensuring the database is created or updated as needed.
 
 !!! Info
     The distinction between `metadata.name` and `spec.name` allows multiple
-    `Database` resources with identical PostgreSQL database names to coexist in
-    different CloudNativePG clusters within the same Kubernetes namespace.
+    `Database` resources to reference databases with the same name across different
+    CloudNativePG clusters in the same Kubernetes namespace.
 
-!!! Warning
-    While CloudNativePG adheres to PostgreSQL’s
-    [CREATE DATABASE](https://www.postgresql.org/docs/current/sql-createdatabase.html) and
-    [ALTER DATABASE](https://www.postgresql.org/docs/current/sql-alterdatabase.html)
-    commands, **renaming databases is not supported**. Attempting to modify
-    `spec.name` in an existing `Database` object will result in rejection by
-    Kubernetes.
+## Reserved Database Names
 
-## Managing an existing database via a Database manifest
+PostgreSQL automatically creates databases such as `postgres`, `template0`, and
+`template1`. These names are reserved and cannot be used for new `Database`
+objects in CloudNativePG.
 
-It is possible to declare a Database object that references an existing
-database. In such case, the Database's fields will be applied using `ALTER`
-statements, rather than `CREATE`. There are differences between these two
-Postgres commands. In particular, the options accepted by `ALTER` are a subset
-of those accepted by `CREATE`.
+!!! Important
+    Creating a `Database` with `spec.name` set to `postgres`, `template0`, or
+    `template1` is not allowed.
 
-The database reconciler will transparently handle this on behalf of the user,
-making it easy to honor a Database manifest no matter the previous history
-of the cluster.
+## Reconciliation and Status
 
-There is however a difference regarding the handling of "immutable" fields: on
-an existing Database object, any modification of the immutable fields will
-be rejected at the Kubernetes level.
-On a newly declared Database manifest that references an existing database, the
-immutable fields will simply be ignored, as they are not valid options in the
-`ALTER DATABASE` command.
+Once a `Database` object is reconciled successfully:
 
-!!! Warning
-    If a Database manifest references an existing database, any fields in the
-    manifest that cannot be set in `ALTER DATABASE` will be ignored.
-    Notably, the options around encoding and collations, as well as the template
-    used, are immutable and not supported in `ALTER`.
+- `status.applied` will be set to `true`.
+- `status.observedGeneration` will match the `metadata.generation` of the last
+  applied configuration.
 
-## Database objects defined on  replica clusters
-
-Database objects declared on a replica cluster cannot be enforced, since the
-replica does not have write privileges.
-Instead, a Database object defined on a replica cluster will be periodically
-re-queued, and will be enforced once the cluster is promoted.
-
-## Reserved names
-
-PostgreSQL creates the `postgres` database, as well as `template0` and
-`template1`. Those names are therefore reserved for Postgres use. You will not
-be allowed to create a Database with any of `postgres`, `template0`, or
-`template1` as the `spec.name`.
-
-## Status sub-resource
-
-Once the reconciliation of a Database has been performed,
-the Database status will be updated with the field  `applied` set to `true`,
-and the field `observedGeneration` set to the last applied `generation`.
-If there were errors during the reconciliation of a database, the `applied`
-field would show `false`, and an additional field `message` would be displayed
-in the status.
+Example of a reconciled `Database` object:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
 kind: Database
 metadata:
-  [... snipped ...]
   generation: 1
-  name: db-one
+  name: cluster-example-one
 spec:
   cluster:
     name: cluster-example
-  name: declarative
+  name: one
   owner: app
-  template: template0
 status:
   observedGeneration: 1
   applied: true
 ```
 
-## Database Deletion and Reclaim Policies
+If an error occurs during reconciliation, `status.applied` will be `false`, and
+an error message will be included in the `status.message` field.
 
-A finalizer named `cnpg.io/deleteDatabase` is automatically added
-to each Database object to control its deletion process.
+## Deleting a Database
 
-By default, the `databaseReclaimPolicy` is set to `retain`, which means
-that if the Database object is deleted, the underlying PostgreSQL database
-will be retained for manual management by an administrator.
+CloudNativePG supports two methods for database deletion:
 
-Alternatively, if the `databaseReclaimPolicy` is set to `delete`,
-the PostgreSQL database will be automatically deleted when the Database
-object is removed.
+1. Using the `delete` reclaim policy*
+2. Declaratively setting the database's `ensure` field to `absent`
 
-### Example: Database with Delete Reclaim Policy
+### Deleting via `delete` Reclaim Policy
 
-The following example illustrates a Database object with a `delete`
-reclaim policy:
+The `databaseReclaimPolicy` field determines the behavior when a `Database`
+object is deleted:
+
+- `retain` (default): The database remains in PostgreSQL for manual management.
+- `delete`: The database is automatically removed from PostgreSQL.
+
+Example:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
 kind: Database
 metadata:
-  name: db-one-with-delete-reclaim-policy
+  name: cluster-example-two
 spec:
   databaseReclaimPolicy: delete
   name: two
@@ -159,135 +133,85 @@ spec:
     name: cluster-example
 ```
 
-In this case, when the Database object is deleted, the database `two` will
-be removed automatically in PostgreSQL.
+Deleting this `Database` object will automatically remove the `two` database
+from the `cluster-example` cluster.
 
-## Imperative deletion of a PostgreSQL database
+### Declaratively Setting `ensure: absent`
 
-In the previous section, the database Reclaim Policy was discussed, which
-determines whether the Postgres database should be dropped once the Database
-object is deleted.
+To remove a database, set the `ensure` field to `absent`.
 
-It is also possible to use the `ensure` field to delete an existing Postgres
-database via a Database declaration. The default value of `ensure` is `present`.
-Setting it to `absent` will have the effect of dropping the database in the next
-reconciliation cycle.
-
-### Example deletion of a Postgres database
-
-In the following example, `ensure: absent` has the effect of dropping the
-Postgres database. Since `applied` is true, we know the database was
-successfully dropped.
+Example:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
 kind: Database
 metadata:
-  [... snipped ...]
-  generation: 1
-  name: db-one-deleter
+  name: cluster-example-database-to-drop
 spec:
   cluster:
     name: cluster-example
   name: database-to-drop
   owner: app
   ensure: absent
-status:
-  observedGeneration: 1
-  applied: true
 ```
 
-## Collision of Database objects
+This manifest ensures that the `database-to-drop` database is removed from the
+`cluster-example` cluster.
 
-As mentioned above, the Database CRD has the fields `metadata.name` and
-`spec.name`, which are individually settable. A situation can arise where two
-Database objects refer to the same Postgres database (i.e. they have
-identical `spec.name` and `spec.cluster.name`).
+---
 
-The database reconciler could simply apply them both. The first applied would
-result in `CREATE` statements (assuming the database did not exist in Postgres),
-while the second one would result in `ALTER` statements.
-While this could work, it would make it much harder to reason about Database
-objects. There would be uncertainty as to the order of operations.
+## Limitations and Caveats
 
-For this reason, the database reconciler will check, given a Database object,
-if there is already another Database object managing the same database.
-If so, it will update its status with a message explaining this, and will not
-apply any changes in Postgres, as shown in the following example:
+### Renaming a database
 
-```yaml
-apiVersion: postgresql.cnpg.io/v1
-kind: Database
-metadata:
-  [... snipped ...]
-  generation: 1
-  name: db-duplicate
-spec:
-  cluster:
-    name: cluster-example
-  name: declarative
-  owner: app
-status:
-  applied: false
-  message: 'reconciliation error: database "declarative" is already managed by Database object "db-one"'
-```
+While CloudNativePG adheres to PostgreSQL’s
+[CREATE DATABASE](https://www.postgresql.org/docs/current/sql-createdatabase.html) and
+[ALTER DATABASE](https://www.postgresql.org/docs/current/sql-alterdatabase.html)
+commands, **renaming databases is not supported**.
+Attempting to modify `spec.name` in an existing `Database` object will result
+in rejection by Kubernetes.
+
+### Creating vs. Altering a Database
+
+- For new databases, CloudNativePG uses the `CREATE DATABASE` statement.
+- For existing databases, `ALTER DATABASE` is used to apply changes.
+
+It is important to note that there are some differences between these two
+Postgres commands: in particular, the options accepted by `ALTER` are a subset
+of those accepted by `CREATE`.
 
 !!! Warning
-    A Database object referring to a Postgres database that is already being
-    managed by a Database object will be rejected.
+    Some fields, such as encoding and collation settings, are immutable in
+    PostgreSQL. Attempts to modify these fields on existing databases will be
+    ignored.
 
-## Support of different Postgres versions
+### Replica Clusters
 
-The DDL for databases in Postgres keeps evolving. For example, the option
-[`ICU_RULES`](https://www.postgresql.org/docs/16/sql-createdatabase.html) has
-been introduced with Postgres 16 and is not available in previous versions.
+Database objects declared on replica clusters cannot be enforced, as replicas
+lack write privileges. These objects will remain in a pending state until the
+replica is promoted.
 
-The database reconciler will apply all the fields declared in the `spec`, and
-will transparently relay back any error messages from Postgres, leaving it to
-the user to take appropriate steps.
+### Conflict Resolution
 
-For example, applying the following Database manifest:
+If two `Database` objects manage the same PostgreSQL database (i.e., identical
+`spec.name` and `spec.cluster.name`), the second object will be rejected.
 
-```yaml
-apiVersion: postgresql.cnpg.io/v1
-  kind: Database
-  metadata:
-    name: db-icu
-spec:
-  name: declarative-icu
-  owner: app
-  encoding: UTF8
-  locale_provider: icu
-  icu_locale: en
-  icu_rules: fr
-  template: template0
-  cluster:
-    name: cluster-example
-```
-
-on a cluster running Postgres 14 will result in an error message in the
-Database object's status:
+Example status message:
 
 ```yaml
-[...]
 status:
   applied: false
-  error: 'reconciliation error: while creating database "declarative-icu": ERROR:
-    option "locale_provider" not recognized (SQLSTATE 42601)'
+  message: 'reconciliation error: database "example" is already managed by Database object "db-one"'
 ```
 
-This is exactly what would happen if you attempted to create the database
-directly using `psql`. The database reconciler aims for transparency.
+### Postgres Version Differences
 
-## Making direct changes in Postgres
+CloudNativePG adheres to PostgreSQL's capabilities. For example, features like
+`ICU_RULES` introduced in PostgreSQL 16 are unavailable in earlier versions.
+Errors from PostgreSQL will be reflected in the `Database` object's `status`.
 
-It is possible to make changes directly in Postgres to a database that was
-created or managed with a Database object.
+### Manual Changes
 
-The fields `observedGeneration` and `generation` described above will ensure
-that once a Database has been reconciled to its defined `generation`, it will
-not be re-applied by the instance manager. Therefore, your manual changes will
-not be rolled back inadvertently.
-
-CloudNativePG gives you the flexibility to make your databases via Database
-manifests, via direct changes, or mixing matching to fit your use case.
+CloudNativePG does not overwrite manual changes to databases. Once reconciled,
+a `Database` object will not be reapplied unless its `metadata.generation`
+changes, giving flexibility for direct PostgreSQL modifications.
