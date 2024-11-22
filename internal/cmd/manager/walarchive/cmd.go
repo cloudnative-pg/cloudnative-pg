@@ -31,7 +31,6 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	"github.com/spf13/cobra"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	pluginClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
@@ -39,9 +38,8 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/cache"
 	cacheClient "github.com/cloudnative-pg/cloudnative-pg/internal/management/cache/client"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/conditions"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
 	pgManagement "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -70,49 +68,27 @@ func NewCmd() *cobra.Command {
 				return err
 			}
 
-			typedClient, err := management.NewControllerRuntimeClient()
-			if err != nil {
-				contextLog.Error(err, "creating controller-runtine client")
-				return err
+			cluster, errCluster := cacheClient.GetCluster()
+			if errCluster != nil {
+				return fmt.Errorf("failed to get cluster: %w", errCluster)
 			}
 
-			cluster, err := cacheClient.GetCluster()
-			if err != nil {
-				return fmt.Errorf("failed to get cluster: %w", err)
-			}
-
-			err = run(ctx, podName, pgData, cluster, args)
-			if err != nil {
+			if err := run(ctx, podName, pgData, cluster, args); err != nil {
 				if errors.Is(err, errSwitchoverInProgress) {
 					contextLog.Warning("Refusing to archive WALs until the switchover is not completed",
 						"err", err)
 				} else {
 					contextLog.Error(err, logErrorMessage)
 				}
-
-				condition := metav1.Condition{
-					Type:    string(apiv1.ConditionContinuousArchiving),
-					Status:  metav1.ConditionFalse,
-					Reason:  string(apiv1.ConditionReasonContinuousArchivingFailing),
-					Message: err.Error(),
-				}
-				if errCond := conditions.Patch(ctx, typedClient, cluster, &condition); errCond != nil {
-					contextLog.Error(errCond, "Error changing wal archiving condition (wal archiving failed)")
+				if reqErr := webserver.NewLocalClient().SetWALArchiveStatusCondition(ctx, err.Error()); err != nil {
+					contextLog.Error(reqErr, "while invoking the set wal archive condition endpoint")
 				}
 				return err
 			}
 
-			// Update the condition if needed.
-			condition := metav1.Condition{
-				Type:    string(apiv1.ConditionContinuousArchiving),
-				Status:  metav1.ConditionTrue,
-				Reason:  string(apiv1.ConditionReasonContinuousArchivingSuccess),
-				Message: "Continuous archiving is working",
+			if err := webserver.NewLocalClient().SetWALArchiveStatusCondition(ctx, ""); err != nil {
+				contextLog.Error(err, "while invoking the set wal archive condition endpoint")
 			}
-			if errCond := conditions.Patch(ctx, typedClient, cluster, &condition); errCond != nil {
-				contextLog.Error(errCond, "Error changing wal archiving condition (wal archiving succeeded)")
-			}
-
 			return nil
 		},
 	}
