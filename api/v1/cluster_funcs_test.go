@@ -1005,7 +1005,7 @@ var _ = Describe("Managed Roles", func() {
 		Expect(cluster.UsesSecretInManagedRoles("test_user_secrets")).To(BeTrue())
 		Expect(cluster.UsesSecretInManagedRoles("test_user_secrets1")).To(BeFalse())
 		Expect(cluster.Spec.Managed.Roles[0].GetRoleInherit()).To(BeTrue())
-		Expect(cluster.Spec.Managed.Roles[0].GetRoleSecretsName()).To(Equal("test_user_secrets"))
+		Expect(cluster.Spec.Managed.Roles[0].GetRoleSecretName()).To(Equal("test_user_secrets"))
 	})
 
 	It("Verifies default values when there are no managed roles", func() {
