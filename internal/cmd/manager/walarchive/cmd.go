@@ -59,7 +59,7 @@ func NewCmd() *cobra.Command {
 				return fmt.Errorf("failed to get cluster: %w", errCluster)
 			}
 
-			if err := archiver.Run(ctx, podName, pgData, cluster, args[0], false); err != nil {
+			if err := archiver.Run(ctx, podName, pgData, cluster, args[0]); err != nil {
 				if errors.Is(err, errSwitchoverInProgress) {
 					contextLog.Warning("Refusing to archive WALs until the switchover is not completed",
 						"err", err)

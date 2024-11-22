@@ -107,14 +107,11 @@ func ArchiveAllReadyWALs(
 
 // Run implements the WAL archiving process given the current cluster definition
 // and the current Pod Name.
-// If the force flag is true, this function will archive the WAL file even when the current
-// pod specified in podName is not the current primary.
 func Run(
 	ctx context.Context,
 	podName, pgData string,
 	cluster *apiv1.Cluster,
 	walName string,
-	force bool,
 ) error {
 	contextLog := log.FromContext(ctx)
 
@@ -131,7 +128,7 @@ func Run(
 		}
 	}
 
-	if !force && cluster.Status.CurrentPrimary != podName {
+	if cluster.Status.CurrentPrimary != podName {
 		contextLog.Info("Refusing to archive WAL when there is a switchover in progress",
 			"currentPrimary", cluster.Status.CurrentPrimary,
 			"targetPrimary", cluster.Status.TargetPrimary,
