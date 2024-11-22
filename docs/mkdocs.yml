@@ -39,6 +39,7 @@ nav:
   - service_management.md
   - postgresql_conf.md
   - declarative_role_management.md
+  - declarative_database_management.md
   - tablespaces.md
   - operator_conf.md
   - cluster_conf.md

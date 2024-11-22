@@ -1128,6 +1128,7 @@ scheduledbackupspec
 scheduledbackupstatus
 schedulerName
 schemaOnly
+schemas
 sdk
 searchAttribute
 searchFilter

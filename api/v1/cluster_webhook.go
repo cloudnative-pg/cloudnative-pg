@@ -102,7 +102,7 @@ func (r *Cluster) setDefaults(preserveUserSettings bool) {
 		r.Spec.Bootstrap = &BootstrapConfiguration{}
 	}
 
-	// Defaulting initDB if no other boostrap method was passed
+	// Defaulting initDB if no other bootstrap method was passed
 	switch {
 	case r.Spec.Bootstrap.Recovery != nil:
 		r.defaultRecovery()

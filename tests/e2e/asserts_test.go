@@ -975,7 +975,7 @@ func AssertReplicaModeCluster(
 // AssertDetachReplicaModeCluster verifies that a replica cluster can be detached from the
 // source cluster, and its target primary can be promoted. As such, new write operation
 // on the source cluster shouldn't be received anymore by the detached replica cluster.
-// Also, make sure the boostrap fields database and owner of the replica cluster are
+// Also, make sure the bootstrap fields database and owner of the replica cluster are
 // properly ignored
 func AssertDetachReplicaModeCluster(
 	namespace,

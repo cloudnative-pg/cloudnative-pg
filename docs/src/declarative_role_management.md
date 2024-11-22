@@ -1,4 +1,4 @@
-# Database Role Management
+# PostgreSQL Role Management
 
 From its inception, CloudNativePG has managed the creation of specific roles
 required in PostgreSQL instances:
