@@ -355,7 +355,7 @@ type passwordSecret struct {
 }
 
 type passwordManager interface {
-	GetRoleSecretsName() string
+	GetRoleSecretName() string
 	GetRoleName() string
 	ShouldDisablePassword() bool
 }
@@ -368,7 +368,7 @@ func getPassword(
 	rolePassword passwordManager,
 	namespace string,
 ) (passwordSecret, error) {
-	secretName := rolePassword.GetRoleSecretsName()
+	secretName := rolePassword.GetRoleSecretName()
 	// no secrets defined, will keep rolePassword.Password nil
 	if secretName == "" {
 		return passwordSecret{}, nil
