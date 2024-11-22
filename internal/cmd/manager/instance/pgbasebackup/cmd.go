@@ -77,7 +77,7 @@ func NewCmd() *cobra.Command {
 			}
 
 			if err = env.bootstrapUsingPgbasebackup(ctx); err != nil {
-				contextLogger.Error(err, "Unable to boostrap cluster")
+				contextLogger.Error(err, "Unable to bootstrap cluster")
 			}
 			return err
 		},
