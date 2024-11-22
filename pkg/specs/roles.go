@@ -270,7 +270,9 @@ func getInvolvedSecretNames(cluster apiv1.Cluster, backupOrigin *apiv1.Backup, r
 	involvedSecretNames = append(involvedSecretNames, externalClusterSecrets(cluster)...)
 	involvedSecretNames = append(involvedSecretNames, managedRolesSecrets(cluster)...)
 	for _, r := range roles {
-		involvedSecretNames = append(involvedSecretNames, crdRoleSecrets(r)...)
+		if secretName := crdRoleSecretName(r); secretName != "" {
+			involvedSecretNames = append(involvedSecretNames, secretName)
+		}
 	}
 
 	return cleanupResourceList(involvedSecretNames)
@@ -466,13 +468,13 @@ func managedRolesSecrets(cluster apiv1.Cluster) []string {
 	return secretNames
 }
 
-func crdRoleSecrets(role apiv1.Role) []string {
+func crdRoleSecretName(role apiv1.Role) string {
 	if role.Spec.DisablePassword || role.Spec.PasswordSecret == nil {
-		return []string{}
+		return ""
 	}
-	secretName := role.Spec.GetRoleSecretsName()
+	secretName := role.Spec.GetRoleSecretName()
 	if secretName != "" {
-		return []string{secretName}
+		return secretName
 	}
-	return []string{}
+	return ""
 }

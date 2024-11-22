@@ -134,18 +134,18 @@ func (d *DatabaseRole) ApplyPassword(
 ) (string, error) {
 	var passVersion string
 	switch {
-	case rolePassword.GetRoleSecretsName() == "" && !rolePassword.ShouldDisablePassword():
+	case rolePassword.GetRoleSecretName() == "" && !rolePassword.ShouldDisablePassword():
 		d.IgnorePassword = true
 		return "", nil
-	case rolePassword.GetRoleSecretsName() == "" && rolePassword.ShouldDisablePassword():
+	case rolePassword.GetRoleSecretName() == "" && rolePassword.ShouldDisablePassword():
 		d.Password = sql.NullString{}
 		return "", nil
-	case rolePassword.GetRoleSecretsName() != "" && rolePassword.ShouldDisablePassword():
+	case rolePassword.GetRoleSecretName() != "" && rolePassword.ShouldDisablePassword():
 		// this case should be prevented by the validation webhook,
 		// and is an error
 		return "",
 			fmt.Errorf("cannot reconcile: password both provided and disabled: %s",
-				rolePassword.GetRoleSecretsName())
+				rolePassword.GetRoleSecretName())
 	default: // role.PasswordSecret != nil && !rolePassword.ShouldDisablePassword():
 		passwordSecret, err := getPassword(ctx, cl, rolePassword, namespace)
 		if err != nil {
