@@ -52,19 +52,6 @@ var _ = Describe("create client", func() {
 		Expect(Client).NotTo(BeNil())
 	})
 
-	It("should generate the correct UserAgent string", func() {
-		expectedUserAgent := fmt.Sprintf("kubectl-cnpg/v%s (%s)", versions.Version, versions.Info.Commit)
-
-		// Create a new rest.Config
-		config := &rest.Config{}
-
-		// Set the user agent
-		config.UserAgent = fmt.Sprintf("kubectl-cnpg/v%s (%s)", versions.Version, versions.Info.Commit)
-
-		// Verify it matches what we expect
-		Expect(config.UserAgent).To(Equal(expectedUserAgent))
-	})
-
 	It("should set the UserAgent correctly", func() {
 		// Create a test HTTP transport that captures the request headers
 		var capturedUserAgent string
