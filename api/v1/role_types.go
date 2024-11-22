@@ -36,6 +36,7 @@ const (
 type RoleSpec struct {
 	// The corresponding cluster
 	ClusterRef corev1.LocalObjectReference `json:"cluster"`
+
 	// The policy for end-of-life maintenance of this role
 	// +kubebuilder:validation:Enum=delete;retain
 	// +kubebuilder:default:=retain
@@ -44,6 +45,7 @@ type RoleSpec struct {
 
 	// Name of the role
 	Name string `json:"name"`
+
 	// Description of the role
 	// +optional
 	Comment string `json:"comment,omitempty"`
@@ -88,7 +90,7 @@ type RoleSpec struct {
 	// Whether the role is a `superuser` who can override all access
 	// restrictions within the database - superuser status is dangerous and
 	// should be used only when really needed. You must yourself be a
-	// superuser to create a new superuser. Defaults is `false`.
+	// superuser to create a new superuser. Default is `false`.
 	// +optional
 	Superuser bool `json:"superuser,omitempty"`
 
@@ -104,10 +106,10 @@ type RoleSpec struct {
 	// +optional
 	CreateRole bool `json:"createrole,omitempty"`
 
-	// Whether the role is allowed to log in. A role having the `login`
-	// attribute can be thought of as a user. Roles without this attribute
-	// are useful for managing database privileges, but are not users in
-	// the usual sense of the word. Default is `false`.
+	// Whether the role is allowed to log in.
+	// A role having the `login` attribute can be thought of as a user.
+	// Roles without this attribute are useful for managing database privileges,
+	// but are not users in the usual sense of the word. Default is `false`.
 	// +optional
 	Login bool `json:"login,omitempty"`
 
@@ -116,8 +118,8 @@ type RoleSpec struct {
 	// server in replication mode (physical or logical replication) and in
 	// order to be able to create or drop replication slots. A role having
 	// the `replication` attribute is a very highly privileged role, and
-	// should only be used on roles actually used for replication. Default
-	// is `false`.
+	// should only be used on roles actually used for replication.
+	// Default is `false`.
 	// +optional
 	Replication bool `json:"replication,omitempty"`
 
@@ -145,7 +147,7 @@ type RoleState struct {
 
 	// PasswordState holds the last applied version of the passwordSecret, and
 	// the last transaction ID of the role in postgres
-	PasswordState PasswordState `json:"passwordStatus,omitempty"`
+	PasswordState PasswordState `json:"passwordState,omitempty"`
 }
 
 // +kubebuilder:object:root=true

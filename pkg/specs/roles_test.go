@@ -370,3 +370,43 @@ var _ = Describe("Roles", func() {
 		Expect(secretsPolicy.ResourceNames).To(ContainElements("my_secret1", "my_secret3", "my_secret5"))
 	})
 })
+
+var _ = Describe("CRD role secret name", func() {
+	It("should be empty when password is disabled", func() {
+		role := apiv1.Role{
+			Spec: apiv1.RoleSpec{
+				DisablePassword: true,
+				PasswordSecret:  &apiv1.LocalObjectReference{},
+			},
+		}
+		secrets := crdRoleSecretName(role)
+		Expect(secrets).To(BeEmpty())
+	})
+	It("should be empty when password secret is nil", func() {
+		role := apiv1.Role{
+			Spec: apiv1.RoleSpec{},
+		}
+		secrets := crdRoleSecretName(role)
+		Expect(secrets).To(BeEmpty())
+	})
+	It("should be empty when password secret name is empty", func() {
+		role := apiv1.Role{
+			Spec: apiv1.RoleSpec{
+				PasswordSecret: &apiv1.LocalObjectReference{},
+			},
+		}
+		secrets := crdRoleSecretName(role)
+		Expect(secrets).To(BeEmpty())
+	})
+	It("should work properly when the password secret name is set", func() {
+		role := apiv1.Role{
+			Spec: apiv1.RoleSpec{
+				PasswordSecret: &apiv1.LocalObjectReference{
+					Name: "secret-name",
+				},
+			},
+		}
+		secrets := crdRoleSecretName(role)
+		Expect(secrets).To(BeIdenticalTo("secret-name"))
+	})
+})

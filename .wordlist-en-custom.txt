@@ -1034,6 +1034,7 @@ paru
 passfile
 passwd
 passwordSecret
+passwordState
 passwordStatus
 pc
 pdf
