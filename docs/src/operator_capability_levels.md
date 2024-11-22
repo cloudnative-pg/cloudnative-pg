@@ -143,17 +143,15 @@ read, and read-only workloads.
 Using the convention-over-configuration approach, the operator creates a
 database called `app`, by default owned by a regular Postgres user with the
 same name. You can specify both the database name and the user name, if
-required.
+required, as part of the boostrap.
+
+Additional databases can be created or managed via
+[declarative database management](declarative_database_management.md) using
+the `Database` CRD.
 
 Although no configuration is required to run the cluster, you can customize
 both PostgreSQL runtime configuration and PostgreSQL host-based
 authentication rules in the `postgresql` section of the CR.
-
-#### Additional databases
-
-Additional databases can be created or managed via
-[declarative database management](declarative_database_management.md) using
-the Database CRD.
 
 ### Configuration of Postgres roles, users, and groups
 

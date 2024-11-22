@@ -138,9 +138,8 @@ from the `cluster-example` cluster.
 
 ### Declaratively Setting `ensure: absent`
 
-To remove a database, set the `ensure` field to `absent`.
-
-Example:
+To remove a database, set the `ensure` field to `absent` like in the following
+example:.
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -157,8 +156,6 @@ spec:
 
 This manifest ensures that the `database-to-drop` database is removed from the
 `cluster-example` cluster.
-
----
 
 ## Limitations and Caveats
 
@@ -193,15 +190,16 @@ replica is promoted.
 
 ### Conflict Resolution
 
-If two `Database` objects manage the same PostgreSQL database (i.e., identical
-`spec.name` and `spec.cluster.name`), the second object will be rejected.
+If two `Database` objects in the same namespace manage the same PostgreSQL
+database (i.e., identical `spec.name` and `spec.cluster.name`), the second
+object will be rejected.
 
 Example status message:
 
 ```yaml
 status:
   applied: false
-  message: 'reconciliation error: database "example" is already managed by Database object "db-one"'
+  message: 'reconciliation error: database "one" is already managed by Database object "cluster-example-one"'
 ```
 
 ### Postgres Version Differences
