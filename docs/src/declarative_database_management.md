@@ -1,13 +1,16 @@
 # Declarative Database Management
 
-## The Database Custom Resource Definition
+Declarative database management allows users to define and control the
+lifecycle of PostgreSQL databases using the `Database` Custom Resource
+Definition (CRD). This method integrates seamlessly with Kubernetes, enabling a
+consistent and automated approach to database management.
 
-Declarative database management enables users to control the lifecycle of
-databases in PostgreSQL via the `Database` Custom Resource Definition (CRD).
+!!! Important
+    Each `Database` resource must reference a specific `Cluster`, which
+    determines where the database will be created.
 
-### Example: Simple Database Declaration
-
-Below is an example of a basic `Database` manifest:
+The following example demonstrates how a `Database` resource interacts with a
+`Cluster`:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -21,28 +24,34 @@ spec:
     name: cluster-example
 ```
 
-Note that the Database references a Cluster, on which the database will be
-created.
-The Database object is managed by the instance manager of the cluster's
-primary instance.
+When applied, this manifest requests the creation of a PostgreSQL database
+named `one`, owned by the `app` role, within the `cluster-example` PostgreSQL
+cluster. The `db-one` `Database` resource will reside in the Kubernetes
+`default` namespace, where the corresponding `cluster-example` `Cluster`
+resource must also exist.
 
-In the CRD, the `metadata.name` field represents the name the object
-will have in Kubernetes, which is guaranteed to be unique per namespace.
-There is also the field `spec.name`, which is the name that will be used for
-the database in Postgres.
+In summary, the key options in the `Database` manifest are:
 
-!!! Note
-    Having separate `metadata.name` and `spec.name` makes it possible to have
-    two different CloudNativePG clusters in the same namespace, with Databases
-    that have the same name in Postgres.
+- `metadata.name`: the unique name of the Kubernetes object within its namespace.
+- `spec.name`: the name of the database as it will appear in PostgreSQL.
+- `owner`: the PostgreSQL role that owns the database.
+- `cluster.name`: the name of the target PostgreSQL cluster.
+
+The `Database` object is managed by the instance manager running on the primary
+instance of the cluster, ensuring the database is created or updated as needed.
+
+!!! Info
+    The distinction between `metadata.name` and `spec.name` allows multiple
+    `Database` resources with identical PostgreSQL database names to coexist in
+    different CloudNativePG clusters within the same Kubernetes namespace.
 
 !!! Warning
-    While declarative database management in CloudNativePG adheres to the
-    PostgreSQL database
-    [CREATE](https://www.postgresql.org/docs/current/sql-createdatabase.html)
-    and [ALTER](https://www.postgresql.org/docs/current/sql-alterdatabase.html)
-    commands, it does not support renaming of databases. Changing the
-    `spec.name` in a Database object will be rejected at the Kubernetes level.
+    While CloudNativePG adheres to PostgreSQL’s
+    [CREATE DATABASE](https://www.postgresql.org/docs/current/sql-createdatabase.html) and
+    [ALTER DATABASE](https://www.postgresql.org/docs/current/sql-alterdatabase.html)
+    commands, **renaming databases is not supported**. Attempting to modify
+    `spec.name` in an existing `Database` object will result in rejection by
+    Kubernetes.
 
 ## Managing an existing database via a Database manifest
 

@@ -24,7 +24,6 @@ nav:
   - image_catalog.md
   - bootstrap.md
   - database_import.md
-  - declarative_database_management.md
   - security.md
   - instance_manager.md
   - scheduling.md
@@ -39,6 +38,7 @@ nav:
   - recovery.md
   - service_management.md
   - postgresql_conf.md
+  - declarative_database_management.md
   - declarative_role_management.md
   - tablespaces.md
   - operator_conf.md
