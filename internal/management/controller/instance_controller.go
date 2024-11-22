@@ -1009,7 +1009,7 @@ func (r *InstanceReconciler) reconcilePostgreSQLAutoConfFilePermissions(ctx cont
 // The file is created immediately after initdb and removed after the
 // first WAL is archived
 func (r *InstanceReconciler) reconcileCheckWalArchiveFile(cluster *apiv1.Cluster) error {
-	filePath := filepath.Join(r.instance.PgData, postgresManagement.CheckEmptyWalArchiveFile)
+	filePath := filepath.Join(r.instance.PgData, constants.CheckEmptyWalArchiveFile)
 	for _, condition := range cluster.Status.Conditions {
 		// If our current condition is archiving we can delete the file
 		if condition.Type == string(apiv1.ConditionContinuousArchiving) && condition.Status == metav1.ConditionTrue {
