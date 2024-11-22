@@ -107,7 +107,7 @@ an error message will be included in the `status.message` field.
 
 CloudNativePG supports two methods for database deletion:
 
-1. Using the `delete` reclaim policy*
+1. Using the `delete` reclaim policy
 2. Declaratively setting the database's `ensure` field to `absent`
 
 ### Deleting via `delete` Reclaim Policy
