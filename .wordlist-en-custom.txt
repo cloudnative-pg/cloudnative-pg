@@ -1196,6 +1196,7 @@ passfile
 passthrough
 passwd
 passwordSecret
+passwordState
 passwordStatus
 passwordstate
 pc
