@@ -1,9 +1,18 @@
-# Declarative Database Management
+# PostgreSQL Database Management
 
-Declarative database management allows users to define and control the
-lifecycle of PostgreSQL databases using the `Database` Custom Resource
-Definition (CRD). This method integrates seamlessly with Kubernetes, enabling a
-consistent and automated approach to database management.
+CloudNativePG simplifies database provisioning by automatically creating an
+application database, named `app` by default. This behavior is outlined in the
+["Bootstrap an empty cluster"](bootstrap.md#bootstrap-an-empty-cluster-initdb)
+section.
+
+While this default setup suits many scenarios, CloudNativePG also offers a
+powerful feature called **declarative database management**. This feature
+enables users to define and control the entire lifecycle of PostgreSQL
+databases using the `Database` Custom Resource Definition (CRD).
+
+Declarative database management integrates seamlessly with Kubernetes,
+providing a consistent, automated, and scalable approach to managing PostgreSQL
+databases.
 
 !!! Important
     Each `Database` resource must reference a specific `Cluster`, which
