@@ -37,10 +37,10 @@ recovery.
 PostgreSQL 9.0 (2010) introduced WAL streaming and read-only replicas through
 *hot standby*. In 2011, PostgreSQL 9.1 brought synchronous replication at the
 transaction level, supporting RPO=0 clusters. Cascading replication was added in
-PostgreSQL 9.2 (2012). The foundations for logical replication were established
-in PostgreSQL 9.4 (2014), and version 10 (2017) introduced native support for
-the publisher/subscriber pattern to replicate data from an origin to a
-destination. The table below summarizes these milestones.
+PostgreSQL 9.2 (2012). The foundations for [logical replication](logical_replication.md)
+were established in PostgreSQL 9.4 (2014), and version 10 (2017) introduced
+native support for the publisher/subscriber pattern to replicate data from an
+origin to a destination. The table below summarizes these milestones.
 
 | Version | Year | Feature                                                               |
 |:-------:|:----:|-----------------------------------------------------------------------|

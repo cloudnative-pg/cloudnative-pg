@@ -1,4 +1,4 @@
-# Declarative Publication/Subscription Management
+# Logical Replication
 
 Declarative publication/subscription management enables users to set up
 logical replication via the following Custom Resource Definitions (CRD):
