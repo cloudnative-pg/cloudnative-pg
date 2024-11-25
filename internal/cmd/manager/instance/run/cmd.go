@@ -165,6 +165,11 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 						instance.GetNamespaceName(): {},
 					},
 				},
+				&apiv1.Role{}: {
+					Namespaces: map[string]cache.Config{
+						instance.GetNamespaceName(): {},
+					},
+				},
 			},
 		},
 		// We don't need a cache for secrets and configmap, as all reloads
@@ -212,6 +217,12 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 	dbReconciler := controller.NewDatabaseReconciler(mgr, instance)
 	if err := dbReconciler.SetupWithManager(mgr); err != nil {
 		contextLogger.Error(err, "unable to create database controller")
+		return err
+	}
+
+	roleReconciler := controller.NewRoleReconciler(mgr, instance)
+	if err := roleReconciler.SetupWithManager(mgr); err != nil {
+		contextLogger.Error(err, "unable to create role controller")
 		return err
 	}
 
