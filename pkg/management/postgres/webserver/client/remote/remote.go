@@ -14,34 +14,24 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cache
+package remote
 
-import (
-	"sync"
-)
-
-var cache sync.Map
-
-// Store write an object into the local cache
-func Store(c string, v interface{}) {
-	cache.Store(c, v)
+// Client is the interface to interact with the remote webserver
+type Client interface {
+	Instance() InstanceClient
 }
 
-// Delete an object from the local cache
-func Delete(c string) {
-	cache.Delete(c)
+type remoteClientImpl struct {
+	instance InstanceClient
 }
 
-// LoadEnv loads a key from the local cache
-func LoadEnv(c string) ([]string, error) {
-	value, ok := cache.Load(c)
-	if !ok {
-		return nil, ErrCacheMiss
-	}
+func (r *remoteClientImpl) Instance() InstanceClient {
+	return r.instance
+}
 
-	if v, ok := value.([]string); ok {
-		return v, nil
+// NewClient creates a new remote client
+func NewClient() Client {
+	return &remoteClientImpl{
+		instance: newInstanceClient(),
 	}
-
-	return nil, ErrUnsupportedObject
 }

@@ -47,9 +47,9 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/conditions"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/client/remote"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/backup/volumesnapshot"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/instance"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -71,7 +71,7 @@ type BackupReconciler struct {
 	Recorder record.EventRecorder
 	Plugins  repository.Interface
 
-	instanceStatusClient instance.Client
+	instanceStatusClient remote.InstanceClient
 }
 
 // NewBackupReconciler properly initializes the BackupReconciler
@@ -85,7 +85,7 @@ func NewBackupReconciler(
 		DiscoveryClient:      discoveryClient,
 		Scheme:               mgr.GetScheme(),
 		Recorder:             mgr.GetEventRecorderFor("cloudnative-pg-backup"),
-		instanceStatusClient: instance.NewStatusClient(),
+		instanceStatusClient: remote.NewClient().Instance(),
 		Plugins:              plugins,
 	}
 }

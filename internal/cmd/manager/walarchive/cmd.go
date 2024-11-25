@@ -25,9 +25,8 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/spf13/cobra"
 
-	cacheClient "github.com/cloudnative-pg/cloudnative-pg/internal/management/cache/client"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/archiver"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/client/local"
 )
 
 // errSwitchoverInProgress is raised when there is a switchover in progress
@@ -54,7 +53,8 @@ func NewCmd() *cobra.Command {
 				return err
 			}
 
-			cluster, errCluster := cacheClient.GetCluster()
+			localClient := local.NewClient()
+			cluster, errCluster := localClient.Cache().GetCluster()
 			if errCluster != nil {
 				return fmt.Errorf("failed to get cluster: %w", errCluster)
 			}
@@ -66,13 +66,13 @@ func NewCmd() *cobra.Command {
 				} else {
 					contextLog.Error(err, logErrorMessage)
 				}
-				if reqErr := webserver.NewLocalClient().SetWALArchiveStatusCondition(ctx, err.Error()); reqErr != nil {
+				if reqErr := localClient.Cluster().SetWALArchiveStatusCondition(ctx, err.Error()); reqErr != nil {
 					contextLog.Error(reqErr, "while invoking the set wal archive condition endpoint")
 				}
 				return err
 			}
 
-			if err := webserver.NewLocalClient().SetWALArchiveStatusCondition(ctx, ""); err != nil {
+			if err := localClient.Cluster().SetWALArchiveStatusCondition(ctx, ""); err != nil {
 				contextLog.Error(err, "while invoking the set wal archive condition endpoint")
 			}
 			return nil

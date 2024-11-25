@@ -36,8 +36,8 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/cache"
-	cacheClient "github.com/cloudnative-pg/cloudnative-pg/internal/management/cache/client"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/client/local"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -165,7 +165,7 @@ func internalRun(
 	}
 
 	// Get environment from cache
-	env, err := cacheClient.GetEnv(cache.WALArchiveKey)
+	env, err := local.NewClient().Cache().GetEnv(cache.WALArchiveKey)
 	if err != nil {
 		return fmt.Errorf("failed to get envs: %w", err)
 	}

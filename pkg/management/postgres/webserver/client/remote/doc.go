@@ -14,34 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cache
-
-import (
-	"sync"
-)
-
-var cache sync.Map
-
-// Store write an object into the local cache
-func Store(c string, v interface{}) {
-	cache.Store(c, v)
-}
-
-// Delete an object from the local cache
-func Delete(c string) {
-	cache.Delete(c)
-}
-
-// LoadEnv loads a key from the local cache
-func LoadEnv(c string) ([]string, error) {
-	value, ok := cache.Load(c)
-	if !ok {
-		return nil, ErrCacheMiss
-	}
-
-	if v, ok := value.([]string); ok {
-		return v, nil
-	}
-
-	return nil, ErrUnsupportedObject
-}
+// Package remote contains the client capable of querying the webserver remote endpoint.
+package remote

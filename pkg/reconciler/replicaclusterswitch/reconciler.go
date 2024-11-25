@@ -29,8 +29,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/client/remote"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/instance"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -39,7 +39,7 @@ func Reconcile(
 	ctx context.Context,
 	cli client.Client,
 	cluster *apiv1.Cluster,
-	instanceClient instance.Client,
+	instanceClient remote.InstanceClient,
 	instances postgres.PostgresqlStatusList,
 ) (*ctrl.Result, error) {
 	if !cluster.IsReplica() {
@@ -150,7 +150,7 @@ func reconcileDemotionToken(
 	ctx context.Context,
 	cli client.Client,
 	cluster *apiv1.Cluster,
-	instanceClient instance.Client,
+	instanceClient remote.InstanceClient,
 	instances postgres.PostgresqlStatusList,
 ) (*ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx).WithName("replica_cluster")
