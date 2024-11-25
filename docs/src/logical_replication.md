@@ -1,15 +1,35 @@
 # Logical Replication
 
-Declarative publication/subscription management enables users to set up
-logical replication via the following Custom Resource Definitions (CRD):
+PostgreSQL extends its replication capabilities beyond physical replication,
+which works at the level of exact block addresses and byte-by-byte copying, by
+also offering [logical replication](https://www.postgresql.org/docs/current/logical-replication.html).
+Logical replication enables data objects and their changes to be replicated
+based on a defined replication identity, typically the primary key.
 
-- `Database` ,
-- `Publication`,
-- `Subscription`,
+Logical replication uses a publish-and-subscribe model, where one or more
+subscribers connect to one or more publications on a publisher node.
+Subscribers pull data changes from the publications they subscribe to and can
+re-publish this data, enabling cascading replication or more complex
+replication topologies.
 
-The Database CRD is discussed in depth in the
-["Declarative database management"](declarative_database_management.md) section.
-In this section we describe `Publication` and `Subscription` in more detail.
+This flexible approach is particularly suited for use cases such as:
+
+- Online data migrations
+- Live PostgreSQL version upgrades
+- Data distribution across multiple systems
+- Real-time analytics
+- Seamless integration with external applications
+
+!!! Info
+    For detailed information and examples, see the official PostgreSQL
+    documentation on [Logical Replication](https://www.postgresql.org/docs/current/logical-replication.html).
+
+**CloudNativePG** further enhances this feature by providing declarative
+support for the core PostgreSQL objects that manage logical replication:
+
+- **Publications** via the `Publication` resource
+- **Subscriptions** via the `Subscription` resource
+
 
 ## Overview
 
