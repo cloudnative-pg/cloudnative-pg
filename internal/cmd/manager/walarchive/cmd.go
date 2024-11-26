@@ -66,7 +66,7 @@ func NewCmd() *cobra.Command {
 				} else {
 					contextLog.Error(err, logErrorMessage)
 				}
-				if reqErr := webserver.NewLocalClient().SetWALArchiveStatusCondition(ctx, err.Error()); err != nil {
+				if reqErr := webserver.NewLocalClient().SetWALArchiveStatusCondition(ctx, err.Error()); reqErr != nil {
 					contextLog.Error(reqErr, "while invoking the set wal archive condition endpoint")
 				}
 				return err
