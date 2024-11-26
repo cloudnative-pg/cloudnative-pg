@@ -698,3 +698,10 @@ spec:
       - path: owner
         displayName: Database Owner
         description: Database Owner
+      statusDescriptors:
+      - path: applied
+        displayName: Applied
+        description: Database applied
+      - path: message
+        displayName: Message
+        description: Database message from the last reconciliation loop
