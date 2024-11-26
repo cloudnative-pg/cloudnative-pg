@@ -29,6 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/istio"
@@ -134,6 +135,10 @@ func buildLocalWebserverMgr(ctx context.Context, clusterName string, namespace s
 					&apiv1.Backup{},
 				},
 			},
+		},
+		LeaderElection: false,
+		Metrics: metricsserver.Options{
+			BindAddress: "0",
 		},
 	})
 	if err != nil {
