@@ -50,8 +50,6 @@ can be defined declaratively through the `Publication` resource.
     Please refer to the [API reference](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-Publication)
     the full list of attributes you can define for each `Publication` object.
 
-### Declarative `Publication` Manifest
-
 Suppose you have a cluster named `freddie` and want to replicate all tables in
 the `app` database. Here's a `Publication` manifest:
 
@@ -78,12 +76,15 @@ In the above example:
   (`spec.cluster.name`).
 
 !!! Important
-    While `allTables` simplifies configuration, PostgreSQL provides
-    fine-grained options for replicating specific tables or data changes.
-    Refer to the [PostgreSQL documentation](https://www.postgresql.org/docs/current/logical-replication.html)
-    for advanced configurations.
+    While `allTables` simplifies configuration, PostgreSQL offers fine-grained
+    control for replicating specific tables or targeted data changes. For advanced
+    configurations, consult the [PostgreSQL documentation](https://www.postgresql.org/docs/current/logical-replication.html).
+    Additionally, refer to the [CloudNativePG API reference](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-PublicationTarget)
+    for details on declaratively customizing replication targets.
 
-### Required Fields in the `Publication` Manifest
+#### Required Fields in the `Publication` Manifest
+
+The following fields are required for a `Publication` object:
 
 - `metadata.name`: Unique name for the Kubernetes `Publication` object.
 - `spec.cluster.name`: Name of the PostgreSQL cluster.
@@ -95,16 +96,20 @@ The `Publication` object must reference a specific `Cluster`, determining where
 the publication will be created. It is managed by the cluster's primary instance,
 ensuring the publication is created or updated as needed.
 
-### Reconciliation and Status
+#### Reconciliation and Status
 
-Once the `Publication` is created, CloudNativePG ensures it is managed on the
-primary of the specified cluster. After a successful reconciliation cycle, the
-`Publication` status will include:
+After creating a `Publication`, CloudNativePG manages it on the primary
+instance of the specified cluster. Following a successful reconciliation cycle,
+the `Publication` status will reflect the following:
 
-- `ready: true`: Indicates the publication is active.
-- `error: <empty>`: Indicates no issues were encountered.
+- `applied: true`, indicates the configuration has been successfully applied.
+- `observedGeneration` matches `metadata.generation`, confirming the applied
+  configuration corresponds to the most recent changes.
 
-### Managing Publication Deletion
+If an error occurs during reconciliation, `status.applied` will be `false`, and
+an error message will be included in the `status.message` field.
+
+#### Removing a publication
 
 The `publicationReclaimPolicy` field controls the behavior when deleting a
 `Publication` object:
@@ -113,7 +118,7 @@ The `publicationReclaimPolicy` field controls the behavior when deleting a
   management.
 - `delete`: Automatically removes the publication from PostgreSQL.
 
-**Example**:
+Consider the following example:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -132,12 +137,6 @@ spec:
 
 In this case, deleting the `Publication` object also removes the `publisher`
 publication from the `app` database of the `freddie` cluster.
-
-!!! Important
-    Using the `allTables` target is often sufficient for many use cases.
-    However, PostgreSQL's logical replication provides additional customization
-    options for fine-grained control over which tables and changes are replicated.
-    For more details, refer to the [official PostgreSQL documentation](https://www.postgresql.org/docs/current/logical-replication.html).
 
 ## Subscriptions
 
