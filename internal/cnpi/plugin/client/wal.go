@@ -76,14 +76,14 @@ func (data *data) RestoreWAL(
 	cluster client.Object,
 	sourceWALName string,
 	destinationFileName string,
-) error {
+) (bool, error) {
 	var errorCollector error
 
 	contextLogger := log.FromContext(ctx)
 
 	serializedCluster, err := json.Marshal(cluster)
 	if err != nil {
-		return fmt.Errorf("while serializing %s %s/%s to JSON: %w",
+		return false, fmt.Errorf("while serializing %s %s/%s to JSON: %w",
 			cluster.GetObjectKind().GroupVersionKind().Kind,
 			cluster.GetNamespace(), cluster.GetName(),
 			err,
@@ -114,9 +114,9 @@ func (data *data) RestoreWAL(
 			pluginLogger.Trace("WAL restore via plugin failed, trying next one", "err", err)
 			errorCollector = multierr.Append(errorCollector, err)
 		} else {
-			return nil
+			return true, nil
 		}
 	}
 
-	return errorCollector
+	return false, errorCollector
 }
