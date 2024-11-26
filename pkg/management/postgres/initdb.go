@@ -47,13 +47,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/system"
 )
 
-const (
-	// CheckEmptyWalArchiveFile is the name of the file in the PGDATA that,
-	// if present, requires the WAL archiver to check that the backup object
-	// store is empty.
-	CheckEmptyWalArchiveFile = ".check-empty-wal-archive"
-)
-
 // InitInfo contains all the info needed to bootstrap a new PostgreSQL instance
 type InitInfo struct {
 	// The data directory where to generate the new cluster
@@ -339,7 +332,7 @@ func (info InitInfo) ConfigureNewInstance(instance *Instance) error {
 		return fmt.Errorf("could not execute post init application SQL refs: %w", err)
 	}
 
-	filePath := filepath.Join(info.PgData, CheckEmptyWalArchiveFile)
+	filePath := filepath.Join(info.PgData, constants.CheckEmptyWalArchiveFile)
 	// We create the check empty wal archive file to tell that we should check if the
 	// destination path it is empty
 	if err := fileutils.CreateEmptyFile(filepath.Clean(filePath)); err != nil {
