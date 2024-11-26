@@ -57,7 +57,7 @@ the `app` database. Here's a `Publication` manifest:
 apiVersion: postgresql.cnpg.io/v1
 kind: Publication
 metadata:
-  name: freddie-pub
+  name: freddie-publisher
 spec:
   cluster:
     name: freddie
@@ -69,11 +69,11 @@ spec:
 
 In the above example:
 
-- The publication is named `publisher` (`spec.name`).
+- The publication object is named `freddie-publisher` (`metadata.name`).
+- The publication is created via the primary of the `freddie` cluster
+  (`spec.cluster.name`) with name `publisher` (`spec.name`).
 - It includes all tables (`spec.target.allTables: true`) from the `app`
   database (`spec.dbname`).
-- The publication is created via the primary of the `freddie` cluster
-  (`spec.cluster.name`).
 
 !!! Important
     While `allTables` simplifies configuration, PostgreSQL offers fine-grained
@@ -82,7 +82,7 @@ In the above example:
     Additionally, refer to the [CloudNativePG API reference](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-PublicationTarget)
     for details on declaratively customizing replication targets.
 
-#### Required Fields in the `Publication` Manifest
+### Required Fields in the `Publication` Manifest
 
 The following fields are required for a `Publication` object:
 
@@ -96,7 +96,7 @@ The `Publication` object must reference a specific `Cluster`, determining where
 the publication will be created. It is managed by the cluster's primary instance,
 ensuring the publication is created or updated as needed.
 
-#### Reconciliation and Status
+### Reconciliation and Status
 
 After creating a `Publication`, CloudNativePG manages it on the primary
 instance of the specified cluster. Following a successful reconciliation cycle,
@@ -109,7 +109,7 @@ the `Publication` status will reflect the following:
 If an error occurs during reconciliation, `status.applied` will be `false`, and
 an error message will be included in the `status.message` field.
 
-#### Removing a publication
+### Removing a publication
 
 The `publicationReclaimPolicy` field controls the behavior when deleting a
 `Publication` object:
@@ -124,7 +124,7 @@ Consider the following example:
 apiVersion: postgresql.cnpg.io/v1
 kind: Publication
 metadata:
-  name: freddie-pub
+  name: freddie-publisher
 spec:
   cluster:
     name: freddie
@@ -140,94 +140,129 @@ publication from the `app` database of the `freddie` cluster.
 
 ## Subscriptions
 
-TODO
+In PostgreSQL's publish-and-subscribe replication model, a
+[**subscription**](https://www.postgresql.org/docs/current/logical-replication-subscription.html)
+represents the downstream component that consumes data changes.
+A subscription establishes the connection to a publisher's database and
+specifies the set of publications (one or more) it subscribes to. Subscriptions
+can be created on any supported PostgreSQL instance acting as the *subscriber*.
 
-## Overview
+!!! Important
+    Since schema definitions are not replicated, the subscriber must have the
+    corresponding tables already defined before data replication begins.
 
-The procedure to set up logical replication:
+CloudNativePG simplifies subscription management by enabling you to define them
+declaratively using the `Subscription` resource.
 
-- Begins with two CloudNativePG clusters.
-    - One of them will be the "source"
-    - The "destination" cluster should have an `externalClusters` stanza
-      containing the connection information to the source cluster
-- A Database object creating a database (e.g. named `sample`) in the source
-  cluster
-- A Database object creating a database with the same name in the destination
-  cluster
-- A Publication in the source cluster referencing the database
-- A Subscription in the destination cluster, referencing the Publication that
-  was created in the previous step
+!!! Info
+    Please refer to the [API reference](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-Subscription)
+    the full list of attributes you can define for each `Subscription` object.
 
-Once these objects are reconciled, PostgreSQL will replicate the data from
-the source cluster to the destination cluster using logical replication. There
-are many use cases for logical replication; please refer to the
-[PostgreSQL documentation](https://www.postgresql.org/docs/current/logical-replication.html)
-for detailed discussion.
-
-!!! Note
-    the `externalClusters` section in the destination cluster has the same
-    structure used in [database import](database_import.md) as well as for
-    replica clusters. However, the destination cluster does not necessarily
-    have to be bootstrapped via replication nor import.
-
-### Example: Simple Subscription Declaration
-
-A `Subscription` object is managed by the instance manager of the destination
-cluster's primary instance.
-Below is an example of a basic `Subscription` configuration:
+Suppose you want to replicate changes from the `publisher` publication on the
+`app` database of the `freddie` cluster (*publisher*) to the `app` database of
+the `king` cluster (*subscriber*). Here's an example of a `Subscription`
+manifest:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
 kind: Subscription
 metadata:
-  name: sub-one
+  name: freddie-to-king-subscription
 spec:
-  name: sub
-  dbname: cat
-  publicationName: pub
   cluster:
-    name: destination-cluster
-  externalClusterName: source-cluster
+    name: king
+  dbname: app
+  name: subscriber
+  externalClusterName: freddie
+  publicationName: publisher
 ```
 
-The `dbname` field specifies the database the publication is applied to.
-The `publicationName` field specifies the name of the publication the subscription refers to.
-The `externalClusterName` field specifies the external cluster the publication belongs to.
+In the above example:
 
-Once the reconciliation cycle is completed successfully, the `Subscription`
-status will show a `ready` field set to `true` and an empty `error` field.
+- The subscription object is named `freddie-to-king-subscriber` (`metadata.name`).
+- The subscription is created in the `app` database (`spec.dbname`) of the
+  `king` cluster (`spec.cluster.name`), with name `subscriber` (`spec.name`).
+- It connects to the `publisher` publication in the external `freddie` cluster,
+  referenced by `spec.externalClusterName`.
 
-## Subscription Deletion and Reclaim Policies
+To facilitate this setup, the `freddie` external cluster must be defined in the
+`king` cluster's configuration. Below is an example excerpt showing how to
+define the external cluster in the `king` manifest:
 
-A finalizer named `cnpg.io/deleteSubscription` is automatically added
-to each `Subscription` object to control its deletion process.
+```yaml
+externalClusters:
+  - name: freddie
+    connectionParameters:
+      host: freddie-rw.default.svc
+      user: postgres
+      dbname: app
+```
 
-By default, the `subscriptionReclaimPolicy` is set to `retain`, which means
-that if the `Subscription` object is deleted, the actual PostgreSQL publication
-is retained for manual management by an administrator.
+!!! Info
+    For more details on configuring the `externalClusters` section, see the
+    ["Bootstrap" section](bootstrap.md#the-externalclusters-section) of the
+    documentation.
 
-Alternatively, if the `subscriptionReclaimPolicy` is set to `delete`,
-the PostgreSQL publication will be automatically deleted when the `Publication`
-object is removed.
+### Required Fields in the `Subscription` Manifest
 
-### Example: Subscription with Delete Reclaim Policy
+The following fields are mandatory for defining a `Subscription` object:
 
-The following example illustrates a `Subscription` object with a `delete`
-reclaim policy:
+- `metadata.name`: A unique name for the Kubernetes `Subscription` object
+  within its namespace.
+- `spec.cluster.name`: The name of the PostgreSQL cluster where the
+  subscription will be created.
+- `spec.dbname`: The name of the database in which the subscription will be
+  created.
+- `spec.name`: The name of the subscription as it will appear in PostgreSQL.
+- `spec.externalClusterName`: The name of the external cluster, as defined in
+  the `spec.cluster.name` cluster's configuration. This references the
+  publisher database.
+- `spec.publicationName`: The name of the publication in the publisher database
+  to which the subscription will connect.
+
+The `Subscription` object must reference a specific `Cluster`, determining
+where the subscription will be managed. CloudNativePG ensures that the
+subscription is created or updated on the primary instance of the specified
+cluster.
+
+### Reconciliation and Status
+
+After creating a `Subscription`, CloudNativePG manages it on the primary
+instance of the specified cluster. Following a successful reconciliation cycle,
+the `Subscription` status will reflect the following:
+
+- `applied: true`, indicates the configuration has been successfully applied.
+- `observedGeneration` matches `metadata.generation`, confirming the applied
+  configuration corresponds to the most recent changes.
+
+If an error occurs during reconciliation, `status.applied` will be `false`, and
+an error message will be included in the `status.message` field.
+
+### Removing a subscription
+
+The `subscriptionReclaimPolicy` field controls the behavior when deleting a
+`Subscription` object:
+
+- `retain` (default): Leaves the subscription in PostgreSQL for manual
+  management.
+- `delete`: Automatically removes the subscription from PostgreSQL.
+
+Consider the following example:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
 kind: Subscription
 metadata:
-  name: sub-one
+  name: freddie-to-king-subscription
 spec:
-  name: sub
-  dbname: cat
-  publicationName: pub
+  cluster:
+    name: king
+  dbname: app
+  name: subscriber
+  externalClusterName: freddie
+  publicationName: publisher
   subscriptionReclaimPolicy: delete
-  cluster:
-    name: destination-cluster
-  externalClusterName: source-cluster
 ```
 
-In this case, when the `Subscription` object is deleted, the corresponding PostgreSQL publication will also be removed automatically.
+In this case, deleting the `Subscription` object also removes the `subscriber`
+subscription from the `app` database of the `king` cluster.
