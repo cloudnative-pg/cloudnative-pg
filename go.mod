@@ -125,3 +125,5 @@ require (
 	sigs.k8s.io/kustomize/kyaml v0.17.2 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 )
+
+replace github.com/cloudnative-pg/barman-cloud => github.com/fcanovai/barman-cloud v0.0.0-20241126101944-1ccac132a8c4
