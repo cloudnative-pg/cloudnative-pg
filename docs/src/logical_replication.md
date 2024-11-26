@@ -1,35 +1,147 @@
 # Logical Replication
 
 PostgreSQL extends its replication capabilities beyond physical replication,
-which works at the level of exact block addresses and byte-by-byte copying, by
-also offering [logical replication](https://www.postgresql.org/docs/current/logical-replication.html).
-Logical replication enables data objects and their changes to be replicated
-based on a defined replication identity, typically the primary key.
+which operates at the level of exact block addresses and byte-by-byte copying,
+by offering [logical replication](https://www.postgresql.org/docs/current/logical-replication.html).
+Logical replication replicates data objects and their changes based on a
+defined replication identity, typically the primary key.
 
-Logical replication uses a publish-and-subscribe model, where one or more
-subscribers connect to one or more publications on a publisher node.
-Subscribers pull data changes from the publications they subscribe to and can
-re-publish this data, enabling cascading replication or more complex
-replication topologies.
+Logical replication uses a publish-and-subscribe model, where subscribers
+connect to publications on a publisher node. Subscribers pull data changes from
+these publications and can re-publish them, enabling cascading replication and
+complex topologies.
 
-This flexible approach is particularly suited for use cases such as:
+This flexible model is particularly useful for:
 
 - Online data migrations
 - Live PostgreSQL version upgrades
-- Data distribution across multiple systems
+- Data distribution across systems
 - Real-time analytics
-- Seamless integration with external applications
+- Integration with external applications
 
 !!! Info
-    For detailed information and examples, see the official PostgreSQL
-    documentation on [Logical Replication](https://www.postgresql.org/docs/current/logical-replication.html).
+    For more details and examples, refer to the
+    [official PostgreSQL documentation on Logical Replication](https://www.postgresql.org/docs/current/logical-replication.html).
 
-**CloudNativePG** further enhances this feature by providing declarative
-support for the core PostgreSQL objects that manage logical replication:
+**CloudNativePG** enhances this capability by providing declarative support for
+key PostgreSQL logical replication objects:
 
 - **Publications** via the `Publication` resource
 - **Subscriptions** via the `Subscription` resource
 
+## Publications
+
+In PostgreSQL's publish-and-subscribe replication model, a
+[**publication**](https://www.postgresql.org/docs/current/logical-replication-publication.html)
+is the source of data changes. It acts as a logical container for the change
+sets (also known as *replication sets*) generated from one or more tables within
+a database. Publications can be defined on any PostgreSQL 10+ instance acting
+as the *publisher*, including instances managed by popular DBaaS solutions in the
+public cloud. Each publication is tied to a single database and provides
+fine-grained control over which tables and changes are replicated.
+
+For publishers outside Kubernetes, you can [create publications using SQL](https://www.postgresql.org/docs/current/sql-createpublication.html)
+or leverage the [`cnpg publication create` plugin command](kubectl-plugin.md#logical-replication-publications).
+
+When managing `Cluster` objects with **CloudNativePG**, PostgreSQL publications
+can be defined declaratively through the `Publication` resource.
+
+!!! Info
+    Please refer to the [API reference](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-Publication)
+    the full list of attributes you can define for each `Publication` object.
+
+### Declarative `Publication` Manifest
+
+Suppose you have a cluster named `freddie` and want to replicate all tables in
+the `app` database. Here's a `Publication` manifest:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Publication
+metadata:
+  name: freddie-pub
+spec:
+  cluster:
+    name: freddie
+  dbname: app
+  name: publisher
+  target:
+    allTables: true
+```
+
+In the above example:
+
+- The publication is named `publisher` (`spec.name`).
+- It includes all tables (`spec.target.allTables: true`) from the `app`
+  database (`spec.dbname`).
+- The publication is created via the primary of the `freddie` cluster
+  (`spec.cluster.name`).
+
+!!! Important
+    While `allTables` simplifies configuration, PostgreSQL provides
+    fine-grained options for replicating specific tables or data changes.
+    Refer to the [PostgreSQL documentation](https://www.postgresql.org/docs/current/logical-replication.html)
+    for advanced configurations.
+
+### Required Fields in the `Publication` Manifest
+
+- `metadata.name`: Unique name for the Kubernetes `Publication` object.
+- `spec.cluster.name`: Name of the PostgreSQL cluster.
+- `spec.dbname`: Database name where the publication is created.
+- `spec.name`: Publication name in PostgreSQL.
+- `spec.target`: Specifies the tables or changes to include in the publication.
+
+The `Publication` object must reference a specific `Cluster`, determining where
+the publication will be created. It is managed by the cluster's primary instance,
+ensuring the publication is created or updated as needed.
+
+### Reconciliation and Status
+
+Once the `Publication` is created, CloudNativePG ensures it is managed on the
+primary of the specified cluster. After a successful reconciliation cycle, the
+`Publication` status will include:
+
+- `ready: true`: Indicates the publication is active.
+- `error: <empty>`: Indicates no issues were encountered.
+
+### Managing Publication Deletion
+
+The `publicationReclaimPolicy` field controls the behavior when deleting a
+`Publication` object:
+
+- `retain` (default): Leaves the publication in PostgreSQL for manual
+  management.
+- `delete`: Automatically removes the publication from PostgreSQL.
+
+**Example**:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Publication
+metadata:
+  name: freddie-pub
+spec:
+  cluster:
+    name: freddie
+  dbname: app
+  name: publisher
+  target:
+    allTables: true
+  publicationReclaimPolicy: delete
+```
+
+In this case, deleting the `Publication` object also removes the `publisher`
+publication from the `app` database of the `freddie` cluster.
+
+!!! Important
+    Using the `allTables` target is often sufficient for many use cases.
+    However, PostgreSQL's logical replication provides additional customization
+    options for fine-grained control over which tables and changes are replicated.
+    For more details, refer to the [official PostgreSQL documentation](https://www.postgresql.org/docs/current/logical-replication.html).
+
+## Subscriptions
+
+TODO
 
 ## Overview
 
@@ -58,65 +170,6 @@ for detailed discussion.
     structure used in [database import](database_import.md) as well as for
     replica clusters. However, the destination cluster does not necessarily
     have to be bootstrapped via replication nor import.
-
-### Example: Simple Publication Declaration
-
-A `Publication` object is managed by the instance manager of the source
-cluster's primary instance.
-Below is an example of a basic `Publication` configuration:
-
-```yaml
-apiVersion: postgresql.cnpg.io/v1
-kind: Publication
-metadata:
-  name: pub-one
-spec:
-  name: pub
-  dbname: cat
-  cluster:
-    name: source-cluster
-  target:
-    allTables: true
-```
-
-The `dbname` field specifies the database the publication is applied to.
-Once the reconciliation cycle is completed successfully, the `Publication`
-status will show a `ready` field set to `true`, and an empty `error` field.
-
-### Publication Deletion and Reclaim Policies
-
-A finalizer named `cnpg.io/deletePublication` is automatically added
-to each `Publication` object to control its deletion process.
-
-By default, the `publicationReclaimPolicy` is set to `retain`, which means
-that if the `Publication` object is deleted, the actual PostgreSQL publication
-is retained for manual management by an administrator.
-
-Alternatively, if the `publicationReclaimPolicy` is set to `delete`,
-the PostgreSQL publication will be automatically deleted when the `Publication`
-object is removed.
-
-### Example: Publication with Delete Reclaim Policy
-
-The following example illustrates a `Publication` object with a `delete`
-reclaim policy:
-
-```yaml
-apiVersion: postgresql.cnpg.io/v1
-kind: Publication
-metadata:
-  name: pub-one
-spec:
-  name: pub
-  dbname: cat
-  publicationReclaimPolicy: delete
-  cluster:
-    name: source-cluster
-  target:
-    allTables: true
-```
-
-In this case, when the `Publication` object is deleted, the corresponding PostgreSQL publication will also be removed automatically.
 
 ### Example: Simple Subscription Declaration
 
