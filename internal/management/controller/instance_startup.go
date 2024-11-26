@@ -32,6 +32,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/controller"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/archiver"
 	postgresSpec "github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 )
@@ -244,6 +245,11 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(ctx context.Context
 		if err != nil {
 			contextLogger.Error(
 				err, "Error while changing mode of the postgresql.auto.conf file before pg_rewind, skipped")
+		}
+
+		// We archive every WAL that have not been archived from the latest postmaster invocation.
+		if err := archiver.ArchiveAllReadyWALs(ctx, cluster, r.instance.PgData); err != nil {
+			return fmt.Errorf("while ensuring all WAL files are archived: %w", err)
 		}
 
 		// pg_rewind could require a clean shutdown of the old primary to
