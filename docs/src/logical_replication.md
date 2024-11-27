@@ -48,7 +48,7 @@ can be defined declaratively through the `Publication` resource.
 
 !!! Info
     Please refer to the [API reference](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-Publication)
-    the full list of attributes you can define for each `Publication` object.
+    for the full list of attributes you can define for each `Publication` object.
 
 Suppose you have a cluster named `freddie` and want to replicate all tables in
 the `app` database. Here's a `Publication` manifest:
@@ -156,7 +156,7 @@ declaratively using the `Subscription` resource.
 
 !!! Info
     Please refer to the [API reference](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-Subscription)
-    the full list of attributes you can define for each `Subscription` object.
+    for the full list of attributes you can define for each `Subscription` object.
 
 Suppose you want to replicate changes from the `publisher` publication on the
 `app` database of the `freddie` cluster (*publisher*) to the `app` database of
@@ -314,8 +314,8 @@ manage, and evaluate such scenarios in a Kubernetes environment.
 
 ### Step 1: Setting Up the Publisher (`freddie`)
 
-The first step involves creating a `freddie` PostgreSQL cluster with version
-16. The cluster contains a single instance and includes an `app` database
+The first step involves creating a `freddie` PostgreSQL cluster with version 16.
+The cluster contains a single instance and includes an `app` database
 initialized with a table, `n`, storing 10,000 numbers. A logical replication
 publication named `publisher` is also configured to include all tables in the
 database.
