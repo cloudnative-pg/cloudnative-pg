@@ -86,7 +86,7 @@ var _ = Describe("JSON log output", Label(tests.LabelObservability), func() {
 						specs.PostgresContainerName, &commandTimeout, "psql", "-U", "postgres", "app", "-tAc",
 						errorTestQuery)
 					return queryError
-				}, RetryTimeout, PollingTime).ShouldNot(BeNil())
+				}, RetryTimeout, PollingTime).ShouldNot(Succeed())
 
 				// Eventually the error log line will be logged
 				Eventually(func(g Gomega) bool {
@@ -118,7 +118,7 @@ var _ = Describe("JSON log output", Label(tests.LabelObservability), func() {
 					*primaryPod, specs.PostgresContainerName,
 					&commandTimeout, "psql", "-U", "postgres", "app", "-tAc", errorTestQuery)
 				return queryError
-			}, RetryTimeout, PollingTime).ShouldNot(BeNil())
+			}, RetryTimeout, PollingTime).ShouldNot(Succeed())
 
 			// Expect the query to be eventually logged on the primary
 			Eventually(func() (bool, error) {
