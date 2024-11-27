@@ -26,14 +26,13 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
 
 type restoreRunnable struct {
-	mgr         manager.Manager
+	cli         client.Client
 	clusterName string
 	namespace   string
 	pgData      string
@@ -42,10 +41,8 @@ type restoreRunnable struct {
 }
 
 func (r *restoreRunnable) Start(ctx context.Context) error {
-	cli := r.mgr.GetClient()
-
 	// we will wait this way for the mgr and informers to be online
-	if err := management.WaitForGetClusterWithClient(ctx, cli, client.ObjectKey{
+	if err := management.WaitForGetClusterWithClient(ctx, r.cli, client.ObjectKey{
 		Name:      r.clusterName,
 		Namespace: r.namespace,
 	}); err != nil {
@@ -59,7 +56,7 @@ func (r *restoreRunnable) Start(ctx context.Context) error {
 		PgWal:       r.pgWal,
 	}
 
-	if err := restoreSubCommand(ctx, info, cli); err != nil {
+	if err := restoreSubCommand(ctx, info, r.cli); err != nil {
 		return fmt.Errorf("while restoring cluster: %s", err)
 	}
 
@@ -71,13 +68,11 @@ func (r *restoreRunnable) Start(ctx context.Context) error {
 
 func restoreSubCommand(ctx context.Context, info postgres.InitInfo, cli client.Client) error {
 	contextLogger := log.FromContext(ctx)
-	err := info.CheckTargetDataDirectory(ctx)
-	if err != nil {
+	if err := info.CheckTargetDataDirectory(ctx); err != nil {
 		return err
 	}
 
-	err = info.Restore(ctx, cli)
-	if err != nil {
+	if err := info.Restore(ctx, cli); err != nil {
 		contextLogger.Error(err, "Error while restoring a backup")
 		cleanupDataDirectoryIfNeeded(ctx, err, info.PgData)
 		return err

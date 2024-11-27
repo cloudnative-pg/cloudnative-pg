@@ -56,16 +56,30 @@ func NewCmd() *cobra.Command {
 			ctx, cancel := context.WithCancel(cmd.Context())
 			defer cancel()
 
-			// Step 1: create a manager with the local web server
-			mgr, err := buildLocalWebserverMgr(ctx, clusterName, namespace)
+			// Step 1: build the manager
+			mgr, err := buildManager(clusterName, namespace)
 			if err != nil {
 				contextLogger.Error(err, "while building the manager")
 				return err
 			}
 
+			// Step 1.1: add the local webserver to the manager
+			localSrv, err := webserver.NewLocalWebServer(
+				postgres.NewInstance().WithClusterName(clusterName).WithNamespace(namespace),
+				mgr.GetClient(),
+				mgr.GetEventRecorderFor("local-webserver"),
+			)
+			if err != nil {
+				return err
+			}
+			if err = mgr.Add(localSrv); err != nil {
+				contextLogger.Error(err, "unable to add local webserver runnable")
+				return err
+			}
+
 			// Step 2: add the restore process to the manager
 			restoreProcess := restoreRunnable{
-				mgr:         mgr,
+				cli:         mgr.GetClient(),
 				clusterName: clusterName,
 				namespace:   namespace,
 				pgData:      pgData,
@@ -84,8 +98,7 @@ func NewCmd() *cobra.Command {
 			}
 
 			if !errors.Is(ctx.Err(), context.Canceled) {
-				contextLogger.Error(err, "error while recoverying backup")
-				// TODO(leonardoce): controlla se l'errore arriva qua
+				contextLogger.Error(err, "error while recovering backup")
 				return err
 			}
 
@@ -111,11 +124,9 @@ func NewCmd() *cobra.Command {
 	return cmd
 }
 
-func buildLocalWebserverMgr(ctx context.Context, clusterName string, namespace string) (manager.Manager, error) {
-	contextLogger := log.FromContext(ctx)
-	runtimeScheme := scheme.BuildWithAllKnownScheme()
-	mgr, err := controllerruntime.NewManager(controllerruntime.GetConfigOrDie(), controllerruntime.Options{
-		Scheme: runtimeScheme,
+func buildManager(clusterName string, namespace string) (manager.Manager, error) {
+	return controllerruntime.NewManager(controllerruntime.GetConfigOrDie(), controllerruntime.Options{
+		Scheme: scheme.BuildWithAllKnownScheme(),
 		Cache: cache.Options{
 			ByObject: map[client.Object]cache.ByObject{
 				&apiv1.Cluster{}: {
@@ -141,22 +152,4 @@ func buildLocalWebserverMgr(ctx context.Context, clusterName string, namespace s
 			BindAddress: "0",
 		},
 	})
-	if err != nil {
-		return nil, err
-	}
-
-	localSrv, err := webserver.NewLocalWebServer(
-		postgres.NewInstance().WithClusterName(clusterName).WithNamespace(namespace),
-		mgr.GetClient(),
-		mgr.GetEventRecorderFor("local-webserver"),
-	)
-	if err != nil {
-		return nil, err
-	}
-	if err = mgr.Add(localSrv); err != nil {
-		contextLogger.Error(err, "unable to add local webserver runnable")
-		return nil, err
-	}
-
-	return mgr, nil
 }
