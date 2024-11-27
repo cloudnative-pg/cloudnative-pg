@@ -590,6 +590,15 @@ and makes the use of the underlying PostgreSQL resources more efficient.
 Instead of connecting directly to a PostgreSQL service, applications can now
 connect to the PgBouncer service and start reusing any existing connection.
 
+### Logical Replication
+
+CloudNativePG supports PostgreSQL's logical replication in a declarative manner
+using `Publication` and `Subscription` custom resource definitions.
+
+Logical replication is particularly useful together with the import facility
+for online data migrations (even from public DBaaS solutions) and major
+PostgreSQL upgrades.
+
 ## Level 4: Deep insights
 
 Capability level 4 is about *observability*: monitoring,
