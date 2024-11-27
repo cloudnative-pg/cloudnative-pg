@@ -145,7 +145,7 @@ jobs:
           echo "LOG_LEVEL=${LOG_LEVEL}" >> $GITHUB_ENV
 
       - name: Resolve Git reference
-        uses: xt0rted/pull-request-comment-branch@v2
+        uses: xt0rted/pull-request-comment-branch@v3
         id: refs
 
       - name: Create comment
