@@ -429,8 +429,6 @@ kubectl cnpg psql king -- app -qAt -c 'SELECT count(*) FROM n'
 This command should return `10000`, confirming that the data from the `freddie`
 cluster has been successfully replicated to the `king` cluster.
 
-Here’s an improved version of your text for better clarity and flow:
-
 Using the `cnpg` plugin, you can also synchronize existing sequences to ensure
 consistency between the publisher and subscriber. The example below
 demonstrates how to synchronize a sequence for the `king` cluster:
