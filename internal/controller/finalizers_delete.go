@@ -20,6 +20,8 @@ import (
 	"context"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -28,36 +30,80 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-// deleteDatabaseFinalizers deletes Database object finalizers when the cluster they were in has been deleted
-func (r *ClusterReconciler) deleteDatabaseFinalizers(ctx context.Context, namespacedName types.NamespacedName) error {
-	contextLogger := log.FromContext(ctx)
+// ClusterReferrer is an object containing a cluster reference
+type ClusterReferrer interface {
+	GetClusterRef() corev1.LocalObjectReference
+	client.Object
+}
 
-	databases := apiv1.DatabaseList{}
-	if err := r.List(ctx,
-		&databases,
-		client.InNamespace(namespacedName.Namespace),
+// deleteFinalizers deletes object finalizers when the cluster they were in has been deleted
+func (r *ClusterReconciler) deleteFinalizers(ctx context.Context, namespacedName types.NamespacedName) error {
+	if err := r.deleteFinalizersForResource(
+		ctx,
+		namespacedName,
+		&apiv1.DatabaseList{},
+		utils.DatabaseFinalizerName,
 	); err != nil {
 		return err
 	}
 
-	for idx := range databases.Items {
-		database := &databases.Items[idx]
+	if err := r.deleteFinalizersForResource(
+		ctx,
+		namespacedName,
+		&apiv1.PublicationList{},
+		utils.PublicationFinalizerName,
+	); err != nil {
+		return err
+	}
 
-		if database.Spec.ClusterRef.Name != namespacedName.Name {
+	return r.deleteFinalizersForResource(
+		ctx,
+		namespacedName,
+		&apiv1.SubscriptionList{},
+		utils.SubscriptionFinalizerName,
+	)
+}
+
+// deleteFinalizersForResource deletes finalizers for a given resource type
+func (r *ClusterReconciler) deleteFinalizersForResource(
+	ctx context.Context,
+	namespacedName types.NamespacedName,
+	list client.ObjectList,
+	finalizerName string,
+) error {
+	contextLogger := log.FromContext(ctx)
+
+	if err := r.List(ctx, list, client.InNamespace(namespacedName.Namespace)); err != nil {
+		return err
+	}
+
+	items, err := meta.ExtractList(list)
+	if err != nil {
+		return err
+	}
+
+	for _, item := range items {
+		obj, ok := item.(ClusterReferrer)
+		if !ok {
 			continue
 		}
 
-		origDatabase := database.DeepCopy()
-		if controllerutil.RemoveFinalizer(database, utils.DatabaseFinalizerName) {
-			contextLogger.Debug("Removing finalizer from database",
-				"finalizer", utils.DatabaseFinalizerName, "database", database.Name)
-			if err := r.Patch(ctx, database, client.MergeFrom(origDatabase)); err != nil {
+		if obj.GetClusterRef().Name != namespacedName.Name {
+			continue
+		}
+
+		origObj := obj.DeepCopyObject().(ClusterReferrer)
+		if controllerutil.RemoveFinalizer(obj, finalizerName) {
+			contextLogger.Debug("Removing finalizer from resource",
+				"finalizer", finalizerName, "resource", obj.GetName())
+			if err := r.Patch(ctx, obj, client.MergeFrom(origObj)); err != nil {
 				contextLogger.Error(
 					err,
-					"error while removing finalizer from database",
-					"database", database.Name,
-					"oldFinalizerList", origDatabase.ObjectMeta.Finalizers,
-					"newFinalizerList", database.ObjectMeta.Finalizers,
+					"error while removing finalizer from resource",
+					"resource", obj.GetName(),
+					"kind", obj.GetObjectKind().GroupVersionKind().Kind,
+					"oldFinalizerList", origObj.GetFinalizers(),
+					"newFinalizerList", obj.GetFinalizers(),
 				)
 				return err
 			}

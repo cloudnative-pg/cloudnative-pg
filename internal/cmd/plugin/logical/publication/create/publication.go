@@ -56,7 +56,7 @@ type PublicationTarget interface {
 	ToPublicationTargetSQL() string
 }
 
-// PublicationTargetALLTables will publicate all tables
+// PublicationTargetALLTables will publish all tables
 type PublicationTargetALLTables struct{}
 
 // ToPublicationTargetSQL implements the PublicationTarget interface
@@ -64,7 +64,7 @@ func (PublicationTargetALLTables) ToPublicationTargetSQL() string {
 	return "FOR ALL TABLES"
 }
 
-// PublicationTargetPublicationObjects publicates multiple publication objects
+// PublicationTargetPublicationObjects publishes multiple publication objects
 type PublicationTargetPublicationObjects struct {
 	PublicationObjects []PublicationObject
 }
@@ -85,15 +85,15 @@ func (objs *PublicationTargetPublicationObjects) ToPublicationTargetSQL() string
 	return result
 }
 
-// PublicationObject represent an object to publicate
+// PublicationObject represent an object to publish
 type PublicationObject interface {
-	// Create the SQL statement to publicate this object
+	// ToPublicationObjectSQL creates the SQL statement to publish this object
 	ToPublicationObjectSQL() string
 }
 
-// PublicationObjectSchema will publicate all the tables in a certain schema
+// PublicationObjectSchema will publish all the tables in a certain schema
 type PublicationObjectSchema struct {
-	// The schema to publicate
+	// The schema to publish
 	SchemaName string
 }
 
@@ -102,9 +102,9 @@ func (obj PublicationObjectSchema) ToPublicationObjectSQL() string {
 	return fmt.Sprintf("TABLES IN SCHEMA %s", pgx.Identifier{obj.SchemaName}.Sanitize())
 }
 
-// PublicationObjectTableExpression will publicate the passed table expression
+// PublicationObjectTableExpression will publish the passed table expression
 type PublicationObjectTableExpression struct {
-	// The table expression to publicate
+	// The table expression to publish
 	TableExpressions []string
 }
 

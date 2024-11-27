@@ -20,4 +20,12 @@ const (
 	// DatabaseFinalizerName is the name of the finalizer
 	// triggering the deletion of the database
 	DatabaseFinalizerName = MetadataNamespace + "/deleteDatabase"
+
+	// PublicationFinalizerName is the name of the finalizer
+	// triggering the deletion of the publication
+	PublicationFinalizerName = MetadataNamespace + "/deletePublication"
+
+	// SubscriptionFinalizerName is the name of the finalizer
+	// triggering the deletion of the subscription
+	SubscriptionFinalizerName = MetadataNamespace + "/deleteSubscription"
 )

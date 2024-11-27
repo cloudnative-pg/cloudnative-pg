@@ -688,7 +688,7 @@ spec:
       specDescriptors:
       - path: databaseReclaimPolicy
         displayName: Database reclaim policy
-        description: Database reclame policy
+        description: Database reclaim policy
       - path: cluster
         displayName: Cluster requested to create the database
         description: Cluster requested to create the database
@@ -698,3 +698,50 @@ spec:
       - path: owner
         displayName: Database Owner
         description: Database Owner
+    - kind: Publication
+      name: publications.postgresql.cnpg.io
+      displayName: Publication
+      description: Declarative publication
+      version: v1
+      resources:
+        - kind: Cluster
+          name: ''
+          version: v1
+      specDescriptors:
+        - path: name
+          displayName: Publication name
+          description: Publication name
+        - path: dbname
+          displayName: Database name
+          description: Database name
+        - path: cluster
+          displayName: Cluster requested to create the publication
+          description: Cluster requested to create the publication
+        - path: target
+          displayName: Publication target
+          description: Publication target
+    - kind: Subscription
+      name: subscriptions.postgresql.cnpg.io
+      displayName: Subscription
+      description: Declarative subscription
+      version: v1
+      resources:
+        - kind: Cluster
+          name: ''
+          version: v1
+      specDescriptors:
+        - path: name
+          displayName: Subscription name
+          description: Subscription name
+        - path: dbname
+          displayName: Database name
+          description: Database name
+        - path: publicationName
+          displayName: Publication name
+          description: Publication name
+        - path: cluster
+          displayName: Cluster requested to create the subscription
+          description: Cluster requested to create the subscription
+        - path: externalClusterName
+          displayName: Name of the external cluster with publication
+          description: Name of the external cluster with publication

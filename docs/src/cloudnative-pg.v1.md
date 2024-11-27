@@ -12,7 +12,9 @@
 - [Database](#postgresql-cnpg-io-v1-Database)
 - [ImageCatalog](#postgresql-cnpg-io-v1-ImageCatalog)
 - [Pooler](#postgresql-cnpg-io-v1-Pooler)
+- [Publication](#postgresql-cnpg-io-v1-Publication)
 - [ScheduledBackup](#postgresql-cnpg-io-v1-ScheduledBackup)
+- [Subscription](#postgresql-cnpg-io-v1-Subscription)
 
 ## Backup     {#postgresql-cnpg-io-v1-Backup}
 
@@ -224,6 +226,42 @@ More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-
 </tbody>
 </table>
 
+## Publication     {#postgresql-cnpg-io-v1-Publication}
+
+
+**Appears in:**
+
+
+
+<p>Publication is the Schema for the publications API</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>apiVersion</code> <B>[Required]</B><br/>string</td><td><code>postgresql.cnpg.io/v1</code></td></tr>
+<tr><td><code>kind</code> <B>[Required]</B><br/>string</td><td><code>Publication</code></td></tr>
+<tr><td><code>metadata</code> <B>[Required]</B><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#objectmeta-v1-meta"><i>meta/v1.ObjectMeta</i></a>
+</td>
+<td>
+   <span class="text-muted">No description provided.</span>Refer to the Kubernetes API documentation for the fields of the <code>metadata</code> field.</td>
+</tr>
+<tr><td><code>spec</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-PublicationSpec"><i>PublicationSpec</i></a>
+</td>
+<td>
+   <span class="text-muted">No description provided.</span></td>
+</tr>
+<tr><td><code>status</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-PublicationStatus"><i>PublicationStatus</i></a>
+</td>
+<td>
+   <span class="text-muted">No description provided.</span></td>
+</tr>
+</tbody>
+</table>
+
 ## ScheduledBackup     {#postgresql-cnpg-io-v1-ScheduledBackup}
 
 
@@ -258,6 +296,42 @@ More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-
 to date. Populated by the system. Read-only.
 More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status</p>
 </td>
+</tr>
+</tbody>
+</table>
+
+## Subscription     {#postgresql-cnpg-io-v1-Subscription}
+
+
+**Appears in:**
+
+
+
+<p>Subscription is the Schema for the subscriptions API</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>apiVersion</code> <B>[Required]</B><br/>string</td><td><code>postgresql.cnpg.io/v1</code></td></tr>
+<tr><td><code>kind</code> <B>[Required]</B><br/>string</td><td><code>Subscription</code></td></tr>
+<tr><td><code>metadata</code> <B>[Required]</B><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#objectmeta-v1-meta"><i>meta/v1.ObjectMeta</i></a>
+</td>
+<td>
+   <span class="text-muted">No description provided.</span>Refer to the Kubernetes API documentation for the fields of the <code>metadata</code> field.</td>
+</tr>
+<tr><td><code>spec</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-SubscriptionSpec"><i>SubscriptionSpec</i></a>
+</td>
+<td>
+   <span class="text-muted">No description provided.</span></td>
+</tr>
+<tr><td><code>status</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-SubscriptionStatus"><i>SubscriptionStatus</i></a>
+</td>
+<td>
+   <span class="text-muted">No description provided.</span></td>
 </tr>
 </tbody>
 </table>
@@ -3955,6 +4029,232 @@ the primary server of the cluster as part of rolling updates</p>
 
 
 
+## PublicationReclaimPolicy     {#postgresql-cnpg-io-v1-PublicationReclaimPolicy}
+
+(Alias of `string`)
+
+**Appears in:**
+
+- [PublicationSpec](#postgresql-cnpg-io-v1-PublicationSpec)
+
+
+<p>PublicationReclaimPolicy defines a policy for end-of-life maintenance of Publications.</p>
+
+
+
+
+## PublicationSpec     {#postgresql-cnpg-io-v1-PublicationSpec}
+
+
+**Appears in:**
+
+- [Publication](#postgresql-cnpg-io-v1-Publication)
+
+
+<p>PublicationSpec defines the desired state of Publication</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>cluster</code> <B>[Required]</B><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#localobjectreference-v1-core"><i>core/v1.LocalObjectReference</i></a>
+</td>
+<td>
+   <p>The name of the PostgreSQL cluster that identifies the &quot;publisher&quot;</p>
+</td>
+</tr>
+<tr><td><code>name</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The name of the publication inside PostgreSQL</p>
+</td>
+</tr>
+<tr><td><code>dbname</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The name of the database where the publication will be installed in
+the &quot;publisher&quot; cluster</p>
+</td>
+</tr>
+<tr><td><code>parameters</code><br/>
+<i>map[string]string</i>
+</td>
+<td>
+   <p>Publication parameters part of the <code>WITH</code> clause as expected by
+PostgreSQL <code>CREATE PUBLICATION</code> command</p>
+</td>
+</tr>
+<tr><td><code>target</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-PublicationTarget"><i>PublicationTarget</i></a>
+</td>
+<td>
+   <p>Target of the publication as expected by PostgreSQL <code>CREATE PUBLICATION</code> command</p>
+</td>
+</tr>
+<tr><td><code>publicationReclaimPolicy</code><br/>
+<a href="#postgresql-cnpg-io-v1-PublicationReclaimPolicy"><i>PublicationReclaimPolicy</i></a>
+</td>
+<td>
+   <p>The policy for end-of-life maintenance of this publication</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## PublicationStatus     {#postgresql-cnpg-io-v1-PublicationStatus}
+
+
+**Appears in:**
+
+- [Publication](#postgresql-cnpg-io-v1-Publication)
+
+
+<p>PublicationStatus defines the observed state of Publication</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>observedGeneration</code><br/>
+<i>int64</i>
+</td>
+<td>
+   <p>A sequence number representing the latest
+desired state that was synchronized</p>
+</td>
+</tr>
+<tr><td><code>applied</code><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>Applied is true if the publication was reconciled correctly</p>
+</td>
+</tr>
+<tr><td><code>message</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Message is the reconciliation output message</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## PublicationTarget     {#postgresql-cnpg-io-v1-PublicationTarget}
+
+
+**Appears in:**
+
+- [PublicationSpec](#postgresql-cnpg-io-v1-PublicationSpec)
+
+
+<p>PublicationTarget is what this publication should publish</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>allTables</code><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>Marks the publication as one that replicates changes for all tables
+in the database, including tables created in the future.
+Corresponding to <code>FOR ALL TABLES</code> in PostgreSQL.</p>
+</td>
+</tr>
+<tr><td><code>objects</code><br/>
+<a href="#postgresql-cnpg-io-v1-PublicationTargetObject"><i>[]PublicationTargetObject</i></a>
+</td>
+<td>
+   <p>Just the following schema objects</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## PublicationTargetObject     {#postgresql-cnpg-io-v1-PublicationTargetObject}
+
+
+**Appears in:**
+
+- [PublicationTarget](#postgresql-cnpg-io-v1-PublicationTarget)
+
+
+<p>PublicationTargetObject is an object to publish</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>tablesInSchema</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Marks the publication as one that replicates changes for all tables
+in the specified list of schemas, including tables created in the
+future. Corresponding to <code>FOR TABLES IN SCHEMA</code> in PostgreSQL.</p>
+</td>
+</tr>
+<tr><td><code>table</code><br/>
+<a href="#postgresql-cnpg-io-v1-PublicationTargetTable"><i>PublicationTargetTable</i></a>
+</td>
+<td>
+   <p>Specifies a list of tables to add to the publication. Corresponding
+to <code>FOR TABLE</code> in PostgreSQL.</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## PublicationTargetTable     {#postgresql-cnpg-io-v1-PublicationTargetTable}
+
+
+**Appears in:**
+
+- [PublicationTargetObject](#postgresql-cnpg-io-v1-PublicationTargetObject)
+
+
+<p>PublicationTargetTable is a table to publish</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>only</code><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>Whether to limit to the table only or include all its descendants</p>
+</td>
+</tr>
+<tr><td><code>name</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The table name</p>
+</td>
+</tr>
+<tr><td><code>schema</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The schema name</p>
+</td>
+</tr>
+<tr><td><code>columns</code><br/>
+<i>[]string</i>
+</td>
+<td>
+   <p>The columns to publish</p>
+</td>
+</tr>
+</tbody>
+</table>
+
 ## RecoveryTarget     {#postgresql-cnpg-io-v1-RecoveryTarget}
 
 
@@ -4812,6 +5112,136 @@ Size cannot be decreased.</p>
 </td>
 <td>
    <p>Template to be used to generate the Persistent Volume Claim</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## SubscriptionReclaimPolicy     {#postgresql-cnpg-io-v1-SubscriptionReclaimPolicy}
+
+(Alias of `string`)
+
+**Appears in:**
+
+- [SubscriptionSpec](#postgresql-cnpg-io-v1-SubscriptionSpec)
+
+
+<p>SubscriptionReclaimPolicy describes a policy for end-of-life maintenance of Subscriptions.</p>
+
+
+
+
+## SubscriptionSpec     {#postgresql-cnpg-io-v1-SubscriptionSpec}
+
+
+**Appears in:**
+
+- [Subscription](#postgresql-cnpg-io-v1-Subscription)
+
+
+<p>SubscriptionSpec defines the desired state of Subscription</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>cluster</code> <B>[Required]</B><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#localobjectreference-v1-core"><i>core/v1.LocalObjectReference</i></a>
+</td>
+<td>
+   <p>The name of the PostgreSQL cluster that identifies the &quot;subscriber&quot;</p>
+</td>
+</tr>
+<tr><td><code>name</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The name of the subscription inside PostgreSQL</p>
+</td>
+</tr>
+<tr><td><code>dbname</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The name of the database where the publication will be installed in
+the &quot;subscriber&quot; cluster</p>
+</td>
+</tr>
+<tr><td><code>parameters</code><br/>
+<i>map[string]string</i>
+</td>
+<td>
+   <p>Subscription parameters part of the <code>WITH</code> clause as expected by
+PostgreSQL <code>CREATE SUBSCRIPTION</code> command</p>
+</td>
+</tr>
+<tr><td><code>publicationName</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The name of the publication inside the PostgreSQL database in the
+&quot;publisher&quot;</p>
+</td>
+</tr>
+<tr><td><code>publicationDBName</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The name of the database containing the publication on the external
+cluster. Defaults to the one in the external cluster definition.</p>
+</td>
+</tr>
+<tr><td><code>externalClusterName</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The name of the external cluster with the publication (&quot;publisher&quot;)</p>
+</td>
+</tr>
+<tr><td><code>subscriptionReclaimPolicy</code><br/>
+<a href="#postgresql-cnpg-io-v1-SubscriptionReclaimPolicy"><i>SubscriptionReclaimPolicy</i></a>
+</td>
+<td>
+   <p>The policy for end-of-life maintenance of this subscription</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## SubscriptionStatus     {#postgresql-cnpg-io-v1-SubscriptionStatus}
+
+
+**Appears in:**
+
+- [Subscription](#postgresql-cnpg-io-v1-Subscription)
+
+
+<p>SubscriptionStatus defines the observed state of Subscription</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>observedGeneration</code><br/>
+<i>int64</i>
+</td>
+<td>
+   <p>A sequence number representing the latest
+desired state that was synchronized</p>
+</td>
+</tr>
+<tr><td><code>applied</code><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>Applied is true if the subscription was reconciled correctly</p>
+</td>
+</tr>
+<tr><td><code>message</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Message is the reconciliation output message</p>
 </td>
 </tr>
 </tbody>

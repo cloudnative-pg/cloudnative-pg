@@ -26,7 +26,6 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -308,18 +307,7 @@ func (r *DatabaseReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 // GetCluster gets the managed cluster through the client
 func (r *DatabaseReconciler) GetCluster(ctx context.Context) (*apiv1.Cluster, error) {
-	var cluster apiv1.Cluster
-	err := r.Client.Get(ctx,
-		types.NamespacedName{
-			Namespace: r.instance.GetNamespaceName(),
-			Name:      r.instance.GetClusterName(),
-		},
-		&cluster)
-	if err != nil {
-		return nil, err
-	}
-
-	return &cluster, nil
+	return getClusterFromInstance(ctx, r.Client, r.instance)
 }
 
 func (r *DatabaseReconciler) reconcileDatabase(ctx context.Context, obj *apiv1.Database) error {

@@ -267,3 +267,21 @@ topic is beyond the scope of CloudNativePG, we recommend that you reduce
 unnecessary writes in the checkpoint area by tuning Postgres GUCs like
 `shared_buffers`, `max_wal_size`, `checkpoint_timeout` directly in the
 `Cluster` configuration.
+
+## Online Import and Upgrades
+
+Logical replication offers a powerful way to import any PostgreSQL database
+accessible over the network using the following approach:
+
+- **Import Bootstrap with Schema-Only Option**: Initialize the schema in the
+  target database before replication begins.
+- **`Subscription` Resource**: Set up continuous replication to synchronize
+  data changes.
+
+This technique can also be leveraged for performing major PostgreSQL upgrades
+with minimal downtime, making it ideal for seamless migrations and system
+upgrades.
+
+For more details, including limitations and best practices, refer to the
+[Logical Replication](logical_replication.md) section in the documentation.
+
