@@ -4038,7 +4038,7 @@ the primary server of the cluster as part of rolling updates</p>
 - [PublicationSpec](#postgresql-cnpg-io-v1-PublicationSpec)
 
 
-<p>PublicationReclaimPolicy describes a policy for end-of-life maintenance of Publications.</p>
+<p>PublicationReclaimPolicy defines a policy for end-of-life maintenance of Publications.</p>
 
 
 
@@ -4061,35 +4061,37 @@ the primary server of the cluster as part of rolling updates</p>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#localobjectreference-v1-core"><i>core/v1.LocalObjectReference</i></a>
 </td>
 <td>
-   <p>The corresponding cluster</p>
+   <p>The name of the PostgreSQL cluster that identifies the &quot;publisher&quot;</p>
 </td>
 </tr>
 <tr><td><code>name</code> <B>[Required]</B><br/>
 <i>string</i>
 </td>
 <td>
-   <p>The name inside PostgreSQL</p>
+   <p>The name of the publication inside PostgreSQL</p>
 </td>
 </tr>
 <tr><td><code>dbname</code> <B>[Required]</B><br/>
 <i>string</i>
 </td>
 <td>
-   <p>The name of the database</p>
+   <p>The name of the database where the publication will be installed in
+the &quot;publisher&quot; cluster</p>
 </td>
 </tr>
 <tr><td><code>parameters</code><br/>
 <i>map[string]string</i>
 </td>
 <td>
-   <p>Parameters</p>
+   <p>Publication parameters part of the <code>WITH</code> clause as expected by
+PostgreSQL <code>CREATE PUBLICATION</code> command</p>
 </td>
 </tr>
 <tr><td><code>target</code> <B>[Required]</B><br/>
 <a href="#postgresql-cnpg-io-v1-PublicationTarget"><i>PublicationTarget</i></a>
 </td>
 <td>
-   <p>Publication target</p>
+   <p>Target of the publication as expected by PostgreSQL <code>CREATE PUBLICATION</code> command</p>
 </td>
 </tr>
 <tr><td><code>publicationReclaimPolicy</code><br/>
@@ -4159,7 +4161,9 @@ desired state that was synchronized</p>
 <i>bool</i>
 </td>
 <td>
-   <p>All tables should be published</p>
+   <p>Marks the publication as one that replicates changes for all tables
+in the database, including tables created in the future.
+Corresponding to <code>FOR ALL TABLES</code> in PostgreSQL.</p>
 </td>
 </tr>
 <tr><td><code>objects</code><br/>
@@ -4190,14 +4194,17 @@ desired state that was synchronized</p>
 <i>string</i>
 </td>
 <td>
-   <p>The schema to publish</p>
+   <p>Marks the publication as one that replicates changes for all tables
+in the specified list of schemas, including tables created in the
+future. Corresponding to <code>FOR TABLES IN SCHEMA</code> in PostgreSQL.</p>
 </td>
 </tr>
 <tr><td><code>table</code><br/>
 <a href="#postgresql-cnpg-io-v1-PublicationTargetTable"><i>PublicationTargetTable</i></a>
 </td>
 <td>
-   <p>A table to publish</p>
+   <p>Specifies a list of tables to add to the publication. Corresponding
+to <code>FOR TABLE</code> in PostgreSQL.</p>
 </td>
 </tr>
 </tbody>
@@ -5142,50 +5149,53 @@ Size cannot be decreased.</p>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#localobjectreference-v1-core"><i>core/v1.LocalObjectReference</i></a>
 </td>
 <td>
-   <p>The corresponding cluster</p>
+   <p>The name of the PostgreSQL cluster that identifies the &quot;subscriber&quot;</p>
 </td>
 </tr>
 <tr><td><code>name</code> <B>[Required]</B><br/>
 <i>string</i>
 </td>
 <td>
-   <p>The name inside PostgreSQL</p>
+   <p>The name of the subscription inside PostgreSQL</p>
 </td>
 </tr>
 <tr><td><code>dbname</code> <B>[Required]</B><br/>
 <i>string</i>
 </td>
 <td>
-   <p>The name of the database</p>
+   <p>The name of the database where the publication will be installed in
+the &quot;subscriber&quot; cluster</p>
 </td>
 </tr>
 <tr><td><code>parameters</code><br/>
 <i>map[string]string</i>
 </td>
 <td>
-   <p>Parameters</p>
+   <p>Subscription parameters part of the <code>WITH</code> clause as expected by
+PostgreSQL <code>CREATE SUBSCRIPTION</code> command</p>
 </td>
 </tr>
 <tr><td><code>publicationName</code> <B>[Required]</B><br/>
 <i>string</i>
 </td>
 <td>
-   <p>The name of the publication</p>
+   <p>The name of the publication inside the PostgreSQL database in the
+&quot;publisher&quot;</p>
 </td>
 </tr>
 <tr><td><code>publicationDBName</code><br/>
 <i>string</i>
 </td>
 <td>
-   <p>The name of the database containing the publication on the external cluster.
-Defaults to the one in the external cluster definition</p>
+   <p>The name of the database containing the publication on the external
+cluster. Defaults to the one in the external cluster definition.</p>
 </td>
 </tr>
 <tr><td><code>externalClusterName</code> <B>[Required]</B><br/>
 <i>string</i>
 </td>
 <td>
-   <p>The name of the external cluster with the publication</p>
+   <p>The name of the external cluster with the publication (&quot;publisher&quot;)</p>
 </td>
 </tr>
 <tr><td><code>subscriptionReclaimPolicy</code><br/>

@@ -57,7 +57,8 @@ spec:
             description: SubscriptionSpec defines the desired state of Subscription
             properties:
               cluster:
-                description: The corresponding cluster
+                description: The name of the PostgreSQL cluster that identifies the
+                  "subscriber"
                 properties:
                   name:
                     default: ""
@@ -71,16 +72,19 @@ spec:
                 type: object
                 x-kubernetes-map-type: atomic
               dbname:
-                description: The name of the database
+                description: |-
+                  The name of the database where the publication will be installed in
+                  the "subscriber" cluster
                 type: string
                 x-kubernetes-validations:
                 - message: dbname is immutable
                   rule: self == oldSelf
               externalClusterName:
                 description: The name of the external cluster with the publication
+                  ("publisher")
                 type: string
               name:
-                description: The name inside PostgreSQL
+                description: The name of the subscription inside PostgreSQL
                 type: string
                 x-kubernetes-validations:
                 - message: name is immutable
@@ -88,15 +92,19 @@ spec:
               parameters:
                 additionalProperties:
                   type: string
-                description: Parameters
+                description: |-
+                  Subscription parameters part of the `WITH` clause as expected by
+                  PostgreSQL `CREATE SUBSCRIPTION` command
                 type: object
               publicationDBName:
                 description: |-
-                  The name of the database containing the publication on the external cluster.
-                  Defaults to the one in the external cluster definition
+                  The name of the database containing the publication on the external
+                  cluster. Defaults to the one in the external cluster definition.
                 type: string
               publicationName:
-                description: The name of the publication
+                description: |-
+                  The name of the publication inside the PostgreSQL database in the
+                  "publisher"
                 type: string
               subscriptionReclaimPolicy:
                 default: retain

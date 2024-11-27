@@ -37,30 +37,33 @@ const (
 
 // SubscriptionSpec defines the desired state of Subscription
 type SubscriptionSpec struct {
-	// The corresponding cluster
+	// The name of the PostgreSQL cluster that identifies the "subscriber"
 	ClusterRef corev1.LocalObjectReference `json:"cluster"`
 
-	// The name inside PostgreSQL
+	// The name of the subscription inside PostgreSQL
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="name is immutable"
 	Name string `json:"name"`
 
-	// The name of the database
+	// The name of the database where the publication will be installed in
+	// the "subscriber" cluster
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="dbname is immutable"
 	DBName string `json:"dbname"`
 
-	// Parameters
+	// Subscription parameters part of the `WITH` clause as expected by
+	// PostgreSQL `CREATE SUBSCRIPTION` command
 	// +optional
 	Parameters map[string]string `json:"parameters,omitempty"`
 
-	// The name of the publication
+	// The name of the publication inside the PostgreSQL database in the
+	// "publisher"
 	PublicationName string `json:"publicationName"`
 
-	// The name of the database containing the publication on the external cluster.
-	// Defaults to the one in the external cluster definition
+	// The name of the database containing the publication on the external
+	// cluster. Defaults to the one in the external cluster definition.
 	// +optional
 	PublicationDBName string `json:"publicationDBName,omitempty"`
 
-	// The name of the external cluster with the publication
+	// The name of the external cluster with the publication ("publisher")
 	ExternalClusterName string `json:"externalClusterName"`
 
 	// The policy for end-of-life maintenance of this subscription
