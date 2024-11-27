@@ -21,7 +21,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// PublicationReclaimPolicy describes a policy for end-of-life maintenance of Publications.
+// PublicationReclaimPolicy defines a policy for end-of-life maintenance of Publications.
 // +enum
 type PublicationReclaimPolicy string
 
@@ -37,22 +37,24 @@ const (
 
 // PublicationSpec defines the desired state of Publication
 type PublicationSpec struct {
-	// The corresponding cluster
+	// The name of the PostgreSQL cluster that identifies the "publisher"
 	ClusterRef corev1.LocalObjectReference `json:"cluster"`
 
-	// The name inside PostgreSQL
+	// The name of the publication inside PostgreSQL
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="name is immutable"
 	Name string `json:"name"`
 
-	// The name of the database
+	// The name of the database where the publication will be installed in
+	// the "publisher" cluster
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="dbname is immutable"
 	DBName string `json:"dbname"`
 
-	// Parameters
+	// Publication parameters part of the `WITH` clause as expected by
+	// PostgreSQL `CREATE PUBLICATION` command
 	// +optional
 	Parameters map[string]string `json:"parameters,omitempty"`
 
-	// Publication target
+	// Target of the publication as expected by PostgreSQL `CREATE PUBLICATION` command
 	Target PublicationTarget `json:"target"`
 
 	// The policy for end-of-life maintenance of this publication
@@ -65,7 +67,9 @@ type PublicationSpec struct {
 // PublicationTarget is what this publication should publish
 // +kubebuilder:validation:XValidation:rule="(has(self.allTables) && !has(self.objects)) || (!has(self.allTables) && has(self.objects))",message="allTables and objects are mutually exclusive"
 type PublicationTarget struct {
-	// All tables should be published
+	// Marks the publication as one that replicates changes for all tables
+	// in the database, including tables created in the future.
+	// Corresponding to `FOR ALL TABLES` in PostgreSQL.
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="allTables is immutable"
 	// +optional
 	AllTables bool `json:"allTables,omitempty"`
@@ -80,11 +84,14 @@ type PublicationTarget struct {
 // PublicationTargetObject is an object to publish
 // +kubebuilder:validation:XValidation:rule="(has(self.tablesInSchema) && !has(self.table)) || (!has(self.tablesInSchema) && has(self.table))",message="tablesInSchema and table are mutually exclusive"
 type PublicationTargetObject struct {
-	// The schema to publish
+	// Marks the publication as one that replicates changes for all tables
+	// in the specified list of schemas, including tables created in the
+	// future. Corresponding to `FOR TABLES IN SCHEMA` in PostgreSQL.
 	// +optional
 	TablesInSchema string `json:"tablesInSchema,omitempty"`
 
-	// A table to publish
+	// Specifies a list of tables to add to the publication. Corresponding
+	// to `FOR TABLE` in PostgreSQL.
 	// +optional
 	Table *PublicationTargetTable `json:"table,omitempty"`
 }

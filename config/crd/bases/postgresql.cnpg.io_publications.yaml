@@ -57,7 +57,8 @@ spec:
             description: PublicationSpec defines the desired state of Publication
             properties:
               cluster:
-                description: The corresponding cluster
+                description: The name of the PostgreSQL cluster that identifies the
+                  "publisher"
                 properties:
                   name:
                     default: ""
@@ -71,13 +72,15 @@ spec:
                 type: object
                 x-kubernetes-map-type: atomic
               dbname:
-                description: The name of the database
+                description: |-
+                  The name of the database where the publication will be installed in
+                  the "publisher" cluster
                 type: string
                 x-kubernetes-validations:
                 - message: dbname is immutable
                   rule: self == oldSelf
               name:
-                description: The name inside PostgreSQL
+                description: The name of the publication inside PostgreSQL
                 type: string
                 x-kubernetes-validations:
                 - message: name is immutable
@@ -85,7 +88,9 @@ spec:
               parameters:
                 additionalProperties:
                   type: string
-                description: Parameters
+                description: |-
+                  Publication parameters part of the `WITH` clause as expected by
+                  PostgreSQL `CREATE PUBLICATION` command
                 type: object
               publicationReclaimPolicy:
                 default: retain
@@ -95,10 +100,14 @@ spec:
                 - retain
                 type: string
               target:
-                description: Publication target
+                description: Target of the publication as expected by PostgreSQL `CREATE
+                  PUBLICATION` command
                 properties:
                   allTables:
-                    description: All tables should be published
+                    description: |-
+                      Marks the publication as one that replicates changes for all tables
+                      in the database, including tables created in the future.
+                      Corresponding to `FOR ALL TABLES` in PostgreSQL.
                     type: boolean
                     x-kubernetes-validations:
                     - message: allTables is immutable
@@ -109,7 +118,9 @@ spec:
                       description: PublicationTargetObject is an object to publish
                       properties:
                         table:
-                          description: A table to publish
+                          description: |-
+                            Specifies a list of tables to add to the publication. Corresponding
+                            to `FOR TABLE` in PostgreSQL.
                           properties:
                             columns:
                               description: The columns to publish
@@ -130,7 +141,10 @@ spec:
                           - name
                           type: object
                         tablesInSchema:
-                          description: The schema to publish
+                          description: |-
+                            Marks the publication as one that replicates changes for all tables
+                            in the specified list of schemas, including tables created in the
+                            future. Corresponding to `FOR TABLES IN SCHEMA` in PostgreSQL.
                           type: string
                       type: object
                       x-kubernetes-validations:
