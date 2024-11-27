@@ -6,7 +6,7 @@ toolchain go1.23.3
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
-	github.com/Masterminds/semver/v3 v3.3.0
+	github.com/Masterminds/semver/v3 v3.3.1
 	github.com/avast/retry-go/v4 v4.6.0
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/cheynewallace/tabby v1.1.1
@@ -21,8 +21,8 @@ require (
 	github.com/lib/pq v1.10.9
 	github.com/logrusorgru/aurora/v4 v4.0.0
 	github.com/mitchellh/go-ps v1.0.0
-	github.com/onsi/ginkgo/v2 v2.21.0
-	github.com/onsi/gomega v1.35.1
+	github.com/onsi/ginkgo/v2 v2.22.0
+	github.com/onsi/gomega v1.36.0
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.78.1
 	github.com/prometheus/client_golang v1.20.5
 	github.com/robfig/cron v1.2.0
