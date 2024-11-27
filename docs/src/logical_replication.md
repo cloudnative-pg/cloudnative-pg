@@ -20,7 +20,7 @@ This flexible model is particularly useful for:
 - Integration with external applications
 
 !!! Info
-    For more details and examples, refer to the
+    For more details, examples, and limitations, please refer to the
     [official PostgreSQL documentation on Logical Replication](https://www.postgresql.org/docs/current/logical-replication.html).
 
 **CloudNativePG** enhances this capability by providing declarative support for
@@ -266,3 +266,146 @@ spec:
 
 In this case, deleting the `Subscription` object also removes the `subscriber`
 subscription from the `app` database of the `king` cluster.
+
+## Example: Live Migration and Upgrade with Logical Replication
+
+To highlight the powerful capabilities of logical replication, this example
+demonstrates how to replicate data from a publisher database (`freddie`)
+running PostgreSQL 16 to a subscriber database (`king`) running the latest
+PostgreSQL version. This setup can be deployed in your Kubernetes cluster for
+evaluation and hands-on learning.
+
+This example illustrates how logical replication facilitates live migrations
+and upgrades between PostgreSQL versions while ensuring data consistency. By
+combining logical replication with CloudNativePG, you can easily set up,
+manage, and evaluate such scenarios in a Kubernetes environment.
+
+### Step 1: Setting Up the Publisher (`freddie`)
+
+The first step involves creating a `freddie` PostgreSQL cluster with version
+16. The cluster contains a single instance and includes an `app` database
+initialized with a table, `n`, storing 10,000 numbers. A logical replication
+publication named `publisher` is also configured to include all tables in the
+database.
+
+Here’s the manifest for setting up the `freddie` cluster and its publication
+resource:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: freddie
+spec:
+  instances: 1
+
+  imageName: ghcr.io/cloudnative-pg/postgresql:16
+
+  storage:
+    size: 1Gi
+
+  bootstrap:
+    initdb:
+      postInitApplicationSQL:
+        - CREATE TABLE n (i SERIAL PRIMARY KEY, m INTEGER)
+        - INSERT INTO n (m) (SELECT generate_series(1, 10000))
+        - ALTER TABLE n OWNER TO app
+
+  managed:
+    roles:
+      - name: app
+        login: true
+        replication: true
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Publication
+metadata:
+  name: freddie-publisher
+spec:
+  cluster:
+    name: freddie
+  dbname: app
+  name: publisher
+  target:
+    allTables: true
+```
+
+### Step 2: Setting Up the Subscriber (`king`)
+
+Next, create the `king` PostgreSQL cluster, running the latest version of
+PostgreSQL. This cluster initializes by importing the schema from the `app`
+database on the `freddie` cluster using the external cluster configuration. A
+`Subscription` resource, `freddie-to-king-subscription`, is then configured to
+consume changes published by the `publisher` on `freddie`.
+
+Below is the manifest for setting up the `king` cluster and its subscription:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: king
+spec:
+  instances: 1
+
+  storage:
+    size: 1Gi
+
+  bootstrap:
+    initdb:
+      import:
+        type: microservice
+        schemaOnly: true
+        databases:
+          - app
+        source:
+          externalCluster: freddie
+
+  externalClusters:
+  - name: freddie
+    connectionParameters:
+      host: freddie-rw.default.svc
+      user: app
+      dbname: app
+    password:
+      name: freddie-app
+      key: password
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Subscription
+metadata:
+  name: freddie-to-king-subscription
+spec:
+  cluster:
+    name: king
+  dbname: app
+  name: subscriber
+  externalClusterName: freddie
+  publicationName: publisher
+```
+
+## Limitations
+
+Logical replication in PostgreSQL has some inherent limitations, as outlined in
+the [official documentation](https://www.postgresql.org/docs/current/logical-replication-restrictions.html).
+Notably, the following objects are not replicated:
+
+- **Database schema and DDL commands**
+- **Sequence data**
+- **Large objects**
+
+### Addressing Schema Replication
+
+The first limitation, related to schema replication, can be easily addressed
+using CloudNativePG's capabilities. For instance, you can leverage the `import`
+bootstrap feature to copy the schema of the tables you need to replicate.
+Alternatively, you can manually create the schema as you would for any
+PostgreSQL database.
+
+### Handling Sequences
+
+While sequences are not automatically kept in sync through logical replication,
+CloudNativePG provides a solution to be used in live migrations.
+You can use the [`cnpg` plugin](kubectl-plugin.md#synchronizing-sequences)
+to synchronize sequence values, ensuring consistency between the publisher and
+subscriber databases.
