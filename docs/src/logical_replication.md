@@ -203,6 +203,12 @@ externalClusters:
     ["Bootstrap" section](bootstrap.md#the-externalclusters-section) of the
     documentation.
 
+As you can see, a subscription can connect to any PostgreSQL database
+accessible over the network. This flexibility allows you to seamlessly migrate
+your data into Kubernetes with nearly zero downtime. It’s an excellent option
+for transitioning from various environments, including popular cloud-based
+Database-as-a-Service (DBaaS) platforms.
+
 ### Required Fields in the `Subscription` Manifest
 
 The following fields are mandatory for defining a `Subscription` object:
@@ -267,7 +273,33 @@ spec:
 In this case, deleting the `Subscription` object also removes the `subscriber`
 subscription from the `app` database of the `king` cluster.
 
-## Example: Live Migration and Upgrade with Logical Replication
+## Limitations
+
+Logical replication in PostgreSQL has some inherent limitations, as outlined in
+the [official documentation](https://www.postgresql.org/docs/current/logical-replication-restrictions.html).
+Notably, the following objects are not replicated:
+
+- **Database schema and DDL commands**
+- **Sequence data**
+- **Large objects**
+
+### Addressing Schema Replication
+
+The first limitation, related to schema replication, can be easily addressed
+using CloudNativePG's capabilities. For instance, you can leverage the `import`
+bootstrap feature to copy the schema of the tables you need to replicate.
+Alternatively, you can manually create the schema as you would for any
+PostgreSQL database.
+
+### Handling Sequences
+
+While sequences are not automatically kept in sync through logical replication,
+CloudNativePG provides a solution to be used in live migrations.
+You can use the [`cnpg` plugin](kubectl-plugin.md#synchronizing-sequences)
+to synchronize sequence values, ensuring consistency between the publisher and
+subscriber databases.
+
+## Example of live migration and major Postgres upgrade with logical replication
 
 To highlight the powerful capabilities of logical replication, this example
 demonstrates how to replicate data from a publisher database (`freddie`)
@@ -384,28 +416,31 @@ spec:
   publicationName: publisher
 ```
 
-## Limitations
+Once the `king` cluster is running, you can verify that the replication is
+working by connecting to the `app` database and counting the records in the `n`
+table. The following example uses the `psql` command provided by the `cnpg`
+plugin for simplicity:
 
-Logical replication in PostgreSQL has some inherent limitations, as outlined in
-the [official documentation](https://www.postgresql.org/docs/current/logical-replication-restrictions.html).
-Notably, the following objects are not replicated:
+```console
+kubectl cnpg psql king -- app -qAt -c 'SELECT count(*) FROM n'
+10000
+```
 
-- **Database schema and DDL commands**
-- **Sequence data**
-- **Large objects**
+This command should return `10000`, confirming that the data from the `freddie`
+cluster has been successfully replicated to the `king` cluster.
 
-### Addressing Schema Replication
+Here’s an improved version of your text for better clarity and flow:
 
-The first limitation, related to schema replication, can be easily addressed
-using CloudNativePG's capabilities. For instance, you can leverage the `import`
-bootstrap feature to copy the schema of the tables you need to replicate.
-Alternatively, you can manually create the schema as you would for any
-PostgreSQL database.
+Using the `cnpg` plugin, you can also synchronize existing sequences to ensure
+consistency between the publisher and subscriber. The example below
+demonstrates how to synchronize a sequence for the `king` cluster:
 
-### Handling Sequences
+```console
+kubectl cnpg subscription sync-sequences king --subscription=subscriber
+SELECT setval('"public"."n_i_seq"', 10000);
 
-While sequences are not automatically kept in sync through logical replication,
-CloudNativePG provides a solution to be used in live migrations.
-You can use the [`cnpg` plugin](kubectl-plugin.md#synchronizing-sequences)
-to synchronize sequence values, ensuring consistency between the publisher and
-subscriber databases.
+10000
+```
+
+This command updates the sequence `n_i_seq` in the `king` cluster to match the
+current value, ensuring it is in sync with the source database.
