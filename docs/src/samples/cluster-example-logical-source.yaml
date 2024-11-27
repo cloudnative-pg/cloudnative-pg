@@ -25,8 +25,6 @@ spec:
         - INSERT INTO another_schema.numbers_three (m) (SELECT generate_series(1,10000))
         - ALTER TABLE another_schema.numbers_three OWNER TO app
 
-  enableSuperuserAccess: true
-
   managed:
     roles:
       - name: app
