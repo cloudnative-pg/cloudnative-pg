@@ -72,7 +72,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 
 				cluster.Spec.MaxSyncReplicas = 1
 				return env.Client.Update(env.Ctx, cluster)
-			}, RetryTimeout, 5).Should(BeNil())
+			}, RetryTimeout, 5).Should(Succeed())
 
 			// Scale the cluster down to 2 pods
 			_, _, err := utils.Run(fmt.Sprintf("kubectl scale --replicas=2 -n %v cluster/%v", namespace, clusterName))

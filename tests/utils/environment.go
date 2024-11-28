@@ -191,7 +191,7 @@ func (env TestingEnvironment) EventuallyExecCommand(
 			return err
 		}
 		return nil
-	}, RetryTimeout, PollingTime).Should(BeNil())
+	}, RetryTimeout, PollingTime).Should(Succeed())
 	return stdOut, stdErr, err
 }
 
