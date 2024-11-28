@@ -46,7 +46,7 @@ func ExecuteBackup(
 			return fmt.Errorf("could not create backup.\nStdErr: %v\nError: %v", stderr, err)
 		}
 		return nil
-	}, RetryTimeout, PollingTime).Should(BeNil())
+	}, RetryTimeout, PollingTime).Should(Succeed())
 	backupNamespacedName := types.NamespacedName{
 		Namespace: namespace,
 		Name:      backupName,
