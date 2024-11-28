@@ -82,7 +82,7 @@ var _ = Describe("Managed services tests", Label(tests.LabelSmoke, tests.LabelBa
 				g.Expect(err).ToNot(HaveOccurred())
 				cluster.Spec.Managed.Services.Additional = []apiv1.ManagedService{}
 				return env.Client.Update(ctx, cluster)
-			}, RetryTimeout, PollingTime).Should(BeNil())
+			}, RetryTimeout, PollingTime).Should(Succeed())
 
 			AssertClusterIsReady(namespace, clusterName, testTimeouts[utils.ManagedServices], env)
 			Eventually(func(g Gomega) {
@@ -128,7 +128,7 @@ var _ = Describe("Managed services tests", Label(tests.LabelSmoke, tests.LabelBa
 				g.Expect(err).ToNot(HaveOccurred())
 				cluster.Spec.Managed.Services.DisabledDefaultServices = []apiv1.ServiceSelectorType{}
 				return env.Client.Update(ctx, cluster)
-			}, RetryTimeout, PollingTime).Should(BeNil())
+			}, RetryTimeout, PollingTime).Should(Succeed())
 
 			AssertClusterIsReady(namespace, clusterName, testTimeouts[utils.ManagedServices], env)
 
@@ -189,7 +189,7 @@ var _ = Describe("Managed services tests", Label(tests.LabelSmoke, tests.LabelBa
 				g.Expect(err).ToNot(HaveOccurred())
 				cluster.Spec.Managed.Services.Additional[0].ServiceTemplate.ObjectMeta.Labels["new-label"] = "new"
 				return env.Client.Update(ctx, cluster)
-			}, RetryTimeout, PollingTime).Should(BeNil())
+			}, RetryTimeout, PollingTime).Should(Succeed())
 		})
 
 		By("expecting the service to be recreated", func() {

@@ -118,7 +118,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 
 			cluster.Spec.ImageName = updatedImageName
 			return env.Client.Update(env.Ctx, cluster)
-		}, RetryTimeout, PollingTime).Should(BeNil())
+		}, RetryTimeout, PollingTime).Should(Succeed())
 
 		// All the postgres containers should have the updated image
 		AssertPodsRunOnImage(namespace, clusterName, updatedImageName, cluster.Spec.Instances, timeout)
@@ -599,7 +599,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 				// Wait until we really deleted it
 				Eventually(func() error {
 					return env.Client.Get(env.Ctx, ctrl.ObjectKey{Name: catalog.Name}, catalog)
-				}, 30).Should(MatchError(apierrs.IsNotFound, metav1.StatusReasonNotFound))
+				}, 30).Should(MatchError(apierrs.IsNotFound, string(metav1.StatusReasonNotFound)))
 			})
 			Context("Three Instances", func() {
 				const (

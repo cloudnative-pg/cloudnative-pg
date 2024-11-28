@@ -98,7 +98,7 @@ var _ = Describe("Verify storage", Label(tests.LabelStorage), func() {
 						return err
 					}
 					return nil
-				}, 60, 5).Should(BeNil())
+				}, 60, 5).Should(Succeed())
 			})
 			OfflineResizePVC(namespace, clusterName, 600)
 		})
