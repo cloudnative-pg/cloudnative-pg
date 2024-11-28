@@ -916,7 +916,7 @@ func AssertReplicaModeCluster(
 		Eventually(func() error {
 			primaryReplicaCluster, err = env.GetClusterPrimary(namespace, replicaClusterName)
 			return err
-		}, 30, 3).Should(BeNil())
+		}, 30, 3).Should(Succeed())
 		AssertPgRecoveryMode(primaryReplicaCluster, true)
 	})
 
@@ -1704,7 +1704,7 @@ func AssertSuspendScheduleBackups(namespace, scheduledBackupName string) {
 				return err
 			}
 			return nil
-		}, 60, 5).Should(BeNil())
+		}, 60, 5).Should(Succeed())
 		scheduledBackupNamespacedName := types.NamespacedName{
 			Namespace: namespace,
 			Name:      scheduledBackupName,
@@ -1752,7 +1752,7 @@ func AssertSuspendScheduleBackups(namespace, scheduledBackupName string) {
 				return err
 			}
 			return nil
-		}, 60, 5).Should(BeNil())
+		}, 60, 5).Should(Succeed())
 		scheduledBackupNamespacedName := types.NamespacedName{
 			Namespace: namespace,
 			Name:      scheduledBackupName,
@@ -2203,7 +2203,7 @@ func OnlineResizePVC(namespace, clusterName string) {
 			Eventually(func() error {
 				_, _, err := testsUtils.RunUnchecked(cmd)
 				return err
-			}, 60, 5).Should(BeNil())
+			}, 60, 5).Should(Succeed())
 		}
 	})
 	By("verifying Cluster storage is expanded", func() {
@@ -2259,7 +2259,7 @@ func OfflineResizePVC(namespace, clusterName string, timeout int) {
 			Eventually(func() error {
 				_, _, err := testsUtils.RunUnchecked(cmd)
 				return err
-			}, 60, 5).Should(BeNil())
+			}, 60, 5).Should(Succeed())
 		}
 	})
 	By("deleting Pod and PVCs, first replicas then the primary", func() {
@@ -2480,7 +2480,7 @@ func CreateResourcesFromFileWithError(namespace, sampleFilePath string) error {
 func CreateResourceFromFile(namespace, sampleFilePath string) {
 	Eventually(func() error {
 		return CreateResourcesFromFileWithError(namespace, sampleFilePath)
-	}, RetryTimeout, PollingTime).Should(BeNil())
+	}, RetryTimeout, PollingTime).Should(Succeed())
 }
 
 // GetYAMLContent opens a .yaml of .template file and returns its content

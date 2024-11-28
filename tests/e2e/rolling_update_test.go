@@ -87,7 +87,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 
 			cluster.Spec.ImageName = updatedImageName
 			return env.Client.Update(env.Ctx, cluster)
-		}, RetryTimeout, PollingTime).Should(BeNil())
+		}, RetryTimeout, PollingTime).Should(Succeed())
 
 		// All the postgres containers should have the updated image
 		Eventually(func() (int32, error) {

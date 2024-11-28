@@ -256,11 +256,8 @@ func (env TestingEnvironment) EventuallyExecQueryInInstancePod(
 				Namespace: podLocator.Namespace,
 				PodName:   podLocator.PodName,
 			}, dbname, query)
-		if err != nil {
-			return err
-		}
-		return nil
-	}, retryTimeout, pollingTime).Should(BeNil())
+		return err
+	}, retryTimeout, pollingTime).Should(Succeed())
 
 	return stdOut, stdErr, err
 }
