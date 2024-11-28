@@ -53,7 +53,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/configfile"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/external"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
 	postgresSpec "github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
@@ -233,14 +232,10 @@ func (info InitInfo) createBackupObjectForSnapshotRestore(
 }
 
 // Restore restores a PostgreSQL cluster from a backup into the object storage
-func (info InitInfo) Restore(ctx context.Context) error {
+func (info InitInfo) Restore(ctx context.Context, cli client.Client) error {
 	contextLogger := log.FromContext(ctx)
-	typedClient, err := management.NewControllerRuntimeClient()
-	if err != nil {
-		return err
-	}
 
-	cluster, err := info.loadCluster(ctx, typedClient)
+	cluster, err := info.loadCluster(ctx, cli)
 	if err != nil {
 		return err
 	}
@@ -284,13 +279,13 @@ func (info InitInfo) Restore(ctx context.Context) error {
 	} else {
 		// Before starting the restore we check if the archive destination is safe to use
 		// otherwise, we stop creating the cluster
-		err = info.checkBackupDestination(ctx, typedClient, cluster)
+		err = info.checkBackupDestination(ctx, cli, cluster)
 		if err != nil {
 			return err
 		}
 
 		// If we need to download data from a backup, we do it
-		backup, env, err := info.loadBackup(ctx, typedClient, cluster)
+		backup, env, err := info.loadBackup(ctx, cli, cluster)
 		if err != nil {
 			return err
 		}
@@ -332,7 +327,7 @@ func (info InitInfo) Restore(ctx context.Context) error {
 		}
 
 		connectionString, err := external.ConfigureConnectionToServer(
-			ctx, typedClient, info.Namespace, &server)
+			ctx, cli, info.Namespace, &server)
 		if err != nil {
 			return err
 		}

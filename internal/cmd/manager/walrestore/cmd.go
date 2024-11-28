@@ -118,8 +118,12 @@ func run(ctx context.Context, pgData string, podName string, args []string) erro
 		return fmt.Errorf("failed to get cluster: %w", err)
 	}
 
-	if err := restoreWALViaPlugins(ctx, cluster, walName, path.Join(pgData, destinationPath)); err != nil {
+	walFound, err := restoreWALViaPlugins(ctx, cluster, walName, path.Join(pgData, destinationPath))
+	if err != nil {
 		return err
+	}
+	if walFound {
+		return nil
 	}
 
 	recoverClusterName, recoverEnv, barmanConfiguration, err := GetRecoverConfiguration(cluster, podName)
@@ -244,7 +248,7 @@ func restoreWALViaPlugins(
 	cluster *apiv1.Cluster,
 	walName string,
 	destinationPathName string,
-) error {
+) (bool, error) {
 	contextLogger := log.FromContext(ctx)
 
 	plugins := repository.New()
@@ -267,7 +271,7 @@ func restoreWALViaPlugins(
 	)
 	if err != nil {
 		contextLogger.Error(err, "Error while loading required plugins")
-		return err
+		return false, err
 	}
 	defer client.Close(ctx)
 

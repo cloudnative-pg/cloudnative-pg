@@ -126,13 +126,14 @@ type WalCapabilities interface {
 	) error
 
 	// RestoreWAL calls the loaded plugins to archive a WAL file.
-	// This call is a no-op if there's no plugin implementing WAL archiving
+	// This call returns a boolean indicating if the WAL was restored
+	// by a plugin and the occurred error.
 	RestoreWAL(
 		ctx context.Context,
 		cluster client.Object,
 		sourceWALName string,
 		destinationFileName string,
-	) error
+	) (bool, error)
 }
 
 // BackupCapabilities describes a set of behaviour needed to backup
