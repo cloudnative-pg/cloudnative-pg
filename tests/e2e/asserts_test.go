@@ -349,6 +349,8 @@ func AssertUpdateSecret(
 	env *testsUtils.TestingEnvironment,
 ) {
 	var secret corev1.Secret
+
+	// Gather the secret
 	Eventually(func(g Gomega) {
 		err := env.Client.Get(env.Ctx,
 			ctrlclient.ObjectKey{Namespace: namespace, Name: secretName},
@@ -356,13 +358,14 @@ func AssertUpdateSecret(
 		g.Expect(err).ToNot(HaveOccurred())
 	}).Should(Succeed())
 
+	// Change the given field to the new value provided
 	secret.Data[field] = []byte(value)
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		return env.Client.Update(env.Ctx, &secret)
 	})
 	Expect(err).ToNot(HaveOccurred())
 
-	// Wait for the cluster pickup the updated secrets version first
+	// Wait for the cluster to pick up the updated secrets version first
 	Eventually(func() string {
 		cluster, err := env.GetCluster(namespace, clusterName)
 		if err != nil {
@@ -371,13 +374,23 @@ func AssertUpdateSecret(
 		}
 		switch {
 		case strings.HasSuffix(secretName, apiv1.ApplicationUserSecretSuffix):
-			GinkgoWriter.Printf("Resource version of Application secret referenced in the cluster is %v\n",
+			GinkgoWriter.Printf("Resource version of %s secret referenced in the cluster is %v\n",
+				secretName,
 				cluster.Status.SecretsResourceVersion.ApplicationSecretVersion)
 			return cluster.Status.SecretsResourceVersion.ApplicationSecretVersion
+
 		case strings.HasSuffix(secretName, apiv1.SuperUserSecretSuffix):
-			GinkgoWriter.Printf("Resource version of Superuser secret referenced in the cluster is %v\n",
+			GinkgoWriter.Printf("Resource version of %s secret referenced in the cluster is %v\n",
+				secretName,
 				cluster.Status.SecretsResourceVersion.SuperuserSecretVersion)
 			return cluster.Status.SecretsResourceVersion.SuperuserSecretVersion
+
+		case cluster.UsesSecretInManagedRoles(secretName):
+			GinkgoWriter.Printf("Resource version of %s ManagedRole secret referenced in the cluster is %v\n",
+				secretName,
+				cluster.Status.SecretsResourceVersion.ManagedRoleSecretVersions[secretName])
+			return cluster.Status.SecretsResourceVersion.ManagedRoleSecretVersions[secretName]
+
 		default:
 			GinkgoWriter.Printf("Unsupported secrets name found %v\n", secretName)
 			return ""

@@ -19,7 +19,6 @@ package e2e
 import (
 	"fmt"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
@@ -56,6 +55,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 	Context("plain vanilla cluster", Ordered, func() {
 		const (
 			namespacePrefix        = "managed-roles"
+			secretName             = "cluster-example-dante"
 			username               = "dante"
 			appUsername            = "app"
 			password               = "dante"
@@ -64,8 +64,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 			userWithPerpetualPass  = "boccaccio"
 			userWithHashedPassword = "cavalcanti"
 		)
-		var clusterName, secretName, namespace string
-		var secretNameSpacedName *types.NamespacedName
+		var clusterName, namespace string
 
 		BeforeAll(func() {
 			var err error
@@ -75,12 +74,6 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 
 			clusterName, err = env.GetResourceNameFromYAML(clusterManifest)
 			Expect(err).ToNot(HaveOccurred())
-
-			secretName = "cluster-example-dante"
-			secretNameSpacedName = &types.NamespacedName{
-				Namespace: namespace,
-				Name:      secretName,
-			}
 
 			By("setting up cluster with managed roles", func() {
 				AssertCreateCluster(namespace, clusterName, clusterManifest, env)
@@ -460,49 +453,14 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 
 		It("Can update role password in secrets and db and verify the connectivity", func() {
 			var err error
-			var xmin int
 			newPassword := "ThisIsNew"
-			xMinQuery := fmt.Sprintf("SELECT xmin FROM pg_authid WHERE rolname='%s'", username)
 
 			primaryPod, err := env.GetClusterPrimary(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 
-			By("collecting the current transaction identity", func() {
-				rawValue, _, err := env.ExecQueryInInstancePod(
-					utils.PodLocator{
-						Namespace: namespace,
-						PodName:   primaryPod.Name,
-					},
-					utils.PostgresDBName,
-					xMinQuery)
-				Expect(err).ToNot(HaveOccurred())
-				xmin, err = strconv.Atoi(strings.TrimSpace(rawValue))
-				Expect(err).ToNot(HaveOccurred())
-			})
-
 			By("update password from secrets", func() {
-				var secret corev1.Secret
-				err := env.Client.Get(env.Ctx, *secretNameSpacedName, &secret)
-				Expect(err).ToNot(HaveOccurred())
-
-				updated := secret.DeepCopy()
-				updated.Data["password"] = []byte(newPassword)
-				err = env.Client.Patch(env.Ctx, updated, client.MergeFrom(&secret))
-				Expect(err).ToNot(HaveOccurred())
-			})
-
-			By("verify password has been updated ", func() {
-				Eventually(func() (int, error) {
-					rawValue, _, err := env.ExecQueryInInstancePod(
-						utils.PodLocator{
-							Namespace: namespace,
-							PodName:   primaryPod.Name,
-						},
-						utils.PostgresDBName,
-						xMinQuery)
-					Expect(err).ToNot(HaveOccurred())
-					return strconv.Atoi(strings.TrimSpace(rawValue))
-				}, 30).Should(BeNumerically(">", xmin))
+				AssertUpdateSecret("password", newPassword, secretName,
+					namespace, clusterName, 30, env)
 			})
 
 			By("Verify connectivity using changed password in secret", func() {
@@ -525,7 +483,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 				Expect(err).ToNot(HaveOccurred())
 			})
 
-			By("Verify password in secrets could still valid", func() {
+			By("Verify password in secrets is still valid", func() {
 				rwService := utils.GetReadWriteServiceName(clusterName)
 				AssertConnection(namespace, rwService, utils.PostgresDBName, username, newPassword, env)
 			})
