@@ -101,7 +101,7 @@ func (ds *databaseSnapshotter) exportDatabases(
 		contextLogger.Info("exporting database", "databaseName", database)
 		dsn := target.GetDsn(database)
 		options := []string{
-			"-Fc",
+			"-Fd",
 			"-f", generateFileNameForDatabase(database),
 			"-d", dsn,
 			"-v",
