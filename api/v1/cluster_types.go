@@ -1468,6 +1468,23 @@ type BootstrapInitDB struct {
 	// +optional
 	LocaleCType string `json:"localeCType,omitempty"`
 
+	// This option sets the locale provider for databases created in the new cluster.
+	// +optional
+	LocaleProvider string `json:"localeProvider,omitempty"`
+
+	// Specifies the ICU locale when the ICU provider is used.
+	// +optional
+	IcuLocale string `json:"icuLocale,omitempty"`
+
+	// Specifies additional collation rules to customize the behavior of the default collation.
+	// This is supported for ICU only.
+	// +optional
+	IcuRules string `json:"icuRules,omitempty"`
+
+	// Specifies the locale name when the builtin provider is used.
+	// +optional
+	BuiltinLocale string `json:"builtinLocale,omitempty"`
+
 	// The value in megabytes (1 to 1024) to be passed to the `--wal-segsize`
 	// option for initdb (default: empty, resulting in PostgreSQL default: 16MB)
 	// +kubebuilder:validation:Minimum=1

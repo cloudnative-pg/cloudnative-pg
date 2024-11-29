@@ -601,6 +601,7 @@ bootstrapinitdb
 bootstraprecovery
 br
 bs
+builtinLocale
 bw
 byStatus
 bypassrls
@@ -833,6 +834,8 @@ httpGet
 https
 hugepages
 icu
+icuLocale
+icuRules
 ident
 imageCatalogRef
 imageName
@@ -921,6 +924,7 @@ livenessProbeTimeout
 lm
 localeCType
 localeCollate
+localeProvider
 localhost
 localobjectreference
 locktype

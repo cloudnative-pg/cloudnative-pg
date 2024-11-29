@@ -1495,6 +1495,10 @@ spec:
                   initdb:
                     description: Bootstrap the cluster via initdb
                     properties:
+                      builtinLocale:
+                        description: Specifies the locale name when the builtin provider
+                          is used.
+                        type: string
                       dataChecksums:
                         description: |-
                           Whether the `-k` option should be passed to initdb,
@@ -1507,6 +1511,15 @@ spec:
                       encoding:
                         description: The value to be passed as option `--encoding`
                           for initdb (default:`UTF8`)
+                        type: string
+                      icuLocale:
+                        description: Specifies the ICU locale when the ICU provider
+                          is used.
+                        type: string
+                      icuRules:
+                        description: |-
+                          Specifies additional collation rules to customize the behavior of the default collation.
+                          This is supported for ICU only.
                         type: string
                       import:
                         description: |-
@@ -1583,6 +1596,10 @@ spec:
                       localeCollate:
                         description: The value to be passed as option `--lc-collate`
                           for initdb (default:`C`)
+                        type: string
+                      localeProvider:
+                        description: This option sets the locale provider for databases
+                          created in the new cluster.
                         type: string
                       options:
                         description: |-

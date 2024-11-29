@@ -1079,6 +1079,35 @@ enabling checksums on data pages (default: <code>false</code>)</p>
    <p>The value to be passed as option <code>--lc-ctype</code> for initdb (default:<code>C</code>)</p>
 </td>
 </tr>
+<tr><td><code>localeProvider</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>This option sets the locale provider for databases created in the new cluster.</p>
+</td>
+</tr>
+<tr><td><code>icuLocale</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Specifies the ICU locale when the ICU provider is used.</p>
+</td>
+</tr>
+<tr><td><code>icuRules</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Specifies additional collation rules to customize the behavior of the default collation.
+This is supported for ICU only.</p>
+</td>
+</tr>
+<tr><td><code>builtinLocale</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Specifies the locale name when the builtin provider is used.</p>
+</td>
+</tr>
 <tr><td><code>walSegmentSize</code><br/>
 <i>int</i>
 </td>

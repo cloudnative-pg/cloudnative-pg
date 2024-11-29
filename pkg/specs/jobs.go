@@ -142,6 +142,18 @@ func buildInitDBFlags(cluster apiv1.Cluster) (initCommand []string) {
 	if localeCType := config.LocaleCType; localeCType != "" {
 		options = append(options, fmt.Sprintf("--lc-ctype=%s", localeCType))
 	}
+	if localeProvider := config.LocaleProvider; localeProvider != "" {
+		options = append(options, fmt.Sprintf("--locale-provider=%s", localeProvider))
+	}
+	if icuLocale := config.IcuLocale; icuLocale != "" {
+		options = append(options, fmt.Sprintf("--icu-locale=%s", icuLocale))
+	}
+	if icuRules := config.IcuRules; icuRules != "" {
+		options = append(options, fmt.Sprintf("--icu-rules=%s", icuRules))
+	}
+	if builtinLocale := config.BuiltinLocale; builtinLocale != "" {
+		options = append(options, fmt.Sprintf("--builtin-locale=%s", builtinLocale))
+	}
 	if walSegmentSize := config.WalSegmentSize; walSegmentSize != 0 && utils.IsPowerOfTwo(walSegmentSize) {
 		options = append(options, fmt.Sprintf("--wal-segsize=%v", walSegmentSize))
 	}
