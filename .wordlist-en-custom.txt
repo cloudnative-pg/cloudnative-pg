@@ -1008,6 +1008,8 @@ pgAdmin
 pgBouncer
 pgBouncerIntegration
 pgBouncerSecrets
+pgDumpExtraOptions
+pgRestoreExtraOptions
 pgSQL
 pgadmin
 pgaudit
