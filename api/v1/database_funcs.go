@@ -16,7 +16,29 @@ limitations under the License.
 
 package v1
 
-import corev1 "k8s.io/api/core/v1"
+import (
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/utils/ptr"
+)
+
+// SetAsFailed sets the database as failed with the given error
+func (db *Database) SetAsFailed(err error) {
+	db.Status.Applied = ptr.To(false)
+	db.Status.Message = err.Error()
+}
+
+// SetAsUnknown sets the database as unknown with the given error
+func (db *Database) SetAsUnknown(err error) {
+	db.Status.Applied = nil
+	db.Status.Message = err.Error()
+}
+
+// SetAsReady sets the database as working correctly
+func (db *Database) SetAsReady() {
+	db.Status.Applied = ptr.To(true)
+	db.Status.Message = ""
+	db.Status.ObservedGeneration = db.Generation
+}
 
 // GetClusterRef returns the cluster reference of the database
 func (db *Database) GetClusterRef() corev1.LocalObjectReference {
