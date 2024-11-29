@@ -19,6 +19,7 @@ package fio
 
 import (
 	"context"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -181,9 +182,19 @@ func getSecurityContext() *corev1.SecurityContext {
 	return sc
 }
 
+func getPodSecurityContext() *corev1.PodSecurityContext {
+	if utils.HaveSecurityContextConstraints() {
+		return &corev1.PodSecurityContext{}
+	}
+	runAs := int64(10001)
+	return &corev1.PodSecurityContext{
+		FSGroup: &runAs,
+	}
+}
+
 // createFioDeployment creates spec of deployment.
 func (cmd *fioCommand) generateFioDeployment(deploymentName string) *appsv1.Deployment {
-	fioDeployment := &appsv1.Deployment{
+	return &appsv1.Deployment{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "apps/v1",
 			Kind:       "Deployment",
@@ -313,10 +324,9 @@ func (cmd *fioCommand) generateFioDeployment(deploymentName string) *appsv1.Depl
 						},
 					},
 					NodeSelector:    map[string]string{},
-					SecurityContext: &corev1.PodSecurityContext{},
+					SecurityContext: getPodSecurityContext(),
 				},
 			},
 		},
 	}
-	return fioDeployment
 }
