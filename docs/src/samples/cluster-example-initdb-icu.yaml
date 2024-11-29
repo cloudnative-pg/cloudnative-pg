@@ -1,0 +1,19 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example-initdb-icu
+spec:
+  instances: 3
+
+  bootstrap:
+    initdb:
+      encoding: UTF8
+      localeCollate: en_US.UTF8
+      localeCType: en_US.UTF8
+      localeProvider: icu
+      icuLocale: en-US
+      # we want to order g and G after A (and before b)
+      icuRules: '&A < g <<< G'
+      
+  storage:
+    size: 1Gi
