@@ -109,12 +109,12 @@ var _ = Describe("Managed Database status", func() {
 			Client:   fakeClient,
 			Scheme:   schemeBuilder.BuildWithAllKnownScheme(),
 			instance: &f,
-			finalizerReconciler: newFinalizerReconciler(
-				fakeClient,
-				utils.DatabaseFinalizerName,
-				r.evaluateDropDatabase,
-			),
 		}
+		r.finalizerReconciler = newFinalizerReconciler(
+			fakeClient,
+			utils.DatabaseFinalizerName,
+			r.evaluateDropDatabase,
+		)
 	})
 
 	AfterEach(func() {
