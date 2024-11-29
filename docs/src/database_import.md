@@ -280,15 +280,15 @@ import/export processes, as shown in the following example:
   bootstrap:
     initdb:
       import:
-	type: microservice
-	databases:
-	  - app
-	source:
-	  externalCluster: cluster-example
-	pgDumpExtraOptions:
-	- '--jobs=2'
-	pgRestoreExtraOptions:
-	- '--jobs=2'
+        type: microservice
+        databases:
+        - app
+        source:
+          externalCluster: cluster-example
+        pgDumpExtraOptions:
+        - '--jobs=2'
+        pgRestoreExtraOptions:
+        - '--jobs=2'
   # <snip>
 ```
 
