@@ -78,11 +78,14 @@ Git tags for versions are prefixed with `v`.
 
 ## Support status of CloudNativePG releases
 
-| Version         | Currently supported  | Release date      | End of life         | Supported Kubernetes versions | Tested, but not supported | Supported Postgres versions |
-|-----------------|----------------------|-------------------|---------------------|-------------------------------|---------------------------|-----------------------------|
-| 1.24.x          | Yes                  | August 22, 2024   | ~ February, 2025    | 1.28, 1.29, 1.30, 1.31        | 1.27                      | 12 - 17                     |
-| 1.23.x          | Yes                  | April 24, 2024    | ~ November, 2024    | 1.27, 1.28, 1.29              | 1.30, 1.31                | 12 - 16                     |
-| main            | No, development only |                   |                     |                               |                           | 12 - 16                     |
+<!-- TODO: Complete dates and versions below -->
+| Version         | Currently supported  | Release date        | End of life         | Supported Kubernetes versions | Tested, but not supported | Supported Postgres versions |
+|-----------------|----------------------|---------------------|---------------------|-------------------------------|---------------------------|-----------------------------|
+| 1.25.x          | Yes                  | December XX, 2024   | ~ February, 2025    | 1.29, 1.30, 1.31, 1.32 (??)   | 1.27, 1.28                | 13 - 17                     |
+| 1.24.x          | Yes                  | August 22, 2024     | February XX, 2025   | 1.28, 1.29, 1.30, 1.31        | 1.27                      | 13 - 17                     |
+| main            | No, development only |                     |                     |                               |                           | 13 - 17                     |
+
+<!-- <sup>1</sup> _PostgreSQL 13 will be supported until November 13, 2025._ -->
 
 The list of supported Kubernetes versions in the table depends on what
 the CloudNativePG maintainers think is reasonable to support and to test.
@@ -134,6 +137,7 @@ version of PostgreSQL, we might not be able to help you.
 
 | Version         | Release date      | End of life         | Compatible Kubernetes versions |
 |-----------------|-------------------|---------------------|--------------------------------|
+| 1.23.x          | April 24, 2024    | November 24, 2024   | 1.27, 1.28, 1.29               |
 | 1.22.x          | December 21, 2023 | July 24, 2024       | 1.26, 1.27, 1.28               |
 | 1.21.x          | October 12, 2023  | Jun 12, 2024        | 1.25, 1.26, 1.27, 1.28         |
 | 1.20.x          | April 27, 2023    | January 21, 2024    | 1.24, 1.25, 1.26, 1.27         |
