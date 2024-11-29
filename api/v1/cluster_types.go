@@ -1469,21 +1469,25 @@ type BootstrapInitDB struct {
 	LocaleCType string `json:"localeCType,omitempty"`
 
 	// This option sets the locale provider for databases created in the new cluster.
+	// Available from PostgreSQL 16.
 	// +optional
 	LocaleProvider string `json:"localeProvider,omitempty"`
 
 	// Specifies the ICU locale when the ICU provider is used.
 	// This option requires `localeProvider` to be set to `icu`.
+	// Available from PostgreSQL 15.
 	// +optional
 	IcuLocale string `json:"icuLocale,omitempty"`
 
 	// Specifies additional collation rules to customize the behavior of the default collation.
 	// This option requires `localeProvider` to be set to `icu`.
+	// Available from PostgreSQL 16.
 	// +optional
 	IcuRules string `json:"icuRules,omitempty"`
 
 	// Specifies the locale name when the builtin provider is used.
 	// This option requires `localeProvider` to be set to `builtin`.
+	// Available from PostgreSQL 17.
 	// +optional
 	BuiltinLocale string `json:"builtinLocale,omitempty"`
 

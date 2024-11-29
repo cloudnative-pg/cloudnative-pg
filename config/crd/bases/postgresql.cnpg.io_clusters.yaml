@@ -1496,8 +1496,10 @@ spec:
                     description: Bootstrap the cluster via initdb
                     properties:
                       builtinLocale:
-                        description: Specifies the locale name when the builtin provider
-                          is used.
+                        description: |-
+                          Specifies the locale name when the builtin provider is used.
+                          This option requires `localeProvider` to be set to `builtin`.
+                          Available from PostgreSQL 17.
                         type: string
                       dataChecksums:
                         description: |-
@@ -1513,13 +1515,16 @@ spec:
                           for initdb (default:`UTF8`)
                         type: string
                       icuLocale:
-                        description: Specifies the ICU locale when the ICU provider
-                          is used.
+                        description: |-
+                          Specifies the ICU locale when the ICU provider is used.
+                          This option requires `localeProvider` to be set to `icu`.
+                          Available from PostgreSQL 15.
                         type: string
                       icuRules:
                         description: |-
                           Specifies additional collation rules to customize the behavior of the default collation.
-                          This is supported for ICU only.
+                          This option requires `localeProvider` to be set to `icu`.
+                          Available from PostgreSQL 16.
                         type: string
                       import:
                         description: |-
@@ -1598,8 +1603,9 @@ spec:
                           for initdb (default:`C`)
                         type: string
                       localeProvider:
-                        description: This option sets the locale provider for databases
-                          created in the new cluster.
+                        description: |-
+                          This option sets the locale provider for databases created in the new cluster.
+                          Available from PostgreSQL 16.
                         type: string
                       options:
                         description: |-
