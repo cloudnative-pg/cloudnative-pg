@@ -19,7 +19,6 @@ package fio
 
 import (
 	"context"
-
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -29,6 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 type fioCommand struct {
@@ -156,9 +156,33 @@ func (cmd *fioCommand) generateConfigMapObject() *corev1.ConfigMap {
 	return result
 }
 
+func getSecurityContext() *corev1.SecurityContext {
+	runAs := int64(10001)
+	sc := &corev1.SecurityContext{
+		AllowPrivilegeEscalation: ptr.To(false),
+		RunAsNonRoot:             ptr.To(true),
+		Capabilities: &corev1.Capabilities{
+			Drop: []corev1.Capability{
+				"ALL",
+			},
+		},
+		ReadOnlyRootFilesystem: ptr.To(true),
+	}
+	if utils.HaveSecurityContextConstraints() {
+		return sc
+	}
+
+	sc.RunAsUser = &runAs
+	sc.RunAsGroup = &runAs
+	sc.SeccompProfile = &corev1.SeccompProfile{
+		Type: corev1.SeccompProfileTypeRuntimeDefault,
+	}
+
+	return sc
+}
+
 // createFioDeployment creates spec of deployment.
 func (cmd *fioCommand) generateFioDeployment(deploymentName string) *appsv1.Deployment {
-	runAs := int64(10001)
 	fioDeployment := &appsv1.Deployment{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "apps/v1",
@@ -229,22 +253,7 @@ func (cmd *fioCommand) generateFioDeployment(deploymentName string) *appsv1.Depl
 								InitialDelaySeconds: 60,
 								PeriodSeconds:       10,
 							},
-							SecurityContext: &corev1.SecurityContext{
-								AllowPrivilegeEscalation: ptr.To(false),
-								SeccompProfile: &corev1.SeccompProfile{
-									Type: corev1.SeccompProfileTypeRuntimeDefault,
-								},
-								RunAsGroup:   &runAs,
-								RunAsNonRoot: ptr.To(true),
-								RunAsUser:    &runAs,
-
-								Capabilities: &corev1.Capabilities{
-									Drop: []corev1.Capability{
-										"ALL",
-									},
-								},
-								ReadOnlyRootFilesystem: ptr.To(true),
-							},
+							SecurityContext: getSecurityContext(),
 							Resources: corev1.ResourceRequirements{
 								Requests: corev1.ResourceList{
 									"memory": resource.MustParse("100M"),
@@ -303,10 +312,8 @@ func (cmd *fioCommand) generateFioDeployment(deploymentName string) *appsv1.Depl
 							},
 						},
 					},
-					NodeSelector: map[string]string{},
-					SecurityContext: &corev1.PodSecurityContext{
-						FSGroup: &runAs,
-					},
+					NodeSelector:    map[string]string{},
+					SecurityContext: &corev1.PodSecurityContext{},
 				},
 			},
 		},

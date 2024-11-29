@@ -64,7 +64,7 @@ func NewCmd() *cobra.Command {
 				fmt.Printf("To remove this test you need to delete the Deployment, ConfigMap "+
 					"and PVC with the name %v\n\nThe most simple way to do this is to re-run the command that was run"+
 					"to generate the deployment with the --dry-run flag and pipe that output to kubectl delete, e.g.:\n\n"+
-					"kubectl cnpg fio <fio-job-name> --dry-run | kubectl delete -f -", deploymentName)
+					"kubectl cnpg fio <fio-job-name> --dry-run | kubectl delete -f -\n", deploymentName)
 			}
 		},
 	}
