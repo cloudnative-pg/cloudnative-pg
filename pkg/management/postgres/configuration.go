@@ -252,7 +252,9 @@ func UpdateReplicaConfiguration(pgData, primaryConnInfo, slotName string) (chang
 }
 
 // configurePostgresOverrideConfFile writes the content of override.conf file, including
-// replication information
+// replication information. The “primary_slot_name` parameter will be generated only when the parameter slotName is not
+// empty.
+// Returns a boolean indicating if any changes were done and any errors encountered
 func configurePostgresOverrideConfFile(pgData, primaryConnInfo, slotName string) (changed bool, err error) {
 	targetFile := path.Join(pgData, constants.PostgresqlOverrideConfigurationFile)
 	options := map[string]string{
@@ -260,8 +262,11 @@ func configurePostgresOverrideConfFile(pgData, primaryConnInfo, slotName string)
 			"/controller/manager wal-restore --log-destination %s/%s.json %%f %%p",
 			postgres.LogPath, postgres.LogFileName),
 		"recovery_target_timeline": "latest",
-		"primary_slot_name":        slotName,
 		"primary_conninfo":         primaryConnInfo,
+	}
+
+	if len(slotName) > 0 {
+		options["primary_slot_name"] = slotName
 	}
 
 	// Ensure that override.conf file contains just the above options
