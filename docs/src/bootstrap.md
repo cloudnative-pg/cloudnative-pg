@@ -211,6 +211,14 @@ The actual PostgreSQL data directory is created via an invocation of the
 (i.e., to change the `locale` used for the template databases or to add data
 checksums), you can use the following parameters:
 
+builtinLocale
+:   When `builtinLocale` is set to a value, CNPG passes it to the `--builtin-locale`
+option in `initdb`. This option controls the ICU locale, as defined in
+["Locale Support"](https://www.postgresql.org/docs/current/locale.html) from the
+PostgreSQL documentation (default: empty).
+Note that this option requires `localeProvider` to be set to `builtin`.
+Available from PostgreSQL 17.
+
 dataChecksums
 :   When `dataChecksums` is set to `true`, CNPG invokes the `-k` option in
     `initdb` to enable checksums on data pages and help detect corruption by the
@@ -219,6 +227,22 @@ dataChecksums
 encoding
 :   When `encoding` set to a value, CNPG passes it to the `--encoding` option in `initdb`,
     which selects the encoding of the template database (default: `UTF8`).
+
+icuLocale
+:   When `icuLocale` is set to a value, CNPG passes it to the `--icu-locale` option in
+`initdb`. This option controls the ICU locale, as defined in
+["Locale Support"](https://www.postgresql.org/docs/current/locale.html) from the
+PostgreSQL documentation (default: empty).
+Note that this option requires `localeProvider` to be set to `icu`.
+Available from PostgreSQL 15.
+
+icuRules
+:   When `icuRules` is set to a value, CNPG passes it to the `--icu-rules` option in
+`initdb`. This option controls the ICU locale, as defined in
+["Locale Support"](https://www.postgresql.org/docs/current/locale.html) from the
+PostgreSQL documentation (default: empty).
+Note that this option requires `localeProvider` to be set to `icu`.
+Available from PostgreSQL 16.
 
 localeCollate
 :   When `localeCollate` is set to a value, CNPG passes it to the `--lc-collate`
@@ -237,27 +261,7 @@ localeProvider
 option in `initdb`. This option controls the locale provider, as defined in
 ["Locale Support"](https://www.postgresql.org/docs/current/locale.html) from the
 PostgreSQL documentation (default: empty, which means `libc` for PostgreSQL).
-
-icuLocale
-:   When `icuLocale` is set to a value, CNPG passes it to the `--icu-locale` option in
-`initdb`. This option controls the ICU locale, as defined in
-["Locale Support"](https://www.postgresql.org/docs/current/locale.html) from the
-PostgreSQL documentation (default: empty).
-Note that this option requires `localeProvider` to be set to `icu`.
-
-icuRules
-:   When `icuRules` is set to a value, CNPG passes it to the `--icu-rules` option in
-`initdb`. This option controls the ICU locale, as defined in
-["Locale Support"](https://www.postgresql.org/docs/current/locale.html) from the
-PostgreSQL documentation (default: empty).
-Note that this option requires `localeProvider` to be set to `icu`.
-
-builtinLocale
-:   When `builtinLocale` is set to a value, CNPG passes it to the `--builtin-locale`
-option in `initdb`. This option controls the ICU locale, as defined in
-["Locale Support"](https://www.postgresql.org/docs/current/locale.html) from the
-PostgreSQL documentation (default: empty).
-Note that this option requires `localeProvider` to be set to `builtin`.
+Available from PostgreSQL 15.
 
 walSegmentSize
 :   When `walSegmentSize` is set to a value, CNPG passes it to the `--wal-segsize`
