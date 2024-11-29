@@ -34,6 +34,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -108,6 +109,11 @@ var _ = Describe("Managed Database status", func() {
 			Client:   fakeClient,
 			Scheme:   schemeBuilder.BuildWithAllKnownScheme(),
 			instance: &f,
+			finalizerReconciler: newFinalizerReconciler(
+				fakeClient,
+				utils.DatabaseFinalizerName,
+				r.evaluateDropDatabase,
+			),
 		}
 	})
 
@@ -263,7 +269,7 @@ var _ = Describe("Managed Database status", func() {
 		Expect(apierrors.IsNotFound(err)).To(BeTrue())
 	})
 
-	It("skips reconciliation if cluster isn't found (deleted cluster)", func(ctx SpecContext) {
+	It("fails reconciliation if cluster isn't found (deleted cluster)", func(ctx SpecContext) {
 		// since the fakeClient has the `cluster-example` cluster, let's reference
 		// another cluster `cluster-other` that is not found by the fakeClient
 		pgInstance := postgres.NewInstance().
@@ -301,8 +307,8 @@ var _ = Describe("Managed Database status", func() {
 		}, &updatedDatabase)
 		Expect(err).ToNot(HaveOccurred())
 
-		Expect(updatedDatabase.Status.Applied).Should(BeNil())
-		Expect(updatedDatabase.Status.Message).Should(BeEmpty())
+		Expect(updatedDatabase.Status.Applied).Should(HaveValue(BeFalse()))
+		Expect(updatedDatabase.Status.Message).Should(ContainSubstring("\"cluster-other\" not found"))
 	})
 
 	It("skips reconciliation if database object isn't found (deleted database)", func(ctx SpecContext) {
