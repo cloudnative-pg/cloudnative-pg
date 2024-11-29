@@ -19,6 +19,7 @@ package controller
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"fmt"
 	"maps"
 	"slices"
@@ -30,6 +31,17 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
+
+// errClusterIsReplica is raised when an object
+// cannot be reconciled because it belongs to a replica cluster
+var errClusterIsReplica = fmt.Errorf("waiting for the cluster to become primary")
+
+type instanceInterface interface {
+	GetSuperUserDB() (*sql.DB, error)
+	GetClusterName() string
+	GetPodName() string
+	GetNamespaceName() string
+}
 
 type markableAsFailed interface {
 	client.Object

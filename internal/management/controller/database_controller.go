@@ -18,23 +18,17 @@ package controller
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"fmt"
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/instance"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -43,19 +37,9 @@ type DatabaseReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 
-	instance instanceInterface
+	instance            instanceInterface
+	finalizerReconciler *finalizerReconciler[*apiv1.Database]
 }
-
-type instanceInterface interface {
-	GetSuperUserDB() (*sql.DB, error)
-	GetClusterName() string
-	GetPodName() string
-	GetNamespaceName() string
-}
-
-// errClusterIsReplica is raised when the database object
-// cannot be reconciled because it belongs to a replica cluster
-var errClusterIsReplica = fmt.Errorf("waiting for the cluster to become primary")
 
 // databaseReconciliationInterval is the time between the
 // database reconciliation loop failures
@@ -76,16 +60,16 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		Namespace: req.Namespace,
 		Name:      req.Name,
 	}, &database); err != nil {
-		// This is a deleted object, there's nothing
-		// to do since we don't manage any finalizers.
-		if apierrors.IsNotFound(err) {
-			return ctrl.Result{}, nil
-		}
-		return ctrl.Result{}, err
+		contextLogger.Trace("Could not fetch Database", "error", err)
+		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
 	// This is not for me!
 	if database.Spec.ClusterRef.Name != r.instance.GetClusterName() {
+		contextLogger.Trace("Database is not for this cluster",
+			"cluster", database.Spec.ClusterRef.Name,
+			"expected", r.instance.GetClusterName(),
+		)
 		return ctrl.Result{}, nil
 	}
 
@@ -97,19 +81,7 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	// Fetch the Cluster from the cache
 	cluster, err := r.GetCluster(ctx)
 	if err != nil {
-		if apierrors.IsNotFound(err) {
-			// The cluster has been deleted.
-			// We just need to wait for this instance manager to be terminated
-			contextLogger.Debug("Could not find Cluster")
-			return ctrl.Result{}, nil
-		}
-
-		return ctrl.Result{}, fmt.Errorf("could not fetch Cluster: %w", err)
-	}
-
-	// This is not for me, at least now
-	if cluster.Status.CurrentPrimary != r.instance.GetPodName() {
-		return ctrl.Result{RequeueAfter: databaseReconciliationInterval}, nil
+		return ctrl.Result{}, markAsFailed(ctx, r.Client, &database, fmt.Errorf("while fetching the cluster: %w", err))
 	}
 
 	contextLogger.Info("Reconciling database")
@@ -122,64 +94,45 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{RequeueAfter: databaseReconciliationInterval}, nil
 	}
 
-	// Cannot do anything on a replica cluster
-	if cluster.IsReplica() {
-		return r.replicaClusterReconciliation(ctx, &database)
+	// This is not for me, at least now
+	if cluster.Status.CurrentPrimary != r.instance.GetPodName() {
+		return ctrl.Result{RequeueAfter: databaseReconciliationInterval}, nil
 	}
 
-	// Add the finalizer if we don't have it
-	// nolint:nestif
-	if database.DeletionTimestamp.IsZero() {
-		if controllerutil.AddFinalizer(&database, utils.DatabaseFinalizerName) {
-			if err := r.Update(ctx, &database); err != nil {
-				return ctrl.Result{}, err
-			}
+	// Cannot do anything on a replica cluster
+	if cluster.IsReplica() {
+		if err := markAsUnknown(ctx, r.Client, &database, errClusterIsReplica); err != nil {
+			return ctrl.Result{}, err
 		}
-	} else {
-		// This database is being deleted
-		if controllerutil.ContainsFinalizer(&database, utils.DatabaseFinalizerName) {
-			if database.Spec.ReclaimPolicy == apiv1.DatabaseReclaimDelete {
-				if err := r.deleteDatabase(ctx, &database); err != nil {
-					return ctrl.Result{}, err
-				}
-			}
+		return ctrl.Result{RequeueAfter: databaseReconciliationInterval}, nil
+	}
 
-			// remove our finalizer from the list and update it.
-			controllerutil.RemoveFinalizer(&database, utils.DatabaseFinalizerName)
-			if err := r.Update(ctx, &database); err != nil {
-				return ctrl.Result{}, err
-			}
-		}
-
+	if err := r.finalizerReconciler.reconcile(ctx, &database); err != nil {
+		return ctrl.Result{}, fmt.Errorf("while reconciling the finalizer: %w", err)
+	}
+	if !database.GetDeletionTimestamp().IsZero() {
 		return ctrl.Result{}, nil
 	}
 
 	// Make sure the target PG Database is not being managed by another Database Object
 	if err := r.ensureOnlyOneManager(ctx, database); err != nil {
-		return r.failedReconciliation(
-			ctx,
-			&database,
-			err,
-		)
+		if err := markAsFailed(ctx, r.Client, &database, err); err != nil {
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{RequeueAfter: databaseReconciliationInterval}, nil
 	}
 
-	if err := r.reconcileDatabase(
-		ctx,
-		&database,
-	); err != nil {
-		contextLogger.Error(err, "while reconciling database")
-		return r.failedReconciliation(
-			ctx,
-			&database,
-			err,
-		)
+	if err := r.reconcileDatabase(ctx, &database); err != nil {
+		if err := markAsFailed(ctx, r.Client, &database, err); err != nil {
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{RequeueAfter: databaseReconciliationInterval}, nil
 	}
 
-	contextLogger.Info("Reconciliation of database completed")
-	return r.succeededReconciliation(
-		ctx,
-		&database,
-	)
+	if err := markAsReady(ctx, r.Client, &database); err != nil {
+		return ctrl.Result{}, err
+	}
+	return ctrl.Result{RequeueAfter: databaseReconciliationInterval}, nil
 }
 
 // ensureOnlyOneManager verifies that the target PostgreSQL Database specified by the given Database object
@@ -226,68 +179,16 @@ func (r *DatabaseReconciler) ensureOnlyOneManager(
 	return nil
 }
 
-// failedReconciliation marks the reconciliation as failed and logs the corresponding error
-func (r *DatabaseReconciler) failedReconciliation(
-	ctx context.Context,
-	database *apiv1.Database,
-	err error,
-) (ctrl.Result, error) {
-	oldDatabase := database.DeepCopy()
-	database.Status.Message = fmt.Sprintf("reconciliation error: %s", err.Error())
-	database.Status.Applied = ptr.To(false)
-
-	var statusError *instance.StatusError
-	if errors.As(err, &statusError) {
-		// The body line of the instance manager contains the human
-		// readable error
-		database.Status.Message = statusError.Body
+func (r *DatabaseReconciler) evaluateDropDatabase(ctx context.Context, db *apiv1.Database) error {
+	if db.Spec.ReclaimPolicy != apiv1.DatabaseReclaimDelete {
+		return nil
+	}
+	sqlDB, err := r.instance.GetSuperUserDB()
+	if err != nil {
+		return fmt.Errorf("while getting DB connection: %w", err)
 	}
 
-	if err := r.Client.Status().Patch(ctx, database, client.MergeFrom(oldDatabase)); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	return ctrl.Result{
-		RequeueAfter: databaseReconciliationInterval,
-	}, nil
-}
-
-// succeededReconciliation marks the reconciliation as succeeded
-func (r *DatabaseReconciler) succeededReconciliation(
-	ctx context.Context,
-	database *apiv1.Database,
-) (ctrl.Result, error) {
-	oldDatabase := database.DeepCopy()
-	database.Status.Message = ""
-	database.Status.Applied = ptr.To(true)
-	database.Status.ObservedGeneration = database.Generation
-
-	if err := r.Client.Status().Patch(ctx, database, client.MergeFrom(oldDatabase)); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	return ctrl.Result{
-		RequeueAfter: databaseReconciliationInterval,
-	}, nil
-}
-
-// replicaClusterReconciliation sets the status for a reconciliation that's
-// executed in a replica Cluster
-func (r *DatabaseReconciler) replicaClusterReconciliation(
-	ctx context.Context,
-	database *apiv1.Database,
-) (ctrl.Result, error) {
-	oldDatabase := database.DeepCopy()
-	database.Status.Message = errClusterIsReplica.Error()
-	database.Status.Applied = nil
-
-	if err := r.Client.Status().Patch(ctx, database, client.MergeFrom(oldDatabase)); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	return ctrl.Result{
-		RequeueAfter: databaseReconciliationInterval,
-	}, nil
+	return dropDatabase(ctx, sqlDB, db)
 }
 
 // NewDatabaseReconciler creates a new database reconciler
@@ -295,10 +196,18 @@ func NewDatabaseReconciler(
 	mgr manager.Manager,
 	instance *postgres.Instance,
 ) *DatabaseReconciler {
-	return &DatabaseReconciler{
+	dr := &DatabaseReconciler{
 		Client:   mgr.GetClient(),
 		instance: instance,
 	}
+
+	dr.finalizerReconciler = newFinalizerReconciler(
+		mgr.GetClient(),
+		utils.DatabaseFinalizerName,
+		dr.evaluateDropDatabase,
+	)
+
+	return dr
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -334,13 +243,4 @@ func (r *DatabaseReconciler) reconcileDatabase(ctx context.Context, obj *apiv1.D
 	}
 
 	return createDatabase(ctx, db, obj)
-}
-
-func (r *DatabaseReconciler) deleteDatabase(ctx context.Context, obj *apiv1.Database) error {
-	db, err := r.instance.GetSuperUserDB()
-	if err != nil {
-		return fmt.Errorf("while connecting to the database %q: %w", obj.Spec.Name, err)
-	}
-
-	return dropDatabase(ctx, db, obj)
 }

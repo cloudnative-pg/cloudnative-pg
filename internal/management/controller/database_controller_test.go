@@ -333,29 +333,6 @@ var _ = Describe("Managed Database status", func() {
 		Expect(result).Should(BeZero()) // nothing to do, since the DB is being deleted
 	})
 
-	It("properly marks the status on a succeeded reconciliation", func(ctx SpecContext) {
-		_, err := r.succeededReconciliation(ctx, database)
-		Expect(err).ToNot(HaveOccurred())
-		Expect(database.Status.Applied).To(HaveValue(BeTrue()))
-		Expect(database.Status.Message).To(BeEmpty())
-	})
-
-	It("properly marks the status on a failed reconciliation", func(ctx SpecContext) {
-		exampleError := fmt.Errorf("sample error for database %s", database.Spec.Name)
-
-		_, err := r.failedReconciliation(ctx, database, exampleError)
-		Expect(err).ToNot(HaveOccurred())
-		Expect(database.Status.Applied).To(HaveValue(BeFalse()))
-		Expect(database.Status.Message).To(ContainSubstring(exampleError.Error()))
-	})
-
-	It("properly marks the status on a replica Cluster reconciliation", func(ctx SpecContext) {
-		_, err := r.replicaClusterReconciliation(ctx, database)
-		Expect(err).ToNot(HaveOccurred())
-		Expect(database.Status.Applied).To(BeNil())
-		Expect(database.Status.Message).To(BeEquivalentTo(errClusterIsReplica.Error()))
-	})
-
 	It("drops database with ensure absent option", func(ctx SpecContext) {
 		// Mocking dropDatabase
 		expectedValue := sqlmock.NewResult(0, 1)
