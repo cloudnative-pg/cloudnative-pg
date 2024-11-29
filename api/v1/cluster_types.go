@@ -1473,15 +1473,17 @@ type BootstrapInitDB struct {
 	LocaleProvider string `json:"localeProvider,omitempty"`
 
 	// Specifies the ICU locale when the ICU provider is used.
+	// This option requires `localeProvider` to be set to `icu`.
 	// +optional
 	IcuLocale string `json:"icuLocale,omitempty"`
 
 	// Specifies additional collation rules to customize the behavior of the default collation.
-	// This is supported for ICU only.
+	// This option requires `localeProvider` to be set to `icu`.
 	// +optional
 	IcuRules string `json:"icuRules,omitempty"`
 
 	// Specifies the locale name when the builtin provider is used.
+	// This option requires `localeProvider` to be set to `builtin`.
 	// +optional
 	BuiltinLocale string `json:"builtinLocale,omitempty"`
 
