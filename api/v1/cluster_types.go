@@ -1428,6 +1428,9 @@ type CertificatesStatus struct {
 // BootstrapInitDB is the configuration of the bootstrap process when
 // initdb is used
 // Refer to the Bootstrap page of the documentation for more information.
+// +kubebuilder:validation:XValidation:rule="!has(self.builtinLocale) || self.localeProvider == 'builtin'",message="builtinLocale is only available when localeProvider is set to `builtin`"
+// +kubebuilder:validation:XValidation:rule="!has(self.icuLocale) || self.localeProvider == 'icu'",message="icuLocale is only available when localeProvider is set to `icu`"
+// +kubebuilder:validation:XValidation:rule="!has(self.icuRules) || self.localeProvider == 'icu'",message="icuRules is only available when localeProvider is set to `icu`"
 type BootstrapInitDB struct {
 	// Name of the database used by the application. Default: `app`.
 	// +optional
