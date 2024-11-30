@@ -1815,13 +1815,13 @@ spec:
                     x-kubernetes-validations:
                     - message: builtinLocale is only available when localeProvider
                         is set to `builtin`
-                      rule: '!has(self.builtinLocale) || self.localeProvider == ''builtin'')'
+                      rule: '!has(self.builtinLocale) || self.localeProvider == ''builtin'''
                     - message: icuLocale is only available when localeProvider is
                         set to `icu`
-                      rule: '!has(self.icuLocale) || self.localeProvider == ''icu'')'
+                      rule: '!has(self.icuLocale) || self.localeProvider == ''icu'''
                     - message: icuRules is only available when localeProvider is set
                         to `icu`
-                      rule: '!has(self.icuRules) || self.localeProvider == ''icu'')'
+                      rule: '!has(self.icuRules) || self.localeProvider == ''icu'''
                   pg_basebackup:
                     description: |-
                       Bootstrap the cluster taking a physical backup of another compatible
