@@ -53,11 +53,21 @@ func Monolith(
 		return err
 	}
 
-	if err := ds.exportDatabases(ctx, origin, databases, cluster.Spec.Bootstrap.InitDB.Import.PgDumpExtraOptions); err != nil {
+	if err := ds.exportDatabases(
+		ctx,
+		origin,
+		databases,
+		cluster.Spec.Bootstrap.InitDB.Import.PgDumpExtraOptions,
+	); err != nil {
 		return err
 	}
 
-	if err := ds.importDatabases(ctx, destination, databases, cluster.Spec.Bootstrap.InitDB.Import.PgRestoreExtraOptions); err != nil {
+	if err := ds.importDatabases(
+		ctx,
+		destination,
+		databases,
+		cluster.Spec.Bootstrap.InitDB.Import.PgRestoreExtraOptions,
+	); err != nil {
 		return err
 	}
 

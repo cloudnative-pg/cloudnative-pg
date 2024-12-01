@@ -34,18 +34,29 @@ func Microservice(
 ) error {
 	contextLogger := log.FromContext(ctx)
 	ds := databaseSnapshotter{cluster: cluster}
-	databases := cluster.Spec.Bootstrap.InitDB.Import.Databases
+	initDB := cluster.Spec.Bootstrap.InitDB
+	databases := initDB.Import.Databases
+
 	contextLogger.Info("starting microservice clone process")
 
 	if err := createDumpsDirectory(); err != nil {
 		return nil
 	}
 
-	if err := ds.exportDatabases(ctx, origin, databases, cluster.Spec.Bootstrap.InitDB.Import.PgDumpExtraOptions); err != nil {
+	if err := ds.exportDatabases(
+		ctx,
+		origin,
+		databases,
+		initDB.Import.PgDumpExtraOptions,
+	); err != nil {
 		return err
 	}
 
-	if err := ds.dropExtensionsFromDatabase(ctx, destination, cluster.Spec.Bootstrap.InitDB.Database); err != nil {
+	if err := ds.dropExtensionsFromDatabase(
+		ctx,
+		destination,
+		initDB.Database,
+	); err != nil {
 		return err
 	}
 
@@ -53,9 +64,9 @@ func Microservice(
 		ctx,
 		destination,
 		databases[0],
-		cluster.Spec.Bootstrap.InitDB.Database,
-		cluster.Spec.Bootstrap.InitDB.Owner,
-		cluster.Spec.Bootstrap.InitDB.Import.PgRestoreExtraOptions,
+		initDB.Database,
+		initDB.Owner,
+		initDB.Import.PgRestoreExtraOptions,
 	); err != nil {
 		return err
 	}
@@ -64,9 +75,13 @@ func Microservice(
 		return err
 	}
 
-	if err := ds.executePostImportQueries(ctx, destination, cluster.Spec.Bootstrap.InitDB.Database); err != nil {
+	if err := ds.executePostImportQueries(
+		ctx,
+		destination,
+		initDB.Database,
+	); err != nil {
 		return err
 	}
 
-	return ds.analyze(ctx, destination, []string{cluster.Spec.Bootstrap.InitDB.Database})
+	return ds.analyze(ctx, destination, []string{initDB.Database})
 }
