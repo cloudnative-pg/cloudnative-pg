@@ -233,6 +233,9 @@ vet: ## Run go vet against code.
 lint: ## Run the linter.
 	golangci-lint run
 
+lint-fix: ## Run the linter with --fix.
+	golangci-lint run --fix
+
 shellcheck: ## Shellcheck for the hack directory.
 	@{ \
 	set -e ;\
