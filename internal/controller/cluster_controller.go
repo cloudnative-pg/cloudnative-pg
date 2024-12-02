@@ -160,6 +160,16 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 				"namespace", req.Namespace,
 			)
 		}
+
+		if err := r.setCrdAsNotReconciled(ctx, req.NamespacedName); err != nil {
+			contextLogger.Error(
+				err,
+				"error while marking objects not reconciled on the cluster",
+				"clusterName", req.Name,
+				"namespace", req.Namespace,
+			)
+		}
+
 		if err := r.deleteFinalizers(ctx, req.NamespacedName); err != nil {
 			contextLogger.Error(
 				err,
