@@ -27,8 +27,9 @@ import (
 	"time"
 
 	"github.com/cheynewallace/tabby"
+	"github.com/cloudnative-pg/cnpg-i/pkg/identity"
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
-	types "github.com/cloudnative-pg/machinery/pkg/types"
+	"github.com/cloudnative-pg/machinery/pkg/types"
 	"github.com/logrusorgru/aurora/v4"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
@@ -143,6 +144,7 @@ func Status(
 		status.printPodDisruptionBudgetStatus()
 	}
 	status.printInstancesStatus()
+	status.printPluginStatus()
 
 	if len(errs) > 0 {
 		fmt.Println()
@@ -751,6 +753,7 @@ func (fullStatus *PostgresqlStatus) printInstancesStatus() {
 		continue
 	}
 	status.Print()
+	fmt.Println()
 }
 
 func (fullStatus *PostgresqlStatus) printCertificatesStatus() {
@@ -1144,6 +1147,62 @@ func (fullStatus *PostgresqlStatus) printTablespacesStatus() {
 		tbsStatus.AddLine(tbs.Name, tbs.Owner, tbs.State, temporaryTablespaces.Has(tbs.Name), tbs.Error)
 	}
 	tbsStatus.Print()
+	fmt.Println()
+}
+
+func (fullStatus *PostgresqlStatus) printPluginStatus() {
+	const header = "Plugins status"
+
+	parseCapabilities := func(capabilities []string) string {
+		if len(capabilities) == 0 {
+			return "N/A"
+		}
+
+		result := make([]string, len(capabilities))
+		for idx, capability := range capabilities {
+			switch capability {
+			case identity.PluginCapability_Service_TYPE_BACKUP_SERVICE.String():
+				result[idx] = "Backup Service"
+			case identity.PluginCapability_Service_TYPE_RESTORE_JOB.String():
+				result[idx] = "Restore Job"
+			case identity.PluginCapability_Service_TYPE_RECONCILER_HOOKS.String():
+				result[idx] = "Reconciler Hooks"
+			case identity.PluginCapability_Service_TYPE_WAL_SERVICE.String():
+				result[idx] = "WAL Service"
+			case identity.PluginCapability_Service_TYPE_OPERATOR_SERVICE.String():
+				result[idx] = "Operator Service"
+			case identity.PluginCapability_Service_TYPE_LIFECYCLE_SERVICE.String():
+				result[idx] = "Lifecycle Service"
+			case identity.PluginCapability_Service_TYPE_UNSPECIFIED.String():
+				continue
+			default:
+				result[idx] = capability
+			}
+		}
+
+		return strings.Join(result, ", ")
+	}
+
+	if len(fullStatus.Cluster.Status.PluginStatus) == 0 {
+		fmt.Println(aurora.Green(header))
+		fmt.Println("No plugins found")
+		return
+	}
+
+	fmt.Println(aurora.Green(header))
+
+	status := tabby.New()
+	status.AddHeader("Name", "Version", "Status", "Reported Operator Capabilities")
+
+	for _, plg := range fullStatus.Cluster.Status.PluginStatus {
+		plgStatus := "N/A"
+		if plg.Status != "" {
+			plgStatus = plg.Status
+		}
+		status.AddLine(plg.Name, plg.Version, plgStatus, parseCapabilities(plg.Capabilities))
+	}
+
+	status.Print()
 	fmt.Println()
 }
 
