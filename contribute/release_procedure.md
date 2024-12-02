@@ -71,6 +71,8 @@ activities:
   update [`docs/src/release_notes.md`](../docs/src/release_notes.md)
   and [`.github/ISSUE_TEMPLATE/bug.yml`](../.github/ISSUE_TEMPLATE/bug.yml).
   These changes should go in a PR against `main`, and get maintainer approval.
+  Look at the template file to get an idea of how to start a new minor release
+  version document.
 
 - **Capabilities page:** in case of a new minor release, ensure that the
   operator capability levels page in
