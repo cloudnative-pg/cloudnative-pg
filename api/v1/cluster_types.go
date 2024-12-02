@@ -511,7 +511,7 @@ const (
 	PhaseImageCatalogError = "Cluster has incomplete or invalid image catalog"
 
 	// PhaseUnrecoverable for an unrecoverable cluster
-	PhaseUnrecoverable = "Cluster is in an unrecoverable state, needs manual intervention"
+	PhaseUnrecoverable = "Cluster is unrecoverable and needs manual intervention"
 
 	// PhaseArchitectureBinaryMissing is the error phase describing a missing architecture
 	PhaseArchitectureBinaryMissing = "Cluster cannot execute instance online upgrade due to missing architecture binary"
