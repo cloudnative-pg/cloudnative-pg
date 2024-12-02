@@ -1065,8 +1065,8 @@ func (r *ClusterReconciler) createPrimaryInstance(
 
 		if err := r.RegisterPhase(ctx, cluster,
 			apiv1.PhaseUnrecoverable,
-			"One or more nodes were previously generated but no PersistentVolumeClaims are found."+
-				"This is in an unrecoverable state. Restore the cluster from a backup if possible.",
+			"One or more instances were previously created, but no PersistentVolumeClaims (PVCs) exist."+
+				"The cluster is in an unrecoverable state. To resolve this, restore the cluster from a recent backup.",
 		); err != nil {
 			return ctrl.Result{}, fmt.Errorf("while registering the unrecoverable phase: %w", err)
 		}
