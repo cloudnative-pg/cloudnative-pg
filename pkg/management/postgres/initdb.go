@@ -416,7 +416,6 @@ func (info InitInfo) Bootstrap(ctx context.Context) error {
 
 	// Prepare the managed configuration file (override.conf)
 	primaryConnInfo := info.GetPrimaryConnInfo()
-	slotName := cluster.GetSlotNameFromInstanceName(info.PodName)
 
 	if isImportBootstrap {
 		// Write a special configuration for the import phase
@@ -425,7 +424,7 @@ func (info InitInfo) Bootstrap(ctx context.Context) error {
 		}
 	} else {
 		// Write standard replication configuration
-		if _, err = configurePostgresOverrideConfFile(info.PgData, primaryConnInfo, slotName); err != nil {
+		if _, err = configurePostgresOverrideConfFile(info.PgData, primaryConnInfo, ""); err != nil {
 			return fmt.Errorf("while configuring Postgres for replication: %w", err)
 		}
 	}
@@ -452,7 +451,7 @@ func (info InitInfo) Bootstrap(ctx context.Context) error {
 	// In case of import bootstrap, we restore the standard configuration file content
 	if isImportBootstrap {
 		/// Write standard replication configuration
-		if _, err = configurePostgresOverrideConfFile(info.PgData, primaryConnInfo, slotName); err != nil {
+		if _, err = configurePostgresOverrideConfFile(info.PgData, primaryConnInfo, ""); err != nil {
 			return fmt.Errorf("while configuring Postgres for replication: %w", err)
 		}
 
