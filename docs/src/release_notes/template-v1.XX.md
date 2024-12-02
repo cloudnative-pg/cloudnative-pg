@@ -8,8 +8,8 @@ on the release branch in GitHub.
 
 <!--
 
-# Use the last known tag as a start (e.g. LAST_TAG=v1.24.1)
-git log ${LAST_TAG}...HEAD --oneline --pretty="format:%h;%s"
+# Use the last known tag on `main` branch as a start (e.g. LAST_TAG=v1.24.0).
+git log ${LAST_TAG}.. --oneline --pretty="format:%h;%s" > log.csv
 
 -->
 
