@@ -10,3 +10,5 @@ spec:
   type: rw
   pgbouncer:
     poolMode: session
+    parameters:
+      server_tls_protocols: tlsv1.3
