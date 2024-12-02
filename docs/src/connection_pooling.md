@@ -340,7 +340,7 @@ are the ones directly set by PgBouncer.
 - [`dns_nxdomain_ttl`](https://www.pgbouncer.org/config.html#dns_nxdomain_ttl)
 - [`idle_transaction_timeout`](https://www.pgbouncer.org/config.html#idle_transaction_timeout)
 - [`ignore_startup_parameters`](https://www.pgbouncer.org/config.html#ignore_startup_parameters):
-  to be appended to `extra_float_digits,options` - required by CNP
+  to be appended to `extra_float_digits,options` - required by CloudNativePG
 - [`listen_backlog`](https://www.pgbouncer.org/config.html#listen_backlog)
 - [`log_connections`](https://www.pgbouncer.org/config.html#log_connections)
 - [`log_disconnections`](https://www.pgbouncer.org/config.html#log_disconnections)
