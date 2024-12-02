@@ -370,6 +370,8 @@ ReplicationTLSSecret
 ResizingPVC
 ResourceRequirements
 ResourceVersion
+RestoreJobHook
+RestoreJobHookCapabilities
 RetentionPolicy
 RoleBinding
 RoleConfiguration
@@ -1121,6 +1123,7 @@ resizingPVC
 resourceVersion
 resourcerequirements
 restoreAdditionalCommandArgs
+restoreJobHookCapabilities
 resync
 retentionPolicy
 reusePVC

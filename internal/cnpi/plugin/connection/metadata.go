@@ -19,10 +19,11 @@ package connection
 // Metadata expose the metadata as discovered
 // from a plugin
 type Metadata struct {
-	Name                 string
-	Version              string
-	Capabilities         []string
-	OperatorCapabilities []string
-	WALCapabilities      []string
-	BackupCapabilities   []string
+	Name                       string
+	Version                    string
+	Capabilities               []string
+	OperatorCapabilities       []string
+	WALCapabilities            []string
+	BackupCapabilities         []string
+	RestoreJobHookCapabilities []string
 }

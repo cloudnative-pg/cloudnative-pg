@@ -3637,6 +3637,14 @@ plugin regarding the WAL management</p>
 plugin regarding the Backup management</p>
 </td>
 </tr>
+<tr><td><code>restoreJobHookCapabilities</code><br/>
+<i>[]string</i>
+</td>
+<td>
+   <p>RestoreJobHookCapabilities are the list of capabilities of the
+plugin regarding the RestoreJobHook management</p>
+</td>
+</tr>
 <tr><td><code>status</code><br/>
 <i>string</i>
 </td>
