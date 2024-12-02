@@ -53,7 +53,6 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 		summaryInStatus         expectedKeysInStatus  = "summary"
 		tableName                                     = "test"
 	)
-	var namespace string
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
@@ -61,6 +60,7 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 	})
 
 	Context("hibernate", func() {
+		var namespace string
 		var err error
 		getPrimaryAndClusterManifest := func(namespace, clusterName string) ([]byte, string) {
 			var beforeHibernationClusterInfo *apiv1.Cluster
@@ -225,7 +225,13 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 			var beforeHibernationPgDataPvcUID types.UID
 
 			// Write a table and some data on the "app" database
-			AssertCreateTestData(namespace, clusterName, tableName, psqlClientPod)
+			tableLocator := TableLocator{
+				Namespace:    namespace,
+				ClusterName:  clusterName,
+				DatabaseName: testsUtils.AppDBName,
+				TableName:    tableName,
+			}
+			AssertCreateTestData(env, tableLocator)
 			clusterManifest, currentPrimary := getPrimaryAndClusterManifest(namespace, clusterName)
 
 			By("collecting pgWal pvc details of current primary", func() {
@@ -289,7 +295,7 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 
 			AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReady], env)
 			// Test data should be present after hibernation off
-			AssertDataExpectedCount(namespace, clusterName, tableName, 2, psqlClientPod)
+			AssertDataExpectedCount(env, tableLocator, 2)
 		}
 
 		When("cluster setup with PG-WAL volume", func() {
@@ -298,14 +304,8 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 				clusterName, err := env.GetResourceNameFromYAML(sampleFileClusterWithPGWalVolume)
 				Expect(err).ToNot(HaveOccurred())
 				// Create a cluster in a namespace we'll delete after the test
-				namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+				namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
-				DeferCleanup(func() error {
-					if CurrentSpecReport().Failed() {
-						env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-					}
-					return env.DeleteNamespace(namespace)
-				})
 				AssertCreateCluster(namespace, clusterName, sampleFileClusterWithPGWalVolume, env)
 				assertHibernation(namespace, clusterName, tableName)
 			})
@@ -318,17 +318,17 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 				clusterName, err := env.GetResourceNameFromYAML(sampleFileClusterWithOutPGWalVolume)
 				Expect(err).ToNot(HaveOccurred())
 				// Create a cluster in a namespace we'll delete after the test
-				namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+				namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
-				DeferCleanup(func() error {
-					if CurrentSpecReport().Failed() {
-						env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-					}
-					return env.DeleteNamespace(namespace)
-				})
 				AssertCreateCluster(namespace, clusterName, sampleFileClusterWithOutPGWalVolume, env)
 				// Write a table and some data on the "app" database
-				AssertCreateTestData(namespace, clusterName, tableName, psqlClientPod)
+				tableLocator := TableLocator{
+					Namespace:    namespace,
+					ClusterName:  clusterName,
+					DatabaseName: testsUtils.AppDBName,
+					TableName:    tableName,
+				}
+				AssertCreateTestData(env, tableLocator)
 				clusterManifest, currentPrimary := getPrimaryAndClusterManifest(namespace,
 					clusterName)
 
@@ -375,7 +375,7 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 
 				AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReady], env)
 				// Test data should be present after hibernation off
-				AssertDataExpectedCount(namespace, clusterName, tableName, 2, psqlClientPod)
+				AssertDataExpectedCount(env, tableLocator, 2)
 			})
 		})
 		When("cluster hibernation after switchover", func() {
@@ -384,14 +384,8 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 				clusterName, err := env.GetResourceNameFromYAML(sampleFileClusterWithPGWalVolume)
 				Expect(err).ToNot(HaveOccurred())
 				// Create a cluster in a namespace we'll delete after the test
-				namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+				namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
-				DeferCleanup(func() error {
-					if CurrentSpecReport().Failed() {
-						env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-					}
-					return env.DeleteNamespace(namespace)
-				})
 				AssertCreateCluster(namespace, clusterName, sampleFileClusterWithPGWalVolume, env)
 				AssertSwitchover(namespace, clusterName, env)
 				assertHibernation(namespace, clusterName, tableName)

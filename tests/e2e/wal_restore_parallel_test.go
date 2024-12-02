@@ -23,6 +23,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	testUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/minio"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -65,17 +66,18 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 		clusterName, err := env.GetResourceNameFromYAML(clusterWithMinioSampleFile)
 		Expect(err).ToNot(HaveOccurred())
 
-		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-			return env.DeleteNamespace(namespace)
-		})
 
 		By("creating the credentials for minio", func() {
-			AssertStorageCredentialsAreCreated(namespace, "backup-storage-creds", "minio", "minio123")
+			_, err = testUtils.CreateObjectStorageSecret(
+				namespace,
+				"backup-storage-creds",
+				"minio",
+				"minio123",
+				env,
+			)
+			Expect(err).ToNot(HaveOccurred())
 		})
 
 		By("create the certificates for MinIO", func() {
@@ -110,10 +112,10 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 			Expect(err).ToNot(HaveOccurred())
 			primary := pod.GetName()
 			latestWAL = switchWalAndGetLatestArchive(namespace, primary)
-			latestWALPath := minioPath(clusterName, latestWAL+".gz")
+			latestWALPath := minio.GetFilePath(clusterName, latestWAL+".gz")
 			Eventually(func() (int, error) {
 				// WALs are compressed with gzip in the fixture
-				return testUtils.CountFilesOnMinio(minioEnv, latestWALPath)
+				return minio.CountFiles(minioEnv, latestWALPath)
 			}, RetryTimeout).Should(BeEquivalentTo(1),
 				fmt.Sprintf("verify the existence of WAL %v in minio", latestWALPath))
 		})
@@ -124,15 +126,20 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 			walFile3 = "0000000100000000000000F3"
 			walFile4 = "0000000100000000000000F4"
 			walFile5 = "0000000100000000000000F5"
-			Expect(testUtils.ForgeArchiveWalOnMinio(minioEnv.Namespace, clusterName, minioEnv.Client.Name, latestWAL, walFile1)).
+			Expect(testUtils.ForgeArchiveWalOnMinio(minioEnv.Namespace, clusterName, minioEnv.Client.Name, latestWAL,
+				walFile1)).
 				ShouldNot(HaveOccurred())
-			Expect(testUtils.ForgeArchiveWalOnMinio(minioEnv.Namespace, clusterName, minioEnv.Client.Name, latestWAL, walFile2)).
+			Expect(testUtils.ForgeArchiveWalOnMinio(minioEnv.Namespace, clusterName, minioEnv.Client.Name, latestWAL,
+				walFile2)).
 				ShouldNot(HaveOccurred())
-			Expect(testUtils.ForgeArchiveWalOnMinio(minioEnv.Namespace, clusterName, minioEnv.Client.Name, latestWAL, walFile3)).
+			Expect(testUtils.ForgeArchiveWalOnMinio(minioEnv.Namespace, clusterName, minioEnv.Client.Name, latestWAL,
+				walFile3)).
 				ShouldNot(HaveOccurred())
-			Expect(testUtils.ForgeArchiveWalOnMinio(minioEnv.Namespace, clusterName, minioEnv.Client.Name, latestWAL, walFile4)).
+			Expect(testUtils.ForgeArchiveWalOnMinio(minioEnv.Namespace, clusterName, minioEnv.Client.Name, latestWAL,
+				walFile4)).
 				ShouldNot(HaveOccurred())
-			Expect(testUtils.ForgeArchiveWalOnMinio(minioEnv.Namespace, clusterName, minioEnv.Client.Name, latestWAL, walFile5)).
+			Expect(testUtils.ForgeArchiveWalOnMinio(minioEnv.Namespace, clusterName, minioEnv.Client.Name, latestWAL,
+				walFile5)).
 				ShouldNot(HaveOccurred())
 		})
 
@@ -173,7 +180,10 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 				WithTimeout(RetryTimeout).
 				Should(BeTrue(),
 					"#3 wal is in the spool directory")
-			Eventually(func() bool { return testUtils.TestFileExist(namespace, standby, SpoolDirectory, "end-of-wal-stream") }).
+			Eventually(func() bool {
+				return testUtils.TestFileExist(namespace, standby, SpoolDirectory,
+					"end-of-wal-stream")
+			}).
 				WithTimeout(RetryTimeout).
 				Should(BeFalse(),
 					"end-of-wal-stream flag is unset")
@@ -199,7 +209,10 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 				WithTimeout(RetryTimeout).
 				Should(BeTrue(),
 					"#3 wal is in the spool directory")
-			Eventually(func() bool { return testUtils.TestFileExist(namespace, standby, SpoolDirectory, "end-of-wal-stream") }).
+			Eventually(func() bool {
+				return testUtils.TestFileExist(namespace, standby, SpoolDirectory,
+					"end-of-wal-stream")
+			}).
 				WithTimeout(RetryTimeout).
 				Should(BeFalse(),
 					"end-of-wal-stream flag is unset")
@@ -247,7 +260,10 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 				WithTimeout(RetryTimeout).
 				Should(BeTrue(),
 					"#5 wal is in the spool directory")
-			Eventually(func() bool { return testUtils.TestFileExist(namespace, standby, SpoolDirectory, "end-of-wal-stream") }).
+			Eventually(func() bool {
+				return testUtils.TestFileExist(namespace, standby, SpoolDirectory,
+					"end-of-wal-stream")
+			}).
 				WithTimeout(RetryTimeout).
 				Should(BeTrue(),
 					"end-of-wal-stream flag is set for #6 wal is not present")
@@ -256,7 +272,8 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 		// Generate a new wal file; the archive also contains WAL #6.
 		By("forging a new wal file, the #6 wal", func() {
 			walFile6 = "0000000100000000000000F6"
-			Expect(testUtils.ForgeArchiveWalOnMinio(minioEnv.Namespace, clusterName, minioEnv.Client.Name, latestWAL, walFile6)).
+			Expect(testUtils.ForgeArchiveWalOnMinio(minioEnv.Namespace, clusterName, minioEnv.Client.Name, latestWAL,
+				walFile6)).
 				ShouldNot(HaveOccurred())
 		})
 
@@ -279,7 +296,10 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 				WithTimeout(RetryTimeout).
 				Should(BeFalse(),
 					"no wal files exist in the spool directory")
-			Eventually(func() bool { return testUtils.TestFileExist(namespace, standby, SpoolDirectory, "end-of-wal-stream") }).
+			Eventually(func() bool {
+				return testUtils.TestFileExist(namespace, standby, SpoolDirectory,
+					"end-of-wal-stream")
+			}).
 				WithTimeout(RetryTimeout).
 				Should(BeTrue(),
 					"end-of-wal-stream flag is still there")
@@ -327,7 +347,10 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 				WithTimeout(RetryTimeout).
 				Should(BeFalse(),
 					"no wals in the spool directory")
-			Eventually(func() bool { return testUtils.TestFileExist(namespace, standby, SpoolDirectory, "end-of-wal-stream") }).
+			Eventually(func() bool {
+				return testUtils.TestFileExist(namespace, standby, SpoolDirectory,
+					"end-of-wal-stream")
+			}).
 				WithTimeout(RetryTimeout).
 				Should(BeTrue(),
 					"end-of-wal-stream flag is set for #7 and #8 wal is not present")

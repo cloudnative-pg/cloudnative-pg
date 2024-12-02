@@ -24,6 +24,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/hibernation"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -49,20 +50,19 @@ var _ = Describe("Cluster declarative hibernation", func() {
 		clusterName, err := env.GetResourceNameFromYAML(sampleFileCluster)
 		Expect(err).ToNot(HaveOccurred())
 		// Create a cluster in a namespace we'll delete after the test
-		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-
-		DeferCleanup(func() error {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-			return env.DeleteNamespace(namespace)
-		})
 
 		By("creating a new cluster", func() {
 			AssertCreateCluster(namespace, clusterName, sampleFileCluster, env)
 			// Write a table and some data on the "app" database
-			AssertCreateTestData(namespace, clusterName, tableName, psqlClientPod)
+			tableLocator := TableLocator{
+				Namespace:    namespace,
+				ClusterName:  clusterName,
+				DatabaseName: testsUtils.AppDBName,
+				TableName:    tableName,
+			}
+			AssertCreateTestData(env, tableLocator)
 		})
 
 		By("hibernating the new cluster", func() {
@@ -121,7 +121,13 @@ var _ = Describe("Cluster declarative hibernation", func() {
 		})
 
 		By("verifying the data has been preserved", func() {
-			AssertDataExpectedCount(namespace, clusterName, tableName, 2, psqlClientPod)
+			tableLocator := TableLocator{
+				Namespace:    namespace,
+				ClusterName:  clusterName,
+				DatabaseName: testsUtils.AppDBName,
+				TableName:    tableName,
+			}
+			AssertDataExpectedCount(env, tableLocator, 2)
 		})
 	})
 })

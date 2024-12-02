@@ -132,25 +132,27 @@ The above steps might be integrated into the `cnpg` plugin at some stage in the 
 
 ## Logs
 
-Every resource created and controlled by CloudNativePG logs to
-standard output, as expected by Kubernetes, and directly in [JSON
-format](logging.md). As a result, you should rely on the `kubectl logs`
-command to retrieve logs from a given resource.
+All resources created and managed by CloudNativePG log to standard output in
+accordance with Kubernetes conventions, using [JSON format](logging.md).
 
-For more information, type:
+While logs are typically processed at the infrastructure level and include
+those from CloudNativePG, accessing logs directly from the command line
+interface is critical during troubleshooting. You have three primary options
+for doing so:
 
-```shell
-kubectl logs --help
-```
-
-!!! Hint
-    JSON logs are great for machine reading, but hard to read for human beings.
-    Our recommendation is to use the `jq` command to improve usability. For
-    example, you can *pipe* the `kubectl logs` command with `| jq -C`.
+- Use the `kubectl logs` command to retrieve logs from a specific resource, and
+  apply `jq` for better readability.
+- Use the [`kubectl cnpg logs` command](kubectl-plugin.md#logs) for
+  CloudNativePG-specific logging.
+- Leverage specialized open-source tools like
+  [stern](https://github.com/stern/stern), which can aggregate logs from
+  multiple resources (e.g., all pods in a PostgreSQL cluster by selecting the
+  `cnpg.io/clusterName` label), filter log entries, customize output formats,
+  and more.
 
 !!! Note
-    In the sections below, we will show some examples on how to retrieve logs
-    about different resources when it comes to troubleshooting CloudNativePG.
+    The following sections provide examples of how to retrieve logs for various
+    resources when troubleshooting CloudNativePG.
 
 ## Operator information
 
@@ -218,7 +220,7 @@ Cluster in healthy state
 Name:               cluster-example
 Namespace:          default
 System ID:          7044925089871458324
-PostgreSQL Image:   ghcr.io/cloudnative-pg/postgresql:16.3-3
+PostgreSQL Image:   ghcr.io/cloudnative-pg/postgresql:17.2-3
 Primary instance:   cluster-example-1
 Instances:          3
 Ready instances:    3
@@ -277,14 +279,6 @@ kubectl cnpg status -n <NAMESPACE> <CLUSTER>
 !!! Tip
     You can print more information by adding the `--verbose` option.
 
-!!! Note
-    Besides knowing cluster status, you can also do the following things with the cnpg plugin:
-    Promote a replica.<br />
-    Manage certificates.<br />
-    Make a rollout restart cluster to apply configuration changes.<br />
-    Make a reconciliation loop to reload and apply configuration changes.<br />
-    For more information, please see [`cnpg` plugin](kubectl-plugin.md) documentation.
-
 Get PostgreSQL container image version:
 
 ```shell
@@ -294,7 +288,7 @@ kubectl describe cluster <CLUSTER_NAME> -n <NAMESPACE> | grep "Image Name"
 Output:
 
 ```shell
-  Image Name:    ghcr.io/cloudnative-pg/postgresql:16.3-3
+  Image Name:    ghcr.io/cloudnative-pg/postgresql:17.2-3
 ```
 
 !!! Note
@@ -338,7 +332,14 @@ kubectl logs -n <NAMESPACE> <CLUSTER>-<N> | \
   jq 'select(.logger=="postgres") | .record.message'
 ```
 
-The following example also adds the timestamp in a user-friendly format:
+The following example also adds the timestamp:
+
+```shell
+kubectl logs -n <NAMESPACE> <CLUSTER>-<N> | \
+  jq -r 'select(.logger=="postgres") | [.ts, .record.message] | @csv'
+```
+
+If the timestamp is displayed in Unix Epoch time, you can convert it to a user-friendly format:
 
 ```shell
 kubectl logs -n <NAMESPACE> <CLUSTER>-<N> | \
@@ -441,11 +442,6 @@ You can list the backups that have been created for a named cluster with:
 ```shell
 kubectl get backup -l cnpg.io/cluster=<CLUSTER>
 ```
-
-!!! Important
-    Backup labelling has been introduced in version 1.10.0 of CloudNativePG.
-    So only those resources that have been created with that version or
-    a higher one will contain such a label.
 
 ## Storage information
 
@@ -706,8 +702,7 @@ Cluster is stuck in "Creating a new replica", while pod logs don't show
 relevant problems.
 This has been found to be related to the next issue
 [on connectivity](#networking-is-impaired-by-installed-network-policies).
-From releases 1.20.1, 1.19.3, and 1.18.5, networking issues will be more clearly
-reflected in the status column as follows:
+Networking issues are reflected in the status column as follows:
 
 ``` text
 Instance Status Extraction Error: HTTP communication issue
@@ -786,3 +781,16 @@ For example:
 Please remember that you must have enough hugepages memory available to schedule
 every Pod in the Cluster (in the example above, at least 512MiB per Pod must be
 free).
+
+### Bootstrap job hangs in running status
+
+If your Cluster's initialization job hangs while in `Running` status with the
+message:
+"error while waiting for the API server to be reachable", you probably have
+a network issue preventing communication with the Kubernetes API server.
+Initialization jobs (like most of jobs) need to access the Kubernetes
+API. Please check your networking.
+
+Another possible cause is when you have sidecar injection configured. Sidecars
+such as Istio may make the network temporarily unavailable during startup. If
+you have sidecar injection enabled, retry with injection disabled.

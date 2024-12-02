@@ -27,9 +27,12 @@ import (
 	"time"
 
 	"github.com/cheynewallace/tabby"
+	"github.com/cloudnative-pg/machinery/pkg/stringset"
+	types "github.com/cloudnative-pg/machinery/pkg/types"
 	"github.com/logrusorgru/aurora/v4"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -42,7 +45,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/hibernation"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/stringset"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -61,6 +63,12 @@ type PostgresqlStatus struct {
 	// PodDisruptionBudgetList prints every PDB that matches against the cluster
 	// with the label selector
 	PodDisruptionBudgetList policyv1.PodDisruptionBudgetList
+
+	// ErrorList store the possible errors while getting the PostgreSQL status
+	ErrorList []error
+
+	// The size of the cluster
+	TotalClusterSize string
 }
 
 func (fullStatus *PostgresqlStatus) getReplicationSlotList() postgres.PgReplicationSlotList {
@@ -91,77 +99,91 @@ func getPrintableIntegerPointer(i *int) string {
 }
 
 // Status implements the "status" subcommand
-func Status(ctx context.Context, clusterName string, verbose bool, format plugin.OutputFormat) error {
-	status, err := ExtractPostgresqlStatus(ctx, clusterName)
-	if err != nil {
-		return err
-	}
-
-	err = plugin.Print(status, format, os.Stdout)
-	if err != nil {
-		return err
-	}
-
-	if format != plugin.OutputFormatText {
-		return nil
-	}
-
-	status.printBasicInfo()
-	status.printHibernationInfo()
-	var nonFatalError error
-	if verbose {
-		err = status.printPostgresConfiguration(ctx)
-		if err != nil {
-			nonFatalError = err
-		}
-	}
-	status.printCertificatesStatus()
-	status.printBackupStatus()
-	status.printBasebackupStatus()
-	status.printReplicaStatus(verbose)
-	status.printUnmanagedReplicationSlotStatus()
-	status.printRoleManagerStatus()
-	status.printTablespacesStatus()
-	status.printPodDisruptionBudgetStatus()
-	status.printInstancesStatus()
-
-	if nonFatalError != nil {
-		return nonFatalError
-	}
-	return nil
-}
-
-// ExtractPostgresqlStatus gets the PostgreSQL status using the Kubernetes API
-func ExtractPostgresqlStatus(ctx context.Context, clusterName string) (*PostgresqlStatus, error) {
+func Status(
+	ctx context.Context,
+	clusterName string,
+	verbosity int,
+	format plugin.OutputFormat,
+) error {
 	var cluster apiv1.Cluster
+	var errs []error
+
+	// Create a Kubernetes client suitable for calling the "Exec" subresource
+	clientInterface := kubernetes.NewForConfigOrDie(plugin.Config)
 
 	// Get the Cluster object
 	err := plugin.Client.Get(ctx, client.ObjectKey{Namespace: plugin.Namespace, Name: clusterName}, &cluster)
 	if err != nil {
-		return nil, err
+		return fmt.Errorf("while trying to get cluster %s in namespace %s: %w",
+			clusterName, plugin.Namespace, err)
+	}
+
+	status := extractPostgresqlStatus(ctx, cluster)
+	err = plugin.Print(status, format, os.Stdout)
+	if err != nil || format != plugin.OutputFormatText {
+		return err
+	}
+	errs = append(errs, status.ErrorList...)
+
+	status.printBasicInfo(ctx, clientInterface)
+	status.printHibernationInfo()
+	status.printDemotionTokenInfo()
+	status.printPromotionTokenInfo()
+	if verbosity > 1 {
+		errs = append(errs, status.printPostgresConfiguration(ctx, clientInterface)...)
+		status.printCertificatesStatus()
+	}
+	status.printBackupStatus()
+	status.printBasebackupStatus(verbosity)
+	status.printReplicaStatus(verbosity)
+	if verbosity > 0 {
+		status.printUnmanagedReplicationSlotStatus()
+		status.printRoleManagerStatus()
+		status.printTablespacesStatus()
+		status.printPodDisruptionBudgetStatus()
+	}
+	status.printInstancesStatus()
+
+	if len(errs) > 0 {
+		fmt.Println()
+
+		errors := tabby.New()
+		errors.AddHeader(aurora.Red("Error(s) extracting status"))
+		for _, err := range errs {
+			fmt.Printf("%s\n", err)
+		}
+	}
+
+	return nil
+}
+
+// extractPostgresqlStatus gets the PostgreSQL status using the Kubernetes API
+func extractPostgresqlStatus(ctx context.Context, cluster apiv1.Cluster) *PostgresqlStatus {
+	var errs []error
+
+	managedPods, primaryPod, err := resources.GetInstancePods(ctx, cluster.Name)
+	if err != nil {
+		errs = append(errs, err)
 	}
 
 	// Get the list of Pods created by this Cluster
-	var instancesStatus postgres.PostgresqlStatusList
-	managedPods, primaryPod, err := resources.GetInstancePods(ctx, clusterName)
-	if err != nil {
-		return nil, err
-	}
-
-	instancesStatus = resources.ExtractInstancesStatus(
+	instancesStatus, errList := resources.ExtractInstancesStatus(
 		ctx,
 		plugin.Config,
 		managedPods,
-		specs.PostgresContainerName)
+	)
+	if len(errList) != 0 {
+		errs = append(errs, errList...)
+	}
 
 	var pdbl policyv1.PodDisruptionBudgetList
 	if err := plugin.Client.List(
 		ctx,
 		&pdbl,
 		client.InNamespace(plugin.Namespace),
-		client.MatchingLabels{utils.ClusterLabelName: clusterName},
+		client.MatchingLabels{utils.ClusterLabelName: cluster.Name},
 	); err != nil {
-		return nil, fmt.Errorf("while extracting PodDisruptionBudgetList: %w", err)
+		errs = append(errs, err)
 	}
 	// Extract the status from the instances
 	status := PostgresqlStatus{
@@ -169,8 +191,9 @@ func ExtractPostgresqlStatus(ctx context.Context, clusterName string) (*Postgres
 		InstanceStatus:          &instancesStatus,
 		PrimaryPod:              primaryPod,
 		PodDisruptionBudgetList: pdbl,
+		ErrorList:               errs,
 	}
-	return &status, nil
+	return &status
 }
 
 func listFencedInstances(fencedInstances *stringset.Data) string {
@@ -180,8 +203,32 @@ func listFencedInstances(fencedInstances *stringset.Data) string {
 	return strings.Join(fencedInstances.ToList(), ", ")
 }
 
-func (fullStatus *PostgresqlStatus) printBasicInfo() {
+func (fullStatus *PostgresqlStatus) getClusterSize(ctx context.Context, client kubernetes.Interface) (string, error) {
+	timeout := time.Second * 10
+
+	// Compute the disk space through `du`
+	output, _, err := utils.ExecCommand(
+		ctx,
+		client,
+		plugin.Config,
+		fullStatus.PrimaryPod,
+		specs.PostgresContainerName,
+		&timeout,
+		"du",
+		"-sLh",
+		specs.PgDataPath)
+	if err != nil {
+		return "", err
+	}
+
+	size, _, _ := strings.Cut(output, "\t")
+	return size, nil
+}
+
+func (fullStatus *PostgresqlStatus) printBasicInfo(ctx context.Context, k8sClient kubernetes.Interface) {
 	summary := tabby.New()
+
+	clusterSize, clusterSizeErr := fullStatus.getClusterSize(ctx, k8sClient)
 
 	cluster := fullStatus.Cluster
 
@@ -204,8 +251,8 @@ func (fullStatus *PostgresqlStatus) printBasicInfo() {
 	isPrimaryFenced := cluster.IsInstanceFenced(cluster.Status.CurrentPrimary)
 	primaryInstanceStatus := fullStatus.tryGetPrimaryInstance()
 
-	summary.AddLine("Name:", cluster.Name)
-	summary.AddLine("Namespace:", cluster.Namespace)
+	summary.AddLine("Name", client.ObjectKeyFromObject(cluster).String())
+
 	if primaryInstanceStatus != nil {
 		summary.AddLine("System ID:", primaryInstanceStatus.SystemID)
 	}
@@ -249,6 +296,13 @@ func (fullStatus *PostgresqlStatus) printBasicInfo() {
 			fmt.Println(aurora.Red("Switchover in progress"))
 		}
 	}
+
+	if clusterSizeErr != nil {
+		summary.AddLine("Size:", aurora.Red(clusterSizeErr.Error()))
+	} else {
+		summary.AddLine("Size:", clusterSize)
+	}
+
 	if !cluster.IsReplica() && primaryInstanceStatus != nil {
 		lsnInfo := fmt.Sprintf(
 			"%s (Timeline: %d - WAL File: %s)",
@@ -289,6 +343,89 @@ func (fullStatus *PostgresqlStatus) printHibernationInfo() {
 	fmt.Println()
 }
 
+func (fullStatus *PostgresqlStatus) printTokenStatus(token string) {
+	primaryInstanceStatus := fullStatus.tryGetPrimaryInstance()
+
+	tokenStatus := tabby.New()
+	if tokenContent, err := utils.ParsePgControldataToken(token); err != nil {
+		tokenStatus.AddLine(
+			"Token",
+			fmt.Sprintf("%s %s", token, aurora.Red(fmt.Sprintf("(invalid format: %s)", err.Error()))),
+		)
+	} else if err := tokenContent.IsValid(); err != nil {
+		tokenStatus.AddLine("Token", token)
+		tokenStatus.AddLine("Validity", aurora.Red(fmt.Sprintf("not valid: %s", err.Error())))
+	} else {
+		var systemIDCheck string
+
+		switch {
+		case primaryInstanceStatus == nil:
+			systemIDCheck = aurora.Red("(no primary have been found)").String()
+		case tokenContent.DatabaseSystemIdentifier != primaryInstanceStatus.SystemID:
+			systemIDCheck = aurora.Red("(invalid)").String()
+		default:
+			systemIDCheck = aurora.Green("(ok)").String()
+		}
+
+		tokenStatus.AddLine(
+			"Token",
+			token)
+		tokenStatus.AddLine(
+			"Validity",
+			aurora.Green("valid"))
+		tokenStatus.AddLine(
+			"Latest checkpoint's TimeLineID",
+			tokenContent.LatestCheckpointTimelineID)
+		tokenStatus.AddLine(
+			"Latest checkpoint's REDO WAL file",
+			tokenContent.REDOWALFile)
+		tokenStatus.AddLine(
+			"Latest checkpoint's REDO location",
+			tokenContent.LatestCheckpointREDOLocation)
+		tokenStatus.AddLine(
+			"Database system identifier",
+			fmt.Sprintf("%s %s", tokenContent.DatabaseSystemIdentifier, systemIDCheck))
+		tokenStatus.AddLine(
+			"Time of latest checkpoint",
+			tokenContent.TimeOfLatestCheckpoint)
+		tokenStatus.AddLine(
+			"Version of the operator",
+			tokenContent.OperatorVersion)
+	}
+	tokenStatus.Print()
+}
+
+func (fullStatus *PostgresqlStatus) printDemotionTokenInfo() {
+	demotionToken := fullStatus.Cluster.Status.DemotionToken
+	if len(demotionToken) == 0 {
+		return
+	}
+
+	fmt.Println(aurora.Green("Demotion token"))
+	fullStatus.printTokenStatus(demotionToken)
+	fmt.Println()
+}
+
+func (fullStatus *PostgresqlStatus) printPromotionTokenInfo() {
+	if fullStatus.Cluster.Spec.ReplicaCluster == nil {
+		return
+	}
+
+	promotionToken := fullStatus.Cluster.Spec.ReplicaCluster.PromotionToken
+	if len(promotionToken) == 0 {
+		return
+	}
+
+	if promotionToken == fullStatus.Cluster.Status.LastPromotionToken {
+		// This token was already processed
+		return
+	}
+
+	fmt.Println(aurora.Green("Promotion token"))
+	fullStatus.printTokenStatus(promotionToken)
+	fmt.Println()
+}
+
 func (fullStatus *PostgresqlStatus) getStatus(isPrimaryFenced bool, cluster *apiv1.Cluster) string {
 	if isPrimaryFenced {
 		return fmt.Sprintf("%v", aurora.Red("Primary instance is fenced"))
@@ -304,26 +441,29 @@ func (fullStatus *PostgresqlStatus) getStatus(isPrimaryFenced bool, cluster *api
 	}
 }
 
-func (fullStatus *PostgresqlStatus) printPostgresConfiguration(ctx context.Context) error {
+func (fullStatus *PostgresqlStatus) printPostgresConfiguration(
+	ctx context.Context,
+	client kubernetes.Interface,
+) []error {
 	timeout := time.Second * 10
-	clientInterface := kubernetes.NewForConfigOrDie(plugin.Config)
+	var errs []error
 
 	// Read PostgreSQL configuration from custom.conf
-	customConf, _, err := utils.ExecCommand(ctx, clientInterface, plugin.Config, fullStatus.PrimaryPod,
+	customConf, _, err := utils.ExecCommand(ctx, client, plugin.Config, fullStatus.PrimaryPod,
 		specs.PostgresContainerName,
 		&timeout,
 		"cat",
 		path.Join(specs.PgDataPath, constants.PostgresqlCustomConfigurationFile))
 	if err != nil {
-		return err
+		errs = append(errs, err)
 	}
 
 	// Read PostgreSQL HBA Rules from pg_hba.conf
-	pgHBAConf, _, err := utils.ExecCommand(ctx, clientInterface, plugin.Config, fullStatus.PrimaryPod,
+	pgHBAConf, _, err := utils.ExecCommand(ctx, client, plugin.Config, fullStatus.PrimaryPod,
 		specs.PostgresContainerName,
 		&timeout, "cat", path.Join(specs.PgDataPath, constants.PostgresqlHBARulesFile))
 	if err != nil {
-		return err
+		errs = append(errs, err)
 	}
 
 	fmt.Println(aurora.Green("PostgreSQL Configuration"))
@@ -334,7 +474,7 @@ func (fullStatus *PostgresqlStatus) printPostgresConfiguration(ctx context.Conte
 	fmt.Println(pgHBAConf)
 	fmt.Println()
 
-	return nil
+	return errs
 }
 
 func (fullStatus *PostgresqlStatus) printBackupStatus() {
@@ -396,9 +536,9 @@ func (fullStatus *PostgresqlStatus) areReplicationSlotsEnabled() bool {
 		fullStatus.Cluster.Spec.ReplicationSlots.HighAvailability.GetEnabled()
 }
 
-func (fullStatus *PostgresqlStatus) printReplicaStatusTableHeader(table *tabby.Tabby, verbose bool) {
+func (fullStatus *PostgresqlStatus) printReplicaStatusTableHeader(table *tabby.Tabby, verbosity int) {
 	switch {
-	case fullStatus.areReplicationSlotsEnabled() && verbose:
+	case fullStatus.areReplicationSlotsEnabled() && verbosity > 0:
 		table.AddHeader(
 			"Name",
 			"Sent LSN",
@@ -416,7 +556,7 @@ func (fullStatus *PostgresqlStatus) printReplicaStatusTableHeader(table *tabby.T
 			"Slot WAL Status",
 			"Slot Safe WAL Size",
 		)
-	case fullStatus.areReplicationSlotsEnabled() && !verbose:
+	case fullStatus.areReplicationSlotsEnabled() && verbosity == 0:
 		table.AddHeader(
 			"Name",
 			"Sent LSN",
@@ -452,7 +592,7 @@ func (fullStatus *PostgresqlStatus) printReplicaStatusTableHeader(table *tabby.T
 func (fullStatus *PostgresqlStatus) addReplicationSlotsColumns(
 	applicationName string,
 	columns *[]interface{},
-	verbose bool,
+	verbosity int,
 ) {
 	printSlotActivity := func(isActive bool) string {
 		if isActive {
@@ -462,18 +602,18 @@ func (fullStatus *PostgresqlStatus) addReplicationSlotsColumns(
 	}
 	slot := fullStatus.getPrintableReplicationSlotInfo(applicationName)
 	switch {
-	case slot != nil && verbose:
+	case slot != nil && verbosity > 0:
 		*columns = append(*columns,
 			printSlotActivity(slot.Active),
 			slot.RestartLsn,
 			slot.WalStatus,
 			getPrintableIntegerPointer(slot.SafeWalSize),
 		)
-	case slot != nil && !verbose:
+	case slot != nil && verbosity == 0:
 		*columns = append(*columns,
 			printSlotActivity(slot.Active),
 		)
-	case slot == nil && verbose:
+	case slot == nil && verbosity > 0:
 		*columns = append(*columns,
 			"-",
 			"-",
@@ -487,7 +627,7 @@ func (fullStatus *PostgresqlStatus) addReplicationSlotsColumns(
 	}
 }
 
-func (fullStatus *PostgresqlStatus) printReplicaStatus(verbose bool) {
+func (fullStatus *PostgresqlStatus) printReplicaStatus(verbosity int) {
 	if fullStatus.Cluster.IsReplica() {
 		return
 	}
@@ -517,13 +657,13 @@ func (fullStatus *PostgresqlStatus) printReplicaStatus(verbose bool) {
 	}
 
 	status := tabby.New()
-	fullStatus.printReplicaStatusTableHeader(status, verbose)
+	fullStatus.printReplicaStatusTableHeader(status, verbosity)
 
 	// print Replication Slots columns only if the cluster has replication slots enabled
 	addReplicationSlotsColumns := func(_ string, _ *[]interface{}) {}
 	if fullStatus.areReplicationSlotsEnabled() {
 		addReplicationSlotsColumns = func(applicationName string, columns *[]interface{}) {
-			fullStatus.addReplicationSlotsColumns(applicationName, columns, verbose)
+			fullStatus.addReplicationSlotsColumns(applicationName, columns, verbosity)
 		}
 	}
 
@@ -564,13 +704,13 @@ func (fullStatus *PostgresqlStatus) printInstancesStatus() {
 	//  else:
 	//  	if it is paused, print "Standby (paused)"
 	//  	else if SyncState = sync/quorum print "Standby (sync)"
+	//  	else if SyncState = potential print "Standby (potential sync)"
 	//  	else print "Standby (async)"
 
 	status := tabby.New()
 	fmt.Println(aurora.Green("Instances status"))
 	status.AddHeader(
 		"Name",
-		"Database Size",
 		"Current LSN", // For standby use "Replay LSN"
 		"Replication role",
 		"Status",
@@ -586,7 +726,7 @@ func (fullStatus *PostgresqlStatus) printInstancesStatus() {
 				"-",
 				"-",
 				"-",
-				instance.Error.Error(),
+				apierrs.ReasonForError(instance.Error),
 				instance.Pod.Status.QOSClass,
 				"-",
 				instance.Pod.Spec.NodeName,
@@ -601,7 +741,6 @@ func (fullStatus *PostgresqlStatus) printInstancesStatus() {
 		replicaRole := getReplicaRole(instance, fullStatus)
 		status.AddLine(
 			instance.Pod.Name,
-			instance.TotalInstanceSize,
 			getCurrentLSN(instance),
 			replicaRole,
 			statusMsg,
@@ -676,7 +815,7 @@ func (fullStatus *PostgresqlStatus) tryGetPrimaryInstance() *postgres.Postgresql
 	return nil
 }
 
-func getCurrentLSN(instance postgres.PostgresqlStatus) postgres.LSN {
+func getCurrentLSN(instance postgres.PostgresqlStatus) types.LSN {
 	if instance.IsPrimary {
 		return instance.CurrentLsn
 	}
@@ -721,6 +860,8 @@ func getReplicaRole(instance postgres.PostgresqlStatus, fullStatus *PostgresqlSt
 		switch state.SyncState {
 		case "quorum", "sync":
 			return "Standby (sync)"
+		case "potential":
+			return "Standby (potential sync)"
 		case "async":
 			return "Standby (async)"
 		default:
@@ -831,7 +972,7 @@ func (fullStatus *PostgresqlStatus) printPodDisruptionBudgetStatus() {
 
 	for _, item := range fullStatus.PodDisruptionBudgetList.Items {
 		status.AddLine(item.Name,
-			item.Spec.Selector.MatchLabels[utils.ClusterRoleLabelName],
+			item.Spec.Selector.MatchLabels[utils.ClusterInstanceRoleLabelName],
 			item.Status.ExpectedPods,
 			item.Status.CurrentHealthy,
 			item.Status.DesiredHealthy,
@@ -843,7 +984,7 @@ func (fullStatus *PostgresqlStatus) printPodDisruptionBudgetStatus() {
 	fmt.Println()
 }
 
-func (fullStatus *PostgresqlStatus) printBasebackupStatus() {
+func (fullStatus *PostgresqlStatus) printBasebackupStatus(verbosity int) {
 	const header = "Physical backups"
 
 	primaryInstanceStatus := fullStatus.tryGetPrimaryInstance()
@@ -854,7 +995,7 @@ func (fullStatus *PostgresqlStatus) printBasebackupStatus() {
 		return
 	}
 
-	if len(primaryInstanceStatus.PgStatBasebackupsInfo) == 0 {
+	if verbosity > 0 && len(primaryInstanceStatus.PgStatBasebackupsInfo) == 0 {
 		fmt.Println(aurora.Green(header))
 		fmt.Println(aurora.Yellow("No running physical backups found").String())
 		fmt.Println()
@@ -1007,6 +1148,10 @@ func (fullStatus *PostgresqlStatus) printTablespacesStatus() {
 }
 
 func getPrimaryStartTime(cluster *apiv1.Cluster) string {
+	return getPrimaryStartTimeIdempotent(cluster, time.Now())
+}
+
+func getPrimaryStartTimeIdempotent(cluster *apiv1.Cluster, currentTime time.Time) string {
 	if len(cluster.Status.CurrentPrimaryTimestamp) == 0 {
 		return ""
 	}
@@ -1019,7 +1164,7 @@ func getPrimaryStartTime(cluster *apiv1.Cluster) string {
 		return aurora.Red("error: " + err.Error()).String()
 	}
 
-	uptime := time.Since(primaryInstanceTimestamp)
+	uptime := currentTime.Sub(primaryInstanceTimestamp)
 	return fmt.Sprintf(
 		"%s (uptime %s)",
 		primaryInstanceTimestamp.Round(time.Second),

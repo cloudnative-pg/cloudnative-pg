@@ -19,6 +19,8 @@ package e2e
 import (
 	"os"
 
+	"github.com/cloudnative-pg/machinery/pkg/image/reference"
+	"github.com/cloudnative-pg/machinery/pkg/postgres/version"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,7 +29,6 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
@@ -117,7 +118,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 
 			cluster.Spec.ImageName = updatedImageName
 			return env.Client.Update(env.Ctx, cluster)
-		}, RetryTimeout, PollingTime).Should(BeNil())
+		}, RetryTimeout, PollingTime).Should(Succeed())
 
 		// All the postgres containers should have the updated image
 		AssertPodsRunOnImage(namespace, clusterName, updatedImageName, cluster.Spec.Instances, timeout)
@@ -308,7 +309,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		})
 	}
 
-	newImageCatalog := func(namespace string, name string, major int, image string) *apiv1.ImageCatalog {
+	newImageCatalog := func(namespace string, name string, major uint64, image string) *apiv1.ImageCatalog {
 		imgCat := &apiv1.ImageCatalog{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: namespace,
@@ -318,7 +319,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 				Images: []apiv1.CatalogImage{
 					{
 						Image: image,
-						Major: major,
+						Major: int(major),
 					},
 				},
 			},
@@ -328,7 +329,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 	}
 
 	newImageCatalogCluster := func(
-		namespace string, name string, major int, instances int, storageClass string,
+		namespace string, name string, major uint64, instances int, storageClass string,
 	) *apiv1.Cluster {
 		cluster := &apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
@@ -343,7 +344,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 						Name:     name,
 						Kind:     "ImageCatalog",
 					},
-					Major: major,
+					Major: int(major),
 				},
 				PostgresConfiguration: apiv1.PostgresConfiguration{
 					Parameters: map[string]string{
@@ -376,7 +377,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		return cluster
 	}
 
-	newClusterImageCatalog := func(name string, major int, image string) *apiv1.ClusterImageCatalog {
+	newClusterImageCatalog := func(name string, major uint64, image string) *apiv1.ClusterImageCatalog {
 		imgCat := &apiv1.ClusterImageCatalog{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: name,
@@ -385,7 +386,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 				Images: []apiv1.CatalogImage{
 					{
 						Image: image,
-						Major: major,
+						Major: int(major),
 					},
 				},
 			},
@@ -476,14 +477,8 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 				// the image name has to be tagged as foo:MAJ.MIN. We'll update
 				// it to foo:MAJ, representing the latest minor.
 				// Create a cluster in a namespace we'll delete after the test
-				namespace, err := env.CreateUniqueNamespace(namespacePrefix)
+				namespace, err := env.CreateUniqueTestNamespace(namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
-				DeferCleanup(func() error {
-					if CurrentSpecReport().Failed() {
-						env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-					}
-					return env.DeleteNamespace(namespace)
-				})
 				clusterName, err := env.GetResourceNameFromYAML(sampleFile)
 				Expect(err).ToNot(HaveOccurred())
 				AssertRollingUpdate(namespace, clusterName, sampleFile, true)
@@ -501,14 +496,8 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 				// the image name has to be tagged as foo:MAJ.MIN. We'll update
 				// it to foo:MAJ, representing the latest minor.
 				// Create a cluster in a namespace we'll delete after the test
-				namespace, err := env.CreateUniqueNamespace(namespacePrefix)
+				namespace, err := env.CreateUniqueTestNamespace(namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
-				DeferCleanup(func() error {
-					if CurrentSpecReport().Failed() {
-						env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-					}
-					return env.DeleteNamespace(namespace)
-				})
 				clusterName, err := env.GetResourceNameFromYAML(sampleFile)
 				Expect(err).ToNot(HaveOccurred())
 				AssertRollingUpdate(namespace, clusterName, sampleFile, false)
@@ -521,14 +510,8 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 				sampleFile      = fixturesDir + "/rolling_updates/cluster-using-primary-update-method.yaml.template"
 			)
 			It("can do rolling update", func() {
-				namespace, err := env.CreateUniqueNamespace(namespacePrefix)
+				namespace, err := env.CreateUniqueTestNamespace(namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
-				DeferCleanup(func() error {
-					if CurrentSpecReport().Failed() {
-						env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-					}
-					return env.DeleteNamespace(namespace)
-				})
 				clusterName, err := env.GetResourceNameFromYAML(sampleFile)
 				Expect(err).ToNot(HaveOccurred())
 				AssertRollingUpdate(namespace, clusterName, sampleFile, false)
@@ -540,7 +523,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 		var storageClass string
 		var preRollingImg string
 		var updatedImageName string
-		var major int
+		var pgVersion version.Data
 		BeforeEach(func() {
 			storageClass = os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
 			preRollingImg = os.Getenv("E2E_PRE_ROLLING_UPDATE_IMG")
@@ -551,11 +534,11 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 
 			// We automate the extraction of the major version from the image, because we don't want to keep maintaining
 			// the major version in the test
-			version, err := postgres.GetPostgresVersionFromTag(utils.GetImageTag(preRollingImg))
+			var err error
+			pgVersion, err = version.FromTag(reference.New(preRollingImg).Tag)
 			if err != nil {
 				Expect(err).ToNot(HaveOccurred())
 			}
-			major = postgres.GetPostgresMajorVersion(version) / 10000
 		})
 
 		Context("ImageCatalog", func() {
@@ -572,18 +555,12 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 					// the image name has to be tagged as foo:MAJ.MIN. We'll update
 					// it to foo:MAJ, representing the latest minor.
 					// Create a cluster in a namespace we'll delete after the test
-					namespace, err := env.CreateUniqueNamespace(namespacePrefix)
+					namespace, err := env.CreateUniqueTestNamespace(namespacePrefix)
 					Expect(err).ToNot(HaveOccurred())
-					DeferCleanup(func() error {
-						if CurrentSpecReport().Failed() {
-							env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-						}
-						return env.DeleteNamespace(namespace)
-					})
 
 					// Create a new image catalog and a new cluster
-					catalog := newImageCatalog(namespace, clusterName, major, preRollingImg)
-					cluster := newImageCatalogCluster(namespace, clusterName, major, 3, storageClass)
+					catalog := newImageCatalog(namespace, clusterName, pgVersion.Major(), preRollingImg)
+					cluster := newImageCatalogCluster(namespace, clusterName, pgVersion.Major(), 3, storageClass)
 
 					AssertRollingUpdateWithImageCatalog(cluster, catalog, updatedImageName, true)
 				})
@@ -598,17 +575,11 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 					// the image name has to be tagged as foo:MAJ.MIN. We'll update
 					// it to foo:MAJ, representing the latest minor.
 					// Create a cluster in a namespace we'll delete after the test
-					namespace, err := env.CreateUniqueNamespace(namespacePrefix)
+					namespace, err := env.CreateUniqueTestNamespace(namespacePrefix)
 					Expect(err).ToNot(HaveOccurred())
-					DeferCleanup(func() error {
-						if CurrentSpecReport().Failed() {
-							env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-						}
-						return env.DeleteNamespace(namespace)
-					})
 
-					catalog := newImageCatalog(namespace, clusterName, major, preRollingImg)
-					cluster := newImageCatalogCluster(namespace, clusterName, major, 1, storageClass)
+					catalog := newImageCatalog(namespace, clusterName, pgVersion.Major(), preRollingImg)
+					cluster := newImageCatalogCluster(namespace, clusterName, pgVersion.Major(), 1, storageClass)
 					AssertRollingUpdateWithImageCatalog(cluster, catalog, updatedImageName, false)
 				})
 			})
@@ -619,7 +590,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 			)
 			var catalog *apiv1.ClusterImageCatalog
 			BeforeEach(func() {
-				catalog = newClusterImageCatalog(clusterName, major, preRollingImg)
+				catalog = newClusterImageCatalog(clusterName, pgVersion.Major(), preRollingImg)
 			})
 			AfterEach(func() {
 				err := env.Client.Delete(env.Ctx, catalog)
@@ -628,7 +599,7 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 				// Wait until we really deleted it
 				Eventually(func() error {
 					return env.Client.Get(env.Ctx, ctrl.ObjectKey{Name: catalog.Name}, catalog)
-				}, 30).Should(MatchError(apierrs.IsNotFound, metav1.StatusReasonNotFound))
+				}, 30).Should(MatchError(apierrs.IsNotFound, string(metav1.StatusReasonNotFound)))
 			})
 			Context("Three Instances", func() {
 				const (
@@ -640,16 +611,10 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 					// the image name has to be tagged as foo:MAJ.MIN. We'll update
 					// it to foo:MAJ, representing the latest minor.
 					// Create a cluster in a namespace we'll delete after the test
-					namespace, err := env.CreateUniqueNamespace(namespacePrefix)
+					namespace, err := env.CreateUniqueTestNamespace(namespacePrefix)
 					Expect(err).ToNot(HaveOccurred())
-					DeferCleanup(func() error {
-						if CurrentSpecReport().Failed() {
-							env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-						}
-						return env.DeleteNamespace(namespace)
-					})
 
-					cluster := newImageCatalogCluster(namespace, clusterName, major, 3, storageClass)
+					cluster := newImageCatalogCluster(namespace, clusterName, pgVersion.Major(), 3, storageClass)
 					cluster.Spec.ImageCatalogRef.Kind = "ClusterImageCatalog"
 					AssertRollingUpdateWithImageCatalog(cluster, catalog, updatedImageName, true)
 				})
@@ -664,16 +629,10 @@ var _ = Describe("Rolling updates", Label(tests.LabelPostgresConfiguration), fun
 					// the image name has to be tagged as foo:MAJ.MIN. We'll update
 					// it to foo:MAJ, representing the latest minor.
 					// Create a cluster in a namespace we'll delete after the test
-					namespace, err := env.CreateUniqueNamespace(namespacePrefix)
+					namespace, err := env.CreateUniqueTestNamespace(namespacePrefix)
 					Expect(err).ToNot(HaveOccurred())
-					DeferCleanup(func() error {
-						if CurrentSpecReport().Failed() {
-							env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-						}
-						return env.DeleteNamespace(namespace)
-					})
 
-					cluster := newImageCatalogCluster(namespace, clusterName, major, 1, storageClass)
+					cluster := newImageCatalogCluster(namespace, clusterName, pgVersion.Major(), 1, storageClass)
 					cluster.Spec.ImageCatalogRef.Kind = "ClusterImageCatalog"
 					AssertRollingUpdateWithImageCatalog(cluster, catalog, updatedImageName, false)
 				})

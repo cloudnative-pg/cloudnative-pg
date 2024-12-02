@@ -32,15 +32,16 @@ import (
 	"time"
 
 	"github.com/blang/semver"
+	"github.com/cloudnative-pg/machinery/pkg/execlog"
+	"github.com/cloudnative-pg/machinery/pkg/fileutils"
+	"github.com/cloudnative-pg/machinery/pkg/fileutils/compatibility"
+	"github.com/cloudnative-pg/machinery/pkg/log"
+	"github.com/cloudnative-pg/machinery/pkg/postgres/version"
 	"go.uber.org/atomic"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils/compatibility"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/logpipe"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pool"
 	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
@@ -141,13 +142,13 @@ type Instance struct {
 	primaryPool *pool.ConnectionPool
 
 	// The namespace of the k8s object representing this cluster
-	Namespace string
+	namespace string
 
 	// The name of the Pod where the controller is executing
-	PodName string
+	podName string
 
-	// The name of the cluster of which this Pod is belonging
-	ClusterName string
+	// The name of the cluster this instance belongs in
+	clusterName string
 
 	// The sha256 of the config. It is computed on the config string, before
 	// adding the PostgreSQL CNPGConfigSha256 parameter
@@ -205,14 +206,11 @@ type Instance struct {
 	// StatusPortTLS enables TLS on the status port used to communicate with the operator
 	StatusPortTLS bool
 
+	// MetricsPortTLS enables TLS on the port used to publish metrics over HTTP/HTTPS
+	MetricsPortTLS bool
+
 	// ServerCertificate is the certificate we use to serve https connections
 	ServerCertificate *tls.Certificate
-}
-
-// SetAlterSystemEnabled allows or deny the usage of the
-// ALTER SYSTEM SQL command
-func (instance *Instance) SetAlterSystemEnabled(enabled bool) error {
-	return instance.SetPostgreSQLAutoConfWritable(enabled)
 }
 
 // SetPostgreSQLAutoConfWritable allows or deny writes to the
@@ -333,7 +331,7 @@ func (instance *Instance) VerifyPgDataCoherence(ctx context.Context) error {
 	}
 
 	// creates a bare pg_ident.conf that only grants local access
-	_, err := instance.RefreshPGIdent(nil)
+	_, err := instance.RefreshPGIdent(ctx, nil)
 	return err
 }
 
@@ -367,6 +365,24 @@ func NewInstance() *Instance {
 		roleSynchronizerChan:       make(chan *apiv1.ManagedConfiguration),
 		tablespaceSynchronizerChan: make(chan map[string]apiv1.TablespaceConfiguration),
 	}
+}
+
+// WithNamespace specifies the namespace for this Instance
+func (instance *Instance) WithNamespace(namespace string) *Instance {
+	instance.namespace = namespace
+	return instance
+}
+
+// WithPodName specifies the pod name for this Instance
+func (instance *Instance) WithPodName(podName string) *Instance {
+	instance.podName = podName
+	return instance
+}
+
+// WithClusterName specifies the name of the cluster this Instance belongs to
+func (instance *Instance) WithClusterName(clusterName string) *Instance {
+	instance.clusterName = clusterName
+	return instance
 }
 
 // RetryUntilServerAvailable is the default retry configuration that is used
@@ -461,7 +477,8 @@ func (instance *Instance) ShutdownConnections() {
 // with Startup.
 // This function will return an error whether PostgreSQL is still up
 // after the shutdown request.
-func (instance *Instance) Shutdown(options shutdownOptions) error {
+func (instance *Instance) Shutdown(ctx context.Context, options shutdownOptions) error {
+	contextLogger := log.FromContext(ctx)
 	instance.ShutdownConnections()
 
 	// check instance status
@@ -487,7 +504,7 @@ func (instance *Instance) Shutdown(options shutdownOptions) error {
 		pgCtlOptions = append(pgCtlOptions, "-t", fmt.Sprintf("%v", *options.Timeout))
 	}
 
-	log.Info("Shutting down instance",
+	contextLogger.Info("Shutting down instance",
 		"pgdata", instance.PgData,
 		"mode", options.Mode,
 		"timeout", options.Timeout,
@@ -521,11 +538,14 @@ func (instance *Instance) TryShuttingDownSmartFast(ctx context.Context) error {
 
 	if smartTimeout > 0 {
 		contextLogger.Info("Requesting smart shutdown of the PostgreSQL instance")
-		err = instance.Shutdown(shutdownOptions{
-			Mode:    shutdownModeSmart,
-			Wait:    true,
-			Timeout: &smartTimeout,
-		})
+		err = instance.Shutdown(
+			ctx,
+			shutdownOptions{
+				Mode:    shutdownModeSmart,
+				Wait:    true,
+				Timeout: &smartTimeout,
+			},
+		)
 		if err != nil {
 			contextLogger.Warning("Error while handling the smart shutdown request", "err", err)
 		}
@@ -533,10 +553,12 @@ func (instance *Instance) TryShuttingDownSmartFast(ctx context.Context) error {
 
 	if err != nil || smartTimeout == 0 {
 		contextLogger.Info("Requesting fast shutdown of the PostgreSQL instance")
-		err = instance.Shutdown(shutdownOptions{
-			Mode: shutdownModeFast,
-			Wait: true,
-		})
+		err = instance.Shutdown(ctx,
+			shutdownOptions{
+				Mode: shutdownModeFast,
+				Wait: true,
+			},
+		)
 	}
 	if err != nil {
 		contextLogger.Error(err, "Error while shutting down the PostgreSQL instance")
@@ -555,19 +577,24 @@ func (instance *Instance) TryShuttingDownFastImmediate(ctx context.Context) erro
 	contextLogger := log.FromContext(ctx)
 
 	contextLogger.Info("Requesting fast shutdown of the PostgreSQL instance")
-	err := instance.Shutdown(shutdownOptions{
-		Mode:    shutdownModeFast,
-		Wait:    true,
-		Timeout: &instance.MaxSwitchoverDelay,
-	})
+	err := instance.Shutdown(
+		ctx,
+		shutdownOptions{
+			Mode:    shutdownModeFast,
+			Wait:    true,
+			Timeout: &instance.MaxSwitchoverDelay,
+		},
+	)
 	var exitError *exec.ExitError
 	if errors.As(err, &exitError) {
 		contextLogger.Info("Graceful shutdown failed. Issuing immediate shutdown",
 			"exitCode", exitError.ExitCode())
-		err = instance.Shutdown(shutdownOptions{
-			Mode: shutdownModeImmediate,
-			Wait: true,
-		})
+		err = instance.Shutdown(ctx,
+			shutdownOptions{
+				Mode: shutdownModeImmediate,
+				Wait: true,
+			},
+		)
 	}
 	return err
 }
@@ -684,7 +711,7 @@ func (instance *Instance) WithActiveInstance(inner func() error) error {
 	}
 
 	defer func() {
-		if err := instance.Shutdown(defaultShutdownOptions); err != nil {
+		if err := instance.Shutdown(ctx, defaultShutdownOptions); err != nil {
 			log.Info("Error while deactivating instance", "err", err)
 		}
 	}()
@@ -779,7 +806,7 @@ func (instance *Instance) Demote(ctx context.Context, cluster *apiv1.Cluster) er
 	contextLogger := log.FromContext(ctx)
 
 	contextLogger.Info("Demoting instance", "pgpdata", instance.PgData)
-	slotName := cluster.GetSlotNameFromInstanceName(instance.PodName)
+	slotName := cluster.GetSlotNameFromInstanceName(instance.GetPodName())
 	_, err := UpdateReplicaConfiguration(instance.PgData, instance.GetPrimaryConnInfo(), slotName)
 	return err
 }
@@ -831,18 +858,19 @@ func (instance *Instance) WaitForSuperuserConnectionAvailable(ctx context.Contex
 
 // waitForConnectionAvailable waits until we can connect to the passed
 // sql.DB connection
-func waitForConnectionAvailable(context context.Context, db *sql.DB) error {
+func waitForConnectionAvailable(ctx context.Context, db *sql.DB) error {
+	contextLogger := log.FromContext(ctx)
 	errorIsRetryable := func(err error) bool {
-		if context.Err() != nil {
+		if ctx.Err() != nil {
 			return false
 		}
 		return err != nil
 	}
 
 	return retry.OnError(RetryUntilServerAvailable, errorIsRetryable, func() error {
-		err := db.PingContext(context)
+		err := db.PingContext(ctx)
 		if err != nil {
-			log.Info("DB not available, will retry", "err", err)
+			contextLogger.Info("DB not available, will retry", "err", err)
 		}
 		return err
 	})
@@ -908,7 +936,9 @@ func (instance *Instance) WaitForConfigReload(ctx context.Context) (*postgres.Po
 
 // waitForStreamingConnectionAvailable waits until we can connect to the passed
 // sql.DB connection using streaming protocol
-func waitForStreamingConnectionAvailable(db *sql.DB) error {
+func waitForStreamingConnectionAvailable(ctx context.Context, db *sql.DB) error {
+	contextLogger := log.FromContext(ctx)
+
 	errorIsRetryable := func(err error) bool {
 		return err != nil
 	}
@@ -916,7 +946,7 @@ func waitForStreamingConnectionAvailable(db *sql.DB) error {
 	return retry.OnError(RetryUntilServerAvailable, errorIsRetryable, func() error {
 		result, err := db.Query("IDENTIFY_SYSTEM")
 		if err != nil || result.Err() != nil {
-			log.Info("DB not available, will retry", "err", err)
+			contextLogger.Info("DB not available, will retry", "err", err)
 			return err
 		}
 		defer func() {
@@ -985,7 +1015,7 @@ func (instance *Instance) removePgControlFileBackup() error {
 
 // Rewind uses pg_rewind to align this data directory with the contents of the primary node.
 // If postgres major version is >= 13, add "--restore-target-wal" option
-func (instance *Instance) Rewind(ctx context.Context, postgresMajorVersion int) error {
+func (instance *Instance) Rewind(ctx context.Context, postgresVersion version.Data) error {
 	contextLogger := log.FromContext(ctx)
 
 	// Signal the liveness probe that we are running pg_rewind before starting postgres
@@ -1005,7 +1035,7 @@ func (instance *Instance) Rewind(ctx context.Context, postgresMajorVersion int) 
 
 	// As PostgreSQL 13 introduces support of restore from the WAL archive in pg_rewind,
 	// let’s automatically use it, if possible
-	if postgresMajorVersion >= 130000 {
+	if postgresVersion.Major() >= 13 {
 		options = append(options, "--restore-target-wal")
 	}
 
@@ -1113,6 +1143,21 @@ func (instance *Instance) GetPgControldata() (string, error) {
 // wait for the operations requested on the instance
 func (instance *Instance) GetInstanceCommandChan() <-chan InstanceCommand {
 	return instance.instanceCommandChan
+}
+
+// GetClusterName returns the name of the cluster where this instance belongs
+func (instance *Instance) GetClusterName() string {
+	return instance.clusterName
+}
+
+// GetPodName returns the name of the pod where this instance is running
+func (instance *Instance) GetPodName() string {
+	return instance.podName
+}
+
+// GetNamespaceName returns the name of the namespace where this instance is running
+func (instance *Instance) GetNamespaceName() string {
+	return instance.namespace
 }
 
 // RequestFastImmediateShutdown request the lifecycle manager to shut down
@@ -1237,7 +1282,7 @@ func (instance *Instance) DropConnections() error {
 
 // GetPrimaryConnInfo returns the DSN to reach the primary
 func (instance *Instance) GetPrimaryConnInfo() string {
-	return buildPrimaryConnInfo(instance.ClusterName+"-rw", instance.PodName)
+	return buildPrimaryConnInfo(instance.GetClusterName()+"-rw", instance.GetPodName())
 }
 
 // HandleInstanceCommandRequests execute a command requested by the reconciliation

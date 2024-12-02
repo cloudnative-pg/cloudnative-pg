@@ -21,6 +21,7 @@ with the following requirements:
 - PGAudit extension installed (optional - only if PGAudit is required
   in the deployed clusters)
 - Appropriate locale settings
+- `du` (optional, for `kubectl cnpg status`)
 
 !!! Important
     Only [PostgreSQL versions supported by the PGDG](https://postgresql.org/) are allowed.

@@ -24,11 +24,12 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/prometheus/client_golang/prometheus"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/cache"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	cacheClient "github.com/cloudnative-pg/cloudnative-pg/internal/management/cache/client"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	m "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/metrics"
 	postgresconf "github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
@@ -39,13 +40,17 @@ import (
 // or the operator
 const PrometheusNamespace = "cnpg"
 
-var synchronousStandbyNamesRegex = regexp.MustCompile(`ANY ([0-9]+) \(.*\)`)
+var synchronousStandbyNamesRegex = regexp.MustCompile(`(?:ANY|FIRST) ([0-9]+) \(.*\)`)
 
 // Exporter exports a set of metrics and collectors on a given postgres instance
 type Exporter struct {
 	instance *postgres.Instance
 	Metrics  *metrics
 	queries  *m.QueriesCollector
+	// this is used for two reasons:
+	// - to ensure we are able to unit test
+	// - to make the struct adhere to the composition pattern instead of hardcoding dependencies inside the functions
+	getCluster func() (*apiv1.Cluster, error)
 }
 
 // metrics here are related to the exporter itself, which is instrumented to
@@ -85,8 +90,9 @@ type PgStatWalMetrics struct {
 // NewExporter creates an exporter
 func NewExporter(instance *postgres.Instance) *Exporter {
 	return &Exporter{
-		instance: instance,
-		Metrics:  newMetrics(),
+		instance:   instance,
+		Metrics:    newMetrics(),
+		getCluster: cacheClient.GetCluster,
 	}
 }
 
@@ -352,13 +358,13 @@ func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric) {
 	// First, let's check the connection. No need to proceed if this fails.
 	if err := db.Ping(); err != nil {
 		log.Warning("Unable to collect metrics", "error", err)
-		e.Metrics.PostgreSQLUp.WithLabelValues(e.instance.ClusterName).Set(0)
+		e.Metrics.PostgreSQLUp.WithLabelValues(e.instance.GetClusterName()).Set(0)
 		e.Metrics.Error.Set(1)
 		e.Metrics.CollectionDuration.WithLabelValues("Collect.up").Set(time.Since(collectionStart).Seconds())
 		return
 	}
 
-	e.Metrics.PostgreSQLUp.WithLabelValues(e.instance.ClusterName).Set(1)
+	e.Metrics.PostgreSQLUp.WithLabelValues(e.instance.GetClusterName()).Set(1)
 	e.Metrics.Error.Set(0)
 	e.Metrics.CollectionDuration.WithLabelValues("Collect.up").Set(time.Since(collectionStart).Seconds())
 
@@ -430,7 +436,7 @@ func (e *Exporter) setTimestampMetric(
 	errorLabel string,
 	getTimestampFunc func(cluster *apiv1.Cluster) string,
 ) {
-	cluster, err := cache.LoadClusterUnsafe()
+	cluster, err := e.getCluster()
 	// there isn't a cached object yet
 	if errors.Is(err, cache.ErrCacheMiss) {
 		return
@@ -472,7 +478,7 @@ func (e *Exporter) setTimestampMetric(
 func (e *Exporter) collectNodesUsed() {
 	const notExtractedValue float64 = -1
 
-	cluster, err := cache.LoadClusterUnsafe()
+	cluster, err := e.getCluster()
 	if err != nil {
 		log.Error(err, "unable to collect metrics")
 		e.Metrics.Error.Set(1)
@@ -511,7 +517,7 @@ func (e *Exporter) collectFromPrimaryFirstPointOnTimeRecovery() {
 }
 
 func (e *Exporter) collectFromPrimarySynchronousStandbysNumber(db *sql.DB) {
-	nStandbys, err := getSynchronousStandbysNumber(db)
+	nStandbys, err := getRequestedSynchronousStandbysNumber(db)
 	if err != nil {
 		log.Error(err, "unable to collect metrics")
 		e.Metrics.Error.Set(1)
@@ -535,12 +541,15 @@ func collectPGVersion(e *Exporter) error {
 	if err != nil {
 		return err
 	}
-	e.Metrics.PgVersion.WithLabelValues(majorMinor, e.instance.ClusterName).Set(version)
+	e.Metrics.PgVersion.WithLabelValues(majorMinor, e.instance.GetClusterName()).Set(version)
 
 	return nil
 }
 
-func getSynchronousStandbysNumber(db *sql.DB) (int, error) {
+// getRequestedSynchronousStandbysNumber returns the number of requested synchronous standbys
+// Example: FIRST 2 (node1,node2) will return 2, ANY 4 (node1) will return 4.
+// If the query fails, it will return 0 and an error.
+func getRequestedSynchronousStandbysNumber(db *sql.DB) (int, error) {
 	var syncReplicasFromConfig string
 	err := db.QueryRow(fmt.Sprintf("SHOW %s", postgresconf.SynchronousStandbyNames)).
 		Scan(&syncReplicasFromConfig)

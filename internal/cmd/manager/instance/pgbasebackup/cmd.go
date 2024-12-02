@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/spf13/cobra"
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -30,7 +31,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/linkerd"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/external"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/system"
 )
@@ -52,12 +52,15 @@ func NewCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "pgbasebackup",
 		PreRunE: func(cmd *cobra.Command, _ []string) error {
-			return management.WaitKubernetesAPIServer(cmd.Context(), ctrl.ObjectKey{
+			return management.WaitForGetCluster(cmd.Context(), ctrl.ObjectKey{
 				Name:      clusterName,
 				Namespace: namespace,
 			})
 		},
-		RunE: func(_ *cobra.Command, _ []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			ctx := cmd.Context()
+			contextLogger := log.FromContext(ctx)
+
 			client, err := management.NewControllerRuntimeClient()
 			if err != nil {
 				return err
@@ -73,10 +76,8 @@ func NewCmd() *cobra.Command {
 				client: client,
 			}
 
-			ctx := context.Background()
-
 			if err = env.bootstrapUsingPgbasebackup(ctx); err != nil {
-				log.Error(err, "Unable to boostrap cluster")
+				contextLogger.Error(err, "Unable to bootstrap cluster")
 			}
 			return err
 		},
@@ -101,6 +102,8 @@ func NewCmd() *cobra.Command {
 
 // bootstrapUsingPgbasebackup creates a new data dir from the configuration
 func (env *CloneInfo) bootstrapUsingPgbasebackup(ctx context.Context) error {
+	contextLogger := log.FromContext(ctx)
+
 	var cluster apiv1.Cluster
 	err := env.client.Get(ctx, ctrl.ObjectKey{Namespace: env.info.Namespace, Name: env.info.ClusterName}, &cluster)
 	if err != nil {
@@ -130,18 +133,18 @@ func (env *CloneInfo) bootstrapUsingPgbasebackup(ctx context.Context) error {
 
 	pgVersion, err := cluster.GetPostgresqlVersion()
 	if err != nil {
-		log.Warning(
+		contextLogger.Warning(
 			"Error while parsing PostgreSQL server version to define connection options, defaulting to PostgreSQL 11",
 			"imageName", cluster.GetImageName(),
 			"err", err)
-	} else if pgVersion >= 120000 {
+	} else if pgVersion.Major() >= 12 {
 		// We explicitly disable wal_sender_timeout for join-related pg_basebackup executions.
 		// A short timeout could not be enough in case the instance is slow to send data,
 		// like when the I/O is overloaded.
 		connectionString += " options='-c wal_sender_timeout=0s'"
 	}
 
-	err = postgres.ClonePgData(connectionString, env.info.PgData, env.info.PgWal)
+	err = postgres.ClonePgData(ctx, connectionString, env.info.PgData, env.info.PgWal)
 	if err != nil {
 		return err
 	}
@@ -158,11 +161,11 @@ func (env *CloneInfo) bootstrapUsingPgbasebackup(ctx context.Context) error {
 // configureInstanceAsNewPrimary sets up this instance as a new primary server, using
 // the configuration created by the user and setting up the global objects as needed
 func (env *CloneInfo) configureInstanceAsNewPrimary(ctx context.Context, cluster *apiv1.Cluster) error {
-	if err := env.info.WriteInitialPostgresqlConf(cluster); err != nil {
+	if err := env.info.WriteInitialPostgresqlConf(ctx, cluster); err != nil {
 		return err
 	}
 
-	if err := env.info.WriteRestoreHbaConf(); err != nil {
+	if err := env.info.WriteRestoreHbaConf(ctx); err != nil {
 		return err
 	}
 

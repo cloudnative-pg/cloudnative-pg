@@ -22,12 +22,20 @@ spec:
   - name: cluster-example
     connectionParameters:
       host: cluster-example-rw.default.svc
-      # We're using the superuser to allow the publication to be
-      # created directly when connected to the target server.
-      # See cluster-example-logical-source.yaml for more information
-      # about this.
-      user: postgres
+      user: app
       dbname: app
     password:
-      name: cluster-example-superuser
+      name: cluster-example-app
       key: password
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Subscription
+metadata:
+  name: cluster-example-dest-sub
+spec:
+  cluster:
+    name: cluster-example-dest
+  name: sub
+  dbname: app
+  publicationName: pub
+  externalClusterName: cluster-example

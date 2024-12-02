@@ -1,390 +1,470 @@
 {
-  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    "config:base"
+  $schema: 'https://docs.renovatebot.com/renovate-schema.json',
+  extends: [
+    'config:recommended',
   ],
-  "rebaseWhen": "never",
-// The maximum number of PRs to be created in parallel
-  "prConcurrentLimit": 5,
-// The branches renovate should target
-// PLEASE UPDATE THIS WHEN RELEASING.
-  "baseBranches": ["main","release-1.21","release-1.22", "release-1.23"],
-  "ignorePaths": ["docs/**", "config/**", "releases/**", "contribute/**", "config/**", "licenses/**"],
-  "postUpdateOptions": ["gomodTidy"],
-  "semanticCommits": "enabled",
-// All PRs should have a label
-  "labels": ["automated", "do not backport", "no-issue"],
-  "regexManagers": [
-    {
-      // We want a PR to bump Kustomize version in the Makefile
-      "fileMatch": [
-        "^Makefile$",
-      ],
-      "matchStrings": [
-        "KUSTOMIZE_VERSION \\?= (?<currentValue>.*?)\\n"
-      ],
-      "datasourceTemplate": "go",
-      "depNameTemplate": "sigs.k8s.io/kustomize/kustomize/v5",
-    }, {
-      // We want a PR to bump controller-gen version in the Makefile
-      "fileMatch": [
-        "^Makefile$",
-      ],
-      "matchStrings": [
-        "CONTROLLER_TOOLS_VERSION \\?= (?<currentValue>.*?)\\n"
-      ],
-      "datasourceTemplate": "go",
-      "depNameTemplate": "sigs.k8s.io/controller-tools",
-    }, {
-      // We want a PR to bump goreleaser version in the Makefile
-      "fileMatch": [
-        "^Makefile$",
-      ],
-      "matchStrings": [
-        "GORELEASER_VERSION \\?= (?<currentValue>.*?)\\n"
-      ],
-      "datasourceTemplate": "go",
-      "versioningTemplate": "loose",
-      "depNameTemplate": "github.com/goreleaser/goreleaser",
-    }, {
-      // We want a PR to bump the external-snapshotter version
-      "fileMatch": [
-        "^.github/workflows/continuous-delivery.yml",
-        "^hack/setup-cluster\.sh$",
-      ],
-      "matchStrings": [
-        "EXTERNAL_SNAPSHOTTER_VERSION: \"(?<currentValue>.*?)\"",
-        "EXTERNAL_SNAPSHOTTER_VERSION=(?<currentValue>.*?)\\n",
-      ],
-      "datasourceTemplate": "github-releases",
-      "versioningTemplate": "loose",
-      "depNameTemplate": "kubernetes-csi/external-snapshotter",
-      "extractVersionTemplate": "^(?<version>v\\d+\\.\\d+\\.\\d+)"
-    }, {
-      // We want a PR to bump the external-provisioner version
-      "fileMatch": [
-        "^hack/setup-cluster\.sh$",
-      ],
-      "matchStrings": [
-        "EXTERNAL_PROVISIONER_VERSION=(?<currentValue>.*?)\\n",
-      ],
-      "datasourceTemplate": "github-releases",
-      "versioningTemplate": "loose",
-      "depNameTemplate": "kubernetes-csi/external-provisioner",
-      "extractVersionTemplate": "^(?<version>v\\d+\\.\\d+\\.\\d+)"
-    }, {
-      // We want a PR to bump the external-resizer version
-      "fileMatch": [
-        "^hack/setup-cluster\.sh$",
-      ],
-      "matchStrings": [
-        "EXTERNAL_RESIZER_VERSION=(?<currentValue>.*?)\\n",
-      ],
-      "datasourceTemplate": "github-releases",
-      "versioningTemplate": "loose",
-      "depNameTemplate": "kubernetes-csi/external-resizer",
-      "extractVersionTemplate": "^(?<version>v\\d+\\.\\d+\\.\\d+)"
-    }, {
-      // We want a PR to bump the external-attacher version
-      "fileMatch": [
-        "^hack/setup-cluster\.sh$",
-      ],
-      "matchStrings": [
-        "EXTERNAL_ATTACHER_VERSION=(?<currentValue>.*?)\\n",
-      ],
-      "datasourceTemplate": "github-releases",
-      "versioningTemplate": "loose",
-      "depNameTemplate": "kubernetes-csi/external-attacher",
-      "extractVersionTemplate": "^(?<version>v\\d+\\.\\d+\\.\\d+)"
-    }, {
-      // We want a PR to bump the csi-driver-host-path version
-      "fileMatch": [
-        "^hack/setup-cluster\.sh$",
-      ],
-      "matchStrings": [
-        "CSI_DRIVER_HOST_PATH_DEFAULT_VERSION=(?<currentValue>.*?)\\n",
-      ],
-      "datasourceTemplate": "github-releases",
-      "versioningTemplate": "loose",
-      "depNameTemplate": "kubernetes-csi/csi-driver-host-path",
-      "extractVersionTemplate": "^(?<version>v\\d+\\.\\d+\\.\\d+)"
-    }, {
-      // We want a PR to bump the rook version
-      "fileMatch": [
-        "^.github/workflows/continuous-delivery.yml",
-      ],
-      "matchStrings": [
-        "ROOK_VERSION: \"(?<currentValue>.*?)\"",
-      ],
-      "datasourceTemplate": "github-releases",
-      "versioningTemplate": "loose",
-      "depNameTemplate": "rook/rook",
-      "extractVersionTemplate": "^(?<version>v\\d+\\.\\d+\\.\\d+)"
-    }, {
-      // We want a PR to bump kind version
-      "fileMatch": [
-        "^.github/workflows/continuous-delivery.yml",
-        "^.github/workflows/continuous-integration.yml",
-      ],
-      "matchStrings": [
-        "KIND_VERSION: \"(?<currentValue>.*?)\"",
-      ],
-      "datasourceTemplate": "github-tags",
-      "depNameTemplate": "kubernetes-sigs/kind",
-    }, {
-      // We want a PR to bump kind node version
-      "fileMatch": [
-        "^hack/setup-cluster.sh$",
-        "^hack/e2e/run-e2e-kind.sh$",
-      ],
-      "matchStrings": [
-        "KIND_NODE_DEFAULT_VERSION=(?<currentValue>.*?)\\n",
-      ],
-      "datasourceTemplate": "docker",
-      "versioningTemplate": "loose",
-      "depNameTemplate": "kindest/node",
-    }, {
-      // We want a PR to bump k3d node version
-      "fileMatch": [
-        "^hack/setup-cluster.sh$",
-        "^hack/e2e/run-e2e-k3d.sh$",
-      ],
-      "matchStrings": [
-        "K3D_NODE_DEFAULT_VERSION=(?<currentValue>.*?)\\n",
-      ],
-      "versioningTemplate": "regex:^v(?<major>\\d+)(\\.(?<minor>\\d+))?(\\.(?<patch>\\d+))(\\+k3s?(?<build>\\d+))?$",
-      "extractVersionTemplate": "^(?<version>v\\d+\\.\\d+\\.\\d+)",
-      "datasourceTemplate": "github-releases",
-      "depNameTemplate": "k3s-io/k3s",
-    }, {
-      // We want a PR to bump spellcheck version in the Makefile
-      "fileMatch": [
-        "^Makefile$",
-      ],
-      "matchStrings": [
-        "SPELLCHECK_VERSION \\?= (?<currentValue>.*?)\\n"
-      ],
-      "datasourceTemplate": "docker",
-      "versioningTemplate": "loose",
-      "depNameTemplate": "jonasbn/github-action-spellcheck",
-    }, {
-      // We want a PR to bump woke version in the Makefile
-      "fileMatch": [
-        "^Makefile$",
-      ],
-      "matchStrings": [
-        "WOKE_VERSION \\?= (?<currentValue>.*?)\\n"
-      ],
-      "datasourceTemplate": "docker",
-      "versioningTemplate": "loose",
-      "depNameTemplate": "getwoke/woke",
-    }, {
-      // We want a PR to bump operator-sdk in the Makefile
-      "fileMatch": [
-        "^Makefile$",
-      ],
-      "matchStrings": [
-        "OPERATOR_SDK_VERSION \\?= (?<currentValue>.*?)\\n"
-      ],
-      "datasourceTemplate": "github-releases",
-      "depNameTemplate": "operator-framework/operator-sdk",
-      "versioningTemplate": "loose",
-      "extractVersionTemplate": "^(?<version>v\\d+\\.\\d+\\.\\d+)"
-    }, {
-      // We want a PR to bump operator package manager (opm) in the Makefile
-      "fileMatch": [
-        "^Makefile$",
-      ],
-      "matchStrings": [
-        "OPM_VERSION \\?= (?<currentValue>.*?)\\n"
-      ],
-      "datasourceTemplate": "github-releases",
-      "depNameTemplate": "operator-framework/operator-registry",
-      "versioningTemplate": "loose",
-      "extractVersionTemplate": "^(?<version>v\\d+\\.\\d+\\.\\d+)"
-    }, {
-      // We want a PR to bump redhat-preflight in the Makefile
-      "fileMatch": [
-        "^Makefile$",
-      ],
-      "matchStrings": [
-        "PREFLIGHT_VERSION \\?= (?<currentValue>.*?)\\n"
-      ],
-      "datasourceTemplate": "github-releases",
-      "depNameTemplate": "redhat-openshift-ecosystem/openshift-preflight",
-      "versioningTemplate": "loose",
-      "extractVersionTemplate": "^(?<version>\\d+\\.\\d+\\.\\d+)"
-    },{
-      // We want a PR to bump Default Container Images versions.
-      "fileMatch": [
-        "^pkg\\/versions\\/versions\\.go$",
-        "^pkg\\/specs\\/pgbouncer\\/deployments\\.go$"
-      ],
-      "matchStrings": [
-        "DefaultImageName = \"(?<depName>.+?):(?<currentValue>.*?)\"\\n",
-        "DefaultPgbouncerImage = \"(?<depName>.+?):(?<currentValue>.*?)\"\\n",
-      ],
-      "datasourceTemplate": "docker",
-      "versioningTemplate": "loose",
-    }, {
-// We want a PR to bump Go versions used through env variables in any GitHub
-// Actions, taking it from the official GitHub repository.
-      "fileMatch": ["^\\.github\\/workflows\\/[^/]+\\.ya?ml$"],
-      "matchStrings": [
-        "GOLANG_VERSION: \"(?<currentValue>.*?)\\.x\"",
-      ],
-      "datasourceTemplate": "golang-version",
-      "depNameTemplate": "golang",
-      "versioningTemplate": "loose",
-      "extractVersionTemplate": "^(?<version>\\d+\\.\\d+)"
-    }, {
-// We want a PR to bump golangci-lint versions used through env variables in
-// any GitHub Actions or Makefile, taking it from the official GitHub
-// repository tags.
-      "fileMatch": ["^\\.github\\/workflows\\/[^/]+\\.ya?ml$"],
-      "matchStrings": [
-        "GOLANGCI_LINT_VERSION: \"v(?<currentValue>.*?)\"",
-      ],
-      "datasourceTemplate": "github-releases",
-      "depNameTemplate": "golangci/golangci-lint",
-      "versioningTemplate": "loose",
-      "extractVersionTemplate": "^v(?<version>\\d+\\.\\d+)"
-    }
+  rebaseWhen: 'never',
+  prConcurrentLimit: 5,
+  baseBranches: [
+    'main',
+    'release-1.22',
+    'release-1.23',
+    'release-1.24',
   ],
-  "packageRules": [
+  ignorePaths: [
+    'docs/**',
+    'releases/**',
+    'contribute/**',
+    'licenses/**',
+    'pkg/versions/**',
+  ],
+  postUpdateOptions: [
+    'gomodTidy',
+  ],
+  semanticCommits: 'enabled',
+  labels: [
+    'automated',
+    'do not backport',
+    'no-issue',
+  ],
+  customManagers: [
     {
-      "matchDatasources": [
-        "docker"
+      customType: 'regex',
+      fileMatch: [
+        '^Makefile$',
       ],
-      "allowedVersions": "!/alpha/",
+      matchStrings: [
+        'KUSTOMIZE_VERSION \\?= (?<currentValue>.*?)\\n',
+      ],
+      datasourceTemplate: 'go',
+      depNameTemplate: 'sigs.k8s.io/kustomize/kustomize/v5',
     },
     {
-// We need to ignore k8s.io/client-go older versions as they switched to
-// semantic version and old tags are still available in the repo.
-      "matchDatasources": [
-        "go"
+      customType: 'regex',
+      fileMatch: [
+        '^Makefile$',
       ],
-      "matchDepNames": [
-        "k8s.io/client-go"
+      matchStrings: [
+        'CONTROLLER_TOOLS_VERSION \\?= (?<currentValue>.*?)\\n',
       ],
-      "allowedVersions": "<1.0"
-    }, {
-// We want a single PR for all the patches bumps of kubernetes related
-// dependencies, as usually these are all strictly related.
-      "matchDatasources": [
-        "go"
-      ],
-      "groupName": "kubernetes patches",
-      "matchUpdateTypes": [
-        "patch",
-        "digest"
-      ],
-      "matchPackagePrefixes": [
-        "k8s.io",
-        "sigs.k8s.io",
-        "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring"
-      ],
-      "excludeDepNames": [
-        "sigs.k8s.io/kustomize/kustomize/v5",
-        "sigs.k8s.io/controller-tools"
-      ]
-    }, {
-// We want dedicated PRs for each minor and major bumps to kubernetes related
-// dependencies.
-      "matchDatasources": [
-        "go"
-      ],
-      "matchUpdateTypes": [
-        "major",
-        "minor"
-      ],
-      "matchPackagePrefixes": [
-        "k8s.io",
-        "sigs.k8s.io",
-        "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring"
-      ]
-    }, {
-// We want dedicated PRs for each bump to non-kubernetes Go dependencies.
-      "matchDatasources": [
-        "go"
-      ],
-      "matchPackagePatterns": [
-        "*"
-      ],
-      "excludePackagePrefixes": [
-        "k8s.io",
-        "sigs.k8s.io",
-        "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring"
-      ],
-      "matchUpdateTypes": [
-        "major",
-      ],
-    }, {
-// We want a single PR for all minor and patch bumps to non-kubernetes Go
-// dependencies.
-      "matchDatasources": [
-        "go"
-      ],
-      "matchPackagePatterns": [
-        "*"
-      ],
-      "excludePackagePrefixes": [
-        "k8s.io",
-        "sigs.k8s.io",
-        "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring"
-      ],
-      "matchUpdateTypes": [
-        "minor",
-        "patch",
-        "digest"
-      ],
-      "groupName": "all non-major go dependencies"
-    }, {
-// We want a single PR for all minor and patch bumps of GitHub Actions
-      "matchDepTypes": [
-        "action"
-      ],
-      "matchUpdateTypes": [
-        "minor",
-        "patch"
-      ],
-      "groupName": "all non-major github action",
-      "pinDigests": false
-    },{
-// We want dedicated PRs for each major bump to GitHub Actions
-      "matchDepTypes": [
-        "action"
-      ],
-      "pinDigests": false
-    },{
-// PR group for Kubernetes CSI
-      "groupName": "kubernetes CSI",
-      "matchPackagePrefixes": [
-        "kubernetes-csi",
-        "rook",
-      ],
-      "separateMajorMinor": "false",
-      "pinDigests": false
+      datasourceTemplate: 'go',
+      depNameTemplate: 'sigs.k8s.io/controller-tools',
     },
     {
-// PR group for all the operator framework related things
-      "groupName": "operator framework",
-      "matchPackagePrefixes": [
-        "operator-framework",
-        "redhat-openshift-ecosystem",
+      customType: 'regex',
+      fileMatch: [
+        '^Makefile$',
       ],
-      "separateMajorMinor": "false",
-      "pinDigests": false
+      matchStrings: [
+        'GORELEASER_VERSION \\?= (?<currentValue>.*?)\\n',
+      ],
+      datasourceTemplate: 'go',
+      versioningTemplate: 'loose',
+      depNameTemplate: 'github.com/goreleaser/goreleaser',
     },
     {
-// PR group for spellcheck
-      "groupName": "spellcheck",
-      "matchPackagePrefixes": [
-        "jonasbn/github-action-spellcheck",
-        "rojopolis/spellcheck-github-actions",
+      customType: 'regex',
+      fileMatch: [
+        '^.github/workflows/continuous-delivery.yml',
+        '^hack/setup-cluster.sh$',
       ],
-      "separateMajorMinor": "false",
-      "pinDigests": false,
-    }
-  ]
+      matchStrings: [
+        'EXTERNAL_SNAPSHOTTER_VERSION: "(?<currentValue>.*?)"',
+        'EXTERNAL_SNAPSHOTTER_VERSION=(?<currentValue>.*?)\\n',
+      ],
+      datasourceTemplate: 'github-releases',
+      versioningTemplate: 'loose',
+      depNameTemplate: 'kubernetes-csi/external-snapshotter',
+      extractVersionTemplate: '^(?<version>v\\d+\\.\\d+\\.\\d+)',
+    },
+    {
+      customType: 'regex',
+      fileMatch: [
+        '^hack/setup-cluster.sh$',
+      ],
+      matchStrings: [
+        'EXTERNAL_PROVISIONER_VERSION=(?<currentValue>.*?)\\n',
+      ],
+      datasourceTemplate: 'github-releases',
+      versioningTemplate: 'loose',
+      depNameTemplate: 'kubernetes-csi/external-provisioner',
+      extractVersionTemplate: '^(?<version>v\\d+\\.\\d+\\.\\d+)',
+    },
+    {
+      customType: 'regex',
+      fileMatch: [
+        '^hack/setup-cluster.sh$',
+      ],
+      matchStrings: [
+        'EXTERNAL_RESIZER_VERSION=(?<currentValue>.*?)\\n',
+      ],
+      datasourceTemplate: 'github-releases',
+      versioningTemplate: 'loose',
+      depNameTemplate: 'kubernetes-csi/external-resizer',
+      extractVersionTemplate: '^(?<version>v\\d+\\.\\d+\\.\\d+)',
+    },
+    {
+      customType: 'regex',
+      fileMatch: [
+        '^hack/setup-cluster.sh$',
+      ],
+      matchStrings: [
+        'EXTERNAL_ATTACHER_VERSION=(?<currentValue>.*?)\\n',
+      ],
+      datasourceTemplate: 'github-releases',
+      versioningTemplate: 'loose',
+      depNameTemplate: 'kubernetes-csi/external-attacher',
+      extractVersionTemplate: '^(?<version>v\\d+\\.\\d+\\.\\d+)',
+    },
+    {
+      customType: 'regex',
+      fileMatch: [
+        '^hack/setup-cluster.sh$',
+      ],
+      matchStrings: [
+        'CSI_DRIVER_HOST_PATH_DEFAULT_VERSION=(?<currentValue>.*?)\\n',
+      ],
+      datasourceTemplate: 'github-releases',
+      versioningTemplate: 'loose',
+      depNameTemplate: 'kubernetes-csi/csi-driver-host-path',
+      extractVersionTemplate: '^(?<version>v\\d+\\.\\d+\\.\\d+)',
+    },
+    {
+      customType: 'regex',
+      fileMatch: [
+        '^.github/workflows/continuous-delivery.yml',
+      ],
+      matchStrings: [
+        'ROOK_VERSION: "(?<currentValue>.*?)"',
+      ],
+      datasourceTemplate: 'github-releases',
+      versioningTemplate: 'loose',
+      depNameTemplate: 'rook/rook',
+      extractVersionTemplate: '^(?<version>v\\d+\\.\\d+\\.\\d+)',
+    },
+    {
+      customType: 'regex',
+      fileMatch: [
+        '^.github/workflows/continuous-delivery.yml',
+        '^.github/workflows/continuous-integration.yml',
+      ],
+      matchStrings: [
+        'KIND_VERSION: "(?<currentValue>.*?)"',
+      ],
+      datasourceTemplate: 'github-tags',
+      depNameTemplate: 'kubernetes-sigs/kind',
+    },
+    {
+      customType: 'regex',
+      fileMatch: [
+        '^hack/setup-cluster.sh$',
+        '^hack/e2e/run-e2e-kind.sh$',
+      ],
+      matchStrings: [
+        'KIND_NODE_DEFAULT_VERSION=(?<currentValue>.*?)\\n',
+      ],
+      datasourceTemplate: 'docker',
+      versioningTemplate: 'loose',
+      depNameTemplate: 'kindest/node',
+    },
+    {
+      customType: 'regex',
+      fileMatch: [
+        '^hack/setup-cluster.sh$',
+        '^hack/e2e/run-e2e-k3d.sh$',
+      ],
+      matchStrings: [
+        'K3D_NODE_DEFAULT_VERSION=(?<currentValue>.*?)\\n',
+      ],
+      versioningTemplate: 'regex:^v(?<major>\\d+)(\\.(?<minor>\\d+))?(\\.(?<patch>\\d+))(\\+k3s?(?<build>\\d+))?$',
+      extractVersionTemplate: '^(?<version>v\\d+\\.\\d+\\.\\d+)',
+      datasourceTemplate: 'github-releases',
+      depNameTemplate: 'k3s-io/k3s',
+    },
+    {
+      customType: 'regex',
+      fileMatch: [
+        '^Makefile$',
+      ],
+      matchStrings: [
+        'SPELLCHECK_VERSION \\?= (?<currentValue>.*?)\\n',
+      ],
+      datasourceTemplate: 'docker',
+      versioningTemplate: 'loose',
+      depNameTemplate: 'jonasbn/github-action-spellcheck',
+    },
+    {
+      customType: 'regex',
+      fileMatch: [
+        '^Makefile$',
+      ],
+      matchStrings: [
+        'WOKE_VERSION \\?= (?<currentValue>.*?)\\n',
+      ],
+      datasourceTemplate: 'docker',
+      versioningTemplate: 'loose',
+      depNameTemplate: 'getwoke/woke',
+    },
+    {
+      customType: 'regex',
+      fileMatch: [
+        '^Makefile$',
+      ],
+      matchStrings: [
+        'OPERATOR_SDK_VERSION \\?= (?<currentValue>.*?)\\n',
+      ],
+      datasourceTemplate: 'github-releases',
+      depNameTemplate: 'operator-framework/operator-sdk',
+      versioningTemplate: 'loose',
+      extractVersionTemplate: '^(?<version>v\\d+\\.\\d+\\.\\d+)',
+    },
+    {
+      customType: 'regex',
+      fileMatch: [
+        '^Makefile$',
+      ],
+      matchStrings: [
+        'OPM_VERSION \\?= (?<currentValue>.*?)\\n',
+      ],
+      datasourceTemplate: 'github-releases',
+      depNameTemplate: 'operator-framework/operator-registry',
+      versioningTemplate: 'loose',
+      extractVersionTemplate: '^(?<version>v\\d+\\.\\d+\\.\\d+)',
+    },
+    {
+      customType: 'regex',
+      fileMatch: [
+        '^Makefile$',
+      ],
+      matchStrings: [
+        'PREFLIGHT_VERSION \\?= (?<currentValue>.*?)\\n',
+      ],
+      datasourceTemplate: 'github-releases',
+      depNameTemplate: 'redhat-openshift-ecosystem/openshift-preflight',
+      versioningTemplate: 'loose',
+      extractVersionTemplate: '^(?<version>\\d+\\.\\d+\\.\\d+)',
+    },
+    {
+      customType: 'regex',
+      fileMatch: [
+        '^config\\/olm-scorecard\\/patches\\/basic\\.config\\.yaml$',
+        '^config\\/olm-scorecard\\/patches\\/olm\\.config\\.yaml$',
+      ],
+      matchStrings: [
+        'image: quay.io/operator-framework/scorecard-test:(?<currentValue>.*?)\\n',
+      ],
+      datasourceTemplate: 'docker',
+      versioningTemplate: 'loose',
+      depNameTemplate: 'quay.io/operator-framework/scorecard-test',
+      extractVersionTemplate: '^(?<version>v\\d+\\.\\d+\\.\\d+)',
+    },
+    {
+      customType: 'regex',
+      fileMatch: [
+        '^pkg\\/versions\\/versions\\.go$',
+        '^pkg\\/specs\\/pgbouncer\\/deployments\\.go$',
+      ],
+      matchStrings: [
+        'DefaultImageName = "(?<depName>.+?):(?<currentValue>.*?)"\\n',
+        'DefaultPgbouncerImage = "(?<depName>.+?):(?<currentValue>.*?)"\\n',
+      ],
+      datasourceTemplate: 'docker',
+      versioningTemplate: 'loose',
+    },
+    {
+      customType: 'regex',
+      fileMatch: [
+        '^\\.github\\/workflows\\/[^/]+\\.ya?ml$',
+      ],
+      matchStrings: [
+        'GOLANG_VERSION: "(?<currentValue>.*?)\\.x"',
+      ],
+      datasourceTemplate: 'golang-version',
+      depNameTemplate: 'golang',
+      versioningTemplate: 'loose',
+      extractVersionTemplate: '^(?<version>\\d+\\.\\d+)',
+    },
+    {
+      customType: 'regex',
+      fileMatch: [
+        '^\\.github\\/workflows\\/[^/]+\\.ya?ml$',
+      ],
+      matchStrings: [
+        'GOLANGCI_LINT_VERSION: "v(?<currentValue>.*?)"',
+      ],
+      datasourceTemplate: 'github-releases',
+      depNameTemplate: 'golangci/golangci-lint',
+      versioningTemplate: 'loose',
+      extractVersionTemplate: '^v(?<version>\\d+\\.\\d+\\.\\d+)',
+    },
+    {
+      customType: 'regex',
+      fileMatch: [
+        '^.github/workflows/continuous-delivery.yml',
+      ],
+      matchStrings: [
+        'VELERO_VERSION: "v(?<currentValue>.*?)"',
+      ],
+      datasourceTemplate: 'github-releases',
+      depNameTemplate: 'vmware-tanzu/velero',
+      versioningTemplate: 'loose',
+      extractVersionTemplate: '^(?<version>v\\d+\\.\\d+\\.\\d+)',
+    },
+    {
+      customType: 'regex',
+      fileMatch: [
+        '^.github/workflows/continuous-delivery.yml',
+      ],
+      matchStrings: [
+        'VELERO_AWS_PLUGIN_VERSION: "v(?<currentValue>.*?)"',
+      ],
+      datasourceTemplate: 'github-releases',
+      depNameTemplate: 'vmware-tanzu/velero-plugin-for-aws',
+      versioningTemplate: 'loose',
+      extractVersionTemplate: '^(?<version>v\\d+\\.\\d+\\.\\d+)',
+    },
+  ],
+  packageRules: [
+    {
+      matchDatasources: [
+        'docker',
+      ],
+      allowedVersions: '!/alpha/',
+    },
+    {
+      matchDatasources: [
+        'go',
+      ],
+      matchDepNames: [
+        'k8s.io/client-go',
+      ],
+      allowedVersions: '<1.0',
+    },
+    {
+      matchDatasources: [
+        'go',
+      ],
+      groupName: 'kubernetes patches',
+      matchUpdateTypes: [
+        'patch',
+        'digest',
+      ],
+      matchPackageNames: [
+        'k8s.io{/,}**',
+        'sigs.k8s.io{/,}**',
+        'github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring{/,}**',
+      ],
+      matchDepNames: [
+        '!sigs.k8s.io/kustomize/kustomize/v5',
+        '!sigs.k8s.io/controller-tools',
+      ],
+    },
+    {
+      matchDatasources: [
+        'go',
+      ],
+      matchUpdateTypes: [
+        'major',
+        'minor',
+      ],
+      matchPackageNames: [
+        'k8s.io{/,}**',
+        'sigs.k8s.io{/,}**',
+        'github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring{/,}**',
+      ],
+    },
+    {
+      matchDatasources: [
+        'go',
+      ],
+      matchUpdateTypes: [
+        'major',
+      ],
+      matchPackageNames: [
+        '*',
+        '!k8s.io{/,}**',
+        '!sigs.k8s.io{/,}**',
+        '!github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring{/,}**',
+      ],
+    },
+    {
+      matchDatasources: [
+        'go',
+      ],
+      matchUpdateTypes: [
+        'minor',
+        'patch',
+        'digest',
+      ],
+      groupName: 'all non-major go dependencies',
+      matchPackageNames: [
+        '*',
+        '!k8s.io{/,}**',
+        '!sigs.k8s.io{/,}**',
+        '!github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring{/,}**',
+        '!github.com/cloudnative-pg/{/,}**',
+      ],
+    },
+    {
+      matchDepTypes: [
+        'action',
+      ],
+      matchUpdateTypes: [
+        'minor',
+        'patch',
+      ],
+      groupName: 'all non-major github action',
+      pinDigests: false,
+    },
+    {
+      matchDepTypes: [
+        'action',
+      ],
+      pinDigests: false,
+    },
+    {
+      groupName: 'kubernetes CSI',
+      separateMajorMinor: false,
+      pinDigests: false,
+      matchPackageNames: [
+        'kubernetes-csi{/,}**',
+        'rook{/,}**',
+      ],
+    },
+    {
+      groupName: 'backup test tools',
+      separateMajorMinor: false,
+      pinDigests: false,
+      matchPackageNames: [
+        'vmware-tanzu{/,}**',
+      ],
+    },
+    {
+      groupName: 'operator framework',
+      separateMajorMinor: false,
+      pinDigests: false,
+      matchPackageNames: [
+        'operator-framework{/,}**',
+        'redhat-openshift-ecosystem{/,}**',
+        'quay.io/operator-framework{/,}**',
+      ],
+    },
+    {
+      groupName: 'spellcheck',
+      separateMajorMinor: false,
+      pinDigests: false,
+      matchPackageNames: [
+        'jonasbn/github-action-spellcheck{/,}**',
+        'rojopolis/spellcheck-github-actions{/,}**',
+      ],
+    },
+    {
+      groupName: 'cnpg',
+      matchPackageNames: [
+        'github.com/cloudnative-pg/',
+      ],
+      separateMajorMinor: false,
+      pinDigests: false,
+    },
+  ],
 }

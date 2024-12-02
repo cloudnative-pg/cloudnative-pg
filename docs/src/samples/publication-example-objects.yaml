@@ -1,0 +1,16 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Publication
+metadata:
+  name: publication-example-objects
+spec:
+  cluster:
+    name: cluster-example
+  name: pub-objects
+  dbname: app
+  target:
+    objects:
+      - tablesInSchema: public
+      - table:
+          schema: another_schema
+          name: numbers_three
+          only: true

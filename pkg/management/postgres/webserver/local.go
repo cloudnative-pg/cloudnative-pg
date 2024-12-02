@@ -23,16 +23,20 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/cache"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/conditions"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 type localWebserverEndpoints struct {
@@ -42,25 +46,21 @@ type localWebserverEndpoints struct {
 }
 
 // NewLocalWebServer returns a webserver that allows connection only from localhost
-func NewLocalWebServer(instance *postgres.Instance) (*Webserver, error) {
-	typedClient, err := management.NewControllerRuntimeClient()
-	if err != nil {
-		return nil, fmt.Errorf("creating controller-runtine client: %v", err)
-	}
-	eventRecorder, err := management.NewEventRecorder()
-	if err != nil {
-		return nil, fmt.Errorf("creating kubernetes event recorder: %v", err)
-	}
-
+func NewLocalWebServer(
+	instance *postgres.Instance,
+	cli client.Client,
+	recorder record.EventRecorder,
+) (*Webserver, error) {
 	endpoints := localWebserverEndpoints{
-		typedClient:   typedClient,
+		typedClient:   cli,
 		instance:      instance,
-		eventRecorder: eventRecorder,
+		eventRecorder: recorder,
 	}
 
 	serveMux := http.NewServeMux()
 	serveMux.HandleFunc(url.PathCache, endpoints.serveCache)
 	serveMux.HandleFunc(url.PathPgBackup, endpoints.requestBackup)
+	serveMux.HandleFunc(url.PathWALArchiveStatusCondition, endpoints.setWALArchiveStatusCondition)
 
 	server := &http.Server{
 		Addr:              fmt.Sprintf("localhost:%d", url.LocalPort),
@@ -69,7 +69,7 @@ func NewLocalWebServer(instance *postgres.Instance) (*Webserver, error) {
 		ReadTimeout:       DefaultReadTimeout,
 	}
 
-	webserver := NewWebServer(instance, server)
+	webserver := NewWebServer(server)
 
 	return webserver, nil
 }
@@ -83,19 +83,19 @@ func (ws *localWebserverEndpoints) serveCache(w http.ResponseWriter, r *http.Req
 	var js []byte
 	switch requestedObject {
 	case cache.ClusterKey:
-		response, err := cache.LoadClusterUnsafe()
-		if errors.Is(err, cache.ErrCacheMiss) {
+		cluster, err := ws.getCluster(r.Context())
+		if apierrs.IsNotFound(err) {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		} else if err != nil {
-			log.Error(err, "while loading cached cluster")
+			log.Error(err, "while loading cluster")
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 
-		js, err = json.Marshal(response)
+		js, err = json.Marshal(cluster)
 		if err != nil {
-			log.Error(err, "while unmarshalling cached cluster")
+			log.Error(err, "while marshalling the cluster")
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -112,7 +112,7 @@ func (ws *localWebserverEndpoints) serveCache(w http.ResponseWriter, r *http.Req
 
 		js, err = json.Marshal(response)
 		if err != nil {
-			log.Error(err, "while unmarshalling cached env")
+			log.Error(err, "while marshalling cached env")
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -128,7 +128,6 @@ func (ws *localWebserverEndpoints) serveCache(w http.ResponseWriter, r *http.Req
 
 // This function schedule a backup
 func (ws *localWebserverEndpoints) requestBackup(w http.ResponseWriter, r *http.Request) {
-	var cluster apiv1.Cluster
 	var backup apiv1.Backup
 
 	ctx := context.Background()
@@ -139,10 +138,8 @@ func (ws *localWebserverEndpoints) requestBackup(w http.ResponseWriter, r *http.
 		return
 	}
 
-	if err := ws.typedClient.Get(ctx, client.ObjectKey{
-		Namespace: ws.instance.Namespace,
-		Name:      ws.instance.ClusterName,
-	}, &cluster); err != nil {
+	cluster, err := ws.getCluster(ctx)
+	if err != nil {
 		http.Error(
 			w,
 			fmt.Sprintf("error while getting cluster: %v", err.Error()),
@@ -151,7 +148,7 @@ func (ws *localWebserverEndpoints) requestBackup(w http.ResponseWriter, r *http.
 	}
 
 	if err := ws.typedClient.Get(ctx, client.ObjectKey{
-		Namespace: ws.instance.Namespace,
+		Namespace: ws.instance.GetNamespaceName(),
 		Name:      backupName,
 	}, &backup); err != nil {
 		http.Error(
@@ -168,7 +165,7 @@ func (ws *localWebserverEndpoints) requestBackup(w http.ResponseWriter, r *http.
 			return
 		}
 
-		if err := ws.startBarmanBackup(ctx, &cluster, &backup); err != nil {
+		if err := ws.startBarmanBackup(ctx, cluster, &backup); err != nil {
 			http.Error(
 				w,
 				fmt.Sprintf("error while requesting backup: %v", err.Error()),
@@ -183,7 +180,7 @@ func (ws *localWebserverEndpoints) requestBackup(w http.ResponseWriter, r *http.
 			return
 		}
 
-		ws.startPluginBackup(ctx, &cluster, &backup)
+		ws.startPluginBackup(ctx, cluster, &backup)
 		_, _ = fmt.Fprint(w, "OK")
 
 	default:
@@ -192,6 +189,17 @@ func (ws *localWebserverEndpoints) requestBackup(w http.ResponseWriter, r *http.
 			fmt.Sprintf("Unknown backup method: %v", backup.Spec.Method),
 			http.StatusBadRequest)
 	}
+}
+
+func (ws *localWebserverEndpoints) getCluster(ctx context.Context) (*apiv1.Cluster, error) {
+	var cluster apiv1.Cluster
+	if err := ws.typedClient.Get(ctx, client.ObjectKey{
+		Namespace: ws.instance.GetNamespaceName(),
+		Name:      ws.instance.GetClusterName(),
+	}, &cluster); err != nil {
+		return nil, err
+	}
+	return &cluster, nil
 }
 
 func (ws *localWebserverEndpoints) startBarmanBackup(
@@ -227,6 +235,63 @@ func (ws *localWebserverEndpoints) startPluginBackup(
 	cluster *apiv1.Cluster,
 	backup *apiv1.Backup,
 ) {
-	cmd := NewPluginBackupCommand(cluster, backup, ws.typedClient, ws.eventRecorder)
-	cmd.Start(ctx)
+	// TODO: timeout should be configurable by the user
+	ctx = context.WithValue(ctx, utils.GRPCTimeoutKey, 100*time.Minute)
+	NewPluginBackupCommand(cluster, backup, ws.typedClient, ws.eventRecorder).Start(ctx)
+}
+
+// ArchiveStatusRequest is the request body for the archive status endpoint
+type ArchiveStatusRequest struct {
+	Error string `json:"error,omitempty"`
+}
+
+func (asr *ArchiveStatusRequest) getContinuousArchivingCondition() *metav1.Condition {
+	if asr.Error != "" {
+		return &metav1.Condition{
+			Type:    string(apiv1.ConditionContinuousArchiving),
+			Status:  metav1.ConditionFalse,
+			Reason:  string(apiv1.ConditionReasonContinuousArchivingFailing),
+			Message: asr.Error,
+		}
+	}
+
+	return &metav1.Condition{
+		Type:    string(apiv1.ConditionContinuousArchiving),
+		Status:  metav1.ConditionTrue,
+		Reason:  string(apiv1.ConditionReasonContinuousArchivingSuccess),
+		Message: "Continuous archiving is working",
+	}
+}
+
+func (ws *localWebserverEndpoints) setWALArchiveStatusCondition(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	contextLogger := log.FromContext(ctx)
+	// decode body req
+	var asr ArchiveStatusRequest
+	if err := json.NewDecoder(r.Body).Decode(&asr); err != nil {
+		contextLogger.Error(err, "error while decoding request")
+		http.Error(w, fmt.Sprintf("error while decoding request: %v", err.Error()), http.StatusBadRequest)
+		return
+	}
+
+	cluster, err := ws.getCluster(ctx)
+	if err != nil {
+		http.Error(
+			w,
+			fmt.Sprintf("error while getting cluster: %v", err.Error()),
+			http.StatusInternalServerError)
+		return
+	}
+
+	if errCond := conditions.Patch(ctx, ws.typedClient, cluster, asr.getContinuousArchivingCondition()); errCond != nil {
+		contextLogger.Error(errCond, "Error changing wal archiving condition",
+			"condition", asr.getContinuousArchivingCondition())
+		http.Error(
+			w,
+			fmt.Sprintf("error while updating wal archiving condition: %v", errCond.Error()),
+			http.StatusInternalServerError)
+		return
+	}
+
+	_, _ = fmt.Fprint(w, "OK")
 }

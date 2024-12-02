@@ -240,8 +240,8 @@ var _ = Describe("cluster_create unit tests", func() {
 
 			By("checking read-write service", func() {
 				checkService(readWriteService, map[string]string{
-					"cnpg.io/cluster": cluster.Name,
-					"role":            "primary",
+					"cnpg.io/cluster":                  cluster.Name,
+					utils.ClusterInstanceRoleLabelName: "primary",
 				})
 			})
 
@@ -254,8 +254,8 @@ var _ = Describe("cluster_create unit tests", func() {
 
 			By("checking read only service", func() {
 				checkService(readOnlyService, map[string]string{
-					"cnpg.io/cluster": cluster.Name,
-					"role":            "replica",
+					"cnpg.io/cluster":                  cluster.Name,
+					utils.ClusterInstanceRoleLabelName: "replica",
 				})
 			})
 		})
@@ -361,6 +361,30 @@ var _ = Describe("cluster_create unit tests", func() {
 			)
 		})
 
+		By("scaling the instances to 2", func() {
+			cluster.Spec.Instances = 2
+			cluster.Status.Instances = 2
+		})
+
+		By("reconciling pdb with two nodes", func() {
+			reconcilePDB()
+		})
+
+		By("making sure that only the replicas PDB has been deleted", func() {
+			expectResourceExists(
+				env.client,
+				pdbPrimaryName,
+				namespace,
+				&policyv1.PodDisruptionBudget{},
+			)
+			expectResourceDoesntExist(
+				env.client,
+				pdbReplicaName,
+				namespace,
+				&policyv1.PodDisruptionBudget{},
+			)
+		})
+
 		By("enabling the cluster maintenance mode", func() {
 			reusePVC := true
 			cluster.Spec.NodeMaintenanceWindow = &apiv1.NodeMaintenanceWindow{
@@ -373,7 +397,13 @@ var _ = Describe("cluster_create unit tests", func() {
 			reconcilePDB()
 		})
 
-		By("making sure that the replicas PDB are deleted", func() {
+		By("making sure that only the replicas PDB has been deleted", func() {
+			expectResourceExists(
+				env.client,
+				pdbPrimaryName,
+				namespace,
+				&policyv1.PodDisruptionBudget{},
+			)
 			expectResourceDoesntExist(
 				env.client,
 				pdbReplicaName,
@@ -792,14 +822,12 @@ var _ = Describe("createOrPatchClusterCredentialSecret", func() {
 		namespace  = "test-namespace"
 	)
 	var (
-		ctx      context.Context
 		proposed *corev1.Secret
 		cli      k8client.Client
 	)
 
 	BeforeEach(func() {
 		cli = fake.NewClientBuilder().WithScheme(schemeBuilder.BuildWithAllKnownScheme()).Build()
-		ctx = context.TODO()
 		const secretName = "test-secret"
 		proposed = &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
@@ -813,7 +841,7 @@ var _ = Describe("createOrPatchClusterCredentialSecret", func() {
 	})
 
 	Context("when the secret does not exist", func() {
-		It("should create the secret", func() {
+		It("should create the secret", func(ctx SpecContext) {
 			err := createOrPatchClusterCredentialSecret(ctx, cli, proposed)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -827,7 +855,7 @@ var _ = Describe("createOrPatchClusterCredentialSecret", func() {
 	})
 
 	Context("when the secret exists and is owned by the cluster", func() {
-		BeforeEach(func() {
+		BeforeEach(func(ctx SpecContext) {
 			existingSecret := &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        secretName,
@@ -848,7 +876,7 @@ var _ = Describe("createOrPatchClusterCredentialSecret", func() {
 			Expect(cli.Create(ctx, existingSecret)).To(Succeed())
 		})
 
-		It("should patch the secret if metadata differs", func() {
+		It("should patch the secret if metadata differs", func(ctx SpecContext) {
 			Expect(proposed.Labels).To(HaveKeyWithValue("test", "label"))
 			Expect(proposed.Annotations).To(HaveKeyWithValue("test", "annotation"))
 
@@ -862,7 +890,7 @@ var _ = Describe("createOrPatchClusterCredentialSecret", func() {
 			Expect(patchedSecret.Annotations).To(HaveKeyWithValue("test", "annotation"))
 		})
 
-		It("should not patch the secret if metadata is the same", func() {
+		It("should not patch the secret if metadata is the same", func(ctx SpecContext) {
 			var originalSecret corev1.Secret
 			err := cli.Get(ctx, types.NamespacedName{Name: secretName, Namespace: namespace}, &originalSecret)
 			Expect(err).NotTo(HaveOccurred())
@@ -883,7 +911,7 @@ var _ = Describe("createOrPatchClusterCredentialSecret", func() {
 	})
 
 	Context("when the secret exists but is not owned by the cluster", func() {
-		BeforeEach(func() {
+		BeforeEach(func(ctx SpecContext) {
 			existingSecret := &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      secretName,
@@ -893,7 +921,7 @@ var _ = Describe("createOrPatchClusterCredentialSecret", func() {
 			Expect(cli.Create(ctx, existingSecret)).To(Succeed())
 		})
 
-		It("should not modify the secret", func() {
+		It("should not modify the secret", func(ctx SpecContext) {
 			var originalSecret corev1.Secret
 			err := cli.Get(ctx, types.NamespacedName{Name: secretName, Namespace: namespace}, &originalSecret)
 			Expect(err).NotTo(HaveOccurred())
@@ -1012,7 +1040,7 @@ var _ = Describe("createOrPatchOwnedPodDisruptionBudget", func() {
 	})
 })
 
-var _ = Describe("deletePodDisruptionBudgetIfExists", func() {
+var _ = Describe("deletePodDisruptionBudgetsIfExist", func() {
 	const namespace = "default"
 
 	var (
@@ -1086,7 +1114,7 @@ var _ = Describe("deletePodDisruptionBudgetIfExists", func() {
 		err = fakeClient.Get(ctx, k8client.ObjectKeyFromObject(pdbPrimary), &policyv1.PodDisruptionBudget{})
 		Expect(err).ToNot(HaveOccurred())
 
-		err = reconciler.deletePodDisruptionBudgetIfExists(ctx, cluster)
+		err = reconciler.deletePodDisruptionBudgetsIfExist(ctx, cluster)
 		Expect(err).ToNot(HaveOccurred())
 
 		err = fakeClient.Get(ctx, k8client.ObjectKeyFromObject(pdbPrimary), &policyv1.PodDisruptionBudget{})
@@ -1110,10 +1138,206 @@ var _ = Describe("deletePodDisruptionBudgetIfExists", func() {
 		err := fakeClient.Get(ctx, k8client.ObjectKeyFromObject(pdbPrimary), &policyv1.PodDisruptionBudget{})
 		Expect(apierrs.IsNotFound(err)).To(BeTrue())
 
-		err = reconciler.deletePodDisruptionBudgetIfExists(ctx, cluster)
+		err = reconciler.deletePodDisruptionBudgetsIfExist(ctx, cluster)
 		Expect(err).ToNot(HaveOccurred())
 
 		err = fakeClient.Get(ctx, k8client.ObjectKeyFromObject(pdb), &policyv1.PodDisruptionBudget{})
 		Expect(apierrs.IsNotFound(err)).To(BeTrue())
+	})
+})
+
+var _ = Describe("Service Reconciling", func() {
+	var (
+		ctx           context.Context
+		cluster       apiv1.Cluster
+		reconciler    *ClusterReconciler
+		serviceClient k8client.Client
+	)
+
+	BeforeEach(func() {
+		ctx = context.Background()
+		cluster = apiv1.Cluster{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       apiv1.ClusterKind,
+				APIVersion: apiv1.GroupVersion.String(),
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-cluster",
+				Namespace: "default",
+			},
+			Spec: apiv1.ClusterSpec{
+				Managed: &apiv1.ManagedConfiguration{
+					Services: &apiv1.ManagedServices{
+						Additional: []apiv1.ManagedService{},
+					},
+				},
+			},
+		}
+
+		serviceClient = fake.NewClientBuilder().
+			WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+			Build()
+		reconciler = &ClusterReconciler{
+			Client: serviceClient,
+		}
+	})
+
+	Describe("serviceReconciler", func() {
+		var proposedService *corev1.Service
+
+		BeforeEach(func() {
+			proposedService = &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-service",
+					Namespace: "default",
+				},
+				Spec: corev1.ServiceSpec{
+					Selector: map[string]string{"app": "test"},
+					Ports:    []corev1.ServicePort{{Port: 80}},
+				},
+			}
+			cluster.SetInheritedDataAndOwnership(&proposedService.ObjectMeta)
+		})
+
+		Context("when service does not exist", func() {
+			It("should create a new service if enabled", func() {
+				err := reconciler.serviceReconciler(ctx, &cluster, proposedService, true)
+				Expect(err).NotTo(HaveOccurred())
+
+				var createdService corev1.Service
+				err = serviceClient.Get(ctx, types.NamespacedName{
+					Name:      proposedService.Name,
+					Namespace: proposedService.Namespace,
+				}, &createdService)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(createdService.Spec.Selector).To(Equal(proposedService.Spec.Selector))
+			})
+
+			It("should not create a new service if not enabled", func() {
+				err := reconciler.serviceReconciler(ctx, &cluster, proposedService, false)
+				Expect(err).NotTo(HaveOccurred())
+
+				var createdService corev1.Service
+				err = serviceClient.Get(
+					ctx,
+					types.NamespacedName{Name: proposedService.Name, Namespace: proposedService.Namespace},
+					&createdService,
+				)
+				Expect(apierrs.IsNotFound(err)).To(BeTrue())
+			})
+		})
+
+		Context("when service exists", func() {
+			BeforeEach(func() {
+				err := serviceClient.Create(ctx, proposedService)
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("should delete the service if not enabled", func() {
+				err := reconciler.serviceReconciler(ctx, &cluster, proposedService, false)
+				Expect(err).NotTo(HaveOccurred())
+
+				var deletedService corev1.Service
+				err = serviceClient.Get(ctx, types.NamespacedName{
+					Name:      proposedService.Name,
+					Namespace: proposedService.Namespace,
+				}, &deletedService)
+				Expect(apierrs.IsNotFound(err)).To(BeTrue())
+			})
+
+			It("should update the service if necessary", func() {
+				existingService := proposedService.DeepCopy()
+				existingService.Spec.Selector = map[string]string{"app": "old"}
+				err := serviceClient.Update(ctx, existingService)
+				Expect(err).NotTo(HaveOccurred())
+
+				err = reconciler.serviceReconciler(ctx, &cluster, proposedService, true)
+				Expect(err).NotTo(HaveOccurred())
+
+				var updatedService corev1.Service
+				err = serviceClient.Get(ctx, types.NamespacedName{
+					Name:      proposedService.Name,
+					Namespace: proposedService.Namespace,
+				}, &updatedService)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(updatedService.Spec.Selector).To(Equal(proposedService.Spec.Selector))
+			})
+
+			It("should preserve existing labels and annotations added by third parties", func() {
+				existingService := proposedService.DeepCopy()
+				existingService.Labels = map[string]string{"custom-label": "value"}
+				existingService.Annotations = map[string]string{"custom-annotation": "value"}
+				err := serviceClient.Update(ctx, existingService)
+				Expect(err).NotTo(HaveOccurred())
+
+				proposedService.Labels = map[string]string{"app": "test"}
+				proposedService.Annotations = map[string]string{"annotation": "test"}
+
+				err = reconciler.serviceReconciler(ctx, &cluster, proposedService, true)
+				Expect(err).NotTo(HaveOccurred())
+
+				var updatedService corev1.Service
+				err = serviceClient.Get(ctx, types.NamespacedName{
+					Name:      proposedService.Name,
+					Namespace: proposedService.Namespace,
+				}, &updatedService)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(updatedService.Labels).To(HaveKeyWithValue("custom-label", "value"))
+				Expect(updatedService.Annotations).To(HaveKeyWithValue("custom-annotation", "value"))
+			})
+		})
+	})
+
+	Describe("reconcilePostgresServices", func() {
+		It("should create the default services", func() {
+			err := reconciler.reconcilePostgresServices(ctx, &cluster)
+			Expect(err).NotTo(HaveOccurred())
+			err = reconciler.Client.Get(
+				ctx,
+				types.NamespacedName{Name: cluster.GetServiceReadWriteName(), Namespace: cluster.Namespace},
+				&corev1.Service{},
+			)
+			Expect(err).ToNot(HaveOccurred())
+			err = reconciler.Client.Get(
+				ctx,
+				types.NamespacedName{Name: cluster.GetServiceReadName(), Namespace: cluster.Namespace},
+				&corev1.Service{},
+			)
+			Expect(err).ToNot(HaveOccurred())
+			err = reconciler.Client.Get(
+				ctx,
+				types.NamespacedName{Name: cluster.GetServiceReadOnlyName(), Namespace: cluster.Namespace},
+				&corev1.Service{},
+			)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("should not create the default services", func() {
+			cluster.Spec.Managed.Services.DisabledDefaultServices = []apiv1.ServiceSelectorType{
+				apiv1.ServiceSelectorTypeRW,
+				apiv1.ServiceSelectorTypeRO,
+				apiv1.ServiceSelectorTypeR,
+			}
+			err := reconciler.reconcilePostgresServices(ctx, &cluster)
+			Expect(err).NotTo(HaveOccurred())
+			err = reconciler.Client.Get(
+				ctx,
+				types.NamespacedName{Name: cluster.GetServiceReadWriteName(), Namespace: cluster.Namespace},
+				&corev1.Service{},
+			)
+			Expect(apierrs.IsNotFound(err)).To(BeTrue())
+			err = reconciler.Client.Get(
+				ctx,
+				types.NamespacedName{Name: cluster.GetServiceReadName(), Namespace: cluster.Namespace},
+				&corev1.Service{},
+			)
+			Expect(apierrs.IsNotFound(err)).To(BeTrue())
+			err = reconciler.Client.Get(
+				ctx,
+				types.NamespacedName{Name: cluster.GetServiceReadOnlyName(), Namespace: cluster.Namespace},
+				&corev1.Service{},
+			)
+			Expect(apierrs.IsNotFound(err)).To(BeTrue())
+		})
 	})
 })

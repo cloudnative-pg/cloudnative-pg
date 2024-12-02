@@ -18,9 +18,12 @@ package specs
 
 import (
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 )
 
 // ClusterPodMonitorManager builds the PodMonitor for the cluster resource
@@ -43,6 +46,24 @@ func (c ClusterPodMonitorManager) BuildPodMonitor() *monitoringv1.PodMonitor {
 
 	endpoint := monitoringv1.PodMetricsEndpoint{
 		Port: "metrics",
+	}
+
+	if c.cluster.IsMetricsTLSEnabled() {
+		endpoint.Scheme = "https"
+		endpoint.TLSConfig = &monitoringv1.SafeTLSConfig{
+			CA: monitoringv1.SecretOrConfigMap{
+				Secret: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: c.cluster.GetServerCASecretName(),
+					},
+					Key: certs.CACertKey,
+				},
+			},
+			ServerName: ptr.To(c.cluster.GetServiceReadWriteName()),
+			// InsecureSkipVerify needs to be set to match the ssl_mode=verify-ca
+			// used by postgres when connecting to the other instances.
+			InsecureSkipVerify: ptr.To(true),
+		}
 	}
 
 	if c.cluster.Spec.Monitoring != nil {

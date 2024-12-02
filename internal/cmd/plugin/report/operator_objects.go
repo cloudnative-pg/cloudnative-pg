@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -28,7 +29,6 @@ import (
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
 const (
@@ -43,35 +43,15 @@ const (
 
 var errNoOperatorDeployment = fmt.Errorf("no deployment found")
 
+func getLabelOperatorsNamespace() string {
+	return labelOperatorKeyPrefix + plugin.Namespace
+}
+
 // getOperatorDeployment returns the operator Deployment if there is a single one running, error otherwise
 func getOperatorDeployment(ctx context.Context) (appsv1.Deployment, error) {
-	deployment, err := tryGetOperatorDeployment(ctx,
+	return tryGetOperatorDeployment(ctx,
 		ctrlclient.MatchingLabels{labelOperatorNameKey: labelOperatorName},
 		ctrlclient.InNamespace(plugin.Namespace))
-	if err != errNoOperatorDeployment {
-		return deployment, err
-	}
-
-	deployment, err = tryGetOperatorDeployment(ctx,
-		ctrlclient.HasLabels{labelOperatorKeyPrefix + "openshift-operators"},
-		ctrlclient.InNamespace(plugin.Namespace))
-	if err != errNoOperatorDeployment {
-		return deployment, err
-	}
-
-	deployment, err = tryGetOperatorDeployment(ctx,
-		ctrlclient.HasLabels{labelOperatorKeyPrefix + plugin.Namespace},
-		ctrlclient.InNamespace(plugin.Namespace))
-	if err == errNoOperatorDeployment {
-		return appsv1.Deployment{},
-			fmt.Errorf("could not get operator in namespace '%s': %w",
-				plugin.Namespace, err)
-	}
-	if err != nil {
-		return appsv1.Deployment{}, err
-	}
-
-	return deployment, nil
 }
 
 // tryGetOperatorDeployment tries to fetch the operator deployment from the
@@ -81,11 +61,17 @@ func tryGetOperatorDeployment(ctx context.Context, options ...ctrlclient.ListOpt
 	deploymentList := &appsv1.DeploymentList{}
 
 	if err := plugin.Client.List(ctx, deploymentList, options...); err != nil {
-		return appsv1.Deployment{}, err
+		return appsv1.Deployment{},
+			fmt.Errorf("could not get operator in namespace '%s': %w",
+				plugin.Namespace,
+				err,
+			)
 	}
 	// We check if we have one or more deployments
 	if len(deploymentList.Items) > 1 {
-		return appsv1.Deployment{}, fmt.Errorf("number of operator deployments bigger than 1")
+		return appsv1.Deployment{},
+			fmt.Errorf("could not get operator in namespace '%s': number of operator deployments bigger than 1",
+				plugin.Namespace)
 	}
 
 	if len(deploymentList.Items) == 1 {

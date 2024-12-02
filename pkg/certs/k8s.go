@@ -24,18 +24,16 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/cloudnative-pg/machinery/pkg/fileutils"
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/robfig/cron"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	v1 "k8s.io/api/core/v1"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
 var (
@@ -79,10 +77,6 @@ type PublicKeyInfrastructure struct {
 	// to inject the caBundle
 	ValidatingWebhookConfigurationName string
 
-	// The name of every CRD that has a reference to a conversion webhook
-	// on which we need to inject our public key
-	CustomResourceDefinitionsName []string
-
 	// The labelSelector to be used to get the operators deployment,
 	// e.g. "app.kubernetes.io/name=cloudnative-pg"
 	OperatorDeploymentLabelSelector string
@@ -91,7 +85,7 @@ type PublicKeyInfrastructure struct {
 // RenewLeafCertificate renew a secret containing a server
 // certificate given the secret containing the CA that will sign it.
 // Returns true if the certificate has been renewed
-func RenewLeafCertificate(caSecret *v1.Secret, secret *v1.Secret) (bool, error) {
+func RenewLeafCertificate(caSecret *v1.Secret, secret *v1.Secret, altDNSNames []string) (bool, error) {
 	// Verify the temporal validity of this CA
 	pair, err := ParseServerSecret(secret)
 	if err != nil {
@@ -102,7 +96,13 @@ func RenewLeafCertificate(caSecret *v1.Secret, secret *v1.Secret) (bool, error) 
 	if err != nil {
 		return false, err
 	}
-	if !expiring {
+
+	altDNSNamesMatch, err := pair.DoAltDNSNamesMatch(altDNSNames)
+	if err != nil {
+		return false, err
+	}
+
+	if !expiring && altDNSNamesMatch {
 		return false, nil
 	}
 
@@ -122,7 +122,7 @@ func RenewLeafCertificate(caSecret *v1.Secret, secret *v1.Secret) (bool, error) 
 		return false, err
 	}
 
-	err = pair.RenewCertificate(caPrivateKey, caCertificate)
+	err = pair.RenewCertificate(caPrivateKey, caCertificate, altDNSNames)
 	if err != nil {
 		return false, err
 	}
@@ -215,7 +215,7 @@ func renewCACertificate(ctx context.Context, kubeClient client.Client, secret *v
 		return nil, err
 	}
 
-	err = pair.RenewCertificate(privateKey, nil)
+	err = pair.RenewCertificate(privateKey, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -286,12 +286,6 @@ func (pki PublicKeyInfrastructure) setupWebhooksCertificate(
 		return nil, err
 	}
 
-	for _, name := range pki.CustomResourceDefinitionsName {
-		if err := pki.injectPublicKeyIntoCRD(ctx, kubeClient, name, webhookSecret); err != nil {
-			return nil, err
-		}
-	}
-
 	return webhookSecret, nil
 }
 
@@ -324,6 +318,10 @@ func (pki PublicKeyInfrastructure) schedulePeriodicMaintenance(
 func (pki PublicKeyInfrastructure) ensureCertificate(
 	ctx context.Context, kubeClient client.Client, caSecret *v1.Secret,
 ) (*v1.Secret, error) {
+	webhookHostname := fmt.Sprintf(
+		"%v.%v.svc",
+		pki.ServiceName,
+		pki.OperatorNamespace)
 	secret := &v1.Secret{}
 	// Checking if the secret already exist
 	if err := kubeClient.Get(
@@ -333,7 +331,7 @@ func (pki PublicKeyInfrastructure) ensureCertificate(
 	); err == nil {
 		// Verify the temporal validity of this certificate and
 		// renew it if needed
-		return renewServerCertificate(ctx, kubeClient, *caSecret, secret)
+		return renewServerCertificate(ctx, kubeClient, *caSecret, secret, []string{webhookHostname})
 	} else if !apierrors.IsNotFound(err) {
 		return nil, err
 	}
@@ -344,10 +342,6 @@ func (pki PublicKeyInfrastructure) ensureCertificate(
 		return nil, err
 	}
 
-	webhookHostname := fmt.Sprintf(
-		"%v.%v.svc",
-		pki.ServiceName,
-		pki.OperatorNamespace)
 	webhookPair, err := caPair.CreateAndSignPair(webhookHostname, CertTypeServer, nil)
 	if err != nil {
 		return nil, err
@@ -373,10 +367,10 @@ func (pki PublicKeyInfrastructure) ensureCertificate(
 // renewServerCertificate renews a server certificate if needed
 // Returns the renewed secret or the original one if unchanged
 func renewServerCertificate(
-	ctx context.Context, kubeClient client.Client, caSecret v1.Secret, secret *v1.Secret,
+	ctx context.Context, kubeClient client.Client, caSecret v1.Secret, secret *v1.Secret, altDNSNames []string,
 ) (*v1.Secret, error) {
 	origSecret := secret.DeepCopy()
-	hasBeenRenewed, err := RenewLeafCertificate(&caSecret, secret)
+	hasBeenRenewed, err := RenewLeafCertificate(&caSecret, secret, altDNSNames)
 	if err != nil {
 		return nil, err
 	}
@@ -458,33 +452,6 @@ func (pki PublicKeyInfrastructure) injectPublicKeyIntoValidatingWebhook(
 	}
 
 	return kubeClient.Patch(ctx, config, client.MergeFrom(oldConfig))
-}
-
-// injectPublicKeyIntoCRD inject the TLS public key into the admitted
-// ones from a certain conversion webhook inside a CRD
-func (pki PublicKeyInfrastructure) injectPublicKeyIntoCRD(
-	ctx context.Context,
-	kubeClient client.Client,
-	name string,
-	tlsSecret *v1.Secret,
-) error {
-	crd := apiextensionsv1.CustomResourceDefinition{}
-	err := kubeClient.Get(ctx, client.ObjectKey{Name: name}, &crd)
-	if err != nil {
-		return err
-	}
-
-	oldCrd := crd.DeepCopy()
-	if crd.Spec.Conversion == nil ||
-		crd.Spec.Conversion.Webhook == nil ||
-		crd.Spec.Conversion.Webhook.ClientConfig == nil ||
-		reflect.DeepEqual(crd.Spec.Conversion.Webhook.ClientConfig.CABundle, tlsSecret.Data["tls.crt"]) {
-		return nil
-	}
-
-	crd.Spec.Conversion.Webhook.ClientConfig.CABundle = tlsSecret.Data["tls.crt"]
-
-	return kubeClient.Patch(ctx, &crd, client.MergeFrom(oldCrd))
 }
 
 func isSecretsMountNotRefreshedError(err error) bool {

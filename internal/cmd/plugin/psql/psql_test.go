@@ -132,7 +132,7 @@ func fakePod(name, role string) corev1.Pod {
 			Name:      name,
 			Namespace: "default",
 			Labels: map[string]string{
-				utils.ClusterRoleLabelName: role,
+				utils.ClusterInstanceRoleLabelName: role,
 			},
 		},
 	}

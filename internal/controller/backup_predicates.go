@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -28,7 +29,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 

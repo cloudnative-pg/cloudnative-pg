@@ -23,10 +23,9 @@ import (
 	"slices"
 
 	"github.com/cloudnative-pg/cnpg-i/pkg/wal"
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	"go.uber.org/multierr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
 func (data *data) ArchiveWAL(
@@ -46,27 +45,25 @@ func (data *data) ArchiveWAL(
 	}
 
 	for idx := range data.plugins {
-		plugin := &data.plugins[idx]
+		plugin := data.plugins[idx]
 
-		if !slices.Contains(plugin.walCapabilities, wal.WALCapability_RPC_TYPE_ARCHIVE_WAL) {
+		if !slices.Contains(plugin.WALCapabilities(), wal.WALCapability_RPC_TYPE_ARCHIVE_WAL) {
 			continue
 		}
 
-		contextLogger := contextLogger.WithValues(
-			"pluginName", plugin.name,
-		)
+		pluginLogger := contextLogger.WithValues("pluginName", plugin.Name())
 		request := wal.WALArchiveRequest{
 			ClusterDefinition: serializedCluster,
 			SourceFileName:    sourceFileName,
 		}
 
-		contextLogger.Trace(
+		pluginLogger.Trace(
 			"Calling ArchiveWAL endpoint",
 			"clusterDefinition", request.ClusterDefinition,
 			"sourceFile", request.SourceFileName)
-		_, err := plugin.walClient.Archive(ctx, &request)
+		_, err := plugin.WALClient().Archive(ctx, &request)
 		if err != nil {
-			contextLogger.Error(err, "Error while calling ArchiveWAL, failing")
+			pluginLogger.Error(err, "Error while calling ArchiveWAL, failing")
 			return err
 		}
 	}
@@ -79,14 +76,14 @@ func (data *data) RestoreWAL(
 	cluster client.Object,
 	sourceWALName string,
 	destinationFileName string,
-) error {
+) (bool, error) {
 	var errorCollector error
 
 	contextLogger := log.FromContext(ctx)
 
 	serializedCluster, err := json.Marshal(cluster)
 	if err != nil {
-		return fmt.Errorf("while serializing %s %s/%s to JSON: %w",
+		return false, fmt.Errorf("while serializing %s %s/%s to JSON: %w",
 			cluster.GetObjectKind().GroupVersionKind().Kind,
 			cluster.GetNamespace(), cluster.GetName(),
 			err,
@@ -94,34 +91,32 @@ func (data *data) RestoreWAL(
 	}
 
 	for idx := range data.plugins {
-		plugin := &data.plugins[idx]
+		plugin := data.plugins[idx]
 
-		if !slices.Contains(plugin.walCapabilities, wal.WALCapability_RPC_TYPE_RESTORE_WAL) {
+		if !slices.Contains(plugin.WALCapabilities(), wal.WALCapability_RPC_TYPE_RESTORE_WAL) {
 			continue
 		}
 
-		contextLogger := contextLogger.WithValues(
-			"pluginName", plugin.name,
-		)
+		pluginLogger := contextLogger.WithValues("pluginName", plugin.Name())
 		request := wal.WALRestoreRequest{
 			ClusterDefinition:   serializedCluster,
 			SourceWalName:       sourceWALName,
 			DestinationFileName: destinationFileName,
 		}
 
-		contextLogger.Trace(
+		pluginLogger.Trace(
 			"Calling RestoreWAL endpoint",
 			"clusterDefinition", request.ClusterDefinition,
 			"sourceWALName", sourceWALName,
 			"destinationFileName", destinationFileName,
 		)
-		if _, err := plugin.walClient.Restore(ctx, &request); err != nil {
-			contextLogger.Trace("WAL restore via plugin failed, trying next one", "err", err)
+		if _, err := plugin.WALClient().Restore(ctx, &request); err != nil {
+			pluginLogger.Trace("WAL restore via plugin failed, trying next one", "err", err)
 			errorCollector = multierr.Append(errorCollector, err)
 		} else {
-			return nil
+			return true, nil
 		}
 	}
 
-	return errorCollector
+	return false, errorCollector
 }

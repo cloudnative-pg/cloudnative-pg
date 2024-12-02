@@ -22,8 +22,9 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/cloudnative-pg/machinery/pkg/fileutils"
+
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -84,7 +85,7 @@ var _ = Describe("testing primary instance methods", Ordered, func() {
 	It("should correctly restore pg_control from the pg_control.old file", func() {
 		data := []byte("pgControlFakeData")
 
-		err := fileutils.EnsureParentDirectoryExist(pgControlOld)
+		err := fileutils.EnsureParentDirectoryExists(pgControlOld)
 		Expect(err).ToNot(HaveOccurred())
 
 		err = os.WriteFile(pgControlOld, data, 0o600)
@@ -99,7 +100,7 @@ var _ = Describe("testing primary instance methods", Ordered, func() {
 	It("should properly remove pg_control file", func() {
 		data := []byte("pgControlFakeData")
 
-		err := fileutils.EnsureParentDirectoryExist(pgControlOld)
+		err := fileutils.EnsureParentDirectoryExists(pgControlOld)
 		Expect(err).ToNot(HaveOccurred())
 
 		err = os.WriteFile(pgControl, data, 0o600)
@@ -110,7 +111,7 @@ var _ = Describe("testing primary instance methods", Ordered, func() {
 	})
 
 	It("should fail if the pg_control file has issues", func() {
-		err := fileutils.EnsureParentDirectoryExist(pgControl)
+		err := fileutils.EnsureParentDirectoryExists(pgControl)
 		Expect(err).ToNot(HaveOccurred())
 
 		err = os.WriteFile(pgControl, nil, 0o600)
@@ -226,7 +227,7 @@ var _ = Describe("check atomic bool", func() {
 	})
 })
 
-var _ = Describe("ALTER SYSTEM enable and disable", func() {
+var _ = Describe("ALTER SYSTEM enable and disable in PostgreSQL <17", func() {
 	var instance Instance
 	var autoConfFile string
 
@@ -243,7 +244,7 @@ var _ = Describe("ALTER SYSTEM enable and disable", func() {
 	})
 
 	It("should be able to enable ALTER SYSTEM", func() {
-		err := instance.SetAlterSystemEnabled(true)
+		err := instance.SetPostgreSQLAutoConfWritable(true)
 		Expect(err).ToNot(HaveOccurred())
 
 		info, err := os.Stat(autoConfFile)
@@ -253,7 +254,7 @@ var _ = Describe("ALTER SYSTEM enable and disable", func() {
 	})
 
 	It("should be able to disable ALTER SYSTEM", func() {
-		err := instance.SetAlterSystemEnabled(false)
+		err := instance.SetPostgreSQLAutoConfWritable(false)
 		Expect(err).ToNot(HaveOccurred())
 
 		info, err := os.Stat(autoConfFile)

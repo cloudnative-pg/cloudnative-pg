@@ -24,21 +24,23 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/machinery/pkg/log"
 )
 
 // TryInvokeQuitEndpoint executes a post request on the /quitquitquit endpoint. Returns any errors encountered if
 // the service exists
 func TryInvokeQuitEndpoint(ctx context.Context) error {
 	const endpoint = "http://localhost:15000/quitquitquit"
-	logger := log.FromContext(ctx)
+	logger := log.FromContext(ctx).WithName("try_invoke_quit_quit_endpoint")
 
 	clientHTTP := http.Client{Timeout: 5 * time.Second}
 	resp, err := clientHTTP.Post(endpoint, "", nil)
 	if errors.Is(err, syscall.ECONNREFUSED) || os.IsTimeout(err) {
+		logger.Debug("received ECONNREFUSED, ignoring the error", "endpoint", endpoint)
 		return nil
 	}
 	if err != nil {
+		logger.Error(err, "while invoking the /quitquitquit endpoint", "endpoint", endpoint)
 		return err
 	}
 	if closeErr := resp.Body.Close(); closeErr != nil {

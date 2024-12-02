@@ -17,6 +17,8 @@ limitations under the License.
 package walrestore
 
 import (
+	"k8s.io/utils/ptr"
+
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -58,7 +60,7 @@ var _ = Describe("Function isStreamingAvailable", func() {
 					},
 				},
 				ReplicaCluster: &apiv1.ReplicaClusterConfiguration{
-					Enabled: true,
+					Enabled: ptr.To(true),
 					Source:  "clusterSource",
 				},
 			},
@@ -79,7 +81,7 @@ var _ = Describe("Function isStreamingAvailable", func() {
 					},
 				},
 				ReplicaCluster: &apiv1.ReplicaClusterConfiguration{
-					Enabled: true,
+					Enabled: ptr.To(true),
 					Source:  "clusterSource",
 				},
 			},
@@ -100,7 +102,7 @@ var _ = Describe("Function isStreamingAvailable", func() {
 					},
 				},
 				ReplicaCluster: &apiv1.ReplicaClusterConfiguration{
-					Enabled: true,
+					Enabled: ptr.To(true),
 					Source:  "clusterSource",
 				},
 			},

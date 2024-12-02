@@ -23,13 +23,10 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Set default queries", func() {
+var _ = Describe("Set default queries", Ordered, func() {
 	q := NewQueriesCollector("test", nil, "db")
 
 	It("does assign nothing with empty default queries", func() {
-		Expect(q.userQueries).To(BeEmpty())
-		Expect(q.mappings).To(BeEmpty())
-		Expect(q.variableLabels).To(BeEmpty())
 		Expect(q.userQueries).To(BeEmpty())
 		Expect(q.mappings).To(BeEmpty())
 		Expect(q.variableLabels).To(BeEmpty())

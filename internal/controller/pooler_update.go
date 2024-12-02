@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,7 +30,6 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs/pgbouncer"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -40,15 +40,15 @@ func (r *PoolerReconciler) updateOwnedObjects(
 	pooler *apiv1.Pooler,
 	resources *poolerManagedResources,
 ) error {
-	if err := r.updateDeployment(ctx, pooler, resources); err != nil {
-		return err
-	}
-
 	if err := r.updateServiceAccount(ctx, pooler, resources); err != nil {
 		return err
 	}
 
 	if err := r.updateRBAC(ctx, pooler, resources); err != nil {
+		return err
+	}
+
+	if err := r.updateDeployment(ctx, pooler, resources); err != nil {
 		return err
 	}
 
@@ -99,7 +99,13 @@ func (r *PoolerReconciler) updateDeployment(
 		}
 
 		deployment := resources.Deployment.DeepCopy()
-		deployment.Spec = generatedDeployment.Spec
+		deployment.Spec.Replicas = generatedDeployment.Spec.Replicas
+
+		// If the Pooler is annotated with `cnpg.io/reconcilePodSpec: disabled`,
+		// we avoid patching the deployment spec, except the number replicas
+		if !utils.IsPodSpecReconciliationDisabled(&pooler.ObjectMeta) {
+			deployment.Spec = generatedDeployment.Spec
+		}
 
 		utils.MergeObjectsMetadata(deployment, generatedDeployment)
 
@@ -309,7 +315,7 @@ func (r *PoolerReconciler) ensureServiceAccountPullSecret(
 	}
 
 	// we reconcile only if the secret is owned by us
-	if _, isOwned := isOwnedByPooler(&remoteSecret); !isOwned {
+	if _, isOwned := isOwnedByPoolerKind(&remoteSecret); !isOwned {
 		return pullSecretName, nil
 	}
 	if reflect.DeepEqual(remoteSecret.Data, secret.Data) && reflect.DeepEqual(remoteSecret.Type, secret.Type) {

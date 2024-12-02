@@ -25,14 +25,14 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"runtime/debug"
 	"time"
 
+	"github.com/cloudnative-pg/machinery/pkg/fileutils"
+	"github.com/cloudnative-pg/machinery/pkg/fileutils/compatibility"
+	"github.com/cloudnative-pg/machinery/pkg/log"
+
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/concurrency"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils/compatibility"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
 type lineHandler func(line []byte)
@@ -105,7 +105,7 @@ func (p *LineLogPipe) Start(ctx context.Context) error {
 			}
 
 			// check if the directory exists
-			if err := fileutils.EnsureDirectoryExists(filepath.Dir(p.fileName)); err != nil {
+			if err := fileutils.EnsureParentDirectoryExists(p.fileName); err != nil {
 				filenameLog.Error(err, "Error checking if the directory exists")
 				continue
 			}
@@ -180,6 +180,7 @@ func (p *LineLogPipe) collectLogsFromFile(ctx context.Context) error {
 // decoded invalid line
 func (p *LineLogPipe) streamLogFromFile(ctx context.Context, reader io.Reader) error {
 	scanner := bufio.NewScanner(reader)
+	scanner.Buffer(make([]byte, 0, 4096), 1024*1024)
 	for scanner.Scan() {
 		line := scanner.Bytes()
 		p.handler(line)

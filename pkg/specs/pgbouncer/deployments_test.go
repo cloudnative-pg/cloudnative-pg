@@ -23,11 +23,11 @@ import (
 	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	config "github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	pgBouncerConfig "github.com/cloudnative-pg/cloudnative-pg/pkg/management/pgbouncer/config"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/hash"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -76,7 +76,7 @@ var _ = Describe("Deployment", func() {
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(deployment).ToNot(BeNil())
 
-		expectedHash, err := hash.ComputeVersionedHash(pooler.Spec, 3)
+		expectedHash, err := computeTemplateHash(pooler, config.Current.OperatorImageName)
 		Expect(err).ShouldNot(HaveOccurred())
 
 		// Check the computed hash

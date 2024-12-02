@@ -19,8 +19,12 @@ package utils
 
 import (
 	"errors"
+	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
+	"regexp"
+	"slices"
 	"sort"
 	"strings"
 
@@ -60,25 +64,31 @@ func GetAvailableReleases(releasesPath string) ([]*semver.Version, error) {
 		return nil, err
 	}
 
-	for i, file := range fileInfo {
-		if !strings.HasSuffix(file.Name(), ".yaml") {
-			fileInfo = append(fileInfo[:i], fileInfo[i+1:]...)
+	validFiles := make([]fs.DirEntry, 0, len(fileInfo))
+	for _, file := range fileInfo {
+		if strings.HasSuffix(file.Name(), ".yaml") && !strings.Contains(file.Name(), "-rc") {
+			validFiles = append(validFiles, file)
 		}
 	}
 
-	versions := make([]*semver.Version, len(fileInfo))
+	versions := make([]*semver.Version, len(validFiles))
 
 	// build the array that contains the versions
 	// found in the releasePath directory
-	for i, file := range fileInfo {
-		tag := extractTag(file.Name())
+	for i, file := range validFiles {
+		tag, err := extractTag(file.Name())
+		if err != nil {
+			continue
+		}
 		versions[i] = semver.MustParse(tag)
 	}
 
 	// Sorting version as descending order ([v1.10.0, v1.9.0...])
 	sort.Sort(sort.Reverse(semver.Collection(versions)))
 
-	return versions, nil
+	return slices.CompactFunc(versions, func(a, b *semver.Version) bool {
+		return a.Equal(b)
+	}), nil
 }
 
 func isReleasePullRequestBranch() bool {
@@ -93,9 +103,13 @@ func isReleasePullRequestBranch() bool {
 	return strings.HasPrefix(branchName, "release/v")
 }
 
-func extractTag(releaseFile string) string {
-	releaseFile = strings.TrimPrefix(releaseFile, "cnpg-")
-	tag := strings.TrimSuffix(releaseFile, ".yaml")
+var extractTagRegex = regexp.MustCompile(`-(\d+\.\d+\.\d+).yaml$`)
 
-	return tag
+func extractTag(releaseFile string) (string, error) {
+	matches := extractTagRegex.FindStringSubmatch(releaseFile)
+	if len(matches) == 0 {
+		return "", fmt.Errorf("could not extract tag from filename %s", releaseFile)
+	}
+	// since the regex is matched, the second fragment contains the submatch
+	return matches[1], nil
 }

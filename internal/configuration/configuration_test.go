@@ -17,6 +17,8 @@ limitations under the License.
 package configuration
 
 import (
+	"time"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -126,5 +128,43 @@ var _ = Describe("Annotation and label inheritance", func() {
 				"pg_prod",
 			}))
 		})
+	})
+
+	Context("included plugin list", func() {
+		It("is empty by default", func() {
+			Expect(newDefaultConfig().GetIncludePlugins()).To(BeEmpty())
+		})
+
+		It("contains a set of comma-separated plugins", func() {
+			Expect((&Data{
+				IncludePlugins: "a,b,c",
+			}).GetIncludePlugins()).To(ContainElements("a", "b", "c"))
+			Expect((&Data{
+				IncludePlugins: "a,,,b,c",
+			}).GetIncludePlugins()).To(ContainElements("a", "b", "c"))
+			Expect((&Data{
+				IncludePlugins: "a,,,b , c",
+			}).GetIncludePlugins()).To(ContainElements("a", "b", "c"))
+		})
+	})
+
+	It("returns correct delay for clusters rollout", func() {
+		config := Data{ClustersRolloutDelay: 10}
+		Expect(config.GetClustersRolloutDelay()).To(Equal(10 * time.Second))
+	})
+
+	It("returns zero as default delay for clusters rollout when not set", func() {
+		config := Data{}
+		Expect(config.GetClustersRolloutDelay()).To(BeZero())
+	})
+
+	It("returns correct delay for instances rollout", func() {
+		config := Data{InstancesRolloutDelay: 5}
+		Expect(config.GetInstancesRolloutDelay()).To(Equal(5 * time.Second))
+	})
+
+	It("returns zero as default delay for instances rollout when not set", func() {
+		config := Data{}
+		Expect(config.GetInstancesRolloutDelay()).To(BeZero())
 	})
 })

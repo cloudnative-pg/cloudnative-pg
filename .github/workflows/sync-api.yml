@@ -1,0 +1,17 @@
+name: Sync API
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  trigger-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Invoke repository dispatch
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.REPO_GHA_PAT }}
+          repository: cloudnative-pg/api
+          event-type: sync-api

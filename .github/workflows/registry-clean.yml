@@ -9,8 +9,6 @@ on:
 
 env:
   IMAGE_NAME: "cloudnative-pg-testing"
-  ORG_NAME: "cloudnative-pg"
-  SNOK_TOKEN: ${{ secrets.REPO_GHA_PAT }}
   CONTAINER_IMAGE_NAMES: "pgbouncer-testing, postgresql-testing, postgis-testing"
 
 jobs:
@@ -18,25 +16,21 @@ jobs:
     name: delete old testing container images
     runs-on: ubuntu-latest
     steps:
-    # once issue https://github.com/snok/container-retention-policy/issues/33 is fixed
-    # we can merge the two steps into one
-      - name: Delete '-testing' images for ${{ env.IMAGE_NAME }}
-        uses: snok/container-retention-policy@v2
+      - name: Delete '-testing' operator images in ${{ env.IMAGE_NAME }}
+        uses: snok/container-retention-policy@v3.0.0
         with:
           image-names: ${{ env.IMAGE_NAME }}
-          cut-off: 5 days ago UTC
-          keep-at-least: 1
-          account-type: org
-          org-name: ${{ env.ORG_NAME }}
-          # use the GITHUB_TOKEN when issue https://github.com/snok/container-retention-policy/issues/27 is fixed
-          token: ${{ env.SNOK_TOKEN }}
-      - name: Delete '-testing' images for containers
-        uses: snok/container-retention-policy@v2
+          cut-off: 5d
+          keep-n-most-recent: 1
+          account: ${{ github.repository_owner }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Delete '-testing' operand images
+        uses: snok/container-retention-policy@v3.0.0
+        if: ${{ github.repository_owner == 'cloudnative-pg' }}
         with:
           image-names: ${{ env.CONTAINER_IMAGE_NAMES }}
-          cut-off: A week ago UTC
-          keep-at-least: 1
-          account-type: org
-          org-name: ${{ env.ORG_NAME }}
-          # use the GITHUB_TOKEN when issue https://github.com/snok/container-retention-policy/issues/27 is fixed
-          token: ${{ env.SNOK_TOKEN }}
+          cut-off: 1w
+          keep-n-most-recent: 1
+          account: "cloudnative-pg"
+          token: ${{ secrets.REPO_GHA_PAT }}

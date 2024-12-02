@@ -108,6 +108,7 @@ var _ = Describe("ColumnMapping ToMetricMap", func() {
 			Expect(math.IsNaN(val)).To(BeTrue())
 		})
 	})
+
 	Context("when usage is LABEL", func() {
 		It("should return expected MetricMapSet", func() {
 			columnMapping := ColumnMapping{
@@ -212,6 +213,23 @@ var _ = Describe("ColumnMapping ToMetricMap", func() {
 
 			_, ok := result[columnName].Conversion("unknown")
 			Expect(ok).To(BeFalse())
+		})
+	})
+
+	Context("when overriding the column name", func() {
+		It("should set the correct description", func() {
+			customColumnName := "custom_column"
+			columnName := "gauge_column"
+
+			columnMapping := ColumnMapping{
+				Name:  customColumnName,
+				Usage: "GAUGE",
+			}
+
+			result := columnMapping.ToMetricMap(columnName, namespace, variableLabels)
+			Expect(result[columnName].Desc.String()).To(Equal(prometheus.NewDesc(
+				fmt.Sprintf("%s_%s", namespace, customColumnName),
+				"", variableLabels, nil).String()))
 		})
 	})
 })

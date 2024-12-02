@@ -5,3 +5,6 @@ resources:
 - postgresql_v1_scheduledbackup.yaml
 - postgresql_v1_imagecatalog.yaml
 - postgresql_v1_clusterimagecatalog.yaml
+- postgresql_v1_database.yaml
+- postgresql_v1_publication.yaml
+- postgresql_v1_subscription.yaml

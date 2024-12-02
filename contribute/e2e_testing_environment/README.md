@@ -141,6 +141,8 @@ The script can be configured through the following environment variables:
   blob storage
 * `AZURE_STORAGE_KEY`: Azure storage key to test backup and restore, using Barman Cloud on Azure
   blob storage
+* `TEST_DEPTH`: maximum test level included in the run.
+   From `0` (only critical tests) to `4` (all the tests), default `2`
 * `FEATURE_TYPE`: Feature type key to run e2e based on feature labels.Ex: smoke, basic, security... details
   can be fetched from labels file [`tests/labels.go`](../../tests/labels.go)
 
@@ -204,6 +206,8 @@ exported, it will select all medium test cases from the feature type provided.
 | `security`                        |
 | `maintenance`                     |
 | `tablespaces`                     |
+| `publication-subscription`        |
+| `declarative-databases`           |
 
 ex:
 ```shell
@@ -302,53 +306,67 @@ choosing between `kind` or K3d engine.
 
 ### Running E2E tests on a fork of the repository
 
-Additionally, if you fork the repository and want to run the tests on your fork, you can do so with the `/test` command.
-
-`/test` is used to trigger a run of the end-to-end tests in the GitHub Actions. Only users who have `write` permission
-to the repository can use this command. The format of `/test`
-
-      `/test options`
+Additionally, if you fork the repository and want to run the tests on your fork, you can do so
+by running the `/test` command in a Pull Request opened in your forked repository.
+`/test` is used to trigger a run of the end-to-end tests in the GitHub Actions.
+Only users who have `write` permission to the repository can use this command.
 
 Options supported are:
 
-- test_level (level or tl for short)  
-  The priority of test to run, If test level is set, all tests with that priority and higher will
-  be triggered. Default value for the test level is 4. Available values are:
+- test_level (`level` or `tl` for short)
+  Each e2e test defines its own importance from 0(highest) to 4(lowest).
+  With `test_level` you can choose which tests the suite should be running.
+  If `test_level` is set, all tests with that importance or higher will be triggered.
+  E.g. selecting `1` will only run level `1` (high) and `0` (highest) tests.
+  Available values are:
   - 0: highest
   - 1: high
   - 2: medium
   - 3: low
-  - 4: lowest
+  - 4: lowest (default)
 
-- depth (d for short)   
-  The type of test to run. Default value is `main`, available values
-  are:
-  - push
-  - main
-  - pull_request
-  - schedule
-- feature_type (type or ft for short)  
-  The label for the end-to-end test to be run, empty value means all labels. Default value is empty, available
-  type are: [listed above in the feature types section](https://github.com/cloudnative-pg/cloudnative-pg/tree/main/contribute/e2e_testing_environment#using-feature-type-test-selectionfilter)
-- log_level (ll for short)    
-  Defines the log value for cloudNativePG operator, which will be specified as the value for `--log-value` in the 
-  operator command.
-  Default value is info and available values are: `error, warning, info, debug, trace`
-- build_plugin (plugin or bp for short)  
-  Whether to run the build cnpg plugin job in the end-to-end test. Available values are true and false and default value
-  is false.
+- depth (`d` for short)
+  Depth determines the matrix of K8S_VERSION x POSTGRES_VERSION jobs where E2E tests will be executed.
+  Default value is `main`. Available values are:
+  - push:
+    * oldest K8S_VERSION x oldest POSTGRES_VERSION
+    * latest K8S_VERSION x latest POSTGRES_VERSION
+    * no cloud providers
+  - main:
+    * each K8S_VERSION x oldest POSTGRES_VERSION
+    * each K8S_VERSION x latest POSTGRES_VERSION
+    * latest K8S_VERSION x each POSTGRES_VERSION
+    * On cloud providers: latest K8S_VERSION x latest POSTGRES_VERSION
+  - pull_request:
+    * same as `main`
+  - schedule:
+    * same as `main`
+    * On cloud providers: each K8S_VERSION x latest POSTGRES_VERSION
+
+- feature_type (`type` or `ft` for short)
+  A label to select a subset of E2E tests to be run, divided by functionality.
+  Empty value means no filter is applied. Default value is empty.
+  Available options are: [Relate to the feature types section](#using-feature-type-test-selectionfilter)
+
+- log_level (`ll` for short)
+  Defines the log value for CloudNativePG operator, which will be specified as the value for the `--log-value`
+  argument in the operator command. Available values are:
+  - error
+  - warning
+  - info
+  - debug (default)
+  - trace
 
 Example:
-1. Trigger an e2e test to run all test cases with `highest` test level, we want
-   to cover most Kubernetes and Postgres metrics
-
-  ```
-     /test -tl=0 d=schedule
-  ```
-2. Run smoke and upgrade test for the pull request
-  ```
-     /test type=smoke,upgrade
-  ```
+1. Trigger an e2e test to run all test cases with `lowest` test level.
+   We want to cover most Kubernetes x Postgres combinations.
+   ```
+      /test tl=4 d=schedule
+   ```
+2. Run only smoke and upgrade tests
+   ```
+      /test type=smoke,upgrade
+   ```
 
 ## Storage class for volume snapshots on Kind
 

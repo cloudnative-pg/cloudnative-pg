@@ -21,6 +21,7 @@ import (
 	"context"
 	"os"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/kballard/go-shellquote"
 	"github.com/spf13/cobra"
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
@@ -28,7 +29,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/istio"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/linkerd"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
 
@@ -46,40 +46,43 @@ func NewCmd() *cobra.Command {
 	var postInitSQLStr string
 	var postInitApplicationSQLStr string
 	var postInitTemplateSQLStr string
+	var postInitSQLRefsFolder string
 	var postInitApplicationSQLRefsFolder string
+	var postInitTemplateSQLRefsFolder string
 
 	cmd := &cobra.Command{
 		Use: "init [options]",
 		PreRunE: func(cmd *cobra.Command, _ []string) error {
-			return management.WaitKubernetesAPIServer(cmd.Context(), ctrl.ObjectKey{
+			return management.WaitForGetCluster(cmd.Context(), ctrl.ObjectKey{
 				Name:      clusterName,
 				Namespace: namespace,
 			})
 		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
+			contextLogger := log.FromContext(ctx)
 
 			initDBFlags, err := shellquote.Split(initDBFlagsString)
 			if err != nil {
-				log.Error(err, "Error while parsing initdb flags")
+				contextLogger.Error(err, "Error while parsing initdb flags")
 				return err
 			}
 
 			postInitSQL, err := shellquote.Split(postInitSQLStr)
 			if err != nil {
-				log.Error(err, "Error while parsing post init SQL queries")
+				contextLogger.Error(err, "Error while parsing post init SQL queries")
 				return err
 			}
 
 			postInitApplicationSQL, err := shellquote.Split(postInitApplicationSQLStr)
 			if err != nil {
-				log.Error(err, "Error while parsing post init template SQL queries")
+				contextLogger.Error(err, "Error while parsing post init template SQL queries")
 				return err
 			}
 
 			postInitTemplateSQL, err := shellquote.Split(postInitTemplateSQLStr)
 			if err != nil {
-				log.Error(err, "Error while parsing post init template SQL queries")
+				contextLogger.Error(err, "Error while parsing post init template SQL queries")
 				return err
 			}
 
@@ -96,9 +99,11 @@ func NewCmd() *cobra.Command {
 				PostInitSQL:            postInitSQL,
 				PostInitApplicationSQL: postInitApplicationSQL,
 				PostInitTemplateSQL:    postInitTemplateSQL,
-				// if the value to postInitApplicationSQLRefsFolder is empty,
-				// bootstrap will do nothing for post init application SQL refs.
+				// If the value for an SQLRefsFolder is empty,
+				// bootstrap will do nothing for that specific PostInit option.
 				PostInitApplicationSQLRefsFolder: postInitApplicationSQLRefsFolder,
+				PostInitTemplateSQLRefsFolder:    postInitTemplateSQLRefsFolder,
+				PostInitSQLRefsFolder:            postInitSQLRefsFolder,
 			}
 
 			return initSubCommand(ctx, info)
@@ -133,22 +138,26 @@ func NewCmd() *cobra.Command {
 		"The list of SQL queries to be executed inside application database right after the database is created")
 	cmd.Flags().StringVar(&postInitTemplateSQLStr, "post-init-template-sql", "",
 		"The list of SQL queries to be executed inside template1 database to configure the new instance")
+	cmd.Flags().StringVar(&postInitSQLRefsFolder, "post-init-sql-refs-folder",
+		"", "The folder contains a set of SQL files to be executed in alphabetical order")
 	cmd.Flags().StringVar(&postInitApplicationSQLRefsFolder, "post-init-application-sql-refs-folder",
 		"", "The folder contains a set of SQL files to be executed in alphabetical order "+
 			"against the application database immediately after its creation")
-
+	cmd.Flags().StringVar(&postInitTemplateSQLRefsFolder, "post-init-template-sql-refs-folder",
+		"", "The folder contains a set of SQL files to be executed in alphabetical order")
 	return cmd
 }
 
 func initSubCommand(ctx context.Context, info postgres.InitInfo) error {
-	err := info.VerifyPGData()
+	contextLogger := log.FromContext(ctx)
+	err := info.CheckTargetDataDirectory(ctx)
 	if err != nil {
 		return err
 	}
 
 	err = info.Bootstrap(ctx)
 	if err != nil {
-		log.Error(err, "Error while bootstrapping data directory")
+		contextLogger.Error(err, "Error while bootstrapping data directory")
 		return err
 	}
 

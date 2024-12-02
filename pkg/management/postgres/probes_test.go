@@ -98,10 +98,9 @@ var _ = Describe("probes", func() {
 		})
 
 		It("set the information", func() {
-			instance := &Instance{
+			instance := (&Instance{
 				pgVersion: &semver.Version{Major: 13},
-				PodName:   "test-1",
-			}
+			}).WithPodName("test-1")
 			status := &postgres.PostgresqlStatus{
 				IsPrimary: false,
 			}

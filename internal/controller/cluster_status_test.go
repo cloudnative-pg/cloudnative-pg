@@ -142,7 +142,7 @@ var _ = Describe("cluster_status unit tests", func() {
 			DiscoveryClient: env.clusterReconciler.DiscoveryClient,
 			Scheme:          env.clusterReconciler.Scheme,
 			Recorder:        env.clusterReconciler.Recorder,
-			StatusClient:    env.clusterReconciler.StatusClient,
+			InstanceClient:  env.clusterReconciler.InstanceClient,
 		}
 
 		namespace := newFakeNamespace(env.client)

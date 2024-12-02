@@ -107,8 +107,10 @@ spec:
   maintainers:
     - email: jonathan.gonzalez@enterprisedb.com
       name: Jonathan Gonzalez V.
-    - email: john.long@enterprisedb.com
-      name: John Long
+    - email: jonathan.battiato@enterprisedb.com
+      name: Jonathan Battiato
+    - email: niccolo.fei@enterprisedb.com
+      name: Niccolo Fei
     - email: gabriele.bartolini@enterprisedb.com
       name: Gabriele Bartolini
   maturity: stable
@@ -642,7 +644,6 @@ spec:
       - displayName: Last backup
         description: When the last backup was scheduled
         path: lastScheduleTime
-
     - kind: ImageCatalog
       name: imagecatalogs.postgresql.cnpg.io
       displayName: Image Catalog
@@ -675,3 +676,72 @@ spec:
       - path: images.image
         x-descriptors:
           - 'urn:alm:descriptor:com.tectonic.ui:text'
+    - kind: Database
+      name: databases.postgresql.cnpg.io
+      displayName: Database management
+      description: Declarative database management
+      version: v1
+      resources:
+      - kind: Cluster
+        name: ''
+        version: v1
+      specDescriptors:
+      - path: databaseReclaimPolicy
+        displayName: Database reclaim policy
+        description: Database reclaim policy
+      - path: cluster
+        displayName: Cluster requested to create the database
+        description: Cluster requested to create the database
+      - path: name
+        displayName: Database name
+        description: Database name
+      - path: owner
+        displayName: Database Owner
+        description: Database Owner
+    - kind: Publication
+      name: publications.postgresql.cnpg.io
+      displayName: Publication
+      description: Declarative publication
+      version: v1
+      resources:
+        - kind: Cluster
+          name: ''
+          version: v1
+      specDescriptors:
+        - path: name
+          displayName: Publication name
+          description: Publication name
+        - path: dbname
+          displayName: Database name
+          description: Database name
+        - path: cluster
+          displayName: Cluster requested to create the publication
+          description: Cluster requested to create the publication
+        - path: target
+          displayName: Publication target
+          description: Publication target
+    - kind: Subscription
+      name: subscriptions.postgresql.cnpg.io
+      displayName: Subscription
+      description: Declarative subscription
+      version: v1
+      resources:
+        - kind: Cluster
+          name: ''
+          version: v1
+      specDescriptors:
+        - path: name
+          displayName: Subscription name
+          description: Subscription name
+        - path: dbname
+          displayName: Database name
+          description: Database name
+        - path: publicationName
+          displayName: Publication name
+          description: Publication name
+        - path: cluster
+          displayName: Cluster requested to create the subscription
+          description: Cluster requested to create the subscription
+        - path: externalClusterName
+          displayName: Name of the external cluster with publication
+          description: Name of the external cluster with publication

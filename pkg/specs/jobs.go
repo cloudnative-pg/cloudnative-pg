@@ -19,23 +19,30 @@ package specs
 import (
 	"fmt"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/kballard/go-shellquote"
-	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
+type postInitFolder string
+
 const (
-	// postInitApplicationSQLRefsFolder points to the folder of
-	// postInitApplicationSQL files in the primary job with initdb.
-	postInitApplicationSQLRefsFolder = "/etc/post-init-application-sql"
+	// Each SQLRefsFolder entry points to the related folder containing
+	// its post init SQL files, in the primary job with initdb.
+	postInitApplicationSQLRefsFolder postInitFolder = "/etc/post-init-application-sql"
+	postInitTemplateQLRefsFolder     postInitFolder = "/etc/post-init-template-sql"
+	postInitSQLRefsFolder            postInitFolder = "/etc/post-init-sql"
 )
+
+func (p postInitFolder) toString() string {
+	return string(p)
+}
 
 // CreatePrimaryJobViaInitdb creates a new primary instance in a Pod
 func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int) *batchv1.Job {
@@ -84,7 +91,17 @@ func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int) *batchv1.J
 
 	if cluster.ShouldInitDBRunPostInitApplicationSQLRefs() {
 		initCommand = append(initCommand,
-			"--post-init-application-sql-refs-folder", postInitApplicationSQLRefsFolder)
+			"--post-init-application-sql-refs-folder", postInitApplicationSQLRefsFolder.toString())
+	}
+
+	if cluster.ShouldInitDBRunPostInitTemplateSQLRefs() {
+		initCommand = append(initCommand,
+			"--post-init-template-sql-refs-folder", postInitTemplateQLRefsFolder.toString())
+	}
+
+	if cluster.ShouldInitDBRunPostInitSQLRefs() {
+		initCommand = append(initCommand,
+			"--post-init-sql-refs-folder", postInitSQLRefsFolder.toString())
 	}
 
 	return createPrimaryJob(cluster, nodeSerial, jobRoleInitDB, initCommand)
@@ -140,7 +157,7 @@ func buildInitDBFlags(cluster apiv1.Cluster) (initCommand []string) {
 func CreatePrimaryJobViaRestoreSnapshot(
 	cluster apiv1.Cluster,
 	nodeSerial int,
-	snapshot storagesnapshotv1.VolumeSnapshot,
+	object *metav1.ObjectMeta,
 	backup *apiv1.Backup,
 ) *batchv1.Job {
 	initCommand := []string{
@@ -149,13 +166,13 @@ func CreatePrimaryJobViaRestoreSnapshot(
 		"restoresnapshot",
 	}
 
-	if snapshot.Annotations[utils.BackupLabelFileAnnotationName] != "" {
-		flag := fmt.Sprintf("--backuplabel=%s", snapshot.Annotations[utils.BackupLabelFileAnnotationName])
+	if object.Annotations[utils.BackupLabelFileAnnotationName] != "" {
+		flag := fmt.Sprintf("--backuplabel=%s", object.Annotations[utils.BackupLabelFileAnnotationName])
 		initCommand = append(initCommand, flag)
 	}
 
-	if snapshot.Annotations[utils.BackupTablespaceMapFileAnnotationName] != "" {
-		flag := fmt.Sprintf("--tablespacemap=%s", snapshot.Annotations[utils.BackupTablespaceMapFileAnnotationName])
+	if object.Annotations[utils.BackupTablespaceMapFileAnnotationName] != "" {
+		flag := fmt.Sprintf("--tablespacemap=%s", object.Annotations[utils.BackupTablespaceMapFileAnnotationName])
 		initCommand = append(initCommand, flag)
 	}
 
@@ -361,8 +378,29 @@ func createPrimaryJob(cluster apiv1.Cluster, nodeSerial int, role jobRole, initC
 	}
 
 	if cluster.ShouldInitDBRunPostInitApplicationSQLRefs() {
-		volumes, volumeMounts := createVolumesAndVolumeMountsForPostInitApplicationSQLRefs(
+		volumes, volumeMounts := createVolumesAndVolumeMountsForSQLRefs(
+			postInitApplicationSQLRefsFolder,
 			cluster.Spec.Bootstrap.InitDB.PostInitApplicationSQLRefs,
+		)
+		job.Spec.Template.Spec.Volumes = append(job.Spec.Template.Spec.Volumes, volumes...)
+		job.Spec.Template.Spec.Containers[0].VolumeMounts = append(
+			job.Spec.Template.Spec.Containers[0].VolumeMounts, volumeMounts...)
+	}
+
+	if cluster.ShouldInitDBRunPostInitTemplateSQLRefs() {
+		volumes, volumeMounts := createVolumesAndVolumeMountsForSQLRefs(
+			postInitTemplateQLRefsFolder,
+			cluster.Spec.Bootstrap.InitDB.PostInitTemplateSQLRefs,
+		)
+		job.Spec.Template.Spec.Volumes = append(job.Spec.Template.Spec.Volumes, volumes...)
+		job.Spec.Template.Spec.Containers[0].VolumeMounts = append(
+			job.Spec.Template.Spec.Containers[0].VolumeMounts, volumeMounts...)
+	}
+
+	if cluster.ShouldInitDBRunPostInitSQLRefs() {
+		volumes, volumeMounts := createVolumesAndVolumeMountsForSQLRefs(
+			postInitSQLRefsFolder,
+			cluster.Spec.Bootstrap.InitDB.PostInitSQLRefs,
 		)
 		job.Spec.Template.Spec.Volumes = append(job.Spec.Template.Spec.Volumes, volumes...)
 		job.Spec.Template.Spec.Containers[0].VolumeMounts = append(

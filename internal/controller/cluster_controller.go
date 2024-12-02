@@ -24,6 +24,7 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
@@ -42,10 +43,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	cnpgiClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/operatorclient"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
+	rolloutManager "github.com/cloudnative-pg/cloudnative-pg/internal/controller/rollout"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/hibernation"
 	instanceReconciler "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/instance"
@@ -67,6 +70,11 @@ const (
 
 var apiGVString = apiv1.GroupVersion.String()
 
+// errOldPrimaryDetected occurs when a primary Pod loses connectivity with the
+// API server and, upon reconnection, attempts to retain its previous primary
+// role.
+var errOldPrimaryDetected = errors.New("old primary detected")
+
 // ClusterReconciler reconciles a Cluster objects
 type ClusterReconciler struct {
 	client.Client
@@ -74,18 +82,29 @@ type ClusterReconciler struct {
 	DiscoveryClient discovery.DiscoveryInterface
 	Scheme          *runtime.Scheme
 	Recorder        record.EventRecorder
+	InstanceClient  instance.Client
+	Plugins         repository.Interface
 
-	*instance.StatusClient
+	rolloutManager *rolloutManager.Manager
 }
 
 // NewClusterReconciler creates a new ClusterReconciler initializing it
-func NewClusterReconciler(mgr manager.Manager, discoveryClient *discovery.DiscoveryClient) *ClusterReconciler {
+func NewClusterReconciler(
+	mgr manager.Manager,
+	discoveryClient *discovery.DiscoveryClient,
+	plugins repository.Interface,
+) *ClusterReconciler {
 	return &ClusterReconciler{
-		StatusClient:    instance.NewStatusClient(),
+		InstanceClient:  instance.NewStatusClient(),
 		DiscoveryClient: discoveryClient,
 		Client:          operatorclient.NewExtendedClient(mgr.GetClient()),
 		Scheme:          mgr.GetScheme(),
 		Recorder:        mgr.GetEventRecorderFor("cloudnative-pg"),
+		Plugins:         plugins,
+		rolloutManager: rolloutManager.New(
+			configuration.Current.GetClustersRolloutDelay(),
+			configuration.Current.GetInstancesRolloutDelay(),
+		),
 	}
 }
 
@@ -93,9 +112,8 @@ func NewClusterReconciler(mgr manager.Manager, discoveryClient *discovery.Discov
 var ErrNextLoop = utils.ErrNextLoop
 
 // Alphabetical order to not repeat or miss permissions
-// +kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=mutatingwebhookconfigurations,verbs=get;update;list;patch
-// +kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=validatingwebhookconfigurations,verbs=get;update;list;patch
-// +kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=get;update;list
+// +kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=mutatingwebhookconfigurations,verbs=get;patch
+// +kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=validatingwebhookconfigurations,verbs=get;patch
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;delete;patch;create;watch
 // +kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;create;update
 // +kubebuilder:rbac:groups=monitoring.coreos.com,resources=podmonitors,verbs=get;create;list;watch;delete;patch
@@ -107,11 +125,10 @@ var ErrNextLoop = utils.ErrNextLoop
 // +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles,verbs=create;patch;update;get;list;watch
 // +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch;create;update;watch;delete;patch
 // +kubebuilder:rbac:groups="",resources=configmaps/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
+// +kubebuilder:rbac:groups="",resources=events,verbs=create
 // +kubebuilder:rbac:groups="",resources=nodes,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=persistentvolumeclaims,verbs=get;list;create;watch;delete;patch
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get;list;delete;patch;create;watch
-// +kubebuilder:rbac:groups="",resources=pods/exec,verbs=get;list;delete;patch;create;watch
 // +kubebuilder:rbac:groups="",resources=pods/status,verbs=get
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=create;list;get;watch;delete
 // +kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=create;patch;update;list;watch;get
@@ -143,9 +160,47 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 				"namespace", req.Namespace,
 			)
 		}
+		if err := r.deleteFinalizers(ctx, req.NamespacedName); err != nil {
+			contextLogger.Error(
+				err,
+				"error while deleting finalizers of objects on the cluster",
+				"clusterName", req.Name,
+				"namespace", req.Namespace,
+			)
+		}
 		return ctrl.Result{}, err
 	}
+
 	ctx = cluster.SetInContext(ctx)
+
+	// Load the plugins required to bootstrap and reconcile this cluster
+	enabledPluginNames := cluster.Spec.Plugins.GetEnabledPluginNames()
+	enabledPluginNames = append(enabledPluginNames, cluster.Spec.ExternalClusters.GetEnabledPluginNames()...)
+	pluginClient, err := cnpgiClient.WithPlugins(ctx, r.Plugins, enabledPluginNames...)
+	if err != nil {
+		var errUnknownPlugin *repository.ErrUnknownPlugin
+		if errors.As(err, &errUnknownPlugin) {
+			return ctrl.Result{
+					RequeueAfter: 10 * time.Second,
+				}, r.RegisterPhase(
+					ctx,
+					cluster,
+					apiv1.PhaseUnknownPlugin,
+					fmt.Sprintf("Unknown plugin: '%s'. "+
+						"This may be caused by the plugin not being loaded correctly by the operator. "+
+						"Check the operator and plugin logs for errors", errUnknownPlugin.Name),
+				)
+		}
+
+		contextLogger.Error(err, "Error loading plugins, retrying")
+		return ctrl.Result{}, err
+	}
+	defer func() {
+		pluginClient.Close(ctx)
+	}()
+
+	ctx = setPluginClientInContext(ctx, pluginClient)
+
 	// Run the inner reconcile loop. Translate any ErrNextLoop to an errorless return
 	result, err := r.reconcile(ctx, cluster)
 	if errors.Is(err, ErrNextLoop) {
@@ -154,7 +209,10 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if errors.Is(err, utils.ErrTerminateLoop) {
 		return ctrl.Result{}, nil
 	}
-	return result, err
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	return result, nil
 }
 
 // Inner reconcile loop. Anything inside can require the reconciliation loop to stop by returning ErrNextLoop
@@ -211,6 +269,13 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 
 	// Ensure we have the required global objects
 	if err := r.createPostgresClusterObjects(ctx, cluster); err != nil {
+		if errors.Is(err, ErrNextLoop) {
+			return ctrl.Result{}, err
+		}
+		contextLogger.Error(err, "while reconciling postgres cluster objects")
+		if regErr := r.RegisterPhase(ctx, cluster, apiv1.PhaseCannotCreateClusterObjects, err.Error()); regErr != nil {
+			contextLogger.Error(regErr, "unable to register phase", "outerErr", err.Error())
+		}
 		return ctrl.Result{}, fmt.Errorf("cannot create Cluster auxiliary objects: %w", err)
 	}
 
@@ -235,6 +300,8 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 
 	// Calls pre-reconcile hooks
 	if hookResult := preReconcilePluginHooks(ctx, cluster, cluster); hookResult.StopReconciliation {
+		contextLogger.Info("Pre-reconcile hook stopped the reconciliation loop",
+			"hookResult", hookResult)
 		return hookResult.Result, hookResult.Err
 	}
 
@@ -248,19 +315,29 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
+	if cluster.ShouldPromoteFromReplicaCluster() {
+		if !(cluster.Status.Phase == apiv1.PhaseReplicaClusterPromotion ||
+			cluster.Status.Phase == apiv1.PhaseUnrecoverable) {
+			return ctrl.Result{RequeueAfter: 1 * time.Second}, r.RegisterPhase(ctx,
+				cluster,
+				apiv1.PhaseReplicaClusterPromotion,
+				"Replica cluster promotion in progress")
+		}
+		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+	}
+
 	// Store in the context the TLS configuration required communicating with the Pods
 	ctx, err = certs.NewTLSConfigForContext(
 		ctx,
 		r.Client,
 		cluster.GetServerCASecretObjectKey(),
-		cluster.GetServiceReadWriteName(),
 	)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
 	// Get the replication status
-	instancesStatus := r.StatusClient.GetStatusFromInstances(ctx, resources.instances)
+	instancesStatus := r.InstanceClient.GetStatusFromInstances(ctx, resources.instances)
 
 	// we update all the cluster status fields that require the instances status
 	if err := r.updateClusterStatusThatRequiresInstancesState(ctx, cluster, instancesStatus); err != nil {
@@ -270,6 +347,27 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 			return ctrl.Result{Requeue: true}, nil
 		}
 		return ctrl.Result{}, fmt.Errorf("cannot update the instances status on the cluster: %w", err)
+	}
+
+	// If a Pod loses connectivity, the operator will fail over but the faulty
+	// Pod would not receive a change of its role from primary to replica.
+	//
+	// When the connectivity resumes the operator will find two primaries:
+	// the previously faulting one and the new primary that has been
+	// promoted. The operator should just wait for the Pods to get its
+	// current role from auto-healing to proceed. Without this safety
+	// measure, the operator would just fail back to the first primary of
+	// the list.
+	if primaryNames := instancesStatus.PrimaryNames(); len(primaryNames) > 1 {
+		contextLogger.Error(
+			errOldPrimaryDetected,
+			"An old primary pod has been detected. Awaiting its recognition of the new role",
+			"primaryNames", primaryNames,
+		)
+		instancesStatus.LogStatus(ctx)
+		return ctrl.Result{
+			RequeueAfter: 5 * time.Second,
+		}, nil
 	}
 
 	if err := persistentvolumeclaim.ReconcileMetadata(
@@ -319,7 +417,8 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		return res, err
 	}
 
-	if res, err := replicaclusterswitch.Reconcile(ctx, r.Client, cluster, instancesStatus); res != nil || err != nil {
+	if res, err := replicaclusterswitch.Reconcile(
+		ctx, r.Client, cluster, r.InstanceClient, instancesStatus); res != nil || err != nil {
 		if res != nil {
 			return *res, nil
 		}
@@ -405,8 +504,14 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	}
 
 	// Calls post-reconcile hooks
-	hookResult := postReconcilePluginHooks(ctx, cluster, cluster)
-	return hookResult.Result, hookResult.Err
+	if hookResult := postReconcilePluginHooks(ctx, cluster, cluster); hookResult.Err != nil ||
+		!hookResult.Result.IsZero() {
+		contextLogger.Info("Post-reconcile hook stopped the reconciliation loop",
+			"hookResult", hookResult)
+		return hookResult.Result, hookResult.Err
+	}
+
+	return setStatusPluginHook(ctx, r.Client, getPluginClientFromContext(ctx), cluster)
 }
 
 func (r *ClusterReconciler) ensureNoFailoverOnFullDisk(
@@ -548,45 +653,45 @@ func (r *ClusterReconciler) reconcileResources(
 	resources *managedResources, instancesStatus postgres.PostgresqlStatusList,
 ) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
+	runningJobs := resources.runningJobNames()
 
 	// Act on Pods and PVCs only if there is nothing that is currently being created or deleted
-	if runningJobs := resources.countRunningJobs(); runningJobs > 0 {
-		contextLogger.Debug("A job is currently running. Waiting", "count", runningJobs)
-		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
-	}
 
-	// Delete Pods which have been evicted by the Kubelet
-	result, err := r.deleteEvictedOrUnscheduledInstances(ctx, cluster, resources)
-	if err != nil {
-		contextLogger.Error(err, "While deleting evicted pods")
+	if len(runningJobs) > 0 {
+		contextLogger.Debug("A job is currently running. Waiting", "runningJobs", runningJobs)
 		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 	}
-	if result != nil {
+
+	if result, err := r.deleteTerminatedPods(ctx, cluster, resources); err != nil {
+		contextLogger.Error(err, "While deleting terminated pods")
+		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+	} else if result != nil {
+		return *result, nil
+	}
+
+	if result, err := r.processUnschedulableInstances(ctx, cluster, resources); err != nil {
+		contextLogger.Error(err, "While processing unschedulable instances")
+		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+	} else if result != nil {
 		return *result, err
 	}
 
-	// TODO: move into a central waiting phase
-	// If we are joining a node, we should wait for the process to finish
-	if resources.countRunningJobs() > 0 {
-		contextLogger.Debug("Waiting for jobs to finish",
-			"clusterName", cluster.Name,
-			"namespace", cluster.Namespace,
-			"jobs", len(resources.jobs.Items))
-		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
-	}
-
 	if !resources.allInstancesAreActive() {
-		contextLogger.Debug("Instance pod not active. Retrying in one second.")
+		contextLogger = contextLogger.WithValues(
+			"inactiveInstances", resources.inactiveInstanceNames())
 
 		// Preserve phases that handle the in-place restart behaviour for the following reasons:
 		// 1. Technically: The Inplace phases help determine if a switchover is required.
 		// 2. Descriptive: They precisely describe the cluster's current state externally.
 		if cluster.IsInplaceRestartPhase() {
-			contextLogger.Debug("Cluster is in an in-place restart phase. Waiting...", "phase", cluster.Status.Phase)
+			contextLogger.Debug(
+				"Cluster is in an in-place restart phase. Waiting...",
+				"phase", cluster.Status.Phase,
+			)
 		} else {
 			// If not in an Inplace phase, notify that the reconciliation is halted due
 			// to an unready instance.
-			contextLogger.Debug("An instance is not ready. Pausing reconciliation...")
+			contextLogger.Debug("Instance pod not active. Retrying...")
 
 			// Register a phase indicating some instances aren't active yet
 			if err := r.RegisterPhase(
@@ -634,7 +739,7 @@ func (r *ClusterReconciler) reconcileResources(
 	}
 
 	// When everything is reconciled, update the status
-	if err = r.RegisterPhase(ctx, cluster, apiv1.PhaseHealthy, ""); err != nil {
+	if err := r.RegisterPhase(ctx, cluster, apiv1.PhaseHealthy, ""); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -643,8 +748,8 @@ func (r *ClusterReconciler) reconcileResources(
 	return ctrl.Result{}, nil
 }
 
-// deleteEvictedOrUnscheduledInstances will delete the Pods that the Kubelet has evicted or cannot schedule
-func (r *ClusterReconciler) deleteEvictedOrUnscheduledInstances(
+// deleteTerminatedPods will delete the Pods that are terminated
+func (r *ClusterReconciler) deleteTerminatedPods(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	resources *managedResources,
@@ -653,55 +758,93 @@ func (r *ClusterReconciler) deleteEvictedOrUnscheduledInstances(
 	deletedPods := false
 
 	for idx := range resources.instances.Items {
-		instance := &resources.instances.Items[idx]
+		pod := &resources.instances.Items[idx]
 
-		// we process unscheduled pod only if we are in IsNodeMaintenanceWindow, and we can delete the PVC Group
-		// This will be better handled in a next patch
-		if !utils.IsPodEvicted(instance) && !(utils.IsPodUnscheduled(instance) &&
-			cluster.IsNodeMaintenanceWindowInProgress() &&
-			!cluster.IsReusePVCEnabled()) {
+		if pod.GetDeletionTimestamp() != nil {
 			continue
 		}
-		contextLogger.Warning("Deleting evicted/unscheduled pod",
-			"pod", instance.Name,
-			"podStatus", instance.Status)
-		if err := r.Delete(ctx, instance); err != nil {
-			if apierrs.IsConflict(err) {
-				contextLogger.Debug("Conflict error while deleting instances item", "error", err)
-				return &ctrl.Result{Requeue: true}, nil
-			}
+
+		if pod.Status.Phase != corev1.PodSucceeded && pod.Status.Phase != corev1.PodFailed {
+			continue
+		}
+
+		contextLogger.Info(
+			"Deleting terminated pod",
+			"podName", pod.Name,
+			"phase", pod.Status.Phase,
+		)
+		if err := r.Delete(ctx, pod); err != nil && !apierrs.IsNotFound(err) {
 			return nil, err
 		}
 		deletedPods = true
 
-		r.Recorder.Eventf(cluster, "Normal", "DeletePod",
-			"Deleted evicted/unscheduled Pod %v",
-			instance.Name)
+		r.Recorder.Eventf(cluster,
+			"Normal",
+			"DeletePod",
+			"Deleted '%s' pod: '%v'", pod.Status.Phase, pod.Name)
+	}
 
-		// we never delete the pvc unless we are in node Maintenance Window and the Reuse PVC is false
+	if deletedPods {
+		// We deleted objects. Give time to the informer cache to notice that.
+		return &ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+	}
+
+	return nil, nil
+}
+
+// processUnschedulableInstances will delete the Pods that cannot schedule
+func (r *ClusterReconciler) processUnschedulableInstances(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	resources *managedResources,
+) (*ctrl.Result, error) {
+	contextLogger := log.FromContext(ctx)
+	for idx := range resources.instances.Items {
+		pod := &resources.instances.Items[idx]
+
+		if pod.GetDeletionTimestamp() != nil {
+			continue
+		}
+
+		if !utils.IsPodUnschedulable(pod) {
+			continue
+		}
+
+		if podRollout := isPodNeedingRollout(ctx, pod, cluster); podRollout.required {
+			return &ctrl.Result{RequeueAfter: 1 * time.Second},
+				r.upgradePod(ctx, cluster, pod, fmt.Sprintf("recreating unschedulable pod: %s", podRollout.reason))
+		}
+
 		if !cluster.IsNodeMaintenanceWindowInProgress() || cluster.IsReusePVCEnabled() {
 			continue
 		}
+
+		contextLogger.Warning("Deleting unschedulable pod", "pod", pod.Name, "podStatus", pod.Status)
+		if err := r.Delete(ctx, pod); err != nil && !apierrs.IsNotFound(err) {
+			return nil, err
+		}
+
+		r.Recorder.Eventf(cluster, "Normal", "DeletePod",
+			"Deleted unschedulable pod %v",
+			pod.Name)
 
 		if err := persistentvolumeclaim.EnsureInstancePVCGroupIsDeleted(
 			ctx,
 			r.Client,
 			cluster,
-			instance.Name,
-			instance.Namespace,
+			pod.Name,
+			pod.Namespace,
 		); err != nil {
 			return nil, err
 		}
 		r.Recorder.Eventf(cluster, "Normal", "DeletePVCs",
-			"Deleted evicted/unscheduled Pod %v PVCs",
-			instance.Name)
-	}
+			"Deleted unschedulable pod %v PVCs",
+			pod.Name)
 
-	if deletedPods {
-		// We cleaned up Pods which were evicted.
-		// Let's wait for the informer cache to notice that
+		// We deleted the pod and the PVCGroup. Give time to the informer cache to notice that.
 		return &ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
+
 	return nil, nil
 }
 
@@ -743,7 +886,9 @@ func (r *ClusterReconciler) reconcilePods(
 	// The user have chosen to wait for the missing nodes to come up
 	if !(cluster.IsNodeMaintenanceWindowInProgress() && cluster.IsReusePVCEnabled()) &&
 		instancesStatus.InstancesReportingStatus() < cluster.Status.Instances {
-		contextLogger.Debug("Waiting for Pods to be ready")
+		contextLogger.Debug(
+			"Waiting for Pods to be ready",
+			"podStatus", cluster.Status.InstancesStatus)
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
 	}
 
@@ -826,6 +971,21 @@ func (r *ClusterReconciler) handleRollingUpdate(
 				"not connected via streaming replication, waiting for 5 seconds",
 		)
 		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+	case errors.Is(err, errRolloutDelayed):
+		contextLogger.Warning(
+			"A Pod need to be rolled out, but the rollout is being delayed",
+		)
+		if err := r.RegisterPhase(
+			ctx,
+			cluster,
+			apiv1.PhaseUpgradeDelayed,
+			"The cluster need to be update, but the operator is configured to delay "+
+				"the operation",
+		); err != nil {
+			return ctrl.Result{}, err
+		}
+
+		return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
 	case err != nil:
 		return ctrl.Result{}, err
 	case done:
@@ -869,6 +1029,7 @@ func (r *ClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&apiv1.Cluster{}).
+		Named("cluster").
 		Owns(&corev1.Pod{}).
 		Owns(&batchv1.Job{}).
 		Owns(&corev1.Service{}).
@@ -1189,9 +1350,8 @@ func (r *ClusterReconciler) mapNodeToClusters() handler.MapFunc {
 		err := r.List(ctx, &childPods,
 			client.MatchingFields{".spec.nodeName": node.Name},
 			client.MatchingLabels{
-				// TODO: eventually migrate to the new label
-				utils.ClusterRoleLabelName: specs.ClusterRoleLabelPrimary,
-				utils.PodRoleLabelName:     string(utils.PodRoleInstance),
+				utils.ClusterInstanceRoleLabelName: specs.ClusterRoleLabelPrimary,
+				utils.PodRoleLabelName:             string(utils.PodRoleInstance),
 			},
 		)
 		if err != nil {
@@ -1229,15 +1389,20 @@ func (r *ClusterReconciler) markPVCReadyForCompletedJobs(
 
 	for _, job := range completeJobs {
 		for _, pvc := range resources.pvcs.Items {
-			pvc := pvc
 			if !persistentvolumeclaim.IsUsedByPodSpec(job.Spec.Template.Spec, pvc.Name) {
 				continue
 			}
 
-			roleName := job.Labels[utils.JobRoleLabelName]
-			contextLogger.Info("job has been finished, setting PVC as ready",
+			if pvc.Annotations[utils.PVCStatusAnnotationName] == persistentvolumeclaim.StatusReady {
+				continue
+			}
+
+			roleName := job.Spec.Template.Labels[utils.JobRoleLabelName]
+			contextLogger.Info(
+				"The job finished, setting PVC as ready",
 				"pvcName", pvc.Name,
 				"role", roleName,
+				"jobName", job.Name,
 			)
 
 			if err := r.setPVCStatusReady(ctx, &pvc); err != nil {
@@ -1248,78 +1413,4 @@ func (r *ClusterReconciler) markPVCReadyForCompletedJobs(
 	}
 
 	return nil
-}
-
-// TODO: only required to cleanup custom monitoring queries configmaps from older versions (v1.10 and v1.11)
-// that could have been copied with the source configmap name instead of the new default one.
-// Should be removed in future releases.
-func (r *ClusterReconciler) deleteOldCustomQueriesConfigmap(ctx context.Context, cluster *apiv1.Cluster) {
-	contextLogger := log.FromContext(ctx)
-
-	// if the cluster didn't have default monitoring queries, do nothing
-	if cluster.Spec.Monitoring.AreDefaultQueriesDisabled() ||
-		configuration.Current.MonitoringQueriesConfigmap == "" ||
-		configuration.Current.MonitoringQueriesConfigmap == apiv1.DefaultMonitoringConfigMapName {
-		return
-	}
-
-	// otherwise, remove the old default monitoring queries configmap from the cluster and delete it, if present
-	oldCmID := -1
-	for idx, cm := range cluster.Spec.Monitoring.CustomQueriesConfigMap {
-		if cm.Name == configuration.Current.MonitoringQueriesConfigmap &&
-			cm.Key == apiv1.DefaultMonitoringKey {
-			oldCmID = idx
-			break
-		}
-	}
-
-	// if we didn't find it, do nothing
-	if oldCmID < 0 {
-		return
-	}
-
-	// if we found it, we are going to get it and check it was actually created by the operator or was already deleted
-	var oldCm corev1.ConfigMap
-	err := r.Get(ctx, types.NamespacedName{
-		Name:      configuration.Current.MonitoringQueriesConfigmap,
-		Namespace: cluster.Namespace,
-	}, &oldCm)
-	// if we found it, we check the annotation the operator should have set to be sure it was created by us
-	if err == nil { // nolint:nestif
-		// if it was, we delete it and proceed to remove it from the cluster monitoring spec
-		if _, ok := oldCm.Annotations[utils.OperatorVersionAnnotationName]; ok {
-			err = r.Delete(ctx, &oldCm)
-			// if there is any error except the cm was already deleted, we return
-			if err != nil && !apierrs.IsNotFound(err) {
-				contextLogger.Warning("error while deleting old default monitoring custom queries configmap",
-					"err", err,
-					"configmap", configuration.Current.MonitoringQueriesConfigmap)
-				return
-			}
-		} else {
-			// it exists, but it's not handled by the operator, we do nothing
-			contextLogger.Warning("A configmap with the same name as the old default monitoring queries "+
-				"configmap exists, but doesn't have the required annotation, so it won't be deleted, "+
-				"nor removed from the cluster monitoring spec",
-				"configmap", oldCm.Name)
-			return
-		}
-	} else if !apierrs.IsNotFound(err) {
-		// if there is any error except the cm was already deleted, we return
-		contextLogger.Warning("error while getting old default monitoring custom queries configmap",
-			"err", err,
-			"configmap", configuration.Current.MonitoringQueriesConfigmap)
-		return
-	}
-	// both if it exists or not, if we are here we should delete it from the list of custom queries configmaps
-	oldCluster := cluster.DeepCopy()
-	cluster.Spec.Monitoring.CustomQueriesConfigMap = append(cluster.Spec.Monitoring.CustomQueriesConfigMap[:oldCmID],
-		cluster.Spec.Monitoring.CustomQueriesConfigMap[oldCmID+1:]...)
-	err = r.Patch(ctx, cluster, client.MergeFrom(oldCluster))
-	if err != nil {
-		log.Warning("had an error while removing the old custom monitoring queries configmap from "+
-			"the monitoring section in the cluster",
-			"err", err,
-			"configmap", configuration.Current.MonitoringQueriesConfigmap)
-	}
 }

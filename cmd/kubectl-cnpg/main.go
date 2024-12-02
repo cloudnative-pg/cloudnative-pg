@@ -22,6 +22,7 @@ package main
 import (
 	"os"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
@@ -47,7 +48,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/snapshot"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/status"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/versions"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )
@@ -81,6 +81,33 @@ func main() {
 
 	logFlags.AddFlags(rootCmd.PersistentFlags())
 	configFlags.AddFlags(rootCmd.PersistentFlags())
+
+	adminGroup := &cobra.Group{
+		ID:    plugin.GroupIDAdmin,
+		Title: "Operator-level administration",
+	}
+
+	troubleshootingGroup := &cobra.Group{
+		ID:    plugin.GroupIDTroubleshooting,
+		Title: "Troubleshooting",
+	}
+
+	pgClusterGroup := &cobra.Group{
+		ID:    plugin.GroupIDCluster,
+		Title: "Cluster administration",
+	}
+
+	pgDatabaseGroup := &cobra.Group{
+		ID:    plugin.GroupIDDatabase,
+		Title: "Database administration",
+	}
+
+	miscGroup := &cobra.Group{
+		ID:    plugin.GroupIDMiscellaneous,
+		Title: "Miscellaneous",
+	}
+
+	rootCmd.AddGroup(adminGroup, troubleshootingGroup, pgClusterGroup, pgDatabaseGroup, miscGroup)
 
 	subcommands := []*cobra.Command{
 		backup.NewCmd(),

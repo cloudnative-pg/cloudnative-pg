@@ -56,12 +56,6 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive, tests.LabelOper
 		}
 	})
 
-	JustAfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(webhookNamespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-		}
-	})
-
 	BeforeAll(func() {
 		clusterName, err = env.GetResourceNameFromYAML(sampleFile)
 		Expect(err).ToNot(HaveOccurred())
@@ -81,14 +75,8 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive, tests.LabelOper
 		})
 
 		// Create a basic PG cluster
-		webhookNamespace, err = env.CreateUniqueNamespace(webhookNamespacePrefix)
+		webhookNamespace, err := env.CreateUniqueTestNamespace(webhookNamespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(webhookNamespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-			return env.DeleteNamespace(webhookNamespace)
-		})
 		AssertCreateCluster(webhookNamespace, clusterName, sampleFile, env)
 		// Check if cluster is ready and the default values are populated
 		AssertClusterDefault(webhookNamespace, clusterName, clusterIsDefaulted, env)
@@ -125,14 +113,8 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive, tests.LabelOper
 		})
 
 		// Create a basic PG cluster
-		webhookNamespace, err = env.CreateUniqueNamespace(webhookNamespacePrefix)
+		webhookNamespace, err = env.CreateUniqueTestNamespace(webhookNamespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(webhookNamespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-			return env.DeleteNamespace(webhookNamespace)
-		})
 		AssertCreateCluster(webhookNamespace, clusterName, sampleFile, env)
 		// Check if cluster is ready and has no default value in the object
 		AssertClusterDefault(webhookNamespace, clusterName, clusterIsDefaulted, env)

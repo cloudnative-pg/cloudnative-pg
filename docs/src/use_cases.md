@@ -39,7 +39,8 @@ Another possible use case is to manage your PostgreSQL database inside
 Kubernetes, while having your applications outside of it (for example in a
 virtualized environment). In this case, PostgreSQL is represented by an IP
 address (or host name) and a TCP port, corresponding to the defined Ingress
-resource in Kubernetes.
+resource in Kubernetes (normally a `LoadBalancer` service type as explained
+in the ["Service Management"](service_management.md) page).
 
 The application can still benefit from a TLS connection to PostgreSQL.
 

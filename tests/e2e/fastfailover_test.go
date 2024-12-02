@@ -57,12 +57,6 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance, tests.La
 		}
 	})
 
-	JustAfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-		}
-	})
-
 	Context("with async replicas cluster (without HA Replication Slots)", func() {
 		// Confirm that a standby closely following the primary doesn't need more
 		// than 10 seconds to be promoted and be able to start inserting records.
@@ -74,11 +68,8 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance, tests.La
 			clusterName = "cluster-fast-failover"
 			var err error
 			// Create a cluster in a namespace we'll delete after the test
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.DeleteNamespace(namespace)
-			})
 			AssertFastFailOver(namespace, sampleFileWithoutReplicationSlots, clusterName,
 				webTestFile, webTestJob, maxReattachTime, maxFailoverTime)
 		})
@@ -95,11 +86,8 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance, tests.La
 			clusterName = "cluster-fast-failover"
 			var err error
 			// Create a cluster in a namespace we'll delete after the test
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.DeleteNamespace(namespace)
-			})
 			AssertFastFailOver(namespace, sampleFileWithReplicationSlots,
 				clusterName, webTestFile, webTestJob, maxReattachTime, maxFailoverTime)
 			AssertClusterHAReplicationSlots(namespace, clusterName)
@@ -112,11 +100,8 @@ var _ = Describe("Fast failover", Serial, Label(tests.LabelPerformance, tests.La
 			clusterName = "cluster-syncreplicas-fast-failover"
 			var err error
 			// Create a cluster in a namespace we'll delete after the test
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.DeleteNamespace(namespace)
-			})
 			AssertFastFailOver(
 				namespace, sampleFileSyncReplicas, clusterName, webTestSyncReplicas, webTestJob, maxReattachTime, maxFailoverTime)
 		})

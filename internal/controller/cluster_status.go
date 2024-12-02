@@ -23,20 +23,21 @@ import (
 	"runtime"
 	"sort"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
+	pgTime "github.com/cloudnative-pg/machinery/pkg/postgres/time"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/strings/slices"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/hibernation"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/status"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
@@ -53,20 +54,30 @@ type managedResources struct {
 }
 
 // Count the number of jobs that are still running
-func (resources *managedResources) countRunningJobs() int {
-	jobCount := len(resources.jobs.Items)
-	completeJobs := utils.CountJobsWithOneCompletion(resources.jobs.Items)
-	return jobCount - completeJobs
+func (resources *managedResources) runningJobNames() []string {
+	result := make([]string, 0, len(resources.jobs.Items))
+	for _, job := range resources.jobs.Items {
+		if !utils.JobHasOneCompletion(job) {
+			result = append(result, job.Name)
+		}
+	}
+	return result
+}
+
+// Check if every managed Pod is active and will be schedules
+func (resources *managedResources) inactiveInstanceNames() []string {
+	result := make([]string, 0, len(resources.instances.Items))
+	for idx := range resources.instances.Items {
+		if !utils.IsPodActive(resources.instances.Items[idx]) {
+			result = append(result, resources.instances.Items[idx].Name)
+		}
+	}
+	return result
 }
 
 // Check if every managed Pod is active and will be schedules
 func (resources *managedResources) allInstancesAreActive() bool {
-	for idx := range resources.instances.Items {
-		if !utils.IsPodActive(resources.instances.Items[idx]) {
-			return false
-		}
-	}
-	return true
+	return len(resources.inactiveInstanceNames()) == 0
 }
 
 // Check if at least one Pod is alive (active and not crash-looping)
@@ -215,7 +226,7 @@ func (r *ClusterReconciler) setPVCStatusReady(
 		return nil
 	}
 
-	contextLogger.Debug("Marking PVC as ready", "pvcName", pvc.Name)
+	contextLogger.Trace("Marking PVC as ready", "pvcName", pvc.Name)
 
 	oldPvc := pvc.DeepCopy()
 
@@ -232,6 +243,7 @@ func (r *ClusterReconciler) updateResourceStatus(
 	cluster *apiv1.Cluster,
 	resources *managedResources,
 ) error {
+	contextLogger := log.FromContext(ctx)
 	// Retrieve the cluster key
 
 	existingClusterStatus := cluster.Status
@@ -250,7 +262,7 @@ func (r *ClusterReconciler) updateResourceStatus(
 	)
 
 	// Count jobs
-	newJobs := int32(len(resources.jobs.Items))
+	newJobs := int32(len(resources.jobs.Items)) //nolint:gosec
 	cluster.Status.JobCount = newJobs
 
 	cluster.Status.Topology = getPodsTopology(
@@ -287,7 +299,7 @@ func (r *ClusterReconciler) updateResourceStatus(
 				"targetPrimary", cluster.Status.TargetPrimary,
 				"instances", resources.instances)
 			cluster.Status.TargetPrimary = cluster.Status.CurrentPrimary
-			cluster.Status.TargetPrimaryTimestamp = utils.GetCurrentTimestamp()
+			cluster.Status.TargetPrimaryTimestamp = pgTime.GetCurrentTimestamp()
 		}
 	}
 
@@ -306,7 +318,7 @@ func (r *ClusterReconciler) updateResourceStatus(
 	if poolerIntegrations, err := r.getPoolerIntegrationsNeeded(ctx, cluster); err == nil {
 		cluster.Status.PoolerIntegrations = poolerIntegrations
 	} else {
-		log.Error(err, "while checking pooler integrations were needed, ignored")
+		contextLogger.Error(err, "while checking pooler integrations were needed, ignored")
 	}
 
 	// Set the current hash code of the operator binary inside the status.
@@ -341,6 +353,14 @@ func (r *ClusterReconciler) updateResourceStatus(
 
 	if err := r.refreshConfigMapResourceVersions(ctx, cluster); err != nil {
 		return err
+	}
+
+	if cluster.Spec.ReplicaCluster != nil && len(cluster.Spec.ReplicaCluster.PromotionToken) == 0 {
+		cluster.Status.LastPromotionToken = ""
+	}
+
+	if !cluster.IsReplica() {
+		cluster.Status.DemotionToken = ""
 	}
 
 	if !reflect.DeepEqual(existingClusterStatus, cluster.Status) {
@@ -699,9 +719,10 @@ func (r *ClusterReconciler) setPrimaryInstance(
 	cluster *apiv1.Cluster,
 	podName string,
 ) error {
+	origCluster := cluster.DeepCopy()
 	cluster.Status.TargetPrimary = podName
-	cluster.Status.TargetPrimaryTimestamp = utils.GetCurrentTimestamp()
-	return r.Status().Update(ctx, cluster)
+	cluster.Status.TargetPrimaryTimestamp = pgTime.GetCurrentTimestamp()
+	return r.Status().Patch(ctx, cluster, client.MergeFrom(origCluster))
 }
 
 // RegisterPhase update phase in the status cluster with the
@@ -711,40 +732,7 @@ func (r *ClusterReconciler) RegisterPhase(ctx context.Context,
 	phase string,
 	reason string,
 ) error {
-	// we ensure that the cluster conditions aren't nil before operating
-	if cluster.Status.Conditions == nil {
-		cluster.Status.Conditions = []metav1.Condition{}
-	}
-
-	existingCluster := cluster.DeepCopy()
-	cluster.Status.Phase = phase
-	cluster.Status.PhaseReason = reason
-
-	condition := metav1.Condition{
-		Type:    string(apiv1.ConditionClusterReady),
-		Status:  metav1.ConditionFalse,
-		Reason:  string(apiv1.ClusterIsNotReady),
-		Message: "Cluster Is Not Ready",
-	}
-
-	if cluster.Status.Phase == apiv1.PhaseHealthy {
-		condition = metav1.Condition{
-			Type:    string(apiv1.ConditionClusterReady),
-			Status:  metav1.ConditionTrue,
-			Reason:  string(apiv1.ClusterReady),
-			Message: "Cluster is Ready",
-		}
-	}
-
-	meta.SetStatusCondition(&cluster.Status.Conditions, condition)
-
-	if !reflect.DeepEqual(existingCluster, cluster) {
-		if err := r.Status().Patch(ctx, cluster, client.MergeFrom(existingCluster)); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return status.RegisterPhase(ctx, r.Client, cluster, phase, reason)
 }
 
 // updateClusterStatusThatRequiresInstancesState updates all the cluster status fields that require the instances status
@@ -809,7 +797,7 @@ func getPodsTopology(
 		}
 	}
 
-	return apiv1.Topology{SuccessfullyExtracted: true, Instances: data, NodesUsed: int32(len(nodesMap))}
+	return apiv1.Topology{SuccessfullyExtracted: true, Instances: data, NodesUsed: int32(len(nodesMap))} //nolint:gosec
 }
 
 // isWALSpaceAvailableOnPod check if a Pod terminated because it has no

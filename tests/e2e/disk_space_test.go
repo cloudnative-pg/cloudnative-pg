@@ -40,6 +40,8 @@ var _ = Describe("Volume space unavailable", Label(tests.LabelStorage), func() {
 		namespacePrefix = "diskspace-e2e"
 	)
 
+	var namespace string
+
 	diskSpaceDetectionTest := func(namespace, clusterName string) {
 		const walDir = "/var/lib/postgresql/data/pgdata/pg_wal"
 		var cluster *apiv1.Cluster
@@ -71,22 +73,22 @@ var _ = Describe("Volume space unavailable", Label(tests.LabelStorage), func() {
 		By("writing something when no space is available", func() {
 			// Create the table used by the scenario
 			query := "CREATE TABLE diskspace AS SELECT generate_series(1, 1000000);"
-			_, _, err := env.ExecCommandWithPsqlClient(
-				namespace,
-				clusterName,
-				primaryPod,
-				apiv1.ApplicationUserSecretSuffix,
+			_, _, err := env.ExecQueryInInstancePod(
+				testsUtils.PodLocator{
+					Namespace: primaryPod.Namespace,
+					PodName:   primaryPod.Name,
+				},
 				testsUtils.AppDBName,
-				query,
-			)
+				query)
 			Expect(err).To(HaveOccurred())
+
 			query = "CHECKPOINT; SELECT pg_switch_wal(); CHECKPOINT"
 			_, _, err = env.ExecQueryInInstancePod(
 				testsUtils.PodLocator{
 					Namespace: primaryPod.Namespace,
 					PodName:   primaryPod.Name,
 				},
-				testsUtils.DatabaseName("postgres"),
+				testsUtils.PostgresDBName,
 				query)
 			Expect(err).To(HaveOccurred())
 		})
@@ -169,7 +171,7 @@ var _ = Describe("Volume space unavailable", Label(tests.LabelStorage), func() {
 					Namespace: primaryPod.Namespace,
 					PodName:   primaryPod.Name,
 				},
-				testsUtils.DatabaseName("postgres"),
+				testsUtils.PostgresDBName,
 				query)
 			Expect(err).NotTo(HaveOccurred())
 		})
@@ -179,25 +181,18 @@ var _ = Describe("Volume space unavailable", Label(tests.LabelStorage), func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
-		if IsLocal() {
+		if MustGetEnvProfile().UsesNodeDiskSpace() {
 			// Local environments use the node disk space, running out of that space could cause multiple failures
-			Skip("This test is not executed on local environments")
+			Skip("this test might exhaust node storage")
 		}
 	})
 
 	DescribeTable("WAL volume space unavailable",
 		func(sampleFile string) {
-			var namespace string
 			var err error
 			// Create a cluster in a namespace we'll delete after the test
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				if CurrentSpecReport().Failed() {
-					env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-				}
-				return env.DeleteNamespace(namespace)
-			})
 
 			clusterName, err := env.GetResourceNameFromYAML(sampleFile)
 			Expect(err).ToNot(HaveOccurred())

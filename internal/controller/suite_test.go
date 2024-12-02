@@ -128,8 +128,10 @@ func buildTestEnvironment() *testingEnvironment {
 func newFakePooler(k8sClient client.Client, cluster *apiv1.Cluster) *apiv1.Pooler {
 	pooler := &apiv1.Pooler{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "pooler-" + rand.String(10),
-			Namespace: cluster.Namespace,
+			Name:        "pooler-" + rand.String(10),
+			Namespace:   cluster.Namespace,
+			Annotations: map[string]string{},
+			Labels:      map[string]string{},
 		},
 		Spec: apiv1.PoolerSpec{
 			Cluster: apiv1.LocalObjectReference{
@@ -167,8 +169,10 @@ func newFakeCNPGCluster(
 
 	cluster := &apiv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
+			Name:        name,
+			Namespace:   namespace,
+			Annotations: map[string]string{},
+			Labels:      map[string]string{},
 		},
 		Spec: apiv1.ClusterSpec{
 			Instances: instances,

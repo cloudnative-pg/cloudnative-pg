@@ -24,6 +24,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,7 +34,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/instance"
@@ -44,7 +44,7 @@ import (
 type Reconciler struct {
 	cli                  client.Client
 	recorder             record.EventRecorder
-	instanceStatusClient *instance.StatusClient
+	instanceStatusClient instance.Client
 }
 
 // ExecutorBuilder is a struct capable of creating a Reconciler
@@ -96,11 +96,11 @@ func (se *Reconciler) enrichSnapshot(
 	if data, err := se.instanceStatusClient.GetPgControlDataFromInstance(ctx, targetPod); err == nil {
 		vs.Annotations[utils.PgControldataAnnotationName] = data
 		pgControlData := utils.ParsePgControldataOutput(data)
-		timelineID, ok := pgControlData["Latest checkpoint's TimeLineID"]
+		timelineID, ok := pgControlData[utils.PgControlDataKeyLatestCheckpointTimelineID]
 		if ok {
 			vs.Labels[utils.BackupTimelineLabelName] = timelineID
 		}
-		startWal, ok := pgControlData["Latest checkpoint's REDO WAL file"]
+		startWal, ok := pgControlData[utils.PgControlDataKeyREDOWALFile]
 		if ok {
 			vs.Annotations[utils.BackupStartWALAnnotationName] = startWal
 			// TODO: once we have online volumesnapshot backups, this should change

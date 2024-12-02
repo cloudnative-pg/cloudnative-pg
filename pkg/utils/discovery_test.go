@@ -42,48 +42,14 @@ var _ = DescribeTable("Kubernetes minor version detection",
 	Entry("When minor version is wrong", &version.Info{Minor: "c3p0"}, 0, false),
 )
 
-var _ = Describe("Set and unset Seccomp support", func() {
-	It("should have seccomp support", func() {
-		SetSeccompSupport(true)
-		Expect(HaveSeccompSupport()).To(BeTrue())
-	})
-
-	It("should not have seccomp support", func() {
-		SetSeccompSupport(false)
-		Expect(HaveSeccompSupport()).To(BeFalse())
-	})
-})
-
-var _ = Describe("Detect Seccomp support depending on", func() {
-	client := fakeClient.NewSimpleClientset()
-	fakeDiscovery := client.Discovery().(*discoveryFake.FakeDiscovery)
-
-	It("version 1.22 not supported", func() {
-		fakeDiscovery.FakedServerVersion = &version.Info{
-			Major: "1",
-			Minor: "22",
-		}
-
-		err := DetectSeccompSupport(client.Discovery())
-		Expect(err).ToNot(HaveOccurred())
-		Expect(HaveSeccompSupport()).To(BeFalse())
-	})
-
-	It("version 1.26 supported", func() {
-		fakeDiscovery.FakedServerVersion = &version.Info{
-			Major: "1",
-			Minor: "26",
-		}
-
-		err := DetectSeccompSupport(client.Discovery())
-		Expect(err).ToNot(HaveOccurred())
-		Expect(HaveSeccompSupport()).To(BeTrue())
-	})
-})
-
 var _ = Describe("Detect resources properly when", func() {
-	client := fakeClient.NewSimpleClientset()
-	fakeDiscovery := client.Discovery().(*discoveryFake.FakeDiscovery)
+	var client *fakeClient.Clientset
+	var fakeDiscovery *discoveryFake.FakeDiscovery
+
+	BeforeEach(func() {
+		client = fakeClient.NewSimpleClientset()
+		fakeDiscovery = client.Discovery().(*discoveryFake.FakeDiscovery)
+	})
 
 	It("should not detect PodMonitor resource", func() {
 		exists, err := PodMonitorExist(client.Discovery())
@@ -231,7 +197,9 @@ var _ = Describe("AvailableArchitecture", func() {
 			})
 
 			It("should panic with an error", func() {
-				Expect(arch.calculateHash).To(Panic())
+				Expect(func() {
+					arch.calculateHash()
+				}).To(Panic())
 			})
 		})
 	})
@@ -293,16 +261,14 @@ var _ = Describe("AvailableArchitecture", func() {
 		})
 
 		It("should retrieve an existing available architecture", func() {
-			tempDir, err := os.MkdirTemp("", "test")
-			Expect(err).NotTo(HaveOccurred())
+			tempDir := GinkgoT().TempDir()
 			DeferCleanup(func() {
-				Expect(os.RemoveAll(tempDir)).To(Succeed())
 				availableArchitectures = nil
 			})
 
 			// Create a sample file
 			Expect(os.WriteFile(filepath.Join(tempDir, "manager_amd64"), []byte("amd64"), 0o600)).To(Succeed())
-			err = detectAvailableArchitectures(filepath.Join(tempDir, "manager_*"))
+			err := detectAvailableArchitectures(filepath.Join(tempDir, "manager_*"))
 			Expect(err).ToNot(HaveOccurred())
 			Expect(availableArchitectures).To(HaveLen(1))
 

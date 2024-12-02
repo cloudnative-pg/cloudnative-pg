@@ -87,6 +87,11 @@ deletion of the pooler, and vice versa.
     possible architectures. You can have clusters without poolers, clusters with
     a single pooler, or clusters with several poolers, that is, one per application.
 
+!!! Important
+    When the operator is upgraded, the pooler pods will undergo a rolling
+    upgrade. This is necessary to ensure that the instance manager within the
+    pooler pods is also upgraded.
+
 ## Security
 
 Any PgBouncer pooler is transparently integrated with CloudNativePG support for
@@ -283,6 +288,18 @@ spec:
       max_client_conn: "1000"
       default_pool_size: "10"
 ```
+The operator by default adds a `ServicePort` with the following data:
+```
+  ports:
+  - name: pgbouncer
+    port: 5432
+    protocol: TCP
+    targetPort: pgbouncer
+```
+
+!!! Warning
+    Specifying a `ServicePort` with the name `pgbouncer` or the port `5432`  will prevent the default `ServicePort` from being added.
+    This because `ServicePort` entries with the same `name` or `port` are not allowed on Kubernetes and result in errors.
 
 ## High availability (HA)
 

@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // operatorReport contains the data to be printed by the `report operator` plugin
@@ -173,6 +174,27 @@ func operator(ctx context.Context, format plugin.OutputFormat,
 			return streamOperatorLogsToZip(ctx, operatorPods, dirname, "operator-logs", logTimeStamp, zipper)
 		}
 		sections = append(sections, logZipper)
+	}
+
+	// Detect if we are running in an OLM cluster
+	discoveryClient, err := utils.GetDiscoveryClient()
+	if err != nil {
+		return err
+	}
+
+	if err = utils.DetectOLM(discoveryClient); err != nil {
+		return fmt.Errorf("unable too look for OLM resources: %w", err)
+	}
+
+	if utils.RunningOnOLM() {
+		olmReport, err := getOlmReport(ctx, plugin.Namespace)
+		if err != nil {
+			return fmt.Errorf("could not get openshift operator report: %w", err)
+		}
+		olmZipper := func(zipper *zip.Writer, dirname string) error {
+			return olmReport.writeToZip(zipper, format, dirname)
+		}
+		sections = append(sections, olmZipper)
 	}
 
 	err = writeZippedReport(sections, file, reportName("operator", now))

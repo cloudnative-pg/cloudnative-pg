@@ -42,13 +42,13 @@ func Service(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*corev1.Service, err
 		WithLabel(utils.PodRoleLabelName, string(utils.PodRolePooler)).
 		WithAnnotation(utils.PoolerSpecHashAnnotationName, poolerHash).
 		WithServiceType(corev1.ServiceTypeClusterIP, false).
-		WithServicePort(&corev1.ServicePort{
+		WithServicePortNoOverwrite(&corev1.ServicePort{
 			Name:       pgBouncerConfig.PgBouncerPortName,
 			Port:       pgBouncerConfig.PgBouncerPort,
 			TargetPort: intstr.FromString(pgBouncerConfig.PgBouncerPortName),
 			Protocol:   corev1.ProtocolTCP,
 		}).
-		WithSelector(pooler.Name, true).
+		SetPGBouncerSelector(pooler.Name).
 		Build()
 
 	return &corev1.Service{

@@ -4,9 +4,9 @@ This section describes how to release a new set of supported versions of
 CloudNativePG, which should be done by one of the project's maintainers.
 It is a semi-automated process that requires human supervision.
 
-You can only release from a release branch, that is a branch in the
-Git repository called `release-X.Y`, e.g., `release-1.16`, which corresponds
-to a minor release.
+You can only release stable versions from a release branch, that is a branch
+in the Git repository called `release-X.Y`, e.g., `release-1.16`, which
+corresponds to a minor release.
 
 The release procedure must be repeated for all the supported minor releases,
 usually 3:
@@ -53,7 +53,8 @@ activities:
   last few days without previous validation from the team.
 
 - **Supported releases:** Make sure that you update the supported releases page
-  in `docs/src/supported_releases.md`, and that the maintainers approve the changes.
+  in [`docs/src/supported_releases.md`](../docs/src/supported_releases.md),
+  and that the maintainers approve the changes.
 
 - **Check on backporting:** Make sure to cherry-pick any code that requires
   backporting to the various release branches ahead of time. Doing that will
@@ -67,11 +68,15 @@ activities:
 
 - **Release notes:** You should create/update the release note documents in
   `docs/src/release_notes/` for each version to release. Remember to
-  update `docs/src/release_notes.md`.
+  update [`docs/src/release_notes.md`](../docs/src/release_notes.md)
+  and [`.github/ISSUE_TEMPLATE/bug.yml`](../.github/ISSUE_TEMPLATE/bug.yml).
   These changes should go in a PR against `main`, and get maintainer approval.
+  Look at the template file to get an idea of how to start a new minor release
+  version document.
 
 - **Capabilities page:** in case of a new minor release, ensure that the
-  operator capability levels page in `docs/src/operator_capability_levels.md`
+  operator capability levels page in
+  [`docs/src/operator_capability_levels.md`](../docs/src/operator_capability_levels.md)
   is up-to-date and approved by the maintainers.
 
 - **Documentation on website:** Remember that after the release, you will
@@ -122,7 +127,7 @@ but in `release-1.17`, the file should stay in `release_notes/`.
 
 **IMPORTANT:** The instructions in the previous sections should have been completed ahead
 of this. I.e., all cherry-picks should be done, documents should be up-to-date,
-and the  release notes should have been merged in `main`.
+and the release notes should have been merged in `main`.
 
 A new release branch is created starting from the most updated commit in the
 trunk by a maintainer:
@@ -237,3 +242,25 @@ and the Kubernetes ones are aligned with the supported release page.
 
 Open the `.github/ISSUE_TEMPLATES/bug.yml` file and update it accordingly.
 
+## Release candidate
+
+It's possible to create a release candidate (RC) for a new upcoming
+minor release.
+Unlike stable releases, a release candidate will be released just for one
+version, as such the release process doesn't have to be repeated for all
+the supported release branches.
+
+**IMPORTANT:** Release candidates should always be released from the
+`main` branch. A release branch for a new minor should only be created
+once we are releasing the first stable version. This is necessary to
+ensure the newly created release branch is a descendant of the `main`
+branch.
+
+To release a RC you can follow the [Release steps](#release-steps) until
+point 5, taking care to use a valid semantic version when running the first
+step (e.g., `hack/release.sh 1.16.0-rc1`).
+See [Semantic Versioning 2.0.0 - item 9](https://semver.org/#spec-item-9) to
+check for valid release candidate identifiers.
+
+**NOTE:** Release candidates can only be installed via the YAML manifest,
+other installation methods such as Helm Chart or OLM are currently not supported.

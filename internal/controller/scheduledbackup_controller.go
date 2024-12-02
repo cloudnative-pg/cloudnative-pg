@@ -23,6 +23,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
+	pgTime "github.com/cloudnative-pg/machinery/pkg/postgres/time"
 	"github.com/robfig/cron"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,7 +35,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -172,9 +173,25 @@ func ReconcileScheduledBackup(
 	}
 
 	now := time.Now()
-	origScheduled := scheduledBackup.DeepCopy()
+	if schedule.Next(now).IsZero() {
+		// No time satisfying the schedule have been found.
+		// We cannot proceed reconciling it.
+		event.Eventf(
+			scheduledBackup,
+			"Warning",
+			"NoSchedule",
+			"No time satisfying the schedule %q have been found", scheduledBackup.Spec.Schedule)
+		return ctrl.Result{}, nil
+	}
+
+	if scheduledBackup.Status.LastCheckTime == nil && scheduledBackup.IsImmediate() {
+		// we populate the status (lastCheckTime...) by following the same rules of the scheduled backup
+		event.Eventf(scheduledBackup, "Normal", "BackupSchedule", "Scheduled immediate backup now: %v", now)
+		return createBackup(ctx, event, cli, scheduledBackup, now, now, schedule, true)
+	}
 
 	if scheduledBackup.Status.LastCheckTime == nil {
+		origScheduled := scheduledBackup.DeepCopy()
 		// This is the first time we check this schedule,
 		// let's wait until the first job will be actually
 		// scheduled
@@ -184,11 +201,6 @@ func ReconcileScheduledBackup(
 		err := cli.Status().Patch(ctx, scheduledBackup, client.MergeFrom(origScheduled))
 		if err != nil {
 			return ctrl.Result{}, err
-		}
-
-		if scheduledBackup.IsImmediate() {
-			event.Eventf(scheduledBackup, "Normal", "BackupSchedule", "Scheduled immediate backup now: %v", now)
-			return createBackup(ctx, event, cli, scheduledBackup, now, now, schedule, true)
 		}
 
 		nextTime := schedule.Next(now)
@@ -227,7 +239,7 @@ func createBackup(
 	// So we have no backup running, let's create a backup.
 	// Let's have deterministic names to avoid creating the job two
 	// times
-	name := fmt.Sprintf("%s-%s", scheduledBackup.GetName(), utils.ToCompactISO8601(backupTime))
+	name := fmt.Sprintf("%s-%s", scheduledBackup.GetName(), pgTime.ToCompactISO8601(backupTime))
 	backup := scheduledBackup.CreateBackup(name)
 	metadata := &backup.ObjectMeta
 	if metadata.Labels == nil {
@@ -342,5 +354,6 @@ func (r *ScheduledBackupReconciler) SetupWithManager(ctx context.Context, mgr ct
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&apiv1.ScheduledBackup{}).
+		Named("scheduled-backup").
 		Complete(r)
 }

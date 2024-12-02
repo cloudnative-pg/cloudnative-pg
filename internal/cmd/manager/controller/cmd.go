@@ -20,6 +20,8 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 )
 
 // NewCmd create a new cobra command
@@ -48,6 +50,7 @@ func NewCmd() *cobra.Command {
 				},
 				pprofHTTPServer,
 				port,
+				configuration.Current,
 			)
 		},
 	}

@@ -20,6 +20,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
+	pgTime "github.com/cloudnative-pg/machinery/pkg/postgres/time"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
@@ -27,11 +29,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	pluginClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/conditions"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // PluginBackupCommand represent a backup command that is being executed
@@ -40,7 +43,6 @@ type PluginBackupCommand struct {
 	Backup   *apiv1.Backup
 	Client   client.Client
 	Recorder record.EventRecorder
-	Log      log.Logger
 }
 
 // NewPluginBackupCommand initializes a BackupCommand object, taking a physical
@@ -51,16 +53,23 @@ func NewPluginBackupCommand(
 	client client.Client,
 	recorder record.EventRecorder,
 ) *PluginBackupCommand {
+	backup.EnsureGVKIsPresent()
+
 	logger := log.WithValues(
 		"pluginConfiguration", backup.Spec.PluginConfiguration,
 		"backupName", backup.Name,
 		"backupNamespace", backup.Name)
+
+	plugins := repository.New()
+	if _, err := plugins.RegisterUnixSocketPluginsInPath(configuration.Current.PluginSocketDir); err != nil {
+		logger.Error(err, "Error while discovering plugins")
+	}
+
 	return &PluginBackupCommand{
 		Cluster:  cluster,
 		Backup:   backup,
 		Client:   client,
 		Recorder: recorder,
-		Log:      logger,
 	}
 }
 
@@ -70,19 +79,35 @@ func (b *PluginBackupCommand) Start(ctx context.Context) {
 }
 
 func (b *PluginBackupCommand) invokeStart(ctx context.Context) {
-	backupLog := b.Log.WithValues(
+	contextLogger := log.FromContext(ctx).WithValues(
+		"pluginConfiguration", b.Backup.Spec.PluginConfiguration,
 		"backupName", b.Backup.Name,
 		"backupNamespace", b.Backup.Name)
 
-	cli, err := b.Cluster.LoadPluginClient(ctx)
+	plugins := repository.New()
+	if _, err := plugins.RegisterUnixSocketPluginsInPath(configuration.Current.PluginSocketDir); err != nil {
+		contextLogger.Error(err, "Error while discovering plugins")
+	}
+	defer plugins.Close()
+
+	cli, err := pluginClient.WithPlugins(ctx, plugins, b.Cluster.Spec.Plugins.GetEnabledPluginNames()...)
 	if err != nil {
 		b.markBackupAsFailed(ctx, err)
 		return
 	}
 
 	// record the backup beginning
-	backupLog.Info("Plugin backup started")
+	contextLogger.Info("Plugin backup started")
 	b.Recorder.Event(b.Backup, "Normal", "Starting", "Backup started")
+
+	// Update backup status in cluster conditions on startup
+	if err := b.retryWithRefreshedCluster(ctx, func() error {
+		return conditions.Patch(ctx, b.Client, b.Cluster, apiv1.BackupStartingCondition)
+	}); err != nil {
+		contextLogger.Error(err, "Error changing backup condition (backup started)")
+		// We do not terminate here because we could still have a good backup
+		// even if we are unable to communicate with the Kubernetes API server
+	}
 
 	response, err := cli.Backup(
 		ctx,
@@ -95,7 +120,7 @@ func (b *PluginBackupCommand) invokeStart(ctx context.Context) {
 		return
 	}
 
-	backupLog.Info("Backup completed")
+	contextLogger.Info("Backup completed")
 	b.Recorder.Event(b.Backup, "Normal", "Completed", "Backup completed")
 
 	// Set the status to completed
@@ -112,6 +137,7 @@ func (b *PluginBackupCommand) invokeStart(ctx context.Context) {
 	b.Backup.Status.BackupLabelFile = response.BackupLabelFile
 	b.Backup.Status.TablespaceMapFile = response.TablespaceMapFile
 	b.Backup.Status.Online = ptr.To(response.Online)
+	b.Backup.Status.PluginMetadata = response.Metadata
 
 	if !response.StartedAt.IsZero() {
 		b.Backup.Status.StartedAt = ptr.To(metav1.NewTime(response.StartedAt))
@@ -121,28 +147,30 @@ func (b *PluginBackupCommand) invokeStart(ctx context.Context) {
 	}
 
 	if err := postgres.PatchBackupStatusAndRetry(ctx, b.Client, b.Backup); err != nil {
-		backupLog.Error(err, "Can't set backup status as completed")
+		contextLogger.Error(err, "Can't set backup status as completed")
 	}
 
 	// Update backup status in cluster conditions on backup completion
 	if err := b.retryWithRefreshedCluster(ctx, func() error {
 		return conditions.Patch(ctx, b.Client, b.Cluster, apiv1.BackupSucceededCondition)
 	}); err != nil {
-		b.Log.Error(err, "Can't update the cluster with the completed backup data")
+		contextLogger.Error(err, "Can't update the cluster with the completed backup data")
 	}
 }
 
 func (b *PluginBackupCommand) markBackupAsFailed(ctx context.Context, failure error) {
+	contextLogger := log.FromContext(ctx)
+
 	backupStatus := b.Backup.GetStatus()
 
 	// record the failure
-	b.Log.Error(failure, "Backup failed")
+	contextLogger.Error(failure, "Backup failed")
 	b.Recorder.Event(b.Backup, "Normal", "Failed", "Backup failed")
 
 	// update backup status as failed
 	backupStatus.SetAsFailed(failure)
 	if err := postgres.PatchBackupStatusAndRetry(ctx, b.Client, b.Backup); err != nil {
-		b.Log.Error(err, "Can't mark backup as failed")
+		contextLogger.Error(err, "Can't mark backup as failed")
 		// We do not terminate here because we still want to set the condition on the cluster.
 	}
 
@@ -152,10 +180,10 @@ func (b *PluginBackupCommand) markBackupAsFailed(ctx context.Context, failure er
 
 		meta.SetStatusCondition(&b.Cluster.Status.Conditions, *apiv1.BuildClusterBackupFailedCondition(failure))
 
-		b.Cluster.Status.LastFailedBackup = utils.GetCurrentTimestampWithFormat(time.RFC3339)
+		b.Cluster.Status.LastFailedBackup = pgTime.GetCurrentTimestampWithFormat(time.RFC3339)
 		return b.Client.Status().Patch(ctx, b.Cluster, client.MergeFrom(origCluster))
 	}); failErr != nil {
-		b.Log.Error(failErr, "while setting cluster condition for failed backup")
+		contextLogger.Error(failErr, "while setting cluster condition for failed backup")
 	}
 }
 

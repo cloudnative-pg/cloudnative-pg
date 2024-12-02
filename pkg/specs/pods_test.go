@@ -26,7 +26,6 @@ import (
 
 	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -61,24 +60,9 @@ var (
 	}
 )
 
-var _ = Describe("The PostgreSQL security context with nil SeccompProfile", func() {
-	cluster := v1.Cluster{}
-	utils.SetSeccompSupport(false)
-	securityContext := CreatePodSecurityContext(cluster.GetSeccompProfile(), 26, 26)
-
-	It("allows the container to create its own PGDATA", func() {
-		Expect(securityContext.RunAsUser).To(Equal(securityContext.FSGroup))
-	})
-
-	It("by default it should be nil", func() {
-		Expect(securityContext.SeccompProfile).To(BeNil())
-	})
-})
-
 var _ = Describe("The PostgreSQL security context with", func() {
 	It("default RuntimeDefault profile", func() {
 		cluster := v1.Cluster{}
-		utils.SetSeccompSupport(true)
 		securityContext := CreatePodSecurityContext(cluster.GetSeccompProfile(), 26, 26)
 
 		Expect(securityContext.SeccompProfile).ToNot(BeNil())
@@ -92,7 +76,6 @@ var _ = Describe("The PostgreSQL security context with", func() {
 			LocalhostProfile: &profilePath,
 		}
 		cluster := v1.Cluster{Spec: v1.ClusterSpec{SeccompProfile: localhostProfile}}
-		utils.SetSeccompSupport(true)
 		securityContext := CreatePodSecurityContext(cluster.GetSeccompProfile(), 26, 26)
 
 		Expect(securityContext.SeccompProfile).ToNot(BeNil())
@@ -350,12 +333,20 @@ var _ = Describe("EnvConfig", func() {
 						Value: cluster.Name,
 					},
 					{
+						Name:  "PSQL_HISTORY",
+						Value: postgres.TemporaryDirectory + "/.psql_history",
+					},
+					{
 						Name:  "PGPORT",
 						Value: strconv.Itoa(postgres.ServerPort),
 					},
 					{
 						Name:  "PGHOST",
 						Value: postgres.SocketDirectory,
+					},
+					{
+						Name:  "TMPDIR",
+						Value: postgres.TemporaryDirectory,
 					},
 					{
 						Name:  "TEST_ENV",
@@ -401,6 +392,10 @@ var _ = Describe("EnvConfig", func() {
 					{
 						Name:  "PGHOST",
 						Value: postgres.SocketDirectory,
+					},
+					{
+						Name:  "TMPDIR",
+						Value: postgres.TemporaryDirectory,
 					},
 					{
 						Name:  "TEST_ENV",

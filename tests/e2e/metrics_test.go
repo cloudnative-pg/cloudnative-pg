@@ -41,9 +41,11 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 		targetDBSecret                   = "secret_test"
 		testTableName                    = "test_table"
 		clusterMetricsFile               = fixturesDir + "/metrics/cluster-metrics.yaml.template"
+		clusterMetricsTLSFile            = fixturesDir + "/metrics/cluster-metrics-tls.yaml.template"
 		clusterMetricsDBFile             = fixturesDir + "/metrics/cluster-metrics-with-target-databases.yaml.template"
 		clusterMetricsPredicateQueryFile = fixturesDir + "/metrics/cluster-metrics-with-predicate-query.yaml.template"
-		customQueriesSampleFile          = fixturesDir + "/metrics/custom-queries-with-target-databases.yaml"
+		customQueriesSampleFile          = fixturesDir + "/metrics/custom-queries.yaml"
+		customQueriesTargetDBSampleFile  = fixturesDir + "/metrics/custom-queries-with-target-databases.yaml"
 		defaultMonitoringConfigMapName   = "cnpg-default-monitoring"
 		level                            = tests.Low
 	)
@@ -86,112 +88,85 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 	})
 
 	// Cluster identifiers
-	var namespace, metricsClusterName, curlPodName string
-	var err error
+	var namespace string
 
-	JustAfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-		}
-	})
-
-	It("can gather metrics", func() {
+	AssertGatherMetrics := func(namespacePrefix, clusterFile string) {
 		// Create the cluster namespace
-		const namespacePrefix = "cluster-metrics-e2e"
-		metricsClusterName, err = env.GetResourceNameFromYAML(clusterMetricsFile)
+		namespace, err := env.CreateUniqueTestNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+
+		AssertCustomMetricsResourcesExist(namespace, customQueriesSampleFile, 2, 1)
+
+		metricsClusterName, err := env.GetResourceNameFromYAML(clusterFile)
 		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			return env.DeleteNamespace(namespace)
-		})
-
-		AssertCustomMetricsResourcesExist(namespace, fixturesDir+"/metrics/custom-queries.yaml", 2, 1)
-
-		// Create the curl client pod and wait for it to be ready.
-		By("setting up curl client pod", func() {
-			curlClient := utils.CurlClient(namespace)
-			err := utils.PodCreateAndWaitForReady(env, &curlClient, 240)
-			Expect(err).ToNot(HaveOccurred())
-			curlPodName = curlClient.GetName()
-		})
 
 		// Create the cluster
-		AssertCreateCluster(namespace, metricsClusterName, clusterMetricsFile, env)
+		AssertCreateCluster(namespace, metricsClusterName, clusterFile, env)
 
+		cluster, err := env.GetCluster(namespace, metricsClusterName)
+		Expect(err).NotTo(HaveOccurred())
+
+		// Check metrics on each pod
 		By("ensuring metrics are correct on each pod", func() {
-			metricsCluster, err := env.GetCluster(namespace, metricsClusterName)
-			Expect(err).ToNot(HaveOccurred())
-
 			podList, err := env.GetClusterPodList(namespace, metricsClusterName)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Gather metrics in each pod
 			for _, pod := range podList.Items {
 				By(fmt.Sprintf("checking metrics for pod: %s", pod.Name), func() {
-					out, err := utils.CurlGetMetrics(namespace, curlPodName, pod.Status.PodIP, 9187)
+					out, err := utils.RetrieveMetricsFromInstance(env, pod, cluster.IsMetricsTLSEnabled())
 					Expect(err).ToNot(HaveOccurred(), "while getting pod metrics")
-					expectedMetrics := buildExpectedMetrics(metricsCluster, !specs.IsPodPrimary(pod))
+					expectedMetrics := buildExpectedMetrics(cluster, !specs.IsPodPrimary(pod))
 					assertIncludesMetrics(out, expectedMetrics)
 				})
 			}
 		})
 
-		// verify cnpg_collector_x metrics is exists in each pod
-		collectAndAssertCollectorMetricsPresentOnEachPod(namespace, metricsClusterName,
-			curlPodName)
+		// verify cnpg_collector_x metrics exists in each pod
+		collectAndAssertCollectorMetricsPresentOnEachPod(cluster)
+	}
+
+	It("can gather metrics", func() {
+		const namespacePrefix = "cluster-metrics-e2e"
+
+		AssertGatherMetrics(namespacePrefix, clusterMetricsFile)
+	})
+
+	It("can gather metrics with TLS enabled", func() {
+		const namespacePrefix = "cluster-metrics-tls-e2e"
+
+		AssertGatherMetrics(namespacePrefix, clusterMetricsTLSFile)
 	})
 
 	It("can gather metrics with multiple target databases", func() {
 		const namespacePrefix = "metrics-target-databases-e2e"
-		metricsClusterName, err = env.GetResourceNameFromYAML(clusterMetricsDBFile)
+		metricsClusterName, err := env.GetResourceNameFromYAML(clusterMetricsDBFile)
 		Expect(err).ToNot(HaveOccurred())
 		// Create the cluster namespace
-		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			return env.DeleteNamespace(namespace)
-		})
-		AssertCustomMetricsResourcesExist(namespace, customQueriesSampleFile, 1, 1)
-
-		// Create the curl client pod and wait for it to be ready.
-		By("setting up curl client pod", func() {
-			curlClient := utils.CurlClient(namespace)
-			err := utils.PodCreateAndWaitForReady(env, &curlClient, 240)
-			Expect(err).ToNot(HaveOccurred())
-			curlPodName = curlClient.GetName()
-		})
+		AssertCustomMetricsResourcesExist(namespace, customQueriesTargetDBSampleFile, 1, 1)
 
 		// Create the cluster
 		AssertCreateCluster(namespace, metricsClusterName, clusterMetricsDBFile, env)
-		AssertCreationOfTestDataForTargetDB(namespace, metricsClusterName, targetDBOne, testTableName, psqlClientPod)
-		AssertCreationOfTestDataForTargetDB(namespace, metricsClusterName, targetDBTwo, testTableName, psqlClientPod)
-		AssertCreationOfTestDataForTargetDB(namespace, metricsClusterName, targetDBSecret, testTableName, psqlClientPod)
+		AssertCreationOfTestDataForTargetDB(env, namespace, metricsClusterName, targetDBOne, testTableName)
+		AssertCreationOfTestDataForTargetDB(env, namespace, metricsClusterName, targetDBTwo, testTableName)
+		AssertCreationOfTestDataForTargetDB(env, namespace, metricsClusterName, targetDBSecret, testTableName)
 
 		cluster, err := env.GetCluster(namespace, metricsClusterName)
 		Expect(err).ToNot(HaveOccurred())
 
-		AssertMetricsData(namespace, curlPodName, targetDBOne, targetDBTwo, targetDBSecret, cluster)
+		AssertMetricsData(namespace, targetDBOne, targetDBTwo, targetDBSecret, cluster)
 	})
 
 	It("can gather default metrics details", func() {
 		const clusterWithDefaultMetricsFile = fixturesDir + "/base/cluster-storage-class.yaml.template"
 		const namespacePrefix = "default-metrics-details"
-		metricsClusterName, err = env.GetResourceNameFromYAML(clusterWithDefaultMetricsFile)
+		metricsClusterName, err := env.GetResourceNameFromYAML(clusterWithDefaultMetricsFile)
 		Expect(err).ToNot(HaveOccurred())
-		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
-		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			return env.DeleteNamespace(namespace)
-		})
 
-		// Create the curl client pod and wait for it to be ready.
-		By("setting up curl client pod", func() {
-			curlClient := utils.CurlClient(namespace)
-			err := utils.PodCreateAndWaitForReady(env, &curlClient, 240)
-			Expect(err).ToNot(HaveOccurred())
-			curlPodName = curlClient.GetName()
-		})
+		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+		Expect(err).ToNot(HaveOccurred())
 
 		AssertCreateCluster(namespace, metricsClusterName, clusterWithDefaultMetricsFile, env)
 
@@ -206,36 +181,30 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 				return err
 			}, 10).ShouldNot(HaveOccurred())
 		})
+		cluster, err := env.GetCluster(namespace, metricsClusterName)
+		Expect(err).ToNot(HaveOccurred())
 
-		collectAndAssertDefaultMetricsPresentOnEachPod(namespace, metricsClusterName, curlPodName, true)
+		collectAndAssertDefaultMetricsPresentOnEachPod(namespace, metricsClusterName, cluster.IsMetricsTLSEnabled(), true)
 	})
 
 	It("can gather metrics depending on the predicate query", func() {
 		// Create the cluster namespace
 		const namespacePrefix = "predicate-query-metrics-e2e"
-		metricsClusterName, err = env.GetResourceNameFromYAML(clusterMetricsPredicateQueryFile)
+		metricsClusterName, err := env.GetResourceNameFromYAML(clusterMetricsPredicateQueryFile)
 		Expect(err).ToNot(HaveOccurred())
-		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			return env.DeleteNamespace(namespace)
-		})
 
 		AssertCustomMetricsResourcesExist(namespace, fixturesDir+"/metrics/custom-queries-with-predicate-query.yaml", 1, 0)
-
-		// Create the curl client pod and wait for it to be ready.
-		By("setting up curl client pod", func() {
-			curlClient := utils.CurlClient(namespace)
-			err := utils.PodCreateAndWaitForReady(env, &curlClient, 240)
-			Expect(err).ToNot(HaveOccurred())
-			curlPodName = curlClient.GetName()
-		})
 
 		// Create the cluster
 		AssertCreateCluster(namespace, metricsClusterName, clusterMetricsPredicateQueryFile, env)
 
 		By("ensuring only metrics with a positive predicate are collected", func() {
 			podList, err := env.GetClusterPodList(namespace, metricsClusterName)
+			Expect(err).ToNot(HaveOccurred())
+
+			cluster, err := env.GetCluster(namespace, metricsClusterName)
 			Expect(err).ToNot(HaveOccurred())
 
 			// We expect only the metrics that have a predicate_query valid.
@@ -254,7 +223,7 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 			// Gather metrics in each pod
 			for _, pod := range podList.Items {
 				By(fmt.Sprintf("checking metrics for pod: %s", pod.Name), func() {
-					out, err := utils.CurlGetMetrics(namespace, curlPodName, pod.Status.PodIP, 9187)
+					out, err := utils.RetrieveMetricsFromInstance(env, pod, cluster.IsMetricsTLSEnabled())
 					Expect(err).ToNot(HaveOccurred(), "while getting pod metrics")
 					assertIncludesMetrics(out, expectedMetrics)
 					assertExcludesMetrics(out, nonCollectableMetrics)
@@ -268,26 +237,18 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 		const defaultMonitoringQueriesDisableSampleFile = fixturesDir +
 			"/metrics/cluster-disable-default-metrics.yaml.template"
 		const namespacePrefix = "disable-default-metrics"
-		metricsClusterName, err = env.GetResourceNameFromYAML(defaultMonitoringQueriesDisableSampleFile)
+		metricsClusterName, err := env.GetResourceNameFromYAML(defaultMonitoringQueriesDisableSampleFile)
 		Expect(err).ToNot(HaveOccurred())
-		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			return env.DeleteNamespace(namespace)
-		})
-
-		// Create the curl client pod and wait for it to be ready.
-		By("setting up curl client pod", func() {
-			curlClient := utils.CurlClient(namespace)
-			err := utils.PodCreateAndWaitForReady(env, &curlClient, 240)
-			Expect(err).ToNot(HaveOccurred())
-			curlPodName = curlClient.GetName()
-		})
 
 		// Create the cluster
 		AssertCreateCluster(namespace, metricsClusterName, defaultMonitoringQueriesDisableSampleFile, env)
 
-		collectAndAssertDefaultMetricsPresentOnEachPod(namespace, metricsClusterName, curlPodName, false)
+		cluster, err := env.GetCluster(namespace, metricsClusterName)
+		Expect(err).ToNot(HaveOccurred())
+
+		collectAndAssertDefaultMetricsPresentOnEachPod(namespace, metricsClusterName, cluster.IsMetricsTLSEnabled(), false)
 	})
 
 	It("execute custom queries against the application database on replica clusters", func() {
@@ -310,22 +271,11 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		// create namespace
-		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			return env.DeleteNamespace(namespace)
-		})
 
 		// Creating and verifying custom queries configmap
 		AssertCustomMetricsResourcesExist(namespace, configMapFIle, 1, 0)
-
-		// Create the curl client pod and wait for it to be ready
-		By("setting up curl client pod", func() {
-			curlClient := utils.CurlClient(namespace)
-			err := utils.PodCreateAndWaitForReady(env, &curlClient, 240)
-			Expect(err).ToNot(HaveOccurred())
-			curlPodName = curlClient.GetName()
-		})
 
 		// Create the source Cluster
 		AssertCreateCluster(namespace, srcClusterName, srcClusterSampleFile, env)
@@ -337,37 +287,47 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 			srcClusterDatabaseName,
 			replicaClusterSampleFile,
 			testTableName,
-			psqlClientPod)
+		)
 
 		By(fmt.Sprintf("grant select permission for %v table to pg_monitor", testTableName), func() {
-			cmd := fmt.Sprintf("GRANT SELECT ON %v TO pg_monitor", testTableName)
-			appUser, appUserPass, err := utils.GetCredentials(srcClusterName, namespace, apiv1.ApplicationUserSecretSuffix, env)
-			Expect(err).ToNot(HaveOccurred())
-			host, err := utils.GetHostName(namespace, srcClusterName, env)
-			Expect(err).ToNot(HaveOccurred())
-			_, _, err = utils.RunQueryFromPod(
-				psqlClientPod,
-				host,
+			forward, conn, err := utils.ForwardPSQLConnection(
+				env,
+				namespace,
+				srcClusterName,
 				srcClusterDatabaseName,
-				appUser,
-				appUserPass,
-				cmd,
-				env)
+				apiv1.ApplicationUserSecretSuffix,
+			)
+			defer func() {
+				_ = conn.Close()
+				forward.Close()
+			}()
+			Expect(err).ToNot(HaveOccurred())
+
+			cmd := fmt.Sprintf("GRANT SELECT ON %v TO pg_monitor", testTableName)
+			_, err = conn.Exec(cmd)
 			Expect(err).ToNot(HaveOccurred())
 		})
+		replicaCluster, err := env.GetCluster(namespace, replicaClusterName)
+		Expect(err).ToNot(HaveOccurred())
 
 		By("collecting metrics on each pod and checking that the table has been found", func() {
 			podList, err := env.GetClusterPodList(namespace, replicaClusterName)
 			Expect(err).ToNot(HaveOccurred())
+
 			// Gather metrics in each pod
 			expectedMetric := fmt.Sprintf("cnpg_%v_row_count 3", testTableName)
 			for _, pod := range podList.Items {
-				podIP := pod.Status.PodIP
-				out, err := utils.CurlGetMetrics(namespace, curlPodName, podIP, 9187)
+				out, err := utils.RetrieveMetricsFromInstance(env, pod, replicaCluster.IsMetricsTLSEnabled())
 				Expect(err).Should(Not(HaveOccurred()))
 				Expect(strings.Split(out, "\n")).Should(ContainElement(expectedMetric))
 			}
 		})
-		collectAndAssertDefaultMetricsPresentOnEachPod(namespace, replicaClusterName, curlPodName, true)
+
+		collectAndAssertDefaultMetricsPresentOnEachPod(
+			namespace,
+			replicaClusterName,
+			replicaCluster.IsMetricsTLSEnabled(),
+			true,
+		)
 	})
 })

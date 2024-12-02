@@ -20,8 +20,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
-
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // DefaultWebapp returns a struct representing a
@@ -29,9 +27,6 @@ func DefaultWebapp(namespace string, name string, rootCASecretName string, tlsSe
 	var secretMode int32 = 0o600
 	seccompProfile := &corev1.SeccompProfile{
 		Type: corev1.SeccompProfileTypeRuntimeDefault,
-	}
-	if !utils.HaveSeccompSupport() {
-		seccompProfile = nil
 	}
 
 	return corev1.Pod{

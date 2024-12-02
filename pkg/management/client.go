@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -38,7 +39,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 )
 
@@ -49,8 +49,8 @@ var (
 	// readinessCheckRetry is used to wait until the API server is reachable
 	readinessCheckRetry = wait.Backoff{
 		Steps:    5,
-		Duration: 10 * time.Millisecond,
-		Factor:   5.0,
+		Duration: 1 * time.Second,
+		Factor:   3.0,
 		Jitter:   0.1,
 	}
 )
@@ -129,10 +129,10 @@ func NewEventRecorder() (record.EventRecorder, error) {
 	return recorder, nil
 }
 
-// WaitKubernetesAPIServer will wait for the kubernetes API server to by ready.
-// Returns any error if it can't be reached.
-func WaitKubernetesAPIServer(ctx context.Context, clusterObjectKey client.ObjectKey) error {
-	logger := log.FromContext(ctx)
+// WaitForGetCluster will wait for a successful get cluster to be executed.
+// Returns any error encountered.
+func WaitForGetCluster(ctx context.Context, clusterObjectKey client.ObjectKey) error {
+	logger := log.FromContext(ctx).WithName("wait-for-get-cluster")
 
 	cli, err := NewControllerRuntimeClient()
 	if err != nil {
@@ -140,9 +140,21 @@ func WaitKubernetesAPIServer(ctx context.Context, clusterObjectKey client.Object
 		return err
 	}
 
-	if err := retry.OnError(readinessCheckRetry, resources.RetryAlways, func() (err error) {
-		return cli.Get(ctx, clusterObjectKey, &apiv1.Cluster{})
-	}); err != nil {
+	return WaitForGetClusterWithClient(ctx, cli, clusterObjectKey)
+}
+
+// WaitForGetClusterWithClient will wait for a successful get cluster to be executed
+func WaitForGetClusterWithClient(ctx context.Context, cli client.Client, clusterObjectKey client.ObjectKey) error {
+	logger := log.FromContext(ctx).WithName("wait-for-get-cluster")
+
+	err := retry.OnError(readinessCheckRetry, resources.RetryAlways, func() error {
+		if err := cli.Get(ctx, clusterObjectKey, &apiv1.Cluster{}); err != nil {
+			logger.Warning("Encountered an error while executing get cluster. Will wait and retry", "error", err.Error())
+			return err
+		}
+		return nil
+	})
+	if err != nil {
 		const message = "error while waiting for the API server to be reachable"
 		logger.Error(err, message)
 		return fmt.Errorf("%s: %w", message, err)

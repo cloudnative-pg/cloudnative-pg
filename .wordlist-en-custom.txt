@@ -2,6 +2,8 @@ AES
 API's
 APIs
 ARMv
+AZ
+AZs
 AcolumnName
 AdditionalCommandArgs
 AdditionalPodAffinity
@@ -59,6 +61,8 @@ CRDs
 CSI
 CSV
 CSVs
+CVE
+CVEs
 CannotReconcile
 Canovai
 CatalogImage
@@ -81,6 +85,7 @@ ClusterIP
 ClusterImageCatalog
 ClusterIsNotReady
 ClusterList
+ClusterMonitoringTLSConfiguration
 ClusterRole
 ClusterRole's
 ClusterServiceVersion
@@ -107,19 +112,26 @@ CustomResourceDefinition
 CustomResourceDefinitions
 Customizations
 DBA
+DBaaS
 DDTHH
 DISA
 DNS
 DataBackupConfiguration
 DataBase
+DataDurabilityLevel
 DataSource
+DatabaseReclaimPolicy
 DatabaseRoleRef
+DatabaseSpec
+DatabaseStatus
+DemotionToken
 DeploymentStrategy
 DevOps
 DevSecOps
 Dhilip
 DigitalOcean
 DisablePassword
+DisabledDefaultServices
 DoD
 DockerHub
 Dockle
@@ -142,6 +154,7 @@ EphemeralVolumeSource
 EphemeralVolumesSizeLimit
 EphemeralVolumesSizeLimitConfiguration
 ExternalCluster
+ExternalClusterList
 FQDN
 Fei
 Filesystem
@@ -159,6 +172,7 @@ GUCs
 Gabriele
 GaugeVec
 Gi
+GitOps
 GoArch
 Golang
 GolangCI
@@ -174,6 +188,7 @@ INPLACE
 IOPS
 IPv
 IRSA
+IaC
 Ibryam
 IfNotPresent
 ImageCatalog
@@ -205,6 +220,7 @@ LTS
 LastBackupFailed
 LastBackupSucceeded
 LastFailedArchiveTime
+LastPromotionToken
 Lifecycle
 Linkerd
 Linode
@@ -218,6 +234,8 @@ MVCC
 ManagedConfiguration
 ManagedRoles
 ManagedRolesStatus
+ManagedService
+ManagedServices
 MetricDescription
 MetricName
 MetricType
@@ -241,6 +259,7 @@ NodeSelector
 NodesUsed
 Noland
 O'Reilly
+OLAP
 OLTP
 OOM
 OU
@@ -312,6 +331,8 @@ PoolerStatus
 PoolerType
 PostGIS
 PostInitApplicationSQLRefs
+PostInitSQLRefs
+PostInitTemplateSQLRefs
 Postgres
 PostgresConfiguration
 PrimaryUpdateMethod
@@ -319,6 +340,13 @@ PrimaryUpdateStrategy
 PriorityClass
 PriorityClassName
 ProjectedVolumeSource
+PublicationReclaimPolicy
+PublicationSpec
+PublicationStatus
+PublicationTarget
+PublicationTargetAllTables
+PublicationTargetObject
+PublicationTargetTable
 PullPolicy
 QoS
 Quaresima
@@ -353,6 +381,7 @@ RunningBackups
 RunningSnapshotBackups
 RuntimeDefault
 Ruocco
+SANs
 SAS
 SCC
 SCCs
@@ -362,6 +391,7 @@ SHA
 SLA
 SPoF
 SQLQuery
+SQLRefs
 SSL
 SSZ
 STORAGEACCOUNTNAME
@@ -378,14 +408,19 @@ SecretVersion
 SecretsResourceVersion
 SecurityProfiles
 Seealso
+SelectorType
 ServerCASecret
 ServerTLSSecret
 ServiceAccount
 ServiceAccount's
 ServiceAccountTemplate
 ServiceMonitor
+ServiceSelectorType
 ServiceSpec
 ServiceTemplateSpec
+ServiceUpdateStrategy
+SetStatusInCluster
+ShutdownCheckpointToken
 Silvela
 Slonik
 SnapshotOwnerReference
@@ -397,11 +432,16 @@ StatefulSets
 StorageClass
 StorageConfiguration
 Storages
+SubscriptionReclaimPolicy
+SubscriptionSpec
+SubscriptionStatus
 SuccessfullyExtracted
 SwitchReplicaClusterStatus
 SyncReplicaElectionConstraints
 SynchronizeReplicas
 SynchronizeReplicasConfiguration
+SynchronousReplicaConfiguration
+SynchronousReplicaConfigurationMethod
 Synopsys
 TCP
 TLS
@@ -428,6 +468,7 @@ URIs
 UTF
 Uncomment
 Unrealizable
+UpdateStrategy
 VLDB
 VM
 VMs
@@ -463,13 +504,16 @@ addons
 affinityconfiguration
 aks
 albert
+allTables
 allnamespaces
 alloc
 allocator
+allowConnections
 allowPrivilegeEscalation
 allowVolumeExpansion
 amd
 angus
+anonymization
 api
 apiGroup
 apiGroups
@@ -484,6 +528,7 @@ applicationCredentials
 applicationSecretVersion
 appsv
 appuser
+archiveAdditionalCommandArgs
 archiver
 args
 armru
@@ -493,6 +538,7 @@ authQuery
 authQuerySecret
 authn
 authz
+autocompletion
 autoscaler
 autovacuum
 availableArchitectures
@@ -519,6 +565,7 @@ backuplist
 backupspec
 backupstatus
 balancer
+balancers
 barmanEndpointCA
 barmanObjectStore
 barmanobjectstore
@@ -577,6 +624,7 @@ clusterName
 clusterimagecatalogs
 clusterlist
 clusterrole
+clusterserviceversions
 clusterspec
 clusterstatus
 cmd
@@ -604,6 +652,7 @@ connectionParameters
 connectionString
 conninfo
 containerPort
+controldata
 coredump
 coredumps
 coreos
@@ -638,7 +687,9 @@ cyber
 dT
 danglingPVC
 dataChecksums
+dataDurability
 databackupconfiguration
+databaseReclaimPolicy
 datacenter
 datacenters
 datallowconn
@@ -651,6 +702,7 @@ de
 declaratively
 defaultMode
 defaultPoolSize
+demotionToken
 deployer
 deploymentStrategy
 destinationPath
@@ -661,6 +713,7 @@ digestValue
 dir
 disableDefaultQueries
 disablePassword
+disabledDefaultServices
 distro
 distroless
 distros
@@ -678,6 +731,7 @@ ecdsa
 edb
 eks
 enableAlterSystem
+enableMetricsTLS
 enablePDB
 enablePodAntiAffinity
 enablePodMonitor
@@ -698,6 +752,7 @@ executables
 expirations
 extensibility
 externalCluster
+externalClusterName
 externalClusterSecretVersion
 externalClusters
 externalclusters
@@ -713,6 +768,7 @@ ffd
 fieldPath
 fieldref
 filesystem
+finalizer
 findstr
 fio
 firstRecoverabilityPoint
@@ -757,6 +813,7 @@ http
 httpGet
 https
 hugepages
+icu
 ident
 imageCatalogRef
 imageName
@@ -777,9 +834,12 @@ initDB
 initdb
 initialise
 initializingPVC
+inplace
+installplans
 instanceID
 instanceName
 instanceNames
+instanceRole
 instancesReportedState
 instancesStatus
 inuse
@@ -788,6 +848,7 @@ ip
 ipcs
 ips
 isPrimary
+isTemplate
 issuecomment
 italy
 jdbc
@@ -812,6 +873,7 @@ labelling
 largeobject
 lastCheckTime
 lastFailedBackup
+lastPromotionToken
 lastScheduleTime
 lastSuccessfulBackup
 lastSuccessfulBackupByMethod
@@ -856,6 +918,7 @@ matchExpressions
 matchLabels
 maxClientConnections
 maxParallel
+maxStandbyNamesFromCluster
 maxSyncReplicas
 maxwait
 mcache
@@ -868,6 +931,7 @@ metricNameKS
 microservice
 microservices
 microsoft
+minApplyDelay
 minSyncReplicas
 minikube
 minio
@@ -877,6 +941,7 @@ mountPath
 msg
 mspan
 multinamespace
+mutatingwebhookconfigurations
 myAKSCluster
 myResourceGroup
 namespace
@@ -907,6 +972,7 @@ objid
 objref
 objsubid
 observability
+observedGeneration
 oc
 ol
 olm
@@ -958,6 +1024,7 @@ pitr
 plpgsql
 pluggable
 pluginConfiguration
+pluginMetadata
 pluginStatus
 png
 podAffinityTerm
@@ -980,7 +1047,9 @@ postImportApplicationSQL
 postInitApplicationSQL
 postInitApplicationSQLRefs
 postInitSQL
+postInitSQLRefs
 postInitTemplateSQL
+postInitTemplateSQLRefs
 postgis
 postgres
 postgresGID
@@ -1003,8 +1072,12 @@ proj
 projectedVolumeTemplate
 prometheus
 promotionTimeout
+promotionToken
 provisioner
 psql
+publicationDBName
+publicationName
+publicationReclaimPolicy
 pv
 pvc
 pvcCount
@@ -1014,6 +1087,7 @@ quantile
 queryable
 quickstart
 rbac
+rc
 readService
 readinessProbe
 readthedocs
@@ -1025,6 +1099,7 @@ recoveredCluster
 recoveryTarget
 recoverytarget
 recv
+redefinitions
 redhat
 rehydrate
 rehydrated
@@ -1043,6 +1118,7 @@ resizeInUseVolumes
 resizingPVC
 resourceVersion
 resourcerequirements
+restoreAdditionalCommandArgs
 resync
 retentionPolicy
 reusePVC
@@ -1067,6 +1143,7 @@ scheduledbackupspec
 scheduledbackupstatus
 schedulerName
 schemaOnly
+schemas
 sdk
 searchAttribute
 searchFilter
@@ -1081,6 +1158,7 @@ securego
 securityContext
 seg
 segsize
+selectorType
 serverAltDNSNames
 serverCA
 serverCASecret
@@ -1097,6 +1175,7 @@ sha
 shm
 shmall
 shmmax
+shutdownCheckpointToken
 sig
 sigs
 singlenamespace
@@ -1121,6 +1200,8 @@ sslkey
 sslmode
 sslrootcert
 sso
+standbyNamesPost
+standbyNamesPre
 startDelay
 startedAt
 stateful
@@ -1142,6 +1223,7 @@ subcommand
 subcommands
 subdirectory
 subresource
+subscriptionReclaimPolicy
 substatement
 successfullyExtracted
 sudo
@@ -1160,6 +1242,8 @@ syslog
 systemd
 sysv
 tAc
+tableExpression
+tablesInSchema
 tablespace
 tablespaceClassName
 tablespaceMapFile
@@ -1207,9 +1291,12 @@ unencrypted
 unfence
 unfencing
 unix
+unsatisfiable
+unschedulable
 unsetting
 unusablePVC
 updateInterval
+updateStrategy
 upgradable
 uptime
 uri
@@ -1218,6 +1305,7 @@ usernamepassword
 usr
 utils
 validUntil
+validatingwebhookconfigurations
 valueFrom
 viceversa
 virtualized

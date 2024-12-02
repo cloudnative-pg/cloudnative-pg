@@ -17,10 +17,13 @@ limitations under the License.
 package tablespaces
 
 import (
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
+	"github.com/cloudnative-pg/machinery/pkg/fileutils"
+
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 )
 
+// tablespaceStorageManager represents the required behavior in terms of storage
+// for the tablespace reconciler
 type tablespaceStorageManager interface {
 	getStorageLocation(tbsName string) string
 	storageExists(tbsName string) (bool, error)

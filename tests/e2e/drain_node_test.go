@@ -82,12 +82,6 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 		const sampleFile = fixturesDir + "/drain-node/cluster-drain-node.yaml.template"
 		const clusterName = "cluster-drain-node"
 
-		JustAfterEach(func() {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-		})
-
 		// We cordon one node, so pods will run on one or two nodes. This
 		// is only to create a harder situation for the operator.
 		// We then drain the node containing the primary and expect the pod(s)
@@ -109,11 +103,8 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 			})
 			var err error
 			// Create a cluster in a namespace we'll delete after the test
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.DeleteNamespace(namespace)
-			})
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
 			By("waiting for the jobs to be removed", func() {
@@ -127,9 +118,13 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 
 			// Load test data
 			oldPrimary := clusterName + "-1"
-			primary, err := env.GetClusterPrimary(namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
-			AssertCreateTestData(namespace, clusterName, "test", primary)
+			tableLocator := TableLocator{
+				Namespace:    namespace,
+				ClusterName:  clusterName,
+				DatabaseName: testsUtils.AppDBName,
+				TableName:    "test",
+			}
+			AssertCreateTestData(env, tableLocator)
 
 			// We create a mapping between the pod names and the UIDs of
 			// their volumes. We do not expect the UIDs to change.
@@ -189,10 +184,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 				}
 			})
 
-			// Expect the (previously created) test data to be available
-			primary, err = env.GetClusterPrimary(namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
-			AssertDataExpectedCountWithDatabaseName(namespace, primary.Name, "app", "test", 2)
+			AssertDataExpectedCount(env, tableLocator, 2)
 			AssertClusterStandbysAreStreaming(namespace, clusterName, 120)
 		})
 
@@ -201,14 +193,14 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 		// If PVCs can be moved: all the replicas will be killed and rescheduled to a different node,
 		// then a switchover will be triggered, and the old primary will be killed and moved too.
 		// The drain will succeed.
-		// We have skipped this scenario on the Local executors, Openshift, EKS, RKE
+		// We have skipped this scenario on the local executors, Openshift, EKS, GKE
 		// because here PVCs can not be moved, so this all replicas should be killed and can not be rescheduled on a
 		// new node as there are none, the primary node can not be killed, therefore the drain fails.
 
 		When("the cluster allows moving PVCs between nodes", func() {
 			BeforeEach(func() {
-				// AKS using rook and the standard GKE StorageClass allow moving PVCs between nodes
-				if !(IsAKS() || IsGKE()) {
+				// AKS using rook allows moving PVCs between nodes
+				if !MustGetEnvProfile().CanMovePVCAcrossNodes() {
 					Skip("This test case is only applicable on clusters where PVC can be moved")
 				}
 			})
@@ -226,11 +218,8 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 				})
 				var err error
 				// Create a cluster in a namespace we'll delete after the test
-				namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+				namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
-				DeferCleanup(func() error {
-					return env.DeleteNamespace(namespace)
-				})
 				AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
 				By("waiting for the jobs to be removed", func() {
@@ -244,9 +233,13 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 
 				// Load test data
 				oldPrimary := clusterName + "-1"
-				primary, err := env.GetClusterPrimary(namespace, clusterName)
-				Expect(err).ToNot(HaveOccurred())
-				AssertCreateTestData(namespace, clusterName, "test", primary)
+				tableLocator := TableLocator{
+					Namespace:    namespace,
+					ClusterName:  clusterName,
+					DatabaseName: testsUtils.AppDBName,
+					TableName:    "test",
+				}
+				AssertCreateTestData(env, tableLocator)
 
 				// We create a mapping between the pod names and the UIDs of
 				// their volumes. We do not expect the UIDs to change.
@@ -310,10 +303,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 					}
 				})
 
-				// Expect the (previously created) test data to be available
-				primary, err = env.GetClusterPrimary(namespace, clusterName)
-				Expect(err).ToNot(HaveOccurred())
-				AssertDataExpectedCountWithDatabaseName(namespace, primary.Name, "app", "test", 2)
+				AssertDataExpectedCount(env, tableLocator, 2)
 				AssertClusterStandbysAreStreaming(namespace, clusterName, 120)
 			})
 		})
@@ -330,13 +320,8 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 			// All GKE and AKS persistent disks are network storage located independently of the underlying Nodes, so
 			// they don't get deleted after a Drain. Hence, even when using "reusePVC off", all the pods will
 			// be recreated with the same name and will reuse the existing volume.
-			if IsAKS() || IsGKE() {
+			if MustGetEnvProfile().CanMovePVCAcrossNodes() {
 				Skip("This test case is only applicable on clusters with local storage")
-			}
-		})
-		JustAfterEach(func() {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 			}
 		})
 
@@ -355,11 +340,8 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 			})
 			var err error
 			// Create a cluster in a namespace we'll delete after the test
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.DeleteNamespace(namespace)
-			})
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
 			// Avoid pod from init jobs interfering with the tests
@@ -384,9 +366,13 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 			})
 
 			// Load test data
-			primary, err := env.GetClusterPrimary(namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
-			AssertCreateTestData(namespace, clusterName, "test", primary)
+			tableLocator := TableLocator{
+				Namespace:    namespace,
+				ClusterName:  clusterName,
+				DatabaseName: testsUtils.AppDBName,
+				TableName:    "test",
+			}
+			AssertCreateTestData(env, tableLocator)
 
 			// We uncordon a cordoned node. New pods can go there.
 			By("uncordon node for pod failover", func() {
@@ -422,10 +408,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 				}, timeout).Should(Succeed())
 			})
 
-			// Expect the (previously created) test data to be available
-			primary, err = env.GetClusterPrimary(namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
-			AssertDataExpectedCountWithDatabaseName(namespace, primary.Name, "app", "test", 2)
+			AssertDataExpectedCount(env, tableLocator, 2)
 			AssertClusterStandbysAreStreaming(namespace, clusterName, 120)
 			err = nodes.UncordonAllNodes(env)
 			Expect(err).ToNot(HaveOccurred())
@@ -441,11 +424,8 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 		BeforeAll(func() {
 			var err error
 			// Create a cluster in a namespace we'll delete after the test
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.DeleteNamespace(namespace)
-			})
 		})
 
 		When("the PDB is disabled", func() {
@@ -462,9 +442,13 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 				})
 
 				// Load test data
-				primary, err := env.GetClusterPrimary(namespace, clusterName)
-				Expect(err).ToNot(HaveOccurred())
-				AssertCreateTestData(namespace, clusterName, "test", primary)
+				tableLocator := TableLocator{
+					Namespace:    namespace,
+					ClusterName:  clusterName,
+					DatabaseName: testsUtils.AppDBName,
+					TableName:    "test",
+				}
+				AssertCreateTestData(env, tableLocator)
 
 				// Drain the node containing the primary pod and store the list of running pods
 				_ = nodes.DrainPrimaryNode(namespace, clusterName,
@@ -487,7 +471,8 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 					Expect(err).ToNot(HaveOccurred())
 				})
 
-				AssertDataExpectedCountWithDatabaseName(namespace, primary.Name, "app", "test", 2)
+				AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReady], env)
+				AssertDataExpectedCount(env, tableLocator, 2)
 			})
 		})
 

@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -27,7 +28,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 )
@@ -42,8 +42,9 @@ func (r *ClusterReconciler) scaleDownCluster(
 	contextLogger := log.FromContext(ctx)
 
 	if cluster.Spec.MaxSyncReplicas > 0 && cluster.Spec.Instances < (cluster.Spec.MaxSyncReplicas+1) {
+		origCluster := cluster.DeepCopy()
 		cluster.Spec.Instances = cluster.Status.Instances
-		if err := r.Update(ctx, cluster); err != nil {
+		if err := r.Patch(ctx, cluster, client.MergeFrom(origCluster)); err != nil {
 			return err
 		}
 
@@ -95,6 +96,8 @@ func (r *ClusterReconciler) ensureInstanceJobAreDeleted(
 	cluster *apiv1.Cluster,
 	instanceName string,
 ) error {
+	contextLogger := log.FromContext(ctx)
+
 	for _, jobName := range specs.GetPossibleJobNames(instanceName) {
 		job := &batchv1.Job{
 			ObjectMeta: metav1.ObjectMeta{
@@ -102,6 +105,7 @@ func (r *ClusterReconciler) ensureInstanceJobAreDeleted(
 				Namespace: cluster.Namespace,
 			},
 		}
+
 		// This job was working against the PVC of this Pod,
 		// let's remove it
 		foreground := metav1.DeletePropagationForeground
@@ -110,6 +114,7 @@ func (r *ClusterReconciler) ensureInstanceJobAreDeleted(
 			if !apierrs.IsNotFound(err) {
 				return fmt.Errorf("scaling down node (job) %v: %w", instanceName, err)
 			}
+			contextLogger.Info("Deleted job", "jobName", job.Name)
 		}
 	}
 	return nil

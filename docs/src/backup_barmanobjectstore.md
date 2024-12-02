@@ -96,9 +96,9 @@ algorithms via `barman-cloud-backup` (for backups) and
 * snappy
 
 The compression settings for backups and WALs are independent. See the
-[DataBackupConfiguration](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-DataBackupConfiguration) and
-[WALBackupConfiguration](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-WalBackupConfiguration) sections in
-the API reference.
+[DataBackupConfiguration](https://pkg.go.dev/github.com/cloudnative-pg/barman-cloud/pkg/api#DataBackupConfiguration) and
+[WALBackupConfiguration](https://pkg.go.dev/github.com/cloudnative-pg/barman-cloud/pkg/api#WalBackupConfiguration) sections in
+the barman-cloud API reference.
 
 It is important to note that archival time, restore time, and size change
 between the algorithms, so the compression algorithm should be chosen according
@@ -148,23 +148,27 @@ spec:
         backupRetentionPolicy: "keep"
 ```
 
-## Extra options for the backup command
+## Extra options for the backup and WAL commands
 
-You can append additional options to the `barman-cloud-backup` command by using
+You can append additional options to the `barman-cloud-backup` and `barman-cloud-wal-archive` commands by using
 the `additionalCommandArgs` property in the
-`.spec.backup.barmanObjectStore.data` section.
-This property is a list of strings that will be appended to the
-`barman-cloud-backup` command.
+`.spec.backup.barmanObjectStore.data` and `.spec.backup.barmanObjectStore.wal` sections respectively.
+This properties are lists of strings that will be appended to the
+`barman-cloud-backup` and `barman-cloud-wal-archive` commands.
+
 For example, you can use the `--read-timeout=60` to customize the connection
 reading timeout.
-For additional options supported by `barman-cloud-backup` you can refer to the
-official barman  documentation [here](https://www.pgbarman.org/documentation/).
+
+For additional options supported by `barman-cloud-backup` and `barman-cloud-wal-archive` commands you can refer to the
+official barman documentation [here](https://www.pgbarman.org/documentation/).
 
 If an option provided in `additionalCommandArgs` is already present in the
-declared options in  the `barmanObjectStore` section, the extra option will be
+declared options in its section (`.spec.backup.barmanObjectStore.data` or `.spec.backup.barmanObjectStore.wal`), the extra option will be
 ignored.
 
 The following is an example of how to use this property:
+
+For backups:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -177,5 +181,21 @@ spec:
       data:
         additionalCommandArgs:
         - "--min-chunk-size=5MB"
+        - "--read-timeout=60"
+```
+
+For WAL files:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+[...]
+spec:
+  backup:
+    barmanObjectStore:
+      [...]
+      wal:
+        additionalCommandArgs:
+        - "--max-concurrency=1"
         - "--read-timeout=60"
 ```

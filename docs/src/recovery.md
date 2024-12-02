@@ -21,14 +21,7 @@ from the archive.
 
 WAL files are pulled from the defined *recovery object store*.
 
-Base backups can be taken either on object stores or using volume snapshots
-(from version 1.21).
-
-!!! Warning
-    Recovery using volume snapshots had an initial release on 1.20.1. Because of
-    the amount of progress on the feature for 1.21.0, to use volume
-    snapshots, we strongly advise you to upgrade to 1.21 or more advanced
-    releases.
+Base backups can be taken either on object stores or using volume snapshots.
 
 You can achieve recovery from a *recovery object store* in two ways:
 
@@ -93,6 +86,11 @@ spec:
         wal:
           maxParallel: 8
 ```
+
+The previous example assumes that the application database and its owning user
+are named `app` by default. If the PostgreSQL cluster being restored uses
+different names, you must specify these names before exiting the recovery phase,
+as documented in ["Configure the application database"](#configure-the-application-database).
 
 !!! Important
     By default, the `recovery` method strictly uses the `name` of the
@@ -164,6 +162,11 @@ spec:
           apiGroup: snapshot.storage.k8s.io
 ```
 
+The previous example assumes that the application database and its owning user
+are named `app` by default. If the PostgreSQL cluster being restored uses
+different names, you must specify these names before exiting the recovery phase,
+as documented in ["Configure the application database"](#configure-the-application-database).
+
 !!! Warning
     If bootstrapping a replica-mode cluster from snapshots, to leverage
     snapshots for the standby instances and not just the primary,
@@ -200,26 +203,29 @@ spec:
 This bootstrap method allows you to specify just a reference to the
 backup that needs to be restored.
 
-The previous example implies the application database and its owning user is
-the default one, `app`. If the PostgreSQL cluster being restored was using
-different names, you can specify them as documented in [Configure the
-application database](#configure-the-application-database).
+The previous example assumes that the application database and its owning user
+are named `app` by default. If the PostgreSQL cluster being restored uses
+different names, you must specify these names before exiting the recovery phase,
+as documented in ["Configure the application database"](#configure-the-application-database).
 
-## Additional considerations
+## Additional Considerations
 
-Whether you recover from a recovery object store, a volume snapshot, or an
-existing `Backup` resource, the following considerations apply:
+Whether you recover from an object store, a volume snapshot, or an existing
+`Backup` resource, no changes to the database, including the catalog, are
+permitted until the `Cluster` is fully promoted to primary and accepts write
+operations. This restriction includes any role overrides, which are deferred
+until the `Cluster` transitions to primary.
+As a result, the following considerations apply:
 
-- The application database name and the application database user are preserved
-  from the backup that's being restored. The operator doesn't currently attempt
-  to back up the underlying secrets, as this is part of the usual maintenance
-  activity of the Kubernetes cluster.
-- To preserve the original postgres user password, you need to properly
-  configure `enableSuperuserAccess` and supply a `superuserSecret`.
-- By default, the recovery continues up to the latest
-  available WAL on the default target timeline (`latest`).
-  You can optionally specify a `recoveryTarget` to perform a point-in-time
-  recovery (see [Point in time recovery (PITR)](#point-in-time-recovery-pitr)).
+- The application database name and user are copied from the backup being
+  restored. The operator does not currently back up the underlying secrets, as
+  this is part of the usual maintenance activity of the Kubernetes cluster.
+- To preserve the original postgres user password, configure
+  `enableSuperuserAccess` and supply a `superuserSecret`.
+
+By default, recovery continues up to the latest available WAL on the default
+target timeline (`latest`). You can optionally specify a `recoveryTarget` to
+perform a point-in-time recovery (see [Point in Time Recovery (PITR)](#point-in-time-recovery-pitr)).
 
 !!! Important
     Consider using the `barmanObjectStore.wal.maxParallel` option to speed
@@ -388,8 +394,7 @@ targetImmediate
     The operator can retrieve the closest backup when you specify either
     `targetTime` or `targetLSN`. However, this isn't possible for the remaining
     targets: `targetName`, `targetXID`, and `targetImmediate`. In such cases, it's
-    important to specify `backupID`, unless the last available backup in the
-    catalog is acceptable.
+    mandatory to specify `backupID`.
 
 This example uses a `targetName`-based recovery target:
 
@@ -465,8 +470,15 @@ generate a secret with a randomly secure password for use.
 See [Bootstrap an empty cluster](bootstrap.md#bootstrap-an-empty-cluster-initdb)
 for more information about secrets.
 
-This example configures the application database `app` with owner `app` and
-supplied secret `app-secret`.
+!!! Important
+    While the `Cluster` is in recovery mode, no changes to the database,
+    including the catalog, are permitted. This restriction includes any role
+    overrides, which are deferred until the `Cluster` transitions to primary.
+    During this phase, users remain as defined in the source cluster.
+
+The following example configures the `app` database with the owner `app` and
+the password stored in the provided secret `app-secret`, following the
+bootstrap from a live cluster.
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -482,20 +494,16 @@ spec:
       [...]
 ```
 
-With this configuration, the following happens after recovery is complete:
+With the above configuration, the following will happen only **after recovery is
+completed**:
 
-1. If database `app` doesn't exist, a new database `app` is created.
-2. If user `app` doesn't exist, a new user `app` is created.
-3. if user `app` isn't the owner of the database, user `app` is granted
-   as owner of database `app`.
-4. If the value of `username` matches the value of `owner` in the secret, the
-   password of application database is changed to the value of `password` in the
-   secret.
-
-!!! Important
-    For a replica cluster with replica mode enabled, the operator doesn't
-    create any database or user in the PostgreSQL instance. These are
-    recovered from the original cluster.
+1. If the `app` database does not exist, it will be created.
+2. If the `app` user does not exist, it will be created.
+3. If the `app` user is not the owner of the `app` database, ownership will be
+   granted to the `app` user.
+4. If the `username` value matches the `owner` value in the secret, the
+   password for the application user (the `app` user in this case) will be
+   updated to the `password` value in the secret.
 
 ## How recovery works under the hood
 
@@ -588,10 +596,10 @@ could be overwritten by the new cluster.
 
 !!! Warning
     The operator includes a safety check to ensure a cluster doesn't overwrite
-a storage bucket that contained information. A cluster that would overwrite
-existing storage remains in the state `Setting up primary` with pods in an
-error state. The pod logs show: `ERROR: WAL archive check failed for server
-recoveredCluster: Expected empty archive`.
+    a storage bucket that contained information. A cluster that would overwrite
+    existing storage remains in the state `Setting up primary` with pods in an
+    error state. The pod logs show: `ERROR: WAL archive check failed for server
+    recoveredCluster: Expected empty archive`.
 
 !!! Important
     If you set the `cnpg.io/skipEmptyWalArchiveCheck` annotation to `enabled`

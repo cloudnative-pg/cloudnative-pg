@@ -23,28 +23,31 @@ const (
 	// LabelBackupRestore is a label for only selecting backup and restore tests
 	LabelBackupRestore = "backup-restore"
 
-	// LabelBasic is a label for  selecting basic test
+	// LabelBasic is a label for selecting basic tests
 	LabelBasic = "basic"
 
-	// LabelClusterMetadata is a label for selecting cluster-metadata test
+	// LabelClusterMetadata is a label for selecting cluster-metadata tests
 	LabelClusterMetadata = "cluster-metadata"
+
+	// LabelDeclarativeDatabases is a label for selecting the declarative databases test
+	LabelDeclarativeDatabases = "declarative-databases"
+
+	// LabelDeclarativePubSub  is a label for selecting the publication / subscription test
+	LabelDeclarativePubSub = "publication-subscription"
 
 	// LabelDisruptive is the string for labelling disruptive tests
 	LabelDisruptive = "disruptive"
 
-	// LabelIgnoreFails is the string for labelling tests that should not be considered when failing.
-	LabelIgnoreFails = "ignore-fails"
-
-	// LabelImportingDatabases is a label for selecting importing-databases test
+	// LabelImportingDatabases is a label for selecting the importing-databases test
 	LabelImportingDatabases = "importing-databases"
 
-	// LabelMaintenance is a label for selecting maintenance test
+	// LabelMaintenance is a label for selecting maintenance tests
 	LabelMaintenance = "maintenance"
 
-	// LabelNoOpenshift is the string for labelling tests that don't run on Openshift
+	// LabelNoOpenshift is the string for selecting tests that don't run on Openshift
 	LabelNoOpenshift = "no-openshift"
 
-	// LabelObservability is a label for selecting observability test
+	// LabelObservability is a label for selecting observability tests
 	LabelObservability = "observability"
 
 	// LabelOperator is a label for only selecting operator tests
@@ -53,7 +56,7 @@ const (
 	// LabelPerformance is the string for labelling performance tests
 	LabelPerformance = "performance"
 
-	// LabelPlugin is a label for selecting plugin test
+	// LabelPlugin is a label for selecting plugin tests
 	LabelPlugin = "plugin"
 
 	// LabelPodScheduling is a label for selecting pod-scheduling test
@@ -62,33 +65,33 @@ const (
 	// LabelPostgresConfiguration is a label for selecting postgres-configuration test
 	LabelPostgresConfiguration = "postgres-configuration"
 
-	// LabelRecovery is a label for selecting recovery test
+	// LabelRecovery is a label for selecting recovery tests
 	LabelRecovery = "recovery"
 
-	// LabelReplication is a label for selecting replication test
+	// LabelReplication is a label for selecting replication tests
 	LabelReplication = "replication"
 
-	// LabelSecurity is a label for selecting security test
+	// LabelSecurity is a label for selecting security tests
 	LabelSecurity = "security"
 
-	// LabelSelfHealing is a label for selecting self-healing test
+	// LabelSelfHealing is a label for selecting self-healing tests
 	LabelSelfHealing = "self-healing"
 
-	// LabelServiceConnectivity is a label for selecting service connections test
+	// LabelServiceConnectivity is a label for selecting service connections tests
 	LabelServiceConnectivity = "service-connectivity"
 
-	// LabelSmoke is a label for selecting  smoke test
+	// LabelSmoke is a label for selecting smoke tests
 	LabelSmoke = "smoke"
 
 	// LabelSnapshot is a label for selecting snapshot tests
 	LabelSnapshot = "snapshot"
 
-	// LabelStorage is a label for selecting storage test
+	// LabelStorage is a label for selecting storage tests
 	LabelStorage = "storage"
 
-	// LabelTablespaces is a lable for selectin the tablespaces tests
+	// LabelTablespaces is a label for selecting the tablespaces test
 	LabelTablespaces = "tablespaces"
 
-	// LabelUpgrade is the string for labelling upgrade tests
+	// LabelUpgrade is a label for upgrade tests
 	LabelUpgrade = "upgrade"
 )

@@ -24,13 +24,13 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/cloudnative-pg/machinery/pkg/fileutils"
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/executablehash"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
@@ -50,23 +50,10 @@ func (instance *Instance) IsServerHealthy() error {
 	return err
 }
 
-// IsServerReady check if the instance is healthy and can really accept connections
-func (instance *Instance) IsServerReady() error {
-	if !instance.CanCheckReadiness() {
-		return fmt.Errorf("instance is not ready yet")
-	}
-	superUserDB, err := instance.GetSuperUserDB()
-	if err != nil {
-		return err
-	}
-
-	return superUserDB.Ping()
-}
-
 // GetStatus Extract the status of this PostgreSQL database
 func (instance *Instance) GetStatus() (result *postgres.PostgresqlStatus, err error) {
 	result = &postgres.PostgresqlStatus{
-		Pod:                    &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: instance.PodName}},
+		Pod:                    &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: instance.GetPodName()}},
 		InstanceManagerVersion: versions.Version,
 		MightBeUnavailable:     instance.MightBeUnavailable(),
 	}
@@ -105,10 +92,8 @@ func (instance *Instance) GetStatus() (result *postgres.PostgresqlStatus, err er
 			-- True if this is a primary instance
 			NOT pg_is_in_recovery() as primary,
 			-- True if at least one column requires a restart
-			EXISTS(SELECT 1 FROM pg_settings WHERE pending_restart),
-			-- The size of database in human readable format
-			(SELECT pg_size_pretty(SUM(pg_database_size(oid))) FROM pg_database)`)
-	err = row.Scan(&result.SystemID, &result.IsPrimary, &result.PendingRestart, &result.TotalInstanceSize)
+			EXISTS(SELECT 1 FROM pg_settings WHERE pending_restart)`)
+	err = row.Scan(&result.SystemID, &result.IsPrimary, &result.PendingRestart)
 	if err != nil {
 		return result, err
 	}
@@ -483,7 +468,7 @@ func (instance *Instance) fillWalStatusFromConnection(result *postgres.Postgresq
 			coalesce(sync_priority, 0)
 		FROM pg_catalog.pg_stat_replication
 		WHERE application_name ~ $1 AND usename = $2`,
-		fmt.Sprintf("%s-[0-9]+$", instance.ClusterName),
+		fmt.Sprintf("%s-[0-9]+$", instance.GetClusterName()),
 		v1.StreamingReplicationUser,
 	)
 	if err != nil {

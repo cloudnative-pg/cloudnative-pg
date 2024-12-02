@@ -17,17 +17,8 @@ limitations under the License.
 package v1
 
 import (
-	"context"
-	"sort"
-	"strings"
-
-	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
-	corev1 "k8s.io/api/core/v1"
+	barmanApi "github.com/cloudnative-pg/barman-cloud/pkg/api"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // BackupPhase is the phase of the backup
@@ -60,6 +51,51 @@ const (
 	// BackupPhaseWalArchivingFailing means wal archiving isn't properly working
 	BackupPhaseWalArchivingFailing = "walArchivingFailing"
 )
+
+// BarmanCredentials an object containing the potential credentials for each cloud provider
+// +kubebuilder:object:generate:=false
+type BarmanCredentials = barmanApi.BarmanCredentials
+
+// AzureCredentials is the type for the credentials to be used to upload
+// files to Azure Blob Storage. The connection string contains every needed
+// information. If the connection string is not specified, we'll need the
+// storage account name and also one (and only one) of:
+//
+// - storageKey
+// - storageSasToken
+//
+// - inheriting the credentials from the pod environment by setting inheritFromAzureAD to true
+// +kubebuilder:object:generate:=false
+type AzureCredentials = barmanApi.AzureCredentials
+
+// BarmanObjectStoreConfiguration contains the backup configuration
+// using Barman against an S3-compatible object storage
+// +kubebuilder:object:generate:=false
+type BarmanObjectStoreConfiguration = barmanApi.BarmanObjectStoreConfiguration
+
+// DataBackupConfiguration is the configuration of the backup of
+// the data directory
+// +kubebuilder:object:generate:=false
+type DataBackupConfiguration = barmanApi.DataBackupConfiguration
+
+// GoogleCredentials is the type for the Google Cloud Storage credentials.
+// This needs to be specified even if we run inside a GKE environment.
+// +kubebuilder:object:generate:=false
+type GoogleCredentials = barmanApi.GoogleCredentials
+
+// S3Credentials is the type for the credentials to be used to upload
+// files to S3. It can be provided in two alternative ways:
+//
+// - explicitly passing accessKeyId and secretAccessKey
+//
+// - inheriting the role from the pod environment by setting inheritFromIAMRole to true
+// +kubebuilder:object:generate:=false
+type S3Credentials = barmanApi.S3Credentials
+
+// WalBackupConfiguration is the configuration of the backup of the
+// WAL stream
+// +kubebuilder:object:generate:=false
+type WalBackupConfiguration = barmanApi.WalBackupConfiguration
 
 // BackupMethod defines the way of executing the physical base backups of
 // the selected PostgreSQL instance
@@ -146,6 +182,7 @@ type BackupSnapshotElementStatus struct {
 
 	// TablespaceName is the name of the snapshotted tablespace. Only set
 	// when type is PG_TABLESPACE
+	// +optional
 	TablespaceName string `json:"tablespaceName,omitempty"`
 }
 
@@ -249,7 +286,12 @@ type BackupStatus struct {
 	Method BackupMethod `json:"method,omitempty"`
 
 	// Whether the backup was online/hot (`true`) or offline/cold (`false`)
+	// +optional
 	Online *bool `json:"online,omitempty"`
+
+	// A map containing the plugin metadata
+	// +optional
+	PluginMetadata map[string]string `json:"pluginMetadata,omitempty"`
 }
 
 // InstanceID contains the information to identify an instance
@@ -294,214 +336,10 @@ type BackupList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+	// +optional
 	metav1.ListMeta `json:"metadata,omitempty"`
 	// List of backups
 	Items []Backup `json:"items"`
-}
-
-// SetAsFailed marks a certain backup as invalid
-func (backupStatus *BackupStatus) SetAsFailed(
-	err error,
-) {
-	backupStatus.Phase = BackupPhaseFailed
-
-	if err != nil {
-		backupStatus.Error = err.Error()
-	} else {
-		backupStatus.Error = ""
-	}
-}
-
-// SetAsFinalizing marks a certain backup as finalizing
-func (backupStatus *BackupStatus) SetAsFinalizing() {
-	backupStatus.Phase = BackupPhaseFinalizing
-	backupStatus.Error = ""
-}
-
-// SetAsCompleted marks a certain backup as completed
-func (backupStatus *BackupStatus) SetAsCompleted() {
-	backupStatus.Phase = BackupPhaseCompleted
-	backupStatus.Error = ""
-	backupStatus.StoppedAt = ptr.To(metav1.Now())
-}
-
-// SetAsStarted marks a certain backup as started
-func (backupStatus *BackupStatus) SetAsStarted(podName, containerID string, method BackupMethod) {
-	backupStatus.Phase = BackupPhaseStarted
-	backupStatus.InstanceID = &InstanceID{
-		PodName:     podName,
-		ContainerID: containerID,
-	}
-	backupStatus.Method = method
-}
-
-// SetSnapshotElements sets the Snapshots field from a list of VolumeSnapshot
-func (snapshotStatus *BackupSnapshotStatus) SetSnapshotElements(snapshots []volumesnapshot.VolumeSnapshot) {
-	snapshotNames := make([]BackupSnapshotElementStatus, len(snapshots))
-	for idx, volumeSnapshot := range snapshots {
-		snapshotNames[idx] = BackupSnapshotElementStatus{
-			Name:           volumeSnapshot.Name,
-			Type:           volumeSnapshot.Annotations[utils.PvcRoleLabelName],
-			TablespaceName: volumeSnapshot.Labels[utils.TablespaceNameLabelName],
-		}
-	}
-	snapshotStatus.Elements = snapshotNames
-}
-
-// IsDone check if a backup is completed or still in progress
-func (backupStatus *BackupStatus) IsDone() bool {
-	return backupStatus.Phase == BackupPhaseCompleted || backupStatus.Phase == BackupPhaseFailed
-}
-
-// GetOnline tells whether this backup was taken while the database
-// was up
-func (backupStatus *BackupStatus) GetOnline() bool {
-	if backupStatus.Online == nil {
-		return false
-	}
-
-	return *backupStatus.Online
-}
-
-// IsCompletedVolumeSnapshot checks if a backup is completed using the volume snapshot method.
-// It returns true if the backup's method is BackupMethodVolumeSnapshot and its status phase is BackupPhaseCompleted.
-// Otherwise, it returns false.
-func (backup *Backup) IsCompletedVolumeSnapshot() bool {
-	return backup != nil &&
-		backup.Spec.Method == BackupMethodVolumeSnapshot &&
-		backup.Status.Phase == BackupPhaseCompleted
-}
-
-// IsInProgress check if a certain backup is in progress or not
-func (backupStatus *BackupStatus) IsInProgress() bool {
-	return backupStatus.Phase == BackupPhasePending ||
-		backupStatus.Phase == BackupPhaseStarted ||
-		backupStatus.Phase == BackupPhaseRunning
-}
-
-// GetPendingBackupNames returns the pending backup list
-func (list BackupList) GetPendingBackupNames() []string {
-	// Retry the backup if another backup is running
-	pendingBackups := make([]string, 0, len(list.Items))
-	for _, concurrentBackup := range list.Items {
-		if concurrentBackup.Status.IsDone() {
-			continue
-		}
-		if !concurrentBackup.Status.IsInProgress() {
-			pendingBackups = append(pendingBackups, concurrentBackup.Name)
-		}
-	}
-
-	return pendingBackups
-}
-
-// CanExecuteBackup control if we can start a reconciliation loop for a certain backup.
-//
-// A reconciliation loop can start if:
-// - there's no backup running, and if the first of the sorted list of backups
-// - the current backup is running and is the first running backup of the list
-//
-// As a side effect, this function will sort the backup list
-func (list *BackupList) CanExecuteBackup(backupName string) bool {
-	var foundRunningBackup bool
-
-	list.SortByName()
-
-	for _, concurrentBackup := range list.Items {
-		if concurrentBackup.Status.IsInProgress() {
-			if backupName == concurrentBackup.Name && !foundRunningBackup {
-				return true
-			}
-
-			foundRunningBackup = true
-			if backupName != concurrentBackup.Name {
-				return false
-			}
-		}
-	}
-
-	pendingBackups := list.GetPendingBackupNames()
-	if len(pendingBackups) > 0 && pendingBackups[0] != backupName {
-		return false
-	}
-
-	return true
-}
-
-// SortByName sorts the backup items in alphabetical order
-func (list *BackupList) SortByName() {
-	// Sort the list of backups in alphabetical order
-	sort.Slice(list.Items, func(i, j int) bool {
-		return strings.Compare(list.Items[i].Name, list.Items[j].Name) <= 0
-	})
-}
-
-// SortByReverseCreationTime sorts the backup items in reverse creation time (starting from the latest one)
-func (list *BackupList) SortByReverseCreationTime() {
-	// Sort the list of backups in reverse creation time
-	sort.Slice(list.Items, func(i, j int) bool {
-		return list.Items[i].CreationTimestamp.Time.Compare(list.Items[j].CreationTimestamp.Time) > 0
-	})
-}
-
-// GetStatus gets the backup status
-func (backup *Backup) GetStatus() *BackupStatus {
-	return &backup.Status
-}
-
-// GetMetadata get the metadata
-func (backup *Backup) GetMetadata() *metav1.ObjectMeta {
-	return &backup.ObjectMeta
-}
-
-// GetName get the backup name
-func (backup *Backup) GetName() string {
-	return backup.Name
-}
-
-// GetNamespace get the backup namespace
-func (backup *Backup) GetNamespace() string {
-	return backup.Namespace
-}
-
-// GetAssignedInstance fetches the instance that was assigned to the backup execution
-func (backup *Backup) GetAssignedInstance(ctx context.Context, cli client.Client) (*corev1.Pod, error) {
-	if backup.Status.InstanceID == nil || len(backup.Status.InstanceID.PodName) == 0 {
-		return nil, nil
-	}
-
-	var previouslyElectedPod corev1.Pod
-	if err := cli.Get(
-		ctx,
-		client.ObjectKey{Namespace: backup.Namespace, Name: backup.Status.InstanceID.PodName},
-		&previouslyElectedPod,
-	); err != nil {
-		return nil, err
-	}
-
-	return &previouslyElectedPod, nil
-}
-
-// GetVolumeSnapshotConfiguration overrides the  configuration value with the ones specified
-// in the backup, if present.
-func (backup *Backup) GetVolumeSnapshotConfiguration(
-	clusterConfig VolumeSnapshotConfiguration,
-) VolumeSnapshotConfiguration {
-	config := clusterConfig
-	if backup.Spec.Online != nil {
-		config.Online = backup.Spec.Online
-	}
-
-	if backup.Spec.OnlineConfiguration != nil {
-		config.OnlineConfiguration = *backup.Spec.OnlineConfiguration
-	}
-
-	return config
-}
-
-// IsEmpty checks if the plugin configuration is empty or not
-func (configuration *BackupPluginConfiguration) IsEmpty() bool {
-	return configuration == nil || len(configuration.Name) == 0
 }
 
 func init() {

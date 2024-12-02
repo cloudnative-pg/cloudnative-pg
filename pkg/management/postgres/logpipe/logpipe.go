@@ -29,10 +29,11 @@ import (
 	"runtime/debug"
 	"time"
 
+	"github.com/cloudnative-pg/machinery/pkg/fileutils"
+	"github.com/cloudnative-pg/machinery/pkg/fileutils/compatibility"
+	"github.com/cloudnative-pg/machinery/pkg/log"
+
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/concurrency"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils/compatibility"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 )
 
@@ -95,7 +96,7 @@ func (p *LogPipe) Start(ctx context.Context) error {
 			}
 
 			// check if the directory exists
-			if err := fileutils.EnsureDirectoryExists(filepath.Dir(p.fileName)); err != nil {
+			if err := fileutils.EnsureParentDirectoryExists(p.fileName); err != nil {
 				filenameLog.Error(err, "Error checking if the directory exists")
 				continue
 			}

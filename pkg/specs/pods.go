@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"path"
 	"reflect"
 	"slices"
 	"strconv"
@@ -50,10 +51,6 @@ const (
 	// ClusterReloadAnnotationName is the name of the annotation containing the
 	// latest required restart time
 	ClusterReloadAnnotationName = utils.ClusterReloadAnnotationName
-
-	// ClusterRoleLabelName label is applied to Pods to mark primary ones
-	// Deprecated: Use utils.ClusterInstanceRoleLabelName
-	ClusterRoleLabelName = utils.ClusterRoleLabelName
 
 	// WatchedLabelName label is for Secrets or ConfigMaps that needs to be reloaded
 	WatchedLabelName = utils.WatchedLabelName
@@ -136,12 +133,20 @@ func CreatePodEnvConfig(cluster apiv1.Cluster, podName string) EnvConfig {
 				Value: cluster.Name,
 			},
 			{
+				Name:  "PSQL_HISTORY",
+				Value: path.Join(postgres.TemporaryDirectory, ".psql_history"),
+			},
+			{
 				Name:  "PGPORT",
 				Value: strconv.Itoa(postgres.ServerPort),
 			},
 			{
 				Name:  "PGHOST",
 				Value: postgres.SocketDirectory,
+			},
+			{
+				Name:  "TMPDIR",
+				Value: postgres.TemporaryDirectory,
 			},
 		},
 		EnvFrom: cluster.Spec.EnvFrom,
@@ -258,6 +263,10 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig, enable
 		containers[0].Command = append(containers[0].Command, "--status-port-tls")
 	}
 
+	if cluster.IsMetricsTLSEnabled() {
+		containers[0].Command = append(containers[0].Command, "--metrics-port-tls")
+	}
+
 	addManagerLoggingOptions(cluster, &containers[0])
 
 	// if user customizes the liveness probe timeout, we need to adjust the failure threshold
@@ -354,6 +363,13 @@ func CreateGeneratedAntiAffinity(clusterName string, config apiv1.AffinityConfig
 						clusterName,
 					},
 				},
+				{
+					Key:      utils.PodRoleLabelName,
+					Operator: metav1.LabelSelectorOpIn,
+					Values: []string{
+						string(utils.PodRoleInstance),
+					},
+				},
 			},
 		},
 		TopologyKey: topologyKey,
@@ -386,10 +402,6 @@ func CreatePodSecurityContext(seccompProfile *corev1.SeccompProfile, user, group
 	// Under Openshift we inherit SecurityContext from the restricted security context constraint
 	if utils.HaveSecurityContextConstraints() {
 		return nil
-	}
-
-	if !utils.HaveSeccompSupport() {
-		seccompProfile = nil
 	}
 
 	trueValue := true

@@ -93,7 +93,7 @@ func NewCmd() *cobra.Command {
 			target := dbName
 			if len(externalClusterName) > 0 {
 				var err error
-				target, err = logical.GetConnectionString(cmd.Context(), clusterName, externalClusterName)
+				target, err = logical.GetConnectionString(cmd.Context(), clusterName, externalClusterName, dbName)
 				if err != nil {
 					return err
 				}

@@ -1,0 +1,11 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Subscription
+metadata:
+  name: subscription-declarative
+spec:
+  name: sub
+  dbname: declarative
+  publicationName: pub
+  cluster:
+    name: destination-cluster
+  externalClusterName: source-cluster

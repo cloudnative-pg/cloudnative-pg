@@ -36,30 +36,34 @@ var _ = Describe("Postgres tablespaces functions test", func() {
 	`
 	expectedCreateStmt := "CREATE TABLESPACE \"%s\" OWNER \"%s\" " +
 		"LOCATION '/var/lib/postgresql/tablespaces/atablespace/data'"
+
+	expectedUpdateStmt := "ALTER TABLESPACE \"%s\" OWNER TO \"%s\""
+
 	It("should send the expected query to list tablespaces and parse the return", func(ctx SpecContext) {
 		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 		Expect(err).ToNot(HaveOccurred())
+		tbsName := "atablespace"
+		anotherTbsName := "anothertablespace"
+		ownerName := "postgres"
 
-		tbsManager := newPostgresTablespaceManager(db)
 		rows := sqlmock.NewRows(
 			[]string{"spcname", "rolname"}).
-			AddRow("atablespace", "postgres").
-			AddRow("anothertablespace", "postgres")
+			AddRow(tbsName, ownerName).
+			AddRow(anotherTbsName, ownerName)
 		mock.ExpectQuery(expectedListStmt).WithArgs("pg_").WillReturnRows(rows)
-		tbs, err := tbsManager.List(ctx)
+		tbs, err := List(ctx, db)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(tbs).To(HaveLen(2))
 		Expect(tbs).To(ConsistOf(
-			Tablespace{Name: "atablespace", Owner: "postgres"},
-			Tablespace{Name: "anothertablespace", Owner: "postgres"}))
+			Tablespace{Name: tbsName, Owner: ownerName},
+			Tablespace{Name: anotherTbsName, Owner: ownerName}))
 	})
 	It("should detect error if the list query returns error", func(ctx SpecContext) {
 		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 		Expect(err).ToNot(HaveOccurred())
 
-		tbsManager := newPostgresTablespaceManager(db)
 		mock.ExpectQuery(expectedListStmt).WithArgs("pg_").WillReturnError(fmt.Errorf("boom"))
-		tbs, err := tbsManager.List(ctx)
+		tbs, err := List(ctx, db)
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("boom"))
 		Expect(tbs).To(BeEmpty())
@@ -71,10 +75,9 @@ var _ = Describe("Postgres tablespaces functions test", func() {
 		tbsName := "atablespace"
 		ownerName := "postgres"
 		stmt := fmt.Sprintf(expectedCreateStmt, tbsName, ownerName)
-		tbsManager := newPostgresTablespaceManager(db)
 		mock.ExpectExec(stmt).
 			WillReturnResult(sqlmock.NewResult(2, 1))
-		err = tbsManager.Create(ctx, Tablespace{Name: tbsName, Owner: "postgres"})
+		err = Create(ctx, db, Tablespace{Name: tbsName, Owner: ownerName})
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(mock.ExpectationsWereMet()).To(Succeed())
 	})
@@ -84,12 +87,23 @@ var _ = Describe("Postgres tablespaces functions test", func() {
 		tbsName := "atablespace"
 		ownerName := "postgres"
 		stmt := fmt.Sprintf(expectedCreateStmt, tbsName, ownerName)
-		tbsManager := newPostgresTablespaceManager(db)
 		mock.ExpectExec(stmt).
 			WillReturnError(fmt.Errorf("boom"))
-		err = tbsManager.Create(ctx, Tablespace{Name: tbsName, Owner: "postgres"})
+		err = Create(ctx, db, Tablespace{Name: tbsName, Owner: ownerName})
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("boom"))
+		Expect(mock.ExpectationsWereMet()).To(Succeed())
+	})
+	It("should issue the expected command to update a tablespace", func(ctx SpecContext) {
+		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+		Expect(err).ToNot(HaveOccurred())
+		tbsName := "atablespace"
+		ownerName := "postgres"
+		stmt := fmt.Sprintf(expectedUpdateStmt, tbsName, ownerName)
+		mock.ExpectExec(stmt).
+			WillReturnResult(sqlmock.NewResult(2, 1))
+		err = Update(ctx, db, Tablespace{Name: tbsName, Owner: ownerName})
+		Expect(err).ShouldNot(HaveOccurred())
 		Expect(mock.ExpectationsWereMet()).To(Succeed())
 	})
 })

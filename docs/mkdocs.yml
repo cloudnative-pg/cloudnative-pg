@@ -2,7 +2,8 @@ site_name: CloudNativePG
 site_author: The CloudNativePG Contributors
 docs_dir: src
 
-theme: readthedocs
+theme:
+  name: readthedocs
 
 extra_css:
   - css/override.css
@@ -11,6 +12,7 @@ markdown_extensions:
   - admonition
   - def_list
   - attr_list
+  - footnotes
 
 nav:
   - index.md
@@ -29,13 +31,16 @@ nav:
   - failure_modes.md
   - rolling_update.md
   - replication.md
+  - logical_replication.md
   - backup.md
   - backup_barmanobjectstore.md
   - wal_archiving.md
   - backup_volumesnapshot.md
   - recovery.md
+  - service_management.md
   - postgresql_conf.md
   - declarative_role_management.md
+  - declarative_database_management.md
   - tablespaces.md
   - operator_conf.md
   - cluster_conf.md
@@ -49,7 +54,6 @@ nav:
   - connection_pooling.md
   - replica_cluster.md
   - kubernetes_upgrade.md
-  - expose_pg_services.md
   - kubectl-plugin.md
   - failover.md
   - troubleshooting.md
@@ -63,10 +67,10 @@ nav:
   - samples.md
   - networking.md
   - benchmarking.md
-  - commercial_support.md
   - faq.md
   - cloudnative-pg.v1.md
   - supported_releases.md
+  - preview_version.md
   - release_notes.md
   - Appendixes:
     - appendixes/object_stores.md

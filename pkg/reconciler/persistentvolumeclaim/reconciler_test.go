@@ -184,7 +184,7 @@ var _ = Describe("Reconcile resource requests", func() {
 	})
 })
 
-var _ = Describe("PVC reconciliation", func() {
+var _ = Describe("PVC reconciliation", Ordered, func() {
 	const clusterName = "cluster-pvc-reconciliation"
 
 	fetchPVC := func(cl client.Client, pvcToFetch corev1.PersistentVolumeClaim) corev1.PersistentVolumeClaim {

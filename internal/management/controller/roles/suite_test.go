@@ -23,6 +23,29 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+const (
+	expectedSelStmt = `SELECT rolname, rolsuper, rolinherit, rolcreaterole, rolcreatedb, 
+		rolcanlogin, rolreplication, rolconnlimit, rolpassword, rolvaliduntil, rolbypassrls,
+		pg_catalog.shobj_description(auth.oid, 'pg_authid') as comment, auth.xmin,
+		mem.inroles
+	FROM pg_catalog.pg_authid as auth
+	LEFT JOIN (
+		SELECT array_agg(pg_get_userbyid(roleid)) as inroles, member
+		FROM pg_auth_members GROUP BY member
+	) mem ON member = oid
+	WHERE rolname not like 'pg\_%'`
+
+	expectedMembershipStmt = `SELECT mem.inroles 
+	FROM pg_catalog.pg_authid as auth
+	LEFT JOIN (
+		SELECT array_agg(pg_get_userbyid(roleid)) as inroles, member
+		FROM pg_auth_members GROUP BY member
+	) mem ON member = oid
+	WHERE rolname = $1`
+
+	wantedRoleCommentTpl = "COMMENT ON ROLE \"%s\" IS %s"
+)
+
 func TestReconciler(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Internal Management Controller Roles Reconciler Suite")

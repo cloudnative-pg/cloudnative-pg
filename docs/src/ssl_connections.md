@@ -173,7 +173,7 @@ Output:
                                         version
 --------------------------------------------------------------------------------------
 ------------------
-PostgreSQL 16.3 on x86_64-pc-linux-gnu, compiled by gcc (GCC) 8.3.1 20191121 (Red Hat
+PostgreSQL 17.2 on x86_64-pc-linux-gnu, compiled by gcc (GCC) 8.3.1 20191121 (Red Hat
 8.3.1-5), 64-bit
 (1 row)
 ```
@@ -183,10 +183,6 @@ PostgreSQL 16.3 on x86_64-pc-linux-gnu, compiled by gcc (GCC) 8.3.1 20191121 (Re
 By default, the operator sets both [`ssl_min_protocol_version`](https://www.postgresql.org/docs/current/runtime-config-connection.html#GUC-SSL-MIN-PROTOCOL-VERSION)
 and [`ssl_max_protocol_version`](https://www.postgresql.org/docs/current/runtime-config-connection.html#GUC-SSL-MAX-PROTOCOL-VERSION)
 to `TLSv1.3`.
-
-!!! Important
-    In PostgreSQL 11, these two GUCs don't exist. Hence, in these specific versions
-    these values aren't set,  and the default values are used.
 
 This assumes that the PostgreSQL operand images include an OpenSSL library that
 supports the `TLSv1.3` version. If not, or if your client applications need a
