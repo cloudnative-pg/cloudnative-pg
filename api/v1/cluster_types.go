@@ -2141,6 +2141,11 @@ type PluginStatus struct {
 	// +optional
 	BackupCapabilities []string `json:"backupCapabilities,omitempty"`
 
+	// RestoreJobHookCapabilities are the list of capabilities of the
+	// plugin regarding the RestoreJobHook management
+	// +optional
+	RestoreJobHookCapabilities []string `json:"restoreJobHookCapabilities,omitempty"`
+
 	// Status contain the status reported by the plugin through the SetStatusInCluster interface
 	// +optional
 	Status string `json:"status,omitempty"`

@@ -6024,6 +6024,13 @@ spec:
                       items:
                         type: string
                       type: array
+                    restoreJobHookCapabilities:
+                      description: |-
+                        RestoreJobHookCapabilities are the list of capabilities of the
+                        plugin regarding the RestoreJobHook management
+                      items:
+                        type: string
+                      type: array
                     status:
                       description: Status contain the status reported by the plugin
                         through the SetStatusInCluster interface

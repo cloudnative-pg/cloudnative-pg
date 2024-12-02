@@ -43,6 +43,7 @@ func (r *ClusterReconciler) updatePluginsStatus(ctx context.Context, cluster *ap
 		cluster.Status.PluginStatus[i].OperatorCapabilities = entry.OperatorCapabilities
 		cluster.Status.PluginStatus[i].WALCapabilities = entry.WALCapabilities
 		cluster.Status.PluginStatus[i].BackupCapabilities = entry.BackupCapabilities
+		cluster.Status.PluginStatus[i].RestoreJobHookCapabilities = entry.RestoreJobHookCapabilities
 	}
 
 	// If nothing changes, there's no need to hit the API server

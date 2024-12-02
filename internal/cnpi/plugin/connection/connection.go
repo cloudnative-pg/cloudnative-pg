@@ -264,12 +264,13 @@ func (pluginData *data) loadRestoreJobHooksCapabilities(ctx context.Context) err
 // the internal metadata
 func (pluginData *data) Metadata() Metadata {
 	result := Metadata{
-		Name:                 pluginData.name,
-		Version:              pluginData.version,
-		Capabilities:         make([]string, len(pluginData.capabilities)),
-		OperatorCapabilities: make([]string, len(pluginData.operatorCapabilities)),
-		WALCapabilities:      make([]string, len(pluginData.walCapabilities)),
-		BackupCapabilities:   make([]string, len(pluginData.backupCapabilities)),
+		Name:                       pluginData.name,
+		Version:                    pluginData.version,
+		Capabilities:               make([]string, len(pluginData.capabilities)),
+		OperatorCapabilities:       make([]string, len(pluginData.operatorCapabilities)),
+		WALCapabilities:            make([]string, len(pluginData.walCapabilities)),
+		BackupCapabilities:         make([]string, len(pluginData.backupCapabilities)),
+		RestoreJobHookCapabilities: make([]string, len(pluginData.restoreJobHooksCapabilities)),
 	}
 
 	for i := range pluginData.capabilities {
@@ -286,6 +287,10 @@ func (pluginData *data) Metadata() Metadata {
 
 	for i := range pluginData.backupCapabilities {
 		result.BackupCapabilities[i] = pluginData.backupCapabilities[i].String()
+	}
+
+	for i := range pluginData.restoreJobHooksCapabilities {
+		result.RestoreJobHookCapabilities[i] = pluginData.restoreJobHooksCapabilities[i].String()
 	}
 
 	return result
