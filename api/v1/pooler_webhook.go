@@ -74,6 +74,8 @@ var (
 		"server_reset_query",
 		"server_reset_query_always",
 		"server_round_robin",
+		"server_tls_ciphers",
+		"server_tls_protocols",
 		"stats_period",
 		"suspend_timeout",
 		"tcp_defer_accept",
