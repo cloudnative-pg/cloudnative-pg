@@ -122,9 +122,8 @@ func (psql *Command) getKubectlInvocation() ([]string, error) {
 		return nil, err
 	}
 
-	// If we're running under OpenShift and the user didn't specify a user to connect
-	// we append the -U flag with the postgres user
-	if utils.HaveSecurityContextConstraints() && !slices.Contains(psql.Args, "-U") {
+	// Default to `postgres` if no-user has been specified
+	if !slices.Contains(psql.Args, "-U") {
 		psql.Args = append([]string{"-U", "postgres"}, psql.Args...)
 	}
 
