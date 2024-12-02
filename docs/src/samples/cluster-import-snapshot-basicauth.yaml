@@ -13,6 +13,10 @@ spec:
           - app
         source:
           externalCluster: cluster-example
+        pgDumpExtraOptions:
+        - '--jobs=2'
+        pgRestoreExtraOptions:
+        - '--jobs=2'
   storage:
     size: 1Gi
   externalClusters:

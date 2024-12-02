@@ -2747,6 +2747,26 @@ database right after is imported - to be used with extreme care
 <code>pg_restore</code> are invoked, avoiding data import. Default: <code>false</code>.</p>
 </td>
 </tr>
+<tr><td><code>pgDumpExtraOptions</code><br/>
+<i>[]string</i>
+</td>
+<td>
+   <p>List of custom options to pass to the <code>pg_dump</code> command. IMPORTANT:
+Use these options with caution and at your own risk, as the operator
+does not validate their content. Be aware that certain options may
+conflict with the operator's intended functionality or design.</p>
+</td>
+</tr>
+<tr><td><code>pgRestoreExtraOptions</code><br/>
+<i>[]string</i>
+</td>
+<td>
+   <p>List of custom options to pass to the <code>pg_restore</code> command. IMPORTANT:
+Use these options with caution and at your own risk, as the operator
+does not validate their content. Be aware that certain options may
+conflict with the operator's intended functionality or design.</p>
+</td>
+</tr>
 </tbody>
 </table>
 

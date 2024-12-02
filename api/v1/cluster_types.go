@@ -1566,6 +1566,20 @@ type Import struct {
 	// `pg_restore` are invoked, avoiding data import. Default: `false`.
 	// +optional
 	SchemaOnly bool `json:"schemaOnly,omitempty"`
+
+	// List of custom options to pass to the `pg_dump` command. IMPORTANT:
+	// Use these options with caution and at your own risk, as the operator
+	// does not validate their content. Be aware that certain options may
+	// conflict with the operator's intended functionality or design.
+	// +optional
+	PgDumpExtraOptions []string `json:"pgDumpExtraOptions,omitempty"`
+
+	// List of custom options to pass to the `pg_restore` command. IMPORTANT:
+	// Use these options with caution and at your own risk, as the operator
+	// does not validate their content. Be aware that certain options may
+	// conflict with the operator's intended functionality or design.
+	// +optional
+	PgRestoreExtraOptions []string `json:"pgRestoreExtraOptions,omitempty"`
 }
 
 // ImportSource describes the source for the logical snapshot

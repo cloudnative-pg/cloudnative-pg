@@ -70,6 +70,8 @@ func ImportDatabaseMicroservice(
 						Source: apiv1.ImportSource{
 							ExternalCluster: sourceClusterName,
 						},
+						PgDumpExtraOptions:       []string{"--jobs=2"},
+						PgRestoreExtraOptions:    []string{"--jobs=2"},
 						PostImportApplicationSQL: []string{"SELECT 1"},
 					},
 				},
