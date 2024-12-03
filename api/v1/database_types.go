@@ -51,6 +51,9 @@ type DatabaseSpec struct {
 	// +kubebuilder:validation:XValidation:rule="self != 'postgres'",message="the name postgres is reserved"
 	// +kubebuilder:validation:XValidation:rule="self != 'template0'",message="the name template0 is reserved"
 	// +kubebuilder:validation:XValidation:rule="self != 'template1'",message="the name template1 is reserved"
+	// +kubebuilder:validation:XValidation:rule="!has(self.builtinLocale) || self.localeProvider == 'builtin'",message="builtinLocale is only available when localeProvider is set to `builtin`"
+	// +kubebuilder:validation:XValidation:rule="!has(self.icuLocale) || self.localeProvider == 'icu'",message="icuLocale is only available when localeProvider is set to `icu`"
+	// +kubebuilder:validation:XValidation:rule="!has(self.icuRules) || self.localeProvider == 'icu'",message="icuRules is only available when localeProvider is set to `icu`"
 	Name string `json:"name"`
 
 	// The owner
@@ -71,40 +74,40 @@ type DatabaseSpec struct {
 	// +optional
 	Locale string `json:"locale,omitempty"`
 
-	// The locale provider (cannot be changed)
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="locale_provider is immutable"
+	// This option sets the locale provider for the databases. (cannot be changed)
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="localeProvider is immutable"
 	// +optional
-	LocaleProvider string `json:"locale_provider,omitempty"`
+	LocaleProvider string `json:"localeProvider,omitempty"`
 
 	// The LC_COLLATE (cannot be changed)
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="lc_collate is immutable"
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="localeCollate is immutable"
 	// +optional
-	LcCollate string `json:"lc_collate,omitempty"`
+	LcCollate string `json:"localeCollate,omitempty"`
 
 	// The LC_CTYPE (cannot be changed)
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="lc_ctype is immutable"
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="localeCType is immutable"
 	// +optional
-	LcCtype string `json:"lc_ctype,omitempty"`
+	LcCtype string `json:"localeCType,omitempty"`
 
 	// The ICU_LOCALE (cannot be changed)
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="icu_locale is immutable"
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="icuLocale is immutable"
 	// +optional
-	IcuLocale string `json:"icu_locale,omitempty"`
+	IcuLocale string `json:"icuLocale,omitempty"`
 
 	// The ICU_RULES (cannot be changed)
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="icu_rules is immutable"
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="icuRules is immutable"
 	// +optional
-	IcuRules string `json:"icu_rules,omitempty"`
+	IcuRules string `json:"icuRules,omitempty"`
 
 	// The BUILTIN_LOCALE (cannot be changed)
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="builtin_locale is immutable"
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="builtinLocale is immutable"
 	// +optional
-	BuiltinLocale string `json:"builtin_locale,omitempty"`
+	BuiltinLocale string `json:"builtinLocale,omitempty"`
 
 	// The COLLATION_VERSION (cannot be changed)
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="collation_version is immutable"
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="collationVersion is immutable"
 	// +optional
-	CollationVersion string `json:"collation_version,omitempty"`
+	CollationVersion string `json:"collationVersion,omitempty"`
 
 	// True when the database is a template
 	// +optional

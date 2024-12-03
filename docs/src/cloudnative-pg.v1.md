@@ -2469,49 +2469,49 @@ PostgreSQL cluster from an existing storage</p>
    <p>The locale (cannot be changed)</p>
 </td>
 </tr>
-<tr><td><code>locale_provider</code><br/>
+<tr><td><code>localeProvider</code><br/>
 <i>string</i>
 </td>
 <td>
-   <p>The locale provider (cannot be changed)</p>
+   <p>This option sets the locale provider for the databases. (cannot be changed)</p>
 </td>
 </tr>
-<tr><td><code>lc_collate</code><br/>
+<tr><td><code>localeCollate</code><br/>
 <i>string</i>
 </td>
 <td>
    <p>The LC_COLLATE (cannot be changed)</p>
 </td>
 </tr>
-<tr><td><code>lc_ctype</code><br/>
+<tr><td><code>localeCType</code><br/>
 <i>string</i>
 </td>
 <td>
    <p>The LC_CTYPE (cannot be changed)</p>
 </td>
 </tr>
-<tr><td><code>icu_locale</code><br/>
+<tr><td><code>icuLocale</code><br/>
 <i>string</i>
 </td>
 <td>
    <p>The ICU_LOCALE (cannot be changed)</p>
 </td>
 </tr>
-<tr><td><code>icu_rules</code><br/>
+<tr><td><code>icuRules</code><br/>
 <i>string</i>
 </td>
 <td>
    <p>The ICU_RULES (cannot be changed)</p>
 </td>
 </tr>
-<tr><td><code>builtin_locale</code><br/>
+<tr><td><code>builtinLocale</code><br/>
 <i>string</i>
 </td>
 <td>
    <p>The BUILTIN_LOCALE (cannot be changed)</p>
 </td>
 </tr>
-<tr><td><code>collation_version</code><br/>
+<tr><td><code>collationVersion</code><br/>
 <i>string</i>
 </td>
 <td>

@@ -61,11 +61,11 @@ spec:
               allowConnections:
                 description: True when connections to this database are allowed
                 type: boolean
-              builtin_locale:
+              builtinLocale:
                 description: The BUILTIN_LOCALE (cannot be changed)
                 type: string
                 x-kubernetes-validations:
-                - message: builtin_locale is immutable
+                - message: builtinLocale is immutable
                   rule: self == oldSelf
               cluster:
                 description: The corresponding cluster
@@ -81,11 +81,11 @@ spec:
                     type: string
                 type: object
                 x-kubernetes-map-type: atomic
-              collation_version:
+              collationVersion:
                 description: The COLLATION_VERSION (cannot be changed)
                 type: string
                 x-kubernetes-validations:
-                - message: collation_version is immutable
+                - message: collationVersion is immutable
                   rule: self == oldSelf
               connectionLimit:
                 description: |-
@@ -113,44 +113,45 @@ spec:
                 - present
                 - absent
                 type: string
-              icu_locale:
+              icuLocale:
                 description: The ICU_LOCALE (cannot be changed)
                 type: string
                 x-kubernetes-validations:
-                - message: icu_locale is immutable
+                - message: icuLocale is immutable
                   rule: self == oldSelf
-              icu_rules:
+              icuRules:
                 description: The ICU_RULES (cannot be changed)
                 type: string
                 x-kubernetes-validations:
-                - message: icu_rules is immutable
+                - message: icuRules is immutable
                   rule: self == oldSelf
               isTemplate:
                 description: True when the database is a template
                 type: boolean
-              lc_collate:
-                description: The LC_COLLATE (cannot be changed)
-                type: string
-                x-kubernetes-validations:
-                - message: lc_collate is immutable
-                  rule: self == oldSelf
-              lc_ctype:
-                description: The LC_CTYPE (cannot be changed)
-                type: string
-                x-kubernetes-validations:
-                - message: lc_ctype is immutable
-                  rule: self == oldSelf
               locale:
                 description: The locale (cannot be changed)
                 type: string
                 x-kubernetes-validations:
                 - message: locale is immutable
                   rule: self == oldSelf
-              locale_provider:
-                description: The locale provider (cannot be changed)
+              localeCType:
+                description: The LC_CTYPE (cannot be changed)
                 type: string
                 x-kubernetes-validations:
-                - message: locale_provider is immutable
+                - message: localeCType is immutable
+                  rule: self == oldSelf
+              localeCollate:
+                description: The LC_COLLATE (cannot be changed)
+                type: string
+                x-kubernetes-validations:
+                - message: localeCollate is immutable
+                  rule: self == oldSelf
+              localeProvider:
+                description: This option sets the locale provider for the databases.
+                  (cannot be changed)
+                type: string
+                x-kubernetes-validations:
+                - message: localeProvider is immutable
                   rule: self == oldSelf
               name:
                 description: The name inside PostgreSQL
@@ -164,6 +165,15 @@ spec:
                   rule: self != 'template0'
                 - message: the name template1 is reserved
                   rule: self != 'template1'
+                - message: builtinLocale is only available when localeProvider is
+                    set to `builtin`
+                  rule: '!has(self.builtinLocale) || self.localeProvider == ''builtin'''
+                - message: icuLocale is only available when localeProvider is set
+                    to `icu`
+                  rule: '!has(self.icuLocale) || self.localeProvider == ''icu'''
+                - message: icuRules is only available when localeProvider is set to
+                    `icu`
+                  rule: '!has(self.icuRules) || self.localeProvider == ''icu'''
               owner:
                 description: The owner
                 type: string
