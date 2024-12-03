@@ -19,6 +19,8 @@ limitations under the License.
 package pgbouncer
 
 import (
+	"path"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -108,6 +110,13 @@ func Deployment(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*appsv1.Deploymen
 		}, true).
 		WithContainerEnv("pgbouncer", corev1.EnvVar{Name: "NAMESPACE", Value: pooler.Namespace}, true).
 		WithContainerEnv("pgbouncer", corev1.EnvVar{Name: "POOLER_NAME", Value: pooler.Name}, true).
+		WithContainerEnv("pgbouncer", corev1.EnvVar{Name: "PGUSER", Value: "pgbouncer"}, false).
+		WithContainerEnv("pgbouncer", corev1.EnvVar{Name: "PGDATABASE", Value: "pgbouncer"}, false).
+		WithContainerEnv("pgbouncer", corev1.EnvVar{Name: "PGHOST", Value: "/controller/run"}, false).
+		WithContainerEnv("pgbouncer", corev1.EnvVar{
+			Name:  "PSQL_HISTORY",
+			Value: path.Join(postgres.TemporaryDirectory, ".psql_history"),
+		}, false).
 		WithContainerSecurityContext("pgbouncer", specs.CreateContainerSecurityContext(cluster.GetSeccompProfile()), true).
 		WithServiceAccountName(pooler.Name, true).
 		WithReadinessProbe("pgbouncer", &corev1.Probe{
