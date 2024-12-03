@@ -24,7 +24,7 @@ For more detailed information about this feature, please refer to the
     CloudNativePG requires both the `postgres` user and database to
     always exists. Using the local Unix Domain Socket, it needs to connect
     as `postgres` user to the `postgres` database via `peer` authentication in
-    order to perform administrative tasks on the cluster.  
+    order to perform administrative tasks on the cluster.
     **DO NOT DELETE** the `postgres` user or the `postgres` database!!!
 
 !!! Info
@@ -204,13 +204,23 @@ The user that owns the database defaults to the database name instead.
 The application user is not used internally by the operator, which instead
 relies on the superuser to reconcile the cluster with the desired status.
 
-### Passing options to `initdb`
+### Passing Options to `initdb`
 
-The actual PostgreSQL data directory is created via an invocation of the
+The PostgreSQL data directory is initialized using the
 [`initdb` PostgreSQL command](https://www.postgresql.org/docs/current/app-initdb.html).
-If you need to add custom options to that command (i.e., to change the `locale`
-used for the template databases or to add data checksums), you can use the
-following parameters:
+
+CloudNativePG enables you to customize the behavior of `initdb` to modify
+settings such as default locale configurations and data checksums.
+
+!!! Warning
+    CloudNativePG acts only as a direct proxy to `initdb` for locale-related
+    options, due to the ongoing and significant enhancements in PostgreSQL's locale
+    support. It is your responsibility to ensure that the correct options are
+    provided, following the PostgreSQL documentation, and to verify that the
+    bootstrap process completes successfully.
+
+To include custom options in the `initdb` command, you can use the following
+parameters:
 
 builtinLocale
 :   When `builtinLocale` is set to a value, CNPG passes it to the `--builtin-locale`
@@ -273,13 +283,6 @@ Available from PostgreSQL 15.
 walSegmentSize
 :   When `walSegmentSize` is set to a value, CNPG passes it to the `--wal-segsize`
     option in `initdb` (default: not set - defined by PostgreSQL as 16 megabytes).
-
-!!! Warning  
-    CloudNativePG provides only a direct proxy to `initdb` for locale-related
-    options, due to the rapid and extensive changes in PostgreSQL's locale support.
-    It is your responsibility to ensure that the correct options are used in
-    accordance with the PostgreSQL documentation and to verify that the bootstrap
-    phase completes successfully.
 
 !!! Note
     The only two locale options that CloudNativePG implements during
