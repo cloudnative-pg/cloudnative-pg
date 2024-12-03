@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	corev1 "k8s.io/api/core/v1"
@@ -33,6 +34,12 @@ import (
 // ClusterReferrer is an object containing a cluster reference
 type ClusterReferrer interface {
 	GetClusterRef() corev1.LocalObjectReference
+	client.Object
+}
+
+// StatusSetter is an object that can set a status
+type StatusSetter interface {
+	SetAsFailed(err error)
 	client.Object
 }
 
@@ -96,6 +103,7 @@ func (r *ClusterReconciler) deleteFinalizersForResource(
 		if controllerutil.RemoveFinalizer(obj, finalizerName) {
 			contextLogger.Debug("Removing finalizer from resource",
 				"finalizer", finalizerName, "resource", obj.GetName())
+
 			if err := r.Patch(ctx, obj, client.MergeFrom(origObj)); err != nil {
 				contextLogger.Error(
 					err,
@@ -104,6 +112,18 @@ func (r *ClusterReconciler) deleteFinalizersForResource(
 					"kind", obj.GetObjectKind().GroupVersionKind().Kind,
 					"oldFinalizerList", origObj.GetFinalizers(),
 					"newFinalizerList", obj.GetFinalizers(),
+				)
+				return err
+			}
+
+			// set status as failed, as the orphan resource is not reconciled
+			obj.(StatusSetter).SetAsFailed(fmt.Errorf("orphan resource is not reconciled"))
+			if err := r.Status().Patch(ctx, obj, client.MergeFrom(origObj)); err != nil {
+				contextLogger.Error(
+					err,
+					"error while patching resource status",
+					"resource", obj.GetName(),
+					"kind", obj.GetObjectKind().GroupVersionKind().Kind,
 				)
 				return err
 			}

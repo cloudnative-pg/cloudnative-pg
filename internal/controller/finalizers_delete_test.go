@@ -87,7 +87,8 @@ var _ = Describe("CRD finalizers", func() {
 			},
 		}
 
-		cli := fake.NewClientBuilder().WithScheme(scheme).WithLists(databaseList).Build()
+		cli := fake.NewClientBuilder().WithScheme(scheme).WithLists(databaseList).
+			WithStatusSubresource(&databaseList.Items[0], &databaseList.Items[1]).Build()
 		r.Client = cli
 		err := r.deleteFinalizers(ctx, namespacedName)
 		Expect(err).ToNot(HaveOccurred())
@@ -97,6 +98,8 @@ var _ = Describe("CRD finalizers", func() {
 			err = cli.Get(ctx, client.ObjectKeyFromObject(&db), database)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(database.Finalizers).To(BeZero())
+			Expect(*database.Status.Applied).To(BeFalse())
+			Expect(database.Status.Message).To(ContainSubstring("not reconciled"))
 		}
 	})
 
@@ -131,6 +134,8 @@ var _ = Describe("CRD finalizers", func() {
 			err = cli.Get(ctx, client.ObjectKeyFromObject(&databaseList.Items[0]), database)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(database.Finalizers).To(BeEquivalentTo([]string{utils.DatabaseFinalizerName}))
+			Expect(database.Status.Applied).To(BeNil())
+			Expect(database.Status.Message).ToNot(ContainSubstring("not reconciled"))
 		})
 
 	It("should delete publication finalizers for publications on the cluster", func(ctx SpecContext) {
@@ -169,7 +174,8 @@ var _ = Describe("CRD finalizers", func() {
 			},
 		}
 
-		cli := fake.NewClientBuilder().WithScheme(scheme).WithLists(publicationList).Build()
+		cli := fake.NewClientBuilder().WithScheme(scheme).WithLists(publicationList).
+			WithStatusSubresource(&publicationList.Items[0], &publicationList.Items[1]).Build()
 		r.Client = cli
 		err := r.deleteFinalizers(ctx, namespacedName)
 		Expect(err).ToNot(HaveOccurred())
@@ -179,6 +185,8 @@ var _ = Describe("CRD finalizers", func() {
 			err = cli.Get(ctx, client.ObjectKeyFromObject(&pub), publication)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(publication.Finalizers).To(BeZero())
+			Expect(*publication.Status.Applied).To(BeFalse())
+			Expect(publication.Status.Message).To(ContainSubstring("not reconciled"))
 		}
 	})
 
@@ -212,6 +220,8 @@ var _ = Describe("CRD finalizers", func() {
 		err = cli.Get(ctx, client.ObjectKeyFromObject(&publicationList.Items[0]), publication)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(publication.Finalizers).To(BeEquivalentTo([]string{utils.PublicationFinalizerName}))
+		Expect(publication.Status.Applied).To(BeNil())
+		Expect(publication.Status.Message).ToNot(ContainSubstring("not reconciled"))
 	})
 
 	It("should delete subscription finalizers for subscriptions on the cluster", func(ctx SpecContext) {
@@ -250,7 +260,8 @@ var _ = Describe("CRD finalizers", func() {
 			},
 		}
 
-		cli := fake.NewClientBuilder().WithScheme(scheme).WithLists(subscriptionList).Build()
+		cli := fake.NewClientBuilder().WithScheme(scheme).WithLists(subscriptionList).
+			WithStatusSubresource(&subscriptionList.Items[0], &subscriptionList.Items[1]).Build()
 		r.Client = cli
 		err := r.deleteFinalizers(ctx, namespacedName)
 		Expect(err).ToNot(HaveOccurred())
@@ -260,6 +271,8 @@ var _ = Describe("CRD finalizers", func() {
 			err = cli.Get(ctx, client.ObjectKeyFromObject(&sub), subscription)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(subscription.Finalizers).To(BeZero())
+			Expect(*subscription.Status.Applied).To(BeFalse())
+			Expect(subscription.Status.Message).To(ContainSubstring("not reconciled"))
 		}
 	})
 
@@ -293,5 +306,7 @@ var _ = Describe("CRD finalizers", func() {
 		err = cli.Get(ctx, client.ObjectKeyFromObject(&subscriptionList.Items[0]), subscription)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(subscription.Finalizers).To(BeEquivalentTo([]string{utils.SubscriptionFinalizerName}))
+		Expect(subscription.Status.Applied).To(BeNil())
+		Expect(subscription.Status.Message).ToNot(ContainSubstring("not reconciled"))
 	})
 })
