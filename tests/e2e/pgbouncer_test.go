@@ -17,6 +17,10 @@ limitations under the License.
 package e2e
 
 import (
+	corev1 "k8s.io/api/core/v1"
+	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -74,6 +78,16 @@ var _ = Describe("PGBouncer Connections", Label(tests.LabelServiceConnectivity),
 			By("verifying read connections using pgbouncer service", func() {
 				assertReadWriteConnectionUsingPgBouncerService(namespace, clusterName,
 					poolerBasicAuthROSampleFile, false)
+			})
+
+			By("executing psql within the pgbouncer pod", func() {
+				pod, err := getPgbouncerPod(poolerBasicAuthRWSampleFile)
+				Expect(err).ToNot(HaveOccurred())
+
+				GinkgoWriter.Println(pod.Name)
+
+				err = runShowHelpInPod(pod)
+				Expect(err).ToNot(HaveOccurred())
 			})
 		})
 
@@ -176,3 +190,24 @@ var _ = Describe("PGBouncer Connections", Label(tests.LabelServiceConnectivity),
 		})
 	})
 })
+
+func getPgbouncerPod(sampleFile string) (*corev1.Pod, error) {
+	poolerKey, err := env.GetResourceNamespacedNameFromYAML(sampleFile)
+	if err != nil {
+		return nil, err
+	}
+
+	Expect(err).ToNot(HaveOccurred())
+
+	var podList corev1.PodList
+	err = env.Client.List(env.Ctx, &podList, ctrlclient.InNamespace(poolerKey.Namespace),
+		ctrlclient.MatchingLabels{utils.PgbouncerNameLabel: poolerKey.Name})
+	Expect(err).ToNot(HaveOccurred())
+	Expect(len(podList.Items)).Should(BeEquivalentTo(1))
+	return &podList.Items[0], nil
+}
+
+func runShowHelpInPod(pod *corev1.Pod) error {
+	_, _, err := env.ExecCommand(env.Ctx, *pod, "pgbouncer", nil, "psql", "-c", "SHOW HELP")
+	return err
+}
