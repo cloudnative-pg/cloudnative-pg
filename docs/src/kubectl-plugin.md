@@ -349,13 +349,13 @@ The meaning of this command is to `promote` a pod in the cluster to primary, so 
 can start with maintenance work or test a switch-over situation in your cluster
 
 ```sh
-kubectl cnpg promote [cluster] [cluster]-[instance-id]
+kubectl cnpg promote [cluster] [cluster]-[node]
 ```
 
 Or you can use the instance id number to promote
 
 ```sh
-kubectl cnpg promote [cluster] [instance-id]
+kubectl cnpg promote [cluster] [node]
 ```
 
 ### Certificates
@@ -400,7 +400,7 @@ The `kubectl cnpg restart` command can be used in two cases:
 kubectl cnpg restart [cluster]
 
 # this command will restart a single instance, according to the policy above
-kubectl cnpg restart [cluster] [instance-id]
+kubectl cnpg restart [cluster] [node]
 ```
 
 If the in-place restart is requested but the change cannot be applied without
@@ -869,7 +869,7 @@ detached PVCs.
 Usage:
 
 ```sh
-kubectl cnpg destroy [cluster] [instance-id]
+kubectl cnpg destroy [cluster] [node]
 ```
 
 The following example removes the `cluster-example-2` pod and the associated

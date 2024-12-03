@@ -34,7 +34,7 @@ func NewCmd() *cobra.Command {
 	var dryRun bool
 
 	subscriptionDropCmd := &cobra.Command{
-		Use:  "drop cluster_name",
+		Use:  "drop [cluster]",
 		Args: plugin.RequiresArguments(1),
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			return plugin.CompleteClusters(cmd.Context(), args, toComplete), cobra.ShellCompDirectiveNoFileComp

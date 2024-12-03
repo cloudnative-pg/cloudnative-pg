@@ -37,7 +37,7 @@ func NewCmd() *cobra.Command {
 	var dryRun bool
 
 	subscriptionCreateCmd := &cobra.Command{
-		Use:   "create cluster_name",
+		Use:   "create [cluster]",
 		Short: "create a logical replication subscription",
 		Args:  plugin.RequiresArguments(1),
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {

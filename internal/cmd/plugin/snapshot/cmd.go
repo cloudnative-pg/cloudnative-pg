@@ -28,7 +28,7 @@ import (
 // NewCmd implements the `snapshot` subcommand
 func NewCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "snapshot <cluster-name>",
+		Use:     "snapshot [cluster]",
 		Short:   "DEPRECATED (use `backup -m volumeSnapshot` instead)",
 		Long:    "Replaced by `kubectl cnpg backup <cluster-name> -m volumeSnapshot`",
 		GroupID: plugin.GroupIDDatabase,

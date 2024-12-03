@@ -47,14 +47,14 @@ func NewCmd() *cobra.Command {
 		&run.jobName,
 		"job-name",
 		"",
-		"Name of the job, defaulting to: <clusterName>-pgbench-xxxx",
+		"Name of the job, defaulting to: [cluster]-pgbench-xxxx",
 	)
 
 	pgBenchCmd.Flags().StringVar(
 		&run.jobName,
 		"pgbench-job-name",
 		"",
-		"Name of the job, defaulting to: <clusterName>-pgbench-xxxx",
+		"Name of the job, defaulting to: [cluster]-pgbench-xxxx",
 	)
 
 	pgBenchCmd.Flags().StringVar(
