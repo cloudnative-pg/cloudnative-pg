@@ -144,7 +144,7 @@ func Status(
 		status.printPodDisruptionBudgetStatus()
 	}
 	status.printInstancesStatus()
-	status.printPluginStatus()
+	status.printPluginStatus(verbosity)
 
 	if len(errs) > 0 {
 		fmt.Println()
@@ -1150,7 +1150,7 @@ func (fullStatus *PostgresqlStatus) printTablespacesStatus() {
 	fmt.Println()
 }
 
-func (fullStatus *PostgresqlStatus) printPluginStatus() {
+func (fullStatus *PostgresqlStatus) printPluginStatus(verbosity int) {
 	const header = "Plugins status"
 
 	parseCapabilities := func(capabilities []string) string {
@@ -1184,8 +1184,10 @@ func (fullStatus *PostgresqlStatus) printPluginStatus() {
 	}
 
 	if len(fullStatus.Cluster.Status.PluginStatus) == 0 {
-		fmt.Println(aurora.Green(header))
-		fmt.Println("No plugins found")
+		if verbosity > 0 {
+			fmt.Println(aurora.Green(header))
+			fmt.Println("No plugins found")
+		}
 		return
 	}
 
