@@ -43,6 +43,9 @@ var (
 	// Namespace to operate in
 	Namespace string
 
+	// KubeContext to operate with
+	KubeContext string
+
 	// NamespaceExplicitlyPassed indicates if the namespace was passed manually
 	NamespaceExplicitlyPassed bool
 
@@ -95,6 +98,8 @@ func SetupKubernetesClient(configFlags *genericclioptions.ConfigFlags) error {
 	if err != nil {
 		return err
 	}
+
+	KubeContext = *configFlags.Context
 
 	ClientInterface = kubernetes.NewForConfigOrDie(Config)
 
