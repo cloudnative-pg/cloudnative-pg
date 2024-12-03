@@ -331,6 +331,7 @@ local all all peer
 
 hostssl postgres streaming_replica all cert
 hostssl replication streaming_replica all cert
+hostssl all cnpg_pooler_pgbouncer all cert
 ```
 
 Default rules:
