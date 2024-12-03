@@ -143,7 +143,7 @@ spec:
           - 'urn:alm:descriptor:io.kubernetes:Clusters'
       statusDescriptors:
       - displayName: Phase
-        description: Current backupphase
+        description: Current backup phase
         path: phase
         x-descriptors:
         - 'urn:alm:descriptor:io.kubernetes.phase'
@@ -174,6 +174,18 @@ spec:
         x-descriptors:
           - 'urn:alm:descriptor:com.tectonic.ui:text'
           - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      # Image section
+      - path: imagePullSecrets
+        displayName: Image Pull Secret
+        description: List of secrets to use for pulling the images
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: imagePullSecrets[0].name
+        displayName: Image Pull Secret
+        description: Secret for pulling the image. If empty, no secret will be used
+        x-descriptors:
+          - 'urn:alm:descriptor:io.kubernetes:Secret'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
       - path: imageName
         displayName: Image Name
         description: Name of the PostgreSQL container image
@@ -198,6 +210,13 @@ spec:
         x-descriptors:
           - 'urn:alm:descriptor:com.tectonic.ui:hidden'
           - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: imageCatalogRef
+        displayName: Image Catalog
+        description: The name of the image catalog to use
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:text'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      # Instances section
       - path: instances
         displayName: Instances
         description: Number of instances required in the cluster
@@ -215,6 +234,34 @@ spec:
         x-descriptors:
           - 'urn:alm:descriptor:com.tectonic.ui:number'
           - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: enablePDB
+        displayName: Enable Pod Disruption Budget
+        description: Boolean to enable or disable the Pod Disruption Budget
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:booleanSwitch'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: priorityClassName
+        displayName: Priority Class Name
+        description: The name of the Priority Class to use in every generated Pod
+        x-descriptors:
+          - 'urn:alm:descriptor:io.kubernetes:PriorityClass'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: env
+        displayName: Environment Variables
+        description: Environment variables to set in the pods created in the cluster
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: envFrom
+        displayName: Environment Variables from ConfigMap
+        description: ConfigMap to use as environment variables in the pods created in the cluster
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: seccompProfile
+        displayName: Seccomp Profile applied to every pod in the cluster
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:text'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      # PostgreSQL Configuration section
       - path: postgresql
         displayName: PostgreSQL Configuration
         description: Options for postgresql.conf
@@ -226,11 +273,8 @@ spec:
       - path: postgresql.pg_hba[0]
         displayName: pg_hba rules
         description: PostgreSQL Host Based Authentication rules
-      - path: postgresql.epas.audit
-        displayName: EPAS Configuration
-        description: Boolean to enable edb_audit logging
       - path: postgresql.promotionTimeout
-        displayName: pgctl Timeout
+        displayName: pg_ctl Timeout
         description: maximum number of seconds to wait when promoting an instance to primary
       - path: postgresql.shared_preload_libraries[0]
         displayName: Preload Libraries
@@ -259,6 +303,22 @@ spec:
         description: Boolean to enable TLS
         x-descriptors:
           - 'urn:alm:descriptor:com.tectonic.ui:booleanSwitch'
+      - path: tablespaces
+        displayName: Tablespaces
+        description: Configuration of the tablespaces
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: managed
+        displayName: Managed service
+        description: Resources managed by the operator
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: replicationSlots
+        displayName: Replication Slots Configuration
+        description: Configuration of the replication slots
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      # Bootstrap section
       - path: bootstrap
         displayName: Bootstrap Configuration
         description: Instructions to bootstrap the cluster
@@ -269,12 +329,14 @@ spec:
         description: The name of the Bootstrap secret
         x-descriptors:
           - 'urn:alm:descriptor:io.kubernetes:Secret'
+      # Replica cluster section
       - path: replica
         displayName: Replica
         description: Replica cluster configuration
         x-descriptors:
           - 'urn:alm:descriptor:io.kubernetes:Secret'
           - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      # Superuser section
       - path: superuserSecret
         displayName: Superuser Secret
         description: |
@@ -284,7 +346,7 @@ spec:
           - 'urn:alm:descriptor:com.tectonic.ui:advanced'
       - path: superuserSecret.name
         displayName: Superuser Secret
-        description: Name of hte Superuser Secret
+        description: Name of the Superuser Secret
         x-descriptors:
           - 'urn:alm:descriptor:io.kubernetes:Secret'
       - path: enableSuperuserAccess
@@ -293,16 +355,13 @@ spec:
         x-descriptors:
           - 'urn:alm:descriptor:com.tectonic.ui:booleanSwitch'
           - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      # Certificates section
       - path: certificates
         displayName: Certificates
         description: The configuration for the CA and related certificates
         x-descriptors:
           - 'urn:alm:descriptor:com.tectonic.ui:advanced'
-      - path: imagePullSecrets[0].name
-        displayName: Image Pull Secret
-        description: Secret for pulling the image. If empty, no secret will be used
-        x-descriptors:
-          - 'urn:alm:descriptor:io.kubernetes:Secret'
+      # Storage section
       - path: storage
         displayName: Storage
         description: Configuration of the storage of the instances
@@ -336,6 +395,7 @@ spec:
         path: storage.pvcTemplate
         x-descriptors:
           - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      # Delay and timeout section
       - path: startDelay
         displayName: Maximum Start Delay
         description: The time in seconds that is allowed for a PostgreSQL instance
@@ -350,6 +410,33 @@ spec:
         x-descriptors:
           - 'urn:alm:descriptor:com.tectonic.ui:number'
           - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: smartShutdownTimeout
+        displayName: Smart Shutdown Timeout
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:number'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: switchoverDelay
+        displayName: Switchover Delay
+        description: The time in seconds that is allowed for a PostgreSQL instance
+          to gracefully shutdown during a switchover
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:number'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: failoverDelay
+        displayName: Failover Delay
+        description: The amount of time (in seconds) to wait before triggering a failover 
+          after the primary PostgreSQL instance in the cluster was detected to be unhealthy
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:number'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: livenessProbeTimeout
+        displayName: Liveness Probe Timeout
+        description: The time in seconds that is allowed for the liveness probe to
+          complete
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:number'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      # Affinity section
       - path: affinity
         displayName: Pod Affinity
         description: Affinity/Anti-affinity rules for Pods
@@ -365,11 +452,13 @@ spec:
         description: Key value pair of which nodes the pods can run
         x-descriptors:
           - 'urn:alm:descriptor:com.tectonic.ui:selector:core:v1:Node'
+      # Resources section
       - path: resources
-        display: Resources
-        description:
+        displayName: PostgreSQL Resources requirement
+        description: Resources requirement for the PostgreSQL instances
         x-descriptors:
           - 'urn:alm:descriptor:com.tectonic.ui:resourceRequirements'
+      # Update strategy section
       - path: primaryUpdateStrategy
         displayName: Primary Update Strategy
         x-descriptors:
@@ -378,6 +467,10 @@ spec:
         displayName: Primary Update Method
         x-descriptors:
           - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      # Backup section
+      - path: backup
+        displayName: Backup Configuration
+        description: Configuration to be used for backups
       - path: backup.barmanObjectStore.endpointURL
         displayName: Object Storage Endpoint
         description: S3-compatible object storage Endpoint. If empty the S3 default is used
@@ -410,7 +503,7 @@ spec:
           - 'urn:alm:descriptor:io.kubernetes:text'
       - path: backup.barmanObjectStore.wal.encryption
         displayName: WAL encryption
-        description: WAL encryprion algorithm
+        description: WAL encryption algorithm
         x-descriptors:
           - 'urn:alm:descriptor:io.kubernetes:text'
       - path: backup.barmanObjectStore.data.compression
@@ -420,7 +513,7 @@ spec:
           - 'urn:alm:descriptor:io.kubernetes:text'
       - path: backup.barmanObjectStore.data.encryption
         displayName: Data encryption
-        description: Data encryprion algorithm
+        description: Data encryption algorithm
         x-descriptors:
           - 'urn:alm:descriptor:io.kubernetes:text'
       - path: backup.barmanObjectStore.data.immediateCheckpoint
@@ -431,6 +524,10 @@ spec:
         displayName: Jobs
         x-descriptors:
           - 'urn:alm:descriptor:com.tectonic.ui:number'
+      # Maintenance Window section
+      - path: nodeMaintenanceWindow
+        displayName: Node Maintenance Window
+        description: The configuration of the maintenance window for Kubernetes nodes
       - path: nodeMaintenanceWindow.inProgress
         displayName: In Progress
         description: Maintenance window for Kubernetes node upgrades is in progress
@@ -442,6 +539,7 @@ spec:
         description: Should the existing PVCs be reused during Kubernetes upgrades?
         x-descriptors:
           - 'urn:alm:descriptor:com.tectonic.ui:booleanSwitch'
+      # Monitoring section
       - path: monitoring
         displayName: Monitoring
         description: The configuration of the monitoring infrastructure of this cluster
@@ -467,15 +565,23 @@ spec:
         displayName: Enable PodMonitor resource
         x-descriptors:
           - 'urn:alm:descriptor:com.tectonic.ui:booleanSwitch'
+      # External Clusters section
       - path: externalClusters
         displayName: External Clusters
         description: List of external clusters which are used in the configuration
         x-descriptors:
           - 'urn:alm:descriptor:io.kubernetes:text'
           - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      # Log Level section
       - path: logLevel
         displayName: Log Level
         description: One of error, info (default), debug or trace
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      # Plugins section
+      - path: plugins
+        displayName: Plugins
+        description: List of plugins to be installed
         x-descriptors:
           - 'urn:alm:descriptor:com.tectonic.ui:advanced'
       statusDescriptors:
@@ -551,7 +657,7 @@ spec:
         x-descriptors:
           - 'urn:alm:descriptor:com.tectonic.ui:text'
       - path: type
-        description: Service type of the cluster to connect to ('rw' or 'rw')
+        description: Service type of the cluster to connect to ('rw' or 'ro')
         x-descriptors:
           - 'urn:alm:descriptor:io.kubernetes:text'
       - path: instances
@@ -570,7 +676,7 @@ spec:
           - 'urn:alm:descriptor:com.tectonic.ui:advanced'
       - path: pgbouncer.poolMode
         displayName: PgBouncer PoolMode
-        description: The poolmode to use. One of 'session' or 'transaction'.
+        description: The pool mode to use. One of 'session' or 'transaction'.
         x-descriptors:
           - 'urn:alm:descriptor:io.kubernetes:text'
       - path: pgbouncer.authQuerySecret
