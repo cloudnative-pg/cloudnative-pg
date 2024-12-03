@@ -40,6 +40,11 @@ func (sub *Subscription) SetAsReady() {
 	sub.Status.ObservedGeneration = sub.Generation
 }
 
+// GetStatusMessage returns the applied status of the subscription
+func (sub *Subscription) GetStatusMessage() string {
+	return sub.Status.Message
+}
+
 // GetClusterRef returns the cluster reference of the subscription
 func (sub *Subscription) GetClusterRef() corev1.LocalObjectReference {
 	return sub.Spec.ClusterRef

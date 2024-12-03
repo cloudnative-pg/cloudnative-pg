@@ -90,7 +90,7 @@ var _ = Describe("CRD finalizers", func() {
 		cli := fake.NewClientBuilder().WithScheme(scheme).WithLists(databaseList).
 			WithStatusSubresource(&databaseList.Items[0], &databaseList.Items[1]).Build()
 		r.Client = cli
-		err := r.deleteFinalizers(ctx, namespacedName)
+		err := r.notifyDeletionToOwnedResources(ctx, namespacedName)
 		Expect(err).ToNot(HaveOccurred())
 
 		for _, db := range databaseList.Items {
@@ -127,7 +127,7 @@ var _ = Describe("CRD finalizers", func() {
 
 			cli := fake.NewClientBuilder().WithScheme(scheme).WithLists(databaseList).Build()
 			r.Client = cli
-			err := r.deleteFinalizers(ctx, namespacedName)
+			err := r.notifyDeletionToOwnedResources(ctx, namespacedName)
 			Expect(err).ToNot(HaveOccurred())
 
 			database := &apiv1.Database{}
@@ -177,7 +177,7 @@ var _ = Describe("CRD finalizers", func() {
 		cli := fake.NewClientBuilder().WithScheme(scheme).WithLists(publicationList).
 			WithStatusSubresource(&publicationList.Items[0], &publicationList.Items[1]).Build()
 		r.Client = cli
-		err := r.deleteFinalizers(ctx, namespacedName)
+		err := r.notifyDeletionToOwnedResources(ctx, namespacedName)
 		Expect(err).ToNot(HaveOccurred())
 
 		for _, pub := range publicationList.Items {
@@ -213,7 +213,7 @@ var _ = Describe("CRD finalizers", func() {
 
 		cli := fake.NewClientBuilder().WithScheme(scheme).WithLists(publicationList).Build()
 		r.Client = cli
-		err := r.deleteFinalizers(ctx, namespacedName)
+		err := r.notifyDeletionToOwnedResources(ctx, namespacedName)
 		Expect(err).ToNot(HaveOccurred())
 
 		publication := &apiv1.Publication{}
@@ -263,7 +263,7 @@ var _ = Describe("CRD finalizers", func() {
 		cli := fake.NewClientBuilder().WithScheme(scheme).WithLists(subscriptionList).
 			WithStatusSubresource(&subscriptionList.Items[0], &subscriptionList.Items[1]).Build()
 		r.Client = cli
-		err := r.deleteFinalizers(ctx, namespacedName)
+		err := r.notifyDeletionToOwnedResources(ctx, namespacedName)
 		Expect(err).ToNot(HaveOccurred())
 
 		for _, sub := range subscriptionList.Items {
@@ -299,7 +299,7 @@ var _ = Describe("CRD finalizers", func() {
 
 		cli := fake.NewClientBuilder().WithScheme(scheme).WithLists(subscriptionList).Build()
 		r.Client = cli
-		err := r.deleteFinalizers(ctx, namespacedName)
+		err := r.notifyDeletionToOwnedResources(ctx, namespacedName)
 		Expect(err).ToNot(HaveOccurred())
 
 		subscription := &apiv1.Subscription{}
