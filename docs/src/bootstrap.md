@@ -223,65 +223,68 @@ To include custom options in the `initdb` command, you can use the following
 parameters:
 
 builtinLocale
-:   When `builtinLocale` is set to a value, CNPG passes it to the `--builtin-locale`
-option in `initdb`. This option controls the ICU locale, as defined in
-["Locale Support"](https://www.postgresql.org/docs/current/locale.html) from the
-PostgreSQL documentation (default: empty).
-Note that this option requires `localeProvider` to be set to `builtin`.
-Available from PostgreSQL 17.
+:   When `builtinLocale` is set to a value, CloudNativePG passes it to the
+    `--builtin-locale` option in `initdb`. This option controls the ICU locale, as
+    defined in ["Locale Support"](https://www.postgresql.org/docs/current/locale.html)
+    from the PostgreSQL documentation (default: empty). Note that this option requires
+    `localeProvider` to be set to `builtin`. Available from PostgreSQL 17.
 
 dataChecksums
-:   When `dataChecksums` is set to `true`, CNPG invokes the `-k` option in
+:   When `dataChecksums` is set to `true`, CloudNativePG invokes the `-k` option in
     `initdb` to enable checksums on data pages and help detect corruption by the
     I/O system - that would otherwise be silent (default: `false`).
 
 encoding
-:   When `encoding` set to a value, CNPG passes it to the `--encoding` option in `initdb`,
-    which selects the encoding of the template database (default: `UTF8`).
+:   When `encoding` set to a value, CloudNativePG passes it to the `--encoding`
+    option in `initdb`, which selects the encoding of the template database
+    (default: `UTF8`).
 
 icuLocale
-:   When `icuLocale` is set to a value, CNPG passes it to the `--icu-locale` option in
-`initdb`. This option controls the ICU locale, as defined in
-["Locale Support"](https://www.postgresql.org/docs/current/locale.html) from the
-PostgreSQL documentation (default: empty).
-Note that this option requires `localeProvider` to be set to `icu`.
-Available from PostgreSQL 15.
+:   When `icuLocale` is set to a value, CloudNativePG passes it to the
+    `--icu-locale` option in `initdb`. This option controls the ICU locale, as
+    defined in ["Locale Support"](https://www.postgresql.org/docs/current/locale.html)
+    from the PostgreSQL documentation (default: empty).
+    Note that this option requires `localeProvider` to be set to `icu`.
+    Available from PostgreSQL 15.
 
 icuRules
-:   When `icuRules` is set to a value, CNPG passes it to the `--icu-rules` option in
-`initdb`. This option controls the ICU locale, as defined in
-["Locale Support"](https://www.postgresql.org/docs/current/locale.html) from the
-PostgreSQL documentation (default: empty).
-Note that this option requires `localeProvider` to be set to `icu`.
-Available from PostgreSQL 16.
+:   When `icuRules` is set to a value, CloudNativePG passes it to the
+    `--icu-rules` option in `initdb`. This option controls the ICU locale, as
+    defined in ["Locale
+    Support"](https://www.postgresql.org/docs/current/locale.html) from the
+    PostgreSQL documentation (default: empty). Note that this option requires
+    `localeProvider` to be set to `icu`. Available from PostgreSQL 16.
 
 locale
-:   When `locale` is set to a value, CNPG passes it to the `--locale`
-option in `initdb`. This option controls the locale, as defined in
-["Locale Support"](https://www.postgresql.org/docs/current/locale.html) from the
-PostgreSQL documentation (default: empty).
+:   When `locale` is set to a value, CloudNativePG passes it to the `--locale`
+    option in `initdb`. This option controls the locale, as defined in
+    ["Locale Support"](https://www.postgresql.org/docs/current/locale.html) from
+    the PostgreSQL documentation. By default, the locale parameter is empty. In
+    this case, environment variables such as `LANG` are used to determine the
+    locale. Be aware that these variables can vary between container images,
+    potentially leading to inconsistent behavior.
 
 localeCollate
-:   When `localeCollate` is set to a value, CNPG passes it to the `--lc-collate`
+:   When `localeCollate` is set to a value, CloudNativePG passes it to the `--lc-collate`
     option in `initdb`. This option controls the collation order (`LC_COLLATE`
     subcategory), as defined in ["Locale Support"](https://www.postgresql.org/docs/current/locale.html)
     from the PostgreSQL documentation (default: `C`).
 
 localeCType
-:   When `localeCType` is set to a value, CNPG passes it to the `--lc-ctype` option in
+:   When `localeCType` is set to a value, CloudNativePG passes it to the `--lc-ctype` option in
     `initdb`. This option controls the collation order (`LC_CTYPE` subcategory), as
     defined in ["Locale Support"](https://www.postgresql.org/docs/current/locale.html)
     from the PostgreSQL documentation (default: `C`).
 
 localeProvider
-:   When `localeProvider` is set to a value, CNPG passes it to the `--locale-provider`
+:   When `localeProvider` is set to a value, CloudNativePG passes it to the `--locale-provider`
 option in `initdb`. This option controls the locale provider, as defined in
 ["Locale Support"](https://www.postgresql.org/docs/current/locale.html) from the
 PostgreSQL documentation (default: empty, which means `libc` for PostgreSQL).
 Available from PostgreSQL 15.
 
 walSegmentSize
-:   When `walSegmentSize` is set to a value, CNPG passes it to the `--wal-segsize`
+:   When `walSegmentSize` is set to a value, CloudNativePG passes it to the `--wal-segsize`
     option in `initdb` (default: not set - defined by PostgreSQL as 16 megabytes).
 
 !!! Note
