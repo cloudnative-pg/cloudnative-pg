@@ -397,10 +397,10 @@ The `kubectl cnpg restart` command can be used in two cases:
 
 ```sh
 # this command will restart a whole cluster in a rollout fashion
-kubectl cnpg restart [clusterName]
+kubectl cnpg restart [cluster]
 
 # this command will restart a single instance, according to the policy above
-kubectl cnpg restart [clusterName] [pod]
+kubectl cnpg restart [cluster] [pod]
 ```
 
 If the in-place restart is requested but the change cannot be applied without
@@ -420,7 +420,7 @@ to cluster dependent objects, such as ConfigMaps containing custom monitoring qu
 The following command will reload all configurations for a given cluster:
 
 ```sh
-kubectl cnpg reload [cluster_name]
+kubectl cnpg reload [cluster]
 ```
 
 ### Maintenance
@@ -641,7 +641,7 @@ so the `-S` is disabled.
 Usage:
 
 ```sh
-kubectl cnpg report cluster <clusterName> [flags]
+kubectl cnpg report cluster [cluster] [flags]
 ```
 
 Note that, unlike the `operator` sub-command, for the `cluster` sub-command you
@@ -751,7 +751,7 @@ which takes `-f` to mean the logs should be followed.
 Usage:
 
 ```sh
-kubectl cnpg logs cluster <clusterName> [flags]
+kubectl cnpg logs cluster [cluster] [flags]
 ```
 
 Using the `-f` option to follow:
@@ -869,7 +869,7 @@ detached PVCs.
 Usage:
 
 ```sh
-kubectl cnpg destroy [CLUSTER_NAME] [INSTANCE_ID]
+kubectl cnpg destroy [cluster] [instance-id]
 ```
 
 The following example removes the `cluster-example-2` pod and the associated
@@ -895,7 +895,7 @@ instance.
 You can hibernate a cluster with:
 
 ```sh
-kubectl cnpg hibernate on <cluster-name>
+kubectl cnpg hibernate on cluster
 ```
 
 This will:
@@ -924,7 +924,7 @@ kubectl cnpg hibernate on cluster-example --force
 A hibernated cluster can be resumed with:
 
 ```sh
-kubectl cnpg hibernate off <cluster-name>
+kubectl cnpg hibernate off cluster
 ```
 
 Once the cluster has been hibernated, it's possible to show the last
@@ -932,7 +932,7 @@ configuration and the status that PostgreSQL had after it was shut down.
 That can be done with:
 
 ```sh
-kubectl cnpg hibernate status <cluster-name>
+kubectl cnpg hibernate status cluster
 ```
 
 ### Benchmarking the database with pgbench
@@ -941,7 +941,7 @@ Pgbench can be run against an existing PostgreSQL cluster with following
 command:
 
 ```sh
-kubectl cnpg pgbench <cluster-name> -- --time 30 --client 1 --jobs 1
+kubectl cnpg pgbench cluster -- --time 30 --client 1 --jobs 1
 ```
 
 Refer to the [Benchmarking pgbench section](benchmarking.md#pgbench) for more
@@ -965,13 +965,13 @@ an existing Postgres cluster by creating a new `Backup` resource.
 The following example requests an on-demand backup for a given cluster:
 
 ```sh
-kubectl cnpg backup [cluster_name]
+kubectl cnpg backup [cluster]
 ```
 
 or, if using volume snapshots:
 
 ```sh
-kubectl cnpg backup [cluster_name] -m volumeSnapshot
+kubectl cnpg backup [cluster] -m volumeSnapshot
 ```
 
 The created backup will be named after the request time:
