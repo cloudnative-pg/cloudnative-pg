@@ -1,3 +1,4 @@
+
 AES
 API's
 APIs
@@ -9,6 +10,7 @@ AdditionalCommandArgs
 AdditionalPodAffinity
 AdditionalPodAntiAffinity
 AffinityConfiguration
+AllNamespaces
 AntiAffinity
 AppArmor
 AppArmorProfile
@@ -239,6 +241,7 @@ Milsted
 MinIO
 Minikube
 MonitoringConfiguration
+MultiNamespace
 NFS
 NGINX
 NOBYPASSRLS
@@ -271,6 +274,7 @@ Openshift
 OperatorCapabilities
 OperatorGroup
 OperatorHub
+OwnNamespace
 PDB
 PDBs
 PGAudit
@@ -389,6 +393,7 @@ ScheduledBackupSpec
 ScheduledBackupStatus
 ScheduledBackups
 Scorsolini
+Seccomp
 SeccompProfile
 SecretKeySelector
 SecretRefs
@@ -410,6 +415,7 @@ ServiceUpdateStrategy
 SetStatusInCluster
 ShutdownCheckpointToken
 Silvela
+SingleNamespace
 Slonik
 SnapshotOwnerReference
 SnapshotType
@@ -421,6 +427,7 @@ StorageClass
 StorageConfiguration
 Storages
 SuccessfullyExtracted
+SuperUserSecret
 SwitchReplicaClusterStatus
 SyncReplicaElectionConstraints
 SynchronizeReplicas
@@ -494,6 +501,7 @@ alloc
 allocator
 allowPrivilegeEscalation
 allowVolumeExpansion
+alm
 amd
 angus
 api
@@ -504,6 +512,7 @@ apidoc
 apimachinery
 apis
 apiserver
+apiservicedefinitions
 apparmor
 appdb
 applicationCredentials
@@ -566,6 +575,7 @@ bindPassword
 bindSearchAuth
 bitmask
 bool
+booleanSwitch
 bootstrapconfiguration
 bootstrapinitdb
 bootstraprecovery
@@ -633,6 +643,7 @@ connectionLimit
 connectionParameters
 connectionString
 conninfo
+containerImage
 containerPort
 controldata
 coredump
@@ -645,6 +656,7 @@ cpu
 crc
 crds
 crdview
+createdAt
 createdb
 createrole
 createuser
@@ -664,6 +676,7 @@ currentPrimaryTimestamp
 customQueriesConfigMap
 customQueriesSecret
 customizable
+customresourcedefinitions
 cutover
 cyber
 dT
@@ -694,6 +707,8 @@ dir
 disableDefaultQueries
 disablePassword
 disabledDefaultServices
+displayName
+displayName
 distro
 distroless
 distros
@@ -749,6 +764,7 @@ fieldref
 filesystem
 findstr
 fio
+fips
 firstRecoverabilityPoint
 firstRecoverabilityPointByMethod
 freddie
@@ -757,6 +773,7 @@ gapped
 gc
 gcc
 gce
+gcp
 gcs
 gcsCredentials
 geocoder
@@ -812,6 +829,7 @@ initdb
 initialise
 initializingPVC
 inplace
+installModes
 installplans
 instanceID
 instanceName
@@ -899,6 +917,7 @@ maxSyncReplicas
 maxwait
 mcache
 md
+mediatype
 mem
 memstats
 metav
@@ -908,6 +927,7 @@ microservice
 microservices
 microsoft
 minApplyDelay
+minKubeVersion
 minSyncReplicas
 minikube
 minio
@@ -1004,10 +1024,12 @@ png
 podAffinityTerm
 podAntiAffinity
 podAntiAffinityType
+podCount
 podMetricsEndpoints
 podMonitorMetricRelabelings
 podMonitorRelabelings
 podName
+podStatuses
 podmonitor
 podtemplates
 poolMode
@@ -1087,6 +1109,7 @@ req
 requiredDuringSchedulingIgnoredDuringExecution
 resizeInUseVolumes
 resizingPVC
+resourceRequirements
 resourceVersion
 resourcerequirements
 restoreAdditionalCommandArgs
@@ -1149,6 +1172,7 @@ shutdownCheckpointToken
 sig
 sigs
 singlenamespace
+skipRange
 slotPrefix
 smartShutdownTimeout
 snapshotBackupStatus
@@ -1156,6 +1180,7 @@ snapshotOwnerReference
 snapshotted
 snapshotting
 sourceNamespace
+specDescriptors
 specificities
 sql
 src
@@ -1175,6 +1200,7 @@ standbyNamesPre
 startDelay
 startedAt
 stateful
+statusDescriptors
 stderr
 stdout
 stedolan
@@ -1200,6 +1226,7 @@ superuserSecret
 superuserSecretVersion
 sv
 svc
+svg
 switchReplicaClusterStatus
 switchoverDelay
 switchovers
@@ -1250,6 +1277,7 @@ transactional
 transactionid
 tx
 ubi
+ui
 uid
 ul
 un
@@ -1267,6 +1295,7 @@ updateStrategy
 upgradable
 uptime
 uri
+url
 usename
 usernamepassword
 usr
@@ -1303,5 +1332,6 @@ wsl
 www
 xact
 xlog
+xml
 yaml
 yml
