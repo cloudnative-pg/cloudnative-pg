@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+//nolint:dupl
+
 package v1
 
 import (
@@ -48,4 +50,19 @@ func (sub *Subscription) GetStatusMessage() string {
 // GetClusterRef returns the cluster reference of the subscription
 func (sub *Subscription) GetClusterRef() corev1.LocalObjectReference {
 	return sub.Spec.ClusterRef
+}
+
+// GetName returns the subscription object name
+func (sub *Subscription) GetName() string {
+	return sub.Name
+}
+
+// GetManagedObjectName returns the name of the managed subscription object
+func (sub *Subscription) GetManagedObjectName() string {
+	return sub.Spec.Name
+}
+
+// HasReconciliations returns true if the subscription has been reconciled at least once
+func (sub *Subscription) HasReconciliations() bool {
+	return sub.Status.ObservedGeneration > 0
 }

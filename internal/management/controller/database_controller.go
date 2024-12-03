@@ -158,7 +158,7 @@ func (r *DatabaseReconciler) ensureOnlyOneManager(
 ) error {
 	contextLogger := log.FromContext(ctx)
 
-	if database.Status.ObservedGeneration > 0 {
+	if database.HasReconciliations() {
 		return nil
 	}
 
@@ -171,26 +171,12 @@ func (r *DatabaseReconciler) ensureOnlyOneManager(
 			r.instance.GetNamespaceName(), err)
 	}
 
-	for _, item := range databaseList.Items {
-		if item.Name == database.Name {
-			continue
-		}
-
-		if item.Spec.ClusterRef.Name != r.instance.GetClusterName() {
-			continue
-		}
-
-		if item.Status.ObservedGeneration == 0 {
-			continue
-		}
-
-		if item.Spec.Name == database.Spec.Name {
-			return fmt.Errorf("database %q is already managed by Database object %q",
-				database.Spec.Name, item.Name)
-		}
+	managerObjects := make([]managerObject, len(databaseList.Items))
+	for i, item := range databaseList.Items {
+		managerObjects[i] = &item
 	}
 
-	return nil
+	return detectTooManyManagers(&database, managerObjects)
 }
 
 func (r *DatabaseReconciler) evaluateDropDatabase(ctx context.Context, db *apiv1.Database) error {

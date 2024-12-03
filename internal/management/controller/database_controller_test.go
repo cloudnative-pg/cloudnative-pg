@@ -422,7 +422,7 @@ var _ = Describe("Managed Database status", func() {
 		}, dbDuplicate)
 		Expect(err).ToNot(HaveOccurred())
 
-		expectedError := fmt.Sprintf("database %q is already managed by Database object %q",
+		expectedError := fmt.Sprintf("%q is already managed by object %q",
 			dbDuplicate.Spec.Name, currentManager.Name)
 		Expect(dbDuplicate.Status.Applied).To(HaveValue(BeFalse()))
 		Expect(dbDuplicate.Status.Message).To(ContainSubstring(expectedError))

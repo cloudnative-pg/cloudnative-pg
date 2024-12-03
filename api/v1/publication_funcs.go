@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+//nolint:dupl
+
 package v1
 
 import (
@@ -48,4 +50,19 @@ func (pub *Publication) GetStatusMessage() string {
 // GetClusterRef returns the cluster reference of the publication
 func (pub *Publication) GetClusterRef() corev1.LocalObjectReference {
 	return pub.Spec.ClusterRef
+}
+
+// GetManagedObjectName returns the name of the managed publication object
+func (pub *Publication) GetManagedObjectName() string {
+	return pub.Spec.Name
+}
+
+// HasReconciliations returns true if the publication has been reconciled at least once
+func (pub *Publication) HasReconciliations() bool {
+	return pub.Status.ObservedGeneration > 0
+}
+
+// GetName returns the publication name
+func (pub *Publication) GetName() string {
+	return pub.Name
 }

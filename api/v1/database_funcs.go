@@ -49,3 +49,18 @@ func (db *Database) GetStatusMessage() string {
 func (db *Database) GetClusterRef() corev1.LocalObjectReference {
 	return db.Spec.ClusterRef
 }
+
+// GetManagedObjectName returns the name of the managed database object
+func (db *Database) GetManagedObjectName() string {
+	return db.Spec.Name
+}
+
+// GetName returns the database object name
+func (db *Database) GetName() string {
+	return db.Name
+}
+
+// HasReconciliations returns true if the database object has been reconciled at least once
+func (db *Database) HasReconciliations() bool {
+	return db.Status.ObservedGeneration > 0
+}
