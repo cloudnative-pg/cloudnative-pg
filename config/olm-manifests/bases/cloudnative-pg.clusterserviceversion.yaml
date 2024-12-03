@@ -785,7 +785,7 @@ spec:
     - kind: Database
       name: databases.postgresql.cnpg.io
       displayName: Database management
-      description: Declarative database management
+      description: Declarative creation and management of a database on a Cluster
       version: v1
       resources:
       - kind: Cluster
@@ -794,20 +794,56 @@ spec:
       specDescriptors:
       - path: databaseReclaimPolicy
         displayName: Database reclaim policy
-        description: Database reclaim policy
+        description: Whether to delete or reclaim management of the database on object deletion
       - path: cluster
         displayName: Cluster requested to create the database
-        description: Cluster requested to create the database
+        description: Cluster in which to create the database
       - path: name
         displayName: Database name
         description: Database name
       - path: owner
         displayName: Database Owner
-        description: Database Owner
+        description: Owner of the database that will be created in Postgres
+      - path: icu_locale
+        displayName: ICU locale
+        description: ICU locale to use for the database
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:text'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: icu_rules
+        displayName: ICU rules
+        description: Additional customization of ICU locale
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:text'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: lc_collate
+        displayName: LC collate
+        description: The collation to use for the database
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:text'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: lc_ctype
+        displayName: LC ctype
+        description: The ctype to use for the database
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:text'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: collation_version
+        displayName: Collation version
+        description: The version identifier of the collation
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:text'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: builtin_locale
+        displayName: Builtin locale
+        description: The choice of which builtin locale to use
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:text'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
     - kind: Publication
       name: publications.postgresql.cnpg.io
       displayName: Publication
-      description: Declarative publication
+      description: Declarative creation and management of a Publication in a Cluster
       version: v1
       resources:
         - kind: Cluster
@@ -819,17 +855,17 @@ spec:
           description: Publication name
         - path: dbname
           displayName: Database name
-          description: Database name
+          description: Database on which the publication will be created
         - path: cluster
           displayName: Cluster requested to create the publication
-          description: Cluster requested to create the publication
+          description: Cluster on which the publication will be created
         - path: target
           displayName: Publication target
-          description: Publication target
+          description: Specifies which tables/schemas in the database should be published
     - kind: Subscription
       name: subscriptions.postgresql.cnpg.io
       displayName: Subscription
-      description: Declarative subscription
+      description: Declarative creation and management of a Subscription to a previously defined Publication
       version: v1
       resources:
         - kind: Cluster
@@ -841,13 +877,13 @@ spec:
           description: Subscription name
         - path: dbname
           displayName: Database name
-          description: Database name
+          description: Database on which the Subscription will be created
         - path: publicationName
           displayName: Publication name
-          description: Publication name
+          description: Name of the Publication to subscribe to
         - path: cluster
           displayName: Cluster requested to create the subscription
-          description: Cluster requested to create the subscription
+          description: Cluster on which the subscription will be created
         - path: externalClusterName
           displayName: Name of the external cluster with publication
-          description: Name of the external cluster with publication
+          description: Name of the cluster where the Publication is defined
