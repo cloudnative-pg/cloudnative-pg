@@ -142,6 +142,9 @@ func buildInitDBFlags(cluster apiv1.Cluster) (initCommand []string) {
 	if localeCType := config.LocaleCType; localeCType != "" {
 		options = append(options, fmt.Sprintf("--lc-ctype=%s", localeCType))
 	}
+	if locale := config.LocaleProvider; locale != "" {
+		options = append(options, fmt.Sprintf("--locale=%s", locale))
+	}
 	if localeProvider := config.LocaleProvider; localeProvider != "" {
 		options = append(options, fmt.Sprintf("--locale-provider=%s", localeProvider))
 	}

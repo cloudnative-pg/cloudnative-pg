@@ -1471,6 +1471,10 @@ type BootstrapInitDB struct {
 	// +optional
 	LocaleCType string `json:"localeCType,omitempty"`
 
+	// Sets the default collation order and character classification in the new database.
+	// +optional
+	Locale string `json:"locale,omitempty"`
+
 	// This option sets the locale provider for databases created in the new cluster.
 	// Available from PostgreSQL 16.
 	// +optional

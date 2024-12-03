@@ -1079,6 +1079,13 @@ enabling checksums on data pages (default: <code>false</code>)</p>
    <p>The value to be passed as option <code>--lc-ctype</code> for initdb (default:<code>C</code>)</p>
 </td>
 </tr>
+<tr><td><code>locale</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Sets the default collation order and character classification in the new database.</p>
+</td>
+</tr>
 <tr><td><code>localeProvider</code><br/>
 <i>string</i>
 </td>

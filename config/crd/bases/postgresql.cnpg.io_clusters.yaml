@@ -1594,6 +1594,10 @@ spec:
                         - source
                         - type
                         type: object
+                      locale:
+                        description: Sets the default collation order and character
+                          classification in the new database.
+                        type: string
                       localeCType:
                         description: The value to be passed as option `--lc-ctype`
                           for initdb (default:`C`)

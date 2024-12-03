@@ -256,6 +256,12 @@ localeCType
     defined in ["Locale Support"](https://www.postgresql.org/docs/current/locale.html)
     from the PostgreSQL documentation (default: `C`).
 
+locale
+:   When `locale` is set to a value, CNPG passes it to the `--locale`
+option in `initdb`. This option controls the locale, as defined in
+["Locale Support"](https://www.postgresql.org/docs/current/locale.html) from the
+PostgreSQL documentation (default: empty).
+
 localeProvider
 :   When `localeProvider` is set to a value, CNPG passes it to the `--locale-provider`
 option in `initdb`. This option controls the locale provider, as defined in
