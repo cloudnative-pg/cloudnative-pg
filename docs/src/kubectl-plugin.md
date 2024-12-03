@@ -349,13 +349,13 @@ The meaning of this command is to `promote` a pod in the cluster to primary, so 
 can start with maintenance work or test a switch-over situation in your cluster
 
 ```sh
-kubectl cnpg promote cluster-example cluster-example-2
+kubectl cnpg promote [cluster] [cluster]-[instance-id]
 ```
 
-Or you can use the instance node number to promote
+Or you can use the instance id number to promote
 
 ```sh
-kubectl cnpg promote cluster-example 2
+kubectl cnpg promote [cluster] [instance-id]
 ```
 
 ### Certificates
@@ -367,7 +367,7 @@ To get a certificate, you need to provide a name for the secret to store
 the credentials, the cluster name, and a user for this certificate
 
 ```sh
-kubectl cnpg certificate cluster-cert --cnpg-cluster cluster-example --cnpg-user appuser
+kubectl cnpg certificate cluster-cert --cnpg-cluster [cluster] --cnpg-user appuser
 ```
 
 After the secret it's created, you can get it using `kubectl`
@@ -400,7 +400,7 @@ The `kubectl cnpg restart` command can be used in two cases:
 kubectl cnpg restart [cluster]
 
 # this command will restart a single instance, according to the policy above
-kubectl cnpg restart [cluster] [pod]
+kubectl cnpg restart [cluster] [instance-id]
 ```
 
 If the in-place restart is requested but the change cannot be applied without
@@ -649,7 +649,7 @@ need to provide the cluster name, and very likely the namespace, unless the clus
 is in the default one.
 
 ```sh
-kubectl cnpg report cluster example -f report.zip -n example_namespace
+kubectl cnpg report cluster [cluster] -f report.zip -n example_namespace
 ```
 
 and then:
@@ -671,7 +671,7 @@ Archive:  report.zip
 Remember that you can use the `--logs` flag to add the pod and job logs to the ZIP.
 
 ```sh
-kubectl cnpg report cluster example -n example_namespace --logs
+kubectl cnpg report cluster [cluster] -n example_namespace --logs
 ```
 
 will result in:
@@ -757,14 +757,14 @@ kubectl cnpg logs cluster [cluster] [flags]
 Using the `-f` option to follow:
 
 ```sh
-kubectl cnpg report cluster cluster-example -f
+kubectl cnpg report cluster [cluster] -f
 ```
 
 Using `--tail` option to display 3 lines from each pod and the `-f` option
 to follow:
 
 ```sh
-kubectl cnpg report cluster cluster-example -f --tail 3
+kubectl cnpg report cluster [cluster] -f --tail 3
 ```
 
 ```output
@@ -777,7 +777,7 @@ kubectl cnpg report cluster cluster-example -f --tail 3
 With the `-o` option omitted, and with `--output` specified:
 
 ```console
-$ kubectl cnpg logs cluster cluster-example --output my-cluster.log
+$ kubectl cnpg logs cluster [cluster] --output my-cluster.log
 
 Successfully written logs to "my-cluster.log"
 ```
@@ -787,7 +787,7 @@ Successfully written logs to "my-cluster.log"
 The `pretty` sub-command reads a log stream from standard input, formats it
 into a human-readable output, and attempts to sort the entries by timestamp.
 
-It can be used in combination with `kubectl cnpg logs cluster`, as
+It can be used in combination with `kubectl cnpg logs [cluster]`, as
 shown in the following example:
 
 ```console
@@ -895,7 +895,7 @@ instance.
 You can hibernate a cluster with:
 
 ```sh
-kubectl cnpg hibernate on cluster
+kubectl cnpg hibernate on [cluster]
 ```
 
 This will:
@@ -918,13 +918,13 @@ In case of error the operator will not be able to revert the procedure. You can
 still force the operation with:
 
 ```sh
-kubectl cnpg hibernate on cluster-example --force
+kubectl cnpg hibernate on [cluster] --force
 ```
 
 A hibernated cluster can be resumed with:
 
 ```sh
-kubectl cnpg hibernate off cluster
+kubectl cnpg hibernate off [cluster]
 ```
 
 Once the cluster has been hibernated, it's possible to show the last
@@ -932,7 +932,7 @@ configuration and the status that PostgreSQL had after it was shut down.
 That can be done with:
 
 ```sh
-kubectl cnpg hibernate status cluster
+kubectl cnpg hibernate status [cluster]
 ```
 
 ### Benchmarking the database with pgbench
@@ -941,7 +941,7 @@ Pgbench can be run against an existing PostgreSQL cluster with following
 command:
 
 ```sh
-kubectl cnpg pgbench cluster -- --time 30 --client 1 --jobs 1
+kubectl cnpg pgbench [cluster] -- --time 30 --client 1 --jobs 1
 ```
 
 Refer to the [Benchmarking pgbench section](benchmarking.md#pgbench) for more
@@ -995,7 +995,7 @@ the configuration settings.
 
 ### Launching psql
 
-The `kubectl cnpg psql` command starts a new PostgreSQL interactive front-end
+The `kubectl cnpg psql [cluster]` command starts a new PostgreSQL interactive front-end
 process (psql) connected to an existing Postgres cluster, as if you were running
 it from the actual pod. This means that you will be using the `postgres` user.
 
