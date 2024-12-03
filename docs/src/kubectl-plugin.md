@@ -352,7 +352,7 @@ can start with maintenance work or test a switch-over situation in your cluster
 kubectl cnpg promote [cluster] [cluster]-[node]
 ```
 
-Or you can use the instance id number to promote
+Or you can use the instance node number to promote
 
 ```sh
 kubectl cnpg promote [cluster] [node]
