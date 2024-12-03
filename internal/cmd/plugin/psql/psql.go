@@ -24,6 +24,7 @@ import (
 	"syscall"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/utils/strings/slices"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
@@ -102,7 +103,7 @@ func NewCommand(
 
 // getKubectlInvocation gets the kubectl command to be executed
 func (psql *Command) getKubectlInvocation() ([]string, error) {
-	result := make([]string, 0, 11+len(psql.Args))
+	result := make([]string, 0, 13+len(psql.Args))
 	result = append(result, "kubectl", "exec")
 
 	if psql.AllocateTTY {
@@ -119,6 +120,11 @@ func (psql *Command) getKubectlInvocation() ([]string, error) {
 	podName, err := psql.getPodName()
 	if err != nil {
 		return nil, err
+	}
+
+	// Default to `postgres` if no-user has been specified
+	if !slices.Contains(psql.Args, "-U") {
+		psql.Args = append([]string{"-U", "postgres"}, psql.Args...)
 	}
 
 	result = append(result, podName)
