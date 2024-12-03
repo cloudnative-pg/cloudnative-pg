@@ -95,6 +95,8 @@ var _ = Describe("psql launcher", func() {
 			"cluster-example-1",
 			"--",
 			"psql",
+			"-U",
+			"postgres",
 		))
 	})
 
@@ -120,6 +122,8 @@ var _ = Describe("psql launcher", func() {
 			"cluster-example-1",
 			"--",
 			"psql",
+			"-U",
+			"postgres",
 			"-c",
 			"select 1",
 		))
