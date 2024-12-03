@@ -207,9 +207,10 @@ relies on the superuser to reconcile the cluster with the desired status.
 ### Passing options to `initdb`
 
 The actual PostgreSQL data directory is created via an invocation of the
-`initdb` PostgreSQL command. If you need to add custom options to that command
-(i.e., to change the `locale` used for the template databases or to add data
-checksums), you can use the following parameters:
+[`initdb` PostgreSQL command](https://www.postgresql.org/docs/current/app-initdb.html).
+If you need to add custom options to that command (i.e., to change the `locale`
+used for the template databases or to add data checksums), you can use the
+following parameters:
 
 builtinLocale
 :   When `builtinLocale` is set to a value, CNPG passes it to the `--builtin-locale`
@@ -244,6 +245,12 @@ PostgreSQL documentation (default: empty).
 Note that this option requires `localeProvider` to be set to `icu`.
 Available from PostgreSQL 16.
 
+locale
+:   When `locale` is set to a value, CNPG passes it to the `--locale`
+option in `initdb`. This option controls the locale, as defined in
+["Locale Support"](https://www.postgresql.org/docs/current/locale.html) from the
+PostgreSQL documentation (default: empty).
+
 localeCollate
 :   When `localeCollate` is set to a value, CNPG passes it to the `--lc-collate`
     option in `initdb`. This option controls the collation order (`LC_COLLATE`
@@ -256,12 +263,6 @@ localeCType
     defined in ["Locale Support"](https://www.postgresql.org/docs/current/locale.html)
     from the PostgreSQL documentation (default: `C`).
 
-locale
-:   When `locale` is set to a value, CNPG passes it to the `--locale`
-option in `initdb`. This option controls the locale, as defined in
-["Locale Support"](https://www.postgresql.org/docs/current/locale.html) from the
-PostgreSQL documentation (default: empty).
-
 localeProvider
 :   When `localeProvider` is set to a value, CNPG passes it to the `--locale-provider`
 option in `initdb`. This option controls the locale provider, as defined in
@@ -272,6 +273,13 @@ Available from PostgreSQL 15.
 walSegmentSize
 :   When `walSegmentSize` is set to a value, CNPG passes it to the `--wal-segsize`
     option in `initdb` (default: not set - defined by PostgreSQL as 16 megabytes).
+
+!!! Warning  
+    CloudNativePG provides only a direct proxy to `initdb` for locale-related
+    options, due to the rapid and extensive changes in PostgreSQL's locale support.
+    It is your responsibility to ensure that the correct options are used in
+    accordance with the PostgreSQL documentation and to verify that the bootstrap
+    phase completes successfully.
 
 !!! Note
     The only two locale options that CloudNativePG implements during
