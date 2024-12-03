@@ -38,7 +38,7 @@ func NewCmd() *cobra.Command {
 	var dryRun bool
 
 	publicationCreateCmd := &cobra.Command{
-		Use:  "create cluster_name",
+		Use:  "create clusterName",
 		Args: plugin.RequiresArguments(1),
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			return plugin.CompleteClusters(cmd.Context(), args, toComplete), cobra.ShellCompDirectiveNoFileComp
