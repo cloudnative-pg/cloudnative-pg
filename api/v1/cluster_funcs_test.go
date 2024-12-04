@@ -26,6 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -1680,5 +1681,48 @@ var _ = Describe("UpdateBackupTimes", func() {
 			To(Equal(oneHourAgo))
 		Expect(cluster.Status.LastSuccessfulBackupByMethod[BackupMethodVolumeSnapshot]).
 			To(Equal(now))
+	})
+})
+
+var _ = Describe("Probes configuration", func() {
+	originalProbe := corev1.Probe{
+		ProbeHandler: corev1.ProbeHandler{
+			HTTPGet: &corev1.HTTPGetAction{
+				Path: "/",
+				Port: intstr.FromInt32(23),
+			},
+		},
+
+		InitialDelaySeconds:           21,
+		PeriodSeconds:                 11,
+		FailureThreshold:              433,
+		TerminationGracePeriodSeconds: ptr.To[int64](23),
+	}
+
+	It("Does not change any field if the configuration is nil", func() {
+		var nilProbe *Probe
+		configuredProbe := originalProbe.DeepCopy()
+		nilProbe.ApplyInto(configuredProbe)
+		Expect(originalProbe).To(BeEquivalentTo(*configuredProbe))
+	})
+
+	It("Changes the corresponding fields", func() {
+		config := &Probe{
+			InitialDelaySeconds:           1,
+			TimeoutSeconds:                2,
+			PeriodSeconds:                 3,
+			SuccessThreshold:              4,
+			FailureThreshold:              5,
+			TerminationGracePeriodSeconds: nil,
+		}
+
+		configuredProbe := originalProbe.DeepCopy()
+		config.ApplyInto(configuredProbe)
+		Expect(configuredProbe.InitialDelaySeconds).To(Equal(config.InitialDelaySeconds))
+		Expect(configuredProbe.TimeoutSeconds).To(Equal(config.TimeoutSeconds))
+		Expect(configuredProbe.PeriodSeconds).To(Equal(config.PeriodSeconds))
+		Expect(configuredProbe.SuccessThreshold).To(Equal(config.SuccessThreshold))
+		Expect(configuredProbe.FailureThreshold).To(Equal(config.FailureThreshold))
+		Expect(configuredProbe.TerminationGracePeriodSeconds).To(BeNil())
 	})
 })
