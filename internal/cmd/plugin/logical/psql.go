@@ -64,6 +64,8 @@ func getSQLCommand(
 ) (*psql.Command, error) {
 	psqlArgs := []string{
 		connectionString,
+		"-U",
+		"postgres",
 		"-c",
 		sqlCommand,
 	}

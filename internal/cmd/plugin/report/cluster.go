@@ -32,7 +32,7 @@ func clusterCmd() *cobra.Command {
 
 	const filePlaceholder = "report_cluster_<name>_<timestamp>.zip"
 	cmd := &cobra.Command{
-		Use:   "cluster [cluster]",
+		Use:   "cluster CLUSTER",
 		Short: "Report cluster resources, pods, events, logs (opt-in)",
 		Long:  "Collects combined information on the cluster in a Zip file",
 		Args:  plugin.RequiresArguments(1),

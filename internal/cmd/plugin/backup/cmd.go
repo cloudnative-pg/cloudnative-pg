@@ -72,8 +72,8 @@ func NewCmd() *cobra.Command {
 	}
 
 	backupSubcommand := &cobra.Command{
-		Use:     "backup [cluster]",
-		Short:   "Request an on-demand backup for a PostgreSQL Cluster",
+		Use:     "backup CLUSTER",
+		Short:   "Request an on-demand backup for the PostgreSQL Cluster named CLUSTER",
 		GroupID: plugin.GroupIDDatabase,
 		Args:    plugin.RequiresArguments(1),
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {

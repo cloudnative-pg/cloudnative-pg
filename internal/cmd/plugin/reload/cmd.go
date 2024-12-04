@@ -27,7 +27,7 @@ import (
 // NewCmd creates the new "reset" command
 func NewCmd() *cobra.Command {
 	restartCmd := &cobra.Command{
-		Use:     "reload [cluster]",
+		Use:     "reload CLUSTER",
 		Short:   `Reload a cluster`,
 		Long:    `Triggers a reconciliation loop for all the cluster's instances, rolling out new configurations if present.`,
 		GroupID: plugin.GroupIDCluster,
