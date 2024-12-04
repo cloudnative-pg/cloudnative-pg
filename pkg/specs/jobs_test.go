@@ -189,6 +189,7 @@ var _ = Describe("Job created via InitDB", func() {
 		Expect(initdbFlags).Should(ContainSubstring("--encoding=UTF-8"))
 		Expect(initdbFlags).Should(ContainSubstring("--locale-provider=icu"))
 		Expect(initdbFlags).Should(ContainSubstring("--icu-locale=und"))
+		Expect(initdbFlags).ShouldNot(ContainSubstring("--locale="))
 		Expect(initdbFlags).Should(ContainSubstring("'--icu-rules=&A < z <<< Z'"))
 	})
 })
