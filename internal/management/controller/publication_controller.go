@@ -58,12 +58,9 @@ const publicationReconciliationInterval = 30 * time.Second
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.18.4/pkg/reconcile
 func (r *PublicationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	contextLogger := log.FromContext(ctx)
-
-	contextLogger.Debug("Reconciliation loop start")
-	defer func() {
-		contextLogger.Debug("Reconciliation loop end")
-	}()
+	contextLogger := log.FromContext(ctx).
+		WithName("publication_reconciler").
+		WithValues("publicationName", req.Name)
 
 	// Get the publication object
 	var publication apiv1.Publication
@@ -105,6 +102,11 @@ func (r *PublicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{RequeueAfter: publicationReconciliationInterval}, nil
 	}
 
+	contextLogger.Info("Reconciling publication")
+	defer func() {
+		contextLogger.Info("Reconciliation loop of publication exited")
+	}()
+
 	// Cannot do anything on a replica cluster
 	if cluster.IsReplica() {
 		if err := markAsUnknown(ctx, r.Client, &publication, errClusterIsReplica); err != nil {
@@ -121,12 +123,14 @@ func (r *PublicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 
 	if err := r.alignPublication(ctx, &publication); err != nil {
+		contextLogger.Error(err, "while reconciling publication")
 		if err := markAsFailed(ctx, r.Client, &publication, err); err != nil {
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{RequeueAfter: publicationReconciliationInterval}, nil
 	}
 
+	contextLogger.Info("Reconciliation of publication completed")
 	if err := markAsReady(ctx, r.Client, &publication); err != nil {
 		return ctrl.Result{}, err
 	}

@@ -51,12 +51,9 @@ const subscriptionReconciliationInterval = 30 * time.Second
 
 // Reconcile is the subscription reconciliation loop
 func (r *SubscriptionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	contextLogger := log.FromContext(ctx)
-
-	contextLogger.Debug("Reconciliation loop start")
-	defer func() {
-		contextLogger.Debug("Reconciliation loop end")
-	}()
+	contextLogger := log.FromContext(ctx).
+		WithName("subscription_reconciler").
+		WithValues("subscriptionName", req.Name)
 
 	// Get the subscription object
 	var subscription apiv1.Subscription
@@ -98,6 +95,11 @@ func (r *SubscriptionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{RequeueAfter: subscriptionReconciliationInterval}, nil
 	}
 
+	contextLogger.Info("Reconciling subscription")
+	defer func() {
+		contextLogger.Info("Reconciliation loop of subscription exited")
+	}()
+
 	// Cannot do anything on a replica cluster
 	if cluster.IsReplica() {
 		if err := markAsUnknown(ctx, r.Client, &subscription, errClusterIsReplica); err != nil {
@@ -127,12 +129,14 @@ func (r *SubscriptionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	if err := r.alignSubscription(ctx, &subscription, connString); err != nil {
+		contextLogger.Error(err, "while reconciling subscription")
 		if err := markAsFailed(ctx, r.Client, &subscription, err); err != nil {
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{RequeueAfter: subscriptionReconciliationInterval}, nil
 	}
 
+	contextLogger.Info("Reconciliation of subscription completed")
 	if err := markAsReady(ctx, r.Client, &subscription); err != nil {
 		return ctrl.Result{}, err
 	}
