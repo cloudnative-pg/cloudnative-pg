@@ -42,8 +42,6 @@ type managerObject interface {
 
 // detectTooManyManagers checks if a certain `manager` wants to manage the same
 // underlying object as some previously existing manager
-//
-//	also known as turf war
 func detectTooManyManagers(
 	manager managerObject,
 	potentialManagers []managerObject,
