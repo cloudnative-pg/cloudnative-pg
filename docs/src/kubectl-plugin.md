@@ -169,7 +169,7 @@ sudo mv kubectl_complete-cnpg /usr/local/bin
 Once the plugin is installed and deployed, you can start using it like this:
 
 ```sh
-kubectl cnpg <command> <args...>
+kubectl cnpg COMMAND [ARGS...]
 ```
 
 !!! Note
@@ -503,7 +503,7 @@ default time-stamped filename is created for the zip file.
     E.g. the default installation namespace is cnpg-system
 
 ```sh
-kubectl cnpg report operator -n <namespace>
+kubectl cnpg report operator -n cnpg-system
 ```
 
 results in
@@ -515,7 +515,7 @@ Successfully written report to "report_operator_<TIMESTAMP>.zip" (format: "yaml"
 With the `-f` flag set:
 
 ```sh
-kubectl cnpg report operator -n <namespace> -f reportRedacted.zip
+kubectl cnpg report operator -n cnpg-system -f reportRedacted.zip
 ```
 
 Unzipping the file will produce a time-stamped top-level folder to keep the
@@ -592,7 +592,7 @@ metadata:
 With the `-S` (`--stopRedaction`) option activated, secrets are shown:
 
 ```sh
-kubectl cnpg report operator -n <namespace> -f reportNonRedacted.zip -S
+kubectl cnpg report operator -n cnpg-system -f reportNonRedacted.zip -S
 ```
 
 You'll get a reminder that you're about to view confidential information:
@@ -1136,20 +1136,20 @@ command. The basic structure of this command is as follows:
 
 ```sh
 kubectl cnpg publication create \
-  --publication <PUBLICATION_NAME> \
-  [--external-cluster <EXTERNAL_CLUSTER>]
-  <LOCAL_CLUSTER> [options]
+  --publication PUBLICATION_NAME \
+  [--external-cluster EXTERNAL_CLUSTER]
+  LOCAL_CLUSTER [options]
 ```
 
 There are two primary use cases:
 
 - With `--external-cluster`: Use this option to create a publication on an
   external cluster (i.e. defined in the `externalClusters` stanza). The commands
-  will be issued from the `<LOCAL_CLUSTER>`, but the publication will be for the
-  data in `<EXTERNAL_CLUSTER>`.
+  will be issued from the `LOCAL_CLUSTER`, but the publication will be for the
+  data in `EXTERNAL_CLUSTER`.
 
 - Without `--external-cluster`: Use this option to create a publication in the
-  `<LOCAL_CLUSTER>` PostgreSQL `Cluster` (by default, the `app` database).
+  `LOCAL_CLUSTER` PostgreSQL `Cluster` (by default, the `app` database).
 
 !!! Warning
     When connecting to an external cluster, ensure that the specified user has
@@ -1215,9 +1215,9 @@ following command structure:
 
 ```sh
 kubectl cnpg publication drop \
-  --publication <PUBLICATION_NAME> \
-  [--external-cluster <EXTERNAL_CLUSTER>]
-  <LOCAL_CLUSTER> [options]
+  --publication PUBLICATION_NAME \
+  [--external-cluster EXTERNAL_CLUSTER]
+  LOCAL_CLUSTER [options]
 ```
 
 To access further details and precise instructions, use the following command:
@@ -1253,15 +1253,15 @@ command. The basic structure of this command is as follows:
 
 ```sh
 kubectl cnpg subscription create \
-  --subscription <SUBSCRIPTION_NAME> \
-  --publication <PUBLICATION_NAME> \
-  --external-cluster <EXTERNAL_CLUSTER> \
-  <LOCAL_CLUSTER> [options]
+  --subscription SUBSCRIPTION_NAME \
+  --publication PUBLICATION_NAME \
+  --external-cluster EXTERNAL_CLUSTER \
+  LOCAL_CLUSTER [options]
 ```
 
 This command configures a subscription directed towards the specified
 publication in the designated external cluster, as defined in the
-`externalClusters` stanza of the `<LOCAL_CLUSTER>`.
+`externalClusters` stanza of the `LOCAL_CLUSTER`.
 
 For additional information and detailed instructions, type the following
 command:
@@ -1303,8 +1303,8 @@ You can drop a `SUBSCRIPTION` with the following command structure:
 
 ```sh
 kubectl cnpg subcription drop \
-  --subscription <SUBSCRIPTION_NAME> \
-  <LOCAL_CLUSTER> [options]
+  --subscription SUBSCRIPTION_NAME \
+  LOCAL_CLUSTER [options]
 ```
 
 To access further details and precise instructions, use the following command:
@@ -1332,8 +1332,8 @@ You can use the command as shown below:
 
 ```sh
 kubectl cnpg subscription sync-sequences \
-  --subscription <SUBSCRIPTION_NAME> \
-  <LOCAL_CLUSTER>
+  --subscription SUBSCRIPTION_NAME \
+  LOCAL_CLUSTER
 ```
 
 For comprehensive details and specific instructions, utilize the following
