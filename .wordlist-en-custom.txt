@@ -342,6 +342,8 @@ PrimaryUpdateMethod
 PrimaryUpdateStrategy
 PriorityClass
 PriorityClassName
+ProbeTerminationGracePeriod
+ProbesConfiguration
 ProjectedVolumeSource
 PublicationReclaimPolicy
 PublicationSpec
@@ -778,6 +780,7 @@ facto
 failover
 failoverDelay
 failovers
+failureThreshold
 faq
 fastpath
 fb
@@ -854,6 +857,7 @@ inheritedMetadata
 init
 initDB
 initdb
+initialDelaySeconds
 initialise
 initializingPVC
 inplace
@@ -1028,6 +1032,7 @@ passwordSecret
 passwordStatus
 pc
 pdf
+periodSeconds
 persistentvolumeclaim
 persistentvolumeclaims
 pgAdmin
@@ -1260,6 +1265,7 @@ subdirectory
 subresource
 subscriptionReclaimPolicy
 substatement
+successThreshold
 successfullyExtracted
 sudo
 superuserSecret
@@ -1302,11 +1308,13 @@ tbody
 tcp
 td
 temporaryData
+terminationGracePeriodSeconds
 th
 thead
 timeLineID
 timeframes
 timelineID
+timeoutSeconds
 tls
 tmp
 tmpfs

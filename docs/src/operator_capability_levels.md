@@ -494,18 +494,24 @@ scalability of PostgreSQL databases, ensuring a streamlined and optimized
 experience for managing large scale data storage in cloud-native environments.
 Support for temporary tablespaces is also included.
 
-### Liveness and readiness probes
+### Startup, Liveness, and Readiness Probes
 
-The operator defines liveness and readiness probes for the Postgres
-containers that are then invoked by the kubelet. They're mapped respectively
-to the `/healthz` and `/readyz` endpoints of the web server managed
-directly by the instance manager.
+CloudNativePG configures startup, liveness, and readiness probes for PostgreSQL
+containers, which are managed by the Kubernetes kubelet. These probes interact
+with the `/healthz` and `/readyz` endpoints exposed by the instance manager's
+web server to monitor the Pod's health and readiness.
 
-The liveness probe is based on the `pg_isready` executable, and the pod is
-considered healthy with exit codes 0 (server accepting connections normally)
-and 1 (server is rejecting connections, for example, during startup). The
-readiness probe issues a simple query (`;`) to verify that the server is
-ready to accept connections.
+The startup and liveness probes use the `pg_isready` utility. A Pod is
+considered healthy if `pg_isready` returns an exit code of 0 (indicating the
+server is accepting connections) or 1 (indicating the server is rejecting
+connections, such as during startup).
+
+The readiness probe executes a simple SQL query (`;`) to verify that the
+PostgreSQL server is ready to accept client connections.
+
+All probes are configured with default settings but can be fully customized to
+meet specific needs, allowing for fine-tuning to align with your environment
+and workloads.
 
 ### Rolling deployments
 
