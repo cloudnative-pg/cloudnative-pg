@@ -386,24 +386,27 @@ func (ws *remoteWebserverEndpoints) pgArchivePartial(w http.ResponseWriter, req 
 		return
 	}
 
-	pgWalDirectory := path.Join(os.Getenv("PGDATA"), "pg_wal")
-	walFilPath := path.Join(pgWalDirectory, walFile)
-	partialWalFilePath := fmt.Sprintf("%s.partial", walFilPath)
+	pgData := os.Getenv("PGDATA")
+	walRelativePath := path.Join("pg_wal", walFile)
+	partialWalFileRelativePath := fmt.Sprintf("%s.partial", walRelativePath)
+	walFileAbsolutePath := path.Join(pgData, walRelativePath)
+	partialWalFileAbsolutePath := path.Join(pgData, partialWalFileRelativePath)
 
-	if err := os.Link(walFilPath, partialWalFilePath); err != nil {
+	if err := os.Link(walFileAbsolutePath, partialWalFileAbsolutePath); err != nil {
 		log.Error(err, "failed to get pg_controldata")
 		sendBadRequestJSONResponse(w, "ERROR_WHILE_CREATING_SYMLINK", err.Error())
 		return
 	}
 
 	defer func() {
-		if err := fileutils.RemoveFile(partialWalFilePath); err != nil {
+		if err := fileutils.RemoveFile(partialWalFileAbsolutePath); err != nil {
 			log.Error(err, "while deleting the partial wal file symlink")
 		}
 	}()
 
-	options := []string{constants.WalArchiveCommand, partialWalFilePath}
+	options := []string{constants.WalArchiveCommand, partialWalFileRelativePath}
 	walArchiveCmd := exec.Command("/controller/manager", options...) // nolint: gosec
+	walArchiveCmd.Dir = pgData
 	if err := execlog.RunBuffering(walArchiveCmd, "wal-archive-partial"); err != nil {
 		sendBadRequestJSONResponse(w, "ERROR_WHILE_EXECUTING_WAL_ARCHIVE", err.Error())
 		return
