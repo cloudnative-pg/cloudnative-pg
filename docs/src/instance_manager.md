@@ -18,35 +18,77 @@ of the Pod, the instance manager acts as a backend to handle the
 ## Startup, liveness and readiness probes
 
 The startup and liveness probes rely on `pg_isready`, while the readiness
-probe checks if the database is up and able to accept connections using the
-superuser credentials.
+probe checks if the database is up and able to accept connections.
 
-The readiness probe is positive when the Pod is ready to accept traffic.
-The liveness probe controls when to restart the container once
-the startup probe interval has elapsed.
+### Startup Probe
 
-!!! Important
-    The liveness and readiness probes will report a failure if the probe command
-    fails three times with a 10-second interval between each check.
-
-The liveness probe detects if the PostgreSQL instance is in a
-broken state and needs to be restarted. The value in `startDelay` is used
-to delay the probe's execution, preventing an
-instance with a long startup time from being restarted.
-
-The amount of time needed for a Pod to be classified as not alive is
-configurable in the `.spec.livenessProbeTimeout` parameter, that
-defaults to 30 seconds.
-
-The interval (in seconds) after the Pod has started before the liveness
-probe starts working is expressed in the `.spec.startDelay` parameter,
-which defaults to 3600 seconds. The correct value for your cluster is
-related to the time needed by PostgreSQL to start.
+The `.spec.startDelay` parameter specifies the delay (in seconds) before the
+liveness probe activates after a PostgreSQL Pod starts. By default, this is set
+to `3600` seconds. You should adjust this value based on the time PostgreSQL
+requires to fully initialize in your environment.
 
 !!! Warning
-    If `.spec.startDelay` is too low, the liveness probe will start working
-    before the PostgreSQL startup is complete, and the Pod could be restarted
-    prematurely.
+    Setting `.spec.startDelay` too low can cause the liveness probe to activate
+    prematurely, potentially resulting in unnecessary Pod restarts if PostgreSQL
+    hasn’t fully initialized.
+
+CloudNativePG configures the startup probe with the following default parameters:
+
+```yaml
+initialDelaySeconds: 0
+periodSeconds: 10
+timeoutSeconds: 5
+successThreshold: 1
+failureThreshold: FAILURE_THRESHOLD
+```
+
+Here, `FAILURE_THRESHOLD` is calculated as `startDelay` divided by
+`periodSeconds`.
+
+If the default behavior based on `startDelay` is not suitable for your use
+case, you can take full control of the startup probe by specifying custom
+parameters in the `.spec.probes.startup` stanza. Note that defining this stanza
+will override the default behavior, including the use of `startDelay`.
+
+!!! Info
+    For detailed information about probe configuration, refer to the
+    [probe API](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-Probe).
+
+For example, the following configuration bypasses `startDelay` entirely:
+
+```yaml
+# ... snip
+spec:
+  probes:
+    startup:
+      periodSeconds: 3
+      timeoutSeconds: 3
+      failureThreshold: 10
+```
+
+### Readiness probe
+
+The readiness probe is positive when the Pod is ready to accept traffic. The
+liveness probe controls when to restart the container once the startup probe
+interval has elapsed.
+
+TODO
+
+### Liveness
+
+The liveness probe detects if the PostgreSQL instance is in a broken state and
+needs to be restarted. The value in `startDelay` is used to delay the probe's
+execution, preventing an instance with a long startup time from being
+restarted.
+
+The amount of time needed for a Pod to be classified as not alive is
+configurable in the `.spec.livenessProbeTimeout` parameter.
+
+!!! Important
+    By default, the liveness and readiness probes will report a failure if the
+    probe command fails three times with a 10-second interval between each check.
+
+TODO
 
 ## Shutdown control
 

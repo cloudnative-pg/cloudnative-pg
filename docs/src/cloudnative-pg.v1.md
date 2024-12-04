@@ -1932,6 +1932,14 @@ development/staging purposes.</p>
 any plugin to be loaded with the corresponding configuration</p>
 </td>
 </tr>
+<tr><td><code>probes</code><br/>
+<a href="#postgresql-cnpg-io-v1-ProbesConfiguration"><i>ProbesConfiguration</i></a>
+</td>
+<td>
+   <p>The configuration of the probes to be injected
+in the PostgreSQL Pods.</p>
+</td>
+</tr>
 </tbody>
 </table>
 
@@ -4110,6 +4118,120 @@ the primary server of the cluster as part of rolling updates</p>
 
 
 
+
+## Probe     {#postgresql-cnpg-io-v1-Probe}
+
+
+**Appears in:**
+
+- [ProbesConfiguration](#postgresql-cnpg-io-v1-ProbesConfiguration)
+
+
+<p>Probe describes a health check to be performed against a container to determine whether it is
+alive or ready to receive traffic.</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>initialDelaySeconds</code><br/>
+<i>int32</i>
+</td>
+<td>
+   <p>Number of seconds after the container has started before liveness probes are initiated.
+More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes</p>
+</td>
+</tr>
+<tr><td><code>timeoutSeconds</code><br/>
+<i>int32</i>
+</td>
+<td>
+   <p>Number of seconds after which the probe times out.
+Defaults to 1 second. Minimum value is 1.
+More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes</p>
+</td>
+</tr>
+<tr><td><code>periodSeconds</code><br/>
+<i>int32</i>
+</td>
+<td>
+   <p>How often (in seconds) to perform the probe.
+Default to 10 seconds. Minimum value is 1.</p>
+</td>
+</tr>
+<tr><td><code>successThreshold</code><br/>
+<i>int32</i>
+</td>
+<td>
+   <p>Minimum consecutive successes for the probe to be considered successful after having failed.
+Defaults to 1. Must be 1 for liveness and startup. Minimum value is 1.</p>
+</td>
+</tr>
+<tr><td><code>failureThreshold</code><br/>
+<i>int32</i>
+</td>
+<td>
+   <p>Minimum consecutive failures for the probe to be considered failed after having succeeded.
+Defaults to 3. Minimum value is 1.</p>
+</td>
+</tr>
+<tr><td><code>terminationGracePeriodSeconds</code><br/>
+<i>int64</i>
+</td>
+<td>
+   <p>Optional duration in seconds the pod needs to terminate gracefully upon probe failure.
+The grace period is the duration in seconds after the processes running in the pod are sent
+a termination signal and the time when the processes are forcibly halted with a kill signal.
+Set this value longer than the expected cleanup time for your process.
+If this value is nil, the pod's terminationGracePeriodSeconds will be used. Otherwise, this
+value overrides the value provided by the pod spec.
+Value must be non-negative integer. The value zero indicates stop immediately via
+the kill signal (no opportunity to shut down).
+This is a beta field and requires enabling ProbeTerminationGracePeriod feature gate.
+Minimum value is 1. spec.terminationGracePeriodSeconds is used if unset.</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## ProbesConfiguration     {#postgresql-cnpg-io-v1-ProbesConfiguration}
+
+
+**Appears in:**
+
+- [ClusterSpec](#postgresql-cnpg-io-v1-ClusterSpec)
+
+
+<p>ProbesConfiguration represent the configuration for the probes
+to be injected in the PostgreSQL Pods</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>startup</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-Probe"><i>Probe</i></a>
+</td>
+<td>
+   <p>The startup probe configuration</p>
+</td>
+</tr>
+<tr><td><code>liveness</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-Probe"><i>Probe</i></a>
+</td>
+<td>
+   <p>The liveness probe configuration</p>
+</td>
+</tr>
+<tr><td><code>readiness</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-Probe"><i>Probe</i></a>
+</td>
+<td>
+   <p>The readiness probe configuration</p>
+</td>
+</tr>
+</tbody>
+</table>
 
 ## PublicationReclaimPolicy     {#postgresql-cnpg-io-v1-PublicationReclaimPolicy}
 
