@@ -164,7 +164,7 @@ func (info InitInfo) CheckTargetDataDirectories(ctx context.Context) error {
 			}
 		} else {
 			contextLogger.Info("pg_controldata check on existing directory succeeded, renaming the folders")
-			return info.renameEsistingTargetDataDirectories(ctx)
+			return info.renameExistingTargetDataDirectories(ctx)
 		}
 	}
 
@@ -179,7 +179,7 @@ func (info InitInfo) CheckTargetDataDirectories(ctx context.Context) error {
 	return nil
 }
 
-func (info InitInfo) renameEsistingTargetDataDirectories(ctx context.Context) error {
+func (info InitInfo) renameExistingTargetDataDirectories(ctx context.Context) error {
 	contextLogger := log.FromContext(ctx).WithValues("pgdata", info.PgData, "pgwal", info.PgWal)
 
 	suffixTimestamp := fileutils.FormatFriendlyTimestamp(time.Now())
