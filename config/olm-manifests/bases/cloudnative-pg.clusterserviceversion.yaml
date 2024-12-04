@@ -804,37 +804,37 @@ spec:
       - path: owner
         displayName: Database Owner
         description: Owner of the database that will be created in Postgres
-      - path: icu_locale
+      - path: icuLocale
         displayName: ICU locale
         description: ICU locale to use for the database
         x-descriptors:
           - 'urn:alm:descriptor:com.tectonic.ui:text'
           - 'urn:alm:descriptor:com.tectonic.ui:advanced'
-      - path: icu_rules
+      - path: icuRules
         displayName: ICU rules
         description: Additional customization of ICU locale
         x-descriptors:
           - 'urn:alm:descriptor:com.tectonic.ui:text'
           - 'urn:alm:descriptor:com.tectonic.ui:advanced'
-      - path: lc_collate
+      - path: localeCollate
         displayName: LC collate
         description: The collation to use for the database
         x-descriptors:
           - 'urn:alm:descriptor:com.tectonic.ui:text'
           - 'urn:alm:descriptor:com.tectonic.ui:advanced'
-      - path: lc_ctype
+      - path: localeCType
         displayName: LC ctype
         description: The ctype to use for the database
         x-descriptors:
           - 'urn:alm:descriptor:com.tectonic.ui:text'
           - 'urn:alm:descriptor:com.tectonic.ui:advanced'
-      - path: collation_version
+      - path: collationVersion
         displayName: Collation version
         description: The version identifier of the collation
         x-descriptors:
           - 'urn:alm:descriptor:com.tectonic.ui:text'
           - 'urn:alm:descriptor:com.tectonic.ui:advanced'
-      - path: builtin_locale
+      - path: builtinLocale
         displayName: Builtin locale
         description: The choice of which builtin locale to use
         x-descriptors:
