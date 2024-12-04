@@ -5,8 +5,8 @@ metadata:
 spec:
   name: declarative
   owner: app
-  lc_ctype: C
-  lc_collate: C
+  localeCType: C
+  localeCollate: C
   encoding: UTF8
   databaseReclaimPolicy: delete
   cluster:

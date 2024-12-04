@@ -2466,52 +2466,64 @@ PostgreSQL cluster from an existing storage</p>
 <i>string</i>
 </td>
 <td>
-   <p>The locale (cannot be changed)</p>
+   <p>The locale (cannot be changed)
+Sets the default collation order and character classification in the new database.</p>
 </td>
 </tr>
-<tr><td><code>locale_provider</code><br/>
+<tr><td><code>localeProvider</code><br/>
 <i>string</i>
 </td>
 <td>
-   <p>The locale provider (cannot be changed)</p>
+   <p>The LOCALE_PROVIDER (cannot be changed)
+This option sets the locale provider for databases created in the new cluster.
+Available from PostgreSQL 16.</p>
 </td>
 </tr>
-<tr><td><code>lc_collate</code><br/>
+<tr><td><code>localeCollate</code><br/>
 <i>string</i>
 </td>
 <td>
    <p>The LC_COLLATE (cannot be changed)</p>
 </td>
 </tr>
-<tr><td><code>lc_ctype</code><br/>
+<tr><td><code>localeCType</code><br/>
 <i>string</i>
 </td>
 <td>
    <p>The LC_CTYPE (cannot be changed)</p>
 </td>
 </tr>
-<tr><td><code>icu_locale</code><br/>
+<tr><td><code>icuLocale</code><br/>
 <i>string</i>
 </td>
 <td>
-   <p>The ICU_LOCALE (cannot be changed)</p>
+   <p>The ICU_LOCALE (cannot be changed)
+Specifies the ICU locale when the ICU provider is used.
+This option requires <code>localeProvider</code> to be set to <code>icu</code>.
+Available from PostgreSQL 15.</p>
 </td>
 </tr>
-<tr><td><code>icu_rules</code><br/>
+<tr><td><code>icuRules</code><br/>
 <i>string</i>
 </td>
 <td>
-   <p>The ICU_RULES (cannot be changed)</p>
+   <p>The ICU_RULES (cannot be changed)
+Specifies additional collation rules to customize the behavior of the default collation.
+This option requires <code>localeProvider</code> to be set to <code>icu</code>.
+Available from PostgreSQL 16.</p>
 </td>
 </tr>
-<tr><td><code>builtin_locale</code><br/>
+<tr><td><code>builtinLocale</code><br/>
 <i>string</i>
 </td>
 <td>
-   <p>The BUILTIN_LOCALE (cannot be changed)</p>
+   <p>The BUILTIN_LOCALE (cannot be changed)
+Specifies the locale name when the builtin provider is used.
+This option requires <code>localeProvider</code> to be set to <code>builtin</code>.
+Available from PostgreSQL 17.</p>
 </td>
 </tr>
-<tr><td><code>collation_version</code><br/>
+<tr><td><code>collationVersion</code><br/>
 <i>string</i>
 </td>
 <td>
