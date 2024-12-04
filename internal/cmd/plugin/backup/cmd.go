@@ -62,7 +62,7 @@ func NewCmd() *cobra.Command {
 	var backupName, backupTarget, backupMethod, online, immediateCheckpoint, waitForArchive string
 
 	backupSubcommand := &cobra.Command{
-		Use:     "backup [cluster]",
+		Use:     "backup CLUSTER",
 		Short:   "Request an on-demand backup for a PostgreSQL Cluster",
 		GroupID: plugin.GroupIDDatabase,
 		Args:    plugin.RequiresArguments(1),
@@ -146,7 +146,7 @@ func NewCmd() *cobra.Command {
 		"backup-name",
 		"",
 		"The name of the Backup resource that will be created, "+
-			"defaults to \"[cluster]-[current_timestamp]\"",
+			"defaults to \"CLUSTER-CURRENT_TIMESTAMP\"",
 	)
 	backupSubcommand.Flags().StringVarP(
 		&backupTarget,
