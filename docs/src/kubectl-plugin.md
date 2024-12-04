@@ -397,10 +397,10 @@ The `kubectl cnpg restart` command can be used in two cases:
 
 ```sh
 # this command will restart a whole cluster in a rollout fashion
-kubectl cnpg restart [clusterName]
+kubectl cnpg restart CLUSTER
 
 # this command will restart a single instance, according to the policy above
-kubectl cnpg restart [clusterName] [pod]
+kubectl cnpg restart CLUSTER INSTANCE
 ```
 
 If the in-place restart is requested but the change cannot be applied without
