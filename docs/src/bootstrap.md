@@ -224,7 +224,7 @@ parameters:
 
 builtinLocale
 :   When `builtinLocale` is set to a value, CloudNativePG passes it to the
-    `--builtin-locale` option in `initdb`. This option controls the ICU locale, as
+    `--builtin-locale` option in `initdb`. This option controls the builtin locale, as
     defined in ["Locale Support"](https://www.postgresql.org/docs/current/locale.html)
     from the PostgreSQL documentation (default: empty). Note that this option requires
     `localeProvider` to be set to `builtin`. Available from PostgreSQL 17.
