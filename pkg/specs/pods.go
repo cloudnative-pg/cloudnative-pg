@@ -201,6 +201,8 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig) []core
 			Env:             envConfig.EnvVars,
 			EnvFrom:         envConfig.EnvFrom,
 			VolumeMounts:    createPostgresVolumeMounts(cluster),
+			// This is the default startup probe, and can be overridden
+			// the user configuration in cluster.spec.probes.startup
 			StartupProbe: &corev1.Probe{
 				FailureThreshold: getStartupProbeFailureThreshold(cluster.GetMaxStartDelay()),
 				PeriodSeconds:    StartupProbePeriod,
@@ -212,6 +214,8 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig) []core
 					},
 				},
 			},
+			// This is the default readiness probe, and can be overridden
+			// by the user configuration in cluster.spec.probes.readiness
 			ReadinessProbe: &corev1.Probe{
 				TimeoutSeconds: 5,
 				PeriodSeconds:  ReadinessProbePeriod,
@@ -222,6 +226,8 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig) []core
 					},
 				},
 			},
+			// This is the default liveness probe, and can be overridden
+			// by the user configuration in cluster.spec.probes.liveness
 			LivenessProbe: &corev1.Probe{
 				PeriodSeconds:  LivenessProbePeriod,
 				TimeoutSeconds: 5,
@@ -264,15 +270,34 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig) []core
 	// if user customizes the liveness probe timeout, we need to adjust the failure threshold
 	addLivenessProbeFailureThreshold(cluster, &containers[0])
 
+	// use the custom probe configuration if provided
+	ensureCustomProbesConfiguration(&cluster, &containers[0])
+
 	return containers
 }
 
-// adjust the liveness probe failure threshold based on the `spec.livenessProbeTimeout` value
+// addLivenessProbeFailureThreshold adjusts the liveness probe failure threshold
+// based on the `spec.livenessProbeTimeout` value
 func addLivenessProbeFailureThreshold(cluster apiv1.Cluster, container *corev1.Container) {
 	if cluster.Spec.LivenessProbeTimeout != nil {
 		timeout := *cluster.Spec.LivenessProbeTimeout
 		container.LivenessProbe.FailureThreshold = getLivenessProbeFailureThreshold(timeout)
 	}
+}
+
+// ensureCustomProbesConfiguration applies the custom probe configuration
+// if specified inside the cluster specification
+func ensureCustomProbesConfiguration(cluster *apiv1.Cluster, container *corev1.Container) {
+	// No probes configuration
+	if cluster.Spec.Probes == nil {
+		return
+	}
+
+	// There's no need to check for nils here because a nil probe specification
+	// will result in no change in the Kubernetes probe.
+	cluster.Spec.Probes.Liveness.ApplyInto(container.LivenessProbe)
+	cluster.Spec.Probes.Readiness.ApplyInto(container.ReadinessProbe)
+	cluster.Spec.Probes.Startup.ApplyInto(container.StartupProbe)
 }
 
 // getStartupProbeFailureThreshold get the startup probe failure threshold

@@ -17,6 +17,8 @@ limitations under the License.
 package specs
 
 import (
+	corev1 "k8s.io/api/core/v1"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -36,5 +38,56 @@ var _ = Describe("PodSpecDiff", func() {
 
 	It("returns false for empty volume name", func() {
 		Expect(shouldIgnoreCurrentVolume("")).To(BeFalse())
+	})
+
+	It("return false when the startup probe do not match and true otherwise", func() {
+		containerPre := corev1.Container{
+			StartupProbe: &corev1.Probe{
+				TimeoutSeconds: 23,
+			},
+		}
+		containerPost := corev1.Container{
+			StartupProbe: &corev1.Probe{
+				TimeoutSeconds: 24,
+			},
+		}
+		Expect(doContainersMatch(containerPre, containerPre)).To(BeTrue())
+		status, diff := doContainersMatch(containerPre, containerPost)
+		Expect(status).To(BeFalse())
+		Expect(diff).To(Equal("startup-probe"))
+	})
+
+	It("return false when the liveness probe do not match and true otherwise", func() {
+		containerPre := corev1.Container{
+			LivenessProbe: &corev1.Probe{
+				InitialDelaySeconds: 23,
+			},
+		}
+		containerPost := corev1.Container{
+			LivenessProbe: &corev1.Probe{
+				InitialDelaySeconds: 24,
+			},
+		}
+		Expect(doContainersMatch(containerPre, containerPre)).To(BeTrue())
+		status, diff := doContainersMatch(containerPre, containerPost)
+		Expect(status).To(BeFalse())
+		Expect(diff).To(Equal("liveness-probe"))
+	})
+
+	It("return false when the readiness probe do not match and true otherwise", func() {
+		containerPre := corev1.Container{
+			ReadinessProbe: &corev1.Probe{
+				SuccessThreshold: 23,
+			},
+		}
+		containerPost := corev1.Container{
+			ReadinessProbe: &corev1.Probe{
+				SuccessThreshold: 24,
+			},
+		}
+		Expect(doContainersMatch(containerPre, containerPre)).To(BeTrue())
+		status, diff := doContainersMatch(containerPre, containerPost)
+		Expect(status).To(BeFalse())
+		Expect(diff).To(Equal("readiness-probe"))
 	})
 })

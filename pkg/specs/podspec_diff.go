@@ -176,6 +176,9 @@ func doContainersMatch(currentContainer, targetContainer corev1.Container) (bool
 		"liveness-probe": func() bool {
 			return reflect.DeepEqual(currentContainer.LivenessProbe, targetContainer.LivenessProbe)
 		},
+		"startup-probe": func() bool {
+			return reflect.DeepEqual(currentContainer.StartupProbe, targetContainer.StartupProbe)
+		},
 		"command": func() bool {
 			return reflect.DeepEqual(currentContainer.Command, targetContainer.Command)
 		},
