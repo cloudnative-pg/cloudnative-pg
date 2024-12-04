@@ -27,7 +27,7 @@ var _ = Describe("NewCmd", func() {
 	It("should create a cobra.Command with correct defaults", func() {
 		cmd := NewCmd()
 
-		Expect(cmd.Use).To(Equal("pgbench [cluster] [-- pgBenchCommandArgs...]"))
+		Expect(cmd.Use).To(Equal("pgbench CLUSTER [-- PGBENCH_COMMAND_ARGS...]"))
 		Expect(cmd.Short).To(Equal("Creates a pgbench job"))
 		Expect(cmd.Long).To(Equal("Creates a pgbench job to run against the specified Postgres Cluster."))
 		Expect(cmd.Example).To(Equal(jobExample))
