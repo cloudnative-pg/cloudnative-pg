@@ -346,16 +346,16 @@ The command also supports output in `yaml` and `json` format.
 ### Promote
 
 The meaning of this command is to `promote` a pod in the cluster to primary, so you
-can start with maintenance work or test a switch-over situation in your cluster
+can start with maintenance work or test a switch-over situation in your cluster:
 
 ```sh
-kubectl cnpg promote [cluster] [cluster]-[node]
+kubectl cnpg promote CLUSTER CLUSTER-INSTANCE
 ```
 
-Or you can use the instance node number to promote
+Or you can use the instance node number to promote:
 
 ```sh
-kubectl cnpg promote [cluster] [node]
+kubectl cnpg promote CLUSTER INSTANCE
 ```
 
 ### Certificates
@@ -364,13 +364,13 @@ Clusters created using the CloudNativePG operator work with a CA to sign
 a TLS authentication certificate.
 
 To get a certificate, you need to provide a name for the secret to store
-the credentials, the cluster name, and a user for this certificate
+the credentials, the cluster name, and a user for this certificate:
 
 ```sh
-kubectl cnpg certificate cluster-cert --cnpg-cluster [cluster] --cnpg-user appuser
+kubectl cnpg certificate cluster-cert --cnpg-cluster CLUSTER --cnpg-user USER
 ```
 
-After the secret it's created, you can get it using `kubectl`
+After the secret it's created, you can get it using `kubectl`:
 
 ```sh
 kubectl get secret cluster-cert
@@ -388,7 +388,7 @@ The `kubectl cnpg restart` command can be used in two cases:
 
 - requesting the operator to orchestrate a rollout restart
   for a certain cluster. This is useful to apply
-  configuration changes to cluster dependent objects, such as ConfigMaps
+  configuration changes to cluster dependent objects, such as `ConfigMaps`
   containing custom monitoring queries.
 
 - request a single instance restart, either in-place if the instance is
@@ -420,7 +420,7 @@ to cluster dependent objects, such as ConfigMaps containing custom monitoring qu
 The following command will reload all configurations for a given cluster:
 
 ```sh
-kubectl cnpg reload [cluster]
+kubectl cnpg reload CLUSTER
 ```
 
 ### Maintenance
@@ -641,7 +641,7 @@ so the `-S` is disabled.
 Usage:
 
 ```sh
-kubectl cnpg report cluster [cluster] [flags]
+kubectl cnpg report cluster CLUSTER [flags]
 ```
 
 Note that, unlike the `operator` sub-command, for the `cluster` sub-command you
@@ -649,7 +649,7 @@ need to provide the cluster name, and very likely the namespace, unless the clus
 is in the default one.
 
 ```sh
-kubectl cnpg report cluster [cluster] -f report.zip -n example_namespace
+kubectl cnpg report cluster CLUSTER -f report.zip [-n NAMESPACE]
 ```
 
 and then:
@@ -671,7 +671,7 @@ Archive:  report.zip
 Remember that you can use the `--logs` flag to add the pod and job logs to the ZIP.
 
 ```sh
-kubectl cnpg report cluster [cluster] -n example_namespace --logs
+kubectl cnpg report cluster CLUSTER [-n NAMESPACE] --logs
 ```
 
 will result in:
@@ -751,20 +751,20 @@ which takes `-f` to mean the logs should be followed.
 Usage:
 
 ```sh
-kubectl cnpg logs cluster [cluster] [flags]
+kubectl cnpg logs cluster CLUSTER [flags]
 ```
 
 Using the `-f` option to follow:
 
 ```sh
-kubectl cnpg report cluster [cluster] -f
+kubectl cnpg report cluster CLUSTER -f
 ```
 
 Using `--tail` option to display 3 lines from each pod and the `-f` option
 to follow:
 
 ```sh
-kubectl cnpg report cluster [cluster] -f --tail 3
+kubectl cnpg report cluster CLUSTER -f --tail 3
 ```
 
 ```output
@@ -777,7 +777,7 @@ kubectl cnpg report cluster [cluster] -f --tail 3
 With the `-o` option omitted, and with `--output` specified:
 
 ```console
-$ kubectl cnpg logs cluster [cluster] --output my-cluster.log
+$ kubectl cnpg logs cluster CLUSTER --output my-cluster.log
 
 Successfully written logs to "my-cluster.log"
 ```
@@ -787,7 +787,7 @@ Successfully written logs to "my-cluster.log"
 The `pretty` sub-command reads a log stream from standard input, formats it
 into a human-readable output, and attempts to sort the entries by timestamp.
 
-It can be used in combination with `kubectl cnpg logs [cluster]`, as
+It can be used in combination with `kubectl cnpg logs cluster`, as
 shown in the following example:
 
 ```console
@@ -869,7 +869,7 @@ detached PVCs.
 Usage:
 
 ```sh
-kubectl cnpg destroy [cluster] [node]
+kubectl cnpg destroy CLUSTER INSTANCE
 ```
 
 The following example removes the `cluster-example-2` pod and the associated
@@ -895,7 +895,7 @@ instance.
 You can hibernate a cluster with:
 
 ```sh
-kubectl cnpg hibernate on [cluster]
+kubectl cnpg hibernate on CLUSTER
 ```
 
 This will:
@@ -918,13 +918,13 @@ In case of error the operator will not be able to revert the procedure. You can
 still force the operation with:
 
 ```sh
-kubectl cnpg hibernate on [cluster] --force
+kubectl cnpg hibernate on CLUSTER --force
 ```
 
 A hibernated cluster can be resumed with:
 
 ```sh
-kubectl cnpg hibernate off [cluster]
+kubectl cnpg hibernate off CLUSTER
 ```
 
 Once the cluster has been hibernated, it's possible to show the last
@@ -932,7 +932,7 @@ configuration and the status that PostgreSQL had after it was shut down.
 That can be done with:
 
 ```sh
-kubectl cnpg hibernate status [cluster]
+kubectl cnpg hibernate status CLUSTER
 ```
 
 ### Benchmarking the database with pgbench
@@ -941,7 +941,7 @@ Pgbench can be run against an existing PostgreSQL cluster with following
 command:
 
 ```sh
-kubectl cnpg pgbench [cluster] -- --time 30 --client 1 --jobs 1
+kubectl cnpg pgbench CLUSTER -- --time 30 --client 1 --jobs 1
 ```
 
 Refer to the [Benchmarking pgbench section](benchmarking.md#pgbench) for more
@@ -949,10 +949,10 @@ details.
 
 ### Benchmarking the storage with fio
 
-fio can be run on an existing storage class with following command:
+`fio` can be run on an existing storage class with following command:
 
 ```sh
-kubectl cnpg fio <fio-job-name> -n <namespace>
+kubectl cnpg fio FIO_JOB_NAME [-n NAMESPACE]
 ```
 
 Refer to the [Benchmarking fio section](benchmarking.md#fio) for more details.
@@ -965,13 +965,13 @@ an existing Postgres cluster by creating a new `Backup` resource.
 The following example requests an on-demand backup for a given cluster:
 
 ```sh
-kubectl cnpg backup [cluster]
+kubectl cnpg backup CLUSTER
 ```
 
 or, if using volume snapshots:
 
 ```sh
-kubectl cnpg backup [cluster] -m volumeSnapshot
+kubectl cnpg backup CLUSTER -m volumeSnapshot
 ```
 
 The created backup will be named after the request time:
@@ -995,7 +995,7 @@ the configuration settings.
 
 ### Launching psql
 
-The `kubectl cnpg psql [cluster]` command starts a new PostgreSQL interactive front-end
+The `kubectl cnpg psql CLUSTER` command starts a new PostgreSQL interactive front-end
 process (psql) connected to an existing Postgres cluster, as if you were running
 it from the actual pod. This means that you will be using the `postgres` user.
 
