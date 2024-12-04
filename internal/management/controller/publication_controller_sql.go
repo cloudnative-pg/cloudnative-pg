@@ -28,7 +28,7 @@ import (
 )
 
 func (r *PublicationReconciler) alignPublication(ctx context.Context, obj *apiv1.Publication) error {
-	db, err := r.instance.ConnectionPool().Connection(obj.Spec.DBName)
+	db, err := r.instance.GetNamedDB(obj.Spec.DBName)
 	if err != nil {
 		return fmt.Errorf("while getting DB connection: %w", err)
 	}

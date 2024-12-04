@@ -729,6 +729,11 @@ func (instance *Instance) GetTemplateDB() (*sql.DB, error) {
 	return instance.ConnectionPool().Connection("template1")
 }
 
+// GetNamedDB gets a connection to the named database on this instance
+func (instance *Instance) GetNamedDB(name string) (*sql.DB, error) {
+	return instance.ConnectionPool().Connection(name)
+}
+
 // GetPgVersion queries the postgres instance to know the current version, parses it and memoize it for future uses
 func (instance *Instance) GetPgVersion() (semver.Version, error) {
 	// Better not to recompute what we already have
