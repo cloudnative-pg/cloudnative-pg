@@ -47,17 +47,17 @@ const (
 )
 
 var jobExample = `
-  # Dry-run command with default values and clusterName "cluster-example"
+  # Dry-run command with default values and [cluster] "cluster-example"
   kubectl-cnpg pgbench cluster-example --dry-run
 
-  # Create a pgbench job with default values and clusterName "cluster-example"
+  # Create a pgbench job with default values and [cluster] "cluster-example"
   kubectl-cnpg pgbench cluster-example
 
-  # Dry-run command with given values and clusterName "cluster-example"
+  # Dry-run command with given values and [cluster] "cluster-example"
   kubectl-cnpg pgbench cluster-example --db-name pgbenchDBName --job-name job-name --dry-run -- \
     --time 30 --client 1 --jobs 1
 
-  # Create a job with given values and clusterName "cluster-example"
+  # Create a job with given values and [cluster] "cluster-example"
   kubectl-cnpg pgbench cluster-example --db-name pgbenchDBName --job-name job-name -- \
     --time 30 --client 1 --jobs 1`
 

@@ -30,7 +30,7 @@ import (
 func NewCmd() *cobra.Command {
 	promoteCmd := &cobra.Command{
 		Use:     "promote CLUSTER INSTANCE",
-		Short:   "Promote the pod named CLUSTER-INSTANCE to primary",
+		Short:   "Promote the instance named CLUSTER-INSTANCE to primary",
 		GroupID: plugin.GroupIDCluster,
 		Args:    plugin.RequiresArguments(2),
 		RunE: func(_ *cobra.Command, args []string) error {

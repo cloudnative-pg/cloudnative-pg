@@ -47,14 +47,14 @@ func NewCmd() *cobra.Command {
 		&run.jobName,
 		"job-name",
 		"",
-		"Name of the job, defaulting to: <clusterName>-pgbench-xxxx",
+		"Name of the job, defaulting to: CLUSTER-pgbench-xxxx",
 	)
 
 	pgBenchCmd.Flags().StringVar(
 		&run.jobName,
 		"pgbench-job-name",
 		"",
-		"Name of the job, defaulting to: <clusterName>-pgbench-xxxx",
+		"Name of the job, defaulting to: CLUSTER-pgbench-xxxx",
 	)
 
 	pgBenchCmd.Flags().StringVar(
@@ -88,7 +88,7 @@ func validateCommandArgs(cmd *cobra.Command, args []string) error {
 	}
 
 	if cmd.ArgsLenAtDash() > 1 {
-		return fmt.Errorf("pgBenchCommands should be passed after the -- delimiter")
+		return fmt.Errorf("PGBENCH_COMMAND_ARGS should be passed after the -- delimiter")
 	}
 
 	return nil
