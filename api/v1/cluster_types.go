@@ -1428,6 +1428,9 @@ type CertificatesStatus struct {
 // BootstrapInitDB is the configuration of the bootstrap process when
 // initdb is used
 // Refer to the Bootstrap page of the documentation for more information.
+// +kubebuilder:validation:XValidation:rule="!has(self.builtinLocale) || self.localeProvider == 'builtin'",message="builtinLocale is only available when localeProvider is set to `builtin`"
+// +kubebuilder:validation:XValidation:rule="!has(self.icuLocale) || self.localeProvider == 'icu'",message="icuLocale is only available when localeProvider is set to `icu`"
+// +kubebuilder:validation:XValidation:rule="!has(self.icuRules) || self.localeProvider == 'icu'",message="icuRules is only available when localeProvider is set to `icu`"
 type BootstrapInitDB struct {
 	// Name of the database used by the application. Default: `app`.
 	// +optional
@@ -1467,6 +1470,33 @@ type BootstrapInitDB struct {
 	// The value to be passed as option `--lc-ctype` for initdb (default:`C`)
 	// +optional
 	LocaleCType string `json:"localeCType,omitempty"`
+
+	// Sets the default collation order and character classification in the new database.
+	// +optional
+	Locale string `json:"locale,omitempty"`
+
+	// This option sets the locale provider for databases created in the new cluster.
+	// Available from PostgreSQL 16.
+	// +optional
+	LocaleProvider string `json:"localeProvider,omitempty"`
+
+	// Specifies the ICU locale when the ICU provider is used.
+	// This option requires `localeProvider` to be set to `icu`.
+	// Available from PostgreSQL 15.
+	// +optional
+	IcuLocale string `json:"icuLocale,omitempty"`
+
+	// Specifies additional collation rules to customize the behavior of the default collation.
+	// This option requires `localeProvider` to be set to `icu`.
+	// Available from PostgreSQL 16.
+	// +optional
+	IcuRules string `json:"icuRules,omitempty"`
+
+	// Specifies the locale name when the builtin provider is used.
+	// This option requires `localeProvider` to be set to `builtin`.
+	// Available from PostgreSQL 17.
+	// +optional
+	BuiltinLocale string `json:"builtinLocale,omitempty"`
 
 	// The value in megabytes (1 to 1024) to be passed to the `--wal-segsize`
 	// option for initdb (default: empty, resulting in PostgreSQL default: 16MB)
