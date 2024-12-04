@@ -28,7 +28,7 @@ import (
 // NewCmd create the new "status" subcommand
 func NewCmd() *cobra.Command {
 	statusCmd := &cobra.Command{
-		Use:     "status [cluster]",
+		Use:     "status CLUSTER",
 		Short:   "Get the status of a PostgreSQL cluster",
 		Args:    plugin.RequiresArguments(1),
 		GroupID: plugin.GroupIDDatabase,

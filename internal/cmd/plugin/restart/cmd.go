@@ -28,7 +28,7 @@ import (
 // NewCmd creates the new "reset" command
 func NewCmd() *cobra.Command {
 	restartCmd := &cobra.Command{
-		Use:   "restart clusterName [instance]",
+		Use:   "restart CLUSTER [NODE]",
 		Short: `Restart a cluster or a single instance in a cluster`,
 		Long: `If only the cluster name is specified, the whole cluster will be restarted, 
 rolling out new configurations if present.

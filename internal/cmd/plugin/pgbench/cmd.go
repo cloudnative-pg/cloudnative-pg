@@ -29,7 +29,7 @@ func NewCmd() *cobra.Command {
 	run := &pgBenchRun{}
 
 	pgBenchCmd := &cobra.Command{
-		Use:     "pgbench [cluster] [-- pgBenchCommandArgs...]",
+		Use:     "pgbench CLUSTER [-- pgBenchCommandArgs...]",
 		Short:   "Creates a pgbench job",
 		Args:    validateCommandArgs,
 		Long:    "Creates a pgbench job to run against the specified Postgres Cluster.",

@@ -36,7 +36,7 @@ func NewCmd() *cobra.Command {
 	var offset int
 
 	syncSequencesCmd := &cobra.Command{
-		Use:   "sync-sequences clusterName",
+		Use:   "sync-sequences CLUSTER",
 		Short: "synchronize the sequences from the source database",
 		Args:  plugin.RequiresArguments(1),
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {

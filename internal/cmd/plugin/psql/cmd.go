@@ -31,7 +31,7 @@ func NewCmd() *cobra.Command {
 	var passStdin bool
 
 	cmd := &cobra.Command{
-		Use:   "psql [cluster] [-- psqlArgs...]",
+		Use:   "psql CLUSTER [-- psqlArgs...]",
 		Short: "Start a psql session targeting a CloudNativePG cluster",
 		Args:  validatePsqlArgs,
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
