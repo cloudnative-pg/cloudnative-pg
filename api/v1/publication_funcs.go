@@ -40,6 +40,11 @@ func (pub *Publication) SetAsReady() {
 	pub.Status.ObservedGeneration = pub.Generation
 }
 
+// GetStatusMessage returns the applied status of the publication
+func (pub *Publication) GetStatusMessage() string {
+	return pub.Status.Message
+}
+
 // GetClusterRef returns the cluster reference of the publication
 func (pub *Publication) GetClusterRef() corev1.LocalObjectReference {
 	return pub.Spec.ClusterRef

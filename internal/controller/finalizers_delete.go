@@ -18,7 +18,7 @@ package controller
 
 import (
 	"context"
-	"fmt"
+	"errors"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	corev1 "k8s.io/api/core/v1"
@@ -31,21 +31,12 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-// ClusterReferrer is an object containing a cluster reference
-type ClusterReferrer interface {
-	GetClusterRef() corev1.LocalObjectReference
-	client.Object
-}
-
-// StatusSetter is an object that can set a status
-type StatusSetter interface {
-	SetAsFailed(err error)
-	client.Object
-}
-
-// deleteFinalizers deletes object finalizers when the cluster they were in has been deleted
-func (r *ClusterReconciler) deleteFinalizers(ctx context.Context, namespacedName types.NamespacedName) error {
-	if err := r.deleteFinalizersForResource(
+// notifyDeletionToOwnedResources notifies the cluster deletion to the managed owned resources
+func (r *ClusterReconciler) notifyDeletionToOwnedResources(
+	ctx context.Context,
+	namespacedName types.NamespacedName,
+) error {
+	if err := r.notifyOwnedResourceDeletion(
 		ctx,
 		namespacedName,
 		&apiv1.DatabaseList{},
@@ -54,7 +45,7 @@ func (r *ClusterReconciler) deleteFinalizers(ctx context.Context, namespacedName
 		return err
 	}
 
-	if err := r.deleteFinalizersForResource(
+	if err := r.notifyOwnedResourceDeletion(
 		ctx,
 		namespacedName,
 		&apiv1.PublicationList{},
@@ -63,7 +54,7 @@ func (r *ClusterReconciler) deleteFinalizers(ctx context.Context, namespacedName
 		return err
 	}
 
-	return r.deleteFinalizersForResource(
+	return r.notifyOwnedResourceDeletion(
 		ctx,
 		namespacedName,
 		&apiv1.SubscriptionList{},
@@ -71,13 +62,23 @@ func (r *ClusterReconciler) deleteFinalizers(ctx context.Context, namespacedName
 	)
 }
 
-// deleteFinalizersForResource deletes finalizers for a given resource type
-func (r *ClusterReconciler) deleteFinalizersForResource(
+// notifyOwnedResourceDeletion deletes finalizers for a given resource type
+func (r *ClusterReconciler) notifyOwnedResourceDeletion(
 	ctx context.Context,
 	namespacedName types.NamespacedName,
 	list client.ObjectList,
 	finalizerName string,
 ) error {
+	// TODO(armru): make this dependency more explicit
+	// ClusterOwnedResourceWithStatus is a kubernetes resource object owned by a cluster that has status
+	// capabilities
+	type ClusterOwnedResourceWithStatus interface {
+		client.Object
+		GetClusterRef() corev1.LocalObjectReference
+		GetStatusMessage() string
+		SetAsFailed(err error)
+	}
+
 	contextLogger := log.FromContext(ctx)
 
 	if err := r.List(ctx, list, client.InNamespace(namespacedName.Namespace)); err != nil {
@@ -90,40 +91,40 @@ func (r *ClusterReconciler) deleteFinalizersForResource(
 	}
 
 	for _, item := range items {
-		obj, ok := item.(ClusterReferrer)
+		obj, ok := item.(ClusterOwnedResourceWithStatus)
 		if !ok {
 			continue
 		}
 
+		itemLogger := contextLogger.WithValues(
+			"resourceKind", obj.GetObjectKind().GroupVersionKind().Kind,
+			"resourceName", obj.GetName(),
+			"finalizerName", finalizerName,
+		)
 		if obj.GetClusterRef().Name != namespacedName.Name {
 			continue
 		}
 
-		origObj := obj.DeepCopyObject().(ClusterReferrer)
-		if controllerutil.RemoveFinalizer(obj, finalizerName) {
-			contextLogger.Debug("Removing finalizer from resource",
-				"finalizer", finalizerName, "resource", obj.GetName())
+		const statusMessage = "cluster resource has been deleted, skipping reconciliation"
 
-			if err := r.Patch(ctx, obj, client.MergeFrom(origObj)); err != nil {
-				contextLogger.Error(
-					err,
-					"error while removing finalizer from resource",
-					"resource", obj.GetName(),
-					"kind", obj.GetObjectKind().GroupVersionKind().Kind,
-					"oldFinalizerList", origObj.GetFinalizers(),
-					"newFinalizerList", obj.GetFinalizers(),
-				)
+		origObj := obj.DeepCopyObject().(ClusterOwnedResourceWithStatus)
+
+		if obj.GetStatusMessage() != statusMessage {
+			obj.SetAsFailed(errors.New(statusMessage))
+			if err := r.Status().Patch(ctx, obj, client.MergeFrom(origObj)); err != nil {
+				itemLogger.Error(err, "error while setting failed status for cluster deletion")
 				return err
 			}
+		}
 
-			// set status as failed, as the orphan resource is not reconciled
-			obj.(StatusSetter).SetAsFailed(fmt.Errorf("orphan resource is not reconciled"))
-			if err := r.Status().Patch(ctx, obj, client.MergeFrom(origObj)); err != nil {
-				contextLogger.Error(
+		if controllerutil.RemoveFinalizer(obj, finalizerName) {
+			itemLogger.Debug("Removing finalizer from resource")
+			if err := r.Patch(ctx, obj, client.MergeFrom(origObj)); err != nil {
+				itemLogger.Error(
 					err,
-					"error while patching resource status",
-					"resource", obj.GetName(),
-					"kind", obj.GetObjectKind().GroupVersionKind().Kind,
+					"while removing the finalizer",
+					"oldFinalizerList", origObj.GetFinalizers(),
+					"newFinalizerList", obj.GetFinalizers(),
 				)
 				return err
 			}

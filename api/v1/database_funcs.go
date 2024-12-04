@@ -40,6 +40,11 @@ func (db *Database) SetAsReady() {
 	db.Status.ObservedGeneration = db.Generation
 }
 
+// GetStatusMessage returns the applied status of the database
+func (db *Database) GetStatusMessage() string {
+	return db.Status.Message
+}
+
 // GetClusterRef returns the cluster reference of the database
 func (db *Database) GetClusterRef() corev1.LocalObjectReference {
 	return db.Spec.ClusterRef
