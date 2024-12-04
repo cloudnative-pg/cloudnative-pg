@@ -124,8 +124,15 @@ func (r *PublicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	if err := r.alignPublication(ctx, &publication); err != nil {
 		contextLogger.Error(err, "while reconciling publication")
-		if err := markAsFailed(ctx, r.Client, &publication, err); err != nil {
-			return ctrl.Result{}, err
+		if markErr := markAsFailed(ctx, r.Client, &publication, err); markErr != nil {
+			contextLogger.Error(err, "while marking as failed the publication resource",
+				"error", err,
+				"markError", markErr,
+			)
+			return ctrl.Result{}, fmt.Errorf(
+				"encountered an error while marking as failed the publication resource: %w, original error: %w",
+				markErr,
+				err)
 		}
 		return ctrl.Result{RequeueAfter: publicationReconciliationInterval}, nil
 	}

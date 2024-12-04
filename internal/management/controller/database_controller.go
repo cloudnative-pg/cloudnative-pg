@@ -116,8 +116,15 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	// Make sure the target PG Database is not being managed by another Database Object
 	if err := r.ensureOnlyOneManager(ctx, database); err != nil {
-		if err := markAsFailed(ctx, r.Client, &database, err); err != nil {
-			return ctrl.Result{}, err
+		if markErr := markAsFailed(ctx, r.Client, &database, err); markErr != nil {
+			contextLogger.Error(err, "while marking as failed the database resource",
+				"error", err,
+				"markError", markErr,
+			)
+			return ctrl.Result{}, fmt.Errorf(
+				"encountered an error while marking as failed the database resource: %w, original error: %w",
+				markErr,
+				err)
 		}
 		return ctrl.Result{RequeueAfter: databaseReconciliationInterval}, nil
 	}
