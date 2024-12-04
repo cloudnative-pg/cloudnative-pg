@@ -29,7 +29,7 @@ func NewCmd() *cobra.Command {
 	run := &pgBenchRun{}
 
 	pgBenchCmd := &cobra.Command{
-		Use:     "pgbench CLUSTER [-- pgBenchCommandArgs...]",
+		Use:     "pgbench CLUSTER [-- PGBENCH_COMMAND_ARGS...]",
 		Short:   "Creates a pgbench job",
 		Args:    validateCommandArgs,
 		Long:    "Creates a pgbench job to run against the specified Postgres Cluster.",
@@ -47,14 +47,14 @@ func NewCmd() *cobra.Command {
 		&run.jobName,
 		"job-name",
 		"",
-		"Name of the job, defaulting to: <clusterName>-pgbench-xxxx",
+		"Name of the job, defaulting to: CLUSTER-pgbench-xxxx",
 	)
 
 	pgBenchCmd.Flags().StringVar(
 		&run.jobName,
 		"pgbench-job-name",
 		"",
-		"Name of the job, defaulting to: <clusterName>-pgbench-xxxx",
+		"Name of the job, defaulting to: CLUSTER-pgbench-xxxx",
 	)
 
 	pgBenchCmd.Flags().StringVar(
@@ -88,7 +88,7 @@ func validateCommandArgs(cmd *cobra.Command, args []string) error {
 	}
 
 	if cmd.ArgsLenAtDash() > 1 {
-		return fmt.Errorf("pgBenchCommands should be passed after the -- delimiter")
+		return fmt.Errorf("PGBENCH_COMMAND_ARGS should be passed after the -- delimiter")
 	}
 
 	return nil
