@@ -1,4 +1,3 @@
-
 AES
 API's
 APIs
@@ -645,6 +644,7 @@ cn
 cnp
 cnpg
 codeready
+collationVersion
 columnValue
 commandError
 commandOutput

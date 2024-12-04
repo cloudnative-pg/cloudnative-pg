@@ -36,6 +36,9 @@ const (
 )
 
 // DatabaseSpec is the specification of a Postgresql Database
+// +kubebuilder:validation:XValidation:rule="!has(self.builtinLocale) || self.localeProvider == 'builtin'",message="builtinLocale is only available when localeProvider is set to `builtin`"
+// +kubebuilder:validation:XValidation:rule="!has(self.icuLocale) || self.localeProvider == 'icu'",message="icuLocale is only available when localeProvider is set to `icu`"
+// +kubebuilder:validation:XValidation:rule="!has(self.icuRules) || self.localeProvider == 'icu'",message="icuRules is only available when localeProvider is set to `icu`"
 type DatabaseSpec struct {
 	// The corresponding cluster
 	ClusterRef corev1.LocalObjectReference `json:"cluster"`
@@ -51,9 +54,6 @@ type DatabaseSpec struct {
 	// +kubebuilder:validation:XValidation:rule="self != 'postgres'",message="the name postgres is reserved"
 	// +kubebuilder:validation:XValidation:rule="self != 'template0'",message="the name template0 is reserved"
 	// +kubebuilder:validation:XValidation:rule="self != 'template1'",message="the name template1 is reserved"
-	// +kubebuilder:validation:XValidation:rule="!has(self.builtinLocale) || self.localeProvider == 'builtin'",message="builtinLocale is only available when localeProvider is set to `builtin`"
-	// +kubebuilder:validation:XValidation:rule="!has(self.icuLocale) || self.localeProvider == 'icu'",message="icuLocale is only available when localeProvider is set to `icu`"
-	// +kubebuilder:validation:XValidation:rule="!has(self.icuRules) || self.localeProvider == 'icu'",message="icuRules is only available when localeProvider is set to `icu`"
 	Name string `json:"name"`
 
 	// The owner
