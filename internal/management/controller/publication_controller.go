@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"time"
 
@@ -32,12 +33,20 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
+type instanceInterface2 interface {
+	GetClusterName() string
+	GetPodName() string
+	GetNamespaceName() string
+	GetNamedDB(name string) (*sql.DB, error)
+	GetSuperUserDB() (*sql.DB, error)
+}
+
 // PublicationReconciler reconciles a Publication object
 type PublicationReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 
-	instance            *postgres.Instance
+	instance            instanceInterface2
 	finalizerReconciler *finalizerReconciler[*apiv1.Publication]
 }
 
@@ -153,7 +162,7 @@ func (r *PublicationReconciler) evaluateDropPublication(ctx context.Context, pub
 	if pub.Spec.ReclaimPolicy != apiv1.PublicationReclaimDelete {
 		return nil
 	}
-	db, err := r.instance.ConnectionPool().Connection(pub.Spec.DBName)
+	db, err := r.instance.GetNamedDB(pub.Spec.DBName)
 	if err != nil {
 		return fmt.Errorf("while getting DB connection: %w", err)
 	}
