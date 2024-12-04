@@ -2474,7 +2474,7 @@ Sets the default collation order and character classification in the new databas
 <i>string</i>
 </td>
 <td>
-   <p>This option sets the locale provider for the databases. (cannot be changed)
+   <p>The LOCALE_PROVIDER (cannot be changed)
 This option sets the locale provider for databases created in the new cluster.
 Available from PostgreSQL 16.</p>
 </td>

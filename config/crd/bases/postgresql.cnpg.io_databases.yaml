@@ -162,7 +162,7 @@ spec:
                   rule: self == oldSelf
               localeProvider:
                 description: |-
-                  This option sets the locale provider for the databases. (cannot be changed)
+                  The LOCALE_PROVIDER (cannot be changed)
                   This option sets the locale provider for databases created in the new cluster.
                   Available from PostgreSQL 16.
                 type: string
