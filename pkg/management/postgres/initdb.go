@@ -144,8 +144,8 @@ func (info InitInfo) CheckTargetDataDirectories(ctx context.Context) error {
 	pgWalExists := false
 	if info.PgWal != "" {
 		if pgWalExists, err = fileutils.FileExists(info.PgWal); err != nil {
-			contextLogger.Error(err, "Error while checking for an existing PGData")
-			return fmt.Errorf("while verifying is PGWAL exists: %w", err)
+			contextLogger.Error(err, "Error while checking for an existing PGWAL")
+			return fmt.Errorf("while verifying if PGWAL exists: %w", err)
 		}
 	}
 
