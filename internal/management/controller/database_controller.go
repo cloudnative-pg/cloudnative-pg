@@ -66,7 +66,9 @@ const databaseReconciliationInterval = 30 * time.Second
 
 // Reconcile is the database reconciliation loop
 func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	contextLogger := log.FromContext(ctx)
+	contextLogger := log.FromContext(ctx).
+		WithName("database_reconciler").
+		WithValues("databaseName", req.Name)
 
 	// Get the database object
 	var database apiv1.Database
@@ -110,9 +112,9 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{RequeueAfter: databaseReconciliationInterval}, nil
 	}
 
-	contextLogger.Info("Reconciling database", "databaseName", req.Name)
+	contextLogger.Info("Reconciling database")
 	defer func() {
-		contextLogger.Info("Reconciliation loop of database exited", "databaseName", req.Name)
+		contextLogger.Info("Reconciliation loop of database exited")
 	}()
 
 	// Still not for me, we're waiting for a switchover
@@ -165,7 +167,7 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		ctx,
 		&database,
 	); err != nil {
-		contextLogger.Error(err, "while reconciling database", "databaseName", req.Name)
+		contextLogger.Error(err, "while reconciling database")
 		return r.failedReconciliation(
 			ctx,
 			&database,
@@ -173,7 +175,7 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		)
 	}
 
-	contextLogger.Info("Reconciliation of database completed", "databaseName", req.Name)
+	contextLogger.Info("Reconciliation of database completed")
 	return r.succeededReconciliation(
 		ctx,
 		&database,
