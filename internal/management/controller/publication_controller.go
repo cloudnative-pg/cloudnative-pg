@@ -60,11 +60,6 @@ const publicationReconciliationInterval = 30 * time.Second
 func (r *PublicationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
-	contextLogger.Debug("Reconciliation loop start")
-	defer func() {
-		contextLogger.Debug("Reconciliation loop end")
-	}()
-
 	// Get the publication object
 	var publication apiv1.Publication
 	if err := r.Client.Get(ctx, client.ObjectKey{
@@ -105,6 +100,11 @@ func (r *PublicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{RequeueAfter: publicationReconciliationInterval}, nil
 	}
 
+	contextLogger.Info("Reconciling publication", "publicationName", req.Name)
+	defer func() {
+		contextLogger.Info("Reconciliation loop of publication exited", "publicationName", req.Name)
+	}()
+
 	// Cannot do anything on a replica cluster
 	if cluster.IsReplica() {
 		if err := markAsUnknown(ctx, r.Client, &publication, errClusterIsReplica); err != nil {
@@ -121,12 +121,14 @@ func (r *PublicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 
 	if err := r.alignPublication(ctx, &publication); err != nil {
+		contextLogger.Error(err, "while reconciling publication", "publicationName", req.Name)
 		if err := markAsFailed(ctx, r.Client, &publication, err); err != nil {
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{RequeueAfter: publicationReconciliationInterval}, nil
 	}
 
+	contextLogger.Info("Reconciliation loop of publication completed", "publicationName", req.Name)
 	if err := markAsReady(ctx, r.Client, &publication); err != nil {
 		return ctrl.Result{}, err
 	}
