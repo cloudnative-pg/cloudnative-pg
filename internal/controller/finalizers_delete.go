@@ -22,7 +22,6 @@ import (
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -36,66 +35,77 @@ func (r *ClusterReconciler) notifyDeletionToOwnedResources(
 	ctx context.Context,
 	namespacedName types.NamespacedName,
 ) error {
-	if err := r.notifyOwnedResourceDeletion(
+	var dbList apiv1.DatabaseList
+	if err := r.List(ctx, &dbList, client.InNamespace(namespacedName.Namespace)); err != nil {
+		return err
+	}
+
+	if err := notifyOwnedResourceDeletion(
 		ctx,
+		r.Client,
 		namespacedName,
-		&apiv1.DatabaseList{},
+		toSliceWithPointers(dbList.Items),
 		utils.DatabaseFinalizerName,
 	); err != nil {
 		return err
 	}
 
-	if err := r.notifyOwnedResourceDeletion(
+	var pbList apiv1.PublicationList
+	if err := r.List(ctx, &pbList, client.InNamespace(namespacedName.Namespace)); err != nil {
+		return err
+	}
+
+	if err := notifyOwnedResourceDeletion(
 		ctx,
+		r.Client,
 		namespacedName,
-		&apiv1.PublicationList{},
+		toSliceWithPointers(pbList.Items),
 		utils.PublicationFinalizerName,
 	); err != nil {
 		return err
 	}
 
-	return r.notifyOwnedResourceDeletion(
+	var sbList apiv1.SubscriptionList
+	if err := r.List(ctx, &sbList, client.InNamespace(namespacedName.Namespace)); err != nil {
+		return err
+	}
+
+	return notifyOwnedResourceDeletion(
 		ctx,
+		r.Client,
 		namespacedName,
-		&apiv1.SubscriptionList{},
+		toSliceWithPointers(sbList.Items),
 		utils.SubscriptionFinalizerName,
 	)
 }
 
+// clusterOwnedResourceWithStatus is a kubernetes resource object owned by a cluster that has status
+// capabilities
+type clusterOwnedResourceWithStatus interface {
+	client.Object
+	GetClusterRef() corev1.LocalObjectReference
+	GetStatusMessage() string
+	SetAsFailed(err error)
+}
+
+func toSliceWithPointers[T any](items []T) []*T {
+	result := make([]*T, len(items))
+	for i, item := range items {
+		result[i] = &item
+	}
+	return result
+}
+
 // notifyOwnedResourceDeletion deletes finalizers for a given resource type
-func (r *ClusterReconciler) notifyOwnedResourceDeletion(
+func notifyOwnedResourceDeletion[T clusterOwnedResourceWithStatus](
 	ctx context.Context,
+	cli client.Client,
 	namespacedName types.NamespacedName,
-	list client.ObjectList,
+	objects []T,
 	finalizerName string,
 ) error {
-	// TODO(armru): make this dependency more explicit
-	// ClusterOwnedResourceWithStatus is a kubernetes resource object owned by a cluster that has status
-	// capabilities
-	type ClusterOwnedResourceWithStatus interface {
-		client.Object
-		GetClusterRef() corev1.LocalObjectReference
-		GetStatusMessage() string
-		SetAsFailed(err error)
-	}
-
 	contextLogger := log.FromContext(ctx)
-
-	if err := r.List(ctx, list, client.InNamespace(namespacedName.Namespace)); err != nil {
-		return err
-	}
-
-	items, err := meta.ExtractList(list)
-	if err != nil {
-		return err
-	}
-
-	for _, item := range items {
-		obj, ok := item.(ClusterOwnedResourceWithStatus)
-		if !ok {
-			continue
-		}
-
+	for _, obj := range objects {
 		itemLogger := contextLogger.WithValues(
 			"resourceKind", obj.GetObjectKind().GroupVersionKind().Kind,
 			"resourceName", obj.GetName(),
@@ -107,11 +117,11 @@ func (r *ClusterReconciler) notifyOwnedResourceDeletion(
 
 		const statusMessage = "cluster resource has been deleted, skipping reconciliation"
 
-		origObj := obj.DeepCopyObject().(ClusterOwnedResourceWithStatus)
+		origObj := obj.DeepCopyObject().(T)
 
 		if obj.GetStatusMessage() != statusMessage {
 			obj.SetAsFailed(errors.New(statusMessage))
-			if err := r.Status().Patch(ctx, obj, client.MergeFrom(origObj)); err != nil {
+			if err := cli.Status().Patch(ctx, obj, client.MergeFrom(origObj)); err != nil {
 				itemLogger.Error(err, "error while setting failed status for cluster deletion")
 				return err
 			}
@@ -119,7 +129,7 @@ func (r *ClusterReconciler) notifyOwnedResourceDeletion(
 
 		if controllerutil.RemoveFinalizer(obj, finalizerName) {
 			itemLogger.Debug("Removing finalizer from resource")
-			if err := r.Patch(ctx, obj, client.MergeFrom(origObj)); err != nil {
+			if err := cli.Patch(ctx, obj, client.MergeFrom(origObj)); err != nil {
 				itemLogger.Error(
 					err,
 					"while removing the finalizer",
