@@ -1224,6 +1224,21 @@ func (target *RecoveryTarget) BuildPostgresOptions() string {
 	return result
 }
 
+// ApplyInto applies the content of the probe configuration in a Kubernetes
+// probe
+func (p *Probe) ApplyInto(k8sProbe *corev1.Probe) {
+	if p == nil {
+		return
+	}
+
+	k8sProbe.InitialDelaySeconds = p.InitialDelaySeconds
+	k8sProbe.TimeoutSeconds = p.TimeoutSeconds
+	k8sProbe.PeriodSeconds = p.PeriodSeconds
+	k8sProbe.SuccessThreshold = p.SuccessThreshold
+	k8sProbe.FailureThreshold = p.FailureThreshold
+	k8sProbe.TerminationGracePeriodSeconds = p.TerminationGracePeriodSeconds
+}
+
 func init() {
 	SchemeBuilder.Register(&Cluster{}, &ClusterList{})
 }
