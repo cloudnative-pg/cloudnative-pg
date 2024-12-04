@@ -308,7 +308,7 @@ var _ = Describe("Managed Database status", func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		Expect(updatedDatabase.Status.Applied).Should(HaveValue(BeFalse()))
-		Expect(updatedDatabase.Status.Message).Should(ContainSubstring("\"cluster-other\" not found"))
+		Expect(updatedDatabase.Status.Message).Should(ContainSubstring(`"cluster-other" not found`))
 	})
 
 	It("skips reconciliation if database object isn't found (deleted database)", func(ctx SpecContext) {
