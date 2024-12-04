@@ -128,7 +128,7 @@ func (r *PublicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{RequeueAfter: publicationReconciliationInterval}, nil
 	}
 
-	contextLogger.Info("Reconciliation loop of publication completed", "publicationName", req.Name)
+	contextLogger.Info("Reconciliation of publication completed", "publicationName", req.Name)
 	if err := markAsReady(ctx, r.Client, &publication); err != nil {
 		return ctrl.Result{}, err
 	}
