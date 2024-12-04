@@ -70,11 +70,14 @@ type DatabaseSpec struct {
 	Encoding string `json:"encoding,omitempty"`
 
 	// The locale (cannot be changed)
+	// Sets the default collation order and character classification in the new database.
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="locale is immutable"
 	// +optional
 	Locale string `json:"locale,omitempty"`
 
-	// This option sets the locale provider for the databases. (cannot be changed)
+	// The LOCALE_PROVIDER (cannot be changed)
+	// This option sets the locale provider for databases created in the new cluster.
+	// Available from PostgreSQL 16.
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="localeProvider is immutable"
 	// +optional
 	LocaleProvider string `json:"localeProvider,omitempty"`
@@ -90,16 +93,25 @@ type DatabaseSpec struct {
 	LcCtype string `json:"localeCType,omitempty"`
 
 	// The ICU_LOCALE (cannot be changed)
+	// Specifies the ICU locale when the ICU provider is used.
+	// This option requires `localeProvider` to be set to `icu`.
+	// Available from PostgreSQL 15.
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="icuLocale is immutable"
 	// +optional
 	IcuLocale string `json:"icuLocale,omitempty"`
 
 	// The ICU_RULES (cannot be changed)
+	// Specifies additional collation rules to customize the behavior of the default collation.
+	// This option requires `localeProvider` to be set to `icu`.
+	// Available from PostgreSQL 16.
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="icuRules is immutable"
 	// +optional
 	IcuRules string `json:"icuRules,omitempty"`
 
 	// The BUILTIN_LOCALE (cannot be changed)
+	// Specifies the locale name when the builtin provider is used.
+	// This option requires `localeProvider` to be set to `builtin`.
+	// Available from PostgreSQL 17.
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="builtinLocale is immutable"
 	// +optional
 	BuiltinLocale string `json:"builtinLocale,omitempty"`

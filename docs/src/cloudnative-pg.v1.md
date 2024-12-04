@@ -2466,14 +2466,17 @@ PostgreSQL cluster from an existing storage</p>
 <i>string</i>
 </td>
 <td>
-   <p>The locale (cannot be changed)</p>
+   <p>The locale (cannot be changed)
+Sets the default collation order and character classification in the new database.</p>
 </td>
 </tr>
 <tr><td><code>localeProvider</code><br/>
 <i>string</i>
 </td>
 <td>
-   <p>This option sets the locale provider for the databases. (cannot be changed)</p>
+   <p>This option sets the locale provider for the databases. (cannot be changed)
+This option sets the locale provider for databases created in the new cluster.
+Available from PostgreSQL 16.</p>
 </td>
 </tr>
 <tr><td><code>localeCollate</code><br/>
@@ -2494,21 +2497,30 @@ PostgreSQL cluster from an existing storage</p>
 <i>string</i>
 </td>
 <td>
-   <p>The ICU_LOCALE (cannot be changed)</p>
+   <p>The ICU_LOCALE (cannot be changed)
+Specifies the ICU locale when the ICU provider is used.
+This option requires <code>localeProvider</code> to be set to <code>icu</code>.
+Available from PostgreSQL 15.</p>
 </td>
 </tr>
 <tr><td><code>icuRules</code><br/>
 <i>string</i>
 </td>
 <td>
-   <p>The ICU_RULES (cannot be changed)</p>
+   <p>The ICU_RULES (cannot be changed)
+Specifies additional collation rules to customize the behavior of the default collation.
+This option requires <code>localeProvider</code> to be set to <code>icu</code>.
+Available from PostgreSQL 16.</p>
 </td>
 </tr>
 <tr><td><code>builtinLocale</code><br/>
 <i>string</i>
 </td>
 <td>
-   <p>The BUILTIN_LOCALE (cannot be changed)</p>
+   <p>The BUILTIN_LOCALE (cannot be changed)
+Specifies the locale name when the builtin provider is used.
+This option requires <code>localeProvider</code> to be set to <code>builtin</code>.
+Available from PostgreSQL 17.</p>
 </td>
 </tr>
 <tr><td><code>collationVersion</code><br/>

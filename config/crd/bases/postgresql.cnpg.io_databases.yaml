@@ -62,7 +62,11 @@ spec:
                 description: True when connections to this database are allowed
                 type: boolean
               builtinLocale:
-                description: The BUILTIN_LOCALE (cannot be changed)
+                description: |-
+                  The BUILTIN_LOCALE (cannot be changed)
+                  Specifies the locale name when the builtin provider is used.
+                  This option requires `localeProvider` to be set to `builtin`.
+                  Available from PostgreSQL 17.
                 type: string
                 x-kubernetes-validations:
                 - message: builtinLocale is immutable
@@ -114,13 +118,21 @@ spec:
                 - absent
                 type: string
               icuLocale:
-                description: The ICU_LOCALE (cannot be changed)
+                description: |-
+                  The ICU_LOCALE (cannot be changed)
+                  Specifies the ICU locale when the ICU provider is used.
+                  This option requires `localeProvider` to be set to `icu`.
+                  Available from PostgreSQL 15.
                 type: string
                 x-kubernetes-validations:
                 - message: icuLocale is immutable
                   rule: self == oldSelf
               icuRules:
-                description: The ICU_RULES (cannot be changed)
+                description: |-
+                  The ICU_RULES (cannot be changed)
+                  Specifies additional collation rules to customize the behavior of the default collation.
+                  This option requires `localeProvider` to be set to `icu`.
+                  Available from PostgreSQL 16.
                 type: string
                 x-kubernetes-validations:
                 - message: icuRules is immutable
@@ -129,7 +141,9 @@ spec:
                 description: True when the database is a template
                 type: boolean
               locale:
-                description: The locale (cannot be changed)
+                description: |-
+                  The locale (cannot be changed)
+                  Sets the default collation order and character classification in the new database.
                 type: string
                 x-kubernetes-validations:
                 - message: locale is immutable
@@ -147,8 +161,10 @@ spec:
                 - message: localeCollate is immutable
                   rule: self == oldSelf
               localeProvider:
-                description: This option sets the locale provider for the databases.
-                  (cannot be changed)
+                description: |-
+                  This option sets the locale provider for the databases. (cannot be changed)
+                  This option sets the locale provider for databases created in the new cluster.
+                  Available from PostgreSQL 16.
                 type: string
                 x-kubernetes-validations:
                 - message: localeProvider is immutable
