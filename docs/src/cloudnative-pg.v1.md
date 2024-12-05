@@ -2453,7 +2453,7 @@ PostgreSQL cluster from an existing storage</p>
 <i>string</i>
 </td>
 <td>
-   <p>The role name of the user who own the database inside PostgreSQL.</p>
+   <p>The role name of the user who owns the database inside PostgreSQL.</p>
 </td>
 </tr>
 <tr><td><code>template</code><br/>

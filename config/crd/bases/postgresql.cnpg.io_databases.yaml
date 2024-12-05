@@ -194,7 +194,7 @@ spec:
                 - message: the name template1 is reserved
                   rule: self != 'template1'
               owner:
-                description: The role name of the user who own the database inside
+                description: The role name of the user who owns the database inside
                   PostgreSQL.
                 type: string
               tablespace:

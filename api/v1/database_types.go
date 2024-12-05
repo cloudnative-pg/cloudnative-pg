@@ -66,7 +66,7 @@ type DatabaseSpec struct {
 	Template string `json:"template,omitempty"`
 
 	// Maps to the `ENCODING` parameter of `CREATE DATABASE`. This setting cannot be changed.
-        // Character set encoding to use in the database. This setting cannot be changed.
+	// Character set encoding to use in the database. This setting cannot be changed.
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="encoding is immutable"
 	// +optional
 	Encoding string `json:"encoding,omitempty"`
