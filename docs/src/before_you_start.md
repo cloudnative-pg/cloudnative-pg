@@ -131,6 +131,13 @@ PVC group
   belonging to the same PostgreSQL instance, namely the main volume containing
   the PGDATA (`storage`) and the volume for WALs (`walStorage`).
 
+<a id="rto"></a>RTO
+: Acronym for "recovery time objective", the amount of time a system can be
+  unavailable without adversely impacting the application.
+
+<a id="rpo"></a>RPO
+:  Acronym for "recovery point objective", a calculation of the level of
+  acceptable data loss following a disaster recovery scenario.
 
 ## Cloud terminology
 
