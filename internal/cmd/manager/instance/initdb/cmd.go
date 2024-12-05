@@ -143,7 +143,7 @@ func NewCmd() *cobra.Command {
 
 func initSubCommand(ctx context.Context, info postgres.InitInfo) error {
 	contextLogger := log.FromContext(ctx)
-	err := info.CheckTargetDataDirectory(ctx)
+	err := info.EnsureTargetDirectoriesDoNotExist(ctx)
 	if err != nil {
 		return err
 	}
