@@ -56,7 +56,7 @@ type DatabaseSpec struct {
 	// +kubebuilder:validation:XValidation:rule="self != 'template1'",message="the name template1 is reserved"
 	Name string `json:"name"`
 
-	// The role name of the user who own the database inside PostgreSQL.
+	// The role name of the user who owns the database inside PostgreSQL.
 	Owner string `json:"owner"`
 
 	// Maps to the `TEMPLATE` parameter of `CREATE DATABASE`. This setting cannot be changed.
