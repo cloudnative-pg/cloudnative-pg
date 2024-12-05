@@ -5,7 +5,7 @@ It simply relies on the Kubernetes API server and a native key component called:
 the **Postgres instance manager**.
 
 The instance manager takes care of the entire lifecycle of the PostgreSQL
-leading process (also known as `postmaster`).
+server process (also known as `postmaster`).
 
 When you create a new cluster, the operator makes a Pod per instance.
 The field `.spec.instances` specifies how many instances to create.
@@ -182,8 +182,9 @@ seconds.
 
 !!! Important
     In order to avoid any data loss in the Postgres cluster, which impacts
-    the database RPO, don't delete the Pod where the primary instance is running.
-    In this case, perform a switchover to another instance first.
+    the database [RPO](before_you_start.md#rpo), don't delete the Pod where
+    the primary instance is running. In this case, perform a switchover to
+    another instance first.
 
 ### Shutdown of the primary during a switchover
 
@@ -197,11 +198,12 @@ the  time given to the former primary to shut down gracefully and archive all
 the WAL files. By default it is set to `3600` (1 hour).
 
 !!! Warning
-    The `.spec.switchoverDelay` option affects the RPO and RTO of your
-    PostgreSQL database. Setting it to a low value, might favor RTO over RPO
-    but lead to data loss at cluster level and/or backup level. On the contrary,
-    setting it to a high value, might remove the risk of data loss while leaving
-    the cluster without an active primary for a longer time during the switchover.
+    The `.spec.switchoverDelay` option affects the [RPO](before_you_start.md#rpo)
+    and [RTO](before_you_start.md#rto) of your PostgreSQL database. Setting it to
+    a low value, might favor RTO over RPO but lead to data loss at cluster level
+    and/or backup level. On the contrary, setting it to a high value, might remove
+    the risk of data loss while leaving the cluster without an active primary for a
+    longer time during the switchover.
 
 ## Failover
 

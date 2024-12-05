@@ -336,11 +336,12 @@ continuity and scalability.
 
 *Disaster recovery* is a business continuity component that requires
 that both backup and recovery of a database work correctly. While as a
-starting point, the goal is to achieve RPO < 5 minutes, the long-term goal is
-to implement RPO=0 backup solutions. *High availability* is the other
-important component of business continuity. Through PostgreSQL native
-physical replication and hot standby replicas, it allows the operator to perform
-failover and switchover operations. This area includes enhancements in:
+starting point, the goal is to achieve [RPO](before_you_start.md#rpo) < 5
+minutes, the long-term goal is to implement RPO=0 backup solutions. *High
+availability* is the other important component of business continuity. Through
+PostgreSQL native physical replication and hot standby replicas, it allows the
+operator to perform failover and switchover operations. This area includes
+enhancements in:
 
 - Control of PostgreSQL physical replication, such as synchronous replication,
   (cascading) replication clusters, and so on
@@ -404,8 +405,9 @@ database snapshots with cold backups.
 ### Backups from a standby
 
 The operator supports offloading base backups onto a standby without impacting
-the RPO of the database. This allows resources to be preserved on the primary, in
-particular I/O, for standard database operations.
+the [RPO](before_you_start.md#rpo) of the database. This allows resources to
+be preserved on the primary, in particular I/O, for standard database
+operations.
 
 ### Full restore from a backup
 
@@ -460,8 +462,8 @@ switchover across data centers remains necessary.)
 
 Additionally, the flexibility extends to creating delayed replica clusters
 intentionally lagging behind the primary cluster. This intentional lag aims to
-minimize the Recovery Time Objective (RTO) in the event of unintended errors,
-such as incorrect `DELETE` or `UPDATE` SQL operations.
+minimize the Recovery Time Objective ([RTO](before_you_start.md#rto)) in the
+event of unintended errors, such as incorrect `DELETE` or `UPDATE` SQL operations.
 
 ### Distributed Database Topologies
 

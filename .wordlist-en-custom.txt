@@ -361,7 +361,9 @@ README
 RHSA
 RLS
 RPO
+rpo
 RTO
+rto
 RUNTIME
 ReadWriteOnce
 RedHat
