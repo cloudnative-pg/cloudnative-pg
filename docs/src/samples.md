@@ -135,3 +135,70 @@ For a list of available options, see [API reference](cloudnative-pg.v1.md).
 
 **Pooler with custom service config**
 : [`pooler-external.yaml`](samples/pooler-external.yaml)
+
+## Logical replication via declarative Publication and Subscription objects
+
+Two test manifests contain everything needed to set up logical replication:
+
+**Source cluster with a publication**
+: [`cluster-example-logical-source.yaml`](samples/cluster-example-logical-source.yaml)
+
+Sets up a cluster, `cluster-example` with some tables created in the `app`
+database, and, importantly, *adds replication to the app user*.
+A publication is created for the cluster on the `app` database: note that the
+publication will be reconciled only after the cluster's primary is up and
+running.
+
+**Destination cluster with a subscription**
+: *Prerequisites*: The source cluster with publication, defined as above.
+: [`cluster-example-logical-destination.yaml`](samples/cluster-example-logical-destination.yaml)
+
+Sets up a cluster `cluster-example-dest` with:
+
+- the source cluster defined in the `externalClusters` stanza. Note that it uses
+  the `app` role to connect, which assumes the source cluster grants it
+  `replication` privilege.
+- a bootstrap import of microservice type, with `schemaOnly` enabled
+
+A subscription is created on the destination cluster: note that the subscription
+will be reconciled only after the destination cluster's primary is up and
+running.
+
+After both clusters have been reconciled, together with the publication and
+subscription objects, you can verify that that tables in the source cluster,
+and the data in them, have been replicated in the destination cluster
+
+In addition, there are some standalone example manifests:
+
+**A plain Publication targeting All Tables**
+: *Prerequisites*: an existing cluster `cluster-example`.
+: [`publication-example.yaml`](samples/publication-example.yaml)
+
+**A Publication with a constrained publication target**
+: *Prerequisites*: an existing cluster `cluster-example`.
+: [`publication-example-objects.yaml`](samples/publication-example-objects.yaml)
+
+**A plain Subscription**
+: Prerequisites: an existing cluster `cluster-example` set up as source, with
+    a publication `pub-all`. A cluster `cluster-example-dest` set up as a
+    destination cluster, including the `externalClusters` stanza with
+    connection parameters to the source cluster, including a role with
+    replication privilege.
+: [`subscription-example.yaml`](samples/subscription-example.yaml)
+
+All the above manifests create publications or subscriptions on the `app`
+database. The Database CRD offers a convenient way to create databases
+declaratively. With it, logical replication could be set up for arbitrary
+databases.
+Which brings us to the next section.
+
+## Declarative management of Postgres databases
+
+**A plain Database**
+: *Prerequisites*: an existing cluster `cluster-example`.
+: [`database-example.yaml`](samples/database-example.yaml)
+
+**A Database with ICU local specifications**
+: *Prerequisites*: an existing cluster `cluster-example` running Postgres 16
+  or more advanced.
+: [`database-example-icu.yaml`](samples/database-example-icu.yaml)
