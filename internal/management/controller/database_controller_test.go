@@ -40,15 +40,6 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-type fakeInstanceData struct {
-	*postgres.Instance
-	db *sql.DB
-}
-
-func (f *fakeInstanceData) GetSuperUserDB() (*sql.DB, error) {
-	return f.db, nil
-}
-
 var _ = Describe("Managed Database status", func() {
 	var (
 		dbMock     sqlmock.Sqlmock
