@@ -64,3 +64,9 @@ func (db *Database) GetName() string {
 func (db *Database) HasReconciliations() bool {
 	return db.Status.ObservedGeneration > 0
 }
+
+// DetectConflicting detects conflicting databases
+func (dbList *DatabaseList) DetectConflicting(reference Database) error {
+	pointers := toSliceWithPointers(dbList.Items)
+	return detectConflicting(&reference, pointers)
+}

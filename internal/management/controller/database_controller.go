@@ -115,18 +115,29 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 
 	// Make sure the target PG Database is not being managed by another Database Object
-	if err := r.ensureOnlyOneManager(ctx, database); err != nil {
-		if markErr := markAsFailed(ctx, r.Client, &database, err); markErr != nil {
-			contextLogger.Error(err, "while marking as failed the database resource",
-				"error", err,
-				"markError", markErr,
-			)
-			return ctrl.Result{}, fmt.Errorf(
-				"encountered an error while marking as failed the database resource: %w, original error: %w",
-				markErr,
-				err)
+	if database.HasReconciliations() {
+		var databaseList apiv1.DatabaseList
+		if err := r.Client.List(ctx, &databaseList,
+			client.InNamespace(r.instance.GetNamespaceName()),
+		); err != nil {
+			contextLogger.Error(err, "while getting database list", "namespace", r.instance.GetNamespaceName())
+			return ctrl.Result{}, fmt.Errorf("impossible to list database objects in namespace %s: %w",
+				r.instance.GetNamespaceName(), err)
 		}
-		return ctrl.Result{RequeueAfter: databaseReconciliationInterval}, nil
+
+		if err := databaseList.DetectConflicting(database); err != nil {
+			if markErr := markAsFailed(ctx, r.Client, &database, err); markErr != nil {
+				contextLogger.Error(err, "while marking as failed the database resource",
+					"error", err,
+					"markError", markErr,
+				)
+				return ctrl.Result{}, fmt.Errorf(
+					"encountered an error while marking as failed the database resource: %w, original error: %w",
+					markErr,
+					err)
+			}
+			return ctrl.Result{RequeueAfter: databaseReconciliationInterval}, nil
+		}
 	}
 
 	if err := r.reconcileDatabase(ctx, &database); err != nil {
@@ -147,36 +158,6 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, err
 	}
 	return ctrl.Result{RequeueAfter: databaseReconciliationInterval}, nil
-}
-
-// ensureOnlyOneManager verifies that the target PostgreSQL Database specified by the given Database object
-// is not already managed by another Database object within the same namespace and cluster.
-// If another Database object is found to be managing the same PostgreSQL database, this method returns an error.
-func (r *DatabaseReconciler) ensureOnlyOneManager(
-	ctx context.Context,
-	database apiv1.Database,
-) error {
-	contextLogger := log.FromContext(ctx)
-
-	if database.HasReconciliations() {
-		return nil
-	}
-
-	var databaseList apiv1.DatabaseList
-	if err := r.Client.List(ctx, &databaseList,
-		client.InNamespace(r.instance.GetNamespaceName()),
-	); err != nil {
-		contextLogger.Error(err, "while getting database list", "namespace", r.instance.GetNamespaceName())
-		return fmt.Errorf("impossible to list database objects in namespace %s: %w",
-			r.instance.GetNamespaceName(), err)
-	}
-
-	managerObjects := make([]managerObject, len(databaseList.Items))
-	for i, item := range databaseList.Items {
-		managerObjects[i] = &item
-	}
-
-	return detectTooManyManagers(&database, managerObjects)
 }
 
 func (r *DatabaseReconciler) evaluateDropDatabase(ctx context.Context, db *apiv1.Database) error {

@@ -115,12 +115,23 @@ func (r *PublicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{RequeueAfter: publicationReconciliationInterval}, nil
 	}
 
-	// Make sure the target PG Publication is not being managed by another Publication Object
-	if err := r.ensureOnlyOneManager(ctx, publication); err != nil {
-		if err := markAsFailed(ctx, r.Client, &publication, err); err != nil {
-			return ctrl.Result{}, err
+	if !publication.HasReconciliations() {
+		var publicationList apiv1.PublicationList
+		if err := r.Client.List(ctx, &publicationList,
+			client.InNamespace(r.instance.GetNamespaceName()),
+		); err != nil {
+			contextLogger.Error(err, "while getting publication list", "namespace", r.instance.GetNamespaceName())
+			return ctrl.Result{}, fmt.Errorf("impossible to list publication objects in namespace %s: %w",
+				r.instance.GetNamespaceName(), err)
 		}
-		return ctrl.Result{RequeueAfter: publicationReconciliationInterval}, nil
+
+		// Make sure the target PG Publication is not being managed by another Publication Object
+		if err := publicationList.DetectConflicting(publication); err != nil {
+			if err := markAsFailed(ctx, r.Client, &publication, err); err != nil {
+				return ctrl.Result{}, err
+			}
+			return ctrl.Result{RequeueAfter: publicationReconciliationInterval}, nil
+		}
 	}
 
 	if err := r.finalizerReconciler.reconcile(ctx, &publication); err != nil {
@@ -149,36 +160,6 @@ func (r *PublicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, err
 	}
 	return ctrl.Result{RequeueAfter: publicationReconciliationInterval}, nil
-}
-
-// ensureOnlyOneManager verifies that the target PostgreSQL Publication specified by the given Publication object
-// is not already managed by another Publication object within the same namespace and cluster.
-// If another Publication object is found to be managing the same PostgreSQL Publication, this method returns an error.
-func (r *PublicationReconciler) ensureOnlyOneManager(
-	ctx context.Context,
-	publication apiv1.Publication,
-) error {
-	contextLogger := log.FromContext(ctx)
-
-	if publication.HasReconciliations() {
-		return nil
-	}
-
-	var publicationList apiv1.PublicationList
-	if err := r.Client.List(ctx, &publicationList,
-		client.InNamespace(r.instance.GetNamespaceName()),
-	); err != nil {
-		contextLogger.Error(err, "while getting publication list", "namespace", r.instance.GetNamespaceName())
-		return fmt.Errorf("impossible to list publication objects in namespace %s: %w",
-			r.instance.GetNamespaceName(), err)
-	}
-
-	managerObjects := make([]managerObject, len(publicationList.Items))
-	for i, item := range publicationList.Items {
-		managerObjects[i] = &item
-	}
-
-	return detectTooManyManagers(&publication, managerObjects)
 }
 
 func (r *PublicationReconciler) evaluateDropPublication(ctx context.Context, pub *apiv1.Publication) error {

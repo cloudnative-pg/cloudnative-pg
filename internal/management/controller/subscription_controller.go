@@ -135,12 +135,23 @@ func (r *SubscriptionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{RequeueAfter: subscriptionReconciliationInterval}, nil
 	}
 
-	// Make sure the target PG Subscription is not being managed by another Subscription Object
-	if err := r.ensureOnlyOneManager(ctx, subscription); err != nil {
-		if err := markAsFailed(ctx, r.Client, &subscription, err); err != nil {
-			return ctrl.Result{}, err
+	if !subscription.HasReconciliations() {
+		var subscriptionList apiv1.SubscriptionList
+		if err := r.Client.List(ctx, &subscriptionList,
+			client.InNamespace(r.instance.GetNamespaceName()),
+		); err != nil {
+			contextLogger.Error(err, "while getting subscription list", "namespace", r.instance.GetNamespaceName())
+			return ctrl.Result{}, fmt.Errorf("impossible to list subscription objects in namespace %s: %w",
+				r.instance.GetNamespaceName(), err)
 		}
-		return ctrl.Result{RequeueAfter: publicationReconciliationInterval}, nil
+
+		// Make sure the target PG Subscription is not being managed by another Subscription Object
+		if err := subscriptionList.DetectConflicting(subscription); err != nil {
+			if err := markAsFailed(ctx, r.Client, &subscription, err); err != nil {
+				return ctrl.Result{}, err
+			}
+			return ctrl.Result{RequeueAfter: publicationReconciliationInterval}, nil
+		}
 	}
 
 	if err := r.alignSubscription(ctx, &subscription, connString); err != nil {
@@ -163,38 +174,6 @@ func (r *SubscriptionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, err
 	}
 	return ctrl.Result{RequeueAfter: subscriptionReconciliationInterval}, nil
-}
-
-// ensureOnlyOneManager verifies that the target PostgreSQL Subscription specified
-// by the given Subscription object is not already managed by another Subscription object
-// within the same namespace and cluster.
-// If another Subscription object is found to be managing the same PostgreSQL subscription,
-// this method returns an error.
-func (r *SubscriptionReconciler) ensureOnlyOneManager(
-	ctx context.Context,
-	subscription apiv1.Subscription,
-) error {
-	contextLogger := log.FromContext(ctx)
-
-	if subscription.HasReconciliations() {
-		return nil
-	}
-
-	var subscriptionList apiv1.SubscriptionList
-	if err := r.Client.List(ctx, &subscriptionList,
-		client.InNamespace(r.instance.GetNamespaceName()),
-	); err != nil {
-		contextLogger.Error(err, "while getting subscription list", "namespace", r.instance.GetNamespaceName())
-		return fmt.Errorf("impossible to list subscription objects in namespace %s: %w",
-			r.instance.GetNamespaceName(), err)
-	}
-
-	managerObjects := make([]managerObject, len(subscriptionList.Items))
-	for i, item := range subscriptionList.Items {
-		managerObjects[i] = &item
-	}
-
-	return detectTooManyManagers(&subscription, managerObjects)
 }
 
 func (r *SubscriptionReconciler) evaluateDropSubscription(ctx context.Context, sub *apiv1.Subscription) error {

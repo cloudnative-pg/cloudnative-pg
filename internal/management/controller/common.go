@@ -26,48 +26,11 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/lib/pq"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
-
-type managerObject interface {
-	GetName() string
-	GetManagedObjectName() string
-	GetClusterRef() corev1.LocalObjectReference
-	HasReconciliations() bool
-}
-
-// detectTooManyManagers checks if a certain `manager` wants to manage the same
-// underlying object as some previously existing manager
-func detectTooManyManagers(
-	manager managerObject,
-	potentialManagers []managerObject,
-) error {
-	for _, item := range potentialManagers {
-		if item.GetName() == manager.GetName() {
-			// skip itself
-			continue
-		}
-
-		if item.GetClusterRef().Name != manager.GetClusterRef().Name {
-			continue
-		}
-
-		if !item.HasReconciliations() {
-			continue
-		}
-
-		if item.GetManagedObjectName() == manager.GetManagedObjectName() {
-			return fmt.Errorf("%q is already managed by object %q",
-				manager.GetManagedObjectName(), item.GetName())
-		}
-	}
-
-	return nil
-}
 
 // errClusterIsReplica is raised when an object
 // cannot be reconciled because it belongs to a replica cluster

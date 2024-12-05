@@ -64,3 +64,9 @@ func (pub *Publication) HasReconciliations() bool {
 func (pub *Publication) GetName() string {
 	return pub.Name
 }
+
+// DetectConflicting detects conflicting publications
+func (pub *PublicationList) DetectConflicting(reference Publication) error {
+	pointers := toSliceWithPointers(pub.Items)
+	return detectConflicting(&reference, pointers)
+}

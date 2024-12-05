@@ -64,3 +64,9 @@ func (sub *Subscription) GetManagedObjectName() string {
 func (sub *Subscription) HasReconciliations() bool {
 	return sub.Status.ObservedGeneration > 0
 }
+
+// DetectConflicting detects conflicting subscriptions
+func (pub *SubscriptionList) DetectConflicting(reference Subscription) error {
+	pointers := toSliceWithPointers(pub.Items)
+	return detectConflicting(&reference, pointers)
+}
