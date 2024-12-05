@@ -2432,49 +2432,51 @@ PostgreSQL cluster from an existing storage</p>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#localobjectreference-v1-core"><i>core/v1.LocalObjectReference</i></a>
 </td>
 <td>
-   <p>The corresponding cluster</p>
+   <p>The name of the PostgreSQL cluster hosting the database.</p>
 </td>
 </tr>
 <tr><td><code>ensure</code><br/>
 <a href="#postgresql-cnpg-io-v1-EnsureOption"><i>EnsureOption</i></a>
 </td>
 <td>
-   <p>Ensure the PostgreSQL database is <code>present</code> or <code>absent</code> - defaults to &quot;present&quot;</p>
+   <p>Ensure the PostgreSQL database is <code>present</code> or <code>absent</code> - defaults to &quot;present&quot;.</p>
 </td>
 </tr>
 <tr><td><code>name</code> <B>[Required]</B><br/>
 <i>string</i>
 </td>
 <td>
-   <p>The name inside PostgreSQL</p>
+   <p>The name of the database to create inside PostgreSQL. This setting cannot be changed.</p>
 </td>
 </tr>
 <tr><td><code>owner</code> <B>[Required]</B><br/>
 <i>string</i>
 </td>
 <td>
-   <p>The owner</p>
+   <p>The role name of the user who own the database inside PostgreSQL.</p>
 </td>
 </tr>
 <tr><td><code>template</code><br/>
 <i>string</i>
 </td>
 <td>
-   <p>The name of the template from which to create the new database</p>
+   <p>Maps to the <code>TEMPLATE</code> parameter of <code>CREATE DATABASE</code>. This setting cannot be changed.
+The name of the template from which to create this database.</p>
 </td>
 </tr>
 <tr><td><code>encoding</code><br/>
 <i>string</i>
 </td>
 <td>
-   <p>The encoding (cannot be changed)</p>
+   <p>Maps to the <code>ENCODING</code> parameter of <code>CREATE DATABASE</code>. This setting cannot be changed.
+Character set encoding to use in the database. This setting cannot be changed.</p>
 </td>
 </tr>
 <tr><td><code>locale</code><br/>
 <i>string</i>
 </td>
 <td>
-   <p>The locale (cannot be changed)
+   <p>Maps to the <code>LOCALE</code> parameter of <code>CREATE DATABASE</code>. This setting cannot be changed.
 Sets the default collation order and character classification in the new database.</p>
 </td>
 </tr>
@@ -2482,7 +2484,7 @@ Sets the default collation order and character classification in the new databas
 <i>string</i>
 </td>
 <td>
-   <p>The LOCALE_PROVIDER (cannot be changed)
+   <p>Maps to the <code>LOCALE_PROVIDER</code> parameter of <code>CREATE DATABASE</code>. This setting cannot be changed.
 This option sets the locale provider for databases created in the new cluster.
 Available from PostgreSQL 16.</p>
 </td>
@@ -2491,21 +2493,21 @@ Available from PostgreSQL 16.</p>
 <i>string</i>
 </td>
 <td>
-   <p>The LC_COLLATE (cannot be changed)</p>
+   <p>Maps to the <code>LC_COLLATE</code> parameter of <code>CREATE DATABASE</code>. This setting cannot be changed.</p>
 </td>
 </tr>
 <tr><td><code>localeCType</code><br/>
 <i>string</i>
 </td>
 <td>
-   <p>The LC_CTYPE (cannot be changed)</p>
+   <p>Maps to the <code>LC_CTYPE</code> parameter of <code>CREATE DATABASE</code>. This setting cannot be changed.</p>
 </td>
 </tr>
 <tr><td><code>icuLocale</code><br/>
 <i>string</i>
 </td>
 <td>
-   <p>The ICU_LOCALE (cannot be changed)
+   <p>Maps to the <code>ICU_LOCALE</code> parameter of <code>CREATE DATABASE</code>. This setting cannot be changed.
 Specifies the ICU locale when the ICU provider is used.
 This option requires <code>localeProvider</code> to be set to <code>icu</code>.
 Available from PostgreSQL 15.</p>
@@ -2515,7 +2517,7 @@ Available from PostgreSQL 15.</p>
 <i>string</i>
 </td>
 <td>
-   <p>The ICU_RULES (cannot be changed)
+   <p>Maps to the <code>ICU_RULES</code> parameter of <code>CREATE DATABASE</code>. This setting cannot be changed.
 Specifies additional collation rules to customize the behavior of the default collation.
 This option requires <code>localeProvider</code> to be set to <code>icu</code>.
 Available from PostgreSQL 16.</p>
@@ -2525,7 +2527,7 @@ Available from PostgreSQL 16.</p>
 <i>string</i>
 </td>
 <td>
-   <p>The BUILTIN_LOCALE (cannot be changed)
+   <p>Maps to the <code>BUILTIN_LOCALE</code> parameter of <code>CREATE DATABASE</code>. This setting cannot be changed.
 Specifies the locale name when the builtin provider is used.
 This option requires <code>localeProvider</code> to be set to <code>builtin</code>.
 Available from PostgreSQL 17.</p>
@@ -2535,43 +2537,50 @@ Available from PostgreSQL 17.</p>
 <i>string</i>
 </td>
 <td>
-   <p>The COLLATION_VERSION (cannot be changed)</p>
+   <p>Maps to the <code>COLLATION_VERSION</code> parameter of <code>CREATE DATABASE</code>. This setting cannot be changed.</p>
 </td>
 </tr>
 <tr><td><code>isTemplate</code><br/>
 <i>bool</i>
 </td>
 <td>
-   <p>True when the database is a template</p>
+   <p>Maps to the <code>IS_TEMPLATE</code> parameter of <code>CREATE DATABASE</code>.
+If true, this database is considered a template and can be cloned by
+any user with <code>CREATEDB</code> privileges.</p>
 </td>
 </tr>
 <tr><td><code>allowConnections</code><br/>
 <i>bool</i>
 </td>
 <td>
-   <p>True when connections to this database are allowed</p>
+   <p>Maps to the <code>ALLOW_CONNECTIONS</code> parameter of <code>CREATE DATABASE</code>.
+If false then no one can connect to this database.</p>
 </td>
 </tr>
 <tr><td><code>connectionLimit</code><br/>
 <i>int</i>
 </td>
 <td>
-   <p>Connection limit, -1 means no limit and -2 means the
-database is not valid</p>
+   <p>Maps to the <code>CONNECTION LIMIT</code> clause of <code>CREATE DATABASE</code>.
+How many concurrent connections can be made to this database. -1
+(the default) means no limit.</p>
 </td>
 </tr>
 <tr><td><code>tablespace</code><br/>
 <i>string</i>
 </td>
 <td>
-   <p>The default tablespace of this database</p>
+   <p>Maps to the <code>TABLESPACE</code> parameter of <code>CREATE DATABASE</code>.
+The name of the tablespace (in PostgreSQL) that will be associated
+with the new database. This tablespace will be the default
+tablespace used for objects created in this database.</p>
 </td>
 </tr>
 <tr><td><code>databaseReclaimPolicy</code><br/>
 <a href="#postgresql-cnpg-io-v1-DatabaseReclaimPolicy"><i>DatabaseReclaimPolicy</i></a>
 </td>
 <td>
-   <p>The policy for end-of-life maintenance of this database</p>
+   <p>The policy for end-of-life maintenance of this database.</p>
 </td>
 </tr>
 </tbody>
