@@ -2464,110 +2464,114 @@ The role name of the user who owns the database inside PostgreSQL.</p>
 <i>string</i>
 </td>
 <td>
-   <p>Maps to the <code>TEMPLATE</code> parameter of <code>CREATE DATABASE</code>. This setting cannot be changed.
-The name of the template from which to create this database.</p>
+   <p>Maps to the <code>TEMPLATE</code> parameter of <code>CREATE DATABASE</code>. This setting
+cannot be changed. The name of the template from which to create
+this database.</p>
 </td>
 </tr>
 <tr><td><code>encoding</code><br/>
 <i>string</i>
 </td>
 <td>
-   <p>Maps to the <code>ENCODING</code> parameter of <code>CREATE DATABASE</code>. This setting cannot be changed.
-Character set encoding to use in the database.</p>
+   <p>Maps to the <code>ENCODING</code> parameter of <code>CREATE DATABASE</code>. This setting
+cannot be changed. Character set encoding to use in the database.</p>
 </td>
 </tr>
 <tr><td><code>locale</code><br/>
 <i>string</i>
 </td>
 <td>
-   <p>Maps to the <code>LOCALE</code> parameter of <code>CREATE DATABASE</code>. This setting cannot be changed.
-Sets the default collation order and character classification in the new database.</p>
+   <p>Maps to the <code>LOCALE</code> parameter of <code>CREATE DATABASE</code>. This setting
+cannot be changed. Sets the default collation order and character
+classification in the new database.</p>
 </td>
 </tr>
 <tr><td><code>localeProvider</code><br/>
 <i>string</i>
 </td>
 <td>
-   <p>Maps to the <code>LOCALE_PROVIDER</code> parameter of <code>CREATE DATABASE</code>. This setting cannot be changed.
-This option sets the locale provider for databases created in the new cluster.
-Available from PostgreSQL 16.</p>
+   <p>Maps to the <code>LOCALE_PROVIDER</code> parameter of <code>CREATE DATABASE</code>. This
+setting cannot be changed. This option sets the locale provider for
+databases created in the new cluster. Available from PostgreSQL 16.</p>
 </td>
 </tr>
 <tr><td><code>localeCollate</code><br/>
 <i>string</i>
 </td>
 <td>
-   <p>Maps to the <code>LC_COLLATE</code> parameter of <code>CREATE DATABASE</code>. This setting cannot be changed.</p>
+   <p>Maps to the <code>LC_COLLATE</code> parameter of <code>CREATE DATABASE</code>. This
+setting cannot be changed.</p>
 </td>
 </tr>
 <tr><td><code>localeCType</code><br/>
 <i>string</i>
 </td>
 <td>
-   <p>Maps to the <code>LC_CTYPE</code> parameter of <code>CREATE DATABASE</code>. This setting cannot be changed.</p>
+   <p>Maps to the <code>LC_CTYPE</code> parameter of <code>CREATE DATABASE</code>. This setting
+cannot be changed.</p>
 </td>
 </tr>
 <tr><td><code>icuLocale</code><br/>
 <i>string</i>
 </td>
 <td>
-   <p>Maps to the <code>ICU_LOCALE</code> parameter of <code>CREATE DATABASE</code>. This setting cannot be changed.
-Specifies the ICU locale when the ICU provider is used.
-This option requires <code>localeProvider</code> to be set to <code>icu</code>.
-Available from PostgreSQL 15.</p>
+   <p>Maps to the <code>ICU_LOCALE</code> parameter of <code>CREATE DATABASE</code>. This
+setting cannot be changed. Specifies the ICU locale when the ICU
+provider is used. This option requires <code>localeProvider</code> to be set to
+<code>icu</code>. Available from PostgreSQL 15.</p>
 </td>
 </tr>
 <tr><td><code>icuRules</code><br/>
 <i>string</i>
 </td>
 <td>
-   <p>Maps to the <code>ICU_RULES</code> parameter of <code>CREATE DATABASE</code>. This setting cannot be changed.
-Specifies additional collation rules to customize the behavior of the default collation.
-This option requires <code>localeProvider</code> to be set to <code>icu</code>.
-Available from PostgreSQL 16.</p>
+   <p>Maps to the <code>ICU_RULES</code> parameter of <code>CREATE DATABASE</code>. This setting
+cannot be changed. Specifies additional collation rules to customize
+the behavior of the default collation. This option requires
+<code>localeProvider</code> to be set to <code>icu</code>. Available from PostgreSQL 16.</p>
 </td>
 </tr>
 <tr><td><code>builtinLocale</code><br/>
 <i>string</i>
 </td>
 <td>
-   <p>Maps to the <code>BUILTIN_LOCALE</code> parameter of <code>CREATE DATABASE</code>. This setting cannot be changed.
-Specifies the locale name when the builtin provider is used.
-This option requires <code>localeProvider</code> to be set to <code>builtin</code>.
-Available from PostgreSQL 17.</p>
+   <p>Maps to the <code>BUILTIN_LOCALE</code> parameter of <code>CREATE DATABASE</code>. This
+setting cannot be changed. Specifies the locale name when the
+builtin provider is used. This option requires <code>localeProvider</code> to
+be set to <code>builtin</code>. Available from PostgreSQL 17.</p>
 </td>
 </tr>
 <tr><td><code>collationVersion</code><br/>
 <i>string</i>
 </td>
 <td>
-   <p>Maps to the <code>COLLATION_VERSION</code> parameter of <code>CREATE DATABASE</code>. This setting cannot be changed.</p>
+   <p>Maps to the <code>COLLATION_VERSION</code> parameter of <code>CREATE DATABASE</code>. This
+setting cannot be changed.</p>
 </td>
 </tr>
 <tr><td><code>isTemplate</code><br/>
 <i>bool</i>
 </td>
 <td>
-   <p>Maps to the <code>IS_TEMPLATE</code> parameter of <code>CREATE DATABASE</code> and <code>ALTER DATABASE</code>.
-If true, this database is considered a template and can be cloned by
-any user with <code>CREATEDB</code> privileges.</p>
+   <p>Maps to the <code>IS_TEMPLATE</code> parameter of <code>CREATE DATABASE</code> and <code>ALTER DATABASE</code>. If true, this database is considered a template and can
+be cloned by any user with <code>CREATEDB</code> privileges.</p>
 </td>
 </tr>
 <tr><td><code>allowConnections</code><br/>
 <i>bool</i>
 </td>
 <td>
-   <p>Maps to the <code>ALLOW_CONNECTIONS</code> parameter of <code>CREATE DATABASE</code> and <code>ALTER DATABASE</code>.
-If false then no one can connect to this database.</p>
+   <p>Maps to the <code>ALLOW_CONNECTIONS</code> parameter of <code>CREATE DATABASE</code> and
+<code>ALTER DATABASE</code>. If false then no one can connect to this database.</p>
 </td>
 </tr>
 <tr><td><code>connectionLimit</code><br/>
 <i>int</i>
 </td>
 <td>
-   <p>Maps to the <code>CONNECTION LIMIT</code> clause of <code>CREATE DATABASE</code> and <code>ALTER DATABASE</code>.
-How many concurrent connections can be made to this database. -1
-(the default) means no limit.</p>
+   <p>Maps to the <code>CONNECTION LIMIT</code> clause of <code>CREATE DATABASE</code> and
+<code>ALTER DATABASE</code>. How many concurrent connections can be made to
+this database. -1 (the default) means no limit.</p>
 </td>
 </tr>
 <tr><td><code>tablespace</code><br/>

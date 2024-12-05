@@ -60,15 +60,15 @@ spec:
             properties:
               allowConnections:
                 description: |-
-                  Maps to the `ALLOW_CONNECTIONS` parameter of `CREATE DATABASE` and `ALTER DATABASE`.
-                  If false then no one can connect to this database.
+                  Maps to the `ALLOW_CONNECTIONS` parameter of `CREATE DATABASE` and
+                  `ALTER DATABASE`. If false then no one can connect to this database.
                 type: boolean
               builtinLocale:
                 description: |-
-                  Maps to the `BUILTIN_LOCALE` parameter of `CREATE DATABASE`. This setting cannot be changed.
-                  Specifies the locale name when the builtin provider is used.
-                  This option requires `localeProvider` to be set to `builtin`.
-                  Available from PostgreSQL 17.
+                  Maps to the `BUILTIN_LOCALE` parameter of `CREATE DATABASE`. This
+                  setting cannot be changed. Specifies the locale name when the
+                  builtin provider is used. This option requires `localeProvider` to
+                  be set to `builtin`. Available from PostgreSQL 17.
                 type: string
                 x-kubernetes-validations:
                 - message: builtinLocale is immutable
@@ -88,17 +88,18 @@ spec:
                 type: object
                 x-kubernetes-map-type: atomic
               collationVersion:
-                description: Maps to the `COLLATION_VERSION` parameter of `CREATE
-                  DATABASE`. This setting cannot be changed.
+                description: |-
+                  Maps to the `COLLATION_VERSION` parameter of `CREATE DATABASE`. This
+                  setting cannot be changed.
                 type: string
                 x-kubernetes-validations:
                 - message: collationVersion is immutable
                   rule: self == oldSelf
               connectionLimit:
                 description: |-
-                  Maps to the `CONNECTION LIMIT` clause of `CREATE DATABASE` and `ALTER DATABASE`.
-                  How many concurrent connections can be made to this database. -1
-                  (the default) means no limit.
+                  Maps to the `CONNECTION LIMIT` clause of `CREATE DATABASE` and
+                  `ALTER DATABASE`. How many concurrent connections can be made to
+                  this database. -1 (the default) means no limit.
                 type: integer
               databaseReclaimPolicy:
                 default: retain
@@ -109,8 +110,8 @@ spec:
                 type: string
               encoding:
                 description: |-
-                  Maps to the `ENCODING` parameter of `CREATE DATABASE`. This setting cannot be changed.
-                  Character set encoding to use in the database.
+                  Maps to the `ENCODING` parameter of `CREATE DATABASE`. This setting
+                  cannot be changed. Character set encoding to use in the database.
                 type: string
                 x-kubernetes-validations:
                 - message: encoding is immutable
@@ -125,57 +126,60 @@ spec:
                 type: string
               icuLocale:
                 description: |-
-                  Maps to the `ICU_LOCALE` parameter of `CREATE DATABASE`. This setting cannot be changed.
-                  Specifies the ICU locale when the ICU provider is used.
-                  This option requires `localeProvider` to be set to `icu`.
-                  Available from PostgreSQL 15.
+                  Maps to the `ICU_LOCALE` parameter of `CREATE DATABASE`. This
+                  setting cannot be changed. Specifies the ICU locale when the ICU
+                  provider is used. This option requires `localeProvider` to be set to
+                  `icu`. Available from PostgreSQL 15.
                 type: string
                 x-kubernetes-validations:
                 - message: icuLocale is immutable
                   rule: self == oldSelf
               icuRules:
                 description: |-
-                  Maps to the `ICU_RULES` parameter of `CREATE DATABASE`. This setting cannot be changed.
-                  Specifies additional collation rules to customize the behavior of the default collation.
-                  This option requires `localeProvider` to be set to `icu`.
-                  Available from PostgreSQL 16.
+                  Maps to the `ICU_RULES` parameter of `CREATE DATABASE`. This setting
+                  cannot be changed. Specifies additional collation rules to customize
+                  the behavior of the default collation. This option requires
+                  `localeProvider` to be set to `icu`. Available from PostgreSQL 16.
                 type: string
                 x-kubernetes-validations:
                 - message: icuRules is immutable
                   rule: self == oldSelf
               isTemplate:
                 description: |-
-                  Maps to the `IS_TEMPLATE` parameter of `CREATE DATABASE` and `ALTER DATABASE`.
-                  If true, this database is considered a template and can be cloned by
-                  any user with `CREATEDB` privileges.
+                  Maps to the `IS_TEMPLATE` parameter of `CREATE DATABASE` and `ALTER
+                  DATABASE`. If true, this database is considered a template and can
+                  be cloned by any user with `CREATEDB` privileges.
                 type: boolean
               locale:
                 description: |-
-                  Maps to the `LOCALE` parameter of `CREATE DATABASE`. This setting cannot be changed.
-                  Sets the default collation order and character classification in the new database.
+                  Maps to the `LOCALE` parameter of `CREATE DATABASE`. This setting
+                  cannot be changed. Sets the default collation order and character
+                  classification in the new database.
                 type: string
                 x-kubernetes-validations:
                 - message: locale is immutable
                   rule: self == oldSelf
               localeCType:
-                description: Maps to the `LC_CTYPE` parameter of `CREATE DATABASE`.
-                  This setting cannot be changed.
+                description: |-
+                  Maps to the `LC_CTYPE` parameter of `CREATE DATABASE`. This setting
+                  cannot be changed.
                 type: string
                 x-kubernetes-validations:
                 - message: localeCType is immutable
                   rule: self == oldSelf
               localeCollate:
-                description: Maps to the `LC_COLLATE` parameter of `CREATE DATABASE`.
-                  This setting cannot be changed.
+                description: |-
+                  Maps to the `LC_COLLATE` parameter of `CREATE DATABASE`. This
+                  setting cannot be changed.
                 type: string
                 x-kubernetes-validations:
                 - message: localeCollate is immutable
                   rule: self == oldSelf
               localeProvider:
                 description: |-
-                  Maps to the `LOCALE_PROVIDER` parameter of `CREATE DATABASE`. This setting cannot be changed.
-                  This option sets the locale provider for databases created in the new cluster.
-                  Available from PostgreSQL 16.
+                  Maps to the `LOCALE_PROVIDER` parameter of `CREATE DATABASE`. This
+                  setting cannot be changed. This option sets the locale provider for
+                  databases created in the new cluster. Available from PostgreSQL 16.
                 type: string
                 x-kubernetes-validations:
                 - message: localeProvider is immutable
@@ -209,8 +213,9 @@ spec:
                 type: string
               template:
                 description: |-
-                  Maps to the `TEMPLATE` parameter of `CREATE DATABASE`. This setting cannot be changed.
-                  The name of the template from which to create this database.
+                  Maps to the `TEMPLATE` parameter of `CREATE DATABASE`. This setting
+                  cannot be changed. The name of the template from which to create
+                  this database.
                 type: string
                 x-kubernetes-validations:
                 - message: template is immutable
