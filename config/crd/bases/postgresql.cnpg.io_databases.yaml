@@ -60,7 +60,7 @@ spec:
             properties:
               allowConnections:
                 description: |-
-                  Maps to the `ALLOW_CONNECTIONS` parameter of `CREATE DATABASE`.
+                  Maps to the `ALLOW_CONNECTIONS` parameter of `CREATE DATABASE` and `ALTER DATABASE`.
                   If false then no one can connect to this database.
                 type: boolean
               builtinLocale:
@@ -96,7 +96,7 @@ spec:
                   rule: self == oldSelf
               connectionLimit:
                 description: |-
-                  Maps to the `CONNECTION LIMIT` clause of `CREATE DATABASE`.
+                  Maps to the `CONNECTION LIMIT` clause of `CREATE DATABASE` and `ALTER DATABASE`.
                   How many concurrent connections can be made to this database. -1
                   (the default) means no limit.
                 type: integer
@@ -110,7 +110,7 @@ spec:
               encoding:
                 description: |-
                   Maps to the `ENCODING` parameter of `CREATE DATABASE`. This setting cannot be changed.
-                  Character set encoding to use in the database. This setting cannot be changed.
+                  Character set encoding to use in the database.
                 type: string
                 x-kubernetes-validations:
                 - message: encoding is immutable
@@ -145,7 +145,7 @@ spec:
                   rule: self == oldSelf
               isTemplate:
                 description: |-
-                  Maps to the `IS_TEMPLATE` parameter of `CREATE DATABASE`.
+                  Maps to the `IS_TEMPLATE` parameter of `CREATE DATABASE` and `ALTER DATABASE`.
                   If true, this database is considered a template and can be cloned by
                   any user with `CREATEDB` privileges.
                 type: boolean
@@ -194,12 +194,15 @@ spec:
                 - message: the name template1 is reserved
                   rule: self != 'template1'
               owner:
-                description: The role name of the user who owns the database inside
-                  PostgreSQL.
+                description: |-
+                  Maps to the `OWNER` parameter of `CREATE DATABASE`.
+                  Maps to the `OWNER TO` command of `ALTER DATABASE`.
+                  The role name of the user who owns the database inside PostgreSQL.
                 type: string
               tablespace:
                 description: |-
                   Maps to the `TABLESPACE` parameter of `CREATE DATABASE`.
+                  Maps to the `SET TABLESPACE` command of `ALTER DATABASE`.
                   The name of the tablespace (in PostgreSQL) that will be associated
                   with the new database. This tablespace will be the default
                   tablespace used for objects created in this database.

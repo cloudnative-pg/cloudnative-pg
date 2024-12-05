@@ -2422,7 +2422,9 @@ PostgreSQL cluster from an existing storage</p>
 - [Database](#postgresql-cnpg-io-v1-Database)
 
 
-<p>DatabaseSpec is the specification of a Postgresql Database</p>
+<p>DatabaseSpec is the specification of a Postgresql Database, built around the
+<code>CREATE DATABASE</code>, <code>ALTER DATABASE</code>, and <code>DROP DATABASE</code> SQL commands of
+PostgreSQL.</p>
 
 
 <table class="table">
@@ -2453,7 +2455,9 @@ PostgreSQL cluster from an existing storage</p>
 <i>string</i>
 </td>
 <td>
-   <p>The role name of the user who owns the database inside PostgreSQL.</p>
+   <p>Maps to the <code>OWNER</code> parameter of <code>CREATE DATABASE</code>.
+Maps to the <code>OWNER TO</code> command of <code>ALTER DATABASE</code>.
+The role name of the user who owns the database inside PostgreSQL.</p>
 </td>
 </tr>
 <tr><td><code>template</code><br/>
@@ -2469,7 +2473,7 @@ The name of the template from which to create this database.</p>
 </td>
 <td>
    <p>Maps to the <code>ENCODING</code> parameter of <code>CREATE DATABASE</code>. This setting cannot be changed.
-Character set encoding to use in the database. This setting cannot be changed.</p>
+Character set encoding to use in the database.</p>
 </td>
 </tr>
 <tr><td><code>locale</code><br/>
@@ -2544,7 +2548,7 @@ Available from PostgreSQL 17.</p>
 <i>bool</i>
 </td>
 <td>
-   <p>Maps to the <code>IS_TEMPLATE</code> parameter of <code>CREATE DATABASE</code>.
+   <p>Maps to the <code>IS_TEMPLATE</code> parameter of <code>CREATE DATABASE</code> and <code>ALTER DATABASE</code>.
 If true, this database is considered a template and can be cloned by
 any user with <code>CREATEDB</code> privileges.</p>
 </td>
@@ -2553,7 +2557,7 @@ any user with <code>CREATEDB</code> privileges.</p>
 <i>bool</i>
 </td>
 <td>
-   <p>Maps to the <code>ALLOW_CONNECTIONS</code> parameter of <code>CREATE DATABASE</code>.
+   <p>Maps to the <code>ALLOW_CONNECTIONS</code> parameter of <code>CREATE DATABASE</code> and <code>ALTER DATABASE</code>.
 If false then no one can connect to this database.</p>
 </td>
 </tr>
@@ -2561,7 +2565,7 @@ If false then no one can connect to this database.</p>
 <i>int</i>
 </td>
 <td>
-   <p>Maps to the <code>CONNECTION LIMIT</code> clause of <code>CREATE DATABASE</code>.
+   <p>Maps to the <code>CONNECTION LIMIT</code> clause of <code>CREATE DATABASE</code> and <code>ALTER DATABASE</code>.
 How many concurrent connections can be made to this database. -1
 (the default) means no limit.</p>
 </td>
@@ -2571,6 +2575,7 @@ How many concurrent connections can be made to this database. -1
 </td>
 <td>
    <p>Maps to the <code>TABLESPACE</code> parameter of <code>CREATE DATABASE</code>.
+Maps to the <code>SET TABLESPACE</code> command of <code>ALTER DATABASE</code>.
 The name of the tablespace (in PostgreSQL) that will be associated
 with the new database. This tablespace will be the default
 tablespace used for objects created in this database.</p>

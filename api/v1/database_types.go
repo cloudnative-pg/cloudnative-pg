@@ -35,7 +35,9 @@ const (
 	DatabaseReclaimRetain DatabaseReclaimPolicy = "retain"
 )
 
-// DatabaseSpec is the specification of a Postgresql Database
+// DatabaseSpec is the specification of a Postgresql Database, built around the
+// `CREATE DATABASE`, `ALTER DATABASE`, and `DROP DATABASE` SQL commands of
+// PostgreSQL.
 // +kubebuilder:validation:XValidation:rule="!has(self.builtinLocale) || self.localeProvider == 'builtin'",message="builtinLocale is only available when localeProvider is set to `builtin`"
 // +kubebuilder:validation:XValidation:rule="!has(self.icuLocale) || self.localeProvider == 'icu'",message="icuLocale is only available when localeProvider is set to `icu`"
 // +kubebuilder:validation:XValidation:rule="!has(self.icuRules) || self.localeProvider == 'icu'",message="icuRules is only available when localeProvider is set to `icu`"
@@ -56,6 +58,8 @@ type DatabaseSpec struct {
 	// +kubebuilder:validation:XValidation:rule="self != 'template1'",message="the name template1 is reserved"
 	Name string `json:"name"`
 
+	// Maps to the `OWNER` parameter of `CREATE DATABASE`.
+	// Maps to the `OWNER TO` command of `ALTER DATABASE`.
 	// The role name of the user who owns the database inside PostgreSQL.
 	Owner string `json:"owner"`
 
@@ -66,7 +70,7 @@ type DatabaseSpec struct {
 	Template string `json:"template,omitempty"`
 
 	// Maps to the `ENCODING` parameter of `CREATE DATABASE`. This setting cannot be changed.
-	// Character set encoding to use in the database. This setting cannot be changed.
+        // Character set encoding to use in the database.
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="encoding is immutable"
 	// +optional
 	Encoding string `json:"encoding,omitempty"`
@@ -123,24 +127,25 @@ type DatabaseSpec struct {
 	// +optional
 	CollationVersion string `json:"collationVersion,omitempty"`
 
-	// Maps to the `IS_TEMPLATE` parameter of `CREATE DATABASE`.
+	// Maps to the `IS_TEMPLATE` parameter of `CREATE DATABASE` and `ALTER DATABASE`.
 	// If true, this database is considered a template and can be cloned by
 	// any user with `CREATEDB` privileges.
 	// +optional
 	IsTemplate *bool `json:"isTemplate,omitempty"`
 
-	// Maps to the `ALLOW_CONNECTIONS` parameter of `CREATE DATABASE`.
+	// Maps to the `ALLOW_CONNECTIONS` parameter of `CREATE DATABASE` and `ALTER DATABASE`.
 	// If false then no one can connect to this database.
 	// +optional
 	AllowConnections *bool `json:"allowConnections,omitempty"`
 
-	// Maps to the `CONNECTION LIMIT` clause of `CREATE DATABASE`.
+	// Maps to the `CONNECTION LIMIT` clause of `CREATE DATABASE` and `ALTER DATABASE`.
 	// How many concurrent connections can be made to this database. -1
 	// (the default) means no limit.
 	// +optional
 	ConnectionLimit *int `json:"connectionLimit,omitempty"`
 
 	// Maps to the `TABLESPACE` parameter of `CREATE DATABASE`.
+	// Maps to the `SET TABLESPACE` command of `ALTER DATABASE`.
 	// The name of the tablespace (in PostgreSQL) that will be associated
 	// with the new database. This tablespace will be the default
 	// tablespace used for objects created in this database.
