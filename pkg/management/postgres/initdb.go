@@ -138,14 +138,14 @@ func (info InitInfo) EnsureTargetDirectoriesDoNotExist(ctx context.Context) erro
 	pgDataExists, err := fileutils.FileExists(info.PgData)
 	if err != nil {
 		contextLogger.Error(err, "Error while checking for an existing data directory")
-		return fmt.Errorf("while verifying if data directory exists: %w", err)
+		return fmt.Errorf("while verifying if the data directory exists: %w", err)
 	}
 
 	pgWalExists := false
 	if info.PgWal != "" {
 		if pgWalExists, err = fileutils.FileExists(info.PgWal); err != nil {
 			contextLogger.Error(err, "Error while checking for an existing WAL directory")
-			return fmt.Errorf("while verifying if WAL directory exists: %w", err)
+			return fmt.Errorf("while verifying if the WAL directory exists: %w", err)
 		}
 	}
 
