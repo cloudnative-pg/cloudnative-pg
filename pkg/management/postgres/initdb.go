@@ -103,11 +103,11 @@ type InitInfo struct {
 	TablespaceMapFile []byte
 }
 
-// CheckTargetDataDirectory ensures that the target data directory does not exist.
-// This is a safety check we do before initializing a new instance data directory.
+// EnsureTargetDirectoriesDoNotExist ensures that the target data and WAL directories do not exist.
+// This is a safety check we do before initializing a new instance.
 //
 // If the PGDATA directory already exists and contains a valid PostgreSQL control file,
-// the function moves its contents to a uniquely named directory.
+// the function moves the contents to uniquely named directories.
 // If no valid control file is found, the function assumes the directory is the result of
 // a failed initialization attempt and removes it.
 //
@@ -123,45 +123,82 @@ type InitInfo struct {
 //     important user data. This is particularly relevant when using static provisioning
 //     of PersistentVolumeClaims (PVCs), as it prevents accidental overwriting of a valid
 //     data directory that may exist in the PersistentVolumes (PVs).
-func (info InitInfo) CheckTargetDataDirectory(ctx context.Context) error {
+func (info InitInfo) EnsureTargetDirectoriesDoNotExist(ctx context.Context) error {
 	contextLogger := log.FromContext(ctx).WithValues("pgdata", info.PgData)
 
 	pgDataExists, err := fileutils.FileExists(info.PgData)
 	if err != nil {
-		contextLogger.Error(err, "Error while checking for an existing PGData")
-		return fmt.Errorf("while verifying is PGDATA exists: %w", err)
+		contextLogger.Error(err, "Error while checking for an existing data directory")
+		return fmt.Errorf("while verifying if the data directory exists: %w", err)
 	}
-	if !pgDataExists {
-		// The PGDATA directory doesn't exist. We can definitely
-		// write to it
+
+	pgWalExists := false
+	if info.PgWal != "" {
+		if pgWalExists, err = fileutils.FileExists(info.PgWal); err != nil {
+			contextLogger.Error(err, "Error while checking for an existing WAL directory")
+			return fmt.Errorf("while verifying if the WAL directory exists: %w", err)
+		}
+	}
+
+	if !pgDataExists && !pgWalExists {
 		return nil
 	}
 
-	// We've an existing directory. Let's check if this is a real
-	// PGDATA directory or not.
 	out, err := info.GetInstance().GetPgControldata()
-	if err != nil {
-		contextLogger.Info("pg_controldata check on existing directory failed, cleaning it up",
-			"out", out, "err", err)
+	if err == nil {
+		contextLogger.Info("pg_controldata check on existing directory succeeded, renaming the folders", "out", out)
+		return info.renameExistingTargetDataDirectories(ctx, pgWalExists)
+	}
 
+	contextLogger.Info("pg_controldata check on existing directory failed, cleaning up folders", "err", err, "out", out)
+	return info.removeExistingTargetDataDirectories(ctx, pgDataExists, pgWalExists)
+}
+
+func (info InitInfo) removeExistingTargetDataDirectories(ctx context.Context, pgDataExists, pgWalExists bool) error {
+	contextLogger := log.FromContext(ctx).WithValues("pgdata", info.PgData, "pgwal", info.PgWal)
+
+	if pgDataExists {
+		contextLogger.Info("cleaning up existing data directory")
 		if err := fileutils.RemoveDirectory(info.PgData); err != nil {
 			contextLogger.Error(err, "error while cleaning up existing data directory")
 			return err
 		}
-
-		return nil
 	}
 
-	renamedDirectoryName := fmt.Sprintf("%s_%s", info.PgData, fileutils.FormatFriendlyTimestamp(time.Now()))
-	contextLogger = contextLogger.WithValues(
-		"out", out,
-		"newName", renamedDirectoryName,
-	)
+	if pgWalExists {
+		contextLogger.Info("cleaning up existing WAL directory")
+		if err := fileutils.RemoveDirectory(info.PgWal); err != nil {
+			contextLogger.Error(err, "error while cleaning up existing WAL directory")
+			return err
+		}
+	}
 
-	contextLogger.Info("pg_controldata check on existing directory succeeded, renaming the folder")
-	if err := os.Rename(info.PgData, renamedDirectoryName); err != nil {
-		contextLogger.Error(err, "error while renaming existing data directory")
+	return nil
+}
+
+func (info InitInfo) renameExistingTargetDataDirectories(ctx context.Context, pgWalExists bool) error {
+	contextLogger := log.FromContext(ctx).WithValues("pgdata", info.PgData, "pgwal", info.PgWal)
+
+	suffixTimestamp := fileutils.FormatFriendlyTimestamp(time.Now())
+
+	pgdataNewName := fmt.Sprintf("%s_%s", info.PgData, suffixTimestamp)
+	contextLogger = contextLogger.WithValues()
+
+	contextLogger.Info("renaming the data directory", "pgdataNewName", pgdataNewName)
+	if err := os.Rename(info.PgData, pgdataNewName); err != nil {
+		contextLogger.Error(err, "error while renaming existing data directory",
+			"pgdataNewName", pgdataNewName)
 		return fmt.Errorf("while renaming existing data directory: %w", err)
+	}
+
+	if pgWalExists {
+		pgwalNewName := fmt.Sprintf("%s_%s", info.PgWal, suffixTimestamp)
+
+		contextLogger.Info("renaming the WAL directory", "pgwalNewName", pgwalNewName)
+		if err := os.Rename(info.PgWal, pgwalNewName); err != nil {
+			contextLogger.Error(err, "error while renaming existing WAL directory")
+			return fmt.Errorf("while renaming existing WAL directory: %w", err)
+		}
 	}
 
 	return nil
