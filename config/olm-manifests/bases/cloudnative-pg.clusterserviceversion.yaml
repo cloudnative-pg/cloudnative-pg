@@ -843,7 +843,7 @@ spec:
     - kind: Publication
       name: publications.postgresql.cnpg.io
       displayName: Publication
-      description: Declarative creation and management of a Publication in a Cluster
+      description: Declarative creation and management of a Logical Replication Publication in a PostgreSQL Cluster
       version: v1
       resources:
         - kind: Cluster
@@ -852,7 +852,7 @@ spec:
       specDescriptors:
         - path: name
           displayName: Publication name
-          description: Publication name
+          description: Name of the publication for PostgreSQL logical replication
         - path: dbname
           displayName: Database name
           description: Database on which the publication will be created
@@ -865,7 +865,7 @@ spec:
     - kind: Subscription
       name: subscriptions.postgresql.cnpg.io
       displayName: Subscription
-      description: Declarative creation and management of a Subscription to a previously defined Publication
+      description: Declarative creation and management of a Logical Replication Subscription in a PostgreSQL Cluster to a previously defined Publication
       version: v1
       resources:
         - kind: Cluster
@@ -874,7 +874,7 @@ spec:
       specDescriptors:
         - path: name
           displayName: Subscription name
-          description: Subscription name
+          description: Name of the subscription for PostgreSQL logical replication
         - path: dbname
           displayName: Database name
           description: Database on which the Subscription will be created
@@ -883,7 +883,7 @@ spec:
           description: Name of the Publication to subscribe to
         - path: cluster
           displayName: Cluster requested to create the subscription
-          description: Cluster on which the subscription will be created
+          description: Cluster on which the subscription will be created (subscriber)
         - path: externalClusterName
           displayName: Name of the external cluster with publication
-          description: Name of the cluster where the Publication is defined
+          description: Name of the cluster where the Publication is defined (publisher)
