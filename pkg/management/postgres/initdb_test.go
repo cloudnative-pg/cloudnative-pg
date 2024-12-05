@@ -33,7 +33,7 @@ var _ = Describe("EnsureTargetDirectoriesDoNotExist", func() {
 			PgWal:  GinkgoT().TempDir(),
 		}
 		Expect(os.Create(filepath.Join(initInfo.PgData, "PG_VERSION"))).Error().To(Succeed())
-		Expect(os.Mkdir(filepath.Join(initInfo.PgWal, "archive_status"), 0o777)).To(Succeed())
+		Expect(os.Mkdir(filepath.Join(initInfo.PgWal, "archive_status"), 0o700)).To(Succeed())
 	})
 
 	It("should do nothing if both data and WAL directories do not exist", func(ctx SpecContext) {
@@ -85,7 +85,7 @@ var _ = Describe("renameExistingTargetDataDirectories", func() {
 			PgWal:  GinkgoT().TempDir(),
 		}
 		Expect(os.Create(filepath.Join(initInfo.PgData, "PG_VERSION"))).Error().To(Succeed())
-		Expect(os.Mkdir(filepath.Join(initInfo.PgWal, "archive_status"), 0o777)).To(Succeed())
+		Expect(os.Mkdir(filepath.Join(initInfo.PgWal, "archive_status"), 0o700)).To(Succeed())
 	})
 
 	It("should rename existing data and WAL directories", func(ctx SpecContext) {
