@@ -40,59 +40,61 @@ const (
 // +kubebuilder:validation:XValidation:rule="!has(self.icuLocale) || self.localeProvider == 'icu'",message="icuLocale is only available when localeProvider is set to `icu`"
 // +kubebuilder:validation:XValidation:rule="!has(self.icuRules) || self.localeProvider == 'icu'",message="icuRules is only available when localeProvider is set to `icu`"
 type DatabaseSpec struct {
-	// The corresponding cluster
+	// The name of the PostgreSQL cluster hosting the database.
 	ClusterRef corev1.LocalObjectReference `json:"cluster"`
 
-	// Ensure the PostgreSQL database is `present` or `absent` - defaults to "present"
+	// Ensure the PostgreSQL database is `present` or `absent` - defaults to "present".
 	// +kubebuilder:default:="present"
 	// +kubebuilder:validation:Enum=present;absent
 	// +optional
 	Ensure EnsureOption `json:"ensure,omitempty"`
 
-	// The name inside PostgreSQL
+	// The name of the database to create inside PostgreSQL. This setting cannot be changed.
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="name is immutable"
 	// +kubebuilder:validation:XValidation:rule="self != 'postgres'",message="the name postgres is reserved"
 	// +kubebuilder:validation:XValidation:rule="self != 'template0'",message="the name template0 is reserved"
 	// +kubebuilder:validation:XValidation:rule="self != 'template1'",message="the name template1 is reserved"
 	Name string `json:"name"`
 
-	// The owner
+	// The role name of the user who own the database inside PostgreSQL.
 	Owner string `json:"owner"`
 
-	// The name of the template from which to create the new database
+	// Maps to the `TEMPLATE` parameter of `CREATE DATABASE`. This setting cannot be changed.
+	// The name of the template from which to create this database.
 	// +optional
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="template is immutable"
 	Template string `json:"template,omitempty"`
 
-	// The encoding (cannot be changed)
+	// Maps to the `ENCODING` parameter of `CREATE DATABASE`. This setting cannot be changed.
+        // Character set encoding to use in the database. This setting cannot be changed.
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="encoding is immutable"
 	// +optional
 	Encoding string `json:"encoding,omitempty"`
 
-	// The locale (cannot be changed)
+	// Maps to the `LOCALE` parameter of `CREATE DATABASE`. This setting cannot be changed.
 	// Sets the default collation order and character classification in the new database.
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="locale is immutable"
 	// +optional
 	Locale string `json:"locale,omitempty"`
 
-	// The LOCALE_PROVIDER (cannot be changed)
+	// Maps to the `LOCALE_PROVIDER` parameter of `CREATE DATABASE`. This setting cannot be changed.
 	// This option sets the locale provider for databases created in the new cluster.
 	// Available from PostgreSQL 16.
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="localeProvider is immutable"
 	// +optional
 	LocaleProvider string `json:"localeProvider,omitempty"`
 
-	// The LC_COLLATE (cannot be changed)
+	// Maps to the `LC_COLLATE` parameter of `CREATE DATABASE`. This setting cannot be changed.
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="localeCollate is immutable"
 	// +optional
 	LcCollate string `json:"localeCollate,omitempty"`
 
-	// The LC_CTYPE (cannot be changed)
+	// Maps to the `LC_CTYPE` parameter of `CREATE DATABASE`. This setting cannot be changed.
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="localeCType is immutable"
 	// +optional
 	LcCtype string `json:"localeCType,omitempty"`
 
-	// The ICU_LOCALE (cannot be changed)
+	// Maps to the `ICU_LOCALE` parameter of `CREATE DATABASE`. This setting cannot be changed.
 	// Specifies the ICU locale when the ICU provider is used.
 	// This option requires `localeProvider` to be set to `icu`.
 	// Available from PostgreSQL 15.
@@ -100,7 +102,7 @@ type DatabaseSpec struct {
 	// +optional
 	IcuLocale string `json:"icuLocale,omitempty"`
 
-	// The ICU_RULES (cannot be changed)
+	// Maps to the `ICU_RULES` parameter of `CREATE DATABASE`. This setting cannot be changed.
 	// Specifies additional collation rules to customize the behavior of the default collation.
 	// This option requires `localeProvider` to be set to `icu`.
 	// Available from PostgreSQL 16.
@@ -108,7 +110,7 @@ type DatabaseSpec struct {
 	// +optional
 	IcuRules string `json:"icuRules,omitempty"`
 
-	// The BUILTIN_LOCALE (cannot be changed)
+	// Maps to the `BUILTIN_LOCALE` parameter of `CREATE DATABASE`. This setting cannot be changed.
 	// Specifies the locale name when the builtin provider is used.
 	// This option requires `localeProvider` to be set to `builtin`.
 	// Available from PostgreSQL 17.
@@ -116,29 +118,36 @@ type DatabaseSpec struct {
 	// +optional
 	BuiltinLocale string `json:"builtinLocale,omitempty"`
 
-	// The COLLATION_VERSION (cannot be changed)
+	// Maps to the `COLLATION_VERSION` parameter of `CREATE DATABASE`. This setting cannot be changed.
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="collationVersion is immutable"
 	// +optional
 	CollationVersion string `json:"collationVersion,omitempty"`
 
-	// True when the database is a template
+	// Maps to the `IS_TEMPLATE` parameter of `CREATE DATABASE`.
+	// If true, this database is considered a template and can be cloned by
+	// any user with `CREATEDB` privileges.
 	// +optional
 	IsTemplate *bool `json:"isTemplate,omitempty"`
 
-	// True when connections to this database are allowed
+	// Maps to the `ALLOW_CONNECTIONS` parameter of `CREATE DATABASE`.
+	// If false then no one can connect to this database.
 	// +optional
 	AllowConnections *bool `json:"allowConnections,omitempty"`
 
-	// Connection limit, -1 means no limit and -2 means the
-	// database is not valid
+	// Maps to the `CONNECTION LIMIT` clause of `CREATE DATABASE`.
+	// How many concurrent connections can be made to this database. -1
+	// (the default) means no limit.
 	// +optional
 	ConnectionLimit *int `json:"connectionLimit,omitempty"`
 
-	// The default tablespace of this database
+	// Maps to the `TABLESPACE` parameter of `CREATE DATABASE`.
+	// The name of the tablespace (in PostgreSQL) that will be associated
+	// with the new database. This tablespace will be the default
+	// tablespace used for objects created in this database.
 	// +optional
 	Tablespace string `json:"tablespace,omitempty"`
 
-	// The policy for end-of-life maintenance of this database
+	// The policy for end-of-life maintenance of this database.
 	// +kubebuilder:validation:Enum=delete;retain
 	// +kubebuilder:default:=retain
 	// +optional
