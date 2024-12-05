@@ -38,7 +38,7 @@ type SubscriptionReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 
-	instance            *postgres.Instance
+	instance            instanceInterface
 	finalizerReconciler *finalizerReconciler[*apiv1.Subscription]
 }
 
@@ -167,7 +167,7 @@ func (r *SubscriptionReconciler) evaluateDropSubscription(ctx context.Context, s
 		return nil
 	}
 
-	db, err := r.instance.ConnectionPool().Connection(sub.Spec.DBName)
+	db, err := r.instance.GetNamedDB(sub.Spec.DBName)
 	if err != nil {
 		return fmt.Errorf("while getting DB connection: %w", err)
 	}
