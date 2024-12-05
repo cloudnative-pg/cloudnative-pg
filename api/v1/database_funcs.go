@@ -40,7 +40,7 @@ func (db *Database) SetAsReady() {
 	db.Status.ObservedGeneration = db.Generation
 }
 
-// GetStatusMessage returns the applied status of the database
+// GetStatusMessage returns the status message of the database
 func (db *Database) GetStatusMessage() string {
 	return db.Status.Message
 }

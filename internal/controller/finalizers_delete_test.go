@@ -21,6 +21,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -33,7 +34,7 @@ import (
 )
 
 // nolint: dupl
-var _ = Describe("CRD finalizers", func() {
+var _ = Describe("Test cleanup of owned objects on cluster deletion", func() {
 	var (
 		r              ClusterReconciler
 		scheme         *runtime.Scheme
@@ -51,7 +52,7 @@ var _ = Describe("CRD finalizers", func() {
 		}
 	})
 
-	It("should delete database finalizers for databases on the cluster", func(ctx SpecContext) {
+	It("should set databases on the cluster as failed and delete their finalizers", func(ctx SpecContext) {
 		databaseList := &apiv1.DatabaseList{
 			Items: []apiv1.Database{
 				{
@@ -67,6 +68,10 @@ var _ = Describe("CRD finalizers", func() {
 						ClusterRef: corev1.LocalObjectReference{
 							Name: "cluster",
 						},
+					},
+					Status: apiv1.DatabaseStatus{
+						Applied: ptr.To(true),
+						Message: "",
 					},
 				},
 				{
@@ -98,8 +103,8 @@ var _ = Describe("CRD finalizers", func() {
 			err = cli.Get(ctx, client.ObjectKeyFromObject(&db), database)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(database.Finalizers).To(BeZero())
-			Expect(*database.Status.Applied).To(BeFalse())
-			Expect(database.Status.Message).To(ContainSubstring("not reconciled"))
+			Expect(database.Status.Applied).To(HaveValue(BeFalse()))
+			Expect(database.Status.Message).To(ContainSubstring("cluster resource has been deleted"))
 		}
 	})
 
@@ -138,7 +143,7 @@ var _ = Describe("CRD finalizers", func() {
 			Expect(database.Status.Message).ToNot(ContainSubstring("not reconciled"))
 		})
 
-	It("should delete publication finalizers for publications on the cluster", func(ctx SpecContext) {
+	It("should set publications on the cluster as failed and delete their finalizers", func(ctx SpecContext) {
 		publicationList := &apiv1.PublicationList{
 			Items: []apiv1.Publication{
 				{
@@ -154,6 +159,10 @@ var _ = Describe("CRD finalizers", func() {
 						ClusterRef: corev1.LocalObjectReference{
 							Name: "cluster",
 						},
+					},
+					Status: apiv1.PublicationStatus{
+						Applied: ptr.To(true),
+						Message: "",
 					},
 				},
 				{
@@ -185,8 +194,8 @@ var _ = Describe("CRD finalizers", func() {
 			err = cli.Get(ctx, client.ObjectKeyFromObject(&pub), publication)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(publication.Finalizers).To(BeZero())
-			Expect(*publication.Status.Applied).To(BeFalse())
-			Expect(publication.Status.Message).To(ContainSubstring("not reconciled"))
+			Expect(publication.Status.Applied).To(HaveValue(BeFalse()))
+			Expect(publication.Status.Message).To(ContainSubstring("cluster resource has been deleted"))
 		}
 	})
 
@@ -224,7 +233,7 @@ var _ = Describe("CRD finalizers", func() {
 		Expect(publication.Status.Message).ToNot(ContainSubstring("not reconciled"))
 	})
 
-	It("should delete subscription finalizers for subscriptions on the cluster", func(ctx SpecContext) {
+	It("should set subscriptions on the cluster as failed and delete their finalizers ", func(ctx SpecContext) {
 		subscriptionList := &apiv1.SubscriptionList{
 			Items: []apiv1.Subscription{
 				{
@@ -240,6 +249,10 @@ var _ = Describe("CRD finalizers", func() {
 						ClusterRef: corev1.LocalObjectReference{
 							Name: "cluster",
 						},
+					},
+					Status: apiv1.SubscriptionStatus{
+						Applied: ptr.To(true),
+						Message: "",
 					},
 				},
 				{
@@ -271,8 +284,8 @@ var _ = Describe("CRD finalizers", func() {
 			err = cli.Get(ctx, client.ObjectKeyFromObject(&sub), subscription)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(subscription.Finalizers).To(BeZero())
-			Expect(*subscription.Status.Applied).To(BeFalse())
-			Expect(subscription.Status.Message).To(ContainSubstring("not reconciled"))
+			Expect(subscription.Status.Applied).To(HaveValue(BeFalse()))
+			Expect(subscription.Status.Message).To(ContainSubstring("cluster resource has been deleted"))
 		}
 	})
 

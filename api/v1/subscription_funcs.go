@@ -40,7 +40,7 @@ func (sub *Subscription) SetAsReady() {
 	sub.Status.ObservedGeneration = sub.Generation
 }
 
-// GetStatusMessage returns the applied status of the subscription
+// GetStatusMessage returns the status message of the subscription
 func (sub *Subscription) GetStatusMessage() string {
 	return sub.Status.Message
 }
