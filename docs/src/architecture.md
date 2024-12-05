@@ -354,11 +354,12 @@ only write inside a single Kubernetes cluster, at any time.
 
 However, for business continuity objectives it is fundamental to:
 
-- reduce global **recovery point objectives** (RPO) by storing PostgreSQL backup data
-  in multiple locations, regions and possibly using different providers
-  (Disaster Recovery)
-- reduce global **recovery time objectives** (RTO) by taking advantage of PostgreSQL
-  replication beyond the primary Kubernetes cluster (High Availability)
+- reduce global **recovery point objectives** ([RPO](before_you_start.md#rpo))
+  by storing PostgreSQL backup data in multiple locations, regions and possibly
+  using different providers (Disaster Recovery)
+- reduce global **recovery time objectives** ([RTO](before_you_start.md#rto))
+  by taking advantage of PostgreSQL replication beyond the primary Kubernetes
+  cluster (High Availability)
 
 In order to address the above concerns, CloudNativePG introduces the concept of
 a PostgreSQL Topology that is distributed across different Kubernetes clusters
