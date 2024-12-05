@@ -113,7 +113,7 @@ func (r *ClusterReconciler) reconcileImage(ctx context.Context, cluster *apiv1.C
 	}
 
 	// If the image is different, we set it into the cluster status
-	if cluster.Spec.ImageName != catalogImage {
+	if cluster.Status.Image != catalogImage {
 		cluster.Status.Image = catalogImage
 		patch := client.MergeFrom(oldCluster)
 		if err := r.Status().Patch(ctx, cluster, patch); err != nil {
