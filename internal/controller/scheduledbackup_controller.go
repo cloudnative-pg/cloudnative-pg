@@ -33,6 +33,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -326,7 +327,11 @@ func (r *ScheduledBackupReconciler) GetChildBackups(
 }
 
 // SetupWithManager install this controller in the controller manager
-func (r *ScheduledBackupReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
+func (r *ScheduledBackupReconciler) SetupWithManager(
+	ctx context.Context,
+	mgr ctrl.Manager,
+	maxConcurrentReconciles int,
+) error {
 	// Create a new indexed field on backups. This field will be used to easily
 	// find all the backups created by this controller
 	if err := mgr.GetFieldIndexer().IndexField(
@@ -353,6 +358,7 @@ func (r *ScheduledBackupReconciler) SetupWithManager(ctx context.Context, mgr ct
 	}
 
 	return ctrl.NewControllerManagedBy(mgr).
+		WithOptions(controller.Options{MaxConcurrentReconciles: maxConcurrentReconciles}).
 		For(&apiv1.ScheduledBackup{}).
 		Named("scheduled-backup").
 		Complete(r)
