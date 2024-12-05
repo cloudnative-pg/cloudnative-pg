@@ -18,7 +18,6 @@ package controller
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"time"
 
@@ -33,20 +32,12 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-type instanceInterface2 interface {
-	GetClusterName() string
-	GetPodName() string
-	GetNamespaceName() string
-	GetNamedDB(name string) (*sql.DB, error)
-	GetSuperUserDB() (*sql.DB, error)
-}
-
 // PublicationReconciler reconciles a Publication object
 type PublicationReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 
-	instance            instanceInterface2
+	instance            instanceInterface
 	finalizerReconciler *finalizerReconciler[*apiv1.Publication]
 }
 
