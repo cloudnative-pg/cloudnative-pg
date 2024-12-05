@@ -204,7 +204,7 @@ func (info InitInfo) renameExistingTargetDataDirectories(ctx context.Context, pg
 		pgwalNewName := fmt.Sprintf("%s_%s", info.PgWal, suffixTimestamp)
 
 		contextLogger.Info("renaming the WAL directory", "pgwalNewName", pgwalNewName)
-		if err := os.Rename(info.PgData, pgwalNewName); err != nil {
+		if err := os.Rename(info.PgWal, pgwalNewName); err != nil {
 			contextLogger.Error(err, "error while renaming existing WAL directory")
 			return fmt.Errorf("while renaming existing WAL directory: %w", err)
 		}
