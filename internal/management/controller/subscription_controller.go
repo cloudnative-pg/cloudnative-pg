@@ -122,16 +122,30 @@ func (r *SubscriptionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		subscription.Spec.PublicationDBName,
 	)
 	if err != nil {
-		if err := markAsFailed(ctx, r.Client, &subscription, err); err != nil {
-			return ctrl.Result{}, err
+		if markErr := markAsFailed(ctx, r.Client, &subscription, err); markErr != nil {
+			contextLogger.Error(err, "while marking as failed the subscription resource",
+				"error", err,
+				"markError", markErr,
+			)
+			return ctrl.Result{}, fmt.Errorf(
+				"encountered an error while marking as failed the subscription resource: %w, original error: %w",
+				markErr,
+				err)
 		}
 		return ctrl.Result{RequeueAfter: subscriptionReconciliationInterval}, nil
 	}
 
 	if err := r.alignSubscription(ctx, &subscription, connString); err != nil {
 		contextLogger.Error(err, "while reconciling subscription")
-		if err := markAsFailed(ctx, r.Client, &subscription, err); err != nil {
-			return ctrl.Result{}, err
+		if markErr := markAsFailed(ctx, r.Client, &subscription, err); markErr != nil {
+			contextLogger.Error(err, "while marking as failed the subscription resource",
+				"error", err,
+				"markError", markErr,
+			)
+			return ctrl.Result{}, fmt.Errorf(
+				"encountered an error while marking as failed the subscription resource: %w, original error: %w",
+				markErr,
+				err)
 		}
 		return ctrl.Result{RequeueAfter: subscriptionReconciliationInterval}, nil
 	}

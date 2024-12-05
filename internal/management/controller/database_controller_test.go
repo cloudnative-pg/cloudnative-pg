@@ -34,6 +34,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -109,6 +110,11 @@ var _ = Describe("Managed Database status", func() {
 			Scheme:   schemeBuilder.BuildWithAllKnownScheme(),
 			instance: &f,
 		}
+		r.finalizerReconciler = newFinalizerReconciler(
+			fakeClient,
+			utils.DatabaseFinalizerName,
+			r.evaluateDropDatabase,
+		)
 	})
 
 	AfterEach(func() {
@@ -263,7 +269,7 @@ var _ = Describe("Managed Database status", func() {
 		Expect(apierrors.IsNotFound(err)).To(BeTrue())
 	})
 
-	It("skips reconciliation if cluster isn't found (deleted cluster)", func(ctx SpecContext) {
+	It("fails reconciliation if cluster isn't found (deleted cluster)", func(ctx SpecContext) {
 		// since the fakeClient has the `cluster-example` cluster, let's reference
 		// another cluster `cluster-other` that is not found by the fakeClient
 		pgInstance := postgres.NewInstance().
@@ -301,8 +307,8 @@ var _ = Describe("Managed Database status", func() {
 		}, &updatedDatabase)
 		Expect(err).ToNot(HaveOccurred())
 
-		Expect(updatedDatabase.Status.Applied).Should(BeNil())
-		Expect(updatedDatabase.Status.Message).Should(BeEmpty())
+		Expect(updatedDatabase.Status.Applied).Should(HaveValue(BeFalse()))
+		Expect(updatedDatabase.Status.Message).Should(ContainSubstring(`"cluster-other" not found`))
 	})
 
 	It("skips reconciliation if database object isn't found (deleted database)", func(ctx SpecContext) {
@@ -331,29 +337,6 @@ var _ = Describe("Managed Database status", func() {
 		// Expect the reconciler to exit silently since the object doesn't exist
 		Expect(err).ToNot(HaveOccurred())
 		Expect(result).Should(BeZero()) // nothing to do, since the DB is being deleted
-	})
-
-	It("properly marks the status on a succeeded reconciliation", func(ctx SpecContext) {
-		_, err := r.succeededReconciliation(ctx, database)
-		Expect(err).ToNot(HaveOccurred())
-		Expect(database.Status.Applied).To(HaveValue(BeTrue()))
-		Expect(database.Status.Message).To(BeEmpty())
-	})
-
-	It("properly marks the status on a failed reconciliation", func(ctx SpecContext) {
-		exampleError := fmt.Errorf("sample error for database %s", database.Spec.Name)
-
-		_, err := r.failedReconciliation(ctx, database, exampleError)
-		Expect(err).ToNot(HaveOccurred())
-		Expect(database.Status.Applied).To(HaveValue(BeFalse()))
-		Expect(database.Status.Message).To(ContainSubstring(exampleError.Error()))
-	})
-
-	It("properly marks the status on a replica Cluster reconciliation", func(ctx SpecContext) {
-		_, err := r.replicaClusterReconciliation(ctx, database)
-		Expect(err).ToNot(HaveOccurred())
-		Expect(database.Status.Applied).To(BeNil())
-		Expect(database.Status.Message).To(BeEquivalentTo(errClusterIsReplica.Error()))
 	})
 
 	It("drops database with ensure absent option", func(ctx SpecContext) {
