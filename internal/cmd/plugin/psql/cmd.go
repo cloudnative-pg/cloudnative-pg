@@ -45,6 +45,7 @@ func NewCmd() *cobra.Command {
 			psqlOptions := CommandOptions{
 				Replica:     replica,
 				Namespace:   plugin.Namespace,
+				Context:     plugin.KubeContext,
 				AllocateTTY: allocateTTY,
 				PassStdin:   passStdin,
 				Args:        psqlArgs,
