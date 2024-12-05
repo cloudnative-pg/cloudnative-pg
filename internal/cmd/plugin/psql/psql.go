@@ -59,6 +59,9 @@ type CommandOptions struct {
 	// The Namespace where we're working in
 	Namespace string
 
+	// The Context to execute the command
+	Context string
+
 	// Whether we should we allocate a TTY for psql
 	AllocateTTY bool
 
@@ -105,6 +108,10 @@ func NewCommand(
 func (psql *Command) getKubectlInvocation() ([]string, error) {
 	result := make([]string, 0, 13+len(psql.Args))
 	result = append(result, "kubectl", "exec")
+
+	if psql.Context != "" {
+		result = append(result, "--context", psql.Context)
+	}
 
 	if psql.AllocateTTY {
 		result = append(result, "-t")
