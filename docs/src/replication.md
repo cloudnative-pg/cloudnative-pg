@@ -34,12 +34,25 @@ technologies, physical replication was first introduced in PostgreSQL 8.2
 (2006) through WAL shipping from the primary to a warm standby in
 continuous recovery.
 
-PostgreSQL 9.0 (2010) enhanced it with WAL streaming and read-only replicas via
-*hot standby*, while 9.1 (2011) introduced synchronous replication at the
-transaction level (for RPO=0 clusters). Cascading replication was released with
-PostgreSQL 9.2 (2012). The foundations of logical replication were laid in
-PostgreSQL 9.4, while version 10 (2017) introduced native support for the
-publisher/subscriber pattern to replicate data from an origin to a destination.
+PostgreSQL 9.0 (2010) introduced WAL streaming and read-only replicas through
+*hot standby*. In 2011, PostgreSQL 9.1 brought synchronous replication at the
+transaction level, supporting [RPO](before_you_start.md#rpo)=0 clusters. Cascading replication was added
+in PostgreSQL 9.2 (2012). The foundations for logical replication were
+established in PostgreSQL 9.4 (2014), and version 10 (2017) introduced native
+support for the publisher/subscriber pattern to replicate data from an origin
+to a destination. The table below summarizes these milestones.
+
+| Version | Year | Feature                                                               |
+|:-------:|:----:|-----------------------------------------------------------------------|
+| 8.2     | 2006 | Warm Standby with WAL shipping                                        |
+| 9.0     | 2010 | Hot Standby and physical streaming replication                        |
+| 9.1     | 2011 | Synchronous replication (priority-based)                              |
+| 9.2     | 2012 | Cascading replication                                                 |
+| 9.4     | 2014 | Foundations of logical replication                                    |
+| 10      | 2017 | Logical publisher/subscriber and quorum-based synchronous replication |
+
+This table highlights key PostgreSQL replication features and their respective
+versions.
 
 ## Streaming replication support
 
@@ -158,7 +171,8 @@ we would be able to ensure the sync replica will be in a different availability
 zone from the primary instance, usually identified by the `topology.kubernetes.io/zone`
 [label on a node](https://kubernetes.io/docs/reference/labels-annotations-taints/#topologykubernetesiozone).
 This would increase the robustness of the cluster in case of an outage in a single
-availability zone, especially in terms of recovery point objective (RPO).
+availability zone, especially in terms of recovery point objective
+([RPO](before_you_start.md#rpo)).
 
 The idea of anti-affinity is to ensure that sync replicas that participate in
 the quorum are chosen from pods running on nodes that have different values for
