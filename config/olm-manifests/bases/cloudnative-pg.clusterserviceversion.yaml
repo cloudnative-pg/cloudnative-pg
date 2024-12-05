@@ -794,7 +794,7 @@ spec:
       specDescriptors:
       - path: databaseReclaimPolicy
         displayName: Database reclaim policy
-        description: Whether to delete or reclaim management of the database on object deletion
+        description: Specifies the action to take for the database inside PostgreSQL when the associated object in Kubernetes is deleted. Options are to either delete the database or retain it for future management.
       - path: cluster
         displayName: Cluster requested to create the database
         description: Cluster in which to create the database
