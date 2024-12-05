@@ -172,11 +172,11 @@ In addition, there are some standalone example manifests:
 
 **A plain Publication targeting All Tables**
 : *Prerequisites*: an existing cluster `cluster-example`.
-: [`cluster-example-with-tablespaces-backup.yaml`](samples/publication-example.yaml)
+: [`publication-example.yaml`](samples/publication-example.yaml)
 
 **A Publication with a constrained publication target**
 : *Prerequisites*: an existing cluster `cluster-example`.
-: [`publication-example-objects`](samples/publication-example-objects.yaml)
+: [`publication-example-objects.yaml`](samples/publication-example-objects.yaml)
 
 **A plain Subscription**
 : Prerequisites: an existing cluster `cluster-example` set up as source, with
@@ -196,9 +196,9 @@ Which brings us to the next section.
 
 **A plain Database**
 : *Prerequisites*: an existing cluster `cluster-example`.
-: [`subscription-example.yaml`](samples/database-example.yaml)
+: [`database-example.yaml`](samples/database-example.yaml)
 
 **A Database with ICU local specifications**
 : *Prerequisites*: an existing cluster `cluster-example` running Postgres 16
   or more advanced.
-: [`subscription-example.yaml`](samples/database-example.yaml)
+: [`database-example-icu.yaml`](samples/database-example-icu.yaml)
