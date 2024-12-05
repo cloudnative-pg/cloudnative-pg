@@ -112,7 +112,7 @@ type InitInfo struct {
 	TablespaceMapFile []byte
 }
 
-// CheckTargetDataDirectories ensures that the target data and WAL directories do not exist.
+// EnsureTargetDirectoriesDoNotExist ensures that the target data and WAL directories do not exist.
 // This is a safety check we do before initializing a new instance.
 //
 // If the PGDATA directory already exists and contains a valid PostgreSQL control file,
@@ -132,7 +132,7 @@ type InitInfo struct {
 //     important user data. This is particularly relevant when using static provisioning
 //     of PersistentVolumeClaims (PVCs), as it prevents accidental overwriting of a valid
 //     data directory that may exist in the PersistentVolumes (PVs).
-func (info InitInfo) CheckTargetDataDirectories(ctx context.Context) error {
+func (info InitInfo) EnsureTargetDirectoriesDoNotExist(ctx context.Context) error {
 	contextLogger := log.FromContext(ctx).WithValues("pgdata", info.PgData)
 
 	pgDataExists, err := fileutils.FileExists(info.PgData)

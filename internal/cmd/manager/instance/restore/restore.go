@@ -68,7 +68,7 @@ func (r *restoreRunnable) Start(ctx context.Context) error {
 
 func restoreSubCommand(ctx context.Context, info postgres.InitInfo, cli client.Client) error {
 	contextLogger := log.FromContext(ctx)
-	if err := info.CheckTargetDataDirectories(ctx); err != nil {
+	if err := info.EnsureTargetDirectoriesDoNotExist(ctx); err != nil {
 		return err
 	}
 
