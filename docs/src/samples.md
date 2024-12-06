@@ -71,7 +71,7 @@ your PostgreSQL cluster.
 **Simple cluster with backup configured for Scaleway Object Storage**
 :   *Prerequisites*: The configuration assumes a Scaleway Object Storage bucket exists.
     Update `backup.barmanObjectStore` with your Scaleway parameters.
-:  [`cluster-exemple-with-backup-scaleway.yaml`](samples/cluster-example-with-backup-scaleway.yaml)
+:  [`cluster-example-with-backup-scaleway.yaml`](samples/cluster-example-with-backup-scaleway.yaml)
    A basic cluster with backups configured to work with Scaleway Object Storage..
 
 ## Replica clusters
