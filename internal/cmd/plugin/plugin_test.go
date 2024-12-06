@@ -18,7 +18,6 @@ package plugin
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
 	k8client "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -30,20 +29,17 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("create client", Ordered, func() {
+var _ = Describe("create client", func() {
 	It("with given configuration", func() {
+		// createClient is not a pure function and as a side effect
+		// it will:
+		// - set the Client global variable
+		// - set the UserAgent field inside cfg
 		err := createClient(cfg)
+
 		Expect(err).NotTo(HaveOccurred())
+		Expect(cfg.UserAgent).To(Equal("kubectl-cnpg/v" + versions.Version + " (" + versions.Info.Commit + ")"))
 		Expect(Client).NotTo(BeNil())
-	})
-
-	It("should set the UserAgent correctly", func() {
-		configFlags := genericclioptions.NewConfigFlags(true)
-
-		err := SetupKubernetesClient(configFlags)
-		Expect(err).ToNot(HaveOccurred())
-
-		Expect(Config.UserAgent).To(Equal("kubectl-cnpg/v" + versions.Version + " (" + versions.Info.Commit + ")"))
 	})
 })
 

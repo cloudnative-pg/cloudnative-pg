@@ -90,8 +90,6 @@ func SetupKubernetesClient(configFlags *genericclioptions.ConfigFlags) error {
 		return err
 	}
 
-	Config.UserAgent = fmt.Sprintf("kubectl-cnpg/v%s (%s)", versions.Version, versions.Info.Commit)
-
 	err = createClient(Config)
 	if err != nil {
 		return err
@@ -111,10 +109,13 @@ func SetupKubernetesClient(configFlags *genericclioptions.ConfigFlags) error {
 
 func createClient(cfg *rest.Config) error {
 	var err error
+
 	scheme := runtime.NewScheme()
 	_ = clientgoscheme.AddToScheme(scheme)
 	_ = apiv1.AddToScheme(scheme)
 	_ = storagesnapshotv1.AddToScheme(scheme)
+
+	cfg.UserAgent = fmt.Sprintf("kubectl-cnpg/v%s (%s)", versions.Version, versions.Info.Commit)
 
 	Client, err = client.New(cfg, client.Options{Scheme: scheme})
 	if err != nil {
