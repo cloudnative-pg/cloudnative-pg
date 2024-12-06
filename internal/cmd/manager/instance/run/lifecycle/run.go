@@ -22,10 +22,10 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/jackc/pgx/v5"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
 )
@@ -98,7 +98,7 @@ func (i *PostgresLifecycle) runPostgresAndWait(ctx context.Context) <-chan error
 			return err
 		}
 
-		log.Info("postmaster started", "postMasterPID", postMasterPID)
+		contextLogger.Info("postmaster started", "postMasterPID", postMasterPID)
 
 		// Now we'll wait for PostgreSQL to accept connections, and setup everything required
 		// for replication and pg_rewind to work correctly.
@@ -116,7 +116,11 @@ func (i *PostgresLifecycle) runPostgresAndWait(ctx context.Context) <-chan error
 		defer i.instance.SetCanCheckReadiness(false)
 
 		postmasterExitStatus := streamingCmd.Wait()
-		log.Info("postmaster exited", "postmasterExitStatus", postmasterExitStatus, "postMasterPID", postMasterPID)
+		contextLogger.Info(
+			"postmaster exited",
+			"postmasterExitStatus", postmasterExitStatus,
+			"postMasterPID", postMasterPID,
+		)
 		return postmasterExitStatus
 	}
 

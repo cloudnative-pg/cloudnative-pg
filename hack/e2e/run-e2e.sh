@@ -75,7 +75,6 @@ if [ "${FEATURE_TYPE-}" ]; then
 fi
 echo "E2E tests are running with the following filters: ${LABEL_FILTERS}"
 # The RC return code will be non-zero iff either the two `jq` calls has a non-zero exit
-# NOTE: the ginkgo calls may have non-zero exits, with E2E tests that fail but could be 'ignore-fail'
 RC=0
 RC_GINKGO1=0
 if [[ "${TEST_UPGRADE_TO_V1}" != "false" ]] && [[ "${TEST_CLOUD_VENDOR}" != "ocp" ]]; then
@@ -112,7 +111,7 @@ if [[ "${TEST_UPGRADE_TO_V1}" != "false" ]] && [[ "${TEST_CLOUD_VENDOR}" != "ocp
    --focus-file "${ROOT_DIR}/tests/e2e/upgrade_test.go" --output-dir "${ROOT_DIR}/tests/e2e/out" \
    --json-report  "upgrade_report.json" -v "${ROOT_DIR}/tests/e2e/..." || RC_GINKGO1=$?
 
-  # Report if there are any tests that failed and did NOT have an "ignore-fails" label
+  # Report if there are any tests that failed
   jq -e -c -f "${ROOT_DIR}/hack/e2e/test-report.jq" "${ROOT_DIR}/tests/e2e/out/upgrade_report.json" || RC=$?
 fi
 
@@ -149,16 +148,13 @@ ginkgo --nodes=4 --timeout 3h --poll-progress-after=1200s --poll-progress-interv
        --output-dir "${ROOT_DIR}/tests/e2e/out/" \
        --json-report  "report.json" -v "${ROOT_DIR}/tests/e2e/..." || RC_GINKGO2=$?
 
-# Report if there are any tests that failed and did NOT have an "ignore-fails" label
+# Report if there are any tests that failed
 jq -e -c -f "${ROOT_DIR}/hack/e2e/test-report.jq" "${ROOT_DIR}/tests/e2e/out/report.json" || RC=$?
 
-# The exit code reported depends on the two `jq` filter calls. In case we have
-# FAIL in the Ginkgo, but the `jq` succeeds because the failures are ignorable,
-# we should add some explanation
 set +x
 if [[ $RC == 0 ]]; then
   if [[ $RC_GINKGO1 != 0 || $RC_GINKGO2 != 0 ]]; then
-    printf "\033[0;32m%s\n" "SUCCESS. All the failures in Ginkgo are labelled 'ignore-fails'."
+    printf "\033[0;32m%s\n" "SUCCESS."
     echo
   fi
 fi

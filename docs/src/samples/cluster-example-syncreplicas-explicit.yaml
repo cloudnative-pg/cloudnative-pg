@@ -1,0 +1,14 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example-syncreplicas
+spec:
+  instances: 5
+
+  postgresql:
+    synchronous:
+      method: first
+      number: 2
+
+  storage:
+    size: 1G

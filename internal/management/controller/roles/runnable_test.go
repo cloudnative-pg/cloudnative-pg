@@ -18,11 +18,17 @@ package roles
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
+	"time"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/lib/pq"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -33,243 +39,87 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-type funcCall struct{ verb, roleName string }
-
-type mockRoleManager struct {
-	roles       map[string]DatabaseRole
-	callHistory []funcCall
+type fakeInstanceData struct {
+	*postgres.Instance
+	db *sql.DB
 }
 
-func (m *mockRoleManager) List(_ context.Context) ([]DatabaseRole, error) {
-	m.callHistory = append(m.callHistory, funcCall{"list", ""})
-	re := make([]DatabaseRole, len(m.roles))
-	i := 0
-	for _, r := range m.roles {
-		re[i] = r
-		i++
-	}
-	return re, nil
-}
-
-func (m *mockRoleManager) Update(
-	_ context.Context, role DatabaseRole,
-) error {
-	m.callHistory = append(m.callHistory, funcCall{"update", role.Name})
-	_, found := m.roles[role.Name]
-	if !found {
-		return fmt.Errorf("tring to update unknown role: %s", role.Name)
-	}
-	m.roles[role.Name] = role
-	return nil
-}
-
-func (m *mockRoleManager) UpdateComment(
-	_ context.Context, role DatabaseRole,
-) error {
-	m.callHistory = append(m.callHistory, funcCall{"updateComment", role.Name})
-	_, found := m.roles[role.Name]
-	if !found {
-		return fmt.Errorf("tring to update comment of unknown role: %s", role.Name)
-	}
-	m.roles[role.Name] = role
-	return nil
-}
-
-func (m *mockRoleManager) Create(
-	_ context.Context, role DatabaseRole,
-) error {
-	m.callHistory = append(m.callHistory, funcCall{"create", role.Name})
-	_, found := m.roles[role.Name]
-	if found {
-		return fmt.Errorf("tring to create existing role: %s", role.Name)
-	}
-	m.roles[role.Name] = role
-	return nil
-}
-
-func (m *mockRoleManager) Delete(
-	_ context.Context, role DatabaseRole,
-) error {
-	m.callHistory = append(m.callHistory, funcCall{"delete", role.Name})
-	_, found := m.roles[role.Name]
-	if !found {
-		return fmt.Errorf("tring to delete unknown role: %s", role.Name)
-	}
-	delete(m.roles, role.Name)
-	return nil
-}
-
-func (m *mockRoleManager) GetLastTransactionID(_ context.Context, _ DatabaseRole) (int64, error) {
-	return 0, nil
-}
-
-func (m *mockRoleManager) UpdateMembership(
-	_ context.Context,
-	role DatabaseRole,
-	_ []string,
-	_ []string,
-) error {
-	m.callHistory = append(m.callHistory, funcCall{"updateMembership", role.Name})
-	_, found := m.roles[role.Name]
-	if !found {
-		return fmt.Errorf("trying to update Role Members of unknown role: %s", role.Name)
-	}
-	m.roles[role.Name] = role
-	return nil
-}
-
-func (m *mockRoleManager) GetParentRoles(_ context.Context, role DatabaseRole) ([]string, error) {
-	m.callHistory = append(m.callHistory, funcCall{"getParentRoles", role.Name})
-	_, found := m.roles[role.Name]
-	if !found {
-		return nil, fmt.Errorf("trying to get parent of unknown role: %s", role.Name)
-	}
-	m.roles[role.Name] = role
-	return nil, nil
-}
-
-// mock.ExpectExec(unWantedRoleExpectedDelStmt).
-// WillReturnError(&pgconn.PgError{Code: "2BP01"})
-
-type mockRoleManagerWithError struct {
-	roles       map[string]DatabaseRole
-	callHistory []funcCall
-}
-
-func (m *mockRoleManagerWithError) List(_ context.Context) ([]DatabaseRole, error) {
-	m.callHistory = append(m.callHistory, funcCall{"list", ""})
-	re := make([]DatabaseRole, len(m.roles))
-	i := 0
-	for _, r := range m.roles {
-		re[i] = r
-		i++
-	}
-	return re, nil
-}
-
-func (m *mockRoleManagerWithError) Update(
-	_ context.Context, role DatabaseRole,
-) error {
-	m.callHistory = append(m.callHistory, funcCall{"update", role.Name})
-	_, found := m.roles[role.Name]
-	if !found {
-		return fmt.Errorf("tring to update unknown role: %s", role.Name)
-	}
-	m.roles[role.Name] = role
-	return nil
-}
-
-func (m *mockRoleManagerWithError) UpdateComment(
-	_ context.Context, role DatabaseRole,
-) error {
-	m.callHistory = append(m.callHistory, funcCall{"updateComment", role.Name})
-	_, found := m.roles[role.Name]
-	if !found {
-		return fmt.Errorf("tring to update comment of unknown role: %s", role.Name)
-	}
-	m.roles[role.Name] = role
-	return nil
-}
-
-func (m *mockRoleManagerWithError) Create(
-	_ context.Context, role DatabaseRole,
-) error {
-	m.callHistory = append(m.callHistory, funcCall{"create", role.Name})
-	_, found := m.roles[role.Name]
-	if found {
-		return fmt.Errorf("tring to create existing role: %s", role.Name)
-	}
-	m.roles[role.Name] = role
-	return nil
-}
-
-func (m *mockRoleManagerWithError) Delete(
-	_ context.Context, role DatabaseRole,
-) error {
-	m.callHistory = append(m.callHistory, funcCall{"delete", role.Name})
-	_, found := m.roles[role.Name]
-	if !found {
-		return fmt.Errorf("tring to delete unknown role: %s", role.Name)
-	}
-	return fmt.Errorf("could not delete role 'foo': %w",
-		&pgconn.PgError{
-			Code: "2BP01", Detail: "owner of database edbDatabase",
-			Message: `role "dante" cannot be dropped because some objects depend on it`,
-		})
-}
-
-func (m *mockRoleManagerWithError) GetLastTransactionID(_ context.Context, _ DatabaseRole) (int64, error) {
-	return 0, nil
-}
-
-func (m *mockRoleManagerWithError) UpdateMembership(
-	_ context.Context,
-	role DatabaseRole,
-	_ []string,
-	_ []string,
-) error {
-	m.callHistory = append(m.callHistory, funcCall{"updateMembership", role.Name})
-	_, found := m.roles[role.Name]
-	if !found {
-		return fmt.Errorf("trying to update Role Members of unknown role: %s", role.Name)
-	}
-	m.roles[role.Name] = role
-	return &pgconn.PgError{Code: "42704", Message: "unknown role 'blah'"}
-}
-
-func (m *mockRoleManagerWithError) GetParentRoles(_ context.Context, role DatabaseRole) ([]string, error) {
-	m.callHistory = append(m.callHistory, funcCall{"getParentRoles", role.Name})
-	_, found := m.roles[role.Name]
-	if !found {
-		return nil, fmt.Errorf("trying to get parent of unknown role: %s", role.Name)
-	}
-	m.roles[role.Name] = role
-	return nil, nil
+func (f *fakeInstanceData) GetSuperUserDB() (*sql.DB, error) {
+	return f.db, nil
 }
 
 var _ = Describe("Role synchronizer tests", func() {
-	roleSynchronizer := RoleSynchronizer{
-		instance: &postgres.Instance{
-			Namespace: "myPod",
-		},
-	}
+	var (
+		db               *sql.DB
+		mock             sqlmock.Sqlmock
+		err              error
+		roleSynchronizer RoleSynchronizer
+	)
+
+	BeforeEach(func() {
+		db, mock, err = sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+		Expect(err).ToNot(HaveOccurred())
+		DeferCleanup(func() {
+			Expect(mock.ExpectationsWereMet()).To(Succeed())
+		})
+
+		testDate := time.Date(2023, 4, 4, 0, 0, 0, 0, time.UTC)
+
+		rowsInMockDatabase := sqlmock.NewRows([]string{
+			"rolname", "rolsuper", "rolinherit", "rolcreaterole", "rolcreatedb",
+			"rolcanlogin", "rolreplication", "rolconnlimit", "rolpassword", "rolvaliduntil", "rolbypassrls", "comment",
+			"xmin", "inroles",
+		}).
+			AddRow("postgres", true, false, true, true, true, false, -1, []byte("12345"),
+				nil, false, []byte("This is postgres user"), 11, []byte("{}")).
+			AddRow("streaming_replica", false, false, true, true, false, true, 10, []byte("54321"),
+				pgtype.Timestamp{
+					Valid:            true,
+					Time:             testDate,
+					InfinityModifier: pgtype.Finite,
+				}, false, []byte("This is streaming_replica user"), 22, []byte(`{"role1","role2"}`)).
+			AddRow("role_to_ignore", true, false, true, true, true, false, -1, []byte("12345"),
+				nil, false, []byte("This is a custom role in the DB"), 11, []byte("{}")).
+			AddRow("role_to_test1", true, true, false, false, false, false, -1, []byte("12345"),
+				nil, false, []byte("This is a role to test with"), 11, []byte("{}")).
+			AddRow("role_to_test2", true, true, false, false, false, false, -1, []byte("12345"),
+				nil, false, []byte("This is a role to test with"), 11, []byte("{inrole}"))
+		mock.ExpectQuery(expectedSelStmt).WillReturnRows(rowsInMockDatabase)
+
+		roleSynchronizer = RoleSynchronizer{
+			instance: &fakeInstanceData{
+				Instance: postgres.NewInstance().WithNamespace("default"),
+				db:       db,
+			},
+		}
+	})
 
 	When("role configurations are realizable", func() {
 		It("it will Create ensure:present roles in spec missing from DB", func(ctx context.Context) {
+			mock.ExpectExec("CREATE ROLE \"foo_bar\" NOBYPASSRLS NOCREATEDB NOCREATEROLE INHERIT " +
+				"NOLOGIN NOREPLICATION NOSUPERUSER CONNECTION LIMIT 0").
+				WillReturnResult(sqlmock.NewResult(11, 1))
 			managedConf := apiv1.ManagedConfiguration{
 				Roles: []apiv1.RoleConfiguration{
-					{
-						Name:   "edb_test",
-						Ensure: apiv1.EnsurePresent,
-					},
 					{
 						Name:   "foo_bar",
 						Ensure: apiv1.EnsurePresent,
 					},
 				},
 			}
-			rm := mockRoleManager{
-				roles: map[string]DatabaseRole{
-					"postgres": {
-						Name:      "postgres",
-						Superuser: true,
-					},
-				},
-			}
-			_, _, err := roleSynchronizer.synchronizeRoles(ctx, &rm, &managedConf, map[string]apiv1.PasswordState{})
+			rows := mock.NewRows([]string{"xmin"}).AddRow("12")
+			lastTransactionQuery := "SELECT xmin FROM pg_catalog.pg_authid WHERE rolname = $1"
+			mock.ExpectQuery(lastTransactionQuery).WithArgs("foo_bar").WillReturnRows(rows)
+			passwordState, rolesWithErrors, err := roleSynchronizer.synchronizeRoles(ctx, db, &managedConf,
+				map[string]apiv1.PasswordState{})
 			Expect(err).ShouldNot(HaveOccurred())
-			Expect(rm.callHistory).To(ConsistOf(
-				[]funcCall{
-					{"list", ""},
-					{"create", "edb_test"},
-					{"create", "foo_bar"},
+			Expect(rolesWithErrors).To(BeEmpty())
+			Expect(passwordState).To(BeEquivalentTo(map[string]apiv1.PasswordState{
+				"foo_bar": {
+					TransactionID:         12,
+					SecretResourceVersion: "",
 				},
-			))
-			Expect(rm.callHistory).To(ConsistOf(
-				funcCall{"list", ""},
-				funcCall{"create", "edb_test"},
-				funcCall{"create", "foo_bar"},
-			))
+			}))
 		})
 
 		It("it will ignore ensure:absent roles in spec missing from DB", func(ctx context.Context) {
@@ -281,323 +131,254 @@ var _ = Describe("Role synchronizer tests", func() {
 					},
 				},
 			}
-			rm := mockRoleManager{
-				roles: map[string]DatabaseRole{
-					"postgres": {
-						Name:      "postgres",
-						Superuser: true,
-					},
-				},
-			}
 
-			_, _, err := roleSynchronizer.synchronizeRoles(ctx, &rm, &managedConf, map[string]apiv1.PasswordState{})
+			_, _, err := roleSynchronizer.synchronizeRoles(ctx, db, &managedConf, map[string]apiv1.PasswordState{})
 			Expect(err).ShouldNot(HaveOccurred())
-			Expect(rm.callHistory).To(ConsistOf(funcCall{"list", ""}))
 		})
 
-		It("it will ignore DB roles that are not in spec", func(ctx context.Context) {
+		It("it will call the necessary grants to update membership", func(ctx context.Context) {
 			managedConf := apiv1.ManagedConfiguration{
 				Roles: []apiv1.RoleConfiguration{
 					{
-						Name:   "edb_test",
-						Ensure: apiv1.EnsureAbsent,
-					},
-				},
-			}
-			rm := mockRoleManager{
-				roles: map[string]DatabaseRole{
-					"postgres": {
-						Name:      "postgres",
+						Name:      "role_to_test1",
 						Superuser: true,
-					},
-					"ignorezMoi": {
-						Name:      "ignorezMoi",
-						Superuser: true,
-					},
-				},
-			}
-			_, _, err := roleSynchronizer.synchronizeRoles(ctx, &rm, &managedConf, map[string]apiv1.PasswordState{})
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(rm.callHistory).To(ConsistOf(funcCall{"list", ""}))
-		})
-
-		It("it will call the updateMembership method", func(ctx context.Context) {
-			trueValue := true
-			managedConf := apiv1.ManagedConfiguration{
-				Roles: []apiv1.RoleConfiguration{
-					{
-						Name:      "edb_test",
-						Superuser: true,
-						Inherit:   &trueValue,
+						Inherit:   ptr.To(true),
 						InRoles: []string{
 							"role1",
 							"role2",
 						},
+						Comment:         "This is a role to test with",
+						ConnectionLimit: -1,
 					},
 				},
 			}
-			rm := mockRoleManager{
-				roles: map[string]DatabaseRole{
-					"edb_test": {
-						Name:      "edb_test",
-						Superuser: true,
-						Inherit:   true,
-					},
-				},
+			noParents := sqlmock.NewRows([]string{"inroles"}).AddRow([]byte(`{}`))
+			mock.ExpectQuery(expectedMembershipStmt).WithArgs("role_to_test1").WillReturnRows(noParents)
+			mock.ExpectBegin()
+			expectedMembershipExecs := []string{
+				`GRANT "role1" TO "role_to_test1"`,
+				`GRANT "role2" TO "role_to_test1"`,
 			}
-			_, _, err := roleSynchronizer.synchronizeRoles(ctx, &rm, &managedConf, map[string]apiv1.PasswordState{})
+
+			for _, ex := range expectedMembershipExecs {
+				mock.ExpectExec(ex).
+					WillReturnResult(sqlmock.NewResult(2, 3))
+			}
+
+			mock.ExpectCommit()
+
+			_, rolesWithErrors, err := roleSynchronizer.synchronizeRoles(ctx, db, &managedConf, map[string]apiv1.PasswordState{
+				"role_to_test1": {
+					TransactionID: 11, // defined in the mock query to the DB above
+				},
+			})
 			Expect(err).ShouldNot(HaveOccurred())
-			Expect(rm.callHistory).To(ConsistOf(funcCall{"list", ""},
-				funcCall{"getParentRoles", "edb_test"},
-				funcCall{"updateMembership", "edb_test"}))
+			Expect(rolesWithErrors).To(BeEmpty())
+		})
+
+		It("it will call the necessary revokes to update membership", func(ctx context.Context) {
+			managedConf := apiv1.ManagedConfiguration{
+				Roles: []apiv1.RoleConfiguration{
+					{
+						Name:            "role_to_test2",
+						Superuser:       true,
+						Inherit:         ptr.To(true),
+						InRoles:         []string{},
+						Comment:         "This is a role to test with",
+						ConnectionLimit: -1,
+					},
+				},
+			}
+			rows := sqlmock.NewRows([]string{
+				"inroles",
+			}).
+				AddRow([]byte(`{"foo"}`))
+			mock.ExpectQuery(expectedMembershipStmt).WithArgs("role_to_test2").WillReturnRows(rows)
+			mock.ExpectBegin()
+
+			mock.ExpectExec(`REVOKE "foo" FROM "role_to_test2"`).
+				WillReturnResult(sqlmock.NewResult(2, 3))
+
+			mock.ExpectCommit()
+
+			_, rolesWithErrors, err := roleSynchronizer.synchronizeRoles(ctx, db, &managedConf, map[string]apiv1.PasswordState{
+				"role_to_test2": {
+					TransactionID: 11, // defined in the mock query to the DB above
+				},
+			})
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(rolesWithErrors).To(BeEmpty())
 		})
 
 		It("it will call the updateComment method", func(ctx context.Context) {
-			trueValue := true
 			managedConf := apiv1.ManagedConfiguration{
 				Roles: []apiv1.RoleConfiguration{
 					{
-						Name:      "edb_test",
-						Superuser: true,
-						Inherit:   &trueValue,
-						Comment:   "my comment",
+						Name:            "role_to_test1",
+						Superuser:       true,
+						Inherit:         ptr.To(true),
+						Comment:         "my comment",
+						ConnectionLimit: -1,
 					},
 				},
 			}
-			rm := mockRoleManager{
-				roles: map[string]DatabaseRole{
-					"edb_test": {
-						Name:      "edb_test",
-						Superuser: true,
-						Inherit:   true,
-						Comment:   "my tailor is rich",
-					},
+			wantedRoleCommentStmt := fmt.Sprintf(
+				wantedRoleCommentTpl,
+				managedConf.Roles[0].Name, pq.QuoteLiteral(managedConf.Roles[0].Comment))
+			mock.ExpectExec(wantedRoleCommentStmt).WillReturnResult(sqlmock.NewResult(2, 3))
+			_, _, err := roleSynchronizer.synchronizeRoles(ctx, db, &managedConf, map[string]apiv1.PasswordState{
+				"role_to_test1": {
+					TransactionID: 11, // defined in the mock query to the DB above
 				},
-			}
-			_, _, err := roleSynchronizer.synchronizeRoles(ctx, &rm, &managedConf, map[string]apiv1.PasswordState{})
+			})
 			Expect(err).ShouldNot(HaveOccurred())
-			Expect(rm.callHistory).To(ConsistOf(funcCall{"list", ""},
-				funcCall{"updateComment", "edb_test"}))
 		})
 
 		It("it will no-op if the roles are reconciled", func(ctx context.Context) {
-			trueValue := true
 			managedConf := apiv1.ManagedConfiguration{
 				Roles: []apiv1.RoleConfiguration{
 					{
-						Name:      "edb_test",
-						Superuser: true,
-						Inherit:   &trueValue,
+						Name:            "role_to_test1",
+						Superuser:       true,
+						Inherit:         ptr.To(true),
+						Comment:         "This is a role to test with",
+						ConnectionLimit: -1,
 					},
 				},
 			}
-			rm := mockRoleManager{
-				roles: map[string]DatabaseRole{
-					"edb_test": {
-						Name:      "edb_test",
-						Superuser: true,
-						Inherit:   true,
-					},
+			_, _, err := roleSynchronizer.synchronizeRoles(ctx, db, &managedConf, map[string]apiv1.PasswordState{
+				"role_to_test1": {
+					TransactionID: 11, // defined in the mock query to the DB above
 				},
-			}
-			_, _, err := roleSynchronizer.synchronizeRoles(ctx, &rm, &managedConf, map[string]apiv1.PasswordState{})
+			})
 			Expect(err).ShouldNot(HaveOccurred())
-			Expect(rm.callHistory).To(ConsistOf(
-				funcCall{"list", ""}))
 		})
 
 		It("it will Delete ensure:absent roles that are in the DB", func(ctx context.Context) {
 			managedConf := apiv1.ManagedConfiguration{
 				Roles: []apiv1.RoleConfiguration{
 					{
-						Name:   "edb_test",
+						Name:   "role_to_test1",
 						Ensure: apiv1.EnsureAbsent,
 					},
 				},
 			}
-			rm := mockRoleManager{
-				roles: map[string]DatabaseRole{
-					"postgres": {
-						Name:      "postgres",
-						Superuser: true,
-					},
-					"edb_test": {
-						Name:      "edb_test",
-						Superuser: true,
-					},
+			roleDeletionStmt := fmt.Sprintf("DROP ROLE \"%s\"", "role_to_test1")
+			mock.ExpectExec(roleDeletionStmt).WillReturnResult(sqlmock.NewResult(2, 3))
+			_, _, err := roleSynchronizer.synchronizeRoles(ctx, db, &managedConf, map[string]apiv1.PasswordState{
+				"role_to_test1": {
+					TransactionID: 11, // defined in the mock query to the DB above
 				},
-			}
-			_, _, err := roleSynchronizer.synchronizeRoles(ctx, &rm, &managedConf, map[string]apiv1.PasswordState{})
+			})
 			Expect(err).ShouldNot(HaveOccurred())
-			Expect(rm.callHistory).To(ConsistOf(
-				funcCall{"list", ""},
-				funcCall{"delete", "edb_test"},
-			))
 		})
 
 		It("it will Update ensure:present roles that are in the DB but have different fields", func(ctx context.Context) {
 			managedConf := apiv1.ManagedConfiguration{
 				Roles: []apiv1.RoleConfiguration{
 					{
-						Name:      "edb_test",
-						Ensure:    apiv1.EnsurePresent,
-						CreateDB:  true,
-						BypassRLS: true,
+						Name:            "role_to_test1",
+						Superuser:       false,
+						Inherit:         ptr.To(false),
+						Comment:         "This is a role to test with",
+						BypassRLS:       true,
+						CreateRole:      true,
+						Login:           true,
+						ConnectionLimit: 2,
 					},
 				},
 			}
-			rm := mockRoleManager{
-				roles: map[string]DatabaseRole{
-					"postgres": {
-						Name:      "postgres",
-						Superuser: true,
+			alterStmt := fmt.Sprintf(
+				"ALTER ROLE \"%s\" BYPASSRLS NOCREATEDB CREATEROLE NOINHERIT LOGIN NOREPLICATION NOSUPERUSER CONNECTION LIMIT 2 ",
+				"role_to_test1")
+			mock.ExpectExec(alterStmt).WillReturnResult(sqlmock.NewResult(2, 3))
+			rows := mock.NewRows([]string{"xmin"}).AddRow("12")
+			lastTransactionQuery := "SELECT xmin FROM pg_catalog.pg_authid WHERE rolname = $1"
+			mock.ExpectQuery(lastTransactionQuery).WithArgs("role_to_test1").WillReturnRows(rows)
+			passwordState, rolesWithErrors, err := roleSynchronizer.synchronizeRoles(ctx, db, &managedConf,
+				map[string]apiv1.PasswordState{
+					"role_to_test1": {
+						TransactionID: 11, // defined in the mock query to the DB above
 					},
-					"edb_test": {
-						Name:      "edb_test",
-						Superuser: true,
-					},
-				},
-			}
-			_, _, err := roleSynchronizer.synchronizeRoles(ctx, &rm, &managedConf, map[string]apiv1.PasswordState{})
+				})
 			Expect(err).ShouldNot(HaveOccurred())
-			Expect(rm.callHistory).To(ConsistOf(
-				funcCall{"list", ""},
-				funcCall{"update", "edb_test"},
-			))
+			Expect(rolesWithErrors).To(BeEmpty())
+			Expect(passwordState).To(BeEquivalentTo(map[string]apiv1.PasswordState{
+				"role_to_test1": {
+					TransactionID:         12,
+					SecretResourceVersion: "",
+				},
+			}))
 		})
 	})
 
 	When("role configurations are unrealizable", func() {
-		It("it will record that updateMembership could not succeed", func(ctx context.Context) {
-			trueValue := true
+		It("it will carry on and capture postgres errors per role", func(ctx context.Context) {
 			managedConf := apiv1.ManagedConfiguration{
 				Roles: []apiv1.RoleConfiguration{
 					{
-						Name:      "edb_test",
+						Name:      "role_to_test1",
 						Superuser: true,
-						Inherit:   &trueValue,
+						Inherit:   ptr.To(true),
 						InRoles: []string{
 							"role1",
 							"role2",
 						},
+						Comment:         "This is a role to test with",
+						ConnectionLimit: -1,
 					},
-				},
-			}
-			rm := mockRoleManagerWithError{
-				roles: map[string]DatabaseRole{
-					"edb_test": {
-						Name:      "edb_test",
-						Superuser: true,
-						Inherit:   true,
-					},
-				},
-			}
-			_, unrealizable, err := roleSynchronizer.synchronizeRoles(ctx, &rm, &managedConf, map[string]apiv1.PasswordState{})
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(rm.callHistory).To(ConsistOf(funcCall{"list", ""},
-				funcCall{"getParentRoles", "edb_test"},
-				funcCall{"updateMembership", "edb_test"}))
-			Expect(unrealizable).To(HaveLen(1))
-			Expect(unrealizable["edb_test"]).To(HaveLen(1))
-			Expect(unrealizable["edb_test"][0]).To(BeEquivalentTo(
-				"could not perform UPDATE_MEMBERSHIPS on role edb_test: unknown role 'blah'"))
-		})
-
-		It("it will record that Delete could not succeed", func(ctx context.Context) {
-			managedConf := apiv1.ManagedConfiguration{
-				Roles: []apiv1.RoleConfiguration{
 					{
-						Name:   "edb_test",
+						Name:   "role_to_test2",
 						Ensure: apiv1.EnsureAbsent,
 					},
 				},
 			}
-			rm := mockRoleManagerWithError{
-				roles: map[string]DatabaseRole{
-					"postgres": {
-						Name:      "postgres",
-						Superuser: true,
-					},
-					"edb_test": {
-						Name:      "edb_test",
-						Superuser: true,
-					},
-				},
-			}
-			_, unrealizable, err := roleSynchronizer.synchronizeRoles(ctx, &rm, &managedConf, map[string]apiv1.PasswordState{})
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(rm.callHistory).To(ConsistOf(
-				funcCall{"list", ""},
-				funcCall{"delete", "edb_test"},
-			))
-			Expect(unrealizable).To(HaveLen(1))
-			Expect(unrealizable["edb_test"]).To(HaveLen(1))
-			Expect(unrealizable["edb_test"][0]).To(BeEquivalentTo(
-				"could not perform DELETE on role edb_test: owner of database edbDatabase"))
-		})
 
-		It("it will continue the synchronization even if it finds errors", func(ctx context.Context) {
-			trueValue := true
-			managedConf := apiv1.ManagedConfiguration{
-				Roles: []apiv1.RoleConfiguration{
-					{
-						Name:   "edb_test",
-						Ensure: apiv1.EnsureAbsent,
-					},
-					{
-						Name:      "another_test",
-						Ensure:    apiv1.EnsurePresent,
-						Superuser: true,
-						Inherit:   &trueValue,
-						InRoles: []string{
-							"role1",
-							"role2",
-						},
-					},
-				},
+			noParents := sqlmock.NewRows([]string{"inroles"}).AddRow([]byte(`{}`))
+			mock.ExpectQuery(expectedMembershipStmt).WithArgs("role_to_test1").WillReturnRows(noParents)
+			mock.ExpectBegin()
+
+			mock.ExpectExec(`GRANT "role1" TO "role_to_test1"`).
+				WillReturnResult(sqlmock.NewResult(2, 3))
+
+			impossibleGrantError := pgconn.PgError{
+				Code:    "0LP01", // 0LP01 -> invalid_grant_operation
+				Message: "unknown role 'role2'",
 			}
-			rm := mockRoleManagerWithError{
-				roles: map[string]DatabaseRole{
-					"postgres": {
-						Name:      "postgres",
-						Superuser: true,
-					},
-					"edb_test": {
-						Name:      "edb_test",
-						Superuser: true,
-					},
-					"another_test": {
-						Name:      "another_test",
-						Superuser: true,
-						Inherit:   true,
-					},
-				},
+			mock.ExpectExec(`GRANT "role2" TO "role_to_test1"`).
+				WillReturnError(&impossibleGrantError)
+
+			mock.ExpectRollback()
+
+			impossibleDeleteError := pgconn.PgError{
+				Code:   "2BP01", // 2BP01 -> dependent_objects_still_exist
+				Detail: "owner of database edbDatabase",
 			}
-			_, unrealizable, err := roleSynchronizer.synchronizeRoles(ctx, &rm, &managedConf, map[string]apiv1.PasswordState{})
+
+			roleDeletionStmt := fmt.Sprintf("DROP ROLE \"%s\"", "role_to_test2")
+			mock.ExpectExec(roleDeletionStmt).WillReturnError(&impossibleDeleteError)
+
+			_, unrealizable, err := roleSynchronizer.synchronizeRoles(ctx, db, &managedConf, map[string]apiv1.PasswordState{
+				"role_to_test1": {
+					TransactionID: 11, // defined in the mock query to the DB above
+				},
+			})
+
 			Expect(err).ShouldNot(HaveOccurred())
-			Expect(rm.callHistory).To(ConsistOf(
-				funcCall{"list", ""},
-				funcCall{"delete", "edb_test"},
-				funcCall{"getParentRoles", "another_test"},
-				funcCall{"updateMembership", "another_test"},
-			))
 			Expect(unrealizable).To(HaveLen(2))
-			Expect(unrealizable["edb_test"]).To(HaveLen(1))
-			Expect(unrealizable["edb_test"][0]).To(BeEquivalentTo(
-				"could not perform DELETE on role edb_test: owner of database edbDatabase"))
-			Expect(unrealizable["another_test"]).To(HaveLen(1))
-			Expect(unrealizable["another_test"][0]).To(BeEquivalentTo(
-				"could not perform UPDATE_MEMBERSHIPS on role another_test: unknown role 'blah'"))
+			Expect(unrealizable["role_to_test1"]).To(HaveLen(1))
+			Expect(unrealizable["role_to_test1"][0]).To(BeEquivalentTo(
+				"could not perform UPDATE_MEMBERSHIPS on role role_to_test1: unknown role 'role2'"))
+			Expect(unrealizable["role_to_test2"]).To(HaveLen(1))
+			Expect(unrealizable["role_to_test2"][0]).To(BeEquivalentTo(
+				"could not perform DELETE on role role_to_test2: owner of database edbDatabase"))
 		})
 	})
 })
 
-var _ = DescribeTable("Role status getter tests",
-	func(spec *apiv1.ManagedConfiguration, db mockRoleManager, expected map[string]apiv1.RoleStatus) {
+var _ = DescribeTable("Role status tests",
+	func(spec *apiv1.ManagedConfiguration, roles []DatabaseRole, expected map[string]apiv1.RoleStatus) {
 		ctx := context.TODO()
-
-		roles, err := db.List(ctx)
-		Expect(err).ToNot(HaveOccurred())
 
 		statusMap := evaluateNextRoleActions(ctx, spec, roles, map[string]apiv1.PasswordState{
 			"roleWithChangedPassInSpec": {
@@ -639,17 +420,15 @@ var _ = DescribeTable("Role status getter tests",
 				},
 			},
 		},
-		mockRoleManager{
-			roles: map[string]DatabaseRole{
-				"postgres": {
-					Name:      "postgres",
-					Superuser: true,
-				},
-				"ensurePresent": {
-					Name:      "ensurePresent",
-					Superuser: true,
-					Inherit:   true,
-				},
+		[]DatabaseRole{
+			{
+				Name:      "postgres",
+				Superuser: true,
+			},
+			{
+				Name:      "ensurePresent",
+				Superuser: true,
+				Inherit:   true,
 			},
 		},
 		map[string]apiv1.RoleStatus{
@@ -678,20 +457,18 @@ var _ = DescribeTable("Role status getter tests",
 				},
 			},
 		},
-		mockRoleManager{
-			roles: map[string]DatabaseRole{
-				"postgres": {
-					Name:      "postgres",
-					Superuser: true,
-				},
-				"unwantedInDB": {
-					Name:      "unwantedInDB",
-					Superuser: true,
-				},
-				"drifted": {
-					Name:      "drifted",
-					Superuser: false,
-				},
+		[]DatabaseRole{
+			{
+				Name:      "postgres",
+				Superuser: true,
+			},
+			{
+				Name:      "unwantedInDB",
+				Superuser: true,
+			},
+			{
+				Name:      "drifted",
+				Superuser: false,
 			},
 		},
 		map[string]apiv1.RoleStatus{
@@ -711,21 +488,19 @@ var _ = DescribeTable("Role status getter tests",
 				},
 			},
 		},
-		mockRoleManager{
-			roles: map[string]DatabaseRole{
-				"postgres": {
-					Name:      "postgres",
-					Superuser: true,
-				},
-				"edb_admin": {
-					Name:      "edb_admin",
-					Superuser: true,
-					Inherit:   true,
-				},
-				"missingFromSpec": {
-					Name:      "missingFromSpec",
-					Superuser: false,
-				},
+		[]DatabaseRole{
+			{
+				Name:      "postgres",
+				Superuser: true,
+			},
+			{
+				Name:      "edb_admin",
+				Superuser: true,
+				Inherit:   true,
+			},
+			{
+				Name:      "missingFromSpec",
+				Superuser: false,
 			},
 		},
 		map[string]apiv1.RoleStatus{
@@ -745,18 +520,16 @@ var _ = DescribeTable("Role status getter tests",
 				},
 			},
 		},
-		mockRoleManager{
-			roles: map[string]DatabaseRole{
-				"postgres": {
-					Name:      "postgres",
-					Superuser: true,
-				},
-				"roleWithChangedPassInDB": {
-					Name:          "roleWithChangedPassInDB",
-					Superuser:     true,
-					transactionID: 102,
-					Inherit:       true,
-				},
+		[]DatabaseRole{
+			{
+				Name:      "postgres",
+				Superuser: true,
+			},
+			{
+				Name:          "roleWithChangedPassInDB",
+				Superuser:     true,
+				transactionID: 102,
+				Inherit:       true,
 			},
 		},
 		map[string]apiv1.RoleStatus{
@@ -774,18 +547,16 @@ var _ = DescribeTable("Role status getter tests",
 				},
 			},
 		},
-		mockRoleManager{
-			roles: map[string]DatabaseRole{
-				"postgres": {
-					Name:      "postgres",
-					Superuser: true,
-				},
-				"roleWithChangedPassInSpec": {
-					Name:          "roleWithChangedPassInSpec",
-					Superuser:     true,
-					transactionID: 101,
-					Inherit:       true,
-				},
+		[]DatabaseRole{
+			{
+				Name:      "postgres",
+				Superuser: true,
+			},
+			{
+				Name:          "roleWithChangedPassInSpec",
+				Superuser:     true,
+				transactionID: 101,
+				Inherit:       true,
 			},
 		},
 		map[string]apiv1.RoleStatus{

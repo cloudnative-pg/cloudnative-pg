@@ -57,8 +57,9 @@ The `primaryUpdateMethod` option accepts one of the following values:
 
 There's no one-size-fits-all configuration for the update method, as that
 depends on several factors like the actual workload of your database, the
-requirements in terms of RPO and RTO, whether your PostgreSQL architecture is
-shared or shared nothing, and so on.
+requirements in terms of [RPO](before_you_start.md#rpo) and
+[RTO](before_you_start.md#rto), whether your PostgreSQL architecture is shared
+or shared nothing, and so on.
 
 Indeed, being PostgreSQL a primary/standby architecture database management
 system, the update process inevitably generates a downtime for your

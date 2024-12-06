@@ -44,11 +44,8 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), Ordered, func(
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 		var err error
-		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			return env.DeleteNamespace(namespace)
-		})
 	})
 
 	testDataCorruption := func(
@@ -61,7 +58,13 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), Ordered, func(
 		clusterName, err := env.GetResourceNameFromYAML(sampleFile)
 		Expect(err).ToNot(HaveOccurred())
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
-		AssertCreateTestData(namespace, clusterName, tableName, psqlClientPod)
+		tableLocator := TableLocator{
+			Namespace:    namespace,
+			ClusterName:  clusterName,
+			DatabaseName: testsUtils.AppDBName,
+			TableName:    tableName,
+		}
+		AssertCreateTestData(env, tableLocator)
 
 		By("gathering current primary pod and pvc", func() {
 			oldPrimaryPod, err := env.GetClusterPrimary(namespace, clusterName)
@@ -80,7 +83,7 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), Ordered, func(
 		})
 
 		By("corrupting primary pod by removing PGDATA", func() {
-			cmd := fmt.Sprintf("rm -fr %v/base/*", specs.PgDataPath)
+			cmd := fmt.Sprintf("find %v/base/* -type f -delete", specs.PgDataPath)
 			_, _, err = env.ExecCommandInInstancePod(
 				testsUtils.PodLocator{
 					Namespace: namespace,
@@ -190,15 +193,9 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), Ordered, func(
 			}, 300).Should(BeTrue())
 		})
 		AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReadyQuick], env)
-		AssertDataExpectedCount(namespace, clusterName, tableName, 2, psqlClientPod)
+		AssertDataExpectedCount(env, tableLocator, 2)
 		AssertClusterStandbysAreStreaming(namespace, clusterName, 120)
 	}
-
-	JustAfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-		}
-	})
 
 	Context("plain cluster", func() {
 		It("can recover cluster after pgdata corruption on primary", func() {

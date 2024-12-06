@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"path"
 	"reflect"
 	"slices"
 	"strconv"
@@ -50,10 +51,6 @@ const (
 	// ClusterReloadAnnotationName is the name of the annotation containing the
 	// latest required restart time
 	ClusterReloadAnnotationName = utils.ClusterReloadAnnotationName
-
-	// ClusterRoleLabelName label is applied to Pods to mark primary ones
-	// Deprecated: Use utils.ClusterInstanceRoleLabelName
-	ClusterRoleLabelName = utils.ClusterRoleLabelName
 
 	// WatchedLabelName label is for Secrets or ConfigMaps that needs to be reloaded
 	WatchedLabelName = utils.WatchedLabelName
@@ -136,12 +133,20 @@ func CreatePodEnvConfig(cluster apiv1.Cluster, podName string) EnvConfig {
 				Value: cluster.Name,
 			},
 			{
+				Name:  "PSQL_HISTORY",
+				Value: path.Join(postgres.TemporaryDirectory, ".psql_history"),
+			},
+			{
 				Name:  "PGPORT",
 				Value: strconv.Itoa(postgres.ServerPort),
 			},
 			{
 				Name:  "PGHOST",
 				Value: postgres.SocketDirectory,
+			},
+			{
+				Name:  "TMPDIR",
+				Value: postgres.TemporaryDirectory,
 			},
 		},
 		EnvFrom: cluster.Spec.EnvFrom,
@@ -193,6 +198,8 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig, enable
 			Env:             envConfig.EnvVars,
 			EnvFrom:         envConfig.EnvFrom,
 			VolumeMounts:    createPostgresVolumeMounts(cluster),
+			// This is the default startup probe, and can be overridden
+			// the user configuration in cluster.spec.probes.startup
 			StartupProbe: &corev1.Probe{
 				FailureThreshold: getStartupProbeFailureThreshold(cluster.GetMaxStartDelay()),
 				PeriodSeconds:    StartupProbePeriod,
@@ -204,6 +211,8 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig, enable
 					},
 				},
 			},
+			// This is the default readiness probe, and can be overridden
+			// by the user configuration in cluster.spec.probes.readiness
 			ReadinessProbe: &corev1.Probe{
 				TimeoutSeconds: 5,
 				PeriodSeconds:  ReadinessProbePeriod,
@@ -214,6 +223,8 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig, enable
 					},
 				},
 			},
+			// This is the default liveness probe, and can be overridden
+			// by the user configuration in cluster.spec.probes.liveness
 			LivenessProbe: &corev1.Probe{
 				PeriodSeconds:  LivenessProbePeriod,
 				TimeoutSeconds: 5,
@@ -258,20 +269,43 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig, enable
 		containers[0].Command = append(containers[0].Command, "--status-port-tls")
 	}
 
+	if cluster.IsMetricsTLSEnabled() {
+		containers[0].Command = append(containers[0].Command, "--metrics-port-tls")
+	}
+
 	addManagerLoggingOptions(cluster, &containers[0])
 
 	// if user customizes the liveness probe timeout, we need to adjust the failure threshold
 	addLivenessProbeFailureThreshold(cluster, &containers[0])
 
+	// use the custom probe configuration if provided
+	ensureCustomProbesConfiguration(&cluster, &containers[0])
+
 	return containers
 }
 
-// adjust the liveness probe failure threshold based on the `spec.livenessProbeTimeout` value
+// addLivenessProbeFailureThreshold adjusts the liveness probe failure threshold
+// based on the `spec.livenessProbeTimeout` value
 func addLivenessProbeFailureThreshold(cluster apiv1.Cluster, container *corev1.Container) {
 	if cluster.Spec.LivenessProbeTimeout != nil {
 		timeout := *cluster.Spec.LivenessProbeTimeout
 		container.LivenessProbe.FailureThreshold = getLivenessProbeFailureThreshold(timeout)
 	}
+}
+
+// ensureCustomProbesConfiguration applies the custom probe configuration
+// if specified inside the cluster specification
+func ensureCustomProbesConfiguration(cluster *apiv1.Cluster, container *corev1.Container) {
+	// No probes configuration
+	if cluster.Spec.Probes == nil {
+		return
+	}
+
+	// There's no need to check for nils here because a nil probe specification
+	// will result in no change in the Kubernetes probe.
+	cluster.Spec.Probes.Liveness.ApplyInto(container.LivenessProbe)
+	cluster.Spec.Probes.Readiness.ApplyInto(container.ReadinessProbe)
+	cluster.Spec.Probes.Startup.ApplyInto(container.StartupProbe)
 }
 
 // getStartupProbeFailureThreshold get the startup probe failure threshold
@@ -354,6 +388,13 @@ func CreateGeneratedAntiAffinity(clusterName string, config apiv1.AffinityConfig
 						clusterName,
 					},
 				},
+				{
+					Key:      utils.PodRoleLabelName,
+					Operator: metav1.LabelSelectorOpIn,
+					Values: []string{
+						string(utils.PodRoleInstance),
+					},
+				},
 			},
 		},
 		TopologyKey: topologyKey,
@@ -386,10 +427,6 @@ func CreatePodSecurityContext(seccompProfile *corev1.SeccompProfile, user, group
 	// Under Openshift we inherit SecurityContext from the restricted security context constraint
 	if utils.HaveSecurityContextConstraints() {
 		return nil
-	}
-
-	if !utils.HaveSeccompSupport() {
-		seccompProfile = nil
 	}
 
 	trueValue := true

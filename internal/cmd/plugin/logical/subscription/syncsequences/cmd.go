@@ -36,7 +36,7 @@ func NewCmd() *cobra.Command {
 	var offset int
 
 	syncSequencesCmd := &cobra.Command{
-		Use:   "sync-sequences cluster_name",
+		Use:   "sync-sequences CLUSTER",
 		Short: "synchronize the sequences from the source database",
 		Args:  plugin.RequiresArguments(1),
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
@@ -57,7 +57,8 @@ func NewCmd() *cobra.Command {
 				&cluster,
 			)
 			if err != nil {
-				return fmt.Errorf("cluster %s not found in namespace %s", clusterName, plugin.Namespace)
+				return fmt.Errorf("cluster %s not found in namespace %s: %w",
+					clusterName, plugin.Namespace, err)
 			}
 
 			if len(dbName) == 0 {

@@ -19,11 +19,11 @@ package specs
 import (
 	"slices"
 
+	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/stringset"
 )
 
 // CreateRole create a role with the permissions needed by the instance manager
@@ -124,6 +124,90 @@ func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) rbacv1.Role {
 			Verbs: []string{
 				"create",
 				"patch",
+			},
+		},
+		{
+			APIGroups: []string{
+				"postgresql.cnpg.io",
+			},
+			Resources: []string{
+				"databases",
+			},
+			Verbs: []string{
+				"get",
+				"update",
+				"list",
+				"watch",
+			},
+			ResourceNames: []string{},
+		},
+		{
+			APIGroups: []string{
+				"postgresql.cnpg.io",
+			},
+			Resources: []string{
+				"databases/status",
+			},
+			Verbs: []string{
+				"get",
+				"patch",
+				"update",
+			},
+		},
+		{
+			APIGroups: []string{
+				"postgresql.cnpg.io",
+			},
+			Resources: []string{
+				"publications",
+			},
+			Verbs: []string{
+				"get",
+				"update",
+				"list",
+				"watch",
+			},
+			ResourceNames: []string{},
+		},
+		{
+			APIGroups: []string{
+				"postgresql.cnpg.io",
+			},
+			Resources: []string{
+				"publications/status",
+			},
+			Verbs: []string{
+				"get",
+				"patch",
+				"update",
+			},
+		},
+		{
+			APIGroups: []string{
+				"postgresql.cnpg.io",
+			},
+			Resources: []string{
+				"subscriptions",
+			},
+			Verbs: []string{
+				"get",
+				"update",
+				"list",
+				"watch",
+			},
+			ResourceNames: []string{},
+		},
+		{
+			APIGroups: []string{
+				"postgresql.cnpg.io",
+			},
+			Resources: []string{
+				"subscriptions/status",
+			},
+			Verbs: []string{
+				"get",
+				"patch",
+				"update",
 			},
 		},
 	}

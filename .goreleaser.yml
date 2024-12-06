@@ -93,12 +93,18 @@ nfpms:
     formats:
       - rpm
       - deb
+    rpm:
+      signature:
+        key_file: gpg_signing_key.asc
+    deb:
+      signature:
+        key_file: gpg_signing_key.asc
 
 checksum:
   name_template: '{{ .ProjectName }}-{{ .Version }}-checksums.txt'
 
 snapshot:
-  name_template: "{{ .Tag }}-next"
+  version_template: "{{ .Tag }}-next"
 
 changelog:
   disable: true

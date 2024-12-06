@@ -83,7 +83,7 @@ func Maintenance(ctx context.Context,
 	for _, item := range clusterList.Items {
 		err := patchNodeMaintenanceWindow(ctx, item, setInProgressTo, reusePVC)
 		if err != nil {
-			return fmt.Errorf("unable to set progress to cluster %v in namespace %v", item.Name, item.Namespace)
+			return fmt.Errorf("unable to set progress to cluster %v in namespace %v: %w", item.Name, item.Namespace, err)
 		}
 	}
 

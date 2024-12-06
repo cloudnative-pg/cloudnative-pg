@@ -1,0 +1,11 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Publication
+metadata:
+  name: publication-example
+spec:
+  cluster:
+    name: cluster-example
+  name: pub-all
+  dbname: app
+  target:
+    allTables: true

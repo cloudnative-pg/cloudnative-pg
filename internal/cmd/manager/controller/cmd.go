@@ -20,6 +20,8 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 )
 
 // NewCmd create a new cobra command
@@ -32,6 +34,7 @@ func NewCmd() *cobra.Command {
 	var pprofHTTPServer bool
 	var leaderLeaseDuration int
 	var leaderRenewDeadline int
+	var maxConcurrentReconciles int
 
 	cmd := cobra.Command{
 		Use:           "controller [flags]",
@@ -48,6 +51,8 @@ func NewCmd() *cobra.Command {
 				},
 				pprofHTTPServer,
 				port,
+				maxConcurrentReconciles,
+				configuration.Current,
 			)
 		},
 	}
@@ -73,6 +78,12 @@ func NewCmd() *cobra.Command {
 		"pprof-server",
 		false,
 		"If true it will start a pprof debug http server on localhost:6060. Defaults to false.",
+	)
+	cmd.Flags().IntVar(
+		&maxConcurrentReconciles,
+		"max-concurrent-reconciles",
+		10,
+		"The maximum number of concurrent reconciles. Defaults to 10.",
 	)
 
 	return &cmd

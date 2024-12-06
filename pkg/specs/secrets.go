@@ -35,6 +35,7 @@ func CreateSecret(
 	dbname string,
 	username string,
 	password string,
+	usertype utils.UserType,
 ) *corev1.Secret {
 	uriBuilder := newConnectionStringBuilder(hostname, dbname, username, password, namespace)
 
@@ -43,7 +44,8 @@ func CreateSecret(
 			Name:      name,
 			Namespace: namespace,
 			Labels: map[string]string{
-				utils.WatchedLabelName: "true",
+				utils.UserTypeLabelName: string(usertype),
+				utils.WatchedLabelName:  "true",
 			},
 		},
 		Type: corev1.SecretTypeBasicAuth,

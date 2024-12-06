@@ -19,10 +19,12 @@ package pgbouncer
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/pgbouncer/run"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 )
 
 // NewCmd creates the "instance" command
@@ -31,6 +33,9 @@ func NewCmd() *cobra.Command {
 		Use:           "pgbouncer",
 		Short:         "pgbouncer management subfeatures",
 		SilenceErrors: true,
+		PersistentPreRunE: func(_ *cobra.Command, _ []string) error {
+			return os.MkdirAll(postgres.TemporaryDirectory, 0o1777) //nolint:gosec
+		},
 		RunE: func(_ *cobra.Command, _ []string) error {
 			return fmt.Errorf("missing subcommand")
 		},

@@ -71,9 +71,13 @@ const (
 	// scheduled backup if a backup is created by a scheduled backup
 	ParentScheduledBackupLabelName = MetadataNamespace + "/scheduled-backup"
 
-	// WatchedLabelName the name of the label which tell if a resource change will be automatically reloaded by instance
+	// WatchedLabelName the name of the label which tells if a resource change will be automatically reloaded by instance
 	// or not, use for Secrets or ConfigMaps
 	WatchedLabelName = MetadataNamespace + "/reload"
+
+	// UserTypeLabelName the name of the label which tells if a Secret refers
+	// to a superuser database role or an application one
+	UserTypeLabelName = MetadataNamespace + "/userType"
 
 	// BackupTimelineLabelName is the name or the label where the timeline of a backup is kept
 	BackupTimelineLabelName = MetadataNamespace + "/backupTimeline"
@@ -92,6 +96,10 @@ const (
 
 	// IsManagedLabelName is the name of the label used to indicate a '.spec.managed' resource
 	IsManagedLabelName = MetadataNamespace + "/isManaged"
+
+	// PluginNameLabelName is the name of the label to be applied to services
+	// to have them detected as CNPG-i plugins
+	PluginNameLabelName = MetadataNamespace + "/pluginName"
 )
 
 const (
@@ -106,6 +114,9 @@ const (
 	// ReconciliationLoopAnnotationName is the name of the annotation controlling
 	// the status of the reconciliation loop for the cluster
 	ReconciliationLoopAnnotationName = MetadataNamespace + "/reconciliationLoop"
+
+	// ReconcilePodSpecAnnotationName is the name of the annotation that prevents the pod spec to be reconciled
+	ReconcilePodSpecAnnotationName = MetadataNamespace + "/reconcilePodSpec"
 
 	// HibernateClusterManifestAnnotationName contains the hibernated cluster manifest
 	// Deprecated. Replaced by: ClusterManifestAnnotationName. This annotation is
@@ -205,6 +216,23 @@ const (
 	// ClusterRestartAnnotationName is the name of the annotation containing the
 	// latest required restart time
 	ClusterRestartAnnotationName = "kubectl.kubernetes.io/restartedAt"
+
+	// UpdateStrategyAnnotation is the name of the annotation used to indicate how to update the given resource
+	UpdateStrategyAnnotation = MetadataNamespace + "/updateStrategy"
+
+	// PluginClientSecretAnnotationName is the name of the annotation containing
+	// the secret containing the TLS credentials that the operator should use to
+	// connect to the plugin
+	PluginClientSecretAnnotationName = MetadataNamespace + "/pluginClientSecret"
+
+	// PluginServerSecretAnnotationName is the name of the annotation containing
+	// the secret containing the TLS credentials that are used by the plugin
+	// server to authenticate
+	PluginServerSecretAnnotationName = MetadataNamespace + "/pluginServerSecret"
+
+	// PluginPortAnnotationName is the name of the annotation containing the
+	// port the plugin is listening to
+	PluginPortAnnotationName = MetadataNamespace + "/pluginPort"
 )
 
 type annotationStatus string
@@ -247,6 +275,19 @@ const (
 	// HibernationAnnotationValueOn is the value of hibernation annotation when the hibernation
 	// has been requested for the cluster
 	HibernationAnnotationValueOn HibernationAnnotationValue = "on"
+)
+
+// UserType tells if a secret refers to a superuser database role
+// or an application one
+type UserType string
+
+const (
+	// UserTypeSuperuser is the type of a superuser database
+	// role
+	UserTypeSuperuser UserType = "superuser"
+
+	// UserTypeApp is the type of an application role
+	UserTypeApp UserType = "app"
 )
 
 // LabelClusterName labels the object with the cluster name
@@ -387,6 +428,14 @@ func AnnotateAppArmor(object *metav1.ObjectMeta, spec *corev1.PodSpec, annotatio
 // IsReconciliationDisabled checks if the reconciliation loop is disabled on the given resource
 func IsReconciliationDisabled(object *metav1.ObjectMeta) bool {
 	return object.Annotations[ReconciliationLoopAnnotationName] == string(annotationStatusDisabled)
+}
+
+// IsPodSpecReconciliationDisabled checks if the pod spec reconciliation is disabled
+func IsPodSpecReconciliationDisabled(object *metav1.ObjectMeta) bool {
+	if object.Annotations == nil {
+		return false
+	}
+	return object.Annotations[ReconcilePodSpecAnnotationName] == string(annotationStatusDisabled)
 }
 
 // IsEmptyWalArchiveCheckEnabled returns a boolean indicating if we should run the logic that checks if the WAL archive

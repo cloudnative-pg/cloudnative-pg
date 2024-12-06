@@ -26,9 +26,8 @@ import (
 
 	"github.com/cloudnative-pg/cnpg-i/pkg/backup"
 	"github.com/cloudnative-pg/cnpg-i/pkg/identity"
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
 var (
@@ -87,6 +86,9 @@ type BackupResponse struct {
 
 	// This field is set to true for online/hot backups and to false otherwise.
 	Online bool
+
+	// This field contains the metadata to be associated with this backup
+	Metadata map[string]string
 }
 
 func (data *data) Backup(
@@ -121,11 +123,11 @@ func (data *data) Backup(
 		return nil, err
 	}
 
-	if !slices.Contains(plugin.capabilities, identity.PluginCapability_Service_TYPE_BACKUP_SERVICE) {
+	if !slices.Contains(plugin.PluginCapabilities(), identity.PluginCapability_Service_TYPE_BACKUP_SERVICE) {
 		return nil, ErrPluginNotSupportBackup
 	}
 
-	if !slices.Contains(plugin.backupCapabilities, backup.BackupCapability_RPC_TYPE_BACKUP) {
+	if !slices.Contains(plugin.BackupCapabilities(), backup.BackupCapability_RPC_TYPE_BACKUP) {
 		return nil, ErrPluginNotSupportBackupEndpoint
 	}
 
@@ -144,7 +146,7 @@ func (data *data) Backup(
 		"clusterDefinition", request.ClusterDefinition,
 		"parameters", parameters)
 
-	result, err := plugin.backupClient.Backup(ctx, &request)
+	result, err := plugin.BackupClient().Backup(ctx, &request)
 	if err != nil {
 		contextLogger.Error(err, "Error while calling Backup, failing")
 		return nil, err
@@ -163,5 +165,6 @@ func (data *data) Backup(
 		TablespaceMapFile: result.TablespaceMapFile,
 		InstanceID:        result.InstanceId,
 		Online:            result.Online,
+		Metadata:          result.Metadata,
 	}, nil
 }

@@ -54,17 +54,17 @@ var _ = Describe("Connection via services", Label(tests.LabelServiceConnectivity
 		env *utils.TestingEnvironment,
 	) {
 		// We test -rw, -ro and -r services with the app user and the superuser
-		rwService := fmt.Sprintf("%v-rw.%v.svc", clusterName, namespace)
-		rService := fmt.Sprintf("%v-r.%v.svc", clusterName, namespace)
-		roService := fmt.Sprintf("%v-ro.%v.svc", clusterName, namespace)
+		rwService := fmt.Sprintf("%v-rw", clusterName)
+		rService := fmt.Sprintf("%v-r", clusterName)
+		roService := fmt.Sprintf("%v-ro", clusterName)
 		services := []string{rwService, roService, rService}
 		for _, service := range services {
-			AssertConnection(service, "postgres", appDBName, superuserPassword, *psqlClientPod, 10, env)
-			AssertConnection(service, appDBUser, appDBName, appPassword, *psqlClientPod, 10, env)
+			AssertConnection(namespace, service, appDBName, utils.PostgresDBName, superuserPassword, env)
+			AssertConnection(namespace, service, appDBName, appDBUser, appPassword, env)
 		}
 
-		AssertWritesToReplicaFails(psqlClientPod, roService, appDBName, appDBUser, appPassword)
-		AssertWritesToPrimarySucceeds(psqlClientPod, rwService, appDBName, appDBUser, appPassword)
+		AssertWritesToReplicaFails(namespace, roService, appDBName, appDBUser, appPassword)
+		AssertWritesToPrimarySucceeds(namespace, rwService, appDBName, appDBUser, appPassword)
 	}
 
 	Context("Auto-generated passwords", func() {
@@ -72,21 +72,14 @@ var _ = Describe("Connection via services", Label(tests.LabelServiceConnectivity
 		const sampleFile = fixturesDir + "/secrets/cluster-auto-generated.yaml.template"
 		const clusterName = "postgresql-auto-generated"
 		var namespace string
-		JustAfterEach(func() {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-		})
+
 		// If we don't specify secrets, the operator should autogenerate them.
 		// We check that we're able to use them
 		It("can connect with auto-generated passwords", func() {
 			// Create a cluster in a namespace we'll delete after the test
 			var err error
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.DeleteNamespace(namespace)
-			})
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
 			// Get the superuser password from the -superuser secret
@@ -121,11 +114,7 @@ var _ = Describe("Connection via services", Label(tests.LabelServiceConnectivity
 		const sampleFile = fixturesDir + "/secrets/cluster-user-supplied.yaml.template"
 		const clusterName = "postgresql-user-supplied"
 		var namespace string
-		JustAfterEach(func() {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-		})
+
 		// If we have specified secrets, we test that we're able to use them
 		// to connect
 		It("can connect with user-supplied passwords", func() {
@@ -134,11 +123,8 @@ var _ = Describe("Connection via services", Label(tests.LabelServiceConnectivity
 
 			// Create a cluster in a namespace we'll delete after the test
 			var err error
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.DeleteNamespace(namespace)
-			})
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 			AssertServices(namespace, clusterName, appDBName, appDBUser,
 				suppliedAppUserPassword, suppliedSuperuserPassword, env)

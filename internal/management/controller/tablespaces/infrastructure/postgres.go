@@ -21,38 +21,21 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 )
 
-// postgresTablespaceManager is a TablespaceManager for a database instance
-type postgresTablespaceManager struct {
-	superUserDB *sql.DB
-}
-
-// NewPostgresTablespaceManager returns an implementation of TablespaceManager for postgres
-func NewPostgresTablespaceManager(superDB *sql.DB) TablespaceManager {
-	return newPostgresTablespaceManager(superDB)
-}
-
-// NewPostgresTablespaceManager returns an implementation of TablespaceManager for postgres
-func newPostgresTablespaceManager(superDB *sql.DB) postgresTablespaceManager {
-	return postgresTablespaceManager{
-		superUserDB: superDB,
-	}
-}
-
 // List the tablespaces in the database
 // The content exclude pg_default and pg_global database
-func (tbsMgr postgresTablespaceManager) List(ctx context.Context) ([]Tablespace, error) {
+func List(ctx context.Context, db *sql.DB) ([]Tablespace, error) {
 	logger := log.FromContext(ctx).WithName("tbs_reconciler_list")
 	logger.Trace("Invoked list")
 	wrapErr := func(err error) error { return fmt.Errorf("while listing DB tablespaces: %w", err) }
 
-	rows, err := tbsMgr.superUserDB.QueryContext(
+	rows, err := db.QueryContext(
 		ctx,
 		`
 		SELECT
@@ -93,7 +76,7 @@ func (tbsMgr postgresTablespaceManager) List(ctx context.Context) ([]Tablespace,
 }
 
 // Create the tablespace in the database, if tablespace is temporary tablespace, need reload configure
-func (tbsMgr postgresTablespaceManager) Create(ctx context.Context, tbs Tablespace) error {
+func Create(ctx context.Context, db *sql.DB, tbs Tablespace) error {
 	contextLog := log.FromContext(ctx).WithName("tbs_reconciler_create")
 	tablespaceLocation := specs.LocationForTablespace(tbs.Name)
 
@@ -104,7 +87,7 @@ func (tbsMgr postgresTablespaceManager) Create(ctx context.Context, tbs Tablespa
 		return fmt.Errorf("while creating tablespace %s: %w", tbs.Name, err)
 	}
 	var err error
-	if _, err = tbsMgr.superUserDB.ExecContext(
+	if _, err = db.ExecContext(
 		ctx,
 		fmt.Sprintf(
 			"CREATE TABLESPACE %s OWNER %s LOCATION '%s'",
@@ -119,7 +102,7 @@ func (tbsMgr postgresTablespaceManager) Create(ctx context.Context, tbs Tablespa
 }
 
 // Update the tablespace in the database (change ownership)
-func (tbsMgr postgresTablespaceManager) Update(ctx context.Context, tbs Tablespace) error {
+func Update(ctx context.Context, db *sql.DB, tbs Tablespace) error {
 	contextLog := log.FromContext(ctx).WithName("tbs_reconciler_update")
 	tablespaceLocation := specs.LocationForTablespace(tbs.Name)
 
@@ -130,7 +113,7 @@ func (tbsMgr postgresTablespaceManager) Update(ctx context.Context, tbs Tablespa
 		return fmt.Errorf("while updating tablespace %s: %w", tbs.Name, err)
 	}
 	var err error
-	if _, err = tbsMgr.superUserDB.ExecContext(
+	if _, err = db.ExecContext(
 		ctx,
 		fmt.Sprintf(
 			"ALTER TABLESPACE %s OWNER TO %s",

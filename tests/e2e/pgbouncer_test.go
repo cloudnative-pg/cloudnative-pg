@@ -17,6 +17,10 @@ limitations under the License.
 package e2e
 
 import (
+	corev1 "k8s.io/api/core/v1"
+	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -39,27 +43,20 @@ var _ = Describe("PGBouncer Connections", Label(tests.LabelServiceConnectivity),
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 	})
-	JustAfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			env.DumpPoolerResourcesInfo(namespace, CurrentSpecReport().LeafNodeText)
-		}
-	})
 
 	Context("no user-defined certificates", Ordered, func() {
 		BeforeAll(func() {
 			// Create a cluster in a namespace we'll delete after the test
-			namespace, err = env.CreateUniqueNamespace("pgbouncer-auth-no-user-certs")
+			namespace, err = env.CreateUniqueTestNamespace("pgbouncer-auth-no-user-certs")
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.DeleteNamespace(namespace)
-			})
 			clusterName, err = env.GetResourceNameFromYAML(sampleFile)
 			Expect(err).ToNot(HaveOccurred())
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 		})
 		JustAfterEach(func() {
-			DeleteTableUsingPgBouncerService(namespace, clusterName, poolerBasicAuthRWSampleFile, env, psqlClientPod)
+			primaryPod, err := env.GetClusterPrimary(namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+			DeleteTableUsingPgBouncerService(namespace, clusterName, poolerBasicAuthRWSampleFile, env, primaryPod)
 		})
 
 		It("can connect to Postgres via pgbouncer service using basic authentication", func() {
@@ -81,6 +78,16 @@ var _ = Describe("PGBouncer Connections", Label(tests.LabelServiceConnectivity),
 			By("verifying read connections using pgbouncer service", func() {
 				assertReadWriteConnectionUsingPgBouncerService(namespace, clusterName,
 					poolerBasicAuthROSampleFile, false)
+			})
+
+			By("executing psql within the pgbouncer pod", func() {
+				pod, err := getPgbouncerPod(poolerBasicAuthRWSampleFile)
+				Expect(err).ToNot(HaveOccurred())
+
+				GinkgoWriter.Println(pod.Name)
+
+				err = runShowHelpInPod(pod)
+				Expect(err).ToNot(HaveOccurred())
 			})
 		})
 
@@ -148,11 +155,8 @@ var _ = Describe("PGBouncer Connections", Label(tests.LabelServiceConnectivity),
 				caSecNameClient               = "my-postgresql-client-ca"
 			)
 			// Create a cluster in a namespace that will be deleted after the test
-			namespace, err = env.CreateUniqueNamespace("pgbouncer-separate-certificates")
+			namespace, err = env.CreateUniqueTestNamespace("pgbouncer-separate-certificates")
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.DeleteNamespace(namespace)
-			})
 			clusterName, err = env.GetResourceNameFromYAML(sampleFileWithCertificate)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -186,3 +190,24 @@ var _ = Describe("PGBouncer Connections", Label(tests.LabelServiceConnectivity),
 		})
 	})
 })
+
+func getPgbouncerPod(sampleFile string) (*corev1.Pod, error) {
+	poolerKey, err := env.GetResourceNamespacedNameFromYAML(sampleFile)
+	if err != nil {
+		return nil, err
+	}
+
+	Expect(err).ToNot(HaveOccurred())
+
+	var podList corev1.PodList
+	err = env.Client.List(env.Ctx, &podList, ctrlclient.InNamespace(poolerKey.Namespace),
+		ctrlclient.MatchingLabels{utils.PgbouncerNameLabel: poolerKey.Name})
+	Expect(err).ToNot(HaveOccurred())
+	Expect(len(podList.Items)).Should(BeEquivalentTo(1))
+	return &podList.Items[0], nil
+}
+
+func runShowHelpInPod(pod *corev1.Pod) error {
+	_, _, err := env.ExecCommand(env.Ctx, *pod, "pgbouncer", nil, "psql", "-c", "SHOW HELP")
+	return err
+}

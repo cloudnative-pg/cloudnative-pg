@@ -16,10 +16,10 @@ on:
 
 # set up environment variables to be used across all the jobs
 env:
-  GOLANG_VERSION: "1.22.x"
-  GOLANGCI_LINT_VERSION: "v1.59"
+  GOLANG_VERSION: "1.23.x"
+  GOLANGCI_LINT_VERSION: "v1.62.2"
   KUBEBUILDER_VERSION: "2.3.1"
-  KIND_VERSION: "v0.23.0"
+  KIND_VERSION: "v0.25.0"
   OPERATOR_IMAGE_NAME: "ghcr.io/${{ github.repository }}-testing"
   API_DOC_NAME: "cloudnative-pg.v1.md"
   SLACK_USERNAME: "cnpg-bot"
@@ -46,13 +46,13 @@ jobs:
   # Trigger the workflow on release-* branches for smoke testing whenever it's a scheduled run.
   # Note: this is a workaround since we can't directly schedule-run a workflow from a non default branch
   smoke_test_release_branches:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     name: smoke test release-* branches when it's a scheduled run
     if: github.event_name == 'schedule'
     strategy:
       fail-fast: false
       matrix:
-        branch: [release-1.22, release-1.23]
+        branch: [release-1.22, release-1.23, release-1.24]
 
     steps:
       - name: Invoke workflow with inputs
@@ -65,7 +65,7 @@ jobs:
   #   1. it's on 'main' branch
   #   2. it's triggered by events in the 'do_not_skip' list
   duplicate_runs:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     name: Skip duplicate runs
     continue-on-error: true
     outputs:
@@ -86,7 +86,7 @@ jobs:
     name: Check changed files
     needs: duplicate_runs
     if: ${{ needs.duplicate_runs.outputs.should_skip != 'true' }}
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     outputs:
       docs-changed: ${{ steps.filter.outputs.docs-changed }}
       operator-changed: ${{ steps.filter.outputs.operator-changed }}
@@ -145,7 +145,7 @@ jobs:
       - change-triage
     # We need always run linter as go linter is a required check
     if: needs.duplicate_runs.outputs.should_skip != 'true'
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -175,7 +175,7 @@ jobs:
     if: |
       needs.duplicate_runs.outputs.should_skip != 'true' &&
       needs.change-triage.outputs.renovate-changed == 'true'
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -194,7 +194,7 @@ jobs:
         needs.change-triage.outputs.operator-changed == 'true' ||
         needs.change-triage.outputs.go-code-changed == 'true'
       )
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Run govulncheck
         uses: golang/govulncheck-action@v1
@@ -211,7 +211,7 @@ jobs:
     if: |
       needs.duplicate_runs.outputs.should_skip != 'true' &&
       needs.change-triage.outputs.shell-script-changed == 'true'
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     env:
         SHELLCHECK_OPTS: -a -S style
     steps:
@@ -233,7 +233,7 @@ jobs:
         needs.change-triage.outputs.operator-changed == 'true' ||
         needs.change-triage.outputs.go-code-changed == 'true'
       )
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     outputs:
       k8sMatrix: ${{ steps.get-k8s-versions.outputs.k8s_versions }}
       latest_k8s_version: ${{ steps.get-k8s-versions.outputs.latest_k8s_version }}
@@ -272,7 +272,7 @@ jobs:
         needs.change-triage.outputs.operator-changed == 'true' ||
         needs.change-triage.outputs.go-code-changed == 'true'
       )
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         # The Unit test is performed per multiple supported k8s versions (each job for each k8s version) as below:
@@ -315,7 +315,7 @@ jobs:
         needs.change-triage.outputs.go-code-changed == 'true' ||
         needs.change-triage.outputs.docs-changed == 'true'
       )
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -350,7 +350,7 @@ jobs:
         needs.change-triage.outputs.go-code-changed == 'true' ||
         needs.change-triage.outputs.operator-changed == 'true'
       )
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -403,7 +403,7 @@ jobs:
       (needs.tests.result == 'success' || needs.tests.result == 'skipped') &&
       (needs.apidoc.result == 'success' || needs.apidoc.result == 'skipped') &&
       (needs.crd.result == 'success' || needs.crd.result == 'skipped')
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     permissions:
       actions: read
       contents: read
@@ -480,7 +480,7 @@ jobs:
           )
         with:
           distribution: goreleaser
-          version: latest
+          version: v2
           args: ${{ env.BUILD_PLUGIN_RELEASE_ARGS }}
         env:
           DATE: ${{ env.DATE }}
@@ -513,7 +513,7 @@ jobs:
         uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
-          version: latest
+          version: v2
           args: ${{ env.BUILD_MANAGER_RELEASE_ARGS }}
         env:
           DATE: ${{ env.DATE }}
@@ -702,7 +702,7 @@ jobs:
 
   olm-bundle:
     name: Create OLM bundle and catalog
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       packages: write
@@ -760,7 +760,7 @@ jobs:
 
   preflight:
     name: Run openshift-preflight test
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs:
       - buildx
       - olm-bundle
@@ -816,7 +816,7 @@ jobs:
 
   olm-scorecard:
     name: Run OLM scorecard test
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs:
       - buildx
       - olm-bundle
@@ -867,7 +867,7 @@ jobs:
       matrix:
         test: [ kiwi, lemon, orange ]
     name: Run OLM ${{ matrix.test }} test
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs:
       - buildx
       - olm-bundle

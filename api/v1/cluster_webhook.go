@@ -17,13 +17,18 @@ limitations under the License.
 package v1
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"slices"
 	"strconv"
 	"strings"
 
+	barmanWebhooks "github.com/cloudnative-pg/barman-cloud/pkg/api/webhooks"
+	"github.com/cloudnative-pg/machinery/pkg/image/reference"
+	"github.com/cloudnative-pg/machinery/pkg/log"
+	"github.com/cloudnative-pg/machinery/pkg/postgres/version"
+	"github.com/cloudnative-pg/machinery/pkg/stringset"
+	"github.com/cloudnative-pg/machinery/pkg/types"
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -39,9 +44,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/stringset"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -99,7 +102,7 @@ func (r *Cluster) setDefaults(preserveUserSettings bool) {
 		r.Spec.Bootstrap = &BootstrapConfiguration{}
 	}
 
-	// Defaulting initDB if no other boostrap method was passed
+	// Defaulting initDB if no other bootstrap method was passed
 	switch {
 	case r.Spec.Bootstrap.Recovery != nil:
 		r.defaultRecovery()
@@ -125,11 +128,12 @@ func (r *Cluster) setDefaults(preserveUserSettings bool) {
 		// validateImageName function
 		info := postgres.ConfigurationInfo{
 			Settings:                      postgres.CnpgConfigurationSettings,
-			MajorVersion:                  psqlVersion,
+			Version:                       psqlVersion,
 			UserSettings:                  r.Spec.PostgresConfiguration.Parameters,
 			IsReplicaCluster:              r.IsReplica(),
 			PreserveFixedSettingsFromUser: preserveUserSettings,
 			IsWalArchivingDisabled:        utils.IsWalArchivingDisabled(&r.ObjectMeta),
+			IsAlterSystemEnabled:          r.Spec.PostgresConfiguration.EnableAlterSystem,
 		}
 		sanitizedParameters := postgres.CreatePostgresqlConfiguration(info).GetConfigurationParameters()
 		r.Spec.PostgresConfiguration.Parameters = sanitizedParameters
@@ -165,26 +169,24 @@ func (r *Cluster) setDefaults(preserveUserSettings bool) {
 		r.defaultTablespaces()
 	}
 
-	ctx := context.Background()
+	r.setDefaultPlugins(configuration.Current)
+}
 
-	// Call the plugins to help with defaulting this cluster
-	contextLogger := log.FromContext(ctx)
-	pluginClient, err := r.LoadPluginClient(ctx)
-	if err != nil {
-		contextLogger.Error(err, "Error invoking plugin in the defaulting webhook, skipping")
-		return
-	}
-	defer func() {
-		pluginClient.Close(ctx)
-	}()
-
-	var mutatedCluster Cluster
-	if err := pluginClient.MutateCluster(ctx, r, &mutatedCluster); err != nil {
-		contextLogger.Error(err, "Error invoking plugin in the defaulting webhook, skipping")
-		return
+func (r *Cluster) setDefaultPlugins(config *configuration.Data) {
+	// Add the list of pre-defined plugins
+	foundPlugins := stringset.New()
+	for _, plugin := range r.Spec.Plugins {
+		foundPlugins.Put(plugin.Name)
 	}
 
-	mutatedCluster.DeepCopyInto(r)
+	for _, pluginName := range config.GetIncludePlugins() {
+		if !foundPlugins.Has(pluginName) {
+			r.Spec.Plugins = append(r.Spec.Plugins, PluginConfiguration{
+				Name:    pluginName,
+				Enabled: ptr.To(true),
+			})
+		}
+	}
 }
 
 // defaultTablespaces adds the tablespace owner where the
@@ -309,25 +311,6 @@ var _ webhook.Validator = &Cluster{}
 func (r *Cluster) ValidateCreate() (admission.Warnings, error) {
 	clusterLog.Info("validate create", "name", r.Name, "namespace", r.Namespace)
 	allErrs := r.Validate()
-
-	// Call the plugins to help validating this cluster creation
-	ctx := context.Background()
-	contextLogger := log.FromContext(ctx)
-	pluginClient, err := r.LoadPluginClient(ctx)
-	if err != nil {
-		contextLogger.Error(err, "Error invoking plugin in the validate/create webhook")
-		return nil, err
-	}
-	defer func() {
-		pluginClient.Close(ctx)
-	}()
-
-	pluginValidationResult, err := pluginClient.ValidateClusterCreate(ctx, r)
-	if err != nil {
-		contextLogger.Error(err, "Error invoking plugin in the validate/update webhook")
-		return nil, err
-	}
-	allErrs = append(allErrs, pluginValidationResult...)
 	allWarnings := r.getAdmissionWarnings()
 
 	if len(allErrs) == 0 {
@@ -371,7 +354,9 @@ func (r *Cluster) Validate() (allErrs field.ErrorList) {
 		r.validateAntiAffinity,
 		r.validateReplicaMode,
 		r.validateBackupConfiguration,
+		r.validateRetentionPolicy,
 		r.validateConfiguration,
+		r.validateSynchronousReplicaConfiguration,
 		r.validateLDAP,
 		r.validateReplicationSlots,
 		r.validateEnv,
@@ -402,25 +387,6 @@ func (r *Cluster) ValidateUpdate(old runtime.Object) (admission.Warnings, error)
 		r.Validate(),
 		r.ValidateChanges(oldCluster)...,
 	)
-
-	// Call the plugins to help validating this cluster update
-	ctx := context.Background()
-	contextLogger := log.FromContext(ctx)
-	pluginClient, err := r.LoadPluginClient(ctx)
-	if err != nil {
-		contextLogger.Error(err, "Error invoking plugin in the validate/create webhook")
-		return nil, err
-	}
-	defer func() {
-		pluginClient.Close(ctx)
-	}()
-
-	pluginValidationResult, err := pluginClient.ValidateClusterUpdate(ctx, oldCluster, r)
-	if err != nil {
-		contextLogger.Error(err, "Error invoking plugin in the validate/update webhook")
-		return nil, err
-	}
-	allErrs = append(allErrs, pluginValidationResult...)
 
 	if len(allErrs) == 0 {
 		return r.getAdmissionWarnings(), nil
@@ -981,9 +947,10 @@ func validateVolumeSnapshotSource(
 
 	switch {
 	case apiGroup == storagesnapshotv1.GroupName && value.Kind == "VolumeSnapshot":
+	case apiGroup == v1.GroupName && value.Kind == "PersistentVolumeClaim":
 	default:
 		return field.ErrorList{
-			field.Invalid(path, value, "Only VolumeSnapshots are supported"),
+			field.Invalid(path, value, "Only VolumeSnapshots and PersistentVolumeClaims are supported"),
 		}
 	}
 
@@ -1001,7 +968,7 @@ func (r *Cluster) validateImageName() field.ErrorList {
 	}
 
 	// We have to check if the image has a valid tag
-	tag := utils.GetImageTag(r.Spec.ImageName)
+	tag := reference.New(r.Spec.ImageName).Tag
 	switch tag {
 	case "latest":
 		result = append(
@@ -1018,7 +985,7 @@ func (r *Cluster) validateImageName() field.ErrorList {
 				r.Spec.ImageName,
 				"Can't use just the image sha as we can't detect upgrades"))
 	default:
-		_, err := postgres.GetPostgresVersionFromTag(tag)
+		_, err := version.FromTag(tag)
 		if err != nil {
 			result = append(
 				result,
@@ -1108,9 +1075,43 @@ func (r *Cluster) validateResources() field.ErrorList {
 	return result
 }
 
+func (r *Cluster) validateSynchronousReplicaConfiguration() field.ErrorList {
+	if r.Spec.PostgresConfiguration.Synchronous == nil {
+		return nil
+	}
+
+	var result field.ErrorList
+
+	if r.Spec.PostgresConfiguration.Synchronous.Number >= (r.Spec.Instances +
+		len(r.Spec.PostgresConfiguration.Synchronous.StandbyNamesPost) +
+		len(r.Spec.PostgresConfiguration.Synchronous.StandbyNamesPre)) {
+		err := field.Invalid(
+			field.NewPath("spec", "postgresql", "synchronous"),
+			r.Spec.PostgresConfiguration.Synchronous,
+			"Invalid synchronous configuration: the number of synchronous replicas must be less than the "+
+				"total number of instances and the provided standby names.",
+		)
+		result = append(result, err)
+	}
+
+	return result
+}
+
 // validateConfiguration determines whether a PostgreSQL configuration is valid
 func (r *Cluster) validateConfiguration() field.ErrorList {
 	var result field.ErrorList
+
+	// We cannot have both old-style synchronous replica configuration
+	// and new-style synchronous replica configuration
+	haveOldStyleSyncReplicaConfig := r.Spec.PostgresConfiguration.Synchronous != nil
+	haveNewStyleSyncReplicaConfig := r.Spec.MinSyncReplicas > 0 || r.Spec.MaxSyncReplicas > 0
+	if haveOldStyleSyncReplicaConfig && haveNewStyleSyncReplicaConfig {
+		result = append(result,
+			field.Invalid(
+				field.NewPath("spec", "postgresql", "synchronous"),
+				r.Spec.PostgresConfiguration.Synchronous,
+				"Can't have both legacy synchronous replica configuration and new one"))
+	}
 
 	pgVersion, err := r.GetPostgresqlVersion()
 	if err != nil {
@@ -1118,19 +1119,20 @@ func (r *Cluster) validateConfiguration() field.ErrorList {
 		// validateImageName function
 		return result
 	}
-	if pgVersion < 110000 {
+	if pgVersion.Major() < 12 {
 		result = append(result,
 			field.Invalid(
 				field.NewPath("spec", "imageName"),
 				r.Spec.ImageName,
-				"Unsupported PostgreSQL version. Versions 11 or newer are supported"))
+				"Unsupported PostgreSQL version. Versions 12 or newer are supported"))
 	}
 	info := postgres.ConfigurationInfo{
 		Settings:               postgres.CnpgConfigurationSettings,
-		MajorVersion:           pgVersion,
+		Version:                pgVersion,
 		UserSettings:           r.Spec.PostgresConfiguration.Parameters,
 		IsReplicaCluster:       r.IsReplica(),
 		IsWalArchivingDisabled: utils.IsWalArchivingDisabled(&r.ObjectMeta),
+		IsAlterSystemEnabled:   r.Spec.PostgresConfiguration.EnableAlterSystem,
 	}
 	sanitizedParameters := postgres.CreatePostgresqlConfiguration(info).GetConfigurationParameters()
 
@@ -1392,7 +1394,7 @@ func validateSyncReplicaElectionConstraint(constraints SyncReplicaElectionConstr
 // to a new one.
 func (r *Cluster) validateImageChange(old *Cluster) field.ErrorList {
 	var result field.ErrorList
-	var newMajor, oldMajor int
+	var newVersion, oldVersion version.Data
 	var err error
 	var newImagePath *field.Path
 	if r.Spec.ImageCatalogRef != nil {
@@ -1402,7 +1404,7 @@ func (r *Cluster) validateImageChange(old *Cluster) field.ErrorList {
 	}
 
 	r.Status.Image = ""
-	newMajor, err = r.GetPostgresqlVersion()
+	newVersion, err = r.GetPostgresqlVersion()
 	if err != nil {
 		// The validation error will be already raised by the
 		// validateImageName function
@@ -1410,23 +1412,23 @@ func (r *Cluster) validateImageChange(old *Cluster) field.ErrorList {
 	}
 
 	old.Status.Image = ""
-	oldMajor, err = old.GetPostgresqlVersion()
+	oldVersion, err = old.GetPostgresqlVersion()
 	if err != nil {
 		// The validation error will be already raised by the
 		// validateImageName function
 		return result
 	}
 
-	status := postgres.IsUpgradePossible(oldMajor, newMajor)
+	status := version.IsUpgradePossible(oldVersion, newVersion)
 
 	if !status {
 		result = append(
 			result,
 			field.Invalid(
 				newImagePath,
-				newMajor,
+				newVersion,
 				fmt.Sprintf("can't upgrade between majors %v and %v",
-					oldMajor, newMajor)))
+					oldVersion, newVersion)))
 	}
 
 	return result
@@ -1449,7 +1451,7 @@ func (r *Cluster) validateRecoveryTarget() field.ErrorList {
 
 	// validate format of TargetTime
 	if recoveryTarget.TargetTime != "" {
-		if _, err := utils.ParseTargetTime(nil, recoveryTarget.TargetTime); err != nil {
+		if _, err := types.ParseTargetTime(nil, recoveryTarget.TargetTime); err != nil {
 			result = append(result, field.Invalid(
 				field.NewPath("spec", "bootstrap", "recovery", "recoveryTarget"),
 				recoveryTarget.TargetTime,
@@ -1459,7 +1461,7 @@ func (r *Cluster) validateRecoveryTarget() field.ErrorList {
 
 	// validate TargetLSN
 	if recoveryTarget.TargetLSN != "" {
-		if _, err := postgres.LSN(recoveryTarget.TargetLSN).Parse(); err != nil {
+		if _, err := types.LSN(recoveryTarget.TargetLSN).Parse(); err != nil {
 			result = append(result, field.Invalid(
 				field.NewPath("spec", "bootstrap", "recovery", "recoveryTarget"),
 				recoveryTarget.TargetLSN,
@@ -1639,7 +1641,6 @@ func (r *Cluster) validateTablespaceStorageSize() field.ErrorList {
 	var result field.ErrorList
 
 	for idx, tablespaceConf := range r.Spec.Tablespaces {
-		tablespaceConf := tablespaceConf
 		result = append(result,
 			validateStorageConfigurationSize(
 				*field.NewPath("spec", "tablespaces").Index(idx),
@@ -1875,12 +1876,14 @@ func (r *Cluster) validateExternalClusters() field.ErrorList {
 func (r *Cluster) validateExternalCluster(externalCluster *ExternalCluster, path *field.Path) field.ErrorList {
 	var result field.ErrorList
 
-	if externalCluster.ConnectionParameters == nil && externalCluster.BarmanObjectStore == nil {
+	if externalCluster.ConnectionParameters == nil &&
+		externalCluster.BarmanObjectStore == nil &&
+		externalCluster.PluginConfiguration == nil {
 		result = append(result,
 			field.Invalid(
 				path,
 				externalCluster,
-				"one of connectionParameters and barmanObjectStore is required"))
+				"one of connectionParameters, plugin and barmanObjectStore is required"))
 	}
 
 	return result
@@ -1937,6 +1940,16 @@ func (r *Cluster) validatePromotionToken() field.ErrorList {
 	token := r.Spec.ReplicaCluster.PromotionToken
 	// Nothing to validate if the token is empty, we can immediately return
 	if len(token) == 0 {
+		return result
+	}
+
+	if r.Spec.ReplicaCluster.MinApplyDelay != nil {
+		result = append(
+			result,
+			field.Invalid(
+				field.NewPath("spec", "replicaCluster", "minApplyDelay"),
+				token,
+				"minApplyDelay cannot be applied with a promotion token"))
 		return result
 	}
 
@@ -2066,7 +2079,6 @@ func (r *Cluster) validateTolerations() field.ErrorList {
 	path := field.NewPath("spec", "affinity", "toleration")
 	allErrors := field.ErrorList{}
 	for i, toleration := range r.Spec.Affinity.Tolerations {
-		toleration := toleration
 		idxPath := path.Index(i)
 		// validate the toleration key
 		if len(toleration.Key) > 0 {
@@ -2165,57 +2177,24 @@ func (r *Cluster) validateAntiAffinity() field.ErrorList {
 
 // validateBackupConfiguration validates the backup configuration
 func (r *Cluster) validateBackupConfiguration() field.ErrorList {
-	allErrors := field.ErrorList{}
-
-	if r.Spec.Backup == nil || r.Spec.Backup.BarmanObjectStore == nil {
+	if r.Spec.Backup == nil {
 		return nil
 	}
+	return barmanWebhooks.ValidateBackupConfiguration(
+		r.Spec.Backup.BarmanObjectStore,
+		field.NewPath("spec", "backup", "barmanObjectStore"),
+	)
+}
 
-	credentialsCount := 0
-	if r.Spec.Backup.BarmanObjectStore.BarmanCredentials.Azure != nil {
-		credentialsCount++
-		allErrors = r.Spec.Backup.BarmanObjectStore.BarmanCredentials.Azure.validateAzureCredentials(
-			field.NewPath("spec", "backupConfiguration", "azureCredentials"))
+// validateRetentionPolicy validates the retention policy configuration
+func (r *Cluster) validateRetentionPolicy() field.ErrorList {
+	if r.Spec.Backup == nil {
+		return nil
 	}
-	if r.Spec.Backup.BarmanObjectStore.BarmanCredentials.AWS != nil {
-		credentialsCount++
-		allErrors = r.Spec.Backup.BarmanObjectStore.BarmanCredentials.AWS.validateAwsCredentials(
-			field.NewPath("spec", "backupConfiguration", "s3Credentials"))
-	}
-	if r.Spec.Backup.BarmanObjectStore.BarmanCredentials.Google != nil {
-		credentialsCount++
-		allErrors = r.Spec.Backup.BarmanObjectStore.BarmanCredentials.Google.validateGCSCredentials(
-			field.NewPath("spec", "backupConfiguration", "googleCredentials"))
-	}
-	if credentialsCount == 0 {
-		allErrors = append(allErrors, field.Invalid(
-			field.NewPath("spec", "backupConfiguration"),
-			r.Spec.Backup.BarmanObjectStore,
-			"missing credentials. "+
-				"One and only one of azureCredentials, s3Credentials and googleCredentials are required",
-		))
-	}
-	if credentialsCount > 1 {
-		allErrors = append(allErrors, field.Invalid(
-			field.NewPath("spec", "backupConfiguration"),
-			r.Spec.Backup.BarmanObjectStore,
-			"too many credentials. "+
-				"One and only one of azureCredentials, s3Credentials and googleCredentials are required",
-		))
-	}
-
-	if r.Spec.Backup.RetentionPolicy != "" {
-		_, err := utils.ParsePolicy(r.Spec.Backup.RetentionPolicy)
-		if err != nil {
-			allErrors = append(allErrors, field.Invalid(
-				field.NewPath("spec", "retentionPolicy"),
-				r.Spec.Backup.RetentionPolicy,
-				"not a valid retention policy",
-			))
-		}
-	}
-
-	return allErrors
+	return barmanWebhooks.ValidateRetentionPolicy(
+		r.Spec.Backup.RetentionPolicy,
+		field.NewPath("spec", "backup", "retentionPolicy"),
+	)
 }
 
 func (r *Cluster) validateReplicationSlots() field.ErrorList {
@@ -2233,33 +2212,6 @@ func (r *Cluster) validateReplicationSlots() field.ErrorList {
 
 	if !replicationSlots.GetEnabled() {
 		return nil
-	}
-
-	psqlVersion, err := r.GetPostgresqlVersion()
-	if err != nil {
-		// The validation error will be already raised by the
-		// validateImageName function
-		return nil
-	}
-
-	if psqlVersion < 110000 {
-		if replicationSlots.HighAvailability.GetEnabled() {
-			return field.ErrorList{
-				field.Invalid(
-					field.NewPath("spec", "replicationSlots", "highAvailability", "enabled"),
-					replicationSlots.HighAvailability.GetEnabled(),
-					"Cannot enable HA replication slots synchronization. PostgreSQL 11 or above required"),
-			}
-		}
-
-		if replicationSlots.SynchronizeReplicas.GetEnabled() {
-			return field.ErrorList{
-				field.Invalid(
-					field.NewPath("spec", "replicationSlots", "synchronizeReplicas", "enabled"),
-					replicationSlots.SynchronizeReplicas.GetEnabled(),
-					"Cannot enable user defined replication slots synchronization. PostgreSQL 11 or above required"),
-			}
-		}
 	}
 
 	if errs := r.Spec.ReplicationSlots.SynchronizeReplicas.compileRegex(); len(errs) > 0 {
@@ -2325,116 +2277,6 @@ func (r *Cluster) validateWALLevelChange(old *Cluster) field.ErrorList {
 	}
 
 	return errs
-}
-
-// validateAzureCredentials checks and validates the azure credentials
-func (azure *AzureCredentials) validateAzureCredentials(path *field.Path) field.ErrorList {
-	allErrors := field.ErrorList{}
-
-	secrets := 0
-	if azure.InheritFromAzureAD {
-		secrets++
-	}
-	if azure.StorageKey != nil {
-		secrets++
-	}
-	if azure.StorageSasToken != nil {
-		secrets++
-	}
-
-	if secrets != 1 && azure.ConnectionString == nil {
-		allErrors = append(
-			allErrors,
-			field.Invalid(
-				path,
-				azure,
-				"when connection string is not specified, one and only one of "+
-					"storage key and storage SAS token is allowed"))
-	}
-
-	if secrets != 0 && azure.ConnectionString != nil {
-		allErrors = append(
-			allErrors,
-			field.Invalid(
-				path,
-				azure,
-				"when connection string is specified, the other parameters "+
-					"must be empty"))
-	}
-
-	return allErrors
-}
-
-func (s3 *S3Credentials) validateAwsCredentials(path *field.Path) field.ErrorList {
-	allErrors := field.ErrorList{}
-	credentials := 0
-
-	if s3.InheritFromIAMRole {
-		credentials++
-	}
-	if s3.AccessKeyIDReference != nil && s3.SecretAccessKeyReference != nil {
-		credentials++
-	} else if s3.AccessKeyIDReference != nil || s3.SecretAccessKeyReference != nil {
-		credentials++
-		allErrors = append(
-			allErrors,
-			field.Invalid(
-				path,
-				s3,
-				"when using AWS credentials both accessKeyId and secretAccessKey must be provided",
-			),
-		)
-	}
-
-	if credentials == 0 {
-		allErrors = append(
-			allErrors,
-			field.Invalid(
-				path,
-				s3,
-				"at least one AWS authentication method should be supplied",
-			),
-		)
-	}
-
-	if credentials > 1 {
-		allErrors = append(
-			allErrors,
-			field.Invalid(
-				path,
-				s3,
-				"only one AWS authentication method should be supplied",
-			),
-		)
-	}
-
-	return allErrors
-}
-
-func (gcs *GoogleCredentials) validateGCSCredentials(path *field.Path) field.ErrorList {
-	allErrors := field.ErrorList{}
-
-	if !gcs.GKEEnvironment && gcs.ApplicationCredentials == nil {
-		allErrors = append(
-			allErrors,
-			field.Invalid(
-				path,
-				gcs,
-				"if gkeEnvironment is false, secret with credentials must be provided",
-			))
-	}
-
-	if gcs.GKEEnvironment && gcs.ApplicationCredentials != nil {
-		allErrors = append(
-			allErrors,
-			field.Invalid(
-				path,
-				gcs,
-				"if gkeEnvironment is true, secret with credentials must not be provided",
-			))
-	}
-
-	return allErrors
 }
 
 func (r *Cluster) validateManagedServices() field.ErrorList {

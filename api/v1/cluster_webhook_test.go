@@ -21,7 +21,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
+	"github.com/cloudnative-pg/machinery/pkg/image/reference"
+	pgversion "github.com/cloudnative-pg/machinery/pkg/postgres/version"
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -79,114 +82,6 @@ var _ = Describe("bootstrap methods validation", func() {
 		}
 		result := invalidCluster.validateBootstrapMethod()
 		Expect(result).To(HaveLen(1))
-	})
-})
-
-var _ = Describe("azure credentials", func() {
-	path := field.NewPath("spec", "backupConfiguration", "azureCredentials")
-
-	It("contain only one of storage account key and SAS token", func() {
-		azureCredentials := AzureCredentials{
-			StorageAccount: &SecretKeySelector{
-				LocalObjectReference: LocalObjectReference{
-					Name: "azure-config",
-				},
-				Key: "storageAccount",
-			},
-			StorageKey: &SecretKeySelector{
-				LocalObjectReference: LocalObjectReference{
-					Name: "azure-config",
-				},
-				Key: "storageKey",
-			},
-			StorageSasToken: &SecretKeySelector{
-				LocalObjectReference: LocalObjectReference{
-					Name: "azure-config",
-				},
-				Key: "sasToken",
-			},
-		}
-		Expect(azureCredentials.validateAzureCredentials(path)).ToNot(BeEmpty())
-
-		azureCredentials = AzureCredentials{
-			StorageAccount: &SecretKeySelector{
-				LocalObjectReference: LocalObjectReference{
-					Name: "azure-config",
-				},
-				Key: "storageAccount",
-			},
-			StorageKey:      nil,
-			StorageSasToken: nil,
-		}
-		Expect(azureCredentials.validateAzureCredentials(path)).ToNot(BeEmpty())
-	})
-
-	It("is correct when the storage key is used", func() {
-		azureCredentials := AzureCredentials{
-			StorageAccount: &SecretKeySelector{
-				LocalObjectReference: LocalObjectReference{
-					Name: "azure-config",
-				},
-				Key: "storageAccount",
-			},
-			StorageKey: &SecretKeySelector{
-				LocalObjectReference: LocalObjectReference{
-					Name: "azure-config",
-				},
-				Key: "storageKey",
-			},
-			StorageSasToken: nil,
-		}
-		Expect(azureCredentials.validateAzureCredentials(path)).To(BeEmpty())
-	})
-
-	It("is correct when the sas token is used", func() {
-		azureCredentials := AzureCredentials{
-			StorageAccount: &SecretKeySelector{
-				LocalObjectReference: LocalObjectReference{
-					Name: "azure-config",
-				},
-				Key: "storageAccount",
-			},
-			StorageKey: nil,
-			StorageSasToken: &SecretKeySelector{
-				LocalObjectReference: LocalObjectReference{
-					Name: "azure-config",
-				},
-				Key: "sasToken",
-			},
-		}
-		Expect(azureCredentials.validateAzureCredentials(path)).To(BeEmpty())
-	})
-
-	It("is correct even if only the connection string is specified", func() {
-		azureCredentials := AzureCredentials{
-			ConnectionString: &SecretKeySelector{
-				LocalObjectReference: LocalObjectReference{
-					Name: "azure-config",
-				},
-				Key: "connectionString",
-			},
-		}
-		Expect(azureCredentials.validateAzureCredentials(path)).To(BeEmpty())
-	})
-
-	It("it is not correct when the connection string is specified with other parameters", func() {
-		azureCredentials := AzureCredentials{
-			ConnectionString: &SecretKeySelector{
-				LocalObjectReference: LocalObjectReference{
-					Name: "azure-config",
-				},
-				Key: "connectionString",
-			},
-			StorageAccount: &SecretKeySelector{
-				LocalObjectReference: LocalObjectReference{
-					Name: "azure-config",
-				},
-				Key: "storageAccount",
-			},
-		}
-		Expect(azureCredentials.validateAzureCredentials(path)).To(BeEmpty())
 	})
 })
 
@@ -294,7 +189,7 @@ var _ = Describe("initdb options validation", func() {
 					InitDB: &BootstrapInitDB{
 						Database: "app",
 						Owner:    "app",
-						PostInitApplicationSQLRefs: &PostInitApplicationSQLRefs{
+						PostInitApplicationSQLRefs: &SQLRefs{
 							SecretRefs: []SecretKeySelector{
 								{
 									LocalObjectReference: LocalObjectReference{Name: "secret1"},
@@ -317,7 +212,7 @@ var _ = Describe("initdb options validation", func() {
 					InitDB: &BootstrapInitDB{
 						Database: "app",
 						Owner:    "app",
-						PostInitApplicationSQLRefs: &PostInitApplicationSQLRefs{
+						PostInitApplicationSQLRefs: &SQLRefs{
 							SecretRefs: []SecretKeySelector{
 								{
 									Key: "key",
@@ -340,7 +235,7 @@ var _ = Describe("initdb options validation", func() {
 					InitDB: &BootstrapInitDB{
 						Database: "app",
 						Owner:    "app",
-						PostInitApplicationSQLRefs: &PostInitApplicationSQLRefs{
+						PostInitApplicationSQLRefs: &SQLRefs{
 							ConfigMapRefs: []ConfigMapKeySelector{
 								{
 									LocalObjectReference: LocalObjectReference{Name: "configmap1"},
@@ -363,7 +258,7 @@ var _ = Describe("initdb options validation", func() {
 					InitDB: &BootstrapInitDB{
 						Database: "app",
 						Owner:    "app",
-						PostInitApplicationSQLRefs: &PostInitApplicationSQLRefs{
+						PostInitApplicationSQLRefs: &SQLRefs{
 							ConfigMapRefs: []ConfigMapKeySelector{
 								{
 									Key: "key",
@@ -386,7 +281,7 @@ var _ = Describe("initdb options validation", func() {
 					InitDB: &BootstrapInitDB{
 						Database: "app",
 						Owner:    "app",
-						PostInitApplicationSQLRefs: &PostInitApplicationSQLRefs{
+						PostInitApplicationSQLRefs: &SQLRefs{
 							ConfigMapRefs: []ConfigMapKeySelector{
 								{
 									LocalObjectReference: LocalObjectReference{Name: "configmap1"},
@@ -1438,12 +1333,12 @@ var _ = Describe("validate image name change", func() {
 		It("complains if it can't upgrade between mayor versions", func() {
 			clusterOld := Cluster{
 				Spec: ClusterSpec{
-					ImageName: "postgres:12.0",
+					ImageName: "postgres:17.0",
 				},
 			}
 			clusterNew := Cluster{
 				Spec: ClusterSpec{
-					ImageName: "postgres:11.0",
+					ImageName: "postgres:16.0",
 				},
 			}
 			Expect(clusterNew.validateImageChange(&clusterOld)).To(HaveLen(1))
@@ -1452,12 +1347,12 @@ var _ = Describe("validate image name change", func() {
 		It("doesn't complain if image change is valid", func() {
 			clusterOld := Cluster{
 				Spec: ClusterSpec{
-					ImageName: "postgres:12.1",
+					ImageName: "postgres:17.1",
 				},
 			}
 			clusterNew := Cluster{
 				Spec: ClusterSpec{
-					ImageName: "postgres:12.0",
+					ImageName: "postgres:17.0",
 				},
 			}
 			Expect(clusterNew.validateImageChange(&clusterOld)).To(BeEmpty())
@@ -1513,7 +1408,7 @@ var _ = Describe("validate image name change", func() {
 		It("complains on major upgrades", func() {
 			clusterOld := Cluster{
 				Spec: ClusterSpec{
-					ImageName: "postgres:15.1",
+					ImageName: "postgres:16.1",
 				},
 			}
 			clusterNew := Cluster{
@@ -1523,7 +1418,7 @@ var _ = Describe("validate image name change", func() {
 							Name: "test",
 							Kind: "ImageCatalog",
 						},
-						Major: 16,
+						Major: 17,
 					},
 				},
 			}
@@ -1540,13 +1435,16 @@ var _ = Describe("validate image name change", func() {
 							Name: "test",
 							Kind: "ImageCatalog",
 						},
-						Major: 14,
+						Major: 16,
 					},
 				},
 			}
 			Expect(clusterNew.validateImageChange(&clusterOld)).To(HaveLen(1))
 		})
 		It("doesn't complain going from default imageName to same major imageCatalogRef", func() {
+			defaultImageRef := reference.New(versions.DefaultImageName)
+			version, err := pgversion.FromTag(defaultImageRef.Tag)
+			Expect(err).ToNot(HaveOccurred())
 			clusterOld := Cluster{
 				Spec: ClusterSpec{},
 			}
@@ -1557,7 +1455,7 @@ var _ = Describe("validate image name change", func() {
 							Name: "test",
 							Kind: "ImageCatalog",
 						},
-						Major: 16,
+						Major: int(version.Major()),
 					},
 				},
 			}
@@ -1574,13 +1472,13 @@ var _ = Describe("validate image name change", func() {
 							Name: "test",
 							Kind: "ImageCatalog",
 						},
-						Major: 16,
+						Major: 17,
 					},
 				},
 			}
 			clusterNew := Cluster{
 				Spec: ClusterSpec{
-					ImageName: "postgres:16.1",
+					ImageName: "postgres:17.1",
 				},
 			}
 			Expect(clusterNew.validateImageChange(&clusterOld)).To(BeEmpty())
@@ -1593,35 +1491,18 @@ var _ = Describe("validate image name change", func() {
 							Name: "test",
 							Kind: "ImageCatalog",
 						},
-						Major: 15,
+						Major: 16,
 					},
 				},
 			}
 			clusterNew := Cluster{
 				Spec: ClusterSpec{
-					ImageName: "postgres:16.1",
+					ImageName: "postgres:17.1",
 				},
 			}
 			Expect(clusterNew.validateImageChange(&clusterOld)).To(HaveLen(1))
 		})
-		It("complains going from default imageName to different major imageCatalogRef", func() {
-			clusterOld := Cluster{
-				Spec: ClusterSpec{
-					ImageCatalogRef: &ImageCatalogRef{
-						TypedLocalObjectReference: corev1.TypedLocalObjectReference{
-							Name: "test",
-							Kind: "ImageCatalog",
-						},
-						Major: 14,
-					},
-				},
-			}
-			clusterNew := Cluster{
-				Spec: ClusterSpec{},
-			}
-			Expect(clusterNew.validateImageChange(&clusterOld)).To(HaveLen(1))
-		})
-		It("doesn't complain going from default imageName to same major imageCatalogRef", func() {
+		It("complains going from imageCatalogRef to different major default imageName", func() {
 			clusterOld := Cluster{
 				Spec: ClusterSpec{
 					ImageCatalogRef: &ImageCatalogRef{
@@ -1630,6 +1511,27 @@ var _ = Describe("validate image name change", func() {
 							Kind: "ImageCatalog",
 						},
 						Major: 16,
+					},
+				},
+			}
+			clusterNew := Cluster{
+				Spec: ClusterSpec{},
+			}
+			Expect(clusterNew.validateImageChange(&clusterOld)).To(HaveLen(1))
+		})
+		It("doesn't complain going from imageCatalogRef to same major default imageName", func() {
+			imageNameRef := reference.New(versions.DefaultImageName)
+			version, err := pgversion.FromTag(imageNameRef.Tag)
+			Expect(err).ToNot(HaveOccurred())
+
+			clusterOld := Cluster{
+				Spec: ClusterSpec{
+					ImageCatalogRef: &ImageCatalogRef{
+						TypedLocalObjectReference: corev1.TypedLocalObjectReference{
+							Name: "test",
+							Kind: "ImageCatalog",
+						},
+						Major: int(version.Major()),
 					},
 				},
 			}
@@ -1967,54 +1869,144 @@ var _ = Describe("primary update strategy", func() {
 })
 
 var _ = Describe("Number of synchronous replicas", func() {
-	It("should be a positive integer", func() {
-		cluster := Cluster{
-			Spec: ClusterSpec{
-				Instances:       3,
-				MaxSyncReplicas: -3,
-			},
-		}
-		Expect(cluster.validateMaxSyncReplicas()).ToNot(BeEmpty())
+	Context("new-style configuration", func() {
+		It("can't have both new-style configuration and legacy one", func() {
+			cluster := Cluster{
+				Spec: ClusterSpec{
+					Instances:       3,
+					MinSyncReplicas: 1,
+					MaxSyncReplicas: 2,
+					PostgresConfiguration: PostgresConfiguration{
+						Synchronous: &SynchronousReplicaConfiguration{
+							Number: 2,
+						},
+					},
+				},
+			}
+			Expect(cluster.validateConfiguration()).ToNot(BeEmpty())
+		})
 	})
 
-	It("should not be equal than the number of replicas", func() {
-		cluster := Cluster{
+	Context("legacy configuration", func() {
+		It("should be a positive integer", func() {
+			cluster := Cluster{
+				Spec: ClusterSpec{
+					Instances:       3,
+					MaxSyncReplicas: -3,
+				},
+			}
+			Expect(cluster.validateMaxSyncReplicas()).ToNot(BeEmpty())
+		})
+
+		It("should not be equal than the number of replicas", func() {
+			cluster := Cluster{
+				Spec: ClusterSpec{
+					Instances:       3,
+					MaxSyncReplicas: 3,
+				},
+			}
+			Expect(cluster.validateMaxSyncReplicas()).ToNot(BeEmpty())
+		})
+
+		It("should not be greater than the number of replicas", func() {
+			cluster := Cluster{
+				Spec: ClusterSpec{
+					Instances:       3,
+					MaxSyncReplicas: 5,
+				},
+			}
+			Expect(cluster.validateMaxSyncReplicas()).ToNot(BeEmpty())
+		})
+
+		It("can be zero", func() {
+			cluster := Cluster{
+				Spec: ClusterSpec{
+					Instances:       3,
+					MaxSyncReplicas: 0,
+				},
+			}
+			Expect(cluster.validateMaxSyncReplicas()).To(BeEmpty())
+		})
+
+		It("can be lower than the number of replicas", func() {
+			cluster := Cluster{
+				Spec: ClusterSpec{
+					Instances:       3,
+					MaxSyncReplicas: 2,
+				},
+			}
+			Expect(cluster.validateMaxSyncReplicas()).To(BeEmpty())
+		})
+	})
+})
+
+var _ = Describe("validateSynchronousReplicaConfiguration", func() {
+	It("returns no error when synchronous configuration is nil", func() {
+		cluster := &Cluster{
 			Spec: ClusterSpec{
-				Instances:       3,
-				MaxSyncReplicas: 3,
+				PostgresConfiguration: PostgresConfiguration{
+					Synchronous: nil,
+				},
 			},
 		}
-		Expect(cluster.validateMaxSyncReplicas()).ToNot(BeEmpty())
+		errors := cluster.validateSynchronousReplicaConfiguration()
+		Expect(errors).To(BeEmpty())
 	})
 
-	It("should not be greater than the number of replicas", func() {
-		cluster := Cluster{
+	It("returns an error when number of synchronous replicas is greater than the total instances and standbys", func() {
+		cluster := &Cluster{
 			Spec: ClusterSpec{
-				Instances:       3,
-				MaxSyncReplicas: 5,
+				Instances: 2,
+				PostgresConfiguration: PostgresConfiguration{
+					Synchronous: &SynchronousReplicaConfiguration{
+						Number:           5,
+						StandbyNamesPost: []string{"standby1"},
+						StandbyNamesPre:  []string{"standby2"},
+					},
+				},
 			},
 		}
-		Expect(cluster.validateMaxSyncReplicas()).ToNot(BeEmpty())
+		errors := cluster.validateSynchronousReplicaConfiguration()
+		Expect(errors).To(HaveLen(1))
+		Expect(errors[0].Detail).To(
+			Equal("Invalid synchronous configuration: the number of synchronous replicas must be less than the " +
+				"total number of instances and the provided standby names."))
 	})
 
-	It("can be zero", func() {
-		cluster := Cluster{
+	It("returns an error when number of synchronous replicas is equal to total instances and standbys", func() {
+		cluster := &Cluster{
 			Spec: ClusterSpec{
-				Instances:       3,
-				MaxSyncReplicas: 0,
+				Instances: 3,
+				PostgresConfiguration: PostgresConfiguration{
+					Synchronous: &SynchronousReplicaConfiguration{
+						Number:           5,
+						StandbyNamesPost: []string{"standby1"},
+						StandbyNamesPre:  []string{"standby2"},
+					},
+				},
 			},
 		}
-		Expect(cluster.validateMaxSyncReplicas()).To(BeEmpty())
+		errors := cluster.validateSynchronousReplicaConfiguration()
+		Expect(errors).To(HaveLen(1))
+		Expect(errors[0].Detail).To(Equal("Invalid synchronous configuration: the number of synchronous replicas " +
+			"must be less than the total number of instances and the provided standby names."))
 	})
 
-	It("can be lower than the number of replicas", func() {
-		cluster := Cluster{
+	It("returns no error when number of synchronous replicas is less than total instances and standbys", func() {
+		cluster := &Cluster{
 			Spec: ClusterSpec{
-				Instances:       3,
-				MaxSyncReplicas: 2,
+				Instances: 2,
+				PostgresConfiguration: PostgresConfiguration{
+					Synchronous: &SynchronousReplicaConfiguration{
+						Number:           2,
+						StandbyNamesPost: []string{"standby1"},
+						StandbyNamesPre:  []string{"standby2"},
+					},
+				},
 			},
 		}
-		Expect(cluster.validateMaxSyncReplicas()).To(BeEmpty())
+		errors := cluster.validateSynchronousReplicaConfiguration()
+		Expect(errors).To(BeEmpty())
 	})
 })
 
@@ -2773,6 +2765,36 @@ var _ = Describe("promotion token validation", func() {
 		result := cluster.validatePromotionToken()
 		Expect(result).NotTo(BeEmpty())
 	})
+
+	It("complains it the token is set when minApplyDelay is being used", func() {
+		tokenContent := utils.PgControldataTokenContent{
+			LatestCheckpointTimelineID:   "1",
+			REDOWALFile:                  "0000000100000001000000A1",
+			DatabaseSystemIdentifier:     "231231212",
+			LatestCheckpointREDOLocation: "0/1000000",
+			TimeOfLatestCheckpoint:       "we don't know",
+			OperatorVersion:              "version info",
+		}
+		jsonToken, err := json.Marshal(tokenContent)
+		Expect(err).ToNot(HaveOccurred())
+
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				ReplicaCluster: &ReplicaClusterConfiguration{
+					Primary:        "test",
+					Self:           "test",
+					Source:         "test",
+					PromotionToken: base64.StdEncoding.EncodeToString(jsonToken),
+					MinApplyDelay: &metav1.Duration{
+						Duration: 1 * time.Hour,
+					},
+				},
+			},
+		}
+
+		result := cluster.validatePromotionToken()
+		Expect(result).NotTo(BeEmpty())
+	})
 })
 
 var _ = Describe("replica mode validation", func() {
@@ -3089,15 +3111,17 @@ var _ = Describe("Backup validation", func() {
 		err := cluster.validateBackupConfiguration()
 		Expect(err).To(HaveLen(1))
 	})
+})
 
+var _ = Describe("Backup retention policy validation", func() {
 	It("doesn't complain if given policy is not provided", func() {
 		cluster := &Cluster{
 			Spec: ClusterSpec{
 				Backup: &BackupConfiguration{},
 			},
 		}
-		err := cluster.validateBackupConfiguration()
-		Expect(err).To(BeNil())
+		err := cluster.validateRetentionPolicy()
+		Expect(err).To(BeEmpty())
 	})
 
 	It("doesn't complain if given policy is valid", func() {
@@ -3108,21 +3132,20 @@ var _ = Describe("Backup validation", func() {
 				},
 			},
 		}
-		err := cluster.validateBackupConfiguration()
-		Expect(err).To(BeNil())
+		err := cluster.validateRetentionPolicy()
+		Expect(err).To(BeEmpty())
 	})
 
 	It("complain if a given policy is not valid", func() {
 		cluster := &Cluster{
 			Spec: ClusterSpec{
 				Backup: &BackupConfiguration{
-					BarmanObjectStore: &BarmanObjectStoreConfiguration{},
-					RetentionPolicy:   "09",
+					RetentionPolicy: "09",
 				},
 			},
 		}
-		err := cluster.validateBackupConfiguration()
-		Expect(err).To(HaveLen(2))
+		err := cluster.validateRetentionPolicy()
+		Expect(err).To(HaveLen(1))
 	})
 })
 
@@ -3427,24 +3450,6 @@ var _ = Describe("validation of imports", func() {
 })
 
 var _ = Describe("validation of replication slots configuration", func() {
-	It("prevents using replication slots on PostgreSQL 10 and older", func() {
-		cluster := &Cluster{
-			Spec: ClusterSpec{
-				ImageName: "ghcr.io/cloudnative-pg/postgresql:10.5",
-				ReplicationSlots: &ReplicationSlotsConfiguration{
-					HighAvailability: &ReplicationSlotsHAConfiguration{
-						Enabled: ptr.To(true),
-					},
-					UpdateInterval: 0,
-				},
-			},
-		}
-		cluster.Default()
-
-		result := cluster.validateReplicationSlots()
-		Expect(result).To(HaveLen(1))
-	})
-
 	It("can be enabled on the default PostgreSQL image", func() {
 		cluster := &Cluster{
 			Spec: ClusterSpec{
@@ -4872,5 +4877,63 @@ var _ = Describe("ServiceTemplate Validation", func() {
 				Expect(errs).To(BeEmpty())
 			})
 		})
+	})
+})
+
+var _ = Describe("setDefaultPlugins", func() {
+	It("adds pre-defined plugins if not already present", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				Plugins: []PluginConfiguration{
+					{Name: "existing-plugin", Enabled: ptr.To(true)},
+				},
+			},
+		}
+		config := &configuration.Data{
+			IncludePlugins: "predefined-plugin1,predefined-plugin2",
+		}
+
+		cluster.setDefaultPlugins(config)
+
+		Expect(cluster.Spec.Plugins).To(
+			ContainElement(PluginConfiguration{Name: "existing-plugin", Enabled: ptr.To(true)}))
+		Expect(cluster.Spec.Plugins).To(
+			ContainElement(PluginConfiguration{Name: "predefined-plugin1", Enabled: ptr.To(true)}))
+		Expect(cluster.Spec.Plugins).To(
+			ContainElement(PluginConfiguration{Name: "predefined-plugin2", Enabled: ptr.To(true)}))
+	})
+
+	It("does not add pre-defined plugins if already present", func() {
+		cluster := &Cluster{
+			Spec: ClusterSpec{
+				Plugins: []PluginConfiguration{
+					{Name: "predefined-plugin1", Enabled: ptr.To(false)},
+				},
+			},
+		}
+		config := &configuration.Data{
+			IncludePlugins: "predefined-plugin1,predefined-plugin2",
+		}
+
+		cluster.setDefaultPlugins(config)
+
+		Expect(cluster.Spec.Plugins).To(HaveLen(2))
+		Expect(cluster.Spec.Plugins).To(
+			ContainElement(PluginConfiguration{Name: "predefined-plugin1", Enabled: ptr.To(false)}))
+		Expect(cluster.Spec.Plugins).To(
+			ContainElement(PluginConfiguration{Name: "predefined-plugin2", Enabled: ptr.To(true)}))
+	})
+
+	It("handles empty plugin list gracefully", func() {
+		cluster := &Cluster{}
+		config := &configuration.Data{
+			IncludePlugins: "predefined-plugin1",
+		}
+
+		cluster.setDefaultPlugins(config)
+
+		Expect(cluster.Spec.Plugins).To(HaveLen(1))
+		Expect(cluster.Spec.Plugins).To(
+			ContainElement(PluginConfiguration{Name: "predefined-plugin1", Enabled: ptr.To(true)}))
 	})
 })

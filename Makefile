@@ -41,15 +41,15 @@ LOCALBIN ?= $(shell pwd)/bin
 
 BUILD_IMAGE ?= true
 POSTGRES_IMAGE_NAME ?= $(shell grep 'DefaultImageName.*=' "pkg/versions/versions.go" | cut -f 2 -d \")
-KUSTOMIZE_VERSION ?= v5.4.2
-CONTROLLER_TOOLS_VERSION ?= v0.15.0
-GORELEASER_VERSION ?= v2.0.1
-SPELLCHECK_VERSION ?= 0.38.0
+KUSTOMIZE_VERSION ?= v5.5.0
+CONTROLLER_TOOLS_VERSION ?= v0.16.5
+GORELEASER_VERSION ?= v2.4.8
+SPELLCHECK_VERSION ?= 0.45.0
 WOKE_VERSION ?= 0.19.0
-OPERATOR_SDK_VERSION ?= v1.35.0
-OPM_VERSION ?= v1.43.1
-PREFLIGHT_VERSION ?= 1.9.8
-OPENSHIFT_VERSIONS ?= v4.11-v4.15
+OPERATOR_SDK_VERSION ?= v1.38.0
+OPM_VERSION ?= v1.48.0
+PREFLIGHT_VERSION ?= 1.10.2
+OPENSHIFT_VERSIONS ?= v4.12-v4.18
 ARCH ?= amd64
 
 export CONTROLLER_IMG
@@ -101,7 +101,13 @@ test: generate fmt vet manifests envtest ## Run tests.
 	source <(${ENVTEST} use -p env --bin-dir ${ENVTEST_ASSETS_DIR} ${ENVTEST_K8S_VERSION}) ;\
 	export KUBEBUILDER_CONTROLPLANE_STOP_TIMEOUT=60s ;\
 	export KUBEBUILDER_CONTROLPLANE_START_TIMEOUT=60s ;\
-	go test -coverpkg=./... --count=1 -coverprofile=cover.out ./api/... ./cmd/... ./internal/... ./pkg/... ./tests/utils ;
+	go test -coverpkg=./... -coverprofile=cover.out ./api/... ./cmd/... ./internal/... ./pkg/... ./tests/utils
+
+test-race: generate fmt vet manifests envtest ## Run tests enabling race detection.
+	mkdir -p ${ENVTEST_ASSETS_DIR} ;\
+	source <(${ENVTEST} use -p env --bin-dir ${ENVTEST_ASSETS_DIR} ${ENVTEST_K8S_VERSION}) ;\
+	go run github.com/onsi/ginkgo/v2/ginkgo -r -p --skip-package=e2e \
+	  --race --keep-going --fail-on-empty --randomize-all --randomize-suites
 
 e2e-test-kind: ## Run e2e tests locally using kind.
 	hack/e2e/run-e2e-kind.sh
@@ -227,6 +233,9 @@ vet: ## Run go vet against code.
 lint: ## Run the linter.
 	golangci-lint run
 
+lint-fix: ## Run the linter with --fix.
+	golangci-lint run --fix
+
 shellcheck: ## Shellcheck for the hack directory.
 	@{ \
 	set -e ;\
@@ -257,7 +266,7 @@ checks: go-mod-check generate manifests apidoc fmt spellcheck wordlist-ordered w
 licenses: go-licenses ## Generate the licenses folder.
 	# The following statement is expected to fail because our license is unrecognised
 	$(GO_LICENSES) \
-		save github.com/cloudnative-pg/cloudnative-pg \
+		save ./... \
 		--save_path licenses/go-licenses --force || true
 	chmod a+rw -R licenses/go-licenses
 	find licenses/go-licenses \( -name '*.mod' -or -name '*.go' \) -delete
@@ -271,7 +280,7 @@ apidoc: genref ## Update the API Reference section of the documentation.
 ##@ Cleanup
 
 clean: ## Clean-up the work tree from build/test artifacts
-	rm -rf $(LOCALBIN)/kubectl-cnpg $(LOCALBIN)/manager $(DIST_PATH) _*/ tests/e2e/out/ cover.out
+	rm -rf $(LOCALBIN)/kubectl-cnpg $(LOCALBIN)/manager $(DIST_PATH) _*/ tests/e2e/out/ tests/e2e/*_logs/ cover.out
 
 distclean: clean ## Clean-up the work tree removing also cached tools binaries
 	! [ -d "$(ENVTEST_ASSETS_DIR)" ] || chmod -R u+w $(ENVTEST_ASSETS_DIR)
@@ -337,38 +346,35 @@ kind-cluster-destroy: ## Destroy KinD cluster created using kind-cluster command
 	hack/setup-cluster.sh -n1 -r destroy
 
 .PHONY: operator-sdk
+OPERATOR_SDK = $(LOCALBIN)/operator-sdk
 operator-sdk: ## Install the operator-sdk app
-ifneq ($(shell PATH="$(LOCALBIN):$${PATH}" operator-sdk version 2>/dev/null | awk -F '"' '{print $$2}'), $(OPERATOR_SDK_VERSION))
+ifneq ($(shell $(OPERATOR_SDK) version 2>/dev/null | awk -F '"' '{print $$2}'), $(OPERATOR_SDK_VERSION))
 	@{ \
 	set -e ;\
 	mkdir -p $(LOCALBIN) ;\
 	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
-	curl -sSL "https://github.com/operator-framework/operator-sdk/releases/download/${OPERATOR_SDK_VERSION}/operator-sdk_$${OS}_$${ARCH}" -o "$(LOCALBIN)/operator-sdk" ;\
+	curl -sSL "https://github.com/operator-framework/operator-sdk/releases/download/${OPERATOR_SDK_VERSION}/operator-sdk_$${OS}_$${ARCH}" -o "$(OPERATOR_SDK)" ;\
 	chmod +x "$(LOCALBIN)/operator-sdk" ;\
 	}
-OPERATOR_SDK=$(LOCALBIN)/operator-sdk
-else
-OPERATOR_SDK=$(shell which operator-sdk)
 endif
 
 .PHONY: opm
+OPM = $(LOCALBIN)/opm
 opm: ## Download opm locally if necessary.
-ifneq ($(shell PATH="$(LOCALBIN):$${PATH}" opm version 2>/dev/null | awk -F '"' '{print $$2}'), $(OPM_VERSION))
+ifneq ($(shell $(OPM) version 2>/dev/null | awk -F '"' '{print $$2}'), $(OPM_VERSION))
 	@{ \
 	set -e ;\
 	mkdir -p $(LOCALBIN) ;\
 	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
-	curl -sSL https://github.com/operator-framework/operator-registry/releases/download/${OPM_VERSION}/$${OS}-$${ARCH}-opm -o "$(LOCALBIN)/opm";\
+	curl -sSL https://github.com/operator-framework/operator-registry/releases/download/${OPM_VERSION}/$${OS}-$${ARCH}-opm -o "$(OPM)";\
 	chmod +x $(LOCALBIN)/opm ;\
 	}
-OPM=$(LOCALBIN)/opm
-else
-OPM=$(shell which opm)
 endif
 
 .PHONY: preflight
+PREFLIGHT = $(LOCALBIN)/preflight
 preflight: ## Download preflight locally if necessary.
-ifneq ($(shell PATH="$(LOCALBIN):$${PATH}" preflight --version 2>/dev/null | awk '{print $$3}'), $(PREFLIGHT_VERSION))
+ifneq ($(shell $(PREFLIGHT) --version 2>/dev/null | awk '{print $$3}'), $(PREFLIGHT_VERSION))
 	@{ \
 	set -e ;\
 	mkdir -p $(LOCALBIN) ;\
@@ -376,11 +382,8 @@ ifneq ($(shell PATH="$(LOCALBIN):$${PATH}" preflight --version 2>/dev/null | awk
 	if [ "$${OS}" != "linux" ] ; then \
 		echo "Unsupported OS: $${OS}" ;\
 	else \
-		curl -sSL "https://github.com/redhat-openshift-ecosystem/openshift-preflight/releases/download/${PREFLIGHT_VERSION}/preflight-$${OS}-$${ARCH}" -o "$(LOCALBIN)/preflight" ;\
+		curl -sSL "https://github.com/redhat-openshift-ecosystem/openshift-preflight/releases/download/${PREFLIGHT_VERSION}/preflight-$${OS}-$${ARCH}" -o "$(PREFLIGHT)" ;\
 		chmod +x $(LOCALBIN)/preflight ;\
 	fi \
 	}
-PREFLIGHT=$(LOCALBIN)/preflight
-else
-PREFLIGHT=$(shell which PREFLIGHT)
 endif

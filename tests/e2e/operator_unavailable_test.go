@@ -26,6 +26,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -40,6 +41,7 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 		sampleFile  = fixturesDir + "/operator-unavailable/operator-unavailable.yaml.template"
 		level       = tests.Medium
 	)
+	var namespace string
 
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
@@ -49,27 +51,22 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 
 	Context("Scale down operator replicas to zero and delete primary", func() {
 		const namespacePrefix = "op-unavailable-e2e-zero-replicas"
-		var namespace string
-		JustAfterEach(func() {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-		})
 		It("can survive operator failures", func() {
 			var err error
 			// Create the cluster namespace
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.DeleteNamespace(namespace)
-			})
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
 			// Load test data
 			currentPrimary := clusterName + "-1"
-			primary, err := env.GetClusterPrimary(namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
-			AssertCreateTestData(namespace, clusterName, "test", primary)
+			tableLocator := TableLocator{
+				Namespace:    namespace,
+				ClusterName:  clusterName,
+				DatabaseName: testsUtils.AppDBName,
+				TableName:    "test",
+			}
+			AssertCreateTestData(env, tableLocator)
 
 			By("scaling down operator replicas to zero", func() {
 				err := env.ScaleOperatorDeployment(0)
@@ -130,37 +127,30 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 					return specs.IsPodStandby(pod), err
 				}, timeout).Should(BeTrue())
 			})
-			// Expect the test data previously created to be available
-			primary, err = env.GetClusterPrimary(namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
-			AssertDataExpectedCountWithDatabaseName(namespace, primary.Name, "app", "test", 2)
+			AssertDataExpectedCount(env, tableLocator, 2)
 		})
 	})
 
 	Context("Delete primary and operator concurrently", func() {
 		const namespacePrefix = "op-unavailable-e2e-delete-operator"
-		var namespace string
-		JustAfterEach(func() {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-		})
+
 		It("can survive operator failures", func() {
 			var operatorPodName string
 			var err error
 			// Create the cluster namespace
-			namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			DeferCleanup(func() error {
-				return env.DeleteNamespace(namespace)
-			})
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
 			// Load test data
 			currentPrimary := clusterName + "-1"
-			primary, err := env.GetClusterPrimary(namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
-			AssertCreateTestData(namespace, clusterName, "test", primary)
+			tableLocator := TableLocator{
+				Namespace:    namespace,
+				ClusterName:  clusterName,
+				DatabaseName: testsUtils.AppDBName,
+				TableName:    "test",
+			}
+			AssertCreateTestData(env, tableLocator)
 
 			operatorNamespace, err := env.GetOperatorNamespaceName()
 			Expect(err).ToNot(HaveOccurred())
@@ -231,10 +221,7 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 					return specs.IsPodStandby(pod), err
 				}, timeout).Should(BeTrue())
 			})
-			// Expect the test data previously created to be available
-			primary, err = env.GetClusterPrimary(namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
-			AssertDataExpectedCountWithDatabaseName(namespace, primary.Name, "app", "test", 2)
+			AssertDataExpectedCount(env, tableLocator, 2)
 		})
 	})
 })

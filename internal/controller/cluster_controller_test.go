@@ -17,9 +17,9 @@ limitations under the License.
 package controller
 
 import (
-	"context"
 	"time"
 
+	cnpgTypes "github.com/cloudnative-pg/machinery/pkg/types"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -72,8 +72,7 @@ var _ = Describe("Updating target primary", func() {
 		env = buildTestEnvironment()
 	})
 
-	It("selects the new target primary right away", func() {
-		ctx := context.TODO()
+	It("selects the new target primary right away", func(ctx SpecContext) {
 		namespace := newFakeNamespace(env.client)
 		cluster := newFakeCNPGCluster(env.client, namespace)
 
@@ -91,23 +90,23 @@ var _ = Describe("Updating target primary", func() {
 		statusList := postgres.PostgresqlStatusList{
 			Items: []postgres.PostgresqlStatus{
 				{
-					CurrentLsn:  postgres.LSN("0/0"),
-					ReceivedLsn: postgres.LSN("0/0"),
-					ReplayLsn:   postgres.LSN("0/0"),
+					CurrentLsn:  cnpgTypes.LSN("0/0"),
+					ReceivedLsn: cnpgTypes.LSN("0/0"),
+					ReplayLsn:   cnpgTypes.LSN("0/0"),
 					IsPodReady:  true,
 					Pod:         &instances[1],
 				},
 				{
-					CurrentLsn:  postgres.LSN("0/0"),
-					ReceivedLsn: postgres.LSN("0/0"),
-					ReplayLsn:   postgres.LSN("0/0"),
+					CurrentLsn:  cnpgTypes.LSN("0/0"),
+					ReceivedLsn: cnpgTypes.LSN("0/0"),
+					ReplayLsn:   cnpgTypes.LSN("0/0"),
 					IsPodReady:  true,
 					Pod:         &instances[2],
 				},
 				{
-					CurrentLsn:  postgres.LSN("0/0"),
-					ReceivedLsn: postgres.LSN("0/0"),
-					ReplayLsn:   postgres.LSN("0/0"),
+					CurrentLsn:  cnpgTypes.LSN("0/0"),
+					ReceivedLsn: cnpgTypes.LSN("0/0"),
+					ReplayLsn:   cnpgTypes.LSN("0/0"),
 					IsPodReady:  false,
 					Pod:         &instances[0],
 				},
@@ -131,8 +130,7 @@ var _ = Describe("Updating target primary", func() {
 		})
 	})
 
-	It("it should wait the failover delay to select the new target primary", func() {
-		ctx := context.TODO()
+	It("it should wait the failover delay to select the new target primary", func(ctx SpecContext) {
 		namespace := newFakeNamespace(env.client)
 		cluster := newFakeCNPGCluster(env.client, namespace, func(cluster *apiv1.Cluster) {
 			cluster.Spec.FailoverDelay = 2
@@ -152,25 +150,25 @@ var _ = Describe("Updating target primary", func() {
 		statusList := postgres.PostgresqlStatusList{
 			Items: []postgres.PostgresqlStatus{
 				{
-					CurrentLsn:  postgres.LSN("0/0"),
-					ReceivedLsn: postgres.LSN("0/0"),
-					ReplayLsn:   postgres.LSN("0/0"),
+					CurrentLsn:  cnpgTypes.LSN("0/0"),
+					ReceivedLsn: cnpgTypes.LSN("0/0"),
+					ReplayLsn:   cnpgTypes.LSN("0/0"),
 					IsPodReady:  false,
 					IsPrimary:   false,
 					Pod:         &instances[0],
 				},
 				{
-					CurrentLsn:  postgres.LSN("0/0"),
-					ReceivedLsn: postgres.LSN("0/0"),
-					ReplayLsn:   postgres.LSN("0/0"),
+					CurrentLsn:  cnpgTypes.LSN("0/0"),
+					ReceivedLsn: cnpgTypes.LSN("0/0"),
+					ReplayLsn:   cnpgTypes.LSN("0/0"),
 					IsPodReady:  false,
 					IsPrimary:   true,
 					Pod:         &instances[1],
 				},
 				{
-					CurrentLsn:  postgres.LSN("0/0"),
-					ReceivedLsn: postgres.LSN("0/0"),
-					ReplayLsn:   postgres.LSN("0/0"),
+					CurrentLsn:  cnpgTypes.LSN("0/0"),
+					ReceivedLsn: cnpgTypes.LSN("0/0"),
+					ReplayLsn:   cnpgTypes.LSN("0/0"),
 					IsPodReady:  true,
 					Pod:         &instances[2],
 				},
@@ -209,8 +207,7 @@ var _ = Describe("Updating target primary", func() {
 		})
 	})
 
-	It("Issue #1783: ensure that the scale-down behaviour remain consistent", func() {
-		ctx := context.TODO()
+	It("Issue #1783: ensure that the scale-down behaviour remain consistent", func(ctx SpecContext) {
 		namespace := newFakeNamespace(env.client)
 		cluster := newFakeCNPGCluster(env.client, namespace, func(cluster *apiv1.Cluster) {
 			cluster.Spec.Instances = 2
@@ -236,18 +233,18 @@ var _ = Describe("Updating target primary", func() {
 		statusList := postgres.PostgresqlStatusList{
 			Items: []postgres.PostgresqlStatus{
 				{
-					CurrentLsn:         postgres.LSN("0/0"),
-					ReceivedLsn:        postgres.LSN("0/0"),
-					ReplayLsn:          postgres.LSN("0/0"),
+					CurrentLsn:         cnpgTypes.LSN("0/0"),
+					ReceivedLsn:        cnpgTypes.LSN("0/0"),
+					ReplayLsn:          cnpgTypes.LSN("0/0"),
 					IsPodReady:         true,
 					IsPrimary:          false,
 					Pod:                &instances[0],
 					MightBeUnavailable: false,
 				},
 				{
-					CurrentLsn:         postgres.LSN("0/0"),
-					ReceivedLsn:        postgres.LSN("0/0"),
-					ReplayLsn:          postgres.LSN("0/0"),
+					CurrentLsn:         cnpgTypes.LSN("0/0"),
+					ReceivedLsn:        cnpgTypes.LSN("0/0"),
+					ReplayLsn:          cnpgTypes.LSN("0/0"),
 					IsPodReady:         true,
 					IsPrimary:          true,
 					Pod:                &instances[1],

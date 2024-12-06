@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -30,7 +31,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 )
 
 // reconcileImage sets the image inside the status, to be used by the following
@@ -113,7 +113,7 @@ func (r *ClusterReconciler) reconcileImage(ctx context.Context, cluster *apiv1.C
 	}
 
 	// If the image is different, we set it into the cluster status
-	if cluster.Spec.ImageName != catalogImage {
+	if cluster.Status.Image != catalogImage {
 		cluster.Status.Image = catalogImage
 		patch := client.MergeFrom(oldCluster)
 		if err := r.Status().Patch(ctx, cluster, patch); err != nil {

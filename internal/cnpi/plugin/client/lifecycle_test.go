@@ -31,6 +31,7 @@ import (
 	k8client "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/connection"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -128,7 +129,7 @@ func tryDecode[T k8client.Object](rawObj []byte, cast T) error {
 	return dec.Decode(cast)
 }
 
-func (f *fakeLifecycleClient) set(d *pluginData) {
+func (f *fakeLifecycleClient) set(d *fakeConnection) {
 	if d == nil {
 		return
 	}
@@ -159,8 +160,8 @@ var _ = Describe("LifecycleHook", func() {
 
 	BeforeEach(func() {
 		d = &data{
-			plugins: []pluginData{
-				{
+			plugins: []connection.Interface{
+				&fakeConnection{
 					name: "test",
 				},
 			},
@@ -174,7 +175,7 @@ var _ = Describe("LifecycleHook", func() {
 	It("should correctly inject the values in the passed object", func(ctx SpecContext) {
 		mapInjector := map[string]string{"test": "test"}
 		f := newFakeLifecycleClient(capabilities, mapInjector, nil, nil)
-		f.set(&d.plugins[0])
+		f.set(d.plugins[0].(*fakeConnection))
 
 		pod := &corev1.Pod{
 			TypeMeta: metav1.TypeMeta{
@@ -195,7 +196,7 @@ var _ = Describe("LifecycleHook", func() {
 	It("should correctly remove the values in the passed object", func(ctx SpecContext) {
 		mapInjector := map[string]string{"test": "test"}
 		f := newFakeLifecycleClient(capabilities, mapInjector, nil, nil)
-		f.set(&d.plugins[0])
+		f.set(d.plugins[0].(*fakeConnection))
 
 		pod := &corev1.Pod{
 			TypeMeta: metav1.TypeMeta{

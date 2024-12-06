@@ -31,12 +31,13 @@ func NewCmd() *cobra.Command {
 		confirmationRequired bool
 
 	maintenanceCmd := &cobra.Command{
-		Use:   "maintenance [set/unset]",
-		Short: "Sets or removes maintenance mode from clusters",
+		Use:     "maintenance [set/unset]",
+		Short:   "Sets or removes maintenance mode from clusters",
+		GroupID: plugin.GroupIDCluster,
 	}
 
 	maintenanceCmd.AddCommand(&cobra.Command{
-		Use:   "set [cluster]",
+		Use:   "set CLUSTER",
 		Short: "Sets maintenance mode",
 		Long: "This command will set maintenance mode on a single cluster or on all clusters " +
 			"in the current namespace if not specified differently through flags",
@@ -57,7 +58,7 @@ func NewCmd() *cobra.Command {
 	})
 
 	maintenanceCmd.AddCommand(&cobra.Command{
-		Use:   "unset [cluster]",
+		Use:   "unset CLUSTER",
 		Short: "Removes maintenance mode",
 		Long: "This command will unset maintenance mode on a single cluster or on all clusters " +
 			"in the current namespace if not specified differently through flags",

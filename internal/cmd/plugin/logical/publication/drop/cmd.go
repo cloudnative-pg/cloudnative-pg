@@ -35,7 +35,7 @@ func NewCmd() *cobra.Command {
 	var dryRun bool
 
 	publicationDropCmd := &cobra.Command{
-		Use:  "drop cluster_name",
+		Use:  "drop CLUSTER",
 		Args: plugin.RequiresArguments(1),
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			return plugin.CompleteClusters(cmd.Context(), args, toComplete), cobra.ShellCompDirectiveNoFileComp
@@ -69,7 +69,7 @@ func NewCmd() *cobra.Command {
 			target := dbName
 			if len(externalClusterName) > 0 {
 				var err error
-				target, err = logical.GetConnectionString(cmd.Context(), clusterName, externalClusterName)
+				target, err = logical.GetConnectionString(cmd.Context(), clusterName, externalClusterName, dbName)
 				if err != nil {
 					return err
 				}

@@ -1,0 +1,14 @@
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-affinity
+spec:
+  instances: 1
+
+  affinity:
+    podAntiAffinityType: required
+
+  storage:
+    size: 1Gi
+

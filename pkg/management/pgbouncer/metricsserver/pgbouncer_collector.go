@@ -18,13 +18,14 @@ limitations under the License.
 package metricsserver
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"time"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/pgbouncer/config"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pool"
 )
@@ -35,6 +36,7 @@ const PrometheusNamespace = "cnpg"
 
 // Exporter exports a set of metrics and collectors on a given postgres instance
 type Exporter struct {
+	ctx     context.Context
 	Metrics *metrics
 	pool    pool.Pooler
 }
@@ -53,8 +55,9 @@ type metrics struct {
 }
 
 // NewExporter creates an exporter
-func NewExporter() *Exporter {
+func NewExporter(ctx context.Context) *Exporter {
 	return &Exporter{
+		ctx:     ctx,
 		Metrics: newMetrics(),
 	}
 }
@@ -122,6 +125,8 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 }
 
 func (e *Exporter) collectPgBouncerMetrics(ch chan<- prometheus.Metric) {
+	contextLogger := log.FromContext(e.ctx)
+
 	e.Metrics.CollectionsTotal.Inc()
 	collectionStart := time.Now()
 	defer func() {
@@ -129,7 +134,7 @@ func (e *Exporter) collectPgBouncerMetrics(ch chan<- prometheus.Metric) {
 	}()
 	db, err := e.GetPgBouncerDB()
 	if err != nil {
-		log.Error(err, "Error opening connection to PostgreSQL")
+		contextLogger.Error(err, "Error opening connection to PostgreSQL")
 		e.Metrics.Error.Set(1)
 		return
 	}

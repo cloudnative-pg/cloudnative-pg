@@ -26,11 +26,11 @@ import (
 	"os"
 	"syscall"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/concurrency"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
 
@@ -82,7 +82,8 @@ func FromReader(
 	}
 
 	// Validate the hash of this instance manager
-	if err := validateInstanceManagerHash(typedClient, instance.ClusterName, instance.Namespace,
+	if err := validateInstanceManagerHash(typedClient,
+		instance.GetClusterName(), instance.GetNamespaceName(),
 		instanceStatus.InstanceArch, newHash); err != nil {
 		return fmt.Errorf("while validating instance manager binary: %w", err)
 	}
@@ -185,7 +186,7 @@ func validateInstanceManagerHash(
 // This function never returns in case of success.
 func reloadInstanceManager() error {
 	log.Info("Replacing current instance")
-	err := syscall.Exec(os.Args[0], os.Args, os.Environ()) // #nosec
+	err := syscall.Exec(InstanceManagerPath, os.Args, os.Environ()) // #nosec G204
 	if err != nil {
 		return err
 	}

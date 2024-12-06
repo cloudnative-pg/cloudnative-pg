@@ -47,14 +47,8 @@ var _ = Describe("Replication Slot", Label(tests.LabelReplication), func() {
 
 	It("Can enable and disable replication slots", func() {
 		var err error
-		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-			return env.DeleteNamespace(namespace)
-		})
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
 		By("enabling replication slot on cluster", func() {
@@ -115,10 +109,14 @@ var _ = Describe("Replication Slot", Label(tests.LabelReplication), func() {
 			primaryPod, err := env.GetClusterPrimary(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 
-			_, _, err = testsUtils.RunQueryFromPod(primaryPod, testsUtils.PGLocalSocketDir,
-				"app", "postgres", "''",
-				fmt.Sprintf("SELECT pg_create_physical_replication_slot('%s');", userPhysicalSlot),
-				env)
+			query := fmt.Sprintf("SELECT pg_create_physical_replication_slot('%s');", userPhysicalSlot)
+			_, _, err = env.ExecQueryInInstancePod(
+				testsUtils.PodLocator{
+					Namespace: primaryPod.Namespace,
+					PodName:   primaryPod.Name,
+				},
+				testsUtils.PostgresDBName,
+				query)
 			Expect(err).ToNot(HaveOccurred())
 		})
 

@@ -22,11 +22,12 @@ import (
 	"slices"
 	"time"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
+	pgTime "github.com/cloudnative-pg/machinery/pkg/postgres/time"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -186,7 +187,7 @@ func (r *ClusterReconciler) setPrimaryOnSchedulableNode(
 	contextLogger := log.FromContext(ctx)
 
 	// Checking failed pods, e.g. pending pods due to missing PVCs
-	_, hasFailedPods := cluster.Status.InstancesStatus[utils.PodFailed]
+	_, hasFailedPods := cluster.Status.InstancesStatus[apiv1.PodFailed]
 
 	// Checking whether there are pods on other nodes
 	podsOnOtherNodes := GetPodsNotOnPrimaryNode(status, primaryPod)
@@ -350,13 +351,13 @@ func (r *ClusterReconciler) evaluateFailoverDelay(
 	}
 
 	if cluster.Status.CurrentPrimaryFailingSinceTimestamp == "" {
-		cluster.Status.CurrentPrimaryFailingSinceTimestamp = utils.GetCurrentTimestamp()
+		cluster.Status.CurrentPrimaryFailingSinceTimestamp = pgTime.GetCurrentTimestamp()
 		if err := r.Status().Update(ctx, cluster); err != nil {
 			return err
 		}
 	}
-	primaryFailingSince, err := utils.DifferenceBetweenTimestamps(
-		utils.GetCurrentTimestamp(),
+	primaryFailingSince, err := pgTime.DifferenceBetweenTimestamps(
+		pgTime.GetCurrentTimestamp(),
 		cluster.Status.CurrentPrimaryFailingSinceTimestamp,
 	)
 	if err != nil {

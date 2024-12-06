@@ -77,6 +77,12 @@ These predefined labels are managed by CloudNativePG.
 : Available on `ConfigMap` and `Secret` resources. When set to `true`,
   a change in the resource is automatically reloaded by the operator.
 
+`cnpg.io/userType`
+: Specifies the type of PostgreSQL user associated with the
+  `Secret`, either `superuser` (Postgres superuser access) or `app`
+  (application-level user in CloudNativePG terminology), and is limited to the
+  default users created by CloudNativePG (typically `postgres` and `app`).
+
 `role` - **deprecated**
 :  Whether the instance running in a pod is a `primary` or a `replica`.
    This label is deprecated, you should use `cnpg.io/instanceRole` instead.
@@ -164,6 +170,19 @@ These predefined annotations are managed by CloudNativePG.
 `cnpg.io/pvcStatus`
 :   Current status of the PVC: `initializing`, `ready`, or `detached`.
 
+`cnpg.io/reconcilePodSpec`
+:  Annotation can be applied to a `Cluster` or `Pooler` to prevent restarts.
+
+   When set to `disabled` on a `Cluster`, the operator prevents instances
+   from restarting due to changes in the PodSpec. This includes changes to:
+
+     - Topology or affinity
+     - Scheduler
+     - Volumes or containers
+
+  When set to `disabled` on a `Pooler`, the operator restricts any modifications
+  to the deployment specification, except for changes to `spec.instances`.
+
 `cnpg.io/reconciliationLoop`
 :   When set to `disabled` on a `Cluster`, the operator prevents the
     reconciliation loop from running.
@@ -176,8 +195,8 @@ These predefined annotations are managed by CloudNativePG.
     that ensures that the WAL archive is empty before writing data. Use at your own
     risk.
 
-`cnpg.io/skipEmptyWalArchiveCheck`
-:   When set to `true` on a `Cluster` resource, the operator disables WAL archiving.
+`cnpg.io/skipWalArchiving`
+:   When set to `enabled` on a `Cluster` resource, the operator disables WAL archiving.
     This will set `archive_mode` to `off` and require a restart of all PostgreSQL
     instances. Use at your own risk.
 

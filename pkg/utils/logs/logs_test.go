@@ -56,7 +56,7 @@ var _ = Describe("Pod logging tests", func() {
 		streamPodLog := StreamingRequest{
 			Pod:     nil,
 			Options: podLogOptions,
-			client:  client,
+			Client:  client,
 		}
 		var logBuffer bytes.Buffer
 		err := streamPodLog.Stream(ctx, &logBuffer)
@@ -95,7 +95,7 @@ var _ = Describe("Pod logging tests", func() {
 			Pod:      pod,
 			Options:  podLogOptions,
 			Previous: false,
-			client:   client,
+			Client:   client,
 		}
 
 		var logBuffer bytes.Buffer
@@ -125,10 +125,9 @@ var _ = Describe("Pod logging tests", func() {
 		Expect(logBuffer.String()).To(BeEquivalentTo("fake logs"))
 	})
 
-	It("can follow pod logs", func() {
+	It("can follow pod logs", func(ctx SpecContext) {
 		client := fake.NewSimpleClientset(pod)
 		var logBuffer bytes.Buffer
-		ctx := context.TODO()
 		var wait sync.WaitGroup
 		wait.Add(1)
 		go func() {

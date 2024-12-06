@@ -23,23 +23,24 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"os"
 	"os/exec"
 	"path"
 	"path/filepath"
 	"sort"
+	"time"
 
+	"github.com/cloudnative-pg/machinery/pkg/execlog"
+	"github.com/cloudnative-pg/machinery/pkg/fileutils"
+	"github.com/cloudnative-pg/machinery/pkg/fileutils/compatibility"
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/jackc/pgx/v5"
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/configfile"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils/compatibility"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/archiver"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/external"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/logicalimport"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pool"
@@ -92,8 +93,17 @@ type InitInfo struct {
 	Temporary bool
 
 	// PostInitApplicationSQLRefsFolder is the folder which contains a bunch
-	// of SQL files to be executed just after having configured a new instance
+	// of SQL files to be executed inside the application database right after
+	// having configured a new instance
 	PostInitApplicationSQLRefsFolder string
+
+	// PostInitSQLRefsFolder is the folder which contains a bunch of SQL files
+	// to be executed inside the `postgres` database right after having configured a new instance
+	PostInitSQLRefsFolder string
+
+	// PostInitTemplateSQLRefsFolder is the folder which contains a bunch of SQL files
+	// to be executed inside the `template1` database right after having configured a new instance
+	PostInitTemplateSQLRefsFolder string
 
 	// BackupLabelFile holds the content returned by pg_stop_backup. Needed for a hot backup restore
 	BackupLabelFile []byte
@@ -102,16 +112,102 @@ type InitInfo struct {
 	TablespaceMapFile []byte
 }
 
-// VerifyPGData verifies if the passed configuration is OK, otherwise it returns an error
-func (info InitInfo) VerifyPGData() error {
-	pgdataExists, err := fileutils.FileExists(info.PgData)
+// EnsureTargetDirectoriesDoNotExist ensures that the target data and WAL directories do not exist.
+// This is a safety check we do before initializing a new instance.
+//
+// If the PGDATA directory already exists and contains a valid PostgreSQL control file,
+// the function moves the contents to uniquely named directories.
+// If no valid control file is found, the function assumes the directory is the result of
+// a failed initialization attempt and removes it.
+//
+// By moving rather than deleting the existing data, we use more disk space than necessary.
+// However, this approach is justified for two reasons:
+//
+//  1. The PostgreSQL control file is the last file written by pg_basebackup.
+//     So the only chance to trigger this protection is if the "join" Pod is interrupted
+//     shortly after writing the control file but before the Pod terminates.
+//     This is a very short time window, and it is extremely unlikely that it happens.
+//
+//  2. If the PGDATA directory wasn't created by us, renaming preserves potentially
+//     important user data. This is particularly relevant when using static provisioning
+//     of PersistentVolumeClaims (PVCs), as it prevents accidental overwriting of a valid
+//     data directory that may exist in the PersistentVolumes (PVs).
+func (info InitInfo) EnsureTargetDirectoriesDoNotExist(ctx context.Context) error {
+	contextLogger := log.FromContext(ctx).WithValues("pgdata", info.PgData)
+
+	pgDataExists, err := fileutils.FileExists(info.PgData)
 	if err != nil {
-		log.Error(err, "Error while checking for an existing PGData")
-		return err
+		contextLogger.Error(err, "Error while checking for an existing data directory")
+		return fmt.Errorf("while verifying if the data directory exists: %w", err)
 	}
-	if pgdataExists {
-		log.Info("PGData already exists, can't overwrite")
-		return fmt.Errorf("PGData directories already exist")
+
+	pgWalExists := false
+	if info.PgWal != "" {
+		if pgWalExists, err = fileutils.FileExists(info.PgWal); err != nil {
+			contextLogger.Error(err, "Error while checking for an existing WAL directory")
+			return fmt.Errorf("while verifying if the WAL directory exists: %w", err)
+		}
+	}
+
+	if !pgDataExists && !pgWalExists {
+		return nil
+	}
+
+	out, err := info.GetInstance().GetPgControldata()
+	if err == nil {
+		contextLogger.Info("pg_controldata check on existing directory succeeded, renaming the folders", "out", out)
+		return info.renameExistingTargetDataDirectories(ctx, pgWalExists)
+	}
+
+	contextLogger.Info("pg_controldata check on existing directory failed, cleaning up folders", "err", err, "out", out)
+	return info.removeExistingTargetDataDirectories(ctx, pgDataExists, pgWalExists)
+}
+
+func (info InitInfo) removeExistingTargetDataDirectories(ctx context.Context, pgDataExists, pgWalExists bool) error {
+	contextLogger := log.FromContext(ctx).WithValues("pgdata", info.PgData, "pgwal", info.PgWal)
+
+	if pgDataExists {
+		contextLogger.Info("cleaning up existing data directory")
+		if err := fileutils.RemoveDirectory(info.PgData); err != nil {
+			contextLogger.Error(err, "error while cleaning up existing data directory")
+			return err
+		}
+	}
+
+	if pgWalExists {
+		contextLogger.Info("cleaning up existing WAL directory")
+		if err := fileutils.RemoveDirectory(info.PgWal); err != nil {
+			contextLogger.Error(err, "error while cleaning up existing WAL directory")
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (info InitInfo) renameExistingTargetDataDirectories(ctx context.Context, pgWalExists bool) error {
+	contextLogger := log.FromContext(ctx).WithValues("pgdata", info.PgData, "pgwal", info.PgWal)
+
+	suffixTimestamp := fileutils.FormatFriendlyTimestamp(time.Now())
+
+	pgdataNewName := fmt.Sprintf("%s_%s", info.PgData, suffixTimestamp)
+	contextLogger = contextLogger.WithValues()
+
+	contextLogger.Info("renaming the data directory", "pgdataNewName", pgdataNewName)
+	if err := os.Rename(info.PgData, pgdataNewName); err != nil {
+		contextLogger.Error(err, "error while renaming existing data directory",
+			"pgdataNewName", pgdataNewName)
+		return fmt.Errorf("while renaming existing data directory: %w", err)
+	}
+
+	if pgWalExists {
+		pgwalNewName := fmt.Sprintf("%s_%s", info.PgWal, suffixTimestamp)
+
+		contextLogger.Info("renaming the WAL directory", "pgwalNewName", pgwalNewName)
+		if err := os.Rename(info.PgWal, pgwalNewName); err != nil {
+			contextLogger.Error(err, "error while renaming existing WAL directory")
+			return fmt.Errorf("while renaming existing WAL directory: %w", err)
+		}
 	}
 
 	return nil
@@ -218,22 +314,27 @@ func (info InitInfo) ConfigureNewInstance(instance *Instance) error {
 		}
 	}
 
-	// Execute the custom set of init queries
+	// Execute the custom set of init queries for the `postgres` database
 	log.Info("Executing post-init SQL instructions")
 	if err = info.executeQueries(dbSuperUser, info.PostInitSQL); err != nil {
 		return err
+	}
+	if err = info.executeSQLRefs(dbSuperUser, info.PostInitSQLRefsFolder); err != nil {
+		return fmt.Errorf("could not execute post init application SQL refs: %w", err)
 	}
 
 	dbTemplate, err := instance.GetTemplateDB()
 	if err != nil {
 		return fmt.Errorf("while getting template database: %w", err)
 	}
-	// Execute the custom set of init queries of the template
+	// Execute the custom set of init queries for the `template1` database
 	log.Info("Executing post-init template SQL instructions")
 	if err = info.executeQueries(dbTemplate, info.PostInitTemplateSQL); err != nil {
 		return fmt.Errorf("could not execute init Template queries: %w", err)
 	}
-
+	if err = info.executeSQLRefs(dbTemplate, info.PostInitTemplateSQLRefsFolder); err != nil {
+		return fmt.Errorf("could not execute post init application SQL refs: %w", err)
+	}
 	if info.ApplicationDatabase == "" {
 		return nil
 	}
@@ -258,17 +359,17 @@ func (info InitInfo) ConfigureNewInstance(instance *Instance) error {
 	if err != nil {
 		return fmt.Errorf("could not get connection to ApplicationDatabase: %w", err)
 	}
-	// Execute the custom set of init queries of the application database
+	// Execute the custom set of init queries for the application database
 	log.Info("executing Application instructions")
 	if err = info.executeQueries(appDB, info.PostInitApplicationSQL); err != nil {
 		return fmt.Errorf("could not execute init Application queries: %w", err)
 	}
 
-	if err = info.executePostInitApplicationSQLRefs(appDB); err != nil {
+	if err = info.executeSQLRefs(appDB, info.PostInitApplicationSQLRefsFolder); err != nil {
 		return fmt.Errorf("could not execute post init application SQL refs: %w", err)
 	}
 
-	filePath := filepath.Join(info.PgData, archiver.CheckEmptyWalArchiveFile)
+	filePath := filepath.Join(info.PgData, constants.CheckEmptyWalArchiveFile)
 	// We create the check empty wal archive file to tell that we should check if the
 	// destination path it is empty
 	if err := fileutils.CreateEmptyFile(filepath.Clean(filePath)); err != nil {
@@ -278,19 +379,19 @@ func (info InitInfo) ConfigureNewInstance(instance *Instance) error {
 	return nil
 }
 
-func (info InitInfo) executePostInitApplicationSQLRefs(sqlUser *sql.DB) error {
-	if info.PostInitApplicationSQLRefsFolder == "" {
+func (info InitInfo) executeSQLRefs(sqlUser *sql.DB, directory string) error {
+	if directory == "" {
 		return nil
 	}
 
-	if err := fileutils.EnsureDirectoryExists(info.PostInitApplicationSQLRefsFolder); err != nil {
-		return fmt.Errorf("could not find directory: %s, err: %w", info.PostInitApplicationSQLRefsFolder, err)
+	if err := fileutils.EnsureDirectoryExists(directory); err != nil {
+		return fmt.Errorf("could not find directory: %s, err: %w", directory, err)
 	}
 
-	files, err := fileutils.GetDirectoryContent(info.PostInitApplicationSQLRefsFolder)
+	files, err := fileutils.GetDirectoryContent(directory)
 	if err != nil {
 		return fmt.Errorf("could not get directory content from: %s, err: %w",
-			info.PostInitApplicationSQLRefsFolder, err)
+			directory, err)
 	}
 
 	// Sorting ensures that we execute the files in the correct order.
@@ -298,7 +399,7 @@ func (info InitInfo) executePostInitApplicationSQLRefs(sqlUser *sql.DB) error {
 	sort.Strings(files)
 
 	for _, file := range files {
-		sql, ioErr := fileutils.ReadFile(path.Join(info.PostInitApplicationSQLRefsFolder, file))
+		sql, ioErr := fileutils.ReadFile(path.Join(directory, file))
 		if ioErr != nil {
 			return fmt.Errorf("could not read file: %s, err; %w", file, err)
 		}
@@ -358,7 +459,7 @@ func (info InitInfo) Bootstrap(ctx context.Context) error {
 		cluster.Spec.Bootstrap.InitDB != nil &&
 		cluster.Spec.Bootstrap.InitDB.Import != nil
 
-	if applied, err := instance.RefreshConfigurationFilesFromCluster(cluster, true); err != nil {
+	if applied, err := instance.RefreshConfigurationFilesFromCluster(ctx, cluster, true); err != nil {
 		return fmt.Errorf("while writing the config: %w", err)
 	} else if !applied {
 		return fmt.Errorf("could not apply the config")
@@ -366,7 +467,6 @@ func (info InitInfo) Bootstrap(ctx context.Context) error {
 
 	// Prepare the managed configuration file (override.conf)
 	primaryConnInfo := info.GetPrimaryConnInfo()
-	slotName := cluster.GetSlotNameFromInstanceName(info.PodName)
 
 	if isImportBootstrap {
 		// Write a special configuration for the import phase
@@ -375,7 +475,7 @@ func (info InitInfo) Bootstrap(ctx context.Context) error {
 		}
 	} else {
 		// Write standard replication configuration
-		if _, err = configurePostgresOverrideConfFile(info.PgData, primaryConnInfo, slotName); err != nil {
+		if _, err = configurePostgresOverrideConfFile(info.PgData, primaryConnInfo, ""); err != nil {
 			return fmt.Errorf("while configuring Postgres for replication: %w", err)
 		}
 	}
@@ -402,7 +502,7 @@ func (info InitInfo) Bootstrap(ctx context.Context) error {
 	// In case of import bootstrap, we restore the standard configuration file content
 	if isImportBootstrap {
 		/// Write standard replication configuration
-		if _, err = configurePostgresOverrideConfFile(info.PgData, primaryConnInfo, slotName); err != nil {
+		if _, err = configurePostgresOverrideConfFile(info.PgData, primaryConnInfo, ""); err != nil {
 			return fmt.Errorf("while configuring Postgres for replication: %w", err)
 		}
 

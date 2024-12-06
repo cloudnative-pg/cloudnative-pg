@@ -95,6 +95,8 @@ var _ = Describe("psql launcher", func() {
 			"cluster-example-1",
 			"--",
 			"psql",
+			"-U",
+			"postgres",
 		))
 	})
 
@@ -120,6 +122,8 @@ var _ = Describe("psql launcher", func() {
 			"cluster-example-1",
 			"--",
 			"psql",
+			"-U",
+			"postgres",
 			"-c",
 			"select 1",
 		))
@@ -132,7 +136,7 @@ func fakePod(name, role string) corev1.Pod {
 			Name:      name,
 			Namespace: "default",
 			Labels: map[string]string{
-				utils.ClusterRoleLabelName: role,
+				utils.ClusterInstanceRoleLabelName: role,
 			},
 		},
 	}

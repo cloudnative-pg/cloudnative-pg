@@ -88,9 +88,8 @@ func CreateClusterReadOnlyService(cluster apiv1.Cluster) *corev1.Service {
 			Type:  corev1.ServiceTypeClusterIP,
 			Ports: buildInstanceServicePorts(),
 			Selector: map[string]string{
-				utils.ClusterLabelName: cluster.Name,
-				// TODO: eventually migrate to the new label
-				utils.ClusterRoleLabelName: ClusterRoleLabelReplica,
+				utils.ClusterLabelName:             cluster.Name,
+				utils.ClusterInstanceRoleLabelName: ClusterRoleLabelReplica,
 			},
 		},
 	}
@@ -107,8 +106,8 @@ func CreateClusterReadWriteService(cluster apiv1.Cluster) *corev1.Service {
 			Type:  corev1.ServiceTypeClusterIP,
 			Ports: buildInstanceServicePorts(),
 			Selector: map[string]string{
-				utils.ClusterLabelName:     cluster.Name,
-				utils.ClusterRoleLabelName: ClusterRoleLabelPrimary,
+				utils.ClusterLabelName:             cluster.Name,
+				utils.ClusterInstanceRoleLabelName: ClusterRoleLabelPrimary,
 			},
 		},
 	}
@@ -152,6 +151,7 @@ func BuildManagedServices(cluster apiv1.Cluster) ([]corev1.Service, error) {
 		builder := servicespec.NewFrom(&serviceConfiguration.ServiceTemplate).
 			WithServiceType(defaultService.Spec.Type, false).
 			WithLabel(utils.IsManagedLabelName, "true").
+			WithAnnotation(utils.UpdateStrategyAnnotation, string(serviceConfiguration.UpdateStrategy)).
 			SetSelectors(defaultService.Spec.Selector)
 
 		for idx := range defaultService.Spec.Ports {

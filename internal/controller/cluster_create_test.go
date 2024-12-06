@@ -240,8 +240,8 @@ var _ = Describe("cluster_create unit tests", func() {
 
 			By("checking read-write service", func() {
 				checkService(readWriteService, map[string]string{
-					"cnpg.io/cluster": cluster.Name,
-					"role":            "primary",
+					"cnpg.io/cluster":                  cluster.Name,
+					utils.ClusterInstanceRoleLabelName: "primary",
 				})
 			})
 
@@ -254,8 +254,8 @@ var _ = Describe("cluster_create unit tests", func() {
 
 			By("checking read only service", func() {
 				checkService(readOnlyService, map[string]string{
-					"cnpg.io/cluster": cluster.Name,
-					"role":            "replica",
+					"cnpg.io/cluster":                  cluster.Name,
+					utils.ClusterInstanceRoleLabelName: "replica",
 				})
 			})
 		})
@@ -361,6 +361,30 @@ var _ = Describe("cluster_create unit tests", func() {
 			)
 		})
 
+		By("scaling the instances to 2", func() {
+			cluster.Spec.Instances = 2
+			cluster.Status.Instances = 2
+		})
+
+		By("reconciling pdb with two nodes", func() {
+			reconcilePDB()
+		})
+
+		By("making sure that only the replicas PDB has been deleted", func() {
+			expectResourceExists(
+				env.client,
+				pdbPrimaryName,
+				namespace,
+				&policyv1.PodDisruptionBudget{},
+			)
+			expectResourceDoesntExist(
+				env.client,
+				pdbReplicaName,
+				namespace,
+				&policyv1.PodDisruptionBudget{},
+			)
+		})
+
 		By("enabling the cluster maintenance mode", func() {
 			reusePVC := true
 			cluster.Spec.NodeMaintenanceWindow = &apiv1.NodeMaintenanceWindow{
@@ -373,7 +397,13 @@ var _ = Describe("cluster_create unit tests", func() {
 			reconcilePDB()
 		})
 
-		By("making sure that the replicas PDB are deleted", func() {
+		By("making sure that only the replicas PDB has been deleted", func() {
+			expectResourceExists(
+				env.client,
+				pdbPrimaryName,
+				namespace,
+				&policyv1.PodDisruptionBudget{},
+			)
 			expectResourceDoesntExist(
 				env.client,
 				pdbReplicaName,
@@ -792,14 +822,12 @@ var _ = Describe("createOrPatchClusterCredentialSecret", func() {
 		namespace  = "test-namespace"
 	)
 	var (
-		ctx      context.Context
 		proposed *corev1.Secret
 		cli      k8client.Client
 	)
 
 	BeforeEach(func() {
 		cli = fake.NewClientBuilder().WithScheme(schemeBuilder.BuildWithAllKnownScheme()).Build()
-		ctx = context.TODO()
 		const secretName = "test-secret"
 		proposed = &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
@@ -813,7 +841,7 @@ var _ = Describe("createOrPatchClusterCredentialSecret", func() {
 	})
 
 	Context("when the secret does not exist", func() {
-		It("should create the secret", func() {
+		It("should create the secret", func(ctx SpecContext) {
 			err := createOrPatchClusterCredentialSecret(ctx, cli, proposed)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -827,7 +855,7 @@ var _ = Describe("createOrPatchClusterCredentialSecret", func() {
 	})
 
 	Context("when the secret exists and is owned by the cluster", func() {
-		BeforeEach(func() {
+		BeforeEach(func(ctx SpecContext) {
 			existingSecret := &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        secretName,
@@ -848,7 +876,7 @@ var _ = Describe("createOrPatchClusterCredentialSecret", func() {
 			Expect(cli.Create(ctx, existingSecret)).To(Succeed())
 		})
 
-		It("should patch the secret if metadata differs", func() {
+		It("should patch the secret if metadata differs", func(ctx SpecContext) {
 			Expect(proposed.Labels).To(HaveKeyWithValue("test", "label"))
 			Expect(proposed.Annotations).To(HaveKeyWithValue("test", "annotation"))
 
@@ -862,7 +890,7 @@ var _ = Describe("createOrPatchClusterCredentialSecret", func() {
 			Expect(patchedSecret.Annotations).To(HaveKeyWithValue("test", "annotation"))
 		})
 
-		It("should not patch the secret if metadata is the same", func() {
+		It("should not patch the secret if metadata is the same", func(ctx SpecContext) {
 			var originalSecret corev1.Secret
 			err := cli.Get(ctx, types.NamespacedName{Name: secretName, Namespace: namespace}, &originalSecret)
 			Expect(err).NotTo(HaveOccurred())
@@ -883,7 +911,7 @@ var _ = Describe("createOrPatchClusterCredentialSecret", func() {
 	})
 
 	Context("when the secret exists but is not owned by the cluster", func() {
-		BeforeEach(func() {
+		BeforeEach(func(ctx SpecContext) {
 			existingSecret := &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      secretName,
@@ -893,7 +921,7 @@ var _ = Describe("createOrPatchClusterCredentialSecret", func() {
 			Expect(cli.Create(ctx, existingSecret)).To(Succeed())
 		})
 
-		It("should not modify the secret", func() {
+		It("should not modify the secret", func(ctx SpecContext) {
 			var originalSecret corev1.Secret
 			err := cli.Get(ctx, types.NamespacedName{Name: secretName, Namespace: namespace}, &originalSecret)
 			Expect(err).NotTo(HaveOccurred())
@@ -1012,7 +1040,7 @@ var _ = Describe("createOrPatchOwnedPodDisruptionBudget", func() {
 	})
 })
 
-var _ = Describe("deletePodDisruptionBudgetIfExists", func() {
+var _ = Describe("deletePodDisruptionBudgetsIfExist", func() {
 	const namespace = "default"
 
 	var (
@@ -1086,7 +1114,7 @@ var _ = Describe("deletePodDisruptionBudgetIfExists", func() {
 		err = fakeClient.Get(ctx, k8client.ObjectKeyFromObject(pdbPrimary), &policyv1.PodDisruptionBudget{})
 		Expect(err).ToNot(HaveOccurred())
 
-		err = reconciler.deletePodDisruptionBudgetIfExists(ctx, cluster)
+		err = reconciler.deletePodDisruptionBudgetsIfExist(ctx, cluster)
 		Expect(err).ToNot(HaveOccurred())
 
 		err = fakeClient.Get(ctx, k8client.ObjectKeyFromObject(pdbPrimary), &policyv1.PodDisruptionBudget{})
@@ -1110,7 +1138,7 @@ var _ = Describe("deletePodDisruptionBudgetIfExists", func() {
 		err := fakeClient.Get(ctx, k8client.ObjectKeyFromObject(pdbPrimary), &policyv1.PodDisruptionBudget{})
 		Expect(apierrs.IsNotFound(err)).To(BeTrue())
 
-		err = reconciler.deletePodDisruptionBudgetIfExists(ctx, cluster)
+		err = reconciler.deletePodDisruptionBudgetsIfExist(ctx, cluster)
 		Expect(err).ToNot(HaveOccurred())
 
 		err = fakeClient.Get(ctx, k8client.ObjectKeyFromObject(pdb), &policyv1.PodDisruptionBudget{})

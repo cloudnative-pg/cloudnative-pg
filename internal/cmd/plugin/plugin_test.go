@@ -23,6 +23,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -30,8 +31,14 @@ import (
 
 var _ = Describe("create client", func() {
 	It("with given configuration", func() {
+		// createClient is not a pure function and as a side effect
+		// it will:
+		// - set the Client global variable
+		// - set the UserAgent field inside cfg
 		err := createClient(cfg)
+
 		Expect(err).NotTo(HaveOccurred())
+		Expect(cfg.UserAgent).To(Equal("kubectl-cnpg/v" + versions.Version + " (" + versions.Info.Commit + ")"))
 		Expect(Client).NotTo(BeNil())
 	})
 })

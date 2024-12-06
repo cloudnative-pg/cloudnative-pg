@@ -24,13 +24,13 @@ if [ "${DEBUG-}" = true ]; then
 fi
 
 # Defaults
-KIND_NODE_DEFAULT_VERSION=v1.30.0
-K3D_NODE_DEFAULT_VERSION=v1.30.1
-CSI_DRIVER_HOST_PATH_DEFAULT_VERSION=v1.14.0
-EXTERNAL_SNAPSHOTTER_VERSION=v8.0.1
-EXTERNAL_PROVISIONER_VERSION=v5.0.1
-EXTERNAL_RESIZER_VERSION=v1.11.1
-EXTERNAL_ATTACHER_VERSION=v4.6.1
+KIND_NODE_DEFAULT_VERSION=v1.31.2
+K3D_NODE_DEFAULT_VERSION=v1.30.3
+CSI_DRIVER_HOST_PATH_DEFAULT_VERSION=v1.15.0
+EXTERNAL_SNAPSHOTTER_VERSION=v8.1.0
+EXTERNAL_PROVISIONER_VERSION=v5.1.0
+EXTERNAL_RESIZER_VERSION=v1.12.0
+EXTERNAL_ATTACHER_VERSION=v4.7.0
 K8S_VERSION=${K8S_VERSION-}
 KUBECTL_VERSION=${KUBECTL_VERSION-}
 CSI_DRIVER_HOST_PATH_VERSION=${CSI_DRIVER_HOST_PATH_VERSION:-$CSI_DRIVER_HOST_PATH_DEFAULT_VERSION}
@@ -38,6 +38,7 @@ ENGINE=${CLUSTER_ENGINE:-kind}
 ENABLE_REGISTRY=${ENABLE_REGISTRY:-}
 ENABLE_PYROSCOPE=${ENABLE_PYROSCOPE:-}
 ENABLE_CSI_DRIVER=${ENABLE_CSI_DRIVER:-}
+ENABLE_APISERVER_AUDIT=${ENABLE_APISERVER_AUDIT:-}
 NODES=${NODES:-3}
 # This option is telling the docker to use node image with certain arch, i.e kindest/node in kind.
 # In M1/M2,  if enable amd64 emulation then we keep it as linux/amd64.
@@ -82,7 +83,7 @@ registry_name=registry.dev
 POSTGRES_IMG=${POSTGRES_IMG:-$(grep 'DefaultImageName.*=' "${ROOT_DIR}/pkg/versions/versions.go" | cut -f 2 -d \")}
 E2E_PRE_ROLLING_UPDATE_IMG=${E2E_PRE_ROLLING_UPDATE_IMG:-${POSTGRES_IMG%.*}}
 PGBOUNCER_IMG=${PGBOUNCER_IMG:-$(grep 'DefaultPgbouncerImage.*=' "${ROOT_DIR}/pkg/specs/pgbouncer/deployments.go" | cut -f 2 -d \")}
-MINIO_IMG=${MINIO_IMG:-$(grep 'minioImage.*=' "${ROOT_DIR}/tests/utils/minio.go"  | cut -f 2 -d \")}
+MINIO_IMG=${MINIO_IMG:-$(grep 'minioImage.*=' "${ROOT_DIR}/tests/utils/minio/minio.go"  | cut -f 2 -d \")}
 APACHE_IMG=${APACHE_IMG:-"httpd"}
 
 HELPER_IMGS=("$POSTGRES_IMG" "$E2E_PRE_ROLLING_UPDATE_IMG" "$PGBOUNCER_IMG" "$MINIO_IMG" "$APACHE_IMG")
@@ -146,6 +147,41 @@ kubeadmConfigPatchesJSON6902:
 nodes:
 - role: control-plane
 EOF
+  if [ "${ENABLE_APISERVER_AUDIT}" = "true" ]; then
+    # Create the apiserver audit log directory beforehand, otherwise it will be
+    # generated within docker with root permissions
+    mkdir -p "${LOG_DIR}/apiserver"
+    touch "${LOG_DIR}/apiserver/kube-apiserver-audit.log"
+    cat >>"${config_file}" <<-EOF
+  kubeadmConfigPatches:
+  - |
+    kind: ClusterConfiguration
+    apiServer:
+        # enable auditing flags on the API server
+        extraArgs:
+          audit-log-path: /var/log/kubernetes/kube-apiserver-audit.log
+          audit-policy-file: /etc/kubernetes/policies/audit-policy.yaml
+        # mount new files / directories on the control plane
+        extraVolumes:
+          - name: audit-policies
+            hostPath: /etc/kubernetes/policies
+            mountPath: /etc/kubernetes/policies
+            readOnly: true
+            pathType: "DirectoryOrCreate"
+          - name: "audit-logs"
+            hostPath: "/var/log/kubernetes"
+            mountPath: "/var/log/kubernetes"
+            readOnly: false
+            pathType: DirectoryOrCreate
+  # mount the local file on the control plane
+  extraMounts:
+  - hostPath: ${E2E_DIR}/audit-policy.yaml
+    containerPath: /etc/kubernetes/policies/audit-policy.yaml
+    readOnly: true
+  - hostPath: ${LOG_DIR}/apiserver/
+    containerPath: /var/log/kubernetes/
+EOF
+  fi
 
   if [ "$NODES" -gt 1 ]; then
     for ((i = 0; i < NODES; i++)); do
@@ -299,7 +335,7 @@ install_kubectl() {
 
   local binary="${bindir}/kubectl"
 
-  curl -sL "https://storage.googleapis.com/kubernetes-release/release/v${KUBECTL_VERSION#v}/bin/${OS}/${ARCH}/kubectl" -o "${binary}"
+  curl -sL "https://dl.k8s.io/release/v${KUBECTL_VERSION#v}/bin/${OS}/${ARCH}/kubectl" -o "${binary}"
   chmod +x "${binary}"
 }
 
@@ -382,6 +418,10 @@ deploy_csi_host_path() {
 
   ## create volumesnapshotclass
   kubectl apply -f "${CSI_BASE_URL}"/csi-driver-host-path/"${CSI_DRIVER_HOST_PATH_VERSION}"/deploy/kubernetes-1.27/hostpath/csi-hostpath-snapshotclass.yaml
+
+  ## Prevent VolumeSnapshot E2e test to fail when taking a
+  ## snapshot of a running PostgreSQL instance
+  kubectl patch volumesnapshotclass csi-hostpath-snapclass -p '{"parameters":{"ignoreFailedRead":"true"}}' --type merge
 
   ## create storage class
   kubectl apply -f "${CSI_BASE_URL}"/csi-driver-host-path/"${CSI_DRIVER_HOST_PATH_VERSION}"/examples/csi-storageclass.yaml

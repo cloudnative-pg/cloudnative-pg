@@ -16,6 +16,11 @@ limitations under the License.
 
 package v1
 
+// GetSpec returns the Spec of the ImageCatalog
+func (c *ImageCatalog) GetSpec() *ImageCatalogSpec {
+	return &c.Spec
+}
+
 // FindImageForMajor finds the correct image for the selected major version
 func (spec *ImageCatalogSpec) FindImageForMajor(major int) (string, bool) {
 	for _, entry := range spec.Images {

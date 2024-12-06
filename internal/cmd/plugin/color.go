@@ -32,9 +32,9 @@ type colorConfiguration string
 const (
 	// colorAlways configures the output to always be colorized
 	colorAlways colorConfiguration = "always"
-	// colorAuto configures the the output to be colorized only when attached to a terminal
+	// colorAuto configures the output to be colorized only when attached to a terminal
 	colorAuto colorConfiguration = "auto"
-	// colorNever configures the the output never to be colorized
+	// colorNever configures the output never to be colorized
 	colorNever colorConfiguration = "never"
 )
 

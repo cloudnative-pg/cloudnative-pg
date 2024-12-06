@@ -22,8 +22,9 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/cloudnative-pg/machinery/pkg/fileutils"
+
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -226,7 +227,7 @@ var _ = Describe("check atomic bool", func() {
 	})
 })
 
-var _ = Describe("ALTER SYSTEM enable and disable", func() {
+var _ = Describe("ALTER SYSTEM enable and disable in PostgreSQL <17", func() {
 	var instance Instance
 	var autoConfFile string
 
@@ -243,7 +244,7 @@ var _ = Describe("ALTER SYSTEM enable and disable", func() {
 	})
 
 	It("should be able to enable ALTER SYSTEM", func() {
-		err := instance.SetAlterSystemEnabled(true)
+		err := instance.SetPostgreSQLAutoConfWritable(true)
 		Expect(err).ToNot(HaveOccurred())
 
 		info, err := os.Stat(autoConfFile)
@@ -253,7 +254,7 @@ var _ = Describe("ALTER SYSTEM enable and disable", func() {
 	})
 
 	It("should be able to disable ALTER SYSTEM", func() {
-		err := instance.SetAlterSystemEnabled(false)
+		err := instance.SetPostgreSQLAutoConfWritable(false)
 		Expect(err).ToNot(HaveOccurred())
 
 		info, err := os.Stat(autoConfFile)

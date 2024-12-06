@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: post-init-application-sql-configmap
+data:
+  configmap.sql: |
+    create table application_configmaps (i integer);
+    insert into application_configmaps (select generate_series(1,10000));

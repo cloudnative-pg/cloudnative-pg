@@ -3,6 +3,7 @@ matrix:
   sources:
   - 'docs/src/*.md'
   - 'docs/src/*/*.md'
+  - 'config/olm-manifests/bases/*.yaml'
   default_encoding: utf-8
   aspell:
     lang: en
@@ -25,4 +26,6 @@ matrix:
             close: '(?P=open)'
           - open: '(?P<open><!--)'
             close: '(?P<close>-->)'
+          - open: '.*base64data.*'
+            close: "$"
     - pyspelling.filters.url:

@@ -1,0 +1,11 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Subscription
+metadata:
+  name: subscription-sample
+spec:
+  name: sub
+  dbname: app
+  publicationName: pub-all
+  cluster:
+    name: cluster-example-dest
+  externalClusterName: cluster-example

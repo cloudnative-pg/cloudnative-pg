@@ -18,16 +18,18 @@ package tablespaces
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"time"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/tablespaces/infrastructure"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/readiness"
 )
 
 // Reconcile is the main reconciliation loop for the instance
@@ -69,7 +71,8 @@ func (r *TablespaceReconciler) Reconcile(
 		return reconcile.Result{}, nil
 	}
 
-	if r.instance.IsServerReady() != nil {
+	checker := readiness.ForInstance(r.instance)
+	if checker.IsServerReady(ctx) != nil {
 		contextLogger.Debug("database not ready, skipping tablespace reconciling")
 		return reconcile.Result{RequeueAfter: time.Second}, nil
 	}
@@ -94,9 +97,7 @@ func (r *TablespaceReconciler) reconcile(
 		return nil, fmt.Errorf("while reconcile tablespaces: %w", err)
 	}
 
-	tbsManager := infrastructure.NewPostgresTablespaceManager(superUserDB)
-	tbsStorageManager := instanceTablespaceStorageManager{}
-	tbsInDatabase, err := tbsManager.List(ctx)
+	tbsInDatabase, err := infrastructure.List(ctx, superUserDB)
 	if err != nil {
 		return nil, fmt.Errorf("could not fetch tablespaces from database: %w", err)
 	}
@@ -104,15 +105,14 @@ func (r *TablespaceReconciler) reconcile(
 	steps := evaluateNextSteps(ctx, tbsInDatabase, cluster.Spec.Tablespaces)
 	result := r.applySteps(
 		ctx,
-		tbsManager,
-		tbsStorageManager,
+		superUserDB,
 		steps,
 	)
 
 	// update the cluster status
 	updatedCluster := cluster.DeepCopy()
 	updatedCluster.Status.TablespacesStatus = result
-	if err := r.GetClient().Status().Patch(ctx, updatedCluster, client.MergeFrom(cluster)); err != nil {
+	if err := r.client.Status().Patch(ctx, updatedCluster, client.MergeFrom(cluster)); err != nil {
 		return nil, fmt.Errorf("while setting the tablespace reconciler status: %w", err)
 	}
 
@@ -130,15 +130,13 @@ func (r *TablespaceReconciler) reconcile(
 // if they arose when applying the steps
 func (r *TablespaceReconciler) applySteps(
 	ctx context.Context,
-	tbsManager infrastructure.TablespaceManager,
-	tbsStorageManager tablespaceStorageManager,
+	db *sql.DB,
 	actions []tablespaceReconcilerStep,
 ) []apiv1.TablespaceState {
 	result := make([]apiv1.TablespaceState, len(actions))
 
 	for idx, step := range actions {
-		step := step
-		result[idx] = step.execute(ctx, tbsManager, tbsStorageManager)
+		result[idx] = step.execute(ctx, db, r.storageManager)
 	}
 
 	return result

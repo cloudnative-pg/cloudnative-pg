@@ -26,14 +26,18 @@ import (
 	"strings"
 	"time"
 
+	barmanCommand "github.com/cloudnative-pg/barman-cloud/pkg/command"
+	barmanRestorer "github.com/cloudnative-pg/barman-cloud/pkg/restorer"
+	"github.com/cloudnative-pg/machinery/pkg/log"
+	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	"github.com/spf13/cobra"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	pluginClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/cache"
 	cacheClient "github.com/cloudnative-pg/cloudnative-pg/internal/management/cache/client"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/barman/restorer"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 )
 
@@ -74,10 +78,10 @@ func NewCmd() *cobra.Command {
 			}
 
 			switch {
-			case errors.Is(err, restorer.ErrWALNotFound):
+			case errors.Is(err, barmanRestorer.ErrWALNotFound):
 				// Nothing to log here. The failure has already been logged.
 			case errors.Is(err, ErrNoBackupConfigured):
-				contextLog.Info("tried restoring WALs, but no backup was configured")
+				contextLog.Debug("tried restoring WALs, but no backup was configured")
 			case errors.Is(err, ErrEndOfWALStreamReached):
 				contextLog.Info(
 					"end-of-wal-stream flag found." +
@@ -114,8 +118,12 @@ func run(ctx context.Context, pgData string, podName string, args []string) erro
 		return fmt.Errorf("failed to get cluster: %w", err)
 	}
 
-	if err := restoreWALViaPlugins(ctx, cluster, walName, path.Join(pgData, destinationPath)); err != nil {
+	walFound, err := restoreWALViaPlugins(ctx, cluster, walName, path.Join(pgData, destinationPath))
+	if err != nil {
 		return err
+	}
+	if walFound {
+		return nil
 	}
 
 	recoverClusterName, recoverEnv, barmanConfiguration, err := GetRecoverConfiguration(cluster, podName)
@@ -132,7 +140,7 @@ func run(ctx context.Context, pgData string, podName string, args []string) erro
 		return fmt.Errorf("while getting recover configuration: %w", err)
 	}
 
-	options, err := barman.CloudWalRestoreOptions(barmanConfiguration, recoverClusterName)
+	options, err := barmanCommand.CloudWalRestoreOptions(ctx, barmanConfiguration, recoverClusterName)
 	if err != nil {
 		return fmt.Errorf("while getting barman-cloud-wal-restore options: %w", err)
 	}
@@ -145,8 +153,8 @@ func run(ctx context.Context, pgData string, podName string, args []string) erro
 	mergeEnv(env, recoverEnv)
 
 	// Create the restorer
-	var walRestorer *restorer.WALRestorer
-	if walRestorer, err = restorer.New(ctx, cluster, env, SpoolDirectory); err != nil {
+	var walRestorer *barmanRestorer.WALRestorer
+	if walRestorer, err = barmanRestorer.New(ctx, env, SpoolDirectory); err != nil {
 		return fmt.Errorf("while creating the restorer: %w", err)
 	}
 
@@ -240,21 +248,38 @@ func restoreWALViaPlugins(
 	cluster *apiv1.Cluster,
 	walName string,
 	destinationPathName string,
-) error {
+) (bool, error) {
 	contextLogger := log.FromContext(ctx)
 
-	pluginClient, err := cluster.LoadSelectedPluginsClient(ctx, cluster.GetWALPluginNames())
+	plugins := repository.New()
+	availablePluginNames, err := plugins.RegisterUnixSocketPluginsInPath(configuration.Current.PluginSocketDir)
 	if err != nil {
-		contextLogger.Error(err, "Error loading plugins while archiving a WAL")
-		return err
+		contextLogger.Error(err, "Error while loading local plugins")
 	}
-	defer pluginClient.Close(ctx)
+	defer plugins.Close()
 
-	return pluginClient.RestoreWAL(ctx, cluster, walName, destinationPathName)
+	availablePluginNamesSet := stringset.From(availablePluginNames)
+
+	enabledPluginNames := cluster.Spec.Plugins.GetEnabledPluginNames()
+	enabledPluginNames = append(enabledPluginNames, cluster.Spec.ExternalClusters.GetEnabledPluginNames()...)
+	enabledPluginNamesSet := stringset.From(enabledPluginNames)
+
+	client, err := pluginClient.WithPlugins(
+		ctx,
+		plugins,
+		availablePluginNamesSet.Intersect(enabledPluginNamesSet).ToList()...,
+	)
+	if err != nil {
+		contextLogger.Error(err, "Error while loading required plugins")
+		return false, err
+	}
+	defer client.Close(ctx)
+
+	return client.RestoreWAL(ctx, cluster, walName, destinationPathName)
 }
 
 // checkEndOfWALStreamFlag returns ErrEndOfWALStreamReached if the flag is set in the restorer
-func checkEndOfWALStreamFlag(walRestorer *restorer.WALRestorer) error {
+func checkEndOfWALStreamFlag(walRestorer *barmanRestorer.WALRestorer) error {
 	contain, err := walRestorer.IsEndOfWALStream()
 	if err != nil {
 		return err
@@ -273,9 +298,9 @@ func checkEndOfWALStreamFlag(walRestorer *restorer.WALRestorer) error {
 
 // isEndOfWALStream returns true if one of the downloads has returned
 // a file-not-found error
-func isEndOfWALStream(results []restorer.Result) bool {
+func isEndOfWALStream(results []barmanRestorer.Result) bool {
 	for _, result := range results {
-		if errors.Is(result.Err, restorer.ErrWALNotFound) {
+		if errors.Is(result.Err, barmanRestorer.ErrWALNotFound) {
 			return true
 		}
 	}

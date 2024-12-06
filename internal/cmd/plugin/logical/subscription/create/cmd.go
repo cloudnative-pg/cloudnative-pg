@@ -31,12 +31,13 @@ func NewCmd() *cobra.Command {
 	var externalClusterName string
 	var publicationName string
 	var subscriptionName string
-	var dbName string
+	var publicationDBName string
+	var subscriptionDBName string
 	var parameters string
 	var dryRun bool
 
 	subscriptionCreateCmd := &cobra.Command{
-		Use:   "create cluster_name",
+		Use:   "create CLUSTER",
 		Short: "create a logical replication subscription",
 		Args:  plugin.RequiresArguments(1),
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
@@ -47,21 +48,27 @@ func NewCmd() *cobra.Command {
 			externalClusterName := strings.TrimSpace(externalClusterName)
 			publicationName := strings.TrimSpace(publicationName)
 			subscriptionName := strings.TrimSpace(subscriptionName)
-			dbName := strings.TrimSpace(dbName)
+			publicationDBName := strings.TrimSpace(publicationDBName)
+			subscriptionDBName := strings.TrimSpace(subscriptionDBName)
 
-			if len(dbName) == 0 {
+			if len(subscriptionDBName) == 0 {
 				var err error
-				dbName, err = logical.GetApplicationDatabaseName(cmd.Context(), clusterName)
+				subscriptionDBName, err = logical.GetApplicationDatabaseName(cmd.Context(), clusterName)
 				if err != nil {
 					return err
 				}
 			}
-			if len(dbName) == 0 {
+			if len(subscriptionDBName) == 0 {
 				return fmt.Errorf(
 					"the name of the database was not specified and there is no available application database")
 			}
 
-			connectionString, err := logical.GetConnectionString(cmd.Context(), clusterName, externalClusterName)
+			connectionString, err := logical.GetConnectionString(
+				cmd.Context(),
+				clusterName,
+				externalClusterName,
+				publicationDBName,
+			)
 			if err != nil {
 				return err
 			}
@@ -79,7 +86,7 @@ func NewCmd() *cobra.Command {
 				return nil
 			}
 
-			return logical.RunSQL(cmd.Context(), clusterName, dbName, sqlCommand)
+			return logical.RunSQL(cmd.Context(), clusterName, subscriptionDBName, sqlCommand)
 		},
 	}
 
@@ -108,10 +115,17 @@ func NewCmd() *cobra.Command {
 	_ = subscriptionCreateCmd.MarkFlagRequired("subscription")
 
 	subscriptionCreateCmd.Flags().StringVar(
-		&dbName,
+		&subscriptionDBName,
 		"dbname",
 		"",
-		"The name of the application where to create the subscription. Defaults to the application database if available",
+		"The name of the database where to create the subscription. Defaults to the application database if available",
+	)
+	subscriptionCreateCmd.Flags().StringVar(
+		&publicationDBName,
+		"publication-dbname",
+		"",
+		"The name of the database containing the publication on the external cluster. "+
+			"Defaults to the one in the external cluster definition",
 	)
 	subscriptionCreateCmd.Flags().StringVar(
 		&parameters,

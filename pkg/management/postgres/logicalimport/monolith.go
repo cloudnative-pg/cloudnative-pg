@@ -19,8 +19,9 @@ package logicalimport
 import (
 	"context"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
+
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pool"
 )
 
@@ -52,11 +53,21 @@ func Monolith(
 		return err
 	}
 
-	if err := ds.exportDatabases(ctx, origin, databases); err != nil {
+	if err := ds.exportDatabases(
+		ctx,
+		origin,
+		databases,
+		cluster.Spec.Bootstrap.InitDB.Import.PgDumpExtraOptions,
+	); err != nil {
 		return err
 	}
 
-	if err := ds.importDatabases(ctx, destination, databases); err != nil {
+	if err := ds.importDatabases(
+		ctx,
+		destination,
+		databases,
+		cluster.Spec.Bootstrap.InitDB.Import.PgRestoreExtraOptions,
+	); err != nil {
 		return err
 	}
 

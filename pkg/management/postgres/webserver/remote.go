@@ -28,25 +28,27 @@ import (
 	"os/exec"
 	"path"
 
+	"github.com/cloudnative-pg/machinery/pkg/execlog"
+	"github.com/cloudnative-pg/machinery/pkg/fileutils"
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/concurrency"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/execlog"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/readiness"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/upgrade"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 type remoteWebserverEndpoints struct {
-	typedClient   client.Client
-	instance      *postgres.Instance
-	currentBackup *backupConnection
+	typedClient      client.Client
+	instance         *postgres.Instance
+	currentBackup    *backupConnection
+	readinessChecker *readiness.Data
 }
 
 // StartBackupRequest the required data to execute the pg_start_backup
@@ -79,8 +81,9 @@ func NewRemoteWebServer(
 	}
 
 	endpoints := remoteWebserverEndpoints{
-		typedClient: typedClient,
-		instance:    instance,
+		typedClient:      typedClient,
+		instance:         instance,
+		readinessChecker: readiness.ForInstance(instance),
 	}
 
 	serveMux := http.NewServeMux()
@@ -108,7 +111,7 @@ func NewRemoteWebServer(
 		}
 	}
 
-	return NewWebServer(instance, server), nil
+	return NewWebServer(server), nil
 }
 
 func (ws *remoteWebserverEndpoints) isServerHealthy(w http.ResponseWriter, _ *http.Request) {
@@ -133,8 +136,8 @@ func (ws *remoteWebserverEndpoints) isServerHealthy(w http.ResponseWriter, _ *ht
 }
 
 // This is the readiness probe
-func (ws *remoteWebserverEndpoints) isServerReady(w http.ResponseWriter, _ *http.Request) {
-	if err := ws.instance.IsServerReady(); err != nil {
+func (ws *remoteWebserverEndpoints) isServerReady(w http.ResponseWriter, r *http.Request) {
+	if err := ws.readinessChecker.IsServerReady(r.Context()); err != nil {
 		log.Debug("Readiness probe failing", "err", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -354,13 +357,17 @@ func (ws *remoteWebserverEndpoints) pgArchivePartial(w http.ResponseWriter, req 
 
 	var cluster apiv1.Cluster
 	if err := ws.typedClient.Get(req.Context(),
-		client.ObjectKey{Namespace: ws.instance.Namespace, Name: ws.instance.ClusterName},
+		client.ObjectKey{
+			Namespace: ws.instance.GetNamespaceName(),
+			Name:      ws.instance.GetClusterName(),
+		},
 		&cluster); err != nil {
 		sendBadRequestJSONResponse(w, "NO_CLUSTER_FOUND", err.Error())
 		return
 	}
 
-	if cluster.Status.TargetPrimary != ws.instance.PodName || cluster.Status.CurrentPrimary != ws.instance.PodName {
+	if cluster.Status.TargetPrimary != ws.instance.GetPodName() ||
+		cluster.Status.CurrentPrimary != ws.instance.GetPodName() {
 		sendBadRequestJSONResponse(w, "NOT_EXPECTED_PRIMARY", "")
 		return
 	}
@@ -379,24 +386,27 @@ func (ws *remoteWebserverEndpoints) pgArchivePartial(w http.ResponseWriter, req 
 		return
 	}
 
-	pgWalDirectory := path.Join(os.Getenv("PGDATA"), "pg_wal")
-	walFilPath := path.Join(pgWalDirectory, walFile)
-	partialWalFilePath := fmt.Sprintf("%s.partial", walFilPath)
+	pgData := os.Getenv("PGDATA")
+	walRelativePath := path.Join("pg_wal", walFile)
+	partialWalFileRelativePath := fmt.Sprintf("%s.partial", walRelativePath)
+	walFileAbsolutePath := path.Join(pgData, walRelativePath)
+	partialWalFileAbsolutePath := path.Join(pgData, partialWalFileRelativePath)
 
-	if err := os.Link(walFilPath, partialWalFilePath); err != nil {
+	if err := os.Link(walFileAbsolutePath, partialWalFileAbsolutePath); err != nil {
 		log.Error(err, "failed to get pg_controldata")
 		sendBadRequestJSONResponse(w, "ERROR_WHILE_CREATING_SYMLINK", err.Error())
 		return
 	}
 
 	defer func() {
-		if err := fileutils.RemoveFile(partialWalFilePath); err != nil {
+		if err := fileutils.RemoveFile(partialWalFileAbsolutePath); err != nil {
 			log.Error(err, "while deleting the partial wal file symlink")
 		}
 	}()
 
-	options := []string{constants.WalArchiveCommand, partialWalFilePath}
+	options := []string{constants.WalArchiveCommand, partialWalFileRelativePath}
 	walArchiveCmd := exec.Command("/controller/manager", options...) // nolint: gosec
+	walArchiveCmd.Dir = pgData
 	if err := execlog.RunBuffering(walArchiveCmd, "wal-archive-partial"); err != nil {
 		sendBadRequestJSONResponse(w, "ERROR_WHILE_EXECUTING_WAL_ARCHIVE", err.Error())
 		return

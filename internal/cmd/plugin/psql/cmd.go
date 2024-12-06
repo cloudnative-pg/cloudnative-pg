@@ -31,19 +31,21 @@ func NewCmd() *cobra.Command {
 	var passStdin bool
 
 	cmd := &cobra.Command{
-		Use:   "psql [cluster] [-- psqlArgs...]",
+		Use:   "psql CLUSTER [-- PSQL_ARGS...]",
 		Short: "Start a psql session targeting a CloudNativePG cluster",
 		Args:  validatePsqlArgs,
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			return plugin.CompleteClusters(cmd.Context(), args, toComplete), cobra.ShellCompDirectiveNoFileComp
 		},
-		Long: "This command will start an interactive psql session inside a PostgreSQL Pod created by CloudNativePG.",
+		Long:    "This command will start an interactive psql session inside a PostgreSQL Pod created by CloudNativePG.",
+		GroupID: plugin.GroupIDMiscellaneous,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			clusterName := args[0]
 			psqlArgs := args[1:]
 			psqlOptions := CommandOptions{
 				Replica:     replica,
 				Namespace:   plugin.Namespace,
+				Context:     plugin.KubeContext,
 				AllocateTTY: allocateTTY,
 				PassStdin:   passStdin,
 				Args:        psqlArgs,
@@ -91,7 +93,7 @@ func validatePsqlArgs(cmd *cobra.Command, args []string) error {
 	}
 
 	if cmd.ArgsLenAtDash() > 1 {
-		return fmt.Errorf("psqlArgs should be passed after -- delimitator")
+		return fmt.Errorf("psqlArgs should be passed after the -- delimiter")
 	}
 
 	return nil

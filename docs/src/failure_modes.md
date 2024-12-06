@@ -99,26 +99,24 @@ kubectl delete pod [primary pod] --grace-period=1
     triggers a failover promoting the most aligned standby, without
     the guarantee that the primary had been shut down.
 
+### Liveness Probe Failure
 
-### Readiness probe failure
+By default, after three consecutive liveness probe failures, the `postgres`
+container will be considered failed. The Pod will remain part of the `Cluster`,
+but the *kubelet* will attempt to restart the failed container. If the issue
+causing the failure persists and cannot be resolved, you can manually delete
+the Pod.
 
-After 3 failures, the pod will be considered *not ready*. The pod will still
-be part of the `Cluster`, no new pod will be created.
+In both cases, self-healing occurs automatically once the underlying issues are
+resolved.
 
-If the cause of the failure can't be fixed, it is possible to delete the pod
-manually. Otherwise, the pod will resume the previous role when the failure
-is solved.
+### Readiness Probe Failure
 
-Self-healing will happen after three failures of the probe.
-
-### Liveness probe failure
-
-After 3 failures, the `postgres` container will be considered failed. The
-pod will still be part of the `Cluster`, and the *kubelet* will try to restart
-the container. If the cause of the failure can't be fixed, it is possible
-to delete the pod manually.
-
-Self-healing will happen after three failures of the probe.
+By default, after three consecutive readiness probe failures, the Pod will be
+marked as *not ready*. It will remain part of the `Cluster`, and no new Pod
+will be created. If the issue causing the failure cannot be resolved, you can
+manually delete the Pod. Once the failure is addressed, the Pod will
+automatically regain its previous role.
 
 ### Worker node drained
 
@@ -176,9 +174,8 @@ to solve the problem manually.
     In such cases, please do not perform any manual operation without
     [professional support](https://cloudnative-pg.io/support/).
 
-From version 1.11.0 of the operator, you can use the
-`cnpg.io/reconciliationLoop` annotation to temporarily disable the
-reconciliation loop on a selected PostgreSQL cluster, as follows:
+You can use the `cnpg.io/reconciliationLoop` annotation to temporarily disable
+the reconciliation loop for a specific PostgreSQL cluster, as shown below:
 
 ``` yaml
 metadata:

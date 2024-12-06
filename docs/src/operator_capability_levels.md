@@ -75,7 +75,7 @@ of the CloudNativePG deployment in your Kubernetes infrastructure.
 ### Self-contained instance manager
 
 Instead of relying on an external tool to
-coordinate PostgreSQL instances in the Kubernetes cluster pods, 
+coordinate PostgreSQL instances in the Kubernetes cluster pods,
 such as Patroni or Stolon, the operator
 injects the operator executable inside each pod, in a file named
 `/controller/manager`. The application is used to control the underlying
@@ -136,14 +136,18 @@ PostgreSQL outside Kubernetes. This is particularly useful for DBaaS purposes.
 
 ### Database configuration
 
-The operator is designed to manage a PostgreSQL cluster with a single
-database. The operator transparently manages access to the database through
-three Kubernetes services provisioned and managed for read-write,
+The operator is designed to bootstrap a PostgreSQL cluster with a single
+database. The operator transparently manages network access to the cluster
+through three Kubernetes services provisioned and managed for read-write,
 read, and read-only workloads.
 Using the convention-over-configuration approach, the operator creates a
 database called `app`, by default owned by a regular Postgres user with the
 same name. You can specify both the database name and the user name, if
-required.
+required, as part of the bootstrap.
+
+Additional databases can be created or managed via
+[declarative database management](declarative_database_management.md) using
+the `Database` CRD.
 
 Although no configuration is required to run the cluster, you can customize
 both PostgreSQL runtime configuration and PostgreSQL host-based
@@ -223,7 +227,7 @@ includes integration with cert-manager.
 
 ### Certificate authentication for streaming replication
 
-To authorize streaming replication connections from the standby servers, 
+To authorize streaming replication connections from the standby servers,
 the operator relies on TLS client certificate authentication. This method is used
 instead of relying on a password (and therefore a secret).
 
@@ -285,16 +289,20 @@ workload, in this case PostgreSQL servers. This includes PostgreSQL minor
 release updates (security and bug fixes normally) as well as major online
 upgrades.
 
-### Upgrade of the operator
+### Operator Upgrade
 
-You can upgrade the operator seamlessly as a new deployment. Because of the instance
-manager's injection, a change in the
-operator doesn't require a change in the operand. 
-The operator can manage older versions of the operand.
+Upgrading the operator is seamless and can be done as a new deployment. After
+upgrading the controller, a rolling update of all deployed PostgreSQL clusters
+is initiated. You can choose to update all clusters simultaneously or
+distribute their upgrades over time.
 
-CloudNativePG also supports [in-place updates of the instance manager](installation_upgrade.md#in-place-updates-of-the-instance-manager)
-following an upgrade of the operator. In-place updates don't require a rolling
-update (and subsequent switchover) of the cluster.
+Thanks to the instance manager's injection, upgrading the operator does not
+require changes to the operand, allowing the operator to manage older versions
+of it.
+
+Additionally, CloudNativePG supports [in-place updates of the instance manager](installation_upgrade.md#in-place-updates-of-the-instance-manager)
+following an operator upgrade. In-place updates do not require a rolling update
+or a subsequent switchover of the cluster.
 
 ### Upgrade of the managed workload
 
@@ -328,11 +336,12 @@ continuity and scalability.
 
 *Disaster recovery* is a business continuity component that requires
 that both backup and recovery of a database work correctly. While as a
-starting point, the goal is to achieve RPO < 5 minutes, the long-term goal is
-to implement RPO=0 backup solutions. *High availability* is the other
-important component of business continuity. Through PostgreSQL native
-physical replication and hot standby replicas, it allows the operator to perform
-failover and switchover operations. This area includes enhancements in:
+starting point, the goal is to achieve [RPO](before_you_start.md#rpo) < 5
+minutes, the long-term goal is to implement RPO=0 backup solutions. *High
+availability* is the other important component of business continuity. Through
+PostgreSQL native physical replication and hot standby replicas, it allows the
+operator to perform failover and switchover operations. This area includes
+enhancements in:
 
 - Control of PostgreSQL physical replication, such as synchronous replication,
   (cascading) replication clusters, and so on
@@ -355,8 +364,8 @@ user action. The operator transparently sets
 the `archive_command` to rely on `barman-cloud-wal-archive` to ship WAL
 files to the defined endpoint. You can decide the compression algorithm,
 as well as the number of parallel jobs to concurrently upload WAL files
-in the archive. In addition, `Instance Manager` checks 
-the correctness of the archive destination by performing the `barman-cloud-check-wal-archive` 
+in the archive. In addition, `Instance Manager` checks
+the correctness of the archive destination by performing the `barman-cloud-check-wal-archive`
 command before beginning to ship the first set of WAL files.
 
 ### PostgreSQL backups
@@ -373,7 +382,7 @@ Base backups can be saved on:
 Base backups are defined at the cluster level, declaratively,
 through the `backup` parameter in the cluster definition.
 
-You can define base backups in two ways: 
+You can define base backups in two ways:
 
 - On-demand, through the `Backup` custom resource definition
 - Scheduled, through the `ScheduledBackup`custom resource definition, using a cron-like syntax
@@ -396,8 +405,9 @@ database snapshots with cold backups.
 ### Backups from a standby
 
 The operator supports offloading base backups onto a standby without impacting
-the RPO of the database. This allows resources to be preserved on the primary, in
-particular I/O, for standard database operations.
+the [RPO](before_you_start.md#rpo) of the database. This allows resources to
+be preserved on the primary, in particular I/O, for standard database
+operations.
 
 ### Full restore from a backup
 
@@ -420,18 +430,13 @@ label, or a transaction ID. This capability is built on top of the full restore
 one and supports all the options available in
 [PostgreSQL for PITR](https://www.postgresql.org/docs/current/runtime-config-wal.html#RUNTIME-CONFIG-WAL-RECOVERY-TARGET).
 
-### Zero-data-loss clusters through synchronous replication
+### Zero-Data-Loss Clusters Through Synchronous Replication
 
-Achieve  *zero data loss* (RPO=0) in your local high-availability CloudNativePG
-cluster through quorum-based synchronous replication support. The operator provides
-two configuration options that control the minimum and maximum number of
-expected synchronous standby replicas available at any time. The operator
-reacts accordingly, based on the number of available and ready PostgreSQL
-instances in the cluster. It uses the following formula for the quorum (`q`):
-
-```
-1 <= minSyncReplicas <= q <= maxSyncReplicas <= readyReplicas
-```
+Achieve *zero data loss* (RPO=0) in your local high-availability CloudNativePG
+cluster with support for both quorum-based and priority-based synchronous
+replication. The operator offers a flexible way to define the number of
+expected synchronous standby replicas available at any time, and allows
+customization of the `synchronous_standby_names` option as needed.
 
 ### Replica clusters
 
@@ -457,23 +462,28 @@ switchover across data centers remains necessary.)
 
 Additionally, the flexibility extends to creating delayed replica clusters
 intentionally lagging behind the primary cluster. This intentional lag aims to
-minimize the Recovery Time Objective (RTO) in the event of unintended errors,
-such as incorrect `DELETE` or `UPDATE` SQL operations.
+minimize the Recovery Time Objective ([RTO](before_you_start.md#rto)) in the
+event of unintended errors, such as incorrect `DELETE` or `UPDATE` SQL operations.
 
 ### Distributed Database Topologies
 
-Using replica clusters, you can create distributed database topologies based on
-PostgreSQL that span different Kubernetes clusters, enabling hybrid and
-multi-cloud scenarios.
-With CloudNativePG, you can:
+Leverage replica clusters to
+define [distributed database topologies](replica_cluster.md#distributed-topology)
+for PostgreSQL that span across various Kubernetes clusters, facilitating hybrid
+and multi-cloud deployments. With CloudNativePG, you gain powerful capabilities,
+including:
 
-- Declaratively control which PostgreSQL cluster is the primary.
-- Seamlessly demote the current primary and promote another PostgreSQL cluster
-  (typically in another region) without the need to re-clone the former primary.
+- **Declarative Primary Control**: Easily specify which PostgreSQL cluster acts
+  as the primary.
+- **Seamless Primary Switchover**: Effortlessly demote the current primary and
+  promote another PostgreSQL cluster, typically located in a different region,
+  without needing to re-clone the former primary.
 
-This setup can function across two or more regions, relying solely on object
-stores for replication, with a maximum guaranteed RPO of 5 minutes. This
-feature is currently unique to CloudNativePG.
+This setup can efficiently operate across two or more regions, can rely entirely
+on object stores for replication, and guarantees a maximum RPO (Recovery Point
+Objective) of 5 minutes. This advanced feature is uniquely provided by
+CloudNativePG, ensuring robust data integrity and continuity across diverse
+environments.
 
 ### Tablespace support
 
@@ -486,18 +496,24 @@ scalability of PostgreSQL databases, ensuring a streamlined and optimized
 experience for managing large scale data storage in cloud-native environments.
 Support for temporary tablespaces is also included.
 
-### Liveness and readiness probes
+### Startup, Liveness, and Readiness Probes
 
-The operator defines liveness and readiness probes for the Postgres
-containers that are then invoked by the kubelet. They're mapped respectively
-to the `/healthz` and `/readyz` endpoints of the web server managed
-directly by the instance manager.
+CloudNativePG configures startup, liveness, and readiness probes for PostgreSQL
+containers, which are managed by the Kubernetes kubelet. These probes interact
+with the `/healthz` and `/readyz` endpoints exposed by the instance manager's
+web server to monitor the Pod's health and readiness.
 
-The liveness probe is based on the `pg_isready` executable, and the pod is
-considered healthy with exit codes 0 (server accepting connections normally)
-and 1 (server is rejecting connections, for example, during startup). The
-readiness probe issues a simple query (`;`) to verify that the server is
-ready to accept connections.
+The startup and liveness probes use the `pg_isready` utility. A Pod is
+considered healthy if `pg_isready` returns an exit code of 0 (indicating the
+server is accepting connections) or 1 (indicating the server is rejecting
+connections, such as during startup).
+
+The readiness probe executes a simple SQL query (`;`) to verify that the
+PostgreSQL server is ready to accept client connections.
+
+All probes are configured with default settings but can be fully customized to
+meet specific needs, allowing for fine-tuning to align with your environment
+and workloads.
 
 ### Rolling deployments
 
@@ -581,6 +597,15 @@ to access the database. This optimizes the query flow toward the instances
 and makes the use of the underlying PostgreSQL resources more efficient.
 Instead of connecting directly to a PostgreSQL service, applications can now
 connect to the PgBouncer service and start reusing any existing connection.
+
+### Logical Replication
+
+CloudNativePG supports PostgreSQL's logical replication in a declarative manner
+using `Publication` and `Subscription` custom resource definitions.
+
+Logical replication is particularly useful together with the import facility
+for online data migrations (even from public DBaaS solutions) and major
+PostgreSQL upgrades.
 
 ## Level 4: Deep insights
 

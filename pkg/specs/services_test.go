@@ -69,6 +69,7 @@ var _ = Describe("Services specification", func() {
 		Expect(service.Spec.Ports[0].Protocol).To(Equal(corev1.ProtocolTCP))
 		Expect(service.Spec.Ports[0].TargetPort.IntVal).To(BeEquivalentTo(postgres.ServerPort))
 		Expect(service.Spec.Ports[0].Port).To(BeEquivalentTo(postgres.ServerPort))
+		Expect(service.Spec.Selector[utils.ClusterInstanceRoleLabelName]).To(Equal(ClusterRoleLabelReplica))
 	})
 
 	It("create a configured -rw service", func() { //nolint:all
@@ -81,6 +82,7 @@ var _ = Describe("Services specification", func() {
 		Expect(service.Spec.Ports[0].Protocol).To(Equal(corev1.ProtocolTCP))
 		Expect(service.Spec.Ports[0].TargetPort.IntVal).To(BeEquivalentTo(postgres.ServerPort))
 		Expect(service.Spec.Ports[0].Port).To(BeEquivalentTo(postgres.ServerPort))
+		Expect(service.Spec.Selector[utils.ClusterInstanceRoleLabelName]).To(Equal(ClusterRoleLabelPrimary))
 	})
 })
 

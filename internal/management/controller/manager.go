@@ -52,7 +52,7 @@ type InstanceReconciler struct {
 func NewInstanceReconciler(
 	instance *postgres.Instance,
 	client ctrl.Client,
-	server *metricserver.MetricsServer,
+	metricsExporter *metricserver.Exporter,
 ) *InstanceReconciler {
 	return &InstanceReconciler{
 		instance:              instance,
@@ -60,7 +60,7 @@ func NewInstanceReconciler(
 		secretVersions:        make(map[string]string),
 		extensionStatus:       make(map[string]bool),
 		systemInitialization:  concurrency.NewExecuted(),
-		metricsServerExporter: server.GetExporter(),
+		metricsServerExporter: metricsExporter,
 	}
 }
 
@@ -82,18 +82,7 @@ func (r *InstanceReconciler) Instance() *postgres.Instance {
 
 // GetCluster gets the managed cluster through the client
 func (r *InstanceReconciler) GetCluster(ctx context.Context) (*apiv1.Cluster, error) {
-	var cluster apiv1.Cluster
-	err := r.GetClient().Get(ctx,
-		types.NamespacedName{
-			Namespace: r.instance.Namespace,
-			Name:      r.instance.ClusterName,
-		},
-		&cluster)
-	if err != nil {
-		return nil, err
-	}
-
-	return &cluster, nil
+	return getClusterFromInstance(ctx, r.client, r.instance)
 }
 
 // GetSecret will get a named secret in the instance namespace
@@ -102,7 +91,7 @@ func (r *InstanceReconciler) GetSecret(ctx context.Context, name string) (*corev
 	err := r.GetClient().Get(ctx,
 		types.NamespacedName{
 			Name:      name,
-			Namespace: r.instance.Namespace,
+			Namespace: r.instance.GetNamespaceName(),
 		}, &secret)
 	if err != nil {
 		return nil, fmt.Errorf("while getting secret: %w", err)

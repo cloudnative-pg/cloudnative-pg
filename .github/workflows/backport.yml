@@ -9,7 +9,7 @@ on:
       - main
 
 env:
-  GOLANG_VERSION: "1.22.x"
+  GOLANG_VERSION: "1.23.x"
 
 jobs:
   # Label the source pull request with 'backport-requested' and all supported releases label, the goal is, by default
@@ -20,7 +20,7 @@ jobs:
         github.event.pull_request.merged == false &&
         !contains(github.event.pull_request.labels.*.name, 'backport-requested') &&
         !contains(github.event.pull_request.labels.*.name, 'do not backport')
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       -
         name: Label the pull request
@@ -33,6 +33,7 @@ jobs:
             backport-requested :arrow_backward:
             release-1.22
             release-1.23
+            release-1.24
       -
         name: Create comment
         uses: peter-evans/create-or-update-comment@v4
@@ -56,6 +57,7 @@ jobs:
             backport-requested :arrow_backward:
             release-1.22
             release-1.23
+            release-1.24
 
   ## backport pull request in condition when pr contains 'backport-requested' label and contains target branches labels
   back-porting-pr:
@@ -67,11 +69,11 @@ jobs:
           contains(github.event.pull_request.labels.*.name, 'backport-requested :arrow_backward:')
         ) &&
         !contains(github.event.pull_request.labels.*.name, 'do not backport')
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
-        branch: [release-1.22, release-1.23]
+        branch: [release-1.22, release-1.23, release-1.24]
     env:
       PR: ${{ github.event.pull_request.number }}
     outputs:
@@ -139,7 +141,7 @@ jobs:
     env:
       PR: ${{ github.event.pull_request.number }}
       COMMIT: ${{ needs.back-porting-pr.outputs.commit }}
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: create ticket
         uses: dacbd/create-issue-action@v2

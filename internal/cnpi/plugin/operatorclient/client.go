@@ -20,12 +20,12 @@ import (
 	"context"
 	"reflect"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin"
-	pluginclient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
+	cnpgiClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -53,21 +53,14 @@ func (e *extendedClient) invokePlugin(
 		return obj, nil
 	}
 
-	loader, ok := cluster.(pluginclient.Loader)
-	if !ok {
-		contextLogger.Trace("skipping invokePlugin, cluster does not adhere to Loader interface")
+	pluginClient, ok := ctx.Value(utils.PluginClientKey).(cnpgiClient.Client)
+	if !ok || pluginClient == nil {
+		contextLogger.Trace("skipping invokePlugin, cannot find the plugin client inside the context")
 		return obj, nil
 	}
 
-	pClient, err := loader.LoadPluginClient(ctx)
-	if err != nil {
-		contextLogger.Trace("skipping invokePlugin, cannot load the plugin client")
-		return obj, nil
-	}
-
-	contextLogger.Debug("correctly loaded the plugin client")
-
-	return pClient.LifecycleHook(ctx, operationVerb, cluster, obj)
+	contextLogger.Trace("correctly loaded the plugin client")
+	return pluginClient.LifecycleHook(ctx, operationVerb, cluster, obj)
 }
 
 // Create saves the object obj in the Kubernetes cluster. obj must be a

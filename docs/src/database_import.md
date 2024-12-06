@@ -73,7 +73,7 @@ performed in 4 steps:
 
 - `initdb` bootstrap of the new cluster
 - export of the selected database (in `initdb.import.databases`) using
-  `pg_dump -Fc`
+  `pg_dump -Fd`
 - import of the database using `pg_restore --no-acl --no-owner` into the
   `initdb.database` (application database) owned by the `initdb.owner` user
 - cleanup of the database dump file
@@ -145,7 +145,7 @@ There are a few things you need to be aware of when using the `microservice` typ
   `externalCluster` during the operation
 - Connection to the source database must be granted with the specified user
   that needs to run `pg_dump` and read roles information (*superuser* is OK)
-- Currently, the `pg_dump -Fc` result is stored temporarily inside the `dumps`
+- Currently, the `pg_dump -Fd` result is stored temporarily inside the `dumps`
   folder in the `PGDATA` volume, so there should be enough available space to
   temporarily contain the dump result on the assigned node, as well as the
   restored data and indexes. Once the import operation is completed, this
@@ -162,7 +162,7 @@ The operation is performed in the following steps:
 - `initdb` bootstrap of the new cluster
 - export and import of the selected roles
 - export of the selected databases (in `initdb.import.databases`), one at a time,
-  using `pg_dump -Fc`
+  using `pg_dump -Fd`
 - create each of the selected databases and import data using `pg_restore`
 - run `ANALYZE` on each imported database
 - cleanup of the database dump files
@@ -222,7 +222,7 @@ There are a few things you need to be aware of when using the `monolith` type:
 - Connection to the source database must be granted with the specified user
   that needs to run `pg_dump` and retrieve roles information (*superuser* is
   OK)
-- Currently, the `pg_dump -Fc` result is stored temporarily inside the `dumps`
+- Currently, the `pg_dump -Fd` result is stored temporarily inside the `dumps`
   folder in the `PGDATA` volume, so there should be enough available space to
   temporarily contain the dump result on the assigned node, as well as the
   restored data and indexes. Once the import operation is completed, this
@@ -267,3 +267,52 @@ topic is beyond the scope of CloudNativePG, we recommend that you reduce
 unnecessary writes in the checkpoint area by tuning Postgres GUCs like
 `shared_buffers`, `max_wal_size`, `checkpoint_timeout` directly in the
 `Cluster` configuration.
+
+## Customizing `pg_dump` and `pg_restore` Behavior
+
+You can customize the behavior of `pg_dump` and `pg_restore` by specifying
+additional options using the `pgDumpExtraOptions` and `pgRestoreExtraOptions`
+parameters. For instance, you can enable parallel jobs to speed up data
+import/export processes, as shown in the following example:
+
+```yaml
+  # <snip>
+  bootstrap:
+    initdb:
+      import:
+        type: microservice
+        databases:
+        - app
+        source:
+          externalCluster: cluster-example
+        pgDumpExtraOptions:
+        - '--jobs=2'
+        pgRestoreExtraOptions:
+        - '--jobs=2'
+  # <snip>
+```
+
+!!! Warning
+    Use the `pgDumpExtraOptions` and `pgRestoreExtraOptions` fields with
+    caution and at your own risk. These options are not validated or verified by
+    the operator, and some configurations may conflict with its intended
+    functionality or behavior. Always test thoroughly in a safe and controlled
+    environment before applying them in production.
+
+## Online Import and Upgrades
+
+Logical replication offers a powerful way to import any PostgreSQL database
+accessible over the network using the following approach:
+
+- **Import Bootstrap with Schema-Only Option**: Initialize the schema in the
+  target database before replication begins.
+- **`Subscription` Resource**: Set up continuous replication to synchronize
+  data changes.
+
+This technique can also be leveraged for performing major PostgreSQL upgrades
+with minimal downtime, making it ideal for seamless migrations and system
+upgrades.
+
+For more details, including limitations and best practices, refer to the
+[Logical Replication](logical_replication.md) section in the documentation.
+

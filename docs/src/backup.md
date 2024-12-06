@@ -1,13 +1,5 @@
 # Backup
 
-!!! Important
-    With version 1.21, backup and recovery capabilities in CloudNativePG
-    have sensibly changed due to the introduction of native support for
-    [Kubernetes Volume Snapshots](backup_volumesnapshot.md).
-    Up to that point, backup and recovery were available only for object
-    stores. Please carefully read this section and the [recovery](recovery.md)
-    one if you have been a user of CloudNativePG 1.15 through 1.20.
-
 PostgreSQL natively provides first class backup and recovery capabilities based
 on file system level (physical) copy. These have been successfully used for
 more than 15 years in mission critical production databases, helping
@@ -74,7 +66,8 @@ as they can simply rely on the WAL archive to synchronize across long
 distances, extending disaster recovery goals across different regions.
 
 When you [configure a WAL archive](wal_archiving.md), CloudNativePG provides
-out-of-the-box an RPO <= 5 minutes for disaster recovery, even across regions.
+out-of-the-box an [RPO](before_you_start.md#rpo) <= 5 minutes for disaster
+recovery, even across regions.
 
 !!! Important
     Our recommendation is to always setup the WAL archive in production.
@@ -126,9 +119,9 @@ including:
 - availability of a trusted storage class that supports volume snapshots
 - size of the database: with object stores, the larger your database, the
   longer backup and, most importantly, recovery procedures take (the latter
-  impacts RTO); in presence of Very Large Databases (VLDB), the general
-  advice is to rely on Volume Snapshots as, thanks to copy-on-write, they
-  provide faster recovery
+  impacts [RTO](before_you_start.md#rto)); in presence of Very Large Databases
+  (VLDB), the general advice is to rely on Volume Snapshots as, thanks to
+  copy-on-write, they provide faster recovery
 - data mobility and possibility to store or relay backup files on a
   secondary location in a different region, or any subsequent one
 - other factors, mostly based on the confidence and familiarity with the
@@ -196,7 +189,7 @@ In Kubernetes CronJobs, the equivalent expression is `0 0 * * *` because seconds
 are not included.
 
 !!! Hint
-    Backup frequency might impact your recovery time object (RTO) after a
+    Backup frequency might impact your recovery time objective ([RTO](before_you_start.md#rto)) after a
     disaster which requires a full or Point-In-Time recovery operation. Our
     advice is that you regularly test your backups by recovering them, and then
     measuring the time it takes to recover from scratch so that you can refine

@@ -26,7 +26,7 @@ func clusterCmd() *cobra.Command {
 	cl := clusterLogs{}
 
 	cmd := &cobra.Command{
-		Use:   "cluster <clusterName>",
+		Use:   "cluster CLUSTER",
 		Short: "Logs for cluster's pods",
 		Long:  "Collects the logs for all pods in a cluster into a single stream or outputFile",
 		Args:  plugin.RequiresArguments(1),

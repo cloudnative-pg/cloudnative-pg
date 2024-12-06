@@ -34,6 +34,16 @@ import (
 )
 
 var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
+	var namespace string
+	const (
+		level = tests.Medium
+	)
+	BeforeEach(func() {
+		if testLevelEnv.Depth < int(level) {
+			Skip("Test depth is lower than the amount requested for this test")
+		}
+	})
+
 	failoverTest := func(namespace, clusterName string, hasDelay bool) {
 		var pods []string
 		var currentPrimary, targetPrimary, pausedReplica, pid string
@@ -69,9 +79,15 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 
 			// Get the walreceiver pid
 			query := "SELECT pid FROM pg_stat_activity WHERE backend_type = 'walreceiver'"
-			out, _, err := env.EventuallyExecCommand(
-				env.Ctx, *pausedPod, specs.PostgresContainerName, &commandTimeout,
-				"psql", "-U", "postgres", "-tAc", query)
+			out, _, err := env.EventuallyExecQueryInInstancePod(
+				utils.PodLocator{
+					Namespace: pausedPod.Namespace,
+					PodName:   pausedPod.Name,
+				}, utils.PostgresDBName,
+				query,
+				RetryTimeout,
+				PollingTime,
+			)
 			Expect(err).ToNot(HaveOccurred())
 			pid = strings.Trim(out, "\n")
 
@@ -84,9 +100,15 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 			// We don't want to wait for the replication timeout.
 			query = fmt.Sprintf("SELECT pg_terminate_backend(pid) FROM pg_stat_replication "+
 				"WHERE application_name = '%v'", pausedReplica)
-			_, _, err = env.EventuallyExecCommand(
-				env.Ctx, *primaryPod, specs.PostgresContainerName, &commandTimeout,
-				"psql", "-U", "postgres", "-tAc", query)
+			_, _, err = env.EventuallyExecQueryInInstancePod(
+				utils.PodLocator{
+					Namespace: primaryPod.Namespace,
+					PodName:   primaryPod.Name,
+				}, utils.PostgresDBName,
+				query,
+				RetryTimeout,
+				PollingTime,
+			)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Expect the primary to have lost connection with the stopped standby
@@ -104,28 +126,46 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			// Gather the current WAL LSN
-			initialLSN, _, err := env.EventuallyExecCommand(
-				env.Ctx, *primaryPod, specs.PostgresContainerName, &commandTimeout,
-				"psql", "-U", "postgres", "-tAc", "SELECT pg_current_wal_lsn()")
+			initialLSN, _, err := env.EventuallyExecQueryInInstancePod(
+				utils.PodLocator{
+					Namespace: primaryPod.Namespace,
+					PodName:   primaryPod.Name,
+				}, utils.PostgresDBName,
+				"SELECT pg_current_wal_lsn()",
+				RetryTimeout,
+				PollingTime,
+			)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Execute a checkpoint
-			_, _, err = env.EventuallyExecCommand(
-				env.Ctx, *primaryPod, specs.PostgresContainerName, &commandTimeout,
-				"psql", "-U", "postgres", "-tAc", "CHECKPOINT")
+			_, _, err = env.EventuallyExecQueryInInstancePod(
+				utils.PodLocator{
+					Namespace: primaryPod.Namespace,
+					PodName:   primaryPod.Name,
+				}, utils.PostgresDBName,
+				"CHECKPOINT",
+				RetryTimeout,
+				PollingTime,
+			)
 			Expect(err).ToNot(HaveOccurred())
 
+			query := fmt.Sprintf("SELECT true FROM pg_stat_replication "+
+				"WHERE application_name = '%v' AND replay_lsn > '%v'",
+				targetPrimary, strings.Trim(initialLSN, "\n"))
 			// The replay_lsn of the targetPrimary should be ahead
 			// of the one before the checkpoint
 			Eventually(func() (string, error) {
 				primaryPod, err = env.GetPod(namespace, currentPrimary)
 				Expect(err).ToNot(HaveOccurred())
-				query := fmt.Sprintf("SELECT true FROM pg_stat_replication "+
-					"WHERE application_name = '%v' AND replay_lsn > '%v'",
-					targetPrimary, strings.Trim(initialLSN, "\n"))
-				out, _, err := env.EventuallyExecCommand(
-					env.Ctx, *primaryPod, specs.PostgresContainerName, &commandTimeout,
-					"psql", "-U", "postgres", "-tAc", query)
+				out, _, err := env.EventuallyExecQueryInInstancePod(
+					utils.PodLocator{
+						Namespace: primaryPod.Namespace,
+						PodName:   primaryPod.Name,
+					}, utils.PostgresDBName,
+					query,
+					RetryTimeout,
+					PollingTime,
+				)
 				return strings.TrimSpace(out), err
 			}, RetryTimeout).Should(BeEquivalentTo("t"))
 		})
@@ -190,15 +230,6 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 		})
 	}
 
-	const (
-		level = tests.Medium
-	)
-	BeforeEach(func() {
-		if testLevelEnv.Depth < int(level) {
-			Skip("Test depth is lower than the amount requested for this test")
-		}
-	})
-
 	// This tests only checks that after the failure of a primary the instance
 	// that has received/applied more WALs is promoted.
 	// To make sure that we know which instance is promoted, we pause the
@@ -211,18 +242,10 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 			sampleFile      = fixturesDir + "/failover/cluster-failover.yaml.template"
 			namespacePrefix = "failover-e2e"
 		)
-		var namespace string
 		var err error
 		// Create a cluster in a namespace we'll delete after the test
-		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-			return env.DeleteNamespace(namespace)
-		})
-
 		clusterName, err := env.GetResourceNameFromYAML(sampleFile)
 		Expect(err).ToNot(HaveOccurred())
 
@@ -236,16 +259,9 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 			sampleFile      = fixturesDir + "/failover/cluster-failover-delay.yaml.template"
 			namespacePrefix = "failover-e2e-delay"
 		)
-		var namespace string
 		var err error
-		namespace, err = env.CreateUniqueNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() error {
-			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
-			}
-			return env.DeleteNamespace(namespace)
-		})
 
 		clusterName, err := env.GetResourceNameFromYAML(sampleFile)
 		Expect(err).ToNot(HaveOccurred())

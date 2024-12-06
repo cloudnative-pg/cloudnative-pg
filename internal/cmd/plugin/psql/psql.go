@@ -24,6 +24,7 @@ import (
 	"syscall"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/utils/strings/slices"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
@@ -58,6 +59,9 @@ type CommandOptions struct {
 	// The Namespace where we're working in
 	Namespace string
 
+	// The Context to execute the command
+	Context string
+
 	// Whether we should we allocate a TTY for psql
 	AllocateTTY bool
 
@@ -83,6 +87,11 @@ func NewCommand(
 		return nil, err
 	}
 
+	// Check if the pod list is empty
+	if len(pods.Items) == 0 {
+		return nil, fmt.Errorf("cluster does not exist or is not accessible")
+	}
+
 	kubectlPath, err := exec.LookPath(kubectlCommand)
 	if err != nil {
 		return nil, fmt.Errorf("while getting kubectl path: %w", err)
@@ -97,8 +106,12 @@ func NewCommand(
 
 // getKubectlInvocation gets the kubectl command to be executed
 func (psql *Command) getKubectlInvocation() ([]string, error) {
-	result := make([]string, 0, 11+len(psql.Args))
+	result := make([]string, 0, 13+len(psql.Args))
 	result = append(result, "kubectl", "exec")
+
+	if psql.Context != "" {
+		result = append(result, "--context", psql.Context)
+	}
 
 	if psql.AllocateTTY {
 		result = append(result, "-t")
@@ -114,6 +127,11 @@ func (psql *Command) getKubectlInvocation() ([]string, error) {
 	podName, err := psql.getPodName()
 	if err != nil {
 		return nil, err
+	}
+
+	// Default to `postgres` if no-user has been specified
+	if !slices.Contains(psql.Args, "-U") {
+		psql.Args = append([]string{"-U", "postgres"}, psql.Args...)
 	}
 
 	result = append(result, podName)

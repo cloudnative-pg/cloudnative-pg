@@ -19,6 +19,8 @@ limitations under the License.
 package pgbouncer
 
 import (
+	"path"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,13 +39,15 @@ import (
 
 const (
 	// DefaultPgbouncerImage is the name of the pgbouncer image used by default
-	DefaultPgbouncerImage = "ghcr.io/cloudnative-pg/pgbouncer:1.22.1"
+	DefaultPgbouncerImage = "ghcr.io/cloudnative-pg/pgbouncer:1.23.0"
 )
 
 // Deployment create the deployment of pgbouncer, given
 // the configurations we have in the pooler specifications
 func Deployment(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*appsv1.Deployment, error) {
-	poolerHash, err := hash.ComputeVersionedHash(pooler.Spec, 3)
+	operatorImageName := config.Current.OperatorImageName
+
+	poolerHash, err := computeTemplateHash(pooler, operatorImageName)
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +87,7 @@ func Deployment(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*appsv1.Deploymen
 			Name:          "metrics",
 			ContainerPort: url.PgBouncerMetricsPort,
 		}).
-		WithInitContainerImage(specs.BootstrapControllerContainerName, config.Current.OperatorImageName, true).
+		WithInitContainerImage(specs.BootstrapControllerContainerName, operatorImageName, true).
 		WithInitContainerCommand(specs.BootstrapControllerContainerName,
 			[]string{"/manager", "bootstrap", "/controller/manager"},
 			true).
@@ -106,6 +110,13 @@ func Deployment(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*appsv1.Deploymen
 		}, true).
 		WithContainerEnv("pgbouncer", corev1.EnvVar{Name: "NAMESPACE", Value: pooler.Namespace}, true).
 		WithContainerEnv("pgbouncer", corev1.EnvVar{Name: "POOLER_NAME", Value: pooler.Name}, true).
+		WithContainerEnv("pgbouncer", corev1.EnvVar{Name: "PGUSER", Value: "pgbouncer"}, false).
+		WithContainerEnv("pgbouncer", corev1.EnvVar{Name: "PGDATABASE", Value: "pgbouncer"}, false).
+		WithContainerEnv("pgbouncer", corev1.EnvVar{Name: "PGHOST", Value: "/controller/run"}, false).
+		WithContainerEnv("pgbouncer", corev1.EnvVar{
+			Name:  "PSQL_HISTORY",
+			Value: path.Join(postgres.TemporaryDirectory, ".psql_history"),
+		}, false).
 		WithContainerSecurityContext("pgbouncer", specs.CreateContainerSecurityContext(cluster.GetSeccompProfile()), true).
 		WithServiceAccountName(pooler.Name, true).
 		WithReadinessProbe("pgbouncer", &corev1.Probe{
@@ -148,6 +159,20 @@ func Deployment(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*appsv1.Deploymen
 			Strategy: getDeploymentStrategy(pooler.Spec.DeploymentStrategy),
 		},
 	}, nil
+}
+
+func computeTemplateHash(pooler *apiv1.Pooler, operatorImageName string) (string, error) {
+	type deploymentHash struct {
+		poolerSpec                      apiv1.PoolerSpec
+		operatorImageName               string
+		isPodSpecReconciliationDisabled bool
+	}
+
+	return hash.ComputeHash(deploymentHash{
+		poolerSpec:                      pooler.Spec,
+		operatorImageName:               operatorImageName,
+		isPodSpecReconciliationDisabled: utils.IsPodSpecReconciliationDisabled(&pooler.ObjectMeta),
+	})
 }
 
 func getDeploymentStrategy(strategy *appsv1.DeploymentStrategy) appsv1.DeploymentStrategy {

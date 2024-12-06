@@ -1,0 +1,23 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: pg-backup-scaleway
+spec:
+  instances: 3
+  storage:
+    storageClass: standard
+    size: 1Gi
+  backup:
+    barmanObjectStore:
+      destinationPath: "s3://<bucket>/backups/"     # change <bucket> with your bucket's name.
+      endpointURL: "https://s3.<region>.scw.cloud"  # change <region> with your bucket's location/region.
+      s3Credentials:
+        accessKeyId:
+          name: scaleway
+          key: ACCESS_KEY_ID
+        secretAccessKey:
+          name: scaleway
+          key: ACCESS_SECRET_KEY
+        region:
+          name: scaleway
+          key: ACCESS_REGION

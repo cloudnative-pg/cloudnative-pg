@@ -17,13 +17,15 @@ limitations under the License.
 package logs
 
 import (
+	"bufio"
 	"context"
+	"fmt"
 	"io"
 	"log"
 	"sync"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -44,7 +46,7 @@ const DefaultFollowWaiting time.Duration = 1 * time.Second
 // streaming
 type ClusterStreamingRequest struct {
 	Cluster       *apiv1.Cluster
-	Options       *v1.PodLogOptions
+	Options       *corev1.PodLogOptions
 	Previous      bool `json:"previous,omitempty"`
 	FollowWaiting time.Duration
 	// NOTE: the Client argument may be omitted, but it is good practice to pass it
@@ -60,12 +62,17 @@ func (csr *ClusterStreamingRequest) getClusterNamespace() string {
 	return csr.Cluster.Namespace
 }
 
-func (csr *ClusterStreamingRequest) getLogOptions() *v1.PodLogOptions {
+func (csr *ClusterStreamingRequest) getLogOptions(containerName string) *corev1.PodLogOptions {
 	if csr.Options == nil {
-		csr.Options = &v1.PodLogOptions{}
+		return &corev1.PodLogOptions{
+			Container: containerName,
+			Previous:  csr.Previous,
+		}
 	}
-	csr.Options.Previous = csr.Previous
-	return csr.Options
+	options := csr.Options.DeepCopy()
+	options.Container = containerName
+	options.Previous = csr.Previous
+	return options
 }
 
 func (csr *ClusterStreamingRequest) getKubernetesClient() kubernetes.Interface {
@@ -131,6 +138,8 @@ func (as *activeSet) add(name string) {
 
 // has returns true if and only if name is active
 func (as *activeSet) has(name string) bool {
+	as.m.Lock()
+	defer as.m.Unlock()
 	_, found := as.set[name]
 	return found
 }
@@ -145,6 +154,8 @@ func (as *activeSet) drop(name string) {
 
 // isZero checks if there are any active processes
 func (as *activeSet) isZero() bool {
+	as.m.Lock()
+	defer as.m.Unlock()
 	return len(as.set) == 0
 }
 
@@ -165,7 +176,7 @@ func (csr *ClusterStreamingRequest) SingleStream(ctx context.Context, writer io.
 
 	for {
 		var (
-			podList *v1.PodList
+			podList *corev1.PodList
 			err     error
 		)
 		if isFirstScan || csr.Options.Follow {
@@ -185,14 +196,26 @@ func (csr *ClusterStreamingRequest) SingleStream(ctx context.Context, writer io.
 			return nil
 		}
 
+		wrappedWriter := safeWriterFrom(writer)
 		for _, pod := range podList.Items {
-			if streamSet.has(pod.Name) {
-				continue
-			}
+			for _, container := range pod.Status.ContainerStatuses {
+				if container.State.Running != nil {
+					streamName := fmt.Sprintf("%s-%s", pod.Name, container.Name)
+					if streamSet.has(streamName) {
+						continue
+					}
 
-			streamSet.add(pod.Name)
-			go csr.streamInGoroutine(ctx, pod.Name, client, streamSet,
-				safeWriterFrom(writer))
+					streamSet.add(streamName)
+					go csr.streamInGoroutine(
+						ctx,
+						pod.Name,
+						container.Name,
+						client,
+						streamSet,
+						wrappedWriter,
+					)
+				}
+			}
 		}
 		if streamSet.isZero() {
 			return nil
@@ -210,18 +233,19 @@ func (csr *ClusterStreamingRequest) SingleStream(ctx context.Context, writer io.
 func (csr *ClusterStreamingRequest) streamInGoroutine(
 	ctx context.Context,
 	podName string,
+	containerName string,
 	client kubernetes.Interface,
 	streamSet *activeSet,
 	output io.Writer,
 ) {
 	defer func() {
-		streamSet.drop(podName)
+		streamSet.drop(fmt.Sprintf("%s-%s", podName, containerName))
 	}()
 
 	pods := client.CoreV1().Pods(csr.getClusterNamespace())
 	logsRequest := pods.GetLogs(
 		podName,
-		csr.getLogOptions())
+		csr.getLogOptions(containerName))
 
 	logStream, err := logsRequest.Stream(ctx)
 	if err != nil {
@@ -237,9 +261,26 @@ func (csr *ClusterStreamingRequest) streamInGoroutine(
 		}
 	}()
 
-	_, err = io.Copy(output, logStream)
-	if err != nil {
-		log.Printf("error sending logs to writer, pod %s: %v", podName, err)
-		return
+	scanner := bufio.NewScanner(logStream)
+	scanner.Buffer(make([]byte, 0, 4096), 1024*1024)
+	bufferedOutput := bufio.NewWriter(output)
+
+readLoop:
+	for scanner.Scan() {
+		select {
+		case <-ctx.Done():
+			break readLoop
+		default:
+			data := scanner.Text()
+			if _, err := bufferedOutput.Write([]byte(data)); err != nil {
+				log.Printf("error writing log line to output: %v", err)
+			}
+			if err := bufferedOutput.WriteByte('\n'); err != nil {
+				log.Printf("error writing newline to output: %v", err)
+			}
+			if err := bufferedOutput.Flush(); err != nil {
+				log.Printf("error flushing output: %v", err)
+			}
+		}
 	}
 }

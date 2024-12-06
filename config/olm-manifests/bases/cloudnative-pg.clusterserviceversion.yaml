@@ -107,8 +107,10 @@ spec:
   maintainers:
     - email: jonathan.gonzalez@enterprisedb.com
       name: Jonathan Gonzalez V.
-    - email: john.long@enterprisedb.com
-      name: John Long
+    - email: jonathan.battiato@enterprisedb.com
+      name: Jonathan Battiato
+    - email: niccolo.fei@enterprisedb.com
+      name: Niccolo Fei
     - email: gabriele.bartolini@enterprisedb.com
       name: Gabriele Bartolini
   maturity: stable
@@ -141,7 +143,7 @@ spec:
           - 'urn:alm:descriptor:io.kubernetes:Clusters'
       statusDescriptors:
       - displayName: Phase
-        description: Current backupphase
+        description: Current backup phase
         path: phase
         x-descriptors:
         - 'urn:alm:descriptor:io.kubernetes.phase'
@@ -172,6 +174,18 @@ spec:
         x-descriptors:
           - 'urn:alm:descriptor:com.tectonic.ui:text'
           - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      # Image section
+      - path: imagePullSecrets
+        displayName: Image Pull Secret
+        description: List of secrets to use for pulling the images
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: imagePullSecrets[0].name
+        displayName: Image Pull Secret
+        description: Secret for pulling the image. If empty, no secret will be used
+        x-descriptors:
+          - 'urn:alm:descriptor:io.kubernetes:Secret'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
       - path: imageName
         displayName: Image Name
         description: Name of the PostgreSQL container image
@@ -196,6 +210,13 @@ spec:
         x-descriptors:
           - 'urn:alm:descriptor:com.tectonic.ui:hidden'
           - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: imageCatalogRef
+        displayName: Image Catalog
+        description: The name of the image catalog to use
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:text'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      # Instances section
       - path: instances
         displayName: Instances
         description: Number of instances required in the cluster
@@ -213,6 +234,34 @@ spec:
         x-descriptors:
           - 'urn:alm:descriptor:com.tectonic.ui:number'
           - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: enablePDB
+        displayName: Enable Pod Disruption Budget
+        description: Boolean to enable or disable the Pod Disruption Budget
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:booleanSwitch'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: priorityClassName
+        displayName: Priority Class Name
+        description: The name of the Priority Class to use in every generated Pod
+        x-descriptors:
+          - 'urn:alm:descriptor:io.kubernetes:PriorityClass'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: env
+        displayName: Environment Variables
+        description: Environment variables to set in the pods created in the cluster
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: envFrom
+        displayName: Environment Variables from ConfigMap
+        description: ConfigMap to use as environment variables in the pods created in the cluster
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: seccompProfile
+        displayName: Seccomp Profile applied to every pod in the cluster
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:text'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      # PostgreSQL Configuration section
       - path: postgresql
         displayName: PostgreSQL Configuration
         description: Options for postgresql.conf
@@ -224,11 +273,8 @@ spec:
       - path: postgresql.pg_hba[0]
         displayName: pg_hba rules
         description: PostgreSQL Host Based Authentication rules
-      - path: postgresql.epas.audit
-        displayName: EPAS Configuration
-        description: Boolean to enable edb_audit logging
       - path: postgresql.promotionTimeout
-        displayName: pgctl Timeout
+        displayName: pg_ctl Timeout
         description: maximum number of seconds to wait when promoting an instance to primary
       - path: postgresql.shared_preload_libraries[0]
         displayName: Preload Libraries
@@ -257,6 +303,22 @@ spec:
         description: Boolean to enable TLS
         x-descriptors:
           - 'urn:alm:descriptor:com.tectonic.ui:booleanSwitch'
+      - path: tablespaces
+        displayName: Tablespaces
+        description: Configuration of the tablespaces
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: managed
+        displayName: Managed service
+        description: Resources managed by the operator
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: replicationSlots
+        displayName: Replication Slots Configuration
+        description: Configuration of the replication slots
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      # Bootstrap section
       - path: bootstrap
         displayName: Bootstrap Configuration
         description: Instructions to bootstrap the cluster
@@ -267,12 +329,14 @@ spec:
         description: The name of the Bootstrap secret
         x-descriptors:
           - 'urn:alm:descriptor:io.kubernetes:Secret'
+      # Replica cluster section
       - path: replica
         displayName: Replica
         description: Replica cluster configuration
         x-descriptors:
           - 'urn:alm:descriptor:io.kubernetes:Secret'
           - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      # Superuser section
       - path: superuserSecret
         displayName: Superuser Secret
         description: |
@@ -282,7 +346,7 @@ spec:
           - 'urn:alm:descriptor:com.tectonic.ui:advanced'
       - path: superuserSecret.name
         displayName: Superuser Secret
-        description: Name of hte Superuser Secret
+        description: Name of the Superuser Secret
         x-descriptors:
           - 'urn:alm:descriptor:io.kubernetes:Secret'
       - path: enableSuperuserAccess
@@ -291,16 +355,13 @@ spec:
         x-descriptors:
           - 'urn:alm:descriptor:com.tectonic.ui:booleanSwitch'
           - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      # Certificates section
       - path: certificates
         displayName: Certificates
         description: The configuration for the CA and related certificates
         x-descriptors:
           - 'urn:alm:descriptor:com.tectonic.ui:advanced'
-      - path: imagePullSecrets[0].name
-        displayName: Image Pull Secret
-        description: Secret for pulling the image. If empty, no secret will be used
-        x-descriptors:
-          - 'urn:alm:descriptor:io.kubernetes:Secret'
+      # Storage section
       - path: storage
         displayName: Storage
         description: Configuration of the storage of the instances
@@ -334,6 +395,7 @@ spec:
         path: storage.pvcTemplate
         x-descriptors:
           - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      # Delay and timeout section
       - path: startDelay
         displayName: Maximum Start Delay
         description: The time in seconds that is allowed for a PostgreSQL instance
@@ -348,6 +410,33 @@ spec:
         x-descriptors:
           - 'urn:alm:descriptor:com.tectonic.ui:number'
           - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: smartShutdownTimeout
+        displayName: Smart Shutdown Timeout
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:number'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: switchoverDelay
+        displayName: Switchover Delay
+        description: The time in seconds that is allowed for a PostgreSQL instance
+          to gracefully shutdown during a switchover
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:number'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: failoverDelay
+        displayName: Failover Delay
+        description: The amount of time (in seconds) to wait before triggering a failover 
+          after the primary PostgreSQL instance in the cluster was detected to be unhealthy
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:number'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: livenessProbeTimeout
+        displayName: Liveness Probe Timeout
+        description: The time in seconds that is allowed for the liveness probe to
+          complete
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:number'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      # Affinity section
       - path: affinity
         displayName: Pod Affinity
         description: Affinity/Anti-affinity rules for Pods
@@ -363,11 +452,13 @@ spec:
         description: Key value pair of which nodes the pods can run
         x-descriptors:
           - 'urn:alm:descriptor:com.tectonic.ui:selector:core:v1:Node'
+      # Resources section
       - path: resources
-        display: Resources
-        description:
+        displayName: PostgreSQL Resources requirement
+        description: Resources requirement for the PostgreSQL instances
         x-descriptors:
           - 'urn:alm:descriptor:com.tectonic.ui:resourceRequirements'
+      # Update strategy section
       - path: primaryUpdateStrategy
         displayName: Primary Update Strategy
         x-descriptors:
@@ -376,6 +467,10 @@ spec:
         displayName: Primary Update Method
         x-descriptors:
           - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      # Backup section
+      - path: backup
+        displayName: Backup Configuration
+        description: Configuration to be used for backups
       - path: backup.barmanObjectStore.endpointURL
         displayName: Object Storage Endpoint
         description: S3-compatible object storage Endpoint. If empty the S3 default is used
@@ -408,7 +503,7 @@ spec:
           - 'urn:alm:descriptor:io.kubernetes:text'
       - path: backup.barmanObjectStore.wal.encryption
         displayName: WAL encryption
-        description: WAL encryprion algorithm
+        description: WAL encryption algorithm
         x-descriptors:
           - 'urn:alm:descriptor:io.kubernetes:text'
       - path: backup.barmanObjectStore.data.compression
@@ -418,7 +513,7 @@ spec:
           - 'urn:alm:descriptor:io.kubernetes:text'
       - path: backup.barmanObjectStore.data.encryption
         displayName: Data encryption
-        description: Data encryprion algorithm
+        description: Data encryption algorithm
         x-descriptors:
           - 'urn:alm:descriptor:io.kubernetes:text'
       - path: backup.barmanObjectStore.data.immediateCheckpoint
@@ -429,6 +524,10 @@ spec:
         displayName: Jobs
         x-descriptors:
           - 'urn:alm:descriptor:com.tectonic.ui:number'
+      # Maintenance Window section
+      - path: nodeMaintenanceWindow
+        displayName: Node Maintenance Window
+        description: The configuration of the maintenance window for Kubernetes nodes
       - path: nodeMaintenanceWindow.inProgress
         displayName: In Progress
         description: Maintenance window for Kubernetes node upgrades is in progress
@@ -440,6 +539,7 @@ spec:
         description: Should the existing PVCs be reused during Kubernetes upgrades?
         x-descriptors:
           - 'urn:alm:descriptor:com.tectonic.ui:booleanSwitch'
+      # Monitoring section
       - path: monitoring
         displayName: Monitoring
         description: The configuration of the monitoring infrastructure of this cluster
@@ -465,15 +565,23 @@ spec:
         displayName: Enable PodMonitor resource
         x-descriptors:
           - 'urn:alm:descriptor:com.tectonic.ui:booleanSwitch'
+      # External Clusters section
       - path: externalClusters
         displayName: External Clusters
         description: List of external clusters which are used in the configuration
         x-descriptors:
           - 'urn:alm:descriptor:io.kubernetes:text'
           - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      # Log Level section
       - path: logLevel
         displayName: Log Level
         description: One of error, info (default), debug or trace
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      # Plugins section
+      - path: plugins
+        displayName: Plugins
+        description: List of plugins to be installed
         x-descriptors:
           - 'urn:alm:descriptor:com.tectonic.ui:advanced'
       statusDescriptors:
@@ -549,7 +657,7 @@ spec:
         x-descriptors:
           - 'urn:alm:descriptor:com.tectonic.ui:text'
       - path: type
-        description: Service type of the cluster to connect to ('rw' or 'rw')
+        description: Service type of the cluster to connect to ('rw' or 'ro')
         x-descriptors:
           - 'urn:alm:descriptor:io.kubernetes:text'
       - path: instances
@@ -568,7 +676,7 @@ spec:
           - 'urn:alm:descriptor:com.tectonic.ui:advanced'
       - path: pgbouncer.poolMode
         displayName: PgBouncer PoolMode
-        description: The poolmode to use. One of 'session' or 'transaction'.
+        description: The pool mode to use. One of 'session' or 'transaction'.
         x-descriptors:
           - 'urn:alm:descriptor:io.kubernetes:text'
       - path: pgbouncer.authQuerySecret
@@ -642,7 +750,6 @@ spec:
       - displayName: Last backup
         description: When the last backup was scheduled
         path: lastScheduleTime
-
     - kind: ImageCatalog
       name: imagecatalogs.postgresql.cnpg.io
       displayName: Image Catalog
@@ -675,3 +782,171 @@ spec:
       - path: images.image
         x-descriptors:
           - 'urn:alm:descriptor:com.tectonic.ui:text'
+    - kind: Database
+      name: databases.postgresql.cnpg.io
+      displayName: Postgres Database
+      description: Declarative creation and management of a database on a Cluster
+      version: v1
+      resources:
+      - kind: Cluster
+        name: ''
+        version: v1
+      specDescriptors:
+      - path: cluster
+        displayName: Cluster requested to create the database
+        description: Cluster in which to create the database
+      - path: name
+        displayName: Database name
+        description: Database name
+      - path: owner
+        displayName: Database Owner
+        description: Owner of the database that will be created in Postgres
+      - path: ensure
+        displayName: Ensure
+        description: Ensure the PostgreSQL database is `present` or `absent`
+      - path: databaseReclaimPolicy
+        displayName: Database reclaim policy
+        description: Specifies the action to take for the database inside PostgreSQL when the associated object in Kubernetes is deleted. Options are to either delete the database or retain it for future management.
+      # Configuration section
+      - path: template
+        displayName: Template
+        description: The name of the template from which to create this database.
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:text'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: tablespace
+        displayName: Tablespace
+        description: The name of the tablespace that will be associated with the database.
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:text'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: isTemplate
+        displayName: Database is a template
+        description: If true, this database is considered a template
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:booleanSwitch'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: allowConnections
+        displayName: Allow Connections
+        description: If false, then no one can connect to this database
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:booleanSwitch'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: connectionLimit
+        displayName: Connection Limit
+        description: How many concurrent connections can be made to this database
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:number'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      # Encoding and Locale
+      - path: encoding
+        displayName: Encoding
+        description: Character set encoding to use in the database
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:text'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: locale
+        displayName: Locale
+        description: Sets the default collation order and character classification for the database.
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:text'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: localeCollate
+        displayName: LC collate
+        description: The collation to use for the database
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:text'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: localeCType
+        displayName: LC ctype
+        description: The ctype to use for the database
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:text'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: localeProvider
+        displayName: Locale Provider
+        description: Specifies the provider to use for the default collation in this database (Available from PostgreSQL 16).
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:text'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: collationVersion
+        displayName: Collation version
+        description: The version identifier of the collation
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:text'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: builtinLocale
+        displayName: Builtin locale
+        description: The choice of which builtin locale to use
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:text'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      # ICU section
+      - path: icuLocale
+        displayName: ICU locale
+        description: ICU locale to use for the database
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:text'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: icuRules
+        displayName: ICU rules
+        description: Additional customization of ICU locale
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:text'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+    - kind: Publication
+      name: publications.postgresql.cnpg.io
+      displayName: Postgres Publication
+      description: Declarative creation and management of a Logical Replication Publication in a PostgreSQL Cluster
+      version: v1
+      resources:
+        - kind: Cluster
+          name: ''
+          version: v1
+      specDescriptors:
+        - path: name
+          displayName: Publication name
+          description: Name of the publication for PostgreSQL logical replication
+        - path: dbname
+          displayName: Database name
+          description: Database on which the publication will be created
+        - path: cluster
+          displayName: Cluster requested to create the publication
+          description: Cluster on which the publication will be created
+        - path: target
+          displayName: Publication target
+          description: Specifies which tables/schemas in the database should be published
+        - path: publicationReclaimPolicy
+          displayName: Publication reclaim policy
+          description: Specifies the action to take for the publication inside PostgreSQL when the associated object in Kubernetes is deleted. Options are to either delete the database or retain it for future management.
+    - kind: Subscription
+      name: subscriptions.postgresql.cnpg.io
+      displayName: Postgres Subscription
+      description: Declarative creation and management of a Logical Replication Subscription in a PostgreSQL Cluster to a previously defined Publication
+      version: v1
+      resources:
+        - kind: Cluster
+          name: ''
+          version: v1
+      specDescriptors:
+        - path: name
+          displayName: Subscription name
+          description: Name of the subscription for PostgreSQL logical replication
+        - path: dbname
+          displayName: Database name
+          description: Database on which the Subscription will be created
+        - path: publicationName
+          displayName: Publication name
+          description: Name of the Publication to subscribe to
+        - path: cluster
+          displayName: Cluster requested to create the subscription
+          description: Cluster on which the subscription will be created (subscriber)
+        - path: externalClusterName
+          displayName: Name of the external cluster with publication
+          description: Name of the cluster where the Publication is defined (publisher)
+        - path: publicationDBName
+          displayName: Name of the database containing the publication on the external cluster
+          description: The name of the database containing the publication on the external cluster. Defaults to the one in the external cluster definition.
+        - path: subscriptionReclaimPolicy
+          displayName: Subscription reclaim policy
+          description: Specifies the action to take for the subscription inside PostgreSQL when the associated object in Kubernetes is deleted. Options are to either delete the database or retain it for future management.

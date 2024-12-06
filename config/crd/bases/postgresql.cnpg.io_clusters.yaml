@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.15.0
+    controller-gen.kubebuilder.io/version: v0.16.5
   name: clusters.postgresql.cnpg.io
 spec:
   group: postgresql.cnpg.io
@@ -146,7 +146,7 @@ spec:
                                     pod labels will be ignored. The default value is empty.
                                     The same key is forbidden to exist in both matchLabelKeys and labelSelector.
                                     Also, matchLabelKeys cannot be set when labelSelector isn't set.
-                                    This is an alpha field and requires enabling MatchLabelKeysInPodAffinity feature gate.
+                                    This is a beta field and requires enabling MatchLabelKeysInPodAffinity feature gate (enabled by default).
                                   items:
                                     type: string
                                   type: array
@@ -161,7 +161,7 @@ spec:
                                     pod labels will be ignored. The default value is empty.
                                     The same key is forbidden to exist in both mismatchLabelKeys and labelSelector.
                                     Also, mismatchLabelKeys cannot be set when labelSelector isn't set.
-                                    This is an alpha field and requires enabling MatchLabelKeysInPodAffinity feature gate.
+                                    This is a beta field and requires enabling MatchLabelKeysInPodAffinity feature gate (enabled by default).
                                   items:
                                     type: string
                                   type: array
@@ -327,7 +327,7 @@ spec:
                                 pod labels will be ignored. The default value is empty.
                                 The same key is forbidden to exist in both matchLabelKeys and labelSelector.
                                 Also, matchLabelKeys cannot be set when labelSelector isn't set.
-                                This is an alpha field and requires enabling MatchLabelKeysInPodAffinity feature gate.
+                                This is a beta field and requires enabling MatchLabelKeysInPodAffinity feature gate (enabled by default).
                               items:
                                 type: string
                               type: array
@@ -342,7 +342,7 @@ spec:
                                 pod labels will be ignored. The default value is empty.
                                 The same key is forbidden to exist in both mismatchLabelKeys and labelSelector.
                                 Also, mismatchLabelKeys cannot be set when labelSelector isn't set.
-                                This is an alpha field and requires enabling MatchLabelKeysInPodAffinity feature gate.
+                                This is a beta field and requires enabling MatchLabelKeysInPodAffinity feature gate (enabled by default).
                               items:
                                 type: string
                               type: array
@@ -505,7 +505,7 @@ spec:
                                     pod labels will be ignored. The default value is empty.
                                     The same key is forbidden to exist in both matchLabelKeys and labelSelector.
                                     Also, matchLabelKeys cannot be set when labelSelector isn't set.
-                                    This is an alpha field and requires enabling MatchLabelKeysInPodAffinity feature gate.
+                                    This is a beta field and requires enabling MatchLabelKeysInPodAffinity feature gate (enabled by default).
                                   items:
                                     type: string
                                   type: array
@@ -520,7 +520,7 @@ spec:
                                     pod labels will be ignored. The default value is empty.
                                     The same key is forbidden to exist in both mismatchLabelKeys and labelSelector.
                                     Also, mismatchLabelKeys cannot be set when labelSelector isn't set.
-                                    This is an alpha field and requires enabling MatchLabelKeysInPodAffinity feature gate.
+                                    This is a beta field and requires enabling MatchLabelKeysInPodAffinity feature gate (enabled by default).
                                   items:
                                     type: string
                                   type: array
@@ -686,7 +686,7 @@ spec:
                                 pod labels will be ignored. The default value is empty.
                                 The same key is forbidden to exist in both matchLabelKeys and labelSelector.
                                 Also, matchLabelKeys cannot be set when labelSelector isn't set.
-                                This is an alpha field and requires enabling MatchLabelKeysInPodAffinity feature gate.
+                                This is a beta field and requires enabling MatchLabelKeysInPodAffinity feature gate (enabled by default).
                               items:
                                 type: string
                               type: array
@@ -701,7 +701,7 @@ spec:
                                 pod labels will be ignored. The default value is empty.
                                 The same key is forbidden to exist in both mismatchLabelKeys and labelSelector.
                                 Also, mismatchLabelKeys cannot be set when labelSelector isn't set.
-                                This is an alpha field and requires enabling MatchLabelKeysInPodAffinity feature gate.
+                                This is a beta field and requires enabling MatchLabelKeysInPodAffinity feature gate (enabled by default).
                               items:
                                 type: string
                               type: array
@@ -1136,12 +1136,10 @@ spec:
                               provide flexibility to customize the backup process further according to
                               specific requirements or configurations.
 
-
                               Example:
                               In a scenario where specialized backup options are required, such as setting
                               a specific timeout or defining custom behavior, users can use this field
                               to specify additional command arguments.
-
 
                               Note:
                               It's essential to ensure that the provided arguments are valid and supported
@@ -1324,19 +1322,16 @@ spec:
                           When not defined, WAL files will be stored uncompressed and may be
                           unencrypted in the object store, according to the bucket default policy.
                         properties:
-                          additionalCommandArgs:
+                          archiveAdditionalCommandArgs:
                             description: |-
-                              AdditionalCommandArgs represents additional arguments that can be appended
-                              to the 'barman-cloud-wal-archive' command-line invocation. These arguments
-                              provide flexibility to customize the backup process further according to
-                              specific requirements or configurations.
-
+                              Additional arguments that can be appended to the 'barman-cloud-wal-archive'
+                              command-line invocation. These arguments provide flexibility to customize
+                              the WAL archive process further, according to specific requirements or configurations.
 
                               Example:
                               In a scenario where specialized backup options are required, such as setting
                               a specific timeout or defining custom behavior, users can use this field
                               to specify additional command arguments.
-
 
                               Note:
                               It's essential to ensure that the provided arguments are valid and supported
@@ -1374,6 +1369,24 @@ spec:
                               value - with 1 being the minimum accepted value.
                             minimum: 1
                             type: integer
+                          restoreAdditionalCommandArgs:
+                            description: |-
+                              Additional arguments that can be appended to the 'barman-cloud-wal-restore'
+                              command-line invocation. These arguments provide flexibility to customize
+                              the WAL restore process further, according to specific requirements or configurations.
+
+                              Example:
+                              In a scenario where specialized backup options are required, such as setting
+                              a specific timeout or defining custom behavior, users can use this field
+                              to specify additional command arguments.
+
+                              Note:
+                              It's essential to ensure that the provided arguments are valid and supported
+                              by the 'barman-cloud-wal-restore' command, to avoid potential errors or unintended
+                              behavior during execution.
+                            items:
+                              type: string
+                            type: array
                         type: object
                     required:
                     - destinationPath
@@ -1482,6 +1495,12 @@ spec:
                   initdb:
                     description: Bootstrap the cluster via initdb
                     properties:
+                      builtinLocale:
+                        description: |-
+                          Specifies the locale name when the builtin provider is used.
+                          This option requires `localeProvider` to be set to `builtin`.
+                          Available from PostgreSQL 17.
+                        type: string
                       dataChecksums:
                         description: |-
                           Whether the `-k` option should be passed to initdb,
@@ -1495,6 +1514,18 @@ spec:
                         description: The value to be passed as option `--encoding`
                           for initdb (default:`UTF8`)
                         type: string
+                      icuLocale:
+                        description: |-
+                          Specifies the ICU locale when the ICU provider is used.
+                          This option requires `localeProvider` to be set to `icu`.
+                          Available from PostgreSQL 15.
+                        type: string
+                      icuRules:
+                        description: |-
+                          Specifies additional collation rules to customize the behavior of the default collation.
+                          This option requires `localeProvider` to be set to `icu`.
+                          Available from PostgreSQL 16.
+                        type: string
                       import:
                         description: |-
                           Bootstraps the new cluster by importing data from an existing PostgreSQL
@@ -1502,6 +1533,24 @@ spec:
                         properties:
                           databases:
                             description: The databases to import
+                            items:
+                              type: string
+                            type: array
+                          pgDumpExtraOptions:
+                            description: |-
+                              List of custom options to pass to the `pg_dump` command. IMPORTANT:
+                              Use these options with caution and at your own risk, as the operator
+                              does not validate their content. Be aware that certain options may
+                              conflict with the operator's intended functionality or design.
+                            items:
+                              type: string
+                            type: array
+                          pgRestoreExtraOptions:
+                            description: |-
+                              List of custom options to pass to the `pg_restore` command. IMPORTANT:
+                              Use these options with caution and at your own risk, as the operator
+                              does not validate their content. Be aware that certain options may
+                              conflict with the operator's intended functionality or design.
                             items:
                               type: string
                             type: array
@@ -1545,6 +1594,10 @@ spec:
                         - source
                         - type
                         type: object
+                      locale:
+                        description: Sets the default collation order and character
+                          classification in the new database.
+                        type: string
                       localeCType:
                         description: The value to be passed as option `--lc-ctype`
                           for initdb (default:`C`)
@@ -1552,6 +1605,11 @@ spec:
                       localeCollate:
                         description: The value to be passed as option `--lc-collate`
                           for initdb (default:`C`)
+                        type: string
+                      localeProvider:
+                        description: |-
+                          This option sets the locale provider for databases created in the new cluster.
+                          Available from PostgreSQL 16.
                         type: string
                       options:
                         description: |-
@@ -1570,17 +1628,19 @@ spec:
                       postInitApplicationSQL:
                         description: |-
                           List of SQL queries to be executed as a superuser in the application
-                          database right after is created - to be used with extreme care
+                          database right after the cluster has been created - to be used with extreme care
                           (by default empty)
                         items:
                           type: string
                         type: array
                       postInitApplicationSQLRefs:
                         description: |-
-                          PostInitApplicationSQLRefs points references to ConfigMaps or Secrets which
-                          contain SQL files, the general implementation order to these references is
-                          from all Secrets to all ConfigMaps, and inside Secrets or ConfigMaps,
-                          the implementation order is same as the order of each array
+                          List of references to ConfigMaps or Secrets containing SQL files
+                          to be executed as a superuser in the application database right after
+                          the cluster has been created. The references are processed in a specific order:
+                          first, all Secrets are processed, followed by all ConfigMaps.
+                          Within each group, the processing order follows the sequence specified
+                          in their respective arrays.
                           (by default empty)
                         properties:
                           configMapRefs:
@@ -1624,20 +1684,118 @@ spec:
                         type: object
                       postInitSQL:
                         description: |-
-                          List of SQL queries to be executed as a superuser immediately
-                          after the cluster has been created - to be used with extreme care
+                          List of SQL queries to be executed as a superuser in the `postgres`
+                          database right after the cluster has been created - to be used with extreme care
                           (by default empty)
                         items:
                           type: string
                         type: array
+                      postInitSQLRefs:
+                        description: |-
+                          List of references to ConfigMaps or Secrets containing SQL files
+                          to be executed as a superuser in the `postgres` database right after
+                          the cluster has been created. The references are processed in a specific order:
+                          first, all Secrets are processed, followed by all ConfigMaps.
+                          Within each group, the processing order follows the sequence specified
+                          in their respective arrays.
+                          (by default empty)
+                        properties:
+                          configMapRefs:
+                            description: ConfigMapRefs holds a list of references
+                              to ConfigMaps
+                            items:
+                              description: |-
+                                ConfigMapKeySelector contains enough information to let you locate
+                                the key of a ConfigMap
+                              properties:
+                                key:
+                                  description: The key to select
+                                  type: string
+                                name:
+                                  description: Name of the referent.
+                                  type: string
+                              required:
+                              - key
+                              - name
+                              type: object
+                            type: array
+                          secretRefs:
+                            description: SecretRefs holds a list of references to
+                              Secrets
+                            items:
+                              description: |-
+                                SecretKeySelector contains enough information to let you locate
+                                the key of a Secret
+                              properties:
+                                key:
+                                  description: The key to select
+                                  type: string
+                                name:
+                                  description: Name of the referent.
+                                  type: string
+                              required:
+                              - key
+                              - name
+                              type: object
+                            type: array
+                        type: object
                       postInitTemplateSQL:
                         description: |-
                           List of SQL queries to be executed as a superuser in the `template1`
-                          after the cluster has been created - to be used with extreme care
+                          database right after the cluster has been created - to be used with extreme care
                           (by default empty)
                         items:
                           type: string
                         type: array
+                      postInitTemplateSQLRefs:
+                        description: |-
+                          List of references to ConfigMaps or Secrets containing SQL files
+                          to be executed as a superuser in the `template1` database right after
+                          the cluster has been created. The references are processed in a specific order:
+                          first, all Secrets are processed, followed by all ConfigMaps.
+                          Within each group, the processing order follows the sequence specified
+                          in their respective arrays.
+                          (by default empty)
+                        properties:
+                          configMapRefs:
+                            description: ConfigMapRefs holds a list of references
+                              to ConfigMaps
+                            items:
+                              description: |-
+                                ConfigMapKeySelector contains enough information to let you locate
+                                the key of a ConfigMap
+                              properties:
+                                key:
+                                  description: The key to select
+                                  type: string
+                                name:
+                                  description: Name of the referent.
+                                  type: string
+                              required:
+                              - key
+                              - name
+                              type: object
+                            type: array
+                          secretRefs:
+                            description: SecretRefs holds a list of references to
+                              Secrets
+                            items:
+                              description: |-
+                                SecretKeySelector contains enough information to let you locate
+                                the key of a Secret
+                              properties:
+                                key:
+                                  description: The key to select
+                                  type: string
+                                name:
+                                  description: Name of the referent.
+                                  type: string
+                              required:
+                              - key
+                              - name
+                              type: object
+                            type: array
+                        type: object
                       secret:
                         description: |-
                           Name of the secret containing the initial credentials for the
@@ -1658,6 +1816,16 @@ spec:
                         minimum: 1
                         type: integer
                     type: object
+                    x-kubernetes-validations:
+                    - message: builtinLocale is only available when localeProvider
+                        is set to `builtin`
+                      rule: '!has(self.builtinLocale) || self.localeProvider == ''builtin'''
+                    - message: icuLocale is only available when localeProvider is
+                        set to `icu`
+                      rule: '!has(self.icuLocale) || self.localeProvider == ''icu'''
+                    - message: icuRules is only available when localeProvider is set
+                        to `icu`
+                      rule: '!has(self.icuRules) || self.localeProvider == ''icu'''
                   pg_basebackup:
                     description: |-
                       Bootstrap the cluster taking a physical backup of another compatible
@@ -1994,9 +2162,7 @@ spec:
                                 This field is effectively required, but due to backwards compatibility is
                                 allowed to be empty. Instances of this type with an empty value here are
                                 almost certainly wrong.
-                                TODO: Add other useful fields. apiVersion, kind, uid?
                                 More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                TODO: Drop `kubebuilder:default` when controller-gen doesn't need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.
                               type: string
                             optional:
                               description: Specify whether the ConfigMap or its key
@@ -2061,9 +2227,7 @@ spec:
                                 This field is effectively required, but due to backwards compatibility is
                                 allowed to be empty. Instances of this type with an empty value here are
                                 almost certainly wrong.
-                                TODO: Add other useful fields. apiVersion, kind, uid?
                                 More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                TODO: Drop `kubebuilder:default` when controller-gen doesn't need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.
                               type: string
                             optional:
                               description: Specify whether the Secret or its key must
@@ -2095,9 +2259,7 @@ spec:
                             This field is effectively required, but due to backwards compatibility is
                             allowed to be empty. Instances of this type with an empty value here are
                             almost certainly wrong.
-                            TODO: Add other useful fields. apiVersion, kind, uid?
                             More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                            TODO: Drop `kubebuilder:default` when controller-gen doesn't need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.
                           type: string
                         optional:
                           description: Specify whether the ConfigMap must be defined
@@ -2118,9 +2280,7 @@ spec:
                             This field is effectively required, but due to backwards compatibility is
                             allowed to be empty. Instances of this type with an empty value here are
                             almost certainly wrong.
-                            TODO: Add other useful fields. apiVersion, kind, uid?
                             More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                            TODO: Drop `kubebuilder:default` when controller-gen doesn't need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.
                           type: string
                         optional:
                           description: Specify whether the Secret must be defined
@@ -2143,7 +2303,6 @@ spec:
                       entry. Pod validation will reject the pod if the concatenated name
                       is not valid for a PVC (for example, too long).
 
-
                       An existing PVC with that name that is not owned by the pod
                       will *not* be used for the pod to avoid using an unrelated
                       volume by mistake. Starting the pod is then blocked until
@@ -2153,10 +2312,8 @@ spec:
                       this should not be necessary, but it may be useful when
                       manually reconstructing a broken cluster.
 
-
                       This field is read-only and no changes will be made by Kubernetes
                       to the PVC after it has been created.
-
 
                       Required, must not be nil.
                     properties:
@@ -2355,7 +2512,7 @@ spec:
                               set to a Pending state, as reflected by the modifyVolumeStatus field, until such as a resource
                               exists.
                               More info: https://kubernetes.io/docs/concepts/storage/volume-attributes-classes/
-                              (Alpha) Using this field requires the VolumeAttributesClass feature gate to be enabled.
+                              (Beta) Using this field requires the VolumeAttributesClass feature gate to be enabled (off by default).
                             type: string
                           volumeMode:
                             description: |-
@@ -2481,12 +2638,10 @@ spec:
                                 provide flexibility to customize the backup process further according to
                                 specific requirements or configurations.
 
-
                                 Example:
                                 In a scenario where specialized backup options are required, such as setting
                                 a specific timeout or defining custom behavior, users can use this field
                                 to specify additional command arguments.
-
 
                                 Note:
                                 It's essential to ensure that the provided arguments are valid and supported
@@ -2669,19 +2824,16 @@ spec:
                             When not defined, WAL files will be stored uncompressed and may be
                             unencrypted in the object store, according to the bucket default policy.
                           properties:
-                            additionalCommandArgs:
+                            archiveAdditionalCommandArgs:
                               description: |-
-                                AdditionalCommandArgs represents additional arguments that can be appended
-                                to the 'barman-cloud-wal-archive' command-line invocation. These arguments
-                                provide flexibility to customize the backup process further according to
-                                specific requirements or configurations.
-
+                                Additional arguments that can be appended to the 'barman-cloud-wal-archive'
+                                command-line invocation. These arguments provide flexibility to customize
+                                the WAL archive process further, according to specific requirements or configurations.
 
                                 Example:
                                 In a scenario where specialized backup options are required, such as setting
                                 a specific timeout or defining custom behavior, users can use this field
                                 to specify additional command arguments.
-
 
                                 Note:
                                 It's essential to ensure that the provided arguments are valid and supported
@@ -2719,6 +2871,24 @@ spec:
                                 value - with 1 being the minimum accepted value.
                               minimum: 1
                               type: integer
+                            restoreAdditionalCommandArgs:
+                              description: |-
+                                Additional arguments that can be appended to the 'barman-cloud-wal-restore'
+                                command-line invocation. These arguments provide flexibility to customize
+                                the WAL restore process further, according to specific requirements or configurations.
+
+                                Example:
+                                In a scenario where specialized backup options are required, such as setting
+                                a specific timeout or defining custom behavior, users can use this field
+                                to specify additional command arguments.
+
+                                Note:
+                                It's essential to ensure that the provided arguments are valid and supported
+                                by the 'barman-cloud-wal-restore' command, to avoid potential errors or unintended
+                                behavior during execution.
+                              items:
+                                type: string
+                              type: array
                           type: object
                       required:
                       - destinationPath
@@ -2753,9 +2923,7 @@ spec:
                             This field is effectively required, but due to backwards compatibility is
                             allowed to be empty. Instances of this type with an empty value here are
                             almost certainly wrong.
-                            TODO: Add other useful fields. apiVersion, kind, uid?
                             More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                            TODO: Drop `kubebuilder:default` when controller-gen doesn't need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.
                           type: string
                         optional:
                           description: Specify whether the Secret or its key must
@@ -2765,6 +2933,26 @@ spec:
                       - key
                       type: object
                       x-kubernetes-map-type: atomic
+                    plugin:
+                      description: |-
+                        The configuration of the plugin that is taking care
+                        of WAL archiving and backups for this external cluster
+                      properties:
+                        enabled:
+                          default: true
+                          description: Enabled is true if this plugin will be used
+                          type: boolean
+                        name:
+                          description: Name is the plugin name
+                          type: string
+                        parameters:
+                          additionalProperties:
+                            type: string
+                          description: Parameters is the configuration of the plugin
+                          type: object
+                      required:
+                      - name
+                      type: object
                     sslCert:
                       description: |-
                         The reference to an SSL certificate to be used to connect to this
@@ -2781,9 +2969,7 @@ spec:
                             This field is effectively required, but due to backwards compatibility is
                             allowed to be empty. Instances of this type with an empty value here are
                             almost certainly wrong.
-                            TODO: Add other useful fields. apiVersion, kind, uid?
                             More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                            TODO: Drop `kubebuilder:default` when controller-gen doesn't need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.
                           type: string
                         optional:
                           description: Specify whether the Secret or its key must
@@ -2809,9 +2995,7 @@ spec:
                             This field is effectively required, but due to backwards compatibility is
                             allowed to be empty. Instances of this type with an empty value here are
                             almost certainly wrong.
-                            TODO: Add other useful fields. apiVersion, kind, uid?
                             More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                            TODO: Drop `kubebuilder:default` when controller-gen doesn't need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.
                           type: string
                         optional:
                           description: Specify whether the Secret or its key must
@@ -2837,9 +3021,7 @@ spec:
                             This field is effectively required, but due to backwards compatibility is
                             allowed to be empty. Instances of this type with an empty value here are
                             almost certainly wrong.
-                            TODO: Add other useful fields. apiVersion, kind, uid?
                             More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                            TODO: Drop `kubebuilder:default` when controller-gen doesn't need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.
                           type: string
                         optional:
                           description: Specify whether the Secret or its key must
@@ -2972,7 +3154,6 @@ spec:
                         with the additional field Ensure specifying whether to ensure the presence or
                         absence of the role in the database
 
-
                         The defaults of the CREATE ROLE command are applied
                         Reference: https://www.postgresql.org/docs/current/sql-createrole.html
                       properties:
@@ -3088,18 +3269,13 @@ spec:
                             It includes the type of service and its associated template specification.
                           properties:
                             selectorType:
-                              allOf:
-                              - enum:
-                                - rw
-                                - r
-                                - ro
-                              - enum:
-                                - rw
-                                - r
-                                - ro
                               description: |-
                                 SelectorType specifies the type of selectors that the service will have.
                                 Valid values are "rw", "r", and "ro", representing read-write, read, and read-only services.
+                              enum:
+                              - rw
+                              - r
+                              - ro
                               type: string
                             serviceTemplate:
                               description: ServiceTemplate is the template specification
@@ -3187,7 +3363,6 @@ spec:
                                         clients must ensure that clusterIPs[0] and clusterIP have the same
                                         value.
 
-
                                         This field may hold a maximum of two entries (dual-stack IPs, in either order).
                                         These IPs must correspond to the values of the ipFamilies field. Both
                                         clusterIPs and ipFamilies are governed by the ipFamilyPolicy field.
@@ -3267,7 +3442,6 @@ spec:
                                         NodePort, and LoadBalancer, and does apply to "headless" services.
                                         This field will be wiped when updating a Service to type ExternalName.
 
-
                                         This field may hold a maximum of two entries (dual-stack families, in
                                         either order).  These families must correspond to the values of the
                                         clusterIPs field, if specified. Both clusterIPs and ipFamilies are
@@ -3338,16 +3512,13 @@ spec:
                                               This field follows standard Kubernetes label syntax.
                                               Valid values are either:
 
-
                                               * Un-prefixed protocol names - reserved for IANA standard service names (as per
                                               RFC-6335 and https://www.iana.org/assignments/service-names).
-
 
                                               * Kubernetes-defined prefixed names:
                                                 * 'kubernetes.io/h2c' - HTTP/2 prior knowledge over cleartext as described in https://www.rfc-editor.org/rfc/rfc9113.html#name-starting-http-2-with-prior-
                                                 * 'kubernetes.io/ws'  - WebSocket over cleartext as described in https://www.rfc-editor.org/rfc/rfc6455
                                                 * 'kubernetes.io/wss' - WebSocket over TLS as described in https://www.rfc-editor.org/rfc/rfc6455
-
 
                                               * Other protocols should use implementation-defined prefixed names such as
                                               mycompany.com/my-custom-protocol.
@@ -3485,6 +3656,14 @@ spec:
                                       type: string
                                   type: object
                               type: object
+                            updateStrategy:
+                              default: patch
+                              description: UpdateStrategy describes how the service
+                                differences should be reconciled
+                              enum:
+                              - patch
+                              - replace
+                              type: string
                           required:
                           - selectorType
                           - serviceTemplate
@@ -3581,7 +3760,6 @@ spec:
                         RelabelConfig allows dynamic rewriting of the label set for targets, alerts,
                         scraped samples and remote write samples.
 
-
                         More info: https://prometheus.io/docs/prometheus/latest/configuration/configuration/#relabel_config
                       properties:
                         action:
@@ -3589,10 +3767,8 @@ spec:
                           description: |-
                             Action to perform based on the regex matching.
 
-
                             `Uppercase` and `Lowercase` actions require Prometheus >= v2.36.0.
                             `DropEqual` and `KeepEqual` actions require Prometheus >= v2.41.0.
-
 
                             Default: "Replace"
                           enum:
@@ -3623,7 +3799,6 @@ spec:
                           description: |-
                             Modulus to take of the hash of the source label values.
 
-
                             Only applicable when the action is `HashMod`.
                           format: int64
                           type: integer
@@ -3635,7 +3810,6 @@ spec:
                           description: |-
                             Replacement value against which a Replace action is performed if the
                             regular expression matches.
-
 
                             Regex capture groups are available.
                           type: string
@@ -3659,10 +3833,8 @@ spec:
                           description: |-
                             Label to which the resulting string is written in a replacement.
 
-
                             It is mandatory for `Replace`, `HashMod`, `Lowercase`, `Uppercase`,
                             `KeepEqual` and `DropEqual` actions.
-
 
                             Regex capture groups are available.
                           type: string
@@ -3676,7 +3848,6 @@ spec:
                         RelabelConfig allows dynamic rewriting of the label set for targets, alerts,
                         scraped samples and remote write samples.
 
-
                         More info: https://prometheus.io/docs/prometheus/latest/configuration/configuration/#relabel_config
                       properties:
                         action:
@@ -3684,10 +3855,8 @@ spec:
                           description: |-
                             Action to perform based on the regex matching.
 
-
                             `Uppercase` and `Lowercase` actions require Prometheus >= v2.36.0.
                             `DropEqual` and `KeepEqual` actions require Prometheus >= v2.41.0.
-
 
                             Default: "Replace"
                           enum:
@@ -3718,7 +3887,6 @@ spec:
                           description: |-
                             Modulus to take of the hash of the source label values.
 
-
                             Only applicable when the action is `HashMod`.
                           format: int64
                           type: integer
@@ -3730,7 +3898,6 @@ spec:
                           description: |-
                             Replacement value against which a Replace action is performed if the
                             regular expression matches.
-
 
                             Regex capture groups are available.
                           type: string
@@ -3754,15 +3921,25 @@ spec:
                           description: |-
                             Label to which the resulting string is written in a replacement.
 
-
                             It is mandatory for `Replace`, `HashMod`, `Lowercase`, `Uppercase`,
                             `KeepEqual` and `DropEqual` actions.
-
 
                             Regex capture groups are available.
                           type: string
                       type: object
                     type: array
+                  tls:
+                    description: |-
+                      Configure TLS communication for the metrics endpoint.
+                      Changing tls.enabled option will force a rollout of all instances.
+                    properties:
+                      enabled:
+                        default: false
+                        description: |-
+                          Enable TLS for the monitoring endpoint.
+                          Changing this option will force a rollout of all instances.
+                        type: boolean
+                    type: object
                 type: object
               nodeMaintenanceWindow:
                 description: Define a maintenance window for the Kubernetes nodes
@@ -3787,6 +3964,10 @@ spec:
                     PluginConfiguration specifies a plugin that need to be loaded for this
                     cluster to be reconciled
                   properties:
+                    enabled:
+                      default: true
+                      description: Enabled is true if this plugin will be used
+                      type: boolean
                     name:
                       description: Name is the plugin name
                       type: string
@@ -3858,9 +4039,7 @@ spec:
                                   This field is effectively required, but due to backwards compatibility is
                                   allowed to be empty. Instances of this type with an empty value here are
                                   almost certainly wrong.
-                                  TODO: Add other useful fields. apiVersion, kind, uid?
                                   More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                  TODO: Drop `kubebuilder:default` when controller-gen doesn't need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.
                                 type: string
                               optional:
                                 description: Specify whether the Secret or its key
@@ -3945,6 +4124,75 @@ spec:
                     required:
                     - enabled
                     type: object
+                  synchronous:
+                    description: Configuration of the PostgreSQL synchronous replication
+                      feature
+                    properties:
+                      dataDurability:
+                        default: required
+                        description: |-
+                          If set to "required", data durability is strictly enforced. Write operations
+                          with synchronous commit settings (`on`, `remote_write`, or `remote_apply`) will
+                          block if there are insufficient healthy replicas, ensuring data persistence.
+                          If set to "preferred", data durability is maintained when healthy replicas
+                          are available, but the required number of instances will adjust dynamically
+                          if replicas become unavailable. This setting relaxes strict durability enforcement
+                          to allow for operational continuity. This setting is only applicable if both
+                          `standbyNamesPre` and `standbyNamesPost` are unset (empty).
+                        enum:
+                        - required
+                        - preferred
+                        type: string
+                      maxStandbyNamesFromCluster:
+                        description: |-
+                          Specifies the maximum number of local cluster pods that can be
+                          automatically included in the `synchronous_standby_names` option in
+                          PostgreSQL.
+                        type: integer
+                      method:
+                        description: |-
+                          Method to select synchronous replication standbys from the listed
+                          servers, accepting 'any' (quorum-based synchronous replication) or
+                          'first' (priority-based synchronous replication) as values.
+                        enum:
+                        - any
+                        - first
+                        type: string
+                      number:
+                        description: |-
+                          Specifies the number of synchronous standby servers that
+                          transactions must wait for responses from.
+                        type: integer
+                        x-kubernetes-validations:
+                        - message: The number of synchronous replicas should be greater
+                            than zero
+                          rule: self > 0
+                      standbyNamesPost:
+                        description: |-
+                          A user-defined list of application names to be added to
+                          `synchronous_standby_names` after local cluster pods (the order is
+                          only useful for priority-based synchronous replication).
+                        items:
+                          type: string
+                        type: array
+                      standbyNamesPre:
+                        description: |-
+                          A user-defined list of application names to be added to
+                          `synchronous_standby_names` before local cluster pods (the order is
+                          only useful for priority-based synchronous replication).
+                        items:
+                          type: string
+                        type: array
+                    required:
+                    - method
+                    - number
+                    type: object
+                    x-kubernetes-validations:
+                    - message: dataDurability set to 'preferred' requires empty 'standbyNamesPre'
+                        and empty 'standbyNamesPost'
+                      rule: self.dataDurability!='preferred' || ((!has(self.standbyNamesPre)
+                        || self.standbyNamesPre.size()==0) && (!has(self.standbyNamesPost)
+                        || self.standbyNamesPost.size()==0))
                 type: object
               primaryUpdateMethod:
                 default: restart
@@ -3973,6 +4221,159 @@ spec:
                   https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/#priorityclass
                   for more information
                 type: string
+              probes:
+                description: |-
+                  The configuration of the probes to be injected
+                  in the PostgreSQL Pods.
+                properties:
+                  liveness:
+                    description: The liveness probe configuration
+                    properties:
+                      failureThreshold:
+                        description: |-
+                          Minimum consecutive failures for the probe to be considered failed after having succeeded.
+                          Defaults to 3. Minimum value is 1.
+                        format: int32
+                        type: integer
+                      initialDelaySeconds:
+                        description: |-
+                          Number of seconds after the container has started before liveness probes are initiated.
+                          More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
+                        format: int32
+                        type: integer
+                      periodSeconds:
+                        description: |-
+                          How often (in seconds) to perform the probe.
+                          Default to 10 seconds. Minimum value is 1.
+                        format: int32
+                        type: integer
+                      successThreshold:
+                        description: |-
+                          Minimum consecutive successes for the probe to be considered successful after having failed.
+                          Defaults to 1. Must be 1 for liveness and startup. Minimum value is 1.
+                        format: int32
+                        type: integer
+                      terminationGracePeriodSeconds:
+                        description: |-
+                          Optional duration in seconds the pod needs to terminate gracefully upon probe failure.
+                          The grace period is the duration in seconds after the processes running in the pod are sent
+                          a termination signal and the time when the processes are forcibly halted with a kill signal.
+                          Set this value longer than the expected cleanup time for your process.
+                          If this value is nil, the pod's terminationGracePeriodSeconds will be used. Otherwise, this
+                          value overrides the value provided by the pod spec.
+                          Value must be non-negative integer. The value zero indicates stop immediately via
+                          the kill signal (no opportunity to shut down).
+                          This is a beta field and requires enabling ProbeTerminationGracePeriod feature gate.
+                          Minimum value is 1. spec.terminationGracePeriodSeconds is used if unset.
+                        format: int64
+                        type: integer
+                      timeoutSeconds:
+                        description: |-
+                          Number of seconds after which the probe times out.
+                          Defaults to 1 second. Minimum value is 1.
+                          More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
+                        format: int32
+                        type: integer
+                    type: object
+                  readiness:
+                    description: The readiness probe configuration
+                    properties:
+                      failureThreshold:
+                        description: |-
+                          Minimum consecutive failures for the probe to be considered failed after having succeeded.
+                          Defaults to 3. Minimum value is 1.
+                        format: int32
+                        type: integer
+                      initialDelaySeconds:
+                        description: |-
+                          Number of seconds after the container has started before liveness probes are initiated.
+                          More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
+                        format: int32
+                        type: integer
+                      periodSeconds:
+                        description: |-
+                          How often (in seconds) to perform the probe.
+                          Default to 10 seconds. Minimum value is 1.
+                        format: int32
+                        type: integer
+                      successThreshold:
+                        description: |-
+                          Minimum consecutive successes for the probe to be considered successful after having failed.
+                          Defaults to 1. Must be 1 for liveness and startup. Minimum value is 1.
+                        format: int32
+                        type: integer
+                      terminationGracePeriodSeconds:
+                        description: |-
+                          Optional duration in seconds the pod needs to terminate gracefully upon probe failure.
+                          The grace period is the duration in seconds after the processes running in the pod are sent
+                          a termination signal and the time when the processes are forcibly halted with a kill signal.
+                          Set this value longer than the expected cleanup time for your process.
+                          If this value is nil, the pod's terminationGracePeriodSeconds will be used. Otherwise, this
+                          value overrides the value provided by the pod spec.
+                          Value must be non-negative integer. The value zero indicates stop immediately via
+                          the kill signal (no opportunity to shut down).
+                          This is a beta field and requires enabling ProbeTerminationGracePeriod feature gate.
+                          Minimum value is 1. spec.terminationGracePeriodSeconds is used if unset.
+                        format: int64
+                        type: integer
+                      timeoutSeconds:
+                        description: |-
+                          Number of seconds after which the probe times out.
+                          Defaults to 1 second. Minimum value is 1.
+                          More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
+                        format: int32
+                        type: integer
+                    type: object
+                  startup:
+                    description: The startup probe configuration
+                    properties:
+                      failureThreshold:
+                        description: |-
+                          Minimum consecutive failures for the probe to be considered failed after having succeeded.
+                          Defaults to 3. Minimum value is 1.
+                        format: int32
+                        type: integer
+                      initialDelaySeconds:
+                        description: |-
+                          Number of seconds after the container has started before liveness probes are initiated.
+                          More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
+                        format: int32
+                        type: integer
+                      periodSeconds:
+                        description: |-
+                          How often (in seconds) to perform the probe.
+                          Default to 10 seconds. Minimum value is 1.
+                        format: int32
+                        type: integer
+                      successThreshold:
+                        description: |-
+                          Minimum consecutive successes for the probe to be considered successful after having failed.
+                          Defaults to 1. Must be 1 for liveness and startup. Minimum value is 1.
+                        format: int32
+                        type: integer
+                      terminationGracePeriodSeconds:
+                        description: |-
+                          Optional duration in seconds the pod needs to terminate gracefully upon probe failure.
+                          The grace period is the duration in seconds after the processes running in the pod are sent
+                          a termination signal and the time when the processes are forcibly halted with a kill signal.
+                          Set this value longer than the expected cleanup time for your process.
+                          If this value is nil, the pod's terminationGracePeriodSeconds will be used. Otherwise, this
+                          value overrides the value provided by the pod spec.
+                          Value must be non-negative integer. The value zero indicates stop immediately via
+                          the kill signal (no opportunity to shut down).
+                          This is a beta field and requires enabling ProbeTerminationGracePeriod feature gate.
+                          Minimum value is 1. spec.terminationGracePeriodSeconds is used if unset.
+                        format: int64
+                        type: integer
+                      timeoutSeconds:
+                        description: |-
+                          Number of seconds after which the probe times out.
+                          Defaults to 1 second. Minimum value is 1.
+                          More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
+                        format: int32
+                        type: integer
+                    type: object
+                type: object
               projectedVolumeTemplate:
                 description: |-
                   Template to be used to define projected volumes, projected volumes will be mounted
@@ -3989,23 +4390,23 @@ spec:
                     format: int32
                     type: integer
                   sources:
-                    description: sources is the list of volume projections
+                    description: |-
+                      sources is the list of volume projections. Each entry in this list
+                      handles one source.
                     items:
-                      description: Projection that may be projected along with other
-                        supported volume types
+                      description: |-
+                        Projection that may be projected along with other supported volume types.
+                        Exactly one of these fields must be set.
                       properties:
                         clusterTrustBundle:
                           description: |-
                             ClusterTrustBundle allows a pod to access the `.spec.trustBundle` field
                             of ClusterTrustBundle objects in an auto-updating file.
 
-
                             Alpha, gated by the ClusterTrustBundleProjection feature gate.
-
 
                             ClusterTrustBundle objects can either be selected by name, or by the
                             combination of signer name and a label selector.
-
 
                             Kubelet performs aggressive normalization of the PEM contents written
                             into the pod filesystem.  Esoteric PEM features such as inter-block
@@ -4139,9 +4540,7 @@ spec:
                                 This field is effectively required, but due to backwards compatibility is
                                 allowed to be empty. Instances of this type with an empty value here are
                                 almost certainly wrong.
-                                TODO: Add other useful fields. apiVersion, kind, uid?
                                 More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                TODO: Drop `kubebuilder:default` when controller-gen doesn't need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.
                               type: string
                             optional:
                               description: optional specify whether the ConfigMap
@@ -4273,9 +4672,7 @@ spec:
                                 This field is effectively required, but due to backwards compatibility is
                                 allowed to be empty. Instances of this type with an empty value here are
                                 almost certainly wrong.
-                                TODO: Add other useful fields. apiVersion, kind, uid?
                                 More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                TODO: Drop `kubebuilder:default` when controller-gen doesn't need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.
                               type: string
                             optional:
                               description: optional field specify whether the Secret
@@ -4326,6 +4723,14 @@ spec:
                       object store or via streaming through pg_basebackup.
                       Refer to the Replica clusters page of the documentation for more information.
                     type: boolean
+                  minApplyDelay:
+                    description: |-
+                      When replica mode is enabled, this parameter allows you to replay
+                      transactions only when the system time is at least the configured
+                      time past the commit time. This provides an opportunity to correct
+                      data loss errors. Note that when this parameter is set, a promotion
+                      token cannot be used.
+                    type: string
                   primary:
                     description: |-
                       Primary defines which Cluster is defined to be the primary in the distributed PostgreSQL cluster, based on the
@@ -4418,10 +4823,8 @@ spec:
                       Claims lists the names of resources, defined in spec.resourceClaims,
                       that are used by this container.
 
-
                       This is an alpha field and requires enabling the
                       DynamicResourceAllocation feature gate.
-
 
                       This field is immutable. It can only be set for containers.
                     items:
@@ -4432,6 +4835,12 @@ spec:
                             Name must match the name of one entry in pod.spec.resourceClaims of
                             the Pod where this field is used. It makes that resource available
                             inside a container.
+                          type: string
+                        request:
+                          description: |-
+                            Request is the name chosen for a request in the referenced claim.
+                            If empty, everything from the claim is made available, otherwise
+                            only the result of this request.
                           type: string
                       required:
                       - name
@@ -4488,7 +4897,6 @@ spec:
                     description: |-
                       type indicates which kind of seccomp profile will be applied.
                       Valid options are:
-
 
                       Localhost - a profile defined in a file on the node should be used.
                       RuntimeDefault - the container runtime default profile should be used.
@@ -4744,7 +5152,7 @@ spec:
                           set to a Pending state, as reflected by the modifyVolumeStatus field, until such as a resource
                           exists.
                           More info: https://kubernetes.io/docs/concepts/storage/volume-attributes-classes/
-                          (Alpha) Using this field requires the VolumeAttributesClass feature gate to be enabled.
+                          (Beta) Using this field requires the VolumeAttributesClass feature gate to be enabled (off by default).
                         type: string
                       volumeMode:
                         description: |-
@@ -5002,7 +5410,7 @@ spec:
                                 set to a Pending state, as reflected by the modifyVolumeStatus field, until such as a resource
                                 exists.
                                 More info: https://kubernetes.io/docs/concepts/storage/volume-attributes-classes/
-                                (Alpha) Using this field requires the VolumeAttributesClass feature gate to be enabled.
+                                (Beta) Using this field requires the VolumeAttributesClass feature gate to be enabled (off by default).
                               type: string
                             volumeMode:
                               description: |-
@@ -5114,7 +5522,6 @@ spec:
                         Keys that don't exist in the incoming pod labels will
                         be ignored. A null or empty list means only match against labelSelector.
 
-
                         This is a beta field and requires the MatchLabelKeysInPodTopologySpread feature gate to be enabled (enabled by default).
                       items:
                         type: string
@@ -5154,7 +5561,6 @@ spec:
                         Valid values are integers greater than 0.
                         When value is not nil, WhenUnsatisfiable must be DoNotSchedule.
 
-
                         For example, in a 3-zone cluster, MaxSkew is set to 2, MinDomains is set to 5 and pods with the same
                         labelSelector spread as 2/2/2:
                         | zone1 | zone2 | zone3 |
@@ -5172,7 +5578,6 @@ spec:
                         - Honor: only nodes matching nodeAffinity/nodeSelector are included in the calculations.
                         - Ignore: nodeAffinity/nodeSelector are ignored. All nodes are included in the calculations.
 
-
                         If this value is nil, the behavior is equivalent to the Honor policy.
                         This is a beta-level feature default enabled by the NodeInclusionPolicyInPodTopologySpread feature flag.
                       type: string
@@ -5183,7 +5588,6 @@ spec:
                         - Honor: nodes without taints, along with tainted nodes for which the incoming pod
                         has a toleration, are included.
                         - Ignore: node taints are ignored. All nodes are included.
-
 
                         If this value is nil, the behavior is equivalent to the Ignore policy.
                         This is a beta-level feature default enabled by the NodeInclusionPolicyInPodTopologySpread feature flag.
@@ -5418,7 +5822,7 @@ spec:
                           set to a Pending state, as reflected by the modifyVolumeStatus field, until such as a resource
                           exists.
                           More info: https://kubernetes.io/docs/concepts/storage/volume-attributes-classes/
-                          (Alpha) Using this field requires the VolumeAttributesClass feature gate to be enabled.
+                          (Beta) Using this field requires the VolumeAttributesClass feature gate to be enabled (off by default).
                         type: string
                       volumeMode:
                         description: |-
@@ -5545,16 +5949,8 @@ spec:
               conditions:
                 description: Conditions for cluster object
                 items:
-                  description: "Condition contains details for one aspect of the current
-                    state of this API Resource.\n---\nThis struct is intended for
-                    direct use as an array at the field path .status.conditions.  For
-                    example,\n\n\n\ttype FooStatus struct{\n\t    // Represents the
-                    observations of a foo's current state.\n\t    // Known .status.conditions.type
-                    are: \"Available\", \"Progressing\", and \"Degraded\"\n\t    //
-                    +patchMergeKey=type\n\t    // +patchStrategy=merge\n\t    // +listType=map\n\t
-                    \   // +listMapKey=type\n\t    Conditions []metav1.Condition `json:\"conditions,omitempty\"
-                    patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"`\n\n\n\t
-                    \   // other fields\n\t}"
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
                   properties:
                     lastTransitionTime:
                       description: |-
@@ -5595,12 +5991,7 @@ spec:
                       - Unknown
                       type: string
                     type:
-                      description: |-
-                        type of condition in CamelCase or in foo.example.com/CamelCase.
-                        ---
-                        Many .condition.type values are consistent across resources like Available, but because arbitrary conditions can be
-                        useful (see .node.status.conditions), the ability to deconflict is important.
-                        The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
                       maxLength: 316
                       pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
                       type: string
@@ -5818,6 +6209,17 @@ spec:
                       items:
                         type: string
                       type: array
+                    restoreJobHookCapabilities:
+                      description: |-
+                        RestoreJobHookCapabilities are the list of capabilities of the
+                        plugin regarding the RestoreJobHook management
+                      items:
+                        type: string
+                      type: array
+                    status:
+                      description: Status contain the status reported by the plugin
+                        through the SetStatusInCluster interface
+                      type: string
                     version:
                       description: |-
                         Version is the version of the plugin loaded by the

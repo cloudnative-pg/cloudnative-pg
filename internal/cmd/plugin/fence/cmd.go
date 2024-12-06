@@ -27,8 +27,8 @@ import (
 
 var (
 	fenceOnCmd = &cobra.Command{
-		Use:   "on [cluster] [node]",
-		Short: `Fence an instance named [cluster]-[node] or [node]`,
+		Use:   "on CLUSTER INSTANCE",
+		Short: `Fence an instance named CLUSTER-INSTANCE`,
 		Args:  plugin.RequiresArguments(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			clusterName := args[0]
@@ -42,8 +42,8 @@ var (
 	}
 
 	fenceOffCmd = &cobra.Command{
-		Use:   "off [cluster] [node]",
-		Short: `Remove fence for an instance named [cluster]-[node] or [node]`,
+		Use:   "off CLUSTER INSTANCE",
+		Short: `Remove fence for an instance named CLUSTER-INSTANCE`,
 		Args:  plugin.RequiresArguments(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			clusterName := args[0]
@@ -59,8 +59,9 @@ var (
 // NewCmd creates the new "fencing" command
 func NewCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "fencing",
-		Short: `Fencing related commands`,
+		Use:     "fencing",
+		Short:   `Fencing related commands`,
+		GroupID: plugin.GroupIDCluster,
 	}
 	cmd.AddCommand(fenceOnCmd)
 	cmd.AddCommand(fenceOffCmd)

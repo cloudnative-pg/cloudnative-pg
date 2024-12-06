@@ -17,7 +17,9 @@ limitations under the License.
 package specs
 
 import (
-	v1 "k8s.io/api/batch/v1"
+	"slices"
+
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -37,8 +39,8 @@ var _ = Describe("Barman endpoint CA", func() {
 			},
 		}
 
-		job := v1.Job{
-			Spec: v1.JobSpec{
+		job := batchv1.Job{
+			Spec: batchv1.JobSpec{
 				Template: corev1.PodTemplateSpec{
 					Spec: corev1.PodSpec{
 						Containers: []corev1.Container{{}},
@@ -80,8 +82,8 @@ var _ = Describe("Barman endpoint CA", func() {
 			},
 		}
 
-		job := v1.Job{
-			Spec: v1.JobSpec{
+		job := batchv1.Job{
+			Spec: batchv1.JobSpec{
 				Template: corev1.PodTemplateSpec{
 					Spec: corev1.PodSpec{
 						Containers: []corev1.Container{
@@ -118,8 +120,8 @@ var _ = Describe("Barman endpoint CA", func() {
 			},
 		}}
 
-		job := v1.Job{
-			Spec: v1.JobSpec{
+		job := batchv1.Job{
+			Spec: batchv1.JobSpec{
 				Template: corev1.PodTemplateSpec{
 					Spec: corev1.PodSpec{
 						Containers: []corev1.Container{
@@ -144,7 +146,7 @@ var _ = Describe("Job created via InitDB", func() {
 						PostInitSQL:            []string{"testPostInitSql"},
 						PostInitTemplateSQL:    []string{"testPostInitTemplateSql"},
 						PostInitApplicationSQL: []string{"testPostInitApplicationSql"},
-						PostInitApplicationSQLRefs: &apiv1.PostInitApplicationSQLRefs{
+						PostInitApplicationSQLRefs: &apiv1.SQLRefs{
 							SecretRefs: []apiv1.SecretKeySelector{
 								{
 									Key: "secretKey1",
@@ -162,6 +164,32 @@ var _ = Describe("Job created via InitDB", func() {
 		Expect(job.Spec.Template.Spec.Containers[0].Command).Should(ContainElement("testPostInitSql"))
 		Expect(job.Spec.Template.Spec.Containers[0].Command).Should(ContainElement("testPostInitTemplateSql"))
 		Expect(job.Spec.Template.Spec.Containers[0].Command).Should(ContainElement("testPostInitApplicationSql"))
-		Expect(job.Spec.Template.Spec.Containers[0].Command).Should(ContainElement(postInitApplicationSQLRefsFolder))
+		Expect(job.Spec.Template.Spec.Containers[0].Command).Should(ContainElement(
+			postInitApplicationSQLRefsFolder.toString()))
+	})
+
+	It("contains icu configuration", func() {
+		cluster := apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Bootstrap: &apiv1.BootstrapConfiguration{
+					InitDB: &apiv1.BootstrapInitDB{
+						Encoding:       "UTF-8",
+						LocaleProvider: "icu",
+						IcuLocale:      "und",
+						IcuRules:       "&A < z <<< Z",
+					},
+				},
+			},
+		}
+		job := CreatePrimaryJobViaInitdb(cluster, 0)
+
+		jobCommand := job.Spec.Template.Spec.Containers[0].Command
+		Expect(jobCommand).Should(ContainElement("--initdb-flags"))
+		initdbFlags := jobCommand[slices.Index(jobCommand, "--initdb-flags")+1]
+		Expect(initdbFlags).Should(ContainSubstring("--encoding=UTF-8"))
+		Expect(initdbFlags).Should(ContainSubstring("--locale-provider=icu"))
+		Expect(initdbFlags).Should(ContainSubstring("--icu-locale=und"))
+		Expect(initdbFlags).ShouldNot(ContainSubstring("--locale="))
+		Expect(initdbFlags).Should(ContainSubstring("'--icu-rules=&A < z <<< Z'"))
 	})
 })

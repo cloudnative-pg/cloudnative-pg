@@ -5,7 +5,7 @@ It simply relies on the Kubernetes API server and a native key component called:
 the **Postgres instance manager**.
 
 The instance manager takes care of the entire lifecycle of the PostgreSQL
-leading process (also known as `postmaster`).
+server process (also known as `postmaster`).
 
 When you create a new cluster, the operator makes a Pod per instance.
 The field `.spec.instances` specifies how many instances to create.
@@ -18,35 +18,144 @@ of the Pod, the instance manager acts as a backend to handle the
 ## Startup, liveness and readiness probes
 
 The startup and liveness probes rely on `pg_isready`, while the readiness
-probe checks if the database is up and able to accept connections using the
-superuser credentials.
+probe checks if the database is up and able to accept connections.
 
-The readiness probe is positive when the Pod is ready to accept traffic.
-The liveness probe controls when to restart the container once
-the startup probe interval has elapsed.
+### Startup Probe
 
-!!! Important
-    The liveness and readiness probes will report a failure if the probe command
-    fails three times with a 10-second interval between each check.
-
-The liveness probe detects if the PostgreSQL instance is in a
-broken state and needs to be restarted. The value in `startDelay` is used
-to delay the probe's execution, preventing an
-instance with a long startup time from being restarted.
-
-The amount of time needed for a Pod to be classified as not alive is
-configurable in the `.spec.livenessProbeTimeout` parameter, that
-defaults to 30 seconds.
-
-The interval (in seconds) after the Pod has started before the liveness
-probe starts working is expressed in the `.spec.startDelay` parameter,
-which defaults to 3600 seconds. The correct value for your cluster is
-related to the time needed by PostgreSQL to start.
+The `.spec.startDelay` parameter specifies the delay (in seconds) before the
+liveness probe activates after a PostgreSQL Pod starts. By default, this is set
+to `3600` seconds. You should adjust this value based on the time PostgreSQL
+requires to fully initialize in your environment.
 
 !!! Warning
-    If `.spec.startDelay` is too low, the liveness probe will start working
-    before the PostgreSQL startup is complete, and the Pod could be restarted
-    prematurely.
+    Setting `.spec.startDelay` too low can cause the liveness probe to activate
+    prematurely, potentially resulting in unnecessary Pod restarts if PostgreSQL
+    hasn’t fully initialized.
+
+CloudNativePG configures the startup probe with the following default parameters:
+
+```yaml
+failureThreshold: FAILURE_THRESHOLD
+periodSeconds: 10
+successThreshold: 1
+timeoutSeconds: 5
+```
+
+Here, `FAILURE_THRESHOLD` is calculated as `startDelay` divided by
+`periodSeconds`.
+
+If the default behavior based on `startDelay` is not suitable for your use
+case, you can take full control of the startup probe by specifying custom
+parameters in the `.spec.probes.startup` stanza. Note that defining this stanza
+will override the default behavior, including the use of `startDelay`.
+
+!!! Warning
+    Ensure that any custom probe settings are aligned with your cluster’s
+    operational requirements to prevent unintended disruptions.
+
+!!! Info
+    For detailed information about probe configuration, refer to the
+    [probe API](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-Probe).
+
+For example, the following configuration bypasses `startDelay` entirely:
+
+```yaml
+# ... snip
+spec:
+  probes:
+    startup:
+      periodSeconds: 3
+      timeoutSeconds: 3
+      failureThreshold: 10
+```
+
+### Liveness Probe
+
+The liveness probe begins after the startup probe succeeds and is responsible
+for detecting if the PostgreSQL instance has entered a broken state that
+requires a restart of the pod.
+
+The amount of time before a Pod is classified as not alive is configurable via
+the `.spec.livenessProbeTimeout` parameter.
+
+CloudNativePG configures the liveness probe with the following default
+parameters:
+
+```yaml
+failureThreshold: FAILURE_THRESHOLD
+periodSeconds: 10
+successThreshold: 1
+timeoutSeconds: 5
+```
+
+Here, `FAILURE_THRESHOLD` is calculated as `livenessProbeTimeout` divided by
+`periodSeconds`.
+
+By default, `.spec.livenessProbeTimeout` is set to `30` seconds. This means the
+liveness probe will report a failure if it detects three consecutive probe
+failures, with a 10-second interval between each check.
+
+If the default behavior using `livenessProbeTimeout` does not meet your needs,
+you can fully customize the liveness probe by defining parameters in the
+`.spec.probes.liveness` stanza. Keep in mind that specifying this stanza will
+override the default behavior, including the use of `livenessProbeTimeout`.
+
+!!! Warning
+    Ensure that any custom probe settings are aligned with your cluster’s
+    operational requirements to prevent unintended disruptions.
+
+!!! Info
+    For more details on probe configuration, refer to the
+    [probe API](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-Probe).
+
+For example, the following configuration overrides the default behavior and
+bypasses `livenessProbeTimeout`:
+
+```yaml
+# ... snip
+spec:
+  probes:
+    liveness:
+      periodSeconds: 3
+      timeoutSeconds: 3
+      failureThreshold: 10
+```
+
+### Readiness Probe
+
+The readiness probe determines when a pod running a PostgreSQL instance is
+prepared to accept traffic and serve requests.
+
+CloudNativePG uses the following default configuration for the readiness probe:
+
+```yaml
+failureThreshold: 3
+periodSeconds: 10
+successThreshold: 1
+timeoutSeconds: 5
+```
+
+If the default settings do not suit your requirements, you can fully customize
+the readiness probe by specifying parameters in the `.spec.probes.readiness`
+stanza. For example:
+
+```yaml
+# ... snip
+spec:
+  probes:
+    readiness:
+      periodSeconds: 3
+      timeoutSeconds: 3
+      failureThreshold: 10
+```
+
+!!! Warning
+    Ensure that any custom probe settings are aligned with your cluster’s
+    operational requirements to prevent unintended disruptions.
+
+!!! Info
+    For more information on configuring probes, see the
+    [probe API](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-Probe).
 
 ## Shutdown control
 
@@ -73,8 +182,9 @@ seconds.
 
 !!! Important
     In order to avoid any data loss in the Postgres cluster, which impacts
-    the database RPO, don't delete the Pod where the primary instance is running.
-    In this case, perform a switchover to another instance first.
+    the database [RPO](before_you_start.md#rpo), don't delete the Pod where
+    the primary instance is running. In this case, perform a switchover to
+    another instance first.
 
 ### Shutdown of the primary during a switchover
 
@@ -88,11 +198,12 @@ the  time given to the former primary to shut down gracefully and archive all
 the WAL files. By default it is set to `3600` (1 hour).
 
 !!! Warning
-    The `.spec.switchoverDelay` option affects the RPO and RTO of your
-    PostgreSQL database. Setting it to a low value, might favor RTO over RPO
-    but lead to data loss at cluster level and/or backup level. On the contrary,
-    setting it to a high value, might remove the risk of data loss while leaving
-    the cluster without an active primary for a longer time during the switchover.
+    The `.spec.switchoverDelay` option affects the [RPO](before_you_start.md#rpo)
+    and [RTO](before_you_start.md#rto) of your PostgreSQL database. Setting it to
+    a low value, might favor RTO over RPO but lead to data loss at cluster level
+    and/or backup level. On the contrary, setting it to a high value, might remove
+    the risk of data loss while leaving the cluster without an active primary for a
+    longer time during the switchover.
 
 ## Failover
 
@@ -102,7 +213,7 @@ Please refer to the ["Failover" section](failover.md) for details.
 ## Disk Full Failure
 
 Storage exhaustion is a well known issue for PostgreSQL clusters.
-The [PostgreSQL documentation](https://www.postgresql.org/docs/current/disk-full.html)
+The [PostgreSQL documentation](https://www.postgresql.org/docs/current/diskusage.html#DISK-FULL)
 highlights the possible failure scenarios and the importance of monitoring disk
 usage to prevent it from becoming full.
 

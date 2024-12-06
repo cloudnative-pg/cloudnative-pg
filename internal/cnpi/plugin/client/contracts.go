@@ -19,30 +19,15 @@ package client
 import (
 	"context"
 
+	restore "github.com/cloudnative-pg/cnpg-i/pkg/restore/job"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/connection"
 )
-
-// Metadata expose the metadata as discovered
-// from a plugin
-type Metadata struct {
-	Name                 string
-	Version              string
-	Capabilities         []string
-	OperatorCapabilities []string
-	WALCapabilities      []string
-	BackupCapabilities   []string
-}
-
-// Loader describes a struct capable of generating a plugin Client
-type Loader interface {
-	// LoadPluginClient creates a new plugin client, loading the plugins that are required
-	// by this cluster
-	LoadPluginClient(ctx context.Context) (Client, error)
-}
 
 // Client describes a set of behaviour needed to properly handle all the plugin client expected features
 type Client interface {
@@ -52,18 +37,16 @@ type Client interface {
 	LifecycleCapabilities
 	WalCapabilities
 	BackupCapabilities
+	RestoreJobHooksCapabilities
 }
 
 // Connection describes a set of behaviour needed to properly handle the plugin connections
 type Connection interface {
-	// Load connect to the plugin with the specified name
-	Load(ctx context.Context, name string) error
-
 	// Close closes the connection to every loaded plugin
 	Close(ctx context.Context)
 
 	// MetadataList exposes the metadata of the loaded plugins
-	MetadataList() []Metadata
+	MetadataList() []connection.Metadata
 }
 
 // ClusterCapabilities describes a set of behaviour needed to implement the Cluster capabilities
@@ -87,16 +70,20 @@ type ClusterCapabilities interface {
 	// be changed from a value to another
 	ValidateClusterUpdate(
 		ctx context.Context,
-		oldObject client.Object,
-		newObject client.Object,
+		cluster client.Object,
+		mutatedCluster client.Object,
 	) (field.ErrorList, error)
+
+	// SetStatusInCluster returns a map of [pluginName]: statuses to be assigned to the cluster
+	SetStatusInCluster(ctx context.Context, cluster client.Object) (map[string]string, error)
 }
 
 // ReconcilerHookResult is the result of a reconciliation loop
 type ReconcilerHookResult struct {
-	Result             ctrl.Result
-	Err                error
-	StopReconciliation bool
+	Result             ctrl.Result `json:"result"`
+	Err                error       `json:"err"`
+	StopReconciliation bool        `json:"stopReconciliation"`
+	Identifier         string      `json:"identifier"`
 }
 
 // ClusterReconcilerHooks decsribes a set of behavior needed to enhance
@@ -139,13 +126,14 @@ type WalCapabilities interface {
 	) error
 
 	// RestoreWAL calls the loaded plugins to archive a WAL file.
-	// This call is a no-op if there's no plugin implementing WAL archiving
+	// This call returns a boolean indicating if the WAL was restored
+	// by a plugin and the occurred error.
 	RestoreWAL(
 		ctx context.Context,
 		cluster client.Object,
 		sourceWALName string,
 		destinationFileName string,
-	) error
+	) (bool, error)
 }
 
 // BackupCapabilities describes a set of behaviour needed to backup
@@ -159,4 +147,9 @@ type BackupCapabilities interface {
 		pluginName string,
 		parameters map[string]string,
 	) (*BackupResponse, error)
+}
+
+// RestoreJobHooksCapabilities describes a set of behaviour needed to run the Restore
+type RestoreJobHooksCapabilities interface {
+	Restore(ctx context.Context, cluster *apiv1.Cluster) (*restore.RestoreResponse, error)
 }

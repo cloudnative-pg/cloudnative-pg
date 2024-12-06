@@ -24,19 +24,34 @@ spec:
       database: app
       owner: app
       postInitSQL:
-        - create table numbers (i integer)
-        - insert into numbers (select generate_series(1,10000))
+        - create table sql (i integer)
+        - insert into sql (select generate_series(1,10000))
       postInitTemplateSQL:
-        - create extension intarray
+        - create table template_sql (i integer)
+        - insert into template_sql (select generate_series(1,10000))
       postInitApplicationSQL:
-        - create table application_numbers (i integer)
-        - insert into application_numbers (select generate_series(1,10000))
-      postInitApplicationSQLRefs:
+        - create table application_sql (i integer)
+        - insert into application_sql (select generate_series(1,10000))
+      postInitSQLRefs:
         configMapRefs:
         - name: post-init-sql-configmap
           key: configmap.sql
         secretRefs:
         - name: post-init-sql-secret
+          key: secret.sql
+      postInitTemplateSQLRefs:
+        configMapRefs:
+        - name: post-init-template-sql-configmap
+          key: configmap.sql
+        secretRefs:
+        - name: post-init-template-sql-secret
+          key: secret.sql
+      postInitApplicationSQLRefs:
+        configMapRefs:
+        - name: post-init-application-sql-configmap
+          key: configmap.sql
+        secretRefs:
+        - name: post-init-application-sql-secret
           key: secret.sql
 
   # Persistent storage configuration

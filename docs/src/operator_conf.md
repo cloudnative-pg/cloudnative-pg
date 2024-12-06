@@ -35,16 +35,19 @@ The operator looks for the following environment variables to be defined in the 
 
 Name | Description
 ---- | -----------
-`INHERITED_ANNOTATIONS` | list of annotation names that, when defined in a `Cluster` metadata, will be inherited by all the generated resources, including pods
-`INHERITED_LABELS` | list of label names that, when defined in a `Cluster` metadata, will be inherited by all the generated resources, including pods
-`PULL_SECRET_NAME` | name of an additional pull secret to be defined in the operator's namespace and to be used to download images
+`CERTIFICATE_DURATION` | Determines the lifetime of the generated certificates in days. Default is 90.
+`CLUSTERS_ROLLOUT_DELAY` | The duration (in seconds) to wait between the roll-outs of different clusters during an operator upgrade. This setting controls the timing of upgrades across clusters, spreading them out to reduce system impact. The default value is `0` which means no delay between PostgreSQL cluster upgrades.
+`CREATE_ANY_SERVICE` | When set to `true`, will create `-any` service for the cluster. Default is `false`
 `ENABLE_AZURE_PVC_UPDATES` | Enables to delete Postgres pod if its PVC is stuck in Resizing condition. This feature is mainly for the Azure environment (default `false`)
-`ENABLE_INSTANCE_MANAGER_INPLACE_UPDATES` | when set to `true`, enables in-place updates of the instance manager after an update of the operator, avoiding rolling updates of the cluster (default `false`)
+`ENABLE_INSTANCE_MANAGER_INPLACE_UPDATES` | When set to `true`, enables in-place updates of the instance manager after an update of the operator, avoiding rolling updates of the cluster (default `false`)
+`EXPIRING_CHECK_THRESHOLD` | Determines the threshold, in days, for identifying a certificate as expiring. Default is 7. 
+`INCLUDE_PLUGINS` | A comma-separated list of plugins to be always included in the Cluster's reconciliation.
+`INHERITED_ANNOTATIONS` | List of annotation names that, when defined in a `Cluster` metadata, will be inherited by all the generated resources, including pods
+`INHERITED_LABELS` | List of label names that, when defined in a `Cluster` metadata, will be inherited by all the generated resources, including pods
+`INSTANCES_ROLLOUT_DELAY` | The duration (in seconds) to wait between roll-outs of individual PostgreSQL instances within the same cluster during an operator upgrade. The default value is `0`, meaning no delay between upgrades of instances in the same PostgreSQL cluster.
 `MONITORING_QUERIES_CONFIGMAP` | The name of a ConfigMap in the operator's namespace with a set of default queries (to be specified under the key `queries`) to be applied to all created Clusters
 `MONITORING_QUERIES_SECRET` | The name of a Secret in the operator's namespace with a set of default queries (to be specified under the key `queries`) to be applied to all created Clusters
-`CERTIFICATE_DURATION` | Determines the lifetime of the generated certificates in days. Default is 90.
-`EXPIRING_CHECK_THRESHOLD` | Determines the threshold, in days, for identifying a certificate as expiring. Default is 7. 
-`CREATE_ANY_SERVICE` | when set to `true`, will create `-any` service for the cluster. Default is `false`
+`PULL_SECRET_NAME` | Name of an additional pull secret to be defined in the operator's namespace and to be used to download images
 
 Values in `INHERITED_ANNOTATIONS` and `INHERITED_LABELS` support path-like wildcards. For example, the value `example.com/*` will match
 both the value `example.com/one` and `example.com/two`.
@@ -57,19 +60,14 @@ The namespace where the operator looks for the `PULL_SECRET_NAME` secret is wher
 you installed the operator. If the operator is not able to find that secret, it
 will ignore the configuration parameter.
 
-!!! Warning
-    Previous versions of the operator copied the `PULL_SECRET_NAME` secret inside
-    the namespaces where you deploy the PostgreSQL clusters. From version "1.11.0"
-    the behavior changed to match the previous description. The pull secrets
-    created by the previous versions of the operator are unused.
-
 ## Defining an operator config map
 
 The example below customizes the behavior of the operator, by defining
 the label/annotation names to be inherited by the resources created by
-any `Cluster` object that is deployed at a later time, and by enabling
+any `Cluster` object that is deployed at a later time, by enabling
 [in-place updates for the instance
-manager](installation_upgrade.md#in-place-updates-of-the-instance-manager).
+manager](installation_upgrade.md#in-place-updates-of-the-instance-manager),
+and by spreading upgrades.
 
 ```yaml
 apiVersion: v1
@@ -78,9 +76,11 @@ metadata:
   name: cnpg-controller-manager-config
   namespace: cnpg-system
 data:
+  CLUSTERS_ROLLOUT_DELAY: '60'
+  ENABLE_INSTANCE_MANAGER_INPLACE_UPDATES: 'true'
   INHERITED_ANNOTATIONS: categories
   INHERITED_LABELS: environment, workload, app
-  ENABLE_INSTANCE_MANAGER_INPLACE_UPDATES: 'true'
+  INSTANCES_ROLLOUT_DELAY: '10'
 ```
 
 ## Defining an operator secret
@@ -89,7 +89,8 @@ The example below customizes the behavior of the operator, by defining
 the label/annotation names to be inherited by the resources created by
 any `Cluster` object that is deployed at a later time, and by enabling
 [in-place updates for the instance
-manager](installation_upgrade.md#in-place-updates-of-the-instance-manager).
+manager](installation_upgrade.md#in-place-updates-of-the-instance-manager),
+and by spreading upgrades.
 
 ```yaml
 apiVersion: v1
@@ -99,9 +100,11 @@ metadata:
   namespace: cnpg-system
 type: Opaque
 stringData:
+  CLUSTERS_ROLLOUT_DELAY: '60'
+  ENABLE_INSTANCE_MANAGER_INPLACE_UPDATES: 'true'
   INHERITED_ANNOTATIONS: categories
   INHERITED_LABELS: environment, workload, app
-  ENABLE_INSTANCE_MANAGER_INPLACE_UPDATES: 'true'
+  INSTANCES_ROLLOUT_DELAY: '10'
 ```
 
 ## Restarting the operator to reload configs
@@ -150,7 +153,8 @@ You can do this by executing these commands:
 kubectl edit deployment -n cnpg-system cnpg-controller-manager
 ```
 
-Then on the edit page scroll down the container args and add `--pprof-server=true`, example:
+Then on the edit page scroll down the container args and add
+`--pprof-server=true`, as in this example:
 
 ```yaml
       containers:
@@ -165,7 +169,8 @@ Then on the edit page scroll down the container args and add `--pprof-server=tru
         - /manager
 ```
 
-Save the changes, the deployment now will execute a rollout and the new pod will have the PPROF server enabled.
+Save the changes; the deployment now will execute a roll-out, and the new pod
+will have the PPROF server enabled.
 
 Once the pod is running you can exec inside the container by doing:
 

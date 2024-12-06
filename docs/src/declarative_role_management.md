@@ -1,4 +1,4 @@
-# Database Role Management
+# PostgreSQL Role Management
 
 From its inception, CloudNativePG has managed the creation of specific roles
 required in PostgreSQL instances:
@@ -150,14 +150,8 @@ never expires, mirroring the behavior of PostgreSQL. Specifically:
   allowing `VALID UNTIL NULL` in the `ALTER ROLE` SQL statement)
 
 !!! Warning
-    The declarative role management feature has changed behavior since its
-    initial version (1.20.0). In 1.20.0, a role without a `passwordSecret` would
-    lead to setting the password to NULL in PostgreSQL.
-    In practice there is little difference from 1.20.0.
-    New roles created without `passwordSecret` will have a `NULL` password.
-    The relevant change is when using the managed roles to manage roles that
-    had been previously created. In 1.20.0, doing this might inadvertently
-    result in setting existing passwords to `NULL`.
+    New roles created without `passwordSecret` will have a `NULL` password
+    inside PostgreSQL.
 
 ### Password hashed
 

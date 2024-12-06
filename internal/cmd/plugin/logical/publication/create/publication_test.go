@@ -22,14 +22,14 @@ import (
 )
 
 var _ = Describe("create publication SQL generator", func() {
-	It("can publicate all tables", func() {
+	It("can publish all tables", func() {
 		Expect(PublicationCmdBuilder{
 			PublicationName:   "app",
 			PublicationTarget: PublicationTargetALLTables{},
 		}.ToSQL()).To(Equal(`CREATE PUBLICATION "app" FOR ALL TABLES`))
 	})
 
-	It("can publicate all tables with custom parameters", func() {
+	It("can publish all tables with custom parameters", func() {
 		Expect(PublicationCmdBuilder{
 			PublicationName:       "app",
 			PublicationTarget:     PublicationTargetALLTables{},
@@ -37,7 +37,7 @@ var _ = Describe("create publication SQL generator", func() {
 		}.ToSQL()).To(Equal(`CREATE PUBLICATION "app" FOR ALL TABLES WITH (publish='insert')`))
 	})
 
-	It("can publicate a list of tables via multiple publication objects", func() {
+	It("can publish a list of tables via multiple publication objects", func() {
 		// This is supported from PG 15
 		Expect(PublicationCmdBuilder{
 			PublicationName: "app",
@@ -54,7 +54,7 @@ var _ = Describe("create publication SQL generator", func() {
 		}.ToSQL()).To(Equal(`CREATE PUBLICATION "app" FOR TABLE a, TABLE b`))
 	})
 
-	It("can publicate a list of tables via multiple table expressions", func() {
+	It("can publish a list of tables via multiple table expressions", func() {
 		// This is supported in PG < 15
 		Expect(PublicationCmdBuilder{
 			PublicationName: "app",

@@ -7,12 +7,12 @@
 The operator can be installed like any other resource in Kubernetes,
 through a YAML manifest applied via `kubectl`.
 
-You can install the [latest operator manifest](https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.23/releases/cnpg-1.23.2.yaml)
+You can install the [latest operator manifest](https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.24/releases/cnpg-1.24.1.yaml)
 for this minor release as follows:
 
 ```sh
 kubectl apply --server-side -f \
-  https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.23/releases/cnpg-1.23.2.yaml
+  https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.24/releases/cnpg-1.24.1.yaml
 ```
 
 You can verify that with:
@@ -72,12 +72,13 @@ specific minor release, you can just run:
 
 ```sh
 curl -sSfL \
-  https://raw.githubusercontent.com/cloudnative-pg/artifacts/release-1.23/manifests/operator-manifest.yaml | \
+  https://raw.githubusercontent.com/cloudnative-pg/artifacts/release-1.24/manifests/operator-manifest.yaml | \
   kubectl apply --server-side -f -
 ```
 
 !!! Important
-    Snapshots are not supported by the CloudNativePG and not intended for production usage.
+    Snapshots are not supported by the CloudNativePG Community, and are not
+    intended for use in production.
 
 ### Using the Helm Chart
 
@@ -85,9 +86,12 @@ The operator can be installed using the provided [Helm chart](https://github.com
 
 ### Using OLM
 
-CloudNativePG can also be installed using the
-[Operator Lifecycle Manager (OLM)](https://olm.operatorframework.io/docs/)
+CloudNativePG can also be installed via the [Operator Lifecycle Manager (OLM)](https://olm.operatorframework.io/docs/)
 directly from [OperatorHub.io](https://operatorhub.io/operator/cloudnative-pg).
+
+For deployments on Red Hat OpenShift, EDB offers and fully supports a certified
+version of CloudNativePG, available through the
+[Red Hat OpenShift Container Platform](https://catalog.redhat.com/software/container-stacks/detail/653fd4035eece8598f66d97b).
 
 ## Details about the deployment
 
@@ -151,13 +155,14 @@ by applying the manifest of the newer version for plain Kubernetes
 installations, or using the native package manager of the used distribution
 (please follow the instructions in the above sections).
 
-The second step is automatically executed after having updated the controller,
-by default triggering a rolling update of every deployed PostgreSQL instance to
-use the new instance manager. The rolling update procedure culminates with a
-switchover, which is controlled by the `primaryUpdateStrategy` option, by
-default set to `unsupervised`. When set to `supervised`, users need to complete
-the rolling update by manually promoting a new instance through the `cnpg`
-plugin for `kubectl`.
+
+The second step is automatically triggered after updating the controller. By
+default, this initiates a rolling update of every deployed PostgreSQL cluster,
+upgrading one instance at a time to use the new instance manager. The rolling
+update concludes with a switchover, which is governed by the
+`primaryUpdateStrategy` option. The default value, `unsupervised`, completes
+the switchover automatically. If set to `supervised`, the user must manually
+promote the new primary instance using the `cnpg` plugin for `kubectl`.
 
 !!! Seealso "Rolling updates"
     This process is discussed in-depth on the [Rolling Updates](rolling_update.md) page.
@@ -167,10 +172,25 @@ plugin for `kubectl`.
     an upgrade of the operator will trigger a switchover on your PostgreSQL cluster,
     causing a (normally negligible) downtime.
 
-Since version 1.10.0, the rolling update behavior can be replaced with in-place
-updates of the instance manager. The latter don't require a restart of the
-PostgreSQL instance and, as a result, a switchover in the cluster.
-This behavior, which is disabled by default, is described below.
+The default rolling update behavior can be replaced with in-place updates of
+the instance manager. This approach does not require a restart of the
+PostgreSQL instance, thereby avoiding a switchover within the cluster. This
+feature, which is disabled by default, is described in detail below.
+
+### Spread Upgrades
+
+By default, all PostgreSQL clusters are rolled out simultaneously, which may
+lead to a spike in resource usage, especially when managing multiple clusters.
+CloudNativePG provides two configuration options at the [operator level](operator_conf.md)
+that allow you to introduce delays between cluster roll-outs or even between
+instances within the same cluster, helping to distribute resource usage over
+time:
+
+- `CLUSTERS_ROLLOUT_DELAY`: Defines the number of seconds to wait between
+  roll-outs of different PostgreSQL clusters (default: `0`).
+- `INSTANCES_ROLLOUT_DELAY`: Defines the number of seconds to wait between
+  roll-outs of individual instances within the same PostgreSQL cluster (default:
+  `0`).
 
 ### In-place updates of the instance manager
 
@@ -182,11 +202,11 @@ However, this behavior can be changed via configuration to enable in-place
 updates of the instance manager, which is the PID 1 process that keeps the
 container alive.
 
-Internally, any instance manager from version 1.10 of CloudNativePG
-supports injection of a new executable that will replace the existing one,
-once the integrity verification phase is completed, as well as graceful
-termination of all the internal processes. When the new instance manager
-restarts using the new binary, it adopts the already running *postmaster*.
+Internally, each instance manager in CloudNativePG supports the injection of a
+new executable that replaces the existing one after successfully completing an
+integrity verification phase and gracefully terminating all internal processes.
+Upon restarting with the new binary, the instance manager seamlessly adopts the
+already running *postmaster*.
 
 As a result, the PostgreSQL process is unaffected by the update, refraining
 from the need to perform a switchover. The other side of the coin, is that
@@ -228,19 +248,65 @@ When versions are not directly upgradable, the old version needs to be
 removed before installing the new one. This won't affect user data but
 only the operator itself.
 
-### Upgrading to 1.23.0, 1.22.3 or 1.21.5
+<!--
+### Upgrading to 1.25.0 or 1.24.x
 
 !!! Important
     We encourage all existing users of CloudNativePG to upgrade to version
-    1.23.0 or at least to the latest stable version of the minor release you are
-    currently using (namely 1.22.2 or 1.21.4).
+    1.25.0 or at least to the latest stable version of the minor release you are
+    currently using (namely 1.24.x).
+-->
+
+### Upgrading to 1.24 from a previous minor version
 
 !!! Warning
     Every time you are upgrading to a higher minor release, make sure you
     go through the release notes and upgrade instructions of all the
     intermediate minor releases. For example, if you want to move
-    from 1.21.x to 1.23, make sure you go through the release notes
-    and upgrade instructions for 1.22 and 1.23.
+    from 1.22.x to 1.24, make sure you go through the release notes
+    and upgrade instructions for 1.23 and 1.24.
+
+#### From Replica Clusters to Distributed Topology
+
+One of the key enhancements in CloudNativePG 1.24.0 is the upgrade of the
+replica cluster feature.
+
+The former replica cluster feature, now referred to as the "Standalone Replica
+Cluster," is no longer recommended for Disaster Recovery (DR) and High
+Availability (HA) scenarios that span multiple Kubernetes clusters. Standalone
+replica clusters are best suited for read-only workloads, such as reporting,
+OLAP, or creating development environments with test data.
+
+For DR and HA purposes, CloudNativePG now introduces the Distributed Topology
+strategy for replica clusters. This new strategy allows you to build PostgreSQL
+clusters across private, public, hybrid, and multi-cloud environments, spanning
+multiple regions and potentially different cloud providers. It also provides an
+API to control the switchover operation, ensuring that only one cluster acts as
+the primary at any given time.
+
+This Distributed Topology strategy enhances resilience and scalability, making
+it a robust solution for modern, distributed applications that require high
+availability and disaster recovery capabilities across diverse infrastructure
+setups.
+
+You can seamlessly transition from a previous replica cluster configuration to a
+distributed topology by modifying all the `Cluster` resources involved in the
+distributed PostgreSQL setup. Ensure the following steps are taken:
+
+- Configure the `externalClusters` section to include all the clusters involved
+  in the distributed topology. We strongly suggest using the same configuration
+  across all `Cluster` resources for maintainability and consistency.
+- Configure the `primary` and `source` fields in the `.spec.replica` stanza to
+  reflect the distributed topology. The `primary` field should contain the name
+  of the current primary cluster in the distributed topology, while the `source`
+  field should contain the name of the cluster each `Cluster` resource is
+  replicating from. It is important to note that the `enabled` field, which was
+  previously set to `true` or `false`, should now be unset (default).
+
+For more information, please refer to
+the ["Distributed Topology" section for replica clusters](replica_cluster.md#distributed-topology).
+
+### Upgrading to 1.23 from a previous minor version
 
 #### User defined replication slots
 
@@ -299,213 +365,3 @@ kubectl apply --server-side --force-conflicts -f <OPERATOR_MANIFEST>
 Henceforth, `kube-apiserver` will be automatically acknowledged as a recognized
 manager for the CRDs, eliminating the need for any further manual intervention
 on this matter.
-
-### Upgrading to 1.22 from a previous minor version
-
-CloudNativePG continues to adhere to the security-by-default approach. As of
-version 1.22, the usage of the `ALTER SYSTEM` command is now disabled by
-default.
-
-The reason behind this choice is to ensure that, by default, changes to the
-PostgreSQL configuration in a database cluster controlled by CloudNativePG are
-allowed only through the Kubernetes API.
-
-At the same time, we are providing an option to enable `ALTER SYSTEM` if you
-need to use it, even temporarily, from versions 1.22.0, 1.21.2, and 1.20.5,
-by setting `.spec.postgresql.enableAlterSystem` to `true`, as in the following
-excerpt:
-
-```yaml
-...
-  postgresql:
-    enableAlterSystem: true
-...
-```
-
-Clusters in 1.22 will have `enableAlterSystem` set to `false` by default.
-If you want to retain the existing behavior, in 1.22, you need to explicitly
-set `enableAlterSystem` to `true` as shown above.
-
-In versions 1.21.2 and 1.20.5, and later patch releases in the 1.20 and 1.21
-branches, `enableAlterSystem` will be set to `true` by default, keeping with
-the existing behavior. If you don't need to use `ALTER SYSTEM`, we recommend
-that you set `enableAlterSystem` explicitly to `false`.
-
-!!! Important
-    You can set the desired value for  `enableAlterSystem` immediately
-    following your upgrade to version 1.22.0, 1.21.2, or 1.20.5, as shown in
-    the example above.
-
-### Upgrading to 1.21 from a previous minor version
-
-With the goal to keep improving out-of-the-box the *convention over
-configuration* behavior of the operator, CloudNativePG changes the default
-value of several knobs in the following areas:
-
-- startup and shutdown control of the PostgreSQL instance
-- self-healing
-- security
-- labels
-
-!!! Warning
-    Please read carefully the list of changes below, and how to modify the
-    `Cluster` manifests to retain the existing behavior if you don't want to
-    disrupt your existing workloads. Alternatively, postpone the upgrade to
-    until you are sure. In general, we recommend adopting these default
-    values unless you have valid reasons not to.
-
-#### Superuser access disabled
-
-Pushing towards *security-by-default*, CloudNativePG now disables access
-`postgres` superuser access via the network in all new clusters, unless
-explicitly enabled.
-
-If you want to ensure superuser access to the PostgreSQL cluster, regardless
-which version of CloudNativePG you are running, we advise you to explicitly
-declare it by setting:
-
-```yaml
-spec:
-   ...
-   enableSuperuserAccess: true
-```
-
-#### Replication slots for HA
-
-Replication slots for High Availability are enabled by default.
-
-If you want to ensure replication slots are disabled, regardless of which
-version of CloudNativePG you are running, we advise you to explicitly declare
-it by setting:
-
-```yaml
-spec:
-   ...
-   replicationSlots:
-     highAvailability:
-       enabled: false
-```
-
-#### Delay for PostgreSQL shutdown
-
-Up to 1.20.2, [the `stopDelay` parameter](instance_manager.md#shutdown-control)
-was set to 30 seconds. Despite the recommendations to change and tune this
-value, almost all the cases we have examined during support incidents or
-community issues show that this value is left unchanged.
-
-The [new default value is 1800 seconds](https://github.com/cloudnative-pg/cloudnative-pg/commit/9f7f18c5b9d9103423a53d180c0e2f2189e71c3c),
-the equivalent of 30 minutes.
-
-The new `smartShutdownTimeout` parameter has been introduced to define
-the maximum time window within the `stopDelay` value reserved to complete
-the `smart` shutdown procedure in PostgreSQL. During this time, the
-Postgres server rejects any new connections while waiting for all regular
-sessions to terminate.
-
-Once elapsed, the remaining time up to `stopDelay` will be reserved for
-PostgreSQL to complete its duties regarding WAL commitments with both the
-archive and the streaming replicas to ensure the cluster doesn't lose any data.
-
-If you want to retain the old behavior, you need to set explicitly:
-
-```yaml
-spec:
-   ...
-   stopDelay: 30
-```
-
-And, **after** the upgrade has completed, specify `smartShutdownTimeout`:
-
-```yaml
-spec:
-   ...
-   stopDelay: 30
-   smartShutdownTimeout: 15
-```
-
-#### Delay for PostgreSQL startup
-
-Up to 1.20.2, [the `startDelay` parameter](instance_manager.md#startup-liveness-and-readiness-probes)
-was set to 30 seconds, and CloudNativePG used this parameter as
-`initialDelaySeconds` for the Kubernetes liveness probe. Given that all the
-supported Kubernetes releases provide [startup probes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#define-startup-probes),
-`startDelay` is now automatically divided into periods of 10 seconds of
-duration  each.
-
-!!! Important
-    In order to add the `startupProbe`, each pod needs to be restarted.
-    As a result, when you upgrade the operator, a one-time rolling
-    update of the cluster will be executed even in the online update case.
-
-Despite the recommendations to change and tune this value, almost all the cases
-we have examined during support incidents or community issues show that this
-value is left unchanged. Given that this parameter influences the startup of
-a PostgreSQL instance, a low value of `startDelay` would cause Postgres
-never to reach a consistent recovery state and be restarted indefinitely.
-
-For this reason, `startDelay` has been [raised by default to 3600 seconds](https://github.com/cloudnative-pg/cloudnative-pg/commit/4f4cd96bc6f8e284a200705c11a2b41652d58146),
-the equivalent of 1 hour.
-
-If you want to retain the existing behavior using the new implementation, you
-can do that by explicitly setting:
-
-```yaml
-spec:
-   ...
-   startDelay: 30
-```
-
-#### Delay for PostgreSQL switchover
-
-Up to 1.20.2, [the `switchoverDelay` parameter](instance_manager.md#shutdown-of-the-primary-during-a-switchover)
-was set by default to 40000000 seconds (over 15 months) to simulate a very long
-interval.
-
-The [default value has been lowered to 3600 seconds](https://github.com/cloudnative-pg/cloudnative-pg/commit/9565f9f2ebab8bc648d9c361198479974664c322),
-the equivalent of 1 hour.
-
-If you want to retain the old behavior, you need to set explicitly:
-
-```yaml
-spec:
-   ...
-   switchoverDelay: 40000000
-```
-
-#### Labels
-
-In version 1.18, we deprecated the `postgresql` label in pods to identify the
-name of the cluster, and replaced it with the more canonical `cnpg.io/cluster`
-label. The `postgresql` label is no longer maintained.
-
-Similarly, from this version, the `role` label is deprecated. The new label
-`cnpg.io/instanceRole` is now used, and will entirely replace the `role` label
-in a future release.
-
-#### Shortcut for keeping the existing behavior
-
-If you want to explicitly keep the behavior of CloudNativePG up to version
-1.20.2 (we advise not to), you need to set these values in all your `Cluster`
-definitions **before upgrading** to a higher version:
-
-```yaml
-spec:
-   ...
-   # Changed in 1.21.0, 1.20.3 and 1.19.5
-   startDelay: 30
-   stopDelay: 30
-   switchoverDelay: 40000000
-   # Changed in 1.21.0 only
-   enableSuperuserAccess: true
-   replicationSlots:
-     highAvailability:
-       enabled: false
-```
-
-Once the upgrade is completed, also add:
-
-```yaml
-spec:
-   ...
-   smartShutdownTimeout: 15
-```

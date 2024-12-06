@@ -26,8 +26,8 @@ import (
 
 var (
 	hibernateOnCmd = &cobra.Command{
-		Use:   "on [cluster]",
-		Short: "Hibernates the cluster named [cluster]",
+		Use:   "on CLUSTER",
+		Short: "Hibernates the cluster named CLUSTER",
 		Args:  plugin.RequiresArguments(1),
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			return plugin.CompleteClusters(cmd.Context(), args, toComplete), cobra.ShellCompDirectiveNoFileComp
@@ -49,8 +49,8 @@ var (
 	}
 
 	hibernateOffCmd = &cobra.Command{
-		Use:   "off [cluster]",
-		Short: "Bring the cluster named [cluster] back from hibernation",
+		Use:   "off CLUSTER",
+		Short: "Bring the cluster named CLUSTER back from hibernation",
 		Args:  plugin.RequiresArguments(1),
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			return plugin.CompleteClusters(cmd.Context(), args, toComplete), cobra.ShellCompDirectiveNoFileComp
@@ -63,8 +63,8 @@ var (
 	}
 
 	hibernateStatusCmd = &cobra.Command{
-		Use:   "status [cluster]",
-		Short: "Prints the hibernation status for the [cluster]",
+		Use:   "status CLUSTER",
+		Short: "Prints the hibernation status for the CLUSTER",
 		Args:  plugin.RequiresArguments(1),
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			return plugin.CompleteClusters(cmd.Context(), args, toComplete), cobra.ShellCompDirectiveNoFileComp
@@ -92,8 +92,9 @@ var (
 // NewCmd initializes the hibernate command
 func NewCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "hibernate",
-		Short: `Hibernation related commands`,
+		Use:     "hibernate",
+		Short:   `Hibernation related commands`,
+		GroupID: plugin.GroupIDCluster,
 	}
 
 	cmd.AddCommand(hibernateOnCmd)

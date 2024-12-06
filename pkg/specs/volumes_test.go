@@ -27,16 +27,16 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("test createVolumesAndVolumeMountsForPostInitApplicationSQLRefs", func() {
+var _ = Describe("test createVolumesAndVolumeMountsForSQLRefs", func() {
 	It("input is empty", func() {
-		input := &apiv1.PostInitApplicationSQLRefs{}
-		volumes, volumeMounts := createVolumesAndVolumeMountsForPostInitApplicationSQLRefs(input)
+		input := &apiv1.SQLRefs{}
+		volumes, volumeMounts := createVolumesAndVolumeMountsForSQLRefs(postInitApplicationSQLRefsFolder, input)
 		Expect(volumes).To(BeEmpty())
 		Expect(volumeMounts).To(BeEmpty())
 	})
 
 	It("we have reference to secrets only", func() {
-		input := &apiv1.PostInitApplicationSQLRefs{
+		input := &apiv1.SQLRefs{
 			SecretRefs: []apiv1.SecretKeySelector{
 				{
 					LocalObjectReference: apiv1.LocalObjectReference{
@@ -52,17 +52,17 @@ var _ = Describe("test createVolumesAndVolumeMountsForPostInitApplicationSQLRefs
 				},
 			},
 		}
-		volumes, volumeMounts := createVolumesAndVolumeMountsForPostInitApplicationSQLRefs(input)
+		volumes, volumeMounts := createVolumesAndVolumeMountsForSQLRefs(postInitApplicationSQLRefsFolder, input)
 		Expect(volumeMounts).To(Equal([]corev1.VolumeMount{
 			{
 				Name:      "0-post-init-application-sql",
-				MountPath: postInitApplicationSQLRefsFolder + "/0.sql",
+				MountPath: postInitApplicationSQLRefsFolder.toString() + "/0.sql",
 				SubPath:   "0.sql",
 				ReadOnly:  true,
 			},
 			{
 				Name:      "1-post-init-application-sql",
-				MountPath: postInitApplicationSQLRefsFolder + "/1.sql",
+				MountPath: postInitApplicationSQLRefsFolder.toString() + "/1.sql",
 				SubPath:   "1.sql",
 				ReadOnly:  true,
 			},
@@ -101,7 +101,7 @@ var _ = Describe("test createVolumesAndVolumeMountsForPostInitApplicationSQLRefs
 	})
 
 	It("we have reference to configmaps only", func() {
-		input := &apiv1.PostInitApplicationSQLRefs{
+		input := &apiv1.SQLRefs{
 			ConfigMapRefs: []apiv1.ConfigMapKeySelector{
 				{
 					LocalObjectReference: apiv1.LocalObjectReference{
@@ -117,17 +117,17 @@ var _ = Describe("test createVolumesAndVolumeMountsForPostInitApplicationSQLRefs
 				},
 			},
 		}
-		volumes, volumeMounts := createVolumesAndVolumeMountsForPostInitApplicationSQLRefs(input)
+		volumes, volumeMounts := createVolumesAndVolumeMountsForSQLRefs(postInitApplicationSQLRefsFolder, input)
 		Expect(volumeMounts).To(Equal([]corev1.VolumeMount{
 			{
 				Name:      "0-post-init-application-sql",
-				MountPath: postInitApplicationSQLRefsFolder + "/0.sql",
+				MountPath: postInitApplicationSQLRefsFolder.toString() + "/0.sql",
 				SubPath:   "0.sql",
 				ReadOnly:  true,
 			},
 			{
 				Name:      "1-post-init-application-sql",
-				MountPath: postInitApplicationSQLRefsFolder + "/1.sql",
+				MountPath: postInitApplicationSQLRefsFolder.toString() + "/1.sql",
 				SubPath:   "1.sql",
 				ReadOnly:  true,
 			},
@@ -170,7 +170,7 @@ var _ = Describe("test createVolumesAndVolumeMountsForPostInitApplicationSQLRefs
 	})
 
 	It("we have reference to both configmaps and secrets", func() {
-		input := &apiv1.PostInitApplicationSQLRefs{
+		input := &apiv1.SQLRefs{
 			SecretRefs: []apiv1.SecretKeySelector{
 				{
 					LocalObjectReference: apiv1.LocalObjectReference{
@@ -200,29 +200,29 @@ var _ = Describe("test createVolumesAndVolumeMountsForPostInitApplicationSQLRefs
 				},
 			},
 		}
-		volumes, volumeMounts := createVolumesAndVolumeMountsForPostInitApplicationSQLRefs(input)
+		volumes, volumeMounts := createVolumesAndVolumeMountsForSQLRefs(postInitApplicationSQLRefsFolder, input)
 		Expect(volumeMounts).To(Equal([]corev1.VolumeMount{
 			{
 				Name:      "0-post-init-application-sql",
-				MountPath: postInitApplicationSQLRefsFolder + "/0.sql",
+				MountPath: postInitApplicationSQLRefsFolder.toString() + "/0.sql",
 				SubPath:   "0.sql",
 				ReadOnly:  true,
 			},
 			{
 				Name:      "1-post-init-application-sql",
-				MountPath: postInitApplicationSQLRefsFolder + "/1.sql",
+				MountPath: postInitApplicationSQLRefsFolder.toString() + "/1.sql",
 				SubPath:   "1.sql",
 				ReadOnly:  true,
 			},
 			{
 				Name:      "2-post-init-application-sql",
-				MountPath: postInitApplicationSQLRefsFolder + "/2.sql",
+				MountPath: postInitApplicationSQLRefsFolder.toString() + "/2.sql",
 				SubPath:   "2.sql",
 				ReadOnly:  true,
 			},
 			{
 				Name:      "3-post-init-application-sql",
-				MountPath: postInitApplicationSQLRefsFolder + "/3.sql",
+				MountPath: postInitApplicationSQLRefsFolder.toString() + "/3.sql",
 				SubPath:   "3.sql",
 				ReadOnly:  true,
 			},

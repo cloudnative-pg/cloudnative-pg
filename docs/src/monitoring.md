@@ -9,16 +9,15 @@
 ## Monitoring Instances
 
 For each PostgreSQL instance, the operator provides an exporter of metrics for
-[Prometheus](https://prometheus.io/) via HTTP, on port 9187, named `metrics`.
+[Prometheus](https://prometheus.io/) via HTTP or HTTPS, on port 9187, named `metrics`.
 The operator comes with a [predefined set of metrics](#predefined-set-of-metrics), as well as a highly
 configurable and customizable system to define additional queries via one or
 more `ConfigMap` or `Secret` resources (see the
 ["User defined metrics" section](#user-defined-metrics) below for details).
 
 !!! Important
-    Starting from version 1.11, CloudNativePG already installs
-    [by default a set of predefined metrics](#default-set-of-metrics) in
-    a `ConfigMap` called `default-monitoring`.
+    CloudNativePG, by default, installs a set of [predefined metrics](#default-set-of-metrics)
+    in a `ConfigMap` named `default-monitoring`.
 
 !!! Info
     You can inspect the exported metrics by following the instructions in
@@ -59,15 +58,17 @@ by specifying a list of one or more databases in the `target_databases` option.
 
 A specific PostgreSQL cluster can be monitored using the
 [Prometheus Operator's](https://github.com/prometheus-operator/prometheus-operator) resource 
-[PodMonitor](https://github.com/prometheus-operator/prometheus-operator/blob/v0.47.1/Documentation/api.md#podmonitor).
-A PodMonitor correctly pointing to a Cluster can be automatically created by the operator by setting
-`.spec.monitoring.enablePodMonitor` to `true` in the Cluster resource itself (default: false).
+[PodMonitor](https://github.com/prometheus-operator/prometheus-operator/blob/v0.75.1/Documentation/api.md#podmonitor).
+
+A `PodMonitor` that correctly points to the Cluster can be automatically created by the operator by setting
+`.spec.monitoring.enablePodMonitor` to `true` in the Cluster resource itself (default: `false`).
 
 !!! Important
     Any change to the `PodMonitor` created automatically will be overridden by the Operator at the next reconciliation
     cycle, in case you need to customize it, you can do so as described below.
 
-To deploy a `PodMonitor` for a specific Cluster manually, you can just define it as follows, changing it as needed:
+To deploy a `PodMonitor` for a specific Cluster manually, define it as follows and adjust as needed:
+
 ```yaml
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
@@ -82,13 +83,57 @@ spec:
 ```
 
 !!! Important
-    Make sure you modify the example above with a unique name as well as the
-    correct cluster's namespace and labels (we are using `cluster-example`).
+    Ensure you modify the example above with a unique name, as well as the
+    correct cluster's namespace and labels (e.g., `cluster-example`).
 
 !!! Important
-    Label `postgresql`, used in previous versions of this document, is deprecated
-    and will be removed in the future. Please use the label `cnpg.io/cluster`
+    The `postgresql` label, used in previous versions of this document, is deprecated
+    and will be removed in the future. Please use the `cnpg.io/cluster` label
     instead to select the instances.
+
+### Enabling TLS on the Metrics Port
+
+To enable TLS communication on the metrics port, configure the `.spec.monitoring.tls.enabled`
+setting to `true`. This setup ensures that the metrics exporter uses the same
+server certificate used by PostgreSQL to secure communication on port 5432.
+
+!!! Important
+    Changing the `.spec.monitoring.tls.enabled` setting will trigger a rolling restart of the Cluster.
+
+If the `PodMonitor` is managed by the operator (`.spec.monitoring.enablePodMonitor` set to `true`),
+it will automatically contain the necessary configurations to access the metrics via TLS.
+
+To manually deploy a `PodMonitor` suitable for reading metrics via TLS, define it as follows and
+adjust as needed:
+
+```yaml
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: cluster-example
+spec:
+  selector:
+    matchLabels:
+      "cnpg.io/cluster": cluster-example
+  podMetricsEndpoints:
+  - port: metrics
+    scheme: https
+    tlsConfig:
+      ca:
+        secret:
+          name: cluster-example-ca
+          key: ca.crt
+      serverName: cluster-example-rw
+```
+
+!!! Important
+    Ensure you modify the example above with a unique name, as well as the
+    correct Cluster's namespace and labels (e.g., `cluster-example`).
+
+!!! Important
+    The `serverName` field in the metrics endpoint must match one of the names
+    defined in the server certificate. If the default certificate is in use,
+    the `serverName` value should be in the format `<cluster-name>-rw`.
 
 ### Predefined set of metrics
 
@@ -172,7 +217,7 @@ cnpg_collector_up{cluster="cluster-example"} 1
 
 # HELP cnpg_collector_postgres_version Postgres version
 # TYPE cnpg_collector_postgres_version gauge
-cnpg_collector_postgres_version{cluster="cluster-example",full="16.3"} 16.3
+cnpg_collector_postgres_version{cluster="cluster-example",full="17.2"} 17.2
 
 # HELP cnpg_collector_last_failed_backup_timestamp The last failed backup as a unix timestamp
 # TYPE cnpg_collector_last_failed_backup_timestamp gauge
@@ -744,6 +789,11 @@ And then run:
 
 ```shell
 kubectl exec -ti curl -- curl -s ${POD_IP}:9187/metrics
+```
+
+If you enabled TLS metrics, run instead:
+```shell
+kubectl exec -ti curl -- curl -sk https://${POD_IP}:9187/metrics
 ```
 
 In case you want to access the metrics of the operator, you need to point

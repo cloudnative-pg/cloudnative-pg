@@ -23,13 +23,13 @@ import (
 	"slices"
 	"time"
 
-	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/sethvargo/go-password/password"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -41,12 +41,12 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
+	"github.com/cloudnative-pg/machinery/pkg/log"
 )
 
 // createPostgresClusterObjects ensures that we have the required global objects
@@ -98,56 +98,48 @@ func (r *ClusterReconciler) createPostgresClusterObjects(ctx context.Context, cl
 		return err
 	}
 
-	// TODO: only required to cleanup custom monitoring queries configmaps from older versions (v1.10 and v1.11)
-	// 		 that could have been copied with the source configmap name instead of the new default one.
-	// 		 Should be removed in future releases.
-	// should never return an error, not a requirement, just a nice to have
-	r.deleteOldCustomQueriesConfigmap(ctx, cluster)
-
 	return nil
 }
 
 func (r *ClusterReconciler) reconcilePodDisruptionBudget(ctx context.Context, cluster *apiv1.Cluster) error {
 	if !cluster.GetEnablePDB() {
-		return r.deletePodDisruptionBudgetIfExists(ctx, cluster)
+		return r.deletePodDisruptionBudgetsIfExist(ctx, cluster)
 	}
 
-	// The PDB should not be enforced if we are inside a maintenance
-	// window, and we chose to avoid allocating more storage space.
+	primaryPDB := specs.BuildPrimaryPodDisruptionBudget(cluster)
+	replicaPDB := specs.BuildReplicasPodDisruptionBudget(cluster)
+
 	if cluster.IsNodeMaintenanceWindowInProgress() && cluster.IsReusePVCEnabled() {
-		if err := r.deleteReplicasPodDisruptionBudget(ctx, cluster); err != nil {
-			return err
-		}
+		// The replica PDB should not be enforced if we are inside a maintenance
+		// window, and we chose to avoid allocating more storage space.
+		replicaPDB = nil
 
+		// If this a single-instance cluster, we need to delete
+		// the PodDisruptionBudget for the primary node too
+		// otherwise the user won't be able to drain the workloads
+		// from the underlying node.
 		if cluster.Spec.Instances == 1 {
-			// If this a single-instance cluster, we need to delete
-			// the PodDisruptionBudget for the primary node too
-			// otherwise the user won't be able to drain the workloads
-			// from the underlying node.
-			return r.deletePrimaryPodDisruptionBudget(ctx, cluster)
+			primaryPDB = nil
 		}
-
-		// Make sure that if the cluster was scaled down and scaled up
-		// we create the primary PDB even if we're under a maintenance window
-		return r.createOrPatchOwnedPodDisruptionBudget(ctx,
-			cluster,
-			specs.BuildPrimaryPodDisruptionBudget(cluster),
-		)
 	}
 
-	// Reconcile the primary PDB
-	err := r.createOrPatchOwnedPodDisruptionBudget(ctx,
-		cluster,
-		specs.BuildPrimaryPodDisruptionBudget(cluster),
-	)
-	if err != nil {
+	if err := r.handlePDB(ctx, cluster, primaryPDB, r.deletePrimaryPodDisruptionBudgetIfExists); err != nil {
 		return err
 	}
 
-	return r.createOrPatchOwnedPodDisruptionBudget(ctx,
-		cluster,
-		specs.BuildReplicasPodDisruptionBudget(cluster),
-	)
+	return r.handlePDB(ctx, cluster, replicaPDB, r.deleteReplicasPodDisruptionBudgetIfExists)
+}
+
+func (r *ClusterReconciler) handlePDB(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	pdb *policyv1.PodDisruptionBudget,
+	deleteFunc func(context.Context, *apiv1.Cluster) error,
+) error {
+	if pdb != nil {
+		return r.createOrPatchOwnedPodDisruptionBudget(ctx, cluster, pdb)
+	}
+	return deleteFunc(ctx, cluster)
 }
 
 func (r *ClusterReconciler) reconcilePostgresSecrets(ctx context.Context, cluster *apiv1.Cluster) error {
@@ -184,7 +176,8 @@ func (r *ClusterReconciler) reconcileSuperuserSecret(ctx context.Context, cluste
 			cluster.GetServiceReadWriteName(),
 			"*",
 			"postgres",
-			postgresPassword)
+			postgresPassword,
+			utils.UserTypeSuperuser)
 		cluster.SetInheritedDataAndOwnership(&postgresSecret.ObjectMeta)
 
 		return createOrPatchClusterCredentialSecret(ctx, r.Client, postgresSecret)
@@ -224,7 +217,8 @@ func (r *ClusterReconciler) reconcileAppUserSecret(ctx context.Context, cluster 
 			cluster.GetServiceReadWriteName(),
 			cluster.GetApplicationDatabaseName(),
 			cluster.GetApplicationDatabaseOwner(),
-			appPassword)
+			appPassword,
+			utils.UserTypeApp)
 
 		cluster.SetInheritedDataAndOwnership(&appSecret.ObjectMeta)
 		return createOrPatchClusterCredentialSecret(ctx, r.Client, appSecret)
@@ -365,6 +359,8 @@ func (r *ClusterReconciler) reconcileManagedServices(ctx context.Context, cluste
 		if isEnabled {
 			continue
 		}
+
+		// Ensure the service is not present
 		if err := r.serviceReconciler(ctx, cluster, &livingService, false); err != nil {
 			return err
 		}
@@ -378,7 +374,16 @@ func (r *ClusterReconciler) serviceReconciler(
 	proposed *corev1.Service,
 	enabled bool,
 ) error {
-	contextLogger := log.FromContext(ctx).WithValues("serviceName", proposed.Name)
+	strategy := apiv1.ServiceUpdateStrategyPatch
+	annotationStrategy := apiv1.ServiceUpdateStrategy(proposed.Annotations[utils.UpdateStrategyAnnotation])
+	if annotationStrategy == apiv1.ServiceUpdateStrategyReplace {
+		strategy = apiv1.ServiceUpdateStrategyReplace
+	}
+
+	contextLogger := log.FromContext(ctx).WithValues(
+		"serviceName", proposed.Name,
+		"updateStrategy", strategy,
+	)
 
 	var livingService corev1.Service
 	err := r.Client.Get(ctx, types.NamespacedName{Name: proposed.Name, Namespace: proposed.Namespace}, &livingService)
@@ -395,6 +400,11 @@ func (r *ClusterReconciler) serviceReconciler(
 
 	if owner, _ := IsOwnedByCluster(&livingService); owner != cluster.Name {
 		return fmt.Errorf("refusing to reconcile service: %s, not owned by the cluster", livingService.Name)
+	}
+
+	if !livingService.DeletionTimestamp.IsZero() {
+		contextLogger.Info("waiting for service to be deleted")
+		return ErrNextLoop
 	}
 
 	if !enabled {
@@ -432,9 +442,18 @@ func (r *ClusterReconciler) serviceReconciler(
 		return nil
 	}
 
-	contextLogger.Info("reconciling service")
-	// we update to ensure that we substitute the selectors
-	return r.Client.Update(ctx, &livingService)
+	if strategy == apiv1.ServiceUpdateStrategyPatch {
+		contextLogger.Info("reconciling service")
+		// we update to ensure that we substitute the selectors
+		return r.Client.Update(ctx, &livingService)
+	}
+
+	contextLogger.Info("deleting the service")
+	if err := r.Client.Delete(ctx, &livingService); err != nil {
+		return err
+	}
+
+	return ErrNextLoop
 }
 
 // createOrPatchOwnedPodDisruptionBudget ensures that we have a PDB requiring to remove one node at a time
@@ -481,33 +500,36 @@ func (r *ClusterReconciler) createOrPatchOwnedPodDisruptionBudget(
 	return nil
 }
 
-func (r *ClusterReconciler) deletePodDisruptionBudgetIfExists(ctx context.Context, cluster *apiv1.Cluster) error {
-	if err := r.deletePrimaryPodDisruptionBudget(ctx, cluster); err != nil && !apierrs.IsNotFound(err) {
-		return fmt.Errorf("unable to retrieve primary PodDisruptionBudget: %w", err)
+func (r *ClusterReconciler) deletePodDisruptionBudgetsIfExist(ctx context.Context, cluster *apiv1.Cluster) error {
+	if err := r.deletePrimaryPodDisruptionBudgetIfExists(ctx, cluster); err != nil {
+		return err
 	}
 
-	if err := r.deleteReplicasPodDisruptionBudget(ctx, cluster); err != nil && !apierrs.IsNotFound(err) {
-		return fmt.Errorf("unable to retrieve replica PodDisruptionBudget: %w", err)
-	}
-
-	return nil
+	return r.deleteReplicasPodDisruptionBudgetIfExists(ctx, cluster)
 }
 
-// deleteReplicasPodDisruptionBudget ensures that we delete the PDB requiring to remove one node at a time
-func (r *ClusterReconciler) deletePrimaryPodDisruptionBudget(ctx context.Context, cluster *apiv1.Cluster) error {
-	return r.deletePodDisruptionBudget(
+func (r *ClusterReconciler) deletePrimaryPodDisruptionBudgetIfExists(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+) error {
+	return r.deletePodDisruptionBudgetIfExists(
 		ctx,
 		cluster,
 		client.ObjectKey{Name: cluster.Name + apiv1.PrimaryPodDisruptionBudgetSuffix, Namespace: cluster.Namespace})
 }
 
-// deleteReplicasPodDisruptionBudget ensures that we delete the PDB requiring to remove one node at a time
-func (r *ClusterReconciler) deleteReplicasPodDisruptionBudget(ctx context.Context, cluster *apiv1.Cluster) error {
-	return r.deletePodDisruptionBudget(ctx, cluster, client.ObjectKey{Name: cluster.Name, Namespace: cluster.Namespace})
+func (r *ClusterReconciler) deleteReplicasPodDisruptionBudgetIfExists(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+) error {
+	return r.deletePodDisruptionBudgetIfExists(
+		ctx,
+		cluster,
+		client.ObjectKey{Name: cluster.Name, Namespace: cluster.Namespace},
+	)
 }
 
-// deleteReplicasPodDisruptionBudget ensures that we delete the PDB requiring to remove one node at a time
-func (r *ClusterReconciler) deletePodDisruptionBudget(
+func (r *ClusterReconciler) deletePodDisruptionBudgetIfExists(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	key types.NamespacedName,
@@ -692,8 +714,8 @@ func (r *ClusterReconciler) createOrPatchRole(ctx context.Context, cluster *apiv
 	}
 
 	generatedRole := specs.CreateRole(*cluster, originBackup)
-	if reflect.DeepEqual(generatedRole.Rules, role.Rules) {
-		// Everything fine, the two config maps are exactly the same
+	if equality.Semantic.DeepEqual(generatedRole.Rules, role.Rules) {
+		// Everything fine, the two rules have the same content
 		return nil
 	}
 
@@ -701,9 +723,9 @@ func (r *ClusterReconciler) createOrPatchRole(ctx context.Context, cluster *apiv
 
 	// The configuration changed, and we need the patch the
 	// configMap we have
-	patchedRole := role
+	patchedRole := role.DeepCopy()
 	patchedRole.Rules = generatedRole.Rules
-	if err := r.Patch(ctx, &patchedRole, client.MergeFrom(&role)); err != nil {
+	if err := r.Patch(ctx, patchedRole, client.MergeFrom(&role)); err != nil {
 		return fmt.Errorf("while patching role: %w", err)
 	}
 
@@ -1042,6 +1064,14 @@ func (r *ClusterReconciler) createPrimaryInstance(
 		// reconciliation loop is started by the informers.
 		contextLogger.Info("refusing to create the primary instance while the latest generated serial is not zero",
 			"latestGeneratedNode", cluster.Status.LatestGeneratedNode)
+
+		if err := r.RegisterPhase(ctx, cluster,
+			apiv1.PhaseUnrecoverable,
+			"One or more instances were previously created, but no PersistentVolumeClaims (PVCs) exist. "+
+				"The cluster is in an unrecoverable state. To resolve this, restore the cluster from a recent backup.",
+		); err != nil {
+			return ctrl.Result{}, fmt.Errorf("while registering the unrecoverable phase: %w", err)
+		}
 		return ctrl.Result{}, nil
 	}
 
@@ -1093,14 +1123,17 @@ func (r *ClusterReconciler) createPrimaryInstance(
 	isBootstrappingFromBaseBackup := cluster.Spec.Bootstrap != nil && cluster.Spec.Bootstrap.PgBaseBackup != nil
 	switch {
 	case isBootstrappingFromRecovery && recoverySnapshot != nil:
-		var snapshot volumesnapshot.VolumeSnapshot
-		if err := r.Client.Get(ctx,
-			types.NamespacedName{Name: recoverySnapshot.DataSource.Name, Namespace: cluster.Namespace},
-			&snapshot); err != nil {
+		metadata, err := persistentvolumeclaim.GetSourceMetadataOrNil(
+			ctx,
+			r.Client,
+			cluster.Namespace,
+			recoverySnapshot.DataSource,
+		)
+		if err != nil {
 			return ctrl.Result{}, err
 		}
 		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (from volumeSnapshots)")
-		job = specs.CreatePrimaryJobViaRestoreSnapshot(*cluster, nodeSerial, snapshot, backup)
+		job = specs.CreatePrimaryJobViaRestoreSnapshot(*cluster, nodeSerial, metadata, backup)
 
 	case isBootstrappingFromRecovery:
 		r.Recorder.Event(cluster, "Normal", "CreatingInstance", "Primary instance (from backup)")
@@ -1281,7 +1314,7 @@ func (r *ClusterReconciler) ensureInstancesAreCreated(
 		return ctrl.Result{}, err
 	}
 	if instanceToCreate == nil {
-		contextLogger.Debug(
+		contextLogger.Trace(
 			"haven't found any instance to create",
 			"instances", instancesStatus.GetNames(),
 			"dangling", cluster.Status.DanglingPVC,

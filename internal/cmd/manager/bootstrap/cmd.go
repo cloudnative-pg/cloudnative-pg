@@ -20,10 +20,10 @@ package bootstrap
 import (
 	"os"
 
+	"github.com/cloudnative-pg/machinery/pkg/fileutils"
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/spf13/cobra"
 
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/fileutils"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/log"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
 
@@ -33,9 +33,10 @@ func NewCmd() *cobra.Command {
 		Use:  "bootstrap [target]",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			contextLogger := log.FromContext(cmd.Context())
 			dest := args[0]
 
-			log.Info("Installing the manager executable",
+			contextLogger.Info("Installing the manager executable",
 				"destination", dest,
 				"version", versions.Version,
 				"build", versions.Info)
@@ -44,13 +45,13 @@ func NewCmd() *cobra.Command {
 				panic(err)
 			}
 
-			log.Info("Setting 0750 permissions")
+			contextLogger.Info("Setting 0750 permissions")
 			err = os.Chmod(dest, 0o750) // #nosec
 			if err != nil {
 				panic(err)
 			}
 
-			log.Info("Bootstrap completed")
+			contextLogger.Info("Bootstrap completed")
 
 			return nil
 		},

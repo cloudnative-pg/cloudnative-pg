@@ -9,6 +9,12 @@ specific to Kubernetes and PostgreSQL.
 : A *node* is a worker machine in Kubernetes, either virtual or physical, where
   all services necessary to run pods are managed by the control plane node(s).
 
+[Postgres Node](architecture.md#reserving-nodes-for-postgresql-workloads)
+: A *Postgres node* is a Kubernetes worker node dedicated to running PostgreSQL
+  workloads. This is achieved by applying the `node-role.kubernetes.io` label and
+  taint, as [proposed by CloudNativePG](architecture.md#reserving-nodes-for-postgresql-workloads).
+  It is also referred to as a `postgres` node.
+
 [Pod](https://kubernetes.io/docs/concepts/workloads/pods/pod/)
 : A *pod* is the smallest computing unit that can be deployed in a Kubernetes
   cluster and is composed of one or more containers that share network and
@@ -123,8 +129,15 @@ Superuser
 PVC group
 : A PVC group in CloudNativePG's terminology is a group of related PVCs
   belonging to the same PostgreSQL instance, namely the main volume containing
-  the PGDATA (`storage`) and the volume for WALs (`walStorage`).|
+  the PGDATA (`storage`) and the volume for WALs (`walStorage`).
 
+<a id="rto"></a>RTO
+: Acronym for "recovery time objective", the amount of time a system can be
+  unavailable without adversely impacting the application.
+
+<a id="rpo"></a>RPO
+:  Acronym for "recovery point objective", a calculation of the level of
+  acceptable data loss following a disaster recovery scenario.
 
 ## Cloud terminology
 

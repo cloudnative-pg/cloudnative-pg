@@ -9,9 +9,12 @@
 - [Backup](#postgresql-cnpg-io-v1-Backup)
 - [Cluster](#postgresql-cnpg-io-v1-Cluster)
 - [ClusterImageCatalog](#postgresql-cnpg-io-v1-ClusterImageCatalog)
+- [Database](#postgresql-cnpg-io-v1-Database)
 - [ImageCatalog](#postgresql-cnpg-io-v1-ImageCatalog)
 - [Pooler](#postgresql-cnpg-io-v1-Pooler)
+- [Publication](#postgresql-cnpg-io-v1-Publication)
 - [ScheduledBackup](#postgresql-cnpg-io-v1-ScheduledBackup)
+- [Subscription](#postgresql-cnpg-io-v1-Subscription)
 
 ## Backup     {#postgresql-cnpg-io-v1-Backup}
 
@@ -118,6 +121,44 @@ More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-
 </tbody>
 </table>
 
+## Database     {#postgresql-cnpg-io-v1-Database}
+
+
+
+<p>Database is the Schema for the databases API</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>apiVersion</code> <B>[Required]</B><br/>string</td><td><code>postgresql.cnpg.io/v1</code></td></tr>
+<tr><td><code>kind</code> <B>[Required]</B><br/>string</td><td><code>Database</code></td></tr>
+<tr><td><code>metadata</code> <B>[Required]</B><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#objectmeta-v1-meta"><i>meta/v1.ObjectMeta</i></a>
+</td>
+<td>
+   <span class="text-muted">No description provided.</span>Refer to the Kubernetes API documentation for the fields of the <code>metadata</code> field.</td>
+</tr>
+<tr><td><code>spec</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-DatabaseSpec"><i>DatabaseSpec</i></a>
+</td>
+<td>
+   <p>Specification of the desired Database.
+More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status</p>
+</td>
+</tr>
+<tr><td><code>status</code><br/>
+<a href="#postgresql-cnpg-io-v1-DatabaseStatus"><i>DatabaseStatus</i></a>
+</td>
+<td>
+   <p>Most recently observed status of the Database. This data may not be up to
+date. Populated by the system. Read-only.
+More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status</p>
+</td>
+</tr>
+</tbody>
+</table>
+
 ## ImageCatalog     {#postgresql-cnpg-io-v1-ImageCatalog}
 
 
@@ -185,6 +226,42 @@ More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-
 </tbody>
 </table>
 
+## Publication     {#postgresql-cnpg-io-v1-Publication}
+
+
+**Appears in:**
+
+
+
+<p>Publication is the Schema for the publications API</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>apiVersion</code> <B>[Required]</B><br/>string</td><td><code>postgresql.cnpg.io/v1</code></td></tr>
+<tr><td><code>kind</code> <B>[Required]</B><br/>string</td><td><code>Publication</code></td></tr>
+<tr><td><code>metadata</code> <B>[Required]</B><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#objectmeta-v1-meta"><i>meta/v1.ObjectMeta</i></a>
+</td>
+<td>
+   <span class="text-muted">No description provided.</span>Refer to the Kubernetes API documentation for the fields of the <code>metadata</code> field.</td>
+</tr>
+<tr><td><code>spec</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-PublicationSpec"><i>PublicationSpec</i></a>
+</td>
+<td>
+   <span class="text-muted">No description provided.</span></td>
+</tr>
+<tr><td><code>status</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-PublicationStatus"><i>PublicationStatus</i></a>
+</td>
+<td>
+   <span class="text-muted">No description provided.</span></td>
+</tr>
+</tbody>
+</table>
+
 ## ScheduledBackup     {#postgresql-cnpg-io-v1-ScheduledBackup}
 
 
@@ -219,6 +296,42 @@ More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-
 to date. Populated by the system. Read-only.
 More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status</p>
 </td>
+</tr>
+</tbody>
+</table>
+
+## Subscription     {#postgresql-cnpg-io-v1-Subscription}
+
+
+**Appears in:**
+
+
+
+<p>Subscription is the Schema for the subscriptions API</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>apiVersion</code> <B>[Required]</B><br/>string</td><td><code>postgresql.cnpg.io/v1</code></td></tr>
+<tr><td><code>kind</code> <B>[Required]</B><br/>string</td><td><code>Subscription</code></td></tr>
+<tr><td><code>metadata</code> <B>[Required]</B><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#objectmeta-v1-meta"><i>meta/v1.ObjectMeta</i></a>
+</td>
+<td>
+   <span class="text-muted">No description provided.</span>Refer to the Kubernetes API documentation for the fields of the <code>metadata</code> field.</td>
+</tr>
+<tr><td><code>spec</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-SubscriptionSpec"><i>SubscriptionSpec</i></a>
+</td>
+<td>
+   <span class="text-muted">No description provided.</span></td>
+</tr>
+<tr><td><code>status</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-SubscriptionStatus"><i>SubscriptionStatus</i></a>
+</td>
+<td>
+   <span class="text-muted">No description provided.</span></td>
 </tr>
 </tbody>
 </table>
@@ -341,74 +454,6 @@ by the operator if EnablePodAntiAffinity is set to true (default) or to be used 
 </tbody>
 </table>
 
-## AzureCredentials     {#postgresql-cnpg-io-v1-AzureCredentials}
-
-
-**Appears in:**
-
-- [BarmanCredentials](#postgresql-cnpg-io-v1-BarmanCredentials)
-
-
-<p>AzureCredentials is the type for the credentials to be used to upload
-files to Azure Blob Storage. The connection string contains every needed
-information. If the connection string is not specified, we'll need the
-storage account name and also one (and only one) of:</p>
-<ul>
-<li>
-<p>storageKey</p>
-</li>
-<li>
-<p>storageSasToken</p>
-</li>
-<li>
-<p>inheriting the credentials from the pod environment by setting inheritFromAzureAD to true</p>
-</li>
-</ul>
-
-
-<table class="table">
-<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
-<tbody>
-<tr><td><code>connectionString</code><br/>
-<a href="#postgresql-cnpg-io-v1-SecretKeySelector"><i>SecretKeySelector</i></a>
-</td>
-<td>
-   <p>The connection string to be used</p>
-</td>
-</tr>
-<tr><td><code>storageAccount</code><br/>
-<a href="#postgresql-cnpg-io-v1-SecretKeySelector"><i>SecretKeySelector</i></a>
-</td>
-<td>
-   <p>The storage account where to upload data</p>
-</td>
-</tr>
-<tr><td><code>storageKey</code><br/>
-<a href="#postgresql-cnpg-io-v1-SecretKeySelector"><i>SecretKeySelector</i></a>
-</td>
-<td>
-   <p>The storage account key to be used in conjunction
-with the storage account name</p>
-</td>
-</tr>
-<tr><td><code>storageSasToken</code><br/>
-<a href="#postgresql-cnpg-io-v1-SecretKeySelector"><i>SecretKeySelector</i></a>
-</td>
-<td>
-   <p>A shared-access-signature to be used in conjunction with
-the storage account name</p>
-</td>
-</tr>
-<tr><td><code>inheritFromAzureAD</code><br/>
-<i>bool</i>
-</td>
-<td>
-   <p>Use the Azure AD based authentication without providing explicitly the keys.</p>
-</td>
-</tr>
-</tbody>
-</table>
-
 ## BackupConfiguration     {#postgresql-cnpg-io-v1-BackupConfiguration}
 
 
@@ -434,7 +479,7 @@ documentation</p>
 </td>
 </tr>
 <tr><td><code>barmanObjectStore</code><br/>
-<a href="#postgresql-cnpg-io-v1-BarmanObjectStoreConfiguration"><i>BarmanObjectStoreConfiguration</i></a>
+<a href="https://pkg.go.dev/github.com/cloudnative-pg/barman-cloud/pkg/api/#BarmanObjectStoreConfiguration"><i>github.com/cloudnative-pg/barman-cloud/pkg/api.BarmanObjectStoreConfiguration</i></a>
 </td>
 <td>
    <p>The configuration for the barman-cloud tool suite</p>
@@ -560,7 +605,7 @@ plugin for this backup</p>
    <p>Type is tho role of the snapshot in the cluster, such as PG_DATA, PG_WAL and PG_TABLESPACE</p>
 </td>
 </tr>
-<tr><td><code>tablespaceName</code> <B>[Required]</B><br/>
+<tr><td><code>tablespaceName</code><br/>
 <i>string</i>
 </td>
 <td>
@@ -611,13 +656,13 @@ information that could be needed to correctly restore it.</p>
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
 <tr><td><code>LocalObjectReference</code><br/>
-<a href="#postgresql-cnpg-io-v1-LocalObjectReference"><i>LocalObjectReference</i></a>
+<a href="https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api/#LocalObjectReference"><i>github.com/cloudnative-pg/machinery/pkg/api.LocalObjectReference</i></a>
 </td>
 <td>(Members of <code>LocalObjectReference</code> are embedded into this type.)
    <span class="text-muted">No description provided.</span></td>
 </tr>
 <tr><td><code>endpointCA</code><br/>
-<a href="#postgresql-cnpg-io-v1-SecretKeySelector"><i>SecretKeySelector</i></a>
+<a href="https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api/#SecretKeySelector"><i>github.com/cloudnative-pg/machinery/pkg/api.SecretKeySelector</i></a>
 </td>
 <td>
    <p>EndpointCA store the CA bundle of the barman endpoint.
@@ -643,7 +688,7 @@ errors with certificate issuer and barman-cloud-wal-archive.</p>
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
 <tr><td><code>cluster</code> <B>[Required]</B><br/>
-<a href="#postgresql-cnpg-io-v1-LocalObjectReference"><i>LocalObjectReference</i></a>
+<a href="https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api/#LocalObjectReference"><i>github.com/cloudnative-pg/machinery/pkg/api.LocalObjectReference</i></a>
 </td>
 <td>
    <p>The cluster to backup</p>
@@ -711,14 +756,14 @@ Overrides the default settings specified in the cluster '.backup.volumeSnapshot.
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
 <tr><td><code>BarmanCredentials</code><br/>
-<a href="#postgresql-cnpg-io-v1-BarmanCredentials"><i>BarmanCredentials</i></a>
+<a href="https://pkg.go.dev/github.com/cloudnative-pg/barman-cloud/pkg/api/#BarmanCredentials"><i>github.com/cloudnative-pg/barman-cloud/pkg/api.BarmanCredentials</i></a>
 </td>
 <td>(Members of <code>BarmanCredentials</code> are embedded into this type.)
    <p>The potential credentials for each cloud provider</p>
 </td>
 </tr>
 <tr><td><code>endpointCA</code><br/>
-<a href="#postgresql-cnpg-io-v1-SecretKeySelector"><i>SecretKeySelector</i></a>
+<a href="https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api/#SecretKeySelector"><i>github.com/cloudnative-pg/machinery/pkg/api.SecretKeySelector</i></a>
 </td>
 <td>
    <p>EndpointCA store the CA bundle of the barman endpoint.
@@ -877,11 +922,18 @@ parameter is omitted</p>
    <p>The backup method being used</p>
 </td>
 </tr>
-<tr><td><code>online</code> <B>[Required]</B><br/>
+<tr><td><code>online</code><br/>
 <i>bool</i>
 </td>
 <td>
    <p>Whether the backup was online/hot (<code>true</code>) or offline/cold (<code>false</code>)</p>
+</td>
+</tr>
+<tr><td><code>pluginMetadata</code><br/>
+<i>map[string]string</i>
+</td>
+<td>
+   <p>A map containing the plugin metadata</p>
 </td>
 </tr>
 </tbody>
@@ -904,142 +956,6 @@ parameter is omitted</p>
 
 
 
-
-## BarmanCredentials     {#postgresql-cnpg-io-v1-BarmanCredentials}
-
-
-**Appears in:**
-
-- [BackupStatus](#postgresql-cnpg-io-v1-BackupStatus)
-
-- [BarmanObjectStoreConfiguration](#postgresql-cnpg-io-v1-BarmanObjectStoreConfiguration)
-
-
-<p>BarmanCredentials an object containing the potential credentials for each cloud provider</p>
-
-
-<table class="table">
-<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
-<tbody>
-<tr><td><code>googleCredentials</code><br/>
-<a href="#postgresql-cnpg-io-v1-GoogleCredentials"><i>GoogleCredentials</i></a>
-</td>
-<td>
-   <p>The credentials to use to upload data to Google Cloud Storage</p>
-</td>
-</tr>
-<tr><td><code>s3Credentials</code><br/>
-<a href="#postgresql-cnpg-io-v1-S3Credentials"><i>S3Credentials</i></a>
-</td>
-<td>
-   <p>The credentials to use to upload data to S3</p>
-</td>
-</tr>
-<tr><td><code>azureCredentials</code><br/>
-<a href="#postgresql-cnpg-io-v1-AzureCredentials"><i>AzureCredentials</i></a>
-</td>
-<td>
-   <p>The credentials to use to upload data to Azure Blob Storage</p>
-</td>
-</tr>
-</tbody>
-</table>
-
-## BarmanObjectStoreConfiguration     {#postgresql-cnpg-io-v1-BarmanObjectStoreConfiguration}
-
-
-**Appears in:**
-
-- [BackupConfiguration](#postgresql-cnpg-io-v1-BackupConfiguration)
-
-- [ExternalCluster](#postgresql-cnpg-io-v1-ExternalCluster)
-
-
-<p>BarmanObjectStoreConfiguration contains the backup configuration
-using Barman against an S3-compatible object storage</p>
-
-
-<table class="table">
-<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
-<tbody>
-<tr><td><code>BarmanCredentials</code><br/>
-<a href="#postgresql-cnpg-io-v1-BarmanCredentials"><i>BarmanCredentials</i></a>
-</td>
-<td>(Members of <code>BarmanCredentials</code> are embedded into this type.)
-   <p>The potential credentials for each cloud provider</p>
-</td>
-</tr>
-<tr><td><code>endpointURL</code><br/>
-<i>string</i>
-</td>
-<td>
-   <p>Endpoint to be used to upload data to the cloud,
-overriding the automatic endpoint discovery</p>
-</td>
-</tr>
-<tr><td><code>endpointCA</code><br/>
-<a href="#postgresql-cnpg-io-v1-SecretKeySelector"><i>SecretKeySelector</i></a>
-</td>
-<td>
-   <p>EndpointCA store the CA bundle of the barman endpoint.
-Useful when using self-signed certificates to avoid
-errors with certificate issuer and barman-cloud-wal-archive</p>
-</td>
-</tr>
-<tr><td><code>destinationPath</code> <B>[Required]</B><br/>
-<i>string</i>
-</td>
-<td>
-   <p>The path where to store the backup (i.e. s3://bucket/path/to/folder)
-this path, with different destination folders, will be used for WALs
-and for data</p>
-</td>
-</tr>
-<tr><td><code>serverName</code><br/>
-<i>string</i>
-</td>
-<td>
-   <p>The server name on S3, the cluster name is used if this
-parameter is omitted</p>
-</td>
-</tr>
-<tr><td><code>wal</code><br/>
-<a href="#postgresql-cnpg-io-v1-WalBackupConfiguration"><i>WalBackupConfiguration</i></a>
-</td>
-<td>
-   <p>The configuration for the backup of the WAL stream.
-When not defined, WAL files will be stored uncompressed and may be
-unencrypted in the object store, according to the bucket default policy.</p>
-</td>
-</tr>
-<tr><td><code>data</code><br/>
-<a href="#postgresql-cnpg-io-v1-DataBackupConfiguration"><i>DataBackupConfiguration</i></a>
-</td>
-<td>
-   <p>The configuration to be used to backup the data files
-When not defined, base backups files will be stored uncompressed and may
-be unencrypted in the object store, according to the bucket default
-policy.</p>
-</td>
-</tr>
-<tr><td><code>tags</code><br/>
-<i>map[string]string</i>
-</td>
-<td>
-   <p>Tags is a list of key value pairs that will be passed to the
-Barman --tags option.</p>
-</td>
-</tr>
-<tr><td><code>historyTags</code><br/>
-<i>map[string]string</i>
-</td>
-<td>
-   <p>HistoryTags is a list of key value pairs that will be passed to the
-Barman --history-tags option.</p>
-</td>
-</tr>
-</tbody>
-</table>
 
 ## BootstrapConfiguration     {#postgresql-cnpg-io-v1-BootstrapConfiguration}
 
@@ -1116,7 +1032,7 @@ by applications. Defaults to the value of the <code>database</code> key.</p>
 </td>
 </tr>
 <tr><td><code>secret</code><br/>
-<a href="#postgresql-cnpg-io-v1-LocalObjectReference"><i>LocalObjectReference</i></a>
+<a href="https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api/#LocalObjectReference"><i>github.com/cloudnative-pg/machinery/pkg/api.LocalObjectReference</i></a>
 </td>
 <td>
    <p>Name of the secret containing the initial credentials for the
@@ -1163,6 +1079,48 @@ enabling checksums on data pages (default: <code>false</code>)</p>
    <p>The value to be passed as option <code>--lc-ctype</code> for initdb (default:<code>C</code>)</p>
 </td>
 </tr>
+<tr><td><code>locale</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Sets the default collation order and character classification in the new database.</p>
+</td>
+</tr>
+<tr><td><code>localeProvider</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>This option sets the locale provider for databases created in the new cluster.
+Available from PostgreSQL 16.</p>
+</td>
+</tr>
+<tr><td><code>icuLocale</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Specifies the ICU locale when the ICU provider is used.
+This option requires <code>localeProvider</code> to be set to <code>icu</code>.
+Available from PostgreSQL 15.</p>
+</td>
+</tr>
+<tr><td><code>icuRules</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Specifies additional collation rules to customize the behavior of the default collation.
+This option requires <code>localeProvider</code> to be set to <code>icu</code>.
+Available from PostgreSQL 16.</p>
+</td>
+</tr>
+<tr><td><code>builtinLocale</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Specifies the locale name when the builtin provider is used.
+This option requires <code>localeProvider</code> to be set to <code>builtin</code>.
+Available from PostgreSQL 17.</p>
+</td>
+</tr>
 <tr><td><code>walSegmentSize</code><br/>
 <i>int</i>
 </td>
@@ -1175,8 +1133,8 @@ option for initdb (default: empty, resulting in PostgreSQL default: 16MB)</p>
 <i>[]string</i>
 </td>
 <td>
-   <p>List of SQL queries to be executed as a superuser immediately
-after the cluster has been created - to be used with extreme care
+   <p>List of SQL queries to be executed as a superuser in the <code>postgres</code>
+database right after the cluster has been created - to be used with extreme care
 (by default empty)</p>
 </td>
 </tr>
@@ -1185,7 +1143,7 @@ after the cluster has been created - to be used with extreme care
 </td>
 <td>
    <p>List of SQL queries to be executed as a superuser in the application
-database right after is created - to be used with extreme care
+database right after the cluster has been created - to be used with extreme care
 (by default empty)</p>
 </td>
 </tr>
@@ -1194,7 +1152,7 @@ database right after is created - to be used with extreme care
 </td>
 <td>
    <p>List of SQL queries to be executed as a superuser in the <code>template1</code>
-after the cluster has been created - to be used with extreme care
+database right after the cluster has been created - to be used with extreme care
 (by default empty)</p>
 </td>
 </tr>
@@ -1207,13 +1165,41 @@ instance using logical backup (<code>pg_dump</code> and <code>pg_restore</code>)
 </td>
 </tr>
 <tr><td><code>postInitApplicationSQLRefs</code><br/>
-<a href="#postgresql-cnpg-io-v1-PostInitApplicationSQLRefs"><i>PostInitApplicationSQLRefs</i></a>
+<a href="#postgresql-cnpg-io-v1-SQLRefs"><i>SQLRefs</i></a>
 </td>
 <td>
-   <p>PostInitApplicationSQLRefs points references to ConfigMaps or Secrets which
-contain SQL files, the general implementation order to these references is
-from all Secrets to all ConfigMaps, and inside Secrets or ConfigMaps,
-the implementation order is same as the order of each array
+   <p>List of references to ConfigMaps or Secrets containing SQL files
+to be executed as a superuser in the application database right after
+the cluster has been created. The references are processed in a specific order:
+first, all Secrets are processed, followed by all ConfigMaps.
+Within each group, the processing order follows the sequence specified
+in their respective arrays.
+(by default empty)</p>
+</td>
+</tr>
+<tr><td><code>postInitTemplateSQLRefs</code><br/>
+<a href="#postgresql-cnpg-io-v1-SQLRefs"><i>SQLRefs</i></a>
+</td>
+<td>
+   <p>List of references to ConfigMaps or Secrets containing SQL files
+to be executed as a superuser in the <code>template1</code> database right after
+the cluster has been created. The references are processed in a specific order:
+first, all Secrets are processed, followed by all ConfigMaps.
+Within each group, the processing order follows the sequence specified
+in their respective arrays.
+(by default empty)</p>
+</td>
+</tr>
+<tr><td><code>postInitSQLRefs</code><br/>
+<a href="#postgresql-cnpg-io-v1-SQLRefs"><i>SQLRefs</i></a>
+</td>
+<td>
+   <p>List of references to ConfigMaps or Secrets containing SQL files
+to be executed as a superuser in the <code>postgres</code> database right after
+the cluster has been created. The references are processed in a specific order:
+first, all Secrets are processed, followed by all ConfigMaps.
+Within each group, the processing order follows the sequence specified
+in their respective arrays.
 (by default empty)</p>
 </td>
 </tr>
@@ -1258,7 +1244,7 @@ by applications. Defaults to the value of the <code>database</code> key.</p>
 </td>
 </tr>
 <tr><td><code>secret</code><br/>
-<a href="#postgresql-cnpg-io-v1-LocalObjectReference"><i>LocalObjectReference</i></a>
+<a href="https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api/#LocalObjectReference"><i>github.com/cloudnative-pg/machinery/pkg/api.LocalObjectReference</i></a>
 </td>
 <td>
    <p>Name of the secret containing the initial credentials for the
@@ -1354,7 +1340,7 @@ by applications. Defaults to the value of the <code>database</code> key.</p>
 </td>
 </tr>
 <tr><td><code>secret</code><br/>
-<a href="#postgresql-cnpg-io-v1-LocalObjectReference"><i>LocalObjectReference</i></a>
+<a href="https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api/#LocalObjectReference"><i>github.com/cloudnative-pg/machinery/pkg/api.LocalObjectReference</i></a>
 </td>
 <td>
    <p>Name of the secret containing the initial credentials for the
@@ -1507,6 +1493,32 @@ this can be omitted.<!-- raw HTML omitted --></li>
 </tbody>
 </table>
 
+## ClusterMonitoringTLSConfiguration     {#postgresql-cnpg-io-v1-ClusterMonitoringTLSConfiguration}
+
+
+**Appears in:**
+
+- [MonitoringConfiguration](#postgresql-cnpg-io-v1-MonitoringConfiguration)
+
+
+<p>ClusterMonitoringTLSConfiguration is the type containing the TLS configuration
+for the cluster's monitoring</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>enabled</code><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>Enable TLS for the monitoring endpoint.
+Changing this option will force a rollout of all instances.</p>
+</td>
+</tr>
+</tbody>
+</table>
+
 ## ClusterSpec     {#postgresql-cnpg-io-v1-ClusterSpec}
 
 
@@ -1640,7 +1652,7 @@ Undefined or 0 disable synchronous replication.</p>
 </td>
 </tr>
 <tr><td><code>superuserSecret</code><br/>
-<a href="#postgresql-cnpg-io-v1-LocalObjectReference"><i>LocalObjectReference</i></a>
+<a href="https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api/#LocalObjectReference"><i>github.com/cloudnative-pg/machinery/pkg/api.LocalObjectReference</i></a>
 </td>
 <td>
    <p>The secret containing the superuser password. If not defined a new
@@ -1667,7 +1679,7 @@ user by setting it to <code>NULL</code>. Disabled by default.</p>
 </td>
 </tr>
 <tr><td><code>imagePullSecrets</code><br/>
-<a href="#postgresql-cnpg-io-v1-LocalObjectReference"><i>[]LocalObjectReference</i></a>
+<a href="https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api/#LocalObjectReference"><i>[]github.com/cloudnative-pg/machinery/pkg/api.LocalObjectReference</i></a>
 </td>
 <td>
    <p>The list of pull secrets to be used to pull the images</p>
@@ -1781,7 +1793,7 @@ https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
 for more information.</p>
 </td>
 </tr>
-<tr><td><code>ephemeralVolumesSizeLimit</code> <B>[Required]</B><br/>
+<tr><td><code>ephemeralVolumesSizeLimit</code><br/>
 <a href="#postgresql-cnpg-io-v1-EphemeralVolumesSizeLimitConfiguration"><i>EphemeralVolumesSizeLimitConfiguration</i></a>
 </td>
 <td>
@@ -1839,7 +1851,7 @@ it can be with a switchover (<code>switchover</code>) or in-place (<code>restart
 </td>
 </tr>
 <tr><td><code>externalClusters</code><br/>
-<a href="#postgresql-cnpg-io-v1-ExternalCluster"><i>[]ExternalCluster</i></a>
+<a href="#postgresql-cnpg-io-v1-ExternalClusterList"><i>ExternalClusterList</i></a>
 </td>
 <td>
    <p>The list of external clusters which are used in the configuration</p>
@@ -1912,12 +1924,20 @@ advisable for any PostgreSQL cluster employed for
 development/staging purposes.</p>
 </td>
 </tr>
-<tr><td><code>plugins</code> <B>[Required]</B><br/>
+<tr><td><code>plugins</code><br/>
 <a href="#postgresql-cnpg-io-v1-PluginConfigurationList"><i>PluginConfigurationList</i></a>
 </td>
 <td>
    <p>The plugins configuration, containing
 any plugin to be loaded with the corresponding configuration</p>
+</td>
+</tr>
+<tr><td><code>probes</code><br/>
+<a href="#postgresql-cnpg-io-v1-ProbesConfiguration"><i>ProbesConfiguration</i></a>
+</td>
+<td>
+   <p>The configuration of the probes to be injected
+in the PostgreSQL Pods.</p>
 </td>
 </tr>
 </tbody>
@@ -2015,7 +2035,7 @@ any plugin to be loaded with the corresponding configuration</p>
 during a switchover or a failover</p>
 </td>
 </tr>
-<tr><td><code>lastPromotionToken</code> <B>[Required]</B><br/>
+<tr><td><code>lastPromotionToken</code><br/>
 <i>string</i>
 </td>
 <td>
@@ -2250,7 +2270,7 @@ This field is reported when <code>.spec.failoverDelay</code> is populated or dur
    <p>Image contains the image name used by the pods</p>
 </td>
 </tr>
-<tr><td><code>pluginStatus</code> <B>[Required]</B><br/>
+<tr><td><code>pluginStatus</code><br/>
 <a href="#postgresql-cnpg-io-v1-PluginStatus"><i>[]PluginStatus</i></a>
 </td>
 <td>
@@ -2272,56 +2292,6 @@ This field is reported when <code>.spec.failoverDelay</code> is populated or dur
 from pg_controldata such as Database system identifier, Latest checkpoint's
 TimeLineID, Latest checkpoint's REDO location, Latest checkpoint's REDO
 WAL file, and Time of latest checkpoint</p>
-</td>
-</tr>
-</tbody>
-</table>
-
-## CompressionType     {#postgresql-cnpg-io-v1-CompressionType}
-
-(Alias of `string`)
-
-**Appears in:**
-
-- [DataBackupConfiguration](#postgresql-cnpg-io-v1-DataBackupConfiguration)
-
-- [WalBackupConfiguration](#postgresql-cnpg-io-v1-WalBackupConfiguration)
-
-
-<p>CompressionType encapsulates the available types of compression</p>
-
-
-
-
-## ConfigMapKeySelector     {#postgresql-cnpg-io-v1-ConfigMapKeySelector}
-
-
-**Appears in:**
-
-- [MonitoringConfiguration](#postgresql-cnpg-io-v1-MonitoringConfiguration)
-
-- [PostInitApplicationSQLRefs](#postgresql-cnpg-io-v1-PostInitApplicationSQLRefs)
-
-
-<p>ConfigMapKeySelector contains enough information to let you locate
-the key of a ConfigMap</p>
-
-
-<table class="table">
-<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
-<tbody>
-<tr><td><code>LocalObjectReference</code><br/>
-<a href="#postgresql-cnpg-io-v1-LocalObjectReference"><i>LocalObjectReference</i></a>
-</td>
-<td>(Members of <code>LocalObjectReference</code> are embedded into this type.)
-   <p>The name of the secret in the pod's namespace to select from.</p>
-</td>
-</tr>
-<tr><td><code>key</code> <B>[Required]</B><br/>
-<i>string</i>
-</td>
-<td>
-   <p>The key to select</p>
 </td>
 </tr>
 </tbody>
@@ -2353,79 +2323,20 @@ Map keys are the config map names, map values are the versions</p>
 </tbody>
 </table>
 
-## DataBackupConfiguration     {#postgresql-cnpg-io-v1-DataBackupConfiguration}
+## DataDurabilityLevel     {#postgresql-cnpg-io-v1-DataDurabilityLevel}
 
+(Alias of `string`)
 
 **Appears in:**
 
-- [BarmanObjectStoreConfiguration](#postgresql-cnpg-io-v1-BarmanObjectStoreConfiguration)
+- [SynchronousReplicaConfiguration](#postgresql-cnpg-io-v1-SynchronousReplicaConfiguration)
 
 
-<p>DataBackupConfiguration is the configuration of the backup of
-the data directory</p>
+<p>DataDurabilityLevel specifies how strictly to enforce synchronous replication
+when cluster instances are unavailable. Options are <code>required</code> or <code>preferred</code>.</p>
 
 
-<table class="table">
-<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
-<tbody>
-<tr><td><code>compression</code><br/>
-<a href="#postgresql-cnpg-io-v1-CompressionType"><i>CompressionType</i></a>
-</td>
-<td>
-   <p>Compress a backup file (a tar file per tablespace) while streaming it
-to the object store. Available options are empty string (no
-compression, default), <code>gzip</code>, <code>bzip2</code> or <code>snappy</code>.</p>
-</td>
-</tr>
-<tr><td><code>encryption</code><br/>
-<a href="#postgresql-cnpg-io-v1-EncryptionType"><i>EncryptionType</i></a>
-</td>
-<td>
-   <p>Whenever to force the encryption of files (if the bucket is
-not already configured for that).
-Allowed options are empty string (use the bucket policy, default),
-<code>AES256</code> and <code>aws:kms</code></p>
-</td>
-</tr>
-<tr><td><code>jobs</code><br/>
-<i>int32</i>
-</td>
-<td>
-   <p>The number of parallel jobs to be used to upload the backup, defaults
-to 2</p>
-</td>
-</tr>
-<tr><td><code>immediateCheckpoint</code><br/>
-<i>bool</i>
-</td>
-<td>
-   <p>Control whether the I/O workload for the backup initial checkpoint will
-be limited, according to the <code>checkpoint_completion_target</code> setting on
-the PostgreSQL server. If set to true, an immediate checkpoint will be
-used, meaning PostgreSQL will complete the checkpoint as soon as
-possible. <code>false</code> by default.</p>
-</td>
-</tr>
-<tr><td><code>additionalCommandArgs</code> <B>[Required]</B><br/>
-<i>[]string</i>
-</td>
-<td>
-   <p>AdditionalCommandArgs represents additional arguments that can be appended
-to the 'barman-cloud-backup' command-line invocation. These arguments
-provide flexibility to customize the backup process further according to
-specific requirements or configurations.</p>
-<p>Example:
-In a scenario where specialized backup options are required, such as setting
-a specific timeout or defining custom behavior, users can use this field
-to specify additional command arguments.</p>
-<p>Note:
-It's essential to ensure that the provided arguments are valid and supported
-by the 'barman-cloud-backup' command, to avoid potential errors or unintended
-behavior during execution.</p>
-</td>
-</tr>
-</tbody>
-</table>
+
 
 ## DataSource     {#postgresql-cnpg-io-v1-DataSource}
 
@@ -2466,6 +2377,20 @@ PostgreSQL cluster from an existing storage</p>
 </tbody>
 </table>
 
+## DatabaseReclaimPolicy     {#postgresql-cnpg-io-v1-DatabaseReclaimPolicy}
+
+(Alias of `string`)
+
+**Appears in:**
+
+- [DatabaseSpec](#postgresql-cnpg-io-v1-DatabaseSpec)
+
+
+<p>DatabaseReclaimPolicy describes a policy for end-of-life maintenance of databases.</p>
+
+
+
+
 ## DatabaseRoleRef     {#postgresql-cnpg-io-v1-DatabaseRoleRef}
 
 
@@ -2485,6 +2410,226 @@ PostgreSQL cluster from an existing storage</p>
 </td>
 <td>
    <span class="text-muted">No description provided.</span></td>
+</tr>
+</tbody>
+</table>
+
+## DatabaseSpec     {#postgresql-cnpg-io-v1-DatabaseSpec}
+
+
+**Appears in:**
+
+- [Database](#postgresql-cnpg-io-v1-Database)
+
+
+<p>DatabaseSpec is the specification of a Postgresql Database, built around the
+<code>CREATE DATABASE</code>, <code>ALTER DATABASE</code>, and <code>DROP DATABASE</code> SQL commands of
+PostgreSQL.</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>cluster</code> <B>[Required]</B><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#localobjectreference-v1-core"><i>core/v1.LocalObjectReference</i></a>
+</td>
+<td>
+   <p>The name of the PostgreSQL cluster hosting the database.</p>
+</td>
+</tr>
+<tr><td><code>ensure</code><br/>
+<a href="#postgresql-cnpg-io-v1-EnsureOption"><i>EnsureOption</i></a>
+</td>
+<td>
+   <p>Ensure the PostgreSQL database is <code>present</code> or <code>absent</code> - defaults to &quot;present&quot;.</p>
+</td>
+</tr>
+<tr><td><code>name</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The name of the database to create inside PostgreSQL. This setting cannot be changed.</p>
+</td>
+</tr>
+<tr><td><code>owner</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Maps to the <code>OWNER</code> parameter of <code>CREATE DATABASE</code>.
+Maps to the <code>OWNER TO</code> command of <code>ALTER DATABASE</code>.
+The role name of the user who owns the database inside PostgreSQL.</p>
+</td>
+</tr>
+<tr><td><code>template</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Maps to the <code>TEMPLATE</code> parameter of <code>CREATE DATABASE</code>. This setting
+cannot be changed. The name of the template from which to create
+this database.</p>
+</td>
+</tr>
+<tr><td><code>encoding</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Maps to the <code>ENCODING</code> parameter of <code>CREATE DATABASE</code>. This setting
+cannot be changed. Character set encoding to use in the database.</p>
+</td>
+</tr>
+<tr><td><code>locale</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Maps to the <code>LOCALE</code> parameter of <code>CREATE DATABASE</code>. This setting
+cannot be changed. Sets the default collation order and character
+classification in the new database.</p>
+</td>
+</tr>
+<tr><td><code>localeProvider</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Maps to the <code>LOCALE_PROVIDER</code> parameter of <code>CREATE DATABASE</code>. This
+setting cannot be changed. This option sets the locale provider for
+databases created in the new cluster. Available from PostgreSQL 16.</p>
+</td>
+</tr>
+<tr><td><code>localeCollate</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Maps to the <code>LC_COLLATE</code> parameter of <code>CREATE DATABASE</code>. This
+setting cannot be changed.</p>
+</td>
+</tr>
+<tr><td><code>localeCType</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Maps to the <code>LC_CTYPE</code> parameter of <code>CREATE DATABASE</code>. This setting
+cannot be changed.</p>
+</td>
+</tr>
+<tr><td><code>icuLocale</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Maps to the <code>ICU_LOCALE</code> parameter of <code>CREATE DATABASE</code>. This
+setting cannot be changed. Specifies the ICU locale when the ICU
+provider is used. This option requires <code>localeProvider</code> to be set to
+<code>icu</code>. Available from PostgreSQL 15.</p>
+</td>
+</tr>
+<tr><td><code>icuRules</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Maps to the <code>ICU_RULES</code> parameter of <code>CREATE DATABASE</code>. This setting
+cannot be changed. Specifies additional collation rules to customize
+the behavior of the default collation. This option requires
+<code>localeProvider</code> to be set to <code>icu</code>. Available from PostgreSQL 16.</p>
+</td>
+</tr>
+<tr><td><code>builtinLocale</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Maps to the <code>BUILTIN_LOCALE</code> parameter of <code>CREATE DATABASE</code>. This
+setting cannot be changed. Specifies the locale name when the
+builtin provider is used. This option requires <code>localeProvider</code> to
+be set to <code>builtin</code>. Available from PostgreSQL 17.</p>
+</td>
+</tr>
+<tr><td><code>collationVersion</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Maps to the <code>COLLATION_VERSION</code> parameter of <code>CREATE DATABASE</code>. This
+setting cannot be changed.</p>
+</td>
+</tr>
+<tr><td><code>isTemplate</code><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>Maps to the <code>IS_TEMPLATE</code> parameter of <code>CREATE DATABASE</code> and <code>ALTER DATABASE</code>. If true, this database is considered a template and can
+be cloned by any user with <code>CREATEDB</code> privileges.</p>
+</td>
+</tr>
+<tr><td><code>allowConnections</code><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>Maps to the <code>ALLOW_CONNECTIONS</code> parameter of <code>CREATE DATABASE</code> and
+<code>ALTER DATABASE</code>. If false then no one can connect to this database.</p>
+</td>
+</tr>
+<tr><td><code>connectionLimit</code><br/>
+<i>int</i>
+</td>
+<td>
+   <p>Maps to the <code>CONNECTION LIMIT</code> clause of <code>CREATE DATABASE</code> and
+<code>ALTER DATABASE</code>. How many concurrent connections can be made to
+this database. -1 (the default) means no limit.</p>
+</td>
+</tr>
+<tr><td><code>tablespace</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Maps to the <code>TABLESPACE</code> parameter of <code>CREATE DATABASE</code>.
+Maps to the <code>SET TABLESPACE</code> command of <code>ALTER DATABASE</code>.
+The name of the tablespace (in PostgreSQL) that will be associated
+with the new database. This tablespace will be the default
+tablespace used for objects created in this database.</p>
+</td>
+</tr>
+<tr><td><code>databaseReclaimPolicy</code><br/>
+<a href="#postgresql-cnpg-io-v1-DatabaseReclaimPolicy"><i>DatabaseReclaimPolicy</i></a>
+</td>
+<td>
+   <p>The policy for end-of-life maintenance of this database.</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## DatabaseStatus     {#postgresql-cnpg-io-v1-DatabaseStatus}
+
+
+**Appears in:**
+
+- [Database](#postgresql-cnpg-io-v1-Database)
+
+
+<p>DatabaseStatus defines the observed state of Database</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>observedGeneration</code><br/>
+<i>int64</i>
+</td>
+<td>
+   <p>A sequence number representing the latest
+desired state that was synchronized</p>
+</td>
+</tr>
+<tr><td><code>applied</code><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>Applied is true if the database was reconciled correctly</p>
+</td>
+</tr>
+<tr><td><code>message</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Message is the reconciliation output message</p>
+</td>
 </tr>
 </tbody>
 </table>
@@ -2518,27 +2663,13 @@ PostgreSQL cluster from an existing storage</p>
 </tbody>
 </table>
 
-## EncryptionType     {#postgresql-cnpg-io-v1-EncryptionType}
-
-(Alias of `string`)
-
-**Appears in:**
-
-- [DataBackupConfiguration](#postgresql-cnpg-io-v1-DataBackupConfiguration)
-
-- [WalBackupConfiguration](#postgresql-cnpg-io-v1-WalBackupConfiguration)
-
-
-<p>EncryptionType encapsulated the available types of encryption</p>
-
-
-
-
 ## EnsureOption     {#postgresql-cnpg-io-v1-EnsureOption}
 
 (Alias of `string`)
 
 **Appears in:**
+
+- [DatabaseSpec](#postgresql-cnpg-io-v1-DatabaseSpec)
 
 - [RoleConfiguration](#postgresql-cnpg-io-v1-RoleConfiguration)
 
@@ -2564,127 +2695,18 @@ storage</p>
 <table class="table">
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td><code>shm</code> <B>[Required]</B><br/>
+<tr><td><code>shm</code><br/>
 <a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/api/resource#Quantity"><i>k8s.io/apimachinery/pkg/api/resource.Quantity</i></a>
 </td>
 <td>
    <p>Shm is the size limit of the shared memory volume</p>
 </td>
 </tr>
-<tr><td><code>temporaryData</code> <B>[Required]</B><br/>
+<tr><td><code>temporaryData</code><br/>
 <a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/api/resource#Quantity"><i>k8s.io/apimachinery/pkg/api/resource.Quantity</i></a>
 </td>
 <td>
    <p>TemporaryData is the size limit of the temporary data volume</p>
-</td>
-</tr>
-</tbody>
-</table>
-
-## ExternalCluster     {#postgresql-cnpg-io-v1-ExternalCluster}
-
-
-**Appears in:**
-
-- [ClusterSpec](#postgresql-cnpg-io-v1-ClusterSpec)
-
-
-<p>ExternalCluster represents the connection parameters to an
-external cluster which is used in the other sections of the configuration</p>
-
-
-<table class="table">
-<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
-<tbody>
-<tr><td><code>name</code> <B>[Required]</B><br/>
-<i>string</i>
-</td>
-<td>
-   <p>The server name, required</p>
-</td>
-</tr>
-<tr><td><code>connectionParameters</code><br/>
-<i>map[string]string</i>
-</td>
-<td>
-   <p>The list of connection parameters, such as dbname, host, username, etc</p>
-</td>
-</tr>
-<tr><td><code>sslCert</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#secretkeyselector-v1-core"><i>core/v1.SecretKeySelector</i></a>
-</td>
-<td>
-   <p>The reference to an SSL certificate to be used to connect to this
-instance</p>
-</td>
-</tr>
-<tr><td><code>sslKey</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#secretkeyselector-v1-core"><i>core/v1.SecretKeySelector</i></a>
-</td>
-<td>
-   <p>The reference to an SSL private key to be used to connect to this
-instance</p>
-</td>
-</tr>
-<tr><td><code>sslRootCert</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#secretkeyselector-v1-core"><i>core/v1.SecretKeySelector</i></a>
-</td>
-<td>
-   <p>The reference to an SSL CA public key to be used to connect to this
-instance</p>
-</td>
-</tr>
-<tr><td><code>password</code><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#secretkeyselector-v1-core"><i>core/v1.SecretKeySelector</i></a>
-</td>
-<td>
-   <p>The reference to the password to be used to connect to the server.
-If a password is provided, CloudNativePG creates a PostgreSQL
-passfile at <code>/controller/external/NAME/pass</code> (where &quot;NAME&quot; is the
-cluster's name). This passfile is automatically referenced in the
-connection string when establishing a connection to the remote
-PostgreSQL server from the current PostgreSQL <code>Cluster</code>. This ensures
-secure and efficient password management for external clusters.</p>
-</td>
-</tr>
-<tr><td><code>barmanObjectStore</code><br/>
-<a href="#postgresql-cnpg-io-v1-BarmanObjectStoreConfiguration"><i>BarmanObjectStoreConfiguration</i></a>
-</td>
-<td>
-   <p>The configuration for the barman-cloud tool suite</p>
-</td>
-</tr>
-</tbody>
-</table>
-
-## GoogleCredentials     {#postgresql-cnpg-io-v1-GoogleCredentials}
-
-
-**Appears in:**
-
-- [BarmanCredentials](#postgresql-cnpg-io-v1-BarmanCredentials)
-
-
-<p>GoogleCredentials is the type for the Google Cloud Storage credentials.
-This needs to be specified even if we run inside a GKE environment.</p>
-
-
-<table class="table">
-<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
-<tbody>
-<tr><td><code>applicationCredentials</code><br/>
-<a href="#postgresql-cnpg-io-v1-SecretKeySelector"><i>SecretKeySelector</i></a>
-</td>
-<td>
-   <p>The secret containing the Google Cloud Storage JSON file with the credentials</p>
-</td>
-</tr>
-<tr><td><code>gkeEnvironment</code><br/>
-<i>bool</i>
-</td>
-<td>
-   <p>If set to true, will presume that it's running inside a GKE environment,
-default to false.</p>
 </td>
 </tr>
 </tbody>
@@ -2803,6 +2825,26 @@ database right after is imported - to be used with extreme care
 <td>
    <p>When set to true, only the <code>pre-data</code> and <code>post-data</code> sections of
 <code>pg_restore</code> are invoked, avoiding data import. Default: <code>false</code>.</p>
+</td>
+</tr>
+<tr><td><code>pgDumpExtraOptions</code><br/>
+<i>[]string</i>
+</td>
+<td>
+   <p>List of custom options to pass to the <code>pg_dump</code> command. IMPORTANT:
+Use these options with caution and at your own risk, as the operator
+does not validate their content. Be aware that certain options may
+conflict with the operator's intended functionality or design.</p>
+</td>
+</tr>
+<tr><td><code>pgRestoreExtraOptions</code><br/>
+<i>[]string</i>
+</td>
+<td>
+   <p>List of custom options to pass to the <code>pg_restore</code> command. IMPORTANT:
+Use these options with caution and at your own risk, as the operator
+does not validate their content. Be aware that certain options may
+conflict with the operator's intended functionality or design.</p>
 </td>
 </tr>
 </tbody>
@@ -3052,53 +3094,6 @@ the bind+search LDAP authentication process</p>
 
 
 
-## LocalObjectReference     {#postgresql-cnpg-io-v1-LocalObjectReference}
-
-
-**Appears in:**
-
-- [BackupSource](#postgresql-cnpg-io-v1-BackupSource)
-
-- [BackupSpec](#postgresql-cnpg-io-v1-BackupSpec)
-
-- [BootstrapInitDB](#postgresql-cnpg-io-v1-BootstrapInitDB)
-
-- [BootstrapPgBaseBackup](#postgresql-cnpg-io-v1-BootstrapPgBaseBackup)
-
-- [BootstrapRecovery](#postgresql-cnpg-io-v1-BootstrapRecovery)
-
-- [ClusterSpec](#postgresql-cnpg-io-v1-ClusterSpec)
-
-- [ConfigMapKeySelector](#postgresql-cnpg-io-v1-ConfigMapKeySelector)
-
-- [PgBouncerSpec](#postgresql-cnpg-io-v1-PgBouncerSpec)
-
-- [PoolerSpec](#postgresql-cnpg-io-v1-PoolerSpec)
-
-- [RoleConfiguration](#postgresql-cnpg-io-v1-RoleConfiguration)
-
-- [ScheduledBackupSpec](#postgresql-cnpg-io-v1-ScheduledBackupSpec)
-
-- [SecretKeySelector](#postgresql-cnpg-io-v1-SecretKeySelector)
-
-
-<p>LocalObjectReference contains enough information to let you locate a
-local object with a known type inside the same namespace</p>
-
-
-<table class="table">
-<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
-<tbody>
-<tr><td><code>name</code> <B>[Required]</B><br/>
-<i>string</i>
-</td>
-<td>
-   <p>Name of the referent.</p>
-</td>
-</tr>
-</tbody>
-</table>
-
 ## ManagedConfiguration     {#postgresql-cnpg-io-v1-ManagedConfiguration}
 
 
@@ -3193,6 +3188,13 @@ It includes the type of service and its associated template specification.</p>
 Valid values are &quot;rw&quot;, &quot;r&quot;, and &quot;ro&quot;, representing read-write, read, and read-only services.</p>
 </td>
 </tr>
+<tr><td><code>updateStrategy</code><br/>
+<a href="#postgresql-cnpg-io-v1-ServiceUpdateStrategy"><i>ServiceUpdateStrategy</i></a>
+</td>
+<td>
+   <p>UpdateStrategy describes how the service differences should be reconciled</p>
+</td>
+</tr>
 <tr><td><code>serviceTemplate</code> <B>[Required]</B><br/>
 <a href="#postgresql-cnpg-io-v1-ServiceTemplateSpec"><i>ServiceTemplateSpec</i></a>
 </td>
@@ -3225,7 +3227,7 @@ Valid values are &quot;rw&quot;, &quot;r&quot;, and &quot;ro&quot;, representing
 Valid values are &quot;r&quot;, and &quot;ro&quot;, representing read, and read-only services.</p>
 </td>
 </tr>
-<tr><td><code>additional</code> <B>[Required]</B><br/>
+<tr><td><code>additional</code><br/>
 <a href="#postgresql-cnpg-io-v1-ManagedService"><i>[]ManagedService</i></a>
 </td>
 <td>
@@ -3256,7 +3258,7 @@ not using the core data types.</p>
 <table class="table">
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td><code>name</code> <B>[Required]</B><br/>
+<tr><td><code>name</code><br/>
 <i>string</i>
 </td>
 <td>
@@ -3311,14 +3313,14 @@ Default: false.</p>
 </td>
 </tr>
 <tr><td><code>customQueriesConfigMap</code><br/>
-<a href="#postgresql-cnpg-io-v1-ConfigMapKeySelector"><i>[]ConfigMapKeySelector</i></a>
+<a href="https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api/#ConfigMapKeySelector"><i>[]github.com/cloudnative-pg/machinery/pkg/api.ConfigMapKeySelector</i></a>
 </td>
 <td>
    <p>The list of config maps containing the custom queries</p>
 </td>
 </tr>
 <tr><td><code>customQueriesSecret</code><br/>
-<a href="#postgresql-cnpg-io-v1-SecretKeySelector"><i>[]SecretKeySelector</i></a>
+<a href="https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api/#SecretKeySelector"><i>[]github.com/cloudnative-pg/machinery/pkg/api.SecretKeySelector</i></a>
 </td>
 <td>
    <p>The list of secrets containing the custom queries</p>
@@ -3329,6 +3331,14 @@ Default: false.</p>
 </td>
 <td>
    <p>Enable or disable the <code>PodMonitor</code></p>
+</td>
+</tr>
+<tr><td><code>tls</code><br/>
+<a href="#postgresql-cnpg-io-v1-ClusterMonitoringTLSConfiguration"><i>ClusterMonitoringTLSConfiguration</i></a>
+</td>
+<td>
+   <p>Configure TLS communication for the metrics endpoint.
+Changing tls.enabled option will force a rollout of all instances.</p>
 </td>
 </tr>
 <tr><td><code>podMonitorMetricRelabelings</code><br/>
@@ -3545,7 +3555,7 @@ by pgbouncer</p>
 </td>
 </tr>
 <tr><td><code>authQuerySecret</code><br/>
-<a href="#postgresql-cnpg-io-v1-LocalObjectReference"><i>LocalObjectReference</i></a>
+<a href="https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api/#LocalObjectReference"><i>github.com/cloudnative-pg/machinery/pkg/api.LocalObjectReference</i></a>
 </td>
 <td>
    <p>The credentials of the user that need to be used for the authentication
@@ -3593,6 +3603,59 @@ the operator calls PgBouncer's <code>PAUSE</code> and <code>RESUME</code> comman
 </tbody>
 </table>
 
+## PluginConfiguration     {#postgresql-cnpg-io-v1-PluginConfiguration}
+
+
+**Appears in:**
+
+
+
+<p>PluginConfiguration specifies a plugin that need to be loaded for this
+cluster to be reconciled</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>name</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Name is the plugin name</p>
+</td>
+</tr>
+<tr><td><code>enabled</code><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>Enabled is true if this plugin will be used</p>
+</td>
+</tr>
+<tr><td><code>parameters</code><br/>
+<i>map[string]string</i>
+</td>
+<td>
+   <p>Parameters is the configuration of the plugin</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## PluginConfigurationList     {#postgresql-cnpg-io-v1-PluginConfigurationList}
+
+(Alias of `[]github.com/cloudnative-pg/cloudnative-pg/api/v1.PluginConfiguration`)
+
+**Appears in:**
+
+- [ClusterSpec](#postgresql-cnpg-io-v1-ClusterSpec)
+
+
+<p>PluginConfigurationList represent a set of plugin with their
+configuration parameters</p>
+
+
+
+
 ## PluginStatus     {#postgresql-cnpg-io-v1-PluginStatus}
 
 
@@ -3622,7 +3685,7 @@ the operator calls PgBouncer's <code>PAUSE</code> and <code>RESUME</code> comman
 latest reconciliation loop</p>
 </td>
 </tr>
-<tr><td><code>capabilities</code> <B>[Required]</B><br/>
+<tr><td><code>capabilities</code><br/>
 <i>[]string</i>
 </td>
 <td>
@@ -3630,7 +3693,7 @@ latest reconciliation loop</p>
 plugin</p>
 </td>
 </tr>
-<tr><td><code>operatorCapabilities</code> <B>[Required]</B><br/>
+<tr><td><code>operatorCapabilities</code><br/>
 <i>[]string</i>
 </td>
 <td>
@@ -3638,7 +3701,7 @@ plugin</p>
 plugin regarding the reconciler</p>
 </td>
 </tr>
-<tr><td><code>walCapabilities</code> <B>[Required]</B><br/>
+<tr><td><code>walCapabilities</code><br/>
 <i>[]string</i>
 </td>
 <td>
@@ -3646,12 +3709,27 @@ plugin regarding the reconciler</p>
 plugin regarding the WAL management</p>
 </td>
 </tr>
-<tr><td><code>backupCapabilities</code> <B>[Required]</B><br/>
+<tr><td><code>backupCapabilities</code><br/>
 <i>[]string</i>
 </td>
 <td>
    <p>BackupCapabilities are the list of capabilities of the
 plugin regarding the Backup management</p>
+</td>
+</tr>
+<tr><td><code>restoreJobHookCapabilities</code><br/>
+<i>[]string</i>
+</td>
+<td>
+   <p>RestoreJobHookCapabilities are the list of capabilities of the
+plugin regarding the RestoreJobHook management</p>
+</td>
+</tr>
+<tr><td><code>status</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Status contain the status reported by the plugin through the SetStatusInCluster interface</p>
 </td>
 </tr>
 </tbody>
@@ -3836,7 +3914,7 @@ part for now.</p>
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
 <tr><td><code>cluster</code> <B>[Required]</B><br/>
-<a href="#postgresql-cnpg-io-v1-LocalObjectReference"><i>LocalObjectReference</i></a>
+<a href="https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api/#LocalObjectReference"><i>github.com/cloudnative-pg/machinery/pkg/api.LocalObjectReference</i></a>
 </td>
 <td>
    <p>This is the cluster reference on which the Pooler will work.
@@ -3941,40 +4019,6 @@ we are targeting. Allowed values are <code>rw</code> and <code>ro</code>.</p>
 
 
 
-## PostInitApplicationSQLRefs     {#postgresql-cnpg-io-v1-PostInitApplicationSQLRefs}
-
-
-**Appears in:**
-
-- [BootstrapInitDB](#postgresql-cnpg-io-v1-BootstrapInitDB)
-
-
-<p>PostInitApplicationSQLRefs points references to ConfigMaps or Secrets which
-contain SQL files, the general implementation order to these references is
-from all Secrets to all ConfigMaps, and inside Secrets or ConfigMaps,
-the implementation order is same as the order of each array</p>
-
-
-<table class="table">
-<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
-<tbody>
-<tr><td><code>secretRefs</code><br/>
-<a href="#postgresql-cnpg-io-v1-SecretKeySelector"><i>[]SecretKeySelector</i></a>
-</td>
-<td>
-   <p>SecretRefs holds a list of references to Secrets</p>
-</td>
-</tr>
-<tr><td><code>configMapRefs</code><br/>
-<a href="#postgresql-cnpg-io-v1-ConfigMapKeySelector"><i>[]ConfigMapKeySelector</i></a>
-</td>
-<td>
-   <p>ConfigMapRefs holds a list of references to ConfigMaps</p>
-</td>
-</tr>
-</tbody>
-</table>
-
 ## PostgresConfiguration     {#postgresql-cnpg-io-v1-PostgresConfiguration}
 
 
@@ -3994,6 +4038,13 @@ the implementation order is same as the order of each array</p>
 </td>
 <td>
    <p>PostgreSQL configuration options (postgresql.conf)</p>
+</td>
+</tr>
+<tr><td><code>synchronous</code><br/>
+<a href="#postgresql-cnpg-io-v1-SynchronousReplicaConfiguration"><i>SynchronousReplicaConfiguration</i></a>
+</td>
+<td>
+   <p>Configuration of the PostgreSQL synchronous replication feature</p>
 </td>
 </tr>
 <tr><td><code>pg_hba</code><br/>
@@ -4085,6 +4136,346 @@ the primary server of the cluster as part of rolling updates</p>
 
 
 
+
+## Probe     {#postgresql-cnpg-io-v1-Probe}
+
+
+**Appears in:**
+
+- [ProbesConfiguration](#postgresql-cnpg-io-v1-ProbesConfiguration)
+
+
+<p>Probe describes a health check to be performed against a container to determine whether it is
+alive or ready to receive traffic.</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>initialDelaySeconds</code><br/>
+<i>int32</i>
+</td>
+<td>
+   <p>Number of seconds after the container has started before liveness probes are initiated.
+More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes</p>
+</td>
+</tr>
+<tr><td><code>timeoutSeconds</code><br/>
+<i>int32</i>
+</td>
+<td>
+   <p>Number of seconds after which the probe times out.
+Defaults to 1 second. Minimum value is 1.
+More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes</p>
+</td>
+</tr>
+<tr><td><code>periodSeconds</code><br/>
+<i>int32</i>
+</td>
+<td>
+   <p>How often (in seconds) to perform the probe.
+Default to 10 seconds. Minimum value is 1.</p>
+</td>
+</tr>
+<tr><td><code>successThreshold</code><br/>
+<i>int32</i>
+</td>
+<td>
+   <p>Minimum consecutive successes for the probe to be considered successful after having failed.
+Defaults to 1. Must be 1 for liveness and startup. Minimum value is 1.</p>
+</td>
+</tr>
+<tr><td><code>failureThreshold</code><br/>
+<i>int32</i>
+</td>
+<td>
+   <p>Minimum consecutive failures for the probe to be considered failed after having succeeded.
+Defaults to 3. Minimum value is 1.</p>
+</td>
+</tr>
+<tr><td><code>terminationGracePeriodSeconds</code><br/>
+<i>int64</i>
+</td>
+<td>
+   <p>Optional duration in seconds the pod needs to terminate gracefully upon probe failure.
+The grace period is the duration in seconds after the processes running in the pod are sent
+a termination signal and the time when the processes are forcibly halted with a kill signal.
+Set this value longer than the expected cleanup time for your process.
+If this value is nil, the pod's terminationGracePeriodSeconds will be used. Otherwise, this
+value overrides the value provided by the pod spec.
+Value must be non-negative integer. The value zero indicates stop immediately via
+the kill signal (no opportunity to shut down).
+This is a beta field and requires enabling ProbeTerminationGracePeriod feature gate.
+Minimum value is 1. spec.terminationGracePeriodSeconds is used if unset.</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## ProbesConfiguration     {#postgresql-cnpg-io-v1-ProbesConfiguration}
+
+
+**Appears in:**
+
+- [ClusterSpec](#postgresql-cnpg-io-v1-ClusterSpec)
+
+
+<p>ProbesConfiguration represent the configuration for the probes
+to be injected in the PostgreSQL Pods</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>startup</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-Probe"><i>Probe</i></a>
+</td>
+<td>
+   <p>The startup probe configuration</p>
+</td>
+</tr>
+<tr><td><code>liveness</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-Probe"><i>Probe</i></a>
+</td>
+<td>
+   <p>The liveness probe configuration</p>
+</td>
+</tr>
+<tr><td><code>readiness</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-Probe"><i>Probe</i></a>
+</td>
+<td>
+   <p>The readiness probe configuration</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## PublicationReclaimPolicy     {#postgresql-cnpg-io-v1-PublicationReclaimPolicy}
+
+(Alias of `string`)
+
+**Appears in:**
+
+- [PublicationSpec](#postgresql-cnpg-io-v1-PublicationSpec)
+
+
+<p>PublicationReclaimPolicy defines a policy for end-of-life maintenance of Publications.</p>
+
+
+
+
+## PublicationSpec     {#postgresql-cnpg-io-v1-PublicationSpec}
+
+
+**Appears in:**
+
+- [Publication](#postgresql-cnpg-io-v1-Publication)
+
+
+<p>PublicationSpec defines the desired state of Publication</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>cluster</code> <B>[Required]</B><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#localobjectreference-v1-core"><i>core/v1.LocalObjectReference</i></a>
+</td>
+<td>
+   <p>The name of the PostgreSQL cluster that identifies the &quot;publisher&quot;</p>
+</td>
+</tr>
+<tr><td><code>name</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The name of the publication inside PostgreSQL</p>
+</td>
+</tr>
+<tr><td><code>dbname</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The name of the database where the publication will be installed in
+the &quot;publisher&quot; cluster</p>
+</td>
+</tr>
+<tr><td><code>parameters</code><br/>
+<i>map[string]string</i>
+</td>
+<td>
+   <p>Publication parameters part of the <code>WITH</code> clause as expected by
+PostgreSQL <code>CREATE PUBLICATION</code> command</p>
+</td>
+</tr>
+<tr><td><code>target</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-PublicationTarget"><i>PublicationTarget</i></a>
+</td>
+<td>
+   <p>Target of the publication as expected by PostgreSQL <code>CREATE PUBLICATION</code> command</p>
+</td>
+</tr>
+<tr><td><code>publicationReclaimPolicy</code><br/>
+<a href="#postgresql-cnpg-io-v1-PublicationReclaimPolicy"><i>PublicationReclaimPolicy</i></a>
+</td>
+<td>
+   <p>The policy for end-of-life maintenance of this publication</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## PublicationStatus     {#postgresql-cnpg-io-v1-PublicationStatus}
+
+
+**Appears in:**
+
+- [Publication](#postgresql-cnpg-io-v1-Publication)
+
+
+<p>PublicationStatus defines the observed state of Publication</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>observedGeneration</code><br/>
+<i>int64</i>
+</td>
+<td>
+   <p>A sequence number representing the latest
+desired state that was synchronized</p>
+</td>
+</tr>
+<tr><td><code>applied</code><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>Applied is true if the publication was reconciled correctly</p>
+</td>
+</tr>
+<tr><td><code>message</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Message is the reconciliation output message</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## PublicationTarget     {#postgresql-cnpg-io-v1-PublicationTarget}
+
+
+**Appears in:**
+
+- [PublicationSpec](#postgresql-cnpg-io-v1-PublicationSpec)
+
+
+<p>PublicationTarget is what this publication should publish</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>allTables</code><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>Marks the publication as one that replicates changes for all tables
+in the database, including tables created in the future.
+Corresponding to <code>FOR ALL TABLES</code> in PostgreSQL.</p>
+</td>
+</tr>
+<tr><td><code>objects</code><br/>
+<a href="#postgresql-cnpg-io-v1-PublicationTargetObject"><i>[]PublicationTargetObject</i></a>
+</td>
+<td>
+   <p>Just the following schema objects</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## PublicationTargetObject     {#postgresql-cnpg-io-v1-PublicationTargetObject}
+
+
+**Appears in:**
+
+- [PublicationTarget](#postgresql-cnpg-io-v1-PublicationTarget)
+
+
+<p>PublicationTargetObject is an object to publish</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>tablesInSchema</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Marks the publication as one that replicates changes for all tables
+in the specified list of schemas, including tables created in the
+future. Corresponding to <code>FOR TABLES IN SCHEMA</code> in PostgreSQL.</p>
+</td>
+</tr>
+<tr><td><code>table</code><br/>
+<a href="#postgresql-cnpg-io-v1-PublicationTargetTable"><i>PublicationTargetTable</i></a>
+</td>
+<td>
+   <p>Specifies a list of tables to add to the publication. Corresponding
+to <code>FOR TABLE</code> in PostgreSQL.</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## PublicationTargetTable     {#postgresql-cnpg-io-v1-PublicationTargetTable}
+
+
+**Appears in:**
+
+- [PublicationTargetObject](#postgresql-cnpg-io-v1-PublicationTargetObject)
+
+
+<p>PublicationTargetTable is a table to publish</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>only</code><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>Whether to limit to the table only or include all its descendants</p>
+</td>
+</tr>
+<tr><td><code>name</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The table name</p>
+</td>
+</tr>
+<tr><td><code>schema</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The schema name</p>
+</td>
+</tr>
+<tr><td><code>columns</code><br/>
+<i>[]string</i>
+</td>
+<td>
+   <p>The columns to publish</p>
+</td>
+</tr>
+</tbody>
+</table>
 
 ## RecoveryTarget     {#postgresql-cnpg-io-v1-RecoveryTarget}
 
@@ -4180,7 +4571,7 @@ cluster</p>
 <table class="table">
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td><code>self</code> <B>[Required]</B><br/>
+<tr><td><code>self</code><br/>
 <i>string</i>
 </td>
 <td>
@@ -4188,7 +4579,7 @@ cluster</p>
 or a replica cluster, comparing it with <code>primary</code></p>
 </td>
 </tr>
-<tr><td><code>primary</code> <B>[Required]</B><br/>
+<tr><td><code>primary</code><br/>
 <i>string</i>
 </td>
 <td>
@@ -4203,7 +4594,7 @@ topology specified in externalClusters</p>
    <p>The name of the external cluster which is the replication origin</p>
 </td>
 </tr>
-<tr><td><code>enabled</code> <B>[Required]</B><br/>
+<tr><td><code>enabled</code><br/>
 <i>bool</i>
 </td>
 <td>
@@ -4213,12 +4604,23 @@ object store or via streaming through pg_basebackup.
 Refer to the Replica clusters page of the documentation for more information.</p>
 </td>
 </tr>
-<tr><td><code>promotionToken</code> <B>[Required]</B><br/>
+<tr><td><code>promotionToken</code><br/>
 <i>string</i>
 </td>
 <td>
    <p>A demotion token generated by an external cluster used to
 check if the promotion requirements are met.</p>
+</td>
+</tr>
+<tr><td><code>minApplyDelay</code><br/>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/apis/meta/v1#Duration"><i>meta/v1.Duration</i></a>
+</td>
+<td>
+   <p>When replica mode is enabled, this parameter allows you to replay
+transactions only when the system time is at least the configured
+time past the commit time. This provides an opportunity to correct
+data loss errors. Note that when this parameter is set, a promotion
+token cannot be used.</p>
 </td>
 </tr>
 </tbody>
@@ -4350,7 +4752,7 @@ Reference: https://www.postgresql.org/docs/current/sql-createrole.html</p>
 </td>
 </tr>
 <tr><td><code>passwordSecret</code><br/>
-<a href="#postgresql-cnpg-io-v1-LocalObjectReference"><i>LocalObjectReference</i></a>
+<a href="https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api/#LocalObjectReference"><i>github.com/cloudnative-pg/machinery/pkg/api.LocalObjectReference</i></a>
 </td>
 <td>
    <p>Secret containing the password of the role (if present)
@@ -4458,62 +4860,36 @@ Default is <code>false</code>.</p>
 </tbody>
 </table>
 
-## S3Credentials     {#postgresql-cnpg-io-v1-S3Credentials}
+## SQLRefs     {#postgresql-cnpg-io-v1-SQLRefs}
 
 
 **Appears in:**
 
-- [BarmanCredentials](#postgresql-cnpg-io-v1-BarmanCredentials)
+- [BootstrapInitDB](#postgresql-cnpg-io-v1-BootstrapInitDB)
 
 
-<p>S3Credentials is the type for the credentials to be used to upload
-files to S3. It can be provided in two alternative ways:</p>
-<ul>
-<li>
-<p>explicitly passing accessKeyId and secretAccessKey</p>
-</li>
-<li>
-<p>inheriting the role from the pod environment by setting inheritFromIAMRole to true</p>
-</li>
-</ul>
+<p>SQLRefs holds references to ConfigMaps or Secrets
+containing SQL files. The references are processed in a specific order:
+first, all Secrets are processed, followed by all ConfigMaps.
+Within each group, the processing order follows the sequence specified
+in their respective arrays.</p>
 
 
 <table class="table">
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td><code>accessKeyId</code><br/>
-<a href="#postgresql-cnpg-io-v1-SecretKeySelector"><i>SecretKeySelector</i></a>
+<tr><td><code>secretRefs</code><br/>
+<a href="https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api/#SecretKeySelector"><i>[]github.com/cloudnative-pg/machinery/pkg/api.SecretKeySelector</i></a>
 </td>
 <td>
-   <p>The reference to the access key id</p>
+   <p>SecretRefs holds a list of references to Secrets</p>
 </td>
 </tr>
-<tr><td><code>secretAccessKey</code><br/>
-<a href="#postgresql-cnpg-io-v1-SecretKeySelector"><i>SecretKeySelector</i></a>
+<tr><td><code>configMapRefs</code><br/>
+<a href="https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api/#ConfigMapKeySelector"><i>[]github.com/cloudnative-pg/machinery/pkg/api.ConfigMapKeySelector</i></a>
 </td>
 <td>
-   <p>The reference to the secret access key</p>
-</td>
-</tr>
-<tr><td><code>region</code><br/>
-<a href="#postgresql-cnpg-io-v1-SecretKeySelector"><i>SecretKeySelector</i></a>
-</td>
-<td>
-   <p>The reference to the secret containing the region name</p>
-</td>
-</tr>
-<tr><td><code>sessionToken</code><br/>
-<a href="#postgresql-cnpg-io-v1-SecretKeySelector"><i>SecretKeySelector</i></a>
-</td>
-<td>
-   <p>The references to the session key</p>
-</td>
-</tr>
-<tr><td><code>inheritFromIAMRole</code><br/>
-<i>bool</i>
-</td>
-<td>
-   <p>Use the role based authentication without providing explicitly the keys.</p>
+   <p>ConfigMapRefs holds a list of references to ConfigMaps</p>
 </td>
 </tr>
 </tbody>
@@ -4557,7 +4933,7 @@ see https://pkg.go.dev/github.com/robfig/cron#hdr-CRON_Expression_Format</p>
 </td>
 </tr>
 <tr><td><code>cluster</code> <B>[Required]</B><br/>
-<a href="#postgresql-cnpg-io-v1-LocalObjectReference"><i>LocalObjectReference</i></a>
+<a href="https://pkg.go.dev/github.com/cloudnative-pg/machinery/pkg/api/#LocalObjectReference"><i>github.com/cloudnative-pg/machinery/pkg/api.LocalObjectReference</i></a>
 </td>
 <td>
    <p>The cluster to backup</p>
@@ -4591,8 +4967,8 @@ standby, if available.</p>
 <a href="#postgresql-cnpg-io-v1-BackupMethod"><i>BackupMethod</i></a>
 </td>
 <td>
-   <p>The backup method to be used, possible options are <code>barmanObjectStore</code>
-and <code>volumeSnapshot</code>. Defaults to: <code>barmanObjectStore</code>.</p>
+   <p>The backup method to be used, possible options are <code>barmanObjectStore</code>,
+<code>volumeSnapshot</code> or <code>plugin</code>. Defaults to: <code>barmanObjectStore</code>.</p>
 </td>
 </tr>
 <tr><td><code>pluginConfiguration</code><br/>
@@ -4655,52 +5031,6 @@ Overrides the default settings specified in the cluster '.backup.volumeSnapshot.
 </td>
 <td>
    <p>Next time we will run a backup</p>
-</td>
-</tr>
-</tbody>
-</table>
-
-## SecretKeySelector     {#postgresql-cnpg-io-v1-SecretKeySelector}
-
-
-**Appears in:**
-
-- [AzureCredentials](#postgresql-cnpg-io-v1-AzureCredentials)
-
-- [BackupSource](#postgresql-cnpg-io-v1-BackupSource)
-
-- [BackupStatus](#postgresql-cnpg-io-v1-BackupStatus)
-
-- [BarmanObjectStoreConfiguration](#postgresql-cnpg-io-v1-BarmanObjectStoreConfiguration)
-
-- [GoogleCredentials](#postgresql-cnpg-io-v1-GoogleCredentials)
-
-- [MonitoringConfiguration](#postgresql-cnpg-io-v1-MonitoringConfiguration)
-
-- [PostInitApplicationSQLRefs](#postgresql-cnpg-io-v1-PostInitApplicationSQLRefs)
-
-- [S3Credentials](#postgresql-cnpg-io-v1-S3Credentials)
-
-
-<p>SecretKeySelector contains enough information to let you locate
-the key of a Secret</p>
-
-
-<table class="table">
-<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
-<tbody>
-<tr><td><code>LocalObjectReference</code><br/>
-<a href="#postgresql-cnpg-io-v1-LocalObjectReference"><i>LocalObjectReference</i></a>
-</td>
-<td>(Members of <code>LocalObjectReference</code> are embedded into this type.)
-   <p>The name of the secret in the pod's namespace to select from.</p>
-</td>
-</tr>
-<tr><td><code>key</code> <B>[Required]</B><br/>
-<i>string</i>
-</td>
-<td>
-   <p>The key to select</p>
 </td>
 </tr>
 </tbody>
@@ -4913,6 +5243,20 @@ More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-
 </tbody>
 </table>
 
+## ServiceUpdateStrategy     {#postgresql-cnpg-io-v1-ServiceUpdateStrategy}
+
+(Alias of `string`)
+
+**Appears in:**
+
+- [ManagedService](#postgresql-cnpg-io-v1-ManagedService)
+
+
+<p>ServiceUpdateStrategy describes how the changes to the managed service should be handled</p>
+
+
+
+
 ## SnapshotOwnerReference     {#postgresql-cnpg-io-v1-SnapshotOwnerReference}
 
 (Alias of `string`)
@@ -4990,6 +5334,136 @@ Size cannot be decreased.</p>
 </td>
 <td>
    <p>Template to be used to generate the Persistent Volume Claim</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## SubscriptionReclaimPolicy     {#postgresql-cnpg-io-v1-SubscriptionReclaimPolicy}
+
+(Alias of `string`)
+
+**Appears in:**
+
+- [SubscriptionSpec](#postgresql-cnpg-io-v1-SubscriptionSpec)
+
+
+<p>SubscriptionReclaimPolicy describes a policy for end-of-life maintenance of Subscriptions.</p>
+
+
+
+
+## SubscriptionSpec     {#postgresql-cnpg-io-v1-SubscriptionSpec}
+
+
+**Appears in:**
+
+- [Subscription](#postgresql-cnpg-io-v1-Subscription)
+
+
+<p>SubscriptionSpec defines the desired state of Subscription</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>cluster</code> <B>[Required]</B><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#localobjectreference-v1-core"><i>core/v1.LocalObjectReference</i></a>
+</td>
+<td>
+   <p>The name of the PostgreSQL cluster that identifies the &quot;subscriber&quot;</p>
+</td>
+</tr>
+<tr><td><code>name</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The name of the subscription inside PostgreSQL</p>
+</td>
+</tr>
+<tr><td><code>dbname</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The name of the database where the publication will be installed in
+the &quot;subscriber&quot; cluster</p>
+</td>
+</tr>
+<tr><td><code>parameters</code><br/>
+<i>map[string]string</i>
+</td>
+<td>
+   <p>Subscription parameters part of the <code>WITH</code> clause as expected by
+PostgreSQL <code>CREATE SUBSCRIPTION</code> command</p>
+</td>
+</tr>
+<tr><td><code>publicationName</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The name of the publication inside the PostgreSQL database in the
+&quot;publisher&quot;</p>
+</td>
+</tr>
+<tr><td><code>publicationDBName</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The name of the database containing the publication on the external
+cluster. Defaults to the one in the external cluster definition.</p>
+</td>
+</tr>
+<tr><td><code>externalClusterName</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The name of the external cluster with the publication (&quot;publisher&quot;)</p>
+</td>
+</tr>
+<tr><td><code>subscriptionReclaimPolicy</code><br/>
+<a href="#postgresql-cnpg-io-v1-SubscriptionReclaimPolicy"><i>SubscriptionReclaimPolicy</i></a>
+</td>
+<td>
+   <p>The policy for end-of-life maintenance of this subscription</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## SubscriptionStatus     {#postgresql-cnpg-io-v1-SubscriptionStatus}
+
+
+**Appears in:**
+
+- [Subscription](#postgresql-cnpg-io-v1-Subscription)
+
+
+<p>SubscriptionStatus defines the observed state of Subscription</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>observedGeneration</code><br/>
+<i>int64</i>
+</td>
+<td>
+   <p>A sequence number representing the latest
+desired state that was synchronized</p>
+</td>
+</tr>
+<tr><td><code>applied</code><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>Applied is true if the subscription was reconciled correctly</p>
+</td>
+</tr>
+<tr><td><code>message</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Message is the reconciliation output message</p>
 </td>
 </tr>
 </tbody>
@@ -5082,14 +5556,101 @@ physical replication slots</p>
    <p>List of regular expression patterns to match the names of replication slots to be excluded (by default empty)</p>
 </td>
 </tr>
-<tr><td><code>-</code> <B>[Required]</B><br/>
-<a href="#postgresql-cnpg-io-v1-synchronizeReplicasCache"><i>synchronizeReplicasCache</i></a>
+</tbody>
+</table>
+
+## SynchronousReplicaConfiguration     {#postgresql-cnpg-io-v1-SynchronousReplicaConfiguration}
+
+
+**Appears in:**
+
+- [PostgresConfiguration](#postgresql-cnpg-io-v1-PostgresConfiguration)
+
+
+<p>SynchronousReplicaConfiguration contains the configuration of the
+PostgreSQL synchronous replication feature.
+Important: at this moment, also <code>.spec.minSyncReplicas</code> and <code>.spec.maxSyncReplicas</code>
+need to be considered.</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>method</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-SynchronousReplicaConfigurationMethod"><i>SynchronousReplicaConfigurationMethod</i></a>
 </td>
 <td>
-   <span class="text-muted">No description provided.</span></td>
+   <p>Method to select synchronous replication standbys from the listed
+servers, accepting 'any' (quorum-based synchronous replication) or
+'first' (priority-based synchronous replication) as values.</p>
+</td>
+</tr>
+<tr><td><code>number</code> <B>[Required]</B><br/>
+<i>int</i>
+</td>
+<td>
+   <p>Specifies the number of synchronous standby servers that
+transactions must wait for responses from.</p>
+</td>
+</tr>
+<tr><td><code>maxStandbyNamesFromCluster</code><br/>
+<i>int</i>
+</td>
+<td>
+   <p>Specifies the maximum number of local cluster pods that can be
+automatically included in the <code>synchronous_standby_names</code> option in
+PostgreSQL.</p>
+</td>
+</tr>
+<tr><td><code>standbyNamesPre</code><br/>
+<i>[]string</i>
+</td>
+<td>
+   <p>A user-defined list of application names to be added to
+<code>synchronous_standby_names</code> before local cluster pods (the order is
+only useful for priority-based synchronous replication).</p>
+</td>
+</tr>
+<tr><td><code>standbyNamesPost</code><br/>
+<i>[]string</i>
+</td>
+<td>
+   <p>A user-defined list of application names to be added to
+<code>synchronous_standby_names</code> after local cluster pods (the order is
+only useful for priority-based synchronous replication).</p>
+</td>
+</tr>
+<tr><td><code>dataDurability</code><br/>
+<a href="#postgresql-cnpg-io-v1-DataDurabilityLevel"><i>DataDurabilityLevel</i></a>
+</td>
+<td>
+   <p>If set to &quot;required&quot;, data durability is strictly enforced. Write operations
+with synchronous commit settings (<code>on</code>, <code>remote_write</code>, or <code>remote_apply</code>) will
+block if there are insufficient healthy replicas, ensuring data persistence.
+If set to &quot;preferred&quot;, data durability is maintained when healthy replicas
+are available, but the required number of instances will adjust dynamically
+if replicas become unavailable. This setting relaxes strict durability enforcement
+to allow for operational continuity. This setting is only applicable if both
+<code>standbyNamesPre</code> and <code>standbyNamesPost</code> are unset (empty).</p>
+</td>
 </tr>
 </tbody>
 </table>
+
+## SynchronousReplicaConfigurationMethod     {#postgresql-cnpg-io-v1-SynchronousReplicaConfigurationMethod}
+
+(Alias of `string`)
+
+**Appears in:**
+
+- [SynchronousReplicaConfiguration](#postgresql-cnpg-io-v1-SynchronousReplicaConfiguration)
+
+
+<p>SynchronousReplicaConfigurationMethod configures whether to use
+quorum based replication or a priority list</p>
+
+
+
 
 ## TablespaceConfiguration     {#postgresql-cnpg-io-v1-TablespaceConfiguration}
 
@@ -5313,72 +5874,6 @@ online/hot (<code>true</code>, default) or offline/cold (<code>false</code>)</p>
 </td>
 <td>
    <p>Configuration parameters to control the online/hot backup with volume snapshots</p>
-</td>
-</tr>
-</tbody>
-</table>
-
-## WalBackupConfiguration     {#postgresql-cnpg-io-v1-WalBackupConfiguration}
-
-
-**Appears in:**
-
-- [BarmanObjectStoreConfiguration](#postgresql-cnpg-io-v1-BarmanObjectStoreConfiguration)
-
-
-<p>WalBackupConfiguration is the configuration of the backup of the
-WAL stream</p>
-
-
-<table class="table">
-<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
-<tbody>
-<tr><td><code>compression</code><br/>
-<a href="#postgresql-cnpg-io-v1-CompressionType"><i>CompressionType</i></a>
-</td>
-<td>
-   <p>Compress a WAL file before sending it to the object store. Available
-options are empty string (no compression, default), <code>gzip</code>, <code>bzip2</code> or <code>snappy</code>.</p>
-</td>
-</tr>
-<tr><td><code>encryption</code><br/>
-<a href="#postgresql-cnpg-io-v1-EncryptionType"><i>EncryptionType</i></a>
-</td>
-<td>
-   <p>Whenever to force the encryption of files (if the bucket is
-not already configured for that).
-Allowed options are empty string (use the bucket policy, default),
-<code>AES256</code> and <code>aws:kms</code></p>
-</td>
-</tr>
-<tr><td><code>maxParallel</code><br/>
-<i>int</i>
-</td>
-<td>
-   <p>Number of WAL files to be either archived in parallel (when the
-PostgreSQL instance is archiving to a backup object store) or
-restored in parallel (when a PostgreSQL standby is fetching WAL
-files from a recovery object store). If not specified, WAL files
-will be processed one at a time. It accepts a positive integer as a
-value - with 1 being the minimum accepted value.</p>
-</td>
-</tr>
-<tr><td><code>additionalCommandArgs</code> <B>[Required]</B><br/>
-<i>[]string</i>
-</td>
-<td>
-   <p>AdditionalCommandArgs represents additional arguments that can be appended
-to the 'barman-cloud-wal-archive' command-line invocation. These arguments
-provide flexibility to customize the backup process further according to
-specific requirements or configurations.</p>
-<p>Example:
-In a scenario where specialized backup options are required, such as setting
-a specific timeout or defining custom behavior, users can use this field
-to specify additional command arguments.</p>
-<p>Note:
-It's essential to ensure that the provided arguments are valid and supported
-by the 'barman-cloud-wal-archive' command, to avoid potential errors or unintended
-behavior during execution.</p>
 </td>
 </tr>
 </tbody>

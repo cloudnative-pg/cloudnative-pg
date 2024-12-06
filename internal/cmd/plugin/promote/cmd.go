@@ -29,9 +29,10 @@ import (
 // NewCmd create the new "promote" subcommand
 func NewCmd() *cobra.Command {
 	promoteCmd := &cobra.Command{
-		Use:   "promote [cluster] [node]",
-		Short: "Promote the pod named [cluster]-[node] or [node] to primary",
-		Args:  plugin.RequiresArguments(2),
+		Use:     "promote CLUSTER INSTANCE",
+		Short:   "Promote the instance named CLUSTER-INSTANCE to primary",
+		GroupID: plugin.GroupIDCluster,
+		Args:    plugin.RequiresArguments(2),
 		RunE: func(_ *cobra.Command, args []string) error {
 			ctx := context.Background()
 			clusterName := args[0]
