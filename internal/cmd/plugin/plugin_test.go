@@ -30,7 +30,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("create client", func() {
+var _ = Describe("create client", Ordered, func() {
 	It("with given configuration", func() {
 		err := createClient(cfg)
 		Expect(err).NotTo(HaveOccurred())
