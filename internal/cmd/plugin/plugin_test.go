@@ -17,33 +17,18 @@ limitations under the License.
 package plugin
 
 import (
-	"context"
-	"fmt"
-	"io"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
-	"net/http"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	k8client "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	"strings"
-
-	"k8s.io/client-go/rest"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
-
-type fakeRoundTripper struct {
-	fn func(*http.Request) (*http.Response, error)
-}
-
-func (f *fakeRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	return f.fn(req)
-}
 
 var _ = Describe("create client", func() {
 	It("with given configuration", func() {
@@ -53,37 +38,12 @@ var _ = Describe("create client", func() {
 	})
 
 	It("should set the UserAgent correctly", func() {
-		// Create a test HTTP transport that captures the request headers
-		var capturedUserAgent string
-		testTransport := &fakeRoundTripper{
-			fn: func(req *http.Request) (*http.Response, error) {
-				capturedUserAgent = req.Header.Get("User-Agent")
-				// Return an empty 200 response
-				return &http.Response{
-					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader("{\"kind\":\"PodList\",\"apiVersion\":\"v1\",\"items\":[]}")),
-				}, nil
-			},
-		}
+		configFlags := genericclioptions.NewConfigFlags(true)
 
-		// Create a basic rest.Config
-		config := &rest.Config{
-			Host:      "https://fake-server",
-			UserAgent: fmt.Sprintf("kubectl-cnpg/v%s (%s)", versions.Version, versions.Info.Commit),
-			Transport: testTransport, // Set the transport directly
-		}
+		err := SetupKubernetesClient(configFlags)
+		Expect(err).ToNot(HaveOccurred())
 
-		// Create the client with our config
-		client, err := kubernetes.NewForConfig(config)
-		Expect(err).NotTo(HaveOccurred())
-
-		// Make a request
-		_, err = client.CoreV1().Pods("default").List(context.Background(), metav1.ListOptions{})
-		Expect(err).NotTo(HaveOccurred())
-
-		// Verify the user agent was set correctly
-		expectedUserAgent := fmt.Sprintf("kubectl-cnpg/v%s (%s)", versions.Version, versions.Info.Commit)
-		Expect(capturedUserAgent).To(Equal(expectedUserAgent))
+		Expect(Config.UserAgent).To(Equal("kubectl-cnpg/v" + versions.Version + " (" + versions.Info.Commit + ")"))
 	})
 })
 
