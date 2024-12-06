@@ -37,6 +37,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
 
 var (
@@ -108,10 +109,13 @@ func SetupKubernetesClient(configFlags *genericclioptions.ConfigFlags) error {
 
 func createClient(cfg *rest.Config) error {
 	var err error
+
 	scheme := runtime.NewScheme()
 	_ = clientgoscheme.AddToScheme(scheme)
 	_ = apiv1.AddToScheme(scheme)
 	_ = storagesnapshotv1.AddToScheme(scheme)
+
+	cfg.UserAgent = fmt.Sprintf("kubectl-cnpg/v%s (%s)", versions.Version, versions.Info.Commit)
 
 	Client, err = client.New(cfg, client.Options{Scheme: scheme})
 	if err != nil {
