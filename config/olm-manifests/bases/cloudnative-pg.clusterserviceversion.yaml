@@ -792,9 +792,6 @@ spec:
         name: ''
         version: v1
       specDescriptors:
-      - path: databaseReclaimPolicy
-        displayName: Database reclaim policy
-        description: Specifies the action to take for the database inside PostgreSQL when the associated object in Kubernetes is deleted. Options are to either delete the database or retain it for future management.
       - path: cluster
         displayName: Cluster requested to create the database
         description: Cluster in which to create the database
@@ -807,15 +804,44 @@ spec:
       - path: ensure
         displayName: Ensure
         description: Ensure the PostgreSQL database is `present` or `absent`
-      - path: icuLocale
-        displayName: ICU locale
-        description: ICU locale to use for the database
+      - path: databaseReclaimPolicy
+        displayName: Database reclaim policy
+        description: Specifies the action to take for the database inside PostgreSQL when the associated object in Kubernetes is deleted. Options are to either delete the database or retain it for future management.
+      # Configuration section
+      - path: template
+        displayName: Template
+        description: The name of the template from which to create this database.
         x-descriptors:
           - 'urn:alm:descriptor:com.tectonic.ui:text'
           - 'urn:alm:descriptor:com.tectonic.ui:advanced'
-      - path: icuRules
-        displayName: ICU rules
-        description: Additional customization of ICU locale
+      - path: tablespace
+        displayName: Tablespace
+        description: The name of the tablespace that will be associated with the database.
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:text'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: isTemplate
+        displayName: Database is a template
+        description: If true, this database is considered a template
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:booleanSwitch'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: allowConnections
+        displayName: Allow Connections
+        description: If false, then no one can connect to this database
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:booleanSwitch'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: connectionLimit
+        displayName: Connection Limit
+        description: How many concurrent connections can be made to this database
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:number'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      # Encoding and Locale
+      - path: encoding
+        displayName: Encoding
+        description: Character set encoding to use in the database
         x-descriptors:
           - 'urn:alm:descriptor:com.tectonic.ui:text'
           - 'urn:alm:descriptor:com.tectonic.ui:advanced'
@@ -855,39 +881,16 @@ spec:
         x-descriptors:
           - 'urn:alm:descriptor:com.tectonic.ui:text'
           - 'urn:alm:descriptor:com.tectonic.ui:advanced'
-      - path: allowConnections
-        displayName: Allow Connections
-        description: If false, then no one can connect to this database
-        x-descriptors:
-          - 'urn:alm:descriptor:com.tectonic.ui:booleanSwitch'
-          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
-      - path: connectionLimit
-        displayName: Connection Limit
-        description: How many concurrent connections can be made to this database
-        x-descriptors:
-          - 'urn:alm:descriptor:com.tectonic.ui:number'
-          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
-      - path: encoding
-        displayName: Encoding
-        description: Character set encoding to use in the database
+      # ICU section
+      - path: icuLocale
+        displayName: ICU locale
+        description: ICU locale to use for the database
         x-descriptors:
           - 'urn:alm:descriptor:com.tectonic.ui:text'
           - 'urn:alm:descriptor:com.tectonic.ui:advanced'
-      - path: isTemplate
-        displayName: Database is a template
-        description: If true, this database is considered a template
-        x-descriptors:
-          - 'urn:alm:descriptor:com.tectonic.ui:booleanSwitch'
-          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
-      - path: tablespace
-        displayName: Tablespace
-        description: The name of the tablespace that will be associated with the database.
-        x-descriptors:
-          - 'urn:alm:descriptor:com.tectonic.ui:text'
-          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
-      - path: template
-        displayName: Template
-        description: The name of the template from which to create this database.
+      - path: icuRules
+        displayName: ICU rules
+        description: Additional customization of ICU locale
         x-descriptors:
           - 'urn:alm:descriptor:com.tectonic.ui:text'
           - 'urn:alm:descriptor:com.tectonic.ui:advanced'
