@@ -49,3 +49,24 @@ func (pub *Publication) GetStatusMessage() string {
 func (pub *Publication) GetClusterRef() corev1.LocalObjectReference {
 	return pub.Spec.ClusterRef
 }
+
+// GetManagedObjectName returns the name of the managed publication object
+func (pub *Publication) GetManagedObjectName() string {
+	return pub.Spec.Name
+}
+
+// HasReconciliations returns true if the publication has been reconciled at least once
+func (pub *Publication) HasReconciliations() bool {
+	return pub.Status.ObservedGeneration > 0
+}
+
+// GetName returns the publication name
+func (pub *Publication) GetName() string {
+	return pub.Name
+}
+
+// MustHaveManagedResourceExclusivity detects conflicting publications
+func (pub *PublicationList) MustHaveManagedResourceExclusivity(reference *Publication) error {
+	pointers := toSliceWithPointers(pub.Items)
+	return ensureManagedResourceExclusivity(reference, pointers)
+}

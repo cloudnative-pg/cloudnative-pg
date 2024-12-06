@@ -115,6 +115,11 @@ func (r *PublicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{RequeueAfter: publicationReconciliationInterval}, nil
 	}
 
+	if res, err := detectConflictingManagers(ctx, r.Client, &publication, &apiv1.PublicationList{}); err != nil ||
+		!res.IsZero() {
+		return res, err
+	}
+
 	if err := r.finalizerReconciler.reconcile(ctx, &publication); err != nil {
 		return ctrl.Result{}, fmt.Errorf("while reconciling the finalizer: %w", err)
 	}

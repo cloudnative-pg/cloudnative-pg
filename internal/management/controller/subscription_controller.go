@@ -135,6 +135,11 @@ func (r *SubscriptionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{RequeueAfter: subscriptionReconciliationInterval}, nil
 	}
 
+	if res, err := detectConflictingManagers(ctx, r.Client, &subscription, &apiv1.SubscriptionList{}); err != nil ||
+		!res.IsZero() {
+		return res, err
+	}
+
 	if err := r.alignSubscription(ctx, &subscription, connString); err != nil {
 		contextLogger.Error(err, "while reconciling subscription")
 		if markErr := markAsFailed(ctx, r.Client, &subscription, err); markErr != nil {
