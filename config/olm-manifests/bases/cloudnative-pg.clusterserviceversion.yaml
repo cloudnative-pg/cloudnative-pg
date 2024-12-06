@@ -784,7 +784,7 @@ spec:
           - 'urn:alm:descriptor:com.tectonic.ui:text'
     - kind: Database
       name: databases.postgresql.cnpg.io
-      displayName: Database management
+      displayName: Postgres Database
       description: Declarative creation and management of a database on a Cluster
       version: v1
       resources:
@@ -795,9 +795,6 @@ spec:
       - path: databaseReclaimPolicy
         displayName: Database reclaim policy
         description: Specifies the action to take for the database inside PostgreSQL when the associated object in Kubernetes is deleted. Options are to either delete the database or retain it for future management.
-        x-descriptors:
-          - 'urn:alm:descriptor:com.tectonic.ui:select:delete'
-          - 'urn:alm:descriptor:com.tectonic.ui:select:retain'
       - path: cluster
         displayName: Cluster requested to create the database
         description: Cluster in which to create the database
@@ -810,9 +807,6 @@ spec:
       - path: ensure
         displayName: Ensure
         description: Ensure the PostgreSQL database is `present` or `absent`
-        x-descriptors:
-          - 'urn:alm:descriptor:com.tectonic.ui:select:present'
-          - 'urn:alm:descriptor:com.tectonic.ui:select:absent'
       - path: icuLocale
         displayName: ICU locale
         description: ICU locale to use for the database
@@ -899,7 +893,7 @@ spec:
           - 'urn:alm:descriptor:com.tectonic.ui:advanced'
     - kind: Publication
       name: publications.postgresql.cnpg.io
-      displayName: Publication
+      displayName: Postgres Publication
       description: Declarative creation and management of a Logical Replication Publication in a PostgreSQL Cluster
       version: v1
       resources:
@@ -919,9 +913,15 @@ spec:
         - path: target
           displayName: Publication target
           description: Specifies which tables/schemas in the database should be published
+        - path: publicationReclaimPolicy
+          displayName: Publication reclaim policy
+          description: Specifies the action to take for the publication inside PostgreSQL when the associated object in Kubernetes is deleted. Options are to either delete the database or retain it for future management.
+        - path: parameters
+          displayName: Parameters
+          description: Publication parameters part of the `WITH` clause as expected by PostgreSQL `CREATE PUBLICATION` command
     - kind: Subscription
       name: subscriptions.postgresql.cnpg.io
-      displayName: Subscription
+      displayName: Postgres Subscription
       description: Declarative creation and management of a Logical Replication Subscription in a PostgreSQL Cluster to a previously defined Publication
       version: v1
       resources:
@@ -944,3 +944,12 @@ spec:
         - path: externalClusterName
           displayName: Name of the external cluster with publication
           description: Name of the cluster where the Publication is defined (publisher)
+        - path: publicationDBName
+          displayName: Name of the database containing the publication on the external cluster
+          description: The name of the database containing the publication on the external cluster. Defaults to the one in the external cluster definition.
+        - path: subscriptionReclaimPolicy
+          displayName: Subscription reclaim policy
+          description: Specifies the action to take for the subscription inside PostgreSQL when the associated object in Kubernetes is deleted. Options are to either delete the database or retain it for future management.
+        - path: parameters
+          displayName: Parameters
+          description: Subscription parameters part of the `WITH` clause as expected by PostgreSQL `CREATE SUBSCRIPTION` command
