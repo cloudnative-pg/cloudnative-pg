@@ -112,7 +112,9 @@ func getInstanceStatusFromPod(
 		DoRaw(ctx)
 	if err != nil {
 		result.AddPod(pod)
-		result.Error = err
+		result.Error = fmt.Errorf(
+			"failed to get status by proxying to the pod, you might lack permissions to get pods/proxy: %w",
+			err)
 		return result
 	}
 
