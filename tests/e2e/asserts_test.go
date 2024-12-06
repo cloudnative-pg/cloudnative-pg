@@ -415,19 +415,21 @@ func AssertConnection(
 	})
 
 	By(fmt.Sprintf("connecting to the %v service as %v", service, user), func() {
-		forwardConn, conn, err := testsUtils.ForwardPSQLServiceConnection(env, namespace, service,
-			dbname, user, password)
-		defer func() {
-			_ = conn.Close()
-			forwardConn.Close()
-		}()
-		Expect(err).ToNot(HaveOccurred())
+		Eventually(func(g Gomega) {
+			forwardConn, conn, err := testsUtils.ForwardPSQLServiceConnection(env, namespace, service,
+				dbname, user, password)
+			defer func() {
+				_ = conn.Close()
+				forwardConn.Close()
+			}()
+			g.Expect(err).ToNot(HaveOccurred())
 
-		var rawValue string
-		row := conn.QueryRow("SELECT 1")
-		err = row.Scan(&rawValue)
-		Expect(err).ToNot(HaveOccurred())
-		Expect(strings.TrimSpace(rawValue)).To(BeEquivalentTo("1"))
+			var rawValue string
+			row := conn.QueryRow("SELECT 1")
+			err = row.Scan(&rawValue)
+			g.Expect(err).ToNot(HaveOccurred())
+			g.Expect(strings.TrimSpace(rawValue)).To(BeEquivalentTo("1"))
+		}, RetryTimeout).Should(Succeed())
 	})
 }
 
