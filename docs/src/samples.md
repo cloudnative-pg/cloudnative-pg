@@ -62,11 +62,17 @@ your PostgreSQL cluster.
 : [`backup-example.yaml`](samples/backup-example.yaml):
   An example of a backup that runs against the previous sample.
 
-**Simple cluster with backup configured**
+**Simple cluster with backup configured for minio**
 :   *Prerequisites*: The configuration assumes minio is running and working.
     Update `backup.barmanObjectStore` with your minio parameters or your cloud solution.
 :  [`cluster-example-with-backup.yaml`](samples/cluster-example-with-backup.yaml)
    A basic cluster with backups configured.
+
+**Simple cluster with backup configured for Scaleway Object Storage**
+:   *Prerequisites*: The configuration assumes a Scaleway Object Storage bucket exists.
+    Update `backup.barmanObjectStore` with your Scaleway parameters.
+:  [`cluster-example-with-backup-scaleway.yaml`](samples/cluster-example-with-backup-scaleway.yaml)
+   A basic cluster with backups configured to work with Scaleway Object Storage..
 
 ## Replica clusters
 
