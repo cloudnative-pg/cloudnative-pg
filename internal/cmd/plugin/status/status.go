@@ -995,10 +995,12 @@ func (fullStatus *PostgresqlStatus) printBasebackupStatus(verbosity int) {
 		return
 	}
 
-	if verbosity > 0 && len(primaryInstanceStatus.PgStatBasebackupsInfo) == 0 {
-		fmt.Println(aurora.Green(header))
-		fmt.Println(aurora.Yellow("No running physical backups found").String())
-		fmt.Println()
+	if len(primaryInstanceStatus.PgStatBasebackupsInfo) == 0 {
+		if verbosity > 0 {
+			fmt.Println(aurora.Green(header))
+			fmt.Println(aurora.Yellow("No running physical backups found").String())
+			fmt.Println()
+		}
 		return
 	}
 
