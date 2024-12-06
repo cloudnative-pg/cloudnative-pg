@@ -17,6 +17,8 @@ limitations under the License.
 package v1
 
 import (
+	"strings"
+
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/robfig/cron"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -28,7 +30,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
-	"strings"
 )
 
 // scheduledBackupLog is for logging in this package.
@@ -57,13 +58,11 @@ var _ webhook.Validator = &ScheduledBackup{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
 func (r *ScheduledBackup) ValidateCreate() (admission.Warnings, error) {
-	var allErrs field.ErrorList
 	scheduledBackupLog.Info("validate create", "name", r.Name, "namespace", r.Namespace)
 
-	allErrs = append(allErrs, r.validate()...)
-
+	warnings, allErrs := r.validate()
 	if len(allErrs) == 0 {
-		return nil, nil
+		return warnings, nil
 	}
 
 	return nil, apierrors.NewInvalid(
@@ -83,15 +82,23 @@ func (r *ScheduledBackup) ValidateDelete() (admission.Warnings, error) {
 	return nil, nil
 }
 
-func (r *ScheduledBackup) validate() field.ErrorList {
+func (r *ScheduledBackup) validate() (admission.Warnings, field.ErrorList) {
 	var result field.ErrorList
+	var warnings admission.Warnings
 
 	if _, err := cron.Parse(r.GetSchedule()); err != nil {
 		result = append(result,
 			field.Invalid(
 				field.NewPath("spec", "schedule"),
 				r.Spec.Schedule, err.Error()))
+	} else if len(strings.Fields(r.Spec.Schedule)) != 6 {
+		warnings = append(
+			warnings,
+			"Schedule parameter may not have the right number of arguments "+
+				"(usually six arguments are needed)",
+		)
 	}
+
 	if r.Spec.Method == BackupMethodVolumeSnapshot && !utils.HaveVolumeSnapshot() {
 		result = append(result, field.Invalid(
 			field.NewPath("spec", "method"),
@@ -118,15 +125,6 @@ func (r *ScheduledBackup) validate() field.ErrorList {
 			"OnlineConfiguration parameter can be specified only if the method is volumeSnapshot",
 		))
 	}
-	
-	if strings.Count(strings.Trim(r.Spec.Schedule," ")," ") != 5 {
-		result = append(result, field.Invalid(
-                        field.NewPath("spec", "schedule"),
-                        r.Spec.Schedule,
-                        "Schedule parameter has not the right number of arguments. Must be 6.",
-                ))
 
-	}
-
-	return result
+	return warnings, result
 }
