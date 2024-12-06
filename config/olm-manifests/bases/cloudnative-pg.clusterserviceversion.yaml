@@ -784,30 +784,120 @@ spec:
           - 'urn:alm:descriptor:com.tectonic.ui:text'
     - kind: Database
       name: databases.postgresql.cnpg.io
-      displayName: Database management
-      description: Declarative database management
+      displayName: Postgres Database
+      description: Declarative creation and management of a database on a Cluster
       version: v1
       resources:
       - kind: Cluster
         name: ''
         version: v1
       specDescriptors:
-      - path: databaseReclaimPolicy
-        displayName: Database reclaim policy
-        description: Database reclaim policy
       - path: cluster
         displayName: Cluster requested to create the database
-        description: Cluster requested to create the database
+        description: Cluster in which to create the database
       - path: name
         displayName: Database name
         description: Database name
       - path: owner
         displayName: Database Owner
-        description: Database Owner
+        description: Owner of the database that will be created in Postgres
+      - path: ensure
+        displayName: Ensure
+        description: Ensure the PostgreSQL database is `present` or `absent`
+      - path: databaseReclaimPolicy
+        displayName: Database reclaim policy
+        description: Specifies the action to take for the database inside PostgreSQL when the associated object in Kubernetes is deleted. Options are to either delete the database or retain it for future management.
+      # Configuration section
+      - path: template
+        displayName: Template
+        description: The name of the template from which to create this database.
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:text'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: tablespace
+        displayName: Tablespace
+        description: The name of the tablespace that will be associated with the database.
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:text'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: isTemplate
+        displayName: Database is a template
+        description: If true, this database is considered a template
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:booleanSwitch'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: allowConnections
+        displayName: Allow Connections
+        description: If false, then no one can connect to this database
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:booleanSwitch'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: connectionLimit
+        displayName: Connection Limit
+        description: How many concurrent connections can be made to this database
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:number'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      # Encoding and Locale
+      - path: encoding
+        displayName: Encoding
+        description: Character set encoding to use in the database
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:text'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: locale
+        displayName: Locale
+        description: Sets the default collation order and character classification for the database.
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:text'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: localeCollate
+        displayName: LC collate
+        description: The collation to use for the database
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:text'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: localeCType
+        displayName: LC ctype
+        description: The ctype to use for the database
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:text'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: localeProvider
+        displayName: Locale Provider
+        description: Specifies the provider to use for the default collation in this database (Available from PostgreSQL 16).
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:text'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: collationVersion
+        displayName: Collation version
+        description: The version identifier of the collation
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:text'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: builtinLocale
+        displayName: Builtin locale
+        description: The choice of which builtin locale to use
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:text'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      # ICU section
+      - path: icuLocale
+        displayName: ICU locale
+        description: ICU locale to use for the database
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:text'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      - path: icuRules
+        displayName: ICU rules
+        description: Additional customization of ICU locale
+        x-descriptors:
+          - 'urn:alm:descriptor:com.tectonic.ui:text'
+          - 'urn:alm:descriptor:com.tectonic.ui:advanced'
     - kind: Publication
       name: publications.postgresql.cnpg.io
-      displayName: Publication
-      description: Declarative publication
+      displayName: Postgres Publication
+      description: Declarative creation and management of a Logical Replication Publication in a PostgreSQL Cluster
       version: v1
       resources:
         - kind: Cluster
@@ -816,20 +906,23 @@ spec:
       specDescriptors:
         - path: name
           displayName: Publication name
-          description: Publication name
+          description: Name of the publication for PostgreSQL logical replication
         - path: dbname
           displayName: Database name
-          description: Database name
+          description: Database on which the publication will be created
         - path: cluster
           displayName: Cluster requested to create the publication
-          description: Cluster requested to create the publication
+          description: Cluster on which the publication will be created
         - path: target
           displayName: Publication target
-          description: Publication target
+          description: Specifies which tables/schemas in the database should be published
+        - path: publicationReclaimPolicy
+          displayName: Publication reclaim policy
+          description: Specifies the action to take for the publication inside PostgreSQL when the associated object in Kubernetes is deleted. Options are to either delete the database or retain it for future management.
     - kind: Subscription
       name: subscriptions.postgresql.cnpg.io
-      displayName: Subscription
-      description: Declarative subscription
+      displayName: Postgres Subscription
+      description: Declarative creation and management of a Logical Replication Subscription in a PostgreSQL Cluster to a previously defined Publication
       version: v1
       resources:
         - kind: Cluster
@@ -838,16 +931,22 @@ spec:
       specDescriptors:
         - path: name
           displayName: Subscription name
-          description: Subscription name
+          description: Name of the subscription for PostgreSQL logical replication
         - path: dbname
           displayName: Database name
-          description: Database name
+          description: Database on which the Subscription will be created
         - path: publicationName
           displayName: Publication name
-          description: Publication name
+          description: Name of the Publication to subscribe to
         - path: cluster
           displayName: Cluster requested to create the subscription
-          description: Cluster requested to create the subscription
+          description: Cluster on which the subscription will be created (subscriber)
         - path: externalClusterName
           displayName: Name of the external cluster with publication
-          description: Name of the external cluster with publication
+          description: Name of the cluster where the Publication is defined (publisher)
+        - path: publicationDBName
+          displayName: Name of the database containing the publication on the external cluster
+          description: The name of the database containing the publication on the external cluster. Defaults to the one in the external cluster definition.
+        - path: subscriptionReclaimPolicy
+          displayName: Subscription reclaim policy
+          description: Specifies the action to take for the subscription inside PostgreSQL when the associated object in Kubernetes is deleted. Options are to either delete the database or retain it for future management.
