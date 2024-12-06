@@ -17,6 +17,8 @@ limitations under the License.
 package specs
 
 import (
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -24,7 +26,7 @@ import (
 var _ = Describe("Secret creation", func() {
 	It("create a secret with the right user and password", func() {
 		secret := CreateSecret("name", "namespace",
-			"thishost", "thisdb", "thisuser", "thispassword")
+			"thishost", "thisdb", "thisuser", "thispassword", utils.UserTypeApp)
 		Expect(secret.Name).To(Equal("name"))
 		Expect(secret.Namespace).To(Equal("namespace"))
 		Expect(secret.StringData["username"]).To(Equal("thisuser"))
@@ -39,5 +41,7 @@ var _ = Describe("Secret creation", func() {
 		Expect(secret.StringData["jdbc-uri"]).To(
 			Equal("jdbc:postgresql://thishost.namespace:5432/thisdb?password=thispassword&user=thisuser"),
 		)
+		Expect(secret.Labels).To(
+			HaveKeyWithValue(utils.UserTypeLabelName, string(utils.UserTypeApp)))
 	})
 })

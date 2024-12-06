@@ -71,9 +71,13 @@ const (
 	// scheduled backup if a backup is created by a scheduled backup
 	ParentScheduledBackupLabelName = MetadataNamespace + "/scheduled-backup"
 
-	// WatchedLabelName the name of the label which tell if a resource change will be automatically reloaded by instance
+	// WatchedLabelName the name of the label which tells if a resource change will be automatically reloaded by instance
 	// or not, use for Secrets or ConfigMaps
 	WatchedLabelName = MetadataNamespace + "/reload"
+
+	// UserTypeLabelName the name of the label which tells if a Secret refers
+	// to a superuser database role or an application one
+	UserTypeLabelName = MetadataNamespace + "/userType"
 
 	// BackupTimelineLabelName is the name or the label where the timeline of a backup is kept
 	BackupTimelineLabelName = MetadataNamespace + "/backupTimeline"
@@ -247,6 +251,19 @@ const (
 	// HibernationAnnotationValueOn is the value of hibernation annotation when the hibernation
 	// has been requested for the cluster
 	HibernationAnnotationValueOn HibernationAnnotationValue = "on"
+)
+
+// UserType tells if a secret refers to a superuser database role
+// or an application one
+type UserType string
+
+const (
+	// UserTypeSuperuser is the type of a superuser database
+	// role
+	UserTypeSuperuser UserType = "superuser"
+
+	// UserTypeApp is the type of an application role
+	UserTypeApp UserType = "app"
 )
 
 // LabelClusterName labels the object with the cluster name
