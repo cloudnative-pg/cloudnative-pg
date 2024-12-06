@@ -270,23 +270,7 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(ctx context.Context
 		// retrying after having started up the instance.
 		err = r.instance.Rewind(ctx, pgVersion)
 		if err != nil {
-			contextLogger.Info(
-				"pg_rewind failed, starting the server to complete the crash recovery",
-				"err", err)
-
-			// pg_rewind requires a clean shutdown of the old primary to work.
-			// The only way to do that is to start the server again
-			// and wait for it to be available again.
-			err = r.instance.CompleteCrashRecovery(ctx)
-			if err != nil {
-				return err
-			}
-
-			// Then let's go back to the point of the new primary
-			err = r.instance.Rewind(ctx, pgVersion)
-			if err != nil {
-				return err
-			}
+			return fmt.Errorf("while exucuting pg_rewind: %w", err)
 		}
 
 		// Now I can demote myself

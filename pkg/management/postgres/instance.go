@@ -829,22 +829,6 @@ func (instance *Instance) WaitForPrimaryAvailable(ctx context.Context) error {
 	return waitForConnectionAvailable(ctx, db)
 }
 
-// CompleteCrashRecovery temporary starts up the server and wait for it
-// to be fully available for queries. This will ensure that the crash recovery
-// is fully done.
-// Important: this function must be called only when the instance isn't started
-func (instance *Instance) CompleteCrashRecovery(ctx context.Context) error {
-	log.Info("Waiting for server to complete crash recovery")
-
-	defer func() {
-		instance.ShutdownConnections()
-	}()
-
-	return instance.WithActiveInstance(func() error {
-		return instance.WaitForSuperuserConnectionAvailable(ctx)
-	})
-}
-
 // WaitForSuperuserConnectionAvailable waits until we can connect to this
 // instance using the superuser account
 func (instance *Instance) WaitForSuperuserConnectionAvailable(ctx context.Context) error {
