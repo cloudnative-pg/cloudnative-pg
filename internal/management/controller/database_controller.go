@@ -114,30 +114,9 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, nil
 	}
 
-	// Make sure the target PG Database is not being managed by another Database Object
-	if database.HasReconciliations() {
-		var databaseList apiv1.DatabaseList
-		if err := r.Client.List(ctx, &databaseList,
-			client.InNamespace(r.instance.GetNamespaceName()),
-		); err != nil {
-			contextLogger.Error(err, "while getting database list", "namespace", r.instance.GetNamespaceName())
-			return ctrl.Result{}, fmt.Errorf("impossible to list database objects in namespace %s: %w",
-				r.instance.GetNamespaceName(), err)
-		}
-
-		if err := databaseList.DetectConflicting(database); err != nil {
-			if markErr := markAsFailed(ctx, r.Client, &database, err); markErr != nil {
-				contextLogger.Error(err, "while marking as failed the database resource",
-					"error", err,
-					"markError", markErr,
-				)
-				return ctrl.Result{}, fmt.Errorf(
-					"encountered an error while marking as failed the database resource: %w, original error: %w",
-					markErr,
-					err)
-			}
-			return ctrl.Result{RequeueAfter: databaseReconciliationInterval}, nil
-		}
+	if res, err := detectConflictingResources(ctx, r.Client, &database, &apiv1.DatabaseList{}); err != nil ||
+		!res.IsZero() {
+		return res, err
 	}
 
 	if err := r.reconcileDatabase(ctx, &database); err != nil {

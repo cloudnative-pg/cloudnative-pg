@@ -66,7 +66,7 @@ func (db *Database) HasReconciliations() bool {
 }
 
 // DetectConflicting detects conflicting databases
-func (dbList *DatabaseList) DetectConflicting(reference Database) error {
+func (dbList *DatabaseList) DetectConflicting(reference *Database) error {
 	pointers := toSliceWithPointers(dbList.Items)
-	return detectConflicting(&reference, pointers)
+	return detectConflicting(reference, pointers)
 }

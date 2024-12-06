@@ -135,23 +135,9 @@ func (r *SubscriptionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{RequeueAfter: subscriptionReconciliationInterval}, nil
 	}
 
-	if !subscription.HasReconciliations() {
-		var subscriptionList apiv1.SubscriptionList
-		if err := r.Client.List(ctx, &subscriptionList,
-			client.InNamespace(r.instance.GetNamespaceName()),
-		); err != nil {
-			contextLogger.Error(err, "while getting subscription list", "namespace", r.instance.GetNamespaceName())
-			return ctrl.Result{}, fmt.Errorf("impossible to list subscription objects in namespace %s: %w",
-				r.instance.GetNamespaceName(), err)
-		}
-
-		// Make sure the target PG Subscription is not being managed by another Subscription Object
-		if err := subscriptionList.DetectConflicting(subscription); err != nil {
-			if err := markAsFailed(ctx, r.Client, &subscription, err); err != nil {
-				return ctrl.Result{}, err
-			}
-			return ctrl.Result{RequeueAfter: publicationReconciliationInterval}, nil
-		}
+	if res, err := detectConflictingResources(ctx, r.Client, &subscription, &apiv1.SubscriptionList{}); err != nil ||
+		!res.IsZero() {
+		return res, err
 	}
 
 	if err := r.alignSubscription(ctx, &subscription, connString); err != nil {

@@ -27,7 +27,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -45,7 +44,7 @@ func (r *ClusterReconciler) notifyDeletionToOwnedResources(
 		ctx,
 		r.Client,
 		namespacedName,
-		resources.ToSliceWithPointers(dbList.Items),
+		toSliceWithPointers(dbList.Items),
 		utils.DatabaseFinalizerName,
 	); err != nil {
 		return err
@@ -60,7 +59,7 @@ func (r *ClusterReconciler) notifyDeletionToOwnedResources(
 		ctx,
 		r.Client,
 		namespacedName,
-		resources.ToSliceWithPointers(pbList.Items),
+		toSliceWithPointers(pbList.Items),
 		utils.PublicationFinalizerName,
 	); err != nil {
 		return err
@@ -75,7 +74,7 @@ func (r *ClusterReconciler) notifyDeletionToOwnedResources(
 		ctx,
 		r.Client,
 		namespacedName,
-		resources.ToSliceWithPointers(sbList.Items),
+		toSliceWithPointers(sbList.Items),
 		utils.SubscriptionFinalizerName,
 	)
 }
@@ -87,6 +86,14 @@ type clusterOwnedResourceWithStatus interface {
 	GetClusterRef() corev1.LocalObjectReference
 	GetStatusMessage() string
 	SetAsFailed(err error)
+}
+
+func toSliceWithPointers[T any](items []T) []*T {
+	result := make([]*T, len(items))
+	for i, item := range items {
+		result[i] = &item
+	}
+	return result
 }
 
 // notifyOwnedResourceDeletion deletes finalizers for a given resource type

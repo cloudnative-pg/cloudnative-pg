@@ -66,7 +66,7 @@ func (sub *Subscription) HasReconciliations() bool {
 }
 
 // DetectConflicting detects conflicting subscriptions
-func (pub *SubscriptionList) DetectConflicting(reference Subscription) error {
+func (pub *SubscriptionList) DetectConflicting(reference *Subscription) error {
 	pointers := toSliceWithPointers(pub.Items)
-	return detectConflicting(&reference, pointers)
+	return detectConflicting(reference, pointers)
 }

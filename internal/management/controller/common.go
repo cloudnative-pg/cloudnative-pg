@@ -23,10 +23,13 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"time"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/jackc/pgx/v5"
 	"github.com/lib/pq"
 	"k8s.io/apimachinery/pkg/types"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -120,4 +123,54 @@ func toPostgresParameters(parameters map[string]string) string {
 
 	// pruning last 2 chars `, `
 	return b.String()[:len(b.String())-2]
+}
+
+type hasReconciliations interface {
+	client.Object
+	HasReconciliations() bool
+	markableAsFailed
+}
+
+type canDetectConflicts[T client.Object] interface {
+	DetectConflicting(reference T) error
+	client.ObjectList
+}
+
+func detectConflictingResources[T hasReconciliations, TL canDetectConflicts[T]](
+	ctx context.Context,
+	cli client.Client,
+	resource T,
+	list TL,
+) (ctrl.Result, error) {
+	if resource.HasReconciliations() {
+		return ctrl.Result{}, nil
+	}
+	contextLogger := log.FromContext(ctx)
+
+	if err := cli.List(ctx, list,
+		client.InNamespace(resource.GetNamespace()),
+	); err != nil {
+		kind := list.GetObjectKind().GroupVersionKind().Kind
+
+		contextLogger.Error(err, "while getting list",
+			"kind", kind,
+			"namespace", resource.GetNamespace(),
+		)
+		return ctrl.Result{}, fmt.Errorf("impossible to list %s objects in namespace %s: %w",
+			kind, resource.GetNamespace(), err)
+	}
+
+	// Make sure the target PG element is not being managed by another kubernetes resource
+	if conflictErr := list.DetectConflicting(resource); conflictErr != nil {
+		if markErr := markAsFailed(ctx, cli, resource, conflictErr); markErr != nil {
+			return ctrl.Result{},
+				fmt.Errorf("encountered an error while marking as failed the resource: %w, original error: %w",
+					markErr,
+					conflictErr,
+				)
+		}
+		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+	}
+
+	return ctrl.Result{}, nil
 }

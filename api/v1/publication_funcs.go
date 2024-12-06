@@ -66,7 +66,7 @@ func (pub *Publication) GetName() string {
 }
 
 // DetectConflicting detects conflicting publications
-func (pub *PublicationList) DetectConflicting(reference Publication) error {
+func (pub *PublicationList) DetectConflicting(reference *Publication) error {
 	pointers := toSliceWithPointers(pub.Items)
-	return detectConflicting(&reference, pointers)
+	return detectConflicting(reference, pointers)
 }

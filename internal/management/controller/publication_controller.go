@@ -115,23 +115,9 @@ func (r *PublicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{RequeueAfter: publicationReconciliationInterval}, nil
 	}
 
-	if !publication.HasReconciliations() {
-		var publicationList apiv1.PublicationList
-		if err := r.Client.List(ctx, &publicationList,
-			client.InNamespace(r.instance.GetNamespaceName()),
-		); err != nil {
-			contextLogger.Error(err, "while getting publication list", "namespace", r.instance.GetNamespaceName())
-			return ctrl.Result{}, fmt.Errorf("impossible to list publication objects in namespace %s: %w",
-				r.instance.GetNamespaceName(), err)
-		}
-
-		// Make sure the target PG Publication is not being managed by another Publication Object
-		if err := publicationList.DetectConflicting(publication); err != nil {
-			if err := markAsFailed(ctx, r.Client, &publication, err); err != nil {
-				return ctrl.Result{}, err
-			}
-			return ctrl.Result{RequeueAfter: publicationReconciliationInterval}, nil
-		}
+	if res, err := detectConflictingResources(ctx, r.Client, &publication, &apiv1.PublicationList{}); err != nil ||
+		!res.IsZero() {
+		return res, err
 	}
 
 	if err := r.finalizerReconciler.reconcile(ctx, &publication); err != nil {
@@ -140,6 +126,7 @@ func (r *PublicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	if !publication.GetDeletionTimestamp().IsZero() {
 		return ctrl.Result{}, nil
 	}
+
 	if err := r.alignPublication(ctx, &publication); err != nil {
 		contextLogger.Error(err, "while reconciling publication")
 		if markErr := markAsFailed(ctx, r.Client, &publication, err); markErr != nil {
