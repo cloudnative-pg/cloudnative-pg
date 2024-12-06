@@ -23,6 +23,7 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/jackc/pgx/v5"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -36,6 +37,12 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+)
+
+const (
+	publicationDetectionQuery = `SELECT count(*)
+		FROM pg_publication
+		WHERE pubname = $1`
 )
 
 var _ = Describe("Managed publication controller tests", func() {
@@ -75,10 +82,12 @@ var _ = Describe("Managed publication controller tests", func() {
 				DBName:        "app",
 				Target: apiv1.PublicationTarget{
 					AllTables: true,
+					Objects: []apiv1.PublicationTargetObject{
+						{TablesInSchema: "public"},
+					},
 				},
 			},
 		}
-
 		db, dbMock, err = sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 		Expect(err).ToNot(HaveOccurred())
 
@@ -117,10 +126,9 @@ var _ = Describe("Managed publication controller tests", func() {
 		Expect(publication.Finalizers).To(BeEmpty())
 
 		// Mocking Detect
-		expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
-		dbMock.ExpectQuery(`SELECT count(*)
-		FROM pg_publication
-		WHERE pubname = $1`).WithArgs(publication.Spec.Name).WillReturnRows(expectedValue)
+		noHits := sqlmock.NewRows([]string{""}).AddRow("0")
+		dbMock.ExpectQuery(publicationDetectionQuery).WithArgs(publication.Spec.Name).
+			WillReturnRows(noHits)
 
 		// Mocking CreatePublication
 		expectedCreate := sqlmock.NewResult(0, 1)
@@ -149,117 +157,114 @@ var _ = Describe("Managed publication controller tests", func() {
 		Expect(updatedPublication.Finalizers).NotTo(BeEmpty())
 	})
 
-	// It("database object inherits error after patching", func(ctx SpecContext) {
-	// 	// Mocking Detect
-	// 	expectedValue := sqlmock.NewRows([]string{""}).AddRow("1")
-	// 	dbMock.ExpectQuery(`SELECT count(*)
-	// 	FROM pg_database
-	// 	WHERE datname = $1`).WithArgs(publication.Spec.Name).WillReturnRows(expectedValue)
+	It("publication object inherits error after patching", func(ctx SpecContext) {
+		// Mocking Detect
+		oneHit := sqlmock.NewRows([]string{""}).AddRow("1")
+		dbMock.ExpectQuery(publicationDetectionQuery).WithArgs(publication.Spec.Name).
+			WillReturnRows(oneHit)
 
-	// 	// Mocking Alter Database
-	// 	expectedError := fmt.Errorf("no permission")
-	// 	expectedQuery := fmt.Sprintf("ALTER DATABASE %s OWNER TO %s",
-	// 		pgx.Identifier{publication.Spec.Name}.Sanitize(),
-	// 		pgx.Identifier{publication.Spec.Owner}.Sanitize(),
-	// 	)
-	// 	dbMock.ExpectExec(expectedQuery).WillReturnError(expectedError)
+		// Mocking Alter Publication
+		expectedError := fmt.Errorf("no permission")
+		expectedQuery := fmt.Sprintf("ALTER PUBLICATION %s SET TABLES IN SCHEMA \"public\"",
+			pgx.Identifier{publication.Spec.Name}.Sanitize(),
+		)
+		dbMock.ExpectExec(expectedQuery).WillReturnError(expectedError)
 
-	// 	// Reconcile and get the updated object
-	// 	_, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{
-	// 		Namespace: publication.Namespace,
-	// 		Name:      publication.Name,
-	// 	}})
-	// 	Expect(err).ToNot(HaveOccurred())
+		// Reconcile and get the updated object
+		_, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{
+			Namespace: publication.Namespace,
+			Name:      publication.Name,
+		}})
+		Expect(err).ToNot(HaveOccurred())
 
-	// 	var updatedDatabase apiv1.Database
-	// 	err = fakeClient.Get(ctx, client.ObjectKey{
-	// 		Namespace: publication.Namespace,
-	// 		Name:      publication.Name,
-	// 	}, &updatedDatabase)
-	// 	Expect(err).ToNot(HaveOccurred())
+		var updatedPublication apiv1.Publication
+		err = fakeClient.Get(ctx, client.ObjectKey{
+			Namespace: publication.Namespace,
+			Name:      publication.Name,
+		}, &updatedPublication)
+		Expect(err).ToNot(HaveOccurred())
 
-	// 	Expect(updatedDatabase.Status.Applied).Should(HaveValue(BeFalse()))
-	// 	Expect(updatedDatabase.Status.Message).Should(ContainSubstring(expectedError.Error()))
-	// })
+		Expect(updatedPublication.Status.Applied).Should(HaveValue(BeFalse()))
+		Expect(updatedPublication.Status.Message).Should(ContainSubstring(expectedError.Error()))
+	})
 
-	// It("on deletion it removes finalizers and drops DB", func(ctx SpecContext) {
-	// 	Expect(publication.Finalizers).To(BeEmpty())
+	It("on deletion it removes finalizers and drops publication", func(ctx SpecContext) {
+		Expect(publication.Finalizers).To(BeEmpty())
 
-	// 	// Mocking Detect
-	// 	expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
-	// 	dbMock.ExpectQuery(`SELECT count(*)
-	// 	FROM pg_database
-	// 	WHERE datname = $1`).WithArgs(publication.Spec.Name).WillReturnRows(expectedValue)
+		// Mocking Detect
+		noHits := sqlmock.NewRows([]string{""}).AddRow("0")
+		dbMock.ExpectQuery(publicationDetectionQuery).WithArgs(publication.Spec.Name).
+			WillReturnRows(noHits)
 
-	// 	// Mocking CreatePublication
-	// 	expectedCreate := sqlmock.NewResult(0, 1)
-	// 	expectedQuery := fmt.Sprintf(
-	// 		"CREATE DATABASE %s OWNER %s",
-	// 		pgx.Identifier{publication.Spec.Name}.Sanitize(), pgx.Identifier{publication.Spec.Owner}.Sanitize(),
-	// 	)
-	// 	dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
+		// Mocking CreatePublication
+		expectedCreate := sqlmock.NewResult(0, 1)
+		expectedQuery := fmt.Sprintf(
+			"CREATE PUBLICATION %s FOR ALL TABLES",
+			pgx.Identifier{publication.Spec.Name}.Sanitize(),
+		)
+		dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
 
-	// 	// Reconcile and get the updated object
-	// 	_, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{
-	// 		Namespace: publication.Namespace,
-	// 		Name:      publication.Name,
-	// 	}})
-	// 	Expect(err).ToNot(HaveOccurred())
+		// Reconcile and get the updated object
+		_, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{
+			Namespace: publication.Namespace,
+			Name:      publication.Name,
+		}})
+		Expect(err).ToNot(HaveOccurred())
 
-	// 	var updatedDatabase apiv1.Database
-	// 	err = fakeClient.Get(ctx, client.ObjectKey{
-	// 		Namespace: publication.Namespace,
-	// 		Name:      publication.Name,
-	// 	}, &updatedDatabase)
-	// 	Expect(err).ToNot(HaveOccurred())
+		var updatedPublication apiv1.Publication
+		err = fakeClient.Get(ctx, client.ObjectKey{
+			Namespace: publication.Namespace,
+			Name:      publication.Name,
+		}, &updatedPublication)
+		Expect(err).ToNot(HaveOccurred())
 
-	// 	Expect(updatedDatabase.Status.Applied).Should(HaveValue(BeTrue()))
-	// 	Expect(updatedDatabase.Status.Message).Should(BeEmpty())
-	// 	Expect(updatedDatabase.Finalizers).NotTo(BeEmpty())
+		Expect(updatedPublication.Status.Applied).Should(HaveValue(BeTrue()))
+		Expect(updatedPublication.Status.Message).Should(BeEmpty())
+		Expect(updatedPublication.Finalizers).NotTo(BeEmpty())
 
-	// 	// the next 3 lines are a hacky bit to make sure the next reconciler
-	// 	// call doesn't skip on account of Generation == ObservedGeneration.
-	// 	// See fake.Client known issues with `Generation`
-	// 	// https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/client/fake@v0.19.0#NewClientBuilder
-	// 	currentDatabase := updatedDatabase.DeepCopy()
-	// 	updatedDatabase.Status.ObservedGeneration = 2
-	// 	Expect(fakeClient.Status().Patch(ctx, &updatedDatabase, client.MergeFrom(currentDatabase))).To(Succeed())
+		// the next 3 lines are a hacky bit to make sure the next reconciler
+		// call doesn't skip on account of Generation == ObservedGeneration.
+		// See fake.Client known issues with `Generation`
+		// https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/client/fake@v0.19.0#NewClientBuilder
+		currentPublication := updatedPublication.DeepCopy()
+		updatedPublication.Status.ObservedGeneration = 2
+		Expect(fakeClient.Status().Patch(ctx, &updatedPublication, client.MergeFrom(currentPublication))).To(Succeed())
 
-	// 	// We now look at the behavior when we delete the Database object
-	// 	Expect(fakeClient.Delete(ctx, publication)).To(Succeed())
+		// We now look at the behavior when we delete the Publication object
+		Expect(fakeClient.Delete(ctx, publication)).To(Succeed())
 
-	// 	// the Database object is Deleted, but its finalizer prevents removal from
-	// 	// the API
-	// 	var fadingDatabase apiv1.Database
-	// 	err = fakeClient.Get(ctx, client.ObjectKey{
-	// 		Namespace: publication.Namespace,
-	// 		Name:      publication.Name,
-	// 	}, &fadingDatabase)
-	// 	Expect(err).ToNot(HaveOccurred())
-	// 	Expect(fadingDatabase.DeletionTimestamp).NotTo(BeZero())
-	// 	Expect(fadingDatabase.Finalizers).NotTo(BeEmpty())
+		// the Publication object is Deleted, but its finalizer prevents removal from
+		// the API
+		var fadingPublication apiv1.Publication
+		err = fakeClient.Get(ctx, client.ObjectKey{
+			Namespace: publication.Namespace,
+			Name:      publication.Name,
+		}, &fadingPublication)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(fadingPublication.DeletionTimestamp).NotTo(BeZero())
+		Expect(fadingPublication.Finalizers).NotTo(BeEmpty())
 
-	// 	// Mocking Drop Database
-	// 	expectedDrop := fmt.Sprintf("DROP DATABASE IF EXISTS %s",
-	// 		pgx.Identifier{publication.Spec.Name}.Sanitize(),
-	// 	)
-	// 	dbMock.ExpectExec(expectedDrop).WillReturnResult(sqlmock.NewResult(0, 1))
+		// Mocking Drop Publication
+		expectedDrop := fmt.Sprintf("DROP PUBLICATION IF EXISTS %s",
+			pgx.Identifier{publication.Spec.Name}.Sanitize(),
+		)
+		dbMock.ExpectExec(expectedDrop).WillReturnResult(sqlmock.NewResult(0, 1))
 
-	// 	// Reconcile and get the updated object
-	// 	_, err = r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{
-	// 		Namespace: publication.Namespace,
-	// 		Name:      publication.Name,
-	// 	}})
-	// 	Expect(err).ToNot(HaveOccurred())
+		// Reconcile and get the updated object
+		_, err = r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{
+			Namespace: publication.Namespace,
+			Name:      publication.Name,
+		}})
+		Expect(err).ToNot(HaveOccurred())
 
-	// 	var finalDatabase apiv1.Database
-	// 	err = fakeClient.Get(ctx, client.ObjectKey{
-	// 		Namespace: publication.Namespace,
-	// 		Name:      publication.Name,
-	// 	}, &finalDatabase)
-	// 	Expect(err).To(HaveOccurred())
-	// 	Expect(apierrors.IsNotFound(err)).To(BeTrue())
-	// })
+		var finalPublication apiv1.Publication
+		err = fakeClient.Get(ctx, client.ObjectKey{
+			Namespace: publication.Namespace,
+			Name:      publication.Name,
+		}, &finalPublication)
+		Expect(err).To(HaveOccurred())
+		Expect(apierrors.IsNotFound(err)).To(BeTrue())
+	})
 
 	// It("fails reconciliation if cluster isn't found (deleted cluster)", func(ctx SpecContext) {
 	// 	// since the fakeClient has the `cluster-example` cluster, let's reference
