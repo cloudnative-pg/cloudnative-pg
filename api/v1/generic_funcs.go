@@ -32,16 +32,15 @@ type managedResourceComparer interface {
 func detectConflicting[T managedResourceComparer](t1 T, list []T) error {
 	for _, t2 := range list {
 		if t1.GetName() == t2.GetName() {
-			// skip itself
-			return nil
+			continue
 		}
 
 		if t1.GetClusterRef().Name != t2.GetClusterRef().Name {
-			return nil
+			continue
 		}
 
-		if !t1.HasReconciliations() {
-			return nil
+		if !t2.HasReconciliations() {
+			continue
 		}
 
 		if t1.GetManagedObjectName() == t2.GetManagedObjectName() {
