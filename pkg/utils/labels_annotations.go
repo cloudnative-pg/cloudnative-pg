@@ -276,6 +276,19 @@ const (
 	HibernationAnnotationValueOn HibernationAnnotationValue = "on"
 )
 
+// UserType tells if a secret refers to a superuser database role
+// or an application one
+type UserType string
+
+const (
+	// UserTypeSuperuser is the type of a superuser database
+	// role
+	UserTypeSuperuser UserType = "superuser"
+
+	// UserTypeApp is the type of an application role
+	UserTypeApp UserType = "app"
+)
+
 // LabelClusterName labels the object with the cluster name
 func LabelClusterName(object *metav1.ObjectMeta, name string) {
 	if object.Labels == nil {
