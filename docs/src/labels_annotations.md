@@ -77,6 +77,12 @@ These predefined labels are managed by CloudNativePG.
 : Available on `ConfigMap` and `Secret` resources. When set to `true`,
   a change in the resource is automatically reloaded by the operator.
 
+`cnpg.io/userType`
+: Specifies the type of PostgreSQL user associated with the
+  `Secret`, either `superuser` (Postgres superuser access) or `app`
+  (application-level user in CloudNativePG terminology), and is limited to the
+  default users created by CloudNativePG (typically `postgres` and `app`).
+
 `role` - **deprecated**
 :  Whether the instance running in a pod is a `primary` or a `replica`.
    This label is deprecated, you should use `cnpg.io/instanceRole` instead.
