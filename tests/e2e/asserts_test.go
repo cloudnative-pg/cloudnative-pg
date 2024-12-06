@@ -349,6 +349,8 @@ func AssertUpdateSecret(
 	env *testsUtils.TestingEnvironment,
 ) {
 	var secret corev1.Secret
+
+	// Gather the secret
 	Eventually(func(g Gomega) {
 		err := env.Client.Get(env.Ctx,
 			ctrlclient.ObjectKey{Namespace: namespace, Name: secretName},
@@ -356,13 +358,14 @@ func AssertUpdateSecret(
 		g.Expect(err).ToNot(HaveOccurred())
 	}).Should(Succeed())
 
+	// Change the given field to the new value provided
 	secret.Data[field] = []byte(value)
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		return env.Client.Update(env.Ctx, &secret)
 	})
 	Expect(err).ToNot(HaveOccurred())
 
-	// Wait for the cluster pickup the updated secrets version first
+	// Wait for the cluster to pick up the updated secrets version first
 	Eventually(func() string {
 		cluster, err := env.GetCluster(namespace, clusterName)
 		if err != nil {
@@ -371,13 +374,23 @@ func AssertUpdateSecret(
 		}
 		switch {
 		case strings.HasSuffix(secretName, apiv1.ApplicationUserSecretSuffix):
-			GinkgoWriter.Printf("Resource version of Application secret referenced in the cluster is %v\n",
+			GinkgoWriter.Printf("Resource version of %s secret referenced in the cluster is %v\n",
+				secretName,
 				cluster.Status.SecretsResourceVersion.ApplicationSecretVersion)
 			return cluster.Status.SecretsResourceVersion.ApplicationSecretVersion
+
 		case strings.HasSuffix(secretName, apiv1.SuperUserSecretSuffix):
-			GinkgoWriter.Printf("Resource version of Superuser secret referenced in the cluster is %v\n",
+			GinkgoWriter.Printf("Resource version of %s secret referenced in the cluster is %v\n",
+				secretName,
 				cluster.Status.SecretsResourceVersion.SuperuserSecretVersion)
 			return cluster.Status.SecretsResourceVersion.SuperuserSecretVersion
+
+		case cluster.UsesSecretInManagedRoles(secretName):
+			GinkgoWriter.Printf("Resource version of %s ManagedRole secret referenced in the cluster is %v\n",
+				secretName,
+				cluster.Status.SecretsResourceVersion.ManagedRoleSecretVersions[secretName])
+			return cluster.Status.SecretsResourceVersion.ManagedRoleSecretVersions[secretName]
+
 		default:
 			GinkgoWriter.Printf("Unsupported secrets name found %v\n", secretName)
 			return ""
@@ -385,28 +398,36 @@ func AssertUpdateSecret(
 	}, timeout).Should(BeEquivalentTo(secret.ResourceVersion))
 }
 
-// AssertConnection is used if a connection from a pod to a postgresql
-// database works
+// AssertConnection is used if a connection from a pod to a postgresql database works
 func AssertConnection(
-	host string,
-	user string,
+	namespace string,
+	service string,
 	dbname string,
+	user string,
 	password string,
-	queryingPod *corev1.Pod,
-	timeout int,
 	env *testsUtils.TestingEnvironment,
 ) {
-	By(fmt.Sprintf("connecting to the %v service as %v", host, user), func() {
-		Eventually(func() string {
-			dsn := fmt.Sprintf("host=%v user=%v dbname=%v password=%v sslmode=require", host, user, dbname, password)
-			commandTimeout := time.Second * 10
-			stdout, _, err := env.ExecCommand(env.Ctx, *queryingPod, specs.PostgresContainerName, &commandTimeout,
-				"psql", dsn, "-tAc", "SELECT 1")
-			if err != nil {
-				return ""
-			}
-			return stdout
-		}, timeout).Should(Equal("1\n"))
+	By(fmt.Sprintf("checking that %v service exists", service), func() {
+		Eventually(func(g Gomega) {
+			_, err := testsUtils.GetService(namespace, service, env)
+			g.Expect(err).ToNot(HaveOccurred())
+		}, RetryTimeout).Should(Succeed())
+	})
+
+	By(fmt.Sprintf("connecting to the %v service as %v", service, user), func() {
+		forwardConn, conn, err := testsUtils.ForwardPSQLServiceConnection(env, namespace, service,
+			dbname, user, password)
+		defer func() {
+			_ = conn.Close()
+			forwardConn.Close()
+		}()
+		Expect(err).ToNot(HaveOccurred())
+
+		var rawValue string
+		row := conn.QueryRow("SELECT 1")
+		err = row.Scan(&rawValue)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(strings.TrimSpace(rawValue)).To(BeEquivalentTo("1"))
 	})
 }
 
@@ -508,24 +529,26 @@ func AssertDatabaseExists(pod *corev1.Pod, databaseName string, expectedValue bo
 // AssertUserExists assert if user exists
 func AssertUserExists(pod *corev1.Pod, userName string, expectedValue bool) {
 	By(fmt.Sprintf("verifying if user %v exists", userName), func() {
-		query := fmt.Sprintf("SELECT EXISTS(SELECT 1 FROM pg_user WHERE lower(usename) = lower('%v'));", userName)
-		stdout, stderr, err := env.ExecQueryInInstancePod(
-			testsUtils.PodLocator{
-				Namespace: pod.Namespace,
-				PodName:   pod.Name,
-			},
-			testsUtils.PostgresDBName,
-			query)
-		if err != nil {
-			GinkgoWriter.Printf("stdout: %v\nstderr: %v", stdout, stderr)
-		}
-		Expect(err).ToNot(HaveOccurred())
+		query := fmt.Sprintf("SELECT EXISTS(SELECT 1 FROM pg_roles WHERE lower(rolname) = lower('%v'));", userName)
+		Eventually(func(g Gomega) {
+			stdout, stderr, err := env.ExecQueryInInstancePod(
+				testsUtils.PodLocator{
+					Namespace: pod.Namespace,
+					PodName:   pod.Name,
+				},
+				testsUtils.PostgresDBName,
+				query)
+			if err != nil {
+				GinkgoWriter.Printf("stdout: %v\nstderr: %v", stdout, stderr)
+			}
+			g.Expect(err).ToNot(HaveOccurred())
 
-		if expectedValue {
-			Expect(strings.Trim(stdout, "\n")).To(BeEquivalentTo("t"))
-		} else {
-			Expect(strings.Trim(stdout, "\n")).To(BeEquivalentTo("f"))
-		}
+			if expectedValue {
+				g.Expect(strings.Trim(stdout, "\n")).To(BeEquivalentTo("t"))
+			} else {
+				g.Expect(strings.Trim(stdout, "\n")).To(BeEquivalentTo("f"))
+			}
+		}, 60).Should(Succeed())
 	})
 }
 
@@ -1079,57 +1102,53 @@ func AssertDetachReplicaModeCluster(
 	})
 }
 
-func AssertWritesToReplicaFails(
-	connectingPod *corev1.Pod,
-	service string,
-	appDBName string,
-	appDBUser string,
-	appDBPass string,
-) {
-	By(fmt.Sprintf("Verifying %v service doesn't allow writes", service),
-		func() {
-			timeout := time.Second * 10
-			dsn := testsUtils.CreateDSN(service, appDBUser, appDBName, appDBPass, testsUtils.Require, 5432)
+func AssertWritesToReplicaFails(namespace, service, appDBName, appDBUser, appDBPass string) {
+	By(fmt.Sprintf("Verifying %v service doesn't allow writes", service), func() {
+		forwardConn, conn, err := testsUtils.ForwardPSQLServiceConnection(env, namespace, service,
+			appDBName, appDBUser, appDBPass)
+		defer func() {
+			_ = conn.Close()
+			forwardConn.Close()
+		}()
+		Expect(err).ToNot(HaveOccurred())
 
-			// Expect to be connected to a replica
-			stdout, _, err := env.EventuallyExecCommand(env.Ctx, *connectingPod, specs.PostgresContainerName, &timeout,
-				"psql", dsn, "-tAc", "select pg_is_in_recovery()")
-			value := strings.Trim(stdout, "\n")
-			Expect(value, err).To(Equal("t"))
+		var rawValue string
+		// Expect to be connected to a replica
+		row := conn.QueryRow("SELECT pg_is_in_recovery()")
+		err = row.Scan(&rawValue)
+		Expect(err).ToNot(HaveOccurred())
+		isReplica := strings.TrimSpace(rawValue)
+		Expect(isReplica).To(BeEquivalentTo("true"))
 
-			// Expect to be in a read-only transaction
-			_, _, err = utils.ExecCommand(env.Ctx, env.Interface, env.RestClientConfig, *connectingPod,
-				specs.PostgresContainerName, &timeout,
-				"psql", dsn, "-tAc", "CREATE TABLE IF NOT EXISTS table1(var1 text);")
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).Should(
-				ContainSubstring("cannot execute CREATE TABLE in a read-only transaction"))
-		})
+		// Expect to be in a read-only transaction
+		_, err = conn.Exec("CREATE TABLE IF NOT EXISTS table1(var1 text)")
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).Should(ContainSubstring("cannot execute CREATE TABLE in a read-only transaction"))
+	})
 }
 
-func AssertWritesToPrimarySucceeds(
-	connectingPod *corev1.Pod,
-	service string,
-	appDBName string,
-	appDBUser string,
-	appDBPass string,
-) {
-	By(fmt.Sprintf("Verifying %v service correctly manages writes", service),
-		func() {
-			timeout := time.Second * 10
-			dsn := testsUtils.CreateDSN(service, appDBUser, appDBName, appDBPass, testsUtils.Require, 5432)
+func AssertWritesToPrimarySucceeds(namespace, service, appDBName, appDBUser, appDBPass string) {
+	By(fmt.Sprintf("Verifying %v service correctly manages writes", service), func() {
+		forwardConn, conn, err := testsUtils.ForwardPSQLServiceConnection(env, namespace, service,
+			appDBName, appDBUser, appDBPass)
+		defer func() {
+			_ = conn.Close()
+			forwardConn.Close()
+		}()
+		Expect(err).ToNot(HaveOccurred())
 
-			// Expect to be connected to a primary
-			stdout, _, err := env.EventuallyExecCommand(env.Ctx, *connectingPod, specs.PostgresContainerName, &timeout,
-				"psql", dsn, "-tAc", "select pg_is_in_recovery()")
-			value := strings.Trim(stdout, "\n")
-			Expect(value, err).To(Equal("f"))
+		var rawValue string
+		// Expect to be connected to a primary
+		row := conn.QueryRow("SELECT pg_is_in_recovery()")
+		err = row.Scan(&rawValue)
+		Expect(err).ToNot(HaveOccurred())
+		isReplica := strings.TrimSpace(rawValue)
+		Expect(isReplica).To(BeEquivalentTo("false"))
 
-			// Expect to be able to write
-			_, _, err = env.EventuallyExecCommand(env.Ctx, *connectingPod, specs.PostgresContainerName, &timeout,
-				"psql", dsn, "-tAc", "CREATE TABLE IF NOT EXISTS table1(var1 text);")
-			Expect(err).ToNot(HaveOccurred())
-		})
+		// Expect to be able to write
+		_, err = conn.Exec("CREATE TABLE IF NOT EXISTS table1(var1 text)")
+		Expect(err).ToNot(HaveOccurred())
+	})
 }
 
 func AssertFastFailOver(
@@ -1346,7 +1365,6 @@ func AssertApplicationDatabaseConnection(
 	appDB,
 	appPassword,
 	appSecretName string,
-	pod *corev1.Pod,
 ) {
 	By("checking cluster can connect with application database user and password", func() {
 		// Get the app user password from the auto generated -app secret if appPassword is not provided
@@ -1363,10 +1381,9 @@ func AssertApplicationDatabaseConnection(
 			Expect(err).ToNot(HaveOccurred())
 			appPassword = string(appSecret.Data["password"])
 		}
-		// rwService := fmt.Sprintf("%v-rw.%v.svc", clusterName, namespace)
-		rwService := testsUtils.CreateServiceFQDN(namespace, testsUtils.GetReadWriteServiceName(clusterName))
+		rwService := testsUtils.GetReadWriteServiceName(clusterName)
 
-		AssertConnection(rwService, appUser, appDB, appPassword, pod, 60, env)
+		AssertConnection(namespace, rwService, appDB, appUser, appPassword, env)
 	})
 }
 
@@ -1578,24 +1595,18 @@ func AssertClusterRestoreWithApplicationDB(namespace, restoreClusterFile, tableN
 	secretName := restoredClusterName + apiv1.ApplicationUserSecretSuffix
 
 	By("checking the restored cluster with pre-defined app password connectable", func() {
-		primaryPod, err := env.GetClusterPrimary(namespace, restoredClusterName)
-		Expect(err).ToNot(HaveOccurred())
 		AssertApplicationDatabaseConnection(
 			namespace,
 			restoredClusterName,
 			appUser,
 			testsUtils.AppDBName,
 			appUserPass,
-			secretName,
-			primaryPod)
+			secretName)
 	})
 
 	By("update user application password for restored cluster and verify connectivity", func() {
 		const newPassword = "eeh2Zahohx" //nolint:gosec
 		AssertUpdateSecret("password", newPassword, secretName, namespace, restoredClusterName, 30, env)
-
-		primaryPod, err := env.GetClusterPrimary(namespace, restoredClusterName)
-		Expect(err).ToNot(HaveOccurred())
 
 		AssertApplicationDatabaseConnection(
 			namespace,
@@ -1603,8 +1614,7 @@ func AssertClusterRestoreWithApplicationDB(namespace, restoreClusterFile, tableN
 			appUser,
 			testsUtils.AppDBName,
 			newPassword,
-			secretName,
-			primaryPod)
+			secretName)
 	})
 }
 
@@ -1820,9 +1830,6 @@ func AssertClusterWasRestoredWithPITRAndApplicationDB(namespace, clusterName, ta
 		env)
 	Expect(err).ToNot(HaveOccurred())
 
-	primaryPod, err := env.GetClusterPrimary(namespace, clusterName)
-	Expect(err).ToNot(HaveOccurred())
-
 	By("checking the restored cluster with auto generated app password connectable", func() {
 		AssertApplicationDatabaseConnection(
 			namespace,
@@ -1830,8 +1837,7 @@ func AssertClusterWasRestoredWithPITRAndApplicationDB(namespace, clusterName, ta
 			appUser,
 			testsUtils.AppDBName,
 			appUserPass,
-			secretName,
-			primaryPod)
+			secretName)
 	})
 
 	By("update user application password for restored cluster and verify connectivity", func() {
@@ -1843,8 +1849,7 @@ func AssertClusterWasRestoredWithPITRAndApplicationDB(namespace, clusterName, ta
 			appUser,
 			testsUtils.AppDBName,
 			newPassword,
-			secretName,
-			primaryPod)
+			secretName)
 	})
 }
 
@@ -2001,23 +2006,20 @@ func assertReadWriteConnectionUsingPgBouncerService(
 	poolerYamlFilePath string,
 	isPoolerRW bool,
 ) {
-	poolerName, err := env.GetResourceNameFromYAML(poolerYamlFilePath)
+	poolerService, err := env.GetResourceNameFromYAML(poolerYamlFilePath)
 	Expect(err).ToNot(HaveOccurred())
-	poolerService := testsUtils.CreateServiceFQDN(namespace, poolerName)
 	appUser, generatedAppUserPassword, err := testsUtils.GetCredentials(
 		clusterName, namespace, apiv1.ApplicationUserSecretSuffix, env)
 	Expect(err).ToNot(HaveOccurred())
-	primaryPod, err := env.GetClusterPrimary(namespace, clusterName)
-	Expect(err).ToNot(HaveOccurred())
-	AssertConnection(poolerService, appUser, "app", generatedAppUserPassword, primaryPod, 180, env)
+	AssertConnection(namespace, poolerService, testsUtils.AppDBName, appUser, generatedAppUserPassword, env)
 
 	// verify that, if pooler type setup read write then it will allow both read and
 	// write operations or if pooler type setup read only then it will allow only read operations
 	if isPoolerRW {
-		AssertWritesToPrimarySucceeds(primaryPod, poolerService, "app", appUser,
+		AssertWritesToPrimarySucceeds(namespace, poolerService, "app", appUser,
 			generatedAppUserPassword)
 	} else {
-		AssertWritesToReplicaFails(primaryPod, poolerService, "app", appUser,
+		AssertWritesToReplicaFails(namespace, poolerService, "app", appUser,
 			generatedAppUserPassword)
 	}
 }
@@ -2344,13 +2346,12 @@ func DeleteTableUsingPgBouncerService(
 	env *testsUtils.TestingEnvironment,
 	pod *corev1.Pod,
 ) {
-	poolerName, err := env.GetResourceNameFromYAML(poolerYamlFilePath)
+	poolerService, err := env.GetResourceNameFromYAML(poolerYamlFilePath)
 	Expect(err).ToNot(HaveOccurred())
-	poolerService := testsUtils.CreateServiceFQDN(namespace, poolerName)
 	appUser, generatedAppUserPassword, err := testsUtils.GetCredentials(
 		clusterName, namespace, apiv1.ApplicationUserSecretSuffix, env)
 	Expect(err).ToNot(HaveOccurred())
-	AssertConnection(poolerService, appUser, "app", generatedAppUserPassword, pod, 180, env)
+	AssertConnection(namespace, poolerService, testsUtils.AppDBName, appUser, generatedAppUserPassword, env)
 
 	connectionTimeout := time.Second * 10
 	dsn := testsUtils.CreateDSN(poolerService, appUser, testsUtils.AppDBName, generatedAppUserPassword,
