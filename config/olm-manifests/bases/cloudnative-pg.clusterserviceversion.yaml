@@ -919,9 +919,6 @@ spec:
         - path: publicationReclaimPolicy
           displayName: Publication reclaim policy
           description: Specifies the action to take for the publication inside PostgreSQL when the associated object in Kubernetes is deleted. Options are to either delete the database or retain it for future management.
-        - path: parameters
-          displayName: Parameters
-          description: Publication parameters part of the `WITH` clause as expected by PostgreSQL `CREATE PUBLICATION` command
     - kind: Subscription
       name: subscriptions.postgresql.cnpg.io
       displayName: Postgres Subscription
@@ -953,6 +950,3 @@ spec:
         - path: subscriptionReclaimPolicy
           displayName: Subscription reclaim policy
           description: Specifies the action to take for the subscription inside PostgreSQL when the associated object in Kubernetes is deleted. Options are to either delete the database or retain it for future management.
-        - path: parameters
-          displayName: Parameters
-          description: Subscription parameters part of the `WITH` clause as expected by PostgreSQL `CREATE SUBSCRIPTION` command
