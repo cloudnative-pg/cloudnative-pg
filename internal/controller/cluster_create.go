@@ -218,7 +218,7 @@ func (r *ClusterReconciler) reconcileAppUserSecret(ctx context.Context, cluster 
 			cluster.GetApplicationDatabaseName(),
 			cluster.GetApplicationDatabaseOwner(),
 			appPassword,
-			"default")
+			"app")
 
 		cluster.SetInheritedDataAndOwnership(&appSecret.ObjectMeta)
 		return createOrPatchClusterCredentialSecret(ctx, r.Client, appSecret)

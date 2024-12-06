@@ -71,12 +71,12 @@ const (
 	// scheduled backup if a backup is created by a scheduled backup
 	ParentScheduledBackupLabelName = MetadataNamespace + "/scheduled-backup"
 
-	// WatchedLabelName the name of the label which tell if a resource change will be automatically reloaded by instance
+	// WatchedLabelName the name of the label which tells if a resource change will be automatically reloaded by instance
 	// or not, use for Secrets or ConfigMaps
 	WatchedLabelName = MetadataNamespace + "/reload"
 
-	// UserRoleLabeName the name of the label which tell if a Secret refers to a superuser database role or a default one
-	UserRoleLabelName = MetadataNamespace + "/user-role"
+	// UserTypeLabelName the name of the label which tells if a Secret refers to a superuser database role or an application one
+	UserTypeLabelName = MetadataNamespace + "/userType"
 
 	// BackupTimelineLabelName is the name or the label where the timeline of a backup is kept
 	BackupTimelineLabelName = MetadataNamespace + "/backupTimeline"
