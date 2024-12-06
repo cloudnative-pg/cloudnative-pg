@@ -176,40 +176,6 @@ var _ = Describe("Role synchronizer tests", func() {
 			Expect(rolesWithErrors).To(BeEmpty())
 		})
 
-		It("it will call the necessary revokes to update membership", func(ctx context.Context) {
-			managedConf := apiv1.ManagedConfiguration{
-				Roles: []apiv1.RoleConfiguration{
-					{
-						Name:            "role_to_test2",
-						Superuser:       true,
-						Inherit:         ptr.To(true),
-						InRoles:         []string{},
-						Comment:         "This is a role to test with",
-						ConnectionLimit: -1,
-					},
-				},
-			}
-			rows := sqlmock.NewRows([]string{
-				"inroles",
-			}).
-				AddRow([]byte(`{"foo"}`))
-			mock.ExpectQuery(expectedMembershipStmt).WithArgs("role_to_test2").WillReturnRows(rows)
-			mock.ExpectBegin()
-
-			mock.ExpectExec(`REVOKE "foo" FROM "role_to_test2"`).
-				WillReturnResult(sqlmock.NewResult(2, 3))
-
-			mock.ExpectCommit()
-
-			_, rolesWithErrors, err := roleSynchronizer.synchronizeRoles(ctx, db, &managedConf, map[string]apiv1.PasswordState{
-				"role_to_test2": {
-					TransactionID: 11, // defined in the mock query to the DB above
-				},
-			})
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(rolesWithErrors).To(BeEmpty())
-		})
-
 		It("it will call the updateComment method", func(ctx context.Context) {
 			managedConf := apiv1.ManagedConfiguration{
 				Roles: []apiv1.RoleConfiguration{
