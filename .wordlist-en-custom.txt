@@ -389,6 +389,7 @@ SQLRefs
 SSL
 SSZ
 STORAGEACCOUNTNAME
+Scaleway
 ScheduledBackup
 ScheduledBackupList
 ScheduledBackupSpec
@@ -1126,6 +1127,8 @@ robfig
 roleRef
 rollingupdatestatus
 rollout
+rpo
+rto
 runonserver
 runtime
 rw
@@ -1134,6 +1137,7 @@ sa
 sas
 scalability
 scalable
+scaleway
 sccs
 scheduledbackup
 scheduledbackuplist
