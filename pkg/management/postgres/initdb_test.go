@@ -32,7 +32,7 @@ var _ = Describe("EnsureTargetDirectoriesDoNotExist", func() {
 			PgData: GinkgoT().TempDir(),
 			PgWal:  GinkgoT().TempDir(),
 		}
-		Expect(os.Create(filepath.Join(initInfo.PgData, "PG_VERSION"))).Error().To(Succeed())
+		Expect(os.Create(filepath.Join(initInfo.PgData, "PG_VERSION"))).Error().NotTo(HaveOccurred())
 		Expect(os.Mkdir(filepath.Join(initInfo.PgWal, "archive_status"), 0o700)).To(Succeed())
 	})
 
@@ -84,7 +84,7 @@ var _ = Describe("renameExistingTargetDataDirectories", func() {
 			PgData: GinkgoT().TempDir(),
 			PgWal:  GinkgoT().TempDir(),
 		}
-		Expect(os.Create(filepath.Join(initInfo.PgData, "PG_VERSION"))).Error().To(Succeed())
+		Expect(os.Create(filepath.Join(initInfo.PgData, "PG_VERSION"))).Error().NotTo(HaveOccurred())
 		Expect(os.Mkdir(filepath.Join(initInfo.PgWal, "archive_status"), 0o700)).To(Succeed())
 	})
 
