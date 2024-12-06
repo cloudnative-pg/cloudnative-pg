@@ -75,7 +75,8 @@ const (
 	// or not, use for Secrets or ConfigMaps
 	WatchedLabelName = MetadataNamespace + "/reload"
 
-	// UserTypeLabelName the name of the label which tells if a Secret refers to a superuser database role or an application one
+	// UserTypeLabelName the name of the label which tells if a Secret refers
+	// to a superuser database role or an application one
 	UserTypeLabelName = MetadataNamespace + "/userType"
 
 	// BackupTimelineLabelName is the name or the label where the timeline of a backup is kept
