@@ -71,12 +71,9 @@ var _ = Describe("Bootstrap with pg_basebackup", Label(tests.LabelRecovery), fun
 
 			secretName := dstClusterName + apiv1.ApplicationUserSecretSuffix
 
-			primaryPod, err := env.GetClusterPrimary(namespace, dstClusterName)
-			Expect(err).ToNot(HaveOccurred())
-
 			By("checking the dst cluster with auto generated app password connectable", func() {
 				AssertApplicationDatabaseConnection(namespace, dstClusterName,
-					appUser, utils.AppDBName, "", secretName, primaryPod)
+					appUser, utils.AppDBName, "", secretName)
 			})
 
 			By("update user application password for dst cluster and verify connectivity", func() {
@@ -88,8 +85,7 @@ var _ = Describe("Bootstrap with pg_basebackup", Label(tests.LabelRecovery), fun
 					appUser,
 					utils.AppDBName,
 					newPassword,
-					secretName,
-					primaryPod)
+					secretName)
 			})
 
 			By("checking data have been copied correctly", func() {
