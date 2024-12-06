@@ -125,18 +125,18 @@ func toPostgresParameters(parameters map[string]string) string {
 	return b.String()[:len(b.String())-2]
 }
 
-type hasReconciliations interface {
+type postgresResourceManager interface {
 	client.Object
 	HasReconciliations() bool
 	markableAsFailed
 }
 
-type canDetectConflicts[T client.Object] interface {
-	DetectConflicting(reference T) error
+type managedResourceExclusivityEnsurer[T postgresResourceManager] interface {
+	MustHaveManagedResourceExclusivity(newManager T) error
 	client.ObjectList
 }
 
-func detectConflictingResources[T hasReconciliations, TL canDetectConflicts[T]](
+func detectConflictingManagers[T postgresResourceManager, TL managedResourceExclusivityEnsurer[T]](
 	ctx context.Context,
 	cli client.Client,
 	resource T,
@@ -161,7 +161,7 @@ func detectConflictingResources[T hasReconciliations, TL canDetectConflicts[T]](
 	}
 
 	// Make sure the target PG element is not being managed by another kubernetes resource
-	if conflictErr := list.DetectConflicting(resource); conflictErr != nil {
+	if conflictErr := list.MustHaveManagedResourceExclusivity(resource); conflictErr != nil {
 		if markErr := markAsFailed(ctx, cli, resource, conflictErr); markErr != nil {
 			return ctrl.Result{},
 				fmt.Errorf("encountered an error while marking as failed the resource: %w, original error: %w",

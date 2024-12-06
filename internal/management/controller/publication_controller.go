@@ -115,7 +115,7 @@ func (r *PublicationReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{RequeueAfter: publicationReconciliationInterval}, nil
 	}
 
-	if res, err := detectConflictingResources(ctx, r.Client, &publication, &apiv1.PublicationList{}); err != nil ||
+	if res, err := detectConflictingManagers(ctx, r.Client, &publication, &apiv1.PublicationList{}); err != nil ||
 		!res.IsZero() {
 		return res, err
 	}

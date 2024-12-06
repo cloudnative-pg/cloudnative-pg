@@ -29,7 +29,7 @@ type managedResourceComparer interface {
 	HasReconciliations() bool
 }
 
-func detectConflicting[T managedResourceComparer](t1 T, list []T) error {
+func ensureManagedResourceExclusivity[T managedResourceComparer](t1 T, list []T) error {
 	for _, t2 := range list {
 		if t1.GetName() == t2.GetName() {
 			continue

@@ -65,8 +65,8 @@ func (pub *Publication) GetName() string {
 	return pub.Name
 }
 
-// DetectConflicting detects conflicting publications
-func (pub *PublicationList) DetectConflicting(reference *Publication) error {
+// MustHaveManagedResourceExclusivity detects conflicting publications
+func (pub *PublicationList) MustHaveManagedResourceExclusivity(reference *Publication) error {
 	pointers := toSliceWithPointers(pub.Items)
-	return detectConflicting(reference, pointers)
+	return ensureManagedResourceExclusivity(reference, pointers)
 }

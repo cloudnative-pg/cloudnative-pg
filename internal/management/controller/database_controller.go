@@ -114,7 +114,7 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, nil
 	}
 
-	if res, err := detectConflictingResources(ctx, r.Client, &database, &apiv1.DatabaseList{}); err != nil ||
+	if res, err := detectConflictingManagers(ctx, r.Client, &database, &apiv1.DatabaseList{}); err != nil ||
 		!res.IsZero() {
 		return res, err
 	}

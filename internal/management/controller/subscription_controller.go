@@ -135,7 +135,7 @@ func (r *SubscriptionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{RequeueAfter: subscriptionReconciliationInterval}, nil
 	}
 
-	if res, err := detectConflictingResources(ctx, r.Client, &subscription, &apiv1.SubscriptionList{}); err != nil ||
+	if res, err := detectConflictingManagers(ctx, r.Client, &subscription, &apiv1.SubscriptionList{}); err != nil ||
 		!res.IsZero() {
 		return res, err
 	}
