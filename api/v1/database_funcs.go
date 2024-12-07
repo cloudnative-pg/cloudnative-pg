@@ -40,6 +40,11 @@ func (db *Database) SetAsReady() {
 	db.Status.ObservedGeneration = db.Generation
 }
 
+// GetStatusApplied returns the `applied` value in the status
+func (db *Database) GetStatusApplied() *bool {
+	return db.Status.Applied
+}
+
 // GetStatusMessage returns the status message of the database
 func (db *Database) GetStatusMessage() string {
 	return db.Status.Message

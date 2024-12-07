@@ -40,6 +40,11 @@ func (pub *Publication) SetAsReady() {
 	pub.Status.ObservedGeneration = pub.Generation
 }
 
+// GetStatusApplied returns the `applied` value in the status
+func (pub *Publication) GetStatusApplied() *bool {
+	return pub.Status.Applied
+}
+
 // GetStatusMessage returns the status message of the publication
 func (pub *Publication) GetStatusMessage() string {
 	return pub.Status.Message
