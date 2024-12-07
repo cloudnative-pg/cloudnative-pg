@@ -80,11 +80,11 @@ Git tags for versions are prefixed with `v`.
 ## Support status of CloudNativePG releases
 
 <!-- TODO: Complete dates and versions below -->
-| Version         | Currently supported  | Release date        | End of life         | Supported Kubernetes versions | Tested, but not supported | Supported Postgres versions |
-|-----------------|----------------------|---------------------|---------------------|-------------------------------|---------------------------|-----------------------------|
-| 1.25.x          | Yes                  | December XX, 2024   | ~ February, 2025    | 1.29, 1.30, 1.31, 1.32 (??)   | 1.27, 1.28                | 13 - 17                     |
-| 1.24.x          | Yes                  | August 22, 2024     | February XX, 2025   | 1.28, 1.29, 1.30, 1.31        | 1.27                      | 13 - 17                     |
-| main            | No, development only |                     |                     |                               |                           | 13 - 17                     |
+| Version         | Currently supported  | Release date   | End of life         | Supported Kubernetes versions | Tested, but not supported | Supported Postgres versions |
+|-----------------|----------------------|----------------|---------------------|-------------------------------|---------------------------|-----------------------------|
+| 1.25.x          | No (RC)              | Dec XX, 2024   | ~ May/Jun, 2025     | 1.29, 1.30, 1.31, 1.32 (!)    | 1.27, 1.28                | 13 - 17                     |
+| 1.24.x          | Yes                  | Aug 22, 2024   | Feb XX, 2025        | 1.28, 1.29, 1.30, 1.31        | 1.27                      | 13 - 17                     |
+| main            | No, development only |                |                     |                               |                           | 13 - 17                     |
 
 <!-- <sup>1</sup> _PostgreSQL 13 will be supported until November 13, 2025._ -->
 
@@ -121,7 +121,7 @@ version of PostgreSQL, we might not be able to help you.
 
 | Version         | Release date          | End of life               |
 |-----------------|-----------------------|---------------------------|
-| 1.25.0          | Nov/Dec, 2024         | May/Jun, 2025             |
+| 1.25.0          | Dec, 2024             | May/Jun, 2025             |
 | 1.26.0          | Mar, 2025             | Aug/Sep, 2025             |
 | 1.27.0          | Jun, 2025             | Dec, 2025                 |
 
