@@ -29,11 +29,11 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/spf13/cobra"
 
-	cacheClient "github.com/cloudnative-pg/cloudnative-pg/internal/management/cache/client"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/client/common"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/client/local"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 )
 
 // NewCmd create the "instance status" subcommand
@@ -56,7 +56,7 @@ func statusSubCommand(ctx context.Context) error {
 		return err
 	}
 
-	cluster, err := cacheClient.GetCluster()
+	cluster, err := local.NewClient().Cache().GetCluster()
 	if err != nil {
 		contextLogger.Error(err, "while loading the cluster from cache")
 		return err
@@ -131,6 +131,6 @@ func executeRequest(ctx context.Context, scheme string) (*http.Response, error) 
 		contextLogger.Error(err, "Error while building the request")
 		return nil, err
 	}
-	httpClient := resources.NewHTTPClient(connectionTimeout, requestTimeout)
+	httpClient := common.NewHTTPClient(connectionTimeout, requestTimeout)
 	return httpClient.Do(req) // nolint:gosec
 }

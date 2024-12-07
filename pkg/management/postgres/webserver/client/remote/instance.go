@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package instance
+package remote
 
 import (
 	"context"
@@ -34,9 +34,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/client/common"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -55,8 +55,8 @@ var requestRetry = wait.Backoff{
 	Jitter:   0.1,
 }
 
-// Client a http client capable of querying the instance HTTP endpoints
-type Client interface {
+// InstanceClient a http client capable of querying the instance HTTP endpoints
+type InstanceClient interface {
 	// GetStatusFromInstances gets the replication status from the PostgreSQL instances,
 	// the returned list is sorted in order to have the primary as the first element
 	// and the other instances in their election order
@@ -83,7 +83,7 @@ type Client interface {
 	ArchivePartialWAL(context.Context, *corev1.Pod) (string, error)
 }
 
-type statusClient struct {
+type instanceClientImpl struct {
 	*http.Client
 }
 
@@ -97,18 +97,18 @@ func (i StatusError) Error() string {
 	return fmt.Sprintf("error status code: %v, body: %v", i.StatusCode, i.Body)
 }
 
-// NewStatusClient returns a client capable of querying the instance HTTP endpoints
-func NewStatusClient() Client {
+// newInstanceClient returns a client capable of querying the instance HTTP endpoints
+func newInstanceClient() InstanceClient {
 	const connectionTimeout = 2 * time.Second
 	const requestTimeout = 10 * time.Second
 
-	return &statusClient{Client: resources.NewHTTPClient(connectionTimeout, requestTimeout)}
+	return &instanceClientImpl{Client: common.NewHTTPClient(connectionTimeout, requestTimeout)}
 }
 
 // extractInstancesStatus extracts the status of the underlying PostgreSQL instance from
 // the requested Pod, via the instance manager. In case of failure, errors are passed
 // in the result list
-func (r statusClient) extractInstancesStatus(
+func (r instanceClientImpl) extractInstancesStatus(
 	ctx context.Context,
 	activePods []corev1.Pod,
 ) postgres.PostgresqlStatusList {
@@ -123,7 +123,7 @@ func (r statusClient) extractInstancesStatus(
 
 // getReplicaStatusFromPodViaHTTP retrieves the status of PostgreSQL pod via HTTP, retrying
 // the request if some communication error is encountered
-func (r *statusClient) getReplicaStatusFromPodViaHTTP(
+func (r *instanceClientImpl) getReplicaStatusFromPodViaHTTP(
 	ctx context.Context,
 	pod corev1.Pod,
 ) (result postgres.PostgresqlStatus) {
@@ -161,7 +161,7 @@ func (r *statusClient) getReplicaStatusFromPodViaHTTP(
 	return result
 }
 
-func (r *statusClient) GetStatusFromInstances(
+func (r *instanceClientImpl) GetStatusFromInstances(
 	ctx context.Context,
 	pods corev1.PodList,
 ) postgres.PostgresqlStatusList {
@@ -184,7 +184,7 @@ func (r *statusClient) GetStatusFromInstances(
 	return status
 }
 
-func (r *statusClient) GetPgControlDataFromInstance(
+func (r *instanceClientImpl) GetPgControlDataFromInstance(
 	ctx context.Context,
 	pod *corev1.Pod,
 ) (string, error) {
@@ -231,7 +231,7 @@ func (r *statusClient) GetPgControlDataFromInstance(
 }
 
 // UpgradeInstanceManager upgrades the instance manager to the passed availableArchitecture
-func (r *statusClient) UpgradeInstanceManager(
+func (r *instanceClientImpl) UpgradeInstanceManager(
 	ctx context.Context,
 	pod *corev1.Pod,
 	availableArchitecture *utils.AvailableArchitecture,
@@ -293,7 +293,7 @@ func isEOF(err error) bool {
 }
 
 // rawInstanceStatusRequest retrieves the status of PostgreSQL pods via an HTTP request with GET method.
-func (r *statusClient) rawInstanceStatusRequest(
+func (r *instanceClientImpl) rawInstanceStatusRequest(
 	ctx context.Context,
 	pod corev1.Pod,
 ) (result postgres.PostgresqlStatus) {
@@ -376,7 +376,7 @@ func GetStatusSchemeFromPod(pod *corev1.Pod) HTTPScheme {
 	return schemeHTTP
 }
 
-func (r *statusClient) ArchivePartialWAL(ctx context.Context, pod *corev1.Pod) (string, error) {
+func (r *instanceClientImpl) ArchivePartialWAL(ctx context.Context, pod *corev1.Pod) (string, error) {
 	contextLogger := log.FromContext(ctx)
 
 	statusURL := url.Build(

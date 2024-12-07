@@ -29,9 +29,9 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/cache"
-	cacheClient "github.com/cloudnative-pg/cloudnative-pg/internal/management/cache/client"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	m "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/metrics"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/client/local"
 	postgresconf "github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 )
@@ -92,7 +92,7 @@ func NewExporter(instance *postgres.Instance) *Exporter {
 	return &Exporter{
 		instance:   instance,
 		Metrics:    newMetrics(),
-		getCluster: cacheClient.GetCluster,
+		getCluster: local.NewClient().Cache().GetCluster,
 	}
 }
 

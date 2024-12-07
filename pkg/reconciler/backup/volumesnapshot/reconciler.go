@@ -35,8 +35,8 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/client/remote"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/instance"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -44,7 +44,7 @@ import (
 type Reconciler struct {
 	cli                  client.Client
 	recorder             record.EventRecorder
-	instanceStatusClient instance.Client
+	instanceStatusClient remote.InstanceClient
 }
 
 // ExecutorBuilder is a struct capable of creating a Reconciler
@@ -61,7 +61,7 @@ func NewReconcilerBuilder(
 		executor: Reconciler{
 			cli:                  cli,
 			recorder:             recorder,
-			instanceStatusClient: instance.NewStatusClient(),
+			instanceStatusClient: remote.NewClient().Instance(),
 		},
 	}
 }

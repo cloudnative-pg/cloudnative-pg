@@ -26,14 +26,15 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/client/local"
 )
 
 type onlineExecutor struct {
-	backupClient webserver.BackupClient
+	backupClient local.BackupClient
 }
 
 func newOnlineExecutor() *onlineExecutor {
-	return &onlineExecutor{backupClient: webserver.NewBackupClient()}
+	return &onlineExecutor{backupClient: local.NewClient().Backup()}
 }
 
 func (o *onlineExecutor) finalize(

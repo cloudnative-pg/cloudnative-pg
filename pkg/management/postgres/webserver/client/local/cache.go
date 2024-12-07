@@ -14,9 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package client contains the constants and functions for reading supported objects from cache
-// or building them in case of cache miss.
-package client
+package local
 
 import (
 	"encoding/json"
@@ -32,9 +30,19 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
 )
 
+// CacheClient is the interface to interact with the cache endpoints
+type CacheClient interface {
+	GetCluster() (*apiv1.Cluster, error)
+	GetEnv(key string) ([]string, error)
+}
+
+type cacheClientImpl struct {
+	cli *http.Client
+}
+
 // GetCluster gets the required cluster from cache
-func GetCluster() (*apiv1.Cluster, error) {
-	bytes, err := httpCacheGet(cache.ClusterKey)
+func (c *cacheClientImpl) GetCluster() (*apiv1.Cluster, error) {
+	bytes, err := c.httpCacheGet(cache.ClusterKey)
 	if err != nil {
 		return nil, err
 	}
@@ -49,8 +57,8 @@ func GetCluster() (*apiv1.Cluster, error) {
 }
 
 // GetEnv gets the environment variables from cache
-func GetEnv(key string) ([]string, error) {
-	bytes, err := httpCacheGet(key)
+func (c *cacheClientImpl) GetEnv(key string) ([]string, error) {
+	bytes, err := c.httpCacheGet(key)
 	if err != nil {
 		return nil, err
 	}
@@ -66,11 +74,11 @@ func GetEnv(key string) ([]string, error) {
 
 // httpCacheGet retrieves an object from the cache.
 // In case of failures it retries for a while before giving up
-func httpCacheGet(urlPath string) ([]byte, error) {
+func (c *cacheClientImpl) httpCacheGet(urlPath string) ([]byte, error) {
 	var bytes []byte
 	err := retry.OnError(retry.DefaultBackoff, func(error) bool { return true }, func() error {
 		var err error
-		bytes, err = get(urlPath)
+		bytes, err = c.get(urlPath)
 		return err
 	})
 	if err != nil {
@@ -80,8 +88,8 @@ func httpCacheGet(urlPath string) ([]byte, error) {
 	return bytes, nil
 }
 
-func get(urlPath string) ([]byte, error) {
-	resp, err := http.Get(url.Local(url.PathCache+urlPath, url.LocalPort))
+func (c *cacheClientImpl) get(urlPath string) ([]byte, error) {
+	resp, err := c.cli.Get(url.Local(url.PathCache+urlPath, url.LocalPort))
 	if err != nil {
 		return nil, err
 	}

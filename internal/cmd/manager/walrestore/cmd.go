@@ -37,7 +37,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/cache"
-	cacheClient "github.com/cloudnative-pg/cloudnative-pg/internal/management/cache/client"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/client/local"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 )
 
@@ -113,6 +113,7 @@ func run(ctx context.Context, pgData string, podName string, args []string) erro
 	var cluster *apiv1.Cluster
 	var err error
 
+	cacheClient := local.NewClient().Cache()
 	cluster, err = cacheClient.GetCluster()
 	if err != nil {
 		return fmt.Errorf("failed to get cluster: %w", err)

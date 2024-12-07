@@ -23,8 +23,8 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/log"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/client/remote"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/instance"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -38,7 +38,7 @@ var errPostgresNotShutDown = fmt.Errorf("expected postmaster to be shut down")
 func generateDemotionToken(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
-	instanceClient instance.Client,
+	instanceClient remote.InstanceClient,
 	instancesStatus postgres.PostgresqlStatusList,
 ) (string, error) {
 	contextLogger := log.FromContext(ctx).WithName("shutdown_checkpoint")
