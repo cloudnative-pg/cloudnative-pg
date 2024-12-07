@@ -123,69 +123,50 @@ var _ = Describe("Managed publication controller tests", func() {
 	})
 
 	It("adds finalizer and sets status ready on success", func(ctx SpecContext) {
-		Expect(publication.Finalizers).To(BeEmpty())
+		assertObjectWasReconciled(ctx, r, publication, &apiv1.Publication{}, fakeClient,
+			func() {
+				// Mocking Detect
+				noHits := sqlmock.NewRows([]string{""}).AddRow("0")
+				dbMock.ExpectQuery(publicationDetectionQuery).WithArgs(publication.Spec.Name).
+					WillReturnRows(noHits)
 
-		// Mocking Detect
-		noHits := sqlmock.NewRows([]string{""}).AddRow("0")
-		dbMock.ExpectQuery(publicationDetectionQuery).WithArgs(publication.Spec.Name).
-			WillReturnRows(noHits)
-
-		// Mocking CreatePublication
-		expectedCreate := sqlmock.NewResult(0, 1)
-		expectedQuery := fmt.Sprintf(
-			"CREATE PUBLICATION %s FOR ALL TABLES",
-			pgx.Identifier{publication.Spec.Name}.Sanitize(),
+				// Mocking CreatePublication
+				expectedCreate := sqlmock.NewResult(0, 1)
+				expectedQuery := fmt.Sprintf(
+					"CREATE PUBLICATION %s FOR ALL TABLES",
+					pgx.Identifier{publication.Spec.Name}.Sanitize(),
+				)
+				dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
+			},
+			func(updatedPublication *apiv1.Publication) {
+				Expect(updatedPublication.GetStatusApplied()).Should(HaveValue(BeTrue()))
+				Expect(updatedPublication.GetStatusMessage()).Should(BeEmpty())
+				Expect(updatedPublication.GetFinalizers()).NotTo(BeEmpty())
+			},
 		)
-		dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
-
-		// Reconcile and get the updated object
-		_, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{
-			Namespace: publication.Namespace,
-			Name:      publication.Name,
-		}})
-		Expect(err).ToNot(HaveOccurred())
-
-		var updatedPublication apiv1.Publication
-		err = fakeClient.Get(ctx, client.ObjectKey{
-			Namespace: publication.Namespace,
-			Name:      publication.Name,
-		}, &updatedPublication)
-		Expect(err).ToNot(HaveOccurred())
-
-		Expect(updatedPublication.Status.Applied).Should(HaveValue(BeTrue()))
-		Expect(updatedPublication.Status.Message).Should(BeEmpty())
-		Expect(updatedPublication.Finalizers).NotTo(BeEmpty())
 	})
 
 	It("publication object inherits error after patching", func(ctx SpecContext) {
-		// Mocking Detect
-		oneHit := sqlmock.NewRows([]string{""}).AddRow("1")
-		dbMock.ExpectQuery(publicationDetectionQuery).WithArgs(publication.Spec.Name).
-			WillReturnRows(oneHit)
-
-		// Mocking Alter Publication
 		expectedError := fmt.Errorf("no permission")
-		expectedQuery := fmt.Sprintf("ALTER PUBLICATION %s SET TABLES IN SCHEMA \"public\"",
-			pgx.Identifier{publication.Spec.Name}.Sanitize(),
+		assertObjectWasReconciled(ctx, r, publication, &apiv1.Publication{}, fakeClient,
+			func() {
+				// Mocking Detect
+				oneHit := sqlmock.NewRows([]string{""}).AddRow("1")
+				dbMock.ExpectQuery(publicationDetectionQuery).WithArgs(publication.Spec.Name).
+					WillReturnRows(oneHit)
+
+				// Mocking Alter Publication
+
+				expectedQuery := fmt.Sprintf("ALTER PUBLICATION %s SET TABLES IN SCHEMA \"public\"",
+					pgx.Identifier{publication.Spec.Name}.Sanitize(),
+				)
+				dbMock.ExpectExec(expectedQuery).WillReturnError(expectedError)
+			},
+			func(updatedPublication *apiv1.Publication) {
+				Expect(updatedPublication.Status.Applied).Should(HaveValue(BeFalse()))
+				Expect(updatedPublication.Status.Message).Should(ContainSubstring(expectedError.Error()))
+			},
 		)
-		dbMock.ExpectExec(expectedQuery).WillReturnError(expectedError)
-
-		// Reconcile and get the updated object
-		_, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{
-			Namespace: publication.Namespace,
-			Name:      publication.Name,
-		}})
-		Expect(err).ToNot(HaveOccurred())
-
-		var updatedPublication apiv1.Publication
-		err = fakeClient.Get(ctx, client.ObjectKey{
-			Namespace: publication.Namespace,
-			Name:      publication.Name,
-		}, &updatedPublication)
-		Expect(err).ToNot(HaveOccurred())
-
-		Expect(updatedPublication.Status.Applied).Should(HaveValue(BeFalse()))
-		Expect(updatedPublication.Status.Message).Should(ContainSubstring(expectedError.Error()))
 	})
 
 	It("on deletion it removes finalizers and drops publication", func(ctx SpecContext) {
