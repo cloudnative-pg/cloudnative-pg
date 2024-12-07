@@ -113,72 +113,52 @@ var _ = Describe("Managed Database status", func() {
 	})
 
 	It("adds finalizer and sets status ready on success", func(ctx SpecContext) {
-		Expect(database.Finalizers).To(BeEmpty())
+		assertObjectWasReconciled(ctx, r, database, &apiv1.Database{}, fakeClient,
+			func() {
+				// Mocking DetectDB
+				expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
+				dbMock.ExpectQuery(`SELECT count(*)
+					FROM pg_database
+					WHERE datname = $1`).WithArgs(database.Spec.Name).WillReturnRows(expectedValue)
 
-		// Mocking DetectDB
-		expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
-		dbMock.ExpectQuery(`SELECT count(*)
-		FROM pg_database
-		WHERE datname = $1`).WithArgs(database.Spec.Name).WillReturnRows(expectedValue)
-
-		// Mocking CreateDB
-		expectedCreate := sqlmock.NewResult(0, 1)
-		expectedQuery := fmt.Sprintf(
-			"CREATE DATABASE %s OWNER %s",
-			pgx.Identifier{database.Spec.Name}.Sanitize(), pgx.Identifier{database.Spec.Owner}.Sanitize(),
+				// Mocking CreateDB
+				expectedCreate := sqlmock.NewResult(0, 1)
+				expectedQuery := fmt.Sprintf(
+					"CREATE DATABASE %s OWNER %s",
+					pgx.Identifier{database.Spec.Name}.Sanitize(), pgx.Identifier{database.Spec.Owner}.Sanitize(),
+				)
+				dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
+			},
+			func(updatedDatabase *apiv1.Database) {
+				Expect(updatedDatabase.GetStatusApplied()).Should(HaveValue(BeTrue()))
+				Expect(updatedDatabase.GetStatusMessage()).Should(BeEmpty())
+				Expect(updatedDatabase.GetFinalizers()).NotTo(BeEmpty())
+			},
 		)
-		dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
-
-		// Reconcile and get the updated object
-		_, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{
-			Namespace: database.Namespace,
-			Name:      database.Name,
-		}})
-		Expect(err).ToNot(HaveOccurred())
-
-		var updatedDatabase apiv1.Database
-		err = fakeClient.Get(ctx, client.ObjectKey{
-			Namespace: database.Namespace,
-			Name:      database.Name,
-		}, &updatedDatabase)
-		Expect(err).ToNot(HaveOccurred())
-
-		Expect(updatedDatabase.Status.Applied).Should(HaveValue(BeTrue()))
-		Expect(updatedDatabase.Status.Message).Should(BeEmpty())
-		Expect(updatedDatabase.Finalizers).NotTo(BeEmpty())
 	})
 
 	It("database object inherits error after patching", func(ctx SpecContext) {
-		// Mocking DetectDB
-		expectedValue := sqlmock.NewRows([]string{""}).AddRow("1")
-		dbMock.ExpectQuery(`SELECT count(*)
-		FROM pg_database
-		WHERE datname = $1`).WithArgs(database.Spec.Name).WillReturnRows(expectedValue)
-
-		// Mocking Alter Database
 		expectedError := fmt.Errorf("no permission")
-		expectedQuery := fmt.Sprintf("ALTER DATABASE %s OWNER TO %s",
-			pgx.Identifier{database.Spec.Name}.Sanitize(),
-			pgx.Identifier{database.Spec.Owner}.Sanitize(),
+		assertObjectWasReconciled(ctx, r, database, &apiv1.Database{}, fakeClient,
+			func() {
+				// Mocking DetectDB
+				expectedValue := sqlmock.NewRows([]string{""}).AddRow("1")
+				dbMock.ExpectQuery(`SELECT count(*)
+				FROM pg_database
+				WHERE datname = $1`).WithArgs(database.Spec.Name).WillReturnRows(expectedValue)
+
+				// Mocking Alter Database
+				expectedQuery := fmt.Sprintf("ALTER DATABASE %s OWNER TO %s",
+					pgx.Identifier{database.Spec.Name}.Sanitize(),
+					pgx.Identifier{database.Spec.Owner}.Sanitize(),
+				)
+				dbMock.ExpectExec(expectedQuery).WillReturnError(expectedError)
+			},
+			func(updatedDatabase *apiv1.Database) {
+				Expect(updatedDatabase.Status.Applied).Should(HaveValue(BeFalse()))
+				Expect(updatedDatabase.Status.Message).Should(ContainSubstring(expectedError.Error()))
+			},
 		)
-		dbMock.ExpectExec(expectedQuery).WillReturnError(expectedError)
-
-		// Reconcile and get the updated object
-		_, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{
-			Namespace: database.Namespace,
-			Name:      database.Name,
-		}})
-		Expect(err).ToNot(HaveOccurred())
-
-		var updatedDatabase apiv1.Database
-		err = fakeClient.Get(ctx, client.ObjectKey{
-			Namespace: database.Namespace,
-			Name:      database.Name,
-		}, &updatedDatabase)
-		Expect(err).ToNot(HaveOccurred())
-
-		Expect(updatedDatabase.Status.Applied).Should(HaveValue(BeFalse()))
-		Expect(updatedDatabase.Status.Message).Should(ContainSubstring(expectedError.Error()))
 	})
 
 	It("on deletion it removes finalizers and drops DB", func(ctx SpecContext) {
