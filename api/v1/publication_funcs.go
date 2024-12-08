@@ -70,6 +70,11 @@ func (pub *Publication) GetName() string {
 	return pub.Name
 }
 
+// SetObservedGeneration sets the status's observed generation
+func (pub *Publication) SetObservedGeneration(gen int64) {
+	pub.Status.ObservedGeneration = gen
+}
+
 // MustHaveManagedResourceExclusivity detects conflicting publications
 func (pub *PublicationList) MustHaveManagedResourceExclusivity(reference *Publication) error {
 	pointers := toSliceWithPointers(pub.Items)
