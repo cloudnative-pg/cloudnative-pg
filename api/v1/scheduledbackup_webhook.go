@@ -28,6 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"strings"
 )
 
 // scheduledBackupLog is for logging in this package.
@@ -116,6 +117,15 @@ func (r *ScheduledBackup) validate() field.ErrorList {
 			r.Spec.OnlineConfiguration,
 			"OnlineConfiguration parameter can be specified only if the method is volumeSnapshot",
 		))
+	}
+	
+	if strings.Count(strings.Trim(r.Spec.Schedule," ")," ") != 5 {
+		result = append(result, field.Invalid(
+                        field.NewPath("spec", "schedule"),
+                        r.Spec.Schedule,
+                        "Schedule parameter has not the right number of arguments. Must be 6.",
+                ))
+
 	}
 
 	return result
