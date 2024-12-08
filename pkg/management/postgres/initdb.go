@@ -355,7 +355,7 @@ func (info InitInfo) ConfigureNewInstance(instance *Instance) error {
 	if err != nil {
 		return fmt.Errorf("could not create ApplicationDatabase: %w", err)
 	}
-	appDB, err := instance.ConnectionPool().Connection(info.ApplicationDatabase)
+	appDB, err := instance.GetNamedDB(info.ApplicationDatabase)
 	if err != nil {
 		return fmt.Errorf("could not get connection to ApplicationDatabase: %w", err)
 	}
