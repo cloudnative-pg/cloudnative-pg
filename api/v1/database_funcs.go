@@ -70,6 +70,11 @@ func (db *Database) HasReconciliations() bool {
 	return db.Status.ObservedGeneration > 0
 }
 
+// SetObservedGeneration sets the status's observed generation
+func (db *Database) SetObservedGeneration(gen int64) {
+	db.Status.ObservedGeneration = gen
+}
+
 // MustHaveManagedResourceExclusivity detects conflicting databases
 func (dbList *DatabaseList) MustHaveManagedResourceExclusivity(reference *Database) error {
 	pointers := toSliceWithPointers(dbList.Items)
