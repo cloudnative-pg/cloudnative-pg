@@ -9,11 +9,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
-
-type reconcilerer interface {
-	Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error)
-}
 
 type postgresObjectManager interface {
 	client.Object
@@ -22,9 +19,15 @@ type postgresObjectManager interface {
 	SetObservedGeneration(gen int64)
 }
 
+// assertObjectWasReconciled reconciles the object and retrieves its updtate
+// from kubernetes
+//
+// NOTE: in the `newObj` argument, simply pass an empty struct of the type T
+// you are testig (e.g. &apiv1.Database{}), as this will be populated in the
+// kubernetes Get() calls
 func assertObjectWasReconciled[T postgresObjectManager](
 	ctx context.Context,
-	r reconcilerer,
+	r reconcile.Reconciler,
 	obj T,
 	newObj T,
 	fakeClient client.Client,
@@ -62,9 +65,13 @@ func assertObjectWasReconciled[T postgresObjectManager](
 //   - first reconciliation (creates finalizers)
 //   - object gets Deleted in kubernetes
 //   - a second reconciliation deletes the finalizers and *may* perform DROPs in Postgres
+//
+// NOTE: in the `newObj` argument, simply pass an empty struct of the type T
+// you are testig (e.g. &apiv1.Database{}), as this will be populated in the
+// kubernetes Get() calls
 func assertObjectReconciledAfterDeletion[T postgresObjectManager](
 	ctx context.Context,
-	r reconcilerer,
+	r reconcile.Reconciler,
 	obj T,
 	newObj T,
 	fakeClient client.Client,
