@@ -237,7 +237,7 @@ func (r *InstanceReconciler) Reconcile(
 
 	r.configureSlotReplicator(cluster)
 
-	postgresDB, err := r.instance.ConnectionPool().Connection("postgres")
+	postgresDB, err := r.instance.GetNamedDB("postgres")
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("while getting the postgres connection: %w", err)
 	}
@@ -573,7 +573,7 @@ func (r *InstanceReconciler) reconcileDatabases(ctx context.Context, cluster *ap
 
 	databases, errors := r.getAllAccessibleDatabases(ctx, db)
 	for _, databaseName := range databases {
-		db, err := r.instance.ConnectionPool().Connection(databaseName)
+		db, err := r.instance.GetNamedDB(databaseName)
 		if err != nil {
 			errors = append(errors,
 				fmt.Errorf("could not connect to database %s: %w", databaseName, err))
