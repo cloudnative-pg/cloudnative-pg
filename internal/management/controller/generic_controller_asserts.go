@@ -4,7 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/onsi/gomega"
+	g "github.com/onsi/gomega"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -18,7 +19,7 @@ type postgresObjectManager interface {
 	client.Object
 	GetStatusApplied() *bool
 	GetStatusMessage() string
-	// GetName() string
+	SetObservedGeneration(gen int64)
 }
 
 func assertObjectWasReconciled[T postgresObjectManager](
@@ -30,7 +31,7 @@ func assertObjectWasReconciled[T postgresObjectManager](
 	postgresExpectations func(),
 	updatedObjectExpectations func(newObj T),
 ) {
-	gomega.Expect(obj.GetFinalizers()).To(gomega.BeEmpty())
+	g.Expect(obj.GetFinalizers()).To(g.BeEmpty())
 
 	postgresExpectations()
 
@@ -39,7 +40,7 @@ func assertObjectWasReconciled[T postgresObjectManager](
 		Namespace: obj.GetNamespace(),
 		Name:      obj.GetName(),
 	}})
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	g.Expect(err).ToNot(g.HaveOccurred())
 
 	err = fakeClient.Get(ctx, client.ObjectKey{
 		Namespace: obj.GetNamespace(),
@@ -49,9 +50,81 @@ func assertObjectWasReconciled[T postgresObjectManager](
 	errstr := fmt.Sprintf("err: %#v\n", err)
 	_ = errstr
 	kind := obj.GetObjectKind().GroupVersionKind()
-	gomega.Expect(kind).NotTo(gomega.BeNil())
+	g.Expect(kind).NotTo(g.BeNil())
 
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	g.Expect(err).ToNot(g.HaveOccurred())
 
 	updatedObjectExpectations(newObj)
+}
+
+// assertObjectReconciledAfterDeletion goes through the whole lifetime of an object
+//
+//   - first reconciliation (creates finalizers)
+//   - object gets Deleted in kubernetes
+//   - a second reconciliation deletes the finalizers and *may* perform DROPs in Postgres
+func assertObjectReconciledAfterDeletion[T postgresObjectManager](
+	ctx context.Context,
+	r reconcilerer,
+	obj T,
+	newObj T,
+	fakeClient client.Client,
+	postgresExpectations func(),
+) {
+	g.Expect(obj.GetFinalizers()).To(g.BeEmpty())
+
+	postgresExpectations()
+
+	// Reconcile and get the updated object
+	_, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{
+		Namespace: obj.GetNamespace(),
+		Name:      obj.GetName(),
+	}})
+	g.Expect(err).ToNot(g.HaveOccurred())
+
+	err = fakeClient.Get(ctx, client.ObjectKey{
+		Namespace: obj.GetNamespace(),
+		Name:      obj.GetName(),
+	}, newObj)
+	g.Expect(err).ToNot(g.HaveOccurred())
+
+	// plain successful reconciliation, finalizers have been created
+	g.Expect(newObj.GetStatusApplied()).Should(g.HaveValue(g.BeTrue()))
+	g.Expect(newObj.GetStatusMessage()).Should(g.BeEmpty())
+	g.Expect(newObj.GetFinalizers()).NotTo(g.BeEmpty())
+
+	// the next 2 lines are a hacky bit to make sure the next reconciler
+	// call doesn't skip on account of Generation == ObservedGeneration.
+	// See fake.Client known issues with `Generation`
+	// https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/client/fake@v0.19.0#NewClientBuilder
+	newObj.SetObservedGeneration(2)
+	g.Expect(fakeClient.Status().Update(ctx, newObj)).To(g.Succeed())
+
+	// We now look at the behavior when we delete the Database object
+	g.Expect(fakeClient.Delete(ctx, obj)).To(g.Succeed())
+
+	// the Database object is Deleted, but its finalizer prevents removal from
+	// the API
+	err = fakeClient.Get(ctx, client.ObjectKey{
+		Namespace: obj.GetNamespace(),
+		Name:      obj.GetName(),
+	}, newObj)
+	g.Expect(err).ToNot(g.HaveOccurred())
+	g.Expect(newObj.GetDeletionTimestamp()).NotTo(g.BeZero())
+	g.Expect(newObj.GetFinalizers()).NotTo(g.BeEmpty())
+
+	// Reconcile and get the updated object
+	_, err = r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{
+		Namespace: obj.GetNamespace(),
+		Name:      obj.GetName(),
+	}})
+	g.Expect(err).ToNot(g.HaveOccurred())
+
+	err = fakeClient.Get(ctx, client.ObjectKey{
+		Namespace: obj.GetNamespace(),
+		Name:      obj.GetName(),
+	}, newObj)
+
+	// verify object has been deleted
+	g.Expect(err).To(g.HaveOccurred())
+	g.Expect(apierrors.IsNotFound(err)).To(g.BeTrue())
 }
