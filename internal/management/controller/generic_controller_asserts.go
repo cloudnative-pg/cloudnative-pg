@@ -2,7 +2,6 @@ package controller
 
 import (
 	"context"
-	"fmt"
 
 	g "github.com/onsi/gomega"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -19,11 +18,11 @@ type postgresObjectManager interface {
 	SetObservedGeneration(gen int64)
 }
 
-// assertObjectWasReconciled reconciles the object and retrieves its updtate
+// assertObjectWasReconciled reconciles the object and retrieves its update
 // from kubernetes
 //
 // NOTE: in the `newObj` argument, simply pass an empty struct of the type T
-// you are testig (e.g. &apiv1.Database{}), as this will be populated in the
+// you are testing (e.g. &apiv1.Database{}), as this will be populated in the
 // kubernetes Get() calls
 func assertObjectWasReconciled[T postgresObjectManager](
 	ctx context.Context,
@@ -49,12 +48,6 @@ func assertObjectWasReconciled[T postgresObjectManager](
 		Namespace: obj.GetNamespace(),
 		Name:      obj.GetName(),
 	}, newObj)
-
-	errstr := fmt.Sprintf("err: %#v\n", err)
-	_ = errstr
-	kind := obj.GetObjectKind().GroupVersionKind()
-	g.Expect(kind).NotTo(g.BeNil())
-
 	g.Expect(err).ToNot(g.HaveOccurred())
 
 	updatedObjectExpectations(newObj)
@@ -67,7 +60,7 @@ func assertObjectWasReconciled[T postgresObjectManager](
 //   - a second reconciliation deletes the finalizers and *may* perform DROPs in Postgres
 //
 // NOTE: in the `newObj` argument, simply pass an empty struct of the type T
-// you are testig (e.g. &apiv1.Database{}), as this will be populated in the
+// you are testing (e.g. &apiv1.Database{}), as this will be populated in the
 // kubernetes Get() calls
 func assertObjectReconciledAfterDeletion[T postgresObjectManager](
 	ctx context.Context,

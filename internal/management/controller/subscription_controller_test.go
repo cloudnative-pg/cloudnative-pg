@@ -40,11 +40,9 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-const (
-	subscriptionDetectionQuery = `SELECT count(*)
+const subscriptionDetectionQuery = `SELECT count(*)
 		FROM pg_subscription
 		WHERE subname = $1`
-)
 
 var _ = Describe("Managed subscription controller tests", func() {
 	var (

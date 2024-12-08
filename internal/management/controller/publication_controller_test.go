@@ -39,11 +39,9 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-const (
-	publicationDetectionQuery = `SELECT count(*)
+const publicationDetectionQuery = `SELECT count(*)
 		FROM pg_publication
 		WHERE pubname = $1`
-)
 
 var _ = Describe("Managed publication controller tests", func() {
 	var (
