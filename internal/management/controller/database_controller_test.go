@@ -23,7 +23,6 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/jackc/pgx/v5"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
@@ -161,83 +160,57 @@ var _ = Describe("Managed Database status", func() {
 		)
 	})
 
-	It("on deletion it removes finalizers and drops DB", func(ctx SpecContext) {
-		Expect(database.Finalizers).To(BeEmpty())
+	When("retention policy is delete", func() {
+		It("on deletion it removes finalizers and drops DB", func(ctx SpecContext) {
+			assertObjectReconciledAfterDeletion(ctx, r, database, &apiv1.Database{}, fakeClient,
+				func() {
+					// Mocking DetectDB
+					expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
+					dbMock.ExpectQuery(`SELECT count(*)
+			FROM pg_database
+			WHERE datname = $1`).WithArgs(database.Spec.Name).WillReturnRows(expectedValue)
 
-		// Mocking DetectDB
-		expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
-		dbMock.ExpectQuery(`SELECT count(*)
-		FROM pg_database
-		WHERE datname = $1`).WithArgs(database.Spec.Name).WillReturnRows(expectedValue)
+					// Mocking CreateDB
+					expectedCreate := sqlmock.NewResult(0, 1)
+					expectedQuery := fmt.Sprintf(
+						"CREATE DATABASE %s OWNER %s",
+						pgx.Identifier{database.Spec.Name}.Sanitize(), pgx.Identifier{database.Spec.Owner}.Sanitize(),
+					)
+					dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
 
-		// Mocking CreateDB
-		expectedCreate := sqlmock.NewResult(0, 1)
-		expectedQuery := fmt.Sprintf(
-			"CREATE DATABASE %s OWNER %s",
-			pgx.Identifier{database.Spec.Name}.Sanitize(), pgx.Identifier{database.Spec.Owner}.Sanitize(),
-		)
-		dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
+					// Mocking Drop Database
+					expectedDrop := fmt.Sprintf("DROP DATABASE IF EXISTS %s",
+						pgx.Identifier{database.Spec.Name}.Sanitize(),
+					)
+					dbMock.ExpectExec(expectedDrop).WillReturnResult(sqlmock.NewResult(0, 1))
+				},
+			)
+		})
+	})
 
-		// Reconcile and get the updated object
-		_, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{
-			Namespace: database.Namespace,
-			Name:      database.Name,
-		}})
-		Expect(err).ToNot(HaveOccurred())
+	When("retention policy is retain", func() {
+		It("on deletion it removes finalizers and does NOT drop the DB", func(ctx SpecContext) {
+			database.Spec.ReclaimPolicy = apiv1.DatabaseReclaimRetain
+			Expect(fakeClient.Update(ctx, database)).To(Succeed())
 
-		var updatedDatabase apiv1.Database
-		err = fakeClient.Get(ctx, client.ObjectKey{
-			Namespace: database.Namespace,
-			Name:      database.Name,
-		}, &updatedDatabase)
-		Expect(err).ToNot(HaveOccurred())
+			assertObjectReconciledAfterDeletion(ctx, r, database, &apiv1.Database{}, fakeClient,
+				func() {
+					// Mocking DetectDB
+					expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
+					dbMock.ExpectQuery(`SELECT count(*)
+			FROM pg_database
+			WHERE datname = $1`).WithArgs(database.Spec.Name).WillReturnRows(expectedValue)
 
-		Expect(updatedDatabase.Status.Applied).Should(HaveValue(BeTrue()))
-		Expect(updatedDatabase.Status.Message).Should(BeEmpty())
-		Expect(updatedDatabase.Finalizers).NotTo(BeEmpty())
-
-		// the next 3 lines are a hacky bit to make sure the next reconciler
-		// call doesn't skip on account of Generation == ObservedGeneration.
-		// See fake.Client known issues with `Generation`
-		// https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/client/fake@v0.19.0#NewClientBuilder
-		currentDatabase := updatedDatabase.DeepCopy()
-		updatedDatabase.Status.ObservedGeneration = 2
-		Expect(fakeClient.Status().Patch(ctx, &updatedDatabase, client.MergeFrom(currentDatabase))).To(Succeed())
-
-		// We now look at the behavior when we delete the Database object
-		Expect(fakeClient.Delete(ctx, database)).To(Succeed())
-
-		// the Database object is Deleted, but its finalizer prevents removal from
-		// the API
-		var fadingDatabase apiv1.Database
-		err = fakeClient.Get(ctx, client.ObjectKey{
-			Namespace: database.Namespace,
-			Name:      database.Name,
-		}, &fadingDatabase)
-		Expect(err).ToNot(HaveOccurred())
-		Expect(fadingDatabase.DeletionTimestamp).NotTo(BeZero())
-		Expect(fadingDatabase.Finalizers).NotTo(BeEmpty())
-
-		// Mocking Drop Database
-		expectedDrop := fmt.Sprintf("DROP DATABASE IF EXISTS %s",
-			pgx.Identifier{database.Spec.Name}.Sanitize(),
-		)
-		dbMock.ExpectExec(expectedDrop).WillReturnResult(sqlmock.NewResult(0, 1))
-
-		// Reconcile and get the updated object
-		_, err = r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{
-			Namespace: database.Namespace,
-			Name:      database.Name,
-		}})
-		Expect(err).ToNot(HaveOccurred())
-
-		var finalDatabase apiv1.Database
-		err = fakeClient.Get(ctx, client.ObjectKey{
-			Namespace: database.Namespace,
-			Name:      database.Name,
-		}, &finalDatabase)
-		Expect(err).To(HaveOccurred())
-		Expect(apierrors.IsNotFound(err)).To(BeTrue())
+					// Mocking CreateDB
+					expectedCreate := sqlmock.NewResult(0, 1)
+					expectedQuery := fmt.Sprintf(
+						"CREATE DATABASE %s OWNER %s",
+						pgx.Identifier{database.Spec.Name}.Sanitize(), pgx.Identifier{database.Spec.Owner}.Sanitize(),
+					)
+					dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
+				},
+			)
+		})
 	})
 
 	It("fails reconciliation if cluster isn't found (deleted cluster)", func(ctx SpecContext) {
@@ -259,27 +232,19 @@ var _ = Describe("Managed Database status", func() {
 			instance: &f,
 		}
 
-		// patching the Database object to reference the newly created Cluster
-		originalDatabase := database.DeepCopy()
+		// updating the Database object to reference the newly created Cluster
 		database.Spec.ClusterRef.Name = "cluster-other"
-		Expect(fakeClient.Patch(ctx, database, client.MergeFrom(originalDatabase))).To(Succeed())
+		Expect(fakeClient.Update(ctx, database)).To(Succeed())
 
-		// Reconcile and get the updated object
-		_, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{
-			Namespace: database.Namespace,
-			Name:      database.Name,
-		}})
-		Expect(err).ToNot(HaveOccurred())
-
-		var updatedDatabase apiv1.Database
-		err = fakeClient.Get(ctx, client.ObjectKey{
-			Namespace: database.Namespace,
-			Name:      database.Name,
-		}, &updatedDatabase)
-		Expect(err).ToNot(HaveOccurred())
-
-		Expect(updatedDatabase.Status.Applied).Should(HaveValue(BeFalse()))
-		Expect(updatedDatabase.Status.Message).Should(ContainSubstring(`"cluster-other" not found`))
+		assertObjectWasReconciled(ctx, r, database, &apiv1.Database{}, fakeClient,
+			func() {
+				// never even hits any SQL
+			},
+			func(updatedDatabase *apiv1.Database) {
+				Expect(updatedDatabase.Status.Applied).Should(HaveValue(BeFalse()))
+				Expect(updatedDatabase.Status.Message).Should(ContainSubstring(`"cluster-other" not found`))
+			},
+		)
 	})
 
 	It("skips reconciliation if database object isn't found (deleted database)", func(ctx SpecContext) {
@@ -311,57 +276,34 @@ var _ = Describe("Managed Database status", func() {
 	})
 
 	It("drops database with ensure absent option", func(ctx SpecContext) {
-		// Mocking dropDatabase
-		expectedValue := sqlmock.NewResult(0, 1)
-		expectedQuery := fmt.Sprintf(
-			"DROP DATABASE IF EXISTS %s",
-			pgx.Identifier{database.Spec.Name}.Sanitize(),
-		)
-		dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedValue)
-
 		// Update the obj to set EnsureAbsent
 		database.Spec.Ensure = apiv1.EnsureAbsent
 		Expect(fakeClient.Update(ctx, database)).To(Succeed())
 
-		// Reconcile and get the updated object
-		_, err = r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{
-			Namespace: database.Namespace,
-			Name:      database.Name,
-		}})
-		Expect(err).ToNot(HaveOccurred())
-
-		err = fakeClient.Get(ctx, client.ObjectKey{
-			Namespace: database.Namespace,
-			Name:      database.Name,
-		}, database)
-		Expect(err).ToNot(HaveOccurred())
-
-		Expect(database.Status.Applied).To(HaveValue(BeTrue()))
-		Expect(database.Status.Message).To(BeEmpty())
-		Expect(database.Status.ObservedGeneration).To(BeEquivalentTo(1))
+		assertObjectWasReconciled(ctx, r, database, &apiv1.Database{}, fakeClient,
+			func() {
+				// Mocking dropDatabase
+				expectedValue := sqlmock.NewResult(0, 1)
+				expectedQuery := fmt.Sprintf(
+					"DROP DATABASE IF EXISTS %s",
+					pgx.Identifier{database.Spec.Name}.Sanitize(),
+				)
+				dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedValue)
+			},
+			func(updatedDatabase *apiv1.Database) {
+				Expect(updatedDatabase.Status.Applied).To(HaveValue(BeTrue()))
+				Expect(updatedDatabase.Status.Message).To(BeEmpty())
+				Expect(updatedDatabase.Status.ObservedGeneration).To(BeEquivalentTo(1))
+			},
+		)
 	})
 
 	It("marks as failed if the target Database is already being managed", func(ctx SpecContext) {
-		// The Database obj currently managing "test-database"
-		currentManager := &apiv1.Database{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "current-manager",
-				Namespace: "default",
-			},
-			Spec: apiv1.DatabaseSpec{
-				ClusterRef: corev1.LocalObjectReference{
-					Name: cluster.Name,
-				},
-				Name:  "test-database",
-				Owner: "app",
-			},
-			Status: apiv1.DatabaseStatus{
-				Applied:            ptr.To(true),
-				ObservedGeneration: 1,
-			},
-		}
+		// Let's force the database to have a past reconciliation
+		database.SetObservedGeneration(2)
+		Expect(fakeClient.Status().Update(ctx, database)).To(Succeed())
 
-		// A new Database Object targeting the same "test-database"
+		// A new Database Object targeting the same "db-one"
 		dbDuplicate := &apiv1.Database{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:       "db-duplicate",
@@ -372,32 +314,26 @@ var _ = Describe("Managed Database status", func() {
 				ClusterRef: corev1.LocalObjectReference{
 					Name: cluster.Name,
 				},
-				Name:  "test-database",
+				Name:  "db-one",
 				Owner: "app",
 			},
 		}
 
-		Expect(fakeClient.Create(ctx, currentManager)).To(Succeed())
+		// Expect(fakeClient.Create(ctx, currentManager)).To(Succeed())
 		Expect(fakeClient.Create(ctx, dbDuplicate)).To(Succeed())
 
-		// Reconcile and get the updated object
-		_, err = r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{
-			Namespace: dbDuplicate.Namespace,
-			Name:      dbDuplicate.Name,
-		}})
-		Expect(err).ToNot(HaveOccurred())
-
-		err = fakeClient.Get(ctx, client.ObjectKey{
-			Namespace: dbDuplicate.Namespace,
-			Name:      dbDuplicate.Name,
-		}, dbDuplicate)
-		Expect(err).ToNot(HaveOccurred())
-
-		expectedError := fmt.Sprintf("%q is already managed by object %q",
-			dbDuplicate.Spec.Name, currentManager.Name)
-		Expect(dbDuplicate.Status.Applied).To(HaveValue(BeFalse()))
-		Expect(dbDuplicate.Status.Message).To(ContainSubstring(expectedError))
-		Expect(dbDuplicate.Status.ObservedGeneration).To(BeZero())
+		assertObjectWasReconciled(ctx, r, dbDuplicate, &apiv1.Database{}, fakeClient,
+			func() {
+				// No DB interactions expected
+			},
+			func(updatedDatabase *apiv1.Database) {
+				expectedError := fmt.Sprintf("%q is already managed by object %q",
+					dbDuplicate.Spec.Name, database.Name)
+				Expect(updatedDatabase.Status.Applied).To(HaveValue(BeFalse()))
+				Expect(updatedDatabase.Status.Message).To(ContainSubstring(expectedError))
+				Expect(updatedDatabase.Status.ObservedGeneration).To(BeZero())
+			},
+		)
 	})
 
 	It("properly signals a database is on a replica cluster", func(ctx SpecContext) {
@@ -407,20 +343,14 @@ var _ = Describe("Managed Database status", func() {
 		}
 		Expect(fakeClient.Patch(ctx, cluster, client.MergeFrom(initialCluster))).To(Succeed())
 
-		_, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{
-			Namespace: database.Namespace,
-			Name:      database.Spec.Name,
-		}})
-		Expect(err).ToNot(HaveOccurred())
-
-		var updatedDatabase apiv1.Database
-		err = fakeClient.Get(ctx, client.ObjectKey{
-			Namespace: database.Namespace,
-			Name:      database.Name,
-		}, &updatedDatabase)
-		Expect(err).ToNot(HaveOccurred())
-
-		Expect(updatedDatabase.Status.Applied).Should(BeNil())
-		Expect(updatedDatabase.Status.Message).Should(ContainSubstring("waiting for the cluster to become primary"))
+		assertObjectWasReconciled(ctx, r, database, &apiv1.Database{}, fakeClient,
+			func() {
+				// No DB interactions expected
+			},
+			func(updatedDatabase *apiv1.Database) {
+				Expect(updatedDatabase.Status.Applied).Should(BeNil())
+				Expect(updatedDatabase.Status.Message).Should(ContainSubstring("waiting for the cluster to become primary"))
+			},
+		)
 	})
 })
