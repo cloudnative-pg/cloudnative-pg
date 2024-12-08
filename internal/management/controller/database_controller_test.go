@@ -39,6 +39,10 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+const databaseDetectionQuery = `SELECT count(*)
+			FROM pg_database
+			WHERE datname = $1`
+
 var _ = Describe("Managed Database status", func() {
 	var (
 		dbMock     sqlmock.Sqlmock
@@ -116,15 +120,15 @@ var _ = Describe("Managed Database status", func() {
 			func() {
 				// Mocking DetectDB
 				expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
-				dbMock.ExpectQuery(`SELECT count(*)
-					FROM pg_database
-					WHERE datname = $1`).WithArgs(database.Spec.Name).WillReturnRows(expectedValue)
+				dbMock.ExpectQuery(databaseDetectionQuery).WithArgs(database.Spec.Name).
+					WillReturnRows(expectedValue)
 
 				// Mocking CreateDB
 				expectedCreate := sqlmock.NewResult(0, 1)
 				expectedQuery := fmt.Sprintf(
 					"CREATE DATABASE %s OWNER %s",
-					pgx.Identifier{database.Spec.Name}.Sanitize(), pgx.Identifier{database.Spec.Owner}.Sanitize(),
+					pgx.Identifier{database.Spec.Name}.Sanitize(),
+					pgx.Identifier{database.Spec.Owner}.Sanitize(),
 				)
 				dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
 			},
@@ -142,9 +146,8 @@ var _ = Describe("Managed Database status", func() {
 			func() {
 				// Mocking DetectDB
 				expectedValue := sqlmock.NewRows([]string{""}).AddRow("1")
-				dbMock.ExpectQuery(`SELECT count(*)
-				FROM pg_database
-				WHERE datname = $1`).WithArgs(database.Spec.Name).WillReturnRows(expectedValue)
+				dbMock.ExpectQuery(databaseDetectionQuery).WithArgs(database.Spec.Name).
+					WillReturnRows(expectedValue)
 
 				// Mocking Alter Database
 				expectedQuery := fmt.Sprintf("ALTER DATABASE %s OWNER TO %s",
@@ -166,15 +169,15 @@ var _ = Describe("Managed Database status", func() {
 				func() {
 					// Mocking DetectDB
 					expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
-					dbMock.ExpectQuery(`SELECT count(*)
-			FROM pg_database
-			WHERE datname = $1`).WithArgs(database.Spec.Name).WillReturnRows(expectedValue)
+					dbMock.ExpectQuery(databaseDetectionQuery).WithArgs(database.Spec.Name).
+						WillReturnRows(expectedValue)
 
 					// Mocking CreateDB
 					expectedCreate := sqlmock.NewResult(0, 1)
 					expectedQuery := fmt.Sprintf(
 						"CREATE DATABASE %s OWNER %s",
-						pgx.Identifier{database.Spec.Name}.Sanitize(), pgx.Identifier{database.Spec.Owner}.Sanitize(),
+						pgx.Identifier{database.Spec.Name}.Sanitize(),
+						pgx.Identifier{database.Spec.Owner}.Sanitize(),
 					)
 					dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
 
@@ -197,15 +200,15 @@ var _ = Describe("Managed Database status", func() {
 				func() {
 					// Mocking DetectDB
 					expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
-					dbMock.ExpectQuery(`SELECT count(*)
-			FROM pg_database
-			WHERE datname = $1`).WithArgs(database.Spec.Name).WillReturnRows(expectedValue)
+					dbMock.ExpectQuery(databaseDetectionQuery).WithArgs(database.Spec.Name).
+						WillReturnRows(expectedValue)
 
 					// Mocking CreateDB
 					expectedCreate := sqlmock.NewResult(0, 1)
 					expectedQuery := fmt.Sprintf(
 						"CREATE DATABASE %s OWNER %s",
-						pgx.Identifier{database.Spec.Name}.Sanitize(), pgx.Identifier{database.Spec.Owner}.Sanitize(),
+						pgx.Identifier{database.Spec.Name}.Sanitize(),
+						pgx.Identifier{database.Spec.Owner}.Sanitize(),
 					)
 					dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
 				},
