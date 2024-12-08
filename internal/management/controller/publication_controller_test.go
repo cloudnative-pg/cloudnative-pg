@@ -69,7 +69,7 @@ var _ = Describe("Managed publication controller tests", func() {
 		}
 		publication = &apiv1.Publication{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:       "db-one",
+				Name:       "pub-one",
 				Namespace:  "default",
 				Generation: 1,
 			},
@@ -173,12 +173,12 @@ var _ = Describe("Managed publication controller tests", func() {
 		It("on deletion it removes finalizers and drops the Publication", func(ctx SpecContext) {
 			assertObjectReconciledAfterDeletion(ctx, r, publication, &apiv1.Publication{}, fakeClient,
 				func() {
-					// Mocking DetectDB
+					// Mocking Detect publication
 					expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
 					dbMock.ExpectQuery(publicationDetectionQuery).WithArgs(publication.Spec.Name).
 						WillReturnRows(expectedValue)
 
-					// Mocking CreateDB
+					// Mocking Create publication
 					expectedCreate := sqlmock.NewResult(0, 1)
 					expectedQuery := fmt.Sprintf(
 						"CREATE PUBLICATION %s FOR ALL TABLES",
@@ -203,12 +203,12 @@ var _ = Describe("Managed publication controller tests", func() {
 
 			assertObjectReconciledAfterDeletion(ctx, r, publication, &apiv1.Publication{}, fakeClient,
 				func() {
-					// Mocking DetectDB
+					// Mocking Detect publication
 					expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
 					dbMock.ExpectQuery(publicationDetectionQuery).WithArgs(publication.Spec.Name).
 						WillReturnRows(expectedValue)
 
-					// Mocking CreateDB
+					// Mocking Create publication
 					expectedCreate := sqlmock.NewResult(0, 1)
 					expectedQuery := fmt.Sprintf(
 						"CREATE PUBLICATION %s FOR ALL TABLES",
@@ -239,7 +239,7 @@ var _ = Describe("Managed publication controller tests", func() {
 			instance: &f,
 		}
 
-		// updating the Database object to reference the newly created Cluster
+		// updating the publication object to reference the newly created Cluster
 		publication.Spec.ClusterRef.Name = "cluster-other"
 		Expect(fakeClient.Update(ctx, publication)).To(Succeed())
 
@@ -258,7 +258,7 @@ var _ = Describe("Managed publication controller tests", func() {
 		// Initialize a new Publication but without creating it in the K8S Cluster
 		otherPublication := &apiv1.Publication{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:       "db-other",
+				Name:       "pub-other",
 				Namespace:  "default",
 				Generation: 1,
 			},
@@ -266,7 +266,7 @@ var _ = Describe("Managed publication controller tests", func() {
 				ClusterRef: corev1.LocalObjectReference{
 					Name: cluster.Name,
 				},
-				Name: "db-one",
+				Name: "pub-all",
 			},
 		}
 
@@ -278,7 +278,7 @@ var _ = Describe("Managed publication controller tests", func() {
 
 		// Expect the reconciler to exit silently since the object doesn't exist
 		Expect(err).ToNot(HaveOccurred())
-		Expect(result).Should(BeZero()) // nothing to do, since the DB is being deleted
+		Expect(result).Should(BeZero())
 	})
 
 	It("marks as failed if the target publication is already being managed", func(ctx SpecContext) {
@@ -318,7 +318,7 @@ var _ = Describe("Managed publication controller tests", func() {
 		)
 	})
 
-	It("properly signals a database is on a replica cluster", func(ctx SpecContext) {
+	It("properly signals a publication is on a replica cluster", func(ctx SpecContext) {
 		initialCluster := cluster.DeepCopy()
 		cluster.Spec.ReplicaCluster = &apiv1.ReplicaClusterConfiguration{
 			Enabled: ptr.To(true),
