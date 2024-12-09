@@ -167,7 +167,7 @@ var _ = Describe("Managed publication controller tests", func() {
 		)
 	})
 
-	When("retention policy is delete", func() {
+	When("reclaim policy is delete", func() {
 		It("on deletion it removes finalizers and drops the Publication", func(ctx SpecContext) {
 			assertObjectReconciledAfterDeletion(ctx, r, publication, &apiv1.Publication{}, fakeClient,
 				func() {
@@ -194,7 +194,7 @@ var _ = Describe("Managed publication controller tests", func() {
 		})
 	})
 
-	When("retention policy is retain", func() {
+	When("reclaim policy is retain", func() {
 		It("on deletion it removes finalizers and does NOT drop the Publication", func(ctx SpecContext) {
 			publication.Spec.ReclaimPolicy = apiv1.PublicationReclaimRetain
 			Expect(fakeClient.Update(ctx, publication)).To(Succeed())
@@ -219,7 +219,7 @@ var _ = Describe("Managed publication controller tests", func() {
 	})
 
 	It("fails reconciliation if cluster isn't found (deleted cluster)", func(ctx SpecContext) {
-		// since the fakeClient has the `cluster-example` cluster, let's reference
+		// Since the fakeClient has the `cluster-example` cluster, let's reference
 		// another cluster `cluster-other` that is not found by the fakeClient
 		pgInstance := postgres.NewInstance().
 			WithNamespace("default").
@@ -237,7 +237,7 @@ var _ = Describe("Managed publication controller tests", func() {
 			instance: &f,
 		}
 
-		// updating the publication object to reference the newly created Cluster
+		// Updating the publication object to reference the newly created Cluster
 		publication.Spec.ClusterRef.Name = "cluster-other"
 		Expect(fakeClient.Update(ctx, publication)).To(Succeed())
 
@@ -247,7 +247,8 @@ var _ = Describe("Managed publication controller tests", func() {
 			},
 			func(updatedPublication *apiv1.Publication) {
 				Expect(updatedPublication.Status.Applied).Should(HaveValue(BeFalse()))
-				Expect(updatedPublication.Status.Message).Should(ContainSubstring(`"cluster-other" not found`))
+				Expect(updatedPublication.Status.Message).Should(ContainSubstring(
+					fmt.Sprintf("%q not found", publication.Spec.ClusterRef.Name)))
 			},
 		)
 	})
@@ -274,7 +275,7 @@ var _ = Describe("Managed publication controller tests", func() {
 			Name:      otherPublication.Name,
 		}})
 
-		// Expect the reconciler to exit silently since the object doesn't exist
+		// Expect the reconciler to exit silently, since the object doesn't exist
 		Expect(err).ToNot(HaveOccurred())
 		Expect(result).Should(BeZero())
 	})
