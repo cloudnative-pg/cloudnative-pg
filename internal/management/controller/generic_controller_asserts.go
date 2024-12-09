@@ -68,41 +68,6 @@ func (pr *postgresReconciliationTester[T]) assert(
 	}
 }
 
-// assertObjectWasReconciled reconciles the object and retrieves its update
-// from kubernetes
-//
-// NOTE: in the `newObj` argument, simply pass an empty struct of the type T
-// you are testing (e.g. &apiv1.Database{}), as this will be populated in the
-// kubernetes Get() calls
-func assertObjectWasReconciled[T postgresObjectManager](
-	ctx context.Context,
-	r reconcile.Reconciler,
-	obj T,
-	newObj T,
-	fakeClient client.Client,
-	postgresExpectations func(),
-	updatedObjectExpectations func(newObj T),
-) {
-	g.Expect(obj.GetFinalizers()).To(g.BeEmpty())
-
-	postgresExpectations()
-
-	// Reconcile and get the updated object
-	_, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{
-		Namespace: obj.GetNamespace(),
-		Name:      obj.GetName(),
-	}})
-	g.Expect(err).ToNot(g.HaveOccurred())
-
-	err = fakeClient.Get(ctx, client.ObjectKey{
-		Namespace: obj.GetNamespace(),
-		Name:      obj.GetName(),
-	}, newObj)
-	g.Expect(err).ToNot(g.HaveOccurred())
-
-	updatedObjectExpectations(newObj)
-}
-
 // assertObjectReconciledAfterDeletion goes through the whole lifetime of an object
 //
 //   - first reconciliation (creates finalizers)
