@@ -9,3 +9,5 @@ spec:
   cluster:
     name: cluster-sample-dest
   externalClusterName: cluster-sample
+status:
+  applied: false
