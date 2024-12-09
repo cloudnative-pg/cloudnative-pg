@@ -18,6 +18,56 @@ type postgresObjectManager interface {
 	SetObservedGeneration(gen int64)
 }
 
+type postgresReconciliationTester[T postgresObjectManager] struct {
+	cli                       client.Client
+	reconcileFunc             func(ctx context.Context, req ctrl.Request) (ctrl.Result, error)
+	postgresExpectations      func()
+	updatedObjectExpectations func(newObj T)
+}
+
+func (pr *postgresReconciliationTester[T]) setPostgresExpectations(
+	postgresExpectations func(),
+) *postgresReconciliationTester[T] {
+	pr.postgresExpectations = postgresExpectations
+	return pr
+}
+
+func (pr *postgresReconciliationTester[T]) setUpdatedObjectExpectations(
+	updatedObjectExpectations func(newObj T),
+) *postgresReconciliationTester[T] {
+	pr.updatedObjectExpectations = updatedObjectExpectations
+	return pr
+}
+
+func (pr *postgresReconciliationTester[T]) assert(
+	ctx context.Context,
+	obj T,
+) {
+	g.Expect(obj.GetFinalizers()).To(g.BeEmpty())
+
+	if pr.postgresExpectations != nil {
+		pr.postgresExpectations()
+	}
+
+	// Reconcile and get the updated object
+	_, err := pr.reconcileFunc(ctx, ctrl.Request{NamespacedName: types.NamespacedName{
+		Namespace: obj.GetNamespace(),
+		Name:      obj.GetName(),
+	}})
+	g.Expect(err).ToNot(g.HaveOccurred())
+
+	newObj := obj.DeepCopyObject().(T)
+	err = pr.cli.Get(ctx, client.ObjectKey{
+		Namespace: obj.GetNamespace(),
+		Name:      obj.GetName(),
+	}, newObj)
+	g.Expect(err).ToNot(g.HaveOccurred())
+
+	if pr.updatedObjectExpectations != nil {
+		pr.updatedObjectExpectations(newObj)
+	}
+}
+
 // assertObjectWasReconciled reconciles the object and retrieves its update
 // from kubernetes
 //
