@@ -511,6 +511,11 @@ func (info InitInfo) loadBackupObjectFromExternalCluster(
 	if !found {
 		return nil, nil, fmt.Errorf("missing external cluster: %v", sourceName)
 	}
+
+	if server.BarmanObjectStore == nil {
+		return nil, nil, fmt.Errorf("missing barman object store configuration for source: %v", sourceName)
+	}
+
 	serverName := server.GetServerName()
 
 	env, err := barmanCredentials.EnvSetRestoreCloudCredentials(
