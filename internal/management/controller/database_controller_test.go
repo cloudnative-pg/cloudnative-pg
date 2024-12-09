@@ -52,6 +52,7 @@ var _ = Describe("Managed Database status", func() {
 		r          *DatabaseReconciler
 		fakeClient client.Client
 		err        error
+		tester     postgresReconciliationTester[*apiv1.Database]
 	)
 
 	BeforeEach(func() {
@@ -109,6 +110,11 @@ var _ = Describe("Managed Database status", func() {
 			utils.DatabaseFinalizerName,
 			r.evaluateDropDatabase,
 		)
+
+		tester = postgresReconciliationTester[*apiv1.Database]{
+			cli:           fakeClient,
+			reconcileFunc: r.Reconcile,
+		}
 	})
 
 	AfterEach(func() {
@@ -116,51 +122,49 @@ var _ = Describe("Managed Database status", func() {
 	})
 
 	It("adds finalizer and sets status ready on success", func(ctx SpecContext) {
-		assertObjectWasReconciled(ctx, r, database, &apiv1.Database{}, fakeClient,
-			func() {
-				// Mocking DetectDB
-				expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
-				dbMock.ExpectQuery(databaseDetectionQuery).WithArgs(database.Spec.Name).
-					WillReturnRows(expectedValue)
+		tester.setPostgresExpectations(func() {
+			expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
+			dbMock.ExpectQuery(databaseDetectionQuery).WithArgs(database.Spec.Name).
+				WillReturnRows(expectedValue)
 
-				// Mocking CreateDB
-				expectedCreate := sqlmock.NewResult(0, 1)
-				expectedQuery := fmt.Sprintf(
-					"CREATE DATABASE %s OWNER %s",
-					pgx.Identifier{database.Spec.Name}.Sanitize(),
-					pgx.Identifier{database.Spec.Owner}.Sanitize(),
-				)
-				dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
-			},
-			func(updatedDatabase *apiv1.Database) {
-				Expect(updatedDatabase.GetStatusApplied()).Should(HaveValue(BeTrue()))
-				Expect(updatedDatabase.GetStatusMessage()).Should(BeEmpty())
-				Expect(updatedDatabase.GetFinalizers()).NotTo(BeEmpty())
-			},
-		)
+			expectedCreate := sqlmock.NewResult(0, 1)
+			expectedQuery := fmt.Sprintf(
+				"CREATE DATABASE %s OWNER %s",
+				pgx.Identifier{database.Spec.Name}.Sanitize(),
+				pgx.Identifier{database.Spec.Owner}.Sanitize(),
+			)
+			dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
+		})
+
+		tester.setUpdatedObjectExpectations(func(updatedDatabase *apiv1.Database) {
+			Expect(updatedDatabase.GetStatusApplied()).Should(HaveValue(BeTrue()))
+			Expect(updatedDatabase.GetStatusMessage()).Should(BeEmpty())
+			Expect(updatedDatabase.GetFinalizers()).NotTo(BeEmpty())
+		})
+
+		tester.assert(ctx, database)
 	})
 
 	It("database object inherits error after patching", func(ctx SpecContext) {
 		expectedError := fmt.Errorf("no permission")
-		assertObjectWasReconciled(ctx, r, database, &apiv1.Database{}, fakeClient,
-			func() {
-				// Mocking DetectDB
-				expectedValue := sqlmock.NewRows([]string{""}).AddRow("1")
-				dbMock.ExpectQuery(databaseDetectionQuery).WithArgs(database.Spec.Name).
-					WillReturnRows(expectedValue)
+		tester.setPostgresExpectations(func() {
+			expectedValue := sqlmock.NewRows([]string{""}).AddRow("1")
+			dbMock.ExpectQuery(databaseDetectionQuery).WithArgs(database.Spec.Name).
+				WillReturnRows(expectedValue)
 
-				// Mocking Alter Database
-				expectedQuery := fmt.Sprintf("ALTER DATABASE %s OWNER TO %s",
-					pgx.Identifier{database.Spec.Name}.Sanitize(),
-					pgx.Identifier{database.Spec.Owner}.Sanitize(),
-				)
-				dbMock.ExpectExec(expectedQuery).WillReturnError(expectedError)
-			},
-			func(updatedDatabase *apiv1.Database) {
-				Expect(updatedDatabase.Status.Applied).Should(HaveValue(BeFalse()))
-				Expect(updatedDatabase.Status.Message).Should(ContainSubstring(expectedError.Error()))
-			},
-		)
+			expectedQuery := fmt.Sprintf("ALTER DATABASE %s OWNER TO %s",
+				pgx.Identifier{database.Spec.Name}.Sanitize(),
+				pgx.Identifier{database.Spec.Owner}.Sanitize(),
+			)
+			dbMock.ExpectExec(expectedQuery).WillReturnError(expectedError)
+		})
+
+		tester.setUpdatedObjectExpectations(func(updatedDatabase *apiv1.Database) {
+			Expect(updatedDatabase.GetStatusApplied()).Should(HaveValue(BeFalse()))
+			Expect(updatedDatabase.GetStatusMessage()).Should(ContainSubstring(expectedError.Error()))
+		})
+
+		tester.assert(ctx, database)
 	})
 
 	When("reclaim policy is delete", func() {
@@ -239,16 +243,13 @@ var _ = Describe("Managed Database status", func() {
 		database.Spec.ClusterRef.Name = "cluster-other"
 		Expect(fakeClient.Update(ctx, database)).To(Succeed())
 
-		assertObjectWasReconciled(ctx, r, database, &apiv1.Database{}, fakeClient,
-			func() {
-				// Never even hits any SQL
-			},
-			func(updatedDatabase *apiv1.Database) {
-				Expect(updatedDatabase.Status.Applied).Should(HaveValue(BeFalse()))
-				Expect(updatedDatabase.Status.Message).Should(ContainSubstring(
-					fmt.Sprintf("%q not found", database.Spec.ClusterRef.Name)))
-			},
-		)
+		tester.reconcileFunc = r.Reconcile
+		tester.setUpdatedObjectExpectations(func(updatedDatabase *apiv1.Database) {
+			Expect(updatedDatabase.Status.Applied).Should(HaveValue(BeFalse()))
+			Expect(updatedDatabase.Status.Message).Should(ContainSubstring(
+				fmt.Sprintf("%q not found", database.Spec.ClusterRef.Name)))
+		})
+		tester.assert(ctx, database)
 	})
 
 	It("skips reconciliation if database object isn't found (deleted database)", func(ctx SpecContext) {
@@ -284,22 +285,21 @@ var _ = Describe("Managed Database status", func() {
 		database.Spec.Ensure = apiv1.EnsureAbsent
 		Expect(fakeClient.Update(ctx, database)).To(Succeed())
 
-		assertObjectWasReconciled(ctx, r, database, &apiv1.Database{}, fakeClient,
-			func() {
-				// Mocking dropDatabase
-				expectedValue := sqlmock.NewResult(0, 1)
-				expectedQuery := fmt.Sprintf(
-					"DROP DATABASE IF EXISTS %s",
-					pgx.Identifier{database.Spec.Name}.Sanitize(),
-				)
-				dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedValue)
-			},
-			func(updatedDatabase *apiv1.Database) {
-				Expect(updatedDatabase.Status.Applied).To(HaveValue(BeTrue()))
-				Expect(updatedDatabase.Status.Message).To(BeEmpty())
-				Expect(updatedDatabase.Status.ObservedGeneration).To(BeEquivalentTo(1))
-			},
-		)
+		tester.setPostgresExpectations(func() {
+			expectedValue := sqlmock.NewResult(0, 1)
+			expectedQuery := fmt.Sprintf(
+				"DROP DATABASE IF EXISTS %s",
+				pgx.Identifier{database.Spec.Name}.Sanitize(),
+			)
+			dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedValue)
+		})
+
+		tester.setUpdatedObjectExpectations(func(updatedDatabase *apiv1.Database) {
+			Expect(updatedDatabase.Status.Applied).To(HaveValue(BeTrue()))
+			Expect(updatedDatabase.Status.Message).To(BeEmpty())
+			Expect(updatedDatabase.Status.ObservedGeneration).To(BeEquivalentTo(1))
+		})
+		tester.assert(ctx, database)
 	})
 
 	It("marks as failed if the target Database is already being managed", func(ctx SpecContext) {
@@ -326,18 +326,15 @@ var _ = Describe("Managed Database status", func() {
 		// Expect(fakeClient.Create(ctx, currentManager)).To(Succeed())
 		Expect(fakeClient.Create(ctx, dbDuplicate)).To(Succeed())
 
-		assertObjectWasReconciled(ctx, r, dbDuplicate, &apiv1.Database{}, fakeClient,
-			func() {
-				// No DB interactions expected
-			},
-			func(updatedDatabase *apiv1.Database) {
-				expectedError := fmt.Sprintf("%q is already managed by object %q",
-					dbDuplicate.Spec.Name, database.Name)
-				Expect(updatedDatabase.Status.Applied).To(HaveValue(BeFalse()))
-				Expect(updatedDatabase.Status.Message).To(ContainSubstring(expectedError))
-				Expect(updatedDatabase.Status.ObservedGeneration).To(BeZero())
-			},
-		)
+		tester.setUpdatedObjectExpectations(func(updatedDatabase *apiv1.Database) {
+			expectedError := fmt.Sprintf("%q is already managed by object %q",
+				dbDuplicate.Spec.Name, database.Name)
+			Expect(updatedDatabase.Status.Applied).To(HaveValue(BeFalse()))
+			Expect(updatedDatabase.Status.Message).To(ContainSubstring(expectedError))
+			Expect(updatedDatabase.Status.ObservedGeneration).To(BeZero())
+		})
+
+		tester.assert(ctx, dbDuplicate)
 	})
 
 	It("properly signals a database is on a replica cluster", func(ctx SpecContext) {
@@ -347,14 +344,10 @@ var _ = Describe("Managed Database status", func() {
 		}
 		Expect(fakeClient.Patch(ctx, cluster, client.MergeFrom(initialCluster))).To(Succeed())
 
-		assertObjectWasReconciled(ctx, r, database, &apiv1.Database{}, fakeClient,
-			func() {
-				// No DB interactions expected
-			},
-			func(updatedDatabase *apiv1.Database) {
-				Expect(updatedDatabase.Status.Applied).Should(BeNil())
-				Expect(updatedDatabase.Status.Message).Should(ContainSubstring("waiting for the cluster to become primary"))
-			},
-		)
+		tester.setUpdatedObjectExpectations(func(updatedDatabase *apiv1.Database) {
+			Expect(updatedDatabase.Status.Applied).Should(BeNil())
+			Expect(updatedDatabase.Status.Message).Should(ContainSubstring("waiting for the cluster to become primary"))
+		})
+		tester.assert(ctx, database)
 	})
 })
