@@ -163,7 +163,7 @@ var _ = Describe("Managed Database status", func() {
 		)
 	})
 
-	When("retention policy is delete", func() {
+	When("reclaim policy is delete", func() {
 		It("on deletion it removes finalizers and drops DB", func(ctx SpecContext) {
 			assertObjectReconciledAfterDeletion(ctx, r, database, &apiv1.Database{}, fakeClient,
 				func() {
@@ -191,7 +191,7 @@ var _ = Describe("Managed Database status", func() {
 		})
 	})
 
-	When("retention policy is retain", func() {
+	When("reclaim policy is retain", func() {
 		It("on deletion it removes finalizers and does NOT drop the DB", func(ctx SpecContext) {
 			database.Spec.ReclaimPolicy = apiv1.DatabaseReclaimRetain
 			Expect(fakeClient.Update(ctx, database)).To(Succeed())
@@ -217,7 +217,7 @@ var _ = Describe("Managed Database status", func() {
 	})
 
 	It("fails reconciliation if cluster isn't found (deleted cluster)", func(ctx SpecContext) {
-		// since the fakeClient has the `cluster-example` cluster, let's reference
+		// Since the fakeClient has the `cluster-example` cluster, let's reference
 		// another cluster `cluster-other` that is not found by the fakeClient
 		pgInstance := postgres.NewInstance().
 			WithNamespace("default").
@@ -235,17 +235,18 @@ var _ = Describe("Managed Database status", func() {
 			instance: &f,
 		}
 
-		// updating the Database object to reference the newly created Cluster
+		// Updating the Database object to reference the newly created Cluster
 		database.Spec.ClusterRef.Name = "cluster-other"
 		Expect(fakeClient.Update(ctx, database)).To(Succeed())
 
 		assertObjectWasReconciled(ctx, r, database, &apiv1.Database{}, fakeClient,
 			func() {
-				// never even hits any SQL
+				// Never even hits any SQL
 			},
 			func(updatedDatabase *apiv1.Database) {
 				Expect(updatedDatabase.Status.Applied).Should(HaveValue(BeFalse()))
-				Expect(updatedDatabase.Status.Message).Should(ContainSubstring(`"cluster-other" not found`))
+				Expect(updatedDatabase.Status.Message).Should(ContainSubstring(
+					fmt.Sprintf("%q not found", database.Spec.ClusterRef.Name)))
 			},
 		)
 	})
@@ -273,7 +274,7 @@ var _ = Describe("Managed Database status", func() {
 			Name:      otherDatabase.Name,
 		}})
 
-		// Expect the reconciler to exit silently since the object doesn't exist
+		// Expect the reconciler to exit silently, since the object doesn't exist
 		Expect(err).ToNot(HaveOccurred())
 		Expect(result).Should(BeZero()) // nothing to do, since the DB is being deleted
 	})
