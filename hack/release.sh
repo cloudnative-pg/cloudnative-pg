@@ -96,17 +96,19 @@ KUSTOMIZE="${REPO_ROOT}/bin/kustomize"
 
 mkdir -p releases/
 release_manifest="releases/cnpg-${release_version}.yaml"
+# shellcheck disable=SC2001
+release_branch="release-$(sed -e 's/^\([0-9]\+\.[0-9]\+\)\..*$/\1/' <<< "$release_version" )"
 
 # Perform automated substitutions of the version string in the source code
 sed -i -e "/Version *= *.*/Is/\".*\"/\"${release_version}\"/" \
     -e "/DefaultOperatorImageName *= *.*/Is/\"\(.*\):.*\"/\"\1:${release_version}\"/" \
     pkg/versions/versions.go
 
-sed -i -e "s@release-[0-9.]*/releases/cnpg-[0-9.]*.yaml@${branch}/releases/cnpg-${release_version}.yaml@g" \
-    -e "s@artifacts/release-[0-9.]*/@artifacts/${branch}/@g" \
+sed -i -e "s@\(release-[0-9.]\+\|main\)/releases/cnpg-[0-9.]\+\(-rc.*\)\?.yaml@${branch}/releases/cnpg-${release_version}.yaml@g" \
+    -e "s@artifacts/release-[0-9.]*/@artifacts/${release_branch}/@g" \
     docs/src/installation_upgrade.md
 
-sed -i -e "s@1\.[0-9]\+\.[0-9]\+@${release_version}@g" docs/src/kubectl-plugin.md
+sed -i -e "s@1\.[0-9]\+\.[0-9]\+\(-[a-z0-9]\+\)\?@${release_version}@g" docs/src/kubectl-plugin.md
 
 CONFIG_TMP_DIR=$(mktemp -d)
 cp -r config/* "${CONFIG_TMP_DIR}"
@@ -123,6 +125,7 @@ git checkout -b "release/v${release_version}"
 git add \
     pkg/versions/versions.go \
     docs/src/installation_upgrade.md \
+    docs/src/kubectl-plugin.md \
     "${release_manifest}"
 git commit -sm "Version tag to ${release_version}"
 git push origin -u "release/v${release_version}"
