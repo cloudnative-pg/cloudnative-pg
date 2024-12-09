@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cloudnative-pg/barman-cloud/pkg/api"
 	"github.com/cloudnative-pg/machinery/pkg/image/reference"
 	pgversion "github.com/cloudnative-pg/machinery/pkg/postgres/version"
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
@@ -2328,23 +2329,26 @@ var _ = Describe("bootstrap recovery validation", func() {
 		Expect(result).To(BeEmpty())
 	})
 
-	It("does not complain when bootstrap recovery source matches one of the names of external clusters", func() {
-		recoveryCluster := &Cluster{
-			Spec: ClusterSpec{
-				Bootstrap: &BootstrapConfiguration{
-					Recovery: &BootstrapRecovery{
-						Source: "test",
+	Context("does not complain when bootstrap recovery source matches one of the names of external clusters", func() {
+		When("using a barman object store configuration", func() {
+			recoveryCluster := &Cluster{
+				Spec: ClusterSpec{
+					Bootstrap: &BootstrapConfiguration{
+						Recovery: &BootstrapRecovery{
+							Source: "test",
+						},
+					},
+					ExternalClusters: []ExternalCluster{
+						{
+							Name:              "test",
+							BarmanObjectStore: &api.BarmanObjectStoreConfiguration{},
+						},
 					},
 				},
-				ExternalClusters: []ExternalCluster{
-					{
-						Name: "test",
-					},
-				},
-			},
-		}
-		errorsList := recoveryCluster.validateBootstrapRecoverySource()
-		Expect(errorsList).To(BeEmpty())
+			}
+			errorsList := recoveryCluster.validateBootstrapRecoverySource()
+			Expect(errorsList).To(BeEmpty())
+		})
 	})
 
 	It("complains when bootstrap recovery source does not match one of the names of external clusters", func() {
@@ -2364,6 +2368,25 @@ var _ = Describe("bootstrap recovery validation", func() {
 		}
 		errorsList := recoveryCluster.validateBootstrapRecoverySource()
 		Expect(errorsList).ToNot(BeEmpty())
+	})
+
+	It("complains when bootstrap recovery source have no BarmanObjectStore nor plugin configuration", func() {
+		recoveryCluster := &Cluster{
+			Spec: ClusterSpec{
+				Bootstrap: &BootstrapConfiguration{
+					Recovery: &BootstrapRecovery{
+						Source: "test",
+					},
+				},
+				ExternalClusters: []ExternalCluster{
+					{
+						Name: "test",
+					},
+				},
+			},
+		}
+		errorsList := recoveryCluster.validateBootstrapRecoverySource()
+		Expect(errorsList).To(HaveLen(1))
 	})
 })
 
