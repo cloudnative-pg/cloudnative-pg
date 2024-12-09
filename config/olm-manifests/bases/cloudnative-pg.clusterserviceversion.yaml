@@ -894,6 +894,13 @@ spec:
         x-descriptors:
           - 'urn:alm:descriptor:com.tectonic.ui:text'
           - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+      statusDescriptors:
+      - path: applied
+        displayName: Applied
+        description: Database applied
+      - path: message
+        displayName: Message
+        description: Database message from the last reconciliation loop
     - kind: Publication
       name: publications.postgresql.cnpg.io
       displayName: Postgres Publication
@@ -919,6 +926,13 @@ spec:
         - path: publicationReclaimPolicy
           displayName: Publication reclaim policy
           description: Specifies the action to take for the publication inside PostgreSQL when the associated object in Kubernetes is deleted. Options are to either delete the database or retain it for future management.
+      statusDescriptors:
+      - path: applied
+        displayName: Applied
+        description: Database applied
+      - path: message
+        displayName: Message
+        description: Database message from the last reconciliation loop
     - kind: Subscription
       name: subscriptions.postgresql.cnpg.io
       displayName: Postgres Subscription
@@ -950,3 +964,10 @@ spec:
         - path: subscriptionReclaimPolicy
           displayName: Subscription reclaim policy
           description: Specifies the action to take for the subscription inside PostgreSQL when the associated object in Kubernetes is deleted. Options are to either delete the database or retain it for future management.
+      statusDescriptors:
+      - path: applied
+        displayName: Applied
+        description: Database applied
+      - path: message
+        displayName: Message
+        description: Database message from the last reconciliation loop

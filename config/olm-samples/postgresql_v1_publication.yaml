@@ -9,3 +9,5 @@ spec:
     name: cluster-sample
   target:
     allTables: true
+status:
+  applied: false
