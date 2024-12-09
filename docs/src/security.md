@@ -293,19 +293,10 @@ CloudNativePG.
 : The instance manager requires to `update` and `patch` the status of any
   `Backup` resource in the namespace
 
-### Pod Security Policies
+### Security Contexts
 
-!!! Important
-    Starting from Kubernetes v1.21, the use of `PodSecurityPolicy` has been
-    deprecated, and as of Kubernetes v1.25, it has been completely removed. Despite
-    this deprecation, we acknowledge that the operator is currently undergoing
-    testing in older and unsupported versions of Kubernetes. Therefore, this
-    section is retained for those specific scenarios.
-
-A [Pod Security Policy](https://kubernetes.io/docs/concepts/policy/pod-security-policy/)
-is the Kubernetes way to define security rules and specifications that a pod needs to meet
-to run in a cluster.
-For InfoSec reasons, every Kubernetes platform should implement them.
+A [Security Context](https://kubernetes.io/docs/tasks/configure-pod-container/security-context/) is a
+Kubernetes way to defines privilege and access control settings for a Pod or Container.
 
 CloudNativePG does not require *privileged* mode for containers execution.
 The PostgreSQL containers run as `postgres` system user. No component whatsoever requires running as `root`.
@@ -314,7 +305,24 @@ Likewise, Volumes access does not require *privileges* mode or `root` privileges
 Proper permissions must be properly assigned by the Kubernetes platform and/or administrators.
 The PostgreSQL containers run with a read-only root filesystem (i.e. no writable layer).
 
-The operator explicitly sets the required security contexts.
+The operator explicitly sets the required security contexts for all cluster containers. However, the 
+[Seccomp Profile](https://kubernetes.io/docs/tutorials/security/seccomp/) to be used for the
+PostgreSQL containers can be configured with the `spec.seccompProfile` of the `Cluster` resource. If no
+`seccompProfile` is requested, the `Cluster` containers will use a profile `Type` of `RuntimeDefault`.
+
+The security context of all PostgreSQL containers using the default `seccompProfile` will look like:
+```
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+    - ALL
+  privileged: false
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+```
 
 ### Restricting Pod access using AppArmor
 
