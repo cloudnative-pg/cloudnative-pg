@@ -878,7 +878,7 @@ func (r *Cluster) validateBootstrapRecoverySource() field.ErrorList {
 				fmt.Sprintf("External cluster %v not found", r.Spec.Bootstrap.Recovery.Source)))
 	}
 
-	// Ensure the external cluster definition have enough information
+	// Ensure the external cluster definition has enough information
 	// to be used to recover a data directory
 	if externalCluster.BarmanObjectStore == nil && externalCluster.PluginConfiguration == nil {
 		result = append(
@@ -886,9 +886,8 @@ func (r *Cluster) validateBootstrapRecoverySource() field.ErrorList {
 			field.Invalid(
 				field.NewPath("spec", "bootstrap", "recovery", "source"),
 				r.Spec.Bootstrap.Recovery.Source,
-				fmt.Sprintf("External cluster %v cannot be used to recover "+
-					"a cluster because both the barman and the CNPG-i plugin "+
-					"configuration are not present", r.Spec.Bootstrap.Recovery.Source)))
+				fmt.Sprintf("External cluster %v cannot be used for recovery: "+
+					"both Barman and CNPG-i plugin configurations are missing", r.Spec.Bootstrap.Recovery.Source)))
 	}
 
 	return result
