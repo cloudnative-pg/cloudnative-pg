@@ -508,23 +508,25 @@ func insertRecordIntoTable(tableName string, value int, conn *sql.DB) {
 func AssertDatabaseExists(pod *corev1.Pod, databaseName string, expectedValue bool) {
 	By(fmt.Sprintf("verifying if database %v exists", databaseName), func() {
 		query := fmt.Sprintf("SELECT EXISTS(SELECT 1 FROM pg_database WHERE lower(datname) = lower('%v'));", databaseName)
-		stdout, stderr, err := env.ExecQueryInInstancePod(
-			testsUtils.PodLocator{
-				Namespace: pod.Namespace,
-				PodName:   pod.Name,
-			},
-			testsUtils.PostgresDBName,
-			query)
-		if err != nil {
-			GinkgoWriter.Printf("stdout: %v\nstderr: %v", stdout, stderr)
-		}
-		Expect(err).ToNot(HaveOccurred())
+		Eventually(func(g Gomega) {
+			stdout, stderr, err := env.ExecQueryInInstancePod(
+				testsUtils.PodLocator{
+					Namespace: pod.Namespace,
+					PodName:   pod.Name,
+				},
+				testsUtils.PostgresDBName,
+				query)
+			if err != nil {
+				GinkgoWriter.Printf("stdout: %v\nstderr: %v", stdout, stderr)
+			}
+			g.Expect(err).ToNot(HaveOccurred())
 
-		if expectedValue {
-			Expect(strings.Trim(stdout, "\n")).To(BeEquivalentTo("t"))
-		} else {
-			Expect(strings.Trim(stdout, "\n")).To(BeEquivalentTo("f"))
-		}
+			if expectedValue {
+				g.Expect(strings.Trim(stdout, "\n")).To(BeEquivalentTo("t"))
+			} else {
+				g.Expect(strings.Trim(stdout, "\n")).To(BeEquivalentTo("f"))
+			}
+		}, 60).Should(Succeed())
 	})
 }
 
