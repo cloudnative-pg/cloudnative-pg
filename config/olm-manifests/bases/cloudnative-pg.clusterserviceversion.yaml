@@ -929,10 +929,10 @@ spec:
       statusDescriptors:
       - path: applied
         displayName: Applied
-        description: Database applied
+        description: Publication applied
       - path: message
         displayName: Message
-        description: Database message from the last reconciliation loop
+        description: Publication message from the last reconciliation loop
     - kind: Subscription
       name: subscriptions.postgresql.cnpg.io
       displayName: Postgres Subscription
@@ -967,7 +967,7 @@ spec:
       statusDescriptors:
       - path: applied
         displayName: Applied
-        description: Database applied
+        description: Subscription applied
       - path: message
         displayName: Message
-        description: Database message from the last reconciliation loop
+        description: Subscription message from the last reconciliation loop
