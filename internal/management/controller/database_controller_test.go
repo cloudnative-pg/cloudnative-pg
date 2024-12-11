@@ -137,7 +137,7 @@ var _ = Describe("Managed Database status", func() {
 		})
 
 		tester.setUpdatedObjectExpectations(func(updatedDatabase *apiv1.Database) {
-			Expect(updatedDatabase.GetStatusApplied()).Should(HaveValue(BeTrue()))
+			Expect(updatedDatabase.Status.Applied).Should(HaveValue(BeTrue()))
 			Expect(updatedDatabase.GetStatusMessage()).Should(BeEmpty())
 			Expect(updatedDatabase.GetFinalizers()).NotTo(BeEmpty())
 		})
@@ -160,7 +160,7 @@ var _ = Describe("Managed Database status", func() {
 		})
 
 		tester.setUpdatedObjectExpectations(func(updatedDatabase *apiv1.Database) {
-			Expect(updatedDatabase.GetStatusApplied()).Should(HaveValue(BeFalse()))
+			Expect(updatedDatabase.Status.Applied).Should(HaveValue(BeFalse()))
 			Expect(updatedDatabase.GetStatusMessage()).Should(ContainSubstring(expectedError.Error()))
 		})
 
@@ -304,7 +304,7 @@ var _ = Describe("Managed Database status", func() {
 
 	It("marks as failed if the target Database is already being managed", func(ctx SpecContext) {
 		// Let's force the database to have a past reconciliation
-		database.SetObservedGeneration(2)
+		database.Status.ObservedGeneration = 2
 		Expect(fakeClient.Status().Update(ctx, database)).To(Succeed())
 
 		// A new Database Object targeting the same "db-one"

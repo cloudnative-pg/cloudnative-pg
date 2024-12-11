@@ -13,9 +13,7 @@ import (
 
 type postgresObjectManager interface {
 	client.Object
-	GetStatusApplied() *bool
 	GetStatusMessage() string
-	SetObservedGeneration(gen int64)
 }
 
 type postgresReconciliationTester[T postgresObjectManager] struct {

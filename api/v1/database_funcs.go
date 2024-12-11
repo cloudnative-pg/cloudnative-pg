@@ -40,11 +40,6 @@ func (db *Database) SetAsReady() {
 	db.Status.ObservedGeneration = db.Generation
 }
 
-// GetStatusApplied returns the `applied` value in the status
-func (db *Database) GetStatusApplied() *bool {
-	return db.Status.Applied
-}
-
 // GetStatusMessage returns the status message of the database
 func (db *Database) GetStatusMessage() string {
 	return db.Status.Message
@@ -68,11 +63,6 @@ func (db *Database) GetName() string {
 // HasReconciliations returns true if the database object has been reconciled at least once
 func (db *Database) HasReconciliations() bool {
 	return db.Status.ObservedGeneration > 0
-}
-
-// SetObservedGeneration sets the status's observed generation
-func (db *Database) SetObservedGeneration(gen int64) {
-	db.Status.ObservedGeneration = gen
 }
 
 // MustHaveManagedResourceExclusivity detects conflicting databases

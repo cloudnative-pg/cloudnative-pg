@@ -40,11 +40,6 @@ func (sub *Subscription) SetAsReady() {
 	sub.Status.ObservedGeneration = sub.Generation
 }
 
-// GetStatusApplied returns the `applied` value in the status
-func (sub *Subscription) GetStatusApplied() *bool {
-	return sub.Status.Applied
-}
-
 // GetStatusMessage returns the status message of the subscription
 func (sub *Subscription) GetStatusMessage() string {
 	return sub.Status.Message
@@ -68,11 +63,6 @@ func (sub *Subscription) GetManagedObjectName() string {
 // HasReconciliations returns true if the subscription has been reconciled at least once
 func (sub *Subscription) HasReconciliations() bool {
 	return sub.Status.ObservedGeneration > 0
-}
-
-// SetObservedGeneration sets the status's observed generation
-func (sub *Subscription) SetObservedGeneration(gen int64) {
-	sub.Status.ObservedGeneration = gen
 }
 
 // MustHaveManagedResourceExclusivity detects conflicting subscriptions

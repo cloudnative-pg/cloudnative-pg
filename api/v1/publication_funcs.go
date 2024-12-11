@@ -40,11 +40,6 @@ func (pub *Publication) SetAsReady() {
 	pub.Status.ObservedGeneration = pub.Generation
 }
 
-// GetStatusApplied returns the `applied` value in the status
-func (pub *Publication) GetStatusApplied() *bool {
-	return pub.Status.Applied
-}
-
 // GetStatusMessage returns the status message of the publication
 func (pub *Publication) GetStatusMessage() string {
 	return pub.Status.Message
@@ -68,11 +63,6 @@ func (pub *Publication) HasReconciliations() bool {
 // GetName returns the publication name
 func (pub *Publication) GetName() string {
 	return pub.Name
-}
-
-// SetObservedGeneration sets the status's observed generation
-func (pub *Publication) SetObservedGeneration(gen int64) {
-	pub.Status.ObservedGeneration = gen
 }
 
 // MustHaveManagedResourceExclusivity detects conflicting publications

@@ -140,7 +140,7 @@ var _ = Describe("Managed publication controller tests", func() {
 		})
 
 		tester.setUpdatedObjectExpectations(func(updatedPublication *apiv1.Publication) {
-			Expect(updatedPublication.GetStatusApplied()).Should(HaveValue(BeTrue()))
+			Expect(updatedPublication.Status.Applied).Should(HaveValue(BeTrue()))
 			Expect(updatedPublication.GetStatusMessage()).Should(BeEmpty())
 			Expect(updatedPublication.GetFinalizers()).NotTo(BeEmpty())
 		})
@@ -246,7 +246,7 @@ var _ = Describe("Managed publication controller tests", func() {
 		Expect(fakeClient.Update(ctx, publication)).To(Succeed())
 
 		tester.setUpdatedObjectExpectations(func(updatedPublication *apiv1.Publication) {
-			Expect(updatedPublication.GetStatusApplied()).Should(HaveValue(BeFalse()))
+			Expect(updatedPublication.Status.Applied).Should(HaveValue(BeFalse()))
 			Expect(updatedPublication.GetStatusMessage()).Should(ContainSubstring(
 				fmt.Sprintf("%q not found", publication.Spec.ClusterRef.Name)))
 		})
@@ -283,7 +283,7 @@ var _ = Describe("Managed publication controller tests", func() {
 
 	It("marks as failed if the target publication is already being managed", func(ctx SpecContext) {
 		// Let's force the publication to have a past reconciliation
-		publication.SetObservedGeneration(2)
+		publication.Status.ObservedGeneration = 2
 		Expect(fakeClient.Status().Update(ctx, publication)).To(Succeed())
 
 		// A new Publication Object targeting the same "pub-all"

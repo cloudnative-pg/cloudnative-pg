@@ -155,7 +155,7 @@ var _ = Describe("Managed subscription controller tests", func() {
 		})
 
 		tester.setUpdatedObjectExpectations(func(updatedSubscription *apiv1.Subscription) {
-			Expect(updatedSubscription.GetStatusApplied()).Should(HaveValue(BeTrue()))
+			Expect(updatedSubscription.Status.Applied).Should(HaveValue(BeTrue()))
 			Expect(updatedSubscription.GetStatusMessage()).Should(BeEmpty())
 			Expect(updatedSubscription.GetFinalizers()).NotTo(BeEmpty())
 		})
@@ -303,7 +303,7 @@ var _ = Describe("Managed subscription controller tests", func() {
 
 	It("marks as failed if the target subscription is already being managed", func(ctx SpecContext) {
 		// Let's force the subscription to have a past reconciliation
-		subscription.SetObservedGeneration(2)
+		subscription.Status.ObservedGeneration = 2
 		Expect(fakeClient.Status().Update(ctx, subscription)).To(Succeed())
 
 		// A new subscription Object targeting the same "sub-one"

@@ -37,7 +37,7 @@ type PublicationReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 
-	instance            instanceInterface
+	instance            *postgres.Instance
 	finalizerReconciler *finalizerReconciler[*apiv1.Publication]
 }
 
@@ -153,7 +153,7 @@ func (r *PublicationReconciler) evaluateDropPublication(ctx context.Context, pub
 	if pub.Spec.ReclaimPolicy != apiv1.PublicationReclaimDelete {
 		return nil
 	}
-	db, err := r.instance.GetNamedDB(pub.Spec.DBName)
+	db, err := r.instance.ConnectionPool().Connection(pub.Spec.DBName)
 	if err != nil {
 		return fmt.Errorf("while getting DB connection: %w", err)
 	}
