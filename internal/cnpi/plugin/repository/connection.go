@@ -26,6 +26,10 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/connection"
 )
 
+// maxConnectionAttempts is the maximum number of connections attempts to a
+// plugin. maxConnectionAttempts should be higher or equal to maxPoolSize
+const maxConnectionAttempts = 5
+
 type releasingConnection struct {
 	connection.Interface
 	closer func() error
@@ -51,7 +55,7 @@ func (r *data) GetConnection(ctx context.Context, name string) (connection.Inter
 	var resource *puddle.Resource[connection.Interface]
 	var err error
 
-	for i := 0; i < maxPoolSize; i++ {
+	for i := 0; i < maxConnectionAttempts; i++ {
 		contextLogger.Trace("try getting connection")
 		resource, err = pool.Acquire(ctx)
 		if err != nil {
@@ -60,7 +64,10 @@ func (r *data) GetConnection(ctx context.Context, name string) (connection.Inter
 
 		err = resource.Value().Ping(ctx)
 		if err != nil {
-			contextLogger.Debug("Detected plugin connection error, closing the connection and trying again")
+			contextLogger.Info(
+				"Detected stale/broken plugin connection, closing and trying again",
+				"pluginName", name,
+				"err", err)
 			resource.Destroy()
 		} else {
 			break
@@ -71,9 +78,17 @@ func (r *data) GetConnection(ctx context.Context, name string) (connection.Inter
 		return nil, fmt.Errorf("while getting plugin connection: %w", err)
 	}
 
+	contextLogger.Trace(
+		"Acquired logical plugin connection",
+		"name", name,
+	)
 	return &releasingConnection{
 		Interface: resource.Value(),
 		closer: func() error {
+			contextLogger.Trace(
+				"Released logical plugin connection",
+				"name", name,
+			)
 			// When the client has done its job with a plugin connection, it
 			// will be returned to the pool
 			resource.Release()
