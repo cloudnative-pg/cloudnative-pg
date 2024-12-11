@@ -42,12 +42,16 @@ func NewCmd() *cobra.Command {
 			}
 
 			keepPVC, _ := cmd.Flags().GetBool("keep-pvc")
-			return Destroy(ctx, clusterName, node, keepPVC)
+			force, _ := cmd.Flags().GetBool("force")
+			return Destroy(ctx, clusterName, node, keepPVC, force)
 		},
 	}
 
 	destroyCmd.Flags().BoolP("keep-pvc", "k", false,
 		"Keep the PVC but detach it from instance")
+
+	destroyCmd.Flags().BoolP("force", "f", false,
+		"Force deletion even if it's the last instance")
 
 	return destroyCmd
 }
