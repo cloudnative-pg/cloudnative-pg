@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	"github.com/cloudnative-pg/machinery/pkg/stringset"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/connection"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
@@ -40,18 +41,6 @@ func (data *data) getPlugin(pluginName string) (connection.Interface, error) {
 	}
 
 	return nil, ErrPluginNotLoaded
-}
-
-func (data *data) load(ctx context.Context, names ...string) error {
-	for _, name := range names {
-		pluginData, err := data.repository.GetConnection(ctx, name)
-		if err != nil {
-			return err
-		}
-
-		data.plugins = append(data.plugins, pluginData)
-	}
-	return nil
 }
 
 func (data *data) MetadataList() []connection.Metadata {
@@ -83,7 +72,27 @@ func WithPlugins(ctx context.Context, repository repository.Interface, names ...
 	result := &data{
 		repository: repository,
 	}
-	if err := result.load(ctx, names...); err != nil {
+
+	load := func(names ...string) error {
+		for _, name := range names {
+			pluginData, err := result.repository.GetConnection(ctx, name)
+			if err != nil {
+				return err
+			}
+
+			result.plugins = append(result.plugins, pluginData)
+		}
+		return nil
+	}
+
+	// The following ensures that each plugin is loaded just one
+	// time, even when the same plugin has been requested multiple
+	// times.
+	loadingPlugins := stringset.From(names)
+	uniqueSortedPluginName := loadingPlugins.ToSortedList()
+
+	if err := load(uniqueSortedPluginName...); err != nil {
+		result.Close(ctx)
 		return nil, err
 	}
 
