@@ -41,7 +41,6 @@ var errClusterIsReplica = fmt.Errorf("waiting for the cluster to become primary"
 
 type instanceInterface interface {
 	GetSuperUserDB() (*sql.DB, error)
-	GetNamedDB(name string) (*sql.DB, error)
 	GetClusterName() string
 	GetPodName() string
 	GetNamespaceName() string
