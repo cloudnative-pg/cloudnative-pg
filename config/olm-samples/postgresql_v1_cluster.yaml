@@ -19,3 +19,5 @@ spec:
   walStorage:
     size: 1Gi
   logLevel: info
+status:
+  instances: 3

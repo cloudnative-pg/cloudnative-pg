@@ -6,3 +6,5 @@ spec:
   schedule: "0 0 0 * * *"
   cluster:
     name: cluster-sample
+status:
+  lastCheckTime:
