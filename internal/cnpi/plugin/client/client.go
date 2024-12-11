@@ -18,7 +18,6 @@ package client
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
@@ -45,39 +44,14 @@ func (data *data) getPlugin(pluginName string) (connection.Interface, error) {
 }
 
 func (data *data) load(ctx context.Context, names ...string) error {
-	contextLogger := log.FromContext(ctx)
-
-	closeConns := func(pluginsToClose []connection.Interface) {
-		for _, plugin := range pluginsToClose {
-			name := plugin.Name()
-			closingErr := plugin.Close()
-			if closingErr != nil {
-				contextLogger.Info(
-					"Detected error while closing a plugin collection when rolling back plugin loading, skipping",
-					"err", closingErr,
-					"pluginName", name,
-					"requestedPlugins", names)
-			}
-		}
-
-	}
-
-	loadedPlugins := make([]connection.Interface, 0, len(names))
-	// Try loading each requested plugin
 	for _, name := range names {
 		pluginData, err := data.repository.GetConnection(ctx, name)
 		if err != nil {
-			// A loading error has been detected. Closing the
-			// connections that were already opened
-			closeConns(loadedPlugins)
-			return fmt.Errorf("while loading %s: %w", name, err)
+			return err
 		}
 
-		loadedPlugins = append(loadedPlugins, pluginData)
+		data.plugins = append(data.plugins, pluginData)
 	}
-
-	data.plugins = append(data.plugins, loadedPlugins...)
-
 	return nil
 }
 
@@ -118,6 +92,7 @@ func WithPlugins(ctx context.Context, repository repository.Interface, names ...
 	uniqueSortedPluginName := loadingPlugins.ToSortedList()
 
 	if err := result.load(ctx, uniqueSortedPluginName...); err != nil {
+		result.Close(ctx)
 		return nil, err
 	}
 
