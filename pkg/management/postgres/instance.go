@@ -721,17 +721,12 @@ func (instance *Instance) WithActiveInstance(inner func() error) error {
 
 // GetSuperUserDB gets a connection to the "postgres" database on this instance
 func (instance *Instance) GetSuperUserDB() (*sql.DB, error) {
-	return instance.GetNamedDB("postgres")
+	return instance.ConnectionPool().Connection("postgres")
 }
 
 // GetTemplateDB gets a connection to the "template1" database on this instance
 func (instance *Instance) GetTemplateDB() (*sql.DB, error) {
-	return instance.GetNamedDB("template1")
-}
-
-// GetNamedDB gets a connection to the named database on this instance
-func (instance *Instance) GetNamedDB(name string) (*sql.DB, error) {
-	return instance.ConnectionPool().Connection(name)
+	return instance.ConnectionPool().Connection("template1")
 }
 
 // GetPgVersion queries the postgres instance to know the current version, parses it and memoize it for future uses
