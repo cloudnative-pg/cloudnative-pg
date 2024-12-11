@@ -34,30 +34,18 @@ import (
 )
 
 // Destroy implements destroy subcommand
-func Destroy(ctx context.Context, clusterName, instanceName string, keepPVC bool) error {
+func Destroy(ctx context.Context, clusterName, instanceName string, keepPVC bool, force bool) error {
+	// Ensure there is more than one running and ready replica
+	if err := ensureMultipleReplicasRunning(ctx, clusterName, force); err != nil {
+		return err
+	}
+
 	if err := ensurePodIsDeleted(ctx, instanceName, clusterName); err != nil {
 		return err
 	}
 
-	var jobList batchv1.JobList
-	if err := plugin.Client.List(
-		ctx,
-		&jobList,
-		client.InNamespace(plugin.Namespace),
-		client.MatchingLabels{
-			utils.InstanceNameLabelName: instanceName,
-		},
-	); err != nil {
+	if err := deleteAssociatedJobs(ctx, instanceName); err != nil {
 		return err
-	}
-	for idx := range jobList.Items {
-		if err := plugin.Client.Delete(
-			ctx,
-			&jobList.Items[idx],
-			client.PropagationPolicy(metav1.DeletePropagationBackground),
-		); err != nil && !apierrs.IsNotFound(err) {
-			return fmt.Errorf("deleting job %s: %w", jobList.Items[idx].Name, err)
-		}
 	}
 
 	pvcs, err := persistentvolumeclaim.GetInstancePVCs(ctx, plugin.Client, instanceName, plugin.Namespace)
@@ -120,7 +108,6 @@ func ensurePodIsDeleted(ctx context.Context, instanceName, clusterName string) e
 		Name:      instanceName,
 	}, &pod)
 	if apierrs.IsNotFound(err) {
-		// The Pod doesn't exist, so we already did our job
 		return nil
 	}
 	if err != nil {
@@ -132,6 +119,68 @@ func ensurePodIsDeleted(ctx context.Context, instanceName, clusterName string) e
 	}
 
 	return plugin.Client.Delete(ctx, &pod)
+}
+
+func ensureMultipleReplicasRunning(ctx context.Context, clusterName string, force bool) error {
+	// List all pods for the cluster
+	var podList corev1.PodList
+	if err := plugin.Client.List(ctx, &podList, client.InNamespace(plugin.Namespace), client.MatchingLabels{
+		"cnpg.io/cluster": clusterName,
+		"cnpg.io/podRole": "instance",
+	}); err != nil {
+		return fmt.Errorf("error listing pods for cluster %s: %v", clusterName, err)
+	}
+
+	runningAndReadyCount := 0
+	for _, pod := range podList.Items {
+		if pod.Status.Phase == corev1.PodRunning && isPodReady(&pod) {
+			runningAndReadyCount++
+		}
+	}
+
+	if runningAndReadyCount <= 1 && !force {
+		fmt.Printf("Warning: Only %d replica(s) are running and ready. Are you sure you want to destroy the instance? [y/N]: ", runningAndReadyCount)
+		var response string
+		fmt.Scanln(&response)
+		if response != "y" && response != "Y" {
+			return fmt.Errorf("operation aborted by user")
+		}
+	}
+
+	return nil
+}
+
+func isPodReady(pod *corev1.Pod) bool {
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type == corev1.PodReady && condition.Status == corev1.ConditionTrue {
+			return true
+		}
+	}
+	return false
+}
+
+func deleteAssociatedJobs(ctx context.Context, instanceName string) error {
+	var jobList batchv1.JobList
+	if err := plugin.Client.List(
+		ctx,
+		&jobList,
+		client.InNamespace(plugin.Namespace),
+		client.MatchingLabels{
+			utils.InstanceNameLabelName: instanceName,
+		},
+	); err != nil {
+		return err
+	}
+	for idx := range jobList.Items {
+		if err := plugin.Client.Delete(
+			ctx,
+			&jobList.Items[idx],
+			client.PropagationPolicy(metav1.DeletePropagationBackground),
+		); err != nil && !apierrs.IsNotFound(err) {
+			return fmt.Errorf("deleting job %s: %w", jobList.Items[idx].Name, err)
+		}
+	}
+	return nil
 }
 
 // removeOwnerReference removes the owner reference to the cluster
