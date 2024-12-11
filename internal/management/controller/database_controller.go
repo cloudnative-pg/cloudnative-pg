@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"time"
 
@@ -39,6 +40,7 @@ type DatabaseReconciler struct {
 
 	instance            instanceInterface
 	finalizerReconciler *finalizerReconciler[*apiv1.Database]
+	getSuperUserDB      func() (*sql.DB, error)
 }
 
 // databaseReconciliationInterval is the time between the
@@ -143,7 +145,7 @@ func (r *DatabaseReconciler) evaluateDropDatabase(ctx context.Context, db *apiv1
 	if db.Spec.ReclaimPolicy != apiv1.DatabaseReclaimDelete {
 		return nil
 	}
-	sqlDB, err := r.instance.GetSuperUserDB()
+	sqlDB, err := r.getSuperUserDB()
 	if err != nil {
 		return fmt.Errorf("while getting DB connection: %w", err)
 	}
@@ -159,6 +161,9 @@ func NewDatabaseReconciler(
 	dr := &DatabaseReconciler{
 		Client:   mgr.GetClient(),
 		instance: instance,
+		getSuperUserDB: func() (*sql.DB, error) {
+			return instance.GetSuperUserDB()
+		},
 	}
 
 	dr.finalizerReconciler = newFinalizerReconciler(
@@ -184,7 +189,7 @@ func (r *DatabaseReconciler) GetCluster(ctx context.Context) (*apiv1.Cluster, er
 }
 
 func (r *DatabaseReconciler) reconcileDatabase(ctx context.Context, obj *apiv1.Database) error {
-	db, err := r.instance.GetSuperUserDB()
+	db, err := r.getSuperUserDB()
 	if err != nil {
 		return fmt.Errorf("while connecting to the database %q: %w", obj.Spec.Name, err)
 	}

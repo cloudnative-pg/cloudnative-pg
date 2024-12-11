@@ -110,11 +110,6 @@ var _ = Describe("Managed Database status", func() {
 			WithPodName("cluster-example-1").
 			WithClusterName("cluster-example")
 
-		f := fakeInstanceData{
-			Instance: pgInstance,
-			db:       db,
-		}
-
 		fakeClient = fake.NewClientBuilder().WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
 			WithObjects(cluster, database).
 			WithStatusSubresource(&apiv1.Cluster{}, &apiv1.Database{}).
@@ -123,7 +118,10 @@ var _ = Describe("Managed Database status", func() {
 		r = &DatabaseReconciler{
 			Client:   fakeClient,
 			Scheme:   schemeBuilder.BuildWithAllKnownScheme(),
-			instance: &f,
+			instance: pgInstance,
+			getSuperUserDB: func() (*sql.DB, error) {
+				return db, nil
+			},
 		}
 		r.finalizerReconciler = newFinalizerReconciler(
 			fakeClient,
@@ -191,7 +189,10 @@ var _ = Describe("Managed Database status", func() {
 
 	When("reclaim policy is delete", func() {
 		It("on deletion it removes finalizers and drops DB", func(ctx SpecContext) {
-			assertObjectReconciledAfterDeletion(ctx, r, newWrappedDatabase(database), newWrappedDatabase(&apiv1.Database{}), fakeClient,
+			assertObjectReconciledAfterDeletion(ctx, r,
+				newWrappedDatabase(database),
+				newWrappedDatabase(&apiv1.Database{}),
+				fakeClient,
 				func() {
 					// Mocking DetectDB
 					expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
@@ -222,7 +223,10 @@ var _ = Describe("Managed Database status", func() {
 			database.Spec.ReclaimPolicy = apiv1.DatabaseReclaimRetain
 			Expect(fakeClient.Update(ctx, database)).To(Succeed())
 
-			assertObjectReconciledAfterDeletion(ctx, r, newWrappedDatabase(database), newWrappedDatabase(&apiv1.Database{}), fakeClient,
+			assertObjectReconciledAfterDeletion(ctx, r,
+				newWrappedDatabase(database),
+				newWrappedDatabase(&apiv1.Database{}),
+				fakeClient,
 				func() {
 					// Mocking DetectDB
 					expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
@@ -250,15 +254,13 @@ var _ = Describe("Managed Database status", func() {
 			WithPodName("cluster-other-1").
 			WithClusterName("cluster-other")
 
-		f := fakeInstanceData{
-			Instance: pgInstance,
-			db:       db,
-		}
-
 		r = &DatabaseReconciler{
 			Client:   fakeClient,
 			Scheme:   schemeBuilder.BuildWithAllKnownScheme(),
-			instance: &f,
+			instance: pgInstance,
+			getSuperUserDB: func() (*sql.DB, error) {
+				return db, nil
+			},
 		}
 
 		// Updating the Database object to reference the newly created Cluster

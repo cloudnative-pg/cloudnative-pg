@@ -27,16 +27,14 @@ type postgresReconciliationTester struct {
 
 func (pr *postgresReconciliationTester) setPostgresExpectations(
 	postgresExpectations func(),
-) *postgresReconciliationTester {
+) {
 	pr.postgresExpectations = postgresExpectations
-	return pr
 }
 
 func (pr *postgresReconciliationTester) setUpdatedObjectExpectations(
 	updatedObjectExpectations func(newObj client.Object),
-) *postgresReconciliationTester {
+) {
 	pr.updatedObjectExpectations = updatedObjectExpectations
-	return pr
 }
 
 func (pr *postgresReconciliationTester) assert(
