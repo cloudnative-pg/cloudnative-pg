@@ -92,6 +92,8 @@ func (r *data) setPluginProtocol(name string, protocol connection.Protocol) erro
 			WithValues("pluginName", name)
 		ctx = log.IntoContext(ctx, constructorLogger)
 
+		constructorLogger.Trace("Acquired physical plugin connection")
+
 		if handler, err = protocol.Dial(ctx); err != nil {
 			constructorLogger.Error(err, "Got error while connecting to plugin")
 			return nil, err
@@ -101,6 +103,12 @@ func (r *data) setPluginProtocol(name string, protocol connection.Protocol) erro
 	}
 
 	destructor := func(res connection.Interface) {
+		constructorLogger := log.
+			FromContext(context.Background()).
+			WithName("setPluginProtocol").
+			WithValues("pluginName", name)
+		constructorLogger.Trace("Released physical plugin connection")
+
 		err := res.Close()
 		if err != nil {
 			destructorLogger := log.FromContext(context.Background()).

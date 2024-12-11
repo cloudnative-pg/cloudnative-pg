@@ -18,8 +18,10 @@ package client
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	"github.com/cloudnative-pg/machinery/pkg/stringset"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/connection"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
@@ -43,15 +45,45 @@ func (data *data) getPlugin(pluginName string) (connection.Interface, error) {
 }
 
 func (data *data) load(ctx context.Context, names ...string) error {
+	contextLogger := log.FromContext(ctx)
+
+	loadedPlugins := make([]connection.Interface, 0, len(names))
+
+	// Try loading each requested plugin
+	var loadingError error
 	for _, name := range names {
 		pluginData, err := data.repository.GetConnection(ctx, name)
 		if err != nil {
-			return err
+			loadingError = fmt.Errorf("while loading %s: %w", name, err)
+			break
 		}
 
-		data.plugins = append(data.plugins, pluginData)
+		loadedPlugins = append(loadedPlugins, pluginData)
 	}
-	return nil
+
+	// If every requested plugin has been loaded, we're
+	// done.
+	if loadingError == nil {
+		data.plugins = append(data.plugins, loadedPlugins...)
+		return nil
+	}
+
+	// A loading error has been detected. Closing the
+	// connections that were already opened
+	for _, plugin := range loadedPlugins {
+		name := plugin.Name()
+		closingErr := plugin.Close()
+		if closingErr != nil {
+			contextLogger.Info(
+				"Detected error while closing a plugin collection when rolling back plugin loading, skipping",
+				"err", closingErr,
+				"pluginName", name,
+				"loadingError", loadingError,
+				"requestedPlugins", names)
+		}
+	}
+
+	return loadingError
 }
 
 func (data *data) MetadataList() []connection.Metadata {
@@ -83,7 +115,14 @@ func WithPlugins(ctx context.Context, repository repository.Interface, names ...
 	result := &data{
 		repository: repository,
 	}
-	if err := result.load(ctx, names...); err != nil {
+
+	// The following ensures that each plugin is loaded just one
+	// time, even when the same plugin has been requested multiple
+	// times.
+	loadingPlugins := stringset.From(names)
+	uniqueSortedPluginName := loadingPlugins.ToSortedList()
+
+	if err := result.load(ctx, uniqueSortedPluginName...); err != nil {
 		return nil, err
 	}
 

@@ -60,7 +60,10 @@ func (r *data) GetConnection(ctx context.Context, name string) (connection.Inter
 
 		err = resource.Value().Ping(ctx)
 		if err != nil {
-			contextLogger.Debug("Detected plugin connection error, closing the connection and trying again")
+			contextLogger.Info(
+				"Detected stale/broken plugin connection, closing and trying again",
+				"pluginName", name,
+				"err", err)
 			resource.Destroy()
 		} else {
 			break
@@ -71,9 +74,17 @@ func (r *data) GetConnection(ctx context.Context, name string) (connection.Inter
 		return nil, fmt.Errorf("while getting plugin connection: %w", err)
 	}
 
+	contextLogger.Trace(
+		"Acquired logical plugin connection",
+		"name", name,
+	)
 	return &releasingConnection{
 		Interface: resource.Value(),
 		closer: func() error {
+			contextLogger.Trace(
+				"Released logical plugin connection",
+				"name", name,
+			)
 			// When the client has done its job with a plugin connection, it
 			// will be returned to the pool
 			resource.Release()
