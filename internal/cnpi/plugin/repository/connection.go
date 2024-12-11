@@ -26,6 +26,10 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/connection"
 )
 
+// maxConnectionAttempts is the maximum number of connections attempts to a
+// plugin. maxConnectionAttempts should be higher or equal to maxPoolSize
+const maxConnectionAttempts = 5
+
 type releasingConnection struct {
 	connection.Interface
 	closer func() error
@@ -51,7 +55,7 @@ func (r *data) GetConnection(ctx context.Context, name string) (connection.Inter
 	var resource *puddle.Resource[connection.Interface]
 	var err error
 
-	for i := 0; i < maxPoolSize; i++ {
+	for i := 0; i < maxConnectionAttempts; i++ {
 		contextLogger.Trace("try getting connection")
 		resource, err = pool.Acquire(ctx)
 		if err != nil {

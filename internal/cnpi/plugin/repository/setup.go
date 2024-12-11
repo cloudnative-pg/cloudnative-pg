@@ -60,6 +60,8 @@ type data struct {
 	pluginConnectionPool map[string]*puddle.Pool[connection.Interface]
 }
 
+// maxPoolSize is the maximum number of connections in a plugin's connection
+// pool
 const maxPoolSize = 5
 
 func (r *data) setPluginProtocol(name string, protocol connection.Protocol) error {
