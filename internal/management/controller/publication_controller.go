@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"time"
 
@@ -39,6 +40,7 @@ type PublicationReconciler struct {
 
 	instance            *postgres.Instance
 	finalizerReconciler *finalizerReconciler[*apiv1.Publication]
+	getDB               func(name string) (*sql.DB, error)
 }
 
 // publicationReconciliationInterval is the time between the
@@ -153,7 +155,7 @@ func (r *PublicationReconciler) evaluateDropPublication(ctx context.Context, pub
 	if pub.Spec.ReclaimPolicy != apiv1.PublicationReclaimDelete {
 		return nil
 	}
-	db, err := r.instance.ConnectionPool().Connection(pub.Spec.DBName)
+	db, err := r.getDB(pub.Spec.DBName)
 	if err != nil {
 		return fmt.Errorf("while getting DB connection: %w", err)
 	}
@@ -169,6 +171,9 @@ func NewPublicationReconciler(
 	pr := &PublicationReconciler{
 		Client:   mgr.GetClient(),
 		instance: instance,
+		getDB: func(name string) (*sql.DB, error) {
+			return instance.ConnectionPool().Connection(name)
+		},
 	}
 
 	pr.finalizerReconciler = newFinalizerReconciler(

@@ -32,7 +32,7 @@ func (r *SubscriptionReconciler) alignSubscription(
 	obj *apiv1.Subscription,
 	connString string,
 ) error {
-	db, err := r.instance.ConnectionPool().Connection(obj.Spec.DBName)
+	db, err := r.getDB(obj.Spec.DBName)
 	if err != nil {
 		return fmt.Errorf("while getting DB connection: %w", err)
 	}

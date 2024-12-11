@@ -127,11 +127,6 @@ var _ = Describe("Managed subscription controller tests", func() {
 			WithPodName("cluster-example-1").
 			WithClusterName("cluster-example")
 
-		f := fakeInstanceData{
-			Instance: pgInstance,
-			db:       db,
-		}
-
 		fakeClient = fake.NewClientBuilder().WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
 			WithObjects(cluster, subscription).
 			WithStatusSubresource(&apiv1.Cluster{}, &apiv1.Subscription{}).
@@ -140,7 +135,10 @@ var _ = Describe("Managed subscription controller tests", func() {
 		r = &SubscriptionReconciler{
 			Client:   fakeClient,
 			Scheme:   schemeBuilder.BuildWithAllKnownScheme(),
-			instance: &f,
+			instance: pgInstance,
+			getDB: func(_ string) (*sql.DB, error) {
+				return db, nil
+			},
 		}
 		r.finalizerReconciler = newFinalizerReconciler(
 			fakeClient,
@@ -209,7 +207,10 @@ var _ = Describe("Managed subscription controller tests", func() {
 
 	When("reclaim policy is delete", func() {
 		It("on deletion it removes finalizers and drops the subscription", func(ctx SpecContext) {
-			assertObjectReconciledAfterDeletion(ctx, r, newSubscriptionTesterAdapter(subscription), newSubscriptionTesterAdapter(&apiv1.Subscription{}), fakeClient,
+			assertObjectReconciledAfterDeletion(ctx, r,
+				newSubscriptionTesterAdapter(subscription),
+				newSubscriptionTesterAdapter(&apiv1.Subscription{}),
+				fakeClient,
 				func() {
 					// Mocking detection of subscriptions
 					expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
@@ -241,7 +242,10 @@ var _ = Describe("Managed subscription controller tests", func() {
 			subscription.Spec.ReclaimPolicy = apiv1.SubscriptionReclaimRetain
 			Expect(fakeClient.Update(ctx, subscription)).To(Succeed())
 
-			assertObjectReconciledAfterDeletion(ctx, r, newSubscriptionTesterAdapter(subscription), newSubscriptionTesterAdapter(&apiv1.Subscription{}), fakeClient,
+			assertObjectReconciledAfterDeletion(ctx, r,
+				newSubscriptionTesterAdapter(subscription),
+				newSubscriptionTesterAdapter(&apiv1.Subscription{}),
+				fakeClient,
 				func() {
 					// Mocking Detect subscription
 					expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
@@ -270,15 +274,13 @@ var _ = Describe("Managed subscription controller tests", func() {
 			WithPodName("cluster-other-1").
 			WithClusterName("cluster-other")
 
-		f := fakeInstanceData{
-			Instance: pgInstance,
-			db:       db,
-		}
-
 		r = &SubscriptionReconciler{
 			Client:   fakeClient,
 			Scheme:   schemeBuilder.BuildWithAllKnownScheme(),
-			instance: &f,
+			instance: pgInstance,
+			getDB: func(_ string) (*sql.DB, error) {
+				return db, nil
+			},
 		}
 
 		tester.reconcileFunc = r.Reconcile

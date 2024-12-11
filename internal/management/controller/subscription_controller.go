@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"time"
 
@@ -40,6 +41,7 @@ type SubscriptionReconciler struct {
 
 	instance            *postgres.Instance
 	finalizerReconciler *finalizerReconciler[*apiv1.Subscription]
+	getDB               func(name string) (*sql.DB, error)
 }
 
 // subscriptionReconciliationInterval is the time between the
@@ -167,7 +169,7 @@ func (r *SubscriptionReconciler) evaluateDropSubscription(ctx context.Context, s
 		return nil
 	}
 
-	db, err := r.instance.ConnectionPool().Connection(sub.Spec.DBName)
+	db, err := r.getDB(sub.Spec.DBName)
 	if err != nil {
 		return fmt.Errorf("while getting DB connection: %w", err)
 	}
@@ -179,7 +181,13 @@ func NewSubscriptionReconciler(
 	mgr manager.Manager,
 	instance *postgres.Instance,
 ) *SubscriptionReconciler {
-	sr := &SubscriptionReconciler{Client: mgr.GetClient(), instance: instance}
+	sr := &SubscriptionReconciler{
+		Client:   mgr.GetClient(),
+		instance: instance,
+		getDB: func(name string) (*sql.DB, error) {
+			return instance.ConnectionPool().Connection(name)
+		},
+	}
 	sr.finalizerReconciler = newFinalizerReconciler(
 		mgr.GetClient(),
 		utils.SubscriptionFinalizerName,

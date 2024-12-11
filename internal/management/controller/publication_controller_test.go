@@ -115,11 +115,6 @@ var _ = Describe("Managed publication controller tests", func() {
 			WithPodName("cluster-example-1").
 			WithClusterName("cluster-example")
 
-		f := fakeInstanceData{
-			Instance: pgInstance,
-			db:       db,
-		}
-
 		fakeClient = fake.NewClientBuilder().WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
 			WithObjects(cluster, publication).
 			WithStatusSubresource(&apiv1.Cluster{}, &apiv1.Publication{}).
@@ -128,7 +123,10 @@ var _ = Describe("Managed publication controller tests", func() {
 		r = &PublicationReconciler{
 			Client:   fakeClient,
 			Scheme:   schemeBuilder.BuildWithAllKnownScheme(),
-			instance: &f,
+			instance: pgInstance,
+			getDB: func(_ string) (*sql.DB, error) {
+				return db, nil
+			},
 		}
 		r.finalizerReconciler = newFinalizerReconciler(
 			fakeClient,
@@ -193,7 +191,10 @@ var _ = Describe("Managed publication controller tests", func() {
 
 	When("reclaim policy is delete", func() {
 		It("on deletion it removes finalizers and drops the Publication", func(ctx SpecContext) {
-			assertObjectReconciledAfterDeletion(ctx, r, newPublicationTesterAdapter(publication), newPublicationTesterAdapter(&apiv1.Publication{}), fakeClient,
+			assertObjectReconciledAfterDeletion(ctx, r,
+				newPublicationTesterAdapter(publication),
+				newPublicationTesterAdapter(&apiv1.Publication{}),
+				fakeClient,
 				func() {
 					// Mocking Detect publication
 					expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
@@ -223,7 +224,10 @@ var _ = Describe("Managed publication controller tests", func() {
 			publication.Spec.ReclaimPolicy = apiv1.PublicationReclaimRetain
 			Expect(fakeClient.Update(ctx, publication)).To(Succeed())
 
-			assertObjectReconciledAfterDeletion(ctx, r, newPublicationTesterAdapter(publication), newPublicationTesterAdapter(&apiv1.Publication{}), fakeClient,
+			assertObjectReconciledAfterDeletion(ctx, r,
+				newPublicationTesterAdapter(publication),
+				newPublicationTesterAdapter(&apiv1.Publication{}),
+				fakeClient,
 				func() {
 					// Mocking Detect publication
 					expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
@@ -250,15 +254,13 @@ var _ = Describe("Managed publication controller tests", func() {
 			WithPodName("cluster-other-1").
 			WithClusterName("cluster-other")
 
-		f := fakeInstanceData{
-			Instance: pgInstance,
-			db:       db,
-		}
-
 		r = &PublicationReconciler{
 			Client:   fakeClient,
 			Scheme:   schemeBuilder.BuildWithAllKnownScheme(),
 			instance: pgInstance,
+			getDB: func(_ string) (*sql.DB, error) {
+				return db, nil
+			},
 		}
 
 		tester.reconcileFunc = r.Reconcile

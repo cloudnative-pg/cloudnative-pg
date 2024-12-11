@@ -17,27 +17,9 @@ limitations under the License.
 package controller
 
 import (
-	"database/sql"
-
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
-
-// implementation of instanceInterface with fakeable DB
-type fakeInstanceData struct {
-	*postgres.Instance
-	db *sql.DB
-}
-
-func (f *fakeInstanceData) GetSuperUserDB() (*sql.DB, error) {
-	return f.db, nil
-}
-
-func (f *fakeInstanceData) GetNamedDB(_ string) (*sql.DB, error) {
-	return f.db, nil
-}
 
 var _ = Describe("Conversion of PG parameters from map to string of key/value pairs", func() {
 	It("returns expected well-formed list", func() {
