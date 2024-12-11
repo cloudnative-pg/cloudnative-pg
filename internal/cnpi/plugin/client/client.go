@@ -47,43 +47,38 @@ func (data *data) getPlugin(pluginName string) (connection.Interface, error) {
 func (data *data) load(ctx context.Context, names ...string) error {
 	contextLogger := log.FromContext(ctx)
 
-	loadedPlugins := make([]connection.Interface, 0, len(names))
+	closeConns := func(pluginsToClose []connection.Interface) {
+		for _, plugin := range pluginsToClose {
+			name := plugin.Name()
+			closingErr := plugin.Close()
+			if closingErr != nil {
+				contextLogger.Info(
+					"Detected error while closing a plugin collection when rolling back plugin loading, skipping",
+					"err", closingErr,
+					"pluginName", name,
+					"requestedPlugins", names)
+			}
+		}
 
+	}
+
+	loadedPlugins := make([]connection.Interface, 0, len(names))
 	// Try loading each requested plugin
-	var loadingError error
 	for _, name := range names {
 		pluginData, err := data.repository.GetConnection(ctx, name)
 		if err != nil {
-			loadingError = fmt.Errorf("while loading %s: %w", name, err)
-			break
+			// A loading error has been detected. Closing the
+			// connections that were already opened
+			closeConns(loadedPlugins)
+			return fmt.Errorf("while loading %s: %w", name, err)
 		}
 
 		loadedPlugins = append(loadedPlugins, pluginData)
 	}
 
-	// If every requested plugin has been loaded, we're
-	// done.
-	if loadingError == nil {
-		data.plugins = append(data.plugins, loadedPlugins...)
-		return nil
-	}
+	data.plugins = append(data.plugins, loadedPlugins...)
 
-	// A loading error has been detected. Closing the
-	// connections that were already opened
-	for _, plugin := range loadedPlugins {
-		name := plugin.Name()
-		closingErr := plugin.Close()
-		if closingErr != nil {
-			contextLogger.Info(
-				"Detected error while closing a plugin collection when rolling back plugin loading, skipping",
-				"err", closingErr,
-				"pluginName", name,
-				"loadingError", loadingError,
-				"requestedPlugins", names)
-		}
-	}
-
-	return loadingError
+	return nil
 }
 
 func (data *data) MetadataList() []connection.Metadata {
