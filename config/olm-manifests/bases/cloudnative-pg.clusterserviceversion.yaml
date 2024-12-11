@@ -897,10 +897,10 @@ spec:
       statusDescriptors:
       - path: applied
         displayName: Applied
-        description: Database applied
+        description: Applied is true if the database was reconciled correctly
       - path: message
         displayName: Message
-        description: Database message from the last reconciliation loop
+        description: Message is the reconciliation output message
     - kind: Publication
       name: publications.postgresql.cnpg.io
       displayName: Postgres Publication
@@ -929,10 +929,10 @@ spec:
       statusDescriptors:
       - path: applied
         displayName: Applied
-        description: Publication applied
+        description: Applied is true if the publication was reconciled correctly
       - path: message
         displayName: Message
-        description: Publication message from the last reconciliation loop
+        description: Message is the reconciliation output message
     - kind: Subscription
       name: subscriptions.postgresql.cnpg.io
       displayName: Postgres Subscription
@@ -967,7 +967,7 @@ spec:
       statusDescriptors:
       - path: applied
         displayName: Applied
-        description: Subscription applied
+        description: Applied is true if the subscription was reconciled correctly
       - path: message
         displayName: Message
-        description: Subscription message from the last reconciliation loop
+        description: Message is the reconciliation output message
