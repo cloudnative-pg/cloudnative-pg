@@ -64,7 +64,7 @@ func (r *data) GetConnection(ctx context.Context, name string) (connection.Inter
 
 		err = resource.Value().Ping(ctx)
 		if err != nil {
-			contextLogger.Info(
+			contextLogger.Warning(
 				"Detected stale/broken plugin connection, closing and trying again",
 				"pluginName", name,
 				"err", err)

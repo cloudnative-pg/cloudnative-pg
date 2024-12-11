@@ -43,18 +43,6 @@ func (data *data) getPlugin(pluginName string) (connection.Interface, error) {
 	return nil, ErrPluginNotLoaded
 }
 
-func (data *data) load(ctx context.Context, names ...string) error {
-	for _, name := range names {
-		pluginData, err := data.repository.GetConnection(ctx, name)
-		if err != nil {
-			return err
-		}
-
-		data.plugins = append(data.plugins, pluginData)
-	}
-	return nil
-}
-
 func (data *data) MetadataList() []connection.Metadata {
 	result := make([]connection.Metadata, len(data.plugins))
 	for i := range data.plugins {
@@ -85,13 +73,25 @@ func WithPlugins(ctx context.Context, repository repository.Interface, names ...
 		repository: repository,
 	}
 
+	load := func(names ...string) error {
+		for _, name := range names {
+			pluginData, err := result.repository.GetConnection(ctx, name)
+			if err != nil {
+				return err
+			}
+
+			result.plugins = append(result.plugins, pluginData)
+		}
+		return nil
+	}
+
 	// The following ensures that each plugin is loaded just one
 	// time, even when the same plugin has been requested multiple
 	// times.
 	loadingPlugins := stringset.From(names)
 	uniqueSortedPluginName := loadingPlugins.ToSortedList()
 
-	if err := result.load(ctx, uniqueSortedPluginName...); err != nil {
+	if err := load(uniqueSortedPluginName...); err != nil {
 		result.Close(ctx)
 		return nil, err
 	}
