@@ -12,35 +12,38 @@ import (
 )
 
 type postgresObjectManager interface {
-	client.Object
+	GetStatusApplied() *bool
 	GetStatusMessage() string
+	SetObservedGeneration(gen int64)
+	GetClientObject() client.Object
 }
 
-type postgresReconciliationTester[T postgresObjectManager] struct {
+type postgresReconciliationTester struct {
 	cli                       client.Client
 	reconcileFunc             func(ctx context.Context, req ctrl.Request) (ctrl.Result, error)
 	postgresExpectations      func()
-	updatedObjectExpectations func(newObj T)
+	updatedObjectExpectations func(newObj client.Object)
 }
 
-func (pr *postgresReconciliationTester[T]) setPostgresExpectations(
+func (pr *postgresReconciliationTester) setPostgresExpectations(
 	postgresExpectations func(),
-) *postgresReconciliationTester[T] {
+) *postgresReconciliationTester {
 	pr.postgresExpectations = postgresExpectations
 	return pr
 }
 
-func (pr *postgresReconciliationTester[T]) setUpdatedObjectExpectations(
-	updatedObjectExpectations func(newObj T),
-) *postgresReconciliationTester[T] {
+func (pr *postgresReconciliationTester) setUpdatedObjectExpectations(
+	updatedObjectExpectations func(newObj client.Object),
+) *postgresReconciliationTester {
 	pr.updatedObjectExpectations = updatedObjectExpectations
 	return pr
 }
 
-func (pr *postgresReconciliationTester[T]) assert(
+func (pr *postgresReconciliationTester) assert(
 	ctx context.Context,
-	obj T,
+	wrapper postgresObjectManager,
 ) {
+	obj := wrapper.GetClientObject()
 	g.Expect(obj.GetFinalizers()).To(g.BeEmpty())
 
 	if pr.postgresExpectations != nil {
@@ -54,7 +57,7 @@ func (pr *postgresReconciliationTester[T]) assert(
 	}})
 	g.Expect(err).ToNot(g.HaveOccurred())
 
-	newObj := obj.DeepCopyObject().(T)
+	newObj := obj.DeepCopyObject().(client.Object)
 	err = pr.cli.Get(ctx, client.ObjectKey{
 		Namespace: obj.GetNamespace(),
 		Name:      obj.GetName(),
@@ -75,14 +78,15 @@ func (pr *postgresReconciliationTester[T]) assert(
 // NOTE: in the `newObj` argument, simply pass an empty struct of the type T
 // you are testing (e.g. &apiv1.Database{}), as this will be populated in the
 // kubernetes Get() calls
-func assertObjectReconciledAfterDeletion[T postgresObjectManager](
+func assertObjectReconciledAfterDeletion(
 	ctx context.Context,
 	r reconcile.Reconciler,
-	obj T,
-	newObj T,
+	wrapper postgresObjectManager,
+	newWrapper postgresObjectManager,
 	fakeClient client.Client,
 	postgresExpectations func(),
 ) {
+	obj := wrapper.GetClientObject()
 	g.Expect(obj.GetFinalizers()).To(g.BeEmpty())
 
 	postgresExpectations()
@@ -94,6 +98,7 @@ func assertObjectReconciledAfterDeletion[T postgresObjectManager](
 	}})
 	g.Expect(err).ToNot(g.HaveOccurred())
 
+	newObj := newWrapper.GetClientObject()
 	err = fakeClient.Get(ctx, client.ObjectKey{
 		Namespace: obj.GetNamespace(),
 		Name:      obj.GetName(),
@@ -101,15 +106,15 @@ func assertObjectReconciledAfterDeletion[T postgresObjectManager](
 	g.Expect(err).ToNot(g.HaveOccurred())
 
 	// plain successful reconciliation, finalizers have been created
-	g.Expect(newObj.GetStatusApplied()).Should(g.HaveValue(g.BeTrue()))
-	g.Expect(newObj.GetStatusMessage()).Should(g.BeEmpty())
+	g.Expect(newWrapper.GetStatusApplied()).Should(g.HaveValue(g.BeTrue()))
+	g.Expect(newWrapper.GetStatusMessage()).Should(g.BeEmpty())
 	g.Expect(newObj.GetFinalizers()).NotTo(g.BeEmpty())
 
 	// the next 2 lines are a hacky bit to make sure the next reconciler
 	// call doesn't skip on account of Generation == ObservedGeneration.
 	// See fake.Client known issues with `Generation`
 	// https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/client/fake@v0.19.0#NewClientBuilder
-	newObj.SetObservedGeneration(2)
+	newWrapper.SetObservedGeneration(2)
 	g.Expect(fakeClient.Status().Update(ctx, newObj)).To(g.Succeed())
 
 	// We now look at the behavior when we delete the Database object
