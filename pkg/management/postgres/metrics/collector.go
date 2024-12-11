@@ -120,7 +120,7 @@ func (q *QueriesCollector) collectUserQueries(ch chan<- prometheus.Metric) error
 
 		allTargetDatabases := q.expandTargetDatabases(targetDatabases, allAccessibleDatabasesCache)
 		for targetDatabase := range allTargetDatabases {
-			conn, err := q.instance.GetNamedDB(targetDatabase)
+			conn, err := q.instance.ConnectionPool().Connection(targetDatabase)
 			if err != nil {
 				q.reportUserQueryErrorMetric(name + ": " + err.Error())
 				continue
@@ -207,7 +207,7 @@ func (q QueriesCollector) expandTargetDatabases(
 }
 
 func (q QueriesCollector) getAllAccessibleDatabases() ([]string, error) {
-	conn, err := q.instance.GetNamedDB(q.defaultDBName)
+	conn, err := q.instance.ConnectionPool().Connection(q.defaultDBName)
 	if err != nil {
 		return nil, fmt.Errorf("while connecting to expand target_database *: %w", err)
 	}
