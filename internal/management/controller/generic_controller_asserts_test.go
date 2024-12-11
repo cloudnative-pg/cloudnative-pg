@@ -3,12 +3,13 @@ package controller
 import (
 	"context"
 
-	g "github.com/onsi/gomega"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	. "github.com/onsi/gomega"
 )
 
 type postgresObjectManager interface {
@@ -42,7 +43,7 @@ func (pr *postgresReconciliationTester) assert(
 	wrapper postgresObjectManager,
 ) {
 	obj := wrapper.GetClientObject()
-	g.Expect(obj.GetFinalizers()).To(g.BeEmpty())
+	Expect(obj.GetFinalizers()).To(BeEmpty())
 
 	if pr.postgresExpectations != nil {
 		pr.postgresExpectations()
@@ -53,14 +54,14 @@ func (pr *postgresReconciliationTester) assert(
 		Namespace: obj.GetNamespace(),
 		Name:      obj.GetName(),
 	}})
-	g.Expect(err).ToNot(g.HaveOccurred())
+	Expect(err).ToNot(HaveOccurred())
 
 	newObj := obj.DeepCopyObject().(client.Object)
 	err = pr.cli.Get(ctx, client.ObjectKey{
 		Namespace: obj.GetNamespace(),
 		Name:      obj.GetName(),
 	}, newObj)
-	g.Expect(err).ToNot(g.HaveOccurred())
+	Expect(err).ToNot(HaveOccurred())
 
 	if pr.updatedObjectExpectations != nil {
 		pr.updatedObjectExpectations(newObj)
@@ -85,7 +86,7 @@ func assertObjectReconciledAfterDeletion(
 	postgresExpectations func(),
 ) {
 	obj := wrapper.GetClientObject()
-	g.Expect(obj.GetFinalizers()).To(g.BeEmpty())
+	Expect(obj.GetFinalizers()).To(BeEmpty())
 
 	postgresExpectations()
 
@@ -94,29 +95,29 @@ func assertObjectReconciledAfterDeletion(
 		Namespace: obj.GetNamespace(),
 		Name:      obj.GetName(),
 	}})
-	g.Expect(err).ToNot(g.HaveOccurred())
+	Expect(err).ToNot(HaveOccurred())
 
 	newObj := newWrapper.GetClientObject()
 	err = fakeClient.Get(ctx, client.ObjectKey{
 		Namespace: obj.GetNamespace(),
 		Name:      obj.GetName(),
 	}, newObj)
-	g.Expect(err).ToNot(g.HaveOccurred())
+	Expect(err).ToNot(HaveOccurred())
 
 	// plain successful reconciliation, finalizers have been created
-	g.Expect(newWrapper.GetStatusApplied()).Should(g.HaveValue(g.BeTrue()))
-	g.Expect(newWrapper.GetStatusMessage()).Should(g.BeEmpty())
-	g.Expect(newObj.GetFinalizers()).NotTo(g.BeEmpty())
+	Expect(newWrapper.GetStatusApplied()).Should(HaveValue(BeTrue()))
+	Expect(newWrapper.GetStatusMessage()).Should(BeEmpty())
+	Expect(newObj.GetFinalizers()).NotTo(BeEmpty())
 
 	// the next 2 lines are a hacky bit to make sure the next reconciler
 	// call doesn't skip on account of Generation == ObservedGeneration.
 	// See fake.Client known issues with `Generation`
 	// https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/client/fake@v0.19.0#NewClientBuilder
 	newWrapper.SetObservedGeneration(2)
-	g.Expect(fakeClient.Status().Update(ctx, newObj)).To(g.Succeed())
+	Expect(fakeClient.Status().Update(ctx, newObj)).To(Succeed())
 
 	// We now look at the behavior when we delete the Database object
-	g.Expect(fakeClient.Delete(ctx, obj)).To(g.Succeed())
+	Expect(fakeClient.Delete(ctx, obj)).To(Succeed())
 
 	// the Database object is Deleted, but its finalizer prevents removal from
 	// the API
@@ -124,16 +125,16 @@ func assertObjectReconciledAfterDeletion(
 		Namespace: obj.GetNamespace(),
 		Name:      obj.GetName(),
 	}, newObj)
-	g.Expect(err).ToNot(g.HaveOccurred())
-	g.Expect(newObj.GetDeletionTimestamp()).NotTo(g.BeZero())
-	g.Expect(newObj.GetFinalizers()).NotTo(g.BeEmpty())
+	Expect(err).ToNot(HaveOccurred())
+	Expect(newObj.GetDeletionTimestamp()).NotTo(BeZero())
+	Expect(newObj.GetFinalizers()).NotTo(BeEmpty())
 
 	// Reconcile and get the updated object
 	_, err = r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{
 		Namespace: obj.GetNamespace(),
 		Name:      obj.GetName(),
 	}})
-	g.Expect(err).ToNot(g.HaveOccurred())
+	Expect(err).ToNot(HaveOccurred())
 
 	err = fakeClient.Get(ctx, client.ObjectKey{
 		Namespace: obj.GetNamespace(),
@@ -141,6 +142,6 @@ func assertObjectReconciledAfterDeletion(
 	}, newObj)
 
 	// verify object has been deleted
-	g.Expect(err).To(g.HaveOccurred())
-	g.Expect(apierrors.IsNotFound(err)).To(g.BeTrue())
+	Expect(err).To(HaveOccurred())
+	Expect(apierrors.IsNotFound(err)).To(BeTrue())
 }
