@@ -159,7 +159,7 @@ CloudNativePG supports
 [management of PostgreSQL roles, users, and groups through declarative configuration](declarative_role_management.md)
 using the `.spec.managed.roles` stanza.
 
-### Pod security policies
+### Pod security standards
 
 For InfoSec requirements, the operator doesn't require privileged mode for
 any container. It enforces a read-only root filesystem to guarantee containers
