@@ -72,7 +72,7 @@ var _ = Describe("Managed Database status", func() {
 		r          *DatabaseReconciler
 		fakeClient client.Client
 		err        error
-		tester     postgresReconciliationTester
+		tester     postgresReconciliationTester[*apiv1.Database]
 	)
 
 	BeforeEach(func() {
@@ -129,7 +129,7 @@ var _ = Describe("Managed Database status", func() {
 			r.evaluateDropDatabase,
 		)
 
-		tester = postgresReconciliationTester{
+		tester = postgresReconciliationTester[*apiv1.Database]{
 			cli:           fakeClient,
 			reconcileFunc: r.Reconcile,
 		}
@@ -154,11 +154,10 @@ var _ = Describe("Managed Database status", func() {
 			dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
 		})
 
-		tester.setUpdatedObjectExpectations(func(obj client.Object) {
-			updatedDatabase := obj.(*apiv1.Database)
-			Expect(updatedDatabase.Status.Applied).Should(HaveValue(BeTrue()))
-			Expect(updatedDatabase.GetStatusMessage()).Should(BeEmpty())
-			Expect(updatedDatabase.GetFinalizers()).NotTo(BeEmpty())
+		tester.setUpdatedObjectExpectations(func(obj *apiv1.Database) {
+			Expect(obj.Status.Applied).Should(HaveValue(BeTrue()))
+			Expect(obj.GetStatusMessage()).Should(BeEmpty())
+			Expect(obj.GetFinalizers()).NotTo(BeEmpty())
 		})
 
 		tester.assert(ctx, newDatabaseTesterAdapter(database))
@@ -178,10 +177,9 @@ var _ = Describe("Managed Database status", func() {
 			dbMock.ExpectExec(expectedQuery).WillReturnError(expectedError)
 		})
 
-		tester.setUpdatedObjectExpectations(func(obj client.Object) {
-			updatedDatabase := obj.(*apiv1.Database)
-			Expect(updatedDatabase.Status.Applied).Should(HaveValue(BeFalse()))
-			Expect(updatedDatabase.GetStatusMessage()).Should(ContainSubstring(expectedError.Error()))
+		tester.setUpdatedObjectExpectations(func(obj *apiv1.Database) {
+			Expect(obj.Status.Applied).Should(HaveValue(BeFalse()))
+			Expect(obj.GetStatusMessage()).Should(ContainSubstring(expectedError.Error()))
 		})
 
 		tester.assert(ctx, newDatabaseTesterAdapter(database))
@@ -210,15 +208,14 @@ var _ = Describe("Managed Database status", func() {
 				)
 				dbMock.ExpectExec(expectedDrop).WillReturnResult(sqlmock.NewResult(0, 1))
 			})
-			tester.setUpdatedObjectExpectations(func(obj client.Object) {
-				updatedDatabase := obj.(*apiv1.Database)
+			tester.setUpdatedObjectExpectations(func(obj *apiv1.Database) {
 				// Plain successful reconciliation, finalizers have been created
 				Expect(obj.GetFinalizers()).NotTo(BeEmpty())
-				Expect(updatedDatabase.Status.Applied).Should(HaveValue(BeTrue()))
-				Expect(updatedDatabase.Status.Message).Should(BeEmpty())
+				Expect(obj.Status.Applied).Should(HaveValue(BeTrue()))
+				Expect(obj.Status.Message).Should(BeEmpty())
 			})
 			tester.reconcile()
-			tester.setObjectMutator(func(obj client.Object) {
+			tester.setObjectMutator(func(obj *apiv1.Database) {
 				// The next 2 lines are a hacky bit to make sure the next reconciler
 				// call doesn't skip on account of Generation == ObservedGeneration.
 				// See fake.Client known issues with `Generation`
@@ -255,15 +252,14 @@ var _ = Describe("Managed Database status", func() {
 				)
 				dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
 			})
-			tester.setUpdatedObjectExpectations(func(obj client.Object) {
-				updatedDatabase := obj.(*apiv1.Database)
+			tester.setUpdatedObjectExpectations(func(obj *apiv1.Database) {
 				// Plain successful reconciliation, finalizers have been created
 				Expect(obj.GetFinalizers()).NotTo(BeEmpty())
-				Expect(updatedDatabase.Status.Applied).Should(HaveValue(BeTrue()))
-				Expect(updatedDatabase.Status.Message).Should(BeEmpty())
+				Expect(obj.Status.Applied).Should(HaveValue(BeTrue()))
+				Expect(obj.Status.Message).Should(BeEmpty())
 			})
 			tester.reconcile()
-			tester.setObjectMutator(func(obj client.Object) {
+			tester.setObjectMutator(func(obj *apiv1.Database) {
 				// The next 2 lines are a hacky bit to make sure the next reconciler
 				// call doesn't skip on account of Generation == ObservedGeneration.
 				// See fake.Client known issues with `Generation`
@@ -302,10 +298,9 @@ var _ = Describe("Managed Database status", func() {
 		Expect(fakeClient.Update(ctx, database)).To(Succeed())
 
 		tester.reconcileFunc = r.Reconcile
-		tester.setUpdatedObjectExpectations(func(obj client.Object) {
-			updatedDatabase := obj.(*apiv1.Database)
-			Expect(updatedDatabase.Status.Applied).Should(HaveValue(BeFalse()))
-			Expect(updatedDatabase.Status.Message).Should(ContainSubstring(
+		tester.setUpdatedObjectExpectations(func(obj *apiv1.Database) {
+			Expect(obj.Status.Applied).Should(HaveValue(BeFalse()))
+			Expect(obj.Status.Message).Should(ContainSubstring(
 				fmt.Sprintf("%q not found", database.Spec.ClusterRef.Name)))
 		})
 		tester.assert(ctx, newDatabaseTesterAdapter(database))
@@ -353,11 +348,10 @@ var _ = Describe("Managed Database status", func() {
 			dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedValue)
 		})
 
-		tester.setUpdatedObjectExpectations(func(obj client.Object) {
-			updatedDatabase := obj.(*apiv1.Database)
-			Expect(updatedDatabase.Status.Applied).To(HaveValue(BeTrue()))
-			Expect(updatedDatabase.Status.Message).To(BeEmpty())
-			Expect(updatedDatabase.Status.ObservedGeneration).To(BeEquivalentTo(1))
+		tester.setUpdatedObjectExpectations(func(obj *apiv1.Database) {
+			Expect(obj.Status.Applied).To(HaveValue(BeTrue()))
+			Expect(obj.Status.Message).To(BeEmpty())
+			Expect(obj.Status.ObservedGeneration).To(BeEquivalentTo(1))
 		})
 		tester.assert(ctx, newDatabaseTesterAdapter(database))
 	})
@@ -386,13 +380,12 @@ var _ = Describe("Managed Database status", func() {
 		// Expect(fakeClient.Create(ctx, currentManager)).To(Succeed())
 		Expect(fakeClient.Create(ctx, dbDuplicate)).To(Succeed())
 
-		tester.setUpdatedObjectExpectations(func(obj client.Object) {
-			updatedDatabase := obj.(*apiv1.Database)
+		tester.setUpdatedObjectExpectations(func(obj *apiv1.Database) {
 			expectedError := fmt.Sprintf("%q is already managed by object %q",
 				dbDuplicate.Spec.Name, database.Name)
-			Expect(updatedDatabase.Status.Applied).To(HaveValue(BeFalse()))
-			Expect(updatedDatabase.Status.Message).To(ContainSubstring(expectedError))
-			Expect(updatedDatabase.Status.ObservedGeneration).To(BeZero())
+			Expect(obj.Status.Applied).To(HaveValue(BeFalse()))
+			Expect(obj.Status.Message).To(ContainSubstring(expectedError))
+			Expect(obj.Status.ObservedGeneration).To(BeZero())
 		})
 
 		tester.assert(ctx, newDatabaseTesterAdapter(dbDuplicate))
@@ -405,10 +398,9 @@ var _ = Describe("Managed Database status", func() {
 		}
 		Expect(fakeClient.Patch(ctx, cluster, client.MergeFrom(initialCluster))).To(Succeed())
 
-		tester.setUpdatedObjectExpectations(func(obj client.Object) {
-			updatedDatabase := obj.(*apiv1.Database)
-			Expect(updatedDatabase.Status.Applied).Should(BeNil())
-			Expect(updatedDatabase.Status.Message).Should(ContainSubstring("waiting for the cluster to become primary"))
+		tester.setUpdatedObjectExpectations(func(obj *apiv1.Database) {
+			Expect(obj.Status.Applied).Should(BeNil())
+			Expect(obj.Status.Message).Should(ContainSubstring("waiting for the cluster to become primary"))
 		})
 		tester.assert(ctx, newDatabaseTesterAdapter(database))
 	})

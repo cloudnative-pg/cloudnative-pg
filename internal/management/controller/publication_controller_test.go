@@ -72,7 +72,7 @@ var _ = Describe("Managed publication controller tests", func() {
 		r           *PublicationReconciler
 		fakeClient  client.Client
 		err         error
-		tester      postgresReconciliationTester
+		tester      postgresReconciliationTester[*apiv1.Publication]
 	)
 
 	BeforeEach(func() {
@@ -133,7 +133,7 @@ var _ = Describe("Managed publication controller tests", func() {
 			utils.PublicationFinalizerName,
 			r.evaluateDropPublication,
 		)
-		tester = postgresReconciliationTester{
+		tester = postgresReconciliationTester[*apiv1.Publication]{
 			reconcileFunc: r.Reconcile,
 			cli:           fakeClient,
 		}
@@ -157,11 +157,10 @@ var _ = Describe("Managed publication controller tests", func() {
 			dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
 		})
 
-		tester.setUpdatedObjectExpectations(func(obj client.Object) {
-			updatedPublication := obj.(*apiv1.Publication)
-			Expect(updatedPublication.Status.Applied).Should(HaveValue(BeTrue()))
-			Expect(updatedPublication.GetStatusMessage()).Should(BeEmpty())
-			Expect(updatedPublication.GetFinalizers()).NotTo(BeEmpty())
+		tester.setUpdatedObjectExpectations(func(obj *apiv1.Publication) {
+			Expect(obj.Status.Applied).Should(HaveValue(BeTrue()))
+			Expect(obj.GetStatusMessage()).Should(BeEmpty())
+			Expect(obj.GetFinalizers()).NotTo(BeEmpty())
 		})
 
 		tester.assert(ctx, newPublicationTesterAdapter(publication))
@@ -180,10 +179,9 @@ var _ = Describe("Managed publication controller tests", func() {
 			dbMock.ExpectExec(expectedQuery).WillReturnError(expectedError)
 		})
 
-		tester.setUpdatedObjectExpectations(func(obj client.Object) {
-			updatedPublication := obj.(*apiv1.Publication)
-			Expect(updatedPublication.Status.Applied).Should(HaveValue(BeFalse()))
-			Expect(updatedPublication.Status.Message).Should(ContainSubstring(expectedError.Error()))
+		tester.setUpdatedObjectExpectations(func(obj *apiv1.Publication) {
+			Expect(obj.Status.Applied).Should(HaveValue(BeFalse()))
+			Expect(obj.Status.Message).Should(ContainSubstring(expectedError.Error()))
 		})
 
 		tester.assert(ctx, newPublicationTesterAdapter(publication))
@@ -211,15 +209,14 @@ var _ = Describe("Managed publication controller tests", func() {
 				)
 				dbMock.ExpectExec(expectedDrop).WillReturnResult(sqlmock.NewResult(0, 1))
 			})
-			tester.setUpdatedObjectExpectations(func(obj client.Object) {
-				updatedPublication := obj.(*apiv1.Publication)
+			tester.setUpdatedObjectExpectations(func(obj *apiv1.Publication) {
 				// Plain successful reconciliation, finalizers have been created
 				Expect(obj.GetFinalizers()).NotTo(BeEmpty())
-				Expect(updatedPublication.Status.Applied).Should(HaveValue(BeTrue()))
-				Expect(updatedPublication.Status.Message).Should(BeEmpty())
+				Expect(obj.Status.Applied).Should(HaveValue(BeTrue()))
+				Expect(obj.Status.Message).Should(BeEmpty())
 			})
 			tester.reconcile()
-			tester.setObjectMutator(func(obj client.Object) {
+			tester.setObjectMutator(func(obj *apiv1.Publication) {
 				// The next 2 lines are a hacky bit to make sure the next reconciler
 				// call doesn't skip on account of Generation == ObservedGeneration.
 				// See fake.Client known issues with `Generation`
@@ -255,15 +252,14 @@ var _ = Describe("Managed publication controller tests", func() {
 				)
 				dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
 			})
-			tester.setUpdatedObjectExpectations(func(obj client.Object) {
-				updatedPublication := obj.(*apiv1.Publication)
+			tester.setUpdatedObjectExpectations(func(obj *apiv1.Publication) {
 				// Plain successful reconciliation, finalizers have been created
 				Expect(obj.GetFinalizers()).NotTo(BeEmpty())
-				Expect(updatedPublication.Status.Applied).Should(HaveValue(BeTrue()))
-				Expect(updatedPublication.Status.Message).Should(BeEmpty())
+				Expect(obj.Status.Applied).Should(HaveValue(BeTrue()))
+				Expect(obj.Status.Message).Should(BeEmpty())
 			})
 			tester.reconcile()
-			tester.setObjectMutator(func(obj client.Object) {
+			tester.setObjectMutator(func(obj *apiv1.Publication) {
 				// The next 2 lines are a hacky bit to make sure the next reconciler
 				// call doesn't skip on account of Generation == ObservedGeneration.
 				// See fake.Client known issues with `Generation`
@@ -303,10 +299,9 @@ var _ = Describe("Managed publication controller tests", func() {
 		publication.Spec.ClusterRef.Name = "cluster-other"
 		Expect(fakeClient.Update(ctx, publication)).To(Succeed())
 
-		tester.setUpdatedObjectExpectations(func(obj client.Object) {
-			updatedPublication := obj.(*apiv1.Publication)
-			Expect(updatedPublication.Status.Applied).Should(HaveValue(BeFalse()))
-			Expect(updatedPublication.GetStatusMessage()).Should(ContainSubstring(
+		tester.setUpdatedObjectExpectations(func(obj *apiv1.Publication) {
+			Expect(obj.Status.Applied).Should(HaveValue(BeFalse()))
+			Expect(obj.GetStatusMessage()).Should(ContainSubstring(
 				fmt.Sprintf("%q not found", publication.Spec.ClusterRef.Name)))
 		})
 
@@ -363,13 +358,12 @@ var _ = Describe("Managed publication controller tests", func() {
 		// Expect(fakeClient.Create(ctx, currentManager)).To(Succeed())
 		Expect(fakeClient.Create(ctx, pubDuplicate)).To(Succeed())
 
-		tester.setUpdatedObjectExpectations(func(obj client.Object) {
-			updatedPublication := obj.(*apiv1.Publication)
+		tester.setUpdatedObjectExpectations(func(obj *apiv1.Publication) {
 			expectedError := fmt.Sprintf("%q is already managed by object %q",
 				pubDuplicate.Spec.Name, publication.Name)
-			Expect(updatedPublication.Status.Applied).To(HaveValue(BeFalse()))
-			Expect(updatedPublication.Status.Message).To(ContainSubstring(expectedError))
-			Expect(updatedPublication.Status.ObservedGeneration).To(BeZero())
+			Expect(obj.Status.Applied).To(HaveValue(BeFalse()))
+			Expect(obj.Status.Message).To(ContainSubstring(expectedError))
+			Expect(obj.Status.ObservedGeneration).To(BeZero())
 		})
 
 		tester.assert(ctx, newPublicationTesterAdapter(pubDuplicate))
@@ -382,10 +376,9 @@ var _ = Describe("Managed publication controller tests", func() {
 		}
 		Expect(fakeClient.Patch(ctx, cluster, client.MergeFrom(initialCluster))).To(Succeed())
 
-		tester.setUpdatedObjectExpectations(func(obj client.Object) {
-			updatedPublication := obj.(*apiv1.Publication)
-			Expect(updatedPublication.Status.Applied).Should(BeNil())
-			Expect(updatedPublication.Status.Message).Should(ContainSubstring("waiting for the cluster to become primary"))
+		tester.setUpdatedObjectExpectations(func(obj *apiv1.Publication) {
+			Expect(obj.Status.Applied).Should(BeNil())
+			Expect(obj.Status.Message).Should(ContainSubstring("waiting for the cluster to become primary"))
 		})
 
 		tester.assert(ctx, newPublicationTesterAdapter(publication))

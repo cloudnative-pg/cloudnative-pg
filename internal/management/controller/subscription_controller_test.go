@@ -74,7 +74,7 @@ var _ = Describe("Managed subscription controller tests", func() {
 		fakeClient   client.Client
 		connString   string
 		err          error
-		tester       postgresReconciliationTester
+		tester       postgresReconciliationTester[*apiv1.Subscription]
 	)
 
 	BeforeEach(func() {
@@ -146,7 +146,7 @@ var _ = Describe("Managed subscription controller tests", func() {
 			r.evaluateDropSubscription,
 		)
 
-		tester = postgresReconciliationTester{
+		tester = postgresReconciliationTester[*apiv1.Subscription]{
 			reconcileFunc: r.Reconcile,
 			cli:           fakeClient,
 		}
@@ -172,11 +172,10 @@ var _ = Describe("Managed subscription controller tests", func() {
 			dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
 		})
 
-		tester.setUpdatedObjectExpectations(func(obj client.Object) {
-			updatedSubscription := obj.(*apiv1.Subscription)
-			Expect(updatedSubscription.Status.Applied).Should(HaveValue(BeTrue()))
-			Expect(updatedSubscription.GetStatusMessage()).Should(BeEmpty())
-			Expect(updatedSubscription.GetFinalizers()).NotTo(BeEmpty())
+		tester.setUpdatedObjectExpectations(func(obj *apiv1.Subscription) {
+			Expect(obj.Status.Applied).Should(HaveValue(BeTrue()))
+			Expect(obj.GetStatusMessage()).Should(BeEmpty())
+			Expect(obj.GetFinalizers()).NotTo(BeEmpty())
 		})
 
 		tester.assert(ctx, newSubscriptionTesterAdapter(subscription))
@@ -196,10 +195,9 @@ var _ = Describe("Managed subscription controller tests", func() {
 			dbMock.ExpectExec(expectedQuery).WillReturnError(expectedError)
 		})
 
-		tester.setUpdatedObjectExpectations(func(obj client.Object) {
-			updatedSubscription := obj.(*apiv1.Subscription)
-			Expect(updatedSubscription.Status.Applied).Should(HaveValue(BeFalse()))
-			Expect(updatedSubscription.Status.Message).Should(ContainSubstring(expectedError.Error()))
+		tester.setUpdatedObjectExpectations(func(obj *apiv1.Subscription) {
+			Expect(obj.Status.Applied).Should(HaveValue(BeFalse()))
+			Expect(obj.Status.Message).Should(ContainSubstring(expectedError.Error()))
 		})
 
 		tester.assert(ctx, newSubscriptionTesterAdapter(subscription))
@@ -229,15 +227,14 @@ var _ = Describe("Managed subscription controller tests", func() {
 				)
 				dbMock.ExpectExec(expectedDrop).WillReturnResult(sqlmock.NewResult(0, 1))
 			})
-			tester.setUpdatedObjectExpectations(func(obj client.Object) {
-				updatedPublication := obj.(*apiv1.Subscription)
+			tester.setUpdatedObjectExpectations(func(obj *apiv1.Subscription) {
 				// Plain successful reconciliation, finalizers have been created
-				Expect(updatedPublication.GetFinalizers()).NotTo(BeEmpty())
-				Expect(updatedPublication.Status.Applied).Should(HaveValue(BeTrue()))
-				Expect(updatedPublication.Status.Message).Should(BeEmpty())
+				Expect(obj.GetFinalizers()).NotTo(BeEmpty())
+				Expect(obj.Status.Applied).Should(HaveValue(BeTrue()))
+				Expect(obj.Status.Message).Should(BeEmpty())
 			})
 			tester.reconcile()
-			tester.setObjectMutator(func(obj client.Object) {
+			tester.setObjectMutator(func(obj *apiv1.Subscription) {
 				// The next 2 lines are a hacky bit to make sure the next reconciler
 				// call doesn't skip on account of Generation == ObservedGeneration.
 				// See fake.Client known issues with `Generation`
@@ -275,15 +272,14 @@ var _ = Describe("Managed subscription controller tests", func() {
 				)
 				dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
 			})
-			tester.setUpdatedObjectExpectations(func(obj client.Object) {
-				updatedPublication := obj.(*apiv1.Subscription)
+			tester.setUpdatedObjectExpectations(func(obj *apiv1.Subscription) {
 				// Plain successful reconciliation, finalizers have been created
 				Expect(obj.GetFinalizers()).NotTo(BeEmpty())
-				Expect(updatedPublication.Status.Applied).Should(HaveValue(BeTrue()))
-				Expect(updatedPublication.Status.Message).Should(BeEmpty())
+				Expect(obj.Status.Applied).Should(HaveValue(BeTrue()))
+				Expect(obj.Status.Message).Should(BeEmpty())
 			})
 			tester.reconcile()
-			tester.setObjectMutator(func(obj client.Object) {
+			tester.setObjectMutator(func(obj *apiv1.Subscription) {
 				// The next 2 lines are a hacky bit to make sure the next reconciler
 				// call doesn't skip on account of Generation == ObservedGeneration.
 				// See fake.Client known issues with `Generation`
@@ -323,10 +319,9 @@ var _ = Describe("Managed subscription controller tests", func() {
 		subscription.Spec.ClusterRef.Name = "cluster-other"
 		Expect(fakeClient.Update(ctx, subscription)).To(Succeed())
 
-		tester.setUpdatedObjectExpectations(func(obj client.Object) {
-			updatedSubscription := obj.(*apiv1.Subscription)
-			Expect(updatedSubscription.Status.Applied).Should(HaveValue(BeFalse()))
-			Expect(updatedSubscription.Status.Message).Should(ContainSubstring(
+		tester.setUpdatedObjectExpectations(func(obj *apiv1.Subscription) {
+			Expect(obj.Status.Applied).Should(HaveValue(BeFalse()))
+			Expect(obj.Status.Message).Should(ContainSubstring(
 				fmt.Sprintf("%q not found", subscription.Spec.ClusterRef.Name)))
 		})
 
@@ -386,12 +381,11 @@ var _ = Describe("Managed subscription controller tests", func() {
 		// Expect(fakeClient.Create(ctx, currentManager)).To(Succeed())
 		Expect(fakeClient.Create(ctx, subDuplicate)).To(Succeed())
 
-		tester.setUpdatedObjectExpectations(func(obj client.Object) {
-			updatedSubscription := obj.(*apiv1.Subscription)
+		tester.setUpdatedObjectExpectations(func(obj *apiv1.Subscription) {
 			expectedError := fmt.Sprintf("%q is already managed by object %q",
 				subDuplicate.Spec.Name, subscription.Name)
-			Expect(updatedSubscription.Status.Applied).Should(HaveValue(BeFalse()))
-			Expect(updatedSubscription.Status.Message).Should(ContainSubstring(expectedError))
+			Expect(obj.Status.Applied).Should(HaveValue(BeFalse()))
+			Expect(obj.Status.Message).Should(ContainSubstring(expectedError))
 		})
 
 		tester.assert(ctx, newSubscriptionTesterAdapter(subDuplicate))
@@ -404,10 +398,9 @@ var _ = Describe("Managed subscription controller tests", func() {
 		}
 		Expect(fakeClient.Patch(ctx, cluster, client.MergeFrom(initialCluster))).To(Succeed())
 
-		tester.setUpdatedObjectExpectations(func(obj client.Object) {
-			updatedSubscription := obj.(*apiv1.Subscription)
-			Expect(updatedSubscription.Status.Applied).Should(BeNil())
-			Expect(updatedSubscription.Status.Message).Should(ContainSubstring("waiting for the cluster to become primary"))
+		tester.setUpdatedObjectExpectations(func(obj *apiv1.Subscription) {
+			Expect(obj.Status.Applied).Should(BeNil())
+			Expect(obj.Status.Message).Should(ContainSubstring("waiting for the cluster to become primary"))
 		})
 
 		tester.assert(ctx, newSubscriptionTesterAdapter(subscription))

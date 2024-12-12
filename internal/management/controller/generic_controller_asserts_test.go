@@ -19,53 +19,53 @@ type postgresObjectManager interface {
 }
 
 type (
-	objectMutatorFunc             func(obj client.Object)
-	postgresExpectationsFunc      func()
-	updatedObjectExpectationsFunc func(newObj client.Object)
-	reconciliation                struct {
-		objectMutator             objectMutatorFunc
+	objectMutatorFunc[T client.Object]             func(obj T)
+	postgresExpectationsFunc                       func()
+	updatedObjectExpectationsFunc[T client.Object] func(newObj T)
+	reconciliation[T client.Object]                struct {
+		objectMutator             objectMutatorFunc[T]
 		postgresExpectations      postgresExpectationsFunc
-		updatedObjectExpectations updatedObjectExpectationsFunc
+		updatedObjectExpectations updatedObjectExpectationsFunc[T]
 		expectMissingObject       bool
 	}
 )
 
-type postgresReconciliationTester struct {
+type postgresReconciliationTester[T client.Object] struct {
 	cli                       client.Client
 	reconcileFunc             func(ctx context.Context, req ctrl.Request) (ctrl.Result, error)
-	objectMutator             objectMutatorFunc
+	objectMutator             objectMutatorFunc[T]
 	postgresExpectations      postgresExpectationsFunc
-	updatedObjectExpectations updatedObjectExpectationsFunc
+	updatedObjectExpectations updatedObjectExpectationsFunc[T]
 	expectMissingObject       bool
-	reconciliations           []reconciliation
+	reconciliations           []reconciliation[T]
 }
 
-func (pr *postgresReconciliationTester) setObjectMutator(objectMutator objectMutatorFunc) {
+func (pr *postgresReconciliationTester[T]) setObjectMutator(objectMutator objectMutatorFunc[T]) {
 	pr.objectMutator = objectMutator
 }
 
-func (pr *postgresReconciliationTester) setPostgresExpectations(
+func (pr *postgresReconciliationTester[T]) setPostgresExpectations(
 	postgresExpectations postgresExpectationsFunc,
 ) {
 	pr.postgresExpectations = postgresExpectations
 }
 
-func (pr *postgresReconciliationTester) setUpdatedObjectExpectations(
-	updatedObjectExpectations updatedObjectExpectationsFunc,
+func (pr *postgresReconciliationTester[T]) setUpdatedObjectExpectations(
+	updatedObjectExpectations updatedObjectExpectationsFunc[T],
 ) {
 	pr.updatedObjectExpectations = updatedObjectExpectations
 }
 
-func (pr *postgresReconciliationTester) setExpectMissingObject() {
+func (pr *postgresReconciliationTester[T]) setExpectMissingObject() {
 	pr.expectMissingObject = true
 }
 
-func (pr *postgresReconciliationTester) reconcile() {
+func (pr *postgresReconciliationTester[T]) reconcile() {
 	if pr.postgresExpectations == nil && pr.updatedObjectExpectations == nil && !pr.expectMissingObject {
 		return
 	}
 
-	pr.reconciliations = append(pr.reconciliations, reconciliation{
+	pr.reconciliations = append(pr.reconciliations, reconciliation[T]{
 		objectMutator:             pr.objectMutator,
 		postgresExpectations:      pr.postgresExpectations,
 		updatedObjectExpectations: pr.updatedObjectExpectations,
@@ -78,7 +78,7 @@ func (pr *postgresReconciliationTester) reconcile() {
 	pr.expectMissingObject = false
 }
 
-func (pr *postgresReconciliationTester) assert(
+func (pr *postgresReconciliationTester[T]) assert(
 	ctx context.Context,
 	wrapper postgresObjectManager,
 ) {
@@ -92,7 +92,7 @@ func (pr *postgresReconciliationTester) assert(
 		}
 
 		if r.objectMutator != nil {
-			r.objectMutator(wrapper.GetClientObject())
+			r.objectMutator(wrapper.GetClientObject().(T))
 		}
 
 		_, err := pr.reconcileFunc(ctx, ctrl.Request{NamespacedName: types.NamespacedName{
@@ -113,7 +113,7 @@ func (pr *postgresReconciliationTester) assert(
 		}
 
 		if r.updatedObjectExpectations != nil {
-			r.updatedObjectExpectations(wrapper.GetClientObject())
+			r.updatedObjectExpectations(wrapper.GetClientObject().(T))
 		}
 	}
 }
