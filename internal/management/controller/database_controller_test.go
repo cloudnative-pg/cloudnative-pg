@@ -59,7 +59,7 @@ func (w *databaseTesterAdapter) GetClientObject() client.Object {
 	return w.Database
 }
 
-func newWrappedDatabase(db *apiv1.Database) postgresObjectManager {
+func newDatabaseTesterAdapter(db *apiv1.Database) postgresObjectManager {
 	return &databaseTesterAdapter{db}
 }
 
@@ -161,7 +161,7 @@ var _ = Describe("Managed Database status", func() {
 			Expect(updatedDatabase.GetFinalizers()).NotTo(BeEmpty())
 		})
 
-		tester.assert(ctx, newWrappedDatabase(database))
+		tester.assert(ctx, newDatabaseTesterAdapter(database))
 	})
 
 	It("database object inherits error after patching", func(ctx SpecContext) {
@@ -184,7 +184,7 @@ var _ = Describe("Managed Database status", func() {
 			Expect(updatedDatabase.GetStatusMessage()).Should(ContainSubstring(expectedError.Error()))
 		})
 
-		tester.assert(ctx, newWrappedDatabase(database))
+		tester.assert(ctx, newDatabaseTesterAdapter(database))
 	})
 
 	When("reclaim policy is delete", func() {
@@ -231,7 +231,7 @@ var _ = Describe("Managed Database status", func() {
 			})
 			tester.setExpectMissingObject()
 			tester.reconcile()
-			tester.assert(ctx, newWrappedDatabase(database))
+			tester.assert(ctx, newDatabaseTesterAdapter(database))
 		})
 	})
 
@@ -276,7 +276,7 @@ var _ = Describe("Managed Database status", func() {
 			})
 			tester.setExpectMissingObject()
 			tester.reconcile()
-			tester.assert(ctx, newWrappedDatabase(database))
+			tester.assert(ctx, newDatabaseTesterAdapter(database))
 		})
 	})
 
@@ -308,7 +308,7 @@ var _ = Describe("Managed Database status", func() {
 			Expect(updatedDatabase.Status.Message).Should(ContainSubstring(
 				fmt.Sprintf("%q not found", database.Spec.ClusterRef.Name)))
 		})
-		tester.assert(ctx, newWrappedDatabase(database))
+		tester.assert(ctx, newDatabaseTesterAdapter(database))
 	})
 
 	It("skips reconciliation if database object isn't found (deleted database)", func(ctx SpecContext) {
@@ -359,7 +359,7 @@ var _ = Describe("Managed Database status", func() {
 			Expect(updatedDatabase.Status.Message).To(BeEmpty())
 			Expect(updatedDatabase.Status.ObservedGeneration).To(BeEquivalentTo(1))
 		})
-		tester.assert(ctx, newWrappedDatabase(database))
+		tester.assert(ctx, newDatabaseTesterAdapter(database))
 	})
 
 	It("marks as failed if the target Database is already being managed", func(ctx SpecContext) {
@@ -395,7 +395,7 @@ var _ = Describe("Managed Database status", func() {
 			Expect(updatedDatabase.Status.ObservedGeneration).To(BeZero())
 		})
 
-		tester.assert(ctx, newWrappedDatabase(dbDuplicate))
+		tester.assert(ctx, newDatabaseTesterAdapter(dbDuplicate))
 	})
 
 	It("properly signals a database is on a replica cluster", func(ctx SpecContext) {
@@ -410,6 +410,6 @@ var _ = Describe("Managed Database status", func() {
 			Expect(updatedDatabase.Status.Applied).Should(BeNil())
 			Expect(updatedDatabase.Status.Message).Should(ContainSubstring("waiting for the cluster to become primary"))
 		})
-		tester.assert(ctx, newWrappedDatabase(database))
+		tester.assert(ctx, newDatabaseTesterAdapter(database))
 	})
 })
