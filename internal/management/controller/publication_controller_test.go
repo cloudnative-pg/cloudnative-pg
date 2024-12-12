@@ -1,0 +1,349 @@
+/*
+Copyright The CloudNativePG Contributors
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package controller
+
+import (
+	"database/sql"
+	"fmt"
+
+	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/jackc/pgx/v5"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+)
+
+const publicationDetectionQuery = `SELECT count(*)
+		FROM pg_publication
+		WHERE pubname = $1`
+
+type publicationTesterAdapter struct {
+	*apiv1.Publication
+}
+
+func (p publicationTesterAdapter) GetStatusApplied() *bool {
+	return p.Status.Applied
+}
+
+func (p publicationTesterAdapter) SetObservedGeneration(gen int64) {
+	p.Status.ObservedGeneration = gen
+}
+
+func (p publicationTesterAdapter) GetClientObject() client.Object {
+	return p.Publication
+}
+
+func newPublicationTesterAdapter(p *apiv1.Publication) postgresObjectManager {
+	return publicationTesterAdapter{p}
+}
+
+var _ = Describe("Managed publication controller tests", func() {
+	var (
+		dbMock      sqlmock.Sqlmock
+		db          *sql.DB
+		publication *apiv1.Publication
+		cluster     *apiv1.Cluster
+		r           *PublicationReconciler
+		fakeClient  client.Client
+		err         error
+		tester      postgresReconciliationTester
+	)
+
+	BeforeEach(func() {
+		cluster = &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "cluster-example",
+				Namespace: "default",
+			},
+			Status: apiv1.ClusterStatus{
+				CurrentPrimary: "cluster-example-1",
+				TargetPrimary:  "cluster-example-1",
+			},
+		}
+		publication = &apiv1.Publication{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       "pub-one",
+				Namespace:  "default",
+				Generation: 1,
+			},
+			Spec: apiv1.PublicationSpec{
+				ClusterRef: corev1.LocalObjectReference{
+					Name: cluster.Name,
+				},
+				ReclaimPolicy: apiv1.PublicationReclaimDelete,
+				Name:          "pub-all",
+				DBName:        "app",
+				Target: apiv1.PublicationTarget{
+					AllTables: true,
+					Objects: []apiv1.PublicationTargetObject{
+						{TablesInSchema: "public"},
+					},
+				},
+			},
+		}
+		db, dbMock, err = sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+		Expect(err).ToNot(HaveOccurred())
+
+		pgInstance := postgres.NewInstance().
+			WithNamespace("default").
+			WithPodName("cluster-example-1").
+			WithClusterName("cluster-example")
+
+		fakeClient = fake.NewClientBuilder().WithScheme(schemeBuilder.BuildWithAllKnownScheme()).
+			WithObjects(cluster, publication).
+			WithStatusSubresource(&apiv1.Cluster{}, &apiv1.Publication{}).
+			Build()
+
+		r = &PublicationReconciler{
+			Client:   fakeClient,
+			Scheme:   schemeBuilder.BuildWithAllKnownScheme(),
+			instance: pgInstance,
+			getDB: func(_ string) (*sql.DB, error) {
+				return db, nil
+			},
+		}
+		r.finalizerReconciler = newFinalizerReconciler(
+			fakeClient,
+			utils.PublicationFinalizerName,
+			r.evaluateDropPublication,
+		)
+		tester = postgresReconciliationTester{
+			reconcileFunc: r.Reconcile,
+			cli:           fakeClient,
+		}
+	})
+
+	AfterEach(func() {
+		Expect(dbMock.ExpectationsWereMet()).To(Succeed())
+	})
+
+	It("adds finalizer and sets status ready on success", func(ctx SpecContext) {
+		tester.setPostgresExpectations(func() {
+			noHits := sqlmock.NewRows([]string{""}).AddRow("0")
+			dbMock.ExpectQuery(publicationDetectionQuery).WithArgs(publication.Spec.Name).
+				WillReturnRows(noHits)
+
+			expectedCreate := sqlmock.NewResult(0, 1)
+			expectedQuery := fmt.Sprintf(
+				"CREATE PUBLICATION %s FOR ALL TABLES",
+				pgx.Identifier{publication.Spec.Name}.Sanitize(),
+			)
+			dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
+		})
+
+		tester.setUpdatedObjectExpectations(func(obj client.Object) {
+			updatedPublication := obj.(*apiv1.Publication)
+			Expect(updatedPublication.Status.Applied).Should(HaveValue(BeTrue()))
+			Expect(updatedPublication.GetStatusMessage()).Should(BeEmpty())
+			Expect(updatedPublication.GetFinalizers()).NotTo(BeEmpty())
+		})
+
+		tester.assert(ctx, newPublicationTesterAdapter(publication))
+	})
+
+	It("publication object inherits error after patching", func(ctx SpecContext) {
+		expectedError := fmt.Errorf("no permission")
+		tester.setPostgresExpectations(func() {
+			oneHit := sqlmock.NewRows([]string{""}).AddRow("1")
+			dbMock.ExpectQuery(publicationDetectionQuery).WithArgs(publication.Spec.Name).
+				WillReturnRows(oneHit)
+
+			expectedQuery := fmt.Sprintf("ALTER PUBLICATION %s SET TABLES IN SCHEMA \"public\"",
+				pgx.Identifier{publication.Spec.Name}.Sanitize(),
+			)
+			dbMock.ExpectExec(expectedQuery).WillReturnError(expectedError)
+		})
+
+		tester.setUpdatedObjectExpectations(func(obj client.Object) {
+			updatedPublication := obj.(*apiv1.Publication)
+			Expect(updatedPublication.Status.Applied).Should(HaveValue(BeFalse()))
+			Expect(updatedPublication.Status.Message).Should(ContainSubstring(expectedError.Error()))
+		})
+
+		tester.assert(ctx, newPublicationTesterAdapter(publication))
+	})
+
+	When("reclaim policy is delete", func() {
+		It("on deletion it removes finalizers and drops the Publication", func(ctx SpecContext) {
+			assertObjectReconciledAfterDeletion(ctx, r, newPublicationTesterAdapter(publication), fakeClient, func() {
+				// Mocking Detect publication
+				expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
+				dbMock.ExpectQuery(publicationDetectionQuery).WithArgs(publication.Spec.Name).
+					WillReturnRows(expectedValue)
+
+				// Mocking Create publication
+				expectedCreate := sqlmock.NewResult(0, 1)
+				expectedQuery := fmt.Sprintf(
+					"CREATE PUBLICATION %s FOR ALL TABLES",
+					pgx.Identifier{publication.Spec.Name}.Sanitize(),
+				)
+				dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
+
+				// Mocking Drop Publication
+				expectedDrop := fmt.Sprintf("DROP PUBLICATION IF EXISTS %s",
+					pgx.Identifier{publication.Spec.Name}.Sanitize(),
+				)
+				dbMock.ExpectExec(expectedDrop).WillReturnResult(sqlmock.NewResult(0, 1))
+			})
+		})
+	})
+
+	When("reclaim policy is retain", func() {
+		It("on deletion it removes finalizers and does NOT drop the Publication", func(ctx SpecContext) {
+			publication.Spec.ReclaimPolicy = apiv1.PublicationReclaimRetain
+			Expect(fakeClient.Update(ctx, publication)).To(Succeed())
+
+			assertObjectReconciledAfterDeletion(ctx, r, newPublicationTesterAdapter(publication), fakeClient, func() {
+				// Mocking Detect publication
+				expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
+				dbMock.ExpectQuery(publicationDetectionQuery).WithArgs(publication.Spec.Name).
+					WillReturnRows(expectedValue)
+
+				// Mocking Create publication
+				expectedCreate := sqlmock.NewResult(0, 1)
+				expectedQuery := fmt.Sprintf(
+					"CREATE PUBLICATION %s FOR ALL TABLES",
+					pgx.Identifier{publication.Spec.Name}.Sanitize(),
+				)
+				dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
+			})
+		})
+	})
+
+	It("fails reconciliation if cluster isn't found (deleted cluster)", func(ctx SpecContext) {
+		// Since the fakeClient has the `cluster-example` cluster, let's reference
+		// another cluster `cluster-other` that is not found by the fakeClient
+		pgInstance := postgres.NewInstance().
+			WithNamespace("default").
+			WithPodName("cluster-other-1").
+			WithClusterName("cluster-other")
+
+		r = &PublicationReconciler{
+			Client:   fakeClient,
+			Scheme:   schemeBuilder.BuildWithAllKnownScheme(),
+			instance: pgInstance,
+			getDB: func(_ string) (*sql.DB, error) {
+				return db, nil
+			},
+		}
+
+		tester.reconcileFunc = r.Reconcile
+
+		// Updating the publication object to reference the newly created Cluster
+		publication.Spec.ClusterRef.Name = "cluster-other"
+		Expect(fakeClient.Update(ctx, publication)).To(Succeed())
+
+		tester.setUpdatedObjectExpectations(func(obj client.Object) {
+			updatedPublication := obj.(*apiv1.Publication)
+			Expect(updatedPublication.Status.Applied).Should(HaveValue(BeFalse()))
+			Expect(updatedPublication.GetStatusMessage()).Should(ContainSubstring(
+				fmt.Sprintf("%q not found", publication.Spec.ClusterRef.Name)))
+		})
+
+		tester.assert(ctx, newPublicationTesterAdapter(publication))
+	})
+
+	It("skips reconciliation if publication object isn't found (deleted publication)", func(ctx SpecContext) {
+		// Initialize a new Publication but without creating it in the K8S Cluster
+		otherPublication := &apiv1.Publication{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       "pub-other",
+				Namespace:  "default",
+				Generation: 1,
+			},
+			Spec: apiv1.PublicationSpec{
+				ClusterRef: corev1.LocalObjectReference{
+					Name: cluster.Name,
+				},
+				Name: "pub-all",
+			},
+		}
+
+		// Reconcile the publication that hasn't been created in the K8S Cluster
+		result, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{
+			Namespace: otherPublication.Namespace,
+			Name:      otherPublication.Name,
+		}})
+
+		// Expect the reconciler to exit silently, since the object doesn't exist
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result).Should(BeZero())
+	})
+
+	It("marks as failed if the target publication is already being managed", func(ctx SpecContext) {
+		// Let's force the publication to have a past reconciliation
+		publication.Status.ObservedGeneration = 2
+		Expect(fakeClient.Status().Update(ctx, publication)).To(Succeed())
+
+		// A new Publication Object targeting the same "pub-all"
+		pubDuplicate := &apiv1.Publication{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       "pub-duplicate",
+				Namespace:  "default",
+				Generation: 1,
+			},
+			Spec: apiv1.PublicationSpec{
+				ClusterRef: corev1.LocalObjectReference{
+					Name: cluster.Name,
+				},
+				Name: "pub-all",
+			},
+		}
+
+		// Expect(fakeClient.Create(ctx, currentManager)).To(Succeed())
+		Expect(fakeClient.Create(ctx, pubDuplicate)).To(Succeed())
+
+		tester.setUpdatedObjectExpectations(func(obj client.Object) {
+			updatedPublication := obj.(*apiv1.Publication)
+			expectedError := fmt.Sprintf("%q is already managed by object %q",
+				pubDuplicate.Spec.Name, publication.Name)
+			Expect(updatedPublication.Status.Applied).To(HaveValue(BeFalse()))
+			Expect(updatedPublication.Status.Message).To(ContainSubstring(expectedError))
+			Expect(updatedPublication.Status.ObservedGeneration).To(BeZero())
+		})
+
+		tester.assert(ctx, newPublicationTesterAdapter(pubDuplicate))
+	})
+
+	It("properly signals a publication is on a replica cluster", func(ctx SpecContext) {
+		initialCluster := cluster.DeepCopy()
+		cluster.Spec.ReplicaCluster = &apiv1.ReplicaClusterConfiguration{
+			Enabled: ptr.To(true),
+		}
+		Expect(fakeClient.Patch(ctx, cluster, client.MergeFrom(initialCluster))).To(Succeed())
+
+		tester.setUpdatedObjectExpectations(func(obj client.Object) {
+			updatedPublication := obj.(*apiv1.Publication)
+			Expect(updatedPublication.Status.Applied).Should(BeNil())
+			Expect(updatedPublication.Status.Message).Should(ContainSubstring("waiting for the cluster to become primary"))
+		})
+
+		tester.assert(ctx, newPublicationTesterAdapter(publication))
+	})
+})
