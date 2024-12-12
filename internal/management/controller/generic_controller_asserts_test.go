@@ -19,9 +19,11 @@ type postgresObjectManager interface {
 }
 
 type (
+	objectMutatorFunc             func(obj client.Object)
 	postgresExpectationsFunc      func()
 	updatedObjectExpectationsFunc func(newObj client.Object)
 	reconciliation                struct {
+		objectMutator             objectMutatorFunc
 		postgresExpectations      postgresExpectationsFunc
 		updatedObjectExpectations updatedObjectExpectationsFunc
 		expectMissingObject       bool
@@ -31,10 +33,15 @@ type (
 type postgresReconciliationTester struct {
 	cli                       client.Client
 	reconcileFunc             func(ctx context.Context, req ctrl.Request) (ctrl.Result, error)
+	objectMutator             objectMutatorFunc
 	postgresExpectations      postgresExpectationsFunc
 	updatedObjectExpectations updatedObjectExpectationsFunc
 	expectMissingObject       bool
 	reconciliations           []reconciliation
+}
+
+func (pr *postgresReconciliationTester) setObjectMutator(objectMutator objectMutatorFunc) {
+	pr.objectMutator = objectMutator
 }
 
 func (pr *postgresReconciliationTester) setPostgresExpectations(
@@ -59,11 +66,13 @@ func (pr *postgresReconciliationTester) reconcile() {
 	}
 
 	pr.reconciliations = append(pr.reconciliations, reconciliation{
+		objectMutator:             pr.objectMutator,
 		postgresExpectations:      pr.postgresExpectations,
 		updatedObjectExpectations: pr.updatedObjectExpectations,
 		expectMissingObject:       pr.expectMissingObject,
 	})
 
+	pr.objectMutator = nil
 	pr.postgresExpectations = nil
 	pr.updatedObjectExpectations = nil
 	pr.expectMissingObject = false
@@ -82,7 +91,10 @@ func (pr *postgresReconciliationTester) assert(
 			r.postgresExpectations()
 		}
 
-		// Reconcile and get the updated object
+		if r.objectMutator != nil {
+			r.objectMutator(wrapper.GetClientObject())
+		}
+
 		_, err := pr.reconcileFunc(ctx, ctrl.Request{NamespacedName: types.NamespacedName{
 			Namespace: obj.GetNamespace(),
 			Name:      obj.GetName(),

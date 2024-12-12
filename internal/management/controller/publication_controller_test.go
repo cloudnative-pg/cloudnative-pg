@@ -217,7 +217,9 @@ var _ = Describe("Managed publication controller tests", func() {
 				Expect(obj.GetFinalizers()).NotTo(BeEmpty())
 				Expect(updatedPublication.Status.Applied).Should(HaveValue(BeTrue()))
 				Expect(updatedPublication.Status.Message).Should(BeEmpty())
-
+			})
+			tester.reconcile()
+			tester.setObjectMutator(func(obj client.Object) {
 				// The next 2 lines are a hacky bit to make sure the next reconciler
 				// call doesn't skip on account of Generation == ObservedGeneration.
 				// See fake.Client known issues with `Generation`
@@ -228,7 +230,6 @@ var _ = Describe("Managed publication controller tests", func() {
 				// We now look at the behavior when we delete the Database object
 				Expect(fakeClient.Delete(ctx, obj)).To(Succeed())
 			})
-			tester.reconcile()
 			tester.setExpectMissingObject()
 			tester.reconcile()
 			tester.assert(ctx, newPublicationTesterAdapter(publication))
@@ -260,7 +261,9 @@ var _ = Describe("Managed publication controller tests", func() {
 				Expect(obj.GetFinalizers()).NotTo(BeEmpty())
 				Expect(updatedPublication.Status.Applied).Should(HaveValue(BeTrue()))
 				Expect(updatedPublication.Status.Message).Should(BeEmpty())
-
+			})
+			tester.reconcile()
+			tester.setObjectMutator(func(obj client.Object) {
 				// The next 2 lines are a hacky bit to make sure the next reconciler
 				// call doesn't skip on account of Generation == ObservedGeneration.
 				// See fake.Client known issues with `Generation`
@@ -271,7 +274,6 @@ var _ = Describe("Managed publication controller tests", func() {
 				// We now look at the behavior when we delete the Database object
 				Expect(fakeClient.Delete(ctx, obj)).To(Succeed())
 			})
-			tester.reconcile()
 			tester.setExpectMissingObject()
 			tester.reconcile()
 			tester.assert(ctx, newPublicationTesterAdapter(publication))
