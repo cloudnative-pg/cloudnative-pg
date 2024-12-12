@@ -18,7 +18,6 @@ package controller
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -35,7 +34,6 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/roles"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/instance"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -197,12 +195,7 @@ func (r *RoleReconciler) failedReconciliation(
 	role.Status.Message = err.Error()
 	role.Status.Applied = ptr.To(false)
 
-	var statusError *instance.StatusError
-	if errors.As(err, &statusError) {
-		// The body line of the instance manager contains the human
-		// readable error
-		role.Status.Message = statusError.Body
-	}
+	role.Status.Message = err.Error()
 
 	if err := r.Client.Status().Patch(ctx, role, client.MergeFrom(oldRole)); err != nil {
 		return ctrl.Result{}, err
