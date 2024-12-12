@@ -177,7 +177,7 @@ func (r *instanceClientImpl) GetStatusFromInstances(
 	for idx := range status.Items {
 		if status.Items[idx].Error != nil {
 			log.FromContext(ctx).Info("Cannot extract Pod status",
-				"name", status.Items[idx].Pod.Name,
+				"podName", status.Items[idx].Pod.Name,
 				"error", status.Items[idx].Error.Error())
 		}
 	}
