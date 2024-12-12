@@ -191,31 +191,47 @@ var _ = Describe("Managed publication controller tests", func() {
 
 	When("reclaim policy is delete", func() {
 		It("on deletion it removes finalizers and drops the Publication", func(ctx SpecContext) {
-			assertObjectReconciledAfterDeletion(ctx, r,
-				newPublicationTesterAdapter(publication),
-				newPublicationTesterAdapter(&apiv1.Publication{}),
-				fakeClient,
-				func() {
-					// Mocking Detect publication
-					expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
-					dbMock.ExpectQuery(publicationDetectionQuery).WithArgs(publication.Spec.Name).
-						WillReturnRows(expectedValue)
+			tester.setPostgresExpectations(func() {
+				// Mocking Detect publication
+				expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
+				dbMock.ExpectQuery(publicationDetectionQuery).WithArgs(publication.Spec.Name).
+					WillReturnRows(expectedValue)
 
-					// Mocking Create publication
-					expectedCreate := sqlmock.NewResult(0, 1)
-					expectedQuery := fmt.Sprintf(
-						"CREATE PUBLICATION %s FOR ALL TABLES",
-						pgx.Identifier{publication.Spec.Name}.Sanitize(),
-					)
-					dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
+				// Mocking Create publication
+				expectedCreate := sqlmock.NewResult(0, 1)
+				expectedQuery := fmt.Sprintf(
+					"CREATE PUBLICATION %s FOR ALL TABLES",
+					pgx.Identifier{publication.Spec.Name}.Sanitize(),
+				)
+				dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
 
-					// Mocking Drop Publication
-					expectedDrop := fmt.Sprintf("DROP PUBLICATION IF EXISTS %s",
-						pgx.Identifier{publication.Spec.Name}.Sanitize(),
-					)
-					dbMock.ExpectExec(expectedDrop).WillReturnResult(sqlmock.NewResult(0, 1))
-				},
-			)
+				// Mocking Drop Publication
+				expectedDrop := fmt.Sprintf("DROP PUBLICATION IF EXISTS %s",
+					pgx.Identifier{publication.Spec.Name}.Sanitize(),
+				)
+				dbMock.ExpectExec(expectedDrop).WillReturnResult(sqlmock.NewResult(0, 1))
+			})
+			tester.setUpdatedObjectExpectations(func(obj client.Object) {
+				updatedPublication := obj.(*apiv1.Publication)
+				// Plain successful reconciliation, finalizers have been created
+				Expect(obj.GetFinalizers()).NotTo(BeEmpty())
+				Expect(updatedPublication.Status.Applied).Should(HaveValue(BeTrue()))
+				Expect(updatedPublication.Status.Message).Should(BeEmpty())
+
+				// The next 2 lines are a hacky bit to make sure the next reconciler
+				// call doesn't skip on account of Generation == ObservedGeneration.
+				// See fake.Client known issues with `Generation`
+				// https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/client/fake@v0.19.0#NewClientBuilder
+				obj.SetGeneration(obj.GetGeneration() + 1)
+				Expect(fakeClient.Update(ctx, obj)).To(Succeed())
+
+				// We now look at the behavior when we delete the Database object
+				Expect(fakeClient.Delete(ctx, obj)).To(Succeed())
+			})
+			tester.reconcile()
+			tester.setExpectMissingObject()
+			tester.reconcile()
+			tester.assert(ctx, newPublicationTesterAdapter(publication))
 		})
 	})
 
@@ -224,25 +240,41 @@ var _ = Describe("Managed publication controller tests", func() {
 			publication.Spec.ReclaimPolicy = apiv1.PublicationReclaimRetain
 			Expect(fakeClient.Update(ctx, publication)).To(Succeed())
 
-			assertObjectReconciledAfterDeletion(ctx, r,
-				newPublicationTesterAdapter(publication),
-				newPublicationTesterAdapter(&apiv1.Publication{}),
-				fakeClient,
-				func() {
-					// Mocking Detect publication
-					expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
-					dbMock.ExpectQuery(publicationDetectionQuery).WithArgs(publication.Spec.Name).
-						WillReturnRows(expectedValue)
+			tester.setPostgresExpectations(func() {
+				// Mocking Detect publication
+				expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
+				dbMock.ExpectQuery(publicationDetectionQuery).WithArgs(publication.Spec.Name).
+					WillReturnRows(expectedValue)
 
-					// Mocking Create publication
-					expectedCreate := sqlmock.NewResult(0, 1)
-					expectedQuery := fmt.Sprintf(
-						"CREATE PUBLICATION %s FOR ALL TABLES",
-						pgx.Identifier{publication.Spec.Name}.Sanitize(),
-					)
-					dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
-				},
-			)
+				// Mocking Create publication
+				expectedCreate := sqlmock.NewResult(0, 1)
+				expectedQuery := fmt.Sprintf(
+					"CREATE PUBLICATION %s FOR ALL TABLES",
+					pgx.Identifier{publication.Spec.Name}.Sanitize(),
+				)
+				dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
+			})
+			tester.setUpdatedObjectExpectations(func(obj client.Object) {
+				updatedPublication := obj.(*apiv1.Publication)
+				// Plain successful reconciliation, finalizers have been created
+				Expect(obj.GetFinalizers()).NotTo(BeEmpty())
+				Expect(updatedPublication.Status.Applied).Should(HaveValue(BeTrue()))
+				Expect(updatedPublication.Status.Message).Should(BeEmpty())
+
+				// The next 2 lines are a hacky bit to make sure the next reconciler
+				// call doesn't skip on account of Generation == ObservedGeneration.
+				// See fake.Client known issues with `Generation`
+				// https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/client/fake@v0.19.0#NewClientBuilder
+				obj.SetGeneration(obj.GetGeneration() + 1)
+				Expect(fakeClient.Update(ctx, obj)).To(Succeed())
+
+				// We now look at the behavior when we delete the Database object
+				Expect(fakeClient.Delete(ctx, obj)).To(Succeed())
+			})
+			tester.reconcile()
+			tester.setExpectMissingObject()
+			tester.reconcile()
+			tester.assert(ctx, newPublicationTesterAdapter(publication))
 		})
 	})
 
