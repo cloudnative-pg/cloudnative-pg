@@ -7,3 +7,5 @@ spec:
   owner: app
   cluster:
     name: cluster-sample
+status:
+  applied: false
