@@ -54,6 +54,8 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelDeclarativePub
 		const (
 			namespacePrefix = "declarative-pub-sub"
 			dbname          = "declarative"
+			subName         = "sub"
+			pubName         = "pub"
 			tableName       = "test"
 		)
 		var (
@@ -82,17 +84,43 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelDeclarativePub
 		})
 
 		AfterEach(func() {
-			// Removing databases and check that they have been deleted
-			Expect(DeleteResourcesFromFile(namespace, sourceDatabaseManifest)).To(Succeed())
-			Expect(DeleteResourcesFromFile(namespace, destinationDatabaseManifest)).To(Succeed())
+			// We want to reuse the same source and destination Cluster, so
+			// we need to drop each Postgres object that has been created.
+			// We need to make sure that publication/subscription have been removed before
+			// attempting to drop the database, otherwise the DROP DATABASE will fail because
+			// there's an  active logical replication slot.
+			destPrimaryPod, err := env.GetClusterPrimary(namespace, destinationClusterName)
+			Expect(err).ToNot(HaveOccurred())
+			_, _, err = env.EventuallyExecQueryInInstancePod(
+				testUtils.PodLocator{
+					Namespace: destPrimaryPod.Namespace,
+					PodName:   destPrimaryPod.Name,
+				},
+				dbname,
+				fmt.Sprintf("DROP SUBSCRIPTION IF EXISTS %s", subName),
+				RetryTimeout,
+				PollingTime,
+			)
+			Expect(err).ToNot(HaveOccurred())
 
 			sourcePrimaryPod, err := env.GetClusterPrimary(namespace, sourceClusterName)
 			Expect(err).ToNot(HaveOccurred())
-			AssertDatabaseExists(sourcePrimaryPod, dbname, false)
-
-			destPrimaryPod, err := env.GetClusterPrimary(namespace, destinationClusterName)
+			_, _, err = env.EventuallyExecQueryInInstancePod(
+				testUtils.PodLocator{
+					Namespace: sourcePrimaryPod.Namespace,
+					PodName:   sourcePrimaryPod.Name,
+				},
+				dbname,
+				fmt.Sprintf("DROP PUBLICATION IF EXISTS %s", pubName),
+				RetryTimeout,
+				PollingTime,
+			)
 			Expect(err).ToNot(HaveOccurred())
+
+			Expect(DeleteResourcesFromFile(namespace, destinationDatabaseManifest)).To(Succeed())
+			Expect(DeleteResourcesFromFile(namespace, sourceDatabaseManifest)).To(Succeed())
 			AssertDatabaseExists(destPrimaryPod, dbname, false)
+			AssertDatabaseExists(sourcePrimaryPod, dbname, false)
 		})
 
 		assertPublicationExists := func(namespace, clusterName string, pub *apiv1.Publication, expectedValue bool) {
