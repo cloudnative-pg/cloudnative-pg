@@ -207,33 +207,28 @@ var _ = Describe("Managed subscription controller tests", func() {
 
 	When("reclaim policy is delete", func() {
 		It("on deletion it removes finalizers and drops the subscription", func(ctx SpecContext) {
-			assertObjectReconciledAfterDeletion(ctx, r,
-				newSubscriptionTesterAdapter(subscription),
-				newSubscriptionTesterAdapter(&apiv1.Subscription{}),
-				fakeClient,
-				func() {
-					// Mocking detection of subscriptions
-					expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
-					dbMock.ExpectQuery(subscriptionDetectionQuery).WithArgs(subscription.Spec.Name).
-						WillReturnRows(expectedValue)
+			assertObjectReconciledAfterDeletion(ctx, r, newSubscriptionTesterAdapter(subscription), fakeClient, func() {
+				// Mocking detection of subscriptions
+				expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
+				dbMock.ExpectQuery(subscriptionDetectionQuery).WithArgs(subscription.Spec.Name).
+					WillReturnRows(expectedValue)
 
-					// Mocking create subscription
-					expectedCreate := sqlmock.NewResult(0, 1)
-					expectedQuery := fmt.Sprintf(
-						"CREATE SUBSCRIPTION %s CONNECTION %s PUBLICATION %s",
-						pgx.Identifier{subscription.Spec.Name}.Sanitize(),
-						pq.QuoteLiteral(connString),
-						pgx.Identifier{subscription.Spec.PublicationName}.Sanitize(),
-					)
-					dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
+				// Mocking create subscription
+				expectedCreate := sqlmock.NewResult(0, 1)
+				expectedQuery := fmt.Sprintf(
+					"CREATE SUBSCRIPTION %s CONNECTION %s PUBLICATION %s",
+					pgx.Identifier{subscription.Spec.Name}.Sanitize(),
+					pq.QuoteLiteral(connString),
+					pgx.Identifier{subscription.Spec.PublicationName}.Sanitize(),
+				)
+				dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
 
-					// Mocking Drop subscription
-					expectedDrop := fmt.Sprintf("DROP SUBSCRIPTION IF EXISTS %s",
-						pgx.Identifier{subscription.Spec.Name}.Sanitize(),
-					)
-					dbMock.ExpectExec(expectedDrop).WillReturnResult(sqlmock.NewResult(0, 1))
-				},
-			)
+				// Mocking Drop subscription
+				expectedDrop := fmt.Sprintf("DROP SUBSCRIPTION IF EXISTS %s",
+					pgx.Identifier{subscription.Spec.Name}.Sanitize(),
+				)
+				dbMock.ExpectExec(expectedDrop).WillReturnResult(sqlmock.NewResult(0, 1))
+			})
 		})
 	})
 
@@ -242,27 +237,22 @@ var _ = Describe("Managed subscription controller tests", func() {
 			subscription.Spec.ReclaimPolicy = apiv1.SubscriptionReclaimRetain
 			Expect(fakeClient.Update(ctx, subscription)).To(Succeed())
 
-			assertObjectReconciledAfterDeletion(ctx, r,
-				newSubscriptionTesterAdapter(subscription),
-				newSubscriptionTesterAdapter(&apiv1.Subscription{}),
-				fakeClient,
-				func() {
-					// Mocking Detect subscription
-					expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
-					dbMock.ExpectQuery(subscriptionDetectionQuery).WithArgs(subscription.Spec.Name).
-						WillReturnRows(expectedValue)
+			assertObjectReconciledAfterDeletion(ctx, r, newSubscriptionTesterAdapter(subscription), fakeClient, func() {
+				// Mocking Detect subscription
+				expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
+				dbMock.ExpectQuery(subscriptionDetectionQuery).WithArgs(subscription.Spec.Name).
+					WillReturnRows(expectedValue)
 
-					// Mocking Create subscription
-					expectedCreate := sqlmock.NewResult(0, 1)
-					expectedQuery := fmt.Sprintf(
-						"CREATE SUBSCRIPTION %s CONNECTION %s PUBLICATION %s",
-						pgx.Identifier{subscription.Spec.Name}.Sanitize(),
-						pq.QuoteLiteral(connString),
-						pgx.Identifier{subscription.Spec.PublicationName}.Sanitize(),
-					)
-					dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
-				},
-			)
+				// Mocking Create subscription
+				expectedCreate := sqlmock.NewResult(0, 1)
+				expectedQuery := fmt.Sprintf(
+					"CREATE SUBSCRIPTION %s CONNECTION %s PUBLICATION %s",
+					pgx.Identifier{subscription.Spec.Name}.Sanitize(),
+					pq.QuoteLiteral(connString),
+					pgx.Identifier{subscription.Spec.PublicationName}.Sanitize(),
+				)
+				dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
+			})
 		})
 	})
 

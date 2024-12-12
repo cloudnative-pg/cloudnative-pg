@@ -191,31 +191,26 @@ var _ = Describe("Managed publication controller tests", func() {
 
 	When("reclaim policy is delete", func() {
 		It("on deletion it removes finalizers and drops the Publication", func(ctx SpecContext) {
-			assertObjectReconciledAfterDeletion(ctx, r,
-				newPublicationTesterAdapter(publication),
-				newPublicationTesterAdapter(&apiv1.Publication{}),
-				fakeClient,
-				func() {
-					// Mocking Detect publication
-					expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
-					dbMock.ExpectQuery(publicationDetectionQuery).WithArgs(publication.Spec.Name).
-						WillReturnRows(expectedValue)
+			assertObjectReconciledAfterDeletion(ctx, r, newPublicationTesterAdapter(publication), fakeClient, func() {
+				// Mocking Detect publication
+				expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
+				dbMock.ExpectQuery(publicationDetectionQuery).WithArgs(publication.Spec.Name).
+					WillReturnRows(expectedValue)
 
-					// Mocking Create publication
-					expectedCreate := sqlmock.NewResult(0, 1)
-					expectedQuery := fmt.Sprintf(
-						"CREATE PUBLICATION %s FOR ALL TABLES",
-						pgx.Identifier{publication.Spec.Name}.Sanitize(),
-					)
-					dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
+				// Mocking Create publication
+				expectedCreate := sqlmock.NewResult(0, 1)
+				expectedQuery := fmt.Sprintf(
+					"CREATE PUBLICATION %s FOR ALL TABLES",
+					pgx.Identifier{publication.Spec.Name}.Sanitize(),
+				)
+				dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
 
-					// Mocking Drop Publication
-					expectedDrop := fmt.Sprintf("DROP PUBLICATION IF EXISTS %s",
-						pgx.Identifier{publication.Spec.Name}.Sanitize(),
-					)
-					dbMock.ExpectExec(expectedDrop).WillReturnResult(sqlmock.NewResult(0, 1))
-				},
-			)
+				// Mocking Drop Publication
+				expectedDrop := fmt.Sprintf("DROP PUBLICATION IF EXISTS %s",
+					pgx.Identifier{publication.Spec.Name}.Sanitize(),
+				)
+				dbMock.ExpectExec(expectedDrop).WillReturnResult(sqlmock.NewResult(0, 1))
+			})
 		})
 	})
 
@@ -224,25 +219,20 @@ var _ = Describe("Managed publication controller tests", func() {
 			publication.Spec.ReclaimPolicy = apiv1.PublicationReclaimRetain
 			Expect(fakeClient.Update(ctx, publication)).To(Succeed())
 
-			assertObjectReconciledAfterDeletion(ctx, r,
-				newPublicationTesterAdapter(publication),
-				newPublicationTesterAdapter(&apiv1.Publication{}),
-				fakeClient,
-				func() {
-					// Mocking Detect publication
-					expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
-					dbMock.ExpectQuery(publicationDetectionQuery).WithArgs(publication.Spec.Name).
-						WillReturnRows(expectedValue)
+			assertObjectReconciledAfterDeletion(ctx, r, newPublicationTesterAdapter(publication), fakeClient, func() {
+				// Mocking Detect publication
+				expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
+				dbMock.ExpectQuery(publicationDetectionQuery).WithArgs(publication.Spec.Name).
+					WillReturnRows(expectedValue)
 
-					// Mocking Create publication
-					expectedCreate := sqlmock.NewResult(0, 1)
-					expectedQuery := fmt.Sprintf(
-						"CREATE PUBLICATION %s FOR ALL TABLES",
-						pgx.Identifier{publication.Spec.Name}.Sanitize(),
-					)
-					dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
-				},
-			)
+				// Mocking Create publication
+				expectedCreate := sqlmock.NewResult(0, 1)
+				expectedQuery := fmt.Sprintf(
+					"CREATE PUBLICATION %s FOR ALL TABLES",
+					pgx.Identifier{publication.Spec.Name}.Sanitize(),
+				)
+				dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
+			})
 		})
 	})
 

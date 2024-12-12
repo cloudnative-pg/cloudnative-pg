@@ -189,32 +189,27 @@ var _ = Describe("Managed Database status", func() {
 
 	When("reclaim policy is delete", func() {
 		It("on deletion it removes finalizers and drops DB", func(ctx SpecContext) {
-			assertObjectReconciledAfterDeletion(ctx, r,
-				newWrappedDatabase(database),
-				newWrappedDatabase(&apiv1.Database{}),
-				fakeClient,
-				func() {
-					// Mocking DetectDB
-					expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
-					dbMock.ExpectQuery(databaseDetectionQuery).WithArgs(database.Spec.Name).
-						WillReturnRows(expectedValue)
+			assertObjectReconciledAfterDeletion(ctx, r, newWrappedDatabase(database), fakeClient, func() {
+				// Mocking DetectDB
+				expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
+				dbMock.ExpectQuery(databaseDetectionQuery).WithArgs(database.Spec.Name).
+					WillReturnRows(expectedValue)
 
-					// Mocking CreateDB
-					expectedCreate := sqlmock.NewResult(0, 1)
-					expectedQuery := fmt.Sprintf(
-						"CREATE DATABASE %s OWNER %s",
-						pgx.Identifier{database.Spec.Name}.Sanitize(),
-						pgx.Identifier{database.Spec.Owner}.Sanitize(),
-					)
-					dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
+				// Mocking CreateDB
+				expectedCreate := sqlmock.NewResult(0, 1)
+				expectedQuery := fmt.Sprintf(
+					"CREATE DATABASE %s OWNER %s",
+					pgx.Identifier{database.Spec.Name}.Sanitize(),
+					pgx.Identifier{database.Spec.Owner}.Sanitize(),
+				)
+				dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
 
-					// Mocking Drop Database
-					expectedDrop := fmt.Sprintf("DROP DATABASE IF EXISTS %s",
-						pgx.Identifier{database.Spec.Name}.Sanitize(),
-					)
-					dbMock.ExpectExec(expectedDrop).WillReturnResult(sqlmock.NewResult(0, 1))
-				},
-			)
+				// Mocking Drop Database
+				expectedDrop := fmt.Sprintf("DROP DATABASE IF EXISTS %s",
+					pgx.Identifier{database.Spec.Name}.Sanitize(),
+				)
+				dbMock.ExpectExec(expectedDrop).WillReturnResult(sqlmock.NewResult(0, 1))
+			})
 		})
 	})
 
@@ -223,26 +218,21 @@ var _ = Describe("Managed Database status", func() {
 			database.Spec.ReclaimPolicy = apiv1.DatabaseReclaimRetain
 			Expect(fakeClient.Update(ctx, database)).To(Succeed())
 
-			assertObjectReconciledAfterDeletion(ctx, r,
-				newWrappedDatabase(database),
-				newWrappedDatabase(&apiv1.Database{}),
-				fakeClient,
-				func() {
-					// Mocking DetectDB
-					expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
-					dbMock.ExpectQuery(databaseDetectionQuery).WithArgs(database.Spec.Name).
-						WillReturnRows(expectedValue)
+			assertObjectReconciledAfterDeletion(ctx, r, newWrappedDatabase(database), fakeClient, func() {
+				// Mocking DetectDB
+				expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
+				dbMock.ExpectQuery(databaseDetectionQuery).WithArgs(database.Spec.Name).
+					WillReturnRows(expectedValue)
 
-					// Mocking CreateDB
-					expectedCreate := sqlmock.NewResult(0, 1)
-					expectedQuery := fmt.Sprintf(
-						"CREATE DATABASE %s OWNER %s",
-						pgx.Identifier{database.Spec.Name}.Sanitize(),
-						pgx.Identifier{database.Spec.Owner}.Sanitize(),
-					)
-					dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
-				},
-			)
+				// Mocking CreateDB
+				expectedCreate := sqlmock.NewResult(0, 1)
+				expectedQuery := fmt.Sprintf(
+					"CREATE DATABASE %s OWNER %s",
+					pgx.Identifier{database.Spec.Name}.Sanitize(),
+					pgx.Identifier{database.Spec.Owner}.Sanitize(),
+				)
+				dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
+			})
 		})
 	})
 
