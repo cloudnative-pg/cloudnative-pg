@@ -17,12 +17,14 @@ limitations under the License.
 package controller
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/jackc/pgx/v5"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
@@ -43,26 +45,6 @@ const databaseDetectionQuery = `SELECT count(*)
 			FROM pg_database
 			WHERE datname = $1`
 
-type databaseTesterAdapter struct {
-	*apiv1.Database
-}
-
-func (w *databaseTesterAdapter) GetStatusApplied() *bool {
-	return w.Status.Applied
-}
-
-func (w *databaseTesterAdapter) SetObservedGeneration(gen int64) {
-	w.Status.ObservedGeneration = gen
-}
-
-func (w *databaseTesterAdapter) GetClientObject() client.Object {
-	return w.Database
-}
-
-func newDatabaseTesterAdapter(db *apiv1.Database) postgresObjectManager {
-	return &databaseTesterAdapter{db}
-}
-
 var _ = Describe("Managed Database status", func() {
 	var (
 		dbMock     sqlmock.Sqlmock
@@ -72,7 +54,6 @@ var _ = Describe("Managed Database status", func() {
 		r          *DatabaseReconciler
 		fakeClient client.Client
 		err        error
-		tester     postgresReconciliationTester[*apiv1.Database]
 	)
 
 	BeforeEach(func() {
@@ -128,11 +109,6 @@ var _ = Describe("Managed Database status", func() {
 			utils.DatabaseFinalizerName,
 			r.evaluateDropDatabase,
 		)
-
-		tester = postgresReconciliationTester[*apiv1.Database]{
-			cli:           fakeClient,
-			reconcileFunc: r.Reconcile,
-		}
 	})
 
 	AfterEach(func() {
@@ -140,11 +116,53 @@ var _ = Describe("Managed Database status", func() {
 	})
 
 	It("adds finalizer and sets status ready on success", func(ctx SpecContext) {
-		tester.setPostgresExpectations(func() {
+		expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
+		dbMock.ExpectQuery(databaseDetectionQuery).WithArgs(database.Spec.Name).
+			WillReturnRows(expectedValue)
+
+		expectedCreate := sqlmock.NewResult(0, 1)
+		expectedQuery := fmt.Sprintf(
+			"CREATE DATABASE %s OWNER %s",
+			pgx.Identifier{database.Spec.Name}.Sanitize(),
+			pgx.Identifier{database.Spec.Owner}.Sanitize(),
+		)
+		dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
+
+		err := reconcileDatabase(ctx, fakeClient, r, database)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(database.Status.Applied).Should(HaveValue(BeTrue()))
+		Expect(database.GetStatusMessage()).Should(BeEmpty())
+		Expect(database.GetFinalizers()).NotTo(BeEmpty())
+	})
+
+	It("database object inherits error after patching", func(ctx SpecContext) {
+		expectedError := fmt.Errorf("no permission")
+		expectedValue := sqlmock.NewRows([]string{""}).AddRow("1")
+		dbMock.ExpectQuery(databaseDetectionQuery).WithArgs(database.Spec.Name).
+			WillReturnRows(expectedValue)
+
+		expectedQuery := fmt.Sprintf("ALTER DATABASE %s OWNER TO %s",
+			pgx.Identifier{database.Spec.Name}.Sanitize(),
+			pgx.Identifier{database.Spec.Owner}.Sanitize(),
+		)
+		dbMock.ExpectExec(expectedQuery).WillReturnError(expectedError)
+
+		err := reconcileDatabase(ctx, fakeClient, r, database)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(database.Status.Applied).Should(HaveValue(BeFalse()))
+		Expect(database.GetStatusMessage()).Should(ContainSubstring(expectedError.Error()))
+	})
+
+	When("reclaim policy is delete", func() {
+		It("on deletion it removes finalizers and drops DB", func(ctx SpecContext) {
+			// Mocking DetectDB
 			expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
 			dbMock.ExpectQuery(databaseDetectionQuery).WithArgs(database.Spec.Name).
 				WillReturnRows(expectedValue)
 
+			// Mocking CreateDB
 			expectedCreate := sqlmock.NewResult(0, 1)
 			expectedQuery := fmt.Sprintf(
 				"CREATE DATABASE %s OWNER %s",
@@ -152,83 +170,34 @@ var _ = Describe("Managed Database status", func() {
 				pgx.Identifier{database.Spec.Owner}.Sanitize(),
 			)
 			dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
-		})
 
-		tester.setUpdatedObjectExpectations(func(obj *apiv1.Database) {
-			Expect(obj.Status.Applied).Should(HaveValue(BeTrue()))
-			Expect(obj.GetStatusMessage()).Should(BeEmpty())
-			Expect(obj.GetFinalizers()).NotTo(BeEmpty())
-		})
-
-		tester.assert(ctx, newDatabaseTesterAdapter(database))
-	})
-
-	It("database object inherits error after patching", func(ctx SpecContext) {
-		expectedError := fmt.Errorf("no permission")
-		tester.setPostgresExpectations(func() {
-			expectedValue := sqlmock.NewRows([]string{""}).AddRow("1")
-			dbMock.ExpectQuery(databaseDetectionQuery).WithArgs(database.Spec.Name).
-				WillReturnRows(expectedValue)
-
-			expectedQuery := fmt.Sprintf("ALTER DATABASE %s OWNER TO %s",
+			// Mocking Drop Database
+			expectedDrop := fmt.Sprintf("DROP DATABASE IF EXISTS %s",
 				pgx.Identifier{database.Spec.Name}.Sanitize(),
-				pgx.Identifier{database.Spec.Owner}.Sanitize(),
 			)
-			dbMock.ExpectExec(expectedQuery).WillReturnError(expectedError)
-		})
+			dbMock.ExpectExec(expectedDrop).WillReturnResult(sqlmock.NewResult(0, 1))
 
-		tester.setUpdatedObjectExpectations(func(obj *apiv1.Database) {
-			Expect(obj.Status.Applied).Should(HaveValue(BeFalse()))
-			Expect(obj.GetStatusMessage()).Should(ContainSubstring(expectedError.Error()))
-		})
+			err := reconcileDatabase(ctx, fakeClient, r, database)
+			Expect(err).ToNot(HaveOccurred())
 
-		tester.assert(ctx, newDatabaseTesterAdapter(database))
-	})
+			// Plain successful reconciliation, finalizers have been created
+			Expect(database.GetFinalizers()).NotTo(BeEmpty())
+			Expect(database.Status.Applied).Should(HaveValue(BeTrue()))
+			Expect(database.Status.Message).Should(BeEmpty())
 
-	When("reclaim policy is delete", func() {
-		It("on deletion it removes finalizers and drops DB", func(ctx SpecContext) {
-			tester.setPostgresExpectations(func() {
-				// Mocking DetectDB
-				expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
-				dbMock.ExpectQuery(databaseDetectionQuery).WithArgs(database.Spec.Name).
-					WillReturnRows(expectedValue)
+			// The next 2 lines are a hacky bit to make sure the next reconciler
+			// call doesn't skip on account of Generation == ObservedGeneration.
+			// See fake.Client known issues with `Generation`
+			// https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/client/fake@v0.19.0#NewClientBuilder
+			database.SetGeneration(database.GetGeneration() + 1)
+			Expect(fakeClient.Update(ctx, database)).To(Succeed())
 
-				// Mocking CreateDB
-				expectedCreate := sqlmock.NewResult(0, 1)
-				expectedQuery := fmt.Sprintf(
-					"CREATE DATABASE %s OWNER %s",
-					pgx.Identifier{database.Spec.Name}.Sanitize(),
-					pgx.Identifier{database.Spec.Owner}.Sanitize(),
-				)
-				dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
+			// We now look at the behavior when we delete the Database object
+			Expect(fakeClient.Delete(ctx, database)).To(Succeed())
 
-				// Mocking Drop Database
-				expectedDrop := fmt.Sprintf("DROP DATABASE IF EXISTS %s",
-					pgx.Identifier{database.Spec.Name}.Sanitize(),
-				)
-				dbMock.ExpectExec(expectedDrop).WillReturnResult(sqlmock.NewResult(0, 1))
-			})
-			tester.setUpdatedObjectExpectations(func(obj *apiv1.Database) {
-				// Plain successful reconciliation, finalizers have been created
-				Expect(obj.GetFinalizers()).NotTo(BeEmpty())
-				Expect(obj.Status.Applied).Should(HaveValue(BeTrue()))
-				Expect(obj.Status.Message).Should(BeEmpty())
-			})
-			tester.reconcile()
-			tester.setObjectMutator(func(obj *apiv1.Database) {
-				// The next 2 lines are a hacky bit to make sure the next reconciler
-				// call doesn't skip on account of Generation == ObservedGeneration.
-				// See fake.Client known issues with `Generation`
-				// https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/client/fake@v0.19.0#NewClientBuilder
-				obj.SetGeneration(obj.GetGeneration() + 1)
-				Expect(fakeClient.Update(ctx, obj)).To(Succeed())
-
-				// We now look at the behavior when we delete the Database object
-				Expect(fakeClient.Delete(ctx, obj)).To(Succeed())
-			})
-			tester.setExpectMissingObject()
-			tester.reconcile()
-			tester.assert(ctx, newDatabaseTesterAdapter(database))
+			err = reconcileDatabase(ctx, fakeClient, r, database)
+			Expect(err).To(HaveOccurred())
+			Expect(apierrors.IsNotFound(err)).To(BeTrue())
 		})
 	})
 
@@ -237,42 +206,40 @@ var _ = Describe("Managed Database status", func() {
 			database.Spec.ReclaimPolicy = apiv1.DatabaseReclaimRetain
 			Expect(fakeClient.Update(ctx, database)).To(Succeed())
 
-			tester.setPostgresExpectations(func() {
-				// Mocking DetectDB
-				expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
-				dbMock.ExpectQuery(databaseDetectionQuery).WithArgs(database.Spec.Name).
-					WillReturnRows(expectedValue)
+			// Mocking DetectDB
+			expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
+			dbMock.ExpectQuery(databaseDetectionQuery).WithArgs(database.Spec.Name).
+				WillReturnRows(expectedValue)
 
-				// Mocking CreateDB
-				expectedCreate := sqlmock.NewResult(0, 1)
-				expectedQuery := fmt.Sprintf(
-					"CREATE DATABASE %s OWNER %s",
-					pgx.Identifier{database.Spec.Name}.Sanitize(),
-					pgx.Identifier{database.Spec.Owner}.Sanitize(),
-				)
-				dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
-			})
-			tester.setUpdatedObjectExpectations(func(obj *apiv1.Database) {
-				// Plain successful reconciliation, finalizers have been created
-				Expect(obj.GetFinalizers()).NotTo(BeEmpty())
-				Expect(obj.Status.Applied).Should(HaveValue(BeTrue()))
-				Expect(obj.Status.Message).Should(BeEmpty())
-			})
-			tester.reconcile()
-			tester.setObjectMutator(func(obj *apiv1.Database) {
-				// The next 2 lines are a hacky bit to make sure the next reconciler
-				// call doesn't skip on account of Generation == ObservedGeneration.
-				// See fake.Client known issues with `Generation`
-				// https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/client/fake@v0.19.0#NewClientBuilder
-				obj.SetGeneration(obj.GetGeneration() + 1)
-				Expect(fakeClient.Update(ctx, obj)).To(Succeed())
+			// Mocking CreateDB
+			expectedCreate := sqlmock.NewResult(0, 1)
+			expectedQuery := fmt.Sprintf(
+				"CREATE DATABASE %s OWNER %s",
+				pgx.Identifier{database.Spec.Name}.Sanitize(),
+				pgx.Identifier{database.Spec.Owner}.Sanitize(),
+			)
+			dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
 
-				// We now look at the behavior when we delete the Database object
-				Expect(fakeClient.Delete(ctx, obj)).To(Succeed())
-			})
-			tester.setExpectMissingObject()
-			tester.reconcile()
-			tester.assert(ctx, newDatabaseTesterAdapter(database))
+			err := reconcileDatabase(ctx, fakeClient, r, database)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Plain successful reconciliation, finalizers have been created
+			Expect(database.GetFinalizers()).NotTo(BeEmpty())
+			Expect(database.Status.Applied).Should(HaveValue(BeTrue()))
+			Expect(database.Status.Message).Should(BeEmpty())
+
+			// The next 2 lines are a hacky bit to make sure the next reconciler
+			// call doesn't skip on account of Generation == ObservedGeneration.
+			// See fake.Client known issues with `Generation`
+			// https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/client/fake@v0.19.0#NewClientBuilder
+			database.SetGeneration(database.GetGeneration() + 1)
+			Expect(fakeClient.Update(ctx, database)).To(Succeed())
+
+			// We now look at the behavior when we delete the Database object
+			Expect(fakeClient.Delete(ctx, database)).To(Succeed())
+
+			err = reconcileDatabase(ctx, fakeClient, r, database)
+			Expect(apierrors.IsNotFound(err)).To(BeTrue())
 		})
 	})
 
@@ -297,13 +264,12 @@ var _ = Describe("Managed Database status", func() {
 		database.Spec.ClusterRef.Name = "cluster-other"
 		Expect(fakeClient.Update(ctx, database)).To(Succeed())
 
-		tester.reconcileFunc = r.Reconcile
-		tester.setUpdatedObjectExpectations(func(obj *apiv1.Database) {
-			Expect(obj.Status.Applied).Should(HaveValue(BeFalse()))
-			Expect(obj.Status.Message).Should(ContainSubstring(
-				fmt.Sprintf("%q not found", database.Spec.ClusterRef.Name)))
-		})
-		tester.assert(ctx, newDatabaseTesterAdapter(database))
+		err := reconcileDatabase(ctx, fakeClient, r, database)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(database.Status.Applied).Should(HaveValue(BeFalse()))
+		Expect(database.Status.Message).Should(ContainSubstring(
+			fmt.Sprintf("%q not found", database.Spec.ClusterRef.Name)))
 	})
 
 	It("skips reconciliation if database object isn't found (deleted database)", func(ctx SpecContext) {
@@ -339,21 +305,19 @@ var _ = Describe("Managed Database status", func() {
 		database.Spec.Ensure = apiv1.EnsureAbsent
 		Expect(fakeClient.Update(ctx, database)).To(Succeed())
 
-		tester.setPostgresExpectations(func() {
-			expectedValue := sqlmock.NewResult(0, 1)
-			expectedQuery := fmt.Sprintf(
-				"DROP DATABASE IF EXISTS %s",
-				pgx.Identifier{database.Spec.Name}.Sanitize(),
-			)
-			dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedValue)
-		})
+		expectedValue := sqlmock.NewResult(0, 1)
+		expectedQuery := fmt.Sprintf(
+			"DROP DATABASE IF EXISTS %s",
+			pgx.Identifier{database.Spec.Name}.Sanitize(),
+		)
+		dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedValue)
 
-		tester.setUpdatedObjectExpectations(func(obj *apiv1.Database) {
-			Expect(obj.Status.Applied).To(HaveValue(BeTrue()))
-			Expect(obj.Status.Message).To(BeEmpty())
-			Expect(obj.Status.ObservedGeneration).To(BeEquivalentTo(1))
-		})
-		tester.assert(ctx, newDatabaseTesterAdapter(database))
+		err := reconcileDatabase(ctx, fakeClient, r, database)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(database.Status.Applied).To(HaveValue(BeTrue()))
+		Expect(database.Status.Message).To(BeEmpty())
+		Expect(database.Status.ObservedGeneration).To(BeEquivalentTo(1))
 	})
 
 	It("marks as failed if the target Database is already being managed", func(ctx SpecContext) {
@@ -380,15 +344,14 @@ var _ = Describe("Managed Database status", func() {
 		// Expect(fakeClient.Create(ctx, currentManager)).To(Succeed())
 		Expect(fakeClient.Create(ctx, dbDuplicate)).To(Succeed())
 
-		tester.setUpdatedObjectExpectations(func(obj *apiv1.Database) {
-			expectedError := fmt.Sprintf("%q is already managed by object %q",
-				dbDuplicate.Spec.Name, database.Name)
-			Expect(obj.Status.Applied).To(HaveValue(BeFalse()))
-			Expect(obj.Status.Message).To(ContainSubstring(expectedError))
-			Expect(obj.Status.ObservedGeneration).To(BeZero())
-		})
+		err := reconcileDatabase(ctx, fakeClient, r, dbDuplicate)
+		Expect(err).ToNot(HaveOccurred())
 
-		tester.assert(ctx, newDatabaseTesterAdapter(dbDuplicate))
+		expectedError := fmt.Sprintf("%q is already managed by object %q",
+			dbDuplicate.Spec.Name, database.Name)
+		Expect(dbDuplicate.Status.Applied).To(HaveValue(BeFalse()))
+		Expect(dbDuplicate.Status.Message).To(ContainSubstring(expectedError))
+		Expect(dbDuplicate.Status.ObservedGeneration).To(BeZero())
 	})
 
 	It("properly signals a database is on a replica cluster", func(ctx SpecContext) {
@@ -398,10 +361,28 @@ var _ = Describe("Managed Database status", func() {
 		}
 		Expect(fakeClient.Patch(ctx, cluster, client.MergeFrom(initialCluster))).To(Succeed())
 
-		tester.setUpdatedObjectExpectations(func(obj *apiv1.Database) {
-			Expect(obj.Status.Applied).Should(BeNil())
-			Expect(obj.Status.Message).Should(ContainSubstring("waiting for the cluster to become primary"))
-		})
-		tester.assert(ctx, newDatabaseTesterAdapter(database))
+		err := reconcileDatabase(ctx, fakeClient, r, database)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(database.Status.Applied).Should(BeNil())
+		Expect(database.Status.Message).Should(ContainSubstring("waiting for the cluster to become primary"))
 	})
 })
+
+func reconcileDatabase(
+	ctx context.Context,
+	fakeClient client.Client,
+	r *DatabaseReconciler,
+	database *apiv1.Database,
+) error {
+	GinkgoT().Helper()
+	_, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{
+		Namespace: database.GetNamespace(),
+		Name:      database.GetName(),
+	}})
+	Expect(err).ToNot(HaveOccurred())
+	return fakeClient.Get(ctx, client.ObjectKey{
+		Namespace: database.GetNamespace(),
+		Name:      database.GetName(),
+	}, database)
+}

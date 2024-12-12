@@ -17,6 +17,7 @@ limitations under the License.
 package controller
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 
@@ -24,6 +25,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/lib/pq"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
@@ -44,26 +46,6 @@ const subscriptionDetectionQuery = `SELECT count(*)
 		FROM pg_subscription
 		WHERE subname = $1`
 
-type subscriptionTesterAdapter struct {
-	*apiv1.Subscription
-}
-
-func (s *subscriptionTesterAdapter) GetStatusApplied() *bool {
-	return s.Status.Applied
-}
-
-func (s *subscriptionTesterAdapter) SetObservedGeneration(gen int64) {
-	s.Status.ObservedGeneration = gen
-}
-
-func (s *subscriptionTesterAdapter) GetClientObject() client.Object {
-	return s.Subscription
-}
-
-func newSubscriptionTesterAdapter(subscription *apiv1.Subscription) postgresObjectManager {
-	return &subscriptionTesterAdapter{Subscription: subscription}
-}
-
 var _ = Describe("Managed subscription controller tests", func() {
 	var (
 		dbMock       sqlmock.Sqlmock
@@ -74,7 +56,6 @@ var _ = Describe("Managed subscription controller tests", func() {
 		fakeClient   client.Client
 		connString   string
 		err          error
-		tester       postgresReconciliationTester[*apiv1.Subscription]
 	)
 
 	BeforeEach(func() {
@@ -145,11 +126,6 @@ var _ = Describe("Managed subscription controller tests", func() {
 			utils.SubscriptionFinalizerName,
 			r.evaluateDropSubscription,
 		)
-
-		tester = postgresReconciliationTester[*apiv1.Subscription]{
-			reconcileFunc: r.Reconcile,
-			cli:           fakeClient,
-		}
 	})
 
 	AfterEach(func() {
@@ -157,11 +133,62 @@ var _ = Describe("Managed subscription controller tests", func() {
 	})
 
 	It("adds finalizer and sets status ready on success", func(ctx SpecContext) {
-		tester.setPostgresExpectations(func() {
-			noHits := sqlmock.NewRows([]string{""}).AddRow("0")
-			dbMock.ExpectQuery(subscriptionDetectionQuery).WithArgs(subscription.Spec.Name).
-				WillReturnRows(noHits)
+		noHits := sqlmock.NewRows([]string{""}).AddRow("0")
+		dbMock.ExpectQuery(subscriptionDetectionQuery).WithArgs(subscription.Spec.Name).
+			WillReturnRows(noHits)
 
+		expectedCreate := sqlmock.NewResult(0, 1)
+		expectedQuery := fmt.Sprintf(
+			"CREATE SUBSCRIPTION %s CONNECTION %s PUBLICATION %s",
+			pgx.Identifier{subscription.Spec.Name}.Sanitize(),
+			pq.QuoteLiteral(connString),
+			pgx.Identifier{subscription.Spec.PublicationName}.Sanitize(),
+		)
+		dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
+
+		_, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{
+			Namespace: subscription.GetNamespace(),
+			Name:      subscription.GetName(),
+		}})
+		Expect(err).ToNot(HaveOccurred())
+		err = fakeClient.Get(ctx, client.ObjectKey{
+			Namespace: subscription.GetNamespace(),
+			Name:      subscription.GetName(),
+		}, subscription)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(subscription.Status.Applied).Should(HaveValue(BeTrue()))
+		Expect(subscription.GetStatusMessage()).Should(BeEmpty())
+		Expect(subscription.GetFinalizers()).NotTo(BeEmpty())
+	})
+
+	It("subscription object inherits error after patching", func(ctx SpecContext) {
+		expectedError := fmt.Errorf("no permission")
+		oneHit := sqlmock.NewRows([]string{""}).AddRow("1")
+		dbMock.ExpectQuery(subscriptionDetectionQuery).WithArgs(subscription.Spec.Name).
+			WillReturnRows(oneHit)
+
+		expectedQuery := fmt.Sprintf("ALTER SUBSCRIPTION %s SET PUBLICATION %s",
+			pgx.Identifier{subscription.Spec.Name}.Sanitize(),
+			pgx.Identifier{subscription.Spec.PublicationName}.Sanitize(),
+		)
+		dbMock.ExpectExec(expectedQuery).WillReturnError(expectedError)
+
+		err = reconcileSubscription(ctx, fakeClient, r, subscription)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(subscription.Status.Applied).Should(HaveValue(BeFalse()))
+		Expect(subscription.Status.Message).Should(ContainSubstring(expectedError.Error()))
+	})
+
+	When("reclaim policy is delete", func() {
+		It("on deletion it removes finalizers and drops the subscription", func(ctx SpecContext) {
+			// Mocking detection of subscriptions
+			expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
+			dbMock.ExpectQuery(subscriptionDetectionQuery).WithArgs(subscription.Spec.Name).
+				WillReturnRows(expectedValue)
+
+			// Mocking create subscription
 			expectedCreate := sqlmock.NewResult(0, 1)
 			expectedQuery := fmt.Sprintf(
 				"CREATE SUBSCRIPTION %s CONNECTION %s PUBLICATION %s",
@@ -170,84 +197,34 @@ var _ = Describe("Managed subscription controller tests", func() {
 				pgx.Identifier{subscription.Spec.PublicationName}.Sanitize(),
 			)
 			dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
-		})
 
-		tester.setUpdatedObjectExpectations(func(obj *apiv1.Subscription) {
-			Expect(obj.Status.Applied).Should(HaveValue(BeTrue()))
-			Expect(obj.GetStatusMessage()).Should(BeEmpty())
-			Expect(obj.GetFinalizers()).NotTo(BeEmpty())
-		})
-
-		tester.assert(ctx, newSubscriptionTesterAdapter(subscription))
-	})
-
-	It("subscription object inherits error after patching", func(ctx SpecContext) {
-		expectedError := fmt.Errorf("no permission")
-		tester.setPostgresExpectations(func() {
-			oneHit := sqlmock.NewRows([]string{""}).AddRow("1")
-			dbMock.ExpectQuery(subscriptionDetectionQuery).WithArgs(subscription.Spec.Name).
-				WillReturnRows(oneHit)
-
-			expectedQuery := fmt.Sprintf("ALTER SUBSCRIPTION %s SET PUBLICATION %s",
+			// Mocking Drop subscription
+			expectedDrop := fmt.Sprintf("DROP SUBSCRIPTION IF EXISTS %s",
 				pgx.Identifier{subscription.Spec.Name}.Sanitize(),
-				pgx.Identifier{subscription.Spec.PublicationName}.Sanitize(),
 			)
-			dbMock.ExpectExec(expectedQuery).WillReturnError(expectedError)
-		})
+			dbMock.ExpectExec(expectedDrop).WillReturnResult(sqlmock.NewResult(0, 1))
 
-		tester.setUpdatedObjectExpectations(func(obj *apiv1.Subscription) {
-			Expect(obj.Status.Applied).Should(HaveValue(BeFalse()))
-			Expect(obj.Status.Message).Should(ContainSubstring(expectedError.Error()))
-		})
+			err = reconcileSubscription(ctx, fakeClient, r, subscription)
+			Expect(err).ToNot(HaveOccurred())
 
-		tester.assert(ctx, newSubscriptionTesterAdapter(subscription))
-	})
+			// Plain successful reconciliation, finalizers have been created
+			Expect(subscription.GetFinalizers()).NotTo(BeEmpty())
+			Expect(subscription.Status.Applied).Should(HaveValue(BeTrue()))
+			Expect(subscription.Status.Message).Should(BeEmpty())
 
-	When("reclaim policy is delete", func() {
-		It("on deletion it removes finalizers and drops the subscription", func(ctx SpecContext) {
-			tester.setPostgresExpectations(func() {
-				// Mocking detection of subscriptions
-				expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
-				dbMock.ExpectQuery(subscriptionDetectionQuery).WithArgs(subscription.Spec.Name).
-					WillReturnRows(expectedValue)
+			// The next 2 lines are a hacky bit to make sure the next reconciler
+			// call doesn't skip on account of Generation == ObservedGeneration.
+			// See fake.Client known issues with `Generation`
+			// https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/client/fake@v0.19.0#NewClientBuilder
+			subscription.SetGeneration(subscription.GetGeneration() + 1)
+			Expect(fakeClient.Update(ctx, subscription)).To(Succeed())
 
-				// Mocking create subscription
-				expectedCreate := sqlmock.NewResult(0, 1)
-				expectedQuery := fmt.Sprintf(
-					"CREATE SUBSCRIPTION %s CONNECTION %s PUBLICATION %s",
-					pgx.Identifier{subscription.Spec.Name}.Sanitize(),
-					pq.QuoteLiteral(connString),
-					pgx.Identifier{subscription.Spec.PublicationName}.Sanitize(),
-				)
-				dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
+			// We now look at the behavior when we delete the Database object
+			Expect(fakeClient.Delete(ctx, subscription)).To(Succeed())
 
-				// Mocking Drop subscription
-				expectedDrop := fmt.Sprintf("DROP SUBSCRIPTION IF EXISTS %s",
-					pgx.Identifier{subscription.Spec.Name}.Sanitize(),
-				)
-				dbMock.ExpectExec(expectedDrop).WillReturnResult(sqlmock.NewResult(0, 1))
-			})
-			tester.setUpdatedObjectExpectations(func(obj *apiv1.Subscription) {
-				// Plain successful reconciliation, finalizers have been created
-				Expect(obj.GetFinalizers()).NotTo(BeEmpty())
-				Expect(obj.Status.Applied).Should(HaveValue(BeTrue()))
-				Expect(obj.Status.Message).Should(BeEmpty())
-			})
-			tester.reconcile()
-			tester.setObjectMutator(func(obj *apiv1.Subscription) {
-				// The next 2 lines are a hacky bit to make sure the next reconciler
-				// call doesn't skip on account of Generation == ObservedGeneration.
-				// See fake.Client known issues with `Generation`
-				// https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/client/fake@v0.19.0#NewClientBuilder
-				obj.SetGeneration(obj.GetGeneration() + 1)
-				Expect(fakeClient.Update(ctx, obj)).To(Succeed())
-
-				// We now look at the behavior when we delete the Database object
-				Expect(fakeClient.Delete(ctx, obj)).To(Succeed())
-			})
-			tester.setExpectMissingObject()
-			tester.reconcile()
-			tester.assert(ctx, newSubscriptionTesterAdapter(subscription))
+			err = reconcileSubscription(ctx, fakeClient, r, subscription)
+			Expect(err).To(HaveOccurred())
+			Expect(apierrors.IsNotFound(err)).To(BeTrue())
 		})
 	})
 
@@ -256,43 +233,42 @@ var _ = Describe("Managed subscription controller tests", func() {
 			subscription.Spec.ReclaimPolicy = apiv1.SubscriptionReclaimRetain
 			Expect(fakeClient.Update(ctx, subscription)).To(Succeed())
 
-			tester.setPostgresExpectations(func() {
-				// Mocking Detect subscription
-				expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
-				dbMock.ExpectQuery(subscriptionDetectionQuery).WithArgs(subscription.Spec.Name).
-					WillReturnRows(expectedValue)
+			// Mocking Detect subscription
+			expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
+			dbMock.ExpectQuery(subscriptionDetectionQuery).WithArgs(subscription.Spec.Name).
+				WillReturnRows(expectedValue)
 
-				// Mocking Create subscription
-				expectedCreate := sqlmock.NewResult(0, 1)
-				expectedQuery := fmt.Sprintf(
-					"CREATE SUBSCRIPTION %s CONNECTION %s PUBLICATION %s",
-					pgx.Identifier{subscription.Spec.Name}.Sanitize(),
-					pq.QuoteLiteral(connString),
-					pgx.Identifier{subscription.Spec.PublicationName}.Sanitize(),
-				)
-				dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
-			})
-			tester.setUpdatedObjectExpectations(func(obj *apiv1.Subscription) {
-				// Plain successful reconciliation, finalizers have been created
-				Expect(obj.GetFinalizers()).NotTo(BeEmpty())
-				Expect(obj.Status.Applied).Should(HaveValue(BeTrue()))
-				Expect(obj.Status.Message).Should(BeEmpty())
-			})
-			tester.reconcile()
-			tester.setObjectMutator(func(obj *apiv1.Subscription) {
-				// The next 2 lines are a hacky bit to make sure the next reconciler
-				// call doesn't skip on account of Generation == ObservedGeneration.
-				// See fake.Client known issues with `Generation`
-				// https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/client/fake@v0.19.0#NewClientBuilder
-				obj.SetGeneration(obj.GetGeneration() + 1)
-				Expect(fakeClient.Update(ctx, obj)).To(Succeed())
+			// Mocking Create subscription
+			expectedCreate := sqlmock.NewResult(0, 1)
+			expectedQuery := fmt.Sprintf(
+				"CREATE SUBSCRIPTION %s CONNECTION %s PUBLICATION %s",
+				pgx.Identifier{subscription.Spec.Name}.Sanitize(),
+				pq.QuoteLiteral(connString),
+				pgx.Identifier{subscription.Spec.PublicationName}.Sanitize(),
+			)
+			dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedCreate)
 
-				// We now look at the behavior when we delete the Database object
-				Expect(fakeClient.Delete(ctx, obj)).To(Succeed())
-			})
-			tester.setExpectMissingObject()
-			tester.reconcile()
-			tester.assert(ctx, newSubscriptionTesterAdapter(subscription))
+			err = reconcileSubscription(ctx, fakeClient, r, subscription)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Plain successful reconciliation, finalizers have been created
+			Expect(subscription.GetFinalizers()).NotTo(BeEmpty())
+			Expect(subscription.Status.Applied).Should(HaveValue(BeTrue()))
+			Expect(subscription.Status.Message).Should(BeEmpty())
+
+			// The next 2 lines are a hacky bit to make sure the next reconciler
+			// call doesn't skip on account of Generation == ObservedGeneration.
+			// See fake.Client known issues with `Generation`
+			// https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/client/fake@v0.19.0#NewClientBuilder
+			subscription.SetGeneration(subscription.GetGeneration() + 1)
+			Expect(fakeClient.Update(ctx, subscription)).To(Succeed())
+
+			// We now look at the behavior when we delete the Database object
+			Expect(fakeClient.Delete(ctx, subscription)).To(Succeed())
+
+			err = reconcileSubscription(ctx, fakeClient, r, subscription)
+			Expect(err).To(HaveOccurred())
+			Expect(apierrors.IsNotFound(err)).To(BeTrue())
 		})
 	})
 
@@ -313,19 +289,16 @@ var _ = Describe("Managed subscription controller tests", func() {
 			},
 		}
 
-		tester.reconcileFunc = r.Reconcile
-
 		// Updating the subscription object to reference the newly created Cluster
 		subscription.Spec.ClusterRef.Name = "cluster-other"
 		Expect(fakeClient.Update(ctx, subscription)).To(Succeed())
 
-		tester.setUpdatedObjectExpectations(func(obj *apiv1.Subscription) {
-			Expect(obj.Status.Applied).Should(HaveValue(BeFalse()))
-			Expect(obj.Status.Message).Should(ContainSubstring(
-				fmt.Sprintf("%q not found", subscription.Spec.ClusterRef.Name)))
-		})
+		err = reconcileSubscription(ctx, fakeClient, r, subscription)
+		Expect(err).ToNot(HaveOccurred())
 
-		tester.assert(ctx, newSubscriptionTesterAdapter(subscription))
+		Expect(subscription.Status.Applied).Should(HaveValue(BeFalse()))
+		Expect(subscription.Status.Message).Should(ContainSubstring(
+			fmt.Sprintf("%q not found", subscription.Spec.ClusterRef.Name)))
 	})
 
 	It("skips reconciliation if subscription object isn't found (deleted subscription)", func(ctx SpecContext) {
@@ -381,14 +354,13 @@ var _ = Describe("Managed subscription controller tests", func() {
 		// Expect(fakeClient.Create(ctx, currentManager)).To(Succeed())
 		Expect(fakeClient.Create(ctx, subDuplicate)).To(Succeed())
 
-		tester.setUpdatedObjectExpectations(func(obj *apiv1.Subscription) {
-			expectedError := fmt.Sprintf("%q is already managed by object %q",
-				subDuplicate.Spec.Name, subscription.Name)
-			Expect(obj.Status.Applied).Should(HaveValue(BeFalse()))
-			Expect(obj.Status.Message).Should(ContainSubstring(expectedError))
-		})
+		err = reconcileSubscription(ctx, fakeClient, r, subDuplicate)
+		Expect(err).ToNot(HaveOccurred())
 
-		tester.assert(ctx, newSubscriptionTesterAdapter(subDuplicate))
+		expectedError := fmt.Sprintf("%q is already managed by object %q",
+			subDuplicate.Spec.Name, subscription.Name)
+		Expect(subDuplicate.Status.Applied).Should(HaveValue(BeFalse()))
+		Expect(subDuplicate.Status.Message).Should(ContainSubstring(expectedError))
 	})
 
 	It("properly signals a subscription is on a replica cluster", func(ctx SpecContext) {
@@ -398,11 +370,28 @@ var _ = Describe("Managed subscription controller tests", func() {
 		}
 		Expect(fakeClient.Patch(ctx, cluster, client.MergeFrom(initialCluster))).To(Succeed())
 
-		tester.setUpdatedObjectExpectations(func(obj *apiv1.Subscription) {
-			Expect(obj.Status.Applied).Should(BeNil())
-			Expect(obj.Status.Message).Should(ContainSubstring("waiting for the cluster to become primary"))
-		})
+		err = reconcileSubscription(ctx, fakeClient, r, subscription)
+		Expect(err).ToNot(HaveOccurred())
 
-		tester.assert(ctx, newSubscriptionTesterAdapter(subscription))
+		Expect(subscription.Status.Applied).Should(BeNil())
+		Expect(subscription.Status.Message).Should(ContainSubstring("waiting for the cluster to become primary"))
 	})
 })
+
+func reconcileSubscription(
+	ctx context.Context,
+	fakeClient client.Client,
+	r *SubscriptionReconciler,
+	subscription *apiv1.Subscription,
+) error {
+	GinkgoT().Helper()
+	_, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: types.NamespacedName{
+		Namespace: subscription.GetNamespace(),
+		Name:      subscription.GetName(),
+	}})
+	Expect(err).ToNot(HaveOccurred())
+	return fakeClient.Get(ctx, client.ObjectKey{
+		Namespace: subscription.GetNamespace(),
+		Name:      subscription.GetName(),
+	}, subscription)
+}
