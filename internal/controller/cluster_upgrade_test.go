@@ -57,7 +57,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 	})
 
 	It("will not require a restart for just created Pods", func(ctx SpecContext) {
-		pod := specs.PodWithExistingStorage(cluster, 1)
+		pod, _ := specs.PodWithExistingStorage(cluster, 1)
 
 		status := postgres.PostgresqlStatus{
 			Pod:            pod,
@@ -71,7 +71,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 	})
 
 	It("requires rollout when running a different image name", func(ctx SpecContext) {
-		pod := specs.PodWithExistingStorage(cluster, 1)
+		pod, _ := specs.PodWithExistingStorage(cluster, 1)
 		pod.Spec.Containers[0].Image = "postgres:13.10"
 		status := postgres.PostgresqlStatus{
 			Pod:            pod,
@@ -86,7 +86,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 	})
 
 	It("requires rollout when a restart annotation has been added to the cluster", func(ctx SpecContext) {
-		pod := specs.PodWithExistingStorage(cluster, 1)
+		pod, _ := specs.PodWithExistingStorage(cluster, 1)
 		clusterRestart := cluster
 		clusterRestart.Annotations = make(map[string]string)
 		clusterRestart.Annotations[utils.ClusterRestartAnnotationName] = "now"
@@ -110,7 +110,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 	})
 
 	It("should prioritize full rollout over inplace restarts", func(ctx SpecContext) {
-		pod := specs.PodWithExistingStorage(cluster, 1)
+		pod, _ := specs.PodWithExistingStorage(cluster, 1)
 
 		status := postgres.PostgresqlStatus{
 			Pod:            pod,
@@ -140,7 +140,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 	})
 
 	It("requires rollout when PostgreSQL needs to be restarted", func(ctx SpecContext) {
-		pod := specs.PodWithExistingStorage(cluster, 1)
+		pod, _ := specs.PodWithExistingStorage(cluster, 1)
 
 		status := postgres.PostgresqlStatus{
 			Pod:            pod,
@@ -166,7 +166,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 	})
 
 	It("requires pod rollout if executable does not have a hash", func(ctx SpecContext) {
-		pod := specs.PodWithExistingStorage(cluster, 1)
+		pod, _ := specs.PodWithExistingStorage(cluster, 1)
 		status := postgres.PostgresqlStatus{
 			Pod:            pod,
 			PendingRestart: false,
@@ -181,7 +181,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 	})
 
 	It("checkPodSpecIsOutdated should not return any error", func() {
-		pod := specs.PodWithExistingStorage(cluster, 1)
+		pod, _ := specs.PodWithExistingStorage(cluster, 1)
 		rollout, err := checkPodSpecIsOutdated(pod, &cluster)
 		Expect(rollout.required).To(BeFalse())
 		Expect(rollout.canBeInPlace).To(BeFalse())
@@ -190,7 +190,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 	})
 
 	It("checks when a rollout is needed for any reason", func(ctx SpecContext) {
-		pod := specs.PodWithExistingStorage(cluster, 1)
+		pod, _ := specs.PodWithExistingStorage(cluster, 1)
 		status := postgres.PostgresqlStatus{
 			Pod:            pod,
 			PendingRestart: true,
@@ -216,7 +216,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 
 	When("the PodSpec annotation is not available", func() {
 		It("should trigger a rollout when the scheduler changes", func(ctx SpecContext) {
-			pod := specs.PodWithExistingStorage(cluster, 1)
+			pod, _ := specs.PodWithExistingStorage(cluster, 1)
 			cluster.Spec.SchedulerName = "newScheduler"
 			delete(pod.Annotations, utils.PodSpecAnnotationName)
 
@@ -241,7 +241,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 				ImageName: "postgres:13.11",
 			},
 		}
-		pod := specs.PodWithExistingStorage(cluster, 1)
+		pod, _ := specs.PodWithExistingStorage(cluster, 1)
 		cluster.Spec.SchedulerName = "newScheduler"
 
 		status := postgres.PostgresqlStatus{
@@ -272,7 +272,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 			},
 		}
 		It("should trigger a rollout when the cluster has a Resource changed", func(ctx SpecContext) {
-			pod := specs.PodWithExistingStorage(clusterWithResources, 1)
+			pod, _ := specs.PodWithExistingStorage(clusterWithResources, 1)
 			clusterWithResources.Spec.Resources.Limits["cpu"] = resource.MustParse("3") // was "2"
 
 			status := postgres.PostgresqlStatus{
@@ -290,7 +290,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 			Expect(rollout.needsChangeOperatorImage).To(BeFalse())
 		})
 		It("should trigger a rollout when the cluster has Resources deleted from spec", func(ctx SpecContext) {
-			pod := specs.PodWithExistingStorage(clusterWithResources, 1)
+			pod, _ := specs.PodWithExistingStorage(clusterWithResources, 1)
 			clusterWithResources.Spec.Resources = corev1.ResourceRequirements{}
 
 			status := postgres.PostgresqlStatus{
@@ -311,7 +311,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 
 	When("the PodSpec annotation is not available", func() {
 		It("detects when a new custom environment variable is set", func(ctx SpecContext) {
-			pod := specs.PodWithExistingStorage(cluster, 1)
+			pod, _ := specs.PodWithExistingStorage(cluster, 1)
 			delete(pod.Annotations, utils.PodSpecAnnotationName)
 
 			cluster := cluster.DeepCopy()
@@ -341,7 +341,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 					ImageName: "postgres:13.11",
 				},
 			}
-			pod := specs.PodWithExistingStorage(cluster, 1)
+			pod, _ := specs.PodWithExistingStorage(cluster, 1)
 			delete(pod.Annotations, utils.PodSpecAnnotationName)
 
 			status := postgres.PostgresqlStatus{
@@ -365,7 +365,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 					ImageName: "postgres:13.11",
 				},
 			}
-			pod := specs.PodWithExistingStorage(cluster, 1)
+			pod, _ := specs.PodWithExistingStorage(cluster, 1)
 			delete(pod.Annotations, utils.PodSpecAnnotationName)
 
 			status := postgres.PostgresqlStatus{
@@ -388,7 +388,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 
 	When("the podSpec annotation is available", func() {
 		It("detects when a new custom environment variable is set", func(ctx SpecContext) {
-			pod := specs.PodWithExistingStorage(cluster, 1)
+			pod, _ := specs.PodWithExistingStorage(cluster, 1)
 
 			cluster := cluster.DeepCopy()
 			cluster.Spec.Env = []corev1.EnvVar{
@@ -418,7 +418,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 					ImageName: "postgres:13.11",
 				},
 			}
-			pod := specs.PodWithExistingStorage(cluster, 1)
+			pod, _ := specs.PodWithExistingStorage(cluster, 1)
 
 			status := postgres.PostgresqlStatus{
 				Pod:            pod,
@@ -441,7 +441,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 					ImageName: "postgres:13.11",
 				},
 			}
-			pod := specs.PodWithExistingStorage(cluster, 1)
+			pod, _ := specs.PodWithExistingStorage(cluster, 1)
 
 			status := postgres.PostgresqlStatus{
 				Pod:            pod,
@@ -467,7 +467,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 				cluster.Spec.ProjectedVolumeTemplate = &corev1.ProjectedVolumeSource{
 					Sources: []corev1.VolumeProjection{},
 				}
-				pod := specs.PodWithExistingStorage(cluster, 1)
+				pod, _ := specs.PodWithExistingStorage(cluster, 1)
 				status := postgres.PostgresqlStatus{
 					Pod:            pod,
 					IsPodReady:     true,
@@ -484,7 +484,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 				cluster.Spec.ProjectedVolumeTemplate = &corev1.ProjectedVolumeSource{
 					Sources: nil,
 				}
-				pod := specs.PodWithExistingStorage(cluster, 1)
+				pod, _ := specs.PodWithExistingStorage(cluster, 1)
 				status := postgres.PostgresqlStatus{
 					Pod:            pod,
 					IsPodReady:     true,
@@ -499,7 +499,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 		It("should not require rollout if projected volume  is nil",
 			func(ctx SpecContext) {
 				cluster.Spec.ProjectedVolumeTemplate = nil
-				pod := specs.PodWithExistingStorage(cluster, 1)
+				pod, _ := specs.PodWithExistingStorage(cluster, 1)
 				status := postgres.PostgresqlStatus{
 					Pod:            pod,
 					IsPodReady:     true,
@@ -531,7 +531,7 @@ var _ = Describe("Test pod rollout due to topology", func() {
 				TopologySpreadConstraints: []corev1.TopologySpreadConstraint{topology},
 			},
 		}
-		pod = specs.PodWithExistingStorage(*cluster, 1)
+		pod, _ = specs.PodWithExistingStorage(*cluster, 1)
 	})
 
 	When("the original podSpec annotation is available", func() {
@@ -596,7 +596,7 @@ var _ = Describe("Test pod rollout due to topology", func() {
 
 		It("should not require rollout if pod and spec both lack TopologySpreadConstraints", func(ctx SpecContext) {
 			cluster.Spec.TopologySpreadConstraints = nil
-			pod = specs.PodWithExistingStorage(*cluster, 1)
+			pod, _ = specs.PodWithExistingStorage(*cluster, 1)
 			Expect(pod.Spec.TopologySpreadConstraints).To(BeNil())
 
 			status := postgres.PostgresqlStatus{
@@ -755,7 +755,7 @@ var _ = Describe("Cluster upgrade with podSpec reconciliation disabled", func() 
 	It("skips the rollout if the annotation that disables PodSpec reconciliation is set", func(ctx SpecContext) {
 		cluster.ObjectMeta.Annotations[utils.ReconcilePodSpecAnnotationName] = "disabled"
 
-		pod := specs.PodWithExistingStorage(cluster, 1)
+		pod, _ := specs.PodWithExistingStorage(cluster, 1)
 		cluster.Spec.SchedulerName = "newScheduler"
 		delete(pod.Annotations, utils.PodSpecAnnotationName)
 

@@ -1443,7 +1443,7 @@ func findInstancePodToCreate(
 		if err != nil {
 			return nil, err
 		}
-		return specs.PodWithExistingStorage(*cluster, serial), nil
+		return specs.PodWithExistingStorage(*cluster, serial)
 	}
 
 	return nil, nil
