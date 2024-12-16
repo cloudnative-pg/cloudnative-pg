@@ -13,7 +13,7 @@ resources:
 - bases/postgresql.cnpg.io_databases.yaml
 - bases/postgresql.cnpg.io_publications.yaml
 - bases/postgresql.cnpg.io_subscriptions.yaml
-- bases/postgresql.cnpg.io_roles.yaml
+- bases/postgresql.cnpg.io_pgroles.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 patches:
 # [WEBHOOK] To enable webhook, uncomment all the sections with [WEBHOOK] prefix.

@@ -23,11 +23,11 @@ import (
 type RoleReclaimPolicy string
 
 const (
-	// RoleReclaimDelete means the Role will be deleted from Kubernetes on release
+	// RoleReclaimDelete means the PGRole will be deleted from Kubernetes on release
 	// from its claim.
 	RoleReclaimDelete RoleReclaimPolicy = "delete"
 
-	// RoleReclaimRetain means the Role will be left in its current phase for manual
+	// RoleReclaimRetain means the PGRole will be left in its current phase for manual
 	// reclamation by the administrator. The default policy is Retain.
 	RoleReclaimRetain RoleReclaimPolicy = "retain"
 )
@@ -129,7 +129,7 @@ type RoleSpec struct {
 	BypassRLS bool `json:"bypassrls,omitempty"` // Row-Level Security
 }
 
-// RoleState defines the observed state of a Role
+// RoleState defines the observed state of a PGRole
 // TODO: the existing RoleStatus in the cluster managed roles, does more than we need
 type RoleState struct {
 	// A sequence number representing the latest
@@ -158,8 +158,8 @@ type RoleState struct {
 // +kubebuilder:printcolumn:name="Applied",type="boolean",JSONPath=".status.applied"
 // +kubebuilder:printcolumn:name="Message",type="string",JSONPath=".status.message",description="Latest message"
 
-// Role is the Schema for the databases API
-type Role struct {
+// PGRole is the Schema for the databases API
+type PGRole struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
@@ -169,13 +169,13 @@ type Role struct {
 
 // +kubebuilder:object:root=true
 
-// RoleList contains a list of Roles
-type RoleList struct {
+// PGRoleList contains a list of Roles
+type PGRoleList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []Role `json:"items"`
+	Items           []PGRole `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&Role{}, &RoleList{})
+	SchemeBuilder.Register(&PGRole{}, &PGRoleList{})
 }

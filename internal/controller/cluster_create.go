@@ -713,7 +713,7 @@ func (r *ClusterReconciler) createOrPatchRole(ctx context.Context, cluster *apiv
 		return r.createRole(ctx, cluster, originBackup)
 	}
 
-	var roleList apiv1.RoleList
+	var roleList apiv1.PGRoleList
 	// TODO: to ensure we only give permissions for the secrets in the Roles that refer
 	// to THIS cluster, we should add cluster labels to the Role objects, then filter with
 	// client.MatchingLabels{utils.ClusterLabelName: clusterName},

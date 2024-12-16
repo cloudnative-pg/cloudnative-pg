@@ -27,7 +27,7 @@ import (
 )
 
 // CreateRole create a role with the permissions needed by the instance manager
-func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup, roles []apiv1.Role) rbacv1.Role {
+func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup, roles []apiv1.PGRole) rbacv1.Role {
 	rules := []rbacv1.PolicyRule{
 		{
 			APIGroups: []string{
@@ -215,7 +215,7 @@ func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup, roles []apiv1
 				"postgresql.cnpg.io",
 			},
 			Resources: []string{
-				"roles",
+				"pgroles",
 			},
 			Verbs: []string{
 				"get",
@@ -230,7 +230,7 @@ func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup, roles []apiv1
 				"postgresql.cnpg.io",
 			},
 			Resources: []string{
-				"roles/status",
+				"pgroles/status",
 			},
 			Verbs: []string{
 				"get",
@@ -249,7 +249,7 @@ func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup, roles []apiv1
 	}
 }
 
-func getInvolvedSecretNames(cluster apiv1.Cluster, backupOrigin *apiv1.Backup, roles []apiv1.Role) []string {
+func getInvolvedSecretNames(cluster apiv1.Cluster, backupOrigin *apiv1.Backup, roles []apiv1.PGRole) []string {
 	involvedSecretNames := []string{
 		cluster.GetReplicationSecretName(),
 		cluster.GetClientCASecretName(),
@@ -468,7 +468,7 @@ func managedRolesSecrets(cluster apiv1.Cluster) []string {
 	return secretNames
 }
 
-func crdRoleSecretName(role apiv1.Role) string {
+func crdRoleSecretName(role apiv1.PGRole) string {
 	if role.Spec.DisablePassword || role.Spec.PasswordSecret == nil {
 		return ""
 	}
