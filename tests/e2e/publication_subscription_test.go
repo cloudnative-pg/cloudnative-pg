@@ -127,8 +127,9 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelDeclarativePub
 			primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 
-			query := fmt.Sprintf("select count(*) from pg_publication where pubname = '%s'",
-				pub.Spec.Name)
+			pubName := pub.Spec.Name
+			query := fmt.Sprintf("select count(*) from pg_publication where pubname = '%s'", pubName)
+
 			Eventually(func(g Gomega) {
 				stdout, _, err := env.ExecQueryInInstancePod(
 					testUtils.PodLocator{
@@ -139,9 +140,11 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelDeclarativePub
 					query)
 				g.Expect(err).ToNot(HaveOccurred())
 				if expectedValue {
-					g.Expect(stdout).To(ContainSubstring("1"), "expected a publication to be found")
+					g.Expect(stdout).To(ContainSubstring("1"),
+						fmt.Sprintf("expected publication %q to be present", pubName))
 				} else {
-					g.Expect(stdout).To(ContainSubstring("0"), "expected a publication to be present")
+					g.Expect(stdout).To(ContainSubstring("0"),
+						fmt.Sprintf("expected publication %q to be not present", pubName))
 				}
 			}, 30).Should(Succeed())
 		}
@@ -150,8 +153,9 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelDeclarativePub
 			primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 
-			query := fmt.Sprintf("select count(*) from pg_subscription where subname = '%s'",
-				sub.Spec.Name)
+			subName := sub.Spec.Name
+			query := fmt.Sprintf("select count(*) from pg_subscription where subname = '%s'", subName)
+
 			Eventually(func(g Gomega) {
 				stdout, _, err := env.ExecQueryInInstancePod(
 					testUtils.PodLocator{
@@ -162,9 +166,11 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelDeclarativePub
 					query)
 				g.Expect(err).ToNot(HaveOccurred())
 				if expectedValue {
-					g.Expect(stdout).To(ContainSubstring("1"), "expected a subscription to be found")
+					g.Expect(stdout).To(ContainSubstring("1"),
+						fmt.Sprintf("expected subscription %q to be present", subName))
 				} else {
-					g.Expect(stdout).To(ContainSubstring("0"), "expected a subscription to be present")
+					g.Expect(stdout).To(ContainSubstring("0"),
+						fmt.Sprintf("expected subscription %q to be not present", subName))
 				}
 			}, 30).Should(Succeed())
 		}
