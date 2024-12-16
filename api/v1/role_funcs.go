@@ -16,13 +16,13 @@ package v1
 import "k8s.io/utils/ptr"
 
 // SetAsFailed sets the publication as failed with the given error
-func (r *Role) SetAsFailed(err error) {
+func (r *PGRole) SetAsFailed(err error) {
 	r.Status.Applied = ptr.To(false)
 	r.Status.Message = err.Error()
 }
 
 // SetAsApplied sets the subscription as working correctly
-func (r *Role) SetAsApplied() {
+func (r *PGRole) SetAsApplied() {
 	r.Status.Message = ""
 	r.Status.Applied = ptr.To(true)
 	r.Status.ObservedGeneration = r.Generation

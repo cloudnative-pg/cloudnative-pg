@@ -1,5 +1,5 @@
 apiVersion: postgresql.cnpg.io/v1
-kind: Role
+kind: PGRole
 metadata:
   name: role-app
 spec:
@@ -10,7 +10,7 @@ spec:
   login: true
 ---    
 apiVersion: postgresql.cnpg.io/v1
-kind: Role
+kind: PGRole
 metadata:
   name: role-dante
 spec:
