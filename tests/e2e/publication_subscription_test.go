@@ -30,6 +30,17 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+// This struct contains info of publication or subscription object,
+// in order to maintain just an assert function
+type objectInfo struct {
+	namespace   string
+	name        string
+	clusterName string
+	dbName      string
+	query       string
+	expected    bool
+}
+
 // - spinning up a cluster, apply a declarative publication/subscription on it
 
 // Set of tests in which we use the declarative publication and subscription CRDs on an existing cluster
@@ -123,12 +134,9 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelDeclarativePub
 			AssertDatabaseExists(sourcePrimaryPod, dbname, false)
 		})
 
-		assertPublicationExists := func(namespace, clusterName string, pub *apiv1.Publication, expectedValue bool) {
-			primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
+		assertObjectExists := func(obj objectInfo) {
+			primaryPodInfo, err := env.GetClusterPrimary(namespace, obj.clusterName)
 			Expect(err).ToNot(HaveOccurred())
-
-			pubName := pub.Spec.Name
-			query := fmt.Sprintf("select count(*) from pg_publication where pubname = '%s'", pubName)
 
 			Eventually(func(g Gomega) {
 				stdout, _, err := env.ExecQueryInInstancePod(
@@ -136,41 +144,14 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelDeclarativePub
 						Namespace: primaryPodInfo.Namespace,
 						PodName:   primaryPodInfo.Name,
 					},
-					testUtils.DatabaseName(pub.Spec.DBName),
-					query)
+					testUtils.DatabaseName(obj.dbName), obj.query)
 				g.Expect(err).ToNot(HaveOccurred())
-				if expectedValue {
+				if obj.expected {
 					g.Expect(stdout).To(ContainSubstring("1"),
-						fmt.Sprintf("expected publication %q to be present", pubName))
+						fmt.Sprintf("expected %q to be present", obj.name))
 				} else {
 					g.Expect(stdout).To(ContainSubstring("0"),
-						fmt.Sprintf("expected publication %q to be not present", pubName))
-				}
-			}, 30).Should(Succeed())
-		}
-
-		assertSubscriptionExists := func(namespace, clusterName string, sub *apiv1.Subscription, expectedValue bool) {
-			primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
-
-			subName := sub.Spec.Name
-			query := fmt.Sprintf("select count(*) from pg_subscription where subname = '%s'", subName)
-
-			Eventually(func(g Gomega) {
-				stdout, _, err := env.ExecQueryInInstancePod(
-					testUtils.PodLocator{
-						Namespace: primaryPodInfo.Namespace,
-						PodName:   primaryPodInfo.Name,
-					},
-					testUtils.DatabaseName(sub.Spec.DBName),
-					query)
-				g.Expect(err).ToNot(HaveOccurred())
-				if expectedValue {
-					g.Expect(stdout).To(ContainSubstring("1"),
-						fmt.Sprintf("expected subscription %q to be present", subName))
-				} else {
-					g.Expect(stdout).To(ContainSubstring("0"),
-						fmt.Sprintf("expected subscription %q to be not present", subName))
+						fmt.Sprintf("expected %q to be not present", obj.name))
 				}
 			}, 30).Should(Succeed())
 		}
@@ -230,7 +211,17 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelDeclarativePub
 			})
 
 			By("verifying new publication has been created", func() {
-				assertPublicationExists(namespace, clusterName, pub, true)
+				publicationName := pub.Spec.Name
+				query := fmt.Sprintf("select count(*) from pg_publication where pubname = '%s'", publicationName)
+				pub := objectInfo{
+					namespace:   namespace,
+					name:        publicationName,
+					clusterName: clusterName,
+					dbName:      pub.Spec.DBName,
+					query:       query,
+					expected:    true,
+				}
+				assertObjectExists(pub)
 			})
 		}
 
@@ -259,7 +250,17 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelDeclarativePub
 			})
 
 			By("verifying new subscription has been created", func() {
-				assertSubscriptionExists(namespace, clusterName, sub, true)
+				subscriptionName := sub.Spec.Name
+				query := fmt.Sprintf("select count(*) from pg_subscription where subname = '%s'", subscriptionName)
+				sub := objectInfo{
+					namespace:   namespace,
+					name:        subscriptionName,
+					clusterName: clusterName,
+					dbName:      sub.Spec.DBName,
+					query:       query,
+					expected:    true,
+				}
+				assertObjectExists(sub)
 			})
 		}
 
@@ -335,8 +336,31 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelDeclarativePub
 			})
 
 			By("verifying the retention policy in the postgres database", func() {
-				assertPublicationExists(namespace, sourceClusterName, publication, retainOnDeletion)
-				assertSubscriptionExists(namespace, destinationClusterName, subscription, retainOnDeletion)
+				publicationName := publication.Spec.Name
+				pubQuery := fmt.Sprintf("select count(*) from pg_publication where pubname = '%s'",
+					publicationName)
+				pub := objectInfo{
+					namespace:   namespace,
+					name:        publication.Name,
+					clusterName: sourceClusterName,
+					dbName:      publication.Spec.DBName,
+					query:       pubQuery,
+					expected:    retainOnDeletion,
+				}
+				assertObjectExists(pub)
+
+				subscriptionName := subscription.Spec.Name
+				subQuery := fmt.Sprintf("select count(*) from pg_subscription where subname = '%s'",
+					subscriptionName)
+				sub := objectInfo{
+					namespace:   namespace,
+					name:        subscription.Name,
+					clusterName: destinationClusterName,
+					dbName:      subscription.Spec.DBName,
+					query:       subQuery,
+					expected:    retainOnDeletion,
+				}
+				assertObjectExists(sub)
 			})
 		}
 
