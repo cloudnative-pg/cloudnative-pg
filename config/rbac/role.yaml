@@ -140,9 +140,9 @@ rules:
   - backups
   - clusters
   - databases
+  - pgroles
   - poolers
   - publications
-  - roles
   - scheduledbackups
   - subscriptions
   verbs:
@@ -158,8 +158,8 @@ rules:
   resources:
   - backups/status
   - databases/status
+  - pgroles/status
   - publications/status
-  - roles/status
   - scheduledbackups/status
   - subscriptions/status
   verbs:

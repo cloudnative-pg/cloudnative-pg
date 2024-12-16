@@ -37,7 +37,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-// RoleReconciler reconciles a Role object defined by apiv1.Role (rather than in spec.managed)
+// RoleReconciler reconciles a PGRole object defined by apiv1.PGRole (rather than in spec.managed)
 type RoleReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
@@ -60,8 +60,8 @@ type RoleReconciler struct {
 // role reconciliation loop failures
 const roleReconciliationInterval = 30 * time.Second
 
-// +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=roles,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=roles/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=pgroles,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=postgresql.cnpg.io,resources=pgroles/status,verbs=get;update;patch
 
 // Reconcile is the role reconciliation loop
 func (r *RoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -73,7 +73,7 @@ func (r *RoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	}()
 
 	// Get the role object
-	var role apiv1.Role
+	var role apiv1.PGRole
 	if err := r.Client.Get(ctx, client.ObjectKey{
 		Namespace: req.Namespace,
 		Name:      req.Name,
@@ -188,7 +188,7 @@ func (r *RoleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 // failedReconciliation marks the reconciliation as failed and logs the corresponding error
 func (r *RoleReconciler) failedReconciliation(
 	ctx context.Context,
-	role *apiv1.Role,
+	role *apiv1.PGRole,
 	err error,
 ) (ctrl.Result, error) {
 	oldRole := role.DeepCopy()
@@ -209,7 +209,7 @@ func (r *RoleReconciler) failedReconciliation(
 // succeededReconciliation marks the reconciliation as succeeded
 func (r *RoleReconciler) succeededReconciliation(
 	ctx context.Context,
-	role *apiv1.Role,
+	role *apiv1.PGRole,
 	passVersion string,
 ) (ctrl.Result, error) {
 	oldRole := role.DeepCopy()
@@ -241,7 +241,7 @@ func NewRoleReconciler(
 // SetupWithManager sets up the controller with the Manager.
 func (r *RoleReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&apiv1.Role{}).
+		For(&apiv1.PGRole{}).
 		Named("instance-role-reconciler").
 		Complete(r)
 }
@@ -262,7 +262,7 @@ func (r *RoleReconciler) GetCluster(ctx context.Context) (*apiv1.Cluster, error)
 	return &cluster, nil
 }
 
-func (r *RoleReconciler) reconcileRole(ctx context.Context, role *apiv1.Role) (string, error) {
+func (r *RoleReconciler) reconcileRole(ctx context.Context, role *apiv1.PGRole) (string, error) {
 	contextLogger := log.FromContext(ctx)
 	db, err := r.instance.GetSuperUserDB()
 	if err != nil {
