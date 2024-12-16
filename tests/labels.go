@@ -32,9 +32,6 @@ const (
 	// LabelDeclarativeDatabases is a label for selecting the declarative databases test
 	LabelDeclarativeDatabases = "declarative-databases"
 
-	// LabelDeclarativePubSub  is a label for selecting the publication / subscription test
-	LabelDeclarativePubSub = "publication-subscription"
-
 	// LabelDisruptive is the string for labelling disruptive tests
 	LabelDisruptive = "disruptive"
 
@@ -64,6 +61,9 @@ const (
 
 	// LabelPostgresConfiguration is a label for selecting postgres-configuration test
 	LabelPostgresConfiguration = "postgres-configuration"
+
+	// LabelDeclarativePubSub  is a label for selecting the publication / subscription test
+	LabelDeclarativePubSub = "publication-subscription"
 
 	// LabelRecovery is a label for selecting recovery tests
 	LabelRecovery = "recovery"
