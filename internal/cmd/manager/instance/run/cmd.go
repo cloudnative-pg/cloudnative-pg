@@ -200,7 +200,7 @@ func runSubCommand( //nolint: gocyclo,gocognit
 						instance.GetNamespaceName(): {},
 					},
 				},
-				&apiv1.Role{}: {
+				&apiv1.PGRole{}: {
 					Namespaces: map[string]cache.Config{
 						instance.GetNamespaceName(): {},
 					},
