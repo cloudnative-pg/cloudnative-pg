@@ -125,6 +125,7 @@ var _ = Describe("testing backup command", func() {
 			Client: fake.NewClientBuilder().
 				WithScheme(scheme.BuildWithAllKnownScheme()).
 				WithObjects(cluster, backup).
+				WithStatusSubresource(cluster, backup).
 				Build(),
 			Recorder:     &record.FakeRecorder{},
 			Env:          os.Environ(),

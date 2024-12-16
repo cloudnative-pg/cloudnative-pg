@@ -417,7 +417,7 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 		}
 	}
 
-	if errCond := conditions.Patch(ctx, r.Client, cluster, apiv1.BackupStartingCondition); errCond != nil {
+	if errCond := conditions.Update(ctx, r.Client, cluster, apiv1.BackupStartingCondition); errCond != nil {
 		contextLogger.Error(errCond, "Error while updating backup condition (backup starting)")
 	}
 
@@ -440,7 +440,12 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 		// and un-fence the Pod
 		contextLogger.Error(err, "while executing snapshot backup")
 		// Update backup status in cluster conditions
-		if errCond := conditions.Patch(ctx, r.Client, cluster, apiv1.BuildClusterBackupFailedCondition(err)); errCond != nil {
+		if errCond := conditions.Update(
+			ctx,
+			r.Client,
+			cluster,
+			apiv1.BuildClusterBackupFailedCondition(err),
+		); errCond != nil {
 			contextLogger.Error(errCond, "Error while updating backup condition (backup snapshot failed)")
 		}
 
@@ -453,7 +458,7 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 		return res, nil
 	}
 
-	if err := conditions.Patch(ctx, r.Client, cluster, apiv1.BackupSucceededCondition); err != nil {
+	if err := conditions.Update(ctx, r.Client, cluster, apiv1.BackupSucceededCondition); err != nil {
 		contextLogger.Error(err, "Can't update the cluster with the completed snapshot backup data")
 	}
 
@@ -633,7 +638,7 @@ func startInstanceManagerBackup(
 		status.CommandError = stdout
 
 		// Update backup status in cluster conditions
-		if errCond := conditions.Patch(ctx, client, cluster, apiv1.BuildClusterBackupFailedCondition(err)); errCond != nil {
+		if errCond := conditions.Update(ctx, client, cluster, apiv1.BuildClusterBackupFailedCondition(err)); errCond != nil {
 			log.FromContext(ctx).Error(errCond, "Error while updating backup condition (backup failed)")
 		}
 		return postgres.PatchBackupStatusAndRetry(ctx, client, backup)
