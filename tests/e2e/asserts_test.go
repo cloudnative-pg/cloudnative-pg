@@ -504,25 +504,27 @@ func insertRecordIntoTable(tableName string, value int, conn *sql.DB) {
 	Expect(err).ToNot(HaveOccurred())
 }
 
-func AssertQueryEventuallyMatchExpectation(
+func QueryMatchExpectationPredicate(
 	pod *corev1.Pod,
 	dbname testsUtils.DatabaseName,
 	query string,
 	expectedOutput string,
-) {
-	Eventually(func(g Gomega) {
+) func(g Gomega) {
+	return func(g Gomega) {
+		// executor
 		stdout, stderr, err := env.ExecQueryInInstancePod(
-			testsUtils.PodLocator{
-				Namespace: pod.Namespace,
-				PodName:   pod.Name,
-			}, dbname, query)
+			testsUtils.PodLocator{Namespace: pod.Namespace, PodName: pod.Name},
+			dbname,
+			query,
+		)
+
 		if err != nil {
 			GinkgoWriter.Printf("stdout: %v\nstderr: %v", stdout, stderr)
 		}
 		g.Expect(err).ToNot(HaveOccurred())
 		g.Expect(strings.Trim(stdout, "\n")).To(BeEquivalentTo(expectedOutput),
 			fmt.Sprintf("expected query %q to return %q", query, expectedOutput))
-	}, 30).Should(Succeed())
+	}
 }
 
 func roleExistsQuery(roleName string) string {
@@ -973,10 +975,10 @@ func AssertReplicaModeCluster(
 		// verify the replica database created followed the source database, rather than
 		// default to the "app" db and user
 		By("checking that in replica cluster there is no database app and user app", func() {
-			AssertQueryEventuallyMatchExpectation(primaryReplicaCluster, testsUtils.PostgresDBName,
-				databaseExistsQuery("app"), "f")
-			AssertQueryEventuallyMatchExpectation(primaryReplicaCluster, testsUtils.PostgresDBName,
-				roleExistsQuery("app"), "f")
+			Eventually(QueryMatchExpectationPredicate(primaryReplicaCluster, testsUtils.PostgresDBName,
+				databaseExistsQuery("app"), "f"), 30).Should(Succeed())
+			Eventually(QueryMatchExpectationPredicate(primaryReplicaCluster, testsUtils.PostgresDBName,
+				roleExistsQuery("app"), "f"), 30).Should(Succeed())
 		})
 	}
 }
@@ -1056,10 +1058,10 @@ func AssertDetachReplicaModeCluster(
 	By("verifying the replica database doesn't exist in the replica cluster", func() {
 		// Application database configuration is skipped for replica clusters,
 		// so we expect these to not be present
-		AssertQueryEventuallyMatchExpectation(primaryReplicaCluster, testsUtils.PostgresDBName,
-			databaseExistsQuery(replicaDatabaseName), "f")
-		AssertQueryEventuallyMatchExpectation(primaryReplicaCluster, testsUtils.PostgresDBName,
-			roleExistsQuery(replicaUserName), "f")
+		Eventually(QueryMatchExpectationPredicate(primaryReplicaCluster, testsUtils.PostgresDBName,
+			databaseExistsQuery(replicaDatabaseName), "f"), 30).Should(Succeed())
+		Eventually(QueryMatchExpectationPredicate(primaryReplicaCluster, testsUtils.PostgresDBName,
+			roleExistsQuery(replicaUserName), "f"), 30).Should(Succeed())
 	})
 
 	By("writing some new data to the source cluster", func() {

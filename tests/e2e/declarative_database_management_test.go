@@ -119,8 +119,8 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 				primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 
-				AssertQueryEventuallyMatchExpectation(primaryPodInfo, testsUtils.PostgresDBName,
-					databaseExistsQuery(dbname), "t")
+				Eventually(QueryMatchExpectationPredicate(primaryPodInfo, testsUtils.PostgresDBName,
+					databaseExistsQuery(dbname), "t"), 30).Should(Succeed())
 
 				assertDatabaseHasExpectedFields(namespace, primaryPodInfo.Name, database)
 			})
@@ -133,8 +133,8 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 				primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 
-				AssertQueryEventuallyMatchExpectation(primaryPodInfo, testsUtils.PostgresDBName,
-					databaseExistsQuery(dbname), boolPGOutput(retainOnDeletion))
+				Eventually(QueryMatchExpectationPredicate(primaryPodInfo, testsUtils.PostgresDBName,
+					databaseExistsQuery(dbname), boolPGOutput(retainOnDeletion)), 30).Should(Succeed())
 			})
 		}
 

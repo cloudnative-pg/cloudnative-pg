@@ -119,10 +119,10 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelDeclarativePub
 
 			Expect(DeleteResourcesFromFile(namespace, destinationDatabaseManifest)).To(Succeed())
 			Expect(DeleteResourcesFromFile(namespace, sourceDatabaseManifest)).To(Succeed())
-			AssertQueryEventuallyMatchExpectation(sourcePrimaryPod, testsUtils.PostgresDBName,
-				databaseExistsQuery(dbname), "f")
-			AssertQueryEventuallyMatchExpectation(destPrimaryPod, testsUtils.PostgresDBName,
-				databaseExistsQuery(dbname), "f")
+			Eventually(QueryMatchExpectationPredicate(sourcePrimaryPod, testsUtils.PostgresDBName,
+				databaseExistsQuery(dbname), "f"), 30).Should(Succeed())
+			Eventually(QueryMatchExpectationPredicate(destPrimaryPod, testsUtils.PostgresDBName,
+				databaseExistsQuery(dbname), "f"), 30).Should(Succeed())
 		})
 
 		assertCreateDatabase := func(namespace, clusterName, databaseManifest string) {
@@ -151,8 +151,8 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelDeclarativePub
 				primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 
-				AssertQueryEventuallyMatchExpectation(primaryPodInfo, testsUtils.PostgresDBName,
-					databaseExistsQuery(databaseObject.Spec.Name), "t")
+				Eventually(QueryMatchExpectationPredicate(primaryPodInfo, testsUtils.PostgresDBName,
+					databaseExistsQuery(databaseObject.Spec.Name), "t"), 30).Should(Succeed())
 			})
 		}
 
@@ -184,8 +184,8 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelDeclarativePub
 				primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 
-				AssertQueryEventuallyMatchExpectation(primaryPodInfo, dbname,
-					publicationExistsQuery(pubName), "t")
+				Eventually(QueryMatchExpectationPredicate(primaryPodInfo, dbname,
+					publicationExistsQuery(pubName), "t"), 30).Should(Succeed())
 			})
 		}
 
@@ -217,8 +217,8 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelDeclarativePub
 				primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 
-				AssertQueryEventuallyMatchExpectation(primaryPodInfo, dbname,
-					subscriptionExistsQuery(subName), "t")
+				Eventually(QueryMatchExpectationPredicate(primaryPodInfo, dbname,
+					subscriptionExistsQuery(subName), "t"), 30).Should(Succeed())
 			})
 		}
 
@@ -263,13 +263,23 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelDeclarativePub
 				Expect(err).NotTo(HaveOccurred())
 
 				Eventually(func(g Gomega) {
-					publication, err = testsUtils.GetPublicationObject(namespace, pubObjectName, env)
+					var pub apiv1.Publication
+					err = testsUtils.GetObject(
+						env,
+						types.NamespacedName{Namespace: namespace, Name: pubObjectName},
+						&pub,
+					)
 					g.Expect(err).ToNot(HaveOccurred())
 					publication.Spec.ReclaimPolicy = publicationReclaimPolicy
 					err = env.Client.Update(env.Ctx, publication)
 					g.Expect(err).ToNot(HaveOccurred())
 
-					subscription, err = testsUtils.GetSubscriptionObject(namespace, subObjectName, env)
+					var sub apiv1.Subscription
+					err = testsUtils.GetObject(
+						env,
+						types.NamespacedName{Namespace: namespace, Name: subObjectName},
+						&sub,
+					)
 					g.Expect(err).ToNot(HaveOccurred())
 					subscription.Spec.ReclaimPolicy = subscriptionReclaimPolicy
 					err = env.Client.Update(env.Ctx, subscription)
@@ -296,16 +306,16 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelDeclarativePub
 				primaryPodInfo, err := env.GetClusterPrimary(namespace, sourceClusterName)
 				Expect(err).ToNot(HaveOccurred())
 
-				AssertQueryEventuallyMatchExpectation(primaryPodInfo, dbname,
-					publicationExistsQuery(pubName), boolPGOutput(retainOnDeletion))
+				Eventually(QueryMatchExpectationPredicate(primaryPodInfo, dbname,
+					publicationExistsQuery(pubName), boolPGOutput(retainOnDeletion)), 30).Should(Succeed())
 			})
 
 			By("verifying the subscription reclaim policy outcome", func() {
 				primaryPodInfo, err := env.GetClusterPrimary(namespace, destinationClusterName)
 				Expect(err).ToNot(HaveOccurred())
 
-				AssertQueryEventuallyMatchExpectation(primaryPodInfo, dbname,
-					subscriptionExistsQuery(subName), boolPGOutput(retainOnDeletion))
+				Eventually(QueryMatchExpectationPredicate(primaryPodInfo, dbname,
+					subscriptionExistsQuery(subName), boolPGOutput(retainOnDeletion)), 30).Should(Succeed())
 			})
 		}
 

@@ -139,14 +139,14 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 				primaryPod, err := env.GetClusterPrimary(namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 
-				AssertQueryEventuallyMatchExpectation(primaryPod, testsUtils.PostgresDBName,
-					roleExistsQuery(username), "t")
-				AssertQueryEventuallyMatchExpectation(primaryPod, testsUtils.PostgresDBName,
-					roleExistsQuery(userWithPerpetualPass), "t")
-				AssertQueryEventuallyMatchExpectation(primaryPod, testsUtils.PostgresDBName,
-					roleExistsQuery(userWithHashedPassword), "t")
-				AssertQueryEventuallyMatchExpectation(primaryPod, testsUtils.PostgresDBName,
-					roleExistsQuery(unrealizableUser), "f")
+				Eventually(QueryMatchExpectationPredicate(primaryPod, testsUtils.PostgresDBName,
+					roleExistsQuery(username), "t"), 30).Should(Succeed())
+				Eventually(QueryMatchExpectationPredicate(primaryPod, testsUtils.PostgresDBName,
+					roleExistsQuery(userWithPerpetualPass), "t"), 30).Should(Succeed())
+				Eventually(QueryMatchExpectationPredicate(primaryPod, testsUtils.PostgresDBName,
+					roleExistsQuery(userWithHashedPassword), "t"), 30).Should(Succeed())
+				Eventually(QueryMatchExpectationPredicate(primaryPod, testsUtils.PostgresDBName,
+					roleExistsQuery(unrealizableUser), "f"), 30).Should(Succeed())
 
 				query := fmt.Sprintf("SELECT true FROM pg_roles WHERE rolname='%s' and rolcanlogin=%v and rolsuper=%v "+
 					"and rolcreatedb=%v and rolcreaterole=%v and rolinherit=%v and rolreplication=%v "+
@@ -180,8 +180,8 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 				primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 
-				AssertQueryEventuallyMatchExpectation(primaryPodInfo, testsUtils.PostgresDBName,
-					roleExistsQuery(appUsername), "t")
+				Eventually(QueryMatchExpectationPredicate(primaryPodInfo, testsUtils.PostgresDBName,
+					roleExistsQuery(appUsername), "t"), 30).Should(Succeed())
 
 				query := fmt.Sprintf("SELECT rolcreatedb and rolvaliduntil='infinity' "+
 					"FROM pg_roles WHERE rolname='%s'", appUsername)
@@ -377,8 +377,8 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 					Expect(err).ToNot(HaveOccurred())
 					return len(cluster.Status.ManagedRolesStatus.CannotReconcile)
 				}, 30).Should(Equal(0))
-				AssertQueryEventuallyMatchExpectation(primaryPod, testsUtils.PostgresDBName,
-					roleExistsQuery(unrealizableUser), "t")
+				Eventually(QueryMatchExpectationPredicate(primaryPod, testsUtils.PostgresDBName,
+					roleExistsQuery(unrealizableUser), "t"), 30).Should(Succeed())
 			})
 
 			By("Add role in InRole for role new_role and verify in database", func() {
@@ -439,8 +439,8 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 				err = env.Client.Patch(env.Ctx, updated, client.MergeFrom(cluster))
 				Expect(err).ToNot(HaveOccurred())
 				// user not changed
-				AssertQueryEventuallyMatchExpectation(primaryPod, testsUtils.PostgresDBName,
-					roleExistsQuery(unrealizableUser), "t")
+				Eventually(QueryMatchExpectationPredicate(primaryPod, testsUtils.PostgresDBName,
+					roleExistsQuery(unrealizableUser), "t"), 30).Should(Succeed())
 				Eventually(func() int {
 					cluster, err := env.GetCluster(namespace, clusterName)
 					Expect(err).ToNot(HaveOccurred())
@@ -553,8 +553,8 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 			By("Verify new_role not existed in db", func() {
 				primaryPod, err := env.GetClusterPrimary(namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
-				AssertQueryEventuallyMatchExpectation(primaryPod, testsUtils.PostgresDBName,
-					roleExistsQuery(newUserName), "f")
+				Eventually(QueryMatchExpectationPredicate(primaryPod, testsUtils.PostgresDBName,
+					roleExistsQuery(newUserName), "f"), 30).Should(Succeed())
 			})
 		})
 	})

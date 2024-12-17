@@ -21,9 +21,6 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
-
-	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
 
 const (
@@ -57,32 +54,4 @@ func CountReplicas(env *TestingEnvironment, pod *corev1.Pod) (int, error) {
 		return 0, nil
 	}
 	return strconv.Atoi(strings.Trim(stdOut, "\n"))
-}
-
-// GetPublicationObject gets a Publication given name and namespace
-func GetPublicationObject(namespace string, name string, env *TestingEnvironment) (*apiv1.Publication, error) {
-	namespacedName := types.NamespacedName{
-		Namespace: namespace,
-		Name:      name,
-	}
-	publication := &apiv1.Publication{}
-	err := GetObject(env, namespacedName, publication)
-	if err != nil {
-		return nil, err
-	}
-	return publication, nil
-}
-
-// GetSubscriptionObject gets a Subscription given name and namespace
-func GetSubscriptionObject(namespace string, name string, env *TestingEnvironment) (*apiv1.Subscription, error) {
-	namespacedName := types.NamespacedName{
-		Namespace: namespace,
-		Name:      name,
-	}
-	subscription := &apiv1.Subscription{}
-	err := GetObject(env, namespacedName, subscription)
-	if err != nil {
-		return nil, err
-	}
-	return subscription, nil
 }

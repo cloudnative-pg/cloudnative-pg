@@ -261,8 +261,8 @@ func assertTableAndDataOnImportedCluster(
 		})
 
 		By("verifying the user named 'micro' on source is not in imported database", func() {
-			AssertQueryEventuallyMatchExpectation(pod, testsUtils.PostgresDBName,
-				roleExistsQuery("micro"), "f")
+			Eventually(QueryMatchExpectationPredicate(pod, testsUtils.PostgresDBName,
+				roleExistsQuery("micro"), "f"), 30).Should(Succeed())
 		})
 	})
 }
@@ -331,10 +331,10 @@ func assertImportRenamesSelectedDatabase(
 		importedPrimaryPod, err := env.GetClusterPrimary(namespace, importedClusterName)
 		Expect(err).ToNot(HaveOccurred())
 
-		AssertQueryEventuallyMatchExpectation(importedPrimaryPod, testsUtils.PostgresDBName,
-			roleExistsQuery("db2"), "f")
-		AssertQueryEventuallyMatchExpectation(importedPrimaryPod, testsUtils.PostgresDBName,
-			roleExistsQuery("app"), "t")
+		Eventually(QueryMatchExpectationPredicate(importedPrimaryPod, testsUtils.PostgresDBName,
+			roleExistsQuery("db2"), "f"), 30).Should(Succeed())
+		Eventually(QueryMatchExpectationPredicate(importedPrimaryPod, testsUtils.PostgresDBName,
+			roleExistsQuery("app"), "t"), 30).Should(Succeed())
 	})
 
 	By("cleaning up the clusters", func() {
