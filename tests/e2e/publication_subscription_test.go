@@ -24,22 +24,11 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
-	testUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
-
-// This struct contains info of publication or subscription object,
-// in order to maintain just an assert function
-type objectInfo struct {
-	namespace   string
-	name        string
-	clusterName string
-	dbName      string
-	query       string
-	expected    bool
-}
 
 // - spinning up a cluster, apply a declarative publication/subscription on it
 
@@ -103,7 +92,7 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelDeclarativePub
 			destPrimaryPod, err := env.GetClusterPrimary(namespace, destinationClusterName)
 			Expect(err).ToNot(HaveOccurred())
 			_, _, err = env.EventuallyExecQueryInInstancePod(
-				testUtils.PodLocator{
+				testsUtils.PodLocator{
 					Namespace: destPrimaryPod.Namespace,
 					PodName:   destPrimaryPod.Name,
 				},
@@ -117,7 +106,7 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelDeclarativePub
 			sourcePrimaryPod, err := env.GetClusterPrimary(namespace, sourceClusterName)
 			Expect(err).ToNot(HaveOccurred())
 			_, _, err = env.EventuallyExecQueryInInstancePod(
-				testUtils.PodLocator{
+				testsUtils.PodLocator{
 					Namespace: sourcePrimaryPod.Namespace,
 					PodName:   sourcePrimaryPod.Name,
 				},
@@ -130,31 +119,11 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelDeclarativePub
 
 			Expect(DeleteResourcesFromFile(namespace, destinationDatabaseManifest)).To(Succeed())
 			Expect(DeleteResourcesFromFile(namespace, sourceDatabaseManifest)).To(Succeed())
-			AssertDatabaseExists(destPrimaryPod, dbname, false)
-			AssertDatabaseExists(sourcePrimaryPod, dbname, false)
+			AssertQueryEventuallyMatchExpectation(sourcePrimaryPod, testsUtils.PostgresDBName,
+				databaseExistsQuery(dbname), "f")
+			AssertQueryEventuallyMatchExpectation(destPrimaryPod, testsUtils.PostgresDBName,
+				databaseExistsQuery(dbname), "f")
 		})
-
-		assertObjectExists := func(obj objectInfo) {
-			primaryPodInfo, err := env.GetClusterPrimary(namespace, obj.clusterName)
-			Expect(err).ToNot(HaveOccurred())
-
-			Eventually(func(g Gomega) {
-				stdout, _, err := env.ExecQueryInInstancePod(
-					testUtils.PodLocator{
-						Namespace: primaryPodInfo.Namespace,
-						PodName:   primaryPodInfo.Name,
-					},
-					testUtils.DatabaseName(obj.dbName), obj.query)
-				g.Expect(err).ToNot(HaveOccurred())
-				if obj.expected {
-					g.Expect(stdout).To(ContainSubstring("1"),
-						fmt.Sprintf("expected %q to be present", obj.name))
-				} else {
-					g.Expect(stdout).To(ContainSubstring("0"),
-						fmt.Sprintf("expected %q to be not present", obj.name))
-				}
-			}, 30).Should(Succeed())
-		}
 
 		assertCreateDatabase := func(namespace, clusterName, databaseManifest string) {
 			databaseObject := &apiv1.Database{}
@@ -182,13 +151,13 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelDeclarativePub
 				primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 
-				AssertDatabaseExists(primaryPodInfo, databaseObject.Spec.Name, true)
+				AssertQueryEventuallyMatchExpectation(primaryPodInfo, testsUtils.PostgresDBName,
+					databaseExistsQuery(databaseObject.Spec.Name), "t")
 			})
 		}
 
 		// nolint:dupl
 		assertCreatePublication := func(namespace, clusterName, publicationManifest string) {
-			pub := &apiv1.Publication{}
 			pubObjectName, err := env.GetResourceNameFromYAML(publicationManifest)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -204,6 +173,7 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelDeclarativePub
 				}
 
 				Eventually(func(g Gomega) {
+					pub := &apiv1.Publication{}
 					err := env.Client.Get(env.Ctx, pubNamespacedName, pub)
 					Expect(err).ToNot(HaveOccurred())
 					g.Expect(pub.Status.Applied).Should(HaveValue(BeTrue()))
@@ -211,23 +181,16 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelDeclarativePub
 			})
 
 			By("verifying new publication has been created", func() {
-				publicationName := pub.Spec.Name
-				query := fmt.Sprintf("select count(*) from pg_publication where pubname = '%s'", publicationName)
-				pub := objectInfo{
-					namespace:   namespace,
-					name:        publicationName,
-					clusterName: clusterName,
-					dbName:      pub.Spec.DBName,
-					query:       query,
-					expected:    true,
-				}
-				assertObjectExists(pub)
+				primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
+				Expect(err).ToNot(HaveOccurred())
+
+				AssertQueryEventuallyMatchExpectation(primaryPodInfo, dbname,
+					publicationExistsQuery(pubName), "t")
 			})
 		}
 
 		// nolint:dupl
 		assertCreateSubscription := func(namespace, clusterName, subscriptionManifest string) {
-			sub := &apiv1.Subscription{}
 			subObjectName, err := env.GetResourceNameFromYAML(subscriptionManifest)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -243,6 +206,7 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelDeclarativePub
 				}
 
 				Eventually(func(g Gomega) {
+					sub := &apiv1.Subscription{}
 					err := env.Client.Get(env.Ctx, pubNamespacedName, sub)
 					Expect(err).ToNot(HaveOccurred())
 					g.Expect(sub.Status.Applied).Should(HaveValue(BeTrue()))
@@ -250,17 +214,11 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelDeclarativePub
 			})
 
 			By("verifying new subscription has been created", func() {
-				subscriptionName := sub.Spec.Name
-				query := fmt.Sprintf("select count(*) from pg_subscription where subname = '%s'", subscriptionName)
-				sub := objectInfo{
-					namespace:   namespace,
-					name:        subscriptionName,
-					clusterName: clusterName,
-					dbName:      sub.Spec.DBName,
-					query:       query,
-					expected:    true,
-				}
-				assertObjectExists(sub)
+				primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
+				Expect(err).ToNot(HaveOccurred())
+
+				AssertQueryEventuallyMatchExpectation(primaryPodInfo, dbname,
+					subscriptionExistsQuery(subName), "t")
 			})
 		}
 
@@ -279,7 +237,7 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelDeclarativePub
 
 			By("creating an empty table inside the destination database", func() {
 				query := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %v (column1 int) ;", tableName)
-				_, err = testUtils.RunExecOverForward(env, namespace, destinationClusterName, dbname,
+				_, err = testsUtils.RunExecOverForward(env, namespace, destinationClusterName, dbname,
 					apiv1.ApplicationUserSecretSuffix, query)
 				Expect(err).ToNot(HaveOccurred())
 			})
@@ -297,7 +255,6 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelDeclarativePub
 				if retainOnDeletion {
 					publicationReclaimPolicy = apiv1.PublicationReclaimRetain
 					subscriptionReclaimPolicy = apiv1.SubscriptionReclaimRetain
-
 				}
 				// Get the object names
 				pubObjectName, err := env.GetResourceNameFromYAML(pubManifest)
@@ -306,13 +263,13 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelDeclarativePub
 				Expect(err).NotTo(HaveOccurred())
 
 				Eventually(func(g Gomega) {
-					publication, err = testUtils.GetPublicationObject(namespace, pubObjectName, env)
+					publication, err = testsUtils.GetPublicationObject(namespace, pubObjectName, env)
 					g.Expect(err).ToNot(HaveOccurred())
 					publication.Spec.ReclaimPolicy = publicationReclaimPolicy
 					err = env.Client.Update(env.Ctx, publication)
 					g.Expect(err).ToNot(HaveOccurred())
 
-					subscription, err = testUtils.GetSubscriptionObject(namespace, subObjectName, env)
+					subscription, err = testsUtils.GetSubscriptionObject(namespace, subObjectName, env)
 					g.Expect(err).ToNot(HaveOccurred())
 					subscription.Spec.ReclaimPolicy = subscriptionReclaimPolicy
 					err = env.Client.Update(env.Ctx, subscription)
@@ -331,36 +288,24 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelDeclarativePub
 			})
 
 			By("removing the objects", func() {
-				Expect(testUtils.DeleteObject(env, publication)).To(Succeed())
-				Expect(testUtils.DeleteObject(env, subscription)).To(Succeed())
+				Expect(testsUtils.DeleteObject(env, publication)).To(Succeed())
+				Expect(testsUtils.DeleteObject(env, subscription)).To(Succeed())
 			})
 
-			By("verifying the retention policy in the postgres database", func() {
-				publicationName := publication.Spec.Name
-				pubQuery := fmt.Sprintf("select count(*) from pg_publication where pubname = '%s'",
-					publicationName)
-				pub := objectInfo{
-					namespace:   namespace,
-					name:        publication.Name,
-					clusterName: sourceClusterName,
-					dbName:      publication.Spec.DBName,
-					query:       pubQuery,
-					expected:    retainOnDeletion,
-				}
-				assertObjectExists(pub)
+			By("verifying the publication reclaim policy outcome", func() {
+				primaryPodInfo, err := env.GetClusterPrimary(namespace, sourceClusterName)
+				Expect(err).ToNot(HaveOccurred())
 
-				subscriptionName := subscription.Spec.Name
-				subQuery := fmt.Sprintf("select count(*) from pg_subscription where subname = '%s'",
-					subscriptionName)
-				sub := objectInfo{
-					namespace:   namespace,
-					name:        subscription.Name,
-					clusterName: destinationClusterName,
-					dbName:      subscription.Spec.DBName,
-					query:       subQuery,
-					expected:    retainOnDeletion,
-				}
-				assertObjectExists(sub)
+				AssertQueryEventuallyMatchExpectation(primaryPodInfo, dbname,
+					publicationExistsQuery(pubName), boolPGOutput(retainOnDeletion))
+			})
+
+			By("verifying the subscription reclaim policy outcome", func() {
+				primaryPodInfo, err := env.GetClusterPrimary(namespace, destinationClusterName)
+				Expect(err).ToNot(HaveOccurred())
+
+				AssertQueryEventuallyMatchExpectation(primaryPodInfo, dbname,
+					subscriptionExistsQuery(subName), boolPGOutput(retainOnDeletion))
 			})
 		}
 
@@ -377,3 +322,11 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelDeclarativePub
 		})
 	})
 })
+
+func publicationExistsQuery(pubName string) string {
+	return fmt.Sprintf("SELECT EXISTS(SELECT 1 FROM pg_publication WHERE pubname='%s')", pubName)
+}
+
+func subscriptionExistsQuery(subName string) string {
+	return fmt.Sprintf("SELECT EXISTS(SELECT 1 FROM pg_subscription WHERE subname='%s')", subName)
+}
