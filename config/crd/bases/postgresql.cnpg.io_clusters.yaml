@@ -2546,6 +2546,49 @@ spec:
                     pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                     x-kubernetes-int-or-string: true
                 type: object
+              extensions:
+                description: The configuration of the extensions to be added
+                items:
+                  description: |-
+                    ExtensionConfiguration is the configuration used to add
+                    a PostgreSQL extensions to the Cluster
+                  properties:
+                    image:
+                      description: The image containing the extension, required
+                      properties:
+                        pullPolicy:
+                          description: |-
+                            Policy for pulling OCI objects. Possible values are:
+                            Always: the kubelet always attempts to pull the reference. Container creation will fail If the pull fails.
+                            Never: the kubelet never pulls the reference and only uses a local image or artifact. Container creation will fail if the reference isn't present.
+                            IfNotPresent: the kubelet pulls if the reference isn't already present on disk. Container creation will fail if the reference isn't present and the pull fails.
+                            Defaults to Always if :latest tag is specified, or IfNotPresent otherwise.
+                          type: string
+                        reference:
+                          description: |-
+                            Required: Image or artifact reference to be used.
+                            Behaves in the same way as pod.spec.containers[*].image.
+                            Pull secrets will be assembled in the same way as for the container image by looking up node credentials, SA image pull secrets, and pod spec image pull secrets.
+                            More info: https://kubernetes.io/docs/concepts/containers/images
+                            This field is optional to allow higher level config management to default or override
+                            container images in workload controllers like Deployments and StatefulSets.
+                          type: string
+                      type: object
+                    libDirectoryPath:
+                      description: The path to the directory containing the libraries
+                      type: string
+                    name:
+                      description: The name of the extension, required
+                      type: string
+                    shareDirectoryPath:
+                      description: The path to the directory containing the extension
+                        files
+                      type: string
+                  required:
+                  - image
+                  - name
+                  type: object
+                type: array
               externalClusters:
                 description: The list of external clusters which are used in the configuration
                 items:
