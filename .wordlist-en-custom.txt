@@ -161,6 +161,8 @@ EphemeralVolumesSizeLimit
 EphemeralVolumesSizeLimitConfiguration
 ExtensionSpec
 ExtensionStatus
+ExtensionConfiguration
+ExtensionConfigurationList
 ExternalCluster
 FQDN
 FQDNs

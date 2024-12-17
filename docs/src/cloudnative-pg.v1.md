@@ -1935,6 +1935,13 @@ any plugin to be loaded with the corresponding configuration</p>
 in the PostgreSQL Pods.</p>
 </td>
 </tr>
+<tr><td><code>extensions</code><br/>
+<a href="#postgresql-cnpg-io-v1-ExtensionConfigurationList"><i>ExtensionConfigurationList</i></a>
+</td>
+<td>
+   <p>The configuration of the extensions to be added</p>
+</td>
+</tr>
 </tbody>
 </table>
 
@@ -2947,6 +2954,20 @@ of WAL archiving and backups for this external cluster</p>
 </tr>
 </tbody>
 </table>
+
+## ExtensionConfigurationList     {#postgresql-cnpg-io-v1-ExtensionConfigurationList}
+
+(Alias of `[]github.com/cloudnative-pg/cloudnative-pg/api/v1.ExtensionConfiguration`)
+
+**Appears in:**
+
+- [ClusterSpec](#postgresql-cnpg-io-v1-ClusterSpec)
+
+
+<p>ExtensionConfigurationList is a list of ExtensionConfiguration</p>
+
+
+
 
 ## ImageCatalogRef     {#postgresql-cnpg-io-v1-ImageCatalogRef}
 
