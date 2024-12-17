@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package conditions
+package status
 
 import (
 	"context"
@@ -28,22 +28,24 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
 
-// Update will update a particular condition in cluster status.
+// PatchConditionsWithOptimisticLock will update a particular condition in cluster status.
 // This function may update the conditions in the passed cluster
 // with the latest ones that were found from the API server.
-func Update(
+// This function is needed because Kubernetes still doesn't support strategic merge
+// for CRDs (see https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/).
+func PatchConditionsWithOptimisticLock(
 	ctx context.Context,
 	c client.Client,
 	cluster *apiv1.Cluster,
-	condition ...metav1.Condition,
+	conditions ...metav1.Condition,
 ) error {
-	if cluster == nil || len(condition) == 0 {
+	if cluster == nil || len(conditions) == 0 {
 		return nil
 	}
 
-	tx := func(cluster *apiv1.Cluster) bool {
+	applyConditions := func(cluster *apiv1.Cluster) bool {
 		changed := false
-		for _, c := range condition {
+		for _, c := range conditions {
 			changed = changed || meta.SetStatusCondition(&cluster.Status.Conditions, c)
 		}
 		return changed
@@ -56,16 +58,10 @@ func Update(
 		}
 
 		updatedCluster := currentCluster.DeepCopy()
-		if changed := tx(updatedCluster); !changed {
+		if changed := applyConditions(updatedCluster); !changed {
 			return nil
 		}
 
-		// Send the new conditions to the API server preventing
-		// this update to remove the conditions added by other
-		// clients.
-		//
-		// Kubernetes still doesn't support strategic merge
-		// for CRDs (see https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/).
 		if err := c.Status().Patch(
 			ctx,
 			updatedCluster,

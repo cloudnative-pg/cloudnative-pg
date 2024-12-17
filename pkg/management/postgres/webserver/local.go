@@ -33,9 +33,9 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/cache"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/conditions"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/status"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -283,7 +283,12 @@ func (ws *localWebserverEndpoints) setWALArchiveStatusCondition(w http.ResponseW
 		return
 	}
 
-	if errCond := conditions.Update(ctx, ws.typedClient, cluster, asr.getContinuousArchivingCondition()); errCond != nil {
+	if errCond := status.PatchConditionsWithOptimisticLock(
+		ctx,
+		ws.typedClient,
+		cluster,
+		asr.getContinuousArchivingCondition(),
+	); errCond != nil {
 		contextLogger.Error(errCond, "Error changing wal archiving condition",
 			"condition", asr.getContinuousArchivingCondition())
 		http.Error(

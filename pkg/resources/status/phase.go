@@ -51,7 +51,7 @@ func RegisterPhaseWithOrigCluster(
 	phase string,
 	reason string,
 ) error {
-	if err := UpdateAndRefresh(
+	if err := PatchWithOptimisticLock(
 		ctx,
 		cli,
 		modifiedCluster,

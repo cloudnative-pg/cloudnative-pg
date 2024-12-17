@@ -45,11 +45,11 @@ import (
 	cnpgiClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/conditions"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/client/remote"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/backup/volumesnapshot"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
+	resourcestatus "github.com/cloudnative-pg/cloudnative-pg/pkg/resources/status"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -417,7 +417,12 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 		}
 	}
 
-	if errCond := conditions.Update(ctx, r.Client, cluster, apiv1.BackupStartingCondition); errCond != nil {
+	if errCond := resourcestatus.PatchConditionsWithOptimisticLock(
+		ctx,
+		r.Client,
+		cluster,
+		apiv1.BackupStartingCondition,
+	); errCond != nil {
 		contextLogger.Error(errCond, "Error while updating backup condition (backup starting)")
 	}
 
@@ -440,7 +445,7 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 		// and un-fence the Pod
 		contextLogger.Error(err, "while executing snapshot backup")
 		// Update backup status in cluster conditions
-		if errCond := conditions.Update(
+		if errCond := resourcestatus.PatchConditionsWithOptimisticLock(
 			ctx,
 			r.Client,
 			cluster,
@@ -458,7 +463,12 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 		return res, nil
 	}
 
-	if err := conditions.Update(ctx, r.Client, cluster, apiv1.BackupSucceededCondition); err != nil {
+	if err := resourcestatus.PatchConditionsWithOptimisticLock(
+		ctx,
+		r.Client,
+		cluster,
+		apiv1.BackupSucceededCondition,
+	); err != nil {
 		contextLogger.Error(err, "Can't update the cluster with the completed snapshot backup data")
 	}
 
@@ -638,7 +648,12 @@ func startInstanceManagerBackup(
 		status.CommandError = stdout
 
 		// Update backup status in cluster conditions
-		if errCond := conditions.Update(ctx, client, cluster, apiv1.BuildClusterBackupFailedCondition(err)); errCond != nil {
+		if errCond := resourcestatus.PatchConditionsWithOptimisticLock(
+			ctx,
+			client,
+			cluster,
+			apiv1.BuildClusterBackupFailedCondition(err),
+		); errCond != nil {
 			log.FromContext(ctx).Error(errCond, "Error while updating backup condition (backup failed)")
 		}
 		return postgres.PatchBackupStatusAndRetry(ctx, client, backup)

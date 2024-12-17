@@ -32,7 +32,6 @@ import (
 	pluginClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/conditions"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/status"
@@ -103,7 +102,7 @@ func (b *PluginBackupCommand) invokeStart(ctx context.Context) {
 
 	// Update backup status in cluster conditions on startup
 	if err := b.retryWithRefreshedCluster(ctx, func() error {
-		return conditions.Update(ctx, b.Client, b.Cluster, apiv1.BackupStartingCondition)
+		return status.PatchConditionsWithOptimisticLock(ctx, b.Client, b.Cluster, apiv1.BackupStartingCondition)
 	}); err != nil {
 		contextLogger.Error(err, "Error changing backup condition (backup started)")
 		// We do not terminate here because we could still have a good backup
@@ -153,7 +152,7 @@ func (b *PluginBackupCommand) invokeStart(ctx context.Context) {
 
 	// Update backup status in cluster conditions on backup completion
 	if err := b.retryWithRefreshedCluster(ctx, func() error {
-		return conditions.Update(ctx, b.Client, b.Cluster, apiv1.BackupSucceededCondition)
+		return status.PatchConditionsWithOptimisticLock(ctx, b.Client, b.Cluster, apiv1.BackupSucceededCondition)
 	}); err != nil {
 		contextLogger.Error(err, "Can't update the cluster with the completed backup data")
 	}
@@ -177,7 +176,7 @@ func (b *PluginBackupCommand) markBackupAsFailed(ctx context.Context, failure er
 
 	// add backup failed condition to the cluster
 	if failErr := b.retryWithRefreshedCluster(ctx, func() error {
-		return status.UpdateAndRefresh(
+		return status.PatchWithOptimisticLock(
 			ctx,
 			b.Client,
 			b.Cluster,

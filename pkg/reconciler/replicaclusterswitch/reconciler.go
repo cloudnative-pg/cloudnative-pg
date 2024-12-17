@@ -90,7 +90,7 @@ func startTransition(ctx context.Context, cli client.Client, cluster *apiv1.Clus
 		return nil, fmt.Errorf("while fencing primary cluster to demote it: %w", err)
 	}
 
-	if err := status.UpdateAndRefresh(
+	if err := status.PatchWithOptimisticLock(
 		ctx,
 		cli,
 		cluster,
@@ -139,7 +139,7 @@ func cleanupTransitionMetadata(ctx context.Context, cli client.Client, cluster *
 		}
 	}
 
-	return status.UpdateAndRefresh(
+	return status.PatchWithOptimisticLock(
 		ctx,
 		cli,
 		cluster,

@@ -27,11 +27,11 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
 
-// UpdateAndRefresh updates the status of the cluster using the passed
+// PatchWithOptimisticLock updates the status of the cluster using the passed
 // transaction function.
 // Important: after successfully updating the status, this
 // function refreshes it into the passed cluster
-func UpdateAndRefresh(
+func PatchWithOptimisticLock(
 	ctx context.Context,
 	c client.Client,
 	cluster *apiv1.Cluster,
