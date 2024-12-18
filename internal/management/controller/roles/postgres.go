@@ -304,7 +304,7 @@ func appendInRoleOptions(role DatabaseRole, query *strings.Builder) {
 		quotedInRoles := make([]string, len(role.InRoles))
 
 		for i, inRole := range role.InRoles {
-			quotedInRoles[i] = pq.QuoteIdentifier(inRole)
+			quotedInRoles[i] = pgx.Identifier{inRole}.Sanitize()
 		}
 
 		query.WriteString(fmt.Sprintf(" IN ROLE %s ", strings.Join(quotedInRoles, ",")))
