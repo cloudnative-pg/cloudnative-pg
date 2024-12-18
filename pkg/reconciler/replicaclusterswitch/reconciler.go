@@ -31,6 +31,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/instance"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/status"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -89,28 +90,33 @@ func startTransition(ctx context.Context, cli client.Client, cluster *apiv1.Clus
 		return nil, fmt.Errorf("while fencing primary cluster to demote it: %w", err)
 	}
 
-	origCluster := cluster.DeepCopy()
-	meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
-		Type:    conditionDesignatedPrimaryTransition,
-		Status:  metav1.ConditionFalse,
-		Reason:  "ReplicaClusterAfterCreation",
-		Message: "Enabled external cluster after a node was generated",
-	})
-	meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
-		Type:    conditionFence,
-		Status:  metav1.ConditionTrue,
-		Reason:  "ReplicaClusterAfterCreation",
-		Message: "Enabled external cluster after a node was generated",
-	})
-	meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
-		Type:    ConditionReplicaClusterSwitch,
-		Status:  metav1.ConditionFalse,
-		Reason:  "ReplicaEnabledSetTrue",
-		Message: "Starting the Replica cluster transition",
-	})
+	if err := status.PatchWithOptimisticLock(
+		ctx,
+		cli,
+		cluster,
+		func(cluster *apiv1.Cluster) {
+			meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+				Type:    conditionDesignatedPrimaryTransition,
+				Status:  metav1.ConditionFalse,
+				Reason:  "ReplicaClusterAfterCreation",
+				Message: "Enabled external cluster after a node was generated",
+			})
+			meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+				Type:    conditionFence,
+				Status:  metav1.ConditionTrue,
+				Reason:  "ReplicaClusterAfterCreation",
+				Message: "Enabled external cluster after a node was generated",
+			})
+			meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+				Type:    ConditionReplicaClusterSwitch,
+				Status:  metav1.ConditionFalse,
+				Reason:  "ReplicaEnabledSetTrue",
+				Message: "Starting the Replica cluster transition",
+			})
 
-	cluster.Status.SwitchReplicaClusterStatus.InProgress = true
-	if err := cli.Status().Patch(ctx, cluster, client.MergeFrom(origCluster)); err != nil {
+			cluster.Status.SwitchReplicaClusterStatus.InProgress = true
+		},
+	); err != nil {
 		return nil, err
 	}
 
@@ -132,18 +138,23 @@ func cleanupTransitionMetadata(ctx context.Context, cli client.Client, cluster *
 			return err
 		}
 	}
-	origCluster := cluster.DeepCopy()
-	meta.RemoveStatusCondition(&cluster.Status.Conditions, conditionDesignatedPrimaryTransition)
-	meta.RemoveStatusCondition(&cluster.Status.Conditions, conditionFence)
-	meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
-		Type:    ConditionReplicaClusterSwitch,
-		Status:  metav1.ConditionTrue,
-		Reason:  "ReplicaEnabledSetTrue",
-		Message: "Completed the Replica cluster transition",
-	})
-	cluster.Status.SwitchReplicaClusterStatus.InProgress = false
 
-	return cli.Status().Patch(ctx, cluster, client.MergeFrom(origCluster))
+	return status.PatchWithOptimisticLock(
+		ctx,
+		cli,
+		cluster,
+		func(cluster *apiv1.Cluster) {
+			meta.RemoveStatusCondition(&cluster.Status.Conditions, conditionDesignatedPrimaryTransition)
+			meta.RemoveStatusCondition(&cluster.Status.Conditions, conditionFence)
+			meta.SetStatusCondition(&cluster.Status.Conditions, metav1.Condition{
+				Type:    ConditionReplicaClusterSwitch,
+				Status:  metav1.ConditionTrue,
+				Reason:  "ReplicaEnabledSetTrue",
+				Message: "Completed the Replica cluster transition",
+			})
+			cluster.Status.SwitchReplicaClusterStatus.InProgress = false
+		},
+	)
 }
 
 func reconcileDemotionToken(

@@ -28,9 +28,9 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	cacheClient "github.com/cloudnative-pg/cloudnative-pg/internal/management/cache/client"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/conditions"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/archiver"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/status"
 )
 
 // errSwitchoverInProgress is raised when there is a switchover in progress
@@ -83,7 +83,12 @@ func NewCmd() *cobra.Command {
 					Reason:  string(apiv1.ConditionReasonContinuousArchivingFailing),
 					Message: err.Error(),
 				}
-				if errCond := conditions.Patch(ctx, typedClient, cluster, &condition); errCond != nil {
+				if errCond := status.PatchConditionsWithOptimisticLock(
+					ctx,
+					typedClient,
+					cluster,
+					condition,
+				); errCond != nil {
 					contextLog.Error(errCond, "Error changing wal archiving condition (wal archiving failed)")
 				}
 				return err
@@ -96,7 +101,12 @@ func NewCmd() *cobra.Command {
 				Reason:  string(apiv1.ConditionReasonContinuousArchivingSuccess),
 				Message: "Continuous archiving is working",
 			}
-			if errCond := conditions.Patch(ctx, typedClient, cluster, &condition); errCond != nil {
+			if errCond := status.PatchConditionsWithOptimisticLock(
+				ctx,
+				typedClient,
+				cluster,
+				condition,
+			); errCond != nil {
 				contextLog.Error(errCond, "Error changing wal archiving condition (wal archiving succeeded)")
 			}
 
