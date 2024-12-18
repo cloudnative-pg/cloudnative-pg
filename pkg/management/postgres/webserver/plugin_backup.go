@@ -29,9 +29,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/conditions"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/status"
 )
 
 // PluginBackupCommand represent a backup command that is being executed
@@ -83,7 +83,7 @@ func (b *PluginBackupCommand) invokeStart(ctx context.Context) {
 
 	// Update backup status in cluster conditions on startup
 	if err := b.retryWithRefreshedCluster(ctx, func() error {
-		return conditions.Patch(ctx, b.Client, b.Cluster, apiv1.BackupStartingCondition)
+		return status.PatchConditionsWithOptimisticLock(ctx, b.Client, b.Cluster, apiv1.BackupStartingCondition)
 	}); err != nil {
 		contextLogger.Error(err, "Error changing backup condition (backup started)")
 		// We do not terminate here because we could still have a good backup
@@ -132,7 +132,7 @@ func (b *PluginBackupCommand) invokeStart(ctx context.Context) {
 
 	// Update backup status in cluster conditions on backup completion
 	if err := b.retryWithRefreshedCluster(ctx, func() error {
-		return conditions.Patch(ctx, b.Client, b.Cluster, apiv1.BackupSucceededCondition)
+		return status.PatchConditionsWithOptimisticLock(ctx, b.Client, b.Cluster, apiv1.BackupSucceededCondition)
 	}); err != nil {
 		contextLogger.Error(err, "Can't update the cluster with the completed backup data")
 	}
@@ -156,12 +156,15 @@ func (b *PluginBackupCommand) markBackupAsFailed(ctx context.Context, failure er
 
 	// add backup failed condition to the cluster
 	if failErr := b.retryWithRefreshedCluster(ctx, func() error {
-		origCluster := b.Cluster.DeepCopy()
-
-		meta.SetStatusCondition(&b.Cluster.Status.Conditions, *apiv1.BuildClusterBackupFailedCondition(failure))
-
-		b.Cluster.Status.LastFailedBackup = pgTime.GetCurrentTimestampWithFormat(time.RFC3339)
-		return b.Client.Status().Patch(ctx, b.Cluster, client.MergeFrom(origCluster))
+		return status.PatchWithOptimisticLock(
+			ctx,
+			b.Client,
+			b.Cluster,
+			func(cluster *apiv1.Cluster) {
+				meta.SetStatusCondition(&cluster.Status.Conditions, apiv1.BuildClusterBackupFailedCondition(failure))
+				cluster.Status.LastFailedBackup = pgTime.GetCurrentTimestampWithFormat(time.RFC3339)
+			},
+		)
 	}); failErr != nil {
 		contextLogger.Error(failErr, "while setting cluster condition for failed backup")
 	}

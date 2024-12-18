@@ -24,7 +24,7 @@ import (
 var (
 	// BackupSucceededCondition is added to a backup
 	// when it was completed correctly
-	BackupSucceededCondition = &metav1.Condition{
+	BackupSucceededCondition = metav1.Condition{
 		Type:    string(ConditionBackup),
 		Status:  metav1.ConditionTrue,
 		Reason:  string(ConditionReasonLastBackupSucceeded),
@@ -33,7 +33,7 @@ var (
 
 	// BackupStartingCondition is added to a backup
 	// when it started
-	BackupStartingCondition = &metav1.Condition{
+	BackupStartingCondition = metav1.Condition{
 		Type:    string(ConditionBackup),
 		Status:  metav1.ConditionFalse,
 		Reason:  string(ConditionBackupStarted),
@@ -42,8 +42,8 @@ var (
 
 	// BuildClusterBackupFailedCondition builds
 	// ConditionReasonLastBackupFailed condition
-	BuildClusterBackupFailedCondition = func(err error) *metav1.Condition {
-		return &metav1.Condition{
+	BuildClusterBackupFailedCondition = func(err error) metav1.Condition {
+		return metav1.Condition{
 			Type:    string(ConditionBackup),
 			Status:  metav1.ConditionFalse,
 			Reason:  string(ConditionReasonLastBackupFailed),
