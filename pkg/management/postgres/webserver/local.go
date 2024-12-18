@@ -33,9 +33,9 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/cache"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/conditions"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/status"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -245,9 +245,9 @@ type ArchiveStatusRequest struct {
 	Error string `json:"error,omitempty"`
 }
 
-func (asr *ArchiveStatusRequest) getContinuousArchivingCondition() *metav1.Condition {
+func (asr *ArchiveStatusRequest) getContinuousArchivingCondition() metav1.Condition {
 	if asr.Error != "" {
-		return &metav1.Condition{
+		return metav1.Condition{
 			Type:    string(apiv1.ConditionContinuousArchiving),
 			Status:  metav1.ConditionFalse,
 			Reason:  string(apiv1.ConditionReasonContinuousArchivingFailing),
@@ -255,7 +255,7 @@ func (asr *ArchiveStatusRequest) getContinuousArchivingCondition() *metav1.Condi
 		}
 	}
 
-	return &metav1.Condition{
+	return metav1.Condition{
 		Type:    string(apiv1.ConditionContinuousArchiving),
 		Status:  metav1.ConditionTrue,
 		Reason:  string(apiv1.ConditionReasonContinuousArchivingSuccess),
@@ -283,7 +283,12 @@ func (ws *localWebserverEndpoints) setWALArchiveStatusCondition(w http.ResponseW
 		return
 	}
 
-	if errCond := conditions.Patch(ctx, ws.typedClient, cluster, asr.getContinuousArchivingCondition()); errCond != nil {
+	if errCond := status.PatchConditionsWithOptimisticLock(
+		ctx,
+		ws.typedClient,
+		cluster,
+		asr.getContinuousArchivingCondition(),
+	); errCond != nil {
 		contextLogger.Error(errCond, "Error changing wal archiving condition",
 			"condition", asr.getContinuousArchivingCondition())
 		http.Error(

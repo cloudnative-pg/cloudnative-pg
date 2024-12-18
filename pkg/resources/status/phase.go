@@ -18,7 +18,7 @@ package status
 
 import (
 	"context"
-	"reflect"
+	"fmt"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -51,47 +51,50 @@ func RegisterPhaseWithOrigCluster(
 	phase string,
 	reason string,
 ) error {
+	if err := PatchWithOptimisticLock(
+		ctx,
+		cli,
+		modifiedCluster,
+		func(cluster *apiv1.Cluster) {
+			if cluster.Status.Conditions == nil {
+				cluster.Status.Conditions = []metav1.Condition{}
+			}
+
+			cluster.Status.Phase = phase
+			cluster.Status.PhaseReason = reason
+
+			condition := metav1.Condition{
+				Type:    string(apiv1.ConditionClusterReady),
+				Status:  metav1.ConditionFalse,
+				Reason:  string(apiv1.ClusterIsNotReady),
+				Message: "Cluster Is Not Ready",
+			}
+
+			if cluster.Status.Phase == apiv1.PhaseHealthy {
+				condition = metav1.Condition{
+					Type:    string(apiv1.ConditionClusterReady),
+					Status:  metav1.ConditionTrue,
+					Reason:  string(apiv1.ClusterReady),
+					Message: "Cluster is Ready",
+				}
+			}
+
+			meta.SetStatusCondition(&cluster.Status.Conditions, condition)
+		},
+	); err != nil {
+		return fmt.Errorf("while updating phase: %w", err)
+	}
+
 	contextLogger := log.FromContext(ctx)
 
-	// we ensure that the modifiedCluster conditions aren't nil before operating
-	if modifiedCluster.Status.Conditions == nil {
-		modifiedCluster.Status.Conditions = []metav1.Condition{}
+	modifiedPhase := modifiedCluster.Status.Phase
+	origPhase := origCluster.Status.Phase
+
+	if modifiedPhase != apiv1.PhaseHealthy && origPhase == apiv1.PhaseHealthy {
+		contextLogger.Info("Cluster is not healthy")
 	}
-
-	modifiedCluster.Status.Phase = phase
-	modifiedCluster.Status.PhaseReason = reason
-
-	condition := metav1.Condition{
-		Type:    string(apiv1.ConditionClusterReady),
-		Status:  metav1.ConditionFalse,
-		Reason:  string(apiv1.ClusterIsNotReady),
-		Message: "Cluster Is Not Ready",
-	}
-
-	if modifiedCluster.Status.Phase == apiv1.PhaseHealthy {
-		condition = metav1.Condition{
-			Type:    string(apiv1.ConditionClusterReady),
-			Status:  metav1.ConditionTrue,
-			Reason:  string(apiv1.ClusterReady),
-			Message: "Cluster is Ready",
-		}
-	}
-
-	meta.SetStatusCondition(&modifiedCluster.Status.Conditions, condition)
-
-	if !reflect.DeepEqual(origCluster, modifiedCluster) {
-		modifiedPhase := modifiedCluster.Status.Phase
-		origPhase := origCluster.Status.Phase
-
-		if modifiedPhase != apiv1.PhaseHealthy && origPhase == apiv1.PhaseHealthy {
-			contextLogger.Info("Cluster is not healthy")
-		}
-		if modifiedPhase == apiv1.PhaseHealthy && origPhase != apiv1.PhaseHealthy {
-			contextLogger.Info("Cluster is healthy")
-		}
-		if err := cli.Status().Patch(ctx, modifiedCluster, client.MergeFrom(origCluster)); err != nil {
-			return err
-		}
+	if modifiedPhase == apiv1.PhaseHealthy && origPhase != apiv1.PhaseHealthy {
+		contextLogger.Info("Cluster is healthy")
 	}
 
 	return nil
