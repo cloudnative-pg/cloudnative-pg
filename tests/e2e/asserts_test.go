@@ -517,7 +517,6 @@ func QueryMatchExpectationPredicate(
 			dbname,
 			query,
 		)
-
 		if err != nil {
 			GinkgoWriter.Printf("stdout: %v\nstderr: %v", stdout, stderr)
 		}
