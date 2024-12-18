@@ -951,38 +951,6 @@ const (
 	ConditionClusterReady ClusterConditionType = "Ready"
 )
 
-// A Condition that can be used to communicate the Backup progress
-var (
-	// BackupSucceededCondition is added to a backup
-	// when it was completed correctly
-	BackupSucceededCondition = metav1.Condition{
-		Type:    string(ConditionBackup),
-		Status:  metav1.ConditionTrue,
-		Reason:  string(ConditionReasonLastBackupSucceeded),
-		Message: "Backup was successful",
-	}
-
-	// BackupStartingCondition is added to a backup
-	// when it started
-	BackupStartingCondition = metav1.Condition{
-		Type:    string(ConditionBackup),
-		Status:  metav1.ConditionFalse,
-		Reason:  string(ConditionBackupStarted),
-		Message: "New Backup starting up",
-	}
-
-	// BuildClusterBackupFailedCondition builds
-	// ConditionReasonLastBackupFailed condition
-	BuildClusterBackupFailedCondition = func(err error) metav1.Condition {
-		return metav1.Condition{
-			Type:    string(ConditionBackup),
-			Status:  metav1.ConditionFalse,
-			Reason:  string(ConditionReasonLastBackupFailed),
-			Message: err.Error(),
-		}
-	}
-)
-
 // ConditionStatus defines conditions of resources
 type ConditionStatus string
 
