@@ -62,8 +62,8 @@ const (
 	// LabelPostgresConfiguration is a label for selecting postgres-configuration test
 	LabelPostgresConfiguration = "postgres-configuration"
 
-	// LabelDeclarativePubSub  is a label for selecting the publication / subscription test
-	LabelDeclarativePubSub = "publication-subscription"
+	// LabelPublicationSubscription  is a label for selecting the publication / subscription test
+	LabelPublicationSubscription = "publication-subscription"
 
 	// LabelRecovery is a label for selecting recovery tests
 	LabelRecovery = "recovery"

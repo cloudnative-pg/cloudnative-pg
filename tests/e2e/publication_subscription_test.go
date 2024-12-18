@@ -33,7 +33,7 @@ import (
 // - spinning up a cluster, apply a declarative publication/subscription on it
 
 // Set of tests in which we use the declarative publication and subscription CRDs on an existing cluster
-var _ = Describe("Publication and Subscription", Label(tests.LabelDeclarativePubSub), func() {
+var _ = Describe("Publication and Subscription", Label(tests.LabelPublicationSubscription), func() {
 	const (
 		sourceClusterManifest       = fixturesDir + "/declarative_pub_sub/source-cluster.yaml.template"
 		destinationClusterManifest  = fixturesDir + "/declarative_pub_sub/destination-cluster.yaml.template"
