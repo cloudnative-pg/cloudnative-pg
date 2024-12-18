@@ -57,7 +57,6 @@ func PatchWithOptimisticLock(
 		if err := c.Status().Patch(
 			ctx,
 			updatedCluster,
-			// Send the new status to the API server with optimistic locking
 			client.MergeFromWithOptions(&currentCluster, client.MergeFromWithOptimisticLock{}),
 		); err != nil {
 			return err

@@ -307,7 +307,6 @@ func (b *BackupCommand) backupMaintenance(ctx context.Context) {
 			data.GetLastSuccessfulBackupTime(),
 		)
 
-		// TODO(leonardoce) questo deep equal fa venire la nausea
 		if equality.Semantic.DeepEqual(origCluster.Status, b.Cluster.Status) {
 			return nil
 		}
