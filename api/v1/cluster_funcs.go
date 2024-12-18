@@ -1238,7 +1238,3 @@ func (p *Probe) ApplyInto(k8sProbe *corev1.Probe) {
 	k8sProbe.FailureThreshold = p.FailureThreshold
 	k8sProbe.TerminationGracePeriodSeconds = p.TerminationGracePeriodSeconds
 }
-
-func init() {
-	SchemeBuilder.Register(&Cluster{}, &ClusterList{})
-}

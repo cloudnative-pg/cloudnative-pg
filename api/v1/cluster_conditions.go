@@ -16,9 +16,7 @@ limitations under the License.
 
 package v1
 
-import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-)
+import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 // A Condition that can be used to communicate the Backup progress
 var (
