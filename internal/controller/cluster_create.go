@@ -1166,7 +1166,7 @@ func (r *ClusterReconciler) createPrimaryInstance(
 	}
 
 	contextLogger.Info("Creating new Job",
-		"name", job.Name,
+		"jobName", job.Name,
 		"primary", true)
 
 	utils.SetOperatorVersion(&job.ObjectMeta, versions.Version)
