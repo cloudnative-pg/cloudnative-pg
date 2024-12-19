@@ -79,7 +79,7 @@ var _ = Describe("PoolerPodMonitorManager", func() {
 			}))
 
 			Expect(podMonitor.Spec.PodMetricsEndpoints).To(HaveLen(1))
-			Expect(podMonitor.Spec.PodMetricsEndpoints[0].Port).To(Equal("metrics"))
+			Expect(*podMonitor.Spec.PodMetricsEndpoints[0].Port).To(Equal("metrics"))
 		})
 	})
 
