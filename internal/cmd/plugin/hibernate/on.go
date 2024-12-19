@@ -273,6 +273,7 @@ func (on *onCommand) deleteResourcesStep() error {
 		on.cluster.Name,
 		fmt.Sprintf("%s-%s", on.cluster.Name, strconv.Itoa(on.primaryInstanceSerial)),
 		true,
+		true,
 	); err != nil {
 		return fmt.Errorf("error destroying primary instance: %w", err)
 	}
