@@ -35,11 +35,53 @@ var (
 		Resource: "clusters",
 	}
 
+	// BackupGVK is the triple to reach Backup resources in k8s
+	BackupGVK = schema.GroupVersionResource{
+		Group:    GroupVersion.Group,
+		Version:  GroupVersion.Version,
+		Resource: "backups",
+	}
+
 	// PoolerGVK is the triple to reach Pooler resources in k8s
 	PoolerGVK = schema.GroupVersionResource{
 		Group:    GroupVersion.Group,
 		Version:  GroupVersion.Version,
 		Resource: "poolers",
+	}
+
+	// ImageCatalogGVK is the triple to reach ImageCatalog resources in k8s
+	ImageCatalogGVK = schema.GroupVersionResource{
+		Group:    GroupVersion.Group,
+		Version:  GroupVersion.Version,
+		Resource: "imagecatalogs",
+	}
+
+	// ClusterImageCatalogGVK is the triple to reach ClusterImageCatalog resources in k8s
+	ClusterImageCatalogGVK = schema.GroupVersionResource{
+		Group:    GroupVersion.Group,
+		Version:  GroupVersion.Version,
+		Resource: "clusterimagecatalogs",
+	}
+
+	// PublicationGVK is the triple to reach Publication resources in k8s
+	PublicationGVK = schema.GroupVersionResource{
+		Group:    GroupVersion.Group,
+		Version:  GroupVersion.Version,
+		Resource: "publications",
+	}
+
+	// SubscriptionGVK is the triple to reach Subscription resources in k8s
+	SubscriptionGVK = schema.GroupVersionResource{
+		Group:    GroupVersion.Group,
+		Version:  GroupVersion.Version,
+		Resource: "subscriptions",
+	}
+
+	// DatabaseGVK is the triple to reach Database resources in k8s
+	DatabaseGVK = schema.GroupVersionResource{
+		Group:    GroupVersion.Group,
+		Version:  GroupVersion.Version,
+		Resource: "databases",
 	}
 
 	// ClusterKind is the kind name of Clusters
@@ -56,6 +98,15 @@ var (
 
 	// ClusterImageCatalogKind is the kind name of the cluster-wide image catalogs
 	ClusterImageCatalogKind = "ClusterImageCatalog"
+
+	// PublicationKind is the kind name of publications
+	PublicationKind = "Publication"
+
+	// SubscriptionKind is the kind name of subscriptions
+	SubscriptionKind = "Subscription"
+
+	// DatabaseKind is the kind name of databases
+	DatabaseKind = "Database"
 
 	// SchemeBuilder is used to add go types to the GroupVersionKind scheme
 	SchemeBuilder = &scheme.Builder{GroupVersion: GroupVersion}
