@@ -20,8 +20,8 @@ github.com/cheynewallace/tabby v1.1.1 h1:JvUR8waht4Y0S3JF17G6Vhyt+FRhnqVCkk8l4Yr
 github.com/cheynewallace/tabby v1.1.1/go.mod h1:Pba/6cUL8uYqvOc9RkyvFbHGrQ9wShyrn6/S/1OYVys=
 github.com/cloudnative-pg/barman-cloud v0.0.0-20241218093921-134c7de4954a h1:VrEa9P/HfA6csNOh0DRlUyeUoKuByV57tLnf2rTIqfU=
 github.com/cloudnative-pg/barman-cloud v0.0.0-20241218093921-134c7de4954a/go.mod h1:HPGwXHlatQEnb2HdsbGTZLEo8qlxKLdxTHiTeF9TTqw=
-github.com/cloudnative-pg/machinery v0.0.0-20241122084004-33b997fc6c61 h1:KzazCP/OVbCPAkhhg9hLLNzLyAHcYzxA3U3wsyLDWbs=
-github.com/cloudnative-pg/machinery v0.0.0-20241122084004-33b997fc6c61/go.mod h1:uBHGRIk5rt07mO4zjIC1uvGBWTH6PqIiD1PfpvPGZKU=
+github.com/cloudnative-pg/machinery v0.0.0-20241219102532-2807bc88310d h1:v9IgiRYa7r+KCUxl5lCyUXdhsefZ90engPSMNLBqYmc=
+github.com/cloudnative-pg/machinery v0.0.0-20241219102532-2807bc88310d/go.mod h1:uBHGRIk5rt07mO4zjIC1uvGBWTH6PqIiD1PfpvPGZKU=
 github.com/cpuguy83/go-md2man/v2 v2.0.4/go.mod h1:tgQtvFlXSQOSOSIRvRPT7W67SCa46tRHOmNcaadrF8o=
 github.com/creack/pty v1.1.18 h1:n56/Zwd5o6whRC5PMGretI4IdRLlmBXYNjScPaBgsbY=
 github.com/creack/pty v1.1.18/go.mod h1:MOBLtS5ELjhRRrroQr9kyvTxUAFNvYEK993ew/Vr4O4=
