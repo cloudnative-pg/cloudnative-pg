@@ -57,6 +57,15 @@ var (
 	// ClusterImageCatalogKind is the kind name of the cluster-wide image catalogs
 	ClusterImageCatalogKind = "ClusterImageCatalog"
 
+	// PublicationKind is the kind name of publications
+	PublicationKind = "Publication"
+
+	// SubscriptionKind is the kind name of subscriptions
+	SubscriptionKind = "Subscription"
+
+	// DatabaseKind is the kind name of databases
+	DatabaseKind = "Database"
+
 	// SchemeBuilder is used to add go types to the GroupVersionKind scheme
 	SchemeBuilder = &scheme.Builder{GroupVersion: GroupVersion}
 
