@@ -20,10 +20,10 @@ on:
         default: '4'
       feature_type:
         description: >
-          Feature Type (disruptive, performance, upgrade, smoke, basic, service-connectivity, self-healing,
-          backup-restore, snapshot, operator, observability, replication, plugin, postgres-configuration,
-          pod-scheduling, cluster-metadata, recovery, importing-databases, storage, security, maintenance,
-          tablespaces)
+          Feature Type (backup-restore, basic, cluster-metadata, declarative-databases, disruptive,
+          importing-databases, maintenance, no-openshift, observability, operator, performance, plugin,
+          pod-scheduling, postgres-configuration, publication-subscription, recovery, replication, 
+          security, self-healing, service-connectivity, smoke, snapshot, storage, tablespaces, upgrade)
         required: false
       log_level:
         description: 'Log level for operator (error, warning, info, debug(default), trace)'

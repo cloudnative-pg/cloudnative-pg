@@ -32,7 +32,7 @@ import (
 	"github.com/thoas/go-funk"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/strings/slices"
@@ -504,54 +504,34 @@ func insertRecordIntoTable(tableName string, value int, conn *sql.DB) {
 	Expect(err).ToNot(HaveOccurred())
 }
 
-// AssertDatabaseExists assert if database exists
-func AssertDatabaseExists(pod *corev1.Pod, databaseName string, expectedValue bool) {
-	By(fmt.Sprintf("verifying if database %v exists", databaseName), func() {
-		query := fmt.Sprintf("SELECT EXISTS(SELECT 1 FROM pg_database WHERE lower(datname) = lower('%v'));", databaseName)
+func QueryMatchExpectationPredicate(
+	pod *corev1.Pod,
+	dbname testsUtils.DatabaseName,
+	query string,
+	expectedOutput string,
+) func(g Gomega) {
+	return func(g Gomega) {
+		// executor
 		stdout, stderr, err := env.ExecQueryInInstancePod(
-			testsUtils.PodLocator{
-				Namespace: pod.Namespace,
-				PodName:   pod.Name,
-			},
-			testsUtils.PostgresDBName,
-			query)
+			testsUtils.PodLocator{Namespace: pod.Namespace, PodName: pod.Name},
+			dbname,
+			query,
+		)
 		if err != nil {
 			GinkgoWriter.Printf("stdout: %v\nstderr: %v", stdout, stderr)
 		}
-		Expect(err).ToNot(HaveOccurred())
-
-		if expectedValue {
-			Expect(strings.Trim(stdout, "\n")).To(BeEquivalentTo("t"))
-		} else {
-			Expect(strings.Trim(stdout, "\n")).To(BeEquivalentTo("f"))
-		}
-	})
+		g.Expect(err).ToNot(HaveOccurred())
+		g.Expect(strings.Trim(stdout, "\n")).To(BeEquivalentTo(expectedOutput),
+			fmt.Sprintf("expected query %q to return %q", query, expectedOutput))
+	}
 }
 
-// AssertUserExists assert if user exists
-func AssertUserExists(pod *corev1.Pod, userName string, expectedValue bool) {
-	By(fmt.Sprintf("verifying if user %v exists", userName), func() {
-		query := fmt.Sprintf("SELECT EXISTS(SELECT 1 FROM pg_roles WHERE lower(rolname) = lower('%v'));", userName)
-		Eventually(func(g Gomega) {
-			stdout, stderr, err := env.ExecQueryInInstancePod(
-				testsUtils.PodLocator{
-					Namespace: pod.Namespace,
-					PodName:   pod.Name,
-				},
-				testsUtils.PostgresDBName,
-				query)
-			if err != nil {
-				GinkgoWriter.Printf("stdout: %v\nstderr: %v", stdout, stderr)
-			}
-			g.Expect(err).ToNot(HaveOccurred())
+func roleExistsQuery(roleName string) string {
+	return fmt.Sprintf("SELECT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='%v')", roleName)
+}
 
-			if expectedValue {
-				g.Expect(strings.Trim(stdout, "\n")).To(BeEquivalentTo("t"))
-			} else {
-				g.Expect(strings.Trim(stdout, "\n")).To(BeEquivalentTo("f"))
-			}
-		}, 60).Should(Succeed())
-	})
+func databaseExistsQuery(dbName string) string {
+	return fmt.Sprintf("SELECT EXISTS(SELECT 1 FROM pg_database WHERE datname='%v')", dbName)
 }
 
 // AssertDataExpectedCount verifies that an expected amount of rows exists on the table
@@ -832,7 +812,7 @@ func AssertScheduledBackupsAreScheduled(namespace string, backupYAMLPath string,
 		Name:      scheduledBackupName,
 	}
 
-	Eventually(func() (*v1.Time, error) {
+	Eventually(func() (*metav1.Time, error) {
 		scheduledBackup := &apiv1.ScheduledBackup{}
 		err := env.Client.Get(env.Ctx,
 			scheduledBackupNamespacedName, scheduledBackup)
@@ -891,11 +871,6 @@ func getScheduledBackupCompleteBackupsCount(namespace string, scheduledBackupNam
 // AssertPgRecoveryMode verifies if the target pod recovery mode is enabled or disabled
 func AssertPgRecoveryMode(pod *corev1.Pod, expectedValue bool) {
 	By(fmt.Sprintf("verifying that postgres recovery mode is %v", expectedValue), func() {
-		stringExpectedValue := "f"
-		if expectedValue {
-			stringExpectedValue = "t"
-		}
-
 		Eventually(func() (string, error) {
 			stdOut, stdErr, err := env.ExecQueryInInstancePod(
 				testsUtils.PodLocator{
@@ -908,8 +883,16 @@ func AssertPgRecoveryMode(pod *corev1.Pod, expectedValue bool) {
 				GinkgoWriter.Printf("stdout: %v\ntderr: %v\n", stdOut, stdErr)
 			}
 			return strings.Trim(stdOut, "\n"), err
-		}, 300, 10).Should(BeEquivalentTo(stringExpectedValue))
+		}, 300, 10).Should(BeEquivalentTo(boolPGOutput(expectedValue)))
 	})
+}
+
+func boolPGOutput(expectedValue bool) string {
+	stringExpectedValue := "f"
+	if expectedValue {
+		stringExpectedValue = "t"
+	}
+	return stringExpectedValue
 }
 
 // AssertReplicaModeCluster checks that, after inserting some data in a source cluster,
@@ -991,8 +974,10 @@ func AssertReplicaModeCluster(
 		// verify the replica database created followed the source database, rather than
 		// default to the "app" db and user
 		By("checking that in replica cluster there is no database app and user app", func() {
-			AssertDatabaseExists(primaryReplicaCluster, "app", false)
-			AssertUserExists(primaryReplicaCluster, "app", false)
+			Eventually(QueryMatchExpectationPredicate(primaryReplicaCluster, testsUtils.PostgresDBName,
+				databaseExistsQuery("app"), "f"), 30).Should(Succeed())
+			Eventually(QueryMatchExpectationPredicate(primaryReplicaCluster, testsUtils.PostgresDBName,
+				roleExistsQuery("app"), "f"), 30).Should(Succeed())
 		})
 	}
 }
@@ -1072,8 +1057,10 @@ func AssertDetachReplicaModeCluster(
 	By("verifying the replica database doesn't exist in the replica cluster", func() {
 		// Application database configuration is skipped for replica clusters,
 		// so we expect these to not be present
-		AssertDatabaseExists(primaryReplicaCluster, replicaDatabaseName, false)
-		AssertUserExists(primaryReplicaCluster, replicaUserName, false)
+		Eventually(QueryMatchExpectationPredicate(primaryReplicaCluster, testsUtils.PostgresDBName,
+			databaseExistsQuery(replicaDatabaseName), "f"), 30).Should(Succeed())
+		Eventually(QueryMatchExpectationPredicate(primaryReplicaCluster, testsUtils.PostgresDBName,
+			roleExistsQuery(replicaUserName), "f"), 30).Should(Succeed())
 	})
 
 	By("writing some new data to the source cluster", func() {
@@ -1684,7 +1671,7 @@ func AssertScheduledBackupsImmediate(namespace, backupYAMLPath, scheduledBackupN
 			Namespace: namespace,
 			Name:      scheduledBackupName,
 		}
-		Eventually(func() (*v1.Time, error) {
+		Eventually(func() (*metav1.Time, error) {
 			scheduledBackup := &apiv1.ScheduledBackup{}
 			err = env.Client.Get(env.Ctx,
 				scheduledBackupNamespacedName, scheduledBackup)
@@ -2605,7 +2592,7 @@ func AssertBackupConditionTimestampChangedInClusterStatus(
 	namespace,
 	clusterName string,
 	clusterConditionType apiv1.ClusterConditionType,
-	lastTransactionTimeStamp *v1.Time,
+	lastTransactionTimeStamp *metav1.Time,
 ) {
 	By(fmt.Sprintf("waiting for backup condition status in cluster '%v'", clusterName), func() {
 		Eventually(func() (bool, error) {

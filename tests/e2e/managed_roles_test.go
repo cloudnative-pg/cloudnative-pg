@@ -24,13 +24,13 @@ import (
 
 	"github.com/lib/pq"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -92,11 +92,11 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 					) mem ON member = oid
 					WHERE rolname =` + pq.QuoteLiteral(roleName)
 				stdout, _, err := env.ExecQueryInInstancePod(
-					utils.PodLocator{
+					testsUtils.PodLocator{
 						Namespace: namespace,
 						PodName:   primaryPod,
 					},
-					utils.PostgresDBName,
+					testsUtils.PostgresDBName,
 					query)
 				if err != nil {
 					return []string{ERROR}
@@ -112,11 +112,11 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 			Expect(err).ToNot(HaveOccurred())
 			Eventually(func() string {
 				stdout, _, err := env.ExecQueryInInstancePod(
-					utils.PodLocator{
+					testsUtils.PodLocator{
 						Namespace: namespace,
 						PodName:   primaryPod.Name,
 					},
-					utils.PostgresDBName,
+					testsUtils.PostgresDBName,
 					query)
 				if err != nil {
 					return ""
@@ -139,10 +139,14 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 				primaryPod, err := env.GetClusterPrimary(namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 
-				AssertUserExists(primaryPod, username, true)
-				AssertUserExists(primaryPod, userWithPerpetualPass, true)
-				AssertUserExists(primaryPod, userWithHashedPassword, true)
-				AssertUserExists(primaryPod, unrealizableUser, false)
+				Eventually(QueryMatchExpectationPredicate(primaryPod, testsUtils.PostgresDBName,
+					roleExistsQuery(username), "t"), 30).Should(Succeed())
+				Eventually(QueryMatchExpectationPredicate(primaryPod, testsUtils.PostgresDBName,
+					roleExistsQuery(userWithPerpetualPass), "t"), 30).Should(Succeed())
+				Eventually(QueryMatchExpectationPredicate(primaryPod, testsUtils.PostgresDBName,
+					roleExistsQuery(userWithHashedPassword), "t"), 30).Should(Succeed())
+				Eventually(QueryMatchExpectationPredicate(primaryPod, testsUtils.PostgresDBName,
+					roleExistsQuery(unrealizableUser), "f"), 30).Should(Succeed())
 
 				query := fmt.Sprintf("SELECT true FROM pg_roles WHERE rolname='%s' and rolcanlogin=%v and rolsuper=%v "+
 					"and rolcreatedb=%v and rolcreaterole=%v and rolinherit=%v and rolreplication=%v "+
@@ -152,11 +156,11 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 
 				for _, q := range []string{query, query2} {
 					stdout, _, err := env.ExecQueryInInstancePod(
-						utils.PodLocator{
+						testsUtils.PodLocator{
 							Namespace: primaryPod.Namespace,
 							PodName:   primaryPod.Name,
 						},
-						utils.PostgresDBName,
+						testsUtils.PostgresDBName,
 						q)
 					Expect(err).ToNot(HaveOccurred())
 					Expect(stdout).To(Equal("t\n"))
@@ -164,17 +168,20 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 			})
 
 			By("Verifying connectivity of new managed role", func() {
-				rwService := utils.GetReadWriteServiceName(clusterName)
+				rwService := testsUtils.GetReadWriteServiceName(clusterName)
 				// assert connectable use username and password defined in secrets
-				AssertConnection(namespace, rwService, utils.PostgresDBName, username, password, env)
-				AssertConnection(namespace, rwService, utils.PostgresDBName, userWithHashedPassword, userWithHashedPassword, env)
+				AssertConnection(namespace, rwService, testsUtils.PostgresDBName,
+					username, password, env)
+				AssertConnection(namespace, rwService, testsUtils.PostgresDBName,
+					userWithHashedPassword, userWithHashedPassword, env)
 			})
 
 			By("ensuring the app role has been granted createdb in the managed stanza", func() {
 				primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 
-				AssertUserExists(primaryPodInfo, appUsername, true)
+				Eventually(QueryMatchExpectationPredicate(primaryPodInfo, testsUtils.PostgresDBName,
+					roleExistsQuery(appUsername), "t"), 30).Should(Succeed())
 
 				query := fmt.Sprintf("SELECT rolcreatedb and rolvaliduntil='infinity' "+
 					"FROM pg_roles WHERE rolname='%s'", appUsername)
@@ -186,7 +193,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 				Expect(err).NotTo(HaveOccurred())
 
 				appUserSecret := corev1.Secret{}
-				err = utils.GetObject(
+				err = testsUtils.GetObject(
 					env,
 					types.NamespacedName{Name: cluster.GetApplicationSecretName(), Namespace: namespace},
 					&appUserSecret,
@@ -194,9 +201,9 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 				Expect(err).NotTo(HaveOccurred())
 
 				pass := string(appUserSecret.Data["password"])
-				rwService := utils.GetReadWriteServiceName(clusterName)
+				rwService := testsUtils.GetReadWriteServiceName(clusterName)
 				// assert connectable use username and password defined in secrets
-				AssertConnection(namespace, rwService, utils.PostgresDBName, appUsername, pass, env)
+				AssertConnection(namespace, rwService, testsUtils.PostgresDBName, appUsername, pass, env)
 			})
 
 			By("Verify show unrealizable role configurations in the status", func() {
@@ -220,7 +227,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 			expectedCreateDB := false
 			expectedCreateRole := true
 			expectedConnLmt := int64(10)
-			rwService := utils.GetReadWriteServiceName(clusterName)
+			rwService := testsUtils.GetReadWriteServiceName(clusterName)
 
 			By("updating role attribute in spec", func() {
 				cluster, err := env.GetCluster(namespace, clusterName)
@@ -243,8 +250,8 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 			})
 
 			By("the connection should fail since we disabled the login", func() {
-				forwardConn, conn, err := utils.ForwardPSQLServiceConnection(env, namespace, rwService,
-					utils.PostgresDBName, username, password)
+				forwardConn, conn, err := testsUtils.ForwardPSQLServiceConnection(env, namespace, rwService,
+					testsUtils.PostgresDBName, username, password)
 				defer func() {
 					_ = conn.Close()
 					forwardConn.Close()
@@ -274,9 +281,9 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 			})
 
 			By("the connectivity should be success again", func() {
-				rwService := utils.GetReadWriteServiceName(clusterName)
+				rwService := testsUtils.GetReadWriteServiceName(clusterName)
 				// assert connectable use username and password defined in secrets
-				AssertConnection(namespace, rwService, utils.PostgresDBName, username, password, env)
+				AssertConnection(namespace, rwService, testsUtils.PostgresDBName, username, password, env)
 			})
 		})
 
@@ -370,7 +377,8 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 					Expect(err).ToNot(HaveOccurred())
 					return len(cluster.Status.ManagedRolesStatus.CannotReconcile)
 				}, 30).Should(Equal(0))
-				AssertUserExists(primaryPod, unrealizableUser, true)
+				Eventually(QueryMatchExpectationPredicate(primaryPod, testsUtils.PostgresDBName,
+					roleExistsQuery(unrealizableUser), "t"), 30).Should(Succeed())
 			})
 
 			By("Add role in InRole for role new_role and verify in database", func() {
@@ -431,7 +439,8 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 				err = env.Client.Patch(env.Ctx, updated, client.MergeFrom(cluster))
 				Expect(err).ToNot(HaveOccurred())
 				// user not changed
-				AssertUserExists(primaryPod, unrealizableUser, true)
+				Eventually(QueryMatchExpectationPredicate(primaryPod, testsUtils.PostgresDBName,
+					roleExistsQuery(unrealizableUser), "t"), 30).Should(Succeed())
 				Eventually(func() int {
 					cluster, err := env.GetCluster(namespace, clusterName)
 					Expect(err).ToNot(HaveOccurred())
@@ -464,9 +473,9 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 			})
 
 			By("Verify connectivity using changed password in secret", func() {
-				rwService := utils.GetReadWriteServiceName(clusterName)
+				rwService := testsUtils.GetReadWriteServiceName(clusterName)
 				// assert connectable use username and password defined in secrets
-				AssertConnection(namespace, rwService, utils.PostgresDBName, username, newPassword, env)
+				AssertConnection(namespace, rwService, testsUtils.PostgresDBName, username, newPassword, env)
 			})
 
 			By("Update password in database", func() {
@@ -474,18 +483,18 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 					username, pq.QuoteLiteral(newPassword))
 
 				_, _, err = env.ExecQueryInInstancePod(
-					utils.PodLocator{
+					testsUtils.PodLocator{
 						Namespace: namespace,
 						PodName:   primaryPod.Name,
 					},
-					utils.PostgresDBName,
+					testsUtils.PostgresDBName,
 					query)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
 			By("Verify password in secrets is still valid", func() {
-				rwService := utils.GetReadWriteServiceName(clusterName)
-				AssertConnection(namespace, rwService, utils.PostgresDBName, username, newPassword, env)
+				rwService := testsUtils.GetReadWriteServiceName(clusterName)
+				AssertConnection(namespace, rwService, testsUtils.PostgresDBName, username, newPassword, env)
 			})
 		})
 
@@ -497,12 +506,12 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 				updated := cluster.DeepCopy()
 				for i, r := range updated.Spec.Managed.Roles {
 					if r.Name == newUserName {
-						updated.Spec.Managed.Roles[i].ValidUntil = &v1.Time{}
+						updated.Spec.Managed.Roles[i].ValidUntil = &metav1.Time{}
 					}
 					if r.Name == username {
 						tt, err := time.Parse(time.RFC3339Nano, newValidUntilString)
 						Expect(err).ToNot(HaveOccurred())
-						nt := v1.NewTime(tt)
+						nt := metav1.NewTime(tt)
 						updated.Spec.Managed.Roles[i].ValidUntil = &nt
 					}
 				}
@@ -544,7 +553,8 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 			By("Verify new_role not existed in db", func() {
 				primaryPod, err := env.GetClusterPrimary(namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
-				AssertUserExists(primaryPod, newUserName, false)
+				Eventually(QueryMatchExpectationPredicate(primaryPod, testsUtils.PostgresDBName,
+					roleExistsQuery(newUserName), "f"), 30).Should(Succeed())
 			})
 		})
 	})

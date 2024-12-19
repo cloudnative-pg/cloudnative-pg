@@ -24,7 +24,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -75,7 +75,7 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 				db.Spec.Name, db.Spec.Encoding, db.Spec.LcCtype, db.Spec.LcCollate)
 			Eventually(func(g Gomega) {
 				stdout, _, err := env.ExecQueryInInstancePod(
-					utils.PodLocator{
+					testsUtils.PodLocator{
 						Namespace: namespace,
 						PodName:   primaryPod,
 					},
@@ -119,20 +119,22 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 				primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 
-				AssertDatabaseExists(primaryPodInfo, dbname, true)
+				Eventually(QueryMatchExpectationPredicate(primaryPodInfo, testsUtils.PostgresDBName,
+					databaseExistsQuery(dbname), "t"), 30).Should(Succeed())
 
 				assertDatabaseHasExpectedFields(namespace, primaryPodInfo.Name, database)
 			})
 
 			By("removing the Database object", func() {
-				Expect(utils.DeleteObject(env, &database)).To(Succeed())
+				Expect(testsUtils.DeleteObject(env, &database)).To(Succeed())
 			})
 
 			By("verifying the retention policy in the postgres database", func() {
 				primaryPodInfo, err := env.GetClusterPrimary(namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 
-				AssertDatabaseExists(primaryPodInfo, dbname, retainOnDeletion)
+				Eventually(QueryMatchExpectationPredicate(primaryPodInfo, testsUtils.PostgresDBName,
+					databaseExistsQuery(dbname), boolPGOutput(retainOnDeletion)), 30).Should(Succeed())
 			})
 		}
 
@@ -193,7 +195,7 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 				}, 300).WithPolling(10 * time.Second).Should(Succeed())
 			})
 			By("deleting the namespace and making sure it succeeds before timeout", func() {
-				err := env.DeleteNamespaceAndWait(namespace, 60)
+				err := env.DeleteNamespaceAndWait(namespace, 120)
 				Expect(err).ToNot(HaveOccurred())
 			})
 		})
