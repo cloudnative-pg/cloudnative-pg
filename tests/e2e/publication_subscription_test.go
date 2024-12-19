@@ -246,8 +246,8 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelPublicationSub
 			assertCreateSubscription(namespace, destinationClusterName, subManifest)
 
 			var (
-				publication  *apiv1.Publication
-				subscription *apiv1.Subscription
+				publication  apiv1.Publication
+				subscription apiv1.Subscription
 			)
 			By("setting the reclaimPolicy", func() {
 				publicationReclaimPolicy := apiv1.PublicationReclaimDelete
@@ -263,26 +263,24 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelPublicationSub
 				Expect(err).NotTo(HaveOccurred())
 
 				Eventually(func(g Gomega) {
-					var pub apiv1.Publication
 					err = testsUtils.GetObject(
 						env,
 						types.NamespacedName{Namespace: namespace, Name: pubObjectName},
-						&pub,
+						&publication,
 					)
 					g.Expect(err).ToNot(HaveOccurred())
 					publication.Spec.ReclaimPolicy = publicationReclaimPolicy
-					err = env.Client.Update(env.Ctx, publication)
+					err = env.Client.Update(env.Ctx, &publication)
 					g.Expect(err).ToNot(HaveOccurred())
 
-					var sub apiv1.Subscription
 					err = testsUtils.GetObject(
 						env,
 						types.NamespacedName{Namespace: namespace, Name: subObjectName},
-						&sub,
+						&subscription,
 					)
 					g.Expect(err).ToNot(HaveOccurred())
 					subscription.Spec.ReclaimPolicy = subscriptionReclaimPolicy
-					err = env.Client.Update(env.Ctx, subscription)
+					err = env.Client.Update(env.Ctx, &subscription)
 					g.Expect(err).ToNot(HaveOccurred())
 				}, 60, 5).Should(Succeed())
 			})
@@ -298,8 +296,8 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelPublicationSub
 			})
 
 			By("removing the objects", func() {
-				Expect(testsUtils.DeleteObject(env, publication)).To(Succeed())
-				Expect(testsUtils.DeleteObject(env, subscription)).To(Succeed())
+				Expect(testsUtils.DeleteObject(env, &publication)).To(Succeed())
+				Expect(testsUtils.DeleteObject(env, &subscription)).To(Succeed())
 			})
 
 			By("verifying the publication reclaim policy outcome", func() {
