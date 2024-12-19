@@ -301,7 +301,13 @@ func GetParentRoles(ctx context.Context, db *sql.DB, role DatabaseRole) ([]strin
 
 func appendInRoleOptions(role DatabaseRole, query *strings.Builder) {
 	if len(role.InRoles) > 0 {
-		query.WriteString(fmt.Sprintf(" IN ROLE %s ", strings.Join(role.InRoles, ",")))
+		quotedInRoles := make([]string, len(role.InRoles))
+
+		for i, inRole := range role.InRoles {
+			quotedInRoles[i] = pgx.Identifier{inRole}.Sanitize()
+		}
+
+		query.WriteString(fmt.Sprintf(" IN ROLE %s ", strings.Join(quotedInRoles, ",")))
 	}
 }
 
