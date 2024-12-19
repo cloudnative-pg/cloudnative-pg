@@ -10,6 +10,7 @@ LABEL summary="$SUMMARY" \
       io.k8s.display-name="$SUMMARY" \
       io.k8s.description="$DESCRIPTION" \
       name="CloudNativePG Operator" \
+      maintainer="CloudNativePG Contributors" \
       vendor="CloudNativePG Contributors" \
       url="https://cloudnative-pg.io/" \
       version="$VERSION" \
