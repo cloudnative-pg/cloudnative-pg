@@ -22,7 +22,8 @@ import (
 	"strings"
 
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -47,19 +48,20 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 		namespace,
 		clusterName,
 		tableName string,
-		dbName utils.DatabaseName,
+		dbName exec.DatabaseName,
 		expectedCount int,
 	) {
 		query := fmt.Sprintf("SELECT count(*) FROM %s", tableName)
 
-		primary, err := env.GetClusterPrimary(namespace, clusterName)
+		primary, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 
 		By(fmt.Sprintf(
 			"querying the %s table in the %s database defined by postInit SQL",
 			tableName, dbName), func() {
-			stdout, _, err := env.ExecQueryInInstancePod(
-				utils.PodLocator{
+			stdout, _, err := exec.QueryInInstancePod(
+				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+				exec.PodLocator{
 					Namespace: namespace,
 					PodName:   primary.Name,
 				}, dbName,
@@ -88,7 +90,7 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 			// Create a cluster in a namespace we'll delete after the test
 			const namespacePrefix = "initdb-postqueries"
 			var err error
-			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 
 			CreateResourceFromFile(namespace, postInitSQLSecretRef)
@@ -127,11 +129,12 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 				"app", 10000)
 
 			By("checking inside the database the default locale", func() {
-				primary, err := env.GetClusterPrimary(namespace, clusterName)
+				primary, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 
-				stdout, _, err := env.ExecQueryInInstancePod(
-					utils.PodLocator{
+				stdout, _, err := exec.QueryInInstancePod(
+					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+					exec.PodLocator{
 						Namespace: namespace,
 						PodName:   primary.Name,
 					}, "postgres",
@@ -154,16 +157,17 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 			// Create a cluster in a namespace we'll delete after the test
 			const namespacePrefix = "initdb-locale"
 			var err error
-			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			AssertCreateCluster(namespace, clusterName, postInitSQLCluster, env)
 
 			By("checking inside the database", func() {
-				primary, err := env.GetClusterPrimary(namespace, clusterName)
+				primary, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 
-				stdout, _, err := env.ExecQueryInInstancePod(
-					utils.PodLocator{
+				stdout, _, err := exec.QueryInInstancePod(
+					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+					exec.PodLocator{
 						Namespace: namespace,
 						PodName:   primary.Name,
 					}, "postgres",

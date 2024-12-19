@@ -18,6 +18,7 @@ package e2e
 
 import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/operator"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -34,10 +35,10 @@ var _ = Describe("PostgreSQL operator deployment", Label(tests.LabelBasic, tests
 
 	It("sets up the operator", func() {
 		By("having a pod for the operator in state ready", func() {
-			AssertOperatorIsReady()
+			AssertOperatorIsReady(env.Ctx, env.Client, env.Interface)
 		})
 		By("having a deployment for the operator in state ready", func() {
-			ready, err := env.IsOperatorDeploymentReady()
+			ready, err := operator.IsOperatorDeploymentReady(env.Ctx, env.Client)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(ready).To(BeTrue())
 		})

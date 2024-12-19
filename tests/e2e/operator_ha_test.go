@@ -21,7 +21,9 @@ import (
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
-	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/operator"
+	podutils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -49,11 +51,11 @@ var _ = Describe("Operator High Availability", Serial,
 
 		It("can work as HA mode", func() {
 			// Make sure there's at least one pod of the operator
-			err := env.ScaleOperatorDeployment(1)
+			err := operator.ScaleOperatorDeployment(env.Ctx, env.Client, 1)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Get Operator Pod name
-			operatorPodName, err := env.GetOperatorPod()
+			operatorPodName, err := operator.GetOperatorPod(env.Ctx, env.Client)
 			Expect(err).ToNot(HaveOccurred())
 
 			By("having an operator already running", func() {
@@ -64,11 +66,11 @@ var _ = Describe("Operator High Availability", Serial,
 			})
 
 			// Get operator namespace
-			operatorNamespace, err := env.GetOperatorNamespaceName()
+			operatorNamespace, err := operator.GetOperatorNamespaceName(env.Ctx, env.Client)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Create the cluster namespace
-			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Create Cluster
@@ -76,18 +78,20 @@ var _ = Describe("Operator High Availability", Serial,
 
 			By("verifying current leader", func() {
 				// Check for the current Operator Pod leader from ConfigMap
-				Expect(testsUtils.GetLeaderInfoFromLease(operatorNamespace, env)).To(HavePrefix(operatorPodName.GetName()))
+				Expect(operator.GetLeaderInfoFromLease(
+					env.Ctx, env.Interface,
+					operatorNamespace)).To(HavePrefix(operatorPodName.GetName()))
 			})
 
 			By("scale up operator replicas to 3", func() {
 				// Set old leader pod name to operator pod name
 				oldLeaderPodName = operatorPodName.GetName()
 
-				err := env.ScaleOperatorDeployment(3)
+				err := operator.ScaleOperatorDeployment(env.Ctx, env.Client, 3)
 				Expect(err).ToNot(HaveOccurred())
 
 				// Gather pod names from operator deployment
-				podList, err := env.GetPodList(operatorNamespace)
+				podList, err := podutils.GetPodList(env.Ctx, env.Client, operatorNamespace)
 				Expect(err).ToNot(HaveOccurred())
 				for _, podItem := range podList.Items {
 					operatorPodNames = append(operatorPodNames, podItem.GetName())
@@ -97,7 +101,9 @@ var _ = Describe("Operator High Availability", Serial,
 			By("verifying leader information after scale up", func() {
 				// Check for Operator Pod leader from ConfigMap to be the former one
 				Eventually(func() (string, error) {
-					return testsUtils.GetLeaderInfoFromLease(operatorNamespace, env)
+					return operator.GetLeaderInfoFromLease(
+						env.Ctx, env.Interface,
+						operatorNamespace)
 				}, 60).Should(HavePrefix(oldLeaderPodName))
 			})
 
@@ -106,12 +112,12 @@ var _ = Describe("Operator High Availability", Serial,
 				quickDelete := &ctrlclient.DeleteOptions{
 					GracePeriodSeconds: &quickDeletionPeriod,
 				}
-				err = env.DeletePod(operatorNamespace, oldLeaderPodName, quickDelete)
+				err = podutils.DeletePod(env.Ctx, env.Client, operatorNamespace, oldLeaderPodName, quickDelete)
 				Expect(err).ToNot(HaveOccurred())
 
 				// Verify operator pod should have been deleted
 				Eventually(func() []string {
-					podList, err := env.GetPodList(operatorNamespace)
+					podList, err := podutils.GetPodList(env.Ctx, env.Client, operatorNamespace)
 					Expect(err).ToNot(HaveOccurred())
 					var podNames []string
 					for _, podItem := range podList.Items {
@@ -124,13 +130,15 @@ var _ = Describe("Operator High Availability", Serial,
 			By("new leader should be configured", func() {
 				// Verify that the leader name is different from the previous one
 				Eventually(func() (string, error) {
-					return testsUtils.GetLeaderInfoFromLease(operatorNamespace, env)
+					return operator.GetLeaderInfoFromLease(
+						env.Ctx, env.Interface,
+						operatorNamespace)
 				}, 120).ShouldNot(HavePrefix(oldLeaderPodName))
 			})
 
 			By("verifying reconciliation", func() {
 				// Get current CNPG cluster's Primary
-				currentPrimary, err := env.GetClusterPrimary(namespace, clusterName)
+				currentPrimary, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 				oldPrimary := currentPrimary.GetName()
 
@@ -138,7 +146,7 @@ var _ = Describe("Operator High Availability", Serial,
 				quickDelete := &ctrlclient.DeleteOptions{
 					GracePeriodSeconds: &quickDeletionPeriod,
 				}
-				err = env.DeletePod(namespace, currentPrimary.GetName(), quickDelete)
+				err = podutils.DeletePod(env.Ctx, env.Client, namespace, currentPrimary.GetName(), quickDelete)
 				Expect(err).ToNot(HaveOccurred())
 
 				// Expect a new primary to be elected and promoted
@@ -147,18 +155,20 @@ var _ = Describe("Operator High Availability", Serial,
 
 			By("scale down operator replicas to 1", func() {
 				// Scale down operator deployment to one replica
-				err := env.ScaleOperatorDeployment(1)
+				err := operator.ScaleOperatorDeployment(env.Ctx, env.Client, 1)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
 			By("verifying leader information after scale down", func() {
 				// Get Operator Pod name
-				operatorPodName, err := env.GetOperatorPod()
+				operatorPodName, err := operator.GetOperatorPod(env.Ctx, env.Client)
 				Expect(err).ToNot(HaveOccurred())
 
 				// Verify the Operator Pod is the leader
 				Eventually(func() (string, error) {
-					return testsUtils.GetLeaderInfoFromLease(operatorNamespace, env)
+					return operator.GetLeaderInfoFromLease(
+						env.Ctx, env.Interface,
+						operatorNamespace)
 				}, 120).Should(HavePrefix(operatorPodName.GetName()))
 			})
 		})

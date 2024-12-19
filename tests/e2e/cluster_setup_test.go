@@ -27,7 +27,9 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
-	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -53,13 +55,13 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 		var err error
 
 		// Create a cluster in a namespace we'll delete after the test
-		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
 		By("having three PostgreSQL pods with status ready", func() {
-			podList, err := env.GetClusterPodList(namespace, clusterName)
+			podList, err := clusterutils.GetClusterPodList(env.Ctx, env.Client, namespace, clusterName)
 			Expect(utils.CountReadyPods(podList.Items), err).Should(BeEquivalentTo(3))
 		})
 
@@ -75,11 +77,14 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 			err := env.Client.Get(env.Ctx, namespacedName, pod)
 			Expect(err).ToNot(HaveOccurred())
 
-			forward, conn, err := testsUtils.ForwardPSQLConnection(
-				env,
+			forward, conn, err := postgres.ForwardPSQLConnection(
+				env.Ctx,
+				env.Client,
+				env.Interface,
+				env.RestClientConfig,
 				namespace,
 				clusterName,
-				testsUtils.AppDBName,
+				postgres.AppDBName,
 				apiv1.ApplicationUserSecretSuffix,
 			)
 			Expect(err).NotTo(HaveOccurred())
@@ -121,13 +126,16 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 				return int32(-1), nil
 			}, timeout).Should(BeEquivalentTo(restart + 1))
 
-			AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReady], env)
+			AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReady], env)
 
-			forward, conn, err = testsUtils.ForwardPSQLConnection(
-				env,
+			forward, conn, err = postgres.ForwardPSQLConnection(
+				env.Ctx,
+				env.Client,
+				env.Interface,
+				env.RestClientConfig,
 				namespace,
 				clusterName,
-				testsUtils.AppDBName,
+				postgres.AppDBName,
 				apiv1.ApplicationUserSecretSuffix,
 			)
 			defer func() {
@@ -145,7 +153,7 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 		const namespacePrefix = "cluster-conditions"
 
 		var err error
-		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 
 		By(fmt.Sprintf("having a %v namespace", namespace), func() {
@@ -172,7 +180,7 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 
 		// scale up the cluster to verify if the cluster remains in Ready
 		By("scaling up the cluster size", func() {
-			err := env.ScaleClusterSize(namespace, clusterName, 5)
+			err := clusterutils.ScaleClusterSize(env.Ctx, env.Client, namespace, clusterName, 5)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
