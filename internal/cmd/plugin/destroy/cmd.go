@@ -20,10 +20,14 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/spf13/cobra"
+	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // NewCmd create the new "destroy" subcommand
@@ -43,7 +47,12 @@ func NewCmd() *cobra.Command {
 
 			keepPVC, _ := cmd.Flags().GetBool("keep-pvc")
 			force, _ := cmd.Flags().GetBool("force")
-			return Destroy(ctx, clusterName, node, keepPVC, force)
+			if !force {
+				if err := ensureMultipleReplicasRunning(ctx, clusterName); err != nil {
+					return err
+				}
+			}
+			return Destroy(ctx, clusterName, node, keepPVC)
 		},
 	}
 
@@ -54,4 +63,40 @@ func NewCmd() *cobra.Command {
 		"Force deletion even if it's the last instance")
 
 	return destroyCmd
+}
+
+func ensureMultipleReplicasRunning(ctx context.Context, clusterName string) error {
+	// List all pods for the cluster
+	var podList corev1.PodList
+	if err := plugin.Client.List(ctx, &podList, client.InNamespace(plugin.Namespace), client.MatchingLabels{
+		utils.ClusterLabelName: clusterName,
+		utils.PodRoleLabelName: string(utils.PodRoleInstance),
+	}); err != nil {
+		return fmt.Errorf("error listing pods for cluster %s: %v", clusterName, err)
+	}
+
+	var runningAndReadyCount int
+	for _, pod := range podList.Items {
+		if utils.IsPodReady(pod) && utils.IsPodActive(pod) {
+			runningAndReadyCount++
+		}
+	}
+
+	if runningAndReadyCount > 1 {
+		return nil
+	}
+
+	fmt.Printf(
+		"Warning: Only %d replica(s) are running and ready. Are you sure you want to destroy the instance? [y/N]: ",
+		runningAndReadyCount,
+	)
+	var response string
+	if _, err := fmt.Scanln(&response); err != nil {
+		return err
+	}
+	if strings.ToLower(response) != "y" {
+		return fmt.Errorf("operation aborted by user")
+	}
+
+	return nil
 }
