@@ -381,6 +381,8 @@ RetentionPolicy
 RoleBinding
 RoleConfiguration
 RolePasswordStatus
+RoleSpec
+RoleState
 RoleStatus
 RollingUpdateStatus
 RunningBackupStatus
@@ -1030,6 +1032,7 @@ parseable
 passfile
 passwd
 passwordSecret
+passwordState
 passwordStatus
 pc
 pdf
@@ -1162,6 +1165,7 @@ retentionPolicy
 reusePVC
 ro
 robfig
+roleReclaimPolicy
 roleRef
 rollingupdatestatus
 rollout
