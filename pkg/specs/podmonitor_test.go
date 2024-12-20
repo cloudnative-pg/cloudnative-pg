@@ -44,7 +44,8 @@ var _ = Describe("PodMonitor test", func() {
 		},
 	}
 
-	expectedEndpoint := monitoringv1.PodMetricsEndpoint{Port: "metrics"}
+	metricsPort := "metrics"
+	expectedEndpoint := monitoringv1.PodMetricsEndpoint{Port: &metricsPort}
 	metricRelabelings := []monitoringv1.RelabelConfig{
 		{
 			SourceLabels: []monitoringv1.LabelName{"cluster"},
