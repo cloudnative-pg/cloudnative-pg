@@ -24,66 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/scheme"
 )
 
-var (
-	// GroupVersion is group version used to register these objects
-	GroupVersion = schema.GroupVersion{Group: "postgresql.cnpg.io", Version: "v1"}
-
-	// ClusterGVK is the triple to reach Cluster resources in k8s
-	ClusterGVK = schema.GroupVersionResource{
-		Group:    GroupVersion.Group,
-		Version:  GroupVersion.Version,
-		Resource: "clusters",
-	}
-
-	// BackupGVK is the triple to reach Backup resources in k8s
-	BackupGVK = schema.GroupVersionResource{
-		Group:    GroupVersion.Group,
-		Version:  GroupVersion.Version,
-		Resource: "backups",
-	}
-
-	// PoolerGVK is the triple to reach Pooler resources in k8s
-	PoolerGVK = schema.GroupVersionResource{
-		Group:    GroupVersion.Group,
-		Version:  GroupVersion.Version,
-		Resource: "poolers",
-	}
-
-	// ImageCatalogGVK is the triple to reach ImageCatalog resources in k8s
-	ImageCatalogGVK = schema.GroupVersionResource{
-		Group:    GroupVersion.Group,
-		Version:  GroupVersion.Version,
-		Resource: "imagecatalogs",
-	}
-
-	// ClusterImageCatalogGVK is the triple to reach ClusterImageCatalog resources in k8s
-	ClusterImageCatalogGVK = schema.GroupVersionResource{
-		Group:    GroupVersion.Group,
-		Version:  GroupVersion.Version,
-		Resource: "clusterimagecatalogs",
-	}
-
-	// PublicationGVK is the triple to reach Publication resources in k8s
-	PublicationGVK = schema.GroupVersionResource{
-		Group:    GroupVersion.Group,
-		Version:  GroupVersion.Version,
-		Resource: "publications",
-	}
-
-	// SubscriptionGVK is the triple to reach Subscription resources in k8s
-	SubscriptionGVK = schema.GroupVersionResource{
-		Group:    GroupVersion.Group,
-		Version:  GroupVersion.Version,
-		Resource: "subscriptions",
-	}
-
-	// DatabaseGVK is the triple to reach Database resources in k8s
-	DatabaseGVK = schema.GroupVersionResource{
-		Group:    GroupVersion.Group,
-		Version:  GroupVersion.Version,
-		Resource: "databases",
-	}
-
+const (
 	// ClusterKind is the kind name of Clusters
 	ClusterKind = "Cluster"
 
@@ -107,6 +48,11 @@ var (
 
 	// DatabaseKind is the kind name of databases
 	DatabaseKind = "Database"
+)
+
+var (
+	// GroupVersion is group version used to register these objects
+	GroupVersion = schema.GroupVersion{Group: "postgresql.cnpg.io", Version: "v1"}
 
 	// SchemeBuilder is used to add go types to the GroupVersionKind scheme
 	SchemeBuilder = &scheme.Builder{GroupVersion: GroupVersion}
