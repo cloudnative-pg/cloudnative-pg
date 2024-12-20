@@ -1,24 +1,24 @@
 # Scheduling
 
-Scheduling, in Kubernetes, is the process responsible for placing a new pod on
+In Kubernetes, scheduling is the process responsible for placing a new pod on
 the best node possible, based on several criteria.
 
 !!! Seealso "Kubernetes documentation"
-    Please refer to the
+    See the
     [Kubernetes documentation](https://kubernetes.io/docs/concepts/scheduling-eviction/)
-    for more information on scheduling, including all the available policies. On
-    this page we assume you are familiar with concepts like affinity,
+    for more information on scheduling, including all the available policies.
+    We assume you're familiar with concepts like affinity,
     anti-affinity, node selectors, and so on.
 
-You can control how the CloudNativePG cluster's instances should be
-scheduled through the [`affinity`](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-AffinityConfiguration)
-section in the definition of the cluster, which supports:
+You can control how to schedule the CloudNativePG cluster's instances
+through the [`affinity`](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-AffinityConfiguration)
+section in the definition of the cluster. This section supports:
 
-- pod affinity/anti-affinity
-- node selectors
-- tolerations
+- Pod affinity and anti-affinity
+- Node selectors
+- Tolerations
 
-## Pod Affinity and Anti-Affinity
+## Pod affinity and anti-affinity
 
 Kubernetes provides mechanisms to control where pods are scheduled using
 *affinity* and *anti-affinity* rules. These rules allow you to specify whether
@@ -76,34 +76,34 @@ With this setup, Kubernetes will *prefer* to schedule a 3-node PostgreSQL
 cluster across three different nodes, assuming sufficient resources are
 available.
 
-### Requiring Pod Anti-Affinity
+### Requiring pod anti-affinity
 
-You can modify the default behavior by adjusting the settings mentioned above.
+You can modify the default behavior by adjusting the settings mentioned previously.
 
 For example, setting `podAntiAffinityType` to `required` will enforce
 `requiredDuringSchedulingIgnoredDuringExecution` instead of
 `preferredDuringSchedulingIgnoredDuringExecution`.
 
 However, be aware that this strict requirement may cause pods to remain pending
-if resources are insufficient—this is particularly relevant when using [Cluster Autoscaler](https://github.com/kubernetes/autoscaler/tree/master/cluster-autoscaler) <!-- wokeignore:rule=master -->
+if resources are insufficient. This is particularly relevant when using [Cluster Autoscaler](https://github.com/kubernetes/autoscaler/tree/master/cluster-autoscaler) <!-- wokeignore:rule=master -->
 for automated horizontal scaling in a Kubernetes cluster.
 
-!!! Seealso "Inter-pod Affinity and Anti-Affinity"
+!!! Seealso "Inter-pod affinity and anti-affinity"
     For more details, refer to the [Kubernetes documentation](https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#inter-pod-affinity-and-anti-affinity).
 
-### Topology Considerations
+### Topology considerations
 
 In cloud environments, you might consider using `topology.kubernetes.io/zone`
 as the `topologyKey` to ensure pods are distributed across different
 availability zones rather than just nodes. For more options, see
 [Well-Known Labels, Annotations, and Taints](https://kubernetes.io/docs/reference/labels-annotations-taints/).
 
-### Disabling Anti-Affinity Policies
+### Disabling anti-affinity policies
 
 If needed, you can disable the operator-generated anti-affinity policies by
 setting `enablePodAntiAffinity` to `false`.
 
-### Fine-Grained Control with Custom Rules
+### Fine-grained control with custom rules
 
 For scenarios requiring more precise control, you can specify custom pod
 affinity or anti-affinity rules using the `additionalPodAffinity` and
@@ -114,8 +114,8 @@ the operator-generated rules are disabled.
 !!! Note
     When using `additionalPodAntiAffinity` or `additionalPodAffinity`, you must
     provide the full `podAntiAffinity` or `podAffinity` structure expected by the
-    Pod specification. The following YAML example demonstrates how to configure
-    only one instance of PostgreSQL per worker node, regardless of which PostgreSQL
+    pod specification. The following YAML example shows how to configure
+    only one instance of PostgreSQL per worker node, regardless of the PostgreSQL
     cluster it belongs to:
 
 ```yaml
@@ -131,29 +131,28 @@ the operator-generated rules are disabled.
 
 ## Node selection through `nodeSelector`
 
-Kubernetes allows `nodeSelector` to provide a list of labels (defined as
-key-value pairs) to select the nodes on which a pod can run. Specifically,
-the node must have each indicated key-value pair as labels for the
-pod to be scheduled and run.
+Kubernetes allows `nodeSelector` to provide a list of labels, defined as
+key-value pairs, to select the nodes on which a pod can run. Specifically,
+for the pod to be scheduled and run, the node must have each indicated key-value pair as labels.
 
-Similarly, CloudNativePG consents you to define a `nodeSelector` in the
+Similarly, CloudNativePG allows you to define a `nodeSelector` in the
 `affinity` section, so that you can request a PostgreSQL cluster to run only
 on nodes that have those labels.
 
 ## Tolerations
 
-Kubernetes allows you to specify (through `taints`) whether a node should repel
+Kubernetes allows you to specify (through `taints`) for a node to repel
 all pods not explicitly tolerating (through `tolerations`) their `taints`.
 
 So, by setting a proper set of `tolerations` for a workload matching a specific
-node's `taints`, Kubernetes scheduler will now take into consideration the
+node's `taints`, Kubernetes scheduler takes into consideration the
 tainted node, while deciding on which node to schedule the workload.
-Tolerations can be configured for all the pods of a Cluster through the
-`.spec.affinity.tolerations` section, which accepts the usual Kubernetes syntax
+Tolerations can be configured for all the pods of a cluster in the
+`.spec.affinity.tolerations` section. This section accepts the usual Kubernetes syntax
 for tolerations.
 
 !!! Seealso "Taints and Tolerations"
-    More information on taints and tolerations can be found in the
+    For more information on taints and tolerations, see the
     [Kubernetes documentation](https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/).
 
 ## Isolating PostgreSQL workloads
