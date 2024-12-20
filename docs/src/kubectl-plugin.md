@@ -858,8 +858,9 @@ of the supported flags and their usage.
 The `kubectl cnpg destroy` command helps remove an instance and all the
 associated PVCs from a Kubernetes cluster.
 
-Default behavior will ask you confirmation if you want to delete the last
-healthy instance. You can blind delete using the force flag with `--force`.
+The default behavior will prompt you for confirmation before deleting
+the last healthy instance.
+To bypass this prompt, you can use the --force flag.
 
 The optional `--keep-pvc` flag, if specified, allows you to keep the PVCs,
 while removing all `metadata.ownerReferences` that were set by the instance.

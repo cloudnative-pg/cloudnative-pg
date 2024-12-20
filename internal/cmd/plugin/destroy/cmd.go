@@ -48,7 +48,7 @@ func NewCmd() *cobra.Command {
 			keepPVC, _ := cmd.Flags().GetBool("keep-pvc")
 			force, _ := cmd.Flags().GetBool("force")
 			if !force {
-				if err := ensureMultipleReplicasRunning(ctx, clusterName); err != nil {
+				if err := ensureOtherRunningInstances(ctx, clusterName, node); err != nil {
 					return err
 				}
 			}
@@ -60,12 +60,12 @@ func NewCmd() *cobra.Command {
 		"Keep the PVC but detach it from instance")
 
 	destroyCmd.Flags().BoolP("force", "f", false,
-		"Force deletion even if it's the last instance")
+		"Force the deletion, even if it is the last remaining instance")
 
 	return destroyCmd
 }
 
-func ensureMultipleReplicasRunning(ctx context.Context, clusterName string) error {
+func ensureOtherRunningInstances(ctx context.Context, clusterName string, node string) error {
 	// List all pods for the cluster
 	var podList corev1.PodList
 	if err := plugin.Client.List(ctx, &podList, client.InNamespace(plugin.Namespace), client.MatchingLabels{
@@ -75,27 +75,30 @@ func ensureMultipleReplicasRunning(ctx context.Context, clusterName string) erro
 		return fmt.Errorf("error listing pods for cluster %s: %v", clusterName, err)
 	}
 
-	var runningAndReadyCount int
+	var otherRunningInstancesCount int
 	for _, pod := range podList.Items {
+		if pod.Name == node {
+			continue
+		}
+
 		if utils.IsPodReady(pod) && utils.IsPodActive(pod) {
-			runningAndReadyCount++
+			otherRunningInstancesCount++
 		}
 	}
 
-	if runningAndReadyCount > 1 {
+	if otherRunningInstancesCount > 0 {
 		return nil
 	}
 
 	fmt.Printf(
-		"Warning: Only %d replica(s) are running and ready. Are you sure you want to destroy the instance? [y/N]: ",
-		runningAndReadyCount,
+		"WARNING: No running instances remain. Are you sure you want to attempt destroying the instance? [y/N]: ",
 	)
 	var response string
 	if _, err := fmt.Scanln(&response); err != nil {
 		return err
 	}
 	if strings.ToLower(response) != "y" {
-		return fmt.Errorf("operation aborted by user")
+		return fmt.Errorf("operation aborted by the user")
 	}
 
 	return nil
