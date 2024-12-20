@@ -35,6 +35,7 @@ var _ = Describe("PodMonitor test", func() {
 		clusterName      = "test"
 		clusterNamespace = "test-namespace"
 	)
+	metricsPort := "metrics"
 
 	assertPodMonitorCorrect := func(cluster *apiv1.Cluster, expectedEndpoint monitoringv1.PodMetricsEndpoint) {
 		getMetricRelabelings := func() []monitoringv1.RelabelConfig {
@@ -121,7 +122,7 @@ var _ = Describe("PodMonitor test", func() {
 			},
 		}
 
-		expectedEndpoint := monitoringv1.PodMetricsEndpoint{Port: "metrics"}
+		expectedEndpoint := monitoringv1.PodMetricsEndpoint{Port: &metricsPort}
 
 		assertPodMonitorCorrect(&cluster, expectedEndpoint)
 	})
@@ -142,7 +143,7 @@ var _ = Describe("PodMonitor test", func() {
 		}
 
 		expectedEndpoint := monitoringv1.PodMetricsEndpoint{
-			Port:   "metrics",
+			Port:   &metricsPort,
 			Scheme: "https",
 			TLSConfig: &monitoringv1.SafeTLSConfig{
 				CA: monitoringv1.SecretOrConfigMap{

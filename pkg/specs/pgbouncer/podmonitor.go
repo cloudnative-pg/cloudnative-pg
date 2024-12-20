@@ -51,8 +51,9 @@ func (c PoolerPodMonitorManager) BuildPodMonitor() *monitoringv1.PodMonitor {
 
 	utils.SetAsOwnedBy(&meta, c.pooler.ObjectMeta, c.pooler.TypeMeta)
 
+	metricsPort := "metrics"
 	endpoint := monitoringv1.PodMetricsEndpoint{
-		Port: "metrics",
+		Port: &metricsPort,
 	}
 
 	if c.pooler.Spec.Monitoring != nil {
