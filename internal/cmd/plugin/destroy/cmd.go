@@ -20,10 +20,14 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/spf13/cobra"
+	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // NewCmd create the new "destroy" subcommand
@@ -42,6 +46,12 @@ func NewCmd() *cobra.Command {
 			}
 
 			keepPVC, _ := cmd.Flags().GetBool("keep-pvc")
+			force, _ := cmd.Flags().GetBool("force")
+			if !force {
+				if err := ensureOtherRunningInstances(ctx, clusterName, node); err != nil {
+					return err
+				}
+			}
 			return Destroy(ctx, clusterName, node, keepPVC)
 		},
 	}
@@ -49,5 +59,47 @@ func NewCmd() *cobra.Command {
 	destroyCmd.Flags().BoolP("keep-pvc", "k", false,
 		"Keep the PVC but detach it from instance")
 
+	destroyCmd.Flags().BoolP("force", "f", false,
+		"Force the deletion, even if it is the last remaining instance")
+
 	return destroyCmd
+}
+
+func ensureOtherRunningInstances(ctx context.Context, clusterName string, node string) error {
+	// List all pods for the cluster
+	var podList corev1.PodList
+	if err := plugin.Client.List(ctx, &podList, client.InNamespace(plugin.Namespace), client.MatchingLabels{
+		utils.ClusterLabelName: clusterName,
+		utils.PodRoleLabelName: string(utils.PodRoleInstance),
+	}); err != nil {
+		return fmt.Errorf("error listing pods for cluster %s: %v", clusterName, err)
+	}
+
+	var otherRunningInstancesCount int
+	for _, pod := range podList.Items {
+		if pod.Name == node {
+			continue
+		}
+
+		if utils.IsPodReady(pod) && utils.IsPodActive(pod) {
+			otherRunningInstancesCount++
+		}
+	}
+
+	if otherRunningInstancesCount > 0 {
+		return nil
+	}
+
+	fmt.Printf(
+		"WARNING: No running instances remain. Are you sure you want to attempt destroying the instance? [y/N]: ",
+	)
+	var response string
+	if _, err := fmt.Scanln(&response); err != nil {
+		return err
+	}
+	if strings.ToLower(response) != "y" {
+		return fmt.Errorf("operation aborted by the user")
+	}
+
+	return nil
 }
