@@ -44,8 +44,9 @@ func (c ClusterPodMonitorManager) BuildPodMonitor() *monitoringv1.PodMonitor {
 	}
 	c.cluster.SetInheritedDataAndOwnership(&meta)
 
+	metricsPort := "metrics"
 	endpoint := monitoringv1.PodMetricsEndpoint{
-		Port: "metrics",
+		Port: &metricsPort,
 	}
 
 	if c.cluster.IsMetricsTLSEnabled() {
