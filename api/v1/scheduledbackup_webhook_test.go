@@ -31,7 +31,20 @@ var _ = Describe("Validate schedule", func() {
 			},
 		}
 
-		result := schedule.validate()
+		warnings, result := schedule.validate()
+		Expect(warnings).To(BeEmpty())
+		Expect(result).To(BeEmpty())
+	})
+
+	It("warn the user if the schedule has a wrong number of arguments", func() {
+		schedule := &ScheduledBackup{
+			Spec: ScheduledBackupSpec{
+				Schedule: "1 2 3 4 5",
+			},
+		}
+
+		warnings, result := schedule.validate()
+		Expect(warnings).To(HaveLen(1))
 		Expect(result).To(BeEmpty())
 	})
 
@@ -42,7 +55,8 @@ var _ = Describe("Validate schedule", func() {
 			},
 		}
 
-		result := schedule.validate()
+		warnings, result := schedule.validate()
+		Expect(warnings).To(BeEmpty())
 		Expect(result).To(HaveLen(1))
 	})
 
@@ -54,7 +68,9 @@ var _ = Describe("Validate schedule", func() {
 			},
 		}
 		utils.SetVolumeSnapshot(true)
-		result := schedule.validate()
+
+		warnings, result := schedule.validate()
+		Expect(warnings).To(BeEmpty())
 		Expect(result).To(BeEmpty())
 	})
 
@@ -66,7 +82,8 @@ var _ = Describe("Validate schedule", func() {
 			},
 		}
 		utils.SetVolumeSnapshot(false)
-		result := schedule.validate()
+		warnings, result := schedule.validate()
+		Expect(warnings).To(BeEmpty())
 		Expect(result).To(HaveLen(1))
 		Expect(result[0].Field).To(Equal("spec.method"))
 	})

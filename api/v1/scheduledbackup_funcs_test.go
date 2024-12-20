@@ -77,7 +77,8 @@ var _ = Describe("Scheduled backup", func() {
 				Schedule: "* * * * * *",
 			},
 		}
-		result := scheduledBackup.validate()
+		warnings, result := scheduledBackup.validate()
+		Expect(warnings).To(BeEmpty())
 		Expect(result).To(HaveLen(1))
 		Expect(result[0].Field).To(Equal("spec.online"))
 	})
@@ -90,7 +91,8 @@ var _ = Describe("Scheduled backup", func() {
 				Schedule:            "* * * * * *",
 			},
 		}
-		result := scheduledBackup.validate()
+		warnings, result := scheduledBackup.validate()
+		Expect(warnings).To(BeEmpty())
 		Expect(result).To(HaveLen(1))
 		Expect(result[0].Field).To(Equal("spec.onlineConfiguration"))
 	})
