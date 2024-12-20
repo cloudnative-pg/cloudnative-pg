@@ -80,6 +80,22 @@ Installed size: 78 M
 Is this ok [y/N]: y
 ```
 
+### Using the Arch Linux User Repository (AUR) Package
+
+To install the plugin from the [AUR](https://aur.archlinux.org/packages/kubectl-cnpg), follow these steps:
+
+```sh
+git clone https://aur.archlinux.org/kubectl-cnpg.git
+cd kubectl-cnpg
+makepkg -si
+```
+
+Or use your favourite AUR-helper, for example [paru](https://github.com/Morganamilo/paru):
+
+```sh
+paru -S kubectl-cnpg
+```
+
 ### Using Krew
 
 If you already have [Krew](https://krew.sigs.k8s.io/) installed, you can simply
