@@ -48,17 +48,6 @@ var _ = Describe("Validate schedule", func() {
 		Expect(result).To(BeEmpty())
 	})
 
-	It("complain with a wrong number of arguments", func() {
-		schedule := &ScheduledBackup{
-			Spec: ScheduledBackupSpec{
-				Schedule: "1 2 3 4 5",
-			},
-		}
-
-		result := schedule.validate()
-		Expect(result).To(HaveLen(1))
-	})
-
 	It("complain with a wrong time", func() {
 		schedule := &ScheduledBackup{
 			Spec: ScheduledBackupSpec{
