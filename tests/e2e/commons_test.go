@@ -16,33 +16,35 @@ limitations under the License.
 
 package e2e
 
-import "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+import (
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/cloudvendors"
+)
 
-func MustGetEnvProfile() utils.EnvProfile {
-	return utils.GetEnvProfile(*testCloudVendorEnv)
+func MustGetEnvProfile() cloudvendors.EnvProfile {
+	return cloudvendors.GetEnvProfile(*testCloudVendorEnv)
 }
 
 // IsAKS checks if the running cluster is on AKS
 func IsAKS() bool {
-	return *testCloudVendorEnv == utils.AKS
+	return *testCloudVendorEnv == cloudvendors.AKS
 }
 
 // IsEKS checks if the running cluster is on EKS
 func IsEKS() bool {
-	return *testCloudVendorEnv == utils.EKS
+	return *testCloudVendorEnv == cloudvendors.EKS
 }
 
 // IsGKE checks if the running cluster is on GKE
 func IsGKE() bool {
-	return *testCloudVendorEnv == utils.GKE
+	return *testCloudVendorEnv == cloudvendors.GKE
 }
 
 // IsLocal checks if the running cluster is on local
 func IsLocal() bool {
-	return *testCloudVendorEnv == utils.LOCAL
+	return *testCloudVendorEnv == cloudvendors.LOCAL
 }
 
 // IsOpenshift checks if the running cluster is on OpenShift
 func IsOpenshift() bool {
-	return *testCloudVendorEnv == utils.OCP
+	return *testCloudVendorEnv == cloudvendors.OCP
 }

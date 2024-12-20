@@ -16,10 +16,17 @@ limitations under the License.
 package e2e
 
 import (
+	"fmt"
+	"regexp"
+	"strings"
+
 	"github.com/blang/semver"
 
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
-	testsUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/openshift"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/operator"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -53,21 +60,21 @@ var _ = Describe("Upgrade Paths on OpenShift", Label(tests.LabelUpgrade), Ordere
 		ocp412, err = semver.Make("4.12.0")
 		Expect(err).ToNot(HaveOccurred())
 		// Get current OpenShift Versions
-		ocpVersion, err = testsUtils.GetOpenshiftVersion(env)
+		ocpVersion, err = openshift.GetOpenshiftVersion(env.Ctx, env.RestClientConfig)
 		Expect(err).ToNot(HaveOccurred())
 	})
 
 	cleanupOperator := func() error {
 		// Cleanup the Operator
-		err = testsUtils.DeleteOperatorCRDs(env)
+		err = openshift.DeleteOperatorCRDs(env.Ctx, env.Client)
 		if err != nil {
 			return err
 		}
-		err = testsUtils.DeleteSubscription(env)
+		err = openshift.DeleteSubscription(env.Ctx, env.Client)
 		if err != nil {
 			return err
 		}
-		err = testsUtils.DeleteCSV(env)
+		err = openshift.DeleteCSV(env.Ctx, env.Client)
 		if err != nil {
 			return err
 		}
@@ -78,7 +85,7 @@ var _ = Describe("Upgrade Paths on OpenShift", Label(tests.LabelUpgrade), Ordere
 		err := cleanupOperator()
 		Expect(err).ToNot(HaveOccurred())
 		Eventually(func() error {
-			_, err = env.GetOperatorPod()
+			_, err = operator.GetOperatorPod(env.Ctx, env.Client)
 			return err
 		}, 120).Should(HaveOccurred())
 	}
@@ -86,21 +93,21 @@ var _ = Describe("Upgrade Paths on OpenShift", Label(tests.LabelUpgrade), Ordere
 	assertClusterIsAligned := func(namespace, clusterName string) {
 		By("Verifying the cluster pods have been upgraded", func() {
 			Eventually(func() bool {
-				return testsUtils.HasOperatorBeenUpgraded(env)
+				return operator.HasOperatorBeenUpgraded(env.Ctx, env.Client)
 			}).Should(BeTrue())
 
-			operatorPodName, err := testsUtils.GetOperatorPodName(env)
+			operatorPodName, err := operator.GetOperatorPodName(env.Ctx, env.Client)
 			Expect(err).ToNot(HaveOccurred())
 
-			expectedVersion, err := testsUtils.GetOperatorVersion("openshift-operators", operatorPodName)
+			expectedVersion, err := operator.GetOperatorVersion("openshift-operators", operatorPodName)
 			Expect(err).ToNot(HaveOccurred())
 
-			podList, err := env.GetClusterPodList(namespace, clusterName)
+			podList, err := clusterutils.GetClusterPodList(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 
 			for _, pod := range podList.Items {
 				Eventually(func() (string, error) {
-					return testsUtils.GetManagerVersion(namespace, pod.Name)
+					return GetManagerVersion(namespace, pod.Name)
 				}, 300).Should(BeEquivalentTo(expectedVersion))
 			}
 		})
@@ -110,13 +117,13 @@ var _ = Describe("Upgrade Paths on OpenShift", Label(tests.LabelUpgrade), Ordere
 		// Apply a subscription in the openshift-operators namespace.
 		// This should create the operator
 		By("Applying the initial subscription", func() {
-			err := testsUtils.CreateSubscription(env, initialSubscription)
+			err := openshift.CreateSubscription(env.Ctx, env.Client, initialSubscription)
 			Expect(err).ToNot(HaveOccurred())
-			AssertOperatorIsReady()
+			AssertOperatorIsReady(env.Ctx, env.Client, env.Interface)
 		})
 
 		// Gather the version and semantic Versions of the operator
-		currentVersion, err := testsUtils.GetSubscriptionVersion(env)
+		currentVersion, err := openshift.GetSubscriptionVersion(env.Ctx, env.Client)
 		Expect(err).ToNot(HaveOccurred())
 		currentSemVersion, err := semver.Make(currentVersion)
 		Expect(err).ToNot(HaveOccurred())
@@ -124,27 +131,27 @@ var _ = Describe("Upgrade Paths on OpenShift", Label(tests.LabelUpgrade), Ordere
 		Expect(err).ToNot(HaveOccurred())
 
 		// Create a Cluster in a namespace we'll delete at the end
-		namespace, err := env.CreateUniqueTestNamespace(namespacePrefix)
+		namespace, err := env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
 		By("Patching the status condition if required", func() {
 			// Patch the status conditions if we are running on a pre new-policy release
 			if currentSemVersion.LT(newPolicyRelease) {
-				err = testsUtils.PatchStatusCondition(namespace, clusterName, env)
+				err = openshift.PatchStatusCondition(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 			}
 		})
 
 		By("Applying the upgrade subscription", func() {
 			// Apply the new subscription to upgrade to a new version of the operator
-			err = testsUtils.UpgradeSubscription(env, upgradeSubscription)
+			err = openshift.UpgradeSubscription(env.Ctx, env.Client, upgradeSubscription)
 			Expect(err).ToNot(HaveOccurred())
 			Eventually(func() (string, error) {
-				return testsUtils.GetSubscriptionVersion(env)
+				return openshift.GetSubscriptionVersion(env.Ctx, env.Client)
 			}, 300).
 				ShouldNot(BeEquivalentTo(currentVersion))
-			AssertOperatorIsReady()
+			AssertOperatorIsReady(env.Ctx, env.Client, env.Interface)
 		})
 
 		// Check if the upgrade was successful by making sure all the pods
@@ -160,3 +167,18 @@ var _ = Describe("Upgrade Paths on OpenShift", Label(tests.LabelUpgrade), Ordere
 		applyUpgrade("stable-v1", "alpha")
 	})
 })
+
+// GetManagerVersion returns the current manager version of a given pod
+func GetManagerVersion(namespace, podName string) (string, error) {
+	out, _, err := run.Unchecked(fmt.Sprintf(
+		"kubectl -n %v exec %v -c postgres -- /controller/manager version",
+		namespace,
+		podName,
+	))
+	if err != nil {
+		return "", err
+	}
+	versionRegexp := regexp.MustCompile(`^Build: {Version:(\d+.*) Commit.*}$`)
+	ver := versionRegexp.FindStringSubmatch(strings.TrimSpace(out))[1]
+	return ver, nil
+}
