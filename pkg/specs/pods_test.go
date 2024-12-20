@@ -26,6 +26,7 @@ import (
 
 	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -932,5 +933,40 @@ var _ = Describe("Compute liveness probe failure threshold", func() {
 
 	It("should take the value from 'startDelay / periodSeconds'", func() {
 		Expect(getLivenessProbeFailureThreshold(31)).To(BeNumerically("==", 4))
+	})
+})
+
+var _ = Describe("PodWithExistingStorage", func() {
+	It("applies JSON patch from annotation", func() {
+		cluster := v1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-cluster",
+				Namespace: "default",
+				Annotations: map[string]string{
+					utils.PodPatchAnnotationName: `[{"op": "replace", "path": "/spec/containers/0/image", "value": "new-image:latest"}]`, // nolint: lll
+				},
+			},
+		}
+
+		pod, err := PodWithExistingStorage(cluster, 1)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(pod).NotTo(BeNil())
+		Expect(pod.Spec.Containers[0].Image).To(Equal("new-image:latest"))
+	})
+
+	It("returns error if JSON patch is invalid", func() {
+		cluster := v1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-cluster",
+				Namespace: "default",
+				Annotations: map[string]string{
+					utils.PodPatchAnnotationName: `invalid-json-patch`,
+				},
+			},
+		}
+
+		_, err := PodWithExistingStorage(cluster, 1)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("while decoding JSON patch from annotation"))
 	})
 })
