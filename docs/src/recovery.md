@@ -23,7 +23,7 @@ WAL files are pulled from the defined *recovery object store*.
 
 Base backups can be taken either on object stores or using volume snapshots.
 
-You can achieve recovery from a *recovery object store* in two ways:
+You can achieve recovery from a recovery object store in two ways:
 
 - We recommend using a recovery object store, that is, a backup of another cluster
   created by Barman Cloud and defined by way of the `barmanObjectStore` option
