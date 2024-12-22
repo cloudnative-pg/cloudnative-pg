@@ -32,14 +32,16 @@ externalPackages:
 
 hideTypePatterns:
   - "ParseError$"
-  # We cannot exclude all `List$` because we declare PluginConfigurationList
-  - "BackupList$"
-  - "ClusterList$"
-  - "ClusterImageCatalogList$"
-  - "DatabaseList$"
-  - "ImageCatalogList$"
-  - "PoolerList$"
-  - "ScheduledBackupList$"
+  # We cannot exclude all `List$` because we declare PluginConfigurationList and ExternalClusterList
+  - "\\.BackupList$"
+  - "\\.ClusterList$"
+  - "\\.ClusterImageCatalogList$"
+  - "\\.DatabaseList$"
+  - "\\.ImageCatalogList$"
+  - "\\.PoolerList$"
+  - "\\.ScheduledBackupList$"
+  - "\\.PublicationList$"
+  - "\\.SubscriptionList$"
 
 markdownDisabled: false
 
