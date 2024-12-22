@@ -229,9 +229,6 @@ More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-
 ## Publication     {#postgresql-cnpg-io-v1-Publication}
 
 
-**Appears in:**
-
-
 
 <p>Publication is the Schema for the publications API</p>
 
@@ -301,9 +298,6 @@ More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-
 </table>
 
 ## Subscription     {#postgresql-cnpg-io-v1-Subscription}
-
-
-**Appears in:**
 
 
 
@@ -2711,6 +2705,20 @@ storage</p>
 </tr>
 </tbody>
 </table>
+
+## ExternalClusterList     {#postgresql-cnpg-io-v1-ExternalClusterList}
+
+(Alias of `[]github.com/cloudnative-pg/cloudnative-pg/api/v1.ExternalCluster`)
+
+**Appears in:**
+
+- [ClusterSpec](#postgresql-cnpg-io-v1-ClusterSpec)
+
+
+<p>ExternalClusterList is a list of external clusters</p>
+
+
+
 
 ## ImageCatalogRef     {#postgresql-cnpg-io-v1-ImageCatalogRef}
 
