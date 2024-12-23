@@ -90,7 +90,11 @@ func (b *PluginBackupCommand) invokeStart(ctx context.Context) {
 	}
 	defer plugins.Close()
 
-	cli, err := pluginClient.WithPlugins(ctx, plugins, b.Cluster.Spec.Plugins.GetEnabledPluginNames()...)
+	cli, err := pluginClient.WithPlugins(
+		ctx,
+		plugins,
+		apiv1.GetPluginConfigurationEnabledPluginNames(b.Cluster.Spec.Plugins)...,
+	)
 	if err != nil {
 		b.markBackupAsFailed(ctx, err)
 		return

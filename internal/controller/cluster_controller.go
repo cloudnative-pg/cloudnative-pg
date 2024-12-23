@@ -175,7 +175,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	ctx = cluster.SetInContext(ctx)
 
 	// Load the plugins required to bootstrap and reconcile this cluster
-	enabledPluginNames := cluster.Spec.Plugins.GetEnabledPluginNames()
+	enabledPluginNames := apiv1.GetPluginConfigurationEnabledPluginNames(cluster.Spec.Plugins)
 	enabledPluginNames = append(
 		enabledPluginNames,
 		apiv1.GetExternalClustersEnabledPluginNames(cluster.Spec.ExternalClusters)...,
