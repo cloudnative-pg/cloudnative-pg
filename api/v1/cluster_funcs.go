@@ -82,13 +82,13 @@ func (pluginList PluginConfigurationList) GetEnabledPluginNames() (result []stri
 	return pluginNames
 }
 
-// GetEnabledPluginNames gets the name of the plugins that are
+// GetExternalClustersEnabledPluginNames gets the name of the plugins that are
 // involved in the reconciliation of this external cluster list. This
 // list is usually composed by the plugins that need to be active to
 // recover data from the external clusters.
-func (externalClusterList ExternalClusterList) GetEnabledPluginNames() (result []string) {
-	pluginNames := make([]string, 0, len(externalClusterList))
-	for _, externalCluster := range externalClusterList {
+func GetExternalClustersEnabledPluginNames(externalClusters []ExternalCluster) (result []string) {
+	pluginNames := make([]string, 0, len(externalClusters))
+	for _, externalCluster := range externalClusters {
 		if externalCluster.PluginConfiguration != nil {
 			pluginNames = append(pluginNames, externalCluster.PluginConfiguration.Name)
 		}

@@ -69,8 +69,8 @@ var _ = Describe("Managed subscription controller tests", func() {
 				TargetPrimary:  "cluster-example-1",
 			},
 			Spec: apiv1.ClusterSpec{
-				ExternalClusters: apiv1.ExternalClusterList{
-					apiv1.ExternalCluster{
+				ExternalClusters: []apiv1.ExternalCluster{
+					{
 						Name: "cluster-other",
 						ConnectionParameters: map[string]string{
 							"host": "localhost",

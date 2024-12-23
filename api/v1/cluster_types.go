@@ -422,7 +422,7 @@ type ClusterSpec struct {
 
 	// The list of external clusters which are used in the configuration
 	// +optional
-	ExternalClusters ExternalClusterList `json:"externalClusters,omitempty"`
+	ExternalClusters []ExternalCluster `json:"externalClusters,omitempty"`
 
 	// The instances' log level, one of the following values: error, warning, info (default), debug, trace
 	// +kubebuilder:default:=info
@@ -2059,9 +2059,6 @@ type ClusterMonitoringTLSConfiguration struct {
 	// +optional
 	Enabled bool `json:"enabled,omitempty"`
 }
-
-// ExternalClusterList is a list of external clusters
-type ExternalClusterList []ExternalCluster
 
 // ExternalCluster represents the connection parameters to an
 // external cluster which is used in the other sections of the configuration
