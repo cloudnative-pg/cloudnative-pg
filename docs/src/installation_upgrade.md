@@ -235,12 +235,7 @@ When versions are not directly upgradable, the old version needs to be
 removed before installing the new one. This won't affect user data but
 only the operator itself.
 
-### Upgrading to 1.23.0, 1.22.3 or 1.21.5
-
-!!! Important
-    We encourage all existing users of CloudNativePG to upgrade to version
-    1.23.0 or at least to the latest stable version of the minor release you are
-    currently using (namely 1.22.2 or 1.21.4).
+### Upgrading to 1.23 from a previous minor version
 
 !!! Warning
     Every time you are upgrading to a higher minor release, make sure you
