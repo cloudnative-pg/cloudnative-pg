@@ -1919,7 +1919,7 @@ development/staging purposes.</p>
 </td>
 </tr>
 <tr><td><code>plugins</code><br/>
-<a href="#postgresql-cnpg-io-v1-PluginConfigurationList"><i>PluginConfigurationList</i></a>
+<a href="#postgresql-cnpg-io-v1-PluginConfiguration"><i>[]PluginConfiguration</i></a>
 </td>
 <td>
    <p>The plugins configuration, containing
@@ -3686,6 +3686,8 @@ the operator calls PgBouncer's <code>PAUSE</code> and <code>RESUME</code> comman
 
 **Appears in:**
 
+- [ClusterSpec](#postgresql-cnpg-io-v1-ClusterSpec)
+
 - [ExternalCluster](#postgresql-cnpg-io-v1-ExternalCluster)
 
 
@@ -3719,21 +3721,6 @@ cluster to be reconciled</p>
 </tr>
 </tbody>
 </table>
-
-## PluginConfigurationList     {#postgresql-cnpg-io-v1-PluginConfigurationList}
-
-(Alias of `[]github.com/cloudnative-pg/cloudnative-pg/api/v1.PluginConfiguration`)
-
-**Appears in:**
-
-- [ClusterSpec](#postgresql-cnpg-io-v1-ClusterSpec)
-
-
-<p>PluginConfigurationList represent a set of plugin with their
-configuration parameters</p>
-
-
-
 
 ## PluginStatus     {#postgresql-cnpg-io-v1-PluginStatus}
 
