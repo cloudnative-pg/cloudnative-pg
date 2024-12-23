@@ -19,11 +19,13 @@ package backup
 import (
 	"context"
 	"fmt"
+	"os"
 	"slices"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	pgTime "github.com/cloudnative-pg/machinery/pkg/postgres/time"
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -72,14 +74,16 @@ func NewCmd() *cobra.Command {
 	}
 
 	backupSubcommand := &cobra.Command{
-		Use:     "backup CLUSTER",
-		Short:   "Request an on-demand backup for a PostgreSQL Cluster",
+		Use: "backup CLUSTER",
+		Short: "Request an on-demand backup for a PostgreSQL Cluster. Returns exit code 2 when encountering " +
+			"kube-api server errors",
 		GroupID: plugin.GroupIDDatabase,
 		Args:    plugin.RequiresArguments(1),
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			return plugin.CompleteClusters(cmd.Context(), args, toComplete), cobra.ShellCompDirectiveNoFileComp
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			contextLogger := log.FromContext(cmd.Context())
 			clusterName := args[0]
 
 			if len(backupName) == 0 {
@@ -130,7 +134,8 @@ func NewCmd() *cobra.Command {
 				&cluster,
 			)
 			if err != nil {
-				return fmt.Errorf("while getting cluster %s: %w", clusterName, err)
+				contextLogger.Error(err, "while getting cluster %s: %w", "clusterName", clusterName)
+				os.Exit(2)
 			}
 
 			parsedOnline, err := parseOptionalBooleanString(online)
@@ -225,6 +230,8 @@ func NewCmd() *cobra.Command {
 
 // createBackup handles the Backup resource creation
 func createBackup(ctx context.Context, options backupCommandOptions) error {
+	contextLogger := log.FromContext(ctx)
+
 	backup := apiv1.Backup{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: plugin.Namespace,
@@ -252,8 +259,15 @@ func createBackup(ctx context.Context, options backupCommandOptions) error {
 	err := plugin.Client.Create(ctx, &backup)
 	if err == nil {
 		fmt.Printf("backup/%v created\n", backup.Name)
+		return nil
 	}
-	return err
+
+	contextLogger.Error(err, "while creating backup",
+		"backupName", backup.Name,
+		"backupSpec", backup.Spec,
+	)
+	os.Exit(2)
+	return nil
 }
 
 func parseOptionalBooleanString(rawBool string) (*bool, error) {

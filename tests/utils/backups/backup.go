@@ -18,8 +18,10 @@ package backups
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 
 	v1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"github.com/onsi/ginkgo/v2"
@@ -27,6 +29,7 @@ import (
 	v2 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -126,8 +129,19 @@ func CreateOnDemandBackupViaKubectlPlugin(
 		command = fmt.Sprintf("%v --method %v", command, method)
 	}
 
-	_, _, err := run.Run(command)
-	return err
+	const apiServerErrorCode = 2
+	isRetryable := func(err error) bool {
+		var exerr *exec.ExitError
+		if errors.As(err, &exerr) && exerr.ExitCode() == apiServerErrorCode {
+			return true
+		}
+
+		return false
+	}
+	return retry.OnError(retry.DefaultBackoff, isRetryable, func() error {
+		_, _, err := run.Run(command)
+		return err
+	})
 }
 
 // GetConditionsInClusterStatus get conditions values as given type from cluster object status
