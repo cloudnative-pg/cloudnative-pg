@@ -251,23 +251,24 @@ When versions are not directly upgradable, the old version needs to be
 removed before installing the new one. This won't affect user data but
 only the operator itself.
 
-<!--
-### Upgrading to 1.25.0 or 1.24.x
+### Upgrading to 1.25.0 or 1.24.2
 
 !!! Important
     We encourage all existing users of CloudNativePG to upgrade to version
     1.25.0 or at least to the latest stable version of the minor release you are
     currently using (namely 1.24.x).
--->
-
-### Upgrading to 1.24 from a previous minor version
 
 !!! Warning
     Every time you are upgrading to a higher minor release, make sure you
     go through the release notes and upgrade instructions of all the
     intermediate minor releases. For example, if you want to move
-    from 1.22.x to 1.24, make sure you go through the release notes
-    and upgrade instructions for 1.23 and 1.24.
+    from 1.23.x to 1.25, make sure you go through the release notes
+    and upgrade instructions for 1.24 and 1.25.
+
+No changes to existing 1.24 cluster configurations are required when upgrading
+to 1.25.
+
+### Upgrading to 1.24 from a previous minor version
 
 #### From Replica Clusters to Distributed Topology
 
