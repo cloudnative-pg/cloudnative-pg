@@ -46,7 +46,7 @@ func PrintReplicationSlots(
 	restConfig *rest.Config,
 	namespace, clusterName, dbName string,
 ) string {
-	podList, err := clusterutils.GetClusterPodList(ctx, crudClient, namespace, clusterName)
+	podList, err := clusterutils.ListPods(ctx, crudClient, namespace, clusterName)
 	if err != nil {
 		return fmt.Sprintf("Couldn't retrieve the cluster's podlist: %v\n", err)
 	}
@@ -106,12 +106,12 @@ func GetExpectedHAReplicationSlotsOnPod(
 	crudClient client.Client,
 	namespace, clusterName, podName string,
 ) ([]string, error) {
-	podList, err := clusterutils.GetClusterPodList(ctx, crudClient, namespace, clusterName)
+	podList, err := clusterutils.ListPods(ctx, crudClient, namespace, clusterName)
 	if err != nil {
 		return nil, err
 	}
 
-	cluster, err := clusterutils.GetCluster(ctx, crudClient, namespace, clusterName)
+	cluster, err := clusterutils.Get(ctx, crudClient, namespace, clusterName)
 	if err != nil {
 		return nil, err
 	}
@@ -210,7 +210,7 @@ func ToggleHAReplicationSlots(
 	namespace, clusterName string,
 	enable bool,
 ) error {
-	cluster, err := clusterutils.GetCluster(ctx, crudClient, namespace, clusterName)
+	cluster, err := clusterutils.Get(ctx, crudClient, namespace, clusterName)
 	if err != nil {
 		return err
 	}
@@ -238,7 +238,7 @@ func ToggleSynchronizeReplicationSlots(
 	namespace, clusterName string,
 	enable bool,
 ) error {
-	cluster, err := clusterutils.GetCluster(ctx, crudClient, namespace, clusterName)
+	cluster, err := clusterutils.Get(ctx, crudClient, namespace, clusterName)
 	if err != nil {
 		return err
 	}

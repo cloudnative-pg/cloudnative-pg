@@ -39,7 +39,7 @@ func GetPodMonitor(
 		Name:      name,
 	}
 
-	err := objects.GetObject(ctx, crudClient, namespacedName, podMonitor)
+	err := objects.Get(ctx, crudClient, namespacedName, podMonitor)
 	if err != nil {
 		return nil, err
 	}

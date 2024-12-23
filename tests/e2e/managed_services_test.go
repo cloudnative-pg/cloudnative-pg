@@ -62,7 +62,7 @@ var _ = Describe("Managed services tests", Label(tests.LabelSmoke, tests.LabelBa
 		Expect(err).ToNot(HaveOccurred())
 		AssertCreateCluster(namespace, clusterName, clusterManifest, env)
 
-		cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+		cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 
 		By("ensuring the service is created", func() {
@@ -80,7 +80,7 @@ var _ = Describe("Managed services tests", Label(tests.LabelSmoke, tests.LabelBa
 
 		By("ensuring the service is deleted when removed from the additional field", func() {
 			Eventually(func(g Gomega) error {
-				cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 				g.Expect(err).ToNot(HaveOccurred())
 				cluster.Spec.Managed.Services.Additional = []apiv1.ManagedService{}
 				return env.Client.Update(ctx, cluster)
@@ -105,7 +105,7 @@ var _ = Describe("Managed services tests", Label(tests.LabelSmoke, tests.LabelBa
 		Expect(err).ToNot(HaveOccurred())
 		AssertCreateCluster(namespace, clusterName, clusterManifest, env)
 
-		cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+		cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 
 		ro := specs.CreateClusterReadOnlyService(*cluster)
@@ -126,7 +126,7 @@ var _ = Describe("Managed services tests", Label(tests.LabelSmoke, tests.LabelBa
 
 		By("creating them when they are re-enabled", func() {
 			Eventually(func(g Gomega) error {
-				cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 				g.Expect(err).ToNot(HaveOccurred())
 				cluster.Spec.Managed.Services.DisabledDefaultServices = []apiv1.ServiceSelectorType{}
 				return env.Client.Update(ctx, cluster)
@@ -164,7 +164,7 @@ var _ = Describe("Managed services tests", Label(tests.LabelSmoke, tests.LabelBa
 		Expect(err).ToNot(HaveOccurred())
 		AssertCreateCluster(namespace, clusterName, clusterManifest, env)
 
-		cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+		cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 
 		var creationTimestamp metav1.Time
@@ -187,7 +187,7 @@ var _ = Describe("Managed services tests", Label(tests.LabelSmoke, tests.LabelBa
 
 		By("updating the service definition", func() {
 			Eventually(func(g Gomega) error {
-				cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 				g.Expect(err).ToNot(HaveOccurred())
 				cluster.Spec.Managed.Services.Additional[0].ServiceTemplate.ObjectMeta.Labels["new-label"] = "new"
 				return env.Client.Update(ctx, cluster)

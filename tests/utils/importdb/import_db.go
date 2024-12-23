@@ -103,7 +103,7 @@ func ImportDatabaseMicroservice(
 		},
 	}
 
-	obj, err := objects.CreateObject(ctx, crudClient, restoreCluster)
+	obj, err := objects.Create(ctx, crudClient, restoreCluster)
 	if err != nil {
 		return nil, err
 	}
@@ -183,7 +183,7 @@ func ImportDatabasesMonolith(
 		},
 	}
 
-	obj, err := objects.CreateObject(ctx, crudClient, targetCluster)
+	obj, err := objects.Create(ctx, crudClient, targetCluster)
 	if err != nil {
 		return nil, err
 	}

@@ -94,7 +94,7 @@ var _ = Describe("Imports with Microservice Approach", Label(tests.LabelImportin
 		AssertDataExpectedCount(env, tableLocator, 2)
 		AssertLargeObjectValue(namespace, importedClusterName, oid, data)
 		By("deleting the imported database", func() {
-			Expect(objects.DeleteObject(env.Ctx, env.Client, cluster)).To(Succeed())
+			Expect(objects.Delete(env.Ctx, env.Client, cluster)).To(Succeed())
 		})
 	})
 
@@ -216,7 +216,7 @@ func assertCreateTableWithDataOnSourceCluster(
 ) {
 	By("create user, insert record in new table, assign new user as owner "+
 		"and grant read only to app user", func() {
-		pod, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
+		pod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 
 		query := fmt.Sprintf(
@@ -246,7 +246,7 @@ func assertTableAndDataOnImportedCluster(
 	importedClusterName string,
 ) {
 	By("verifying presence of table and data from source in imported cluster", func() {
-		pod, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, importedClusterName)
+		pod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, importedClusterName)
 		Expect(err).ToNot(HaveOccurred())
 
 		By("Verifying imported table has owner app user", func() {
@@ -290,7 +290,7 @@ func assertImportRenamesSelectedDatabase(
 	Expect(err).ToNot(HaveOccurred())
 
 	AssertCreateCluster(namespace, clusterName, sampleFile, env)
-	primaryPod, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
+	primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 	Expect(err).ToNot(HaveOccurred())
 
 	By("creating multiple dbs on source and set ownership to app", func() {
@@ -338,7 +338,7 @@ func assertImportRenamesSelectedDatabase(
 	AssertDataExpectedCount(env, tableLocator, 2)
 
 	By("verifying that only 'app' DB exists in the imported cluster", func() {
-		importedPrimaryPod, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, importedClusterName)
+		importedPrimaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, importedClusterName)
 		Expect(err).ToNot(HaveOccurred())
 
 		Eventually(QueryMatchExpectationPredicate(importedPrimaryPod, postgres.PostgresDBName,
@@ -351,6 +351,6 @@ func assertImportRenamesSelectedDatabase(
 		err = DeleteResourcesFromFile(namespace, sampleFile)
 		Expect(err).ToNot(HaveOccurred())
 
-		Expect(objects.DeleteObject(env.Ctx, env.Client, importedCluster)).To(Succeed())
+		Expect(objects.Delete(env.Ctx, env.Client, importedCluster)).To(Succeed())
 	})
 }

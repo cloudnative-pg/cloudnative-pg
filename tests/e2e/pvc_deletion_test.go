@@ -80,7 +80,7 @@ var _ = Describe("PVC Deletion", Label(tests.LabelSelfHealing), func() {
 			quickDelete := &ctrlclient.DeleteOptions{
 				GracePeriodSeconds: &quickDeletionPeriod,
 			}
-			err = podutils.DeletePod(env.Ctx, env.Client, namespace, podName, quickDelete)
+			err = podutils.Delete(env.Ctx, env.Client, namespace, podName, quickDelete)
 			Expect(err).ToNot(HaveOccurred())
 
 			// The pod should be back
@@ -153,7 +153,7 @@ var _ = Describe("PVC Deletion", Label(tests.LabelSelfHealing), func() {
 			}
 
 			// Deleting primary pod
-			err = podutils.DeletePod(env.Ctx, env.Client, namespace, podName, quickDelete)
+			err = podutils.Delete(env.Ctx, env.Client, namespace, podName, quickDelete)
 			Expect(err).ToNot(HaveOccurred())
 
 			// A new pod should be created

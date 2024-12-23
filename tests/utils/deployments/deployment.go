@@ -27,13 +27,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// deploymentIsReady checks if a Deployment is ready
-func deploymentIsReady(deployment appsv1.Deployment) bool {
+// isReady checks if a Deployment is ready
+func isReady(deployment appsv1.Deployment) bool {
 	return deployment.Status.ReadyReplicas == *deployment.Spec.Replicas
 }
 
-// DeploymentWaitForReady waits for a Deployment to be ready
-func DeploymentWaitForReady(
+// WaitForReady waits for a Deployment to be ready
+func WaitForReady(
 	ctx context.Context,
 	crudClient client.Client,
 	deployment *appsv1.Deployment,
@@ -47,7 +47,7 @@ func DeploymentWaitForReady(
 			}, deployment); err != nil {
 				return err
 			}
-			if !deploymentIsReady(*deployment) {
+			if !isReady(*deployment) {
 				return fmt.Errorf(
 					"deployment not ready. Namespace: %v, Name: %v",
 					deployment.Namespace,

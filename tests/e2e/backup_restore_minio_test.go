@@ -98,7 +98,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			AssertCreateCluster(namespace, clusterName, clusterWithMinioSampleFile, env)
 
 			By("verify test connectivity to minio using barman-cloud-wal-archive script", func() {
-				primaryPod, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
+				primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 				Eventually(func() (bool, error) {
 					connectionStatus, err := minio.TestConnectivityUsingBarmanCloudWalArchive(
@@ -146,28 +146,28 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			// There should be a backup resource and
 			By(fmt.Sprintf("backing up a cluster and verifying it exists on minio, backup path is %v", latestTar),
 				func() {
-					backup = backups.ExecuteBackup(env.Ctx, env.Client, env.Scheme, namespace, backupFile, false,
+					backup = backups.Execute(env.Ctx, env.Client, env.Scheme, namespace, backupFile, false,
 						testTimeouts[timeouts.BackupIsReady])
 					backups.AssertBackupConditionInClusterStatus(env.Ctx, env.Client, namespace, clusterName)
 					Eventually(func() (int, error) {
 						return minio.CountFiles(minioEnv, latestTar)
 					}, 60).Should(BeEquivalentTo(1))
 					Eventually(func() (string, error) {
-						cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+						cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 						if err != nil {
 							return "", err
 						}
 						return cluster.Status.FirstRecoverabilityPoint, err
 					}, 30).ShouldNot(BeEmpty())
 					Eventually(func() (string, error) {
-						cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+						cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 						if err != nil {
 							return "", err
 						}
 						return cluster.Status.LastSuccessfulBackup, err
 					}, 30).ShouldNot(BeEmpty())
 					Eventually(func() (string, error) {
-						cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+						cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 						if err != nil {
 							return "", err
 						}
@@ -213,7 +213,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 				err = env.Client.Delete(env.Ctx, backup)
 				Expect(err).ToNot(HaveOccurred())
 				// create a second backup
-				backups.ExecuteBackup(
+				backups.Execute(
 					env.Ctx, env.Client, env.Scheme,
 					namespace, backupFile, false,
 					testTimeouts[timeouts.BackupIsReady],
@@ -230,7 +230,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 					ctrlclient.ObjectKey{Namespace: namespace, Name: backupName},
 					backup)
 				Expect(err).ToNot(HaveOccurred())
-				cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 				// We know that our current images always contain the latest barman version
 				if cluster.ShouldForceLegacyBackup() {
@@ -243,7 +243,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			// Restore backup in a new cluster, also cover if no application database is configured
 			AssertClusterRestore(namespace, clusterRestoreSampleFile, tableName)
 
-			cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, restoredClusterName)
+			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, restoredClusterName)
 			Expect(err).ToNot(HaveOccurred())
 			AssertMetricsData(namespace, targetDBOne, targetDBTwo, targetDBSecret, cluster)
 
@@ -307,7 +307,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			// There should be a backup resource and
 			By(fmt.Sprintf("backing up a cluster from standby and verifying it exists on minio, backup path is %v",
 				latestTar), func() {
-				backups.ExecuteBackup(
+				backups.Execute(
 					env.Ctx, env.Client, env.Scheme,
 					namespace, backupStandbyFile, true,
 					testTimeouts[timeouts.BackupIsReady],
@@ -317,7 +317,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 					return minio.CountFiles(minioEnv, latestTar)
 				}, 60).Should(BeEquivalentTo(1))
 				Eventually(func() (string, error) {
-					cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, targetClusterName)
+					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, targetClusterName)
 					return cluster.Status.FirstRecoverabilityPoint, err
 				}, 30).ShouldNot(BeEmpty())
 			})
@@ -361,7 +361,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			// There should be a backup resource and
 			By(fmt.Sprintf("backing up a cluster from standby (defined in backup file) and verifying it exists on minio,"+
 				" backup path is %v", latestTar), func() {
-				backups.ExecuteBackup(
+				backups.Execute(
 					env.Ctx, env.Client, env.Scheme,
 					namespace, backupWithTargetFile, true,
 					testTimeouts[timeouts.BackupIsReady],
@@ -371,7 +371,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 					return minio.CountFiles(minioEnv, latestTar)
 				}, 60).Should(BeEquivalentTo(1))
 				Eventually(func() (string, error) {
-					cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, targetClusterName)
+					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, targetClusterName)
 					return cluster.Status.FirstRecoverabilityPoint, err
 				}, 30).ShouldNot(BeEmpty())
 			})
@@ -422,7 +422,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 
 			// There should be a backup resource and
 			By("backing up a cluster and verifying it exists on minio", func() {
-				backups.ExecuteBackup(
+				backups.Execute(
 					env.Ctx, env.Client, env.Scheme,
 					namespace, backupFileCustom, false,
 					testTimeouts[timeouts.BackupIsReady],
@@ -435,7 +435,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 					fmt.Sprintf("verify the number of backup %v is equals to 1", latestBaseTar))
 				// this is the second backup we take on the bucket
 				Eventually(func() (string, error) {
-					cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, customClusterName)
+					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, customClusterName)
 					return cluster.Status.FirstRecoverabilityPoint, err
 				}, 30).ShouldNot(BeEmpty())
 			})
@@ -501,7 +501,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			AssertClusterWasRestoredWithPITR(namespace, restoredClusterName, tableName, "00000003")
 
 			By("deleting the restored cluster", func() {
-				Expect(objects.DeleteObject(env.Ctx, env.Client, cluster)).To(Succeed())
+				Expect(objects.Delete(env.Ctx, env.Client, cluster)).To(Succeed())
 			})
 		})
 
@@ -533,14 +533,14 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 			Expect(err).ToNot(HaveOccurred())
 			Expect(tags.Tags).ToNot(BeEmpty())
 
-			currentPrimary, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
+			currentPrimary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			oldPrimary := currentPrimary.GetName()
 			// Force-delete the primary
 			quickDelete := &ctrlclient.DeleteOptions{
 				GracePeriodSeconds: &quickDeletionPeriod,
 			}
-			err = pods.DeletePod(env.Ctx, env.Client, namespace, currentPrimary.GetName(), quickDelete)
+			err = pods.Delete(env.Ctx, env.Client, namespace, currentPrimary.GetName(), quickDelete)
 			Expect(err).ToNot(HaveOccurred())
 
 			AssertNewPrimary(namespace, clusterName, oldPrimary)
@@ -607,7 +607,7 @@ var _ = Describe("MinIO - Clusters Recovery from Barman Object Store", Label(tes
 			AssertCreateCluster(namespace, clusterName, clusterSourceFileMinio, env)
 
 			By("verify test connectivity to minio using barman-cloud-wal-archive script", func() {
-				primaryPod, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
+				primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 				Eventually(func() (bool, error) {
 					connectionStatus, err := minio.TestConnectivityUsingBarmanCloudWalArchive(
@@ -638,12 +638,13 @@ var _ = Describe("MinIO - Clusters Recovery from Barman Object Store", Label(tes
 
 				// There should be a backup resource and
 				By("backing up a cluster and verifying it exists on minio", func() {
-					backups.ExecuteBackup(env.Ctx, env.Client, env.Scheme, namespace, sourceTakeFirstBackupFileMinio, false,
+					backups.Execute(env.Ctx, env.Client, env.Scheme, namespace, sourceTakeFirstBackupFileMinio,
+						false,
 						testTimeouts[timeouts.BackupIsReady])
 					backups.AssertBackupConditionInClusterStatus(env.Ctx, env.Client, namespace, clusterName)
 
 					// TODO: this is to force a CHECKPOINT when we run the backup on standby.
-					// This should be better handled inside ExecuteBackup
+					// This should be better handled inside Execute
 					AssertArchiveWalOnMinio(namespace, clusterName, clusterName)
 
 					latestTar := minio.GetFilePath(clusterName, "data.tar")
@@ -652,7 +653,7 @@ var _ = Describe("MinIO - Clusters Recovery from Barman Object Store", Label(tes
 					}, 60).Should(BeEquivalentTo(1),
 						fmt.Sprintf("verify the number of backup %v is equals to 1", latestTar))
 					Eventually(func() (string, error) {
-						cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+						cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 						if err != nil {
 							return "", err
 						}
@@ -715,7 +716,8 @@ var _ = Describe("MinIO - Clusters Recovery from Barman Object Store", Label(tes
 				insertRecordIntoTable(tableName, 4, conn)
 			})
 			By("creating second backup and verifying it exists on minio", func() {
-				backups.ExecuteBackup(env.Ctx, env.Client, env.Scheme, namespace, sourceTakeSecondBackupFileMinio, false,
+				backups.Execute(env.Ctx, env.Client, env.Scheme, namespace, sourceTakeSecondBackupFileMinio,
+					false,
 					testTimeouts[timeouts.BackupIsReady])
 				backups.AssertBackupConditionInClusterStatus(env.Ctx, env.Client, namespace, clusterName)
 				latestTar := minio.GetFilePath(clusterName, "data.tar")
@@ -739,7 +741,7 @@ var _ = Describe("MinIO - Clusters Recovery from Barman Object Store", Label(tes
 				"00000002",
 			)
 			By("delete restored cluster", func() {
-				Expect(objects.DeleteObject(env.Ctx, env.Client, restoredCluster)).To(Succeed())
+				Expect(objects.Delete(env.Ctx, env.Client, restoredCluster)).To(Succeed())
 			})
 		})
 
@@ -756,7 +758,7 @@ var _ = Describe("MinIO - Clusters Recovery from Barman Object Store", Label(tes
 			AssertArchiveWalOnMinio(namespace, clusterName, clusterName)
 
 			By("backing up a cluster and verifying it exists on minio", func() {
-				backups.ExecuteBackup(env.Ctx, env.Client, env.Scheme, namespace, sourceTakeThirdBackupFileMinio, false,
+				backups.Execute(env.Ctx, env.Client, env.Scheme, namespace, sourceTakeThirdBackupFileMinio, false,
 					testTimeouts[timeouts.BackupIsReady])
 				backups.AssertBackupConditionInClusterStatus(env.Ctx, env.Client, namespace, clusterName)
 				latestTar := minio.GetFilePath(clusterName, "data.tar")
@@ -787,7 +789,7 @@ func prepareClusterForPITROnMinio(
 	const tableNamePitr = "for_restore"
 
 	By("backing up a cluster and verifying it exists on minio", func() {
-		backups.ExecuteBackup(
+		backups.Execute(
 			env.Ctx, env.Client, env.Scheme,
 			namespace, backupSampleFile, false,
 			testTimeouts[timeouts.BackupIsReady],
@@ -799,7 +801,7 @@ func prepareClusterForPITROnMinio(
 			fmt.Sprintf("verify the number of backups %v is greater than or equal to %v", latestTar,
 				expectedVal))
 		Eventually(func() (string, error) {
-			cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			return cluster.Status.FirstRecoverabilityPoint, err
 		}, 30).ShouldNot(BeEmpty())

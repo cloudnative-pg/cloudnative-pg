@@ -51,7 +51,7 @@ var _ = Describe("Config support", Serial, Ordered, Label(tests.LabelDisruptive,
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 
-		operatorDeployment, err := operator.GetOperatorDeployment(env.Ctx, env.Client)
+		operatorDeployment, err := operator.GetDeployment(env.Ctx, env.Client)
 		Expect(err).ToNot(HaveOccurred())
 
 		operatorNamespace = operatorDeployment.GetNamespace()
@@ -76,7 +76,7 @@ var _ = Describe("Config support", Serial, Ordered, Label(tests.LabelDisruptive,
 		err = env.Client.Delete(env.Ctx, secret)
 		Expect(err).NotTo(HaveOccurred())
 
-		err = operator.ReloadOperatorDeployment(env.Ctx, env.Client, env.Interface, 120)
+		err = operator.ReloadDeployment(env.Ctx, env.Client, env.Interface, 120)
 		Expect(err).ToNot(HaveOccurred())
 	})
 
@@ -110,7 +110,7 @@ var _ = Describe("Config support", Serial, Ordered, Label(tests.LabelDisruptive,
 		}, 10).Should(HaveLen(1))
 
 		// Reload the operator with the new config
-		err = operator.ReloadOperatorDeployment(env.Ctx, env.Client, env.Interface, 120)
+		err = operator.ReloadDeployment(env.Ctx, env.Client, env.Interface, 120)
 		Expect(err).ToNot(HaveOccurred())
 	})
 
@@ -123,17 +123,18 @@ var _ = Describe("Config support", Serial, Ordered, Label(tests.LabelDisruptive,
 	})
 
 	It("verify label's and annotation's inheritance when global config-map changed", func() {
-		cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+		cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("checking the cluster has the requested labels", func() {
 			expectedLabels := map[string]string{"environment": "qaEnv"}
-			Expect(clusterutils.ClusterHasLabels(cluster, expectedLabels)).To(BeTrue())
+			Expect(clusterutils.HasLabels(cluster, expectedLabels)).To(BeTrue())
 		})
 		By("checking the pods inherit labels matching the ones in the configuration secret", func() {
 			expectedLabels := map[string]string{"environment": "qaEnv"}
 			Eventually(func() (bool, error) {
-				return clusterutils.AllClusterPodsHaveLabels(env.Ctx, env.Client, namespace, clusterName, expectedLabels)
+				return clusterutils.AllPodsHaveLabels(env.Ctx, env.Client, namespace, clusterName,
+					expectedLabels)
 			}, 180).Should(BeTrue())
 		})
 		By("checking the pods inherit labels matching wildcard ones in the configuration secret", func() {
@@ -142,17 +143,19 @@ var _ = Describe("Config support", Serial, Ordered, Label(tests.LabelDisruptive,
 				"example.com/prod": "prod",
 			}
 			Eventually(func() (bool, error) {
-				return clusterutils.AllClusterPodsHaveLabels(env.Ctx, env.Client, namespace, clusterName, expectedLabels)
+				return clusterutils.AllPodsHaveLabels(env.Ctx, env.Client, namespace, clusterName,
+					expectedLabels)
 			}, 180).Should(BeTrue())
 		})
 		By("checking the cluster has the requested annotation", func() {
 			expectedAnnotations := map[string]string{"categories": "DatabaseApplication"}
-			Expect(clusterutils.ClusterHasAnnotations(cluster, expectedAnnotations)).To(BeTrue())
+			Expect(clusterutils.HasAnnotations(cluster, expectedAnnotations)).To(BeTrue())
 		})
 		By("checking the pods inherit annotations matching the ones in the configuration configMap", func() {
 			expectedAnnotations := map[string]string{"categories": "DatabaseApplication"}
 			Eventually(func() (bool, error) {
-				return clusterutils.AllClusterPodsHaveAnnotations(env.Ctx, env.Client, namespace, clusterName, expectedAnnotations)
+				return clusterutils.AllPodsHaveAnnotations(env.Ctx, env.Client, namespace, clusterName,
+					expectedAnnotations)
 			}, 180).Should(BeTrue())
 		})
 		By("checking the pods inherit annotations matching wildcard ones in the configuration configMap", func() {
@@ -161,7 +164,8 @@ var _ = Describe("Config support", Serial, Ordered, Label(tests.LabelDisruptive,
 				"example.com/prod": "prod",
 			}
 			Eventually(func() (bool, error) {
-				return clusterutils.AllClusterPodsHaveLabels(env.Ctx, env.Client, namespace, clusterName, expectedAnnotations)
+				return clusterutils.AllPodsHaveLabels(env.Ctx, env.Client, namespace, clusterName,
+					expectedAnnotations)
 			}, 180).Should(BeTrue())
 		})
 	})
@@ -169,7 +173,7 @@ var _ = Describe("Config support", Serial, Ordered, Label(tests.LabelDisruptive,
 	// Setting MONITORING_QUERIES_CONFIGMAP: "" should disable monitoring
 	// queries on new cluster. We expect those metrics to be missing.
 	It("verify metrics details when updated default monitoring configMap queries parameter is set to be empty", func() {
-		cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+		cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 		Expect(err).NotTo(HaveOccurred())
 
 		collectAndAssertDefaultMetricsPresentOnEachPod(namespace, clusterName, cluster.IsMetricsTLSEnabled(), false)

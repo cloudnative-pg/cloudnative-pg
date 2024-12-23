@@ -70,7 +70,7 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive, tests.LabelOper
 			err := operator.ScaleOperatorDeployment(env.Ctx, env.Client, 1)
 			Expect(err).ToNot(HaveOccurred())
 
-			ready, err := operator.IsOperatorDeploymentReady(env.Ctx, env.Client)
+			ready, err := operator.IsDeploymentReady(env.Ctx, env.Client)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(ready).To(BeTrue())
 		})
@@ -87,7 +87,7 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive, tests.LabelOper
 		webhookNamespacePrefix := "no-webhook-test"
 		clusterIsDefaulted = true
 
-		mWebhook, admissionNumber, err := operator.GetCNPGsMutatingWebhookByName(env.Ctx, env.Client, mutatingWebhook)
+		mWebhook, admissionNumber, err := operator.GetMutatingWebhookByName(env.Ctx, env.Client, mutatingWebhook)
 		Expect(err).ToNot(HaveOccurred())
 
 		// Add a namespace selector to MutatingWebhooks and ValidatingWebhook, this will assign the webhooks
@@ -97,11 +97,11 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive, tests.LabelOper
 			newWebhook.Webhooks[admissionNumber].NamespaceSelector = &metav1.LabelSelector{
 				MatchLabels: map[string]string{"test": "value"},
 			}
-			err := operator.UpdateCNPGsMutatingWebhookConf(env.Ctx, env.Interface, newWebhook)
+			err := operator.UpdateMutatingWebhookConf(env.Ctx, env.Interface, newWebhook)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		vWebhook, admissionNumber, err := operator.GetCNPGsValidatingWebhookByName(
+		vWebhook, admissionNumber, err := operator.GetValidatingWebhookByName(
 			env.Ctx, env.Client, validatingWebhook,
 		)
 		Expect(err).ToNot(HaveOccurred())
@@ -111,7 +111,7 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive, tests.LabelOper
 			newWebhook.Webhooks[admissionNumber].NamespaceSelector = &metav1.LabelSelector{
 				MatchLabels: map[string]string{"test": "value"},
 			}
-			err := operator.UpdateCNPGsValidatingWebhookConf(env.Ctx, env.Interface, newWebhook)
+			err := operator.UpdateValidatingWebhookConf(env.Ctx, env.Interface, newWebhook)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
@@ -124,7 +124,7 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive, tests.LabelOper
 
 		// Make sure the operator is intact and not crashing
 		By("having a deployment for the operator in state ready", func() {
-			ready, err := operator.IsOperatorDeploymentReady(env.Ctx, env.Client)
+			ready, err := operator.IsDeploymentReady(env.Ctx, env.Client)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(ready).To(BeTrue())
 		})

@@ -84,7 +84,7 @@ func PatchStatusCondition(
 	cluster := &apiv1.Cluster{}
 	var err error
 	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		cluster, err = clusterutils.GetCluster(ctx, crudClient, namespace, clusterName)
+		cluster, err = clusterutils.Get(ctx, crudClient, namespace, clusterName)
 		if err != nil {
 			return err
 		}
@@ -150,7 +150,7 @@ func CreateSubscription(
 		return err
 	}
 
-	_, err = objects.CreateObject(ctx, crudClient, u)
+	_, err = objects.Create(ctx, crudClient, u)
 	return err
 }
 
@@ -168,7 +168,7 @@ func DeleteSubscription(
 		Kind:    "Subscription",
 	})
 
-	err := objects.DeleteObject(ctx, crudClient, u)
+	err := objects.Delete(ctx, crudClient, u)
 	if apierrors.IsNotFound(err) {
 		return nil
 	}
@@ -188,22 +188,22 @@ func DeleteOperatorCRDs(
 		Version: "v1",
 		Kind:    "CustomResourceDefinition",
 	})
-	err := objects.DeleteObject(ctx, crudClient, u)
+	err := objects.Delete(ctx, crudClient, u)
 	if !apierrors.IsNotFound(err) {
 		return err
 	}
 	u.SetName("backups.postgresql.cnpg.io")
-	err = objects.DeleteObject(ctx, crudClient, u)
+	err = objects.Delete(ctx, crudClient, u)
 	if !apierrors.IsNotFound(err) {
 		return err
 	}
 	u.SetName("poolers.postgresql.cnpg.io")
-	err = objects.DeleteObject(ctx, crudClient, u)
+	err = objects.Delete(ctx, crudClient, u)
 	if !apierrors.IsNotFound(err) {
 		return err
 	}
 	u.SetName("scheduledbackups.postgresql.cnpg.io")
-	err = objects.DeleteObject(ctx, crudClient, u)
+	err = objects.Delete(ctx, crudClient, u)
 	if apierrors.IsNotFound(err) {
 		return nil
 	}
@@ -224,12 +224,12 @@ func DeleteCSV(
 	labelSelector := labels.SelectorFromSet(map[string]string{
 		"operators.coreos.com/cloudnative-pg.openshift-operators": "",
 	})
-	err := objects.GetObjectList(ctx, crudClient, ol, client.MatchingLabelsSelector{Selector: labelSelector})
+	err := objects.List(ctx, crudClient, ol, client.MatchingLabelsSelector{Selector: labelSelector})
 	if err != nil {
 		return err
 	}
 	for _, o := range ol.Items {
-		err = objects.DeleteObject(ctx, crudClient, &o)
+		err = objects.Delete(ctx, crudClient, &o)
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				continue

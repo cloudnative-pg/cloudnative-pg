@@ -37,7 +37,7 @@ func ParseJSONLogs(
 	namespace string, podName string,
 ) ([]map[string]interface{}, error) {
 	// Gather pod logs
-	podLogs, err := pods.GetPodLogs(ctx, kubeInterface, namespace, podName)
+	podLogs, err := pods.Logs(ctx, kubeInterface, namespace, podName)
 	if err != nil {
 		return nil, err
 	}

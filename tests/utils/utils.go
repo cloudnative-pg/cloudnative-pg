@@ -35,7 +35,7 @@ import (
 
 // PrintClusterResources prints a summary of the cluster pods, jobs, pvcs etc.
 func PrintClusterResources(ctx context.Context, crudClient client.Client, namespace, clusterName string) string {
-	cluster, err := clusterutils.GetCluster(ctx, crudClient, namespace, clusterName)
+	cluster, err := clusterutils.Get(ctx, crudClient, namespace, clusterName)
 	if err != nil {
 		return fmt.Sprintf("Error while Getting Object %v", err)
 	}
@@ -59,7 +59,7 @@ func PrintClusterResources(ctx context.Context, crudClient client.Client, namesp
 	clusterInfo.AddLine("Cluster current primary", cluster.Status.CurrentPrimary)
 	clusterInfo.AddLine()
 
-	podList, _ := clusterutils.GetClusterPodList(ctx, crudClient, cluster.GetNamespace(), cluster.GetName())
+	podList, _ := clusterutils.ListPods(ctx, crudClient, cluster.GetNamespace(), cluster.GetName())
 
 	clusterInfo.AddLine("Cluster Pods information:")
 	clusterInfo.AddLine("Ready pod number: ", utils2.CountReadyPods(podList.Items))

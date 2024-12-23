@@ -38,7 +38,7 @@ var _ = Describe("PostgreSQL operator deployment", Label(tests.LabelBasic, tests
 			AssertOperatorIsReady(env.Ctx, env.Client, env.Interface)
 		})
 		By("having a deployment for the operator in state ready", func() {
-			ready, err := operator.IsOperatorDeploymentReady(env.Ctx, env.Client)
+			ready, err := operator.IsDeploymentReady(env.Ctx, env.Client)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(ready).To(BeTrue())
 		})

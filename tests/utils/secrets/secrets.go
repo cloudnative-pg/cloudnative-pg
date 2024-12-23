@@ -62,7 +62,7 @@ func CreateSecretCA(
 	if !includeCAPrivateKey {
 		delete(caSecret.Data, certs.CAPrivateKeyKey)
 	}
-	_, err = objects.CreateObject(ctx, crudClient, caSecret)
+	_, err = objects.Create(ctx, crudClient, caSecret)
 	if err != nil {
 		return cluster, caPair, err
 	}
@@ -78,7 +78,7 @@ func GetCredentials(
 	string, string, error,
 ) {
 	// Get the cluster
-	cluster, err := clusterutils.GetCluster(ctx, crudClient, namespace, clusterName)
+	cluster, err := clusterutils.Get(ctx, crudClient, namespace, clusterName)
 	if err != nil {
 		return "", "", err
 	}
@@ -126,7 +126,7 @@ func CreateObjectStorageSecret(
 		},
 		Type: corev1.SecretTypeOpaque,
 	}
-	obj, err := objects.CreateObject(ctx, crudClient, targetSecret)
+	obj, err := objects.Create(ctx, crudClient, targetSecret)
 	if err != nil {
 		return nil, err
 	}

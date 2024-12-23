@@ -126,7 +126,7 @@ func InstallAzurite(
 	if err != nil {
 		return err
 	}
-	err = deployments.DeploymentWaitForReady(ctx, crudClient, deployment, 300)
+	err = deployments.WaitForReady(ctx, crudClient, deployment, 300)
 	if err != nil {
 		return err
 	}
@@ -454,7 +454,7 @@ func CreateClusterFromExternalClusterBackupWithPITROnAzure(
 			},
 		},
 	}
-	obj, err := objects.CreateObject(ctx, crudClient, restoreCluster)
+	obj, err := objects.Create(ctx, crudClient, restoreCluster)
 	if err != nil {
 		return nil, err
 	}
@@ -538,7 +538,7 @@ func CreateClusterFromExternalClusterBackupWithPITROnAzurite(
 			},
 		},
 	}
-	obj, err := objects.CreateObject(ctx, crudClient, restoreCluster)
+	obj, err := objects.Create(ctx, crudClient, restoreCluster)
 	if err != nil {
 		return nil, err
 	}

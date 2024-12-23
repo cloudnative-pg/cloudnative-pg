@@ -122,7 +122,7 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 			})
 
 			By("verifying new database has been created with the expected fields", func() {
-				primaryPodInfo, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
+				primaryPodInfo, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 
 				Eventually(QueryMatchExpectationPredicate(primaryPodInfo, postgres.PostgresDBName,
@@ -132,11 +132,11 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 			})
 
 			By("removing the Database object", func() {
-				Expect(objects.DeleteObject(env.Ctx, env.Client, &database)).To(Succeed())
+				Expect(objects.Delete(env.Ctx, env.Client, &database)).To(Succeed())
 			})
 
 			By("verifying the retention policy in the postgres database", func() {
-				primaryPodInfo, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
+				primaryPodInfo, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 
 				Eventually(QueryMatchExpectationPredicate(primaryPodInfo, postgres.PostgresDBName,

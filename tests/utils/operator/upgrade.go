@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // Package upgrade provide functions to handle operator install/uninstall process
-package upgrade
+package operator
 
 import (
 	"context"
@@ -37,9 +37,9 @@ import (
 	. "github.com/onsi/gomega"    // nolint
 )
 
-// CreateOperatorConfigurationMap creates the operator namespace and enables/disable the online upgrade for
+// CreateConfigMap creates the operator namespace and enables/disable the online upgrade for
 // the instance manager
-func CreateOperatorConfigurationMap(
+func CreateConfigMap(
 	ctx context.Context,
 	crudClient client.Client,
 	pgOperatorNamespace, configName string,
@@ -72,13 +72,13 @@ func CreateOperatorConfigurationMap(
 			},
 			Data: map[string]string{"ENABLE_INSTANCE_MANAGER_INPLACE_UPDATES": enable},
 		}
-		_, err := objects.CreateObject(ctx, crudClient, configMap)
+		_, err := objects.Create(ctx, crudClient, configMap)
 		Expect(err).NotTo(HaveOccurred())
 	})
 }
 
-// InstallLatestCNPGOperator installs an operator version with the most recent release tag
-func InstallLatestCNPGOperator(
+// InstallLatest installs an operator version with the most recent release tag
+func InstallLatest(
 	crudClient client.Client,
 	releaseTag string,
 ) {

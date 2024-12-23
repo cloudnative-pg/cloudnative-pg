@@ -55,7 +55,7 @@ var _ = Describe("Operator High Availability", Serial,
 			Expect(err).ToNot(HaveOccurred())
 
 			// Get Operator Pod name
-			operatorPodName, err := operator.GetOperatorPod(env.Ctx, env.Client)
+			operatorPodName, err := operator.GetPod(env.Ctx, env.Client)
 			Expect(err).ToNot(HaveOccurred())
 
 			By("having an operator already running", func() {
@@ -66,7 +66,7 @@ var _ = Describe("Operator High Availability", Serial,
 			})
 
 			// Get operator namespace
-			operatorNamespace, err := operator.GetOperatorNamespaceName(env.Ctx, env.Client)
+			operatorNamespace, err := operator.NamespaceName(env.Ctx, env.Client)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Create the cluster namespace
@@ -91,7 +91,7 @@ var _ = Describe("Operator High Availability", Serial,
 				Expect(err).ToNot(HaveOccurred())
 
 				// Gather pod names from operator deployment
-				podList, err := podutils.GetPodList(env.Ctx, env.Client, operatorNamespace)
+				podList, err := podutils.List(env.Ctx, env.Client, operatorNamespace)
 				Expect(err).ToNot(HaveOccurred())
 				for _, podItem := range podList.Items {
 					operatorPodNames = append(operatorPodNames, podItem.GetName())
@@ -112,12 +112,12 @@ var _ = Describe("Operator High Availability", Serial,
 				quickDelete := &ctrlclient.DeleteOptions{
 					GracePeriodSeconds: &quickDeletionPeriod,
 				}
-				err = podutils.DeletePod(env.Ctx, env.Client, operatorNamespace, oldLeaderPodName, quickDelete)
+				err = podutils.Delete(env.Ctx, env.Client, operatorNamespace, oldLeaderPodName, quickDelete)
 				Expect(err).ToNot(HaveOccurred())
 
 				// Verify operator pod should have been deleted
 				Eventually(func() []string {
-					podList, err := podutils.GetPodList(env.Ctx, env.Client, operatorNamespace)
+					podList, err := podutils.List(env.Ctx, env.Client, operatorNamespace)
 					Expect(err).ToNot(HaveOccurred())
 					var podNames []string
 					for _, podItem := range podList.Items {
@@ -138,7 +138,7 @@ var _ = Describe("Operator High Availability", Serial,
 
 			By("verifying reconciliation", func() {
 				// Get current CNPG cluster's Primary
-				currentPrimary, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
+				currentPrimary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 				oldPrimary := currentPrimary.GetName()
 
@@ -146,7 +146,7 @@ var _ = Describe("Operator High Availability", Serial,
 				quickDelete := &ctrlclient.DeleteOptions{
 					GracePeriodSeconds: &quickDeletionPeriod,
 				}
-				err = podutils.DeletePod(env.Ctx, env.Client, namespace, currentPrimary.GetName(), quickDelete)
+				err = podutils.Delete(env.Ctx, env.Client, namespace, currentPrimary.GetName(), quickDelete)
 				Expect(err).ToNot(HaveOccurred())
 
 				// Expect a new primary to be elected and promoted
@@ -161,7 +161,7 @@ var _ = Describe("Operator High Availability", Serial,
 
 			By("verifying leader information after scale down", func() {
 				// Get Operator Pod name
-				operatorPodName, err := operator.GetOperatorPod(env.Ctx, env.Client)
+				operatorPodName, err := operator.GetPod(env.Ctx, env.Client)
 				Expect(err).ToNot(HaveOccurred())
 
 				// Verify the Operator Pod is the leader

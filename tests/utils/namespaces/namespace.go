@@ -135,7 +135,7 @@ func CreateNamespace(
 		Version: "v1",
 		Kind:    "Namespace",
 	})
-	_, err := objects.CreateObject(ctx, crudClient, u, opts...)
+	_, err := objects.Create(ctx, crudClient, u, opts...)
 	return err
 }
 
@@ -147,7 +147,7 @@ func EnsureNamespace(
 	namespace string,
 ) error {
 	var nsList corev1.NamespaceList
-	err := objects.GetObjectList(ctx, crudClient, &nsList)
+	err := objects.List(ctx, crudClient, &nsList)
 	if err != nil {
 		return err
 	}
@@ -186,7 +186,7 @@ func deleteNamespace(
 		Kind:    "Namespace",
 	})
 
-	return objects.DeleteObject(ctx, crudClient, u, opts...)
+	return objects.Delete(ctx, crudClient, u, opts...)
 }
 
 // DeleteNamespaceAndWait deletes a namespace if existent and returns when deletion is completed
@@ -211,13 +211,13 @@ func DeleteNamespaceAndWait(
 		return err
 	}
 
-	podList, err := pods.GetPodList(ctx, crudClient, name)
+	podList, err := pods.List(ctx, crudClient, name)
 	if err != nil {
 		return err
 	}
 
 	for _, pod := range podList.Items {
-		err = pods.DeletePod(
+		err = pods.Delete(
 			ctx, crudClient,
 			name, pod.Name,
 			client.GracePeriodSeconds(1), client.PropagationPolicy("Background"),
@@ -255,7 +255,7 @@ func DumpNamespaceObjects(
 	}()
 	w := bufio.NewWriter(f)
 	clusterList := &apiv1.ClusterList{}
-	_ = objects.GetObjectList(ctx, crudClient, clusterList, client.InNamespace(namespace))
+	_ = objects.List(ctx, crudClient, clusterList, client.InNamespace(namespace))
 
 	for _, cluster := range clusterList.Items {
 		out, _ := json.MarshalIndent(cluster, "", "    ")
@@ -263,7 +263,7 @@ func DumpNamespaceObjects(
 		_, _ = fmt.Fprintln(w, string(out))
 	}
 
-	podList, _ := pods.GetPodList(ctx, crudClient, namespace)
+	podList, _ := pods.List(ctx, crudClient, namespace)
 	for _, pod := range podList.Items {
 		out, _ := json.MarshalIndent(pod, "", "    ")
 		_, _ = fmt.Fprintf(w, "Dumping %v/%v pod\n", namespace, pod.Name)
@@ -311,7 +311,7 @@ func DumpNamespaceObjects(
 		}
 	}
 	// dump backup info
-	backupList, _ := backups.GetBackupList(ctx, crudClient, namespace)
+	backupList, _ := backups.List(ctx, crudClient, namespace)
 	// dump backup object info if it's configure
 	for _, backup := range backupList.Items {
 		out, _ := json.MarshalIndent(backup, "", "    ")

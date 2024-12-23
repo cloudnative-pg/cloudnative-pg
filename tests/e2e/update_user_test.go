@@ -66,7 +66,7 @@ var _ = Describe("Update user and superuser password", Label(tests.LabelServiceC
 		appSecretName := clusterName + apiv1.ApplicationUserSecretSuffix
 		superUserSecretName := clusterName + apiv1.SuperUserSecretSuffix
 
-		primaryPod, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
+		primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 
 		By("update user application password", func() {
@@ -98,7 +98,7 @@ var _ = Describe("Update user and superuser password", Label(tests.LabelServiceC
 		By("update superuser password", func() {
 			// Setting EnableSuperuserAccess to true
 			Eventually(func() error {
-				cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).NotTo(HaveOccurred())
 				cluster.Spec.EnableSuperuserAccess = ptr.To(true)
 				return env.Client.Update(env.Ctx, cluster)
@@ -154,7 +154,7 @@ var _ = Describe("Enable superuser password", Label(tests.LabelServiceConnectivi
 			Name:      secretName,
 		}
 
-		primaryPod, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
+		primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 
 		By("ensure superuser access is disabled by default", func() {
@@ -185,7 +185,7 @@ var _ = Describe("Enable superuser password", Label(tests.LabelServiceConnectivi
 		By("enable superuser access", func() {
 			// Setting EnableSuperuserAccess to true
 			Eventually(func() error {
-				cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).NotTo(HaveOccurred())
 				cluster.Spec.EnableSuperuserAccess = ptr.To(true)
 				return env.Client.Update(env.Ctx, cluster)
@@ -208,7 +208,7 @@ var _ = Describe("Enable superuser password", Label(tests.LabelServiceConnectivi
 		By("disable superuser access", func() {
 			// Setting EnableSuperuserAccess to false
 			Eventually(func() error {
-				cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).NotTo(HaveOccurred())
 				cluster.Spec.EnableSuperuserAccess = ptr.To(false)
 				return env.Client.Update(env.Ctx, cluster)

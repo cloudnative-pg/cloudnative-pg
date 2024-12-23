@@ -36,8 +36,8 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
 )
 
-// GetBackupList gathers the current list of backup in namespace
-func GetBackupList(
+// List gathers the current list of backup in namespace
+func List(
 	ctx context.Context,
 	crudClient client.Client,
 	namespace string,
@@ -49,13 +49,13 @@ func GetBackupList(
 	return backupList, err
 }
 
-// CreateBackup creates a Backup resource for a given cluster name
-func CreateBackup(
+// Create creates a Backup resource for a given cluster name
+func Create(
 	ctx context.Context,
 	crudClient client.Client,
 	targetBackup apiv1.Backup,
 ) (*apiv1.Backup, error) {
-	obj, err := objects.CreateObject(ctx, crudClient, &targetBackup)
+	obj, err := objects.Create(ctx, crudClient, &targetBackup)
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +77,7 @@ func GetVolumeSnapshot(
 		Name:      name,
 	}
 	volumeSnapshot := &v1.VolumeSnapshot{}
-	err := objects.GetObject(ctx, crudClient, namespacedName, volumeSnapshot)
+	err := objects.Get(ctx, crudClient, namespacedName, volumeSnapshot)
 	if err != nil {
 		return nil, err
 	}
@@ -141,7 +141,7 @@ func GetConditionsInClusterStatus(
 	var cluster *apiv1.Cluster
 	var err error
 
-	cluster, err = clusterutils.GetCluster(ctx, crudClient, namespace, clusterName)
+	cluster, err = clusterutils.Get(ctx, crudClient, namespace, clusterName)
 	if err != nil {
 		return nil, err
 	}
@@ -155,8 +155,8 @@ func GetConditionsInClusterStatus(
 	return nil, fmt.Errorf("no condition matching requested type found: %v", conditionType)
 }
 
-// ExecuteBackup performs a backup and checks the backup status
-func ExecuteBackup(
+// Execute performs a backup and checks the backup status
+func Execute(
 	ctx context.Context,
 	crudClient client.Client,
 	scheme *runtime.Scheme,
@@ -196,7 +196,7 @@ func ExecuteBackup(
 	var cluster *apiv1.Cluster
 	gomega.Eventually(func() error {
 		var err error
-		cluster, err = clusterutils.GetCluster(ctx, crudClient, namespace, backup.Spec.Cluster.Name)
+		cluster, err = clusterutils.Get(ctx, crudClient, namespace, backup.Spec.Cluster.Name)
 		return err
 	}, timeoutSeconds).ShouldNot(gomega.HaveOccurred())
 
@@ -277,7 +277,7 @@ func CreateClusterFromBackupUsingPITR(
 			},
 		},
 	}
-	obj, err := objects.CreateObject(ctx, crudClient, restoreCluster)
+	obj, err := objects.Create(ctx, crudClient, restoreCluster)
 	if err != nil {
 		return nil, err
 	}
@@ -367,7 +367,7 @@ func CreateClusterFromExternalClusterBackupWithPITROnMinio(
 			},
 		},
 	}
-	obj, err := objects.CreateObject(ctx, crudClient, restoreCluster)
+	obj, err := objects.Create(ctx, crudClient, restoreCluster)
 	if err != nil {
 		return nil, err
 	}
@@ -378,10 +378,10 @@ func CreateClusterFromExternalClusterBackupWithPITROnMinio(
 	return cluster, nil
 }
 
-// CreateOnDemandBackup creates a Backup resource for a given cluster name
-// Deprecated: Use CreateBackup.
+// CreateOnDemand creates a Backup resource for a given cluster name
+// Deprecated: Use Create.
 // TODO: eradicate
-func CreateOnDemandBackup(
+func CreateOnDemand(
 	ctx context.Context,
 	crudClient client.Client,
 	namespace,
@@ -409,7 +409,7 @@ func CreateOnDemandBackup(
 		targetBackup.Spec.Method = method
 	}
 
-	obj, err := objects.CreateObject(ctx, crudClient, targetBackup)
+	obj, err := objects.Create(ctx, crudClient, targetBackup)
 	if err != nil {
 		return nil, err
 	}

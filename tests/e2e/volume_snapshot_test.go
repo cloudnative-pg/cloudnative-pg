@@ -107,7 +107,7 @@ var _ = Describe("Verify Volume Snapshot",
 					// trigger a checkpoint as the backup may run on standby
 					CheckPointAndSwitchWalOnPrimary(namespace, clusterName)
 					Eventually(func(g Gomega) {
-						backupList, err := backups.GetBackupList(env.Ctx, env.Client, namespace)
+						backupList, err := backups.List(env.Ctx, env.Client, namespace)
 						g.Expect(err).ToNot(HaveOccurred())
 						for _, backup := range backupList.Items {
 							if !strings.Contains(backup.Name, clusterName) {
@@ -125,7 +125,8 @@ var _ = Describe("Verify Volume Snapshot",
 				By("checking that volumeSnapshots are properly labeled", func() {
 					Eventually(func(g Gomega) {
 						for _, snapshot := range backupObject.Status.BackupSnapshotStatus.Elements {
-							volumeSnapshot, err := backups.GetVolumeSnapshot(env.Ctx, env.Client, namespace, snapshot.Name)
+							volumeSnapshot, err := backups.GetVolumeSnapshot(env.Ctx, env.Client, namespace,
+								snapshot.Name)
 							g.Expect(err).ToNot(HaveOccurred())
 							g.Expect(volumeSnapshot.Name).Should(ContainSubstring(clusterName))
 							g.Expect(volumeSnapshot.Labels[utils.BackupNameLabelName]).To(BeEquivalentTo(backupObject.Name))
@@ -202,11 +203,13 @@ var _ = Describe("Verify Volume Snapshot",
 				})
 
 				By("verify test connectivity to minio using barman-cloud-wal-archive script", func() {
-					primaryPod, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterToSnapshotName)
+					primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace,
+						clusterToSnapshotName)
 					Expect(err).ToNot(HaveOccurred())
 					Eventually(func() (bool, error) {
 						connectionStatus, err := minio.TestConnectivityUsingBarmanCloudWalArchive(
-							namespace, clusterToSnapshotName, primaryPod.GetName(), "minio", "minio123", minioEnv.ServiceName)
+							namespace, clusterToSnapshotName, primaryPod.GetName(), "minio", "minio123",
+							minioEnv.ServiceName)
 						if err != nil {
 							return false, err
 						}
@@ -218,7 +221,7 @@ var _ = Describe("Verify Volume Snapshot",
 				By("creating a snapshot and waiting until it's completed", func() {
 					var err error
 					backupName := fmt.Sprintf("%s-example", clusterToSnapshotName)
-					backup, err = backups.CreateOnDemandBackup(
+					backup, err = backups.CreateOnDemand(
 						env.Ctx,
 						env.Client,
 						namespace,
@@ -308,7 +311,8 @@ var _ = Describe("Verify Volume Snapshot",
 
 				By("creating the cluster to be restored through snapshot and PITR", func() {
 					AssertCreateCluster(namespace, clusterToRestoreName, clusterSnapshotRestoreFile, env)
-					AssertClusterIsReady(namespace, clusterToRestoreName, testTimeouts[timeouts.ClusterIsReadySlow], env)
+					AssertClusterIsReady(namespace, clusterToRestoreName, testTimeouts[timeouts.ClusterIsReadySlow],
+						env)
 				})
 
 				By("verifying the correct data exists in the restored cluster", func() {
@@ -422,7 +426,8 @@ var _ = Describe("Verify Volume Snapshot",
 				var backup apiv1.Backup
 				By("waiting the backup to complete", func() {
 					Eventually(func(g Gomega) {
-						err := env.Client.Get(env.Ctx, types.NamespacedName{Name: backupName, Namespace: namespace}, &backup)
+						err := env.Client.Get(env.Ctx, types.NamespacedName{Name: backupName, Namespace: namespace},
+							&backup)
 						g.Expect(err).ToNot(HaveOccurred())
 						g.Expect(backup.Status.Phase).To(BeEquivalentTo(apiv1.BackupPhaseCompleted),
 							"Backup should be completed correctly, error message is '%s'",
@@ -443,7 +448,7 @@ var _ = Describe("Verify Volume Snapshot",
 				var clusterToBackup *apiv1.Cluster
 
 				By("fetching the created cluster", func() {
-					clusterToBackup, err = clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterToBackupName)
+					clusterToBackup, err = clusterutils.Get(env.Ctx, env.Client, namespace, clusterToBackupName)
 					Expect(err).ToNot(HaveOccurred())
 				})
 
@@ -489,7 +494,8 @@ var _ = Describe("Verify Volume Snapshot",
 				var backup apiv1.Backup
 				By("waiting the backup to complete", func() {
 					Eventually(func(g Gomega) {
-						err := env.Client.Get(env.Ctx, types.NamespacedName{Name: backupName, Namespace: namespace}, &backup)
+						err := env.Client.Get(env.Ctx, types.NamespacedName{Name: backupName, Namespace: namespace},
+							&backup)
 						g.Expect(err).ToNot(HaveOccurred())
 						g.Expect(backup.Status.Phase).To(
 							BeEquivalentTo(apiv1.BackupPhaseCompleted),
@@ -511,20 +517,21 @@ var _ = Describe("Verify Volume Snapshot",
 				var clusterToBackup *apiv1.Cluster
 
 				By("fetching the created cluster", func() {
-					clusterToBackup, err = clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterToBackupName)
+					clusterToBackup, err = clusterutils.Get(env.Ctx, env.Client, namespace, clusterToBackupName)
 					Expect(err).ToNot(HaveOccurred())
 				})
 
 				_ = getAndVerifySnapshots(clusterToBackup, backup)
 
 				By("ensuring cluster resumes after snapshot", func() {
-					AssertClusterIsReady(namespace, clusterToBackupName, testTimeouts[timeouts.ClusterIsReadyQuick], env)
+					AssertClusterIsReady(namespace, clusterToBackupName, testTimeouts[timeouts.ClusterIsReadyQuick],
+						env)
 				})
 			})
 
 			It("can take a snapshot in a single instance cluster", func() {
 				By("scaling down the cluster to a single instance", func() {
-					cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterToBackupName)
+					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterToBackupName)
 					Expect(err).ToNot(HaveOccurred())
 
 					updated := cluster.DeepCopy()
@@ -535,7 +542,7 @@ var _ = Describe("Verify Volume Snapshot",
 
 				By("ensuring there is only one pod", func() {
 					Eventually(func(g Gomega) {
-						pods, err := clusterutils.GetClusterPodList(env.Ctx, env.Client, namespace, clusterToBackupName)
+						pods, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterToBackupName)
 						g.Expect(err).NotTo(HaveOccurred())
 						g.Expect(pods.Items).To(HaveLen(1))
 					}, testTimeouts[timeouts.ClusterIsReadyQuick]).Should(Succeed())
@@ -543,7 +550,7 @@ var _ = Describe("Verify Volume Snapshot",
 
 				backupName := "single-instance-snap"
 				By("taking a backup snapshot", func() {
-					_, err := backups.CreateOnDemandBackup(
+					_, err := backups.CreateOnDemand(
 						env.Ctx,
 						env.Client,
 						namespace,
@@ -559,7 +566,8 @@ var _ = Describe("Verify Volume Snapshot",
 				var backup apiv1.Backup
 				By("waiting the backup to complete", func() {
 					Eventually(func(g Gomega) {
-						err := env.Client.Get(env.Ctx, types.NamespacedName{Name: backupName, Namespace: namespace}, &backup)
+						err := env.Client.Get(env.Ctx, types.NamespacedName{Name: backupName, Namespace: namespace},
+							&backup)
 						g.Expect(err).ToNot(HaveOccurred())
 						g.Expect(backup.Status.Phase).To(BeEquivalentTo(apiv1.BackupPhaseCompleted),
 							"Backup should be completed correctly, error message is '%s'",
@@ -580,14 +588,15 @@ var _ = Describe("Verify Volume Snapshot",
 				var clusterToBackup *apiv1.Cluster
 				By("fetching the created cluster", func() {
 					var err error
-					clusterToBackup, err = clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterToBackupName)
+					clusterToBackup, err = clusterutils.Get(env.Ctx, env.Client, namespace, clusterToBackupName)
 					Expect(err).ToNot(HaveOccurred())
 				})
 
 				_ = getAndVerifySnapshots(clusterToBackup, backup)
 
 				By("ensuring cluster resumes after snapshot", func() {
-					AssertClusterIsReady(namespace, clusterToBackupName, testTimeouts[timeouts.ClusterIsReadyQuick], env)
+					AssertClusterIsReady(namespace, clusterToBackupName, testTimeouts[timeouts.ClusterIsReadyQuick],
+						env)
 				})
 			})
 		})
@@ -644,11 +653,13 @@ var _ = Describe("Verify Volume Snapshot",
 				})
 
 				By("verify test connectivity to minio using barman-cloud-wal-archive script", func() {
-					primaryPod, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterToSnapshotName)
+					primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace,
+						clusterToSnapshotName)
 					Expect(err).ToNot(HaveOccurred())
 					Eventually(func() (bool, error) {
 						connectionStatus, err := minio.TestConnectivityUsingBarmanCloudWalArchive(
-							namespace, clusterToSnapshotName, primaryPod.GetName(), "minio", "minio123", minioEnv.ServiceName)
+							namespace, clusterToSnapshotName, primaryPod.GetName(), "minio", "minio123",
+							minioEnv.ServiceName)
 						if err != nil {
 							return false, err
 						}
@@ -702,7 +713,7 @@ var _ = Describe("Verify Volume Snapshot",
 				By("creating a snapshot and waiting until it's completed", func() {
 					var err error
 					backupName := fmt.Sprintf("%s-online", clusterToSnapshotName)
-					backupTaken, err = backups.CreateBackup(
+					backupTaken, err = backups.Create(
 						env.Ctx, env.Client,
 						apiv1.Backup{
 							ObjectMeta: metav1.ObjectMeta{
@@ -750,7 +761,8 @@ var _ = Describe("Verify Volume Snapshot",
 
 				By("creating the cluster to be restored through snapshot and PITR", func() {
 					AssertCreateCluster(namespace, clusterToRestoreName, clusterSnapshotRestoreFile, env)
-					AssertClusterIsReady(namespace, clusterToRestoreName, testTimeouts[timeouts.ClusterIsReadySlow], env)
+					AssertClusterIsReady(namespace, clusterToRestoreName, testTimeouts[timeouts.ClusterIsReadySlow],
+						env)
 				})
 
 				By("verifying the correct data exists in the restored cluster", func() {
@@ -806,7 +818,7 @@ var _ = Describe("Verify Volume Snapshot",
 				})
 
 				By("scale up the cluster", func() {
-					err := clusterutils.ScaleClusterSize(env.Ctx, env.Client, namespace, clusterToSnapshotName, 3)
+					err := clusterutils.ScaleSize(env.Ctx, env.Client, namespace, clusterToSnapshotName, 3)
 					Expect(err).ToNot(HaveOccurred())
 				})
 
@@ -817,7 +829,8 @@ var _ = Describe("Verify Volume Snapshot",
 
 				// we need to verify the streaming replica continue works
 				By("verifying the correct data exists in the new pod of the scaled cluster", func() {
-					podList, err := clusterutils.GetClusterReplicas(env.Ctx, env.Client, namespace, clusterToSnapshotName)
+					podList, err := clusterutils.GetReplicas(env.Ctx, env.Client, namespace,
+						clusterToSnapshotName)
 					Expect(err).ToNot(HaveOccurred())
 					Expect(podList.Items).To(HaveLen(2))
 					tableLocator := TableLocator{

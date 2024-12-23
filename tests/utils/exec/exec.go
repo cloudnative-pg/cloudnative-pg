@@ -56,7 +56,7 @@ func CommandInContainer(
 		return fmt.Errorf("while executing command in pod '%s/%s': %w",
 			container.Namespace, container.PodName, err)
 	}
-	pod, err := pods.GetPod(ctx, crudClient, container.Namespace, container.PodName)
+	pod, err := pods.Get(ctx, crudClient, container.Namespace, container.PodName)
 	if err != nil {
 		return "", "", wrapErr(err)
 	}

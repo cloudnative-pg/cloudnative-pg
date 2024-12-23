@@ -73,7 +73,7 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), Ordered, func(
 		AssertCreateTestData(env, tableLocator)
 
 		By("gathering current primary pod and pvc", func() {
-			oldPrimaryPod, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
+			oldPrimaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			oldPrimaryPodName = oldPrimaryPod.GetName()
 			// Get the PVC related to the pod
@@ -102,7 +102,7 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), Ordered, func(
 
 		By("verifying failover happened after the primary pod PGDATA got corrupted", func() {
 			Eventually(func() (string, error) {
-				newPrimaryPod, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
+				newPrimaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 				if err != nil {
 					return "", err
 				}
@@ -170,7 +170,7 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), Ordered, func(
 			}
 
 			// Deleting old primary pod
-			err = podutils.DeletePod(env.Ctx, env.Client, namespace, oldPrimaryPodName, quickDelete)
+			err = podutils.Delete(env.Ctx, env.Client, namespace, oldPrimaryPodName, quickDelete)
 			Expect(err).ToNot(HaveOccurred())
 
 			// checking that the old primary pod is eventually gone

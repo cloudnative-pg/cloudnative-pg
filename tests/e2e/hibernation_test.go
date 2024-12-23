@@ -73,7 +73,7 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 			var clusterManifest []byte
 			var beforeHibernationCurrentPrimary string
 			By("collecting current primary details", func() {
-				beforeHibernationClusterInfo, err = clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+				beforeHibernationClusterInfo, err = clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 				beforeHibernationCurrentPrimary = beforeHibernationClusterInfo.Status.CurrentPrimary
 				// collect expected cluster manifesto info
@@ -85,7 +85,7 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 		getPvc := func(role persistentvolumeclaim.Meta, instanceName string) corev1.PersistentVolumeClaim {
 			pvcName := role.GetName(instanceName)
 			pvcInfo := corev1.PersistentVolumeClaim{}
-			err = objects.GetObject(env.Ctx, env.Client, ctrlclient.ObjectKey{Namespace: namespace, Name: pvcName}, &pvcInfo)
+			err = objects.Get(env.Ctx, env.Client, ctrlclient.ObjectKey{Namespace: namespace, Name: pvcName}, &pvcInfo)
 			Expect(err).ToNot(HaveOccurred())
 			return pvcInfo
 		}
@@ -97,7 +97,7 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 			})
 			By(fmt.Sprintf("verifying cluster %v pods are removed", clusterName), func() {
 				Eventually(func(g Gomega) {
-					podList, _ := clusterutils.GetClusterPodList(env.Ctx, env.Client, namespace, clusterName)
+					podList, _ := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
 					g.Expect(len(podList.Items)).Should(BeEquivalentTo(0))
 				}, 300).Should(Succeed())
 			})
@@ -121,14 +121,16 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 			Expect(strings.Contains(string(message), actualStatus)).Should(BeEquivalentTo(true),
 				actualStatus+"\\not-contained-in\\"+string(message))
 		}
-		verifyClusterResources := func(namespace, clusterName string, objs []persistentvolumeclaim.ExpectedObjectCalculator) {
+		verifyClusterResources := func(
+			namespace, clusterName string, objs []persistentvolumeclaim.ExpectedObjectCalculator,
+		) {
 			By(fmt.Sprintf("verifying cluster resources are removed "+
 				"post hibernation where roles %v", objs), func() {
 				timeout := 120
 
 				By(fmt.Sprintf("verifying cluster %v is removed", clusterName), func() {
 					Eventually(func() (bool, apiv1.Cluster) {
-						cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+						cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 						if err != nil {
 							return true, apiv1.Cluster{}
 						}
@@ -206,7 +208,8 @@ var _ = Describe("Cluster Hibernation with plugin", Label(tests.LabelPlugin), fu
 				})
 			})
 		}
-		verifyPvc := func(expectedObject persistentvolumeclaim.ExpectedObjectCalculator, pvcUid types.UID,
+		verifyPvc := func(
+			expectedObject persistentvolumeclaim.ExpectedObjectCalculator, pvcUid types.UID,
 			clusterManifest []byte, instanceName string,
 		) {
 			pvcInfo := getPvc(expectedObject, instanceName)

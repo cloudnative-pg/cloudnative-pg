@@ -57,13 +57,13 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 		// We check that the currentPrimary is the -1 instance as expected,
 		// and we define the targetPrimary (-3) and pausedReplica (-2).
 		By("checking that CurrentPrimary and TargetPrimary are equal", func() {
-			cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 			Expect(cluster.Status.CurrentPrimary, err).To(
 				BeEquivalentTo(cluster.Status.TargetPrimary))
 			currentPrimary = cluster.Status.CurrentPrimary
 
 			// Gather pod names
-			podList, err := clusterutils.GetClusterPodList(env.Ctx, env.Client, namespace, clusterName)
+			podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(len(podList.Items), err).To(BeEquivalentTo(3))
 			for _, p := range podList.Items {
@@ -78,9 +78,9 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 		// In this way we know that this standby will lag behind when
 		// we do some work on the primary.
 		By("pausing the walreceiver on the 2nd node of the Cluster", func() {
-			primaryPod, err := podutils.GetPod(env.Ctx, env.Client, namespace, currentPrimary)
+			primaryPod, err := podutils.Get(env.Ctx, env.Client, namespace, currentPrimary)
 			Expect(err).ToNot(HaveOccurred())
-			pausedPod, err := podutils.GetPod(env.Ctx, env.Client, namespace, pausedReplica)
+			pausedPod, err := podutils.Get(env.Ctx, env.Client, namespace, pausedReplica)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Get the walreceiver pid
@@ -121,7 +121,7 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 
 			// Expect the primary to have lost connection with the stopped standby
 			Eventually(func() (int, error) {
-				primaryPod, err = podutils.GetPod(env.Ctx, env.Client, namespace, currentPrimary)
+				primaryPod, err = podutils.Get(env.Ctx, env.Client, namespace, currentPrimary)
 				Expect(err).ToNot(HaveOccurred())
 				return postgres.CountReplicas(
 					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
@@ -132,7 +132,7 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 		// Perform a CHECKPOINT on the primary and wait for the working standby
 		// to replicate at it
 		By("generating some WAL traffic in the Cluster", func() {
-			primaryPod, err := podutils.GetPod(env.Ctx, env.Client, namespace, currentPrimary)
+			primaryPod, err := podutils.Get(env.Ctx, env.Client, namespace, currentPrimary)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Gather the current WAL LSN
@@ -167,7 +167,7 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 			// The replay_lsn of the targetPrimary should be ahead
 			// of the one before the checkpoint
 			Eventually(func() (string, error) {
-				primaryPod, err = podutils.GetPod(env.Ctx, env.Client, namespace, currentPrimary)
+				primaryPod, err = podutils.Get(env.Ctx, env.Client, namespace, currentPrimary)
 				Expect(err).ToNot(HaveOccurred())
 				out, _, err := exec.EventuallyExecQueryInInstancePod(
 					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
@@ -190,18 +190,18 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 			quickDelete := &ctrlclient.DeleteOptions{
 				GracePeriodSeconds: &quickDeletionPeriod,
 			}
-			err := podutils.DeletePod(env.Ctx, env.Client, namespace, currentPrimary, quickDelete)
+			err := podutils.Delete(env.Ctx, env.Client, namespace, currentPrimary, quickDelete)
 			Expect(err).ToNot(HaveOccurred())
 
 			// We wait until the operator knows that the primary is dead.
 			// At this point the promotion is waiting for all the walreceivers
 			// to be disconnected. We can send the SIGCONT now.
 			Eventually(func() (int, error) {
-				cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 				return cluster.Status.ReadyInstances, err
 			}, RetryTimeout).Should(BeEquivalentTo(2))
 
-			pausedPod, err := podutils.GetPod(env.Ctx, env.Client, namespace, pausedReplica)
+			pausedPod, err := podutils.Get(env.Ctx, env.Client, namespace, pausedReplica)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Send the SIGCONT to the walreceiver PID to resume execution
@@ -213,7 +213,7 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 				By("making sure that the operator is enforcing the switchover delay")
 				timeout := 120
 				Eventually(func() (string, error) {
-					cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 					return cluster.Status.CurrentPrimaryFailingSinceTimestamp, err
 				}, timeout).Should(Not(Equal("")))
 			}
@@ -222,13 +222,13 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 			// The operator should eventually set the cluster target primary to
 			// the instance we expect to take that role (-3).
 			Eventually(func() (string, error) {
-				cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 				return cluster.Status.TargetPrimary, err
 			}, testTimeouts[timeouts.NewTargetOnFailover]).
 				ShouldNot(
 					Or(BeEquivalentTo(currentPrimary),
 						BeEquivalentTo(apiv1.PendingFailoverMarker)))
-			cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 			Expect(cluster.Status.TargetPrimary, err).To(
 				BeEquivalentTo(targetPrimary))
 		})
@@ -237,7 +237,7 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 		// operator to the target primary
 		By("waiting for the TargetPrimary to become CurrentPrimary", func() {
 			Eventually(func() (string, error) {
-				cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 				return cluster.Status.CurrentPrimary, err
 			}, testTimeouts[timeouts.NewPrimaryAfterFailover]).Should(BeEquivalentTo(targetPrimary))
 		})

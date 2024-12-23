@@ -193,7 +193,7 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 				var primaryPod *corev1.Pod
 				clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, multiInstanceSampleFile)
 				Expect(err).ToNot(HaveOccurred())
-				primaryPod, err = clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
+				primaryPod, err = clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 				taintNodeName = primaryPod.Spec.NodeName
 			})
@@ -201,7 +201,8 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 		AfterAll(func() {
 			if needRemoveTaint {
 				By("cleaning the taint on node", func() {
-					cmd := fmt.Sprintf("kubectl taint nodes %v node.kubernetes.io/memory-pressure:NoExecute-", taintNodeName)
+					cmd := fmt.Sprintf("kubectl taint nodes %v node.kubernetes.io/memory-pressure:NoExecute-",
+						taintNodeName)
 					_, _, err := run.Run(cmd)
 					Expect(err).ToNot(HaveOccurred())
 				})
@@ -216,7 +217,7 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 
 			// Find the standby pod
 			By("getting standby pod to evict", func() {
-				podList, _ := clusterutils.GetClusterPodList(env.Ctx, env.Client, namespace, clusterName)
+				podList, _ := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
 				Expect(len(podList.Items)).To(BeEquivalentTo(3))
 				for _, pod := range podList.Items {
 					// Avoid parting non ready nodes, non active nodes, or primary nodes
@@ -256,7 +257,7 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 
 			clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, multiInstanceSampleFile)
 			Expect(err).ToNot(HaveOccurred())
-			primaryPod, err = clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
+			primaryPod, err = clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 
 			// We can not use patch to simulate the eviction of a primary pod;
@@ -278,7 +279,7 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 
 			By("checking switchover happens", func() {
 				Eventually(func() bool {
-					podList, err := clusterutils.GetClusterPodList(env.Ctx, env.Client, namespace, clusterName)
+					podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
 					Expect(err).ToNot(HaveOccurred())
 					for _, p := range podList.Items {
 						if specs.IsPodPrimary(p) && primaryPod.GetName() != p.GetName() {

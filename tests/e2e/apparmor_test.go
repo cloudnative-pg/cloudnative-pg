@@ -56,7 +56,7 @@ var _ = Describe("AppArmor support", Serial, Label(tests.LabelNoOpenshift, tests
 
 		By("verifying AppArmor annotations on cluster and pods", func() {
 			// Gathers the pod list using annotations
-			podList, _ := clusterutils.GetClusterPodList(env.Ctx, env.Client, namespace, clusterName)
+			podList, _ := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
 			for _, pod := range podList.Items {
 				annotation := pod.ObjectMeta.Annotations[pkgutils.AppArmorAnnotationPrefix+"/"+specs.PostgresContainerName]
 				Expect(annotation).ShouldNot(BeEmpty(),

@@ -84,13 +84,13 @@ var _ = Describe("Available Architectures", Label(tests.LabelBasic), func() {
 		AssertCreateCluster(namespace, clusterName, clusterManifest, env)
 
 		// Fetch the operator's available architectures
-		operatorPod, err := operator.GetOperatorPod(env.Ctx, env.Client)
+		operatorPod, err := operator.GetPod(env.Ctx, env.Client)
 		Expect(err).ToNot(HaveOccurred())
-		imageArchitectures, err := operator.GetOperatorArchitectures(&operatorPod)
+		imageArchitectures, err := operator.Architectures(&operatorPod)
 		Expect(err).ToNot(HaveOccurred())
 
 		// Fetch the Cluster status
-		cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+		cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 		archStatus := cluster.Status.AvailableArchitectures
 

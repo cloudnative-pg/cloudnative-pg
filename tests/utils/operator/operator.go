@@ -44,15 +44,15 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
 )
 
-// ReloadOperatorDeployment finds and deletes the operator pod. Returns
+// ReloadDeployment finds and deletes the operator pod. Returns
 // error if the new pod is not ready within a defined timeout
-func ReloadOperatorDeployment(
+func ReloadDeployment(
 	ctx context.Context,
 	crudClient client.Client,
 	kubeInterface kubernetes.Interface,
 	timeoutSeconds uint,
 ) error {
-	operatorPod, err := GetOperatorPod(ctx, crudClient)
+	operatorPod, err := GetPod(ctx, crudClient)
 	if err != nil {
 		return err
 	}
@@ -65,7 +65,7 @@ func ReloadOperatorDeployment(
 	}
 	err = retry.Do(
 		func() error {
-			ready, err := IsOperatorReady(ctx, crudClient, kubeInterface)
+			ready, err := IsReady(ctx, crudClient, kubeInterface)
 			if err != nil {
 				return err
 			}
@@ -80,8 +80,8 @@ func ReloadOperatorDeployment(
 	return err
 }
 
-// DumpOperator logs the JSON for the deployment in an operator namespace, its pods and endpoints
-func DumpOperator(ctx context.Context, crudClient client.Client, namespace, filename string) {
+// Dump logs the JSON for the deployment in an operator namespace, its pods and endpoints
+func Dump(ctx context.Context, crudClient client.Client, namespace, filename string) {
 	f, err := os.Create(filepath.Clean(filename))
 	if err != nil {
 		fmt.Println(err)
@@ -89,12 +89,12 @@ func DumpOperator(ctx context.Context, crudClient client.Client, namespace, file
 	}
 	w := bufio.NewWriter(f)
 
-	deployment, _ := GetOperatorDeployment(ctx, crudClient)
+	deployment, _ := GetDeployment(ctx, crudClient)
 	out, _ := json.MarshalIndent(deployment, "", "    ")
 	_, _ = fmt.Fprintf(w, "Dumping %v/%v deployment\n", namespace, deployment.Name)
 	_, _ = fmt.Fprintln(w, string(out))
 
-	podList, _ := pods.GetPodList(ctx, crudClient, namespace)
+	podList, _ := pods.List(ctx, crudClient, namespace)
 	for _, pod := range podList.Items {
 		out, _ := json.MarshalIndent(pod, "", "    ")
 		_, _ = fmt.Fprintf(w, "Dumping %v/%v pod\n", namespace, pod.Name)
@@ -110,10 +110,10 @@ func DumpOperator(ctx context.Context, crudClient client.Client, namespace, file
 	_ = f.Close()
 }
 
-// GetOperatorDeployment returns the operator Deployment if there is a single one running, error otherwise
-func GetOperatorDeployment(ctx context.Context, crudClient client.Client) (appsv1.Deployment, error) {
+// GetDeployment returns the operator Deployment if there is a single one running, error otherwise
+func GetDeployment(ctx context.Context, crudClient client.Client) (appsv1.Deployment, error) {
 	deploymentList := &appsv1.DeploymentList{}
-	if err := objects.GetObjectList(ctx, crudClient, deploymentList,
+	if err := objects.List(ctx, crudClient, deploymentList,
 		client.MatchingLabels{"app.kubernetes.io/name": "cloudnative-pg"},
 	); err != nil {
 		return appsv1.Deployment{}, err
@@ -127,7 +127,7 @@ func GetOperatorDeployment(ctx context.Context, crudClient client.Client) (appsv
 		return deploymentList.Items[0], nil
 	}
 
-	if err := objects.GetObjectList(
+	if err := objects.List(
 		ctx,
 		crudClient,
 		deploymentList,
@@ -148,13 +148,13 @@ func GetOperatorDeployment(ctx context.Context, crudClient client.Client) (appsv
 	return deploymentList.Items[0], nil
 }
 
-// GetOperatorPod returns the operator pod if there is a single one running, error otherwise
-func GetOperatorPod(ctx context.Context, crudClient client.Client) (corev1.Pod, error) {
+// GetPod returns the operator pod if there is a single one running, error otherwise
+func GetPod(ctx context.Context, crudClient client.Client) (corev1.Pod, error) {
 	podList := &corev1.PodList{}
 
 	// This will work for newer version of the operator, which are using
 	// our custom label
-	if err := objects.GetObjectList(
+	if err := objects.List(
 		ctx, crudClient,
 		podList, client.MatchingLabels{"app.kubernetes.io/name": "cloudnative-pg"}); err != nil {
 		return corev1.Pod{}, err
@@ -169,14 +169,14 @@ func GetOperatorPod(ctx context.Context, crudClient client.Client) (corev1.Pod, 
 		return activePods[0], nil
 	}
 
-	operatorNamespace, err := GetOperatorNamespaceName(ctx, crudClient)
+	operatorNamespace, err := NamespaceName(ctx, crudClient)
 	if err != nil {
 		return corev1.Pod{}, err
 	}
 
 	// This will work for older version of the operator, which are using
 	// the default label from kube-builder
-	if err := objects.GetObjectList(
+	if err := objects.List(
 		ctx, crudClient, podList,
 		client.MatchingLabels{"control-plane": "controller-manager"},
 		client.InNamespace(operatorNamespace)); err != nil {
@@ -191,22 +191,22 @@ func GetOperatorPod(ctx context.Context, crudClient client.Client) (corev1.Pod, 
 	return podList.Items[0], nil
 }
 
-// GetOperatorNamespaceName returns the namespace the operator Deployment is running in
-func GetOperatorNamespaceName(ctx context.Context, crudClient client.Client) (string, error) {
-	deployment, err := GetOperatorDeployment(ctx, crudClient)
+// NamespaceName returns the namespace the operator Deployment is running in
+func NamespaceName(ctx context.Context, crudClient client.Client) (string, error) {
+	deployment, err := GetDeployment(ctx, crudClient)
 	if err != nil {
 		return "", err
 	}
 	return deployment.GetNamespace(), err
 }
 
-// IsOperatorReady ensures that the operator will be ready.
-func IsOperatorReady(
+// IsReady ensures that the operator will be ready.
+func IsReady(
 	ctx context.Context,
 	crudClient client.Client,
 	kubeInterface kubernetes.Interface,
 ) (bool, error) {
-	pod, err := GetOperatorPod(ctx, crudClient)
+	pod, err := GetPod(ctx, crudClient)
 	if err != nil {
 		return false, err
 	}
@@ -247,7 +247,7 @@ func IsOperatorReady(
 			},
 		},
 	}
-	_, err = objects.CreateObject(
+	_, err = objects.Create(
 		ctx,
 		crudClient,
 		testCluster,
@@ -260,11 +260,11 @@ func IsOperatorReady(
 	return true, err
 }
 
-// IsOperatorDeploymentReady returns true if the operator deployment has the expected number
+// IsDeploymentReady returns true if the operator deployment has the expected number
 // of ready pods.
 // It returns an error if there was a problem getting the operator deployment
-func IsOperatorDeploymentReady(ctx context.Context, crudClient client.Client) (bool, error) {
-	operatorDeployment, err := GetOperatorDeployment(ctx, crudClient)
+func IsDeploymentReady(ctx context.Context, crudClient client.Client) (bool, error) {
+	operatorDeployment, err := GetDeployment(ctx, crudClient)
 	if err != nil {
 		return false, err
 	}
@@ -280,7 +280,7 @@ func IsOperatorDeploymentReady(ctx context.Context, crudClient client.Client) (b
 
 // ScaleOperatorDeployment will scale the operator to n replicas and return error in case of failure
 func ScaleOperatorDeployment(ctx context.Context, crudClient client.Client, replicas int32) error {
-	operatorDeployment, err := GetOperatorDeployment(ctx, crudClient)
+	operatorDeployment, err := GetDeployment(ctx, crudClient)
 	if err != nil {
 		return err
 	}
@@ -296,7 +296,7 @@ func ScaleOperatorDeployment(ctx context.Context, crudClient client.Client, repl
 
 	return retry.Do(
 		func() error {
-			_, err := IsOperatorDeploymentReady(ctx, crudClient)
+			_, err := IsDeploymentReady(ctx, crudClient)
 			return err
 		},
 		retry.Delay(time.Second),
@@ -320,10 +320,10 @@ func PodRestarted(operatorPod corev1.Pod) bool {
 	return restartCount != 0
 }
 
-// GetOperatorPodName returns the name of the current operator pod
+// GetPodName returns the name of the current operator pod
 // NOTE: will return an error if the pod is being deleted
-func GetOperatorPodName(ctx context.Context, crudClient client.Client) (string, error) {
-	pod, err := GetOperatorPod(ctx, crudClient)
+func GetPodName(ctx context.Context, crudClient client.Client) (string, error) {
+	pod, err := GetPod(ctx, crudClient)
 	if err != nil {
 		return "", err
 	}
@@ -334,15 +334,15 @@ func GetOperatorPodName(ctx context.Context, crudClient client.Client) (string, 
 	return pod.GetName(), nil
 }
 
-// HasOperatorBeenUpgraded determines if the operator has been upgraded by checking
+// HasBeenUpgraded determines if the operator has been upgraded by checking
 // if there is a deletion timestamp. If there isn't, it returns true
-func HasOperatorBeenUpgraded(ctx context.Context, crudClient client.Client) bool {
-	_, err := GetOperatorPodName(ctx, crudClient)
+func HasBeenUpgraded(ctx context.Context, crudClient client.Client) bool {
+	_, err := GetPodName(ctx, crudClient)
 	return err == nil
 }
 
-// GetOperatorVersion returns the current operator version
-func GetOperatorVersion(namespace, podName string) (string, error) {
+// Version returns the current operator version
+func Version(namespace, podName string) (string, error) {
 	out, _, err := run.Unchecked(fmt.Sprintf(
 		"kubectl -n %v exec %v -c manager -- /manager version",
 		namespace,
@@ -356,8 +356,8 @@ func GetOperatorVersion(namespace, podName string) (string, error) {
 	return ver, nil
 }
 
-// GetOperatorArchitectures returns all the supported operator architectures
-func GetOperatorArchitectures(operatorPod *corev1.Pod) ([]string, error) {
+// Architectures returns all the supported operator architectures
+func Architectures(operatorPod *corev1.Pod) ([]string, error) {
 	out, _, err := run.Unchecked(fmt.Sprintf(
 		"kubectl -n %v exec %v -c manager -- /manager debug show-architectures",
 		operatorPod.Namespace,

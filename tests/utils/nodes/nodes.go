@@ -32,9 +32,9 @@ import (
 	. "github.com/onsi/gomega"    //nolint
 )
 
-// DrainPrimaryNode drains the node containing the primary pod.
+// DrainPrimary drains the node containing the primary pod.
 // It returns the names of the pods that were running on that node
-func DrainPrimaryNode(
+func DrainPrimary(
 	ctx context.Context,
 	crudClient client.Client,
 	namespace,
@@ -44,12 +44,12 @@ func DrainPrimaryNode(
 	var primaryNode string
 	var podNames []string
 	By("identifying primary node and draining", func() {
-		pod, err := clusterutils.GetClusterPrimary(ctx, crudClient, namespace, clusterName)
+		pod, err := clusterutils.GetPrimary(ctx, crudClient, namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 		primaryNode = pod.Spec.NodeName
 
 		// Gather the pods running on this node
-		podList, err := clusterutils.GetClusterPodList(ctx, crudClient, namespace, clusterName)
+		podList, err := clusterutils.ListPods(ctx, crudClient, namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 		for _, pod := range podList.Items {
 			if pod.Spec.NodeName == primaryNode {
@@ -69,7 +69,7 @@ func DrainPrimaryNode(
 	By("ensuring no cluster pod is still running on the drained node", func() {
 		Eventually(func() ([]string, error) {
 			var usedNodes []string
-			podList, err := clusterutils.GetClusterPodList(ctx, crudClient, namespace, clusterName)
+			podList, err := clusterutils.ListPods(ctx, crudClient, namespace, clusterName)
 			for _, pod := range podList.Items {
 				usedNodes = append(usedNodes, pod.Spec.NodeName)
 			}
@@ -80,12 +80,12 @@ func DrainPrimaryNode(
 	return podNames
 }
 
-// UncordonAllNodes executes the 'kubectl uncordon' command on each node of the list
-func UncordonAllNodes(
+// UncordonAll executes the 'kubectl uncordon' command on each node of the list
+func UncordonAll(
 	ctx context.Context,
 	crudClient client.Client,
 ) error {
-	nodeList, err := GetNodeList(ctx, crudClient)
+	nodeList, err := List(ctx, crudClient)
 	if err != nil {
 		return err
 	}
@@ -99,8 +99,8 @@ func UncordonAllNodes(
 	return nil
 }
 
-// GetNodeList gathers the current list of Nodes
-func GetNodeList(
+// List gathers the current list of Nodes
+func List(
 	ctx context.Context,
 	crudClient client.Client,
 ) (*v1.NodeList, error) {
@@ -112,7 +112,7 @@ func GetNodeList(
 // DescribeKubernetesNodes prints the `describe node` for each node in the
 // kubernetes cluster
 func DescribeKubernetesNodes(ctx context.Context, crudClient client.Client) (string, error) {
-	nodeList, err := GetNodeList(ctx, crudClient)
+	nodeList, err := List(ctx, crudClient)
 	if err != nil {
 		return "", err
 	}

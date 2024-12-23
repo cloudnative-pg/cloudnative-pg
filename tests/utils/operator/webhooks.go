@@ -32,9 +32,9 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 )
 
-// GetCNPGsMutatingWebhookByName get the MutatingWebhook filtered by the name of one
+// GetMutatingWebhookByName get the MutatingWebhook filtered by the name of one
 // of the webhooks
-func GetCNPGsMutatingWebhookByName(
+func GetMutatingWebhookByName(
 	ctx context.Context,
 	crudClient client.Client,
 	name string,
@@ -42,7 +42,7 @@ func GetCNPGsMutatingWebhookByName(
 	*admissionregistrationv1.MutatingWebhookConfiguration, int, error,
 ) {
 	var mWebhooks admissionregistrationv1.MutatingWebhookConfigurationList
-	err := objects.GetObjectList(ctx, crudClient, &mWebhooks)
+	err := objects.List(ctx, crudClient, &mWebhooks)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -57,8 +57,8 @@ func GetCNPGsMutatingWebhookByName(
 	return nil, 0, fmt.Errorf("mutating webhook not found")
 }
 
-// UpdateCNPGsMutatingWebhookConf update MutatingWebhookConfiguration object
-func UpdateCNPGsMutatingWebhookConf(
+// UpdateMutatingWebhookConf update MutatingWebhookConfiguration object
+func UpdateMutatingWebhookConf(
 	ctx context.Context,
 	kubeInterface kubernetes.Interface,
 	wh *admissionregistrationv1.MutatingWebhookConfiguration,
@@ -84,9 +84,9 @@ func getCNPGsValidatingWebhookConf(kubeInterface kubernetes.Interface) (
 	return validatingWebhookConfig, nil
 }
 
-// GetCNPGsValidatingWebhookByName get ValidatingWebhook by the name of one
+// GetValidatingWebhookByName get ValidatingWebhook by the name of one
 // of the webhooks
-func GetCNPGsValidatingWebhookByName(
+func GetValidatingWebhookByName(
 	ctx context.Context,
 	crudClient client.Client,
 	name string,
@@ -94,7 +94,7 @@ func GetCNPGsValidatingWebhookByName(
 	*admissionregistrationv1.ValidatingWebhookConfiguration, int, error,
 ) {
 	var vWebhooks admissionregistrationv1.ValidatingWebhookConfigurationList
-	err := objects.GetObjectList(ctx, crudClient, &vWebhooks)
+	err := objects.List(ctx, crudClient, &vWebhooks)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -109,8 +109,8 @@ func GetCNPGsValidatingWebhookByName(
 	return nil, 0, fmt.Errorf("validating webhook not found")
 }
 
-// UpdateCNPGsValidatingWebhookConf update the ValidatingWebhook object
-func UpdateCNPGsValidatingWebhookConf(
+// UpdateValidatingWebhookConf update the ValidatingWebhook object
+func UpdateValidatingWebhookConf(
 	ctx context.Context,
 	kubeInterface kubernetes.Interface,
 	wh *admissionregistrationv1.ValidatingWebhookConfiguration,
@@ -136,7 +136,7 @@ func checkWebhookReady(
 		Namespace: namespace,
 		Name:      controller.WebhookSecretName,
 	}
-	err := objects.GetObject(ctx, crudClient, secretNamespacedName, secret)
+	err := objects.Get(ctx, crudClient, secretNamespacedName, secret)
 	if err != nil {
 		return err
 	}

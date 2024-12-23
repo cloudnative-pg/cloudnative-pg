@@ -48,7 +48,7 @@ var _ = Describe("Separate pg_wal volume", Label(tests.LabelStorage), func() {
 	)
 	var namespace string
 	verifyPgWal := func(namespace string) {
-		podList, err := clusterutils.GetClusterPodList(env.Ctx, env.Client, namespace, clusterName)
+		podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
 		Expect(len(podList.Items), err).To(BeEquivalentTo(3))
 		By("checking that pg_wal PVC has been created", func() {
 			for _, pod := range podList.Items {
@@ -96,7 +96,7 @@ var _ = Describe("Separate pg_wal volume", Label(tests.LabelStorage), func() {
 	// Inline function to patch walStorage in existing cluster
 	updateWalStorage := func(namespace, clusterName string) {
 		err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-			cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).NotTo(HaveOccurred())
 			WalStorageClass := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
 			cluster.Spec.WalStorage = &apiv1.StorageConfiguration{

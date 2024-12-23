@@ -62,7 +62,7 @@ var _ = Describe("E2E Tolerations Node", Serial, Label(tests.LabelDisruptive, te
 		Expect(err).ToNot(HaveOccurred())
 
 		By("tainting all the nodes", func() {
-			nodes, _ := nodes.GetNodeList(env.Ctx, env.Client)
+			nodes, _ := nodes.List(env.Ctx, env.Client)
 			// We taint all the nodes where we could run the workloads
 			for _, node := range nodes.Items {
 				if (node.Spec.Unschedulable != true) && (len(node.Spec.Taints) == 0) {

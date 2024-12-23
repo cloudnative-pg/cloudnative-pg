@@ -80,7 +80,7 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 				quickDelete := &ctrlclient.DeleteOptions{
 					GracePeriodSeconds: &quickDeletionPeriod,
 				}
-				err = podutils.DeletePod(env.Ctx, env.Client, namespace, currentPrimary, quickDelete)
+				err = podutils.Delete(env.Ctx, env.Client, namespace, currentPrimary, quickDelete)
 				Expect(err).ToNot(HaveOccurred())
 
 				// Expect only 2 instances to be up and running
@@ -154,7 +154,7 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 			}
 			AssertCreateTestData(env, tableLocator)
 
-			operatorNamespace, err := operator.GetOperatorNamespaceName(env.Ctx, env.Client)
+			operatorNamespace, err := operator.NamespaceName(env.Ctx, env.Client)
 			Expect(err).ToNot(HaveOccurred())
 
 			By("deleting primary and operator pod", func() {
@@ -173,11 +173,11 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 				wg.Add(1)
 				wg.Add(1)
 				go func() {
-					_ = podutils.DeletePod(env.Ctx, env.Client, operatorNamespace, operatorPodName, quickDelete)
+					_ = podutils.Delete(env.Ctx, env.Client, operatorNamespace, operatorPodName, quickDelete)
 					wg.Done()
 				}()
 				go func() {
-					_ = podutils.DeletePod(env.Ctx, env.Client, namespace, currentPrimary, quickDelete)
+					_ = podutils.Delete(env.Ctx, env.Client, namespace, currentPrimary, quickDelete)
 					wg.Done()
 				}()
 				wg.Wait()
@@ -204,7 +204,7 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 					g.Expect(podList.Items[0].Name).NotTo(BeEquivalentTo(operatorPodName))
 				}, timeout).Should(Succeed())
 				Eventually(func() (bool, error) {
-					return operator.IsOperatorDeploymentReady(env.Ctx, env.Client)
+					return operator.IsDeploymentReady(env.Ctx, env.Client)
 				}, timeout).Should(BeTrue())
 			})
 

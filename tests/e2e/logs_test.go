@@ -57,7 +57,7 @@ var _ = Describe("JSON log output", Label(tests.LabelObservability), func() {
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
 		By("verifying the presence of possible logger values", func() {
-			podList, _ := clusterutils.GetClusterPodList(env.Ctx, env.Client, namespace, clusterName)
+			podList, _ := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
 			for _, pod := range podList.Items {
 				// Gather pod logs in the form of a Json Array
 				logEntries, err := logs.ParseJSONLogs(
@@ -79,7 +79,7 @@ var _ = Describe("JSON log output", Label(tests.LabelObservability), func() {
 
 		By("verifying the format of error queries being logged", func() {
 			errorTestQuery := "selecct 1\nwith newlines\n"
-			podList, _ := clusterutils.GetClusterPodList(env.Ctx, env.Client, namespace, clusterName)
+			podList, _ := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
 			timeout := 300
 
 			for _, pod := range podList.Items {
@@ -115,7 +115,7 @@ var _ = Describe("JSON log output", Label(tests.LabelObservability), func() {
 
 		By("verifying only the primary instance logs write queries", func() {
 			errorTestQuery := "ccreate table test(var text)"
-			primaryPod, _ := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
+			primaryPod, _ := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 			timeout := 300
 
 			var queryError error
@@ -178,18 +178,18 @@ var _ = Describe("JSON log output", Label(tests.LabelObservability), func() {
 
 		By("verifying pg_rewind logs after deleting the old primary pod", func() {
 			// Force-delete the primary
-			currentPrimary, _ := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
+			currentPrimary, _ := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 			quickDelete := &client.DeleteOptions{
 				GracePeriodSeconds: &quickDeletionPeriod,
 			}
 
-			deletePodError := pods.DeletePod(env.Ctx, env.Client, namespace, currentPrimary.GetName(), quickDelete)
+			deletePodError := pods.Delete(env.Ctx, env.Client, namespace, currentPrimary.GetName(), quickDelete)
 			Expect(deletePodError).ToNot(HaveOccurred())
 
 			// Expect a new primary to be elected
 			timeout := 180
 			Eventually(func() (string, error) {
-				cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 				if err != nil {
 					GinkgoWriter.Printf("Error reported while getting current primary %s\n", err.Error())
 					return "", err

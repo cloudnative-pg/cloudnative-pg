@@ -93,7 +93,7 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelPublicationSub
 			// We need to make sure that publication/subscription have been removed before
 			// attempting to drop the database, otherwise the DROP DATABASE will fail because
 			// there's an  active logical replication slot.
-			destPrimaryPod, err := clusterutils.GetClusterPrimary(
+			destPrimaryPod, err := clusterutils.GetPrimary(
 				env.Ctx, env.Client,
 				namespace, destinationClusterName,
 			)
@@ -111,7 +111,7 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelPublicationSub
 			)
 			Expect(err).ToNot(HaveOccurred())
 
-			sourcePrimaryPod, err := clusterutils.GetClusterPrimary(
+			sourcePrimaryPod, err := clusterutils.GetPrimary(
 				env.Ctx, env.Client,
 				namespace, sourceClusterName,
 			)
@@ -160,7 +160,7 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelPublicationSub
 			})
 
 			By(fmt.Sprintf("verifying the %s database has been created", databaseObject.Spec.Name), func() {
-				primaryPodInfo, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
+				primaryPodInfo, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 
 				Eventually(QueryMatchExpectationPredicate(primaryPodInfo, postgres.PostgresDBName,
@@ -193,7 +193,7 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelPublicationSub
 			})
 
 			By("verifying new publication has been created", func() {
-				primaryPodInfo, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
+				primaryPodInfo, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 
 				Eventually(QueryMatchExpectationPredicate(primaryPodInfo, dbname,
@@ -226,7 +226,7 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelPublicationSub
 			})
 
 			By("verifying new subscription has been created", func() {
-				primaryPodInfo, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
+				primaryPodInfo, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 
 				Eventually(QueryMatchExpectationPredicate(primaryPodInfo, dbname,
@@ -278,7 +278,7 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelPublicationSub
 				Expect(err).NotTo(HaveOccurred())
 
 				Eventually(func(g Gomega) {
-					err = objects.GetObject(
+					err = objects.Get(
 						env.Ctx, env.Client,
 						types.NamespacedName{Namespace: namespace, Name: pubObjectName},
 						&publication,
@@ -288,7 +288,7 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelPublicationSub
 					err = env.Client.Update(env.Ctx, &publication)
 					g.Expect(err).ToNot(HaveOccurred())
 
-					err = objects.GetObject(
+					err = objects.Get(
 						env.Ctx, env.Client,
 						types.NamespacedName{Namespace: namespace, Name: subObjectName},
 						&subscription,
@@ -311,12 +311,12 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelPublicationSub
 			})
 
 			By("removing the objects", func() {
-				Expect(objects.DeleteObject(env.Ctx, env.Client, &publication)).To(Succeed())
-				Expect(objects.DeleteObject(env.Ctx, env.Client, &subscription)).To(Succeed())
+				Expect(objects.Delete(env.Ctx, env.Client, &publication)).To(Succeed())
+				Expect(objects.Delete(env.Ctx, env.Client, &subscription)).To(Succeed())
 			})
 
 			By("verifying the publication reclaim policy outcome", func() {
-				primaryPodInfo, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, sourceClusterName)
+				primaryPodInfo, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, sourceClusterName)
 				Expect(err).ToNot(HaveOccurred())
 
 				Eventually(QueryMatchExpectationPredicate(primaryPodInfo, dbname,
@@ -324,7 +324,7 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelPublicationSub
 			})
 
 			By("verifying the subscription reclaim policy outcome", func() {
-				primaryPodInfo, err := clusterutils.GetClusterPrimary(
+				primaryPodInfo, err := clusterutils.GetPrimary(
 					env.Ctx, env.Client,
 					namespace, destinationClusterName,
 				)

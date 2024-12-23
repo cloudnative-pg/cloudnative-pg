@@ -94,12 +94,12 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 		AssertCreateCluster(namespace, clusterName, clusterWithMinioSampleFile, env)
 
 		// Get the primary
-		pod, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
+		pod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 		primary = pod.GetName()
 
 		// Get the standby
-		podList, err := clusterutils.GetClusterPodList(env.Ctx, env.Client, namespace, clusterName)
+		podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 		for _, po := range podList.Items {
 			if po.Name != primary {
@@ -113,7 +113,7 @@ var _ = Describe("Wal-restore in parallel", Label(tests.LabelBackupRestore), fun
 		// Make sure both Wal-archive and Minio work
 		// Create a WAL on the primary and check if it arrives at minio, within a short time
 		By("archiving WALs and verifying they exist", func() {
-			pod, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
+			pod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			primary := pod.GetName()
 			latestWAL = switchWalAndGetLatestArchive(namespace, primary)

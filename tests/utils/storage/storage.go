@@ -40,7 +40,7 @@ func GetStorageAllowExpansion(
 	defaultStorageClass string,
 ) (*bool, error) {
 	storageClass := &storagev1.StorageClass{}
-	err := objects.GetObject(ctx, crudClient, client.ObjectKey{Name: defaultStorageClass}, storageClass)
+	err := objects.Get(ctx, crudClient, client.ObjectKey{Name: defaultStorageClass}, storageClass)
 	return storageClass.AllowVolumeExpansion, err
 }
 
@@ -50,7 +50,7 @@ func IsWalStorageEnabled(
 	crudClient client.Client,
 	namespace, clusterName string,
 ) (bool, error) {
-	cluster, err := clusterutils.GetCluster(ctx, crudClient, namespace, clusterName)
+	cluster, err := clusterutils.Get(ctx, crudClient, namespace, clusterName)
 	if cluster.Spec.WalStorage == nil {
 		return false, err
 	}

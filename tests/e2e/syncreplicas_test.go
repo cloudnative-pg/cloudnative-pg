@@ -47,7 +47,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 
 	getSyncReplicationCount := func(namespace, clusterName, syncState string, expectedCount int) {
 		Eventually(func() (int, error, error) {
-			primaryPod, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
+			primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 
 			out, stdErr, err := exec.QueryInInstancePod(
@@ -68,7 +68,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 
 	compareSynchronousStandbyNames := func(namespace, clusterName, element string) {
 		Eventually(func() string {
-			primaryPod, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
+			primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 
 			out, stdErr, err := exec.QueryInInstancePod(
@@ -110,7 +110,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 			By("checking that synchronous_standby_names reflects cluster's changes", func() {
 				// Set MaxSyncReplicas to 1
 				Eventually(func(g Gomega) error {
-					cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 					g.Expect(err).ToNot(HaveOccurred())
 
 					cluster.Spec.MaxSyncReplicas = 1
@@ -124,7 +124,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 				timeout := 120
 				// Wait for pod 3 to be completely terminated
 				Eventually(func() (int, error) {
-					podList, err := clusterutils.GetClusterPodList(env.Ctx, env.Client, namespace, clusterName)
+					podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
 					return len(podList.Items), err
 				}, timeout).Should(BeEquivalentTo(2))
 
@@ -133,14 +133,14 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 				compareSynchronousStandbyNames(namespace, clusterName, "ANY 1")
 			})
 			By("failing when SyncReplicas fields are invalid", func() {
-				cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 				// Expect an error. MaxSyncReplicas must be lower than the number of instances
 				cluster.Spec.MaxSyncReplicas = 2
 				err = env.Client.Update(env.Ctx, cluster)
 				Expect(err).To(HaveOccurred())
 
-				cluster, err = clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+				cluster, err = clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 				// Expect an error. MinSyncReplicas must be lower than MaxSyncReplicas
 				cluster.Spec.MinSyncReplicas = 2
@@ -201,7 +201,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 
 			By("setting MaxStandbyNamesFromCluster to 1 and decreasing to 1 the sync replicas required", func() {
 				Eventually(func(g Gomega) error {
-					cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 					g.Expect(err).ToNot(HaveOccurred())
 					cluster.Spec.PostgresConfiguration.Synchronous.MaxStandbyNamesFromCluster = ptr.To(1)
 					cluster.Spec.PostgresConfiguration.Synchronous.Number = 1
@@ -214,7 +214,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 
 			By("switching to MethodFirst (priority-based)", func() {
 				Eventually(func(g Gomega) error {
-					cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 					g.Expect(err).ToNot(HaveOccurred())
 					cluster.Spec.PostgresConfiguration.Synchronous.Method = apiv1.SynchronousReplicaConfigurationMethodFirst
 					return env.Client.Update(env.Ctx, cluster)
@@ -226,7 +226,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 
 			By("by properly setting standbyNamesPre and standbyNamesPost", func() {
 				Eventually(func(g Gomega) error {
-					cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 					g.Expect(err).ToNot(HaveOccurred())
 					cluster.Spec.PostgresConfiguration.Synchronous.MaxStandbyNamesFromCluster = nil
 					cluster.Spec.PostgresConfiguration.Synchronous.StandbyNamesPre = []string{"preSyncReplica"}
@@ -267,7 +267,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 						namespace, clusterName, fencing.UsingAnnotation)).Should(Succeed())
 					Eventually(func() string {
 						commandTimeout := time.Second * 10
-						primary, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
+						primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 						Expect(err).ToNot(HaveOccurred())
 
 						stdout, _, err := exec.Command(

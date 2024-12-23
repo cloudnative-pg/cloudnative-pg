@@ -106,18 +106,19 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 		// Create the cluster
 		AssertCreateCluster(namespace, metricsClusterName, clusterFile, env)
 
-		cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, metricsClusterName)
+		cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, metricsClusterName)
 		Expect(err).NotTo(HaveOccurred())
 
 		// Check metrics on each pod
 		By("ensuring metrics are correct on each pod", func() {
-			podList, err := clusterutils.GetClusterPodList(env.Ctx, env.Client, namespace, metricsClusterName)
+			podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, metricsClusterName)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Gather metrics in each pod
 			for _, pod := range podList.Items {
 				By(fmt.Sprintf("checking metrics for pod: %s", pod.Name), func() {
-					out, err := proxy.RetrieveMetricsFromInstance(env.Ctx, env.Interface, pod, cluster.IsMetricsTLSEnabled())
+					out, err := proxy.RetrieveMetricsFromInstance(env.Ctx, env.Interface, pod,
+						cluster.IsMetricsTLSEnabled())
 					Expect(err).ToNot(HaveOccurred(), "while getting pod metrics")
 					expectedMetrics := buildExpectedMetrics(cluster, !specs.IsPodPrimary(pod))
 					assertIncludesMetrics(out, expectedMetrics)
@@ -156,7 +157,7 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 		AssertCreationOfTestDataForTargetDB(env, namespace, metricsClusterName, targetDBTwo, testTableName)
 		AssertCreationOfTestDataForTargetDB(env, namespace, metricsClusterName, targetDBSecret, testTableName)
 
-		cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, metricsClusterName)
+		cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, metricsClusterName)
 		Expect(err).ToNot(HaveOccurred())
 
 		AssertMetricsData(namespace, targetDBOne, targetDBTwo, targetDBSecret, cluster)
@@ -184,10 +185,11 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 				return err
 			}, 10).ShouldNot(HaveOccurred())
 		})
-		cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, metricsClusterName)
+		cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, metricsClusterName)
 		Expect(err).ToNot(HaveOccurred())
 
-		collectAndAssertDefaultMetricsPresentOnEachPod(namespace, metricsClusterName, cluster.IsMetricsTLSEnabled(), true)
+		collectAndAssertDefaultMetricsPresentOnEachPod(namespace, metricsClusterName, cluster.IsMetricsTLSEnabled(),
+			true)
 	})
 
 	It("can gather metrics depending on the predicate query", func() {
@@ -198,16 +200,17 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 		namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 
-		AssertCustomMetricsResourcesExist(namespace, fixturesDir+"/metrics/custom-queries-with-predicate-query.yaml", 1, 0)
+		AssertCustomMetricsResourcesExist(namespace, fixturesDir+"/metrics/custom-queries-with-predicate-query.yaml", 1,
+			0)
 
 		// Create the cluster
 		AssertCreateCluster(namespace, metricsClusterName, clusterMetricsPredicateQueryFile, env)
 
 		By("ensuring only metrics with a positive predicate are collected", func() {
-			podList, err := clusterutils.GetClusterPodList(env.Ctx, env.Client, namespace, metricsClusterName)
+			podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, metricsClusterName)
 			Expect(err).ToNot(HaveOccurred())
 
-			cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, metricsClusterName)
+			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, metricsClusterName)
 			Expect(err).ToNot(HaveOccurred())
 
 			// We expect only the metrics that have a predicate_query valid.
@@ -226,7 +229,8 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 			// Gather metrics in each pod
 			for _, pod := range podList.Items {
 				By(fmt.Sprintf("checking metrics for pod: %s", pod.Name), func() {
-					out, err := proxy.RetrieveMetricsFromInstance(env.Ctx, env.Interface, pod, cluster.IsMetricsTLSEnabled())
+					out, err := proxy.RetrieveMetricsFromInstance(env.Ctx, env.Interface, pod,
+						cluster.IsMetricsTLSEnabled())
 					Expect(err).ToNot(HaveOccurred(), "while getting pod metrics")
 					assertIncludesMetrics(out, expectedMetrics)
 					assertExcludesMetrics(out, nonCollectableMetrics)
@@ -248,10 +252,11 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 		// Create the cluster
 		AssertCreateCluster(namespace, metricsClusterName, defaultMonitoringQueriesDisableSampleFile, env)
 
-		cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, metricsClusterName)
+		cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, metricsClusterName)
 		Expect(err).ToNot(HaveOccurred())
 
-		collectAndAssertDefaultMetricsPresentOnEachPod(namespace, metricsClusterName, cluster.IsMetricsTLSEnabled(), false)
+		collectAndAssertDefaultMetricsPresentOnEachPod(namespace, metricsClusterName, cluster.IsMetricsTLSEnabled(),
+			false)
 	})
 
 	It("execute custom queries against the application database on replica clusters", func() {
@@ -313,17 +318,18 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 			_, err = conn.Exec(cmd)
 			Expect(err).ToNot(HaveOccurred())
 		})
-		replicaCluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, replicaClusterName)
+		replicaCluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, replicaClusterName)
 		Expect(err).ToNot(HaveOccurred())
 
 		By("collecting metrics on each pod and checking that the table has been found", func() {
-			podList, err := clusterutils.GetClusterPodList(env.Ctx, env.Client, namespace, replicaClusterName)
+			podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, replicaClusterName)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Gather metrics in each pod
 			expectedMetric := fmt.Sprintf("cnpg_%v_row_count 3", testTableName)
 			for _, pod := range podList.Items {
-				out, err := proxy.RetrieveMetricsFromInstance(env.Ctx, env.Interface, pod, replicaCluster.IsMetricsTLSEnabled())
+				out, err := proxy.RetrieveMetricsFromInstance(env.Ctx, env.Interface, pod,
+					replicaCluster.IsMetricsTLSEnabled())
 				Expect(err).Should(Not(HaveOccurred()))
 				Expect(strings.Split(out, "\n")).Should(ContainElement(expectedMetric))
 			}

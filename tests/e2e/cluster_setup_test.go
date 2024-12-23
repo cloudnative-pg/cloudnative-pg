@@ -61,7 +61,7 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
 		By("having three PostgreSQL pods with status ready", func() {
-			podList, err := clusterutils.GetClusterPodList(env.Ctx, env.Client, namespace, clusterName)
+			podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
 			Expect(utils.CountReadyPods(podList.Items), err).Should(BeEquivalentTo(3))
 		})
 
@@ -180,7 +180,7 @@ var _ = Describe("Cluster setup", Label(tests.LabelSmoke, tests.LabelBasic), fun
 
 		// scale up the cluster to verify if the cluster remains in Ready
 		By("scaling up the cluster size", func() {
-			err := clusterutils.ScaleClusterSize(env.Ctx, env.Client, namespace, clusterName, 5)
+			err := clusterutils.ScaleSize(env.Ctx, env.Client, namespace, clusterName, 5)
 			Expect(err).ToNot(HaveOccurred())
 		})
 

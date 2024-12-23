@@ -186,7 +186,7 @@ func assertFastSwitchover(namespace, sampleFile, clusterName, webTestFile, webTe
 	By("setting the TargetPrimary to node2 to trigger a switchover", func() {
 		targetPrimary = clusterName + "-2"
 		err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-			cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			cluster.Status.TargetPrimary = targetPrimary
 			return env.Client.Status().Update(env.Ctx, cluster)

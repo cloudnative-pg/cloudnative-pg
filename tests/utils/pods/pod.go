@@ -36,21 +36,21 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 )
 
-// GetPodList gathers the current list of pods in a namespace
-func GetPodList(
+// List gathers the current list of pods in a namespace
+func List(
 	ctx context.Context,
 	crudClient client.Client,
 	namespace string,
 ) (*v1.PodList, error) {
 	podList := &v1.PodList{}
-	err := objects.GetObjectList(
+	err := objects.List(
 		ctx, crudClient, podList, client.InNamespace(namespace),
 	)
 	return podList, err
 }
 
-// DeletePod deletes a pod if existent
-func DeletePod(
+// Delete deletes a pod if existent
+func Delete(
 	ctx context.Context,
 	crudClient client.Client,
 	namespace, name string,
@@ -65,7 +65,7 @@ func DeletePod(
 		Kind:    "Pod",
 	})
 
-	return objects.DeleteObject(ctx, crudClient, u, opts...)
+	return objects.Delete(ctx, crudClient, u, opts...)
 }
 
 // CreateAndWaitForReady creates a given pod object and wait for it to be ready
@@ -75,15 +75,15 @@ func CreateAndWaitForReady(
 	pod *v1.Pod,
 	timeoutSeconds uint,
 ) error {
-	_, err := objects.CreateObject(ctx, crudClient, pod)
+	_, err := objects.Create(ctx, crudClient, pod)
 	if err != nil {
 		return err
 	}
-	return podWaitForReady(ctx, crudClient, pod, timeoutSeconds)
+	return waitForReady(ctx, crudClient, pod, timeoutSeconds)
 }
 
-// podWaitForReady waits for a pod to be ready
-func podWaitForReady(
+// waitForReady waits for a pod to be ready
+func waitForReady(
 	ctx context.Context,
 	crudClient client.Client,
 	pod *v1.Pod,
@@ -109,8 +109,8 @@ func podWaitForReady(
 	return err
 }
 
-// GetPodLogs gathers pod logs
-func GetPodLogs(
+// Logs gathers pod logs
+func Logs(
 	ctx context.Context,
 	kubeInterface kubernetes.Interface,
 	namespace, podName string,
@@ -136,8 +136,8 @@ func GetPodLogs(
 	return buf.String(), nil
 }
 
-// GetPod gets a pod by namespace and name
-func GetPod(
+// Get gets a pod by namespace and name
+func Get(
 	ctx context.Context,
 	crudClient client.Client,
 	namespace, podName string,
@@ -145,7 +145,7 @@ func GetPod(
 	wrapErr := func(err error) error {
 		return fmt.Errorf("while getting pod '%s/%s': %w", namespace, podName, err)
 	}
-	podList, err := GetPodList(ctx, crudClient, namespace)
+	podList, err := List(ctx, crudClient, namespace)
 	if err != nil {
 		return nil, wrapErr(err)
 	}
@@ -155,4 +155,40 @@ func GetPod(
 		}
 	}
 	return nil, wrapErr(errors.New("pod not found"))
+}
+
+// HasLabels verifies that the labels of a pod contain a specified
+// labels map
+func HasLabels(pod v1.Pod, labels map[string]string) bool {
+	podLabels := pod.Labels
+	for k, v := range labels {
+		val, ok := podLabels[k]
+		if !ok || (v != val) {
+			return false
+		}
+	}
+	return true
+}
+
+// HasAnnotations verifies that the annotations of a pod contain a specified
+// annotations map
+func HasAnnotations(pod v1.Pod, annotations map[string]string) bool {
+	podAnnotations := pod.Annotations
+	for k, v := range annotations {
+		val, ok := podAnnotations[k]
+		if !ok || (v != val) {
+			return false
+		}
+	}
+	return true
+}
+
+// HasCondition verifies that a pod has a specified condition
+func HasCondition(pod *v1.Pod, conditionType v1.PodConditionType, status v1.ConditionStatus) bool {
+	for _, cond := range pod.Status.Conditions {
+		if cond.Type == conditionType && cond.Status == status {
+			return true
+		}
+	}
+	return false
 }

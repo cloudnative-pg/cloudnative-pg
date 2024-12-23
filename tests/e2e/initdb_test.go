@@ -53,7 +53,7 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 	) {
 		query := fmt.Sprintf("SELECT count(*) FROM %s", tableName)
 
-		primary, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
+		primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 
 		By(fmt.Sprintf(
@@ -129,7 +129,7 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 				"app", 10000)
 
 			By("checking inside the database the default locale", func() {
-				primary, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
+				primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 
 				stdout, _, err := exec.QueryInInstancePod(
@@ -162,7 +162,7 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 			AssertCreateCluster(namespace, clusterName, postInitSQLCluster, env)
 
 			By("checking inside the database", func() {
-				primary, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
+				primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 
 				stdout, _, err := exec.QueryInInstancePod(

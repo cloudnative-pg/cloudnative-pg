@@ -34,8 +34,8 @@ const (
 	PollingTime = 5
 )
 
-// CreateObject create object in the Kubernetes cluster
-func CreateObject(
+// Create creates object in the Kubernetes cluster
+func Create(
 	ctx context.Context,
 	crudClient client.Client,
 	object client.Object,
@@ -53,8 +53,8 @@ func CreateObject(
 	return object, err
 }
 
-// DeleteObject delete object in the Kubernetes cluster
-func DeleteObject(
+// Delete deletes an object in the Kubernetes cluster
+func Delete(
 	ctx context.Context,
 	crudClient client.Client,
 	object client.Object,
@@ -72,8 +72,8 @@ func DeleteObject(
 	return err
 }
 
-// GetObjectList retrieves list of objects for a given namespace and list options
-func GetObjectList(
+// List retrieves a list of objects
+func List(
 	ctx context.Context,
 	crudClient client.Client,
 	objectList client.ObjectList,
@@ -94,8 +94,8 @@ func GetObjectList(
 	return err
 }
 
-// GetObject retrieves an objects for the given object key from the Kubernetes Cluster
-func GetObject(
+// Get retrieves an object for the given object key from the Kubernetes Cluster
+func Get(
 	ctx context.Context,
 	crudClient client.Client,
 	objectKey client.ObjectKey,

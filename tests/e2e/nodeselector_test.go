@@ -78,7 +78,7 @@ var _ = Describe("nodeSelector", Label(tests.LabelPodScheduling), func() {
 				timeout := 120
 				Eventually(func() bool {
 					isPending := false
-					podList, err := pods.GetPodList(env.Ctx, env.Client, namespace)
+					podList, err := pods.List(env.Ctx, env.Client, namespace)
 					Expect(err).ToNot(HaveOccurred())
 					if len(podList.Items) > 0 {
 						if len(podList.Items[0].Status.Conditions) > 0 {
@@ -115,7 +115,7 @@ var _ = Describe("nodeSelector", Label(tests.LabelPodScheduling), func() {
 			// We label one node with the label we have defined in the cluster
 			// YAML definition
 			By("labelling a node", func() {
-				nodeList, err := nodes.GetNodeList(env.Ctx, env.Client)
+				nodeList, err := nodes.List(env.Ctx, env.Client)
 				Expect(err).ToNot(HaveOccurred())
 
 				// We want to label a node that is uncordoned and untainted,
@@ -135,7 +135,7 @@ var _ = Describe("nodeSelector", Label(tests.LabelPodScheduling), func() {
 			// All the pods should be running on the labeled node
 			By("confirm pods run on the labelled node", func() {
 				AssertCreateCluster(namespace, clusterName, sampleFile, env)
-				podList, err := pods.GetPodList(env.Ctx, env.Client, namespace)
+				podList, err := pods.List(env.Ctx, env.Client, namespace)
 				Expect(err).ToNot(HaveOccurred())
 				for _, podDetails := range podList.Items {
 					if podDetails.Status.Phase == "Running" {

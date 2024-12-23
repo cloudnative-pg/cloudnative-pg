@@ -102,7 +102,7 @@ var _ = Describe("Azure - Backup and restore", Label(tests.LabelBackupRestore), 
 			assertArchiveWalOnAzureBlob(namespace, clusterName, AzureConfiguration)
 			By("uploading a backup", func() {
 				// We create a backup
-				backups.ExecuteBackup(
+				backups.Execute(
 					env.Ctx, env.Client, env.Scheme,
 					namespace, backupFile, false,
 					testTimeouts[testUtils.BackupIsReady],
@@ -114,7 +114,7 @@ var _ = Describe("Azure - Backup and restore", Label(tests.LabelBackupRestore), 
 					return backups.CountFilesOnAzureBlobStorage(AzureConfiguration, clusterName, "data.tar")
 				}, 30).Should(BeNumerically(">=", 1))
 				Eventually(func() (string, error) {
-					cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 					return cluster.Status.FirstRecoverabilityPoint, err
 				}, 30).ShouldNot(BeEmpty())
 			})
@@ -172,7 +172,7 @@ var _ = Describe("Azure - Backup and restore", Label(tests.LabelBackupRestore), 
 			// Restore backup in a new cluster, also cover if no application database is configured
 			AssertClusterWasRestoredWithPITR(namespace, restoredClusterName, tableName, "00000002")
 			By("deleting the restored cluster", func() {
-				Expect(objects.DeleteObject(env.Ctx, env.Client, cluster)).To(Succeed())
+				Expect(objects.Delete(env.Ctx, env.Client, cluster)).To(Succeed())
 			})
 		})
 
@@ -263,35 +263,36 @@ var _ = Describe("Azure - Clusters Recovery From Barman Object Store", Label(tes
 				AssertCreateCluster(namespace, clusterName, clusterSourceFileAzure, env)
 			})
 
-			It("restores a cluster from barman object using 'barmanObjectStore' option in 'externalClusters' section", func() {
-				// Write a table and some data on the "app" database
-				tableLocator := TableLocator{
-					Namespace:    namespace,
-					ClusterName:  clusterName,
-					DatabaseName: postgres.AppDBName,
-					TableName:    tableName,
-				}
-				AssertCreateTestData(env, tableLocator)
-				assertArchiveWalOnAzureBlob(namespace, clusterName, AzureConfiguration)
+			It("restores a cluster from barman object using 'barmanObjectStore' option in 'externalClusters' section",
+				func() {
+					// Write a table and some data on the "app" database
+					tableLocator := TableLocator{
+						Namespace:    namespace,
+						ClusterName:  clusterName,
+						DatabaseName: postgres.AppDBName,
+						TableName:    tableName,
+					}
+					AssertCreateTestData(env, tableLocator)
+					assertArchiveWalOnAzureBlob(namespace, clusterName, AzureConfiguration)
 
-				By("backing up a cluster and verifying it exists on azure blob storage", func() {
-					// Create the backup
-					backups.ExecuteBackup(
-						env.Ctx, env.Client, env.Scheme,
-						namespace, sourceBackupFileAzure, false,
-						testTimeouts[testUtils.BackupIsReady],
-					)
-					backups.AssertBackupConditionInClusterStatus(env.Ctx, env.Client, namespace, clusterName)
-					// Verifying file called data.tar should be available on Azure blob storage
-					Eventually(func() (int, error) {
-						return backups.CountFilesOnAzureBlobStorage(AzureConfiguration, clusterName, "data.tar")
-					}, 30).Should(BeNumerically(">=", 1))
+					By("backing up a cluster and verifying it exists on azure blob storage", func() {
+						// Create the backup
+						backups.Execute(
+							env.Ctx, env.Client, env.Scheme,
+							namespace, sourceBackupFileAzure, false,
+							testTimeouts[testUtils.BackupIsReady],
+						)
+						backups.AssertBackupConditionInClusterStatus(env.Ctx, env.Client, namespace, clusterName)
+						// Verifying file called data.tar should be available on Azure blob storage
+						Eventually(func() (int, error) {
+							return backups.CountFilesOnAzureBlobStorage(AzureConfiguration, clusterName, "data.tar")
+						}, 30).Should(BeNumerically(">=", 1))
+					})
+
+					// Restoring cluster using a recovery barman object store, which is defined
+					// in the externalClusters section
+					AssertClusterRestore(namespace, externalClusterFileAzure, tableName)
 				})
-
-				// Restoring cluster using a recovery barman object store, which is defined
-				// in the externalClusters section
-				AssertClusterRestore(namespace, externalClusterFileAzure, tableName)
-			})
 
 			It("restores a cluster with 'PITR' from barman object using "+
 				"'barmanObjectStore' option in 'externalClusters' section", func() {
@@ -329,7 +330,7 @@ var _ = Describe("Azure - Clusters Recovery From Barman Object Store", Label(tes
 				)
 
 				By("delete restored cluster", func() {
-					Expect(objects.DeleteObject(env.Ctx, env.Client, restoredCluster)).To(Succeed())
+					Expect(objects.Delete(env.Ctx, env.Client, restoredCluster)).To(Succeed())
 				})
 			})
 		})
@@ -367,37 +368,38 @@ var _ = Describe("Azure - Clusters Recovery From Barman Object Store", Label(tes
 				AssertCreateCluster(namespace, clusterName, clusterSourceFileAzureSAS, env)
 			})
 
-			It("restores cluster from barman object using 'barmanObjectStore' option in 'externalClusters' section", func() {
-				// Write a table and some data on the "app" database
-				tableLocator := TableLocator{
-					Namespace:    namespace,
-					ClusterName:  clusterName,
-					DatabaseName: postgres.AppDBName,
-					TableName:    tableName,
-				}
-				AssertCreateTestData(env, tableLocator)
+			It("restores cluster from barman object using 'barmanObjectStore' option in 'externalClusters' section",
+				func() {
+					// Write a table and some data on the "app" database
+					tableLocator := TableLocator{
+						Namespace:    namespace,
+						ClusterName:  clusterName,
+						DatabaseName: postgres.AppDBName,
+						TableName:    tableName,
+					}
+					AssertCreateTestData(env, tableLocator)
 
-				// Create a WAL on the primary and check if it arrives in the
-				// Azure Blob Storage within a short time
-				assertArchiveWalOnAzureBlob(namespace, clusterName, AzureConfiguration)
+					// Create a WAL on the primary and check if it arrives in the
+					// Azure Blob Storage within a short time
+					assertArchiveWalOnAzureBlob(namespace, clusterName, AzureConfiguration)
 
-				By("backing up a cluster and verifying it exists on azure blob storage", func() {
-					// We create a Backup
-					backups.ExecuteBackup(
-						env.Ctx, env.Client, env.Scheme,
-						namespace, sourceBackupFileAzureSAS, false,
-						testTimeouts[testUtils.BackupIsReady],
-					)
-					backups.AssertBackupConditionInClusterStatus(env.Ctx, env.Client, namespace, clusterName)
-					// Verifying file called data.tar should be available on Azure blob storage
-					Eventually(func() (int, error) {
-						return backups.CountFilesOnAzureBlobStorage(AzureConfiguration, clusterName, "data.tar")
-					}, 30).Should(BeNumerically(">=", 1))
+					By("backing up a cluster and verifying it exists on azure blob storage", func() {
+						// We create a Backup
+						backups.Execute(
+							env.Ctx, env.Client, env.Scheme,
+							namespace, sourceBackupFileAzureSAS, false,
+							testTimeouts[testUtils.BackupIsReady],
+						)
+						backups.AssertBackupConditionInClusterStatus(env.Ctx, env.Client, namespace, clusterName)
+						// Verifying file called data.tar should be available on Azure blob storage
+						Eventually(func() (int, error) {
+							return backups.CountFilesOnAzureBlobStorage(AzureConfiguration, clusterName, "data.tar")
+						}, 30).Should(BeNumerically(">=", 1))
+					})
+
+					// Restore backup in a new cluster
+					AssertClusterRestoreWithApplicationDB(namespace, clusterRestoreFileAzureSAS, tableName)
 				})
-
-				// Restore backup in a new cluster
-				AssertClusterRestoreWithApplicationDB(namespace, clusterRestoreFileAzureSAS, tableName)
-			})
 
 			It("restores a cluster with 'PITR' from barman object using "+
 				"'barmanObjectStore' option in 'externalClusters' section", func() {
@@ -435,7 +437,7 @@ var _ = Describe("Azure - Clusters Recovery From Barman Object Store", Label(tes
 				)
 
 				By("delete restored cluster", func() {
-					Expect(objects.DeleteObject(env.Ctx, env.Client, restoredCluster)).To(Succeed())
+					Expect(objects.Delete(env.Ctx, env.Client, restoredCluster)).To(Succeed())
 				})
 			})
 		})
@@ -445,7 +447,7 @@ var _ = Describe("Azure - Clusters Recovery From Barman Object Store", Label(tes
 func assertArchiveWalOnAzureBlob(namespace, clusterName string, configuration backups.AzureConfiguration) {
 	// Create a WAL on the primary and check if it arrives at the Azure Blob Storage, within a short time
 	By("archiving WALs and verifying they exist", func() {
-		primary, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
+		primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 		latestWAL := switchWalAndGetLatestArchive(primary.Namespace, primary.Name)
 		// Define what file we are looking for in Azure.
@@ -468,7 +470,7 @@ func prepareClusterForPITROnAzureBlob(
 ) {
 	const tableNamePitr = "for_restore"
 	By("backing up a cluster and verifying it exists on Azure Blob", func() {
-		backups.ExecuteBackup(
+		backups.Execute(
 			env.Ctx, env.Client, env.Scheme,
 			namespace, backupSampleFile, false,
 			testTimeouts[testUtils.BackupIsReady],
@@ -478,7 +480,7 @@ func prepareClusterForPITROnAzureBlob(
 			return backups.CountFilesOnAzureBlobStorage(azureConfig, clusterName, "data.tar")
 		}, 30).Should(BeEquivalentTo(expectedVal))
 		Eventually(func() (string, error) {
-			cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			return cluster.Status.FirstRecoverabilityPoint, err
 		}, 30).ShouldNot(BeEmpty())

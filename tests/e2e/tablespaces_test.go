@@ -84,7 +84,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 		By("creating a cluster and having it be ready", func() {
 			AssertCreateCluster(namespace, clusterName, clusterManifest, env)
 		})
-		cluster, err = clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+		cluster, err = clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 	}
 
@@ -135,18 +135,18 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 		})
 
 		It("can update the cluster by change the owner of tablesapce", func() {
-			cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			updateTablespaceOwner(cluster, "anothertablespace", "alpha")
 
-			cluster, err = clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+			cluster, err = clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			AssertTablespaceReconciled(namespace, clusterName, "anothertablespace", testTimeouts[timeouts.Short])
 			AssertTablespaceAndOwnerExist(cluster, "anothertablespace", "alpha")
 		})
 
 		It("can update the cluster to set a tablespace as temporary", func() {
-			cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 
 			By("setting the first tablespace as temporary", func() {
@@ -173,7 +173,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 			Expect(err).ToNot(HaveOccurred())
 
 			By(fmt.Sprintf("creating backup %s and verifying backup is ready", backupName), func() {
-				backups.ExecuteBackup(
+				backups.Execute(
 					env.Ctx, env.Client, env.Scheme,
 					namespace, clusterBackupManifest, false,
 					testTimeouts[timeouts.BackupIsReady],
@@ -187,7 +187,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 
 			By("verifying backup status", func() {
 				Eventually(func() (string, error) {
-					cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 					if err != nil {
 						return "", err
 					}
@@ -198,7 +198,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 
 		It("can update the cluster adding a new tablespace and backup again", func() {
 			By("adding a new tablespace to the cluster", func() {
-				cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 
 				addTablespaces(cluster, []apiv1.TablespaceConfiguration{
@@ -214,13 +214,13 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 					},
 				})
 
-				cluster, err = clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+				cluster, err = clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(cluster.ContainsTablespaces()).To(BeTrue())
 			})
 
 			By("verifying there are 3 tablespaces and PVCs were created", func() {
-				cluster, err = clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+				cluster, err = clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(cluster.Spec.Tablespaces).To(HaveLen(3))
 
@@ -263,7 +263,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 				)
 
 				// TODO: this is to force a CHECKPOINT when we run the backup on standby.
-				// This should be better handled inside ExecuteBackup
+				// This should be better handled inside Execute
 				AssertArchiveWalOnMinio(namespace, clusterName, clusterName)
 
 				backups.AssertBackupConditionInClusterStatus(env.Ctx, env.Client, namespace, clusterName)
@@ -279,21 +279,21 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 
 			By("verifying backup status", func() {
 				Eventually(func() (string, error) {
-					cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 					if err != nil {
 						return "", err
 					}
 					return cluster.Status.FirstRecoverabilityPoint, err
 				}, 30).ShouldNot(BeEmpty())
 				Eventually(func() (string, error) {
-					cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 					if err != nil {
 						return "", err
 					}
 					return cluster.Status.LastSuccessfulBackup, err
 				}, 30).ShouldNot(BeEmpty())
 				Eventually(func() (string, error) {
-					cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 					if err != nil {
 						return "", err
 					}
@@ -321,7 +321,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 			})
 
 			By("verifying that tablespaces and PVC were created", func() {
-				restoredCluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, restoredClusterName)
+				restoredCluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, restoredClusterName)
 				Expect(err).ToNot(HaveOccurred())
 				AssertClusterHasMountPointsAndVolumesForTablespaces(restoredCluster, 3,
 					testTimeouts[timeouts.Short])
@@ -395,7 +395,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 			Expect(err).ToNot(HaveOccurred())
 
 			By(fmt.Sprintf("creating backup %s and verifying backup is ready", backupName), func() {
-				backupObject = backups.ExecuteBackup(
+				backupObject = backups.Execute(
 					env.Ctx,
 					env.Client,
 					env.Scheme,
@@ -441,7 +441,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 				}
 				AssertCreateTestData(env, tl2)
 
-				primaryPod, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
+				primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 				// Execute a checkpoint
 				_, _, err = exec.EventuallyExecQueryInInstancePod(
@@ -473,7 +473,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 				AssertArchiveWalOnMinio(namespace, clusterName, clusterName)
 
 				Eventually(func(g Gomega) {
-					backupList, err := backups.GetBackupList(env.Ctx, env.Client, namespace)
+					backupList, err := backups.List(env.Ctx, env.Client, namespace)
 					g.Expect(err).ToNot(HaveOccurred())
 					for _, backup := range backupList.Items {
 						if backup.Name != backupName {
@@ -507,7 +507,8 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 				err = os.Setenv("BACKUP_NAME", backupName)
 				Expect(err).ToNot(HaveOccurred())
 
-				clusterToRestoreName, err := yaml.GetResourceNameFromYAML(env.Scheme, clusterVolumesnapshoRestoreManifest)
+				clusterToRestoreName, err := yaml.GetResourceNameFromYAML(env.Scheme,
+					clusterVolumesnapshoRestoreManifest)
 				Expect(err).ToNot(HaveOccurred())
 
 				By("creating the cluster to be restored through snapshot", func() {
@@ -517,7 +518,8 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 				})
 
 				By("verifying that tablespaces and PVC were created", func() {
-					restoredCluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterToRestoreName)
+					restoredCluster, err := clusterutils.Get(env.Ctx, env.Client, namespace,
+						clusterToRestoreName)
 					Expect(err).ToNot(HaveOccurred())
 					AssertClusterHasMountPointsAndVolumesForTablespaces(restoredCluster, 2,
 						testTimeouts[timeouts.Short])
@@ -616,7 +618,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 				})
 
 				By("can verify tablespaces and PVC were created", func() {
-					recoveryCluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterToPITRName)
+					recoveryCluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterToPITRName)
 					Expect(err).ToNot(HaveOccurred())
 					AssertClusterHasMountPointsAndVolumesForTablespaces(recoveryCluster, 2,
 						testTimeouts[timeouts.Short])
@@ -656,7 +658,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 
 		It("can update cluster by adding tablespaces", func() {
 			By("adding tablespaces to the spec and patching", func() {
-				cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(cluster.ContainsTablespaces()).To(BeFalse())
 
@@ -675,12 +677,12 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 					},
 				})
 
-				cluster, err = clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+				cluster, err = clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(cluster.ContainsTablespaces()).To(BeTrue())
 			})
 			By("verify tablespaces and PVC were created", func() {
-				cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(cluster.ContainsTablespaces()).To(BeTrue())
 
@@ -713,7 +715,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 
 			By("check all instances become not ready", func() {
 				Eventually(func() (bool, error) {
-					podList, err := clusterutils.GetClusterPodList(env.Ctx, env.Client, namespace, clusterName)
+					podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
 					if err != nil {
 						return false, err
 					}
@@ -738,7 +740,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 
 			By("all instances become ready", func() {
 				Eventually(func() (bool, error) {
-					podList, err := clusterutils.GetClusterPodList(env.Ctx, env.Client, namespace, clusterName)
+					podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
 					if err != nil {
 						return false, err
 					}
@@ -757,7 +759,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 			})
 
 			By("verify tablespaces and PVC are there", func() {
-				cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(cluster.ContainsTablespaces()).To(BeTrue())
 
@@ -786,7 +788,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 
 		It("can update cluster adding tablespaces", func() {
 			By("patch cluster with primaryUpdateMethod=switchover", func() {
-				cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(cluster.ContainsTablespaces()).To(BeFalse())
 
@@ -799,7 +801,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 				AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReady], env)
 			})
 			By("adding tablespaces to the spec and patching", func() {
-				cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(cluster.ContainsTablespaces()).To(BeFalse())
 
@@ -821,14 +823,14 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 				err = env.Client.Patch(env.Ctx, updated, client.MergeFrom(cluster))
 				Expect(err).ToNot(HaveOccurred())
 
-				cluster, err = clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+				cluster, err = clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(cluster.ContainsTablespaces()).To(BeTrue())
 			})
 		})
 
 		It("can verify tablespaces and PVC were created", func() {
-			cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(cluster.ContainsTablespaces()).To(BeTrue())
 
@@ -866,7 +868,7 @@ func AssertTablespaceReconciled(
 ) {
 	By(fmt.Sprintf("checking if tablespace %v is in reconciled status", tablespaceName), func() {
 		Eventually(func(g Gomega) bool {
-			cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 			g.Expect(err).ToNot(HaveOccurred())
 			for _, state := range cluster.Status.TablespacesStatus {
 				if state.State == apiv1.TablespaceStatusReconciled && state.Name == tablespaceName {
@@ -885,7 +887,7 @@ func AssertRoleReconciled(
 ) {
 	By(fmt.Sprintf("checking if role %v is in reconciled status", roleName), func() {
 		Eventually(func(g Gomega) bool {
-			cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 			g.Expect(err).ToNot(HaveOccurred())
 			for state, names := range cluster.Status.ManagedRolesStatus.ByStatus {
 				if state == apiv1.RoleStatusReconciled {
@@ -922,7 +924,7 @@ func AssertClusterHasMountPointsAndVolumesForTablespaces(
 		Eventually(func(g Gomega) {
 			g.Expect(cluster.ContainsTablespaces()).To(BeTrue())
 			g.Expect(cluster.Spec.Tablespaces).To(HaveLen(numTablespaces))
-			podList, err := clusterutils.GetClusterPodList(env.Ctx, env.Client, namespace, clusterName)
+			podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
 			g.Expect(err).ToNot(HaveOccurred())
 			for _, pod := range podList.Items {
 				g.Expect(pod.Spec.Containers).ToNot(BeEmpty())
@@ -998,7 +1000,7 @@ func AssertClusterHasPvcsAndDataDirsForTablespaces(cluster *apiv1.Cluster, timeo
 					}
 				}
 			}
-			podList, err := clusterutils.GetClusterPodList(env.Ctx, env.Client, namespace, clusterName)
+			podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
 			g.Expect(err).ToNot(HaveOccurred())
 			for _, pod := range podList.Items {
 				for _, tbsConfig := range cluster.Spec.Tablespaces {
@@ -1010,7 +1012,7 @@ func AssertClusterHasPvcsAndDataDirsForTablespaces(cluster *apiv1.Cluster, timeo
 	By("checking the data directory for the tablespaces is owned by postgres", func() {
 		Eventually(func(g Gomega) {
 			// minio may in the same namespace with cluster pod
-			pvcList, err := clusterutils.GetClusterPodList(env.Ctx, env.Client, namespace, clusterName)
+			pvcList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
 			g.Expect(err).ShouldNot(HaveOccurred())
 			for _, pod := range pvcList.Items {
 				for _, tbsConfig := range cluster.Spec.Tablespaces {
@@ -1042,7 +1044,7 @@ func AssertDatabaseContainsTablespaces(cluster *apiv1.Cluster, timeout int) {
 	clusterName := cluster.ObjectMeta.Name
 	By("checking the expected tablespaces are in the database", func() {
 		Eventually(func(g Gomega) {
-			instances, err := clusterutils.GetClusterPodList(env.Ctx, env.Client, namespace, clusterName)
+			instances, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
 			g.Expect(err).ShouldNot(HaveOccurred())
 			var tbsListing string
 			for _, instance := range instances.Items {
@@ -1072,7 +1074,7 @@ func AssertTempTablespaceContent(cluster *apiv1.Cluster, timeout int, content st
 	clusterName := cluster.ObjectMeta.Name
 	By("checking the expected setting in a new PG session", func() {
 		Eventually(func(g Gomega) {
-			primary, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
+			primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 			if err != nil {
 				g.Expect(err).ShouldNot(HaveOccurred())
 			}
@@ -1097,7 +1099,7 @@ func AssertTempTablespaceBehavior(cluster *apiv1.Cluster, expectedTempTablespace
 	namespace := cluster.ObjectMeta.Namespace
 	clusterName := cluster.ObjectMeta.Name
 
-	primary, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
+	primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 	if err != nil {
 		Expect(err).ShouldNot(HaveOccurred())
 	}
@@ -1124,7 +1126,7 @@ func AssertTempTablespaceBehavior(cluster *apiv1.Cluster, expectedTempTablespace
 func AssertTablespaceAndOwnerExist(cluster *apiv1.Cluster, tablespace, owner string) {
 	namespace := cluster.ObjectMeta.Namespace
 	clusterName := cluster.ObjectMeta.Name
-	primaryPod, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
+	primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 	Expect(err).ShouldNot(HaveOccurred())
 	result, stdErr, err := exec.QueryInInstancePod(
 		env.Ctx, env.Client, env.Interface, env.RestClientConfig,
@@ -1159,7 +1161,7 @@ func assertCanHibernateClusterWithTablespaces(
 
 	By(fmt.Sprintf("verifying cluster %v pods are removed", clusterName), func() {
 		Eventually(func(g Gomega) {
-			podList, _ := clusterutils.GetClusterPodList(env.Ctx, env.Client, namespace, clusterName)
+			podList, _ := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
 			g.Expect(podList.Items).Should(BeEmpty())
 		}, 300).Should(Succeed())
 	})
@@ -1178,7 +1180,7 @@ func assertCanHibernateClusterWithTablespaces(
 	})
 
 	By("verify tablespaces and PVC are there", func() {
-		cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+		cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(cluster.ContainsTablespaces()).To(BeTrue())
 
@@ -1211,7 +1213,7 @@ func eventuallyHasExpectedNumberOfPVCs(pvcCount int, namespace string) {
 
 func eventuallyHasCompletedBackups(namespace string, numBackups int) {
 	Eventually(func(g Gomega) {
-		backups, err := backups.GetBackupList(env.Ctx, env.Client, namespace)
+		backups, err := backups.List(env.Ctx, env.Client, namespace)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(backups.Items).To(HaveLen(numBackups))
 

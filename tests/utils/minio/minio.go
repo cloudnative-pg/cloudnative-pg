@@ -464,7 +464,7 @@ func Deploy(minioEnv *Env, env *environment.TestingEnvironment) (*corev1.Pod, er
 	}
 
 	minioEnv.CaSecretObj = *minioEnv.CaPair.GenerateCASecret(minioEnv.Namespace, minioEnv.CaSecretName)
-	if _, err = objects.CreateObject(env.Ctx, env.Client, &minioEnv.CaSecretObj); err != nil {
+	if _, err = objects.Create(env.Ctx, env.Client, &minioEnv.CaSecretObj); err != nil {
 		return nil, err
 	}
 
@@ -520,7 +520,7 @@ func (m *Env) CreateCaSecret(env *environment.TestingEnvironment, namespace stri
 	if err != nil {
 		return err
 	}
-	_, err = objects.CreateObject(env.Ctx, env.Client, caSecret)
+	_, err = objects.Create(env.Ctx, env.Client, caSecret)
 	return err
 }
 

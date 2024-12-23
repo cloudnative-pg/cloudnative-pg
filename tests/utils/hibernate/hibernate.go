@@ -56,7 +56,7 @@ func On(
 		}
 		return nil
 	case HibernateDeclaratively:
-		cluster, err := clusterutils.GetCluster(ctx, crudClient, namespace, clusterName)
+		cluster, err := clusterutils.Get(ctx, crudClient, namespace, clusterName)
 		if err != nil {
 			return err
 		}
@@ -90,7 +90,7 @@ func Off(
 		}
 		return nil
 	case HibernateDeclaratively:
-		cluster, err := clusterutils.GetCluster(ctx, crudClient, namespace, clusterName)
+		cluster, err := clusterutils.Get(ctx, crudClient, namespace, clusterName)
 		if err != nil {
 			return err
 		}

@@ -101,7 +101,7 @@ var _ = Describe("Fencing", Label(tests.LabelPlugin), func() {
 	}
 
 	checkPostgresConnection := func(podName, namespace string) {
-		err := objects.GetObject(env.Ctx, env.Client, ctrlclient.ObjectKey{Namespace: namespace, Name: podName}, &pod)
+		err := objects.Get(env.Ctx, env.Client, ctrlclient.ObjectKey{Namespace: namespace, Name: podName}, &pod)
 		Expect(err).ToNot(HaveOccurred())
 		timeout := time.Second * 10
 		dsn := fmt.Sprintf("host=%v user=%v dbname=%v password=%v sslmode=require",
@@ -117,7 +117,7 @@ var _ = Describe("Fencing", Label(tests.LabelPlugin), func() {
 			return
 		}
 		By("checking the cluster has the expected annotation set", func() {
-			cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).NotTo(HaveOccurred())
 			if len(content) == 0 {
 				Expect(cluster.Annotations).To(Or(Not(HaveKey(utils.FencedInstanceAnnotation)),
@@ -135,7 +135,7 @@ var _ = Describe("Fencing", Label(tests.LabelPlugin), func() {
 		It("can fence a primary instance", func() {
 			var beforeFencingPodName string
 			By("fencing the primary instance", func() {
-				primaryPod, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
+				primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 				beforeFencingPodName = primaryPod.GetName()
 				Expect(fencing.On(env.Ctx, env.Client, beforeFencingPodName,
@@ -143,7 +143,8 @@ var _ = Describe("Fencing", Label(tests.LabelPlugin), func() {
 			})
 			By("check the instance is not ready, but kept as primary instance", func() {
 				checkInstanceStatusReadyOrNot(beforeFencingPodName, namespace, false)
-				currentPrimaryPodInfo, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
+				currentPrimaryPodInfo, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace,
+					clusterName)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(beforeFencingPodName).To(Equal(currentPrimaryPodInfo.GetName()))
 			})
@@ -160,7 +161,8 @@ var _ = Describe("Fencing", Label(tests.LabelPlugin), func() {
 				checkInstanceStatusReadyOrNot(beforeFencingPodName, namespace, true)
 			})
 			By("the old primary should still be the primary instance", func() {
-				currentPrimaryPodInfo, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
+				currentPrimaryPodInfo, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace,
+					clusterName)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(beforeFencingPodName).Should(BeEquivalentTo(currentPrimaryPodInfo.GetName()))
 			})
@@ -175,7 +177,7 @@ var _ = Describe("Fencing", Label(tests.LabelPlugin), func() {
 			var beforeFencingPodName string
 			AssertClusterIsReady(namespace, clusterName, testTimeouts[timeouts.ClusterIsReadyQuick], env)
 			By("fence a follower instance", func() {
-				podList, _ := clusterutils.GetClusterPodList(env.Ctx, env.Client, namespace, clusterName)
+				podList, _ := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
 				Expect(len(podList.Items)).To(BeEquivalentTo(3))
 				for _, pod := range podList.Items {
 					if specs.IsPodStandby(pod) {
@@ -210,39 +212,41 @@ var _ = Describe("Fencing", Label(tests.LabelPlugin), func() {
 	}
 	assertFencingClusterWorks := func(fencingMethod fencing.Method) {
 		It("can fence all the instances in a cluster", func() {
-			primaryPod, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
+			primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			primaryPodName := primaryPod.GetName()
 			By("fence the whole cluster using \"(*)\"", func() {
-				Expect(fencing.On(env.Ctx, env.Client, "*", namespace, clusterName, fencingMethod)).ToNot(HaveOccurred())
+				Expect(fencing.On(env.Ctx, env.Client, "*", namespace, clusterName,
+					fencingMethod)).ToNot(HaveOccurred())
 			})
 			checkFencingAnnotationSet(fencingMethod, []string{"*"})
 			By("check all instances are not ready", func() {
-				podList, err := clusterutils.GetClusterPodList(env.Ctx, env.Client, namespace, clusterName)
+				podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).NotTo(HaveOccurred())
 				for _, pod := range podList.Items {
 					checkInstanceStatusReadyOrNot(pod.GetName(), namespace, false)
 				}
 			})
 			By("check postgres connection on all instances", func() {
-				podList, err := clusterutils.GetClusterPodList(env.Ctx, env.Client, namespace, clusterName)
+				podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).NotTo(HaveOccurred())
 				for _, pod := range podList.Items {
 					checkPostgresConnection(pod.GetName(), namespace)
 				}
 			})
 			By("lift the fencing", func() {
-				Expect(fencing.Off(env.Ctx, env.Client, "*", namespace, clusterName, fencingMethod)).ToNot(HaveOccurred())
+				Expect(fencing.Off(env.Ctx, env.Client, "*", namespace, clusterName,
+					fencingMethod)).ToNot(HaveOccurred())
 			})
 			By("all instances become ready", func() {
-				podList, err := clusterutils.GetClusterPodList(env.Ctx, env.Client, namespace, clusterName)
+				podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).NotTo(HaveOccurred())
 				for _, pod := range podList.Items {
 					checkInstanceStatusReadyOrNot(pod.GetName(), namespace, true)
 				}
 			})
 			By("the old primary is still the primary instance", func() {
-				podName, err := clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
+				podName, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(primaryPodName).Should(BeEquivalentTo(podName.GetName()))
 			})

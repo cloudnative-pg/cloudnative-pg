@@ -131,7 +131,7 @@ var _ = Describe("Azurite - Backup and restore", Label(tests.LabelBackupRestore)
 			AssertClusterWasRestoredWithPITR(namespace, restoredClusterName, tableName, "00000002")
 
 			By("deleting the restored cluster", func() {
-				Expect(objects.DeleteObject(env.Ctx, env.Client, cluster)).To(Succeed())
+				Expect(objects.Delete(env.Ctx, env.Client, cluster)).To(Succeed())
 			})
 		})
 
@@ -231,7 +231,7 @@ var _ = Describe("Clusters Recovery From Barman Object Store", Label(tests.Label
 			)
 
 			By("delete restored cluster", func() {
-				Expect(objects.DeleteObject(env.Ctx, env.Client, restoredCluster)).To(Succeed())
+				Expect(objects.Delete(env.Ctx, env.Client, restoredCluster)).To(Succeed())
 			})
 		})
 	})
@@ -283,7 +283,7 @@ func prepareClusterBackupOnAzurite(
 
 	By("backing up a cluster and verifying it exists on azurite", func() {
 		// We create a Backup
-		backups.ExecuteBackup(
+		backups.Execute(
 			env.Ctx, env.Client, env.Scheme,
 			namespace, backupFile, false,
 			testTimeouts[testUtils.BackupIsReady],
@@ -293,7 +293,7 @@ func prepareClusterBackupOnAzurite(
 			return backups.CountFilesOnAzuriteBlobStorage(namespace, clusterName, "data.tar")
 		}, 30).Should(BeNumerically(">=", 1))
 		Eventually(func() (string, error) {
-			cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			return cluster.Status.FirstRecoverabilityPoint, err
 		}, 30).ShouldNot(BeEmpty())
@@ -309,7 +309,7 @@ func prepareClusterForPITROnAzurite(
 ) {
 	By("backing up a cluster and verifying it exists on azurite", func() {
 		// We create a Backup
-		backups.ExecuteBackup(
+		backups.Execute(
 			env.Ctx, env.Client, env.Scheme,
 			namespace, backupSampleFile, false,
 			testTimeouts[testUtils.BackupIsReady],
@@ -319,7 +319,7 @@ func prepareClusterForPITROnAzurite(
 			return backups.CountFilesOnAzuriteBlobStorage(namespace, clusterName, "data.tar")
 		}, 30).Should(BeNumerically(">=", 1))
 		Eventually(func() (string, error) {
-			cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			return cluster.Status.FirstRecoverabilityPoint, err
 		}, 30).ShouldNot(BeEmpty())

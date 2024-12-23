@@ -52,11 +52,11 @@ var _ = Describe("Volume space unavailable", Label(tests.LabelStorage), func() {
 		var primaryPod *corev1.Pod
 		By("finding cluster resources", func() {
 			var err error
-			cluster, err = clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+			cluster, err = clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(cluster).ToNot(BeNil())
 
-			primaryPod, err = clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
+			primaryPod, err = clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(primaryPod).ToNot(BeNil())
 		})
@@ -101,14 +101,14 @@ var _ = Describe("Volume space unavailable", Label(tests.LabelStorage), func() {
 		})
 		By("waiting for the primary to become not ready", func() {
 			Eventually(func(g Gomega) bool {
-				primaryPod, err := pods.GetPod(env.Ctx, env.Client, namespace, primaryPod.Name)
+				primaryPod, err := pods.Get(env.Ctx, env.Client, namespace, primaryPod.Name)
 				g.Expect(err).ToNot(HaveOccurred())
-				return clusterutils.PodHasCondition(primaryPod, corev1.PodReady, corev1.ConditionFalse)
+				return pods.HasCondition(primaryPod, corev1.PodReady, corev1.ConditionFalse)
 			}).WithTimeout(time.Minute).Should(BeTrue())
 		})
 		By("checking if the operator detects the issue", func() {
 			Eventually(func(g Gomega) string {
-				cluster, err := clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 				g.Expect(err).ToNot(HaveOccurred())
 				return cluster.Status.Phase
 			}).WithTimeout(time.Minute).Should(Equal("Not enough disk space"))
@@ -121,11 +121,11 @@ var _ = Describe("Volume space unavailable", Label(tests.LabelStorage), func() {
 		primaryWALPVC := &corev1.PersistentVolumeClaim{}
 		By("finding cluster resources", func() {
 			var err error
-			cluster, err = clusterutils.GetCluster(env.Ctx, env.Client, namespace, clusterName)
+			cluster, err = clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(cluster).ToNot(BeNil())
 
-			primaryPod, err = clusterutils.GetClusterPrimary(env.Ctx, env.Client, namespace, clusterName)
+			primaryPod, err = clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(primaryPod).ToNot(BeNil())
 
@@ -166,9 +166,9 @@ var _ = Describe("Volume space unavailable", Label(tests.LabelStorage), func() {
 			// We can't delete the Pod, as this will trigger
 			// a failover.
 			Eventually(func(g Gomega) bool {
-				primaryPod, err := pods.GetPod(env.Ctx, env.Client, namespace, primaryPod.Name)
+				primaryPod, err := pods.Get(env.Ctx, env.Client, namespace, primaryPod.Name)
 				g.Expect(err).ToNot(HaveOccurred())
-				return clusterutils.PodHasCondition(primaryPod, corev1.PodReady, corev1.ConditionTrue)
+				return pods.HasCondition(primaryPod, corev1.PodReady, corev1.ConditionTrue)
 			}).WithTimeout(10 * time.Minute).Should(BeTrue())
 		})
 		By("writing some WAL", func() {

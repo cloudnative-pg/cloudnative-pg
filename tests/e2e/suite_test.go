@@ -168,7 +168,7 @@ var _ = BeforeEach(func() {
 		return
 	}
 
-	operatorPod, err := operator.GetOperatorPod(env.Ctx, env.Client)
+	operatorPod, err := operator.GetPod(env.Ctx, env.Client)
 	Expect(err).ToNot(HaveOccurred())
 
 	if operatorPodWasRenamed {
@@ -201,7 +201,7 @@ var _ = AfterEach(func() {
 	if len(breakingLabelsInCurrentTest.([]string)) != 0 {
 		return
 	}
-	operatorPod, err := operator.GetOperatorPod(env.Ctx, env.Client)
+	operatorPod, err := operator.GetPod(env.Ctx, env.Client)
 	Expect(err).ToNot(HaveOccurred())
 	wasRenamed := operator.PodRenamed(operatorPod, expectedOperatorPodName)
 	if wasRenamed {

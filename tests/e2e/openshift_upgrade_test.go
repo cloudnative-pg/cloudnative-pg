@@ -85,7 +85,7 @@ var _ = Describe("Upgrade Paths on OpenShift", Label(tests.LabelUpgrade), Ordere
 		err := cleanupOperator()
 		Expect(err).ToNot(HaveOccurred())
 		Eventually(func() error {
-			_, err = operator.GetOperatorPod(env.Ctx, env.Client)
+			_, err = operator.GetPod(env.Ctx, env.Client)
 			return err
 		}, 120).Should(HaveOccurred())
 	}
@@ -93,16 +93,16 @@ var _ = Describe("Upgrade Paths on OpenShift", Label(tests.LabelUpgrade), Ordere
 	assertClusterIsAligned := func(namespace, clusterName string) {
 		By("Verifying the cluster pods have been upgraded", func() {
 			Eventually(func() bool {
-				return operator.HasOperatorBeenUpgraded(env.Ctx, env.Client)
+				return operator.HasBeenUpgraded(env.Ctx, env.Client)
 			}).Should(BeTrue())
 
-			operatorPodName, err := operator.GetOperatorPodName(env.Ctx, env.Client)
+			operatorPodName, err := operator.GetPodName(env.Ctx, env.Client)
 			Expect(err).ToNot(HaveOccurred())
 
-			expectedVersion, err := operator.GetOperatorVersion("openshift-operators", operatorPodName)
+			expectedVersion, err := operator.Version("openshift-operators", operatorPodName)
 			Expect(err).ToNot(HaveOccurred())
 
-			podList, err := clusterutils.GetClusterPodList(env.Ctx, env.Client, namespace, clusterName)
+			podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 
 			for _, pod := range podList.Items {
