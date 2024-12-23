@@ -176,7 +176,10 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	// Load the plugins required to bootstrap and reconcile this cluster
 	enabledPluginNames := cluster.Spec.Plugins.GetEnabledPluginNames()
-	enabledPluginNames = append(enabledPluginNames, cluster.Spec.ExternalClusters.GetEnabledPluginNames()...)
+	enabledPluginNames = append(
+		enabledPluginNames,
+		apiv1.GetExternalClustersEnabledPluginNames(cluster.Spec.ExternalClusters)...,
+	)
 
 	pluginLoadingContext, cancelPluginLoading := context.WithTimeout(ctx, 5*time.Second)
 	defer cancelPluginLoading()

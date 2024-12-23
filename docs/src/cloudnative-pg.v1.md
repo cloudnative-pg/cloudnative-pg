@@ -1845,7 +1845,7 @@ it can be with a switchover (<code>switchover</code>) or in-place (<code>restart
 </td>
 </tr>
 <tr><td><code>externalClusters</code><br/>
-<a href="#postgresql-cnpg-io-v1-ExternalClusterList"><i>ExternalClusterList</i></a>
+<a href="#postgresql-cnpg-io-v1-ExternalCluster"><i>[]ExternalCluster</i></a>
 </td>
 <td>
    <p>The list of external clusters which are used in the configuration</p>
@@ -2706,19 +2706,89 @@ storage</p>
 </tbody>
 </table>
 
-## ExternalClusterList     {#postgresql-cnpg-io-v1-ExternalClusterList}
+## ExternalCluster     {#postgresql-cnpg-io-v1-ExternalCluster}
 
-(Alias of `[]github.com/cloudnative-pg/cloudnative-pg/api/v1.ExternalCluster`)
 
 **Appears in:**
 
 - [ClusterSpec](#postgresql-cnpg-io-v1-ClusterSpec)
 
 
-<p>ExternalClusterList is a list of external clusters</p>
+<p>ExternalCluster represents the connection parameters to an
+external cluster which is used in the other sections of the configuration</p>
 
 
-
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>name</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The server name, required</p>
+</td>
+</tr>
+<tr><td><code>connectionParameters</code><br/>
+<i>map[string]string</i>
+</td>
+<td>
+   <p>The list of connection parameters, such as dbname, host, username, etc</p>
+</td>
+</tr>
+<tr><td><code>sslCert</code><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#secretkeyselector-v1-core"><i>core/v1.SecretKeySelector</i></a>
+</td>
+<td>
+   <p>The reference to an SSL certificate to be used to connect to this
+instance</p>
+</td>
+</tr>
+<tr><td><code>sslKey</code><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#secretkeyselector-v1-core"><i>core/v1.SecretKeySelector</i></a>
+</td>
+<td>
+   <p>The reference to an SSL private key to be used to connect to this
+instance</p>
+</td>
+</tr>
+<tr><td><code>sslRootCert</code><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#secretkeyselector-v1-core"><i>core/v1.SecretKeySelector</i></a>
+</td>
+<td>
+   <p>The reference to an SSL CA public key to be used to connect to this
+instance</p>
+</td>
+</tr>
+<tr><td><code>password</code><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#secretkeyselector-v1-core"><i>core/v1.SecretKeySelector</i></a>
+</td>
+<td>
+   <p>The reference to the password to be used to connect to the server.
+If a password is provided, CloudNativePG creates a PostgreSQL
+passfile at <code>/controller/external/NAME/pass</code> (where &quot;NAME&quot; is the
+cluster's name). This passfile is automatically referenced in the
+connection string when establishing a connection to the remote
+PostgreSQL server from the current PostgreSQL <code>Cluster</code>. This ensures
+secure and efficient password management for external clusters.</p>
+</td>
+</tr>
+<tr><td><code>barmanObjectStore</code><br/>
+<a href="https://pkg.go.dev/github.com/cloudnative-pg/barman-cloud/pkg/api/#BarmanObjectStoreConfiguration"><i>github.com/cloudnative-pg/barman-cloud/pkg/api.BarmanObjectStoreConfiguration</i></a>
+</td>
+<td>
+   <p>The configuration for the barman-cloud tool suite</p>
+</td>
+</tr>
+<tr><td><code>plugin</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-PluginConfiguration"><i>PluginConfiguration</i></a>
+</td>
+<td>
+   <p>The configuration of the plugin that is taking care
+of WAL archiving and backups for this external cluster</p>
+</td>
+</tr>
+</tbody>
+</table>
 
 ## ImageCatalogRef     {#postgresql-cnpg-io-v1-ImageCatalogRef}
 
@@ -3616,6 +3686,7 @@ the operator calls PgBouncer's <code>PAUSE</code> and <code>RESUME</code> comman
 
 **Appears in:**
 
+- [ExternalCluster](#postgresql-cnpg-io-v1-ExternalCluster)
 
 
 <p>PluginConfiguration specifies a plugin that need to be loaded for this
