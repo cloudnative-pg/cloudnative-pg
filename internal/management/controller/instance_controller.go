@@ -1042,9 +1042,7 @@ func (r *InstanceReconciler) processConfigReloadAndManageRestart(ctx context.Con
 	phaseReason := "PostgreSQL configuration changed"
 	if status.IsPrimary && status.PendingRestartForDecrease {
 		if cluster.GetPrimaryUpdateStrategy() == apiv1.PrimaryUpdateStrategyUnsupervised {
-			contextLogger.Info("Restarting primary in-place due to hot standby sensible parameters decrease")
-			restartTimeout := time.Duration(cluster.GetRestartTimeout()) * time.Second
-			return r.Instance().RequestAndWaitRestartSmartFast(ctx, restartTimeout)
+			return r.triggerRestartForDecrease(ctx, cluster)
 		}
 		reason := "decrease of hot standby sensitive parameters"
 		contextLogger.Info("Waiting for the user to request a restart of the primary instance or a switchover "+
@@ -1072,6 +1070,25 @@ func (r *InstanceReconciler) processConfigReloadAndManageRestart(ctx context.Con
 		clusterstatus.SetPhaseTX(phase, phaseReason),
 		clusterstatus.SetClusterReadyConditionTX,
 	)
+}
+
+// triggerRestartForDecrease triggers an in-place restart and then asks
+// the operator to continue with the reconciliation. This is needed to
+// apply a change in replica-sensitive parameters that need to be done
+// on the primary node and, after that, to the replicas
+func (r *InstanceReconciler) triggerRestartForDecrease(ctx context.Context, cluster *apiv1.Cluster) error {
+	contextLogger := log.FromContext(ctx)
+
+	contextLogger.Info("Restarting primary in-place due to hot standby sensible parameters decrease")
+	restartTimeout := time.Duration(cluster.GetRestartTimeout()) * time.Second
+	if err := r.Instance().RequestAndWaitRestartSmartFast(ctx, restartTimeout); err != nil {
+		return err
+	}
+
+	phase := apiv1.PhaseApplyingConfiguration
+	phaseReason := "Decrease of hot standby sensitive parameters"
+
+	return clusterstatus.RegisterPhase(ctx, r.client, cluster, phase, phaseReason)
 }
 
 // refreshCertificateFilesFromSecret receive a secret and rewrite the file
