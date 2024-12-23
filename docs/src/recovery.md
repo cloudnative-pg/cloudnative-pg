@@ -23,6 +23,11 @@ WAL files are pulled from the defined *recovery object store*.
 
 Base backups can be taken either on object stores or using volume snapshots.
 
+!!! Info
+    Starting with version 1.25, CloudNativePG includes experimental support for
+    backup and recovery using plugins, such as the
+    [Barman Cloud plugin](https://github.com/cloudnative-pg/plugin-barman-cloud).
+
 You can achieve recovery from a *recovery object store* in two ways:
 
 - We recommend using a recovery object store, that is, a backup of another cluster
@@ -64,7 +69,7 @@ metadata:
   name: cluster-restore
 spec:
   [...]
-  
+
   superuserSecret:
     name: superuser-secret
 

@@ -964,6 +964,7 @@ minKubeVersion
 minSyncReplicas
 minikube
 minio
+misconfigurations
 mmap
 monitoringconfiguration
 mountPath

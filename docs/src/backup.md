@@ -41,6 +41,11 @@ On the other hand, CloudNativePG supports two ways to store physical base backup
     the supported [Container Storage Interface (CSI) drivers](https://kubernetes-csi.github.io/docs/drivers.html)
     that provide snapshotting capabilities.
 
+!!! Info
+    Starting with version 1.25, CloudNativePG includes experimental support for
+    backup and recovery using plugins, such as the
+    [Barman Cloud plugin](https://github.com/cloudnative-pg/plugin-barman-cloud).
+
 ## WAL archive
 
 The WAL archive in PostgreSQL is at the heart of **continuous backup**, and it
