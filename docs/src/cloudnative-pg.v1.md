@@ -1763,7 +1763,7 @@ development/staging purposes.</p>
 </td>
 </tr>
 <tr><td><code>plugins</code><br/>
-<a href="#postgresql-cnpg-io-v1-PluginConfigurationList"><i>PluginConfigurationList</i></a>
+<a href="#postgresql-cnpg-io-v1-PluginConfiguration"><i>[]PluginConfiguration</i></a>
 </td>
 <td>
    <p>The plugins configuration, containing
@@ -3246,20 +3246,37 @@ the operator calls PgBouncer's <code>PAUSE</code> and <code>RESUME</code> comman
 </tbody>
 </table>
 
-## PluginConfigurationList     {#postgresql-cnpg-io-v1-PluginConfigurationList}
+## PluginConfiguration     {#postgresql-cnpg-io-v1-PluginConfiguration}
 
-(Alias of `[]github.com/cloudnative-pg/cloudnative-pg/api/v1.PluginConfiguration`)
 
 **Appears in:**
 
 - [ClusterSpec](#postgresql-cnpg-io-v1-ClusterSpec)
 
 
-<p>PluginConfigurationList represent a set of plugin with their
-configuration parameters</p>
+<p>PluginConfiguration specifies a plugin that need to be loaded for this
+cluster to be reconciled</p>
 
 
-
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>name</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Name is the plugin name</p>
+</td>
+</tr>
+<tr><td><code>parameters</code><br/>
+<i>map[string]string</i>
+</td>
+<td>
+   <p>Parameters is the configuration of the plugin</p>
+</td>
+</tr>
+</tbody>
+</table>
 
 ## PluginStatus     {#postgresql-cnpg-io-v1-PluginStatus}
 

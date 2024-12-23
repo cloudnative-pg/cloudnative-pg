@@ -162,7 +162,11 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	pluginLoadingContext, cancelPluginLoading := context.WithTimeout(ctx, 5*time.Second)
 	defer cancelPluginLoading()
 
-	pluginClient, err := cnpgiClient.WithPlugins(pluginLoadingContext, r.Plugins, cluster.Spec.Plugins.GetNames()...)
+	pluginClient, err := cnpgiClient.WithPlugins(
+		pluginLoadingContext,
+		r.Plugins,
+		apiv1.GetPluginConfigurationEnabledPluginNames(cluster.Spec.Plugins)...,
+	)
 	if err != nil {
 		var errUnknownPlugin *repository.ErrUnknownPlugin
 		if errors.As(err, &errUnknownPlugin) {

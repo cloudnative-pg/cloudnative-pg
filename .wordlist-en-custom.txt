@@ -301,7 +301,6 @@ PgBouncerSecrets
 PgBouncerSecretsVersions
 PgBouncerSpec
 Philippe
-PluginConfigurationList
 PluginStatus
 PoLA
 PodAffinity

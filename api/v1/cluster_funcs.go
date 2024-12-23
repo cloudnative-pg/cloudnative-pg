@@ -69,12 +69,12 @@ func (o OnlineConfiguration) GetImmediateCheckpoint() bool {
 	return *o.ImmediateCheckpoint
 }
 
-// GetNames gets the name of the plugins that are involved
+// GetPluginConfigurationEnabledPluginNames gets the name of the plugins that are involved
 // in the reconciliation of this cluster
-func (pluginList PluginConfigurationList) GetNames() (result []string) {
-	pluginNames := make([]string, len(pluginList))
-	for i, pluginDeclaration := range pluginList {
-		pluginNames[i] = pluginDeclaration.Name
+func GetPluginConfigurationEnabledPluginNames(pluginList []PluginConfiguration) (result []string) {
+	pluginNames := make([]string, 0, len(pluginList))
+	for _, pluginDeclaration := range pluginList {
+		pluginNames = append(pluginNames, pluginDeclaration.Name)
 	}
 	return pluginNames
 }

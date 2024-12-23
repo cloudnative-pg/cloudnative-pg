@@ -136,7 +136,11 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	// Load the required plugins
-	pluginClient, err := cnpgiClient.WithPlugins(ctx, r.Plugins, cluster.Spec.Plugins.GetNames()...)
+	pluginClient, err := cnpgiClient.WithPlugins(
+		ctx,
+		r.Plugins,
+		apiv1.GetPluginConfigurationEnabledPluginNames(cluster.Spec.Plugins)...,
+	)
 	if err != nil {
 		contextLogger.Error(err, "Error loading plugins, retrying")
 		return ctrl.Result{}, err

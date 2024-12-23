@@ -475,7 +475,7 @@ type ClusterSpec struct {
 	// The plugins configuration, containing
 	// any plugin to be loaded with the corresponding configuration
 	// +optional
-	Plugins PluginConfigurationList `json:"plugins,omitempty"`
+	Plugins []PluginConfiguration `json:"plugins,omitempty"`
 
 	// The configuration of the probes to be injected
 	// in the PostgreSQL Pods.
@@ -533,10 +533,6 @@ type Probe struct {
 	// +optional
 	TerminationGracePeriodSeconds *int64 `json:"terminationGracePeriodSeconds,omitempty"`
 }
-
-// PluginConfigurationList represent a set of plugin with their
-// configuration parameters
-type PluginConfigurationList []PluginConfiguration
 
 const (
 	// PhaseSwitchover when a cluster is changing the primary node
