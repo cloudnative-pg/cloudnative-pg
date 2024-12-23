@@ -155,7 +155,6 @@ EphemeralVolumeSource
 EphemeralVolumesSizeLimit
 EphemeralVolumesSizeLimitConfiguration
 ExternalCluster
-ExternalClusterList
 FQDN
 Fei
 Filesystem
