@@ -43,4 +43,3 @@ For more information on the current preview version and how to test, please view
 - [Announcement](https://cloudnative-pg.io/releases/cloudnative-pg-1-25.0-rc1-released/)
 - [Documentation](https://cloudnative-pg.io/documentation/preview/)
 -->
-
