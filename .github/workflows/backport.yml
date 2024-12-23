@@ -73,7 +73,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        branch: [release-1.22, release-1.23, release-1.24]
+        branch: [release-1.22, release-1.24]
     env:
       PR: ${{ github.event.pull_request.number }}
     outputs:
