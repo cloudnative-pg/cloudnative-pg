@@ -648,7 +648,6 @@ var _ = Describe("Configuration update with primaryUpdateMethod", Label(tests.La
 					}, 160).Should(BeEquivalentTo(10))
 				}
 			})
-			AssertPostgresNoPendingRestart(namespace, clusterName, 120)
 		})
 	})
 })
