@@ -32,7 +32,8 @@ jobs:
           labels: |
             backport-requested :arrow_backward:
             release-1.22
-            release-1.23
+            release-1.24
+            release-1.25
       -
         name: Create comment
         uses: peter-evans/create-or-update-comment@v4
@@ -55,7 +56,8 @@ jobs:
           labels: |
             backport-requested :arrow_backward:
             release-1.22
-            release-1.23
+            release-1.24
+            release-1.25
 
   ## backport pull request in condition when pr contains 'backport-requested' label and contains target branches labels
   back-porting-pr:
@@ -71,7 +73,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        branch: [release-1.22, release-1.23]
+        branch: [release-1.22, release-1.24]
     env:
       PR: ${{ github.event.pull_request.number }}
     outputs:
