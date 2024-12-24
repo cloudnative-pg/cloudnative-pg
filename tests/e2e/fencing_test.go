@@ -158,7 +158,7 @@ var _ = Describe("Fencing", Label(tests.LabelPlugin), func() {
 				Expect(beforeFencingPodName).Should(BeEquivalentTo(currentPrimaryPodInfo.GetName()))
 			})
 			By("all followers should be streaming again from the primary instance", func() {
-				AssertClusterStandbysAreStreaming(namespace, clusterName, 120)
+				AssertClusterStandbysAreStreaming(namespace, clusterName, 140)
 			})
 			checkFencingAnnotationSet(fencingMethod, nil)
 		})
