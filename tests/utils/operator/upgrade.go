@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package upgrade provide functions to handle operator install/uninstall process
+// Package operator provide functions to handle operator install/uninstall process
 package operator
 
 import (
