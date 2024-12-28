@@ -41,6 +41,7 @@ import (
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	webhookv1 "github.com/cloudnative-pg/cloudnative-pg/internal/webhook/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -335,7 +336,9 @@ func AssertClusterDefault(
 			g.Expect(err).ToNot(HaveOccurred())
 		}).Should(Succeed())
 
-		validationErr := cluster.Validate()
+		validator := webhookv1.ClusterCustomValidator{}
+		validationWarn, validationErr := validator.ValidateCreate(env.Ctx, cluster)
+		Expect(validationWarn).To(BeEmpty())
 		if isExpectedToDefault {
 			Expect(validationErr).Should(BeEmpty(), validationErr)
 		} else {
