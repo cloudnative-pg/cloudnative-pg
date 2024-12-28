@@ -87,11 +87,11 @@ const (
 	// streaming replication purposes
 	StreamingReplicationUser = "streaming_replica"
 
-	// defaultPostgresUID is the default UID which is used by PostgreSQL
-	defaultPostgresUID = 26
+	// DefaultPostgresUID is the default UID which is used by PostgreSQL
+	DefaultPostgresUID = 26
 
-	// defaultPostgresGID is the default GID which is used by PostgreSQL
-	defaultPostgresGID = 26
+	// DefaultPostgresGID is the default GID which is used by PostgreSQL
+	DefaultPostgresGID = 26
 
 	// PodAntiAffinityTypeRequired is the label for required anti-affinity type
 	PodAntiAffinityTypeRequired = "required"
