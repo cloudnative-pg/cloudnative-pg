@@ -321,7 +321,6 @@ func AssertClusterIsReady(namespace string, clusterName string, timeout int, env
 func AssertClusterDefault(
 	namespace string,
 	clusterName string,
-	isExpectedToDefault bool,
 	env *environment.TestingEnvironment,
 ) {
 	By("having a Cluster object populated with default values", func() {
@@ -339,11 +338,7 @@ func AssertClusterDefault(
 		validator := webhookv1.ClusterCustomValidator{}
 		validationWarn, validationErr := validator.ValidateCreate(env.Ctx, cluster)
 		Expect(validationWarn).To(BeEmpty())
-		if isExpectedToDefault {
-			Expect(validationErr).Should(BeEmpty(), validationErr)
-		} else {
-			Expect(validationErr).ShouldNot(BeEmpty(), validationErr)
-		}
+		Expect(validationErr).ToNot(HaveOccurred())
 	})
 }
 
