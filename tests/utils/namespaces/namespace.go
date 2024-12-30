@@ -31,6 +31,7 @@ import (
 
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/onsi/ginkgo/v2"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/events/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -42,7 +43,6 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/jobs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/storage"
@@ -277,7 +277,10 @@ func DumpNamespaceObjects(
 		_, _ = fmt.Fprintln(w, string(out))
 	}
 
-	jobList, _ := jobs.GetJobList(ctx, crudClient, namespace)
+	jobList := &batchv1.JobList{}
+	_ = crudClient.List(
+		ctx, jobList, client.InNamespace(namespace),
+	)
 	for _, job := range jobList.Items {
 		out, _ := json.MarshalIndent(job, "", "    ")
 		_, _ = fmt.Fprintf(w, "Dumping %v/%v job\n", namespace, job.Name)

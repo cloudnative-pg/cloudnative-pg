@@ -23,12 +23,12 @@ import (
 	"text/tabwriter"
 
 	"github.com/cheynewallace/tabby"
+	batchv1 "k8s.io/api/batch/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	utils2 "github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/jobs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/storage"
 )
@@ -82,7 +82,10 @@ func PrintClusterResources(ctx context.Context, crudClient client.Client, namesp
 	clusterInfo.AddLine("Jobs information:")
 	clusterInfo.AddLine()
 	clusterInfo.AddHeader("Items", "Values")
-	jobList, _ := jobs.GetJobList(ctx, crudClient, cluster.GetNamespace())
+	jobList := &batchv1.JobList{}
+	_ = crudClient.List(
+		ctx, jobList, client.InNamespace(namespace),
+	)
 	for _, job := range jobList.Items {
 		clusterInfo.AddLine("Job name", job.Name)
 		clusterInfo.AddLine("Job status", fmt.Sprintf("%#v", job.Status))
