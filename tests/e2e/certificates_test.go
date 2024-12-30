@@ -17,15 +17,17 @@ limitations under the License.
 package e2e
 
 import (
+	"context"
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/ptr"
+	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/certificates"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	podutils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
@@ -48,6 +50,31 @@ import (
 // from an application, by using certificates that have been created by 'kubectl-cnpg'
 // Then we verify that the server certificate  and the operator are able to handle the provided server certificates
 var _ = Describe("Certificates", func() {
+	createClientCertificatesViaKubectlPluginFunc := func(
+		ctx context.Context,
+		crudClient ctrlclient.Client,
+		cluster apiv1.Cluster,
+		certName string,
+		userName string,
+	) error {
+		// clientCertName := "cluster-cert"
+		// user := "app"
+		// Create the certificate
+		_, _, err := run.Run(fmt.Sprintf(
+			"kubectl cnpg certificate %v --cnpg-cluster %v --cnpg-user %v -n %v",
+			certName,
+			cluster.Name,
+			userName,
+			cluster.Namespace))
+		if err != nil {
+			return err
+		}
+		// Verifying client certificate secret existence
+		secret := &corev1.Secret{}
+		err = crudClient.Get(ctx, ctrlclient.ObjectKey{Namespace: cluster.Namespace, Name: certName}, secret)
+		return err
+	}
+
 	defaultPodFunc := func(namespace string, name string, rootCASecretName string, tlsSecretName string) corev1.Pod {
 		var secretMode int32 = 0o600
 		seccompProfile := &corev1.SeccompProfile{
@@ -162,7 +189,7 @@ var _ = Describe("Certificates", func() {
 			// Create the client certificate
 			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
-			err = certificates.CreateClientCertificatesViaKubectlPlugin(
+			err = createClientCertificatesViaKubectlPluginFunc(
 				env.Ctx,
 				env.Client,
 				*cluster,
@@ -329,7 +356,7 @@ var _ = Describe("Certificates", func() {
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
-			err = certificates.CreateClientCertificatesViaKubectlPlugin(
+			err = createClientCertificatesViaKubectlPluginFunc(
 				env.Ctx,
 				env.Client,
 				*cluster,
