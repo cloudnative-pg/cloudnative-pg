@@ -99,3 +99,59 @@ func RegisterPhaseWithOrigCluster(
 
 	return nil
 }
+
+// RegisterStatusWithOrigCluster updates the status to reflect that in `modifiedCluster`
+// and adjusts the conditions according to whether the Phase is healthy
+func RegisterStatusWithOrigCluster(
+	ctx context.Context,
+	cli client.Client,
+	modifiedCluster *apiv1.Cluster,
+	origCluster *apiv1.Cluster,
+) error {
+	if err := PatchWithOptimisticLock(
+		ctx,
+		cli,
+		modifiedCluster,
+		func(cluster *apiv1.Cluster) {
+			if cluster.Status.Conditions == nil {
+				cluster.Status.Conditions = []metav1.Condition{}
+			}
+
+			cluster.Status = modifiedCluster.Status
+
+			condition := metav1.Condition{
+				Type:    string(apiv1.ConditionClusterReady),
+				Status:  metav1.ConditionFalse,
+				Reason:  string(apiv1.ClusterIsNotReady),
+				Message: "Cluster Is Not Ready",
+			}
+
+			if cluster.Status.Phase == apiv1.PhaseHealthy {
+				condition = metav1.Condition{
+					Type:    string(apiv1.ConditionClusterReady),
+					Status:  metav1.ConditionTrue,
+					Reason:  string(apiv1.ClusterReady),
+					Message: "Cluster is Ready",
+				}
+			}
+
+			meta.SetStatusCondition(&cluster.Status.Conditions, condition)
+		},
+	); err != nil {
+		return fmt.Errorf("while updating phase: %w", err)
+	}
+
+	contextLogger := log.FromContext(ctx)
+
+	modifiedPhase := modifiedCluster.Status.Phase
+	origPhase := origCluster.Status.Phase
+
+	if modifiedPhase != apiv1.PhaseHealthy && origPhase == apiv1.PhaseHealthy {
+		contextLogger.Info("Cluster is not healthy")
+	}
+	if modifiedPhase == apiv1.PhaseHealthy && origPhase != apiv1.PhaseHealthy {
+		contextLogger.Info("Cluster is healthy")
+	}
+
+	return nil
+}
