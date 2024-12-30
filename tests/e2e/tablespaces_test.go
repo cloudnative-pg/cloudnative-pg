@@ -17,6 +17,7 @@ limitations under the License.
 package e2e
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path"
@@ -32,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/hibernation"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
@@ -39,7 +41,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/fencing"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/hibernate"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/minio"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
@@ -696,11 +697,11 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 		})
 
 		It("can hibernate via plugin a cluster with tablespaces", func() {
-			assertCanHibernateClusterWithTablespaces(namespace, clusterName, hibernate.HibernateImperatively, 2)
+			assertCanHibernateClusterWithTablespaces(namespace, clusterName, hibernateImperatively, 2)
 		})
 
 		It("can hibernate via annotation a cluster with tablespaces", func() {
-			assertCanHibernateClusterWithTablespaces(namespace, clusterName, hibernate.HibernateDeclaratively, 6)
+			assertCanHibernateClusterWithTablespaces(namespace, clusterName, hibernateDeclaratively, 6)
 		})
 
 		It("can fence a cluster with tablespaces using the plugin", func() {
@@ -1147,7 +1148,7 @@ func AssertTablespaceAndOwnerExist(cluster *apiv1.Cluster, tablespace, owner str
 func assertCanHibernateClusterWithTablespaces(
 	namespace string,
 	clusterName string,
-	method hibernate.HibernationMethod,
+	method hibernationMethod,
 	keptPVCs int,
 ) {
 	By("verifying expected PVCs for tablespaces before hibernate", func() {
@@ -1155,7 +1156,7 @@ func assertCanHibernateClusterWithTablespaces(
 	})
 
 	By("hibernate the cluster", func() {
-		err := hibernate.On(env.Ctx, env.Client, namespace, clusterName, method)
+		err := hibernateOn(env.Ctx, env.Client, namespace, clusterName, method)
 		Expect(err).ToNot(HaveOccurred())
 	})
 
@@ -1171,7 +1172,7 @@ func assertCanHibernateClusterWithTablespaces(
 	})
 
 	By("hibernate off the cluster", func() {
-		err := hibernate.Off(env.Ctx, env.Client, namespace, clusterName, method)
+		err := hibernateOff(env.Ctx, env.Client, namespace, clusterName, method)
 		Expect(err).ToNot(HaveOccurred())
 	})
 
@@ -1269,4 +1270,79 @@ func getSnapshots(
 	}
 
 	return snapshotList, nil
+}
+
+type hibernationMethod string
+
+const (
+	// hibernateDeclaratively it is a keyword to use while fencing on/off the instances using annotation method
+	hibernateDeclaratively hibernationMethod = "annotation"
+	// hibernateImperatively it is a keyword to use while fencing on/off the instances using plugin method
+	hibernateImperatively hibernationMethod = "plugin"
+)
+
+func hibernateOn(
+	ctx context.Context,
+	crudClient client.Client,
+	namespace,
+	clusterName string,
+	method hibernationMethod,
+) error {
+	switch method {
+	case hibernateImperatively:
+		_, _, err := run.Run(fmt.Sprintf("kubectl cnpg hibernate on %v -n %v",
+			clusterName, namespace))
+		if err != nil {
+			return err
+		}
+		return nil
+	case hibernateDeclaratively:
+		cluster, err := clusterutils.Get(ctx, crudClient, namespace, clusterName)
+		if err != nil {
+			return err
+		}
+		if cluster.Annotations == nil {
+			cluster.Annotations = make(map[string]string)
+		}
+		originCluster := cluster.DeepCopy()
+		cluster.Annotations[utils.HibernationAnnotationName] = hibernation.HibernationOn
+
+		err = crudClient.Patch(context.Background(), cluster, client.MergeFrom(originCluster))
+		return err
+	default:
+		return fmt.Errorf("unknown method: %v", method)
+	}
+}
+
+func hibernateOff(
+	ctx context.Context,
+	crudClient client.Client,
+	namespace,
+	clusterName string,
+	method hibernationMethod,
+) error {
+	switch method {
+	case hibernateImperatively:
+		_, _, err := run.Run(fmt.Sprintf("kubectl cnpg hibernate off %v -n %v",
+			clusterName, namespace))
+		if err != nil {
+			return err
+		}
+		return nil
+	case hibernateDeclaratively:
+		cluster, err := clusterutils.Get(ctx, crudClient, namespace, clusterName)
+		if err != nil {
+			return err
+		}
+		if cluster.Annotations == nil {
+			cluster.Annotations = make(map[string]string)
+		}
+		originCluster := cluster.DeepCopy()
+		cluster.Annotations[utils.HibernationAnnotationName] = hibernation.HibernationOff
+
+		err = crudClient.Patch(context.Background(), cluster, client.MergeFrom(originCluster))
+		return err
+	default:
+		return fmt.Errorf("unknown method: %v", method)
+	}
 }
