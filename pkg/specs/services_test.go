@@ -108,6 +108,15 @@ var _ = Describe("BuildManagedServices", func() {
 										Selector: map[string]string{
 											"additional": "true",
 										},
+										Ports: []corev1.ServicePort{
+											{
+												Name:       PostgresContainerName,
+												Protocol:   corev1.ProtocolTCP,
+												TargetPort: intstr.FromInt32(postgres.ServerPort),
+												Port:       postgres.ServerPort,
+												NodePort:   5533,
+											},
+										},
 									},
 								},
 							},
@@ -152,6 +161,14 @@ var _ = Describe("BuildManagedServices", func() {
 			Expect(services[0].ObjectMeta.Labels).To(HaveKeyWithValue(utils.IsManagedLabelName, "true"))
 			Expect(services[0].ObjectMeta.Labels).To(HaveKeyWithValue("test-label", "test-value"))
 			Expect(services[0].ObjectMeta.Annotations).To(HaveKeyWithValue("test-annotation", "test-value"))
+		})
+
+		It("should not overwrite the user specified service port with the default one", func() {
+			services, err := BuildManagedServices(cluster)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(services).NotTo(BeNil())
+			Expect(services).To(HaveLen(1))
+			Expect(services[0].Spec.Ports[0].NodePort).To(Equal(int32(5533)))
 		})
 	})
 })
