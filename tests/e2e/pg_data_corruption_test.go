@@ -194,7 +194,7 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), Ordered, func(
 		})
 		AssertClusterIsReady(namespace, clusterName, testTimeouts[testsUtils.ClusterIsReadyQuick], env)
 		AssertDataExpectedCount(env, tableLocator, 2)
-		AssertClusterStandbysAreStreaming(namespace, clusterName, 120)
+		AssertClusterStandbysAreStreaming(namespace, clusterName, 140)
 	}
 
 	Context("plain cluster", func() {

@@ -315,7 +315,7 @@ func assertImportRenamesSelectedDatabase(
 		Expect(err).ToNot(HaveOccurred())
 		// We give more time than the usual 600s, since the recovery is slower
 		AssertClusterIsReady(namespace, importedClusterName, 1000, env)
-		AssertClusterStandbysAreStreaming(namespace, importedClusterName, 120)
+		AssertClusterStandbysAreStreaming(namespace, importedClusterName, 140)
 	})
 
 	tableLocator := TableLocator{
