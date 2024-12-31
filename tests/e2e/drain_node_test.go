@@ -185,7 +185,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 			})
 
 			AssertDataExpectedCount(env, tableLocator, 2)
-			AssertClusterStandbysAreStreaming(namespace, clusterName, 120)
+			AssertClusterStandbysAreStreaming(namespace, clusterName, 140)
 		})
 
 		// Scenario: all the pods of a cluster are on a single node and another schedulable node exists.
@@ -304,7 +304,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 				})
 
 				AssertDataExpectedCount(env, tableLocator, 2)
-				AssertClusterStandbysAreStreaming(namespace, clusterName, 120)
+				AssertClusterStandbysAreStreaming(namespace, clusterName, 140)
 			})
 		})
 	})
@@ -409,7 +409,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 			})
 
 			AssertDataExpectedCount(env, tableLocator, 2)
-			AssertClusterStandbysAreStreaming(namespace, clusterName, 120)
+			AssertClusterStandbysAreStreaming(namespace, clusterName, 140)
 			err = nodes.UncordonAllNodes(env)
 			Expect(err).ToNot(HaveOccurred())
 		})

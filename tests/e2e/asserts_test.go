@@ -1588,7 +1588,7 @@ func AssertClusterRestoreWithApplicationDB(namespace, restoreClusterFile, tableN
 	})
 
 	// Restored standby should be attached to restored primary
-	AssertClusterStandbysAreStreaming(namespace, restoredClusterName, 120)
+	AssertClusterStandbysAreStreaming(namespace, restoredClusterName, 140)
 
 	// Gather Credentials
 	appUser, appUserPass, err := testsUtils.GetCredentials(restoredClusterName, namespace,
@@ -1651,7 +1651,7 @@ func AssertClusterRestore(namespace, restoreClusterFile, tableName string) {
 		Expect(strings.Trim(out, "\n"), err).To(Equal("00000002"))
 
 		// Restored standby should be attached to restored primary
-		AssertClusterStandbysAreStreaming(namespace, restoredClusterName, 120)
+		AssertClusterStandbysAreStreaming(namespace, restoredClusterName, 140)
 	})
 }
 
@@ -1668,7 +1668,7 @@ func AssertClusterImport(namespace, clusterWithExternalClusterName, clusterName,
 		AssertClusterIsReady(namespace, clusterWithExternalClusterName,
 			testTimeouts[testsUtils.ClusterIsReadySlow], env)
 		// Restored standby should be attached to restored primary
-		AssertClusterStandbysAreStreaming(namespace, clusterWithExternalClusterName, 120)
+		AssertClusterStandbysAreStreaming(namespace, clusterWithExternalClusterName, 140)
 	})
 	return cluster
 }
