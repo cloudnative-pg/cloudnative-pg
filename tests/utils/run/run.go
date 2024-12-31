@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package run contains functions to executes commands locally
+// Package run contains functions to execute commands locally
 package run
 
 import (
