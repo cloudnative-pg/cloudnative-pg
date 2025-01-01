@@ -12,7 +12,7 @@ require (
 	github.com/cheynewallace/tabby v1.1.1
 	github.com/cloudnative-pg/barman-cloud v0.0.0-20241218093921-134c7de4954a
 	github.com/cloudnative-pg/cnpg-i v0.0.0-20241224161104-7e2cfa59debc
-	github.com/cloudnative-pg/machinery v0.0.0-20241219102532-2807bc88310d
+	github.com/cloudnative-pg/machinery v0.0.0-20241223154527-66cd032ef607
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/evanphx/json-patch/v5 v5.9.0
 	github.com/go-logr/logr v1.4.2
