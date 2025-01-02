@@ -69,8 +69,9 @@ var _ = Describe("psql launcher", func() {
 		}
 
 		_, err := cmd.getPodName()
-		Expect(err).To(HaveOccurred())
-		Expect(err.(*ErrMissingPod)).ToNot(BeNil())
+		Expect(err).To(MatchError((&ErrMissingPod{
+			role: "primary",
+		}).Error()))
 	})
 
 	It("correctly composes a kubectl exec command line", func() {
