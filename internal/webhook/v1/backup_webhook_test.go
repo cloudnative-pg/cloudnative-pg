@@ -19,6 +19,7 @@ package v1
 import (
 	"k8s.io/utils/ptr"
 
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -26,49 +27,54 @@ import (
 )
 
 var _ = Describe("Backup webhook validate", func() {
+	var v *BackupCustomValidator
+	BeforeEach(func() {
+		v = &BackupCustomValidator{}
+	})
+
 	It("doesn't complain if VolumeSnapshot CRD is present", func() {
-		backup := &Backup{
-			Spec: BackupSpec{
-				Method: BackupMethodVolumeSnapshot,
+		backup := &apiv1.Backup{
+			Spec: apiv1.BackupSpec{
+				Method: apiv1.BackupMethodVolumeSnapshot,
 			},
 		}
 		utils.SetVolumeSnapshot(true)
-		result := backup.validate()
+		result := v.validate(backup)
 		Expect(result).To(BeEmpty())
 	})
 
 	It("complains if VolumeSnapshot CRD is not present", func() {
-		backup := &Backup{
-			Spec: BackupSpec{
-				Method: BackupMethodVolumeSnapshot,
+		backup := &apiv1.Backup{
+			Spec: apiv1.BackupSpec{
+				Method: apiv1.BackupMethodVolumeSnapshot,
 			},
 		}
 		utils.SetVolumeSnapshot(false)
-		result := backup.validate()
+		result := v.validate(backup)
 		Expect(result).To(HaveLen(1))
 		Expect(result[0].Field).To(Equal("spec.method"))
 	})
 
 	It("complains if online is set on a barman backup", func() {
-		backup := &Backup{
-			Spec: BackupSpec{
-				Method: BackupMethodBarmanObjectStore,
+		backup := &apiv1.Backup{
+			Spec: apiv1.BackupSpec{
+				Method: apiv1.BackupMethodBarmanObjectStore,
 				Online: ptr.To(true),
 			},
 		}
-		result := backup.validate()
+		result := v.validate(backup)
 		Expect(result).To(HaveLen(1))
 		Expect(result[0].Field).To(Equal("spec.online"))
 	})
 
 	It("complains if onlineConfiguration is set on a barman backup", func() {
-		backup := &Backup{
-			Spec: BackupSpec{
-				Method:              BackupMethodBarmanObjectStore,
-				OnlineConfiguration: &OnlineConfiguration{},
+		backup := &apiv1.Backup{
+			Spec: apiv1.BackupSpec{
+				Method:              apiv1.BackupMethodBarmanObjectStore,
+				OnlineConfiguration: &apiv1.OnlineConfiguration{},
 			},
 		}
-		result := backup.validate()
+		result := v.validate(backup)
 		Expect(result).To(HaveLen(1))
 		Expect(result[0].Field).To(Equal("spec.onlineConfiguration"))
 	})
