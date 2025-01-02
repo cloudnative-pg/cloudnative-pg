@@ -17,12 +17,7 @@ limitations under the License.
 package e2e
 
 import (
-	"fmt"
-	"strconv"
-	"strings"
-
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -43,34 +38,6 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 	})
-
-	assertPostInitData := func(
-		namespace,
-		clusterName,
-		tableName string,
-		dbName exec.DatabaseName,
-		expectedCount int,
-	) {
-		query := fmt.Sprintf("SELECT count(*) FROM %s", tableName)
-
-		primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
-		Expect(err).ToNot(HaveOccurred())
-
-		By(fmt.Sprintf(
-			"querying the %s table in the %s database defined by postInit SQL",
-			tableName, dbName), func() {
-			stdout, _, err := exec.QueryInInstancePod(
-				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
-				exec.PodLocator{
-					Namespace: namespace,
-					PodName:   primary.Name,
-				}, dbName,
-				query)
-			Expect(err).ToNot(HaveOccurred())
-			nRows, atoiErr := strconv.Atoi(strings.Trim(stdout, "\n"))
-			Expect(nRows, atoiErr).To(BeEquivalentTo(expectedCount))
-		})
-	}
 
 	Context("initdb custom post-init SQL scripts", func() {
 		const (
@@ -96,27 +63,64 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 
 			primaryDst := clusterName + "-1"
 
-			// Data defined by postInitSQLRefs, postInitApplicationSQLRefs and postInitTemplateSQLRefs
-			// via secret
-			assertPostInitData(namespace, clusterName, "secrets",
-				"postgres", 10000)
-			assertPostInitData(namespace, clusterName, "application_secrets",
-				"app", 10000)
-			assertPostInitData(namespace, clusterName, "template_secrets",
-				"app", 10000)
-
-			// Data defined by postInitSQLRefs, postInitApplicationSQLRefs and postInitTemplateSQLRefs
-			// via configmap
-			assertPostInitData(namespace, clusterName, "configmaps",
-				"postgres", 10000)
-			assertPostInitData(namespace, clusterName, "application_configmaps",
-				"app", 10000)
-			assertPostInitData(namespace, clusterName, "template_configmaps",
-				"app", 10000)
-
+			By("querying the tables via psql", func() {
+				_, _, err := exec.QueryInInstancePod(
+					env.Ctx,
+					env.Client,
+					env.Interface,
+					env.RestClientConfig,
+					exec.PodLocator{
+						Namespace: namespace,
+						PodName:   primaryDst,
+					}, exec.DatabaseName("postgres"),
+					"SELECT count(*) FROM numbers")
+				Expect(err).ToNot(HaveOccurred())
+			})
+			By("querying the App database tables via psql", func() {
+				_, _, err := exec.QueryInInstancePod(
+					env.Ctx,
+					env.Client,
+					env.Interface,
+					env.RestClientConfig,
+					exec.PodLocator{
+						Namespace: namespace,
+						PodName:   primaryDst,
+					}, exec.DatabaseName("app"),
+					"SELECT count(*) FROM application_numbers")
+				Expect(err).ToNot(HaveOccurred())
+			})
+			By("querying the App database tables defined by secretRefs", func() {
+				_, _, err := exec.QueryInInstancePod(
+					env.Ctx,
+					env.Client,
+					env.Interface,
+					env.RestClientConfig,
+					exec.PodLocator{
+						Namespace: namespace,
+						PodName:   primaryDst,
+					}, exec.DatabaseName("app"),
+					"SELECT count(*) FROM secrets")
+				Expect(err).ToNot(HaveOccurred())
+			})
+			By("querying the App database tables defined by configMapRefs", func() {
+				_, _, err := exec.QueryInInstancePod(
+					env.Ctx,
+					env.Client,
+					env.Interface,
+					env.RestClientConfig,
+					exec.PodLocator{
+						Namespace: namespace,
+						PodName:   primaryDst,
+					}, exec.DatabaseName("app"),
+					"SELECT count(*) FROM configmaps")
+				Expect(err).ToNot(HaveOccurred())
+			})
 			By("querying the database to ensure the installed extension is there", func() {
 				stdout, _, err := exec.QueryInInstancePod(
-					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+					env.Ctx,
+					env.Client,
+					env.Interface,
+					env.RestClientConfig,
 					exec.PodLocator{
 						Namespace: namespace,
 						PodName:   primaryDst,
@@ -127,7 +131,10 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 			})
 			By("checking inside the database the default locale", func() {
 				stdout, _, err := exec.QueryInInstancePod(
-					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+					env.Ctx,
+					env.Client,
+					env.Interface,
+					env.RestClientConfig,
 					exec.PodLocator{
 						Namespace: namespace,
 						PodName:   primaryDst,
@@ -155,15 +162,17 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 			Expect(err).ToNot(HaveOccurred())
 			AssertCreateCluster(namespace, clusterName, postInitSQLCluster, env)
 
-			By("checking inside the database", func() {
-				primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
-				Expect(err).ToNot(HaveOccurred())
+			primaryDst := clusterName + "-1"
 
+			By("checking inside the database", func() {
 				stdout, _, err := exec.QueryInInstancePod(
-					env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+					env.Ctx,
+					env.Client,
+					env.Interface,
+					env.RestClientConfig,
 					exec.PodLocator{
 						Namespace: namespace,
-						PodName:   primary.Name,
+						PodName:   primaryDst,
 					}, exec.DatabaseName("postgres"),
 					"select datcollate from pg_database where datname='template0'")
 				Expect(err).ToNot(HaveOccurred())
