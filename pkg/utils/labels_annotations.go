@@ -233,6 +233,10 @@ const (
 	// PluginPortAnnotationName is the name of the annotation containing the
 	// port the plugin is listening to
 	PluginPortAnnotationName = MetadataNamespace + "/pluginPort"
+
+	// PodPatchAnnotationName is the name of the annotation containing the
+	// patch to apply to the pod
+	PodPatchAnnotationName = MetadataNamespace + "/podPatch"
 )
 
 type annotationStatus string

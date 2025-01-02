@@ -27,6 +27,7 @@ import (
 	"slices"
 	"strconv"
 
+	jsonpatch "github.com/evanphx/json-patch/v5"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -440,7 +441,7 @@ func CreatePodSecurityContext(seccompProfile *corev1.SeccompProfile, user, group
 }
 
 // PodWithExistingStorage create a new instance with an existing storage
-func PodWithExistingStorage(cluster apiv1.Cluster, nodeSerial int) *corev1.Pod {
+func PodWithExistingStorage(cluster apiv1.Cluster, nodeSerial int) (*corev1.Pod, error) {
 	podName := GetInstanceName(cluster.Name, nodeSerial)
 	gracePeriod := int64(cluster.GetMaxStopDelay())
 
@@ -481,7 +482,28 @@ func PodWithExistingStorage(cluster apiv1.Cluster, nodeSerial int) *corev1.Pod {
 	if utils.IsAnnotationAppArmorPresent(&pod.Spec, cluster.Annotations) {
 		utils.AnnotateAppArmor(&pod.ObjectMeta, &pod.Spec, cluster.Annotations)
 	}
-	return pod
+
+	if jsonPatch := cluster.Annotations[utils.PodPatchAnnotationName]; jsonPatch != "" {
+		serializedObject, err := json.Marshal(pod)
+		if err != nil {
+			return nil, fmt.Errorf("while serializing pod to JSON: %w", err)
+		}
+		patch, err := jsonpatch.DecodePatch([]byte(jsonPatch))
+		if err != nil {
+			return nil, fmt.Errorf("while decoding JSON patch from annotation: %w", err)
+		}
+
+		serializedObject, err = patch.Apply(serializedObject)
+		if err != nil {
+			return nil, fmt.Errorf("while applying JSON patch from annotation: %w", err)
+		}
+
+		if err = json.Unmarshal(serializedObject, pod); err != nil {
+			return nil, fmt.Errorf("while deserializing pod to JSON: %w", err)
+		}
+	}
+
+	return pod, nil
 }
 
 // GetInstanceName returns a string indicating the instance name
