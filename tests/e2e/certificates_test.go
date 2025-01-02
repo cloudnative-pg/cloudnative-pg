@@ -17,12 +17,21 @@ limitations under the License.
 package e2e
 
 import (
+	"context"
 	"fmt"
 
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/utils/ptr"
+	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
+	podutils "github.com/cloudnative-pg/cloudnative-pg/tests/utils/pods"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -41,6 +50,95 @@ import (
 // from an application, by using certificates that have been created by 'kubectl-cnpg'
 // Then we verify that the server certificate  and the operator are able to handle the provided server certificates
 var _ = Describe("Certificates", func() {
+	createClientCertificatesViaKubectlPluginFunc := func(
+		ctx context.Context,
+		crudClient ctrlclient.Client,
+		cluster apiv1.Cluster,
+		certName string,
+		userName string,
+	) error {
+		// clientCertName := "cluster-cert"
+		// user := "app"
+		// Create the certificate
+		_, _, err := run.Run(fmt.Sprintf(
+			"kubectl cnpg certificate %v --cnpg-cluster %v --cnpg-user %v -n %v",
+			certName,
+			cluster.Name,
+			userName,
+			cluster.Namespace))
+		if err != nil {
+			return err
+		}
+		// Verifying client certificate secret existence
+		secret := &corev1.Secret{}
+		err = crudClient.Get(ctx, ctrlclient.ObjectKey{Namespace: cluster.Namespace, Name: certName}, secret)
+		return err
+	}
+
+	defaultPodFunc := func(namespace string, name string, rootCASecretName string, tlsSecretName string) corev1.Pod {
+		var secretMode int32 = 0o600
+		seccompProfile := &corev1.SeccompProfile{
+			Type: corev1.SeccompProfileTypeRuntimeDefault,
+		}
+
+		return corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+				Name:      name,
+			},
+			Spec: corev1.PodSpec{
+				Volumes: []corev1.Volume{
+					{
+						Name: "secret-volume-root-ca",
+						VolumeSource: corev1.VolumeSource{
+							Secret: &corev1.SecretVolumeSource{
+								SecretName:  rootCASecretName,
+								DefaultMode: &secretMode,
+							},
+						},
+					},
+					{
+						Name: "secret-volume-tls",
+						VolumeSource: corev1.VolumeSource{
+							Secret: &corev1.SecretVolumeSource{
+								SecretName:  tlsSecretName,
+								DefaultMode: &secretMode,
+							},
+						},
+					},
+				},
+				Containers: []corev1.Container{
+					{
+						Name:  name,
+						Image: "ghcr.io/cloudnative-pg/webtest:1.6.0",
+						Ports: []corev1.ContainerPort{
+							{
+								ContainerPort: 8080,
+							},
+						},
+						VolumeMounts: []corev1.VolumeMount{
+							{
+								Name:      "secret-volume-root-ca",
+								MountPath: "/etc/secrets/ca",
+							},
+							{
+								Name:      "secret-volume-tls",
+								MountPath: "/etc/secrets/tls",
+							},
+						},
+						SecurityContext: &corev1.SecurityContext{
+							AllowPrivilegeEscalation: ptr.To(false),
+							SeccompProfile:           seccompProfile,
+						},
+					},
+				},
+				SecurityContext: &corev1.PodSecurityContext{
+					SeccompProfile: seccompProfile,
+				},
+			},
+		}
+	}
+
 	const (
 		serverCASecretName              = "my-postgresql-server-ca" // #nosec
 		serverCertSecretName            = "my-postgresql-server"    // #nosec
@@ -67,7 +165,7 @@ var _ = Describe("Certificates", func() {
 
 		cleanClusterCertification := func() {
 			err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-				cluster, err := env.GetCluster(namespace, clusterName)
+				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
 				cluster.Spec.Certificates.ServerTLSSecret = ""
 				cluster.Spec.Certificates.ServerCASecret = ""
@@ -82,20 +180,21 @@ var _ = Describe("Certificates", func() {
 			var err error
 			// Create a cluster in a namespace we'll delete after the test
 			const namespacePrefix = "postgresql-cert"
-			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
-			clusterName, err = env.GetResourceNameFromYAML(sampleFile)
+			clusterName, err = yaml.GetResourceNameFromYAML(env.Scheme, sampleFile)
 			Expect(err).ToNot(HaveOccurred())
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
 			// Create the client certificate
-			cluster, err := env.GetCluster(namespace, clusterName)
+			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
-			err = utils.CreateClientCertificatesViaKubectlPlugin(
+			err = createClientCertificatesViaKubectlPluginFunc(
+				env.Ctx,
+				env.Client,
 				*cluster,
 				kubectlCNPGClientCertSecretName,
 				"app",
-				env,
 			)
 			Expect(err).ToNot(HaveOccurred())
 		})
@@ -106,96 +205,99 @@ var _ = Describe("Certificates", func() {
 
 		It("can authenticate using a Certificate that is generated from the 'kubectl-cnpg' plugin",
 			Label(tests.LabelPlugin), func() {
-				pod := utils.DefaultWebapp(namespace, "app-pod-cert-1",
+				pod := defaultPodFunc(namespace, "app-pod-cert-1",
 					defaultCASecretName, kubectlCNPGClientCertSecretName)
-				err := utils.PodCreateAndWaitForReady(env, &pod, 240)
+				err := podutils.CreateAndWaitForReady(env.Ctx, env.Client, &pod, 240)
 				Expect(err).ToNot(HaveOccurred())
 				AssertSSLVerifyFullDBConnectionFromAppPod(namespace, clusterName, pod)
 			})
 
-		It("can authenticate after switching to user-supplied server certs", Label(tests.LabelServiceConnectivity), func() {
-			CreateAndAssertServerCertificatesSecrets(
-				namespace,
-				clusterName,
-				serverCASecretName,
-				serverCertSecretName,
-				false,
-			)
+		It("can authenticate after switching to user-supplied server certs", Label(tests.LabelServiceConnectivity),
+			func() {
+				CreateAndAssertServerCertificatesSecrets(
+					namespace,
+					clusterName,
+					serverCASecretName,
+					serverCertSecretName,
+					false,
+				)
 
-			var err error
-			// Updating defaults certificates entries with user provided certificates,
-			// i.e server CA and TLS secrets inside the cluster
-			Eventually(func() error {
-				_, _, err = utils.RunUnchecked(fmt.Sprintf(
-					"kubectl patch cluster %v -n %v -p "+
-						"'{\"spec\":{\"certificates\":{\"serverCASecret\":\"%v\","+
-						"\"serverTLSSecret\":\"%v\"}}}'"+
-						" --type='merge'", clusterName, namespace, serverCASecretName, serverCertSecretName))
-				if err != nil {
-					return err
-				}
-				return nil
-			}, 60, 5).Should(Succeed())
-
-			Eventually(func() (bool, error) {
-				certUpdateStatus := false
-				cluster, err := env.GetCluster(namespace, clusterName)
-				if cluster.Status.Certificates.ServerCASecret == serverCASecretName {
-					if cluster.Status.Certificates.ServerTLSSecret == serverCertSecretName {
-						certUpdateStatus = true
+				var err error
+				// Updating defaults certificates entries with user provided certificates,
+				// i.e server CA and TLS secrets inside the cluster
+				Eventually(func() error {
+					_, _, err = run.Unchecked(fmt.Sprintf(
+						"kubectl patch cluster %v -n %v -p "+
+							"'{\"spec\":{\"certificates\":{\"serverCASecret\":\"%v\","+
+							"\"serverTLSSecret\":\"%v\"}}}'"+
+							" --type='merge'", clusterName, namespace, serverCASecretName, serverCertSecretName))
+					if err != nil {
+						return err
 					}
-				}
-				return certUpdateStatus, err
-			}, 120).Should(BeTrue(), fmt.Sprintf("Error: %v", err))
+					return nil
+				}, 60, 5).Should(Succeed())
 
-			pod := utils.DefaultWebapp(
-				namespace,
-				"app-pod-cert-2",
-				serverCASecretName,
-				kubectlCNPGClientCertSecretName,
-			)
-			err = utils.PodCreateAndWaitForReady(env, &pod, 240)
-			Expect(err).ToNot(HaveOccurred())
-			AssertSSLVerifyFullDBConnectionFromAppPod(namespace, clusterName, pod)
-		})
+				Eventually(func() (bool, error) {
+					certUpdateStatus := false
+					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+					if cluster.Status.Certificates.ServerCASecret == serverCASecretName {
+						if cluster.Status.Certificates.ServerTLSSecret == serverCertSecretName {
+							certUpdateStatus = true
+						}
+					}
+					return certUpdateStatus, err
+				}, 120).Should(BeTrue(), fmt.Sprintf("Error: %v", err))
 
-		It("can connect after switching to user-supplied client certificates", Label(tests.LabelServiceConnectivity), func() {
-			// Create certificates secret for client
-			CreateAndAssertClientCertificatesSecrets(namespace, clusterName, clientCASecretName, replicaCertSecretName,
-				clientCertSecretName, false)
+				pod := defaultPodFunc(
+					namespace,
+					"app-pod-cert-2",
+					serverCASecretName,
+					kubectlCNPGClientCertSecretName,
+				)
+				err = podutils.CreateAndWaitForReady(env.Ctx, env.Client, &pod, 240)
+				Expect(err).ToNot(HaveOccurred())
+				AssertSSLVerifyFullDBConnectionFromAppPod(namespace, clusterName, pod)
+			})
 
-			// Updating defaults certificates entries with user provided certificates,
-			// i.e client CA and TLS secrets inside the cluster
-			Eventually(func() error {
-				_, _, err := utils.RunUnchecked(fmt.Sprintf(
-					"kubectl patch cluster %v -n %v -p "+
-						"'{\"spec\":{\"certificates\":{\"clientCASecret\":\"%v\","+
-						"\"replicationTLSSecret\":\"%v\"}}}'"+
-						" --type='merge'", clusterName, namespace, clientCASecretName, replicaCertSecretName))
-				if err != nil {
-					return err
-				}
-				return nil
-			}, 60, 5).Should(Succeed())
+		It("can connect after switching to user-supplied client certificates", Label(tests.LabelServiceConnectivity),
+			func() {
+				// Create certificates secret for client
+				CreateAndAssertClientCertificatesSecrets(namespace, clusterName, clientCASecretName,
+					replicaCertSecretName,
+					clientCertSecretName, false)
 
-			Eventually(func() (bool, error) {
-				cluster, err := env.GetCluster(namespace, clusterName)
-				return cluster.Spec.Certificates.ClientCASecret == clientCASecretName &&
-					cluster.Status.Certificates.ReplicationTLSSecret == replicaCertSecretName, err
-			}, 120, 5).Should(BeTrue())
+				// Updating defaults certificates entries with user provided certificates,
+				// i.e client CA and TLS secrets inside the cluster
+				Eventually(func() error {
+					_, _, err := run.Unchecked(fmt.Sprintf(
+						"kubectl patch cluster %v -n %v -p "+
+							"'{\"spec\":{\"certificates\":{\"clientCASecret\":\"%v\","+
+							"\"replicationTLSSecret\":\"%v\"}}}'"+
+							" --type='merge'", clusterName, namespace, clientCASecretName, replicaCertSecretName))
+					if err != nil {
+						return err
+					}
+					return nil
+				}, 60, 5).Should(Succeed())
 
-			pod := utils.DefaultWebapp(namespace, "app-pod-cert-3", defaultCASecretName, clientCertSecretName)
-			err := utils.PodCreateAndWaitForReady(env, &pod, 240)
-			Expect(err).ToNot(HaveOccurred())
-			AssertSSLVerifyFullDBConnectionFromAppPod(namespace, clusterName, pod)
-		})
+				Eventually(func() (bool, error) {
+					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+					return cluster.Spec.Certificates.ClientCASecret == clientCASecretName &&
+						cluster.Status.Certificates.ReplicationTLSSecret == replicaCertSecretName, err
+				}, 120, 5).Should(BeTrue())
+
+				pod := defaultPodFunc(namespace, "app-pod-cert-3", defaultCASecretName, clientCertSecretName)
+				err := podutils.CreateAndWaitForReady(env.Ctx, env.Client, &pod, 240)
+				Expect(err).ToNot(HaveOccurred())
+				AssertSSLVerifyFullDBConnectionFromAppPod(namespace, clusterName, pod)
+			})
 
 		It("can connect after switching both server and client certificates to user-supplied mode",
 			Label(tests.LabelServiceConnectivity), func() {
 				// Updating defaults certificates entries with user provided certificates,
 				// i.e server and client CA and TLS secrets inside the cluster
 				Eventually(func() error {
-					_, _, err := utils.RunUnchecked(fmt.Sprintf(
+					_, _, err := run.Unchecked(fmt.Sprintf(
 						"kubectl patch cluster %v -n %v -p "+
 							"'{\"spec\":{\"certificates\":{\"serverCASecret\":\"%v\","+
 							"\"serverTLSSecret\":\"%v\",\"clientCASecret\":\"%v\","+
@@ -215,15 +317,15 @@ var _ = Describe("Certificates", func() {
 				}, 60, 5).Should(Succeed())
 
 				Eventually(func() (bool, error) {
-					cluster, err := env.GetCluster(namespace, clusterName)
+					cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 					return cluster.Status.Certificates.ServerCASecret == serverCASecretName &&
 						cluster.Status.Certificates.ClientCASecret == clientCASecretName &&
 						cluster.Status.Certificates.ServerTLSSecret == serverCertSecretName &&
 						cluster.Status.Certificates.ReplicationTLSSecret == replicaCertSecretName, err
 				}, 120, 5).Should(BeTrue())
 
-				pod := utils.DefaultWebapp(namespace, "app-pod-cert-4", serverCASecretName, clientCertSecretName)
-				err := utils.PodCreateAndWaitForReady(env, &pod, 240)
+				pod := defaultPodFunc(namespace, "app-pod-cert-4", serverCASecretName, clientCertSecretName)
+				err := podutils.CreateAndWaitForReady(env.Ctx, env.Client, &pod, 240)
 				Expect(err).ToNot(HaveOccurred())
 				AssertSSLVerifyFullDBConnectionFromAppPod(namespace, clusterName, pod)
 			})
@@ -242,7 +344,7 @@ var _ = Describe("Certificates", func() {
 
 			var err error
 			// Create a cluster in a namespace that will be deleted after the test
-			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			CreateAndAssertServerCertificatesSecrets(
 				namespace,
@@ -252,23 +354,24 @@ var _ = Describe("Certificates", func() {
 				false,
 			)
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
-			cluster, err := env.GetCluster(namespace, clusterName)
+			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
-			err = utils.CreateClientCertificatesViaKubectlPlugin(
+			err = createClientCertificatesViaKubectlPluginFunc(
+				env.Ctx,
+				env.Client,
 				*cluster,
 				kubectlCNPGClientCertSecretName,
 				"app",
-				env,
 			)
 			Expect(err).ToNot(HaveOccurred())
 
-			pod := utils.DefaultWebapp(
+			pod := defaultPodFunc(
 				namespace,
 				"app-pod-cert-2",
 				serverCASecretName,
 				kubectlCNPGClientCertSecretName,
 			)
-			err = utils.PodCreateAndWaitForReady(env, &pod, 240)
+			err = podutils.CreateAndWaitForReady(env.Ctx, env.Client, &pod, 240)
 			Expect(err).ToNot(HaveOccurred())
 			AssertSSLVerifyFullDBConnectionFromAppPod(namespace, clusterName, pod)
 		})
@@ -287,7 +390,7 @@ var _ = Describe("Certificates", func() {
 
 				var err error
 				// Create a cluster in a namespace that will be deleted after the test
-				namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+				namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
 
 				// Create certificates secret for client
@@ -300,8 +403,8 @@ var _ = Describe("Certificates", func() {
 					false,
 				)
 				AssertCreateCluster(namespace, clusterName, sampleFile, env)
-				pod := utils.DefaultWebapp(namespace, "app-pod-cert-3", defaultCASecretName, clientCertSecretName)
-				err = utils.PodCreateAndWaitForReady(env, &pod, 240)
+				pod := defaultPodFunc(namespace, "app-pod-cert-3", defaultCASecretName, clientCertSecretName)
+				err = podutils.CreateAndWaitForReady(env.Ctx, env.Client, &pod, 240)
 				Expect(err).ToNot(HaveOccurred())
 				AssertSSLVerifyFullDBConnectionFromAppPod(namespace, clusterName, pod)
 			})
@@ -320,7 +423,7 @@ var _ = Describe("Certificates", func() {
 
 				// Create a cluster in a namespace that will be deleted after the test
 				var err error
-				namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+				namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
 
 				// Create certificates secret for server
@@ -341,8 +444,8 @@ var _ = Describe("Certificates", func() {
 					false,
 				)
 				AssertCreateCluster(namespace, clusterName, sampleFile, env)
-				pod := utils.DefaultWebapp(namespace, "app-pod-cert-4", serverCASecretName, clientCertSecretName)
-				err = utils.PodCreateAndWaitForReady(env, &pod, 240)
+				pod := defaultPodFunc(namespace, "app-pod-cert-4", serverCASecretName, clientCertSecretName)
+				err = podutils.CreateAndWaitForReady(env.Ctx, env.Client, &pod, 240)
 				Expect(err).ToNot(HaveOccurred())
 				AssertSSLVerifyFullDBConnectionFromAppPod(namespace, clusterName, pod)
 			})

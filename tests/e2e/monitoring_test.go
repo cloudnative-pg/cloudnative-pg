@@ -17,8 +17,15 @@ limitations under the License.
 package e2e
 
 import (
+	"context"
+
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	"k8s.io/apimachinery/pkg/types"
+	k8client "sigs.k8s.io/controller-runtime/pkg/client"
+
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/objects"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -26,6 +33,24 @@ import (
 
 // Set of tests that set up a cluster with monitoring support enabled
 var _ = Describe("PodMonitor support", Serial, Label(tests.LabelObservability), func() {
+	getPodMonitorFunc := func(
+		ctx context.Context,
+		crudClient k8client.Client,
+		namespace, name string,
+	) (*monitoringv1.PodMonitor, error) {
+		podMonitor := &monitoringv1.PodMonitor{}
+		namespacedName := types.NamespacedName{
+			Namespace: namespace,
+			Name:      name,
+		}
+
+		err := objects.Get(ctx, crudClient, namespacedName, podMonitor)
+		if err != nil {
+			return nil, err
+		}
+		return podMonitor, nil
+	}
+
 	const (
 		namespacePrefix              = "cluster-monitoring-e2e"
 		level                        = tests.Medium
@@ -53,13 +78,13 @@ var _ = Describe("PodMonitor support", Serial, Label(tests.LabelObservability), 
 	})
 
 	It("sets up a cluster enabling PodMonitor feature", func() {
-		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 
 		AssertCreateCluster(namespace, clusterDefaultName, clusterDefaultMonitoringFile, env)
 
 		By("verifying PodMonitor existence", func() {
-			podMonitor, err := env.GetPodMonitor(namespace, clusterDefaultName)
+			podMonitor, err := getPodMonitorFunc(env.Ctx, env.Client, namespace, clusterDefaultName)
 			Expect(err).ToNot(HaveOccurred())
 
 			endpoints := podMonitor.Spec.PodMetricsEndpoints

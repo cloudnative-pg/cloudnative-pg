@@ -24,7 +24,8 @@ import (
 
 	pkgutils "github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -53,9 +54,9 @@ var _ = Describe("PGBouncer Types", Ordered, Label(tests.LabelServiceConnectivit
 	BeforeAll(func() {
 		// Create a cluster in a namespace we'll delete after the test
 		// This cluster will be shared by the next tests
-		namespace, err = env.CreateUniqueTestNamespace("pgbouncer-types")
+		namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, "pgbouncer-types")
 		Expect(err).ToNot(HaveOccurred())
-		clusterName, err = env.GetResourceNameFromYAML(sampleFile)
+		clusterName, err = yaml.GetResourceNameFromYAML(env.Scheme, sampleFile)
 		Expect(err).ToNot(HaveOccurred())
 		AssertCreateCluster(namespace, clusterName, sampleFile, env)
 	})
@@ -74,7 +75,7 @@ var _ = Describe("PGBouncer Types", Ordered, Label(tests.LabelServiceConnectivit
 		})
 
 		By("verify that read-only pooler pgbouncer.ini contains the correct host service", func() {
-			poolerName, err := env.GetResourceNameFromYAML(poolerCertificateROSampleFile)
+			poolerName, err := yaml.GetResourceNameFromYAML(env.Scheme, poolerCertificateROSampleFile)
 			Expect(err).ToNot(HaveOccurred())
 			podList := &corev1.PodList{}
 			err = env.Client.List(env.Ctx, podList, ctrlclient.InNamespace(namespace),
@@ -89,7 +90,7 @@ var _ = Describe("PGBouncer Types", Ordered, Label(tests.LabelServiceConnectivit
 		})
 
 		By("verify that read-write pooler pgbouncer.ini contains the correct host service", func() {
-			poolerName, err := env.GetResourceNameFromYAML(poolerCertificateRWSampleFile)
+			poolerName, err := yaml.GetResourceNameFromYAML(env.Scheme, poolerCertificateRWSampleFile)
 			Expect(err).ToNot(HaveOccurred())
 			podList := &corev1.PodList{}
 			err = env.Client.List(env.Ctx, podList, ctrlclient.InNamespace(namespace),
@@ -105,7 +106,7 @@ var _ = Describe("PGBouncer Types", Ordered, Label(tests.LabelServiceConnectivit
 			By(fmt.Sprintf("scaling PGBouncer to %v instances", instances), func() {
 				command := fmt.Sprintf("kubectl scale pooler %s -n %s --replicas=%v",
 					poolerResourceNameRO, namespace, instances)
-				_, _, err := utils.Run(command)
+				_, _, err := run.Run(command)
 				Expect(err).ToNot(HaveOccurred())
 
 				// verifying if PGBouncer pooler pods are ready after scale up
@@ -114,7 +115,7 @@ var _ = Describe("PGBouncer Types", Ordered, Label(tests.LabelServiceConnectivit
 				// // scale up command for 3 replicas for read write
 				command = fmt.Sprintf("kubectl scale pooler %s -n %s --replicas=%v",
 					poolerResourceNameRW, namespace, instances)
-				_, _, err = utils.Run(command)
+				_, _, err = run.Run(command)
 				Expect(err).ToNot(HaveOccurred())
 
 				// verifying if PGBouncer pooler pods are ready after scale up
@@ -126,7 +127,7 @@ var _ = Describe("PGBouncer Types", Ordered, Label(tests.LabelServiceConnectivit
 			})
 
 			By("verifying that read-only pooler pgbouncer.ini contains the correct host service", func() {
-				poolerName, err := env.GetResourceNameFromYAML(poolerCertificateROSampleFile)
+				poolerName, err := yaml.GetResourceNameFromYAML(env.Scheme, poolerCertificateROSampleFile)
 				Expect(err).ToNot(HaveOccurred())
 				podList := &corev1.PodList{}
 				err = env.Client.List(env.Ctx, podList, ctrlclient.InNamespace(namespace),
@@ -141,7 +142,7 @@ var _ = Describe("PGBouncer Types", Ordered, Label(tests.LabelServiceConnectivit
 			})
 
 			By("verifying that read-write pooler pgbouncer.ini contains the correct host service", func() {
-				poolerName, err := env.GetResourceNameFromYAML(poolerCertificateRWSampleFile)
+				poolerName, err := yaml.GetResourceNameFromYAML(env.Scheme, poolerCertificateRWSampleFile)
 				Expect(err).ToNot(HaveOccurred())
 				podList := &corev1.PodList{}
 				err = env.Client.List(env.Ctx, podList, ctrlclient.InNamespace(namespace),

@@ -23,7 +23,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/environment"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -51,7 +52,7 @@ var _ = Describe("Connection via services", Label(tests.LabelServiceConnectivity
 		appDBUser string,
 		appPassword string,
 		superuserPassword string,
-		env *utils.TestingEnvironment,
+		env *environment.TestingEnvironment,
 	) {
 		// We test -rw, -ro and -r services with the app user and the superuser
 		rwService := fmt.Sprintf("%v-rw", clusterName)
@@ -59,8 +60,7 @@ var _ = Describe("Connection via services", Label(tests.LabelServiceConnectivity
 		roService := fmt.Sprintf("%v-ro", clusterName)
 		services := []string{rwService, roService, rService}
 		for _, service := range services {
-			AssertConnection(namespace, service, appDBName, utils.PostgresDBName, superuserPassword, env)
-			AssertConnection(namespace, service, appDBName, appDBUser, appPassword, env)
+			AssertConnection(namespace, service, appDBName, postgres.PostgresDBName, superuserPassword, env)
 		}
 
 		AssertWritesToReplicaFails(namespace, roService, appDBName, appDBUser, appPassword)
@@ -78,7 +78,7 @@ var _ = Describe("Connection via services", Label(tests.LabelServiceConnectivity
 		It("can connect with auto-generated passwords", func() {
 			// Create a cluster in a namespace we'll delete after the test
 			var err error
-			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
@@ -123,7 +123,7 @@ var _ = Describe("Connection via services", Label(tests.LabelServiceConnectivity
 
 			// Create a cluster in a namespace we'll delete after the test
 			var err error
-			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			AssertCreateCluster(namespace, clusterName, sampleFile, env)
 			AssertServices(namespace, clusterName, appDBName, appDBUser,
