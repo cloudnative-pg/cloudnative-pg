@@ -28,7 +28,10 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/proxy"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -91,9 +94,9 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 	It("can gather metrics", func() {
 		// Create the cluster namespace
 		const namespacePrefix = "cluster-metrics-e2e"
-		metricsClusterName, err = env.GetResourceNameFromYAML(clusterMetricsFile)
+		metricsClusterName, err = yaml.GetResourceNameFromYAML(env.Scheme, clusterMetricsFile)
 		Expect(err).ToNot(HaveOccurred())
-		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 
 		AssertCustomMetricsResourcesExist(namespace, fixturesDir+"/metrics/custom-queries.yaml", 2, 1)
@@ -102,16 +105,16 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 		AssertCreateCluster(namespace, metricsClusterName, clusterMetricsFile, env)
 
 		By("ensuring metrics are correct on each pod", func() {
-			metricsCluster, err := env.GetCluster(namespace, metricsClusterName)
+			metricsCluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, metricsClusterName)
 			Expect(err).ToNot(HaveOccurred())
 
-			podList, err := env.GetClusterPodList(namespace, metricsClusterName)
+			podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, metricsClusterName)
 			Expect(err).ToNot(HaveOccurred())
 
 			// Gather metrics in each pod
 			for _, pod := range podList.Items {
 				By(fmt.Sprintf("checking metrics for pod: %s", pod.Name), func() {
-					out, err := utils.RetrieveMetricsFromInstance(env, namespace, pod.Name)
+					out, err := proxy.RetrieveMetricsFromInstance(env.Ctx, env.Interface, pod, false)
 					Expect(err).ToNot(HaveOccurred(), "while getting pod metrics")
 					expectedMetrics := buildExpectedMetrics(metricsCluster, !specs.IsPodPrimary(pod))
 					assertMetrics(out, expectedMetrics)
@@ -125,10 +128,10 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 
 	It("can gather metrics with multiple target databases", func() {
 		const namespacePrefix = "metrics-target-databases-e2e"
-		metricsClusterName, err = env.GetResourceNameFromYAML(clusterMetricsDBFile)
+		metricsClusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, clusterMetricsDBFile)
 		Expect(err).ToNot(HaveOccurred())
 		// Create the cluster namespace
-		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 
 		AssertCustomMetricsResourcesExist(namespace, customQueriesSampleFile, 1, 1)
@@ -139,7 +142,7 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 		AssertCreationOfTestDataForTargetDB(env, namespace, metricsClusterName, targetDBTwo, testTableName)
 		AssertCreationOfTestDataForTargetDB(env, namespace, metricsClusterName, targetDBSecret, testTableName)
 
-		cluster, err := env.GetCluster(namespace, metricsClusterName)
+		cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, metricsClusterName)
 		Expect(err).ToNot(HaveOccurred())
 
 		AssertMetricsData(namespace, targetDBOne, targetDBTwo, targetDBSecret, cluster)
@@ -148,9 +151,10 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 	It("can gather default metrics details", func() {
 		const clusterWithDefaultMetricsFile = fixturesDir + "/base/cluster-storage-class.yaml.template"
 		const namespacePrefix = "default-metrics-details"
-		metricsClusterName, err = env.GetResourceNameFromYAML(clusterWithDefaultMetricsFile)
+		metricsClusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, clusterWithDefaultMetricsFile)
 		Expect(err).ToNot(HaveOccurred())
-		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+
+		namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 
 		AssertCreateCluster(namespace, metricsClusterName, clusterWithDefaultMetricsFile, env)
@@ -175,9 +179,9 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 		const defaultMonitoringQueriesDisableSampleFile = fixturesDir +
 			"/metrics/cluster-disable-default-metrics.yaml.template"
 		const namespacePrefix = "disable-default-metrics"
-		metricsClusterName, err = env.GetResourceNameFromYAML(defaultMonitoringQueriesDisableSampleFile)
+		metricsClusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, defaultMonitoringQueriesDisableSampleFile)
 		Expect(err).ToNot(HaveOccurred())
-		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 
 		// Create the cluster
@@ -198,15 +202,15 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 		)
 
 		// Fetching the source cluster name
-		srcClusterName, err := env.GetResourceNameFromYAML(srcClusterSampleFile)
+		srcClusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, srcClusterSampleFile)
 		Expect(err).ToNot(HaveOccurred())
 
 		// Fetching replica cluster name
-		replicaClusterName, err := env.GetResourceNameFromYAML(replicaClusterSampleFile)
+		replicaClusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, replicaClusterSampleFile)
 		Expect(err).ToNot(HaveOccurred())
 
 		// create namespace
-		namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+		namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 		Expect(err).ToNot(HaveOccurred())
 
 		// Creating and verifying custom queries configmap
@@ -225,8 +229,11 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 		)
 
 		By(fmt.Sprintf("grant select permission for %v table to pg_monitor", testTableName), func() {
-			forward, conn, err := utils.ForwardPSQLConnection(
-				env,
+			forward, conn, err := postgres.ForwardPSQLConnection(
+				env.Ctx,
+				env.Client,
+				env.Interface,
+				env.RestClientConfig,
 				namespace,
 				srcClusterName,
 				srcClusterDatabaseName,
@@ -244,12 +251,12 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 		})
 
 		By("collecting metrics on each pod and checking that the table has been found", func() {
-			podList, err := env.GetClusterPodList(namespace, replicaClusterName)
+			podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, replicaClusterName)
 			Expect(err).ToNot(HaveOccurred())
 			// Gather metrics in each pod
 			expectedMetric := fmt.Sprintf("cnpg_%v_row_count 3", testTableName)
 			for _, pod := range podList.Items {
-				out, err := utils.RetrieveMetricsFromInstance(env, namespace, pod.Name)
+				out, err := proxy.RetrieveMetricsFromInstance(env.Ctx, env.Interface, pod, false)
 				Expect(err).Should(Not(HaveOccurred()))
 				Expect(strings.Split(out, "\n")).Should(ContainElement(expectedMetric))
 			}

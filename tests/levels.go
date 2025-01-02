@@ -20,7 +20,7 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/environment"
 )
 
 // Level - Define test importance. Each test should define its own importance
@@ -46,13 +46,13 @@ const defaultTestDepth = int(Medium)
 
 // TestEnvLevel struct for operator testing
 type TestEnvLevel struct {
-	*utils.TestingEnvironment
+	*environment.TestingEnvironment
 	Depth int
 }
 
 // TestLevel creates the environment for testing
 func TestLevel() (*TestEnvLevel, error) {
-	env, err := utils.NewTestingEnvironment()
+	env, err := environment.NewTestingEnvironment()
 	if err != nil {
 		return nil, err
 	}

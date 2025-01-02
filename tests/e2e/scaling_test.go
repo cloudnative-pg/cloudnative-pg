@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -47,7 +47,7 @@ var _ = Describe("Cluster scale up and down", Serial, Label(tests.LabelReplicati
 			const namespacePrefix = "cluster-scale-e2e-with-slots"
 			var err error
 			// Create a cluster in a namespace we'll delete after the test
-			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			AssertCreateCluster(namespace, clusterName, sampleFileWithReplicationSlots, env)
 
@@ -55,7 +55,7 @@ var _ = Describe("Cluster scale up and down", Serial, Label(tests.LabelReplicati
 			// Add a node to the cluster and verify the cluster has one more
 			// element
 			By("adding an instance to the cluster", func() {
-				_, _, err := utils.Run(fmt.Sprintf("kubectl scale --replicas=4 -n %v cluster/%v", namespace, clusterName))
+				_, _, err := run.Run(fmt.Sprintf("kubectl scale --replicas=4 -n %v cluster/%v", namespace, clusterName))
 				Expect(err).ToNot(HaveOccurred())
 				timeout := 300
 				AssertClusterIsReady(namespace, clusterName, timeout, env)
@@ -66,7 +66,7 @@ var _ = Describe("Cluster scale up and down", Serial, Label(tests.LabelReplicati
 			// Remove a node from the cluster and verify the cluster has one
 			// element less
 			By("removing an instance from the cluster", func() {
-				_, _, err := utils.Run(fmt.Sprintf("kubectl scale --replicas=3 -n %v cluster/%v", namespace, clusterName))
+				_, _, err := run.Run(fmt.Sprintf("kubectl scale --replicas=3 -n %v cluster/%v", namespace, clusterName))
 				Expect(err).ToNot(HaveOccurred())
 				timeout := 60
 				AssertClusterIsReady(namespace, clusterName, timeout, env)
@@ -84,14 +84,14 @@ var _ = Describe("Cluster scale up and down", Serial, Label(tests.LabelReplicati
 			// Create a cluster in a namespace we'll delete after the test
 			const namespacePrefix = "cluster-scale-e2e"
 			var err error
-			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			AssertCreateCluster(namespace, clusterName, sampleFileWithoutReplicationSlots, env)
 
 			// Add a node to the cluster and verify the cluster has one more
 			// element
 			By("adding an instance to the cluster", func() {
-				_, _, err := utils.Run(fmt.Sprintf("kubectl scale --replicas=4 -n %v cluster/%v", namespace, clusterName))
+				_, _, err := run.Run(fmt.Sprintf("kubectl scale --replicas=4 -n %v cluster/%v", namespace, clusterName))
 				Expect(err).ToNot(HaveOccurred())
 				timeout := 300
 				AssertClusterIsReady(namespace, clusterName, timeout, env)
@@ -101,7 +101,7 @@ var _ = Describe("Cluster scale up and down", Serial, Label(tests.LabelReplicati
 			// Remove a node from the cluster and verify the cluster has one
 			// element less
 			By("removing an instance from the cluster", func() {
-				_, _, err := utils.Run(fmt.Sprintf("kubectl scale --replicas=3 -n %v cluster/%v", namespace, clusterName))
+				_, _, err := run.Run(fmt.Sprintf("kubectl scale --replicas=3 -n %v cluster/%v", namespace, clusterName))
 				Expect(err).ToNot(HaveOccurred())
 				timeout := 60
 				AssertClusterIsReady(namespace, clusterName, timeout, env)

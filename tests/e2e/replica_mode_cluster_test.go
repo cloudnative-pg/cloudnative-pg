@@ -30,7 +30,14 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
-	testUtils "github.com/cloudnative-pg/cloudnative-pg/tests/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/namespaces"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/secrets"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/storage"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -68,7 +75,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				testTableName           = "replica_mode_tls_auth"
 			)
 
-			replicaNamespace, err := env.CreateUniqueTestNamespace(replicaNamespacePrefix)
+			replicaNamespace, err := env.CreateUniqueTestNamespace(env.Ctx, env.Client, replicaNamespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 
 			AssertCreateCluster(replicaNamespace, srcClusterName, srcClusterSample, env)
@@ -81,7 +88,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				testTableName,
 			)
 
-			replicaName, err := env.GetResourceNameFromYAML(replicaClusterSampleTLS)
+			replicaName, err := yaml.GetResourceNameFromYAML(env.Scheme, replicaClusterSampleTLS)
 			Expect(err).ToNot(HaveOccurred())
 
 			assertReplicaClusterTopology(replicaNamespace, replicaName)
@@ -100,9 +107,9 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				testTableName                 = "replica_mode_basic_auth"
 			)
 
-			replicaClusterName, err := env.GetResourceNameFromYAML(replicaClusterSampleBasicAuth)
+			replicaClusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, replicaClusterSampleBasicAuth)
 			Expect(err).ToNot(HaveOccurred())
-			replicaNamespace, err := env.CreateUniqueTestNamespace(replicaNamespacePrefix)
+			replicaNamespace, err := env.CreateUniqueTestNamespace(env.Ctx, env.Client, replicaNamespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 			AssertCreateCluster(replicaNamespace, srcClusterName, srcClusterSample, env)
 
@@ -133,18 +140,19 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				testTableName          = "replica_mode_archive"
 			)
 
-			replicaClusterName, err := env.GetResourceNameFromYAML(replicaClusterSample)
+			replicaClusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, replicaClusterSample)
 			Expect(err).ToNot(HaveOccurred())
-			replicaNamespace, err := env.CreateUniqueTestNamespace(replicaNamespacePrefix)
+			replicaNamespace, err := env.CreateUniqueTestNamespace(env.Ctx, env.Client, replicaNamespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 
 			By("creating the credentials for minio", func() {
-				_, err = testUtils.CreateObjectStorageSecret(
+				_, err = secrets.CreateObjectStorageSecret(
+					env.Ctx,
+					env.Client,
 					replicaNamespace,
 					"backup-storage-creds",
 					"minio",
 					"minio123",
-					env,
 				)
 				Expect(err).ToNot(HaveOccurred())
 			})
@@ -165,14 +173,20 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			)
 
 			// Get primary from replica cluster
-			primaryReplicaCluster, err := env.GetClusterPrimary(replicaNamespace, replicaClusterName)
+			primaryReplicaCluster, err := clusterutils.GetPrimary(
+				env.Ctx,
+				env.Client,
+				replicaNamespace,
+				replicaClusterName,
+			)
 			Expect(err).ToNot(HaveOccurred())
 
 			By("verify archive mode is set to 'always on' designated primary", func() {
 				query := "show archive_mode;"
 				Eventually(func() (string, error) {
-					stdOut, _, err := env.ExecQueryInInstancePod(
-						testUtils.PodLocator{
+					stdOut, _, err := exec.QueryInInstancePod(
+						env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+						exec.PodLocator{
 							Namespace: primaryReplicaCluster.Namespace,
 							PodName:   primaryReplicaCluster.Name,
 						},
@@ -198,22 +212,23 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 
 		JustAfterEach(func() {
 			if CurrentSpecReport().Failed() {
-				env.DumpNamespaceObjects(namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
+				namespaces.DumpNamespaceObjects(env.Ctx, env.Client, namespace, "out/"+CurrentSpecReport().LeafNodeText+".log")
 			}
 		})
 
 		BeforeAll(func() {
 			var err error
-			namespace, err = env.CreateUniqueTestNamespace(namespacePrefix)
+			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 			Expect(err).ToNot(HaveOccurred())
 
 			By("creating the credentials for minio", func() {
-				_, err = testUtils.CreateObjectStorageSecret(
+				_, err = secrets.CreateObjectStorageSecret(
+					env.Ctx,
+					env.Client,
 					namespace,
 					"backup-storage-creds",
 					"minio",
 					"minio123",
-					env,
 				)
 				Expect(err).ToNot(HaveOccurred())
 			})
@@ -224,7 +239,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			})
 
 			// Create the cluster
-			clusterName, err = env.GetResourceNameFromYAML(clusterSample)
+			clusterName, err = yaml.GetResourceNameFromYAML(env.Scheme, clusterSample)
 			Expect(err).ToNot(HaveOccurred())
 			AssertCreateCluster(namespace, clusterName, clusterSample, env)
 		})
@@ -237,13 +252,15 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 
 			By("creating a backup and waiting until it's completed", func() {
 				backupName := fmt.Sprintf("%v-backup", clusterName)
-				backup, err := testUtils.CreateOnDemandBackup(
+				backup, err := backups.CreateOnDemand(
+					env.Ctx,
+					env.Client,
 					namespace,
 					clusterName,
 					backupName,
 					apiv1.BackupTargetStandby,
 					apiv1.BackupMethodBarmanObjectStore,
-					env)
+				)
 				Expect(err).ToNot(HaveOccurred())
 
 				Eventually(func() (apiv1.BackupPhase, error) {
@@ -252,7 +269,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 						Name:      backupName,
 					}, backup)
 					return backup.Status.Phase, err
-				}, testTimeouts[testUtils.BackupIsReady]).Should(BeEquivalentTo(apiv1.BackupPhaseCompleted))
+				}, testTimeouts[timeouts.BackupIsReady]).Should(BeEquivalentTo(apiv1.BackupPhaseCompleted))
 			})
 
 			By("creating a replica cluster from the backup", func() {
@@ -290,13 +307,15 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 			By("creating a snapshot and waiting until it's completed", func() {
 				var err error
 				snapshotName := fmt.Sprintf("%v-snapshot", clusterName)
-				backup, err = testUtils.CreateOnDemandBackup(
+				backup, err = backups.CreateOnDemand(
+					env.Ctx,
+					env.Client,
 					namespace,
 					clusterName,
 					snapshotName,
 					apiv1.BackupTargetStandby,
 					apiv1.BackupMethodVolumeSnapshot,
-					env)
+				)
 				Expect(err).ToNot(HaveOccurred())
 
 				Eventually(func(g Gomega) {
@@ -307,7 +326,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 					g.Expect(err).ToNot(HaveOccurred())
 					g.Expect(backup.Status.BackupSnapshotStatus.Elements).To(HaveLen(2))
 					g.Expect(backup.Status.Phase).To(BeEquivalentTo(apiv1.BackupPhaseCompleted))
-				}, testTimeouts[testUtils.VolumeSnapshotIsReady]).Should(Succeed())
+				}, testTimeouts[timeouts.VolumeSnapshotIsReady]).Should(Succeed())
 			})
 
 			By("fetching the volume snapshots", func() {
@@ -318,11 +337,11 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 				Expect(err).ToNot(HaveOccurred())
 				Expect(snapshotList.Items).To(HaveLen(len(backup.Status.BackupSnapshotStatus.Elements)))
 
-				envVars := testUtils.EnvVarsForSnapshots{
+				envVars := storage.EnvVarsForSnapshots{
 					DataSnapshot: snapshotDataEnv,
 					WalSnapshot:  snapshotWalEnv,
 				}
-				err = testUtils.SetSnapshotNameAsEnv(&snapshotList, backup, envVars)
+				err = storage.SetSnapshotNameAsEnv(&snapshotList, backup, envVars)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
@@ -351,7 +370,7 @@ func assertReplicaClusterTopology(namespace, clusterName string) {
 		standbys            []string
 	)
 
-	cluster, err := env.GetCluster(namespace, clusterName)
+	cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
 	Expect(err).ToNot(HaveOccurred())
 	Expect(cluster.Status.ReadyInstances).To(BeEquivalentTo(cluster.Spec.Instances))
 
@@ -363,8 +382,9 @@ func assertReplicaClusterTopology(namespace, clusterName string) {
 	standbys = funk.FilterString(cluster.Status.InstanceNames, func(name string) bool { return name != primary })
 
 	getStreamingInfo := func(podName string) ([]string, error) {
-		stdout, _, err := env.ExecCommandInInstancePod(
-			testUtils.PodLocator{
+		stdout, _, err := exec.CommandInInstancePod(
+			env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+			exec.PodLocator{
 				Namespace: namespace,
 				PodName:   podName,
 			},
@@ -407,8 +427,9 @@ func assertReplicaClusterTopology(namespace, clusterName string) {
 
 	By("verifying that the new primary is streaming from the source cluster", func() {
 		Eventually(func(g Gomega) {
-			stdout, _, err := env.ExecCommandInInstancePod(
-				testUtils.PodLocator{
+			stdout, _, err := exec.CommandInInstancePod(
+				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+				exec.PodLocator{
 					Namespace: namespace,
 					PodName:   primary,
 				},
