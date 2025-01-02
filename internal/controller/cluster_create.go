@@ -1169,7 +1169,6 @@ func (r *ClusterReconciler) createPrimaryInstance(
 		"jobName", job.Name,
 		"primary", true)
 
-	utils.SetOperatorVersion(&job.ObjectMeta, versions.Version)
 	utils.InheritAnnotations(&job.ObjectMeta, cluster.Annotations,
 		cluster.GetFixedInheritedAnnotations(), configuration.Current)
 	utils.InheritAnnotations(&job.Spec.Template.ObjectMeta, cluster.Annotations,
@@ -1266,7 +1265,6 @@ func (r *ClusterReconciler) joinReplicaInstance(
 		return ctrl.Result{}, err
 	}
 
-	utils.SetOperatorVersion(&job.ObjectMeta, versions.Version)
 	utils.InheritAnnotations(&job.ObjectMeta, cluster.Annotations,
 		cluster.GetFixedInheritedAnnotations(), configuration.Current)
 	utils.InheritAnnotations(&job.Spec.Template.ObjectMeta, cluster.Annotations,
@@ -1375,7 +1373,6 @@ func (r *ClusterReconciler) ensureInstancesAreCreated(
 		return ctrl.Result{}, fmt.Errorf("unable to set the owner reference for the Pod: %w", err)
 	}
 
-	utils.SetOperatorVersion(&instanceToCreate.ObjectMeta, versions.Version)
 	utils.InheritAnnotations(&instanceToCreate.ObjectMeta, cluster.Annotations,
 		cluster.GetFixedInheritedAnnotations(), configuration.Current)
 	utils.InheritLabels(&instanceToCreate.ObjectMeta, cluster.Labels,
