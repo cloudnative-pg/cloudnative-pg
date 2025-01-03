@@ -155,7 +155,8 @@ func BuildManagedServices(cluster apiv1.Cluster) ([]corev1.Service, error) {
 			SetSelectors(defaultService.Spec.Selector)
 
 		for idx := range defaultService.Spec.Ports {
-			builder = builder.WithServicePort(&defaultService.Spec.Ports[idx])
+			// we preserve the user settings over the default configuration, issue: #6389
+			builder = builder.WithServicePortNoOverwrite(&defaultService.Spec.Ports[idx])
 		}
 
 		for key, value := range defaultService.Labels {
