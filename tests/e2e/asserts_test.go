@@ -1146,54 +1146,58 @@ func AssertWritesToReplicaFails(
 	namespace, service, appDBName, appDBUser, appDBPass string,
 ) {
 	By(fmt.Sprintf("Verifying %v service doesn't allow writes", service), func() {
-		forwardConn, conn, err := postgres.ForwardPSQLServiceConnection(
-			env.Ctx, env.Interface, env.RestClientConfig,
-			namespace, service, appDBName, appDBUser, appDBPass,
-		)
-		defer func() {
-			_ = conn.Close()
-			forwardConn.Close()
-		}()
-		Expect(err).ToNot(HaveOccurred())
+		Eventually(func(g Gomega) {
+			forwardConn, conn, err := postgres.ForwardPSQLServiceConnection(
+				env.Ctx, env.Interface, env.RestClientConfig,
+				namespace, service,
+				appDBName, appDBUser, appDBPass)
+			defer func() {
+				_ = conn.Close()
+				forwardConn.Close()
+			}()
+			g.Expect(err).ToNot(HaveOccurred())
 
-		var rawValue string
-		// Expect to be connected to a replica
-		row := conn.QueryRow("SELECT pg_is_in_recovery()")
-		err = row.Scan(&rawValue)
-		Expect(err).ToNot(HaveOccurred())
-		isReplica := strings.TrimSpace(rawValue)
-		Expect(isReplica).To(BeEquivalentTo("true"))
+			var rawValue string
+			// Expect to be connected to a replica
+			row := conn.QueryRow("SELECT pg_is_in_recovery()")
+			err = row.Scan(&rawValue)
+			g.Expect(err).ToNot(HaveOccurred())
+			isReplica := strings.TrimSpace(rawValue)
+			g.Expect(isReplica).To(BeEquivalentTo("true"))
 
-		// Expect to be in a read-only transaction
-		_, err = conn.Exec("CREATE TABLE IF NOT EXISTS table1(var1 text)")
-		Expect(err).To(HaveOccurred())
-		Expect(err.Error()).Should(ContainSubstring("cannot execute CREATE TABLE in a read-only transaction"))
+			// Expect to be in a read-only transaction
+			_, err = conn.Exec("CREATE TABLE IF NOT EXISTS table1(var1 text)")
+			g.Expect(err).To(HaveOccurred())
+			g.Expect(err.Error()).Should(ContainSubstring("cannot execute CREATE TABLE in a read-only transaction"))
+		}, RetryTimeout).Should(Succeed())
 	})
 }
 
 func AssertWritesToPrimarySucceeds(namespace, service, appDBName, appDBUser, appDBPass string) {
 	By(fmt.Sprintf("Verifying %v service correctly manages writes", service), func() {
-		forwardConn, conn, err := postgres.ForwardPSQLServiceConnection(
-			env.Ctx, env.Interface, env.RestClientConfig,
-			namespace, service, appDBName, appDBUser, appDBPass,
-		)
-		defer func() {
-			_ = conn.Close()
-			forwardConn.Close()
-		}()
-		Expect(err).ToNot(HaveOccurred())
+		Eventually(func(g Gomega) {
+			forwardConn, conn, err := postgres.ForwardPSQLServiceConnection(
+				env.Ctx, env.Interface, env.RestClientConfig,
+				namespace, service,
+				appDBName, appDBUser, appDBPass)
+			defer func() {
+				_ = conn.Close()
+				forwardConn.Close()
+			}()
+			g.Expect(err).ToNot(HaveOccurred())
 
-		var rawValue string
-		// Expect to be connected to a primary
-		row := conn.QueryRow("SELECT pg_is_in_recovery()")
-		err = row.Scan(&rawValue)
-		Expect(err).ToNot(HaveOccurred())
-		isReplica := strings.TrimSpace(rawValue)
-		Expect(isReplica).To(BeEquivalentTo("false"))
+			var rawValue string
+			// Expect to be connected to a primary
+			row := conn.QueryRow("SELECT pg_is_in_recovery()")
+			err = row.Scan(&rawValue)
+			g.Expect(err).ToNot(HaveOccurred())
+			isReplica := strings.TrimSpace(rawValue)
+			g.Expect(isReplica).To(BeEquivalentTo("false"))
 
-		// Expect to be able to write
-		_, err = conn.Exec("CREATE TABLE IF NOT EXISTS table1(var1 text)")
-		Expect(err).ToNot(HaveOccurred())
+			// Expect to be able to write
+			_, err = conn.Exec("CREATE TABLE IF NOT EXISTS table1(var1 text)")
+			g.Expect(err).ToNot(HaveOccurred())
+		}, RetryTimeout).Should(Succeed())
 	})
 }
 
