@@ -1996,15 +1996,18 @@ func AssertArchiveConditionMet(namespace, clusterName, timeout string) {
 
 // switchWalAndGetLatestArchive trigger a new wal and get the name of latest wal file
 func switchWalAndGetLatestArchive(namespace, podName string) string {
-	_, _, err := exec.QueryInInstancePod(
+	_, _, err := exec.QueryInInstancePodWithTimeout(
 		env.Ctx, env.Client, env.Interface, env.RestClientConfig,
 		exec.PodLocator{
 			Namespace: namespace,
 			PodName:   podName,
 		},
 		postgres.PostgresDBName,
-		"CHECKPOINT;")
-	Expect(err).ToNot(HaveOccurred())
+		"CHECKPOINT",
+		300*time.Second,
+	)
+	Expect(err).ToNot(HaveOccurred(),
+		"failed to trigger a new wal while executing 'switchWalAndGetLatestArchive'")
 
 	out, _, err := exec.QueryInInstancePod(
 		env.Ctx, env.Client, env.Interface, env.RestClientConfig,
@@ -2013,8 +2016,11 @@ func switchWalAndGetLatestArchive(namespace, podName string) string {
 			PodName:   podName,
 		},
 		postgres.PostgresDBName,
-		"SELECT pg_walfile_name(pg_switch_wal());")
-	Expect(err).ToNot(HaveOccurred())
+		"SELECT pg_walfile_name(pg_switch_wal());",
+	)
+	Expect(err).ToNot(
+		HaveOccurred(),
+		"failed to get latest wal file name while executing 'switchWalAndGetLatestArchive")
 
 	return strings.TrimSpace(out)
 }
