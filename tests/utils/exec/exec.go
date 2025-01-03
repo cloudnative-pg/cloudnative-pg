@@ -107,6 +107,21 @@ func QueryInInstancePod(
 	query string,
 ) (string, string, error) {
 	timeout := time.Second * 10
+	return QueryInInstancePodWithTimeout(ctx, crudClient, kubeInterface, restConfig, podLocator, dbname, query, timeout)
+}
+
+// QueryInInstancePodWithTimeout executes a query in an instance pod, by connecting to the pod
+// and the postgres container, and using a local connection with the postgres user
+func QueryInInstancePodWithTimeout(
+	ctx context.Context,
+	crudClient client.Client,
+	kubeInterface kubernetes.Interface,
+	restConfig *rest.Config,
+	podLocator PodLocator,
+	dbname DatabaseName,
+	query string,
+	timeout time.Duration,
+) (string, string, error) {
 	return CommandInInstancePod(
 		ctx, crudClient, kubeInterface, restConfig,
 		PodLocator{
