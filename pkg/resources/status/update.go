@@ -35,7 +35,7 @@ func PatchWithOptimisticLock(
 	ctx context.Context,
 	c client.Client,
 	cluster *apiv1.Cluster,
-	tx func(cluster *apiv1.Cluster),
+	txs ...func(cluster *apiv1.Cluster),
 ) error {
 	if cluster == nil {
 		return nil
@@ -48,7 +48,9 @@ func PatchWithOptimisticLock(
 		}
 
 		updatedCluster := currentCluster.DeepCopy()
-		tx(updatedCluster)
+		for _, tx := range txs {
+			tx(updatedCluster)
+		}
 
 		if equality.Semantic.DeepEqual(currentCluster.Status, updatedCluster.Status) {
 			return nil
@@ -62,6 +64,7 @@ func PatchWithOptimisticLock(
 			return err
 		}
 
+		// NOTE: we assign the status only at the end now
 		cluster.Status = updatedCluster.Status
 
 		return nil
