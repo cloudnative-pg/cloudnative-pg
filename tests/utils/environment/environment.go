@@ -47,7 +47,8 @@ import (
 	// Import the client auth plugin package to allow use gke or ake to run tests
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
-	. "github.com/onsi/gomega" // nolint
+	. "github.com/onsi/ginkgo/v2" // nolint
+	. "github.com/onsi/gomega"    // nolint
 )
 
 const (
@@ -76,9 +77,10 @@ type uniqueStringSlice struct {
 func (a *uniqueStringSlice) generateUniqueName(prefix string) string {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	process := GinkgoParallelProcess()
 
 	for {
-		potentialUniqueName := fmt.Sprintf("%s-%d", prefix, funk.RandomInt(0, 9999))
+		potentialUniqueName := fmt.Sprintf("%s-%d-%d", prefix, process, funk.RandomInt(0, 9999))
 		if !slices.Contains(a.values, potentialUniqueName) {
 			a.values = append(a.values, potentialUniqueName)
 			return potentialUniqueName
