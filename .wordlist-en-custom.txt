@@ -3,6 +3,9 @@ AES
 API's
 APIs
 ARMv
+AUR
+AZ
+AZs
 AcolumnName
 AdditionalCommandArgs
 AdditionalPodAffinity
@@ -939,6 +942,7 @@ ownerMetadata
 ownerReference
 packagemanifests
 parseable
+paru
 passfile
 passwd
 passwordSecret

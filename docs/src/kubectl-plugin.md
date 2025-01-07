@@ -90,7 +90,7 @@ cd kubectl-cnpg
 makepkg -si
 ```
 
-Or use your favourite AUR-helper, for example [paru](https://github.com/Morganamilo/paru):
+Or use your favorite AUR-helper, for example [paru](https://github.com/Morganamilo/paru):
 
 ```sh
 paru -S kubectl-cnpg
