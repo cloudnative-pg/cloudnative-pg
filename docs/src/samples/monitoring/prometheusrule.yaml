@@ -26,7 +26,7 @@ spec:
         severity: warning
     - alert: PGDatabaseXidAge
       annotations:
-        description: Over 150,000,000 transactions from frozen xid on pod {{ $labels.pod  }}
+        description: Over 300,000,000 transactions from frozen xid on pod {{ $labels.pod  }}
         summary: Number of transactions from the frozen XID to the current one
       expr: |-
         cnpg_pg_database_xid_age > 300000000
@@ -42,7 +42,7 @@ spec:
       for: 1m
       labels:
         severity: warning
-    - alert: LastFailedArchiveTime 
+    - alert: LastFailedArchiveTime
       annotations:
         description: Archiving failed for {{ $labels.pod }}
         summary: Checks the last time archiving failed. Will be < 0 when it has not failed.
@@ -51,7 +51,7 @@ spec:
       for: 1m
       labels:
         severity: warning
-    - alert: DatabaseDeadlockConflicts 
+    - alert: DatabaseDeadlockConflicts
       annotations:
         description: There are over 10 deadlock conflicts in {{ $labels.pod }}
         summary: Checks the number of database conflicts
