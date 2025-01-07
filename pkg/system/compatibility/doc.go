@@ -1,6 +1,3 @@
-//go:build darwin
-// +build darwin
-
 /*
 Copyright The CloudNativePG Contributors
 
@@ -17,9 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package compatibility provides a layer to cross-compile with other OS than Linux
 package compatibility
-
-// SetCoredumpFilter for darwin compatibility
-func SetCoredumpFilter(_ string) error {
-	return nil
-}
