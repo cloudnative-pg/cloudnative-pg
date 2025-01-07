@@ -18,6 +18,7 @@ package status
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -42,7 +43,7 @@ func RegisterPhase(
 		},
 		ReconcileClusterReadyConditionTX,
 	); err != nil {
-		return err
+		return fmt.Errorf("while updating phase: %w", err)
 	}
 
 	contextLogger := log.FromContext(ctx)
