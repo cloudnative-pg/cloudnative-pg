@@ -4884,3 +4884,40 @@ var _ = Describe("ServiceTemplate Validation", func() {
 		})
 	})
 })
+
+var _ = Describe("validatePodPatchAnnotation", func() {
+	var v *ClusterCustomValidator
+
+	It("returns nil if the annotation is not present", func() {
+		cluster := &apiv1.Cluster{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{}}}
+		Expect(v.validatePodPatchAnnotation(cluster)).To(BeNil())
+	})
+
+	It("returns an error if decoding the JSON patch fails", func() {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					utils.PodPatchAnnotationName: "invalid-json-patch",
+				},
+			},
+		}
+
+		errors := v.validatePodPatchAnnotation(cluster)
+		Expect(errors).To(HaveLen(1))
+		Expect(errors[0].Type).To(Equal(field.ErrorTypeInvalid))
+		Expect(errors[0].Field).To(Equal("metadata.annotations." + utils.PodPatchAnnotationName))
+		Expect(errors[0].Detail).To(ContainSubstring("error decoding JSON patch"))
+	})
+
+	It("returns nil if the JSON patch is decoded successfully", func() {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					utils.PodPatchAnnotationName: `[{"op": "replace", "path": "/metadata/name", "value": "test"}]`,
+				},
+			},
+		}
+
+		Expect(v.validatePodPatchAnnotation(cluster)).To(BeNil())
+	})
+})
