@@ -37,13 +37,13 @@ func PromoteViaPlugin(ctx context.Context, clusterName string, serverName string
 }
 
 // Promote promotes an instance in a cluster
-func Promote(ctx context.Context, cl client.Client,
+func Promote(ctx context.Context, cli client.Client,
 	namespace, clusterName, serverName string,
 ) error {
 	var cluster apiv1.Cluster
 
 	// Get the Cluster object
-	err := cl.Get(ctx, client.ObjectKey{Namespace: namespace, Name: clusterName}, &cluster)
+	err := cli.Get(ctx, client.ObjectKey{Namespace: namespace, Name: clusterName}, &cluster)
 	if err != nil {
 		return fmt.Errorf("cluster %s not found in namespace %s: %w", clusterName, namespace, err)
 	}
@@ -57,13 +57,13 @@ func Promote(ctx context.Context, cl client.Client,
 
 	// Check if the Pod exist
 	var pod v1.Pod
-	err = cl.Get(ctx, client.ObjectKey{Namespace: namespace, Name: serverName}, &pod)
+	err = cli.Get(ctx, client.ObjectKey{Namespace: namespace, Name: serverName}, &pod)
 	if err != nil {
 		return fmt.Errorf("new primary node %s not found in namespace %s: %w", serverName, namespace, err)
 	}
 
 	// The Pod exists, let's update the cluster's status with the new target primary
-	if err := status.PatchWithOptimisticLock(ctx, cl, &cluster,
+	if err := status.PatchWithOptimisticLock(ctx, cli, &cluster,
 		func(cluster *apiv1.Cluster) {
 			cluster.Status.TargetPrimary = serverName
 			cluster.Status.TargetPrimaryTimestamp = pgTime.GetCurrentTimestamp()
