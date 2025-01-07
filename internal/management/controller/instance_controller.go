@@ -318,11 +318,10 @@ func (r *InstanceReconciler) restartPrimaryInplaceIfRequested(
 		if cluster.Status.CurrentPrimary != cluster.Status.TargetPrimary {
 			return false, fmt.Errorf("cannot restart the primary in-place when a switchover is in progress")
 		}
-		restartTimeout := cluster.GetRestartTimeout()
 
 		if err := r.instance.RequestAndWaitRestartSmartFast(
 			ctx,
-			time.Duration(restartTimeout)*time.Second,
+			cluster.GetRestartTimeout(),
 		); err != nil {
 			return true, err
 		}
@@ -1080,8 +1079,7 @@ func (r *InstanceReconciler) triggerRestartForDecrease(ctx context.Context, clus
 	contextLogger := log.FromContext(ctx)
 
 	contextLogger.Info("Restarting primary in-place due to hot standby sensible parameters decrease")
-	restartTimeout := time.Duration(cluster.GetRestartTimeout()) * time.Second
-	if err := r.Instance().RequestAndWaitRestartSmartFast(ctx, restartTimeout); err != nil {
+	if err := r.Instance().RequestAndWaitRestartSmartFast(ctx, cluster.GetRestartTimeout()); err != nil {
 		return err
 	}
 
