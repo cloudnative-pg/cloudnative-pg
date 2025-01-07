@@ -2,6 +2,7 @@ AES
 API's
 APIs
 ARMv
+AUR
 AZ
 AZs
 AcolumnName
@@ -1026,6 +1027,7 @@ ownerMetadata
 ownerReference
 packagemanifests
 parseable
+paru
 passfile
 passwd
 passwordSecret
