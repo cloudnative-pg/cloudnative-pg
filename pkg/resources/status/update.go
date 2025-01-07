@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -40,6 +41,10 @@ func PatchWithOptimisticLock(
 	if cluster == nil {
 		return nil
 	}
+
+	contextLogger := log.FromContext(ctx)
+
+	origCluster := cluster.DeepCopy()
 
 	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		var currentCluster apiv1.Cluster
@@ -64,12 +69,18 @@ func PatchWithOptimisticLock(
 			return err
 		}
 
-		// NOTE: we assign the status only at the end now
 		cluster.Status = updatedCluster.Status
 
 		return nil
 	}); err != nil {
 		return fmt.Errorf("while updating conditions: %w", err)
+	}
+
+	if cluster.Status.Phase != apiv1.PhaseHealthy && origCluster.Status.Phase == apiv1.PhaseHealthy {
+		contextLogger.Info("Cluster has become unhealthy")
+	}
+	if cluster.Status.Phase == apiv1.PhaseHealthy && origCluster.Status.Phase != apiv1.PhaseHealthy {
+		contextLogger.Info("Cluster has become healthy")
 	}
 
 	return nil

@@ -23,9 +23,9 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
 
-// ReconcileClusterReadyConditionTX updates the cluster's readiness condition
+// SetClusterReadyConditionTX updates the cluster's readiness condition
 // according to the cluster phase
-func ReconcileClusterReadyConditionTX(cluster *apiv1.Cluster) {
+func SetClusterReadyConditionTX(cluster *apiv1.Cluster) {
 	if cluster.Status.Conditions == nil {
 		cluster.Status.Conditions = []metav1.Condition{}
 	}
@@ -47,4 +47,12 @@ func ReconcileClusterReadyConditionTX(cluster *apiv1.Cluster) {
 	}
 
 	meta.SetStatusCondition(&cluster.Status.Conditions, condition)
+}
+
+// SetPhaseTX is a transaction that sets the cluster phase and reason
+func SetPhaseTX(phase string, reason string) func(cluster *apiv1.Cluster) {
+	return func(cluster *apiv1.Cluster) {
+		cluster.Status.Phase = phase
+		cluster.Status.PhaseReason = reason
+	}
 }

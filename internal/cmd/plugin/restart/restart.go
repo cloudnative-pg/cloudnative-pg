@@ -68,12 +68,12 @@ func instanceRestart(ctx context.Context, clusterName, node string) error {
 	}
 
 	if cluster.Status.CurrentPrimary == node {
-		if err := status.RegisterPhase(
+		if err := status.PatchWithOptimisticLock(
 			ctx,
 			plugin.Client,
 			&cluster,
-			apiv1.PhaseInplacePrimaryRestart,
-			"Requested by the user",
+			status.SetPhaseTX(apiv1.PhaseInplacePrimaryRestart, "Requested by the user"),
+			status.SetClusterReadyConditionTX,
 		); err != nil {
 			return fmt.Errorf("while requesting restart on primary POD for cluster %v: %w", clusterName, err)
 		}

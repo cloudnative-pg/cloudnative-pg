@@ -26,15 +26,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/status"
 )
-
-// PromoteViaPlugin implements the `promote` plugin command
-// nolint:revive
-func PromoteViaPlugin(ctx context.Context, clusterName string, serverName string) error {
-	return Promote(ctx, plugin.Client, plugin.Namespace, clusterName, serverName)
-}
 
 // Promote promotes an instance in a cluster
 func Promote(ctx context.Context, cli client.Client,
@@ -63,14 +56,15 @@ func Promote(ctx context.Context, cli client.Client,
 	}
 
 	// The Pod exists, let's update the cluster's status with the new target primary
+	reconcileTargetPrimaryFunc := func(cluster *apiv1.Cluster) {
+		cluster.Status.TargetPrimary = serverName
+		cluster.Status.TargetPrimaryTimestamp = pgTime.GetCurrentTimestamp()
+		cluster.Status.Phase = apiv1.PhaseSwitchover
+		cluster.Status.PhaseReason = fmt.Sprintf("Switching over to %v", serverName)
+	}
 	if err := status.PatchWithOptimisticLock(ctx, cli, &cluster,
-		func(cluster *apiv1.Cluster) {
-			cluster.Status.TargetPrimary = serverName
-			cluster.Status.TargetPrimaryTimestamp = pgTime.GetCurrentTimestamp()
-			cluster.Status.Phase = apiv1.PhaseSwitchover
-			cluster.Status.PhaseReason = fmt.Sprintf("Switching over to %v", serverName)
-		},
-		status.ReconcileClusterReadyConditionTX,
+		reconcileTargetPrimaryFunc,
+		status.SetClusterReadyConditionTX,
 	); err != nil {
 		return err
 	}
