@@ -28,7 +28,7 @@ import (
 )
 
 // PatchWithOptimisticLock updates the status of the cluster using the passed
-// transaction function.
+// transaction functions (in the order passed).
 // Important: after successfully updating the status, this
 // function refreshes it into the passed cluster
 func PatchWithOptimisticLock(

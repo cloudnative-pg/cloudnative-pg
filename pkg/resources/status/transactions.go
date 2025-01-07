@@ -17,11 +17,14 @@ limitations under the License.
 package status
 
 import (
-	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
 
+// ReconcileClusterReadyConditionTX updates the cluster's readiness condition
+// according to the cluster phase
 func ReconcileClusterReadyConditionTX(cluster *apiv1.Cluster) {
 	if cluster.Status.Conditions == nil {
 		cluster.Status.Conditions = []metav1.Condition{}

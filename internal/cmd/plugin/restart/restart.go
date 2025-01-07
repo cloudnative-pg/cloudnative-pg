@@ -66,15 +66,12 @@ func instanceRestart(ctx context.Context, clusterName, node string) error {
 	if err != nil {
 		return err
 	}
-	originalCluster := cluster.DeepCopy()
 
 	if cluster.Status.CurrentPrimary == node {
-		cluster.ManagedFields = nil
-		if err := status.RegisterPhaseWithOrigCluster(
+		if err := status.RegisterPhase(
 			ctx,
 			plugin.Client,
 			&cluster,
-			originalCluster,
 			apiv1.PhaseInplacePrimaryRestart,
 			"Requested by the user",
 		); err != nil {

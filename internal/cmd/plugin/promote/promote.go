@@ -62,18 +62,15 @@ func Promote(ctx context.Context, cl client.Client,
 		return fmt.Errorf("new primary node %s not found in namespace %s: %w", serverName, namespace, err)
 	}
 
-	// The Pod exists, let's update status fields
-	origCluster := cluster.DeepCopy()
-	cluster.Status.TargetPrimary = serverName
-	cluster.Status.TargetPrimaryTimestamp = pgTime.GetCurrentTimestamp()
-	cluster.Status.Phase = apiv1.PhaseSwitchover
-	cluster.Status.PhaseReason = fmt.Sprintf("Switching over to %v", serverName)
-
-	if err := status.RegisterStatusWithOrigCluster(
-		ctx,
-		cl,
-		&cluster,
-		origCluster,
+	// The Pod exists, let's update the cluster's status with the new target primary
+	if err := status.PatchWithOptimisticLock(ctx, cl, &cluster,
+		func(cluster *apiv1.Cluster) {
+			cluster.Status.TargetPrimary = serverName
+			cluster.Status.TargetPrimaryTimestamp = pgTime.GetCurrentTimestamp()
+			cluster.Status.Phase = apiv1.PhaseSwitchover
+			cluster.Status.PhaseReason = fmt.Sprintf("Switching over to %v", serverName)
+		},
+		status.ReconcileClusterReadyConditionTX,
 	); err != nil {
 		return err
 	}

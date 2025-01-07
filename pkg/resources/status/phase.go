@@ -18,11 +18,8 @@ package status
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
-	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -37,120 +34,26 @@ func RegisterPhase(
 	phase string,
 	reason string,
 ) error {
-	existingCluster := cluster.DeepCopy()
-	return RegisterPhaseWithOrigCluster(ctx, cli, cluster, existingCluster, phase, reason)
-}
-
-// RegisterPhaseWithOrigCluster update phase in the status cluster with the
-// proper reason, it also receives an origCluster to preserve other modifications done to the status
-func RegisterPhaseWithOrigCluster(
-	ctx context.Context,
-	cli client.Client,
-	modifiedCluster *apiv1.Cluster,
-	origCluster *apiv1.Cluster,
-	phase string,
-	reason string,
-) error {
-	if err := PatchWithOptimisticLock(
-		ctx,
-		cli,
-		modifiedCluster,
+	origPhase := cluster.Status.Phase
+	if err := PatchWithOptimisticLock(ctx, cli, cluster,
 		func(cluster *apiv1.Cluster) {
-			if cluster.Status.Conditions == nil {
-				cluster.Status.Conditions = []metav1.Condition{}
-			}
-
 			cluster.Status.Phase = phase
 			cluster.Status.PhaseReason = reason
-
-			condition := metav1.Condition{
-				Type:    string(apiv1.ConditionClusterReady),
-				Status:  metav1.ConditionFalse,
-				Reason:  string(apiv1.ClusterIsNotReady),
-				Message: "Cluster Is Not Ready",
-			}
-
-			if cluster.Status.Phase == apiv1.PhaseHealthy {
-				condition = metav1.Condition{
-					Type:    string(apiv1.ConditionClusterReady),
-					Status:  metav1.ConditionTrue,
-					Reason:  string(apiv1.ClusterReady),
-					Message: "Cluster is Ready",
-				}
-			}
-
-			meta.SetStatusCondition(&cluster.Status.Conditions, condition)
 		},
+		ReconcileClusterReadyConditionTX,
 	); err != nil {
-		return fmt.Errorf("while updating phase: %w", err)
+		return err
 	}
 
 	contextLogger := log.FromContext(ctx)
 
-	modifiedPhase := modifiedCluster.Status.Phase
-	origPhase := origCluster.Status.Phase
+	modifiedPhase := cluster.Status.Phase
 
 	if modifiedPhase != apiv1.PhaseHealthy && origPhase == apiv1.PhaseHealthy {
-		contextLogger.Info("Cluster is not healthy")
+		contextLogger.Info("Cluster has become unhealthy")
 	}
 	if modifiedPhase == apiv1.PhaseHealthy && origPhase != apiv1.PhaseHealthy {
-		contextLogger.Info("Cluster is healthy")
-	}
-
-	return nil
-}
-
-// RegisterStatusWithOrigCluster updates the status to reflect that in `modifiedCluster`
-// and adjusts the conditions according to whether the Phase is healthy
-func RegisterStatusWithOrigCluster(
-	ctx context.Context,
-	cli client.Client,
-	modifiedCluster *apiv1.Cluster,
-	origCluster *apiv1.Cluster,
-) error {
-	if err := PatchWithOptimisticLock(
-		ctx,
-		cli,
-		modifiedCluster,
-		func(cluster *apiv1.Cluster) {
-			if cluster.Status.Conditions == nil {
-				cluster.Status.Conditions = []metav1.Condition{}
-			}
-
-			cluster.Status = modifiedCluster.Status
-
-			condition := metav1.Condition{
-				Type:    string(apiv1.ConditionClusterReady),
-				Status:  metav1.ConditionFalse,
-				Reason:  string(apiv1.ClusterIsNotReady),
-				Message: "Cluster Is Not Ready",
-			}
-
-			if cluster.Status.Phase == apiv1.PhaseHealthy {
-				condition = metav1.Condition{
-					Type:    string(apiv1.ConditionClusterReady),
-					Status:  metav1.ConditionTrue,
-					Reason:  string(apiv1.ClusterReady),
-					Message: "Cluster is Ready",
-				}
-			}
-
-			meta.SetStatusCondition(&cluster.Status.Conditions, condition)
-		},
-	); err != nil {
-		return fmt.Errorf("while updating phase: %w", err)
-	}
-
-	contextLogger := log.FromContext(ctx)
-
-	modifiedPhase := modifiedCluster.Status.Phase
-	origPhase := origCluster.Status.Phase
-
-	if modifiedPhase != apiv1.PhaseHealthy && origPhase == apiv1.PhaseHealthy {
-		contextLogger.Info("Cluster is not healthy")
-	}
-	if modifiedPhase == apiv1.PhaseHealthy && origPhase != apiv1.PhaseHealthy {
-		contextLogger.Info("Cluster is healthy")
+		contextLogger.Info("Cluster has become healthy")
 	}
 
 	return nil
