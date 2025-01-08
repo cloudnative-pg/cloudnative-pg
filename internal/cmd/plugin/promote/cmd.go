@@ -40,7 +40,7 @@ func NewCmd() *cobra.Command {
 			if _, err := strconv.Atoi(args[1]); err == nil {
 				node = fmt.Sprintf("%s-%s", clusterName, node)
 			}
-			return Promote(ctx, clusterName, node)
+			return Promote(ctx, plugin.Client, plugin.Namespace, clusterName, node)
 		},
 	}
 
