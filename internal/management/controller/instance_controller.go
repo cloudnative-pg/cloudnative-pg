@@ -292,12 +292,12 @@ func (r *InstanceReconciler) restartPrimaryInplaceIfRequested(
 			return true, err
 		}
 
-		return true, clusterstatus.RegisterPhase(
+		return true, clusterstatus.PatchWithOptimisticLock(
 			ctx,
 			r.client,
 			cluster,
-			apiv1.PhaseHealthy,
-			"Primary instance restarted in-place",
+			clusterstatus.SetPhaseTX(apiv1.PhaseHealthy, "Primary instance restarted in-place"),
+			clusterstatus.SetClusterReadyConditionTX,
 		)
 	}
 	return false, nil
@@ -1012,7 +1012,13 @@ func (r *InstanceReconciler) processConfigReloadAndManageRestart(ctx context.Con
 		return nil
 	}
 
-	return clusterstatus.RegisterPhase(ctx, r.client, cluster, phase, phaseReason)
+	return clusterstatus.PatchWithOptimisticLock(
+		ctx,
+		r.client,
+		cluster,
+		clusterstatus.SetPhaseTX(phase, phaseReason),
+		clusterstatus.SetClusterReadyConditionTX,
+	)
 }
 
 // refreshCertificateFilesFromSecret receive a secret and rewrite the file

@@ -723,7 +723,13 @@ func (r *ClusterReconciler) RegisterPhase(ctx context.Context,
 	phase string,
 	reason string,
 ) error {
-	return status.RegisterPhase(ctx, r.Client, cluster, phase, reason)
+	return status.PatchWithOptimisticLock(
+		ctx,
+		r.Client,
+		cluster,
+		status.SetPhaseTX(phase, reason),
+		status.SetClusterReadyConditionTX,
+	)
 }
 
 // updateClusterStatusThatRequiresInstancesState updates all the cluster status fields that require the instances status
