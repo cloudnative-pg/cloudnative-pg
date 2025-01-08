@@ -655,7 +655,7 @@ func (fullStatus *PostgresqlStatus) printReplicaStatus(verbosity int) {
 	}
 
 	if fullStatus.areReplicationSlotsEnabled() {
-		fmt.Println(aurora.Yellow("Replication Slots Enabled").String())
+		fmt.Println(aurora.Green("Replication Slots Enabled").String())
 	}
 
 	status := tabby.New()
