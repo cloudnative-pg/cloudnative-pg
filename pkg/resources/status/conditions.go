@@ -74,7 +74,7 @@ func PatchConditionsWithOptimisticLock(
 
 		return nil
 	}); err != nil {
-		return fmt.Errorf("while updating conditions: %w", err)
+		return fmt.Errorf("while patching conditions: %w", err)
 	}
 
 	return nil
