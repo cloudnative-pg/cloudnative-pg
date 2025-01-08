@@ -29,6 +29,7 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/postgres/version"
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	"github.com/cloudnative-pg/machinery/pkg/types"
+	jsonpatch "github.com/evanphx/json-patch/v5"
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -365,6 +366,7 @@ func (r *Cluster) Validate() (allErrs field.ErrorList) {
 		r.validateManagedExtensions,
 		r.validateResources,
 		r.validateHibernationAnnotation,
+		r.validatePodPatchAnnotation,
 		r.validatePromotionToken,
 	}
 
@@ -2536,4 +2538,23 @@ func (r *Cluster) validateHibernationAnnotation() field.ErrorList {
 			),
 		),
 	}
+}
+
+func (r *Cluster) validatePodPatchAnnotation() field.ErrorList {
+	jsonPatch, ok := r.Annotations[utils.PodPatchAnnotationName]
+	if !ok {
+		return nil
+	}
+
+	if _, err := jsonpatch.DecodePatch([]byte(jsonPatch)); err != nil {
+		return field.ErrorList{
+			field.Invalid(
+				field.NewPath("metadata", "annotations", utils.PodPatchAnnotationName),
+				jsonPatch,
+				fmt.Sprintf("error decoding JSON patch: %s", err.Error()),
+			),
+		}
+	}
+
+	return nil
 }

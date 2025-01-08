@@ -313,7 +313,7 @@ func generateFakeClusterPods(
 	var pods []corev1.Pod
 	for idx < cluster.Spec.Instances {
 		idx++
-		pod := specs.PodWithExistingStorage(*cluster, idx)
+		pod, _ := specs.PodWithExistingStorage(*cluster, idx)
 		cluster.SetInheritedDataAndOwnership(&pod.ObjectMeta)
 
 		err := c.Create(context.Background(), pod)
