@@ -26,18 +26,19 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/status"
 )
 
-// Promote command implementation
-func Promote(ctx context.Context, clusterName string, serverName string) error {
+// Promote promotes an instance in a cluster
+func Promote(ctx context.Context, cli client.Client,
+	namespace, clusterName, serverName string,
+) error {
 	var cluster apiv1.Cluster
 
 	// Get the Cluster object
-	err := plugin.Client.Get(ctx, client.ObjectKey{Namespace: plugin.Namespace, Name: clusterName}, &cluster)
+	err := cli.Get(ctx, client.ObjectKey{Namespace: namespace, Name: clusterName}, &cluster)
 	if err != nil {
-		return fmt.Errorf("cluster %s not found in namespace %s: %w", clusterName, plugin.Namespace, err)
+		return fmt.Errorf("cluster %s not found in namespace %s: %w", clusterName, namespace, err)
 	}
 
 	// If server name is equal to target primary, there is no need to promote
@@ -49,22 +50,21 @@ func Promote(ctx context.Context, clusterName string, serverName string) error {
 
 	// Check if the Pod exist
 	var pod v1.Pod
-	err = plugin.Client.Get(ctx, client.ObjectKey{Namespace: plugin.Namespace, Name: serverName}, &pod)
+	err = cli.Get(ctx, client.ObjectKey{Namespace: namespace, Name: serverName}, &pod)
 	if err != nil {
-		return fmt.Errorf("new primary node %s not found in namespace %s: %w", serverName, plugin.Namespace, err)
+		return fmt.Errorf("new primary node %s not found in namespace %s: %w", serverName, namespace, err)
 	}
 
-	// The Pod exists, let's update status fields
-	origCluster := cluster.DeepCopy()
-	cluster.Status.TargetPrimary = serverName
-	cluster.Status.TargetPrimaryTimestamp = pgTime.GetCurrentTimestamp()
-	if err := status.RegisterPhaseWithOrigCluster(
-		ctx,
-		plugin.Client,
-		&cluster,
-		origCluster,
-		apiv1.PhaseSwitchover,
-		fmt.Sprintf("Switching over to %v", serverName),
+	// The Pod exists, let's update the cluster's status with the new target primary
+	reconcileTargetPrimaryFunc := func(cluster *apiv1.Cluster) {
+		cluster.Status.TargetPrimary = serverName
+		cluster.Status.TargetPrimaryTimestamp = pgTime.GetCurrentTimestamp()
+		cluster.Status.Phase = apiv1.PhaseSwitchover
+		cluster.Status.PhaseReason = fmt.Sprintf("Switching over to %v", serverName)
+	}
+	if err := status.PatchWithOptimisticLock(ctx, cli, &cluster,
+		reconcileTargetPrimaryFunc,
+		status.SetClusterReadyConditionTX,
 	); err != nil {
 		return err
 	}
