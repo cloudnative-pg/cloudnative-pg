@@ -73,7 +73,7 @@ func PatchWithOptimisticLock(
 
 		return nil
 	}); err != nil {
-		return fmt.Errorf("while updating conditions: %w", err)
+		return fmt.Errorf("while patching status: %w", err)
 	}
 
 	if cluster.Status.Phase != apiv1.PhaseHealthy && origCluster.Status.Phase == apiv1.PhaseHealthy {
