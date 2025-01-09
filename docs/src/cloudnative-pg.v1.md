@@ -1935,13 +1935,6 @@ any plugin to be loaded with the corresponding configuration</p>
 in the PostgreSQL Pods.</p>
 </td>
 </tr>
-<tr><td><code>extensions</code><br/>
-<a href="#postgresql-cnpg-io-v1-ExtensionConfigurationList"><i>ExtensionConfigurationList</i></a>
-</td>
-<td>
-   <p>The configuration of the extensions to be added</p>
-</td>
-</tr>
 </tbody>
 </table>
 
@@ -2827,6 +2820,38 @@ storage</p>
 </tbody>
 </table>
 
+## ExtensionConfiguration     {#postgresql-cnpg-io-v1-ExtensionConfiguration}
+
+
+**Appears in:**
+
+- [PostgresConfiguration](#postgresql-cnpg-io-v1-PostgresConfiguration)
+
+
+<p>ExtensionConfiguration is the configuration used to add
+a PostgreSQL extensions to the Cluster</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>name</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The name of the extension, required</p>
+</td>
+</tr>
+<tr><td><code>image</code> <B>[Required]</B><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#imagevolumesource-v1-core"><i>core/v1.ImageVolumeSource</i></a>
+</td>
+<td>
+   <p>The image containing the extension, required</p>
+</td>
+</tr>
+</tbody>
+</table>
+
 ## ExtensionSpec     {#postgresql-cnpg-io-v1-ExtensionSpec}
 
 
@@ -2954,20 +2979,6 @@ of WAL archiving and backups for this external cluster</p>
 </tr>
 </tbody>
 </table>
-
-## ExtensionConfigurationList     {#postgresql-cnpg-io-v1-ExtensionConfigurationList}
-
-(Alias of `[]github.com/cloudnative-pg/cloudnative-pg/api/v1.ExtensionConfiguration`)
-
-**Appears in:**
-
-- [ClusterSpec](#postgresql-cnpg-io-v1-ClusterSpec)
-
-
-<p>ExtensionConfigurationList is a list of ExtensionConfiguration</p>
-
-
-
 
 ## ImageCatalogRef     {#postgresql-cnpg-io-v1-ImageCatalogRef}
 
@@ -4467,6 +4478,13 @@ big enough to simulate an infinite timeout</p>
 on this CloudNativePG Cluster.
 This should only be used for debugging and troubleshooting.
 Defaults to false.</p>
+</td>
+</tr>
+<tr><td><code>extensions</code><br/>
+<a href="#postgresql-cnpg-io-v1-ExtensionConfiguration"><i>[]ExtensionConfiguration</i></a>
+</td>
+<td>
+   <p>The configuration of the extensions to be added</p>
 </td>
 </tr>
 </tbody>
