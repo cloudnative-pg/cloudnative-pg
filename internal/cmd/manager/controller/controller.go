@@ -32,12 +32,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	// +kubebuilder:scaffold:imports
-	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/controller"
 	schemeBuilder "github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
+	webhookv1 "github.com/cloudnative-pg/cloudnative-pg/internal/webhook/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/multicache"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -262,22 +261,22 @@ func RunController(
 		return err
 	}
 
-	if err = (&apiv1.Cluster{}).SetupWebhookWithManager(mgr); err != nil {
+	if err = webhookv1.SetupClusterWebhookWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create webhook", "webhook", "Cluster", "version", "v1")
 		return err
 	}
 
-	if err = (&apiv1.Backup{}).SetupWebhookWithManager(mgr); err != nil {
+	if err = webhookv1.SetupBackupWebhookWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create webhook", "webhook", "Backup", "version", "v1")
 		return err
 	}
 
-	if err = (&apiv1.ScheduledBackup{}).SetupWebhookWithManager(mgr); err != nil {
+	if err = webhookv1.SetupScheduledBackupWebhookWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create webhook", "webhook", "ScheduledBackup", "version", "v1")
 		return err
 	}
 
-	if err = (&apiv1.Pooler{}).SetupWebhookWithManager(mgr); err != nil {
+	if err = webhookv1.SetupPoolerWebhookWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create webhook", "webhook", "Pooler", "version", "v1")
 		return err
 	}

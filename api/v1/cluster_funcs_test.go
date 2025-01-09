@@ -1159,10 +1159,10 @@ var _ = Describe("SynchronizeReplicasConfiguration", func() {
 		synchronizeReplicas = &SynchronizeReplicasConfiguration{}
 	})
 
-	Context("compileRegex", func() {
+	Context("CompileRegex", func() {
 		It("should return no errors when SynchronizeReplicasConfiguration is nil", func() {
 			synchronizeReplicas = nil
-			Expect(synchronizeReplicas.compileRegex()).To(BeEmpty())
+			Expect(synchronizeReplicas.ValidateRegex()).To(BeEmpty())
 		})
 
 		Context("when SynchronizeReplicasConfiguration is not nil", func() {
@@ -1171,7 +1171,7 @@ var _ = Describe("SynchronizeReplicasConfiguration", func() {
 			})
 
 			It("should compile patterns without errors", func() {
-				Expect(synchronizeReplicas.compileRegex()).To(BeEmpty())
+				Expect(synchronizeReplicas.ValidateRegex()).To(BeEmpty())
 			})
 
 			Context("when a pattern fails to compile", func() {
@@ -1180,15 +1180,15 @@ var _ = Describe("SynchronizeReplicasConfiguration", func() {
 				})
 
 				It("should return errors for the invalid pattern", func() {
-					errors := synchronizeReplicas.compileRegex()
+					errors := synchronizeReplicas.ValidateRegex()
 					Expect(errors).To(HaveLen(1))
 				})
 			})
 		})
 
 		It("should return no errors on subsequent calls when compile is called multiple times", func() {
-			Expect(synchronizeReplicas.compileRegex()).To(BeEmpty())
-			Expect(synchronizeReplicas.compileRegex()).To(BeEmpty())
+			Expect(synchronizeReplicas.ValidateRegex()).To(BeEmpty())
+			Expect(synchronizeReplicas.ValidateRegex()).To(BeEmpty())
 		})
 	})
 

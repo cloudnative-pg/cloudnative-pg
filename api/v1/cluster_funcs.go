@@ -182,6 +182,11 @@ func (r *SynchronizeReplicasConfiguration) GetEnabled() bool {
 	return true
 }
 
+// ValidateRegex returns all the errors that happened during the regex compilation
+func (r *SynchronizeReplicasConfiguration) ValidateRegex() []error {
+	return r.compileRegex()
+}
+
 // IsExcludedByUser returns if a replication slot should not be reconciled on the replicas
 func (r *SynchronizeReplicasConfiguration) IsExcludedByUser(slotName string) (bool, error) {
 	if r == nil {
@@ -940,7 +945,7 @@ func (cluster *Cluster) ContainsTablespaces() bool {
 // user
 func (cluster Cluster) GetPostgresUID() int64 {
 	if cluster.Spec.PostgresUID == 0 {
-		return defaultPostgresUID
+		return DefaultPostgresUID
 	}
 	return cluster.Spec.PostgresUID
 }
@@ -949,7 +954,7 @@ func (cluster Cluster) GetPostgresUID() int64 {
 // user
 func (cluster Cluster) GetPostgresGID() int64 {
 	if cluster.Spec.PostgresGID == 0 {
-		return defaultPostgresGID
+		return DefaultPostgresGID
 	}
 	return cluster.Spec.PostgresGID
 }

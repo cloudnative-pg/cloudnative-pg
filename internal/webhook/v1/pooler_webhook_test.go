@@ -19,113 +19,120 @@ package v1
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Pooler validation", func() {
+	var v *PoolerCustomValidator
+	BeforeEach(func() {
+		v = &PoolerCustomValidator{}
+	})
+
 	It("doesn't allow specifying authQuerySecret without any authQuery", func() {
-		pooler := Pooler{
-			Spec: PoolerSpec{
-				PgBouncer: &PgBouncerSpec{
-					AuthQuerySecret: &LocalObjectReference{
+		pooler := &apiv1.Pooler{
+			Spec: apiv1.PoolerSpec{
+				PgBouncer: &apiv1.PgBouncerSpec{
+					AuthQuerySecret: &apiv1.LocalObjectReference{
 						Name: "test",
 					},
 				},
 			},
 		}
 
-		Expect(pooler.validatePgBouncer()).NotTo(BeEmpty())
+		Expect(v.validatePgBouncer(pooler)).NotTo(BeEmpty())
 	})
 
 	It("doesn't allow specifying authQuery without any authQuerySecret", func() {
-		pooler := Pooler{
-			Spec: PoolerSpec{
-				PgBouncer: &PgBouncerSpec{
+		pooler := &apiv1.Pooler{
+			Spec: apiv1.PoolerSpec{
+				PgBouncer: &apiv1.PgBouncerSpec{
 					AuthQuery: "test",
 				},
 			},
 		}
 
-		Expect(pooler.validatePgBouncer()).NotTo(BeEmpty())
+		Expect(v.validatePgBouncer(pooler)).NotTo(BeEmpty())
 	})
 
 	It("allows having both authQuery and authQuerySecret", func() {
-		pooler := Pooler{
-			Spec: PoolerSpec{
-				PgBouncer: &PgBouncerSpec{
+		pooler := &apiv1.Pooler{
+			Spec: apiv1.PoolerSpec{
+				PgBouncer: &apiv1.PgBouncerSpec{
 					AuthQuery: "test",
-					AuthQuerySecret: &LocalObjectReference{
+					AuthQuerySecret: &apiv1.LocalObjectReference{
 						Name: "test",
 					},
 				},
 			},
 		}
 
-		Expect(pooler.validatePgBouncer()).To(BeEmpty())
+		Expect(v.validatePgBouncer(pooler)).To(BeEmpty())
 	})
 
 	It("allows the autoconfiguration mode", func() {
-		pooler := Pooler{
-			Spec: PoolerSpec{
-				PgBouncer: &PgBouncerSpec{},
+		pooler := &apiv1.Pooler{
+			Spec: apiv1.PoolerSpec{
+				PgBouncer: &apiv1.PgBouncerSpec{},
 			},
 		}
 
-		Expect(pooler.validatePgBouncer()).To(BeEmpty())
+		Expect(v.validatePgBouncer(pooler)).To(BeEmpty())
 	})
 
 	It("doesn't allow not specifying a cluster name", func() {
-		pooler := Pooler{
-			Spec: PoolerSpec{
-				Cluster: LocalObjectReference{Name: ""},
+		pooler := &apiv1.Pooler{
+			Spec: apiv1.PoolerSpec{
+				Cluster: apiv1.LocalObjectReference{Name: ""},
 			},
 		}
-		Expect(pooler.validateCluster()).NotTo(BeEmpty())
+		Expect(v.validateCluster(pooler)).NotTo(BeEmpty())
 	})
 
 	It("doesn't allow to have a pooler with the same name of the cluster", func() {
-		pooler := Pooler{
+		pooler := &apiv1.Pooler{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "test",
 			},
-			Spec: PoolerSpec{
-				Cluster: LocalObjectReference{
+			Spec: apiv1.PoolerSpec{
+				Cluster: apiv1.LocalObjectReference{
 					Name: "test",
 				},
 			},
 		}
-		Expect(pooler.validateCluster()).NotTo(BeEmpty())
+		Expect(v.validateCluster(pooler)).NotTo(BeEmpty())
 	})
 
 	It("doesn't complain when specifying a cluster name", func() {
-		pooler := Pooler{
-			Spec: PoolerSpec{
-				Cluster: LocalObjectReference{Name: "cluster-example"},
+		pooler := &apiv1.Pooler{
+			Spec: apiv1.PoolerSpec{
+				Cluster: apiv1.LocalObjectReference{Name: "cluster-example"},
 			},
 		}
-		Expect(pooler.validateCluster()).To(BeEmpty())
+		Expect(v.validateCluster(pooler)).To(BeEmpty())
 	})
 
 	It("does complain when given a fixed parameter", func() {
-		pooler := Pooler{
-			Spec: PoolerSpec{
-				PgBouncer: &PgBouncerSpec{
+		pooler := &apiv1.Pooler{
+			Spec: apiv1.PoolerSpec{
+				PgBouncer: &apiv1.PgBouncerSpec{
 					Parameters: map[string]string{"pool_mode": "test"},
 				},
 			},
 		}
-		Expect(pooler.validatePgbouncerGenericParameters()).NotTo(BeEmpty())
+		Expect(v.validatePgbouncerGenericParameters(pooler)).NotTo(BeEmpty())
 	})
 
 	It("does not complain when given a valid parameter", func() {
-		pooler := Pooler{
-			Spec: PoolerSpec{
-				PgBouncer: &PgBouncerSpec{
+		pooler := &apiv1.Pooler{
+			Spec: apiv1.PoolerSpec{
+				PgBouncer: &apiv1.PgBouncerSpec{
 					Parameters: map[string]string{"verbose": "10"},
 				},
 			},
 		}
-		Expect(pooler.validatePgbouncerGenericParameters()).To(BeEmpty())
+		Expect(v.validatePgbouncerGenericParameters(pooler)).To(BeEmpty())
 	})
 })
