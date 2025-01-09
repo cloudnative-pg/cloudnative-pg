@@ -148,17 +148,16 @@ func createPostgresVolumes(cluster *apiv1.Cluster, podName string) []corev1.Volu
 		result = append(result, createProjectedVolume(cluster))
 	}
 
-	if cluster.UsesExtensions() {
-		for _, extension := range cluster.Spec.Extensions {
-			result = append(result,
-				corev1.Volume{
-					Name: extension.Name,
-					VolumeSource: corev1.VolumeSource{
-						Image: &extension.ImageVolumeSource,
-					},
+	for _, extension := range cluster.Spec.PostgresConfiguration.Extensions {
+		image := extension.ImageVolumeSource
+		result = append(result,
+			corev1.Volume{
+				Name: extension.Name,
+				VolumeSource: corev1.VolumeSource{
+					Image: &image,
 				},
-			)
-		}
+			},
+		)
 	}
 
 	return result
@@ -290,15 +289,13 @@ func CreatePostgresVolumeMounts(cluster apiv1.Cluster) []corev1.VolumeMount {
 		}
 	}
 
-	if cluster.UsesExtensions() {
-		for _, extension := range cluster.Spec.Extensions {
-			volumeMounts = append(volumeMounts,
-				corev1.VolumeMount{
-					Name:      extension.Name,
-					MountPath: fmt.Sprintf("/extensions/%s", extension.Name),
-				},
-			)
-		}
+	for _, extension := range cluster.Spec.PostgresConfiguration.Extensions {
+		volumeMounts = append(volumeMounts,
+			corev1.VolumeMount{
+				Name:      extension.Name,
+				MountPath: fmt.Sprintf("/extensions/%s", extension.Name),
+			},
+		)
 	}
 
 	return volumeMounts

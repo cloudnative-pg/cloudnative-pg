@@ -481,29 +481,6 @@ type ClusterSpec struct {
 	// in the PostgreSQL Pods.
 	// +optional
 	Probes *ProbesConfiguration `json:"probes,omitempty"`
-
-	// The configuration of the extensions to be added
-	// +optional
-	Extensions ExtensionConfigurationList `json:"extensions,omitempty"`
-}
-
-// ExtensionConfigurationList is a list of ExtensionConfiguration
-type ExtensionConfigurationList []ExtensionConfiguration
-
-// ExtensionConfiguration is the configuration used to add
-// a PostgreSQL extensions to the Cluster
-type ExtensionConfiguration struct {
-	// The name of the extension, required
-	Name string `json:"name"`
-
-	// The image containing the extension, required
-	ImageVolumeSource corev1.ImageVolumeSource `json:"image"`
-
-	// The path to the directory containing the extension files
-	ShareDirectoryPath string `json:"shareDirectoryPath,omitempty"`
-
-	// The path to the directory containing the libraries
-	LibDirectoryPath string `json:"libDirectoryPath,omitempty"`
 }
 
 // ProbesConfiguration represent the configuration for the probes
@@ -1429,6 +1406,20 @@ type PostgresConfiguration struct {
 	// Defaults to false.
 	// +optional
 	EnableAlterSystem bool `json:"enableAlterSystem,omitempty"`
+
+	// The configuration of the extensions to be added
+	// +optional
+	Extensions []ExtensionConfiguration `json:"extensions,omitempty"`
+}
+
+// ExtensionConfiguration is the configuration used to add
+// a PostgreSQL extensions to the Cluster
+type ExtensionConfiguration struct {
+	// The name of the extension, required
+	Name string `json:"name"`
+
+	// The image containing the extension, required
+	ImageVolumeSource corev1.ImageVolumeSource `json:"image"`
 }
 
 // BootstrapConfiguration contains information about how to create the PostgreSQL

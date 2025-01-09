@@ -1177,11 +1177,6 @@ func (cluster *Cluster) IsPodMonitorEnabled() bool {
 	return false
 }
 
-// UsesExtensions checks if Extensions are requested
-func (cluster *Cluster) UsesExtensions() bool {
-	return len(cluster.Spec.Extensions) != 0
-}
-
 // IsMetricsTLSEnabled checks if the metrics endpoint should use TLS
 func (cluster *Cluster) IsMetricsTLSEnabled() bool {
 	if cluster.Spec.Monitoring != nil && cluster.Spec.Monitoring.TLSConfig != nil {
