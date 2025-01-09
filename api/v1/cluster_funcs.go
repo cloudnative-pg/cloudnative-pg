@@ -757,7 +757,7 @@ func (cluster *Cluster) ContainsTablespaces() bool {
 // user
 func (cluster Cluster) GetPostgresUID() int64 {
 	if cluster.Spec.PostgresUID == 0 {
-		return defaultPostgresUID
+		return DefaultPostgresUID
 	}
 	return cluster.Spec.PostgresUID
 }
@@ -766,7 +766,7 @@ func (cluster Cluster) GetPostgresUID() int64 {
 // user
 func (cluster Cluster) GetPostgresGID() int64 {
 	if cluster.Spec.PostgresGID == 0 {
-		return defaultPostgresGID
+		return DefaultPostgresGID
 	}
 	return cluster.Spec.PostgresGID
 }
