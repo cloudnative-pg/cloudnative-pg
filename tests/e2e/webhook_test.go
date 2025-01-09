@@ -48,7 +48,6 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive, tests.LabelOper
 	)
 
 	var webhookNamespace, clusterName string
-	var clusterIsDefaulted bool
 	var err error
 
 	BeforeEach(func() {
@@ -64,7 +63,6 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive, tests.LabelOper
 
 	It("checks if webhook works as expected", func() {
 		webhookNamespacePrefix := "webhook-test"
-		clusterIsDefaulted = true
 		By("having a deployment for the operator in state ready", func() {
 			// Make sure that we have at least one operator already working
 			err := operator.ScaleOperatorDeployment(env.Ctx, env.Client, 1)
@@ -80,12 +78,11 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive, tests.LabelOper
 		Expect(err).ToNot(HaveOccurred())
 		AssertCreateCluster(webhookNamespace, clusterName, sampleFile, env)
 		// Check if cluster is ready and the default values are populated
-		AssertClusterDefault(webhookNamespace, clusterName, clusterIsDefaulted, env)
+		AssertClusterDefault(webhookNamespace, clusterName, env)
 	})
 
 	It("Does not crash the operator when disabled", func() {
 		webhookNamespacePrefix := "no-webhook-test"
-		clusterIsDefaulted = true
 
 		mWebhook, admissionNumber, err := operator.GetMutatingWebhookByName(env.Ctx, env.Client, mutatingWebhook)
 		Expect(err).ToNot(HaveOccurred())
@@ -120,7 +117,7 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive, tests.LabelOper
 		Expect(err).ToNot(HaveOccurred())
 		AssertCreateCluster(webhookNamespace, clusterName, sampleFile, env)
 		// Check if cluster is ready and has no default value in the object
-		AssertClusterDefault(webhookNamespace, clusterName, clusterIsDefaulted, env)
+		AssertClusterDefault(webhookNamespace, clusterName, env)
 
 		// Make sure the operator is intact and not crashing
 		By("having a deployment for the operator in state ready", func() {

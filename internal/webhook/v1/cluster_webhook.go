@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"slices"
@@ -30,7 +31,7 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	"github.com/cloudnative-pg/machinery/pkg/types"
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/validation"
@@ -43,24 +44,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
-)
-
-const (
-	// DefaultMonitoringKey is the key that should be used in the default metrics configmap to store the queries
-	DefaultMonitoringKey = "queries"
-	// DefaultMonitoringConfigMapName is the name of the target configmap with the default monitoring queries,
-	// if configured
-	DefaultMonitoringConfigMapName = "cnpg-default-monitoring"
-	// DefaultMonitoringSecretName is the name of the target secret with the default monitoring queries,
-	// if configured
-	DefaultMonitoringSecretName = DefaultMonitoringConfigMapName
-	// DefaultApplicationDatabaseName is the name of application database if not specified
-	DefaultApplicationDatabaseName = "app"
-	// DefaultApplicationUserName is the name of application database owner if not specified
-	DefaultApplicationUserName = DefaultApplicationDatabaseName
 )
 
 const sharedBuffersParameter = "shared_buffers"
@@ -68,250 +54,58 @@ const sharedBuffersParameter = "shared_buffers"
 // clusterLog is for logging in this package.
 var clusterLog = log.WithName("cluster-resource").WithValues("version", "v1")
 
-// SetupWebhookWithManager setup the webhook inside the controller manager
-func (r *Cluster) SetupWebhookWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewWebhookManagedBy(mgr).
-		For(r).
+// SetupClusterWebhookWithManager registers the webhook for Cluster in the manager.
+func SetupClusterWebhookWithManager(mgr ctrl.Manager) error {
+	return ctrl.NewWebhookManagedBy(mgr).For(&apiv1.Cluster{}).
+		WithValidator(&ClusterCustomValidator{}).
+		WithDefaulter(&ClusterCustomDefaulter{}).
 		Complete()
 }
 
+// NOTE: The 'path' attribute must follow a specific pattern and should not be modified directly here.
+// Modifying the path for an invalid path can cause API server errors; failing to locate the webhook.
 // +kubebuilder:webhook:webhookVersions={v1},admissionReviewVersions={v1},path=/mutate-postgresql-cnpg-io-v1-cluster,mutating=true,failurePolicy=fail,groups=postgresql.cnpg.io,resources=clusters,verbs=create;update,versions=v1,name=mcluster.cnpg.io,sideEffects=None
 
-var _ webhook.Defaulter = &Cluster{}
+// ClusterCustomDefaulter struct is responsible for setting default values on the custom resource of the
+// Kind Cluster when those are created or updated.
+type ClusterCustomDefaulter struct{}
 
-// Default implements webhook.Defaulter so a webhook will be registered for the type
-func (r *Cluster) Default() {
-	clusterLog.Info("default", "name", r.Name, "namespace", r.Namespace)
+var _ webhook.CustomDefaulter = &ClusterCustomDefaulter{}
 
-	r.setDefaults(true)
-}
+// Default implements webhook.CustomDefaulter so a webhook will be registered for the Kind Cluster.
+func (d *ClusterCustomDefaulter) Default(_ context.Context, obj runtime.Object) error {
+	cluster, ok := obj.(*apiv1.Cluster)
+	if !ok {
+		return fmt.Errorf("expected an Cluster object but got %T", obj)
+	}
+	clusterLog.Info("Defaulting for Cluster", "name", cluster.GetName(), "namespace", cluster.GetNamespace())
 
-// SetDefaults apply the defaults to undefined values in a Cluster
-func (r *Cluster) SetDefaults() {
-	r.setDefaults(false)
-}
+	cluster.Default()
 
-func (r *Cluster) setDefaults(preserveUserSettings bool) {
-	// Defaulting the image name if not specified
-	if r.Spec.ImageName == "" && r.Spec.ImageCatalogRef == nil {
-		r.Spec.ImageName = configuration.Current.PostgresImageName
-	}
-
-	// Defaulting the bootstrap method if not specified
-	if r.Spec.Bootstrap == nil {
-		r.Spec.Bootstrap = &BootstrapConfiguration{}
-	}
-
-	// Defaulting initDB if no other bootstrap method was passed
-	switch {
-	case r.Spec.Bootstrap.Recovery != nil:
-		r.defaultRecovery()
-	case r.Spec.Bootstrap.PgBaseBackup != nil:
-		r.defaultPgBaseBackup()
-	default:
-		r.defaultInitDB()
-	}
-
-	// Defaulting the pod anti-affinity type if podAntiAffinity
-	if (r.Spec.Affinity.EnablePodAntiAffinity == nil || *r.Spec.Affinity.EnablePodAntiAffinity) &&
-		r.Spec.Affinity.PodAntiAffinityType == "" {
-		r.Spec.Affinity.PodAntiAffinityType = PodAntiAffinityTypePreferred
-	}
-
-	if r.Spec.Backup != nil && r.Spec.Backup.Target == "" {
-		r.Spec.Backup.Target = DefaultBackupTarget
-	}
-
-	psqlVersion, err := r.GetPostgresqlVersion()
-	if err == nil {
-		// The validation error will be already raised by the
-		// validateImageName function
-		info := postgres.ConfigurationInfo{
-			Settings:                      postgres.CnpgConfigurationSettings,
-			Version:                       psqlVersion,
-			UserSettings:                  r.Spec.PostgresConfiguration.Parameters,
-			IsReplicaCluster:              r.IsReplica(),
-			PreserveFixedSettingsFromUser: preserveUserSettings,
-			IsWalArchivingDisabled:        utils.IsWalArchivingDisabled(&r.ObjectMeta),
-			IsAlterSystemEnabled:          r.Spec.PostgresConfiguration.EnableAlterSystem,
-		}
-		sanitizedParameters := postgres.CreatePostgresqlConfiguration(info).GetConfigurationParameters()
-		r.Spec.PostgresConfiguration.Parameters = sanitizedParameters
-	}
-
-	if r.Spec.LogLevel == "" {
-		r.Spec.LogLevel = log.InfoLevelString
-	}
-
-	// we inject the defaultMonitoringQueries if the MonitoringQueriesConfigmap parameter is not empty
-	// and defaultQueries not disabled on cluster crd
-	if !r.Spec.Monitoring.AreDefaultQueriesDisabled() {
-		r.defaultMonitoringQueries(configuration.Current)
-	}
-
-	// If the ReplicationSlots or HighAvailability stanzas are nil, we create them and enable slots
-	if r.Spec.ReplicationSlots == nil {
-		r.Spec.ReplicationSlots = &ReplicationSlotsConfiguration{}
-	}
-	if r.Spec.ReplicationSlots.HighAvailability == nil {
-		r.Spec.ReplicationSlots.HighAvailability = &ReplicationSlotsHAConfiguration{
-			Enabled:    ptr.To(true),
-			SlotPrefix: "_cnpg_",
-		}
-	}
-	if r.Spec.ReplicationSlots.SynchronizeReplicas == nil {
-		r.Spec.ReplicationSlots.SynchronizeReplicas = &SynchronizeReplicasConfiguration{
-			Enabled: ptr.To(true),
-		}
-	}
-
-	if len(r.Spec.Tablespaces) > 0 {
-		r.defaultTablespaces()
-	}
-
-	r.setDefaultPlugins(configuration.Current)
-}
-
-func (r *Cluster) setDefaultPlugins(config *configuration.Data) {
-	// Add the list of pre-defined plugins
-	foundPlugins := stringset.New()
-	for _, plugin := range r.Spec.Plugins {
-		foundPlugins.Put(plugin.Name)
-	}
-
-	for _, pluginName := range config.GetIncludePlugins() {
-		if !foundPlugins.Has(pluginName) {
-			r.Spec.Plugins = append(r.Spec.Plugins, PluginConfiguration{
-				Name:    pluginName,
-				Enabled: ptr.To(true),
-			})
-		}
-	}
-}
-
-// defaultTablespaces adds the tablespace owner where the
-// user didn't specify it
-func (r *Cluster) defaultTablespaces() {
-	defaultOwner := r.GetApplicationDatabaseOwner()
-	if len(defaultOwner) == 0 {
-		defaultOwner = "postgres"
-	}
-
-	for name, tablespaceConfiguration := range r.Spec.Tablespaces {
-		if len(tablespaceConfiguration.Owner.Name) == 0 {
-			tablespaceConfiguration.Owner.Name = defaultOwner
-		}
-		r.Spec.Tablespaces[name] = tablespaceConfiguration
-	}
-}
-
-// defaultMonitoringQueries adds the default monitoring queries configMap
-// if not already present in CustomQueriesConfigMap
-func (r *Cluster) defaultMonitoringQueries(config *configuration.Data) {
-	if r.Spec.Monitoring == nil {
-		r.Spec.Monitoring = &MonitoringConfiguration{}
-	}
-
-	if config.MonitoringQueriesConfigmap != "" {
-		var defaultConfigMapQueriesAlreadyPresent bool
-		// We check if the default queries are already inserted in the monitoring configuration
-		for _, monitoringConfigMap := range r.Spec.Monitoring.CustomQueriesConfigMap {
-			if monitoringConfigMap.Name == DefaultMonitoringConfigMapName {
-				defaultConfigMapQueriesAlreadyPresent = true
-				break
-			}
-		}
-
-		// If the default queries are already present there is no need to re-add them.
-		// Please note that in this case that the default configMap could overwrite user existing queries
-		// depending on the order. This is an accepted behavior because the user willingly defined the order of his array
-		if !defaultConfigMapQueriesAlreadyPresent {
-			r.Spec.Monitoring.CustomQueriesConfigMap = append([]ConfigMapKeySelector{
-				{
-					LocalObjectReference: LocalObjectReference{Name: DefaultMonitoringConfigMapName},
-					Key:                  DefaultMonitoringKey,
-				},
-			}, r.Spec.Monitoring.CustomQueriesConfigMap...)
-		}
-	}
-
-	if config.MonitoringQueriesSecret != "" {
-		var defaultSecretQueriesAlreadyPresent bool
-		// we check if the default queries are already inserted in the monitoring configuration
-		for _, monitoringSecret := range r.Spec.Monitoring.CustomQueriesSecret {
-			if monitoringSecret.Name == DefaultMonitoringSecretName {
-				defaultSecretQueriesAlreadyPresent = true
-				break
-			}
-		}
-
-		if !defaultSecretQueriesAlreadyPresent {
-			r.Spec.Monitoring.CustomQueriesSecret = append([]SecretKeySelector{
-				{
-					LocalObjectReference: LocalObjectReference{Name: DefaultMonitoringSecretName},
-					Key:                  DefaultMonitoringKey,
-				},
-			}, r.Spec.Monitoring.CustomQueriesSecret...)
-		}
-	}
-}
-
-// defaultInitDB enriches the initDB with defaults if not all the required arguments were passed
-func (r *Cluster) defaultInitDB() {
-	if r.Spec.Bootstrap.InitDB == nil {
-		r.Spec.Bootstrap.InitDB = &BootstrapInitDB{
-			Database: DefaultApplicationDatabaseName,
-			Owner:    DefaultApplicationUserName,
-		}
-	}
-
-	if r.Spec.Bootstrap.InitDB.Database == "" {
-		r.Spec.Bootstrap.InitDB.Database = DefaultApplicationDatabaseName
-	}
-	if r.Spec.Bootstrap.InitDB.Owner == "" {
-		r.Spec.Bootstrap.InitDB.Owner = r.Spec.Bootstrap.InitDB.Database
-	}
-	if r.Spec.Bootstrap.InitDB.Encoding == "" {
-		r.Spec.Bootstrap.InitDB.Encoding = "UTF8"
-	}
-	if r.Spec.Bootstrap.InitDB.LocaleCollate == "" {
-		r.Spec.Bootstrap.InitDB.LocaleCollate = "C"
-	}
-	if r.Spec.Bootstrap.InitDB.LocaleCType == "" {
-		r.Spec.Bootstrap.InitDB.LocaleCType = "C"
-	}
-}
-
-// defaultRecovery enriches the recovery with defaults if not all the required arguments were passed
-func (r *Cluster) defaultRecovery() {
-	if r.Spec.Bootstrap.Recovery.Database == "" {
-		r.Spec.Bootstrap.Recovery.Database = DefaultApplicationDatabaseName
-	}
-	if r.Spec.Bootstrap.Recovery.Owner == "" {
-		r.Spec.Bootstrap.Recovery.Owner = r.Spec.Bootstrap.Recovery.Database
-	}
-}
-
-// defaultPgBaseBackup enriches the pg_basebackup with defaults if not all the required arguments were passed
-func (r *Cluster) defaultPgBaseBackup() {
-	if r.Spec.Bootstrap.PgBaseBackup.Database == "" {
-		r.Spec.Bootstrap.PgBaseBackup.Database = DefaultApplicationDatabaseName
-	}
-	if r.Spec.Bootstrap.PgBaseBackup.Owner == "" {
-		r.Spec.Bootstrap.PgBaseBackup.Owner = r.Spec.Bootstrap.PgBaseBackup.Database
-	}
+	return nil
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
+// NOTE: The 'path' attribute must follow a specific pattern and should not be modified directly here.
+// Modifying the path for an invalid path can cause API server errors; failing to locate the webhook.
 // +kubebuilder:webhook:webhookVersions={v1},admissionReviewVersions={v1},verbs=create;update,path=/validate-postgresql-cnpg-io-v1-cluster,mutating=false,failurePolicy=fail,groups=postgresql.cnpg.io,resources=clusters,versions=v1,name=vcluster.cnpg.io,sideEffects=None
 
-var _ webhook.Validator = &Cluster{}
+// ClusterCustomValidator struct is responsible for validating the Cluster resource
+// when it is created, updated, or deleted.
+type ClusterCustomValidator struct{}
 
-// ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (r *Cluster) ValidateCreate() (admission.Warnings, error) {
-	clusterLog.Info("validate create", "name", r.Name, "namespace", r.Namespace)
-	allErrs := r.Validate()
-	allWarnings := r.getAdmissionWarnings()
+var _ webhook.CustomValidator = &ClusterCustomValidator{}
+
+// ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type Cluster.
+func (v *ClusterCustomValidator) ValidateCreate(_ context.Context, obj runtime.Object) (admission.Warnings, error) {
+	cluster, ok := obj.(*apiv1.Cluster)
+	if !ok {
+		return nil, fmt.Errorf("expected a Cluster object but got %T", obj)
+	}
+	clusterLog.Info("Validation for Cluster upon creation", "name", cluster.GetName(), "namespace", cluster.GetNamespace())
+
+	allErrs := v.validate(cluster)
+	allWarnings := v.getAdmissionWarnings(cluster)
 
 	if len(allErrs) == 0 {
 		return allWarnings, nil
@@ -319,121 +113,138 @@ func (r *Cluster) ValidateCreate() (admission.Warnings, error) {
 
 	return nil, apierrors.NewInvalid(
 		schema.GroupKind{Group: "postgresql.cnpg.io", Kind: "Cluster"},
-		r.Name, allErrs)
+		cluster.Name, allErrs)
 }
 
-// Validate groups the validation logic for clusters returning a list of all encountered errors
-func (r *Cluster) Validate() (allErrs field.ErrorList) {
-	type validationFunc func() field.ErrorList
-	validations := []validationFunc{
-		r.validateInitDB,
-		r.validateRecoveryApplicationDatabase,
-		r.validatePgBaseBackupApplicationDatabase,
-		r.validateImport,
-		r.validateSuperuserSecret,
-		r.validateCerts,
-		r.validateBootstrapMethod,
-		r.validateImageName,
-		r.validateImagePullPolicy,
-		r.validateRecoveryTarget,
-		r.validatePrimaryUpdateStrategy,
-		r.validateMinSyncReplicas,
-		r.validateMaxSyncReplicas,
-		r.validateStorageSize,
-		r.validateWalStorageSize,
-		r.validateEphemeralVolumeSource,
-		r.validateTablespaceStorageSize,
-		r.validateName,
-		r.validateTablespaceNames,
-		r.validateBootstrapPgBaseBackupSource,
-		r.validateTablespaceBackupSnapshot,
-		r.validateBootstrapRecoverySource,
-		r.validateBootstrapRecoveryDataSource,
-		r.validateExternalClusters,
-		r.validateTolerations,
-		r.validateAntiAffinity,
-		r.validateReplicaMode,
-		r.validateBackupConfiguration,
-		r.validateRetentionPolicy,
-		r.validateConfiguration,
-		r.validateSynchronousReplicaConfiguration,
-		r.validateLDAP,
-		r.validateReplicationSlots,
-		r.validateEnv,
-		r.validateManagedServices,
-		r.validateManagedRoles,
-		r.validateManagedExtensions,
-		r.validateResources,
-		r.validateHibernationAnnotation,
-		r.validatePromotionToken,
+// ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type Cluster.
+func (v *ClusterCustomValidator) ValidateUpdate(
+	_ context.Context,
+	oldObj, newObj runtime.Object,
+) (admission.Warnings, error) {
+	cluster, ok := newObj.(*apiv1.Cluster)
+	if !ok {
+		return nil, fmt.Errorf("expected a Cluster object for the newObj but got %T", newObj)
 	}
 
-	for _, validate := range validations {
-		allErrs = append(allErrs, validate()...)
+	oldCluster, ok := oldObj.(*apiv1.Cluster)
+	if !ok {
+		return nil, fmt.Errorf("expected a Cluster object for the oldObj but got %T", oldObj)
 	}
 
-	return allErrs
-}
-
-// ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (r *Cluster) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
-	clusterLog.Info("validate update", "name", r.Name, "namespace", r.Namespace)
-	oldCluster := old.(*Cluster)
+	clusterLog.Info("Validation for Cluster upon update", "name", cluster.GetName(), "namespace", cluster.GetNamespace())
 
 	// applying defaults before validating updates to set any new default
 	oldCluster.SetDefaults()
 
 	allErrs := append(
-		r.Validate(),
-		r.ValidateChanges(oldCluster)...,
+		v.validate(cluster),
+		v.validateClusterChanges(cluster, oldCluster)...,
 	)
 
 	if len(allErrs) == 0 {
-		return r.getAdmissionWarnings(), nil
+		return v.getAdmissionWarnings(cluster), nil
 	}
 
 	return nil, apierrors.NewInvalid(
 		schema.GroupKind{Group: "cluster.cnpg.io", Kind: "Cluster"},
-		r.Name, allErrs)
+		cluster.Name, allErrs)
 }
 
-// ValidateChanges groups the validation logic for cluster changes checking the differences between
-// the previous version and the new one of the cluster, returning a list of all encountered errors
-func (r *Cluster) ValidateChanges(old *Cluster) (allErrs field.ErrorList) {
-	if old == nil {
-		clusterLog.Info("Received invalid old object, skipping old object validation",
-			"old", old)
-		return nil
+// ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type Cluster.
+func (v *ClusterCustomValidator) ValidateDelete(_ context.Context, obj runtime.Object) (admission.Warnings, error) {
+	cluster, ok := obj.(*apiv1.Cluster)
+	if !ok {
+		return nil, fmt.Errorf("expected a Cluster object but got %T", obj)
 	}
-	type validationFunc func(old *Cluster) field.ErrorList
+	clusterLog.Info("Validation for Cluster upon deletion", "name", cluster.GetName(), "namespace", cluster.GetNamespace())
+
+	// TODO(user): fill in your validation logic upon object deletion.
+
+	return nil, nil
+}
+
+// validateCluster groups the validation logic for clusters returning a list of all encountered errors
+func (v *ClusterCustomValidator) validate(r *apiv1.Cluster) (allErrs field.ErrorList) {
+	type validationFunc func(*apiv1.Cluster) field.ErrorList
 	validations := []validationFunc{
-		r.validateImageChange,
-		r.validateConfigurationChange,
-		r.validateStorageChange,
-		r.validateWalStorageChange,
-		r.validateTablespacesChange,
-		r.validateUnixPermissionIdentifierChange,
-		r.validateReplicationSlotsChange,
-		r.validateWALLevelChange,
-		r.validateReplicaClusterChange,
+		v.validateInitDB,
+		v.validateRecoveryApplicationDatabase,
+		v.validatePgBaseBackupApplicationDatabase,
+		v.validateImport,
+		v.validateSuperuserSecret,
+		v.validateCerts,
+		v.validateBootstrapMethod,
+		v.validateImageName,
+		v.validateImagePullPolicy,
+		v.validateRecoveryTarget,
+		v.validatePrimaryUpdateStrategy,
+		v.validateMinSyncReplicas,
+		v.validateMaxSyncReplicas,
+		v.validateStorageSize,
+		v.validateWalStorageSize,
+		v.validateEphemeralVolumeSource,
+		v.validateTablespaceStorageSize,
+		v.validateName,
+		v.validateTablespaceNames,
+		v.validateBootstrapPgBaseBackupSource,
+		v.validateTablespaceBackupSnapshot,
+		v.validateBootstrapRecoverySource,
+		v.validateBootstrapRecoveryDataSource,
+		v.validateExternalClusters,
+		v.validateTolerations,
+		v.validateAntiAffinity,
+		v.validateReplicaMode,
+		v.validateBackupConfiguration,
+		v.validateRetentionPolicy,
+		v.validateConfiguration,
+		v.validateSynchronousReplicaConfiguration,
+		v.validateLDAP,
+		v.validateReplicationSlots,
+		v.validateEnv,
+		v.validateManagedServices,
+		v.validateManagedRoles,
+		v.validateManagedExtensions,
+		v.validateResources,
+		v.validateHibernationAnnotation,
+		v.validatePromotionToken,
 	}
+
 	for _, validate := range validations {
-		allErrs = append(allErrs, validate(old)...)
+		allErrs = append(allErrs, validate(r)...)
 	}
 
 	return allErrs
 }
 
-// ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (r *Cluster) ValidateDelete() (admission.Warnings, error) {
-	clusterLog.Info("validate delete", "name", r.Name)
+// validateClusterChanges groups the validation logic for cluster changes checking the differences between
+// the previous version and the new one of the cluster, returning a list of all encountered errors
+func (v *ClusterCustomValidator) validateClusterChanges(r, old *apiv1.Cluster) (allErrs field.ErrorList) {
+	if old == nil {
+		clusterLog.Info("Received invalid old object, skipping old object validation",
+			"old", old)
+		return nil
+	}
+	type validationFunc func(*apiv1.Cluster, *apiv1.Cluster) field.ErrorList
+	validations := []validationFunc{
+		v.validateImageChange,
+		v.validateConfigurationChange,
+		v.validateStorageChange,
+		v.validateWalStorageChange,
+		v.validateTablespacesChange,
+		v.validateUnixPermissionIdentifierChange,
+		v.validateReplicationSlotsChange,
+		v.validateWALLevelChange,
+		v.validateReplicaClusterChange,
+	}
+	for _, validate := range validations {
+		allErrs = append(allErrs, validate(r, old)...)
+	}
 
-	// TODO(user): fill in your validation logic upon object deletion.
-	return nil, nil
+	return allErrs
 }
 
 // validateLDAP validates the ldap postgres configuration
-func (r *Cluster) validateLDAP() field.ErrorList {
+func (v *ClusterCustomValidator) validateLDAP(r *apiv1.Cluster) field.ErrorList {
 	// No validating if not specified
 	if r.Spec.PostgresConfiguration.LDAP == nil {
 		return nil
@@ -460,7 +271,7 @@ func (r *Cluster) validateLDAP() field.ErrorList {
 }
 
 // validateEnv validate the environment variables settings proposed by the user
-func (r *Cluster) validateEnv() field.ErrorList {
+func (v *ClusterCustomValidator) validateEnv(r *apiv1.Cluster) field.ErrorList {
 	var result field.ErrorList
 
 	for i := range r.Spec.Env {
@@ -501,7 +312,7 @@ func isReservedEnvironmentVariable(name string) bool {
 
 // validateInitDB validate the bootstrapping options when initdb
 // method is used
-func (r *Cluster) validateInitDB() field.ErrorList {
+func (v *ClusterCustomValidator) validateInitDB(r *apiv1.Cluster) field.ErrorList {
 	var result field.ErrorList
 
 	// If it's not configured, everything is ok
@@ -516,7 +327,7 @@ func (r *Cluster) validateInitDB() field.ErrorList {
 	// If you specify the database name, then you need also to specify the
 	// owner user and vice-versa
 	initDBOptions := r.Spec.Bootstrap.InitDB
-	result = r.validateApplicationDatabase(initDBOptions.Database, initDBOptions.Owner,
+	result = v.validateApplicationDatabase(initDBOptions.Database, initDBOptions.Owner,
 		"initdb")
 
 	if initDBOptions.WalSegmentSize != 0 && !utils.IsPowerOfTwo(initDBOptions.WalSegmentSize) {
@@ -555,7 +366,7 @@ func (r *Cluster) validateInitDB() field.ErrorList {
 	return result
 }
 
-func (r *Cluster) validateImport() field.ErrorList {
+func (v *ClusterCustomValidator) validateImport(r *apiv1.Cluster) field.ErrorList {
 	// If it's not configured, everything is ok
 	if r.Spec.Bootstrap == nil {
 		return nil
@@ -571,10 +382,10 @@ func (r *Cluster) validateImport() field.ErrorList {
 	}
 
 	switch importSpec.Type {
-	case MicroserviceSnapshotType:
-		return importSpec.validateMicroservice()
-	case MonolithSnapshotType:
-		return importSpec.validateMonolith()
+	case apiv1.MicroserviceSnapshotType:
+		return v.validateMicroservice(importSpec)
+	case apiv1.MonolithSnapshotType:
+		return v.validateMonolith(importSpec)
 	default:
 		return field.ErrorList{
 			field.Invalid(
@@ -585,7 +396,7 @@ func (r *Cluster) validateImport() field.ErrorList {
 	}
 }
 
-func (s Import) validateMicroservice() field.ErrorList {
+func (v *ClusterCustomValidator) validateMicroservice(s *apiv1.Import) field.ErrorList {
 	var result field.ErrorList
 
 	if len(s.Databases) != 1 {
@@ -621,7 +432,7 @@ func (s Import) validateMicroservice() field.ErrorList {
 	return result
 }
 
-func (s Import) validateMonolith() field.ErrorList {
+func (v *ClusterCustomValidator) validateMonolith(s *apiv1.Import) field.ErrorList {
 	var result field.ErrorList
 
 	if len(s.Databases) < 1 {
@@ -669,7 +480,7 @@ func (s Import) validateMonolith() field.ErrorList {
 
 // validateRecovery validate the bootstrapping options when Recovery
 // method is used
-func (r *Cluster) validateRecoveryApplicationDatabase() field.ErrorList {
+func (v *ClusterCustomValidator) validateRecoveryApplicationDatabase(r *apiv1.Cluster) field.ErrorList {
 	var result field.ErrorList
 
 	// If it's not configured, everything is ok
@@ -682,13 +493,12 @@ func (r *Cluster) validateRecoveryApplicationDatabase() field.ErrorList {
 	}
 
 	recoveryOptions := r.Spec.Bootstrap.Recovery
-	return r.validateApplicationDatabase(recoveryOptions.Database, recoveryOptions.Owner,
-		"recovery")
+	return v.validateApplicationDatabase(recoveryOptions.Database, recoveryOptions.Owner, "recovery")
 }
 
 // validatePgBaseBackup validate the bootstrapping options when pg_basebackup
 // method is used
-func (r *Cluster) validatePgBaseBackupApplicationDatabase() field.ErrorList {
+func (v *ClusterCustomValidator) validatePgBaseBackupApplicationDatabase(r *apiv1.Cluster) field.ErrorList {
 	var result field.ErrorList
 
 	// If it's not configured, everything is ok
@@ -701,19 +511,19 @@ func (r *Cluster) validatePgBaseBackupApplicationDatabase() field.ErrorList {
 	}
 
 	pgBaseBackupOptions := r.Spec.Bootstrap.PgBaseBackup
-	return r.validateApplicationDatabase(pgBaseBackupOptions.Database, pgBaseBackupOptions.Owner,
+	return v.validateApplicationDatabase(pgBaseBackupOptions.Database, pgBaseBackupOptions.Owner,
 		"pg_basebackup")
 }
 
 // validateApplicationDatabase validate the configuration for application database
-func (r *Cluster) validateApplicationDatabase(
+func (v *ClusterCustomValidator) validateApplicationDatabase(
 	database string,
 	owner string,
 	command string,
 ) field.ErrorList {
 	var result field.ErrorList
 	// If you specify the database name, then you need also to specify the
-	// owner user and vice-versa
+	// owner user and vice versa
 	if database != "" && owner == "" {
 		result = append(
 			result,
@@ -734,7 +544,7 @@ func (r *Cluster) validateApplicationDatabase(
 }
 
 // validateCerts validate all the provided certs
-func (r *Cluster) validateCerts() field.ErrorList {
+func (v *ClusterCustomValidator) validateCerts(r *apiv1.Cluster) field.ErrorList {
 	var result field.ErrorList
 	certificates := r.Spec.Certificates
 
@@ -778,7 +588,7 @@ func (r *Cluster) validateCerts() field.ErrorList {
 }
 
 // ValidateSuperuserSecret validate super user secret value
-func (r *Cluster) validateSuperuserSecret() field.ErrorList {
+func (v *ClusterCustomValidator) validateSuperuserSecret(r *apiv1.Cluster) field.ErrorList {
 	var result field.ErrorList
 
 	// If empty, we're ok!
@@ -801,7 +611,7 @@ func (r *Cluster) validateSuperuserSecret() field.ErrorList {
 
 // validateBootstrapMethod is used to ensure we have only one
 // bootstrap methods active
-func (r *Cluster) validateBootstrapMethod() field.ErrorList {
+func (v *ClusterCustomValidator) validateBootstrapMethod(r *apiv1.Cluster) field.ErrorList {
 	var result field.ErrorList
 
 	// If it's not configured, everything is ok
@@ -834,7 +644,7 @@ func (r *Cluster) validateBootstrapMethod() field.ErrorList {
 
 // validateBootstrapPgBaseBackupSource is used to ensure that the source
 // server is correctly defined
-func (r *Cluster) validateBootstrapPgBaseBackupSource() field.ErrorList {
+func (v *ClusterCustomValidator) validateBootstrapPgBaseBackupSource(r *apiv1.Cluster) field.ErrorList {
 	var result field.ErrorList
 
 	// This validation is only applicable for physical backup
@@ -858,7 +668,7 @@ func (r *Cluster) validateBootstrapPgBaseBackupSource() field.ErrorList {
 
 // validateBootstrapRecoverySource is used to ensure that the source
 // server is correctly defined
-func (r *Cluster) validateBootstrapRecoverySource() field.ErrorList {
+func (v *ClusterCustomValidator) validateBootstrapRecoverySource(r *apiv1.Cluster) field.ErrorList {
 	var result field.ErrorList
 
 	// This validation is only applicable for recovery based bootstrap
@@ -895,7 +705,7 @@ func (r *Cluster) validateBootstrapRecoverySource() field.ErrorList {
 
 // validateBootstrapRecoveryDataSource is used to ensure that the data
 // source is correctly defined
-func (r *Cluster) validateBootstrapRecoveryDataSource() field.ErrorList {
+func (v *ClusterCustomValidator) validateBootstrapRecoveryDataSource(r *apiv1.Cluster) field.ErrorList {
 	// This validation is only applicable for datasource-based recovery based bootstrap
 	if r.Spec.Bootstrap == nil || r.Spec.Bootstrap.Recovery == nil || r.Spec.Bootstrap.Recovery.VolumeSnapshots == nil {
 		return nil
@@ -951,7 +761,7 @@ func (r *Cluster) validateBootstrapRecoveryDataSource() field.ErrorList {
 // validateVolumeSnapshotSource validates a source of a recovery snapshot.
 // The supported resources are VolumeSnapshots and PersistentVolumeClaim
 func validateVolumeSnapshotSource(
-	value v1.TypedLocalObjectReference,
+	value corev1.TypedLocalObjectReference,
 	path *field.Path,
 ) field.ErrorList {
 	apiGroup := ""
@@ -961,7 +771,7 @@ func validateVolumeSnapshotSource(
 
 	switch {
 	case apiGroup == storagesnapshotv1.GroupName && value.Kind == "VolumeSnapshot":
-	case apiGroup == v1.GroupName && value.Kind == "PersistentVolumeClaim":
+	case apiGroup == corev1.GroupName && value.Kind == "PersistentVolumeClaim":
 	default:
 		return field.ErrorList{
 			field.Invalid(path, value, "Only VolumeSnapshots and PersistentVolumeClaims are supported"),
@@ -973,7 +783,7 @@ func validateVolumeSnapshotSource(
 
 // validateImageName validates the image name ensuring we aren't
 // using the "latest" tag
-func (r *Cluster) validateImageName() field.ErrorList {
+func (v *ClusterCustomValidator) validateImageName(r *apiv1.Cluster) field.ErrorList {
 	var result field.ErrorList
 
 	if r.Spec.ImageName == "" {
@@ -1014,11 +824,11 @@ func (r *Cluster) validateImageName() field.ErrorList {
 
 // validateImagePullPolicy validates the image pull policy,
 // ensuring it is one of "Always", "Never" or "IfNotPresent" when defined
-func (r *Cluster) validateImagePullPolicy() field.ErrorList {
+func (v *ClusterCustomValidator) validateImagePullPolicy(r *apiv1.Cluster) field.ErrorList {
 	var result field.ErrorList
 
 	switch r.Spec.ImagePullPolicy {
-	case v1.PullAlways, v1.PullNever, v1.PullIfNotPresent, "":
+	case corev1.PullAlways, corev1.PullNever, corev1.PullIfNotPresent, "":
 		return result
 	default:
 		return append(
@@ -1027,11 +837,11 @@ func (r *Cluster) validateImagePullPolicy() field.ErrorList {
 				field.NewPath("spec", "imagePullPolicy"),
 				r.Spec.ImagePullPolicy,
 				fmt.Sprintf("invalid imagePullPolicy, if defined must be one of '%s', '%s' or '%s'",
-					v1.PullAlways, v1.PullNever, v1.PullIfNotPresent)))
+					corev1.PullAlways, corev1.PullNever, corev1.PullIfNotPresent)))
 	}
 }
 
-func (r *Cluster) validateResources() field.ErrorList {
+func (v *ClusterCustomValidator) validateResources(r *apiv1.Cluster) field.ErrorList {
 	var result field.ErrorList
 
 	cpuRequest := r.Spec.Resources.Requests.Cpu()
@@ -1089,7 +899,7 @@ func (r *Cluster) validateResources() field.ErrorList {
 	return result
 }
 
-func (r *Cluster) validateSynchronousReplicaConfiguration() field.ErrorList {
+func (v *ClusterCustomValidator) validateSynchronousReplicaConfiguration(r *apiv1.Cluster) field.ErrorList {
 	if r.Spec.PostgresConfiguration.Synchronous == nil {
 		return nil
 	}
@@ -1112,7 +922,7 @@ func (r *Cluster) validateSynchronousReplicaConfiguration() field.ErrorList {
 }
 
 // validateConfiguration determines whether a PostgreSQL configuration is valid
-func (r *Cluster) validateConfiguration() field.ErrorList {
+func (v *ClusterCustomValidator) validateConfiguration(r *apiv1.Cluster) field.ErrorList {
 	var result field.ErrorList
 
 	// We cannot have both old-style synchronous replica configuration
@@ -1249,7 +1059,7 @@ func (r *Cluster) validateConfiguration() field.ErrorList {
 
 // validateWalSizeConfiguration verifies that min_wal_size < max_wal_size < wal volume size
 func validateWalSizeConfiguration(
-	postgresConfig PostgresConfiguration, walVolumeSize *resource.Quantity,
+	postgresConfig apiv1.PostgresConfiguration, walVolumeSize *resource.Quantity,
 ) field.ErrorList {
 	const (
 		minWalSizeKey     = "min_wal_size"
@@ -1365,7 +1175,7 @@ func parsePostgresQuantityValue(value string) (resource.Quantity, error) {
 
 // validateConfigurationChange determines whether a PostgreSQL configuration
 // change can be applied
-func (r *Cluster) validateConfigurationChange(old *Cluster) field.ErrorList {
+func (v *ClusterCustomValidator) validateConfigurationChange(r, old *apiv1.Cluster) field.ErrorList {
 	var result field.ErrorList
 
 	if old.Spec.ImageName != r.Spec.ImageName {
@@ -1387,7 +1197,7 @@ func (r *Cluster) validateConfigurationChange(old *Cluster) field.ErrorList {
 	return result
 }
 
-func validateSyncReplicaElectionConstraint(constraints SyncReplicaElectionConstraints) *field.Error {
+func validateSyncReplicaElectionConstraint(constraints apiv1.SyncReplicaElectionConstraints) *field.Error {
 	if !constraints.Enabled {
 		return nil
 	}
@@ -1406,7 +1216,7 @@ func validateSyncReplicaElectionConstraint(constraints SyncReplicaElectionConstr
 
 // validateImageChange validate the change from a certain image name
 // to a new one.
-func (r *Cluster) validateImageChange(old *Cluster) field.ErrorList {
+func (v *ClusterCustomValidator) validateImageChange(r, old *apiv1.Cluster) field.ErrorList {
 	var result field.ErrorList
 	var newVersion, oldVersion version.Data
 	var err error
@@ -1451,7 +1261,7 @@ func (r *Cluster) validateImageChange(old *Cluster) field.ErrorList {
 // Validate the recovery target to ensure that the mutual exclusivity
 // of options is respected and plus validating the format of targetTime
 // if specified
-func (r *Cluster) validateRecoveryTarget() field.ErrorList {
+func (v *ClusterCustomValidator) validateRecoveryTarget(r *apiv1.Cluster) field.ErrorList {
 	if r.Spec.Bootstrap == nil || r.Spec.Bootstrap.Recovery == nil {
 		return nil
 	}
@@ -1516,7 +1326,7 @@ func (r *Cluster) validateRecoveryTarget() field.ErrorList {
 	return result
 }
 
-func validateTargetExclusiveness(recoveryTarget *RecoveryTarget) field.ErrorList {
+func validateTargetExclusiveness(recoveryTarget *apiv1.RecoveryTarget) field.ErrorList {
 	targets := 0
 	if recoveryTarget.TargetImmediate != nil {
 		targets++
@@ -1547,15 +1357,15 @@ func validateTargetExclusiveness(recoveryTarget *RecoveryTarget) field.ErrorList
 
 // Validate the update strategy related to the number of required
 // instances
-func (r *Cluster) validatePrimaryUpdateStrategy() field.ErrorList {
+func (v *ClusterCustomValidator) validatePrimaryUpdateStrategy(r *apiv1.Cluster) field.ErrorList {
 	if r.Spec.PrimaryUpdateStrategy == "" {
 		return nil
 	}
 
 	var result field.ErrorList
 
-	if r.Spec.PrimaryUpdateStrategy != PrimaryUpdateStrategySupervised &&
-		r.Spec.PrimaryUpdateStrategy != PrimaryUpdateStrategyUnsupervised {
+	if r.Spec.PrimaryUpdateStrategy != apiv1.PrimaryUpdateStrategySupervised &&
+		r.Spec.PrimaryUpdateStrategy != apiv1.PrimaryUpdateStrategyUnsupervised {
 		result = append(result, field.Invalid(
 			field.NewPath("spec", "primaryUpdateStrategy"),
 			r.Spec.PrimaryUpdateStrategy,
@@ -1563,7 +1373,7 @@ func (r *Cluster) validatePrimaryUpdateStrategy() field.ErrorList {
 		return result
 	}
 
-	if r.Spec.PrimaryUpdateStrategy == PrimaryUpdateStrategySupervised && r.Spec.Instances == 1 {
+	if r.Spec.PrimaryUpdateStrategy == apiv1.PrimaryUpdateStrategySupervised && r.Spec.Instances == 1 {
 		result = append(result, field.Invalid(
 			field.NewPath("spec", "primaryUpdateStrategy"),
 			r.Spec.PrimaryUpdateStrategy,
@@ -1576,7 +1386,7 @@ func (r *Cluster) validatePrimaryUpdateStrategy() field.ErrorList {
 
 // Validate the maximum number of synchronous instances
 // that should be kept in sync with the primary server
-func (r *Cluster) validateMaxSyncReplicas() field.ErrorList {
+func (v *ClusterCustomValidator) validateMaxSyncReplicas(r *apiv1.Cluster) field.ErrorList {
 	var result field.ErrorList
 
 	if r.Spec.MaxSyncReplicas < 0 {
@@ -1597,7 +1407,7 @@ func (r *Cluster) validateMaxSyncReplicas() field.ErrorList {
 }
 
 // Validate the minimum number of synchronous instances
-func (r *Cluster) validateMinSyncReplicas() field.ErrorList {
+func (v *ClusterCustomValidator) validateMinSyncReplicas(r *apiv1.Cluster) field.ErrorList {
 	var result field.ErrorList
 
 	if r.Spec.MinSyncReplicas < 0 {
@@ -1617,11 +1427,11 @@ func (r *Cluster) validateMinSyncReplicas() field.ErrorList {
 	return result
 }
 
-func (r *Cluster) validateStorageSize() field.ErrorList {
+func (v *ClusterCustomValidator) validateStorageSize(r *apiv1.Cluster) field.ErrorList {
 	return validateStorageConfigurationSize(*field.NewPath("spec", "storage"), r.Spec.StorageConfiguration)
 }
 
-func (r *Cluster) validateWalStorageSize() field.ErrorList {
+func (v *ClusterCustomValidator) validateWalStorageSize(r *apiv1.Cluster) field.ErrorList {
 	var result field.ErrorList
 
 	if r.ShouldCreateWalArchiveVolume() {
@@ -1632,7 +1442,7 @@ func (r *Cluster) validateWalStorageSize() field.ErrorList {
 	return result
 }
 
-func (r *Cluster) validateEphemeralVolumeSource() field.ErrorList {
+func (v *ClusterCustomValidator) validateEphemeralVolumeSource(r *apiv1.Cluster) field.ErrorList {
 	var result field.ErrorList
 
 	if r.Spec.EphemeralVolumeSource != nil && (r.Spec.EphemeralVolumesSizeLimit != nil &&
@@ -1647,7 +1457,7 @@ func (r *Cluster) validateEphemeralVolumeSource() field.ErrorList {
 	return result
 }
 
-func (r *Cluster) validateTablespaceStorageSize() field.ErrorList {
+func (v *ClusterCustomValidator) validateTablespaceStorageSize(r *apiv1.Cluster) field.ErrorList {
 	if r.Spec.Tablespaces == nil {
 		return nil
 	}
@@ -1666,7 +1476,7 @@ func (r *Cluster) validateTablespaceStorageSize() field.ErrorList {
 
 func validateStorageConfigurationSize(
 	structPath field.Path,
-	storageConfiguration StorageConfiguration,
+	storageConfiguration apiv1.StorageConfiguration,
 ) field.ErrorList {
 	var result field.ErrorList
 
@@ -1692,7 +1502,7 @@ func validateStorageConfigurationSize(
 }
 
 // Validate a change in the storage
-func (r *Cluster) validateStorageChange(old *Cluster) field.ErrorList {
+func (v *ClusterCustomValidator) validateStorageChange(r, old *apiv1.Cluster) field.ErrorList {
 	return validateStorageConfigurationChange(
 		field.NewPath("spec", "storage"),
 		old.Spec.StorageConfiguration,
@@ -1700,7 +1510,7 @@ func (r *Cluster) validateStorageChange(old *Cluster) field.ErrorList {
 	)
 }
 
-func (r *Cluster) validateWalStorageChange(old *Cluster) field.ErrorList {
+func (v *ClusterCustomValidator) validateWalStorageChange(r, old *apiv1.Cluster) field.ErrorList {
 	if old.Spec.WalStorage == nil {
 		return nil
 	}
@@ -1723,7 +1533,7 @@ func (r *Cluster) validateWalStorageChange(old *Cluster) field.ErrorList {
 
 // validateTablespacesChange checks that no tablespaces have been deleted, and that
 // no tablespaces have an invalid storage update
-func (r *Cluster) validateTablespacesChange(old *Cluster) field.ErrorList {
+func (v *ClusterCustomValidator) validateTablespacesChange(r, old *apiv1.Cluster) field.ErrorList {
 	if old.Spec.Tablespaces == nil {
 		return nil
 	}
@@ -1760,8 +1570,8 @@ func (r *Cluster) validateTablespacesChange(old *Cluster) field.ErrorList {
 // validateStorageConfigurationChange generates an error list by comparing two StorageConfiguration
 func validateStorageConfigurationChange(
 	structPath *field.Path,
-	oldStorage StorageConfiguration,
-	newStorage StorageConfiguration,
+	oldStorage apiv1.StorageConfiguration,
+	newStorage apiv1.StorageConfiguration,
 ) field.ErrorList {
 	oldSize := oldStorage.GetSizeOrNil()
 	if oldSize == nil {
@@ -1791,7 +1601,7 @@ func validateStorageConfigurationChange(
 // Validate the cluster name. This is important to avoid issues
 // while generating services, which don't support having dots in
 // their name
-func (r *Cluster) validateName() field.ErrorList {
+func (v *ClusterCustomValidator) validateName(r *apiv1.Cluster) field.ErrorList {
 	var result field.ErrorList
 
 	if errs := validationutil.IsDNS1035Label(r.Name); len(errs) > 0 {
@@ -1811,7 +1621,7 @@ func (r *Cluster) validateName() field.ErrorList {
 	return result
 }
 
-func (r *Cluster) validateTablespaceNames() field.ErrorList {
+func (v *ClusterCustomValidator) validateTablespaceNames(r *apiv1.Cluster) field.ErrorList {
 	var result field.ErrorList
 	if r.Spec.Tablespaces == nil {
 		return nil
@@ -1842,7 +1652,7 @@ func (r *Cluster) validateTablespaceNames() field.ErrorList {
 	return result
 }
 
-func (r *Cluster) validateTablespaceBackupSnapshot() field.ErrorList {
+func (v *ClusterCustomValidator) validateTablespaceBackupSnapshot(r *apiv1.Cluster) field.ErrorList {
 	if r.Spec.Backup == nil || r.Spec.Backup.VolumeSnapshot == nil ||
 		len(r.Spec.Backup.VolumeSnapshot.TablespaceClassName) == 0 {
 		return nil
@@ -1864,7 +1674,7 @@ func (r *Cluster) validateTablespaceBackupSnapshot() field.ErrorList {
 }
 
 // Check if the external clusters list contains two servers with the same name
-func (r *Cluster) validateExternalClusters() field.ErrorList {
+func (v *ClusterCustomValidator) validateExternalClusters(r *apiv1.Cluster) field.ErrorList {
 	var result field.ErrorList
 	stringSet := stringset.New()
 
@@ -1873,7 +1683,7 @@ func (r *Cluster) validateExternalClusters() field.ErrorList {
 		stringSet.Put(externalCluster.Name)
 		result = append(
 			result,
-			r.validateExternalCluster(&r.Spec.ExternalClusters[idx], path)...)
+			v.validateExternalCluster(&r.Spec.ExternalClusters[idx], path)...)
 	}
 
 	if stringSet.Len() != len(r.Spec.ExternalClusters) {
@@ -1887,7 +1697,10 @@ func (r *Cluster) validateExternalClusters() field.ErrorList {
 }
 
 // validateExternalCluster check the validity of a certain ExternalCluster
-func (r *Cluster) validateExternalCluster(externalCluster *ExternalCluster, path *field.Path) field.ErrorList {
+func (v *ClusterCustomValidator) validateExternalCluster(
+	externalCluster *apiv1.ExternalCluster,
+	path *field.Path,
+) field.ErrorList {
 	var result field.ErrorList
 
 	if externalCluster.ConnectionParameters == nil &&
@@ -1903,7 +1716,7 @@ func (r *Cluster) validateExternalCluster(externalCluster *ExternalCluster, path
 	return result
 }
 
-func (r *Cluster) validateReplicaClusterChange(old *Cluster) field.ErrorList {
+func (v *ClusterCustomValidator) validateReplicaClusterChange(r, old *apiv1.Cluster) field.ErrorList {
 	// If the replication role didn't change then everything
 	// is fine
 	if r.IsReplica() == old.IsReplica() {
@@ -1924,7 +1737,7 @@ func (r *Cluster) validateReplicaClusterChange(old *Cluster) field.ErrorList {
 	return nil
 }
 
-func (r *Cluster) validateUnixPermissionIdentifierChange(old *Cluster) field.ErrorList {
+func (v *ClusterCustomValidator) validateUnixPermissionIdentifierChange(r, old *apiv1.Cluster) field.ErrorList {
 	var result field.ErrorList
 
 	if r.Spec.PostgresGID != old.Spec.PostgresGID {
@@ -1944,7 +1757,7 @@ func (r *Cluster) validateUnixPermissionIdentifierChange(old *Cluster) field.Err
 	return result
 }
 
-func (r *Cluster) validatePromotionToken() field.ErrorList {
+func (v *ClusterCustomValidator) validatePromotionToken(r *apiv1.Cluster) field.ErrorList {
 	var result field.ErrorList
 
 	if r.Spec.ReplicaCluster == nil {
@@ -2000,7 +1813,7 @@ func (r *Cluster) validatePromotionToken() field.ErrorList {
 
 // Check if the replica mode is used with an incompatible bootstrap
 // method
-func (r *Cluster) validateReplicaMode() field.ErrorList {
+func (v *ClusterCustomValidator) validateReplicaMode(r *apiv1.Cluster) field.ErrorList {
 	var result field.ErrorList
 
 	replicaClusterConf := r.Spec.ReplicaCluster
@@ -2037,12 +1850,12 @@ func (r *Cluster) validateReplicaMode() field.ErrorList {
 		}
 	}
 
-	result = append(result, r.validateReplicaClusterExternalClusters()...)
+	result = append(result, v.validateReplicaClusterExternalClusters(r)...)
 
 	return result
 }
 
-func (r *Cluster) validateReplicaClusterExternalClusters() field.ErrorList {
+func (v *ClusterCustomValidator) validateReplicaClusterExternalClusters(r *apiv1.Cluster) field.ErrorList {
 	var result field.ErrorList
 	replicaClusterConf := r.Spec.ReplicaCluster
 	if replicaClusterConf == nil {
@@ -2089,7 +1902,7 @@ func (r *Cluster) validateReplicaClusterExternalClusters() field.ErrorList {
 // validateTolerations check and validate the tolerations field
 // This code is almost a verbatim copy of
 // https://github.com/kubernetes/kubernetes/blob/4d38d21/pkg/apis/core/validation/validation.go#L3147
-func (r *Cluster) validateTolerations() field.ErrorList {
+func (v *ClusterCustomValidator) validateTolerations(r *apiv1.Cluster) field.ErrorList {
 	path := field.NewPath("spec", "affinity", "toleration")
 	allErrors := field.ErrorList{}
 	for i, toleration := range r.Spec.Affinity.Tolerations {
@@ -2100,14 +1913,14 @@ func (r *Cluster) validateTolerations() field.ErrorList {
 		}
 
 		// empty toleration key with Exists operator and empty value means match all taints
-		if len(toleration.Key) == 0 && toleration.Operator != v1.TolerationOpExists {
+		if len(toleration.Key) == 0 && toleration.Operator != corev1.TolerationOpExists {
 			allErrors = append(allErrors,
 				field.Invalid(idxPath.Child("operator"),
 					toleration.Operator,
 					"operator must be Exists when `key` is empty, which means \"match all values and all keys\""))
 		}
 
-		if toleration.TolerationSeconds != nil && toleration.Effect != v1.TaintEffectNoExecute {
+		if toleration.TolerationSeconds != nil && toleration.Effect != corev1.TaintEffectNoExecute {
 			allErrors = append(allErrors,
 				field.Invalid(idxPath.Child("effect"),
 					toleration.Effect,
@@ -2117,20 +1930,20 @@ func (r *Cluster) validateTolerations() field.ErrorList {
 		// validate toleration operator and value
 		switch toleration.Operator {
 		// empty operator means Equal
-		case v1.TolerationOpEqual, "":
+		case corev1.TolerationOpEqual, "":
 			if errs := validationutil.IsValidLabelValue(toleration.Value); len(errs) != 0 {
 				allErrors = append(allErrors,
 					field.Invalid(idxPath.Child("operator"),
 						toleration.Value, strings.Join(errs, ";")))
 			}
-		case v1.TolerationOpExists:
+		case corev1.TolerationOpExists:
 			if len(toleration.Value) > 0 {
 				allErrors = append(allErrors,
 					field.Invalid(idxPath.Child("operator"),
 						toleration, "value must be empty when `operator` is 'Exists'"))
 			}
 		default:
-			validValues := []string{string(v1.TolerationOpEqual), string(v1.TolerationOpExists)}
+			validValues := []string{string(corev1.TolerationOpEqual), string(corev1.TolerationOpExists)}
 			allErrors = append(allErrors,
 				field.NotSupported(idxPath.Child("operator"),
 					toleration.Operator, validValues))
@@ -2147,7 +1960,7 @@ func (r *Cluster) validateTolerations() field.ErrorList {
 
 // validateTaintEffect is used from validateTollerations and is a verbatim copy of the code
 // at https://github.com/kubernetes/kubernetes/blob/4d38d21/pkg/apis/core/validation/validation.go#L3087
-func validateTaintEffect(effect *v1.TaintEffect, allowEmpty bool, fldPath *field.Path) field.ErrorList {
+func validateTaintEffect(effect *corev1.TaintEffect, allowEmpty bool, fldPath *field.Path) field.ErrorList {
 	if !allowEmpty && len(*effect) == 0 {
 		return field.ErrorList{field.Required(fldPath, "")}
 	}
@@ -2155,14 +1968,14 @@ func validateTaintEffect(effect *v1.TaintEffect, allowEmpty bool, fldPath *field
 	allErrors := field.ErrorList{}
 	switch *effect {
 	// TODO: Replace next line with subsequent commented-out line when implement TaintEffectNoScheduleNoAdmit.
-	case v1.TaintEffectNoSchedule, v1.TaintEffectPreferNoSchedule, v1.TaintEffectNoExecute:
+	case corev1.TaintEffectNoSchedule, corev1.TaintEffectPreferNoSchedule, corev1.TaintEffectNoExecute:
 		// case core.TaintEffectNoSchedule, core.TaintEffectPreferNoSchedule, core.TaintEffectNoScheduleNoAdmit,
 		//     core.TaintEffectNoExecute:
 	default:
 		validValues := []string{
-			string(v1.TaintEffectNoSchedule),
-			string(v1.TaintEffectPreferNoSchedule),
-			string(v1.TaintEffectNoExecute),
+			string(corev1.TaintEffectNoSchedule),
+			string(corev1.TaintEffectPreferNoSchedule),
+			string(corev1.TaintEffectNoExecute),
 			// TODO: Uncomment this block when implement TaintEffectNoScheduleNoAdmit.
 			// string(core.TaintEffectNoScheduleNoAdmit),
 		}
@@ -2172,25 +1985,25 @@ func validateTaintEffect(effect *v1.TaintEffect, allowEmpty bool, fldPath *field
 }
 
 // validateAntiAffinity checks and validates the anti-affinity fields.
-func (r *Cluster) validateAntiAffinity() field.ErrorList {
+func (v *ClusterCustomValidator) validateAntiAffinity(r *apiv1.Cluster) field.ErrorList {
 	path := field.NewPath("spec", "affinity", "podAntiAffinityType")
 	allErrors := field.ErrorList{}
 
-	if r.Spec.Affinity.PodAntiAffinityType != PodAntiAffinityTypePreferred &&
-		r.Spec.Affinity.PodAntiAffinityType != PodAntiAffinityTypeRequired &&
+	if r.Spec.Affinity.PodAntiAffinityType != apiv1.PodAntiAffinityTypePreferred &&
+		r.Spec.Affinity.PodAntiAffinityType != apiv1.PodAntiAffinityTypeRequired &&
 		r.Spec.Affinity.PodAntiAffinityType != "" {
 		allErrors = append(allErrors, field.Invalid(
 			path,
 			r.Spec.Affinity.PodAntiAffinityType,
 			fmt.Sprintf("pod anti-affinity type must be '%s' (default if empty) or '%s'",
-				PodAntiAffinityTypePreferred, PodAntiAffinityTypeRequired),
+				apiv1.PodAntiAffinityTypePreferred, apiv1.PodAntiAffinityTypeRequired),
 		))
 	}
 	return allErrors
 }
 
 // validateBackupConfiguration validates the backup configuration
-func (r *Cluster) validateBackupConfiguration() field.ErrorList {
+func (v *ClusterCustomValidator) validateBackupConfiguration(r *apiv1.Cluster) field.ErrorList {
 	if r.Spec.Backup == nil {
 		return nil
 	}
@@ -2201,7 +2014,7 @@ func (r *Cluster) validateBackupConfiguration() field.ErrorList {
 }
 
 // validateRetentionPolicy validates the retention policy configuration
-func (r *Cluster) validateRetentionPolicy() field.ErrorList {
+func (v *ClusterCustomValidator) validateRetentionPolicy(r *apiv1.Cluster) field.ErrorList {
 	if r.Spec.Backup == nil {
 		return nil
 	}
@@ -2211,13 +2024,13 @@ func (r *Cluster) validateRetentionPolicy() field.ErrorList {
 	)
 }
 
-func (r *Cluster) validateReplicationSlots() field.ErrorList {
+func (v *ClusterCustomValidator) validateReplicationSlots(r *apiv1.Cluster) field.ErrorList {
 	if r.Spec.ReplicationSlots == nil {
-		r.Spec.ReplicationSlots = &ReplicationSlotsConfiguration{
-			HighAvailability: &ReplicationSlotsHAConfiguration{
+		r.Spec.ReplicationSlots = &apiv1.ReplicationSlotsConfiguration{
+			HighAvailability: &apiv1.ReplicationSlotsHAConfiguration{
 				Enabled: ptr.To(true),
 			},
-			SynchronizeReplicas: &SynchronizeReplicasConfiguration{
+			SynchronizeReplicas: &apiv1.SynchronizeReplicasConfiguration{
 				Enabled: ptr.To(true),
 			},
 		}
@@ -2228,7 +2041,7 @@ func (r *Cluster) validateReplicationSlots() field.ErrorList {
 		return nil
 	}
 
-	if errs := r.Spec.ReplicationSlots.SynchronizeReplicas.compileRegex(); len(errs) > 0 {
+	if errs := r.Spec.ReplicationSlots.SynchronizeReplicas.ValidateRegex(); len(errs) > 0 {
 		return field.ErrorList{
 			field.Invalid(
 				field.NewPath("spec", "replicationSlots", "synchronizeReplicas", "excludePatterns"),
@@ -2240,7 +2053,7 @@ func (r *Cluster) validateReplicationSlots() field.ErrorList {
 	return nil
 }
 
-func (r *Cluster) validateReplicationSlotsChange(old *Cluster) field.ErrorList {
+func (v *ClusterCustomValidator) validateReplicationSlotsChange(r, old *apiv1.Cluster) field.ErrorList {
 	newReplicationSlots := r.Spec.ReplicationSlots
 	oldReplicationSlots := old.Spec.ReplicationSlots
 
@@ -2276,7 +2089,7 @@ func (r *Cluster) validateReplicationSlotsChange(old *Cluster) field.ErrorList {
 	return errs
 }
 
-func (r *Cluster) validateWALLevelChange(old *Cluster) field.ErrorList {
+func (v *ClusterCustomValidator) validateWALLevelChange(r, old *apiv1.Cluster) field.ErrorList {
 	var errs field.ErrorList
 
 	newWALLevel := r.Spec.PostgresConfiguration.Parameters[postgres.ParameterWalLevel]
@@ -2293,7 +2106,7 @@ func (r *Cluster) validateWALLevelChange(old *Cluster) field.ErrorList {
 	return errs
 }
 
-func (r *Cluster) validateManagedServices() field.ErrorList {
+func (v *ClusterCustomValidator) validateManagedServices(r *apiv1.Cluster) field.ErrorList {
 	reservedNames := []string{
 		r.GetServiceReadWriteName(),
 		r.GetServiceReadOnlyName(),
@@ -2319,10 +2132,10 @@ func (r *Cluster) validateManagedServices() field.ErrorList {
 	basePath := field.NewPath("spec", "managed", "services")
 	var errs field.ErrorList
 
-	if slices.Contains(managedServices.DisabledDefaultServices, ServiceSelectorTypeRW) {
+	if slices.Contains(managedServices.DisabledDefaultServices, apiv1.ServiceSelectorTypeRW) {
 		errs = append(errs, field.Invalid(
 			basePath.Child("disabledDefaultServices"),
-			ServiceSelectorTypeRW,
+			apiv1.ServiceSelectorTypeRW,
 			"service of type RW cannot be disabled.",
 		))
 	}
@@ -2366,7 +2179,7 @@ func (r *Cluster) validateManagedServices() field.ErrorList {
 func validateServiceTemplate(
 	path *field.Path,
 	nameRequired bool,
-	template ServiceTemplateSpec,
+	template apiv1.ServiceTemplateSpec,
 ) field.ErrorList {
 	var errs field.ErrorList
 
@@ -2386,7 +2199,7 @@ func validateServiceTemplate(
 }
 
 // validateManagedRoles validate the environment variables settings proposed by the user
-func (r *Cluster) validateManagedRoles() field.ErrorList {
+func (v *ClusterCustomValidator) validateManagedRoles(r *apiv1.Cluster) field.ErrorList {
 	var result field.ErrorList
 
 	if r.Spec.Managed == nil {
@@ -2435,14 +2248,14 @@ func (r *Cluster) validateManagedRoles() field.ErrorList {
 }
 
 // validateManagedExtensions validate the managed extensions parameters set by the user
-func (r *Cluster) validateManagedExtensions() field.ErrorList {
+func (v *ClusterCustomValidator) validateManagedExtensions(r *apiv1.Cluster) field.ErrorList {
 	allErrors := field.ErrorList{}
 
-	allErrors = append(allErrors, r.validatePgFailoverSlots()...)
+	allErrors = append(allErrors, v.validatePgFailoverSlots(r)...)
 	return allErrors
 }
 
-func (r *Cluster) validatePgFailoverSlots() field.ErrorList {
+func (v *ClusterCustomValidator) validatePgFailoverSlots(r *apiv1.Cluster) field.ErrorList {
 	var result field.ErrorList
 	var pgFailoverSlots postgres.ManagedExtension
 
@@ -2502,11 +2315,11 @@ func (r *Cluster) validatePgFailoverSlots() field.ErrorList {
 	return result
 }
 
-func (r *Cluster) getAdmissionWarnings() admission.Warnings {
-	return r.getMaintenanceWindowsAdmissionWarnings()
+func (v *ClusterCustomValidator) getAdmissionWarnings(r *apiv1.Cluster) admission.Warnings {
+	return getMaintenanceWindowsAdmissionWarnings(r)
 }
 
-func (r *Cluster) getMaintenanceWindowsAdmissionWarnings() admission.Warnings {
+func getMaintenanceWindowsAdmissionWarnings(r *apiv1.Cluster) admission.Warnings {
 	var result admission.Warnings
 
 	if r.Spec.NodeMaintenanceWindow != nil {
@@ -2518,7 +2331,7 @@ func (r *Cluster) getMaintenanceWindowsAdmissionWarnings() admission.Warnings {
 }
 
 // validate whether the hibernation configuration is valid
-func (r *Cluster) validateHibernationAnnotation() field.ErrorList {
+func (v *ClusterCustomValidator) validateHibernationAnnotation(r *apiv1.Cluster) field.ErrorList {
 	value, ok := r.Annotations[utils.HibernationAnnotationName]
 	isKnownValue := value == string(utils.HibernationAnnotationValueOn) ||
 		value == string(utils.HibernationAnnotationValueOff)
