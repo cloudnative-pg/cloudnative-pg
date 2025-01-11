@@ -113,7 +113,7 @@ func (v *ClusterCustomValidator) ValidateCreate(_ context.Context, obj runtime.O
 		return allWarnings, nil
 	}
 
-	return nil, apierrors.NewInvalid(
+	return allWarnings, apierrors.NewInvalid(
 		schema.GroupKind{Group: "postgresql.cnpg.io", Kind: "Cluster"},
 		cluster.Name, allErrs)
 }
@@ -142,12 +142,13 @@ func (v *ClusterCustomValidator) ValidateUpdate(
 		v.validate(cluster),
 		v.validateClusterChanges(cluster, oldCluster)...,
 	)
+	allWarnings := v.getAdmissionWarnings(cluster)
 
 	if len(allErrs) == 0 {
-		return v.getAdmissionWarnings(cluster), nil
+		return allWarnings, nil
 	}
 
-	return nil, apierrors.NewInvalid(
+	return allWarnings, apierrors.NewInvalid(
 		schema.GroupKind{Group: "cluster.cnpg.io", Kind: "Cluster"},
 		cluster.Name, allErrs)
 }
