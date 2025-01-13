@@ -2174,6 +2174,16 @@ type PluginConfiguration struct {
 	// +optional
 	Enabled *bool `json:"enabled,omitempty"`
 
+	// Only one plugin can be declared as WALArchiver . Cannot be active at the same time with the "backup" field
+	// +kubebuilder:default:=false
+	// +optional
+	IsWALArchiver *bool `json:"isWALArchiver,omitempty"`
+
+	// Only one plugin can be declared as BackupExecutor. Cannot be active at the same time with the "backup" field
+	// +kubebuilder:default:=false
+	// +optional
+	IsBackupExecutor *bool `json:"isBackupExecutor,omitempty"`
+
 	// Parameters is the configuration of the plugin
 	// +optional
 	Parameters map[string]string `json:"parameters,omitempty"`

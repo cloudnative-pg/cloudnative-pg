@@ -148,9 +148,8 @@ func internalRun(
 	contextLog := log.FromContext(ctx)
 	startTime := time.Now()
 
-	// Request the plugins to archive this WAL
-	if err := archiveWALViaPlugins(ctx, cluster, path.Join(pgData, walName)); err != nil {
-		return err
+	if cluster.GetEnabledWALArchivePluginName() != "" {
+		return archiveWALViaPlugins(ctx, cluster, path.Join(pgData, walName))
 	}
 
 	// Request Barman Cloud to archive this WAL
@@ -266,11 +265,16 @@ func archiveWALViaPlugins(
 	availablePluginNamesSet := stringset.From(availablePluginNames)
 	enabledPluginNamesSet := stringset.From(
 		apiv1.GetPluginConfigurationEnabledPluginNames(cluster.Spec.Plugins))
+	availableAndEnabled := stringset.From(availablePluginNamesSet.Intersect(enabledPluginNamesSet).ToList())
+
+	if !availableAndEnabled.Has(cluster.GetEnabledWALArchivePluginName()) {
+		return fmt.Errorf("wal archive plugin is enabled but not available: %s", cluster.GetEnabledWALArchivePluginName())
+	}
 
 	client, err := pluginClient.WithPlugins(
 		ctx,
 		plugins,
-		availablePluginNamesSet.Intersect(enabledPluginNamesSet).ToList()...,
+		availableAndEnabled.ToList()...,
 	)
 	if err != nil {
 		contextLogger.Error(err, "Error while loading required plugins")

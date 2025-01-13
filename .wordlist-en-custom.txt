@@ -27,6 +27,7 @@ Azurite
 BDR
 BackupCapabilities
 BackupConfiguration
+BackupExecutor
 BackupFrom
 BackupLabelFile
 BackupList
@@ -492,6 +493,7 @@ VolumeSnapshotConfiguration
 VolumeSnapshots
 WAL
 WAL's
+WALArchiver
 WALBackupConfiguration
 WALCapabilities
 WALs
@@ -875,8 +877,10 @@ io
 ip
 ipcs
 ips
+isBackupExecutor
 isPrimary
 isTemplate
+isWALArchiver
 issuecomment
 italy
 jdbc
