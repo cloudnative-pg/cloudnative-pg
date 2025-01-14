@@ -18,10 +18,12 @@ package webserver
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	pgTime "github.com/cloudnative-pg/machinery/pkg/postgres/time"
+	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
@@ -85,15 +87,30 @@ func (b *PluginBackupCommand) invokeStart(ctx context.Context) {
 		"backupNamespace", b.Backup.Name)
 
 	plugins := repository.New()
-	if _, err := plugins.RegisterUnixSocketPluginsInPath(configuration.Current.PluginSocketDir); err != nil {
+	availablePlugins, err := plugins.RegisterUnixSocketPluginsInPath(configuration.Current.PluginSocketDir)
+	if err != nil {
 		contextLogger.Error(err, "Error while discovering plugins")
 	}
 	defer plugins.Close()
 
+	availablePluginNamesSet := stringset.From(availablePlugins)
+
+	enabledPluginNamesSet := stringset.From(
+		apiv1.GetPluginConfigurationEnabledPluginNames(b.Cluster.Spec.Plugins))
+	availableAndEnabled := stringset.From(availablePluginNamesSet.Intersect(enabledPluginNamesSet).ToList())
+
+	if !availableAndEnabled.Has(b.Cluster.GetEnabledBackupExecutorPluginName()) {
+		b.markBackupAsFailed(
+			ctx,
+			fmt.Errorf("backupExecutor plugin is not available: %s", b.Cluster.GetEnabledBackupExecutorPluginName()),
+		)
+		return
+	}
+
 	cli, err := pluginClient.WithPlugins(
 		ctx,
 		plugins,
-		apiv1.GetPluginConfigurationEnabledPluginNames(b.Cluster.Spec.Plugins)...,
+		availableAndEnabled.ToList()...,
 	)
 	if err != nil {
 		b.markBackupAsFailed(ctx, err)
