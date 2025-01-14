@@ -91,7 +91,7 @@ jobs:
     needs:
       - check-version
     outputs:
-      version: ${{ steps.build-meta.outputs.version }}
+      version: ${{ env.VERSION }}
       author_name: ${{ steps.build-meta.outputs.author_name }}
       author_email: ${{ steps.build-meta.outputs.author_email }}
       digest: ${{ steps.build.outputs.digest }}
@@ -127,7 +127,7 @@ jobs:
           commit_short=$(git rev-parse --short "${commit_sha}")
           echo "IMAGES=${images}" >> $GITHUB_ENV
           echo "DATE=${commit_date}" >> $GITHUB_ENV
-          echo "version=${commit_version}" >> $GITHUB_OUTPUT
+          echo "VERSION=${commit_version}" >> $GITHUB_ENV
           echo "COMMIT=${commit_short}" >> $GITHUB_ENV
           echo "author_name=${author_name}" >> $GITHUB_OUTPUT
           echo "author_email=${author_email}" >> $GITHUB_OUTPUT
@@ -156,7 +156,6 @@ jobs:
         env:
           DATE: ${{ env.DATE }}
           COMMIT: ${{ env.COMMIT }}
-          VERSION: ${{ steps.build-meta.outputs.version }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
           NFPM_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
@@ -233,8 +232,15 @@ jobs:
           file: Dockerfile
           push: true
           build-args: |
-            VERSION=${{ steps.build-meta.outputs.version }}
+            VERSION=${{ env.VERSION }}
           tags: ${{ steps.docker-meta.outputs.tags }}
+      -
+        name: Generate SBOM for image
+        uses: anchore/sbom-action@v0.17.9
+        with:
+          image: ${{ steps.docker-meta.outputs.tags }}
+          artifact-name: cloudnative-pg-${{ env.VERSION }}.spdx
+          upload-artifact: false
       -
         name: Build and push UBI8
         uses: docker/build-push-action@v6
@@ -244,8 +250,15 @@ jobs:
           file: Dockerfile-ubi8
           push: true
           build-args: |
-            VERSION=${{ steps.build-meta.outputs.version }}
+            VERSION=${{ env.VERSION }}
           tags: ${{ steps.docker-meta-ubi8.outputs.tags }}
+      -
+        name: Generate SBOM for image UBI8
+        uses: anchore/sbom-action@v0.17.9
+        with:
+          image: ${{ steps.docker-meta-ubi8.outputs.tags }}
+          artifact-name: cloudnative-pg-${{ env.VERSION }}-ubi8.spdx
+          upload-artifact: false
       -
         name: Build and push UBI9
         uses: docker/build-push-action@v6
@@ -255,8 +268,20 @@ jobs:
           file: Dockerfile-ubi9
           push: true
           build-args: |
-            VERSION=${{ steps.build-meta.outputs.version }}
+            VERSION=${{ env.VERSION }}
           tags: ${{ steps.docker-meta-ubi9.outputs.tags }}
+      -
+        name: Generate SBOM for image UBI9
+        uses: anchore/sbom-action@v0.17.9
+        with:
+          image: ${{ steps.docker-meta-ubi9.outputs.tags }}
+          artifact-name: cloudnative-pg-${{ env.VERSION }}-ubi9.spdx
+          upload-artifact: false
+      -
+        name: publish SBOMs
+        uses: anchore/sbom-action/publish-sbom@v0.17.9
+        with:
+          sbom-artifact-match: ".*\\.spdx$"
 
   olm-bundle:
     name: Create OLM bundle and catalog
