@@ -224,7 +224,7 @@ prometheusrules.monitoring.coreos.com       <timestamp>
 as well as a series of Services:
 
 ``` sh
-% kubectl get svc     
+% kubectl get service     
 NAME                                      TYPE        PORT(S)
 …                                         …           …
 prometheus-community-grafana              ClusterIP   80/TCP
