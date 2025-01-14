@@ -91,7 +91,7 @@ jobs:
     needs:
       - check-version
     outputs:
-      version: ${{ steps.build-meta.outputs.version }}
+      version: ${{ env.VERSION }}
       author_name: ${{ steps.build-meta.outputs.author_name }}
       author_email: ${{ steps.build-meta.outputs.author_email }}
       digest: ${{ steps.build.outputs.digest }}
