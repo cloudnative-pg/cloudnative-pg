@@ -440,7 +440,7 @@ info | 1636383566.0664876 | postgres | record
 You can list the backups that have been created for a named cluster with:
 
 ```shell
-kubectl get backup.postgresql.cnpg.io -l cnpg.io/cluster=<CLUSTER>
+kubectl get backups.postgresql.cnpg.io -l cnpg.io/cluster=<CLUSTER>
 ```
 
 ## Storage information
