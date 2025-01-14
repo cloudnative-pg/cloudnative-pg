@@ -283,199 +283,199 @@ jobs:
         with:
           sbom-artifact-match: ".*\\.spdx$"
 
-  olm-bundle:
-    name: Create OLM bundle and catalog
-    runs-on: ubuntu-24.04
-    needs:
-      - check-version
-      - release-binaries
-    if: |
-      (always() && !cancelled()) &&
-      needs.release-binaries.result == 'success' &&
-      needs.check-version.outputs.is_latest == 'true' &&
-      needs.check-version.outputs.is_stable == 'true'
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+  # olm-bundle:
+  #   name: Create OLM bundle and catalog
+  #   runs-on: ubuntu-24.04
+  #   needs:
+  #     - check-version
+  #     - release-binaries
+  #   if: |
+  #     (always() && !cancelled()) &&
+  #     needs.release-binaries.result == 'success' &&
+  #     needs.check-version.outputs.is_latest == 'true' &&
+  #     needs.check-version.outputs.is_stable == 'true'
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
+  #       with:
+  #         fetch-depth: 0
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: ${{ needs.release-binaries.outputs.platforms }}
+  #     - name: Set up QEMU
+  #       uses: docker/setup-qemu-action@v3
+  #       with:
+  #         platforms: ${{ needs.release-binaries.outputs.platforms }}
 
-      - name: Install Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GOLANG_VERSION }}
-          check-latest: true
+  #     - name: Install Go
+  #       uses: actions/setup-go@v5
+  #       with:
+  #         go-version: ${{ env.GOLANG_VERSION }}
+  #         check-latest: true
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+  #     - name: Set up Docker Buildx
+  #       uses: docker/setup-buildx-action@v3
 
-      - name: Login to ghcr.io
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+  #     - name: Login to ghcr.io
+  #       uses: docker/login-action@v3
+  #       with:
+  #         registry: ghcr.io
+  #         username: ${{ github.actor }}
+  #         password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set bundle variables
-        run: |
-          tag="${GITHUB_REF#refs/tags/v}"
-          version="${tag#v}"
-          LOWERCASE_CNPG_IMAGE_NAME=${CNPG_IMAGE_NAME,,}
-          echo "IMAGE_NAME=${LOWERCASE_CNPG_IMAGE_NAME}" >> $GITHUB_ENV
-          echo "CONTROLLER_IMG=${LOWERCASE_CNPG_IMAGE_NAME}:${version}-ubi8" >> $GITHUB_ENV
-          echo "BUNDLE_IMG=${LOWERCASE_CNPG_IMAGE_NAME}:bundle-${version}" >> $GITHUB_ENV
-          echo "CATALOG_IMG=${LOWERCASE_CNPG_IMAGE_NAME}:catalog-${version}" >> $GITHUB_ENV
+  #     - name: Set bundle variables
+  #       run: |
+  #         tag="${GITHUB_REF#refs/tags/v}"
+  #         version="${tag#v}"
+  #         LOWERCASE_CNPG_IMAGE_NAME=${CNPG_IMAGE_NAME,,}
+  #         echo "IMAGE_NAME=${LOWERCASE_CNPG_IMAGE_NAME}" >> $GITHUB_ENV
+  #         echo "CONTROLLER_IMG=${LOWERCASE_CNPG_IMAGE_NAME}:${version}-ubi8" >> $GITHUB_ENV
+  #         echo "BUNDLE_IMG=${LOWERCASE_CNPG_IMAGE_NAME}:bundle-${version}" >> $GITHUB_ENV
+  #         echo "CATALOG_IMG=${LOWERCASE_CNPG_IMAGE_NAME}:catalog-${version}" >> $GITHUB_ENV
 
-      - name: Create bundle
-        env:
-          IMAGE_NAME: ${{ env.IMAGE_NAME }}
-          CONTROLLER_IMG: ${{ env.CONTROLLER_IMG }}
-          BUNDLE_IMG: ${{ env.BUNDLE_IMG }}
-          CATALOG_IMG: ${{ env.CATALOG_IMG }}
-        run: |
-          make olm-catalog
+  #     - name: Create bundle
+  #       env:
+  #         IMAGE_NAME: ${{ env.IMAGE_NAME }}
+  #         CONTROLLER_IMG: ${{ env.CONTROLLER_IMG }}
+  #         BUNDLE_IMG: ${{ env.BUNDLE_IMG }}
+  #         CATALOG_IMG: ${{ env.CATALOG_IMG }}
+  #       run: |
+  #         make olm-catalog
 
-      - name: Archive the bundle manifests
-        uses: actions/upload-artifact@v4
-        with:
-          name: bundle
-          path: |
-            bundle.Dockerfile
-            bundle/
-            cloudnative-pg-catalog.yaml
+  #     - name: Archive the bundle manifests
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: bundle
+  #         path: |
+  #           bundle.Dockerfile
+  #           bundle/
+  #           cloudnative-pg-catalog.yaml
 
-  operatorhub_pr:
-    name: Create remote PR for OperatorHub
-    runs-on: ubuntu-24.04
-    needs:
-      - release-binaries
-      - olm-bundle
-    if: |
-      (always() && !cancelled()) &&
-      needs.olm-bundle.result == 'success'
-    env:
-      VERSION: ${{ needs.release-binaries.outputs.version }}
-    steps:
-      - name: Checkout community-operators
-        uses: actions/checkout@v4
-        with:
-          repository: k8s-operatorhub/community-operators
-          fetch-depth: 0
-          persist-credentials: false
+  # operatorhub_pr:
+  #   name: Create remote PR for OperatorHub
+  #   runs-on: ubuntu-24.04
+  #   needs:
+  #     - release-binaries
+  #     - olm-bundle
+  #   if: |
+  #     (always() && !cancelled()) &&
+  #     needs.olm-bundle.result == 'success'
+  #   env:
+  #     VERSION: ${{ needs.release-binaries.outputs.version }}
+  #   steps:
+  #     - name: Checkout community-operators
+  #       uses: actions/checkout@v4
+  #       with:
+  #         repository: k8s-operatorhub/community-operators
+  #         fetch-depth: 0
+  #         persist-credentials: false
 
-      - name: Download the bundle
-        uses: actions/download-artifact@v4
-        with:
-          name: bundle
+  #     - name: Download the bundle
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: bundle
 
-      - name: Copy bundle in the community-operators
-        run: |
-          mkdir -p "operators/cloudnative-pg/${{ env.VERSION }}"
-          cp -R bundle/* "operators/cloudnative-pg/${{ env.VERSION }}"
-          rm -fr cloudnative-pg-catalog.yaml bundle.Dockerfile *.zip bundle/
+  #     - name: Copy bundle in the community-operators
+  #       run: |
+  #         mkdir -p "operators/cloudnative-pg/${{ env.VERSION }}"
+  #         cp -R bundle/* "operators/cloudnative-pg/${{ env.VERSION }}"
+  #         rm -fr cloudnative-pg-catalog.yaml bundle.Dockerfile *.zip bundle/
 
-      - name: Create Remote Pull Request
-        uses: peter-evans/create-pull-request@v7
-        with:
-          token: ${{ secrets.REPO_GHA_PAT }}
-          commit-message: "operator cloudnative-pg (${{ env.VERSION }})"
-          title: "operator cloudnative-pg (${{ env.VERSION }})"
-          signoff: true
-          branch: release-cloudnativepg-${{ env.VERSION }}
-          delete-branch: true
-          push-to-fork: cloudnative-pg/community-operators
-          body: |
-            Thanks submitting your Operator. Please check below list before you create your Pull Request.
-            ### Updates to existing Operators
+  #     - name: Create Remote Pull Request
+  #       uses: peter-evans/create-pull-request@v7
+  #       with:
+  #         token: ${{ secrets.REPO_GHA_PAT }}
+  #         commit-message: "operator cloudnative-pg (${{ env.VERSION }})"
+  #         title: "operator cloudnative-pg (${{ env.VERSION }})"
+  #         signoff: true
+  #         branch: release-cloudnativepg-${{ env.VERSION }}
+  #         delete-branch: true
+  #         push-to-fork: cloudnative-pg/community-operators
+  #         body: |
+  #           Thanks submitting your Operator. Please check below list before you create your Pull Request.
+  #           ### Updates to existing Operators
 
-              * [x]  Did you create a `ci.yaml` file according to the [update instructions](https://github.com/operator-framework/community-operators/blob/master/docs/operator-ci-yaml.md)?
-              * [x]  Is your new CSV pointing to the previous version with the `replaces` property if you chose `replaces-mode` via the `updateGraph` property in `ci.yaml`?
-              * [x]  Is your new CSV referenced in the [appropriate channel](https://github.com/operator-framework/community-operators/blob/master/docs/packaging-operator.md#channels) defined in the `package.yaml` or `annotations.yaml` ?
-              * [x]  Have you tested an update to your Operator when deployed via OLM?
-              * [x]  Is your submission [signed](https://github.com/operator-framework/community-operators/blob/master/docs/contributing-prerequisites.md#sign-your-work)?
+  #             * [x]  Did you create a `ci.yaml` file according to the [update instructions](https://github.com/operator-framework/community-operators/blob/master/docs/operator-ci-yaml.md)?
+  #             * [x]  Is your new CSV pointing to the previous version with the `replaces` property if you chose `replaces-mode` via the `updateGraph` property in `ci.yaml`?
+  #             * [x]  Is your new CSV referenced in the [appropriate channel](https://github.com/operator-framework/community-operators/blob/master/docs/packaging-operator.md#channels) defined in the `package.yaml` or `annotations.yaml` ?
+  #             * [x]  Have you tested an update to your Operator when deployed via OLM?
+  #             * [x]  Is your submission [signed](https://github.com/operator-framework/community-operators/blob/master/docs/contributing-prerequisites.md#sign-your-work)?
 
-            ### Your submission should not
-              * [x]  Modify more than one operator
-              * [x]  Modify an Operator you don't own
-              * [x]  Rename an operator - please remove and add with a different name instead
-              * [x]  Modify any files outside the above mentioned folders
-              * [x]  Contain more than one commit. **Please squash your commits.**
+  #           ### Your submission should not
+  #             * [x]  Modify more than one operator
+  #             * [x]  Modify an Operator you don't own
+  #             * [x]  Rename an operator - please remove and add with a different name instead
+  #             * [x]  Modify any files outside the above mentioned folders
+  #             * [x]  Contain more than one commit. **Please squash your commits.**
 
-            ### Operator Description must contain (in order)
-              1. [x]  Description about the managed Application and where to find more information
-              2. [x]  Features and capabilities of your Operator and how to use it
-              3. [x]  Any manual steps about potential pre-requisites for using your Operator
+  #           ### Operator Description must contain (in order)
+  #             1. [x]  Description about the managed Application and where to find more information
+  #             2. [x]  Features and capabilities of your Operator and how to use it
+  #             3. [x]  Any manual steps about potential pre-requisites for using your Operator
 
-            ### Operator Metadata should contain
-              * [x]  Human readable name and 1-liner description about your Operator
-              * [x]  Valid [category name](https://github.com/operator-framework/community-operators/blob/master/docs/packaging-operator.md#categories)<sup>1</sup>
-              * [x]  One of the pre-defined [capability levels](https://github.com/operator-framework/operator-courier/blob/4d1a25d2c8d52f7de6297ec18d8afd6521236aa2/operatorcourier/validate.py#L556)<sup>2</sup>
-              * [x]  Links to the maintainer, source code and documentation
-              * [x]  Example templates for all Custom Resource Definitions intended to be used
-              * [x]  A quadratic logo
+  #           ### Operator Metadata should contain
+  #             * [x]  Human readable name and 1-liner description about your Operator
+  #             * [x]  Valid [category name](https://github.com/operator-framework/community-operators/blob/master/docs/packaging-operator.md#categories)<sup>1</sup>
+  #             * [x]  One of the pre-defined [capability levels](https://github.com/operator-framework/operator-courier/blob/4d1a25d2c8d52f7de6297ec18d8afd6521236aa2/operatorcourier/validate.py#L556)<sup>2</sup>
+  #             * [x]  Links to the maintainer, source code and documentation
+  #             * [x]  Example templates for all Custom Resource Definitions intended to be used
+  #             * [x]  A quadratic logo
 
-            Remember that you can preview your CSV [here](https://operatorhub.io/preview).
-            --
-            <sup>1</sup> If you feel your Operator does not fit any of the pre-defined categories, file an issue against this repo and explain your need
-            <sup>2</sup> For more information see [here](https://sdk.operatorframework.io/docs/overview/#operator-capability-level)
+  #           Remember that you can preview your CSV [here](https://operatorhub.io/preview).
+  #           --
+  #           <sup>1</sup> If you feel your Operator does not fit any of the pre-defined categories, file an issue against this repo and explain your need
+  #           <sup>2</sup> For more information see [here](https://sdk.operatorframework.io/docs/overview/#operator-capability-level)
 
-  publish_bundle:
-    name: Publish OLM Bundle
-    needs:
-      - olm-bundle
-      - release-binaries
-    if: |
-      (always() && !cancelled()) &&
-      needs.olm-bundle.result == 'success' &&
-      github.repository_owner == 'cloudnative-pg'
-    env:
-      VERSION: ${{ needs.release-binaries.outputs.version }}
-    runs-on: ubuntu-24.04
-    steps:
-      -
-        name: Checkout artifact
-        uses: actions/checkout@v4
-        with:
-          repository: cloudnative-pg/artifacts
-          token: ${{ secrets.REPO_GHA_PAT }}
-          ref: main
-          fetch-depth: 0
-      -
-        name: Configure git user
-        run: |
-          git config user.email "${{ needs.release-binaries.outputs.author_email }}"
-          git config user.name "${{ needs.release-binaries.outputs.author_name }}"
-      -
-        name: Download the bundle
-        uses: actions/download-artifact@v4
-        with:
-          name: bundle
-      -
-        name: Copy the bundle
-        run: |
-          mkdir -p "bundles/${{ env.VERSION }}"
-          cp -R bundle/* "bundles/${{ env.VERSION }}"
-          rm -fr cloudnative-pg-catalog.yaml bundle.Dockerfile *.zip bundle/
-      -
-        name: Prepare commit message
-        env:
-          COMMIT_MESSAGE: |
-            operator cloudnative-pg (${{ env.VERSION }})
-        run: |
-          # Skip creating the commit if there are no changes
-          [ -n "$(git status -s)" ] || exit 0
+  # publish_bundle:
+  #   name: Publish OLM Bundle
+  #   needs:
+  #     - olm-bundle
+  #     - release-binaries
+  #   if: |
+  #     (always() && !cancelled()) &&
+  #     needs.olm-bundle.result == 'success' &&
+  #     github.repository_owner == 'cloudnative-pg'
+  #   env:
+  #     VERSION: ${{ needs.release-binaries.outputs.version }}
+  #   runs-on: ubuntu-24.04
+  #   steps:
+  #     -
+  #       name: Checkout artifact
+  #       uses: actions/checkout@v4
+  #       with:
+  #         repository: cloudnative-pg/artifacts
+  #         token: ${{ secrets.REPO_GHA_PAT }}
+  #         ref: main
+  #         fetch-depth: 0
+  #     -
+  #       name: Configure git user
+  #       run: |
+  #         git config user.email "${{ needs.release-binaries.outputs.author_email }}"
+  #         git config user.name "${{ needs.release-binaries.outputs.author_name }}"
+  #     -
+  #       name: Download the bundle
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: bundle
+  #     -
+  #       name: Copy the bundle
+  #       run: |
+  #         mkdir -p "bundles/${{ env.VERSION }}"
+  #         cp -R bundle/* "bundles/${{ env.VERSION }}"
+  #         rm -fr cloudnative-pg-catalog.yaml bundle.Dockerfile *.zip bundle/
+  #     -
+  #       name: Prepare commit message
+  #       env:
+  #         COMMIT_MESSAGE: |
+  #           operator cloudnative-pg (${{ env.VERSION }})
+  #       run: |
+  #         # Skip creating the commit if there are no changes
+  #         [ -n "$(git status -s)" ] || exit 0
 
-          git add bundles/${{ env.VERSION }}
-          git commit -sm "${COMMIT_MESSAGE}"
-      -
-        name: Push commit
-        uses: ad-m/github-push-action@v0.8.0
-        with:
-          github_token: ${{ secrets.REPO_GHA_PAT }}
-          repository: cloudnative-pg/artifacts
-          branch: "main"
+  #         git add bundles/${{ env.VERSION }}
+  #         git commit -sm "${COMMIT_MESSAGE}"
+  #     -
+  #       name: Push commit
+  #       uses: ad-m/github-push-action@v0.8.0
+  #       with:
+  #         github_token: ${{ secrets.REPO_GHA_PAT }}
+  #         repository: cloudnative-pg/artifacts
+  #         branch: "main"
