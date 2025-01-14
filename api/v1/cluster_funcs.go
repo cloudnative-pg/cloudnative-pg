@@ -1493,3 +1493,14 @@ func (cluster *Cluster) GetEnabledWALArchivePluginName() string {
 
 	return ""
 }
+
+// GetEnabledBackupExecutorPluginName returns the name of the enabled backup executor plugin or an empty string
+func (cluster *Cluster) GetEnabledBackupExecutorPluginName() string {
+	for _, plugin := range cluster.Spec.Plugins {
+		if plugin.IsEnabled() && plugin.IsBackupExecutor != nil && *plugin.IsBackupExecutor {
+			return plugin.Name
+		}
+	}
+
+	return ""
+}
