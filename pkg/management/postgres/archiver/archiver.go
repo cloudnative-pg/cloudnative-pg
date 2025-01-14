@@ -268,7 +268,7 @@ func archiveWALViaPlugins(
 	availableAndEnabled := stringset.From(availablePluginNamesSet.Intersect(enabledPluginNamesSet).ToList())
 
 	if !availableAndEnabled.Has(cluster.GetEnabledWALArchivePluginName()) {
-		return fmt.Errorf("wal archive plugin is enabled but not available: %s", cluster.GetEnabledWALArchivePluginName())
+		return fmt.Errorf("wal archive plugin is not available: %s", cluster.GetEnabledWALArchivePluginName())
 	}
 
 	client, err := pluginClient.WithPlugins(
