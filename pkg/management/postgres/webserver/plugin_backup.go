@@ -18,6 +18,7 @@ package webserver
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -85,6 +86,13 @@ func (b *PluginBackupCommand) invokeStart(ctx context.Context) {
 		"pluginConfiguration", b.Backup.Spec.PluginConfiguration,
 		"backupName", b.Backup.Name,
 		"backupNamespace", b.Backup.Name)
+
+	if b.Cluster.GetEnabledBackupExecutorPluginName() == "" {
+		err := errors.New("plugin backup was invoked but no backupExecutor plugin is configured")
+		contextLogger.Error(err, "Error while starting plugin backup")
+		b.markBackupAsFailed(ctx, err)
+		return
+	}
 
 	plugins := repository.New()
 	availablePlugins, err := plugins.RegisterUnixSocketPluginsInPath(configuration.Current.PluginSocketDir)
