@@ -86,6 +86,7 @@ type clusterOwnedResourceWithStatus interface {
 	GetClusterRef() corev1.LocalObjectReference
 	GetStatusMessage() string
 	SetAsFailed(err error)
+	SetStatusObservedGeneration(obsGeneration int64)
 }
 
 func toSliceWithPointers[T any](items []T) []*T {
@@ -121,8 +122,9 @@ func notifyOwnedResourceDeletion[T clusterOwnedResourceWithStatus](
 
 		if obj.GetStatusMessage() != statusMessage {
 			obj.SetAsFailed(errors.New(statusMessage))
-			if err := cli.Status().Patch(ctx, obj, client.MergeFrom(origObj)); err != nil {
-				itemLogger.Error(err, "error while setting failed status for cluster deletion")
+			obj.SetStatusObservedGeneration(0)
+			if err := cli.Status().Update(ctx, obj); err != nil {
+				itemLogger.Error(err, "error while updating failed status for cluster deletion")
 				return err
 			}
 		}
