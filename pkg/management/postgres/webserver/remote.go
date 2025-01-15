@@ -145,19 +145,20 @@ func (ws *remoteWebserverEndpoints) isServerReady(w http.ResponseWriter, r *http
 	deadline, hasDeadline := ctx.Deadline()
 
 	if err != nil {
-		if errors.Is(err, context.Canceled) {
+		switch {
+		case errors.Is(err, context.Canceled):
 			log.Trace("Readiness probe context cancelled",
 				"err", err.Error(),
 				"duration", elapsed,
 				"hasDeadline", hasDeadline,
 				"deadline", deadline)
-		} else if errors.Is(err, context.DeadlineExceeded) {
+		case errors.Is(err, context.DeadlineExceeded):
 			log.Trace("Readiness probe timed out",
 				"err", err.Error(),
 				"duration", elapsed,
 				"hasDeadline", hasDeadline,
 				"deadline", deadline)
-		} else {
+		default:
 			log.Trace("Readiness probe failing",
 				"duration", elapsed,
 				"err", err.Error())
