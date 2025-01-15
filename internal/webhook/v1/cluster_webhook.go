@@ -78,7 +78,7 @@ var _ webhook.CustomDefaulter = &ClusterCustomDefaulter{}
 func (d *ClusterCustomDefaulter) Default(_ context.Context, obj runtime.Object) error {
 	cluster, ok := obj.(*apiv1.Cluster)
 	if !ok {
-		return fmt.Errorf("expected an Cluster object but got %T", obj)
+		return fmt.Errorf("expected a Cluster object but got %T", obj)
 	}
 	clusterLog.Info("Defaulting for Cluster", "name", cluster.GetName(), "namespace", cluster.GetNamespace())
 
