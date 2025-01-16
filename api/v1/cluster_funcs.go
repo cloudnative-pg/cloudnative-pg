@@ -1464,3 +1464,26 @@ func (p *Probe) ApplyInto(k8sProbe *corev1.Probe) {
 	k8sProbe.FailureThreshold = p.FailureThreshold
 	k8sProbe.TerminationGracePeriodSeconds = p.TerminationGracePeriodSeconds
 }
+
+// GetEnabledWALArchivePluginName returns the name of the enabled backup plugin or an empty string
+// if no backup plugin is enabled
+func (cluster *Cluster) GetEnabledWALArchivePluginName() string {
+	for _, plugin := range cluster.Spec.Plugins {
+		if plugin.IsEnabled() && plugin.IsWALArchiver != nil && *plugin.IsWALArchiver {
+			return plugin.Name
+		}
+	}
+
+	return ""
+}
+
+// GetEnabledBackupExecutorPluginName returns the name of the enabled backup executor plugin or an empty string
+func (cluster *Cluster) GetEnabledBackupExecutorPluginName() string {
+	for _, plugin := range cluster.Spec.Plugins {
+		if plugin.IsEnabled() && plugin.IsBackupExecutor != nil && *plugin.IsBackupExecutor {
+			return plugin.Name
+		}
+	}
+
+	return ""
+}
