@@ -303,9 +303,17 @@ const (
 	jobRoleFullRecovery     jobRole = "full-recovery"
 	jobRoleJoin             jobRole = "join"
 	jobRoleSnapshotRecovery jobRole = "snapshot-recovery"
+	jobMajorUpgrade         jobRole = "major-upgrade"
 )
 
-var jobRoleList = []jobRole{jobRoleImport, jobRoleInitDB, jobRolePGBaseBackup, jobRoleFullRecovery, jobRoleJoin}
+var jobRoleList = []jobRole{
+	jobRoleImport,
+	jobRoleInitDB,
+	jobRolePGBaseBackup,
+	jobRoleFullRecovery,
+	jobRoleJoin,
+	jobMajorUpgrade,
+}
 
 // getJobName returns a string indicating the job name
 func (role jobRole) getJobName(instanceName string) string {
@@ -336,6 +344,7 @@ func createPrimaryJob(cluster apiv1.Cluster, nodeSerial int, role jobRole, initC
 			Labels: map[string]string{
 				utils.InstanceNameLabelName: instanceName,
 				utils.ClusterLabelName:      cluster.Name,
+				utils.JobRoleLabelName:      string(role),
 			},
 		},
 		Spec: batchv1.JobSpec{

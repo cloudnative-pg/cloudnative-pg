@@ -1241,6 +1241,9 @@ func (v *ClusterCustomValidator) validateImageChange(r, old *apiv1.Cluster) fiel
 	}
 
 	old.Status.Image = ""
+	if old.Status.MajorVersionUpgradeFromImage != nil {
+		old.Status.Image = *old.Status.MajorVersionUpgradeFromImage
+	}
 	oldVersion, err = old.GetPostgresqlVersion()
 	if err != nil {
 		// The validation error will be already raised by the
@@ -1248,15 +1251,13 @@ func (v *ClusterCustomValidator) validateImageChange(r, old *apiv1.Cluster) fiel
 		return result
 	}
 
-	status := version.IsUpgradePossible(oldVersion, newVersion)
-
-	if !status {
+	if oldVersion.Major() > newVersion.Major() {
 		result = append(
 			result,
 			field.Invalid(
 				newImagePath,
 				newVersion,
-				fmt.Sprintf("can't upgrade between majors %v and %v",
+				fmt.Sprintf("can't downgrade from majors %v to %v",
 					oldVersion, newVersion)))
 	}
 

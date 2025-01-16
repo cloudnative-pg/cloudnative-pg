@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -56,8 +57,10 @@ import (
 	instanceReconciler "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/instance"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/replicaclusterswitch"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/status"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
 
 const (
@@ -311,6 +314,14 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		contextLogger.Info("Pre-reconcile hook stopped the reconciliation loop",
 			"hookResult", hookResult)
 		return hookResult.Result, hookResult.Err
+	}
+
+	// In-place Major Version Upgrades
+	if res, err := r.reconcileInPlaceMajorVersionUpgrades(ctx, cluster, resources); res != nil || err != nil {
+		if res != nil {
+			return *res, nil
+		}
+		return ctrl.Result{}, fmt.Errorf("cannot reconcile in-place major version upgrades: %w", err)
 	}
 
 	if cluster.Status.CurrentPrimary != "" &&
@@ -1439,4 +1450,145 @@ func (r *ClusterReconciler) markPVCReadyForCompletedJobs(
 	}
 
 	return nil
+}
+
+func (r *ClusterReconciler) reconcileInPlaceMajorVersionUpgrades(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	resources *managedResources,
+) (*ctrl.Result, error) {
+	contextLogger := log.FromContext(ctx)
+
+	if cluster.Status.MajorVersionUpgradeFromImage == nil {
+		return nil, nil
+	}
+
+	for _, job := range resources.jobs.Items {
+		if job.GetLabels()[utils.JobRoleLabelName] == "major-upgrade" {
+			return r.majorVersionUpgradeCheckForCompletion(ctx, cluster, job, resources)
+		}
+	}
+
+	contextLogger.Info("Reconciling in-place major version upgrades")
+
+	desiredVersion, err := cluster.GetPostgresqlVersion()
+	if err != nil {
+		return nil, err
+	}
+
+	_, primaryNodeSerial, err := getNodeSerialsFromPVCs(resources.pvcs.Items)
+	if err != nil {
+		return nil, err
+	}
+	if primaryNodeSerial == 0 {
+		return nil, fmt.Errorf("no primary pvc found")
+	}
+
+	foundSomethingToDelete := false
+	for _, pod := range resources.instances.Items {
+		foundSomethingToDelete = true
+
+		if pod.GetDeletionTimestamp() != nil {
+			continue
+		}
+
+		if err = r.Delete(ctx, &pod); err != nil {
+			return nil, err
+		}
+	}
+
+	for _, job := range resources.jobs.Items {
+		foundSomethingToDelete = true
+
+		if job.GetDeletionTimestamp() != nil {
+			continue
+		}
+
+		if err = r.Delete(ctx, &job, &client.DeleteOptions{
+			PropagationPolicy: ptr.To(metav1.DeletePropagationForeground),
+		}); err != nil {
+			return nil, err
+		}
+	}
+
+	if foundSomethingToDelete {
+		return &ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+	}
+
+	job := specs.CreateMajorUpgradeJob(cluster, primaryNodeSerial, *cluster.Status.MajorVersionUpgradeFromImage)
+
+	if err := ctrl.SetControllerReference(cluster, job, r.Scheme); err != nil {
+		contextLogger.Error(err, "Unable to set the owner reference for instance")
+		return nil, err
+	}
+
+	err = r.RegisterPhase(ctx, cluster, apiv1.PhaseMajorUpgrade,
+		fmt.Sprintf("Upgrading cluster to major version %v", desiredVersion.Major()))
+	if err != nil {
+		return nil, err
+	}
+
+	contextLogger.Info("Creating new major upgrade Job",
+		"jobName", job.Name,
+		"primary", true)
+
+	utils.SetOperatorVersion(&job.ObjectMeta, versions.Version)
+	utils.InheritAnnotations(&job.ObjectMeta, cluster.Annotations,
+		cluster.GetFixedInheritedAnnotations(), configuration.Current)
+	utils.InheritAnnotations(&job.Spec.Template.ObjectMeta, cluster.Annotations,
+		cluster.GetFixedInheritedAnnotations(), configuration.Current)
+	utils.InheritLabels(&job.ObjectMeta, cluster.Labels,
+		cluster.GetFixedInheritedLabels(), configuration.Current)
+	utils.InheritLabels(&job.Spec.Template.ObjectMeta, cluster.Labels,
+		cluster.GetFixedInheritedLabels(), configuration.Current)
+
+	if err = r.Create(ctx, job); err != nil {
+		if apierrs.IsAlreadyExists(err) {
+			// This Job was already created, maybe the cache is stale.
+			return &ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+		}
+
+		contextLogger.Error(err, "Unable to create job", "job", job)
+		return nil, err
+	}
+
+	return &ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+}
+
+func (r *ClusterReconciler) majorVersionUpgradeCheckForCompletion(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	job batchv1.Job,
+	resources *managedResources,
+) (*ctrl.Result, error) {
+	contextLogger := log.FromContext(ctx)
+
+	if !utils.JobHasOneCompletion(job) {
+		contextLogger.Info("Major upgrade in progress, waiting for it to finish")
+		return &ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+	}
+
+	for _, pvc := range resources.pvcs.Items {
+		if pvc.GetDeletionTimestamp() != nil {
+			continue
+		}
+
+		if specs.IsPrimary(pvc.ObjectMeta) {
+			continue
+		}
+
+		if err := r.Delete(ctx, &pvc); err != nil {
+			// Ignore if NotFound, otherwise report the error
+			if !apierrs.IsNotFound(err) {
+				return nil, err
+			}
+		}
+	}
+
+	return &ctrl.Result{Requeue: true}, status.PatchWithOptimisticLock(
+		ctx,
+		r.Client,
+		cluster,
+		status.SetMajorVersionUpgradeFromImage(nil),
+	)
 }
