@@ -60,7 +60,7 @@ var _ = Describe("Container Security Context creation", func() {
 		runtimeProfile := &corev1.SeccompProfile{
 			Type: corev1.SeccompProfileTypeRuntimeDefault,
 		}
-		securityContext := CreateContainerSecurityContext(cluster.GetSeccompProfile())
+		securityContext := cluster.GetSecurityContext()
 
 		Expect(securityContext.SeccompProfile).ToNot(BeNil())
 		Expect(securityContext.SeccompProfile).To(BeEquivalentTo(runtimeProfile))
@@ -76,7 +76,7 @@ var _ = Describe("Container Security Context creation", func() {
 			SeccompProfile: localhostProfile,
 		}}
 
-		securityContext := CreateContainerSecurityContext(cluster.GetSeccompProfile())
+		securityContext := cluster.GetSecurityContext()
 		Expect(securityContext.SeccompProfile).ToNot(BeNil())
 		Expect(securityContext.SeccompProfile).To(BeEquivalentTo(localhostProfile))
 		Expect(securityContext.SeccompProfile.LocalhostProfile).To(BeEquivalentTo(&profilePath))
