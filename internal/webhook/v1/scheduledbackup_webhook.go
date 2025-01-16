@@ -98,7 +98,7 @@ func (v *ScheduledBackupCustomValidator) ValidateCreate(
 		return warnings, nil
 	}
 
-	return nil, apierrors.NewInvalid(
+	return warnings, apierrors.NewInvalid(
 		schema.GroupKind{Group: "postgresql.cnpg.io", Kind: "ScheduledBackup"},
 		scheduledBackup.Name, allErrs)
 }
@@ -120,7 +120,7 @@ func (v *ScheduledBackupCustomValidator) ValidateUpdate(
 		return warnings, nil
 	}
 
-	return nil, apierrors.NewInvalid(
+	return warnings, apierrors.NewInvalid(
 		schema.GroupKind{Group: "scheduledBackup.cnpg.io", Kind: "ScheduledBackup"},
 		scheduledBackup.Name, allErrs)
 }
