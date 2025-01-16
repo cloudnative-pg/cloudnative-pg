@@ -27,6 +27,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -395,8 +396,11 @@ var _ = Describe("object metadata test", func() {
 			It("Should not change annotations if they already match the cluster's", func() {
 				pod := &corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:        "pod1",
-						Annotations: map[string]string{key: value},
+						Name: "pod1",
+						Annotations: map[string]string{
+							key:                                 value,
+							utils.OperatorVersionAnnotationName: versions.Version,
+						},
 					},
 				}
 
@@ -409,12 +413,16 @@ var _ = Describe("object metadata test", func() {
 					},
 				}
 
-				Expect(cluster.Spec.InheritedMetadata.Annotations).To(Equal(cluster.GetFixedInheritedAnnotations()))
+				expectedAnnotations := cluster.GetFixedInheritedAnnotations()
+				expectedAnnotations[utils.OperatorVersionAnnotationName] = versions.Version
+
+				Expect(expectedAnnotations).To(Equal(cluster.GetFixedInheritedAnnotations()))
 
 				updated := updateClusterAnnotations(context.Background(), cluster, pod)
 				Expect(updated).To(BeFalse())
-				Expect(pod.Annotations).To(HaveLen(1))
+				Expect(pod.Annotations).To(HaveLen(2))
 				Expect(pod.Annotations[key]).To(Equal(value))
+				Expect(pod.Annotations[utils.OperatorVersionAnnotationName]).To(Equal(versions.Version))
 			})
 
 			It("Should correctly add AppArmor annotations if present in the cluster's annotations", func() {
@@ -445,13 +453,16 @@ var _ = Describe("object metadata test", func() {
 				pod := &corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "pod1",
+						Annotations: map[string]string{
+							utils.OperatorVersionAnnotationName: versions.Version,
+						},
 					},
 				}
 				cluster := &apiv1.Cluster{}
 
 				updated := updateClusterAnnotations(context.Background(), cluster, pod)
 				Expect(updated).To(BeFalse())
-				Expect(pod.Annotations).To(BeEmpty())
+				Expect(pod.Annotations).To(HaveLen(1))
 			})
 		})
 	})
@@ -564,7 +575,7 @@ var _ = Describe("metadata update functions", func() {
 		It("Should updateClusterAnnotations correctly", func() {
 			modified := updateClusterAnnotations(ctx, cluster, instance)
 			Expect(modified).To(BeTrue())
-			Expect(instance.Annotations).To(Equal(cluster.Spec.InheritedMetadata.Annotations))
+			Expect(instance.Annotations).To(Equal(cluster.GetFixedInheritedAnnotations()))
 		})
 	})
 })
