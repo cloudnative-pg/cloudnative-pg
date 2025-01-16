@@ -182,13 +182,10 @@ func CreateClusterPodSpec(
 		InitContainers: []corev1.Container{
 			createBootstrapContainer(cluster),
 		},
-		SchedulerName: cluster.Spec.SchedulerName,
-		Containers:    createPostgresContainers(cluster, envConfig, enableHTTPS),
-		Volumes:       createPostgresVolumes(&cluster, podName),
-		SecurityContext: CreatePodSecurityContext(
-			cluster.GetSeccompProfile(),
-			cluster.GetPostgresUID(),
-			cluster.GetPostgresGID()),
+		SchedulerName:                 cluster.Spec.SchedulerName,
+		Containers:                    createPostgresContainers(cluster, envConfig, enableHTTPS),
+		Volumes:                       createPostgresVolumes(&cluster, podName),
+		SecurityContext:               cluster.GetPodSecurityContext(),
 		Affinity:                      CreateAffinitySection(cluster.Name, cluster.Spec.Affinity),
 		Tolerations:                   cluster.Spec.Affinity.Tolerations,
 		ServiceAccountName:            cluster.Name,
@@ -268,7 +265,7 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig, enable
 					Protocol:      "TCP",
 				},
 			},
-			SecurityContext: CreateContainerSecurityContext(cluster.GetSeccompProfile()),
+			SecurityContext: cluster.GetSecurityContext(),
 		},
 	}
 
