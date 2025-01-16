@@ -1344,7 +1344,7 @@ jobs:
         uses: nick-fields/retry@v3
         env:
           VELERO_VERSION: "v1.15.1"
-          VELERO_AWS_PLUGIN_VERSION: "v1.11.0"
+          VELERO_AWS_PLUGIN_VERSION: "v1.11.1"
         with:
           timeout_minutes: 10
           max_attempts: 3
