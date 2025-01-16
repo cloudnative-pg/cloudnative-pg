@@ -381,7 +381,7 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 		return &ctrl.Result{}, nil
 	}
 
-	ctx = log.IntoContext(ctx, contextLogger.WithValues("targetPod", targetPod))
+	ctx = log.IntoContext(ctx, contextLogger.WithValues("targetPodName", targetPod.Name))
 
 	// Validate we don't have other running backups
 	var clusterBackups apiv1.BackupList
