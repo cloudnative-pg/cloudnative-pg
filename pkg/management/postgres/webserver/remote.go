@@ -27,6 +27,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/execlog"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
@@ -120,7 +121,7 @@ func (ws *remoteWebserverEndpoints) isServerHealthy(w http.ResponseWriter, _ *ht
 	// Same goes for instances with fencing on.
 	if ws.instance.PgRewindIsRunning || ws.instance.MightBeUnavailable() {
 		log.Trace("Liveness probe skipped")
-		_, _ = fmt.Fprint(w, "Skipped")
+		sendTextResponse(w, http.StatusOK, "Skipped")
 		return
 	}
 
@@ -132,19 +133,44 @@ func (ws *remoteWebserverEndpoints) isServerHealthy(w http.ResponseWriter, _ *ht
 	}
 
 	log.Trace("Liveness probe succeeding")
-	_, _ = fmt.Fprint(w, "OK")
+	sendTextResponse(w, http.StatusOK, "OK")
 }
 
 // This is the readiness probe
 func (ws *remoteWebserverEndpoints) isServerReady(w http.ResponseWriter, r *http.Request) {
-	if err := ws.readinessChecker.IsServerReady(r.Context()); err != nil {
-		log.Debug("Readiness probe failing", "err", err.Error())
+	start := time.Now()
+	ctx := r.Context()
+	err := ws.readinessChecker.IsServerReady(ctx)
+	elapsed := time.Since(start)
+	deadline, hasDeadline := ctx.Deadline()
+
+	if err != nil {
+		switch {
+		case errors.Is(err, context.Canceled):
+			log.Trace("Readiness probe context cancelled",
+				"err", err.Error(),
+				"duration", elapsed,
+				"hasDeadline", hasDeadline,
+				"deadline", deadline)
+		case errors.Is(err, context.DeadlineExceeded):
+			log.Trace("Readiness probe timed out",
+				"err", err.Error(),
+				"duration", elapsed,
+				"hasDeadline", hasDeadline,
+				"deadline", deadline)
+		default:
+			log.Trace("Readiness probe failing",
+				"duration", elapsed,
+				"err", err.Error())
+		}
+
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	log.Trace("Readiness probe succeeding")
-	_, _ = fmt.Fprint(w, "OK")
+	log.Trace("Readiness probe succeeding",
+		"duration", time.Since(start))
+	sendTextResponse(w, http.StatusOK, "OK")
 }
 
 // This probe is for the instance status, including replication
@@ -170,8 +196,7 @@ func (ws *remoteWebserverEndpoints) pgStatus(w http.ResponseWriter, _ *http.Requ
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_, _ = w.Write(js)
+	sendJSONResponseWithData(w, http.StatusOK, js)
 }
 
 func (ws *remoteWebserverEndpoints) pgControlData(w http.ResponseWriter, _ *http.Request) {
@@ -197,8 +222,7 @@ func (ws *remoteWebserverEndpoints) pgControlData(w http.ResponseWriter, _ *http
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_, _ = w.Write(res)
+	sendJSONResponseWithData(w, http.StatusOK, res)
 }
 
 // updateInstanceManager replace the instance with one in the
@@ -232,7 +256,7 @@ func (ws *remoteWebserverEndpoints) updateInstanceManager(
 		// Unfortunately this point, if everything is right, will not be reached.
 		// At this stage we are running the new version of the instance manager
 		// and not the old one.
-		_, _ = fmt.Fprint(w, "OK")
+		sendTextResponse(w, http.StatusOK, "OK")
 	}
 }
 

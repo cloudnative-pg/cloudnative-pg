@@ -118,12 +118,23 @@ func (ws *Webserver) Start(ctx context.Context) error {
 	return nil
 }
 
+func sendTextResponse(w http.ResponseWriter, statusCode int, message string) {
+	w.Header().Set("Content-Type", "text/plain")
+	w.WriteHeader(statusCode)
+
+	if _, err := fmt.Fprint(w, message); err != nil {
+		log.Trace("Failed to write text response", "error", err, "response", message)
+		http.Error(w, "Failed to write response", http.StatusInternalServerError)
+	}
+}
+
 // sendJSONResponse sends a generic JSON response.
 func sendJSONResponse[T any](w http.ResponseWriter, statusCode int, data Response[T]) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
 
 	if err := json.NewEncoder(w).Encode(data); err != nil {
+		log.Trace("Failed to write JSON response", "error", err, "response", data)
 		http.Error(w, "Failed to write response", http.StatusInternalServerError)
 	}
 }
