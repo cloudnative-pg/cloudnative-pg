@@ -140,6 +140,7 @@ rules:
   - backups
   - clusters
   - databases
+  - pgroles
   - poolers
   - publications
   - scheduledbackups
@@ -157,6 +158,7 @@ rules:
   resources:
   - backups/status
   - databases/status
+  - pgroles/status
   - publications/status
   - scheduledbackups/status
   - subscriptions/status
