@@ -6180,6 +6180,11 @@ spec:
                 description: ID of the latest generated node (used to avoid node name
                   clashing)
                 type: integer
+              majorVersionUpgradeFromImage:
+                description: |-
+                  MajorVersionUpgradeFromImage contains the image from which we are upgrading
+                  when a major version upgrade is running
+                type: string
               managedRolesStatus:
                 description: ManagedRolesStatus reports the state of the managed roles
                   in the cluster
