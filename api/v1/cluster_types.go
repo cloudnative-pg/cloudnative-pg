@@ -462,6 +462,16 @@ type ClusterSpec struct {
 	// +optional
 	SeccompProfile *corev1.SeccompProfile `json:"seccompProfile,omitempty"`
 
+	// The PodSecurityContext applied to every Pod of the cluster.
+	// Defaults to: {}
+	// +optional
+	PodSecurityContext *corev1.PodSecurityContext `json:"podSecurityContext,omitempty"`
+
+	// The SecurityContext applied to every Container in the Pod of the cluster.
+	// Defaults to: {}
+	// +optional
+	SecurityContext *corev1.SecurityContext `json:"SecurityContext,omitempty"`
+
 	// The tablespaces configuration
 	// +optional
 	Tablespaces []TablespaceConfiguration `json:"tablespaces,omitempty"`

@@ -100,8 +100,7 @@ func Deployment(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*appsv1.Deploymen
 			true).
 		WithInitContainerResources(specs.BootstrapControllerContainerName, pooler.GetResourcesRequirements(), false).
 		WithInitContainerSecurityContext(specs.BootstrapControllerContainerName,
-			specs.CreateContainerSecurityContext(cluster.GetSeccompProfile()),
-			true).
+			cluster.GetSecurityContext(), true).
 		WithVolume(&corev1.Volume{
 			Name: "scratch-data",
 			VolumeSource: corev1.VolumeSource{
@@ -125,7 +124,7 @@ func Deployment(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*appsv1.Deploymen
 			Name:  "PSQL_HISTORY",
 			Value: path.Join(postgres.TemporaryDirectory, ".psql_history"),
 		}, false).
-		WithContainerSecurityContext("pgbouncer", specs.CreateContainerSecurityContext(cluster.GetSeccompProfile()), true).
+		WithContainerSecurityContext("pgbouncer", cluster.GetSecurityContext(), true).
 		WithServiceAccountName(pooler.Name, true).
 		WithReadinessProbe("pgbouncer", &corev1.Probe{
 			TimeoutSeconds: 5,
