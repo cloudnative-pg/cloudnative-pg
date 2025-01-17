@@ -470,7 +470,7 @@ type ClusterSpec struct {
 	// The SecurityContext applied to every Container in the Pod of the cluster.
 	// Defaults to: {}
 	// +optional
-	SecurityContext *corev1.SecurityContext `json:"SecurityContext,omitempty"`
+	SecurityContext *corev1.SecurityContext `json:"securityContext,omitempty"`
 
 	// The tablespaces configuration
 	// +optional
