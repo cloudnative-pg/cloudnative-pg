@@ -33,6 +33,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/instance/restoresnapshot"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/instance/run"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/instance/status"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/instance/upgrade"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 )
 
@@ -56,6 +57,7 @@ func NewCmd() *cobra.Command {
 	cmd.AddCommand(pgbasebackup.NewCmd())
 	cmd.AddCommand(restore.NewCmd())
 	cmd.AddCommand(restoresnapshot.NewCmd())
+	cmd.AddCommand(upgrade.NewCmd())
 
 	return cmd
 }
