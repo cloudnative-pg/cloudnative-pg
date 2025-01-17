@@ -9,25 +9,12 @@ import (
 
 // CreateMajorUpgradeJob creates a job to upgrade the primary node to a new major version
 func CreateMajorUpgradeJob(cluster *apiv1.Cluster, nodeSerial int, oldImage string) *batchv1.Job {
-	initContainerCommand := []string{
-		"bash",
-		"-exc",
-		`rm -fr /controller/old
-
-bindir=$(pg_config --bindir)
-mkdir -p "/controller/old${bindir}"
-cp -ax "${bindir}"/. "/controller/old${bindir}"
-
-pkglibdir=$(pg_config --pkglibdir)
-mkdir -p "/controller/old${pkglibdir}"
-cp -ax "${pkglibdir}"/. "/controller/old${pkglibdir}"
-
-sharedir=$(pg_config --sharedir)
-mkdir -p "/controller/old${sharedir}"
-cp -ax "${sharedir}"/. "/controller/old${sharedir}"
-
-echo "/controller/old${bindir}" > /controller/old-bindir.txt
-`,
+	prepareCommand := []string{
+		"/controller/manager",
+		"instance",
+		"upgrade",
+		"prepare",
+		"/controller/old",
 	}
 
 	upgradeCommand := []string{
@@ -65,7 +52,7 @@ EOF
 
 # The magic happens here
 pg_upgrade --link \
-    --old-bindir "$(cat /controller/old-bindir.txt)" \
+    --old-bindir "$(cat /controller/old/bindir.txt)" \
     --old-datadir /var/lib/postgresql/data/pgdata \
     --new-datadir /var/lib/postgresql/data/new
 
@@ -90,10 +77,10 @@ rm -fr /var/lib/postgresql/data/pgdata/pg_tblspc/*/PG_${version}_*/
 	job := createPrimaryJob(*cluster, nodeSerial, jobMajorUpgrade, upgradeCommand)
 
 	oldVersionInitContainer := corev1.Container{
-		Name:            "old",
+		Name:            "prepare",
 		Image:           oldImage,
 		ImagePullPolicy: cluster.Spec.ImagePullPolicy,
-		Command:         initContainerCommand,
+		Command:         prepareCommand,
 		VolumeMounts:    createPostgresVolumeMounts(*cluster),
 		Resources:       cluster.Spec.Resources,
 		SecurityContext: CreateContainerSecurityContext(cluster.GetSeccompProfile()),
