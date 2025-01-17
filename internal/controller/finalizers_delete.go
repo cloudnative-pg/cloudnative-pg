@@ -123,6 +123,8 @@ func notifyOwnedResourceDeletion[T clusterOwnedResourceWithStatus](
 		if obj.GetStatusMessage() != statusMessage {
 			obj.SetAsFailed(errors.New(statusMessage))
 			obj.SetStatusObservedGeneration(0)
+			// We need to use an update here because of the observed generation set to 0
+			// that would be ignored with the patch method.
 			if err := cli.Status().Update(ctx, obj); err != nil {
 				itemLogger.Error(err, "error while updating failed status for cluster deletion")
 				return err
