@@ -192,7 +192,7 @@ func configureInstancePermissions(ctx context.Context, instance *postgres.Instan
 // and has the required rights
 func configureStreamingReplicaUser(tx *sql.Tx) (bool, error) {
 	var hasLoginRight, hasReplicationRight, hasSuperuser bool
-	row := tx.QueryRow("SELECT rolcanlogin, rolreplication, rolsuper FROM pg_roles WHERE rolname = $1",
+	row := tx.QueryRow("SELECT rolcanlogin, rolreplication, rolsuper FROM pg_catalog.pg_roles WHERE rolname = $1",
 		apiv1.StreamingReplicationUser)
 	err := row.Scan(&hasLoginRight, &hasReplicationRight, &hasSuperuser)
 	if err != nil {
@@ -246,10 +246,14 @@ func configurePgRewindPrivileges(majorVersion int, hasSuperuser bool, tx *sql.Tx
 	var hasPgRewindPrivileges bool
 	row := tx.QueryRow(
 		`
-			SELECT has_function_privilege($1, 'pg_ls_dir(text, boolean, boolean)', 'execute') AND
-			       has_function_privilege($2, 'pg_stat_file(text, boolean)', 'execute') AND
-			       has_function_privilege($3, 'pg_read_binary_file(text)', 'execute') AND
-			       has_function_privilege($4, 'pg_read_binary_file(text, bigint, bigint, boolean)', 'execute')`,
+		SELECT pg_catalog.has_function_privilege($1,
+				'pg_catalog.pg_ls_dir(text, boolean, boolean)', 'execute') AND
+			pg_catalog.has_function_privilege($2,
+				'pg_catalog.pg_stat_file(text, boolean)', 'execute') AND
+			pg_catalog.has_function_privilege($3,
+				'pg_catalog.pg_read_binary_file(text)', 'execute') AND
+			pg_catalog.has_function_privilege($4,
+				'pg_catalog.pg_read_binary_file(text, bigint, bigint, boolean)', 'execute')`,
 		apiv1.StreamingReplicationUser,
 		apiv1.StreamingReplicationUser,
 		apiv1.StreamingReplicationUser,
