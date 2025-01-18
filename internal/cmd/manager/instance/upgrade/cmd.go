@@ -20,6 +20,7 @@ package upgrade
 import (
 	"github.com/spf13/cobra"
 
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/instance/upgrade/execute"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/manager/instance/upgrade/prepare"
 )
 
@@ -30,6 +31,7 @@ func NewCmd() *cobra.Command {
 	}
 
 	cmd.AddCommand(prepare.NewCmd())
+	cmd.AddCommand(execute.NewCmd())
 
 	return cmd
 }
