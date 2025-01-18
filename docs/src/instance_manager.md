@@ -28,10 +28,20 @@ While the startup probe is running, the liveness and readiness probes remain
 disabled. Following Kubernetes standards, if the startup probe fails, the
 kubelet will terminate the container, which will then be restarted.
 
-The startup probe provided by CloudNativePG is configurable via the
-parameter `.spec.startDelay`, which specifies the maximum time, in seconds,
+CloudNativePG provides two approaches for configuring startup probes:
+
+1. **Standard**: automatically managed by the operator using the
+  `.spec.startDelay` value (default behavior).
+2. **Advanced**: offers full control over Kubernetes startup probe knobs,
+  as well as a finer success criteria for replicas (e.g., based on streaming
+  replication lag in addition to `pg_isready`).
+
+#### Standard Startup Probe
+
+The `.spec.startDelay` parameter specifies the maximum time, in seconds,
 allowed for the startup probe to succeed. At a minimum, the probe requires
-`pg_isready` to return `0` or `1`.
+`pg_isready` to return `0`. For streaming replicas, it also requires the WAL
+receiver to start successfully.
 
 By default, the `startDelay` is set to `3600` seconds. It is recommended to
 adjust this setting based on the time PostgreSQL needs to fully initialize in
@@ -71,14 +81,67 @@ override the default behavior and disable the automatic use of `startDelay`.
 For example, the following configuration explicitly sets custom probe
 parameters, bypassing `startDelay`:
 
+#### Advanced Startup Probe
+
+In certain scenarios, you may need to customize the startup strategy for
+replicas. For example, you might delay marking a replica as started until it
+begins streaming with the primary or define a replication lag threshold that
+must be met before considering the replica ready.
+
+To address these needs, CloudNativePG provides an advanced startup probe
+configured through the `.spec.probes.startup` stanza. This advanced probe is
+mutually exclusive with the standard startup probe and, when enabled,
+completely bypasses the `startDelay` parameter.
+
+!!! Warning
+    With great power comes great responsibility. When using the advanced
+    startup probe, you assume full responsibility for configuring all startup probe
+    parameters as defined by the [probe API](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-Probe).
+    The most critical parameters to consider are `failureThreshold`,
+    `periodSeconds`, and `timeoutSeconds`. Ensure that your custom probe settings
+    align with your cluster’s operational requirements to prevent unintended
+    disruptions.
+
+In addition to the standard probe options, the startup probe introduces two
+additional parameters:
+
+- `type`: specifies the criteria for considering the probe successful, with the
+  following accepted values:
+
+    - `pg_isready`: marks the probe as successful when the `pg_isready` command
+      exits with `0`. This is the default for primary instances and replicas.
+    - `streaming`: marks the probe as successful when the replica begins
+      streaming from its source and meets the specified lag requirements (details
+      below).
+
+- `lag`: defines the maximum acceptable replication lag, measured in bytes
+  (expressed as Kubernetes quantities). This parameter is only applicable when
+  `type` is set to `streaming`. If `lag` is not specified, the replica is
+  considered successfully started as soon as it begins streaming.
+
+!!! Important
+    The `lag` option is validated and enforced only during the startup phase of
+    the pod, meaning it applies exclusively when the replica is starting.
+
+!!! Warning
+    Incorrect configuration of the `lag` option can cause continuous failures
+    of the startup probe, leading to the replica being repeatedly restarted. Ensure
+    that you fully understand how this option works and provide enough time through
+    the `failureThreshold` and `periodSeconds` settings for the replica to catch up
+    with its source.
+
+The following example requires a replica to have a maximum lag of 16Mi from the
+source to be considered started. It also provides approximately 300 seconds (30
+failures × 10 seconds) for the startup probe to succeed:
+
 ```yaml
-# ... snip
-spec:
-  probes:
-    startup:
-      periodSeconds: 3
-      timeoutSeconds: 3
-      failureThreshold: 10
+# <snip>
+probes:
+  startup:
+    type: streaming
+    lag: 16Mi
+    failureThreshold: 30
+    periodSeconds: 10
 ```
 
 ### Liveness Probe
