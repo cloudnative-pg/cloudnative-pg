@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package prepare implement the "instance upgrade prepare" command
+// Package prepare implement the "instance upgrade prepare" subcommand
 package prepare
 
 import (
@@ -30,7 +30,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// NewCmd create a new cobra command
+// NewCmd create the cobra command
 func NewCmd() *cobra.Command {
 	cmd := cobra.Command{
 		Use:  "prepare [target]",
