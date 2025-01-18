@@ -487,7 +487,7 @@ type ClusterSpec struct {
 // to be injected in the PostgreSQL Pods
 type ProbesConfiguration struct {
 	// The startup probe configuration
-	Startup *Probe `json:"startup,omitempty"`
+	Startup *StartupProbe `json:"startup,omitempty"`
 
 	// The liveness probe configuration
 	Liveness *Probe `json:"liveness,omitempty"`
@@ -495,6 +495,34 @@ type ProbesConfiguration struct {
 	// The readiness probe configuration
 	Readiness *Probe `json:"readiness,omitempty"`
 }
+
+// StartupProbe is the configuration of the startup probe
+type StartupProbe struct {
+	// Probe is the standard probe configuration
+	Probe `json:",inline"`
+
+	// Type is the type of the startup strategy
+	Type StartupStrategyType `json:"type,omitempty"`
+
+	// Lag limit. Used only for `streaming` strategy
+	// +optional
+	Lag *resource.Quantity `json:"lag,omitempty"`
+}
+
+// StartupStrategyType is the type of the strategy used to declare a PostgreSQL instance
+// ready
+type StartupStrategyType string
+
+const (
+	// StartupStrategyPgIsReady means that the pg_isready tool is used to determine
+	// whether PostgreSQL is started up
+	StartupStrategyPgIsReady StartupStrategyType = "pg_isready"
+
+	// StartupStrategyTypeStreaming means that pg_isready is positive and the replica is
+	// connected via streaming replication to the current primary and the lag is, if specified,
+	// within the limit.
+	StartupStrategyTypeStreaming StartupStrategyType = "streaming"
+)
 
 // Probe describes a health check to be performed against a container to determine whether it is
 // alive or ready to receive traffic.

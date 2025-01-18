@@ -186,7 +186,7 @@ func (r *InstanceReconciler) Reconcile(
 		return reconcile.Result{}, nil
 	}
 
-	if r.instance.IsServerHealthy() != nil {
+	if err := postgresManagement.PgIsReady(); err != nil {
 		contextLogger.Info("Instance is still down, will retry in 1 second")
 		return reconcile.Result{RequeueAfter: time.Second}, nil
 	}
