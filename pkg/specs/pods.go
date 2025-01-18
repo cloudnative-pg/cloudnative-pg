@@ -206,7 +206,7 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig, enable
 				TimeoutSeconds: 5,
 				ProbeHandler: corev1.ProbeHandler{
 					HTTPGet: &corev1.HTTPGetAction{
-						Path: url.PathHealth,
+						Path: url.PathStartup,
 						Port: intstr.FromInt32(url.StatusPort),
 					},
 				},
