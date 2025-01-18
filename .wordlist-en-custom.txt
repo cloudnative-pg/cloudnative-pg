@@ -437,6 +437,8 @@ SnapshotType
 Snapshotting
 Snyk
 Stackgres
+StartupProbe
+StartupStrategyType
 StatefulSets
 StorageClass
 StorageConfiguration
@@ -1334,6 +1336,7 @@ tx
 ubi
 ui
 uid
+uint
 ul
 un
 uncordon

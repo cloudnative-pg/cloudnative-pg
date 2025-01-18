@@ -56,7 +56,9 @@ var _ = Describe("Probes configuration tests", Label(tests.LabelBasic), func() {
 			TimeoutSeconds:      8,
 		}
 		probesConfiguration := apiv1.ProbesConfiguration{
-			Startup:   probeConfiguration.DeepCopy(),
+			Startup: &apiv1.StartupProbe{
+				Probe: probeConfiguration,
+			},
 			Liveness:  probeConfiguration.DeepCopy(),
 			Readiness: probeConfiguration.DeepCopy(),
 		}
