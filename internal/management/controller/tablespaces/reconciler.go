@@ -29,7 +29,6 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/controller/tablespaces/infrastructure"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
 
 // Reconcile is the main reconciliation loop for the instance
@@ -71,7 +70,7 @@ func (r *TablespaceReconciler) Reconcile(
 		return reconcile.Result{}, nil
 	}
 
-	if err := postgres.PgIsReady(); err != nil {
+	if err := r.instance.IsReady(); err != nil {
 		contextLogger.Debug(
 			"database not ready, skipping tablespace reconciling",
 			"err", err)
