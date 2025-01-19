@@ -52,6 +52,7 @@ const (
 type instanceInterface interface {
 	GetSuperUserDB() (*sql.DB, error)
 	IsPrimary() (bool, error)
+	IsReady() error
 	RoleSynchronizerChan() <-chan *apiv1.ManagedConfiguration
 	GetClusterName() string
 	GetNamespaceName() string
@@ -133,7 +134,7 @@ func (sr *RoleSynchronizer) reconcile(ctx context.Context, config *apiv1.Managed
 	contextLog := log.FromContext(ctx).WithName("roles_reconciler")
 	contextLog.Debug("reconciling managed roles")
 
-	if err := postgres.PgIsReady(); err != nil {
+	if err := sr.instance.IsReady(); err != nil {
 		contextLog.Debug("database not ready, skipping roles reconciling")
 		return nil
 	}
