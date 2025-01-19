@@ -35,6 +35,7 @@ type instanceInterface interface {
 	GetClusterName() string
 	GetSuperUserDB() (*sql.DB, error)
 	IsPrimary() (bool, error)
+	IsReady() error
 	CanCheckReadiness() bool
 }
 
