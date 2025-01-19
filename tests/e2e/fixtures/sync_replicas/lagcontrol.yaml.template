@@ -1,0 +1,31 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-sync-replica-lag
+spec:
+  instances: 3
+
+  postgresql:
+    synchronous:
+      method: any
+      number: 2
+      dataDurability: preferred
+    parameters:
+      log_checkpoints: "on"
+      log_lock_waits: "on"
+      log_min_duration_statement: '1000'
+      log_statement: 'ddl'
+      log_temp_files: '1024'
+      log_autovacuum_min_duration: '1s'
+      log_replication_commands: 'on'
+
+  probes:
+    startup:
+      type: streaming
+      lag: 16Mi
+      failureThreshold: 30
+      periodSeconds: 1
+
+  storage:
+    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
+    size: 1G
