@@ -225,6 +225,11 @@ func (instance *Instance) SetPostgreSQLAutoConfWritable(writeable bool) error {
 	return os.Chmod(autoConfFileName, mode)
 }
 
+// IsReady runs PgIsReady
+func (instance *Instance) IsReady() error {
+	return PgIsReady()
+}
+
 // IsFenced checks whether the instance is marked as fenced
 func (instance *Instance) IsFenced() bool {
 	return instance.fenced.Load()

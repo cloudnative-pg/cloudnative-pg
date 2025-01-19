@@ -4339,6 +4339,13 @@ spec:
                           More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
                         format: int32
                         type: integer
+                      lag:
+                        anyOf:
+                        - type: integer
+                        - type: string
+                        description: Lag limit. Used only for `streaming` strategy
+                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                        x-kubernetes-int-or-string: true
                       periodSeconds:
                         description: |-
                           How often (in seconds) to perform the probe.
@@ -4372,6 +4379,9 @@ spec:
                           More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
                         format: int32
                         type: integer
+                      type:
+                        description: Type is the type of the startup strategy
+                        type: string
                     type: object
                 type: object
               projectedVolumeTemplate:
