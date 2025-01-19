@@ -25,7 +25,10 @@ import (
 
 // ShowStatsMetrics contains all the SHOW STATS Metrics
 type ShowStatsMetrics struct {
-	TotalServerAssigCount,
+	TotalBindCount,
+	TotalClientParseCount,
+	TotalServerAssignCount,
+	TotalServerParseCount,
 	TotalXactCount,
 	TotalQueryCount,
 	TotalReceived,
@@ -33,7 +36,10 @@ type ShowStatsMetrics struct {
 	TotalXactTime,
 	TotalQueryTime,
 	TotalWaitTime,
-	AvgServerAssigCount,
+	AvgBindCount,
+	AvgClientParseCount,
+	AvgServerAssignCount,
+	AvgServerParseCount,
 	AvgXactCount,
 	AvgQueryCount,
 	AvgRecv,
@@ -45,7 +51,10 @@ type ShowStatsMetrics struct {
 
 // Describe produces the description for all the contained Metrics
 func (r *ShowStatsMetrics) Describe(ch chan<- *prometheus.Desc) {
-	r.TotalServerAssigCount.Describe(ch)
+	r.TotalBindCount.Describe(ch)
+	r.TotalClientParseCount.Describe(ch)
+	r.TotalServerAssignCount.Describe(ch)
+	r.TotalServerParseCount.Describe(ch)
 	r.TotalXactCount.Describe(ch)
 	r.TotalQueryCount.Describe(ch)
 	r.TotalReceived.Describe(ch)
@@ -53,7 +62,10 @@ func (r *ShowStatsMetrics) Describe(ch chan<- *prometheus.Desc) {
 	r.TotalXactTime.Describe(ch)
 	r.TotalQueryTime.Describe(ch)
 	r.TotalWaitTime.Describe(ch)
-	r.AvgServerAssigCount.Describe(ch)
+	r.AvgBindCount.Describe(ch)
+	r.AvgClientParseCount.Describe(ch)
+	r.AvgServerAssignCount.Describe(ch)
+	r.AvgServerParseCount.Describe(ch)
 	r.AvgXactCount.Describe(ch)
 	r.AvgQueryCount.Describe(ch)
 	r.AvgRecv.Describe(ch)
@@ -65,7 +77,10 @@ func (r *ShowStatsMetrics) Describe(ch chan<- *prometheus.Desc) {
 
 // Reset resets all the contained Metrics
 func (r *ShowStatsMetrics) Reset() {
-	r.AvgServerAssigCount.Reset()
+	r.TotalBindCount.Reset()
+	r.TotalClientParseCount.Reset()
+	r.TotalServerAssignCount.Reset()
+	r.TotalServerParseCount.Reset()
 	r.TotalXactCount.Reset()
 	r.TotalQueryCount.Reset()
 	r.TotalReceived.Reset()
@@ -73,7 +88,10 @@ func (r *ShowStatsMetrics) Reset() {
 	r.TotalXactTime.Reset()
 	r.TotalQueryTime.Reset()
 	r.TotalWaitTime.Reset()
-	r.AvgServerAssigCount.Reset()
+	r.AvgBindCount.Reset()
+	r.TotalClientParseCount.Reset()
+	r.AvgServerAssignCount.Reset()
+	r.TotalServerParseCount.Reset()
 	r.AvgXactCount.Reset()
 	r.AvgQueryCount.Reset()
 	r.AvgRecv.Reset()
@@ -87,11 +105,30 @@ func (r *ShowStatsMetrics) Reset() {
 func NewShowStatsMetrics(subsystem string) *ShowStatsMetrics {
 	subsystem += "_stats"
 	return &ShowStatsMetrics{
-		TotalServerAssigCount: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		TotalBindCount: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Namespace: PrometheusNamespace,
+			Subsystem: subsystem,
+			Name:      "total_bind_count",
+			Help: "Total number of prepared statements readied for execution by clients and forwarded to " +
+				"PostgreSQL by pgbouncer",
+		}, []string{"database"}),
+		TotalClientParseCount: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Namespace: PrometheusNamespace,
+			Subsystem: subsystem,
+			Name:      "total_client_parse_count",
+			Help:      "Total number of prepared statements created by clients.",
+		}, []string{"database"}),
+		TotalServerAssignCount: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: PrometheusNamespace,
 			Subsystem: subsystem,
 			Name:      "total_server_assignment_count",
 			Help:      "Total time a server was assigned to a client.",
+		}, []string{"database"}),
+		TotalServerParseCount: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Namespace: PrometheusNamespace,
+			Subsystem: subsystem,
+			Name:      "total_server_parse_count",
+			Help:      "Total number of prepared statements created by pgbouncer on a server.",
 		}, []string{"database"}),
 		TotalXactCount: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: PrometheusNamespace,
@@ -137,12 +174,31 @@ func NewShowStatsMetrics(subsystem string) *ShowStatsMetrics {
 			Name:      "total_wait_time",
 			Help:      "Time spent by clients waiting for a server, in microseconds.",
 		}, []string{"database"}),
-		AvgServerAssigCount: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		AvgBindCount: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Namespace: PrometheusNamespace,
+			Subsystem: subsystem,
+			Name:      "avg_bind_count",
+			Help: "Average number of prepared statements readied for execution by clients and forwarded to " +
+				"PostgreSQL by pgbouncer.",
+		}, []string{"database"}),
+		AvgClientParseCount: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Namespace: PrometheusNamespace,
+			Subsystem: subsystem,
+			Name:      "avg_client_parse_count",
+			Help:      "Average number of prepared statements created by clients.",
+		}, []string{"database"}),
+		AvgServerAssignCount: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: PrometheusNamespace,
 			Subsystem: subsystem,
 			Name:      "avg_server_assignment_count",
 			Help: "Average number of times a server was assigned to a client per second in " +
 				"the last stat period.",
+		}, []string{"database"}),
+		AvgServerParseCount: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Namespace: PrometheusNamespace,
+			Subsystem: subsystem,
+			Name:      "avg_server_parse_count",
+			Help:      "Average number of prepared statements created by pgbouncer on a server.",
 		}, []string{"database"}),
 		AvgXactCount: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: PrometheusNamespace,
@@ -230,10 +286,19 @@ func (e *Exporter) collectShowStats(ch chan<- prometheus.Metric, db *sql.DB) {
 
 	// PGBouncer >= 1.23.0
 	var (
-		totalServerAssigCount,
-		avgServerAssigCount int
+		totalServerAssignCount,
+		avgServerAssignCount int
 	)
 
+	// PGBouncer >= 1.24.0
+	var (
+		totalClientParseCount,
+		totalServerParseCount,
+		totalBindCount,
+		avgClientParseCount,
+		avgServerParseCount,
+		avgBindCount int
+	)
 	statCols, err := rows.Columns()
 	if err != nil {
 		contextLogger.Error(err, "Error while reading SHOW STATS")
@@ -244,7 +309,8 @@ func (e *Exporter) collectShowStats(ch chan<- prometheus.Metric, db *sql.DB) {
 
 	for rows.Next() {
 		var err error
-		if statColsCount < 16 {
+		switch {
+		case statColsCount < 16:
 			err = rows.Scan(&database,
 				&totalXactCount,
 				&totalQueryCount,
@@ -261,9 +327,9 @@ func (e *Exporter) collectShowStats(ch chan<- prometheus.Metric, db *sql.DB) {
 				&avgQueryTime,
 				&avgWaitTime,
 			)
-		} else {
+		case statColsCount == 17:
 			err = rows.Scan(&database,
-				&totalServerAssigCount,
+				&totalServerAssignCount,
 				&totalXactCount,
 				&totalQueryCount,
 				&totalReceived,
@@ -271,7 +337,7 @@ func (e *Exporter) collectShowStats(ch chan<- prometheus.Metric, db *sql.DB) {
 				&totalXactTime,
 				&totalQueryTime,
 				&totalWaitTime,
-				&avgServerAssigCount,
+				&avgServerAssignCount,
 				&avgXactCount,
 				&avgQueryCount,
 				&avgRecv,
@@ -279,6 +345,31 @@ func (e *Exporter) collectShowStats(ch chan<- prometheus.Metric, db *sql.DB) {
 				&avgXactTime,
 				&avgQueryTime,
 				&avgWaitTime,
+			)
+		default:
+			err = rows.Scan(&database,
+				&totalServerAssignCount,
+				&totalXactCount,
+				&totalQueryCount,
+				&totalReceived,
+				&totalSent,
+				&totalXactTime,
+				&totalQueryTime,
+				&totalWaitTime,
+				&totalClientParseCount,
+				&totalServerParseCount,
+				&totalBindCount,
+				&avgServerAssignCount,
+				&avgXactCount,
+				&avgQueryCount,
+				&avgRecv,
+				&avgSent,
+				&avgXactTime,
+				&avgQueryTime,
+				&avgWaitTime,
+				&avgClientParseCount,
+				&avgServerParseCount,
+				&avgBindCount,
 			)
 		}
 		if err != nil {
@@ -302,17 +393,25 @@ func (e *Exporter) collectShowStats(ch chan<- prometheus.Metric, db *sql.DB) {
 		e.Metrics.ShowStats.AvgQueryTime.WithLabelValues(database).Set(float64(avgQueryTime))
 		e.Metrics.ShowStats.AvgWaitTime.WithLabelValues(database).Set(float64(avgWaitTime))
 
-		if statColsCount >= 16 {
-			e.Metrics.ShowStats.TotalServerAssigCount.WithLabelValues(database).Set(
-				float64(totalServerAssigCount))
-			e.Metrics.ShowStats.AvgServerAssigCount.WithLabelValues(database).Set(
-				float64(avgServerAssigCount))
+		if statColsCount == 16 {
+			e.Metrics.ShowStats.TotalServerAssignCount.WithLabelValues(database).Set(
+				float64(totalServerAssignCount))
+			e.Metrics.ShowStats.AvgServerAssignCount.WithLabelValues(database).Set(
+				float64(avgServerAssignCount))
+		} else {
+			e.Metrics.ShowStats.TotalClientParseCount.WithLabelValues(database).Set(
+				float64(totalClientParseCount))
+			e.Metrics.ShowStats.TotalServerParseCount.WithLabelValues(database).Set(
+				float64(totalServerParseCount))
+			e.Metrics.ShowStats.TotalBindCount.WithLabelValues(database).Set(
+				float64(totalBindCount))
+			e.Metrics.ShowStats.AvgClientParseCount.WithLabelValues(database).Set(
+				float64(avgClientParseCount))
+			e.Metrics.ShowStats.AvgServerParseCount.WithLabelValues(database).Set(
+				float64(avgServerParseCount))
+			e.Metrics.ShowStats.AvgBindCount.WithLabelValues(database).Set(
+				float64(avgBindCount))
 		}
-	}
-
-	if statColsCount >= 16 {
-		e.Metrics.ShowStats.TotalServerAssigCount.Collect(ch)
-		e.Metrics.ShowStats.AvgServerAssigCount.Collect(ch)
 	}
 
 	e.Metrics.ShowStats.TotalXactCount.Collect(ch)
@@ -329,6 +428,18 @@ func (e *Exporter) collectShowStats(ch chan<- prometheus.Metric, db *sql.DB) {
 	e.Metrics.ShowStats.AvgXactTime.Collect(ch)
 	e.Metrics.ShowStats.AvgQueryTime.Collect(ch)
 	e.Metrics.ShowStats.AvgWaitTime.Collect(ch)
+
+	if statColsCount == 16 {
+		e.Metrics.ShowStats.TotalServerAssignCount.Collect(ch)
+		e.Metrics.ShowStats.AvgServerAssignCount.Collect(ch)
+	} else {
+		e.Metrics.ShowStats.TotalClientParseCount.Collect(ch)
+		e.Metrics.ShowStats.TotalServerParseCount.Collect(ch)
+		e.Metrics.ShowStats.TotalBindCount.Collect(ch)
+		e.Metrics.ShowStats.AvgClientParseCount.Collect(ch)
+		e.Metrics.ShowStats.AvgServerParseCount.Collect(ch)
+		e.Metrics.ShowStats.AvgBindCount.Collect(ch)
+	}
 
 	if err = rows.Err(); err != nil {
 		e.Metrics.Error.Set(1)
