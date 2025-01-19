@@ -124,7 +124,7 @@ func (ws *remoteWebserverEndpoints) isServerStartedUp(w http.ResponseWriter, req
 		log.Info("Startup check failed, cannot check Cluster definition", "err", err)
 		http.Error(
 			w,
-			fmt.Sprintf("startup check failed (cannot get Cluster definition: '%s')", err.Error()),
+			fmt.Sprintf("startup check failed (cannot get Cluster definition: %s)", err.Error()),
 			http.StatusInternalServerError,
 		)
 		return
@@ -143,7 +143,7 @@ func (ws *remoteWebserverEndpoints) isServerStartedUp(w http.ResponseWriter, req
 		log.Info("Startup probe failing (pg_isready)", "err", err.Error())
 		http.Error(
 			w,
-			fmt.Sprintf("startup check failed (pg_isready failed: '%s')", err.Error()),
+			fmt.Sprintf("startup check failed (pg_isready failed: %s)", err.Error()),
 			http.StatusInternalServerError,
 		)
 		return
@@ -254,7 +254,7 @@ func (ws *remoteWebserverEndpoints) isServerHealthy(w http.ResponseWriter, _ *ht
 		return
 	}
 
-	err := postgres.PgIsReady()
+	err := ws.instance.IsReady()
 	switch {
 	case err == nil:
 		log.Trace("Liveness probe succeeding")
@@ -279,11 +279,11 @@ func (ws *remoteWebserverEndpoints) isServerReady(w http.ResponseWriter, _ *http
 		return
 	}
 
-	if err := postgres.PgIsReady(); err != nil {
+	if err := ws.instance.IsReady(); err != nil {
 		log.Debug("startup probe failing (pg_isready)", "err", err.Error())
 		http.Error(
 			w,
-			fmt.Sprintf("readiness check failed (pg_isready failed: '%s')", err.Error()),
+			fmt.Sprintf("readiness check failed (pg_isready failed: %s)", err.Error()),
 			http.StatusInternalServerError,
 		)
 		return
