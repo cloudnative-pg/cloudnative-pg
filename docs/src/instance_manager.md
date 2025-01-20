@@ -83,7 +83,7 @@ spec:
 
 The liveness probe starts once the startup probe has successfully completed.
 Its purpose is to verify that the PostgreSQL instance, whether primary or
-standby, is functioning correctly by relying on the `pg_isready` check.
+standby, is functioning correctly according to the `pg_isready` check.
 Following Kubernetes standards, if the liveness probe fails, the
 kubelet will terminate the container, which will then be restarted.
 
