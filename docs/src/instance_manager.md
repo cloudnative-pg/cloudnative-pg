@@ -28,8 +28,8 @@ While the startup probe is running, the liveness and readiness probes remain
 disabled. Following Kubernetes standards, if the startup probe fails, the
 kubelet will terminate the container, which will then be restarted.
 
-The startup probe provided by CloudNativePG relies on `.spec.startDelay`.
-The `.spec.startDelay` parameter specifies the maximum time, in seconds,
+The startup probe provided by CloudNativePG is configurable via the
+parameter `.spec.startDelay`, which specifies the maximum time, in seconds,
 allowed for the startup probe to succeed. At a minimum, the probe requires
 `pg_isready` to return `0` or `1`.
 
