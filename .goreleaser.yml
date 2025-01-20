@@ -33,6 +33,25 @@ builds:
     - amd64
     - arm64
 
+- id: manager-race
+  binary: manager/manager_{{ .Arch }}
+  main: cmd/manager/main.go
+  no_unique_dist_dir: true
+  gcflags:
+    - all=-trimpath={{.Env.GOPATH}};{{.Env.PWD}}
+  ldflags:
+    - -race
+    - -s
+    - -w
+    - -X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildVersion={{.Env.VERSION}}
+    - -X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildCommit={{.Env.COMMIT}}
+    - -X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildDate={{.Env.DATE}}
+  goos:
+    - linux
+  goarch:
+    - amd64
+    - arm64
+
 - id: kubectl-cnpg
   binary: kubectl-cnpg
   main: cmd/kubectl-cnpg/main.go
