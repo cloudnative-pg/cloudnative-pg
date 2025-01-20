@@ -81,9 +81,12 @@ spec:
 
 ### Liveness Probe
 
-The liveness probe starts once the startup probe has successfully completed.
-Its purpose is to verify that the PostgreSQL instance, whether primary or
-standby, is functioning correctly according to the `pg_isready` check.
+The liveness probe begins after the startup probe successfully completes. Its
+primary role is to ensure the PostgreSQL instance—whether primary or standby—is
+operating correctly. This is achieved using the `pg_isready` utility. Both exit
+codes `0` (indicating the server is accepting connections) and `1` (indicating
+the server is rejecting connections, such as during startup or a smart
+shutdown) are treated as valid outcomes.
 Following Kubernetes standards, if the liveness probe fails, the
 kubelet will terminate the container, which will then be restarted.
 
