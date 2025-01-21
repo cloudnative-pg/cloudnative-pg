@@ -375,7 +375,7 @@ spec:
     ```
     ANY 1 ("foo-2","foo-3","foo-1")
     ```
-    
+
     At this point no write operations will be allowed until at least one of the
     standbys is available again.
 
@@ -389,6 +389,12 @@ instances adjusts based on the number of available standbys. PostgreSQL will
 attempt to replicate WAL records to the designated number of synchronous
 standbys, but write operations will continue even if fewer than the requested
 number of standbys are available.
+
+!!! Important
+    Make sure you have a clear understanding of what *ready/available* means
+    for a replica and set your expectations accordingly. By default, a replica is
+    considered ready when it has successfully connected to the source at least
+    once.
 
 This setting balances data safety with availability, enabling applications to
 continue writing during temporary standby unavailability—hence, it’s also known
@@ -485,7 +491,7 @@ ANY q (pod1, pod2, ...)
 
 Where:
 
-- `q` is an integer automatically calculated by the operator to be:  
+- `q` is an integer automatically calculated by the operator to be:
   `1 <= minSyncReplicas <= q <= maxSyncReplicas <= readyReplicas`
 - `pod1, pod2, ...` is the list of all PostgreSQL pods in the cluster
 

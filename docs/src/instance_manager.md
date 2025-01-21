@@ -15,17 +15,27 @@ main container, which in turn runs the PostgreSQL instance. During the lifetime
 of the Pod, the instance manager acts as a backend to handle the
 [startup, liveness and readiness probes](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#container-probes).
 
-## Startup, liveness and readiness probes
+## Startup, Liveness, and Readiness Probes
 
-The startup and liveness probes rely on `pg_isready`, while the readiness
-probe checks if the database is up and able to accept connections.
+CloudNativePG leverages [PostgreSQL's `pg_isready`](https://www.postgresql.org/docs/current/app-pg-isready.html)
+to implement Kubernetes startup, liveness, and readiness probes.
 
 ### Startup Probe
 
-The `.spec.startDelay` parameter specifies the delay (in seconds) before the
-liveness probe activates after a PostgreSQL Pod starts. By default, this is set
-to `3600` seconds. You should adjust this value based on the time PostgreSQL
-requires to fully initialize in your environment.
+The startup probe ensures that a PostgreSQL instance, whether a primary or
+standby, has fully started according to `pg_isready`.
+While the startup probe is running, the liveness and readiness probes remain
+disabled. Following Kubernetes standards, if the startup probe fails, the
+kubelet will terminate the container, which will then be restarted.
+
+The startup probe provided by CloudNativePG is configurable via the
+parameter `.spec.startDelay`, which specifies the maximum time, in seconds,
+allowed for the startup probe to succeed. At a minimum, the probe requires
+`pg_isready` to return `0` or `1`.
+
+By default, the `startDelay` is set to `3600` seconds. It is recommended to
+adjust this setting based on the time PostgreSQL needs to fully initialize in
+your specific environment.
 
 !!! Warning
     Setting `.spec.startDelay` too low can cause the liveness probe to activate
@@ -71,9 +81,14 @@ spec:
 
 ### Liveness Probe
 
-The liveness probe begins after the startup probe succeeds and is responsible
-for detecting if the PostgreSQL instance has entered a broken state that
-requires a restart of the pod.
+The liveness probe begins after the startup probe successfully completes. Its
+primary role is to ensure the PostgreSQL instance—whether primary or standby—is
+operating correctly. This is achieved using the `pg_isready` utility. Both exit
+codes `0` (indicating the server is accepting connections) and `1` (indicating
+the server is rejecting connections, such as during startup or a smart
+shutdown) are treated as valid outcomes.
+Following Kubernetes standards, if the liveness probe fails, the
+kubelet will terminate the container, which will then be restarted.
 
 The amount of time before a Pod is classified as not alive is configurable via
 the `.spec.livenessProbeTimeout` parameter.
@@ -123,8 +138,12 @@ spec:
 
 ### Readiness Probe
 
-The readiness probe determines when a pod running a PostgreSQL instance is
-prepared to accept traffic and serve requests.
+The readiness probe begins once the startup probe has successfully completed.
+Its purpose is to check whether the PostgreSQL instance is ready to accept
+traffic and serve requests.
+For streaming replicas, it also requires that they have connected to the source
+at least once. Following Kubernetes standards, if the readiness probe fails,
+the pod will be marked unready and will not receive traffic from any services.
 
 CloudNativePG uses the following default configuration for the readiness probe:
 
