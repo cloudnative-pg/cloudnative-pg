@@ -141,9 +141,9 @@ spec:
 The readiness probe begins once the startup probe has successfully completed.
 Its purpose is to check whether the PostgreSQL instance is ready to accept
 traffic and serve requests.
-For streaming replicas, it also requires that they have connected to the source at least once.
-Following Kubernetes standards, if the readiness probe fails, the
-kubelet will terminate the container, which will then be restarted.
+For streaming replicas, it also requires that they have connected to the source
+at least once. Following Kubernetes standards, if the readiness probe fails,
+the pod will be marked unready and will not receive traffic from any services.
 
 CloudNativePG uses the following default configuration for the readiness probe:
 
