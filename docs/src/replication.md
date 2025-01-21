@@ -342,7 +342,7 @@ ANY q (pod1, pod2, ...)
 
 Where:
 
-- `q` is an integer automatically calculated by the operator to be:  
+- `q` is an integer automatically calculated by the operator to be:
   `1 <= minSyncReplicas <= q <= maxSyncReplicas <= readyReplicas`
 - `pod1, pod2, ...` is the list of all PostgreSQL pods in the cluster
 
