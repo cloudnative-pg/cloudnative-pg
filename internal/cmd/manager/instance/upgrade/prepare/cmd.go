@@ -32,20 +32,35 @@ import (
 
 // NewCmd create the cobra command
 func NewCmd() *cobra.Command {
+	var pgConfig string
+
 	cmd := cobra.Command{
 		Use:  "prepare [target]",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			contextLogger := log.FromContext(cmd.Context())
 			dest := args[0]
 
-			if err := copyPostgresInstallation(cmd.Context(), dest); err != nil {
-				panic(err)
+			if err := copyPostgresInstallation(cmd.Context(), pgConfig, dest); err != nil {
+				contextLogger.Error(err, "Failed to copy the PostgreSQL installation")
+				return err
 			}
+
 			return nil
 		},
 	}
 
+	cmd.Flags().StringVar(&pgConfig, "pg-config", getEnvOrDefault("PG_CONFIG", "pg_config"),
+		`The path of "pg_config" executable. Defaults to "pg_config".`)
+
 	return &cmd
+}
+
+func getEnvOrDefault(env, def string) string {
+	if value, ok := os.LookupEnv(env); ok {
+		return value
+	}
+	return def
 }
 
 // copyPostgresInstallation is roughly equivalent to the following bash code
@@ -65,7 +80,7 @@ func NewCmd() *cobra.Command {
 //	> cp -ax "${sharedir}"/. "/controller/old${sharedir}"
 //	>
 //	> echo "/controller/old${bindir}" > /controller/old/bindir.txt
-func copyPostgresInstallation(ctx context.Context, dest string) interface{} {
+func copyPostgresInstallation(ctx context.Context, pgConfig string, dest string) error {
 	contextLogger := log.FromContext(ctx)
 
 	dest = path.Clean(dest)
@@ -87,7 +102,7 @@ func copyPostgresInstallation(ctx context.Context, dest string) interface{} {
 	}
 
 	for _, config := range []string{"bindir", "pkglibdir", "sharedir"} {
-		sourceDir, err := getPostgresConfig(config)
+		sourceDir, err := getPostgresConfig(pgConfig, config)
 		if err != nil {
 			return err
 		}
@@ -119,8 +134,8 @@ func copyPostgresInstallation(ctx context.Context, dest string) interface{} {
 	return nil
 }
 
-func getPostgresConfig(dir string) (string, error) {
-	out, err := exec.Command("pg_config", "--"+dir).Output() //nolint:gosec
+func getPostgresConfig(pgConfig string, dir string) (string, error) {
+	out, err := exec.Command(pgConfig, "--"+dir).Output() //nolint:gosec
 	if err != nil {
 		return "", fmt.Errorf("failed to get the %q value from pg_config: %w", dir, err)
 	}

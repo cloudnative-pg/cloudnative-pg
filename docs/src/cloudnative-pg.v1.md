@@ -2269,7 +2269,7 @@ This field is reported when <code>.spec.failoverDelay</code> is populated or dur
 </td>
 <td>
    <p>MajorVersionUpgradeFromImage contains the image from which we are upgrading
-when a major version upgrade is running</p>
+when a Postgres major version upgrade is running</p>
 </td>
 </tr>
 <tr><td><code>pluginStatus</code><br/>

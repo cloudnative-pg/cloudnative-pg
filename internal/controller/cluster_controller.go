@@ -316,7 +316,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		return hookResult.Result, hookResult.Err
 	}
 
-	// In-place Major Version Upgrades
+	// In-place Postgres major version upgrades
 	if res, err := r.reconcileInPlaceMajorVersionUpgrades(ctx, cluster, resources); res != nil || err != nil {
 		if res != nil {
 			return *res, nil
