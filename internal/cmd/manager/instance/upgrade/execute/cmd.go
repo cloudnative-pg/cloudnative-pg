@@ -24,8 +24,8 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
-	"slices"
 	"strings"
+	"time"
 
 	"github.com/blang/semver"
 	"github.com/cloudnative-pg/machinery/pkg/execlog"
@@ -55,6 +55,7 @@ func NewCmd() *cobra.Command {
 	var podName string
 	var clusterName string
 	var namespace string
+	var pgUpgrade string
 
 	cmd := &cobra.Command{
 		Use:  "execute [options]",
@@ -62,6 +63,7 @@ func NewCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			oldBinDirFile := args[0]
 			ctx := cmd.Context()
+
 			// The fields in the instance are needed to correctly
 			// download the secret containing the TLS
 			// certificates
@@ -71,12 +73,13 @@ func NewCmd() *cobra.Command {
 				WithClusterName(clusterName)
 
 			// Read the old bindir from the passed file
-			oldBinDir, err := fileutils.ReadFile(oldBinDirFile)
+			oldBinDirBytes, err := fileutils.ReadFile(oldBinDirFile)
 			if err != nil {
 				return fmt.Errorf("error while reading the old bindir: %w", err)
 			}
 
-			return upgradeSubCommand(ctx, instance, pgData, strings.TrimSpace(string(oldBinDir)))
+			oldBinDir := strings.TrimSpace(string(oldBinDirBytes))
+			return upgradeSubCommand(ctx, instance, pgData, oldBinDir, pgUpgrade)
 		},
 		PostRunE: func(cmd *cobra.Command, _ []string) error {
 			if err := istio.TryInvokeQuitEndpoint(cmd.Context()); err != nil {
@@ -94,11 +97,26 @@ func NewCmd() *cobra.Command {
 		"the cluster and of the Pod in k8s")
 	cmd.Flags().StringVar(&clusterName, "cluster-name", os.Getenv("CLUSTER_NAME"), "The name of "+
 		"the current cluster in k8s, used to download TLS certificates")
+	cmd.Flags().StringVar(&pgUpgrade, "pg-upgrade", getEnvOrDefault("PG_UPGRADE", "pg_upgrade"),
+		`The path of "pg_upgrade" executable. Defaults to "pg_upgrade".`)
 
 	return cmd
 }
 
-func upgradeSubCommand(ctx context.Context, instance *postgres.Instance, pgData string, oldBinDir string) error {
+func getEnvOrDefault(env, def string) string {
+	if value, ok := os.LookupEnv(env); ok {
+		return value
+	}
+	return def
+}
+
+func upgradeSubCommand(
+	ctx context.Context,
+	instance *postgres.Instance,
+	pgData string,
+	oldBinDir string,
+	pgUpgrade string,
+) error {
 	contextLogger := log.FromContext(ctx)
 
 	client, err := management.NewControllerRuntimeClient()
@@ -138,10 +156,10 @@ func upgradeSubCommand(ctx context.Context, instance *postgres.Instance, pgData 
 
 	contextLogger.Info("Starting the upgrade process")
 
-	newDataDir := "/var/lib/postgresql/data/new"
+	newDataDir := fmt.Sprintf("%s-new", specs.PgDataPath)
 	var newWalDir *string
 	if cluster.ShouldCreateWalArchiveVolume() {
-		newWalDir = ptr.To(path.Join(specs.PgWalVolumePath, "new_wal"))
+		newWalDir = ptr.To(fmt.Sprintf("%s-new", specs.PgWalVolumePgWalPath))
 	}
 
 	contextLogger.Info("Ensuring the new data directory does not exist", "directory", newDataDir)
@@ -180,7 +198,7 @@ func upgradeSubCommand(ctx context.Context, instance *postgres.Instance, pgData 
 	}
 
 	contextLogger.Info("Running pg_upgrade")
-	if err := runPgUpgrade(pgData, newDataDir, oldBinDir); err != nil {
+	if err := runPgUpgrade(pgData, pgUpgrade, newDataDir, oldBinDir); err != nil {
 		return fmt.Errorf("error while running pg_upgrade: %w", err)
 	}
 
@@ -188,13 +206,16 @@ func upgradeSubCommand(ctx context.Context, instance *postgres.Instance, pgData 
 	if err != nil {
 		contextLogger.Error(err, "Error while moving the data in place, saving the new data directory to avoid data loss")
 
-		if errInner := moveDirIfExists(newDataDir, newDataDir+".failed"); err != nil {
+		suffixTimestamp := fileutils.FormatFriendlyTimestamp(time.Now())
+
+		failedPgDataName := fmt.Sprintf("%s.failed_%s", newDataDir, suffixTimestamp)
+		if errInner := moveDirIfExists(ctx, newDataDir, failedPgDataName); errInner != nil {
 			contextLogger.Error(errInner, "Error while saving the new data directory")
 		}
 
 		if newWalDir != nil {
-			errInner := moveDirIfExists(*newWalDir, *newWalDir+".failed")
-			if errInner != nil {
+			failedPgWalName := fmt.Sprintf("%s.failed_%s", *newWalDir, suffixTimestamp)
+			if errInner := moveDirIfExists(ctx, *newWalDir, failedPgWalName); errInner != nil {
 				contextLogger.Error(errInner, "Error while saving the new pg_wal directory")
 			}
 		}
@@ -264,16 +285,16 @@ func prepareConfigurationFiles(destDir string) error {
 	return nil
 }
 
-func runPgUpgrade(oldDataDir string, newDataDir string, oldBinDir string) error {
+func runPgUpgrade(oldDataDir string, pgUpgrade string, newDataDir string, oldBinDir string) error {
 	// Run the pg_upgrade command
-	cmd := exec.Command("pg_upgrade",
+	cmd := exec.Command(pgUpgrade,
 		"--link",
 		"--old-bindir", oldBinDir,
 		"--old-datadir", oldDataDir,
 		"--new-datadir", newDataDir,
 	) // #nosec
 	cmd.Dir = newDataDir
-	if err := execlog.RunBuffering(cmd, "pg_upgrade"); err != nil {
+	if err := execlog.RunBuffering(cmd, path.Base(pgUpgrade)); err != nil {
 		return fmt.Errorf("error while running pg_upgrade: %w", err)
 	}
 
@@ -294,106 +315,48 @@ func moveDataInPlace(
 		return fmt.Errorf("error while removing the delete_old_cluster.sh script: %w", err)
 	}
 
-	contextLogger.Info("Cleaning up the old data directory")
-	if err := clearDirectory(path.Join(pgData, "pg_wal")); err != nil {
-		return fmt.Errorf("error while removing the content of old pg_wal directory: %w", err)
-	}
-	if err := clearDirectory(pgData, path.Join(pgData, "pg_wal")); err != nil {
-		return fmt.Errorf("error while removing the content of old data directory: %w", err)
+	contextLogger.Info("Moving the old data directory")
+	if err := os.Rename(pgData, pgData+".old"); err != nil {
+		return fmt.Errorf("error while moving the old data directory: %w", err)
 	}
 
-	contextLogger.Info("Moving the new pg_wal directory in place")
-	if err := moveContents(path.Join(newDataDir, "pg_wal"), path.Join(pgData, "pg_wal")); err != nil {
-		return fmt.Errorf("error while moving the pg_wal directory content: %w", err)
-	}
-	if err := os.Remove(path.Join(newDataDir, "pg_wal")); err != nil {
-		return fmt.Errorf("error while removing the new pg_wal directory: %w", err)
-	}
 	if newWalDir != nil {
-		if err := os.Remove(*newWalDir); err != nil {
-			return fmt.Errorf("error while removing the new pg_wal directory in the WAL volume: %w", err)
+		contextLogger.Info("Moving the old pg_wal directory")
+		if err := os.Rename(specs.PgWalVolumePgWalPath, specs.PgWalVolumePgWalPath+".old"); err != nil {
+			return fmt.Errorf("error while moving the old data directory: %w", err)
 		}
 	}
 
 	contextLogger.Info("Moving the new data directory in place")
-	if err := moveContents(newDataDir, pgData); err != nil {
+	if err := os.Rename(newDataDir, pgData); err != nil {
 		return fmt.Errorf("error while moving the new data directory: %w", err)
 	}
-	if err := os.Remove(newDataDir); err != nil {
-		return fmt.Errorf("error while removing the new data directory: %w", err)
+
+	if newWalDir != nil {
+		contextLogger.Info("Moving the new pg_wal directory in place")
+		if err := os.Rename(*newWalDir, specs.PgWalVolumePgWalPath); err != nil {
+			return fmt.Errorf("error while moving the pg_wal directory content: %w", err)
+		}
+		if err := fileutils.RemoveFile(specs.PgWalPath); err != nil {
+			return fmt.Errorf("error while removing the symlink to pg_wal: %w", err)
+		}
+		if err := os.Symlink(specs.PgWalVolumePgWalPath, specs.PgWalPath); err != nil {
+			return fmt.Errorf("error while creatin the symlink to pg_wal: %w", err)
+		}
+	}
+
+	contextLogger.Info("Removing the old data directory and pg_wal directory")
+	if err := os.RemoveAll(pgData + ".old"); err != nil {
+		return fmt.Errorf("error while removing the old data directory: %w", err)
+	}
+	if err := os.RemoveAll(specs.PgWalVolumePgWalPath + ".old"); err != nil {
+		return fmt.Errorf("error while removing the old pg_wal directory: %w", err)
 	}
 
 	contextLogger.Info("Cleaning up the previous version directory from tablespaces")
 	if err := removeMatchingPaths(ctx,
-		path.Join(pgData, "pg_tblspc", "*", fmt.Sprintf("PG_%v_*", oldVersion))); err != nil {
+		path.Join(pgData, "pg_tblspc", "*", fmt.Sprintf("PG_%v_*", oldVersion.Major))); err != nil {
 		return fmt.Errorf("error while removing the old tablespaces directories: %w", err)
-	}
-
-	return nil
-}
-
-func clearDirectory(dir string, exclude ...string) error {
-	// Read the contents of the directory
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return fmt.Errorf("failed to read directory: %w", err)
-	}
-
-	// Loop through the entries and remove them
-	for _, entry := range entries {
-		entryPath := path.Join(dir, entry.Name())
-		if slices.Contains(exclude, entryPath) {
-			continue
-		}
-
-		if entry.IsDir() {
-			// Recursively remove subdirectory
-			err = os.RemoveAll(entryPath)
-		} else {
-			// Remove file
-			err = os.Remove(entryPath)
-		}
-
-		if err != nil {
-			return fmt.Errorf("failed to remove %s: %w", entryPath, err)
-		}
-	}
-
-	return nil
-}
-
-func moveContents(srcDir, destDir string) error {
-	// Ensure the source directory exists
-	srcInfo, err := os.Stat(srcDir)
-	if err != nil {
-		return fmt.Errorf("source directory does not exist: %v", err)
-	}
-	if !srcInfo.IsDir() {
-		return fmt.Errorf("source path is not a directory")
-	}
-
-	// Ensure the destination directory exists (create if it doesn't)
-	err = os.MkdirAll(destDir, 0o750)
-	if err != nil {
-		return fmt.Errorf("failed to create destination directory: %v", err)
-	}
-
-	// Read the contents of the source directory
-	contents, err := os.ReadDir(srcDir)
-	if err != nil {
-		return fmt.Errorf("failed to read source directory: %v", err)
-	}
-
-	// Iterate through the contents and move each item
-	for _, item := range contents {
-		srcPath := filepath.Join(srcDir, item.Name())
-		destPath := filepath.Join(destDir, item.Name())
-
-		// Move the file or directory
-		err := os.Rename(srcPath, destPath)
-		if err != nil {
-			return fmt.Errorf("failed to move %s to %s: %v", srcPath, destPath, err)
-		}
 	}
 
 	return nil
@@ -421,9 +384,11 @@ func removeMatchingPaths(ctx context.Context, pattern string) error {
 	return nil
 }
 
-func moveDirIfExists(targetDir string, destDir string) error {
-	if _, errExists := os.Stat(targetDir); !os.IsNotExist(errExists) {
-		err := moveContents(targetDir, destDir)
+func moveDirIfExists(ctx context.Context, oldPath string, newPath string) error {
+	contextLogger := log.FromContext(ctx)
+	if _, errExists := os.Stat(oldPath); !os.IsNotExist(errExists) {
+		contextLogger.Info("Moving directory", "oldPath", oldPath, "newPath", newPath)
+		err := os.Rename(oldPath, newPath)
 		if err != nil {
 			return err
 		}

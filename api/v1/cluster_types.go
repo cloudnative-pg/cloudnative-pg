@@ -551,7 +551,7 @@ const (
 	PhaseUpgrade = "Upgrading cluster"
 
 	// PhaseMajorUpgrade major version upgrade in process
-	PhaseMajorUpgrade = "Upgrading cluster major version"
+	PhaseMajorUpgrade = "Upgrading Postgres major version"
 
 	// PhaseUpgradeDelayed is set when a cluster needs to be upgraded,
 	// but the operation is being delayed by the operator configuration
@@ -909,7 +909,7 @@ type ClusterStatus struct {
 	Image string `json:"image,omitempty"`
 
 	// MajorVersionUpgradeFromImage contains the image from which we are upgrading
-	// when a major version upgrade is running
+	// when a Postgres major version upgrade is running
 	// +optional
 	MajorVersionUpgradeFromImage *string `json:"majorVersionUpgradeFromImage,omitempty"`
 
