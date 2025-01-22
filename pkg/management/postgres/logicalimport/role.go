@@ -62,10 +62,6 @@ func cloneRoles(
 	destination pool.Pooler,
 	origin pool.Pooler,
 ) error {
-	if len(cluster.Spec.Bootstrap.InitDB.Import.Roles) == 0 {
-		return nil
-	}
-
 	rs := roleManager{origin: origin, destination: destination, cluster: cluster}
 	roles, err := rs.getRoles(ctx)
 	if err != nil {
