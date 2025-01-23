@@ -72,7 +72,7 @@ var _ = Describe("Probes configuration tests", Label(tests.LabelBasic), func() {
 		assertProbesCoherentWithConfiguration := func(container *corev1.Container) {
 			assertProbeCoherentWithConfiguration(container.LivenessProbe)
 			assertProbeCoherentWithConfiguration(container.ReadinessProbe)
-			assertProbeCoherentWithConfiguration(container.LivenessProbe)
+			assertProbeCoherentWithConfiguration(container.StartupProbe)
 		}
 
 		var defaultReadinessProbe *corev1.Probe
