@@ -158,6 +158,20 @@ func upgradeSubCommand(
 		return fmt.Errorf("error while reconciling the WAL storage: %w", err)
 	}
 
+	contextLogger.Info("Searching for failed upgrades")
+
+	var failedDirs []string
+	for _, dir := range []string{specs.PgDataPath, specs.PgWalVolumePgWalPath} {
+		matches, err := filepath.Glob(dir + "*.failed_*")
+		if err != nil {
+			return fmt.Errorf("error matching paths: %w", err)
+		}
+		failedDirs = append(failedDirs, matches...)
+	}
+	if len(failedDirs) > 0 {
+		return fmt.Errorf("found failed upgrade directories: %v", failedDirs)
+	}
+
 	contextLogger.Info("Starting the upgrade process")
 
 	newDataDir := fmt.Sprintf("%s-new", specs.PgDataPath)
@@ -212,15 +226,21 @@ func upgradeSubCommand(
 
 		suffixTimestamp := fileutils.FormatFriendlyTimestamp(time.Now())
 
-		failedPgDataName := fmt.Sprintf("%s.failed_%s", newDataDir, suffixTimestamp)
-		if errInner := moveDirIfExists(ctx, newDataDir, failedPgDataName); errInner != nil {
-			contextLogger.Error(errInner, "Error while saving the new data directory")
+		dirToBeSaved := []string{
+			newDataDir,
+			pgData + ".old",
+		}
+		if newWalDir != nil {
+			dirToBeSaved = append(dirToBeSaved,
+				*newWalDir,
+				specs.PgWalVolumePgWalPath+".old",
+			)
 		}
 
-		if newWalDir != nil {
-			failedPgWalName := fmt.Sprintf("%s.failed_%s", *newWalDir, suffixTimestamp)
-			if errInner := moveDirIfExists(ctx, *newWalDir, failedPgWalName); errInner != nil {
-				contextLogger.Error(errInner, "Error while saving the new pg_wal directory")
+		for _, dir := range dirToBeSaved {
+			failedPgDataName := fmt.Sprintf("%s.failed_%s", dir, suffixTimestamp)
+			if errInner := moveDirIfExists(ctx, dir, failedPgDataName); errInner != nil {
+				contextLogger.Error(errInner, "Error while saving a directory after a failure", "dir", dir)
 			}
 		}
 
@@ -373,7 +393,7 @@ func removeMatchingPaths(ctx context.Context, pattern string) error {
 	// Find all matching paths
 	matches, err := filepath.Glob(pattern)
 	if err != nil {
-		return fmt.Errorf("error matching paths: %v", err)
+		return fmt.Errorf("error matching paths: %w", err)
 	}
 
 	// Iterate through the matches and remove each
@@ -381,7 +401,7 @@ func removeMatchingPaths(ctx context.Context, pattern string) error {
 		contextLogger.Info("Removing path", "path", match)
 		err := os.RemoveAll(match)
 		if err != nil {
-			return fmt.Errorf("failed to remove %s: %v", match, err)
+			return fmt.Errorf("failed to remove %s: %w", match, err)
 		}
 	}
 
