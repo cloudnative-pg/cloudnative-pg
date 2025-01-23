@@ -46,6 +46,8 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), Ordered, func(
 	)
 	var namespace string
 	BeforeAll(func() {
+		Skip("deleting a directory inside PGDATA won't make pg_isready fail")
+
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
