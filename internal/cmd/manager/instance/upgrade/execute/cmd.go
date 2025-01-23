@@ -154,6 +154,10 @@ func upgradeSubCommand(
 	// cryptographic material is not available.
 	reconciler.RefreshSecrets(ctx, &cluster)
 
+	if err := reconciler.ReconcileWalStorage(ctx); err != nil {
+		return fmt.Errorf("error while reconciling the WAL storage: %w", err)
+	}
+
 	contextLogger.Info("Starting the upgrade process")
 
 	newDataDir := fmt.Sprintf("%s-new", specs.PgDataPath)
