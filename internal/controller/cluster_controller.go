@@ -316,14 +316,6 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		return hookResult.Result, hookResult.Err
 	}
 
-	// In-place Postgres major version upgrades
-	if res, err := r.reconcileInPlaceMajorVersionUpgrades(ctx, cluster, resources); res != nil || err != nil {
-		if res != nil {
-			return *res, nil
-		}
-		return ctrl.Result{}, fmt.Errorf("cannot reconcile in-place major version upgrades: %w", err)
-	}
-
 	if cluster.Status.CurrentPrimary != "" &&
 		cluster.Status.CurrentPrimary != cluster.Status.TargetPrimary {
 		contextLogger.Info("There is a switchover or a failover "+
@@ -735,6 +727,14 @@ func (r *ClusterReconciler) reconcileResources(
 		resources.pvcs.Items,
 	); !res.IsZero() || err != nil {
 		return res, err
+	}
+
+	// In-place Postgres major version upgrades
+	if res, err := r.reconcileInPlaceMajorVersionUpgrades(ctx, cluster, resources); res != nil || err != nil {
+		if res != nil {
+			return *res, nil
+		}
+		return ctrl.Result{}, fmt.Errorf("cannot reconcile in-place major version upgrades: %w", err)
 	}
 
 	// Reconcile Pods
@@ -1465,7 +1465,7 @@ func (r *ClusterReconciler) reconcileInPlaceMajorVersionUpgrades(
 
 	for _, job := range resources.jobs.Items {
 		if job.GetLabels()[utils.JobRoleLabelName] == "major-upgrade" {
-			return r.majorVersionUpgradeCheckForCompletion(ctx, cluster, job, resources)
+			return r.majorVersionUpgradeHandleCompletion(ctx, cluster, job, resources)
 		}
 	}
 
@@ -1555,7 +1555,7 @@ func (r *ClusterReconciler) reconcileInPlaceMajorVersionUpgrades(
 	return &ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 }
 
-func (r *ClusterReconciler) majorVersionUpgradeCheckForCompletion(
+func (r *ClusterReconciler) majorVersionUpgradeHandleCompletion(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
 	job batchv1.Job,
@@ -1564,7 +1564,7 @@ func (r *ClusterReconciler) majorVersionUpgradeCheckForCompletion(
 	contextLogger := log.FromContext(ctx)
 
 	if !utils.JobHasOneCompletion(job) {
-		contextLogger.Info("Major upgrade in progress, waiting for it to finish")
+		contextLogger.Warning("Unexpected state: major upgrade job not completed.")
 		return &ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 
@@ -1585,10 +1585,26 @@ func (r *ClusterReconciler) majorVersionUpgradeCheckForCompletion(
 		}
 	}
 
+	jobImage, err := getImageFromUpgrade(job)
+	if err != nil {
+		contextLogger.Error(err, "Unable to retrieve image name from major upgrade job.")
+		return &ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+	}
+
 	return &ctrl.Result{Requeue: true}, status.PatchWithOptimisticLock(
 		ctx,
 		r.Client,
 		cluster,
-		status.SetMajorVersionUpgradeFromImage(nil),
+		status.SetMajorVersionUpgradeFromImage(&jobImage),
 	)
+}
+
+func getImageFromUpgrade(job batchv1.Job) (string, error) {
+	for _, container := range job.Spec.Template.Spec.Containers {
+		if container.Name == "major-upgrade" {
+			return container.Image, nil
+		}
+	}
+
+	return "", fmt.Errorf("container not found")
 }
