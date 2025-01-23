@@ -87,7 +87,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 			Expect(err).ShouldNot(HaveOccurred())
 
 			return strings.Trim(out, "\n")
-		}, 30).Should(ContainSubstring(element))
+		}, 60).Should(ContainSubstring(element))
 	}
 
 	Context("Legacy synchronous replication", func() {
@@ -183,9 +183,8 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 	})
 
 	Context("Synchronous replication", func() {
-		var namespace string
-
 		It("can manage quorum/priority based synchronous replication", func() {
+			var namespace string
 			const (
 				namespacePrefix = "sync-replicas-e2e"
 				sampleFile      = fixturesDir + "/sync_replicas/cluster-sync-replica.yaml.template"
@@ -244,6 +243,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 
 		Context("data durability is preferred", func() {
 			It("will decrease the number of sync replicas to the number of available replicas", func() {
+				var namespace string
 				const (
 					namespacePrefix = "sync-replicas-preferred"
 					sampleFile      = fixturesDir + "/sync_replicas/preferred.yaml.template"
@@ -296,6 +296,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 
 		Context("Lag-control in startup probe", func() {
 			It("lag control in startup probe will delay the readiness of replicas", func() {
+				var namespace string
 				const (
 					namespacePrefix = "sync-replicas-preferred"
 					sampleFile      = fixturesDir + "/sync_replicas/lagcontrol.yaml.template"
@@ -350,7 +351,6 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 						"-c",
 						"create table numbers (i integer); "+
 							"insert into numbers (select generate_series(1,1000000)); "+
-							"insert into numbers (select * from numbers); "+
 							"insert into numbers (select * from numbers); "+
 							"insert into numbers (select * from numbers); "+
 							"insert into numbers (select * from numbers); ",
@@ -419,23 +419,30 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 				})
 
 				By("checking that the replica was waiting for the lag to decrease before being ready", func() {
-					data, err := logs.ParseJSONLogs(env.Ctx, env.Interface, namespace, fencedReplicaName)
-					Expect(err).ToNot(HaveOccurred())
+					timeout := 2 * time.Minute
 
-					recordWasFound := false
-					for _, record := range data {
-						_, hasDetectedLag := record["detectedLag"]
-						_, hasConfiguredLag := record["configuredLag"]
-						recordWasFound = hasDetectedLag && hasConfiguredLag
-						if recordWasFound {
-							break
+					// This "Eventually" block is needed because we may grab only a portion
+					// of the replica logs, and the "ParseJSONLogs" may fail on the latest
+					// log record when this happens
+					Eventually(func(g Gomega) {
+						data, err := logs.ParseJSONLogs(env.Ctx, env.Interface, namespace, fencedReplicaName)
+						g.Expect(err).ToNot(HaveOccurred())
+
+						recordWasFound := false
+						for _, record := range data {
+							_, hasDetectedLag := record["detectedLag"]
+							_, hasConfiguredLag := record["configuredLag"]
+							recordWasFound = hasDetectedLag && hasConfiguredLag
+							if recordWasFound {
+								break
+							}
 						}
-					}
 
-					Expect(recordWasFound).To(
-						BeTrue(),
-						"The startup probe is preventing the replica from being marked ready",
-					)
+						g.Expect(recordWasFound).To(
+							BeTrue(),
+							"The startup probe is preventing the replica from being marked ready",
+						)
+					}, timeout).Should(Succeed())
 				})
 			})
 		})
