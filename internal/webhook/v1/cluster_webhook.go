@@ -1232,14 +1232,16 @@ func (v *ClusterCustomValidator) validateImageChange(r, old *apiv1.Cluster) fiel
 		fieldPath = field.NewPath("spec", "imageName")
 	}
 
-	r.Status.Image = ""
-	newVersion, err = r.GetPostgresqlVersion()
+	newCluster := r.DeepCopy()
+	newCluster.Status.Image = ""
+	newVersion, err = newCluster.GetPostgresqlVersion()
 	if err != nil {
 		// The validation error will be already raised by the
 		// validateImageName function
 		return result
 	}
 
+	old = old.DeepCopy()
 	if old.Status.MajorVersionUpgradeFromImage != nil {
 		old.Status.Image = *old.Status.MajorVersionUpgradeFromImage
 	}
