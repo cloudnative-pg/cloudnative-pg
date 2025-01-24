@@ -73,9 +73,9 @@ func (r *ClusterReconciler) reconcileImage(ctx context.Context, cluster *apiv1.C
 			// The major versions are the same, cancel the update
 			majorVersionUpgradeFromImage = nil
 		default:
-			err := fmt.Errorf("cannot downgrade the image from %s to %s", *currentDataImage, image)
-			contextLogger.Error(err, "While comparing images major versions")
-			return nil, err
+			contextLogger.Info("Cannot downgrade the PostgreSQL major version. Forcing the current image.",
+				"currentImage", *currentDataImage, "requestedImage", image)
+			image = *currentDataImage
 		}
 	}
 
