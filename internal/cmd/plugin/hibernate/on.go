@@ -84,9 +84,13 @@ func newOnCommand(ctx context.Context, clusterName string, force bool) (*onComma
 	}
 
 	// Get the PVCs that will be hibernated
-	pvcs, err := persistentvolumeclaim.GetInstancePVCs(ctx, plugin.Client, primaryInstance.Name, plugin.Namespace)
-	if err != nil {
-		return nil, fmt.Errorf("cannot get PVCs: %w", err)
+	var pvcs []corev1.PersistentVolumeClaim
+	for _, instance := range managedInstances {
+		instancePVCs, err := persistentvolumeclaim.GetInstancePVCs(ctx, plugin.Client, instance.Name, plugin.Namespace)
+		if err != nil {
+			return nil, fmt.Errorf("cannot get PVCs for instance %s: %w", instance.Name, err)
+		}
+		pvcs = append(pvcs, instancePVCs...)
 	}
 
 	// Get the serial ID of the primary instance
@@ -265,18 +269,21 @@ func (on *onCommand) rollBackAnnotationsIfNeeded() {
 }
 
 func (on *onCommand) deleteResourcesStep() error {
-	on.printAdvancement("destroying the primary instance while preserving the pvc")
+	on.printAdvancement("destroying all cluster instances while preserving the PVCs")
 
-	// from this point there is no going back
-	if err := destroy.Destroy(
-		on.ctx,
-		on.cluster.Name,
-		fmt.Sprintf("%s-%s", on.cluster.Name, strconv.Itoa(on.primaryInstanceSerial)),
-		true,
-	); err != nil {
-		return fmt.Errorf("error destroying primary instance: %w", err)
+	// Loop through all managed instances and destroy each one
+	for _, instance := range on.managedInstances {
+		if err := destroy.Destroy(
+			on.ctx,
+			on.cluster.Name,
+			instance.Name,
+			true,
+		); err != nil {
+			return fmt.Errorf("error destroying instance %s: %w", instance.Name, err)
+		}
 	}
-	on.printAdvancement("primary instance destroy completed")
+	
+	on.printAdvancement("all cluster instances destroyed")
 
 	on.printAdvancement("deleting the cluster resource")
 	if err := plugin.Client.Delete(on.ctx, on.cluster); err != nil {
