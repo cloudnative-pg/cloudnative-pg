@@ -3066,9 +3066,6 @@ spec:
                     description: The major version of PostgreSQL we want to use from
                       the ImageCatalog
                     type: integer
-                    x-kubernetes-validations:
-                    - message: Major is immutable
-                      rule: self == oldSelf
                   name:
                     description: Name is the name of resource being referenced
                     type: string

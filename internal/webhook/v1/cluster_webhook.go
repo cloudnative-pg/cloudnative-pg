@@ -1225,11 +1225,11 @@ func (v *ClusterCustomValidator) validateImageChange(r, old *apiv1.Cluster) fiel
 	var result field.ErrorList
 	var newVersion, oldVersion version.Data
 	var err error
-	var newImagePath *field.Path
+	var fieldPath *field.Path
 	if r.Spec.ImageCatalogRef != nil {
-		newImagePath = field.NewPath("spec", "imageCatalogRef")
+		fieldPath = field.NewPath("spec", "imageCatalogRef", "major")
 	} else {
-		newImagePath = field.NewPath("spec", "imageName")
+		fieldPath = field.NewPath("spec", "imageName")
 	}
 
 	r.Status.Image = ""
@@ -1240,7 +1240,6 @@ func (v *ClusterCustomValidator) validateImageChange(r, old *apiv1.Cluster) fiel
 		return result
 	}
 
-	old.Status.Image = ""
 	if old.Status.MajorVersionUpgradeFromImage != nil {
 		old.Status.Image = *old.Status.MajorVersionUpgradeFromImage
 	}
@@ -1255,10 +1254,10 @@ func (v *ClusterCustomValidator) validateImageChange(r, old *apiv1.Cluster) fiel
 		result = append(
 			result,
 			field.Invalid(
-				newImagePath,
-				newVersion,
+				fieldPath,
+				fmt.Sprintf("%v", newVersion.Major()),
 				fmt.Sprintf("can't downgrade from majors %v to %v",
-					oldVersion, newVersion)))
+					oldVersion.Major(), newVersion.Major())))
 	}
 
 	return result

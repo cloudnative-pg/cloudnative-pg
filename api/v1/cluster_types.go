@@ -193,7 +193,6 @@ type ImageCatalogRef struct {
 	// +kubebuilder:validation:XValidation:rule="self.kind == 'ImageCatalog' || self.kind == 'ClusterImageCatalog'",message="Only image catalogs are supported"
 	// +kubebuilder:validation:XValidation:rule="self.apiGroup == 'postgresql.cnpg.io'",message="Only image catalogs are supported"
 	corev1.TypedLocalObjectReference `json:",inline"`
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Major is immutable"
 	// The major version of PostgreSQL we want to use from the ImageCatalog
 	Major int `json:"major"`
 }

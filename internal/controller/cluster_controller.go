@@ -1459,14 +1459,14 @@ func (r *ClusterReconciler) reconcileInPlaceMajorVersionUpgrades(
 ) (*ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
-	if cluster.Status.MajorVersionUpgradeFromImage == nil {
-		return nil, nil
-	}
-
 	for _, job := range resources.jobs.Items {
 		if job.GetLabels()[utils.JobRoleLabelName] == "major-upgrade" {
 			return r.majorVersionUpgradeHandleCompletion(ctx, cluster, job, resources)
 		}
+	}
+
+	if cluster.Status.MajorVersionUpgradeFromImage == nil {
+		return nil, nil
 	}
 
 	contextLogger.Info("Reconciling in-place major version upgrades")
@@ -1591,12 +1591,24 @@ func (r *ClusterReconciler) majorVersionUpgradeHandleCompletion(
 		return &ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 
-	return &ctrl.Result{Requeue: true}, status.PatchWithOptimisticLock(
+	if err := status.PatchWithOptimisticLock(
 		ctx,
 		r.Client,
 		cluster,
 		status.SetMajorVersionUpgradeFromImage(&jobImage),
-	)
+	); err != nil {
+		contextLogger.Error(err, "Unable to update cluster status after major upgrade completed.")
+		return nil, err
+	}
+
+	if err := r.Delete(ctx, &job, &client.DeleteOptions{
+		PropagationPolicy: ptr.To(metav1.DeletePropagationForeground),
+	}); err != nil {
+		contextLogger.Error(err, "Unable to delete major upgrade job.")
+		return nil, err
+	}
+
+	return &ctrl.Result{Requeue: true}, nil
 }
 
 func getImageFromUpgrade(job batchv1.Job) (string, error) {
