@@ -1457,10 +1457,22 @@ func (p *Probe) ApplyInto(k8sProbe *corev1.Probe) {
 		return
 	}
 
-	k8sProbe.InitialDelaySeconds = p.InitialDelaySeconds
-	k8sProbe.TimeoutSeconds = p.TimeoutSeconds
-	k8sProbe.PeriodSeconds = p.PeriodSeconds
-	k8sProbe.SuccessThreshold = p.SuccessThreshold
-	k8sProbe.FailureThreshold = p.FailureThreshold
-	k8sProbe.TerminationGracePeriodSeconds = p.TerminationGracePeriodSeconds
+	if p.InitialDelaySeconds != 0 {
+		k8sProbe.InitialDelaySeconds = p.InitialDelaySeconds
+	}
+	if p.TimeoutSeconds != 0 {
+		k8sProbe.TimeoutSeconds = p.TimeoutSeconds
+	}
+	if p.PeriodSeconds != 0 {
+		k8sProbe.PeriodSeconds = p.PeriodSeconds
+	}
+	if p.SuccessThreshold != 0 {
+		k8sProbe.SuccessThreshold = p.SuccessThreshold
+	}
+	if p.FailureThreshold != 0 {
+		k8sProbe.FailureThreshold = p.FailureThreshold
+	}
+	if p.TerminationGracePeriodSeconds != nil {
+		k8sProbe.TerminationGracePeriodSeconds = p.TerminationGracePeriodSeconds
+	}
 }

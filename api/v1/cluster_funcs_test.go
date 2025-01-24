@@ -1723,6 +1723,14 @@ var _ = Describe("Probes configuration", func() {
 		Expect(configuredProbe.PeriodSeconds).To(Equal(config.PeriodSeconds))
 		Expect(configuredProbe.SuccessThreshold).To(Equal(config.SuccessThreshold))
 		Expect(configuredProbe.FailureThreshold).To(Equal(config.FailureThreshold))
-		Expect(configuredProbe.TerminationGracePeriodSeconds).To(BeNil())
+		Expect(*configuredProbe.TerminationGracePeriodSeconds).To(BeEquivalentTo(23))
+	})
+
+	It("should not overwrite any field", func() {
+		config := &Probe{}
+		configuredProbe := originalProbe.DeepCopy()
+		config.ApplyInto(configuredProbe)
+		Expect(originalProbe).To(BeEquivalentTo(*configuredProbe),
+			"configured probe should not be modified with zero values")
 	})
 })
