@@ -63,23 +63,15 @@ func getEnvOrDefault(env, def string) string {
 	return def
 }
 
-// copyPostgresInstallation is roughly equivalent to the following bash code
+// copyPostgresInstallation replicates the PostgreSQL installation to the specified destination directory
+// for use by the ph_upgrade command as the old binary directory.
 //
-//	> rm -fr /controller/old
-//	>
-//	> bindir=$(pg_config --bindir)
-//	> mkdir -p "/controller/old${bindir}"
-//	> cp -ax "${bindir}"/. "/controller/old${bindir}"
-//	>
-//	> pkglibdir=$(pg_config --pkglibdir)
-//	> mkdir -p "/controller/old${pkglibdir}"
-//	> cp -ax "${pkglibdir}"/. "/controller/old${pkglibdir}"
-//	>
-//	> sharedir=$(pg_config --sharedir)
-//	> mkdir -p "/controller/old${sharedir}"
-//	> cp -ax "${sharedir}"/. "/controller/old${sharedir}"
-//	>
-//	> echo "/controller/old${bindir}" > /controller/old/bindir.txt
+// Steps performed:
+// 1. Removes the existing destination directory if it exists.
+// 2. Retrieves the PostgreSQL binary, library, and shared directories using pg_config.
+// 3. Creates the corresponding directories in the destination path.
+// 4. Copies the contents of the PostgreSQL directories to the destination.
+// 5. Creates a bindir.txt file in the destination directory with the path to the binary directory.
 func copyPostgresInstallation(ctx context.Context, pgConfig string, dest string) error {
 	contextLogger := log.FromContext(ctx)
 
@@ -87,14 +79,12 @@ func copyPostgresInstallation(ctx context.Context, pgConfig string, dest string)
 
 	contextLogger.Info("Copying the PostgreSQL installation to the destination", "destination", dest)
 
-	// Remove the old directory
 	contextLogger.Info("Removing the destination directory", "directory", dest)
 	err := os.RemoveAll(dest)
 	if err != nil {
 		return fmt.Errorf("failed to remove the directory: %w", err)
 	}
 
-	// Create the destination directory
 	contextLogger.Info("Creating the destination directory", "directory", dest)
 	err = os.MkdirAll(dest, 0o750)
 	if err != nil {
