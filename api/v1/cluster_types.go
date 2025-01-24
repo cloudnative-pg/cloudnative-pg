@@ -487,41 +487,47 @@ type ClusterSpec struct {
 // to be injected in the PostgreSQL Pods
 type ProbesConfiguration struct {
 	// The startup probe configuration
-	Startup *StartupProbe `json:"startup,omitempty"`
+	Startup *ProbeWithStrategy `json:"startup,omitempty"`
 
 	// The liveness probe configuration
 	Liveness *Probe `json:"liveness,omitempty"`
 
 	// The readiness probe configuration
-	Readiness *Probe `json:"readiness,omitempty"`
+	Readiness *ProbeWithStrategy `json:"readiness,omitempty"`
 }
 
-// StartupProbe is the configuration of the startup probe
-type StartupProbe struct {
+// ProbeWithStrategy is the configuration of the startup probe
+type ProbeWithStrategy struct {
 	// Probe is the standard probe configuration
 	Probe `json:",inline"`
 
-	// Type is the type of the startup strategy
-	Type StartupStrategyType `json:"type,omitempty"`
+	// The probe strategy
+	// +kubebuilder:validation:Enum=pg_isready;streaming;query
+	// +optional
+	Type ProbeStrategyType `json:"type,omitempty"`
 
 	// Lag limit. Used only for `streaming` strategy
 	// +optional
-	Lag *resource.Quantity `json:"lag,omitempty"`
+	MaximumLag *resource.Quantity `json:"maximumLag,omitempty"`
 }
 
-// StartupStrategyType is the type of the strategy used to declare a PostgreSQL instance
+// ProbeStrategyType is the type of the strategy used to declare a PostgreSQL instance
 // ready
-type StartupStrategyType string
+type ProbeStrategyType string
 
 const (
-	// StartupStrategyPgIsReady means that the pg_isready tool is used to determine
+	// ProbeStrategyPgIsReady means that the pg_isready tool is used to determine
 	// whether PostgreSQL is started up
-	StartupStrategyPgIsReady StartupStrategyType = "pg_isready"
+	ProbeStrategyPgIsReady ProbeStrategyType = "pg_isready"
 
-	// StartupStrategyTypeStreaming means that pg_isready is positive and the replica is
+	// ProbeStrategyStreaming means that pg_isready is positive and the replica is
 	// connected via streaming replication to the current primary and the lag is, if specified,
 	// within the limit.
-	StartupStrategyTypeStreaming StartupStrategyType = "streaming"
+	ProbeStrategyStreaming ProbeStrategyType = "streaming"
+
+	// ProbeStrategyQuery means that the server is able to connect to the superuser database
+	// and able to execute a simple query like "-- ping"
+	ProbeStrategyQuery ProbeStrategyType = "query"
 )
 
 // Probe describes a health check to be performed against a container to determine whether it is

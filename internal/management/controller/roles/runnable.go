@@ -52,8 +52,8 @@ const (
 type instanceInterface interface {
 	GetSuperUserDB() (*sql.DB, error)
 	IsPrimary() (bool, error)
-	IsReady() error
 	RoleSynchronizerChan() <-chan *apiv1.ManagedConfiguration
+	IsReady() error
 	GetClusterName() string
 	GetNamespaceName() string
 }

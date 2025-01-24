@@ -422,7 +422,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 					timeout := 2 * time.Minute
 
 					// This "Eventually" block is needed because we may grab only a portion
-					// of the replica logs, and the "ParseJSONLogs" may fail on the latest
+					// of the replica logs, and the "ParseJSONLogs" function may fail on the latest
 					// log record when this happens
 					Eventually(func(g Gomega) {
 						data, err := logs.ParseJSONLogs(env.Ctx, env.Interface, namespace, fencedReplicaName)
@@ -430,10 +430,13 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 
 						recordWasFound := false
 						for _, record := range data {
-							_, hasDetectedLag := record["detectedLag"]
-							_, hasConfiguredLag := record["configuredLag"]
-							recordWasFound = hasDetectedLag && hasConfiguredLag
-							if recordWasFound {
+							err, ok := record["err"].(string)
+							if !ok {
+								continue
+							}
+
+							if strings.Contains(err, "streaming replica lagging") {
+								recordWasFound = true
 								break
 							}
 						}
