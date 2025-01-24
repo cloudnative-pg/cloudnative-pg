@@ -394,26 +394,6 @@ func (cluster *Cluster) SetInContext(ctx context.Context) context.Context {
 	return context.WithValue(ctx, utils.ContextKeyCluster, cluster)
 }
 
-// GetImageName get the name of the image that should be used
-// to create the pods
-func (cluster *Cluster) GetImageName() string {
-	// If the image is specified in the status, use that one
-	// It should be there since the first reconciliation
-	if len(cluster.Status.Image) > 0 {
-		return cluster.Status.Image
-	}
-
-	// Fallback to the information we have in the spec
-	if len(cluster.Spec.ImageName) > 0 {
-		return cluster.Spec.ImageName
-	}
-
-	// TODO: check: does a scenario exists in which we do have an imageCatalog
-	//   and no status.image? In that case this should probably error out, not
-	//   returning the default image name.
-	return configuration.Current.PostgresImageName
-}
-
 // GetPostgresqlVersion gets the PostgreSQL image version detecting it from the
 // image name or from the ImageCatalogRef.
 // Example:
@@ -421,13 +401,20 @@ func (cluster *Cluster) GetImageName() string {
 // ghcr.io/cloudnative-pg/postgresql:14.0 corresponds to version (14,0)
 // ghcr.io/cloudnative-pg/postgresql:13.2 corresponds to version (13,2)
 func (cluster *Cluster) GetPostgresqlVersion() (version.Data, error) {
+	if cluster.Status.Image != "" {
+		return version.FromTag(reference.New(cluster.Status.Image).Tag)
+	}
+
+	if cluster.Spec.ImageName != "" {
+		return version.FromTag(reference.New(cluster.Spec.ImageName).Tag)
+	}
+
 	if cluster.Spec.ImageCatalogRef != nil {
 		return version.FromTag(strconv.Itoa(cluster.Spec.ImageCatalogRef.Major))
 	}
 
-	image := cluster.GetImageName()
-	tag := reference.New(image).Tag
-	return version.FromTag(tag)
+	// Fallback for unit tests where a cluster is created without status or defaults
+	return version.FromTag(reference.New(configuration.Current.PostgresImageName).Tag)
 }
 
 // GetImagePullSecret get the name of the pull secret to use

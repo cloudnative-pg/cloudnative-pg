@@ -263,7 +263,7 @@ func (fullStatus *PostgresqlStatus) printBasicInfo(ctx context.Context, k8sClien
 	if primaryInstanceStatus != nil {
 		summary.AddLine("System ID:", primaryInstanceStatus.SystemID)
 	}
-	summary.AddLine("PostgreSQL Image:", cluster.GetImageName())
+	summary.AddLine("PostgreSQL Image:", cluster.Status.Image)
 	if cluster.IsReplica() {
 		summary.AddLine("Designated primary:", primaryInstance)
 		summary.AddLine("Source cluster: ", cluster.Spec.ReplicaCluster.Source)

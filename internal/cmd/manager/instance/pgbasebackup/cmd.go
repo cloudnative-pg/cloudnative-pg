@@ -138,7 +138,7 @@ func (env *CloneInfo) bootstrapUsingPgbasebackup(ctx context.Context) error {
 	if err != nil {
 		contextLogger.Warning(
 			"Error while parsing PostgreSQL server version to define connection options, defaulting to PostgreSQL 11",
-			"imageName", cluster.GetImageName(),
+			"imageName", cluster.Status.Image,
 			"err", err)
 	} else if pgVersion.Major() >= 12 {
 		// We explicitly disable wal_sender_timeout for join-related pg_basebackup executions.

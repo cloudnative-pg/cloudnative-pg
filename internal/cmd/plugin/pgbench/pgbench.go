@@ -154,7 +154,7 @@ func (cmd *pgBenchRun) buildJob(cluster *apiv1.Cluster) *batchv1.Job {
 					Containers: []corev1.Container{
 						{
 							Name:            "pgbench",
-							Image:           cluster.GetImageName(),
+							Image:           cluster.Status.Image,
 							ImagePullPolicy: corev1.PullAlways,
 							Env:             cmd.buildEnvVariables(),
 							Command:         []string{pgBenchKeyWord},
