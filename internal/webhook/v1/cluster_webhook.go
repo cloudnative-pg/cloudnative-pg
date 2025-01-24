@@ -2321,10 +2321,7 @@ func (v *ClusterCustomValidator) validatePgFailoverSlots(r *apiv1.Cluster) field
 }
 
 func (v *ClusterCustomValidator) getAdmissionWarnings(r *apiv1.Cluster) admission.Warnings {
-	var result admission.Warnings
-	result = append(result, getMaintenanceWindowsAdmissionWarnings(r)...)
-	result = append(result, getProbesWarnings(r)...)
-	return result
+	return getMaintenanceWindowsAdmissionWarnings(r)
 }
 
 func getMaintenanceWindowsAdmissionWarnings(r *apiv1.Cluster) admission.Warnings {
@@ -2335,20 +2332,6 @@ func getMaintenanceWindowsAdmissionWarnings(r *apiv1.Cluster) admission.Warnings
 			result,
 			"Consider using `.spec.enablePDB` instead of the node maintenance window feature")
 	}
-	return result
-}
-
-func getProbesWarnings(r *apiv1.Cluster) admission.Warnings {
-	var result admission.Warnings
-
-	if r.Spec.Probes != nil && r.Spec.Probes.Startup != nil {
-		if r.Spec.Probes.Startup.FailureThreshold == 0 {
-			result = append(
-				result,
-				"standard startup probe configuration is disabled, consider setting `.spec.probes.startup.failureThreshold`")
-		}
-	}
-
 	return result
 }
 
