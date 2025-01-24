@@ -917,20 +917,12 @@ var _ = Describe("PodSpec drift detection", func() {
 
 var _ = Describe("Compute startup probe failure threshold", func() {
 	It("should take the minimum value 1", func() {
-		Expect(getStartupProbeFailureThreshold(5)).To(BeNumerically("==", 1))
+		Expect(getFailureThreshold(5, StartupProbePeriod)).To(BeNumerically("==", 1))
+		Expect(getFailureThreshold(5, LivenessProbePeriod)).To(BeNumerically("==", 1))
 	})
 
 	It("should take the value from 'startDelay / periodSeconds'", func() {
-		Expect(getStartupProbeFailureThreshold(109)).To(BeNumerically("==", 11))
-	})
-})
-
-var _ = Describe("Compute liveness probe failure threshold", func() {
-	It("should take the minimum value 1", func() {
-		Expect(getLivenessProbeFailureThreshold(5)).To(BeNumerically("==", 1))
-	})
-
-	It("should take the value from 'startDelay / periodSeconds'", func() {
-		Expect(getLivenessProbeFailureThreshold(31)).To(BeNumerically("==", 4))
+		Expect(getFailureThreshold(109, StartupProbePeriod)).To(BeNumerically("==", 11))
+		Expect(getFailureThreshold(31, LivenessProbePeriod)).To(BeNumerically("==", 4))
 	})
 })
