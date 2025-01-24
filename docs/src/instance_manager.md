@@ -41,23 +41,25 @@ successThreshold: 1
 timeoutSeconds: 5
 ```
 
-Here, `FAILURE_THRESHOLD` is calculated as `startDelay` divided by
-`periodSeconds`.
+The `failureThreshold` value is automatically calculated by dividing
+`startDelay` by `periodSeconds`.
 
-If the default behavior based on `startDelay` is not suitable for your use
-case, you can take full control of the startup probe by specifying custom
-parameters in the `.spec.probes.startup` stanza. Note that defining this stanza
-will override the default behavior, including the use of `startDelay`.
+You can customize any of the probe settings in the `.spec.probes.startup`
+section of your configuration.
 
 !!! Warning
-    Ensure that any custom probe settings are aligned with your cluster’s
-    operational requirements to prevent unintended disruptions.
+    Be sure that any custom probe settings are tailored to your cluster's
+    operational requirements to avoid unintended disruptions.
 
 !!! Info
-    For detailed information about probe configuration, refer to the
-    [probe API](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-Probe).
+    For more details on probe configuration, refer to the
+    [probe API documentation](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-Probe).
 
-For example, the following configuration bypasses `startDelay` entirely:
+If you manually specify `.spec.probes.startup.failureThreshold`, it will
+override the default behavior and disable the automatic use of `startDelay`.
+
+For example, the following configuration explicitly sets custom probe
+parameters, bypassing `startDelay`:
 
 ```yaml
 # ... snip
@@ -88,28 +90,30 @@ successThreshold: 1
 timeoutSeconds: 5
 ```
 
-Here, `FAILURE_THRESHOLD` is calculated as `livenessProbeTimeout` divided by
-`periodSeconds`.
+The `failureThreshold` value is automatically calculated by dividing
+`livenessProbeTimeout` by `periodSeconds`.
 
 By default, `.spec.livenessProbeTimeout` is set to `30` seconds. This means the
 liveness probe will report a failure if it detects three consecutive probe
 failures, with a 10-second interval between each check.
 
-If the default behavior using `livenessProbeTimeout` does not meet your needs,
-you can fully customize the liveness probe by defining parameters in the
-`.spec.probes.liveness` stanza. Keep in mind that specifying this stanza will
-override the default behavior, including the use of `livenessProbeTimeout`.
+You can customize any of the probe settings in the `.spec.probes.liveness`
+section of your configuration.
 
 !!! Warning
-    Ensure that any custom probe settings are aligned with your cluster’s
-    operational requirements to prevent unintended disruptions.
+    Be sure that any custom probe settings are tailored to your cluster's
+    operational requirements to avoid unintended disruptions.
 
 !!! Info
     For more details on probe configuration, refer to the
-    [probe API](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-Probe).
+    [probe API documentation](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-Probe).
 
-For example, the following configuration overrides the default behavior and
-bypasses `livenessProbeTimeout`:
+If you manually specify `.spec.probes.liveness.failureThreshold`, it will
+override the default behavior and disable the automatic use of
+`livenessProbeTimeout`.
+
+For example, the following configuration explicitly sets custom probe
+parameters, bypassing `livenessProbeTimeout`:
 
 ```yaml
 # ... snip
