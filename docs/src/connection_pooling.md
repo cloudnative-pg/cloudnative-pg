@@ -577,6 +577,9 @@ cnpg_pgbouncer_stats_total_xact_count{database="pgbouncer"} 15
 cnpg_pgbouncer_stats_total_xact_time{database="pgbouncer"} 0
 ```
 
+!!! Info
+    For a better understanding of the metrics please refer to the PgBouncer documentation.
+
 As for clusters, a specific pooler can be monitored using the
 [Prometheus operator's](https://github.com/prometheus-operator/prometheus-operator) resource
 [PodMonitor](https://github.com/prometheus-operator/prometheus-operator/blob/v0.47.1/Documentation/api.md#podmonitor).
