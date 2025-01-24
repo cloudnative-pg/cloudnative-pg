@@ -4208,9 +4208,9 @@ the primary server of the cluster as part of rolling updates</p>
 
 **Appears in:**
 
-- [ProbesConfiguration](#postgresql-cnpg-io-v1-ProbesConfiguration)
+- [ProbeWithStrategy](#postgresql-cnpg-io-v1-ProbeWithStrategy)
 
-- [StartupProbe](#postgresql-cnpg-io-v1-StartupProbe)
+- [ProbesConfiguration](#postgresql-cnpg-io-v1-ProbesConfiguration)
 
 
 <p>Probe describes a health check to be performed against a container to determine whether it is
@@ -4280,6 +4280,59 @@ Minimum value is 1. spec.terminationGracePeriodSeconds is used if unset.</p>
 </tbody>
 </table>
 
+## ProbeStrategyType     {#postgresql-cnpg-io-v1-ProbeStrategyType}
+
+(Alias of `string`)
+
+**Appears in:**
+
+- [ProbeWithStrategy](#postgresql-cnpg-io-v1-ProbeWithStrategy)
+
+
+<p>ProbeStrategyType is the type of the strategy used to declare a PostgreSQL instance
+ready</p>
+
+
+
+
+## ProbeWithStrategy     {#postgresql-cnpg-io-v1-ProbeWithStrategy}
+
+
+**Appears in:**
+
+- [ProbesConfiguration](#postgresql-cnpg-io-v1-ProbesConfiguration)
+
+
+<p>ProbeWithStrategy is the configuration of the startup probe</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>Probe</code><br/>
+<a href="#postgresql-cnpg-io-v1-Probe"><i>Probe</i></a>
+</td>
+<td>(Members of <code>Probe</code> are embedded into this type.)
+   <p>Probe is the standard probe configuration</p>
+</td>
+</tr>
+<tr><td><code>type</code><br/>
+<a href="#postgresql-cnpg-io-v1-ProbeStrategyType"><i>ProbeStrategyType</i></a>
+</td>
+<td>
+   <p>The probe strategy</p>
+</td>
+</tr>
+<tr><td><code>maximumLag</code><br/>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/api/resource#Quantity"><i>k8s.io/apimachinery/pkg/api/resource.Quantity</i></a>
+</td>
+<td>
+   <p>Lag limit. Used only for <code>streaming</code> strategy</p>
+</td>
+</tr>
+</tbody>
+</table>
+
 ## ProbesConfiguration     {#postgresql-cnpg-io-v1-ProbesConfiguration}
 
 
@@ -4296,7 +4349,7 @@ to be injected in the PostgreSQL Pods</p>
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
 <tr><td><code>startup</code> <B>[Required]</B><br/>
-<a href="#postgresql-cnpg-io-v1-StartupProbe"><i>StartupProbe</i></a>
+<a href="#postgresql-cnpg-io-v1-ProbeWithStrategy"><i>ProbeWithStrategy</i></a>
 </td>
 <td>
    <p>The startup probe configuration</p>
@@ -4310,7 +4363,7 @@ to be injected in the PostgreSQL Pods</p>
 </td>
 </tr>
 <tr><td><code>readiness</code> <B>[Required]</B><br/>
-<a href="#postgresql-cnpg-io-v1-Probe"><i>Probe</i></a>
+<a href="#postgresql-cnpg-io-v1-ProbeWithStrategy"><i>ProbeWithStrategy</i></a>
 </td>
 <td>
    <p>The readiness probe configuration</p>
@@ -5350,59 +5403,6 @@ This specifies which owner the processed resources should relate to.</p>
 
 
 <p>SnapshotType is a type of allowed import</p>
-
-
-
-
-## StartupProbe     {#postgresql-cnpg-io-v1-StartupProbe}
-
-
-**Appears in:**
-
-- [ProbesConfiguration](#postgresql-cnpg-io-v1-ProbesConfiguration)
-
-
-<p>StartupProbe is the configuration of the startup probe</p>
-
-
-<table class="table">
-<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
-<tbody>
-<tr><td><code>Probe</code><br/>
-<a href="#postgresql-cnpg-io-v1-Probe"><i>Probe</i></a>
-</td>
-<td>(Members of <code>Probe</code> are embedded into this type.)
-   <p>Probe is the standard probe configuration</p>
-</td>
-</tr>
-<tr><td><code>type</code> <B>[Required]</B><br/>
-<a href="#postgresql-cnpg-io-v1-StartupStrategyType"><i>StartupStrategyType</i></a>
-</td>
-<td>
-   <p>Type is the type of the startup strategy</p>
-</td>
-</tr>
-<tr><td><code>lag</code><br/>
-<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/api/resource#Quantity"><i>k8s.io/apimachinery/pkg/api/resource.Quantity</i></a>
-</td>
-<td>
-   <p>Lag limit. Used only for <code>streaming</code> strategy</p>
-</td>
-</tr>
-</tbody>
-</table>
-
-## StartupStrategyType     {#postgresql-cnpg-io-v1-StartupStrategyType}
-
-(Alias of `string`)
-
-**Appears in:**
-
-- [StartupProbe](#postgresql-cnpg-io-v1-StartupProbe)
-
-
-<p>StartupStrategyType is the type of the strategy used to declare a PostgreSQL instance
-ready</p>
 
 
 

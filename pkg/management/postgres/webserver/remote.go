@@ -23,7 +23,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
 	"net/http"
 	"os"
 	"os/exec"
@@ -39,6 +38,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/probes"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/upgrade"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -113,6 +113,7 @@ func NewRemoteWebServer(
 	return NewWebServer(server), nil
 }
 
+// isServerStartedUp evaluates the liveness probe
 func (ws *remoteWebserverEndpoints) isServerStartedUp(w http.ResponseWriter, req *http.Request) {
 	var cluster apiv1.Cluster
 	if err := ws.typedClient.Get(req.Context(),
@@ -120,7 +121,8 @@ func (ws *remoteWebserverEndpoints) isServerStartedUp(w http.ResponseWriter, req
 			Namespace: ws.instance.GetNamespaceName(),
 			Name:      ws.instance.GetClusterName(),
 		},
-		&cluster); err != nil {
+		&cluster,
+	); err != nil {
 		log.Info("Startup check failed, cannot check Cluster definition", "err", err)
 		http.Error(
 			w,
@@ -138,103 +140,16 @@ func (ws *remoteWebserverEndpoints) isServerStartedUp(w http.ResponseWriter, req
 		return
 	}
 
-	// Verify that `pg_isready` returns `0` as exit code, meaning that Postgres is accepting connections
-	if err := ws.instance.IsReady(); err != nil {
-		log.Info("Startup probe failing (pg_isready)", "err", err.Error())
+	var startupProbe *apiv1.ProbeWithStrategy
+	if cluster.Spec.Probes != nil {
+		startupProbe = cluster.Spec.Probes.Startup
+	}
+	checker := probes.ForConfiguration(startupProbe)
+	if err := checker.Evaluate(req.Context(), ws.instance); err != nil {
+		log.Info("Startup probe failing", "err", err.Error())
 		http.Error(
 			w,
-			fmt.Sprintf("startup check failed (pg_isready failed: %s)", err.Error()),
-			http.StatusInternalServerError,
-		)
-		return
-	}
-
-	// If no startup probe has been defined, or the user requested `pg_isready` as strategy, exit
-	// if PostgreSQL is started up, we declare the instance up.
-	if cluster.Spec.Probes != nil &&
-		cluster.Spec.Probes.Startup != nil &&
-		cluster.Spec.Probes.Startup.Type == apiv1.StartupStrategyPgIsReady {
-		return
-	}
-
-	superUserDB, err := ws.instance.GetSuperUserDB()
-	if err != nil {
-		log.Info("Startup probe failing (pg_isready)", "err", err.Error())
-		http.Error(w, "instance has not been started up (connection failed)", http.StatusInternalServerError)
-		return
-	}
-
-	// Here the strategy is `streaming`. Verify if lag has been provided.
-	var configuredLag uint64 = math.MaxUint64
-	if cluster.Spec.Probes != nil && cluster.Spec.Probes.Startup != nil && cluster.Spec.Probes.Startup.Lag != nil {
-		configuredLag = cluster.Spec.Probes.Startup.Lag.AsDec().UnscaledBig().Uint64()
-	}
-
-	// At this point, the instance is already running (`pg_isready` returned 0 above).
-	// The startup probe succeeds if the instance satisfies any of the following conditions:
-	// - It is a primary instance.
-	// - It is a log shipping replica (including a designated primary).
-	// - It is a streaming replica with replication lag below the specified threshold.
-	//   If no lag threshold is specified, the startup probe succeeds if the replica has successfully connected
-	//   to its source at least once.
-	row := superUserDB.QueryRowContext(
-		req.Context(),
-		`
-        WITH
-          lag AS (
-            SELECT
-              (latest_end_lsn - pg_last_wal_replay_lsn()) AS value,
-              latest_end_time
-            FROM pg_catalog.pg_stat_wal_receiver
-          )
-        SELECT
-          CASE
-            WHEN NOT pg_is_in_recovery()
-              THEN true
-            WHEN (SELECT coalesce(setting, '') = '' FROM pg_catalog.pg_settings WHERE name = 'primary_conninfo')
-              THEN true
-            WHEN (SELECT value FROM lag) < $1
-              THEN true
-            ELSE false
-          END AS ready_to_start,
-          COALESCE((SELECT value FROM lag), 0) AS lag,
-          COALESCE((SELECT latest_end_time FROM lag), '-infinity') AS latest_end_time
-		`,
-		configuredLag,
-	)
-	if err := row.Err(); err != nil {
-		log.Info("Startup probe failing (streaming replication check failed)", "err", err.Error())
-		http.Error(
-			w,
-			"instance has not been started up (streaming replication check failed)",
-			http.StatusInternalServerError,
-		)
-		return
-	}
-
-	var status bool
-	var detectedLag int64
-	var latestEndTime string
-	if err := row.Scan(&status, &detectedLag, &latestEndTime); err != nil {
-		log.Info("Startup probe failing (scan failed)", "err", err.Error())
-		http.Error(
-			w,
-			"instance has not been started up (streaming replication check failed on scan)",
-			http.StatusInternalServerError,
-		)
-		return
-	}
-
-	if !status {
-		log.Info(
-			"Startup probe failing (streaming replica not connected or lagging)",
-			"detectedLag", detectedLag,
-			"configuredLag", configuredLag,
-			"latestEndTime", latestEndTime,
-		)
-		http.Error(
-			w,
-			"instance has not been started up (streaming replica is not connected or lagging)",
+			fmt.Sprintf("startup check failed: %s", err.Error()),
 			http.StatusInternalServerError,
 		)
 		return
@@ -245,45 +160,43 @@ func (ws *remoteWebserverEndpoints) isServerStartedUp(w http.ResponseWriter, req
 }
 
 func (ws *remoteWebserverEndpoints) isServerHealthy(w http.ResponseWriter, _ *http.Request) {
-	// If `pg_rewind` is running the Pod is starting up.
-	// We need to report it healthy to avoid being killed by the kubelet.
-	// Same goes for instances with fencing on.
-	if ws.instance.PgRewindIsRunning || ws.instance.MightBeUnavailable() {
-		log.Trace("Liveness probe skipped")
-		_, _ = fmt.Fprint(w, "Skipped")
-		return
-	}
-
-	err := ws.instance.IsReady()
-	switch {
-	case err == nil:
-		log.Trace("Liveness probe succeeding")
-		_, _ = fmt.Fprint(w, "OK")
-
-	case errors.Is(err, postgres.ErrPgRejectingConnection):
-		// A healthy server can also be actively rejecting connections.
-		// That's not a problem: it's only the server starting up or shutting
-		// down.
-		_, _ = fmt.Fprint(w, "OK (actively rejecting connections)")
-
-	default:
-		log.Debug("Liveness probe failing", "err", err.Error())
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
+	_, _ = fmt.Fprint(w, "OK")
 }
 
 // This is the readiness probe
-func (ws *remoteWebserverEndpoints) isServerReady(w http.ResponseWriter, _ *http.Request) {
+func (ws *remoteWebserverEndpoints) isServerReady(w http.ResponseWriter, req *http.Request) {
 	if !ws.instance.CanCheckReadiness() {
 		http.Error(w, "instance is not ready yet", http.StatusInternalServerError)
 		return
 	}
 
-	if err := ws.instance.IsReady(); err != nil {
-		log.Debug("startup probe failing (pg_isready)", "err", err.Error())
+	var cluster apiv1.Cluster
+	if err := ws.typedClient.Get(req.Context(),
+		client.ObjectKey{
+			Namespace: ws.instance.GetNamespaceName(),
+			Name:      ws.instance.GetClusterName(),
+		},
+		&cluster,
+	); err != nil {
+		log.Info("Readiness check failed, cannot check Cluster definition", "err", err)
 		http.Error(
 			w,
-			fmt.Sprintf("readiness check failed (pg_isready failed: %s)", err.Error()),
+			fmt.Sprintf("Readiness check failed (cannot get Cluster definition: %s)", err.Error()),
+			http.StatusInternalServerError,
+		)
+		return
+	}
+
+	var readinessProbe *apiv1.ProbeWithStrategy
+	if cluster.Spec.Probes != nil {
+		readinessProbe = cluster.Spec.Probes.Readiness
+	}
+	checker := probes.ForConfiguration(readinessProbe)
+	if err := checker.Evaluate(req.Context(), ws.instance); err != nil {
+		log.Info("Readiness probe failing", "err", err.Error())
+		http.Error(
+			w,
+			fmt.Sprintf("readiness check failed: %s", err.Error()),
 			http.StatusInternalServerError,
 		)
 		return
