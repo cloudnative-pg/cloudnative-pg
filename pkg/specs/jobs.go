@@ -44,6 +44,41 @@ func (p postInitFolder) toString() string {
 	return string(p)
 }
 
+// jobRole describe a possible type of job
+type jobRole string
+
+const (
+	// JobRoleImport represents the import job role
+	JobRoleImport jobRole = "import"
+
+	// JobRoleInitDB represents the initdb job role
+	JobRoleInitDB jobRole = "initdb"
+
+	// JobRolePGBaseBackup represents the pgbasebackup job role
+	JobRolePGBaseBackup jobRole = "pgbasebackup"
+
+	// JobRoleFullRecovery represents the full-recovery job role
+	JobRoleFullRecovery jobRole = "full-recovery"
+
+	// JobRoleJoin represents the join job role
+	JobRoleJoin jobRole = "join"
+
+	// JobRoleSnapshotRecovery represents the snapshot-recovery job role
+	JobRoleSnapshotRecovery jobRole = "snapshot-recovery"
+
+	// JobMajorUpgrade represents the major-upgrade job role
+	JobMajorUpgrade jobRole = "major-upgrade"
+)
+
+var jobRoleList = []jobRole{
+	JobRoleImport,
+	JobRoleInitDB,
+	JobRolePGBaseBackup,
+	JobRoleFullRecovery,
+	JobRoleJoin,
+	JobMajorUpgrade,
+}
+
 // CreatePrimaryJobViaInitdb creates a new primary instance in a Pod
 func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int) *batchv1.Job {
 	initCommand := []string{
@@ -86,7 +121,7 @@ func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int) *batchv1.J
 	initCommand = append(initCommand, buildCommonInitJobFlags(cluster)...)
 
 	if cluster.Spec.Bootstrap.InitDB.Import != nil {
-		return createPrimaryJob(cluster, nodeSerial, jobRoleImport, initCommand)
+		return createPrimaryJob(cluster, nodeSerial, JobRoleImport, initCommand)
 	}
 
 	if cluster.ShouldInitDBRunPostInitApplicationSQLRefs() {
@@ -104,7 +139,7 @@ func CreatePrimaryJobViaInitdb(cluster apiv1.Cluster, nodeSerial int) *batchv1.J
 			"--post-init-sql-refs-folder", postInitSQLRefsFolder.toString())
 	}
 
-	return createPrimaryJob(cluster, nodeSerial, jobRoleInitDB, initCommand)
+	return createPrimaryJob(cluster, nodeSerial, JobRoleInitDB, initCommand)
 }
 
 func buildInitDBFlags(cluster apiv1.Cluster) (initCommand []string) {
@@ -193,7 +228,7 @@ func CreatePrimaryJobViaRestoreSnapshot(
 
 	initCommand = append(initCommand, buildCommonInitJobFlags(cluster)...)
 
-	job := createPrimaryJob(cluster, nodeSerial, jobRoleSnapshotRecovery, initCommand)
+	job := createPrimaryJob(cluster, nodeSerial, JobRoleSnapshotRecovery, initCommand)
 
 	addBarmanEndpointCAToJobFromCluster(cluster, backup, job)
 
@@ -210,7 +245,7 @@ func CreatePrimaryJobViaRecovery(cluster apiv1.Cluster, nodeSerial int, backup *
 
 	initCommand = append(initCommand, buildCommonInitJobFlags(cluster)...)
 
-	job := createPrimaryJob(cluster, nodeSerial, jobRoleFullRecovery, initCommand)
+	job := createPrimaryJob(cluster, nodeSerial, JobRoleFullRecovery, initCommand)
 
 	addBarmanEndpointCAToJobFromCluster(cluster, backup, job)
 
@@ -251,7 +286,7 @@ func CreatePrimaryJobViaPgBaseBackup(cluster apiv1.Cluster, nodeSerial int) *bat
 
 	initCommand = append(initCommand, buildCommonInitJobFlags(cluster)...)
 
-	return createPrimaryJob(cluster, nodeSerial, jobRolePGBaseBackup, initCommand)
+	return createPrimaryJob(cluster, nodeSerial, JobRolePGBaseBackup, initCommand)
 }
 
 // JoinReplicaInstance create a new PostgreSQL node, copying the contents from another Pod
@@ -265,7 +300,7 @@ func JoinReplicaInstance(cluster apiv1.Cluster, nodeSerial int) *batchv1.Job {
 
 	initCommand = append(initCommand, buildCommonInitJobFlags(cluster)...)
 
-	return createPrimaryJob(cluster, nodeSerial, jobRoleJoin, initCommand)
+	return createPrimaryJob(cluster, nodeSerial, JobRoleJoin, initCommand)
 }
 
 // RestoreReplicaInstance creates a new PostgreSQL replica starting from a volume snapshot backup
@@ -279,7 +314,7 @@ func RestoreReplicaInstance(cluster apiv1.Cluster, nodeSerial int) *batchv1.Job 
 
 	initCommand = append(initCommand, buildCommonInitJobFlags(cluster)...)
 
-	job := createPrimaryJob(cluster, nodeSerial, jobRoleSnapshotRecovery, initCommand)
+	job := createPrimaryJob(cluster, nodeSerial, JobRoleSnapshotRecovery, initCommand)
 	return job
 }
 
@@ -291,28 +326,6 @@ func buildCommonInitJobFlags(cluster apiv1.Cluster) []string {
 	}
 
 	return flags
-}
-
-// jobRole describe a possible type of job
-type jobRole string
-
-const (
-	jobRoleImport           jobRole = "import"
-	jobRoleInitDB           jobRole = "initdb"
-	jobRolePGBaseBackup     jobRole = "pgbasebackup"
-	jobRoleFullRecovery     jobRole = "full-recovery"
-	jobRoleJoin             jobRole = "join"
-	jobRoleSnapshotRecovery jobRole = "snapshot-recovery"
-	jobMajorUpgrade         jobRole = "major-upgrade"
-)
-
-var jobRoleList = []jobRole{
-	jobRoleImport,
-	jobRoleInitDB,
-	jobRolePGBaseBackup,
-	jobRoleFullRecovery,
-	jobRoleJoin,
-	jobMajorUpgrade,
 }
 
 // getJobName returns a string indicating the job name
