@@ -201,9 +201,8 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig, enable
 			// This is the default startup probe, and can be overridden
 			// the user configuration in cluster.spec.probes.startup
 			StartupProbe: &corev1.Probe{
-				FailureThreshold: getStartupProbeFailureThreshold(cluster.GetMaxStartDelay()),
-				PeriodSeconds:    StartupProbePeriod,
-				TimeoutSeconds:   5,
+				PeriodSeconds:  StartupProbePeriod,
+				TimeoutSeconds: 5,
 				ProbeHandler: corev1.ProbeHandler{
 					HTTPGet: &corev1.HTTPGetAction{
 						Path: url.PathHealth,
@@ -275,22 +274,25 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig, enable
 
 	addManagerLoggingOptions(cluster, &containers[0])
 
-	// if user customizes the liveness probe timeout, we need to adjust the failure threshold
-	addLivenessProbeFailureThreshold(cluster, &containers[0])
-
 	// use the custom probe configuration if provided
 	ensureCustomProbesConfiguration(&cluster, &containers[0])
 
-	return containers
-}
-
-// addLivenessProbeFailureThreshold adjusts the liveness probe failure threshold
-// based on the `spec.livenessProbeTimeout` value
-func addLivenessProbeFailureThreshold(cluster apiv1.Cluster, container *corev1.Container) {
-	if cluster.Spec.LivenessProbeTimeout != nil {
-		timeout := *cluster.Spec.LivenessProbeTimeout
-		container.LivenessProbe.FailureThreshold = getLivenessProbeFailureThreshold(timeout)
+	// ensure a proper threshold is set
+	if containers[0].StartupProbe.FailureThreshold == 0 {
+		containers[0].StartupProbe.FailureThreshold = getFailureThreshold(
+			cluster.GetMaxStartDelay(),
+			containers[0].StartupProbe.PeriodSeconds,
+		)
 	}
+
+	if cluster.Spec.LivenessProbeTimeout != nil && containers[0].LivenessProbe.FailureThreshold == 0 {
+		containers[0].LivenessProbe.FailureThreshold = getFailureThreshold(
+			*cluster.Spec.LivenessProbeTimeout,
+			containers[0].LivenessProbe.PeriodSeconds,
+		)
+	}
+
+	return containers
 }
 
 // ensureCustomProbesConfiguration applies the custom probe configuration
@@ -308,22 +310,13 @@ func ensureCustomProbesConfiguration(cluster *apiv1.Cluster, container *corev1.C
 	cluster.Spec.Probes.Startup.ApplyInto(container.StartupProbe)
 }
 
-// getStartupProbeFailureThreshold get the startup probe failure threshold
+// getFailureThreshold get the startup probe failure threshold
 // FAILURE_THRESHOLD = ceil(startDelay / periodSeconds) and minimum value is 1
-func getStartupProbeFailureThreshold(startupDelay int32) int32 {
-	if startupDelay <= StartupProbePeriod {
+func getFailureThreshold(startupDelay, period int32) int32 {
+	if startupDelay <= period {
 		return 1
 	}
-	return int32(math.Ceil(float64(startupDelay) / float64(StartupProbePeriod)))
-}
-
-// getLivenessProbeFailureThreshold get the liveness probe failure threshold
-// FAILURE_THRESHOLD = ceil(livenessTimeout / periodSeconds) and minimum value is 1
-func getLivenessProbeFailureThreshold(livenessTimeout int32) int32 {
-	if livenessTimeout <= LivenessProbePeriod {
-		return 1
-	}
-	return int32(math.Ceil(float64(livenessTimeout) / float64(LivenessProbePeriod)))
+	return int32(math.Ceil(float64(startupDelay) / float64(period)))
 }
 
 // CreateAffinitySection creates the affinity sections for Pods, given the configuration
