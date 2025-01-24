@@ -1484,7 +1484,7 @@ func (p *Probe) ApplyInto(k8sProbe *corev1.Probe) {
 
 // ApplyInto applies the content of the probe configuration in a Kubernetes
 // probe
-func (p *StartupProbe) ApplyInto(k8sProbe *corev1.Probe) {
+func (p *ProbeWithStrategy) ApplyInto(k8sProbe *corev1.Probe) {
 	if p == nil {
 		return
 	}
