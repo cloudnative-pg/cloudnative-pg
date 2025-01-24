@@ -124,15 +124,6 @@ func (off *offCommand) ensurePVCsArePartOfAPVCGroupStep(pvcs []corev1.Persistent
 			return err
 		}
 
-		serial := pvc.Annotations[utils.ClusterSerialAnnotationName]
-		if !slices.Contains(nodeSerial, serial) {
-			nodeSerial = append(nodeSerial, serial)
-		}
-	}
-	if len(nodeSerial) != 1 {
-		return fmt.Errorf("hibernate pvcs belong to different instances of the cluster, cannot proceed")
-	}
-
 	return nil
 }
 
