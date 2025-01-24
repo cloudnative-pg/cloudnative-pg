@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/blang/semver"
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"github.com/jackc/pgx/v5"
 
@@ -149,7 +150,7 @@ func configureInstancePermissions(ctx context.Context, instance *postgres.Instan
 		return nil
 	}
 
-	majorVersion, err := postgresutils.GetMajorVersion(instance.PgData)
+	majorVersion, err := postgresutils.GetPgdataVersion(instance.PgData)
 	if err != nil {
 		return fmt.Errorf("while getting major version: %w", err)
 	}
@@ -227,10 +228,10 @@ func configureStreamingReplicaUser(tx *sql.Tx) (bool, error) {
 }
 
 // configurePgRewindPrivileges ensures that the StreamingReplicationUser has enough rights to execute pg_rewind
-func configurePgRewindPrivileges(majorVersion int, hasSuperuser bool, tx *sql.Tx) error {
+func configurePgRewindPrivileges(majorVersion *semver.Version, hasSuperuser bool, tx *sql.Tx) error {
 	// We need the superuser bit for the streaming-replication user since pg_rewind in PostgreSQL <= 10
 	// will require it.
-	if majorVersion <= 10 {
+	if majorVersion != nil && majorVersion.Major <= 10 {
 		if !hasSuperuser {
 			_, err := tx.Exec(fmt.Sprintf(
 				"ALTER USER %v SUPERUSER",
