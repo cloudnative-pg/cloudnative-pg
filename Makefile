@@ -27,6 +27,7 @@ endif
 endif
 CATALOG_IMG ?= $(shell echo "${CONTROLLER_IMG}" | sed -e 's/:/:catalog-/')
 BUNDLE_IMG ?= $(shell echo "${CONTROLLER_IMG}" | sed -e 's/:/:bundle-/')
+INDEX_IMG ?= $(shell echo "${CONTROLLER_IMG}" | sed -e 's/:/:index-/')
 
 COMMIT := $(shell git rev-parse --short HEAD || echo unknown)
 DATE := $(shell git log -1 --pretty=format:'%ad' --date short)
@@ -170,6 +171,8 @@ olm-catalog: olm-bundle opm ## Build and push the index image for OLM Catalog
 	    - Image: ${BUNDLE_IMG}" | envsubst > cloudnative-pg-operator-template.yaml
 	$(OPM) alpha render-template semver -o yaml < cloudnative-pg-operator-template.yaml > catalog/catalog.yaml ;\
 	$(OPM) validate catalog/ ;\
+	$(OPM) index add --mode semver --container-tool docker --bundles "${BUNDLE_IMG}" --tag "${INDEX_IMG}" ;\
+	docker push ${INDEX_IMG} ;\
 	DOCKER_BUILDKIT=1 docker build --push -f catalog.Dockerfile -t ${CATALOG_IMG} . ;\
 	echo -e "apiVersion: operators.coreos.com/v1alpha1\n\
 	kind: CatalogSource\n\
