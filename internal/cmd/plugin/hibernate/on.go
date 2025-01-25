@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
@@ -282,7 +281,7 @@ func (on *onCommand) deleteResourcesStep() error {
 			return fmt.Errorf("error destroying instance %s: %w", instance.Name, err)
 		}
 	}
-	
+
 	on.printAdvancement("all cluster instances destroyed")
 
 	on.printAdvancement("deleting the cluster resource")

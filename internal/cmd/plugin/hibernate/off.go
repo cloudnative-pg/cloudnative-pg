@@ -25,7 +25,6 @@ import (
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/strings/slices"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
@@ -111,7 +110,6 @@ func (off *offCommand) ensureClusterDoesNotExistStep() error {
 // ensurePVCsArePartOfAPVCGroupStep check if the passed PVCs are really part of the same group
 func (off *offCommand) ensurePVCsArePartOfAPVCGroupStep(pvcs []corev1.PersistentVolumeClaim) error {
 	// ensure all the pvcs belong to the same node serial and are hibernated
-	var nodeSerial []string
 	for _, pvc := range pvcs {
 		// IMPORTANT: do not use utils.ClusterManifestAnnotationName, utils.PgControlDataAnnotationName here for backwards
 		// compatibility
@@ -124,6 +122,7 @@ func (off *offCommand) ensurePVCsArePartOfAPVCGroupStep(pvcs []corev1.Persistent
 			return err
 		}
 
+	}
 	return nil
 }
 
