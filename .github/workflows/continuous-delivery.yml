@@ -81,6 +81,7 @@ jobs:
   check_commenter:
     if: |
       github.event_name == 'issue_comment' &&
+      github.event.action == 'created' &&
       github.event.issue.pull_request &&
       startsWith(github.event.comment.body, '/test')
     name: Retrieve command
