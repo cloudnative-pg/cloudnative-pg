@@ -1364,7 +1364,7 @@ func (r *InstanceReconciler) refreshCredentialsFromSecret(
 	if cluster.GetEnableSuperuserAccess() {
 		err = r.reconcileUser(ctx, "postgres", cluster.GetSuperuserSecretName(), db)
 		if err != nil {
-			return err
+			return fmt.Errorf("error reconciling superuser: %w", err)
 		}
 	} else {
 		err = postgresutils.DisableSuperuserPassword(db)
@@ -1376,7 +1376,7 @@ func (r *InstanceReconciler) refreshCredentialsFromSecret(
 	if cluster.ShouldCreateApplicationDatabase() {
 		err = r.reconcileUser(ctx, cluster.GetApplicationDatabaseOwner(), cluster.GetApplicationSecretName(), db)
 		if err != nil {
-			return err
+			return fmt.Errorf("error reconciling application user: %w", err)
 		}
 	}
 
@@ -1390,9 +1390,6 @@ func (r *InstanceReconciler) reconcileUser(ctx context.Context, username string,
 		client.ObjectKey{Namespace: r.instance.GetNamespaceName(), Name: secretName},
 		&secret)
 	if err != nil {
-		if apierrors.IsNotFound(err) {
-			return nil
-		}
 		return err
 	}
 
