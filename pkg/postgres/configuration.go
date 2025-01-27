@@ -239,6 +239,12 @@ local {{.Username}} postgres
 
 	// SynchronousStandbyNames is the postgresql parameter key for synchronous standbys
 	SynchronousStandbyNames = "synchronous_standby_names"
+
+	// ExtensionControlPath is the postgresql parameter key for extension_control_path
+	ExtensionControlPath = "extension_control_path"
+
+	// DynamicLibraryPath is the postgresql parameter key dynamic_library_path
+	DynamicLibraryPath = "dynamic_library_path"
 )
 
 // hbaTemplate is the template used to create the HBA configuration
@@ -702,15 +708,11 @@ func CreatePostgresqlConfiguration(info ConfigurationInfo) *PgConfiguration {
 	}
 
 	if len(info.Extensions) > 0 {
-		extensionControlPath := []string{"$system"}
-		dynamicLibraryPath := []string{"$libdir"}
+		// Set all ExtensionControlPaths
+		SetExtensionControlPath(info, configuration)
 
-		for _, extension := range info.Extensions {
-			extensionControlPath = append(extensionControlPath, fmt.Sprintf("/extensions/%s/share", extension))
-			dynamicLibraryPath = append(dynamicLibraryPath, fmt.Sprintf("/extensions/%s/lib", extension))
-		}
-		configuration.OverwriteConfig("extension_control_path", strings.Join(extensionControlPath, ":"))
-		configuration.OverwriteConfig("dynamic_library_path", strings.Join(dynamicLibraryPath, ":"))
+		// Set all DynamicLibraryPaths
+		SetDynamicLibraryPath(info, configuration)
 	}
 
 	return configuration
@@ -794,4 +796,38 @@ func CreatePostgresqlConfFile(configuration *PgConfiguration) (string, string) {
 // directly embeddable in the PostgreSQL configuration file
 func escapePostgresConfValue(value string) string {
 	return fmt.Sprintf("'%v'", strings.ReplaceAll(value, "'", "''"))
+}
+
+func SetExtensionControlPath(info ConfigurationInfo, configuration *PgConfiguration) {
+	extensionControlPath := []string{"$system"}
+	for _, extension := range info.Extensions {
+		extensionControlPath = append(extensionControlPath, fmt.Sprintf("/extensions/%s/share", extension))
+	}
+
+	userDefinedPath := strings.Split(configuration.GetConfig(ExtensionControlPath), ":")
+	for _, path := range userDefinedPath {
+		if path == "" {
+			continue
+		}
+		extensionControlPath = append(extensionControlPath, path)
+	}
+
+	configuration.OverwriteConfig(ExtensionControlPath, strings.Join(extensionControlPath, ":"))
+}
+
+func SetDynamicLibraryPath(info ConfigurationInfo, configuration *PgConfiguration) {
+	dynamicLibraryPath := []string{"$libdir"}
+	for _, extension := range info.Extensions {
+		dynamicLibraryPath = append(dynamicLibraryPath, fmt.Sprintf("/extensions/%s/lib", extension))
+	}
+
+	userDefinedPath := strings.Split(configuration.GetConfig(DynamicLibraryPath), ":")
+	for _, path := range userDefinedPath {
+		if path == "" {
+			continue
+		}
+		dynamicLibraryPath = append(dynamicLibraryPath, path)
+	}
+
+	configuration.OverwriteConfig(DynamicLibraryPath, strings.Join(dynamicLibraryPath, ":"))
 }
