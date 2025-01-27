@@ -35,12 +35,13 @@ func Monolith(
 	contextLogger := log.FromContext(ctx)
 	contextLogger.Info("starting monolith clone process")
 
-	if err := cloneRoles(ctx, cluster, destination, origin); err != nil {
-		return err
-	}
-
-	if err := cloneRoleInheritance(ctx, destination, origin); err != nil {
-		return err
+	if len(cluster.Spec.Bootstrap.InitDB.Import.Roles) > 0 {
+		if err := cloneRoles(ctx, cluster, destination, origin); err != nil {
+			return err
+		}
+		if err := cloneRoleInheritance(ctx, destination, origin); err != nil {
+			return err
+		}
 	}
 
 	ds := databaseSnapshotter{cluster: cluster}
