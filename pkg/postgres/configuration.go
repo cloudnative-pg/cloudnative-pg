@@ -328,6 +328,9 @@ type ConfigurationInfo struct {
 
 	// Minimum apply delay of transaction
 	RecoveryMinApplyDelay time.Duration
+
+	// The list of extensions to be loaded
+	Extensions []string
 }
 
 // getAlterSystemEnabledValue returns a config compatible value for IsAlterSystemEnabled
@@ -696,6 +699,18 @@ func CreatePostgresqlConfiguration(info ConfigurationInfo) *PgConfiguration {
 	// Apply the list of temporary tablespaces
 	if len(info.TemporaryTablespaces) > 0 {
 		configuration.OverwriteConfig("temp_tablespaces", strings.Join(info.TemporaryTablespaces, ","))
+	}
+
+	if len(info.Extensions) > 0 {
+		extensionControlPath := []string{"$system"}
+		dynamicLibraryPath := []string{"$libdir"}
+
+		for _, extension := range info.Extensions {
+			extensionControlPath = append(extensionControlPath, fmt.Sprintf("/extensions/%s/share", extension))
+			dynamicLibraryPath = append(dynamicLibraryPath, fmt.Sprintf("/extensions/%s/lib", extension))
+		}
+		configuration.OverwriteConfig("extension_control_path", strings.Join(extensionControlPath, ":"))
+		configuration.OverwriteConfig("dynamic_library_path", strings.Join(dynamicLibraryPath, ":"))
 	}
 
 	return configuration
