@@ -417,6 +417,11 @@ func createPostgresqlConfiguration(cluster *apiv1.Cluster, preserveUserSettings 
 		info.RecoveryMinApplyDelay = cluster.Spec.ReplicaCluster.MinApplyDelay.Duration
 	}
 
+	// Set extensions to be loaded
+	for _, extension := range cluster.Spec.PostgresConfiguration.Extensions {
+		info.Extensions = append(info.Extensions, extension.Name)
+	}
+
 	conf, sha256 := postgres.CreatePostgresqlConfFile(postgres.CreatePostgresqlConfiguration(info))
 	return conf, sha256, nil
 }
