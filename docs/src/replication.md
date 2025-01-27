@@ -422,7 +422,7 @@ spec:
     synchronous:
       method: any
       number: 2
-      dataDurability: required
+      dataDurability: preferred
 ```
 
 1. Initial state. The content of `synchronous_standby_names` is:
