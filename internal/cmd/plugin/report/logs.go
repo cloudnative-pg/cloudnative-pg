@@ -21,7 +21,6 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
-	"strings"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -114,17 +113,16 @@ func streamClusterLogsToZip(
 		Previous: true,
 	}
 
-	for _, pod := range podList.Items {
+	for idx := range podList.Items {
+		pod := podList.Items[idx]
 		for _, container := range pod.Spec.Containers {
-			fileName := strings.Join([]string{pod.Name, container.Name}, "-")
-			writer, err := zipper.Create(filepath.Join(logsdir, fileName) + ".jsonl")
+			path := filepath.Join(logsdir, fmt.Sprintf("%s-%s.jsonl", pod.Name, container.Name))
+			writer, err := zipper.Create(path)
 			if err != nil {
-				return fmt.Errorf("could not add '%s' to zip: %w",
-					filepath.Join(logsdir, fileName), err)
+				return fmt.Errorf("could not add '%s' to zip: %w", path, err)
 			}
 			streamPodLogs.Options.Container = container.Name
-			podPointer := pod
-			streamPodLogs.Pod = &podPointer
+			streamPodLogs.Pod = &pod
 
 			if _, err := fmt.Fprint(writer, "\n\"====== Begin of Previous Log =====\"\n"); err != nil {
 				return err
@@ -185,19 +183,17 @@ func streamClusterJobLogsToZip(ctx context.Context, clusterName, namespace strin
 			Options:  podLogOptions,
 			Previous: false,
 		}
-		for _, pod := range podList.Items {
+		for idx := range podList.Items {
+			pod := podList.Items[idx]
 			for _, container := range pod.Spec.Containers {
-				fileName := strings.Join([]string{pod.Name, container.Name}, "-")
-				writer, err := zipper.Create(filepath.Join(logsdir, fileName) + ".jsonl")
+				path := filepath.Join(logsdir, fmt.Sprintf("%s-%s.jsonl", pod.Name, container.Name))
+				writer, err := zipper.Create(path)
 				if err != nil {
-					return fmt.Errorf("could not add '%s' to zip: %w",
-						filepath.Join(logsdir, fileName), err)
+					return fmt.Errorf("could not add '%s' to zip: %w", path, err)
 				}
 				streamPodLogs.Options.Container = container.Name
-				podPointer := pod
-				streamPodLogs.Pod = &podPointer
-				err = streamPodLogs.Stream(ctx, writer)
-				if err != nil {
+				streamPodLogs.Pod = &pod
+				if err = streamPodLogs.Stream(ctx, writer); err != nil {
 					return err
 				}
 			}
