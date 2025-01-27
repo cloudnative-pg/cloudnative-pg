@@ -272,7 +272,7 @@ func runInitDB(destDir string, walDir *string) error {
 	_ = compatibility.Umask(0o077)
 
 	initdbCmd := exec.Command(constants.InitdbName, options...) // #nosec
-	if err := execlog.RunBuffering(initdbCmd, constants.InitdbName); err != nil {
+	if err := execlog.RunStreaming(initdbCmd, constants.InitdbName); err != nil {
 		return err
 	}
 
