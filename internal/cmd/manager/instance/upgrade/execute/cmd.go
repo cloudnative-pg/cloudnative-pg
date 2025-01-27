@@ -217,6 +217,7 @@ func upgradeSubCommand(
 
 	contextLogger.Info("Running pg_upgrade")
 	if err := runPgUpgrade(pgData, pgUpgrade, newDataDir, oldBinDir); err != nil {
+		// TODO: in case of failures we should dump the content of the pg_upgrade logs
 		return fmt.Errorf("error while running pg_upgrade: %w", err)
 	}
 
@@ -318,7 +319,7 @@ func runPgUpgrade(oldDataDir string, pgUpgrade string, newDataDir string, oldBin
 		"--new-datadir", newDataDir,
 	) // #nosec
 	cmd.Dir = newDataDir
-	if err := execlog.RunBuffering(cmd, path.Base(pgUpgrade)); err != nil {
+	if err := execlog.RunStreaming(cmd, path.Base(pgUpgrade)); err != nil {
 		return fmt.Errorf("error while running pg_upgrade: %w", err)
 	}
 
