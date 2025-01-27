@@ -794,3 +794,20 @@ API. Please check your networking.
 Another possible cause is when you have sidecar injection configured. Sidecars
 such as Istio may make the network temporarily unavailable during startup. If
 you have sidecar injection enabled, retry with injection disabled.
+
+### Standbys take over two minutes to reconnect after a failover
+
+When the primary instance fails, the operator promotes the most advanced
+standby to the primary role. Other standby instances then attempt to reconnect
+to the `-rw` service for replication. However, during this reconnection
+process, the `kube-proxy` may not have updated its routing information yet.
+As a result, the initial `SYN` packet from the standby might fail to reach its
+destination.
+
+On Linux systems, the default value of the `tcp_syn_retries` kernel parameter
+is 6. This configuration causes the system to retry a stuck connection after
+approximately 127 seconds. For more details, refer to the
+[tcp_syn_retries documentation](https://www.kernel.org/doc/Documentation/networking/ip-sysctl.txt).
+
+Altering this behaviour will require changing the `tcp_syn_retries`
+parameter on the host node.
