@@ -795,7 +795,7 @@ Another possible cause is when you have sidecar injection configured. Sidecars
 such as Istio may make the network temporarily unavailable during startup. If
 you have sidecar injection enabled, retry with injection disabled.
 
-### Standbys take over two minutes to reconnect after a failover
+### Replicas take over two minutes to reconnect after a failover
 
 When the primary instance fails, the operator promotes the most advanced
 standby to the primary role. Other standby instances then attempt to reconnect
