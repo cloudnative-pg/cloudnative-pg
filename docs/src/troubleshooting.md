@@ -800,7 +800,7 @@ you have sidecar injection enabled, retry with injection disabled.
 When the primary instance fails, the operator promotes the most advanced
 standby to the primary role. Other standby instances then attempt to reconnect
 to the `-rw` service for replication. However, during this reconnection
-process, the `kube-proxy` may not yet have updated its routing information.
+process, `kube-proxy` may not yet have updated its routing information.
 As a result, the initial `SYN` packet sent by the standby instances can fail
 to reach the intended destination.
 
