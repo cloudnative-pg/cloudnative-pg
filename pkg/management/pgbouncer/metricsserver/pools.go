@@ -253,8 +253,11 @@ func (e *Exporter) collectShowPools(ch chan<- prometheus.Metric, db *sql.DB) {
 		return
 	}
 	for rows.Next() {
-		const poolsColumnsPgBouncer1180 = 16
-		const poolsColumnsPgBouncer1240 = 17
+		const (
+			poolsColumnsPgBouncer1180 = 16
+			poolsColumnsPgBouncer1240 = 17
+		)
+
 		switch len(cols) {
 		case poolsColumnsPgBouncer1180:
 			if err = rows.Scan(&database, &user,
