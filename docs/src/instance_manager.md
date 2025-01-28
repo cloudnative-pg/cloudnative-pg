@@ -15,33 +15,23 @@ main container, which in turn runs the PostgreSQL instance. During the lifetime
 of the Pod, the instance manager acts as a backend to handle the
 [startup, liveness and readiness probes](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#container-probes).
 
-## Startup, Liveness, and Readiness Probes
-
-CloudNativePG leverages [PostgreSQL's `pg_isready`](https://www.postgresql.org/docs/current/app-pg-isready.html)
-to implement Kubernetes startup, liveness, and readiness probes.
-
-### Startup Probe
+## Startup Probe
 
 The startup probe ensures that a PostgreSQL instance, whether a primary or
-standby, has fully started according to `pg_isready`.
+standby, has fully started.
+
+!!! Info
+    By default, the startup probe uses
+    [`pg_isready`](https://www.postgresql.org/docs/current/app-pg-isready.html).
+    However, the behavior can be customized by specifying a different startup
+    strategy.
+
 While the startup probe is running, the liveness and readiness probes remain
 disabled. Following Kubernetes standards, if the startup probe fails, the
 kubelet will terminate the container, which will then be restarted.
 
-CloudNativePG provides two approaches for configuring startup probes:
-
-1. **Standard**: automatically managed by the operator using the
-  `.spec.startDelay` value (default behavior).
-2. **Advanced**: offers full control over Kubernetes startup probe knobs,
-  as well as a finer success criteria for replicas (e.g., based on streaming
-  replication lag in addition to `pg_isready`).
-
-#### Standard Startup Probe
-
 The `.spec.startDelay` parameter specifies the maximum time, in seconds,
-allowed for the startup probe to succeed. At a minimum, the probe requires
-`pg_isready` to return `0`. For streaming replicas, it also requires the WAL
-receiver to start successfully.
+allowed for the startup probe to succeed.
 
 By default, the `startDelay` is set to `3600` seconds. It is recommended to
 adjust this setting based on the time PostgreSQL needs to fully initialize in
@@ -73,7 +63,7 @@ section of your configuration.
 
 !!! Info
     For more details on probe configuration, refer to the
-    [probe API documentation](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-Probe).
+    [probe API documentation](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-ProbeWithStrategy).
 
 If you manually specify `.spec.probes.startup.failureThreshold`, it will
 override the default behavior and disable the automatic use of `startDelay`.
@@ -81,79 +71,73 @@ override the default behavior and disable the automatic use of `startDelay`.
 For example, the following configuration explicitly sets custom probe
 parameters, bypassing `startDelay`:
 
-#### Advanced Startup Probe
+```yaml
+# ... snip
+spec:
+  probes:
+    startup:
+      periodSeconds: 3
+      timeoutSeconds: 3
+      failureThreshold: 10
+```
 
-In certain scenarios, you may need to customize the startup strategy for
-replicas. For example, you might delay marking a replica as started until it
-begins streaming with the primary or define a replication lag threshold that
-must be met before considering the replica ready.
+### Startup Probe Strategy
 
-To address these needs, CloudNativePG provides an advanced startup probe
-configured through the `.spec.probes.startup` stanza. This advanced probe is
-mutually exclusive with the standard startup probe and, when enabled,
-completely bypasses the `startDelay` parameter.
+In certain scenarios, you may need to customize the startup strategy for your
+PostgreSQL cluster. For example, you might delay marking a replica as started
+until it begins streaming from the primary or define a replication lag
+threshold that must be met before considering the replica ready.
 
-!!! Warning
-    With great power comes great responsibility. When using the advanced
-    startup probe, you assume full responsibility for configuring all startup probe
-    parameters as defined by the [probe API](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-Probe).
-    The most critical parameters to consider are `failureThreshold`,
-    `periodSeconds`, and `timeoutSeconds`. Ensure that your custom probe settings
-    align with your cluster’s operational requirements to prevent unintended
-    disruptions.
+To accommodate these requirements, CloudNativePG extends the
+`.spec.probes.startup` stanza with two optional parameters:
 
-In addition to the standard probe options, the startup probe introduces two
-additional parameters:
-
-- `type`: specifies the criteria for considering the probe successful, with the
-  following accepted values:
+- `type`: specifies the criteria for considering the probe successful. Accepted
+  values, in increasing order of complexity/depth, include:
 
     - `pg_isready`: marks the probe as successful when the `pg_isready` command
       exits with `0`. This is the default for primary instances and replicas.
+    - `query`: marks the probe as successful when a basic query is executed on
+      the `postgres` database locally.
     - `streaming`: marks the probe as successful when the replica begins
       streaming from its source and meets the specified lag requirements (details
       below).
 
-- `lag`: defines the maximum acceptable replication lag, measured in bytes
+- `maximumLag`: defines the maximum acceptable replication lag, measured in bytes
   (expressed as Kubernetes quantities). This parameter is only applicable when
-  `type` is set to `streaming`. If `lag` is not specified, the replica is
+  `type` is set to `streaming`. If `maximumLag` is not specified, the replica is
   considered successfully started as soon as it begins streaming.
 
 !!! Important
-    The `lag` option is validated and enforced only during the startup phase of
-    the pod, meaning it applies exclusively when the replica is starting.
+    The `.spec.probes.startup.maximumLag` option is validated and enforced only
+    during the startup phase of the pod, meaning it applies exclusively when the
+    replica is starting.
 
 !!! Warning
-    Incorrect configuration of the `lag` option can cause continuous failures
-    of the startup probe, leading to the replica being repeatedly restarted. Ensure
-    that you fully understand how this option works and provide enough time through
-    the `failureThreshold` and `periodSeconds` settings for the replica to catch up
-    with its source.
+    Incorrect configuration of the `maximumLag` option can cause continuous
+    failures of the startup probe, leading to repeated replica restarts. Ensure
+    you understand how this option works and configure appropriate values for
+    `failureThreshold` and `periodSeconds` to give the replica enough time to
+    catch up with its source.
 
 The following example requires a replica to have a maximum lag of 16Mi from the
-source to be considered started. It also provides approximately 300 seconds (30
-failures × 10 seconds) for the startup probe to succeed:
+source to be considered started:
 
 ```yaml
 # <snip>
 probes:
   startup:
     type: streaming
-    lag: 16Mi
-    failureThreshold: 30
-    periodSeconds: 10
+    maximumLag: 16Mi
 ```
 
-### Liveness Probe
+## Liveness Probe
 
 The liveness probe begins after the startup probe successfully completes. Its
-primary role is to ensure the PostgreSQL instance—whether primary or standby—is
-operating correctly. This is achieved using the `pg_isready` utility. Both exit
-codes `0` (indicating the server is accepting connections) and `1` (indicating
-the server is rejecting connections, such as during startup or a smart
-shutdown) are treated as valid outcomes.
-Following Kubernetes standards, if the liveness probe fails, the
-kubelet will terminate the container, which will then be restarted.
+primary role is to ensure the PostgreSQL instance manager is operating
+correctly.
+
+Following Kubernetes standards, if the liveness probe fails, the kubelet will
+terminate the container, which will then be restarted.
 
 The amount of time before a Pod is classified as not alive is configurable via
 the `.spec.livenessProbeTimeout` parameter.
@@ -203,14 +187,21 @@ spec:
       failureThreshold: 10
 ```
 
-### Readiness Probe
+## Readiness Probe
 
-The readiness probe begins once the startup probe has successfully completed.
-Its purpose is to check whether the PostgreSQL instance is ready to accept
-traffic and serve requests.
-For streaming replicas, it also requires that they have connected to the source
-at least once. Following Kubernetes standards, if the readiness probe fails,
-the pod will be marked unready and will not receive traffic from any services.
+The readiness probe starts once the startup probe has successfully completed.
+Its primary purpose is to check whether the PostgreSQL instance is ready to
+accept traffic and serve requests at any point during the pod's lifecycle.
+
+!!! Info
+    By default, the readiness probe uses
+    [`pg_isready`](https://www.postgresql.org/docs/current/app-pg-isready.html).
+    However, the behavior can be customized by specifying a different readiness
+    strategy.
+
+Following Kubernetes standards, if the readiness probe fails, the pod will be
+marked unready and will not receive traffic from any services. An unready pod
+is also ineligible for promotion during automated failover scenarios.
 
 CloudNativePG uses the following default configuration for the readiness probe:
 
@@ -241,7 +232,53 @@ spec:
 
 !!! Info
     For more information on configuring probes, see the
-    [probe API](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-Probe).
+    [probe API](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-ProbeWithStrategy).
+
+### Readiness Probe Strategy
+
+In certain scenarios, you may need to customize the readiness strategy for your
+cluster. For example, you might delay marking a replica as ready until it
+begins streaming from the primary or define a maximum replication lag threshold
+before considering the replica ready.
+
+To accommodate these requirements, CloudNativePG extends the
+`.spec.probes.readiness` stanza with two optional parameters: `type` and
+`maximumLag`. Please refer to the [Startup Probe Strategy](#startup-probe-strategy)
+section for detailed information on these options.
+
+!!! Important
+    Unlike the startup probe, the `.spec.probes.readiness.maximumLag` option is
+    continuously monitored. A lagging replica may become unready if this setting is
+    not appropriately tuned.
+
+!!! Warning
+    Incorrect configuration of the `maximumLag` option can lead to repeated
+    readiness probe failures, causing serious consequences, such as:
+
+    - Exclusion of the replica from key operator features, such as promotion
+      during failover or participation in synchronous replication quorum.
+    - Disruptions in read/read-only services.
+    - In longer failover times scenarios, replicas might be declared unready,
+      leading to a cluster stall requiring manual intervention.
+
+!!! Recommendation
+    Use the `streaming` and `maximumLag` options with extreme caution. If
+    you're unfamiliar with PostgreSQL replication, rely on the default
+    strategy. Seek professional advice if unsure.
+
+The following example requires a replica to have a maximum lag of 64Mi from the
+source to be considered ready. It also provides approximately 300 seconds (30
+failures × 10 seconds) for the startup probe to succeed:
+
+```yaml
+# <snip>
+probes:
+  readiness:
+    type: streaming
+    lag: 64Mi
+    failureThreshold: 30
+    periodSeconds: 10
+```
 
 ## Shutdown control
 
