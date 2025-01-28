@@ -1150,9 +1150,10 @@ func validateWalSizeConfiguration(
 // into kubernetes resource.Quantity values
 // Ref: Numeric with Unit @ https://www.postgresql.org/docs/current/config-setting.html#CONFIG-SETTING-NAMES-VALUES
 func parsePostgresQuantityValue(value string) (resource.Quantity, error) {
-	// If no suffix, default is MB
-	if _, err := strconv.Atoi(value); err == nil {
-		value += "MB"
+	// If no suffix, take it as 8kB (default PostgreSQL's value)
+	if size, err := strconv.Atoi(value); err == nil {
+		size = size * 8
+		value = strconv.Itoa(size) + "kB"
 	}
 
 	// If there is a suffix it must be "B"
