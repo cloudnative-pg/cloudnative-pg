@@ -810,5 +810,5 @@ for approximately 127 seconds before giving up. This extended retry period can
 significantly delay the reconnection process. For more details, consult the
 [tcp_syn_retries documentation](https://www.kernel.org/doc/Documentation/networking/ip-sysctl.txt).
 
-Altering this behaviour will require changing the `tcp_syn_retries`
+Altering this behavior will require changing the `tcp_syn_retries`
 parameter on the host node.
