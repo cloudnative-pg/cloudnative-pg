@@ -1131,6 +1131,7 @@ readthedocs
 readyInstances
 reconciler
 reconciliationLoop
+reconnection
 recoverability
 recoveredCluster
 recoveryTarget
