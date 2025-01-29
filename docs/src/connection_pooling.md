@@ -368,164 +368,164 @@ This example shows the output for `cnpg_pgbouncer` metrics:
 ```text
 # HELP cnpg_pgbouncer_collection_duration_seconds Collection time duration in seconds
 # TYPE cnpg_pgbouncer_collection_duration_seconds gauge
-cnpg_pgbouncer_collection_duration_seconds{collector="Collect.up"} 0.002443168
-
+cnpg_pgbouncer_collection_duration_seconds{collector="Collect.up"} 0.002338805
+# HELP cnpg_pgbouncer_collection_errors_total Total errors occurred accessing PostgreSQL for metrics.
+# TYPE cnpg_pgbouncer_collection_errors_total counter
+cnpg_pgbouncer_collection_errors_total{collector="sql: Scan error on column index 16, name \"load_balance_hosts\": converting NULL to int is unsupported"} 5
 # HELP cnpg_pgbouncer_collections_total Total number of times PostgreSQL was accessed for metrics.
 # TYPE cnpg_pgbouncer_collections_total counter
-cnpg_pgbouncer_collections_total 1
-
+cnpg_pgbouncer_collections_total 5
 # HELP cnpg_pgbouncer_last_collection_error 1 if the last collection ended with error, 0 otherwise.
 # TYPE cnpg_pgbouncer_last_collection_error gauge
 cnpg_pgbouncer_last_collection_error 0
-
 # HELP cnpg_pgbouncer_lists_databases Count of databases.
 # TYPE cnpg_pgbouncer_lists_databases gauge
 cnpg_pgbouncer_lists_databases 1
-
 # HELP cnpg_pgbouncer_lists_dns_names Count of DNS names in the cache.
 # TYPE cnpg_pgbouncer_lists_dns_names gauge
 cnpg_pgbouncer_lists_dns_names 0
-
 # HELP cnpg_pgbouncer_lists_dns_pending Not used.
 # TYPE cnpg_pgbouncer_lists_dns_pending gauge
 cnpg_pgbouncer_lists_dns_pending 0
-
 # HELP cnpg_pgbouncer_lists_dns_queries Count of in-flight DNS queries.
 # TYPE cnpg_pgbouncer_lists_dns_queries gauge
 cnpg_pgbouncer_lists_dns_queries 0
-
 # HELP cnpg_pgbouncer_lists_dns_zones Count of DNS zones in the cache.
 # TYPE cnpg_pgbouncer_lists_dns_zones gauge
 cnpg_pgbouncer_lists_dns_zones 0
-
 # HELP cnpg_pgbouncer_lists_free_clients Count of free clients.
 # TYPE cnpg_pgbouncer_lists_free_clients gauge
 cnpg_pgbouncer_lists_free_clients 49
-
 # HELP cnpg_pgbouncer_lists_free_servers Count of free servers.
 # TYPE cnpg_pgbouncer_lists_free_servers gauge
 cnpg_pgbouncer_lists_free_servers 0
-
 # HELP cnpg_pgbouncer_lists_login_clients Count of clients in login state.
 # TYPE cnpg_pgbouncer_lists_login_clients gauge
 cnpg_pgbouncer_lists_login_clients 0
-
 # HELP cnpg_pgbouncer_lists_pools Count of pools.
 # TYPE cnpg_pgbouncer_lists_pools gauge
 cnpg_pgbouncer_lists_pools 1
-
 # HELP cnpg_pgbouncer_lists_used_clients Count of used clients.
 # TYPE cnpg_pgbouncer_lists_used_clients gauge
 cnpg_pgbouncer_lists_used_clients 1
-
 # HELP cnpg_pgbouncer_lists_used_servers Count of used servers.
 # TYPE cnpg_pgbouncer_lists_used_servers gauge
 cnpg_pgbouncer_lists_used_servers 0
-
 # HELP cnpg_pgbouncer_lists_users Count of users.
 # TYPE cnpg_pgbouncer_lists_users gauge
 cnpg_pgbouncer_lists_users 2
-
 # HELP cnpg_pgbouncer_pools_cl_active Client connections that are linked to server connection and can process queries.
 # TYPE cnpg_pgbouncer_pools_cl_active gauge
 cnpg_pgbouncer_pools_cl_active{database="pgbouncer",user="pgbouncer"} 1
-
+# HELP cnpg_pgbouncer_pools_cl_active_cancel_req Client connections that have forwarded query cancellations to the server and are waiting for the server response.
+# TYPE cnpg_pgbouncer_pools_cl_active_cancel_req gauge
+cnpg_pgbouncer_pools_cl_active_cancel_req{database="pgbouncer",user="pgbouncer"} 0
 # HELP cnpg_pgbouncer_pools_cl_cancel_req Client connections that have not forwarded query cancellations to the server yet.
 # TYPE cnpg_pgbouncer_pools_cl_cancel_req gauge
 cnpg_pgbouncer_pools_cl_cancel_req{database="pgbouncer",user="pgbouncer"} 0
-
 # HELP cnpg_pgbouncer_pools_cl_waiting Client connections that have sent queries but have not yet got a server connection.
 # TYPE cnpg_pgbouncer_pools_cl_waiting gauge
 cnpg_pgbouncer_pools_cl_waiting{database="pgbouncer",user="pgbouncer"} 0
-
+# HELP cnpg_pgbouncer_pools_cl_waiting_cancel_req Client connections that have not forwarded query cancellations to the server yet.
+# TYPE cnpg_pgbouncer_pools_cl_waiting_cancel_req gauge
+cnpg_pgbouncer_pools_cl_waiting_cancel_req{database="pgbouncer",user="pgbouncer"} 0
+# HELP cnpg_pgbouncer_pools_load_balance_hosts Number of hosts not load balancing between hosts
+# TYPE cnpg_pgbouncer_pools_load_balance_hosts gauge
+cnpg_pgbouncer_pools_load_balance_hosts{database="pgbouncer",user="pgbouncer"} 0
 # HELP cnpg_pgbouncer_pools_maxwait How long the first (oldest) client in the queue has waited, in seconds. If this starts increasing, then the current pool of servers does not handle requests quickly enough. The reason may be either an overloaded server or just too small of a pool_size setting.
 # TYPE cnpg_pgbouncer_pools_maxwait gauge
 cnpg_pgbouncer_pools_maxwait{database="pgbouncer",user="pgbouncer"} 0
-
 # HELP cnpg_pgbouncer_pools_maxwait_us Microsecond part of the maximum waiting time.
 # TYPE cnpg_pgbouncer_pools_maxwait_us gauge
 cnpg_pgbouncer_pools_maxwait_us{database="pgbouncer",user="pgbouncer"} 0
-
 # HELP cnpg_pgbouncer_pools_pool_mode The pooling mode in use. 1 for session, 2 for transaction, 3 for statement, -1 if unknown
 # TYPE cnpg_pgbouncer_pools_pool_mode gauge
 cnpg_pgbouncer_pools_pool_mode{database="pgbouncer",user="pgbouncer"} 3
-
 # HELP cnpg_pgbouncer_pools_sv_active Server connections that are linked to a client.
 # TYPE cnpg_pgbouncer_pools_sv_active gauge
 cnpg_pgbouncer_pools_sv_active{database="pgbouncer",user="pgbouncer"} 0
-
+# HELP cnpg_pgbouncer_pools_sv_active_cancel Server connections that are currently forwarding a cancel request
+# TYPE cnpg_pgbouncer_pools_sv_active_cancel gauge
+cnpg_pgbouncer_pools_sv_active_cancel{database="pgbouncer",user="pgbouncer"} 0
 # HELP cnpg_pgbouncer_pools_sv_idle Server connections that are unused and immediately usable for client queries.
 # TYPE cnpg_pgbouncer_pools_sv_idle gauge
 cnpg_pgbouncer_pools_sv_idle{database="pgbouncer",user="pgbouncer"} 0
-
 # HELP cnpg_pgbouncer_pools_sv_login Server connections currently in the process of logging in.
 # TYPE cnpg_pgbouncer_pools_sv_login gauge
 cnpg_pgbouncer_pools_sv_login{database="pgbouncer",user="pgbouncer"} 0
-
 # HELP cnpg_pgbouncer_pools_sv_tested Server connections that are currently running either server_reset_query or server_check_query.
 # TYPE cnpg_pgbouncer_pools_sv_tested gauge
 cnpg_pgbouncer_pools_sv_tested{database="pgbouncer",user="pgbouncer"} 0
-
 # HELP cnpg_pgbouncer_pools_sv_used Server connections that have been idle for more than server_check_delay, so they need server_check_query to run on them before they can be used again.
 # TYPE cnpg_pgbouncer_pools_sv_used gauge
 cnpg_pgbouncer_pools_sv_used{database="pgbouncer",user="pgbouncer"} 0
-
+# HELP cnpg_pgbouncer_pools_sv_wait_cancels Servers that normally could become idle, but are waiting to do so until all in-flight cancel requests have completed that were sent to cancel a query on this server.
+# TYPE cnpg_pgbouncer_pools_sv_wait_cancels gauge
+cnpg_pgbouncer_pools_sv_wait_cancels{database="pgbouncer",user="pgbouncer"} 0
+# HELP cnpg_pgbouncer_stats_avg_bind_count Average number of prepared statements readied for execution by clients and forwarded to PostgreSQL by pgbouncer.
+# TYPE cnpg_pgbouncer_stats_avg_bind_count gauge
+cnpg_pgbouncer_stats_avg_bind_count{database="pgbouncer"} 0
+# HELP cnpg_pgbouncer_stats_avg_client_parse_count Average number of prepared statements created by clients.
+# TYPE cnpg_pgbouncer_stats_avg_client_parse_count gauge
+cnpg_pgbouncer_stats_avg_client_parse_count{database="pgbouncer"} 0
 # HELP cnpg_pgbouncer_stats_avg_query_count Average queries per second in last stat period.
 # TYPE cnpg_pgbouncer_stats_avg_query_count gauge
-cnpg_pgbouncer_stats_avg_query_count{database="pgbouncer"} 1
-
+cnpg_pgbouncer_stats_avg_query_count{database="pgbouncer"} 0
 # HELP cnpg_pgbouncer_stats_avg_query_time Average query duration, in microseconds.
 # TYPE cnpg_pgbouncer_stats_avg_query_time gauge
 cnpg_pgbouncer_stats_avg_query_time{database="pgbouncer"} 0
-
 # HELP cnpg_pgbouncer_stats_avg_recv Average received (from clients) bytes per second.
 # TYPE cnpg_pgbouncer_stats_avg_recv gauge
 cnpg_pgbouncer_stats_avg_recv{database="pgbouncer"} 0
-
 # HELP cnpg_pgbouncer_stats_avg_sent Average sent (to clients) bytes per second.
 # TYPE cnpg_pgbouncer_stats_avg_sent gauge
 cnpg_pgbouncer_stats_avg_sent{database="pgbouncer"} 0
-
+# HELP cnpg_pgbouncer_stats_avg_server_parse_count Average number of prepared statements created by pgbouncer on a server.
+# TYPE cnpg_pgbouncer_stats_avg_server_parse_count gauge
+cnpg_pgbouncer_stats_avg_server_parse_count{database="pgbouncer"} 0
 # HELP cnpg_pgbouncer_stats_avg_wait_time Time spent by clients waiting for a server, in microseconds (average per second).
 # TYPE cnpg_pgbouncer_stats_avg_wait_time gauge
 cnpg_pgbouncer_stats_avg_wait_time{database="pgbouncer"} 0
-
 # HELP cnpg_pgbouncer_stats_avg_xact_count Average transactions per second in last stat period.
 # TYPE cnpg_pgbouncer_stats_avg_xact_count gauge
-cnpg_pgbouncer_stats_avg_xact_count{database="pgbouncer"} 1
-
+cnpg_pgbouncer_stats_avg_xact_count{database="pgbouncer"} 0
 # HELP cnpg_pgbouncer_stats_avg_xact_time Average transaction duration, in microseconds.
 # TYPE cnpg_pgbouncer_stats_avg_xact_time gauge
 cnpg_pgbouncer_stats_avg_xact_time{database="pgbouncer"} 0
-
+# HELP cnpg_pgbouncer_stats_total_bind_count Total number of prepared statements readied for execution by clients and forwarded to PostgreSQL by pgbouncer
+# TYPE cnpg_pgbouncer_stats_total_bind_count gauge
+cnpg_pgbouncer_stats_total_bind_count{database="pgbouncer"} 0
+# HELP cnpg_pgbouncer_stats_total_client_parse_count Total number of prepared statements created by clients.
+# TYPE cnpg_pgbouncer_stats_total_client_parse_count gauge
+cnpg_pgbouncer_stats_total_client_parse_count{database="pgbouncer"} 0
 # HELP cnpg_pgbouncer_stats_total_query_count Total number of SQL queries pooled by pgbouncer.
 # TYPE cnpg_pgbouncer_stats_total_query_count gauge
-cnpg_pgbouncer_stats_total_query_count{database="pgbouncer"} 3
-
+cnpg_pgbouncer_stats_total_query_count{database="pgbouncer"} 15
 # HELP cnpg_pgbouncer_stats_total_query_time Total number of microseconds spent by pgbouncer when actively connected to PostgreSQL, executing queries.
 # TYPE cnpg_pgbouncer_stats_total_query_time gauge
 cnpg_pgbouncer_stats_total_query_time{database="pgbouncer"} 0
-
 # HELP cnpg_pgbouncer_stats_total_received Total volume in bytes of network traffic received by pgbouncer.
 # TYPE cnpg_pgbouncer_stats_total_received gauge
 cnpg_pgbouncer_stats_total_received{database="pgbouncer"} 0
-
 # HELP cnpg_pgbouncer_stats_total_sent Total volume in bytes of network traffic sent by pgbouncer.
 # TYPE cnpg_pgbouncer_stats_total_sent gauge
 cnpg_pgbouncer_stats_total_sent{database="pgbouncer"} 0
-
+# HELP cnpg_pgbouncer_stats_total_server_parse_count Total number of prepared statements created by pgbouncer on a server.
+# TYPE cnpg_pgbouncer_stats_total_server_parse_count gauge
+cnpg_pgbouncer_stats_total_server_parse_count{database="pgbouncer"} 0
 # HELP cnpg_pgbouncer_stats_total_wait_time Time spent by clients waiting for a server, in microseconds.
 # TYPE cnpg_pgbouncer_stats_total_wait_time gauge
 cnpg_pgbouncer_stats_total_wait_time{database="pgbouncer"} 0
-
 # HELP cnpg_pgbouncer_stats_total_xact_count Total number of SQL transactions pooled by pgbouncer.
 # TYPE cnpg_pgbouncer_stats_total_xact_count gauge
-cnpg_pgbouncer_stats_total_xact_count{database="pgbouncer"} 3
-
+cnpg_pgbouncer_stats_total_xact_count{database="pgbouncer"} 15
 # HELP cnpg_pgbouncer_stats_total_xact_time Total number of microseconds spent by pgbouncer when connected to PostgreSQL in a transaction, either idle in transaction or executing queries.
 # TYPE cnpg_pgbouncer_stats_total_xact_time gauge
 cnpg_pgbouncer_stats_total_xact_time{database="pgbouncer"} 0
 ```
+
+!!! Info
+    For a better understanding of the metrics please refer to the PgBouncer documentation.
 
 As for clusters, a specific pooler can be monitored using the
 [Prometheus operator's](https://github.com/prometheus-operator/prometheus-operator) resource
