@@ -163,6 +163,7 @@ func (r *ClusterReconciler) createMajorUpgradeJob(
 		cluster.GetFixedInheritedLabels(), configuration.Current)
 	utils.InheritLabels(&job.Spec.Template.ObjectMeta, cluster.Labels,
 		cluster.GetFixedInheritedLabels(), configuration.Current)
+	utils.SetInstanceRole(job.Spec.Template.ObjectMeta, specs.ClusterRoleLabelPrimary)
 
 	contextLogger.Info("Creating new major upgrade Job",
 		"jobName", job.Name,
