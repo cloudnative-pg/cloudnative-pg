@@ -30,7 +30,7 @@ env:
   BUILD_PUSH_CACHE_FROM: ""
   BUILD_PUSH_CACHE_TO: ""
   BUILD_PLUGIN_RELEASE_ARGS: "build --skip=validate --clean --id kubectl-cnpg --timeout 60m"
-  BUILD_MANAGER_RELEASE_ARGS: "build --skip=validate --clean --id manager"
+  BUILD_MANAGER_RELEASE_ARGS: "build --skip=validate --clean --id manager-race"
   REPOSITORY_OWNER: "cloudnative-pg"
   REGISTRY: "ghcr.io"
   REGISTRY_USER: ${{ github.actor }}
