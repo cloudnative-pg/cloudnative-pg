@@ -158,6 +158,11 @@ func upgradeSubCommand(
 		return fmt.Errorf("error while reconciling the WAL storage: %w", err)
 	}
 
+	socketDir := postgres.GetSocketDir()
+	if err := fileutils.EnsureDirectoryExists(socketDir); err != nil {
+		return fmt.Errorf("while creating socket directory: %w", err)
+	}
+
 	contextLogger.Info("Searching for failed upgrades")
 
 	var failedDirs []string
@@ -191,7 +196,7 @@ func upgradeSubCommand(
 	}
 
 	contextLogger.Info("Preparing configuration files", "directory", newDataDir)
-	if err := prepareConfigurationFiles(newDataDir); err != nil {
+	if err := prepareConfigurationFiles(ctx, cluster, newDataDir); err != nil {
 		return err
 	}
 
@@ -279,7 +284,7 @@ func runInitDB(destDir string, walDir *string) error {
 	return nil
 }
 
-func prepareConfigurationFiles(destDir string) error {
+func prepareConfigurationFiles(ctx context.Context, cluster apiv1.Cluster, destDir string) error {
 	// Always read the custom and override configuration files created by the operator
 	_, err := configfile.EnsureIncludes(path.Join(destDir, "postgresql.conf"),
 		constants.PostgresqlCustomConfigurationFile,
@@ -289,13 +294,9 @@ func prepareConfigurationFiles(destDir string) error {
 		return fmt.Errorf("appending inclusion directives to postgresql.conf file resulted in an error: %w", err)
 	}
 
-	// Create a stub for the configuration file
-	// to be filled during the real startup of this instance
-	err = fileutils.CreateEmptyFile(
-		path.Join(destDir, constants.PostgresqlCustomConfigurationFile))
-	if err != nil {
-		return fmt.Errorf("creating the operator managed configuration file '%v' resulted in an error: %w",
-			constants.PostgresqlCustomConfigurationFile, err)
+	newInstance := postgres.Instance{PgData: destDir}
+	if _, err := newInstance.RefreshConfigurationFilesFromCluster(ctx, &cluster, false); err != nil {
+		return fmt.Errorf("error while creating the configuration files for new datadir %q: %w", destDir, err)
 	}
 
 	// Create a stub for the configuration file
@@ -320,7 +321,7 @@ func runPgUpgrade(oldDataDir string, pgUpgrade string, newDataDir string, oldBin
 	) // #nosec
 	cmd.Dir = newDataDir
 	if err := execlog.RunStreaming(cmd, path.Base(pgUpgrade)); err != nil {
-		return fmt.Errorf("error while running pg_upgrade: %w", err)
+		return fmt.Errorf("error while running %q: %w", cmd, err)
 	}
 
 	return nil
