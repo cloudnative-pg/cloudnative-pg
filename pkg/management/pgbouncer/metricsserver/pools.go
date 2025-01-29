@@ -39,7 +39,8 @@ type ShowPoolsMetrics struct {
 	SvLogin,
 	MaxWait,
 	MaxWaitUs,
-	PoolMode *prometheus.GaugeVec
+	PoolMode,
+	LoadBalanceHosts *prometheus.GaugeVec
 }
 
 // Describe produces the description for all the contained Metrics
@@ -180,6 +181,12 @@ func NewShowPoolsMetrics(subsystem string) *ShowPoolsMetrics {
 			Name:      "pool_mode",
 			Help:      "The pooling mode in use. 1 for session, 2 for transaction, 3 for statement, -1 if unknown",
 		}, []string{"database", "user"}),
+		LoadBalanceHosts: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Namespace: PrometheusNamespace,
+			Subsystem: subsystem,
+			Name:      "load_balance_hosts",
+			Help:      "Number of hosts not load balancing between hosts",
+		}, []string{"database", "user"}),
 	}
 }
 
@@ -233,6 +240,10 @@ func (e *Exporter) collectShowPools(ch chan<- prometheus.Metric, db *sql.DB) {
 		svActiveCancel     int
 		svBeingCanceled    int
 	)
+	// PGBouncer 1.24.0 or above
+	var (
+		loadBalanceHosts int
+	)
 
 	cols, err := rows.Columns()
 	if err != nil {
@@ -242,7 +253,11 @@ func (e *Exporter) collectShowPools(ch chan<- prometheus.Metric, db *sql.DB) {
 		return
 	}
 	for rows.Next() {
-		const poolsColumnsPgBouncer1180 = 16
+		const (
+			poolsColumnsPgBouncer1180 = 16
+			poolsColumnsPgBouncer1240 = 17
+		)
+
 		switch len(cols) {
 		case poolsColumnsPgBouncer1180:
 			if err = rows.Scan(&database, &user,
@@ -260,6 +275,28 @@ func (e *Exporter) collectShowPools(ch chan<- prometheus.Metric, db *sql.DB) {
 				&maxWait,
 				&maxWaitUs,
 				&poolMode,
+			); err != nil {
+				contextLogger.Error(err, "Error while executing SHOW POOLS")
+				e.Metrics.Error.Set(1)
+				e.Metrics.PgCollectionErrors.WithLabelValues(err.Error()).Inc()
+			}
+		case poolsColumnsPgBouncer1240:
+			if err = rows.Scan(&database, &user,
+				&clActive,
+				&clWaiting,
+				&clActiveCancelReq,
+				&clWaitingCancelReq,
+				&svActive,
+				&svActiveCancel,
+				&svBeingCanceled,
+				&svIdle,
+				&svUsed,
+				&svTested,
+				&svLogin,
+				&maxWait,
+				&maxWaitUs,
+				&poolMode,
+				&loadBalanceHosts,
 			); err != nil {
 				contextLogger.Error(err, "Error while executing SHOW POOLS")
 				e.Metrics.Error.Set(1)
@@ -299,6 +336,7 @@ func (e *Exporter) collectShowPools(ch chan<- prometheus.Metric, db *sql.DB) {
 		e.Metrics.ShowPools.MaxWait.WithLabelValues(database, user).Set(float64(maxWait))
 		e.Metrics.ShowPools.MaxWaitUs.WithLabelValues(database, user).Set(float64(maxWaitUs))
 		e.Metrics.ShowPools.PoolMode.WithLabelValues(database, user).Set(float64(poolModeToInt(poolMode)))
+		e.Metrics.ShowPools.LoadBalanceHosts.WithLabelValues(database, user).Set(float64(loadBalanceHosts))
 	}
 
 	e.Metrics.ShowPools.ClActive.Collect(ch)
@@ -316,6 +354,7 @@ func (e *Exporter) collectShowPools(ch chan<- prometheus.Metric, db *sql.DB) {
 	e.Metrics.ShowPools.MaxWait.Collect(ch)
 	e.Metrics.ShowPools.MaxWaitUs.Collect(ch)
 	e.Metrics.ShowPools.PoolMode.Collect(ch)
+	e.Metrics.ShowPools.LoadBalanceHosts.Collect(ch)
 
 	if err = rows.Err(); err != nil {
 		e.Metrics.Error.Set(1)
