@@ -860,7 +860,7 @@ func (v *ClusterCustomValidator) validateResources(r *apiv1.Cluster) field.Error
 	memoryRequest := r.Spec.Resources.Requests.Memory()
 	rawSharedBuffer := r.Spec.PostgresConfiguration.Parameters[sharedBuffersParameter]
 	if !memoryRequest.IsZero() && rawSharedBuffer != "" {
-		if sharedBuffers, err := parsePostgresQuantityValue(rawSharedBuffer); err == nil {
+		if sharedBuffers, err := parsePostgresQuantityValue(rawSharedBuffer, 8); err == nil {
 			if memoryRequest.Cmp(sharedBuffers) < 0 {
 				result = append(result, field.Invalid(
 					field.NewPath("spec", "resources", "requests", "memory"),
@@ -1009,7 +1009,7 @@ func (v *ClusterCustomValidator) validateConfiguration(r *apiv1.Cluster) field.E
 	}
 
 	if value := r.Spec.PostgresConfiguration.Parameters[sharedBuffersParameter]; value != "" {
-		if _, err := parsePostgresQuantityValue(value); err != nil {
+		if _, err := parsePostgresQuantityValue(value, 8); err != nil {
 			result = append(
 				result,
 				field.Invalid(
@@ -1075,7 +1075,7 @@ func validateWalSizeConfiguration(
 		minWalSize = minWalSizeDefault
 		hasMinWalSize = false
 	}
-	minWalSizeValue, err := parsePostgresQuantityValue(minWalSize)
+	minWalSizeValue, err := parsePostgresQuantityValue(minWalSize, 1024)
 	if err != nil {
 		result = append(
 			result,
@@ -1090,7 +1090,7 @@ func validateWalSizeConfiguration(
 		maxWalSize = maxWalSizeDefault
 		hasMaxWalSize = false
 	}
-	maxWalSizeValue, err := parsePostgresQuantityValue(maxWalSize)
+	maxWalSizeValue, err := parsePostgresQuantityValue(maxWalSize, 1024)
 	if err != nil {
 		result = append(
 			result,
@@ -1145,10 +1145,11 @@ func validateWalSizeConfiguration(
 // parsePostgresQuantityValue converts the  sizes in the PostgreSQL configuration
 // into kubernetes resource.Quantity values
 // Ref: Numeric with Unit @ https://www.postgresql.org/docs/current/config-setting.html#CONFIG-SETTING-NAMES-VALUES
-func parsePostgresQuantityValue(value string) (resource.Quantity, error) {
-	// If no suffix, take it as 8kB (default PostgreSQL's value)
+// unit argument must be in kB
+func parsePostgresQuantityValue(value string, unit int) (resource.Quantity, error) {
+	// If no suffix, use the given unit argument (kB)
 	if size, err := strconv.Atoi(value); err == nil {
-		size = size * 8
+		size *= unit
 		value = strconv.Itoa(size) + "kB"
 	}
 
