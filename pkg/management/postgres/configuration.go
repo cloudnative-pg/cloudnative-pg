@@ -27,10 +27,12 @@ import (
 
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	"github.com/cloudnative-pg/machinery/pkg/postgres/version"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/configfile"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
+	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres/replication"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -65,11 +67,12 @@ func (instance *Instance) RefreshConfigurationFilesFromCluster(
 	cluster *apiv1.Cluster,
 	preserveUserSettings bool,
 ) (bool, error) {
-	postgresConfiguration, sha256, err := createPostgresqlConfiguration(cluster, preserveUserSettings)
+	pgVersion, err := postgresutils.GetPgdataVersion(instance.PgData)
 	if err != nil {
 		return false, err
 	}
 
+	postgresConfiguration, sha256 := createPostgresqlConfiguration(cluster, preserveUserSettings, pgVersion.Major)
 	postgresConfigurationChanged, err := InstallPgDataFileContent(
 		ctx,
 		instance.PgData,
@@ -376,16 +379,14 @@ func (instance *Instance) migratePostgresAutoConfFile(ctx context.Context) (bool
 
 // createPostgresqlConfiguration creates the PostgreSQL configuration to be
 // used for this cluster and return it and its sha256 checksum
-func createPostgresqlConfiguration(cluster *apiv1.Cluster, preserveUserSettings bool) (string, string, error) {
-	// Extract the PostgreSQL major version
-	fromVersion, err := cluster.GetPostgresqlVersion()
-	if err != nil {
-		return "", "", err
-	}
-
+func createPostgresqlConfiguration(
+	cluster *apiv1.Cluster,
+	preserveUserSettings bool,
+	majorVersion uint64,
+) (string, string) {
 	info := postgres.ConfigurationInfo{
 		Settings:                         postgres.CnpgConfigurationSettings,
-		Version:                          fromVersion,
+		Version:                          version.New(majorVersion, 0),
 		UserSettings:                     cluster.Spec.PostgresConfiguration.Parameters,
 		IncludingSharedPreloadLibraries:  true,
 		AdditionalSharedPreloadLibraries: cluster.Spec.PostgresConfiguration.AdditionalLibraries,
@@ -417,8 +418,7 @@ func createPostgresqlConfiguration(cluster *apiv1.Cluster, preserveUserSettings 
 		info.RecoveryMinApplyDelay = cluster.Spec.ReplicaCluster.MinApplyDelay.Duration
 	}
 
-	conf, sha256 := postgres.CreatePostgresqlConfFile(postgres.CreatePostgresqlConfiguration(info))
-	return conf, sha256, nil
+	return postgres.CreatePostgresqlConfFile(postgres.CreatePostgresqlConfiguration(info))
 }
 
 // configurePostgresForImport configures Postgres to be optimized for the firt import
