@@ -47,6 +47,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -2365,6 +2366,16 @@ func (v *ClusterCustomValidator) validatePodPatchAnnotation(r *apiv1.Cluster) fi
 				field.NewPath("metadata", "annotations", utils.PodPatchAnnotationName),
 				jsonPatch,
 				fmt.Sprintf("error decoding JSON patch: %s", err.Error()),
+			),
+		}
+	}
+
+	if _, err := specs.PodWithExistingStorage(*r, 1); err != nil {
+		return field.ErrorList{
+			field.Invalid(
+				field.NewPath("metadata", "annotations", utils.PodPatchAnnotationName),
+				jsonPatch,
+				fmt.Sprintf("jsonpatch doesn't apply cleanly to the pod: %s", err.Error()),
 			),
 		}
 	}

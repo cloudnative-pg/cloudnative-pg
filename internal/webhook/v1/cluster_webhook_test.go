@@ -4893,7 +4893,7 @@ var _ = Describe("validatePodPatchAnnotation", func() {
 		Expect(v.validatePodPatchAnnotation(cluster)).To(BeNil())
 	})
 
-	It("returns an error if decoding the JSON patch fails", func() {
+	It("returns an error if decoding the JSON patch fails to decode", func() {
 		cluster := &apiv1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
@@ -4907,6 +4907,22 @@ var _ = Describe("validatePodPatchAnnotation", func() {
 		Expect(errors[0].Type).To(Equal(field.ErrorTypeInvalid))
 		Expect(errors[0].Field).To(Equal("metadata.annotations." + utils.PodPatchAnnotationName))
 		Expect(errors[0].Detail).To(ContainSubstring("error decoding JSON patch"))
+	})
+
+	It("returns an error if decoding the JSON patch fails to apply", func() {
+		cluster := &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					utils.PodPatchAnnotationName: `[{"op": "replace", "path": "/spec/podInvalidSection", "value": "test"}]`,
+				},
+			},
+		}
+
+		errors := v.validatePodPatchAnnotation(cluster)
+		Expect(errors).To(HaveLen(1))
+		Expect(errors[0].Type).To(Equal(field.ErrorTypeInvalid))
+		Expect(errors[0].Field).To(Equal("metadata.annotations." + utils.PodPatchAnnotationName))
+		Expect(errors[0].Detail).To(ContainSubstring("jsonpatch doesn't apply cleanly to the pod"))
 	})
 
 	It("returns nil if the JSON patch is decoded successfully", func() {
