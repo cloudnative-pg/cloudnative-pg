@@ -34,12 +34,13 @@ import (
 )
 
 type pgBenchRun struct {
-	jobName            string
-	clusterName        string
-	dbName             string
-	nodeSelector       []string
-	pgBenchCommandArgs []string
-	dryRun             bool
+	jobName                 string
+	clusterName             string
+	dbName                  string
+	nodeSelector            []string
+	pgBenchCommandArgs      []string
+	dryRun                  bool
+	ttlSecondsAfterFinished int32
 }
 
 const (
@@ -59,6 +60,10 @@ var jobExample = `
 
   # Create a job with given values and [cluster] "cluster-example"
   kubectl-cnpg pgbench cluster-example --db-name pgbenchDBName --job-name job-name -- \
+    --time 30 --client 1 --jobs 1
+
+  # Create a job with given values on[cluster] "cluster-example". The job will be cleaned after 10 minutes.
+  kubectl-cnpg pgbench cluster-example --db-name pgbenchDBName --job-name job-name --ttl 600 -- \
     --time 30 --client 1 --jobs 1`
 
 func (cmd *pgBenchRun) execute(ctx context.Context) error {
@@ -136,6 +141,7 @@ func (cmd *pgBenchRun) buildJob(cluster *apiv1.Cluster) *batchv1.Job {
 			Labels:    labels,
 		},
 		Spec: batchv1.JobSpec{
+			TTLSecondsAfterFinished: &cmd.ttlSecondsAfterFinished,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: labels,
