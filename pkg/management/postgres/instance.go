@@ -36,7 +36,6 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils/compatibility"
 	"github.com/cloudnative-pg/machinery/pkg/log"
-	"github.com/cloudnative-pg/machinery/pkg/postgres/version"
 	"go.uber.org/atomic"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
@@ -999,7 +998,7 @@ func (instance *Instance) removePgControlFileBackup() error {
 
 // Rewind uses pg_rewind to align this data directory with the contents of the primary node.
 // If postgres major version is >= 13, add "--restore-target-wal" option
-func (instance *Instance) Rewind(ctx context.Context, postgresVersion version.Data) error {
+func (instance *Instance) Rewind(ctx context.Context, postgresVersion semver.Version) error {
 	contextLogger := log.FromContext(ctx)
 
 	// Signal the liveness probe that we are running pg_rewind before starting postgres
@@ -1019,7 +1018,12 @@ func (instance *Instance) Rewind(ctx context.Context, postgresVersion version.Da
 
 	// As PostgreSQL 13 introduces support of restore from the WAL archive in pg_rewind,
 	// let’s automatically use it, if possible
-	if postgresVersion.Major() >= 13 {
+	if postgresVersion.Major >= 13 {
+		// make sure restore_command is set in override.conf
+		if _, err := configurePostgresOverrideConfFile(instance.PgData, primaryConnInfo, ""); err != nil {
+			return err
+		}
+
 		options = append(options, "--restore-target-wal")
 	}
 
