@@ -33,6 +33,7 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/controller"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/archiver"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
 	postgresSpec "github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 )
@@ -237,7 +238,7 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(ctx context.Context
 			return err
 		}
 
-		pgVersion, err := cluster.GetPostgresqlVersion()
+		pgVersion, err := utils.GetPgdataVersion(r.instance.PgData)
 		if err != nil {
 			return err
 		}
@@ -262,12 +263,6 @@ func (r *InstanceReconciler) verifyPgDataCoherenceForPrimary(ctx context.Context
 			return fmt.Errorf("while ensuring all WAL files are archived: %w", err)
 		}
 
-		// pg_rewind could require a clean shutdown of the old primary to
-		// work. Unfortunately, if the old primary is already clean starting
-		// it up may make it advance in respect to the new one.
-		// The only way to check if we really need to start it up before
-		// invoking pg_rewind is to try using pg_rewind and, on failures,
-		// retrying after having started up the instance.
 		err = r.instance.Rewind(ctx, pgVersion)
 		if err != nil {
 			contextLogger.Info(
