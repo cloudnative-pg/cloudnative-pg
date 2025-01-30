@@ -228,10 +228,10 @@ func configureStreamingReplicaUser(tx *sql.Tx) (bool, error) {
 }
 
 // configurePgRewindPrivileges ensures that the StreamingReplicationUser has enough rights to execute pg_rewind
-func configurePgRewindPrivileges(majorVersion semver.Version, hasSuperuser bool, tx *sql.Tx) error {
+func configurePgRewindPrivileges(pgVersion semver.Version, hasSuperuser bool, tx *sql.Tx) error {
 	// We need the superuser bit for the streaming-replication user since pg_rewind in PostgreSQL <= 10
 	// will require it.
-	if majorVersion.Major <= 10 {
+	if pgVersion.Major <= 10 {
 		if !hasSuperuser {
 			_, err := tx.Exec(fmt.Sprintf(
 				"ALTER USER %v SUPERUSER",

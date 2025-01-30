@@ -67,12 +67,12 @@ func (instance *Instance) RefreshConfigurationFilesFromCluster(
 	cluster *apiv1.Cluster,
 	preserveUserSettings bool,
 ) (bool, error) {
-	majorVersion, err := postgresutils.GetPgdataVersion(instance.PgData)
+	pgVersion, err := postgresutils.GetPgdataVersion(instance.PgData)
 	if err != nil {
 		return false, err
 	}
 
-	postgresConfiguration, sha256 := createPostgresqlConfiguration(cluster, preserveUserSettings, majorVersion.Major)
+	postgresConfiguration, sha256 := createPostgresqlConfiguration(cluster, preserveUserSettings, pgVersion.Major)
 	postgresConfigurationChanged, err := InstallPgDataFileContent(
 		ctx,
 		instance.PgData,
