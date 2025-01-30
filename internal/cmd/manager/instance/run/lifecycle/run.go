@@ -150,7 +150,7 @@ func configureInstancePermissions(ctx context.Context, instance *postgres.Instan
 		return nil
 	}
 
-	majorVersion, err := postgresutils.GetPgdataVersion(instance.PgData)
+	pgVersion, err := postgresutils.GetPgdataVersion(instance.PgData)
 	if err != nil {
 		return fmt.Errorf("while getting major version: %w", err)
 	}
@@ -180,7 +180,7 @@ func configureInstancePermissions(ctx context.Context, instance *postgres.Instan
 		return err
 	}
 
-	err = configurePgRewindPrivileges(majorVersion, hasSuperuser, tx)
+	err = configurePgRewindPrivileges(pgVersion, hasSuperuser, tx)
 	if err != nil {
 		_ = tx.Rollback()
 		return err
