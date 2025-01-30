@@ -20,10 +20,13 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/cloudnative-pg/machinery/pkg/image/reference"
+	"github.com/cloudnative-pg/machinery/pkg/postgres/version"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -114,6 +117,9 @@ var _ = Describe("testing the building of the ldap config string", func() {
 })
 
 var _ = Describe("Test building of the list of temporary tablespaces", func() {
+	defaultVersion, err := version.FromTag(reference.New(versions.DefaultImageName).Tag)
+	Expect(err).ToNot(HaveOccurred())
+
 	clusterWithoutTablespaces := apiv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "configurationTest",
@@ -164,20 +170,17 @@ var _ = Describe("Test building of the list of temporary tablespaces", func() {
 	}
 
 	It("doesn't set temp_tablespaces if there are no declared tablespaces", func() {
-		config, _, err := createPostgresqlConfiguration(&clusterWithoutTablespaces, true)
-		Expect(err).ShouldNot(HaveOccurred())
+		config, _ := createPostgresqlConfiguration(&clusterWithoutTablespaces, true, defaultVersion.Major())
 		Expect(config).ToNot(ContainSubstring("temp_tablespaces"))
 	})
 
 	It("doesn't set temp_tablespaces if there are no temporary tablespaces", func() {
-		config, _, err := createPostgresqlConfiguration(&clusterWithoutTemporaryTablespaces, true)
-		Expect(err).ShouldNot(HaveOccurred())
+		config, _ := createPostgresqlConfiguration(&clusterWithoutTemporaryTablespaces, true, defaultVersion.Major())
 		Expect(config).ToNot(ContainSubstring("temp_tablespaces"))
 	})
 
 	It("sets temp_tablespaces when there are temporary tablespaces", func() {
-		config, _, err := createPostgresqlConfiguration(&clusterWithTemporaryTablespaces, true)
-		Expect(err).ShouldNot(HaveOccurred())
+		config, _ := createPostgresqlConfiguration(&clusterWithTemporaryTablespaces, true, defaultVersion.Major())
 		Expect(config).To(ContainSubstring("temp_tablespaces = 'other_temporary_tablespace,temporary_tablespace'"))
 	})
 })

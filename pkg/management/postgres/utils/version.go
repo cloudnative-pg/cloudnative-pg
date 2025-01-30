@@ -38,25 +38,30 @@ func GetPgVersion(db *sql.DB) (*semver.Version, error) {
 }
 
 func parseVersionNum(versionNum string) (*semver.Version, error) {
-	versionInt, err := strconv.Atoi(versionNum)
+	versionInt, err := strconv.ParseUint(versionNum, 10, 64)
 	if err != nil {
 		return nil, err
 	}
 
 	return &semver.Version{
-		Major: uint64(versionInt / 10000),       //nolint:gosec
-		Minor: uint64((versionInt / 100) % 100), //nolint:gosec
-		Patch: uint64(versionInt % 100),         //nolint:gosec
+		Major: versionInt / 10000,
+		Minor: (versionInt / 100) % 100,
+		Patch: versionInt % 100,
 	}, nil
 }
 
-// GetMajorVersion read the PG_VERSION file in the data directory
+// GetPgdataVersion read the PG_VERSION file in the data directory
 // returning the major version of the database
-func GetMajorVersion(pgData string) (int, error) {
+func GetPgdataVersion(pgData string) (semver.Version, error) {
 	content, err := os.ReadFile(path.Join(pgData, "PG_VERSION")) // #nosec
 	if err != nil {
-		return 0, err
+		return semver.Version{}, err
 	}
 
-	return strconv.Atoi(strings.TrimSpace(string(content)))
+	major, err := strconv.ParseUint(strings.TrimSpace(string(content)), 10, 64)
+	if err != nil {
+		return semver.Version{}, err
+	}
+
+	return semver.Version{Major: major}, nil
 }
