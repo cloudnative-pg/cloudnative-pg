@@ -19,7 +19,6 @@ package configparser
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"os"
 )
 
 // FakeData is an example of the configuration structure
@@ -58,11 +57,6 @@ func (config *FakeData) readConfigMap(data map[string]string) {
 }
 
 var _ = Describe("Data test suite", func() {
-	BeforeEach(func() {
-		Expect(os.Unsetenv("WATCH_NAMESPACE")).ToNot(HaveOccurred())
-		Expect(os.Unsetenv("INHERITED_ANNOTATIONS")).ToNot(HaveOccurred())
-		Expect(os.Unsetenv("INHERITED_LABELS")).ToNot(HaveOccurred())
-	})
 	It("correctly splits and trims lists", func() {
 		list := splitAndTrim("string, with space , inside\t")
 		Expect(list).To(Equal([]string{"string", "with space", "inside"}))
@@ -70,6 +64,9 @@ var _ = Describe("Data test suite", func() {
 
 	It("loads values from a map", func() {
 		config := &FakeData{}
+		GinkgoT().Setenv("WATCH_NAMESPACE", "")
+		GinkgoT().Setenv("INHERITED_ANNOTATIONS", "")
+		GinkgoT().Setenv("INHERITED_LABELS", "")
 		config.readConfigMap(map[string]string{
 			"WATCH_NAMESPACE":       oneNamespace,
 			"INHERITED_ANNOTATIONS": "one, two",
@@ -82,10 +79,10 @@ var _ = Describe("Data test suite", func() {
 
 	It("loads values from environment", func() {
 		config := &FakeData{}
-		Expect(os.Setenv("WATCH_NAMESPACE", oneNamespace)).ToNot(HaveOccurred())
-		Expect(os.Setenv("INHERITED_ANNOTATIONS", "one, two")).ToNot(HaveOccurred())
-		Expect(os.Setenv("INHERITED_LABELS", "alpha, beta")).ToNot(HaveOccurred())
-		Expect(os.Setenv("EXPIRING_CHECK_THRESHOLD", "2")).ToNot(HaveOccurred())
+		GinkgoT().Setenv("WATCH_NAMESPACE", oneNamespace)
+		GinkgoT().Setenv("INHERITED_ANNOTATIONS", "one, two")
+		GinkgoT().Setenv("INHERITED_LABELS", "alpha, beta")
+		GinkgoT().Setenv("EXPIRING_CHECK_THRESHOLD", "2")
 		config.readConfigMap(nil)
 		Expect(config.WatchNamespace).To(Equal(oneNamespace))
 		Expect(config.InheritedAnnotations).To(Equal([]string{"one", "two"}))
@@ -98,10 +95,8 @@ var _ = Describe("Data test suite", func() {
 			CertificateDuration:    90,
 			ExpiringCheckThreshold: 7,
 		}
-
-		Expect(os.Setenv("EXPIRING_CHECK_THRESHOLD", "3600min")).ToNot(HaveOccurred())
-		Expect(os.Setenv("CERTIFICATE_DURATION", "unknown")).ToNot(HaveOccurred())
-
+		GinkgoT().Setenv("EXPIRING_CHECK_THRESHOLD", "3600min")
+		GinkgoT().Setenv("CERTIFICATE_DURATION", "unknown")
 		defaultData := &FakeData{
 			CertificateDuration:    90,
 			ExpiringCheckThreshold: 7,
@@ -112,6 +107,8 @@ var _ = Describe("Data test suite", func() {
 	})
 
 	It("handles correctly default values of slices", func() {
+		GinkgoT().Setenv("INHERITED_ANNOTATIONS", "")
+		GinkgoT().Setenv("INHERITED_LABELS", "")
 		config := &FakeData{}
 		config.readConfigMap(nil)
 		Expect(config.InheritedAnnotations).To(Equal(defaultInheritedAnnotations))
