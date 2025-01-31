@@ -115,63 +115,78 @@ func NewRemoteWebServer(
 }
 
 func (ws *remoteWebserverEndpoints) isServerHealthy(w http.ResponseWriter, _ *http.Request) {
+	log.Trace("isServerHealthy: entry")
+
+	defer log.Trace("isServerHealthy: deferred exit")
+
 	// If `pg_rewind` is running the Pod is starting up.
 	// We need to report it healthy to avoid being killed by the kubelet.
 	// Same goes for instances with fencing on.
 	if ws.instance.PgRewindIsRunning || ws.instance.MightBeUnavailable() {
-		log.Trace("Liveness probe skipped")
-		_, _ = fmt.Fprint(w, "Skipped")
+		log.Trace("isServerHealthy: Liveness probe skipped")
+		sendTextResponse(w, http.StatusOK, "Skipped")
 		return
 	}
 
 	err := ws.instance.IsServerHealthy()
 	if err != nil {
-		log.Debug("Liveness probe failing", "err", err.Error())
+		log.Debug("isServerHealthy: Liveness probe failing", "err", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	log.Trace("Liveness probe succeeding")
-	_, _ = fmt.Fprint(w, "OK")
+	log.Trace("isServerHealthy: Liveness probe succeeding")
+	sendTextResponse(w, http.StatusOK, "OK")
+	log.Trace("isServerHealthy: exit")
 }
 
 // This is the readiness probe
 func (ws *remoteWebserverEndpoints) isServerReady(w http.ResponseWriter, r *http.Request) {
+	log.Trace("isServerReady: entry")
+
+	defer log.Trace("isServerReady: deferred exit")
+
 	if err := ws.readinessChecker.IsServerReady(r.Context()); err != nil {
-		log.Debug("Readiness probe failing", "err", err.Error())
+		log.Debug("isServerReady: Readiness probe failing", "err", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	log.Trace("Readiness probe succeeding")
-	_, _ = fmt.Fprint(w, "OK")
+	log.Trace("isServerReady: Readiness probe succeeding")
+	sendTextResponse(w, http.StatusOK, "OK")
+	log.Trace("isServerReady: exit")
 }
 
 // This probe is for the instance status, including replication
 func (ws *remoteWebserverEndpoints) pgStatus(w http.ResponseWriter, _ *http.Request) {
+	defer log.Trace("pgStatus: deferred exit")
+
+	log.Trace("pgStatus: entry")
+
 	// Extract the status of the current instance
 	status, err := ws.instance.GetStatus()
 	if err != nil {
 		log.Debug(
-			"Instance status probe failing",
+			"pgStatus: Instance status probe failing",
 			"err", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	// Marshal the status back to the operator
-	log.Trace("Instance status probe succeeding")
+	log.Trace("pgStatus: marshalling status")
 	js, err := json.Marshal(status)
 	if err != nil {
 		log.Warning(
-			"Internal error marshalling instance status",
+			"pgStatus: Internal error marshalling instance status",
 			"err", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	log.Trace("pgStatus: marshalling complete")
 
-	w.Header().Set("Content-Type", "application/json")
-	_, _ = w.Write(js)
+	sendJSONResponseWithData(w, http.StatusOK, js)
+	log.Trace("pgStatus: exit")
 }
 
 func (ws *remoteWebserverEndpoints) pgControlData(w http.ResponseWriter, _ *http.Request) {
@@ -197,8 +212,7 @@ func (ws *remoteWebserverEndpoints) pgControlData(w http.ResponseWriter, _ *http
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_, _ = w.Write(res)
+	sendJSONResponseWithData(w, http.StatusOK, res)
 }
 
 // updateInstanceManager replace the instance with one in the
@@ -232,7 +246,7 @@ func (ws *remoteWebserverEndpoints) updateInstanceManager(
 		// Unfortunately this point, if everything is right, will not be reached.
 		// At this stage we are running the new version of the instance manager
 		// and not the old one.
-		_, _ = fmt.Fprint(w, "OK")
+		sendTextResponse(w, http.StatusOK, "OK")
 	}
 }
 

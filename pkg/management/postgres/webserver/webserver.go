@@ -118,14 +118,42 @@ func (ws *Webserver) Start(ctx context.Context) error {
 	return nil
 }
 
-// sendJSONResponse sends a generic JSON response.
-func sendJSONResponse[T any](w http.ResponseWriter, statusCode int, data Response[T]) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(statusCode)
+// sendTextResponse sends a generic text response
+//
+//nolint:unparam
+func sendTextResponse(w http.ResponseWriter, statusCode int, message string) {
+	log.Trace("sendTextResponse: entered")
 
-	if err := json.NewEncoder(w).Encode(data); err != nil {
+	defer log.Trace("sendTextResponse: deferred exit")
+
+	w.Header().Set("Content-Type", "text/plain")
+	w.WriteHeader(statusCode)
+	log.Trace("sendTextResponse: response headers set", "status", statusCode)
+
+	if _, err := fmt.Fprint(w, message); err != nil {
+		log.Trace("sendTextResponse: Failed to write text response", "error", err, "response", message)
 		http.Error(w, "Failed to write response", http.StatusInternalServerError)
 	}
+
+	log.Trace("sendTextResponse: exit", "status", statusCode)
+}
+
+// sendJSONResponse sends a generic JSON response.
+func sendJSONResponse[T any](w http.ResponseWriter, statusCode int, data Response[T]) {
+	log.Trace("sendJSONResponse: entered")
+
+	defer log.Trace("sendJSONResponse: deferred exit")
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+	log.Trace("sendJSONResponse: response headers set", "status", statusCode)
+
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		log.Trace("sendJSONResponse: Failed to write JSON response", "error", err, "response", data)
+		http.Error(w, "Failed to write response", http.StatusInternalServerError)
+	}
+
+	log.Trace("sendJSONResponse: exit", "status", statusCode)
 }
 
 func sendBadRequestJSONResponse(w http.ResponseWriter, errorCode string, message string) {
