@@ -165,9 +165,9 @@ These predefined annotations are managed by CloudNativePG.
 
     When set to JSON-patch formatted patch, the patch will be applied on the instance Pods.
 
-    **IMPORTANT**: when this feature is used, CNPG cannot guarantee the congruency
-    of the generated Pods with Kubernetes and with the CNPG operator. Please use this
-    feature with the greatest care and only as a last resort.
+    **⚠️ WARNING:** This feature may introduce discrepancies between the
+    operator’s expectations and Kubernetes behavior. Use with caution and only as a
+    last resort.
 
     **IMPORTANT**: adding or changing this annotation won't trigger a rolling deployment
     of the generated Pods. The latter can be triggered manually by the user with
