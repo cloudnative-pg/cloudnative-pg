@@ -80,6 +80,8 @@ spec:
     size: 1Gi
 ```
 
+## shared_buffers
+
 In the above example, we have specified `shared_buffers` parameter with a value of `256MB` - i.e., how much memory is
 dedicated to the PostgreSQL server for caching data (the default value for this parameter is `128MB` in case
 it's not defined).
@@ -88,6 +90,23 @@ A reasonable starting value for `shared_buffers` is 25% of the memory in your sy
 For example: if your `shared_buffers` is 256 MB, then the recommended value for your container memory size is 1 GB,
 which means that within a pod all the containers will have a total of 1 GB memory that Kubernetes will always preserve,
 enabling our containers to work as expected.
+
+You must provide the unit in the YAML configuration in order to correctly
+set `shared_buffers` parameter, otherwise an error message will be printed. For example : 
+
+```yaml
+  postgresql:
+    parameters:
+      shared_buffers: "256"
+``` 
+will be rejected, but this on will be accepted :
+
+```yaml
+  postgresql:
+    parameters:
+      shared_buffers: "256MB"
+``` 
+
 For more details, please refer to the ["Resource Consumption"](https://www.postgresql.org/docs/current/runtime-config-resource.html)
 section in the PostgreSQL documentation.
 

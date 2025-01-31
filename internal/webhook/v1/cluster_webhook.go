@@ -864,7 +864,7 @@ func (v *ClusterCustomValidator) validateResources(r *apiv1.Cluster) field.Error
 	memoryRequest := r.Spec.Resources.Requests.Memory()
 	rawSharedBuffer := r.Spec.PostgresConfiguration.Parameters[sharedBuffersParameter]
 	if !memoryRequest.IsZero() && rawSharedBuffer != "" {
-		if sharedBuffers, err := parsePostgresQuantityValue(rawSharedBuffer, 8); err == nil {
+		if sharedBuffers, err := parsePostgresQuantityValue(rawSharedBuffer); err == nil {
 			if memoryRequest.Cmp(sharedBuffers) < 0 {
 				result = append(result, field.Invalid(
 					field.NewPath("spec", "resources", "requests", "memory"),
@@ -1013,7 +1013,7 @@ func (v *ClusterCustomValidator) validateConfiguration(r *apiv1.Cluster) field.E
 	}
 
 	if value := r.Spec.PostgresConfiguration.Parameters[sharedBuffersParameter]; value != "" {
-		if _, err := parsePostgresQuantityValue(value, 8); err != nil {
+		if _, err := parsePostgresQuantityValue(value); err != nil {
 			result = append(
 				result,
 				field.Invalid(
@@ -1021,7 +1021,7 @@ func (v *ClusterCustomValidator) validateConfiguration(r *apiv1.Cluster) field.E
 					sharedBuffersParameter,
 					fmt.Sprintf(
 						"Invalid value for configuration parameter %s. More info on accepted values format: "+
-							"https://www.postgresql.org/docs/current/config-setting.html#CONFIG-SETTING-NAMES-VALUES",
+							"https://cloudnative-pg.io/documentation/current/resource_management/",
 						sharedBuffersParameter,
 					)))
 		}
@@ -1079,7 +1079,7 @@ func validateWalSizeConfiguration(
 		minWalSize = minWalSizeDefault
 		hasMinWalSize = false
 	}
-	minWalSizeValue, err := parsePostgresQuantityValue(minWalSize, 1024)
+	minWalSizeValue, err := parsePostgresQuantityValue(minWalSize)
 	if err != nil {
 		result = append(
 			result,
@@ -1094,7 +1094,7 @@ func validateWalSizeConfiguration(
 		maxWalSize = maxWalSizeDefault
 		hasMaxWalSize = false
 	}
-	maxWalSizeValue, err := parsePostgresQuantityValue(maxWalSize, 1024)
+	maxWalSizeValue, err := parsePostgresQuantityValue(maxWalSize)
 	if err != nil {
 		result = append(
 			result,
@@ -1149,13 +1149,7 @@ func validateWalSizeConfiguration(
 // parsePostgresQuantityValue converts the  sizes in the PostgreSQL configuration
 // into kubernetes resource.Quantity values
 // Ref: Numeric with Unit @ https://www.postgresql.org/docs/current/config-setting.html#CONFIG-SETTING-NAMES-VALUES
-// unit argument must be in kB
-func parsePostgresQuantityValue(value string, unit int) (resource.Quantity, error) {
-	// If no suffix, use the given unit argument (kB)
-	if size, err := strconv.Atoi(value); err == nil {
-		size *= unit
-		value = strconv.Itoa(size) + "kB"
-	}
+func parsePostgresQuantityValue(value string) (resource.Quantity, error) {
 
 	// If there is a suffix it must be "B"
 	if value[len(value)-1:] != "B" {
@@ -1165,14 +1159,20 @@ func parsePostgresQuantityValue(value string, unit int) (resource.Quantity, erro
 	// Kubernetes uses Mi rather than MB, Gi rather than GB. Drop the "B"
 	value = strings.TrimSuffix(value, "B")
 
+	// If it a bare number, it's rejected
+	if _, err := strconv.Atoi(value); err == nil {
+
+		return resource.Quantity{}, resource.ErrFormatWrong
+	}
+
 	// Spaces are allowed in postgres between number and unit in Postgres, but not in Kubernetes
 	value = strings.ReplaceAll(value, " ", "")
 
-	// Add the 'i' suffix unless it is a bare number (it was 'B' before)
+	// Add the 'i' suffix unless
 	if _, err := strconv.Atoi(value); err != nil {
 		value += "i"
 
-		// 'kB' must translate to 'Ki'
+		// 'ki' must translate to 'Ki'
 		value = strings.ReplaceAll(value, "ki", "Ki")
 	}
 
