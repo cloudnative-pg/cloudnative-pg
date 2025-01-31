@@ -67,6 +67,8 @@ func NewLocalWebServer(
 		Handler:           serveMux,
 		ReadHeaderTimeout: DefaultReadTimeout,
 		ReadTimeout:       DefaultReadTimeout,
+		WriteTimeout:      DefaultWriteTimeout,
+		IdleTimeout:       DefaultIdleTimeout,
 	}
 
 	webserver := NewWebServer(server)

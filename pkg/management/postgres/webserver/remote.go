@@ -100,6 +100,8 @@ func NewRemoteWebServer(
 		Handler:           serveMux,
 		ReadTimeout:       DefaultReadTimeout,
 		ReadHeaderTimeout: DefaultReadHeaderTimeout,
+		WriteTimeout:      DefaultWriteTimeout,
+		IdleTimeout:       DefaultIdleTimeout,
 	}
 
 	if instance.StatusPortTLS {
@@ -115,6 +117,11 @@ func NewRemoteWebServer(
 }
 
 func (ws *remoteWebserverEndpoints) isServerHealthy(w http.ResponseWriter, _ *http.Request) {
+	// Debugging the hanging endpoints:
+	// --------------------------------
+	// If the number of :deferred exit logs don't match the number of :entry logs, something is wrong
+	// This function exits-early; so no :exit log is expected in some cases
+
 	log.Trace("isServerHealthy: entry")
 
 	defer log.Trace("isServerHealthy: deferred exit")
@@ -142,6 +149,11 @@ func (ws *remoteWebserverEndpoints) isServerHealthy(w http.ResponseWriter, _ *ht
 
 // This is the readiness probe
 func (ws *remoteWebserverEndpoints) isServerReady(w http.ResponseWriter, r *http.Request) {
+	// Debugging the hanging endpoints:
+	// --------------------------------
+	// If the number of :deferred exit logs don't match the number of :entry logs, something is wrong
+	// This function exits-early; so no :exit log is expected in some cases
+
 	log.Trace("isServerReady: entry")
 
 	defer log.Trace("isServerReady: deferred exit")
@@ -159,6 +171,11 @@ func (ws *remoteWebserverEndpoints) isServerReady(w http.ResponseWriter, r *http
 
 // This probe is for the instance status, including replication
 func (ws *remoteWebserverEndpoints) pgStatus(w http.ResponseWriter, _ *http.Request) {
+	// Debugging the hanging endpoints:
+	// --------------------------------
+	// If the number of :exit logs don't match the number of :entry logs, something is wrong
+	// If the number of :exit logs don't match the number of :deferred exit logs, something is wrong
+
 	defer log.Trace("pgStatus: deferred exit")
 
 	log.Trace("pgStatus: entry")

@@ -32,6 +32,10 @@ const (
 	DefaultReadTimeout = 20 * time.Second
 	// DefaultReadHeaderTimeout is the default value to be used by the webservers
 	DefaultReadHeaderTimeout = 3 * time.Second
+	// DefaultWriteTimeout is the default value to be used by the webservers
+	DefaultWriteTimeout = 60 * time.Second
+	// DefaultIdleTimeout is the default value to be used by the webservers
+	DefaultIdleTimeout = 120 * time.Second
 )
 
 // Error an error response from http webserver
@@ -122,7 +126,12 @@ func (ws *Webserver) Start(ctx context.Context) error {
 //
 //nolint:unparam
 func sendTextResponse(w http.ResponseWriter, statusCode int, message string) {
-	log.Trace("sendTextResponse: entered")
+	// Debugging the hanging endpoints:
+	// --------------------------------
+	// If the number of :exit logs don't match the number of :entry logs, something is wrong
+	// If the number of :exit logs don't match the number of :deferred exit logs, something is wrong
+
+	log.Trace("sendTextResponse: entry")
 
 	defer log.Trace("sendTextResponse: deferred exit")
 
@@ -140,7 +149,11 @@ func sendTextResponse(w http.ResponseWriter, statusCode int, message string) {
 
 // sendJSONResponse sends a generic JSON response.
 func sendJSONResponse[T any](w http.ResponseWriter, statusCode int, data Response[T]) {
-	log.Trace("sendJSONResponse: entered")
+	// Debugging the hanging endpoints:
+	// --------------------------------
+	// If the number of :exit logs don't match the number of :entry logs, something is wrong
+	// If the number of :exit logs don't match the number of :deferred exit logs, something is wrong
+	log.Trace("sendJSONResponse: entry")
 
 	defer log.Trace("sendJSONResponse: deferred exit")
 
