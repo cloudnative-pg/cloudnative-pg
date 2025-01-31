@@ -45,6 +45,99 @@ const InstanceManagerPath = "/controller/manager"
 // which has not the correct hash
 var ErrorInvalidInstanceManagerBinary = errors.New("invalid instance manager binary")
 
+// FromLocalBinary performs an in-place upgrade of the instance manager using
+// an existing binary from the local filesystem
+func FromLocalBinary(
+	cancelFunc context.CancelFunc,
+	exitedCondition concurrency.MultipleExecuted,
+	typedClient client.Client,
+	instance *postgres.Instance,
+	sourcePath string,
+) error {
+	// Create a temporary file to host the new instance manager binary
+	updatedInstanceManager, err := os.CreateTemp(UploadFolder, "manager_*.new")
+	if err != nil {
+		return fmt.Errorf(
+			"while creating a temporary file to host the new version of the instance manager: %w", err)
+	}
+	defer func() {
+		// This code is executed only if the instance manager has not been updated, and
+		// this is the only condition we have a temporary file to remove
+		removeError := os.Remove(updatedInstanceManager.Name())
+		if removeError != nil {
+			log.Warning("Error while removing temporary instance manager upload file",
+				"name", updatedInstanceManager.Name(), "err", err)
+		}
+	}()
+
+	// Open the source binary file
+	sourceFile, err := os.Open(sourcePath)
+	if err != nil {
+		return fmt.Errorf("while opening source binary file: %w", err)
+	}
+	defer func(sourceFile *os.File) {
+		err := sourceFile.Close()
+		if err != nil {
+			log.Warning("Error while closing source binary file", "err", err)
+		}
+	}(sourceFile)
+
+	// Gather the status of the instance
+	instanceStatus, err := instance.GetStatus()
+	if err != nil {
+		return fmt.Errorf("while retrieving instance's status: %w", err)
+	}
+
+	// Read and validate the binary
+	newHash, err := downloadAndCloseInstanceManagerBinary(updatedInstanceManager, sourceFile)
+	if err != nil {
+		return fmt.Errorf("while reading new instance manager binary: %w", err)
+	}
+
+	// Validate the hash of this instance manager
+	if err := validateInstanceManagerHash(typedClient,
+		instance.GetClusterName(), instance.GetNamespaceName(),
+		instanceStatus.InstanceArch, newHash); err != nil {
+		return fmt.Errorf("while validating instance manager binary: %w", err)
+	}
+
+	log.Info("Using local version of the instance manager",
+		"hashCode", newHash,
+		"temporaryName", updatedInstanceManager.Name(),
+		"sourcePath", sourcePath)
+
+	// Grant the executable bit to the new file
+	err = os.Chmod(updatedInstanceManager.Name(), 0o755) // #nosec
+	if err != nil {
+		return fmt.Errorf("while granting the executable bit to the instance manager binary: %w", err)
+	}
+
+	// Replace the new instance manager with the new one
+	if err := os.Rename(updatedInstanceManager.Name(), InstanceManagerPath); err != nil {
+		return fmt.Errorf("while replacing instance manager binary: %w", err)
+	}
+
+	// We are ready to reload the instance manager
+	// First we are going to cancel the context, this will trigger the shutdown of all
+	// the Runnables handled by the manager.
+	// Only the postgres process will not be actually killed, as the postgres lifecycle
+	// manager will not kill it if InstanceManagerIsUpgrading is set to true.
+	cancelFunc()
+	log.Info("Waiting for log goroutines to exit before proceeding")
+
+	// We have to wait for all the necessary component to exit gracefully first
+	exitedCondition.Wait()
+	log.Info("All log goroutines exited, will reload the instance manager")
+
+	// Now we are actually ready to reload the instance manager
+	err = reloadInstanceManager()
+	if err != nil {
+		return fmt.Errorf("while replacing instance manager process: %w", err)
+	}
+
+	return nil
+}
+
 // FromReader updates in place the binary of the instance manager, replacing itself
 // with a new version with the new binary
 func FromReader(

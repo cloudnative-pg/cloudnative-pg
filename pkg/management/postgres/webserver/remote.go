@@ -94,14 +94,13 @@ func NewRemoteWebServer(
 	serveMux.HandleFunc(url.PathPgArchivePartial, endpoints.pgArchivePartial)
 	serveMux.HandleFunc(url.PathPGControlData, endpoints.pgControlData)
 	serveMux.HandleFunc(url.PathUpdate, endpoints.updateInstanceManager(cancelFunc, exitedConditions))
+	serveMux.HandleFunc(url.PathRestart, endpoints.restartInstanceManager(cancelFunc, exitedConditions))
 
 	server := &http.Server{
 		Addr:              fmt.Sprintf(":%d", url.StatusPort),
 		Handler:           serveMux,
 		ReadTimeout:       DefaultReadTimeout,
 		ReadHeaderTimeout: DefaultReadHeaderTimeout,
-		WriteTimeout:      DefaultWriteTimeout,
-		IdleTimeout:       DefaultIdleTimeout,
 	}
 
 	if instance.StatusPortTLS {
@@ -263,6 +262,49 @@ func (ws *remoteWebserverEndpoints) updateInstanceManager(
 		// Unfortunately this point, if everything is right, will not be reached.
 		// At this stage we are running the new version of the instance manager
 		// and not the old one.
+		sendTextResponse(w, http.StatusOK, "OK")
+	}
+}
+
+// restartInstanceManager replace the instance with a copy of itself
+func (ws *remoteWebserverEndpoints) restartInstanceManager(
+	cancelFunc context.CancelFunc,
+	exitedCondition concurrency.MultipleExecuted,
+) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		defer log.Trace("restartInstanceManager: deferred exit")
+
+		log.Trace("restartInstanceManager: entry")
+		// No need to handle this request if it is not a put
+		if r.Method != http.MethodPut {
+			http.Error(w, "wrong method used", http.StatusMethodNotAllowed)
+			return
+		}
+
+		// No need to do anything if we are already upgrading
+		if !ws.instance.InstanceManagerIsUpgrading.CompareAndSwap(false, true) {
+			log.Trace("restartInstanceManager: instance manager is already upgrading")
+			http.Error(w, "instance manager is already upgrading", http.StatusTeapot)
+			return
+		}
+		// If we get here, the InstanceManagerIsUpgrading flag was set and
+		// we will perform the upgrade. Ensure we unset the flag in the end
+		defer ws.instance.InstanceManagerIsUpgrading.Store(false)
+
+		err := upgrade.FromLocalBinary(cancelFunc, exitedCondition, ws.typedClient, ws.instance, "/controller/manager")
+		if err != nil {
+			// The defer above is known not to execute in the upgradeInstanceManager function
+			// so we'll call it explicitly here
+			ws.instance.InstanceManagerIsUpgrading.Store(false)
+			log.Trace("restartInstanceManager: error while upgrading instance manager", "err", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// Unfortunately this point, if everything is right, will not be reached.
+		// At this stage we are running the new version of the instance manager
+		// and not the old one.
+		log.Trace("restartInstanceManager: exit")
 		sendTextResponse(w, http.StatusOK, "OK")
 	}
 }

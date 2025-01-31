@@ -32,10 +32,6 @@ const (
 	DefaultReadTimeout = 20 * time.Second
 	// DefaultReadHeaderTimeout is the default value to be used by the webservers
 	DefaultReadHeaderTimeout = 3 * time.Second
-	// DefaultWriteTimeout is the default value to be used by the webservers
-	DefaultWriteTimeout = 60 * time.Second
-	// DefaultIdleTimeout is the default value to be used by the webservers
-	DefaultIdleTimeout = 120 * time.Second
 )
 
 // Error an error response from http webserver

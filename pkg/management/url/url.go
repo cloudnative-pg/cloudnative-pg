@@ -64,6 +64,9 @@ const (
 	// PathCache is the URL path for cached resources
 	PathCache string = "/cache/"
 
+	// PathRestart is the URL path for restarting the instance manager
+	PathRestart string = "/restart"
+
 	// StatusPort is the port for status HTTP requests
 	StatusPort int32 = 8000
 )
