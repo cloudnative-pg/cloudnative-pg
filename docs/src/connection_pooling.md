@@ -371,7 +371,7 @@ are the ones directly set by PgBouncer.
 - [`server_reset_query_always`](https://www.pgbouncer.org/config.html#server_reset_query_always)
 - [`server_round_robin`](https://www.pgbouncer.org/config.html#server_round_robin)
 - [`server_tls_ciphers`](https://www.pgbouncer.org/config.html#server_tls_ciphers)
-- [`server_tls_server_tls_protocols`](https://www.pgbouncer.org/config.html#server_tls_protocols)
+- [`server_tls_protocols`](https://www.pgbouncer.org/config.html#server_tls_protocols)
 - [`stats_period`](https://www.pgbouncer.org/config.html#stats_period)
 - [`suspend_timeout`](https://www.pgbouncer.org/config.html#suspend_timeout)
 - [`tcp_defer_accept`](https://www.pgbouncer.org/config.html#tcp_defer_accept)
