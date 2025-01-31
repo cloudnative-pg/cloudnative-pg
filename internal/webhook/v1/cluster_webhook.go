@@ -1168,7 +1168,7 @@ func parsePostgresQuantityValue(value string) (resource.Quantity, error) {
 	// Spaces are allowed in postgres between number and unit in Postgres, but not in Kubernetes
 	value = strings.ReplaceAll(value, " ", "")
 
-	// Add the 'i' suffix unless
+	// Add the 'i' suffix
 	if _, err := strconv.Atoi(value); err != nil {
 		value += "i"
 
