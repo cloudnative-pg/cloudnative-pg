@@ -78,7 +78,7 @@ var _ webhook.CustomDefaulter = &ClusterCustomDefaulter{}
 func (d *ClusterCustomDefaulter) Default(_ context.Context, obj runtime.Object) error {
 	cluster, ok := obj.(*apiv1.Cluster)
 	if !ok {
-		return fmt.Errorf("expected an Cluster object but got %T", obj)
+		return fmt.Errorf("expected a Cluster object but got %T", obj)
 	}
 	clusterLog.Info("Defaulting for Cluster", "name", cluster.GetName(), "namespace", cluster.GetNamespace())
 
@@ -113,7 +113,7 @@ func (v *ClusterCustomValidator) ValidateCreate(_ context.Context, obj runtime.O
 		return allWarnings, nil
 	}
 
-	return nil, apierrors.NewInvalid(
+	return allWarnings, apierrors.NewInvalid(
 		schema.GroupKind{Group: "postgresql.cnpg.io", Kind: "Cluster"},
 		cluster.Name, allErrs)
 }
@@ -142,12 +142,13 @@ func (v *ClusterCustomValidator) ValidateUpdate(
 		v.validate(cluster),
 		v.validateClusterChanges(cluster, oldCluster)...,
 	)
+	allWarnings := v.getAdmissionWarnings(cluster)
 
 	if len(allErrs) == 0 {
-		return v.getAdmissionWarnings(cluster), nil
+		return allWarnings, nil
 	}
 
-	return nil, apierrors.NewInvalid(
+	return allWarnings, apierrors.NewInvalid(
 		schema.GroupKind{Group: "cluster.cnpg.io", Kind: "Cluster"},
 		cluster.Name, allErrs)
 }
