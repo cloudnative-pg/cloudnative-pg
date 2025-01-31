@@ -264,6 +264,7 @@ That allows a human administrator to address the root cause.
 
 In such a case, if supported by the storage class, the quickest course of action
 is currently to:
+
 1. Expand the storage size of the full PVC
 2. Increase the size in the `Cluster` resource to the same value
 
