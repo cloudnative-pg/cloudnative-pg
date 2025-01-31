@@ -82,11 +82,11 @@ field, as it is managed by the operator.
 The `updateStrategy` field allows you to control how the operator
 updates a service definition. By default, the operator uses the `patch`
 strategy, applying changes directly to the service.
-Alternatively, the `recreate` strategy deletes the existing service and
+Alternatively, the `replace` strategy deletes the existing service and
 recreates it from the template.
 
 !!! Warning
-    The `recreate` strategy will cause a service disruption with every
+    The `replace` strategy will cause a service disruption with every
     change.  However, it may be necessary for modifying certain
     parameters that can only be set during service creation.
 
