@@ -30,6 +30,7 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/postgres/version"
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	"github.com/cloudnative-pg/machinery/pkg/types"
+	jsonpatch "github.com/evanphx/json-patch/v5"
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -46,6 +47,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -206,6 +208,7 @@ func (v *ClusterCustomValidator) validate(r *apiv1.Cluster) (allErrs field.Error
 		v.validateManagedExtensions,
 		v.validateResources,
 		v.validateHibernationAnnotation,
+		v.validatePodPatchAnnotation,
 		v.validatePromotionToken,
 	}
 
@@ -2349,4 +2352,33 @@ func (v *ClusterCustomValidator) validateHibernationAnnotation(r *apiv1.Cluster)
 			),
 		),
 	}
+}
+
+func (v *ClusterCustomValidator) validatePodPatchAnnotation(r *apiv1.Cluster) field.ErrorList {
+	jsonPatch, ok := r.Annotations[utils.PodPatchAnnotationName]
+	if !ok {
+		return nil
+	}
+
+	if _, err := jsonpatch.DecodePatch([]byte(jsonPatch)); err != nil {
+		return field.ErrorList{
+			field.Invalid(
+				field.NewPath("metadata", "annotations", utils.PodPatchAnnotationName),
+				jsonPatch,
+				fmt.Sprintf("error decoding JSON patch: %s", err.Error()),
+			),
+		}
+	}
+
+	if _, err := specs.PodWithExistingStorage(*r, 1); err != nil {
+		return field.ErrorList{
+			field.Invalid(
+				field.NewPath("metadata", "annotations", utils.PodPatchAnnotationName),
+				jsonPatch,
+				fmt.Sprintf("jsonpatch doesn't apply cleanly to the pod: %s", err.Error()),
+			),
+		}
+	}
+
+	return nil
 }
