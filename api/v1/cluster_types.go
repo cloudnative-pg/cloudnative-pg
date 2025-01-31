@@ -1679,17 +1679,6 @@ type AffinityConfiguration struct {
 	AdditionalPodAffinity *corev1.PodAffinity `json:"additionalPodAffinity,omitempty"`
 }
 
-// RollingUpdateStatus contains the information about an instance which is
-// being updated
-type RollingUpdateStatus struct {
-	// The image which we put into the Pod
-	ImageName string `json:"imageName"`
-
-	// When the update has been started
-	// +optional
-	StartedAt metav1.Time `json:"startedAt,omitempty"`
-}
-
 // BackupTarget describes the preferred targets for a backup
 type BackupTarget string
 
