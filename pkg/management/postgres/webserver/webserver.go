@@ -131,34 +131,35 @@ func sendTextResponse(w http.ResponseWriter, statusCode int, message string) {
 
 	defer log.Trace("sendTextResponse: deferred exit")
 
-	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(statusCode)
+	w.Header().Set("Content-Type", "text/plain")
 	log.Trace("sendTextResponse: response headers set", "status", statusCode)
 
 	if _, err := fmt.Fprint(w, message); err != nil {
 		log.Trace("sendTextResponse: Failed to write text response", "error", err, "response", message)
-		http.Error(w, "Failed to write response", http.StatusInternalServerError)
 	}
 
 	log.Trace("sendTextResponse: exit", "status", statusCode)
 }
 
-// sendJSONResponse sends a generic JSON response.
-func sendJSONResponse[T any](w http.ResponseWriter, statusCode int, data Response[T]) {
-	// Debugging the hanging endpoints:
-	// --------------------------------
-	// If the number of :exit logs don't match the number of :entry logs, something is wrong
-	// If the number of :exit logs don't match the number of :deferred exit logs, something is wrong
-	log.Trace("sendJSONResponse: entry")
+// Helper to handle pre-marshaled JSON bytes specifically
+func RawJSONResponse(js []byte) Response[json.RawMessage] {
+	raw := json.RawMessage(js)
+	return Response[json.RawMessage]{
+		Data: &raw,
+	}
+}
 
+func sendJSONResponse[T any](w http.ResponseWriter, statusCode int, resp Response[T]) {
+	log.Trace("sendJSONResponse: entry")
 	defer log.Trace("sendJSONResponse: deferred exit")
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
 	log.Trace("sendJSONResponse: response headers set", "status", statusCode)
 
-	if err := json.NewEncoder(w).Encode(data); err != nil {
-		log.Trace("sendJSONResponse: Failed to write JSON response", "error", err, "response", data)
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		log.Trace("sendJSONResponse: Failed to write JSON response", "error", err, "response", resp)
 		http.Error(w, "Failed to write response", http.StatusInternalServerError)
 	}
 
