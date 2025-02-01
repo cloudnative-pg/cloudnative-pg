@@ -95,6 +95,7 @@ func NewRemoteWebServer(
 	serveMux.HandleFunc(url.PathPGControlData, endpoints.pgControlData)
 	serveMux.HandleFunc(url.PathUpdate, endpoints.updateInstanceManager(cancelFunc, exitedConditions))
 	serveMux.HandleFunc(url.PathRestart, endpoints.restartInstanceManager(cancelFunc, exitedConditions))
+	serveMux.HandleFunc(url.PathFoo, endpoints.foo)
 
 	server := &http.Server{
 		Addr:              fmt.Sprintf(":%d", url.StatusPort),
@@ -166,6 +167,19 @@ func (ws *remoteWebserverEndpoints) isServerReady(w http.ResponseWriter, r *http
 	log.Trace("isServerReady: Readiness probe succeeding")
 	sendTextResponse(w, http.StatusOK, "OK")
 	log.Trace("isServerReady: exit")
+}
+
+// This is the readiness probe
+func (ws *remoteWebserverEndpoints) foo(w http.ResponseWriter, r *http.Request) {
+	// Debugging the hanging endpoints:
+	// --------------------------------
+	// If the number of :deferred exit logs don't match the number of :entry logs, something is wrong
+	// This function exits-early; so no :exit log is expected in some cases
+
+	log.Trace("foo: entry")
+	defer log.Trace("foo: deferred exit")
+	sendTextResponse(w, http.StatusOK, "Bar")
+	log.Trace("foo: exit")
 }
 
 // This probe is for the instance status, including replication
