@@ -67,9 +67,6 @@ const (
 	// PathRestart is the URL path for restarting the instance manager
 	PathRestart string = "/restart"
 
-	// PathFoo is the URL path for foo
-	PathFoo string = "/foo"
-
 	// StatusPort is the port for status HTTP requests
 	StatusPort int32 = 8000
 )

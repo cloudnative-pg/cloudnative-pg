@@ -95,7 +95,6 @@ func NewRemoteWebServer(
 	serveMux.HandleFunc(url.PathPGControlData, endpoints.pgControlData)
 	serveMux.HandleFunc(url.PathUpdate, endpoints.updateInstanceManager(cancelFunc, exitedConditions))
 	serveMux.HandleFunc(url.PathRestart, endpoints.restartInstanceManager(cancelFunc, exitedConditions))
-	serveMux.HandleFunc(url.PathFoo, endpoints.foo)
 
 	server := &http.Server{
 		Addr:              fmt.Sprintf(":%d", url.StatusPort),
@@ -122,9 +121,9 @@ func (ws *remoteWebserverEndpoints) isServerHealthy(w http.ResponseWriter, _ *ht
 	// If the number of :deferred exit logs don't match the number of :entry logs, something is wrong
 	// This function exits-early; so no :exit log is expected in some cases
 
-	log.Trace("720: isServerHealthy: entry")
+	log.Trace("isServerHealthy: entry")
 
-	defer log.Trace("720: isServerHealthy: deferred exit")
+	defer log.Trace("isServerHealthy: deferred exit")
 
 	// If `pg_rewind` is running the Pod is starting up.
 	// We need to report it healthy to avoid being killed by the kubelet.
@@ -142,9 +141,9 @@ func (ws *remoteWebserverEndpoints) isServerHealthy(w http.ResponseWriter, _ *ht
 		return
 	}
 
-	log.Trace("720: isServerHealthy: Liveness probe succeeding")
+	log.Trace("isServerHealthy: Liveness probe succeeding")
 	_, _ = fmt.Fprint(w, "OK")
-	log.Trace("720: isServerHealthy: exit")
+	log.Trace("isServerHealthy: exit")
 }
 
 // This is the readiness probe
@@ -154,9 +153,9 @@ func (ws *remoteWebserverEndpoints) isServerReady(w http.ResponseWriter, r *http
 	// If the number of :deferred exit logs don't match the number of :entry logs, something is wrong
 	// This function exits-early; so no :exit log is expected in some cases
 
-	log.Trace("720: isServerReady: entry")
+	log.Trace("isServerReady: entry")
 
-	defer log.Trace("720: isServerReady: deferred exit")
+	defer log.Trace("isServerReady: deferred exit")
 
 	if err := ws.readinessChecker.IsServerReady(r.Context()); err != nil {
 		log.Debug("isServerReady: Readiness probe failing", "err", err.Error())
@@ -164,22 +163,14 @@ func (ws *remoteWebserverEndpoints) isServerReady(w http.ResponseWriter, r *http
 		return
 	}
 
-	log.Trace("720: isServerReady: Readiness probe succeeding")
-	_, _ = fmt.Fprint(w, "OK")
-	log.Trace("720: isServerReady: exit")
-}
+	log.Trace("isServerReady: Readiness probe succeeding")
 
-// This is the readiness probe
-func (ws *remoteWebserverEndpoints) foo(w http.ResponseWriter, r *http.Request) {
-	// Debugging the hanging endpoints:
-	// --------------------------------
-	// If the number of :deferred exit logs don't match the number of :entry logs, something is wrong
-	// This function exits-early; so no :exit log is expected in some cases
+	err := writeTextResponse(w, "isServerReady", "OK")
+	if err != nil {
+		log.Warning("isServerReady: failed to write response", "err", err.Error())
+	}
 
-	log.Trace("720: foo: entry")
-	defer log.Trace("720: foo: deferred exit")
-	sendTextResponse(w, http.StatusOK, "Bar")
-	log.Trace("720: foo: exit")
+	log.Trace("isServerReady: exit")
 }
 
 // This probe is for the instance status, including replication
@@ -189,9 +180,9 @@ func (ws *remoteWebserverEndpoints) pgStatus(w http.ResponseWriter, _ *http.Requ
 	// If the number of :exit logs don't match the number of :entry logs, something is wrong
 	// If the number of :exit logs don't match the number of :deferred exit logs, something is wrong
 
-	defer log.Trace("720: pgStatus: deferred exit")
+	defer log.Trace("pgStatus: deferred exit")
 
-	log.Trace("720: pgStatus: entry")
+	log.Trace("pgStatus: entry")
 
 	// Extract the status of the current instance
 	status, err := ws.instance.GetStatus()
@@ -204,7 +195,7 @@ func (ws *remoteWebserverEndpoints) pgStatus(w http.ResponseWriter, _ *http.Requ
 	}
 
 	// Marshal the status back to the operator
-	log.Trace("720: pgStatus: marshalling status")
+	log.Trace("pgStatus: marshalling status")
 	js, err := json.Marshal(status)
 	if err != nil {
 		log.Warning(
@@ -213,12 +204,14 @@ func (ws *remoteWebserverEndpoints) pgStatus(w http.ResponseWriter, _ *http.Requ
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	log.Trace("720: pgStatus: marshalling complete")
+	log.Trace("pgStatus: marshalling complete")
 
-	w.Header().Set("Content-Type", "application/json")
-	_, _ = w.Write(js)
+	if err := writeJSONResponse(w, "pgStatus", js); err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
 
-	log.Trace("720: pgStatus: exit")
+	log.Trace("pgStatus: exit")
 }
 
 func (ws *remoteWebserverEndpoints) pgControlData(w http.ResponseWriter, _ *http.Request) {
@@ -244,8 +237,9 @@ func (ws *remoteWebserverEndpoints) pgControlData(w http.ResponseWriter, _ *http
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_, _ = w.Write(res)
+	if err := writeJSONResponse(w, "pgControlData", res); err != nil {
+		log.Warning("pgControlData: failed to write response", "err", err.Error())
+	}
 }
 
 // updateInstanceManager replace the instance with one in the
@@ -255,8 +249,8 @@ func (ws *remoteWebserverEndpoints) updateInstanceManager(
 	exitedCondition concurrency.MultipleExecuted,
 ) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		defer log.Trace("720: updateInstanceManager: deferred exit")
-		log.Trace("720: updateInstanceManager: entry")
+		defer log.Trace("updateInstanceManager: deferred exit")
+		log.Trace("updateInstanceManager: entry")
 
 		// No need to handle this request if it is not a put
 		if r.Method != http.MethodPut {
@@ -266,18 +260,22 @@ func (ws *remoteWebserverEndpoints) updateInstanceManager(
 
 		// No need to do anything if we are already upgrading
 		if !ws.instance.InstanceManagerIsUpgrading.CompareAndSwap(false, true) {
-			log.Trace("720: updateInstanceManager: instance manager is already upgrading")
+			log.Trace("updateInstanceManager: instance manager is already upgrading")
 			http.Error(w, "instance manager is already upgrading", http.StatusTeapot)
 			return
 		}
 		// If we get here, the InstanceManagerIsUpgrading flag was set and
 		// we will perform the upgrade. Ensure we unset the flag in the end
-		defer ws.instance.InstanceManagerIsUpgrading.Store(false)
+		defer func() {
+			log.Trace("updateInstanceManager: resetting instance manager upgrade flag")
+			ws.instance.InstanceManagerIsUpgrading.Store(false)
+			log.Trace("updateInstanceManager: instance manager upgrade flag reset")
+		}()
 
-		log.Trace("720: updateInstanceManager: upgrading instance manager")
+		log.Trace("updateInstanceManager: upgrading instance manager")
 		err := upgrade.FromReader(cancelFunc, exitedCondition, ws.typedClient, ws.instance, r.Body)
 		if err != nil {
-			log.Trace("720: updateInstanceManager: error while upgrading instance manager", "err", err)
+			log.Trace("updateInstanceManager: error while upgrading instance manager", "err", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -285,7 +283,11 @@ func (ws *remoteWebserverEndpoints) updateInstanceManager(
 		// Unfortunately this point, if everything is right, will not be reached.
 		// At this stage we are running the new version of the instance manager
 		// and not the old one.
-		_, _ = fmt.Fprint(w, "OK")
+		if err := writeTextResponse(w, "updateInstanceManager", "Unreachable OK"); err != nil {
+			log.Trace("updateInstanceManager: failed to write response in unreachable code block", "err", err)
+		}
+
+		log.Trace("updateInstanceManager: exit (unreachable)")
 	}
 }
 
@@ -295,9 +297,9 @@ func (ws *remoteWebserverEndpoints) restartInstanceManager(
 	exitedCondition concurrency.MultipleExecuted,
 ) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		defer log.Trace("720: restartInstanceManager: deferred exit")
+		defer log.Trace("restartInstanceManager: deferred exit")
 
-		log.Trace("720: restartInstanceManager: entry")
+		log.Trace("restartInstanceManager: entry")
 		// No need to handle this request if it is not a put
 		if r.Method != http.MethodPut {
 			http.Error(w, "wrong method used", http.StatusMethodNotAllowed)
@@ -306,21 +308,25 @@ func (ws *remoteWebserverEndpoints) restartInstanceManager(
 
 		// No need to do anything if we are already upgrading
 		if !ws.instance.InstanceManagerIsUpgrading.CompareAndSwap(false, true) {
-			log.Trace("720: restartInstanceManager: instance manager is already upgrading")
+			log.Trace("restartInstanceManager: instance manager is already upgrading")
 			http.Error(w, "instance manager is already upgrading", http.StatusTeapot)
 			return
 		}
 		// If we get here, the InstanceManagerIsUpgrading flag was set and
 		// we will perform the upgrade. Ensure we unset the flag in the end
-		defer ws.instance.InstanceManagerIsUpgrading.Store(false)
+		defer func() {
+			log.Trace("restartInstanceManager: resetting instance manager upgrade flag")
+			ws.instance.InstanceManagerIsUpgrading.Store(false)
+			log.Trace("restartInstanceManager: instance manager upgrade flag reset")
+		}()
 
-		log.Trace("720: restartInstanceManager: upgrading instance manager")
-		err := upgrade.FromLocalBinary(cancelFunc, exitedCondition, ws.typedClient, ws.instance, "/controller/manager")
+		log.Trace("restartInstanceManager: upgrading instance manager")
+		err := upgrade.FromLocalBinary(cancelFunc, exitedCondition, ws.typedClient, ws.instance, upgrade.InstanceManagerPath)
 		if err != nil {
 			// The defer above is known not to execute in the upgradeInstanceManager function
 			// so we'll call it explicitly here
 			ws.instance.InstanceManagerIsUpgrading.Store(false)
-			log.Trace("720: restartInstanceManager: error while upgrading instance manager", "err", err)
+			log.Trace("restartInstanceManager: error while upgrading instance manager", "err", err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -328,19 +334,22 @@ func (ws *remoteWebserverEndpoints) restartInstanceManager(
 		// Unfortunately this point, if everything is right, will not be reached.
 		// At this stage we are running the new version of the instance manager
 		// and not the old one.
-		log.Trace("720: restartInstanceManager: exit")
-		sendTextResponse(w, http.StatusOK, "OK")
+		if err := writeTextResponse(w, "restartInstanceManager", "Unreachable OK"); err != nil {
+			log.Trace("restartInstanceManger: failed to write response in unreachable code block", "err", err)
+		}
+
+		log.Trace("restartInstanceManager: exit (unreachable)")
 	}
 }
 
 // nolint: gocognit
 func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Request) {
-	log.Trace("720: request method", "method", req.Method)
+	log.Trace("request method", "method", req.Method)
 
 	switch req.Method {
 	case http.MethodGet:
 		if ws.currentBackup == nil {
-			sendJSONResponseWithData(w, 200, struct{}{})
+			sendJSONResponseWithData(w, 200, struct{}{}, "backup")
 			return
 		}
 
@@ -354,14 +363,14 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 			}
 		}
 
-		sendJSONResponse(w, 200, res)
+		sendJSONResponse(w, 200, res, "backup")
 		return
 
 	case http.MethodPost:
 		var p StartBackupRequest
 		err := json.NewDecoder(req.Body).Decode(&p)
 		if err != nil {
-			sendBadRequestJSONResponse(w, "FAILED_TO_PARSE_REQUEST", "Failed to parse request body")
+			sendBadRequestJSONResponse(w, "FAILED_TO_PARSE_REQUEST", "Failed to parse request body", "backup")
 			return
 		}
 		defer func() {
@@ -371,7 +380,7 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 		}()
 		if ws.currentBackup != nil {
 			if !p.Force {
-				sendUnprocessableEntityJSONResponse(w, "PROCESS_ALREADY_RUNNING", "")
+				sendUnprocessableEntityJSONResponse(w, "PROCESS_ALREADY_RUNNING", "", "backup")
 				return
 			}
 			if err := ws.currentBackup.closeConnection(p.BackupName); err != nil {
@@ -388,18 +397,18 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 			p.WaitForArchive,
 		)
 		if err != nil {
-			sendUnprocessableEntityJSONResponse(w, "CANNOT_INITIALIZE_CONNECTION", err.Error())
+			sendUnprocessableEntityJSONResponse(w, "CANNOT_INITIALIZE_CONNECTION", err.Error(), "backup")
 			return
 		}
 		go ws.currentBackup.startBackup(context.Background(), p.BackupName)
-		sendJSONResponseWithData(w, 200, struct{}{})
+		sendJSONResponseWithData(w, 200, struct{}{}, "backup")
 		return
 
 	case http.MethodPut:
 		var p StopBackupRequest
 		err := json.NewDecoder(req.Body).Decode(&p)
 		if err != nil {
-			sendBadRequestJSONResponse(w, "FAILED_TO_PARSE_REQUEST", "Failed to parse request body")
+			sendBadRequestJSONResponse(w, "FAILED_TO_PARSE_REQUEST", "Failed to parse request body", "backup")
 			return
 		}
 		defer func() {
@@ -408,24 +417,24 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 			}
 		}()
 		if ws.currentBackup == nil {
-			sendBadRequestJSONResponse(w, "NO_ONGOING_BACKUP", "")
+			sendBadRequestJSONResponse(w, "NO_ONGOING_BACKUP", "", "backup")
 			return
 		}
 
 		if ws.currentBackup.data.BackupName != p.BackupName {
 			sendUnprocessableEntityJSONResponse(w, "NOT_CURRENT_RUNNING_BACKUP",
-				fmt.Sprintf("Phase is: %s", ws.currentBackup.data.Phase))
+				fmt.Sprintf("Phase is: %s", ws.currentBackup.data.Phase), "backup")
 			return
 		}
 
 		if ws.currentBackup.data.Phase == Closing {
-			sendJSONResponseWithData(w, 200, struct{}{})
+			sendJSONResponseWithData(w, 200, struct{}{}, "backup")
 			return
 		}
 
 		if ws.currentBackup.data.Phase != Started {
 			sendUnprocessableEntityJSONResponse(w, "CANNOT_CLOSE_NOT_STARTED",
-				fmt.Sprintf("Phase is: %s", ws.currentBackup.data.Phase))
+				fmt.Sprintf("Phase is: %s", ws.currentBackup.data.Phase), "backup")
 			return
 		}
 
@@ -436,19 +445,19 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 				}
 			}
 
-			sendJSONResponseWithData(w, 200, struct{}{})
+			sendJSONResponseWithData(w, 200, struct{}{}, "backup")
 			return
 		}
 		ws.currentBackup.setPhase(Closing, p.BackupName)
 		go ws.currentBackup.stopBackup(context.Background(), p.BackupName)
-		sendJSONResponseWithData(w, 200, struct{}{})
+		sendJSONResponseWithData(w, 200, struct{}{}, "backup")
 		return
 	}
 }
 
 func (ws *remoteWebserverEndpoints) pgArchivePartial(w http.ResponseWriter, req *http.Request) {
 	if !ws.instance.IsFenced() {
-		sendBadRequestJSONResponse(w, "NOT_FENCED", "")
+		sendBadRequestJSONResponse(w, "NOT_FENCED", "", "pgArchivePartial")
 		return
 	}
 
@@ -459,13 +468,13 @@ func (ws *remoteWebserverEndpoints) pgArchivePartial(w http.ResponseWriter, req 
 			Name:      ws.instance.GetClusterName(),
 		},
 		&cluster); err != nil {
-		sendBadRequestJSONResponse(w, "NO_CLUSTER_FOUND", err.Error())
+		sendBadRequestJSONResponse(w, "NO_CLUSTER_FOUND", err.Error(), "pgArchivePartial")
 		return
 	}
 
 	if cluster.Status.TargetPrimary != ws.instance.GetPodName() ||
 		cluster.Status.CurrentPrimary != ws.instance.GetPodName() {
-		sendBadRequestJSONResponse(w, "NOT_EXPECTED_PRIMARY", "")
+		sendBadRequestJSONResponse(w, "NOT_EXPECTED_PRIMARY", "", "pgArchivePartial")
 		return
 	}
 
@@ -479,7 +488,7 @@ func (ws *remoteWebserverEndpoints) pgArchivePartial(w http.ResponseWriter, req 
 	data := utils.ParsePgControldataOutput(out)
 	walFile := data[utils.PgControlDataKeyREDOWALFile]
 	if walFile == "" {
-		sendBadRequestJSONResponse(w, "COULD_NOT_PARSE_REDOWAL_FILE", "")
+		sendBadRequestJSONResponse(w, "COULD_NOT_PARSE_REDOWAL_FILE", "", "pgArchivePartial")
 		return
 	}
 
@@ -491,7 +500,7 @@ func (ws *remoteWebserverEndpoints) pgArchivePartial(w http.ResponseWriter, req 
 
 	if err := os.Link(walFileAbsolutePath, partialWalFileAbsolutePath); err != nil {
 		log.Error(err, "failed to get pg_controldata")
-		sendBadRequestJSONResponse(w, "ERROR_WHILE_CREATING_SYMLINK", err.Error())
+		sendBadRequestJSONResponse(w, "ERROR_WHILE_CREATING_SYMLINK", err.Error(), "pgArchivePartial")
 		return
 	}
 
@@ -505,9 +514,9 @@ func (ws *remoteWebserverEndpoints) pgArchivePartial(w http.ResponseWriter, req 
 	walArchiveCmd := exec.Command("/controller/manager", options...) // nolint: gosec
 	walArchiveCmd.Dir = pgData
 	if err := execlog.RunBuffering(walArchiveCmd, "wal-archive-partial"); err != nil {
-		sendBadRequestJSONResponse(w, "ERROR_WHILE_EXECUTING_WAL_ARCHIVE", err.Error())
+		sendBadRequestJSONResponse(w, "ERROR_WHILE_EXECUTING_WAL_ARCHIVE", err.Error(), "pgArchivePartial")
 		return
 	}
 
-	sendJSONResponseWithData(w, 200, walFile)
+	sendJSONResponseWithData(w, 200, walFile, "pgArchivePartial")
 }

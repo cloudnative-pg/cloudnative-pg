@@ -20,6 +20,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 )
 
 // ErrStreamingReplicaNotConnected is raised for streaming replicas that never connected to its primary
@@ -52,13 +53,13 @@ func (data *Data) IsServerReady(ctx context.Context) error {
 	}
 	superUserDB, err := data.instance.GetSuperUserDB()
 	if err != nil {
-		return err
+		return fmt.Errorf("could not get super user database: %w", err)
 	}
 
 	// We now check if the database is ready to accept
 	// connections
 	if err := superUserDB.PingContext(ctx); err != nil {
-		return err
+		return fmt.Errorf("could not ping the database: %w", err)
 	}
 
 	// If we already validated this streaming replica, everything
@@ -84,12 +85,12 @@ func (data *Data) IsServerReady(ctx context.Context) error {
 		`,
 	)
 	if err := row.Err(); err != nil {
-		return err
+		return fmt.Errorf("could not check if the streaming replica is connected: %w", err)
 	}
 
 	var status bool
 	if err := row.Scan(&status); err != nil {
-		return err
+		return fmt.Errorf("could not scan the streaming replica status: %w", err)
 	}
 
 	if !status {

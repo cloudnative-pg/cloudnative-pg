@@ -66,13 +66,26 @@ func (instance *Instance) GetStatus() (result *postgres.PostgresqlStatus, err er
 		if result.MightBeUnavailable && err == nil {
 			return
 		}
-		// we save the error that we are masking
-		result.MightBeUnavailableMaskedError = err.Error()
-		// We override the error. We only care about checking if isPrimary is correctly detected
+		// Save the original error.
+		originalErr := err
+
+		// Overwrite `err` with the new logic.
 		result.IsPrimary, err = instance.IsPrimary()
 		if err != nil {
+			// Or wrap them together
+			err = fmt.Errorf(
+				"GetStatus() might be unavailable, original error: %v, also failed IsPrimary: %w",
+				originalErr,
+				err,
+			)
 			return
 		}
+
+		// If `IsPrimary()` succeeded, we might still want to retain the original error context.
+		err = fmt.Errorf(
+			"GetStatus() might be unavailable: %v",
+			originalErr,
+		)
 	}()
 
 	if instance.PgRewindIsRunning {
@@ -83,7 +96,7 @@ func (instance *Instance) GetStatus() (result *postgres.PostgresqlStatus, err er
 	}
 	superUserDB, err := instance.GetSuperUserDB()
 	if err != nil {
-		return result, err
+		return result, fmt.Errorf("error getting superuser DB in GetStatus(): %w", err)
 	}
 
 	row := superUserDB.QueryRow(
@@ -95,19 +108,19 @@ func (instance *Instance) GetStatus() (result *postgres.PostgresqlStatus, err er
 			EXISTS(SELECT 1 FROM pg_settings WHERE pending_restart)`)
 	err = row.Scan(&result.SystemID, &result.IsPrimary, &result.PendingRestart)
 	if err != nil {
-		return result, err
+		return result, fmt.Errorf("error scanning row in GetStatus(): %w", err)
 	}
 
 	if result.PendingRestart {
 		err = updateResultForDecrease(instance, superUserDB, result)
 		if err != nil {
-			return result, err
+			return result, fmt.Errorf("error updating result for decrease in GetStatus(): %w", err)
 		}
 	}
 
 	err = instance.fillStatus(result)
 	if err != nil {
-		return result, err
+		return result, fmt.Errorf("error filling status in GetStatus(): %w", err)
 	}
 
 	result.InstanceArch = runtime.GOARCH
