@@ -17,6 +17,7 @@ limitations under the License.
 package postgres
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -51,7 +52,7 @@ func (instance *Instance) IsServerHealthy() error {
 }
 
 // GetStatus Extract the status of this PostgreSQL database
-func (instance *Instance) GetStatus() (result *postgres.PostgresqlStatus, err error) {
+func (instance *Instance) GetStatus(ctx context.Context) (result *postgres.PostgresqlStatus, err error) {
 	result = &postgres.PostgresqlStatus{
 		Pod:                    &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: instance.GetPodName()}},
 		InstanceManagerVersion: versions.Version,
@@ -86,7 +87,7 @@ func (instance *Instance) GetStatus() (result *postgres.PostgresqlStatus, err er
 		return result, err
 	}
 
-	row := superUserDB.QueryRow(
+	row := superUserDB.QueryRowContext(ctx,
 		`SELECT
 			(pg_control_system()).system_identifier,
 			-- True if this is a primary instance
