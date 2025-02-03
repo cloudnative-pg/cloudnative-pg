@@ -76,7 +76,7 @@ func (r *ClusterReconciler) reconcileImage(ctx context.Context, cluster *apiv1.C
 	}
 
 	apiGroup := cluster.Spec.ImageCatalogRef.APIGroup
-	if apiGroup == nil || *apiGroup != apiv1.GroupVersion.Group {
+	if apiGroup == nil || *apiGroup != apiv1.SchemeGroupVersion.Group {
 		contextLogger.Info("Unknown catalog group")
 		return &ctrl.Result{}, r.RegisterPhase(ctx, cluster, apiv1.PhaseImageCatalogError,
 			"Invalid image catalog group")

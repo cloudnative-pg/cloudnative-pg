@@ -69,7 +69,7 @@ const (
 	imageCatalogKey               = ".spec.imageCatalog.name"
 )
 
-var apiGVString = apiv1.GroupVersion.String()
+var apiGVString = apiv1.SchemeGroupVersion.String()
 
 // errOldPrimaryDetected occurs when a primary Pod loses connectivity with the
 // API server and, upon reconnection, attempts to retain its previous primary

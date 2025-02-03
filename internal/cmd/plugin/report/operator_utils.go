@@ -44,7 +44,7 @@ func getWebhooks(ctx context.Context, stopRedact bool) (
 
 	for _, item := range mutatingWebhookConfigList.Items {
 		for _, webhook := range item.Webhooks {
-			if len(webhook.Rules) > 0 && webhook.Rules[0].APIGroups[0] == apiv1.GroupVersion.Group {
+			if len(webhook.Rules) > 0 && webhook.Rules[0].APIGroups[0] == apiv1.SchemeGroupVersion.Group {
 				mWebhookConfig.Items = append(mWebhookConfig.Items, item)
 			}
 		}
@@ -63,7 +63,7 @@ func getWebhooks(ctx context.Context, stopRedact bool) (
 
 	for _, item := range validatingWebhookConfigList.Items {
 		for _, webhook := range item.Webhooks {
-			if len(webhook.Rules) > 0 && webhook.Rules[0].APIGroups[0] == apiv1.GroupVersion.Group {
+			if len(webhook.Rules) > 0 && webhook.Rules[0].APIGroups[0] == apiv1.SchemeGroupVersion.Group {
 				vWebhookConfig.Items = append(vWebhookConfig.Items, item)
 			}
 		}
@@ -79,7 +79,7 @@ func getWebhooks(ctx context.Context, stopRedact bool) (
 	if len(mWebhookConfig.Items) == 0 || len(vWebhookConfig.Items) == 0 {
 		return nil, nil, fmt.Errorf(
 			"can't find the webhooks that targeting resources within the group %s",
-			apiv1.GroupVersion.Group,
+			apiv1.SchemeGroupVersion.Group,
 		)
 	}
 
