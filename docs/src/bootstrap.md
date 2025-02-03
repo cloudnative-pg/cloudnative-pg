@@ -48,10 +48,11 @@ specification. CloudNativePG currently supports the following bootstrap methods:
   a given *point in time*
 - `pg_basebackup`: create a PostgreSQL cluster by cloning an existing one of
   the same major version using `pg_basebackup` via streaming replication protocol -
-  useful if you want to migrate databases to CloudNativePG, even
-  from outside Kubernetes (please refer to the
+  useful if you want to migrate databases to CloudNativePG. It is possible to
+  make this method work even with clusters outside Kubernetes, but it is hard
+  to fulfill all the requirements (please refer to the
   [sub-section on pg_basebackup](#bootstrap-from-a-live-cluster-pg_basebackup)
-  for the list of prerequisites).
+  for the list of requirements).
 
 In contrast to the `initdb` method, both `recovery` and `pg_basebackup`
 create a new cluster based on another one (either offline or online) and can be
