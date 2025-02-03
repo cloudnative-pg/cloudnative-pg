@@ -25,6 +25,7 @@ import (
 	"io"
 	"os"
 	"syscall"
+	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -83,7 +84,10 @@ func FromLocalBinary(
 	}(sourceFile)
 
 	// Gather the status of the instance
-	instanceStatus, err := instance.GetStatus()
+	ctx, cancel := context.WithTimeout(context.TODO(), 5*time.Minute)
+	defer cancel()
+
+	instanceStatus, err := instance.GetStatus(ctx)
 	if err != nil {
 		return fmt.Errorf("while retrieving instance's status: %w", err)
 	}
@@ -162,8 +166,12 @@ func FromReader(
 				"name", updatedInstanceManager.Name(), "err", err)
 		}
 	}()
+
+	ctx, cancel := context.WithTimeout(context.TODO(), 5 * time.Minute)
+	defer cancel()
+
 	// Gather the status of the instance
-	instanceStatus, err := instance.GetStatus()
+	instanceStatus, err := instance.GetStatus(ctx)
 	if err != nil {
 		return fmt.Errorf("while retrieving instance's status: %w", err)
 	}

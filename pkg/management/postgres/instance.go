@@ -723,6 +723,12 @@ func (instance *Instance) GetSuperUserDB() (*sql.DB, error) {
 	return instance.ConnectionPool().Connection("postgres")
 }
 
+// GetBackgroundDB returns a connection to the instance that should be used for long running
+// background processes such as creating backups.
+func (instance *Instance) GetBackgroundDB() (*sql.DB, error) {
+	return instance.ConnectionPool().Connection("postgres")
+}
+
 // GetTemplateDB gets a connection to the "template1" database on this instance
 func (instance *Instance) GetTemplateDB() (*sql.DB, error) {
 	return instance.ConnectionPool().Connection("template1")
@@ -902,7 +908,7 @@ func (instance *Instance) WaitForConfigReload(ctx context.Context) (*postgres.Po
 		return nil, fmt.Errorf("while waiting for new configuration to be reloaded: %w", err)
 	}
 
-	status, err := instance.GetStatus()
+	status, err := instance.GetStatus(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("while applying new configuration: %w", err)
 	}
