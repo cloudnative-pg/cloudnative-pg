@@ -19,6 +19,8 @@ For more detailed information about this feature, please refer to the
     to create a **replica cluster**, that is, an independent PostgreSQL
     cluster which is in continuous recovery, synchronized with the source
     cluster, and accepting read-only connections.
+    Refer to the [replica cluster section](replica_cluster.md) for more
+    information.
 
 !!! Warning
     CloudNativePG requires both the `postgres` user and database to
@@ -51,14 +53,15 @@ specification. CloudNativePG currently supports the following bootstrap methods:
   [sub-section on pg_basebackup](#bootstrap-from-a-live-cluster-pg_basebackup)
   for the list of prerequisites).
 
-Differently from the `initdb` method, both `recovery` and `pg_basebackup`
+In contrast to the `initdb` method, both `recovery` and `pg_basebackup`
 create a new cluster based on another one (either offline or online) and can be
 used to spin up replica clusters. They both rely on the definition of external
 clusters.
+Refer to the [replica cluster section](replica_cluster.md) for more information.
 
-Given that there are several possible backup methods and combinations of backup
-storage that the CloudNativePG operator provides, please refer to the
-["Recovery" section](recovery.md) for guidance on each method.
+Given the amount of possible backup methods and combinations of backup
+storage that the CloudNativePG operator provides for `recovery`, please refer to
+the dedicated ["Recovery" section](recovery.md) for guidance on each method.
 
 !!! Seealso "API reference"
     Please refer to the ["API reference for the `bootstrap` section](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-BootstrapConfiguration)
@@ -442,9 +445,9 @@ by `name` (our recommendation is to use the same `name` of the origin cluster).
 
 ### Bootstrap from a backup (`recovery`)
 
-Given the plurality of possibilities, methods, and combinations that the
-CloudNativePG operator provides for of backup and recovery, please refer
-to the ["Recovery" section](recovery.md).
+Given the amount of possible backup methods and combinations of backup
+storage that the CloudNativePG operator provides for `recovery`, please refer to
+the dedicated ["Recovery" section](recovery.md) for guidance on each method.
 
 ### Bootstrap from a live cluster (`pg_basebackup`)
 
@@ -468,10 +471,11 @@ The primary use cases for this method include:
 
 !!! Important
     Avoid using this method, based on physical replication, to migrate an
-    existing PostgreSQL cluster outside of Kubernetes into CloudNativePG unless you
-    are completely certain that all requirements are met and the operation has been
+    existing PostgreSQL cluster outside of Kubernetes into CloudNativePG, unless you
+    are completely certain that all [requirements](#requirements) are met and
+    the operation has been
     thoroughly tested. The CloudNativePG community does not endorse this approach
-    for such use cases and recommends using logical import instead. It is
+    for such use cases, and recommends using logical import instead. It is
     exceedingly rare that all requirements for physical replication are met in a
     way that seamlessly works with CloudNativePG.
 
@@ -725,6 +729,9 @@ Once the backup is completed, the new instance will be started on a new timeline
 and diverge from the source.
 For this reason, it is advised to stop all write operations to the source database
 before migrating to the target database.
+
+Note that this limitation applies only if the target cluster is not defined as
+a replica cluster.
 
 !!! Important
     Before you attempt a migration, you must test both the procedure
