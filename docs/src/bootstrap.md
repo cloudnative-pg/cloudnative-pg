@@ -109,10 +109,10 @@ source can be used for the `recovery` method. When both are defined, any of the
 two bootstrap methods can be chosen.
 
 | content of externalClusters | pg_basebackup | recovery |
-|:----|:-----:|:------:|
-| only streaming | ✅ | |
-| only object store | | ✅ |
-| both methods | ✅ | ✅ |
+|:----------------------------|:-------------:|:--------:|
+| only streaming              | ✅            |          |
+| only object store           |               | ✅       |
+| both methods                | ✅            | ✅       |
 
 Furthermore, in case of `pg_basebackup` or full `recovery` point in time, the
 cluster is eligible for replica cluster mode. This means that the cluster is
