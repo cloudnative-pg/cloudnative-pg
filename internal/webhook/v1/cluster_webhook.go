@@ -1151,6 +1151,12 @@ func validateWalSizeConfiguration(
 // Ref: Numeric with Unit @ https://www.postgresql.org/docs/current/config-setting.html#CONFIG-SETTING-NAMES-VALUES
 func parsePostgresQuantityValue(value string) (resource.Quantity, error) {
 
+	// If it's a bare number, it's rejected
+	if _, err := strconv.Atoi(value); err == nil {
+
+		return resource.Quantity{}, resource.ErrFormatWrong
+	}
+
 	// If there is a suffix it must be "B"
 	if value[len(value)-1:] != "B" {
 		return resource.Quantity{}, resource.ErrFormatWrong
@@ -1159,13 +1165,7 @@ func parsePostgresQuantityValue(value string) (resource.Quantity, error) {
 	// Kubernetes uses Mi rather than MB, Gi rather than GB. Drop the "B"
 	value = strings.TrimSuffix(value, "B")
 
-	// If it a bare number, it's rejected
-	if _, err := strconv.Atoi(value); err == nil {
-
-		return resource.Quantity{}, resource.ErrFormatWrong
-	}
-
-	// Spaces are allowed in postgres between number and unit in Postgres, but not in Kubernetes
+	// Spaces are allowed between number and unit in Postgres, but not in Kubernetes
 	value = strings.ReplaceAll(value, " ", "")
 
 	// Add the 'i' suffix
