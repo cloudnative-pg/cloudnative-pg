@@ -115,7 +115,7 @@ two bootstrap methods can be chosen.
 |:----------------------------|:-------------:|:--------:|
 | only streaming              | ✓             |          |
 | only object store           |               | ✓        |
-| both methods                | ✓             | ✓        |
+| streaming and object store  | ✓             | ✓        |
 
 Furthermore, in case of `pg_basebackup` or full `recovery` point in time, the
 cluster is eligible for replica cluster mode. This means that the cluster is
