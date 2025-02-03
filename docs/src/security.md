@@ -293,7 +293,7 @@ CloudNativePG.
 : The instance manager requires to `update` and `patch` the status of any
   `Backup` resource in the namespace
 
-### Security Contexts
+### Pod and Container Security Contexts
 
 A [Security Context](https://kubernetes.io/docs/tasks/configure-pod-container/security-context/)
 defines privilege and access control settings for a pod or container.
@@ -325,11 +325,10 @@ securityContext:
     type: RuntimeDefault
 ```
 
-#### RedHat OpenShift SCC
+#### Security Context Constraints
 
-When running in a RedHat OpenShift environment the operator does not explicitly set the security context of the
-PostgreSQL cluster pods, but rather allows the pods to inherit the restricted [Security Context Constraints (SCC)](https://docs.openshift.com/container-platform/4.17/authentication/managing-security-context-constraints.html) 
-that are defined within OpenShift.
+When running in an environment that is utilizing [Security Context Constraints (SCC)](https://docs.openshift.com/container-platform/4.17/authentication/managing-security-context-constraints.html)
+the operator does not explicitly set the security context of the PostgreSQL cluster pods, but rather allows the pods to inherit the restricted Security Context Constraints that are already defined.
 
 ### Restricting Pod access using AppArmor
 
