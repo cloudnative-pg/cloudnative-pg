@@ -347,7 +347,7 @@ func (ws *remoteWebserverEndpoints) restartInstanceManager(
 		}()
 
 		log.Trace("restartInstanceManager: upgrading instance manager")
-		err := upgrade.FromLocalBinary(cancelFunc, exitedCondition, ws.typedClient, ws.instance, upgrade.InstanceManagerPath)
+		err := upgrade.FromLocalBinary(cancelFunc, exitedCondition, ws.typedClient, ws.instance)
 		if err != nil {
 			// The defer above is known not to execute in the upgradeInstanceManager function
 			// so we'll call it explicitly here

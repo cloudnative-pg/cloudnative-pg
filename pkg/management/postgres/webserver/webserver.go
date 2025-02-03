@@ -127,7 +127,6 @@ func writeJSONResponse(w http.ResponseWriter, endpoint string, js []byte) error 
 
 	expectedBytes := len(js)
 	n, err := w.Write(js)
-
 	if err != nil {
 		log.Warning(fmt.Sprintf("%s: failed to write JSON response", endpoint),
 			"error", err.Error(),
@@ -157,7 +156,6 @@ func writeJSONResponse(w http.ResponseWriter, endpoint string, js []byte) error 
 func writeTextResponse(w http.ResponseWriter, endpoint, value string) error {
 	expectedBytes := len(value)
 	n, err := fmt.Fprint(w, value)
-
 	if err != nil {
 		log.Warning(fmt.Sprintf("%s: failed to write response", endpoint),
 			"error", err.Error(),
@@ -190,7 +188,8 @@ func sendJSONResponse[T any](w http.ResponseWriter, statusCode int, resp Respons
 	log.Trace("sendJSONResponse: headers set", "status", statusCode, "endpoint", endpoint)
 
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		log.Trace("sendJSONResponse: Failed to write JSON response", "error", err, "response", resp, "status", statusCode, "endpoint", endpoint)
+		log.Trace("sendJSONResponse: Failed to write JSON response",
+			"error", err, "response", resp, "status", statusCode, "endpoint", endpoint)
 		http.Error(w, "Failed to write response", http.StatusInternalServerError)
 	}
 
@@ -206,6 +205,7 @@ func sendBadRequestJSONResponse(w http.ResponseWriter, errorCode string, message
 	}, endpoint)
 }
 
+//nolint:unparam
 func sendUnprocessableEntityJSONResponse(w http.ResponseWriter, errorCode string, message string, endpoint string) {
 	sendJSONResponse(w, http.StatusUnprocessableEntity, Response[any]{
 		Error: &Error{

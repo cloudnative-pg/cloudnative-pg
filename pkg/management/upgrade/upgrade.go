@@ -53,7 +53,6 @@ func FromLocalBinary(
 	exitedCondition concurrency.MultipleExecuted,
 	typedClient client.Client,
 	instance *postgres.Instance,
-	sourcePath string,
 ) error {
 	// Create a temporary file to host the new instance manager binary
 	updatedInstanceManager, err := os.CreateTemp(UploadFolder, "manager_*.new")
@@ -72,7 +71,7 @@ func FromLocalBinary(
 	}()
 
 	// Open the source binary file
-	sourceFile, err := os.Open(sourcePath)
+	sourceFile, err := os.Open(InstanceManagerPath)
 	if err != nil {
 		return fmt.Errorf("while opening source binary file: %w", err)
 	}
@@ -108,7 +107,7 @@ func FromLocalBinary(
 	log.Info("Using local version of the instance manager",
 		"hashCode", newHash,
 		"temporaryName", updatedInstanceManager.Name(),
-		"sourcePath", sourcePath)
+		"sourcePath", InstanceManagerPath)
 
 	// Grant the executable bit to the new file
 	err = os.Chmod(updatedInstanceManager.Name(), 0o755) // #nosec
