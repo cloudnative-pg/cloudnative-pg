@@ -50,7 +50,7 @@ specification. CloudNativePG currently supports the following bootstrap methods:
   the same major version using `pg_basebackup` via streaming replication protocol -
   useful if you want to migrate databases to CloudNativePG. It is possible to
   make this method work even with clusters outside Kubernetes, but it is hard
-  to fulfill all the requirements (please refer to the
+  to meet all the requirements in this use case (please refer to the
   [sub-section on pg_basebackup](#bootstrap-from-a-live-cluster-pg_basebackup)
   for the list of requirements).
 
