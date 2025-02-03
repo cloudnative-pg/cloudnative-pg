@@ -17,6 +17,7 @@ limitations under the License.
 package postgres
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -51,7 +52,7 @@ func (instance *Instance) IsServerHealthy() error {
 }
 
 // GetStatus Extract the status of this PostgreSQL database
-func (instance *Instance) GetStatus() (result *postgres.PostgresqlStatus, err error) {
+func (instance *Instance) GetStatus(ctx context.Context) (result *postgres.PostgresqlStatus, err error) {
 	result = &postgres.PostgresqlStatus{
 		Pod:                    &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: instance.GetPodName()}},
 		InstanceManagerVersion: versions.Version,
@@ -99,7 +100,7 @@ func (instance *Instance) GetStatus() (result *postgres.PostgresqlStatus, err er
 		return result, fmt.Errorf("error getting superuser DB in GetStatus(): %w", err)
 	}
 
-	row := superUserDB.QueryRow(
+	row := superUserDB.QueryRowContext(ctx,
 		`SELECT
 			(pg_control_system()).system_identifier,
 			-- True if this is a primary instance
@@ -288,9 +289,9 @@ func (instance *Instance) fillBasebackupStats(
 	var basebackupList []postgres.PgStatBasebackup
 
 	rows, err := superUserDB.Query(`SELECT
-		   usename, 
-		   application_name, 
-		   backend_start, 
+		   usename,
+		   application_name,
+		   backend_start,
 		   phase,
 		   COALESCE(backup_total, 0) AS backup_total,
 		   COALESCE(backup_streamed, 0) AS backup_streamed,
@@ -299,7 +300,7 @@ func (instance *Instance) fillBasebackupStats(
 		   COALESCE(tablespaces_total, 0) AS tablespaces_total,
 		   COALESCE(tablespaces_streamed, 0) AS tablespaces_streamed
 		FROM pg_stat_progress_basebackup b
-		   JOIN pg_stat_activity a USING (pid) 
+		   JOIN pg_stat_activity a USING (pid)
 		WHERE application_name ~ '-join$'
 		ORDER BY 1, 2`)
 	if err != nil {
@@ -399,15 +400,15 @@ func (instance *Instance) fillReplicationSlotsStatus(result *postgres.Postgresql
 	}
 
 	rows, err := superUserDB.Query(
-		`SELECT 
+		`SELECT
     slot_name,
 	coalesce(plugin::text, ''),
-	coalesce(slot_type::text, ''),	
-	coalesce(datoid::text,''),	
-	coalesce(database::text,''),	
+	coalesce(slot_type::text, ''),
+	coalesce(datoid::text,''),
+	coalesce(database::text,''),
 	active,
-	coalesce(xmin::text, ''),	
-	coalesce(catalog_xmin::text, ''),	
+	coalesce(xmin::text, ''),
+	coalesce(catalog_xmin::text, ''),
 	coalesce(restart_lsn::text, ''),
 	coalesce(wal_status::text, ''),
 	safe_wal_size

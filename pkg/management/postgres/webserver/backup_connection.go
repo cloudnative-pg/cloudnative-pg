@@ -104,7 +104,7 @@ func newBackupConnection(
 	immediateCheckpoint bool,
 	waitForArchive bool,
 ) (*backupConnection, error) {
-	superUserDB, err := instance.GetSuperUserDB()
+	superUserDB, err := instance.GetBackgroundDB()
 	if err != nil {
 		return nil, err
 	}

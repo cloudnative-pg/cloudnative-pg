@@ -27,10 +27,12 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/execlog"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	"golang.org/x/sync/singleflight"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -41,6 +43,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/readiness"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/upgrade"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
+	pg "github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -49,6 +52,8 @@ type remoteWebserverEndpoints struct {
 	instance         *postgres.Instance
 	currentBackup    *backupConnection
 	readinessChecker *readiness.Data
+
+	sg singleflight.Group
 }
 
 // StartBackupRequest the required data to execute the pg_start_backup
@@ -174,7 +179,7 @@ func (ws *remoteWebserverEndpoints) isServerReady(w http.ResponseWriter, r *http
 }
 
 // This probe is for the instance status, including replication
-func (ws *remoteWebserverEndpoints) pgStatus(w http.ResponseWriter, _ *http.Request) {
+func (ws *remoteWebserverEndpoints) pgStatus(w http.ResponseWriter, r *http.Request) {
 	// Debugging the hanging endpoints:
 	// --------------------------------
 	// If the number of :exit logs don't match the number of :entry logs, something is wrong
@@ -184,8 +189,22 @@ func (ws *remoteWebserverEndpoints) pgStatus(w http.ResponseWriter, _ *http.Requ
 
 	log.Trace("pgStatus: entry")
 
-	// Extract the status of the current instance
-	status, err := ws.instance.GetStatus()
+	// Extract the status of the current instance. Dedup concurrent calls to make this cheap to
+	// call concurrently.
+	res, err, shared := ws.sg.Do("pgStatus", func() (any, error) {
+		// Use a single context here that's shared among the goroutines calling this to decouple
+		// the lifetimes.
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		// Extract the status of the current instance
+		status, err := ws.instance.GetStatus(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		return status, nil
+	})
 	if err != nil {
 		log.Debug(
 			"pgStatus: Instance status probe failing",
@@ -194,8 +213,15 @@ func (ws *remoteWebserverEndpoints) pgStatus(w http.ResponseWriter, _ *http.Requ
 		return
 	}
 
+	status, ok := res.(*pg.PostgresqlStatus)
+	if !ok {
+		log.Debug("got something that's not a postgres status", "got", fmt.Sprintf("%T", res))
+		http.Error(w, "unexpected status type", http.StatusInternalServerError)
+		return
+	}
+
 	// Marshal the status back to the operator
-	log.Trace("pgStatus: marshalling status")
+	log.Trace("pgStatus: marshalling status", "shared", shared)
 	js, err := json.Marshal(status)
 	if err != nil {
 		log.Warning(
@@ -378,6 +404,10 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 				log.Error(err, "while closing the body")
 			}
 		}()
+
+		// TODO: There is a race condition here: ws.currentBackup is both being read and written to in this handler, without
+		// any locking. That ain't good.
+
 		if ws.currentBackup != nil {
 			if !p.Force {
 				sendUnprocessableEntityJSONResponse(w, "PROCESS_ALREADY_RUNNING", "", "backup")
