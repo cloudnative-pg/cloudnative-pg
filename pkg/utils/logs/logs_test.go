@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"sync"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,10 +33,54 @@ import (
 var _ = Describe("Pod logging tests", func() {
 	podNamespace := "pod-test"
 	podName := "pod-name-test"
-	pod := &v1.Pod{
+	pod := v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: podNamespace,
 			Name:      podName,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "postgres",
+				},
+			},
+		},
+	}
+
+	podWithSidecar := v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: podNamespace,
+			Name:      podName,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "postgres",
+				},
+				{
+					Name: "sidecar",
+				},
+			},
+		},
+		Status: v1.PodStatus{
+			ContainerStatuses: []v1.ContainerStatus{
+				{
+					Name: "postgres",
+					State: v1.ContainerState{
+						Running: &v1.ContainerStateRunning{
+							StartedAt: metav1.Time{Time: time.Now()},
+						},
+					},
+				},
+				{
+					Name: "sidecar",
+					State: v1.ContainerState{
+						Running: &v1.ContainerStateRunning{
+							StartedAt: metav1.Time{Time: time.Now()},
+						},
+					},
+				},
+			},
 		},
 	}
 
@@ -50,22 +95,17 @@ var _ = Describe("Pod logging tests", func() {
 		Expect(streamPodLog.getPodNamespace()).To(BeEquivalentTo(podNamespace))
 	})
 
-	It("should be able to handle the nil Pod", func(ctx context.Context) {
-		// the nil pod passed will still default to the empty pod name
-		client := fake.NewSimpleClientset()
+	It("should be able to handle the empty Pod", func(ctx context.Context) {
+		client := fake.NewClientset()
 		streamPodLog := StreamingRequest{
-			Pod:     nil,
+			Pod:     v1.Pod{},
 			Options: podLogOptions,
 			Client:  client,
 		}
 		var logBuffer bytes.Buffer
 		err := streamPodLog.Stream(ctx, &logBuffer)
 		Expect(err).NotTo(HaveOccurred())
-		// The fake Client will be given a pod name of "", but it will still
-		// go on along. In production, we'd have an error when pod not found
-		Expect(logBuffer.String()).To(BeEquivalentTo("fake logs"))
-		Expect(streamPodLog.getPodName()).To(BeEquivalentTo(""))
-		Expect(streamPodLog.getPodNamespace()).To(BeEquivalentTo(""))
+		Expect(logBuffer.String()).To(BeEquivalentTo(""))
 	})
 
 	It("previous option must be false by default", func() {
@@ -90,7 +130,7 @@ var _ = Describe("Pod logging tests", func() {
 	})
 
 	It("should read the logs with the provided k8s Client", func(ctx context.Context) {
-		client := fake.NewSimpleClientset(pod)
+		client := fake.NewClientset(&pod)
 		streamPodLog := StreamingRequest{
 			Pod:      pod,
 			Options:  podLogOptions,
@@ -102,38 +142,62 @@ var _ = Describe("Pod logging tests", func() {
 		err := streamPodLog.Stream(ctx, &logBuffer)
 		Expect(err).ToNot(HaveOccurred())
 
-		Expect(logBuffer.String()).To(BeEquivalentTo("fake logs"))
+		Expect(logBuffer.String()).To(BeEquivalentTo("fake logs\n"))
 	})
 
-	It("GetPodLogs correctly streams and provides output lines", func(ctx context.Context) {
-		client := fake.NewSimpleClientset(pod)
+	It("should read the logs with multiple containers", func(ctx context.Context) {
+		client := fake.NewClientset(&podWithSidecar)
+		streamPodLog := StreamingRequest{
+			Pod:      podWithSidecar,
+			Options:  podLogOptions,
+			Previous: false,
+			Client:   client,
+		}
+
 		var logBuffer bytes.Buffer
-		lines, err := GetPodLogs(ctx, client, *pod, false, &logBuffer, 2)
+		err := streamPodLog.Stream(ctx, &logBuffer)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(lines).To(HaveLen(2))
-		Expect(lines[0]).To(BeEquivalentTo("fake logs"))
-		Expect(logBuffer.String()).To(BeEquivalentTo("fake logs"))
+
+		Expect(logBuffer.String()).To(BeEquivalentTo("fake logs\nfake logs\n"))
 	})
 
-	It("GetPodLogs defaults to non-zero lines shown if set to zero", func(ctx context.Context) {
-		client := fake.NewSimpleClientset(pod)
+	It("should read only the specified container logs given multiple containers", func(ctx context.Context) {
+		client := fake.NewClientset(&podWithSidecar)
+		podLogOptionsWithContainer := *podLogOptions
+		podLogOptionsWithContainer.Container = "postgres"
+		streamPodLog := StreamingRequest{
+			Pod:      podWithSidecar,
+			Options:  &podLogOptionsWithContainer,
+			Previous: false,
+			Client:   client,
+		}
+
 		var logBuffer bytes.Buffer
-		lines, err := GetPodLogs(ctx, client, *pod, false, &logBuffer, 0)
+		err := streamPodLog.Stream(ctx, &logBuffer)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(lines).To(HaveLen(10))
-		Expect(lines[0]).To(BeEquivalentTo("fake logs"))
-		Expect(logBuffer.String()).To(BeEquivalentTo("fake logs"))
+
+		Expect(logBuffer.String()).To(BeEquivalentTo("fake logs\n"))
 	})
 
 	It("can follow pod logs", func(ctx SpecContext) {
-		client := fake.NewSimpleClientset(pod)
+		client := fake.NewClientset(&pod)
 		var logBuffer bytes.Buffer
 		var wait sync.WaitGroup
 		wait.Add(1)
 		go func() {
 			defer GinkgoRecover()
 			defer wait.Done()
-			err := TailPodLogs(ctx, client, *pod, &logBuffer, true)
+			now := metav1.Now()
+			streamPodLog := StreamingRequest{
+				Pod: pod,
+				Options: &v1.PodLogOptions{
+					Timestamps: false,
+					Follow:     true,
+					SinceTime:  &now,
+				},
+				Client: client,
+			}
+			err := streamPodLog.Stream(ctx, &logBuffer)
 			Expect(err).NotTo(HaveOccurred())
 		}()
 		// calling ctx.Done is not strictly necessary because the fake Client
@@ -142,6 +206,6 @@ var _ = Describe("Pod logging tests", func() {
 		// the pod logs until the context, or the logs, are over
 		ctx.Done()
 		wait.Wait()
-		Expect(logBuffer.String()).To(BeEquivalentTo("fake logs"))
+		Expect(logBuffer.String()).To(BeEquivalentTo("fake logs\n"))
 	})
 })

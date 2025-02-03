@@ -58,7 +58,7 @@ func streamOperatorLogsToZip(
 		}
 
 		streamPodLogs := &logs.StreamingRequest{
-			Pod:      &pod,
+			Pod:      pod,
 			Options:  podLogOptions,
 			Previous: true,
 		}
@@ -122,7 +122,7 @@ func streamClusterLogsToZip(
 				return fmt.Errorf("could not add '%s' to zip: %w", path, err)
 			}
 			streamPodLogs.Options.Container = container.Name
-			streamPodLogs.Pod = &pod
+			streamPodLogs.Pod = pod
 
 			if _, err := fmt.Fprint(writer, "\n\"====== Begin of Previous Log =====\"\n"); err != nil {
 				return err
@@ -192,7 +192,7 @@ func streamClusterJobLogsToZip(ctx context.Context, clusterName, namespace strin
 					return fmt.Errorf("could not add '%s' to zip: %w", path, err)
 				}
 				streamPodLogs.Options.Container = container.Name
-				streamPodLogs.Pod = &pod
+				streamPodLogs.Pod = pod
 				if err = streamPodLogs.Stream(ctx, writer); err != nil {
 					return err
 				}
