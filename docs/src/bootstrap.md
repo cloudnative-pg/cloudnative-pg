@@ -66,9 +66,9 @@ storage that the CloudNativePG operator provides, please refer to the
 
 ## The `externalClusters` section
 
-The `externalClusters` section can be used to specify one or more
-PostgreSQL clusters associated with the current configuration. Its primary use
-cases include:
+The `externalClusters` section of the cluster manifest can be used to configure
+access to one or more PostgreSQL clusters as *sources*.
+The primary use cases include:
 
 1. **Importing Databases:** Specify an external source to be utilized during
   the [importation of databases](database_import.md) via logical backup and
