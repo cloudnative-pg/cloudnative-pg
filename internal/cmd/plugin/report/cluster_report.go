@@ -75,7 +75,7 @@ func (cr clusterReport) writeToZip(zipper *zip.Writer, format plugin.OutputForma
 // cluster implements the "report cluster" subcommand
 // Produces a zip file containing
 //   - cluster pod and job definitions
-//   - cluster resource (same content as `kubectl get cluster -o yaml`)
+//   - cluster resource (same content as `kubectl get cluster.postgresql.cnpg.io -o yaml`)
 //   - events in the cluster namespace
 //   - logs from the cluster pods (optional - activated with `includeLogs`)
 //   - logs from the cluster jobs (optional - activated with `includeLogs`)

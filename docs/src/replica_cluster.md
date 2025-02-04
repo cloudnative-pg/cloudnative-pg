@@ -294,7 +294,7 @@ To proceed with promoting the other cluster, you need to retrieve the
 `demotionToken` from `cluster-eu-south` using the following command:
 
 ```sh
-kubectl get cluster cluster-eu-south \
+kubectl get cluster.postgresql.cnpg.io cluster-eu-south \
   -o jsonpath='{.status.demotionToken}'
 ```
 
