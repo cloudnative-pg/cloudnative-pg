@@ -299,19 +299,23 @@ A [Security Context](https://kubernetes.io/docs/tasks/configure-pod-container/se
 defines privilege and access control settings for a pod or container.
 
 CloudNativePG does not require *privileged* mode for container execution.
-The PostgreSQL containers run as the `postgres` system user. No component whatsoever requires running as `root`.
+The PostgreSQL containers run as the `postgres` system user. No component
+whatsoever requires running as `root`.
 
-Likewise, Volume access does not require *privileged* mode nor `root` privileges.
-Proper permissions must be assigned by the Kubernetes platform and/or administrators.
-The PostgreSQL containers run with a read-only root filesystem (i.e. no writable layer).
+Likewise, Volume access does not require *privileged* mode nor `root`
+privileges. Proper permissions must be assigned by the Kubernetes platform
+and/or administrators. The PostgreSQL containers run with a read-only root
+filesystem (i.e. no writable layer).
 
-The operator manages the setting of security contexts for all pods and containers of a PostgreSQL cluster.
-The [Seccomp Profile](https://kubernetes.io/docs/tutorials/security/seccomp/) to be used for the PostgreSQL
-containers can be configured with the `spec.seccompProfile` section of the `Cluster` resource. If this 
-section is left blank, the containers will use a seccompProfile `Type` of `RuntimeDefault`, that is, the
-container runtime default.
+The operator manages the setting of security contexts for all pods and 
+containers of a PostgreSQL cluster. The [Seccomp Profile](https://kubernetes.io/docs/tutorials/security/seccomp/) 
+to be used for the PostgreSQL containers can be configured with the 
+`spec.seccompProfile` section of the `Cluster` resource. If this section is left
+blank, the containers will use a seccompProfile `Type` of `RuntimeDefault`, that
+is, the container runtime default.
 
-The security context of PostgreSQL containers using the default `seccompProfile` will look like this:
+The security context of PostgreSQL containers using the default `seccompProfile`
+will look like this:
 ```
 securityContext:
   allowPrivilegeEscalation: false
@@ -327,8 +331,11 @@ securityContext:
 
 #### Security Context Constraints
 
-When running in an environment that is utilizing [Security Context Constraints (SCC)](https://docs.openshift.com/container-platform/4.17/authentication/managing-security-context-constraints.html)
-the operator does not explicitly set the security context of the PostgreSQL cluster pods, but rather allows the pods to inherit the restricted Security Context Constraints that are already defined.
+When running in an environment that is utilizing
+[Security Context Constraints (SCC)](https://docs.openshift.com/container-platform/4.17/authentication/managing-security-context-constraints.html)
+the operator does not explicitly set the security context of the PostgreSQL
+cluster pods, but rather allows the pods to inherit the restricted Security
+Context Constraints that are already defined.
 
 ### Restricting Pod access using AppArmor
 
