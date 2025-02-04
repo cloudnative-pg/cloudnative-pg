@@ -14,9 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package v1 contains API Schema definitions for the postgresql v1 API group
-// +kubebuilder:object:generate=true
-// +groupName=postgresql.cnpg.io
 package v1
 
 import (
@@ -25,23 +22,6 @@ import (
 )
 
 var (
-	// GroupVersion is group version used to register these objects
-	GroupVersion = schema.GroupVersion{Group: "postgresql.cnpg.io", Version: "v1"}
-
-	// ClusterGVK is the triple to reach Cluster resources in k8s
-	ClusterGVK = schema.GroupVersionResource{
-		Group:    GroupVersion.Group,
-		Version:  GroupVersion.Version,
-		Resource: "clusters",
-	}
-
-	// PoolerGVK is the triple to reach Pooler resources in k8s
-	PoolerGVK = schema.GroupVersionResource{
-		Group:    GroupVersion.Group,
-		Version:  GroupVersion.Version,
-		Resource: "poolers",
-	}
-
 	// ClusterKind is the kind name of Clusters
 	ClusterKind = "Cluster"
 
@@ -56,9 +36,14 @@ var (
 
 	// ClusterImageCatalogKind is the kind name of the cluster-wide image catalogs
 	ClusterImageCatalogKind = "ClusterImageCatalog"
+)
+
+var (
+	// SchemeGroupVersion is group version used to register these objects
+	SchemeGroupVersion = schema.GroupVersion{Group: "postgresql.cnpg.io", Version: "v1"}
 
 	// SchemeBuilder is used to add go types to the GroupVersionKind scheme
-	SchemeBuilder = &scheme.Builder{GroupVersion: GroupVersion}
+	SchemeBuilder = &scheme.Builder{GroupVersion: SchemeGroupVersion}
 
 	// AddToScheme adds the types in this group-version to the given scheme.
 	AddToScheme = SchemeBuilder.AddToScheme

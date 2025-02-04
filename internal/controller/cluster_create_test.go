@@ -868,7 +868,7 @@ var _ = Describe("createOrPatchClusterCredentialSecret", func() {
 			cluster := apiv1.Cluster{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       apiv1.ClusterKind,
-					APIVersion: apiGVString,
+					APIVersion: apiSGVString,
 				},
 				ObjectMeta: metav1.ObjectMeta{Name: "test-cluster", Namespace: namespace},
 			}
@@ -1159,7 +1159,7 @@ var _ = Describe("Service Reconciling", func() {
 		cluster = apiv1.Cluster{
 			TypeMeta: metav1.TypeMeta{
 				Kind:       apiv1.ClusterKind,
-				APIVersion: apiv1.GroupVersion.String(),
+				APIVersion: apiv1.SchemeGroupVersion.String(),
 			},
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test-cluster",
