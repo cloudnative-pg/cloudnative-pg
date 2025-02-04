@@ -47,7 +47,7 @@ var _ = Describe("Detect resources properly when", func() {
 	var fakeDiscovery *discoveryFake.FakeDiscovery
 
 	BeforeEach(func() {
-		client = fakeClient.NewSimpleClientset()
+		client = fakeClient.NewClientset()
 		fakeDiscovery = client.Discovery().(*discoveryFake.FakeDiscovery)
 	})
 
