@@ -169,6 +169,22 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForNonReplicaCluster(
 	return mostAdvancedInstance.Pod.Name, r.setPrimaryInstance(ctx, cluster, mostAdvancedInstance.Pod.Name)
 }
 
+var drainTaints = map[string]struct{}{
+	"karpenter.sh/disruption":     {},
+	corev1.TaintNodeUnschedulable: {},
+}
+
+// isNodeBeingDrained checks if a node is currently being drained.
+// Copied from https://github.com/kubernetes-sigs/aws-ebs-csi-driver/blob/7bacf2d36f397bd098b3388403e8759c480be7e5/cmd/hooks/prestop.go#L91
+func isNodeBeingDrained(node corev1.Node) bool {
+	for _, taint := range node.Spec.Taints {
+		if _, isDrainTaint := drainTaints[taint.Key]; isDrainTaint {
+			return true
+		}
+	}
+	return false
+}
+
 // isNodeUnschedulable checks whether a node is set to unschedulable
 func (r *ClusterReconciler) isNodeUnschedulable(ctx context.Context, nodeName string) (bool, error) {
 	var node corev1.Node
@@ -176,7 +192,9 @@ func (r *ClusterReconciler) isNodeUnschedulable(ctx context.Context, nodeName st
 	if err != nil {
 		return false, err
 	}
-	return node.Spec.Unschedulable, nil
+	isBeingDrained := isNodeBeingDrained(node)
+
+	return node.Spec.Unschedulable || isBeingDrained, nil
 }
 
 // Pick the next primary on a schedulable node, if the current is running on an unschedulable one,

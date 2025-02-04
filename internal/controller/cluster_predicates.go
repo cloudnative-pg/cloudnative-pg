@@ -77,7 +77,13 @@ var (
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			oldNode, oldOk := e.ObjectOld.(*corev1.Node)
 			newNode, newOk := e.ObjectNew.(*corev1.Node)
-			return oldOk && newOk && oldNode.Spec.Unschedulable != newNode.Spec.Unschedulable
+			if !oldOk || !newOk {
+				return false
+			}
+
+			oldDrained := isNodeBeingDrained(*oldNode)
+			newDrained := isNodeBeingDrained(*newNode)
+			return oldDrained != newDrained
 		},
 		CreateFunc: func(_ event.CreateEvent) bool {
 			return false
