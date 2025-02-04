@@ -19,6 +19,8 @@ package logs
 import (
 	"bytes"
 	"context"
+	"fmt"
+	"io"
 	"sync"
 	"time"
 
@@ -29,6 +31,23 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
+
+type multiWriter struct {
+	writers map[string]*bytes.Buffer
+}
+
+func newMultiWriter() *multiWriter {
+	newMw := &multiWriter{
+		writers: make(map[string]*bytes.Buffer),
+	}
+	return newMw
+}
+
+func (mw *multiWriter) Create(name string) (io.Writer, error) {
+	var buffer bytes.Buffer
+	mw.writers[name] = &buffer
+	return &buffer, nil
+}
 
 var _ = Describe("Pod logging tests", func() {
 	podNamespace := "pod-test"
@@ -84,12 +103,10 @@ var _ = Describe("Pod logging tests", func() {
 		},
 	}
 
-	podLogOptions := &v1.PodLogOptions{}
-
 	It("should return the proper podName", func() {
 		streamPodLog := StreamingRequest{
 			Pod:     pod,
-			Options: podLogOptions,
+			Options: &v1.PodLogOptions{},
 		}
 		Expect(streamPodLog.getPodName()).To(BeEquivalentTo(podName))
 		Expect(streamPodLog.getPodNamespace()).To(BeEquivalentTo(podNamespace))
@@ -99,7 +116,7 @@ var _ = Describe("Pod logging tests", func() {
 		client := fake.NewClientset()
 		streamPodLog := StreamingRequest{
 			Pod:     v1.Pod{},
-			Options: podLogOptions,
+			Options: &v1.PodLogOptions{},
 			Client:  client,
 		}
 		var logBuffer bytes.Buffer
@@ -111,7 +128,7 @@ var _ = Describe("Pod logging tests", func() {
 	It("previous option must be false by default", func() {
 		streamPodLog := StreamingRequest{
 			Pod:     pod,
-			Options: podLogOptions,
+			Options: &v1.PodLogOptions{},
 		}
 		Expect(streamPodLog.getLogOptions().Previous).To(BeFalse())
 	})
@@ -119,7 +136,7 @@ var _ = Describe("Pod logging tests", func() {
 	It("getLogOptions respects the Previous field setting", func() {
 		streamPodLog := StreamingRequest{
 			Pod:     pod,
-			Options: podLogOptions,
+			Options: &v1.PodLogOptions{},
 		}
 		options := streamPodLog.getLogOptions()
 		Expect(options.Previous).To(BeFalse())
@@ -129,11 +146,11 @@ var _ = Describe("Pod logging tests", func() {
 		Expect(options.Previous).To(BeTrue())
 	})
 
-	It("should read the logs with the provided k8s Client", func(ctx context.Context) {
+	It("should read the logs of a pod with one container", func(ctx context.Context) {
 		client := fake.NewClientset(&pod)
 		streamPodLog := StreamingRequest{
 			Pod:      pod,
-			Options:  podLogOptions,
+			Options:  &v1.PodLogOptions{},
 			Previous: false,
 			Client:   client,
 		}
@@ -145,11 +162,11 @@ var _ = Describe("Pod logging tests", func() {
 		Expect(logBuffer.String()).To(BeEquivalentTo("fake logs\n"))
 	})
 
-	It("should read the logs with multiple containers", func(ctx context.Context) {
+	It("should read the logs of a pod with multiple containers", func(ctx context.Context) {
 		client := fake.NewClientset(&podWithSidecar)
 		streamPodLog := StreamingRequest{
 			Pod:      podWithSidecar,
-			Options:  podLogOptions,
+			Options:  &v1.PodLogOptions{},
 			Previous: false,
 			Client:   client,
 		}
@@ -161,13 +178,13 @@ var _ = Describe("Pod logging tests", func() {
 		Expect(logBuffer.String()).To(BeEquivalentTo("fake logs\nfake logs\n"))
 	})
 
-	It("should read only the specified container logs given multiple containers", func(ctx context.Context) {
+	It("should read only the specified container logs in a pod with multiple containers", func(ctx context.Context) {
 		client := fake.NewClientset(&podWithSidecar)
-		podLogOptionsWithContainer := *podLogOptions
-		podLogOptionsWithContainer.Container = "postgres"
 		streamPodLog := StreamingRequest{
-			Pod:      podWithSidecar,
-			Options:  &podLogOptionsWithContainer,
+			Pod: podWithSidecar,
+			Options: &v1.PodLogOptions{
+				Container: "postgres",
+			},
 			Previous: false,
 			Client:   client,
 		}
@@ -201,11 +218,32 @@ var _ = Describe("Pod logging tests", func() {
 			Expect(err).NotTo(HaveOccurred())
 		}()
 		// calling ctx.Done is not strictly necessary because the fake Client
-		// will terminate the pod stream anyway, ending TailPodLogs.
-		// But in "production", TailPodLogs will follow
+		// will terminate the pod stream anyway, ending Stream.
+		// But in "production", Stream will follow
 		// the pod logs until the context, or the logs, are over
 		ctx.Done()
 		wait.Wait()
 		Expect(logBuffer.String()).To(BeEquivalentTo("fake logs\n"))
+	})
+
+	It("if given the Multiple option it should read each container into a writer", func(ctx context.Context) {
+		client := fake.NewClientset(&podWithSidecar)
+		streamPodLog := StreamingRequest{
+			Pod:      podWithSidecar,
+			Options:  &v1.PodLogOptions{},
+			Previous: false,
+			Client:   client,
+		}
+
+		namer := func(container string) string {
+			return fmt.Sprintf("%s-%s.log", streamPodLog.getPodName(), container)
+		}
+		mw := newMultiWriter()
+		err := streamPodLog.StreamMultiple(ctx, mw, namer)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(mw.writers).To(HaveLen(2))
+
+		Expect(mw.writers["pod-name-test-postgres.log"].String()).To(BeEquivalentTo("fake logs\n"))
+		Expect(mw.writers["pod-name-test-sidecar.log"].String()).To(BeEquivalentTo("fake logs\n"))
 	})
 })
