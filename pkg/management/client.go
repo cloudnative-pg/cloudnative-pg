@@ -73,7 +73,7 @@ func NewControllerRuntimeClient() (client.WithWatch, error) {
 		return nil, err
 	}
 
-	mapper := meta.NewDefaultRESTMapper([]schema.GroupVersion{apiv1.GroupVersion})
+	mapper := meta.NewDefaultRESTMapper([]schema.GroupVersion{apiv1.SchemeGroupVersion})
 	// add here any resource that need to be registered.
 	objectsToRegister := []runtime.Object{
 		// custom resources

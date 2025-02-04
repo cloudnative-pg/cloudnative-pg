@@ -60,7 +60,7 @@ const (
 	disableDefaultQueriesSpecPath = ".spec.monitoring.disableDefaultQueries"
 )
 
-var apiGVString = apiv1.GroupVersion.String()
+var apiSGVString = apiv1.SchemeGroupVersion.String()
 
 // errOldPrimaryDetected occurs when a primary Pod loses connectivity with the
 // API server and, upon reconnection, attempts to retain its previous primary
@@ -985,7 +985,7 @@ func IsOwnedByCluster(obj client.Object) (string, bool) {
 		return "", false
 	}
 
-	if owner.APIVersion != apiGVString {
+	if owner.APIVersion != apiSGVString {
 		return "", false
 	}
 
