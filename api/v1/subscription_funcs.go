@@ -65,6 +65,11 @@ func (sub *Subscription) HasReconciliations() bool {
 	return sub.Status.ObservedGeneration > 0
 }
 
+// SetStatusObservedGeneration sets the observed generation of the subscription
+func (sub *Subscription) SetStatusObservedGeneration(obsGeneration int64) {
+	sub.Status.ObservedGeneration = obsGeneration
+}
+
 // MustHaveManagedResourceExclusivity detects conflicting subscriptions
 func (pub *SubscriptionList) MustHaveManagedResourceExclusivity(reference *Subscription) error {
 	pointers := toSliceWithPointers(pub.Items)
