@@ -348,7 +348,7 @@ func (r *ScheduledBackupReconciler) SetupWithManager(
 				return nil
 			}
 
-			if owner.APIVersion != apiGVString {
+			if owner.APIVersion != apiSGVString {
 				return nil
 			}
 
