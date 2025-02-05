@@ -1397,8 +1397,8 @@ func (cluster *Cluster) GetRecoverySourcePlugin() *PluginConfiguration {
 // By setting the GVK, we ensure that components such as the plugins have enough metadata to typecheck the object.
 func (cluster *Cluster) EnsureGVKIsPresent() {
 	cluster.SetGroupVersionKind(schema.GroupVersionKind{
-		Group:   GroupVersion.Group,
-		Version: GroupVersion.Version,
+		Group:   SchemeGroupVersion.Group,
+		Version: SchemeGroupVersion.Version,
 		Kind:    ClusterKind,
 	})
 }

@@ -151,7 +151,7 @@ func newFakePooler(k8sClient client.Client, cluster *apiv1.Cluster) *apiv1.Poole
 	// upstream issue, go client cleans typemeta: https://github.com/kubernetes/client-go/issues/308
 	pooler.TypeMeta = metav1.TypeMeta{
 		Kind:       apiv1.PoolerKind,
-		APIVersion: apiv1.GroupVersion.String(),
+		APIVersion: apiv1.SchemeGroupVersion.String(),
 	}
 
 	return pooler
@@ -219,7 +219,7 @@ func newFakeCNPGCluster(
 	// upstream issue, go client cleans typemeta: https://github.com/kubernetes/client-go/issues/308
 	cluster.TypeMeta = metav1.TypeMeta{
 		Kind:       apiv1.ClusterKind,
-		APIVersion: apiv1.GroupVersion.String(),
+		APIVersion: apiv1.SchemeGroupVersion.String(),
 	}
 
 	return cluster
@@ -270,7 +270,7 @@ func newFakeCNPGClusterWithPGWal(k8sClient client.Client, namespace string) *api
 	// upstream issue, go client cleans typemeta: https://github.com/kubernetes/client-go/issues/308
 	cluster.TypeMeta = metav1.TypeMeta{
 		Kind:       apiv1.ClusterKind,
-		APIVersion: apiv1.GroupVersion.String(),
+		APIVersion: apiv1.SchemeGroupVersion.String(),
 	}
 
 	return cluster
