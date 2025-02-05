@@ -155,8 +155,8 @@ func (rs *roleManager) getRoles(ctx context.Context) ([]Role, error) {
 			"rolcanlogin, rolconnlimit, rolpassword, " +
 			"rolvaliduntil, rolreplication, rolbypassrls, " +
 			"pg_catalog.shobj_description(oid, 'pg_authid') as rolcomment, " +
-			"rolname = current_user AS is_current_user " +
-			"FROM pg_authid " +
+			"rolname = CURRENT_USER AS is_current_user " +
+			"FROM pg_catalog.pg_authid " +
 			"WHERE oid >= 16384 " +
 			"ORDER BY 2"
 	} else {
@@ -166,8 +166,8 @@ func (rs *roleManager) getRoles(ctx context.Context) ([]Role, error) {
 			"rolvaliduntil, rolreplication, " +
 			"false as rolbypassrls, " +
 			"pg_catalog.shobj_description(oid, 'pg_authid') as rolcomment, " +
-			"rolname = current_user AS is_current_user " +
-			"FROM pg_authid " +
+			"rolname = CURRENT_USER AS is_current_user " +
+			"FROM pg_catalog.pg_authid " +
 			"WHERE oid >= 16384 " +
 			"ORDER BY 2"
 	}

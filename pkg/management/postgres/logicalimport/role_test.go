@@ -28,9 +28,9 @@ import (
 
 var _ = Describe("", func() {
 	const inhQuery = "SELECT ur.rolname AS roleid, um.rolname AS member, a.admin_option, ug.rolname AS grantor " +
-		"FROM pg_auth_members a LEFT JOIN pg_authid ur on ur.oid = a.roleid " +
-		"LEFT JOIN pg_authid um on um.oid = a.member " +
-		"LEFT JOIN pg_authid ug on ug.oid = a.grantor " +
+		"FROM pg_catalog.pg_auth_members a LEFT JOIN pg_authid ur on ur.oid = a.roleid " +
+		"LEFT JOIN pg_catalog.pg_authid um on um.oid = a.member " +
+		"LEFT JOIN pg_catalog.pg_authid ug on ug.oid = a.grantor " +
 		"WHERE ur.oid >= 16384 AND um.oid >= 16384"
 
 	var (
