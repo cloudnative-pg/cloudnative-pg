@@ -104,18 +104,18 @@ func newBackupConnection(
 	immediateCheckpoint bool,
 	waitForArchive bool,
 ) (*backupConnection, error) {
-	superUserDB, err := instance.GetBackgroundDB()
+	db, err := instance.GetBackgroundDB()
 	if err != nil {
 		return nil, err
 	}
 
-	vers, err := utils.GetPgVersion(superUserDB)
+	vers, err := utils.GetPgVersion(db)
 	if err != nil {
 		return nil, err
 	}
 
 	// the context is used only while obtaining the connection
-	conn, err := superUserDB.Conn(ctx)
+	conn, err := db.Conn(ctx)
 	if err != nil {
 		return nil, err
 	}

@@ -726,7 +726,7 @@ func (instance *Instance) GetSuperUserDB() (*sql.DB, error) {
 // GetBackgroundDB returns a connection to the instance that should be used for long running
 // background processes such as creating backups.
 func (instance *Instance) GetBackgroundDB() (*sql.DB, error) {
-	return instance.ConnectionPool().Connection("postgres")
+	return instance.ConnectionPool().BackgroundConnection("postgres")
 }
 
 // GetTemplateDB gets a connection to the "template1" database on this instance
