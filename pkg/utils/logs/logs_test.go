@@ -227,7 +227,7 @@ var _ = Describe("Pod logging tests", func() {
 			Expect(logBuffer.String()).To(BeEquivalentTo("fake logs\n"))
 		})
 	})
-	When("usring the StreamMultiple function", func() {
+	When("using the StreamMultiple function", func() {
 		It("should log each container into a separate writer", func(ctx context.Context) {
 			client := fake.NewClientset(&podWithSidecar)
 			streamPodLog := StreamingRequest{
