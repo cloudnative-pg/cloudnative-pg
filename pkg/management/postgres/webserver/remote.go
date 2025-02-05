@@ -94,6 +94,7 @@ func NewRemoteWebServer(
 	serveMux.HandleFunc(url.PathPgArchivePartial, endpoints.pgArchivePartial)
 	serveMux.HandleFunc(url.PathPGControlData, endpoints.pgControlData)
 	serveMux.HandleFunc(url.PathUpdate, endpoints.updateInstanceManager(cancelFunc, exitedConditions))
+	serveMux.HandleFunc(url.PathRestart, endpoints.restartInstanceManager(cancelFunc, exitedConditions))
 
 	server := &http.Server{
 		Addr:              fmt.Sprintf(":%d", url.StatusPort),
@@ -115,63 +116,95 @@ func NewRemoteWebServer(
 }
 
 func (ws *remoteWebserverEndpoints) isServerHealthy(w http.ResponseWriter, _ *http.Request) {
+	// Debugging the hanging endpoints:
+	// --------------------------------
+	// If the number of :deferred exit logs don't match the number of :entry logs, something is wrong
+	// This function exits-early; so no :exit log is expected in some cases
+
+	log.Trace("isServerHealthy: entry")
+
+	defer log.Trace("isServerHealthy: deferred exit")
+
 	// If `pg_rewind` is running the Pod is starting up.
 	// We need to report it healthy to avoid being killed by the kubelet.
 	// Same goes for instances with fencing on.
 	if ws.instance.PgRewindIsRunning || ws.instance.MightBeUnavailable() {
-		log.Trace("Liveness probe skipped")
+		log.Trace("isServerHealthy: Liveness probe skipped")
 		_, _ = fmt.Fprint(w, "Skipped")
 		return
 	}
 
 	err := ws.instance.IsServerHealthy()
 	if err != nil {
-		log.Debug("Liveness probe failing", "err", err.Error())
+		log.Debug("isServerHealthy: Liveness probe failing", "err", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	log.Trace("Liveness probe succeeding")
+	log.Trace("isServerHealthy: Liveness probe succeeding")
 	_, _ = fmt.Fprint(w, "OK")
+	log.Trace("isServerHealthy: exit")
 }
 
 // This is the readiness probe
 func (ws *remoteWebserverEndpoints) isServerReady(w http.ResponseWriter, r *http.Request) {
+	// Debugging the hanging endpoints:
+	// --------------------------------
+	// If the number of :deferred exit logs don't match the number of :entry logs, something is wrong
+	// This function exits-early; so no :exit log is expected in some cases
+
+	log.Trace("isServerReady: entry")
+
+	defer log.Trace("isServerReady: deferred exit")
+
 	if err := ws.readinessChecker.IsServerReady(r.Context()); err != nil {
-		log.Debug("Readiness probe failing", "err", err.Error())
+		log.Debug("isServerReady: Readiness probe failing", "err", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	log.Trace("Readiness probe succeeding")
+	log.Trace("isServerReady: Readiness probe succeeding")
 	_, _ = fmt.Fprint(w, "OK")
+	log.Trace("isServerReady: exit")
 }
 
 // This probe is for the instance status, including replication
 func (ws *remoteWebserverEndpoints) pgStatus(w http.ResponseWriter, _ *http.Request) {
+	// Debugging the hanging endpoints:
+	// --------------------------------
+	// If the number of :exit logs don't match the number of :entry logs, something is wrong
+	// If the number of :exit logs don't match the number of :deferred exit logs, something is wrong
+
+	defer log.Trace("pgStatus: deferred exit")
+
+	log.Trace("pgStatus: entry")
+
 	// Extract the status of the current instance
 	status, err := ws.instance.GetStatus()
 	if err != nil {
 		log.Debug(
-			"Instance status probe failing",
+			"pgStatus: Instance status probe failing",
 			"err", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	// Marshal the status back to the operator
-	log.Trace("Instance status probe succeeding")
+	log.Trace("pgStatus: marshalling status")
 	js, err := json.Marshal(status)
 	if err != nil {
 		log.Warning(
-			"Internal error marshalling instance status",
+			"pgStatus: Internal error marshalling instance status",
 			"err", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	log.Trace("pgStatus: marshalling complete")
 
 	w.Header().Set("Content-Type", "application/json")
 	_, _ = w.Write(js)
+
+	log.Trace("pgStatus: exit")
 }
 
 func (ws *remoteWebserverEndpoints) pgControlData(w http.ResponseWriter, _ *http.Request) {
@@ -208,6 +241,9 @@ func (ws *remoteWebserverEndpoints) updateInstanceManager(
 	exitedCondition concurrency.MultipleExecuted,
 ) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
+		defer log.Trace("updateInstanceManager: deferred exit")
+		log.Trace("updateInstanceManager: entry")
+
 		// No need to handle this request if it is not a put
 		if r.Method != http.MethodPut {
 			http.Error(w, "wrong method used", http.StatusMethodNotAllowed)
@@ -216,6 +252,7 @@ func (ws *remoteWebserverEndpoints) updateInstanceManager(
 
 		// No need to do anything if we are already upgrading
 		if !ws.instance.InstanceManagerIsUpgrading.CompareAndSwap(false, true) {
+			log.Trace("updateInstanceManager: instance manager is already upgrading")
 			http.Error(w, "instance manager is already upgrading", http.StatusTeapot)
 			return
 		}
@@ -223,8 +260,10 @@ func (ws *remoteWebserverEndpoints) updateInstanceManager(
 		// we will perform the upgrade. Ensure we unset the flag in the end
 		defer ws.instance.InstanceManagerIsUpgrading.Store(false)
 
+		log.Trace("updateInstanceManager: upgrading instance manager")
 		err := upgrade.FromReader(cancelFunc, exitedCondition, ws.typedClient, ws.instance, r.Body)
 		if err != nil {
+			log.Trace("updateInstanceManager: error while upgrading instance manager", "err", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -233,6 +272,51 @@ func (ws *remoteWebserverEndpoints) updateInstanceManager(
 		// At this stage we are running the new version of the instance manager
 		// and not the old one.
 		_, _ = fmt.Fprint(w, "OK")
+		log.Trace("updateInstanceManager: exit")
+	}
+}
+
+// restartInstanceManager replace the instance with a copy of itself
+func (ws *remoteWebserverEndpoints) restartInstanceManager(
+	cancelFunc context.CancelFunc,
+	exitedCondition concurrency.MultipleExecuted,
+) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		defer log.Trace("restartInstanceManager: deferred exit")
+
+		log.Trace("restartInstanceManager: entry")
+		// No need to handle this request if it is not a put
+		if r.Method != http.MethodPut {
+			http.Error(w, "wrong method used", http.StatusMethodNotAllowed)
+			return
+		}
+
+		// No need to do anything if we are already upgrading
+		if !ws.instance.InstanceManagerIsUpgrading.CompareAndSwap(false, true) {
+			log.Trace("restartInstanceManager: instance manager is already upgrading")
+			http.Error(w, "instance manager is already upgrading", http.StatusTeapot)
+			return
+		}
+		// If we get here, the InstanceManagerIsUpgrading flag was set and
+		// we will perform the upgrade. Ensure we unset the flag in the end
+		defer ws.instance.InstanceManagerIsUpgrading.Store(false)
+
+		log.Trace("restartInstanceManager: upgrading instance manager")
+		err := upgrade.FromLocalBinary(cancelFunc, exitedCondition, ws.typedClient, ws.instance, "/controller/manager")
+		if err != nil {
+			// The defer above is known not to execute in the upgradeInstanceManager function
+			// so we'll call it explicitly here
+			ws.instance.InstanceManagerIsUpgrading.Store(false)
+			log.Trace("restartInstanceManager: error while upgrading instance manager", "err", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// Unfortunately this point, if everything is right, will not be reached.
+		// At this stage we are running the new version of the instance manager
+		// and not the old one.
+		_, _ = fmt.Fprint(w, "OK")
+		log.Trace("restartInstanceManager: exit")
 	}
 }
 
