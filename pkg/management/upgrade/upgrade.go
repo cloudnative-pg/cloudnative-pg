@@ -24,8 +24,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
 	"syscall"
-	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -82,15 +82,6 @@ func FromLocalBinary(
 		}
 	}(sourceFile)
 
-	// Gather the status of the instance
-	ctx, cancel := context.WithTimeout(context.TODO(), 5*time.Minute)
-	defer cancel()
-
-	instanceStatus, err := instance.GetStatus(ctx)
-	if err != nil {
-		return fmt.Errorf("while retrieving instance's status: %w", err)
-	}
-
 	// Read and validate the binary
 	newHash, err := downloadAndCloseInstanceManagerBinary(updatedInstanceManager, sourceFile)
 	if err != nil {
@@ -100,7 +91,7 @@ func FromLocalBinary(
 	// Validate the hash of this instance manager
 	if err := validateInstanceManagerHash(typedClient,
 		instance.GetClusterName(), instance.GetNamespaceName(),
-		instanceStatus.InstanceArch, newHash); err != nil {
+		runtime.GOARCH, newHash); err != nil {
 		return fmt.Errorf("while validating instance manager binary: %w", err)
 	}
 
@@ -166,15 +157,6 @@ func FromReader(
 		}
 	}()
 
-	ctx, cancel := context.WithTimeout(context.TODO(), 5 * time.Minute)
-	defer cancel()
-
-	// Gather the status of the instance
-	instanceStatus, err := instance.GetStatus(ctx)
-	if err != nil {
-		return fmt.Errorf("while retrieving instance's status: %w", err)
-	}
-
 	// Read the new instance manager version
 	newHash, err := downloadAndCloseInstanceManagerBinary(updatedInstanceManager, r)
 	if err != nil {
@@ -184,7 +166,7 @@ func FromReader(
 	// Validate the hash of this instance manager
 	if err := validateInstanceManagerHash(typedClient,
 		instance.GetClusterName(), instance.GetNamespaceName(),
-		instanceStatus.InstanceArch, newHash); err != nil {
+		runtime.GOARCH, newHash); err != nil {
 		return fmt.Errorf("while validating instance manager binary: %w", err)
 	}
 
