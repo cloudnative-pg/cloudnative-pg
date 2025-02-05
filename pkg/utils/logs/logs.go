@@ -19,6 +19,8 @@ package logs
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"io"
 
 	v1 "k8s.io/api/core/v1"
@@ -64,9 +66,7 @@ func (spl *StreamingRequest) getKubernetesClient() kubernetes.Interface {
 	return spl.Client
 }
 
-// getPodStreams opens REST request to the pod containers
-// If the pod has only one container, it is used by default. Otherwise
-// it returns a list of streams to each of the running containers
+// getPodStream opens a REST request to the pod
 func (spl *StreamingRequest) getPodStream() *rest.Request {
 	client := spl.getKubernetesClient()
 	pods := client.CoreV1().Pods(spl.getPodNamespace())
@@ -76,26 +76,31 @@ func (spl *StreamingRequest) getPodStream() *rest.Request {
 		spl.getLogOptions())
 }
 
-func (spl *StreamingRequest) getQualifiedPodStream(container string) *rest.Request {
+// getPodStreamWithOptions returns the stream to the pod with overridden container and `previous` values
+func (spl *StreamingRequest) getPodStreamWithOptions(container string, previous bool) *rest.Request {
 	client := spl.getKubernetesClient()
 	pods := client.CoreV1().Pods(spl.getPodNamespace())
 	options := spl.getLogOptions()
-	options.Container = container
+	// dereference to avoid side effects
+	copyOptions := *options
+	copyOptions.Container = container
+	copyOptions.Previous = previous
 
 	return pods.GetLogs(
 		spl.getPodName(),
-		options)
+		&copyOptions)
 }
 
 // Stream streams the pod logs and shunts them to the `writer`.
+// If there are multiple containers, it will concatenate all the container streams into the writer
 func (spl *StreamingRequest) Stream(ctx context.Context, writer io.Writer) (err error) {
 	options := spl.getLogOptions()
 	if options.Container != "" {
-		return writeLogs(ctx, spl.getPodStream(), writer)
+		return sendLogsToWriter(ctx, spl.getPodStream(), writer)
 	}
 
 	for _, container := range spl.Pod.Spec.Containers {
-		if err := writeLogs(ctx, spl.getQualifiedPodStream(container.Name), writer); err != nil {
+		if err := sendLogsToWriter(ctx, spl.getPodStreamWithOptions(container.Name, options.Previous), writer); err != nil {
 			return err
 		}
 	}
@@ -107,50 +112,64 @@ type writerCreator interface {
 	Create(name string) (io.Writer, error)
 }
 
-// StreamMultiple streams the pod logs and shunts each container into a separate writer
+// StreamMultiple streams the pod logs, sending each container's stream to a separate writer
 func (spl *StreamingRequest) StreamMultiple(
 	ctx context.Context,
 	writerGen writerCreator,
 	namer func(string) string,
 ) (err error) {
-	options := spl.getLogOptions()
-	if options.Container != "" {
-		writer, err := writerGen.Create(namer(options.Container))
+	logContainer := func(containerName string) error {
+		options := spl.getLogOptions()
+		writer, err := writerGen.Create(namer(containerName))
 		if err != nil {
 			return err
 		}
-		if err := writeLogs(ctx, spl.getPodStream(), writer); err != nil {
-			return err
+		if options.Previous {
+			jsWrite := json.NewEncoder(writer)
+			if err := jsWrite.Encode("====== Beginning of Previous Log ====="); err != nil {
+				return err
+			}
+			// getting the Previous logs can fail (as with `kubectl logs -p`). Don't error out
+			if err := sendLogsToWriter(ctx, spl.getPodStreamWithOptions(containerName, true), writer); err != nil {
+				jsWrite := json.NewEncoder(writer)
+				// we try to print the json-safe error message. We don't exit on error
+				_ = jsWrite.Encode(err.Error())
+			}
+			if err := jsWrite.Encode("====== End of Previous Log ====="); err != nil {
+				return err
+			}
 		}
+		// get the current logs
+		return sendLogsToWriter(ctx, spl.getPodStreamWithOptions(containerName, false), writer)
 	}
 
+	options := spl.getLogOptions()
+	if options.Container != "" {
+		return logContainer(options.Container)
+	}
 	for _, container := range spl.Pod.Spec.Containers {
-		writer, err := writerGen.Create(namer(container.Name))
-		if err != nil {
-			return err
-		}
-		if err := writeLogs(ctx, spl.getQualifiedPodStream(container.Name), writer); err != nil {
+		if err := logContainer(container.Name); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func writeLogs(ctx context.Context, podStream *rest.Request, writer io.Writer) error {
+func sendLogsToWriter(ctx context.Context, podStream *rest.Request, writer io.Writer) error {
 	logStream, err := podStream.Stream(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("when opening the log stream: %w", err)
 	}
 	defer func() {
 		innerErr := logStream.Close()
 		if err == nil && innerErr != nil {
-			err = innerErr
+			err = fmt.Errorf("when closing the log stream: %w", innerErr)
 		}
 	}()
 
 	_, err = io.Copy(writer, logStream)
 	if err != nil {
-		return err
+		return fmt.Errorf("when copying the log stream to the writer: %w", err)
 	}
 	_, _ = writer.Write([]byte("\n"))
 	return nil
