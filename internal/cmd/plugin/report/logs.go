@@ -115,29 +115,12 @@ func streamClusterLogsToZip(
 
 	for idx := range podList.Items {
 		pod := podList.Items[idx]
-		for _, container := range pod.Spec.Containers {
-			path := filepath.Join(logsdir, fmt.Sprintf("%s-%s.jsonl", pod.Name, container.Name))
-			writer, err := zipper.Create(path)
-			if err != nil {
-				return fmt.Errorf("could not add '%s' to zip: %w", path, err)
-			}
-			streamPodLogs.Options.Container = container.Name
-			streamPodLogs.Pod = pod
-
-			if _, err := fmt.Fprint(writer, "\n\"====== Begin of Previous Log =====\"\n"); err != nil {
-				return err
-			}
-			// We ignore the error because it will error if there are no previous logs
-			_ = streamPodLogs.Stream(ctx, writer)
-			if _, err := fmt.Fprint(writer, "\n\"====== End of Previous Log =====\"\n"); err != nil {
-				return err
-			}
-
-			streamPodLogs.Previous = false
-
-			if err := streamPodLogs.Stream(ctx, writer); err != nil {
-				return err
-			}
+		streamPodLogs.Pod = pod
+		fileNamer := func(containerName string) string {
+			return filepath.Join(logsdir, fmt.Sprintf("%s-%s.jsonl", pod.Name, containerName))
+		}
+		if err := streamPodLogs.StreamMultiple(ctx, zipper, fileNamer); err != nil {
+			return err
 		}
 	}
 
@@ -185,17 +168,12 @@ func streamClusterJobLogsToZip(ctx context.Context, clusterName, namespace strin
 		}
 		for idx := range podList.Items {
 			pod := podList.Items[idx]
-			for _, container := range pod.Spec.Containers {
-				path := filepath.Join(logsdir, fmt.Sprintf("%s-%s.jsonl", pod.Name, container.Name))
-				writer, err := zipper.Create(path)
-				if err != nil {
-					return fmt.Errorf("could not add '%s' to zip: %w", path, err)
-				}
-				streamPodLogs.Options.Container = container.Name
-				streamPodLogs.Pod = pod
-				if err = streamPodLogs.Stream(ctx, writer); err != nil {
-					return err
-				}
+			streamPodLogs.Pod = pod
+			fileNamer := func(containerName string) string {
+				return filepath.Join(logsdir, fmt.Sprintf("%s-%s.jsonl", pod.Name, containerName))
+			}
+			if err := streamPodLogs.StreamMultiple(ctx, zipper, fileNamer); err != nil {
+				return err
 			}
 		}
 	}
