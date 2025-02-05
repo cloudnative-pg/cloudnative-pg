@@ -58,7 +58,7 @@ func streamOperatorLogsToZip(
 		}
 
 		streamPodLogs := &logs.StreamingRequest{
-			Pod:      &pod,
+			Pod:      pod,
 			Options:  podLogOptions,
 			Previous: true,
 		}
@@ -113,27 +113,13 @@ func streamClusterLogsToZip(
 		Previous: true,
 	}
 
-	for _, pod := range podList.Items {
-		writer, err := zipper.Create(filepath.Join(logsdir, pod.Name) + ".jsonl")
-		if err != nil {
-			return fmt.Errorf("could not add '%s' to zip: %w",
-				filepath.Join(logsdir, pod.Name), err)
+	for idx := range podList.Items {
+		pod := podList.Items[idx]
+		streamPodLogs.Pod = pod
+		fileNamer := func(containerName string) string {
+			return filepath.Join(logsdir, fmt.Sprintf("%s-%s.jsonl", pod.Name, containerName))
 		}
-		podPointer := pod
-		streamPodLogs.Pod = &podPointer
-
-		if _, err := fmt.Fprint(writer, "\n\"====== Begin of Previous Log =====\"\n"); err != nil {
-			return err
-		}
-		// We ignore the error because it will error if there are no previous logs
-		_ = streamPodLogs.Stream(ctx, writer)
-		if _, err := fmt.Fprint(writer, "\n\"====== End of Previous Log =====\"\n"); err != nil {
-			return err
-		}
-
-		streamPodLogs.Previous = false
-
-		if err := streamPodLogs.Stream(ctx, writer); err != nil {
+		if err := streamPodLogs.StreamMultiple(ctx, zipper, fileNamer); err != nil {
 			return err
 		}
 	}
@@ -180,16 +166,13 @@ func streamClusterJobLogsToZip(ctx context.Context, clusterName, namespace strin
 			Options:  podLogOptions,
 			Previous: false,
 		}
-		for _, pod := range podList.Items {
-			writer, err := zipper.Create(filepath.Join(logsdir, pod.Name) + ".jsonl")
-			if err != nil {
-				return fmt.Errorf("could not add '%s' to zip: %w",
-					filepath.Join(logsdir, pod.Name), err)
+		for idx := range podList.Items {
+			pod := podList.Items[idx]
+			streamPodLogs.Pod = pod
+			fileNamer := func(containerName string) string {
+				return filepath.Join(logsdir, fmt.Sprintf("%s-%s.jsonl", pod.Name, containerName))
 			}
-			podPointer := pod
-			streamPodLogs.Pod = &podPointer
-			err = streamPodLogs.Stream(ctx, writer)
-			if err != nil {
+			if err := streamPodLogs.StreamMultiple(ctx, zipper, fileNamer); err != nil {
 				return err
 			}
 		}

@@ -42,7 +42,7 @@ var _ = Describe("Get the logs", Ordered, func() {
 			Name:      clusterName + "-1",
 		},
 	}
-	client := fakeClient.NewSimpleClientset(pod)
+	client := fakeClient.NewClientset(pod)
 	cluster := &apiv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
