@@ -8,7 +8,7 @@ require (
 	github.com/avast/retry-go/v4 v4.6.0
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/cheynewallace/tabby v1.1.1
-	github.com/cloudnative-pg/barman-cloud v0.0.0-20250104195650-c1472628b450
+	github.com/cloudnative-pg/barman-cloud v0.0.0-20250205134815-1a6b98ded711
 	github.com/cloudnative-pg/machinery v0.0.0-20250102082645-95c37fe624d0
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/go-logr/logr v1.4.2
