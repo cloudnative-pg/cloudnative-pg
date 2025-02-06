@@ -85,13 +85,13 @@ specified major release.
 ### PostgreSQL Container Images
 
 You can install the
-[latest version of the cluster catalog for the PostgreSQL Container Images](https://raw.githubusercontent.com/cloudnative-pg/postgres-containers/main/Debian/ClusterImageCatalog.yaml)
+[latest version of the cluster catalog for the PostgreSQL Container Images](https://raw.githubusercontent.com/cloudnative-pg/postgres-containers/refs/heads/main/Debian/ClusterImageCatalog-bookworm.yaml)
 ([cloudnative-pg/postgres-containers](https://github.com/cloudnative-pg/postgres-containers) repository)
 with:
 
 ```shell
 kubectl apply \
-  -f https://raw.githubusercontent.com/cloudnative-pg/postgres-containers/main/Debian/ClusterImageCatalog.yaml
+  -f https://raw.githubusercontent.com/cloudnative-pg/postgres-containers/refs/heads/main/Debian/ClusterImageCatalog-bookworm.yaml
 ```
 
 ### PostGIS Container Images
