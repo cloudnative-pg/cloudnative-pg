@@ -1150,10 +1150,8 @@ func validateWalSizeConfiguration(
 // into kubernetes resource.Quantity values
 // Ref: Numeric with Unit @ https://www.postgresql.org/docs/current/config-setting.html#CONFIG-SETTING-NAMES-VALUES
 func parsePostgresQuantityValue(value string) (resource.Quantity, error) {
-
 	// If it's a bare number, it's rejected
 	if _, err := strconv.Atoi(value); err == nil {
-
 		return resource.Quantity{}, resource.ErrFormatWrong
 	}
 
