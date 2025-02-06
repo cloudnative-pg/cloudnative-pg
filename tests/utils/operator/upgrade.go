@@ -104,8 +104,8 @@ func InstallLatest(
 
 	Eventually(func() error {
 		mapping, err := crudClient.RESTMapper().RESTMapping(
-			schema.GroupKind{Group: apiv1.SchemeGroupVersion.Group, Kind: apiv1.ClusterKind},
-			apiv1.SchemeGroupVersion.Version)
+			schema.GroupKind{Group: apiv1.GroupVersion.Group, Kind: apiv1.ClusterKind},
+			apiv1.GroupVersion.Version)
 		if err != nil {
 			return err
 		}

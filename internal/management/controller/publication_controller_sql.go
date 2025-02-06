@@ -37,7 +37,7 @@ func (r *PublicationReconciler) alignPublication(ctx context.Context, obj *apiv1
 		ctx,
 		`
 		SELECT count(*)
-		FROM pg_publication
+		FROM pg_catalog.pg_publication
 	        WHERE pubname = $1
 		`,
 		obj.Spec.Name)

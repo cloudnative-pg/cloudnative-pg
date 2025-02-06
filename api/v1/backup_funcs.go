@@ -236,8 +236,8 @@ func (backup *Backup) GetVolumeSnapshotConfiguration(
 // By setting the GVK, we ensure that components such as the plugins have enough metadata to typecheck the object.
 func (backup *Backup) EnsureGVKIsPresent() {
 	backup.SetGroupVersionKind(schema.GroupVersionKind{
-		Group:   SchemeGroupVersion.Group,
-		Version: SchemeGroupVersion.Version,
+		Group:   GroupVersion.Group,
+		Version: GroupVersion.Version,
 		Kind:    BackupKind,
 	})
 }

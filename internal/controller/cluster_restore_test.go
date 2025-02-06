@@ -483,7 +483,7 @@ var _ = Describe("ensureOrphanServicesAreNotPresent", func() {
 					Namespace: cluster.Namespace,
 				},
 			}
-			cluster.TypeMeta = metav1.TypeMeta{Kind: apiv1.ClusterKind, APIVersion: apiv1.SchemeGroupVersion.String()}
+			cluster.TypeMeta = metav1.TypeMeta{Kind: apiv1.ClusterKind, APIVersion: apiv1.GroupVersion.String()}
 			cluster.SetInheritedDataAndOwnership(&svc.ObjectMeta)
 			mockCli = fake.NewClientBuilder().
 				WithScheme(k8scheme.BuildWithAllKnownScheme()).

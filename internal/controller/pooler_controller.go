@@ -157,7 +157,7 @@ func isOwnedByPoolerKind(obj client.Object) (string, bool) {
 		return "", false
 	}
 
-	if owner.APIVersion != apiSGVString {
+	if owner.APIVersion != apiGVString {
 		return "", false
 	}
 
