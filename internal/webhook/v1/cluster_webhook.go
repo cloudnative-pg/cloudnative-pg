@@ -1224,22 +1224,26 @@ func (v *ClusterCustomValidator) validateImageChange(r, old *apiv1.Cluster) fiel
 	var result field.ErrorList
 	var newVersion, oldVersion version.Data
 	var err error
-	var newImagePath *field.Path
+	var fieldPath *field.Path
 	if r.Spec.ImageCatalogRef != nil {
-		newImagePath = field.NewPath("spec", "imageCatalogRef")
+		fieldPath = field.NewPath("spec", "imageCatalogRef", "major")
 	} else {
-		newImagePath = field.NewPath("spec", "imageName")
+		fieldPath = field.NewPath("spec", "imageName")
 	}
 
-	r.Status.Image = ""
-	newVersion, err = r.GetPostgresqlVersion()
+	newCluster := r.DeepCopy()
+	newCluster.Status.Image = ""
+	newVersion, err = newCluster.GetPostgresqlVersion()
 	if err != nil {
 		// The validation error will be already raised by the
 		// validateImageName function
 		return result
 	}
 
-	old.Status.Image = ""
+	old = old.DeepCopy()
+	if old.Status.MajorVersionUpgradeFromImage != nil {
+		old.Status.Image = *old.Status.MajorVersionUpgradeFromImage
+	}
 	oldVersion, err = old.GetPostgresqlVersion()
 	if err != nil {
 		// The validation error will be already raised by the
@@ -1247,16 +1251,14 @@ func (v *ClusterCustomValidator) validateImageChange(r, old *apiv1.Cluster) fiel
 		return result
 	}
 
-	status := version.IsUpgradePossible(oldVersion, newVersion)
-
-	if !status {
+	if oldVersion.Major() > newVersion.Major() {
 		result = append(
 			result,
 			field.Invalid(
-				newImagePath,
-				newVersion,
-				fmt.Sprintf("can't upgrade between majors %v and %v",
-					oldVersion, newVersion)))
+				fieldPath,
+				fmt.Sprintf("%v", newVersion.Major()),
+				fmt.Sprintf("can't downgrade from majors %v to %v",
+					oldVersion.Major(), newVersion.Major())))
 	}
 
 	return result

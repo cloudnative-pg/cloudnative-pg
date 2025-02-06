@@ -726,6 +726,13 @@ func (r *ClusterReconciler) reconcileResources(
 		return res, err
 	}
 
+	// In-place Postgres major version upgrades
+	if result, err := r.reconcileInPlaceMajorVersionUpgrades(ctx, cluster, resources); err != nil {
+		return ctrl.Result{}, fmt.Errorf("cannot reconcile in-place major version upgrades: %w", err)
+	} else if result != nil {
+		return *result, err
+	}
+
 	// Reconcile Pods
 	if res, err := r.reconcilePods(ctx, cluster, resources, instancesStatus); !res.IsZero() || err != nil {
 		return res, err
