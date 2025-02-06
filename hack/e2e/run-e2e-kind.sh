@@ -84,7 +84,8 @@ main() {
     "${HACK_DIR}/setup-cluster.sh" load
   fi
 
-  "${HACK_DIR}/setup-cluster.sh" load-helper-images
+  # Comment out when the a new release of kindest/node is release newer than v1.32.1
+  # "${HACK_DIR}/setup-cluster.sh" load-helper-images
 
   RC=0
 
