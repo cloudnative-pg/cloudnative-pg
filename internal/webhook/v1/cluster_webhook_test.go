@@ -767,7 +767,7 @@ var _ = Describe("configuration change validation", func() {
 			Spec: apiv1.ClusterSpec{
 				PostgresConfiguration: apiv1.PostgresConfiguration{
 					Parameters: map[string]string{
-						"min_wal_size": "80",
+						"min_wal_size": "80MB",
 						"max_wal_size": "1Gb",
 					},
 				},
