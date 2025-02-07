@@ -120,7 +120,6 @@ jobs:
               - '.github/workflows/continuous-integration.yml'
               - '.goreleaser*.yml'
               - 'Dockerfile'
-              - 'Dockerfile-ubi8'
               - 'Dockerfile-ubi9'
               - 'Makefile'
               - 'go.mod'
@@ -413,7 +412,7 @@ jobs:
       commit_version: ${{ env.VERSION }}
       commit: ${{ env.COMMIT_SHA }}
       controller_img: ${{ env.CONTROLLER_IMG }}
-      controller_img_ubi8: ${{ env.CONTROLLER_IMG_UBI8 }}
+      controller_img_ubi9: ${{ env.CONTROLLER_IMG_UBI9 }}
       bundle_img: ${{ env.BUNDLE_IMG }}
       catalog_img: ${{ env.CATALOG_IMG }}
       push: ${{ env.PUSH }}
@@ -529,17 +528,6 @@ jobs:
             type=ref,event=branch
             type=ref,event=pr
 
-      - name: Docker meta UBI8
-        id: docker-meta-ubi8
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.OPERATOR_IMAGE_NAME }}
-          flavor: |
-            suffix=-ubi8
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-
       - name: Docker meta UBI9
         id: docker-meta-ubi9
         uses: docker/metadata-action@v5
@@ -582,28 +570,6 @@ jobs:
         uses: erzz/dockle-action@v1
         with:
           image: ${{ steps.docker-meta.outputs.tags }}
-          exit-code: '1'
-          failure-threshold: WARN
-          accept-keywords: key
-
-      - name: Build for scan UBI8 image
-        uses: docker/build-push-action@v6
-        with:
-          platforms: "linux/amd64"
-          context: .
-          file: Dockerfile-ubi8
-          push: false
-          load: true
-          build-args: |
-            VERSION=${{ env.VERSION }}
-          tags: ${{ steps.docker-meta-ubi8.outputs.tags }}
-
-      - name: Dockle scan UBI8 image
-        uses: erzz/dockle-action@v1
-        env:
-          DOCKLE_IGNORES: CIS-DI-0009
-        with:
-          image: ${{ steps.docker-meta-ubi8.outputs.tags }}
           exit-code: '1'
           failure-threshold: WARN
           accept-keywords: key
@@ -665,17 +631,6 @@ jobs:
           cache-from: ${{ env.BUILD_PUSH_CACHE_FROM }}
           cache-to: ${{ env.BUILD_PUSH_CACHE_TO }}
 
-      - name: Build and push UBI8
-        uses: docker/build-push-action@v6
-        with:
-          platforms: ${{ env.PLATFORMS }}
-          context: .
-          file: Dockerfile-ubi8
-          push: ${{ env.PUSH }}
-          build-args: |
-            VERSION=${{ env.VERSION }}
-          tags: ${{ steps.docker-meta-ubi8.outputs.tags }}
-
       - name: Build and push UBI9
         uses: docker/build-push-action@v6
         with:
@@ -690,13 +645,13 @@ jobs:
       - name: Output images
         env:
           TAGS: ${{ steps.docker-meta.outputs.tags }}
-          TAGS_UBI8: ${{ steps.docker-meta-ubi8.outputs.tags }}
+          TAGS_UBI9: ${{ steps.docker-meta-ubi9.outputs.tags }}
         run: |
           LOWERCASE_OPERATOR_IMAGE_NAME=${OPERATOR_IMAGE_NAME,,}
           TAG=${TAGS#*:}
-          TAG_UBI=${TAGS_UBI8#*:}
+          TAG_UBI=${TAGS_UBI9#*:}
           echo "CONTROLLER_IMG=${LOWERCASE_OPERATOR_IMAGE_NAME}:${TAG}" >> $GITHUB_ENV
-          echo "CONTROLLER_IMG_UBI8=${LOWERCASE_OPERATOR_IMAGE_NAME}:${TAG_UBI}" >> $GITHUB_ENV
+          echo "CONTROLLER_IMG_UBI9=${LOWERCASE_OPERATOR_IMAGE_NAME}:${TAG_UBI}" >> $GITHUB_ENV
           echo "BUNDLE_IMG=${LOWERCASE_OPERATOR_IMAGE_NAME}:bundle-${TAG}" >> $GITHUB_ENV
           echo "CATALOG_IMG=${LOWERCASE_OPERATOR_IMAGE_NAME}:catalog-${TAG}" >> $GITHUB_ENV
 
@@ -742,7 +697,7 @@ jobs:
 
       - name: Create bundle
         env:
-          CONTROLLER_IMG: ${{ needs.buildx.outputs.controller_img_ubi8 }}
+          CONTROLLER_IMG: ${{ needs.buildx.outputs.controller_img_ubi9 }}
           BUNDLE_IMG: ${{ needs.buildx.outputs.bundle_img }}
           CATALOG_IMG: ${{ needs.buildx.outputs.catalog_img }}
         run: |
@@ -790,7 +745,7 @@ jobs:
 
       - name: Run preflight container test
         env:
-          CONTROLLER_IMG: ${{ needs.buildx.outputs.controller_img_ubi8 }}
+          CONTROLLER_IMG: ${{ needs.buildx.outputs.controller_img_ubi9 }}
           PFLT_ARTIFACTS: "preflight_results"
         run: |
           bin/preflight check container ${CONTROLLER_IMG} \
