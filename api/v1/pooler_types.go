@@ -25,7 +25,7 @@ import (
 
 // PoolerType is the type of the connection pool, meaning the service
 // we are targeting. Allowed values are `rw` and `ro`.
-// +kubebuilder:validation:Enum=rw;ro
+// +kubebuilder:validation:Enum=rw;ro;r
 type PoolerType string
 
 const (
@@ -34,6 +34,9 @@ const (
 
 	// PoolerTypeRO means that the pooler involves only the replicas
 	PoolerTypeRO = PoolerType("ro")
+
+	// PoolerTypeR means that the pooler involves every instance
+	PoolerTypeR = PoolerType("r")
 
 	// DefaultPgBouncerPoolerAuthQuery is the default auth_query for PgBouncer
 	DefaultPgBouncerPoolerAuthQuery = "SELECT usename, passwd FROM public.user_search($1)"
