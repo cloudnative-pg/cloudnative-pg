@@ -1021,7 +1021,7 @@ func (v *ClusterCustomValidator) validateConfiguration(r *apiv1.Cluster) field.E
 					sharedBuffersParameter,
 					fmt.Sprintf(
 						"Invalid value for configuration parameter %s. More info on accepted values format: "+
-							"https://www.postgresql.org/docs/current/config-setting.html#CONFIG-SETTING-NAMES-VALUES",
+							"https://cloudnative-pg.io/documentation/current/resource_management/",
 						sharedBuffersParameter,
 					)))
 		}
@@ -1150,28 +1150,28 @@ func validateWalSizeConfiguration(
 // into kubernetes resource.Quantity values
 // Ref: Numeric with Unit @ https://www.postgresql.org/docs/current/config-setting.html#CONFIG-SETTING-NAMES-VALUES
 func parsePostgresQuantityValue(value string) (resource.Quantity, error) {
-	// If no suffix, default is MB
+	// If it's a bare number, it's rejected
 	if _, err := strconv.Atoi(value); err == nil {
-		value += "MB"
+		return resource.Quantity{}, resource.ErrFormatWrong
 	}
 
 	// If there is a suffix it must be "B"
 	if value[len(value)-1:] != "B" {
 		return resource.Quantity{}, resource.ErrFormatWrong
 	}
-
 	// Kubernetes uses Mi rather than MB, Gi rather than GB. Drop the "B"
 	value = strings.TrimSuffix(value, "B")
 
-	// Spaces are allowed in postgres between number and unit in Postgres, but not in Kubernetes
+	// Spaces are allowed between number and unit in Postgres, but not in Kubernetes
 	value = strings.ReplaceAll(value, " ", "")
 
-	// Add the 'i' suffix unless it is a bare number (it was 'B' before)
+	// Add the 'i' suffix
 	if _, err := strconv.Atoi(value); err != nil {
 		value += "i"
 
-		// 'kB' must translate to 'Ki'
+		// 'ki' must translate to 'Ki'
 		value = strings.ReplaceAll(value, "ki", "Ki")
+	}
 	}
 
 	return resource.ParseQuantity(value)
