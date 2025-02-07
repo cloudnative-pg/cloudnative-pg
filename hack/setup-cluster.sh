@@ -74,6 +74,7 @@ export DOCKER_DEFAULT_PLATFORM
 # Constants
 registry_volume=registry_dev_data
 registry_name=registry.dev
+builder_name=cnpg-builder
 
 # #########################################################################
 # IMPORTANT: here we build a catalog of images that will be needed in the
@@ -361,6 +362,16 @@ check_registry() {
     jq -r ".[].Containers | .[] | select(.Name==\"${registry_name}\") | .Name"
 }
 
+# An existing builder will not have any knowledge of the local registry or the
+# any host outside the builder, but when having the builder inside Kubernetes
+# this is fixed since we already solved the issue of the kubernetes cluster reaching
+# out the local registry. The following functions will handle that builder
+create_builder() {
+  if ! docker buildx inspect "${builder_name}" &>/dev/null; then
+    docker buildx create --name "${builder_name}" --driver kubernetes --use
+  fi
+}
+
 deploy_fluentd() {
   local FLUENTD_IMAGE=fluent/fluentd-kubernetes-daemonset:v1.14.3-debian-forward-1.0
   local FLUENTD_LOCAL_IMAGE="${registry_name}:5000/fluentd-kubernetes-daemonset:local"
@@ -584,6 +595,7 @@ create() {
     sed -i -E -e 's/0\.0\.0\.0/docker/g' "${HOME}/.kube/config"
   fi
 
+  create_builder
   deploy_fluentd
   deploy_csi_host_path
   deploy_prometheus_crds
@@ -619,11 +631,9 @@ load() {
   echo "${bright}Building operator from current worktree${reset}"
 
   CONTROLLER_IMG="$(ENABLE_REGISTRY="${ENABLE_REGISTRY}" print_image)"
-  make -C "${ROOT_DIR}" CONTROLLER_IMG="${CONTROLLER_IMG}" ARCH="${ARCH}" docker-build
+  make -C "${ROOT_DIR}" VERSION=latest REGISTRY="${registry_name}:5000" INSECURE="true" ARCH="${ARCH}" docker-build
 
   echo "${bright}Loading new operator image on cluster ${CLUSTER_NAME}${reset}"
-
-  load_image "${CLUSTER_NAME}" "${CONTROLLER_IMG}"
 
   echo "${bright}Done loading new operator image on cluster ${CLUSTER_NAME}${reset}"
 
@@ -638,10 +648,8 @@ load() {
     PRIME_CONTROLLER_IMG="${CONTROLLER_IMG}-prime"
     CURRENT_VERSION=$(make -C "${ROOT_DIR}" -s print-version)
     PRIME_VERSION="${CURRENT_VERSION}-prime"
-    make -C "${ROOT_DIR}" CONTROLLER_IMG="${PRIME_CONTROLLER_IMG}"  VERSION="${PRIME_VERSION}" \
+    make -C "${ROOT_DIR}" REGISTRY="${registry_name}:5000" INSECURE="true" VERSION="${PRIME_VERSION}" \
       ARCH="${ARCH}" docker-build
-
-    load_image "${CLUSTER_NAME}" "${PRIME_CONTROLLER_IMG}"
 
     echo "${bright}Done loading new 'prime' operator image on cluster ${CLUSTER_NAME}${reset}"
   fi
@@ -666,7 +674,7 @@ print_image() {
   if [ -n "${ENABLE_REGISTRY:-}" ] || "check_registry_${ENGINE}"; then
     tag=latest
   fi
-  echo "${registry_name}:5000/cloudnative-pg:${tag}"
+  echo "${registry_name}:5000/cloudnative-pg-testing:${tag}"
 }
 
 export_logs() {
@@ -766,7 +774,7 @@ main() {
   fi
   KUBECTL_VERSION=${KUBECTL_VERSION:-$K8S_VERSION}
 
-  # Only here the K8S_VERSION veriable contains its final value
+  # Only here the K8S_VERSION variable contains its final value
   # so we can set the default cluster name
   CLUSTER_NAME=${CLUSTER_NAME:-pg-operator-e2e-${K8S_VERSION//./-}}
 
