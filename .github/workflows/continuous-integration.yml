@@ -35,6 +35,7 @@ env:
   REGISTRY: "ghcr.io"
   REGISTRY_USER: ${{ github.actor }}
   REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+  SIGN_IMAGES: "true"
   OPP_SCRIPT_URL: "https://raw.githubusercontent.com/redhat-openshift-ecosystem/community-operators-pipeline/ci/latest/ci/scripts/opp.sh"
 
 defaults:
@@ -120,7 +121,6 @@ jobs:
               - '.github/workflows/continuous-integration.yml'
               - '.goreleaser*.yml'
               - 'Dockerfile'
-              - 'Dockerfile-ubi9'
               - 'Makefile'
               - 'go.mod'
               - 'go.sum'
@@ -408,11 +408,13 @@ jobs:
       contents: read
       packages: write
       security-events: write
+      id-token: write
+
     outputs:
       commit_version: ${{ env.VERSION }}
       commit: ${{ env.COMMIT_SHA }}
       controller_img: ${{ env.CONTROLLER_IMG }}
-      controller_img_ubi9: ${{ env.CONTROLLER_IMG_UBI9 }}
+      controller_img_ubi: ${{ env.CONTROLLER_IMG_UBI }}
       bundle_img: ${{ env.BUNDLE_IMG }}
       catalog_img: ${{ env.CATALOG_IMG }}
       push: ${{ env.PUSH }}
@@ -519,30 +521,11 @@ jobs:
           COMMIT: ${{ env.COMMIT }}
           VERSION: ${{ env.VERSION }}
 
-      - name: Docker meta
-        id: docker-meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.OPERATOR_IMAGE_NAME }}
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-
-      - name: Docker meta UBI9
-        id: docker-meta-ubi9
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.OPERATOR_IMAGE_NAME }}
-          flavor: |
-            suffix=-ubi9
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
         with:
           platforms: ${{ env.PLATFORMS }}
+          cache-image: false
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -554,44 +537,32 @@ jobs:
           username: ${{ env.REGISTRY_USER }}
           password: ${{ env.REGISTRY_PASSWORD }}
 
-      - name: Build for scan distroless image
-        uses: docker/build-push-action@v6
+      - name: Build for scan
+        uses: docker/bake-action@v6
+        id: bake-build
+        env:
+          VERSION: ${{ env.VERSION }}
+          REGISTRY: ${{ env.REGISTRY }}/${{ env.REPOSITORY_OWNER }}
         with:
-          platforms: "linux/amd64"
-          context: .
-          file: Dockerfile
-          push: false
-          load: true
-          build-args: |
-            VERSION=${{ env.VERSION }}
-          tags: ${{ steps.docker-meta.outputs.tags }}
+          source: .
+          push: true
+          no-cache: true
+          targets: "default"
 
       - name: Dockle scan distroless image
         uses: erzz/dockle-action@v1
         with:
-          image: ${{ steps.docker-meta.outputs.tags }}
+          image: ${{ fromJSON(steps.bake-build.outputs.metadata)['distroless']['image.name'] }}
           exit-code: '1'
           failure-threshold: WARN
           accept-keywords: key
 
-      - name: Build for scan UBI9 image
-        uses: docker/build-push-action@v6
-        with:
-          platforms: "linux/amd64"
-          context: .
-          file: Dockerfile-ubi9
-          push: false
-          load: true
-          build-args: |
-            VERSION=${{ env.VERSION }}
-          tags: ${{ steps.docker-meta-ubi9.outputs.tags }}
-
-      - name: Dockle scan UBI9 image
+      - name: Dockle scan UBI image
         uses: erzz/dockle-action@v1
         env:
           DOCKLE_IGNORES: CIS-DI-0009
         with:
-          image: ${{ steps.docker-meta-ubi9.outputs.tags }}
+          image: ${{ fromJSON(steps.bake-build.outputs.metadata)['ubi']['image.name'] }}
           exit-code: '1'
           failure-threshold: WARN
           accept-keywords: key
@@ -605,7 +576,7 @@ jobs:
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
-          image: ${{ steps.docker-meta.outputs.tags }}
+          image: ${{ fromJSON(steps.bake-build.outputs.metadata)['distroless']['image.name'] }}
           args: --severity-threshold=high --file=Dockerfile
 
       - name: Upload result to GitHub Code Scanning
@@ -618,42 +589,40 @@ jobs:
           sarif_file: snyk.sarif
 
       - name: Build and push
-        uses: docker/build-push-action@v6
+        uses: docker/bake-action@v3
+        id: bake-push
+        env:
+          environment: "testing"
+          VERSION: ${{ env.VERSION }}
+          REGISTRY: ${{ env.REGISTRY }}/${{ env.REPOSITORY_OWNER }}
         with:
-          platforms: ${{ env.PLATFORMS }}
-          context: .
-          file: Dockerfile
-          push: ${{ env.PUSH }}
-          build-args: |
-            VERSION=${{ env.VERSION }}
-          tags: ${{ steps.docker-meta.outputs.tags }}
-          provenance: ${{ env.BUILD_PUSH_PROVENANCE }}
-          cache-from: ${{ env.BUILD_PUSH_CACHE_FROM }}
-          cache-to: ${{ env.BUILD_PUSH_CACHE_TO }}
+          push: true
+          no-cache: true
+          targets: "default"
 
-      - name: Build and push UBI9
-        uses: docker/build-push-action@v6
-        with:
-          platforms: ${{ env.PLATFORMS }}
-          context: .
-          file: Dockerfile-ubi9
-          push: ${{ env.PUSH }}
-          build-args: |
-            VERSION=${{ env.VERSION }}
-          tags: ${{ steps.docker-meta-ubi9.outputs.tags }}
+      - name: Install cosign
+        if: env.SIGN_IMAGES == 'true'
+        uses: sigstore/cosign-installer@v3
+        # See https://github.blog/security/supply-chain-security/safeguard-container-signing-capability-actions/
+        # and https://github.com/actions/starter-workflows/blob/main/ci/docker-publish.yml for more details on
+        # how to use cosign.
+      - name: Sign images
+        if: env.SIGN_IMAGES == 'true'
+        run: |
+          images=$(echo '${{ steps.bake-push.outputs.metadata }}' |
+            jq -r '.[] | (."image.name" | sub(",.*";"" )) + "@" + ."containerimage.digest"'
+          )
+          cosign sign --yes ${images}
 
       - name: Output images
         env:
-          TAGS: ${{ steps.docker-meta.outputs.tags }}
-          TAGS_UBI9: ${{ steps.docker-meta-ubi9.outputs.tags }}
+          DISTROLESS: ${{ fromJSON(steps.bake-push.outputs.metadata)['distroless']['image.name'] }}
+          UBI: ${{ fromJSON(steps.bake-push.outputs.metadata)['ubi']['image.name'] }}
         run: |
-          LOWERCASE_OPERATOR_IMAGE_NAME=${OPERATOR_IMAGE_NAME,,}
-          TAG=${TAGS#*:}
-          TAG_UBI=${TAGS_UBI9#*:}
-          echo "CONTROLLER_IMG=${LOWERCASE_OPERATOR_IMAGE_NAME}:${TAG}" >> $GITHUB_ENV
-          echo "CONTROLLER_IMG_UBI9=${LOWERCASE_OPERATOR_IMAGE_NAME}:${TAG_UBI}" >> $GITHUB_ENV
-          echo "BUNDLE_IMG=${LOWERCASE_OPERATOR_IMAGE_NAME}:bundle-${TAG}" >> $GITHUB_ENV
-          echo "CATALOG_IMG=${LOWERCASE_OPERATOR_IMAGE_NAME}:catalog-${TAG}" >> $GITHUB_ENV
+          echo "CONTROLLER_IMG=${DISTROLESS}" >> $GITHUB_ENV
+          echo "CONTROLLER_IMG_UBI=${UBI}" >> $GITHUB_ENV
+          echo "BUNDLE_IMG=${UBI}-bundle" >> $GITHUB_ENV
+          echo "CATALOG_IMG=${UBI}-catalog" >> $GITHUB_ENV
 
   olm-bundle:
     name: Create OLM bundle and catalog
@@ -697,7 +666,7 @@ jobs:
 
       - name: Create bundle
         env:
-          CONTROLLER_IMG: ${{ needs.buildx.outputs.controller_img_ubi9 }}
+          CONTROLLER_IMG: ${{ needs.buildx.outputs.controller_img_ubi }}
           BUNDLE_IMG: ${{ needs.buildx.outputs.bundle_img }}
           CATALOG_IMG: ${{ needs.buildx.outputs.catalog_img }}
         run: |
@@ -745,7 +714,7 @@ jobs:
 
       - name: Run preflight container test
         env:
-          CONTROLLER_IMG: ${{ needs.buildx.outputs.controller_img_ubi9 }}
+          CONTROLLER_IMG: ${{ needs.buildx.outputs.controller_img_ubi }}
           PFLT_ARTIFACTS: "preflight_results"
         run: |
           bin/preflight check container ${CONTROLLER_IMG} \
