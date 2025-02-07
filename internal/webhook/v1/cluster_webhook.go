@@ -1172,7 +1172,6 @@ func parsePostgresQuantityValue(value string) (resource.Quantity, error) {
 		// 'ki' must translate to 'Ki'
 		value = strings.ReplaceAll(value, "ki", "Ki")
 	}
-	}
 
 	return resource.ParseQuantity(value)
 }
