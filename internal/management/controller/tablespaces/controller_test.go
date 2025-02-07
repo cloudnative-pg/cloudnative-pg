@@ -71,6 +71,10 @@ func (f fakeInstance) IsPrimary() (bool, error) {
 	return true, nil
 }
 
+func (f fakeInstance) IsReady() error {
+	return nil
+}
+
 const (
 	expectedListStmt = `
 	SELECT
@@ -84,13 +88,6 @@ const (
 		"LOCATION '%s'"
 
 	expectedUpdateStmt = "ALTER TABLESPACE \"%s\" OWNER TO \"%s\""
-
-	expectedReadinessCheck = `
-		SELECT
-			NOT pg_is_in_recovery()
-			OR (SELECT coalesce(setting, '') = '' FROM pg_settings WHERE name = 'primary_conninfo')
-			OR pg_last_wal_replay_lsn() IS NOT NULL
-		`
 )
 
 func getCluster(ctx context.Context, c client.Client, cluster *apiv1.Cluster) (*apiv1.Cluster, error) {
@@ -149,11 +146,6 @@ func assertTablespaceReconciled(ctx context.Context, tt tablespaceTest) {
 		client:         fakeClient,
 		storageManager: tt.storageManager,
 	}
-
-	// these bits happen because the reconciler checks for instance readiness
-	dbMock.ExpectPing()
-	expectedReadiness := sqlmock.NewRows([]string{""}).AddRow("t")
-	dbMock.ExpectQuery(expectedReadinessCheck).WillReturnRows(expectedReadiness)
 
 	tt.postgresExpectations(dbMock)
 
