@@ -77,7 +77,7 @@ const (
 		pg_tablespace.spcname spcname,
 		COALESCE(pg_roles.rolname, '') rolname
 	FROM pg_catalog.pg_tablespace
-	LEFT JOIN pg_roles ON pg_tablespace.spcowner = pg_roles.oid
+	LEFT JOIN pg_catalog.pg_roles ON pg_tablespace.spcowner = pg_roles.oid
 	WHERE spcname NOT LIKE $1
 	`
 	expectedCreateStmt = "CREATE TABLESPACE \"%s\" OWNER \"%s\" " +
