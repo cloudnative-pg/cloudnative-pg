@@ -143,7 +143,7 @@ run: generate fmt vet manifests ## Run against the configured Kubernetes cluster
 docker-build: go-releaser ## Build the docker image.
 	GOOS=linux GOARCH=${ARCH} GOPATH=$(go env GOPATH) DATE=${DATE} COMMIT=${COMMIT} VERSION=${VERSION} \
 	  $(GO_RELEASER) build --skip=validate --clean --single-target $(if $(VERSION),,--snapshot)
-	DOCKER_BUILDKIT=1 docker build . -t ${CONTROLLER_IMG} --build-arg VERSION=${VERSION}
+	DOCKER_BUILDKIT=1 VERSION=${VERSION} docker buildx bake --set=*.platform="linux/${ARCH}" --push
 
 docker-push: ## Push the docker image.
 	docker push ${CONTROLLER_IMG}

@@ -47,6 +47,7 @@ env:
   REGISTRY_USER: ${{ github.actor }}
   REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
   REPOSITORY_OWNER: "cloudnative-pg"
+  SIGN_IMAGES: "true"
   SLACK_USERNAME: "cnpg-bot"
   BUILD_MANAGER_RELEASE_ARGS: "build --skip=validate --clean --id manager"
   # Keep in mind that adding more platforms (architectures) will increase the building
@@ -248,8 +249,8 @@ jobs:
       contents: read
       packages: write
       pull-requests: read
+      id-token: write
     outputs:
-      image: ${{ steps.image-meta.outputs.image }}
       # 'branch_name' is used in 'GetMostRecentReleaseTag' in the Go code
       branch_name: ${{ steps.build-meta.outputs.branch_name }}
       upload_artifacts: ${{ steps.build-meta.outputs.upload_artifacts }}
@@ -258,7 +259,7 @@ jobs:
       author_name: ${{ steps.build-meta.outputs.author_name }}
       author_email: ${{ steps.build-meta.outputs.author_email }}
       controller_img: ${{ env.CONTROLLER_IMG }}
-      controller_img_ubi9: ${{ env.CONTROLLER_IMG_UBI9 }}
+      controller_img_ubi: ${{ env.CONTROLLER_IMG_UBI }}
       index_img: ${{ env.INDEX_IMG }}
       bundle_img: ${{ env.BUNDLE_IMG }}
       catalog_img: ${{ env.CATALOG_IMG }}
@@ -351,24 +352,6 @@ jobs:
           COMMIT: ${{ env.COMMIT }}
           VERSION: ${{ env.VERSION }}
       -
-        name: Docker meta
-        id: docker-meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.IMAGES }}
-          tags: |
-            type=raw,value=${{ steps.build-meta.outputs.tag_name }}
-      -
-        name: Docker meta UBI9
-        id: docker-meta-ubi9
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.IMAGES }}
-          flavor: |
-            suffix=-ubi9
-          tags: |
-            type=raw,value=${{ steps.build-meta.outputs.tag_name }}
-      -
         name: Set up QEMU
         uses: docker/setup-qemu-action@v3
         with:
@@ -385,34 +368,32 @@ jobs:
           password: ${{ env.REGISTRY_PASSWORD }}
       -
         name: Build and push
-        uses: docker/build-push-action@v6
+        uses: docker/bake-action@v6
+        id: bake-push
+        env:
+          environment: "testing"
+          VERSION: ${{ env.VERSION }}
+          REGISTRY: ${{ env.REGISTRY }}/${{ env.REPOSITORY_OWNER}}
         with:
-          platforms: ${{ env.PLATFORMS }}
-          context: .
-          file: Dockerfile
+          source: .
           push: true
-          build-args: |
-            VERSION=${{ env.VERSION }}
-          tags: ${{ steps.docker-meta.outputs.tags }}
-          labels: ${{ env.LABELS }}
-          provenance: ${{ env.BUILD_PUSH_PROVENANCE }}
-          cache-from: ${{ env.BUILD_PUSH_CACHE_FROM }}
-          cache-to: ${{ env.BUILD_PUSH_CACHE_TO }}
+          no-cache: true
+          targets: "default"
       -
-        name: Build and push UBI9
-        uses: docker/build-push-action@v6
-        with:
-          platforms: ${{ env.PLATFORMS }}
-          context: .
-          file: Dockerfile-ubi9
-          push: true
-          build-args: |
-            VERSION=${{ env.VERSION }}
-          tags: ${{ steps.docker-meta-ubi9.outputs.tags }}
-          labels: ${{ env.LABELS }}
-          provenance: ${{ env.BUILD_PUSH_PROVENANCE }}
-          cache-from: ${{ env.BUILD_PUSH_CACHE_FROM }}
-          cache-to: ${{ env.BUILD_PUSH_CACHE_TO }}
+        name: Install cosign
+        if: env.SIGN_IMAGES == 'true'
+        uses: sigstore/cosign-installer@v3
+        # See https://github.blog/security/supply-chain-security/safeguard-container-signing-capability-actions/
+        # and https://github.com/actions/starter-workflows/blob/main/ci/docker-publish.yml for more details on
+        # how to use cosign.
+      -
+        name: Sign images
+        if: env.SIGN_IMAGES == 'true'
+        run: |
+          images=$(echo '${{ steps.bake-push.outputs.metadata }}' |
+            jq -r '.[] | (."image.name" | sub(",.*";"" )) + "@" + ."containerimage.digest"'
+          )
+          cosign sign --yes ${images}
       -
         name: Image Meta
         id: image-meta
@@ -426,22 +407,19 @@ jobs:
       -
         name: Output images
         env:
-          TAGS: ${{ steps.docker-meta.outputs.tags }}
-          TAGS_UBI9: ${{ steps.docker-meta-ubi9.outputs.tags }}
+          DISTROLESS: ${{ fromJSON(steps.bake-push.outputs.metadata)['distroless']['image.name'] }}
+          UBI: ${{ fromJSON(steps.bake-push.outputs.metadata)['ubi']['image.name'] }}
         run: |
-          LOWERCASE_OPERATOR_IMAGE_NAME=${OPERATOR_IMAGE_NAME,,}
-          TAG=${TAGS#*:}
-          TAG_UBI=${TAGS_UBI9#*:}
-          echo "CONTROLLER_IMG=${LOWERCASE_OPERATOR_IMAGE_NAME}:${TAG}" >> $GITHUB_ENV
-          echo "CONTROLLER_IMG_UBI9=${LOWERCASE_OPERATOR_IMAGE_NAME}:${TAG_UBI}" >> $GITHUB_ENV
-          echo "BUNDLE_IMG=${LOWERCASE_OPERATOR_IMAGE_NAME}:bundle-${TAG}" >> $GITHUB_ENV
-          echo "INDEX_IMG=${LOWERCASE_OPERATOR_IMAGE_NAME}:index-${TAG}" >> $GITHUB_ENV
-          echo "CATALOG_IMG=${LOWERCASE_OPERATOR_IMAGE_NAME}:catalog-${TAG}" >> $GITHUB_ENV
+          echo "CONTROLLER_IMG=${DISTROLESS}" >> $GITHUB_ENV
+          echo "CONTROLLER_IMG_UBI=${UBI}" >> $GITHUB_ENV
+          echo "BUNDLE_IMG=${UBI}-bundle" >> $GITHUB_ENV
+          echo "INDEX_IMG=${UBI}-index" >> $GITHUB_ENV
+          echo "CATALOG_IMG=${UBI}-catalog" >> $GITHUB_ENV
       -
         name: Generate manifest for operator deployment
         id: generate-manifest
         env:
-          CONTROLLER_IMG: ${{ steps.image-meta.outputs.image }}
+          CONTROLLER_IMG: ${{ fromJSON(steps.bake-push.outputs.metadata)['distroless']['image.name'] }}
         run: |
           make generate-manifest
       -
@@ -493,7 +471,7 @@ jobs:
           push: true
           build-args: |
             VERSION=${{ env.VERSION }}-prime
-          tags: ${{ steps.docker-meta.outputs.tags }}-prime
+          tags: ${{ fromJSON(steps.bake-push.outputs.metadata)['distroless']['image.name'] }}-prime
           labels: ${{ env.LABELS }}
           provenance: ${{ env.BUILD_PUSH_PROVENANCE }}
           cache-from: ${{ env.BUILD_PUSH_CACHE_FROM }}
@@ -577,7 +555,7 @@ jobs:
       needs.buildx.result == 'success'
     runs-on: ubuntu-24.04
     outputs:
-      image: ${{ needs.buildx.outputs.image }}
+      controller_img: ${{ needs.buildx.outputs.controller_img }}
       localMatrix: ${{ steps.generate-jobs.outputs.localMatrix }}
       localEnabled: ${{ steps.generate-jobs.outputs.localEnabled }}
       localTimeout: ${{ steps.generate-jobs.outputs.localE2ETimeout }}
@@ -642,7 +620,7 @@ jobs:
 
       DEBUG: "true"
       BUILD_IMAGE: "false"
-      CONTROLLER_IMG: ${{ needs.generate-jobs.outputs.image }}
+      CONTROLLER_IMG: ${{ needs.generate-jobs.outputs.controller_img }}
       E2E_DEFAULT_STORAGE_CLASS: standard
       E2E_CSI_STORAGE_CLASS: csi-hostpath-sc
       E2E_DEFAULT_VOLUMESNAPSHOT_CLASS: csi-hostpath-snapclass
@@ -895,7 +873,7 @@ jobs:
 
       DEBUG: "true"
       BUILD_IMAGE: "false"
-      CONTROLLER_IMG: ${{ needs.generate-jobs.outputs.image }}
+      CONTROLLER_IMG: ${{ needs.generate-jobs.outputs.controller_img }}
       E2E_DEFAULT_STORAGE_CLASS: rook-ceph-block
       E2E_CSI_STORAGE_CLASS: rook-ceph-block
       E2E_DEFAULT_VOLUMESNAPSHOT_CLASS: csi-rbdplugin-snapclass
@@ -1233,7 +1211,7 @@ jobs:
 
       DEBUG: "true"
       BUILD_IMAGE: "false"
-      CONTROLLER_IMG: ${{ needs.generate-jobs.outputs.image }}
+      CONTROLLER_IMG: ${{ needs.generate-jobs.outputs.controller_img }}
       E2E_DEFAULT_STORAGE_CLASS: gp3
       E2E_CSI_STORAGE_CLASS: gp3
       E2E_DEFAULT_VOLUMESNAPSHOT_CLASS: ebs-csi-snapclass
@@ -1621,7 +1599,7 @@ jobs:
 
       DEBUG: "true"
       BUILD_IMAGE: "false"
-      CONTROLLER_IMG: ${{ needs.generate-jobs.outputs.image }}
+      CONTROLLER_IMG: ${{ needs.generate-jobs.outputs.controller_img }}
       E2E_DEFAULT_STORAGE_CLASS: standard-rwo
       E2E_CSI_STORAGE_CLASS: standard-rwo
       E2E_DEFAULT_VOLUMESNAPSHOT_CLASS: pd-csi-snapclass
@@ -1918,7 +1896,7 @@ jobs:
 
       DEBUG: "true"
       BUILD_IMAGE: "false"
-      CONTROLLER_IMG: ${{ needs.generate-jobs.outputs.image }}
+      CONTROLLER_IMG: ${{ needs.generate-jobs.outputs.controller_img }}
       E2E_DEFAULT_STORAGE_CLASS: gp3-csi
       E2E_CSI_STORAGE_CLASS: gp3-csi
       E2E_DEFAULT_VOLUMESNAPSHOT_CLASS: csi-aws-vsc
@@ -1971,7 +1949,7 @@ jobs:
       -
         name: Build and push the operator and catalog
         env:
-          CONTROLLER_IMG: ${{ needs.buildx.outputs.controller_img_ubi9 }}
+          CONTROLLER_IMG: ${{ needs.buildx.outputs.controller_img_ubi }}
           BUNDLE_IMG: ${{ needs.buildx.outputs.bundle_img }}
           INDEX_IMG: ${{ needs.buildx.outputs.index_img }}
           CATALOG_IMG: ${{ needs.buildx.outputs.catalog_img }}

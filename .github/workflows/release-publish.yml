@@ -96,6 +96,7 @@ jobs:
       author_email: ${{ steps.build-meta.outputs.author_email }}
       digest: ${{ steps.build.outputs.digest }}
       platforms: ${{ env.PLATFORMS }}
+      ubi_img: ${{ fromJSON(steps.bake-push.outputs.metadata)['ubi']['image.name'] }}
     steps:
       -
         name: Checkout
@@ -169,29 +170,6 @@ jobs:
         with:
           krew_template_file: dist/krew/cnpg.yaml
       -
-        name: Docker meta
-        id: docker-meta
-        uses: docker/metadata-action@v5
-        env:
-          IS_LATEST: ${{ needs.check-version.outputs.is_latest == 'true' && needs.check-version.outputs.is_stable == 'true' }}
-        with:
-          images: ${{ env.IMAGES }}
-          flavor: |
-            latest=${{ env.IS_LATEST }}
-          tags: |
-            type=semver,pattern={{version}}
-      -
-        name: Docker meta UBI9
-        id: docker-meta-ubi9
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.IMAGES }}
-          flavor: |
-            latest=false
-            suffix=-ubi9
-          tags: |
-            type=semver,pattern={{version}}
-      -
         name: Detect platforms
         run: |
           # Keep in mind that adding more platforms (architectures) will increase the building
@@ -215,26 +193,29 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       -
         name: Build and push
-        uses: docker/build-push-action@v6
+        uses: docker/bake-action@v6
+        id: bake-push
+        env:
+          environment: "production"
+          VERSION: ${{ steps.build-meta.outputs.version }}
+          REGISTRY: ${{ env.CNPG_IMAGE_NAME }}
+          LATEST: ${{ needs.check-version.outputs.is_latest == 'true' && needs.check-version.outputs.is_stable == 'true' }}
         with:
-          platforms: ${{ env.PLATFORMS }}
-          context: .
-          file: Dockerfile
           push: true
-          build-args: |
-            VERSION=${{ steps.build-meta.outputs.version }}
-          tags: ${{ steps.docker-meta.outputs.tags }}
+          no-cache: true
+          targets: "default"
       -
-        name: Build and push UBI9
-        uses: docker/build-push-action@v6
-        with:
-          platforms: ${{ env.PLATFORMS }}
-          context: .
-          file: Dockerfile-ubi9
-          push: true
-          build-args: |
-            VERSION=${{ steps.build-meta.outputs.version }}
-          tags: ${{ steps.docker-meta-ubi9.outputs.tags }}
+        name: Install cosign
+        uses: sigstore/cosign-installer@v3
+        # See https://github.blog/security/supply-chain-security/safeguard-container-signing-capability-actions/
+        # and https://github.com/actions/starter-workflows/blob/main/ci/docker-publish.yml for more details on
+        # how to use cosign.
+      - name: Sign images
+        run: |
+          images=$(echo '${{ steps.bake-push.outputs.metadata }}' |
+            jq '.[] | (."image.name" | sub(",.*";"" )) + "@" + ."containerimage.digest"'
+          )
+          cosign sign --yes ${images}
 
   olm-bundle:
     name: Create OLM bundle and catalog
@@ -275,14 +256,13 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set bundle variables
+        env:
+          UBI_IMG: ${{ needs.release-binaries.outputs.ubi_img }}
         run: |
-          tag="${GITHUB_REF#refs/tags/v}"
-          version="${tag#v}"
-          LOWERCASE_CNPG_IMAGE_NAME=${CNPG_IMAGE_NAME,,}
-          echo "IMAGE_NAME=${LOWERCASE_CNPG_IMAGE_NAME}" >> $GITHUB_ENV
-          echo "CONTROLLER_IMG=${LOWERCASE_CNPG_IMAGE_NAME}:${version}-ubi9" >> $GITHUB_ENV
-          echo "BUNDLE_IMG=${LOWERCASE_CNPG_IMAGE_NAME}:bundle-${version}" >> $GITHUB_ENV
-          echo "CATALOG_IMG=${LOWERCASE_CNPG_IMAGE_NAME}:catalog-${version}" >> $GITHUB_ENV
+          echo "IMAGE_NAME=${UBI_IMG}" >> $GITHUB_ENV
+          echo "CONTROLLER_IMG=${UBI_IMG}" >> $GITHUB_ENV
+          echo "BUNDLE_IMG=${UBI_IMG}-bundle" >> $GITHUB_ENV
+          echo "CATALOG_IMG=${UBI_IMG}-catalog" >> $GITHUB_ENV
 
       - name: Create bundle
         env:
