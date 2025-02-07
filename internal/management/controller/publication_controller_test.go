@@ -42,7 +42,7 @@ import (
 )
 
 const publicationDetectionQuery = `SELECT count(*)
-		FROM pg_publication
+		FROM pg_catalog.pg_publication
 		WHERE pubname = $1`
 
 var _ = Describe("Managed publication controller tests", func() {
