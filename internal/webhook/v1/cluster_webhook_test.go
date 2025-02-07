@@ -565,7 +565,7 @@ var _ = Describe("configuration change validation", func() {
 				PostgresConfiguration: apiv1.PostgresConfiguration{
 					Parameters: map[string]string{
 						"min_wal_size": "80MB",
-						"max_wal_size": "1024",
+						"max_wal_size": "1024MB",
 					},
 				},
 				StorageConfiguration: apiv1.StorageConfiguration{
@@ -579,7 +579,7 @@ var _ = Describe("configuration change validation", func() {
 			Spec: apiv1.ClusterSpec{
 				PostgresConfiguration: apiv1.PostgresConfiguration{
 					Parameters: map[string]string{
-						"min_wal_size": "1500",
+						"min_wal_size": "1500MB",
 						"max_wal_size": "2 GB",
 					},
 				},
@@ -598,7 +598,7 @@ var _ = Describe("configuration change validation", func() {
 				PostgresConfiguration: apiv1.PostgresConfiguration{
 					Parameters: map[string]string{
 						"min_wal_size": "1.5GB",
-						"max_wal_size": "2000",
+						"max_wal_size": "2000MB",
 					},
 				},
 				WalStorage: &apiv1.StorageConfiguration{
@@ -660,7 +660,7 @@ var _ = Describe("configuration change validation", func() {
 			Spec: apiv1.ClusterSpec{
 				PostgresConfiguration: apiv1.PostgresConfiguration{
 					Parameters: map[string]string{
-						"min_wal_size": "1500",
+						"min_wal_size": "1500MB",
 						"max_wal_size": "1GB",
 					},
 				},
@@ -713,7 +713,7 @@ var _ = Describe("configuration change validation", func() {
 				PostgresConfiguration: apiv1.PostgresConfiguration{
 					Parameters: map[string]string{
 						"min_wal_size": "80MB",
-						"max_wal_size": "1500",
+						"max_wal_size": "1500MB",
 					},
 				},
 				WalStorage: &apiv1.StorageConfiguration{
