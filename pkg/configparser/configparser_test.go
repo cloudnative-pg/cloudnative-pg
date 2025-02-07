@@ -52,8 +52,8 @@ var defaultInheritedAnnotations = []string{
 const oneNamespace = "one-namespace"
 
 // readConfigMap reads the configuration from the environment and the passed in data map
-func (config *FakeData) readConfigMap(data map[string]string, env EnvironmentSource) {
-	ReadConfigMap(config, &FakeData{InheritedAnnotations: defaultInheritedAnnotations}, data, env)
+func (config *FakeData) readConfigMap(data map[string]string) {
+	ReadConfigMap(config, &FakeData{InheritedAnnotations: defaultInheritedAnnotations}, data)
 }
 
 var _ = Describe("Data test suite", func() {
@@ -64,11 +64,14 @@ var _ = Describe("Data test suite", func() {
 
 	It("loads values from a map", func() {
 		config := &FakeData{}
+		GinkgoT().Setenv("WATCH_NAMESPACE", "")
+		GinkgoT().Setenv("INHERITED_ANNOTATIONS", "")
+		GinkgoT().Setenv("INHERITED_LABELS", "")
 		config.readConfigMap(map[string]string{
 			"WATCH_NAMESPACE":       oneNamespace,
 			"INHERITED_ANNOTATIONS": "one, two",
 			"INHERITED_LABELS":      "alpha, beta",
-		}, NewFakeEnvironment(nil))
+		})
 		Expect(config.WatchNamespace).To(Equal(oneNamespace))
 		Expect(config.InheritedAnnotations).To(Equal([]string{"one", "two"}))
 		Expect(config.InheritedLabels).To(Equal([]string{"alpha", "beta"}))
@@ -76,13 +79,11 @@ var _ = Describe("Data test suite", func() {
 
 	It("loads values from environment", func() {
 		config := &FakeData{}
-		fakeEnv := NewFakeEnvironment(map[string]string{
-			"WATCH_NAMESPACE":          oneNamespace,
-			"INHERITED_ANNOTATIONS":    "one, two",
-			"INHERITED_LABELS":         "alpha, beta",
-			"EXPIRING_CHECK_THRESHOLD": "2",
-		})
-		config.readConfigMap(nil, fakeEnv)
+		GinkgoT().Setenv("WATCH_NAMESPACE", oneNamespace)
+		GinkgoT().Setenv("INHERITED_ANNOTATIONS", "one, two")
+		GinkgoT().Setenv("INHERITED_LABELS", "alpha, beta")
+		GinkgoT().Setenv("EXPIRING_CHECK_THRESHOLD", "2")
+		config.readConfigMap(nil)
 		Expect(config.WatchNamespace).To(Equal(oneNamespace))
 		Expect(config.InheritedAnnotations).To(Equal([]string{"one", "two"}))
 		Expect(config.InheritedLabels).To(Equal([]string{"alpha", "beta"}))
@@ -94,43 +95,23 @@ var _ = Describe("Data test suite", func() {
 			CertificateDuration:    90,
 			ExpiringCheckThreshold: 7,
 		}
-		fakeEnv := NewFakeEnvironment(map[string]string{
-			"EXPIRING_CHECK_THRESHOLD": "3600min",
-			"CERTIFICATE_DURATION":     "unknown",
-		})
+		GinkgoT().Setenv("EXPIRING_CHECK_THRESHOLD", "3600min")
+		GinkgoT().Setenv("CERTIFICATE_DURATION", "unknown")
 		defaultData := &FakeData{
 			CertificateDuration:    90,
 			ExpiringCheckThreshold: 7,
 		}
-		ReadConfigMap(config, defaultData, nil, fakeEnv)
+		ReadConfigMap(config, defaultData, nil)
 		Expect(config.ExpiringCheckThreshold).To(Equal(7))
 		Expect(config.CertificateDuration).To(Equal(90))
 	})
 
 	It("handles correctly default values of slices", func() {
+		GinkgoT().Setenv("INHERITED_ANNOTATIONS", "")
+		GinkgoT().Setenv("INHERITED_LABELS", "")
 		config := &FakeData{}
-		config.readConfigMap(nil, NewFakeEnvironment(nil))
+		config.readConfigMap(nil)
 		Expect(config.InheritedAnnotations).To(Equal(defaultInheritedAnnotations))
 		Expect(config.InheritedLabels).To(BeNil())
 	})
 })
-
-// FakeEnvironment is an EnvironmentSource that fetches data from an internal map
-type FakeEnvironment struct {
-	values map[string]string
-}
-
-// NewFakeEnvironment creates a FakeEnvironment with the specified data inside
-func NewFakeEnvironment(data map[string]string) FakeEnvironment {
-	f := FakeEnvironment{}
-	if data == nil {
-		data = make(map[string]string)
-	}
-	f.values = data
-	return f
-}
-
-// Getenv retrieves the value of the environment variable named by the key
-func (f FakeEnvironment) Getenv(key string) string {
-	return f.values[key]
-}
