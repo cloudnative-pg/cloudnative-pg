@@ -1962,7 +1962,7 @@ func (v *ClusterCustomValidator) validateTolerations(r *apiv1.Cluster) field.Err
 	return allErrors
 }
 
-// validateTaintEffect is used from validateTollerations and is a verbatim copy of the code
+// validateTaintEffect is used from validateToleration and is a verbatim copy of the code
 // at https://github.com/kubernetes/kubernetes/blob/4d38d21/pkg/apis/core/validation/validation.go#L3087
 func validateTaintEffect(effect *corev1.TaintEffect, allowEmpty bool, fldPath *field.Path) field.ErrorList {
 	if !allowEmpty && len(*effect) == 0 {
