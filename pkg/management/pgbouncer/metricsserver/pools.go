@@ -242,7 +242,7 @@ func (e *Exporter) collectShowPools(ch chan<- prometheus.Metric, db *sql.DB) {
 	)
 	// PGBouncer 1.24.0 or above
 	var (
-		loadBalanceHosts int
+		loadBalanceHosts sql.NullInt32
 	)
 
 	cols, err := rows.Columns()
@@ -336,7 +336,7 @@ func (e *Exporter) collectShowPools(ch chan<- prometheus.Metric, db *sql.DB) {
 		e.Metrics.ShowPools.MaxWait.WithLabelValues(database, user).Set(float64(maxWait))
 		e.Metrics.ShowPools.MaxWaitUs.WithLabelValues(database, user).Set(float64(maxWaitUs))
 		e.Metrics.ShowPools.PoolMode.WithLabelValues(database, user).Set(float64(poolModeToInt(poolMode)))
-		e.Metrics.ShowPools.LoadBalanceHosts.WithLabelValues(database, user).Set(float64(loadBalanceHosts))
+		e.Metrics.ShowPools.LoadBalanceHosts.WithLabelValues(database, user).Set(float64(loadBalanceHosts.Int32))
 	}
 
 	e.Metrics.ShowPools.ClActive.Collect(ch)
