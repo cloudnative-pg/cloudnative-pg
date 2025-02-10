@@ -22,6 +22,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -403,7 +404,7 @@ var _ = DescribeTable("test creation of volumes",
 				Name: "pgdata",
 				VolumeSource: corev1.VolumeSource{
 					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-						ClaimName: "pod-1" + apiv1.DataVolumeSuffix,
+						ClaimName: "pod-1" + configuration.Current.DataVolumeSuffix,
 					},
 				},
 			},
@@ -422,7 +423,7 @@ var _ = DescribeTable("test creation of volumes",
 				Name: "pgdata",
 				VolumeSource: corev1.VolumeSource{
 					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-						ClaimName: "pod-1" + apiv1.DataVolumeSuffix,
+						ClaimName: "pod-1" + configuration.Current.DataVolumeSuffix,
 					},
 				},
 			},
@@ -430,7 +431,7 @@ var _ = DescribeTable("test creation of volumes",
 				Name: "pg-wal",
 				VolumeSource: corev1.VolumeSource{
 					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-						ClaimName: "pod-1" + apiv1.WalArchiveVolumeSuffix,
+						ClaimName: "pod-1" + configuration.Current.WalArchiveVolumeSuffix,
 					},
 				},
 			},
