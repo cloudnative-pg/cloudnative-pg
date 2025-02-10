@@ -19,7 +19,10 @@ package logs
 import (
 	"bytes"
 	"context"
+	"fmt"
+	"io"
 	"sync"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,119 +32,253 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+type multiWriter struct {
+	writers map[string]*bytes.Buffer
+}
+
+func newMultiWriter() *multiWriter {
+	newMw := &multiWriter{
+		writers: make(map[string]*bytes.Buffer),
+	}
+	return newMw
+}
+
+func (mw *multiWriter) Create(name string) (io.Writer, error) {
+	var buffer bytes.Buffer
+	mw.writers[name] = &buffer
+	return &buffer, nil
+}
+
 var _ = Describe("Pod logging tests", func() {
 	podNamespace := "pod-test"
 	podName := "pod-name-test"
-	pod := &v1.Pod{
+	pod := v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: podNamespace,
 			Name:      podName,
 		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "postgres",
+				},
+			},
+		},
 	}
 
-	podLogOptions := &v1.PodLogOptions{}
+	podWithSidecar := v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: podNamespace,
+			Name:      podName,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "postgres",
+				},
+				{
+					Name: "sidecar",
+				},
+			},
+		},
+		Status: v1.PodStatus{
+			ContainerStatuses: []v1.ContainerStatus{
+				{
+					Name: "postgres",
+					State: v1.ContainerState{
+						Running: &v1.ContainerStateRunning{
+							StartedAt: metav1.Time{Time: time.Now()},
+						},
+					},
+				},
+				{
+					Name: "sidecar",
+					State: v1.ContainerState{
+						Running: &v1.ContainerStateRunning{
+							StartedAt: metav1.Time{Time: time.Now()},
+						},
+					},
+				},
+			},
+		},
+	}
 
-	It("should return the proper podName", func() {
-		streamPodLog := StreamingRequest{
-			Pod:     pod,
-			Options: podLogOptions,
-		}
-		Expect(streamPodLog.getPodName()).To(BeEquivalentTo(podName))
-		Expect(streamPodLog.getPodNamespace()).To(BeEquivalentTo(podNamespace))
-	})
+	When("using the Stream function", func() {
+		It("should return the proper podName", func() {
+			streamPodLog := StreamingRequest{
+				Pod:     pod,
+				Options: &v1.PodLogOptions{},
+			}
+			Expect(streamPodLog.getPodName()).To(BeEquivalentTo(podName))
+			Expect(streamPodLog.getPodNamespace()).To(BeEquivalentTo(podNamespace))
+		})
 
-	It("should be able to handle the nil Pod", func(ctx context.Context) {
-		// the nil pod passed will still default to the empty pod name
-		client := fake.NewSimpleClientset()
-		streamPodLog := StreamingRequest{
-			Pod:     nil,
-			Options: podLogOptions,
-			Client:  client,
-		}
-		var logBuffer bytes.Buffer
-		err := streamPodLog.Stream(ctx, &logBuffer)
-		Expect(err).NotTo(HaveOccurred())
-		// The fake Client will be given a pod name of "", but it will still
-		// go on along. In production, we'd have an error when pod not found
-		Expect(logBuffer.String()).To(BeEquivalentTo("fake logs"))
-		Expect(streamPodLog.getPodName()).To(BeEquivalentTo(""))
-		Expect(streamPodLog.getPodNamespace()).To(BeEquivalentTo(""))
-	})
-
-	It("previous option must be false by default", func() {
-		streamPodLog := StreamingRequest{
-			Pod:     pod,
-			Options: podLogOptions,
-		}
-		Expect(streamPodLog.getLogOptions().Previous).To(BeFalse())
-	})
-
-	It("getLogOptions respects the Previous field setting", func() {
-		streamPodLog := StreamingRequest{
-			Pod:     pod,
-			Options: podLogOptions,
-		}
-		options := streamPodLog.getLogOptions()
-		Expect(options.Previous).To(BeFalse())
-
-		streamPodLog.Previous = true
-		options = streamPodLog.getLogOptions()
-		Expect(options.Previous).To(BeTrue())
-	})
-
-	It("should read the logs with the provided k8s Client", func(ctx context.Context) {
-		client := fake.NewSimpleClientset(pod)
-		streamPodLog := StreamingRequest{
-			Pod:      pod,
-			Options:  podLogOptions,
-			Previous: false,
-			Client:   client,
-		}
-
-		var logBuffer bytes.Buffer
-		err := streamPodLog.Stream(ctx, &logBuffer)
-		Expect(err).ToNot(HaveOccurred())
-
-		Expect(logBuffer.String()).To(BeEquivalentTo("fake logs"))
-	})
-
-	It("GetPodLogs correctly streams and provides output lines", func(ctx context.Context) {
-		client := fake.NewSimpleClientset(pod)
-		var logBuffer bytes.Buffer
-		lines, err := GetPodLogs(ctx, client, *pod, false, &logBuffer, 2)
-		Expect(err).ToNot(HaveOccurred())
-		Expect(lines).To(HaveLen(2))
-		Expect(lines[0]).To(BeEquivalentTo("fake logs"))
-		Expect(logBuffer.String()).To(BeEquivalentTo("fake logs"))
-	})
-
-	It("GetPodLogs defaults to non-zero lines shown if set to zero", func(ctx context.Context) {
-		client := fake.NewSimpleClientset(pod)
-		var logBuffer bytes.Buffer
-		lines, err := GetPodLogs(ctx, client, *pod, false, &logBuffer, 0)
-		Expect(err).ToNot(HaveOccurred())
-		Expect(lines).To(HaveLen(10))
-		Expect(lines[0]).To(BeEquivalentTo("fake logs"))
-		Expect(logBuffer.String()).To(BeEquivalentTo("fake logs"))
-	})
-
-	It("can follow pod logs", func(ctx SpecContext) {
-		client := fake.NewSimpleClientset(pod)
-		var logBuffer bytes.Buffer
-		var wait sync.WaitGroup
-		wait.Add(1)
-		go func() {
-			defer GinkgoRecover()
-			defer wait.Done()
-			err := TailPodLogs(ctx, client, *pod, &logBuffer, true)
+		It("should be able to handle the empty Pod", func(ctx context.Context) {
+			client := fake.NewClientset()
+			streamPodLog := StreamingRequest{
+				Pod:     v1.Pod{},
+				Options: &v1.PodLogOptions{},
+				Client:  client,
+			}
+			var logBuffer bytes.Buffer
+			err := streamPodLog.Stream(ctx, &logBuffer)
 			Expect(err).NotTo(HaveOccurred())
-		}()
-		// calling ctx.Done is not strictly necessary because the fake Client
-		// will terminate the pod stream anyway, ending TailPodLogs.
-		// But in "production", TailPodLogs will follow
-		// the pod logs until the context, or the logs, are over
-		ctx.Done()
-		wait.Wait()
-		Expect(logBuffer.String()).To(BeEquivalentTo("fake logs"))
+			Expect(logBuffer.String()).To(BeEquivalentTo(""))
+		})
+
+		It("previous option must be false by default", func() {
+			streamPodLog := StreamingRequest{
+				Pod:     pod,
+				Options: &v1.PodLogOptions{},
+			}
+			Expect(streamPodLog.getLogOptions().Previous).To(BeFalse())
+		})
+
+		It("getLogOptions respects the Previous field setting", func() {
+			streamPodLog := StreamingRequest{
+				Pod:     pod,
+				Options: &v1.PodLogOptions{},
+			}
+			options := streamPodLog.getLogOptions()
+			Expect(options.Previous).To(BeFalse())
+
+			streamPodLog.Previous = true
+			options = streamPodLog.getLogOptions()
+			Expect(options.Previous).To(BeTrue())
+		})
+
+		It("should read the logs of a pod with one container", func(ctx context.Context) {
+			client := fake.NewClientset(&pod)
+			streamPodLog := StreamingRequest{
+				Pod:      pod,
+				Options:  &v1.PodLogOptions{},
+				Previous: false,
+				Client:   client,
+			}
+
+			var logBuffer bytes.Buffer
+			err := streamPodLog.Stream(ctx, &logBuffer)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(logBuffer.String()).To(BeEquivalentTo("fake logs\n"))
+		})
+
+		It("should read the logs of a pod with multiple containers", func(ctx context.Context) {
+			client := fake.NewClientset(&podWithSidecar)
+			streamPodLog := StreamingRequest{
+				Pod:      podWithSidecar,
+				Options:  &v1.PodLogOptions{},
+				Previous: false,
+				Client:   client,
+			}
+
+			var logBuffer bytes.Buffer
+			err := streamPodLog.Stream(ctx, &logBuffer)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(logBuffer.String()).To(BeEquivalentTo("fake logs\nfake logs\n"))
+		})
+
+		It("should read only the specified container logs in a pod with multiple containers", func(ctx context.Context) {
+			client := fake.NewClientset(&podWithSidecar)
+			streamPodLog := StreamingRequest{
+				Pod: podWithSidecar,
+				Options: &v1.PodLogOptions{
+					Container: "postgres",
+				},
+				Previous: false,
+				Client:   client,
+			}
+
+			var logBuffer bytes.Buffer
+			err := streamPodLog.Stream(ctx, &logBuffer)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(logBuffer.String()).To(BeEquivalentTo("fake logs\n"))
+		})
+
+		It("can follow pod logs", func(ctx SpecContext) {
+			client := fake.NewClientset(&pod)
+			var logBuffer bytes.Buffer
+			var wait sync.WaitGroup
+			wait.Add(1)
+			go func() {
+				defer GinkgoRecover()
+				defer wait.Done()
+				now := metav1.Now()
+				streamPodLog := StreamingRequest{
+					Pod: pod,
+					Options: &v1.PodLogOptions{
+						Timestamps: false,
+						Follow:     true,
+						SinceTime:  &now,
+					},
+					Client: client,
+				}
+				err := streamPodLog.Stream(ctx, &logBuffer)
+				Expect(err).NotTo(HaveOccurred())
+			}()
+			// calling ctx.Done is not strictly necessary because the fake Client
+			// will terminate the pod stream anyway, ending Stream.
+			// But in "production", Stream will follow
+			// the pod logs until the context, or the logs, are over
+			ctx.Done()
+			wait.Wait()
+			Expect(logBuffer.String()).To(BeEquivalentTo("fake logs\n"))
+		})
+	})
+	When("using the StreamMultiple function", func() {
+		It("should log each container into a separate writer", func(ctx context.Context) {
+			client := fake.NewClientset(&podWithSidecar)
+			streamPodLog := StreamingRequest{
+				Pod:      podWithSidecar,
+				Options:  &v1.PodLogOptions{},
+				Previous: false,
+				Client:   client,
+			}
+
+			namer := func(container string) string {
+				return fmt.Sprintf("%s-%s.log", streamPodLog.getPodName(), container)
+			}
+			mw := newMultiWriter()
+			err := streamPodLog.StreamMultiple(ctx, mw, namer)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(mw.writers).To(HaveLen(2))
+
+			Expect(mw.writers["pod-name-test-postgres.log"].String()).To(BeEquivalentTo("fake logs\n"))
+			Expect(mw.writers["pod-name-test-sidecar.log"].String()).To(BeEquivalentTo("fake logs\n"))
+		})
+
+		It("can fetch the previous logs for each container", func(ctx context.Context) {
+			client := fake.NewClientset(&podWithSidecar)
+			streamPodLog := StreamingRequest{
+				Pod:      podWithSidecar,
+				Options:  &v1.PodLogOptions{},
+				Previous: true,
+				Client:   client,
+			}
+
+			namer := func(container string) string {
+				return fmt.Sprintf("%s-%s.log", streamPodLog.getPodName(), container)
+			}
+			mw := newMultiWriter()
+			err := streamPodLog.StreamMultiple(ctx, mw, namer)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(mw.writers).To(HaveLen(2))
+
+			Expect(mw.writers["pod-name-test-postgres.log"].String()).To(BeEquivalentTo(
+				`"====== Beginning of Previous Log ====="
+fake logs
+"====== End of Previous Log ====="
+fake logs
+`))
+
+			Expect(mw.writers["pod-name-test-sidecar.log"].String()).To(BeEquivalentTo(
+				`"====== Beginning of Previous Log ====="
+fake logs
+"====== End of Previous Log ====="
+fake logs
+`))
+		})
 	})
 })
