@@ -403,7 +403,7 @@ var _ = DescribeTable("test creation of volumes",
 				Name: "pgdata",
 				VolumeSource: corev1.VolumeSource{
 					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-						ClaimName: "pod-1",
+						ClaimName: "pod-1" + apiv1.DataVolumeSuffix,
 					},
 				},
 			},
@@ -422,7 +422,7 @@ var _ = DescribeTable("test creation of volumes",
 				Name: "pgdata",
 				VolumeSource: corev1.VolumeSource{
 					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-						ClaimName: "pod-1",
+						ClaimName: "pod-1" + apiv1.DataVolumeSuffix,
 					},
 				},
 			},
