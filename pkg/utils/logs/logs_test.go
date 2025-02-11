@@ -106,8 +106,8 @@ var _ = Describe("Pod logging tests", func() {
 	When("using the Stream function", func() {
 		It("should return the proper podName", func() {
 			streamPodLog := StreamingRequest{
-				Pod:     pod,
-				Options: v1.PodLogOptions{},
+				Pod:            pod,
+				DefaultOptions: v1.PodLogOptions{},
 			}
 			Expect(streamPodLog.getPodName()).To(BeEquivalentTo(podName))
 			Expect(streamPodLog.getPodNamespace()).To(BeEquivalentTo(podNamespace))
@@ -116,9 +116,9 @@ var _ = Describe("Pod logging tests", func() {
 		It("should be able to handle the empty Pod", func(ctx context.Context) {
 			client := fake.NewClientset()
 			streamPodLog := StreamingRequest{
-				Pod:     v1.Pod{},
-				Options: v1.PodLogOptions{},
-				Client:  client,
+				Pod:            v1.Pod{},
+				DefaultOptions: v1.PodLogOptions{},
+				Client:         client,
 			}
 			var logBuffer bytes.Buffer
 			err := streamPodLog.Stream(ctx, &logBuffer)
@@ -130,7 +130,7 @@ var _ = Describe("Pod logging tests", func() {
 			client := fake.NewClientset(&pod)
 			streamPodLog := StreamingRequest{
 				Pod: pod,
-				Options: v1.PodLogOptions{
+				DefaultOptions: v1.PodLogOptions{
 					Previous: false,
 				},
 				Client: client,
@@ -147,7 +147,7 @@ var _ = Describe("Pod logging tests", func() {
 			client := fake.NewClientset(&podWithSidecar)
 			streamPodLog := StreamingRequest{
 				Pod: podWithSidecar,
-				Options: v1.PodLogOptions{
+				DefaultOptions: v1.PodLogOptions{
 					Previous: false,
 				},
 				Client: client,
@@ -164,7 +164,7 @@ var _ = Describe("Pod logging tests", func() {
 			client := fake.NewClientset(&podWithSidecar)
 			streamPodLog := StreamingRequest{
 				Pod: podWithSidecar,
-				Options: v1.PodLogOptions{
+				DefaultOptions: v1.PodLogOptions{
 					Container: "postgres",
 					Previous:  false,
 				},
@@ -189,7 +189,7 @@ var _ = Describe("Pod logging tests", func() {
 				now := metav1.Now()
 				streamPodLog := StreamingRequest{
 					Pod: pod,
-					Options: v1.PodLogOptions{
+					DefaultOptions: v1.PodLogOptions{
 						Timestamps: false,
 						Follow:     true,
 						SinceTime:  &now,
@@ -213,7 +213,7 @@ var _ = Describe("Pod logging tests", func() {
 			client := fake.NewClientset(&podWithSidecar)
 			streamPodLog := StreamingRequest{
 				Pod: podWithSidecar,
-				Options: v1.PodLogOptions{
+				DefaultOptions: v1.PodLogOptions{
 					Previous: false,
 				},
 				Client: client,
@@ -235,7 +235,7 @@ var _ = Describe("Pod logging tests", func() {
 			client := fake.NewClientset(&podWithSidecar)
 			streamPodLog := StreamingRequest{
 				Pod: podWithSidecar,
-				Options: v1.PodLogOptions{
+				DefaultOptions: v1.PodLogOptions{
 					Previous: true,
 				},
 				Client: client,
