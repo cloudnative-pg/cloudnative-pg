@@ -31,9 +31,9 @@ import (
 
 // StreamingRequest represents a request to stream a pod's logs
 type StreamingRequest struct {
-	Pod     v1.Pod
-	Options v1.PodLogOptions
-	Client  kubernetes.Interface
+	Pod            v1.Pod
+	DefaultOptions v1.PodLogOptions
+	Client         kubernetes.Interface
 }
 
 func (spl *StreamingRequest) getPodName() string {
@@ -55,34 +55,29 @@ func (spl *StreamingRequest) getKubernetesClient() kubernetes.Interface {
 	return spl.Client
 }
 
-// getPodStream opens a REST request to the pod
-func (spl *StreamingRequest) getPodStream() *rest.Request {
-	client := spl.getKubernetesClient()
-	pods := client.CoreV1().Pods(spl.getPodNamespace())
-
-	return pods.GetLogs(spl.getPodName(), &spl.Options)
+// getContainerLogsRequestWithDefaultOptions opens a REST request to the pod
+func (spl *StreamingRequest) getContainerLogsRequestWithDefaultOptions() *rest.Request {
+	return spl.getContainerLogsRequestWithOptions(&spl.DefaultOptions)
 }
 
-// getPodStreamWithOptions returns the stream to the pod with overridden container and `previous` values
-func (spl *StreamingRequest) getPodStreamWithOptions(container string, previous bool) *rest.Request {
+// getContainerLogsRequestWithOptions returns the stream to the pod with overridden container and `previous` values
+func (spl *StreamingRequest) getContainerLogsRequestWithOptions(options *v1.PodLogOptions) *rest.Request {
 	client := spl.getKubernetesClient()
 	pods := client.CoreV1().Pods(spl.getPodNamespace())
-	options := spl.Options.DeepCopy()
-	options.Container = container
-	options.Previous = previous
-
 	return pods.GetLogs(spl.getPodName(), options)
 }
 
 // Stream streams the pod logs and shunts them to the `writer`.
 // If there are multiple containers, it will concatenate all the container streams into the writer
 func (spl *StreamingRequest) Stream(ctx context.Context, writer io.Writer) (err error) {
-	if spl.Options.Container != "" {
-		return sendLogsToWriter(ctx, spl.getPodStream(), writer)
+	if spl.DefaultOptions.Container != "" {
+		return sendLogsToWriter(ctx, spl.getContainerLogsRequestWithDefaultOptions(), writer)
 	}
 
 	for _, container := range spl.Pod.Spec.Containers {
-		request := spl.getPodStreamWithOptions(container.Name, spl.Options.Previous)
+		opts := spl.DefaultOptions.DeepCopy()
+		opts.Container = container.Name
+		request := spl.getContainerLogsRequestWithOptions(opts)
 		if err := sendLogsToWriter(ctx, request, writer); err != nil {
 			return err
 		}
@@ -106,13 +101,16 @@ func (spl *StreamingRequest) StreamMultiple(
 		if err != nil {
 			return err
 		}
-		if spl.Options.Previous {
+		if spl.DefaultOptions.Previous {
 			jsWrite := json.NewEncoder(writer)
 			if err := jsWrite.Encode("====== Beginning of Previous Log ====="); err != nil {
 				return err
 			}
+			opts := spl.DefaultOptions.DeepCopy()
+			opts.Container = containerName
+			opts.Previous = true
 			// getting the Previous logs can fail (as with `kubectl logs -p`). Don't error out
-			if err := sendLogsToWriter(ctx, spl.getPodStreamWithOptions(containerName, true), writer); err != nil {
+			if err := sendLogsToWriter(ctx, spl.getContainerLogsRequestWithOptions(opts), writer); err != nil {
 				jsWrite := json.NewEncoder(writer)
 				// we try to print the json-safe error message. We don't exit on error
 				_ = jsWrite.Encode(err.Error())
@@ -122,11 +120,14 @@ func (spl *StreamingRequest) StreamMultiple(
 			}
 		}
 		// get the current logs
-		return sendLogsToWriter(ctx, spl.getPodStreamWithOptions(containerName, false), writer)
+		opts := spl.DefaultOptions.DeepCopy()
+		opts.Container = containerName
+		opts.Previous = false
+		return sendLogsToWriter(ctx, spl.getContainerLogsRequestWithOptions(opts), writer)
 	}
 
-	if spl.Options.Container != "" {
-		return logContainer(spl.Options.Container)
+	if spl.DefaultOptions.Container != "" {
+		return logContainer(spl.DefaultOptions.Container)
 	}
 	for _, container := range spl.Pod.Spec.Containers {
 		if err := logContainer(container.Name); err != nil {

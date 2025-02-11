@@ -57,7 +57,7 @@ func streamOperatorLogsToZip(
 
 		streamPodLogs := &logs.StreamingRequest{
 			Pod: pod,
-			Options: corev1.PodLogOptions{
+			DefaultOptions: corev1.PodLogOptions{
 				Timestamps: logTimeStamp,
 				Previous:   true,
 			},
@@ -70,7 +70,7 @@ func streamOperatorLogsToZip(
 			return err
 		}
 
-		streamPodLogs.Options.Previous = false
+		streamPodLogs.DefaultOptions.Previous = false
 		if err := streamPodLogs.Stream(ctx, writer); err != nil {
 			return err
 		}
@@ -105,7 +105,7 @@ func streamClusterLogsToZip(
 		return fmt.Errorf("could not get cluster pods: %w", err)
 	}
 	streamPodLogs := &logs.StreamingRequest{
-		Options: corev1.PodLogOptions{
+		DefaultOptions: corev1.PodLogOptions{
 			Timestamps: logTimeStamp,
 			Previous:   true,
 		},
@@ -157,7 +157,7 @@ func streamClusterJobLogsToZip(ctx context.Context, clusterName, namespace strin
 		}
 
 		streamPodLogs := &logs.StreamingRequest{
-			Options: corev1.PodLogOptions{
+			DefaultOptions: corev1.PodLogOptions{
 				Timestamps: logTimeStamp,
 				Previous:   false,
 			},
