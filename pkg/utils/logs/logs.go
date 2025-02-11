@@ -85,25 +85,26 @@ func (spl *StreamingRequest) Stream(ctx context.Context, writer io.Writer) (err 
 	return nil
 }
 
-// writerCreator is the interface representing an object that can spawn writers
-type writerCreator interface {
+// writerConstructor is the interface representing an object that can spawn writers
+type writerConstructor interface {
 	Create(name string) (io.Writer, error)
 }
 
 // StreamMultiple streams the pod logs, sending each container's stream to a separate writer
 func (spl *StreamingRequest) StreamMultiple(
 	ctx context.Context,
-	writerGen writerCreator,
-	namer func(string) string,
-) (err error) {
+	writerConstructor writerConstructor,
+	filePathGenerator func(string) string,
+) error {
 	logContainer := func(containerName string) error {
-		writer, err := writerGen.Create(namer(containerName))
-		if err != nil {
-			return err
+		logFilePath := filePathGenerator(containerName)
+		writer, createErr := writerConstructor.Create(logFilePath)
+		if createErr != nil {
+			return createErr
 		}
 		if spl.DefaultOptions.Previous {
-			jsWrite := json.NewEncoder(writer)
-			if err := jsWrite.Encode("====== Beginning of Previous Log ====="); err != nil {
+			jsWriter := json.NewEncoder(writer)
+			if err := jsWriter.Encode("====== Beginning of Previous Log ====="); err != nil {
 				return err
 			}
 			opts := spl.DefaultOptions.DeepCopy()
@@ -111,11 +112,10 @@ func (spl *StreamingRequest) StreamMultiple(
 			opts.Previous = true
 			// getting the Previous logs can fail (as with `kubectl logs -p`). Don't error out
 			if err := sendLogsToWriter(ctx, spl.getContainerLogsRequestWithOptions(opts), writer); err != nil {
-				jsWrite := json.NewEncoder(writer)
 				// we try to print the json-safe error message. We don't exit on error
-				_ = jsWrite.Encode(err.Error())
+				_ = json.NewEncoder(writer).Encode("Error fetching previous logs: " + err.Error())
 			}
-			if err := jsWrite.Encode("====== End of Previous Log ====="); err != nil {
+			if err := jsWriter.Encode("====== End of Previous Log ====="); err != nil {
 				return err
 			}
 		}
