@@ -84,7 +84,7 @@ func (instance *Instance) RefreshConfigurationFilesFromCluster(
 			err)
 	}
 
-	if sha256 != "" && postgresConfigurationChanged {
+	if sha256 != "" {
 		instance.ConfigSha256 = sha256
 	}
 
