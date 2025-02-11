@@ -141,8 +141,7 @@ func streamClusterJobLogsToZip(ctx context.Context, clusterName, namespace strin
 	}
 
 	var jobList batchv1.JobList
-	err = plugin.Client.List(ctx, &jobList, matchClusterName, client.InNamespace(namespace))
-	if err != nil {
+	if err := plugin.Client.List(ctx, &jobList, matchClusterName, client.InNamespace(namespace)); err != nil {
 		return fmt.Errorf("could not get cluster jobs: %w", err)
 	}
 
@@ -151,20 +150,19 @@ func streamClusterJobLogsToZip(ctx context.Context, clusterName, namespace strin
 			jobMatcherLabel: job.Name,
 		}
 		var podList corev1.PodList
-		err = plugin.Client.List(ctx, &podList, matchJobName, client.InNamespace(namespace))
-		if err != nil {
+		if err := plugin.Client.List(ctx, &podList, matchJobName, client.InNamespace(namespace)); err != nil {
 			return fmt.Errorf("could not get pods for job '%s': %w", job.Name, err)
 		}
 
-		streamPodLogs := &logs.StreamingRequest{
-			DefaultOptions: corev1.PodLogOptions{
-				Timestamps: logTimeStamp,
-				Previous:   false,
-			},
-		}
 		for idx := range podList.Items {
 			pod := podList.Items[idx]
-			streamPodLogs.Pod = pod
+			streamPodLogs := &logs.StreamingRequest{
+				Pod: pod,
+				DefaultOptions: corev1.PodLogOptions{
+					Timestamps: logTimeStamp,
+				},
+			}
+
 			fileNamer := func(containerName string) string {
 				return filepath.Join(logsdir, fmt.Sprintf("%s-%s.jsonl", pod.Name, containerName))
 			}
