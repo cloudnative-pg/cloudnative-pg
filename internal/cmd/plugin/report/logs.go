@@ -46,9 +46,7 @@ func streamOperatorLogsToZip(
 	if _, err := zipper.Create(logsDir + "/"); err != nil {
 		return fmt.Errorf("could not add '%s' to zip: %w", logsDir, err)
 	}
-	podLogOptions := &corev1.PodLogOptions{
-		Timestamps: logTimeStamp, // NOTE: when activated, lines are no longer JSON
-	}
+
 	for i := range pods {
 		pod := pods[i]
 		path := filepath.Join(logsDir, fmt.Sprintf("%s-logs.jsonl", pod.Name))
@@ -58,9 +56,11 @@ func streamOperatorLogsToZip(
 		}
 
 		streamPodLogs := &logs.StreamingRequest{
-			Pod:      pod,
-			Options:  podLogOptions,
-			Previous: true,
+			Pod: pod,
+			Options: corev1.PodLogOptions{
+				Timestamps: logTimeStamp,
+				Previous:   true,
+			},
 		}
 		if _, err := fmt.Fprint(writer, "\n\"====== Begin of Previous Log =====\"\n"); err != nil {
 			return err
@@ -70,7 +70,7 @@ func streamOperatorLogsToZip(
 			return err
 		}
 
-		streamPodLogs.Previous = false
+		streamPodLogs.Options.Previous = false
 		if err := streamPodLogs.Stream(ctx, writer); err != nil {
 			return err
 		}
@@ -99,18 +99,16 @@ func streamClusterLogsToZip(
 		utils.ClusterLabelName: clusterName,
 	}
 
-	podLogOptions := &corev1.PodLogOptions{
-		Timestamps: logTimeStamp, // NOTE: when activated, lines are no longer JSON
-	}
-
 	var podList corev1.PodList
 	err = plugin.Client.List(ctx, &podList, matchClusterName, client.InNamespace(namespace))
 	if err != nil {
 		return fmt.Errorf("could not get cluster pods: %w", err)
 	}
 	streamPodLogs := &logs.StreamingRequest{
-		Options:  podLogOptions,
-		Previous: true,
+		Options: corev1.PodLogOptions{
+			Timestamps: logTimeStamp,
+			Previous:   true,
+		},
 	}
 
 	for idx := range podList.Items {
@@ -142,10 +140,6 @@ func streamClusterJobLogsToZip(ctx context.Context, clusterName, namespace strin
 		utils.ClusterLabelName: clusterName,
 	}
 
-	podLogOptions := &corev1.PodLogOptions{
-		Timestamps: logTimeStamp, // NOTE: when activated, lines are no longer JSON
-	}
-
 	var jobList batchv1.JobList
 	err = plugin.Client.List(ctx, &jobList, matchClusterName, client.InNamespace(namespace))
 	if err != nil {
@@ -163,8 +157,10 @@ func streamClusterJobLogsToZip(ctx context.Context, clusterName, namespace strin
 		}
 
 		streamPodLogs := &logs.StreamingRequest{
-			Options:  podLogOptions,
-			Previous: false,
+			Options: corev1.PodLogOptions{
+				Timestamps: logTimeStamp,
+				Previous:   false,
+			},
 		}
 		for idx := range podList.Items {
 			pod := podList.Items[idx]
