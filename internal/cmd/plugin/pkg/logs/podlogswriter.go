@@ -28,20 +28,20 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-// StreamingRequest represents a request to stream a pod's logs
-type StreamingRequest struct {
+// PodLogsWriter represents a request to stream a pod's logs
+type PodLogsWriter struct {
 	Pod    v1.Pod
 	Client kubernetes.Interface
 }
 
-// NewStreamingRequest initializes the struct
-func NewStreamingRequest(pod v1.Pod, cli kubernetes.Interface) *StreamingRequest {
-	return &StreamingRequest{Pod: pod, Client: cli}
+// NewPodLogsWriter initializes the struct
+func NewPodLogsWriter(pod v1.Pod, cli kubernetes.Interface) *PodLogsWriter {
+	return &PodLogsWriter{Pod: pod, Client: cli}
 }
 
-// SingleStream streams the pod logs and shunts them to the `writer`.
+// Single streams the pod logs and shunts them to the `writer`.
 // If there are multiple containers, it will concatenate all the container streams into the writer
-func (spl *StreamingRequest) SingleStream(ctx context.Context, writer io.Writer, opts *v1.PodLogOptions) (err error) {
+func (spl *PodLogsWriter) Single(ctx context.Context, writer io.Writer, opts *v1.PodLogOptions) (err error) {
 	if opts.Container != "" {
 		return spl.sendLogsToWriter(ctx, writer, opts)
 	}
@@ -61,7 +61,7 @@ type writerConstructor interface {
 	Create(name string) (io.Writer, error)
 }
 
-func (spl *StreamingRequest) sendLogsToWriter(
+func (spl *PodLogsWriter) sendLogsToWriter(
 	ctx context.Context,
 	writer io.Writer,
 	options *v1.PodLogOptions,
@@ -74,7 +74,7 @@ func (spl *StreamingRequest) sendLogsToWriter(
 			return err
 		}
 		// getting the Previous logs can fail (as with `kubectl logs -p`). Don't error out
-		if err := executeLogRequest(ctx, request, writer); err != nil {
+		if err := executeGetLogRequest(ctx, request, writer); err != nil {
 			// we try to print the json-safe error message. We don't exit on error
 			_ = json.NewEncoder(writer).Encode("Error fetching previous logs: " + err.Error())
 		}
@@ -82,18 +82,18 @@ func (spl *StreamingRequest) sendLogsToWriter(
 			return err
 		}
 	}
-	return executeLogRequest(ctx, request, writer)
+	return executeGetLogRequest(ctx, request, writer)
 }
 
-// MultipleStreams streams the pod logs, sending each container's stream to a separate writer
-func (spl *StreamingRequest) MultipleStreams(
+// Multiple streams the pod logs, sending each container's stream to a separate writer
+func (spl *PodLogsWriter) Multiple(
 	ctx context.Context,
 	opts *v1.PodLogOptions,
 	writerConstructor writerConstructor,
 	filePathGenerator func(string) string,
 ) error {
 	if opts.Container != "" {
-		return fmt.Errorf("use SingleStream method to handle a single container output")
+		return fmt.Errorf("use Single method to handle a single container output")
 	}
 
 	for _, container := range spl.Pod.Spec.Containers {
@@ -111,7 +111,7 @@ func (spl *StreamingRequest) MultipleStreams(
 	return nil
 }
 
-func executeLogRequest(ctx context.Context, logRequest *rest.Request, writer io.Writer) error {
+func executeGetLogRequest(ctx context.Context, logRequest *rest.Request, writer io.Writer) error {
 	logStream, err := logRequest.Stream(ctx)
 	if err != nil {
 		return fmt.Errorf("when opening the log stream: %w", err)
