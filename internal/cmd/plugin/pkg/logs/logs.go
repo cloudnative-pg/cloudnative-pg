@@ -93,12 +93,7 @@ func (spl *StreamingRequest) MultipleStreams(
 	filePathGenerator func(string) string,
 ) error {
 	if opts.Container != "" {
-		writer, err := writerConstructor.Create(filePathGenerator(opts.Container))
-		if err != nil {
-			return err
-		}
-
-		return spl.sendLogsToWriter(ctx, writer, opts)
+		return fmt.Errorf("use SingleStream method to handle a single container output")
 	}
 
 	for _, container := range spl.Pod.Spec.Containers {
