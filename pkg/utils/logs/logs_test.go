@@ -106,22 +106,20 @@ var _ = Describe("Pod logging tests", func() {
 	When("using the Stream function", func() {
 		It("should return the proper podName", func() {
 			streamPodLog := StreamingRequest{
-				Pod:            pod,
-				DefaultOptions: v1.PodLogOptions{},
+				Pod: pod,
 			}
-			Expect(streamPodLog.getPodName()).To(BeEquivalentTo(podName))
-			Expect(streamPodLog.getPodNamespace()).To(BeEquivalentTo(podNamespace))
+			Expect(streamPodLog.Pod.Name).To(BeEquivalentTo(podName))
+			Expect(streamPodLog.Pod.Namespace).To(BeEquivalentTo(podNamespace))
 		})
 
 		It("should be able to handle the empty Pod", func(ctx context.Context) {
 			client := fake.NewClientset()
 			streamPodLog := StreamingRequest{
-				Pod:            v1.Pod{},
-				DefaultOptions: v1.PodLogOptions{},
-				Client:         client,
+				Pod:    v1.Pod{},
+				Client: client,
 			}
 			var logBuffer bytes.Buffer
-			err := streamPodLog.SingleStream(ctx, &logBuffer)
+			err := streamPodLog.SingleStream(ctx, &logBuffer, &v1.PodLogOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(logBuffer.String()).To(BeEquivalentTo(""))
 		})
@@ -129,15 +127,12 @@ var _ = Describe("Pod logging tests", func() {
 		It("should read the logs of a pod with one container", func(ctx context.Context) {
 			client := fake.NewClientset(&pod)
 			streamPodLog := StreamingRequest{
-				Pod: pod,
-				DefaultOptions: v1.PodLogOptions{
-					Previous: false,
-				},
+				Pod:    pod,
 				Client: client,
 			}
 
 			var logBuffer bytes.Buffer
-			err := streamPodLog.SingleStream(ctx, &logBuffer)
+			err := streamPodLog.SingleStream(ctx, &logBuffer, &v1.PodLogOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			Expect(logBuffer.String()).To(BeEquivalentTo("fake logs\n"))
@@ -146,15 +141,12 @@ var _ = Describe("Pod logging tests", func() {
 		It("should read the logs of a pod with multiple containers", func(ctx context.Context) {
 			client := fake.NewClientset(&podWithSidecar)
 			streamPodLog := StreamingRequest{
-				Pod: podWithSidecar,
-				DefaultOptions: v1.PodLogOptions{
-					Previous: false,
-				},
+				Pod:    podWithSidecar,
 				Client: client,
 			}
 
 			var logBuffer bytes.Buffer
-			err := streamPodLog.SingleStream(ctx, &logBuffer)
+			err := streamPodLog.SingleStream(ctx, &logBuffer, &v1.PodLogOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			Expect(logBuffer.String()).To(BeEquivalentTo("fake logs\nfake logs\n"))
@@ -163,16 +155,15 @@ var _ = Describe("Pod logging tests", func() {
 		It("should read only the specified container logs in a pod with multiple containers", func(ctx context.Context) {
 			client := fake.NewClientset(&podWithSidecar)
 			streamPodLog := StreamingRequest{
-				Pod: podWithSidecar,
-				DefaultOptions: v1.PodLogOptions{
-					Container: "postgres",
-					Previous:  false,
-				},
+				Pod:    podWithSidecar,
 				Client: client,
 			}
 
 			var logBuffer bytes.Buffer
-			err := streamPodLog.SingleStream(ctx, &logBuffer)
+			err := streamPodLog.SingleStream(ctx, &logBuffer, &v1.PodLogOptions{
+				Container: "postgres",
+				Previous:  false,
+			})
 			Expect(err).ToNot(HaveOccurred())
 
 			Expect(logBuffer.String()).To(BeEquivalentTo("fake logs\n"))
@@ -188,15 +179,14 @@ var _ = Describe("Pod logging tests", func() {
 				defer wait.Done()
 				now := metav1.Now()
 				streamPodLog := StreamingRequest{
-					Pod: pod,
-					DefaultOptions: v1.PodLogOptions{
-						Timestamps: false,
-						Follow:     true,
-						SinceTime:  &now,
-					},
+					Pod:    pod,
 					Client: client,
 				}
-				err := streamPodLog.SingleStream(ctx, &logBuffer)
+				err := streamPodLog.SingleStream(ctx, &logBuffer, &v1.PodLogOptions{
+					Timestamps: false,
+					Follow:     true,
+					SinceTime:  &now,
+				})
 				Expect(err).NotTo(HaveOccurred())
 			}()
 			// calling ctx.Done is not strictly necessary because the fake Client
@@ -212,18 +202,15 @@ var _ = Describe("Pod logging tests", func() {
 		It("should log each container into a separate writer", func(ctx context.Context) {
 			client := fake.NewClientset(&podWithSidecar)
 			streamPodLog := StreamingRequest{
-				Pod: podWithSidecar,
-				DefaultOptions: v1.PodLogOptions{
-					Previous: false,
-				},
+				Pod:    podWithSidecar,
 				Client: client,
 			}
 
 			namer := func(container string) string {
-				return fmt.Sprintf("%s-%s.log", streamPodLog.getPodName(), container)
+				return fmt.Sprintf("%s-%s.log", streamPodLog.Pod.Name, container)
 			}
 			mw := newMultiWriter()
-			err := streamPodLog.MultipleStreams(ctx, mw, namer)
+			err := streamPodLog.MultipleStreams(ctx, &v1.PodLogOptions{}, mw, namer)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(mw.writers).To(HaveLen(2))
 
@@ -234,18 +221,15 @@ var _ = Describe("Pod logging tests", func() {
 		It("can fetch the previous logs for each container", func(ctx context.Context) {
 			client := fake.NewClientset(&podWithSidecar)
 			streamPodLog := StreamingRequest{
-				Pod: podWithSidecar,
-				DefaultOptions: v1.PodLogOptions{
-					Previous: true,
-				},
+				Pod:    podWithSidecar,
 				Client: client,
 			}
 
 			namer := func(container string) string {
-				return fmt.Sprintf("%s-%s.log", streamPodLog.getPodName(), container)
+				return fmt.Sprintf("%s-%s.log", streamPodLog.Pod.Name, container)
 			}
 			mw := newMultiWriter()
-			err := streamPodLog.MultipleStreams(ctx, mw, namer)
+			err := streamPodLog.MultipleStreams(ctx, &v1.PodLogOptions{Previous: true}, mw, namer)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(mw.writers).To(HaveLen(2))
 
