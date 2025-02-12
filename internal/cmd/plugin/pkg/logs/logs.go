@@ -34,6 +34,7 @@ type StreamingRequest struct {
 	Client kubernetes.Interface
 }
 
+// NewStreamingRequest initializes the struct
 func NewStreamingRequest(pod v1.Pod, cli kubernetes.Interface) *StreamingRequest {
 	return &StreamingRequest{Pod: pod, Client: cli}
 }
@@ -67,7 +68,11 @@ type writerConstructor interface {
 	Create(name string) (io.Writer, error)
 }
 
-func (spl *StreamingRequest) temporaryNameContainerLogs(ctx context.Context, writer io.Writer, options *v1.PodLogOptions) error {
+func (spl *StreamingRequest) temporaryNameContainerLogs(
+	ctx context.Context,
+	writer io.Writer,
+	options *v1.PodLogOptions,
+) error {
 	if options.Previous {
 		jsWriter := json.NewEncoder(writer)
 		if err := jsWriter.Encode("====== Beginning of Previous Log ====="); err != nil {
