@@ -65,13 +65,13 @@ func streamOperatorLogsToZip(
 		if _, err := fmt.Fprint(writer, "\n\"====== Begin of Previous Log =====\"\n"); err != nil {
 			return err
 		}
-		_ = streamPodLogs.Stream(ctx, writer)
+		_ = streamPodLogs.SingleStream(ctx, writer)
 		if _, err := fmt.Fprint(writer, "\n\"====== End of Previous Log =====\"\n"); err != nil {
 			return err
 		}
 
 		streamPodLogs.DefaultOptions.Previous = false
-		if err := streamPodLogs.Stream(ctx, writer); err != nil {
+		if err := streamPodLogs.SingleStream(ctx, writer); err != nil {
 			return err
 		}
 	}
@@ -117,7 +117,7 @@ func streamClusterLogsToZip(
 		fileNamer := func(containerName string) string {
 			return filepath.Join(logsdir, fmt.Sprintf("%s-%s.jsonl", pod.Name, containerName))
 		}
-		if err := streamPodLogs.StreamMultiple(ctx, zipper, fileNamer); err != nil {
+		if err := streamPodLogs.MultipleStreams(ctx, zipper, fileNamer); err != nil {
 			return err
 		}
 	}
@@ -166,7 +166,7 @@ func streamClusterJobLogsToZip(ctx context.Context, clusterName, namespace strin
 			fileNamer := func(containerName string) string {
 				return filepath.Join(logsdir, fmt.Sprintf("%s-%s.jsonl", pod.Name, containerName))
 			}
-			if err := streamPodLogs.StreamMultiple(ctx, zipper, fileNamer); err != nil {
+			if err := streamPodLogs.MultipleStreams(ctx, zipper, fileNamer); err != nil {
 				return err
 			}
 		}
