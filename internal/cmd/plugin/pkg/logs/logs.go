@@ -55,8 +55,7 @@ func (spl *StreamingRequest) SingleStream(ctx context.Context, writer io.Writer,
 	for _, container := range spl.Pod.Spec.Containers {
 		opts := opts.DeepCopy()
 		opts.Container = container.Name
-		request := spl.getContainerLogsRequestWithOptions(opts)
-		if err := sendLogsToWriter(ctx, request, writer); err != nil {
+		if err := sendLogsToWriter(ctx, spl.getContainerLogsRequestWithOptions(opts), writer); err != nil {
 			return err
 		}
 	}
@@ -68,26 +67,26 @@ type writerConstructor interface {
 	Create(name string) (io.Writer, error)
 }
 
-func (spl *StreamingRequest) temporaryNameContainerLogs(
+func (spl *StreamingRequest) sendPreviousContainerLogsToWriter(
 	ctx context.Context,
 	writer io.Writer,
 	options *v1.PodLogOptions,
 ) error {
-	if options.Previous {
-		jsWriter := json.NewEncoder(writer)
-		if err := jsWriter.Encode("====== Beginning of Previous Log ====="); err != nil {
-			return err
-		}
-		// getting the Previous logs can fail (as with `kubectl logs -p`). Don't error out
-		if err := sendLogsToWriter(ctx, spl.getContainerLogsRequestWithOptions(options), writer); err != nil {
-			// we try to print the json-safe error message. We don't exit on error
-			_ = json.NewEncoder(writer).Encode("Error fetching previous logs: " + err.Error())
-		}
-		if err := jsWriter.Encode("====== End of Previous Log ====="); err != nil {
-			return err
-		}
+	if !options.Previous {
+		return fmt.Errorf("invoked previous log writer but previous option is false")
 	}
-	return sendLogsToWriter(ctx, spl.getContainerLogsRequestWithOptions(options), writer)
+
+	jsWriter := json.NewEncoder(writer)
+	if err := jsWriter.Encode("====== Beginning of Previous Log ====="); err != nil {
+		return err
+	}
+	// getting the Previous logs can fail (as with `kubectl logs -p`). Don't error out
+	if err := sendLogsToWriter(ctx, spl.getContainerLogsRequestWithOptions(options), writer); err != nil {
+		// we try to print the json-safe error message. We don't exit on error
+		_ = json.NewEncoder(writer).Encode("Error fetching previous logs: " + err.Error())
+	}
+
+	return jsWriter.Encode("====== End of Previous Log =====")
 }
 
 // MultipleStreams streams the pod logs, sending each container's stream to a separate writer
@@ -103,7 +102,10 @@ func (spl *StreamingRequest) MultipleStreams(
 		if err != nil {
 			return err
 		}
-		return spl.temporaryNameContainerLogs(ctx, writer, opts)
+		if opts.Previous {
+			return spl.sendPreviousContainerLogsToWriter(ctx, writer, opts)
+		}
+		return sendLogsToWriter(ctx, spl.getContainerLogsRequestWithOptions(opts), writer)
 	}
 
 	for _, container := range spl.Pod.Spec.Containers {
@@ -114,7 +116,15 @@ func (spl *StreamingRequest) MultipleStreams(
 		}
 		optsNew := opts.DeepCopy()
 		optsNew.Container = container.Name
-		if err := spl.temporaryNameContainerLogs(ctx, writer, opts); err != nil {
+
+		if opts.Previous {
+			if err := spl.sendPreviousContainerLogsToWriter(ctx, writer, opts); err != nil {
+				return err
+			}
+			continue
+		}
+
+		if err := sendLogsToWriter(ctx, spl.getContainerLogsRequestWithOptions(opts), writer); err != nil {
 			return err
 		}
 	}
