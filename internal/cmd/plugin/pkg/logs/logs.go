@@ -114,17 +114,17 @@ func (spl *StreamingRequest) MultipleStreams(
 		if err != nil {
 			return err
 		}
-		optsNew := opts.DeepCopy()
-		optsNew.Container = container.Name
+		containerOpts := opts.DeepCopy()
+		containerOpts.Container = container.Name
 
 		if opts.Previous {
-			if err := spl.sendPreviousContainerLogsToWriter(ctx, writer, opts); err != nil {
+			if err := spl.sendPreviousContainerLogsToWriter(ctx, writer, containerOpts); err != nil {
 				return err
 			}
 			continue
 		}
 
-		if err := sendLogsToWriter(ctx, spl.getContainerLogsRequestWithOptions(opts), writer); err != nil {
+		if err := sendLogsToWriter(ctx, spl.getContainerLogsRequestWithOptions(containerOpts), writer); err != nil {
 			return err
 		}
 	}
