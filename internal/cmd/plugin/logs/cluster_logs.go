@@ -31,7 +31,7 @@ import (
 
 	cnpgv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/logs"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/pkg/logs"
 )
 
 // clusterLogs contains the options and context to retrieve cluster logs

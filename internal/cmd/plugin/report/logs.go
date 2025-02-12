@@ -20,17 +20,17 @@ import (
 	"archive/zip"
 	"context"
 	"fmt"
-	"k8s.io/client-go/kubernetes"
 	"path/filepath"
-	ctrl "sigs.k8s.io/controller-runtime"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/kubernetes"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/pkg/logs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/logs"
 )
 
 const jobMatcherLabel = "job-name"
