@@ -20,7 +20,9 @@ import (
 	"archive/zip"
 	"context"
 	"fmt"
+	"k8s.io/client-go/kubernetes"
 	"path/filepath"
+	ctrl "sigs.k8s.io/controller-runtime"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -55,23 +57,23 @@ func streamOperatorLogsToZip(
 			return fmt.Errorf("could not add '%s' to zip: %w", path, zipperErr)
 		}
 
-		streamPodLogs := &logs.StreamingRequest{
-			Pod: pod,
-			DefaultOptions: corev1.PodLogOptions{
-				Timestamps: logTimeStamp,
-				Previous:   true,
-			},
-		}
+		streamPodLogs := logs.NewStreamingRequest(pod, kubernetes.NewForConfigOrDie(ctrl.GetConfigOrDie()))
 		if _, err := fmt.Fprint(writer, "\n\"====== Begin of Previous Log =====\"\n"); err != nil {
 			return err
 		}
-		_ = streamPodLogs.SingleStream(ctx, writer)
+		opts := &corev1.PodLogOptions{
+			Timestamps: logTimeStamp,
+			Previous:   true,
+		}
+		_ = streamPodLogs.SingleStream(ctx, writer, opts)
 		if _, err := fmt.Fprint(writer, "\n\"====== End of Previous Log =====\"\n"); err != nil {
 			return err
 		}
 
-		streamPodLogs.DefaultOptions.Previous = false
-		if err := streamPodLogs.SingleStream(ctx, writer); err != nil {
+		singleOpts := &corev1.PodLogOptions{
+			Timestamps: logTimeStamp,
+		}
+		if err := streamPodLogs.SingleStream(ctx, writer, singleOpts); err != nil {
 			return err
 		}
 	}
@@ -104,20 +106,20 @@ func streamClusterLogsToZip(
 	if err != nil {
 		return fmt.Errorf("could not get cluster pods: %w", err)
 	}
-	streamPodLogs := &logs.StreamingRequest{
-		DefaultOptions: corev1.PodLogOptions{
-			Timestamps: logTimeStamp,
-			Previous:   true,
-		},
-	}
+
+	cli := kubernetes.NewForConfigOrDie(ctrl.GetConfigOrDie())
 
 	for idx := range podList.Items {
 		pod := podList.Items[idx]
-		streamPodLogs.Pod = pod
+		streamPodLogs := logs.NewStreamingRequest(pod, cli)
 		fileNamer := func(containerName string) string {
 			return filepath.Join(logsdir, fmt.Sprintf("%s-%s.jsonl", pod.Name, containerName))
 		}
-		if err := streamPodLogs.MultipleStreams(ctx, zipper, fileNamer); err != nil {
+		opts := &corev1.PodLogOptions{
+			Timestamps: logTimeStamp,
+			Previous:   true,
+		}
+		if err := streamPodLogs.MultipleStreams(ctx, opts, zipper, fileNamer); err != nil {
 			return err
 		}
 	}
@@ -156,17 +158,15 @@ func streamClusterJobLogsToZip(ctx context.Context, clusterName, namespace strin
 
 		for idx := range podList.Items {
 			pod := podList.Items[idx]
-			streamPodLogs := &logs.StreamingRequest{
-				Pod: pod,
-				DefaultOptions: corev1.PodLogOptions{
-					Timestamps: logTimeStamp,
-				},
-			}
+			streamPodLogs := logs.NewStreamingRequest(pod, kubernetes.NewForConfigOrDie(ctrl.GetConfigOrDie()))
 
 			fileNamer := func(containerName string) string {
 				return filepath.Join(logsdir, fmt.Sprintf("%s-%s.jsonl", pod.Name, containerName))
 			}
-			if err := streamPodLogs.MultipleStreams(ctx, zipper, fileNamer); err != nil {
+			opts := corev1.PodLogOptions{
+				Timestamps: logTimeStamp,
+			}
+			if err := streamPodLogs.MultipleStreams(ctx, &opts, zipper, fileNamer); err != nil {
 				return err
 			}
 		}
