@@ -121,7 +121,7 @@ var _ = Describe("Pod logging tests", func() {
 				Client:         client,
 			}
 			var logBuffer bytes.Buffer
-			err := streamPodLog.Stream(ctx, &logBuffer)
+			err := streamPodLog.SingleStream(ctx, &logBuffer)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(logBuffer.String()).To(BeEquivalentTo(""))
 		})
@@ -137,7 +137,7 @@ var _ = Describe("Pod logging tests", func() {
 			}
 
 			var logBuffer bytes.Buffer
-			err := streamPodLog.Stream(ctx, &logBuffer)
+			err := streamPodLog.SingleStream(ctx, &logBuffer)
 			Expect(err).ToNot(HaveOccurred())
 
 			Expect(logBuffer.String()).To(BeEquivalentTo("fake logs\n"))
@@ -154,7 +154,7 @@ var _ = Describe("Pod logging tests", func() {
 			}
 
 			var logBuffer bytes.Buffer
-			err := streamPodLog.Stream(ctx, &logBuffer)
+			err := streamPodLog.SingleStream(ctx, &logBuffer)
 			Expect(err).ToNot(HaveOccurred())
 
 			Expect(logBuffer.String()).To(BeEquivalentTo("fake logs\nfake logs\n"))
@@ -172,7 +172,7 @@ var _ = Describe("Pod logging tests", func() {
 			}
 
 			var logBuffer bytes.Buffer
-			err := streamPodLog.Stream(ctx, &logBuffer)
+			err := streamPodLog.SingleStream(ctx, &logBuffer)
 			Expect(err).ToNot(HaveOccurred())
 
 			Expect(logBuffer.String()).To(BeEquivalentTo("fake logs\n"))
@@ -196,7 +196,7 @@ var _ = Describe("Pod logging tests", func() {
 					},
 					Client: client,
 				}
-				err := streamPodLog.Stream(ctx, &logBuffer)
+				err := streamPodLog.SingleStream(ctx, &logBuffer)
 				Expect(err).NotTo(HaveOccurred())
 			}()
 			// calling ctx.Done is not strictly necessary because the fake Client
@@ -223,7 +223,7 @@ var _ = Describe("Pod logging tests", func() {
 				return fmt.Sprintf("%s-%s.log", streamPodLog.getPodName(), container)
 			}
 			mw := newMultiWriter()
-			err := streamPodLog.StreamMultiple(ctx, mw, namer)
+			err := streamPodLog.MultipleStreams(ctx, mw, namer)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(mw.writers).To(HaveLen(2))
 
@@ -245,7 +245,7 @@ var _ = Describe("Pod logging tests", func() {
 				return fmt.Sprintf("%s-%s.log", streamPodLog.getPodName(), container)
 			}
 			mw := newMultiWriter()
-			err := streamPodLog.StreamMultiple(ctx, mw, namer)
+			err := streamPodLog.MultipleStreams(ctx, mw, namer)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(mw.writers).To(HaveLen(2))
 
