@@ -39,23 +39,17 @@ func NewStreamingRequest(pod v1.Pod, cli kubernetes.Interface) *StreamingRequest
 	return &StreamingRequest{Pod: pod, Client: cli}
 }
 
-// getContainerLogsRequestWithOptions returns the stream to the pod with overridden container and `previous` values
-func (spl *StreamingRequest) getContainerLogsRequestWithOptions(options *v1.PodLogOptions) *rest.Request {
-	pods := spl.Client.CoreV1().Pods(spl.Pod.Namespace)
-	return pods.GetLogs(spl.Pod.Name, options)
-}
-
 // SingleStream streams the pod logs and shunts them to the `writer`.
 // If there are multiple containers, it will concatenate all the container streams into the writer
 func (spl *StreamingRequest) SingleStream(ctx context.Context, writer io.Writer, opts *v1.PodLogOptions) (err error) {
 	if opts.Container != "" {
-		return sendLogsToWriter(ctx, spl.getContainerLogsRequestWithOptions(opts), writer)
+		return spl.sendLogsToWriter(ctx, writer, opts)
 	}
 
 	for _, container := range spl.Pod.Spec.Containers {
-		opts := opts.DeepCopy()
-		opts.Container = container.Name
-		if err := sendLogsToWriter(ctx, spl.getContainerLogsRequestWithOptions(opts), writer); err != nil {
+		containerOpts := opts.DeepCopy()
+		containerOpts.Container = container.Name
+		if err := spl.sendLogsToWriter(ctx, writer, containerOpts); err != nil {
 			return err
 		}
 	}
@@ -67,26 +61,28 @@ type writerConstructor interface {
 	Create(name string) (io.Writer, error)
 }
 
-func (spl *StreamingRequest) sendPreviousContainerLogsToWriter(
+func (spl *StreamingRequest) sendLogsToWriter(
 	ctx context.Context,
 	writer io.Writer,
 	options *v1.PodLogOptions,
 ) error {
-	if !options.Previous {
-		return fmt.Errorf("invoked previous log writer but previous option is false")
-	}
+	request := spl.Client.CoreV1().Pods(spl.Pod.Namespace).GetLogs(spl.Pod.Name, options)
 
-	jsWriter := json.NewEncoder(writer)
-	if err := jsWriter.Encode("====== Beginning of Previous Log ====="); err != nil {
-		return err
+	if options.Previous {
+		jsWriter := json.NewEncoder(writer)
+		if err := jsWriter.Encode("====== Beginning of Previous Log ====="); err != nil {
+			return err
+		}
+		// getting the Previous logs can fail (as with `kubectl logs -p`). Don't error out
+		if err := executeLogRequest(ctx, request, writer); err != nil {
+			// we try to print the json-safe error message. We don't exit on error
+			_ = json.NewEncoder(writer).Encode("Error fetching previous logs: " + err.Error())
+		}
+		if err := jsWriter.Encode("====== End of Previous Log ====="); err != nil {
+			return err
+		}
 	}
-	// getting the Previous logs can fail (as with `kubectl logs -p`). Don't error out
-	if err := sendLogsToWriter(ctx, spl.getContainerLogsRequestWithOptions(options), writer); err != nil {
-		// we try to print the json-safe error message. We don't exit on error
-		_ = json.NewEncoder(writer).Encode("Error fetching previous logs: " + err.Error())
-	}
-
-	return jsWriter.Encode("====== End of Previous Log =====")
+	return executeLogRequest(ctx, request, writer)
 }
 
 // MultipleStreams streams the pod logs, sending each container's stream to a separate writer
@@ -97,42 +93,31 @@ func (spl *StreamingRequest) MultipleStreams(
 	filePathGenerator func(string) string,
 ) error {
 	if opts.Container != "" {
-		logFilePath := filePathGenerator(opts.Container)
-		writer, err := writerConstructor.Create(logFilePath)
+		writer, err := writerConstructor.Create(filePathGenerator(opts.Container))
 		if err != nil {
 			return err
 		}
-		if opts.Previous {
-			return spl.sendPreviousContainerLogsToWriter(ctx, writer, opts)
-		}
-		return sendLogsToWriter(ctx, spl.getContainerLogsRequestWithOptions(opts), writer)
+
+		return spl.sendLogsToWriter(ctx, writer, opts)
 	}
 
 	for _, container := range spl.Pod.Spec.Containers {
-		logFilePath := filePathGenerator(container.Name)
-		writer, err := writerConstructor.Create(logFilePath)
+		writer, err := writerConstructor.Create(filePathGenerator(container.Name))
 		if err != nil {
 			return err
 		}
 		containerOpts := opts.DeepCopy()
 		containerOpts.Container = container.Name
 
-		if opts.Previous {
-			if err := spl.sendPreviousContainerLogsToWriter(ctx, writer, containerOpts); err != nil {
-				return err
-			}
-			continue
-		}
-
-		if err := sendLogsToWriter(ctx, spl.getContainerLogsRequestWithOptions(containerOpts), writer); err != nil {
+		if err := spl.sendLogsToWriter(ctx, writer, opts); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func sendLogsToWriter(ctx context.Context, podStream *rest.Request, writer io.Writer) error {
-	logStream, err := podStream.Stream(ctx)
+func executeLogRequest(ctx context.Context, logRequest *rest.Request, writer io.Writer) error {
+	logStream, err := logRequest.Stream(ctx)
 	if err != nil {
 		return fmt.Errorf("when opening the log stream: %w", err)
 	}
