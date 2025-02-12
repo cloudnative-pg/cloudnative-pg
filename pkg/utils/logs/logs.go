@@ -67,9 +67,9 @@ func (spl *StreamingRequest) getContainerLogsRequestWithOptions(options *v1.PodL
 	return pods.GetLogs(spl.getPodName(), options)
 }
 
-// Stream streams the pod logs and shunts them to the `writer`.
+// SingleStream streams the pod logs and shunts them to the `writer`.
 // If there are multiple containers, it will concatenate all the container streams into the writer
-func (spl *StreamingRequest) Stream(ctx context.Context, writer io.Writer) (err error) {
+func (spl *StreamingRequest) SingleStream(ctx context.Context, writer io.Writer) (err error) {
 	if spl.DefaultOptions.Container != "" {
 		return sendLogsToWriter(ctx, spl.getContainerLogsRequestWithDefaultOptions(), writer)
 	}
@@ -90,47 +90,53 @@ type writerConstructor interface {
 	Create(name string) (io.Writer, error)
 }
 
-// StreamMultiple streams the pod logs, sending each container's stream to a separate writer
-func (spl *StreamingRequest) StreamMultiple(
+func (spl *StreamingRequest) temporaryNameContainerLogs(ctx context.Context, writer io.Writer, containerName string) error {
+	if spl.DefaultOptions.Previous {
+		jsWriter := json.NewEncoder(writer)
+		if err := jsWriter.Encode("====== Beginning of Previous Log ====="); err != nil {
+			return err
+		}
+		opts := spl.DefaultOptions.DeepCopy()
+		opts.Container = containerName
+		opts.Previous = true
+		// getting the Previous logs can fail (as with `kubectl logs -p`). Don't error out
+		if err := sendLogsToWriter(ctx, spl.getContainerLogsRequestWithOptions(opts), writer); err != nil {
+			// we try to print the json-safe error message. We don't exit on error
+			_ = json.NewEncoder(writer).Encode("Error fetching previous logs: " + err.Error())
+		}
+		if err := jsWriter.Encode("====== End of Previous Log ====="); err != nil {
+			return err
+		}
+	}
+	// get the current logs
+	opts := spl.DefaultOptions.DeepCopy()
+	opts.Container = containerName
+	opts.Previous = false
+	return sendLogsToWriter(ctx, spl.getContainerLogsRequestWithOptions(opts), writer)
+}
+
+// MultipleStreams streams the pod logs, sending each container's stream to a separate writer
+func (spl *StreamingRequest) MultipleStreams(
 	ctx context.Context,
 	writerConstructor writerConstructor,
 	filePathGenerator func(string) string,
 ) error {
-	logContainer := func(containerName string) error {
-		logFilePath := filePathGenerator(containerName)
-		writer, createErr := writerConstructor.Create(logFilePath)
-		if createErr != nil {
-			return createErr
+	if spl.DefaultOptions.Container != "" {
+		logFilePath := filePathGenerator(spl.DefaultOptions.Container)
+		writer, err := writerConstructor.Create(logFilePath)
+		if err != nil {
+			return err
 		}
-		if spl.DefaultOptions.Previous {
-			jsWriter := json.NewEncoder(writer)
-			if err := jsWriter.Encode("====== Beginning of Previous Log ====="); err != nil {
-				return err
-			}
-			opts := spl.DefaultOptions.DeepCopy()
-			opts.Container = containerName
-			opts.Previous = true
-			// getting the Previous logs can fail (as with `kubectl logs -p`). Don't error out
-			if err := sendLogsToWriter(ctx, spl.getContainerLogsRequestWithOptions(opts), writer); err != nil {
-				// we try to print the json-safe error message. We don't exit on error
-				_ = json.NewEncoder(writer).Encode("Error fetching previous logs: " + err.Error())
-			}
-			if err := jsWriter.Encode("====== End of Previous Log ====="); err != nil {
-				return err
-			}
-		}
-		// get the current logs
-		opts := spl.DefaultOptions.DeepCopy()
-		opts.Container = containerName
-		opts.Previous = false
-		return sendLogsToWriter(ctx, spl.getContainerLogsRequestWithOptions(opts), writer)
+		return spl.temporaryNameContainerLogs(ctx, writer, spl.DefaultOptions.Container)
 	}
 
-	if spl.DefaultOptions.Container != "" {
-		return logContainer(spl.DefaultOptions.Container)
-	}
 	for _, container := range spl.Pod.Spec.Containers {
-		if err := logContainer(container.Name); err != nil {
+		logFilePath := filePathGenerator(container.Name)
+		writer, err := writerConstructor.Create(logFilePath)
+		if err != nil {
+			return err
+		}
+		if err := spl.temporaryNameContainerLogs(ctx, writer, container.Name); err != nil {
 			return err
 		}
 	}
