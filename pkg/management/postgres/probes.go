@@ -88,11 +88,11 @@ func (instance *Instance) GetStatus() (result *postgres.PostgresqlStatus, err er
 
 	row := superUserDB.QueryRow(
 		`SELECT
-			(pg_control_system()).system_identifier,
+			(pg_catalog.pg_control_system()).system_identifier,
 			-- True if this is a primary instance
-			NOT pg_is_in_recovery() as primary,
+			NOT pg_catalog.pg_is_in_recovery() as primary,
 			-- True if at least one column requires a restart
-			EXISTS(SELECT 1 FROM pg_settings WHERE pending_restart)`)
+			EXISTS(SELECT 1 FROM pg_catalog.pg_settings WHERE pending_restart)`)
 	err = row.Scan(&result.SystemID, &result.IsPrimary, &result.PendingRestart)
 	if err != nil {
 		return result, err
@@ -181,7 +181,7 @@ FROM
 	  SELECT name,
 			setting as current_setting,
 			boot_val as default_setting
-	  FROM pg_settings
+	  FROM pg_catalog.pg_settings
 	  WHERE pending_restart
    ) pending_settings
 LEFT OUTER JOIN
@@ -192,7 +192,7 @@ LEFT OUTER JOIN
 				setting as new_setting,
 				rank() OVER (PARTITION BY name ORDER BY seqno DESC) as rank,
 				applied
-			FROM pg_file_settings
+			FROM pg_catalog.pg_file_settings
 		) c
 	    WHERE rank = 1 AND not applied
 	) file_settings
@@ -275,9 +275,9 @@ func (instance *Instance) fillBasebackupStats(
 	var basebackupList []postgres.PgStatBasebackup
 
 	rows, err := superUserDB.Query(`SELECT
-		   usename, 
-		   application_name, 
-		   backend_start, 
+		   usename,
+		   application_name,
+		   backend_start,
 		   phase,
 		   COALESCE(backup_total, 0) AS backup_total,
 		   COALESCE(backup_streamed, 0) AS backup_streamed,
@@ -285,8 +285,8 @@ func (instance *Instance) fillBasebackupStats(
 		   COALESCE(pg_size_pretty(backup_streamed), '') AS backup_streamed_pretty,
 		   COALESCE(tablespaces_total, 0) AS tablespaces_total,
 		   COALESCE(tablespaces_streamed, 0) AS tablespaces_streamed
-		FROM pg_stat_progress_basebackup b
-		   JOIN pg_stat_activity a USING (pid) 
+		FROM pg_catalog.pg_stat_progress_basebackup b
+		   JOIN pg_catalog.pg_stat_activity a USING (pid)
 		WHERE application_name ~ '-join$'
 		ORDER BY 1, 2`)
 	if err != nil {
@@ -335,9 +335,9 @@ func (instance *Instance) fillStatusFromPrimary(result *postgres.PostgresqlStatu
 		`
 		SELECT
 			(SELECT COALESCE(last_archived_wal, '') FROM pg_catalog.pg_stat_archiver),
-			pg_walfile_name(pg_current_wal_lsn()) as current_wal,
-			pg_current_wal_lsn(),
-			(SELECT timeline_id FROM pg_control_checkpoint()) as timeline_id
+			pg_catalog.pg_walfile_name(pg_catalog.pg_current_wal_lsn()) as current_wal,
+			pg_catalog.pg_current_wal_lsn(),
+			(SELECT timeline_id FROM pg_catalog.pg_control_checkpoint()) as timeline_id
 		`)
 	err = row.Scan(&result.LastArchivedWAL,
 		&result.CurrentWAL,
@@ -386,7 +386,7 @@ func (instance *Instance) fillReplicationSlotsStatus(result *postgres.Postgresql
 	}
 
 	rows, err := superUserDB.Query(
-		`SELECT 
+		`SELECT
     slot_name,
 	coalesce(plugin::text, ''),
 	coalesce(slot_type::text, ''),	
@@ -398,7 +398,7 @@ func (instance *Instance) fillReplicationSlotsStatus(result *postgres.Postgresql
 	coalesce(restart_lsn::text, ''),
 	coalesce(wal_status::text, ''),
 	safe_wal_size
-    FROM pg_replication_slots`)
+    FROM pg_catalog.pg_replication_slots`)
 	if err != nil {
 		return err
 	}
@@ -525,10 +525,10 @@ func (instance *Instance) fillStatusFromReplica(result *postgres.PostgresqlStatu
 	// replicas
 	row := superUserDB.QueryRow(
 		"SELECT " +
-			"(SELECT timeline_id FROM pg_control_checkpoint()), " +
-			"COALESCE(pg_last_wal_receive_lsn()::varchar, ''), " +
-			"COALESCE(pg_last_wal_replay_lsn()::varchar, ''), " +
-			"pg_is_wal_replay_paused()")
+			"(SELECT timeline_id FROM pg_catalog.pg_control_checkpoint()), " +
+			"COALESCE(pg_catalog.pg_last_wal_receive_lsn()::varchar, ''), " +
+			"COALESCE(pg_catalog.pg_last_wal_replay_lsn()::varchar, ''), " +
+			"pg_catalog.pg_is_wal_replay_paused()")
 	if err := row.Scan(&result.TimeLineID, &result.ReceivedLsn, &result.ReplayLsn, &result.ReplayPaused); err != nil {
 		return err
 	}
@@ -559,7 +559,7 @@ func (instance *Instance) IsWALReceiverActive() (bool, error) {
 		return false, err
 	}
 
-	row := superUserDB.QueryRow("SELECT COUNT(*) FROM pg_stat_wal_receiver")
+	row := superUserDB.QueryRow("SELECT COUNT(*) FROM pg_catalog.pg_stat_wal_receiver")
 	err = row.Scan(&result)
 	if err != nil {
 		return false, err
@@ -596,7 +596,7 @@ func (instance *Instance) TryGetPgStatWAL() (*PgStatWal, error) {
 	var pgWalStat PgStatWal
 	row := superUserDB.QueryRow(
 		`SELECT
-        wal_records,
+        	wal_records,
 		wal_fpi,
 		wal_bytes,
 		wal_buffers_full,
@@ -605,7 +605,7 @@ func (instance *Instance) TryGetPgStatWAL() (*PgStatWal, error) {
 		wal_write_time,
 		wal_sync_time,
 		stats_reset
-	    FROM pg_stat_wal`)
+	    FROM pg_catalog.pg_stat_wal`)
 	if err := row.Scan(
 		&pgWalStat.WalRecords,
 		&pgWalStat.WalFpi,

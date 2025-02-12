@@ -1237,7 +1237,7 @@ func (instance *Instance) waitForInstanceRestarted(ctx context.Context, after ti
 			return err
 		}
 		var startTime time.Time
-		row := db.QueryRowContext(ctx, "SELECT pg_postmaster_start_time()")
+		row := db.QueryRowContext(ctx, "SELECT pg_catalog.pg_postmaster_start_time()")
 		err = row.Scan(&startTime)
 		if err != nil {
 			return err
@@ -1257,8 +1257,8 @@ func (instance *Instance) DropConnections() error {
 	}
 
 	if _, err := conn.Exec(
-		`SELECT pg_terminate_backend(pid)
-			   FROM pg_stat_activity
+		`SELECT pg_catalog.pg_terminate_backend(pid)
+			   FROM pg_catalog.pg_stat_activity
 			   WHERE pid <> pg_backend_pid()
 			     AND backend_type = 'client backend';`,
 	); err != nil {
