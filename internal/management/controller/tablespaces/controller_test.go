@@ -76,8 +76,8 @@ const (
 	SELECT
 		pg_tablespace.spcname spcname,
 		COALESCE(pg_roles.rolname, '') rolname
-	FROM pg_tablespace
-	LEFT JOIN pg_roles ON pg_tablespace.spcowner = pg_roles.oid
+	FROM pg_catalog.pg_tablespace
+	LEFT JOIN pg_catalog.pg_roles ON pg_tablespace.spcowner = pg_roles.oid
 	WHERE spcname NOT LIKE $1
 	`
 	expectedCreateStmt = "CREATE TABLESPACE \"%s\" OWNER \"%s\" " +
@@ -88,7 +88,7 @@ const (
 	expectedReadinessCheck = `
 		SELECT
 			NOT pg_is_in_recovery()
-			OR (SELECT coalesce(setting, '') = '' FROM pg_settings WHERE name = 'primary_conninfo')
+			OR (SELECT coalesce(setting, '') = '' FROM pg_catalog.pg_settings WHERE name = 'primary_conninfo')
 			OR pg_last_wal_replay_lsn() IS NOT NULL
 		`
 )
