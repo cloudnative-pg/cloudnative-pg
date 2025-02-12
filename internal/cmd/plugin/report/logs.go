@@ -57,7 +57,7 @@ func streamOperatorLogsToZip(
 			return fmt.Errorf("could not add '%s' to zip: %w", path, zipperErr)
 		}
 
-		streamPodLogs := logs.NewStreamingRequest(pod, kubernetes.NewForConfigOrDie(ctrl.GetConfigOrDie()))
+		streamPodLogs := logs.NewPodLogsWriter(pod, kubernetes.NewForConfigOrDie(ctrl.GetConfigOrDie()))
 		if _, err := fmt.Fprint(writer, "\n\"====== Begin of Previous Log =====\"\n"); err != nil {
 			return err
 		}
@@ -65,7 +65,7 @@ func streamOperatorLogsToZip(
 			Timestamps: logTimeStamp,
 			Previous:   true,
 		}
-		_ = streamPodLogs.SingleStream(ctx, writer, opts)
+		_ = streamPodLogs.Single(ctx, writer, opts)
 		if _, err := fmt.Fprint(writer, "\n\"====== End of Previous Log =====\"\n"); err != nil {
 			return err
 		}
@@ -73,7 +73,7 @@ func streamOperatorLogsToZip(
 		singleOpts := &corev1.PodLogOptions{
 			Timestamps: logTimeStamp,
 		}
-		if err := streamPodLogs.SingleStream(ctx, writer, singleOpts); err != nil {
+		if err := streamPodLogs.Single(ctx, writer, singleOpts); err != nil {
 			return err
 		}
 	}
@@ -111,7 +111,7 @@ func streamClusterLogsToZip(
 
 	for idx := range podList.Items {
 		pod := podList.Items[idx]
-		streamPodLogs := logs.NewStreamingRequest(pod, cli)
+		streamPodLogs := logs.NewPodLogsWriter(pod, cli)
 		fileNamer := func(containerName string) string {
 			return filepath.Join(logsdir, fmt.Sprintf("%s-%s.jsonl", pod.Name, containerName))
 		}
@@ -119,7 +119,7 @@ func streamClusterLogsToZip(
 			Timestamps: logTimeStamp,
 			Previous:   true,
 		}
-		if err := streamPodLogs.MultipleStreams(ctx, opts, zipper, fileNamer); err != nil {
+		if err := streamPodLogs.Multiple(ctx, opts, zipper, fileNamer); err != nil {
 			return err
 		}
 	}
@@ -158,7 +158,7 @@ func streamClusterJobLogsToZip(ctx context.Context, clusterName, namespace strin
 
 		for idx := range podList.Items {
 			pod := podList.Items[idx]
-			streamPodLogs := logs.NewStreamingRequest(pod, kubernetes.NewForConfigOrDie(ctrl.GetConfigOrDie()))
+			streamPodLogs := logs.NewPodLogsWriter(pod, kubernetes.NewForConfigOrDie(ctrl.GetConfigOrDie()))
 
 			fileNamer := func(containerName string) string {
 				return filepath.Join(logsdir, fmt.Sprintf("%s-%s.jsonl", pod.Name, containerName))
@@ -166,7 +166,7 @@ func streamClusterJobLogsToZip(ctx context.Context, clusterName, namespace strin
 			opts := corev1.PodLogOptions{
 				Timestamps: logTimeStamp,
 			}
-			if err := streamPodLogs.MultipleStreams(ctx, &opts, zipper, fileNamer); err != nil {
+			if err := streamPodLogs.Multiple(ctx, &opts, zipper, fileNamer); err != nil {
 				return err
 			}
 		}
