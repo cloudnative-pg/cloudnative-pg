@@ -20,8 +20,8 @@ github.com/cheynewallace/tabby v1.1.1 h1:JvUR8waht4Y0S3JF17G6Vhyt+FRhnqVCkk8l4Yr
 github.com/cheynewallace/tabby v1.1.1/go.mod h1:Pba/6cUL8uYqvOc9RkyvFbHGrQ9wShyrn6/S/1OYVys=
 github.com/cloudnative-pg/barman-cloud v0.0.0-20250104195650-c1472628b450 h1:u11mKIHmbEGQWLsAb5hguwgGOOddA8lpPFAViBpbkt8=
 github.com/cloudnative-pg/barman-cloud v0.0.0-20250104195650-c1472628b450/go.mod h1:HPGwXHlatQEnb2HdsbGTZLEo8qlxKLdxTHiTeF9TTqw=
-github.com/cloudnative-pg/machinery v0.0.0-20250102082645-95c37fe624d0 h1:RvwDA4W8K8NQNVQTOzrf9o8P328N7NXztvnq3cUncww=
-github.com/cloudnative-pg/machinery v0.0.0-20250102082645-95c37fe624d0/go.mod h1:pitcj6ztiuxfSFH5EbVHv8iCVxF+yQkzf9o9A1KoDvI=
+github.com/cloudnative-pg/machinery v0.0.0-20250207091712-d15e1d1d4695 h1:iKlyhZi8dvlRUtC4pjdw2vBpsu1W1ffZ08NdvSKl0qU=
+github.com/cloudnative-pg/machinery v0.0.0-20250207091712-d15e1d1d4695/go.mod h1:RMp9FG1kfoG0aU2lzhV3iFyIgBzzD1IgUlIwIey7Jd0=
 github.com/cpuguy83/go-md2man/v2 v2.0.4/go.mod h1:tgQtvFlXSQOSOSIRvRPT7W67SCa46tRHOmNcaadrF8o=
 github.com/creack/pty v1.1.18 h1:n56/Zwd5o6whRC5PMGretI4IdRLlmBXYNjScPaBgsbY=
 github.com/creack/pty v1.1.18/go.mod h1:MOBLtS5ELjhRRrroQr9kyvTxUAFNvYEK993ew/Vr4O4=
@@ -169,8 +169,9 @@ github.com/sethvargo/go-password v0.3.1 h1:WqrLTjo7X6AcVYfC6R7GtSyuUQR9hGyAj/f1P
 github.com/sethvargo/go-password v0.3.1/go.mod h1:rXofC1zT54N7R8K/h1WDUdkf9BOx5OptoxrMBcrXzvs=
 github.com/spf13/cobra v1.8.1 h1:e5/vxKd/rZsfSJMUX1agtjeTDf+qv1/JdBF8gg5k9ZM=
 github.com/spf13/cobra v1.8.1/go.mod h1:wHxEcudfqmLYa8iTfL+OuZPbBZkmvliBWKIezN3kD9Y=
-github.com/spf13/pflag v1.0.5 h1:iy+VFUOCP1a+8yFto/drg2CJ5u0yRoB7fZw3DKv/JXA=
 github.com/spf13/pflag v1.0.5/go.mod h1:McXfInJRrz4CZXVZOBLb0bTZqETkiAhM9Iw0y3An2Bg=
+github.com/spf13/pflag v1.0.6 h1:jFzHGLGAlb3ruxLB8MhbI6A8+AQX/2eW4qeyNZXNp2o=
+github.com/spf13/pflag v1.0.6/go.mod h1:McXfInJRrz4CZXVZOBLb0bTZqETkiAhM9Iw0y3An2Bg=
 github.com/stern/stern v1.32.0 h1:xNw0CizB7/4CkWpI46cAo8tArDnS14eYKLaaDevEnrM=
 github.com/stern/stern v1.32.0/go.mod h1:Nv6yoHcb2E1HvklagJyd4rjoysJM4WxvcGVQtE651Xw=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
