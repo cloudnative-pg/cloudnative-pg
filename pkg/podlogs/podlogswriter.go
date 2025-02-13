@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // Package logs contains code to fetch logs from Kubernetes pods
-package logs
+package podlogs
 
 import (
 	"context"
