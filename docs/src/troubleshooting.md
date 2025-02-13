@@ -39,6 +39,11 @@ following plugins/utilities to be available in your system:
   If you are on Windows OS, you can use [`findstr`](https://docs.microsoft.com/en-us/windows-server/administration/windows-commands/findstr) as an alternative to `grep` or directly use [`wsl`](https://docs.microsoft.com/en-us/windows/wsl/)
   and install your preferred *nix distro and use the tools mentioned above.
 
+### Is your system production-ready?
+
+Please ensure you check the
+[production readiness guide](./production_readiness.md).
+
 ## First steps
 
 To quickly get an overview of the cluster or installation, the `kubectl` plugin
