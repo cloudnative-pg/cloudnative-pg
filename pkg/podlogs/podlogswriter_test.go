@@ -105,7 +105,7 @@ var _ = Describe("Pod logging tests", func() {
 
 	When("using the Stream function", func() {
 		It("should return the proper podName", func() {
-			streamPodLog := PodLogsWriter{
+			streamPodLog := Writer{
 				Pod: pod,
 			}
 			Expect(streamPodLog.Pod.Name).To(BeEquivalentTo(podName))
@@ -114,7 +114,7 @@ var _ = Describe("Pod logging tests", func() {
 
 		It("should be able to handle the empty Pod", func(ctx context.Context) {
 			client := fake.NewClientset()
-			streamPodLog := PodLogsWriter{
+			streamPodLog := Writer{
 				Pod:    v1.Pod{},
 				Client: client,
 			}
@@ -126,7 +126,7 @@ var _ = Describe("Pod logging tests", func() {
 
 		It("should read the logs of a pod with one container", func(ctx context.Context) {
 			client := fake.NewClientset(&pod)
-			streamPodLog := PodLogsWriter{
+			streamPodLog := Writer{
 				Pod:    pod,
 				Client: client,
 			}
@@ -140,7 +140,7 @@ var _ = Describe("Pod logging tests", func() {
 
 		It("should read the logs of a pod with multiple containers", func(ctx context.Context) {
 			client := fake.NewClientset(&podWithSidecar)
-			streamPodLog := PodLogsWriter{
+			streamPodLog := Writer{
 				Pod:    podWithSidecar,
 				Client: client,
 			}
@@ -154,7 +154,7 @@ var _ = Describe("Pod logging tests", func() {
 
 		It("should read only the specified container logs in a pod with multiple containers", func(ctx context.Context) {
 			client := fake.NewClientset(&podWithSidecar)
-			streamPodLog := PodLogsWriter{
+			streamPodLog := Writer{
 				Pod:    podWithSidecar,
 				Client: client,
 			}
@@ -178,7 +178,7 @@ var _ = Describe("Pod logging tests", func() {
 				defer GinkgoRecover()
 				defer wait.Done()
 				now := metav1.Now()
-				streamPodLog := PodLogsWriter{
+				streamPodLog := Writer{
 					Pod:    pod,
 					Client: client,
 				}
@@ -201,7 +201,7 @@ var _ = Describe("Pod logging tests", func() {
 	When("using the StreamMultiple function", func() {
 		It("should log each container into a separate writer", func(ctx context.Context) {
 			client := fake.NewClientset(&podWithSidecar)
-			streamPodLog := PodLogsWriter{
+			streamPodLog := Writer{
 				Pod:    podWithSidecar,
 				Client: client,
 			}
@@ -220,7 +220,7 @@ var _ = Describe("Pod logging tests", func() {
 
 		It("can fetch the previous logs for each container", func(ctx context.Context) {
 			client := fake.NewClientset(&podWithSidecar)
-			streamPodLog := PodLogsWriter{
+			streamPodLog := Writer{
 				Pod:    podWithSidecar,
 				Client: client,
 			}
