@@ -29,7 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/pkg/logs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/podlogs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -57,7 +57,7 @@ func streamOperatorLogsToZip(
 			return fmt.Errorf("could not add '%s' to zip: %w", path, zipperErr)
 		}
 
-		streamPodLogs := logs.NewPodLogsWriter(pod, kubernetes.NewForConfigOrDie(ctrl.GetConfigOrDie()))
+		streamPodLogs := podlogs.NewPodLogsWriter(pod, kubernetes.NewForConfigOrDie(ctrl.GetConfigOrDie()))
 		if _, err := fmt.Fprint(writer, "\n\"====== Begin of Previous Log =====\"\n"); err != nil {
 			return err
 		}
@@ -111,7 +111,7 @@ func streamClusterLogsToZip(
 
 	for idx := range podList.Items {
 		pod := podList.Items[idx]
-		streamPodLogs := logs.NewPodLogsWriter(pod, cli)
+		streamPodLogs := podlogs.NewPodLogsWriter(pod, cli)
 		fileNamer := func(containerName string) string {
 			return filepath.Join(logsdir, fmt.Sprintf("%s-%s.jsonl", pod.Name, containerName))
 		}
@@ -158,7 +158,7 @@ func streamClusterJobLogsToZip(ctx context.Context, clusterName, namespace strin
 
 		for idx := range podList.Items {
 			pod := podList.Items[idx]
-			streamPodLogs := logs.NewPodLogsWriter(pod, kubernetes.NewForConfigOrDie(ctrl.GetConfigOrDie()))
+			streamPodLogs := podlogs.NewPodLogsWriter(pod, kubernetes.NewForConfigOrDie(ctrl.GetConfigOrDie()))
 
 			fileNamer := func(containerName string) string {
 				return filepath.Join(logsdir, fmt.Sprintf("%s-%s.jsonl", pod.Name, containerName))
