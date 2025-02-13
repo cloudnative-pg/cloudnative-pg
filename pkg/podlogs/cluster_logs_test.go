@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package logs
+package podlogs
 
 import (
 	"bytes"
@@ -104,7 +104,7 @@ var _ = Describe("Cluster logging tests", func() {
 		},
 	}
 	It("should exit on ended pod logs with the non-follow option", func(ctx context.Context) {
-		client := fake.NewSimpleClientset(pod)
+		client := fake.NewClientset(pod)
 		var logBuffer bytes.Buffer
 		var wait sync.WaitGroup
 		wait.Add(1)
@@ -150,7 +150,7 @@ var _ = Describe("Cluster logging tests", func() {
 	})
 
 	It("should catch extra logs if given the follow option", func(ctx context.Context) {
-		client := fake.NewSimpleClientset(pod)
+		client := fake.NewClientset(pod)
 		var logBuffer syncBuffer
 		// let's set a short follow-wait, and keep the cluster streaming for two
 		// cycles
