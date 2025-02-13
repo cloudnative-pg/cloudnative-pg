@@ -638,7 +638,7 @@ metadata:
 
 The `cluster` sub-command gathers the following:
 
-* **cluster resources**: the cluster information, same as `kubectl get cluster -o yaml`
+* **cluster resources**: the cluster information, same as `kubectl get cluster.postgresql.cnpg.io -o yaml`
 * **cluster pods**: pods in the cluster namespace matching the cluster name
 * **cluster jobs**: jobs, if any, in the cluster namespace matching the cluster name
 * **events**: events in the cluster namespace

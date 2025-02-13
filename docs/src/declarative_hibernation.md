@@ -39,7 +39,7 @@ The hibernation status can be monitored by looking for the `cnpg.io/hibernation`
 condition:
 
 ``` sh
-$ kubectl get cluster <cluster-name> -o "jsonpath={.status.conditions[?(.type==\"cnpg.io/hibernation\")]}" 
+$ kubectl get cluster.postgresql.cnpg.io <cluster-name> -o "jsonpath={.status.conditions[?(.type==\"cnpg.io/hibernation\")]}" 
 
 {
         "lastTransitionTime":"2023-03-05T16:43:35Z",
