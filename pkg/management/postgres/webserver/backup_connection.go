@@ -28,6 +28,7 @@ import (
 	types "github.com/cloudnative-pg/machinery/pkg/types"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pool"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
 )
 
@@ -99,16 +100,19 @@ func (bc *backupConnection) executeWithLock(backupName string, cb func() error) 
 
 func newBackupConnection(
 	ctx context.Context,
-	instance *postgres.Instance,
 	backupName string,
 	immediateCheckpoint bool,
 	waitForArchive bool,
 ) (*backupConnection, error) {
-	superUserDB, err := instance.GetSuperUserDB()
+	const applicationName = "cnpg-instance-manager-backup"
+	// we don't use the instance connections as a safeguard measure to avoid connection saturation due to possible
+	// connection leaks see #6761.
+	baseConnString := postgres.BuildPostgresUnixConnectionString(applicationName)
+	dsn := pool.AddDBNameToConnectionString(baseConnString, "postgres")
+	superUserDB, err := pool.NewConnection(dsn, pool.ConnectionProfilePostgresql, 1)
 	if err != nil {
 		return nil, err
 	}
-
 	vers, err := utils.GetPgVersion(superUserDB)
 	if err != nil {
 		return nil, err
