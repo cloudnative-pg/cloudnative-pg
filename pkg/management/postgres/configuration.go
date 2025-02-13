@@ -83,10 +83,7 @@ func (instance *Instance) RefreshConfigurationFilesFromCluster(
 			"installing postgresql configuration: %w",
 			err)
 	}
-
-	if sha256 != "" {
-		instance.ConfigSha256 = sha256
-	}
+	instance.ConfigSha256 = sha256
 
 	return postgresConfigurationChanged, nil
 }
