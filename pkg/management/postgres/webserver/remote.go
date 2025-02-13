@@ -280,12 +280,18 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 			if err := ws.currentBackup.closeConnection(p.BackupName); err != nil {
 				if !errors.Is(err, sql.ErrConnDone) {
 					log.Error(err, "Error while closing backup connection (start)")
+					// we can't ignore the problem otherwise this could lead to a connection exhaustion see #6761
+					sendUnprocessableEntityJSONResponse(
+						w,
+						"UNABLE_TO_CLOSE_CONNECTION",
+						err.Error(),
+					)
+					return
 				}
 			}
 		}
 		ws.currentBackup, err = newBackupConnection(
 			req.Context(),
-			ws.instance,
 			p.BackupName,
 			p.ImmediateCheckpoint,
 			p.WaitForArchive,

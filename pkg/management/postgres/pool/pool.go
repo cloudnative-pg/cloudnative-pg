@@ -97,11 +97,14 @@ func (pool *ConnectionPool) ShutdownConnections() {
 	pool.connectionMap = make(map[string]*sql.DB)
 }
 
-// newConnection creates a database connection connectionMap, connecting via
-// Unix domain socket to a database with a certain name
 func (pool *ConnectionPool) newConnection(dbname string) (*sql.DB, error) {
-	dsn := pool.GetDsn(dbname)
-	db, err := NewDBConnection(dsn, pool.connectionProfile)
+	return NewConnection(pool.GetDsn(dbname), pool.connectionProfile, 3)
+}
+
+// NewConnection creates a database connection connectionMap, connecting via
+// Unix domain socket to a database with a certain name
+func NewConnection(dsn string, profile ConnectionProfile, maxOpenConns int) (*sql.DB, error) {
+	db, err := NewDBConnection(dsn, profile)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create connection connectionMap: %w", err)
 	}
@@ -117,7 +120,7 @@ func (pool *ConnectionPool) newConnection(dbname string) (*sql.DB, error) {
 	// The latter will use an exclusive connection, that is required
 	// for the PostgreSQL Physical backup APIs
 
-	db.SetMaxOpenConns(3)
+	db.SetMaxOpenConns(maxOpenConns)
 	db.SetMaxIdleConns(0)
 
 	return db, nil
@@ -125,5 +128,10 @@ func (pool *ConnectionPool) newConnection(dbname string) (*sql.DB, error) {
 
 // GetDsn returns the connection string for a given database
 func (pool *ConnectionPool) GetDsn(dbname string) string {
-	return fmt.Sprintf("%s dbname=%s", pool.baseConnectionString, dbname)
+	return AddDBNameToConnectionString(pool.baseConnectionString, dbname)
+}
+
+// AddDBNameToConnectionString returns the connection string for a given database
+func AddDBNameToConnectionString(baseDSN string, dbname string) string {
+	return fmt.Sprintf("%s dbname=%s", baseDSN, dbname)
 }
