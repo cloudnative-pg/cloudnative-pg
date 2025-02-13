@@ -34,7 +34,7 @@ const (
 	// PathHealth is the URL path for Health State
 	PathHealth string = "/healthz"
 
-	// PathReady is the URL oath for Ready State
+	// PathReady is the URL path for Ready State
 	PathReady string = "/readyz"
 
 	// PathPGControlData is the URL path for PostgreSQL pg_controldata output
@@ -63,6 +63,9 @@ const (
 
 	// PathCache is the URL path for cached resources
 	PathCache string = "/cache/"
+
+	// PathRestart is the URL path for restarting the instance manager
+	PathRestart string = "/restart"
 
 	// StatusPort is the port for status HTTP requests
 	StatusPort int32 = 8000

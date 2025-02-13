@@ -118,36 +118,106 @@ func (ws *Webserver) Start(ctx context.Context) error {
 	return nil
 }
 
-// sendJSONResponse sends a generic JSON response.
-func sendJSONResponse[T any](w http.ResponseWriter, statusCode int, data Response[T]) {
+// writeJSONResponse handles writing a JSON HTTP response with proper error handling and logging.
+// It takes a pre-marshaled JSON byte slice and handles setting the correct content type.
+// It returns an error if the write operation fails or if the number of bytes written
+// doesn't match the expected count.
+func writeJSONResponse(w http.ResponseWriter, endpoint string, js []byte) error {
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(statusCode)
 
-	if err := json.NewEncoder(w).Encode(data); err != nil {
-		http.Error(w, "Failed to write response", http.StatusInternalServerError)
+	expectedBytes := len(js)
+	n, err := w.Write(js)
+
+	if err != nil {
+		log.Warning(fmt.Sprintf("%s: failed to write JSON response", endpoint),
+			"error", err.Error(),
+			"bytesWritten", n,
+			"expectedBytes", expectedBytes)
+		return fmt.Errorf("%s: failed to write JSON response: %w", endpoint, err)
 	}
+
+	if n != expectedBytes {
+		err := fmt.Errorf("incomplete JSON write: wrote %d of %d bytes", n, expectedBytes)
+		log.Warning(fmt.Sprintf("%s: incomplete JSON response write", endpoint),
+			"error", err.Error(),
+			"bytesWritten", n,
+			"expectedBytes", expectedBytes)
+		return err
+	}
+
+	log.Trace(fmt.Sprintf("%s: successfully wrote JSON response", endpoint),
+		"bytesWritten", n)
+
+	return nil
 }
 
-func sendBadRequestJSONResponse(w http.ResponseWriter, errorCode string, message string) {
+// writeResponse handles writing an HTTP response with proper error handling and logging.
+// It returns an error if the write operation fails or if the number of bytes written
+// doesn't match the expected count.
+func writeTextResponse(w http.ResponseWriter, endpoint, value string) error {
+	expectedBytes := len(value)
+	n, err := fmt.Fprint(w, value)
+
+	if err != nil {
+		log.Warning(fmt.Sprintf("%s: failed to write response", endpoint),
+			"error", err.Error(),
+			"bytesWritten", n,
+			"expectedBytes", expectedBytes)
+		return fmt.Errorf("%s: failed to write response: %w", endpoint, err)
+	}
+
+	if n != expectedBytes {
+		err := fmt.Errorf("incomplete write: wrote %d of %d bytes", n, expectedBytes)
+		log.Warning(fmt.Sprintf("%s: incomplete response write", endpoint),
+			"error", err.Error(),
+			"bytesWritten", n,
+			"expectedBytes", expectedBytes)
+		return err
+	}
+
+	log.Trace(fmt.Sprintf("%s: successfully wrote response", endpoint),
+		"bytesWritten", n)
+
+	return nil
+}
+
+func sendJSONResponse[T any](w http.ResponseWriter, statusCode int, resp Response[T], endpoint string) {
+	log.Trace("sendJSONResponse: entry", "status", statusCode, "endpoint", endpoint)
+	defer log.Trace("sendJSONResponse: deferred exit", "status", statusCode, "endpoint", endpoint)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+	log.Trace("sendJSONResponse: headers set", "status", statusCode, "endpoint", endpoint)
+
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		log.Trace("sendJSONResponse: Failed to write JSON response", "error", err, "response", resp, "status", statusCode, "endpoint", endpoint)
+		http.Error(w, "Failed to write response", http.StatusInternalServerError)
+	}
+
+	log.Trace("sendJSONResponse: exit", "status", statusCode, "endpoint", endpoint)
+}
+
+func sendBadRequestJSONResponse(w http.ResponseWriter, errorCode string, message string, endpoint string) {
 	sendJSONResponse(w, http.StatusBadRequest, Response[any]{
 		Error: &Error{
 			Code:    errorCode,
 			Message: message,
 		},
-	})
+	}, endpoint)
 }
 
-func sendUnprocessableEntityJSONResponse(w http.ResponseWriter, errorCode string, message string) {
+func sendUnprocessableEntityJSONResponse(w http.ResponseWriter, errorCode string, message string, endpoint string) {
 	sendJSONResponse(w, http.StatusUnprocessableEntity, Response[any]{
 		Error: &Error{
 			Code:    errorCode,
 			Message: message,
 		},
-	})
+	}, endpoint)
 }
 
-func sendJSONResponseWithData[T interface{}](w http.ResponseWriter, statusCode int, data T) {
+func sendJSONResponseWithData[T interface{}](w http.ResponseWriter, statusCode int, data T, endpoint string) {
 	sendJSONResponse(w, statusCode, Response[T]{
 		Data: &data,
-	})
+	},
+		endpoint)
 }
