@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package logs contains code to fetch logs from Kubernetes pods
+// Package podlogs contains code to fetch logs from Kubernetes pods
 package podlogs
 
 import (
@@ -28,20 +28,20 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-// PodLogsWriter represents a request to stream a pod's logs
-type PodLogsWriter struct {
+// Writer represents a request to stream a pod's logs and send them to an io.Writer
+type Writer struct {
 	Pod    v1.Pod
 	Client kubernetes.Interface
 }
 
 // NewPodLogsWriter initializes the struct
-func NewPodLogsWriter(pod v1.Pod, cli kubernetes.Interface) *PodLogsWriter {
-	return &PodLogsWriter{Pod: pod, Client: cli}
+func NewPodLogsWriter(pod v1.Pod, cli kubernetes.Interface) *Writer {
+	return &Writer{Pod: pod, Client: cli}
 }
 
 // Single streams the pod logs and shunts them to the `writer`.
 // If there are multiple containers, it will concatenate all the container streams into the writer
-func (spl *PodLogsWriter) Single(ctx context.Context, writer io.Writer, opts *v1.PodLogOptions) (err error) {
+func (spl *Writer) Single(ctx context.Context, writer io.Writer, opts *v1.PodLogOptions) (err error) {
 	if opts.Container != "" {
 		return spl.sendLogsToWriter(ctx, writer, opts)
 	}
@@ -61,7 +61,7 @@ type writerConstructor interface {
 	Create(name string) (io.Writer, error)
 }
 
-func (spl *PodLogsWriter) sendLogsToWriter(
+func (spl *Writer) sendLogsToWriter(
 	ctx context.Context,
 	writer io.Writer,
 	options *v1.PodLogOptions,
@@ -86,7 +86,7 @@ func (spl *PodLogsWriter) sendLogsToWriter(
 }
 
 // Multiple streams the pod logs, sending each container's stream to a separate writer
-func (spl *PodLogsWriter) Multiple(
+func (spl *Writer) Multiple(
 	ctx context.Context,
 	opts *v1.PodLogOptions,
 	writerConstructor writerConstructor,
