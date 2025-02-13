@@ -752,19 +752,22 @@ func (instance *Instance) GetPgVersion() (semver.Version, error) {
 func (instance *Instance) ConnectionPool() *pool.ConnectionPool {
 	const applicationName = "cnpg-instance-manager"
 	if instance.pool == nil {
-		socketDir := GetSocketDir()
-		dsn := fmt.Sprintf(
-			"host=%s port=%v user=%v sslmode=disable application_name=%v",
-			socketDir,
-			GetServerPort(),
-			"postgres",
-			applicationName,
-		)
-
-		instance.pool = pool.NewPostgresqlConnectionPool(dsn)
+		instance.pool = pool.NewPostgresqlConnectionPool(BuildPostgresUnixConnectionString(applicationName))
 	}
 
 	return instance.pool
+}
+
+// BuildPostgresUnixConnectionString returns a DSN pointing to the socket dir for user postgres without dbname parameter
+func BuildPostgresUnixConnectionString(applicationName string) string {
+	socketDir := GetSocketDir()
+	return fmt.Sprintf(
+		"host=%s port=%v user=%v sslmode=disable application_name=%v",
+		socketDir,
+		GetServerPort(),
+		"postgres",
+		applicationName,
+	)
 }
 
 // PrimaryConnectionPool gets or initializes the primary connection pool for this instance
