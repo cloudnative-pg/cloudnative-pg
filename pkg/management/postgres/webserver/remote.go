@@ -27,12 +27,10 @@ import (
 	"os"
 	"os/exec"
 	"path"
-	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/execlog"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/log"
-	"golang.org/x/sync/singleflight"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -51,8 +49,6 @@ type remoteWebserverEndpoints struct {
 	instance         *postgres.Instance
 	currentBackup    *backupConnection
 	readinessChecker *readiness.Data
-
-	sg singleflight.Group
 }
 
 // StartBackupRequest the required data to execute the pg_start_backup
@@ -153,34 +149,13 @@ func (ws *remoteWebserverEndpoints) isServerReady(w http.ResponseWriter, r *http
 
 // This probe is for the instance status, including replication
 func (ws *remoteWebserverEndpoints) pgStatus(w http.ResponseWriter, _ *http.Request) {
-	// Extract the status of the current instance. Dedupe concurrent calls to make this cheap to
-	// call concurrently.
-	res, err, _ := ws.sg.Do("pgStatus", func() (any, error) {
-		// Use a single context here that's shared among the goroutines calling this to decouple
-		// the lifetimes.
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
-
-		// Extract the status of the current instance
-		status, err := ws.instance.GetStatus(ctx)
-		if err != nil {
-			return nil, err
-		}
-
-		return status, nil
-	})
+	// Extract the status of the current instance
+	status, err := ws.instance.GetStatus()
 	if err != nil {
 		log.Debug(
 			"Instance status probe failing",
 			"err", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	status, ok := res.(*pg.PostgresqlStatus)
-	if !ok {
-		log.Debug("got something that's not a postgres status", "got", fmt.Sprintf("%T", res))
-		http.Error(w, "unexpected status type", http.StatusInternalServerError)
 		return
 	}
 

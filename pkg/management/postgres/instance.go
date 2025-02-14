@@ -908,7 +908,7 @@ func (instance *Instance) WaitForConfigReload(ctx context.Context) (*postgres.Po
 		return nil, fmt.Errorf("while waiting for new configuration to be reloaded: %w", err)
 	}
 
-	status, err := instance.GetStatus(ctx)
+	status, err := instance.GetStatus()
 	if err != nil {
 		return nil, fmt.Errorf("while applying new configuration: %w", err)
 	}
