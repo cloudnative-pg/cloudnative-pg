@@ -272,6 +272,10 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 				log.Error(err, "while closing the body")
 			}
 		}()
+
+		// TODO: There is a race condition here: ws.currentBackup is both being read and written to in this handler, without
+		// any locking. That ain't good.
+
 		if ws.currentBackup != nil {
 			if !p.Force {
 				sendUnprocessableEntityJSONResponse(w, "PROCESS_ALREADY_RUNNING", "")
