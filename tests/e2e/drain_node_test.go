@@ -141,6 +141,12 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 				}, timeout).ShouldNot(BeEquivalentTo(oldPrimary.Name))
 			})
 
+			By("removing karpenter taint from node", func() {
+				cmd := fmt.Sprintf("kubectl taint nodes %v karpenter.sh/disruption=NoSchedule:NoSchedule-", oldPrimary.Spec.NodeName)
+				_, _, err := run.Run(cmd)
+				Expect(err).ToNot(HaveOccurred())
+			})
+
 			AssertDataExpectedCount(env, tableLocator, 2)
 			AssertClusterStandbysAreStreaming(namespace, clusterName, 140)
 		})
