@@ -64,7 +64,7 @@ var (
 var _ = Describe("The PostgreSQL security context with", func() {
 	It("default RuntimeDefault profile", func() {
 		cluster := v1.Cluster{}
-		securityContext := CreatePodSecurityContext(cluster.GetSeccompProfile(), 26, 26)
+		securityContext := cluster.GetPodSecurityContext()
 
 		Expect(securityContext.SeccompProfile).ToNot(BeNil())
 		Expect(securityContext.SeccompProfile.Type).To(BeEquivalentTo(corev1.SeccompProfileTypeRuntimeDefault))
@@ -77,7 +77,7 @@ var _ = Describe("The PostgreSQL security context with", func() {
 			LocalhostProfile: &profilePath,
 		}
 		cluster := v1.Cluster{Spec: v1.ClusterSpec{SeccompProfile: localhostProfile}}
-		securityContext := CreatePodSecurityContext(cluster.GetSeccompProfile(), 26, 26)
+		securityContext := cluster.GetPodSecurityContext()
 
 		Expect(securityContext.SeccompProfile).ToNot(BeNil())
 		Expect(securityContext.SeccompProfile).To(BeEquivalentTo(localhostProfile))
