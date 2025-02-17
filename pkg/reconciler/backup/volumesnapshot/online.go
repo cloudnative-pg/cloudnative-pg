@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 
@@ -92,6 +93,7 @@ func (o *onlineExecutor) prepare(
 	backup *apiv1.Backup,
 	targetPod *corev1.Pod,
 ) (*ctrl.Result, error) {
+	contextLogger := log.FromContext(ctx)
 	volumeSnapshotConfig := backup.GetVolumeSnapshotConfiguration(*cluster.Spec.Backup.VolumeSnapshot)
 
 	// Handle hot snapshots
@@ -105,13 +107,30 @@ func (o *onlineExecutor) prepare(
 	}
 
 	status := body.Data
+	anotherBackupPresent := status.BackupName != "" && backup.Name != status.BackupName
+
 	// if the backupName doesn't match it means we have an old stuck pending backup that we have to force out.
-	if backup.Name != status.BackupName || status.Phase == "" {
+	if anotherBackupPresent && status.Phase != webserver.Completed {
+		if err := o.backupClient.Stop(ctx, targetPod, *webserver.NewStopBackupRequest(backup.Name)); err != nil {
+			return nil, fmt.Errorf("while stopping the backup client: %w", err)
+		}
+		return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+	}
+
+	// we wait that the other backup closes
+	if anotherBackupPresent && status.Phase == webserver.Closing {
+		contextLogger.Info("waiting for the other backup to close",
+			"previousBackupName", status.BackupName,
+			"previousBackupPhase", status.Phase,
+		)
+		return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+	}
+
+	if anotherBackupPresent && status.Phase == webserver.Completed {
 		req := webserver.StartBackupRequest{
 			ImmediateCheckpoint: volumeSnapshotConfig.OnlineConfiguration.GetImmediateCheckpoint(),
 			WaitForArchive:      volumeSnapshotConfig.OnlineConfiguration.GetWaitForArchive(),
 			BackupName:          backup.Name,
-			Force:               true,
 		}
 		if err := o.backupClient.Start(ctx, targetPod, req); err != nil {
 			return nil, fmt.Errorf("while trying to start the backup: %w", err)

@@ -40,6 +40,7 @@ type BackupResultData struct {
 	SpcmapFile []byte                `json:"spcmapFile,omitempty"`
 	BackupName string                `json:"backupName,omitempty"`
 	Phase      BackupConnectionPhase `json:"phase,omitempty"`
+	Error      string                `json:"error,omitempty"`
 }
 
 // BackupConnectionPhase a connection phase of the backup
@@ -199,6 +200,7 @@ func (bc *backupConnection) stopBackup(ctx context.Context, backupName string) {
 				contextLogger.Error(err, "while closing backup connection")
 			}
 		}
+		bc.data.Phase = Completed
 	}()
 
 	if bc.err != nil {
@@ -217,9 +219,11 @@ func (bc *backupConnection) stopBackup(ctx context.Context, backupName string) {
 	bc.executeWithLock(backupName, func() error {
 		if err := row.Scan(&bc.data.EndLSN, &bc.data.LabelFile, &bc.data.SpcmapFile); err != nil {
 			contextLogger.Error(err, "while stopping PostgreSQL physical backup")
-			return fmt.Errorf("while scanning backup stop: %w", err)
+			msgErr := fmt.Errorf("while scanning backup stop: %w", err)
+			bc.data.Error = msgErr.Error()
+			return msgErr
 		}
-		bc.data.Phase = Completed
+
 		return nil
 	})
 }

@@ -27,6 +27,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"sync"
 
 	"github.com/cloudnative-pg/machinery/pkg/execlog"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
@@ -49,6 +50,7 @@ type remoteWebserverEndpoints struct {
 	instance         *postgres.Instance
 	currentBackup    *backupConnection
 	readinessChecker *readiness.Data
+	syncOperation    sync.Mutex
 }
 
 // StartBackupRequest the required data to execute the pg_start_backup
@@ -56,7 +58,8 @@ type StartBackupRequest struct {
 	ImmediateCheckpoint bool   `json:"immediateCheckpoint"`
 	WaitForArchive      bool   `json:"waitForArchive"`
 	BackupName          string `json:"backupName"`
-	Force               bool   `json:"force,omitempty"`
+	// Deprecated: not used anymore.
+	Force bool `json:"force,omitempty"`
 }
 
 // StopBackupRequest the required data to execute the pg_stop_backup
@@ -272,25 +275,14 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 				log.Error(err, "while closing the body")
 			}
 		}()
-		if ws.currentBackup != nil {
-			if !p.Force {
-				sendUnprocessableEntityJSONResponse(w, "PROCESS_ALREADY_RUNNING", "")
-				return
-			}
-			if err := ws.currentBackup.closeConnection(p.BackupName); err != nil {
-				if !errors.Is(err, sql.ErrConnDone) {
-					log.Error(err, "Error while closing backup connection (start)")
-					// we can't ignore the problem otherwise this could lead to a connection exhaustion see #6761
-					// TODO: the backup controller need to act on this and ensure the cleanup
-					sendUnprocessableEntityJSONResponse(
-						w,
-						"UNABLE_TO_CLOSE_CONNECTION",
-						err.Error(),
-					)
-					return
-				}
-			}
+		ws.syncOperation.Lock()
+		defer ws.syncOperation.Unlock()
+
+		if ws.currentBackup != nil && ws.currentBackup.data.Phase != Completed {
+			sendUnprocessableEntityJSONResponse(w, "PROCESS_ALREADY_RUNNING", "")
+			return
 		}
+
 		ws.currentBackup, err = newBackupConnection(
 			req.Context(),
 			p.BackupName,
@@ -317,6 +309,10 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 				log.Error(err, "while closing the body")
 			}
 		}()
+
+		ws.syncOperation.Lock()
+		defer ws.syncOperation.Unlock()
+
 		if ws.currentBackup == nil {
 			sendBadRequestJSONResponse(w, "NO_ONGOING_BACKUP", "")
 			return
