@@ -58,22 +58,11 @@ func streamOperatorLogsToZip(
 		}
 
 		streamPodLogs := podlogs.NewPodLogsWriter(pod, kubernetes.NewForConfigOrDie(ctrl.GetConfigOrDie()))
-		if _, err := fmt.Fprint(writer, "\n\"====== Begin of Previous Log =====\"\n"); err != nil {
-			return err
-		}
 		opts := &corev1.PodLogOptions{
 			Timestamps: logTimeStamp,
 			Previous:   true,
 		}
-		_ = streamPodLogs.Single(ctx, writer, opts)
-		if _, err := fmt.Fprint(writer, "\n\"====== End of Previous Log =====\"\n"); err != nil {
-			return err
-		}
-
-		singleOpts := &corev1.PodLogOptions{
-			Timestamps: logTimeStamp,
-		}
-		if err := streamPodLogs.Single(ctx, writer, singleOpts); err != nil {
+		if err := streamPodLogs.Single(ctx, writer, opts); err != nil {
 			return err
 		}
 	}
