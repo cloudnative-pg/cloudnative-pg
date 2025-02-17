@@ -1086,7 +1086,12 @@ func (r *InstanceReconciler) triggerRestartForDecrease(ctx context.Context, clus
 	phase := apiv1.PhaseApplyingConfiguration
 	phaseReason := "Decrease of hot standby sensitive parameters"
 
-	return clusterstatus.RegisterPhase(ctx, r.client, cluster, phase, phaseReason)
+	return clusterstatus.PatchWithOptimisticLock(
+		ctx,
+		r.client,
+		cluster,
+		clusterstatus.SetPhaseTX(phase, phaseReason),
+	)
 }
 
 // refreshCertificateFilesFromSecret receive a secret and rewrite the file
