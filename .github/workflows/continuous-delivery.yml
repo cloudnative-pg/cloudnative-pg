@@ -258,7 +258,7 @@ jobs:
       author_name: ${{ steps.build-meta.outputs.author_name }}
       author_email: ${{ steps.build-meta.outputs.author_email }}
       controller_img: ${{ env.CONTROLLER_IMG }}
-      controller_img_ubi8: ${{ env.CONTROLLER_IMG_UBI8 }}
+      controller_img_ubi9: ${{ env.CONTROLLER_IMG_UBI9 }}
       index_img: ${{ env.INDEX_IMG }}
       bundle_img: ${{ env.BUNDLE_IMG }}
       catalog_img: ${{ env.CATALOG_IMG }}
@@ -359,13 +359,13 @@ jobs:
           tags: |
             type=raw,value=${{ steps.build-meta.outputs.tag_name }}
       -
-        name: Docker meta UBI8
-        id: docker-meta-ubi8
+        name: Docker meta UBI9
+        id: docker-meta-ubi9
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.IMAGES }}
           flavor: |
-            suffix=-ubi8
+            suffix=-ubi9
           tags: |
             type=raw,value=${{ steps.build-meta.outputs.tag_name }}
       -
@@ -399,16 +399,16 @@ jobs:
           cache-from: ${{ env.BUILD_PUSH_CACHE_FROM }}
           cache-to: ${{ env.BUILD_PUSH_CACHE_TO }}
       -
-        name: Build and push UBI8
+        name: Build and push UBI9
         uses: docker/build-push-action@v6
         with:
           platforms: ${{ env.PLATFORMS }}
           context: .
-          file: Dockerfile-ubi8
+          file: Dockerfile-ubi9
           push: true
           build-args: |
             VERSION=${{ env.VERSION }}
-          tags: ${{ steps.docker-meta-ubi8.outputs.tags }}
+          tags: ${{ steps.docker-meta-ubi9.outputs.tags }}
           labels: ${{ env.LABELS }}
           provenance: ${{ env.BUILD_PUSH_PROVENANCE }}
           cache-from: ${{ env.BUILD_PUSH_CACHE_FROM }}
@@ -427,13 +427,13 @@ jobs:
         name: Output images
         env:
           TAGS: ${{ steps.docker-meta.outputs.tags }}
-          TAGS_UBI8: ${{ steps.docker-meta-ubi8.outputs.tags }}
+          TAGS_UBI9: ${{ steps.docker-meta-ubi9.outputs.tags }}
         run: |
           LOWERCASE_OPERATOR_IMAGE_NAME=${OPERATOR_IMAGE_NAME,,}
           TAG=${TAGS#*:}
-          TAG_UBI=${TAGS_UBI8#*:}
+          TAG_UBI=${TAGS_UBI9#*:}
           echo "CONTROLLER_IMG=${LOWERCASE_OPERATOR_IMAGE_NAME}:${TAG}" >> $GITHUB_ENV
-          echo "CONTROLLER_IMG_UBI8=${LOWERCASE_OPERATOR_IMAGE_NAME}:${TAG_UBI}" >> $GITHUB_ENV
+          echo "CONTROLLER_IMG_UBI9=${LOWERCASE_OPERATOR_IMAGE_NAME}:${TAG_UBI}" >> $GITHUB_ENV
           echo "BUNDLE_IMG=${LOWERCASE_OPERATOR_IMAGE_NAME}:bundle-${TAG}" >> $GITHUB_ENV
           echo "INDEX_IMG=${LOWERCASE_OPERATOR_IMAGE_NAME}:index-${TAG}" >> $GITHUB_ENV
           echo "CATALOG_IMG=${LOWERCASE_OPERATOR_IMAGE_NAME}:catalog-${TAG}" >> $GITHUB_ENV
@@ -1971,7 +1971,7 @@ jobs:
       -
         name: Build and push the operator and catalog
         env:
-          CONTROLLER_IMG: ${{ needs.buildx.outputs.controller_img_ubi8 }}
+          CONTROLLER_IMG: ${{ needs.buildx.outputs.controller_img_ubi9 }}
           BUNDLE_IMG: ${{ needs.buildx.outputs.bundle_img }}
           INDEX_IMG: ${{ needs.buildx.outputs.index_img }}
           CATALOG_IMG: ${{ needs.buildx.outputs.catalog_img }}
