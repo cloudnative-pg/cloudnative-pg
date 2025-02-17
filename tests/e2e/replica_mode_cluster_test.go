@@ -550,7 +550,7 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication), Ordered, f
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
 				exec.PodLocator{Namespace: namespace, PodName: primary.Name},
 				"postgres",
-				"SELECT timeline_id FROM pg_control_checkpoint();",
+				"SELECT timeline_id FROM pg_catalog.pg_control_checkpoint()",
 			)
 			g.Expect(err).ToNot(HaveOccurred())
 			g.Expect(strings.TrimSpace(stdout)).To(Equal(fmt.Sprintf("%d", expectedTimeline)))
@@ -725,7 +725,7 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication), Ordered, f
 							PodName:   pod.Name,
 						},
 						postgres.PostgresDBName,
-						"select pg_is_in_recovery();")
+						"select pg_catalog.pg_is_in_recovery()")
 					g.Expect(err).ToNot(HaveOccurred())
 					g.Expect(strings.Trim(stdOut, "\n")).To(Equal("t"))
 				}, 60, 10).Should(Succeed())
@@ -799,7 +799,7 @@ func assertReplicaClusterTopology(namespace, clusterName string) {
 			},
 			&commandTimeout,
 			"psql", "-U", "postgres", "-tAc",
-			"select string_agg(application_name, ',') from pg_stat_replication;",
+			"select string_agg(application_name, ',') from pg_catalog.pg_stat_replication;",
 		)
 		if err != nil {
 			return nil, err
@@ -844,7 +844,7 @@ func assertReplicaClusterTopology(namespace, clusterName string) {
 				},
 				&commandTimeout,
 				"psql", "-U", "postgres", "-tAc",
-				"select sender_host from pg_stat_wal_receiver limit 1;",
+				"select sender_host from pg_catalog.pg_stat_wal_receiver limit 1",
 			)
 			g.Expect(err).ToNot(HaveOccurred())
 			g.Expect(strings.TrimSpace(stdout)).To(BeEquivalentTo(sourceHost))

@@ -583,8 +583,8 @@ func (e *Exporter) SetCustomQueries(queries *m.QueriesCollector) {
 // DefaultQueries is the set of default queries for postgresql
 var DefaultQueries = m.UserQueries{
 	"collector": m.UserQuery{
-		Query: "SELECT current_database() as datname, relpages as lo_pages " +
-			"FROM pg_class c JOIN pg_namespace n ON (n.oid = c.relnamespace) " +
+		Query: "SELECT pg_catalog.current_database() as datname, relpages as lo_pages " +
+			"FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON (n.oid = c.relnamespace) " +
 			"WHERE n.nspname = 'pg_catalog' AND c.relname = 'pg_largeobject';",
 		TargetDatabases: []string{"*"},
 		Metrics: []m.Mapping{

@@ -78,9 +78,9 @@ func (data *Data) IsServerReady(ctx context.Context) error {
 		ctx,
 		`
 		SELECT
-			NOT pg_is_in_recovery()
-			OR (SELECT coalesce(setting, '') = '' FROM pg_settings WHERE name = 'primary_conninfo')
-			OR pg_last_wal_replay_lsn() IS NOT NULL
+			NOT pg_catalog.pg_is_in_recovery()
+			OR (SELECT coalesce(setting, '') = '' FROM pg_catalog.pg_settings WHERE name = 'primary_conninfo')
+			OR pg_catalog.pg_last_wal_replay_lsn() IS NOT NULL
 		`,
 	)
 	if err := row.Err(); err != nil {

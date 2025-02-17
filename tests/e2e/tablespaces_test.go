@@ -1057,7 +1057,7 @@ func AssertDatabaseContainsTablespaces(cluster *apiv1.Cluster, timeout int) {
 						Namespace: namespace,
 						PodName:   instance.Name,
 					}, postgres.AppDBName,
-					"SELECT oid, spcname, pg_get_userbyid(spcowner) FROM pg_tablespace;",
+					"SELECT oid, spcname, pg_catalog.pg_get_userbyid(spcowner) FROM pg_catalog.pg_tablespace",
 				)
 				g.Expect(stdErr).To(BeEmpty())
 				g.Expect(err).ShouldNot(HaveOccurred())
@@ -1113,8 +1113,8 @@ func AssertTempTablespaceBehavior(cluster *apiv1.Cluster, expectedTempTablespace
 				PodName:   primary.Name,
 			}, postgres.AppDBName,
 			"CREATE TEMPORARY TABLE cnp_e2e_test_table (i INTEGER); "+
-				"SELECT spcname FROM pg_tablespace WHERE OID="+
-				"(SELECT reltablespace FROM pg_class WHERE oid = 'cnp_e2e_test_table'::regclass)",
+				"SELECT spcname FROM pg_catalog.pg_tablespace WHERE OID="+
+				"(SELECT reltablespace FROM pg_catalog.pg_class WHERE oid = 'cnp_e2e_test_table'::regclass)",
 		)
 		Expect(stdErr).To(BeEmpty())
 		Expect(err).ShouldNot(HaveOccurred())
@@ -1135,7 +1135,8 @@ func AssertTablespaceAndOwnerExist(cluster *apiv1.Cluster, tablespace, owner str
 			Namespace: namespace,
 			PodName:   primaryPod.Name,
 		}, postgres.AppDBName,
-		fmt.Sprintf("SELECT 1 FROM pg_tablespace WHERE spcname = '%s' AND pg_get_userbyid(spcowner) = '%s';",
+		fmt.Sprintf("SELECT 1 FROM pg_catalog.pg_tablespace WHERE spcname = '%s' "+
+			"AND pg_catalog.pg_get_userbyid(spcowner) = '%s'",
 			tablespace,
 			owner),
 	)

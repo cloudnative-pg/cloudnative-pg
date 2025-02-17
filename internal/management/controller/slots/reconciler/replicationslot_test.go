@@ -78,10 +78,10 @@ var _ = Describe("HA Replication Slots reconciliation in Primary", func() {
 			AddRow(newRepSlot("instance1", true, "lsn1")...).
 			AddRow(newRepSlot("instance2", true, "lsn2")...)
 
-		mock.ExpectQuery("^SELECT (.+) FROM pg_replication_slots").
+		mock.ExpectQuery("^SELECT (.+) FROM pg_catalog.pg_replication_slots").
 			WillReturnRows(rows)
 
-		mock.ExpectExec("SELECT pg_create_physical_replication_slot").
+		mock.ExpectExec("SELECT pg_catalog.pg_create_physical_replication_slot").
 			WithArgs(slotPrefix+"instance3", false).
 			WillReturnResult(sqlmock.NewResult(1, 1))
 
@@ -97,10 +97,10 @@ var _ = Describe("HA Replication Slots reconciliation in Primary", func() {
 			AddRow(newRepSlot("instance2", true, "lsn2")...).
 			AddRow(newRepSlot("instance3", false, "lsn2")...)
 
-		mock.ExpectQuery("^SELECT (.+) FROM pg_replication_slots").
+		mock.ExpectQuery("^SELECT (.+) FROM pg_catalog.pg_replication_slots").
 			WillReturnRows(rows)
 
-		mock.ExpectExec("SELECT pg_drop_replication_slot").WithArgs(slotPrefix + "instance3").
+		mock.ExpectExec("SELECT pg_catalog.pg_drop_replication_slot").WithArgs(slotPrefix + "instance3").
 			WillReturnResult(sqlmock.NewResult(1, 1))
 
 		cluster := makeClusterWithInstanceNames([]string{"instance1", "instance2"}, "instance1")
@@ -115,7 +115,7 @@ var _ = Describe("HA Replication Slots reconciliation in Primary", func() {
 			AddRow(newRepSlot("instance2", true, "lsn2")...).
 			AddRow(newRepSlot("instance3", true, "lsn2")...)
 
-		mock.ExpectQuery("^SELECT (.+) FROM pg_replication_slots").
+		mock.ExpectQuery("^SELECT (.+) FROM pg_catalog.pg_replication_slots").
 			WillReturnRows(rows)
 
 		cluster := makeClusterWithInstanceNames([]string{"instance1", "instance2"}, "instance1")
@@ -126,7 +126,7 @@ var _ = Describe("HA Replication Slots reconciliation in Primary", func() {
 })
 
 var _ = Describe("dropReplicationSlots", func() {
-	const selectPgRepSlot = "^SELECT (.+) FROM pg_replication_slots"
+	const selectPgRepSlot = "^SELECT (.+) FROM pg_catalog.pg_replication_slots"
 
 	var (
 		db   *sql.DB
@@ -166,7 +166,7 @@ var _ = Describe("dropReplicationSlots", func() {
 	It("skips the deletion of user defined replication slots on the primary", func(ctx SpecContext) {
 		rows := sqlmock.NewRows(repSlotColumns).
 			AddRow("custom-slot", string(infrastructure.SlotTypePhysical), true, "lsn1", false)
-		mock.ExpectQuery("^SELECT (.+) FROM pg_replication_slots").
+		mock.ExpectQuery("^SELECT (.+) FROM pg_catalog.pg_replication_slots").
 			WillReturnRows(rows)
 
 		cluster := makeClusterWithInstanceNames([]string{}, "")
@@ -182,7 +182,7 @@ var _ = Describe("dropReplicationSlots", func() {
 			AddRow(newRepSlot("instance1", false, "lsn1")...)
 		mock.ExpectQuery(selectPgRepSlot).WillReturnRows(rows)
 
-		mock.ExpectExec("SELECT pg_drop_replication_slot").WithArgs(slotPrefix + "instance1").
+		mock.ExpectExec("SELECT pg_catalog.pg_drop_replication_slot").WithArgs(slotPrefix + "instance1").
 			WillReturnError(errors.New("delete error"))
 
 		cluster := makeClusterWithInstanceNames([]string{}, "")
@@ -197,7 +197,7 @@ var _ = Describe("dropReplicationSlots", func() {
 			AddRow(newRepSlot("instance1", false, "lsn1")...)
 		mock.ExpectQuery(selectPgRepSlot).WillReturnRows(rows)
 
-		mock.ExpectExec("SELECT pg_drop_replication_slot").WithArgs(slotPrefix + "instance1").
+		mock.ExpectExec("SELECT pg_catalog.pg_drop_replication_slot").WithArgs(slotPrefix + "instance1").
 			WillReturnResult(sqlmock.NewResult(1, 1))
 
 		cluster := makeClusterWithInstanceNames([]string{}, "")

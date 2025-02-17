@@ -78,7 +78,7 @@ func (s *walSettings) synchronize(db *sql.DB, configSha256 string) error {
 	}
 
 	rows, err := db.Query(`
-SELECT name, setting FROM pg_settings 
+SELECT name, setting FROM pg_catalog.pg_settings
 WHERE pg_settings.name
 IN ('wal_segment_size', 'min_wal_size', 'max_wal_size', 'wal_keep_size', 'wal_keep_segments', 'max_slot_wal_keep_size')`) // nolint: lll
 	if err != nil {
