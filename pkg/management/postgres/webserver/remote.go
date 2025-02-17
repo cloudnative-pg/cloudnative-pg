@@ -292,7 +292,9 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 			p.WaitForArchive,
 		)
 		if err != nil {
-			_ = ws.currentBackup.close()
+			if err := ws.currentBackup.close(); err != nil {
+				log.Error(err, "while closing the backup connection")
+			}
 			sendUnprocessableEntityJSONResponse(w, "CANNOT_INITIALIZE_CONNECTION", err.Error())
 			return
 		}

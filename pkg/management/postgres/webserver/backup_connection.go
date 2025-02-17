@@ -130,7 +130,12 @@ func (bc *backupConnection) close() error {
 		return nil
 	}
 
-	return bc.conn.Close()
+	err := bc.conn.Close()
+	if errors.Is(err, sql.ErrConnDone) {
+		return nil
+	}
+
+	return err
 }
 
 func (bc *backupConnection) startBackup(ctx context.Context, mutex *sync.Mutex) {
@@ -150,9 +155,7 @@ func (bc *backupConnection) startBackup(ctx context.Context, mutex *sync.Mutex) 
 		contextLogger.Error(errors.New(bc.data.Error), "encountered error while starting backup")
 
 		if err := bc.close(); err != nil {
-			if !errors.Is(err, sql.ErrConnDone) {
-				contextLogger.Error(err, "while closing backup connection")
-			}
+			contextLogger.Error(err, "while closing backup connection")
 		}
 		bc.data.Phase = Errored
 	}()
@@ -196,9 +199,7 @@ func (bc *backupConnection) stopBackup(ctx context.Context, mutex *sync.Mutex) {
 
 	defer func() {
 		if err := bc.close(); err != nil {
-			if !errors.Is(err, sql.ErrConnDone) {
-				contextLogger.Error(err, "while closing backup connection")
-			}
+			contextLogger.Error(err, "while closing backup connection")
 		}
 		if bc.data.Error != "" {
 			bc.data.Phase = Errored
