@@ -55,7 +55,6 @@ in three different flavors:
 
 - Debian 12 distroless
 - Red Hat UBI 9 micro (suffix `-ubi9`)
-- Red Hat UBI 8 micro (suffix `-ubi8`)
 
 Red Hat UBI images are primarily intended for OLM consumption.
 
