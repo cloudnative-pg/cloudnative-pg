@@ -19,9 +19,7 @@ package webserver
 import (
 	"context"
 	"crypto/tls"
-	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -50,7 +48,7 @@ type remoteWebserverEndpoints struct {
 	instance         *postgres.Instance
 	currentBackup    *backupConnection
 	readinessChecker *readiness.Data
-	syncOperation    sync.Mutex
+	syncOperation    *sync.Mutex
 }
 
 // StartBackupRequest the required data to execute the pg_start_backup
@@ -87,6 +85,7 @@ func NewRemoteWebServer(
 		typedClient:      typedClient,
 		instance:         instance,
 		readinessChecker: readiness.ForInstance(instance),
+		syncOperation:    &sync.Mutex{},
 	}
 
 	serveMux := http.NewServeMux()
@@ -253,10 +252,10 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 		res := Response[BackupResultData]{
 			Data: &ws.currentBackup.data,
 		}
-		if ws.currentBackup.err != nil {
+		if ws.currentBackup.data.Error != "" {
 			res.Error = &Error{
 				Code:    "BACKUP_STATUS_CONTAINS_ERROR",
-				Message: ws.currentBackup.err.Error(),
+				Message: ws.currentBackup.data.Error,
 			}
 		}
 
@@ -275,10 +274,13 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 				log.Error(err, "while closing the body")
 			}
 		}()
-		ws.syncOperation.Lock()
+		if lock := ws.syncOperation.TryLock(); !lock {
+			sendUnprocessableEntityJSONResponse(w, "ANOTHER_OPERATION_ONGOING", "")
+			return
+		}
 		defer ws.syncOperation.Unlock()
 
-		if ws.currentBackup != nil && ws.currentBackup.data.Phase != Completed {
+		if ws.currentBackup != nil && !ws.currentBackup.data.Phase.IsTerminatedPhase() {
 			sendUnprocessableEntityJSONResponse(w, "PROCESS_ALREADY_RUNNING", "")
 			return
 		}
@@ -290,10 +292,11 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 			p.WaitForArchive,
 		)
 		if err != nil {
+			_ = ws.currentBackup.close()
 			sendUnprocessableEntityJSONResponse(w, "CANNOT_INITIALIZE_CONNECTION", err.Error())
 			return
 		}
-		go ws.currentBackup.startBackup(context.Background(), p.BackupName)
+		go ws.currentBackup.startBackup(context.Background(), ws.syncOperation)
 		sendJSONResponseWithData(w, 200, struct{}{})
 		return
 
@@ -310,7 +313,10 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 			}
 		}()
 
-		ws.syncOperation.Lock()
+		if lock := ws.syncOperation.TryLock(); !lock {
+			sendUnprocessableEntityJSONResponse(w, "ANOTHER_OPERATION_ONGOING", "")
+			return
+		}
 		defer ws.syncOperation.Unlock()
 
 		if ws.currentBackup == nil {
@@ -324,29 +330,14 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 			return
 		}
 
-		if ws.currentBackup.data.Phase == Closing {
+		switch ws.currentBackup.data.Phase {
+		case Closing, Errored, Completed:
 			sendJSONResponseWithData(w, 200, struct{}{})
 			return
 		}
 
-		if ws.currentBackup.data.Phase != Started {
-			sendUnprocessableEntityJSONResponse(w, "CANNOT_CLOSE_NOT_STARTED",
-				fmt.Sprintf("Phase is: %s", ws.currentBackup.data.Phase))
-			return
-		}
-
-		if ws.currentBackup.err != nil {
-			if err := ws.currentBackup.closeConnection(p.BackupName); err != nil {
-				if !errors.Is(err, sql.ErrConnDone) {
-					log.Error(err, "Error while closing backup connection (stop)")
-				}
-			}
-
-			sendJSONResponseWithData(w, 200, struct{}{})
-			return
-		}
 		ws.currentBackup.setPhase(Closing, p.BackupName)
-		go ws.currentBackup.stopBackup(context.Background(), p.BackupName)
+		go ws.currentBackup.stopBackup(context.Background(), ws.syncOperation)
 		sendJSONResponseWithData(w, 200, struct{}{})
 		return
 	}

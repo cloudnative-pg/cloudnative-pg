@@ -109,7 +109,7 @@ func (o *onlineExecutor) prepare(
 	status := body.Data
 	anotherBackupPresent := status.BackupName != "" && backup.Name != status.BackupName
 
-	if status.BackupName == "" || anotherBackupPresent && status.Phase == webserver.Completed {
+	if status.BackupName == "" || anotherBackupPresent && status.Phase.IsTerminatedPhase() {
 		req := webserver.StartBackupRequest{
 			ImmediateCheckpoint: volumeSnapshotConfig.OnlineConfiguration.GetImmediateCheckpoint(),
 			WaitForArchive:      volumeSnapshotConfig.OnlineConfiguration.GetWaitForArchive(),
