@@ -40,7 +40,8 @@ type BackupResultData struct {
 	SpcmapFile []byte                `json:"spcmapFile,omitempty"`
 	BackupName string                `json:"backupName,omitempty"`
 	Phase      BackupConnectionPhase `json:"phase,omitempty"`
-	Error      string                `json:"error,omitempty"`
+	// TODO: evaluate
+	Error string `json:"error,omitempty"`
 }
 
 // BackupConnectionPhase a connection phase of the backup

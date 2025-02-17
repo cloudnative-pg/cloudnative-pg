@@ -109,24 +109,7 @@ func (o *onlineExecutor) prepare(
 	status := body.Data
 	anotherBackupPresent := status.BackupName != "" && backup.Name != status.BackupName
 
-	// if the backupName doesn't match it means we have an old stuck pending backup that we have to force out.
-	if anotherBackupPresent && status.Phase != webserver.Completed {
-		if err := o.backupClient.Stop(ctx, targetPod, *webserver.NewStopBackupRequest(backup.Name)); err != nil {
-			return nil, fmt.Errorf("while stopping the backup client: %w", err)
-		}
-		return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
-	}
-
-	// we wait that the other backup closes
-	if anotherBackupPresent && status.Phase == webserver.Closing {
-		contextLogger.Info("waiting for the other backup to close",
-			"previousBackupName", status.BackupName,
-			"previousBackupPhase", status.Phase,
-		)
-		return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
-	}
-
-	if anotherBackupPresent && status.Phase == webserver.Completed {
+	if status.BackupName == "" || anotherBackupPresent && status.Phase == webserver.Completed {
 		req := webserver.StartBackupRequest{
 			ImmediateCheckpoint: volumeSnapshotConfig.OnlineConfiguration.GetImmediateCheckpoint(),
 			WaitForArchive:      volumeSnapshotConfig.OnlineConfiguration.GetWaitForArchive(),
@@ -138,8 +121,34 @@ func (o *onlineExecutor) prepare(
 		return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 	}
 
+	if anotherBackupPresent && status.Phase == webserver.Closing {
+		contextLogger.Info("waiting for the other backup to close",
+			"previousBackupName", status.BackupName,
+			"previousBackupPhase", status.Phase,
+		)
+		return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+	}
+
+	if anotherBackupPresent {
+		// if the backupName doesn't match it means we have an old stuck pending backup that we have to force out.
+		contextLogger.Info("found an old backup running, stopping it",
+			"previousBackupName", status.BackupName,
+			"previousBackupPhase", status.Phase,
+		)
+		if err := o.backupClient.Stop(ctx, targetPod, *webserver.NewStopBackupRequest(backup.Name)); err != nil {
+			return nil, fmt.Errorf("while stopping the backup client: %w", err)
+		}
+		return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+	}
+
+	// at this point we are evaluating our backup
+
 	switch status.Phase {
 	case webserver.Starting:
+		contextLogger.Info("waiting for the backup to start",
+			"backupName", backup.Name,
+			"backupPhase", status.Phase,
+		)
 		return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 	case webserver.Started:
 		return nil, nil

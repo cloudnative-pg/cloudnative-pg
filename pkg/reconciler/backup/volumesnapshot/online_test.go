@@ -123,19 +123,20 @@ var _ = Describe("onlineExecutor prepare", func() {
 		Expect(err).To(MatchError(ContainSubstring(expectedErr)))
 	})
 
-	It("should stop when encountering an error calling start", func(ctx SpecContext) {
-		expectedErr := errors.New("test-error")
-		onlineExec := onlineExecutor{backupClient: &fakeBackupClient{
+	It("should stop the other ongoing backup", func(ctx SpecContext) {
+		fakeClient := &fakeBackupClient{
 			response: &webserver.Response[webserver.BackupResultData]{
 				Data: &webserver.BackupResultData{
 					BackupName: "not-correct-backup",
 				},
 			},
-			injectStartError: expectedErr,
-		}}
+		}
+		onlineExec := onlineExecutor{backupClient: fakeClient}
 
-		_, err := onlineExec.prepare(ctx, cluster, backup, target)
-		Expect(err).To(MatchError(expectedErr))
+		res, err := onlineExec.prepare(ctx, cluster, backup, target)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(fakeClient.stopCalled).To(BeTrue())
+		Expect(res).ToNot(BeNil())
 	})
 
 	It("should return an error when encountering an unknown phase", func(ctx SpecContext) {
@@ -152,42 +153,6 @@ var _ = Describe("onlineExecutor prepare", func() {
 		_, err := onlineExec.prepare(ctx, cluster, backup, target)
 		Expect(err).To(MatchError(ContainSubstring(unexpectedPhase)))
 	})
-
-	It("should start the backup if the current backup doesn't match", func(ctx SpecContext) {
-		fakeBackupClient := &fakeBackupClient{
-			response: &webserver.Response[webserver.BackupResultData]{
-				Data: &webserver.BackupResultData{
-					BackupName: "not-correct-backup",
-				},
-			},
-		}
-		onlineExec := onlineExecutor{backupClient: fakeBackupClient}
-
-		res, err := onlineExec.prepare(ctx, cluster, backup, target)
-		Expect(err).ToNot(HaveOccurred())
-		Expect(res).ToNot(BeNil())
-		Expect(fakeBackupClient.startCalled).To(BeTrue())
-	})
-
-	It("should start the backup if the current backup doesn't match even if the body contains an error",
-		func(ctx SpecContext) {
-			fakeBackupClient := &fakeBackupClient{
-				response: &webserver.Response[webserver.BackupResultData]{
-					Data: &webserver.BackupResultData{
-						BackupName: "not-correct-backup",
-					},
-					Error: &webserver.Error{
-						Code: "RANDOM_ERROR",
-					},
-				},
-			}
-			onlineExec := onlineExecutor{backupClient: fakeBackupClient}
-
-			res, err := onlineExec.prepare(ctx, cluster, backup, target)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(res).ToNot(BeNil())
-			Expect(fakeBackupClient.startCalled).To(BeTrue())
-		})
 
 	It("should execute start when no backup is pending", func(ctx SpecContext) {
 		fakeBackupClient := &fakeBackupClient{
