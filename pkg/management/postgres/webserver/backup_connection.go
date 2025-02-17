@@ -156,7 +156,8 @@ func (bc *backupConnection) startBackup(ctx context.Context, backupName string) 
 	slotName := replicationSlotInvalidCharacters.ReplaceAllString(bc.data.BackupName, "_")
 	if _, err := bc.conn.ExecContext(
 		ctx,
-		"SELECT pg_create_physical_replication_slot(slot_name => $1, immediately_reserve => true, temporary => true)",
+		"SELECT pg_catalog.pg_create_physical_replication_slot("+
+			"slot_name => $1, immediately_reserve => true, temporary => true)",
 		slotName,
 	); err != nil {
 		bc.err = fmt.Errorf("while creating the replication slot: %w", bc.err)
@@ -165,10 +166,10 @@ func (bc *backupConnection) startBackup(ctx context.Context, backupName string) 
 
 	var row *sql.Row
 	if bc.postgresMajorVersion < 15 {
-		row = bc.conn.QueryRowContext(ctx, "SELECT pg_start_backup($1, $2, false);", bc.data.BackupName,
+		row = bc.conn.QueryRowContext(ctx, "SELECT pg_catalog.pg_start_backup($1, $2, false);", bc.data.BackupName,
 			bc.immediateCheckpoint)
 	} else {
-		row = bc.conn.QueryRowContext(ctx, "SELECT pg_backup_start(label => $1, fast => $2);", bc.data.BackupName,
+		row = bc.conn.QueryRowContext(ctx, "SELECT pg_catalog.pg_backup_start(label => $1, fast => $2);", bc.data.BackupName,
 			bc.immediateCheckpoint)
 	}
 
@@ -204,10 +205,10 @@ func (bc *backupConnection) stopBackup(ctx context.Context, backupName string) {
 	var row *sql.Row
 	if bc.postgresMajorVersion < 15 {
 		row = bc.conn.QueryRowContext(ctx,
-			"SELECT lsn, labelfile, spcmapfile FROM pg_stop_backup(false, $1);", bc.waitForArchive)
+			"SELECT lsn, labelfile, spcmapfile FROM pg_catalog.pg_stop_backup(false, $1);", bc.waitForArchive)
 	} else {
 		row = bc.conn.QueryRowContext(ctx,
-			"SELECT lsn, labelfile, spcmapfile FROM pg_backup_stop(wait_for_archive => $1);", bc.waitForArchive)
+			"SELECT lsn, labelfile, spcmapfile FROM pg_catalog.pg_backup_stop(wait_for_archive => $1);", bc.waitForArchive)
 	}
 
 	bc.executeWithLock(backupName, func() error {

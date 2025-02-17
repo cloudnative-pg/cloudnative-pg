@@ -41,7 +41,7 @@ func (r *SubscriptionReconciler) alignSubscription(
 		ctx,
 		`
 		SELECT count(*)
-		FROM pg_subscription
+		FROM pg_catalog.pg_subscription
 	    WHERE subname = $1
 		`,
 		obj.Spec.Name)

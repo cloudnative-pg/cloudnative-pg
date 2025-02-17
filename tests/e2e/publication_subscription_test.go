@@ -350,9 +350,9 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelPublicationSub
 })
 
 func publicationExistsQuery(pubName string) string {
-	return fmt.Sprintf("SELECT EXISTS(SELECT 1 FROM pg_publication WHERE pubname='%s')", pubName)
+	return fmt.Sprintf("SELECT EXISTS(SELECT 1 FROM pg_catalog.pg_publication WHERE pubname='%s')", pubName)
 }
 
 func subscriptionExistsQuery(subName string) string {
-	return fmt.Sprintf("SELECT EXISTS(SELECT 1 FROM pg_subscription WHERE subname='%s')", subName)
+	return fmt.Sprintf("SELECT EXISTS(SELECT 1 FROM pg_catalog.pg_subscription WHERE subname='%s')", subName)
 }

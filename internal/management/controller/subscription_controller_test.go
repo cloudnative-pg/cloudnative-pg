@@ -43,7 +43,7 @@ import (
 )
 
 const subscriptionDetectionQuery = `SELECT count(*)
-		FROM pg_subscription
+		FROM pg_catalog.pg_subscription
 		WHERE subname = $1`
 
 var _ = Describe("Managed subscription controller tests", func() {

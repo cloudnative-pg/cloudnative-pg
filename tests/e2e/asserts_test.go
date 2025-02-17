@@ -307,7 +307,7 @@ func AssertClusterIsReady(namespace string, clusterName string, timeout int, env
 						PodName:   primaryPod.Name,
 					},
 					"postgres",
-					fmt.Sprintf("SELECT COUNT(*) FROM pg_stat_replication WHERE application_name IN (%s)",
+					fmt.Sprintf("SELECT COUNT(*) FROM pg_catalog.pg_stat_replication WHERE application_name IN (%s)",
 						replicaNamesString),
 				)
 				g.Expect(err).ToNot(HaveOccurred(), "cannot extract the list of streaming replicas")
@@ -554,11 +554,11 @@ func QueryMatchExpectationPredicate(
 }
 
 func roleExistsQuery(roleName string) string {
-	return fmt.Sprintf("SELECT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='%v')", roleName)
+	return fmt.Sprintf("SELECT EXISTS(SELECT 1 FROM pg_catalog.pg_roles WHERE rolname='%v')", roleName)
 }
 
 func databaseExistsQuery(dbName string) string {
-	return fmt.Sprintf("SELECT EXISTS(SELECT 1 FROM pg_database WHERE datname='%v')", dbName)
+	return fmt.Sprintf("SELECT EXISTS(SELECT 1 FROM pg_catalog.pg_database WHERE datname='%v')", dbName)
 }
 
 // AssertDataExpectedCount verifies that an expected amount of rows exists on the table
@@ -617,7 +617,7 @@ func AssertLargeObjectValue(namespace, clusterName string, oid int, data string)
 
 // AssertClusterStandbysAreStreaming verifies that all the standbys of a cluster have a wal-receiver running.
 func AssertClusterStandbysAreStreaming(namespace string, clusterName string, timeout int32) {
-	query := "SELECT count(*) FROM pg_stat_wal_receiver"
+	query := "SELECT count(*) FROM pg_catalog.pg_stat_wal_receiver"
 	Eventually(func() error {
 		standbyPods, err := clusterutils.GetReplicas(env.Ctx, env.Client, namespace, clusterName)
 		if err != nil {
@@ -914,7 +914,7 @@ func AssertPgRecoveryMode(pod *corev1.Pod, expectedValue bool) {
 					PodName:   pod.Name,
 				},
 				postgres.PostgresDBName,
-				"select pg_is_in_recovery();")
+				"select pg_catalog.pg_is_in_recovery()")
 			if err != nil {
 				GinkgoWriter.Printf("stdout: %v\nstderr: %v\n", stdOut, stdErr)
 			}
@@ -1157,7 +1157,7 @@ func AssertWritesToReplicaFails(
 
 			var rawValue string
 			// Expect to be connected to a replica
-			row := conn.QueryRow("SELECT pg_is_in_recovery()")
+			row := conn.QueryRow("SELECT pg_catalog.pg_is_in_recovery()")
 			err = row.Scan(&rawValue)
 			g.Expect(err).ToNot(HaveOccurred())
 			isReplica := strings.TrimSpace(rawValue)
@@ -1186,7 +1186,7 @@ func AssertWritesToPrimarySucceeds(namespace, service, appDBName, appDBUser, app
 
 			var rawValue string
 			// Expect to be connected to a primary
-			row := conn.QueryRow("SELECT pg_is_in_recovery()")
+			row := conn.QueryRow("SELECT pg_catalog.pg_is_in_recovery()")
 			err = row.Scan(&rawValue)
 			g.Expect(err).ToNot(HaveOccurred())
 			isReplica := strings.TrimSpace(rawValue)
@@ -2021,7 +2021,7 @@ func switchWalAndGetLatestArchive(namespace, podName string) string {
 			PodName:   podName,
 		},
 		postgres.PostgresDBName,
-		"SELECT pg_walfile_name(pg_switch_wal());",
+		"SELECT pg_catalog.pg_walfile_name(pg_switch_wal())",
 	)
 	Expect(err).ToNot(
 		HaveOccurred(),
@@ -2795,12 +2795,12 @@ func AssertReplicationSlotsOnPod(
 
 	for _, slot := range expectedSlots {
 		query := fmt.Sprintf(
-			"SELECT EXISTS (SELECT 1 FROM pg_replication_slots "+
+			"SELECT EXISTS (SELECT 1 FROM pg_catalog.pg_replication_slots "+
 				"WHERE slot_name = '%v' AND active = '%t' "+
 				"AND temporary = 'f' AND slot_type = 'physical')", slot, isActiveOnReplica)
 		if specs.IsPodPrimary(pod) {
 			query = fmt.Sprintf(
-				"SELECT EXISTS (SELECT 1 FROM pg_replication_slots "+
+				"SELECT EXISTS (SELECT 1 FROM pg_catalog.pg_replication_slots "+
 					"WHERE slot_name = '%v' AND active = '%t' "+
 					"AND temporary = 'f' AND slot_type = 'physical')", slot, isActiveOnPrimary)
 		}
