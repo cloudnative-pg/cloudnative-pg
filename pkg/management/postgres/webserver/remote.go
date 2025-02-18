@@ -328,10 +328,7 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 				log.Error(err, "while closing the body")
 			}
 		}()
-		if lock := ws.syncOperation.TryLock(); !lock {
-			sendUnprocessableEntityJSONResponse(w, "ANOTHER_OPERATION_ONGOING", "")
-			return
-		}
+		ws.syncOperation.Lock()
 		defer ws.syncOperation.Unlock()
 
 		if ws.currentBackup != nil && !ws.currentBackup.data.Phase.IsTerminatedPhase() {
@@ -369,10 +366,7 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 			}
 		}()
 
-		if lock := ws.syncOperation.TryLock(); !lock {
-			sendUnprocessableEntityJSONResponse(w, "ANOTHER_OPERATION_ONGOING", "")
-			return
-		}
+		ws.syncOperation.Lock()
 		defer ws.syncOperation.Unlock()
 
 		if ws.currentBackup == nil {
