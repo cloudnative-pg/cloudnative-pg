@@ -67,7 +67,8 @@ func (body Response[T]) EnsureDataIsPresent() error {
 
 // Webserver wraps a webserver to make it a kubernetes Runnable
 type Webserver struct {
-	server *http.Server
+	server   *http.Server
+	routines []func(ctx context.Context)
 }
 
 // NewWebServer creates a Webserver as a Kubernetes Runnable, given a http.Server
@@ -95,6 +96,14 @@ func (ws *Webserver) Start(ctx context.Context) error {
 			errChan <- err
 		}
 	}()
+
+	subCtx, cancel := context.WithCancel(ctx)
+	defer func() {
+		cancel()
+	}()
+	for _, routine := range ws.routines {
+		go routine(subCtx)
+	}
 
 	select {
 	// we exit with error code, potentially we could do a retry logic, but rarely a webserver that doesn't start will run

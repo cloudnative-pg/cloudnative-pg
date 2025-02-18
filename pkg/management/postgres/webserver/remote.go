@@ -26,10 +26,12 @@ import (
 	"os/exec"
 	"path"
 	"sync"
+	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/execlog"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -113,7 +115,11 @@ func NewRemoteWebServer(
 		}
 	}
 
-	return NewWebServer(server), nil
+	srv := NewWebServer(server)
+
+	srv.routines = append(srv.routines, endpoints.backupConnectionsGarbageCollector)
+
+	return srv, nil
 }
 
 func (ws *remoteWebserverEndpoints) isServerHealthy(w http.ResponseWriter, _ *http.Request) {
@@ -235,6 +241,54 @@ func (ws *remoteWebserverEndpoints) updateInstanceManager(
 		// At this stage we are running the new version of the instance manager
 		// and not the old one.
 		_, _ = fmt.Fprint(w, "OK")
+	}
+}
+
+func (ws *remoteWebserverEndpoints) backupConnectionsGarbageCollector(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(1 * time.Minute):
+			if ws == nil {
+				return
+			}
+
+			bc := ws.currentBackup
+			if bc == nil {
+				continue
+			}
+			bc.sync.Lock()
+			if bc.data.Phase.IsTerminatedPhase() || bc.data.BackupName == "" {
+				bc.sync.Unlock()
+				continue
+			}
+
+			var backup apiv1.Backup
+
+			err := ws.typedClient.Get(ctx, client.ObjectKey{
+				Namespace: ws.instance.GetNamespaceName(),
+				Name:      bc.data.BackupName,
+			}, &backup)
+			if apierrs.IsNotFound(err) {
+				_ = bc.close()
+				bc.data.Phase = Errored
+				bc.data.Error = "backup not found"
+				bc.sync.Unlock()
+				continue
+			}
+			if err != nil {
+				bc.sync.Unlock()
+				continue
+			}
+
+			if backup.Status.IsDone() {
+				_ = bc.close()
+				bc.data.Phase = Errored
+				bc.data.Error = "backup is done but the connection was still open"
+			}
+			bc.sync.Unlock()
+		}
 	}
 }
 
