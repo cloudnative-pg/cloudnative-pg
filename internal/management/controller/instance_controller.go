@@ -1091,6 +1091,7 @@ func (r *InstanceReconciler) triggerRestartForDecrease(ctx context.Context, clus
 		r.client,
 		cluster,
 		clusterstatus.SetPhaseTX(phase, phaseReason),
+		clusterstatus.SetClusterReadyConditionTX,
 	)
 }
 
