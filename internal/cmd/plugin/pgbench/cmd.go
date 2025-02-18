@@ -67,8 +67,8 @@ func NewCmd() *cobra.Command {
 	pgBenchCmd.Flags().Int32Var(
 		&run.ttlSecondsAfterFinished,
 		"ttl",
-		86400,
-		"Time to live of the pgbench job. Defaults to: one day",
+		0,
+		"Time to live of the pgbench job. Defaults to no TTL.",
 	)
 
 	pgBenchCmd.Flags().BoolVar(

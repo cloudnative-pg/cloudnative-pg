@@ -129,8 +129,9 @@ func (cmd *pgBenchRun) buildJob(cluster *apiv1.Cluster) *batchv1.Job {
 	labels := map[string]string{
 		"pgBenchJob": cluster.Name,
 	}
-	return &batchv1.Job{
-		// To ensure we have manifest with Kind and APi in --dry-run
+
+	result := &batchv1.Job{
+		// To ensure we have manifest with Kind and API in --dry-run
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "batch/v1",
 			Kind:       "Job",
@@ -141,7 +142,6 @@ func (cmd *pgBenchRun) buildJob(cluster *apiv1.Cluster) *batchv1.Job {
 			Labels:    labels,
 		},
 		Spec: batchv1.JobSpec{
-			TTLSecondsAfterFinished: &cmd.ttlSecondsAfterFinished,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: labels,
@@ -164,6 +164,12 @@ func (cmd *pgBenchRun) buildJob(cluster *apiv1.Cluster) *batchv1.Job {
 			},
 		},
 	}
+
+	if cmd.ttlSecondsAfterFinished != 0 {
+		result.Spec.TTLSecondsAfterFinished = &cmd.ttlSecondsAfterFinished
+	}
+
+	return result
 }
 
 func (cmd *pgBenchRun) buildEnvVariables() []corev1.EnvVar {

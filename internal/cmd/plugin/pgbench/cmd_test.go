@@ -48,10 +48,6 @@ var _ = Describe("NewCmd", func() {
 		nodeSelectorFlag := cmd.Flag("node-selector")
 		Expect(nodeSelectorFlag).ToNot(BeNil())
 		Expect(nodeSelectorFlag.DefValue).To(Equal("[]"))
-
-		ttlFlag := cmd.Flag("ttl")
-		Expect(ttlFlag).ToNot(BeNil())
-		Expect(ttlFlag.DefValue).To(Equal("86400"))
 	})
 
 	It("should correctly parse flags and arguments", func() {
