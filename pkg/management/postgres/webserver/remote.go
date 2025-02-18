@@ -299,6 +299,11 @@ func (ws *remoteWebserverEndpoints) collectConn(ctx context.Context) {
 func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Request) {
 	log.Trace("request method", "method", req.Method)
 
+	log.Trace("waiting for lock")
+	ws.syncOperation.Lock()
+	defer ws.syncOperation.Unlock()
+	log.Trace("lock acquired")
+
 	switch req.Method {
 	case http.MethodGet:
 		if ws.currentBackup == nil {
@@ -331,14 +336,10 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 				log.Error(err, "while closing the body")
 			}
 		}()
-		ws.syncOperation.Lock()
-		defer ws.syncOperation.Unlock()
-
 		if ws.currentBackup != nil && !ws.currentBackup.data.Phase.IsTerminatedPhase() {
 			sendUnprocessableEntityJSONResponse(w, "PROCESS_ALREADY_RUNNING", "")
 			return
 		}
-
 		ws.currentBackup, err = newBackupConnection(
 			req.Context(),
 			p.BackupName,
@@ -368,10 +369,6 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 				log.Error(err, "while closing the body")
 			}
 		}()
-
-		ws.syncOperation.Lock()
-		defer ws.syncOperation.Unlock()
-
 		if ws.currentBackup == nil {
 			sendBadRequestJSONResponse(w, "NO_ONGOING_BACKUP", "")
 			return
