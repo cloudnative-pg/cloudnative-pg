@@ -254,41 +254,45 @@ func (ws *remoteWebserverEndpoints) backupConnectionsGarbageCollector(ctx contex
 				return
 			}
 
-			bc := ws.currentBackup
-			if bc == nil {
-				continue
-			}
-			bc.sync.Lock()
-			if bc.data.Phase.IsTerminatedPhase() || bc.data.BackupName == "" {
-				bc.sync.Unlock()
-				continue
-			}
-
-			var backup apiv1.Backup
-
-			err := ws.typedClient.Get(ctx, client.ObjectKey{
-				Namespace: ws.instance.GetNamespaceName(),
-				Name:      bc.data.BackupName,
-			}, &backup)
-			if apierrs.IsNotFound(err) {
-				_ = bc.close()
-				bc.data.Phase = Errored
-				bc.data.Error = "backup not found"
-				bc.sync.Unlock()
-				continue
-			}
-			if err != nil {
-				bc.sync.Unlock()
-				continue
-			}
-
-			if backup.Status.IsDone() {
-				_ = bc.close()
-				bc.data.Phase = Errored
-				bc.data.Error = "backup is done but the connection was still open"
-			}
-			bc.sync.Unlock()
+			ws.collectConn(ctx)
 		}
+	}
+}
+
+func (ws *remoteWebserverEndpoints) collectConn(ctx context.Context) {
+	bc := ws.currentBackup
+	if bc == nil {
+		return
+	}
+
+	bc.sync.Lock()
+	defer bc.sync.Unlock()
+	if bc.data.Phase.IsTerminatedPhase() || bc.data.BackupName == "" {
+		return
+	}
+
+	var backup apiv1.Backup
+
+	err := ws.typedClient.Get(ctx, client.ObjectKey{
+		Namespace: ws.instance.GetNamespaceName(),
+		Name:      bc.data.BackupName,
+	}, &backup)
+	if apierrs.IsNotFound(err) {
+		_ = bc.close()
+		bc.data.Phase = Errored
+		bc.data.Error = "backup not found"
+		bc.sync.Unlock()
+		return
+	}
+	if err != nil {
+		bc.sync.Unlock()
+		return
+	}
+
+	if backup.Status.IsDone() {
+		_ = bc.close()
+		bc.data.Phase = Errored
+		bc.data.Error = "backup is done but the connection was still open"
 	}
 }
 
