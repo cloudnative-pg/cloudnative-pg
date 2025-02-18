@@ -50,6 +50,17 @@
       datasourceTemplate: 'go',
       depNameTemplate: 'sigs.k8s.io/controller-tools',
     },
+{
+      customType: 'regex',
+      fileMatch: [
+        '^Makefile$',
+      ],
+      matchStrings: [
+        'GENREF_VERSION \\?= (?<currentValue>.*?)\\n',
+      ],
+      datasourceTemplate: 'go',
+      depNameTemplate: 'github.com/kubernetes-sigs/reference-docs/genref',
+    },
     {
       customType: 'regex',
       fileMatch: [
