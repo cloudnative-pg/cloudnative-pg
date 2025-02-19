@@ -27,10 +27,12 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/execlog"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -111,7 +113,65 @@ func NewRemoteWebServer(
 		}
 	}
 
-	return NewWebServer(server), nil
+	srv := NewWebServer(server)
+
+	srv.routines = append(srv.routines, endpoints.connectionsGarbageCollector)
+
+	return srv, nil
+}
+
+func (ws *remoteWebserverEndpoints) connectionsGarbageCollector(ctx context.Context) {
+	innerRoutine := func() {
+		if ws == nil {
+			return
+		}
+		bc := ws.currentBackup
+		if bc == nil || bc.conn == nil {
+			return
+		}
+
+		if bc.data.Phase == Completed || bc.data.BackupName == "" {
+			return
+		}
+
+		bc.sync.Lock()
+		defer bc.sync.Unlock()
+
+		if err := bc.conn.PingContext(ctx); errors.Is(err, sql.ErrConnDone) {
+			bc.data.Phase = Completed
+			return
+		}
+
+		var backup apiv1.Backup
+
+		err := ws.typedClient.Get(ctx, client.ObjectKey{
+			Namespace: ws.instance.GetNamespaceName(),
+			Name:      bc.data.BackupName,
+		}, &backup)
+		if apierrs.IsNotFound(err) {
+			_ = bc.conn.Close()
+			bc.data.Phase = Completed
+			return
+		}
+		if err != nil {
+			return
+		}
+
+		if backup.Status.IsDone() {
+			_ = bc.conn.Close()
+			bc.data.Phase = Completed
+			return
+		}
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(1 * time.Minute):
+			innerRoutine()
+		}
+	}
 }
 
 func (ws *remoteWebserverEndpoints) isServerHealthy(w http.ResponseWriter, _ *http.Request) {
