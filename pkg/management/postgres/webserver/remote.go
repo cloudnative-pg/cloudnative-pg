@@ -115,12 +115,25 @@ func NewRemoteWebServer(
 
 	srv := NewWebServer(server)
 
-	srv.routines = append(srv.routines, endpoints.connectionsGarbageCollector)
+	srv.routines = append(srv.routines, endpoints.cleanupStaleCollections)
 
 	return srv, nil
 }
 
-func (ws *remoteWebserverEndpoints) connectionsGarbageCollector(ctx context.Context) {
+func (ws *remoteWebserverEndpoints) cleanupStaleCollections(ctx context.Context) {
+	closeBackupConnection := func(bc *backupConnection) {
+		log := log.WithValues(
+			"backupName", bc.data.BackupName,
+			"phase", bc.data.Phase,
+		)
+		log.Warning("Closing stale PostgreSQL backup connection")
+
+		if err := bc.conn.Close(); err != nil {
+			log.Error(err, "Error while closing stale PostgreSQL backup connection")
+		}
+		bc.data.Phase = Completed
+	}
+
 	innerRoutine := func() {
 		if ws == nil {
 			return
@@ -138,15 +151,13 @@ func (ws *remoteWebserverEndpoints) connectionsGarbageCollector(ctx context.Cont
 		defer bc.sync.Unlock()
 
 		if bc.err != nil {
-			_ = bc.conn.Close()
-			bc.data.Phase = Completed
+			closeBackupConnection(bc)
 			return
 		}
 
 		if err := bc.conn.PingContext(ctx); err != nil {
-			_ = bc.conn.Close()
-			bc.data.Phase = Completed
 			bc.err = fmt.Errorf("error while pinging: %w", err)
+			closeBackupConnection(bc)
 			return
 		}
 
@@ -157,9 +168,8 @@ func (ws *remoteWebserverEndpoints) connectionsGarbageCollector(ctx context.Cont
 			Name:      bc.data.BackupName,
 		}, &backup)
 		if apierrs.IsNotFound(err) {
-			_ = bc.conn.Close()
-			bc.data.Phase = Completed
 			bc.err = fmt.Errorf("backup %s not found", bc.data.BackupName)
+			closeBackupConnection(bc)
 			return
 		}
 		if err != nil {
@@ -167,9 +177,8 @@ func (ws *remoteWebserverEndpoints) connectionsGarbageCollector(ctx context.Cont
 		}
 
 		if backup.Status.IsDone() {
-			_ = bc.conn.Close()
-			bc.data.Phase = Completed
 			bc.err = fmt.Errorf("backup %s is done", bc.data.BackupName)
+			closeBackupConnection(bc)
 			return
 		}
 	}
