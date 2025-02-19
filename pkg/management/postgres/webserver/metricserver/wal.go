@@ -73,7 +73,7 @@ type walSettings struct {
 }
 
 func (s *walSettings) synchronize(db *sql.DB, configSha256 string) error {
-	if s.configSha256 == configSha256 {
+	if s.configSha256 != "" && s.configSha256 == configSha256 {
 		return nil
 	}
 
