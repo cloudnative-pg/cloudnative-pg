@@ -64,6 +64,13 @@ func NewCmd() *cobra.Command {
 		"The name of the database that will be used by pgbench. Defaults to: app",
 	)
 
+	pgBenchCmd.Flags().Int32Var(
+		&run.ttlSecondsAfterFinished,
+		"ttl",
+		0,
+		"Time to live of the pgbench job. Defaults to no TTL.",
+	)
+
 	pgBenchCmd.Flags().BoolVar(
 		&run.dryRun,
 		"dry-run",
