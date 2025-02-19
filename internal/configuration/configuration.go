@@ -127,7 +127,7 @@ func NewConfiguration() *Data {
 
 // ReadConfigMap reads the configuration from the environment and the passed in data map
 func (config *Data) ReadConfigMap(data map[string]string) {
-	configparser.ReadConfigMap(config, newDefaultConfig(), data, configparser.OsEnvironment{})
+	configparser.ReadConfigMap(config, newDefaultConfig(), data)
 }
 
 // IsAnnotationInherited checks if an annotation with a certain name should
