@@ -170,7 +170,7 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 		})
 
 		By("verifying that the specified source databases were imported", func() {
-			stmt, err := connTarget.Prepare("SELECT datname FROM pg_database WHERE datname IN ($1)")
+			stmt, err := connTarget.Prepare("SELECT datname FROM pg_catalog.pg_database WHERE datname IN ($1)")
 			Expect(err).ToNot(HaveOccurred())
 			rows, err := stmt.QueryContext(env.Ctx, pq.Array(sourceDatabases))
 			Expect(err).ToNot(HaveOccurred())
@@ -184,7 +184,9 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 
 		By(fmt.Sprintf("verifying that the source superuser '%s' became a normal user in target",
 			databaseSuperUser), func() {
-			row := connTarget.QueryRow(fmt.Sprintf("SELECT usesuper FROM pg_user WHERE usename='%s'", databaseSuperUser))
+			row := connTarget.QueryRow(fmt.Sprintf(
+				"SELECT usesuper FROM pg_catalog.pg_user WHERE usename='%s'",
+				databaseSuperUser))
 			var superUser bool
 			err := row.Scan(&superUser)
 			Expect(err).ToNot(HaveOccurred())

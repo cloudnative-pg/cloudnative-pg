@@ -132,7 +132,7 @@ func DBToString(t interface{}) (string, bool) {
 // GetAllAccessibleDatabases returns the list of all the accessible databases using the superuser
 func GetAllAccessibleDatabases(tx *sql.Tx, whereClause string) (databases []string, errors []error) {
 	rows, err := tx.Query(strings.Join(
-		[]string{"SELECT datname FROM pg_database", whereClause},
+		[]string{"SELECT datname FROM pg_catalog.pg_database", whereClause},
 		" WHERE "),
 	)
 	if err != nil {

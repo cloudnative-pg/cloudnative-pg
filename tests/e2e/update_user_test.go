@@ -164,7 +164,7 @@ var _ = Describe("Enable superuser password", Label(tests.LabelServiceConnectivi
 				g.Expect(apierrors.IsNotFound(err)).To(BeTrue())
 			}, 200).Should(Succeed())
 
-			query := "SELECT rolpassword IS NULL FROM pg_authid WHERE rolname='postgres'"
+			query := "SELECT rolpassword IS NULL FROM pg_catalog.pg_authid WHERE rolname='postgres'"
 			// We should have the `postgres` user with a null password
 			Eventually(func() string {
 				stdout, _, err := exec.QueryInInstancePod(

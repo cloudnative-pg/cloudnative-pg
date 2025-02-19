@@ -125,7 +125,7 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 						Namespace: namespace,
 						PodName:   primaryDst,
 					}, exec.DatabaseName("postgres"),
-					"SELECT count(*) FROM pg_available_extensions WHERE name LIKE 'intarray'")
+					"SELECT count(*) FROM pg_catalog.pg_available_extensions WHERE name LIKE 'intarray'")
 				Expect(err).ToNot(HaveOccurred())
 				Expect(stdout, err).To(Equal("1\n"))
 			})
@@ -139,7 +139,7 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 						Namespace: namespace,
 						PodName:   primaryDst,
 					}, exec.DatabaseName("postgres"),
-					"select datcollate from pg_database where datname='template0'")
+					"select datcollate from pg_catalog.pg_database where datname='template0'")
 				Expect(err).ToNot(HaveOccurred())
 				Expect(stdout, err).To(Equal("C\n"))
 			})
@@ -174,7 +174,7 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 						Namespace: namespace,
 						PodName:   primaryDst,
 					}, exec.DatabaseName("postgres"),
-					"select datcollate from pg_database where datname='template0'")
+					"select datcollate from pg_catalog.pg_database where datname='template0'")
 				Expect(err).ToNot(HaveOccurred())
 				Expect(stdout, err).To(Equal("en_US.utf8\n"))
 			})

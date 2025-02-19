@@ -130,7 +130,7 @@ var _ = Describe("databaseSnapshotter methods test", func() {
 		var expectedQuery *sqlmock.ExpectedQuery
 
 		BeforeEach(func() {
-			expectedQuery = mock.ExpectQuery("SELECT extname FROM pg_extension WHERE oid >= 16384")
+			expectedQuery = mock.ExpectQuery("SELECT extname FROM pg_catalog.pg_extension WHERE oid >= 16384")
 		})
 
 		It("should drop the user-defined extensions successfully", func(ctx SpecContext) {
@@ -169,7 +169,7 @@ var _ = Describe("databaseSnapshotter methods test", func() {
 	})
 
 	Context("getDatabaseList testing", func() {
-		const query = "SELECT datname FROM pg_database d " +
+		const query = "SELECT datname FROM pg_catalog.pg_database d " +
 			"WHERE datallowconn AND NOT datistemplate AND datallowconn AND datname != 'postgres' " +
 			"ORDER BY datname"
 

@@ -59,7 +59,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 			Eventually(func() (int, error, error) {
 				primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 				Expect(err).ToNot(HaveOccurred())
-				query := "SELECT count(*) from pg_stat_replication WHERE sync_state = 'quorum'"
+				query := "SELECT count(*) from pg_catalog.pg_stat_replication WHERE sync_state = 'quorum'"
 				out, _, err := exec.Command(
 					env.Ctx,
 					env.Interface,
@@ -175,7 +175,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 						PodName:   primary.GetName(),
 					},
 					exec.DatabaseName("postgres"),
-					"select setting from pg_settings where name = 'synchronous_standby_names'")
+					"select setting from pg_catalog.pg_settings where name = 'synchronous_standby_names'")
 				if err != nil {
 					return stderr + " - " + err.Error()
 				}

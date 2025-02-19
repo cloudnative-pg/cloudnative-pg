@@ -92,8 +92,8 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 				query := `SELECT mem.inroles 
 					FROM pg_catalog.pg_authid as auth
 					LEFT JOIN (
-						SELECT string_agg(pg_get_userbyid(roleid), ',') as inroles, member
-						FROM pg_auth_members GROUP BY member
+						SELECT string_agg(pg_catalog.pg_get_userbyid(roleid), ',') as inroles, member
+						FROM pg_catalog.pg_auth_members GROUP BY member
 					) mem ON member = oid
 					WHERE rolname =` + pq.QuoteLiteral(roleName)
 				stdout, _, err := exec.QueryInInstancePod(
@@ -155,12 +155,12 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 				Eventually(QueryMatchExpectationPredicate(primaryPod, postgres.PostgresDBName,
 					roleExistsQuery(unrealizableUser), "f"), 30).Should(Succeed())
 
-				query := fmt.Sprintf("SELECT true FROM pg_roles WHERE rolname='%s' and rolcanlogin=%v and rolsuper=%v "+
+				query := fmt.Sprintf("SELECT true FROM pg_catalog.pg_roles WHERE rolname='%s' and rolcanlogin=%v and rolsuper=%v "+
 					"and rolcreatedb=%v and rolcreaterole=%v and rolinherit=%v and rolreplication=%v "+
 					"and rolbypassrls=%v and rolconnlimit=%v", username, rolCanLoginInSpec, rolSuperInSpec,
 					rolCreateDBInSpec,
 					rolCreateRoleInSpec, rolInheritInSpec, rolReplicationInSpec, rolByPassRLSInSpec, rolConnLimitInSpec)
-				query2 := fmt.Sprintf("SELECT rolvaliduntil is NULL FROM pg_roles WHERE rolname='%s'",
+				query2 := fmt.Sprintf("SELECT rolvaliduntil is NULL FROM pg_catalog.pg_roles WHERE rolname='%s'",
 					userWithPerpetualPass)
 
 				for _, q := range []string{query, query2} {
@@ -191,7 +191,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 					roleExistsQuery(appUsername), "t"), 30).Should(Succeed())
 
 				query := fmt.Sprintf("SELECT rolcreatedb and rolvaliduntil='infinity' "+
-					"FROM pg_roles WHERE rolname='%s'", appUsername)
+					"FROM pg_catalog.pg_roles WHERE rolname='%s'", appUsername)
 				assertRoleStatus(namespace, clusterName, query, "t")
 			})
 
@@ -250,7 +250,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 			})
 
 			By("Verify the role has been updated in the database", func() {
-				query := fmt.Sprintf("SELECT 1 FROM pg_roles WHERE rolname='%s' and rolcanlogin=%v "+
+				query := fmt.Sprintf("SELECT 1 FROM pg_catalog.pg_roles WHERE rolname='%s' and rolcanlogin=%v "+
 					"and rolcreatedb=%v and rolcreaterole=%v and rolconnlimit=%v",
 					username, expectedLogin, expectedCreateDB, expectedCreateRole, expectedConnLmt)
 				assertRoleStatus(namespace, clusterName, query, "1")
@@ -283,7 +283,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 
 			By("verifying Login is now enabled", func() {
 				expectedLogin = true
-				query := fmt.Sprintf("SELECT 1 FROM pg_roles WHERE rolname='%s' and rolcanlogin=%v "+
+				query := fmt.Sprintf("SELECT 1 FROM pg_catalog.pg_roles WHERE rolname='%s' and rolcanlogin=%v "+
 					"and rolcreatedb=%v and rolcreaterole=%v and rolconnlimit=%v",
 					username, expectedLogin, expectedCreateDB, expectedCreateRole, expectedConnLmt)
 				assertRoleStatus(namespace, clusterName, query, "1")
@@ -321,7 +321,7 @@ var _ = Describe("Managed roles tests", Label(tests.LabelSmoke, tests.LabelBasic
 			})
 
 			By("Verify new_role exists with all attribute default", func() {
-				query := fmt.Sprintf("SELECT 1 FROM pg_roles WHERE rolname='%s' and rolcanlogin=%v and rolsuper=%v "+
+				query := fmt.Sprintf("SELECT 1 FROM pg_catalog.pg_roles WHERE rolname='%s' and rolcanlogin=%v and rolsuper=%v "+
 					"and rolcreatedb=%v and rolcreaterole=%v and rolinherit=%v and rolreplication=%v "+
 					"and rolbypassrls=%v and rolconnlimit=%v", newUserName, defaultRolCanLogin,
 					defaultRolSuper, defaultRolCreateDB,

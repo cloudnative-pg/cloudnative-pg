@@ -65,7 +65,7 @@ func PrintReplicationSlots(
 		}
 		m := make(map[string]string)
 		for _, slot := range slots {
-			query := fmt.Sprintf("SELECT restart_lsn FROM pg_replication_slots WHERE slot_name = '%v'", slot)
+			query := fmt.Sprintf("SELECT restart_lsn FROM pg_catalog.pg_replication_slots WHERE slot_name = '%v'", slot)
 			restartLsn, _, err := exec.QueryInInstancePod(
 				ctx, crudClient, kubeInterface, restConfig,
 				exec.PodLocator{
@@ -145,7 +145,7 @@ func GetReplicationSlotsOnPod(
 		return nil, err
 	}
 
-	query := "SELECT slot_name FROM pg_replication_slots WHERE temporary = 'f' AND slot_type = 'physical'"
+	query := "SELECT slot_name FROM pg_catalog.pg_replication_slots WHERE temporary = 'f' AND slot_type = 'physical'"
 	stdout, _, err := exec.QueryInInstancePod(
 		ctx, crudClient, kubeInterface, restConfig,
 		exec.PodLocator{
@@ -184,7 +184,7 @@ func GetReplicationSlotLsnsOnPod(
 
 	lsnList := make([]string, 0, len(slots))
 	for _, slot := range slots {
-		query := fmt.Sprintf("SELECT restart_lsn FROM pg_replication_slots WHERE slot_name = '%v'",
+		query := fmt.Sprintf("SELECT restart_lsn FROM pg_catalog.pg_replication_slots WHERE slot_name = '%v'",
 			slot)
 		restartLsn, _, err := exec.QueryInInstancePod(
 			ctx, crudClient, kubeInterface, restConfig,

@@ -390,7 +390,7 @@ func assertReplicaClusterTopology(namespace, clusterName string) {
 			},
 			&commandTimeout,
 			"psql", "-U", "postgres", "-tAc",
-			"select string_agg(application_name, ',') from pg_stat_replication;",
+			"select string_agg(application_name, ',') from pg_catalog.pg_stat_replication;",
 		)
 		if err != nil {
 			return nil, err
@@ -435,7 +435,7 @@ func assertReplicaClusterTopology(namespace, clusterName string) {
 				},
 				&commandTimeout,
 				"psql", "-U", "postgres", "-tAc",
-				"select sender_host from pg_stat_wal_receiver limit 1;",
+				"select sender_host from pg_catalog.pg_stat_wal_receiver limit 1",
 			)
 			g.Expect(err).ToNot(HaveOccurred())
 			g.Expect(strings.TrimSpace(stdout)).To(BeEquivalentTo(sourceHost))
