@@ -3520,6 +3520,40 @@ possible. <code>false</code> by default.</p>
 </tbody>
 </table>
 
+## PGRole     {#postgresql-cnpg-io-v1-PGRole}
+
+
+**Appears in:**
+
+
+
+<p>PGRole is the Schema for the databases API</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>metadata</code> <B>[Required]</B><br/>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#objectmeta-v1-meta"><i>meta/v1.ObjectMeta</i></a>
+</td>
+<td>
+   <span class="text-muted">No description provided.</span>Refer to the Kubernetes API documentation for the fields of the <code>metadata</code> field.</td>
+</tr>
+<tr><td><code>spec</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-RoleSpec"><i>RoleSpec</i></a>
+</td>
+<td>
+   <span class="text-muted">No description provided.</span></td>
+</tr>
+<tr><td><code>status</code> <B>[Required]</B><br/>
+<a href="#postgresql-cnpg-io-v1-RoleState"><i>RoleState</i></a>
+</td>
+<td>
+   <span class="text-muted">No description provided.</span></td>
+</tr>
+</tbody>
+</table>
+
 ## PasswordState     {#postgresql-cnpg-io-v1-PasswordState}
 
 
@@ -4782,40 +4816,6 @@ This can only be set at creation time. By default set to <code>_cnpg_</code>.</p
 </tbody>
 </table>
 
-## Role     {#postgresql-cnpg-io-v1-Role}
-
-
-**Appears in:**
-
-
-
-<p>Role is the Schema for the databases API</p>
-
-
-<table class="table">
-<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
-<tbody>
-<tr><td><code>metadata</code> <B>[Required]</B><br/>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#objectmeta-v1-meta"><i>meta/v1.ObjectMeta</i></a>
-</td>
-<td>
-   <span class="text-muted">No description provided.</span>Refer to the Kubernetes API documentation for the fields of the <code>metadata</code> field.</td>
-</tr>
-<tr><td><code>spec</code> <B>[Required]</B><br/>
-<a href="#postgresql-cnpg-io-v1-RoleSpec"><i>RoleSpec</i></a>
-</td>
-<td>
-   <span class="text-muted">No description provided.</span></td>
-</tr>
-<tr><td><code>status</code> <B>[Required]</B><br/>
-<a href="#postgresql-cnpg-io-v1-RoleState"><i>RoleState</i></a>
-</td>
-<td>
-   <span class="text-muted">No description provided.</span></td>
-</tr>
-</tbody>
-</table>
-
 ## RoleConfiguration     {#postgresql-cnpg-io-v1-RoleConfiguration}
 
 
@@ -4983,7 +4983,7 @@ Default is <code>false</code>.</p>
 
 **Appears in:**
 
-- [Role](#postgresql-cnpg-io-v1-Role)
+- [PGRole](#postgresql-cnpg-io-v1-PGRole)
 
 
 <p>RoleSpec represents a role in Postgres</p>
@@ -5141,10 +5141,10 @@ Default is <code>false</code>.</p>
 
 **Appears in:**
 
-- [Role](#postgresql-cnpg-io-v1-Role)
+- [PGRole](#postgresql-cnpg-io-v1-PGRole)
 
 
-<p>RoleState defines the observed state of a Role
+<p>RoleState defines the observed state of a PGRole
 TODO: the existing RoleStatus in the cluster managed roles, does more than we need</p>
 
 
