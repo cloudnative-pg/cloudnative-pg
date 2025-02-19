@@ -32,7 +32,7 @@ func List(ctx context.Context, db *sql.DB, config *v1.ReplicationSlotsConfigurat
 		ctx,
 		`SELECT slot_name, slot_type, active, coalesce(restart_lsn::TEXT, '') AS restart_lsn,
             xmin IS NOT NULL OR catalog_xmin IS NOT NULL AS holds_xmin
-            FROM pg_replication_slots
+            FROM pg_catalog.pg_replication_slots
             WHERE NOT temporary AND slot_type = 'physical'`,
 	)
 	if err != nil {
@@ -83,7 +83,7 @@ func Update(ctx context.Context, db *sql.DB, slot ReplicationSlot) error {
 		return nil
 	}
 
-	_, err := db.ExecContext(ctx, "SELECT pg_replication_slot_advance($1, $2)", slot.SlotName, slot.RestartLSN)
+	_, err := db.ExecContext(ctx, "SELECT pg_catalog.pg_replication_slot_advance($1, $2)", slot.SlotName, slot.RestartLSN)
 	return err
 }
 
@@ -92,7 +92,7 @@ func Create(ctx context.Context, db *sql.DB, slot ReplicationSlot) error {
 	contextLog := log.FromContext(ctx).WithName("createSlot")
 	contextLog.Trace("Invoked", "slot", slot)
 
-	_, err := db.ExecContext(ctx, "SELECT pg_create_physical_replication_slot($1, $2)",
+	_, err := db.ExecContext(ctx, "SELECT pg_catalog.pg_create_physical_replication_slot($1, $2)",
 		slot.SlotName, slot.RestartLSN != "")
 	return err
 }
@@ -105,6 +105,6 @@ func Delete(ctx context.Context, db *sql.DB, slot ReplicationSlot) error {
 		return nil
 	}
 
-	_, err := db.ExecContext(ctx, "SELECT pg_drop_replication_slot($1)", slot.SlotName)
+	_, err := db.ExecContext(ctx, "SELECT pg_catalog.pg_drop_replication_slot($1)", slot.SlotName)
 	return err
 }

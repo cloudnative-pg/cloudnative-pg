@@ -66,7 +66,7 @@ var _ = Describe("Managed Database SQL", func() {
 		It("returns true when it detects an existing Database", func(ctx SpecContext) {
 			expectedValue := sqlmock.NewRows([]string{""}).AddRow("1")
 			dbMock.ExpectQuery(`SELECT count(*)
-		FROM pg_database
+		FROM pg_catalog.pg_database
 		WHERE datname = $1`).WithArgs(database.Spec.Name).WillReturnRows(expectedValue)
 
 			dbExists, err := detectDatabase(ctx, db, database)
@@ -77,7 +77,7 @@ var _ = Describe("Managed Database SQL", func() {
 		It("returns false when a Database is missing", func(ctx SpecContext) {
 			expectedValue := sqlmock.NewRows([]string{""}).AddRow("0")
 			dbMock.ExpectQuery(`SELECT count(*)
-		FROM pg_database
+		FROM pg_catalog.pg_database
 		WHERE datname = $1`).WithArgs(database.Spec.Name).WillReturnRows(expectedValue)
 
 			dbExists, err := detectDatabase(ctx, db, database)

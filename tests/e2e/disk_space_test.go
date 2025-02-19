@@ -88,7 +88,7 @@ var _ = Describe("Volume space unavailable", Label(tests.LabelStorage), func() {
 				query)
 			Expect(err).To(HaveOccurred())
 
-			query = "CHECKPOINT; SELECT pg_switch_wal(); CHECKPOINT"
+			query = "CHECKPOINT; SELECT pg_catalog.pg_switch_wal(); CHECKPOINT"
 			_, _, err = exec.QueryInInstancePod(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
 				exec.PodLocator{
@@ -172,7 +172,7 @@ var _ = Describe("Volume space unavailable", Label(tests.LabelStorage), func() {
 			}).WithTimeout(10 * time.Minute).Should(BeTrue())
 		})
 		By("writing some WAL", func() {
-			query := "CHECKPOINT; SELECT pg_switch_wal(); CHECKPOINT"
+			query := "CHECKPOINT; SELECT pg_catalog.pg_switch_wal(); CHECKPOINT"
 			_, _, err := exec.QueryInInstancePod(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
 				exec.PodLocator{

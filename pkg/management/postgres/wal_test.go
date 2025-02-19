@@ -27,7 +27,7 @@ import (
 )
 
 var _ = Describe("ensure isWalArchiveWorking works correctly", func() {
-	const flexibleCoalescenceQuery = "SELECT COALESCE.*FROM pg_stat_archiver"
+	const flexibleCoalescenceQuery = "SELECT COALESCE.*FROM pg_catalog.pg_stat_archiver"
 	var (
 		db           *sql.DB
 		mock         sqlmock.Sqlmock
@@ -75,7 +75,7 @@ var _ = Describe("ensure isWalArchiveWorking works correctly", func() {
 		rows := sqlmock.NewRows([]string{"is_archiving", "last_failed_time_present"}).AddRow(false, false)
 		mock.ExpectQuery(flexibleCoalescenceQuery).WillReturnRows(rows)
 		mock.ExpectExec("CHECKPOINT").WillReturnResult(fakeResult)
-		mock.ExpectExec("SELECT pg_switch_wal()").WillReturnResult(fakeResult)
+		mock.ExpectExec("SELECT pg_catalog.pg_switch_wal()").WillReturnResult(fakeResult)
 
 		// Call the function
 		err := bootstrapper.mustHaveFirstWalArchived(db)

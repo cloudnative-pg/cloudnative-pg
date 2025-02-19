@@ -42,7 +42,7 @@ import (
 )
 
 const databaseDetectionQuery = `SELECT count(*)
-			FROM pg_database
+			FROM pg_catalog.pg_database
 			WHERE datname = $1`
 
 var _ = Describe("Managed Database status", func() {

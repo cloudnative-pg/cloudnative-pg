@@ -76,7 +76,7 @@ var _ = Describe("Fencing", Label(tests.LabelPlugin), func() {
 	}
 
 	checkInstanceIsStreaming := func(instanceName, namespace string) {
-		query := "SELECT count(*) FROM pg_stat_wal_receiver"
+		query := "SELECT count(*) FROM pg_catalog.pg_stat_wal_receiver"
 		Eventually(func() (int, error) {
 			err := env.Client.Get(env.Ctx,
 				ctrlclient.ObjectKey{Namespace: namespace, Name: instanceName},
