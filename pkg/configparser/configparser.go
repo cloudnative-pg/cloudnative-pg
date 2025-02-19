@@ -49,6 +49,7 @@ package configparser
 
 import (
 	"fmt"
+	"os"
 	"reflect"
 	"strconv"
 	"strings"
@@ -60,7 +61,7 @@ var configparserLog = log.WithName("configparser")
 
 // ReadConfigMap reads the configuration from the environment and the passed in data map.
 // Config and defaults are supposed to be pointers to structs of the same type
-func ReadConfigMap(target interface{}, defaults interface{}, data map[string]string, env EnvironmentSource) {
+func ReadConfigMap(target interface{}, defaults interface{}, data map[string]string) {
 	ensurePointerToCompatibleStruct("target", target, "default", defaults)
 
 	count := reflect.TypeOf(defaults).Elem().NumField()
@@ -98,7 +99,7 @@ func ReadConfigMap(target interface{}, defaults interface{}, data map[string]str
 			value = valueField.String()
 		}
 		// If the key is present in the environment, use its value
-		if envValue := env.Getenv(envName); envValue != "" {
+		if envValue := os.Getenv(envName); envValue != "" {
 			value = envValue
 		}
 		// If the key is present in the passed data, use its value
