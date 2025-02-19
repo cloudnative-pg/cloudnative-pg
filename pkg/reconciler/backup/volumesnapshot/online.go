@@ -30,6 +30,28 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/client/local"
 )
 
+type ErrRetryable struct {
+	err error
+}
+
+func (e ErrRetryable) Error() string {
+	return e.err.Error()
+}
+
+func NewErrRetryable(err error) ErrRetryable {
+	return ErrRetryable{err: err}
+}
+
+func (e ErrRetryable) Timeout() bool {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (e ErrRetryable) Temporary() bool {
+	//TODO implement me
+	panic("implement me")
+}
+
 type onlineExecutor struct {
 	backupClient local.BackupClient
 }
@@ -55,9 +77,10 @@ func (o *onlineExecutor) finalize(
 
 	status := body.Data
 	if status.BackupName != backup.Name {
-		return nil, fmt.Errorf("trying to stop backup with name: %s, while reconciling backup with name: %s",
+		return nil, fmt.Errorf("trying to stop backup with name: %s, while reconciling backup with name: %s, targetPod: %s",
 			status.BackupName,
 			backup.Name,
+			targetPod.Name,
 		)
 	}
 
@@ -109,6 +132,7 @@ func (o *onlineExecutor) prepare(
 	status := body.Data
 	anotherBackupPresent := status.BackupName != "" && backup.Name != status.BackupName
 
+	contextLogger.Info("checking the status of the backup mode", "data", body.Data)
 	if status.BackupName == "" || anotherBackupPresent && status.Phase.IsTerminatedPhase() {
 		req := webserver.StartBackupRequest{
 			ImmediateCheckpoint: volumeSnapshotConfig.OnlineConfiguration.GetImmediateCheckpoint(),
@@ -116,7 +140,7 @@ func (o *onlineExecutor) prepare(
 			BackupName:          backup.Name,
 		}
 		if err := o.backupClient.Start(ctx, targetPod, req); err != nil {
-			return nil, fmt.Errorf("while trying to start the backup: %w", err)
+			return nil, NewErrRetryable(fmt.Errorf("while trying to start the backup: %w", err))
 		}
 		return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 	}
@@ -136,7 +160,7 @@ func (o *onlineExecutor) prepare(
 			"previousBackupPhase", status.Phase,
 		)
 		if err := o.backupClient.Stop(ctx, targetPod, *webserver.NewStopBackupRequest(backup.Name)); err != nil {
-			return nil, fmt.Errorf("while stopping the backup client: %w", err)
+			return nil, NewErrRetryable(fmt.Errorf("while stopping the backup client: %w", err))
 		}
 		return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 	}

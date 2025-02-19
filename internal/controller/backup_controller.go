@@ -555,7 +555,14 @@ func updateClusterWithSnapshotsBackupTimes(
 
 // isErrorRetryable detects is an error is retryable or not
 func isErrorRetryable(err error) bool {
-	return apierrs.IsServerTimeout(err) || apierrs.IsConflict(err) || apierrs.IsInternalError(err)
+	retryableApiErrs := apierrs.IsServerTimeout(err) || apierrs.IsConflict(err) || apierrs.IsInternalError(err)
+	if retryableApiErrs {
+		return true
+	}
+
+	// check if it contains a wrapped ErrRetryable error
+	var retryableErr *volumesnapshot.ErrRetryable
+	return errors.As(err, &retryableErr)
 }
 
 // getBackupTargetPod returns the pod that should run the backup according to the current

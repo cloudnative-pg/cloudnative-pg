@@ -268,7 +268,6 @@ func (ws *remoteWebserverEndpoints) collectConn(ctx context.Context) {
 	bc.sync.Lock()
 	defer bc.sync.Unlock()
 	if bc.data.Phase.IsTerminatedPhase() || bc.data.BackupName == "" {
-		_ = bc.close()
 		return
 	}
 
