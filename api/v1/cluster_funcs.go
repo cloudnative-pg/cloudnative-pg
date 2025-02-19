@@ -459,12 +459,18 @@ func (cluster *Cluster) GetClientCASecretName() string {
 }
 
 // GetFixedInheritedAnnotations gets the annotations that should be
-// inherited by all resources according the cluster spec
+// inherited by all resources according to the cluster spec and the operator version
 func (cluster *Cluster) GetFixedInheritedAnnotations() map[string]string {
+	var meta metav1.ObjectMeta
+	utils.SetOperatorVersion(&meta, versions.Version)
+
 	if cluster.Spec.InheritedMetadata == nil || cluster.Spec.InheritedMetadata.Annotations == nil {
-		return nil
+		return meta.Annotations
 	}
-	return cluster.Spec.InheritedMetadata.Annotations
+
+	utils.MergeMap(meta.Annotations, cluster.Spec.InheritedMetadata.Annotations)
+
+	return meta.Annotations
 }
 
 // GetFixedInheritedLabels gets the labels that should be
@@ -983,7 +989,6 @@ func (cluster *Cluster) SetInheritedData(obj *metav1.ObjectMeta) {
 	utils.InheritAnnotations(obj, cluster.Annotations, cluster.GetFixedInheritedAnnotations(), configuration.Current)
 	utils.InheritLabels(obj, cluster.Labels, cluster.GetFixedInheritedLabels(), configuration.Current)
 	utils.LabelClusterName(obj, cluster.GetName())
-	utils.SetOperatorVersion(obj, versions.Version)
 }
 
 // ShouldForceLegacyBackup if present takes a backup without passing the name argument even on barman version 3.3.0+.
