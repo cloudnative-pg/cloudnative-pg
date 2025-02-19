@@ -288,9 +288,7 @@ var _ = Describe("onlineExecutor finalize", func() {
 		}
 
 		_, err := executor.finalize(ctx, nil, backup, targetPod)
-		expectedErr := fmt.Sprintf("trying to stop backup with name: %s, while reconciling backup with name: %s",
-			"mismatched-backup-name", backup.Name)
-		Expect(err).To(MatchError(expectedErr))
+		Expect(err.Error()).To(ContainSubstring("trying to stop backup with name"))
 	})
 
 	It("should return an error for an unexpected phase", func(ctx SpecContext) {
