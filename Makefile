@@ -44,6 +44,7 @@ BUILD_IMAGE ?= true
 POSTGRES_IMAGE_NAME ?= $(shell grep 'DefaultImageName.*=' "pkg/versions/versions.go" | cut -f 2 -d \")
 KUSTOMIZE_VERSION ?= v5.6.0
 CONTROLLER_TOOLS_VERSION ?= v0.17.2
+GENREF_VERSION ?= 015aaac611407c4fe591bc8700d2c67b7521efca
 GORELEASER_VERSION ?= v2.7.0
 SPELLCHECK_VERSION ?= 0.47.0
 WOKE_VERSION ?= 0.19.0
@@ -324,7 +325,7 @@ $(ENVTEST): $(LOCALBIN)
 
 GENREF = $(LOCALBIN)/genref
 genref: ## Download kubernetes-sigs/reference-docs/genref locally if necessary.
-	$(call go-install-tool,$(GENREF),github.com/kubernetes-sigs/reference-docs/genref@master) # wokeignore:rule=master
+	$(call go-install-tool,$(GENREF),github.com/kubernetes-sigs/reference-docs/genref@$(GENREF_VERSION))
 
 GO_LICENSES = $(LOCALBIN)/go-licenses
 go-licenses: ## Download go-licenses locally if necessary.
