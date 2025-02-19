@@ -146,6 +146,7 @@ func (ws *remoteWebserverEndpoints) connectionsGarbageCollector(ctx context.Cont
 		if err := bc.conn.PingContext(ctx); err != nil {
 			_ = bc.conn.Close()
 			bc.data.Phase = Completed
+			bc.err = fmt.Errorf("error while pinging: %w", err)
 			return
 		}
 
@@ -158,6 +159,7 @@ func (ws *remoteWebserverEndpoints) connectionsGarbageCollector(ctx context.Cont
 		if apierrs.IsNotFound(err) {
 			_ = bc.conn.Close()
 			bc.data.Phase = Completed
+			bc.err = fmt.Errorf("backup %s not found", bc.data.BackupName)
 			return
 		}
 		if err != nil {
@@ -167,6 +169,7 @@ func (ws *remoteWebserverEndpoints) connectionsGarbageCollector(ctx context.Cont
 		if backup.Status.IsDone() {
 			_ = bc.conn.Close()
 			bc.data.Phase = Completed
+			bc.err = fmt.Errorf("backup %s is done", bc.data.BackupName)
 			return
 		}
 	}
