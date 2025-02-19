@@ -33,6 +33,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -255,10 +256,11 @@ var _ = Describe("PVC reconciliation", Ordered, func() {
 		)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(pvcs.Items[2].Annotations).To(BeEquivalentTo(map[string]string{
-			utils.PVCStatusAnnotationName:     "ready",
-			utils.ClusterSerialAnnotationName: "3",
-			"annotation1":                     "value",
-			"annotation2":                     "value",
+			utils.PVCStatusAnnotationName:       "ready",
+			utils.ClusterSerialAnnotationName:   "3",
+			"annotation1":                       "value",
+			"annotation2":                       "value",
+			utils.OperatorVersionAnnotationName: versions.Version,
 		}))
 	})
 
@@ -387,8 +389,9 @@ var _ = Describe("PVC reconciliation", Ordered, func() {
 			utils.ClusterInstanceRoleLabelName: "primary",
 		}))
 		Expect(patchedPvc.Annotations).To(Equal(map[string]string{
-			utils.ClusterSerialAnnotationName: "1",
-			utils.PVCStatusAnnotationName:     "ready",
+			utils.ClusterSerialAnnotationName:   "1",
+			utils.PVCStatusAnnotationName:       "ready",
+			utils.OperatorVersionAnnotationName: versions.Version,
 		}))
 
 		patchedPvc2 := fetchPVC(cl, pvc2)
@@ -399,8 +402,9 @@ var _ = Describe("PVC reconciliation", Ordered, func() {
 			utils.ClusterInstanceRoleLabelName: "replica",
 		}))
 		Expect(patchedPvc2.Annotations).To(Equal(map[string]string{
-			utils.ClusterSerialAnnotationName: "2",
-			utils.PVCStatusAnnotationName:     "ready",
+			utils.OperatorVersionAnnotationName: versions.Version,
+			utils.ClusterSerialAnnotationName:   "2",
+			utils.PVCStatusAnnotationName:       "ready",
 		}))
 
 		patchedPvc3Wal := fetchPVC(cl, pvc3Wal)
@@ -411,8 +415,9 @@ var _ = Describe("PVC reconciliation", Ordered, func() {
 			utils.ClusterInstanceRoleLabelName: "replica",
 		}))
 		Expect(patchedPvc3Wal.Annotations).To(Equal(map[string]string{
-			utils.ClusterSerialAnnotationName: "3",
-			utils.PVCStatusAnnotationName:     "ready",
+			utils.OperatorVersionAnnotationName: versions.Version,
+			utils.ClusterSerialAnnotationName:   "3",
+			utils.PVCStatusAnnotationName:       "ready",
 		}))
 
 		patchedPvc3Data := fetchPVC(cl, pvc3Data)
@@ -423,8 +428,9 @@ var _ = Describe("PVC reconciliation", Ordered, func() {
 			utils.ClusterInstanceRoleLabelName: "replica",
 		}))
 		Expect(patchedPvc3Data.Annotations).To(Equal(map[string]string{
-			utils.ClusterSerialAnnotationName: "3",
-			utils.PVCStatusAnnotationName:     "ready",
+			utils.OperatorVersionAnnotationName: versions.Version,
+			utils.ClusterSerialAnnotationName:   "3",
+			utils.PVCStatusAnnotationName:       "ready",
 		}))
 	})
 })
