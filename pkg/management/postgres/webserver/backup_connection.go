@@ -85,6 +85,13 @@ func (bc *backupConnection) closeConnection(backupName string) error {
 	return bc.conn.Close()
 }
 
+func (bc *backupConnection) forceCloseConnection() error {
+	bc.sync.Lock()
+	defer bc.sync.Unlock()
+
+	return bc.conn.Close()
+}
+
 func (bc *backupConnection) executeWithLock(backupName string, cb func() error) {
 	bc.sync.Lock()
 	defer bc.sync.Unlock()
