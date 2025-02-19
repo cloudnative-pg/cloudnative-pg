@@ -138,7 +138,7 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 						Namespace: namespace,
 						PodName:   primary.Name,
 					}, "postgres",
-					"select datcollate from pg_database where datname='template0'")
+					"select datcollate from pg_catalog.pg_database where datname='template0'")
 				Expect(err).ToNot(HaveOccurred())
 				Expect(stdout, err).To(Equal("C\n"))
 			})
@@ -171,7 +171,7 @@ var _ = Describe("InitDB settings", Label(tests.LabelSmoke, tests.LabelBasic), f
 						Namespace: namespace,
 						PodName:   primary.Name,
 					}, "postgres",
-					"select datcollate from pg_database where datname='template0'")
+					"select datcollate from pg_catalog.pg_database where datname='template0'")
 				Expect(err).ToNot(HaveOccurred())
 				Expect(stdout, err).To(Equal("en_US.utf8\n"))
 			})

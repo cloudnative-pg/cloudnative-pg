@@ -642,7 +642,7 @@ func (r *InstanceReconciler) reconcileExtensions(
 	for _, extension := range postgres.ManagedExtensions {
 		extensionIsUsed := extension.IsUsed(userSettings)
 
-		row := tx.QueryRow("SELECT COUNT(*) > 0 FROM pg_extension WHERE extname = $1", extension.Name)
+		row := tx.QueryRow("SELECT COUNT(*) > 0 FROM pg_catalog.pg_extension WHERE extname = $1", extension.Name)
 		err = row.Err()
 		if err != nil {
 			break
@@ -710,7 +710,7 @@ func (r *InstanceReconciler) reconcilePoolers(
 	}
 
 	var existsFunction bool
-	row = tx.QueryRow(fmt.Sprintf("SELECT COUNT(*) > 0 FROM pg_proc WHERE proname='%s' and prosrc='%s'",
+	row = tx.QueryRow(fmt.Sprintf("SELECT COUNT(*) > 0 FROM pg_catalog.pg_proc WHERE proname='%s' and prosrc='%s'",
 		userSearchFunctionName,
 		userSearchFunction))
 	err = row.Scan(&existsFunction)
@@ -1507,8 +1507,8 @@ func (r *InstanceReconciler) dropStaleReplicationConnections(
 
 	result, err := conn.ExecContext(
 		ctx,
-		`SELECT pg_terminate_backend(pid)
-		FROM pg_stat_replication
+		`SELECT pg_catalog.pg_terminate_backend(pid)
+		FROM pg_catalog.pg_stat_replication
 		WHERE application_name LIKE $1`,
 		fmt.Sprintf("%v-%%", cluster.Name),
 	)

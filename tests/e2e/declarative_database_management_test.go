@@ -75,7 +75,7 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 		})
 
 		assertDatabaseHasExpectedFields := func(namespace, primaryPod string, db apiv1.Database) {
-			query := fmt.Sprintf("select count(*) from pg_database where datname = '%s' "+
+			query := fmt.Sprintf("select count(*) from pg_catalog.pg_database where datname = '%s' "+
 				"and encoding = pg_char_to_encoding('%s') and datctype = '%s' and datcollate = '%s'",
 				db.Spec.Name, db.Spec.Encoding, db.Spec.LcCtype, db.Spec.LcCollate)
 			Eventually(func(g Gomega) {

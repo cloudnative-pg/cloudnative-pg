@@ -340,7 +340,9 @@ func (info InitInfo) ConfigureNewInstance(instance *Instance) error {
 	}
 
 	var existsDB bool
-	dbRow := dbSuperUser.QueryRow("SELECT COUNT(*) > 0 FROM pg_database WHERE datname = $1", info.ApplicationDatabase)
+	dbRow := dbSuperUser.QueryRow(
+		"SELECT COUNT(*) > 0 FROM pg_catalog.pg_database WHERE datname = $1",
+		info.ApplicationDatabase)
 	err = dbRow.Scan(&existsDB)
 	if err != nil {
 		return err

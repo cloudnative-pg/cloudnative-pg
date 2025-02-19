@@ -199,7 +199,7 @@ var _ = Describe("Configuration update", Ordered, Label(tests.LabelClusterMetada
 
 		By("verify that connections succeed after pg_hba_reload", func() {
 			// The new pg_hba rule should be present in every pod
-			query := "select count(*) from pg_hba_file_rules where type = 'host' and auth_method = 'trust'"
+			query := "select count(*) from pg_catalog.pg_hba_file_rules where type = 'host' and auth_method = 'trust'"
 			for _, pod := range podList.Items {
 				Eventually(func() (string, error) {
 					stdout, _, err := exec.QueryInInstancePod(
@@ -429,7 +429,7 @@ var _ = Describe("Configuration update", Ordered, Label(tests.LabelClusterMetada
 		if env.PostgresVersion > 14 {
 			primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
-			query := "select count(1) from pg_ident_file_mappings;"
+			query := "select count(1) from pg_catalog.pg_ident_file_mappings;"
 
 			By("check that there is only one entry in pg_ident_file_mappings", func() {
 				Eventually(func() (string, error) {

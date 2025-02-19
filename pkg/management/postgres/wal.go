@@ -91,7 +91,7 @@ func (w *walArchiveAnalyzer) mustHaveFirstWalArchivedWithBackoff(backoff wait.Ba
 func (w *walArchiveAnalyzer) mustHaveFirstWalArchived(db *sql.DB) error {
 	row := db.QueryRow("SELECT COALESCE(last_archived_time,'-infinity') > " +
 		"COALESCE(last_failed_time, '-infinity') AS is_archiving, last_failed_time IS NOT NULL " +
-		"FROM pg_stat_archiver")
+		"FROM pg_catalog.pg_stat_archiver")
 
 	var walArchivingWorking, lastFailedTimePresent bool
 
@@ -183,7 +183,7 @@ func (w *walArchiveBootstrapper) shipWalFile(db *sql.DB) error {
 		return fmt.Errorf("error while requiring a checkpoint: %w", err)
 	}
 
-	if _, err := db.Exec("SELECT pg_switch_wal()"); err != nil {
+	if _, err := db.Exec("SELECT pg_catalog.pg_switch_wal()"); err != nil {
 		return fmt.Errorf("error while switching to a new WAL: %w", err)
 	}
 
