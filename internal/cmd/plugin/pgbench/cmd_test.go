@@ -62,7 +62,7 @@ var _ = Describe("NewCmd", func() {
 			testRun.dbName, _ = cmd.Flags().GetString("db-name")
 			testRun.dryRun, _ = cmd.Flags().GetBool("dry-run")
 			testRun.nodeSelector, _ = cmd.Flags().GetStringSlice("node-selector")
-
+			testRun.ttlSecondsAfterFinished, _ = cmd.Flags().GetInt32("ttl")
 			testRun.clusterName = args[0]
 			testRun.pgBenchCommandArgs = args[1:]
 			return nil
@@ -75,6 +75,7 @@ var _ = Describe("NewCmd", func() {
 			"--db-name=mydb",
 			"--dry-run=true",
 			"--node-selector=label=value",
+			"--ttl=86400",
 			"arg1",
 			"arg2",
 		}
@@ -91,6 +92,7 @@ var _ = Describe("NewCmd", func() {
 		Expect(testRun.dbName).To(Equal("mydb"))
 		Expect(testRun.dryRun).To(BeTrue())
 		Expect(testRun.nodeSelector).To(Equal([]string{"label=value"}))
+		Expect(testRun.ttlSecondsAfterFinished).To(Equal(int32(86400)))
 		Expect(testRun.pgBenchCommandArgs).To(Equal([]string{"arg1", "arg2"}))
 	})
 })
