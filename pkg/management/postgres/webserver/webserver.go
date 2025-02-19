@@ -71,6 +71,7 @@ type Webserver struct {
 	// instance is the PostgreSQL instance to be collected
 	instance *postgres.Instance
 	server   *http.Server
+	routines []func(ctx context.Context)
 }
 
 // NewWebServer creates a Webserver given a postgres.Instance and a http.Server
@@ -94,6 +95,13 @@ func (ws *Webserver) Start(ctx context.Context) error {
 			errChan <- err
 		}
 	}()
+
+	subCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	for _, routine := range ws.routines {
+		routine(subCtx)
+	}
 
 	select {
 	// we exit with error code, potentially we could do a retry logic, but rarely a webserver that doesn't start will run

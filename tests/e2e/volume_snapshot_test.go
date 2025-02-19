@@ -20,12 +20,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
 	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 	k8client "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -33,6 +35,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/backups"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/minio"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/secrets"
@@ -64,6 +67,18 @@ var _ = Describe("Verify Volume Snapshot",
 			}
 
 			return snapshotList, nil
+		}
+
+		updateClusterSnapshotClass := func(namespace, clusterName, className string) {
+			cluster := &apiv1.Cluster{}
+			err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+				var err error
+				cluster, err = clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
+				Expect(err).ToNot(HaveOccurred())
+				cluster.Spec.Backup.VolumeSnapshot.ClassName = className
+				return env.Client.Update(env.Ctx, cluster)
+			})
+			Expect(err).ToNot(HaveOccurred())
 		}
 
 		var namespace string
@@ -840,6 +855,67 @@ var _ = Describe("Verify Volume Snapshot",
 						TableName:    tableName,
 					}
 					AssertDataExpectedCount(env, tableLocator, 6)
+				})
+			})
+
+			It("should clean up unused backup connections", func() {
+				By("setting a non-existing snapshotClass", func() {
+					updateClusterSnapshotClass(namespace, clusterToSnapshotName, "wrongSnapshotClass")
+				})
+
+				By("starting a new backup that will fail", func() {
+					backupName := fmt.Sprintf("%s-failed", clusterToSnapshotName)
+					failedBackup, err := backups.Create(
+						env.Ctx, env.Client,
+						apiv1.Backup{
+							ObjectMeta: metav1.ObjectMeta{
+								Namespace: namespace,
+								Name:      backupName,
+							},
+							Spec: apiv1.BackupSpec{
+								Target:  apiv1.BackupTargetPrimary,
+								Method:  apiv1.BackupMethodVolumeSnapshot,
+								Cluster: apiv1.LocalObjectReference{Name: clusterToSnapshotName},
+							},
+						},
+					)
+					Expect(err).ToNot(HaveOccurred())
+
+					Eventually(func(g Gomega) {
+						err = env.Client.Get(env.Ctx, types.NamespacedName{
+							Namespace: namespace,
+							Name:      backupName,
+						}, failedBackup)
+						g.Expect(err).ToNot(HaveOccurred())
+						g.Expect(failedBackup.Status.Phase).To(BeEquivalentTo(apiv1.BackupPhaseFailed))
+						g.Expect(failedBackup.Status.Error).To(ContainSubstring("Failed to get snapshot class"))
+					}, RetryTimeout).Should(Succeed())
+				})
+
+				By("verifying that the backup connection is cleaned up", func() {
+					primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace,
+						clusterToSnapshotName)
+					Expect(err).ToNot(HaveOccurred())
+					query := "SELECT count(*) FROM pg_stat_activity WHERE query ILIKE '%pg_backup_start%' " +
+						"AND application_name = 'cnpg-instance-manager'"
+
+					Eventually(func() (int, error, error) {
+						stdout, _, err := exec.QueryInInstancePod(
+							env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+							exec.PodLocator{
+								Namespace: primaryPod.Namespace,
+								PodName:   primaryPod.Name,
+							},
+							postgres.PostgresDBName,
+							query)
+						value, atoiErr := strconv.Atoi(strings.TrimSpace(stdout))
+						return value, err, atoiErr
+					}, RetryTimeout).Should(BeEquivalentTo(0),
+						"Stale backup connection should have been dropped")
+				})
+
+				By("resetting the snapshotClass value", func() {
+					updateClusterSnapshotClass(namespace, clusterToSnapshotName, os.Getenv("E2E_CSI_STORAGE_CLASS"))
 				})
 			})
 		})
