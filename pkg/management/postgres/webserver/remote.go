@@ -143,7 +143,8 @@ func (ws *remoteWebserverEndpoints) connectionsGarbageCollector(ctx context.Cont
 			return
 		}
 
-		if err := bc.conn.PingContext(ctx); errors.Is(err, sql.ErrConnDone) {
+		if err := bc.conn.PingContext(ctx); err != nil {
+			_ = bc.conn.Close()
 			bc.data.Phase = Completed
 			return
 		}
