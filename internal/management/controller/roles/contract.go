@@ -124,15 +124,14 @@ func (d *DatabaseRole) isEquivalentTo(inSpec apiv1.RoleConfiguration) bool {
 	return reflect.DeepEqual(role, spec) && d.hasSameValidUntilAs(inSpec)
 }
 
-// ApplyPassword updates a database role with the password located in the Secret
-// it returns the resource version of the Secret
+// ApplyPassword updates a database role with the password located in the Secret,
+// and it returns the resource version of the Secret
 func (d *DatabaseRole) ApplyPassword(
 	ctx context.Context,
 	cl client.Client,
 	rolePassword passwordManager,
 	namespace string,
 ) (string, error) {
-	var passVersion string
 	switch {
 	case rolePassword.GetRoleSecretName() == "" && !rolePassword.ShouldDisablePassword():
 		d.IgnorePassword = true
@@ -146,14 +145,13 @@ func (d *DatabaseRole) ApplyPassword(
 		return "",
 			fmt.Errorf("cannot reconcile: password both provided and disabled: %s",
 				rolePassword.GetRoleSecretName())
-	default: // role.PasswordSecret != nil && !rolePassword.ShouldDisablePassword():
+	default:
 		passwordSecret, err := getPassword(ctx, cl, rolePassword, namespace)
 		if err != nil {
 			return "", err
 		}
 
 		d.Password = sql.NullString{Valid: true, String: passwordSecret.password}
-		passVersion = passwordSecret.version
-		return passVersion, nil
+		return passwordSecret.version, nil
 	}
 }
