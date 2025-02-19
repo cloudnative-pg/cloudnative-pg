@@ -27,10 +27,12 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/execlog"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -111,7 +113,84 @@ func NewRemoteWebServer(
 		}
 	}
 
-	return NewWebServer(server), nil
+	srv := NewWebServer(server)
+
+	srv.routines = append(srv.routines, endpoints.cleanupStaleCollections)
+
+	return srv, nil
+}
+
+func (ws *remoteWebserverEndpoints) cleanupStaleCollections(ctx context.Context) {
+	closeBackupConnection := func(bc *backupConnection) {
+		log := log.WithValues(
+			"backupName", bc.data.BackupName,
+			"phase", bc.data.Phase,
+		)
+		log.Warning("Closing stale PostgreSQL backup connection")
+
+		if err := bc.conn.Close(); err != nil {
+			log.Error(err, "Error while closing stale PostgreSQL backup connection")
+		}
+		bc.data.Phase = Completed
+	}
+
+	innerRoutine := func() {
+		if ws == nil {
+			return
+		}
+		bc := ws.currentBackup
+		if bc == nil || bc.conn == nil {
+			return
+		}
+
+		if bc.data.Phase == Completed || bc.data.BackupName == "" {
+			return
+		}
+
+		bc.sync.Lock()
+		defer bc.sync.Unlock()
+
+		if bc.err != nil {
+			closeBackupConnection(bc)
+			return
+		}
+
+		if err := bc.conn.PingContext(ctx); err != nil {
+			bc.err = fmt.Errorf("error while pinging: %w", err)
+			closeBackupConnection(bc)
+			return
+		}
+
+		var backup apiv1.Backup
+
+		err := ws.typedClient.Get(ctx, client.ObjectKey{
+			Namespace: ws.instance.GetNamespaceName(),
+			Name:      bc.data.BackupName,
+		}, &backup)
+		if apierrs.IsNotFound(err) {
+			bc.err = fmt.Errorf("backup %s not found", bc.data.BackupName)
+			closeBackupConnection(bc)
+			return
+		}
+		if err != nil {
+			return
+		}
+
+		if backup.Status.IsDone() {
+			bc.err = fmt.Errorf("backup %s is done", bc.data.BackupName)
+			closeBackupConnection(bc)
+			return
+		}
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(1 * time.Minute):
+			innerRoutine()
+		}
+	}
 }
 
 func (ws *remoteWebserverEndpoints) isServerHealthy(w http.ResponseWriter, _ *http.Request) {
