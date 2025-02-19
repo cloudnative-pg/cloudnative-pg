@@ -111,7 +111,7 @@ var _ = Describe("Cluster logging tests", func() {
 		go func() {
 			defer GinkgoRecover()
 			defer wait.Done()
-			streamClusterLogs := ClusterStreamingRequest{
+			streamClusterLogs := ClusterWriter{
 				Cluster: cluster,
 				Options: &corev1.PodLogOptions{
 					Follow: false,
@@ -134,7 +134,7 @@ var _ = Describe("Cluster logging tests", func() {
 		go func() {
 			defer GinkgoRecover()
 			defer wait.Done()
-			streamClusterLogs := ClusterStreamingRequest{
+			streamClusterLogs := ClusterWriter{
 				Cluster: cluster,
 				Options: &corev1.PodLogOptions{
 					Follow: false,
@@ -158,7 +158,7 @@ var _ = Describe("Cluster logging tests", func() {
 		ctx2, cancel := context.WithTimeout(ctx, 300*time.Millisecond)
 		go func() {
 			defer GinkgoRecover()
-			streamClusterLogs := ClusterStreamingRequest{
+			streamClusterLogs := ClusterWriter{
 				Cluster: cluster,
 				Options: &corev1.PodLogOptions{
 					Follow: true,

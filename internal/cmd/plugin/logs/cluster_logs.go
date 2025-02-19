@@ -55,7 +55,7 @@ func getCluster(cl clusterLogs) (*cnpgv1.Cluster, error) {
 	return &cluster, err
 }
 
-func getStreamClusterLogs(cluster *cnpgv1.Cluster, cl clusterLogs) podlogs.ClusterStreamingRequest {
+func getStreamClusterLogs(cluster *cnpgv1.Cluster, cl clusterLogs) podlogs.ClusterWriter {
 	var sinceTime *metav1.Time
 	var tail *int64
 	if cl.timestamp {
@@ -64,7 +64,7 @@ func getStreamClusterLogs(cluster *cnpgv1.Cluster, cl clusterLogs) podlogs.Clust
 	if cl.tailLines >= 0 {
 		tail = &cl.tailLines
 	}
-	return podlogs.ClusterStreamingRequest{
+	return podlogs.ClusterWriter{
 		Cluster: cluster,
 		Options: &corev1.PodLogOptions{
 			Timestamps: cl.timestamp,
