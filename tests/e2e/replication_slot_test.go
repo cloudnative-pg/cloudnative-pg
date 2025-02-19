@@ -117,7 +117,7 @@ var _ = Describe("Replication Slot", Label(tests.LabelReplication), func() {
 			primaryPod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 
-			query := fmt.Sprintf("SELECT pg_create_physical_replication_slot('%s');", userPhysicalSlot)
+			query := fmt.Sprintf("SELECT pg_catalog.pg_create_physical_replication_slot('%s')", userPhysicalSlot)
 			_, _, err = exec.QueryInInstancePod(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
 				exec.PodLocator{

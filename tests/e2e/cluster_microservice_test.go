@@ -251,7 +251,7 @@ func assertTableAndDataOnImportedCluster(
 
 		By("Verifying imported table has owner app user", func() {
 			queryImported := fmt.Sprintf(
-				"select * from pg_tables where tablename = '%v' and tableowner = '%v'",
+				"select * from pg_catalog.pg_tables where tablename = '%v' and tableowner = '%v'",
 				tableName,
 				postgres.AppUser,
 			)

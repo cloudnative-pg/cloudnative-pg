@@ -973,7 +973,7 @@ func waitUntilRecoveryFinishes(db *sql.DB) error {
 	}
 
 	return retry.OnError(RetryUntilRecoveryDone, errorIsRetriable, func() error {
-		row := db.QueryRow("SELECT pg_is_in_recovery()")
+		row := db.QueryRow("SELECT pg_catalog.pg_is_in_recovery()")
 
 		var status bool
 		if err := row.Scan(&status); err != nil {

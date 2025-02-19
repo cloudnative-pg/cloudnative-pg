@@ -51,7 +51,7 @@ func (ds *databaseSnapshotter) getDatabaseList(ctx context.Context, target pool.
 	if err != nil {
 		return nil, err
 	}
-	query := `SELECT datname FROM pg_database d WHERE datallowconn
+	query := `SELECT datname FROM pg_catalog.pg_database d WHERE datallowconn
               AND NOT datistemplate
               AND datallowconn
               AND datname != 'postgres'
@@ -321,7 +321,7 @@ func (ds *databaseSnapshotter) dropExtensionsFromDatabase(
 
 	// In Postgres, OID 16384 is the first non system ID that can be used in the database
 	// catalog, as defined in the `FirstNormalObjectId` constant (src/include/access/transam.h)
-	rows, err := db.QueryContext(ctx, "SELECT extname FROM pg_extension WHERE oid >= 16384")
+	rows, err := db.QueryContext(ctx, "SELECT extname FROM pg_catalog.pg_extension WHERE oid >= 16384")
 	if err != nil {
 		return err
 	}

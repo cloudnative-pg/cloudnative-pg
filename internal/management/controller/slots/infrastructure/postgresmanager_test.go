@@ -52,7 +52,7 @@ var _ = Describe("PostgresManager", func() {
 	})
 
 	Context("Create", func() {
-		const expectedSQL = "SELECT pg_create_physical_replication_slot"
+		const expectedSQL = "SELECT pg_catalog.pg_create_physical_replication_slot"
 		It("should successfully create a replication slot", func(ctx SpecContext) {
 			mock.ExpectExec(expectedSQL).
 				WithArgs(slot.SlotName, slot.RestartLSN != "").
@@ -73,7 +73,7 @@ var _ = Describe("PostgresManager", func() {
 	})
 
 	Context("List", func() {
-		const expectedSQL = "^SELECT (.+) FROM pg_replication_slots"
+		const expectedSQL = "^SELECT (.+) FROM pg_catalog.pg_replication_slots"
 
 		var config *v1.ReplicationSlotsConfiguration
 		BeforeEach(func() {
@@ -123,7 +123,7 @@ var _ = Describe("PostgresManager", func() {
 	})
 
 	Context("Update", func() {
-		const expectedSQL = "SELECT pg_replication_slot_advance"
+		const expectedSQL = "SELECT pg_catalog.pg_replication_slot_advance"
 
 		It("should successfully update a replication slot", func(ctx SpecContext) {
 			mock.ExpectExec(expectedSQL).
@@ -151,7 +151,7 @@ var _ = Describe("PostgresManager", func() {
 	})
 
 	Context("Delete", func() {
-		const expectedSQL = "SELECT pg_drop_replication_slot"
+		const expectedSQL = "SELECT pg_catalog.pg_drop_replication_slot"
 
 		It("should successfully delete a replication slot", func(ctx SpecContext) {
 			slot.Active = false

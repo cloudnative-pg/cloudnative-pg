@@ -59,7 +59,7 @@ func CountReplicas(
 	pod *corev1.Pod,
 	retryTimeout int,
 ) (int, error) {
-	query := "SELECT count(*) FROM pg_stat_replication"
+	query := "SELECT count(*) FROM pg_catalog.pg_stat_replication"
 	stdOut, _, err := exec.EventuallyExecQueryInInstancePod(
 		ctx, crudClient, kubeInterface, restConfig,
 		exec.PodLocator{

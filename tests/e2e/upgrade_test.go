@@ -726,7 +726,7 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 						PodName:   primary,
 					},
 					exec.DatabaseName(databaseName),
-					"SELECT count(*) FROM pg_stat_replication")
+					"SELECT count(*) FROM pg_catalog.pg_stat_replication")
 				return strings.Trim(out, "\n"), err
 			}, 180).Should(BeEquivalentTo("2"))
 		})

@@ -84,7 +84,7 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			// Get the walreceiver pid
-			query := "SELECT pid FROM pg_stat_activity WHERE backend_type = 'walreceiver'"
+			query := "SELECT pid FROM pg_catalog.pg_stat_activity WHERE backend_type = 'walreceiver'"
 			out, _, err := exec.EventuallyExecQueryInInstancePod(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
 				exec.PodLocator{
@@ -105,7 +105,7 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 
 			// Terminate the pausedReplica walsender on the primary.
 			// We don't want to wait for the replication timeout.
-			query = fmt.Sprintf("SELECT pg_terminate_backend(pid) FROM pg_stat_replication "+
+			query = fmt.Sprintf("SELECT pg_catalog.pg_terminate_backend(pid) FROM pg_catalog.pg_stat_replication "+
 				"WHERE application_name = '%v'", pausedReplica)
 			_, _, err = exec.EventuallyExecQueryInInstancePod(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
@@ -142,7 +142,7 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 					Namespace: primaryPod.Namespace,
 					PodName:   primaryPod.Name,
 				}, postgres.PostgresDBName,
-				"SELECT pg_current_wal_lsn()",
+				"SELECT pg_catalog.pg_current_wal_lsn()",
 				RetryTimeout,
 				PollingTime,
 			)
@@ -161,7 +161,7 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 			)
 			Expect(err).ToNot(HaveOccurred())
 
-			query := fmt.Sprintf("SELECT true FROM pg_stat_replication "+
+			query := fmt.Sprintf("SELECT true FROM pg_catalog.pg_stat_replication "+
 				"WHERE application_name = '%v' AND replay_lsn > '%v'",
 				targetPrimary, strings.Trim(initialLSN, "\n"))
 			// The replay_lsn of the targetPrimary should be ahead

@@ -31,8 +31,8 @@ import (
 
 var _ = Describe("Slot synchronization", Ordered, func() {
 	const (
-		selectPgReplicationSlots = "^SELECT (.+) FROM pg_replication_slots"
-		selectPgSlotAdvance      = "SELECT pg_replication_slot_advance"
+		selectPgReplicationSlots = "^SELECT (.+) FROM pg_catalog.pg_replication_slots"
+		selectPgSlotAdvance      = "SELECT pg_catalog.pg_replication_slot_advance"
 
 		localPodName  = "cluster-2"
 		localSlotName = "_cnpg_cluster_2"
@@ -81,7 +81,7 @@ var _ = Describe("Slot synchronization", Ordered, func() {
 		mockLocal.ExpectQuery(selectPgReplicationSlots).
 			WillReturnRows(sqlmock.NewRows(columns))
 
-		mockLocal.ExpectExec("SELECT pg_create_physical_replication_slot").
+		mockLocal.ExpectExec("SELECT pg_catalog.pg_create_physical_replication_slot").
 			WithArgs(slot3, true).
 			WillReturnResult(sqlmock.NewResult(1, 1))
 
@@ -89,7 +89,7 @@ var _ = Describe("Slot synchronization", Ordered, func() {
 			WithArgs(slot3, lsnSlot3).
 			WillReturnResult(sqlmock.NewResult(1, 1))
 
-		mockLocal.ExpectExec("SELECT pg_create_physical_replication_slot").
+		mockLocal.ExpectExec("SELECT pg_catalog.pg_create_physical_replication_slot").
 			WithArgs(slot4, true).
 			WillReturnResult(sqlmock.NewResult(1, 1))
 
@@ -137,7 +137,7 @@ var _ = Describe("Slot synchronization", Ordered, func() {
 			WillReturnRows(sqlmock.NewRows(columns).
 				AddRow(slot4, string(infrastructure.SlotTypePhysical), false, lsnSlot4, false))
 
-		mockLocal.ExpectExec("SELECT pg_drop_replication_slot").WithArgs(slot4).
+		mockLocal.ExpectExec("SELECT pg_catalog.pg_drop_replication_slot").WithArgs(slot4).
 			WillReturnResult(sqlmock.NewResult(1, 1))
 
 		err := synchronizeReplicationSlots(ctx, dbPrimary, dbLocal, localPodName, &config)
@@ -157,7 +157,7 @@ var _ = Describe("Slot synchronization", Ordered, func() {
 
 		mockLocal.ExpectExec(selectPgSlotAdvance).WithArgs(slotWithXmin, "0/301C4D8").
 			WillReturnResult(sqlmock.NewResult(1, 1))
-		mockLocal.ExpectExec("SELECT pg_drop_replication_slot").WithArgs(slotWithXmin).
+		mockLocal.ExpectExec("SELECT pg_catalog.pg_drop_replication_slot").WithArgs(slotWithXmin).
 			WillReturnResult(sqlmock.NewResult(1, 1))
 
 		err := synchronizeReplicationSlots(ctx, dbPrimary, dbLocal, localPodName, &config)

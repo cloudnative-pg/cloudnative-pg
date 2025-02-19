@@ -54,7 +54,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 					PodName:   primaryPod.GetName(),
 				},
 				"postgres",
-				fmt.Sprintf("SELECT count(*) from pg_stat_replication WHERE sync_state = '%s'", syncState))
+				fmt.Sprintf("SELECT count(*) from pg_catalog.pg_stat_replication WHERE sync_state = '%s'", syncState))
 			Expect(stdErr).To(BeEmpty())
 			Expect(err).ShouldNot(HaveOccurred())
 
@@ -75,7 +75,7 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 					PodName:   primaryPod.GetName(),
 				},
 				"postgres",
-				"select setting from pg_settings where name = 'synchronous_standby_names'")
+				"select setting from pg_catalog.pg_settings where name = 'synchronous_standby_names'")
 			Expect(stdErr).To(BeEmpty())
 			Expect(err).ShouldNot(HaveOccurred())
 
