@@ -283,11 +283,10 @@ func (r *InstanceReconciler) restartPrimaryInplaceIfRequested(
 		if cluster.Status.CurrentPrimary != cluster.Status.TargetPrimary {
 			return false, fmt.Errorf("cannot restart the primary in-place when a switchover is in progress")
 		}
-		restartTimeout := cluster.GetRestartTimeout()
 
 		if err := r.instance.RequestAndWaitRestartSmartFast(
 			ctx,
-			time.Duration(restartTimeout)*time.Second,
+			cluster.GetRestartTimeout(),
 		); err != nil {
 			return true, err
 		}
@@ -989,9 +988,7 @@ func (r *InstanceReconciler) processConfigReloadAndManageRestart(ctx context.Con
 	phaseReason := "PostgreSQL configuration changed"
 	if status.IsPrimary && status.PendingRestartForDecrease {
 		if cluster.GetPrimaryUpdateStrategy() == apiv1.PrimaryUpdateStrategyUnsupervised {
-			contextLogger.Info("Restarting primary in-place due to hot standby sensible parameters decrease")
-			restartTimeout := time.Duration(cluster.GetRestartTimeout()) * time.Second
-			return r.Instance().RequestAndWaitRestartSmartFast(ctx, restartTimeout)
+			return r.triggerRestartForDecrease(ctx, cluster)
 		}
 		reason := "decrease of hot standby sensitive parameters"
 		contextLogger.Info("Waiting for the user to request a restart of the primary instance or a switchover "+
@@ -1011,6 +1008,30 @@ func (r *InstanceReconciler) processConfigReloadAndManageRestart(ctx context.Con
 		// so, we will wait for replicas to trigger it first.
 		return nil
 	}
+
+	return clusterstatus.PatchWithOptimisticLock(
+		ctx,
+		r.client,
+		cluster,
+		clusterstatus.SetPhaseTX(phase, phaseReason),
+		clusterstatus.SetClusterReadyConditionTX,
+	)
+}
+
+// triggerRestartForDecrease triggers an in-place restart and then asks
+// the operator to continue with the reconciliation. This is needed to
+// apply a change in replica-sensitive parameters that need to be done
+// on the primary node and, after that, to the replicas
+func (r *InstanceReconciler) triggerRestartForDecrease(ctx context.Context, cluster *apiv1.Cluster) error {
+	contextLogger := log.FromContext(ctx)
+
+	contextLogger.Info("Restarting primary in-place due to hot standby sensible parameters decrease")
+	if err := r.Instance().RequestAndWaitRestartSmartFast(ctx, cluster.GetRestartTimeout()); err != nil {
+		return err
+	}
+
+	phase := apiv1.PhaseApplyingConfiguration
+	phaseReason := "Decrease of hot standby sensitive parameters"
 
 	return clusterstatus.PatchWithOptimisticLock(
 		ctx,
