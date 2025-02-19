@@ -34,12 +34,13 @@ import (
 )
 
 type pgBenchRun struct {
-	jobName            string
-	clusterName        string
-	dbName             string
-	nodeSelector       []string
-	pgBenchCommandArgs []string
-	dryRun             bool
+	jobName                 string
+	clusterName             string
+	dbName                  string
+	nodeSelector            []string
+	pgBenchCommandArgs      []string
+	dryRun                  bool
+	ttlSecondsAfterFinished int32
 }
 
 const (
@@ -59,6 +60,10 @@ var jobExample = `
 
   # Create a job with given values and [cluster] "cluster-example"
   kubectl-cnpg pgbench cluster-example --db-name pgbenchDBName --job-name job-name -- \
+    --time 30 --client 1 --jobs 1
+
+  # Create a job with given values on[cluster] "cluster-example". The job will be cleaned after 10 minutes.
+  kubectl-cnpg pgbench cluster-example --db-name pgbenchDBName --job-name job-name --ttl 600 -- \
     --time 30 --client 1 --jobs 1`
 
 func (cmd *pgBenchRun) execute(ctx context.Context) error {
@@ -124,8 +129,9 @@ func (cmd *pgBenchRun) buildJob(cluster *apiv1.Cluster) *batchv1.Job {
 	labels := map[string]string{
 		"pgBenchJob": cluster.Name,
 	}
-	return &batchv1.Job{
-		// To ensure we have manifest with Kind and APi in --dry-run
+
+	result := &batchv1.Job{
+		// To ensure we have manifest with Kind and API in --dry-run
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "batch/v1",
 			Kind:       "Job",
@@ -158,6 +164,12 @@ func (cmd *pgBenchRun) buildJob(cluster *apiv1.Cluster) *batchv1.Job {
 			},
 		},
 	}
+
+	if cmd.ttlSecondsAfterFinished != 0 {
+		result.Spec.TTLSecondsAfterFinished = &cmd.ttlSecondsAfterFinished
+	}
+
+	return result
 }
 
 func (cmd *pgBenchRun) buildEnvVariables() []corev1.EnvVar {
