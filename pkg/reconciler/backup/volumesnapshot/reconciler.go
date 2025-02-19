@@ -160,12 +160,15 @@ func (se *Reconciler) Reconcile(
 		return nil, fmt.Errorf("cannot execute a VolumeSnapshot on a cluster without configuration")
 	}
 
+	contextLogger := log.FromContext(ctx)
+
 	volumeSnapshots, err := getBackupVolumeSnapshots(ctx, se.cli, cluster.Namespace, backup.Name)
 	if err != nil {
 		return nil, err
 	}
 	volumeSnapshotConfig := backup.GetVolumeSnapshotConfiguration(*cluster.Spec.Backup.VolumeSnapshot)
 
+	contextLogger.Info("creating backup executor", "online", volumeSnapshotConfig.GetOnline())
 	exec := se.newExecutor(volumeSnapshotConfig.GetOnline())
 
 	// Step 1: backup preparation.

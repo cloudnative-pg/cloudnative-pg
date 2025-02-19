@@ -119,13 +119,16 @@ func (o *onlineExecutor) prepare(
 	contextLogger := log.FromContext(ctx)
 	volumeSnapshotConfig := backup.GetVolumeSnapshotConfiguration(*cluster.Spec.Backup.VolumeSnapshot)
 
+	contextLogger.Info("starting backup prepare")
 	// Handle hot snapshots
 	body, err := o.backupClient.StatusWithErrors(ctx, targetPod)
 	if err != nil {
+		contextLogger.Error(err, "encountered error while getting status while preparing")
 		return nil, fmt.Errorf("while getting status while preparing: %w", err)
 	}
 
 	if err := body.EnsureDataIsPresent(); err != nil {
+		contextLogger.Error(err, "encountered error while ensuring data is present")
 		return nil, err
 	}
 
