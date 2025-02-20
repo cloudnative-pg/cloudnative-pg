@@ -33,8 +33,16 @@ import (
 // BackupClient is the interface to interact with the backup endpoints
 type BackupClient interface {
 	StatusWithErrors(ctx context.Context, pod *corev1.Pod) (*webserver.Response[webserver.BackupResultData], error)
-	Start(ctx context.Context, pod *corev1.Pod, sbq webserver.StartBackupRequest) error
-	Stop(ctx context.Context, pod *corev1.Pod, sbq webserver.StopBackupRequest) error
+	Start(
+		ctx context.Context,
+		pod *corev1.Pod,
+		sbq webserver.StartBackupRequest,
+	) (*webserver.Response[webserver.BackupResultData], error)
+	Stop(
+		ctx context.Context,
+		pod *corev1.Pod,
+		sbq webserver.StopBackupRequest,
+	) (*webserver.Response[webserver.BackupResultData], error)
 }
 
 // backupClientImpl a client to interact with the instance backup endpoints
@@ -59,40 +67,46 @@ func (c *backupClientImpl) StatusWithErrors(
 }
 
 // Start runs the pg_start_backup
-func (c *backupClientImpl) Start(ctx context.Context, pod *corev1.Pod, sbq webserver.StartBackupRequest) error {
+func (c *backupClientImpl) Start(
+	ctx context.Context,
+	pod *corev1.Pod,
+	sbq webserver.StartBackupRequest,
+) (*webserver.Response[webserver.BackupResultData], error) {
 	scheme := remote.GetStatusSchemeFromPod(pod)
 	httpURL := url.Build(scheme.ToString(), pod.Status.PodIP, url.PathPgModeBackup, url.StatusPort)
 
 	// Marshalling the payload to JSON
 	jsonBody, err := json.Marshal(sbq)
 	if err != nil {
-		return fmt.Errorf("failed to marshal start payload: %w", err)
+		return nil, fmt.Errorf("failed to marshal start payload: %w", err)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "POST", httpURL, bytes.NewReader(jsonBody))
 	if err != nil {
-		return err
+		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	_, err = executeRequestWithError[struct{}](ctx, c.cli, req, false)
-	return err
+	return executeRequestWithError[webserver.BackupResultData](ctx, c.cli, req, true)
 }
 
 // Stop runs the command pg_stop_backup
-func (c *backupClientImpl) Stop(ctx context.Context, pod *corev1.Pod, sbq webserver.StopBackupRequest) error {
+func (c *backupClientImpl) Stop(
+	ctx context.Context,
+	pod *corev1.Pod,
+	sbq webserver.StopBackupRequest,
+) (*webserver.Response[webserver.BackupResultData], error) {
 	scheme := remote.GetStatusSchemeFromPod(pod)
 	httpURL := url.Build(scheme.ToString(), pod.Status.PodIP, url.PathPgModeBackup, url.StatusPort)
 	// Marshalling the payload to JSON
 	jsonBody, err := json.Marshal(sbq)
 	if err != nil {
-		return fmt.Errorf("failed to marshal stop payload: %w", err)
+		return nil, fmt.Errorf("failed to marshal stop payload: %w", err)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "PUT", httpURL, bytes.NewReader(jsonBody))
 	if err != nil {
-		return err
+		return nil, err
 	}
-	_, err = executeRequestWithError[webserver.BackupResultData](ctx, c.cli, req, false)
-	return err
+	return executeRequestWithError[webserver.BackupResultData](ctx, c.cli, req, true)
 }
