@@ -51,14 +51,22 @@ func (f *fakeBackupClient) StatusWithErrors(
 	return f.response, f.injectStatusError
 }
 
-func (f *fakeBackupClient) Start(_ context.Context, _ *corev1.Pod, _ webserver.StartBackupRequest) error {
+func (f *fakeBackupClient) Start(
+	_ context.Context,
+	_ *corev1.Pod,
+	_ webserver.StartBackupRequest,
+) (*webserver.Response[webserver.BackupResultData], error) {
 	f.startCalled = true
-	return f.injectStartError
+	return &webserver.Response[webserver.BackupResultData]{}, f.injectStartError
 }
 
-func (f *fakeBackupClient) Stop(_ context.Context, _ *corev1.Pod, _ webserver.StopBackupRequest) error {
+func (f *fakeBackupClient) Stop(
+	_ context.Context,
+	_ *corev1.Pod,
+	_ webserver.StopBackupRequest,
+) (*webserver.Response[webserver.BackupResultData], error) {
 	f.stopCalled = true
-	return f.injectStopError
+	return &webserver.Response[webserver.BackupResultData]{}, f.injectStopError
 }
 
 var _ = Describe("onlineExecutor prepare", func() {

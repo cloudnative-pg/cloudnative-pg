@@ -48,6 +48,10 @@ func (o *onlineExecutor) finalize(
 		return nil, fmt.Errorf("while getting status while finalizing: %w", err)
 	}
 
+	if webserver.IsRetryableError(body.Error) {
+		return &ctrl.Result{RequeueAfter: time.Second * 5}, nil
+	}
+
 	if err := body.EnsureDataIsPresent(); err != nil {
 		return nil, err
 	}
@@ -72,9 +76,19 @@ func (o *onlineExecutor) finalize(
 
 	switch status.Phase {
 	case webserver.Started:
-		if err := o.backupClient.Stop(ctx, targetPod, *webserver.NewStopBackupRequest(backup.Name)); err != nil {
+		res, err := o.backupClient.Stop(ctx, targetPod, *webserver.NewStopBackupRequest(backup.Name))
+		if err != nil {
 			return nil, fmt.Errorf("while stopping the backup client: %w", err)
 		}
+
+		if webserver.IsRetryableError(res.Error) {
+			return &ctrl.Result{RequeueAfter: time.Second * 5}, nil
+		}
+
+		if err := body.EnsureDataIsPresent(); err != nil {
+			return nil, err
+		}
+
 		return &ctrl.Result{RequeueAfter: time.Second * 5}, nil
 	case webserver.Closing:
 		return &ctrl.Result{RequeueAfter: time.Second * 5}, nil
@@ -100,6 +114,10 @@ func (o *onlineExecutor) prepare(
 		return nil, fmt.Errorf("while getting status while preparing: %w", err)
 	}
 
+	if webserver.IsRetryableError(body.Error) {
+		return &ctrl.Result{RequeueAfter: time.Second * 5}, nil
+	}
+
 	if err := body.EnsureDataIsPresent(); err != nil {
 		return nil, err
 	}
@@ -112,9 +130,19 @@ func (o *onlineExecutor) prepare(
 			WaitForArchive:      volumeSnapshotConfig.OnlineConfiguration.GetWaitForArchive(),
 			BackupName:          backup.Name,
 		}
-		if err := o.backupClient.Start(ctx, targetPod, req); err != nil {
+		res, err := o.backupClient.Start(ctx, targetPod, req)
+		if err != nil {
 			return nil, fmt.Errorf("while trying to start the backup: %w", err)
 		}
+
+		if webserver.IsRetryableError(res.Error) {
+			return &ctrl.Result{RequeueAfter: time.Second * 5}, nil
+		}
+
+		if err := body.EnsureDataIsPresent(); err != nil {
+			return nil, err
+		}
+
 		return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 	}
 

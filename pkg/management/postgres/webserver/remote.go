@@ -27,6 +27,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"sync"
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/execlog"
@@ -46,11 +47,22 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
+const errCodeAnotherRequestInProgress = "ANOTHER_REQUEST_IN_PROGRESS"
+
+// IsRetryableError checks if the error is retryable
+func IsRetryableError(err *Error) bool {
+	if err == nil {
+		return false
+	}
+	return err.Code == errCodeAnotherRequestInProgress
+}
+
 type remoteWebserverEndpoints struct {
 	typedClient      client.Client
 	instance         *postgres.Instance
 	currentBackup    *backupConnection
 	readinessChecker *readiness.Data
+	ongoingRequest   sync.Mutex
 }
 
 // StartBackupRequest the required data to execute the pg_start_backup
@@ -146,8 +158,8 @@ func (ws *remoteWebserverEndpoints) cleanupStaleCollections(ctx context.Context)
 			return
 		}
 
-		bc.sync.Lock()
-		defer bc.sync.Unlock()
+		ws.ongoingRequest.Lock()
+		defer ws.ongoingRequest.Unlock()
 
 		if bc.err != nil {
 			closeBackupConnection(bc)
@@ -317,6 +329,11 @@ func (ws *remoteWebserverEndpoints) updateInstanceManager(
 // nolint: gocognit
 func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Request) {
 	log.Trace("request method", "method", req.Method)
+	if !ws.ongoingRequest.TryLock() {
+		sendUnprocessableEntityJSONResponse(w, errCodeAnotherRequestInProgress, "")
+		return
+	}
+	defer ws.ongoingRequest.Unlock()
 
 	switch req.Method {
 	case http.MethodGet:
@@ -354,7 +371,7 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 			log.Info("trying to close the current backup connection",
 				"backupName", ws.currentBackup.data.BackupName,
 			)
-			if err := ws.currentBackup.forceCloseConnection(); err != nil {
+			if err := ws.currentBackup.conn.Close(); err != nil {
 				if !errors.Is(err, sql.ErrConnDone) {
 					log.Error(err, "Error while closing backup connection (start)")
 				}
@@ -371,8 +388,12 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 			sendUnprocessableEntityJSONResponse(w, "CANNOT_INITIALIZE_CONNECTION", err.Error())
 			return
 		}
-		go ws.currentBackup.startBackup(context.Background(), p.BackupName)
-		sendJSONResponseWithData(w, 200, struct{}{})
+		go ws.currentBackup.startBackup(context.Background(), &ws.ongoingRequest)
+
+		res := Response[BackupResultData]{
+			Data: &ws.currentBackup.data,
+		}
+		sendJSONResponseWithData(w, 200, res)
 		return
 
 	case http.MethodPut:
@@ -398,8 +419,12 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 			return
 		}
 
+		res := Response[BackupResultData]{
+			Data: &ws.currentBackup.data,
+		}
+
 		if ws.currentBackup.data.Phase == Closing {
-			sendJSONResponseWithData(w, 200, struct{}{})
+			sendJSONResponseWithData(w, 200, res)
 			return
 		}
 
@@ -410,18 +435,19 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 		}
 
 		if ws.currentBackup.err != nil {
-			if err := ws.currentBackup.closeConnection(p.BackupName); err != nil {
+			if err := ws.currentBackup.conn.Close(); err != nil {
 				if !errors.Is(err, sql.ErrConnDone) {
 					log.Error(err, "Error while closing backup connection (stop)")
 				}
 			}
 
-			sendJSONResponseWithData(w, 200, struct{}{})
+			sendJSONResponseWithData(w, 200, res)
 			return
 		}
-		ws.currentBackup.setPhase(Closing, p.BackupName)
-		go ws.currentBackup.stopBackup(context.Background(), p.BackupName)
-		sendJSONResponseWithData(w, 200, struct{}{})
+		ws.currentBackup.data.Phase = Closing
+
+		go ws.currentBackup.stopBackup(context.Background(), &ws.ongoingRequest)
+		sendJSONResponseWithData(w, 200, res)
 		return
 	}
 }
