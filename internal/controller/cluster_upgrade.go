@@ -626,7 +626,7 @@ func (r *ClusterReconciler) upgradePod(
 ) error {
 	log.FromContext(ctx).Info("Recreating instance pod",
 		"pod", pod.Name,
-		"to", cluster.Spec.ImageName,
+		"to", cluster.GetImageName(),
 		"reason", reason,
 	)
 
