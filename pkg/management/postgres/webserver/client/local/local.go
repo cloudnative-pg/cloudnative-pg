@@ -24,13 +24,11 @@ import (
 
 // Client is an entity capable of interacting with the local webserver endpoints
 type Client interface {
-	Backup() BackupClient
 	Cache() CacheClient
 	Cluster() ClusterClient
 }
 
 type localClient struct {
-	backup  BackupClient
 	cache   CacheClient
 	cluster ClusterClient
 }
@@ -43,14 +41,9 @@ func NewClient() Client {
 	standardClient := common.NewHTTPClient(connectionTimeout, requestTimeout)
 
 	return &localClient{
-		backup:  &backupClientImpl{cli: standardClient},
 		cache:   &cacheClientImpl{cli: standardClient},
 		cluster: &clusterClientImpl{cli: standardClient},
 	}
-}
-
-func (c *localClient) Backup() BackupClient {
-	return c.backup
 }
 
 func (c *localClient) Cache() CacheClient {

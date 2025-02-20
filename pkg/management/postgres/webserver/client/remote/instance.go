@@ -34,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/client/common"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
@@ -95,14 +94,6 @@ type StatusError struct {
 
 func (i StatusError) Error() string {
 	return fmt.Sprintf("error status code: %v, body: %v", i.StatusCode, i.Body)
-}
-
-// newInstanceClient returns a client capable of querying the instance HTTP endpoints
-func newInstanceClient() InstanceClient {
-	const connectionTimeout = 2 * time.Second
-	const requestTimeout = 10 * time.Second
-
-	return &instanceClientImpl{Client: common.NewHTTPClient(connectionTimeout, requestTimeout)}
 }
 
 // extractInstancesStatus extracts the status of the underlying PostgreSQL instance from
