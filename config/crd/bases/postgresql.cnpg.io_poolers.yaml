@@ -8400,6 +8400,7 @@ spec:
                 enum:
                 - rw
                 - ro
+                - r
                 type: string
             required:
             - cluster
