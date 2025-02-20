@@ -2949,9 +2949,8 @@ spec:
                           type: boolean
                         isWALArchiver:
                           default: false
-                          description: Only one plugin can be declared as WALArchiver
-                            . Cannot be active at the same time with the "backup"
-                            field
+                          description: Only one plugin can be declared as WALArchiver.
+                            Cannot be active at the same time with the "backup" field
                           type: boolean
                         name:
                           description: Name is the plugin name
@@ -3986,8 +3985,8 @@ spec:
                       type: boolean
                     isWALArchiver:
                       default: false
-                      description: Only one plugin can be declared as WALArchiver
-                        . Cannot be active at the same time with the "backup" field
+                      description: Only one plugin can be declared as WALArchiver.
+                        Cannot be active at the same time with the "backup" field
                       type: boolean
                     name:
                       description: Name is the plugin name

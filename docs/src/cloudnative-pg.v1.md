@@ -3716,7 +3716,7 @@ cluster to be reconciled</p>
 <i>bool</i>
 </td>
 <td>
-   <p>Only one plugin can be declared as WALArchiver . Cannot be active at the same time with the &quot;backup&quot; field</p>
+   <p>Only one plugin can be declared as WALArchiver. Cannot be active at the same time with the &quot;backup&quot; field</p>
 </td>
 </tr>
 <tr><td><code>isBackupExecutor</code><br/>
