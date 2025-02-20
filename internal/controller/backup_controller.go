@@ -135,8 +135,8 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, nil
 	}
 
-	if backup.Spec.Method == apiv1.BackupMethodPlugin && cluster.GetEnabledBackupExecutorPluginName() == "" {
-		message := "cannot proceed with the backup as the cluster has no backup executor plugin enabled"
+	if backup.Spec.Method == apiv1.BackupMethodPlugin && len(cluster.Spec.Plugins) == 0 {
+		message := "cannot proceed with the backup as the cluster has no plugin configured"
 		contextLogger.Warning(message)
 		r.Recorder.Event(&backup, "Warning", "ClusterHasNoBackupExecutorPlugin", message)
 		tryFlagBackupAsFailed(ctx, r.Client, &backup, errors.New(message))

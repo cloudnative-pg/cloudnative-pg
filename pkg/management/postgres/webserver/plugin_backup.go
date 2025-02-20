@@ -18,7 +18,6 @@ package webserver
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -87,13 +86,6 @@ func (b *PluginBackupCommand) invokeStart(ctx context.Context) {
 		"backupName", b.Backup.Name,
 		"backupNamespace", b.Backup.Name)
 
-	if b.Cluster.GetEnabledBackupExecutorPluginName() == "" {
-		err := errors.New("plugin backup was invoked but no backupExecutor plugin is configured")
-		contextLogger.Error(err, "Error while starting plugin backup")
-		b.markBackupAsFailed(ctx, err)
-		return
-	}
-
 	plugins := repository.New()
 	availablePlugins, err := plugins.RegisterUnixSocketPluginsInPath(configuration.Current.PluginSocketDir)
 	if err != nil {
@@ -107,10 +99,10 @@ func (b *PluginBackupCommand) invokeStart(ctx context.Context) {
 		apiv1.GetPluginConfigurationEnabledPluginNames(b.Cluster.Spec.Plugins))
 	availableAndEnabled := stringset.From(availablePluginNamesSet.Intersect(enabledPluginNamesSet).ToList())
 
-	if !availableAndEnabled.Has(b.Cluster.GetEnabledBackupExecutorPluginName()) {
+	if !availableAndEnabled.Has(b.Backup.Spec.PluginConfiguration.Name) {
 		b.markBackupAsFailed(
 			ctx,
-			fmt.Errorf("backupExecutor plugin is not available: %s", b.Cluster.GetEnabledBackupExecutorPluginName()),
+			fmt.Errorf("requested plugin is not available: %s", b.Backup.Spec.PluginConfiguration.Name),
 		)
 		return
 	}

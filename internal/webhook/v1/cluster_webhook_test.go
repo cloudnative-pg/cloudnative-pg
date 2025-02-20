@@ -4951,17 +4951,6 @@ var _ = Describe("validatePluginConfiguration", func() {
 		Enabled:       ptr.To(true),
 		IsWALArchiver: ptr.To(true),
 	}
-	executorPlugin1 := apiv1.PluginConfiguration{
-		Name:             "backupExecutorPlugin1",
-		Enabled:          ptr.To(true),
-		IsBackupExecutor: ptr.To(true),
-	}
-	executorPlugin2 := apiv1.PluginConfiguration{
-		Name:    "backupExecutorPlugin2",
-		Enabled: ptr.To(true),
-
-		IsBackupExecutor: ptr.To(true),
-	}
 
 	BeforeEach(func() {
 		v = &ClusterCustomValidator{}
@@ -4976,52 +4965,26 @@ var _ = Describe("validatePluginConfiguration", func() {
 		Expect(v.validatePluginConfiguration(cluster)).To(BeNil())
 	})
 
-	It("returns an error if a WAL archiver plugin is enabled when backup is enabled", func() {
-		cluster.Spec.Backup = &apiv1.BackupConfiguration{}
+	It("returns an error if a WAL archiver plugin is enabled when barmanObjectStore is configured", func() {
+		cluster.Spec.Backup = &apiv1.BackupConfiguration{
+			BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{},
+		}
 		cluster.Spec.Plugins = append(cluster.Spec.Plugins, walPlugin1)
 		errs := v.validatePluginConfiguration(cluster)
-		Expect(errs).To(HaveLen(2))
-		Expect(errs[0].Error()).To(ContainSubstring("Cannot enable a WAL archiver plugin when backup is enabled"))
-	})
-
-	It("returns an error if a backup executor plugin is enabled when backup is enabled", func() {
-		cluster.Spec.Backup = &apiv1.BackupConfiguration{}
-		cluster.Spec.Plugins = append(cluster.Spec.Plugins, executorPlugin1)
-		errs := v.validatePluginConfiguration(cluster)
-		Expect(errs).To(HaveLen(2))
-		Expect(errs[0].Error()).To(ContainSubstring("Cannot enable a backup executor plugin when backup is enabled"))
+		Expect(errs).To(HaveLen(1))
+		Expect(errs[0].Error()).To(ContainSubstring(
+			"Cannot enable a WAL archiver plugin when barmanObjectStore is configured"))
 	})
 
 	It("returns an error if more than one WAL archiver plugin is enabled", func() {
-		cluster.Spec.Plugins = append(cluster.Spec.Plugins, walPlugin1, walPlugin2, executorPlugin1)
+		cluster.Spec.Plugins = append(cluster.Spec.Plugins, walPlugin1, walPlugin2)
 		errs := v.validatePluginConfiguration(cluster)
 		Expect(errs).To(HaveLen(1))
 		Expect(errs[0].Error()).To(ContainSubstring("Cannot enable more than one WAL archiver plugin"))
 	})
 
-	It("returns an error if more than one backup executor plugin is enabled", func() {
-		cluster.Spec.Plugins = append(cluster.Spec.Plugins, walPlugin1, executorPlugin1, executorPlugin2)
-		errs := v.validatePluginConfiguration(cluster)
-		Expect(errs).To(HaveLen(1))
-		Expect(errs[0].Error()).To(ContainSubstring("Cannot enable more than one backup executor plugin"))
-	})
-
-	It("returns an error if a WAL archiver plugin is enabled without a backup executor plugin", func() {
+	It("returns no errors when WAL archiver is enabled", func() {
 		cluster.Spec.Plugins = append(cluster.Spec.Plugins, walPlugin1)
-		errs := v.validatePluginConfiguration(cluster)
-		Expect(errs).To(HaveLen(1))
-		Expect(errs[0].Error()).To(ContainSubstring("Cannot enable a WAL archiver plugin without a backup executor plugin"))
-	})
-
-	It("returns an error if a backup executor plugin is enabled without a WAL archiver plugin", func() {
-		cluster.Spec.Plugins = append(cluster.Spec.Plugins, executorPlugin1)
-		errs := v.validatePluginConfiguration(cluster)
-		Expect(errs).To(HaveLen(1))
-		Expect(errs[0].Error()).To(ContainSubstring("Cannot enable a backup executor plugin without a WAL archiver plugin"))
-	})
-
-	It("returns no errors when WAL archiver and backup executor plugins are enabled", func() {
-		cluster.Spec.Plugins = append(cluster.Spec.Plugins, walPlugin1, executorPlugin1)
 		Expect(v.validatePluginConfiguration(cluster)).To(BeNil())
 	})
 })
