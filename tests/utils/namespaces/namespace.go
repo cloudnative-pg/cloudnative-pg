@@ -330,6 +330,14 @@ func DumpNamespaceObjects(
 		_, _ = fmt.Fprintln(w, string(out))
 	}
 
+	// dump volumesnapshot info
+	volumeSnaphostList, _ := storage.GetSnapshotList(ctx, crudClient, namespace)
+	for _, volumeSnapshot := range volumeSnaphostList.Items {
+		out, _ := json.MarshalIndent(volumeSnapshot, "", "    ")
+		_, _ = fmt.Fprintf(w, "Dumping %v/%v VolumeSnapshot\n", namespace, volumeSnapshot.Name)
+		_, _ = fmt.Fprintln(w, string(out))
+	}
+
 	err = w.Flush()
 	if err != nil {
 		fmt.Println(err)
