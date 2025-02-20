@@ -283,9 +283,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          images='${{ env.OPERATOR_IMAGE_NAME }}'
-          tags=''
-          labels=''
+          image_tag=$( (git symbolic-ref -q --short HEAD || git describe --tags --exact-match) | tr / -)
+
           commit_sha=${{ needs.evaluate_options.outputs.git_ref }}
           commit_date=$(git log -1 --pretty=format:'%ad' --date short "${commit_sha}" || : )
           # use git describe to get the nearest tag and use that to build the version (e.g. 1.4.0-dev24 or 1.4.0)
@@ -314,17 +313,12 @@ jobs:
             branch_name=$(gh pr view "${{ github.event.issue.number }}" --json headRefName -q '.headRefName' 2>/dev/null)
           fi
 
-          # extract tag from branch name
-          tag_name=$(echo "$branch_name" | sed 's/[^a-zA-Z0-9]/-/g')
-
           upload_artifacts=false
           if [[ ${branch_name} == main || ${branch_name} =~ ^release- ]]; then
             upload_artifacts=true
           fi
 
-          echo "IMAGES=${images}" >> $GITHUB_ENV
-          echo "TAGS=${tags}" >> $GITHUB_ENV
-          echo "LABELS=${labels}" >> $GITHUB_ENV
+          echo "IMAGE_TAG=${image_tag}" >> $GITHUB_ENV
           echo "DATE=${commit_date}" >> $GITHUB_ENV
           echo "VERSION=${commit_version}" >> $GITHUB_ENV
           echo "COMMIT=${commit_short}" >> $GITHUB_ENV
@@ -333,7 +327,6 @@ jobs:
           echo "author_name=${author_name}" >> $GITHUB_OUTPUT
           echo "author_email=${author_email}" >> $GITHUB_OUTPUT
           echo "branch_name=${branch_name}" >> $GITHUB_OUTPUT
-          echo "tag_name=${tag_name,,}" >> $GITHUB_OUTPUT
           echo "upload_artifacts=${upload_artifacts}" >> $GITHUB_OUTPUT
       -
         name: Set GoReleaser environment
@@ -372,8 +365,9 @@ jobs:
         id: bake-push
         env:
           environment: "testing"
-          VERSION: ${{ env.VERSION }}
-          REGISTRY: ${{ env.REGISTRY }}/${{ env.REPOSITORY_OWNER}}
+          buildVersion: ${{ env.VERSION }}
+          TAG: ${{ env.IMAGE_TAG }}
+          REGISTRY: ${{ env.REGISTRY }}/${{ env.REPOSITORY_OWNER }}
         with:
           source: .
           push: true
@@ -395,16 +389,6 @@ jobs:
           )
           cosign sign --yes ${images}
       -
-        name: Image Meta
-        id: image-meta
-        env:
-          TAGS: ${{ steps.docker-meta.outputs.tags }}
-        run: |
-          # If there is more than one tag, take the first one
-          # TAGS could be separated by newlines or commas
-          image=$(sed -n '1{s/,.*//; p}' <<< "$TAGS")
-          echo "image=${image}" >> $GITHUB_OUTPUT
-      -
         name: Output images
         env:
           DISTROLESS: ${{ fromJSON(steps.bake-push.outputs.metadata)['distroless']['image.name'] }}
@@ -419,7 +403,7 @@ jobs:
         name: Generate manifest for operator deployment
         id: generate-manifest
         env:
-          CONTROLLER_IMG: ${{ fromJSON(steps.bake-push.outputs.metadata)['distroless']['image.name'] }}
+          CONTROLLER_IMG: ${{ env.CONTROLLER_IMG }}
         run: |
           make generate-manifest
       -
@@ -471,8 +455,7 @@ jobs:
           push: true
           build-args: |
             VERSION=${{ env.VERSION }}-prime
-          tags: ${{ fromJSON(steps.bake-push.outputs.metadata)['distroless']['image.name'] }}-prime
-          labels: ${{ env.LABELS }}
+          tags: ${{ env.CONTROLLER_IMG }}-prime
           provenance: ${{ env.BUILD_PUSH_PROVENANCE }}
           cache-from: ${{ env.BUILD_PUSH_CACHE_FROM }}
           cache-to: ${{ env.BUILD_PUSH_CACHE_TO }}

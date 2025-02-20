@@ -34,11 +34,15 @@ variable "LATEST" {
   default = "false"
 }
 
-suffix = (environment == "testing") ? "-testing" : ""
-
-variable "VERSION" {
+variable "TAG" {
   default = "dev"
 }
+
+variable "buildVersion" {
+  default = "dev"
+}
+
+suffix = (environment == "testing") ? "-testing" : ""
 
 title = "CloudNativePG Operator"
 description = "This Docker image contains CloudNativePG Operator."
@@ -71,7 +75,7 @@ target "default" {
   name = "${distro}"
   platforms = ["linux/amd64", "linux/arm64"]
   tags = [
-    "${REGISTRY}/cloudnative-pg${suffix}:${VERSION}${distros[distro].tag}",
+    "${REGISTRY}/cloudnative-pg${suffix}:${TAG}${distros[distro].tag}",
     latest("${REGISTRY}/cloudnative-pg${suffix}", "${LATEST}"),
   ]
 
@@ -96,7 +100,7 @@ target "default" {
     "index,manifest:org.opencontainers.image.created=${now}",
     "index,manifest:org.opencontainers.image.url=${url}",
     "index,manifest:org.opencontainers.image.source=${url}",
-    "index,manifest:org.opencontainers.image.version=${VERSION}",
+    "index,manifest:org.opencontainers.image.version=${buildVersion}",
     "index,manifest:org.opencontainers.image.revision=${revision}",
     "index,manifest:org.opencontainers.image.vendor=${authors}",
     "index,manifest:org.opencontainers.image.title=${title}",
@@ -111,7 +115,7 @@ target "default" {
     "org.opencontainers.image.created" = "${now}",
     "org.opencontainers.image.url" = "${url}",
     "org.opencontainers.image.source" = "${url}",
-    "org.opencontainers.image.version" = "${VERSION}",
+    "org.opencontainers.image.version" = "${buildVersion}",
     "org.opencontainers.image.revision" = "${revision}",
     "org.opencontainers.image.vendor" = "${authors}",
     "org.opencontainers.image.title" = "${title}",
@@ -124,7 +128,7 @@ target "default" {
     "name" = "${title}",
     "maintainer" = "${authors}",
     "vendor" = "${authors}",
-    "version" = "${VERSION}",
+    "version" = "${buildVersion}",
     "release" = "${revision}",
     "description" = "${description}",
     "summary" = "${description}",

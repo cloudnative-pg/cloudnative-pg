@@ -4,7 +4,6 @@ ARG BASE=gcr.io/distroless/static-debian12:nonroot
 # to create a symlink and reduce the size of the image
 FROM gcr.io/distroless/static-debian12:debug-nonroot AS builder
 ARG TARGETARCH
-
 SHELL ["/busybox/sh", "-c"]
 COPY --chown=nonroot:nonroot --chmod=0755 dist/manager/* operator/
 RUN ln -sf operator/manager_${TARGETARCH} manager
