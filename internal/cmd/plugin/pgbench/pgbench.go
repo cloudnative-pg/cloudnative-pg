@@ -125,7 +125,6 @@ func (cmd *pgBenchRun) buildNodeSelector() map[string]string {
 }
 
 func (cmd *pgBenchRun) buildJob(cluster *apiv1.Cluster) *batchv1.Job {
-	clusterImageName := cluster.Spec.ImageName
 	labels := map[string]string{
 		"pgBenchJob": cluster.Name,
 	}
@@ -152,7 +151,7 @@ func (cmd *pgBenchRun) buildJob(cluster *apiv1.Cluster) *batchv1.Job {
 					Containers: []corev1.Container{
 						{
 							Name:            "pgbench",
-							Image:           clusterImageName,
+							Image:           cluster.GetImageName(),
 							ImagePullPolicy: corev1.PullAlways,
 							Env:             cmd.buildEnvVariables(),
 							Command:         []string{pgBenchKeyWord},
