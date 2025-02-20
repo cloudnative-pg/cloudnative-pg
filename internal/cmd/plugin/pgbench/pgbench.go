@@ -62,7 +62,7 @@ var jobExample = `
   kubectl-cnpg pgbench cluster-example --db-name pgbenchDBName --job-name job-name -- \
     --time 30 --client 1 --jobs 1
 
-  # Create a job with given values on[cluster] "cluster-example". The job will be cleaned after 10 minutes.
+  # Create a job with given values on [cluster] "cluster-example". The job will be cleaned after 10 minutes.
   kubectl-cnpg pgbench cluster-example --db-name pgbenchDBName --job-name job-name --ttl 600 -- \
     --time 30 --client 1 --jobs 1`
 
