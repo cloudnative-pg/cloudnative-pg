@@ -80,6 +80,7 @@ kubectl cnpg pgbench \
 
 By default, jobs do not expire. You can enable automatic deletion with the
 `--ttl` flag. The job will be deleted after the specified duration (in seconds).
+
 ```shell
 kubectl cnpg pgbench \
   --job-name pgbench-run \
