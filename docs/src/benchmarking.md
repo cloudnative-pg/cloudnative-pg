@@ -78,6 +78,16 @@ kubectl cnpg pgbench \
   -- --time 30 --client 1 --jobs 1
 ```
 
+By default, jobs do not expire. You can enable automatic deletion with the
+`--ttl` flag. The job will be deleted after the specified duration (in seconds).
+```shell
+kubectl cnpg pgbench \
+  --job-name pgbench-run \
+  --ttl 600 \
+  cluster-example \
+  -- --time 30 --client 1 --jobs 1
+```
+
 If you want to run a `pgbench` job on a specific worker node, you can use
 the `--node-selector` option. Suppose you want to run the previous
 initialization job on a node having the `workload=pgbench` label, you can run:
