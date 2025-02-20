@@ -2389,8 +2389,8 @@ func (v *ClusterCustomValidator) validatePluginConfiguration(r *apiv1.Cluster) f
 	if len(r.Spec.Plugins) == 0 {
 		return nil
 	}
-	isBackupEnabled := r.Spec.Backup != nil
-	var walArchiverEnabled, backupExecutorEnabled []string
+	isBarmanObjectStoreConfigured := r.Spec.Backup != nil && r.Spec.Backup.BarmanObjectStore != nil
+	var walArchiverEnabled []string
 
 	for _, plugin := range r.Spec.Plugins {
 		if !plugin.IsEnabled() {
@@ -2399,24 +2399,15 @@ func (v *ClusterCustomValidator) validatePluginConfiguration(r *apiv1.Cluster) f
 		if plugin.IsWALArchiver != nil && *plugin.IsWALArchiver {
 			walArchiverEnabled = append(walArchiverEnabled, plugin.Name)
 		}
-		if plugin.IsBackupExecutor != nil && *plugin.IsBackupExecutor {
-			backupExecutorEnabled = append(backupExecutorEnabled, plugin.Name)
-		}
 	}
 
 	var errorList field.ErrorList
-	if isBackupEnabled {
+	if isBarmanObjectStoreConfigured {
 		if len(walArchiverEnabled) > 0 {
 			errorList = append(errorList, field.Invalid(
 				field.NewPath("spec", "plugins"),
 				walArchiverEnabled,
-				"Cannot enable a WAL archiver plugin when backup is enabled"))
-		}
-		if len(backupExecutorEnabled) > 0 {
-			errorList = append(errorList, field.Invalid(
-				field.NewPath("spec", "plugins"),
-				backupExecutorEnabled,
-				"Cannot enable a backup executor plugin when backup is enabled"))
+				"Cannot enable a WAL archiver plugin when barmanObjectStore is configured"))
 		}
 	}
 
@@ -2425,27 +2416,6 @@ func (v *ClusterCustomValidator) validatePluginConfiguration(r *apiv1.Cluster) f
 			field.NewPath("spec", "plugins"),
 			walArchiverEnabled,
 			"Cannot enable more than one WAL archiver plugin"))
-	}
-
-	if len(backupExecutorEnabled) > 1 {
-		errorList = append(errorList, field.Invalid(
-			field.NewPath("spec", "plugins"),
-			backupExecutorEnabled,
-			"Cannot enable more than one backup executor plugin"))
-	}
-
-	if len(walArchiverEnabled) > 0 && len(backupExecutorEnabled) == 0 {
-		errorList = append(errorList, field.Invalid(
-			field.NewPath("spec", "plugins"),
-			walArchiverEnabled,
-			"Cannot enable a WAL archiver plugin without a backup executor plugin"))
-	}
-
-	if len(backupExecutorEnabled) > 0 && len(walArchiverEnabled) == 0 {
-		errorList = append(errorList, field.Invalid(
-			field.NewPath("spec", "plugins"),
-			backupExecutorEnabled,
-			"Cannot enable a backup executor plugin without a WAL archiver plugin"))
 	}
 
 	return errorList

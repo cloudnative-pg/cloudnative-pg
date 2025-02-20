@@ -27,7 +27,6 @@ Azurite
 BDR
 BackupCapabilities
 BackupConfiguration
-BackupExecutor
 BackupFrom
 BackupLabelFile
 BackupList
@@ -877,7 +876,6 @@ io
 ip
 ipcs
 ips
-isBackupExecutor
 isPrimary
 isTemplate
 isWALArchiver
