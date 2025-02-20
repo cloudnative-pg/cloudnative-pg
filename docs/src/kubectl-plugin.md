@@ -529,8 +529,8 @@ Archive:  reportRedacted.zip
   inflating: report_operator_<TIMESTAMP>/manifests/validating-webhook-configuration.yaml
   inflating: report_operator_<TIMESTAMP>/manifests/mutating-webhook-configuration.yaml
   inflating: report_operator_<TIMESTAMP>/manifests/webhook-service.yaml
-  inflating: report_operator_<TIMESTAMP>/manifests/cnpg-ca-secret.yaml
-  inflating: report_operator_<TIMESTAMP>/manifests/cnpg-webhook-cert.yaml
+  inflating: report_operator_<TIMESTAMP>/manifests/cnpg-ca-secret(secret).yaml
+  inflating: report_operator_<TIMESTAMP>/manifests/cnpg-webhook-cert(secret).yaml
 ```
 
 If you activated the `--logs` option, you'd see an extra subdirectory:
@@ -566,7 +566,7 @@ You can verify that the confidential information is REDACTED by default:
 
 ```sh
 cd report_operator_<TIMESTAMP>/manifests/
-head cnpg-ca-secret.yaml
+head cnpg-ca-secret\(secret\).yaml
 ```
 
 ```yaml
@@ -596,7 +596,7 @@ Successfully written report to "reportNonRedacted.zip" (format: "yaml")
 
 ```sh
 unzip reportNonRedacted.zip
-head cnpg-ca-secret.yaml
+head cnpg-ca-secret\(secret\).yaml
 ```
 
 ```yaml
