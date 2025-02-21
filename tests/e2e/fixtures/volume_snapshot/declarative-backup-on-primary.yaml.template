@@ -7,3 +7,4 @@ spec:
   target: primary
   cluster:
     name: cluster-declarative-backup
+  waitForArchive: false
