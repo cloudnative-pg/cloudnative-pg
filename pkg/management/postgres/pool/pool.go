@@ -38,6 +38,11 @@ type Pooler interface {
 	ShutdownConnections()
 }
 
+type connectionKey struct {
+	name       string
+	background bool
+}
+
 // ConnectionPool is a repository of DB connections, pointing to the same instance
 // given a base DSN without the "dbname" parameter
 type ConnectionPool struct {
@@ -48,7 +53,7 @@ type ConnectionPool struct {
 	connectionProfile ConnectionProfile
 
 	// A map of connection for every used database
-	connectionMap map[string]*sql.DB
+	connectionMap map[connectionKey]*sql.DB
 }
 
 // NewPostgresqlConnectionPool creates a new connectionMap of connections given
@@ -68,14 +73,16 @@ func NewPgbouncerConnectionPool(baseConnectionString string) *ConnectionPool {
 func newConnectionPool(baseConnectionString string, connectionProfile ConnectionProfile) *ConnectionPool {
 	return &ConnectionPool{
 		baseConnectionString: baseConnectionString,
-		connectionMap:        make(map[string]*sql.DB),
+		connectionMap:        make(map[connectionKey]*sql.DB),
 		connectionProfile:    connectionProfile,
 	}
 }
 
 // Connection gets the connection for the given database
 func (pool *ConnectionPool) Connection(dbname string) (*sql.DB, error) {
-	if result, ok := pool.connectionMap[dbname]; ok {
+	key := connectionKey{name: dbname}
+
+	if result, ok := pool.connectionMap[key]; ok {
 		return result, nil
 	}
 
@@ -84,7 +91,29 @@ func (pool *ConnectionPool) Connection(dbname string) (*sql.DB, error) {
 		return nil, err
 	}
 
-	pool.connectionMap[dbname] = connection
+	pool.connectionMap[key] = connection
+
+	return connection, nil
+}
+
+// BackgroundConnection gets the connection for the given database
+func (pool *ConnectionPool) BackgroundConnection(dbname string) (*sql.DB, error) {
+	key := connectionKey{
+		name:       dbname,
+		background: true,
+	}
+
+	if result, ok := pool.connectionMap[key]; ok {
+		return result, nil
+	}
+
+	connection, err := pool.newConnection(dbname)
+	if err != nil {
+		return nil, err
+	}
+
+	pool.connectionMap[key] = connection
+
 	return connection, nil
 }
 
@@ -94,7 +123,7 @@ func (pool *ConnectionPool) ShutdownConnections() {
 		_ = db.Close()
 	}
 
-	pool.connectionMap = make(map[string]*sql.DB)
+	pool.connectionMap = make(map[connectionKey]*sql.DB)
 }
 
 // newConnection creates a database connection connectionMap, connecting via

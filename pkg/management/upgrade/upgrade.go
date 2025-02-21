@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
 	"syscall"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
@@ -69,11 +70,6 @@ func FromReader(
 				"name", updatedInstanceManager.Name(), "err", err)
 		}
 	}()
-	// Gather the status of the instance
-	instanceStatus, err := instance.GetStatus()
-	if err != nil {
-		return fmt.Errorf("while retrieving instance's status: %w", err)
-	}
 
 	// Read the new instance manager version
 	newHash, err := downloadAndCloseInstanceManagerBinary(updatedInstanceManager, r)
@@ -84,7 +80,7 @@ func FromReader(
 	// Validate the hash of this instance manager
 	if err := validateInstanceManagerHash(typedClient,
 		instance.GetClusterName(), instance.GetNamespaceName(),
-		instanceStatus.InstanceArch, newHash); err != nil {
+		runtime.GOARCH, newHash); err != nil {
 		return fmt.Errorf("while validating instance manager binary: %w", err)
 	}
 
