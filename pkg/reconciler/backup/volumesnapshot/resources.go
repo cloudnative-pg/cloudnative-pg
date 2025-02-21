@@ -71,9 +71,6 @@ func (err volumeSnapshotError) Error() string {
 // IsRetryable returns true if the external snapshotter controller
 // will retry taking the snapshot
 func (err volumeSnapshotError) isRetryable() bool {
-	retryableStatusCodes := []int{408, 429, 500, 502, 503, 504}
-	httpStatusCodeRegex := regexp.MustCompile(`HTTPStatusCode:\s(\d{3})`)
-
 	if err.InternalError.Message == nil {
 		return false
 	}
@@ -85,6 +82,14 @@ func (err volumeSnapshotError) isRetryable() bool {
 		return true
 	}
 
+	isRetryableFuncs := []func(string) bool{isRetryableHTTPError}
+
+	for _, isRetryableFunc := range isRetryableFuncs {
+		if isRetryableFunc(msg) {
+			return true
+		}
+	}
+
 	// Obviously this is a heuristic, but unfortunately we don't have
 	// the information we need.
 	// We're trying to handle the cases where the external-snapshotter
@@ -92,20 +97,30 @@ func (err volumeSnapshotError) isRetryable() bool {
 	//
 	// > the object has been modified; please apply your changes to the
 	// > latest version and try again
-	//
-	// Additionally, we'll retry on the following status codes:
-	// - 408: Request Timeout
-	// - 429: Too Many Requests
-	// - 500: Internal Server Error
-	// - 502: Bad Gateway
-	// - 503: Service Unavailable
-	// - 504: Gateway Timeout
 
 	// TODO: instead of blindingly retry on matching errors, we
 	// should enhance our CRD with a configurable deadline. After
 	// the deadline have been met on err.InternalError.CreatedAt
 	// the backup can be marked as failed
 
+	return strings.Contains(
+		*err.InternalError.Message,
+		"the object has been modified")
+}
+
+var (
+	retryableStatusCodes = []int{408, 429, 500, 502, 503, 504}
+	httpStatusCodeRegex  = regexp.MustCompile(`HTTPStatusCode:\s(\d{3})`)
+)
+
+// isRetryableHTTPError, will return a retry on the following status codes:
+// - 408: Request Timeout
+// - 429: Too Many Requests
+// - 500: Internal Server Error
+// - 502: Bad Gateway
+// - 503: Service Unavailable
+// - 504: Gateway Timeout
+func isRetryableHTTPError(msg string) bool {
 	if matches := httpStatusCodeRegex.FindStringSubmatch(msg); len(matches) == 2 {
 		if code, err := strconv.Atoi(matches[1]); err == nil {
 			for _, retryableCode := range retryableStatusCodes {
@@ -116,9 +131,7 @@ func (err volumeSnapshotError) isRetryable() bool {
 		}
 	}
 
-	return strings.Contains(
-		*err.InternalError.Message,
-		"the object has been modified")
+	return false
 }
 
 // slice represents a slice of []storagesnapshotv1.VolumeSnapshot
