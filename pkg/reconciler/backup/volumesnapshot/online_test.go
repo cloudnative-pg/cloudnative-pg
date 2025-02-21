@@ -57,7 +57,9 @@ func (f *fakeBackupClient) Start(
 	_ webserver.StartBackupRequest,
 ) (*webserver.Response[webserver.BackupResultData], error) {
 	f.startCalled = true
-	return &webserver.Response[webserver.BackupResultData]{}, f.injectStartError
+	return &webserver.Response[webserver.BackupResultData]{
+		Data: &webserver.BackupResultData{},
+	}, f.injectStartError
 }
 
 func (f *fakeBackupClient) Stop(
@@ -66,7 +68,9 @@ func (f *fakeBackupClient) Stop(
 	_ webserver.StopBackupRequest,
 ) (*webserver.Response[webserver.BackupResultData], error) {
 	f.stopCalled = true
-	return &webserver.Response[webserver.BackupResultData]{}, f.injectStopError
+	return &webserver.Response[webserver.BackupResultData]{
+		Data: &webserver.BackupResultData{},
+	}, f.injectStopError
 }
 
 var _ = Describe("onlineExecutor prepare", func() {
