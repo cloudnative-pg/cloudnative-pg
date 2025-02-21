@@ -186,7 +186,7 @@ This command ensures that all necessary resources associated with the
 instance are properly removed before the operator provisions a new
 instance on a healthy node.
 
-After destroying the instance, verify that the CloudNativePG operator
+After destroying the instance, verify that the operator
 properly registers the instance removal and provisions a new
 replacement instance on a healthy node. Use the following command to
 monitor the instance creation process:
@@ -205,7 +205,7 @@ Volume Claims (PVCs) and the Pod associated with the instance using
 kubectl delete pvc,pod -n <namespace> -l cnpg.io/instanceName=<instance-name> --force --grace-period=0
 ```
 
-After destroying the instance, verify that the CloudNativePG operator
+After destroying the instance, verify that the operator
 properly registers the instance removal and provisions a new
 replacement instance on a healthy node. Use the following command to
 monitor the instance creation process:
