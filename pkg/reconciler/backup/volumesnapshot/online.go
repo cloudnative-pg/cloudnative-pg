@@ -43,20 +43,20 @@ func (o *onlineExecutor) finalize(
 	backup *apiv1.Backup,
 	targetPod *corev1.Pod,
 ) (*ctrl.Result, error) {
-	body, err := o.backupClient.StatusWithErrors(ctx, targetPod)
+	statusBody, err := o.backupClient.StatusWithErrors(ctx, targetPod)
 	if err != nil {
 		return nil, fmt.Errorf("while getting status while finalizing: %w", err)
 	}
 
-	if webserver.IsRetryableError(body.Error) {
+	if webserver.IsRetryableError(statusBody.Error) {
 		return &ctrl.Result{RequeueAfter: time.Second * 5}, nil
 	}
 
-	if err := body.EnsureDataIsPresent(); err != nil {
+	if err := statusBody.EnsureDataIsPresent(); err != nil {
 		return nil, err
 	}
 
-	status := body.Data
+	status := statusBody.Data
 	if status.BackupName != backup.Name {
 		return nil, fmt.Errorf("trying to stop backup with name: %s, while reconciling backup with name: %s",
 			status.BackupName,
@@ -85,7 +85,7 @@ func (o *onlineExecutor) finalize(
 			return &ctrl.Result{RequeueAfter: time.Second * 5}, nil
 		}
 
-		if err := body.EnsureDataIsPresent(); err != nil {
+		if err := res.EnsureDataIsPresent(); err != nil {
 			return nil, err
 		}
 
@@ -109,20 +109,20 @@ func (o *onlineExecutor) prepare(
 	volumeSnapshotConfig := backup.GetVolumeSnapshotConfiguration(*cluster.Spec.Backup.VolumeSnapshot)
 
 	// Handle hot snapshots
-	body, err := o.backupClient.StatusWithErrors(ctx, targetPod)
+	statusBody, err := o.backupClient.StatusWithErrors(ctx, targetPod)
 	if err != nil {
 		return nil, fmt.Errorf("while getting status while preparing: %w", err)
 	}
 
-	if webserver.IsRetryableError(body.Error) {
+	if webserver.IsRetryableError(statusBody.Error) {
 		return &ctrl.Result{RequeueAfter: time.Second * 5}, nil
 	}
 
-	if err := body.EnsureDataIsPresent(); err != nil {
+	if err := statusBody.EnsureDataIsPresent(); err != nil {
 		return nil, err
 	}
 
-	status := body.Data
+	status := statusBody.Data
 	// if the backupName doesn't match it means we have an old stuck pending backup that we have to force out.
 	if backup.Name != status.BackupName || status.Phase == "" {
 		req := webserver.StartBackupRequest{
@@ -139,7 +139,7 @@ func (o *onlineExecutor) prepare(
 			return &ctrl.Result{RequeueAfter: time.Second * 5}, nil
 		}
 
-		if err := body.EnsureDataIsPresent(); err != nil {
+		if err := res.EnsureDataIsPresent(); err != nil {
 			return nil, err
 		}
 
