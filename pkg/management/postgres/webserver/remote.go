@@ -48,7 +48,6 @@ type StartBackupRequest struct {
 	ImmediateCheckpoint bool   `json:"immediateCheckpoint"`
 	WaitForArchive      bool   `json:"waitForArchive"`
 	BackupName          string `json:"backupName"`
-	Force               bool   `json:"force,omitempty"`
 }
 
 // StopBackupRequest the required data to execute the pg_stop_backup
@@ -331,10 +330,6 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 			}
 		}()
 		if ws.currentBackup != nil {
-			if !p.Force {
-				sendUnprocessableEntityJSONResponse(w, "PROCESS_ALREADY_RUNNING", "")
-				return
-			}
 			log.Info("trying to close the current backup connection",
 				"backupName", ws.currentBackup.data.BackupName,
 			)

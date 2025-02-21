@@ -112,7 +112,6 @@ func (o *onlineExecutor) prepare(
 			ImmediateCheckpoint: volumeSnapshotConfig.OnlineConfiguration.GetImmediateCheckpoint(),
 			WaitForArchive:      volumeSnapshotConfig.OnlineConfiguration.GetWaitForArchive(),
 			BackupName:          backup.Name,
-			Force:               true,
 		}
 		if err := o.backupClient.Start(ctx, targetPod.Status.PodIP, req); err != nil {
 			return nil, fmt.Errorf("while trying to start the backup: %w", err)
