@@ -67,7 +67,18 @@ const (
 	poolerClusterKey              = ".spec.cluster.name"
 	disableDefaultQueriesSpecPath = ".spec.monitoring.disableDefaultQueries"
 	imageCatalogKey               = ".spec.imageCatalog.name"
+	clusterAutoscalerTaint        = "ToBeDeletedByClusterAutoscaler"
+	v1KarpenterTaint              = "karpenter.sh/disrupted"
+	v1beta1KarpenterTaint         = "karpenter.sh/disruption"
 )
+
+// drainTaints includes taints used by K8s or autoscalers that signify node draining or pod eviction.
+var drainTaints = map[string]struct{}{
+	corev1.TaintNodeUnschedulable: {}, // Kubernetes common eviction taint (kubectl drain)
+	clusterAutoscalerTaint:        {},
+	v1KarpenterTaint:              {},
+	v1beta1KarpenterTaint:         {},
+}
 
 var apiSGVString = apiv1.SchemeGroupVersion.String()
 
@@ -1351,9 +1362,9 @@ func filterClustersUsingConfigMap(
 func (r *ClusterReconciler) mapNodeToClusters() handler.MapFunc {
 	return func(ctx context.Context, obj client.Object) []reconcile.Request {
 		node := obj.(*corev1.Node)
-		// exit if the node is schedulable (e.g. not cordoned)
+		// exit if the node does not have any well known drain taints (e.g. not cordoned)
 		// could be expanded here with other conditions (e.g. pressure or issues)
-		if !node.Spec.Unschedulable {
+		if !hasDrainTaints(node) {
 			return nil
 		}
 		var childPods corev1.PodList

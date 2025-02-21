@@ -74,7 +74,7 @@ var (
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			oldNode, oldOk := e.ObjectOld.(*corev1.Node)
 			newNode, newOk := e.ObjectNew.(*corev1.Node)
-			return oldOk && newOk && oldNode.Spec.Unschedulable != newNode.Spec.Unschedulable
+			return oldOk && newOk && hasDrainTaints(oldNode) != hasDrainTaints(newNode)
 		},
 		CreateFunc: func(_ event.CreateEvent) bool {
 			return false
@@ -99,4 +99,13 @@ func isOwnedByClusterOrSatisfiesPredicate(
 func hasReloadLabelSet(obj client.Object) bool {
 	_, hasLabel := obj.GetLabels()[utils.WatchedLabelName]
 	return hasLabel
+}
+
+func hasDrainTaints(node *corev1.Node) bool {
+	for _, taint := range node.Spec.Taints {
+		if _, ok := drainTaints[taint.Key]; ok {
+			return true
+		}
+	}
+	return false
 }

@@ -173,7 +173,7 @@ func (r *ClusterReconciler) isNodeUnschedulable(ctx context.Context, nodeName st
 	if err != nil {
 		return false, err
 	}
-	return node.Spec.Unschedulable, nil
+	return hasDrainTaints(&node), nil
 }
 
 // Pick the next primary on a schedulable node, if the current is running on an unschedulable one,
