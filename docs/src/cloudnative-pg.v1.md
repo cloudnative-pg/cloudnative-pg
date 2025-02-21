@@ -3712,6 +3712,14 @@ cluster to be reconciled</p>
    <p>Enabled is true if this plugin will be used</p>
 </td>
 </tr>
+<tr><td><code>isWALArchiver</code><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>Only one plugin can be declared as WALArchiver.
+Cannot be active if &quot;.spec.backup.barmanObjectStore&quot; configuration is present.</p>
+</td>
+</tr>
 <tr><td><code>parameters</code><br/>
 <i>map[string]string</i>
 </td>

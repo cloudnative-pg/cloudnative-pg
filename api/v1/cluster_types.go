@@ -2174,6 +2174,12 @@ type PluginConfiguration struct {
 	// +optional
 	Enabled *bool `json:"enabled,omitempty"`
 
+	// Only one plugin can be declared as WALArchiver.
+	// Cannot be active if ".spec.backup.barmanObjectStore" configuration is present.
+	// +kubebuilder:default:=false
+	// +optional
+	IsWALArchiver *bool `json:"isWALArchiver,omitempty"`
+
 	// Parameters is the configuration of the plugin
 	// +optional
 	Parameters map[string]string `json:"parameters,omitempty"`

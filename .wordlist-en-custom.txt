@@ -492,6 +492,7 @@ VolumeSnapshotConfiguration
 VolumeSnapshots
 WAL
 WAL's
+WALArchiver
 WALBackupConfiguration
 WALCapabilities
 WALs
@@ -877,6 +878,7 @@ ipcs
 ips
 isPrimary
 isTemplate
+isWALArchiver
 issuecomment
 italy
 jdbc

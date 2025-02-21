@@ -211,6 +211,7 @@ func (v *ClusterCustomValidator) validate(r *apiv1.Cluster) (allErrs field.Error
 		v.validateHibernationAnnotation,
 		v.validatePodPatchAnnotation,
 		v.validatePromotionToken,
+		v.validatePluginConfiguration,
 	}
 
 	for _, validate := range validations {
@@ -2382,4 +2383,40 @@ func (v *ClusterCustomValidator) validatePodPatchAnnotation(r *apiv1.Cluster) fi
 	}
 
 	return nil
+}
+
+func (v *ClusterCustomValidator) validatePluginConfiguration(r *apiv1.Cluster) field.ErrorList {
+	if len(r.Spec.Plugins) == 0 {
+		return nil
+	}
+	isBarmanObjectStoreConfigured := r.Spec.Backup != nil && r.Spec.Backup.BarmanObjectStore != nil
+	var walArchiverEnabled []string
+
+	for _, plugin := range r.Spec.Plugins {
+		if !plugin.IsEnabled() {
+			continue
+		}
+		if plugin.IsWALArchiver != nil && *plugin.IsWALArchiver {
+			walArchiverEnabled = append(walArchiverEnabled, plugin.Name)
+		}
+	}
+
+	var errorList field.ErrorList
+	if isBarmanObjectStoreConfigured {
+		if len(walArchiverEnabled) > 0 {
+			errorList = append(errorList, field.Invalid(
+				field.NewPath("spec", "plugins"),
+				walArchiverEnabled,
+				"Cannot enable a WAL archiver plugin when barmanObjectStore is configured"))
+		}
+	}
+
+	if len(walArchiverEnabled) > 1 {
+		errorList = append(errorList, field.Invalid(
+			field.NewPath("spec", "plugins"),
+			walArchiverEnabled,
+			"Cannot enable more than one WAL archiver plugin"))
+	}
+
+	return errorList
 }
