@@ -134,19 +134,86 @@ is at least another pod that is not ready.
 
 Self-healing will happen as soon as the *apiserver* is notified.
 
-### Worker node failure
+### Worker Node Failure
 
-Since the node is failed, the *kubelet* won't execute the liveness and
-the readiness probes. The pod will be marked for deletion after the
-toleration seconds configured by the Kubernetes cluster administrator for
-that specific failure cause. Based on how the Kubernetes cluster is configured,
-the pod might be removed from the service earlier.
+When a worker node fails, the *kubelet* stops executing the liveness
+and readiness probes. The affected pod will be marked for deletion
+after the *tolerationSeconds* period configured by the Kubernetes
+cluster administrator for that specific failure cause. Depending on
+the cluster configuration, the pod might be removed from the service
+earlier.
 
-A new pod will be created on a different worker node from a physical backup
-of the *primary*. The default value for that parameter in a Kubernetes
-cluster is 5 minutes.
+When an unplanned worker node failure occurs, the priority should be
+to assess whether recovery is feasible or if the node should be
+replaced. In most cases, especially if the data volumes are not
+located on the node, replacing the node is the preferred
+approach. Before proceeding with any action, ensure that the
+underlying hardware—whether physical or virtual—is completely powered
+off to avoid data corruption or split-brain scenarios. Once confirmed,
+delete the node from the cluster and provision a new one.
 
-Self-healing will happen after `tolerationSeconds`.
+!!! Note
+    If you want to force the deletion of the failing pod without
+    deleting the node, you can use the following command:
+
+    `kubectl delete pod <pod-name> --force --grace-period=0 -n <namespace>`
+
+    However, this simply makes Kubernetes forget about the pod, so you
+    must be certain that the underlying container is not running anymore.
+
+If the storage class used by the instance volumes is not node-bound,
+simply re-provisioning the node should be sufficient. However, if the
+storage is node-bound (e.g., using local persistent volumes),
+additional steps are required to allow the operator to create a new
+instance on the newly provisioned hardware.
+
+For example, if a PostgreSQL instance was running on a failed node
+using a local persistent volume, administrators must remove all
+associated Persistent Volume Claims (PVCs) and the Pod to ensure the
+operator can properly initialize a new instance on another available
+node. Alternatively, the plugin's `destroy` command can simplify this
+process.
+
+### Using the Plugin to Destroy an Instance
+
+The `kubectl-cnpg` plugin provides a convenient way to safely destroy
+an instance. Run the following command:
+
+```sh
+kubectl cnpg destroy -n <namespace> <cluster-name> <instance-name>
+```
+
+This command ensures that all necessary resources associated with the
+instance are properly removed before the operator provisions a new
+instance on a healthy node.
+
+After destroying the instance, verify that the PostgreSQL operator
+properly registers the instance removal and provisions a new
+replacement instance on a healthy node. Use the following command to
+monitor the instance creation process:
+
+```sh
+kubectl cnpg status -n <namespace> <cluster-name>
+```
+
+### Manually Destroying an Instance
+
+If the plugin is not available, you can manually remove the Persistent
+Volume Claims (PVCs) and the Pod associated with the instance using
+`kubectl`:
+
+```sh
+kubectl delete pvc,pod -n <namespace> -l cnpg.io/instanceName=<instance-name> --force --grace-period=0
+```
+
+After destroying the instance, verify that the PostgreSQL operator
+properly registers the instance removal and provisions a new
+replacement instance on a healthy node. Use the following command to
+monitor the instance creation process:
+
+```sh
+kubectl get pods -n <namespace> -l cnpg.io/cluster=<cluster-name>
+```
 
 ## Self-healing
 
