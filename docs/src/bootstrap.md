@@ -23,7 +23,7 @@ For more detailed information about this feature, please refer to the
 
 !!! Warning
     CloudNativePG requires both the `postgres` user and database to
-    always exists. Using the local Unix Domain Socket, it needs to connect
+    always exist. Using the local Unix Domain Socket, it needs to connect
     as the `postgres` user to the `postgres` database via `peer` authentication in
     order to perform administrative tasks on the cluster.
     **DO NOT DELETE** the `postgres` user or the `postgres` database!!!
