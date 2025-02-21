@@ -368,7 +368,7 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 			}
 		}()
 		if ws.currentBackup != nil {
-			log.Info("trying to close the current backup connection",
+			log.Debug("trying to close the current backup connection",
 				"backupName", ws.currentBackup.data.BackupName,
 			)
 			if err := ws.currentBackup.conn.Close(); err != nil {
