@@ -52,7 +52,7 @@ func (o *onlineExecutor) finalize(
 		return &ctrl.Result{RequeueAfter: time.Second * 5}, nil
 	}
 
-	if err := statusBody.EnsureDataIsPresent(); err != nil {
+	if err := statusBody.GetError(); err != nil {
 		return nil, err
 	}
 
@@ -85,7 +85,7 @@ func (o *onlineExecutor) finalize(
 			return &ctrl.Result{RequeueAfter: time.Second * 5}, nil
 		}
 
-		if err := res.EnsureDataIsPresent(); err != nil {
+		if err := res.GetError(); err != nil {
 			return nil, err
 		}
 
@@ -118,13 +118,9 @@ func (o *onlineExecutor) prepare(
 		return &ctrl.Result{RequeueAfter: time.Second * 5}, nil
 	}
 
-	if err := statusBody.EnsureDataIsPresent(); err != nil {
-		return nil, err
-	}
-
 	status := statusBody.Data
 	// if the backupName doesn't match it means we have an old stuck pending backup that we have to force out.
-	if backup.Name != status.BackupName || status.Phase == "" {
+	if status != nil && (backup.Name != status.BackupName || status.Phase == "") {
 		req := webserver.StartBackupRequest{
 			ImmediateCheckpoint: volumeSnapshotConfig.OnlineConfiguration.GetImmediateCheckpoint(),
 			WaitForArchive:      volumeSnapshotConfig.OnlineConfiguration.GetWaitForArchive(),
@@ -139,11 +135,15 @@ func (o *onlineExecutor) prepare(
 			return &ctrl.Result{RequeueAfter: time.Second * 5}, nil
 		}
 
-		if err := res.EnsureDataIsPresent(); err != nil {
+		if err := res.GetError(); err != nil {
 			return nil, err
 		}
 
 		return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+	}
+
+	if err := statusBody.GetError(); err != nil {
+		return nil, err
 	}
 
 	switch status.Phase {

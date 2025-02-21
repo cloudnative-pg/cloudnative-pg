@@ -33,6 +33,7 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/execlog"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	"go.uber.org/multierr"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -140,6 +141,7 @@ func (ws *remoteWebserverEndpoints) cleanupStaleCollections(ctx context.Context)
 		log.Warning("Closing stale PostgreSQL backup connection")
 
 		if err := bc.conn.Close(); err != nil {
+			bc.err = multierr.Append(bc.err, err)
 			log.Error(err, "Error while closing stale PostgreSQL backup connection")
 		}
 		bc.data.Phase = Completed
