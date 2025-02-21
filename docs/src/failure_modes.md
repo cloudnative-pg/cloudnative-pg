@@ -140,11 +140,10 @@ When a worker node fails, the *kubelet* stops executing the liveness
 and readiness probes. The affected pod will be marked for deletion
 after the *tolerationSeconds* period configured by the Kubernetes
 cluster administrator for that specific failure cause. Depending on
-the cluster configuration, the pod might be removed from the service
-earlier.
+the cluster configuration, the pod might be removed earlier.
 
-When an unplanned worker node failure occurs, the priority should be
-to assess whether recovery is feasible or if the node should be
+When a worker node fails unexpectedly, the priority should be
+to assess whether recovery is feasible, or if the node should be
 replaced. In most cases, especially if the data volumes are not
 located on the node, replacing the node is the preferred
 approach. Before proceeding with any action, ensure that the
@@ -158,7 +157,7 @@ delete the node from the cluster and provision a new one.
 
     `kubectl delete pod <pod-name> --force --grace-period=0 -n <namespace>`
 
-    However, this simply makes Kubernetes forget about the pod, so you
+    Note that this simply makes Kubernetes stop tracking the pod, so you
     must be certain that the underlying container is not running anymore.
 
 If the storage class used by the instance volumes is not node-bound,
@@ -167,17 +166,17 @@ storage is node-bound (e.g., using local persistent volumes),
 additional steps are required to allow the operator to create a new
 instance on the newly provisioned hardware.
 
-For example, if a PostgreSQL instance was running on a failed node
-using a local persistent volume, administrators must remove all
-associated Persistent Volume Claims (PVCs) and the Pod to ensure the
+For example, if a PostgreSQL instance using a local persistent volume
+was running on a failed node, administrators must remove the Pod
+and all associated Persistent Volume Claims (PVCs), to ensure the
 operator can properly initialize a new instance on another available
-node. Alternatively, the plugin's `destroy` command can simplify this
-process.
+node. Alternatively, the [kubectl plugin's destroy](kubectl-plugin.md#destroy)
+command can simplify this process.
 
 ### Using the Plugin to Destroy an Instance
 
-The `kubectl-cnpg` plugin provides a convenient way to safely destroy
-an instance. Run the following command:
+The [`kubectl-cnpg`](kubectl-plugin.md) plugin provides a convenient way to
+safely destroy an instance. Run the following command:
 
 ```sh
 kubectl cnpg destroy -n <namespace> <cluster-name> <instance-name>
@@ -187,7 +186,7 @@ This command ensures that all necessary resources associated with the
 instance are properly removed before the operator provisions a new
 instance on a healthy node.
 
-After destroying the instance, verify that the PostgreSQL operator
+After destroying the instance, verify that the CloudNativePG operator
 properly registers the instance removal and provisions a new
 replacement instance on a healthy node. Use the following command to
 monitor the instance creation process:
@@ -206,7 +205,7 @@ Volume Claims (PVCs) and the Pod associated with the instance using
 kubectl delete pvc,pod -n <namespace> -l cnpg.io/instanceName=<instance-name> --force --grace-period=0
 ```
 
-After destroying the instance, verify that the PostgreSQL operator
+After destroying the instance, verify that the CloudNativePG operator
 properly registers the instance removal and provisions a new
 replacement instance on a healthy node. Use the following command to
 monitor the instance creation process:
