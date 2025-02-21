@@ -249,7 +249,7 @@ You can check the status of the `<CLUSTER>` cluster in the `NAMESPACE`
 namespace with:
 
 ```shell
-kubectl get cluster -n <NAMESPACE> <CLUSTER>
+kubectl get cluster.postgresql.cnpg.io -n <NAMESPACE> <CLUSTER>
 ```
 
 Output:
@@ -266,7 +266,7 @@ In case of unhealthy conditions, you can discover more by getting the manifest
 of the `Cluster` resource:
 
 ```shell
-kubectl get cluster -o yaml -n <NAMESPACE> <CLUSTER>
+kubectl get cluster.postgresql.cnpg.io -o yaml -n <NAMESPACE> <CLUSTER>
 ```
 
 Another important command to gather is the `status` one, as provided by the
@@ -440,7 +440,7 @@ info | 1636383566.0664876 | postgres | record
 You can list the backups that have been created for a named cluster with:
 
 ```shell
-kubectl get backup -l cnpg.io/cluster=<CLUSTER>
+kubectl get backups.postgresql.cnpg.io -l cnpg.io/cluster=<CLUSTER>
 ```
 
 ## Storage information
@@ -519,7 +519,7 @@ $ kubectl wait --for=condition=Ready cluster/<CLUSTER-NAME> -n <NAMESPACE>
 Below is a snippet of a `cluster.status` that contains a failing condition.
 
 ```bash
-$ kubectl get cluster/<cluster-name> -o yaml
+$ kubectl get cluster.postgresql.cnpg.io/<cluster-name> -o yaml
 .
 .
 .

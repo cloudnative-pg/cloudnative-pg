@@ -91,7 +91,7 @@ will create a deployment, and add two services on ports 6060 and 4040
 respectively, in the same namespace as the operator:
 
 ``` console
-kubectl get svc -n cnpg-system        
+kubectl get service -n cnpg-system        
 
 NAME                   TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)    AGE
 cnpg-pprof             ClusterIP   10.96.17.58    <none>        6060/TCP   9m41s
