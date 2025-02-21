@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package local
+package remote
 
 import (
 	"bytes"
@@ -26,7 +26,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/client/remote"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
 )
 
@@ -48,7 +47,7 @@ func (c *backupClientImpl) StatusWithErrors(
 	ctx context.Context,
 	pod *corev1.Pod,
 ) (*webserver.Response[webserver.BackupResultData], error) {
-	scheme := remote.GetStatusSchemeFromPod(pod)
+	scheme := GetStatusSchemeFromPod(pod)
 	httpURL := url.Build(scheme.ToString(), pod.Status.PodIP, url.PathPgModeBackup, url.StatusPort)
 	req, err := http.NewRequestWithContext(ctx, "GET", httpURL, nil)
 	if err != nil {
@@ -60,7 +59,7 @@ func (c *backupClientImpl) StatusWithErrors(
 
 // Start runs the pg_start_backup
 func (c *backupClientImpl) Start(ctx context.Context, pod *corev1.Pod, sbq webserver.StartBackupRequest) error {
-	scheme := remote.GetStatusSchemeFromPod(pod)
+	scheme := GetStatusSchemeFromPod(pod)
 	httpURL := url.Build(scheme.ToString(), pod.Status.PodIP, url.PathPgModeBackup, url.StatusPort)
 
 	// Marshalling the payload to JSON
@@ -81,7 +80,7 @@ func (c *backupClientImpl) Start(ctx context.Context, pod *corev1.Pod, sbq webse
 
 // Stop runs the command pg_stop_backup
 func (c *backupClientImpl) Stop(ctx context.Context, pod *corev1.Pod, sbq webserver.StopBackupRequest) error {
-	scheme := remote.GetStatusSchemeFromPod(pod)
+	scheme := GetStatusSchemeFromPod(pod)
 	httpURL := url.Build(scheme.ToString(), pod.Status.PodIP, url.PathPgModeBackup, url.StatusPort)
 	// Marshalling the payload to JSON
 	jsonBody, err := json.Marshal(sbq)
