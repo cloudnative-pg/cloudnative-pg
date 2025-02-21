@@ -484,6 +484,12 @@ type ClusterSpec struct {
 	// in the PostgreSQL Pods.
 	// +optional
 	Probes *ProbesConfiguration `json:"probes,omitempty"`
+
+	// a list of taints to treat as drain taints.
+	// It is **highly** recommended to include `"node.kubernetes.io/unschedulable"`
+	// +kubebuilder:default:={"node.kubernetes.io/unschedulable", "ToBeDeletedByClusterAutoscaler", "karpenter.sh/disrupted", "karpenter.sh/disruption"}
+	// +optional
+	DrainTaints []string `json:"drainTaints"`
 }
 
 // ProbesConfiguration represent the configuration for the probes

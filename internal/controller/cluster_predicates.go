@@ -28,6 +28,38 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
+// checks if taints are different
+func areTaintsSame(t1 []corev1.Taint, t2 []corev1.Taint) bool {
+	if len(t1) != len(t2) {
+		return false // Different number of taints
+	}
+
+	// Create maps to store taints by key for efficient lookup
+	m1 := make(map[string]corev1.Taint, len(t1))
+	m2 := make(map[string]corev1.Taint, len(t2))
+
+	for _, taint := range t1 {
+		m1[taint.Key] = taint
+	}
+	for _, taint := range t2 {
+		m2[taint.Key] = taint
+	}
+
+	if len(m1) != len(m2) {
+		return false // Different number of unique keys
+	}
+
+	// Check if the keys are the same and the values/effects match
+	for key, taint1 := range m1 {
+		taint2, ok := m2[key]
+		if !ok || taint1.Value != taint2.Value || taint1.Effect != taint2.Effect {
+			return false // Key not found in t2 or values/effects don't match
+		}
+	}
+
+	return true
+}
+
 var (
 	isUsefulConfigMap = func(object client.Object) bool {
 		return isOwnedByClusterOrSatisfiesPredicate(object, func(object client.Object) bool {
@@ -81,9 +113,7 @@ var (
 				return false
 			}
 
-			oldDrained := isNodeBeingDrained(*oldNode)
-			newDrained := isNodeBeingDrained(*newNode)
-			return oldDrained != newDrained
+			return areTaintsSame(oldNode.Spec.Taints, newNode.Spec.Taints)
 		},
 		CreateFunc: func(_ event.CreateEvent) bool {
 			return false
