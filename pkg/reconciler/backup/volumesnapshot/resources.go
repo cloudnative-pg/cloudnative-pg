@@ -71,8 +71,8 @@ func (err volumeSnapshotError) Error() string {
 // IsRetryable returns true if the external snapshotter controller
 // will retry taking the snapshot
 func (err volumeSnapshotError) isRetryable() bool {
-	var retryableStatusCodes = []int{408, 429, 500, 502, 503, 504}
-	var httpStatusCodeRegex = regexp.MustCompile(`HTTPStatusCode:\s(\d{3})`)
+	retryableStatusCodes := []int{408, 429, 500, 502, 503, 504}
+	httpStatusCodeRegex := regexp.MustCompile(`HTTPStatusCode:\s(\d{3})`)
 
 	if err.InternalError.Message == nil {
 		return false
