@@ -50,16 +50,17 @@ type Response[T interface{}] struct {
 	Error *Error `json:"error,omitempty"`
 }
 
-// EnsureDataIsPresent returns an error if the data is field is nil
-func (body Response[T]) EnsureDataIsPresent() error {
-	status := body.Data
-	if status != nil {
-		return nil
-	}
-
+// GetError returns an error if an error response is detected or if the data is
+// field is nil
+func (body Response[T]) GetError() error {
 	if body.Error != nil {
 		return fmt.Errorf("encountered a body error while preparing, code: '%s', message: %s",
 			body.Error.Code, body.Error.Message)
+	}
+
+	status := body.Data
+	if status != nil {
+		return nil
 	}
 
 	return fmt.Errorf("encounteered an empty body while expecting it to not be empty")
