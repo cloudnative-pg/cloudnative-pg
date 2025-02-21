@@ -419,6 +419,17 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 			return
 		}
 
+		if ws.currentBackup.err != nil {
+			if err := ws.currentBackup.conn.Close(); err != nil {
+				if !errors.Is(err, sql.ErrConnDone) {
+					log.Error(err, "Error while closing backup connection (stop)")
+				}
+			}
+
+			sendUnprocessableEntityJSONResponse(w, "BACKUP_FAILED", ws.currentBackup.err.Error())
+			return
+		}
+
 		res := Response[BackupResultData]{
 			Data: &ws.currentBackup.data,
 		}
@@ -434,16 +445,6 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 			return
 		}
 
-		if ws.currentBackup.err != nil {
-			if err := ws.currentBackup.conn.Close(); err != nil {
-				if !errors.Is(err, sql.ErrConnDone) {
-					log.Error(err, "Error while closing backup connection (stop)")
-				}
-			}
-
-			sendJSONResponseWithData(w, 200, res)
-			return
-		}
 		ws.currentBackup.data.Phase = Closing
 
 		go ws.currentBackup.stopBackup(context.Background(), &ws.ongoingRequest)
