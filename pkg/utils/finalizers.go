@@ -28,4 +28,8 @@ const (
 	// SubscriptionFinalizerName is the name of the finalizer
 	// triggering the deletion of the subscription
 	SubscriptionFinalizerName = MetadataNamespace + "/deleteSubscription"
+
+	// RoleFinalizerName is the name of the finalizer
+	// triggering the deletion of the role
+	RoleFinalizerName = MetadataNamespace + "/deleteRole"
 )
