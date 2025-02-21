@@ -56,3 +56,18 @@ func SetPhaseTX(phase string, reason string) func(cluster *apiv1.Cluster) {
 		cluster.Status.PhaseReason = reason
 	}
 }
+
+// SetImage is a transaction that sets the cluster image
+func SetImage(image string) func(cluster *apiv1.Cluster) {
+	return func(cluster *apiv1.Cluster) {
+		cluster.Status.Image = image
+	}
+}
+
+// SetMajorVersionUpgradeFromImage is a transaction that sets the cluster as upgrading to a newer major version
+// starting from the provided image
+func SetMajorVersionUpgradeFromImage(image *string) func(cluster *apiv1.Cluster) {
+	return func(cluster *apiv1.Cluster) {
+		cluster.Status.MajorVersionUpgradeFromImage = image
+	}
+}

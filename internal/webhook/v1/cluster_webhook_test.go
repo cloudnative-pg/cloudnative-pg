@@ -1242,7 +1242,7 @@ var _ = Describe("validate image name change", func() {
 		})
 	})
 	Context("using image catalog", func() {
-		It("complains on major upgrades", func() {
+		It("complains on major downgrades", func() {
 			clusterOld := &apiv1.Cluster{
 				Spec: apiv1.ClusterSpec{
 					ImageCatalogRef: &apiv1.ImageCatalogRef{
@@ -1250,7 +1250,7 @@ var _ = Describe("validate image name change", func() {
 							Name: "test",
 							Kind: "ImageCatalog",
 						},
-						Major: 15,
+						Major: 16,
 					},
 				},
 			}
@@ -1261,7 +1261,7 @@ var _ = Describe("validate image name change", func() {
 							Name: "test",
 							Kind: "ImageCatalog",
 						},
-						Major: 16,
+						Major: 15,
 					},
 				},
 			}
@@ -1288,10 +1288,10 @@ var _ = Describe("validate image name change", func() {
 			}
 			Expect(v.validateImageChange(clusterNew, clusterOld)).To(BeEmpty())
 		})
-		It("complains on major upgrades", func() {
+		It("complains on major downgrades", func() {
 			clusterOld := &apiv1.Cluster{
 				Spec: apiv1.ClusterSpec{
-					ImageName: "postgres:16.1",
+					ImageName: "postgres:17.1",
 				},
 			}
 			clusterNew := &apiv1.Cluster{
@@ -1301,7 +1301,7 @@ var _ = Describe("validate image name change", func() {
 							Name: "test",
 							Kind: "ImageCatalog",
 						},
-						Major: 17,
+						Major: 16,
 					},
 				},
 			}
@@ -1366,7 +1366,7 @@ var _ = Describe("validate image name change", func() {
 			}
 			Expect(v.validateImageChange(clusterNew, clusterOld)).To(BeEmpty())
 		})
-		It("complains on major upgrades", func() {
+		It("complains on major downgrades", func() {
 			clusterOld := &apiv1.Cluster{
 				Spec: apiv1.ClusterSpec{
 					ImageCatalogRef: &apiv1.ImageCatalogRef{
@@ -1374,18 +1374,18 @@ var _ = Describe("validate image name change", func() {
 							Name: "test",
 							Kind: "ImageCatalog",
 						},
-						Major: 16,
+						Major: 17,
 					},
 				},
 			}
 			clusterNew := &apiv1.Cluster{
 				Spec: apiv1.ClusterSpec{
-					ImageName: "postgres:17.1",
+					ImageName: "postgres:16.1",
 				},
 			}
 			Expect(v.validateImageChange(clusterNew, clusterOld)).To(HaveLen(1))
 		})
-		It("complains going from imageCatalogRef to different major default imageName", func() {
+		It("complains going from imageCatalogRef to lower major default imageName", func() {
 			clusterOld := &apiv1.Cluster{
 				Spec: apiv1.ClusterSpec{
 					ImageCatalogRef: &apiv1.ImageCatalogRef{
@@ -1393,7 +1393,7 @@ var _ = Describe("validate image name change", func() {
 							Name: "test",
 							Kind: "ImageCatalog",
 						},
-						Major: 16,
+						Major: 18,
 					},
 				},
 			}
