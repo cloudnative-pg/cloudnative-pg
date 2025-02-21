@@ -156,12 +156,12 @@ func (ws *remoteWebserverEndpoints) cleanupStaleCollections(ctx context.Context)
 			return
 		}
 
+		ws.ongoingRequest.Lock()
+		defer ws.ongoingRequest.Unlock()
+
 		if bc.data.Phase == Completed || bc.data.BackupName == "" {
 			return
 		}
-
-		ws.ongoingRequest.Lock()
-		defer ws.ongoingRequest.Unlock()
 
 		if bc.err != nil {
 			closeBackupConnection(bc)
