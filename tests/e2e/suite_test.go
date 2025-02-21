@@ -49,9 +49,11 @@ import (
 )
 
 const (
-	fixturesDir  = "./fixtures"
-	RetryTimeout = environment.RetryTimeout
-	PollingTime  = objects.PollingTime
+	fixturesDir                = "./fixtures"
+	RetryTimeout               = environment.RetryTimeout
+	PollingTime                = objects.PollingTime
+	testDataVolumeSuffix       = "-data"
+	testWalArchiveVolumeSuffix = "-wal"
 )
 
 var (
