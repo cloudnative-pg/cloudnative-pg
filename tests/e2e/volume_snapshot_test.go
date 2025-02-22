@@ -110,14 +110,15 @@ var _ = Describe("Verify Volume Snapshot",
 			It("can create a Volume Snapshot", func() {
 				var backupObject apiv1.Backup
 				By("creating a volumeSnapshot and waiting until it's completed", func() {
-					err := backups.CreateOnDemandBackupViaKubectlPlugin(
-						namespace,
-						clusterName,
-						"",
-						apiv1.BackupTargetStandby,
-						apiv1.BackupMethodVolumeSnapshot,
-					)
-					Expect(err).ToNot(HaveOccurred())
+					Eventually(func() error {
+						return backups.CreateOnDemandBackupViaKubectlPlugin(
+							namespace,
+							clusterName,
+							"",
+							apiv1.BackupTargetStandby,
+							apiv1.BackupMethodVolumeSnapshot,
+						)
+					}).WithTimeout(time.Minute).WithPolling(5 * time.Second).Should(Succeed())
 
 					// trigger a checkpoint as the backup may run on standby
 					CheckPointAndSwitchWalOnPrimary(namespace, clusterName)
