@@ -251,11 +251,11 @@ When versions are not directly upgradable, the old version needs to be
 removed before installing the new one. This won't affect user data but
 only the operator itself.
 
-### Upgrading to 1.25.0 or 1.24.2
+### Upgrading to 1.25 from a previous minor version
 
 !!! Important
-    We encourage all existing users of CloudNativePG to upgrade to version
-    1.25.0 or at least to the latest stable version of the minor release you are
+    We strongly recommend that all CloudNativePG users upgrade to version
+    1.25.1 or at least to the latest stable version of the minor release you are
     currently using (namely 1.24.x).
 
 !!! Warning
@@ -309,63 +309,3 @@ distributed PostgreSQL setup. Ensure the following steps are taken:
 
 For more information, please refer to
 the ["Distributed Topology" section for replica clusters](replica_cluster.md#distributed-topology).
-
-### Upgrading to 1.23 from a previous minor version
-
-#### User defined replication slots
-
-CloudNativePG now offers automated synchronization of all replication slots
-defined on the primary to any standby within the High Availability (HA)
-cluster.
-
-If you manually manage replication slots on a standby, it is essential to
-exclude those replication slots from synchronization. Failure to do so may
-result in CloudNativePG removing them from the standby. To implement this
-exclusion, utilize the following YAML configuration. In this example,
-replication slots with a name starting with 'foo' are prevented from
-synchronization:
-
-```yaml
-...
-  replicationSlots:
-    synchronizeReplicas:
-      enabled: true
-      excludePatterns:
-      - "^foo"
-```
-
-Alternatively, if you prefer to disable the synchronization mechanism entirely,
-use the following configuration:
-
-```yaml
-...
-  replicationSlots:
-    synchronizeReplicas:
-      enabled: false
-```
-
-#### Server-side apply of manifests
-
-To ensure compatibility with Kubernetes 1.29 and upcoming versions,
-CloudNativePG now mandates the utilization of
-["Server-side apply"](https://kubernetes.io/docs/reference/using-api/server-side-apply/)
-when deploying the operator manifest.
-
-While employing this installation method poses no challenges for new
-deployments, updating existing operator manifests using the `--server-side`
-option may result in errors resembling the example below:
-
-``` text
-Apply failed with 1 conflict: conflict with "kubectl-client-side-apply" using..
-```
-
-If such errors arise, they can be resolved by explicitly specifying the
-`--force-conflicts` option to enforce conflict resolution:
-
-```sh
-kubectl apply --server-side --force-conflicts -f <OPERATOR_MANIFEST>
-```
-
-Henceforth, `kube-apiserver` will be automatically acknowledged as a recognized
-manager for the CRDs, eliminating the need for any further manual intervention
-on this matter.
