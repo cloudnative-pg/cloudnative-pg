@@ -57,51 +57,12 @@ const (
 var replicationSlotInvalidCharacters = regexp.MustCompile(`[^a-z0-9_]`)
 
 type backupConnection struct {
-	sync                 sync.Mutex
 	immediateCheckpoint  bool
 	waitForArchive       bool
 	conn                 *sql.Conn
 	postgresMajorVersion uint64
 	data                 BackupResultData
 	err                  error
-}
-
-func (bc *backupConnection) setPhase(phase BackupConnectionPhase, backupName string) {
-	bc.sync.Lock()
-	defer bc.sync.Unlock()
-	if backupName != bc.data.BackupName {
-		return
-	}
-	bc.data.Phase = phase
-}
-
-func (bc *backupConnection) closeConnection(backupName string) error {
-	bc.sync.Lock()
-	defer bc.sync.Unlock()
-	if backupName != bc.data.BackupName {
-		return nil
-	}
-
-	return bc.conn.Close()
-}
-
-func (bc *backupConnection) forceCloseConnection() error {
-	bc.sync.Lock()
-	defer bc.sync.Unlock()
-
-	return bc.conn.Close()
-}
-
-func (bc *backupConnection) executeWithLock(backupName string, cb func() error) {
-	bc.sync.Lock()
-	defer bc.sync.Unlock()
-	if backupName != bc.data.BackupName {
-		return
-	}
-
-	if err := cb(); err != nil {
-		bc.err = err
-	}
 }
 
 func newBackupConnection(
@@ -139,8 +100,10 @@ func newBackupConnection(
 	}, nil
 }
 
-func (bc *backupConnection) startBackup(ctx context.Context, backupName string) {
+func (bc *backupConnection) startBackup(ctx context.Context, sync *sync.Mutex) {
 	contextLogger := log.FromContext(ctx).WithValues("step", "start")
+	sync.Lock()
+	defer sync.Unlock()
 
 	if bc == nil {
 		return
@@ -152,7 +115,7 @@ func (bc *backupConnection) startBackup(ctx context.Context, backupName string) 
 		}
 		contextLogger.Error(bc.err, "encountered error while starting backup")
 
-		if err := bc.closeConnection(backupName); err != nil {
+		if err := bc.conn.Close(); err != nil {
 			if !errors.Is(err, sql.ErrConnDone) {
 				contextLogger.Error(err, "while closing backup connection")
 			}
@@ -180,25 +143,25 @@ func (bc *backupConnection) startBackup(ctx context.Context, backupName string) 
 			bc.immediateCheckpoint)
 	}
 
-	bc.executeWithLock(backupName, func() error {
-		if err := row.Scan(&bc.data.BeginLSN); err != nil {
-			return fmt.Errorf("while scanning backup start: %w", err)
-		}
-		bc.data.Phase = Started
+	if err := row.Scan(&bc.data.BeginLSN); err != nil {
+		bc.err = fmt.Errorf("while scanning backup start: %w", err)
+		return
+	}
 
-		return nil
-	})
+	bc.data.Phase = Started
 }
 
-func (bc *backupConnection) stopBackup(ctx context.Context, backupName string) {
+func (bc *backupConnection) stopBackup(ctx context.Context, sync *sync.Mutex) {
 	contextLogger := log.FromContext(ctx).WithValues("step", "stop")
+	sync.Lock()
+	defer sync.Unlock()
 
 	if bc == nil {
 		return
 	}
 
 	defer func() {
-		if err := bc.closeConnection(backupName); err != nil {
+		if err := bc.conn.Close(); err != nil {
 			if !errors.Is(err, sql.ErrConnDone) {
 				contextLogger.Error(err, "while closing backup connection")
 			}
@@ -218,12 +181,11 @@ func (bc *backupConnection) stopBackup(ctx context.Context, backupName string) {
 			"SELECT lsn, labelfile, spcmapfile FROM pg_catalog.pg_backup_stop(wait_for_archive => $1);", bc.waitForArchive)
 	}
 
-	bc.executeWithLock(backupName, func() error {
-		if err := row.Scan(&bc.data.EndLSN, &bc.data.LabelFile, &bc.data.SpcmapFile); err != nil {
-			contextLogger.Error(err, "while stopping PostgreSQL physical backup")
-			return fmt.Errorf("while scanning backup stop: %w", err)
-		}
-		bc.data.Phase = Completed
-		return nil
-	})
+	if err := row.Scan(&bc.data.EndLSN, &bc.data.LabelFile, &bc.data.SpcmapFile); err != nil {
+		contextLogger.Error(err, "while stopping PostgreSQL physical backup")
+		bc.err = fmt.Errorf("while scanning backup stop: %w", err)
+		return
+	}
+
+	bc.data.Phase = Completed
 }
