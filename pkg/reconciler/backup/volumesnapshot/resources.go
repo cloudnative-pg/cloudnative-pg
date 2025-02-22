@@ -19,6 +19,8 @@ package volumesnapshot
 import (
 	"context"
 	"fmt"
+	"regexp"
+	"strconv"
 	"strings"
 
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
@@ -73,6 +75,21 @@ func (err volumeSnapshotError) isRetryable() bool {
 		return false
 	}
 
+	msg := *err.InternalError.Message
+
+	// Check explicit retry flag
+	if strings.Contains(msg, "Retriable: true") {
+		return true
+	}
+
+	isRetryableFuncs := []func(string) bool{isRetryableHTTPError}
+
+	for _, isRetryableFunc := range isRetryableFuncs {
+		if isRetryableFunc(msg) {
+			return true
+		}
+	}
+
 	// Obviously this is a heuristic, but unfortunately we don't have
 	// the information we need.
 	// We're trying to handle the cases where the external-snapshotter
@@ -89,6 +106,32 @@ func (err volumeSnapshotError) isRetryable() bool {
 	return strings.Contains(
 		*err.InternalError.Message,
 		"the object has been modified")
+}
+
+var (
+	retryableStatusCodes = []int{408, 429, 500, 502, 503, 504}
+	httpStatusCodeRegex  = regexp.MustCompile(`HTTPStatusCode:\s(\d{3})`)
+)
+
+// isRetryableHTTPError, will return a retry on the following status codes:
+// - 408: Request Timeout
+// - 429: Too Many Requests
+// - 500: Internal Server Error
+// - 502: Bad Gateway
+// - 503: Service Unavailable
+// - 504: Gateway Timeout
+func isRetryableHTTPError(msg string) bool {
+	if matches := httpStatusCodeRegex.FindStringSubmatch(msg); len(matches) == 2 {
+		if code, err := strconv.Atoi(matches[1]); err == nil {
+			for _, retryableCode := range retryableStatusCodes {
+				if code == retryableCode {
+					return true
+				}
+			}
+		}
+	}
+
+	return false
 }
 
 // slice represents a slice of []storagesnapshotv1.VolumeSnapshot
