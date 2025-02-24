@@ -9,7 +9,8 @@ on:
 
 env:
   GOLANG_VERSION: "1.24.x"
-  CNPG_IMAGE_NAME: "ghcr.io/${{ github.repository }}"
+  REGISTRY: "ghcr.io"
+  REPOSITORY_OWNER: "cloudnative-pg"
 
 permissions:
   contents: write
@@ -91,10 +92,9 @@ jobs:
     needs:
       - check-version
     outputs:
-      version: ${{ steps.build-meta.outputs.version }}
+      version: ${{ env.IMAGE_TAG }}
       author_name: ${{ steps.build-meta.outputs.author_name }}
       author_email: ${{ steps.build-meta.outputs.author_email }}
-      digest: ${{ steps.build.outputs.digest }}
       platforms: ${{ env.PLATFORMS }}
       ubi_img: ${{ fromJSON(steps.bake-push.outputs.metadata)['ubi']['image.name'] }}
     steps:
@@ -114,10 +114,9 @@ jobs:
         name: Build meta
         id: build-meta
         run: |
-          images='ghcr.io/cloudnative-pg/cloudnative-pg'
-          images="${images},ghcr.io/cloudnative-pg/cloudnative-pg-testing"
           commit_sha=${{ github.sha }}
           commit_date=$(git log -1 --pretty=format:'%ad' --date short "${commit_sha}")
+          tag="${GITHUB_REF#refs/tags/v}"
 
           # get git user and email
           author_name=$(git show -s --format='%an' "${commit_sha}")
@@ -126,9 +125,10 @@ jobs:
           # use git describe to get the nearest tag and use that to build the version (e.g. 1.4.0-dev24 or 1.4.0)
           commit_version=$(git describe --tags --match 'v*' "${commit_sha}"| sed -e 's/^v//; s/-g[0-9a-f]\+$//; s/-\([0-9]\+\)$/-dev\1/')
           commit_short=$(git rev-parse --short "${commit_sha}")
-          echo "IMAGES=${images}" >> $GITHUB_ENV
+
           echo "DATE=${commit_date}" >> $GITHUB_ENV
-          echo "version=${commit_version}" >> $GITHUB_OUTPUT
+          echo "VERSION=${commit_version}" >> $GITHUB_ENV
+          echo "IMAGE_TAG=${tag}" >> $GITHUB_ENV
           echo "COMMIT=${commit_short}" >> $GITHUB_ENV
           echo "author_name=${author_name}" >> $GITHUB_OUTPUT
           echo "author_email=${author_email}" >> $GITHUB_OUTPUT
@@ -157,7 +157,7 @@ jobs:
         env:
           DATE: ${{ env.DATE }}
           COMMIT: ${{ env.COMMIT }}
-          VERSION: ${{ steps.build-meta.outputs.version }}
+          VERSION: ${{ env.VERSION }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
           NFPM_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
@@ -188,7 +188,7 @@ jobs:
         name: Login to ghcr.io
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io
+          registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       -
@@ -197,10 +197,12 @@ jobs:
         id: bake-push
         env:
           environment: "production"
-          VERSION: ${{ steps.build-meta.outputs.version }}
-          REGISTRY: ${{ env.CNPG_IMAGE_NAME }}
+          buildVersion: ${{ env.VERSION }}
+          TAG: ${{ env.IMAGE_TAG }}
+          REGISTRY: ${{ env.REGISTRY }}/${{ env.REPOSITORY_OWNER }}
           LATEST: ${{ needs.check-version.outputs.is_latest == 'true' && needs.check-version.outputs.is_stable == 'true' }}
         with:
+          source: .
           push: true
           no-cache: true
           targets: "default"
@@ -251,7 +253,7 @@ jobs:
       - name: Login to ghcr.io
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io
+          registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
@@ -259,14 +261,12 @@ jobs:
         env:
           UBI_IMG: ${{ needs.release-binaries.outputs.ubi_img }}
         run: |
-          echo "IMAGE_NAME=${UBI_IMG}" >> $GITHUB_ENV
           echo "CONTROLLER_IMG=${UBI_IMG}" >> $GITHUB_ENV
           echo "BUNDLE_IMG=${UBI_IMG}-bundle" >> $GITHUB_ENV
           echo "CATALOG_IMG=${UBI_IMG}-catalog" >> $GITHUB_ENV
 
       - name: Create bundle
         env:
-          IMAGE_NAME: ${{ env.IMAGE_NAME }}
           CONTROLLER_IMG: ${{ env.CONTROLLER_IMG }}
           BUNDLE_IMG: ${{ env.BUNDLE_IMG }}
           CATALOG_IMG: ${{ env.CATALOG_IMG }}
