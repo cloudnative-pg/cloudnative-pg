@@ -1839,6 +1839,11 @@ func (in *PluginConfiguration) DeepCopyInto(out *PluginConfiguration) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.IsWALArchiver != nil {
+		in, out := &in.IsWALArchiver, &out.IsWALArchiver
+		*out = new(bool)
+		**out = **in
+	}
 	if in.Parameters != nil {
 		in, out := &in.Parameters, &out.Parameters
 		*out = make(map[string]string, len(*in))
