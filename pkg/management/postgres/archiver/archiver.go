@@ -148,8 +148,17 @@ func internalRun(
 	contextLog := log.FromContext(ctx)
 	startTime := time.Now()
 
+	// We allow plugins to archive WALs even if there is no plugin
+	// directly enabled by the user, to retain compatibility with
+	// the old API.
+	if err := archiveWALViaPlugins(ctx, cluster, path.Join(pgData, walName)); err != nil {
+		return err
+	}
+
+	// If the used chosen a plugin to do WAL archiving, we don't
+	// trigger the legacy archiving process.
 	if cluster.GetEnabledWALArchivePluginName() != "" {
-		return archiveWALViaPlugins(ctx, cluster, path.Join(pgData, walName))
+		return nil
 	}
 
 	// Request Barman Cloud to archive this WAL
@@ -267,8 +276,9 @@ func archiveWALViaPlugins(
 		apiv1.GetPluginConfigurationEnabledPluginNames(cluster.Spec.Plugins))
 	availableAndEnabled := stringset.From(availablePluginNamesSet.Intersect(enabledPluginNamesSet).ToList())
 
-	if !availableAndEnabled.Has(cluster.GetEnabledWALArchivePluginName()) {
-		return fmt.Errorf("wal archive plugin is not available: %s", cluster.GetEnabledWALArchivePluginName())
+	enabledArchiverPluginName := cluster.GetEnabledWALArchivePluginName()
+	if enabledArchiverPluginName != "" && !availableAndEnabled.Has(enabledArchiverPluginName) {
+		return fmt.Errorf("wal archive plugin is not available: %s", enabledArchiverPluginName)
 	}
 
 	client, err := pluginClient.WithPlugins(
