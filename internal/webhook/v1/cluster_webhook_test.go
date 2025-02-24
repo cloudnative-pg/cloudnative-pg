@@ -4864,3 +4864,52 @@ var _ = Describe("ServiceTemplate Validation", func() {
 		})
 	})
 })
+
+var _ = Describe("validatePluginConfiguration", func() {
+	var v *ClusterCustomValidator
+	var cluster *apiv1.Cluster
+	walPlugin1 := apiv1.PluginConfiguration{
+		Name:          "walArchiverPlugin1",
+		IsWALArchiver: ptr.To(true),
+	}
+	walPlugin2 := apiv1.PluginConfiguration{
+		Name:          "walArchiverPlugin2",
+		IsWALArchiver: ptr.To(true),
+	}
+
+	BeforeEach(func() {
+		v = &ClusterCustomValidator{}
+		cluster = &apiv1.Cluster{
+			Spec: apiv1.ClusterSpec{
+				Plugins: []apiv1.PluginConfiguration{},
+			},
+		}
+	})
+
+	It("returns no errors if no plugins are enabled", func() {
+		Expect(v.validatePluginConfiguration(cluster)).To(BeNil())
+	})
+
+	It("returns an error if a WAL archiver plugin is enabled when barmanObjectStore is configured", func() {
+		cluster.Spec.Backup = &apiv1.BackupConfiguration{
+			BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{},
+		}
+		cluster.Spec.Plugins = append(cluster.Spec.Plugins, walPlugin1)
+		errs := v.validatePluginConfiguration(cluster)
+		Expect(errs).To(HaveLen(1))
+		Expect(errs[0].Error()).To(ContainSubstring(
+			"Cannot enable a WAL archiver plugin when barmanObjectStore is configured"))
+	})
+
+	It("returns an error if more than one WAL archiver plugin is enabled", func() {
+		cluster.Spec.Plugins = append(cluster.Spec.Plugins, walPlugin1, walPlugin2)
+		errs := v.validatePluginConfiguration(cluster)
+		Expect(errs).To(HaveLen(1))
+		Expect(errs[0].Error()).To(ContainSubstring("Cannot enable more than one WAL archiver plugin"))
+	})
+
+	It("returns no errors when WAL archiver is enabled", func() {
+		cluster.Spec.Plugins = append(cluster.Spec.Plugins, walPlugin1)
+		Expect(v.validatePluginConfiguration(cluster)).To(BeNil())
+	})
+})

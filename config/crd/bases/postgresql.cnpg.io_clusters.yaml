@@ -3889,6 +3889,12 @@ spec:
                     PluginConfiguration specifies a plugin that need to be loaded for this
                     cluster to be reconciled
                   properties:
+                    isWALArchiver:
+                      default: false
+                      description: |-
+                        Only one plugin can be declared as WALArchiver.
+                        Cannot be active if ".spec.backup.barmanObjectStore" configuration is present.
+                      type: boolean
                     name:
                       description: Name is the plugin name
                       type: string

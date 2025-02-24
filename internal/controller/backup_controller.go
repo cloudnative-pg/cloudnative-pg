@@ -99,7 +99,7 @@ func NewBackupReconciler(
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get
 
 // Reconcile is the main reconciliation loop
-// nolint: gocognit
+// nolint: gocognit,gocyclo
 func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	contextLogger, ctx := log.SetupLogger(ctx)
 	contextLogger.Debug(fmt.Sprintf("reconciling object %#q", req.NamespacedName))
@@ -132,6 +132,22 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		tryFlagBackupAsFailed(ctx, r.Client, &backup, fmt.Errorf("while getting cluster %s: %w", clusterName, err))
 		r.Recorder.Eventf(&backup, "Warning", "FindingCluster",
 			"Error getting cluster %v, will not retry: %s", clusterName, err.Error())
+		return ctrl.Result{}, nil
+	}
+
+	if backup.Spec.Method == apiv1.BackupMethodPlugin && len(cluster.Spec.Plugins) == 0 {
+		message := "cannot proceed with the backup as the cluster has no plugin configured"
+		contextLogger.Warning(message)
+		r.Recorder.Event(&backup, "Warning", "ClusterHasNoBackupExecutorPlugin", message)
+		tryFlagBackupAsFailed(ctx, r.Client, &backup, errors.New(message))
+		return ctrl.Result{}, nil
+	}
+
+	if backup.Spec.Method != apiv1.BackupMethodPlugin && cluster.Spec.Backup == nil {
+		message := "cannot proceed with the backup as the cluster has no backup section"
+		contextLogger.Warning(message)
+		r.Recorder.Event(&backup, "Warning", "ClusterHasBackupConfigured", message)
+		tryFlagBackupAsFailed(ctx, r.Client, &backup, errors.New(message))
 		return ctrl.Result{}, nil
 	}
 
