@@ -121,6 +121,7 @@ jobs:
               - '.github/workflows/continuous-integration.yml'
               - '.goreleaser*.yml'
               - 'Dockerfile'
+              - 'docker-bake.hcl'
               - 'Makefile'
               - 'go.mod'
               - 'go.sum'
@@ -409,7 +410,6 @@ jobs:
       packages: write
       security-events: write
       id-token: write
-
     outputs:
       commit_version: ${{ env.VERSION }}
       commit: ${{ env.COMMIT_SHA }}
@@ -443,10 +443,21 @@ jobs:
           # shortened commit sha
           commit_short=$(git rev-parse --short "${commit_sha}")
 
+          # extract branch name
+          branch_name=${GITHUB_REF#refs/heads/}
+          if [[ ${{ github.event_name }} == 'pull_request' ]]
+          then
+            branch_name=$(gh pr view "${{ github.event.pull_request.number }}" --json headRefName -q '.headRefName' 2>/dev/null)
+          fi
+
+          # extract tag from branch name
+          tag_name=$(echo "$branch_name" | tr / -)
+
           echo "DATE=${commit_date}" >> $GITHUB_ENV
           echo "VERSION=${commit_version}" >> $GITHUB_ENV
           echo "COMMIT=${commit_short}" >> $GITHUB_ENV
           echo "COMMIT_SHA=${commit_sha}" >> $GITHUB_ENV
+          echo "IMAGE_TAG=${tag_name,,}" >> $GITHUB_ENV
 
           # By default the container image is being pushed to the registry
           echo "PUSH=true" >> $GITHUB_ENV
@@ -537,11 +548,13 @@ jobs:
           username: ${{ env.REGISTRY_USER }}
           password: ${{ env.REGISTRY_PASSWORD }}
 
-      - name: Build for scan
+      - name: Build and push
         uses: docker/bake-action@v6
-        id: bake-build
+        id: bake-push
         env:
-          VERSION: ${{ env.VERSION }}
+          environment: "testing"
+          buildVersion: ${{ env.VERSION }}
+          TAG: ${{ env.IMAGE_TAG }}
           REGISTRY: ${{ env.REGISTRY }}/${{ env.REPOSITORY_OWNER }}
         with:
           source: .
@@ -549,10 +562,20 @@ jobs:
           no-cache: true
           targets: "default"
 
+      - name: Output images
+        env:
+          DISTROLESS: ${{ fromJSON(steps.bake-push.outputs.metadata)['distroless']['image.name'] }}
+          UBI: ${{ fromJSON(steps.bake-push.outputs.metadata)['ubi']['image.name'] }}
+        run: |
+          echo "CONTROLLER_IMG=${DISTROLESS}" >> $GITHUB_ENV
+          echo "CONTROLLER_IMG_UBI=${UBI}" >> $GITHUB_ENV
+          echo "BUNDLE_IMG=${UBI}-bundle" >> $GITHUB_ENV
+          echo "CATALOG_IMG=${UBI}-catalog" >> $GITHUB_ENV
+
       - name: Dockle scan distroless image
         uses: erzz/dockle-action@v1
         with:
-          image: ${{ fromJSON(steps.bake-build.outputs.metadata)['distroless']['image.name'] }}
+          image: ${{ env.CONTROLLER_IMG }}
           exit-code: '1'
           failure-threshold: WARN
           accept-keywords: key
@@ -562,7 +585,7 @@ jobs:
         env:
           DOCKLE_IGNORES: CIS-DI-0009
         with:
-          image: ${{ fromJSON(steps.bake-build.outputs.metadata)['ubi']['image.name'] }}
+          image: ${{ env.CONTROLLER_IMG_UBI }}
           exit-code: '1'
           failure-threshold: WARN
           accept-keywords: key
@@ -576,7 +599,7 @@ jobs:
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
-          image: ${{ fromJSON(steps.bake-build.outputs.metadata)['distroless']['image.name'] }}
+          image: ${{ env.CONTROLLER_IMG }}
           args: --severity-threshold=high --file=Dockerfile
 
       - name: Upload result to GitHub Code Scanning
@@ -587,18 +610,6 @@ jobs:
         continue-on-error: true
         with:
           sarif_file: snyk.sarif
-
-      - name: Build and push
-        uses: docker/bake-action@v3
-        id: bake-push
-        env:
-          environment: "testing"
-          VERSION: ${{ env.VERSION }}
-          REGISTRY: ${{ env.REGISTRY }}/${{ env.REPOSITORY_OWNER }}
-        with:
-          push: true
-          no-cache: true
-          targets: "default"
 
       - name: Install cosign
         if: env.SIGN_IMAGES == 'true'
@@ -614,15 +625,6 @@ jobs:
           )
           cosign sign --yes ${images}
 
-      - name: Output images
-        env:
-          DISTROLESS: ${{ fromJSON(steps.bake-push.outputs.metadata)['distroless']['image.name'] }}
-          UBI: ${{ fromJSON(steps.bake-push.outputs.metadata)['ubi']['image.name'] }}
-        run: |
-          echo "CONTROLLER_IMG=${DISTROLESS}" >> $GITHUB_ENV
-          echo "CONTROLLER_IMG_UBI=${UBI}" >> $GITHUB_ENV
-          echo "BUNDLE_IMG=${UBI}-bundle" >> $GITHUB_ENV
-          echo "CATALOG_IMG=${UBI}-catalog" >> $GITHUB_ENV
 
   olm-bundle:
     name: Create OLM bundle and catalog
@@ -647,6 +649,7 @@ jobs:
         uses: docker/setup-qemu-action@v3
         with:
           platforms: ${{ env.PLATFORMS }}
+          cache-image: false
 
       - name: Install Go
         uses: actions/setup-go@v5
@@ -762,6 +765,7 @@ jobs:
         uses: docker/setup-qemu-action@v3
         with:
           platforms: ${{ env.PLATFORMS }}
+          cache-image: false
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3

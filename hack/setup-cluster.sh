@@ -636,7 +636,7 @@ load() {
 
   echo "${bright}Building operator from current worktree${reset}"
 
-  make -C "${ROOT_DIR}" TAG=$(print_tag) REGISTRY="${registry_name}:5000" INSECURE="true" ARCH="${ARCH}" docker-build
+  make -C "${ROOT_DIR}" TAG="$(print_tag)" REGISTRY="${registry_name}:5000" INSECURE="true" ARCH="${ARCH}" docker-build
 
   echo "${bright}Loading new operator image on cluster ${CLUSTER_NAME}${reset}"
 
