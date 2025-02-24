@@ -50,7 +50,7 @@ type Response[T interface{}] struct {
 	Error *Error `json:"error,omitempty"`
 }
 
-// GetError returns an error if an error response is detected or if the data is
+// GetError returns an error if an error response is detected or if the data
 // field is nil
 func (body Response[T]) GetError() error {
 	if body.Error != nil {
