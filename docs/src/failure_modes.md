@@ -139,8 +139,7 @@ Self-healing will happen as soon as the *apiserver* is notified.
 When a worker node fails, the *kubelet* stops executing the liveness
 and readiness probes. The affected pod will be marked for deletion
 after the *tolerationSeconds* period configured by the Kubernetes
-cluster administrator for that specific failure cause. Depending on
-the cluster configuration, the pod might be removed earlier.
+cluster administrator for that specific failure cause.
 
 When a worker node fails unexpectedly, the priority should be
 to assess whether recovery is feasible, or if the node should be
@@ -173,7 +172,7 @@ operator can properly initialize a new instance on another available
 node. Alternatively, the [kubectl plugin's destroy](kubectl-plugin.md#destroy)
 command can simplify this process.
 
-### Using the Plugin to Destroy an Instance
+#### Using the Plugin to Destroy an Instance
 
 The [`kubectl-cnpg`](kubectl-plugin.md) plugin provides a convenient way to
 safely destroy an instance. Run the following command:
@@ -195,7 +194,7 @@ monitor the instance creation process:
 kubectl cnpg status -n <namespace> <cluster-name>
 ```
 
-### Manually Destroying an Instance
+#### Manually Destroying an Instance
 
 If the plugin is not available, you can manually remove the Persistent
 Volume Claims (PVCs) and the Pod associated with the instance using
