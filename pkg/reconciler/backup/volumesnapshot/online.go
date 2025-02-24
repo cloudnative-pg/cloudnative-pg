@@ -142,6 +142,9 @@ func (o *onlineExecutor) prepare(
 		return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 	}
 
+	// If we are here, the status either contains errors
+	// or the running backup is the desired one.
+	// Handle the error case first
 	if err := statusBody.GetError(); err != nil {
 		return nil, err
 	}
