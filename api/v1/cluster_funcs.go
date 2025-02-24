@@ -1481,3 +1481,13 @@ func (p *Probe) ApplyInto(k8sProbe *corev1.Probe) {
 		k8sProbe.TerminationGracePeriodSeconds = p.TerminationGracePeriodSeconds
 	}
 }
+
+// ApplyInto applies the content of the probe configuration in a Kubernetes
+// probe
+func (p *ProbeWithStrategy) ApplyInto(k8sProbe *corev1.Probe) {
+	if p == nil {
+		return
+	}
+
+	p.Probe.ApplyInto(k8sProbe)
+}
