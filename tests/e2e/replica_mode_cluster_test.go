@@ -226,6 +226,17 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 					DatabaseName: sourceDBName,
 					TableName:    "new_test_table",
 				}
+				Eventually(func() error {
+					_, err := postgres.RunExecOverForward(ctx,
+						env.Client,
+						env.Interface,
+						env.RestClientConfig,
+						namespace, clusterTwoName, sourceDBName,
+						apiv1.ApplicationUserSecretSuffix,
+						"SELECT 1;",
+					)
+					return err
+				}, testTimeouts[timeouts.Short]).Should(Succeed())
 				AssertCreateTestData(env, tableLocator)
 			})
 
