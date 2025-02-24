@@ -460,6 +460,7 @@ jobs:
           echo "COMMIT=${commit_short}" >> $GITHUB_ENV
           echo "COMMIT_SHA=${commit_sha}" >> $GITHUB_ENV
           echo "IMAGE_TAG=${tag_name,,}" >> $GITHUB_ENV
+          echo "REPO_OWNER=${GITHUB_REPOSITORY_OWNER,,}" >> $GITHUB_ENV
 
           # By default the container image is being pushed to the registry
           echo "PUSH=true" >> $GITHUB_ENV
@@ -557,14 +558,15 @@ jobs:
           environment: "testing"
           buildVersion: ${{ env.VERSION }}
           TAG: ${{ env.IMAGE_TAG }}
-          REGISTRY: ${{ env.REGISTRY }}/${{ env.REPOSITORY_OWNER }}
+          REGISTRY: ${{ env.REGISTRY }}/${{ env.REPO_OWNER }}
         with:
           source: .
-          push: true
+          push: ${{ env.PUSH }}
           no-cache: true
           targets: "default"
 
       - name: Output images
+        if: env.PUSH == 'true'
         env:
           DISTROLESS: ${{ fromJSON(steps.bake-push.outputs.metadata)['distroless']['image.name'] }}
           UBI: ${{ fromJSON(steps.bake-push.outputs.metadata)['ubi']['image.name'] }}
@@ -576,6 +578,7 @@ jobs:
 
       - name: Dockle scan distroless image
         uses: erzz/dockle-action@v1
+        if: env.PUSH == 'true'
         with:
           image: ${{ env.CONTROLLER_IMG }}
           exit-code: '1'
@@ -584,6 +587,7 @@ jobs:
 
       - name: Dockle scan UBI image
         uses: erzz/dockle-action@v1
+        if: env.PUSH == 'true'
         env:
           DOCKLE_IGNORES: CIS-DI-0009
         with:
@@ -614,13 +618,18 @@ jobs:
           sarif_file: snyk.sarif
 
       - name: Install cosign
-        if: env.SIGN_IMAGES == 'true'
+        if: |
+          env.SIGN_IMAGES == 'true' &&
+          env.PUSH == 'true'
         uses: sigstore/cosign-installer@v3
         # See https://github.blog/security/supply-chain-security/safeguard-container-signing-capability-actions/
         # and https://github.com/actions/starter-workflows/blob/main/ci/docker-publish.yml for more details on
         # how to use cosign.
+
       - name: Sign images
-        if: env.SIGN_IMAGES == 'true'
+        if: |
+          env.SIGN_IMAGES == 'true' &&
+          env.PUSH == 'true'
         run: |
           images=$(echo '${{ steps.bake-push.outputs.metadata }}' |
             jq -r '.[] | (."image.name" | sub(",.*";"" )) + "@" + ."containerimage.digest"'

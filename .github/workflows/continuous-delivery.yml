@@ -323,6 +323,7 @@ jobs:
           echo "VERSION=${commit_version}" >> $GITHUB_ENV
           echo "COMMIT=${commit_short}" >> $GITHUB_ENV
           echo "IMAGE_TAG=${tag_name,,}" >> $GITHUB_ENV
+          echo "REPO_OWNER=${GITHUB_REPOSITORY_OWNER,,}" >> $GITHUB_ENV
           echo "commit_sha=${commit_sha}" >> $GITHUB_OUTPUT
           echo "commit_msg=${commit_message}" >> $GITHUB_OUTPUT
           echo "author_name=${author_name}" >> $GITHUB_OUTPUT
@@ -368,7 +369,7 @@ jobs:
           environment: "testing"
           buildVersion: ${{ env.VERSION }}
           TAG: ${{ env.IMAGE_TAG }}
-          REGISTRY: ${{ env.REGISTRY }}/${{ env.REPOSITORY_OWNER }}
+          REGISTRY: ${{ env.REGISTRY }}/${{ env.REPO_OWNER }}
         with:
           source: .
           push: true

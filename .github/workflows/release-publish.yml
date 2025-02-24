@@ -10,7 +10,6 @@ on:
 env:
   GOLANG_VERSION: "1.24.x"
   REGISTRY: "ghcr.io"
-  REPOSITORY_OWNER: "cloudnative-pg"
 
 permissions:
   contents: write
@@ -129,6 +128,7 @@ jobs:
           echo "DATE=${commit_date}" >> $GITHUB_ENV
           echo "VERSION=${commit_version}" >> $GITHUB_ENV
           echo "IMAGE_TAG=${tag}" >> $GITHUB_ENV
+          echo "REPO_OWNER=${GITHUB_REPOSITORY_OWNER,,}" >> $GITHUB_ENV
           echo "COMMIT=${commit_short}" >> $GITHUB_ENV
           echo "author_name=${author_name}" >> $GITHUB_OUTPUT
           echo "author_email=${author_email}" >> $GITHUB_OUTPUT
@@ -199,7 +199,7 @@ jobs:
           environment: "production"
           buildVersion: ${{ env.VERSION }}
           TAG: ${{ env.IMAGE_TAG }}
-          REGISTRY: ${{ env.REGISTRY }}/${{ env.REPOSITORY_OWNER }}
+          REGISTRY: ${{ env.REGISTRY }}/${{ env.REPO_OWNER }}
           LATEST: ${{ needs.check-version.outputs.is_latest == 'true' && needs.check-version.outputs.is_stable == 'true' }}
         with:
           source: .
