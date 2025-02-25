@@ -507,6 +507,7 @@ func (instance *Instance) Shutdown(ctx context.Context, options shutdownOptions)
 		"pgdata", instance.PgData,
 		"mode", options.Mode,
 		"timeout", options.Timeout,
+		"pgCtlOptions", pgCtlOptions,
 	)
 
 	pgCtlCmd := exec.Command(pgCtlName, pgCtlOptions...) // #nosec
@@ -621,8 +622,10 @@ func (instance *Instance) Reload(ctx context.Context) error {
 		"reload",
 	}
 
-	contextLogger.Info("Requesting configuration reload",
-		"pgdata", instance.PgData)
+	contextLogger.Info(
+		"Requesting configuration reload",
+		"pgdata", instance.PgData,
+		"pgCtlOptions", options)
 
 	// Need to reload certificates if they changed
 	if instance.primaryPool != nil {
