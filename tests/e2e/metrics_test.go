@@ -21,6 +21,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -29,8 +30,10 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/proxy"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/timeouts"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/yaml"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -256,9 +259,31 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 			// Gather metrics in each pod
 			expectedMetric := fmt.Sprintf("cnpg_%v_row_count 3", testTableName)
 			for _, pod := range podList.Items {
+				// Wait a few seconds for the GRANT to be replicated
+				Eventually(func(g Gomega) {
+					out, _, err := exec.QueryInInstancePod(
+						env.Ctx, env.Client, env.Interface, env.RestClientConfig,
+						exec.PodLocator{
+							Namespace: pod.Namespace,
+							PodName:   pod.Name,
+						},
+						srcClusterDatabaseName,
+						fmt.Sprintf(
+							"SELECT has_table_privilege('pg_monitor', '%v', 'SELECT')",
+							testTableName,
+						),
+					)
+					g.Expect(err).ToNot(HaveOccurred())
+					g.Expect(strings.TrimSpace(out)).To(BeEquivalentTo("t"))
+				}).WithTimeout(
+					time.Duration(timeouts.DefaultTestTimeouts[timeouts.Short])*time.Second,
+				).WithPolling(time.Second).Should(Succeed(), fmt.Sprintf("on pod %v", pod.Name))
+
 				out, err := proxy.RetrieveMetricsFromInstance(env.Ctx, env.Interface, pod, false)
-				Expect(err).Should(Not(HaveOccurred()))
-				Expect(strings.Split(out, "\n")).Should(ContainElement(expectedMetric))
+				Expect(err).ShouldNot(HaveOccurred(),
+					fmt.Sprintf("while getting pod metrics for pod: %v", pod.Name))
+				Expect(strings.Split(out, "\n")).Should(ContainElement(expectedMetric),
+					fmt.Sprintf("expected metric %v not found in pod %v", expectedMetric, pod.Name))
 			}
 		})
 		collectAndAssertDefaultMetricsPresentOnEachPod(namespace, replicaClusterName, true)
