@@ -43,16 +43,20 @@ func (o *onlineExecutor) finalize(
 	backup *apiv1.Backup,
 	targetPod *corev1.Pod,
 ) (*ctrl.Result, error) {
-	body, err := o.backupClient.StatusWithErrors(ctx, targetPod)
+	statusBody, err := o.backupClient.StatusWithErrors(ctx, targetPod)
 	if err != nil {
 		return nil, fmt.Errorf("while getting status while finalizing: %w", err)
 	}
 
-	if err := body.EnsureDataIsPresent(); err != nil {
+	if webserver.IsRetryableError(statusBody.Error) {
+		return &ctrl.Result{RequeueAfter: time.Second * 5}, nil
+	}
+
+	if err := statusBody.GetError(); err != nil {
 		return nil, err
 	}
 
-	status := body.Data
+	status := statusBody.Data
 	if status.BackupName != backup.Name {
 		return nil, fmt.Errorf("trying to stop backup with name: %s, while reconciling backup with name: %s",
 			status.BackupName,
@@ -72,9 +76,19 @@ func (o *onlineExecutor) finalize(
 
 	switch status.Phase {
 	case webserver.Started:
-		if err := o.backupClient.Stop(ctx, targetPod, *webserver.NewStopBackupRequest(backup.Name)); err != nil {
+		res, err := o.backupClient.Stop(ctx, targetPod, *webserver.NewStopBackupRequest(backup.Name))
+		if err != nil {
 			return nil, fmt.Errorf("while stopping the backup client: %w", err)
 		}
+
+		if webserver.IsRetryableError(res.Error) {
+			return &ctrl.Result{RequeueAfter: time.Second * 5}, nil
+		}
+
+		if err := res.GetError(); err != nil {
+			return nil, err
+		}
+
 		return &ctrl.Result{RequeueAfter: time.Second * 5}, nil
 	case webserver.Closing:
 		return &ctrl.Result{RequeueAfter: time.Second * 5}, nil
@@ -95,27 +109,44 @@ func (o *onlineExecutor) prepare(
 	volumeSnapshotConfig := backup.GetVolumeSnapshotConfiguration(*cluster.Spec.Backup.VolumeSnapshot)
 
 	// Handle hot snapshots
-	body, err := o.backupClient.StatusWithErrors(ctx, targetPod)
+	statusBody, err := o.backupClient.StatusWithErrors(ctx, targetPod)
 	if err != nil {
 		return nil, fmt.Errorf("while getting status while preparing: %w", err)
 	}
 
-	if err := body.EnsureDataIsPresent(); err != nil {
-		return nil, err
+	if webserver.IsRetryableError(statusBody.Error) {
+		return &ctrl.Result{RequeueAfter: time.Second * 5}, nil
 	}
 
-	status := body.Data
+	status := statusBody.Data
 	// if the backupName doesn't match it means we have an old stuck pending backup that we have to force out.
-	if backup.Name != status.BackupName || status.Phase == "" {
+	if status != nil && (backup.Name != status.BackupName || status.Phase == "") {
 		req := webserver.StartBackupRequest{
 			ImmediateCheckpoint: volumeSnapshotConfig.OnlineConfiguration.GetImmediateCheckpoint(),
 			WaitForArchive:      volumeSnapshotConfig.OnlineConfiguration.GetWaitForArchive(),
 			BackupName:          backup.Name,
 		}
-		if err := o.backupClient.Start(ctx, targetPod, req); err != nil {
+		res, err := o.backupClient.Start(ctx, targetPod, req)
+		if err != nil {
 			return nil, fmt.Errorf("while trying to start the backup: %w", err)
 		}
+
+		if webserver.IsRetryableError(res.Error) {
+			return &ctrl.Result{RequeueAfter: time.Second * 5}, nil
+		}
+
+		if err := res.GetError(); err != nil {
+			return nil, err
+		}
+
 		return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+	}
+
+	// If we are here, the status either contains errors
+	// or the running backup is the desired one.
+	// Handle the error case first
+	if err := statusBody.GetError(); err != nil {
+		return nil, err
 	}
 
 	switch status.Phase {
