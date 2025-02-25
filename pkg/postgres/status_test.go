@@ -24,6 +24,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -233,4 +234,73 @@ var _ = Describe("PostgreSQL status real", func() {
 			Expect(list.Items[0].Pod.Name).To(Equal("sandbox-3"))
 		})
 	})
+})
+
+var _ = Describe("Configuration report", func() {
+	DescribeTable(
+		"Configuration report",
+		func(report ConfigurationReport, result *bool) {
+			if result == nil {
+				Expect(report.IsUniform()).To(BeNil())
+			} else {
+				Expect(report.IsUniform()).To(Equal(result))
+			}
+		},
+		Entry(
+			"with older and newer instance managers at the same time",
+			ConfigurationReport{
+				{
+					PodName:    "cluster-example-1",
+					ConfigHash: "",
+				},
+				{
+					PodName:    "cluster-example-2",
+					ConfigHash: "abc",
+				},
+			},
+			nil,
+		),
+		Entry(
+			"with old instance managers",
+			ConfigurationReport{
+				{
+					PodName:    "cluster-example-1",
+					ConfigHash: "",
+				},
+				{
+					PodName:    "cluster-example-2",
+					ConfigHash: "",
+				},
+			},
+			nil,
+		),
+		Entry(
+			"with instance managers that are reporting different configurations",
+			ConfigurationReport{
+				{
+					PodName:    "cluster-example-1",
+					ConfigHash: "abc",
+				},
+				{
+					PodName:    "cluster-example-2",
+					ConfigHash: "def",
+				},
+			},
+			ptr.To(false),
+		),
+		Entry(
+			"with instance manager that are reporting the same configuration",
+			ConfigurationReport{
+				{
+					PodName:    "cluster-example-1",
+					ConfigHash: "abc",
+				},
+				{
+					PodName:    "cluster-example-2",
+					ConfigHash: "abc",
+				},
+			},
+			ptr.To(true),
+		),
+	)
 })

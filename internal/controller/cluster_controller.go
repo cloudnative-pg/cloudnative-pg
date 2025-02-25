@@ -860,7 +860,8 @@ func (r *ClusterReconciler) processUnschedulableInstances(
 func (r *ClusterReconciler) reconcilePods(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
-	resources *managedResources, instancesStatus postgres.PostgresqlStatusList,
+	resources *managedResources,
+	instancesStatus postgres.PostgresqlStatusList,
 ) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
@@ -925,6 +926,16 @@ func (r *ClusterReconciler) reconcilePods(
 		cluster.Status.ReadyInstances != len(instancesStatus.Items) ||
 		!instancesStatus.IsComplete() {
 		contextLogger.Debug("Waiting for Pods to be ready")
+		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
+	}
+
+	// Stop acting here if the Pods don't have received
+	// the latest PostgreSQL configuration.
+	report := instancesStatus.ConfigurationReport()
+	if isUniform := report.IsUniform(); isUniform == nil || !*isUniform {
+		contextLogger.Debug(
+			"Waiting for the Pods to have loaded the same PostgreSQL configuration",
+			"configurationReport", report)
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
 	}
 
