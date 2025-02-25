@@ -84,10 +84,8 @@ var _ = Describe("PGBouncer Connections", Label(tests.LabelServiceConnectivity),
 			})
 
 			By("executing psql within the pgbouncer pod", func() {
-				pod, err := getPgbouncerPod(poolerBasicAuthRWSampleFile)
+				pod, err := getPgbouncerPod(namespace, poolerBasicAuthRWSampleFile)
 				Expect(err).ToNot(HaveOccurred())
-
-				GinkgoWriter.Println(pod.Name)
 
 				err = runShowHelpInPod(pod)
 				Expect(err).ToNot(HaveOccurred())
@@ -194,7 +192,7 @@ var _ = Describe("PGBouncer Connections", Label(tests.LabelServiceConnectivity),
 	})
 })
 
-func getPgbouncerPod(sampleFile string) (*corev1.Pod, error) {
+func getPgbouncerPod(namespace, sampleFile string) (*corev1.Pod, error) {
 	poolerKey, err := yaml.GetResourceNameFromYAML(env.Scheme, sampleFile)
 	if err != nil {
 		return nil, err
@@ -203,7 +201,7 @@ func getPgbouncerPod(sampleFile string) (*corev1.Pod, error) {
 	Expect(err).ToNot(HaveOccurred())
 
 	var podList corev1.PodList
-	err = env.Client.List(env.Ctx, &podList, ctrlclient.InNamespace(""),
+	err = env.Client.List(env.Ctx, &podList, ctrlclient.InNamespace(namespace),
 		ctrlclient.MatchingLabels{utils.PgbouncerNameLabel: poolerKey})
 	Expect(err).ToNot(HaveOccurred())
 	Expect(len(podList.Items)).Should(BeEquivalentTo(1))
