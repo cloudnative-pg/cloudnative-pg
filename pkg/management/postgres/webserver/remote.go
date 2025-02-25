@@ -23,9 +23,11 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	"go.uber.org/multierr"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -37,10 +39,21 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
 )
 
+const errCodeAnotherRequestInProgress = "ANOTHER_REQUEST_IN_PROGRESS"
+
+// IsRetryableError checks if the error is retryable
+func IsRetryableError(err *Error) bool {
+	if err == nil {
+		return false
+	}
+	return err.Code == errCodeAnotherRequestInProgress
+}
+
 type remoteWebserverEndpoints struct {
-	typedClient   client.Client
-	instance      *postgres.Instance
-	currentBackup *backupConnection
+	typedClient    client.Client
+	instance       *postgres.Instance
+	currentBackup  *backupConnection
+	ongoingRequest sync.Mutex
 }
 
 // StartBackupRequest the required data to execute the pg_start_backup
@@ -107,6 +120,7 @@ func (ws *remoteWebserverEndpoints) cleanupStaleCollections(ctx context.Context)
 		log.Warning("Closing stale PostgreSQL backup connection")
 
 		if err := bc.conn.Close(); err != nil {
+			bc.err = multierr.Append(bc.err, err)
 			log.Error(err, "Error while closing stale PostgreSQL backup connection")
 		}
 		bc.data.Phase = Completed
@@ -121,12 +135,12 @@ func (ws *remoteWebserverEndpoints) cleanupStaleCollections(ctx context.Context)
 			return
 		}
 
+		ws.ongoingRequest.Lock()
+		defer ws.ongoingRequest.Unlock()
+
 		if bc.data.Phase == Completed || bc.data.BackupName == "" {
 			return
 		}
-
-		bc.sync.Lock()
-		defer bc.sync.Unlock()
 
 		if bc.err != nil {
 			closeBackupConnection(bc)
@@ -296,6 +310,11 @@ func (ws *remoteWebserverEndpoints) updateInstanceManager(
 // nolint: gocognit
 func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Request) {
 	log.Trace("request method", "method", req.Method)
+	if !ws.ongoingRequest.TryLock() {
+		sendUnprocessableEntityJSONResponse(w, errCodeAnotherRequestInProgress, "")
+		return
+	}
+	defer ws.ongoingRequest.Unlock()
 
 	switch req.Method {
 	case http.MethodGet:
@@ -330,10 +349,10 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 			}
 		}()
 		if ws.currentBackup != nil {
-			log.Info("trying to close the current backup connection",
+			log.Debug("trying to close the current backup connection",
 				"backupName", ws.currentBackup.data.BackupName,
 			)
-			if err := ws.currentBackup.forceCloseConnection(); err != nil {
+			if err := ws.currentBackup.conn.Close(); err != nil {
 				if !errors.Is(err, sql.ErrConnDone) {
 					log.Error(err, "Error while closing backup connection (start)")
 				}
@@ -350,8 +369,12 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 			sendUnprocessableEntityJSONResponse(w, "CANNOT_INITIALIZE_CONNECTION", err.Error())
 			return
 		}
-		go ws.currentBackup.startBackup(context.Background(), p.BackupName)
-		sendJSONResponseWithData(w, 200, struct{}{})
+		go ws.currentBackup.startBackup(context.Background(), &ws.ongoingRequest)
+
+		res := Response[BackupResultData]{
+			Data: &ws.currentBackup.data,
+		}
+		sendJSONResponseWithData(w, 200, res)
 		return
 
 	case http.MethodPut:
@@ -377,8 +400,23 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 			return
 		}
 
+		if ws.currentBackup.err != nil {
+			if err := ws.currentBackup.conn.Close(); err != nil {
+				if !errors.Is(err, sql.ErrConnDone) {
+					log.Error(err, "Error while closing backup connection (stop)")
+				}
+			}
+
+			sendUnprocessableEntityJSONResponse(w, "BACKUP_FAILED", ws.currentBackup.err.Error())
+			return
+		}
+
+		res := Response[BackupResultData]{
+			Data: &ws.currentBackup.data,
+		}
+
 		if ws.currentBackup.data.Phase == Closing {
-			sendJSONResponseWithData(w, 200, struct{}{})
+			sendJSONResponseWithData(w, 200, res)
 			return
 		}
 
@@ -388,19 +426,10 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 			return
 		}
 
-		if ws.currentBackup.err != nil {
-			if err := ws.currentBackup.closeConnection(p.BackupName); err != nil {
-				if !errors.Is(err, sql.ErrConnDone) {
-					log.Error(err, "Error while closing backup connection (stop)")
-				}
-			}
+		ws.currentBackup.data.Phase = Closing
 
-			sendJSONResponseWithData(w, 200, struct{}{})
-			return
-		}
-		ws.currentBackup.setPhase(Closing, p.BackupName)
-		go ws.currentBackup.stopBackup(context.Background(), p.BackupName)
-		sendJSONResponseWithData(w, 200, struct{}{})
+		go ws.currentBackup.stopBackup(context.Background(), &ws.ongoingRequest)
+		sendJSONResponseWithData(w, 200, res)
 		return
 	}
 }

@@ -43,8 +43,12 @@ type BackupClient interface {
 		ctx context.Context,
 		podIP string,
 		sbq StartBackupRequest,
-	) error
-	Stop(ctx context.Context, podIP string, sbq StopBackupRequest) error
+	) (*Response[BackupResultData], error)
+	Stop(
+		ctx context.Context,
+		podIP string,
+		sbq StopBackupRequest,
+	) (*Response[BackupResultData], error)
 }
 
 // NewBackupClient creates a client capable of interacting with the instance backup endpoints
@@ -82,40 +86,42 @@ func (c *backupClient) Start(
 	ctx context.Context,
 	podIP string,
 	sbq StartBackupRequest,
-) error {
+) (*Response[BackupResultData], error) {
 	httpURL := url.Build(podIP, url.PathPgModeBackup, url.StatusPort)
 
 	// Marshalling the payload to JSON
 	jsonBody, err := json.Marshal(sbq)
 	if err != nil {
-		return fmt.Errorf("failed to marshal start payload: %w", err)
+		return nil, fmt.Errorf("failed to marshal start payload: %w", err)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "POST", httpURL, bytes.NewReader(jsonBody))
 	if err != nil {
-		return err
+		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	_, err = executeRequestWithError[struct{}](ctx, c.cli, req, false)
-	return err
+	return executeRequestWithError[BackupResultData](ctx, c.cli, req, false)
 }
 
 // Stop runs the command pg_stop_backup
-func (c *backupClient) Stop(ctx context.Context, podIP string, sbq StopBackupRequest) error {
+func (c *backupClient) Stop(
+	ctx context.Context,
+	podIP string,
+	sbq StopBackupRequest,
+) (*Response[BackupResultData], error) {
 	httpURL := url.Build(podIP, url.PathPgModeBackup, url.StatusPort)
 	// Marshalling the payload to JSON
 	jsonBody, err := json.Marshal(sbq)
 	if err != nil {
-		return fmt.Errorf("failed to marshal stop payload: %w", err)
+		return nil, fmt.Errorf("failed to marshal stop payload: %w", err)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "PUT", httpURL, bytes.NewReader(jsonBody))
 	if err != nil {
-		return err
+		return nil, err
 	}
-	_, err = executeRequestWithError[BackupResultData](ctx, c.cli, req, false)
-	return err
+	return executeRequestWithError[BackupResultData](ctx, c.cli, req, false)
 }
 
 func executeRequestWithError[T any](
