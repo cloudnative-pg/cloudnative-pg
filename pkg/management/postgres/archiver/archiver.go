@@ -151,7 +151,7 @@ func internalRun(
 	// We allow plugins to archive WALs even if there is no plugin
 	// directly enabled by the user, to retain compatibility with
 	// the old API.
-	if err := archiveWALViaPlugins(ctx, cluster, path.Join(pgData, walName)); err != nil {
+	if err := archiveWALViaPlugins(ctx, cluster, pgData, walName); err != nil {
 		return err
 	}
 
@@ -260,9 +260,15 @@ func internalRun(
 func archiveWALViaPlugins(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
+	pgData string,
 	walName string,
 ) error {
 	contextLogger := log.FromContext(ctx)
+
+	// check if the `walName` is an absolute path or just the filename
+	if !filepath.IsAbs(walName) {
+		walName = filepath.Join(pgData, walName)
+	}
 
 	plugins := repository.New()
 	availablePluginNames, err := plugins.RegisterUnixSocketPluginsInPath(configuration.Current.PluginSocketDir)
