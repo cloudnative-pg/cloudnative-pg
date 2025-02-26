@@ -51,7 +51,7 @@ var _ = Describe("webhook", Serial, Label(tests.LabelDisruptive, tests.LabelOper
 	var err error
 
 	BeforeEach(func() {
-		if testLevelEnv.Depth < int(level) {
+		if testLevel < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 	})

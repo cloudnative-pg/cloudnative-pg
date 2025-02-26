@@ -69,7 +69,7 @@ var _ = Describe("Replica Mode", Label(tests.LabelReplication), func() {
 
 	var err error
 	BeforeEach(func() {
-		if testLevelEnv.Depth < int(level) {
+		if testLevel < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 	})
@@ -507,7 +507,7 @@ var _ = Describe("Replica switchover", Label(tests.LabelReplication), Ordered, f
 	var namespace, clusterAName, clusterBName string
 
 	BeforeAll(func() {
-		if testLevelEnv.Depth < int(level) {
+		if testLevel < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 	})

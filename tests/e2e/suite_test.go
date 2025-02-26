@@ -56,7 +56,7 @@ const (
 
 var (
 	env                     *environment.TestingEnvironment
-	testLevelEnv            *tests.TestEnvLevel
+	testLevel               int
 	testCloudVendorEnv      *cloudvendors.TestEnvVendor
 	expectedOperatorPodName string
 	operatorPodWasRenamed   bool
@@ -130,7 +130,7 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	_ = k8sscheme.AddToScheme(env.Scheme)
 	_ = apiv1.AddToScheme(env.Scheme)
 
-	if testLevelEnv, err = tests.TestLevel(); err != nil {
+	if testLevel, err = tests.TestLevel(); err != nil {
 		panic(err)
 	}
 

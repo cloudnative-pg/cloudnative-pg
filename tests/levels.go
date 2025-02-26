@@ -47,12 +47,13 @@ type TestEnvLevel struct {
 	Depth int
 }
 
-// TestLevel creates the environment for testing
-func TestLevel() (*TestEnvLevel, error) {
+// TestLevel gets the level for testing from the environment TEST_DEPTH,
+// or sets the default value
+func TestLevel() (int, error) {
 	if depthEnv, exists := os.LookupEnv(testDepthEnvVarName); exists {
 		depth, err := strconv.Atoi(depthEnv)
-		return &TestEnvLevel{depth}, err
+		return depth, err
 	}
 
-	return &TestEnvLevel{defaultTestDepth}, nil
+	return defaultTestDepth, nil
 }
