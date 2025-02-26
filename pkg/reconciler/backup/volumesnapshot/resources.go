@@ -19,7 +19,6 @@ package volumesnapshot
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -69,26 +68,16 @@ func (err volumeSnapshotError) Error() string {
 // IsRetryable returns true if the external snapshotter controller
 // will retry taking the snapshot
 func (err volumeSnapshotError) isRetryable() bool {
-	if err.InternalError.Message == nil {
-		return false
-	}
-
-	// Obviously this is a heuristic, but unfortunately we don't have
-	// the information we need.
-	// We're trying to handle the cases where the external-snapshotter
-	// controller failed on a conflict with the following error:
-	//
-	// > the object has been modified; please apply your changes to the
-	// > latest version and try again
-
 	// TODO: instead of blindingly retry on matching errors, we
 	// should enhance our CRD with a configurable deadline. After
 	// the deadline have been met on err.InternalError.CreatedAt
 	// the backup can be marked as failed
 
-	return strings.Contains(
-		*err.InternalError.Message,
-		"the object has been modified")
+	if err.InternalError.Message == nil {
+		return false
+	}
+
+	return isRetriableErrorMessage(*err.InternalError.Message)
 }
 
 // slice represents a slice of []storagesnapshotv1.VolumeSnapshot
