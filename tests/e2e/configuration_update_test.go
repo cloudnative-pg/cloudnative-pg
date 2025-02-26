@@ -138,7 +138,7 @@ var _ = Describe("Configuration update", Ordered, Label(tests.LabelClusterMetada
 	}
 
 	BeforeAll(func() {
-		if testLevelEnv.Depth < int(level) {
+		if testLevel < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 
@@ -470,7 +470,7 @@ var _ = Describe("Configuration update with primaryUpdateMethod", Label(tests.La
 	const level = tests.High
 
 	BeforeEach(func() {
-		if testLevelEnv.Depth < int(level) {
+		if testLevel < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 	})

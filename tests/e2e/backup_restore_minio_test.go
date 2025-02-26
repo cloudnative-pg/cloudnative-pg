@@ -45,7 +45,7 @@ var _ = Describe("MinIO - Backup and restore", Label(tests.LabelBackupRestore), 
 		barmanCloudBackupLogEntry = "Starting barman-cloud-backup"
 	)
 	BeforeEach(func() {
-		if testLevelEnv.Depth < int(tests.High) {
+		if testLevel < int(tests.High) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 	})
@@ -564,7 +564,7 @@ var _ = Describe("MinIO - Clusters Recovery from Barman Object Store", Label(tes
 		tableName                       = "to_restore"
 	)
 	BeforeEach(func() {
-		if testLevelEnv.Depth < int(tests.High) {
+		if testLevel < int(tests.High) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 	})

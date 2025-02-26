@@ -56,7 +56,7 @@ const (
 
 var (
 	env                     *environment.TestingEnvironment
-	testLevelEnv            *tests.TestEnvLevel
+	testLevel               int
 	testCloudVendorEnv      *cloudvendors.TestEnvVendor
 	expectedOperatorPodName string
 	operatorPodWasRenamed   bool
@@ -121,8 +121,7 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	return jsonObjs
 }, func(jsonObjs []byte) {
 	var err error
-	// We are creating new testing env object again because above testing env can not serialize and
-	// accessible to all nodes (specs)
+	// Create a testing env object for each parallel process
 	if env, err = environment.NewTestingEnvironment(); err != nil {
 		panic(err)
 	}
@@ -130,7 +129,7 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	_ = k8sscheme.AddToScheme(env.Scheme)
 	_ = apiv1.AddToScheme(env.Scheme)
 
-	if testLevelEnv, err = tests.TestLevel(); err != nil {
+	if testLevel, err = tests.TestLevel(); err != nil {
 		panic(err)
 	}
 
