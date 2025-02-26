@@ -127,6 +127,9 @@ func (fc *ForwardConnection) StartAndWait() error {
 			return
 		}
 	}()
+	if err != nil {
+		return fmt.Errorf("error starting port-forward: %w", err)
+	}
 	select {
 	case <-fc.readyChannel:
 		ginkgo.GinkgoWriter.Println("port-forward ready")
