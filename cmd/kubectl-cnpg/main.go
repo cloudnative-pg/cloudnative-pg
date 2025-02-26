@@ -20,6 +20,7 @@ kubectl-cnp is a plugin to manage your CloudNativePG clusters
 package main
 
 import (
+	"errors"
 	"os"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
@@ -30,6 +31,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/backup"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/certificate"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/destroy"
+	pluginErrors "github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/errors"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/fence"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/fio"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/hibernate"
@@ -139,6 +141,10 @@ func main() {
 	}
 
 	if err := rootCmd.Execute(); err != nil {
+		var pluginErr *pluginErrors.PluginError
+		if errors.As(err, &pluginErr) {
+			os.Exit(pluginErr.Code)
+		}
 		os.Exit(1)
 	}
 }

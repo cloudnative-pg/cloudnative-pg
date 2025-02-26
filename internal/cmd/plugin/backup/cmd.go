@@ -32,6 +32,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
+	pluginErrors "github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin/errors"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -130,7 +131,9 @@ func NewCmd() *cobra.Command {
 				&cluster,
 			)
 			if err != nil {
-				return fmt.Errorf("while getting cluster %s: %w", clusterName, err)
+				return pluginErrors.NewKubeAPIServerError(
+					fmt.Errorf("while getting cluster %s: %w", clusterName, err),
+				)
 			}
 
 			parsedOnline, err := parseOptionalBooleanString(online)
@@ -252,8 +255,10 @@ func createBackup(ctx context.Context, options backupCommandOptions) error {
 	err := plugin.Client.Create(ctx, &backup)
 	if err == nil {
 		fmt.Printf("backup/%v created\n", backup.Name)
+		return nil
 	}
-	return err
+
+	return pluginErrors.NewKubeAPIServerError(fmt.Errorf("while creating backup: %w", err))
 }
 
 func parseOptionalBooleanString(rawBool string) (*bool, error) {
