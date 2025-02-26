@@ -2828,17 +2828,17 @@ func AssertClusterReplicationSlotsAligned(
 ) {
 	podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
 	Expect(err).ToNot(HaveOccurred())
-	Eventually(func() bool {
+	Eventually(func(g Gomega) {
 		var lsnList []string
 		for _, pod := range podList.Items {
 			out, err := replicationslot.GetReplicationSlotLsnsOnPod(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
 				namespace, clusterName, postgres.AppDBName, pod)
-			Expect(err).ToNot(HaveOccurred())
+			g.Expect(err).ToNot(HaveOccurred(), "error getting replication slot lsn on pod %v", pod.Name)
 			lsnList = append(lsnList, out...)
 		}
-		return replicationslot.AreSameLsn(lsnList)
-	}, 300).Should(BeEquivalentTo(true),
+		g.Expect(replicationslot.AreSameLsn(lsnList)).To(BeTrue())
+	}).WithTimeout(300*time.Second).WithPolling(2*time.Second).Should(Succeed(),
 		func() string {
 			return replicationslot.PrintReplicationSlots(
 				env.Ctx, env.Client, env.Interface, env.RestClientConfig,
