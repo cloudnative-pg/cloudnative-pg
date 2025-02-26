@@ -3689,6 +3689,11 @@ spec:
                           - ro
                           type: string
                         type: array
+                      kubernetesClusterDomain:
+                        description: |-
+                          KubernetesClusterDomain is used to generate the domain portion of the service FQDN.
+                          If not provided, "cluster.local" is used.
+                        type: string
                     type: object
                 type: object
               maxSyncReplicas:

@@ -2161,6 +2161,9 @@ const (
 
 // ManagedServices represents the services managed by the cluster.
 type ManagedServices struct {
+	// KubernetesClusterDomain is used to generate the domain portion of the service FQDN.
+	// If not provided, "cluster.local" is used.
+	KubernetesClusterDomain string `json:"kubernetesClusterDomain,omitempty"`
 	// DisabledDefaultServices is a list of service types that are disabled by default.
 	// Valid values are "r", and "ro", representing read, and read-only services.
 	// +optional
