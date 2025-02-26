@@ -121,8 +121,7 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	return jsonObjs
 }, func(jsonObjs []byte) {
 	var err error
-	// We are creating new testing env object again because above testing env can not serialize and
-	// accessible to all nodes (specs)
+	// Create a testing env object for each parallel process
 	if env, err = environment.NewTestingEnvironment(); err != nil {
 		panic(err)
 	}

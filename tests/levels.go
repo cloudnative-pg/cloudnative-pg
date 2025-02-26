@@ -42,11 +42,6 @@ const testDepthEnvVarName = "TEST_DEPTH"
 // By default, we run tests with at least a medium level of importance
 const defaultTestDepth = int(Medium)
 
-// TestEnvLevel struct for operator testing
-type TestEnvLevel struct {
-	Depth int
-}
-
 // TestLevel gets the level for testing from the environment TEST_DEPTH,
 // or sets the default value
 func TestLevel() (int, error) {
