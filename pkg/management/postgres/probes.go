@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
@@ -126,7 +125,7 @@ func (instance *Instance) GetStatus() (result *postgres.PostgresqlStatus, err er
 		return result, err
 	}
 
-	result.InstanceArch = runtime.GOARCH
+	result.InstanceArch = instance.GetArchitecture()
 
 	result.ExecutableHash, err = executablehash.Get()
 	if err != nil {

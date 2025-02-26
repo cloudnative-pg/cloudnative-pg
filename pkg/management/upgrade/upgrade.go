@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"runtime"
 	"syscall"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
@@ -80,7 +79,7 @@ func FromReader(
 	// Validate the hash of this instance manager
 	if err := validateInstanceManagerHash(typedClient,
 		instance.GetClusterName(), instance.GetNamespaceName(),
-		runtime.GOARCH, newHash); err != nil {
+		instance.GetArchitecture(), newHash); err != nil {
 		return fmt.Errorf("while validating instance manager binary: %w", err)
 	}
 
