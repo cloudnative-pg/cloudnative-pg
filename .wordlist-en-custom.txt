@@ -1147,6 +1147,7 @@ rehydrated
 rehydration
 relabelings
 relatime
+retryable
 replicationSecretVersion
 replicationSlots
 replicationTLSSecret
