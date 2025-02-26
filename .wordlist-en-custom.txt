@@ -1328,6 +1328,7 @@ timeoutSeconds
 tls
 tmp
 tmpfs
+tolerationSeconds
 tolerations
 topologies
 topologyKey
