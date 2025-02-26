@@ -18,6 +18,7 @@ package e2e
 
 import (
 	"fmt"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -462,16 +463,20 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 			It("can drain the primary node and recover the cluster when uncordoned", func() {
 				AssertCreateCluster(namespace, clusterName, sampleFile, env)
 
+				var drainedNodeName string
 				By("waiting for the jobs to be removed", func() {
 					// Wait for jobs to be removed
 					timeout := 180
+					var podList *corev1.PodList
 					Eventually(func() (int, error) {
-						podList, err := pods.List(env.Ctx, env.Client, namespace)
+						var err error
+						podList, err = pods.List(env.Ctx, env.Client, namespace)
 						if err != nil {
 							return 0, err
 						}
 						return len(podList.Items), err
 					}, timeout).Should(BeEquivalentTo(1))
+					drainedNodeName = podList.Items[0].Spec.NodeName
 				})
 
 				// Load test data
@@ -490,16 +495,15 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 					testTimeouts[testsUtils.DrainNode],
 				)
 
-				By("verifying the primary is now pending", func() {
-					timeout := 180
-					// Expect a failover to have happened
-					Eventually(func() (string, error) {
+				By("verifying the primary is now pending or somewhere else", func() {
+					Eventually(func(g Gomega) {
 						pod, err := pods.Get(env.Ctx, env.Client, namespace, clusterName+"-1")
-						if err != nil {
-							return "", err
-						}
-						return string(pod.Status.Phase), err
-					}, timeout).Should(BeEquivalentTo("Pending"))
+						g.Expect(err).ToNot(HaveOccurred())
+						g.Expect(pod).Should(SatisfyAny(
+							HaveField("Spec.NodeName", Not(BeEquivalentTo(drainedNodeName))),
+							HaveField("Status.Phase", BeEquivalentTo("Pending")),
+						))
+					}).WithTimeout(180 * time.Second).WithPolling(PollingTime * time.Second).Should(Succeed())
 				})
 
 				By("uncordoning all nodes", func() {
