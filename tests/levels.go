@@ -19,8 +19,6 @@ package tests
 import (
 	"os"
 	"strconv"
-
-	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/environment"
 )
 
 // Level - Define test importance. Each test should define its own importance
@@ -46,20 +44,15 @@ const defaultTestDepth = int(Medium)
 
 // TestEnvLevel struct for operator testing
 type TestEnvLevel struct {
-	*environment.TestingEnvironment
 	Depth int
 }
 
 // TestLevel creates the environment for testing
 func TestLevel() (*TestEnvLevel, error) {
-	env, err := environment.NewTestingEnvironment()
-	if err != nil {
-		return nil, err
-	}
 	if depthEnv, exists := os.LookupEnv(testDepthEnvVarName); exists {
 		depth, err := strconv.Atoi(depthEnv)
-		return &TestEnvLevel{env, depth}, err
+		return &TestEnvLevel{depth}, err
 	}
 
-	return &TestEnvLevel{env, defaultTestDepth}, err
+	return &TestEnvLevel{defaultTestDepth}, nil
 }
