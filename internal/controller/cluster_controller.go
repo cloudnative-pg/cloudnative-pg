@@ -931,8 +931,8 @@ func (r *ClusterReconciler) reconcilePods(
 
 	// Stop acting here if the Pods don't have received
 	// the latest PostgreSQL configuration.
-	report := instancesStatus.ConfigurationReport()
-	if isUniform := report.IsUniform(); isUniform == nil || !*isUniform {
+	report := instancesStatus.GetConfigurationReport()
+	if !report.IsUniform() {
 		contextLogger.Debug(
 			"Waiting for the Pods to have loaded the same PostgreSQL configuration",
 			"configurationReport", report)
