@@ -1111,7 +1111,6 @@ rehydrated
 rehydration
 relabelings
 relatime
-retryable
 replicationSecretVersion
 replicationSlots
 replicationTLSSecret
@@ -1128,6 +1127,7 @@ resourcerequirements
 restoreAdditionalCommandArgs
 resync
 retentionPolicy
+retryable
 reusePVC
 ro
 robfig
