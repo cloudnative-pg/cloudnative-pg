@@ -24,7 +24,6 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	"github.com/cloudnative-pg/machinery/pkg/types"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/utils/ptr"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -424,9 +423,9 @@ func (list PostgresqlStatusList) PrimaryNames() []string {
 	return result
 }
 
-// ConfigurationReport extracts the configuration report from a Pod
+// GetConfigurationReport extracts the configuration report from a Pod
 // status list
-func (list PostgresqlStatusList) ConfigurationReport() ConfigurationReport {
+func (list PostgresqlStatusList) GetConfigurationReport() ConfigurationReport {
 	result := make([]ConfigurationReportEntry, len(list.Items))
 	for i := range list.Items {
 		result[i].PodName = list.Items[i].Pod.Name
@@ -458,16 +457,16 @@ type ConfigurationReport []ConfigurationReportEntry
 //     configuration is used across all the Pods
 //   - false when every Pod reports the configuration and there
 //     are two Pods using different configurations
-//   - nil when there is a Pod that isn't reporting its configuration
-//     and we can't tell whether the configurations are uniform or not.
-func (report ConfigurationReport) IsUniform() *bool {
+func (report ConfigurationReport) IsUniform() bool {
 	detectedConfigurationHash := stringset.New()
 	for _, item := range report {
 		if item.ConfigHash == "" {
-			return nil
+			// a Pod that isn't reporting its configuration,
+			// and we can't tell whether the configurations are uniform or not.
+			return false
 		}
 		detectedConfigurationHash.Put(item.ConfigHash)
 	}
 
-	return ptr.To(detectedConfigurationHash.Len() == 1)
+	return detectedConfigurationHash.Len() == 1
 }
