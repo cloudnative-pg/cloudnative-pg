@@ -234,3 +234,68 @@ var _ = Describe("PostgreSQL status real", func() {
 		})
 	})
 })
+
+var _ = Describe("Configuration report", func() {
+	DescribeTable(
+		"Configuration report",
+		func(report ConfigurationReport, result bool) {
+			Expect(report.IsUniform()).To(Equal(result))
+		},
+		Entry(
+			"with older and newer instance managers at the same time",
+			ConfigurationReport{
+				{
+					PodName:    "cluster-example-1",
+					ConfigHash: "",
+				},
+				{
+					PodName:    "cluster-example-2",
+					ConfigHash: "abc",
+				},
+			},
+			false,
+		),
+		Entry(
+			"with old instance managers",
+			ConfigurationReport{
+				{
+					PodName:    "cluster-example-1",
+					ConfigHash: "",
+				},
+				{
+					PodName:    "cluster-example-2",
+					ConfigHash: "",
+				},
+			},
+			false,
+		),
+		Entry(
+			"with instance managers that are reporting different configurations",
+			ConfigurationReport{
+				{
+					PodName:    "cluster-example-1",
+					ConfigHash: "abc",
+				},
+				{
+					PodName:    "cluster-example-2",
+					ConfigHash: "def",
+				},
+			},
+			false,
+		),
+		Entry(
+			"with instance manager that are reporting the same configuration",
+			ConfigurationReport{
+				{
+					PodName:    "cluster-example-1",
+					ConfigHash: "abc",
+				},
+				{
+					PodName:    "cluster-example-2",
+					ConfigHash: "abc",
+				},
+			},
+			true,
+		),
+	)
+})
