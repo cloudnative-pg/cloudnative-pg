@@ -227,7 +227,7 @@ func (ws *remoteWebserverEndpoints) isServerStartedUp(w http.ResponseWriter, req
 	// If `pg_rewind` is running, it means that the Pod is starting up.
 	// We need to report it healthy to avoid being killed by the kubelet.
 	if ws.instance.PgRewindIsRunning || ws.instance.MightBeUnavailable() {
-		log.Trace("startup probe skipped")
+		log.Trace("Startup probe skipped")
 		_, _ = fmt.Fprint(w, "Skipped")
 		return
 	}
