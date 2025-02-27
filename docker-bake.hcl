@@ -91,7 +91,7 @@ target "default" {
   }
 
   output = [
-    "type=registry,registry.insecure=${insecure}",
+    "type=image,registry.insecure=${insecure}",
   ]
 
   attest = [
