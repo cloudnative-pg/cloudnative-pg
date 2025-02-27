@@ -233,7 +233,7 @@ func newMetrics() *metrics {
 				Subsystem: subsystem,
 				Name:      "wal_write",
 				Help: "Number of times WAL buffers were written out to disk via XLogWrite request." +
-					" Only available on PG 14+. Moved to pg_stat_io from PG 18.",
+					" Only available on PG 14 to 17.",
 			}, []string{"stats_reset"}),
 			WalSync: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 				Namespace: PrometheusNamespace,
@@ -241,7 +241,7 @@ func newMetrics() *metrics {
 				Name:      "wal_sync",
 				Help: "Number of times WAL files were synced to disk via issue_xlog_fsync request " +
 					"(if fsync is on and wal_sync_method is either fdatasync, fsync or fsync_writethrough, otherwise zero)." +
-					" Only available on PG 14+. Moved to pg_stat_io from PG 18.",
+					" Only available on PG 14 to 17.",
 			}, []string{"stats_reset"}),
 			WalWriteTime: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 				Namespace: PrometheusNamespace,
@@ -250,7 +250,7 @@ func newMetrics() *metrics {
 				Help: "Total amount of time spent writing WAL buffers to disk via XLogWrite request, in milliseconds " +
 					"(if track_wal_io_timing is enabled, otherwise zero). This includes the sync time when wal_sync_method " +
 					"is either open_datasync or open_sync." +
-					" Only available on PG 14+. Moved to pg_stat_io from PG 18.",
+					" Only available on PG 14 to 17.",
 			}, []string{"stats_reset"}),
 			WalSyncTime: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 				Namespace: PrometheusNamespace,
@@ -258,7 +258,7 @@ func newMetrics() *metrics {
 				Name:      "wal_sync_time",
 				Help: "Total amount of time spent syncing WAL files to disk via issue_xlog_fsync request, in milliseconds " +
 					"(if track_wal_io_timing is enabled, fsync is on, and wal_sync_method is either fdatasync, fsync or " +
-					"fsync_writethrough, otherwise zero). Only available on PG 14+. Moved to pg_stat_io from PG 18.",
+					"fsync_writethrough, otherwise zero). Only available on PG 14 to 17.",
 			}, []string{"stats_reset"}),
 		},
 	}
@@ -428,7 +428,7 @@ func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric) {
 	}
 
 	if version, _ := e.instance.GetPgVersion(); version.Major >= 14 {
-		if err := collectPGWALStat(e); err != nil {
+		if err := collectPGStatWAL(e); err != nil {
 			log.Error(err, "while collecting pg_stat_wal")
 			e.Metrics.Error.Set(1)
 			e.Metrics.PgCollectionErrors.WithLabelValues("Collect.PGWALStat").Inc()
