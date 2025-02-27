@@ -18,11 +18,15 @@ package controller
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"time"
 
 	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -160,6 +164,38 @@ var _ = Describe("backup_controller barmanObjectStore unit tests", func() {
 })
 
 var _ = Describe("backup_controller volumeSnapshot unit tests", func() {
+	Context("isErrorRetryable", func() {
+		It("recognizes server timeout errors", func() {
+			err := apierrs.NewServerTimeout(schema.GroupResource{}, "test", 1)
+			Expect(isErrorRetryable(err)).To(BeTrue())
+		})
+
+		It("recognizes conflict errors", func() {
+			err := apierrs.NewConflict(schema.GroupResource{}, "test", nil)
+			Expect(isErrorRetryable(err)).To(BeTrue())
+		})
+
+		It("recognizes internal errors", func() {
+			err := apierrs.NewInternalError(fmt.Errorf("test error"))
+			Expect(isErrorRetryable(err)).To(BeTrue())
+		})
+
+		It("recognizes context deadline exceeded errors", func() {
+			err := context.DeadlineExceeded
+			Expect(isErrorRetryable(err)).To(BeTrue())
+		})
+
+		It("does not retry on not found errors", func() {
+			err := apierrs.NewNotFound(schema.GroupResource{}, "test")
+			Expect(isErrorRetryable(err)).To(BeFalse())
+		})
+
+		It("does not retry on random errors", func() {
+			err := errors.New("random error")
+			Expect(isErrorRetryable(err)).To(BeFalse())
+		})
+	})
+
 	When("there's a running backup", func() {
 		It("prevents concurrent backups", func() {
 			backupList := apiv1.BackupList{

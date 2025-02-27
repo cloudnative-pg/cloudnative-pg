@@ -36,6 +36,7 @@ func isRetriableErrorMessage(msg string) bool {
 		isExplicitlyRetriableError,
 		isRetryableHTTPError,
 		isConflictError,
+		isContextDeadlineExceededError,
 	}
 
 	for _, isRetryableFunc := range isRetryableFuncs {
@@ -45,6 +46,12 @@ func isRetriableErrorMessage(msg string) bool {
 	}
 
 	return false
+}
+
+// isContextDeadlineExceededError detects context deadline exceeded errors
+// These are timeouts that may be retried by the Kubernetes CSI controller
+func isContextDeadlineExceededError(msg string) bool {
+	return strings.Contains(msg, "deadline exceeded") || strings.Contains(msg, "timed out")
 }
 
 // isConflictError detects optimistic locking errors
