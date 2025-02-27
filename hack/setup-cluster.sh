@@ -74,6 +74,8 @@ export DOCKER_DEFAULT_PLATFORM
 # Constants
 registry_volume=registry_dev_data
 registry_name=registry.dev
+registry_net=registry
+builder_name=cnpg-builder
 
 # #########################################################################
 # IMPORTANT: here we build a catalog of images that will be needed in the
@@ -350,8 +352,12 @@ ensure_registry() {
     docker volume create "${registry_volume}"
   fi
 
+  if ! docker network inspect "${registry_net}" &>/dev/null; then
+    docker network create "${registry_net}"
+  fi
+
   if ! docker inspect "${registry_name}" &>/dev/null; then
-    docker container run -d --name "${registry_name}" -v "${registry_volume}:/var/lib/registry" --restart always -p 5000:5000 registry:2
+    docker container run -d --name "${registry_name}" --network "${registry_net}" -v "${registry_volume}:/var/lib/registry" --restart always -p 5000:5000 registry:2
   fi
 }
 
@@ -359,6 +365,20 @@ check_registry() {
   local network=$1
   docker network inspect "${network}" | \
     jq -r ".[].Containers | .[] | select(.Name==\"${registry_name}\") | .Name"
+}
+
+# An existing builder will not have any knowledge of the local registry or the
+# any host outside the builder, but when having the builder inside Kubernetes
+# this is fixed since we already solved the issue of the kubernetes cluster reaching
+# out the local registry. The following functions will handle that builder
+create_builder() {
+  docker buildx rm "${builder_name}" &>/dev/null || true
+  # If ENABLE_REGISTRY is not set, we don't need to define driver-opt network
+  if [ -n "${ENABLE_REGISTRY:-}" ]; then
+    docker buildx create --name "${builder_name}" --driver-opt "network=${registry_net}"
+  else
+    docker buildx create --name "${builder_name}"
+  fi
 }
 
 deploy_fluentd() {
@@ -616,14 +636,14 @@ load() {
     ENABLE_REGISTRY=true
   fi
 
+  create_builder
+
   echo "${bright}Building operator from current worktree${reset}"
 
-  CONTROLLER_IMG="$(ENABLE_REGISTRY="${ENABLE_REGISTRY}" print_image)"
-  make -C "${ROOT_DIR}" CONTROLLER_IMG="${CONTROLLER_IMG}" ARCH="${ARCH}" docker-build
+  make -C "${ROOT_DIR}" IMAGE_TAG="$(print_tag)" registry="${registry_name}:5000" insecure="true" \
+    ARCH="${ARCH}" BUILDER_NAME=${builder_name} docker-build
 
   echo "${bright}Loading new operator image on cluster ${CLUSTER_NAME}${reset}"
-
-  load_image "${CLUSTER_NAME}" "${CONTROLLER_IMG}"
 
   echo "${bright}Done loading new operator image on cluster ${CLUSTER_NAME}${reset}"
 
@@ -635,16 +655,16 @@ load() {
 
     echo "${bright}Building a 'prime' operator from current worktree${reset}"
 
-    PRIME_CONTROLLER_IMG="${CONTROLLER_IMG}-prime"
     CURRENT_VERSION=$(make -C "${ROOT_DIR}" -s print-version)
     PRIME_VERSION="${CURRENT_VERSION}-prime"
-    make -C "${ROOT_DIR}" CONTROLLER_IMG="${PRIME_CONTROLLER_IMG}"  VERSION="${PRIME_VERSION}" \
-      ARCH="${ARCH}" docker-build
-
-    load_image "${CLUSTER_NAME}" "${PRIME_CONTROLLER_IMG}"
+    PRIME_TAG="$(print_tag)-prime"
+    make -C "${ROOT_DIR}" IMAGE_TAG="${PRIME_TAG}" VERSION="${PRIME_VERSION}" registry="${registry_name}:5000" insecure="true" \
+      ARCH="${ARCH}" BUILDER_NAME="${builder_name}" docker-build
 
     echo "${bright}Done loading new 'prime' operator image on cluster ${CLUSTER_NAME}${reset}"
   fi
+
+  docker buildx rm "${builder_name}"
 }
 
 deploy() {
@@ -661,12 +681,16 @@ deploy() {
   echo "${bright}Done deploying manifests from current worktree on cluster ${CLUSTER_NAME}${reset}"
 }
 
-print_image() {
+print_tag() {
   local tag=devel
   if [ -n "${ENABLE_REGISTRY:-}" ] || "check_registry_${ENGINE}"; then
     tag=latest
   fi
-  echo "${registry_name}:5000/cloudnative-pg:${tag}"
+  echo "${tag}"
+}
+
+print_image() {
+  echo "${registry_name}:5000/cloudnative-pg-testing:$(print_tag)"
 }
 
 export_logs() {
@@ -766,7 +790,7 @@ main() {
   fi
   KUBECTL_VERSION=${KUBECTL_VERSION:-$K8S_VERSION}
 
-  # Only here the K8S_VERSION veriable contains its final value
+  # Only here the K8S_VERSION variable contains its final value
   # so we can set the default cluster name
   CLUSTER_NAME=${CLUSTER_NAME:-pg-operator-e2e-${K8S_VERSION//./-}}
 
