@@ -88,22 +88,21 @@ kubectl delete pod [primary pod] --grace-period=1
 
 ### Liveness Probe Failure
 
-By default, after three consecutive liveness probe failures, the `postgres`
-container will be considered failed. The Pod will remain part of the `Cluster`,
-but the *kubelet* will attempt to restart the failed container. If the issue
-causing the failure persists and cannot be resolved, you can manually delete
-the Pod.
-
-In both cases, self-healing occurs automatically once the underlying issues are
-resolved.
+If the [liveness probe](instance_manager.md#liveness-probe) fails, the
+`postgres` container is marked as failed. The Pod remains part of the
+`Cluster`, but the *kubelet* will attempt to restart the container.
+If the failure persists and cannot be resolved, you may manually delete the
+Pod.
+In both cases, the system will automatically recover once the underlying issue
+is fixed.
 
 ### Readiness Probe Failure
 
-By default, after three consecutive readiness probe failures, the Pod will be
-marked as *not ready*. It will remain part of the `Cluster`, and no new Pod
-will be created. If the issue causing the failure cannot be resolved, you can
-manually delete the Pod. Once the failure is addressed, the Pod will
-automatically regain its previous role.
+If the [readiness probe](instance_manager.md#readiness-probe) fails, the Pod is
+marked as *not ready* but remains part of the `Cluster`. No new Pod will be
+created.
+If the issue persists, you may manually delete the Pod. Once resolved, the Pod
+will automatically resume its previous role.
 
 ### Worker node drained
 
