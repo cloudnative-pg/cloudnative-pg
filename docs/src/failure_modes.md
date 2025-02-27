@@ -39,8 +39,6 @@ For more information, please refer to the
 A pod belonging to a `Cluster` can fail in the following ways:
 
 * the pod is explicitly deleted by the user;
-* the readiness probe on its `postgres` container fails;
-* the liveness probe on its `postgres` container fails;
 * the Kubernetes worker node is drained;
 * the Kubernetes worker node where the pod is scheduled fails.
 
@@ -86,39 +84,15 @@ kubectl delete pod [primary pod] --grace-period=1
     triggers a failover promoting the most aligned standby, without
     the guarantee that the primary had been shut down.
 
-### Liveness Probe Failure
+### Worker Node Drained
 
-If the [liveness probe](instance_manager.md#liveness-probe) fails, the
-`postgres` container is marked as failed. The Pod remains part of the
-`Cluster`, but the *kubelet* will attempt to restart the container.
-If the failure persists and cannot be resolved, you may manually delete the
-Pod.
-In both cases, the system will automatically recover once the underlying issue
-is fixed.
-
-### Readiness Probe Failure
-
-If the [readiness probe](instance_manager.md#readiness-probe) fails, the Pod is
-marked as *not ready* but remains part of the `Cluster`. No new Pod will be
-created.
-If the issue persists, you may manually delete the Pod. Once resolved, the Pod
-will automatically resume its previous role.
-
-### Worker node drained
-
-The pod will be evicted from the worker node and removed from the service. A
-new pod will be created on a different worker node from a physical backup of the
-*primary* if the `reusePVC` option of the `nodeMaintenanceWindow` parameter
-is set to `off` (default: `on` during maintenance windows, `off` otherwise).
-
-The `PodDisruptionBudget` may prevent the pod from being evicted if there
-is at least another pod that is not ready.
+If a worker node is drained, the Pod will be evicted and removed from the
+service, provided the `PodDisruptionBudget` allows it.
 
 !!! Note
-    Single instance clusters prevent node drain when `reusePVC` is
-    set to `false`. Refer to the [Kubernetes Upgrade section](kubernetes_upgrade.md).
-
-Self-healing will happen as soon as the *apiserver* is notified.
+    Single-instance clusters prevent node draining by default. See the
+    ["Kubernetes Upgrade" section](kubernetes_upgrade.md#postgresql-clusters-used-for-development-or-testing)
+    for details.
 
 ### Worker Node Failure
 
