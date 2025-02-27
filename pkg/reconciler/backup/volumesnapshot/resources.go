@@ -68,10 +68,13 @@ func (err volumeSnapshotError) Error() string {
 // IsRetryable returns true if the external snapshotter controller
 // will retry taking the snapshot
 func (err volumeSnapshotError) isRetryable() bool {
-	// TODO: instead of blindingly retry on matching errors, we
-	// should enhance our CRD with a configurable deadline. After
-	// the deadline have been met on err.InternalError.CreatedAt
-	// the backup can be marked as failed
+	// The Kubernetes CSI driver/controller will automatically retry snapshot creation
+	// for certain errors, including timeouts. We use pattern matching to identify
+	// these retryable errors and handle them appropriately.
+	//
+	// TODO: Enhance our CRD with a configurable deadline/max retry time.
+	// After the deadline has been met based on err.InternalError.CreatedAt,
+	// the backup should be marked as failed instead of continuing to retry.
 
 	if err.InternalError.Message == nil {
 		return false
