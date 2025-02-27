@@ -45,44 +45,40 @@ A pod belonging to a `Cluster` can fail in the following ways:
 Each one of these failures has different effects on the `Cluster` and the
 services managed by the operator.
 
-### Pod deleted by the user
+### Pod Deleted by the User
 
-The operator is notified of the deletion. A new pod belonging to the
-`Cluster` will be automatically created reusing the existing PVC, if available,
-or starting from a physical backup of the *primary* otherwise.
+When a Pod is deleted, the operator is notified and automatically creates a new
+Pod within the `Cluster`. If the existing PVC group is available, it will be
+reused; otherwise, the Pod is recreated as a replica from a physical backup of
+the primary.
 
 !!! Important
-    In case of deliberate deletion of a pod, `PodDisruptionBudget` policies
-    will not be enforced.
+    When a Pod is manually deleted, `PodDisruptionBudget` policies are not
+    enforced.
 
-Self-healing will happen as soon as the *apiserver* is notified.
+#### Simulating a Pod Failure
 
-You can trigger a sudden failure on a given pod of the cluster using the
-following generic command:
+You can simulate a sudden failure of a specific Pod using the following
+command:
 
 ```sh
 kubectl delete -n [namespace] \
-  pod/[cluster-name]-[serial] --grace-period=1
+    pod/[cluster-name]-[serial] --now
 ```
 
-For example, if you want to simulate a real failure on the primary and trigger
-the failover process, you can run:
-
-```sh
-kubectl delete pod [primary pod] --grace-period=1
-```
+!!! Note
+    Simulating a primary failure in a multi-instance cluster will trigger an
+    automated failover.
 
 !!! Warning
-    Never use `--grace-period=0` in your failover simulation tests, as this
-    might produce misleading results with your PostgreSQL cluster. A grace
-    period of 0 guarantees that the pod is immediately removed from the
-    Kubernetes API server, without first ensuring that the PID 1 process of
-    the `postgres` container (the instance manager) is shut down - contrary
-    to what would happen in case of a real failure (e.g. unplug the power cord
-    cable or network partitioning).
-    As a result, the operator doesn't see the pod of the primary anymore, and
-    triggers a failover promoting the most aligned standby, without
-    the guarantee that the primary had been shut down.
+    Avoid using `--grace-period=0` in failover simulations, as it may lead to
+    misleading results. Setting a grace period of 0 forcefully removes the Pod from
+    the Kubernetes API server without properly shutting down the `postgres`
+    container’s PID 1 process (the instance manager). In contrast, a real
+    failure—such as a power outage or network partition—ensures a proper shutdown.
+    Without this guarantee, the operator may prematurely promote a standby without
+    confirming the primary has fully stopped, potentially leading to data
+    inconsistencies.
 
 ### Worker Node Drained
 
