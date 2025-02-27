@@ -1467,6 +1467,25 @@ spec:
                               an immediate segment switch.
                             type: boolean
                         type: object
+                      retryConfiguration:
+                        description: Configuration for retry behavior when snapshot
+                          operations fail transiently
+                        properties:
+                          deadline:
+                            default: 10m
+                            description: |-
+                              The maximum time to wait for a snapshot operation to complete before
+                              considering it failed. Default is 10 minutes.
+                            pattern: ^([0-9]+(m|s))+$
+                            type: string
+                          maxRetries:
+                            default: 3
+                            description: |-
+                              The number of times to retry a failed snapshot operation before
+                              considering the backup failed. Default is 3 retries.
+                            minimum: 0
+                            type: integer
+                        type: object
                       snapshotOwnerReference:
                         default: none
                         description: SnapshotOwnerReference indicates the type of

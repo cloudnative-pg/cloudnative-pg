@@ -19,10 +19,13 @@ package volumesnapshot
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"time"
 
 	storagesnapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
@@ -41,6 +44,9 @@ type volumeSnapshotInfo struct {
 	// ready is true when the volume snapshot is complete and ready to
 	// be used as a source for a PVC.
 	ready bool
+
+	// retryCount is the number of retries that have been made for this snapshot
+	retryCount int
 }
 
 // volumeSnapshotError is raised when a volume snapshot failed with
@@ -67,17 +73,33 @@ func (err volumeSnapshotError) Error() string {
 
 // IsRetryable returns true if the external snapshotter controller
 // will retry taking the snapshot
-func (err volumeSnapshotError) isRetryable() bool {
+func (err volumeSnapshotError) isRetryable(config *apiv1.VolumeSnapshotRetryConfiguration, retryCount int) bool {
 	// The Kubernetes CSI driver/controller will automatically retry snapshot creation
 	// for certain errors, including timeouts. We use pattern matching to identify
 	// these retryable errors and handle them appropriately.
-	//
-	// TODO: Enhance our CRD with a configurable deadline/max retry time.
-	// After the deadline has been met based on err.InternalError.CreatedAt,
-	// the backup should be marked as failed instead of continuing to retry.
 
 	if err.InternalError.Message == nil {
 		return false
+	}
+
+	// If retry count exceeds the max retries setting, don't retry
+	if config != nil && retryCount >= config.GetMaxRetries() {
+		return false
+	}
+
+	// Check for deadline exceeded if we have a creation timestamp
+	if err.InternalError.Time != nil && config != nil {
+		// Parse the deadline duration
+		deadline, parseErr := time.ParseDuration(config.GetDeadline())
+		if parseErr == nil {
+			// Get elapsed time since snapshot creation attempt
+			elapsedTime := time.Since(err.InternalError.Time.Time)
+
+			// If we've exceeded the deadline, don't retry
+			if elapsedTime > deadline {
+				return false
+			}
+		}
 	}
 
 	return isRetriableErrorMessage(*err.InternalError.Message)
@@ -120,13 +142,29 @@ func getBackupVolumeSnapshots(
 	return list.Items, nil
 }
 
+const (
+	// RetryCountAnnotation is the annotation used to track the number of retries for a snapshot
+	RetryCountAnnotation = "cnpg.io/snapshot-retry-count"
+)
+
 // parseVolumeSnapshotInfo extracts information from a volume snapshot resource
 func parseVolumeSnapshotInfo(snapshot *storagesnapshotv1.VolumeSnapshot) volumeSnapshotInfo {
+	// Extract retry count from annotations if it exists
+	retryCount := 0
+	if snapshot.Annotations != nil {
+		if countStr, ok := snapshot.Annotations[RetryCountAnnotation]; ok {
+			if count, err := strconv.Atoi(countStr); err == nil {
+				retryCount = count
+			}
+		}
+	}
+
 	if snapshot.Status == nil {
 		return volumeSnapshotInfo{
 			error:       nil,
 			provisioned: false,
 			ready:       false,
+			retryCount:  retryCount,
 		}
 	}
 
@@ -134,6 +172,7 @@ func parseVolumeSnapshotInfo(snapshot *storagesnapshotv1.VolumeSnapshot) volumeS
 		return volumeSnapshotInfo{
 			provisioned: false,
 			ready:       false,
+			retryCount:  retryCount,
 			error: &volumeSnapshotError{
 				InternalError: *snapshot.Status.Error,
 				Name:          snapshot.Name,
@@ -150,6 +189,7 @@ func parseVolumeSnapshotInfo(snapshot *storagesnapshotv1.VolumeSnapshot) volumeS
 			provisioned: false,
 			ready:       false,
 			error:       nil,
+			retryCount:  retryCount,
 		}
 	}
 
@@ -160,6 +200,7 @@ func parseVolumeSnapshotInfo(snapshot *storagesnapshotv1.VolumeSnapshot) volumeS
 			error:       nil,
 			provisioned: true,
 			ready:       false,
+			retryCount:  retryCount,
 		}
 	}
 
@@ -168,5 +209,6 @@ func parseVolumeSnapshotInfo(snapshot *storagesnapshotv1.VolumeSnapshot) volumeS
 		error:       nil,
 		provisioned: true,
 		ready:       true,
+		retryCount:  retryCount,
 	}
 }

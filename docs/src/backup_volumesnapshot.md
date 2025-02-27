@@ -205,6 +205,74 @@ spec:
   online: false
 ```
 
+## Retry configuration for volume snapshots
+
+CloudNativePG provides a way to configure retries for volume snapshot operations, 
+which can be particularly useful when working with certain storage providers that 
+might experience temporary failures or timeouts during snapshot operations.
+
+### Understanding CSI Snapshotter vs CloudNativePG Retries
+
+It's important to understand the two layers of retry mechanisms in play:
+
+1. **CSI Snapshotter Controller Retries**: The Kubernetes CSI external-snapshotter
+   controller has its own retry logic for transient errors. It automatically retries
+   snapshot creation operations when encountering certain error types, especially
+   from the storage provider. These are internal to the Kubernetes CSI implementation
+   and occur before CloudNativePG receives an error.
+
+2. **CloudNativePG Operator Retries**: The retry configuration described here
+   applies to the CloudNativePG operator's handling of errors it receives from
+   the Kubernetes API when working with VolumeSnapshot resources. This includes
+   situations where:
+   - The CSI snapshotter has already failed after its own retries
+   - Context deadline exceeded errors occur while waiting for a snapshot operation
+   - Other transient errors from the Kubernetes API service
+
+The CloudNativePG retry mechanism complements the CSI controller's internal retries,
+providing an additional layer of resilience for VolumeSnapshot operations.
+
+You can configure the retry behavior for volume snapshots in the 
+`backup.volumeSnapshot.retryConfiguration` section of your cluster definition:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: snapshot-cluster-with-retries
+spec:
+  instances: 3
+  # ... other configuration ...
+  
+  backup:
+    volumeSnapshot:
+      className: @VOLUME_SNAPSHOT_CLASS_NAME@
+      retryConfiguration:
+        maxRetries: 5
+        deadline: 10m
+```
+
+The `retryConfiguration` section accepts the following parameters:
+
+- `maxRetries`: The maximum number of retry attempts for volume snapshot operations 
+  before considering the operation as failed. If not specified, defaults to 3 retries.
+
+- `deadline`: The maximum time duration to wait for a volume snapshot operation to 
+  complete, expressed as a duration string (e.g., "5m" for 5 minutes, "1h" for 1 hour).
+  If not specified, defaults to 10 minutes.
+
+Retry logic applies to both snapshot provisioning and waiting for a snapshot to be ready.
+When a timeout or transient error occurs, the operator will retry the operation according 
+to the configuration parameters. If all retries are exhausted or the deadline is reached, 
+the backup operation will be marked as failed.
+
+### Monitoring Retries
+
+The operator exposes several metrics to track retry operations, making it easier to 
+monitor snapshot reliability and identify problematic storage classes or configurations.
+See the [VolumeSnapshot Retry Metrics section](monitoring.md#volumesnapshot-retry-metrics) 
+for details on the available metrics.
+
 ## Persistence of volume snapshot objects
 
 By default, `VolumeSnapshot` objects created by CloudNativePG are retained after

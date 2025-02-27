@@ -919,5 +919,64 @@ var _ = Describe("Verify Volume Snapshot",
 					updateClusterSnapshotClass(namespace, clusterToSnapshotName, os.Getenv("E2E_CSI_STORAGE_CLASS"))
 				})
 			})
+
+			It("should use configured retry settings for volume snapshots", func() {
+				// First, update the cluster to use custom retry settings
+				By("configuring retry settings on the cluster", func() {
+					cluster := &apiv1.Cluster{}
+					err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+						var err error
+						cluster, err = clusterutils.Get(env.Ctx, env.Client, namespace, clusterToSnapshotName)
+						Expect(err).ToNot(HaveOccurred())
+
+						// Set custom retry configuration
+						if cluster.Spec.Backup.VolumeSnapshot.RetryConfiguration == nil {
+							cluster.Spec.Backup.VolumeSnapshot.RetryConfiguration = &apiv1.VolumeSnapshotRetryConfiguration{}
+						}
+						cluster.Spec.Backup.VolumeSnapshot.RetryConfiguration.MaxRetries = 2
+						cluster.Spec.Backup.VolumeSnapshot.RetryConfiguration.Deadline = "2m"
+
+						return env.Client.Update(env.Ctx, cluster)
+					})
+					Expect(err).ToNot(HaveOccurred())
+				})
+
+				// Now create a snapshot backup
+				backupName := fmt.Sprintf("%s-retry-test", clusterToSnapshotName)
+				var backup *apiv1.Backup
+
+				By("creating a VolumeSnapshot backup", func() {
+					var err error
+					backup, err = backups.CreateOnDemand(
+						env.Ctx,
+						env.Client,
+						namespace,
+						clusterToSnapshotName,
+						backupName,
+						apiv1.BackupTargetStandby,
+						apiv1.BackupMethodVolumeSnapshot,
+					)
+					Expect(err).ToNot(HaveOccurred())
+
+					// Wait for the backup to complete
+					Eventually(func(g Gomega) {
+						err = env.Client.Get(env.Ctx, types.NamespacedName{
+							Namespace: namespace,
+							Name:      backupName,
+						}, backup)
+						g.Expect(err).ToNot(HaveOccurred())
+						g.Expect(backup.Status.Phase).To(BeEquivalentTo(apiv1.BackupPhaseCompleted),
+							"Backup should be completed correctly, error message is '%s'",
+							backup.Status.Error)
+					}, testTimeouts[timeouts.VolumeSnapshotIsReady]).Should(Succeed())
+				})
+
+				// Verify that the snapshot was created
+				By("verifying the VolumeSnapshot was created", func() {
+					snapshotList, err := getSnapshots(backup.Name, clusterToSnapshotName, namespace)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(snapshotList.Items).To(HaveLen(len(backup.Status.BackupSnapshotStatus.Elements)))
+				})
+			})
 		})
 	})

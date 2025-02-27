@@ -51,9 +51,7 @@ func isRetriableErrorMessage(msg string) bool {
 // isContextDeadlineExceededError detects context deadline exceeded errors
 // These are timeouts that may be retried by the Kubernetes CSI controller
 func isContextDeadlineExceededError(msg string) bool {
-	return strings.Contains(msg, "context deadline exceeded") ||
-		strings.Contains(msg, "deadline exceeded") ||
-		strings.Contains(msg, "timed out")
+	return strings.Contains(msg, "deadline exceeded") || strings.Contains(msg, "timed out")
 }
 
 // isConflictError detects optimistic locking errors

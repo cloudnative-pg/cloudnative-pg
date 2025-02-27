@@ -231,6 +231,32 @@ cnpg_collector_last_available_backup_timestamp 1.63238406e+09
 # TYPE cnpg_collector_first_recoverability_point gauge
 cnpg_collector_first_recoverability_point 1.63238406e+09
 
+# HELP cnpg_volumesnapshot_retry_operations_total Total number of retry operations for volume snapshots
+# TYPE cnpg_volumesnapshot_retry_operations_total counter
+cnpg_volumesnapshot_retry_operations_total{namespace="default",snapshot_name="cluster-example-data-20250227",phase="provisioning"} 2
+
+# HELP cnpg_volumesnapshot_retry_by_error_type_total Total number of retry operations by error type
+# TYPE cnpg_volumesnapshot_retry_by_error_type_total counter
+cnpg_volumesnapshot_retry_by_error_type_total{namespace="default",snapshot_name="cluster-example-data-20250227",error_type="context.DeadlineExceeded",phase="provisioning"} 2
+
+# HELP cnpg_volumesnapshot_failed_operations_total Total number of failed volume snapshot operations after maximum retries
+# TYPE cnpg_volumesnapshot_failed_operations_total gauge
+cnpg_volumesnapshot_failed_operations_total{namespace="default",snapshot_name="cluster-example-data-20250227",phase="provisioning"} 0
+
+# HELP cnpg_volumesnapshot_retry_duration_seconds Duration of volume snapshot retry operations in seconds
+# TYPE cnpg_volumesnapshot_retry_duration_seconds histogram
+cnpg_volumesnapshot_retry_duration_seconds_bucket{namespace="default",snapshot_name="cluster-example-data-20250227",phase="provisioning",le="1"} 0
+cnpg_volumesnapshot_retry_duration_seconds_bucket{namespace="default",snapshot_name="cluster-example-data-20250227",phase="provisioning",le="5"} 0
+cnpg_volumesnapshot_retry_duration_seconds_bucket{namespace="default",snapshot_name="cluster-example-data-20250227",phase="provisioning",le="10"} 0
+cnpg_volumesnapshot_retry_duration_seconds_bucket{namespace="default",snapshot_name="cluster-example-data-20250227",phase="provisioning",le="30"} 0
+cnpg_volumesnapshot_retry_duration_seconds_bucket{namespace="default",snapshot_name="cluster-example-data-20250227",phase="provisioning",le="60"} 1
+cnpg_volumesnapshot_retry_duration_seconds_bucket{namespace="default",snapshot_name="cluster-example-data-20250227",phase="provisioning",le="120"} 1
+cnpg_volumesnapshot_retry_duration_seconds_bucket{namespace="default",snapshot_name="cluster-example-data-20250227",phase="provisioning",le="300"} 2
+cnpg_volumesnapshot_retry_duration_seconds_bucket{namespace="default",snapshot_name="cluster-example-data-20250227",phase="provisioning",le="600"} 2
+cnpg_volumesnapshot_retry_duration_seconds_bucket{namespace="default",snapshot_name="cluster-example-data-20250227",phase="provisioning",le="+Inf"} 2
+cnpg_volumesnapshot_retry_duration_seconds_sum{namespace="default",snapshot_name="cluster-example-data-20250227",phase="provisioning"} 327.45
+cnpg_volumesnapshot_retry_duration_seconds_count{namespace="default",snapshot_name="cluster-example-data-20250227",phase="provisioning"} 2
+
 # HELP cnpg_collector_lo_pages Estimated number of pages in the pg_largeobject table
 # TYPE cnpg_collector_lo_pages gauge
 cnpg_collector_lo_pages{datname="app"} 0
@@ -702,6 +728,23 @@ If you want to disable the default set of metrics, you can:
 CloudNativePG is inspired by the PostgreSQL Prometheus Exporter, but
 presents some differences. In particular, the `cache_seconds` field is not implemented
 in CloudNativePG's exporter.
+
+## VolumeSnapshot Retry Metrics
+
+When VolumeSnapshot retry configuration is enabled, the operator exports the following metrics for tracking retry operations:
+
+| Metric | Type | Description | Labels |
+|--------|------|-------------|--------|
+| `cnpg_volumesnapshot_retry_operations_total` | Counter | Total number of retry operations for volume snapshots | `namespace`, `snapshot_name`, `phase` |
+| `cnpg_volumesnapshot_retry_by_error_type_total` | Counter | Total number of retry operations by error type | `namespace`, `snapshot_name`, `error_type`, `phase` |
+| `cnpg_volumesnapshot_failed_operations_total` | Gauge | Total number of failed volume snapshot operations after maximum retries | `namespace`, `snapshot_name`, `phase` |
+| `cnpg_volumesnapshot_retry_duration_seconds` | Histogram | Duration of volume snapshot retry operations in seconds | `namespace`, `snapshot_name`, `phase` |
+
+The `phase` label can have the following values:
+- `provisioning`: Indicates the snapshot is being provisioned
+- `ready`: Indicates the system is waiting for the snapshot to be ready to use
+
+These metrics help you monitor and troubleshoot VolumeSnapshot operations, identify common error patterns, and tune your retry configuration for optimal reliability.
 
 ## Monitoring the operator
 

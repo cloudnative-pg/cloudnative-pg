@@ -30,6 +30,13 @@ const (
 	// to get the name of the PDB used for the cluster primary
 	PrimaryPodDisruptionBudgetSuffix = "-primary"
 
+	// DefaultVolumeSnapshotDeadline is the default deadline before considering a snapshot
+	// operation failed (10 minutes)
+	DefaultVolumeSnapshotDeadline = "10m"
+
+	// DefaultVolumeSnapshotMaxRetries is the default number of retries for a snapshot operation
+	DefaultVolumeSnapshotMaxRetries = 3
+
 	// ReplicationSecretSuffix is the suffix appended to the cluster name to
 	// get the name of the generated replication secret for PostgreSQL
 	ReplicationSecretSuffix = "-replication" // #nosec
@@ -162,6 +169,10 @@ type VolumeSnapshotConfiguration struct {
 	// +kubebuilder:default:={waitForArchive:true,immediateCheckpoint:false}
 	// +optional
 	OnlineConfiguration OnlineConfiguration `json:"onlineConfiguration,omitempty"`
+
+	// Configuration for retry behavior when snapshot operations fail transiently
+	// +optional
+	RetryConfiguration *VolumeSnapshotRetryConfiguration `json:"retryConfiguration,omitempty"`
 }
 
 // OnlineConfiguration contains the configuration parameters for the online volume snapshot
@@ -186,6 +197,24 @@ type OnlineConfiguration struct {
 	// possible. `false` by default.
 	// +optional
 	ImmediateCheckpoint *bool `json:"immediateCheckpoint,omitempty"`
+}
+
+// VolumeSnapshotRetryConfiguration contains parameters to control retry behavior
+// for operations that may fail transiently, such as volume snapshot creation
+type VolumeSnapshotRetryConfiguration struct {
+	// The maximum time to wait for a snapshot operation to complete before
+	// considering it failed. Default is 10 minutes.
+	// +optional
+	// +kubebuilder:default:="10m"
+	// +kubebuilder:validation:Pattern=^([0-9]+(m|s))+$
+	Deadline string `json:"deadline,omitempty"`
+
+	// The number of times to retry a failed snapshot operation before
+	// considering the backup failed. Default is 3 retries.
+	// +optional
+	// +kubebuilder:default:=3
+	// +kubebuilder:validation:Minimum=0
+	MaxRetries int `json:"maxRetries,omitempty"`
 }
 
 // ImageCatalogRef defines the reference to a major version in an ImageCatalog
