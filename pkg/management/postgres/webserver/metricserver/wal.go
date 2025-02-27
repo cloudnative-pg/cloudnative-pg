@@ -47,14 +47,16 @@ func collectPGWALStat(e *Exporter) error {
 		return err
 	}
 	walMetrics := e.Metrics.PgStatWalMetrics
-	walMetrics.WalSync.WithLabelValues(walStat.StatsReset).Set(float64(walStat.WalSync))
-	walMetrics.WalSyncTime.WithLabelValues(walStat.StatsReset).Set(walStat.WalSyncTime)
-	walMetrics.WALBuffersFull.WithLabelValues(walStat.StatsReset).Set(float64(walStat.WALBuffersFull))
-	walMetrics.WalFpi.WithLabelValues(walStat.StatsReset).Set(float64(walStat.WalFpi))
-	walMetrics.WalWrite.WithLabelValues(walStat.StatsReset).Set(float64(walStat.WalWrite))
-	walMetrics.WalBytes.WithLabelValues(walStat.StatsReset).Set(float64(walStat.WalBytes))
-	walMetrics.WalWriteTime.WithLabelValues(walStat.StatsReset).Set(walStat.WalWriteTime)
 	walMetrics.WalRecords.WithLabelValues(walStat.StatsReset).Set(float64(walStat.WalRecords))
+	walMetrics.WalFpi.WithLabelValues(walStat.StatsReset).Set(float64(walStat.WalFpi))
+	walMetrics.WalBytes.WithLabelValues(walStat.StatsReset).Set(float64(walStat.WalBytes))
+	walMetrics.WALBuffersFull.WithLabelValues(walStat.StatsReset).Set(float64(walStat.WALBuffersFull))
+	if version, _ := e.instance.GetPgVersion(); version.Major < 18 {
+		walMetrics.WalWrite.WithLabelValues(walStat.StatsReset).Set(float64(walStat.WalWrite))
+		walMetrics.WalSync.WithLabelValues(walStat.StatsReset).Set(float64(walStat.WalSync))
+		walMetrics.WalWriteTime.WithLabelValues(walStat.StatsReset).Set(walStat.WalWriteTime)
+		walMetrics.WalSyncTime.WithLabelValues(walStat.StatsReset).Set(walStat.WalSyncTime)
+	}
 
 	return nil
 }

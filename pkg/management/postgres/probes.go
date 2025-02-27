@@ -596,7 +596,7 @@ type PgStatWal struct {
 	StatsReset     string
 }
 
-// TryGetPgStatWAL retrieves pg_wal_stat on pg version 14 and further
+// TryGetPgStatWAL retrieves pg_stat_wal on pg version 14 and further
 func (instance *Instance) TryGetPgStatWAL() (*PgStatWal, error) {
 	version, err := instance.GetPgVersion()
 	if err != nil || version.Major < 14 {
@@ -609,30 +609,52 @@ func (instance *Instance) TryGetPgStatWAL() (*PgStatWal, error) {
 	}
 
 	var pgWalStat PgStatWal
-	row := superUserDB.QueryRow(
-		`SELECT
+	if version.Major < 18 {
+		row := superUserDB.QueryRow(
+			`SELECT
+			wal_records,
+			wal_fpi,
+			wal_bytes,
+			wal_buffers_full,
+			wal_write,
+			wal_sync,
+			wal_write_time,
+			wal_sync_time,
+			stats_reset
+			FROM pg_catalog.pg_stat_wal`)
+		if err := row.Scan(
+			&pgWalStat.WalRecords,
+			&pgWalStat.WalFpi,
+			&pgWalStat.WalBytes,
+			&pgWalStat.WALBuffersFull,
+			&pgWalStat.WalWrite,
+			&pgWalStat.WalSync,
+			&pgWalStat.WalWriteTime,
+			&pgWalStat.WalSyncTime,
+			&pgWalStat.StatsReset,
+		); err != nil {
+			return nil, err
+		}
+	}
+
+	if version.Major >= 18 {
+		row := superUserDB.QueryRow(
+			`SELECT
         	wal_records,
 		wal_fpi,
 		wal_bytes,
 		wal_buffers_full,
-		wal_write,
-		wal_sync,
-		wal_write_time,
-		wal_sync_time,
 		stats_reset
 	    FROM pg_catalog.pg_stat_wal`)
-	if err := row.Scan(
-		&pgWalStat.WalRecords,
-		&pgWalStat.WalFpi,
-		&pgWalStat.WalBytes,
-		&pgWalStat.WALBuffersFull,
-		&pgWalStat.WalWrite,
-		&pgWalStat.WalSync,
-		&pgWalStat.WalWriteTime,
-		&pgWalStat.WalSyncTime,
-		&pgWalStat.StatsReset,
-	); err != nil {
-		return nil, err
+		if err := row.Scan(
+			&pgWalStat.WalRecords,
+			&pgWalStat.WalFpi,
+			&pgWalStat.WalBytes,
+			&pgWalStat.WALBuffersFull,
+			&pgWalStat.StatsReset,
+		); err != nil {
+			return nil, err
+		}
 	}
 
 	return &pgWalStat, nil
