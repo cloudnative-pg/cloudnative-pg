@@ -709,10 +709,10 @@ func CreatePostgresqlConfiguration(info ConfigurationInfo) *PgConfiguration {
 
 	if len(info.Extensions) > 0 {
 		// Set all ExtensionControlPaths
-		SetExtensionControlPath(info, configuration)
+		setExtensionControlPath(info, configuration)
 
 		// Set all DynamicLibraryPaths
-		SetDynamicLibraryPath(info, configuration)
+		setDynamicLibraryPath(info, configuration)
 	}
 
 	return configuration
@@ -798,7 +798,9 @@ func escapePostgresConfValue(value string) string {
 	return fmt.Sprintf("'%v'", strings.ReplaceAll(value, "'", "''"))
 }
 
-func SetExtensionControlPath(info ConfigurationInfo, configuration *PgConfiguration) {
+// setExtensionControlPath manages the extension_control_path parameter, merging the paths
+// defined by the user with the ones provided by the ExtensionConfiguration stanza
+func setExtensionControlPath(info ConfigurationInfo, configuration *PgConfiguration) {
 	extensionControlPath := []string{"$system"}
 	for _, extension := range info.Extensions {
 		extensionControlPath = append(extensionControlPath, fmt.Sprintf("/extensions/%s/share", extension))
@@ -815,7 +817,9 @@ func SetExtensionControlPath(info ConfigurationInfo, configuration *PgConfigurat
 	configuration.OverwriteConfig(ExtensionControlPath, strings.Join(extensionControlPath, ":"))
 }
 
-func SetDynamicLibraryPath(info ConfigurationInfo, configuration *PgConfiguration) {
+// setDynamicLibraryPath manages the dynamic_library_path parameter, merging the paths
+// defined by the user with the ones provided by the ExtensionConfiguration stanza
+func setDynamicLibraryPath(info ConfigurationInfo, configuration *PgConfiguration) {
 	dynamicLibraryPath := []string{"$libdir"}
 	for _, extension := range info.Extensions {
 		dynamicLibraryPath = append(dynamicLibraryPath, fmt.Sprintf("/extensions/%s/lib", extension))
