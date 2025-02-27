@@ -571,7 +571,18 @@ func updateClusterWithSnapshotsBackupTimes(
 
 // isErrorRetryable detects is an error is retryable or not
 func isErrorRetryable(err error) bool {
-	return apierrs.IsServerTimeout(err) || apierrs.IsConflict(err) || apierrs.IsInternalError(err)
+	// Check for common Kubernetes API errors that should be retried
+	if apierrs.IsServerTimeout(err) || apierrs.IsConflict(err) || apierrs.IsInternalError(err) {
+		return true
+	}
+
+	// Check for context deadline exceeded errors, which are common during snapshot creation
+	// but the underlying CSI plugin may still succeed with the snapshot creation
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+
+	return false
 }
 
 // getBackupTargetPod returns the pod that should run the backup according to the current

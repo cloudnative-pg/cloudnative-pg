@@ -33,5 +33,34 @@ var _ = Describe("Retriable error messages", func() {
 		Entry("explicitly non-retriable error", "Retriable: false because my pod is working", false),
 		Entry("error code 502 - retriable", "RetryAfter: 0s, HTTPStatusCode: 502, RawError: Internal Server Error", true),
 		Entry("error code 404 - non retriable", "RetryAfter: 0s, HTTPStatusCode: 404, RawError: Not found", false),
+		Entry("context deadline exceeded - retriable", "context deadline exceeded waiting for snapshot creation", true),
+		Entry("deadline exceeded - retriable", "deadline exceeded during Azure snapshot creation", true),
+		Entry("timed out - retriable", "operation timed out for csi-disk-handler", true),
 	)
+
+	Describe("isContextDeadlineExceededError", func() {
+		It("detects 'context deadline exceeded' error messages", func() {
+			Expect(isContextDeadlineExceededError("context deadline exceeded")).To(BeTrue())
+			Expect(isContextDeadlineExceededError("rpc error: code = DeadlineExceeded desc = context deadline exceeded")).To(BeTrue())
+			Expect(isContextDeadlineExceededError("failed to create snapshot: context deadline exceeded")).To(BeTrue())
+		})
+
+		It("detects 'deadline exceeded' error messages", func() {
+			Expect(isContextDeadlineExceededError("deadline exceeded")).To(BeTrue())
+			Expect(isContextDeadlineExceededError("snapshot creation deadline exceeded")).To(BeTrue())
+			Expect(isContextDeadlineExceededError("the operation deadline exceeded")).To(BeTrue())
+		})
+
+		It("detects 'timed out' error messages", func() {
+			Expect(isContextDeadlineExceededError("operation timed out")).To(BeTrue())
+			Expect(isContextDeadlineExceededError("Azure API request timed out")).To(BeTrue())
+			Expect(isContextDeadlineExceededError("API timeout: request timed out after 10s")).To(BeTrue())
+		})
+
+		It("rejects non-timeout error messages", func() {
+			Expect(isContextDeadlineExceededError("not found")).To(BeFalse())
+			Expect(isContextDeadlineExceededError("permission denied")).To(BeFalse())
+			Expect(isContextDeadlineExceededError("invalid input")).To(BeFalse())
+		})
+	})
 })
