@@ -798,8 +798,9 @@ func escapePostgresConfValue(value string) string {
 	return fmt.Sprintf("'%v'", strings.ReplaceAll(value, "'", "''"))
 }
 
-// setExtensionControlPath manages the extension_control_path parameter, merging the paths
-// defined by the user with the ones provided by the ExtensionConfiguration stanza
+// setExtensionControlPath manages the `extension_control_path` GUC, merging
+// the paths defined by the user with the ones provided by the
+// `.spec.postgresql.extensions` stanza
 func setExtensionControlPath(info ConfigurationInfo, configuration *PgConfiguration) {
 	extensionControlPath := []string{"$system"}
 	for _, extension := range info.Extensions {
@@ -817,8 +818,9 @@ func setExtensionControlPath(info ConfigurationInfo, configuration *PgConfigurat
 	configuration.OverwriteConfig(ExtensionControlPath, strings.Join(extensionControlPath, ":"))
 }
 
-// setDynamicLibraryPath manages the dynamic_library_path parameter, merging the paths
-// defined by the user with the ones provided by the ExtensionConfiguration stanza
+// setDynamicLibraryPath manages the `dynamic_library_path` GUC, merging the
+// paths defined by the user with the ones provided by the
+// `.spec.postgresql.extensions` stanza
 func setDynamicLibraryPath(info ConfigurationInfo, configuration *PgConfiguration) {
 	dynamicLibraryPath := []string{"$libdir"}
 	for _, extension := range info.Extensions {
