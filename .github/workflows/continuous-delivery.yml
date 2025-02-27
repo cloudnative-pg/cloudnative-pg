@@ -368,8 +368,9 @@ jobs:
         env:
           environment: "testing"
           buildVersion: ${{ env.VERSION }}
-          TAG: ${{ env.IMAGE_TAG }}
-          REGISTRY: ${{ env.REGISTRY }}/${{ env.REPO_OWNER }}
+          tag: ${{ env.IMAGE_TAG }}
+          registry: ${{ env.REGISTRY }}/${{ env.REPO_OWNER }}
+          revision: ${{ env.COMMIT }}
         with:
           source: .
           push: true

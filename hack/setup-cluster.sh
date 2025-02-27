@@ -373,8 +373,12 @@ check_registry() {
 # out the local registry. The following functions will handle that builder
 create_builder() {
   docker buildx rm "${builder_name}" &>/dev/null || true
-  docker buildx create --name "${builder_name}" --driver-opt network="${registry_net}" --use
-  docker buildx use "${builder_name}"
+  # If ENABLE_REGISTRY is not set, we don't need to define driver-opt network
+  if [ -n "${ENABLE_REGISTRY:-}" ]; then
+    docker buildx create --name "${builder_name}" --driver-opt "network=${registry_net}"
+  else
+    docker buildx create --name "${builder_name}"
+  fi
 }
 
 deploy_fluentd() {
@@ -636,7 +640,8 @@ load() {
 
   echo "${bright}Building operator from current worktree${reset}"
 
-  make -C "${ROOT_DIR}" TAG="$(print_tag)" REGISTRY="${registry_name}:5000" INSECURE="true" ARCH="${ARCH}" docker-build
+  make -C "${ROOT_DIR}" IMAGE_TAG="$(print_tag)" registry="${registry_name}:5000" insecure="true" \
+    ARCH="${ARCH}" BUILDER_NAME=${builder_name} docker-build
 
   echo "${bright}Loading new operator image on cluster ${CLUSTER_NAME}${reset}"
 
@@ -653,10 +658,13 @@ load() {
     CURRENT_VERSION=$(make -C "${ROOT_DIR}" -s print-version)
     PRIME_VERSION="${CURRENT_VERSION}-prime"
     PRIME_TAG="$(print_tag)-prime"
-    make -C "${ROOT_DIR}" IMAGE_TAG="${PRIME_TAG}" VERSION="${PRIME_VERSION}" REGISTRY="${registry_name}:5000" INSECURE="true" ARCH="${ARCH}" docker-build
+    make -C "${ROOT_DIR}" IMAGE_TAG="${PRIME_TAG}" VERSION="${PRIME_VERSION}" registry="${registry_name}:5000" insecure="true" \
+      ARCH="${ARCH}" BUILDER_NAME="${builder_name}" docker-build
 
     echo "${bright}Done loading new 'prime' operator image on cluster ${CLUSTER_NAME}${reset}"
   fi
+
+  docker buildx rm "${builder_name}"
 }
 
 deploy() {

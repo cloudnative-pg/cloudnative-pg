@@ -198,9 +198,10 @@ jobs:
         env:
           environment: "production"
           buildVersion: ${{ env.VERSION }}
-          TAG: ${{ env.IMAGE_TAG }}
-          REGISTRY: ${{ env.REGISTRY }}/${{ env.REPO_OWNER }}
-          LATEST: ${{ needs.check-version.outputs.is_latest == 'true' && needs.check-version.outputs.is_stable == 'true' }}
+          tag: ${{ env.IMAGE_TAG }}
+          registry: ${{ env.REGISTRY }}/${{ env.REPO_OWNER }}
+          revision: ${{ env.COMMIT }}
+          latest: ${{ needs.check-version.outputs.is_latest == 'true' && needs.check-version.outputs.is_stable == 'true' }}
         with:
           source: .
           push: true

@@ -22,24 +22,28 @@ variable "environment" {
   }
 }
 
-variable "REGISTRY" {
+variable "registry" {
   default = "localhost:5000"
 }
 
-variable "INSECURE" {
+variable "insecure" {
   default = "false"
 }
 
-variable "LATEST" {
+variable "latest" {
   default = "false"
 }
 
-variable "TAG" {
+variable "tag" {
   default = "dev"
 }
 
 variable "buildVersion" {
   default = "dev"
+}
+
+variable "revision" {
+  default = ""
 }
 
 suffix = (environment == "testing") ? "-testing" : ""
@@ -51,7 +55,6 @@ url = "https://github.com/cloudnative-pg/cloudnative-pg"
 documentation = "https://cloudnative-pg.io/documentation/current/"
 license = "Apache-2.0"
 now = timestamp()
-revision = "1"
 
 distros = {
   distroless = {
@@ -75,21 +78,20 @@ target "default" {
   name = "${distro}"
   platforms = ["linux/amd64", "linux/arm64"]
   tags = [
-    "${REGISTRY}/cloudnative-pg${suffix}:${TAG}${distros[distro].tag}",
-    latest("${REGISTRY}/cloudnative-pg${suffix}", "${LATEST}"),
+    "${registry}/cloudnative-pg${suffix}:${tag}${distros[distro].tag}",
+    latest("${registry}/cloudnative-pg${suffix}", "${latest}"),
   ]
 
   dockerfile = "Dockerfile"
 
   context = "."
-  target = "${distro}"
 
   args = {
     BASE = "${distros[distro].baseImage}"
   }
 
   output = [
-  "type=registry,registry.insecure=${INSECURE}",
+    "type=registry,registry.insecure=${insecure}",
   ]
 
   attest = [
@@ -109,7 +111,7 @@ target "default" {
     "index,manifest:org.opencontainers.image.authors=${authors}",
     "index,manifest:org.opencontainers.image.licenses=${license}",
     "index,manifest:org.opencontainers.image.base.name=${distros[distro].baseImage}",
-    "index,manifest:org.opencontainers.image.base.digest=digest($distros[distro].baseImage)",
+    "index,manifest:org.opencontainers.image.base.digest=${digest(distros[distro].baseImage)}",
   ]
   labels = {
     "org.opencontainers.image.created" = "${now}",
@@ -124,12 +126,12 @@ target "default" {
     "org.opencontainers.image.authors" = "${authors}",
     "org.opencontainers.image.licenses" = "${license}",
     "org.opencontainers.image.base.name" = "${distros[distro].baseImage}",
-    "org.opencontainers.image.base.digest" = "digest($distros[distro].baseImage)",
+    "org.opencontainers.image.base.digest" = "${digest(distros[distro].baseImage)}",
     "name" = "${title}",
     "maintainer" = "${authors}",
     "vendor" = "${authors}",
     "version" = "${buildVersion}",
-    "release" = "${revision}",
+    "release" = "1",
     "description" = "${description}",
     "summary" = "${description}",
   }

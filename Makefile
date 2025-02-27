@@ -142,8 +142,13 @@ run: generate fmt vet manifests ## Run against the configured Kubernetes cluster
 
 docker-build: go-releaser ## Build the docker image.
 	GOOS=linux GOARCH=${ARCH} GOPATH=$(go env GOPATH) DATE=${DATE} COMMIT=${COMMIT} VERSION=${VERSION} \
-	  $(GO_RELEASER) build --skip=validate --clean --single-target $(if $(VERSION),,--snapshot)
-	DOCKER_BUILDKIT=1 TAG=${IMAGE_TAG} buildVersion=${VERSION} docker buildx bake --set=*.platform="linux/${ARCH}" --push
+	  $(GO_RELEASER) build --skip=validate --clean --single-target $(if $(VERSION),,--snapshot); \
+	builder_name_option=""; \
+	if [ -n "${BUILDER_NAME}" ]; then \
+	  builder_name_option="--builder ${BUILDER_NAME}"; \
+	fi; \
+	DOCKER_BUILDKIT=1 tag=${IMAGE_TAG} buildVersion=${VERSION} revision=${COMMIT} \
+	  docker buildx bake $${builder_name_option} --set=*.platform="linux/${ARCH}" --push
 
 olm-bundle: manifests kustomize operator-sdk ## Build the bundle for OLM installation
 	set -xeEuo pipefail ;\
