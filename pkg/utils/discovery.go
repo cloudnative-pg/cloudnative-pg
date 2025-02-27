@@ -225,7 +225,7 @@ func detectAvailableArchitectures(filepathGlob string) error {
 
 // DetectAvailableArchitectures detects the architectures available in the cluster
 func DetectAvailableArchitectures() error {
-	return detectAvailableArchitectures("bin/manager_*")
+	return detectAvailableArchitectures("operator/manager_*")
 }
 
 // DetectOLM looks for the operators.coreos.com operators resource in the current
