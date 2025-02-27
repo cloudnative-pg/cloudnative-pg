@@ -41,7 +41,7 @@ func collectPGWalArchiveMetric(exporter *Exporter) error {
 	return nil
 }
 
-func collectPGWALStat(e *Exporter) error {
+func collectPGStatWAL(e *Exporter) error {
 	walStat, err := e.instance.TryGetPgStatWAL()
 	if walStat == nil || err != nil {
 		return err
