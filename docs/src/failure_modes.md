@@ -12,40 +12,27 @@ PostgreSQL can face on a Kubernetes cluster during its lifetime.
     for more information the liveness and readiness probes implemented by
     CloudNativePG.
 
-## Storage space usage
+## Storage Space Usage
 
-The operator will instantiate one PVC for every PostgreSQL instance to store the `PGDATA` content.
-A second PVC dedicated to the WAL storage will be provisioned in case `.spec.walStorage` is
-specified during cluster initialization.
+The operator provisions a Persistent Volume Claim (PVC) for each PostgreSQL
+instance to store `PGDATA`. If `.spec.walStorage` is defined during cluster
+initialization, an additional PVC is created for WAL storage. Likewise, extra
+PVCs are provisioned for any tablespaces specified in `.spec.tablespaces`.
 
-Such storage space is set for reuse in two cases:
+Storage reuse occurs in two scenarios:
 
-- when the corresponding Pod is deleted by the user (and a new Pod will be recreated)
-- when the corresponding Pod is evicted and scheduled on another node
+- When a Pod is deleted by the user, triggering its automatic recreation.
+- When a Pod is evicted.
 
-If you want to prevent the operator from reusing a certain PVC you need to
-remove the PVC before deleting the Pod. For this purpose, you can use the
-following command:
-
-```sh
-kubectl delete -n [namespace] pvc/[cluster-name]-[serial] pod/[cluster-name]-[serial]
-```
-
-!!! Note
-    If you specified a dedicated WAL volume, it will also have to be deleted during this process.
+To prevent the operator from reusing a specific PVC group, delete it before
+removing the associated Pod. Use the following command:
 
 ```sh
-kubectl delete -n [namespace] pvc/[cluster-name]-[serial] pvc/[cluster-name]-[serial]-wal pod/[cluster-name]-[serial]
+kubectl cnpg destroy -n [namespace] [cluster-name] [serial]
 ```
 
-For example:
-
-```sh
-$ kubectl delete -n default pvc/cluster-example-1 pvc/cluster-example-1-wal pod/cluster-example-1
-persistentvolumeclaim "cluster-example-1" deleted
-persistentvolumeclaim "cluster-example-1-wal" deleted
-pod "cluster-example-1" deleted
-```
+For more information, please refer to the
+[`destroy` command of the `cnpg` plugin for `kubectl`](kubectl-plugin.md#destroy).
 
 ## Failure modes
 
