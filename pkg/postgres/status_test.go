@@ -24,6 +24,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -238,7 +239,10 @@ var _ = Describe("PostgreSQL status real", func() {
 var _ = Describe("Configuration report", func() {
 	DescribeTable(
 		"Configuration report",
-		func(report ConfigurationReport, result bool) {
+		func(report ConfigurationReport, result *bool) {
+			if result == nil {
+				Expect(report.IsUniform()).To(BeNil())
+			}
 			Expect(report.IsUniform()).To(Equal(result))
 		},
 		Entry(
@@ -253,7 +257,7 @@ var _ = Describe("Configuration report", func() {
 					ConfigHash: "abc",
 				},
 			},
-			false,
+			nil,
 		),
 		Entry(
 			"with old instance managers",
@@ -267,7 +271,7 @@ var _ = Describe("Configuration report", func() {
 					ConfigHash: "",
 				},
 			},
-			false,
+			nil,
 		),
 		Entry(
 			"with instance managers that are reporting different configurations",
@@ -281,7 +285,7 @@ var _ = Describe("Configuration report", func() {
 					ConfigHash: "def",
 				},
 			},
-			false,
+			ptr.To(false),
 		),
 		Entry(
 			"with instance manager that are reporting the same configuration",
@@ -295,7 +299,7 @@ var _ = Describe("Configuration report", func() {
 					ConfigHash: "abc",
 				},
 			},
-			true,
+			ptr.To(true),
 		),
 	)
 })

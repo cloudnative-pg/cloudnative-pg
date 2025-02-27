@@ -24,6 +24,7 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/stringset"
 	"github.com/cloudnative-pg/machinery/pkg/types"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/utils/ptr"
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -457,16 +458,16 @@ type ConfigurationReport []ConfigurationReportEntry
 //     configuration is used across all the Pods
 //   - false when every Pod reports the configuration and there
 //     are two Pods using different configurations
-func (report ConfigurationReport) IsUniform() bool {
+func (report ConfigurationReport) IsUniform() *bool {
 	detectedConfigurationHash := stringset.New()
 	for _, item := range report {
 		if item.ConfigHash == "" {
 			// a Pod that isn't reporting its configuration,
 			// and we can't tell whether the configurations are uniform or not.
-			return false
+			return nil
 		}
 		detectedConfigurationHash.Put(item.ConfigHash)
 	}
 
-	return detectedConfigurationHash.Len() == 1
+	return ptr.To(detectedConfigurationHash.Len() == 1)
 }
