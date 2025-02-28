@@ -153,7 +153,7 @@ jobs:
         with:
           distribution: goreleaser
           version: v2
-          args: release --clean --timeout 60m
+          args: release --clean --timeout 60m --id manager --id kubectl-cnpg
         env:
           DATE: ${{ env.DATE }}
           COMMIT: ${{ env.COMMIT }}
