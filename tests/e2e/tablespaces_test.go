@@ -460,14 +460,15 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 
 			backupName = clusterName + pgTime.GetCurrentTimestampWithFormat("20060102150405")
 			By("creating a volumeSnapshot and waiting until it's completed", func() {
-				err := backups.CreateOnDemandBackupViaKubectlPlugin(
-					namespace,
-					clusterName,
-					backupName,
-					apiv1.BackupTargetStandby,
-					apiv1.BackupMethodVolumeSnapshot,
-				)
-				Expect(err).ToNot(HaveOccurred())
+				Eventually(func() error {
+					return backups.CreateOnDemandBackupViaKubectlPlugin(
+						namespace,
+						clusterName,
+						backupName,
+						apiv1.BackupTargetStandby,
+						apiv1.BackupMethodVolumeSnapshot,
+					)
+				}).WithTimeout(time.Minute).WithPolling(5 * time.Second).Should(Succeed())
 
 				// TODO: this is to force a CHECKPOINT when we run the backup on standby.
 				// This should probably be moved elsewhere
