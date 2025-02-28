@@ -60,8 +60,15 @@ please use this medium to report it.
 Every container image in CloudNativePG is automatically built via CI/CD
 pipelines after every commit. These images include not only the operator's
 image but also the operands' images, specifically for every supported
-PostgreSQL version. During the CI/CD process, images are scanned using the
-following tools:
+PostgreSQL version.
+
+!!! Important
+    All operand images are automatically and regularly rebuilt by our pipelines
+    to incorporate the latest security updates at both the base image and package
+    levels. This ensures that container images distributed to the community receive
+    **patch-level updates** regularly.
+
+During the CI/CD process, images are scanned using the following tools:
 
 - **[Dockle](https://github.com/goodwithtech/dockle):** Ensures best practices
   in the container build process.
@@ -97,17 +104,21 @@ cosign verify ghcr.io/cloudnative-pg/cloudnative-pg@sha256:<DIGEST> \
 Container images include the following attestations for transparency and
 traceability:
 
-- **Software Bill of Materials (SBOM):** A comprehensive list of software
-  artifacts included in the image or used during its build process, formatted
-  using the in-toto SPDX predicate standard.
-- **Provenance:** Metadata detailing how the image was built, following the
-  SLSA Provenance framework.
+- **[Software Bill of Materials
+  (SBOM)](https://docs.docker.com/build/metadata/attestations/sbom/):** A
+  comprehensive list of software artifacts included in the image or used during
+  its build process, formatted using the
+  [in-toto SPDX predicate standard](https://github.com/in-toto/attestation/blob/main/spec/predicates/spdx.md).
+- **[Provenance](https://docs.docker.com/build/metadata/attestations/slsa-provenance/):**
+  Metadata detailing how the image was built, following the [SLSA Provenance](https://slsa.dev)
+  framework.
 
 You can retrieve the SBOM for a specific image and platform using the following
 command:
 
 ```shell
-docker buildx imagetools inspect <IMAGE> --format '{{ json (index .SBOM "<PLATFORM>").SPDX }}'
+docker buildx imagetools inspect <IMAGE> \
+  --format '{{ json (index .SBOM "<PLATFORM>").SPDX }}'
 ```
 
 This command outputs the SBOM in JSON format, providing a detailed view of the
@@ -116,14 +127,9 @@ software components and build dependencies.
 For the provenance, use:
 
 ```shell
-docker buildx imagetools inspect <IMAGE> --format '{{ json (index .Provenance "<PLATFORM>").SLSA }}'
+docker buildx imagetools inspect <IMAGE> \
+  --format '{{ json (index .Provenance "<PLATFORM>").SLSA }}'
 ```
-
-!!! Important
-    All operand images are automatically and regularly rebuilt by our pipelines
-    to incorporate the latest security updates at both the base image and package
-    levels. This ensures that container images distributed to the community receive
-    **patch-level updates** regularly.
 
 ### Guidelines and Frameworks for Container Security
 
