@@ -69,6 +69,13 @@ spec:
             port: 9443
             scheme: HTTPS
             path: /readyz
+        startupProbe:
+          failureThreshold: 6
+          periodSeconds: 5
+          httpGet:
+            port: 9443
+            scheme: HTTPS
+            path: /readyz
         readinessProbe:
           httpGet:
             port: 9443
