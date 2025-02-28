@@ -58,20 +58,78 @@ please use this medium to report it.
 ## Container
 
 Every container image in CloudNativePG is automatically built via CI/CD
-pipelines following every commit. These images include not only the operator's
+pipelines after every commit. These images include not only the operator's
 image but also the operands' images, specifically for every supported
-PostgreSQL version. During the CI/CD process, images undergo scanning with the
-following tools:
+PostgreSQL version.
+
+!!! Important
+    All operand images are automatically and regularly rebuilt by our pipelines
+    to incorporate the latest security updates at both the base image and package
+    levels. This ensures that container images distributed to the community receive
+    **patch-level updates** regularly.
+
+During the CI/CD process, images are scanned using the following tools:
 
 - **[Dockle](https://github.com/goodwithtech/dockle):** Ensures best practices
   in the container build process.
 - **[Snyk](https://snyk.io/):** Detects security issues within the container
   and reports findings via the GitHub interface.
 
-!!! Important
-    All operand images are automatically rebuilt daily by our pipelines to
-    incorporate security updates at the base image and package level, providing
-    **patch-level updates** for the container images distributed to the community.
+### Image Signatures
+
+The operator and [operand
+images](https://github.com/cloudnative-pg/postgres-containers) are
+cryptographically signed using [cosign](https://github.com/sigstore/cosign), a
+signature tool from [sigstore](https://www.sigstore.dev/).
+This process is automated via GitHub Actions and leverages
+[short-lived tokens issued through OpenID Connect](https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/about-security-hardening-with-openid-connect).
+
+The token issuer is `https://token.actions.githubusercontent.com`, and the
+signing identity corresponds to a GitHub workflow executed under the
+[cloudnative-pg](https://github.com/cloudnative-pg/cloudnative-pg/) repository.
+This workflow uses the [cosign-installer action](https://github.com/marketplace/actions/cosign-installer)
+to streamline the signing process.
+
+To verify the authenticity of an operator image, use the following `cosign`
+command with the image digest:
+
+```shell
+cosign verify ghcr.io/cloudnative-pg/cloudnative-pg@sha256:<DIGEST> \
+  --certificate-identity-regexp="^https://github.com/cloudnative-pg/cloudnative-pg/" \
+  --certificate-oidc-issuer="https://token.actions.githubusercontent.com"
+```
+
+### Attestations
+
+Container images include the following attestations for transparency and
+traceability:
+
+- **[Software Bill of Materials
+  (SBOM)](https://docs.docker.com/build/metadata/attestations/sbom/):** A
+  comprehensive list of software artifacts included in the image or used during
+  its build process, formatted using the
+  [in-toto SPDX predicate standard](https://github.com/in-toto/attestation/blob/main/spec/predicates/spdx.md).
+- **[Provenance](https://docs.docker.com/build/metadata/attestations/slsa-provenance/):**
+  Metadata detailing how the image was built, following the [SLSA Provenance](https://slsa.dev)
+  framework.
+
+You can retrieve the SBOM for a specific image and platform using the following
+command:
+
+```shell
+docker buildx imagetools inspect <IMAGE> \
+  --format '{{ json (index .SBOM "<PLATFORM>").SPDX }}'
+```
+
+This command outputs the SBOM in JSON format, providing a detailed view of the
+software components and build dependencies.
+
+For the provenance, use:
+
+```shell
+docker buildx imagetools inspect <IMAGE> \
+  --format '{{ json (index .Provenance "<PLATFORM>").SLSA }}'
+```
 
 ### Guidelines and Frameworks for Container Security
 
