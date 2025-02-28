@@ -203,6 +203,8 @@ jobs:
           revision: ${{ env.COMMIT }}
           latest: ${{ needs.check-version.outputs.is_latest == 'true' && needs.check-version.outputs.is_stable == 'true' }}
         with:
+          set: |
+            *.platform=${{ env.PLATFORMS }}
           source: .
           push: true
           no-cache: true

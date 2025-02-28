@@ -561,6 +561,8 @@ jobs:
           registry: ${{ env.REGISTRY }}/${{ env.REPO_OWNER }}
           revision: ${{ env.COMMIT }}
         with:
+          set: |
+            *.platform=${{ env.PLATFORMS }}
           source: .
           push: ${{ env.PUSH }}
           no-cache: true
