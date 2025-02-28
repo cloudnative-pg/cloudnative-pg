@@ -5,10 +5,10 @@ sure you remove this comment.
 
 Create a spreadsheet with the list of commits since the last minor release:
 
-Use the last known tag on `main` branch as a start (e.g. LAST_TAG=v1.24.0).
+Use the last known tag on `main` branch as a start (e.g. LAST_TAG=v1.25.1).
 
 ```bash
-LAST_TAG=v1.24.0
+LAST_TAG=v1.25.1
 git checkout main
 git log ${LAST_TAG}.. --oneline --pretty="format:%h;%s" > log.csv
 ```
