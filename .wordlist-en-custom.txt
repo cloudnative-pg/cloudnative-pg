@@ -272,6 +272,7 @@ OngoingSnapshotBackups
 OnlineConfiguration
 OnlineUpdateEnabled
 OnlineUpgrading
+OpenID
 OpenSSL
 OpenShift
 Openshift
@@ -691,6 +692,7 @@ creds
 cron
 crt
 cryptographic
+cryptographically
 csvlog
 csvs
 ctl
@@ -1226,6 +1228,7 @@ shmmax
 shutdownCheckpointToken
 sig
 sigs
+sigstore
 singlenamespace
 skipRange
 slotPrefix
