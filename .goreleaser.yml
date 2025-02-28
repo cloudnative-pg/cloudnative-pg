@@ -37,6 +37,8 @@ builds:
   binary: manager/manager_{{ .Arch }}
   main: cmd/manager/main.go
   no_unique_dist_dir: true
+  skip: >-
+    {{ if and (isEnvSet "RACE") (eq .Env.RACE "true") }}false{{ else }}true{{ end }}
   gcflags:
     - all=-trimpath={{.Env.GOPATH}};{{.Env.PWD}}
   ldflags:
