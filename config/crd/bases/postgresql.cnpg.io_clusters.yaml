@@ -4119,6 +4119,12 @@ spec:
                     items:
                       type: string
                     type: array
+                  standbyConnectionParameters:
+                    additionalProperties:
+                      type: string
+                    description: Allows the user to customize the primary_conninfo
+                      GUC of HA replicas.
+                    type: object
                   syncReplicaElectionConstraint:
                     description: |-
                       Requirements to be met by sync replicas. This will affect how the "synchronous_standby_names" parameter will be

@@ -138,6 +138,33 @@ primary_conninfo = 'host=cluster-example-rw user=postgres dbname=postgres'
 recovery_target_timeline = 'latest'
 ```
 
+The `primaryConnectionParameters` stanza allows to further customize the
+generated `primary_conninfo` PostgreSQL parameter like in the following example:
+
+```yaml
+  # ...
+  postgresql:
+    primaryConnectionParameters:
+      tcp_user_timeout: "5"
+  # ...
+```
+
+Only the following parameters can be changed:
+
+*	`channel_binding`
+*	`connect_timeout`
+*	`client_encoding`
+*	`options`
+*	`keepalives`
+*	`keepalives_idle`
+*	`keepalives_interval`
+*	`keepalives_count`
+*	`tcp_user_timeout`
+
+!!! Seealso "PostgreSQL connection strings"
+    Refer to the PostgreSQL documentation for
+    [more information on the connection parameters](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING).
+
 ### Log control settings
 
 The operator requires PostgreSQL to output its log in CSV format, and the

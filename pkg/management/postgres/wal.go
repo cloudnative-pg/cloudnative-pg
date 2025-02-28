@@ -46,7 +46,8 @@ func ensureWalArchiveIsWorking(instance *Instance) error {
 		return newWalArchiveBootstrapperForPrimary().ensureFirstWalArchived(retryUntilWalArchiveWorking)
 	}
 
-	return newWalArchiveAnalyzerForReplicaInstance(instance.GetPrimaryConnInfo()).
+	var additionalParameters map[string]string
+	return newWalArchiveAnalyzerForReplicaInstance(instance.GetPrimaryConnInfo(additionalParameters)).
 		mustHaveFirstWalArchivedWithBackoff(retryUntilWalArchiveWorking)
 }
 
