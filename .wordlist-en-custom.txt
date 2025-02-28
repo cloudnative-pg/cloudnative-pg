@@ -866,7 +866,6 @@ init
 initDB
 initdb
 initialDelaySeconds
-initialise
 initializingPVC
 inplace
 installModes
@@ -1032,6 +1031,7 @@ operatorgroups
 operatorhub
 osdk
 ou
+overridable
 ownerMetadata
 ownerReference
 packagemanifests
