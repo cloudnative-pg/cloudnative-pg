@@ -25,9 +25,9 @@ ifneq (,${IMAGE_TAG})
 CONTROLLER_IMG = ${IMAGE_NAME}:${IMAGE_TAG}
 endif
 endif
-CATALOG_IMG ?= $(shell echo "${CONTROLLER_IMG}" | sed -e 's/:/:catalog-/')
-BUNDLE_IMG ?= $(shell echo "${CONTROLLER_IMG}" | sed -e 's/:/:bundle-/')
-INDEX_IMG ?= $(shell echo "${CONTROLLER_IMG}" | sed -e 's/:/:index-/')
+CATALOG_IMG ?= ${CONTROLLER_IMG}-catalog
+BUNDLE_IMG ?= ${CONTROLLER_IMG}-bundle
+INDEX_IMG ?= ${CONTROLLER_IMG}-index
 
 COMMIT := $(shell git rev-parse --short HEAD || echo unknown)
 DATE := $(shell git log -1 --pretty=format:'%ad' --date short)
