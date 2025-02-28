@@ -68,16 +68,24 @@ following tools:
 - **[Snyk](https://snyk.io/):** Detects security issues within the container
   and reports findings via the GitHub interface.
 
-The operator and operand images are signed using [cosign](https://github.com/sigstore/cosign)
-the signature tool from [sigstore](https://www.sigstore.dev/). This process is automated
-using the GitHub Actions and leverages [short-lived tokens issued through OpenID Connect](https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/about-security-hardening-with-openid-connect)
+### Image Signatures
 
-The token issuer is `https://token.actions.githubusercontent.com`, and the signing identity
-corresponds to a GitHub workflow executed under the [cloudnative-pg](https://github.com/cloudnative-pg/cloudnative-pg/)
-repository. This workflow uses the [cosign-installer action](https://github.com/marketplace/actions/cosign-installer)
-to facilitate the signing process.
+The operator and [operand
+images](https://github.com/cloudnative-pg/postgres-containers) are
+cryptographically signed using [cosign](https://github.com/sigstore/cosign), a
+signature tool from [sigstore](https://www.sigstore.dev/).
+This process is automated via GitHub Actions and leverages
+[short-lived tokens issued through OpenID Connect](https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/about-security-hardening-with-openid-connect).
 
-To verify the authenticity of the operator image the digest must be used with the following `cosign` command:
+The token issuer is `https://token.actions.githubusercontent.com`, and the
+signing identity corresponds to a GitHub workflow executed under the
+[cloudnative-pg](https://github.com/cloudnative-pg/cloudnative-pg/) repository.
+This workflow uses the [cosign-installer action](https://github.com/marketplace/actions/cosign-installer)
+to streamline the signing process.
+
+To verify the authenticity of an operator image, use the following `cosign`
+command with the image digest:
+
 ```shell
 cosign verify ghcr.io/cloudnative-pg/cloudnative-pg@sha256:<DIGEST> \
   --certificate-identity-regexp="^https://github.com/cloudnative-pg/cloudnative-pg/" \
@@ -85,9 +93,10 @@ cosign verify ghcr.io/cloudnative-pg/cloudnative-pg@sha256:<DIGEST> \
 ```
 
 !!! Important
-    All operand images are automatically rebuilt daily by our pipelines to
-    incorporate security updates at the base image and package level, providing
-    **patch-level updates** for the container images distributed to the community.
+    All operand images are automatically and regularly rebuilt by our pipelines
+    to incorporate the latest security updates at both the base image and package
+    levels. This ensures that container images distributed to the community receive
+    **patch-level updates** regularly.
 
 ### Guidelines and Frameworks for Container Security
 
