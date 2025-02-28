@@ -261,6 +261,7 @@ NodeSelector
 NodesUsed
 Noland
 O'Reilly
+OCI
 OLAP
 OLTP
 OOM
