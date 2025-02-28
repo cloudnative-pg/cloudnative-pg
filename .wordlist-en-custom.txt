@@ -272,6 +272,7 @@ OngoingSnapshotBackups
 OnlineConfiguration
 OnlineUpdateEnabled
 OnlineUpgrading
+OpenID
 OpenSSL
 OpenShift
 Openshift
@@ -389,12 +390,15 @@ RuntimeDefault
 Ruocco
 SANs
 SAS
+SBOM
 SCC
 SCCs
 SDK
 SELinux
 SHA
 SLA
+SLSA
+SPDX
 SPoF
 SQLQuery
 SQLRefs
@@ -690,6 +694,7 @@ creds
 cron
 crt
 cryptographic
+cryptographically
 csvlog
 csvs
 ctl
@@ -1225,6 +1230,7 @@ shmmax
 shutdownCheckpointToken
 sig
 sigs
+sigstore
 singlenamespace
 skipRange
 slotPrefix
@@ -1332,6 +1338,7 @@ tolerations
 topologies
 topologyKey
 topologySpreadConstraints
+toto
 transactionID
 transactional
 transactionid
