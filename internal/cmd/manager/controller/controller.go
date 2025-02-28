@@ -236,8 +236,8 @@ func RunController(
 		return err
 	}
 
-	if err = controller.NewPluginReconciler(mgr, pluginRepository).
-		SetupWithManager(mgr, configuration.Current.OperatorNamespace, maxConcurrentReconciles); err != nil {
+	if err = controller.NewPluginReconciler(mgr, configuration.Current.OperatorNamespace, pluginRepository).
+		SetupWithManager(mgr, maxConcurrentReconciles); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Plugin")
 		return err
 	}
