@@ -217,7 +217,7 @@ jobs:
       - name: Sign images
         run: |
           images=$(echo '${{ steps.bake-push.outputs.metadata }}' |
-            jq '.[] | (."image.name" | sub(",.*";"" )) + "@" + ."containerimage.digest"'
+            jq -r '.[] | (."image.name" | sub(",.*";"" )) + "@" + ."containerimage.digest"'
           )
           cosign sign --yes ${images}
 
