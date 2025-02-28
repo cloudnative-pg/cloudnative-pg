@@ -14,6 +14,7 @@ env:
 permissions:
   contents: write
   packages: write
+  id-token: write
 
 jobs:
 
