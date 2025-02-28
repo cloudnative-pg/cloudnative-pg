@@ -261,6 +261,7 @@ NodeSelector
 NodesUsed
 Noland
 O'Reilly
+OCI
 OLAP
 OLTP
 OOM
@@ -866,7 +867,6 @@ init
 initDB
 initdb
 initialDelaySeconds
-initialise
 initializingPVC
 inplace
 installModes
@@ -1032,6 +1032,7 @@ operatorgroups
 operatorhub
 osdk
 ou
+overridable
 ownerMetadata
 ownerReference
 packagemanifests
