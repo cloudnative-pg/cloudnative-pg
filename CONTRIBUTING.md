@@ -40,8 +40,7 @@ For development contributions, please refer to the separate section called
 ## Ask for Help
 
 The best way to reach us with a question when contributing is to drop a line in
-our [Slack channel](https://join.slack.com/t/cloudnativepg/shared_invite/zt-2vedd06pe-vMZf4wJ3l_H_hB3YCZ947A), or
-start a new Github discussion.
+our [Slack channel](README.md#communications), or start a new Github discussion.
 
 ## Raising Issues
 
