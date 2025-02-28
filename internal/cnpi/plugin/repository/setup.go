@@ -103,7 +103,7 @@ func pluginConnectionConstructor(name string, protocol connection.Protocol) pudd
 
 func pluginConnectionDestructor(res connection.Interface) {
 	logger := log.FromContext(context.Background()).
-		WithName("setPluginProtocol").
+		WithName("pluginConnectionDestructor").
 		WithValues("pluginName", res.Name())
 
 	logger.Trace("Released physical plugin connection")
