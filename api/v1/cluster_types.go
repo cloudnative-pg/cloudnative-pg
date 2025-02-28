@@ -1332,6 +1332,10 @@ type PostgresConfiguration struct {
 	// Defaults to false.
 	// +optional
 	EnableAlterSystem bool `json:"enableAlterSystem,omitempty"`
+
+	// Allows the user to customize the primary_conninfo GUC of HA replicas.
+	// +optional
+	StandbyConnectionParameters map[string]string `json:"standbyConnectionParameters,omitempty"`
 }
 
 // BootstrapConfiguration contains information about how to create the PostgreSQL
