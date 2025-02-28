@@ -390,12 +390,15 @@ RuntimeDefault
 Ruocco
 SANs
 SAS
+SBOM
 SCC
 SCCs
 SDK
 SELinux
 SHA
 SLA
+SLSA
+SPDX
 SPoF
 SQLQuery
 SQLRefs
@@ -1336,6 +1339,7 @@ tolerations
 topologies
 topologyKey
 topologySpreadConstraints
+toto
 transactionID
 transactional
 transactionid

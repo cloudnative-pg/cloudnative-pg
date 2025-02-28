@@ -58,9 +58,9 @@ please use this medium to report it.
 ## Container
 
 Every container image in CloudNativePG is automatically built via CI/CD
-pipelines following every commit. These images include not only the operator's
+pipelines after every commit. These images include not only the operator's
 image but also the operands' images, specifically for every supported
-PostgreSQL version. During the CI/CD process, images undergo scanning with the
+PostgreSQL version. During the CI/CD process, images are scanned using the
 following tools:
 
 - **[Dockle](https://github.com/goodwithtech/dockle):** Ensures best practices
@@ -90,6 +90,33 @@ command with the image digest:
 cosign verify ghcr.io/cloudnative-pg/cloudnative-pg@sha256:<DIGEST> \
   --certificate-identity-regexp="^https://github.com/cloudnative-pg/cloudnative-pg/" \
   --certificate-oidc-issuer="https://token.actions.githubusercontent.com"
+```
+
+### Attestations
+
+Container images include the following attestations for transparency and
+traceability:
+
+- **Software Bill of Materials (SBOM):** A comprehensive list of software
+  artifacts included in the image or used during its build process, formatted
+  using the in-toto SPDX predicate standard.
+- **Provenance:** Metadata detailing how the image was built, following the
+  SLSA Provenance framework.
+
+You can retrieve the SBOM for a specific image and platform using the following
+command:
+
+```shell
+docker buildx imagetools inspect <IMAGE> --format '{{ json (index .SBOM "<PLATFORM>").SPDX }}'
+```
+
+This command outputs the SBOM in JSON format, providing a detailed view of the
+software components and build dependencies.
+
+For the provenance, use:
+
+```shell
+docker buildx imagetools inspect <IMAGE> --format '{{ json (index .Provenance "<PLATFORM>").SLSA }}'
 ```
 
 !!! Important
