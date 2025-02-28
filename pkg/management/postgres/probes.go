@@ -583,7 +583,7 @@ func (instance *Instance) IsWALReceiverActive() (bool, error) {
 	return result, nil
 }
 
-// PgStatWal is a representation of the pg_stat_wal table
+// PgStatWal is a representation of the pg_stat_wal table, introduced in PostgreSQL 14.
 type PgStatWal struct {
 	WalRecords     int64
 	WalFpi         int64
@@ -608,6 +608,9 @@ func (instance *Instance) TryGetPgStatWAL() (*PgStatWal, error) {
 		return nil, err
 	}
 
+	// Since PostgreSQL 18, `wal_write`, `wal_sync`, `wal_write_time` and
+	// `wal_sync_time` have been removed.
+	// See https://github.com/postgres/postgres/commit/2421e9a51d20bb83154e54a16ce628f9249fa907
 	var pgWalStat PgStatWal
 	if version.Major < 18 {
 		row := superUserDB.QueryRow(
