@@ -1,183 +1,59 @@
 # Failure Modes
 
-This section provides an overview of the major failure scenarios that
-PostgreSQL can face on a Kubernetes cluster during its lifetime.
-
-!!! Important
-    In case the failure scenario you are experiencing is not covered by this
-    section, please immediately seek for [professional support](https://cloudnative-pg.io/support/).
-
-!!! Seealso "Postgres instance manager"
-    Please refer to the ["Postgres instance manager" section](instance_manager.md)
-    for more information the liveness and readiness probes implemented by
-    CloudNativePG.
-
-## Storage space usage
-
-The operator will instantiate one PVC for every PostgreSQL instance to store the `PGDATA` content.
-A second PVC dedicated to the WAL storage will be provisioned in case `.spec.walStorage` is
-specified during cluster initialization.
-
-Such storage space is set for reuse in two cases:
-
-- when the corresponding Pod is deleted by the user (and a new Pod will be recreated)
-- when the corresponding Pod is evicted and scheduled on another node
-
-If you want to prevent the operator from reusing a certain PVC you need to
-remove the PVC before deleting the Pod. For this purpose, you can use the
-following command:
-
-```sh
-kubectl delete -n [namespace] pvc/[cluster-name]-[serial] pod/[cluster-name]-[serial]
-```
-
 !!! Note
-    If you specified a dedicated WAL volume, it will also have to be deleted during this process.
+    In previous versions of CloudNativePG, this page included specific failure
+    scenarios. Since these largely follow standard Kubernetes behavior, we have
+    streamlined the content to avoid duplication of information that belongs to the
+    underlying Kubernetes stack and is not specific to CloudNativePG.
 
-```sh
-kubectl delete -n [namespace] pvc/[cluster-name]-[serial] pvc/[cluster-name]-[serial]-wal pod/[cluster-name]-[serial]
-```
-
-For example:
-
-```sh
-$ kubectl delete -n default pvc/cluster-example-1 pvc/cluster-example-1-wal pod/cluster-example-1
-persistentvolumeclaim "cluster-example-1" deleted
-persistentvolumeclaim "cluster-example-1-wal" deleted
-pod "cluster-example-1" deleted
-```
-
-## Failure modes
-
-A pod belonging to a `Cluster` can fail in the following ways:
-
-* the pod is explicitly deleted by the user;
-* the readiness probe on its `postgres` container fails;
-* the liveness probe on its `postgres` container fails;
-* the Kubernetes worker node is drained;
-* the Kubernetes worker node where the pod is scheduled fails.
-
-Each one of these failures has different effects on the `Cluster` and the
-services managed by the operator.
-
-### Pod deleted by the user
-
-The operator is notified of the deletion. A new pod belonging to the
-`Cluster` will be automatically created reusing the existing PVC, if available,
-or starting from a physical backup of the *primary* otherwise.
+CloudNativePG adheres to standard Kubernetes principles for self-healing and
+high availability. We assume familiarity with core Kubernetes concepts such as
+storage classes, PVCs, nodes, and Pods. For CloudNativePG-specific details,
+refer to the ["Postgres Instance Manager" section](instance_manager.md), which
+covers startup, liveness, and readiness probes, as well as the
+[self-healing](#self-healing) section below.
 
 !!! Important
-    In case of deliberate deletion of a pod, `PodDisruptionBudget` policies
-    will not be enforced.
+    If you are running CloudNativePG in production, we strongly recommend
+    seeking [professional support](https://cloudnative-pg.io/support/).
 
-Self-healing will happen as soon as the *apiserver* is notified.
+## Self-Healing
 
-You can trigger a sudden failure on a given pod of the cluster using the
-following generic command:
+### Primary Failure
 
-```sh
-kubectl delete -n [namespace] \
-  pod/[cluster-name]-[serial] --grace-period=1
-```
+If the primary Pod fails:
 
-For example, if you want to simulate a real failure on the primary and trigger
-the failover process, you can run:
+- The operator promotes the most up-to-date standby with the lowest replication
+  lag.
+- The `-rw` service is updated to point to the new primary.
+- The failed Pod is removed from the `-r` and `-rw` services.
+- Standby Pods begin replicating from the new primary.
+- The former primary uses `pg_rewind` to re-synchronize if its PVC is available;
+  otherwise, a new standby is created from a backup of the new primary.
 
-```sh
-kubectl delete pod [primary pod] --grace-period=1
-```
+### Standby Failure
 
-!!! Warning
-    Never use `--grace-period=0` in your failover simulation tests, as this
-    might produce misleading results with your PostgreSQL cluster. A grace
-    period of 0 guarantees that the pod is immediately removed from the
-    Kubernetes API server, without first ensuring that the PID 1 process of
-    the `postgres` container (the instance manager) is shut down - contrary
-    to what would happen in case of a real failure (e.g. unplug the power cord
-    cable or network partitioning).
-    As a result, the operator doesn't see the pod of the primary anymore, and
-    triggers a failover promoting the most aligned standby, without
-    the guarantee that the primary had been shut down.
+If a standby Pod fails:
 
-### Liveness Probe Failure
+- It is removed from the `-r` and `-ro` services.
+- The Pod is restarted using its PVC if available; otherwise, a new Pod is
+  created from a backup of the current primary.
+- Once ready, the Pod is re-added to the `-r` and `-ro` services.
 
-By default, after three consecutive liveness probe failures, the `postgres`
-container will be considered failed. The Pod will remain part of the `Cluster`,
-but the *kubelet* will attempt to restart the failed container. If the issue
-causing the failure persists and cannot be resolved, you can manually delete
-the Pod.
+## Manual Intervention
 
-In both cases, self-healing occurs automatically once the underlying issues are
-resolved.
-
-### Readiness Probe Failure
-
-By default, after three consecutive readiness probe failures, the Pod will be
-marked as *not ready*. It will remain part of the `Cluster`, and no new Pod
-will be created. If the issue causing the failure cannot be resolved, you can
-manually delete the Pod. Once the failure is addressed, the Pod will
-automatically regain its previous role.
-
-### Worker node drained
-
-The pod will be evicted from the worker node and removed from the service. A
-new pod will be created on a different worker node from a physical backup of the
-*primary* if the `reusePVC` option of the `nodeMaintenanceWindow` parameter
-is set to `off` (default: `on` during maintenance windows, `off` otherwise).
-
-The `PodDisruptionBudget` may prevent the pod from being evicted if there
-is at least another pod that is not ready.
-
-!!! Note
-    Single instance clusters prevent node drain when `reusePVC` is
-    set to `false`. Refer to the [Kubernetes Upgrade section](kubernetes_upgrade.md).
-
-Self-healing will happen as soon as the *apiserver* is notified.
-
-### Worker node failure
-
-Since the node is failed, the *kubelet* won't execute the liveness and
-the readiness probes. The pod will be marked for deletion after the
-toleration seconds configured by the Kubernetes cluster administrator for
-that specific failure cause. Based on how the Kubernetes cluster is configured,
-the pod might be removed from the service earlier.
-
-A new pod will be created on a different worker node from a physical backup
-of the *primary*. The default value for that parameter in a Kubernetes
-cluster is 5 minutes.
-
-Self-healing will happen after `tolerationSeconds`.
-
-## Self-healing
-
-If the failed pod is a standby, the pod is removed from the `-r` service
-and from the `-ro` service.
-The pod is then restarted using its PVC if available; otherwise, a new
-pod will be created from a backup of the current primary. The pod
-will be added again to the `-r` service and to the `-ro` service when ready.
-
-If the failed pod is the primary, the operator will promote the active pod
-with status ready and the lowest replication lag, then point the `-rw` service
-to it. The failed pod will be removed from the `-r` service and from the
-`-rw` service.
-Other standbys will start replicating from the new primary. The former
-primary will use `pg_rewind` to synchronize itself with the new one if its
-PVC is available; otherwise, a new standby will be created from a backup of the
-current primary.
-
-## Manual intervention
-
-In the case of undocumented failure, it might be necessary to intervene
-to solve the problem manually.
+For failure scenarios not covered by automated recovery, manual intervention
+may be required.
 
 !!! Important
-    In such cases, please do not perform any manual operation without
-    [professional support](https://cloudnative-pg.io/support/).
+    Do not perform manual operations without [professional support](https://cloudnative-pg.io/support/).
 
-You can use the `cnpg.io/reconciliationLoop` annotation to temporarily disable
-the reconciliation loop for a specific PostgreSQL cluster, as shown below:
+### Disabling Reconciliation
 
-``` yaml
+To temporarily disable the reconciliation loop for a PostgreSQL cluster, use
+the `cnpg.io/reconciliationLoop` annotation:
+
+```yaml
 metadata:
   name: cluster-example-no-reconcile
   annotations:
@@ -186,12 +62,10 @@ spec:
   # ...
 ```
 
-The `cnpg.io/reconciliationLoop` must be used with extreme care
-and for the sole duration of the extraordinary/emergency operation.
+Use this annotation **with extreme caution** and only during emergency
+operations.
 
 !!! Warning
-    Please make sure that you use this annotation only for a limited period of
-    time and you remove it when the emergency has finished. Leaving this annotation
-    in a cluster will prevent the operator from issuing any self-healing operation,
-    such as a failover.
-
+    This annotation should be removed as soon as the issue is resolved. Leaving
+    it in place prevents the operator from executing self-healing actions,
+    including failover.
