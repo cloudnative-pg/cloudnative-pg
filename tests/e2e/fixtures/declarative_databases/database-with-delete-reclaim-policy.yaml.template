@@ -11,3 +11,6 @@ spec:
   databaseReclaimPolicy: delete
   cluster:
     name: cluster-with-declarative-databases
+  extensions:
+  - name: bloom
+    ensure: present

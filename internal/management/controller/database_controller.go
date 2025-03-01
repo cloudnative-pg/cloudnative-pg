@@ -40,8 +40,13 @@ type DatabaseReconciler struct {
 
 	instance            instanceInterface
 	finalizerReconciler *finalizerReconciler[*apiv1.Database]
-	getSuperUserDB      func() (*sql.DB, error)
+
+	getSuperUserDB func() (*sql.DB, error)
+	getTargetDB    func(dbname string) (*sql.DB, error)
 }
+
+// ErrFailedExtensionReconciliation is raised when an extension failed to reconcile
+var ErrFailedExtensionReconciliation = fmt.Errorf("extension reconciliation failed")
 
 // databaseReconciliationInterval is the time between the
 // database reconciliation loop failures
@@ -121,7 +126,7 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return res, err
 	}
 
-	if err := r.reconcileDatabase(ctx, &database); err != nil {
+	if err := r.reconcileDatabaseResource(ctx, &database); err != nil {
 		if markErr := markAsFailed(ctx, r.Client, &database, err); markErr != nil {
 			contextLogger.Error(err, "while marking as failed the database resource",
 				"error", err,
@@ -164,6 +169,9 @@ func NewDatabaseReconciler(
 		getSuperUserDB: func() (*sql.DB, error) {
 			return instance.GetSuperUserDB()
 		},
+		getTargetDB: func(dbname string) (*sql.DB, error) {
+			return instance.ConnectionPool().Connection(dbname)
+		},
 	}
 
 	dr.finalizerReconciler = newFinalizerReconciler(
@@ -188,7 +196,7 @@ func (r *DatabaseReconciler) GetCluster(ctx context.Context) (*apiv1.Cluster, er
 	return getClusterFromInstance(ctx, r.Client, r.instance)
 }
 
-func (r *DatabaseReconciler) reconcileDatabase(ctx context.Context, obj *apiv1.Database) error {
+func (r *DatabaseReconciler) reconcileDatabaseResource(ctx context.Context, obj *apiv1.Database) error {
 	db, err := r.getSuperUserDB()
 	if err != nil {
 		return fmt.Errorf("while connecting to the database %q: %w", obj.Spec.Name, err)
@@ -198,6 +206,28 @@ func (r *DatabaseReconciler) reconcileDatabase(ctx context.Context, obj *apiv1.D
 		return dropDatabase(ctx, db, obj)
 	}
 
+	if err := r.reconcilePostgresDatabase(ctx, db, obj); err != nil {
+		return err
+	}
+
+	obj.Status.Extensions = make([]apiv1.ExtensionStatus, len(obj.Spec.Extensions))
+	for i := range obj.Spec.Extensions {
+		ext := &obj.Spec.Extensions[i]
+		obj.Status.Extensions[i] = r.reconcileDatabaseExtension(
+			ctx,
+			obj.Spec.Name,
+			ext,
+		)
+	}
+
+	if !areAllExtensionsApplied(obj.Status.Extensions) {
+		return ErrFailedExtensionReconciliation
+	}
+
+	return nil
+}
+
+func (r *DatabaseReconciler) reconcilePostgresDatabase(ctx context.Context, db *sql.DB, obj *apiv1.Database) error {
 	dbExists, err := detectDatabase(ctx, db, obj)
 	if err != nil {
 		return fmt.Errorf("while detecting the database %q: %w", obj.Spec.Name, err)
@@ -208,4 +238,105 @@ func (r *DatabaseReconciler) reconcileDatabase(ctx context.Context, obj *apiv1.D
 	}
 
 	return createDatabase(ctx, db, obj)
+}
+
+func (r *DatabaseReconciler) reconcileDatabaseExtension(
+	ctx context.Context,
+	dbname string,
+	ext *apiv1.ExtensionSpec,
+) apiv1.ExtensionStatus {
+	db, err := r.getTargetDB(dbname)
+	if err != nil {
+		return apiv1.ExtensionStatus{
+			Applied: false,
+			Message: fmt.Sprintf("while connecting to the database %q: %v", dbname, err),
+		}
+	}
+
+	extensionExists, err := detectDatabaseExtension(ctx, db, ext)
+	if err != nil {
+		return apiv1.ExtensionStatus{
+			Applied: false,
+			Message: fmt.Sprintf("while detecting the extension %q: %v", ext.Name, err),
+		}
+	}
+
+	switch {
+	case !extensionExists && ext.Ensure == apiv1.EnsurePresent:
+		return reconcileCreateDatabaseExtension(ctx, db, ext)
+
+	case !extensionExists && ext.Ensure == apiv1.EnsureAbsent:
+		return apiv1.ExtensionStatus{
+			Applied: true,
+		}
+
+	case extensionExists && ext.Ensure == apiv1.EnsurePresent:
+		return reconcileUpdateDatabaseExtension(ctx, db, ext)
+
+	case extensionExists && ext.Ensure == apiv1.EnsureAbsent:
+		return reconcileDropDatabaseExtension(ctx, db, ext)
+
+	default:
+		// If this happens, the CRD and/or the validating webhook
+		// are not working properly. In this case, let's do nothing:
+		// better to be safe than sorry.
+		return apiv1.ExtensionStatus{
+			Applied: true,
+		}
+	}
+}
+
+func areAllExtensionsApplied(extensionStatus []apiv1.ExtensionStatus) bool {
+	for i := range extensionStatus {
+		if !extensionStatus[i].Applied {
+			return false
+		}
+	}
+
+	return true
+}
+
+func reconcileCreateDatabaseExtension(ctx context.Context, db *sql.DB, ext *apiv1.ExtensionSpec) apiv1.ExtensionStatus {
+	if err := createDatabaseExtension(ctx, db, ext); err != nil {
+		return apiv1.ExtensionStatus{
+			Name:    ext.Name,
+			Applied: false,
+			Message: err.Error(),
+		}
+	}
+
+	return apiv1.ExtensionStatus{
+		Name:    ext.Name,
+		Applied: true,
+	}
+}
+
+func reconcileDropDatabaseExtension(ctx context.Context, db *sql.DB, ext *apiv1.ExtensionSpec) apiv1.ExtensionStatus {
+	if err := dropDatabaseExtension(ctx, db, ext); err != nil {
+		return apiv1.ExtensionStatus{
+			Name:    ext.Name,
+			Applied: false,
+			Message: err.Error(),
+		}
+	}
+
+	return apiv1.ExtensionStatus{
+		Name:    ext.Name,
+		Applied: true,
+	}
+}
+
+func reconcileUpdateDatabaseExtension(ctx context.Context, db *sql.DB, ext *apiv1.ExtensionSpec) apiv1.ExtensionStatus {
+	if err := updateDatabaseExtension(ctx, db, ext); err != nil {
+		return apiv1.ExtensionStatus{
+			Name:    ext.Name,
+			Applied: false,
+			Message: err.Error(),
+		}
+	}
+
+	return apiv1.ExtensionStatus{
+		Name:    ext.Name,
+		Applied: true,
+	}
 }

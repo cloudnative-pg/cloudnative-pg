@@ -162,6 +162,31 @@ type DatabaseSpec struct {
 	// +kubebuilder:default:=retain
 	// +optional
 	ReclaimPolicy DatabaseReclaimPolicy `json:"databaseReclaimPolicy,omitempty"`
+
+	// The list of extensions to be managed in the database
+	// +optional
+	Extensions []ExtensionSpec `json:"extensions,omitempty"`
+}
+
+// ExtensionSpec configures an extension in a database
+type ExtensionSpec struct {
+	// Name is the name of the extension
+	Name string `json:"name,omitempty"`
+
+	// Ensure tells the operator to install or remove an extension from
+	// the database
+	// +kubebuilder:default:="present"
+	// +kubebuilder:validation:Enum=present;absent
+	// +optional
+	Ensure EnsureOption `json:"ensure"`
+
+	// Version is the version of extension to be installed.
+	// If empty the operator will install the default version and not update it.
+	Version string `json:"version,omitempty"`
+
+	// Schema is the schema where the extension will be installed.
+	// Defaults to the default extension schema.
+	Schema string `json:"schema,omitempty"`
 }
 
 // DatabaseStatus defines the observed state of Database
@@ -176,6 +201,24 @@ type DatabaseStatus struct {
 	Applied *bool `json:"applied,omitempty"`
 
 	// Message is the reconciliation output message
+	// +optional
+	Message string `json:"message,omitempty"`
+
+	// Extensions is the status of the managed extensions
+	// +optional
+	Extensions []ExtensionStatus `json:"extensions,omitempty"`
+}
+
+// ExtensionStatus is the status of the managed extensions
+type ExtensionStatus struct {
+	// The name of the extension
+	Name string `json:"name"`
+
+	// True of the extension has been installed successfully in
+	// the database
+	Applied bool `json:"applied"`
+
+	// Message is the extension reconciliation message
 	// +optional
 	Message string `json:"message,omitempty"`
 }

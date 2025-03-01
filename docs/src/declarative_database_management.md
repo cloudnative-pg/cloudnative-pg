@@ -20,8 +20,8 @@ automated, and consistent approach to managing PostgreSQL databases.
 !!! Important
     CloudNativePG manages **global objects** in PostgreSQL clusters, such as
     databases, roles, and tablespaces. However, it does **not** manage the content
-    of databases (e.g., schemas and tables). For database content, specialized
-    tools or the applications themselves should be used.
+    of databases besides of extensions (e.g., schemas and tables). For database content,
+	specialized tools or the applications themselves should be used.
 
 ### Declarative `Database` Manifest
 
@@ -38,6 +38,9 @@ spec:
   owner: app
   cluster:
     name: cluster-example
+  extensions:
+  - name: bloom
+    ensure: present
 ```
 
 When applied, this manifest creates a `Database` object called
@@ -63,6 +66,33 @@ ensuring the database is created or updated as needed.
     The distinction between `metadata.name` and `spec.name` allows multiple
     `Database` resources to reference databases with the same name across different
     CloudNativePG clusters in the same Kubernetes namespace.
+
+### Installing extensions in the database
+
+CloudNativePG can automate the creation of extensions in the target
+database. To do that the `spec.extensions` field must be set to a
+list of extension specifications, like in the following example:
+
+```yaml
+spec:
+  extensions:
+  - name: bloom
+    ensure: present
+```
+
+Each entry of the list has the following properties:
+
+* `name`: the name of the extension
+* `ensure`
+  * `present`: the extension will be created in the database
+  * `absent`: the extension will be removed from the database
+* `version`: the version of the extension to install or
+  to upgrade to
+* `schema`: the schema where the extension should be installed
+
+Only the extensions specified in `spec.extensions` are reconciled by
+the operator. Existing unspecified extensions are not targeted by the
+reconciliation process.
 
 ## Reserved Database Names
 

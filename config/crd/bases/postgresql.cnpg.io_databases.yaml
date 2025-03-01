@@ -124,6 +124,35 @@ spec:
                 - present
                 - absent
                 type: string
+              extensions:
+                description: The list of extensions to be managed in the database
+                items:
+                  description: ExtensionSpec configures an extension in a database
+                  properties:
+                    ensure:
+                      default: present
+                      description: |-
+                        Ensure tells the operator to install or remove an extension from
+                        the database
+                      enum:
+                      - present
+                      - absent
+                      type: string
+                    name:
+                      description: Name is the name of the extension
+                      type: string
+                    schema:
+                      description: |-
+                        Schema is the schema where the extension will be installed.
+                        Defaults to the default extension schema.
+                      type: string
+                    version:
+                      description: |-
+                        Version is the version of extension to be installed.
+                        If empty the operator will install the default version and not update it.
+                      type: string
+                  type: object
+                type: array
               icuLocale:
                 description: |-
                   Maps to the `ICU_LOCALE` parameter of `CREATE DATABASE`. This
@@ -242,6 +271,27 @@ spec:
               applied:
                 description: Applied is true if the database was reconciled correctly
                 type: boolean
+              extensions:
+                description: Extensions is the status of the managed extensions
+                items:
+                  description: ExtensionStatus is the status of the managed extensions
+                  properties:
+                    applied:
+                      description: |-
+                        True of the extension has been installed successfully in
+                        the database
+                      type: boolean
+                    message:
+                      description: Message is the extension reconciliation message
+                      type: string
+                    name:
+                      description: The name of the extension
+                      type: string
+                  required:
+                  - applied
+                  - name
+                  type: object
+                type: array
               message:
                 description: Message is the reconciliation output message
                 type: string
