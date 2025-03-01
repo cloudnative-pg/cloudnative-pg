@@ -38,7 +38,7 @@ func detectDatabase(
 		`
 		SELECT count(*)
 		FROM pg_catalog.pg_database
-	        WHERE datname = $1
+	    WHERE datname = $1
 		`,
 		obj.Spec.Name)
 	if row.Err() != nil {
@@ -209,6 +209,85 @@ func dropDatabase(
 	if err != nil {
 		contextLogger.Error(err, "while dropping database", "query", query)
 		return fmt.Errorf("while dropping database %q: %w", obj.Spec.Name, err)
+	}
+
+	return nil
+}
+
+const detectDatabaseExtensionSQL = `
+SELECT count(*)
+FROM pg_catalog.pg_extension
+WHERE extname = $1
+`
+
+func detectDatabaseExtension(ctx context.Context, db *sql.DB, ext *apiv1.ExtensionSpec) (bool, error) {
+	row := db.QueryRowContext(
+		ctx, detectDatabaseExtensionSQL,
+		ext.Name)
+	if row.Err() != nil {
+		return false, fmt.Errorf("while checking if database %q exists: %w", ext.Name, row.Err())
+	}
+
+	var count int
+	if err := row.Scan(&count); err != nil {
+		return false, fmt.Errorf("while scanning if database %q exists: %w", ext.Name, err)
+	}
+
+	return count > 0, nil
+}
+
+func createDatabaseExtension(ctx context.Context, db *sql.DB, ext *apiv1.ExtensionSpec) error {
+	contextLogger := log.FromContext(ctx)
+
+	var sqlCreateExtension strings.Builder
+	sqlCreateExtension.WriteString(fmt.Sprintf("CREATE EXTENSION %s ", pgx.Identifier{ext.Name}.Sanitize()))
+	if len(ext.Version) > 0 {
+		sqlCreateExtension.WriteString(fmt.Sprintf(" VERSION %s", pgx.Identifier{ext.Version}.Sanitize()))
+	}
+	if len(ext.Schema) > 0 {
+		sqlCreateExtension.WriteString(fmt.Sprintf(" SCHEMA %s", pgx.Identifier{ext.Schema}.Sanitize()))
+	}
+
+	_, err := db.ExecContext(ctx, sqlCreateExtension.String())
+	if err != nil {
+		contextLogger.Error(err, "while creating extension", "query", sqlCreateExtension.String())
+	}
+
+	return err
+}
+
+func dropDatabaseExtension(ctx context.Context, db *sql.DB, ext *apiv1.ExtensionSpec) error {
+	query := fmt.Sprintf("DROP EXTENSION IF EXISTS %s", pgx.Identifier{ext.Name}.Sanitize())
+	_, err := db.ExecContext(
+		ctx,
+		query)
+	return err
+}
+
+func updateDatabaseExtension(ctx context.Context, db *sql.DB, ext *apiv1.ExtensionSpec) error {
+	if len(ext.Schema) > 0 {
+		changeSchemaSQL := fmt.Sprintf(
+			"ALTER EXTENSION %s SET SCHEMA %v",
+			pgx.Identifier{ext.Name}.Sanitize(),
+			pgx.Identifier{ext.Schema}.Sanitize(),
+		)
+
+		if _, err := db.ExecContext(ctx, changeSchemaSQL); err != nil {
+			return fmt.Errorf("altering schema: %w", err)
+		}
+	}
+
+	if len(ext.Version) > 0 {
+		//nolint:gosec
+		changeVersionSQL := fmt.Sprintf(
+			"ALTER EXTENSION %s UPDATE TO %v",
+			pgx.Identifier{ext.Name}.Sanitize(),
+			pgx.Identifier{ext.Version}.Sanitize(),
+		)
+
+		if _, err := db.ExecContext(ctx, changeVersionSQL); err != nil {
+			return fmt.Errorf("altering version: %w", err)
+		}
 	}
 
 	return nil

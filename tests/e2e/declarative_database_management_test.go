@@ -131,6 +131,16 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 				assertDatabaseHasExpectedFields(namespace, primaryPodInfo.Name, database)
 			})
 
+			By("verifying the extension presence in the target database", func() {
+				primaryPodInfo, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
+				Expect(err).ToNot(HaveOccurred())
+
+				for _, extSpec := range database.Spec.Extensions {
+					Eventually(QueryMatchExpectationPredicate(primaryPodInfo, exec.DatabaseName(database.Spec.Name),
+						extensionExistsQuery(extSpec.Name), boolPGOutput(true)), 30).Should(Succeed())
+				}
+			})
+
 			By("removing the Database object", func() {
 				Expect(objects.Delete(env.Ctx, env.Client, &database)).To(Succeed())
 			})

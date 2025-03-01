@@ -58,9 +58,8 @@ func markAsFailed(
 	resource markableAsFailed,
 	err error,
 ) error {
-	oldResource := resource.DeepCopyObject().(markableAsFailed)
 	resource.SetAsFailed(err)
-	return cli.Status().Patch(ctx, resource, client.MergeFrom(oldResource))
+	return cli.Status().Update(ctx, resource)
 }
 
 type markableAsUnknown interface {
@@ -68,16 +67,15 @@ type markableAsUnknown interface {
 	SetAsUnknown(err error)
 }
 
-// markAsFailed marks the reconciliation as failed and logs the corresponding error
+// markAsUnknown marks the reconciliation as failed and logs the corresponding error
 func markAsUnknown(
 	ctx context.Context,
 	cli client.Client,
 	resource markableAsUnknown,
 	err error,
 ) error {
-	oldResource := resource.DeepCopyObject().(markableAsUnknown)
 	resource.SetAsUnknown(err)
-	return cli.Status().Patch(ctx, resource, client.MergeFrom(oldResource))
+	return cli.Status().Update(ctx, resource)
 }
 
 type markableAsReady interface {
@@ -91,10 +89,8 @@ func markAsReady(
 	cli client.Client,
 	resource markableAsReady,
 ) error {
-	oldResource := resource.DeepCopyObject().(markableAsReady)
 	resource.SetAsReady()
-
-	return cli.Status().Patch(ctx, resource, client.MergeFrom(oldResource))
+	return cli.Status().Update(ctx, resource)
 }
 
 func getClusterFromInstance(
