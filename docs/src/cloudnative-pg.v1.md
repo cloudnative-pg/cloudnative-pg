@@ -4178,6 +4178,13 @@ This should only be used for debugging and troubleshooting.
 Defaults to false.</p>
 </td>
 </tr>
+<tr><td><code>standbyConnectionParameters</code><br/>
+<i>map[string]string</i>
+</td>
+<td>
+   <p>Allows the user to customize the primary_conninfo GUC of HA replicas.</p>
+</td>
+</tr>
 </tbody>
 </table>
 
