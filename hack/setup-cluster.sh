@@ -33,7 +33,6 @@ EXTERNAL_ATTACHER_VERSION=v4.8.0
 K8S_VERSION=${K8S_VERSION-}
 KUBECTL_VERSION=${KUBECTL_VERSION-}
 CSI_DRIVER_HOST_PATH_VERSION=${CSI_DRIVER_HOST_PATH_VERSION:-$CSI_DRIVER_HOST_PATH_DEFAULT_VERSION}
-ENGINE=${CLUSTER_ENGINE:-kind}
 ENABLE_REGISTRY=${ENABLE_REGISTRY:-}
 ENABLE_PYROSCOPE=${ENABLE_PYROSCOPE:-}
 ENABLE_CSI_DRIVER=${ENABLE_CSI_DRIVER:-}
@@ -444,7 +443,7 @@ load_image() {
   local cluster_name=$1
   local image=$2
   if [ -z "${ENABLE_REGISTRY:-}" ]; then
-    "load_image_${ENGINE}" "${cluster_name}" "${image}"
+    "load_image_kind" "${cluster_name}" "${image}"
   else
     load_image_registry "${image}"
   fi
@@ -458,7 +457,7 @@ deploy_operator() {
 
 usage() {
   cat >&2 <<EOF
-Usage: $0 [-e {kind|k3d}] [-k <version>] [-r] <command>
+Usage: $0 [-k <version>] [-r] <command>
 
 Commands:
     prepare <dest_dir>    Downloads the prerequisite into <dest_dir>
@@ -474,11 +473,6 @@ Commands:
     pyroscope             Deploy Pyroscope inside operator namespace
 
 Options:
-    -e|--engine
-        <CLUSTER_ENGINE>  Use the provided ENGINE to run the cluster.
-                          Available options are 'kind'. Default 'kind'.
-                          Env: CLUSTER_ENGINE
-
     -k|--k8s-version
         <K8S_VERSION>     Use the specified kubernetes full version number
                           (e.g., v1.27.0). Env: K8S_VERSION
@@ -504,14 +498,14 @@ prepare() {
   local bindir=$1
   echo "${bright}Installing cluster prerequisites in ${bindir}${reset}"
   install_kubectl "${bindir}"
-  "install_${ENGINE}" "${bindir}"
+  "install_kind" "${bindir}"
   echo "${bright}Done installing cluster prerequisites in ${bindir}${reset}"
 }
 
 create() {
-  echo "${bright}Creating ${ENGINE} cluster ${CLUSTER_NAME} with version ${K8S_VERSION}${reset}"
+  echo "${bright}Creating kind cluster ${CLUSTER_NAME} with version ${K8S_VERSION}${reset}"
 
-  "create_cluster_${ENGINE}" "${K8S_VERSION}" "${CLUSTER_NAME}"
+  "create_cluster_kind" "${K8S_VERSION}" "${CLUSTER_NAME}"
 
   # Support for docker:dind service
   if [ "${DOCKER_HOST:-}" == "tcp://docker:2376" ]; then
@@ -522,7 +516,7 @@ create() {
   deploy_csi_host_path
   deploy_prometheus_crds
 
-  echo "${bright}Done creating ${ENGINE} cluster ${CLUSTER_NAME} with version ${K8S_VERSION}${reset}"
+  echo "${bright}Done creating kind cluster ${CLUSTER_NAME} with version ${K8S_VERSION}${reset}"
 }
 
 load_helper_images() {
@@ -532,7 +526,7 @@ load_helper_images() {
   # with the goal to speed up the runs.
   for IMG in "${HELPER_IMGS[@]}"; do
     docker pull "${IMG}"
-    "load_image_${ENGINE}" "${CLUSTER_NAME}" "${IMG}"
+    "load_image_kind" "${CLUSTER_NAME}" "${IMG}"
   done
 
   echo "${bright}Done loading helper images on cluster ${CLUSTER_NAME}${reset}"
@@ -546,7 +540,7 @@ load() {
   # This code will NEVER run in the cloud CI/CD workflows, as there we do
   # the build and push (into GH test registry) once in `builds`, before
   # the strategy matrix blows up the number of executables
-  if [ -z "${ENABLE_REGISTRY}" ] && "check_registry_${ENGINE}"; then
+  if [ -z "${ENABLE_REGISTRY}" ] && "check_registry_kind"; then
     ENABLE_REGISTRY=true
   fi
 
@@ -559,7 +553,7 @@ load() {
     ARCH="${ARCH}" BUILDER_NAME=${builder_name} docker-build
 
   if [ -z "${ENABLE_REGISTRY:-}" ]; then
-    "load_image_${ENGINE}" "${CLUSTER_NAME}" "${CONTROLLER_IMG}"
+    "load_image_kind" "${CLUSTER_NAME}" "${CONTROLLER_IMG}"
   fi
 
   echo "${bright}Loading new operator image on cluster ${CLUSTER_NAME}${reset}"
@@ -581,7 +575,7 @@ load() {
       ARCH="${ARCH}" BUILDER_NAME="${builder_name}" docker-build
 
   if [ -z "${ENABLE_REGISTRY:-}" ]; then
-    "load_image_${ENGINE}" "${CLUSTER_NAME}" "${CONTROLLER_IMG}"
+    "load_image_kind" "${CLUSTER_NAME}" "${CONTROLLER_IMG}"
   fi
 
     echo "${bright}Done loading new 'prime' operator image on cluster ${CLUSTER_NAME}${reset}"
@@ -591,7 +585,7 @@ load() {
 }
 
 deploy() {
-  if [ -z "${ENABLE_REGISTRY}" ] && "check_registry_${ENGINE}"; then
+  if [ -z "${ENABLE_REGISTRY}" ] && "check_registry_kind"; then
     ENABLE_REGISTRY=true
   fi
 
@@ -606,7 +600,7 @@ deploy() {
 
 print_image() {
   local tag=devel
-  if [ -n "${ENABLE_REGISTRY:-}" ] || "check_registry_${ENGINE}"; then
+  if [ -n "${ENABLE_REGISTRY:-}" ] || "check_registry_kind"; then
     tag=latest
   fi
   echo "${registry_name}:5000/cloudnative-pg-testing:${tag}"
@@ -615,17 +609,17 @@ print_image() {
 export_logs() {
   echo "${bright}Exporting logs from cluster ${CLUSTER_NAME} to ${LOG_DIR}${reset}"
 
-  "export_logs_${ENGINE}" "${CLUSTER_NAME}"
+  "export_logs_kind" "${CLUSTER_NAME}"
 
   echo "${bright}Done exporting logs from cluster ${CLUSTER_NAME} to ${LOG_DIR}${reset}"
 }
 
 destroy() {
-  echo "${bright}Destroying ${ENGINE} cluster ${CLUSTER_NAME}${reset}"
+  echo "${bright}Destroying kind cluster ${CLUSTER_NAME}${reset}"
 
-  "destroy_${ENGINE}" "${CLUSTER_NAME}"
+  "destroy_kind" "${CLUSTER_NAME}"
 
-  echo "${bright}Done destroying ${ENGINE} cluster ${CLUSTER_NAME}${reset}"
+  echo "${bright}Done destroying kind cluster ${CLUSTER_NAME}${reset}"
 }
 
 pyroscope() {
@@ -651,13 +645,7 @@ main() {
     case "${o}" in
     -e | --engine)
       shift
-      ENGINE=$1
-      shift
-      if [ "${ENGINE}" != "kind" ]; then
-        echo "ERROR: ${ENGINE} is not a valid engine! [kind, k3d]" >&2
-        echo >&2
-        usage
-      fi
+      # no-op, kept for compatibility
       ;;
     -k | --k8s-version)
       shift
@@ -698,11 +686,7 @@ main() {
   fi
 
   if [ -z "${K8S_VERSION}" ]; then
-    case "${ENGINE}" in
-    kind)
-      K8S_VERSION=${KIND_NODE_DEFAULT_VERSION}
-      ;;
-    esac
+    K8S_VERSION=${KIND_NODE_DEFAULT_VERSION}
   fi
   KUBECTL_VERSION=${KUBECTL_VERSION:-$K8S_VERSION}
 
