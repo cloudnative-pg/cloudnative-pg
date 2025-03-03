@@ -28,7 +28,12 @@ func TestMetricsRegistration(t *testing.T) {
 		t.Error("VolumeSnapshotRetryTotal should be initialized to 0")
 	}
 
-	if testutil.ToFloat64(VolumeSnapshotRetryByErrorTotal.WithLabelValues("test", "test", "timeout", "provisioning")) != 0 {
+	if testutil.ToFloat64(VolumeSnapshotRetryByErrorTotal.WithLabelValues(
+		"test",
+		"test",
+		"timeout",
+		"provisioning",
+	)) != 0 {
 		t.Error("VolumeSnapshotRetryByErrorTotal should be initialized to 0")
 	}
 
@@ -81,7 +86,7 @@ func TestRecordFailed(t *testing.T) {
 	}
 }
 
-func TestRecordRetryDuration(t *testing.T) {
+func TestRecordRetryDuration(_ *testing.T) {
 	// Reset metrics before test
 	VolumeSnapshotRetryDuration.Reset()
 
