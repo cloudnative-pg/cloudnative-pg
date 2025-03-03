@@ -147,8 +147,10 @@ docker-build: go-releaser ## Build the docker image.
 	if [ -n "${BUILDER_NAME}" ]; then \
 	  builder_name_option="--builder ${BUILDER_NAME}"; \
 	fi; \
-	DOCKER_BUILDKIT=1 tag=${IMAGE_TAG} buildVersion=${VERSION} revision=${COMMIT} \
-	  docker buildx bake $${builder_name_option} --set=*.platform="linux/${ARCH}" --push
+	DOCKER_BUILDKIT=1 buildVersion=${VERSION} revision=${COMMIT} \
+	  docker buildx bake $${builder_name_option} --set=*.platform="linux/${ARCH}" \
+	  --set distroless.tags="$${CONTROLLER_IMG}" \
+	  --push distroless
 
 olm-bundle: manifests kustomize operator-sdk ## Build the bundle for OLM installation
 	set -xeEuo pipefail ;\
