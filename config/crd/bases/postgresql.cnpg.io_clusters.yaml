@@ -4122,8 +4122,10 @@ spec:
                   standbyConnectionParameters:
                     additionalProperties:
                       type: string
-                    description: Allows the user to customize the primary_conninfo
-                      GUC of HA replicas.
+                    description: |-
+                      List of custom libpq connection parameters to be added to the
+                      `primary_conninfo` GUC of each replicas of the PostgreSQL HA
+                      cluster.
                     type: object
                   syncReplicaElectionConstraint:
                     description: |-

@@ -4182,7 +4182,9 @@ Defaults to false.</p>
 <i>map[string]string</i>
 </td>
 <td>
-   <p>Allows the user to customize the primary_conninfo GUC of HA replicas.</p>
+   <p>List of custom libpq connection parameters to be added to the
+<code>primary_conninfo</code> GUC of each replicas of the PostgreSQL HA
+cluster.</p>
 </td>
 </tr>
 </tbody>
