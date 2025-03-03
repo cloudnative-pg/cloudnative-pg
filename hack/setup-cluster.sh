@@ -640,8 +640,13 @@ load() {
 
   echo "${bright}Building operator from current worktree${reset}"
 
-  make -C "${ROOT_DIR}" IMAGE_TAG="$(print_tag)" registry="${registry_name}:5000" insecure="true" \
+  CONTROLLER_IMG="$(ENABLE_REGISTRY="${ENABLE_REGISTRY}" print_image)"
+  make -C "${ROOT_DIR}" CONTROLLER_IMG="${CONTROLLER_IMG}" insecure="true" \
     ARCH="${ARCH}" BUILDER_NAME=${builder_name} docker-build
+
+  if [ -z "${ENABLE_REGISTRY:-}" ]; then
+    "load_image_${ENGINE}" "${CLUSTER_NAME}" "${CONTROLLER_IMG}"
+  fi
 
   echo "${bright}Loading new operator image on cluster ${CLUSTER_NAME}${reset}"
 
@@ -655,11 +660,15 @@ load() {
 
     echo "${bright}Building a 'prime' operator from current worktree${reset}"
 
+    PRIME_CONTROLLER_IMG="${CONTROLLER_IMG}-prime"
     CURRENT_VERSION=$(make -C "${ROOT_DIR}" -s print-version)
     PRIME_VERSION="${CURRENT_VERSION}-prime"
-    PRIME_TAG="$(print_tag)-prime"
-    make -C "${ROOT_DIR}" IMAGE_TAG="${PRIME_TAG}" VERSION="${PRIME_VERSION}" registry="${registry_name}:5000" insecure="true" \
+    make -C "${ROOT_DIR}" CONTROLLER_IMG="${PRIME_CONTROLLER_IMG}" VERSION="${PRIME_VERSION}" insecure="true" \
       ARCH="${ARCH}" BUILDER_NAME="${builder_name}" docker-build
+
+  if [ -z "${ENABLE_REGISTRY:-}" ]; then
+    "load_image_${ENGINE}" "${CLUSTER_NAME}" "${CONTROLLER_IMG}"
+  fi
 
     echo "${bright}Done loading new 'prime' operator image on cluster ${CLUSTER_NAME}${reset}"
   fi
@@ -681,16 +690,12 @@ deploy() {
   echo "${bright}Done deploying manifests from current worktree on cluster ${CLUSTER_NAME}${reset}"
 }
 
-print_tag() {
+print_image() {
   local tag=devel
   if [ -n "${ENABLE_REGISTRY:-}" ] || "check_registry_${ENGINE}"; then
     tag=latest
   fi
-  echo "${tag}"
-}
-
-print_image() {
-  echo "${registry_name}:5000/cloudnative-pg-testing:$(print_tag)"
+  echo "${registry_name}:5000/cloudnative-pg-testing:${tag}"
 }
 
 export_logs() {
