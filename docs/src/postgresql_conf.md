@@ -127,43 +127,46 @@ Since the fixed parameters are added at the end, they can't be overridden by the
 user via the YAML configuration. Those parameters are required for correct WAL
 archiving and replication.
 
-### Replication settings
+### Replication Settings
 
-The `primary_conninfo`, `restore_command`,  and `recovery_target_timeline`
-parameters are managed automatically by the operator according to the state of
-the instance in the cluster.
+The `primary_conninfo`, `restore_command`, and `recovery_target_timeline`
+parameters are automatically managed by the operator based on the instance's
+role within the cluster.
+These parameters are effectively applied only when the instance is operating as
+a replica.
 
-```text
-primary_conninfo = 'host=cluster-example-rw user=postgres dbname=postgres'
-recovery_target_timeline = 'latest'
-```
+CloudNativePG allows you to customise certain libpq connection parameters for
+`primary_conninfo` using the `standbyConnectionParameters` stanza. This is
+useful for fine-tuning aspects such as TCP connection settings, keepalive
+behavior, and other relevant configurations that affect communication
+between replicas and the primary instance in a high-availability (HA) cluster.
 
-The `primaryConnectionParameters` stanza allows to further customize the
-generated `primary_conninfo` PostgreSQL parameter like in the following example:
+For example, to configure `tcp_user_timeout`:
 
 ```yaml
   # ...
   postgresql:
-    primaryConnectionParameters:
+    standbyConnectionParameters:
       tcp_user_timeout: "5"
   # ...
 ```
 
-Only the following parameters can be changed:
+The following libpq parameters can be customised in the `primary_conninfo` of cluster replicas:
 
-*	`channel_binding`
-*	`connect_timeout`
-*	`client_encoding`
-*	`options`
-*	`keepalives`
-*	`keepalives_idle`
-*	`keepalives_interval`
-*	`keepalives_count`
-*	`tcp_user_timeout`
+- `channel_binding`
+- `connect_timeout`
+- `client_encoding`
+- `options`
+- `keepalives`
+- `keepalives_idle`
+- `keepalives_interval`
+- `keepalives_count`
+- `tcp_user_timeout`
+
 
 !!! Seealso "PostgreSQL connection strings"
-    Refer to the PostgreSQL documentation for
-    [more information on the connection parameters](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING).
+    For further details on connection parameters, refer to the official
+    [PostgreSQL documentation](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING).
 
 ### Log control settings
 
