@@ -33,7 +33,7 @@ EXTERNAL_ATTACHER_VERSION=v4.8.0
 K8S_VERSION=${K8S_VERSION-}
 KUBECTL_VERSION=${KUBECTL_VERSION-}
 CSI_DRIVER_HOST_PATH_VERSION=${CSI_DRIVER_HOST_PATH_VERSION:-$CSI_DRIVER_HOST_PATH_DEFAULT_VERSION}
-ENABLE_REGISTRY=${ENABLE_REGISTRY:-}
+ENABLE_REGISTRY=true
 ENABLE_PYROSCOPE=${ENABLE_PYROSCOPE:-}
 ENABLE_CSI_DRIVER=${ENABLE_CSI_DRIVER:-}
 ENABLE_APISERVER_AUDIT=${ENABLE_APISERVER_AUDIT:-}
@@ -259,8 +259,6 @@ install_kubectl() {
 # to have an easy way to refresh the operator version that is running
 # on the temporary cluster.
 ensure_registry() {
-  [ -z "${ENABLE_REGISTRY:-}" ] && return
-
   if ! docker volume inspect "${registry_volume}" &>/dev/null; then
     docker volume create "${registry_volume}"
   fi
@@ -461,7 +459,7 @@ Usage: $0 [-k <version>] [-r] <command>
 
 Commands:
     prepare <dest_dir>    Downloads the prerequisite into <dest_dir>
-    create                Create the test cluster
+    create                Create the test cluster and a local registry
     load                  Build and load the operator image in the cluster
     load-helper-images    Load the catalog of HELPER_IMGS into the local registry
     deploy                Deploy the operator manifests in the cluster
@@ -481,8 +479,6 @@ Options:
         <NODES>           Create a cluster with the required number of nodes.
                           Used only during "create" command. Default: 3
                           Env: NODES
-
-    -r|--registry         Enable local registry. Env: ENABLE_REGISTRY
 
 To use long options you need to have GNU enhanced getopt available, otherwise
 you can only use the short version of the options.
@@ -669,7 +665,6 @@ main() {
       ;;
     -r | --registry)
       shift
-      ENABLE_REGISTRY=true
       ;;
     --)
       shift
