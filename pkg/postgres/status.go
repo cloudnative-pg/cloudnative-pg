@@ -451,13 +451,14 @@ type ConfigurationReportEntry struct {
 // PostgreSQL configuration of each Pod
 type ConfigurationReport []ConfigurationReportEntry
 
-// IsUniform checks if every Pod have loaded the same PostgreSQL
+// IsUniform checks if every Pod has loaded the same PostgreSQL
 // configuration. Returns:
 //
 //   - true when every Pod reports the configuration, and the same
 //     configuration is used across all the Pods
 //   - false when every Pod reports the configuration and there
 //     are two Pods using different configurations
+//   - nil when one of the pods doesn't report the configuration
 func (report ConfigurationReport) IsUniform() *bool {
 	detectedConfigurationHash := stringset.New()
 	for _, item := range report {

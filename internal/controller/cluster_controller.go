@@ -918,7 +918,7 @@ func (r *ClusterReconciler) reconcilePods(
 		}
 	}
 
-	// Stop acting here if there are non-ready Pods
+	// Requeue here if there are non-ready Pods.
 	// In the rest of the function we are sure that
 	// cluster.Status.Instances == cluster.Spec.Instances and
 	// we don't need to modify the cluster topology
@@ -929,19 +929,17 @@ func (r *ClusterReconciler) reconcilePods(
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
 	}
 
-	// Stop acting here if the Pods don't have received
-	// the latest PostgreSQL configuration.
 	report := instancesStatus.GetConfigurationReport()
 
-	// If we don't know if the configuration is uniform (that
-	// would be uniform == nil) we need to proceed with a rolling
-	// update. This means we need to upgrade the instance manager
+	// If any pod is not reporting its configuration,
+	// (in which case, uniform == nil) we need to proceed with a rolling
+	// update. This will upgrade the instance manager
 	// to a version reporting the configuration status.
-	// Otherwise, we need to wait until all the instances report
-	// the same configuration.
+	// If all pods report their configuration, we should wait until all the instances
+	// report the same configuration.
 	if uniform := report.IsUniform(); uniform != nil && !*uniform {
 		contextLogger.Debug(
-			"Waiting for the Pods to have loaded the same PostgreSQL configuration",
+			"Waiting for all Pods to have the same PostgreSQL configuration",
 			"configurationReport", report)
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
 	}
