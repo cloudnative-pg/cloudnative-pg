@@ -1367,7 +1367,9 @@ type PostgresConfiguration struct {
 	// +optional
 	EnableAlterSystem bool `json:"enableAlterSystem,omitempty"`
 
-	// Allows the user to customize the primary_conninfo GUC of HA replicas.
+	// List of custom libpq connection parameters to be added to the
+	// `primary_conninfo` GUC of each replicas of the PostgreSQL HA
+	// cluster.
 	// +optional
 	StandbyConnectionParameters map[string]string `json:"standbyConnectionParameters,omitempty"`
 }
