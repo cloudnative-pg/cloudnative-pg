@@ -135,9 +135,9 @@ role within the cluster.
 These parameters are effectively applied only when the instance is operating as
 a replica.
 
-CloudNativePG allows you to customise certain libpq connection parameters for
+CloudNativePG allows you to customize certain libpq connection parameters for
 `primary_conninfo` using the `standbyConnectionParameters` stanza. This is
-useful for fine-tuning aspects such as TCP connection settings, keepalive
+useful for fine-tuning aspects such as TCP connection settings, keep-alive
 behavior, and other relevant configurations that affect communication
 between replicas and the primary instance in a high-availability (HA) cluster.
 
@@ -151,7 +151,7 @@ For example, to configure `tcp_user_timeout`:
   # ...
 ```
 
-The following libpq parameters can be customised in the `primary_conninfo` of cluster replicas:
+The following libpq parameters can be customized in the `primary_conninfo` of cluster replicas:
 
 - `channel_binding`
 - `connect_timeout`
