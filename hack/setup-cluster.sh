@@ -25,7 +25,6 @@ fi
 
 # Defaults
 KIND_NODE_DEFAULT_VERSION=v1.32.2
-K3D_NODE_DEFAULT_VERSION=v1.30.3
 CSI_DRIVER_HOST_PATH_DEFAULT_VERSION=v1.15.0
 EXTERNAL_SNAPSHOTTER_VERSION=v8.2.0
 EXTERNAL_PROVISIONER_VERSION=v5.2.0
@@ -241,91 +240,6 @@ destroy_kind() {
 
 check_registry_kind() {
   [ -n "$(check_registry "kind")" ]
-}
-
-##
-## K3D SUPPORT
-##
-
-install_k3d() {
-  local bindir=$1
-
-  curl -s https://raw.githubusercontent.com/rancher/k3d/main/install.sh | K3D_INSTALL_DIR=$bindir bash -s -- --no-sudo
-}
-
-create_cluster_k3d() {
-  local k8s_version=$1
-  local cluster_name=$2
-
-  local latest_k3s_tag
-  latest_k3s_tag=$(k3d version list k3s | grep -- "^${k8s_version//./\\.}"'\+-k3s[0-9]$' | tail -n 1)
-
-  local options=()
-  if [ -n "${DOCKER_REGISTRY_MIRROR:-}" ] || [ -n "${ENABLE_REGISTRY:-}" ]; then
-    config_file="${TEMP_DIR}/k3d-registries.yaml"
-    cat >"${config_file}" <<-EOF
-mirrors:
-EOF
-
-    if [ -n "${DOCKER_REGISTRY_MIRROR:-}" ]; then
-      cat >>"${config_file}" <<-EOF
-  "docker.io":
-    endpoint:
-      - "${DOCKER_REGISTRY_MIRROR}"
-EOF
-    fi
-
-    if [ -n "${ENABLE_REGISTRY:-}" ]; then
-      cat >>"${config_file}" <<-EOF
-  "${registry_name}:5000":
-    endpoint:
-    - http://${registry_name}:5000
-EOF
-    fi
-
-    options+=(--registry-config "${config_file}")
-  fi
-
-  local agents=()
-  if [ "$NODES" -gt 1 ]; then
-    agents=(-a "${NODES}")
-  fi
-
-  K3D_FIX_MOUNTS=1 k3d cluster create "${options[@]}" "${agents[@]}" -i "rancher/k3s:${latest_k3s_tag}" --no-lb "${cluster_name}" \
-    --k3s-arg "--disable=traefik@server:0" --k3s-arg "--disable=metrics-server@server:0" \
-    --k3s-arg "--node-taint=node-role.kubernetes.io/master:NoSchedule@server:0" #wokeignore:rule=master
-
-  if [ -n "${ENABLE_REGISTRY:-}" ]; then
-    docker network connect "k3d-${cluster_name}" "${registry_name}" &>/dev/null || true
-  fi
-}
-
-load_image_k3d() {
-  local cluster_name=$1
-  local image=$2
-  k3d image import "${image}" -c "${cluster_name}"
-}
-
-export_logs_k3d() {
-  local cluster_name=$1
-  while IFS= read -r line; do
-    NODES_LIST+=("$line")
-  done < <(k3d node list | awk "/${cluster_name}/{print \$1}")
-  for i in "${NODES_LIST[@]}"; do
-    mkdir -p "${LOG_DIR}/${i}"
-    docker cp -L "${i}:/var/log/." "${LOG_DIR}/${i}"
-  done
-}
-
-destroy_k3d() {
-  local cluster_name=$1
-  docker network disconnect "k3d-${cluster_name}" "${registry_name}" &>/dev/null || true
-  k3d cluster delete "${cluster_name}" || true
-  docker network rm "k3d-${cluster_name}" &>/dev/null || true
-}
-
-check_registry_k3d() {
-  [ -n "$(check_registry "k3d-${CLUSTER_NAME}")" ]
 }
 
 ##
@@ -562,7 +476,7 @@ Commands:
 Options:
     -e|--engine
         <CLUSTER_ENGINE>  Use the provided ENGINE to run the cluster.
-                          Available options are 'kind' and 'k3d'. Default 'kind'.
+                          Available options are 'kind'. Default 'kind'.
                           Env: CLUSTER_ENGINE
 
     -k|--k8s-version
@@ -739,7 +653,7 @@ main() {
       shift
       ENGINE=$1
       shift
-      if [ "${ENGINE}" != "kind" ] && [ "${ENGINE}" != "k3d" ]; then
+      if [ "${ENGINE}" != "kind" ]; then
         echo "ERROR: ${ENGINE} is not a valid engine! [kind, k3d]" >&2
         echo >&2
         usage
@@ -787,9 +701,6 @@ main() {
     case "${ENGINE}" in
     kind)
       K8S_VERSION=${KIND_NODE_DEFAULT_VERSION}
-      ;;
-    k3d)
-      K8S_VERSION=${K3D_NODE_DEFAULT_VERSION}
       ;;
     esac
   fi
