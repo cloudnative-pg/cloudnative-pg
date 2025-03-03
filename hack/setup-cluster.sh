@@ -54,13 +54,6 @@ TEMP_DIR="$(mktemp -d)"
 LOG_DIR=${LOG_DIR:-$ROOT_DIR/_logs/}
 trap 'rm -fr ${TEMP_DIR}' EXIT
 
-# Operating System and Architecture
-ARCH=$(uname -m)
-case $ARCH in
-  x86_64) ARCH="amd64" ;;
-  aarch64) ARCH="arm64" ;;
-esac
-
 # If arm64 and user did not set it explicitly
 if [ "${ARCH}" = "arm64" ]  && [ "${DOCKER_DEFAULT_PLATFORM}" = "" ]; then
   DOCKER_DEFAULT_PLATFORM=linux/arm64
@@ -94,6 +87,10 @@ if [ -t 1 ]; then
   bright=$(tput bold 2>/dev/null || true)
   reset=$(tput sgr0 2>/dev/null || true)
 fi
+
+##
+## KIND SUPPORT
+##
 
 load_image_kind() {
   local cluster_name=$1
@@ -434,14 +431,6 @@ EOF
 ##
 ## COMMANDS
 ##
-
-prepare() {
-  local bindir=$1
-  echo "${bright}Installing cluster prerequisites in ${bindir}${reset}"
-  install_kubectl "${bindir}"
-  "install_kind" "${bindir}"
-  echo "${bright}Done installing cluster prerequisites in ${bindir}${reset}"
-}
 
 create() {
   echo "${bright}Creating kind cluster ${CLUSTER_NAME} with version ${K8S_VERSION}${reset}"
