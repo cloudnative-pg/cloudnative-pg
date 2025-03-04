@@ -40,7 +40,7 @@ var _ = Describe("Azure - Backup and restore", Label(tests.LabelBackupRestore), 
 	AzureConfiguration := backups.NewAzureConfigurationFromEnv()
 
 	BeforeEach(func() {
-		if testLevelEnv.Depth < int(tests.High) {
+		if testLevel < int(tests.High) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 		if !IsAKS() {
@@ -220,7 +220,7 @@ var _ = Describe("Azure - Clusters Recovery From Barman Object Store", Label(tes
 	AzureConfiguration := backups.NewAzureConfigurationFromEnv()
 
 	BeforeEach(func() {
-		if testLevelEnv.Depth < int(level) {
+		if testLevel < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 		if !IsAKS() {

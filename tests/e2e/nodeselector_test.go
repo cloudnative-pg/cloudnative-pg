@@ -36,7 +36,7 @@ var _ = Describe("nodeSelector", Label(tests.LabelPodScheduling), func() {
 	const level = tests.Low
 
 	BeforeEach(func() {
-		if testLevelEnv.Depth < int(level) {
+		if testLevel < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 	})

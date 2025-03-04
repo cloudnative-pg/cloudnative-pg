@@ -57,7 +57,7 @@ var _ = Describe("Imports with Microservice Approach", Label(tests.LabelImportin
 	var namespace, sourceClusterName, importedClusterName string
 
 	BeforeEach(func() {
-		if testLevelEnv.Depth < int(level) {
+		if testLevel < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 	})
