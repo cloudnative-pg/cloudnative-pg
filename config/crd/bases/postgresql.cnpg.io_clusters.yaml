@@ -4119,14 +4119,6 @@ spec:
                     items:
                       type: string
                     type: array
-                  standbyConnectionParameters:
-                    additionalProperties:
-                      type: string
-                    description: |-
-                      List of custom libpq connection parameters to be added to the
-                      `primary_conninfo` GUC of each replicas of the PostgreSQL HA
-                      cluster.
-                    type: object
                   syncReplicaElectionConstraint:
                     description: |-
                       Requirements to be met by sync replicas. This will affect how the "synchronous_standby_names" parameter will be

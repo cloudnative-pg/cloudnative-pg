@@ -1267,7 +1267,6 @@ sslkey
 sslmode
 sslrootcert
 sso
-standbyConnectionParameters
 standbyNamesPost
 standbyNamesPre
 startDelay

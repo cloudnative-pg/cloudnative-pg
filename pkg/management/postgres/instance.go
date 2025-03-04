@@ -42,7 +42,6 @@ import (
 	"k8s.io/client-go/util/retry"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/configfile"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/logpipe"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/pool"
 	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
@@ -780,9 +779,7 @@ func (instance *Instance) ConnectionPool() *pool.ConnectionPool {
 // PrimaryConnectionPool gets or initializes the primary connection pool for this instance
 func (instance *Instance) PrimaryConnectionPool() *pool.ConnectionPool {
 	if instance.primaryPool == nil {
-		var additionalParameters map[string]string
-		instance.primaryPool = pool.NewPostgresqlConnectionPool(
-			instance.GetPrimaryConnInfo(additionalParameters))
+		instance.primaryPool = pool.NewPostgresqlConnectionPool(instance.GetPrimaryConnInfo())
 	}
 
 	return instance.primaryPool
@@ -818,19 +815,13 @@ func (instance *Instance) Demote(ctx context.Context, cluster *apiv1.Cluster) er
 
 	contextLogger.Info("Demoting instance", "pgpdata", instance.PgData)
 	slotName := cluster.GetSlotNameFromInstanceName(instance.GetPodName())
-	_, err := UpdateReplicaConfiguration(
-		instance.PgData,
-		instance.GetPrimaryConnInfo(cluster.Spec.PostgresConfiguration.StandbyConnectionParameters),
-		slotName)
+	_, err := UpdateReplicaConfiguration(instance.PgData, instance.GetPrimaryConnInfo(), slotName)
 	return err
 }
 
 // WaitForPrimaryAvailable waits until we can connect to the primary
 func (instance *Instance) WaitForPrimaryAvailable(ctx context.Context) error {
-	var additionalParameters map[string]string
-	primaryConnInfo := fmt.Sprintf(
-		"%s dbname=postgres connect_timeout=5",
-		instance.GetPrimaryConnInfo(additionalParameters))
+	primaryConnInfo := instance.GetPrimaryConnInfo() + " dbname=postgres connect_timeout=5"
 
 	log.Info("Waiting for the new primary to be available",
 		"primaryConnInfo", primaryConnInfo)
@@ -1027,8 +1018,7 @@ func (instance *Instance) Rewind(ctx context.Context, postgresVersion semver.Ver
 
 	instance.LogPgControldata(ctx, "before pg_rewind")
 
-	var additionalParameters map[string]string
-	primaryConnInfo := instance.GetPrimaryConnInfo(additionalParameters)
+	primaryConnInfo := instance.GetPrimaryConnInfo()
 	options := []string{
 		"-P",
 		"--source-server", primaryConnInfo + " dbname=postgres",
@@ -1293,15 +1283,12 @@ func (instance *Instance) DropConnections() error {
 }
 
 // GetPrimaryConnInfo returns the DSN to reach the primary
-func (instance *Instance) GetPrimaryConnInfo(additionalParameters map[string]string) string {
+func (instance *Instance) GetPrimaryConnInfo() string {
 	result := buildPrimaryConnInfo(instance.GetClusterName()+"-rw", instance.GetPodName())
 
-	// We can use configfile.CreateConnectionString for the
-	// additional parameters because when changing them
-	// we're expecting the replicas to restart.
-	if len(additionalParameters) > 0 {
-		result = fmt.Sprintf(
-			"%s %s", result, configfile.CreateConnectionString(additionalParameters))
+	standbyTCPUserTimeout := os.Getenv("CNPG_STANDBY_TCP_USER_TIMEOUT")
+	if len(standbyTCPUserTimeout) > 0 {
+		result = fmt.Sprintf("%s tcp_user_timeout=%s", result, standbyTCPUserTimeout)
 	}
 
 	return result

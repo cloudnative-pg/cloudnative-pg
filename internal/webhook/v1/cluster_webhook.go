@@ -200,7 +200,6 @@ func (v *ClusterCustomValidator) validate(r *apiv1.Cluster) (allErrs field.Error
 		v.validateBackupConfiguration,
 		v.validateRetentionPolicy,
 		v.validateConfiguration,
-		v.validateStandbyConnectionParameters,
 		v.validateSynchronousReplicaConfiguration,
 		v.validateLDAP,
 		v.validateReplicationSlots,
@@ -300,6 +299,9 @@ func isReservedEnvironmentVariable(name string) bool {
 	name = strings.ToUpper(name)
 
 	switch {
+	case strings.HasPrefix(name, "CNPG_"):
+		return true
+
 	case strings.HasPrefix(name, "PG"):
 		return true
 
@@ -1058,39 +1060,6 @@ func (v *ClusterCustomValidator) validateConfiguration(r *apiv1.Cluster) field.E
 		r.Spec.PostgresConfiguration.SyncReplicaElectionConstraint,
 	); err != nil {
 		result = append(result, err)
-	}
-
-	return result
-}
-
-// validateStandbyConnectionParameters ensure the configuration of
-// the primary connection parameters includes only allowed parameters
-func (v *ClusterCustomValidator) validateStandbyConnectionParameters(r *apiv1.Cluster) field.ErrorList {
-	allowedPrimaryConninfoParameters := []string{
-		"channel_binding",
-		"connect_timeout",
-		"client_encoding",
-		"options",
-		"keepalives",
-		"keepalives_idle",
-		"keepalives_interval",
-		"keepalives_count",
-		"tcp_user_timeout",
-	}
-
-	var result field.ErrorList
-	parameterSet := stringset.From(allowedPrimaryConninfoParameters)
-	for k, v := range r.Spec.PostgresConfiguration.StandbyConnectionParameters {
-		if !parameterSet.Has(k) {
-			result = append(
-				result,
-				field.Invalid(
-					field.NewPath("spec", "postgresql", "standbyConnectionParameters", k),
-					v,
-					"parameter not allowed",
-				),
-			)
-		}
 	}
 
 	return result

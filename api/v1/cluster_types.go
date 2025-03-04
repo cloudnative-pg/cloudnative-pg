@@ -1366,12 +1366,6 @@ type PostgresConfiguration struct {
 	// Defaults to false.
 	// +optional
 	EnableAlterSystem bool `json:"enableAlterSystem,omitempty"`
-
-	// List of custom libpq connection parameters to be added to the
-	// `primary_conninfo` GUC of each replicas of the PostgreSQL HA
-	// cluster.
-	// +optional
-	StandbyConnectionParameters map[string]string `json:"standbyConnectionParameters,omitempty"`
 }
 
 // BootstrapConfiguration contains information about how to create the PostgreSQL
