@@ -5950,5 +5950,46 @@ online/hot (<code>true</code>, default) or offline/cold (<code>false</code>)</p>
    <p>Configuration parameters to control the online/hot backup with volume snapshots</p>
 </td>
 </tr>
+<tr><td><code>retryConfiguration</code><br/>
+<a href="#postgresql-cnpg-io-v1-VolumeSnapshotRetryConfiguration"><i>VolumeSnapshotRetryConfiguration</i></a>
+</td>
+<td>
+   <p>Configuration for retry behavior when snapshot operations fail transiently</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## VolumeSnapshotRetryConfiguration     {#postgresql-cnpg-io-v1-VolumeSnapshotRetryConfiguration}
+
+
+**Appears in:**
+
+- [VolumeSnapshotConfiguration](#postgresql-cnpg-io-v1-VolumeSnapshotConfiguration)
+
+
+<p>VolumeSnapshotRetryConfiguration contains parameters to control retry behavior
+for operations that may fail transiently, such as volume snapshot creation</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>deadline</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The maximum time to wait for a snapshot operation to complete before
+considering it failed. Default is 10 minutes.</p>
+</td>
+</tr>
+<tr><td><code>maxRetries</code><br/>
+<i>int</i>
+</td>
+<td>
+   <p>The number of times to retry a failed snapshot operation before
+considering the backup failed. Default is 3 retries.</p>
+</td>
+</tr>
 </tbody>
 </table>
