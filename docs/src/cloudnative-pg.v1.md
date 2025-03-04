@@ -4178,15 +4178,6 @@ This should only be used for debugging and troubleshooting.
 Defaults to false.</p>
 </td>
 </tr>
-<tr><td><code>standbyConnectionParameters</code><br/>
-<i>map[string]string</i>
-</td>
-<td>
-   <p>List of custom libpq connection parameters to be added to the
-<code>primary_conninfo</code> GUC of each replicas of the PostgreSQL HA
-cluster.</p>
-</td>
-</tr>
 </tbody>
 </table>
 

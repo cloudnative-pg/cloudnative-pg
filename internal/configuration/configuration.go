@@ -125,6 +125,14 @@ type Data struct {
 	// IncludePlugins is a comma-separated list of plugins to always be
 	// included in the Cluster reconciliation
 	IncludePlugins string `json:"includePlugins" env:"INCLUDE_PLUGINS"`
+
+	// StandbyTCPUserTimeout configuration parameter allows you to
+	// specify a custom TCP user timeout for the standby PostgreSQL
+	// server's connection to the primary server. This timeout is
+	// added as a tcp_user_timeout option to the primary_conninfo
+	// string, which is used by the standby server to connect to the
+	// primary server in CloudNativePG.
+	StandbyTCPUserTimeout int `json:"standbyTcpUserTimeout" env:"STANDBY_TCP_USER_TIMEOUT"`
 }
 
 // Current is the configuration used by the operator
@@ -140,6 +148,7 @@ func newDefaultConfig() *Data {
 		CreateAnyService:       false,
 		CertificateDuration:    CertificateDuration,
 		ExpiringCheckThreshold: ExpiringCheckThreshold,
+		StandbyTCPUserTimeout:  0,
 	}
 }
 

@@ -61,10 +61,7 @@ func (instance *Instance) RefreshReplicaConfiguration(
 
 func (instance *Instance) writeReplicaConfigurationForReplica(cluster *apiv1.Cluster) (changed bool, err error) {
 	slotName := cluster.GetSlotNameFromInstanceName(instance.GetPodName())
-	return UpdateReplicaConfiguration(
-		instance.PgData,
-		instance.GetPrimaryConnInfo(cluster.Spec.PostgresConfiguration.StandbyConnectionParameters),
-		slotName)
+	return UpdateReplicaConfiguration(instance.PgData, instance.GetPrimaryConnInfo(), slotName)
 }
 
 func (instance *Instance) writeReplicaConfigurationForDesignatedPrimary(
