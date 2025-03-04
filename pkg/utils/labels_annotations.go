@@ -209,6 +209,10 @@ const (
 	// BackupTablespaceMapFileAnnotationName is the name of the annotation where the `tablespace_map` file is kept
 	BackupTablespaceMapFileAnnotationName = MetadataNamespace + "/backupTablespaceMapFile"
 
+	// BackupVolumeSnapshotDeadlineAnnotationName the numbers of minutes that a retryable error will be retried before
+	// it's considered a failure
+	BackupVolumeSnapshotDeadlineAnnotationName = MetadataNamespace + "/volumeSnapshotDeadline"
+
 	// SnapshotStartTimeAnnotationName is the name of the annotation where a snapshot's start time is kept
 	SnapshotStartTimeAnnotationName = MetadataNamespace + "/snapshotStartTime"
 
