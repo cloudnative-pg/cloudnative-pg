@@ -67,33 +67,6 @@ ensuring the database is created or updated as needed.
     `Database` resources to reference databases with the same name across different
     CloudNativePG clusters in the same Kubernetes namespace.
 
-### Installing extensions in the database
-
-CloudNativePG can automate the creation of extensions in the target
-database. To do that the `spec.extensions` field must be set to a
-list of extension specifications, like in the following example:
-
-```yaml
-spec:
-  extensions:
-  - name: bloom
-    ensure: present
-```
-
-Each entry of the list has the following properties:
-
-* `name`: the name of the extension
-* `ensure`
-  * `present`: the extension will be created in the database
-  * `absent`: the extension will be removed from the database
-* `version`: the version of the extension to install or
-  to upgrade to
-* `schema`: the schema where the extension should be installed
-
-Only the extensions specified in `spec.extensions` are reconciled by
-the operator. Existing unspecified extensions are not targeted by the
-reconciliation process.
-
 ## Reserved Database Names
 
 PostgreSQL automatically creates databases such as `postgres`, `template0`, and
@@ -186,6 +159,40 @@ spec:
 
 This manifest ensures that the `database-to-drop` database is removed from the
 `cluster-example` cluster.
+
+## Managing Extensions in a Database
+
+CloudNativePG can automate the management of PostgreSQL extensions in the
+target database. To enable this feature, define the `spec.extensions` field
+with a list of extension specifications, as shown in the following example:
+
+```yaml
+# ...
+spec:
+  extensions:
+  - name: bloom
+    ensure: present
+# ...
+```
+
+Each extension entry supports the following properties:
+
+- `name`: The name of the extension.
+- `ensure`: Specifies whether the extension should be present or absent in the
+  database:
+    - `present`: Ensures that the extension is installed.
+    - `absent`: Ensures that the extension is removed.
+- `version` *(optional)*: The specific version of the extension to install or
+  upgrade to.
+- `schema` *(optional)*: The schema in which the extension should be installed.
+
+!!! Info
+    CloudNativePG manages extensions using PostgreSQL’s `CREATE EXTENSION`,
+    `ALTER EXTENSION`, and `DROP EXTENSION` SQL commands.
+
+The operator reconciles only the extensions explicitly listed in
+`spec.extensions`. Any existing extensions not specified in this list remain
+unchanged.
 
 ## Limitations and Caveats
 
