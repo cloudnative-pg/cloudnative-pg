@@ -156,6 +156,24 @@ func (se *Reconciler) Reconcile(
 	targetPod *corev1.Pod,
 	pvcs []corev1.PersistentVolumeClaim,
 ) (*ctrl.Result, error) {
+	contextLogger := log.FromContext(ctx).WithName("volumesnapshot_reconciler")
+
+	res, err := se.internalReconcile(ctx, cluster, backup, targetPod, pvcs)
+	if isErrorRetryable(err) {
+		contextLogger.Error(err, "detected retryable error while executing snapshot backup, retrying...")
+		return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+	}
+
+	return res, err
+}
+
+func (se *Reconciler) internalReconcile(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	backup *apiv1.Backup,
+	targetPod *corev1.Pod,
+	pvcs []corev1.PersistentVolumeClaim,
+) (*ctrl.Result, error) {
 	if cluster.Spec.Backup == nil || cluster.Spec.Backup.VolumeSnapshot == nil {
 		return nil, fmt.Errorf("cannot execute a VolumeSnapshot on a cluster without configuration")
 	}
