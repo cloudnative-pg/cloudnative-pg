@@ -63,7 +63,10 @@ func (c PoolerPodMonitorManager) BuildPodMonitor() *monitoringv1.PodMonitor {
 
 	spec := monitoringv1.PodMonitorSpec{
 		Selector: metav1.LabelSelector{
-			MatchLabels: meta.Labels,
+			MatchLabels: map[string]string{
+				utils.PgbouncerNameLabel: c.pooler.Name,
+				utils.PodRoleLabelName:   string(utils.PodRolePooler),
+			},
 		},
 		PodMetricsEndpoints: []monitoringv1.PodMetricsEndpoint{endpoint},
 	}
