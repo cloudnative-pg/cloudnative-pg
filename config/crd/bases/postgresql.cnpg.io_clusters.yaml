@@ -2100,6 +2100,21 @@ spec:
               description:
                 description: Description of this PostgreSQL cluster
                 type: string
+              diskWatcher:
+                description: The configuration of the disk watcher
+                properties:
+                  diskSpaceCheckInterval:
+                    description: Interval between free disk space checks, in seconds.
+                    format: int32
+                    type: integer
+                  readOnlyThreshold:
+                    description: |-
+                      Disk usage threshold, in percents. After the disk usage exceeds this value,
+                      the instance manager will switch all databases in the cluster
+                      to read-only mode.
+                    format: int32
+                    type: integer
+                type: object
               enablePDB:
                 default: true
                 description: |-

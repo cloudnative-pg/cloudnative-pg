@@ -330,6 +330,12 @@ func runSubCommand(ctx context.Context, instance *postgres.Instance) error {
 		return err
 	}
 
+	diskWatcher := controller.NewDiskWatcher(ctx, instance)
+	if err = mgr.Add(diskWatcher); err != nil {
+		contextLogger.Error(err, "unable to add disk watcher")
+		return err
+	}
+
 	contextLogger.Info("starting tablespace manager")
 	if err := tablespaces.NewTablespaceReconciler(instance, mgr.GetClient()).
 		SetupWithManager(mgr); err != nil {

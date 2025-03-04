@@ -112,12 +112,13 @@ func (pool *ConnectionPool) newConnection(dbname string) (*sql.DB, error) {
 	// * Declarative Role Management
 	// * Probes
 	// * Replication slots reconciler
+	// * Disk usage watcher (Read-Only switch manager)
 	// * Online VolumeSnapshot backup connection
 	//
 	// The latter will use an exclusive connection, that is required
 	// for the PostgreSQL Physical backup APIs
 
-	db.SetMaxOpenConns(3)
+	db.SetMaxOpenConns(4)
 	db.SetMaxIdleConns(0)
 
 	return db, nil
