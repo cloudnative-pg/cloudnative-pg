@@ -59,6 +59,7 @@ var _ = Describe("scale down", func() {
 			}
 
 			instanceName := findDeletableInstance(cluster, resources.instances.Items)
+			pvcDataName := persistentvolumeclaim.NewPgDataCalculator().GetName(instanceName)
 			Expect(isResourceExisting(
 				ctx,
 				env.client,
@@ -69,7 +70,7 @@ var _ = Describe("scale down", func() {
 				ctx,
 				env.client,
 				&corev1.PersistentVolumeClaim{},
-				types.NamespacedName{Name: instanceName, Namespace: cluster.Namespace},
+				types.NamespacedName{Name: pvcDataName, Namespace: cluster.Namespace},
 			)).To(BeTrue())
 
 			Expect(env.clusterReconciler.scaleDownCluster(
@@ -110,6 +111,7 @@ var _ = Describe("scale down", func() {
 			}
 
 			instanceName := findDeletableInstance(cluster, resources.instances.Items)
+			pvcDataName := persistentvolumeclaim.NewPgDataCalculator().GetName(instanceName)
 			pvcWalName := persistentvolumeclaim.NewPgWalCalculator().GetName(instanceName)
 			Expect(isResourceExisting(
 				ctx,
@@ -121,7 +123,7 @@ var _ = Describe("scale down", func() {
 				ctx,
 				env.client,
 				&corev1.PersistentVolumeClaim{},
-				types.NamespacedName{Name: instanceName, Namespace: cluster.Namespace},
+				types.NamespacedName{Name: pvcDataName, Namespace: cluster.Namespace},
 			)).To(BeTrue())
 			Expect(isResourceExisting(
 				ctx,

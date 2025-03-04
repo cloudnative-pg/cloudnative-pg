@@ -40,6 +40,14 @@ const (
 
 	// ExpiringCheckThreshold is the default threshold to consider a certificate as expiring
 	ExpiringCheckThreshold = 7
+
+	// DataVolumeSuffix is the suffix appended to the instance name to
+	// get the name of the PVC dedicated to DATA files.
+	DefaultDataVolumeSuffix = ""
+
+	// WalArchiveVolumeSuffix is the suffix appended to the instance name to
+	// get the name of the PVC dedicated to WAL files.
+	DefaultWalArchiveVolumeSuffix = "-wal"
 )
 
 // DefaultPluginSocketDir is the default directory where the plugin sockets are located.
@@ -125,6 +133,14 @@ type Data struct {
 	// IncludePlugins is a comma-separated list of plugins to always be
 	// included in the Cluster reconciliation
 	IncludePlugins string `json:"includePlugins" env:"INCLUDE_PLUGINS"`
+
+	// When set, the PersistenVolmeClaim for data volumes will be named
+	// according to the pod name suffix'ed with this value.
+	DataVolumeSuffix string `json:"dataVolumeSuffix" env:"DATA_VOLUME_SUFFIX"`
+
+	// When set, the PersistenVolmeClaim for WAL volumes will be named
+	// according to the pod name suffix'ed with this value.
+	WalArchiveVolumeSuffix string `json:"walVolumeSuffix" env:"WAL_VOLUME_SUFFIX"`
 }
 
 // Current is the configuration used by the operator
@@ -140,6 +156,8 @@ func newDefaultConfig() *Data {
 		CreateAnyService:       false,
 		CertificateDuration:    CertificateDuration,
 		ExpiringCheckThreshold: ExpiringCheckThreshold,
+		DataVolumeSuffix:       DefaultDataVolumeSuffix,
+		WalArchiveVolumeSuffix: DefaultWalArchiveVolumeSuffix,
 	}
 }
 
