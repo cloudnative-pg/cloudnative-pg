@@ -549,7 +549,7 @@ func QueryMatchExpectationPredicate(
 		}
 		g.Expect(err).ToNot(HaveOccurred())
 		g.Expect(strings.Trim(stdout, "\n")).To(BeEquivalentTo(expectedOutput),
-			fmt.Sprintf("expected query %q to return %q", query, expectedOutput))
+			fmt.Sprintf("expected query %q to return %q (in database %q)", query, expectedOutput, dbname))
 	}
 }
 
@@ -559,6 +559,10 @@ func roleExistsQuery(roleName string) string {
 
 func databaseExistsQuery(dbName string) string {
 	return fmt.Sprintf("SELECT EXISTS(SELECT 1 FROM pg_catalog.pg_database WHERE datname='%v')", dbName)
+}
+
+func extensionExistsQuery(extName string) string {
+	return fmt.Sprintf("SELECT EXISTS(SELECT FROM pg_catalog.pg_extension WHERE extname='%v')", extName)
 }
 
 // AssertDataExpectedCount verifies that an expected amount of rows exists on the table

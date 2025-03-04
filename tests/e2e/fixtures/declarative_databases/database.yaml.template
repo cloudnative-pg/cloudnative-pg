@@ -11,3 +11,6 @@ spec:
   template: template0
   cluster:
     name: cluster-with-declarative-databases
+  extensions:
+  - name: bloom
+    ensure: present

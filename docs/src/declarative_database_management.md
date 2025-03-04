@@ -20,8 +20,8 @@ automated, and consistent approach to managing PostgreSQL databases.
 !!! Important
     CloudNativePG manages **global objects** in PostgreSQL clusters, such as
     databases, roles, and tablespaces. However, it does **not** manage the content
-    of databases (e.g., schemas and tables). For database content, specialized
-    tools or the applications themselves should be used.
+    of databases besides of extensions (e.g., schemas and tables). For database content,
+	specialized tools or the applications themselves should be used.
 
 ### Declarative `Database` Manifest
 
@@ -38,6 +38,9 @@ spec:
   owner: app
   cluster:
     name: cluster-example
+  extensions:
+  - name: bloom
+    ensure: present
 ```
 
 When applied, this manifest creates a `Database` object called
@@ -156,6 +159,50 @@ spec:
 
 This manifest ensures that the `database-to-drop` database is removed from the
 `cluster-example` cluster.
+
+## Managing Extensions in a Database
+
+CloudNativePG can automate the management of PostgreSQL extensions in the
+target database. To enable this feature, define the `spec.extensions` field
+with a list of extension specifications, as shown in the following example:
+
+```yaml
+# ...
+spec:
+  extensions:
+  - name: bloom
+    ensure: present
+# ...
+```
+
+Each extension entry supports the following properties:
+
+- `name`: The name of the extension.
+- `ensure`: Specifies whether the extension should be present or absent in the
+  database:
+    - `present`: Ensures that the extension is installed.
+    - `absent`: Ensures that the extension is removed.
+- `version` *(optional)*: The specific version of the extension to install or
+  upgrade to.
+- `schema` *(optional)*: The schema in which the extension should be installed.
+
+!!! Info
+    CloudNativePG manages extensions using PostgreSQL’s `CREATE EXTENSION`,
+    `ALTER EXTENSION`, and `DROP EXTENSION` SQL commands.
+
+The operator reconciles only the extensions explicitly listed in
+`spec.extensions`. Any existing extensions not specified in this list remain
+unchanged.
+
+!!! Warning
+    Before the introduction of declarative extension management, CloudNativePG
+    did not offer a straightforward way to create extensions through configuration.
+    To address this, the ["managed extensions"](postgresql_conf.md#managed-extensions)
+    feature was introduced, enabling the automated and transparent management
+    of key extensions like `pg_stat_statements`. Currently, it is your
+    responsibility to ensure there are no conflicts between extension support in
+    the `Database` CRD and the managed extensions feature.
+
 
 ## Limitations and Caveats
 

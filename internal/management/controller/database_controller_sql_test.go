@@ -223,3 +223,128 @@ var _ = Describe("Managed Database SQL", func() {
 		})
 	})
 })
+
+var _ = Describe("Managed Extensions SQL", func() {
+	var (
+		dbMock sqlmock.Sqlmock
+		db     *sql.DB
+		ext    *apiv1.ExtensionSpec
+		err    error
+
+		testError error
+	)
+
+	BeforeEach(func() {
+		db, dbMock, err = sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+		Expect(err).ToNot(HaveOccurred())
+
+		ext = &apiv1.ExtensionSpec{
+			Name:    "testext",
+			Ensure:  "present",
+			Version: "1.0",
+			Schema:  "default",
+		}
+
+		testError = fmt.Errorf("test error")
+	})
+
+	AfterEach(func() {
+		Expect(dbMock.ExpectationsWereMet()).To(Succeed())
+	})
+
+	Context("detectDatabaseExtension", func() {
+		It("returns true when the extension exits", func(ctx SpecContext) {
+			dbMock.
+				ExpectQuery(detectDatabaseExtensionSQL).
+				WithArgs(ext.Name).
+				WillReturnRows(
+					sqlmock.NewRows([]string{""}).AddRow("1"),
+				)
+			extExists, err := detectDatabaseExtension(ctx, db, ext)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(extExists).To(BeTrue())
+		})
+
+		It("returns false when it does not exist", func(ctx SpecContext) {
+			dbMock.
+				ExpectQuery(detectDatabaseExtensionSQL).
+				WithArgs(ext.Name).
+				WillReturnRows(
+					sqlmock.NewRows([]string{""}).AddRow("0"),
+				)
+			extExists, err := detectDatabaseExtension(ctx, db, ext)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(extExists).To(BeFalse())
+		})
+	})
+
+	Context("createDatabaseExtension", func() {
+		createExtensionSQL := "CREATE EXTENSION \"testext\" VERSION \"1.0\" SCHEMA \"default\""
+
+		It("returns success when the extension has been created", func(ctx SpecContext) {
+			dbMock.
+				ExpectExec(createExtensionSQL).
+				WillReturnResult(sqlmock.NewResult(0, 1))
+			Expect(createDatabaseExtension(ctx, db, ext)).Error().NotTo(HaveOccurred())
+		})
+
+		It("fails when the extension could not be created", func(ctx SpecContext) {
+			dbMock.
+				ExpectExec(createExtensionSQL).
+				WillReturnError(testError)
+			Expect(createDatabaseExtension(ctx, db, ext)).Error().To(Equal(testError))
+		})
+	})
+
+	Context("dropDatabaseExtension", func() {
+		dropExtensionSQL := "DROP EXTENSION IF EXISTS \"testext\""
+
+		It("returns success when the extension has been dropped", func(ctx SpecContext) {
+			dbMock.
+				ExpectExec(dropExtensionSQL).
+				WillReturnResult(sqlmock.NewResult(0, 1))
+
+			Expect(dropDatabaseExtension(ctx, db, ext)).Error().NotTo(HaveOccurred())
+		})
+
+		It("returns an error when the DROP statement failed", func(ctx SpecContext) {
+			dbMock.
+				ExpectExec(dropExtensionSQL).
+				WillReturnError(testError)
+
+			Expect(dropDatabaseExtension(ctx, db, ext)).Error().To(Equal(testError))
+		})
+	})
+
+	Context("updateDatabaseExtension", func() {
+		It("sets the schema and the extension version", func(ctx SpecContext) {
+			dbMock.
+				ExpectExec("ALTER EXTENSION \"testext\" SET SCHEMA \"default\"").
+				WillReturnResult(sqlmock.NewResult(0, 1))
+			dbMock.
+				ExpectExec("ALTER EXTENSION \"testext\" UPDATE TO \"1.0\"").
+				WillReturnResult(sqlmock.NewResult(0, 1))
+
+			Expect(updateDatabaseExtension(ctx, db, ext)).Error().NotTo(HaveOccurred())
+		})
+
+		It("fail when setting the schema failed", func(ctx SpecContext) {
+			dbMock.
+				ExpectExec("ALTER EXTENSION \"testext\" SET SCHEMA \"default\"").
+				WillReturnError(testError)
+
+			Expect(updateDatabaseExtension(ctx, db, ext)).Error().To(MatchError(testError))
+		})
+
+		It("fail when setting the version failed", func(ctx SpecContext) {
+			dbMock.
+				ExpectExec("ALTER EXTENSION \"testext\" SET SCHEMA \"default\"").
+				WillReturnResult(sqlmock.NewResult(0, 1))
+			dbMock.
+				ExpectExec("ALTER EXTENSION \"testext\" UPDATE TO \"1.0\"").
+				WillReturnError(testError)
+
+			Expect(updateDatabaseExtension(ctx, db, ext)).Error().To(MatchError(testError))
+		})
+	})
+})

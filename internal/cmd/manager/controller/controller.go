@@ -281,6 +281,11 @@ func RunController(
 		return err
 	}
 
+	if err = webhookv1.SetupDatabaseWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "Database", "version", "v1")
+		return err
+	}
+
 	// Setup the handler used by the readiness and liveliness probe.
 	//
 	// Unfortunately the readiness of the probe is not sufficient for the operator to be
