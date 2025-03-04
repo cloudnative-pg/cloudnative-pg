@@ -14,5 +14,9 @@ spec:
          - "120"
          - "-c"
          - "5"
+         - "-v"
+         - "2"
+         - "-s"
+         - "3"
          - "http://webtest:8080/tx"
       restartPolicy: Never

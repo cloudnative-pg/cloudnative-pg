@@ -50,6 +50,9 @@ oc apply -f cloudnative-pg-catalog.yaml
 # create the secret for the index to be pulled in the marketplace
 oc create secret docker-registry -n openshift-marketplace --docker-server="${REGISTRY}" --docker-username="${REGISTRY_USER}" --docker-password="${REGISTRY_PASSWORD}" cnpg-pull-secret || true
 
+# Create the default configmap to set global keepalives on all the tests
+oc create configmap -n openshift-operators --from-literal=STANDBY_TCP_USER_TIMEOUT=5000 cnpg-controller-manager-config
+
 # Install the operator
 oc apply -f - <<EOF
 apiVersion: operators.coreos.com/v1alpha1

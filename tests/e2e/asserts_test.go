@@ -1292,6 +1292,9 @@ func AssertFastFailOver(
 			" -f " + webTestFile)
 		Expect(err).ToNot(HaveOccurred())
 
+		webtestDeploy := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "webtest", Namespace: namespace}}
+		Expect(deployments.WaitForReady(env.Ctx, env.Client, webtestDeploy, 60)).To(Succeed())
+
 		_, _, err = run.Run("kubectl create -n " + namespace +
 			" -f " + webTestJob)
 		Expect(err).ToNot(HaveOccurred())
