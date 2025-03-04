@@ -22,7 +22,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-var isPluginService = func(object client.Object, operatorNamespace string) bool {
+func isPluginService(object client.Object, operatorNamespace string) bool {
 	if object.GetNamespace() != operatorNamespace {
 		// Only consider the services that are in the same
 		// namespace where the operator is installed
@@ -49,4 +49,15 @@ var isPluginService = func(object client.Object, operatorNamespace string) bool 
 	}
 
 	return true
+}
+
+// isSecretUsedByPluginService returns true when the secret with the passed name
+// is used by the passed service
+func isSecretUsedByPluginService(service client.Object, secretName string) bool {
+	annotations := service.GetAnnotations()
+
+	clientSecretName := annotations[utils.PluginClientSecretAnnotationName]
+	serverSecretName := annotations[utils.PluginServerSecretAnnotationName]
+
+	return clientSecretName == secretName || serverSecretName == secretName
 }
