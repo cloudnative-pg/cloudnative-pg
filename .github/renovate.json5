@@ -182,7 +182,6 @@
       customType: 'regex',
       fileMatch: [
         '^hack/setup-cluster.sh$',
-        '^hack/e2e/run-e2e-k3d.sh$',
       ],
       matchStrings: [
         'K3D_NODE_DEFAULT_VERSION=(?<currentValue>.*?)\\n',
