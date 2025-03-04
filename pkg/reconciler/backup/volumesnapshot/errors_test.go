@@ -17,6 +17,13 @@ limitations under the License.
 package volumesnapshot
 
 import (
+	"context"
+	"errors"
+	"fmt"
+
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -56,5 +63,37 @@ var _ = Describe("Retriable error messages", func() {
 			Expect(isContextDeadlineExceededError("permission denied")).To(BeFalse())
 			Expect(isContextDeadlineExceededError("invalid input")).To(BeFalse())
 		})
+	})
+})
+
+var _ = Describe("isErrorRetryable", func() {
+	It("recognizes server timeout errors", func() {
+		err := apierrs.NewServerTimeout(schema.GroupResource{}, "test", 1)
+		Expect(isErrorRetryable(err)).To(BeTrue())
+	})
+
+	It("recognizes conflict errors", func() {
+		err := apierrs.NewConflict(schema.GroupResource{}, "test", nil)
+		Expect(isErrorRetryable(err)).To(BeTrue())
+	})
+
+	It("recognizes internal errors", func() {
+		err := apierrs.NewInternalError(fmt.Errorf("test error"))
+		Expect(isErrorRetryable(err)).To(BeTrue())
+	})
+
+	It("recognizes context deadline exceeded errors", func() {
+		err := context.DeadlineExceeded
+		Expect(isErrorRetryable(err)).To(BeTrue())
+	})
+
+	It("does not retry on not found errors", func() {
+		err := apierrs.NewNotFound(schema.GroupResource{}, "test")
+		Expect(isErrorRetryable(err)).To(BeFalse())
+	})
+
+	It("does not retry on random errors", func() {
+		err := errors.New("random error")
+		Expect(isErrorRetryable(err)).To(BeFalse())
 	})
 })

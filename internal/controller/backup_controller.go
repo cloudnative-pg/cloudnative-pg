@@ -456,10 +456,6 @@ func (r *BackupReconciler) reconcileSnapshotBackup(
 		Build()
 
 	res, err := reconciler.Reconcile(ctx, cluster, backup, targetPod, pvcs)
-	if isErrorRetryable(err) {
-		contextLogger.Error(err, "detected retryable error while executing snapshot backup, retrying...")
-		return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
-	}
 	if err != nil {
 		// Volume Snapshot errors are not retryable, we need to set this backup as failed
 		// and un-fence the Pod
@@ -567,12 +563,6 @@ func updateClusterWithSnapshotsBackupTimes(
 		}
 	}
 	return nil
-}
-
-// isErrorRetryable detects is an error is retryable or not
-func isErrorRetryable(err error) bool {
-	return apierrs.IsServerTimeout(err) || apierrs.IsConflict(err) || apierrs.IsInternalError(err) ||
-		errors.Is(err, context.DeadlineExceeded)
 }
 
 // getBackupTargetPod returns the pod that should run the backup according to the current
