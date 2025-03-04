@@ -25,7 +25,6 @@ fi
 
 # Defaults
 KIND_NODE_DEFAULT_VERSION=v1.32.2
-K3D_NODE_DEFAULT_VERSION=v1.30.3
 CSI_DRIVER_HOST_PATH_DEFAULT_VERSION=v1.15.0
 EXTERNAL_SNAPSHOTTER_VERSION=v8.2.0
 EXTERNAL_PROVISIONER_VERSION=v5.2.0
@@ -34,7 +33,6 @@ EXTERNAL_ATTACHER_VERSION=v4.8.0
 K8S_VERSION=${K8S_VERSION-}
 KUBECTL_VERSION=${KUBECTL_VERSION-}
 CSI_DRIVER_HOST_PATH_VERSION=${CSI_DRIVER_HOST_PATH_VERSION:-$CSI_DRIVER_HOST_PATH_DEFAULT_VERSION}
-ENGINE=${CLUSTER_ENGINE:-kind}
 ENABLE_REGISTRY=${ENABLE_REGISTRY:-}
 ENABLE_PYROSCOPE=${ENABLE_PYROSCOPE:-}
 ENABLE_CSI_DRIVER=${ENABLE_CSI_DRIVER:-}
@@ -244,91 +242,6 @@ check_registry_kind() {
 }
 
 ##
-## K3D SUPPORT
-##
-
-install_k3d() {
-  local bindir=$1
-
-  curl -s https://raw.githubusercontent.com/rancher/k3d/main/install.sh | K3D_INSTALL_DIR=$bindir bash -s -- --no-sudo
-}
-
-create_cluster_k3d() {
-  local k8s_version=$1
-  local cluster_name=$2
-
-  local latest_k3s_tag
-  latest_k3s_tag=$(k3d version list k3s | grep -- "^${k8s_version//./\\.}"'\+-k3s[0-9]$' | tail -n 1)
-
-  local options=()
-  if [ -n "${DOCKER_REGISTRY_MIRROR:-}" ] || [ -n "${ENABLE_REGISTRY:-}" ]; then
-    config_file="${TEMP_DIR}/k3d-registries.yaml"
-    cat >"${config_file}" <<-EOF
-mirrors:
-EOF
-
-    if [ -n "${DOCKER_REGISTRY_MIRROR:-}" ]; then
-      cat >>"${config_file}" <<-EOF
-  "docker.io":
-    endpoint:
-      - "${DOCKER_REGISTRY_MIRROR}"
-EOF
-    fi
-
-    if [ -n "${ENABLE_REGISTRY:-}" ]; then
-      cat >>"${config_file}" <<-EOF
-  "${registry_name}:5000":
-    endpoint:
-    - http://${registry_name}:5000
-EOF
-    fi
-
-    options+=(--registry-config "${config_file}")
-  fi
-
-  local agents=()
-  if [ "$NODES" -gt 1 ]; then
-    agents=(-a "${NODES}")
-  fi
-
-  K3D_FIX_MOUNTS=1 k3d cluster create "${options[@]}" "${agents[@]}" -i "rancher/k3s:${latest_k3s_tag}" --no-lb "${cluster_name}" \
-    --k3s-arg "--disable=traefik@server:0" --k3s-arg "--disable=metrics-server@server:0" \
-    --k3s-arg "--node-taint=node-role.kubernetes.io/master:NoSchedule@server:0" #wokeignore:rule=master
-
-  if [ -n "${ENABLE_REGISTRY:-}" ]; then
-    docker network connect "k3d-${cluster_name}" "${registry_name}" &>/dev/null || true
-  fi
-}
-
-load_image_k3d() {
-  local cluster_name=$1
-  local image=$2
-  k3d image import "${image}" -c "${cluster_name}"
-}
-
-export_logs_k3d() {
-  local cluster_name=$1
-  while IFS= read -r line; do
-    NODES_LIST+=("$line")
-  done < <(k3d node list | awk "/${cluster_name}/{print \$1}")
-  for i in "${NODES_LIST[@]}"; do
-    mkdir -p "${LOG_DIR}/${i}"
-    docker cp -L "${i}:/var/log/." "${LOG_DIR}/${i}"
-  done
-}
-
-destroy_k3d() {
-  local cluster_name=$1
-  docker network disconnect "k3d-${cluster_name}" "${registry_name}" &>/dev/null || true
-  k3d cluster delete "${cluster_name}" || true
-  docker network rm "k3d-${cluster_name}" &>/dev/null || true
-}
-
-check_registry_k3d() {
-  [ -n "$(check_registry "k3d-${CLUSTER_NAME}")" ]
-}
-
-##
 ## GENERIC ROUTINES
 ##
 
@@ -524,7 +437,7 @@ load_image() {
   local cluster_name=$1
   local image=$2
   if [ -z "${ENABLE_REGISTRY:-}" ]; then
-    "load_image_${ENGINE}" "${cluster_name}" "${image}"
+    "load_image_kind" "${cluster_name}" "${image}"
   else
     load_image_registry "${image}"
   fi
@@ -538,7 +451,7 @@ deploy_operator() {
 
 usage() {
   cat >&2 <<EOF
-Usage: $0 [-e {kind|k3d}] [-k <version>] [-r] <command>
+Usage: $0 [-k <version>] [-r] <command>
 
 Commands:
     prepare <dest_dir>    Downloads the prerequisite into <dest_dir>
@@ -554,11 +467,6 @@ Commands:
     pyroscope             Deploy Pyroscope inside operator namespace
 
 Options:
-    -e|--engine
-        <CLUSTER_ENGINE>  Use the provided ENGINE to run the cluster.
-                          Available options are 'kind' and 'k3d'. Default 'kind'.
-                          Env: CLUSTER_ENGINE
-
     -k|--k8s-version
         <K8S_VERSION>     Use the specified kubernetes full version number
                           (e.g., v1.27.0). Env: K8S_VERSION
@@ -584,14 +492,14 @@ prepare() {
   local bindir=$1
   echo "${bright}Installing cluster prerequisites in ${bindir}${reset}"
   install_kubectl "${bindir}"
-  "install_${ENGINE}" "${bindir}"
+  "install_kind" "${bindir}"
   echo "${bright}Done installing cluster prerequisites in ${bindir}${reset}"
 }
 
 create() {
-  echo "${bright}Creating ${ENGINE} cluster ${CLUSTER_NAME} with version ${K8S_VERSION}${reset}"
+  echo "${bright}Creating kind cluster ${CLUSTER_NAME} with version ${K8S_VERSION}${reset}"
 
-  "create_cluster_${ENGINE}" "${K8S_VERSION}" "${CLUSTER_NAME}"
+  "create_cluster_kind" "${K8S_VERSION}" "${CLUSTER_NAME}"
 
   # Support for docker:dind service
   if [ "${DOCKER_HOST:-}" == "tcp://docker:2376" ]; then
@@ -601,7 +509,7 @@ create() {
   deploy_fluentd
   deploy_csi_host_path
 
-  echo "${bright}Done creating ${ENGINE} cluster ${CLUSTER_NAME} with version ${K8S_VERSION}${reset}"
+  echo "${bright}Done creating kind cluster ${CLUSTER_NAME} with version ${K8S_VERSION}${reset}"
 }
 
 load_helper_images() {
@@ -611,7 +519,7 @@ load_helper_images() {
   # with the goal to speed up the runs.
   for IMG in "${HELPER_IMGS[@]}"; do
     docker pull "${IMG}"
-    "load_image_${ENGINE}" "${CLUSTER_NAME}" "${IMG}"
+    "load_image_kind" "${CLUSTER_NAME}" "${IMG}"
   done
 
   echo "${bright}Done loading helper images on cluster ${CLUSTER_NAME}${reset}"
@@ -625,7 +533,7 @@ load() {
   # This code will NEVER run in the cloud CI/CD workflows, as there we do
   # the build and push (into GH test registry) once in `builds`, before
   # the strategy matrix blows up the number of executables
-  if [ -z "${ENABLE_REGISTRY}" ] && "check_registry_${ENGINE}"; then
+  if [ -z "${ENABLE_REGISTRY}" ] && "check_registry_kind"; then
     ENABLE_REGISTRY=true
   fi
 
@@ -638,7 +546,7 @@ load() {
     ARCH="${ARCH}" BUILDER_NAME=${builder_name} docker-build
 
   if [ -z "${ENABLE_REGISTRY:-}" ]; then
-    "load_image_${ENGINE}" "${CLUSTER_NAME}" "${CONTROLLER_IMG}"
+    "load_image_kind" "${CLUSTER_NAME}" "${CONTROLLER_IMG}"
   fi
 
   echo "${bright}Loading new operator image on cluster ${CLUSTER_NAME}${reset}"
@@ -660,7 +568,7 @@ load() {
       ARCH="${ARCH}" BUILDER_NAME="${builder_name}" docker-build
 
   if [ -z "${ENABLE_REGISTRY:-}" ]; then
-    "load_image_${ENGINE}" "${CLUSTER_NAME}" "${CONTROLLER_IMG}"
+    "load_image_kind" "${CLUSTER_NAME}" "${CONTROLLER_IMG}"
   fi
 
     echo "${bright}Done loading new 'prime' operator image on cluster ${CLUSTER_NAME}${reset}"
@@ -670,7 +578,7 @@ load() {
 }
 
 deploy() {
-  if [ -z "${ENABLE_REGISTRY}" ] && "check_registry_${ENGINE}"; then
+  if [ -z "${ENABLE_REGISTRY}" ] && "check_registry_kind"; then
     ENABLE_REGISTRY=true
   fi
 
@@ -685,7 +593,7 @@ deploy() {
 
 print_image() {
   local tag=devel
-  if [ -n "${ENABLE_REGISTRY:-}" ] || "check_registry_${ENGINE}"; then
+  if [ -n "${ENABLE_REGISTRY:-}" ] || "check_registry_kind"; then
     tag=latest
   fi
   echo "${registry_name}:5000/cloudnative-pg-testing:${tag}"
@@ -694,17 +602,17 @@ print_image() {
 export_logs() {
   echo "${bright}Exporting logs from cluster ${CLUSTER_NAME} to ${LOG_DIR}${reset}"
 
-  "export_logs_${ENGINE}" "${CLUSTER_NAME}"
+  "export_logs_kind" "${CLUSTER_NAME}"
 
   echo "${bright}Done exporting logs from cluster ${CLUSTER_NAME} to ${LOG_DIR}${reset}"
 }
 
 destroy() {
-  echo "${bright}Destroying ${ENGINE} cluster ${CLUSTER_NAME}${reset}"
+  echo "${bright}Destroying kind cluster ${CLUSTER_NAME}${reset}"
 
-  "destroy_${ENGINE}" "${CLUSTER_NAME}"
+  "destroy_kind" "${CLUSTER_NAME}"
 
-  echo "${bright}Done destroying ${ENGINE} cluster ${CLUSTER_NAME}${reset}"
+  echo "${bright}Done destroying kind cluster ${CLUSTER_NAME}${reset}"
 }
 
 pyroscope() {
@@ -730,13 +638,7 @@ main() {
     case "${o}" in
     -e | --engine)
       shift
-      ENGINE=$1
-      shift
-      if [ "${ENGINE}" != "kind" ] && [ "${ENGINE}" != "k3d" ]; then
-        echo "ERROR: ${ENGINE} is not a valid engine! [kind, k3d]" >&2
-        echo >&2
-        usage
-      fi
+      # no-op, kept for compatibility
       ;;
     -k | --k8s-version)
       shift
@@ -777,14 +679,7 @@ main() {
   fi
 
   if [ -z "${K8S_VERSION}" ]; then
-    case "${ENGINE}" in
-    kind)
-      K8S_VERSION=${KIND_NODE_DEFAULT_VERSION}
-      ;;
-    k3d)
-      K8S_VERSION=${K3D_NODE_DEFAULT_VERSION}
-      ;;
-    esac
+    K8S_VERSION=${KIND_NODE_DEFAULT_VERSION}
   fi
   KUBECTL_VERSION=${KUBECTL_VERSION:-$K8S_VERSION}
 

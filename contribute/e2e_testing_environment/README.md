@@ -12,8 +12,8 @@ PostgreSQL** on **all supported versions of Kubernetes**.
 
 This framework is made up by two important components:
 
-- a local and disposable Kubernetes cluster built with `kind` (default) or
-  `k3d` on which to run the E2E tests
+- a local and disposable Kubernetes cluster built with `kind` on which to run
+  the E2E tests
 - a set of E2E tests to be run on an existing Kubernetes cluster
   (including the one above)
 
@@ -57,8 +57,7 @@ All flags have corresponding environment variables labeled `(Env:...` in the tab
 | Flags | Usage                                                                                                                         |
 |-------|-------------------------------------------------------------------------------------------------------------------------------|
 | -r    |--registry                       | Enable local registry. (Env: `ENABLE_REGISTRY`)                                                                               |
-| -e    |--engine <CLUSTER_ENGINE>        | Use the provided ENGINE to run the cluster. Available options are 'kind' and 'k3d'. Default 'kind'. (Env: `CLUSTER_ENGINE`)   |
-| -k    |--k8s-version <K8S_VERSION>      | Use the specified Kubernetes full version number (e.g., `-k v1.26.0`). (Env: `K8S_VERSION`)                                   |
+| -k    |--k8s-version <K8S_VERSION>      | Use the specified Kubernetes full version number (e.g., `-k v1.30.0`). (Env: `K8S_VERSION`)                                   |
 | -n    |--nodes <NODES>                  | Create a cluster with the required number of nodes. Used only during "create" command. Default: 3 (Env: `NODES`)              |
 
 
@@ -66,12 +65,12 @@ All flags have corresponding environment variables labeled `(Env:...` in the tab
 > sure that they are consistent through all invocations either via command line
 > options or by defining the respective environment variables
 
-> **NOTE:** on ARM64 architecture like Apple M1/M2/M3, `kind` and `k3d` provide different 
-> images for AMD64 and ARM64 nodes. If the **x86/amd64 emulation** is not enabled, 
+> **NOTE:** on ARM64 architecture like Apple M1/M2/M3, `kind` provides different
+> images for AMD64 and ARM64 nodes. If the **x86/amd64 emulation** is not enabled,
 > the `./hack/setup-cluster.sh` script will correctly detect the architecture
 > and pass the `DOCKER_DEFAULT_PLATFORM=linux/arm64` environment variable to Docker
 > to use the ARM64 node image.
-> If you want to explicitly use the **x86/amd64 emulation**, you need to set 
+> If you want to explicitly use the **x86/amd64 emulation**, you need to set
 > the `DOCKER_DEFAULT_PLATFORM=linux/amd64` environment variable before
 > calling the `./hack/setup-cluster.sh` script.
 
@@ -91,7 +90,7 @@ will create a deployment, and add two services on ports 6060 and 4040
 respectively, in the same namespace as the operator:
 
 ``` console
-kubectl get svc -n cnpg-system        
+kubectl get svc -n cnpg-system
 
 NAME                   TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)    AGE
 cnpg-pprof             ClusterIP   10.96.17.58    <none>        6060/TCP   9m41s
@@ -158,23 +157,7 @@ specifying the following variable
 
 * `DOCKER_REGISTRY_MIRROR`: DockerHub mirror URL (i.e. https://mirror.gcr.io)
 
-To run E2E testing you can also use:
-
-|                    kind                        |                     k3d                         |
-|------------------------------------------------|-------------------------------------------------|
-| `TEST_UPGRADE_TO_V1=false make e2e-test-kind`  | `TEST_UPGRADE_TO_V1=false make e2e-test-k3d`    |
-
-
-### Wrapper scripts for E2E testing
-
-There are currently two available scripts that wrap cluster setup and
-execution of tests. One is for `kind` and one is for `k3d`. They simply embed
-`hack/setup-cluster.sh` and `hack/e2e/run-e2e.sh` to create a local Kubernetes
-cluster and then run E2E tests on it.
-
-There is also a script to run E2E tests on an existing `local` Kubernetes cluster.
-It tries to detect the appropriate defaults for storage class and volume snapshot class environment variables
-by looking at the annotation of the default storage class and the volume snapshot class.
+To run E2E testing you can also use `TEST_UPGRADE_TO_V1=false make e2e-test-kind`.
 
 ### Using feature type test selection/filter
 
@@ -214,6 +197,19 @@ export FEATURE_TYPE=smoke,basic,service-connectivity
 This will run smoke, basic and service connectivity e2e.
 One or many can be passed as value with comma separation without spaces.
 
+### Wrapper scripts for E2E testing
+
+There is a script available that wraps cluster setup and execution of
+tests for `kind`. It embeds `hack/setup-cluster.sh` and
+`hack/e2e/run-e2e.sh` to create a local Kubernetes cluster and then
+run E2E tests on it.
+
+There is also a script to run E2E tests on an existing `local`
+Kubernetes cluster. It tries to detect the appropriate defaults for
+storage class and volume snapshot class environment variables by
+looking at the annotation of the default storage class and the volume
+snapshot class.
+
 #### On kind
 
 You can test the operator locally on `kind` with:
@@ -228,29 +224,6 @@ We have also provided a shortcut to this script in the main `Makefile`:
 
 ```shell
 make e2e-test-kind
-```
-
-#### On k3d
-
-You can test the operator locally on `k3d` with:
-
-``` bash
-run-e2e-k3d.sh
-```
-
-> **NOTE:** error messages, like the example below, that will be shown during
-> cluster creation are **NOT** an issue:
-
-```
-Error response from daemon: manifest for rancher/k3s:v1.20.0-k3s5 not found: manifest unknown: manifest unknown
-```
-
-The script will take care of creating a K3d cluster and then run the tests on it.
-
-We have also provided a shortcut to this script in the main `Makefile`:
-
-```shell
-make e2e-test-k3d
 ```
 
 #### On existing local cluster
@@ -296,11 +269,10 @@ the following ones can be defined:
 * `LOG_DIR`: the directory where the container logs are exported. Default:
   `_logs/` directory in the project root
 
-`run-e2e-kind.sh` forces `E2E_DEFAULT_STORAGE_CLASS=standard` while
-`run-e2e-k3d.sh` forces `E2E_DEFAULT_STORAGE_CLASS=local-path`
+`run-e2e-kind.sh` forces `E2E_DEFAULT_STORAGE_CLASS=standard`.
 
-Both scripts use the `setup-cluster.sh` script, in order to initialize the cluster
-choosing between `kind` or K3d engine.
+The script uses the `setup-cluster.sh` script to initialize the cluster using
+the `kind` engine.
 
 ### Running E2E tests on a fork of the repository
 
