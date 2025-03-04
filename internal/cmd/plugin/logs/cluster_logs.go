@@ -31,7 +31,7 @@ import (
 
 	cnpgv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/logs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/podlogs"
 )
 
 // clusterLogs contains the options and context to retrieve cluster logs
@@ -55,7 +55,7 @@ func getCluster(cl clusterLogs) (*cnpgv1.Cluster, error) {
 	return &cluster, err
 }
 
-func getStreamClusterLogs(cluster *cnpgv1.Cluster, cl clusterLogs) logs.ClusterStreamingRequest {
+func getStreamClusterLogs(cluster *cnpgv1.Cluster, cl clusterLogs) podlogs.ClusterWriter {
 	var sinceTime *metav1.Time
 	var tail *int64
 	if cl.timestamp {
@@ -64,7 +64,7 @@ func getStreamClusterLogs(cluster *cnpgv1.Cluster, cl clusterLogs) logs.ClusterS
 	if cl.tailLines >= 0 {
 		tail = &cl.tailLines
 	}
-	return logs.ClusterStreamingRequest{
+	return podlogs.ClusterWriter{
 		Cluster: cluster,
 		Options: &corev1.PodLogOptions{
 			Timestamps: cl.timestamp,
