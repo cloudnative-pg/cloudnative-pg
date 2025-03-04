@@ -54,6 +54,13 @@ TEMP_DIR="$(mktemp -d)"
 LOG_DIR=${LOG_DIR:-$ROOT_DIR/_logs/}
 trap 'rm -fr ${TEMP_DIR}' EXIT
 
+# Architecture
+ARCH=$(uname -m)
+case $ARCH in
+  x86_64) ARCH="amd64" ;;
+  aarch64) ARCH="arm64" ;;
+esac
+
 # If arm64 and user did not set it explicitly
 if [ "${ARCH}" = "arm64" ]  && [ "${DOCKER_DEFAULT_PLATFORM}" = "" ]; then
   DOCKER_DEFAULT_PLATFORM=linux/arm64
