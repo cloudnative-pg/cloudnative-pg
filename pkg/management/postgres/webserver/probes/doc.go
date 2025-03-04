@@ -14,6 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package readiness contains the code needed to check
-// if PostgreSQL is ready to accept client connections.
-package readiness
+// Package probes contains the implementation of startup, liveness and
+// readiness probes
+package probes

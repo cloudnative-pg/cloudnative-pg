@@ -42,7 +42,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/readiness"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/probes"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/upgrade"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -59,11 +59,10 @@ func IsRetryableError(err *Error) bool {
 }
 
 type remoteWebserverEndpoints struct {
-	typedClient      client.Client
-	instance         *postgres.Instance
-	currentBackup    *backupConnection
-	readinessChecker *readiness.Data
-	ongoingRequest   sync.Mutex
+	typedClient    client.Client
+	instance       *postgres.Instance
+	currentBackup  *backupConnection
+	ongoingRequest sync.Mutex
 }
 
 // StartBackupRequest the required data to execute the pg_start_backup
@@ -95,15 +94,15 @@ func NewRemoteWebServer(
 	}
 
 	endpoints := remoteWebserverEndpoints{
-		typedClient:      typedClient,
-		instance:         instance,
-		readinessChecker: readiness.ForInstance(instance),
+		typedClient: typedClient,
+		instance:    instance,
 	}
 
 	serveMux := http.NewServeMux()
 	serveMux.HandleFunc(url.PathPgModeBackup, endpoints.backup)
 	serveMux.HandleFunc(url.PathHealth, endpoints.isServerHealthy)
 	serveMux.HandleFunc(url.PathReady, endpoints.isServerReady)
+	serveMux.HandleFunc(url.PathStartup, endpoints.isServerStartedUp)
 	serveMux.HandleFunc(url.PathPgStatus, endpoints.pgStatus)
 	serveMux.HandleFunc(url.PathPgArchivePartial, endpoints.pgArchivePartial)
 	serveMux.HandleFunc(url.PathPGControlData, endpoints.pgControlData)
@@ -206,32 +205,92 @@ func (ws *remoteWebserverEndpoints) cleanupStaleCollections(ctx context.Context)
 	}
 }
 
-func (ws *remoteWebserverEndpoints) isServerHealthy(w http.ResponseWriter, _ *http.Request) {
-	// If `pg_rewind` is running the Pod is starting up.
+// isServerStartedUp evaluates the liveness probe
+func (ws *remoteWebserverEndpoints) isServerStartedUp(w http.ResponseWriter, req *http.Request) {
+	var cluster apiv1.Cluster
+	if err := ws.typedClient.Get(req.Context(),
+		client.ObjectKey{
+			Namespace: ws.instance.GetNamespaceName(),
+			Name:      ws.instance.GetClusterName(),
+		},
+		&cluster,
+	); err != nil {
+		log.Info("Startup check failed, cannot check Cluster definition", "err", err)
+		http.Error(
+			w,
+			fmt.Sprintf("startup check failed (cannot get Cluster definition: %s)", err.Error()),
+			http.StatusInternalServerError,
+		)
+		return
+	}
+
+	// If `pg_rewind` is running, it means that the Pod is starting up.
 	// We need to report it healthy to avoid being killed by the kubelet.
-	// Same goes for instances with fencing on.
 	if ws.instance.PgRewindIsRunning || ws.instance.MightBeUnavailable() {
-		log.Trace("Liveness probe skipped")
+		log.Trace("Startup probe skipped")
 		_, _ = fmt.Fprint(w, "Skipped")
 		return
 	}
 
-	err := ws.instance.IsServerHealthy()
-	if err != nil {
-		log.Debug("Liveness probe failing", "err", err.Error())
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	var startupProbe *apiv1.ProbeWithStrategy
+	if cluster.Spec.Probes != nil {
+		startupProbe = cluster.Spec.Probes.Startup
+	}
+	checker := probes.ForConfiguration(startupProbe)
+	if err := checker.Evaluate(req.Context(), ws.instance); err != nil {
+		log.Info("Startup probe failing", "err", err.Error())
+		http.Error(
+			w,
+			fmt.Sprintf("startup check failed: %s", err.Error()),
+			http.StatusInternalServerError,
+		)
 		return
 	}
 
-	log.Trace("Liveness probe succeeding")
+	log.Trace("Startup probe succeeding")
+	_, _ = fmt.Fprint(w, "OK")
+}
+
+func (ws *remoteWebserverEndpoints) isServerHealthy(w http.ResponseWriter, _ *http.Request) {
 	_, _ = fmt.Fprint(w, "OK")
 }
 
 // This is the readiness probe
-func (ws *remoteWebserverEndpoints) isServerReady(w http.ResponseWriter, r *http.Request) {
-	if err := ws.readinessChecker.IsServerReady(r.Context()); err != nil {
-		log.Debug("Readiness probe failing", "err", err.Error())
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+func (ws *remoteWebserverEndpoints) isServerReady(w http.ResponseWriter, req *http.Request) {
+	if !ws.instance.CanCheckReadiness() {
+		http.Error(w, "instance is not ready yet", http.StatusInternalServerError)
+		return
+	}
+
+	var cluster apiv1.Cluster
+	if err := ws.typedClient.Get(req.Context(),
+		client.ObjectKey{
+			Namespace: ws.instance.GetNamespaceName(),
+			Name:      ws.instance.GetClusterName(),
+		},
+		&cluster,
+	); err != nil {
+		log.Info("Readiness check failed, cannot check Cluster definition", "err", err)
+		http.Error(
+			w,
+			fmt.Sprintf("Readiness check failed (cannot get Cluster definition: %s)", err.Error()),
+			http.StatusInternalServerError,
+		)
+		return
+	}
+
+	var readinessProbe *apiv1.ProbeWithStrategy
+	if cluster.Spec.Probes != nil {
+		readinessProbe = cluster.Spec.Probes.Readiness
+	}
+	checker := probes.ForConfiguration(readinessProbe)
+	if err := checker.Evaluate(req.Context(), ws.instance); err != nil {
+		log.Info("Readiness probe failing", "err", err.Error())
+		http.Error(
+			w,
+			fmt.Sprintf("readiness check failed: %s", err.Error()),
+			http.StatusInternalServerError,
+		)
 		return
 	}
 
