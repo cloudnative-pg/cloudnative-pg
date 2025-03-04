@@ -18,6 +18,7 @@ package volumesnapshot
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -449,5 +450,110 @@ var _ = Describe("annotateSnapshotsWithBackupData", func() {
 			Expect(snapshot.Annotations[utils.BackupStartTimeAnnotationName]).To(BeEquivalentTo(startedAt.Format(time.RFC3339)))
 			Expect(snapshot.Annotations[utils.BackupEndTimeAnnotationName]).To(BeEquivalentTo(stoppedAt.Format(time.RFC3339)))
 		}
+	})
+})
+
+var _ = Describe("addDeadlineStatus", func() {
+	var (
+		ctx    context.Context
+		backup *apiv1.Backup
+		cli    k8client.Client
+	)
+
+	BeforeEach(func() {
+		ctx = context.TODO()
+		backup = &apiv1.Backup{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "test-namespace",
+				Name:      "test-backup",
+			},
+			Status: apiv1.BackupStatus{
+				PluginMetadata: make(map[string]string),
+			},
+		}
+		cli = fake.NewClientBuilder().WithScheme(scheme.BuildWithAllKnownScheme()).
+			WithObjects(backup).
+			WithStatusSubresource(&apiv1.Backup{}).
+			Build()
+	})
+
+	It("should add deadline status if not present", func() {
+		err := addDeadlineStatus(ctx, cli, backup)
+		Expect(err).ToNot(HaveOccurred())
+
+		var updatedBackup apiv1.Backup
+		err = cli.Get(ctx, types.NamespacedName{Name: backup.Name, Namespace: backup.Namespace}, &updatedBackup)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(updatedBackup.Status.PluginMetadata).To(HaveKey(pluginName))
+		Expect(updatedBackup.Status.PluginMetadata[pluginName]).ToNot(BeEmpty())
+		Expect(updatedBackup.Status.PluginMetadata[pluginName]).To(MatchRegexp(`{"firstFailure":\d+}`))
+	})
+
+	It("should not modify deadline status if already present", func() {
+		backup.Status.PluginMetadata[pluginName] = `{"firstFailure": 1234567890}`
+		err := cli.Status().Update(ctx, backup)
+		Expect(err).ToNot(HaveOccurred())
+
+		err = addDeadlineStatus(ctx, cli, backup)
+		Expect(err).ToNot(HaveOccurred())
+
+		var updatedBackup apiv1.Backup
+		err = cli.Get(ctx, types.NamespacedName{Name: backup.Name, Namespace: backup.Namespace}, &updatedBackup)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(updatedBackup.Status.PluginMetadata[pluginName]).To(Equal(`{"firstFailure": 1234567890}`))
+	})
+})
+
+var _ = Describe("isDeadlineExceeded", func() {
+	var backup *apiv1.Backup
+
+	BeforeEach(func() {
+		backup = &apiv1.Backup{
+			Status: apiv1.BackupStatus{
+				PluginMetadata: make(map[string]string),
+			},
+		}
+	})
+
+	It("should return false if plugin metadata is empty", func() {
+		exceeded, err := isDeadlineExceeded(backup)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(exceeded).To(BeFalse())
+	})
+
+	It("should return error if unmarshalling fails", func() {
+		backup.Status.PluginMetadata[pluginName] = "invalid-json"
+		exceeded, err := isDeadlineExceeded(backup)
+		Expect(err).To(HaveOccurred())
+		Expect(exceeded).To(BeFalse())
+	})
+
+	It("should return error if no firstFailure found in plugin metadata", func() {
+		backup.Status.PluginMetadata[pluginName] = `{}`
+		exceeded, err := isDeadlineExceeded(backup)
+		Expect(err).To(HaveOccurred())
+		Expect(exceeded).To(BeFalse())
+	})
+
+	It("should return false if deadline has not exceeded", func() {
+		data := metadata{FirstFailure: time.Now().Unix()}
+		rawData, _ := json.Marshal(data)
+		backup.Status.PluginMetadata[pluginName] = string(rawData)
+		backup.Annotations = map[string]string{utils.BackupVolumeSnapshotDeadlineAnnotationName: "10"}
+
+		exceeded, err := isDeadlineExceeded(backup)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(exceeded).To(BeFalse())
+	})
+
+	It("should return true if deadline has exceeded", func() {
+		data := metadata{FirstFailure: time.Now().Add(-20 * time.Minute).Unix()}
+		rawData, _ := json.Marshal(data)
+		backup.Status.PluginMetadata[pluginName] = string(rawData)
+		backup.Annotations = map[string]string{utils.BackupVolumeSnapshotDeadlineAnnotationName: "10"}
+
+		exceeded, err := isDeadlineExceeded(backup)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(exceeded).To(BeTrue())
 	})
 })
