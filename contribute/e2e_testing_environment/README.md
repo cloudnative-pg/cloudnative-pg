@@ -201,14 +201,16 @@ One or many can be passed as value with comma separation without spaces.
 
 ### Wrapper scripts for E2E testing
 
-There's currently two available scripts that wrap cluster setup and
-execution of tests. One is for `kind` and one is for `k3d`. They simply embed
-`hack/setup-cluster.sh` and `hack/e2e/run-e2e.sh` to create a local Kubernetes
-cluster and then run E2E tests on it.
+There is a script available that wraps cluster setup and execution of
+tests for `kind`. It embeds `hack/setup-cluster.sh` and
+`hack/e2e/run-e2e.sh` to create a local Kubernetes cluster and then
+run E2E tests on it.
 
-There is also a script to run E2E tests on an existing `local` Kubernetes cluster.
-It tries to detect the appropriate defaults for storage class and volume snapshot class environment variables
-by looking at the annotation of the default storage class and the volume snapshot class.
+There is also a script to run E2E tests on an existing `local`
+Kubernetes cluster. It tries to detect the appropriate defaults for
+storage class and volume snapshot class environment variables by
+looking at the annotation of the default storage class and the volume
+snapshot class.
 
 #### On kind
 
@@ -269,11 +271,10 @@ the following ones can be defined:
 * `LOG_DIR`: the directory where the container logs are exported. Default:
   `_logs/` directory in the project root
 
-`run-e2e-kind.sh` forces `E2E_DEFAULT_STORAGE_CLASS=standard` while
-`run-e2e-k3d.sh` forces `E2E_DEFAULT_STORAGE_CLASS=local-path`
+`run-e2e-kind.sh` forces `E2E_DEFAULT_STORAGE_CLASS=standard`.
 
-Both scripts use the `setup-cluster.sh` script, in order to initialize the cluster
-choosing between `kind` or K3d engine.
+The script uses the `setup-cluster.sh` script to initialize the cluster using
+the `kind` engine.
 
 ### Running E2E tests on a fork of the repository
 
