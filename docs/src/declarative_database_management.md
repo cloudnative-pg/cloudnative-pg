@@ -194,6 +194,16 @@ The operator reconciles only the extensions explicitly listed in
 `spec.extensions`. Any existing extensions not specified in this list remain
 unchanged.
 
+!!! Warning
+    Before the introduction of declarative extension management, CloudNativePG
+    did not offer a straightforward way to create extensions through configuration.
+    To address this, the ["managed extensions"](postgresql_conf.md#managed-extensions)
+    feature was introduced, enabling the automated and transparent management
+    of key extensions like `pg_stat_statements`. Currently, it is your
+    responsibility to ensure there are no conflicts between extension support in
+    the `Database` CRD and the managed extensions feature.
+
+
 ## Limitations and Caveats
 
 ### Renaming a database
