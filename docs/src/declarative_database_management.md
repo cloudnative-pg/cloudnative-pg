@@ -21,7 +21,7 @@ automated, and consistent approach to managing PostgreSQL databases.
     CloudNativePG manages **global objects** in PostgreSQL clusters, such as
     databases, roles, and tablespaces. However, it does **not** manage the content
     of databases besides of extensions (e.g., schemas and tables). For database content,
-	specialized tools or the applications themselves should be used.
+    specialized tools or the applications themselves should be used.
 
 ### Declarative `Database` Manifest
 
@@ -193,6 +193,16 @@ Each extension entry supports the following properties:
 The operator reconciles only the extensions explicitly listed in
 `spec.extensions`. Any existing extensions not specified in this list remain
 unchanged.
+
+!!! Warning
+    Before the introduction of declarative extension management, CloudNativePG
+    did not offer a straightforward way to create extensions through configuration.
+    To address this, the ["managed extensions"](postgresql_conf.md#managed-extensions)
+    feature was introduced, enabling the automated and transparent management
+    of key extensions like `pg_stat_statements`. Currently, it is your
+    responsibility to ensure there are no conflicts between extension support in
+    the `Database` CRD and the managed extensions feature.
+
 
 ## Limitations and Caveats
 
