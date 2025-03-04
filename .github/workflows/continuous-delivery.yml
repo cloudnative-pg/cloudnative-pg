@@ -659,7 +659,7 @@ jobs:
         with:
           install_only: true
           version: ${{ env.KIND_VERSION }}
-          kubectl_version: v${{ env.K8S_VERSION }}
+          kubectl_version: ${{ env.K8S_VERSION }}
       -
         name: Prepare patch for customization
         env:
