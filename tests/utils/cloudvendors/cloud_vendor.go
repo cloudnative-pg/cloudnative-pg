@@ -38,7 +38,7 @@ var EKS = TestEnvVendor("eks")
 // GKE google cloud cluster
 var GKE = TestEnvVendor("gke")
 
-// LOCAL kind or k3d cluster running locally
+// LOCAL kind cluster running locally
 var LOCAL = TestEnvVendor("local")
 
 // OCP openshift cloud cluster

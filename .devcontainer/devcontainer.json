@@ -2,7 +2,6 @@
   "image": "mcr.microsoft.com/devcontainers/go:1-bookworm",
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:2": {},
-    "ghcr.io/rio/features/k3d:1": {},
     "ghcr.io/mpriscella/features/kind:1": {},
     "ghcr.io/rjfmachado/devcontainer-features/cloud-native:1": {
       "kubectl": "latest",
@@ -17,7 +16,7 @@
     "ghcr.io/dhoeric/features/stern:1": {}
   },
 
-  // Needed by kind and k3s to enable kube-proxy's ipvs mode
+  // Needed by kind to enable kube-proxy's ipvs mode
   "mounts":["type=bind,source=/lib/modules,target=/lib/modules"],
 
   // Enable kubectl short alias with completion
