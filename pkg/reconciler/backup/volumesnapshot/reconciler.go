@@ -208,7 +208,7 @@ func (se *Reconciler) internalReconcile(
 	}
 
 	// Step 3: wait for snapshots to be provisioned
-	if res, err := se.waitSnapshotToBeProvisionedStep(ctx, volumeSnapshots); res != nil || err != nil {
+	if res, err := se.waitSnapshotToBeProvisionedStep(ctx, backup, volumeSnapshots); res != nil || err != nil {
 		return res, err
 	}
 
@@ -225,7 +225,7 @@ func (se *Reconciler) internalReconcile(
 	}
 
 	// Step 5: wait for snapshots to be ready to use
-	if res, err := se.waitSnapshotToBeReadyStep(ctx, volumeSnapshots); res != nil || err != nil {
+	if res, err := se.waitSnapshotToBeReadyStep(ctx, backup, volumeSnapshots); res != nil || err != nil {
 		return res, err
 	}
 
@@ -403,10 +403,11 @@ func (se *Reconciler) createSnapshotPVCGroupStep(
 // waitSnapshotToBeProvisionedStep waits for every PVC snapshot to be claimed
 func (se *Reconciler) waitSnapshotToBeProvisionedStep(
 	ctx context.Context,
+	backup *apiv1.Backup,
 	snapshots []storagesnapshotv1.VolumeSnapshot,
 ) (*ctrl.Result, error) {
 	for i := range snapshots {
-		if res, err := se.waitSnapshotToBeProvisionedAndAnnotate(ctx, &snapshots[i]); res != nil || err != nil {
+		if res, err := se.waitSnapshotToBeProvisionedAndAnnotate(ctx, backup, &snapshots[i]); res != nil || err != nil {
 			return res, err
 		}
 	}
@@ -417,10 +418,11 @@ func (se *Reconciler) waitSnapshotToBeProvisionedStep(
 // waitSnapshotToBeReadyStep waits for every PVC snapshot to be ready to use
 func (se *Reconciler) waitSnapshotToBeReadyStep(
 	ctx context.Context,
+	backup *apiv1.Backup,
 	snapshots []storagesnapshotv1.VolumeSnapshot,
 ) (*ctrl.Result, error) {
 	for i := range snapshots {
-		if res, err := se.waitSnapshotToBeReady(ctx, &snapshots[i]); res != nil || err != nil {
+		if res, err := se.waitSnapshotToBeReady(ctx, backup, &snapshots[i]); res != nil || err != nil {
 			return res, err
 		}
 	}
@@ -519,20 +521,14 @@ func transferLabelsToAnnotations(labels map[string]string, annotations map[strin
 // SnapshotStartTimeAnnotationName and SnapshotEndTimeAnnotationName.
 func (se *Reconciler) waitSnapshotToBeProvisionedAndAnnotate(
 	ctx context.Context,
+	backup *apiv1.Backup,
 	snapshot *storagesnapshotv1.VolumeSnapshot,
 ) (*ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
 	info := parseVolumeSnapshotInfo(snapshot)
 	if info.error != nil {
-		if info.error.isRetryable() {
-			contextLogger.Error(info.error,
-				"Retryable snapshot provisioning error, trying again",
-				"volumeSnapshotName", snapshot.Name)
-			return &ctrl.Result{RequeueAfter: 10 * time.Second}, nil
-		}
-
-		return nil, info.error
+		return se.handleSnapshotErrors(ctx, backup, info.error)
 	}
 	if !info.provisioned {
 		contextLogger.Info(
@@ -562,20 +558,14 @@ func (se *Reconciler) waitSnapshotToBeProvisionedAndAnnotate(
 // SnapshotStartTimeAnnotationName and SnapshotEndTimeAnnotationName.
 func (se *Reconciler) waitSnapshotToBeReady(
 	ctx context.Context,
+	backup *apiv1.Backup,
 	snapshot *storagesnapshotv1.VolumeSnapshot,
 ) (*ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
 	info := parseVolumeSnapshotInfo(snapshot)
 	if info.error != nil {
-		if info.error.isRetryable() {
-			contextLogger.Error(info.error,
-				"Retryable snapshot provisioning error, trying again",
-				"volumeSnapshotName", snapshot.Name)
-			return &ctrl.Result{RequeueAfter: 10 * time.Second}, nil
-		}
-
-		return nil, info.error
+		return se.handleSnapshotErrors(ctx, backup, info.error)
 	}
 	if !info.ready {
 		contextLogger.Info(
@@ -587,4 +577,79 @@ func (se *Reconciler) waitSnapshotToBeReady(
 	}
 
 	return nil, nil
+}
+
+func (se *Reconciler) handleSnapshotErrors(
+	ctx context.Context,
+	backup *apiv1.Backup,
+	snapshotErr *volumeSnapshotError,
+) (*ctrl.Result, error) {
+	contextLogger := log.FromContext(ctx).
+		WithName("handle_snapshot_errors")
+
+	if !snapshotErr.isRetryable() {
+		return nil, snapshotErr
+	}
+
+	if err := addDeadlineStatus(ctx, se.cli, backup); err != nil {
+		return nil, fmt.Errorf("while adding deadline status: %w", err)
+	}
+
+	exceeded, err := isDeadlineExceeded(backup)
+	if err != nil {
+		return nil, fmt.Errorf("while checking if deadline was exceeded: %w", err)
+	}
+	if exceeded {
+		return nil, fmt.Errorf("deadline exceeded for error %w", snapshotErr)
+	}
+
+	contextLogger.Error(snapshotErr,
+		"Retryable snapshot provisioning error, trying again",
+	)
+	return &ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+}
+
+func isDeadlineExceeded(backup *apiv1.Backup) (bool, error) {
+	if backup.Status.PluginMetadata[pluginName] == "" {
+		return false, nil
+	}
+
+	var data metadata
+	if err := json.Unmarshal([]byte(backup.Status.PluginMetadata[pluginName]), &data); err != nil {
+		return false, fmt.Errorf("while unmarshalling metadata: %w", err)
+	}
+
+	if data.FirstFailure == 0 {
+		return false, fmt.Errorf("no firstFailure found in plugin metadata")
+	}
+
+	deadlineMinutes := backup.GetVolumeSnapshotDeadline()
+
+	// if deadlineMinutes have passed since firstFailureTime we need to consider the deadline exceeded
+	return time.Now().Unix()-data.FirstFailure > int64(deadlineMinutes*60), nil
+}
+
+type metadata struct {
+	FirstFailure int64 `json:"firstFailure,omitempty"`
+}
+
+func addDeadlineStatus(ctx context.Context, cli client.Client, backup *apiv1.Backup) error {
+	if _, ok := backup.Status.PluginMetadata[pluginName]; ok {
+		return nil
+	}
+
+	data := &metadata{FirstFailure: time.Now().Unix()}
+	rawData, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+
+	if backup.Status.PluginMetadata == nil {
+		backup.Status.PluginMetadata = map[string]string{}
+	}
+
+	origBackup := backup.DeepCopy()
+	backup.Status.PluginMetadata[pluginName] = string(rawData)
+
+	return cli.Status().Patch(ctx, backup, client.MergeFrom(origBackup))
 }
