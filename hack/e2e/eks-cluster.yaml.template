@@ -11,7 +11,7 @@ iam:
 
 managedNodeGroups:
   - name: default
-    instanceType: c6g.xlarge
+    instanceType: c6a.xlarge
     desiredCapacity: 3
 
 addons:
