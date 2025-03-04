@@ -24,6 +24,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/certs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // ClusterPodMonitorManager builds the PodMonitor for the cluster resource
@@ -74,7 +75,10 @@ func (c ClusterPodMonitorManager) BuildPodMonitor() *monitoringv1.PodMonitor {
 
 	spec := monitoringv1.PodMonitorSpec{
 		Selector: metav1.LabelSelector{
-			MatchLabels: meta.Labels,
+			MatchLabels: map[string]string{
+				utils.ClusterLabelName: c.cluster.Name,
+				utils.PodRoleLabelName: string(utils.PodRoleInstance),
+			},
 		},
 		PodMetricsEndpoints: []monitoringv1.PodMetricsEndpoint{endpoint},
 	}
