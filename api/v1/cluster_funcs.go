@@ -666,6 +666,20 @@ func (cluster *Cluster) GetMaxStopDelay() int32 {
 	return 1800
 }
 
+func (cluster *Cluster) GetReadOnlyDiskUsageThreshold() float64 {
+	if cluster.Spec.DiskWatcher != nil && cluster.Spec.DiskWatcher.ReadOnlyThreshold != nil {
+		return float64(*cluster.Spec.DiskWatcher.ReadOnlyThreshold)
+	}
+	return DefaultReadOnlyDiskUsageThreshold
+}
+
+func (cluster *Cluster) GetDiskWatcherCheckInterval() time.Duration {
+	if cluster.Spec.DiskWatcher != nil && cluster.Spec.DiskWatcher.DiskSpaceCheckInterval != nil {
+		return time.Duration(*cluster.Spec.DiskWatcher.DiskSpaceCheckInterval) * time.Second
+	}
+	return time.Duration(DefaultDiskWatcherCheckInterval) * time.Second
+}
+
 // GetSmartShutdownTimeout is used to ensure that smart shutdown timeout is a positive integer
 func (cluster *Cluster) GetSmartShutdownTimeout() int32 {
 	if cluster.Spec.SmartShutdownTimeout != nil {
