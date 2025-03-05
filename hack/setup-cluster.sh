@@ -33,7 +33,6 @@ EXTERNAL_ATTACHER_VERSION=v4.8.0
 K8S_VERSION=${K8S_VERSION-}
 KUBECTL_VERSION=${KUBECTL_VERSION-}
 CSI_DRIVER_HOST_PATH_VERSION=${CSI_DRIVER_HOST_PATH_VERSION:-$CSI_DRIVER_HOST_PATH_DEFAULT_VERSION}
-ENABLE_REGISTRY=${ENABLE_REGISTRY:-}
 ENABLE_PYROSCOPE=${ENABLE_PYROSCOPE:-}
 ENABLE_CSI_DRIVER=${ENABLE_CSI_DRIVER:-}
 ENABLE_APISERVER_AUDIT=${ENABLE_APISERVER_AUDIT:-}
@@ -189,35 +188,30 @@ EOF
     done
   fi
 
-  if [ -n "${DOCKER_REGISTRY_MIRROR:-}" ] || [ -n "${ENABLE_REGISTRY:-}" ]; then
-    # Add containerdConfigPatches section
-    cat >>"${config_file}" <<-EOF
+  # Add containerdConfigPatches section
+  cat >>"${config_file}" <<-EOF
 
 containerdConfigPatches:
 EOF
 
-    if [ -n "${DOCKER_REGISTRY_MIRROR:-}" ]; then
-      cat >>"${config_file}" <<-EOF
+  if [ -n "${DOCKER_REGISTRY_MIRROR:-}" ]; then
+    cat >>"${config_file}" <<-EOF
 - |-
   [plugins."io.containerd.grpc.v1.cri".registry.mirrors."docker.io"]
     endpoint = ["${DOCKER_REGISTRY_MIRROR}"]
 EOF
-    fi
+  fi
 
-    if [ -n "${ENABLE_REGISTRY:-}" ]; then
-      cat >>"${config_file}" <<-EOF
+  cat >>"${config_file}" <<-EOF
 - |-
   [plugins."io.containerd.grpc.v1.cri".registry.mirrors."${registry_name}:5000"]
     endpoint = ["http://${registry_name}:5000"]
 EOF
-    fi
-  fi
+
   # Create the cluster
   kind create cluster --name "${cluster_name}" --image "kindest/node:${k8s_version}" --config "${config_file}"
 
-  if [ -n "${ENABLE_REGISTRY:-}" ]; then
-    docker network connect "kind" "${registry_name}" &>/dev/null || true
-  fi
+  docker network connect "kind" "${registry_name}" &>/dev/null || true
 
   # Workaround for https://kind.sigs.k8s.io/docs/user/known-issues/#pod-errors-due-to-too-many-open-files
   for node in $(kind get nodes --name "${cluster_name}"); do
@@ -235,10 +229,6 @@ destroy_kind() {
   docker network disconnect "kind" "${registry_name}" &>/dev/null || true
   kind delete cluster --name "${cluster_name}" || true
   docker network rm "kind" &>/dev/null || true
-}
-
-check_registry_kind() {
-  [ -n "$(check_registry "kind")" ]
 }
 
 ##
@@ -259,8 +249,6 @@ install_kubectl() {
 # to have an easy way to refresh the operator version that is running
 # on the temporary cluster.
 ensure_registry() {
-  [ -z "${ENABLE_REGISTRY:-}" ] && return
-
   if ! docker volume inspect "${registry_volume}" &>/dev/null; then
     docker volume create "${registry_volume}"
   fi
@@ -274,24 +262,13 @@ ensure_registry() {
   fi
 }
 
-check_registry() {
-  local network=$1
-  docker network inspect "${network}" | \
-    jq -r ".[].Containers | .[] | select(.Name==\"${registry_name}\") | .Name"
-}
-
 # An existing builder will not have any knowledge of the local registry or the
 # any host outside the builder, but when having the builder inside Kubernetes
 # this is fixed since we already solved the issue of the kubernetes cluster reaching
 # out the local registry. The following functions will handle that builder
 create_builder() {
   docker buildx rm "${builder_name}" &>/dev/null || true
-  # If ENABLE_REGISTRY is not set, we don't need to define driver-opt network
-  if [ -n "${ENABLE_REGISTRY:-}" ]; then
-    docker buildx create --name "${builder_name}" --driver-opt "network=${registry_net}"
-  else
-    docker buildx create --name "${builder_name}"
-  fi
+  docker buildx create --name "${builder_name}" --driver-opt "network=${registry_net}"
 }
 
 deploy_fluentd() {
@@ -436,11 +413,7 @@ load_image_registry() {
 load_image() {
   local cluster_name=$1
   local image=$2
-  if [ -z "${ENABLE_REGISTRY:-}" ]; then
-    "load_image_kind" "${cluster_name}" "${image}"
-  else
-    load_image_registry "${image}"
-  fi
+  load_image_registry "${image}"
 }
 
 deploy_operator() {
@@ -455,7 +428,7 @@ Usage: $0 [-k <version>] [-r] <command>
 
 Commands:
     prepare <dest_dir>    Downloads the prerequisite into <dest_dir>
-    create                Create the test cluster
+    create                Create the test cluster and a local registry
     load                  Build and load the operator image in the cluster
     load-helper-images    Load the catalog of HELPER_IMGS into the local registry
     deploy                Deploy the operator manifests in the cluster
@@ -475,8 +448,6 @@ Options:
         <NODES>           Create a cluster with the required number of nodes.
                           Used only during "create" command. Default: 3
                           Env: NODES
-
-    -r|--registry         Enable local registry. Env: ENABLE_REGISTRY
 
 To use long options you need to have GNU enhanced getopt available, otherwise
 you can only use the short version of the options.
@@ -533,21 +504,14 @@ load() {
   # This code will NEVER run in the cloud CI/CD workflows, as there we do
   # the build and push (into GH test registry) once in `builds`, before
   # the strategy matrix blows up the number of executables
-  if [ -z "${ENABLE_REGISTRY}" ] && "check_registry_kind"; then
-    ENABLE_REGISTRY=true
-  fi
 
   create_builder
 
   echo "${bright}Building operator from current worktree${reset}"
 
-  CONTROLLER_IMG="$(ENABLE_REGISTRY="${ENABLE_REGISTRY}" print_image)"
+  CONTROLLER_IMG="$(print_image)"
   make -C "${ROOT_DIR}" CONTROLLER_IMG="${CONTROLLER_IMG}" insecure="true" \
     ARCH="${ARCH}" BUILDER_NAME=${builder_name} docker-build
-
-  if [ -z "${ENABLE_REGISTRY:-}" ]; then
-    "load_image_kind" "${CLUSTER_NAME}" "${CONTROLLER_IMG}"
-  fi
 
   echo "${bright}Loading new operator image on cluster ${CLUSTER_NAME}${reset}"
 
@@ -567,10 +531,6 @@ load() {
     make -C "${ROOT_DIR}" CONTROLLER_IMG="${PRIME_CONTROLLER_IMG}" VERSION="${PRIME_VERSION}" insecure="true" \
       ARCH="${ARCH}" BUILDER_NAME="${builder_name}" docker-build
 
-  if [ -z "${ENABLE_REGISTRY:-}" ]; then
-    "load_image_kind" "${CLUSTER_NAME}" "${CONTROLLER_IMG}"
-  fi
-
     echo "${bright}Done loading new 'prime' operator image on cluster ${CLUSTER_NAME}${reset}"
   fi
 
@@ -578,11 +538,7 @@ load() {
 }
 
 deploy() {
-  if [ -z "${ENABLE_REGISTRY}" ] && "check_registry_kind"; then
-    ENABLE_REGISTRY=true
-  fi
-
-  CONTROLLER_IMG="$(ENABLE_REGISTRY="${ENABLE_REGISTRY}" print_image)"
+  CONTROLLER_IMG="$(print_image)"
 
   echo "${bright}Deploying manifests from current worktree on cluster ${CLUSTER_NAME}${reset}"
 
@@ -592,11 +548,7 @@ deploy() {
 }
 
 print_image() {
-  local tag=devel
-  if [ -n "${ENABLE_REGISTRY:-}" ] || "check_registry_kind"; then
-    tag=latest
-  fi
-  echo "${registry_name}:5000/cloudnative-pg-testing:${tag}"
+  echo "${registry_name}:5000/cloudnative-pg-testing:latest"
 }
 
 export_logs() {
@@ -662,7 +614,7 @@ main() {
       ;;
     -r | --registry)
       shift
-      ENABLE_REGISTRY=true
+      # no-op, kept for compatibility
       ;;
     --)
       shift
