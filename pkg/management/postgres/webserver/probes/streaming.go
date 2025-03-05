@@ -30,7 +30,7 @@ type pgStreamingChecker struct {
 	maximumLag *uint64
 }
 
-// IsHealthy implements the Checker interface
+// IsHealthy implements the runner interface
 func (c pgStreamingChecker) IsHealthy(ctx context.Context, instance *postgres.Instance) error {
 	superUserDB, err := instance.GetSuperUserDB()
 	if err != nil {

@@ -25,7 +25,7 @@ import (
 // pgIsReadyChecker checks is PostgreSQL is ready
 type pgIsReadyChecker struct{}
 
-// IsHealthy implements the Checker interface
+// IsHealthy implements the runner interface
 func (pgIsReadyChecker) IsHealthy(_ context.Context, instance *postgres.Instance) error {
 	return instance.IsReady()
 }

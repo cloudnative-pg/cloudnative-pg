@@ -207,23 +207,6 @@ func (ws *remoteWebserverEndpoints) cleanupStaleCollections(ctx context.Context)
 
 // isServerStartedUp evaluates the liveness probe
 func (ws *remoteWebserverEndpoints) isServerStartedUp(w http.ResponseWriter, req *http.Request) {
-	var cluster apiv1.Cluster
-	if err := ws.typedClient.Get(req.Context(),
-		client.ObjectKey{
-			Namespace: ws.instance.GetNamespaceName(),
-			Name:      ws.instance.GetClusterName(),
-		},
-		&cluster,
-	); err != nil {
-		log.Warning("Startup check failed, cannot check Cluster definition", "err", err.Error())
-		http.Error(
-			w,
-			fmt.Sprintf("startup check failed (cannot get Cluster definition: %s)", err.Error()),
-			http.StatusInternalServerError,
-		)
-		return
-	}
-
 	// If `pg_rewind` is running, it means that the Pod is starting up.
 	// We need to report it healthy to avoid being killed by the kubelet.
 	if ws.instance.PgRewindIsRunning || ws.instance.MightBeUnavailable() {
@@ -232,24 +215,8 @@ func (ws *remoteWebserverEndpoints) isServerStartedUp(w http.ResponseWriter, req
 		return
 	}
 
-	var startupProbe *apiv1.ProbeWithStrategy
-	if cluster.Spec.Probes != nil {
-		startupProbe = cluster.Spec.Probes.Startup
-	}
-
-	probe := probes.ForStrategy(startupProbe)
-	if err := probe.IsHealthy(req.Context(), ws.instance); err != nil {
-		log.Warning("Startup probe failing", "err", err.Error())
-		http.Error(
-			w,
-			fmt.Sprintf("startup check failed: %s", err.Error()),
-			http.StatusInternalServerError,
-		)
-		return
-	}
-
-	log.Trace("Startup probe succeeding")
-	_, _ = fmt.Fprint(w, "OK")
+	checker := probes.NewChecker(ws.typedClient, ws.instance)
+	checker.IsHealthy(req.Context(), w, probes.ProbeTypeStartup)
 }
 
 func (ws *remoteWebserverEndpoints) isServerHealthy(w http.ResponseWriter, _ *http.Request) {
@@ -263,40 +230,8 @@ func (ws *remoteWebserverEndpoints) isServerReady(w http.ResponseWriter, req *ht
 		return
 	}
 
-	var cluster apiv1.Cluster
-	if err := ws.typedClient.Get(req.Context(),
-		client.ObjectKey{
-			Namespace: ws.instance.GetNamespaceName(),
-			Name:      ws.instance.GetClusterName(),
-		},
-		&cluster,
-	); err != nil {
-		log.Warning("Readiness check failed, cannot check Cluster definition", "err", err.Error())
-		http.Error(
-			w,
-			fmt.Sprintf("Readiness check failed cannot get Cluster definition: '%s'", err.Error()),
-			http.StatusInternalServerError,
-		)
-		return
-	}
-
-	var readinessProbe *apiv1.ProbeWithStrategy
-	if cluster.Spec.Probes != nil {
-		readinessProbe = cluster.Spec.Probes.Readiness
-	}
-	probe := probes.ForStrategy(readinessProbe)
-	if err := probe.IsHealthy(req.Context(), ws.instance); err != nil {
-		log.Info("Readiness check failed", "err", err.Error())
-		http.Error(
-			w,
-			fmt.Sprintf("readiness check failed: '%s'", err.Error()),
-			http.StatusInternalServerError,
-		)
-		return
-	}
-
-	log.Trace("Readiness probe succeeding")
-	_, _ = fmt.Fprint(w, "OK")
+	checker := probes.NewChecker(ws.typedClient, ws.instance)
+	checker.IsHealthy(req.Context(), w, probes.ProbeTypeReadiness)
 }
 
 // This probe is for the instance status, including replication
