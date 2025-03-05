@@ -56,14 +56,8 @@ All flags have corresponding environment variables labeled `(Env:...` in the tab
 
 | Flags | Usage                                                                                                                         |
 |-------|-------------------------------------------------------------------------------------------------------------------------------|
-| -r    |--registry                       | Enable local registry. (Env: `ENABLE_REGISTRY`)                                                                               |
 | -k    |--k8s-version <K8S_VERSION>      | Use the specified Kubernetes full version number (e.g., `-k v1.30.0`). (Env: `K8S_VERSION`)                                   |
 | -n    |--nodes <NODES>                  | Create a cluster with the required number of nodes. Used only during "create" command. Default: 3 (Env: `NODES`)              |
-
-
-> **NOTE:** if you want to use custom engine and registry settings, please make
-> sure that they are consistent through all invocations either via command line
-> options or by defining the respective environment variables
 
 > **NOTE:** on ARM64 architecture like Apple M1/M2/M3, `kind` provides different
 > images for AMD64 and ARM64 nodes. If the **x86/amd64 emulation** is not enabled,
