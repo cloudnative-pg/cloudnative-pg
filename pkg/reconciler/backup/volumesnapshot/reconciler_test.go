@@ -486,11 +486,11 @@ var _ = Describe("addDeadlineStatus", func() {
 		Expect(err).ToNot(HaveOccurred())
 		Expect(updatedBackup.Status.PluginMetadata).To(HaveKey(pluginName))
 		Expect(updatedBackup.Status.PluginMetadata[pluginName]).ToNot(BeEmpty())
-		Expect(updatedBackup.Status.PluginMetadata[pluginName]).To(MatchRegexp(`{"firstFailure":\d+}`))
+		Expect(updatedBackup.Status.PluginMetadata[pluginName]).To(MatchRegexp(`{"volumeSnapshotFirstFailure":\d+}`))
 	})
 
 	It("should not modify deadline status if already present", func() {
-		backup.Status.PluginMetadata[pluginName] = `{"firstFailure": 1234567890}`
+		backup.Status.PluginMetadata[pluginName] = `{"volumeSnapshotFirstFailure": 1234567890}`
 		err := cli.Status().Update(ctx, backup)
 		Expect(err).ToNot(HaveOccurred())
 
@@ -500,7 +500,7 @@ var _ = Describe("addDeadlineStatus", func() {
 		var updatedBackup apiv1.Backup
 		err = cli.Get(ctx, types.NamespacedName{Name: backup.Name, Namespace: backup.Namespace}, &updatedBackup)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(updatedBackup.Status.PluginMetadata[pluginName]).To(Equal(`{"firstFailure": 1234567890}`))
+		Expect(updatedBackup.Status.PluginMetadata[pluginName]).To(Equal(`{"volumeSnapshotFirstFailure": 1234567890}`))
 	})
 })
 
@@ -515,10 +515,9 @@ var _ = Describe("isDeadlineExceeded", func() {
 		}
 	})
 
-	It("should return false if plugin metadata is empty", func() {
-		exceeded, err := isDeadlineExceeded(backup)
-		Expect(err).ToNot(HaveOccurred())
-		Expect(exceeded).To(BeFalse())
+	It("should return an error if plugin metadata is empty", func() {
+		_, err := isDeadlineExceeded(backup)
+		Expect(err).To(HaveOccurred())
 	})
 
 	It("should return error if unmarshalling fails", func() {
@@ -528,7 +527,7 @@ var _ = Describe("isDeadlineExceeded", func() {
 		Expect(exceeded).To(BeFalse())
 	})
 
-	It("should return error if no firstFailure found in plugin metadata", func() {
+	It("should return error if no volumeSnapshotFirstFailure found in plugin metadata", func() {
 		backup.Status.PluginMetadata[pluginName] = `{}`
 		exceeded, err := isDeadlineExceeded(backup)
 		Expect(err).To(HaveOccurred())
@@ -536,7 +535,7 @@ var _ = Describe("isDeadlineExceeded", func() {
 	})
 
 	It("should return false if deadline has not exceeded", func() {
-		data := metadata{FirstFailure: time.Now().Unix()}
+		data := metadata{VolumeSnapshotFirstDetectedFailure: time.Now().Unix()}
 		rawData, _ := json.Marshal(data)
 		backup.Status.PluginMetadata[pluginName] = string(rawData)
 		backup.Annotations = map[string]string{utils.BackupVolumeSnapshotDeadlineAnnotationName: "10"}
@@ -547,7 +546,7 @@ var _ = Describe("isDeadlineExceeded", func() {
 	})
 
 	It("should return true if deadline has exceeded", func() {
-		data := metadata{FirstFailure: time.Now().Add(-20 * time.Minute).Unix()}
+		data := metadata{VolumeSnapshotFirstDetectedFailure: time.Now().Add(-20 * time.Minute).Unix()}
 		rawData, _ := json.Marshal(data)
 		backup.Status.PluginMetadata[pluginName] = string(rawData)
 		backup.Annotations = map[string]string{utils.BackupVolumeSnapshotDeadlineAnnotationName: "10"}
@@ -555,5 +554,35 @@ var _ = Describe("isDeadlineExceeded", func() {
 		exceeded, err := isDeadlineExceeded(backup)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(exceeded).To(BeTrue())
+	})
+})
+
+var _ = Describe("unmarshalMetadata", func() {
+	It("should unmarshal valid metadata correctly", func() {
+		rawData := `{"volumeSnapshotFirstFailure": 1234567890}`
+		data, err := unmarshalMetadata(rawData)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(data.VolumeSnapshotFirstDetectedFailure).To(Equal(int64(1234567890)))
+	})
+
+	It("should return an error if rawData is invalid JSON", func() {
+		rawData := `invalid-json`
+		data, err := unmarshalMetadata(rawData)
+		Expect(err).To(HaveOccurred())
+		Expect(data).To(BeNil())
+	})
+
+	It("should return an error if volumeSnapshotFirstFailure is missing", func() {
+		rawData := `{}`
+		data, err := unmarshalMetadata(rawData)
+		Expect(err).To(HaveOccurred())
+		Expect(data).To(BeNil())
+	})
+
+	It("should return an error if volumeSnapshotFirstFailure is zero", func() {
+		rawData := `{"volumeSnapshotFirstFailure": 0}`
+		data, err := unmarshalMetadata(rawData)
+		Expect(err).To(HaveOccurred())
+		Expect(data).To(BeNil())
 	})
 })
