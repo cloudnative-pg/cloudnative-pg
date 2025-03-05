@@ -229,7 +229,7 @@ generate: controller-gen ## Generate code.
 
 deploy-locally: kind-cluster ## Build and deploy operator in local cluster
 	set -e ;\
-	hack/setup-cluster.sh -n1 -r load deploy
+	hack/setup-cluster.sh -n1 load deploy
 
 olm-scorecard: operator-sdk ## Run the Scorecard test from operator-sdk
 	$(OPERATOR_SDK) scorecard ${BUNDLE_IMG} --wait-time 60s --verbose
@@ -351,11 +351,11 @@ endef
 
 kind-cluster: ## Create KinD cluster to run operator locally
 	set -e ;\
-	hack/setup-cluster.sh -n1 -r create
+	hack/setup-cluster.sh -n1 create
 
 kind-cluster-destroy: ## Destroy KinD cluster created using kind-cluster command
 	set -e ;\
-	hack/setup-cluster.sh -n1 -r destroy
+	hack/setup-cluster.sh -n1 destroy
 
 .PHONY: operator-sdk
 OPERATOR_SDK = $(LOCALBIN)/operator-sdk
