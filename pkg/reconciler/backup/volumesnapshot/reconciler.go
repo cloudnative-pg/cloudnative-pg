@@ -611,34 +611,46 @@ func (se *Reconciler) handleSnapshotErrors(
 
 func isDeadlineExceeded(backup *apiv1.Backup) (bool, error) {
 	if backup.Status.PluginMetadata[pluginName] == "" {
-		return false, nil
+		return false, fmt.Errorf("no plugin metadata found in backup status")
 	}
 
-	var data metadata
-	if err := json.Unmarshal([]byte(backup.Status.PluginMetadata[pluginName]), &data); err != nil {
-		return false, fmt.Errorf("while unmarshalling metadata: %w", err)
-	}
-
-	if data.FirstFailure == 0 {
-		return false, fmt.Errorf("no firstFailure found in plugin metadata")
+	data, err := unmarshalMetadata(backup.Status.PluginMetadata[pluginName])
+	if err != nil {
+		return false, fmt.Errorf("while unmarshalling plugin metadata: %w", err)
 	}
 
 	deadlineMinutes := backup.GetVolumeSnapshotDeadline()
 
 	// if deadlineMinutes have passed since firstFailureTime we need to consider the deadline exceeded
-	return time.Now().Unix()-data.FirstFailure > int64(deadlineMinutes*60), nil
+	return time.Now().Unix()-data.VolumeSnapshotFirstDetectedFailure > int64(deadlineMinutes*60), nil
 }
 
 type metadata struct {
-	FirstFailure int64 `json:"firstFailure,omitempty"`
+	// VolumeSnapshotFirstDetectedFailure is UNIX the timestamp when the first volume snapshot failure was detected
+	VolumeSnapshotFirstDetectedFailure int64 `json:"volumeSnapshotFirstFailure,omitempty"`
+}
+
+func unmarshalMetadata(rawData string) (*metadata, error) {
+	var data metadata
+	if err := json.Unmarshal([]byte(rawData), &data); err != nil {
+		return nil, fmt.Errorf("while unmarshalling metadata: %w", err)
+	}
+
+	if data.VolumeSnapshotFirstDetectedFailure == 0 {
+		return nil, fmt.Errorf("no volumeSnapshotFirstFailure found in plugin metadata: %s", pluginName)
+	}
+
+	return &data, nil
 }
 
 func addDeadlineStatus(ctx context.Context, cli client.Client, backup *apiv1.Backup) error {
-	if _, ok := backup.Status.PluginMetadata[pluginName]; ok {
-		return nil
+	if value, ok := backup.Status.PluginMetadata[pluginName]; ok {
+		if _, err := unmarshalMetadata(value); err == nil {
+			return nil
+		}
 	}
 
-	data := &metadata{FirstFailure: time.Now().Unix()}
+	data := &metadata{VolumeSnapshotFirstDetectedFailure: time.Now().Unix()}
 	rawData, err := json.Marshal(data)
 	if err != nil {
 		return err
