@@ -215,7 +215,7 @@ func (ws *remoteWebserverEndpoints) isServerStartedUp(w http.ResponseWriter, req
 		},
 		&cluster,
 	); err != nil {
-		log.Info("Startup check failed, cannot check Cluster definition", "err", err)
+		log.Warning("Startup check failed, cannot check Cluster definition", "err", err.Error())
 		http.Error(
 			w,
 			fmt.Sprintf("startup check failed (cannot get Cluster definition: %s)", err.Error()),
@@ -236,9 +236,10 @@ func (ws *remoteWebserverEndpoints) isServerStartedUp(w http.ResponseWriter, req
 	if cluster.Spec.Probes != nil {
 		startupProbe = cluster.Spec.Probes.Startup
 	}
-	checker := probes.ForConfiguration(startupProbe)
-	if err := checker.Evaluate(req.Context(), ws.instance); err != nil {
-		log.Info("Startup probe failing", "err", err.Error())
+
+	probe := probes.ForStrategy(startupProbe)
+	if err := probe.IsHealthy(req.Context(), ws.instance); err != nil {
+		log.Warning("Startup probe failing", "err", err.Error())
 		http.Error(
 			w,
 			fmt.Sprintf("startup check failed: %s", err.Error()),
@@ -270,10 +271,10 @@ func (ws *remoteWebserverEndpoints) isServerReady(w http.ResponseWriter, req *ht
 		},
 		&cluster,
 	); err != nil {
-		log.Info("Readiness check failed, cannot check Cluster definition", "err", err)
+		log.Warning("Readiness check failed, cannot check Cluster definition", "err", err.Error())
 		http.Error(
 			w,
-			fmt.Sprintf("Readiness check failed (cannot get Cluster definition: %s)", err.Error()),
+			fmt.Sprintf("Readiness check failed cannot get Cluster definition: '%s'", err.Error()),
 			http.StatusInternalServerError,
 		)
 		return
@@ -283,12 +284,12 @@ func (ws *remoteWebserverEndpoints) isServerReady(w http.ResponseWriter, req *ht
 	if cluster.Spec.Probes != nil {
 		readinessProbe = cluster.Spec.Probes.Readiness
 	}
-	checker := probes.ForConfiguration(readinessProbe)
-	if err := checker.Evaluate(req.Context(), ws.instance); err != nil {
-		log.Info("Readiness probe failing", "err", err.Error())
+	probe := probes.ForStrategy(readinessProbe)
+	if err := probe.IsHealthy(req.Context(), ws.instance); err != nil {
+		log.Info("Readiness check failed", "err", err.Error())
 		http.Error(
 			w,
-			fmt.Sprintf("readiness check failed: %s", err.Error()),
+			fmt.Sprintf("readiness check failed: '%s'", err.Error()),
 			http.StatusInternalServerError,
 		)
 		return

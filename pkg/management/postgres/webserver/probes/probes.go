@@ -27,29 +27,29 @@ import (
 
 // Checker is implemented by probe strategies
 type Checker interface {
-	// Evaluate evaluate the status of PostgreSQL. If the probe is positive,
+	// IsHealthy evaluates the status of PostgreSQL. If the probe is positive,
 	// it returns a nil error, otherwise the error status describes why
 	// the probe is failing
-	Evaluate(ctx context.Context, instance *postgres.Instance) error
+	IsHealthy(ctx context.Context, instance *postgres.Instance) error
 }
 
-// ForConfiguration returns the correct checker for the passed
-// probe
-func ForConfiguration(probe *apiv1.ProbeWithStrategy) Checker {
+// ForStrategy returns the correct checker for the passed
+// probe strategy
+func ForStrategy(probe *apiv1.ProbeWithStrategy) Checker {
 	switch {
 	case probe == nil:
-		return PgIsReadyChecker{}
+		return pgIsReadyChecker{}
 	case probe.Type == apiv1.ProbeStrategyPgIsReady:
-		return PgIsReadyChecker{}
+		return pgIsReadyChecker{}
 	case probe.Type == apiv1.ProbeStrategyQuery:
-		return PgQueryChecker{}
+		return pgQueryChecker{}
 	case probe.Type == apiv1.ProbeStrategyStreaming:
-		result := PgStreamingChecker{}
+		result := pgStreamingChecker{}
 		if probe.MaximumLag != nil {
-			result.MaximumLag = ptr.To(probe.MaximumLag.AsDec().UnscaledBig().Uint64())
+			result.maximumLag = ptr.To(probe.MaximumLag.AsDec().UnscaledBig().Uint64())
 		}
 		return result
 	}
 
-	return PgIsReadyChecker{}
+	return pgIsReadyChecker{}
 }

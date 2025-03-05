@@ -23,13 +23,11 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
 
-// PgQueryChecker checks if the PostgreSQL server can execute a simple query
-type PgQueryChecker struct {
-	MaximumLag *int64
-}
+// pgQueryChecker checks if the PostgreSQL server can execute a simple query
+type pgQueryChecker struct{}
 
-// Evaluate implements the Checker interface
-func (c PgQueryChecker) Evaluate(ctx context.Context, instance *postgres.Instance) error {
+// IsHealthy implements the Checker interface
+func (c pgQueryChecker) IsHealthy(ctx context.Context, instance *postgres.Instance) error {
 	superUserDB, err := instance.GetSuperUserDB()
 	if err != nil {
 		return fmt.Errorf("while getting superuser connection pool: %w", err)
