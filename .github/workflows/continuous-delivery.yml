@@ -654,19 +654,12 @@ jobs:
           username: ${{ env.REGISTRY_USER }}
           password: ${{ env.REGISTRY_PASSWORD }}
       -
-        # 'Retry' preparing the E2E test ENV
-        name: Prepare the environment
-        uses: nick-fields/retry@v3
+        name: Install Kind
+        uses: helm/kind-action@v1.12.0
         with:
-          timeout_seconds: 300
-          max_attempts: 3
-          on_retry_command: |
-            # Clear-ups before retries
-            sudo rm -rf /usr/local/bin/kind /usr/local/bin/kubectl
-          command: |
-            sudo apt-get update
-            sudo apt-get install -y gettext-base
-            sudo hack/setup-cluster.sh prepare /usr/local/bin
+          install_only: true
+          version: ${{ env.KIND_VERSION }}
+          kubectl_version: ${{ env.K8S_VERSION }}
       -
         name: Prepare patch for customization
         env:
