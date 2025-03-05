@@ -187,8 +187,11 @@ Each extension entry supports the following properties:
 - `schema` *(optional)*: The schema in which the extension should be installed.
 
 !!! Info
-    CloudNativePG manages extensions using PostgreSQL’s `CREATE EXTENSION`,
-    `ALTER EXTENSION`, and `DROP EXTENSION` SQL commands.
+    CloudNativePG manages extensions using the following PostgreSQL’s SQL commands:
+    [`CREATE EXTENSION`](https://www.postgresql.org/docs/current/sql-createextension.html),
+    [`DROP EXTENSION`](https://www.postgresql.org/docs/current/sql-dropextension.html),
+    [`ALTER EXTENSION`](https://www.postgresql.org/docs/current/sql-alterextension.html)
+    (limited to `UPDATE TO` and `SET SCHEMA`).
 
 The operator reconciles only the extensions explicitly listed in
 `spec.extensions`. Any existing extensions not specified in this list remain
