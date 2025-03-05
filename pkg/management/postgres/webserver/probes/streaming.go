@@ -24,22 +24,22 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
 
-// PgStreamingChecker checks if the replica is connected via streaming
+// pgStreamingChecker checks if the replica is connected via streaming
 // replication and, optionally, if the lag is within the specified maximum
-type PgStreamingChecker struct {
-	MaximumLag *uint64
+type pgStreamingChecker struct {
+	maximumLag *uint64
 }
 
-// Evaluate implements the Checker interface
-func (c PgStreamingChecker) Evaluate(ctx context.Context, instance *postgres.Instance) error {
+// IsHealthy implements the Checker interface
+func (c pgStreamingChecker) IsHealthy(ctx context.Context, instance *postgres.Instance) error {
 	superUserDB, err := instance.GetSuperUserDB()
 	if err != nil {
 		return fmt.Errorf("while getting superuser connection pool: %w", err)
 	}
 
 	var configuredLag uint64 = math.MaxUint64
-	if c.MaximumLag != nil {
-		configuredLag = *c.MaximumLag
+	if c.maximumLag != nil {
+		configuredLag = *c.maximumLag
 	}
 
 	// At this point, the instance is already running.

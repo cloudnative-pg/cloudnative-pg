@@ -22,10 +22,10 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
 
-// PgIsReadyChecker checks is PostgreSQL is ready
-type PgIsReadyChecker struct{}
+// pgIsReadyChecker checks is PostgreSQL is ready
+type pgIsReadyChecker struct{}
 
-// Evaluate implements the Checker interface
-func (PgIsReadyChecker) Evaluate(_ context.Context, instance *postgres.Instance) error {
+// IsHealthy implements the Checker interface
+func (pgIsReadyChecker) IsHealthy(_ context.Context, instance *postgres.Instance) error {
 	return instance.IsReady()
 }
