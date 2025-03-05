@@ -54,8 +54,7 @@ TEMP_DIR="$(mktemp -d)"
 LOG_DIR=${LOG_DIR:-$ROOT_DIR/_logs/}
 trap 'rm -fr ${TEMP_DIR}' EXIT
 
-# Operating System and Architecture
-OS=$(uname | tr '[:upper:]' '[:lower:]')
+# Architecture
 ARCH=$(uname -m)
 case $ARCH in
   x86_64) ARCH="amd64" ;;
@@ -99,21 +98,6 @@ fi
 ##
 ## KIND SUPPORT
 ##
-
-install_kind() {
-  local bindir=$1
-  local binary="${bindir}/kind"
-  local version
-
-  # Get the latest release of kind unless specified in the environment
-  version=${KIND_VERSION:-$(
-    curl -s -LH "Accept:application/json" https://github.com/kubernetes-sigs/kind/releases/latest |
-      sed 's/.*"tag_name":"\([^"]\+\)".*/\1/'
-  )}
-
-  curl -s -L "https://kind.sigs.k8s.io/dl/${version}/kind-${OS}-${ARCH}" -o "${binary}"
-  chmod +x "${binary}"
-}
 
 load_image_kind() {
   local cluster_name=$1
@@ -234,15 +218,6 @@ destroy_kind() {
 ##
 ## GENERIC ROUTINES
 ##
-
-install_kubectl() {
-  local bindir=$1
-
-  local binary="${bindir}/kubectl"
-
-  curl -sL "https://dl.k8s.io/release/v${KUBECTL_VERSION#v}/bin/${OS}/${ARCH}/kubectl" -o "${binary}"
-  chmod +x "${binary}"
-}
 
 # The following function makes sure we already have a Docker container
 # with a bound volume to act as local registry. This is really needed
@@ -427,7 +402,6 @@ usage() {
 Usage: $0 [-k <version>] [-r] <command>
 
 Commands:
-    prepare <dest_dir>    Downloads the prerequisite into <dest_dir>
     create                Create the test cluster and a local registry
     load                  Build and load the operator image in the cluster
     load-helper-images    Load the catalog of HELPER_IMGS into the local registry
@@ -458,14 +432,6 @@ EOF
 ##
 ## COMMANDS
 ##
-
-prepare() {
-  local bindir=$1
-  echo "${bright}Installing cluster prerequisites in ${bindir}${reset}"
-  install_kubectl "${bindir}"
-  "install_kind" "${bindir}"
-  echo "${bright}Done installing cluster prerequisites in ${bindir}${reset}"
-}
 
 create() {
   echo "${bright}Creating kind cluster ${CLUSTER_NAME} with version ${K8S_VERSION}${reset}"
@@ -645,16 +611,6 @@ main() {
 
     # Invoke the command
     case "$command" in
-    prepare)
-      if [ "$#" -eq 0 ]; then
-        echo "ERROR: prepare requires a destination directory" >&2
-        echo >&2
-        usage
-      fi
-      dest_dir=$1
-      shift
-      prepare "${dest_dir}"
-      ;;
 
     create | load | load-helper-images | deploy | print-image | export-logs | destroy | pyroscope)
       ensure_registry
