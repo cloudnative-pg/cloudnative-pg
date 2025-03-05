@@ -70,6 +70,30 @@ func (o OnlineConfiguration) GetImmediateCheckpoint() bool {
 	return *o.ImmediateCheckpoint
 }
 
+// GetRetryConfiguration returns the retry configuration for this volume snapshot
+// configuration. If no configuration is specified, returns nil.
+func (configuration *VolumeSnapshotConfiguration) GetRetryConfiguration() *VolumeSnapshotRetryConfiguration {
+	return configuration.RetryConfiguration
+}
+
+// GetDeadline returns the deadline for volume snapshot operations.
+// If no deadline is specified, returns the default value.
+func (c *VolumeSnapshotRetryConfiguration) GetDeadline() string {
+	if c == nil || c.Deadline == "" {
+		return DefaultVolumeSnapshotDeadline
+	}
+	return c.Deadline
+}
+
+// GetMaxRetries returns the maximum number of retries for snapshot operations.
+// If not specified, returns the default value.
+func (c *VolumeSnapshotRetryConfiguration) GetMaxRetries() int {
+	if c == nil {
+		return DefaultVolumeSnapshotMaxRetries
+	}
+	return c.MaxRetries
+}
+
 // GetPluginConfigurationEnabledPluginNames gets the name of the plugins that are involved
 // in the reconciliation of this cluster
 func GetPluginConfigurationEnabledPluginNames(pluginList []PluginConfiguration) (result []string) {

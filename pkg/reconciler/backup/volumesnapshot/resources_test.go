@@ -23,6 +23,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -34,7 +36,20 @@ var _ = Describe("parseVolumeSnapshotInfo", func() {
 			error:       nil,
 			provisioned: false,
 			ready:       false,
+			retryCount:  0,
 		}))
+	})
+
+	It("should track retry count from annotations", func() {
+		volumeSnapshot := &storagesnapshotv1.VolumeSnapshot{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					RetryCountAnnotation: "3",
+				},
+			},
+		}
+		info := parseVolumeSnapshotInfo(volumeSnapshot)
+		Expect(info.retryCount).To(Equal(3))
 	})
 
 	It("should gracefully handle snapshot errors", func() {
@@ -61,7 +76,7 @@ var _ = Describe("parseVolumeSnapshotInfo", func() {
 		Expect(err.InternalError).To(BeEquivalentTo(*volumeSnapshot.Status.Error))
 		Expect(err.Name).To(BeEquivalentTo("snapshot"))
 		Expect(err.Namespace).To(BeEquivalentTo("default"))
-		Expect(err.isRetryable()).To(BeFalse())
+		Expect(err.isRetryable(nil, 0)).To(BeFalse())
 	})
 
 	It("should detect retryable errors", func() {
@@ -81,7 +96,7 @@ var _ = Describe("parseVolumeSnapshotInfo", func() {
 		info := parseVolumeSnapshotInfo(volumeSnapshot)
 
 		Expect(info.error).To(HaveOccurred())
-		Expect(info.error.isRetryable()).To(BeTrue())
+		Expect(info.error.isRetryable(nil, 0)).To(BeTrue())
 		Expect(info.ready).To(BeFalse())
 		Expect(info.provisioned).To(BeFalse())
 
@@ -190,6 +205,73 @@ var _ = Describe("parseVolumeSnapshotInfo", func() {
 			info := parseVolumeSnapshotInfo(volumeSnapshot)
 			Expect(info.provisioned).To(BeTrue())
 			Expect(info.ready).To(BeTrue())
+		})
+	})
+
+	_ = Describe("VolumeSnapshotRetryConfiguration", func() {
+		var (
+			retryConfig  *apiv1.VolumeSnapshotRetryConfiguration
+			errorMsg     string
+			vsError      *volumeSnapshotError
+			creationTime metav1.Time
+		)
+
+		BeforeEach(func() {
+			creationTime = metav1.Now()
+			errorMsg = "context deadline exceeded"
+			retryConfig = &apiv1.VolumeSnapshotRetryConfiguration{
+				Deadline:   "5m",
+				MaxRetries: 3,
+			}
+
+			vsError = &volumeSnapshotError{
+				InternalError: storagesnapshotv1.VolumeSnapshotError{
+					Message: &errorMsg,
+					Time:    &creationTime,
+				},
+				Name:      "test-snapshot",
+				Namespace: "test-namespace",
+			}
+		})
+
+		Context("retry behavior with configuration", func() {
+			It("allows retries when within deadline and under max retries", func() {
+				isRetryable := vsError.isRetryable(retryConfig, 0)
+				Expect(isRetryable).To(BeTrue())
+			})
+
+			It("doesn't retry when max retries is reached", func() {
+				isRetryable := vsError.isRetryable(retryConfig, 3)
+				Expect(isRetryable).To(BeFalse())
+			})
+		})
+
+		Context("with default values", func() {
+			It("retries when configuration is nil", func() {
+				// If no config is specified, the error message is still checked
+				errorMsg = "context deadline exceeded"
+				vsError = &volumeSnapshotError{
+					InternalError: storagesnapshotv1.VolumeSnapshotError{
+						Message: &errorMsg,
+					},
+				}
+
+				// Should retry based on the error message pattern
+				isRetryable := vsError.isRetryable(nil, 0)
+				Expect(isRetryable).To(BeTrue())
+
+				// Change to a non-retryable message
+				errorMsg = "access denied"
+				nonRetryableError := &volumeSnapshotError{
+					InternalError: storagesnapshotv1.VolumeSnapshotError{
+						Message: &errorMsg,
+					},
+				}
+
+				// Should not retry
+				isRetryable = nonRetryableError.isRetryable(nil, 0)
+				Expect(isRetryable).To(BeFalse())
+			})
 		})
 	})
 })

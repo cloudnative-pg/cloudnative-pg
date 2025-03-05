@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -36,8 +37,15 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/client/remote"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/backup/volumesnapshot/metrics"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+)
+
+// Constants for the volumesnapshot reconciler
+const (
+	// defaultRetryInterval is the time to wait before retrying a snapshot operation
+	defaultRetryInterval = 10 * time.Second
 )
 
 // Reconciler is an object capable of executing a volume snapshot on a running cluster
@@ -186,7 +194,7 @@ func (se *Reconciler) Reconcile(
 		// let's stop this reconciliation loop and wait for
 		// the external snapshot controller to catch this new
 		// request
-		return &ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+		return &ctrl.Result{RequeueAfter: defaultRetryInterval}, nil
 	}
 
 	// Step 3: wait for snapshots to be provisioned
@@ -505,14 +513,71 @@ func (se *Reconciler) waitSnapshotToBeProvisionedAndAnnotate(
 ) (*ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
+	// Extract the retry configuration from the cluster
+	var retryConfig *apiv1.VolumeSnapshotRetryConfiguration
+	if clusterName, ok := snapshot.Labels[utils.ClusterLabelName]; ok {
+		var cluster apiv1.Cluster
+		if err := se.cli.Get(ctx, client.ObjectKey{
+			Namespace: snapshot.Namespace,
+			Name:      clusterName,
+		}, &cluster); err == nil {
+			if cluster.Spec.Backup != nil &&
+				cluster.Spec.Backup.VolumeSnapshot != nil &&
+				cluster.Spec.Backup.VolumeSnapshot.RetryConfiguration != nil {
+				retryConfig = cluster.Spec.Backup.VolumeSnapshot.RetryConfiguration
+			}
+		}
+	}
+
 	info := parseVolumeSnapshotInfo(snapshot)
 	if info.error != nil {
-		if info.error.isRetryable() {
+		if info.error.isRetryable(retryConfig, info.retryCount) {
+			// Record metrics for this retry
+			metrics.RecordRetry(snapshot.Namespace, snapshot.Name, metrics.PhaseProvisioning)
+
+			// Record error-specific metrics
+			errorType := "unknown"
+			if err := info.error; err != nil {
+				if errors.Is(err, context.DeadlineExceeded) {
+					errorType = "context.DeadlineExceeded"
+				} else if errors.Is(err, context.Canceled) {
+					errorType = "context.Canceled"
+				} else {
+					errorType = fmt.Sprintf("%T", err)
+				}
+			}
+			metrics.RecordRetryWithError(snapshot.Namespace, snapshot.Name,
+				metrics.PhaseProvisioning, errorType)
+
+			// Calculate and record duration for this retry operation
+			startTime := time.Now().Add(-defaultRetryInterval) // Estimate based on requeue time
+			if creationTime := snapshot.GetCreationTimestamp(); !creationTime.IsZero() {
+				startTime = creationTime.Time
+			}
+			metrics.RecordRetryDuration(snapshot.Namespace, snapshot.Name,
+				metrics.PhaseProvisioning, time.Since(startTime).Seconds())
+
+			// Increment the retry count and store it in the annotation
+			oldSnapshot := snapshot.DeepCopy()
+			if snapshot.Annotations == nil {
+				snapshot.Annotations = make(map[string]string)
+			}
+			snapshot.Annotations[RetryCountAnnotation] = strconv.Itoa(info.retryCount + 1)
+
+			// Try to patch the snapshot to update the retry count
+			if err := se.cli.Patch(ctx, snapshot, client.MergeFrom(oldSnapshot)); err != nil {
+				contextLogger.Error(err, "failed to update retry count annotation")
+			}
+
 			contextLogger.Error(info.error,
 				"Retryable snapshot provisioning error, trying again",
-				"volumeSnapshotName", snapshot.Name)
-			return &ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+				"volumeSnapshotName", snapshot.Name,
+				"retryCount", info.retryCount)
+			return &ctrl.Result{RequeueAfter: defaultRetryInterval}, nil
 		}
+
+		// Record failure metrics if maximum retries exceeded
+		metrics.RecordFailed(snapshot.Namespace, snapshot.Name, metrics.PhaseProvisioning)
 
 		return nil, info.error
 	}
@@ -520,7 +585,7 @@ func (se *Reconciler) waitSnapshotToBeProvisionedAndAnnotate(
 		contextLogger.Info(
 			"Waiting for VolumeSnapshot to be provisioned",
 			"volumeSnapshotName", snapshot.Name)
-		return &ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+		return &ctrl.Result{RequeueAfter: defaultRetryInterval}, nil
 	}
 
 	_, hasTimeAnnotation := snapshot.Annotations[utils.SnapshotEndTimeAnnotationName]
@@ -528,6 +593,9 @@ func (se *Reconciler) waitSnapshotToBeProvisionedAndAnnotate(
 		oldSnapshot := snapshot.DeepCopy()
 		// as soon as the volume snapshot has stopped running, we should update its
 		// snapshotEndTime annotation
+		if snapshot.Annotations == nil {
+			snapshot.Annotations = make(map[string]string)
+		}
 		snapshot.Annotations[utils.SnapshotEndTimeAnnotationName] = metav1.Now().Format(time.RFC3339)
 		snapshot.Annotations[utils.SnapshotStartTimeAnnotationName] = snapshot.Status.CreationTime.Format(time.RFC3339)
 		if err := se.cli.Patch(ctx, snapshot, client.MergeFrom(oldSnapshot)); err != nil {
@@ -548,14 +616,71 @@ func (se *Reconciler) waitSnapshotToBeReady(
 ) (*ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
+	// Extract the retry configuration from the cluster
+	var retryConfig *apiv1.VolumeSnapshotRetryConfiguration
+	if clusterName, ok := snapshot.Labels[utils.ClusterLabelName]; ok {
+		var cluster apiv1.Cluster
+		if err := se.cli.Get(ctx, client.ObjectKey{
+			Namespace: snapshot.Namespace,
+			Name:      clusterName,
+		}, &cluster); err == nil {
+			if cluster.Spec.Backup != nil &&
+				cluster.Spec.Backup.VolumeSnapshot != nil &&
+				cluster.Spec.Backup.VolumeSnapshot.RetryConfiguration != nil {
+				retryConfig = cluster.Spec.Backup.VolumeSnapshot.RetryConfiguration
+			}
+		}
+	}
+
 	info := parseVolumeSnapshotInfo(snapshot)
 	if info.error != nil {
-		if info.error.isRetryable() {
+		if info.error.isRetryable(retryConfig, info.retryCount) {
+			// Record metrics for this retry
+			metrics.RecordRetry(snapshot.Namespace, snapshot.Name, metrics.PhaseReady)
+
+			// Record error-specific metrics
+			errorType := "unknown"
+			if err := info.error; err != nil {
+				if errors.Is(err, context.DeadlineExceeded) {
+					errorType = "context.DeadlineExceeded"
+				} else if errors.Is(err, context.Canceled) {
+					errorType = "context.Canceled"
+				} else {
+					errorType = fmt.Sprintf("%T", err)
+				}
+			}
+			metrics.RecordRetryWithError(snapshot.Namespace, snapshot.Name,
+				metrics.PhaseReady, errorType)
+
+			// Calculate and record duration for this retry operation
+			startTime := time.Now().Add(-defaultRetryInterval) // Estimate based on requeue time
+			if creationTime := snapshot.GetCreationTimestamp(); !creationTime.IsZero() {
+				startTime = creationTime.Time
+			}
+			metrics.RecordRetryDuration(snapshot.Namespace, snapshot.Name,
+				metrics.PhaseReady, time.Since(startTime).Seconds())
+
+			// Increment the retry count and store it in the annotation
+			oldSnapshot := snapshot.DeepCopy()
+			if snapshot.Annotations == nil {
+				snapshot.Annotations = make(map[string]string)
+			}
+			snapshot.Annotations[RetryCountAnnotation] = strconv.Itoa(info.retryCount + 1)
+
+			// Try to patch the snapshot to update the retry count
+			if err := se.cli.Patch(ctx, snapshot, client.MergeFrom(oldSnapshot)); err != nil {
+				contextLogger.Error(err, "failed to update retry count annotation")
+			}
+
 			contextLogger.Error(info.error,
 				"Retryable snapshot provisioning error, trying again",
-				"volumeSnapshotName", snapshot.Name)
-			return &ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+				"volumeSnapshotName", snapshot.Name,
+				"retryCount", info.retryCount)
+			return &ctrl.Result{RequeueAfter: defaultRetryInterval}, nil
 		}
+
+		// Record failure metrics if maximum retries exceeded
+		metrics.RecordFailed(snapshot.Namespace, snapshot.Name, metrics.PhaseReady)
 
 		return nil, info.error
 	}
@@ -565,7 +690,7 @@ func (se *Reconciler) waitSnapshotToBeReady(
 			"volumeSnapshotName", snapshot.Name,
 			"boundVolumeSnapshotContentName", snapshot.Status.BoundVolumeSnapshotContentName,
 			"readyToUse", snapshot.Status.ReadyToUse)
-		return &ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+		return &ctrl.Result{RequeueAfter: defaultRetryInterval}, nil
 	}
 
 	return nil, nil
