@@ -20,7 +20,7 @@ var _ = Describe("Set Plugin Protocol", func() {
 		Expect(repository.pluginConnectionPool).To(HaveKey("plugin1"))
 	})
 
-	It("fails when adding same plugin name without force", func() {
+	It("fails when adding same plugin name without forceRegistration", func() {
 		err := repository.setPluginProtocol("plugin1", newUnitTestProtocol("/tmp/socket"), pluginSetupOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
@@ -28,7 +28,7 @@ var _ = Describe("Set Plugin Protocol", func() {
 		Expect(err).To(BeEquivalentTo(&ErrPluginAlreadyRegistered{Name: "plugin1"}))
 	})
 
-	It("overwrites existing plugin when force is true", func() {
+	It("overwrites existing plugin when forceRegistration is true", func() {
 		first := newUnitTestProtocol("/tmp/socket")
 		err := repository.setPluginProtocol("plugin1", first, pluginSetupOptions{})
 		Expect(err).NotTo(HaveOccurred())
@@ -42,7 +42,7 @@ var _ = Describe("Set Plugin Protocol", func() {
 		conn1.Release()
 
 		second := newUnitTestProtocol("/tmp/socket2")
-		err = repository.setPluginProtocol("plugin1", second, pluginSetupOptions{force: true})
+		err = repository.setPluginProtocol("plugin1", second, pluginSetupOptions{forceRegistration: true})
 		Expect(err).NotTo(HaveOccurred())
 		pool2 := repository.pluginConnectionPool["plugin1"]
 

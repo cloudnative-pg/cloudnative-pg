@@ -88,7 +88,7 @@ func (r *PluginReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	if !isPluginService(&service, r.OperatorNamespace) {
-		contextLogger.Trace("Skipping reconciliation for a non-cnpgi service")
+		contextLogger.Trace("Skipping reconciliation for a non-cnpg-i service")
 		return ctrl.Result{}, nil
 	}
 
@@ -238,7 +238,7 @@ func (r *PluginReconciler) mapSecretToPlugin(ctx context.Context, obj client.Obj
 	); err != nil {
 		logger.Error(
 			err,
-			"Error while listing CNPG-i services in the operator namespace",
+			"Error while listing CNPG-I services in the operator namespace",
 		)
 		return nil
 	}

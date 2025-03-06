@@ -51,8 +51,8 @@ func isPluginService(object client.Object, operatorNamespace string) bool {
 	return true
 }
 
-// isSecretUsedByPluginService returns true when the secret with the passed name
-// is used by the passed service
+// isSecretUsedByPluginService returns true when the passed service
+// uses the secret with the passed name
 func isSecretUsedByPluginService(service client.Object, secretName string) bool {
 	annotations := service.GetAnnotations()
 

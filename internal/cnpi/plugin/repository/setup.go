@@ -35,7 +35,7 @@ type Interface interface {
 	// ForgetPlugin closes every connection to the plugin with the passed name
 	// and forgets its discovery info.
 	// This operation is synchronous and blocks until every connection is closed.
-	// If the plug in was not available in the repository, this is a no-op.
+	// If the plugin was not available in the repository, this is a no-op.
 	ForgetPlugin(name string)
 
 	// RegisterRemotePlugin registers a plugin available on a remote
@@ -64,7 +64,9 @@ type data struct {
 // pluginSetupOptions are the options to be used when setting up
 // a plugin connection
 type pluginSetupOptions struct {
-	force bool
+	// forceRegistration forces the creation of a new plugin connection
+	// even if one already exists. The existing connection will be closed.
+	forceRegistration bool
 }
 
 // maxPoolSize is the maximum number of connections in a plugin's connection
@@ -123,7 +125,7 @@ func (r *data) setPluginProtocol(name string, protocol connection.Protocol, opts
 	}
 
 	if oldPool, alreadyRegistered := r.pluginConnectionPool[name]; alreadyRegistered {
-		if opts.force {
+		if opts.forceRegistration {
 			oldPool.Close()
 		} else {
 			return &ErrPluginAlreadyRegistered{
@@ -163,9 +165,9 @@ func (r *data) ForgetPlugin(name string) {
 // unix socket path
 func (r *data) registerUnixSocketPlugin(name, path string) error {
 	return r.setPluginProtocol(name, connection.ProtocolUnix(path), pluginSetupOptions{
-		// forcing the registration of a Unix socket plugin has no meaning
-		// because they can be installed and started only when the Pod is created
-		force: false,
+		// Forcing the registration of a Unix socket plugin has no meaning
+		// because they can be installed and started only when the Pod is created.
+		forceRegistration: false,
 	})
 }
 
@@ -180,7 +182,7 @@ func (r *data) RegisterRemotePlugin(name string, address string, tlsConfig *tls.
 	// In the second case, the plugin loading will be forced and all existing
 	// connections will be dropped and recreated.
 	opts := pluginSetupOptions{
-		force: true,
+		forceRegistration: true,
 	}
 	return r.setPluginProtocol(name, protocol, opts)
 }
