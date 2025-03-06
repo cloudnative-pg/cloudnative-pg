@@ -860,7 +860,8 @@ func (r *ClusterReconciler) processUnschedulableInstances(
 func (r *ClusterReconciler) reconcilePods(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
-	resources *managedResources, instancesStatus postgres.PostgresqlStatusList,
+	resources *managedResources,
+	instancesStatus postgres.PostgresqlStatusList,
 ) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
@@ -917,7 +918,7 @@ func (r *ClusterReconciler) reconcilePods(
 		}
 	}
 
-	// Stop acting here if there are non-ready Pods
+	// Requeue here if there are non-ready Pods.
 	// In the rest of the function we are sure that
 	// cluster.Status.Instances == cluster.Spec.Instances and
 	// we don't need to modify the cluster topology
@@ -925,6 +926,20 @@ func (r *ClusterReconciler) reconcilePods(
 		cluster.Status.ReadyInstances != len(instancesStatus.Items) ||
 		!instancesStatus.IsComplete() {
 		contextLogger.Debug("Waiting for Pods to be ready")
+		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
+	}
+
+	report := instancesStatus.GetConfigurationReport()
+
+	// If any pod is not reporting its configuration (i.e., uniform == nil),
+	// proceed with a rolling update to upgrade the instance manager
+	// to a version that reports the configuration status.
+	// If all pods report their configuration, wait until all instances
+	// report the same configuration.
+	if uniform := report.IsUniform(); uniform != nil && !*uniform {
+		contextLogger.Debug(
+			"Waiting for all Pods to have the same PostgreSQL configuration",
+			"configurationReport", report)
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, ErrNextLoop
 	}
 
