@@ -20,7 +20,7 @@
 
 
 
-<p>Backup is the Schema for the backups API</p>
+<p>A <code>Backup</code> resource is a request for a PostgreSQL backup by the user.</p>
 
 
 <table class="table">

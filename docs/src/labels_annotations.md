@@ -28,50 +28,55 @@ they're inherited by all resources created by it (including pods).
 
 ## Predefined labels
 
-These predefined labels are managed by CloudNativePG.
+CloudNativePG manages the following predefined labels:
 
 `cnpg.io/backupDate`
-: The date of the backup in ISO 8601 format (`YYYYMMDD`)
+: The date of the backup in ISO 8601 format (`YYYYMMDD`).
+  This label is available only on `VolumeSnapshot` resources.
 
 `cnpg.io/backupName`
-: Backup identifier, available only on `Backup` and `VolumeSnapshot`
-  resources
+: Backup identifier.
+  This label is available only on `VolumeSnapshot` resources.
 
 `cnpg.io/backupMonth`
-: The year/month when a backup was taken
+: The year/month when a backup was taken.
+  This label is available only on `VolumeSnapshot` resources.
 
 `cnpg.io/backupTimeline`
-: The timeline of the instance when a backup was taken
+: The timeline of the instance when a backup was taken.
+  This label is available only on `VolumeSnapshot` resources.
 
 `cnpg.io/backupYear`
-: The year a backup was taken
+: The year a backup was taken.
+  This label is available only on `VolumeSnapshot` resources.
 
 `cnpg.io/cluster`
-: Name of the cluster
+: Name of the cluster.
 
 `cnpg.io/immediateBackup`
 : Applied to a `Backup` resource if the backup is the first one created from
-  a `ScheduledBackup` object having `immediate` set to `true`
+  a `ScheduledBackup` object having `immediate` set to `true`.
 
 `cnpg.io/instanceName`
 : Name of the PostgreSQL instance (replaces the old and
-  deprecated `postgresql` label)
+  deprecated `postgresql` label).
 
 `cnpg.io/jobRole`
 : Role of the job (that is, `import`, `initdb`, `join`, ...)
 
 `cnpg.io/onlineBackup`
-: Whether the backup is online (hot) or taken when Postgres is down (cold)
+: Whether the backup is online (hot) or taken when Postgres is down (cold).
+  This label is available only on `VolumeSnapshot` resources.
 
 `cnpg.io/podRole`
-: Distinguishes pods dedicated to pooler deployment from those used for
-  database instances
+: Distinguishes pods dedicated to pooler deployment from those used for.
+  database instances.
 
 `cnpg.io/poolerName`
-: Name of the PgBouncer pooler
+: Name of the PgBouncer pooler.
 
 `cnpg.io/pvcRole`
-: Purpose of the PVC, such as `PG_DATA` or `PG_WAL`
+: Purpose of the PVC, such as `PG_DATA` or `PG_WAL`.
 
 `cnpg.io/reload`
 : Available on `ConfigMap` and `Secret` resources. When set to `true`,
@@ -89,15 +94,15 @@ These predefined labels are managed by CloudNativePG.
 
 `cnpg.io/scheduled-backup`
 :  When available, name of the `ScheduledBackup` resource that created a given
-   `Backup` object
+   `Backup` object.
 
 `cnpg.io/instanceRole`
-: Whether the instance running in a pod is a `primary` or a `replica`.
+: Whether the instance running in a pod is a `primary` or a `replica`..
 
 
 ## Predefined annotations
 
-These predefined annotations are managed by CloudNativePG.
+CloudNativePG manages the following predefined annotations:
 
 `container.apparmor.security.beta.kubernetes.io/*`
 :   Name of the AppArmor profile to apply to the named container.
@@ -106,15 +111,18 @@ These predefined annotations are managed by CloudNativePG.
 
 `cnpg.io/backupEndTime`
 : The time a backup ended.
+  This annotation is available only on `VolumeSnapshot` resources.
 
 `cnpg.io/backupEndWAL`
 : The WAL at the conclusion of a backup.
+  This annotation is available only on `VolumeSnapshot` resources.
 
 `cnpg.io/backupStartTime`
 : The time a backup started.
 
 `cnpg.io/backupStartWAL`
 : The WAL at the start of a backup.
+  This annotation is available only on `VolumeSnapshot` resources.
 
 `cnpg.io/coredumpFilter`
 :   Filter to control the coredump of Postgres processes, expressed with a
