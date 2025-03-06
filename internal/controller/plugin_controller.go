@@ -31,9 +31,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -45,14 +45,21 @@ type PluginReconciler struct {
 
 	Scheme  *runtime.Scheme
 	Plugins repository.Interface
+
+	OperatorNamespace string
 }
 
 // NewPluginReconciler creates a new PluginReconciler initializing it
-func NewPluginReconciler(mgr manager.Manager, plugins repository.Interface) *PluginReconciler {
+func NewPluginReconciler(
+	mgr manager.Manager,
+	operatorNamespace string,
+	plugins repository.Interface,
+) *PluginReconciler {
 	return &PluginReconciler{
-		Client:  mgr.GetClient(),
-		Scheme:  mgr.GetScheme(),
-		Plugins: plugins,
+		Client:            mgr.GetClient(),
+		Scheme:            mgr.GetScheme(),
+		Plugins:           plugins,
+		OperatorNamespace: operatorNamespace,
 	}
 }
 
@@ -60,9 +67,9 @@ func NewPluginReconciler(mgr manager.Manager, plugins repository.Interface) *Plu
 func (r *PluginReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	contextLogger, ctx := log.SetupLogger(ctx)
 
-	contextLogger.Debug("Plugin reconciliation loop start")
+	contextLogger.Trace("Plugin reconciliation loop start")
 	defer func() {
-		contextLogger.Debug("Plugin reconciliation loop end")
+		contextLogger.Trace("Plugin reconciliation loop end")
 	}()
 
 	var service corev1.Service
@@ -77,6 +84,11 @@ func (r *PluginReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 		// This is a real error, maybe the RBAC configuration is wrong?
 		return ctrl.Result{}, fmt.Errorf("cannot get the resource: %w", err)
+	}
+
+	if !isPluginService(&service, r.OperatorNamespace) {
+		contextLogger.Trace("Skipping reconciliation for a non-cnpg-i service")
+		return ctrl.Result{}, nil
 	}
 
 	// Process label and annotations
@@ -206,26 +218,53 @@ func (r *PluginReconciler) getSecret(
 	return &secret, nil
 }
 
-// SetupWithManager adds this PluginReconciler to the passed controller manager
-func (r *PluginReconciler) SetupWithManager(mgr ctrl.Manager, operatorNamespace string) error {
-	pluginServicesPredicate := predicate.Funcs{
-		CreateFunc: func(e event.CreateEvent) bool {
-			return isPluginService(e.Object, operatorNamespace)
-		},
-		DeleteFunc: func(e event.DeleteEvent) bool {
-			return isPluginService(e.Object, operatorNamespace)
-		},
-		GenericFunc: func(e event.GenericEvent) bool {
-			return isPluginService(e.Object, operatorNamespace)
-		},
-		UpdateFunc: func(e event.UpdateEvent) bool {
-			return isPluginService(e.ObjectNew, operatorNamespace)
-		},
+func (r *PluginReconciler) mapSecretToPlugin(ctx context.Context, obj client.Object) []reconcile.Request {
+	// We only consider the secrets that are installed in the
+	// operator namespace because plugins need to be deployed
+	// in the same namespace as the operator.
+	if obj.GetNamespace() != r.OperatorNamespace {
+		return nil
 	}
 
+	logger := log.FromContext(ctx)
+
+	var services corev1.ServiceList
+	if err := r.Client.List(
+		ctx,
+		&services,
+		client.HasLabels{utils.PluginNameLabelName},
+		client.InNamespace(r.OperatorNamespace),
+	); err != nil {
+		logger.Error(
+			err,
+			"Error while listing CNPG-I services in the operator namespace",
+		)
+		return nil
+	}
+
+	var result []reconcile.Request
+	for i := range services.Items {
+		service := &services.Items[i]
+		if isSecretUsedByPluginService(service, obj.GetName()) {
+			result = append(result, reconcile.Request{
+				NamespacedName: client.ObjectKeyFromObject(service),
+			})
+		}
+	}
+
+	return result
+}
+
+// SetupWithManager adds this PluginReconciler to the passed controller manager
+func (r *PluginReconciler) SetupWithManager(
+	mgr ctrl.Manager,
+) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&corev1.Service{}).
 		Named("plugin").
-		WithEventFilter(pluginServicesPredicate).
+		Watches(
+			&corev1.Secret{},
+			handler.EnqueueRequestsFromMapFunc(r.mapSecretToPlugin),
+		).
 		Complete(r)
 }
