@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -27,6 +28,12 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
+
+type extInfo struct {
+	Name    string `json:"name"`
+	Version string `json:"version"`
+	Schema  string `json:"schema"`
+}
 
 func detectDatabase(
 	ctx context.Context,
@@ -87,7 +94,8 @@ func createDatabase(
 		sqlCreateDatabase.WriteString(fmt.Sprintf(" LOCALE %s", pgx.Identifier{obj.Spec.Locale}.Sanitize()))
 	}
 	if obj.Spec.LocaleProvider != "" {
-		sqlCreateDatabase.WriteString(fmt.Sprintf(" LOCALE_PROVIDER %s", pgx.Identifier{obj.Spec.LocaleProvider}.Sanitize()))
+		sqlCreateDatabase.WriteString(fmt.Sprintf(" LOCALE_PROVIDER %s",
+			pgx.Identifier{obj.Spec.LocaleProvider}.Sanitize()))
 	}
 	if obj.Spec.LcCollate != "" {
 		sqlCreateDatabase.WriteString(fmt.Sprintf(" LC_COLLATE %s", pgx.Identifier{obj.Spec.LcCollate}.Sanitize()))
@@ -102,7 +110,8 @@ func createDatabase(
 		sqlCreateDatabase.WriteString(fmt.Sprintf(" ICU_RULES %s", pgx.Identifier{obj.Spec.IcuRules}.Sanitize()))
 	}
 	if obj.Spec.BuiltinLocale != "" {
-		sqlCreateDatabase.WriteString(fmt.Sprintf(" BUILTIN_LOCALE %s", pgx.Identifier{obj.Spec.BuiltinLocale}.Sanitize()))
+		sqlCreateDatabase.WriteString(fmt.Sprintf(" BUILTIN_LOCALE %s",
+			pgx.Identifier{obj.Spec.BuiltinLocale}.Sanitize()))
 	}
 	if obj.Spec.CollationVersion != "" {
 		sqlCreateDatabase.WriteString(fmt.Sprintf(" COLLATION_VERSION %s",
@@ -215,25 +224,29 @@ func dropDatabase(
 }
 
 const detectDatabaseExtensionSQL = `
-SELECT count(*)
-FROM pg_catalog.pg_extension
-WHERE extname = $1
+SELECT e.extname, e.extversion, n.nspname
+FROM pg_catalog.pg_extension e
+JOIN pg_catalog.pg_namespace n ON e.extnamespace=n.oid
+WHERE e.extname = $1
 `
 
-func detectDatabaseExtension(ctx context.Context, db *sql.DB, ext *apiv1.ExtensionSpec) (bool, error) {
+func getDatabaseExtensionInfo(ctx context.Context, db *sql.DB, ext *apiv1.ExtensionSpec) (*extInfo, error) {
 	row := db.QueryRowContext(
 		ctx, detectDatabaseExtensionSQL,
 		ext.Name)
 	if row.Err() != nil {
-		return false, fmt.Errorf("while checking if database %q exists: %w", ext.Name, row.Err())
+		return nil, fmt.Errorf("while checking if extension %q exists: %w", ext.Name, row.Err())
 	}
 
-	var count int
-	if err := row.Scan(&count); err != nil {
-		return false, fmt.Errorf("while scanning if database %q exists: %w", ext.Name, err)
+	var result extInfo
+	if err := row.Scan(&result.Name, &result.Version, &result.Schema); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("while scanning if extension %q exists: %w", ext.Name, err)
 	}
 
-	return count > 0, nil
+	return &result, nil
 }
 
 func createDatabaseExtension(ctx context.Context, db *sql.DB, ext *apiv1.ExtensionSpec) error {
@@ -251,43 +264,56 @@ func createDatabaseExtension(ctx context.Context, db *sql.DB, ext *apiv1.Extensi
 	_, err := db.ExecContext(ctx, sqlCreateExtension.String())
 	if err != nil {
 		contextLogger.Error(err, "while creating extension", "query", sqlCreateExtension.String())
+		return err
 	}
+	contextLogger.Info("created extension", "name", ext.Name)
 
-	return err
+	return nil
 }
 
 func dropDatabaseExtension(ctx context.Context, db *sql.DB, ext *apiv1.ExtensionSpec) error {
+	contextLogger := log.FromContext(ctx)
 	query := fmt.Sprintf("DROP EXTENSION IF EXISTS %s", pgx.Identifier{ext.Name}.Sanitize())
 	_, err := db.ExecContext(
 		ctx,
 		query)
-	return err
+	if err != nil {
+		contextLogger.Error(err, "while dropping extension", "query", query)
+		return err
+	}
+	contextLogger.Info("dropped extension", "name", ext.Name)
+	return nil
 }
 
-func updateDatabaseExtension(ctx context.Context, db *sql.DB, ext *apiv1.ExtensionSpec) error {
-	if len(ext.Schema) > 0 {
+func updateDatabaseExtension(ctx context.Context, db *sql.DB, spec *apiv1.ExtensionSpec, info *extInfo) error {
+	contextLogger := log.FromContext(ctx)
+	if len(spec.Schema) > 0 && spec.Schema != info.Schema {
 		changeSchemaSQL := fmt.Sprintf(
 			"ALTER EXTENSION %s SET SCHEMA %v",
-			pgx.Identifier{ext.Name}.Sanitize(),
-			pgx.Identifier{ext.Schema}.Sanitize(),
+			pgx.Identifier{spec.Name}.Sanitize(),
+			pgx.Identifier{spec.Schema}.Sanitize(),
 		)
 
 		if _, err := db.ExecContext(ctx, changeSchemaSQL); err != nil {
 			return fmt.Errorf("altering schema: %w", err)
 		}
+
+		contextLogger.Info("altered extension schema", "name", spec.Name, "schema", spec.Schema)
 	}
 
-	if len(ext.Version) > 0 {
+	if len(spec.Version) > 0 && spec.Version != info.Version {
 		//nolint:gosec
 		changeVersionSQL := fmt.Sprintf(
 			"ALTER EXTENSION %s UPDATE TO %v",
-			pgx.Identifier{ext.Name}.Sanitize(),
-			pgx.Identifier{ext.Version}.Sanitize(),
+			pgx.Identifier{spec.Name}.Sanitize(),
+			pgx.Identifier{spec.Version}.Sanitize(),
 		)
 
 		if _, err := db.ExecContext(ctx, changeVersionSQL); err != nil {
 			return fmt.Errorf("altering version: %w", err)
 		}
+
+		contextLogger.Info("altered extension version", "name", spec.Name, "version", spec.Version)
 	}
 
 	return nil

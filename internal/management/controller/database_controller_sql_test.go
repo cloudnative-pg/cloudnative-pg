@@ -124,7 +124,8 @@ var _ = Describe("Managed Database SQL", func() {
 					"ICU_LOCALE %s ICU_RULES %s",
 				pgx.Identifier{database.Spec.Name}.Sanitize(), pgx.Identifier{database.Spec.Owner}.Sanitize(),
 				pgx.Identifier{database.Spec.Encoding}.Sanitize(), pgx.Identifier{database.Spec.Locale}.Sanitize(),
-				pgx.Identifier{database.Spec.LocaleProvider}.Sanitize(), pgx.Identifier{database.Spec.LcCollate}.Sanitize(),
+				pgx.Identifier{database.Spec.LocaleProvider}.Sanitize(),
+				pgx.Identifier{database.Spec.LcCollate}.Sanitize(),
 				pgx.Identifier{database.Spec.LcCtype}.Sanitize(),
 				pgx.Identifier{database.Spec.IcuLocale}.Sanitize(), pgx.Identifier{database.Spec.IcuRules}.Sanitize(),
 			)
@@ -144,7 +145,8 @@ var _ = Describe("Managed Database SQL", func() {
 				"CREATE DATABASE %s OWNER %s "+
 					"LOCALE_PROVIDER %s BUILTIN_LOCALE %s COLLATION_VERSION %s",
 				pgx.Identifier{database.Spec.Name}.Sanitize(), pgx.Identifier{database.Spec.Owner}.Sanitize(),
-				pgx.Identifier{database.Spec.LocaleProvider}.Sanitize(), pgx.Identifier{database.Spec.BuiltinLocale}.Sanitize(),
+				pgx.Identifier{database.Spec.LocaleProvider}.Sanitize(),
+				pgx.Identifier{database.Spec.BuiltinLocale}.Sanitize(),
 				pgx.Identifier{database.Spec.CollationVersion}.Sanitize(),
 			)
 			dbMock.ExpectExec(expectedQuery).WillReturnResult(expectedValue)
@@ -252,29 +254,30 @@ var _ = Describe("Managed Extensions SQL", func() {
 		Expect(dbMock.ExpectationsWereMet()).To(Succeed())
 	})
 
-	Context("detectDatabaseExtension", func() {
-		It("returns true when the extension exits", func(ctx SpecContext) {
+	Context("getDatabaseExtensionInfo", func() {
+		It("returns info when the extension exits", func(ctx SpecContext) {
 			dbMock.
 				ExpectQuery(detectDatabaseExtensionSQL).
 				WithArgs(ext.Name).
 				WillReturnRows(
-					sqlmock.NewRows([]string{""}).AddRow("1"),
+					sqlmock.NewRows([]string{"extname", "extversion", "nspname"}).AddRow("testext", "1.0",
+						"default"),
 				)
-			extExists, err := detectDatabaseExtension(ctx, db, ext)
+			extInfo, err := getDatabaseExtensionInfo(ctx, db, ext)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(extExists).To(BeTrue())
+			Expect(extInfo).ToNot(BeNil())
 		})
 
-		It("returns false when it does not exist", func(ctx SpecContext) {
+		It("returns nil info when the extension does not exist", func(ctx SpecContext) {
 			dbMock.
 				ExpectQuery(detectDatabaseExtensionSQL).
 				WithArgs(ext.Name).
 				WillReturnRows(
-					sqlmock.NewRows([]string{""}).AddRow("0"),
+					sqlmock.NewRows([]string{"extname", "extversion", "nspname"}),
 				)
-			extExists, err := detectDatabaseExtension(ctx, db, ext)
+			extInfo, err := getDatabaseExtensionInfo(ctx, db, ext)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(extExists).To(BeFalse())
+			Expect(extInfo).To(BeNil())
 		})
 	})
 
@@ -317,6 +320,32 @@ var _ = Describe("Managed Extensions SQL", func() {
 	})
 
 	Context("updateDatabaseExtension", func() {
+		It("does nothing when the extension is already at the correct version", func(ctx SpecContext) {
+			Expect(updateDatabaseExtension(ctx, db, ext, &extInfo{
+				Name:    ext.Name,
+				Version: ext.Version,
+				Schema:  ext.Schema,
+			})).Error().NotTo(HaveOccurred())
+		})
+
+		It("updates the extension version", func(ctx SpecContext) {
+			dbMock.
+				ExpectExec("ALTER EXTENSION \"testext\" UPDATE TO \"1.0\"").
+				WillReturnResult(sqlmock.NewResult(0, 1))
+
+			Expect(updateDatabaseExtension(ctx, db, ext,
+				&extInfo{Name: ext.Name, Version: "0.9", Schema: ext.Schema})).Error().NotTo(HaveOccurred())
+		})
+
+		It("updates the schema", func(ctx SpecContext) {
+			dbMock.
+				ExpectExec("ALTER EXTENSION \"testext\" SET SCHEMA \"default\"").
+				WillReturnResult(sqlmock.NewResult(0, 1))
+
+			Expect(updateDatabaseExtension(ctx, db, ext,
+				&extInfo{Name: ext.Name, Version: ext.Version, Schema: "old"})).Error().NotTo(HaveOccurred())
+		})
+
 		It("sets the schema and the extension version", func(ctx SpecContext) {
 			dbMock.
 				ExpectExec("ALTER EXTENSION \"testext\" SET SCHEMA \"default\"").
@@ -325,7 +354,10 @@ var _ = Describe("Managed Extensions SQL", func() {
 				ExpectExec("ALTER EXTENSION \"testext\" UPDATE TO \"1.0\"").
 				WillReturnResult(sqlmock.NewResult(0, 1))
 
-			Expect(updateDatabaseExtension(ctx, db, ext)).Error().NotTo(HaveOccurred())
+			Expect(updateDatabaseExtension(ctx, db, ext, &extInfo{
+				Name: ext.Name, Version: "0.9",
+				Schema: "old",
+			})).Error().NotTo(HaveOccurred())
 		})
 
 		It("fail when setting the schema failed", func(ctx SpecContext) {
@@ -333,7 +365,8 @@ var _ = Describe("Managed Extensions SQL", func() {
 				ExpectExec("ALTER EXTENSION \"testext\" SET SCHEMA \"default\"").
 				WillReturnError(testError)
 
-			Expect(updateDatabaseExtension(ctx, db, ext)).Error().To(MatchError(testError))
+			Expect(updateDatabaseExtension(ctx, db, ext,
+				&extInfo{Name: ext.Name, Version: ext.Version, Schema: "old"})).Error().To(MatchError(testError))
 		})
 
 		It("fail when setting the version failed", func(ctx SpecContext) {
@@ -344,7 +377,10 @@ var _ = Describe("Managed Extensions SQL", func() {
 				ExpectExec("ALTER EXTENSION \"testext\" UPDATE TO \"1.0\"").
 				WillReturnError(testError)
 
-			Expect(updateDatabaseExtension(ctx, db, ext)).Error().To(MatchError(testError))
+			Expect(updateDatabaseExtension(ctx, db, ext, &extInfo{
+				Name: ext.Name, Version: "0.9",
+				Schema: "old",
+			})).Error().To(MatchError(testError))
 		})
 	})
 })

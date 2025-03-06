@@ -2586,6 +2586,13 @@ tablespace used for objects created in this database.</p>
    <p>The policy for end-of-life maintenance of this database.</p>
 </td>
 </tr>
+<tr><td><code>extensions</code><br/>
+<a href="#postgresql-cnpg-io-v1-ExtensionSpec"><i>[]ExtensionSpec</i></a>
+</td>
+<td>
+   <p>The list of extensions to be managed in the database</p>
+</td>
+</tr>
 </tbody>
 </table>
 
@@ -2623,6 +2630,13 @@ desired state that was synchronized</p>
 </td>
 <td>
    <p>Message is the reconciliation output message</p>
+</td>
+</tr>
+<tr><td><code>extensions</code><br/>
+<a href="#postgresql-cnpg-io-v1-ExtensionStatus"><i>[]ExtensionStatus</i></a>
+</td>
+<td>
+   <p>Extensions is the status of the managed extensions</p>
 </td>
 </tr>
 </tbody>
@@ -2665,6 +2679,8 @@ desired state that was synchronized</p>
 
 - [DatabaseSpec](#postgresql-cnpg-io-v1-DatabaseSpec)
 
+- [ExtensionSpec](#postgresql-cnpg-io-v1-ExtensionSpec)
+
 - [RoleConfiguration](#postgresql-cnpg-io-v1-RoleConfiguration)
 
 
@@ -2701,6 +2717,93 @@ storage</p>
 </td>
 <td>
    <p>TemporaryData is the size limit of the temporary data volume</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## ExtensionSpec     {#postgresql-cnpg-io-v1-ExtensionSpec}
+
+
+**Appears in:**
+
+- [DatabaseSpec](#postgresql-cnpg-io-v1-DatabaseSpec)
+
+
+<p>ExtensionSpec configures an extension in a database</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>name</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Name is the name of the extension</p>
+</td>
+</tr>
+<tr><td><code>ensure</code><br/>
+<a href="#postgresql-cnpg-io-v1-EnsureOption"><i>EnsureOption</i></a>
+</td>
+<td>
+   <p>Ensure tells the operator to install or remove an extension from
+the database</p>
+</td>
+</tr>
+<tr><td><code>version</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Version is the version of extension to be installed.
+If empty the operator will install the default version and not update it.</p>
+</td>
+</tr>
+<tr><td><code>schema</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Schema is the schema where the extension will be installed.
+Defaults to the default extension schema.</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## ExtensionStatus     {#postgresql-cnpg-io-v1-ExtensionStatus}
+
+
+**Appears in:**
+
+- [DatabaseStatus](#postgresql-cnpg-io-v1-DatabaseStatus)
+
+
+<p>ExtensionStatus is the status of the managed extensions</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>name</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The name of the extension</p>
+</td>
+</tr>
+<tr><td><code>applied</code> <B>[Required]</B><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>True of the extension has been installed successfully in
+the database</p>
+</td>
+</tr>
+<tr><td><code>message</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Message is the extension reconciliation message</p>
 </td>
 </tr>
 </tbody>
