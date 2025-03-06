@@ -29,14 +29,14 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 )
 
-// ProbeType is the type of the probe
-type ProbeType string
+// probeType is the type of the probe
+type probeType string
 
 const (
-	// ProbeTypeReadiness is the readiness probe
-	ProbeTypeReadiness ProbeType = "readiness"
-	// ProbeTypeStartup is the startup probe
-	ProbeTypeStartup ProbeType = "startup"
+	// probeTypeReadiness is the readiness probe
+	probeTypeReadiness probeType = "readiness"
+	// probeTypeStartup is the startup probe
+	probeTypeStartup probeType = "startup"
 )
 
 type runner interface {
@@ -46,24 +46,38 @@ type runner interface {
 	IsHealthy(ctx context.Context, instance *postgres.Instance) error
 }
 
-// Checker is the interface for the probe checker
+// Checker executes the probe and writes the response to the request
 type Checker interface {
-	IsHealthy(ctx context.Context, w http.ResponseWriter, probeType ProbeType)
+	IsHealthy(ctx context.Context, w http.ResponseWriter)
 }
 
 type executor struct {
-	cli      client.Client
-	instance *postgres.Instance
+	cli       client.Client
+	instance  *postgres.Instance
+	probeType probeType
 }
 
-// NewChecker creates a new instance of the probe checker
-func NewChecker(
+// NewReadinessChecker creates a new instance of the readiness probe checker
+func NewReadinessChecker(
 	cli client.Client,
 	instance *postgres.Instance,
 ) Checker {
 	return &executor{
-		cli:      cli,
-		instance: instance,
+		cli:       cli,
+		instance:  instance,
+		probeType: probeTypeReadiness,
+	}
+}
+
+// NewStartupChecker creates a new instance of the startup probe checker
+func NewStartupChecker(
+	cli client.Client,
+	instance *postgres.Instance,
+) Checker {
+	return &executor{
+		cli:       cli,
+		instance:  instance,
+		probeType: probeTypeStartup,
 	}
 }
 
@@ -71,7 +85,6 @@ func NewChecker(
 func (e *executor) IsHealthy(
 	ctx context.Context,
 	w http.ResponseWriter,
-	probeType ProbeType,
 ) {
 	contextLogger := log.FromContext(ctx)
 
@@ -82,40 +95,40 @@ func (e *executor) IsHealthy(
 		&cluster,
 	); err != nil {
 		contextLogger.Warning(
-			fmt.Sprintf("%s check failed, cannot check Cluster definition", probeType),
+			fmt.Sprintf("%s check failed, cannot check Cluster definition", e.probeType),
 			"err", err.Error(),
 		)
 		http.Error(
 			w,
-			fmt.Sprintf("%s check failed cannot get Cluster definition: %s", probeType, err.Error()),
+			fmt.Sprintf("%s check failed cannot get Cluster definition: %s", e.probeType, err.Error()),
 			http.StatusInternalServerError,
 		)
 		return
 	}
 
-	probeRunner := getProbeRunnerFromCluster(probeType, cluster)
+	probeRunner := getProbeRunnerFromCluster(e.probeType, cluster)
 	if err := probeRunner.IsHealthy(ctx, e.instance); err != nil {
-		contextLogger.Warning(fmt.Sprintf("%s probe failing", probeType), "err", err.Error())
+		contextLogger.Warning(fmt.Sprintf("%s probe failing", e.probeType), "err", err.Error())
 		http.Error(
 			w,
-			fmt.Sprintf("%s check failed: %s", probeType, err.Error()),
+			fmt.Sprintf("%s check failed: %s", e.probeType, err.Error()),
 			http.StatusInternalServerError,
 		)
 		return
 	}
 
-	contextLogger.Trace(fmt.Sprintf("%s probe succeeding", probeType))
+	contextLogger.Trace(fmt.Sprintf("%s probe succeeding", e.probeType))
 	_, _ = fmt.Fprint(w, "OK")
 }
 
-func getProbeRunnerFromCluster(probeType ProbeType, cluster apiv1.Cluster) runner {
+func getProbeRunnerFromCluster(probeType probeType, cluster apiv1.Cluster) runner {
 	var probe *apiv1.ProbeWithStrategy
 	if cluster.Spec.Probes != nil {
 		switch probeType {
-		case ProbeTypeStartup:
+		case probeTypeStartup:
 			probe = cluster.Spec.Probes.Startup
 
-		case ProbeTypeReadiness:
+		case probeTypeReadiness:
 			probe = cluster.Spec.Probes.Readiness
 		}
 	}
