@@ -34,11 +34,12 @@ import (
 type Interface interface {
 	// ForgetPlugin closes every connection to the plugin with the passed name
 	// and forgets its discovery info.
-	// If the plug in was not available in the repository, this is a no-op
+	// This operation is synchronous and blocks until every connection is closed.
+	// If the plugin was not available in the repository, this is a no-op.
 	ForgetPlugin(name string)
 
 	// RegisterRemotePlugin registers a plugin available on a remote
-	// TCP entrypoint
+	// TCP entrypoint.
 	RegisterRemotePlugin(name string, address string, tlsConfig *tls.Config) error
 
 	// RegisterUnixSocketPluginsInPath scans the passed directory
@@ -60,11 +61,62 @@ type data struct {
 	pluginConnectionPool map[string]*puddle.Pool[connection.Interface]
 }
 
+// pluginSetupOptions are the options to be used when setting up
+// a plugin connection
+type pluginSetupOptions struct {
+	// forceRegistration forces the creation of a new plugin connection
+	// even if one already exists. The existing connection will be closed.
+	forceRegistration bool
+}
+
 // maxPoolSize is the maximum number of connections in a plugin's connection
 // pool
 const maxPoolSize = 5
 
-func (r *data) setPluginProtocol(name string, protocol connection.Protocol) error {
+func pluginConnectionConstructor(name string, protocol connection.Protocol) puddle.Constructor[connection.Interface] {
+	return func(ctx context.Context) (connection.Interface, error) {
+		logger := log.
+			FromContext(ctx).
+			WithName("setPluginProtocol").
+			WithValues("pluginName", name)
+		ctx = log.IntoContext(ctx, logger)
+
+		logger.Trace("Connecting to plugin")
+		var (
+			result  connection.Interface
+			handler connection.Handler
+			err     error
+		)
+
+		if handler, err = protocol.Dial(ctx); err != nil {
+			logger.Error(err, "Error while connecting to plugin (physical)")
+			return nil, err
+		}
+
+		if result, err = connection.LoadPlugin(ctx, handler); err != nil {
+			logger.Error(err, "Error while connecting to plugin (logical)")
+			_ = handler.Close()
+			return nil, err
+		}
+
+		return result, err
+	}
+}
+
+func pluginConnectionDestructor(res connection.Interface) {
+	logger := log.FromContext(context.Background()).
+		WithName("pluginConnectionDestructor").
+		WithValues("pluginName", res.Name())
+
+	logger.Trace("Released physical plugin connection")
+
+	err := res.Close()
+	if err != nil {
+		logger.Warning("Error while closing plugin connection", "err", err)
+	}
+}
+
+func (r *data) setPluginProtocol(name string, protocol connection.Protocol, opts pluginSetupOptions) error {
 	r.mux.Lock()
 	defer r.mux.Unlock()
 
@@ -72,59 +124,21 @@ func (r *data) setPluginProtocol(name string, protocol connection.Protocol) erro
 		r.pluginConnectionPool = make(map[string]*puddle.Pool[connection.Interface])
 	}
 
-	_, ok := r.pluginConnectionPool[name]
-	if ok {
-		return &ErrPluginAlreadyRegistered{
-			Name: name,
-		}
-	}
-
-	constructor := func(ctx context.Context) (res connection.Interface, err error) {
-		var handler connection.Handler
-
-		defer func() {
-			if err != nil && handler != nil {
-				_ = handler.Close()
+	if oldPool, alreadyRegistered := r.pluginConnectionPool[name]; alreadyRegistered {
+		if opts.forceRegistration {
+			oldPool.Close()
+		} else {
+			return &ErrPluginAlreadyRegistered{
+				Name: name,
 			}
-		}()
-
-		constructorLogger := log.
-			FromContext(ctx).
-			WithName("setPluginProtocol").
-			WithValues("pluginName", name)
-		ctx = log.IntoContext(ctx, constructorLogger)
-
-		constructorLogger.Trace("Acquired physical plugin connection")
-
-		if handler, err = protocol.Dial(ctx); err != nil {
-			constructorLogger.Error(err, "Got error while connecting to plugin")
-			return nil, err
-		}
-
-		return connection.LoadPlugin(ctx, handler)
-	}
-
-	destructor := func(res connection.Interface) {
-		constructorLogger := log.
-			FromContext(context.Background()).
-			WithName("setPluginProtocol").
-			WithValues("pluginName", name)
-		constructorLogger.Trace("Released physical plugin connection")
-
-		err := res.Close()
-		if err != nil {
-			destructorLogger := log.FromContext(context.Background()).
-				WithName("setPluginProtocol").
-				WithValues("pluginName", res.Name())
-			destructorLogger.Warning("Error while closing plugin connection", "err", err)
 		}
 	}
 
 	var err error
 	r.pluginConnectionPool[name], err = puddle.NewPool(
 		&puddle.Config[connection.Interface]{
-			Constructor: constructor,
-			Destructor:  destructor,
+			Constructor: pluginConnectionConstructor(name, protocol),
+			Destructor:  pluginConnectionDestructor,
 			MaxSize:     maxPoolSize,
 		},
 	)
@@ -143,22 +157,34 @@ func (r *data) ForgetPlugin(name string) {
 		return
 	}
 
-	// TODO(leonardoce): should we really wait for all the plugin connections
-	// to be closed?
 	pool.Close()
+	delete(r.pluginConnectionPool, name)
 }
 
 // registerUnixSocketPlugin registers a plugin available at the passed
 // unix socket path
 func (r *data) registerUnixSocketPlugin(name, path string) error {
-	return r.setPluginProtocol(name, connection.ProtocolUnix(path))
+	return r.setPluginProtocol(name, connection.ProtocolUnix(path), pluginSetupOptions{
+		// Forcing the registration of a Unix socket plugin has no meaning
+		// because they can be installed and started only when the Pod is created.
+		forceRegistration: false,
+	})
 }
 
 func (r *data) RegisterRemotePlugin(name string, address string, tlsConfig *tls.Config) error {
-	return r.setPluginProtocol(name, &connection.ProtocolTCP{
+	protocol := &connection.ProtocolTCP{
 		TLSConfig: tlsConfig,
 		Address:   address,
-	})
+	}
+
+	// The RegisterRemotePlugin function is called when the plugin is registered for
+	// the first time and when the certificates of an existing plugin get refreshed.
+	// In the second case, the plugin loading will be forced and all existing
+	// connections will be dropped and recreated.
+	opts := pluginSetupOptions{
+		forceRegistration: true,
+	}
+	return r.setPluginProtocol(name, protocol, opts)
 }
 
 func (r *data) RegisterUnixSocketPluginsInPath(pluginsPath string) ([]string, error) {
