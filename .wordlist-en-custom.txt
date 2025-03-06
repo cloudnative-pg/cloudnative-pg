@@ -155,6 +155,8 @@ EnvVar
 EphemeralVolumeSource
 EphemeralVolumesSizeLimit
 EphemeralVolumesSizeLimitConfiguration
+ExtensionSpec
+ExtensionStatus
 ExternalCluster
 FQDN
 Fei

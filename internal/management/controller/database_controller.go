@@ -248,18 +248,22 @@ func (r *DatabaseReconciler) reconcileDatabaseExtension(
 	db, err := r.getTargetDB(dbname)
 	if err != nil {
 		return apiv1.ExtensionStatus{
+			Name:    ext.Name,
 			Applied: false,
 			Message: fmt.Sprintf("while connecting to the database %q: %v", dbname, err),
 		}
 	}
 
-	extensionExists, err := detectDatabaseExtension(ctx, db, ext)
+	extensionInfo, err := getDatabaseExtensionInfo(ctx, db, ext)
 	if err != nil {
 		return apiv1.ExtensionStatus{
+			Name:    ext.Name,
 			Applied: false,
 			Message: fmt.Sprintf("while detecting the extension %q: %v", ext.Name, err),
 		}
 	}
+
+	extensionExists := extensionInfo != nil
 
 	switch {
 	case !extensionExists && ext.Ensure == apiv1.EnsurePresent:
@@ -267,11 +271,12 @@ func (r *DatabaseReconciler) reconcileDatabaseExtension(
 
 	case !extensionExists && ext.Ensure == apiv1.EnsureAbsent:
 		return apiv1.ExtensionStatus{
+			Name:    ext.Name,
 			Applied: true,
 		}
 
 	case extensionExists && ext.Ensure == apiv1.EnsurePresent:
-		return reconcileUpdateDatabaseExtension(ctx, db, ext)
+		return reconcileUpdateDatabaseExtension(ctx, db, ext, extensionInfo)
 
 	case extensionExists && ext.Ensure == apiv1.EnsureAbsent:
 		return reconcileDropDatabaseExtension(ctx, db, ext)
@@ -281,6 +286,7 @@ func (r *DatabaseReconciler) reconcileDatabaseExtension(
 		// are not working properly. In this case, let's do nothing:
 		// better to be safe than sorry.
 		return apiv1.ExtensionStatus{
+			Name:    ext.Name,
 			Applied: true,
 		}
 	}
@@ -326,17 +332,19 @@ func reconcileDropDatabaseExtension(ctx context.Context, db *sql.DB, ext *apiv1.
 	}
 }
 
-func reconcileUpdateDatabaseExtension(ctx context.Context, db *sql.DB, ext *apiv1.ExtensionSpec) apiv1.ExtensionStatus {
-	if err := updateDatabaseExtension(ctx, db, ext); err != nil {
+func reconcileUpdateDatabaseExtension(
+	ctx context.Context, db *sql.DB, spec *apiv1.ExtensionSpec, info *extInfo,
+) apiv1.ExtensionStatus {
+	if err := updateDatabaseExtension(ctx, db, spec, info); err != nil {
 		return apiv1.ExtensionStatus{
-			Name:    ext.Name,
+			Name:    spec.Name,
 			Applied: false,
 			Message: err.Error(),
 		}
 	}
 
 	return apiv1.ExtensionStatus{
-		Name:    ext.Name,
+		Name:    spec.Name,
 		Applied: true,
 	}
 }
