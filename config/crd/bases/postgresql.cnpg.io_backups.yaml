@@ -33,7 +33,7 @@ spec:
     name: v1
     schema:
       openAPIV3Schema:
-        description: A `Backup` resource is a request for a PostgreSQL backup by the
+        description: A Backup resource is a request for a PostgreSQL backup by the
           user.
         properties:
           apiVersion:
