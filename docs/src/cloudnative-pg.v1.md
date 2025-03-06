@@ -20,7 +20,7 @@
 
 
 
-<p>A <code>Backup</code> resource is a request for a PostgreSQL backup by the user.</p>
+<p>A Backup resource is a request for a PostgreSQL backup by the user.</p>
 
 
 <table class="table">

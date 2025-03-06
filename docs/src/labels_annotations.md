@@ -69,7 +69,7 @@ CloudNativePG manages the following predefined labels:
   This label is available only on `VolumeSnapshot` resources.
 
 `cnpg.io/podRole`
-: Distinguishes pods dedicated to pooler deployment from those used for.
+: Distinguishes pods dedicated to pooler deployment from those used for
   database instances.
 
 `cnpg.io/poolerName`
@@ -97,7 +97,7 @@ CloudNativePG manages the following predefined labels:
    `Backup` object.
 
 `cnpg.io/instanceRole`
-: Whether the instance running in a pod is a `primary` or a `replica`..
+: Whether the instance running in a pod is a `primary` or a `replica`.
 
 
 ## Predefined annotations
