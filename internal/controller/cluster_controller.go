@@ -931,11 +931,10 @@ func (r *ClusterReconciler) reconcilePods(
 
 	report := instancesStatus.GetConfigurationReport()
 
-	// If any pod is not reporting its configuration,
-	// (in which case, uniform == nil) we need to proceed with a rolling
-	// update. This will upgrade the instance manager
-	// to a version reporting the configuration status.
-	// If all pods report their configuration, we should wait until all the instances
+	// If any pod is not reporting its configuration (i.e., uniform == nil),
+	// proceed with a rolling update to upgrade the instance manager
+	// to a version that reports the configuration status.
+	// If all pods report their configuration, wait until all instances
 	// report the same configuration.
 	if uniform := report.IsUniform(); uniform != nil && !*uniform {
 		contextLogger.Debug(

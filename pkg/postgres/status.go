@@ -48,7 +48,7 @@ type PostgresqlStatus struct {
 	// populated when MightBeUnavailable reported a healthy status even if it found an error
 	MightBeUnavailableMaskedError string `json:"mightBeUnavailableMaskedError,omitempty"`
 
-	// This is the hash of the current PostgreSQL configuration
+	// Hash of the current PostgreSQL configuration
 	LoadedConfigurationHash string `json:"loadedConfigurationHash,omitempty"`
 
 	// Archiver status
@@ -424,8 +424,8 @@ func (list PostgresqlStatusList) PrimaryNames() []string {
 	return result
 }
 
-// GetConfigurationReport extracts the configuration report from a Pod
-// status list
+// GetConfigurationReport generates a report on the PostgreSQL configuration
+// status of each Pod in the list.
 func (list PostgresqlStatusList) GetConfigurationReport() ConfigurationReport {
 	result := make([]ConfigurationReportEntry, len(list.Items))
 	for i := range list.Items {
@@ -437,28 +437,28 @@ func (list PostgresqlStatusList) GetConfigurationReport() ConfigurationReport {
 }
 
 // ConfigurationReportEntry contains information about the current
-// PostgreSQL configuration of a Pod
+// PostgreSQL configuration of a Pod.
 type ConfigurationReportEntry struct {
-	// PodName is the name of the Pod
+	// PodName is the name of the Pod.
 	PodName string `json:"podName"`
 
-	// Is the has of the currently loaded configuration or empty
-	// if the instance manager didn't report that
+	// ConfigHash is the hash of the currently loaded configuration or empty
+	// if the instance manager didn't report it.
 	ConfigHash string `json:"configHash"`
 }
 
 // ConfigurationReport contains information about the current
-// PostgreSQL configuration of each Pod
+// PostgreSQL configuration of each Pod.
 type ConfigurationReport []ConfigurationReportEntry
 
 // IsUniform checks if every Pod has loaded the same PostgreSQL
 // configuration. Returns:
 //
-//   - true when every Pod reports the configuration, and the same
-//     configuration is used across all the Pods
-//   - false when every Pod reports the configuration and there
-//     are two Pods using different configurations
-//   - nil when one of the pods doesn't report the configuration
+//   - true if every Pod reports the configuration, and the same
+//     configuration is used across all Pods.
+//   - false if every Pod reports the configuration and there
+//     are two Pods using different configurations.
+//   - nil if any Pod doesn't report the configuration.
 func (report ConfigurationReport) IsUniform() *bool {
 	detectedConfigurationHash := stringset.New()
 	for _, item := range report {
