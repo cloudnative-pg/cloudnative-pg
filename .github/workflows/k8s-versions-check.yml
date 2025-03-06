@@ -109,8 +109,10 @@ jobs:
       -
         name: Get updated OpenShift versions
         run: |
+          # We limit the range starting on 4 to 9 to skip the 13 version
+          # this needs to be updated when the 15 version is also EOL
           curl -s https://mirror.openshift.com/pub/openshift-v4/clients/ocp/ | \
-          grep -e 'href.*"4\.1[2-9]\.[0-9].*"' | \
+          grep -e 'href.*"4\.1[24-9]\.[0-9].*"' | \
           sed -e 's/\(.*\)href="\(4\.1[2-9]\)\(.*\)/\2/' | \
           sort -Vru | \
           awk -vv="$MINIMAL_OCP" '$0>=v {print $0}' | \
