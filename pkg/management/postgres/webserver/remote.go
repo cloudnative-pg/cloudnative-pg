@@ -215,8 +215,8 @@ func (ws *remoteWebserverEndpoints) isServerStartedUp(w http.ResponseWriter, req
 		return
 	}
 
-	checker := probes.NewChecker(ws.typedClient, ws.instance)
-	checker.IsHealthy(req.Context(), w, probes.ProbeTypeStartup)
+	checker := probes.NewStartupChecker(ws.typedClient, ws.instance)
+	checker.IsHealthy(req.Context(), w)
 }
 
 func (ws *remoteWebserverEndpoints) isServerHealthy(w http.ResponseWriter, _ *http.Request) {
@@ -230,8 +230,8 @@ func (ws *remoteWebserverEndpoints) isServerReady(w http.ResponseWriter, req *ht
 		return
 	}
 
-	checker := probes.NewChecker(ws.typedClient, ws.instance)
-	checker.IsHealthy(req.Context(), w, probes.ProbeTypeReadiness)
+	checker := probes.NewReadinessChecker(ws.typedClient, ws.instance)
+	checker.IsHealthy(req.Context(), w)
 }
 
 // This probe is for the instance status, including replication
