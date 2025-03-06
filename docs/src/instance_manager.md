@@ -275,7 +275,7 @@ failures × 10 seconds) for the startup probe to succeed:
 probes:
   readiness:
     type: streaming
-    lag: 64Mi
+    maximumLag: 64Mi
     failureThreshold: 30
     periodSeconds: 10
 ```
