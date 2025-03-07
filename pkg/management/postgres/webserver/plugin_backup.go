@@ -116,6 +116,7 @@ func (b *PluginBackupCommand) invokeStart(ctx context.Context) {
 		b.markBackupAsFailed(ctx, err)
 		return
 	}
+	defer cli.Close(ctx)
 
 	// record the backup beginning
 	contextLogger.Info("Plugin backup started")
