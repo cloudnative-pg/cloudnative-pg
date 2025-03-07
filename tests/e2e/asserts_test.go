@@ -2539,17 +2539,21 @@ func collectAndAssertCollectorMetricsPresentOnEachPod(cluster *apiv1.Cluster) {
 		"cnpg_collector_replica_mode",
 	}
 
-	if env.PostgresVersion > 14 {
+	if env.PostgresVersion >= 14 {
 		cnpgCollectorMetrics = append(cnpgCollectorMetrics,
 			"cnpg_collector_wal_records",
 			"cnpg_collector_wal_fpi",
 			"cnpg_collector_wal_bytes",
 			"cnpg_collector_wal_buffers_full",
-			"cnpg_collector_wal_write",
-			"cnpg_collector_wal_sync",
-			"cnpg_collector_wal_write_time",
-			"cnpg_collector_wal_sync_time",
 		)
+		if env.PostgresVersion < 18 {
+			cnpgCollectorMetrics = append(cnpgCollectorMetrics,
+				"cnpg_collector_wal_write",
+				"cnpg_collector_wal_sync",
+				"cnpg_collector_wal_write_time",
+				"cnpg_collector_wal_sync_time",
+			)
+		}
 	}
 	By("collecting and verify set of collector metrics on each pod", func() {
 		podList, err := clusterutils.ListPods(env.Ctx, env.Client, cluster.Namespace, cluster.Name)
