@@ -59,11 +59,11 @@ func IsRetryableError(err *Error) bool {
 }
 
 type remoteWebserverEndpoints struct {
-	typedClient      client.Client
-	instance         *postgres.Instance
-	currentBackup    *backupConnection
-	readinessChecker *readiness.Data
-	ongoingRequest   sync.Mutex
+	typedClient          client.Client
+	instance             *postgres.Instance
+	currentBackup        *backupConnection
+	readinessChecker     *readiness.Data
+	ongoingBackupRequest sync.Mutex
 }
 
 // StartBackupRequest the required data to execute the pg_start_backup
@@ -156,8 +156,8 @@ func (ws *remoteWebserverEndpoints) cleanupStaleCollections(ctx context.Context)
 			return
 		}
 
-		ws.ongoingRequest.Lock()
-		defer ws.ongoingRequest.Unlock()
+		ws.ongoingBackupRequest.Lock()
+		defer ws.ongoingBackupRequest.Unlock()
 
 		if bc.data.Phase == Completed || bc.data.BackupName == "" {
 			return
@@ -331,11 +331,11 @@ func (ws *remoteWebserverEndpoints) updateInstanceManager(
 // nolint: gocognit
 func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Request) {
 	log.Trace("request method", "method", req.Method)
-	if !ws.ongoingRequest.TryLock() {
+	if !ws.ongoingBackupRequest.TryLock() {
 		sendUnprocessableEntityJSONResponse(w, errCodeAnotherRequestInProgress, "")
 		return
 	}
-	defer ws.ongoingRequest.Unlock()
+	defer ws.ongoingBackupRequest.Unlock()
 
 	switch req.Method {
 	case http.MethodGet:
@@ -390,7 +390,7 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 			sendUnprocessableEntityJSONResponse(w, "CANNOT_INITIALIZE_CONNECTION", err.Error())
 			return
 		}
-		go ws.currentBackup.startBackup(context.Background(), &ws.ongoingRequest)
+		go ws.currentBackup.startBackup(context.Background(), &ws.ongoingBackupRequest)
 
 		res := Response[BackupResultData]{
 			Data: &ws.currentBackup.data,
@@ -449,7 +449,7 @@ func (ws *remoteWebserverEndpoints) backup(w http.ResponseWriter, req *http.Requ
 
 		ws.currentBackup.data.Phase = Closing
 
-		go ws.currentBackup.stopBackup(context.Background(), &ws.ongoingRequest)
+		go ws.currentBackup.stopBackup(context.Background(), &ws.ongoingBackupRequest)
 		sendJSONResponseWithData(w, 200, res)
 		return
 	}
