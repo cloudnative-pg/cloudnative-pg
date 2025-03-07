@@ -314,7 +314,7 @@ type InstanceID struct {
 // +kubebuilder:printcolumn:name="Phase",type="string",JSONPath=".status.phase"
 // +kubebuilder:printcolumn:name="Error",type="string",JSONPath=".status.error"
 
-// Backup is the Schema for the backups API
+// A Backup resource is a request for a PostgreSQL backup by the user.
 type Backup struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata"`
