@@ -28,6 +28,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"time"
 
@@ -1165,6 +1166,11 @@ func (instance *Instance) GetPodName() string {
 // GetNamespaceName returns the name of the namespace where this instance is running
 func (instance *Instance) GetNamespaceName() string {
 	return instance.namespace
+}
+
+// GetArchitecture returns the runtime architecture
+func (instance *Instance) GetArchitecture() string {
+	return runtime.GOARCH
 }
 
 // RequestFastImmediateShutdown request the lifecycle manager to shut down
