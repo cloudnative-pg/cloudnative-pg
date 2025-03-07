@@ -16,13 +16,25 @@ limitations under the License.
 
 package remote
 
+import (
+	"time"
+
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/client/common"
+)
+
 // Client is the interface to interact with the remote webserver
 type Client interface {
 	Instance() InstanceClient
+	Backup() BackupClient
 }
 
 type remoteClientImpl struct {
 	instance InstanceClient
+	backup   *backupClientImpl
+}
+
+func (r *remoteClientImpl) Backup() BackupClient {
+	return r.backup
 }
 
 func (r *remoteClientImpl) Instance() InstanceClient {
@@ -31,7 +43,11 @@ func (r *remoteClientImpl) Instance() InstanceClient {
 
 // NewClient creates a new remote client
 func NewClient() Client {
+	const connectionTimeout = 2 * time.Second
+	const requestTimeout = 10 * time.Second
+
 	return &remoteClientImpl{
-		instance: newInstanceClient(),
+		instance: &instanceClientImpl{Client: common.NewHTTPClient(connectionTimeout, requestTimeout)},
+		backup:   &backupClientImpl{cli: common.NewHTTPClient(connectionTimeout, requestTimeout)},
 	}
 }
