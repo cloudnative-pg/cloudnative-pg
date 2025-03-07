@@ -171,7 +171,7 @@ type DatabaseSpec struct {
 // ExtensionSpec configures an extension in a database
 type ExtensionSpec struct {
 	// Name is the name of the extension
-	Name string `json:"name,omitempty"`
+	Name string `json:"name"`
 
 	// Ensure tells the operator to install or remove an extension from
 	// the database
