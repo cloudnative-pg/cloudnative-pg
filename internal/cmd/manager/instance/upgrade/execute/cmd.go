@@ -125,10 +125,8 @@ func upgradeSubCommand(
 		return err
 	}
 
-	if err = management.WaitForGetClusterWithClient(ctx, client, ctrl.ObjectKey{
-		Name:      instance.GetClusterName(),
-		Namespace: instance.GetNamespaceName(),
-	}); err != nil {
+	clusterObjectKey := ctrl.ObjectKey{Name: instance.GetClusterName(), Namespace: instance.GetNamespaceName()}
+	if err = management.WaitForGetClusterWithClient(ctx, client, clusterObjectKey); err != nil {
 		return err
 	}
 
@@ -139,10 +137,7 @@ func upgradeSubCommand(
 
 	// Download the cluster definition from the API server
 	var cluster apiv1.Cluster
-	if err := reconciler.GetClient().Get(ctx,
-		ctrl.ObjectKey{Namespace: instance.GetNamespaceName(), Name: instance.GetClusterName()},
-		&cluster,
-	); err != nil {
+	if err := reconciler.GetClient().Get(ctx, clusterObjectKey, &cluster); err != nil {
 		contextLogger.Error(err, "Error while getting cluster")
 		return err
 	}
@@ -158,8 +153,7 @@ func upgradeSubCommand(
 		return fmt.Errorf("error while reconciling the WAL storage: %w", err)
 	}
 
-	socketDir := postgres.GetSocketDir()
-	if err := fileutils.EnsureDirectoryExists(socketDir); err != nil {
+	if err := fileutils.EnsureDirectoryExists(postgres.GetSocketDir()); err != nil {
 		return fmt.Errorf("while creating socket directory: %w", err)
 	}
 
@@ -301,8 +295,7 @@ func prepareConfigurationFiles(ctx context.Context, cluster apiv1.Cluster, destD
 
 	// Create a stub for the configuration file
 	// to be filled during the real startup of this instance
-	err = fileutils.CreateEmptyFile(
-		path.Join(destDir, constants.PostgresqlOverrideConfigurationFile))
+	err = fileutils.CreateEmptyFile(path.Join(destDir, constants.PostgresqlOverrideConfigurationFile))
 	if err != nil {
 		return fmt.Errorf("creating the operator managed configuration file '%v' resulted in an error: %w",
 			constants.PostgresqlOverrideConfigurationFile, err)
