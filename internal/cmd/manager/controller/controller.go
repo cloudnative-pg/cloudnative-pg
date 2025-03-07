@@ -217,6 +217,7 @@ func RunController(
 	); err != nil {
 		setupLog.Error(err, "Unable to load sidecar CNPG-i plugins, skipping")
 	}
+	defer pluginRepository.Close()
 
 	if err = controller.NewClusterReconciler(
 		mgr,
