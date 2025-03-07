@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package local
+package remote
 
 import (
 	"context"
@@ -28,6 +28,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver"
 )
 
+// executeRequestWithError executes an http request and returns a webserver.response and any error encountered
 func executeRequestWithError[T any](
 	ctx context.Context,
 	cli *http.Client,
