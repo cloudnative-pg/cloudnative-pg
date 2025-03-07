@@ -1029,7 +1029,7 @@ func AssertClusterHasPvcsAndDataDirsForTablespaces(cluster *apiv1.Cluster, timeo
 					)
 
 					targetContainer := getPostgresContainer(pod)
-					Expect(targetContainer).NotTo(BeNil())
+					g.Expect(targetContainer).NotTo(BeNil())
 					dbUser := getDatabasUserUID(cluster, targetContainer)
 
 					g.Expect(stdErr).To(BeEmpty())

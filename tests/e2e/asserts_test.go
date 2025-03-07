@@ -134,11 +134,11 @@ func AssertSwitchoverWithHistory(
 	})
 
 	By("waiting that the TargetPrimary become also CurrentPrimary", func() {
-		Eventually(func() (string, error) {
+		Eventually(func(g Gomega) {
 			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
-			return cluster.Status.CurrentPrimary, err
-		}, testTimeouts[timeouts.NewPrimaryAfterSwitchover]).Should(BeEquivalentTo(targetPrimary))
+			g.Expect(err).ToNot(HaveOccurred())
+			g.Expect(cluster.Status.CurrentPrimary).To(BeEquivalentTo(targetPrimary))
+		}, testTimeouts[timeouts.NewPrimaryAfterSwitchover]).Should(Succeed())
 	})
 
 	By("waiting that the old primary become ready", func() {
@@ -331,7 +331,6 @@ func AssertClusterDefault(
 		Eventually(func(g Gomega) {
 			var err error
 			cluster, err = clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
 			g.Expect(err).ToNot(HaveOccurred())
 		}).Should(Succeed())
 
@@ -767,12 +766,15 @@ func AssertNewPrimary(namespace string, clusterName string, oldPrimary string) {
 		timeout := 120
 		// Wait for the operator to set a new TargetPrimary
 		var cluster *apiv1.Cluster
-		Eventually(func() (string, error) {
+		Eventually(func(g Gomega) {
 			var err error
 			cluster, err = clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
-			return cluster.Status.TargetPrimary, err
-		}, timeout).ShouldNot(Or(BeEquivalentTo(oldPrimary), BeEquivalentTo(apiv1.PendingFailoverMarker)))
+			g.Expect(err).ToNot(HaveOccurred())
+			g.Expect(cluster.Status.TargetPrimary).ToNot(Or(
+				BeEquivalentTo(oldPrimary),
+				BeEquivalentTo(apiv1.PendingFailoverMarker),
+			))
+		}, timeout).Should(Succeed())
 		newPrimary := cluster.Status.TargetPrimary
 
 		// Expect the chosen pod to eventually become a primary
@@ -2043,15 +2045,15 @@ func switchWalAndGetLatestArchive(namespace, podName string) string {
 
 func createAndAssertPgBouncerPoolerIsSetUp(namespace, poolerYamlFilePath string, expectedInstanceCount int) {
 	CreateResourceFromFile(namespace, poolerYamlFilePath)
-	Eventually(func() (int32, error) {
+	Eventually(func(g Gomega) {
 		poolerName, err := yaml.GetResourceNameFromYAML(env.Scheme, poolerYamlFilePath)
-		Expect(err).ToNot(HaveOccurred())
+		g.Expect(err).ToNot(HaveOccurred())
 		// Wait for the deployment to be ready
 		deployment := &appsv1.Deployment{}
 		err = env.Client.Get(env.Ctx, types.NamespacedName{Namespace: namespace, Name: poolerName}, deployment)
-
-		return deployment.Status.ReadyReplicas, err
-	}, 300).Should(BeEquivalentTo(expectedInstanceCount))
+		g.Expect(err).ToNot(HaveOccurred())
+		g.Expect(deployment.Status.ReadyReplicas).To(BeEquivalentTo(expectedInstanceCount))
+	}, 300).Should(Succeed())
 
 	// check pooler pod is up and running
 	assertPGBouncerPodsAreReady(namespace, poolerYamlFilePath, expectedInstanceCount)
@@ -2062,41 +2064,31 @@ func assertPgBouncerPoolerDeploymentStrategy(
 	expectedMaxSurge, expectedMaxUnavailable string,
 ) {
 	By("verify pooler deployment has expected rolling update configuration", func() {
-		Eventually(func() bool {
+		Eventually(func(g Gomega) {
 			poolerName, err := yaml.GetResourceNameFromYAML(env.Scheme, poolerYamlFilePath)
-			Expect(err).ToNot(HaveOccurred())
+			g.Expect(err).ToNot(HaveOccurred())
 			// Wait for the deployment to be ready
 			deployment := &appsv1.Deployment{}
 			err = env.Client.Get(env.Ctx, types.NamespacedName{Namespace: namespace, Name: poolerName}, deployment)
-			if err != nil {
-				return false
-			}
-			if expectedMaxSurge == deployment.Spec.Strategy.RollingUpdate.MaxSurge.String() &&
-				expectedMaxUnavailable == deployment.Spec.Strategy.RollingUpdate.MaxUnavailable.String() {
-				return true
-			}
-			return false
-		}, 300).Should(BeTrue())
+			g.Expect(err).ToNot(HaveOccurred())
+			g.Expect(deployment.Spec.Strategy.RollingUpdate.MaxSurge.String()).To(BeEquivalentTo(expectedMaxSurge))
+			g.Expect(deployment.Spec.Strategy.RollingUpdate.MaxUnavailable.String()).To(BeEquivalentTo(expectedMaxUnavailable))
+		}, 300).Should(Succeed())
 	})
 }
 
 // assertPGBouncerPodsAreReady verifies if PGBouncer pooler pods are ready
 func assertPGBouncerPodsAreReady(namespace, poolerYamlFilePath string, expectedPodCount int) {
-	Eventually(func() (bool, error) {
+	Eventually(func(g Gomega) {
 		poolerName, err := yaml.GetResourceNameFromYAML(env.Scheme, poolerYamlFilePath)
-		Expect(err).ToNot(HaveOccurred())
+		g.Expect(err).ToNot(HaveOccurred())
 		podList := &corev1.PodList{}
 		err = env.Client.List(env.Ctx, podList, ctrlclient.InNamespace(namespace),
 			ctrlclient.MatchingLabels{utils.PgbouncerNameLabel: poolerName})
-		if err != nil {
-			return false, err
-		}
+		g.Expect(err).ToNot(HaveOccurred())
 
 		podItemsCount := len(podList.Items)
-		if podItemsCount != expectedPodCount {
-			return false, fmt.Errorf("expected pgBouncer pods count match passed expected instance count. "+
-				"Got: %v, Expected: %v", podItemsCount, expectedPodCount)
-		}
+		g.Expect(podItemsCount).To(BeEquivalentTo(expectedPodCount))
 
 		activeAndReadyPodCount := 0
 		for _, item := range podList.Items {
@@ -2105,14 +2097,8 @@ func assertPGBouncerPodsAreReady(namespace, poolerYamlFilePath string, expectedP
 			}
 			continue
 		}
-
-		if activeAndReadyPodCount != expectedPodCount {
-			return false, fmt.Errorf("expected pgBouncer pods to be all active and ready. Got: %v, Expected: %v",
-				activeAndReadyPodCount, expectedPodCount)
-		}
-
-		return true, nil
-	}, 90).Should(BeTrue())
+		g.Expect(activeAndReadyPodCount).To(BeEquivalentTo(expectedPodCount))
+	}, 90).Should(Succeed())
 }
 
 func assertReadWriteConnectionUsingPgBouncerService(
@@ -2334,12 +2320,12 @@ func OnlineResizePVC(namespace, clusterName string) {
 		if walStorageEnabled {
 			expectedCount = 6
 		}
-		Eventually(func() int {
+		Eventually(func(g Gomega) {
 			// Variable counter to store the updated total of expanded PVCs. It should be equal to three
 			updateCount := 0
 			// Gathering PVC list
 			err := env.Client.List(env.Ctx, pvc, ctrlclient.InNamespace(namespace))
-			Expect(err).ToNot(HaveOccurred())
+			g.Expect(err).ToNot(HaveOccurred())
 			// Iterating through PVC list to compare with expanded size
 			for _, pvClaim := range pvc.Items {
 				// Size comparison
@@ -2347,8 +2333,8 @@ func OnlineResizePVC(namespace, clusterName string) {
 					updateCount++
 				}
 			}
-			return updateCount
-		}, 300).Should(BeEquivalentTo(expectedCount))
+			g.Expect(updateCount).To(BeEquivalentTo(expectedCount))
+		}, 300).Should(Succeed())
 	})
 }
 
