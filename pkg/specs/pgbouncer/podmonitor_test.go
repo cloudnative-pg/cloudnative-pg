@@ -76,6 +76,7 @@ var _ = Describe("PoolerPodMonitorManager", func() {
 
 			Expect(podMonitor.Spec.Selector.MatchLabels).To(Equal(map[string]string{
 				utils.PgbouncerNameLabel: pooler.Name,
+				utils.PodRoleLabelName:   string(utils.PodRolePooler),
 			}))
 
 			Expect(podMonitor.Spec.PodMetricsEndpoints).To(HaveLen(1))
