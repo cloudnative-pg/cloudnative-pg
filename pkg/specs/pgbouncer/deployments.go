@@ -108,6 +108,10 @@ func Deployment(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*appsv1.Deploymen
 			Name:      "scratch-data",
 			MountPath: postgres.ScratchDataDirectory,
 		}, true).
+		WithInitContainerResources(
+			specs.BootstrapControllerContainerName,
+			specs.GetInitResources(),
+		).
 		WithContainerEnv("pgbouncer", corev1.EnvVar{Name: "NAMESPACE", Value: pooler.Namespace}, true).
 		WithContainerEnv("pgbouncer", corev1.EnvVar{Name: "POOLER_NAME", Value: pooler.Name}, true).
 		WithContainerEnv("pgbouncer", corev1.EnvVar{Name: "PGUSER", Value: "pgbouncer"}, false).

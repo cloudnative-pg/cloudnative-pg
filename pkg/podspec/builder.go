@@ -344,6 +344,21 @@ func (builder *Builder) WithInitContainerVolumeMount(
 	return builder
 }
 
+func (builder *Builder) WithInitContainerResources(
+	name string,
+	resources corev1.ResourceRequirements,
+) *Builder {
+	builder.WithInitContainer(name)
+
+	for idx, value := range builder.status.Spec.InitContainers {
+		if value.Name == name {
+			builder.status.Spec.InitContainers[idx].Resources = resources
+		}
+	}
+
+	return builder
+}
+
 // WithInitContainerCommand ensures that, if in the current status there is
 // an init container with the passed name and the command is empty, the command will be
 // set to the one passed.
