@@ -18,7 +18,6 @@ package postgres
 
 import (
 	"database/sql"
-	"errors"
 	"fmt"
 	"path/filepath"
 	"runtime"
@@ -35,20 +34,6 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
-
-// IsServerHealthy check if the instance is healthy
-func (instance *Instance) IsServerHealthy() error {
-	err := PgIsReady()
-
-	// A healthy server can also be actively rejecting connections.
-	// That's not a problem: it's only the server starting up or shutting
-	// down.
-	if errors.Is(err, ErrPgRejectingConnection) {
-		return nil
-	}
-
-	return err
-}
 
 // GetStatus Extract the status of this PostgreSQL database
 func (instance *Instance) GetStatus() (result *postgres.PostgresqlStatus, err error) {
