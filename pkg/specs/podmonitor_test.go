@@ -62,8 +62,14 @@ var _ = Describe("PodMonitor test", func() {
 		It("should create a valid monitoringv1.PodMonitor object", func() {
 			mgr := NewClusterPodMonitorManager(cluster.DeepCopy())
 			monitor := mgr.BuildPodMonitor()
-			Expect(monitor.Labels[utils.ClusterLabelName]).To(Equal(cluster.Name))
-			Expect(monitor.Spec.Selector.MatchLabels[utils.ClusterLabelName]).To(Equal(cluster.Name))
+			Expect(monitor.Labels).To(BeEquivalentTo(map[string]string{
+				utils.ClusterLabelName: cluster.Name,
+			}))
+			Expect(monitor.Spec.Selector.MatchLabels).To(BeEquivalentTo(map[string]string{
+				utils.ClusterLabelName: cluster.Name,
+				utils.PodRoleLabelName: string(utils.PodRoleInstance),
+			}))
+
 			Expect(monitor.Spec.PodMetricsEndpoints).To(ContainElement(expectedEndpoint))
 		})
 
