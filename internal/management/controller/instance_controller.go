@@ -330,8 +330,8 @@ func (r *InstanceReconciler) restartPrimaryInplaceIfRequested(
 			ctx,
 			r.client,
 			cluster,
-			clusterstatus.SetPhaseTX(apiv1.PhaseHealthy, "Primary instance restarted in-place"),
-			clusterstatus.SetClusterReadyConditionTX,
+			clusterstatus.SetPhase(apiv1.PhaseHealthy, "Primary instance restarted in-place"),
+			clusterstatus.SetClusterReadyCondition,
 		)
 	}
 	return false, nil
@@ -1066,8 +1066,8 @@ func (r *InstanceReconciler) processConfigReloadAndManageRestart(ctx context.Con
 		ctx,
 		r.client,
 		cluster,
-		clusterstatus.SetPhaseTX(phase, phaseReason),
-		clusterstatus.SetClusterReadyConditionTX,
+		clusterstatus.SetPhase(phase, phaseReason),
+		clusterstatus.SetClusterReadyCondition,
 	)
 }
 
@@ -1090,8 +1090,8 @@ func (r *InstanceReconciler) triggerRestartForDecrease(ctx context.Context, clus
 		ctx,
 		r.client,
 		cluster,
-		clusterstatus.SetPhaseTX(phase, phaseReason),
-		clusterstatus.SetClusterReadyConditionTX,
+		clusterstatus.SetPhase(phase, phaseReason),
+		clusterstatus.SetClusterReadyCondition,
 	)
 }
 
