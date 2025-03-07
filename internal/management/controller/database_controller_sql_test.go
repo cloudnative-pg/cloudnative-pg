@@ -230,7 +230,7 @@ var _ = Describe("Managed Extensions SQL", func() {
 	var (
 		dbMock sqlmock.Sqlmock
 		db     *sql.DB
-		ext    *apiv1.ExtensionSpec
+		ext    apiv1.ExtensionSpec
 		err    error
 
 		testError error
@@ -240,9 +240,11 @@ var _ = Describe("Managed Extensions SQL", func() {
 		db, dbMock, err = sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 		Expect(err).ToNot(HaveOccurred())
 
-		ext = &apiv1.ExtensionSpec{
-			Name:    "testext",
-			Ensure:  "present",
+		ext = apiv1.ExtensionSpec{
+			DatabaseObjectSpec: apiv1.DatabaseObjectSpec{
+				Name:   "testext",
+				Ensure: "present",
+			},
 			Version: "1.0",
 			Schema:  "default",
 		}

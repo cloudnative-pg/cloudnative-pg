@@ -35,6 +35,11 @@ type extInfo struct {
 	Schema  string `json:"schema"`
 }
 
+type schemaInfo struct {
+	Name  string `json:"name"`
+	Owner string `json:"owner"`
+}
+
 func detectDatabase(
 	ctx context.Context,
 	db *sql.DB,
@@ -230,7 +235,7 @@ JOIN pg_catalog.pg_namespace n ON e.extnamespace=n.oid
 WHERE e.extname = $1
 `
 
-func getDatabaseExtensionInfo(ctx context.Context, db *sql.DB, ext *apiv1.ExtensionSpec) (*extInfo, error) {
+func getDatabaseExtensionInfo(ctx context.Context, db *sql.DB, ext apiv1.ExtensionSpec) (*extInfo, error) {
 	row := db.QueryRowContext(
 		ctx, detectDatabaseExtensionSQL,
 		ext.Name)
@@ -249,7 +254,7 @@ func getDatabaseExtensionInfo(ctx context.Context, db *sql.DB, ext *apiv1.Extens
 	return &result, nil
 }
 
-func createDatabaseExtension(ctx context.Context, db *sql.DB, ext *apiv1.ExtensionSpec) error {
+func createDatabaseExtension(ctx context.Context, db *sql.DB, ext apiv1.ExtensionSpec) error {
 	contextLogger := log.FromContext(ctx)
 
 	var sqlCreateExtension strings.Builder
@@ -271,7 +276,7 @@ func createDatabaseExtension(ctx context.Context, db *sql.DB, ext *apiv1.Extensi
 	return nil
 }
 
-func dropDatabaseExtension(ctx context.Context, db *sql.DB, ext *apiv1.ExtensionSpec) error {
+func dropDatabaseExtension(ctx context.Context, db *sql.DB, ext apiv1.ExtensionSpec) error {
 	contextLogger := log.FromContext(ctx)
 	query := fmt.Sprintf("DROP EXTENSION IF EXISTS %s", pgx.Identifier{ext.Name}.Sanitize())
 	_, err := db.ExecContext(
@@ -285,7 +290,7 @@ func dropDatabaseExtension(ctx context.Context, db *sql.DB, ext *apiv1.Extension
 	return nil
 }
 
-func updateDatabaseExtension(ctx context.Context, db *sql.DB, spec *apiv1.ExtensionSpec, info *extInfo) error {
+func updateDatabaseExtension(ctx context.Context, db *sql.DB, spec apiv1.ExtensionSpec, info *extInfo) error {
 	contextLogger := log.FromContext(ctx)
 	if len(spec.Schema) > 0 && spec.Schema != info.Schema {
 		changeSchemaSQL := fmt.Sprintf(
@@ -316,5 +321,83 @@ func updateDatabaseExtension(ctx context.Context, db *sql.DB, spec *apiv1.Extens
 		contextLogger.Info("altered extension version", "name", spec.Name, "version", spec.Version)
 	}
 
+	return nil
+}
+
+const detectDatabaseSchemaSQL = `
+SELECT n.nspname, a.rolname
+FROM pg_catalog.pg_namespace n
+JOIN pg_catalog.pg_authid a ON n.nspowner = a.oid
+WHERE n.nspname = $1
+`
+
+func getDatabaseSchemaInfo(ctx context.Context, db *sql.DB, schema apiv1.SchemaSpec) (*schemaInfo, error) {
+	row := db.QueryRowContext(
+		ctx, detectDatabaseSchemaSQL,
+		schema.Name)
+	if row.Err() != nil {
+		return nil, fmt.Errorf("while checking if schema %q exists: %w", schema.Name, row.Err())
+	}
+
+	var result schemaInfo
+	if err := row.Scan(&result.Name, &result.Owner); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("while scanning if schema %q exists: %w", schema.Name, err)
+	}
+
+	return &result, nil
+}
+
+func createDatabaseSchema(ctx context.Context, db *sql.DB, schema apiv1.SchemaSpec) error {
+	contextLogger := log.FromContext(ctx)
+
+	var sqlCreateExtension strings.Builder
+	sqlCreateExtension.WriteString(fmt.Sprintf("CREATE SCHEMA %s ", pgx.Identifier{schema.Name}.Sanitize()))
+	if len(schema.Owner) > 0 {
+		sqlCreateExtension.WriteString(fmt.Sprintf(" AUTHORIZATION %s", pgx.Identifier{schema.Owner}.Sanitize()))
+	}
+
+	_, err := db.ExecContext(ctx, sqlCreateExtension.String())
+	if err != nil {
+		contextLogger.Error(err, "while creating schema", "query", sqlCreateExtension.String())
+		return err
+	}
+	contextLogger.Info("created schema", "name", schema.Name)
+
+	return nil
+}
+
+func updateDatabaseSchema(ctx context.Context, db *sql.DB, schema apiv1.SchemaSpec, info *schemaInfo) error {
+	contextLogger := log.FromContext(ctx)
+	if len(schema.Owner) > 0 && schema.Owner != info.Owner {
+		changeSchemaSQL := fmt.Sprintf(
+			"ALTER SCHEMA %s OWNER TO %v",
+			pgx.Identifier{schema.Name}.Sanitize(),
+			pgx.Identifier{schema.Owner}.Sanitize(),
+		)
+
+		if _, err := db.ExecContext(ctx, changeSchemaSQL); err != nil {
+			return fmt.Errorf("altering schema: %w", err)
+		}
+
+		contextLogger.Info("altered schema owner", "name", schema.Name, "owner", schema.Owner)
+	}
+
+	return nil
+}
+
+func dropDatabaseSchema(ctx context.Context, db *sql.DB, schema apiv1.SchemaSpec) error {
+	contextLogger := log.FromContext(ctx)
+	query := fmt.Sprintf("DROP SCHEMA IF EXISTS %s", pgx.Identifier{schema.Name}.Sanitize())
+	_, err := db.ExecContext(
+		ctx,
+		query)
+	if err != nil {
+		contextLogger.Error(err, "while dropping schema", "query", query)
+		return err
+	}
+	contextLogger.Info("dropped schema", "name", schema.Name)
 	return nil
 }

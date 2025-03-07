@@ -150,6 +150,7 @@ func (v *DatabaseCustomValidator) validate(d *apiv1.Database) (allErrs field.Err
 	type validationFunc func(*apiv1.Database) field.ErrorList
 	validations := []validationFunc{
 		v.validateExtensions,
+		v.validateSchemas,
 	}
 
 	for _, validate := range validations {
@@ -181,6 +182,29 @@ func (v *DatabaseCustomValidator) validateExtensions(d *apiv1.Database) field.Er
 		}
 
 		extensionNames.Put(name)
+	}
+
+	return result
+}
+
+// validateSchemas validates the database schemas
+func (v *DatabaseCustomValidator) validateSchemas(d *apiv1.Database) field.ErrorList {
+	var result field.ErrorList
+
+	schemaNames := stringset.New()
+	for i, schema := range d.Spec.Schemas {
+		name := schema.Name
+		if schemaNames.Has(name) {
+			result = append(
+				result,
+				field.Duplicate(
+					field.NewPath("spec", "schemas").Index(i).Child("name"),
+					name,
+				),
+			)
+		}
+
+		schemaNames.Put(name)
 	}
 
 	return result
