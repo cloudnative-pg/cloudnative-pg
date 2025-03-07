@@ -132,14 +132,14 @@ spec:
                     ensure:
                       default: present
                       description: |-
-                        Ensure tells the operator to install or remove an extension from
+                        Ensure tells the operator to install or remove a shema from
                         the database
                       enum:
                       - present
                       - absent
                       type: string
                     name:
-                      description: Name is the name of the extension
+                      description: Name is the name of the schema
                       type: string
                     schema:
                       description: |-
@@ -151,6 +151,8 @@ spec:
                         Version is the version of extension to be installed.
                         If empty the operator will install the default version and not update it.
                       type: string
+                  required:
+                  - name
                   type: object
                 type: array
               icuLocale:
@@ -232,6 +234,33 @@ spec:
                   Maps to the `OWNER TO` command of `ALTER DATABASE`.
                   The role name of the user who owns the database inside PostgreSQL.
                 type: string
+              schemas:
+                description: The list of schemas to be managed in the databas
+                items:
+                  description: SchemaSpec configures a schema in a database
+                  properties:
+                    ensure:
+                      default: present
+                      description: |-
+                        Ensure tells the operator to install or remove a shema from
+                        the database
+                      enum:
+                      - present
+                      - absent
+                      type: string
+                    name:
+                      description: Name is the name of the schema
+                      type: string
+                    owner:
+                      description: |-
+                        Maps to the `AUTHORIZATION` parameter of `CREATE SCHEMA`.
+                        Maps to the `OWNER TO` command of `ALTER SCHEMA`.
+                        The role name of the user who owns the schema inside PostgreSQL.
+                      type: string
+                  required:
+                  - name
+                  type: object
+                type: array
               tablespace:
                 description: |-
                   Maps to the `TABLESPACE` parameter of `CREATE DATABASE`.
@@ -274,18 +303,19 @@ spec:
               extensions:
                 description: Extensions is the status of the managed extensions
                 items:
-                  description: ExtensionStatus is the status of the managed extensions
+                  description: DatabaseObjectStatus is the status of the managed database
+                    objects
                   properties:
                     applied:
                       description: |-
-                        True of the extension has been installed successfully in
+                        True of the object has been installed successfully in
                         the database
                       type: boolean
                     message:
-                      description: Message is the extension reconciliation message
+                      description: Message is the object reconciliation message
                       type: string
                     name:
-                      description: The name of the extension
+                      description: The name of the object
                       type: string
                   required:
                   - applied
@@ -301,6 +331,28 @@ spec:
                   desired state that was synchronized
                 format: int64
                 type: integer
+              schemas:
+                description: Schemas is the status of the managed schemas
+                items:
+                  description: DatabaseObjectStatus is the status of the managed database
+                    objects
+                  properties:
+                    applied:
+                      description: |-
+                        True of the object has been installed successfully in
+                        the database
+                      type: boolean
+                    message:
+                      description: Message is the object reconciliation message
+                      type: string
+                    name:
+                      description: The name of the object
+                      type: string
+                  required:
+                  - applied
+                  - name
+                  type: object
+                type: array
             type: object
         required:
         - metadata

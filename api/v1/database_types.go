@@ -163,22 +163,44 @@ type DatabaseSpec struct {
 	// +optional
 	ReclaimPolicy DatabaseReclaimPolicy `json:"databaseReclaimPolicy,omitempty"`
 
+	// The list of schemas to be managed in the databas
+	// +optional
+	Schemas []SchemaSpec `json:"schemas,omitempty"`
+
 	// The list of extensions to be managed in the database
 	// +optional
 	Extensions []ExtensionSpec `json:"extensions,omitempty"`
 }
 
-// ExtensionSpec configures an extension in a database
-type ExtensionSpec struct {
-	// Name is the name of the extension
+// DatabaseObjectSpec contains the fields which are common to every
+// database object
+type DatabaseObjectSpec struct {
+	// Name is the name of the schema
 	Name string `json:"name"`
 
-	// Ensure tells the operator to install or remove an extension from
+	// Ensure tells the operator to install or remove a shema from
 	// the database
 	// +kubebuilder:default:="present"
 	// +kubebuilder:validation:Enum=present;absent
 	// +optional
 	Ensure EnsureOption `json:"ensure"`
+}
+
+// SchemaSpec configures a schema in a database
+type SchemaSpec struct {
+	// Common fields
+	DatabaseObjectSpec `json:",inline"`
+
+	// Maps to the `AUTHORIZATION` parameter of `CREATE SCHEMA`.
+	// Maps to the `OWNER TO` command of `ALTER SCHEMA`.
+	// The role name of the user who owns the schema inside PostgreSQL.
+	Owner string `json:"owner,omitempty"`
+}
+
+// ExtensionSpec configures an extension in a database
+type ExtensionSpec struct {
+	// Common fields
+	DatabaseObjectSpec `json:",inline"`
 
 	// Version is the version of extension to be installed.
 	// If empty the operator will install the default version and not update it.
@@ -204,21 +226,25 @@ type DatabaseStatus struct {
 	// +optional
 	Message string `json:"message,omitempty"`
 
+	// Schemas is the status of the managed schemas
+	// +optional
+	Schemas []DatabaseObjectStatus `json:"schemas,omitempty"`
+
 	// Extensions is the status of the managed extensions
 	// +optional
-	Extensions []ExtensionStatus `json:"extensions,omitempty"`
+	Extensions []DatabaseObjectStatus `json:"extensions,omitempty"`
 }
 
-// ExtensionStatus is the status of the managed extensions
-type ExtensionStatus struct {
-	// The name of the extension
+// DatabaseObjectStatus is the status of the managed database objects
+type DatabaseObjectStatus struct {
+	// The name of the object
 	Name string `json:"name"`
 
-	// True of the extension has been installed successfully in
+	// True of the object has been installed successfully in
 	// the database
 	Applied bool `json:"applied"`
 
-	// Message is the extension reconciliation message
+	// Message is the object reconciliation message
 	// +optional
 	Message string `json:"message,omitempty"`
 }

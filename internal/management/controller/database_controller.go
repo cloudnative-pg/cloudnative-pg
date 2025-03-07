@@ -45,8 +45,24 @@ type DatabaseReconciler struct {
 	getTargetDB    func(dbname string) (*sql.DB, error)
 }
 
-// ErrFailedExtensionReconciliation is raised when an extension failed to reconcile
-var ErrFailedExtensionReconciliation = fmt.Errorf("extension reconciliation failed")
+// ErrFailedDatabaseObjectReconciliation is raised when a database object failed to reconcile
+var ErrFailedDatabaseObjectReconciliation = fmt.Errorf("database object reconciliation failed")
+
+// schemaObjectManager is the manager of schema objects
+var schemaObjectManager = databaseObjectManager[apiv1.SchemaSpec, schemaInfo]{
+	get:    getDatabaseSchemaInfo,
+	create: createDatabaseSchema,
+	update: updateDatabaseSchema,
+	drop:   dropDatabaseSchema,
+}
+
+// extensionObjectManager is the manager of the extension objects
+var extensionObjectManager = databaseObjectManager[apiv1.ExtensionSpec, extInfo]{
+	get:    getDatabaseExtensionInfo,
+	create: createDatabaseExtension,
+	update: updateDatabaseExtension,
+	drop:   dropDatabaseExtension,
+}
 
 // databaseReconciliationInterval is the time between the
 // database reconciliation loop failures
@@ -210,20 +226,39 @@ func (r *DatabaseReconciler) reconcileDatabaseResource(ctx context.Context, obj 
 		return err
 	}
 
-	obj.Status.Extensions = make([]apiv1.ExtensionStatus, len(obj.Spec.Extensions))
-	for i := range obj.Spec.Extensions {
-		ext := &obj.Spec.Extensions[i]
-		obj.Status.Extensions[i] = r.reconcileDatabaseExtension(
-			ctx,
-			obj.Spec.Name,
-			ext,
-		)
+	if err := r.reconcileDatabaseObjects(ctx, obj); err != nil {
+		return err
 	}
 
-	if !areAllExtensionsApplied(obj.Status.Extensions) {
-		return ErrFailedExtensionReconciliation
+	for _, status := range obj.Status.Schemas {
+		if !status.Applied {
+			return ErrFailedDatabaseObjectReconciliation
+		}
+	}
+	for _, status := range obj.Status.Extensions {
+		if !status.Applied {
+			return ErrFailedDatabaseObjectReconciliation
+		}
 	}
 
+	return nil
+}
+
+func (r *DatabaseReconciler) reconcileDatabaseObjects(
+	ctx context.Context,
+	obj *apiv1.Database,
+) error {
+	if len(obj.Spec.Schemas) == 0 && len(obj.Spec.Extensions) == 0 {
+		return nil
+	}
+
+	db, err := r.getTargetDB(obj.Spec.Name)
+	if err != nil {
+		return fmt.Errorf("while connecting to the database %q: %v", obj.Spec.Name, err)
+	}
+
+	obj.Status.Schemas = schemaObjectManager.reconcileList(ctx, db, obj.Spec.Schemas)
+	obj.Status.Extensions = extensionObjectManager.reconcileList(ctx, db, obj.Spec.Extensions)
 	return nil
 }
 
@@ -238,113 +273,4 @@ func (r *DatabaseReconciler) reconcilePostgresDatabase(ctx context.Context, db *
 	}
 
 	return createDatabase(ctx, db, obj)
-}
-
-func (r *DatabaseReconciler) reconcileDatabaseExtension(
-	ctx context.Context,
-	dbname string,
-	ext *apiv1.ExtensionSpec,
-) apiv1.ExtensionStatus {
-	db, err := r.getTargetDB(dbname)
-	if err != nil {
-		return apiv1.ExtensionStatus{
-			Name:    ext.Name,
-			Applied: false,
-			Message: fmt.Sprintf("while connecting to the database %q: %v", dbname, err),
-		}
-	}
-
-	extensionInfo, err := getDatabaseExtensionInfo(ctx, db, ext)
-	if err != nil {
-		return apiv1.ExtensionStatus{
-			Name:    ext.Name,
-			Applied: false,
-			Message: fmt.Sprintf("while detecting the extension %q: %v", ext.Name, err),
-		}
-	}
-
-	extensionExists := extensionInfo != nil
-
-	switch {
-	case !extensionExists && ext.Ensure == apiv1.EnsurePresent:
-		return reconcileCreateDatabaseExtension(ctx, db, ext)
-
-	case !extensionExists && ext.Ensure == apiv1.EnsureAbsent:
-		return apiv1.ExtensionStatus{
-			Name:    ext.Name,
-			Applied: true,
-		}
-
-	case extensionExists && ext.Ensure == apiv1.EnsurePresent:
-		return reconcileUpdateDatabaseExtension(ctx, db, ext, extensionInfo)
-
-	case extensionExists && ext.Ensure == apiv1.EnsureAbsent:
-		return reconcileDropDatabaseExtension(ctx, db, ext)
-
-	default:
-		// If this happens, the CRD and/or the validating webhook
-		// are not working properly. In this case, let's do nothing:
-		// better to be safe than sorry.
-		return apiv1.ExtensionStatus{
-			Name:    ext.Name,
-			Applied: true,
-		}
-	}
-}
-
-func areAllExtensionsApplied(extensionStatus []apiv1.ExtensionStatus) bool {
-	for i := range extensionStatus {
-		if !extensionStatus[i].Applied {
-			return false
-		}
-	}
-
-	return true
-}
-
-func reconcileCreateDatabaseExtension(ctx context.Context, db *sql.DB, ext *apiv1.ExtensionSpec) apiv1.ExtensionStatus {
-	if err := createDatabaseExtension(ctx, db, ext); err != nil {
-		return apiv1.ExtensionStatus{
-			Name:    ext.Name,
-			Applied: false,
-			Message: err.Error(),
-		}
-	}
-
-	return apiv1.ExtensionStatus{
-		Name:    ext.Name,
-		Applied: true,
-	}
-}
-
-func reconcileDropDatabaseExtension(ctx context.Context, db *sql.DB, ext *apiv1.ExtensionSpec) apiv1.ExtensionStatus {
-	if err := dropDatabaseExtension(ctx, db, ext); err != nil {
-		return apiv1.ExtensionStatus{
-			Name:    ext.Name,
-			Applied: false,
-			Message: err.Error(),
-		}
-	}
-
-	return apiv1.ExtensionStatus{
-		Name:    ext.Name,
-		Applied: true,
-	}
-}
-
-func reconcileUpdateDatabaseExtension(
-	ctx context.Context, db *sql.DB, spec *apiv1.ExtensionSpec, info *extInfo,
-) apiv1.ExtensionStatus {
-	if err := updateDatabaseExtension(ctx, db, spec, info); err != nil {
-		return apiv1.ExtensionStatus{
-			Name:    spec.Name,
-			Applied: false,
-			Message: err.Error(),
-		}
-	}
-
-	return apiv1.ExtensionStatus{
-		Name:    spec.Name,
-		Applied: true,
-	}
 }

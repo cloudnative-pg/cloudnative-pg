@@ -23,58 +23,83 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Database validation, prevents duplicate extension names", func() {
+var _ = Describe("Database validation", func() {
 	var v *DatabaseCustomValidator
+
+	createExtensionSpec := func(name string) apiv1.ExtensionSpec {
+		return apiv1.ExtensionSpec{
+			DatabaseObjectSpec: apiv1.DatabaseObjectSpec{
+				Name:   name,
+				Ensure: apiv1.EnsurePresent,
+			},
+		}
+	}
+	createSchemaSpec := func(name string) apiv1.SchemaSpec {
+		return apiv1.SchemaSpec{
+			DatabaseObjectSpec: apiv1.DatabaseObjectSpec{
+				Name:   name,
+				Ensure: apiv1.EnsurePresent,
+			},
+		}
+	}
 
 	BeforeEach(func() {
 		v = &DatabaseCustomValidator{}
 	})
 
-	It("doesn't complain when extensions are null", func() {
-		d := &apiv1.Database{
-			Spec: apiv1.DatabaseSpec{
-				Extensions: nil,
+	DescribeTable(
+		"Database validation",
+		func(db *apiv1.Database, errorCount int) {
+			foundErrors := v.validate(db)
+			Expect(foundErrors).To(HaveLen(errorCount))
+		},
+		Entry(
+			"doesn't complain when extensions and schemas are null",
+			&apiv1.Database{
+				Spec: apiv1.DatabaseSpec{},
 			},
-		}
-
-		Expect(v.validateExtensions(d)).To(BeEmpty())
-	})
-
-	It("doesn't complain if there are no duplicate extensions", func() {
-		d := &apiv1.Database{
-			Spec: apiv1.DatabaseSpec{
-				Extensions: []apiv1.ExtensionSpec{
-					{
-						Name:   "postgis",
-						Ensure: apiv1.EnsurePresent,
+			0,
+		),
+		Entry(
+			"doesn't complain if there are no duplicate extensions and no duplicate schemas",
+			&apiv1.Database{
+				Spec: apiv1.DatabaseSpec{
+					Extensions: []apiv1.ExtensionSpec{
+						createExtensionSpec("postgis"),
+					},
+					Schemas: []apiv1.SchemaSpec{
+						createSchemaSpec("test_schema"),
 					},
 				},
 			},
-		}
-
-		Expect(v.validateExtensions(d)).To(BeEmpty())
-	})
-
-	It("complain if there are duplicate extensions", func() {
-		d := &apiv1.Database{
-			Spec: apiv1.DatabaseSpec{
-				Extensions: []apiv1.ExtensionSpec{
-					{
-						Name:   "postgis",
-						Ensure: apiv1.EnsurePresent,
-					},
-					{
-						Name:   "postgis",
-						Ensure: apiv1.EnsurePresent,
-					},
-					{
-						Name:   "cube",
-						Ensure: apiv1.EnsurePresent,
+			0,
+		),
+		Entry(
+			"complain if there are duplicate extensions",
+			&apiv1.Database{
+				Spec: apiv1.DatabaseSpec{
+					Extensions: []apiv1.ExtensionSpec{
+						createExtensionSpec("postgis"),
+						createExtensionSpec("postgis"),
+						createExtensionSpec("cube"),
 					},
 				},
 			},
-		}
+			1,
+		),
 
-		Expect(v.validateExtensions(d)).To(HaveLen(1))
-	})
+		Entry(
+			"complain if there are duplicate schemas",
+			&apiv1.Database{
+				Spec: apiv1.DatabaseSpec{
+					Schemas: []apiv1.SchemaSpec{
+						createSchemaSpec("test_one"),
+						createSchemaSpec("test_two"),
+						createSchemaSpec("test_two"),
+					},
+				},
+			},
+			1,
+		),
+	)
 })
