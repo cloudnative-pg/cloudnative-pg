@@ -57,16 +57,6 @@ func NewPluginBackupCommand(
 ) *PluginBackupCommand {
 	backup.EnsureGVKIsPresent()
 
-	logger := log.WithValues(
-		"pluginConfiguration", backup.Spec.PluginConfiguration,
-		"backupName", backup.Name,
-		"backupNamespace", backup.Name)
-
-	plugins := repository.New()
-	if _, err := plugins.RegisterUnixSocketPluginsInPath(configuration.Current.PluginSocketDir); err != nil {
-		logger.Error(err, "Error while discovering plugins")
-	}
-
 	return &PluginBackupCommand{
 		Cluster:  cluster,
 		Backup:   backup,
