@@ -1,7 +1,7 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: cluster-sync-replica-lag
+  name: cluster-startup-probe-replica-lag-control
 spec:
   instances: 3
 

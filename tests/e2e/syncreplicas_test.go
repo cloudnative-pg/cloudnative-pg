@@ -90,6 +90,70 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 		}, 60).Should(ContainSubstring(element))
 	}
 
+	assertProbeRespectsReplicaLag := func(namespace, replicaName, probeType string) {
+		By(fmt.Sprintf(
+			"checking that %s probe of replica %s is waiting for lag to decrease before marking the pod ready",
+			probeType, replicaName), func() {
+			timeout := 2 * time.Minute
+
+			// This "Eventually" block is needed because we may grab only a portion
+			// of the replica logs, and the "ParseJSONLogs" function may fail on the latest
+			// log record when this happens
+			Eventually(func(g Gomega) {
+				data, err := logs.ParseJSONLogs(env.Ctx, env.Interface, namespace, replicaName)
+				g.Expect(err).ToNot(HaveOccurred())
+
+				recordWasFound := false
+				for _, record := range data {
+					err, ok := record["err"].(string)
+					if !ok {
+						continue
+					}
+					msg, ok := record["msg"].(string)
+					if !ok {
+						continue
+					}
+
+					if msg == fmt.Sprintf("%s probe failing", probeType) &&
+						strings.Contains(err, "streaming replica lagging") {
+						recordWasFound = true
+						break
+					}
+				}
+
+				g.Expect(recordWasFound).To(
+					BeTrue(),
+					fmt.Sprintf("The %s probe is preventing the replica from being marked ready", probeType),
+				)
+			}, timeout).Should(Succeed())
+		})
+	}
+
+	generateDataLoad := func(namespace, clusterName string) {
+		By("adding data to the primary", func() {
+			commandTimeout := time.Second * 600
+			primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
+			Expect(err).ToNot(HaveOccurred())
+
+			// This will generate 1Gi of data in the primary node and, since the replica we fenced
+			// is not aligned, will generate lag.
+			_, _, err = exec.Command(
+				env.Ctx, env.Interface, env.RestClientConfig,
+				*primary, specs.PostgresContainerName, &commandTimeout,
+				"psql",
+				"-U",
+				"postgres",
+				"-c",
+				"create table numbers (i integer); "+
+					"insert into numbers (select generate_series(1,1000000)); "+
+					"insert into numbers (select * from numbers); "+
+					"insert into numbers (select * from numbers); "+
+					"insert into numbers (select * from numbers); ",
+			)
+			Expect(err).ToNot(HaveOccurred())
+		})
+	}
+
 	Context("Legacy synchronous replication", func() {
 		var namespace string
 
@@ -294,21 +358,26 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 			})
 		})
 
-		Context("Lag-control in startup probe", func() {
-			It("lag control in startup probe will delay the readiness of replicas", func() {
-				var namespace string
-				const (
-					namespacePrefix = "sync-replicas-preferred"
-					sampleFile      = fixturesDir + "/sync_replicas/lagcontrol.yaml.template"
-				)
-				clusterName, err := yaml.GetResourceNameFromYAML(env.Scheme, sampleFile)
-				Expect(err).ToNot(HaveOccurred())
+		Context("Lag-control in startup & readiness probes", func() {
+			var (
+				namespace         string
+				namespacePrefix   string
+				sampleFile        string
+				clusterName       string
+				fencedReplicaName string
+				err               error
+			)
 
-				fencedReplicaName := fmt.Sprintf("%s-2", clusterName)
+			setupClusterWithLaggingReplica := func() {
+				clusterName, err = yaml.GetResourceNameFromYAML(env.Scheme, sampleFile)
+				Expect(err).ToNot(HaveOccurred())
 
 				namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
 				AssertCreateCluster(namespace, clusterName, sampleFile, env)
+
+				// Set our target fencedReplica
+				fencedReplicaName = fmt.Sprintf("%s-2", clusterName)
 
 				By("verifying we have 2 quorum-based replicas", func() {
 					getSyncReplicationCount(namespace, clusterName, "quorum", 2)
@@ -335,28 +404,14 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 					}, 160).Should(BeFalse())
 				})
 
-				By("adding data to the primary", func() {
-					commandTimeout := time.Second * 600
-					primary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
-					Expect(err).ToNot(HaveOccurred())
+				generateDataLoad(namespace, clusterName)
+			}
 
-					// This will generate 1Gi of data in the primary node and, since the replica we fenced
-					// is not aligned, will generate lag.
-					_, _, err = exec.Command(
-						env.Ctx, env.Interface, env.RestClientConfig,
-						*primary, specs.PostgresContainerName, &commandTimeout,
-						"psql",
-						"-U",
-						"postgres",
-						"-c",
-						"create table numbers (i integer); "+
-							"insert into numbers (select generate_series(1,1000000)); "+
-							"insert into numbers (select * from numbers); "+
-							"insert into numbers (select * from numbers); "+
-							"insert into numbers (select * from numbers); ",
-					)
-					Expect(err).ToNot(HaveOccurred())
-				})
+			It("lag control in startup probe will delay the readiness of replicas", func() {
+				namespacePrefix = "startup-probe-lag"
+				sampleFile = fixturesDir + "/sync_replicas/startup-probe-lag-control.yaml.template"
+
+				setupClusterWithLaggingReplica()
 
 				By("stopping the reconciliation loop on the cluster", func() {
 					// This is needed to avoid the operator to recreate the new Pod when we'll
@@ -418,35 +473,21 @@ var _ = Describe("Synchronous Replicas", Label(tests.LabelReplication), func() {
 					}, 160).Should(BeTrue())
 				})
 
-				By("checking that the replica was waiting for the lag to decrease before being ready", func() {
-					timeout := 2 * time.Minute
+				assertProbeRespectsReplicaLag(namespace, fencedReplicaName, "startup")
+			})
 
-					// This "Eventually" block is needed because we may grab only a portion
-					// of the replica logs, and the "ParseJSONLogs" function may fail on the latest
-					// log record when this happens
-					Eventually(func(g Gomega) {
-						data, err := logs.ParseJSONLogs(env.Ctx, env.Interface, namespace, fencedReplicaName)
-						g.Expect(err).ToNot(HaveOccurred())
+			It("lag control in readiness probe will delay the readiness of replicas", func() {
+				namespacePrefix = "readiness-probe-lag"
+				sampleFile = fixturesDir + "/sync_replicas/readiness-probe-lag-control.yaml.template"
 
-						recordWasFound := false
-						for _, record := range data {
-							err, ok := record["err"].(string)
-							if !ok {
-								continue
-							}
+				setupClusterWithLaggingReplica()
 
-							if strings.Contains(err, "streaming replica lagging") {
-								recordWasFound = true
-								break
-							}
-						}
-
-						g.Expect(recordWasFound).To(
-							BeTrue(),
-							"The startup probe is preventing the replica from being marked ready",
-						)
-					}, timeout).Should(Succeed())
+				By("disabling fencing", func() {
+					Expect(fencing.Off(env.Ctx, env.Client, fmt.Sprintf("%v-2", clusterName),
+						namespace, clusterName, fencing.UsingAnnotation)).Should(Succeed())
 				})
+
+				assertProbeRespectsReplicaLag(namespace, fencedReplicaName, "readiness")
 			})
 		})
 	})
