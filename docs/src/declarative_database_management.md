@@ -1,4 +1,4 @@
-# PostgreSQL Database Management
+	# PostgreSQL Database Management
 
 CloudNativePG simplifies PostgreSQL database provisioning by automatically
 creating an application database named `app` by default. This default behavior
@@ -162,8 +162,18 @@ This manifest ensures that the `database-to-drop` database is removed from the
 
 ## Managing Extensions in a Database
 
-CloudNativePG can automate the management of PostgreSQL extensions in the
-target database. To enable this feature, define the `spec.extensions` field
+	!!! Info
+    While extensions are database-scoped rather than global objects,
+    CloudNativePG provides a declarative interface for managing them. This approach
+    is necessary because installing certain extensions may require superuser
+    privileges, which CloudNativePG recommends disabling by default. By leveraging
+    this API, users can efficiently manage extensions in a scalable and controlled
+    manner without requiring elevated privileges.
+
+CloudNativePG simplifies and automates the management of PostgreSQL extensions within the
+target database.
+
+To enable this feature, define the `spec.extensions` field
 with a list of extension specifications, as shown in the following example:
 
 ```yaml
@@ -177,14 +187,14 @@ spec:
 
 Each extension entry supports the following properties:
 
-- `name`: The name of the extension.
+- `name` *(mandatory)*: The name of the extension.
 - `ensure`: Specifies whether the extension should be present or absent in the
   database:
-    - `present`: Ensures that the extension is installed.
+    - `present`: Ensures that the extension is installed (default).
     - `absent`: Ensures that the extension is removed.
-- `version` *(optional)*: The specific version of the extension to install or
+- `version`: The specific version of the extension to install or
   upgrade to.
-- `schema` *(optional)*: The schema in which the extension should be installed.
+- `schema`: The schema in which the extension should be installed.
 
 !!! Info
     CloudNativePG manages extensions using the following PostgreSQL’s SQL commands:
@@ -206,6 +216,44 @@ unchanged.
     responsibility to ensure there are no conflicts between extension support in
     the `Database` CRD and the managed extensions feature.
 
+## Managing Schemas in a Database
+
+!!! Info
+    Schema management in PostgreSQL is an exception to CloudNativePG's primary
+    focus on managing global objects. Since schemas exist within a database, they
+    are typically managed as part of the application development process. However,
+    CloudNativePG provides a declarative interface for schema management, primarily
+    to complete the support of extensions deployment within schemas.
+
+CloudNativePG simplifies and automates the management of PostgreSQL schemas within the
+target database.
+
+To enable this feature, define the `spec.schemas` field
+with a list of schema specifications, as shown in the following example:
+
+```yaml
+# ...
+spec:
+  schemas:
+  - name: app
+    owner: app
+# ...
+```
+
+Each schema entry supports the following properties:
+
+- `name` *(mandatory)*: The name of the schema.
+- `owner`: The owner of the schema.
+- `ensure`: Specifies whether the schema should be present or absent in the
+  database:
+    - `present`: Ensures that the schema is installed (default).
+    - `absent`: Ensures that the schema is removed.
+
+!!! Info
+    CloudNativePG manages schemas using the following PostgreSQL’s SQL commands:
+    [`CREATE SCHEMA`](https://www.postgresql.org/docs/current/sql-createschema.html),
+    [`DROP SCHEMA`](https://www.postgresql.org/docs/current/sql-dropschema.html),
+    [`ALTER SCHEMA`](https://www.postgresql.org/docs/current/sql-alterschema.html).
 
 ## Limitations and Caveats
 
