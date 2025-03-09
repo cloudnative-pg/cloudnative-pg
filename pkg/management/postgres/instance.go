@@ -22,6 +22,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"golang.org/x/sys/unix"
 	"io/fs"
 	"math"
 	"os"
@@ -211,6 +212,13 @@ type Instance struct {
 
 	// ServerCertificate is the certificate we use to serve https connections
 	ServerCertificate *tls.Certificate
+
+	// ReadOnlyDiskUsageThreshold is the minimal amount of disk space usage in percentage
+	// after which the instance should be put in Read-Only mode.
+	ReadOnlyDiskUsageThreshold float64
+
+	// DiskWatcherCheckInterval is the interval at which the disk watcher should check the disk usage
+	DiskWatcherCheckInterval time.Duration
 }
 
 // SetPostgreSQLAutoConfWritable allows or deny writes to the
@@ -752,6 +760,58 @@ func (instance *Instance) GetPgVersion() (semver.Version, error) {
 	return *parsedVersion, nil
 }
 
+// GetDBAndStatus retrieves all non-system databases and their default_transaction_read_only status.
+func (instance *Instance) GetDBAndStatus(conn *sql.Tx) (map[string]bool, error) {
+	query := `
+        SELECT datname,
+        COALESCE(setconfig @> '{default_transaction_read_only=true}'::text[], false) AS read_only
+        FROM pg_database
+        LEFT JOIN pg_db_role_setting
+        ON (setdatabase=oid)
+        WHERE datname != 'postgres' AND NOT datistemplate`
+
+	rows, err := conn.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	databases := make(map[string]bool)
+
+	for rows.Next() {
+		var dbName string
+		var readOnly bool
+
+		if err := rows.Scan(&dbName, &readOnly); err != nil {
+			return nil, err
+		}
+
+		// Escape the database name
+		escapedDBName := fmt.Sprintf(`"%s"`, dbName)
+		databases[escapedDBName] = readOnly
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return databases, nil
+}
+
+// CloseDatabase sets default_transaction_read_only to true for the specified database.
+func (instance *Instance) CloseDatabase(conn *sql.Tx, dbName string) error {
+	query := fmt.Sprintf(`ALTER DATABASE %s SET default_transaction_read_only TO true`, dbName)
+	_, err := conn.Exec(query)
+	return err
+}
+
+// OpenDatabase resets default_transaction_read_only for the specified database.
+func (instance *Instance) OpenDatabase(conn *sql.Tx, dbName string) error {
+	query := fmt.Sprintf(`ALTER DATABASE %s RESET default_transaction_read_only`, dbName)
+	_, err := conn.Exec(query)
+	return err
+}
+
 // ConnectionPool gets or initializes the connection pool for this instance
 func (instance *Instance) ConnectionPool() *pool.ConnectionPool {
 	const applicationName = "cnpg-instance-manager"
@@ -1277,6 +1337,25 @@ func (instance *Instance) DropConnections() error {
 	return nil
 }
 
+// DropUserConnections drops all the connections that hold user sessions
+func (instance *Instance) DropUserConnections() error {
+	conn, err := instance.GetSuperUserDB()
+	if err != nil {
+		return err
+	}
+
+	if _, err := conn.Exec(
+		`SELECT pg_terminate_backend(pid)
+			   FROM pg_stat_activity
+			   WHERE pid <> pg_backend_pid()
+			     AND usename NOT IN ('postgres') AND backend_type != 'walsender';`,
+	); err != nil {
+		return fmt.Errorf("while dropping user connections: %w", err)
+	}
+
+	return nil
+}
+
 // GetPrimaryConnInfo returns the DSN to reach the primary
 func (instance *Instance) GetPrimaryConnInfo() string {
 	return buildPrimaryConnInfo(instance.GetClusterName()+"-rw", instance.GetPodName())
@@ -1319,4 +1398,26 @@ func (instance *Instance) HandleInstanceCommandRequests(
 	default:
 		return false, fmt.Errorf("unrecognized request: %s", req)
 	}
+}
+
+func (instance *Instance) GetPgDataDiskUsage() (float64, error) {
+	var stat unix.Statfs_t
+	err := unix.Statfs(instance.PgData, &stat)
+	if err != nil {
+		return 0, fmt.Errorf("while getting disk space information: %w", err)
+	}
+
+	// Total space = block size * total blocks
+	total := stat.Blocks * uint64(stat.Bsize)
+	// Free space = block size * free blocks
+	free := stat.Bfree * uint64(stat.Bsize)
+	// Used space = total space - free space
+	used := total - free
+
+	// Calculate percentage of used space
+	if total > 0 {
+		return (float64(used) / float64(total)) * 100, nil
+	}
+
+	return 0, nil
 }

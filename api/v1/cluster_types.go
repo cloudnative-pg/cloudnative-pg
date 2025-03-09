@@ -481,6 +481,10 @@ type ClusterSpec struct {
 	// in the PostgreSQL Pods.
 	// +optional
 	Probes *ProbesConfiguration `json:"probes,omitempty"`
+
+	// The configuration of the disk watcher
+	// +optional
+	DiskWatcher *DiskWatcherConfiguration `json:"diskWatcher,omitempty"`
 }
 
 // ProbesConfiguration represent the configuration for the probes
@@ -494,6 +498,20 @@ type ProbesConfiguration struct {
 
 	// The readiness probe configuration
 	Readiness *Probe `json:"readiness,omitempty"`
+}
+
+// DiskWatcherConfiguration defines parameters
+// for cluster free disk space checks. If the free disk space
+// falls below the specified threshold, the instance manager
+// will switch all databases in cluster to read-only mode.
+type DiskWatcherConfiguration struct {
+	// Disk usage threshold, in percents. After the disk usage exceeds this value,
+	// the instance manager will switch all databases in the cluster
+	// to read-only mode.
+	ReadOnlyThreshold *int32 `json:"readOnlyThreshold,omitempty"`
+
+	// Interval between free disk space checks, in seconds.
+	DiskSpaceCheckInterval *int32 `json:"diskSpaceCheckInterval,omitempty"`
 }
 
 // Probe describes a health check to be performed against a container to determine whether it is
@@ -1211,6 +1229,15 @@ const (
 	// FailureThreshold of startupProbe, the formula is `FailureThreshold = ceiling(startDelay / periodSeconds)`,
 	// the minimum value is 1
 	DefaultStartupDelay = 3600
+
+	// DefaultReadOnlyDiskUsageThreshold is the disk usage percentage threshold after which the instance will
+	// be put to ReadOnly mode. After the disk usage drops below the threshold, the instance will be put back to
+	// ReadWrite mode.
+	DefaultReadOnlyDiskUsageThreshold = 95
+
+	// DefaultDiskWatcherCheckInterval is the default interval in seconds
+	// for the disk watcher to check the disk usage
+	DefaultDiskWatcherCheckInterval = 30
 )
 
 // SynchronousReplicaConfigurationMethod configures whether to use
