@@ -40,7 +40,28 @@ type DatabaseReconciler struct {
 
 	instance            instanceInterface
 	finalizerReconciler *finalizerReconciler[*apiv1.Database]
-	getSuperUserDB      func() (*sql.DB, error)
+
+	getSuperUserDB func() (*sql.DB, error)
+	getTargetDB    func(dbname string) (*sql.DB, error)
+}
+
+// ErrFailedDatabaseObjectReconciliation is raised when a database object failed to reconcile
+var ErrFailedDatabaseObjectReconciliation = fmt.Errorf("database object reconciliation failed")
+
+// schemaObjectManager is the manager of schema objects
+var schemaObjectManager = databaseObjectManager[apiv1.SchemaSpec, schemaInfo]{
+	get:    getDatabaseSchemaInfo,
+	create: createDatabaseSchema,
+	update: updateDatabaseSchema,
+	drop:   dropDatabaseSchema,
+}
+
+// extensionObjectManager is the manager of the extension objects
+var extensionObjectManager = databaseObjectManager[apiv1.ExtensionSpec, extInfo]{
+	get:    getDatabaseExtensionInfo,
+	create: createDatabaseExtension,
+	update: updateDatabaseExtension,
+	drop:   dropDatabaseExtension,
 }
 
 // databaseReconciliationInterval is the time between the
@@ -121,7 +142,7 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return res, err
 	}
 
-	if err := r.reconcileDatabase(ctx, &database); err != nil {
+	if err := r.reconcileDatabaseResource(ctx, &database); err != nil {
 		if markErr := markAsFailed(ctx, r.Client, &database, err); markErr != nil {
 			contextLogger.Error(err, "while marking as failed the database resource",
 				"error", err,
@@ -164,6 +185,9 @@ func NewDatabaseReconciler(
 		getSuperUserDB: func() (*sql.DB, error) {
 			return instance.GetSuperUserDB()
 		},
+		getTargetDB: func(dbname string) (*sql.DB, error) {
+			return instance.ConnectionPool().Connection(dbname)
+		},
 	}
 
 	dr.finalizerReconciler = newFinalizerReconciler(
@@ -188,7 +212,7 @@ func (r *DatabaseReconciler) GetCluster(ctx context.Context) (*apiv1.Cluster, er
 	return getClusterFromInstance(ctx, r.Client, r.instance)
 }
 
-func (r *DatabaseReconciler) reconcileDatabase(ctx context.Context, obj *apiv1.Database) error {
+func (r *DatabaseReconciler) reconcileDatabaseResource(ctx context.Context, obj *apiv1.Database) error {
 	db, err := r.getSuperUserDB()
 	if err != nil {
 		return fmt.Errorf("while connecting to the database %q: %w", obj.Spec.Name, err)
@@ -198,6 +222,47 @@ func (r *DatabaseReconciler) reconcileDatabase(ctx context.Context, obj *apiv1.D
 		return dropDatabase(ctx, db, obj)
 	}
 
+	if err := r.reconcilePostgresDatabase(ctx, db, obj); err != nil {
+		return err
+	}
+
+	if err := r.reconcileDatabaseObjects(ctx, obj); err != nil {
+		return err
+	}
+
+	for _, status := range obj.Status.Schemas {
+		if !status.Applied {
+			return ErrFailedDatabaseObjectReconciliation
+		}
+	}
+	for _, status := range obj.Status.Extensions {
+		if !status.Applied {
+			return ErrFailedDatabaseObjectReconciliation
+		}
+	}
+
+	return nil
+}
+
+func (r *DatabaseReconciler) reconcileDatabaseObjects(
+	ctx context.Context,
+	obj *apiv1.Database,
+) error {
+	if len(obj.Spec.Schemas) == 0 && len(obj.Spec.Extensions) == 0 {
+		return nil
+	}
+
+	db, err := r.getTargetDB(obj.Spec.Name)
+	if err != nil {
+		return fmt.Errorf("while connecting to the database %q: %v", obj.Spec.Name, err)
+	}
+
+	obj.Status.Schemas = schemaObjectManager.reconcileList(ctx, db, obj.Spec.Schemas)
+	obj.Status.Extensions = extensionObjectManager.reconcileList(ctx, db, obj.Spec.Extensions)
+	return nil
+}
+
+func (r *DatabaseReconciler) reconcilePostgresDatabase(ctx context.Context, db *sql.DB, obj *apiv1.Database) error {
 	dbExists, err := detectDatabase(ctx, db, obj)
 	if err != nil {
 		return fmt.Errorf("while detecting the database %q: %w", obj.Spec.Name, err)

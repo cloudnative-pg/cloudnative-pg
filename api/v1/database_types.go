@@ -162,6 +162,59 @@ type DatabaseSpec struct {
 	// +kubebuilder:default:=retain
 	// +optional
 	ReclaimPolicy DatabaseReclaimPolicy `json:"databaseReclaimPolicy,omitempty"`
+
+	// The list of schemas to be managed in the database
+	// +optional
+	Schemas []SchemaSpec `json:"schemas,omitempty"`
+
+	// The list of extensions to be managed in the database
+	// +optional
+	Extensions []ExtensionSpec `json:"extensions,omitempty"`
+}
+
+// DatabaseObjectSpec contains the fields which are common to every
+// database object
+type DatabaseObjectSpec struct {
+	// Name of the extension/schema
+	Name string `json:"name"`
+
+	// Specifies whether an extension/schema should be present or absent in
+	// the database. If set to `present`, the extension/schema will be
+	// created if it does not exist. If set to `absent`, the
+	// extension/schema will be removed if it exists.
+	// +kubebuilder:default:="present"
+	// +kubebuilder:validation:Enum=present;absent
+	// +optional
+	Ensure EnsureOption `json:"ensure"`
+}
+
+// SchemaSpec configures a schema in a database
+type SchemaSpec struct {
+	// Common fields
+	DatabaseObjectSpec `json:",inline"`
+
+	// The role name of the user who owns the schema inside PostgreSQL.
+	// It maps to the `AUTHORIZATION` parameter of `CREATE SCHEMA` and the
+	// `OWNER TO` command of `ALTER SCHEMA`.
+	Owner string `json:"owner,omitempty"`
+}
+
+// ExtensionSpec configures an extension in a database
+type ExtensionSpec struct {
+	// Common fields
+	DatabaseObjectSpec `json:",inline"`
+
+	// The version of the extension to install. If empty, the operator will
+	// install the default version (whatever is specified in the
+	// extension's control file)
+	Version string `json:"version,omitempty"`
+
+	// The name of the schema in which to install the extension's objects,
+	// in case the extension allows its contents to be relocated. If not
+	// specified (default), and the extension's control file does not
+	// specify a schema either, the current default object creation schema
+	// is used.
+	Schema string `json:"schema,omitempty"`
 }
 
 // DatabaseStatus defines the observed state of Database
@@ -176,6 +229,28 @@ type DatabaseStatus struct {
 	Applied *bool `json:"applied,omitempty"`
 
 	// Message is the reconciliation output message
+	// +optional
+	Message string `json:"message,omitempty"`
+
+	// Schemas is the status of the managed schemas
+	// +optional
+	Schemas []DatabaseObjectStatus `json:"schemas,omitempty"`
+
+	// Extensions is the status of the managed extensions
+	// +optional
+	Extensions []DatabaseObjectStatus `json:"extensions,omitempty"`
+}
+
+// DatabaseObjectStatus is the status of the managed database objects
+type DatabaseObjectStatus struct {
+	// The name of the object
+	Name string `json:"name"`
+
+	// True of the object has been installed successfully in
+	// the database
+	Applied bool `json:"applied"`
+
+	// Message is the object reconciliation message
 	// +optional
 	Message string `json:"message,omitempty"`
 }
