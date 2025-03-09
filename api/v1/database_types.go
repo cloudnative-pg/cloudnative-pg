@@ -163,7 +163,7 @@ type DatabaseSpec struct {
 	// +optional
 	ReclaimPolicy DatabaseReclaimPolicy `json:"databaseReclaimPolicy,omitempty"`
 
-	// The list of schemas to be managed in the databas
+	// The list of schemas to be managed in the database
 	// +optional
 	Schemas []SchemaSpec `json:"schemas,omitempty"`
 
@@ -175,11 +175,13 @@ type DatabaseSpec struct {
 // DatabaseObjectSpec contains the fields which are common to every
 // database object
 type DatabaseObjectSpec struct {
-	// Name is the name of the schema
+	// Name of the extension/schema
 	Name string `json:"name"`
 
-	// Ensure tells the operator to install or remove a shema from
-	// the database
+	// Specifies whether an extension/schema should be present or absent in
+	// the database. If set to `present`, the extension/schema will be
+	// created if it does not exist. If set to `absent`, the
+	// extension/schema will be removed if it exists.
 	// +kubebuilder:default:="present"
 	// +kubebuilder:validation:Enum=present;absent
 	// +optional
@@ -191,9 +193,9 @@ type SchemaSpec struct {
 	// Common fields
 	DatabaseObjectSpec `json:",inline"`
 
-	// Maps to the `AUTHORIZATION` parameter of `CREATE SCHEMA`.
-	// Maps to the `OWNER TO` command of `ALTER SCHEMA`.
 	// The role name of the user who owns the schema inside PostgreSQL.
+	// It maps to the `AUTHORIZATION` parameter of `CREATE SCHEMA` and the
+	// `OWNER TO` command of `ALTER SCHEMA`.
 	Owner string `json:"owner,omitempty"`
 }
 
@@ -202,12 +204,16 @@ type ExtensionSpec struct {
 	// Common fields
 	DatabaseObjectSpec `json:",inline"`
 
-	// Version is the version of extension to be installed.
-	// If empty the operator will install the default version and not update it.
+	// The version of the extension to install. If empty, the operator will
+	// install the default version (whatever is specified in the
+	// extension's control file)
 	Version string `json:"version,omitempty"`
 
-	// Schema is the schema where the extension will be installed.
-	// Defaults to the default extension schema.
+	// The name of the schema in which to install the extension's objects,
+	// in case the extension allows its contents to be relocated. If not
+	// specified (default), and the extension's control file does not
+	// specify a schema either, the current default object creation schema
+	// is used.
 	Schema string `json:"schema,omitempty"`
 }
 
