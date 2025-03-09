@@ -2371,6 +2371,82 @@ PostgreSQL cluster from an existing storage</p>
 </tbody>
 </table>
 
+## DatabaseObjectSpec     {#postgresql-cnpg-io-v1-DatabaseObjectSpec}
+
+
+**Appears in:**
+
+- [ExtensionSpec](#postgresql-cnpg-io-v1-ExtensionSpec)
+
+- [SchemaSpec](#postgresql-cnpg-io-v1-SchemaSpec)
+
+
+<p>DatabaseObjectSpec contains the fields which are common to every
+database object</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>name</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Name of the extension/schema</p>
+</td>
+</tr>
+<tr><td><code>ensure</code><br/>
+<a href="#postgresql-cnpg-io-v1-EnsureOption"><i>EnsureOption</i></a>
+</td>
+<td>
+   <p>Specifies whether an extension/schema should be present or absent in
+the database. If set to <code>present</code>, the extension/schema will be
+created if it does not exist. If set to <code>absent</code>, the
+extension/schema will be removed if it exists.</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## DatabaseObjectStatus     {#postgresql-cnpg-io-v1-DatabaseObjectStatus}
+
+
+**Appears in:**
+
+- [DatabaseStatus](#postgresql-cnpg-io-v1-DatabaseStatus)
+
+
+<p>DatabaseObjectStatus is the status of the managed database objects</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>name</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The name of the object</p>
+</td>
+</tr>
+<tr><td><code>applied</code> <B>[Required]</B><br/>
+<i>bool</i>
+</td>
+<td>
+   <p>True of the object has been installed successfully in
+the database</p>
+</td>
+</tr>
+<tr><td><code>message</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>Message is the object reconciliation message</p>
+</td>
+</tr>
+</tbody>
+</table>
+
 ## DatabaseReclaimPolicy     {#postgresql-cnpg-io-v1-DatabaseReclaimPolicy}
 
 (Alias of `string`)
@@ -2586,6 +2662,13 @@ tablespace used for objects created in this database.</p>
    <p>The policy for end-of-life maintenance of this database.</p>
 </td>
 </tr>
+<tr><td><code>schemas</code><br/>
+<a href="#postgresql-cnpg-io-v1-SchemaSpec"><i>[]SchemaSpec</i></a>
+</td>
+<td>
+   <p>The list of schemas to be managed in the database</p>
+</td>
+</tr>
 <tr><td><code>extensions</code><br/>
 <a href="#postgresql-cnpg-io-v1-ExtensionSpec"><i>[]ExtensionSpec</i></a>
 </td>
@@ -2632,8 +2715,15 @@ desired state that was synchronized</p>
    <p>Message is the reconciliation output message</p>
 </td>
 </tr>
+<tr><td><code>schemas</code><br/>
+<a href="#postgresql-cnpg-io-v1-DatabaseObjectStatus"><i>[]DatabaseObjectStatus</i></a>
+</td>
+<td>
+   <p>Schemas is the status of the managed schemas</p>
+</td>
+</tr>
 <tr><td><code>extensions</code><br/>
-<a href="#postgresql-cnpg-io-v1-ExtensionStatus"><i>[]ExtensionStatus</i></a>
+<a href="#postgresql-cnpg-io-v1-DatabaseObjectStatus"><i>[]DatabaseObjectStatus</i></a>
 </td>
 <td>
    <p>Extensions is the status of the managed extensions</p>
@@ -2677,9 +2767,9 @@ desired state that was synchronized</p>
 
 **Appears in:**
 
-- [DatabaseSpec](#postgresql-cnpg-io-v1-DatabaseSpec)
+- [DatabaseObjectSpec](#postgresql-cnpg-io-v1-DatabaseObjectSpec)
 
-- [ExtensionSpec](#postgresql-cnpg-io-v1-ExtensionSpec)
+- [DatabaseSpec](#postgresql-cnpg-io-v1-DatabaseSpec)
 
 - [RoleConfiguration](#postgresql-cnpg-io-v1-RoleConfiguration)
 
@@ -2736,74 +2826,31 @@ storage</p>
 <table class="table">
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td><code>name</code> <B>[Required]</B><br/>
-<i>string</i>
+<tr><td><code>DatabaseObjectSpec</code><br/>
+<a href="#postgresql-cnpg-io-v1-DatabaseObjectSpec"><i>DatabaseObjectSpec</i></a>
 </td>
-<td>
-   <p>Name is the name of the extension</p>
-</td>
-</tr>
-<tr><td><code>ensure</code><br/>
-<a href="#postgresql-cnpg-io-v1-EnsureOption"><i>EnsureOption</i></a>
-</td>
-<td>
-   <p>Ensure tells the operator to install or remove an extension from
-the database</p>
+<td>(Members of <code>DatabaseObjectSpec</code> are embedded into this type.)
+   <p>Common fields</p>
 </td>
 </tr>
 <tr><td><code>version</code> <B>[Required]</B><br/>
 <i>string</i>
 </td>
 <td>
-   <p>Version is the version of extension to be installed.
-If empty the operator will install the default version and not update it.</p>
+   <p>The version of the extension to install. If empty, the operator will
+install the default version (whatever is specified in the
+extension's control file)</p>
 </td>
 </tr>
 <tr><td><code>schema</code> <B>[Required]</B><br/>
 <i>string</i>
 </td>
 <td>
-   <p>Schema is the schema where the extension will be installed.
-Defaults to the default extension schema.</p>
-</td>
-</tr>
-</tbody>
-</table>
-
-## ExtensionStatus     {#postgresql-cnpg-io-v1-ExtensionStatus}
-
-
-**Appears in:**
-
-- [DatabaseStatus](#postgresql-cnpg-io-v1-DatabaseStatus)
-
-
-<p>ExtensionStatus is the status of the managed extensions</p>
-
-
-<table class="table">
-<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
-<tbody>
-<tr><td><code>name</code> <B>[Required]</B><br/>
-<i>string</i>
-</td>
-<td>
-   <p>The name of the extension</p>
-</td>
-</tr>
-<tr><td><code>applied</code> <B>[Required]</B><br/>
-<i>bool</i>
-</td>
-<td>
-   <p>True of the extension has been installed successfully in
-the database</p>
-</td>
-</tr>
-<tr><td><code>message</code><br/>
-<i>string</i>
-</td>
-<td>
-   <p>Message is the extension reconciliation message</p>
+   <p>The name of the schema in which to install the extension's objects,
+in case the extension allows its contents to be relocated. If not
+specified (default), and the extension's control file does not
+specify a schema either, the current default object creation schema
+is used.</p>
 </td>
 </tr>
 </tbody>
@@ -5263,6 +5310,39 @@ Overrides the default settings specified in the cluster '.backup.volumeSnapshot.
 </td>
 <td>
    <p>Next time we will run a backup</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+## SchemaSpec     {#postgresql-cnpg-io-v1-SchemaSpec}
+
+
+**Appears in:**
+
+- [DatabaseSpec](#postgresql-cnpg-io-v1-DatabaseSpec)
+
+
+<p>SchemaSpec configures a schema in a database</p>
+
+
+<table class="table">
+<thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>DatabaseObjectSpec</code><br/>
+<a href="#postgresql-cnpg-io-v1-DatabaseObjectSpec"><i>DatabaseObjectSpec</i></a>
+</td>
+<td>(Members of <code>DatabaseObjectSpec</code> are embedded into this type.)
+   <p>Common fields</p>
+</td>
+</tr>
+<tr><td><code>owner</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>The role name of the user who owns the schema inside PostgreSQL.
+It maps to the <code>AUTHORIZATION</code> parameter of <code>CREATE SCHEMA</code> and the
+<code>OWNER TO</code> command of <code>ALTER SCHEMA</code>.</p>
 </td>
 </tr>
 </tbody>
