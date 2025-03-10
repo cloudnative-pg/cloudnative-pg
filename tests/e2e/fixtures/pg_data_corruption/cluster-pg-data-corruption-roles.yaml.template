@@ -36,6 +36,10 @@ spec:
       database: app
       owner: app
 
+  probes:
+    readiness:
+      type: query
+
   # Persistent storage configuration
   storage:
     storageClass: ${E2E_DEFAULT_STORAGE_CLASS}

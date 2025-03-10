@@ -1482,6 +1482,16 @@ func (p *Probe) ApplyInto(k8sProbe *corev1.Probe) {
 	}
 }
 
+// ApplyInto applies the content of the probe configuration in a Kubernetes
+// probe
+func (p *ProbeWithStrategy) ApplyInto(k8sProbe *corev1.Probe) {
+	if p == nil {
+		return
+	}
+
+	p.Probe.ApplyInto(k8sProbe)
+}
+
 // GetEnabledWALArchivePluginName returns the name of the enabled backup plugin or an empty string
 // if no backup plugin is enabled
 func (cluster *Cluster) GetEnabledWALArchivePluginName() string {

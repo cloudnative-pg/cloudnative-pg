@@ -343,7 +343,9 @@ PrimaryUpdateMethod
 PrimaryUpdateStrategy
 PriorityClass
 PriorityClassName
+ProbeStrategyType
 ProbeTerminationGracePeriod
+ProbeWithStrategy
 ProbesConfiguration
 ProjectedVolumeSource
 PublicationReclaimPolicy
@@ -442,6 +444,8 @@ SnapshotType
 Snapshotting
 Snyk
 Stackgres
+StartupProbe
+StartupStrategyType
 StatefulSets
 StorageClass
 StorageConfiguration
@@ -957,6 +961,7 @@ maxClientConnections
 maxParallel
 maxStandbyNamesFromCluster
 maxSyncReplicas
+maximumLag
 maxwait
 mcache
 md
@@ -1348,6 +1353,7 @@ tx
 ubi
 ui
 uid
+uint
 ul
 un
 uncordon

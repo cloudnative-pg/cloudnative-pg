@@ -1,11 +1,15 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: cluster-pg-data-corruption
+  name: cluster-startup-probe-replica-lag-control
 spec:
   instances: 3
 
   postgresql:
+    synchronous:
+      method: any
+      number: 2
+      dataDurability: preferred
     parameters:
       log_checkpoints: "on"
       log_lock_waits: "on"
@@ -14,21 +18,14 @@ spec:
       log_temp_files: '1024'
       log_autovacuum_min_duration: '1s'
       log_replication_commands: 'on'
-      wal_receiver_timeout: '2s'
-
-  bootstrap:
-    initdb:
-      database: app
-      owner: app
 
   probes:
-    readiness:
-      type: query
+    startup:
+      type: streaming
+      maximumLag: 16Mi
+      failureThreshold: 30
+      periodSeconds: 1
 
-  # Persistent storage configuration
   storage:
     storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
-    size: 1Gi
-  walStorage:
-    storageClass: ${E2E_DEFAULT_STORAGE_CLASS}
-    size: 1Gi
+    size: 1G

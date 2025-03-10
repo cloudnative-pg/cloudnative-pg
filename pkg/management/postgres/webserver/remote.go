@@ -42,7 +42,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/readiness"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/probes"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/upgrade"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
@@ -62,7 +62,6 @@ type remoteWebserverEndpoints struct {
 	typedClient          client.Client
 	instance             *postgres.Instance
 	currentBackup        *backupConnection
-	readinessChecker     *readiness.Data
 	ongoingBackupRequest sync.Mutex
 }
 
@@ -95,15 +94,15 @@ func NewRemoteWebServer(
 	}
 
 	endpoints := remoteWebserverEndpoints{
-		typedClient:      typedClient,
-		instance:         instance,
-		readinessChecker: readiness.ForInstance(instance),
+		typedClient: typedClient,
+		instance:    instance,
 	}
 
 	serveMux := http.NewServeMux()
 	serveMux.HandleFunc(url.PathPgModeBackup, endpoints.backup)
 	serveMux.HandleFunc(url.PathHealth, endpoints.isServerHealthy)
 	serveMux.HandleFunc(url.PathReady, endpoints.isServerReady)
+	serveMux.HandleFunc(url.PathStartup, endpoints.isServerStartedUp)
 	serveMux.HandleFunc(url.PathPgStatus, endpoints.pgStatus)
 	serveMux.HandleFunc(url.PathPgArchivePartial, endpoints.pgArchivePartial)
 	serveMux.HandleFunc(url.PathPGControlData, endpoints.pgControlData)
@@ -206,37 +205,33 @@ func (ws *remoteWebserverEndpoints) cleanupStaleCollections(ctx context.Context)
 	}
 }
 
-func (ws *remoteWebserverEndpoints) isServerHealthy(w http.ResponseWriter, _ *http.Request) {
-	// If `pg_rewind` is running the Pod is starting up.
+// isServerStartedUp evaluates the liveness probe
+func (ws *remoteWebserverEndpoints) isServerStartedUp(w http.ResponseWriter, req *http.Request) {
+	// If `pg_rewind` is running, it means that the Pod is starting up.
 	// We need to report it healthy to avoid being killed by the kubelet.
-	// Same goes for instances with fencing on.
 	if ws.instance.PgRewindIsRunning || ws.instance.MightBeUnavailable() {
-		log.Trace("Liveness probe skipped")
+		log.Trace("Startup probe skipped")
 		_, _ = fmt.Fprint(w, "Skipped")
 		return
 	}
 
-	err := ws.instance.IsServerHealthy()
-	if err != nil {
-		log.Debug("Liveness probe failing", "err", err.Error())
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+	checker := probes.NewStartupChecker(ws.typedClient, ws.instance)
+	checker.IsHealthy(req.Context(), w)
+}
 
-	log.Trace("Liveness probe succeeding")
+func (ws *remoteWebserverEndpoints) isServerHealthy(w http.ResponseWriter, _ *http.Request) {
 	_, _ = fmt.Fprint(w, "OK")
 }
 
 // This is the readiness probe
-func (ws *remoteWebserverEndpoints) isServerReady(w http.ResponseWriter, r *http.Request) {
-	if err := ws.readinessChecker.IsServerReady(r.Context()); err != nil {
-		log.Debug("Readiness probe failing", "err", err.Error())
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+func (ws *remoteWebserverEndpoints) isServerReady(w http.ResponseWriter, req *http.Request) {
+	if !ws.instance.CanCheckReadiness() {
+		http.Error(w, "instance is not ready yet", http.StatusInternalServerError)
 		return
 	}
 
-	log.Trace("Readiness probe succeeding")
-	_, _ = fmt.Fprint(w, "OK")
+	checker := probes.NewReadinessChecker(ws.typedClient, ws.instance)
+	checker.IsHealthy(req.Context(), w)
 }
 
 // This probe is for the instance status, including replication

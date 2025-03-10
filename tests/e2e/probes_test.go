@@ -56,9 +56,13 @@ var _ = Describe("Probes configuration tests", Label(tests.LabelBasic), func() {
 			TimeoutSeconds:      8,
 		}
 		probesConfiguration := apiv1.ProbesConfiguration{
-			Startup:   probeConfiguration.DeepCopy(),
-			Liveness:  probeConfiguration.DeepCopy(),
-			Readiness: probeConfiguration.DeepCopy(),
+			Startup: &apiv1.ProbeWithStrategy{
+				Probe: probeConfiguration,
+			},
+			Liveness: probeConfiguration.DeepCopy(),
+			Readiness: &apiv1.ProbeWithStrategy{
+				Probe: probeConfiguration,
+			},
 		}
 
 		assertProbeCoherentWithConfiguration := func(probe *corev1.Probe) {
@@ -70,7 +74,7 @@ var _ = Describe("Probes configuration tests", Label(tests.LabelBasic), func() {
 		assertProbesCoherentWithConfiguration := func(container *corev1.Container) {
 			assertProbeCoherentWithConfiguration(container.LivenessProbe)
 			assertProbeCoherentWithConfiguration(container.ReadinessProbe)
-			assertProbeCoherentWithConfiguration(container.LivenessProbe)
+			assertProbeCoherentWithConfiguration(container.StartupProbe)
 		}
 
 		var defaultReadinessProbe *corev1.Probe

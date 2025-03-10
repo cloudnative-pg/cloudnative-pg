@@ -27,6 +27,10 @@ spec:
       enabled: false
       slotPrefix: _cnpg_
 
+  probes:
+    readiness:
+      type: query
+
   # Persistent storage configuration
   storage:
     storageClass: ${E2E_DEFAULT_STORAGE_CLASS}

@@ -1,0 +1,16 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example
+spec:
+  instances: 3
+
+  probes:
+    startup:
+      type: streaming
+      maximumLag: 16Mi
+      failureThreshold: 30
+      periodSeconds: 10
+
+  storage:
+    size: 1Gi
