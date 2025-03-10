@@ -154,6 +154,16 @@ func CreatePodEnvConfig(cluster apiv1.Cluster, podName string) EnvConfig {
 	}
 	config.EnvVars = append(config.EnvVars, cluster.Spec.Env...)
 
+	if configuration.Current.StandbyTCPUserTimeout != 0 {
+		config.EnvVars = append(
+			config.EnvVars,
+			corev1.EnvVar{
+				Name:  "CNPG_STANDBY_TCP_USER_TIMEOUT",
+				Value: strconv.Itoa(configuration.Current.StandbyTCPUserTimeout),
+			},
+		)
+	}
+
 	hashValue, _ := hash.ComputeHash(config)
 	config.Hash = hashValue
 	return config
