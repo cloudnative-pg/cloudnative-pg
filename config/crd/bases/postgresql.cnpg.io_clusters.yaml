@@ -2107,18 +2107,6 @@ spec:
               description:
                 description: Description of this PostgreSQL cluster
                 type: string
-              drainTaints:
-                default:
-                - node.kubernetes.io/unschedulable
-                - ToBeDeletedByClusterAutoscaler
-                - karpenter.sh/disrupted
-                - karpenter.sh/disruption
-                description: |-
-                  a list of taints to treat as drain taints.
-                  It is **highly** recommended to include `"node.kubernetes.io/unschedulable"`
-                items:
-                  type: string
-                type: array
               enablePDB:
                 default: true
                 description: |-

@@ -20,6 +20,8 @@ SPDX-License-Identifier: Apache-2.0
 package controller
 
 import (
+	"slices"
+
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -27,38 +29,6 @@ import (
 
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
-
-// checks if taints are different
-func areTaintsSame(t1 []corev1.Taint, t2 []corev1.Taint) bool {
-	if len(t1) != len(t2) {
-		return false // Different number of taints
-	}
-
-	// Create maps to store taints by key for efficient lookup
-	m1 := make(map[string]corev1.Taint, len(t1))
-	m2 := make(map[string]corev1.Taint, len(t2))
-
-	for _, taint := range t1 {
-		m1[taint.Key] = taint
-	}
-	for _, taint := range t2 {
-		m2[taint.Key] = taint
-	}
-
-	if len(m1) != len(m2) {
-		return false // Different number of unique keys
-	}
-
-	// Check if the keys are the same and the values/effects match
-	for key, taint1 := range m1 {
-		taint2, ok := m2[key]
-		if !ok || taint1.Value != taint2.Value || taint1.Effect != taint2.Effect {
-			return false // Key not found in t2 or values/effects don't match
-		}
-	}
-
-	return true
-}
 
 var (
 	isUsefulConfigMap = func(object client.Object) bool {
@@ -104,8 +74,10 @@ var (
 			return isUsefulClusterSecret(e.ObjectNew)
 		},
 	}
+)
 
-	nodesPredicate = predicate.Funcs{
+func (r *ClusterReconciler) nodesPredicate() predicate.Funcs {
+	return predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			oldNode, oldOk := e.ObjectOld.(*corev1.Node)
 			newNode, newOk := e.ObjectNew.(*corev1.Node)
@@ -113,7 +85,30 @@ var (
 				return false
 			}
 
-			return areTaintsSame(oldNode.Spec.Taints, newNode.Spec.Taints)
+			if oldNode.Spec.Unschedulable != newNode.Spec.Unschedulable {
+				return true
+			}
+
+			// check if any of the watched drain taints have changed.
+			for _, taint := range r.DrainTaints {
+				oldTaintIndex := slices.IndexFunc(oldNode.Spec.Taints, func(t corev1.Taint) bool { return t.Key == taint })
+				newTaintIndex := slices.IndexFunc(newNode.Spec.Taints, func(t corev1.Taint) bool { return t.Key == taint })
+
+				switch {
+				case oldTaintIndex == -1 && newTaintIndex == -1:
+					continue
+				case oldTaintIndex == -1 || newTaintIndex == -1:
+					return true
+				}
+				// exists in both - check if value or effect is different
+				oldTaint := oldNode.Spec.Taints[oldTaintIndex]
+				newTaint := newNode.Spec.Taints[newTaintIndex]
+				if oldTaint.Value != newTaint.Value || oldTaint.Effect != newTaint.Effect {
+					return true
+				}
+			}
+
+			return false
 		},
 		CreateFunc: func(_ event.CreateEvent) bool {
 			return false
@@ -125,7 +120,7 @@ var (
 			return false
 		},
 	}
-)
+}
 
 func isOwnedByClusterOrSatisfiesPredicate(
 	object client.Object,

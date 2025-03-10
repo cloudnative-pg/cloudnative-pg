@@ -144,6 +144,9 @@ type Data struct {
 	// KubernetesClusterDomain defines the domain suffix for service FQDNs
 	// within the Kubernetes cluster. If left unset, it defaults to `cluster.local`.
 	KubernetesClusterDomain string `json:"kubernetesClusterDomain" env:"KUBERNETES_CLUSTER_DOMAIN"`
+
+	// DrainTaints is a list of taints the operator will watch and treat as Unschedule
+	DrainTaints []string `json:"drainTaints" env:"DRAIN_TAINTS"`
 }
 
 // Current is the configuration used by the operator
@@ -161,6 +164,12 @@ func newDefaultConfig() *Data {
 		ExpiringCheckThreshold:  ExpiringCheckThreshold,
 		StandbyTCPUserTimeout:   0,
 		KubernetesClusterDomain: DefaultKubernetesClusterDomain,
+		DrainTaints: []string{
+			"node.kubernetes.io/unschedulable",
+			"ToBeDeletedByClusterAutoscaler",
+			"karpenter.sh/disrupted",
+			"karpenter.sh/disruption",
+		},
 	}
 }
 
