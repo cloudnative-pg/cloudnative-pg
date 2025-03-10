@@ -213,6 +213,8 @@ destroy_kind() {
   docker network disconnect "kind" "${registry_name}" &>/dev/null || true
   kind delete cluster --name "${cluster_name}" || true
   docker network rm "kind" &>/dev/null || true
+  docker container stop "${registry_name}" &>/dev/null || true
+  docker rm "${registry_name}" &>/dev/null || true
 }
 
 ##
