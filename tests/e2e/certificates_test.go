@@ -110,7 +110,7 @@ var _ = Describe("Certificates", func() {
 				Containers: []corev1.Container{
 					{
 						Name:  name,
-						Image: "ghcr.io/cloudnative-pg/webtest:1.6.0",
+						Image: "ghcr.io/cloudnative-pg/webtest:1.7.0",
 						Ports: []corev1.ContainerPort{
 							{
 								ContainerPort: 8080,
