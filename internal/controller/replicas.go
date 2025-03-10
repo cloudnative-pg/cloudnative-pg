@@ -170,6 +170,7 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForNonReplicaCluster(
 }
 
 // isNodeBeingDrained checks if a node is currently being drained.
+// nolint: lll
 // Copied from https://github.com/kubernetes-sigs/aws-ebs-csi-driver/blob/7bacf2d36f397bd098b3388403e8759c480be7e5/cmd/hooks/prestop.go#L91
 func isNodeBeingDrained(node corev1.Node, drainTaints []string) bool {
 	for _, taint := range node.Spec.Taints {
@@ -181,7 +182,11 @@ func isNodeBeingDrained(node corev1.Node, drainTaints []string) bool {
 }
 
 // isNodeUnschedulable checks whether a node is set to unschedulable
-func (r *ClusterReconciler) isNodeUnschedulable(ctx context.Context, nodeName string, drainTaints []string) (bool, error) {
+func (r *ClusterReconciler) isNodeUnschedulable(
+	ctx context.Context,
+	nodeName string,
+	drainTaints []string,
+) (bool, error) {
 	var node corev1.Node
 	err := r.Get(ctx, client.ObjectKey{Name: nodeName}, &node)
 	if err != nil {

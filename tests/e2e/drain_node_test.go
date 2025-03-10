@@ -142,7 +142,10 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 			})
 
 			By("removing karpenter taint from node", func() {
-				cmd := fmt.Sprintf("kubectl taint nodes %v karpenter.sh/disruption=NoSchedule:NoSchedule-", oldPrimary.Spec.NodeName)
+				cmd := fmt.Sprintf(
+					"kubectl taint nodes %v karpenter.sh/disruption=NoSchedule:NoSchedule-",
+					oldPrimary.Spec.NodeName,
+				)
 				_, _, err := run.Run(cmd)
 				Expect(err).ToNot(HaveOccurred())
 			})
