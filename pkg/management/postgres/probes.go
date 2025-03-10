@@ -18,6 +18,7 @@ package postgres
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
