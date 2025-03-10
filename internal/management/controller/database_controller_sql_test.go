@@ -262,12 +262,15 @@ var _ = Describe("Managed Extensions SQL", func() {
 				ExpectQuery(detectDatabaseExtensionSQL).
 				WithArgs(ext.Name).
 				WillReturnRows(
-					sqlmock.NewRows([]string{"extname", "extversion", "nspname"}).AddRow("testext", "1.0",
-						"default"),
+					sqlmock.NewRows([]string{"extname", "extversion", "nspname"}).
+						AddRow("testext", "1.0", "default"),
 				)
 			extInfo, err := getDatabaseExtensionInfo(ctx, db, ext)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(extInfo).ToNot(BeNil())
+			Expect(extInfo.Name).To(Equal("testext"))
+			Expect(extInfo.Schema).To(Equal("default"))
+			Expect(extInfo.Version).To(Equal("1.0"))
 		})
 
 		It("returns nil info when the extension does not exist", func(ctx SpecContext) {
@@ -383,6 +386,130 @@ var _ = Describe("Managed Extensions SQL", func() {
 				Name: ext.Name, Version: "0.9",
 				Schema: "old",
 			})).Error().To(MatchError(testError))
+		})
+	})
+})
+
+var _ = Describe("Managed schema SQL", func() {
+	var (
+		dbMock sqlmock.Sqlmock
+		db     *sql.DB
+		schema apiv1.SchemaSpec
+		err    error
+
+		testError error
+	)
+
+	BeforeEach(func() {
+		db, dbMock, err = sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+		Expect(err).ToNot(HaveOccurred())
+
+		schema = apiv1.SchemaSpec{
+			DatabaseObjectSpec: apiv1.DatabaseObjectSpec{
+				Name:   "testschema",
+				Ensure: "present",
+			},
+			Owner: "owner",
+		}
+
+		testError = fmt.Errorf("test error")
+	})
+
+	AfterEach(func() {
+		Expect(dbMock.ExpectationsWereMet()).To(Succeed())
+	})
+
+	Context("getDatabaseSchemaInfo", func() {
+		It("returns info when the extension exits", func(ctx SpecContext) {
+			dbMock.
+				ExpectQuery(detectDatabaseSchemaSQL).
+				WithArgs(schema.Name).
+				WillReturnRows(
+					sqlmock.NewRows([]string{"name", "owner"}).
+						AddRow("name", "owner"),
+				)
+			schemaInfo, err := getDatabaseSchemaInfo(ctx, db, schema)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(schemaInfo).ToNot(BeNil())
+			Expect(schemaInfo.Name).To(Equal("name"))
+			Expect(schemaInfo.Owner).To(Equal("owner"))
+		})
+
+		It("returns nil info when the extension does not exist", func(ctx SpecContext) {
+			dbMock.
+				ExpectQuery(detectDatabaseSchemaSQL).
+				WithArgs(schema.Name).
+				WillReturnRows(
+					sqlmock.NewRows([]string{"name", "owner"}),
+				)
+			schemaInfo, err := getDatabaseSchemaInfo(ctx, db, schema)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(schemaInfo).To(BeNil())
+		})
+	})
+
+	Context("createDatabaseSchema", func() {
+		createSchemaSQL := "CREATE SCHEMA \"testschema\" AUTHORIZATION \"owner\""
+
+		It("returns success when the schema has been created", func(ctx SpecContext) {
+			dbMock.
+				ExpectExec(createSchemaSQL).
+				WillReturnResult(sqlmock.NewResult(0, 1))
+			Expect(createDatabaseSchema(ctx, db, schema)).Error().NotTo(HaveOccurred())
+		})
+
+		It("fails when the schema has not been created", func(ctx SpecContext) {
+			dbMock.
+				ExpectExec(createSchemaSQL).
+				WillReturnError(testError)
+			Expect(createDatabaseSchema(ctx, db, schema)).Error().To(Equal(testError))
+		})
+	})
+
+	Context("updateDatabaseSchema", func() {
+		It("does nothing when the schema has been correctly reconciled", func(ctx SpecContext) {
+			Expect(updateDatabaseSchema(ctx, db, schema, &schemaInfo{
+				Name:  schema.Name,
+				Owner: schema.Owner,
+			})).Error().NotTo(HaveOccurred())
+		})
+
+		It("updates the schema owner", func(ctx SpecContext) {
+			dbMock.
+				ExpectExec("ALTER SCHEMA \"testschema\" OWNER TO \"owner\"").
+				WillReturnResult(sqlmock.NewResult(0, 1))
+
+			Expect(updateDatabaseSchema(ctx, db, schema,
+				&schemaInfo{Name: schema.Name, Owner: "old"})).Error().NotTo(HaveOccurred())
+		})
+
+		It("fail when setting the owner failed", func(ctx SpecContext) {
+			dbMock.
+				ExpectExec("ALTER SCHEMA \"testschema\" OWNER TO \"owner\"").
+				WillReturnError(testError)
+
+			Expect(updateDatabaseSchema(ctx, db, schema,
+				&schemaInfo{Name: schema.Name, Owner: "old"})).Error().To(MatchError(testError))
+		})
+	})
+
+	Context("dropDatabaseSchema", func() {
+		dropSchemaSQL := "DROP SCHEMA IF EXISTS \"testschema\""
+
+		It("returns success when the extension has been dropped", func(ctx SpecContext) {
+			dbMock.
+				ExpectExec(dropSchemaSQL).
+				WillReturnResult(sqlmock.NewResult(0, 1))
+
+			Expect(dropDatabaseSchema(ctx, db, schema)).Error().NotTo(HaveOccurred())
+		})
+
+		It("returns an error when the DROP statement failed", func(ctx SpecContext) {
+			dbMock.
+				ExpectExec(dropSchemaSQL).
+				WillReturnError(testError)
+
+			Expect(dropDatabaseSchema(ctx, db, schema)).Error().To(Equal(testError))
 		})
 	})
 })
