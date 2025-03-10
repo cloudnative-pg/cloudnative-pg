@@ -1936,6 +1936,14 @@ any plugin to be loaded with the corresponding configuration</p>
 in the PostgreSQL Pods.</p>
 </td>
 </tr>
+<tr><td><code>drainTaints</code><br/>
+<i>[]string</i>
+</td>
+<td>
+   <p>a list of taints to treat as drain taints.
+It is <strong>highly</strong> recommended to include <code>&quot;node.kubernetes.io/unschedulable&quot;</code></p>
+</td>
+</tr>
 </tbody>
 </table>
 
