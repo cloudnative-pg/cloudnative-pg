@@ -545,11 +545,7 @@ func checkHasMissingPVCs(pod *corev1.Pod, cluster *apiv1.Cluster) (rollout, erro
 }
 
 func checkClusterHasDifferentRestartAnnotation(pod *corev1.Pod, cluster *apiv1.Cluster) (rollout, error) {
-	// check if pod needs to be restarted because of some config requiring it
-	// or if the cluster have been explicitly restarted
-	// If the cluster has been restarted and we are working with a Pod
-	// which has not been restarted yet, or restarted at a different
-	// time, let's restart it.
+	// If the pod restart value doesn't match with the one contained in the cluster, restart the pod.
 	if clusterRestart, ok := cluster.Annotations[utils.ClusterRestartAnnotationName]; ok {
 		podRestart := pod.Annotations[utils.ClusterRestartAnnotationName]
 		if clusterRestart != podRestart {
