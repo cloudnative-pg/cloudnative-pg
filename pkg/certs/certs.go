@@ -166,7 +166,7 @@ func (pair KeyPair) createAndSignPairWithValidity(
 	}
 
 	// Generate a new private key
-	leafKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	leafKey, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
 	if err != nil {
 		return nil, err
 	}
@@ -434,7 +434,7 @@ func createCAWithValidity(
 	if err != nil {
 		return nil, err
 	}
-	rootKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	rootKey, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
 	if err != nil {
 		return nil, err
 	}
