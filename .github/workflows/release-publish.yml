@@ -376,8 +376,8 @@ jobs:
         name: Checkout artifact
         uses: actions/checkout@v4
         with:
-          repository: cloudnative-pg/artifacts
-          token: ${{ secrets.REPO_GHA_PAT }}
+          repository: ${{ github.repository_owner }}/artifacts
+          token: ${{ secrets.GITHUB_TOKEN }}
           ref: main
           fetch-depth: 0
       -
@@ -411,6 +411,6 @@ jobs:
         name: Push commit
         uses: ad-m/github-push-action@v0.8.0
         with:
-          github_token: ${{ secrets.REPO_GHA_PAT }}
-          repository: cloudnative-pg/artifacts
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository_owner }}/artifacts
           branch: "main"
