@@ -9,7 +9,7 @@ on:
 
 env:
   GOLANG_VERSION: "1.24.x"
-  REGISTRY: "ghcr.io"
+  REGISTRY: "ghcr.io/${{ github.repository }}"
 
 permissions:
   contents: write
