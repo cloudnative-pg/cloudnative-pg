@@ -1,0 +1,48 @@
+name: Release Notes
+description: Release notes for a new version of CloudNativePG
+title: "[Release Notes]: CloudNativePG 1.XX.Y and 1.XX-1.Z"
+labels: ["triage", "documentation"]
+projects: ["cloudnative-pg/cloudnative-pg"]
+assignees:
+  - gbartolini
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Make sure that the correct versions are reported in the title of the ticket.
+  - type: checkboxes
+    id: search
+    attributes:
+      label: Is there an existing issue already for this task?
+      description: Before you submit a new issue, make sure you have searched if a similar one already exists
+      options:
+        - label: I have searched for an existing issue, and could not find anything. I believe this is a new request.
+          required: true
+  - type: dropdown
+    id: minor
+    attributes:
+      label: Is this a new minor release?
+      description: Is this a new minor release for CloudNativePG? If so, make sure you check the `contribute/release-notes-template.md` file.
+      options:
+        - "No"
+        - "Yes"
+    validations:
+      required: true
+  - type: dropdown
+    id: preview
+    attributes:
+      label: Is this a preview release?
+      description: Is this a preview release for CloudNativePG? If so, make sure you add `-RC1` to the version and update the `preview_version.md` file.
+      options:
+        - "No"
+        - "Yes"
+    validations:
+      required: true
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Code of Conduct
+      description: By submitting this issue, you agree to follow our [Code of Conduct](https://github.com/cloudnative-pg/governance/blob/main/CODE_OF_CONDUCT.md)
+      options:
+        - label: I agree to follow this project's Code of Conduct
+          required: true
