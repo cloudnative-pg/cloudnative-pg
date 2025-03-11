@@ -3,7 +3,7 @@ project_name: cnpg
 
 release:
   github:
-    owner: cloudnative-pg
+    owner: criteo-forks
     name: cloudnative-pg
 
 env:
@@ -24,9 +24,9 @@ builds:
   ldflags:
     - -s
     - -w
-    - -X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildVersion={{.Env.VERSION}}
-    - -X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildCommit={{.Env.COMMIT}}
-    - -X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildDate={{.Env.DATE}}
+    - -X github.com/criteo-forks/cloudnative-pg/pkg/versions.buildVersion={{.Env.VERSION}}
+    - -X github.com/criteo-forks/cloudnative-pg/pkg/versions.buildCommit={{.Env.COMMIT}}
+    - -X github.com/criteo-forks/cloudnative-pg/pkg/versions.buildDate={{.Env.DATE}}
   goos:
     - linux
   goarch:
@@ -45,9 +45,9 @@ builds:
     - -race
     - -s
     - -w
-    - -X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildVersion={{.Env.VERSION}}
-    - -X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildCommit={{.Env.COMMIT}}
-    - -X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildDate={{.Env.DATE}}
+    - -X github.com/criteo-forks/cloudnative-pg/pkg/versions.buildVersion={{.Env.VERSION}}
+    - -X github.com/criteo-forks/cloudnative-pg/pkg/versions.buildCommit={{.Env.COMMIT}}
+    - -X github.com/criteo-forks/cloudnative-pg/pkg/versions.buildDate={{.Env.DATE}}
   goos:
     - linux
   goarch:
@@ -62,9 +62,9 @@ builds:
   ldflags:
   - -s
   - -w
-  - -X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildVersion={{.Env.VERSION}}
-  - -X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildCommit={{.Env.COMMIT}}
-  - -X github.com/cloudnative-pg/cloudnative-pg/pkg/versions.buildDate={{.Env.DATE}}
+  - -X github.com/criteo-forks/cloudnative-pg/pkg/versions.buildVersion={{.Env.VERSION}}
+  - -X github.com/criteo-forks/cloudnative-pg/pkg/versions.buildCommit={{.Env.COMMIT}}
+  - -X github.com/criteo-forks/cloudnative-pg/pkg/versions.buildDate={{.Env.DATE}}
   goos:
   - darwin
   - linux
@@ -106,7 +106,7 @@ nfpms:
       {{- if eq .Arch "amd64" }}x86_64
       {{- else if eq .Arch "386" }}i386
       {{- else }}{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}{{ end }}
-    homepage: https://github.com/cloudnative-pg/cloudnative-pg
+    homepage: https://github.com/criteo-forks/cloudnative-pg
     bindir: /usr/local/bin
     maintainer: 'Marco Nenciarini <marco.nenciarini@enterprisedb.com>'
     builds:
@@ -136,7 +136,7 @@ signs:
 
 krews:
   - name: cnpg
-    homepage: https://github.com/cloudnative-pg/cloudnative-pg
+    homepage: https://github.com/criteo-forks/cloudnative-pg
     short_description: 'Manage your CloudNativePG clusters'
     skip_upload: true
     description: 'This plugin provides multiple commands to help you manage your CloudNativePG clusters.'
