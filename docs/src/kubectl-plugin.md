@@ -573,7 +573,7 @@ Archive:  report_operator_<TIMESTAMP>.zip
     and previous logs are available, it will show them both.
 
 ```output
-====== Begin of Previous Log =====
+====== Beginning of Previous Log =====
 2023-03-28T12:56:41.251711811Z {"level":"info","ts":"2023-03-28T12:56:41Z","logger":"setup","msg":"Starting CloudNativePG Operator","version":"1.25.1","build":{"Version":"1.25.1+dev107","Commit":"cc9bab17","Date":"2023-03-28"}}
 2023-03-28T12:56:41.251851909Z {"level":"info","ts":"2023-03-28T12:56:41Z","logger":"setup","msg":"Starting pprof HTTP server","addr":"0.0.0.0:6060"}
   <snipped …>

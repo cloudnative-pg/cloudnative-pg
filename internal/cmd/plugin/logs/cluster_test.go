@@ -53,7 +53,7 @@ var _ = Describe("Test the command", func() {
 	}
 
 	plugin.Namespace = namespace
-	plugin.ClientInterface = fakeClient.NewSimpleClientset(pod)
+	plugin.ClientInterface = fakeClient.NewClientset(pod)
 	plugin.Client = fake.NewClientBuilder().
 		WithScheme(scheme.BuildWithAllKnownScheme()).
 		WithObjects(cluster).
