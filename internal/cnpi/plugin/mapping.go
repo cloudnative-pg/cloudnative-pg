@@ -22,15 +22,16 @@ import (
 	"github.com/cloudnative-pg/cnpg-i/pkg/lifecycle"
 )
 
-// The OperationVerb corresponds to the Kubernetes API method
+// The OperationVerb corresponds to the CNPG-I lifecycle operation verb
 type OperationVerb string
 
-// A Kubernetes operation verb
+// A lifecycle operation verb
 const (
-	OperationVerbPatch  OperationVerb = "PATCH"
-	OperationVerbUpdate OperationVerb = "UPDATE"
-	OperationVerbCreate OperationVerb = "CREATE"
-	OperationVerbDelete OperationVerb = "DELETE"
+	OperationVerbPatch    OperationVerb = "PATCH"
+	OperationVerbUpdate   OperationVerb = "UPDATE"
+	OperationVerbCreate   OperationVerb = "CREATE"
+	OperationVerbDelete   OperationVerb = "DELETE"
+	OperationVerbEvaluate OperationVerb = "EVALUATE"
 )
 
 // ToOperationType_Type converts an OperationVerb into a lifecycle.OperationType_Type
@@ -45,6 +46,8 @@ func (o OperationVerb) ToOperationType_Type() (lifecycle.OperatorOperationType_T
 		return lifecycle.OperatorOperationType_TYPE_CREATE, nil
 	case OperationVerbUpdate:
 		return lifecycle.OperatorOperationType_TYPE_UPDATE, nil
+	case OperationVerbEvaluate:
+		return lifecycle.OperatorOperationType_TYPE_EVALUATE, nil
 	}
 
 	return lifecycle.OperatorOperationType_Type(0), fmt.Errorf("unknown operation type: '%s'", o)

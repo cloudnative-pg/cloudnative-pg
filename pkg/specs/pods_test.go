@@ -928,8 +928,8 @@ var _ = Describe("Compute startup probe failure threshold", func() {
 	})
 })
 
-var _ = Describe("PodWithExistingStorage", func() {
-	It("applies JSON patch from annotation", func() {
+var _ = Describe("buildInstance", func() {
+	It("applies JSON patch from annotation", func(ctx SpecContext) {
 		cluster := v1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test-cluster",
@@ -940,13 +940,13 @@ var _ = Describe("PodWithExistingStorage", func() {
 			},
 		}
 
-		pod, err := PodWithExistingStorage(cluster, 1)
+		pod, err := NewInstance(ctx, cluster, 1, true)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(pod).NotTo(BeNil())
 		Expect(pod.Spec.Containers[0].Image).To(Equal("new-image:latest"))
 	})
 
-	It("returns error if JSON patch is invalid", func() {
+	It("returns error if JSON patch is invalid", func(ctx SpecContext) {
 		cluster := v1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test-cluster",
@@ -957,7 +957,7 @@ var _ = Describe("PodWithExistingStorage", func() {
 			},
 		}
 
-		_, err := PodWithExistingStorage(cluster, 1)
+		_, err := NewInstance(ctx, cluster, 1, true)
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("while decoding JSON patch from annotation"))
 	})
