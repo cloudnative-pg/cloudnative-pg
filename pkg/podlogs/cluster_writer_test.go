@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package logs
+package podlogs
 
 import (
 	"bytes"
@@ -104,14 +104,14 @@ var _ = Describe("Cluster logging tests", func() {
 		},
 	}
 	It("should exit on ended pod logs with the non-follow option", func(ctx context.Context) {
-		client := fake.NewSimpleClientset(pod)
+		client := fake.NewClientset(pod)
 		var logBuffer bytes.Buffer
 		var wait sync.WaitGroup
 		wait.Add(1)
 		go func() {
 			defer GinkgoRecover()
 			defer wait.Done()
-			streamClusterLogs := ClusterStreamingRequest{
+			streamClusterLogs := ClusterWriter{
 				Cluster: cluster,
 				Options: &corev1.PodLogOptions{
 					Follow: false,
@@ -134,7 +134,7 @@ var _ = Describe("Cluster logging tests", func() {
 		go func() {
 			defer GinkgoRecover()
 			defer wait.Done()
-			streamClusterLogs := ClusterStreamingRequest{
+			streamClusterLogs := ClusterWriter{
 				Cluster: cluster,
 				Options: &corev1.PodLogOptions{
 					Follow: false,
@@ -150,7 +150,7 @@ var _ = Describe("Cluster logging tests", func() {
 	})
 
 	It("should catch extra logs if given the follow option", func(ctx context.Context) {
-		client := fake.NewSimpleClientset(pod)
+		client := fake.NewClientset(pod)
 		var logBuffer syncBuffer
 		// let's set a short follow-wait, and keep the cluster streaming for two
 		// cycles
@@ -158,7 +158,7 @@ var _ = Describe("Cluster logging tests", func() {
 		ctx2, cancel := context.WithTimeout(ctx, 300*time.Millisecond)
 		go func() {
 			defer GinkgoRecover()
-			streamClusterLogs := ClusterStreamingRequest{
+			streamClusterLogs := ClusterWriter{
 				Cluster: cluster,
 				Options: &corev1.PodLogOptions{
 					Follow: true,
