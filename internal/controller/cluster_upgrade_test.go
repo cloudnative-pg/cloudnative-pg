@@ -104,7 +104,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 		rollout := isInstanceNeedingRollout(ctx, status, &clusterRestart)
 		Expect(rollout.required).To(BeTrue())
 		Expect(rollout.reason).To(Equal("cluster has been explicitly restarted via annotation"))
-		Expect(rollout.canBeInPlace).To(BeTrue())
+		Expect(rollout.canBeInPlace).To(BeFalse())
 		Expect(rollout.needsChangeOperandImage).To(BeFalse())
 		Expect(rollout.needsChangeOperatorImage).To(BeFalse())
 
