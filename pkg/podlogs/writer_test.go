@@ -24,7 +24,7 @@ import (
 	"sync"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 
@@ -52,13 +52,13 @@ func (mw *multiWriter) Create(name string) (io.Writer, error) {
 var _ = Describe("Pod logging tests", func() {
 	podNamespace := "pod-test"
 	podName := "pod-name-test"
-	pod := v1.Pod{
+	pod := corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: podNamespace,
 			Name:      podName,
 		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
 				{
 					Name: "postgres",
 				},
@@ -66,13 +66,13 @@ var _ = Describe("Pod logging tests", func() {
 		},
 	}
 
-	podWithSidecar := v1.Pod{
+	podWithSidecar := corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: podNamespace,
 			Name:      podName,
 		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
 				{
 					Name: "postgres",
 				},
@@ -81,20 +81,20 @@ var _ = Describe("Pod logging tests", func() {
 				},
 			},
 		},
-		Status: v1.PodStatus{
-			ContainerStatuses: []v1.ContainerStatus{
+		Status: corev1.PodStatus{
+			ContainerStatuses: []corev1.ContainerStatus{
 				{
 					Name: "postgres",
-					State: v1.ContainerState{
-						Running: &v1.ContainerStateRunning{
+					State: corev1.ContainerState{
+						Running: &corev1.ContainerStateRunning{
 							StartedAt: metav1.Time{Time: time.Now()},
 						},
 					},
 				},
 				{
 					Name: "sidecar",
-					State: v1.ContainerState{
-						Running: &v1.ContainerStateRunning{
+					State: corev1.ContainerState{
+						Running: &corev1.ContainerStateRunning{
 							StartedAt: metav1.Time{Time: time.Now()},
 						},
 					},
@@ -115,11 +115,11 @@ var _ = Describe("Pod logging tests", func() {
 		It("should be able to handle the empty Pod", func(ctx context.Context) {
 			client := fake.NewClientset()
 			streamPodLog := Writer{
-				Pod:    v1.Pod{},
+				Pod:    corev1.Pod{},
 				Client: client,
 			}
 			var logBuffer bytes.Buffer
-			err := streamPodLog.Single(ctx, &logBuffer, &v1.PodLogOptions{})
+			err := streamPodLog.Single(ctx, &logBuffer, &corev1.PodLogOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(logBuffer.String()).To(BeEquivalentTo(""))
 		})
@@ -132,7 +132,7 @@ var _ = Describe("Pod logging tests", func() {
 			}
 
 			var logBuffer bytes.Buffer
-			err := streamPodLog.Single(ctx, &logBuffer, &v1.PodLogOptions{})
+			err := streamPodLog.Single(ctx, &logBuffer, &corev1.PodLogOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			Expect(logBuffer.String()).To(BeEquivalentTo("fake logs\n"))
@@ -146,7 +146,7 @@ var _ = Describe("Pod logging tests", func() {
 			}
 
 			var logBuffer bytes.Buffer
-			err := streamPodLog.Single(ctx, &logBuffer, &v1.PodLogOptions{})
+			err := streamPodLog.Single(ctx, &logBuffer, &corev1.PodLogOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			Expect(logBuffer.String()).To(BeEquivalentTo("fake logs\nfake logs\n"))
@@ -160,7 +160,7 @@ var _ = Describe("Pod logging tests", func() {
 			}
 
 			var logBuffer bytes.Buffer
-			err := streamPodLog.Single(ctx, &logBuffer, &v1.PodLogOptions{
+			err := streamPodLog.Single(ctx, &logBuffer, &corev1.PodLogOptions{
 				Container: "postgres",
 				Previous:  false,
 			})
@@ -182,14 +182,14 @@ var _ = Describe("Pod logging tests", func() {
 					Pod:    pod,
 					Client: client,
 				}
-				err := streamPodLog.Single(ctx, &logBuffer, &v1.PodLogOptions{
+				err := streamPodLog.Single(ctx, &logBuffer, &corev1.PodLogOptions{
 					Timestamps: false,
 					Follow:     true,
 					SinceTime:  &now,
 				})
 				Expect(err).NotTo(HaveOccurred())
 			}()
-			// calling ctx.Done is not strictly necessary because the fake Client
+			// Calling ctx.Done is not strictly necessary because the fake Client
 			// will terminate the pod stream anyway, ending Stream.
 			// But in "production", Stream will follow
 			// the pod logs until the context, or the logs, are over
@@ -210,7 +210,7 @@ var _ = Describe("Pod logging tests", func() {
 				return fmt.Sprintf("%s-%s.log", streamPodLog.Pod.Name, container)
 			}
 			mw := newMultiWriter()
-			err := streamPodLog.Multiple(ctx, &v1.PodLogOptions{}, mw, namer)
+			err := streamPodLog.Multiple(ctx, &corev1.PodLogOptions{}, mw, namer)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(mw.writers).To(HaveLen(2))
 
@@ -229,7 +229,7 @@ var _ = Describe("Pod logging tests", func() {
 				return fmt.Sprintf("%s-%s.log", streamPodLog.Pod.Name, container)
 			}
 			mw := newMultiWriter()
-			err := streamPodLog.Multiple(ctx, &v1.PodLogOptions{Previous: true}, mw, namer)
+			err := streamPodLog.Multiple(ctx, &corev1.PodLogOptions{Previous: true}, mw, namer)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(mw.writers).To(HaveLen(2))
 

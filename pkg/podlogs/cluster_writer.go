@@ -39,10 +39,10 @@ import (
 // wait before searching again for new cluster pods
 const DefaultFollowWaiting time.Duration = 1 * time.Second
 
-// ClusterWriter represents a request to stream a cluster's pod logs
+// ClusterWriter represents a request to stream a cluster's pod logs.
 //
 // If the Follow Option is set to true, streaming will sit in a loop looking
-// for any new / regenerated pods, and will only exit when there are no pods
+// for any new / regenerated pods and will only exit when there are no pods
 // streaming
 type ClusterWriter struct {
 	Cluster       *apiv1.Cluster

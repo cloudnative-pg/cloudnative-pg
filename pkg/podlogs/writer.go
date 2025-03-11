@@ -23,25 +23,25 @@ import (
 	"fmt"
 	"io"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
 
 // Writer represents a request to stream a pod's logs and send them to an io.Writer
 type Writer struct {
-	Pod    v1.Pod
+	Pod    corev1.Pod
 	Client kubernetes.Interface
 }
 
 // NewPodLogsWriter initializes the struct
-func NewPodLogsWriter(pod v1.Pod, cli kubernetes.Interface) *Writer {
+func NewPodLogsWriter(pod corev1.Pod, cli kubernetes.Interface) *Writer {
 	return &Writer{Pod: pod, Client: cli}
 }
 
 // Single streams the pod logs and shunts them to the `writer`.
 // If there are multiple containers, it will concatenate all the container streams into the writer
-func (spl *Writer) Single(ctx context.Context, writer io.Writer, opts *v1.PodLogOptions) (err error) {
+func (spl *Writer) Single(ctx context.Context, writer io.Writer, opts *corev1.PodLogOptions) (err error) {
 	if opts.Container != "" {
 		return spl.sendLogsToWriter(ctx, writer, opts)
 	}
@@ -64,7 +64,7 @@ type writerConstructor interface {
 func (spl *Writer) sendLogsToWriter(
 	ctx context.Context,
 	writer io.Writer,
-	options *v1.PodLogOptions,
+	options *corev1.PodLogOptions,
 ) error {
 	request := spl.Client.CoreV1().Pods(spl.Pod.Namespace).GetLogs(spl.Pod.Name, options)
 
@@ -88,7 +88,7 @@ func (spl *Writer) sendLogsToWriter(
 // Multiple streams the pod logs, sending each container's stream to a separate writer
 func (spl *Writer) Multiple(
 	ctx context.Context,
-	opts *v1.PodLogOptions,
+	opts *corev1.PodLogOptions,
 	writerConstructor writerConstructor,
 	filePathGenerator func(string) string,
 ) error {
