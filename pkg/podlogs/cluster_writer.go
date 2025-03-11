@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package logs
+package podlogs
 
 import (
 	"bufio"
@@ -39,12 +39,12 @@ import (
 // wait before searching again for new cluster pods
 const DefaultFollowWaiting time.Duration = 1 * time.Second
 
-// ClusterStreamingRequest represents a request to stream a cluster's pod logs
+// ClusterWriter represents a request to stream a cluster's pod logs.
 //
 // If the Follow Option is set to true, streaming will sit in a loop looking
-// for any new / regenerated pods, and will only exit when there are no pods
+// for any new / regenerated pods and will only exit when there are no pods
 // streaming
-type ClusterStreamingRequest struct {
+type ClusterWriter struct {
 	Cluster       *apiv1.Cluster
 	Options       *corev1.PodLogOptions
 	Previous      bool `json:"previous,omitempty"`
@@ -54,15 +54,15 @@ type ClusterStreamingRequest struct {
 	Client kubernetes.Interface
 }
 
-func (csr *ClusterStreamingRequest) getClusterName() string {
+func (csr *ClusterWriter) getClusterName() string {
 	return csr.Cluster.Name
 }
 
-func (csr *ClusterStreamingRequest) getClusterNamespace() string {
+func (csr *ClusterWriter) getClusterNamespace() string {
 	return csr.Cluster.Namespace
 }
 
-func (csr *ClusterStreamingRequest) getLogOptions(containerName string) *corev1.PodLogOptions {
+func (csr *ClusterWriter) getLogOptions(containerName string) *corev1.PodLogOptions {
 	if csr.Options == nil {
 		return &corev1.PodLogOptions{
 			Container: containerName,
@@ -75,7 +75,7 @@ func (csr *ClusterStreamingRequest) getLogOptions(containerName string) *corev1.
 	return options
 }
 
-func (csr *ClusterStreamingRequest) getKubernetesClient() kubernetes.Interface {
+func (csr *ClusterWriter) getKubernetesClient() kubernetes.Interface {
 	if csr.Client != nil {
 		return csr.Client
 	}
@@ -86,7 +86,7 @@ func (csr *ClusterStreamingRequest) getKubernetesClient() kubernetes.Interface {
 	return csr.Client
 }
 
-func (csr *ClusterStreamingRequest) getFollowWaitingTime() time.Duration {
+func (csr *ClusterWriter) getFollowWaitingTime() time.Duration {
 	if csr.FollowWaiting > 0 {
 		return csr.FollowWaiting
 	}
@@ -165,7 +165,7 @@ func (as *activeSet) wait() {
 }
 
 // SingleStream streams the cluster's pod logs and shunts them to a single io.Writer
-func (csr *ClusterStreamingRequest) SingleStream(ctx context.Context, writer io.Writer) error {
+func (csr *ClusterWriter) SingleStream(ctx context.Context, writer io.Writer) error {
 	client := csr.getKubernetesClient()
 	streamSet := newActiveSet()
 	defer func() {
@@ -230,7 +230,7 @@ func (csr *ClusterStreamingRequest) SingleStream(ctx context.Context, writer io.
 //
 // IMPORTANT: the output writer should be goroutine-safe
 // NOTE: the default Go `log` package is used for logging because it's goroutine-safe
-func (csr *ClusterStreamingRequest) streamInGoroutine(
+func (csr *ClusterWriter) streamInGoroutine(
 	ctx context.Context,
 	podName string,
 	containerName string,

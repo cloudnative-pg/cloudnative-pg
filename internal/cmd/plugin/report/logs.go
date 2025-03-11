@@ -24,11 +24,13 @@ import (
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/kubernetes"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/podlogs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/logs"
 )
 
 const jobMatcherLabel = "job-name"
@@ -46,9 +48,7 @@ func streamOperatorLogsToZip(
 	if _, err := zipper.Create(logsDir + "/"); err != nil {
 		return fmt.Errorf("could not add '%s' to zip: %w", logsDir, err)
 	}
-	podLogOptions := &corev1.PodLogOptions{
-		Timestamps: logTimeStamp, // NOTE: when activated, lines are no longer JSON
-	}
+
 	for i := range pods {
 		pod := pods[i]
 		path := filepath.Join(logsDir, fmt.Sprintf("%s-logs.jsonl", pod.Name))
@@ -57,21 +57,12 @@ func streamOperatorLogsToZip(
 			return fmt.Errorf("could not add '%s' to zip: %w", path, zipperErr)
 		}
 
-		streamPodLogs := &logs.StreamingRequest{
-			Pod:      &pod,
-			Options:  podLogOptions,
-			Previous: true,
+		streamPodLogs := podlogs.NewPodLogsWriter(pod, kubernetes.NewForConfigOrDie(ctrl.GetConfigOrDie()))
+		opts := &corev1.PodLogOptions{
+			Timestamps: logTimeStamp,
+			Previous:   true,
 		}
-		if _, err := fmt.Fprint(writer, "\n\"====== Begin of Previous Log =====\"\n"); err != nil {
-			return err
-		}
-		_ = streamPodLogs.Stream(ctx, writer)
-		if _, err := fmt.Fprint(writer, "\n\"====== End of Previous Log =====\"\n"); err != nil {
-			return err
-		}
-
-		streamPodLogs.Previous = false
-		if err := streamPodLogs.Stream(ctx, writer); err != nil {
+		if err := streamPodLogs.Single(ctx, writer, opts); err != nil {
 			return err
 		}
 	}
@@ -99,45 +90,26 @@ func streamClusterLogsToZip(
 		utils.ClusterLabelName: clusterName,
 	}
 
-	podLogOptions := &corev1.PodLogOptions{
-		Timestamps: logTimeStamp, // NOTE: when activated, lines are no longer JSON
-	}
-
 	var podList corev1.PodList
 	err = plugin.Client.List(ctx, &podList, matchClusterName, client.InNamespace(namespace))
 	if err != nil {
 		return fmt.Errorf("could not get cluster pods: %w", err)
 	}
-	streamPodLogs := &logs.StreamingRequest{
-		Options:  podLogOptions,
-		Previous: true,
-	}
+
+	cli := kubernetes.NewForConfigOrDie(ctrl.GetConfigOrDie())
 
 	for idx := range podList.Items {
 		pod := podList.Items[idx]
-		for _, container := range pod.Spec.Containers {
-			path := filepath.Join(logsdir, fmt.Sprintf("%s-%s.jsonl", pod.Name, container.Name))
-			writer, err := zipper.Create(path)
-			if err != nil {
-				return fmt.Errorf("could not add '%s' to zip: %w", path, err)
-			}
-			streamPodLogs.Options.Container = container.Name
-			streamPodLogs.Pod = &pod
-
-			if _, err := fmt.Fprint(writer, "\n\"====== Begin of Previous Log =====\"\n"); err != nil {
-				return err
-			}
-			// We ignore the error because it will error if there are no previous logs
-			_ = streamPodLogs.Stream(ctx, writer)
-			if _, err := fmt.Fprint(writer, "\n\"====== End of Previous Log =====\"\n"); err != nil {
-				return err
-			}
-
-			streamPodLogs.Previous = false
-
-			if err := streamPodLogs.Stream(ctx, writer); err != nil {
-				return err
-			}
+		streamPodLogs := podlogs.NewPodLogsWriter(pod, cli)
+		fileNamer := func(containerName string) string {
+			return filepath.Join(logsdir, fmt.Sprintf("%s-%s.jsonl", pod.Name, containerName))
+		}
+		opts := &corev1.PodLogOptions{
+			Timestamps: logTimeStamp,
+			Previous:   true,
+		}
+		if err := streamPodLogs.Multiple(ctx, opts, zipper, fileNamer); err != nil {
+			return err
 		}
 	}
 
@@ -159,13 +131,8 @@ func streamClusterJobLogsToZip(ctx context.Context, clusterName, namespace strin
 		utils.ClusterLabelName: clusterName,
 	}
 
-	podLogOptions := &corev1.PodLogOptions{
-		Timestamps: logTimeStamp, // NOTE: when activated, lines are no longer JSON
-	}
-
 	var jobList batchv1.JobList
-	err = plugin.Client.List(ctx, &jobList, matchClusterName, client.InNamespace(namespace))
-	if err != nil {
+	if err := plugin.Client.List(ctx, &jobList, matchClusterName, client.InNamespace(namespace)); err != nil {
 		return fmt.Errorf("could not get cluster jobs: %w", err)
 	}
 
@@ -174,28 +141,22 @@ func streamClusterJobLogsToZip(ctx context.Context, clusterName, namespace strin
 			jobMatcherLabel: job.Name,
 		}
 		var podList corev1.PodList
-		err = plugin.Client.List(ctx, &podList, matchJobName, client.InNamespace(namespace))
-		if err != nil {
+		if err := plugin.Client.List(ctx, &podList, matchJobName, client.InNamespace(namespace)); err != nil {
 			return fmt.Errorf("could not get pods for job '%s': %w", job.Name, err)
 		}
 
-		streamPodLogs := &logs.StreamingRequest{
-			Options:  podLogOptions,
-			Previous: false,
-		}
 		for idx := range podList.Items {
 			pod := podList.Items[idx]
-			for _, container := range pod.Spec.Containers {
-				path := filepath.Join(logsdir, fmt.Sprintf("%s-%s.jsonl", pod.Name, container.Name))
-				writer, err := zipper.Create(path)
-				if err != nil {
-					return fmt.Errorf("could not add '%s' to zip: %w", path, err)
-				}
-				streamPodLogs.Options.Container = container.Name
-				streamPodLogs.Pod = &pod
-				if err = streamPodLogs.Stream(ctx, writer); err != nil {
-					return err
-				}
+			streamPodLogs := podlogs.NewPodLogsWriter(pod, kubernetes.NewForConfigOrDie(ctrl.GetConfigOrDie()))
+
+			fileNamer := func(containerName string) string {
+				return filepath.Join(logsdir, fmt.Sprintf("%s-%s.jsonl", pod.Name, containerName))
+			}
+			opts := corev1.PodLogOptions{
+				Timestamps: logTimeStamp,
+			}
+			if err := streamPodLogs.Multiple(ctx, &opts, zipper, fileNamer); err != nil {
+				return err
 			}
 		}
 	}
