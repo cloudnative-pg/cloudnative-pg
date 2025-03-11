@@ -318,11 +318,11 @@ func isPodNeedingRollout(
 	}
 
 	checkers := map[string]rolloutChecker{
-		"pod has missing PVCs":                 checkHasMissingPVCs,
-		"pod has PVC requiring resizing":       checkHasResizingPVC,
-		"pod projected volume is outdated":     checkProjectedVolumeIsOutdated,
-		"pod image is outdated":                checkPodImageIsOutdated,
-		"cluster has newer restart annotation": checkClusterHasNewerRestartAnnotation,
+		"pod has missing PVCs":                     checkHasMissingPVCs,
+		"pod has PVC requiring resizing":           checkHasResizingPVC,
+		"pod projected volume is outdated":         checkProjectedVolumeIsOutdated,
+		"pod image is outdated":                    checkPodImageIsOutdated,
+		"cluster has different restart annotation": checkClusterHasDifferentRestartAnnotation,
 	}
 
 	podRollout := applyCheckers(checkers)
@@ -525,19 +525,15 @@ func checkHasMissingPVCs(pod *corev1.Pod, cluster *apiv1.Cluster) (rollout, erro
 	return rollout{}, nil
 }
 
-func checkClusterHasNewerRestartAnnotation(pod *corev1.Pod, cluster *apiv1.Cluster) (rollout, error) {
-	// check if pod needs to be restarted because of some config requiring it
-	// or if the cluster have been explicitly restarted
-	// If the cluster has been restarted and we are working with a Pod
-	// which has not been restarted yet, or restarted at a different
-	// time, let's restart it.
+func checkClusterHasDifferentRestartAnnotation(pod *corev1.Pod, cluster *apiv1.Cluster) (rollout, error) {
+	// If the pod restart value doesn't match with the one contained in the cluster, restart the pod.
 	if clusterRestart, ok := cluster.Annotations[utils.ClusterRestartAnnotationName]; ok {
 		podRestart := pod.Annotations[utils.ClusterRestartAnnotationName]
 		if clusterRestart != podRestart {
 			return rollout{
 				required:     true,
 				reason:       "cluster has been explicitly restarted via annotation",
-				canBeInPlace: true,
+				canBeInPlace: false,
 			}, nil
 		}
 	}
