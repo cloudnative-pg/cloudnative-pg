@@ -19,6 +19,7 @@ limitations under the License.
 package specs
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -27,12 +28,15 @@ import (
 	"slices"
 	"strconv"
 
+	"github.com/cloudnative-pg/machinery/pkg/log"
 	jsonpatch "github.com/evanphx/json-patch/v5"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin"
+	cnpgiClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
@@ -169,8 +173,8 @@ func CreatePodEnvConfig(cluster apiv1.Cluster, podName string) EnvConfig {
 	return config
 }
 
-// CreateClusterPodSpec computes the PodSpec corresponding to a cluster
-func CreateClusterPodSpec(
+// createClusterPodSpec computes the PodSpec corresponding to a cluster
+func createClusterPodSpec(
 	podName string,
 	cluster apiv1.Cluster,
 	envConfig EnvConfig,
@@ -443,15 +447,58 @@ func CreatePodSecurityContext(seccompProfile *corev1.SeccompProfile, user, group
 	}
 }
 
-// PodWithExistingStorage create a new instance with an existing storage
-func PodWithExistingStorage(cluster apiv1.Cluster, nodeSerial int) (*corev1.Pod, error) {
+// NewInstance creates a new instance Pod with the plugin patches applied
+func NewInstance(
+	ctx context.Context,
+	cluster apiv1.Cluster,
+	nodeSerial int,
+	tlsEnabled bool,
+) (*corev1.Pod, error) {
+	contextLogger := log.FromContext(ctx)
+
+	pod, err := buildInstance(cluster, nodeSerial, tlsEnabled)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		if podSpecMarshaled, err := json.Marshal(pod.Spec); err == nil {
+			pod.Annotations[utils.PodSpecAnnotationName] = string(podSpecMarshaled)
+		}
+	}()
+
+	pluginClient, ok := ctx.Value(utils.PluginClientKey).(cnpgiClient.Client)
+	if !ok || pluginClient == nil {
+		contextLogger.Trace("skipping invokePlugin, cannot find the plugin client inside the context")
+		return pod, nil
+	}
+
+	contextLogger.Trace("correctly loaded the plugin client for pod creation")
+
+	podClientObject, err := pluginClient.LifecycleHook(ctx, plugin.OperationVerbEvaluate, &cluster, pod)
+	if err != nil {
+		return nil, fmt.Errorf("while invoking the plugin lifecycle hook: %w", err)
+	}
+
+	pod, ok = podClientObject.(*corev1.Pod)
+	if !ok {
+		return nil, fmt.Errorf("while casting the pod to the expected type")
+	}
+
+	return pod, nil
+}
+
+func buildInstance(
+	cluster apiv1.Cluster,
+	nodeSerial int,
+	tlsEnabled bool,
+) (*corev1.Pod, error) {
 	podName := GetInstanceName(cluster.Name, nodeSerial)
 	gracePeriod := int64(cluster.GetMaxStopDelay())
 
 	envConfig := CreatePodEnvConfig(cluster, podName)
 
-	tlsEnabled := true
-	podSpec := CreateClusterPodSpec(podName, cluster, envConfig, gracePeriod, tlsEnabled)
+	podSpec := createClusterPodSpec(podName, cluster, envConfig, gracePeriod, tlsEnabled)
 
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -468,10 +515,6 @@ func PodWithExistingStorage(cluster apiv1.Cluster, nodeSerial int) (*corev1.Pod,
 			Namespace: cluster.Namespace,
 		},
 		Spec: podSpec,
-	}
-
-	if podSpecMarshaled, err := json.Marshal(podSpec); err == nil {
-		pod.Annotations[utils.PodSpecAnnotationName] = string(podSpecMarshaled)
 	}
 
 	if cluster.Spec.PriorityClassName != "" {
