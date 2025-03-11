@@ -1,0 +1,29 @@
+name: Docker Image CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  docker_publish:
+    runs-on: "ubuntu-22.04"
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: 'Login to GitHub Container Registry'
+        uses: docker/login-action@v1
+        with:
+          registry: ghcr.io
+          username: ${{github.actor}}
+          password: ${{secrets.GITHUB_TOKEN}}
+
+      # https://github.com/marketplace/actions/push-to-ghcr
+      - name: Build and publish a Docker image for ${{ github.repository }}
+        env:
+          OPERATOR_IMG: ghcr.io/criteo-forks/cloudnative-pg:${{ github.ref_name }}-${{ github.sha }}
+          TARGET_ARCH: linux/amd64
+        run: |
+          make docker-build-operator
+          make docker-push-operator
