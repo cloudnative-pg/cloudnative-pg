@@ -291,6 +291,7 @@ PGAudit
 PGDATA
 PGDG
 PGData
+PGRole
 PGSQL
 PKI
 PODNAME
@@ -388,6 +389,8 @@ RetentionPolicy
 RoleBinding
 RoleConfiguration
 RolePasswordStatus
+RoleSpec
+RoleState
 RoleStatus
 RollingUpdateStatus
 RunningBackupStatus
@@ -1051,6 +1054,7 @@ paru
 passfile
 passwd
 passwordSecret
+passwordState
 passwordStatus
 pc
 pdf
@@ -1185,6 +1189,7 @@ retryable
 reusePVC
 ro
 robfig
+roleReclaimPolicy
 roleRef
 rollingupdatestatus
 rollout
