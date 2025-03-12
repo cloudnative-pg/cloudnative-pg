@@ -37,7 +37,21 @@ func ComparePodSpecs(
 			return compareContainers(currentPodSpec.Containers, targetPodSpec.Containers)
 		},
 		"init-containers": func() (bool, string) {
-			return compareContainers(currentPodSpec.InitContainers, targetPodSpec.InitContainers)
+			extractContainersForComparison := func(passedContainers []corev1.Container) []corev1.Container {
+				var containers []corev1.Container
+				for _, container := range passedContainers {
+					if container.Name == BootstrapControllerContainerName {
+						// ignore the bootstrap controller init container. We handle it inside checkPodSpecIsOutdated.
+						continue
+					}
+					containers = append(containers, container)
+				}
+				return containers
+			}
+			return compareContainers(
+				extractContainersForComparison(currentPodSpec.InitContainers),
+				extractContainersForComparison(targetPodSpec.InitContainers),
+			)
 		},
 	}
 

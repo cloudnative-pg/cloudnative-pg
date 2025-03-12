@@ -474,11 +474,11 @@ func NewInstance(
 		return pod, nil
 	}
 
-	contextLogger.Trace("correctly loaded the plugin client for pod creation")
+	contextLogger.Trace("correctly loaded the plugin client for pod evaluation")
 
 	podClientObject, err := pluginClient.LifecycleHook(ctx, plugin.OperationVerbEvaluate, &cluster, pod)
 	if err != nil {
-		return nil, fmt.Errorf("while invoking the plugin lifecycle hook: %w", err)
+		return nil, fmt.Errorf("while invoking the lifecycle instance evaluation hook: %w", err)
 	}
 
 	pod, ok = podClientObject.(*corev1.Pod)

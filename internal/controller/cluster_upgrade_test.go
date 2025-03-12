@@ -23,8 +23,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8client "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin"
+	pluginClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
@@ -479,7 +482,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 			configuration.Current.OperatorImageName = newOperatorImage
 			configuration.Current.EnableInstanceManagerInplaceUpdates = false
 			rollout := isInstanceNeedingRollout(ctx, status, &cluster)
-			Expect(rollout.reason).To(ContainSubstring("the instance is using an old init container image"))
+			Expect(rollout.reason).To(ContainSubstring("the instance is using an old bootstrap container image"))
 			Expect(rollout.required).To(BeTrue())
 			Expect(rollout.needsChangeOperandImage).To(BeFalse())
 			Expect(rollout.needsChangeOperatorImage).To(BeTrue())
@@ -803,5 +806,109 @@ var _ = Describe("Cluster upgrade with podSpec reconciliation disabled", func() 
 		Expect(rollout.required).To(BeFalse())
 		Expect(rollout.canBeInPlace).To(BeFalse())
 		Expect(rollout.reason).To(BeEmpty())
+	})
+})
+
+type fakePluginClientRollout struct {
+	pluginClient.Client
+	returnedPod   *corev1.Pod
+	returnedError error
+}
+
+func (f fakePluginClientRollout) LifecycleHook(
+	_ context.Context,
+	_ plugin.OperationVerb,
+	_ k8client.Object,
+	_ k8client.Object,
+) (k8client.Object, error) {
+	return f.returnedPod, f.returnedError
+}
+
+var _ = Describe("checkPodSpec with plugins", Ordered, func() {
+	var cluster apiv1.Cluster
+
+	BeforeEach(func() {
+		cluster = apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test",
+			},
+			Spec: apiv1.ClusterSpec{
+				ImageName: "postgres:13.11",
+			},
+		}
+		configuration.Current = configuration.NewConfiguration()
+	})
+
+	AfterAll(func() {
+		configuration.Current = configuration.NewConfiguration()
+	})
+
+	It("image change", func() {
+		pod, err := specs.NewInstance(context.TODO(), cluster, 1, true)
+		Expect(err).ToNot(HaveOccurred())
+
+		podModifiedByPlugins := pod.DeepCopy()
+
+		podModifiedByPlugins.Spec.Containers[0].Image = "postgres:19.0"
+
+		pluginClient := fakePluginClientRollout{
+			returnedPod: podModifiedByPlugins,
+		}
+		ctx := context.WithValue(context.TODO(), utils.PluginClientKey, pluginClient)
+
+		rollout, err := checkPodSpecIsOutdated(ctx, pod, &cluster)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(rollout.required).To(BeTrue())
+		Expect(rollout.reason).To(Equal(
+			"original and target PodSpec differ in containers: container postgres differs in image"))
+	})
+
+	It("init-container change", func() {
+		pod, err := specs.NewInstance(context.TODO(), cluster, 1, true)
+		Expect(err).ToNot(HaveOccurred())
+
+		podModifiedByPlugins := pod.DeepCopy()
+
+		podModifiedByPlugins.Spec.InitContainers = []corev1.Container{
+			{
+				Name:  "new-init-container",
+				Image: "postgres:19.0",
+			},
+		}
+
+		pluginClient := fakePluginClientRollout{
+			returnedPod: podModifiedByPlugins,
+		}
+		ctx := context.WithValue(context.TODO(), utils.PluginClientKey, pluginClient)
+
+		rollout, err := checkPodSpecIsOutdated(ctx, pod, &cluster)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(rollout.required).To(BeTrue())
+		Expect(rollout.reason).To(Equal(
+			"original and target PodSpec differ in init-containers: container new-init-container has been added"))
+	})
+
+	It("environment variable change", func() {
+		pod, err := specs.NewInstance(context.TODO(), cluster, 1, true)
+		Expect(err).ToNot(HaveOccurred())
+
+		podModifiedByPlugins := pod.DeepCopy()
+
+		podModifiedByPlugins.Spec.Containers[0].Env = append(podModifiedByPlugins.Spec.Containers[0].Env,
+			corev1.EnvVar{
+				Name:  "NEW_ENV",
+				Value: "new_value",
+			})
+
+		pluginClient := fakePluginClientRollout{
+			returnedPod: podModifiedByPlugins,
+		}
+		ctx := context.WithValue(context.TODO(), utils.PluginClientKey, pluginClient)
+
+		rollout, err := checkPodSpecIsOutdated(ctx, pod, &cluster)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(rollout.required).To(BeTrue())
+		Expect(rollout.reason).To(Equal(
+			"original and target PodSpec differ in containers: container postgres differs in environment"))
 	})
 })
