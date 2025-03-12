@@ -50,6 +50,26 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
+      path: /mutate-postgresql-cnpg-io-v1-database
+  failurePolicy: Fail
+  name: mdatabase.cnpg.io
+  rules:
+  - apiGroups:
+    - postgresql.cnpg.io
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - databases
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
       path: /mutate-postgresql-cnpg-io-v1-scheduledbackup
   failurePolicy: Fail
   name: mscheduledbackup.cnpg.io
@@ -109,6 +129,26 @@ webhooks:
     - UPDATE
     resources:
     - clusters
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-postgresql-cnpg-io-v1-database
+  failurePolicy: Fail
+  name: vdatabase.cnpg.io
+  rules:
+  - apiGroups:
+    - postgresql.cnpg.io
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - databases
   sideEffects: None
 - admissionReviewVersions:
   - v1

@@ -122,6 +122,8 @@ DataBackupConfiguration
 DataBase
 DataDurabilityLevel
 DataSource
+DatabaseObjectSpec
+DatabaseObjectStatus
 DatabaseReclaimPolicy
 DatabaseRoleRef
 DatabaseSpec
@@ -155,6 +157,8 @@ EnvVar
 EphemeralVolumeSource
 EphemeralVolumesSizeLimit
 EphemeralVolumesSizeLimitConfiguration
+ExtensionSpec
+ExtensionStatus
 ExternalCluster
 FQDN
 Fei
@@ -414,6 +418,7 @@ ScheduledBackupList
 ScheduledBackupSpec
 ScheduledBackupStatus
 ScheduledBackups
+SchemaSpec
 Scorsolini
 Seccomp
 SeccompProfile
