@@ -99,7 +99,7 @@ release_manifest="releases/cnpg-${release_version}.yaml"
 # shellcheck disable=SC2001
 release_branch="release-$(sed -e 's/^\([0-9]\+\.[0-9]\+\)\..*$/\1/' <<< "$release_version" )"
 
-# Find the latest stable version
+# Find the previous version
 previous_version=$(ls releases/cnpg-*.yaml 2>/dev/null | sed -E 's/releases\/cnpg-([0-9]+\.[0-9]+\.[0-9]+).*\.yaml/\1/' | sort -V | tail -1)
 
 echo "Previous version: $previous_version"
