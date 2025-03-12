@@ -257,7 +257,7 @@ var _ = Describe("Managed Extensions SQL", func() {
 	})
 
 	Context("getDatabaseExtensionInfo", func() {
-		It("returns info when the extension exits", func(ctx SpecContext) {
+		It("returns info when the extension exists", func(ctx SpecContext) {
 			dbMock.
 				ExpectQuery(detectDatabaseExtensionSQL).
 				WithArgs(ext.Name).
