@@ -30,6 +30,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/blang/semver"
@@ -1288,7 +1289,8 @@ func (instance *Instance) GetPrimaryConnInfo() string {
 
 	standbyTCPUserTimeout := os.Getenv("CNPG_STANDBY_TCP_USER_TIMEOUT")
 	if len(standbyTCPUserTimeout) > 0 {
-		result = fmt.Sprintf("%s tcp_user_timeout=%s", result, standbyTCPUserTimeout)
+		result = fmt.Sprintf("%s tcp_user_timeout='%s'", result,
+			strings.ReplaceAll(strings.ReplaceAll(standbyTCPUserTimeout, `\`, `\\`), `'`, `\'`))
 	}
 
 	return result
