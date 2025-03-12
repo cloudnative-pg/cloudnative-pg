@@ -650,15 +650,11 @@ func checkPodSpecIsOutdated(
 		!configuration.Current.EnableInstanceManagerInplaceUpdates {
 		return rollout{
 			required: true,
-			reason: fmt.Sprintf("the instance is using an old init container image: %s -> %s",
+			reason: fmt.Sprintf("the instance is using an old bootstrap container image: %s -> %s",
 				opCurrentImageName, configuration.Current.OperatorImageName),
 			needsChangeOperatorImage: true,
 		}, nil
 	}
-
-	// from here we don't care about drift in the init containers: avoid checking them
-	storedPodSpec.InitContainers = nil
-	targetPod.Spec.InitContainers = nil
 
 	match, diff := specs.ComparePodSpecs(storedPodSpec, targetPod.Spec)
 	if !match {
