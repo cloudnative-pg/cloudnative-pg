@@ -565,6 +565,10 @@ func extensionExistsQuery(extName string) string {
 	return fmt.Sprintf("SELECT EXISTS(SELECT FROM pg_catalog.pg_extension WHERE extname='%v')", extName)
 }
 
+func schemaExistsQuery(namespaceName string) string {
+	return fmt.Sprintf("SELECT EXISTS(SELECT FROM pg_catalog.pg_namespace WHERE nspname='%v')", namespaceName)
+}
+
 // AssertDataExpectedCount verifies that an expected amount of rows exists on the table
 func AssertDataExpectedCount(
 	env *environment.TestingEnvironment,

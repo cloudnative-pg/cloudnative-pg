@@ -14,3 +14,6 @@ spec:
   extensions:
   - name: bloom
     ensure: present
+  schemas:
+  - name: test_schema
+    ensure: present
