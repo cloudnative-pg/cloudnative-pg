@@ -401,7 +401,7 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 			configuration.Current.OperatorImageName = newOperatorImage
 			configuration.Current.EnableInstanceManagerInplaceUpdates = false
 			rollout := isInstanceNeedingRollout(ctx, status, &cluster)
-			Expect(rollout.reason).To(ContainSubstring("the instance is using an old init container image"))
+			Expect(rollout.reason).To(ContainSubstring("the instance is using an old bootstrap container image"))
 			Expect(rollout.required).To(BeTrue())
 			Expect(rollout.needsChangeOperandImage).To(BeFalse())
 			Expect(rollout.needsChangeOperatorImage).To(BeTrue())
