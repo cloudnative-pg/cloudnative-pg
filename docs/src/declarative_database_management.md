@@ -1,4 +1,4 @@
-	# PostgreSQL Database Management
+# PostgreSQL Database Management
 
 CloudNativePG simplifies PostgreSQL database provisioning by automatically
 creating an application database named `app` by default. This default behavior
@@ -18,10 +18,10 @@ automated, and consistent approach to managing PostgreSQL databases.
 ### Scope of Management
 
 !!! Important
-    CloudNativePG manages **global objects** in PostgreSQL clusters, such as
-    databases, roles, and tablespaces. However, it does **not** manage the content
-    of databases besides of extensions (e.g., schemas and tables). For database content,
-    specialized tools or the applications themselves should be used.
+    CloudNativePG manages **global objects** in PostgreSQL clusters, including
+    databases, roles, and tablespaces. However, it does **not** manage database content
+    beyond extensions and schemas (e.g., tables). To manage database content, use specialized
+    tools or rely on the applications themselves.
 
 ### Declarative `Database` Manifest
 
@@ -162,7 +162,7 @@ This manifest ensures that the `database-to-drop` database is removed from the
 
 ## Managing Extensions in a Database
 
-	!!! Info
+!!! Info
     While extensions are database-scoped rather than global objects,
     CloudNativePG provides a declarative interface for managing them. This approach
     is necessary because installing certain extensions may require superuser
