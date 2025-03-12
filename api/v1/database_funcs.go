@@ -75,3 +75,13 @@ func (dbList *DatabaseList) MustHaveManagedResourceExclusivity(reference *Databa
 	pointers := toSliceWithPointers(dbList.Items)
 	return ensureManagedResourceExclusivity(reference, pointers)
 }
+
+// GetEnsure gets the ensure status of the resource
+func (dbObject DatabaseObjectSpec) GetEnsure() EnsureOption {
+	return dbObject.Ensure
+}
+
+// GetName gets the name of the resource
+func (dbObject DatabaseObjectSpec) GetName() string {
+	return dbObject.Name
+}

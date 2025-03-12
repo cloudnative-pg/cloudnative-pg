@@ -212,6 +212,12 @@ SELECT datname FROM pg_database WHERE datallowconn
 !!! Note
     The above query also includes template databases like `template1`.
 
+!!! Important
+    With the introduction of [declarative extensions](declarative_database_management.md#managing-extensions-in-a-database)
+    in the `Database` CRD, you can now manage extensions directly. As a result,
+    the managed extensions feature may undergo significant changes in future
+    versions of CloudNativePG, and some functionalities might be deprecated.
+
 #### Enabling `auto_explain`
 
 The [`auto_explain`](https://www.postgresql.org/docs/current/auto-explain.html)
