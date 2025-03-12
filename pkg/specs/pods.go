@@ -455,7 +455,7 @@ func NewInstance(
 	// tlsEnabled TODO: remove when we drop the support for the instances created without TLS
 	tlsEnabled bool,
 ) (*corev1.Pod, error) {
-	contextLogger := log.FromContext(ctx)
+	contextLogger := log.FromContext(ctx).WithName("new_instance")
 
 	pod, err := buildInstance(cluster, nodeSerial, tlsEnabled)
 	if err != nil {
@@ -463,18 +463,21 @@ func NewInstance(
 	}
 
 	defer func() {
-		if podSpecMarshaled, err := json.Marshal(pod.Spec); err == nil {
+		if pod == nil {
+			return
+		}
+		if podSpecMarshaled, marshalErr := json.Marshal(pod.Spec); marshalErr == nil {
 			pod.Annotations[utils.PodSpecAnnotationName] = string(podSpecMarshaled)
 		}
 	}()
 
 	pluginClient, ok := ctx.Value(utils.PluginClientKey).(cnpgiClient.Client)
 	if !ok || pluginClient == nil {
-		contextLogger.Trace("skipping invokePlugin, cannot find the plugin client inside the context")
+		contextLogger.Trace("skipping NewInstance, cannot find the plugin client inside the context")
 		return pod, nil
 	}
 
-	contextLogger.Trace("correctly loaded the plugin client for pod evaluation")
+	contextLogger.Trace("correctly loaded the plugin client for instance evaluation")
 
 	podClientObject, err := pluginClient.LifecycleHook(ctx, plugin.OperationVerbEvaluate, &cluster, pod)
 	if err != nil {
@@ -483,7 +486,7 @@ func NewInstance(
 
 	pod, ok = podClientObject.(*corev1.Pod)
 	if !ok {
-		return nil, fmt.Errorf("while casting the pod to the expected type")
+		return nil, fmt.Errorf("while casting the clientObject to the pod type")
 	}
 
 	return pod, nil
