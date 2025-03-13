@@ -6179,8 +6179,8 @@ spec:
                 type: integer
               majorVersionUpgradeFromImage:
                 description: |-
-                  MajorVersionUpgradeFromImage contains the image from which we are upgrading
-                  when a Postgres major version upgrade is running
+                  MajorVersionUpgradeFromImage contains the image that was
+                  running before the major version upgrade started.
                 type: string
               managedRolesStatus:
                 description: ManagedRolesStatus reports the state of the managed roles

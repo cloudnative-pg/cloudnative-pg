@@ -944,8 +944,8 @@ type ClusterStatus struct {
 	// +optional
 	Image string `json:"image,omitempty"`
 
-	// MajorVersionUpgradeFromImage contains the image from which we are upgrading
-	// when a Postgres major version upgrade is running
+	// MajorVersionUpgradeFromImage contains the image that was
+	// running before the major version upgrade started.
 	// +optional
 	MajorVersionUpgradeFromImage *string `json:"majorVersionUpgradeFromImage,omitempty"`
 
