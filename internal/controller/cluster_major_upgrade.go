@@ -45,7 +45,7 @@ func (r *ClusterReconciler) reconcileInPlaceMajorVersionUpgrades(
 	contextLogger := log.FromContext(ctx)
 
 	if job := getMajorUpdateJob(resources.jobs.Items); job != nil {
-		return r.majorVersionUpgradeHandleCompletion(ctx, cluster, *job, resources)
+		return r.majorVersionUpgradeHandleCompletion(ctx, cluster, job, resources)
 	}
 
 	if cluster.Status.MajorVersionUpgradeFromImage == nil {
@@ -95,7 +95,7 @@ func (r *ClusterReconciler) reconcileInPlaceMajorVersionUpgrades(
 
 func getMajorUpdateJob(items []batchv1.Job) *batchv1.Job {
 	for _, job := range items {
-		if job.GetLabels()[utils.JobRoleLabelName] == string(specs.JobMajorUpgrade) {
+		if specs.IsMajorUpgradeJob(&job) {
 			return &job
 		}
 	}
@@ -147,7 +147,7 @@ func (r *ClusterReconciler) createMajorUpgradeJob(
 ) (*ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
-	job := specs.CreateMajorUpgradeJob(cluster, primaryNodeSerial, *cluster.Status.MajorVersionUpgradeFromImage)
+	job := specs.CreateMajorUpgradeJob(cluster, primaryNodeSerial)
 
 	if err := ctrl.SetControllerReference(cluster, job, r.Scheme); err != nil {
 		contextLogger.Error(err, "Unable to set the owner reference for major upgrade job")
@@ -183,12 +183,12 @@ func (r *ClusterReconciler) createMajorUpgradeJob(
 func (r *ClusterReconciler) majorVersionUpgradeHandleCompletion(
 	ctx context.Context,
 	cluster *apiv1.Cluster,
-	job batchv1.Job,
+	job *batchv1.Job,
 	resources *managedResources,
 ) (*ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
-	if !utils.JobHasOneCompletion(job) {
+	if !utils.JobHasOneCompletion(*job) {
 		contextLogger.Warning("Unexpected state: major upgrade job not completed.")
 		return &ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
@@ -210,9 +210,9 @@ func (r *ClusterReconciler) majorVersionUpgradeHandleCompletion(
 		}
 	}
 
-	jobImage, err := getImageFromMajorUpgradeJob(job)
-	if err != nil {
-		contextLogger.Error(err, "Unable to retrieve image name from major upgrade job.")
+	jobImage, ok := specs.GetTargetImageFromMajorUpgradeJob(job)
+	if !ok {
+		contextLogger.Info("Unable to retrieve image name from major upgrade job.")
 		return &ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 
@@ -226,7 +226,7 @@ func (r *ClusterReconciler) majorVersionUpgradeHandleCompletion(
 		return nil, err
 	}
 
-	if err := r.Delete(ctx, &job, &client.DeleteOptions{
+	if err := r.Delete(ctx, job, &client.DeleteOptions{
 		PropagationPolicy: ptr.To(metav1.DeletePropagationForeground),
 	}); err != nil {
 		contextLogger.Error(err, "Unable to delete major upgrade job.")
@@ -234,14 +234,4 @@ func (r *ClusterReconciler) majorVersionUpgradeHandleCompletion(
 	}
 
 	return &ctrl.Result{Requeue: true}, nil
-}
-
-func getImageFromMajorUpgradeJob(job batchv1.Job) (string, error) {
-	for _, container := range job.Spec.Template.Spec.Containers {
-		if container.Name == string(specs.JobMajorUpgrade) {
-			return container.Image, nil
-		}
-	}
-
-	return "", fmt.Errorf("container not found")
 }
