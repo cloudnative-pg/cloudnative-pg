@@ -110,7 +110,7 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 		var namespace string
 
 		BeforeEach(func() {
-			if testLevelEnv.Depth < int(level) {
+			if testLevel < int(level) {
 				Skip("Test depth is lower than the amount requested for this test")
 			}
 		})
@@ -169,7 +169,7 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 		)
 
 		BeforeEach(func() {
-			if testLevelEnv.Depth < int(level) {
+			if testLevel < int(level) {
 				Skip("Test depth is lower than the amount requested for this test")
 			}
 			if !IsLocal() {

@@ -71,7 +71,7 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 	storageClassName := os.Getenv("E2E_DEFAULT_STORAGE_CLASS")
 
 	BeforeEach(func() {
-		if testLevelEnv.Depth < int(level) {
+		if testLevel < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 	})

@@ -59,7 +59,7 @@ var _ = Describe("Imports with Monolithic Approach", Label(tests.LabelImportingD
 	var connTarget *sql.DB
 
 	BeforeEach(func() {
-		if testLevelEnv.Depth < int(level) {
+		if testLevel < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 	})
