@@ -125,6 +125,9 @@ type Data struct {
 	// IncludePlugins is a comma-separated list of plugins to always be
 	// included in the Cluster reconciliation
 	IncludePlugins string `json:"includePlugins" env:"INCLUDE_PLUGINS"`
+
+	// DrainTaints is a list of taints the operator will watch and treat as Unschedule
+	DrainTaints []string `json:"drainTaints" env:"DRAIN_TAINTS"`
 }
 
 // Current is the configuration used by the operator
@@ -140,6 +143,12 @@ func newDefaultConfig() *Data {
 		CreateAnyService:       false,
 		CertificateDuration:    CertificateDuration,
 		ExpiringCheckThreshold: ExpiringCheckThreshold,
+		DrainTaints: []string{
+			"node.kubernetes.io/unschedulable",
+			"ToBeDeletedByClusterAutoscaler",
+			"karpenter.sh/disrupted",
+			"karpenter.sh/disruption",
+		},
 	}
 }
 

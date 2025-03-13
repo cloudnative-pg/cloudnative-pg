@@ -48,6 +48,7 @@ Name | Description
 `MONITORING_QUERIES_CONFIGMAP` | The name of a ConfigMap in the operator's namespace with a set of default queries (to be specified under the key `queries`) to be applied to all created Clusters
 `MONITORING_QUERIES_SECRET` | The name of a Secret in the operator's namespace with a set of default queries (to be specified under the key `queries`) to be applied to all created Clusters
 `PULL_SECRET_NAME` | Name of an additional pull secret to be defined in the operator's namespace and to be used to download images
+`DRAIN_TAINTS` | The keys of taints to treat the same as `node.kubernetes.io/unschedulable`. Defaults to taints used by [Cluster Autoscalar](https://github.com/kubernetes/autoscaler) and [Karpenter](https://github.com/aws/karpenter-provider-aws). 
 
 Values in `INHERITED_ANNOTATIONS` and `INHERITED_LABELS` support path-like wildcards. For example, the value `example.com/*` will match
 both the value `example.com/one` and `example.com/two`.
