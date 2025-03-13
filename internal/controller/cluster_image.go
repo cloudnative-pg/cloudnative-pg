@@ -36,8 +36,11 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/resources/status"
 )
 
-// reconcileImage sets the image inside the status, to be used by the following
-// functions of the reconciler loop
+// reconcileImage processes the image request, executes it, and stores
+// the result in the .status.image field. If the user requested a
+// major version upgrade, the current image is saved in the
+// .status.majorVersionUpgradeFromImage field. This allows for
+// reverting the upgrade if it doesn't complete successfully.
 func (r *ClusterReconciler) reconcileImage(ctx context.Context, cluster *apiv1.Cluster) (*ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
@@ -46,37 +49,52 @@ func (r *ClusterReconciler) reconcileImage(ctx context.Context, cluster *apiv1.C
 		return &ctrl.Result{}, r.RegisterPhase(ctx, cluster, apiv1.PhaseImageCatalogError, err.Error())
 	}
 
-	currentDataImage := &cluster.Status.Image
+	currentDataImage := cluster.Status.Image
 	if cluster.Status.MajorVersionUpgradeFromImage != nil {
-		currentDataImage = cluster.Status.MajorVersionUpgradeFromImage
+		currentDataImage = *cluster.Status.MajorVersionUpgradeFromImage
 	}
 
+	// Case 1: the cluster is being initialized and there is still no
+	// running image. In this case, we should simply apply the image selected by the user.
+	if currentDataImage == "" {
+		return nil, status.PatchWithOptimisticLock(
+			ctx,
+			r.Client,
+			cluster,
+			status.SetImage(image),
+			status.SetMajorVersionUpgradeFromImage(nil),
+		)
+	}
+
+	// Case 2: there's a running image. The code checks if the user selected
+	// an image of the same major version or if a change in the major
+	// version has been requested.
 	var majorVersionUpgradeFromImage *string
-	if *currentDataImage != "" {
-		currentVersion, err := version.FromTag(reference.New(*currentDataImage).Tag)
-		if err != nil {
-			contextLogger.Error(err, "While parsing current major versions")
-			return nil, err
-		}
+	currentVersion, err := version.FromTag(reference.New(currentDataImage).Tag)
+	if err != nil {
+		contextLogger.Error(err, "While parsing current major versions")
+		return nil, err
+	}
 
-		requestedVersion, err := version.FromTag(reference.New(image).Tag)
-		if err != nil {
-			contextLogger.Error(err, "While parsing requested major versions")
-			return nil, err
-		}
+	requestedVersion, err := version.FromTag(reference.New(image).Tag)
+	if err != nil {
+		contextLogger.Error(err, "While parsing requested major versions")
+		return nil, err
+	}
 
-		switch {
-		case currentVersion.Major() < requestedVersion.Major():
-			// The current major version is older than the requested one
-			majorVersionUpgradeFromImage = currentDataImage
-		case currentVersion.Major() == requestedVersion.Major():
-			// The major versions are the same, cancel the update
-			majorVersionUpgradeFromImage = nil
-		default:
-			contextLogger.Info("Cannot downgrade the PostgreSQL major version. Forcing the current image.",
-				"currentImage", *currentDataImage, "requestedImage", image)
-			image = *currentDataImage
-		}
+	switch {
+	case currentVersion.Major() < requestedVersion.Major():
+		// The current major version is older than the requested one
+		majorVersionUpgradeFromImage = &currentDataImage
+	case currentVersion.Major() == requestedVersion.Major():
+		// The major versions are the same, cancel the update
+		majorVersionUpgradeFromImage = nil
+	default:
+		contextLogger.Info(
+			"Cannot downgrade the PostgreSQL major version. Forcing the current image.",
+			"currentImage", currentDataImage,
+			"requestedImage", image)
+		image = currentDataImage
 	}
 
 	return nil, status.PatchWithOptimisticLock(
