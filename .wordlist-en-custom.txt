@@ -446,6 +446,7 @@ SingleNamespace
 Slonik
 SnapshotOwnerReference
 SnapshotType
+Snapshotter
 Snapshotting
 Snyk
 Stackgres
@@ -503,6 +504,7 @@ VirtualBox
 VolumeSnapshot
 VolumeSnapshotClass
 VolumeSnapshotConfiguration
+VolumeSnapshotRetryConfiguration
 VolumeSnapshots
 WAL
 WAL's
@@ -964,6 +966,7 @@ matchExpressions
 matchLabels
 maxClientConnections
 maxParallel
+maxRetries
 maxStandbyNamesFromCluster
 maxSyncReplicas
 maximumLag
@@ -1181,6 +1184,7 @@ restoreAdditionalCommandArgs
 restoreJobHookCapabilities
 resync
 retentionPolicy
+retryConfiguration
 retryable
 reusePVC
 ro
@@ -1250,6 +1254,7 @@ smartShutdownTimeout
 snapshotBackupStatus
 snapshotOwnerReference
 snapshotted
+snapshotter
 snapshotting
 sourceNamespace
 specDescriptors
