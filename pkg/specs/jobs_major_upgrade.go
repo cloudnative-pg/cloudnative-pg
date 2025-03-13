@@ -21,10 +21,13 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // CreateMajorUpgradeJob creates a job to upgrade the primary node to a new Postgres major version
-func CreateMajorUpgradeJob(cluster *apiv1.Cluster, nodeSerial int, oldImage string) *batchv1.Job {
+func CreateMajorUpgradeJob(cluster *apiv1.Cluster, nodeSerial int) *batchv1.Job {
+	oldImage := *cluster.Status.MajorVersionUpgradeFromImage
+
 	prepareCommand := []string{
 		"/controller/manager",
 		"instance",
@@ -49,8 +52,30 @@ func CreateMajorUpgradeJob(cluster *apiv1.Cluster, nodeSerial int, oldImage stri
 		"execute",
 		"/controller/old/bindir.txt",
 	}
-	job := createPrimaryJob(*cluster, nodeSerial, JobMajorUpgrade, majorUpgradeCommand)
+	job := createPrimaryJob(*cluster, nodeSerial, jobMajorUpgrade, majorUpgradeCommand)
 	job.Spec.Template.Spec.InitContainers = append(job.Spec.Template.Spec.InitContainers, oldVersionInitContainer)
 
 	return job
+}
+
+// IsMajorUpgradeJob tells if the passed Job definition corresponds to
+// the job handling the major upgrade
+func IsMajorUpgradeJob(job *batchv1.Job) bool {
+	return job.GetLabels()[utils.JobRoleLabelName] == string(jobMajorUpgrade)
+}
+
+// GetTargetImageFromMajorUpgradeJob gets the image that is being used as
+// target of the major upgrade process.
+func GetTargetImageFromMajorUpgradeJob(job *batchv1.Job) (string, bool) {
+	if !IsMajorUpgradeJob(job) {
+		return "", false
+	}
+
+	for _, container := range job.Spec.Template.Spec.Containers {
+		if container.Name == string(jobMajorUpgrade) {
+			return container.Image, true
+		}
+	}
+
+	return "", false
 }
