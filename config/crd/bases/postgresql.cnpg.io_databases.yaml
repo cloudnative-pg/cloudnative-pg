@@ -232,8 +232,6 @@ spec:
                   rule: self != 'postgres'
                 - message: the name template0 is reserved
                   rule: self != 'template0'
-                - message: the name template1 is reserved
-                  rule: self != 'template1'
               owner:
                 description: |-
                   Maps to the `OWNER` parameter of `CREATE DATABASE`.
