@@ -938,6 +938,9 @@ var _ = Describe("PodWithExistingStorage", func() {
 					utils.PodPatchAnnotationName: `[{"op": "replace", "path": "/spec/containers/0/image", "value": "new-image:latest"}]`, // nolint: lll
 				},
 			},
+			Status: v1.ClusterStatus{
+				Image: "test",
+			},
 		}
 
 		pod, err := PodWithExistingStorage(cluster, 1)

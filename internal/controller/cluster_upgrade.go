@@ -491,7 +491,7 @@ func getProjectedVolumeConfigurationFromPod(pod corev1.Pod) *corev1.ProjectedVol
 }
 
 func checkPodImageIsOutdated(pod *corev1.Pod, cluster *apiv1.Cluster) (rollout, error) {
-	targetImageName := cluster.GetImageName()
+	targetImageName := cluster.Status.Image
 
 	pgCurrentImageName, err := specs.GetPostgresImageName(*pod)
 	if err != nil {
@@ -662,7 +662,7 @@ func (r *ClusterReconciler) upgradePod(
 ) error {
 	log.FromContext(ctx).Info("Recreating instance pod",
 		"pod", pod.Name,
-		"to", cluster.GetImageName(),
+		"to", cluster.Status.Image,
 		"reason", reason,
 	)
 

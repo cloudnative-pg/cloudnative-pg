@@ -736,8 +736,8 @@ func (r *ClusterReconciler) RegisterPhase(ctx context.Context,
 		ctx,
 		r.Client,
 		cluster,
-		status.SetPhaseTX(phase, reason),
-		status.SetClusterReadyConditionTX,
+		status.SetPhase(phase, reason),
+		status.SetClusterReadyCondition,
 	)
 }
 

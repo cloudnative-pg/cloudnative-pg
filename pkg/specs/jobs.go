@@ -303,6 +303,7 @@ const (
 	jobRoleFullRecovery     jobRole = "full-recovery"
 	jobRoleJoin             jobRole = "join"
 	jobRoleSnapshotRecovery jobRole = "snapshot-recovery"
+	jobMajorUpgrade         jobRole = "major-upgrade"
 )
 
 var jobRoleList = []jobRole{jobRoleImport, jobRoleInitDB, jobRolePGBaseBackup, jobRoleFullRecovery, jobRoleJoin}
@@ -336,6 +337,7 @@ func createPrimaryJob(cluster apiv1.Cluster, nodeSerial int, role jobRole, initC
 			Labels: map[string]string{
 				utils.InstanceNameLabelName: instanceName,
 				utils.ClusterLabelName:      cluster.Name,
+				utils.JobRoleLabelName:      string(role),
 			},
 		},
 		Spec: batchv1.JobSpec{
@@ -356,7 +358,7 @@ func createPrimaryJob(cluster apiv1.Cluster, nodeSerial int, role jobRole, initC
 					Containers: []corev1.Container{
 						{
 							Name:            string(role),
-							Image:           cluster.GetImageName(),
+							Image:           cluster.Status.Image,
 							ImagePullPolicy: cluster.Spec.ImagePullPolicy,
 							Env:             envConfig.EnvVars,
 							EnvFrom:         envConfig.EnvFrom,

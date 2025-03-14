@@ -955,6 +955,7 @@ lookups
 lsn
 lt
 macOS
+majorVersionUpgradeFromImage
 malcolm
 mallocs
 managedRoleSecretVersion
