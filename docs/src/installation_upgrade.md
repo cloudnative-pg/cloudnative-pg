@@ -19,7 +19,8 @@ kubectl apply --server-side -f \
 You can verify that with:
 
 ```sh
-kubectl get deployment -n cnpg-system cnpg-controller-manager
+kubectl rollout status deployment \
+  -n cnpg-system cnpg-controller-manager
 ```
 
 ### Using the `cnpg` plugin for `kubectl`
