@@ -55,7 +55,6 @@ type DatabaseSpec struct {
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="name is immutable"
 	// +kubebuilder:validation:XValidation:rule="self != 'postgres'",message="the name postgres is reserved"
 	// +kubebuilder:validation:XValidation:rule="self != 'template0'",message="the name template0 is reserved"
-	// +kubebuilder:validation:XValidation:rule="self != 'template1'",message="the name template1 is reserved"
 	Name string `json:"name"`
 
 	// Maps to the `OWNER` parameter of `CREATE DATABASE`.
