@@ -85,60 +85,63 @@ Additionally, the community provides images for the [PostGIS extension](postgis.
 - Direct integration with the Kubernetes API server for High Availability,
   eliminating the need for external tools.
 - Self-healing capabilities, including:
-  - Automated failover by promoting the most aligned replica.
-  - Automatic recreation of failed replicas.
+    - Automated failover by promoting the most aligned replica.
+    - Automatic recreation of failed replicas.
 - Planned switchover of the primary instance by promoting a selected replica.
 - Declarative management of key PostgreSQL configurations, including:
-  - PostgreSQL settings.
-  - Roles, users, and groups.
-  - Databases, extensions, and schemas.
-  - Tablespaces (including temporary tablespaces).
+    - PostgreSQL settings.
+    - Roles, users, and groups.
+    - Databases, extensions, and schemas.
+    - Tablespaces (including temporary tablespaces).
 - Flexible instance definition, supporting any number of instances (minimum 1
   primary server).
 - Scale-up/down capabilities to dynamically adjust cluster size.
 - Read-Write and Read-Only Services, ensuring applications connect correctly:
-  - *Read-Write Service*: Routes connections to the primary server.
-  - *Read-Only Service*: Distributes connections among replicas for read workloads.
+    - *Read-Write Service*: Routes connections to the primary server.
+    - *Read-Only Service*: Distributes connections among replicas for read workloads.
 - Support for quorum-based and priority-based PostgreSQL Synchronous
   Replication.
 - Replica clusters enabling PostgreSQL distributed topologies across multiple
   Kubernetes clusters (private, public, hybrid, and multi-cloud).
 - Delayed Replica clusters for point-in-time access to historical data.
 - Persistent volume management, including:
-  - Support for Local Persistent Volumes with PVC templates.
-  - Reuse of Persistent Volumes storage in Pods.
-  - Separate volumes for WAL files and tablespaces.
+    - Support for Local Persistent Volumes with PVC templates.
+    - Reuse of Persistent Volumes storage in Pods.
+    - Separate volumes for WAL files and tablespaces.
 - Backup and recovery options, including:
-  - Integration with Barman Cloud plugin for continuous online backup via WAL
-    archiving to object stores (AWS S3, S3-compatible, Azure Blob Storage,
-    Google Cloud Storage), including retention policies based on recovery window.
-  - Backups using volume snapshots (where supported by storage classes).
-  - Full and Point-In-Time recovery from volume snapshots or object stores (via Barman Cloud plugin).
-  - Backup from standby replicas to reduce primary workload impact.
+    - Integration with the [Barman Cloud plugin](https://github.com/cloudnative-pg/plugin-barman-cloud)
+      for continuous online backup via WAL archiving to AWS S3, S3-compatible
+      services, Azure Blob Storage, and Google Cloud Storage, with support for
+      retention policies based on a configurable recovery window.
+    - Backups using volume snapshots (where supported by storage classes).
+    - Full and Point-In-Time recovery from volume snapshots or object stores (via Barman Cloud plugin).
+    - Backup from standby replicas to reduce primary workload impact.
 - Offline and online import of PostgreSQL databases, including major upgrades:
-  - *Offline Import*: Direct restore from existing databases.
-  - *Online Import*: PostgreSQL native logical replication via the `Subscription` resource.
+    - *Offline Import*: Direct restore from existing databases.
+    - *Online Import*: PostgreSQL native logical replication via the `Subscription` resource.
 - High Availability physical replication slots, including synchronization of
   user-defined replication slots.
 - Parallel WAL archiving and restore, ensuring high-performance data
   synchronization in high-write environments.
 - TLS support, including:
-  - Secure connections and client certificate authentication.
-  - Custom TLS certificates (integrated with `cert-manager`).
-- Fencing of PostgreSQL clusters (full cluster or subset) to isolate instances when needed.
-- Cluster hibernation for resource efficiency in inactive states.
+    - Secure connections and client certificate authentication.
+    - Custom TLS certificates (integrated with `cert-manager`).
 - Startup and readiness probes, including replica probes based on desired lag
   from the primary.
 - Declarative rolling updates for:
-  - PostgreSQL minor versions.
-  - Operator upgrades (in-place or rolling updates).
+    - PostgreSQL minor versions.
+    - Operator upgrades (in-place or rolling updates).
 - Standard output logging of PostgreSQL error messages in JSON format for
   easier integration with log aggregation tools.
 - Prometheus-compatible metrics exporter (`metrics` port 9187) for custom
   monitoring.
 - `cnpg` plugin for `kubectl` to simplify cluster operations.
+- Cluster hibernation for resource efficiency in inactive states.
+- Fencing of PostgreSQL clusters (full cluster or subset) to isolate instances
+  when needed.
 - Connection pooling with PgBouncer for improved database efficiency.
-- OLM (Operator Lifecycle Manager) installation support for streamlined deployments.
+- OLM (Operator Lifecycle Manager) installation support for streamlined
+  deployments.
 - Multi-arch container images, including Software Bill of Materials (SBOM) and
   provenance attestations for security compliance.
 
