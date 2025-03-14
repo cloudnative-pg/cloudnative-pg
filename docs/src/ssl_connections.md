@@ -90,7 +90,7 @@ spec:
         app: webtest
     spec:
       containers:
-        - image: ghcr.io/cloudnative-pg/webtest:1.6.0
+        - image: ghcr.io/cloudnative-pg/webtest:1.7.0
           name: cert-test
           volumeMounts:
             - name: secret-volume-root-ca
@@ -188,4 +188,3 @@ This assumes that the PostgreSQL operand images include an OpenSSL library that
 supports the `TLSv1.3` version. If not, or if your client applications need a
 lower version number, you need to manually configure it in the PostgreSQL
 configuration as any other Postgres GUC.
-

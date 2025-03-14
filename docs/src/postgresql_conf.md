@@ -127,16 +127,26 @@ Since the fixed parameters are added at the end, they can't be overridden by the
 user via the YAML configuration. Those parameters are required for correct WAL
 archiving and replication.
 
-### Replication settings
+### Replication Settings
 
-The `primary_conninfo`, `restore_command`,  and `recovery_target_timeline`
-parameters are managed automatically by the operator according to the state of
-the instance in the cluster.
+The `primary_conninfo`, `restore_command`, and `recovery_target_timeline`
+parameters are automatically managed by the operator based on the instance's
+role within the cluster. These parameters are effectively applied only when the
+instance is operating as a replica.
 
 ```text
 primary_conninfo = 'host=cluster-example-rw user=postgres dbname=postgres'
 recovery_target_timeline = 'latest'
 ```
+
+The [operator configuration setting](operator_conf.md#available-options)
+`STANDBY_TCP_USER_TIMEOUT`, if configured, sets the `tcp_user_timeout` parameter
+on all standby instances managed by the operator.
+
+The `tcp_user_timeout` setting controls how long transmitted data may remain
+unacknowledged before the TCP connection is forcibly closed. By adjusting this
+timeout, users can fine-tune the responsiveness of standby instances to network
+disruptions.
 
 ### Log control settings
 
@@ -648,4 +658,3 @@ Users are not allowed to set the following configuration parameters in the
 - `unix_socket_directories`
 - `unix_socket_group`
 - `unix_socket_permissions`
-

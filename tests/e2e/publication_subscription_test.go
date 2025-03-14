@@ -154,7 +154,7 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelPublicationSub
 
 				Eventually(func(g Gomega) {
 					err := env.Client.Get(env.Ctx, databaseNamespacedName, databaseObject)
-					Expect(err).ToNot(HaveOccurred())
+					g.Expect(err).ToNot(HaveOccurred())
 					g.Expect(databaseObject.Status.Applied).Should(HaveValue(BeTrue()))
 				}, 300).WithPolling(10 * time.Second).Should(Succeed())
 			})
@@ -187,7 +187,7 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelPublicationSub
 				Eventually(func(g Gomega) {
 					pub := &apiv1.Publication{}
 					err := env.Client.Get(env.Ctx, pubNamespacedName, pub)
-					Expect(err).ToNot(HaveOccurred())
+					g.Expect(err).ToNot(HaveOccurred())
 					g.Expect(pub.Status.Applied).Should(HaveValue(BeTrue()))
 				}, 300).WithPolling(10 * time.Second).Should(Succeed())
 			})
@@ -220,7 +220,7 @@ var _ = Describe("Publication and Subscription", Label(tests.LabelPublicationSub
 				Eventually(func(g Gomega) {
 					sub := &apiv1.Subscription{}
 					err := env.Client.Get(env.Ctx, pubNamespacedName, sub)
-					Expect(err).ToNot(HaveOccurred())
+					g.Expect(err).ToNot(HaveOccurred())
 					g.Expect(sub.Status.Applied).Should(HaveValue(BeTrue()))
 				}, 300).WithPolling(10 * time.Second).Should(Succeed())
 			})

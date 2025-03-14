@@ -278,15 +278,17 @@ var _ = Describe("Pod eviction", Serial, Label(tests.LabelDisruptive), func() {
 			})
 
 			By("checking switchover happens", func() {
-				Eventually(func() bool {
+				Eventually(func() (bool, error) {
 					podList, err := clusterutils.ListPods(env.Ctx, env.Client, namespace, clusterName)
-					Expect(err).ToNot(HaveOccurred())
+					if err != nil {
+						return false, err
+					}
 					for _, p := range podList.Items {
 						if specs.IsPodPrimary(p) && primaryPod.GetName() != p.GetName() {
-							return true
+							return true, nil
 						}
 					}
-					return false
+					return false, nil
 				}, 60).Should(BeTrue())
 			})
 

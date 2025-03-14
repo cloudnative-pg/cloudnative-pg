@@ -97,12 +97,12 @@ var _ = Describe("Update user and superuser password", Label(tests.LabelServiceC
 
 		By("update superuser password", func() {
 			// Setting EnableSuperuserAccess to true
-			Eventually(func() error {
+			Eventually(func(g Gomega) {
 				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
-				Expect(err).NotTo(HaveOccurred())
+				g.Expect(err).NotTo(HaveOccurred())
 				cluster.Spec.EnableSuperuserAccess = ptr.To(true)
-				return env.Client.Update(env.Ctx, cluster)
-			}, 60, 5).Should(Not(HaveOccurred()))
+				g.Expect(env.Client.Update(env.Ctx, cluster)).To(Succeed())
+			}, 60, 5).Should(Succeed())
 
 			// We should now have a secret
 			var secret corev1.Secret
@@ -184,18 +184,18 @@ var _ = Describe("Enable superuser password", Label(tests.LabelServiceConnectivi
 
 		By("enable superuser access", func() {
 			// Setting EnableSuperuserAccess to true
-			Eventually(func() error {
+			Eventually(func(g Gomega) {
 				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
-				Expect(err).NotTo(HaveOccurred())
+				g.Expect(err).NotTo(HaveOccurred())
 				cluster.Spec.EnableSuperuserAccess = ptr.To(true)
-				return env.Client.Update(env.Ctx, cluster)
-			}, 60, 5).Should(Not(HaveOccurred()))
+				g.Expect(env.Client.Update(env.Ctx, cluster)).To(Succeed())
+			}, 60, 5).Should(Succeed())
 
 			// We should now have a secret
 			Eventually(func(g Gomega) {
 				err = env.Client.Get(env.Ctx, namespacedName, &secret)
 				g.Expect(err).ToNot(HaveOccurred())
-			}, 90).WithPolling(time.Second).Should(Succeed())
+			}, 90).Should(Succeed())
 
 			superUser, superUserPass, err := secrets.GetCredentials(
 				env.Ctx, env.Client,
@@ -207,12 +207,12 @@ var _ = Describe("Enable superuser password", Label(tests.LabelServiceConnectivi
 
 		By("disable superuser access", func() {
 			// Setting EnableSuperuserAccess to false
-			Eventually(func() error {
+			Eventually(func(g Gomega) {
 				cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
-				Expect(err).NotTo(HaveOccurred())
+				g.Expect(err).NotTo(HaveOccurred())
 				cluster.Spec.EnableSuperuserAccess = ptr.To(false)
-				return env.Client.Update(env.Ctx, cluster)
-			}, 60, 5).Should(Not(HaveOccurred()))
+				g.Expect(env.Client.Update(env.Ctx, cluster)).To(Succeed())
+			}, 60, 5).Should(Succeed())
 
 			// We expect the secret to eventually be deleted
 			Eventually(func(g Gomega) {

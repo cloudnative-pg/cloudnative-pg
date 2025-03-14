@@ -349,7 +349,7 @@ var _ = Describe("Metrics", Label(tests.LabelObservability), func() {
 					g.Expect(strings.TrimSpace(out)).To(BeEquivalentTo("t"))
 				}).WithTimeout(
 					time.Duration(timeouts.DefaultTestTimeouts[timeouts.Short])*time.Second,
-				).WithPolling(time.Second).Should(Succeed(), fmt.Sprintf("on pod %v", pod.Name))
+				).Should(Succeed(), fmt.Sprintf("on pod %v", pod.Name))
 
 				out, err := proxy.RetrieveMetricsFromInstance(env.Ctx, env.Interface, pod,
 					replicaCluster.IsMetricsTLSEnabled())
