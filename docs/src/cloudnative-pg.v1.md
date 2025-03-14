@@ -3447,6 +3447,14 @@ Valid values are &quot;rw&quot;, &quot;r&quot;, and &quot;ro&quot;, representing
 <table class="table">
 <thead><tr><th width="30%">Field</th><th>Description</th></tr></thead>
 <tbody>
+<tr><td><code>kubernetesClusterDomain</code> <B>[Required]</B><br/>
+<i>string</i>
+</td>
+<td>
+   <p>KubernetesClusterDomain is used to generate the domain portion of the service FQDN.
+If not provided, &quot;cluster.local&quot; is used.</p>
+</td>
+</tr>
 <tr><td><code>disabledDefaultServices</code><br/>
 <a href="#postgresql-cnpg-io-v1-ServiceSelectorType"><i>[]ServiceSelectorType</i></a>
 </td>
