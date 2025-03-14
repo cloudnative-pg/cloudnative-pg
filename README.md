@@ -85,8 +85,7 @@ management, including: `Backup`, `ClusterImageCatalog`, `Database`,
 - **Not a general-purpose database operator:** CloudNativePG does not support
   other databases (e.g., MariaDB).
 
-[CloudNativePG can be extended via the CNPG-I plugin
-interface](https://github.com/cloudnative-pg/cnpg-i).
+CloudNativePG can be extended via the [CNPG-I plugin interface](https://github.com/cloudnative-pg/cnpg-i).
 
 ## Communications
 
