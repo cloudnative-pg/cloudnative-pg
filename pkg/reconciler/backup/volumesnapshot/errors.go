@@ -17,15 +17,25 @@ limitations under the License.
 package volumesnapshot
 
 import (
+	"context"
+	"errors"
 	"regexp"
 	"strconv"
 	"strings"
+
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 )
 
 var (
 	retryableStatusCodes = []int{408, 429, 500, 502, 503, 504}
 	httpStatusCodeRegex  = regexp.MustCompile(`HTTPStatusCode:\s(\d{3})`)
 )
+
+// isErrorRetryable detects is an error is retryable or not
+func isErrorRetryable(err error) bool {
+	return apierrs.IsServerTimeout(err) || apierrs.IsConflict(err) || apierrs.IsInternalError(err) ||
+		errors.Is(err, context.DeadlineExceeded)
+}
 
 // isRetriableErrorMessage detects if a certain error message belongs
 // to a retriable error or not. This is obviously an heuristic but
@@ -36,6 +46,7 @@ func isRetriableErrorMessage(msg string) bool {
 		isExplicitlyRetriableError,
 		isRetryableHTTPError,
 		isConflictError,
+		isContextDeadlineExceededError,
 	}
 
 	for _, isRetryableFunc := range isRetryableFuncs {
@@ -45,6 +56,12 @@ func isRetriableErrorMessage(msg string) bool {
 	}
 
 	return false
+}
+
+// isContextDeadlineExceededError detects context deadline exceeded errors
+// These are timeouts that may be retried by the Kubernetes CSI controller
+func isContextDeadlineExceededError(msg string) bool {
+	return strings.Contains(msg, "deadline exceeded") || strings.Contains(msg, "timed out")
 }
 
 // isConflictError detects optimistic locking errors
