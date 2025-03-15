@@ -150,18 +150,8 @@ var _ = Describe("testing backup command", func() {
 
 var _ = Describe("generate backup options", func() {
 	const namespace = "test"
-	capabilities := barmanCapabilities.Capabilities{
-		Version:                    nil,
-		HasAzure:                   true,
-		HasS3:                      true,
-		HasGoogle:                  true,
-		HasRetentionPolicy:         true,
-		HasTags:                    true,
-		HasCheckWalArchive:         true,
-		HasSnappy:                  true,
-		HasErrorCodesForWALRestore: true,
-		HasAzureManagedIdentity:    true,
-	}
+	capabilities, err := barmanCapabilities.CurrentCapabilities()
+	Expect(err).ShouldNot(HaveOccurred())
 	cluster := &apiv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{Name: "test-cluster", Namespace: namespace},
 		Spec: apiv1.ClusterSpec{
@@ -182,7 +172,7 @@ var _ = Describe("generate backup options", func() {
 		extraOptions := []string{"--min-chunk-size=5MB", "--read-timeout=60", "-vv"}
 		cluster.Spec.Backup.BarmanObjectStore.Data.AdditionalCommandArgs = extraOptions
 
-		cmd := barmanBackup.NewBackupCommand(cluster.Spec.Backup.BarmanObjectStore, &capabilities)
+		cmd := barmanBackup.NewBackupCommand(cluster.Spec.Backup.BarmanObjectStore, capabilities)
 		options, err := cmd.GetDataConfiguration([]string{})
 		Expect(err).ToNot(HaveOccurred())
 
@@ -203,7 +193,7 @@ var _ = Describe("generate backup options", func() {
 			"--encryption=aes256",
 		}
 		cluster.Spec.Backup.BarmanObjectStore.Data.AdditionalCommandArgs = extraOptions
-		cmd := barmanBackup.NewBackupCommand(cluster.Spec.Backup.BarmanObjectStore, &capabilities)
+		cmd := barmanBackup.NewBackupCommand(cluster.Spec.Backup.BarmanObjectStore, capabilities)
 		options, err := cmd.GetDataConfiguration([]string{})
 		Expect(err).ToNot(HaveOccurred())
 
