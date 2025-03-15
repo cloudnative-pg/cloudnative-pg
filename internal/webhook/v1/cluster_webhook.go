@@ -2372,7 +2372,12 @@ func (v *ClusterCustomValidator) validatePodPatchAnnotation(r *apiv1.Cluster) fi
 		}
 	}
 
-	if _, err := specs.PodWithExistingStorage(*r, 1); err != nil {
+	if _, err := specs.NewInstance(
+		context.Background(),
+		*r,
+		1,
+		true,
+	); err != nil {
 		return field.ErrorList{
 			field.Invalid(
 				field.NewPath("metadata", "annotations", utils.PodPatchAnnotationName),
