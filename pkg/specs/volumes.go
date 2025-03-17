@@ -222,7 +222,9 @@ func createVolumesAndVolumeMountsForSQLRefs(
 	return volumes, volumeMounts
 }
 
-func createPostgresVolumeMounts(cluster apiv1.Cluster) []corev1.VolumeMount {
+// CreatePostgresVolumeMounts creates the volume mounts that are used
+// by PostgreSQL Pods
+func CreatePostgresVolumeMounts(cluster apiv1.Cluster) []corev1.VolumeMount {
 	volumeMounts := []corev1.VolumeMount{
 		{
 			Name:      "pgdata",

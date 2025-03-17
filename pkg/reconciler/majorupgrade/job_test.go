@@ -14,12 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package specs
+package majorupgrade
 
 import (
 	batchv1 "k8s.io/api/batch/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -43,16 +44,16 @@ var _ = Describe("Major upgrade Job generation", func() {
 	}
 
 	It("creates major upgrade jobs", func() {
-		majorUpgradeJob := CreateMajorUpgradeJob(&cluster, 1)
+		majorUpgradeJob := createMajorUpgradeJobDefinition(&cluster, 1)
 		Expect(majorUpgradeJob).ToNot(BeNil())
 		Expect(majorUpgradeJob.Spec.Template.Spec.Containers[0].Image).To(Equal(newImageName))
 	})
 
 	It("is able to discover which target image was used", func() {
-		majorUpgradeJob := CreateMajorUpgradeJob(&cluster, 1)
+		majorUpgradeJob := createMajorUpgradeJobDefinition(&cluster, 1)
 		Expect(majorUpgradeJob).ToNot(BeNil())
 
-		imgName, found := GetTargetImageFromMajorUpgradeJob(majorUpgradeJob)
+		imgName, found := getTargetImageFromMajorUpgradeJob(majorUpgradeJob)
 		Expect(found).To(BeTrue())
 		Expect(imgName).To(Equal(newImageName))
 	})
@@ -60,9 +61,9 @@ var _ = Describe("Major upgrade Job generation", func() {
 	DescribeTable(
 		"Tells major upgrade jobs apart from jobs of other types",
 		func(job *batchv1.Job, isMajorUpgrade bool) {
-			Expect(IsMajorUpgradeJob(job)).To(Equal(isMajorUpgrade))
+			Expect(isMajorUpgradeJob(job)).To(Equal(isMajorUpgrade))
 		},
-		Entry("initdb jobs are not major upgrades", CreatePrimaryJobViaInitdb(cluster, 1), false),
-		Entry("major-upgrade jobs are major upgrades", CreateMajorUpgradeJob(&cluster, 1), true),
+		Entry("initdb jobs are not major upgrades", specs.CreatePrimaryJobViaInitdb(cluster, 1), false),
+		Entry("major-upgrade jobs are major upgrades", createMajorUpgradeJobDefinition(&cluster, 1), true),
 	)
 })

@@ -215,7 +215,7 @@ func createPostgresContainers(cluster apiv1.Cluster, envConfig EnvConfig, enable
 			ImagePullPolicy: cluster.Spec.ImagePullPolicy,
 			Env:             envConfig.EnvVars,
 			EnvFrom:         envConfig.EnvFrom,
-			VolumeMounts:    createPostgresVolumeMounts(cluster),
+			VolumeMounts:    CreatePostgresVolumeMounts(cluster),
 			// This is the default startup probe, and can be overridden
 			// the user configuration in cluster.spec.probes.startup
 			StartupProbe: &corev1.Probe{

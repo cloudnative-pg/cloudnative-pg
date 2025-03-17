@@ -23,10 +23,11 @@ import (
 	"os"
 	"os/exec"
 	"path"
-	"strings"
 
+	"github.com/cloudnative-pg/machinery/pkg/env"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/log"
+	"github.com/cloudnative-pg/machinery/pkg/postgres/pgconfig"
 	"github.com/spf13/cobra"
 )
 
@@ -50,17 +51,10 @@ func NewCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&pgConfig, "pg-config", getEnvOrDefault("PG_CONFIG", "pg_config"),
+	cmd.Flags().StringVar(&pgConfig, "pg-config", env.GetOrDefault("PG_CONFIG", "pg_config"),
 		`The path of "pg_config" executable. Defaults to "pg_config".`)
 
 	return &cmd
-}
-
-func getEnvOrDefault(env, def string) string {
-	if value, ok := os.LookupEnv(env); ok {
-		return value
-	}
-	return def
 }
 
 // copyPostgresInstallation replicates the PostgreSQL installation to the specified destination directory
@@ -80,54 +74,42 @@ func copyPostgresInstallation(ctx context.Context, pgConfig string, dest string)
 	contextLogger.Info("Copying the PostgreSQL installation to the destination", "destination", dest)
 
 	contextLogger.Info("Removing the destination directory", "directory", dest)
-	err := os.RemoveAll(dest)
-	if err != nil {
+	if err := os.RemoveAll(dest); err != nil {
 		return fmt.Errorf("failed to remove the directory: %w", err)
 	}
 
 	contextLogger.Info("Creating the destination directory", "directory", dest)
-	err = os.MkdirAll(dest, 0o750)
-	if err != nil {
+	if err := os.MkdirAll(dest, 0o750); err != nil {
 		return fmt.Errorf("failed to create the directory: %w", err)
 	}
 
-	for _, config := range []string{"bindir", "pkglibdir", "sharedir"} {
-		sourceDir, err := getPostgresConfig(pgConfig, config)
+	copyLocations := []pgconfig.InstallationLocation{pgconfig.BinDir, pgconfig.PkgLibDir, pgconfig.ShareDir}
+	for _, config := range copyLocations {
+		sourceDir, err := pgconfig.GetInstallationLocation(pgConfig, config)
 		if err != nil {
 			return err
 		}
 		sourceDir = path.Clean(sourceDir)
 		destDir := path.Clean(path.Join(dest, sourceDir))
 
-		if config == "bindir" {
+		if config == pgconfig.BinDir {
 			destFile := path.Join(dest, "bindir.txt")
 			contextLogger.Info("Creating the bindir.txt file", "file", destFile)
-			_, err := fileutils.WriteStringToFile(destFile, fmt.Sprintf("%s\n", destDir))
-			if err != nil {
+			if _, err := fileutils.WriteStringToFile(destFile, fmt.Sprintf("%s\n", destDir)); err != nil {
 				return fmt.Errorf("failed to write the %q file: %w", destFile, err)
 			}
 		}
 
 		contextLogger.Info("Creating the directory", "directory", destDir)
-		err = os.MkdirAll(destDir, 0o750)
-		if err != nil {
+		if err := os.MkdirAll(destDir, 0o750); err != nil {
 			return fmt.Errorf("failed to create the directory: %w", err)
 		}
 
 		contextLogger.Info("Copying the files", "source", sourceDir, "destination", destDir)
-		err = exec.Command("cp", "-a", sourceDir+"/.", destDir).Run() //nolint:gosec
-		if err != nil {
+		if err := exec.Command("cp", "-a", sourceDir+"/.", destDir).Run(); err != nil { //nolint:gosec
 			return fmt.Errorf("failed to copy the files: %w", err)
 		}
 	}
 
 	return nil
-}
-
-func getPostgresConfig(pgConfig string, dir string) (string, error) {
-	out, err := exec.Command(pgConfig, "--"+dir).Output() //nolint:gosec
-	if err != nil {
-		return "", fmt.Errorf("failed to get the %q value from pg_config: %w", dir, err)
-	}
-	return strings.TrimSpace(string(out)), nil
 }

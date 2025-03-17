@@ -32,7 +32,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // scaleDownCluster handles the scaling down operations of a PostgreSQL cluster.
@@ -101,13 +101,25 @@ func (r *ClusterReconciler) ensureInstanceJobAreDeleted(
 ) error {
 	contextLogger := log.FromContext(ctx)
 
-	for _, jobName := range specs.GetPossibleJobNames(instanceName) {
-		job := &batchv1.Job{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      jobName,
-				Namespace: cluster.Namespace,
-			},
-		}
+	var jobList batchv1.JobList
+	if err := r.List(
+		ctx,
+		&jobList,
+		client.InNamespace(cluster.Namespace),
+		client.MatchingFields{jobOwnerKey: cluster.Name},
+		client.MatchingLabels{
+			utils.InstanceNameLabelName: instanceName,
+			utils.ClusterLabelName:      cluster.Name,
+		},
+		client.HasLabels{
+			utils.JobRoleLabelName,
+		},
+	); err != nil {
+		return fmt.Errorf("while looking for stale jobs of instance %s: %w", instanceName, err)
+	}
+
+	for i := range jobList.Items {
+		job := &jobList.Items[i]
 
 		// This job was working against the PVC of this Pod,
 		// let's remove it

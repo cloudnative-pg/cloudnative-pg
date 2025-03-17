@@ -14,15 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+package majorupgrade
 
 import (
 	"context"
 	"fmt"
 	"time"
 
-	"github.com/cloudnative-pg/machinery/pkg/log"
 	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
@@ -35,17 +35,30 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
+	"github.com/cloudnative-pg/machinery/pkg/log"
 )
 
-func (r *ClusterReconciler) reconcileInPlaceMajorVersionUpgrades(
+// ErrIncoherentMajorUpgradeJob is raised when the major upgrade job
+// is missing the target image
+var ErrIncoherentMajorUpgradeJob = fmt.Errorf("major upgrade job is missing the target image")
+
+// ErrNoPrimaryPVCFound is raised when the list of PVCs doesn't
+// include any primary instance.
+var ErrNoPrimaryPVCFound = fmt.Errorf("no primary PVC found")
+
+// Reconcile implements the major version upgrade logic.
+func Reconcile(
 	ctx context.Context,
+	c client.Client,
 	cluster *apiv1.Cluster,
-	resources *managedResources,
+	instances []corev1.Pod,
+	pvcs []corev1.PersistentVolumeClaim,
+	jobs []batchv1.Job,
 ) (*ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
-	if job := getMajorUpdateJob(resources.jobs.Items); job != nil {
-		return r.majorVersionUpgradeHandleCompletion(ctx, cluster, job, resources)
+	if majorUpgradeJob := getMajorUpdateJob(jobs); majorUpgradeJob != nil {
+		return majorVersionUpgradeHandleCompletion(ctx, c, cluster, majorUpgradeJob, pvcs)
 	}
 
 	if cluster.Status.MajorVersionUpgradeFromImage == nil {
@@ -58,11 +71,8 @@ func (r *ClusterReconciler) reconcileInPlaceMajorVersionUpgrades(
 		return nil, err
 	}
 
-	_, primaryNodeSerial, err := getNodeSerialsFromPVCs(resources.pvcs.Items)
+	primaryNodeSerial, err := getPrimarySerial(pvcs)
 	if err != nil || primaryNodeSerial == 0 {
-		if err == nil {
-			err = fmt.Errorf("no primary pvc found")
-		}
 		contextLogger.Error(err, "Unable to retrieve the primary node serial")
 		return nil, err
 	}
@@ -70,20 +80,20 @@ func (r *ClusterReconciler) reconcileInPlaceMajorVersionUpgrades(
 	contextLogger.Info("Reconciling in-place major version upgrades",
 		"primaryNodeSerial", primaryNodeSerial, "desiredVersion", desiredVersion.Major())
 
-	err = r.RegisterPhase(ctx, cluster, apiv1.PhaseMajorUpgrade,
+	err = registerPhase(ctx, c, cluster, apiv1.PhaseMajorUpgrade,
 		fmt.Sprintf("Upgrading cluster to major version %v", desiredVersion.Major()))
 	if err != nil {
 		return nil, err
 	}
 
-	if result, err := r.deleteAllPodsInMajorUpgradePreparation(ctx, resources); err != nil {
+	if result, err := deleteAllPodsInMajorUpgradePreparation(ctx, c, instances, jobs); err != nil {
 		contextLogger.Error(err, "Unable to delete pods and jobs in preparation for major upgrade")
 		return nil, err
 	} else if result != nil {
 		return result, err
 	}
 
-	if result, err := r.createMajorUpgradeJob(ctx, cluster, primaryNodeSerial); err != nil {
+	if result, err := createMajorUpgradeJob(ctx, c, cluster, primaryNodeSerial); err != nil {
 		contextLogger.Error(err, "Unable to create major upgrade job")
 		return nil, err
 	} else if result != nil {
@@ -95,7 +105,7 @@ func (r *ClusterReconciler) reconcileInPlaceMajorVersionUpgrades(
 
 func getMajorUpdateJob(items []batchv1.Job) *batchv1.Job {
 	for _, job := range items {
-		if specs.IsMajorUpgradeJob(&job) {
+		if isMajorUpgradeJob(&job) {
 			return &job
 		}
 	}
@@ -103,30 +113,32 @@ func getMajorUpdateJob(items []batchv1.Job) *batchv1.Job {
 	return nil
 }
 
-func (r *ClusterReconciler) deleteAllPodsInMajorUpgradePreparation(
+func deleteAllPodsInMajorUpgradePreparation(
 	ctx context.Context,
-	resources *managedResources,
+	c client.Client,
+	instances []corev1.Pod,
+	jobs []batchv1.Job,
 ) (*ctrl.Result, error) {
 	foundSomethingToDelete := false
 
-	for _, pod := range resources.instances.Items {
+	for _, pod := range instances {
 		if pod.GetDeletionTimestamp() != nil {
 			continue
 		}
 
 		foundSomethingToDelete = true
-		if err := r.Delete(ctx, &pod); err != nil {
+		if err := c.Delete(ctx, &pod); err != nil {
 			return nil, err
 		}
 	}
 
-	for _, job := range resources.jobs.Items {
+	for _, job := range jobs {
 		if job.GetDeletionTimestamp() != nil {
 			continue
 		}
 
 		foundSomethingToDelete = true
-		if err := r.Delete(ctx, &job, &client.DeleteOptions{
+		if err := c.Delete(ctx, &job, &client.DeleteOptions{
 			PropagationPolicy: ptr.To(metav1.DeletePropagationForeground),
 		}); err != nil {
 			return nil, err
@@ -140,16 +152,17 @@ func (r *ClusterReconciler) deleteAllPodsInMajorUpgradePreparation(
 	return nil, nil
 }
 
-func (r *ClusterReconciler) createMajorUpgradeJob(
+func createMajorUpgradeJob(
 	ctx context.Context,
+	c client.Client,
 	cluster *apiv1.Cluster,
 	primaryNodeSerial int,
 ) (*ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
-	job := specs.CreateMajorUpgradeJob(cluster, primaryNodeSerial)
+	job := createMajorUpgradeJobDefinition(cluster, primaryNodeSerial)
 
-	if err := ctrl.SetControllerReference(cluster, job, r.Scheme); err != nil {
+	if err := ctrl.SetControllerReference(cluster, job, c.Scheme()); err != nil {
 		contextLogger.Error(err, "Unable to set the owner reference for major upgrade job")
 		return nil, err
 	}
@@ -169,7 +182,7 @@ func (r *ClusterReconciler) createMajorUpgradeJob(
 		"jobName", job.Name,
 		"primary", true)
 
-	if err := r.Create(ctx, job); err != nil {
+	if err := c.Create(ctx, job); err != nil {
 		if errors.IsAlreadyExists(err) {
 			// This Job was already created, maybe the cache is stale.
 			return &ctrl.Result{RequeueAfter: 30 * time.Second}, nil
@@ -180,20 +193,21 @@ func (r *ClusterReconciler) createMajorUpgradeJob(
 	return nil, nil
 }
 
-func (r *ClusterReconciler) majorVersionUpgradeHandleCompletion(
+func majorVersionUpgradeHandleCompletion(
 	ctx context.Context,
+	c client.Client,
 	cluster *apiv1.Cluster,
 	job *batchv1.Job,
-	resources *managedResources,
+	pvcs []corev1.PersistentVolumeClaim,
 ) (*ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
 	if !utils.JobHasOneCompletion(*job) {
-		contextLogger.Warning("Unexpected state: major upgrade job not completed.")
+		contextLogger.Info("Major upgrade job not completed.")
 		return &ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 
-	for _, pvc := range resources.pvcs.Items {
+	for _, pvc := range pvcs {
 		if pvc.GetDeletionTimestamp() != nil {
 			continue
 		}
@@ -202,7 +216,7 @@ func (r *ClusterReconciler) majorVersionUpgradeHandleCompletion(
 			continue
 		}
 
-		if err := r.Delete(ctx, &pvc); err != nil {
+		if err := c.Delete(ctx, &pvc); err != nil {
 			// Ignore if NotFound, otherwise report the error
 			if !errors.IsNotFound(err) {
 				return nil, err
@@ -210,15 +224,14 @@ func (r *ClusterReconciler) majorVersionUpgradeHandleCompletion(
 		}
 	}
 
-	jobImage, ok := specs.GetTargetImageFromMajorUpgradeJob(job)
+	jobImage, ok := getTargetImageFromMajorUpgradeJob(job)
 	if !ok {
-		contextLogger.Info("Unable to retrieve image name from major upgrade job.")
-		return &ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+		return nil, ErrIncoherentMajorUpgradeJob
 	}
 
 	if err := status.PatchWithOptimisticLock(
 		ctx,
-		r.Client,
+		c,
 		cluster,
 		status.SetMajorVersionUpgradeFromImage(&jobImage),
 	); err != nil {
@@ -226,7 +239,7 @@ func (r *ClusterReconciler) majorVersionUpgradeHandleCompletion(
 		return nil, err
 	}
 
-	if err := r.Delete(ctx, job, &client.DeleteOptions{
+	if err := c.Delete(ctx, job, &client.DeleteOptions{
 		PropagationPolicy: ptr.To(metav1.DeletePropagationForeground),
 	}); err != nil {
 		contextLogger.Error(err, "Unable to delete major upgrade job.")
@@ -234,4 +247,37 @@ func (r *ClusterReconciler) majorVersionUpgradeHandleCompletion(
 	}
 
 	return &ctrl.Result{Requeue: true}, nil
+}
+
+// registerPhase sets a phase into the cluster
+func registerPhase(
+	ctx context.Context,
+	c client.Client,
+	cluster *apiv1.Cluster,
+	phase string,
+	reason string,
+) error {
+	return status.PatchWithOptimisticLock(
+		ctx,
+		c,
+		cluster,
+		status.SetPhase(phase, reason),
+		status.SetClusterReadyCondition,
+	)
+}
+
+// getPrimarySerial tries to obtain the primary serial from a group of PVCs
+func getPrimarySerial(
+	pvcs []corev1.PersistentVolumeClaim,
+) (int, error) {
+	for _, pvc := range pvcs {
+		instanceRole, _ := utils.GetInstanceRole(pvc.ObjectMeta.Labels)
+		if instanceRole != specs.ClusterRoleLabelPrimary {
+			continue
+		}
+
+		return specs.GetNodeSerial(pvc.ObjectMeta)
+	}
+
+	return 0, ErrNoPrimaryPVCFound
 }

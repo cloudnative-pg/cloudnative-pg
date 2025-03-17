@@ -77,6 +77,7 @@ func buildTestEnvironment() *testingEnvironment {
 	k8sClient := fake.NewClientBuilder().WithScheme(scheme).
 		WithStatusSubresource(&apiv1.Cluster{}, &apiv1.Backup{}, &apiv1.Pooler{}, &corev1.Service{},
 			&corev1.ConfigMap{}, &corev1.Secret{}).
+		WithIndex(&batchv1.Job{}, jobOwnerKey, jobOwnerIndexFunc).
 		Build()
 	Expect(err).ToNot(HaveOccurred())
 
