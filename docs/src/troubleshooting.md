@@ -815,6 +815,6 @@ For more details, consult the
 
 You can work around this issue by setting `STANDBY_TCP_USER_TIMEOUT` in the
 [operator configuration](operator_conf.md#available-options). This will cause
-the standby instances to close the TCP connection if the initial SYN packet is
-not acknowledged within the specified timeout, allowing them to retry the
+the standby instances to close the TCP connection if the initial `SYN` packet
+is not acknowledged within the specified timeout, allowing them to retry the
 connection more quickly.
