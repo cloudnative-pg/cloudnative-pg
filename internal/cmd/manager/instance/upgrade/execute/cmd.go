@@ -342,7 +342,7 @@ func moveDataInPlace(
 	if newWalDir != nil {
 		contextLogger.Info("Moving the old pg_wal directory")
 		if err := os.Rename(specs.PgWalVolumePgWalPath, specs.PgWalVolumePgWalPath+".old"); err != nil {
-			return fmt.Errorf("error while moving the old data directory: %w", err)
+			return fmt.Errorf("error while moving the old pg_wal directory: %w", err)
 		}
 	}
 
@@ -360,7 +360,7 @@ func moveDataInPlace(
 			return fmt.Errorf("error while removing the symlink to pg_wal: %w", err)
 		}
 		if err := os.Symlink(specs.PgWalVolumePgWalPath, specs.PgWalPath); err != nil {
-			return fmt.Errorf("error while creatin the symlink to pg_wal: %w", err)
+			return fmt.Errorf("error while creating the symlink to pg_wal: %w", err)
 		}
 	}
 

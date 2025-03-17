@@ -64,7 +64,7 @@ func getEnvOrDefault(env, def string) string {
 }
 
 // copyPostgresInstallation replicates the PostgreSQL installation to the specified destination directory
-// for use by the ph_upgrade command as the old binary directory.
+// for use by the pg_upgrade command as the old binary directory.
 //
 // Steps performed:
 // 1. Removes the existing destination directory if it exists.

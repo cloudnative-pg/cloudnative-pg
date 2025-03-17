@@ -97,4 +97,7 @@ const (
 
 	// LabelUpgrade is a label for upgrade tests
 	LabelUpgrade = "upgrade"
+
+	// LabelPostgresMajorUpgrade is a label for Cluster major version upgrade tests
+	LabelPostgresMajorUpgrade = "postgres-major-upgrade"
 )

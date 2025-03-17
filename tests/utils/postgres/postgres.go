@@ -134,3 +134,21 @@ func BumpPostgresImageMajorVersion(postgresImage string) (string, error) {
 
 	return imageReference.GetNormalizedName(), nil
 }
+
+// IsLatestMajor returns true if the given postgresImage is using latest Postgres major version
+func IsLatestMajor(postgresImage string) bool {
+	// Get the current tag
+	currentImageReference := reference.New(postgresImage)
+	currentImageVersion, err := version.FromTag(currentImageReference.Tag)
+	if err != nil {
+		return false
+	}
+	// Get the default tag
+	defaultImageReference := reference.New(versions.DefaultImageName)
+	defaultImageVersion, err := version.FromTag(defaultImageReference.Tag)
+	if err != nil {
+		return false
+	}
+
+	return currentImageVersion.Major() >= defaultImageVersion.Major()
+}
