@@ -233,20 +233,20 @@ var _ = Describe("Upgrade", Label(tests.LabelUpgrade, tests.LabelNoOpenshift), O
 					"Pod %v should have updated its config", pod.Name)
 			}
 			// Check that a switchover happened
-			Eventually(func() (bool, error) {
+			Eventually(func(g Gomega) bool {
 				c, err := clusterutils.Get(env.Ctx, env.Client, upgradeNamespace, clusterName)
-				Expect(err).ToNot(HaveOccurred())
+				g.Expect(err).ToNot(HaveOccurred())
 
 				GinkgoWriter.Printf("Current Primary: %s, Current Primary timestamp: %s\n",
 					c.Status.CurrentPrimary, c.Status.CurrentPrimaryTimestamp)
 
 				if c.Status.CurrentPrimary != oldPrimary {
-					return true, nil
+					return true
 				} else if c.Status.CurrentPrimaryTimestamp != oldPrimaryTimestamp {
-					return true, nil
+					return true
 				}
 
-				return false, nil
+				return false
 			}, timeout, "1s").Should(BeTrue())
 		})
 

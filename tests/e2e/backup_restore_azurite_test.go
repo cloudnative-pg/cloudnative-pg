@@ -292,11 +292,11 @@ func prepareClusterBackupOnAzurite(
 		Eventually(func() (int, error) {
 			return backups.CountFilesOnAzuriteBlobStorage(namespace, clusterName, "data.tar")
 		}, 30).Should(BeNumerically(">=", 1))
-		Eventually(func() (string, error) {
+		Eventually(func(g Gomega) {
 			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
-			return cluster.Status.FirstRecoverabilityPoint, err
-		}, 30).ShouldNot(BeEmpty())
+			g.Expect(err).ToNot(HaveOccurred())
+			g.Expect(cluster.Status.FirstRecoverabilityPoint).ToNot(BeEmpty())
+		}, 30).Should(Succeed())
 	})
 	backups.AssertBackupConditionInClusterStatus(env.Ctx, env.Client, namespace, clusterName)
 }
@@ -318,11 +318,11 @@ func prepareClusterForPITROnAzurite(
 		Eventually(func() (int, error) {
 			return backups.CountFilesOnAzuriteBlobStorage(namespace, clusterName, "data.tar")
 		}, 30).Should(BeNumerically(">=", 1))
-		Eventually(func() (string, error) {
+		Eventually(func(g Gomega) {
 			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
-			return cluster.Status.FirstRecoverabilityPoint, err
-		}, 30).ShouldNot(BeEmpty())
+			g.Expect(err).ToNot(HaveOccurred())
+			g.Expect(cluster.Status.FirstRecoverabilityPoint).ToNot(BeEmpty())
+		}, 30).Should(Succeed())
 	})
 
 	// Write a table and insert 2 entries on the "app" database

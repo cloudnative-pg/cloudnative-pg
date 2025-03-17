@@ -20,7 +20,9 @@ import (
 	"fmt"
 	"strings"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 
@@ -28,6 +30,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/clusterutils"
+	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/deployments"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/exec"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/tests/utils/run"
@@ -156,6 +159,10 @@ func assertFastSwitchover(namespace, sampleFile, clusterName, webTestFile, webTe
 		_, _, err := run.Run("kubectl create -n " + namespace +
 			" -f " + webTestFile)
 		Expect(err).ToNot(HaveOccurred())
+
+		webtestDeploy := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "webtest", Namespace: namespace}}
+		Expect(deployments.WaitForReady(env.Ctx, env.Client, webtestDeploy, 60)).To(Succeed())
+
 		_, _, err = run.Run("kubectl create -n " + namespace +
 			" -f " + webTestJob)
 		Expect(err).ToNot(HaveOccurred())
@@ -196,16 +203,6 @@ func assertFastSwitchover(namespace, sampleFile, clusterName, webTestFile, webTe
 
 	var maxReattachTime int32 = 60
 	var maxSwitchoverTime int32 = 20
-
-	// The walreceiver of a standby that wasn't promoted may try to reconnect
-	// before the rw service endpoints are updated. In this case, the walreceiver
-	// can be stuck for waiting for the connection to be established for a time that
-	// depends on the tcp_syn_retries sysctl. Since by default
-	// net.ipv4.tcp_syn_retries=6, PostgreSQL can wait 2^7-1=127 seconds before
-	// restarting the walreceiver.
-	if !IsLocal() {
-		maxReattachTime = 180
-	}
 
 	AssertStandbysFollowPromotion(namespace, clusterName, maxReattachTime)
 

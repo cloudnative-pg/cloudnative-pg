@@ -21,6 +21,8 @@ import (
 
 	"github.com/onsi/ginkgo/v2/types"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/cloudnative-pg/cloudnative-pg/tests"
@@ -45,16 +47,47 @@ var _ = Describe("Config support", Serial, Ordered, Label(tests.LabelDisruptive,
 		level                          = tests.Low
 	)
 	var operatorNamespace, namespace string
+	var initialConfigMap *corev1.ConfigMap
+	var initialSecret *corev1.Secret
 
 	BeforeEach(func() {
 		if testLevelEnv.Depth < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
+	})
 
+	BeforeAll(func() {
 		operatorDeployment, err := operator.GetDeployment(env.Ctx, env.Client)
 		Expect(err).ToNot(HaveOccurred())
-
 		operatorNamespace = operatorDeployment.GetNamespace()
+
+		// Save the initial configMap
+		initialConfigMap = &corev1.ConfigMap{}
+		err = env.Client.Get(env.Ctx, ctrlclient.ObjectKey{Namespace: operatorNamespace, Name: configName},
+			initialConfigMap)
+		if !apierrors.IsNotFound(err) {
+			Expect(err).ToNot(HaveOccurred())
+		}
+		initialConfigMap.SetResourceVersion("")
+		initialConfigMap.SetUID("")
+		initialConfigMap.SetCreationTimestamp(metav1.Time{})
+		initialConfigMap.SetSelfLink("")
+		initialConfigMap.SetGeneration(0)
+		initialConfigMap.SetManagedFields(nil)
+
+		// Save the initial secret
+		initialSecret = &corev1.Secret{}
+		err = env.Client.Get(env.Ctx, ctrlclient.ObjectKey{Namespace: operatorNamespace, Name: configName},
+			initialSecret)
+		if !apierrors.IsNotFound(err) {
+			Expect(err).ToNot(HaveOccurred())
+		}
+		initialSecret.SetResourceVersion("")
+		initialSecret.SetUID("")
+		initialSecret.SetCreationTimestamp(metav1.Time{})
+		initialSecret.SetSelfLink("")
+		initialSecret.SetGeneration(0)
+		initialSecret.SetManagedFields(nil)
 	})
 
 	AfterAll(func() {
@@ -75,6 +108,16 @@ var _ = Describe("Config support", Serial, Ordered, Label(tests.LabelDisruptive,
 		// If the secret exists, we remove it
 		err = env.Client.Delete(env.Ctx, secret)
 		Expect(err).NotTo(HaveOccurred())
+
+		// Create preexisting ConfigMap and Secret
+		if initialConfigMap.Name != "" {
+			err = env.Client.Create(env.Ctx, initialConfigMap)
+			Expect(err).ToNot(HaveOccurred())
+		}
+		if initialSecret.Name != "" {
+			err = env.Client.Create(env.Ctx, initialSecret)
+			Expect(err).ToNot(HaveOccurred())
+		}
 
 		err = operator.ReloadDeployment(env.Ctx, env.Client, env.Interface, 120)
 		Expect(err).ToNot(HaveOccurred())

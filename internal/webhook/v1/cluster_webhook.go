@@ -299,6 +299,9 @@ func isReservedEnvironmentVariable(name string) bool {
 	name = strings.ToUpper(name)
 
 	switch {
+	case strings.HasPrefix(name, "CNPG_"):
+		return true
+
 	case strings.HasPrefix(name, "PG"):
 		return true
 
