@@ -697,10 +697,6 @@ var _ = Describe("Tablespaces tests", Label(tests.LabelTablespaces,
 			})
 		})
 
-		It("can hibernate via plugin a cluster with tablespaces", func() {
-			assertCanHibernateClusterWithTablespaces(namespace, clusterName, hibernateImperatively, 2)
-		})
-
 		It("can hibernate via annotation a cluster with tablespaces", func() {
 			assertCanHibernateClusterWithTablespaces(namespace, clusterName, hibernateDeclaratively, 6)
 		})
@@ -1279,8 +1275,6 @@ type hibernationMethod string
 const (
 	// hibernateDeclaratively it is a keyword to use while fencing on/off the instances using annotation method
 	hibernateDeclaratively hibernationMethod = "annotation"
-	// hibernateImperatively it is a keyword to use while fencing on/off the instances using plugin method
-	hibernateImperatively hibernationMethod = "plugin"
 )
 
 func hibernateOn(
@@ -1291,13 +1285,6 @@ func hibernateOn(
 	method hibernationMethod,
 ) error {
 	switch method {
-	case hibernateImperatively:
-		_, _, err := run.Run(fmt.Sprintf("kubectl cnpg hibernate on %v -n %v",
-			clusterName, namespace))
-		if err != nil {
-			return err
-		}
-		return nil
 	case hibernateDeclaratively:
 		cluster, err := clusterutils.Get(ctx, crudClient, namespace, clusterName)
 		if err != nil {
@@ -1324,13 +1311,6 @@ func hibernateOff(
 	method hibernationMethod,
 ) error {
 	switch method {
-	case hibernateImperatively:
-		_, _, err := run.Run(fmt.Sprintf("kubectl cnpg hibernate off %v -n %v",
-			clusterName, namespace))
-		if err != nil {
-			return err
-		}
-		return nil
 	case hibernateDeclaratively:
 		cluster, err := clusterutils.Get(ctx, crudClient, namespace, clusterName)
 		if err != nil {
