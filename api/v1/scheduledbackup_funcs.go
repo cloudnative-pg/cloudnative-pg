@@ -78,5 +78,14 @@ func (scheduledBackup *ScheduledBackup) CreateBackup(name string) *Backup {
 		},
 	}
 	utils.InheritAnnotations(&backup.ObjectMeta, scheduledBackup.Annotations, nil, configuration.Current)
+
+	if backup.Annotations == nil {
+		backup.Annotations = make(map[string]string)
+	}
+
+	if v := scheduledBackup.Annotations[utils.BackupVolumeSnapshotDeadlineAnnotationName]; v != "" {
+		backup.Annotations[utils.BackupVolumeSnapshotDeadlineAnnotationName] = v
+	}
+
 	return &backup
 }
