@@ -16,7 +16,7 @@ spec:
         app: webtest
     spec:
       containers:
-        - image: ghcr.io/cloudnative-pg/webtest:1.6.0
+        - image: ghcr.io/cloudnative-pg/webtest:1.7.0
           name: webtest
           env:
             - name: PASSWORD
@@ -33,6 +33,12 @@ spec:
               value: "postgres://$(USER):$(PASSWORD)@cluster-syncreplicas-fast-failover-rw/app?sslmode=require&connect_timeout=2"
             - name: SQL_QUERY
               value: "insert into tps.tl(source) values ('hey');"
+          livenessProbe:
+            tcpSocket:
+              port: 8080
+          readinessProbe:
+            tcpSocket:
+              port: 8080
           ports:
             - containerPort: 8080
 ---

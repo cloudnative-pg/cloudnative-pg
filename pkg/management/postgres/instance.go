@@ -30,6 +30,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/blang/semver"
@@ -1284,7 +1285,15 @@ func (instance *Instance) DropConnections() error {
 
 // GetPrimaryConnInfo returns the DSN to reach the primary
 func (instance *Instance) GetPrimaryConnInfo() string {
-	return buildPrimaryConnInfo(instance.GetClusterName()+"-rw", instance.GetPodName())
+	result := buildPrimaryConnInfo(instance.GetClusterName()+"-rw", instance.GetPodName())
+
+	standbyTCPUserTimeout := os.Getenv("CNPG_STANDBY_TCP_USER_TIMEOUT")
+	if len(standbyTCPUserTimeout) > 0 {
+		result = fmt.Sprintf("%s tcp_user_timeout='%s'", result,
+			strings.ReplaceAll(strings.ReplaceAll(standbyTCPUserTimeout, `\`, `\\`), `'`, `\'`))
+	}
+
+	return result
 }
 
 // HandleInstanceCommandRequests execute a command requested by the reconciliation

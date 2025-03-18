@@ -9,10 +9,14 @@ spec:
       - name: apache-benchmark
         image: httpd
         command:
-         - "/usr/local/apache2/bin/ab"
-         - "-t"
-         - "120"
-         - "-c"
-         - "5"
-         - "http://webtest:8080/tx"
+          - "/usr/local/apache2/bin/ab"
+          - "-t"
+          - "120"
+          - "-c"
+          - "5"
+          - "-v"
+          - "2"
+          - "-s"
+          - "3"
+          - "http://webtest:8080/tx"
       restartPolicy: Never

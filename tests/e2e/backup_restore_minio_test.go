@@ -800,11 +800,11 @@ func prepareClusterForPITROnMinio(
 		}, 60).Should(BeNumerically(">=", expectedVal),
 			fmt.Sprintf("verify the number of backups %v is greater than or equal to %v", latestTar,
 				expectedVal))
-		Eventually(func() (string, error) {
+		Eventually(func(g Gomega) {
 			cluster, err := clusterutils.Get(env.Ctx, env.Client, namespace, clusterName)
-			Expect(err).ToNot(HaveOccurred())
-			return cluster.Status.FirstRecoverabilityPoint, err
-		}, 30).ShouldNot(BeEmpty())
+			g.Expect(err).ToNot(HaveOccurred())
+			g.Expect(cluster.Status.FirstRecoverabilityPoint).ToNot(BeEmpty())
+		}, 30).Should(Succeed())
 	})
 
 	// Write a table and insert 2 entries on the "app" database

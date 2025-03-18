@@ -215,7 +215,8 @@ generate-manifest: manifests kustomize ## Generate manifest used for deployment.
 		$(KUSTOMIZE) edit set image controller="${CONTROLLER_IMG}" ;\
 		$(KUSTOMIZE) edit add patch --path env_override.yaml ;\
 		$(KUSTOMIZE) edit add configmap controller-manager-env \
-			--from-literal="POSTGRES_IMAGE_NAME=${POSTGRES_IMAGE_NAME}" ;\
+			--from-literal="POSTGRES_IMAGE_NAME=${POSTGRES_IMAGE_NAME}" \
+			--from-literal="STANDBY_TCP_USER_TIMEOUT=5000" ;\
 	} ;\
 	mkdir -p ${DIST_PATH} ;\
 	$(KUSTOMIZE) build $$CONFIG_TMP_DIR/default > ${OPERATOR_MANIFEST_PATH} ;\

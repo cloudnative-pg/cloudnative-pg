@@ -76,10 +76,10 @@ var _ = Describe("nodeSelector", Label(tests.LabelPodScheduling), func() {
 			// We check the error to verify that's the case
 			By("verifying that the pods can't be scheduled", func() {
 				timeout := 120
-				Eventually(func() bool {
+				Eventually(func(g Gomega) {
 					isPending := false
 					podList, err := pods.List(env.Ctx, env.Client, namespace)
-					Expect(err).ToNot(HaveOccurred())
+					g.Expect(err).ToNot(HaveOccurred())
 					if len(podList.Items) > 0 {
 						if len(podList.Items[0].Status.Conditions) > 0 {
 							if podList.Items[0].Status.Phase == "Pending" && strings.Contains(podList.Items[0].Status.Conditions[0].Message,
@@ -93,8 +93,8 @@ var _ = Describe("nodeSelector", Label(tests.LabelPodScheduling), func() {
 							}
 						}
 					}
-					return isPending
-				}, timeout).Should(BeEquivalentTo(true))
+					g.Expect(isPending).To(BeTrue())
+				}, timeout).Should(Succeed())
 			})
 		})
 	})
