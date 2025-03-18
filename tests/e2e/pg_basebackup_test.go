@@ -40,7 +40,7 @@ var _ = Describe("Bootstrap with pg_basebackup", Label(tests.LabelRecovery), fun
 	var namespace, srcClusterName string
 	var err error
 	BeforeEach(func() {
-		if testLevelEnv.Depth < int(level) {
+		if testLevel < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 	})

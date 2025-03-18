@@ -92,7 +92,7 @@ var _ = Describe("Verify Volume Snapshot",
 
 			var clusterName string
 			BeforeAll(func() {
-				if testLevelEnv.Depth < int(level) {
+				if testLevel < int(level) {
 					Skip("Test depth is lower than the amount requested for this test")
 				}
 				var err error
@@ -175,7 +175,7 @@ var _ = Describe("Verify Volume Snapshot",
 
 			var clusterToSnapshotName string
 			BeforeAll(func() {
-				if testLevelEnv.Depth < int(level) {
+				if testLevel < int(level) {
 					Skip("Test depth is lower than the amount requested for this test")
 				}
 
@@ -400,7 +400,7 @@ var _ = Describe("Verify Volume Snapshot",
 			}
 
 			BeforeAll(func() {
-				if testLevelEnv.Depth < int(level) {
+				if testLevel < int(level) {
 					Skip("Test depth is lower than the amount requested for this test")
 				}
 
@@ -636,7 +636,7 @@ var _ = Describe("Verify Volume Snapshot",
 			var clusterToSnapshotName string
 			var backupTaken *apiv1.Backup
 			BeforeAll(func() {
-				if testLevelEnv.Depth < int(level) {
+				if testLevel < int(level) {
 					Skip("Test depth is lower than the amount requested for this test")
 				}
 

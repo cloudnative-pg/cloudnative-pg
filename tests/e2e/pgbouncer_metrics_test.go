@@ -42,7 +42,7 @@ var _ = Describe("PGBouncer Metrics", Label(tests.LabelObservability), func() {
 	)
 	var namespace, clusterName string
 	BeforeEach(func() {
-		if testLevelEnv.Depth < int(level) {
+		if testLevel < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 	})

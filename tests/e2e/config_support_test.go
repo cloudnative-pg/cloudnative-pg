@@ -51,7 +51,7 @@ var _ = Describe("Config support", Serial, Ordered, Label(tests.LabelDisruptive,
 	var initialSecret *corev1.Secret
 
 	BeforeEach(func() {
-		if testLevelEnv.Depth < int(level) {
+		if testLevel < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 	})

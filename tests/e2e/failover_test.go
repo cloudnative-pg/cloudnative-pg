@@ -44,7 +44,7 @@ var _ = Describe("Failover", Label(tests.LabelSelfHealing), func() {
 		level = tests.Medium
 	)
 	BeforeEach(func() {
-		if testLevelEnv.Depth < int(level) {
+		if testLevel < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 	})

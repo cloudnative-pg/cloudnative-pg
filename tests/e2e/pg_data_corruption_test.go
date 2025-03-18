@@ -46,7 +46,7 @@ var _ = Describe("PGDATA Corruption", Label(tests.LabelRecovery), Ordered, func(
 	)
 	var namespace string
 	BeforeAll(func() {
-		if testLevelEnv.Depth < int(level) {
+		if testLevel < int(level) {
 			Skip("Test depth is lower than the amount requested for this test")
 		}
 		var err error
