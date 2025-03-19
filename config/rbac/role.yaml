@@ -38,6 +38,7 @@ rules:
   - ""
   resources:
   - nodes
+  - persistentvolumes
   verbs:
   - get
   - list
@@ -111,6 +112,24 @@ rules:
   - create
   - get
   - update
+- apiGroups:
+  - groupsnapshot.storage.k8s.io
+  resources:
+  - volumegroupsnapshotcontents
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - groupsnapshot.storage.k8s.io
+  resources:
+  - volumegroupsnapshots
+  verbs:
+  - create
+  - get
+  - list
+  - patch
+  - watch
 - apiGroups:
   - monitoring.coreos.com
   resources:
