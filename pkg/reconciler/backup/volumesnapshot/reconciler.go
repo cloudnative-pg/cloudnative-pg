@@ -159,7 +159,7 @@ func (se *Reconciler) Reconcile(
 	contextLogger := log.FromContext(ctx).WithName("volumesnapshot_reconciler")
 
 	res, err := se.internalReconcile(ctx, cluster, backup, targetPod, pvcs)
-	if isErrorRetryable(err) {
+	if isNetworkErrorRetryable(err) {
 		contextLogger.Error(err, "detected retryable error while executing snapshot backup, retrying...")
 		return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 	}
