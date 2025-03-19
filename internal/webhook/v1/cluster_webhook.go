@@ -1268,6 +1268,17 @@ func (v *ClusterCustomValidator) validateImageChange(r, old *apiv1.Cluster) fiel
 					oldVersion.Major(), newVersion.Major())))
 	}
 
+	// TODO: Upgrading to versions 14 and 15 would require carrying information around about the collation used.
+	//   See https://git.postgresql.org/gitweb/?p=postgresql.git;a=commitdiff;h=9637badd9.
+	//   This is not implemented yet, and users should not upgrade to old versions anyway, so we are blocking it.
+	if oldVersion.Major() < newVersion.Major() && newVersion.Major() < 16 {
+		result = append(
+			result,
+			field.Invalid(
+				fieldPath,
+				fmt.Sprintf("%v", newVersion.Major()),
+				"major upgrades are only supported to version 16 or higher"))
+	}
 	return result
 }
 
