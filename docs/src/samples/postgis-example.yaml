@@ -3,15 +3,25 @@ kind: Cluster
 metadata:
   name: postgis-example
 spec:
-  instances: 3
-  imageName: ghcr.io/cloudnative-pg/postgis:14
-  bootstrap:
-    initdb:
-      postInitTemplateSQL:
-        - CREATE EXTENSION postgis;
-        - CREATE EXTENSION postgis_topology;
-        - CREATE EXTENSION fuzzystrmatch;
-        - CREATE EXTENSION postgis_tiger_geocoder;
-
+  instances: 1
+  imageName: ghcr.io/cloudnative-pg/postgis:17
   storage:
     size: 1Gi
+  postgresql:
+    parameters:
+      log_statement: ddl
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: postgis-example-app
+spec:
+  name: app
+  owner: app
+  cluster:
+    name: postgis-example
+  extensions:
+  - name: postgis
+  - name: postgis_topology
+  - name: fuzzystrmatch
+  - name: postgis_tiger_geocoder

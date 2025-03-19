@@ -46,7 +46,7 @@ do this in two ways:
 
 ## Create a new PostgreSQL cluster with PostGIS
 
-Let's suppose you want to create a new PostgreSQL 14 cluster with PostGIS 3.2.
+Let's suppose you want to create a new PostgreSQL 17 cluster with PostGIS 3.2.
 
 The first step is to ensure you use the right PostGIS container image for the
 operand, and properly set the `.spec.imageName` option in the `Cluster`
@@ -59,7 +59,7 @@ provides some guidance on how the creation of a PostGIS cluster can be done.
     Please consider that, although convention over configuration applies in
     CloudNativePG, you should spend time configuring and tuning your system for
     production. Also the `imageName` in the example below deliberately points
-    to the latest available image for PostgreSQL 14 - you should use a specific
+    to the latest available image for PostgreSQL 17 - you should use a specific
     image name or, preferably, the SHA256 digest for true immutability.
 
 ```yaml
@@ -68,71 +68,75 @@ kind: Cluster
 metadata:
   name: postgis-example
 spec:
-  instances: 3
-  imageName: ghcr.io/cloudnative-pg/postgis:14
-  bootstrap:
-    initdb:
-      postInitTemplateSQL:
-        - CREATE EXTENSION postgis;
-        - CREATE EXTENSION postgis_topology;
-        - CREATE EXTENSION fuzzystrmatch;
-        - CREATE EXTENSION postgis_tiger_geocoder;
-
+  instances: 1
+  imageName: ghcr.io/cloudnative-pg/postgis:17
   storage:
     size: 1Gi
+  postgresql:
+    parameters:
+      log_statement: ddl
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: postgis-example-app
+spec:
+  name: app
+  owner: app
+  cluster:
+    name: postgis-example
+  extensions:
+  - name: postgis
+  - name: postgis_topology
+  - name: fuzzystrmatch
+  - name: postgis_tiger_geocoder
 ```
 
-The example relies on the `postInitTemplateSQL` option which executes a list of
-queries against the `template1` database, before the actual creation of the
-application database (called `app`). This means that, once you have applied the
-manifest and the cluster is up, you will have the above extensions installed in
-both the template database and the application database, ready for use.
+The example leverages the `Database` resource's declarative extension
+management to add the specified extensions to the `app` database.
 
 !!! Info
-    Take some time and look at the available options in `.spec.bootstrap.initdb`
-    from the [API reference](cloudnative-pg.v1.md#postgresql-cnpg-io-v1-BootstrapInitDB), such as
-    `postInitApplicationSQL`.
+    For more details, see the
+    ["Managing Extensions in a Database" section](declarative_database_management.md#managing-extensions-in-a-database).
 
 You can easily verify the available version of PostGIS that is in the
 container, by connecting to the `app` database (you might obtain different
 values from the ones in this document):
 
 ```console
-$ kubectl exec -ti postgis-example-1 -- psql app
-Defaulted container "postgres" out of: postgres, bootstrap-controller (init)
-psql (17.4 (Debian 17.4-1.pgdg110+1))
+$ kubectl cnpg psql postgis-example -- app
+psql (17.4 (Debian 17.4-1.pgdg110+2))
 Type "help" for help.
 
 app=# SELECT * FROM pg_available_extensions WHERE name ~ '^postgis' ORDER BY 1;
            name           | default_version | installed_version |                          comment
 --------------------------+-----------------+-------------------+------------------------------------------------------------
- postgis                  | 3.2.2           | 3.2.2             | PostGIS geometry and geography spatial types and functions
- postgis-3                | 3.2.2           |                   | PostGIS geometry and geography spatial types and functions
- postgis_raster           | 3.2.2           |                   | PostGIS raster types and functions
- postgis_raster-3         | 3.2.2           |                   | PostGIS raster types and functions
- postgis_sfcgal           | 3.2.2           |                   | PostGIS SFCGAL functions
- postgis_sfcgal-3         | 3.2.2           |                   | PostGIS SFCGAL functions
- postgis_tiger_geocoder   | 3.2.2           | 3.2.2             | PostGIS tiger geocoder and reverse geocoder
- postgis_tiger_geocoder-3 | 3.2.2           |                   | PostGIS tiger geocoder and reverse geocoder
- postgis_topology         | 3.2.2           | 3.2.2             | PostGIS topology spatial types and functions
- postgis_topology-3       | 3.2.2           |                   | PostGIS topology spatial types and functions
+ postgis                  | 3.5.2           | 3.5.2             | PostGIS geometry and geography spatial types and functions
+ postgis-3                | 3.5.2           |                   | PostGIS geometry and geography spatial types and functions
+ postgis_raster           | 3.5.2           |                   | PostGIS raster types and functions
+ postgis_raster-3         | 3.5.2           |                   | PostGIS raster types and functions
+ postgis_sfcgal           | 3.5.2           |                   | PostGIS SFCGAL functions
+ postgis_sfcgal-3         | 3.5.2           |                   | PostGIS SFCGAL functions
+ postgis_tiger_geocoder   | 3.5.2           | 3.5.2             | PostGIS tiger geocoder and reverse geocoder
+ postgis_tiger_geocoder-3 | 3.5.2           |                   | PostGIS tiger geocoder and reverse geocoder
+ postgis_topology         | 3.5.2           | 3.5.2             | PostGIS topology spatial types and functions
+ postgis_topology-3       | 3.5.2           |                   | PostGIS topology spatial types and functions
 (10 rows)
 ```
 
-The next step is to verify that the extensions listed in the
-`postInitTemplateSQL` section have been correctly installed in the `app`
-database.
+The next step is to verify that the extensions listed in the `Database`
+resource have been correctly installed in the `app` database.
 
 ```console
 app=# \dx
                                         List of installed extensions
           Name          | Version |   Schema   |                        Description
 ------------------------+---------+------------+------------------------------------------------------------
- fuzzystrmatch          | 1.1     | public     | determine similarities and distance between strings
+ fuzzystrmatch          | 1.2     | public     | determine similarities and distance between strings
  plpgsql                | 1.0     | pg_catalog | PL/pgSQL procedural language
- postgis                | 3.2.2   | public     | PostGIS geometry and geography spatial types and functions
- postgis_tiger_geocoder | 3.2.2   | tiger      | PostGIS tiger geocoder and reverse geocoder
- postgis_topology       | 3.2.2   | topology   | PostGIS topology spatial types and functions
+ postgis                | 3.5.2   | public     | PostGIS geometry and geography spatial types and functions
+ postgis_tiger_geocoder | 3.5.2   | tiger      | PostGIS tiger geocoder and reverse geocoder
+ postgis_topology       | 3.5.2   | topology   | PostGIS topology spatial types and functions
 (5 rows)
 ```
 
@@ -142,6 +146,6 @@ Finally:
 app=# SELECT postgis_full_version();
                                                                             postgis_full_version
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
- POSTGIS="3.2.2 628da50" [EXTENSION] PGSQL="140" GEOS="3.9.0-CAPI-1.16.2" PROJ="7.2.1" LIBXML="2.9.10" LIBJSON="0.15" LIBPROTOBUF="1.3.3" WAGYU="0.5.0 (Internal)" TOPOLOGY
+ POSTGIS="3.5.2 dea6d0a" [EXTENSION] PGSQL="170" GEOS="3.9.0-CAPI-1.16.2" PROJ="7.2.1 NETWORK_ENABLED=OFF URL_ENDPOINT=https://cdn.proj.org USER_WRITABLE_DIRECTORY=/tmp/proj DATABASE_PATH=/usr/share/proj/proj.db" (compiled against PROJ 7.2.1) LIBXML="2.9.10" LIBJSON="0.15" LIBPROTOBUF="1.3.3" WAGYU="0.5.0 (Internal)" TOPOLOGY
 (1 row)
 ```
