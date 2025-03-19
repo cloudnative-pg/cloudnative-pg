@@ -230,6 +230,11 @@ CloudNativePG manages the following predefined annotations:
 `kubectl.kubernetes.io/restartedAt`
 :   When available, the time of last requested restart of a Postgres cluster.
 
+`cnpg.io/volumeSnapshotDeadline`
+:   Allows the user to control how long the operator should retry
+    recoverable errors before considering the volume snapshot backup
+    failed. In minutes, defaulting to 10.
+
 ## Prerequisites
 
 By default, no label or annotation defined in the cluster's metadata is

@@ -619,10 +619,9 @@ func isDeadlineExceeded(backup *apiv1.Backup) (bool, error) {
 		return false, fmt.Errorf("while unmarshalling plugin metadata: %w", err)
 	}
 
-	deadlineMinutes := backup.GetVolumeSnapshotDeadline()
-
-	// if deadlineMinutes have passed since firstFailureTime we need to consider the deadline exceeded
-	return time.Now().Unix()-data.VolumeSnapshotFirstDetectedFailure > int64(deadlineMinutes*60), nil
+	// if the deadline have passed since firstFailureTime we need to consider the deadline exceeded
+	deadline := int64(backup.GetVolumeSnapshotDeadline().Seconds())
+	return time.Now().Unix()-data.VolumeSnapshotFirstDetectedFailure > deadline, nil
 }
 
 type metadata struct {
