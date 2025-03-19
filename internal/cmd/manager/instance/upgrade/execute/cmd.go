@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/blang/semver"
+	"github.com/cloudnative-pg/machinery/pkg/env"
 	"github.com/cloudnative-pg/machinery/pkg/execlog"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/fileutils/compatibility"
@@ -97,17 +98,10 @@ func NewCmd() *cobra.Command {
 		"the cluster and of the Pod in k8s")
 	cmd.Flags().StringVar(&clusterName, "cluster-name", os.Getenv("CLUSTER_NAME"), "The name of "+
 		"the current cluster in k8s, used to download TLS certificates")
-	cmd.Flags().StringVar(&pgUpgrade, "pg-upgrade", getEnvOrDefault("PG_UPGRADE", "pg_upgrade"),
+	cmd.Flags().StringVar(&pgUpgrade, "pg-upgrade", env.GetOrDefault("PG_UPGRADE", "pg_upgrade"),
 		`The path of "pg_upgrade" executable. Defaults to "pg_upgrade".`)
 
 	return cmd
-}
-
-func getEnvOrDefault(env, def string) string {
-	if value, ok := os.LookupEnv(env); ok {
-		return value
-	}
-	return def
 }
 
 func upgradeSubCommand(
@@ -189,7 +183,6 @@ func upgradeSubCommand(
 		contextLogger.Info("Ensuring the new pg_wal directory does not exist", "directory", *newWalDir)
 		if err := os.RemoveAll(*newWalDir); err != nil {
 			return fmt.Errorf("failed to remove the directory: %w", err)
-
 		}
 	}
 
