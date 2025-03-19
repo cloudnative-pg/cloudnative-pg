@@ -123,7 +123,7 @@ version of PostgreSQL, we might not be able to help you.
 |---------|--------------|---------------|
 | 1.26.0  | Mar, 2025    | Aug/Sep, 2025 |
 | 1.27.0  | Jun, 2025    | Dec, 2025     |
-| 1.28.0  | Sep, 2025    | Mar/Apr, 2025 |
+| 1.28.0  | Sep, 2025    | Mar/Apr, 2026 |
 
 !!! Note
     Feature freeze occurs 1-2 weeks before the release, at which point a
