@@ -242,7 +242,95 @@ referenced in the `.spec.backup.volumeSnapshot.className` option.
 Please refer to the [Kubernetes documentation on Volume Snapshot Classes](https://kubernetes.io/docs/concepts/storage/volume-snapshot-classes/)
 for details on this standard behavior.
 
-## Example
+## Backup Volume Snapshot Deadlines
+
+CloudNativePG supports backups using the volume snapshot method. In some
+environments, volume snapshots may encounter temporary issues that can be
+retried.
+
+The `backup.cnpg.io/volumeSnapshotDeadline` annotation defines how long
+CloudNativePG should continue retrying recoverable errors before marking the
+backup as failed.
+
+You can add the `backup.cnpg.io/volumeSnapshotDeadline` annotation to both
+`Backup` and `ScheduledBackup` resources. For `ScheduledBackup` resources, this
+annotation is automatically inherited by any `Backup` resources created from
+the schedule.
+
+If not specified, the default retry deadline is **10 minutes**.
+
+### Error Handling
+
+When a retryable error occurs during a volume snapshot operation:
+
+1. CloudNativePG records the time of the first error.
+2. The system retries the operation every **10 seconds**.
+3. If the error persists beyond the specified deadline (or the default 10
+   minutes), the backup is marked as **failed**.
+
+### Retryable Errors
+
+CloudNativePG treats the following types of errors as retryable:
+
+- **Server timeout errors** (HTTP 408, 429, 500, 502, 503, 504)
+- **Conflicts** (optimistic locking errors)
+- **Internal errors**
+- **Context deadline exceeded errors**
+- **Timeout errors from the CSI snapshot controller**
+
+### Examples
+
+You can add the annotation to a `ScheduledBackup` resource as follows:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: daily-backup-schedule
+  annotations:
+    backup.cnpg.io/volumeSnapshotDeadline: "20"
+spec:
+  schedule: "0 0 * * *"
+  backupOwnerReference: self
+  method: volumeSnapshot
+  # other configuration...
+```
+
+When you define a `ScheduledBackup` with the annotation, any `Backup` resources
+created from this schedule automatically inherit the specified timeout value.
+
+In the following example, all backups created from the schedule will have a
+30-minute timeout for retrying recoverable snapshot errors.
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: weekly-backup
+  annotations:
+    backup.cnpg.io/volumeSnapshotDeadline: "30"
+spec:
+  schedule: "0 0 * * 0"  # Weekly backup on Sunday
+  method: volumeSnapshot
+  cluster:
+    name: my-postgresql-cluster
+```
+
+Alternatively, you can add the annotation directly to a `Backup` Resource:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Backup
+metadata:
+  name: my-backup
+  annotations:
+    backup.cnpg.io/volumeSnapshotDeadline: "15"
+spec:
+  method: volumeSnapshot
+  # other backup configuration...
+```
+
+## Example of Volume Snapshot Backup
 
 The following example shows how to configure volume snapshot base backups on an
 EKS cluster on AWS using the `ebs-sc` storage class and the `csi-aws-vsc`
