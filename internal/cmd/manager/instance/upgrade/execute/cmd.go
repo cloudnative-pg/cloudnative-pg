@@ -224,6 +224,12 @@ func upgradeSubCommand(
 	}
 
 	contextLogger.Info("Running pg_upgrade")
+
+	// We need to make sure that the permissions are the right ones
+	// in some systems they may be messed up even if we fix them before
+	_ = fileutils.EnsurePgDataPerms(pgData)
+	_ = fileutils.EnsurePgDataPerms(newDataDir)
+
 	if err := runPgUpgrade(pgData, pgUpgrade, newDataDir, oldBinDir); err != nil {
 		// TODO: in case of failures we should dump the content of the pg_upgrade logs
 		return fmt.Errorf("error while running pg_upgrade: %w", err)
