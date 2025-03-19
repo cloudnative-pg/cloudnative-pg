@@ -184,6 +184,15 @@ func upgradeSubCommand(
 	if err := os.RemoveAll(newDataDir); err != nil {
 		return fmt.Errorf("failed to remove the directory: %w", err)
 	}
+
+	if newWalDir != nil {
+		contextLogger.Info("Ensuring the new pg_wal directory does not exist", "directory", *newWalDir)
+		if err := os.RemoveAll(*newWalDir); err != nil {
+			return fmt.Errorf("failed to remove the directory: %w", err)
+
+		}
+	}
+
 	contextLogger.Info("Creating data directory", "directory", newDataDir)
 	if err := runInitDB(newDataDir, newWalDir); err != nil {
 		return fmt.Errorf("error while creating the data directory: %w", err)
