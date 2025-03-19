@@ -124,8 +124,8 @@ app=# SELECT * FROM pg_available_extensions WHERE name ~ '^postgis' ORDER BY 1;
 (10 rows)
 ```
 
-The next step is to verify that the extensions listed in the `Database` resouce
-have been correctly installed in the `app` database.
+The next step is to verify that the extensions listed in the `Database`
+resource have been correctly installed in the `app` database.
 
 ```console
 app=# \dx
