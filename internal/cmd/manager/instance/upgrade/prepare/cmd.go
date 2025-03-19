@@ -106,6 +106,14 @@ func copyPostgresInstallation(ctx context.Context, pgConfig string, dest string)
 		}
 
 		contextLogger.Info("Copying the files", "source", sourceDir, "destination", destDir)
+
+		// We use "cp" instead of os.CopyFS because the latter doesn't
+		// support symbolic links as of Go 1.24 and we don't want to
+		// include any other dependencies in the project nor
+		// re-implementing the wheel.
+		//
+		// This should be re-evaluated in the future and the
+		// requirement to have "cp" in the image should be removed.
 		if err := exec.Command("cp", "-a", sourceDir+"/.", destDir).Run(); err != nil { //nolint:gosec
 			return fmt.Errorf("failed to copy the files: %w", err)
 		}
