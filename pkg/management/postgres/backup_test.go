@@ -150,23 +150,33 @@ var _ = Describe("testing backup command", func() {
 
 var _ = Describe("generate backup options", func() {
 	const namespace = "test"
-	capabilities, err := barmanCapabilities.CurrentCapabilities()
-	Expect(err).ShouldNot(HaveOccurred())
-	cluster := &apiv1.Cluster{
-		ObjectMeta: metav1.ObjectMeta{Name: "test-cluster", Namespace: namespace},
-		Spec: apiv1.ClusterSpec{
-			Backup: &apiv1.BackupConfiguration{
-				BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{
-					Data: &apiv1.DataBackupConfiguration{
-						Compression:         "gzip",
-						Encryption:          "aes256",
-						ImmediateCheckpoint: true,
-						Jobs:                ptr.To(int32(2)),
+
+	var (
+		capabilities *barmanCapabilities.Capabilities
+		cluster      *apiv1.Cluster
+	)
+
+	BeforeEach(func() {
+		var err error
+		capabilities, err = barmanCapabilities.CurrentCapabilities()
+		Expect(err).ShouldNot(HaveOccurred())
+
+		cluster = &apiv1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{Name: "test-cluster", Namespace: namespace},
+			Spec: apiv1.ClusterSpec{
+				Backup: &apiv1.BackupConfiguration{
+					BarmanObjectStore: &apiv1.BarmanObjectStoreConfiguration{
+						Data: &apiv1.DataBackupConfiguration{
+							Compression:         "gzip",
+							Encryption:          "aes256",
+							ImmediateCheckpoint: true,
+							Jobs:                ptr.To(int32(2)),
+						},
 					},
 				},
 			},
-		},
-	}
+		}
+	})
 
 	It("should generate correct options", func() {
 		extraOptions := []string{"--min-chunk-size=5MB", "--read-timeout=60", "-vv"}
