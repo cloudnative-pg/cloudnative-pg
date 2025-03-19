@@ -84,16 +84,16 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 				Expect(err).ToNot(HaveOccurred())
 
 				// Expect only 2 instances to be up and running
-				Eventually(func() int32 {
+				Eventually(func(g Gomega) {
 					podList := &corev1.PodList{}
 					err := env.Client.List(
 						env.Ctx, podList,
 						ctrlclient.InNamespace(namespace),
 						ctrlclient.MatchingLabels{utils.ClusterLabelName: clusterName},
 					)
-					Expect(err).ToNot(HaveOccurred())
-					return int32(len(podList.Items))
-				}, 120).Should(BeEquivalentTo(2))
+					g.Expect(err).ToNot(HaveOccurred())
+					g.Expect(podList.Items).To(HaveLen(2))
+				}, 120).Should(Succeed())
 
 				// And to stay like that
 				Consistently(func() int32 {
@@ -183,15 +183,15 @@ var _ = Describe("Operator unavailable", Serial, Label(tests.LabelDisruptive, te
 				wg.Wait()
 
 				// Expect only 2 instances to be up and running
-				Eventually(func() int32 {
+				Eventually(func(g Gomega) {
 					podList := &corev1.PodList{}
 					err := env.Client.List(
 						env.Ctx, podList, ctrlclient.InNamespace(namespace),
 						ctrlclient.MatchingLabels{utils.ClusterLabelName: "operator-unavailable"},
 					)
-					Expect(err).ToNot(HaveOccurred())
-					return int32(len(utils.FilterActivePods(podList.Items)))
-				}, 120).Should(BeEquivalentTo(2))
+					g.Expect(err).ToNot(HaveOccurred())
+					g.Expect(utils.FilterActivePods(podList.Items)).To(HaveLen(2))
+				}, 120).Should(Succeed())
 			})
 
 			By("verifying a new operator pod is now back", func() {

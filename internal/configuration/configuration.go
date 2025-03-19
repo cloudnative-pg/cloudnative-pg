@@ -126,7 +126,15 @@ type Data struct {
 	// included in the Cluster reconciliation
 	IncludePlugins string `json:"includePlugins" env:"INCLUDE_PLUGINS"`
 
-	// DrainTaints is a list of taints the operator will watch and treat as Unschedule
+	// StandbyTCPUserTimeout configuration parameter allows you to
+	// specify a custom TCP user timeout for the standby PostgreSQL
+	// server's connection to the primary server. This timeout is
+	// added as a tcp_user_timeout option to the primary_conninfo
+	// string, which is used by the standby server to connect to the
+	// primary server in CloudNativePG.
+	StandbyTCPUserTimeout int `json:"standbyTcpUserTimeout" env:"STANDBY_TCP_USER_TIMEOUT"`
+
+  // DrainTaints is a list of taints the operator will watch and treat as Unschedule
 	DrainTaints []string `json:"drainTaints" env:"DRAIN_TAINTS"`
 }
 
@@ -143,7 +151,8 @@ func newDefaultConfig() *Data {
 		CreateAnyService:       false,
 		CertificateDuration:    CertificateDuration,
 		ExpiringCheckThreshold: ExpiringCheckThreshold,
-		DrainTaints: []string{
+		StandbyTCPUserTimeout:  0,
+    DrainTaints: []string{
 			"node.kubernetes.io/unschedulable",
 			"ToBeDeletedByClusterAutoscaler",
 			"karpenter.sh/disrupted",
