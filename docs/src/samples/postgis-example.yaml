@@ -1,9 +1,9 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: postgis-17
+  name: postgis-example
 spec:
-  instances: 3
+  instances: 1
   imageName: ghcr.io/cloudnative-pg/postgis:17
   storage:
     size: 1Gi
@@ -14,18 +14,14 @@ spec:
 apiVersion: postgresql.cnpg.io/v1
 kind: Database
 metadata:
-  name: postgis-17-app
+  name: postgis-example-app
 spec:
   name: app
   owner: app
   cluster:
-    name: postgis-17
+    name: postgis-example
   extensions:
   - name: postgis
-    ensure: present
   - name: postgis_topology
-    ensure: present
   - name: fuzzystrmatch
-    ensure: present
   - name: postgis_tiger_geocoder
-    ensure: present

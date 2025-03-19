@@ -46,7 +46,7 @@ do this in two ways:
 
 ## Create a new PostgreSQL cluster with PostGIS
 
-Let's suppose you want to create a new PostgreSQL 14 cluster with PostGIS 3.2.
+Let's suppose you want to create a new PostgreSQL 17 cluster with PostGIS 3.2.
 
 The first step is to ensure you use the right PostGIS container image for the
 operand, and properly set the `.spec.imageName` option in the `Cluster`
@@ -66,32 +66,30 @@ provides some guidance on how the creation of a PostGIS cluster can be done.
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: postgis-17
+  name: postgis-example
 spec:
-  instances: 3
+  instances: 1
   imageName: ghcr.io/cloudnative-pg/postgis:17
-
   storage:
     size: 1Gi
+  postgresql:
+    parameters:
+      log_statement: ddl
 ---
 apiVersion: postgresql.cnpg.io/v1
 kind: Database
 metadata:
-  name: postgis-17-app
+  name: postgis-example-app
 spec:
   name: app
   owner: app
   cluster:
-    name: postgis-17
+    name: postgis-example
   extensions:
   - name: postgis
-    ensure: present
   - name: postgis_topology
-    ensure: present
   - name: fuzzystrmatch
-    ensure: present
   - name: postgis_tiger_geocoder
-    ensure: present
 ```
 
 The example leverages the `Database` resource's declarative extension
@@ -106,7 +104,7 @@ container, by connecting to the `app` database (you might obtain different
 values from the ones in this document):
 
 ```console
-$ kubectl cnpg psql postgis-17 -- app
+$ kubectl cnpg psql postgis-example -- app
 psql (17.4 (Debian 17.4-1.pgdg110+2))
 Type "help" for help.
 
