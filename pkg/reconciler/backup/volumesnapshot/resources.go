@@ -78,7 +78,7 @@ func (err volumeSnapshotError) isRetryable() bool {
 		return false
 	}
 
-	return isRetriableErrorMessage(*err.InternalError.Message)
+	return isCSIErrorMessageRetriable(*err.InternalError.Message)
 }
 
 // slice represents a slice of []storagesnapshotv1.VolumeSnapshot

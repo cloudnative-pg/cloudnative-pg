@@ -31,17 +31,27 @@ var (
 	httpStatusCodeRegex  = regexp.MustCompile(`HTTPStatusCode:\s(\d{3})`)
 )
 
-// isErrorRetryable detects is an error is retryable or not
-func isErrorRetryable(err error) bool {
+// isErrorRetryable detects is an error is retryable or not.
+//
+// Important: this function is intended for detecting errors that
+// occur during communication between the operator and the Kubernetes
+// API server, as well as between the operator and the instance
+// manager.
+// It is not designed to  check errors raised  by the CSI  driver and
+// exposed by the CSI snapshotter sidecar.
+func isNetworkErrorRetryable(err error) bool {
 	return apierrs.IsServerTimeout(err) || apierrs.IsConflict(err) || apierrs.IsInternalError(err) ||
 		errors.Is(err, context.DeadlineExceeded)
 }
 
-// isRetriableErrorMessage detects if a certain error message belongs
-// to a retriable error or not. This is obviously an heuristic but
-// unfortunately we don't have that information exposed in the
-// Kubernetes VolumeSnapshot API and the CSI driver haven't that too.
-func isRetriableErrorMessage(msg string) bool {
+// isCSIErrorMessageRetriable detects if a certain error message
+// raised by the CSI driver corresponds to a retriable error or
+// not.
+//
+// It relies on heuristics, as this information is not available in
+// the Kubernetes VolumeSnapshot API, and the CSI driver does not
+// expose it either.
+func isCSIErrorMessageRetriable(msg string) bool {
 	isRetryableFuncs := []func(string) bool{
 		isExplicitlyRetriableError,
 		isRetryableHTTPError,

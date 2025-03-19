@@ -32,7 +32,7 @@ var _ = Describe("Retriable error messages", func() {
 	DescribeTable(
 		"Retriable error messages",
 		func(msg string, isRetriable bool) {
-			Expect(isRetriableErrorMessage(msg)).To(Equal(isRetriable))
+			Expect(isCSIErrorMessageRetriable(msg)).To(Equal(isRetriable))
 		},
 		Entry("conflict", "Hey, the object has been modified!", true),
 		Entry("non-retriable error", "VolumeSnapshotClass not found", false),
@@ -66,34 +66,34 @@ var _ = Describe("Retriable error messages", func() {
 	})
 })
 
-var _ = Describe("isErrorRetryable", func() {
+var _ = Describe("isNetworkErrorRetryable", func() {
 	It("recognizes server timeout errors", func() {
 		err := apierrs.NewServerTimeout(schema.GroupResource{}, "test", 1)
-		Expect(isErrorRetryable(err)).To(BeTrue())
+		Expect(isNetworkErrorRetryable(err)).To(BeTrue())
 	})
 
 	It("recognizes conflict errors", func() {
 		err := apierrs.NewConflict(schema.GroupResource{}, "test", nil)
-		Expect(isErrorRetryable(err)).To(BeTrue())
+		Expect(isNetworkErrorRetryable(err)).To(BeTrue())
 	})
 
 	It("recognizes internal errors", func() {
 		err := apierrs.NewInternalError(fmt.Errorf("test error"))
-		Expect(isErrorRetryable(err)).To(BeTrue())
+		Expect(isNetworkErrorRetryable(err)).To(BeTrue())
 	})
 
 	It("recognizes context deadline exceeded errors", func() {
 		err := context.DeadlineExceeded
-		Expect(isErrorRetryable(err)).To(BeTrue())
+		Expect(isNetworkErrorRetryable(err)).To(BeTrue())
 	})
 
 	It("does not retry on not found errors", func() {
 		err := apierrs.NewNotFound(schema.GroupResource{}, "test")
-		Expect(isErrorRetryable(err)).To(BeFalse())
+		Expect(isNetworkErrorRetryable(err)).To(BeFalse())
 	})
 
 	It("does not retry on random errors", func() {
 		err := errors.New("random error")
-		Expect(isErrorRetryable(err)).To(BeFalse())
+		Expect(isNetworkErrorRetryable(err)).To(BeFalse())
 	})
 })
