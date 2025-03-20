@@ -895,33 +895,47 @@ PVCs:
 kubectl cnpg destroy cluster-example 2
 ```
 
-### Cluster hibernation
+### Cluster Hibernation
 
-Sometimes you may want to suspend the execution of a CloudNativePG `Cluster`
-while retaining its data, then resume its activity at a later time. We've
-called this feature **cluster hibernation**.
+There are times when you may need to temporarily suspend a CloudNativePG
+`Cluster` while preserving its data, allowing you to resume operations later.
+This feature is known as **cluster hibernation**.
+
+Hibernation is managed declaratively using the `cnpg.io/hibernation`
+annotation.
 
 !!! Info
-    Further details about the hibernation procedure can be found at the [Declarative Hibernation](declarative_hibernation.md) 
-    page.
+    For more details, see the ["Declarative Hibernation"](declarative_hibernation.md)
+    documentation page.
 
-You can hibernate a cluster with:
+To simplify the process, the `cnpg` plugin for `kubectl` provides a `hibernate`
+command, which acts as a convenient shortcut for applying the annotation.
+
+To hibernate a cluster, run:
 
 ```sh
 kubectl cnpg hibernate on CLUSTER
 ```
 
-A hibernated cluster can be resumed with:
+This command applies the `cnpg.io/hibernation=on` annotation to the cluster,
+suspending its execution.
+
+To resume a hibernated cluster, use:
 
 ```sh
 kubectl cnpg hibernate off CLUSTER
 ```
 
-Once the cluster has been hibernated, it's possible to show the status by running:
+This will remove the hibernation state by setting `cnpg.io/hibernation=off`.
+
+You can check the cluster’s status at any time with:
 
 ```sh
 kubectl cnpg status CLUSTER
 ```
+
+This will display the current state of the cluster, including whether it is
+hibernated.
 
 ### Benchmarking the database with pgbench
 
