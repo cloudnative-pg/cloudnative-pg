@@ -138,8 +138,8 @@ type Data struct {
 	// primary server in CloudNativePG.
 	StandbyTCPUserTimeout int `json:"standbyTcpUserTimeout" env:"STANDBY_TCP_USER_TIMEOUT"`
 
-	// KubernetesClusterDomain is used to generate the domain portion
-	// of the service FQDN. If not provided, "cluster.local" is used.
+	// KubernetesClusterDomain defines the domain suffix for service FQDNs
+	// within the Kubernetes cluster. If left unset, it defaults to `cluster.local`.
 	KubernetesClusterDomain string `json:"kubernetesClusterDomain" env:"KUBERNETES_CLUSTER_DOMAIN"`
 }
 
