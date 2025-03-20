@@ -2335,9 +2335,9 @@ func getSharedBuffersWarnings(r *apiv1.Cluster) admission.Warnings {
 		if _, err := strconv.Atoi(v); err == nil {
 			result = append(
 				result,
-				fmt.Sprintf("shared_buffers value '%s' is missing a unit qualifier (e.g., MB, GB). "+
-					"In future releases this will be an error. "+
-					"Please update your configuration to explicitly include units like '%sMB'.", v, v),
+				fmt.Sprintf("`shared_buffers` value '%s' is missing a unit (e.g., MB, GB). "+
+					"While this is currently allowed, future releases will require an explicit unit. "+
+					"Please update your configuration to specify a valid unit, such as '%sMB'.", v, v),
 			)
 		}
 	}
