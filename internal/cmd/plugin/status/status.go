@@ -268,11 +268,12 @@ func (fullStatus *PostgresqlStatus) printBasicInfo(ctx context.Context, k8sClien
 		summary.AddLine("Primary instance:", primaryInstance)
 	}
 
-	if hibernated {
+	switch {
+	case hibernated:
 		summary.AddLine("Status:", aurora.Red("Hibernated"))
-	} else if isPrimaryFenced {
+	case isPrimaryFenced:
 		summary.AddLine("Status:", aurora.Red("Primary instance is fenced"))
-	} else {
+	default:
 		// Avoid printing the start time when hibernated or fenced
 		primaryStartTime := getPrimaryStartTime(cluster)
 		if len(primaryStartTime) > 0 {
@@ -280,6 +281,7 @@ func (fullStatus *PostgresqlStatus) printBasicInfo(ctx context.Context, k8sClien
 		}
 		summary.AddLine("Status:", fullStatus.getStatus(cluster))
 	}
+
 	if cluster.Spec.Instances == cluster.Status.Instances {
 		summary.AddLine("Instances:", aurora.Green(cluster.Spec.Instances))
 	} else {
@@ -300,11 +302,12 @@ func (fullStatus *PostgresqlStatus) printBasicInfo(ctx context.Context, k8sClien
 	}
 
 	if clusterSizeErr != nil {
-		if hibernated {
+		switch {
+		case hibernated:
 			summary.AddLine("Size:", "- (hibernated)")
-		} else if isPrimaryFenced {
+		case isPrimaryFenced:
 			summary.AddLine("Size:", "- (fenced)")
-		} else {
+		default:
 			summary.AddLine("Size:", aurora.Red(clusterSizeErr.Error()))
 		}
 	} else {
