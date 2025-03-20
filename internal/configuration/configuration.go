@@ -39,6 +39,10 @@ const (
 
 	// ExpiringCheckThreshold is the default threshold to consider a certificate as expiring
 	ExpiringCheckThreshold = 7
+
+	// DefaultKubernetesClusterDomain is the default value used as
+	// Kubernetes cluster domain.
+	DefaultKubernetesClusterDomain = "cluster.local"
 )
 
 // DefaultPluginSocketDir is the default directory where the plugin sockets are located.
@@ -107,6 +111,10 @@ type Data struct {
 	// CreateAnyService is true when the user wants the operator to create
 	// the <cluster-name>-any service. Defaults to false.
 	CreateAnyService bool `json:"createAnyService" env:"CREATE_ANY_SERVICE"`
+
+	// KubernetesClusterDomain defines the domain suffix for service FQDNs
+	// within the Kubernetes cluster. If left unset, it defaults to `cluster.local`.
+	KubernetesClusterDomain string `json:"kubernetesClusterDomain" env:"KUBERNETES_CLUSTER_DOMAIN"`
 }
 
 // Current is the configuration used by the operator
@@ -115,13 +123,14 @@ var Current = NewConfiguration()
 // newDefaultConfig creates a configuration holding the defaults
 func newDefaultConfig() *Data {
 	return &Data{
-		OperatorPullSecretName: DefaultOperatorPullSecretName,
-		OperatorImageName:      versions.DefaultOperatorImageName,
-		PostgresImageName:      versions.DefaultImageName,
-		PluginSocketDir:        DefaultPluginSocketDir,
-		CreateAnyService:       false,
-		CertificateDuration:    CertificateDuration,
-		ExpiringCheckThreshold: ExpiringCheckThreshold,
+		OperatorPullSecretName:  DefaultOperatorPullSecretName,
+		OperatorImageName:       versions.DefaultOperatorImageName,
+		PostgresImageName:       versions.DefaultImageName,
+		PluginSocketDir:         DefaultPluginSocketDir,
+		CreateAnyService:        false,
+		CertificateDuration:     CertificateDuration,
+		ExpiringCheckThreshold:  ExpiringCheckThreshold,
+		KubernetesClusterDomain: DefaultKubernetesClusterDomain,
 	}
 }
 

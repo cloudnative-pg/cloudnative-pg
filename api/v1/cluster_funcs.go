@@ -1017,7 +1017,7 @@ func (cluster *Cluster) GetClusterAltDNSNames() []string {
 			serviceName,
 			fmt.Sprintf("%v.%v", serviceName, cluster.Namespace),
 			fmt.Sprintf("%v.%v.svc", serviceName, cluster.Namespace),
-			fmt.Sprintf("%v.%v.svc.cluster.local", serviceName, cluster.Namespace),
+			fmt.Sprintf("%v.%v.svc.%s", serviceName, cluster.Namespace, configuration.Current.KubernetesClusterDomain),
 		}
 	}
 	altDNSNames := slices.Concat(

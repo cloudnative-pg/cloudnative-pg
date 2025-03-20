@@ -153,6 +153,7 @@ EphemeralVolumesSizeLimit
 EphemeralVolumesSizeLimitConfiguration
 ExternalCluster
 FQDN
+FQDNs
 Fei
 Filesystem
 Fluentd
@@ -205,6 +206,7 @@ KinD
 Krew
 KubeCon
 Kubegres
+KubernetesClusterDomain
 Kumar
 LDAP
 LDAPBindAsAuth
@@ -872,6 +874,7 @@ kubebuilder
 kubectl
 kubelet
 kubernetes
+kubernetesClusterDomain
 labelColumnName
 labelColumnValue
 labelName

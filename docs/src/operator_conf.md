@@ -40,6 +40,7 @@ Name | Description
 `PULL_SECRET_NAME` | name of an additional pull secret to be defined in the operator's namespace and to be used to download images
 `ENABLE_AZURE_PVC_UPDATES` | Enables to delete Postgres pod if its PVC is stuck in Resizing condition. This feature is mainly for the Azure environment (default `false`)
 `ENABLE_INSTANCE_MANAGER_INPLACE_UPDATES` | when set to `true`, enables in-place updates of the instance manager after an update of the operator, avoiding rolling updates of the cluster (default `false`)
+`KUBERNETES_CLUSTER_DOMAIN` | Defines the domain suffix for service FQDNs within the Kubernetes cluster. If left unset, it defaults to "cluster.local".
 `MONITORING_QUERIES_CONFIGMAP` | The name of a ConfigMap in the operator's namespace with a set of default queries (to be specified under the key `queries`) to be applied to all created Clusters
 `MONITORING_QUERIES_SECRET` | The name of a Secret in the operator's namespace with a set of default queries (to be specified under the key `queries`) to be applied to all created Clusters
 `CERTIFICATE_DURATION` | Determines the lifetime of the generated certificates in days. Default is 90.
