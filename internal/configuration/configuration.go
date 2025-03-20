@@ -40,6 +40,10 @@ const (
 
 	// ExpiringCheckThreshold is the default threshold to consider a certificate as expiring
 	ExpiringCheckThreshold = 7
+
+	// DefaultKubernetesClusterDomain is the default value used as
+	// Kubernetes cluster domain.
+	DefaultKubernetesClusterDomain = "cluster.local"
 )
 
 // DefaultPluginSocketDir is the default directory where the plugin sockets are located.
@@ -133,6 +137,10 @@ type Data struct {
 	// string, which is used by the standby server to connect to the
 	// primary server in CloudNativePG.
 	StandbyTCPUserTimeout int `json:"standbyTcpUserTimeout" env:"STANDBY_TCP_USER_TIMEOUT"`
+
+	// KubernetesClusterDomain defines the domain suffix for service FQDNs
+	// within the Kubernetes cluster. If left unset, it defaults to `cluster.local`.
+	KubernetesClusterDomain string `json:"kubernetesClusterDomain" env:"KUBERNETES_CLUSTER_DOMAIN"`
 }
 
 // Current is the configuration used by the operator
@@ -141,14 +149,15 @@ var Current = NewConfiguration()
 // newDefaultConfig creates a configuration holding the defaults
 func newDefaultConfig() *Data {
 	return &Data{
-		OperatorPullSecretName: DefaultOperatorPullSecretName,
-		OperatorImageName:      versions.DefaultOperatorImageName,
-		PostgresImageName:      versions.DefaultImageName,
-		PluginSocketDir:        DefaultPluginSocketDir,
-		CreateAnyService:       false,
-		CertificateDuration:    CertificateDuration,
-		ExpiringCheckThreshold: ExpiringCheckThreshold,
-		StandbyTCPUserTimeout:  0,
+		OperatorPullSecretName:  DefaultOperatorPullSecretName,
+		OperatorImageName:       versions.DefaultOperatorImageName,
+		PostgresImageName:       versions.DefaultImageName,
+		PluginSocketDir:         DefaultPluginSocketDir,
+		CreateAnyService:        false,
+		CertificateDuration:     CertificateDuration,
+		ExpiringCheckThreshold:  ExpiringCheckThreshold,
+		StandbyTCPUserTimeout:   0,
+		KubernetesClusterDomain: DefaultKubernetesClusterDomain,
 	}
 }
 
