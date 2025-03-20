@@ -216,12 +216,12 @@ func upgradeSubCommand(
 		return nil
 	}
 
-	contextLogger.Info("Running pg_upgrade")
-
 	// We need to make sure that the permissions are the right ones
 	// in some systems they may be messed up even if we fix them before
 	_ = fileutils.EnsurePgDataPerms(pgData)
 	_ = fileutils.EnsurePgDataPerms(newDataDir)
+
+	contextLogger.Info("Running pg_upgrade")
 
 	if err := runPgUpgrade(pgData, pgUpgrade, newDataDir, oldBinDir); err != nil {
 		// TODO: in case of failures we should dump the content of the pg_upgrade logs
@@ -230,7 +230,8 @@ func upgradeSubCommand(
 
 	err = moveDataInPlace(ctx, pgData, oldVersion, newDataDir, newWalDir)
 	if err != nil {
-		contextLogger.Error(err, "Error while moving the data in place, saving the new data directory to avoid data loss")
+		contextLogger.Error(err,
+			"Error while moving the data in place, saving the new data directory to avoid data loss")
 
 		suffixTimestamp := fileutils.FormatFriendlyTimestamp(time.Now())
 
@@ -301,6 +302,10 @@ func prepareConfigurationFiles(ctx context.Context, cluster apiv1.Cluster, destD
 		return fmt.Errorf("error while creating the configuration files for new datadir %q: %w", destDir, err)
 	}
 
+	if _, err := newInstance.RefreshPGIdent(ctx, nil); err != nil {
+		return fmt.Errorf("error while creating the pg_ident.conf file for new datadir %q: %w", destDir, err)
+	}
+
 	// Create a stub for the configuration file
 	// to be filled during the real startup of this instance
 	err = fileutils.CreateEmptyFile(path.Join(destDir, constants.PostgresqlOverrideConfigurationFile))
@@ -316,6 +321,7 @@ func runPgUpgrade(oldDataDir string, pgUpgrade string, newDataDir string, oldBin
 	// Run the pg_upgrade command
 	cmd := exec.Command(pgUpgrade,
 		"--link",
+		"--username", "postgres",
 		"--old-bindir", oldBinDir,
 		"--old-datadir", oldDataDir,
 		"--new-datadir", newDataDir,
