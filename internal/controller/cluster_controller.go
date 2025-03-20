@@ -439,7 +439,7 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 			// we need to wait for it to be refreshed
 			contextLogger.Info(
 				"Waiting for the Kubelet to refresh the readiness probe",
-				"mostAdvancedInstanceName", mostAdvancedInstance.Node,
+				"mostAdvancedInstanceName", mostAdvancedInstance.Pod.Name,
 				"hasHTTPStatus", hasHTTPStatus,
 				"isPodReady", isPodReady)
 			return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
