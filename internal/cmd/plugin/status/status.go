@@ -120,6 +120,8 @@ func Status(
 	}
 
 	status := extractPostgresqlStatus(ctx, cluster)
+	hibernated, _ := isHibernated(status)
+
 	err = plugin.Print(status, format, os.Stdout)
 	if err != nil || format != plugin.OutputFormatText {
 		return err
@@ -134,16 +136,18 @@ func Status(
 		errs = append(errs, status.printPostgresConfiguration(ctx, clientInterface)...)
 		status.printCertificatesStatus()
 	}
-	status.printBackupStatus()
-	status.printBasebackupStatus(verbosity)
-	status.printReplicaStatus(verbosity)
-	if verbosity > 0 {
-		status.printUnmanagedReplicationSlotStatus()
-		status.printRoleManagerStatus()
-		status.printTablespacesStatus()
-		status.printPodDisruptionBudgetStatus()
+	if !hibernated {
+		status.printBackupStatus()
+		status.printBasebackupStatus(verbosity)
+		status.printReplicaStatus(verbosity)
+		if verbosity > 0 {
+			status.printUnmanagedReplicationSlotStatus()
+			status.printRoleManagerStatus()
+			status.printTablespacesStatus()
+			status.printPodDisruptionBudgetStatus()
+		}
+		status.printInstancesStatus()
 	}
-	status.printInstancesStatus()
 	status.printPluginStatus(verbosity)
 
 	if len(errs) > 0 {
@@ -234,17 +238,10 @@ func (fullStatus *PostgresqlStatus) printBasicInfo(ctx context.Context, k8sClien
 
 	cluster := fullStatus.Cluster
 
-	if cluster.IsReplica() {
-		fmt.Println(aurora.Yellow("Replica Cluster Summary"))
-	} else {
-		fmt.Println(aurora.Green("Cluster Summary"))
-	}
-
 	primaryInstance := cluster.Status.CurrentPrimary
-	if cluster.Status.CurrentPrimary != cluster.Status.TargetPrimary {
-		primaryInstance = fmt.Sprintf("%v (switching to %v)",
-			cluster.Status.CurrentPrimary, cluster.Status.TargetPrimary)
-	}
+
+	// Determine if the cluster is hibernated
+	hibernated, _ := isHibernated(fullStatus)
 
 	fencedInstances, err := utils.GetFencedInstances(cluster.Annotations)
 	if err != nil {
@@ -252,6 +249,11 @@ func (fullStatus *PostgresqlStatus) printBasicInfo(ctx context.Context, k8sClien
 	}
 	isPrimaryFenced := cluster.IsInstanceFenced(cluster.Status.CurrentPrimary)
 	primaryInstanceStatus := fullStatus.tryGetPrimaryInstance()
+
+	if cluster.Status.CurrentPrimary != cluster.Status.TargetPrimary {
+		primaryInstance = fmt.Sprintf("%v (switching to %v)",
+			cluster.Status.CurrentPrimary, cluster.Status.TargetPrimary)
+	}
 
 	summary.AddLine("Name", client.ObjectKeyFromObject(cluster).String())
 
@@ -266,12 +268,20 @@ func (fullStatus *PostgresqlStatus) printBasicInfo(ctx context.Context, k8sClien
 		summary.AddLine("Primary instance:", primaryInstance)
 	}
 
-	primaryStartTime := getPrimaryStartTime(cluster)
-	if len(primaryStartTime) > 0 {
-		summary.AddLine("Primary start time:", primaryStartTime)
+	switch {
+	case hibernated:
+		summary.AddLine("Status:", aurora.Red("Hibernated"))
+	case isPrimaryFenced:
+		summary.AddLine("Status:", aurora.Red("Primary instance is fenced"))
+	default:
+		// Avoid printing the start time when hibernated or fenced
+		primaryStartTime := getPrimaryStartTime(cluster)
+		if len(primaryStartTime) > 0 {
+			summary.AddLine("Primary start time:", primaryStartTime)
+		}
+		summary.AddLine("Status:", fullStatus.getStatus(cluster))
 	}
 
-	summary.AddLine("Status:", fullStatus.getStatus(isPrimaryFenced, cluster))
 	if cluster.Spec.Instances == cluster.Status.Instances {
 		summary.AddLine("Instances:", aurora.Green(cluster.Spec.Instances))
 	} else {
@@ -291,16 +301,15 @@ func (fullStatus *PostgresqlStatus) printBasicInfo(ctx context.Context, k8sClien
 		}
 	}
 
-	if cluster.Status.CurrentPrimary != cluster.Status.TargetPrimary {
-		if cluster.Status.CurrentPrimary == "" {
-			fmt.Println(aurora.Red("Primary server is initializing"))
-		} else {
-			fmt.Println(aurora.Red("Switchover in progress"))
-		}
-	}
-
 	if clusterSizeErr != nil {
-		summary.AddLine("Size:", aurora.Red(clusterSizeErr.Error()))
+		switch {
+		case hibernated:
+			summary.AddLine("Size:", "- (hibernated)")
+		case isPrimaryFenced:
+			summary.AddLine("Size:", "- (fenced)")
+		default:
+			summary.AddLine("Size:", aurora.Red(clusterSizeErr.Error()))
+		}
 	} else {
 		summary.AddLine("Size:", clusterSize)
 	}
@@ -315,23 +324,32 @@ func (fullStatus *PostgresqlStatus) printBasicInfo(ctx context.Context, k8sClien
 		summary.AddLine("Current Write LSN:", lsnInfo)
 	}
 
+	if cluster.IsReplica() {
+		fmt.Println(aurora.Yellow("Replica Cluster Summary"))
+	} else {
+		fmt.Println(aurora.Green("Cluster Summary"))
+	}
+
+	if cluster.Status.CurrentPrimary != cluster.Status.TargetPrimary {
+		if cluster.Status.CurrentPrimary == "" {
+			fmt.Println(aurora.Red("Primary server is initializing"))
+		} else {
+			fmt.Println(aurora.Red("Switchover in progress"))
+		}
+	}
+
 	summary.Print()
 	fmt.Println()
 }
 
 func (fullStatus *PostgresqlStatus) printHibernationInfo() {
-	cluster := fullStatus.Cluster
-
-	hibernationCondition := meta.FindStatusCondition(
-		cluster.Status.Conditions,
-		hibernation.HibernationConditionType,
-	)
+	hibernated, hibernationCondition := isHibernated(fullStatus)
 	if hibernationCondition == nil {
 		return
 	}
 
 	hibernationStatus := tabby.New()
-	if hibernationCondition.Status == metav1.ConditionTrue {
+	if hibernated {
 		hibernationStatus.AddLine("Status", "Hibernated")
 	} else {
 		hibernationStatus.AddLine("Status", "Active")
@@ -343,6 +361,20 @@ func (fullStatus *PostgresqlStatus) printHibernationInfo() {
 	hibernationStatus.Print()
 
 	fmt.Println()
+}
+
+func isHibernated(fullStatus *PostgresqlStatus) (bool, *metav1.Condition) {
+	cluster := fullStatus.Cluster
+	hibernationCondition := meta.FindStatusCondition(
+		cluster.Status.Conditions,
+		hibernation.HibernationConditionType,
+	)
+
+	if hibernationCondition == nil || hibernationCondition.Status != metav1.ConditionTrue {
+		return false, hibernationCondition
+	}
+
+	return true, hibernationCondition
 }
 
 func (fullStatus *PostgresqlStatus) printTokenStatus(token string) {
@@ -428,11 +460,7 @@ func (fullStatus *PostgresqlStatus) printPromotionTokenInfo() {
 	fmt.Println()
 }
 
-func (fullStatus *PostgresqlStatus) getStatus(isPrimaryFenced bool, cluster *apiv1.Cluster) string {
-	if isPrimaryFenced {
-		return fmt.Sprintf("%v", aurora.Red("Primary instance is fenced"))
-	}
-
+func (fullStatus *PostgresqlStatus) getStatus(cluster *apiv1.Cluster) string {
 	switch cluster.Status.Phase {
 	case apiv1.PhaseHealthy, apiv1.PhaseFirstPrimary, apiv1.PhaseCreatingReplica:
 		return fmt.Sprintf("%v %v", aurora.Green(cluster.Status.Phase), cluster.Status.PhaseReason)
