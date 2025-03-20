@@ -541,17 +541,6 @@ var _ = Describe("look up for secrets", Ordered, func() {
 			Expect(assertServiceNamesPresent(namesSet, "two", "cluster.local")).To(BeEmpty(),
 				"missing service name")
 		})
-
-		It("should evaluate the clusterDomain parameter correctly", func() {
-			cluster.Spec.Managed.Services.KubernetesClusterDomain = "unit.test"
-
-			namesSet := stringset.From(cluster.GetClusterAltDNSNames())
-			Expect(namesSet.Len()).To(Equal(20))
-			Expect(assertServiceNamesPresent(namesSet, "one", "unit.test")).To(BeEmpty(),
-				"missing service name")
-			Expect(assertServiceNamesPresent(namesSet, "two", "unit.test")).To(BeEmpty(),
-				"missing service name")
-		})
 	})
 })
 

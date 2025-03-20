@@ -50,6 +50,11 @@ expiration (within a 90-day validity period).
     certificates not controlled by CloudNativePG must be re-issued following the
     renewal process.
 
+When generating certificates, the operator assumes the Kubernetes
+cluster DNS zone to be set to `cluster.local`. This behavior can be
+customized by modifying the `KUBERNETES_CLUSTER_DOMAIN` environment
+variable.
+
 ### Server certificates
 
 #### Server CA secret

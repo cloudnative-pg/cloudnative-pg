@@ -1034,17 +1034,6 @@ func (cluster Cluster) GetBarmanEndpointCAForReplicaCluster() *SecretKeySelector
 
 // GetClusterAltDNSNames returns all the names needed to build a valid Server Certificate
 func (cluster *Cluster) GetClusterAltDNSNames() []string {
-	getClusterDomain := func() string {
-		if cluster.Spec.Managed != nil && cluster.Spec.Managed.Services != nil &&
-			cluster.Spec.Managed.Services.KubernetesClusterDomain != "" {
-			return cluster.Spec.Managed.Services.KubernetesClusterDomain
-		}
-
-		const defaultClusterDomain = "cluster.local"
-
-		return defaultClusterDomain
-	}
-
 	buildServiceNames := func(serviceName string, enabled bool) []string {
 		if !enabled {
 			return nil
@@ -1053,7 +1042,7 @@ func (cluster *Cluster) GetClusterAltDNSNames() []string {
 			serviceName,
 			fmt.Sprintf("%v.%v", serviceName, cluster.Namespace),
 			fmt.Sprintf("%v.%v.svc", serviceName, cluster.Namespace),
-			fmt.Sprintf("%v.%v.svc.%s", serviceName, cluster.Namespace, getClusterDomain()),
+			fmt.Sprintf("%v.%v.svc.%s", serviceName, cluster.Namespace, configuration.Current.KubernetesClusterDomain),
 		}
 	}
 	altDNSNames := slices.Concat(
