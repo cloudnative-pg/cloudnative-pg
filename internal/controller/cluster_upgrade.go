@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	corev1 "k8s.io/api/core/v1"
@@ -498,7 +499,12 @@ func checkPodImageIsOutdated(pod *corev1.Pod, cluster *apiv1.Cluster) (rollout, 
 		return rollout{}, err
 	}
 
-	if pgCurrentImageName == targetImageName {
+	tagsMatch, err := compareImageTags(configuration.Current.PostgresImageName, pgCurrentImageName)
+	if err != nil {
+		return rollout{}, err
+	}
+
+	if tagsMatch {
 		return rollout{}, nil
 	}
 
@@ -520,7 +526,12 @@ func checkPodInitContainerIsOutdated(pod *corev1.Pod, _ *apiv1.Cluster) (rollout
 		return rollout{}, err
 	}
 
-	if opCurrentImageName == configuration.Current.OperatorImageName {
+	tagsMatch, err := compareImageTags(configuration.Current.OperatorImageName, opCurrentImageName)
+	if err != nil {
+		return rollout{}, err
+	}
+
+	if tagsMatch {
 		return rollout{}, nil
 	}
 
@@ -784,4 +795,24 @@ func (r *ClusterReconciler) upgradeInstanceManager(
 	}
 
 	return nil
+}
+func compareImageTags(image1, image2 string) (bool, error) {
+	// Find the last `:` in opCurrentImageName
+	firstIndex := strings.LastIndex(image1, ":")
+	if firstIndex == -1 {
+		return false, fmt.Errorf("invalid format: no ':' in first image uri")
+	}
+
+	// Find the last `:` in operatorImageName
+	secondIndex := strings.LastIndex(image2, ":")
+	if secondIndex == -1 {
+		return false, fmt.Errorf("invalid format: no ':' in second image uri")
+	}
+
+	// Extract parts after the final `:`
+	firstTag := image1[firstIndex+1:]
+	secondTag := image2[secondIndex+1:]
+
+	// Compare the tags
+	return firstTag == secondTag, nil
 }
