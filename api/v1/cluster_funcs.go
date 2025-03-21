@@ -42,6 +42,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/system"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	contextutils "github.com/cloudnative-pg/cloudnative-pg/pkg/utils/context"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/versions"
 )
 
@@ -391,7 +392,7 @@ func (secretResourceVersion *SecretsResourceVersion) SetExternalClusterSecretVer
 
 // SetInContext records the cluster in the given context
 func (cluster *Cluster) SetInContext(ctx context.Context) context.Context {
-	return context.WithValue(ctx, utils.ContextKeyCluster, cluster)
+	return context.WithValue(ctx, contextutils.ContextKeyCluster, cluster)
 }
 
 // GetPostgresqlVersion gets the PostgreSQL image version detecting it from the

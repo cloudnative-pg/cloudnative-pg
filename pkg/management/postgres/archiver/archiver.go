@@ -37,7 +37,6 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	pluginClient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
-	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/management/cache"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/client/local"
@@ -274,32 +273,21 @@ func archiveWALViaPlugins(
 	}
 
 	plugins := repository.New()
-	availablePluginNames, err := plugins.RegisterUnixSocketPluginsInPath(configuration.Current.PluginSocketDir)
-	if err != nil {
-		contextLogger.Error(err, "Error while loading local plugins")
-	}
 	defer plugins.Close()
 
-	availablePluginNamesSet := stringset.From(availablePluginNames)
-	enabledPluginNamesSet := stringset.From(
-		apiv1.GetPluginConfigurationEnabledPluginNames(cluster.Spec.Plugins))
-	availableAndEnabled := stringset.From(availablePluginNamesSet.Intersect(enabledPluginNamesSet).ToList())
+	enabledPluginNamesSet := stringset.From(apiv1.GetPluginConfigurationEnabledPluginNames(cluster.Spec.Plugins))
 
-	enabledArchiverPluginName := cluster.GetEnabledWALArchivePluginName()
-	if enabledArchiverPluginName != "" && !availableAndEnabled.Has(enabledArchiverPluginName) {
-		return fmt.Errorf("wal archive plugin is not available: %s", enabledArchiverPluginName)
-	}
-
-	client, err := pluginClient.WithPlugins(
-		ctx,
-		plugins,
-		availableAndEnabled.ToList()...,
-	)
+	client, err := pluginClient.NewClient(ctx, enabledPluginNamesSet)
 	if err != nil {
 		contextLogger.Error(err, "Error while loading required plugins")
 		return err
 	}
 	defer client.Close(ctx)
+
+	enabledArchiverPluginName := cluster.GetEnabledWALArchivePluginName()
+	if enabledArchiverPluginName != "" && !client.HasPlugin(enabledArchiverPluginName) {
+		return fmt.Errorf("wal archive plugin is not available: %s", enabledArchiverPluginName)
+	}
 
 	return client.ArchiveWAL(ctx, cluster, walName)
 }

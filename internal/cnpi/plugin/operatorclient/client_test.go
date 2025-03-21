@@ -29,7 +29,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin"
 	pluginclient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/scheme"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	contextutils "github.com/cloudnative-pg/cloudnative-pg/pkg/utils/context"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -78,8 +78,8 @@ var _ = Describe("extendedClient", func() {
 
 	It("invokePlugin", func(ctx SpecContext) {
 		fakeCrd := &fakeClusterCRD{}
-		newCtx := context.WithValue(ctx, utils.ContextKeyCluster, fakeCrd)
-		newCtx = context.WithValue(newCtx, utils.PluginClientKey, pluginClient)
+		newCtx := context.WithValue(ctx, contextutils.ContextKeyCluster, fakeCrd)
+		newCtx = context.WithValue(newCtx, contextutils.PluginClientKey, pluginClient)
 
 		By("ensuring it works the first invocation", func() {
 			obj, err := c.invokePlugin(newCtx, plugin.OperationVerbCreate, &corev1.Pod{})
