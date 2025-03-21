@@ -38,7 +38,7 @@ func createBootstrapContainer(cluster apiv1.Cluster) corev1.Container {
 			"bootstrap",
 			"/controller/manager",
 		},
-		VolumeMounts:    createPostgresVolumeMounts(cluster),
+		VolumeMounts:    CreatePostgresVolumeMounts(cluster),
 		Resources:       cluster.Spec.Resources,
 		SecurityContext: CreateContainerSecurityContext(cluster.GetSeccompProfile()),
 	}

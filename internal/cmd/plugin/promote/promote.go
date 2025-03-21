@@ -64,7 +64,7 @@ func Promote(ctx context.Context, cli client.Client,
 	}
 	if err := status.PatchWithOptimisticLock(ctx, cli, &cluster,
 		reconcileTargetPrimaryFunc,
-		status.SetClusterReadyConditionTX,
+		status.SetClusterReadyCondition,
 	); err != nil {
 		return err
 	}
