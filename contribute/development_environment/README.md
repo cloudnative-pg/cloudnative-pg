@@ -180,12 +180,14 @@ build and deploy:
 ```shell
 cd cloudnative-pg
 git checkout main
-make deploy-locally
+./hack/setup.sh create load deploy
 ```
 
 This will build the operator based on the `main` branch content, create a
 `kind` cluster in your workstation with a container registry that provides the
 operator image that you just built.
+
+*Note:* For a list of option, run `./hack/setup-cluster.sh`.
 
 > **NOTE:** In case of errors, make sure that you have the latest versions of the Go
 > binaries in your system. For this reason, from time to time, we recommend
@@ -202,7 +204,7 @@ kubectl get deploy -n cnpg-system cnpg-controller-manager
 Now that your system has been validated, you can tear down the local cluster with:
 
 ```shell
-make kind-cluster-destroy
+./hack/setup.sh destroy
 ```
 
 Congratulations, you have a suitable development environment. You are now able
