@@ -26,6 +26,8 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
+const pluginName = "cnpg_volumesnapshot"
+
 // volumeSnapshotInfo host information about a volume snapshot
 type volumeSnapshotInfo struct {
 	// error contains the raised error when the volume snapshot terminated
@@ -68,16 +70,15 @@ func (err volumeSnapshotError) Error() string {
 // IsRetryable returns true if the external snapshotter controller
 // will retry taking the snapshot
 func (err volumeSnapshotError) isRetryable() bool {
-	// TODO: instead of blindingly retry on matching errors, we
-	// should enhance our CRD with a configurable deadline. After
-	// the deadline have been met on err.InternalError.CreatedAt
-	// the backup can be marked as failed
+	// The Kubernetes CSI driver/controller will automatically retry snapshot creation
+	// for certain errors, including timeouts. We use pattern matching to identify
+	// these retryable errors and handle them appropriately.
 
 	if err.InternalError.Message == nil {
 		return false
 	}
 
-	return isRetriableErrorMessage(*err.InternalError.Message)
+	return isCSIErrorMessageRetriable(*err.InternalError.Message)
 }
 
 // slice represents a slice of []storagesnapshotv1.VolumeSnapshot
