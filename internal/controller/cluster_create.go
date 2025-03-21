@@ -1307,7 +1307,7 @@ func (r *ClusterReconciler) ensureInstancesAreCreated(
 ) (ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
-	instanceToCreate, err := findInstancePodToCreate(cluster, instancesStatus, resources.pvcs.Items)
+	instanceToCreate, err := findInstancePodToCreate(ctx, cluster, instancesStatus, resources.pvcs.Items)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -1394,6 +1394,7 @@ func (r *ClusterReconciler) ensureInstancesAreCreated(
 
 // we elect a current instance that doesn't exist for creation
 func findInstancePodToCreate(
+	ctx context.Context,
 	cluster *apiv1.Cluster,
 	instancesStatus postgres.PostgresqlStatusList,
 	pvcs []corev1.PersistentVolumeClaim,
@@ -1440,7 +1441,7 @@ func findInstancePodToCreate(
 		if err != nil {
 			return nil, err
 		}
-		return specs.PodWithExistingStorage(*cluster, serial)
+		return specs.NewInstance(ctx, *cluster, serial, true)
 	}
 
 	return nil, nil

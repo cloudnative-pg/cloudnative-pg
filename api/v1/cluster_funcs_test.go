@@ -461,12 +461,12 @@ var _ = Describe("look up for secrets", Ordered, func() {
 	}
 
 	// assertServiceNamesPresent returns the first missing service name encountered
-	assertServiceNamesPresent := func(data *stringset.Data, serviceName string) string {
+	assertServiceNamesPresent := func(data *stringset.Data, serviceName string, clusterDomain string) string {
 		assertions := []string{
 			serviceName,
 			fmt.Sprintf("%v.%v", serviceName, cluster.Namespace),
 			fmt.Sprintf("%v.%v.svc", serviceName, cluster.Namespace),
-			fmt.Sprintf("%v.%v.svc.cluster.local", serviceName, cluster.Namespace),
+			fmt.Sprintf("%v.%v.svc.%s", serviceName, cluster.Namespace, clusterDomain),
 		}
 		for _, assertion := range assertions {
 			if !data.Has(assertion) {
@@ -498,11 +498,11 @@ var _ = Describe("look up for secrets", Ordered, func() {
 		Expect(names).To(HaveLen(12))
 		namesSet := stringset.From(names)
 		Expect(namesSet.Len()).To(Equal(12))
-		Expect(assertServiceNamesPresent(namesSet, cluster.GetServiceReadWriteName())).To(BeEmpty(),
+		Expect(assertServiceNamesPresent(namesSet, cluster.GetServiceReadWriteName(), "cluster.local")).To(BeEmpty(),
 			"missing service name")
-		Expect(assertServiceNamesPresent(namesSet, cluster.GetServiceReadName())).To(BeEmpty(),
+		Expect(assertServiceNamesPresent(namesSet, cluster.GetServiceReadName(), "cluster.local")).To(BeEmpty(),
 			"missing service name")
-		Expect(assertServiceNamesPresent(namesSet, cluster.GetServiceReadOnlyName())).To(BeEmpty(),
+		Expect(assertServiceNamesPresent(namesSet, cluster.GetServiceReadOnlyName(), "cluster.local")).To(BeEmpty(),
 			"missing service name")
 	})
 
@@ -521,9 +521,9 @@ var _ = Describe("look up for secrets", Ordered, func() {
 		It("should generate correctly the managed services names", func() {
 			namesSet := stringset.From(cluster.GetClusterAltDNSNames())
 			Expect(namesSet.Len()).To(Equal(20))
-			Expect(assertServiceNamesPresent(namesSet, "one")).To(BeEmpty(),
+			Expect(assertServiceNamesPresent(namesSet, "one", "cluster.local")).To(BeEmpty(),
 				"missing service name")
-			Expect(assertServiceNamesPresent(namesSet, "two")).To(BeEmpty(),
+			Expect(assertServiceNamesPresent(namesSet, "two", "cluster.local")).To(BeEmpty(),
 				"missing service name")
 		})
 
@@ -536,9 +536,9 @@ var _ = Describe("look up for secrets", Ordered, func() {
 			Expect(namesSet.Len()).To(Equal(12))
 			Expect(namesSet.Has(cluster.GetServiceReadName())).To(BeFalse())
 			Expect(namesSet.Has(cluster.GetServiceReadOnlyName())).To(BeFalse())
-			Expect(assertServiceNamesPresent(namesSet, "one")).To(BeEmpty(),
+			Expect(assertServiceNamesPresent(namesSet, "one", "cluster.local")).To(BeEmpty(),
 				"missing service name")
-			Expect(assertServiceNamesPresent(namesSet, "two")).To(BeEmpty(),
+			Expect(assertServiceNamesPresent(namesSet, "two", "cluster.local")).To(BeEmpty(),
 				"missing service name")
 		})
 	})

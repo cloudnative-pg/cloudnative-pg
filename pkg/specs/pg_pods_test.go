@@ -17,6 +17,8 @@ limitations under the License.
 package specs
 
 import (
+	"context"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -33,7 +35,7 @@ var _ = Describe("Extract the used image name", func() {
 			Namespace: "default",
 		},
 	}
-	pod, err := PodWithExistingStorage(cluster, 1)
+	pod, err := NewInstance(context.TODO(), cluster, 1, true)
 	Expect(err).ToNot(HaveOccurred())
 
 	It("extract the default image name", func() {

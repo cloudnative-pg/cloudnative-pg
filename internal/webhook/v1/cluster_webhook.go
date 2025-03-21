@@ -2324,7 +2324,24 @@ func (v *ClusterCustomValidator) validatePgFailoverSlots(r *apiv1.Cluster) field
 }
 
 func (v *ClusterCustomValidator) getAdmissionWarnings(r *apiv1.Cluster) admission.Warnings {
-	return getMaintenanceWindowsAdmissionWarnings(r)
+	list := getMaintenanceWindowsAdmissionWarnings(r)
+	return append(list, getSharedBuffersWarnings(r)...)
+}
+
+func getSharedBuffersWarnings(r *apiv1.Cluster) admission.Warnings {
+	var result admission.Warnings
+
+	if v := r.Spec.PostgresConfiguration.Parameters["shared_buffers"]; v != "" {
+		if _, err := strconv.Atoi(v); err == nil {
+			result = append(
+				result,
+				fmt.Sprintf("`shared_buffers` value '%s' is missing a unit (e.g., MB, GB). "+
+					"While this is currently allowed, future releases will require an explicit unit. "+
+					"Please update your configuration to specify a valid unit, such as '%sMB'.", v, v),
+			)
+		}
+	}
+	return result
 }
 
 func getMaintenanceWindowsAdmissionWarnings(r *apiv1.Cluster) admission.Warnings {
@@ -2375,7 +2392,12 @@ func (v *ClusterCustomValidator) validatePodPatchAnnotation(r *apiv1.Cluster) fi
 		}
 	}
 
-	if _, err := specs.PodWithExistingStorage(*r, 1); err != nil {
+	if _, err := specs.NewInstance(
+		context.Background(),
+		*r,
+		1,
+		true,
+	); err != nil {
 		return field.ErrorList{
 			field.Invalid(
 				field.NewPath("metadata", "annotations", utils.PodPatchAnnotationName),

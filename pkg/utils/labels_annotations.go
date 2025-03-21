@@ -17,7 +17,9 @@ limitations under the License.
 package utils
 
 import (
+	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -499,4 +501,19 @@ func MergeObjectsMetadata(receiver client.Object, giver client.Object) {
 
 	receiver.SetLabels(mergeMap(receiver.GetLabels(), giver.GetLabels()))
 	receiver.SetAnnotations(mergeMap(receiver.GetAnnotations(), giver.GetAnnotations()))
+}
+
+// GetClusterSerialValue returns the `nodeSerial` value from the given annotation map or return an error
+func GetClusterSerialValue(annotations map[string]string) (int, error) {
+	rawSerial, ok := annotations[ClusterSerialAnnotationName]
+	if !ok {
+		return 0, fmt.Errorf("no serial annotation found")
+	}
+
+	serial, err := strconv.Atoi(rawSerial)
+	if err != nil {
+		return 0, fmt.Errorf("invalid serial annotation found: %w", err)
+	}
+
+	return serial, nil
 }

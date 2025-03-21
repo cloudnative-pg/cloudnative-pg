@@ -40,6 +40,10 @@ const (
 
 	// ExpiringCheckThreshold is the default threshold to consider a certificate as expiring
 	ExpiringCheckThreshold = 7
+
+	// DefaultKubernetesClusterDomain is the default value used as
+	// Kubernetes cluster domain.
+	DefaultKubernetesClusterDomain = "cluster.local"
 )
 
 // DefaultPluginSocketDir is the default directory where the plugin sockets are located.
@@ -134,6 +138,10 @@ type Data struct {
 	// primary server in CloudNativePG.
 	StandbyTCPUserTimeout int `json:"standbyTcpUserTimeout" env:"STANDBY_TCP_USER_TIMEOUT"`
 
+	// KubernetesClusterDomain defines the domain suffix for service FQDNs
+	// within the Kubernetes cluster. If left unset, it defaults to `cluster.local`.
+	KubernetesClusterDomain string `json:"kubernetesClusterDomain" env:"KUBERNETES_CLUSTER_DOMAIN"`
+  
   // DrainTaints is a list of taints the operator will watch and treat as Unschedule
 	DrainTaints []string `json:"drainTaints" env:"DRAIN_TAINTS"`
 }
@@ -144,14 +152,15 @@ var Current = NewConfiguration()
 // newDefaultConfig creates a configuration holding the defaults
 func newDefaultConfig() *Data {
 	return &Data{
-		OperatorPullSecretName: DefaultOperatorPullSecretName,
-		OperatorImageName:      versions.DefaultOperatorImageName,
-		PostgresImageName:      versions.DefaultImageName,
-		PluginSocketDir:        DefaultPluginSocketDir,
-		CreateAnyService:       false,
-		CertificateDuration:    CertificateDuration,
-		ExpiringCheckThreshold: ExpiringCheckThreshold,
-		StandbyTCPUserTimeout:  0,
+		OperatorPullSecretName:  DefaultOperatorPullSecretName,
+		OperatorImageName:       versions.DefaultOperatorImageName,
+		PostgresImageName:       versions.DefaultImageName,
+		PluginSocketDir:         DefaultPluginSocketDir,
+		CreateAnyService:        false,
+		CertificateDuration:     CertificateDuration,
+		ExpiringCheckThreshold:  ExpiringCheckThreshold,
+		StandbyTCPUserTimeout:   0,
+		KubernetesClusterDomain: DefaultKubernetesClusterDomain,
     DrainTaints: []string{
 			"node.kubernetes.io/unschedulable",
 			"ToBeDeletedByClusterAutoscaler",

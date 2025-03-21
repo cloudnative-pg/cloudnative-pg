@@ -17,11 +17,15 @@ limitations under the License.
 package hibernate
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/spf13/cobra"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cmd/plugin"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 var (
@@ -34,17 +38,10 @@ var (
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			clusterName := args[0]
-			force, err := cmd.Flags().GetBool("force")
-			if err != nil {
-				return err
-			}
-
-			hibernateOn, err := newOnCommand(cmd.Context(), clusterName, force)
-			if err != nil {
-				return err
-			}
-
-			return hibernateOn.execute()
+			return annotateCluster(cmd.Context(), plugin.Client, client.ObjectKey{
+				Name:      clusterName,
+				Namespace: plugin.Namespace,
+			}, utils.HibernationAnnotationValueOn)
 		},
 	}
 
@@ -57,34 +54,10 @@ var (
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			clusterName := args[0]
-			off := newOffCommand(cmd.Context(), clusterName)
-			return off.execute()
-		},
-	}
-
-	hibernateStatusCmd = &cobra.Command{
-		Use:   "status CLUSTER",
-		Short: "Prints the hibernation status for the CLUSTER",
-		Args:  plugin.RequiresArguments(1),
-		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return plugin.CompleteClusters(cmd.Context(), args, toComplete), cobra.ShellCompDirectiveNoFileComp
-		},
-		RunE: func(cmd *cobra.Command, args []string) error {
-			clusterName := args[0]
-			rawOutput, err := cmd.Flags().GetString("output")
-			if err != nil {
-				return err
-			}
-
-			outputFormat := plugin.OutputFormat(rawOutput)
-			switch outputFormat {
-			case plugin.OutputFormatJSON, plugin.OutputFormatYAML:
-				return newStatusCommandStructuredOutput(cmd.Context(), clusterName, outputFormat).execute()
-			case plugin.OutputFormatText:
-				return newStatusCommandTextOutput(cmd.Context(), clusterName).execute()
-			default:
-				return fmt.Errorf("output: %s is not supported by the hibernate CLI", rawOutput)
-			}
+			return annotateCluster(cmd.Context(), plugin.Client, client.ObjectKey{
+				Name:      clusterName,
+				Namespace: plugin.Namespace,
+			}, utils.HibernationAnnotationValueOff)
 		},
 	}
 )
@@ -99,19 +72,37 @@ func NewCmd() *cobra.Command {
 
 	cmd.AddCommand(hibernateOnCmd)
 	cmd.AddCommand(hibernateOffCmd)
-	cmd.AddCommand(hibernateStatusCmd)
-
-	hibernateOnCmd.Flags().Bool(
-		"force",
-		false,
-		"Force the hibernation procedure even if the preconditions are not met")
-	hibernateStatusCmd.Flags().
-		StringP(
-			"output",
-			"o",
-			"text",
-			"Output format. One of text, json, or yaml",
-		)
 
 	return cmd
+}
+
+func annotateCluster(
+	ctx context.Context,
+	cli client.Client,
+	clusterKey client.ObjectKey,
+	value utils.HibernationAnnotationValue,
+) error {
+	var cluster apiv1.Cluster
+
+	if err := cli.Get(ctx, clusterKey, &cluster); err != nil {
+		return fmt.Errorf("failed to get cluster %s: %w", clusterKey.Name, err)
+	}
+
+	if cluster.Annotations == nil {
+		cluster.SetAnnotations(make(map[string]string))
+	}
+
+	origCluster := cluster.DeepCopy()
+
+	cluster.Annotations[utils.HibernationAnnotationName] = string(value)
+
+	if cluster.Annotations[utils.HibernationAnnotationName] == origCluster.Annotations[utils.HibernationAnnotationName] {
+		return fmt.Errorf("cluster %s is already in the requested state", clusterKey.Name)
+	}
+
+	if err := cli.Patch(ctx, &cluster, client.MergeFrom(origCluster)); err != nil {
+		return fmt.Errorf("failed to patch cluster %s: %w", clusterKey.Name, err)
+	}
+
+	return nil
 }
