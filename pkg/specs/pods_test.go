@@ -928,7 +928,7 @@ var _ = Describe("Compute startup probe failure threshold", func() {
 	})
 })
 
-var _ = Describe("buildInstance", func() {
+var _ = Describe("NewInstance", func() {
 	It("applies JSON patch from annotation", func(ctx SpecContext) {
 		cluster := v1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{

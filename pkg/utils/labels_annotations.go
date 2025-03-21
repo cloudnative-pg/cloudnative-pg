@@ -509,7 +509,7 @@ func GetClusterSerialValue(annotations map[string]string) (int, error) {
 	if !ok {
 		return 0, fmt.Errorf("no serial annotation found")
 	}
-	// convert serial to int with golang
+
 	serial, err := strconv.Atoi(rawSerial)
 	if err != nil {
 		return 0, fmt.Errorf("invalid serial annotation found: %w", err)
