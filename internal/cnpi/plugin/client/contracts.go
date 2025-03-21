@@ -26,6 +26,7 @@ import (
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client/contracts"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/connection"
 )
 
@@ -38,6 +39,7 @@ type Client interface {
 	WalCapabilities
 	BackupCapabilities
 	RestoreJobHooksCapabilities
+	contracts.PostgresConfigurationCapabilities
 }
 
 // Connection describes a set of behaviour needed to properly handle the plugin connections
