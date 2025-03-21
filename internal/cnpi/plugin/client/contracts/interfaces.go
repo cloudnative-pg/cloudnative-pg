@@ -26,5 +26,5 @@ import (
 // capabilities of interacting with PostgreSQL.
 type PostgresConfigurationCapabilities interface {
 	// EnrichConfiguration is the method that enriches the PostgreSQL configuration
-	EnrichConfiguration(ctx context.Context, cluster client.Object, config map[string]string) (map[string]string, error)
+	EnrichConfiguration(ctx context.Context, cluster client.Object, config map[string]string) error
 }

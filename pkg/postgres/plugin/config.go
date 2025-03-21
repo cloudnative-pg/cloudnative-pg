@@ -27,42 +27,33 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
-// CreatePostgresqlConfiguration creates a new PostgreSQL configuration and enriches it by invoking
+// CreatePostgresqlConfigurationWithPlugins creates a new PostgreSQL configuration and enriches it by invoking
 // the registered Plugins
-func CreatePostgresqlConfiguration(
+func CreatePostgresqlConfigurationWithPlugins(
 	ctx context.Context,
 	info postgres.ConfigurationInfo,
 ) (*postgres.PgConfiguration, error) {
-	return enrichConfigurationWithPlugins(ctx, postgres.CreatePostgresqlConfiguration(info))
-}
-
-func enrichConfigurationWithPlugins(
-	ctx context.Context,
-	baseConfig *postgres.PgConfiguration,
-) (*postgres.PgConfiguration, error) {
 	contextLogger := log.FromContext(ctx).WithName("enrichConfigurationWithPlugins")
+
+	config := postgres.CreatePostgresqlConfiguration(info)
 
 	cluster, ok := ctx.Value(utils.ContextKeyCluster).(client.Object)
 	if !ok || cluster == nil {
-		contextLogger.Trace("skipping CreatePostgresqlConfiguration, cannot find the cluster inside the context")
-		return baseConfig, nil
+		contextLogger.Trace("skipping CreatePostgresqlConfigurationWithPlugins, cannot find the cluster inside the context")
+		return config, nil
 	}
 
 	pluginClient, ok := ctx.Value(utils.PluginClientKey).(contracts.PostgresConfigurationCapabilities)
 	if !ok || pluginClient == nil {
-		contextLogger.Trace("skipping CreatePostgresqlConfiguration, cannot find the plugin client inside the context")
-		return baseConfig, nil
+		contextLogger.Trace(
+			"skipping CreatePostgresqlConfigurationWithPlugins, cannot find the plugin client inside the context")
+		return config, nil
 	}
 
-	enrichedMapConfig, err := pluginClient.EnrichConfiguration(ctx, cluster, baseConfig.GetConfigurationParameters())
-	if err != nil {
+	if err := pluginClient.EnrichConfiguration(ctx, cluster, config.GetConfigurationParameters()); err != nil {
 		contextLogger.Error(err, "failed to enrich configuration with plugins")
 		return nil, err
 	}
 
-	for key, value := range enrichedMapConfig {
-		baseConfig.OverwriteConfig(key, value)
-	}
-
-	return baseConfig, nil
+	return config, nil
 }

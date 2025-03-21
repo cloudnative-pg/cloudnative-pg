@@ -29,10 +29,10 @@ func (data *data) EnrichConfiguration(
 	ctx context.Context,
 	cluster client.Object,
 	config map[string]string,
-) (map[string]string, error) {
+) error {
 	clusterDefinition, marshalErr := json.Marshal(cluster)
 	if marshalErr != nil {
-		return nil, marshalErr
+		return marshalErr
 	}
 
 	for idx := range data.plugins {
@@ -47,7 +47,7 @@ func (data *data) EnrichConfiguration(
 		}
 		res, err := plugin.PostgresClient().EnrichConfiguration(ctx, req)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		// merge the received configuration with the existing one
@@ -56,5 +56,5 @@ func (data *data) EnrichConfiguration(
 		}
 	}
 
-	return config, nil
+	return nil
 }

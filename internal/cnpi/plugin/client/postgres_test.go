@@ -110,11 +110,11 @@ var _ = Describe("EnrichConfiguration", func() {
 
 		d.plugins = append(d.plugins, plugin)
 
-		result, err := d.EnrichConfiguration(ctx, cluster, config)
+		err := d.EnrichConfiguration(ctx, cluster, config)
 
 		Expect(err).ToNot(HaveOccurred())
-		Expect(result).To(HaveKeyWithValue("key1", "value1"))
-		Expect(result).To(HaveKeyWithValue("key2", "value2"))
+		Expect(config).To(HaveKeyWithValue("key1", "value1"))
+		Expect(config).To(HaveKeyWithValue("key2", "value2"))
 	})
 
 	It("should return error when plugin returns error", func(ctx SpecContext) {
@@ -132,7 +132,7 @@ var _ = Describe("EnrichConfiguration", func() {
 
 		d.plugins = append(d.plugins, plugin)
 
-		_, err := d.EnrichConfiguration(ctx, cluster, config)
+		err := d.EnrichConfiguration(ctx, cluster, config)
 
 		Expect(err).To(HaveOccurred())
 		Expect(err).To(Equal(expectedErr))
@@ -146,10 +146,12 @@ var _ = Describe("EnrichConfiguration", func() {
 
 		d.plugins = append(d.plugins, plugin)
 
-		result, err := d.EnrichConfiguration(ctx, cluster, config)
+		origMap := cloneMap(config)
+
+		err := d.EnrichConfiguration(ctx, cluster, config)
 
 		Expect(err).ToNot(HaveOccurred())
-		Expect(result).To(Equal(config))
+		Expect(config).To(BeEquivalentTo(origMap))
 	})
 
 	It("should merge configurations from multiple plugins", func(ctx SpecContext) {
@@ -179,12 +181,12 @@ var _ = Describe("EnrichConfiguration", func() {
 
 		d.plugins = append(d.plugins, plugin1, plugin2)
 
-		result, err := d.EnrichConfiguration(ctx, cluster, config)
+		err := d.EnrichConfiguration(ctx, cluster, config)
 
 		Expect(err).ToNot(HaveOccurred())
-		Expect(result).To(HaveKeyWithValue("key1", "value1"))
-		Expect(result).To(HaveKeyWithValue("key2", "value2"))
-		Expect(result).To(HaveKeyWithValue("key3", "value3"))
+		Expect(config).To(HaveKeyWithValue("key1", "value1"))
+		Expect(config).To(HaveKeyWithValue("key2", "value2"))
+		Expect(config).To(HaveKeyWithValue("key3", "value3"))
 	})
 
 	It("should overwrite existing config key when plugin returns the same key", func(ctx SpecContext) {
@@ -202,10 +204,18 @@ var _ = Describe("EnrichConfiguration", func() {
 
 		d.plugins = append(d.plugins, plugin)
 
-		result, err := d.EnrichConfiguration(ctx, cluster, config)
+		err := d.EnrichConfiguration(ctx, cluster, config)
 
 		Expect(err).ToNot(HaveOccurred())
-		Expect(result).To(HaveKeyWithValue("key1", "overwritten-value"))
-		Expect(result).To(HaveLen(1))
+		Expect(config).To(HaveKeyWithValue("key1", "overwritten-value"))
+		Expect(config).To(HaveLen(1))
 	})
 })
+
+func cloneMap(original map[string]string) map[string]string {
+	clone := make(map[string]string, len(original))
+	for k, v := range original {
+		clone[k] = v
+	}
+	return clone
+}

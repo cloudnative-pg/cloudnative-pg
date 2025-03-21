@@ -425,7 +425,7 @@ func createPostgresqlConfiguration(
 		info.RecoveryMinApplyDelay = cluster.Spec.ReplicaCluster.MinApplyDelay.Duration
 	}
 
-	config, err := plugin.CreatePostgresqlConfiguration(ctx, info)
+	config, err := plugin.CreatePostgresqlConfigurationWithPlugins(ctx, info)
 	if err != nil {
 		return "", "", err
 	}
