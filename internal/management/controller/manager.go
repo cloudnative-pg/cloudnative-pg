@@ -31,6 +31,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/repository"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/concurrency"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/metricserver"
@@ -49,6 +50,7 @@ type InstanceReconciler struct {
 	systemInitialization  *concurrency.Executed
 	firstReconcileDone    atomic.Bool
 	metricsServerExporter *metricserver.Exporter
+	pluginRepository      repository.Interface
 }
 
 // NewInstanceReconciler creates a new instance reconciler
@@ -56,6 +58,7 @@ func NewInstanceReconciler(
 	instance *postgres.Instance,
 	client ctrl.Client,
 	metricsExporter *metricserver.Exporter,
+	pluginRepository repository.Interface,
 ) *InstanceReconciler {
 	return &InstanceReconciler{
 		instance:              instance,
@@ -64,6 +67,7 @@ func NewInstanceReconciler(
 		extensionStatus:       make(map[string]bool),
 		systemInitialization:  concurrency.NewExecuted(),
 		metricsServerExporter: metricsExporter,
+		pluginRepository:      pluginRepository,
 	}
 }
 

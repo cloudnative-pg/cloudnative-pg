@@ -29,4 +29,5 @@ type Metadata struct {
 	WALCapabilities            []string
 	BackupCapabilities         []string
 	RestoreJobHookCapabilities []string
+	PostgresCapabilities       []string
 }

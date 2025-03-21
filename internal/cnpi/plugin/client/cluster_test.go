@@ -25,7 +25,6 @@ import (
 
 	"github.com/cloudnative-pg/cnpg-i/pkg/operator"
 
-	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/connection"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -36,9 +35,9 @@ var _ = Describe("SetStatusInCluster", func() {
 	const pluginName = "fake-plugin"
 	const pluginName2 = "fake-plugin2"
 
-	var cluster *apiv1.Cluster
+	var cluster fakeCluster
 	BeforeEach(func() {
-		cluster = &apiv1.Cluster{}
+		cluster = fakeCluster{}
 	})
 
 	It("should correctly set the status of a single plugin", func(ctx SpecContext) {
