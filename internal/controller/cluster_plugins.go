@@ -27,13 +27,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	cnpgiclient "github.com/cloudnative-pg/cloudnative-pg/internal/cnpi/plugin/client"
 )
 
 // updatePluginsStatus ensures that we load the plugins that are required to reconcile
 // this cluster
 func (r *ClusterReconciler) updatePluginsStatus(ctx context.Context, cluster *apiv1.Cluster) error {
 	// Load the plugins
-	pluginClient := getPluginClientFromContext(ctx)
+	pluginClient := cnpgiclient.GetPluginClientFromContext(ctx)
 
 	// Get the status of the plugins and store it inside the status section
 	oldCluster := cluster.DeepCopy()

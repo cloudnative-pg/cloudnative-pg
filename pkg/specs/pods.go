@@ -474,8 +474,8 @@ func NewInstance(
 		}
 	}()
 
-	pluginClient, ok := ctx.Value(utils.PluginClientKey).(cnpgiClient.Client)
-	if !ok || pluginClient == nil {
+	pluginClient := cnpgiClient.GetPluginClientFromContext(ctx)
+	if pluginClient == nil {
 		contextLogger.Trace("skipping NewInstance, cannot find the plugin client inside the context")
 		return pod, nil
 	}
@@ -487,6 +487,7 @@ func NewInstance(
 		return nil, fmt.Errorf("while invoking the lifecycle instance evaluation hook: %w", err)
 	}
 
+	var ok bool
 	pod, ok = podClientObject.(*corev1.Pod)
 	if !ok {
 		return nil, fmt.Errorf("while casting the clientObject to the pod type")
