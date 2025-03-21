@@ -17,17 +17,5 @@ limitations under the License.
 SPDX-License-Identifier: Apache-2.0
 */
 
-package connection
-
-// Metadata expose the metadata as discovered
-// from a plugin
-type Metadata struct {
-	Name                       string
-	Version                    string
-	Capabilities               []string
-	OperatorCapabilities       []string
-	WALCapabilities            []string
-	BackupCapabilities         []string
-	RestoreJobHookCapabilities []string
-	PostgresCapabilities       []string
-}
+// Package plugin contains the methods to interact with the plugins that have the Postgres capabilities
+package plugin
