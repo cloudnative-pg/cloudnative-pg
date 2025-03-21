@@ -24,6 +24,7 @@ import (
 	"github.com/cloudnative-pg/cnpg-i/pkg/identity"
 	"github.com/cloudnative-pg/cnpg-i/pkg/lifecycle"
 	"github.com/cloudnative-pg/cnpg-i/pkg/operator"
+	postgresClient "github.com/cloudnative-pg/cnpg-i/pkg/postgres"
 	"github.com/cloudnative-pg/cnpg-i/pkg/reconciler"
 	restore "github.com/cloudnative-pg/cnpg-i/pkg/restore/job"
 	"github.com/cloudnative-pg/cnpg-i/pkg/wal"
@@ -102,6 +103,14 @@ type fakeConnection struct {
 	lifecycleCapabilities []*lifecycle.OperatorLifecycleCapabilities
 	name                  string
 	operatorClient        *fakeOperatorClient
+}
+
+func (f *fakeConnection) PostgresClient() postgresClient.PostgresClient {
+	panic("implement me")
+}
+
+func (f *fakeConnection) PostgresCapabilities() []postgresClient.PostgresCapability_RPC_Type {
+	panic("implement me")
 }
 
 func (f *fakeConnection) RestoreJobHooksClient() restore.RestoreJobHooksClient {
