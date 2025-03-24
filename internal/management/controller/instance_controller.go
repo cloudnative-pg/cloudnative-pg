@@ -88,7 +88,12 @@ func (r *InstanceReconciler) Reconcile(
 	_ reconcile.Request,
 ) (reconcile.Result, error) {
 	// set up a convenient contextLog object so we don't have to type request over and over again
-	contextLogger := log.FromContext(ctx)
+	contextLogger := log.FromContext(ctx).
+		WithValues(
+			"instance", r.instance.GetPodName(),
+			"cluster", r.instance.GetClusterName(),
+			"namespace", r.instance.GetNamespaceName(),
+		)
 
 	// if the context has already been cancelled,
 	// trying to reconcile would just lead to misleading errors being reported
@@ -111,7 +116,7 @@ func (r *InstanceReconciler) Reconcile(
 	}
 
 	// Print the Cluster
-	contextLogger.Debug("Reconciling Cluster", "cluster", cluster)
+	contextLogger.Debug("Reconciling Cluster")
 
 	// Reconcile PostgreSQL instance parameters
 	r.reconcileInstance(cluster)
