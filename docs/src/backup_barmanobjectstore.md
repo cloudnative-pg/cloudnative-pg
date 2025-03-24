@@ -93,7 +93,10 @@ algorithms via `barman-cloud-backup` (for backups) and
 
 * bzip2
 * gzip
+* lz4
 * snappy
+* xz
+* zstd
 
 The compression settings for backups and WALs are independent. See the
 [DataBackupConfiguration](https://pkg.go.dev/github.com/cloudnative-pg/barman-cloud/pkg/api#DataBackupConfiguration) and

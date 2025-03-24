@@ -1152,11 +1152,14 @@ spec:
                             description: |-
                               Compress a backup file (a tar file per tablespace) while streaming it
                               to the object store. Available options are empty string (no
-                              compression, default), `gzip`, `bzip2` or `snappy`.
+                              compression, default), `gzip`, `bzip2`, `lz4`, `snappy`, `xz`, and `zstd`.
                             enum:
-                            - gzip
                             - bzip2
+                            - gzip
+                            - lz4
                             - snappy
+                            - xz
+                            - zstd
                             type: string
                           encryption:
                             description: |-
@@ -1343,11 +1346,15 @@ spec:
                           compression:
                             description: |-
                               Compress a WAL file before sending it to the object store. Available
-                              options are empty string (no compression, default), `gzip`, `bzip2` or `snappy`.
+                              options are empty string (no compression, default), `gzip`, `bzip2`,
+                              `lz4`, `snappy`, `xz`, and `zstd`.
                             enum:
-                            - gzip
                             - bzip2
+                            - gzip
+                            - lz4
                             - snappy
+                            - xz
+                            - zstd
                             type: string
                           encryption:
                             description: |-
@@ -2654,11 +2661,14 @@ spec:
                               description: |-
                                 Compress a backup file (a tar file per tablespace) while streaming it
                                 to the object store. Available options are empty string (no
-                                compression, default), `gzip`, `bzip2` or `snappy`.
+                                compression, default), `gzip`, `bzip2`, `lz4`, `snappy`, `xz`, and `zstd`.
                               enum:
-                              - gzip
                               - bzip2
+                              - gzip
+                              - lz4
                               - snappy
+                              - xz
+                              - zstd
                               type: string
                             encryption:
                               description: |-
@@ -2845,11 +2855,15 @@ spec:
                             compression:
                               description: |-
                                 Compress a WAL file before sending it to the object store. Available
-                                options are empty string (no compression, default), `gzip`, `bzip2` or `snappy`.
+                                options are empty string (no compression, default), `gzip`, `bzip2`,
+                                `lz4`, `snappy`, `xz`, and `zstd`.
                               enum:
-                              - gzip
                               - bzip2
+                              - gzip
+                              - lz4
                               - snappy
+                              - xz
+                              - zstd
                               type: string
                             encryption:
                               description: |-
