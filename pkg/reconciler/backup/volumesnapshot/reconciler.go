@@ -156,6 +156,24 @@ func (se *Reconciler) Reconcile(
 	targetPod *corev1.Pod,
 	pvcs []corev1.PersistentVolumeClaim,
 ) (*ctrl.Result, error) {
+	contextLogger := log.FromContext(ctx).WithName("volumesnapshot_reconciler")
+
+	res, err := se.internalReconcile(ctx, cluster, backup, targetPod, pvcs)
+	if isNetworkErrorRetryable(err) {
+		contextLogger.Error(err, "detected retryable error while executing snapshot backup, retrying...")
+		return &ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+	}
+
+	return res, err
+}
+
+func (se *Reconciler) internalReconcile(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	backup *apiv1.Backup,
+	targetPod *corev1.Pod,
+	pvcs []corev1.PersistentVolumeClaim,
+) (*ctrl.Result, error) {
 	if cluster.Spec.Backup == nil || cluster.Spec.Backup.VolumeSnapshot == nil {
 		return nil, fmt.Errorf("cannot execute a VolumeSnapshot on a cluster without configuration")
 	}
@@ -190,7 +208,7 @@ func (se *Reconciler) Reconcile(
 	}
 
 	// Step 3: wait for snapshots to be provisioned
-	if res, err := se.waitSnapshotToBeProvisionedStep(ctx, volumeSnapshots); res != nil || err != nil {
+	if res, err := se.waitSnapshotToBeProvisionedStep(ctx, backup, volumeSnapshots); res != nil || err != nil {
 		return res, err
 	}
 
@@ -207,7 +225,7 @@ func (se *Reconciler) Reconcile(
 	}
 
 	// Step 5: wait for snapshots to be ready to use
-	if res, err := se.waitSnapshotToBeReadyStep(ctx, volumeSnapshots); res != nil || err != nil {
+	if res, err := se.waitSnapshotToBeReadyStep(ctx, backup, volumeSnapshots); res != nil || err != nil {
 		return res, err
 	}
 
@@ -385,10 +403,11 @@ func (se *Reconciler) createSnapshotPVCGroupStep(
 // waitSnapshotToBeProvisionedStep waits for every PVC snapshot to be claimed
 func (se *Reconciler) waitSnapshotToBeProvisionedStep(
 	ctx context.Context,
+	backup *apiv1.Backup,
 	snapshots []storagesnapshotv1.VolumeSnapshot,
 ) (*ctrl.Result, error) {
 	for i := range snapshots {
-		if res, err := se.waitSnapshotToBeProvisionedAndAnnotate(ctx, &snapshots[i]); res != nil || err != nil {
+		if res, err := se.waitSnapshotToBeProvisionedAndAnnotate(ctx, backup, &snapshots[i]); res != nil || err != nil {
 			return res, err
 		}
 	}
@@ -399,10 +418,11 @@ func (se *Reconciler) waitSnapshotToBeProvisionedStep(
 // waitSnapshotToBeReadyStep waits for every PVC snapshot to be ready to use
 func (se *Reconciler) waitSnapshotToBeReadyStep(
 	ctx context.Context,
+	backup *apiv1.Backup,
 	snapshots []storagesnapshotv1.VolumeSnapshot,
 ) (*ctrl.Result, error) {
 	for i := range snapshots {
-		if res, err := se.waitSnapshotToBeReady(ctx, &snapshots[i]); res != nil || err != nil {
+		if res, err := se.waitSnapshotToBeReady(ctx, backup, &snapshots[i]); res != nil || err != nil {
 			return res, err
 		}
 	}
@@ -501,20 +521,14 @@ func transferLabelsToAnnotations(labels map[string]string, annotations map[strin
 // SnapshotStartTimeAnnotationName and SnapshotEndTimeAnnotationName.
 func (se *Reconciler) waitSnapshotToBeProvisionedAndAnnotate(
 	ctx context.Context,
+	backup *apiv1.Backup,
 	snapshot *storagesnapshotv1.VolumeSnapshot,
 ) (*ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
 	info := parseVolumeSnapshotInfo(snapshot)
 	if info.error != nil {
-		if info.error.isRetryable() {
-			contextLogger.Error(info.error,
-				"Retryable snapshot provisioning error, trying again",
-				"volumeSnapshotName", snapshot.Name)
-			return &ctrl.Result{RequeueAfter: 10 * time.Second}, nil
-		}
-
-		return nil, info.error
+		return se.handleSnapshotErrors(ctx, backup, info.error)
 	}
 	if !info.provisioned {
 		contextLogger.Info(
@@ -544,20 +558,14 @@ func (se *Reconciler) waitSnapshotToBeProvisionedAndAnnotate(
 // SnapshotStartTimeAnnotationName and SnapshotEndTimeAnnotationName.
 func (se *Reconciler) waitSnapshotToBeReady(
 	ctx context.Context,
+	backup *apiv1.Backup,
 	snapshot *storagesnapshotv1.VolumeSnapshot,
 ) (*ctrl.Result, error) {
 	contextLogger := log.FromContext(ctx)
 
 	info := parseVolumeSnapshotInfo(snapshot)
 	if info.error != nil {
-		if info.error.isRetryable() {
-			contextLogger.Error(info.error,
-				"Retryable snapshot provisioning error, trying again",
-				"volumeSnapshotName", snapshot.Name)
-			return &ctrl.Result{RequeueAfter: 10 * time.Second}, nil
-		}
-
-		return nil, info.error
+		return se.handleSnapshotErrors(ctx, backup, info.error)
 	}
 	if !info.ready {
 		contextLogger.Info(
@@ -569,4 +577,90 @@ func (se *Reconciler) waitSnapshotToBeReady(
 	}
 
 	return nil, nil
+}
+
+func (se *Reconciler) handleSnapshotErrors(
+	ctx context.Context,
+	backup *apiv1.Backup,
+	snapshotErr *volumeSnapshotError,
+) (*ctrl.Result, error) {
+	contextLogger := log.FromContext(ctx).
+		WithName("handle_snapshot_errors")
+
+	if !snapshotErr.isRetryable() {
+		return nil, snapshotErr
+	}
+
+	if err := addDeadlineStatus(ctx, se.cli, backup); err != nil {
+		return nil, fmt.Errorf("while adding deadline status: %w", err)
+	}
+
+	exceeded, err := isDeadlineExceeded(backup)
+	if err != nil {
+		return nil, fmt.Errorf("while checking if deadline was exceeded: %w", err)
+	}
+	if exceeded {
+		return nil, fmt.Errorf("deadline exceeded for error %w", snapshotErr)
+	}
+
+	contextLogger.Error(snapshotErr,
+		"Retryable snapshot provisioning error, trying again",
+	)
+	return &ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+}
+
+func isDeadlineExceeded(backup *apiv1.Backup) (bool, error) {
+	if backup.Status.PluginMetadata[pluginName] == "" {
+		return false, fmt.Errorf("no plugin metadata found in backup status")
+	}
+
+	data, err := unmarshalMetadata(backup.Status.PluginMetadata[pluginName])
+	if err != nil {
+		return false, fmt.Errorf("while unmarshalling plugin metadata: %w", err)
+	}
+
+	// if the deadline have passed since firstFailureTime we need to consider the deadline exceeded
+	deadline := int64(backup.GetVolumeSnapshotDeadline().Seconds())
+	return time.Now().Unix()-data.VolumeSnapshotFirstDetectedFailure > deadline, nil
+}
+
+type metadata struct {
+	// VolumeSnapshotFirstDetectedFailure is UNIX the timestamp when the first volume snapshot failure was detected
+	VolumeSnapshotFirstDetectedFailure int64 `json:"volumeSnapshotFirstFailure,omitempty"`
+}
+
+func unmarshalMetadata(rawData string) (*metadata, error) {
+	var data metadata
+	if err := json.Unmarshal([]byte(rawData), &data); err != nil {
+		return nil, fmt.Errorf("while unmarshalling metadata: %w", err)
+	}
+
+	if data.VolumeSnapshotFirstDetectedFailure == 0 {
+		return nil, fmt.Errorf("no volumeSnapshotFirstFailure found in plugin metadata: %s", pluginName)
+	}
+
+	return &data, nil
+}
+
+func addDeadlineStatus(ctx context.Context, cli client.Client, backup *apiv1.Backup) error {
+	if value, ok := backup.Status.PluginMetadata[pluginName]; ok {
+		if _, err := unmarshalMetadata(value); err == nil {
+			return nil
+		}
+	}
+
+	data := &metadata{VolumeSnapshotFirstDetectedFailure: time.Now().Unix()}
+	rawData, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+
+	if backup.Status.PluginMetadata == nil {
+		backup.Status.PluginMetadata = map[string]string{}
+	}
+
+	origBackup := backup.DeepCopy()
+	backup.Status.PluginMetadata[pluginName] = string(rawData)
+
+	return cli.Status().Patch(ctx, backup, client.MergeFrom(origBackup))
 }

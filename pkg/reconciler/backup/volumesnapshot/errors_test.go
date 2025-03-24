@@ -17,6 +17,13 @@ limitations under the License.
 package volumesnapshot
 
 import (
+	"context"
+	"errors"
+	"fmt"
+
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -25,7 +32,7 @@ var _ = Describe("Retriable error messages", func() {
 	DescribeTable(
 		"Retriable error messages",
 		func(msg string, isRetriable bool) {
-			Expect(isRetriableErrorMessage(msg)).To(Equal(isRetriable))
+			Expect(isCSIErrorMessageRetriable(msg)).To(Equal(isRetriable))
 		},
 		Entry("conflict", "Hey, the object has been modified!", true),
 		Entry("non-retriable error", "VolumeSnapshotClass not found", false),
@@ -33,5 +40,60 @@ var _ = Describe("Retriable error messages", func() {
 		Entry("explicitly non-retriable error", "Retriable: false because my pod is working", false),
 		Entry("error code 502 - retriable", "RetryAfter: 0s, HTTPStatusCode: 502, RawError: Internal Server Error", true),
 		Entry("error code 404 - non retriable", "RetryAfter: 0s, HTTPStatusCode: 404, RawError: Not found", false),
+		Entry("context deadline exceeded - retriable", "context deadline exceeded waiting for snapshot creation", true),
+		Entry("deadline exceeded - retriable", "deadline exceeded during Azure snapshot creation", true),
+		Entry("timed out - retriable", "operation timed out for csi-disk-handler", true),
 	)
+
+	Describe("isContextDeadlineExceededError", func() {
+		It("detects 'context deadline exceeded' error messages", func() {
+			Expect(isContextDeadlineExceededError("context deadline exceeded")).To(BeTrue())
+		})
+
+		It("detects 'deadline exceeded' error messages", func() {
+			Expect(isContextDeadlineExceededError("deadline exceeded")).To(BeTrue())
+		})
+
+		It("detects 'timed out' error messages", func() {
+			Expect(isContextDeadlineExceededError("operation timed out")).To(BeTrue())
+		})
+
+		It("rejects non-timeout error messages", func() {
+			Expect(isContextDeadlineExceededError("not found")).To(BeFalse())
+			Expect(isContextDeadlineExceededError("permission denied")).To(BeFalse())
+			Expect(isContextDeadlineExceededError("invalid input")).To(BeFalse())
+		})
+	})
+})
+
+var _ = Describe("isNetworkErrorRetryable", func() {
+	It("recognizes server timeout errors", func() {
+		err := apierrs.NewServerTimeout(schema.GroupResource{}, "test", 1)
+		Expect(isNetworkErrorRetryable(err)).To(BeTrue())
+	})
+
+	It("recognizes conflict errors", func() {
+		err := apierrs.NewConflict(schema.GroupResource{}, "test", nil)
+		Expect(isNetworkErrorRetryable(err)).To(BeTrue())
+	})
+
+	It("recognizes internal errors", func() {
+		err := apierrs.NewInternalError(fmt.Errorf("test error"))
+		Expect(isNetworkErrorRetryable(err)).To(BeTrue())
+	})
+
+	It("recognizes context deadline exceeded errors", func() {
+		err := context.DeadlineExceeded
+		Expect(isNetworkErrorRetryable(err)).To(BeTrue())
+	})
+
+	It("does not retry on not found errors", func() {
+		err := apierrs.NewNotFound(schema.GroupResource{}, "test")
+		Expect(isNetworkErrorRetryable(err)).To(BeFalse())
+	})
+
+	It("does not retry on random errors", func() {
+		err := errors.New("random error")
+		Expect(isNetworkErrorRetryable(err)).To(BeFalse())
+	})
 })

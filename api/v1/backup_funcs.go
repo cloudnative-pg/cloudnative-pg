@@ -19,7 +19,9 @@ package v1
 import (
 	"context"
 	"sort"
+	"strconv"
 	"strings"
+	"time"
 
 	volumesnapshot "github.com/kubernetes-csi/external-snapshotter/client/v8/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -93,6 +95,23 @@ func (backupStatus *BackupStatus) GetOnline() bool {
 	}
 
 	return *backupStatus.Online
+}
+
+// GetVolumeSnapshotDeadline returns the volume snapshot deadline in minutes.
+func (backup *Backup) GetVolumeSnapshotDeadline() time.Duration {
+	const defaultValue = 10
+
+	value := backup.Annotations[utils.BackupVolumeSnapshotDeadlineAnnotationName]
+	if value == "" {
+		return defaultValue * time.Minute
+	}
+
+	minutes, err := strconv.Atoi(value)
+	if err != nil {
+		return defaultValue * time.Minute
+	}
+
+	return time.Duration(minutes) * time.Minute
 }
 
 // IsCompletedVolumeSnapshot checks if a backup is completed using the volume snapshot method.

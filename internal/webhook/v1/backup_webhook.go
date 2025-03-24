@@ -19,6 +19,7 @@ package v1
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -166,6 +167,17 @@ func (v *BackupCustomValidator) validate(r *apiv1.Backup) field.ErrorList {
 			r.Spec.OnlineConfiguration,
 			"cannot be empty when the backup method is plugin",
 		))
+	}
+
+	if value := r.Annotations[utils.BackupVolumeSnapshotDeadlineAnnotationName]; value != "" {
+		_, err := strconv.Atoi(value)
+		if err != nil {
+			result = append(result, field.Invalid(
+				field.NewPath("metadata", "annotations", utils.BackupVolumeSnapshotDeadlineAnnotationName),
+				value,
+				"must be an integer",
+			))
+		}
 	}
 
 	return result
