@@ -919,6 +919,7 @@ logLevel
 lookups
 lsn
 lt
+lz
 macOS
 malcolm
 mallocs
@@ -1364,5 +1365,7 @@ www
 xact
 xlog
 xml
+xz
 yaml
 yml
+zstd
