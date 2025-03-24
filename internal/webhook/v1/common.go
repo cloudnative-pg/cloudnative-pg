@@ -1,0 +1,170 @@
+/*
+Copyright The CloudNativePG Contributors
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package v1
+
+import (
+	"context"
+	"fmt"
+
+	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+)
+
+const (
+	// validationEnabledAnnotationValue is the value of that "validation"
+	// annotation that is set when the validation is enabled
+	validationEnabledAnnotationValue = "enabled"
+
+	// validationDisabledAnnotationValue is the value of that "validation"
+	// annotation that is set when the validation is disabled
+	validationDisabledAnnotationValue = "disabled"
+)
+
+// invalidValidationAnnotationValue is raised when the "validation"
+// annotation has an unknown value
+type invalidValidationAnnotationValue struct {
+	value string
+}
+
+// newInvalidValidationAnnotationValue creates a new error
+func newInvalidValidationAnnotationValue(value string) *invalidValidationAnnotationValue {
+	return &invalidValidationAnnotationValue{
+		value: value,
+	}
+}
+
+// Error implements the error interface
+func (e *invalidValidationAnnotationValue) Error() string {
+	return fmt.Sprintf(
+		"invalid %q annotation: %q (expected \"enabled\" or \"disabled\")",
+		utils.WebhookValidationAnnotationName, e.value)
+}
+
+// isValidationEnabled checks whether validation webhooks are
+// enabled or disabled
+func isValidationEnabled(obj client.Object) (bool, error) {
+	value := obj.GetAnnotations()[utils.WebhookValidationAnnotationName]
+	switch value {
+	case validationEnabledAnnotationValue:
+		return true, nil
+
+	case validationDisabledAnnotationValue:
+		return false, nil
+
+	case "":
+		return true, nil
+
+	default:
+		return true, newInvalidValidationAnnotationValue(value)
+	}
+}
+
+// bypassableValidator implements a custom validator that enables an
+// existing custom validator to be enabled or disabled via an annotation.
+type bypassableValidator struct {
+	validator admission.CustomValidator
+}
+
+// newBypassableValidator creates a new custom validator that enables an
+// existing custom validator to be enabled or disabled via an annotation.
+func newBypassableValidator(validator admission.CustomValidator) *bypassableValidator {
+	return &bypassableValidator{
+		validator: validator,
+	}
+}
+
+// ValidateCreate validates the object on creation.
+// The optional warnings will be added to the response as warning messages.
+// Return an error if the object is invalid.
+func (b bypassableValidator) ValidateCreate(
+	ctx context.Context,
+	obj runtime.Object,
+) (admission.Warnings, error) {
+	var warnings admission.Warnings
+
+	validationEnabled, err := isValidationEnabled(obj.(client.Object))
+	if err != nil {
+		// If the validation annotation value is unexpected, we continue validating
+		// the object but we warn the user that the value was wrong
+		warnings = append(warnings, err.Error())
+	}
+
+	if !validationEnabled {
+		warnings = append(warnings, "validation webhook disabled")
+		return warnings, nil
+	}
+
+	validationWarnings, err := b.validator.ValidateCreate(ctx, obj)
+	warnings = append(warnings, validationWarnings...)
+	return warnings, err
+}
+
+// ValidateUpdate validates the object on update.
+// The optional warnings will be added to the response as warning messages.
+// Return an error if the object is invalid.
+func (b bypassableValidator) ValidateUpdate(
+	ctx context.Context,
+	oldObj runtime.Object,
+	newObj runtime.Object,
+) (admission.Warnings, error) {
+	var warnings admission.Warnings
+
+	validationEnabled, err := isValidationEnabled(newObj.(client.Object))
+	if err != nil {
+		// If the validation annotation value is unexpected, we continue validating
+		// the object but we warn the user that the value was wrong
+		warnings = append(warnings, err.Error())
+	}
+
+	if !validationEnabled {
+		warnings = append(warnings, "validation webhook disabled")
+		return warnings, nil
+	}
+
+	validationWarnings, err := b.validator.ValidateUpdate(ctx, oldObj, newObj)
+	warnings = append(warnings, validationWarnings...)
+	return warnings, err
+}
+
+// ValidateDelete validates the object on deletion.
+// The optional warnings will be added to the response as warning messages.
+// Return an error if the object is invalid.
+func (b bypassableValidator) ValidateDelete(
+	ctx context.Context,
+	obj runtime.Object,
+) (admission.Warnings, error) {
+	var warnings admission.Warnings
+
+	validationEnabled, err := isValidationEnabled(obj.(client.Object))
+	if err != nil {
+		// If the validation annotation value is unexpected, we continue validating
+		// the object but we warn the user that the value was wrong
+		warnings = append(warnings, err.Error())
+	}
+
+	if !validationEnabled {
+		warnings = append(warnings, "validation webhook disabled")
+		return warnings, nil
+	}
+
+	validationWarnings, err := b.validator.ValidateDelete(ctx, obj)
+	warnings = append(warnings, validationWarnings...)
+	return warnings, err
+}

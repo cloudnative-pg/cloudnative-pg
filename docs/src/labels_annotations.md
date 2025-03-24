@@ -236,6 +236,11 @@ CloudNativePG manages the following predefined annotations:
 `kubectl.kubernetes.io/restartedAt`
 :   When available, the time of last requested restart of a Postgres cluster.
 
+`cnpg.io/validation`
+:   When set to `disabled` on a CNPG-managed custom object, the validation webhook
+    will allow every change. Important: this allows potentially dangerous activities,
+    please use it with care and at your own risk.
+
 ## Prerequisites
 
 By default, no label or annotation defined in the cluster's metadata is

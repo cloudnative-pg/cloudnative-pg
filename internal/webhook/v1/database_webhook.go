@@ -41,7 +41,7 @@ var databaseLog = log.WithName("database-resource").WithValues("version", "v1")
 // SetupDatabaseWebhookWithManager registers the webhook for Database in the manager.
 func SetupDatabaseWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).For(&apiv1.Database{}).
-		WithValidator(&DatabaseCustomValidator{}).
+		WithValidator(newBypassableValidator(&DatabaseCustomValidator{})).
 		WithDefaulter(&DatabaseCustomDefaulter{}).
 		Complete()
 }
