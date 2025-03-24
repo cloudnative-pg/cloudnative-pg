@@ -37,7 +37,7 @@ var (
 // occur during communication between the operator and the Kubernetes
 // API server, as well as between the operator and the instance
 // manager.
-// It is not designed to  check errors raised  by the CSI  driver and
+// It is not designed to check errors raised by the CSI driver and
 // exposed by the CSI snapshotter sidecar.
 func isNetworkErrorRetryable(err error) bool {
 	return apierrs.IsServerTimeout(err) || apierrs.IsConflict(err) || apierrs.IsInternalError(err) ||
