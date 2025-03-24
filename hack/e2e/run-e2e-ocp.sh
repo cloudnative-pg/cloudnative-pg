@@ -36,6 +36,40 @@ function wait_for() {
   [[ $ITER -lt $5 ]]
 }
 
+# Retry a command up to a specific numer of times until it exits successfully,
+# with exponential back off.
+#
+#  $ retry 5 echo Hello
+#  Hello
+#
+#  $ retry 5 false
+#  Retry 1/5 exited 1, retrying in 1 seconds...
+#  Retry 2/5 exited 1, retrying in 2 seconds...
+#  Retry 3/5 exited 1, retrying in 4 seconds...
+#  Retry 4/5 exited 1, retrying in 8 seconds...
+#  Retry 5/5 exited 1, no more retries left.
+#
+# Inspired from https://gist.github.com/sj26/88e1c6584397bb7c13bd11108a579746
+function retry {
+  local retries=$1
+  shift
+
+  local count=0
+  until "$@"; do
+    local exit=$?
+    local wait=$((2 ** count))
+    count=$((count + 1))
+    if [ $count -lt "$retries" ]; then
+      echo "Retry $count/$retries exited $exit, retrying in $wait seconds..." >&2
+      sleep $wait
+    else
+      echo "Retry $count/$retries exited $exit, no more retries left." >&2
+      return $exit
+    fi
+  done
+  return 0
+}
+
 ROOT_DIR=$(realpath "$(dirname "$0")/../../")
 # we need to export ENVs defined in the workflow and used in run-e2e.sh script
 export POSTGRES_IMG=${POSTGRES_IMG:-$(grep 'DefaultImageName.*=' "${ROOT_DIR}/pkg/versions/versions.go" | cut -f 2 -d \")}
@@ -71,7 +105,7 @@ EOF
 # requires a secret. When the sa is available, define the secret.
 wait_for sa openshift-operators cnpg-manager 10 60
 oc create secret docker-registry -n openshift-operators --docker-server="${REGISTRY}" --docker-username="${REGISTRY_USER}" --docker-password="${REGISTRY_PASSWORD}" cnpg-pull-secret || true
-oc secrets link -n openshift-operators cnpg-manager cnpg-pull-secret --for=pull
+retry 5 oc secrets link -n openshift-operators cnpg-manager cnpg-pull-secret --for=pull
 
 # We wait 30 seconds for the operator deployment to be created
 echo "Waiting 30s for the operator deployment to be ready"
