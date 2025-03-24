@@ -214,6 +214,11 @@ CloudNativePG manages the following predefined annotations:
 `cnpg.io/snapshotEndTime`
 :   The time a snapshot was marked as ready to use.
 
+`cnpg.io/volumeSnapshotDeadline`
+:   Applied to `Backup` and `ScheduledBackup` resources, allows you to control
+    how long the operator should retry recoverable errors before considering the
+    volume snapshot backup failed. In minutes, defaulting to 10.
+
 `kubectl.kubernetes.io/restartedAt`
 :   When available, the time of last requested restart of a Postgres cluster.
 
