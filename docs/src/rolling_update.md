@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Rolling Updates
 
 The operator allows changing the PostgreSQL version used in a cluster while

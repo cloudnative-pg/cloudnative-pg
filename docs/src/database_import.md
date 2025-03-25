@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Importing Postgres databases
 
 This section describes how to import one or more existing PostgreSQL

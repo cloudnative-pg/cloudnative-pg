@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Certificates
 
 CloudNativePG was designed to natively support TLS certificates.

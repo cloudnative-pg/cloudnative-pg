@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Appendix A - Common object stores for backups
 
 You can store the [backup](../backup.md) files in any service that is supported

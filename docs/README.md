@@ -71,3 +71,10 @@ consider if they should be included in the curated [list of examples](src/sample
 And please help keeping the samples in the curated list, as well as any samples
 named `cluster-example-*` in runnable condition.
 These can be a big help for beginners.
+
+## License
+
+The CloudNativePG documentation and all the work under the `docs` folder is
+licensed under a Creative Commons Attribution 4.0 International License.
+
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->

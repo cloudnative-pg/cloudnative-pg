@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Scheduling
 
 Scheduling, in Kubernetes, is the process responsible for placing a new pod on

@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Installation and upgrades
 
 ## Installation on Kubernetes

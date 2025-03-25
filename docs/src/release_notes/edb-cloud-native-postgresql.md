@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Release notes for 1.14.0 and earlier
 
 The first public release of CloudNativePG is version 1.15.0. Before that,

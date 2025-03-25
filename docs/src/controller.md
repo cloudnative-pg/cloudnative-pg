@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Custom Pod Controller
 
 Kubernetes uses the

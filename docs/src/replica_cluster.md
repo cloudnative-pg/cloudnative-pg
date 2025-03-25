@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Replica clusters
 
 A replica cluster is a CloudNativePG `Cluster` resource designed to

@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Supported releases
 
 <!-- Inspired by https://github.com/istio/istio.io/blob/933b896c/content/en/docs/releases/supported-releases/index.md -->

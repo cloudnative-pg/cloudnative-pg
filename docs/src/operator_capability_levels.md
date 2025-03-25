@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Operator capability levels
 
 These capabilities were implemented by CloudNativePG,

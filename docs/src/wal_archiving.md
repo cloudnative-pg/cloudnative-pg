@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # WAL archiving
 
 WAL archiving is the process that feeds a [WAL archive](backup.md#wal-archive)
