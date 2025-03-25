@@ -118,5 +118,3 @@ require (
 	sigs.k8s.io/kustomize/kyaml v0.19.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.5.0 // indirect
 )
-
-replace github.com/cloudnative-pg/machinery => github.com/leonardoce/machinery v0.0.0-20250318135228-ba5193c00be5

@@ -83,9 +83,9 @@ func copyPostgresInstallation(ctx context.Context, pgConfig string, dest string)
 		return fmt.Errorf("failed to create the directory: %w", err)
 	}
 
-	copyLocations := []pgconfig.InstallationLocation{pgconfig.BinDir, pgconfig.PkgLibDir, pgconfig.ShareDir}
+	copyLocations := []pgconfig.ConfigurationParameter{pgconfig.BinDir, pgconfig.PkgLibDir, pgconfig.ShareDir}
 	for _, config := range copyLocations {
-		sourceDir, err := pgconfig.GetInstallationLocation(pgConfig, config)
+		sourceDir, err := pgconfig.GetConfigurationParameter(pgConfig, config)
 		if err != nil {
 			return err
 		}
