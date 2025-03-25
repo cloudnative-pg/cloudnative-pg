@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Connecting from an application
 
 Applications are supposed to work with the services created by CloudNativePG

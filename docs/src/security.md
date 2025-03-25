@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Security
 
 This section contains information about security for CloudNativePG,

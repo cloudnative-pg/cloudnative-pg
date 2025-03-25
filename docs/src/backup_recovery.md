@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Backup and Recovery
 
 Until CloudNativePG 1.20, this page used to contain both the backup and

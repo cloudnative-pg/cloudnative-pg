@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Architecture
 
 This section covers the main architectural aspects you need to consider

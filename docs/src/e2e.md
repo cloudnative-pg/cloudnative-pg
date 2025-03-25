@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # End-to-End Tests
 
 CloudNativePG is automatically tested after each

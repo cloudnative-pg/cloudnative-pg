@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Recovery
 
 In PostgreSQL terminology, recovery is the process of starting a PostgreSQL

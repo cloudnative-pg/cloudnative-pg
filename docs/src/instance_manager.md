@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Postgres instance manager
 
 CloudNativePG does not rely on an external tool for failover management.

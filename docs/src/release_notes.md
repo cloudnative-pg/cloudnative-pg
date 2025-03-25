@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Release notes
 
 History of user-visible changes for CloudNativePG, classified for each minor release.

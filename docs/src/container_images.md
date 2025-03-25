@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Container Image Requirements
 
 The CloudNativePG operator for Kubernetes is designed to

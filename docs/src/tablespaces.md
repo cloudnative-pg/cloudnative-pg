@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Tablespaces
 
 A tablespace is a robust and widely embraced feature in database
