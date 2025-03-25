@@ -180,7 +180,7 @@ build and deploy:
 ```shell
 cd cloudnative-pg
 git checkout main
-./hack/setup.sh create load deploy
+./hack/setup-cluster.sh create load deploy
 ```
 
 This will build the operator based on the `main` branch content, create a
@@ -204,7 +204,7 @@ kubectl get deploy -n cnpg-system cnpg-controller-manager
 Now that your system has been validated, you can tear down the local cluster with:
 
 ```shell
-./hack/setup.sh destroy
+./hack/setup-cluster.sh destroy
 ```
 
 Congratulations, you have a suitable development environment. You are now able
