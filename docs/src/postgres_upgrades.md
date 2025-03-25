@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # PostgreSQL Upgrades
 
 PostgreSQL upgrades fall into two categories:
