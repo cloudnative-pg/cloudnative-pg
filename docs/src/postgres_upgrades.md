@@ -104,3 +104,45 @@ rollback.
     possible, without having to perform a full recovery from a backup. Ensure you
     monitor the process closely and take corrective action if needed.
 
+### Example: Performing a Major Upgrade
+
+Consider the following PostgreSQL cluster running version 13:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example
+spec:
+  imageName: ghcr.io/cloudnative-pg/postgresql:13-minimal-bullseye
+  instances: 3
+
+  storage:
+    size: 1Gi
+```
+
+To upgrade the cluster to version 17, update the `imageName` field by changing
+the major version tag from `13` to `17`:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example
+spec:
+  imageName: ghcr.io/cloudnative-pg/postgresql:17-minimal-bullseye
+  instances: 3
+
+  storage:
+    size: 1Gi
+```
+
+- All cluster pods are terminated to ensure a consistent upgrade.
+- A new job is created with the name of the primary pod, appended with the
+  suffix `-major-upgrade`. This job runs `pg_upgrade` on the primary’s
+  persistent volumes group.
+- Once the upgrade is complete:
+  - The PVC groups of the replicas (`cluster-example-2` and `cluster-example-3`) are destroyed
+  - The primary pod is restarted
+  - Two new replicas (`cluster-example-4` and `cluster-example-5`) are
+    re-cloned from the the upgraded primary.
