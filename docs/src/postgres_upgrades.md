@@ -50,4 +50,51 @@ constraints.
 
 ## Offline In-Place Major Upgrades
 
-TODO
+CloudNativePG performs an **offline in-place major upgrade** when a new operand
+container image with a higher PostgreSQL major version is requested for a
+cluster.
+
+You can trigger the upgrade in one of two ways:
+
+- By updating the major version in the image tag via the `.spec.imageName`
+  option.
+- Using an [image catalog](image_catalog.md) to manage version changes.
+
+For details on supported image tags, see
+["Image Tag Requirements"](container_images/#image-tag-requirements).
+
+### Upgrade Process
+
+When CloudNativePG detects a PostgreSQL major version upgrade, it:
+
+1. Shuts down all cluster pods to ensure data consistency.
+2. Records the previous PostgreSQL version in the cluster’s status
+   (`.status.majorVersionUpgradeFromImage`).
+3. Initiates a new upgrade job, which performs the necessary steps to upgrade
+   the database.
+
+!!! Important
+    During the upgrade process, the entire PostgreSQL cluster, including
+    replicas, is unavailable to applications. Ensure that your system can
+    tolerate this downtime before proceeding.
+
+### Post-Upgrade Actions
+
+If the upgrade is **successful**, CloudNativePG:
+
+- **Destroys the PVCs of replicas** (if available).
+- **Scales up replicas as required**.
+
+!!! Warning
+    Recloning replicas may take significant time for very large databases.
+    Ensure you account for this delay. It is strongly recommended to take a **full
+    backup** once the upgrade is completed.
+
+If the upgrade **fails**, you must **manually revert** the major version
+change, as CloudNativePG cannot automatically decide the rollback.
+
+!!! Important
+    This process **protects your existing database from data loss**, as no data
+    is modified during the upgrade. If the upgrade fails, a rollback is possible.
+    Ensure you monitor the process closely and take corrective action if needed.
+
