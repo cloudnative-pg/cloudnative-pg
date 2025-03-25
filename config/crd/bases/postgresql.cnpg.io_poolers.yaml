@@ -300,6 +300,14 @@ spec:
                       type: object
                     type: array
                 type: object
+              odyssey:
+                description: The Odyssey configuration
+                properties:
+                  configuration:
+                    type: string
+                  enabled:
+                    type: boolean
+                type: object
               pgbouncer:
                 description: The PgBouncer configuration
                 properties:

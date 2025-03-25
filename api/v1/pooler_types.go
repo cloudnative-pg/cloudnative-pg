@@ -77,6 +77,10 @@ type PoolerSpec struct {
 	// The PgBouncer configuration
 	PgBouncer *PgBouncerSpec `json:"pgbouncer"`
 
+	// The Odyssey configuration
+	// +optional
+	Odyssey *OdysseySpec `json:"odyssey,omitempty"`
+
 	// The deployment strategy to use for pgbouncer to replace existing pods with new ones
 	// +optional
 	DeploymentStrategy *appsv1.DeploymentStrategy `json:"deploymentStrategy,omitempty"`
@@ -185,6 +189,12 @@ type PgBouncerSpec struct {
 	// +kubebuilder:default:=false
 	// +optional
 	Paused *bool `json:"paused,omitempty"`
+}
+
+// OdysseySpec defines how to configure Odyssey
+type OdysseySpec struct {
+	Enabled       bool   `json:"enabled,omitempty"`
+	Configuration string `json:"configuration,omitempty"`
 }
 
 // PoolerStatus defines the observed state of Pooler
