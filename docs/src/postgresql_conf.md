@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # PostgreSQL Configuration
 
 Users that are familiar with PostgreSQL are aware of the existence of the

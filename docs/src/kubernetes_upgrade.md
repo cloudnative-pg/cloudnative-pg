@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Kubernetes Upgrade and Maintenance
 
 Maintaining an up-to-date Kubernetes cluster is crucial for ensuring optimal

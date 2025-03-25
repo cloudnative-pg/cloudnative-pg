@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Automated failover
 
 In the case of unexpected errors on the primary for longer than the

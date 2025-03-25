@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Troubleshooting
 
 In this page, you can find some basic information on how to troubleshoot

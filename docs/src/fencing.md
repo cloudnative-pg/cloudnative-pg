@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Fencing
 
 Fencing in CloudNativePG is the ultimate process of protecting the

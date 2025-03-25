@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Quickstart
 
 This section guides you through testing a PostgreSQL cluster on your local machine by

@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # PostgreSQL Role Management
 
 From its inception, CloudNativePG has managed the creation of specific roles
