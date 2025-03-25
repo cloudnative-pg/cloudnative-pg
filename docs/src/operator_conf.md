@@ -46,6 +46,8 @@ Name | Description
 `MONITORING_QUERIES_SECRET` | The name of a Secret in the operator's namespace with a set of default queries (to be specified under the key `queries`) to be applied to all created Clusters
 `CERTIFICATE_DURATION` | Determines the lifetime of the generated certificates in days. Default is 90.
 `EXPIRING_CHECK_THRESHOLD` | Determines the threshold, in days, for identifying a certificate as expiring. Default is 7. 
+`OPERATOR_IMAGE_NAME` | The name of the operator image used to bootstrap Pods. Defaults to the image specified during installation.
+`POSTGRES_IMAGE_NAME` | The name of the PostgreSQL image used by default for new clusters. Defaults to the version specified in the operator.
 `CREATE_ANY_SERVICE` | when set to `true`, will create `-any` service for the cluster. Default is `false`
 
 Values in `INHERITED_ANNOTATIONS` and `INHERITED_LABELS` support path-like wildcards. For example, the value `example.com/*` will match
