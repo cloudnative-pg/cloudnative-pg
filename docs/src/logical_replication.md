@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Logical Replication
 
 PostgreSQL extends its replication capabilities beyond physical replication,

@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Before You Start
 
 Before we get started, it is essential to go over some terminology that is

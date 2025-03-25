@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Replication
 
 Physical replication is one of the strengths of PostgreSQL and one of the

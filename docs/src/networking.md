@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Networking
 
 CloudNativePG assumes the underlying Kubernetes cluster has the required

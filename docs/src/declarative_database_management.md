@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # PostgreSQL Database Management
 
 CloudNativePG simplifies PostgreSQL database provisioning by automatically

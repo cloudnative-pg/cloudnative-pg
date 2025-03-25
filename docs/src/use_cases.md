@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Use cases
 
 CloudNativePG has been designed to work with applications

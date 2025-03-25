@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Connection pooling
 
 CloudNativePG provides native support for connection pooling with

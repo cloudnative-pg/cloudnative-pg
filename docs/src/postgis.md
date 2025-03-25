@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # PostGIS
 
 [PostGIS](https://postgis.net/) is a very popular open source extension
