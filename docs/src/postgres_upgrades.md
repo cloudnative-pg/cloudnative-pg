@@ -71,12 +71,16 @@ When CloudNativePG detects a PostgreSQL major version upgrade, it:
 2. Records the previous PostgreSQL version in the cluster’s status
    (`.status.majorVersionUpgradeFromImage`).
 3. Initiates a new upgrade job, which performs the necessary steps to upgrade
-   the database.
+   the database via `pg_upgrade` with the `--link` option.
 
 !!! Important
     During the upgrade process, the entire PostgreSQL cluster, including
     replicas, is unavailable to applications. Ensure that your system can
     tolerate this downtime before proceeding.
+
+!!! Info
+    For detailed guidance on `pg_upgrade`, refer to the official
+    [PostgreSQL documentation](https://www.postgresql.org/docs/current/pgupgrade.html).
 
 ### Post-Upgrade Actions
 
@@ -86,15 +90,17 @@ If the upgrade is **successful**, CloudNativePG:
 - **Scales up replicas as required**.
 
 !!! Warning
-    Recloning replicas may take significant time for very large databases.
+    Re-cloning replicas may take significant time for very large databases.
     Ensure you account for this delay. It is strongly recommended to take a **full
     backup** once the upgrade is completed.
 
-If the upgrade **fails**, you must **manually revert** the major version
-change, as CloudNativePG cannot automatically decide the rollback.
+If the upgrade **fails**, you must **revert** the major version change in the
+cluster's configuration, as CloudNativePG cannot automatically decide the
+rollback.
 
 !!! Important
     This process **protects your existing database from data loss**, as no data
-    is modified during the upgrade. If the upgrade fails, a rollback is possible.
-    Ensure you monitor the process closely and take corrective action if needed.
+    is modified during the upgrade. If the upgrade fails, a rollback is
+    possible, without having to perform a full recovery from a backup. Ensure you
+    monitor the process closely and take corrective action if needed.
 
