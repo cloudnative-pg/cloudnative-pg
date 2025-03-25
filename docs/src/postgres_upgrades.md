@@ -61,7 +61,7 @@ You can trigger the upgrade in one of two ways:
 - Using an [image catalog](image_catalog.md) to manage version changes.
 
 For details on supported image tags, see
-["Image Tag Requirements"](container_images/#image-tag-requirements).
+["Image Tag Requirements"](container_images.md#image-tag-requirements).
 
 ### Upgrade Process
 
