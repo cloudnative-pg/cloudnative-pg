@@ -1,14 +1,7 @@
 #!/usr/bin/env bash
 ##
-## CloudNativePG release script
-##
-## This shell script automates the release process for a selected
-## version of CloudNativePG. It must be invoked from a release
-## branch. For details on the release procedure, please
-## refer to the contribute/release_procedure.md file from the
-## main folder.
-##
-## Copyright The CloudNativePG Contributors
+## Copyright © contributors to CloudNativePG, established as
+## CloudNativePG a Series of LF Projects, LLC.
 ##
 ## Licensed under the Apache License, Version 2.0 (the "License");
 ## you may not use this file except in compliance with the License.
@@ -21,6 +14,17 @@
 ## WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 ## See the License for the specific language governing permissions and
 ## limitations under the License.
+##
+## SPDX-License-Identifier: Apache-2.0
+##
+
+## CloudNativePG release script
+##
+## This shell script automates the release process for a selected
+## version of CloudNativePG. It must be invoked from a release
+## branch. For details on the release procedure, please
+## refer to the contribute/release_procedure.md file from the
+## main folder.
 ##
 
 set -o errexit -o nounset -o pipefail
