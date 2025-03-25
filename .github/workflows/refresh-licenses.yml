@@ -1,10 +1,10 @@
-# Refreshes the licences directory and creates a PR if there are any changes
+# Refresh the "licences" directory and create a PR if there are any changes
 
 name: refresh-licenses
 on:
   workflow_dispatch:
   schedule:
-    - cron: "30 0 * * *"
+    - cron: "30 0 * * 1"
 
 env:
   GOLANG_VERSION: "1.24.x"
@@ -31,11 +31,11 @@ jobs:
         uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ secrets.REPO_GHA_PAT }}
-          title: "feat: refresh licenses directory"
+          title: "chore: refresh licenses directory"
           body: "Refresh the licenses directory"
           branch: "license-updater"
           author: "license-updater <license-updater@users.noreply.github.com>"
           add-paths: |
             licenses/**
-          commit-message: "feat: refresh licenses directory"
+          commit-message: "chore: refresh licenses directory"
           signoff: true
