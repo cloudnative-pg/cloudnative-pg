@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # CloudNativePG
 
 **CloudNativePG** is an open-source
@@ -145,3 +146,6 @@ please consult the ["Before you start" section](before_you_start.md).
 *[Postgres, PostgreSQL and the Slonik Logo](https://www.postgresql.org/about/policies/trademarks/)
 are trademarks or registered trademarks of the PostgreSQL Community Association
 of Canada, and used with their permission.*
+
+The CloudNativePG documentation is licensed under a Creative Commons
+Attribution 4.0 International License.

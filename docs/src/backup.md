@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Backup
 
 PostgreSQL natively provides first class backup and recovery capabilities based

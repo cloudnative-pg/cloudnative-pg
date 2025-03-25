@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Logging
 
 CloudNativePG outputs logs in JSON format directly to standard output, including

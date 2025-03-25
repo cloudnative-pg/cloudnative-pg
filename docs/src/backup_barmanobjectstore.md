@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Backup on object stores
 
 CloudNativePG natively supports **online/hot backup** of PostgreSQL

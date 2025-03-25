@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Service Management
 
 A PostgreSQL cluster should only be accessed via standard Kubernetes network

@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Resource management
 
 In a typical Kubernetes cluster, pods run with unlimited resources. By default,
