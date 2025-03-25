@@ -74,7 +74,7 @@ These can be a big help for beginners.
 
 ## License
 
-The CloudNativePG documentation is licensed under a Creative Commons
-Attribution 4.0 International License.
+The CloudNativePG documentation and all the work under the `docs` folder is
+licensed under a Creative Commons Attribution 4.0 International License.
 
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
