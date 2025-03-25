@@ -90,7 +90,7 @@ func (r *ClusterReconciler) nodesPredicate() predicate.Funcs {
 			}
 
 			// check if any of the watched drain taints have changed.
-			for _, taint := range r.DrainTaints {
+			for _, taint := range r.drainTaints {
 				oldTaintIndex := slices.IndexFunc(oldNode.Spec.Taints, func(t corev1.Taint) bool { return t.Key == taint })
 				newTaintIndex := slices.IndexFunc(newNode.Spec.Taints, func(t corev1.Taint) bool { return t.Key == taint })
 
@@ -100,6 +100,7 @@ func (r *ClusterReconciler) nodesPredicate() predicate.Funcs {
 				case oldTaintIndex == -1 || newTaintIndex == -1:
 					return true
 				}
+
 				// exists in both - check if value or effect is different
 				oldTaint := oldNode.Spec.Taints[oldTaintIndex]
 				newTaint := newNode.Spec.Taints[newTaintIndex]

@@ -88,8 +88,8 @@ type ClusterReconciler struct {
 	Recorder        record.EventRecorder
 	InstanceClient  remote.InstanceClient
 	Plugins         repository.Interface
-	DrainTaints     []string
 
+	drainTaints    []string
 	rolloutManager *rolloutManager.Manager
 }
 
@@ -111,7 +111,7 @@ func NewClusterReconciler(
 			configuration.Current.GetClustersRolloutDelay(),
 			configuration.Current.GetInstancesRolloutDelay(),
 		),
-		DrainTaints: drainTaints,
+		drainTaints: drainTaints,
 	}
 }
 
@@ -1375,7 +1375,7 @@ func (r *ClusterReconciler) mapNodeToClusters() handler.MapFunc {
 
 		// exit if the node is schedulable (e.g. not cordoned)
 		// could be expanded here with other conditions (e.g. pressure or issues)
-		if !isNodeBeingDrained(node, r.DrainTaints) {
+		if !isNodeUnschedulableOrBeingDrained(node, r.drainTaints) {
 			return nil
 		}
 
