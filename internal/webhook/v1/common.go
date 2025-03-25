@@ -37,42 +37,21 @@ const (
 	validationDisabledAnnotationValue = "disabled"
 )
 
-// invalidValidationAnnotationValue is raised when the "validation"
-// annotation has an unknown value
-type invalidValidationAnnotationValue struct {
-	value string
-}
-
-// newInvalidValidationAnnotationValue creates a new error
-func newInvalidValidationAnnotationValue(value string) *invalidValidationAnnotationValue {
-	return &invalidValidationAnnotationValue{
-		value: value,
-	}
-}
-
-// Error implements the error interface
-func (e *invalidValidationAnnotationValue) Error() string {
-	return fmt.Sprintf(
-		"invalid %q annotation: %q (expected \"enabled\" or \"disabled\")",
-		utils.WebhookValidationAnnotationName, e.value)
-}
-
 // isValidationEnabled checks whether validation webhooks are
 // enabled or disabled
 func isValidationEnabled(obj client.Object) (bool, error) {
 	value := obj.GetAnnotations()[utils.WebhookValidationAnnotationName]
 	switch value {
-	case validationEnabledAnnotationValue:
+	case validationEnabledAnnotationValue, "":
 		return true, nil
 
 	case validationDisabledAnnotationValue:
 		return false, nil
 
-	case "":
-		return true, nil
-
 	default:
-		return true, newInvalidValidationAnnotationValue(value)
+		return true, fmt.Errorf(
+			`invalid %q annotation: %q (expected "enabled" or "disabled")`,
+			utils.WebhookValidationAnnotationName, value)
 	}
 }
 
@@ -97,23 +76,9 @@ func (b bypassableValidator) ValidateCreate(
 	ctx context.Context,
 	obj runtime.Object,
 ) (admission.Warnings, error) {
-	var warnings admission.Warnings
-
-	validationEnabled, err := isValidationEnabled(obj.(client.Object))
-	if err != nil {
-		// If the validation annotation value is unexpected, we continue validating
-		// the object but we warn the user that the value was wrong
-		warnings = append(warnings, err.Error())
-	}
-
-	if !validationEnabled {
-		warnings = append(warnings, "validation webhook disabled")
-		return warnings, nil
-	}
-
-	validationWarnings, err := b.validator.ValidateCreate(ctx, obj)
-	warnings = append(warnings, validationWarnings...)
-	return warnings, err
+	return validate(obj, func() (admission.Warnings, error) {
+		return b.validator.ValidateCreate(ctx, obj)
+	})
 }
 
 // ValidateUpdate validates the object on update.
@@ -124,23 +89,9 @@ func (b bypassableValidator) ValidateUpdate(
 	oldObj runtime.Object,
 	newObj runtime.Object,
 ) (admission.Warnings, error) {
-	var warnings admission.Warnings
-
-	validationEnabled, err := isValidationEnabled(newObj.(client.Object))
-	if err != nil {
-		// If the validation annotation value is unexpected, we continue validating
-		// the object but we warn the user that the value was wrong
-		warnings = append(warnings, err.Error())
-	}
-
-	if !validationEnabled {
-		warnings = append(warnings, "validation webhook disabled")
-		return warnings, nil
-	}
-
-	validationWarnings, err := b.validator.ValidateUpdate(ctx, oldObj, newObj)
-	warnings = append(warnings, validationWarnings...)
-	return warnings, err
+	return validate(newObj, func() (admission.Warnings, error) {
+		return b.validator.ValidateUpdate(ctx, oldObj, newObj)
+	})
 }
 
 // ValidateDelete validates the object on deletion.
@@ -150,6 +101,12 @@ func (b bypassableValidator) ValidateDelete(
 	ctx context.Context,
 	obj runtime.Object,
 ) (admission.Warnings, error) {
+	return validate(obj, func() (admission.Warnings, error) {
+		return b.validator.ValidateDelete(ctx, obj)
+	})
+}
+
+func validate(obj runtime.Object, validator func() (admission.Warnings, error)) (admission.Warnings, error) {
 	var warnings admission.Warnings
 
 	validationEnabled, err := isValidationEnabled(obj.(client.Object))
@@ -164,7 +121,7 @@ func (b bypassableValidator) ValidateDelete(
 		return warnings, nil
 	}
 
-	validationWarnings, err := b.validator.ValidateDelete(ctx, obj)
+	validationWarnings, err := validator()
 	warnings = append(warnings, validationWarnings...)
 	return warnings, err
 }
