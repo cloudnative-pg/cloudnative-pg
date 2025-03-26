@@ -3,21 +3,21 @@
 
 PostgreSQL upgrades fall into two categories:
 
-- **Minor version upgrades** (e.g., from 17.0 to 17.1)
-- **Major version upgrades** (e.g., from 16.x to 17.0)
+- [Minor version upgrades](#minor-version-upgrades) (e.g., from 17.0 to 17.1)
+- [Major version upgrades](#major-version-upgrades) (e.g., from 16.x to 17.0)
 
 ## Minor Version Upgrades
 
 PostgreSQL version numbers follow a `major.minor` format. For instance, in
-version **17.1**:
+version 17.1:
 
-- `17` is the **major version**
-- `1` is the **minor version**
+- `17` is the major version
+- `1` is the minor version
 
 Minor releases are fully compatible with earlier and later minor releases of
 the same major version. They include bug fixes and security updates but do not
 introduce changes to the internal storage format.
-For example, **PostgreSQL 17.1** is compatible with **17.0** and **17.4**.
+For example, PostgreSQL 17.1 is compatible with 17.0 and 17.4.
 
 ### Upgrading a Minor Version in CloudNativePG
 
@@ -51,8 +51,8 @@ constraints.
 ## Offline In-Place Major Upgrades
 
 CloudNativePG performs an **offline in-place major upgrade** when a new operand
-container image with a higher PostgreSQL major version is requested for a
-cluster.
+container image with a higher PostgreSQL major version is declaratively
+requested for a cluster.
 
 You can trigger the upgrade in one of two ways:
 
@@ -118,7 +118,7 @@ rollback.
 
 ### Example: Performing a Major Upgrade
 
-Consider the following PostgreSQL cluster running version 13:
+Consider the following PostgreSQL cluster running version 16:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -126,7 +126,7 @@ kind: Cluster
 metadata:
   name: cluster-example
 spec:
-  imageName: ghcr.io/cloudnative-pg/postgresql:13-minimal-bullseye
+  imageName: ghcr.io/cloudnative-pg/postgresql:16-minimal-bullseye
   instances: 3
 
   storage:
@@ -134,7 +134,7 @@ spec:
 ```
 
 To upgrade the cluster to version 17, update the `imageName` field by changing
-the major version tag from `13` to `17`:
+the major version tag from `16` to `17`:
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
@@ -158,7 +158,7 @@ kubectl cnpg psql cluster-example -- -qAt -c 'SELECT version()'
 This will return output similar to:
 
 ```console
-PostgreSQL 13.x ...
+PostgreSQL 16.x ...
 ```
 
 ### Upgrade Process
