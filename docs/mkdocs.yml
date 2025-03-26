@@ -1,5 +1,6 @@
 site_name: CloudNativePG
 site_author: The CloudNativePG Contributors
+copyright: Copyright © CloudNativePG a Series of LF Projects, LLC
 docs_dir: src
 
 theme:
