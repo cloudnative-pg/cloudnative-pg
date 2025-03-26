@@ -109,6 +109,9 @@ func (b bypassableValidator) ValidateDelete(
 	})
 }
 
+const validationDisabledWarning = "validation webhook is disabled — all changes are accepted without validation. " +
+	"This may lead to unsafe or destructive operations. Proceed with extreme caution."
+
 func validate(obj runtime.Object, validator func() (admission.Warnings, error)) (admission.Warnings, error) {
 	var warnings admission.Warnings
 
@@ -120,7 +123,7 @@ func validate(obj runtime.Object, validator func() (admission.Warnings, error)) 
 	}
 
 	if !validationEnabled {
-		warnings = append(warnings, "validation webhook disabled")
+		warnings = append(warnings, validationDisabledWarning)
 		return warnings, nil
 	}
 

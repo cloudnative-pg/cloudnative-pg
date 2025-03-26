@@ -237,9 +237,11 @@ CloudNativePG manages the following predefined annotations:
 :   When available, the time of last requested restart of a Postgres cluster.
 
 `cnpg.io/validation`
-:   When set to `disabled` on a CNPG-managed custom object, the validation webhook
-    will allow every change. Important: this allows potentially dangerous activities,
-    please use it with care and at your own risk.
+:   When set to `disabled` on a CNPG-managed custom resource,
+    the validation webhook will permit all changes without restriction.
+
+    **⚠️ WARNING:** Disabling validation can allow potentially unsafe or destructive operations.
+    Use this setting with caution and at your own risk.
 
 ## Prerequisites
 
