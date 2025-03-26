@@ -160,7 +160,7 @@ CloudNativePG was originally built and sponsored by <a href="https://www.enterpr
 ---
 
 <p align="center">
-<a href="https://www.postgresql.org/about/policies/trademarks/">Postgres, PostgreSQL and the Slonik Logo</a>
+<a href="https://www.postgresql.org/about/policies/trademarks/">Postgres, PostgreSQL, and the Slonik Logo</a>
 are trademarks or registered trademarks of the PostgreSQL Community Association
 of Canada, and used with their permission.
 </p>

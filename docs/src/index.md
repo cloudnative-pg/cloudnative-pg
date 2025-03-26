@@ -33,7 +33,7 @@ pooler based on PgBouncer.
 
 CloudNativePG was originally built by [EDB](https://www.enterprisedb.com), then
 released open source under Apache License 2.0.
-The [source code repository is in Github](https://github.com/cloudnative-pg/cloudnative-pg).
+The [source code repository is in GitHub](https://github.com/cloudnative-pg/cloudnative-pg).
 
 !!! Note
     Based on the [Operator Capability Levels model](operator_capability_levels.md),
@@ -165,7 +165,7 @@ Attribution 4.0 International License.
 
 ---
 
-*[Postgres, PostgreSQL and the Slonik Logo](https://www.postgresql.org/about/policies/trademarks/)
+*[Postgres, PostgreSQL, and the Slonik Logo](https://www.postgresql.org/about/policies/trademarks/)
 are trademarks or registered trademarks of the PostgreSQL Community Association
 of Canada, and used with their permission.*
 
