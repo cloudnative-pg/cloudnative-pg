@@ -63,17 +63,27 @@ You can trigger the upgrade in one of two ways:
 For details on supported image tags, see
 ["Image Tag Requirements"](container_images.md#image-tag-requirements).
 
+!!! Warning
+    CloudNativePG is not responsible for PostgreSQL extensions. You must ensure
+    that extensions in the source PostgreSQL image are compatible with those in the
+    target image and that upgrade paths are supported. Thoroughly test the upgrade
+    process in advance to avoid unexpected issues.
+    The [extensions management feature](declarative_database_management.md#managing-extensions-in-a-database)
+    can help manage extension upgrades declaratively.
+
 ### Upgrade Process
 
-When CloudNativePG detects a PostgreSQL major version upgrade, it:
-
 1. Shuts down all cluster pods to ensure data consistency.
-2. Records the previous PostgreSQL version in the cluster’s status
-   (`.status.majorVersionUpgradeFromImage`).
-3. Initiates a new upgrade job, which performs the necessary steps to upgrade
-   the database via `pg_upgrade` with the `--link` option.
+2. Records the previous PostgreSQL version in the cluster’s status under
+   `.status.majorVersionUpgradeFromImage`.
+3. Initiates a new upgrade job, which:
+   - Verifies that the binaries in the image and the data files align with a
+     major upgrade request.
+   - Performs the upgrade using `pg_upgrade` with the `--link` option.
+   - Creates new directories for `PGDATA`, and where applicable, WAL files and
+     tablespaces.
 
-!!! Important
+!!! Warning
     During the upgrade process, the entire PostgreSQL cluster, including
     replicas, is unavailable to applications. Ensure that your system can
     tolerate this downtime before proceeding.
@@ -84,17 +94,19 @@ When CloudNativePG detects a PostgreSQL major version upgrade, it:
 
 ### Post-Upgrade Actions
 
-If the upgrade is **successful**, CloudNativePG:
+If the upgrade is successful, CloudNativePG:
 
-- **Destroys the PVCs of replicas** (if available).
-- **Scales up replicas as required**.
+- Destroys the PVCs of replicas (if available).
+- Scales up replicas as required.
 
 !!! Warning
-    Re-cloning replicas may take significant time for very large databases.
-    Ensure you account for this delay. It is strongly recommended to take a **full
-    backup** once the upgrade is completed.
+    Re-cloning replicas can be time-consuming, especially for very large
+    databases. Plan accordingly to accommodate potential delays. After completing
+    the upgrade, it is strongly recommended to take a full backup. Existing backup
+    data (namely base backups and WAL files) is only available for the previous
+    minor PostgreSQL release.
 
-If the upgrade **fails**, you must **revert** the major version change in the
+If the upgrade fails, you must revert the major version change in the
 cluster's configuration, as CloudNativePG cannot automatically decide the
 rollback.
 
@@ -137,12 +149,41 @@ spec:
     size: 1Gi
 ```
 
-- All cluster pods are terminated to ensure a consistent upgrade.
-- A new job is created with the name of the primary pod, appended with the
-  suffix `-major-upgrade`. This job runs `pg_upgrade` on the primary’s
-  persistent volumes group.
-- Once the upgrade is complete:
-  - The PVC groups of the replicas (`cluster-example-2` and `cluster-example-3`) are destroyed
-  - The primary pod is restarted
-  - Two new replicas (`cluster-example-4` and `cluster-example-5`) are
-    re-cloned from the the upgraded primary.
+You can check the current PostgreSQL version using the following command:
+
+```sh
+kubectl cnpg psql cluster-example -- -qAt -c 'SELECT version()'
+```
+
+This will return output similar to:
+
+```console
+PostgreSQL 13.x ...
+```
+
+### Upgrade Process
+
+1. Cluster shutdown – All cluster pods are terminated to ensure a consistent
+   upgrade.
+2. Upgrade job execution – A new job is created with the name of the primary
+   pod, appended with the suffix `-major-upgrade`. This job runs `pg_upgrade`
+   on the primary’s persistent volume group.
+3. Post-upgrade steps:
+   - The PVC groups of the replicas (`cluster-example-2` and
+     `cluster-example-3`) are removed.
+   - The primary pod is restarted.
+   - Two new replicas (`cluster-example-4` and `cluster-example-5`) are
+     re-cloned from the upgraded primary.
+
+Once the upgrade is complete, you can verify the new major version by running
+the same command:
+
+```sh
+kubectl cnpg psql cluster-example -- -qAt -c 'SELECT version()'
+```
+
+This should now return output similar to:
+
+```console
+PostgreSQL 17.x ...
+```
