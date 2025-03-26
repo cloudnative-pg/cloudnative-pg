@@ -276,41 +276,32 @@ var _ = Describe("Updating target primary", func() {
 })
 
 var _ = Describe("isNodeUnschedulableOrBeingDrained", func() {
-	var (
-		node                 *corev1.Node
-		nodeUnschedulable    *corev1.Node
-		nodeTainted          *corev1.Node
-		nodeWithUnknownTaint *corev1.Node
-	)
-
-	BeforeEach(func() {
-		node = &corev1.Node{}
-		nodeUnschedulable = &corev1.Node{
-			Spec: corev1.NodeSpec{
-				Unschedulable: true,
-			},
-		}
-		nodeTainted = &corev1.Node{
-			Spec: corev1.NodeSpec{
-				Taints: []corev1.Taint{
-					{
-						Key:    "karpenter.sh/disrupted",
-						Effect: corev1.TaintEffectNoSchedule,
-					},
+	node := &corev1.Node{}
+	nodeUnschedulable := &corev1.Node{
+		Spec: corev1.NodeSpec{
+			Unschedulable: true,
+		},
+	}
+	nodeTainted := &corev1.Node{
+		Spec: corev1.NodeSpec{
+			Taints: []corev1.Taint{
+				{
+					Key:    "karpenter.sh/disrupted",
+					Effect: corev1.TaintEffectNoSchedule,
 				},
 			},
-		}
-		nodeWithUnknownTaint = &corev1.Node{
-			Spec: corev1.NodeSpec{
-				Taints: []corev1.Taint{
-					{
-						Key:    "unknown.io/taint",
-						Effect: corev1.TaintEffectPreferNoSchedule,
-					},
+		},
+	}
+	nodeWithUnknownTaint := &corev1.Node{
+		Spec: corev1.NodeSpec{
+			Taints: []corev1.Taint{
+				{
+					Key:    "unknown.io/taint",
+					Effect: corev1.TaintEffectPreferNoSchedule,
 				},
 			},
-		}
-	})
+		},
+	}
 
 	DescribeTable(
 		"it detects nodes that are unschedulable or being drained",
