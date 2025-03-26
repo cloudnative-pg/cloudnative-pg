@@ -106,6 +106,10 @@ If the upgrade is successful, CloudNativePG:
     data (namely base backups and WAL files) is only available for the previous
     minor PostgreSQL release.
 
+!!! Warning
+    `pg_upgrade` doesn't transfer optimizer statistics. After the upgrade, you
+    may want to run `ANALYZE` on your databases to update them.
+
 If the upgrade fails, you must revert the major version change in the
 cluster's configuration, as CloudNativePG cannot automatically decide the
 rollback.
@@ -126,25 +130,8 @@ kind: Cluster
 metadata:
   name: cluster-example
 spec:
-  imageName: ghcr.io/cloudnative-pg/postgresql:16-minimal-bullseye
+  imageName: ghcr.io/cloudnative-pg/postgresql:16-minimal-bookworm
   instances: 3
-
-  storage:
-    size: 1Gi
-```
-
-To upgrade the cluster to version 17, update the `imageName` field by changing
-the major version tag from `16` to `17`:
-
-```yaml
-apiVersion: postgresql.cnpg.io/v1
-kind: Cluster
-metadata:
-  name: cluster-example
-spec:
-  imageName: ghcr.io/cloudnative-pg/postgresql:17-minimal-bullseye
-  instances: 3
-
   storage:
     size: 1Gi
 ```
@@ -159,6 +146,21 @@ This will return output similar to:
 
 ```console
 PostgreSQL 16.x ...
+```
+
+To upgrade the cluster to version 17, update the `imageName` field by changing
+the major version tag from `16` to `17`:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cluster-example
+spec:
+  imageName: ghcr.io/cloudnative-pg/postgresql:17-minimal-bookworm
+  instances: 3
+  storage:
+    size: 1Gi
 ```
 
 ### Upgrade Process
@@ -186,4 +188,10 @@ This should now return output similar to:
 
 ```console
 PostgreSQL 17.x ...
+```
+
+You can now update the statistics by running `ANALYZE` on the `app` database:
+
+```sh
+kubectl cnpg psql cluster-example -- app -c 'ANALYZE'
 ```
