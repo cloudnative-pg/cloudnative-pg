@@ -64,7 +64,8 @@ in three different flavors:
 
 Red Hat UBI images are primarily intended for OLM consumption.
 
-All container images are signed and come with SBOM and provenance attestations.
+All container images are signed and include SBOM and provenance attestations,
+provided separately for each architecture.
 
 ### Operands
 
@@ -73,7 +74,8 @@ The PostgreSQL operand container images are available for all
 across multiple architectures, directly from the
 [`postgres-containers` project's GitHub Container Registry](https://github.com/cloudnative-pg/postgres-containers/pkgs/container/postgresql).
 
-All container images are signed and come with SBOM and provenance attestations.
+All container images are signed and include SBOM and provenance attestations,
+provided separately for each architecture.
 
 Weekly jobs ensure that critical vulnerabilities (CVEs) in the entire stack are
 promptly addressed.
