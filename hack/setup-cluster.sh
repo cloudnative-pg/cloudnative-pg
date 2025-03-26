@@ -28,7 +28,7 @@ fi
 
 # Defaults
 KIND_NODE_DEFAULT_VERSION=v1.32.3
-CSI_DRIVER_HOST_PATH_DEFAULT_VERSION=v1.15.0
+CSI_DRIVER_HOST_PATH_DEFAULT_VERSION=v1.16.1
 EXTERNAL_SNAPSHOTTER_VERSION=v8.2.0
 EXTERNAL_PROVISIONER_VERSION=v5.2.0
 EXTERNAL_RESIZER_VERSION=v1.13.1
@@ -301,11 +301,18 @@ deploy_csi_host_path() {
   kubectl apply -f "${CSI_BASE_URL}"/external-resizer/"${EXTERNAL_RESIZER_VERSION}"/deploy/kubernetes/rbac.yaml
 
   ## Install driver and plugin
-  kubectl apply -f "${CSI_BASE_URL}"/csi-driver-host-path/"${CSI_DRIVER_HOST_PATH_VERSION}"/deploy/kubernetes-1.27/hostpath/csi-hostpath-driverinfo.yaml
-  kubectl apply -f "${CSI_BASE_URL}"/csi-driver-host-path/"${CSI_DRIVER_HOST_PATH_VERSION}"/deploy/kubernetes-1.27/hostpath/csi-hostpath-plugin.yaml
+  ## Create a temporary file for the modified plugin deployment. This is needed
+  ## because csi-driver-host-path plugin yaml tends to lag behind a few versions.
+  plugin_file="${TEMP_DIR}/csi-hostpath-plugin.yaml"
+  curl -sSL "${CSI_BASE_URL}/csi-driver-host-path/${CSI_DRIVER_HOST_PATH_VERSION}/deploy/kubernetes-1.30/hostpath/csi-hostpath-plugin.yaml" |
+    sed "s|registry.k8s.io/sig-storage/hostpathplugin:.*|registry.k8s.io/sig-storage/hostpathplugin:${CSI_DRIVER_HOST_PATH_VERSION}|g" > "${plugin_file}"
+
+  kubectl apply -f "${CSI_BASE_URL}"/csi-driver-host-path/"${CSI_DRIVER_HOST_PATH_VERSION}"/deploy/kubernetes-1.30/hostpath/csi-hostpath-driverinfo.yaml
+  kubectl apply -f "${plugin_file}"
+  rm "${plugin_file}"
 
   ## create volumesnapshotclass
-  kubectl apply -f "${CSI_BASE_URL}"/csi-driver-host-path/"${CSI_DRIVER_HOST_PATH_VERSION}"/deploy/kubernetes-1.27/hostpath/csi-hostpath-snapshotclass.yaml
+  kubectl apply -f "${CSI_BASE_URL}"/csi-driver-host-path/"${CSI_DRIVER_HOST_PATH_VERSION}"/deploy/kubernetes-1.30/hostpath/csi-hostpath-snapshotclass.yaml
 
   ## Prevent VolumeSnapshot E2e test to fail when taking a
   ## snapshot of a running PostgreSQL instance
