@@ -1,5 +1,5 @@
-<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Backup
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
 PostgreSQL natively provides first class backup and recovery capabilities based
 on file system level (physical) copy. These have been successfully used for
@@ -378,4 +378,3 @@ spec:
 
 In the previous example, CloudNativePG will invariably choose the primary
 instance even if the `Cluster` is set to prefer replicas.
-

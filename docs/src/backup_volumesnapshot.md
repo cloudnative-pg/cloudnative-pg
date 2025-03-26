@@ -1,5 +1,5 @@
-<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Backup on volume snapshots
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
 !!! Warning
     As noted in the [backup document](backup.md), a cold snapshot explicitly

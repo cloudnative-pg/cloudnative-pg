@@ -1,5 +1,5 @@
-<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Client TLS/SSL connections
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
 !!! Seealso "Certificates"
     See [Certificates](certificates.md)

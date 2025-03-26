@@ -1,5 +1,5 @@
-<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Operator configuration
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
 The operator for CloudNativePG is installed from a standard
 deployment manifest and follows the convention over configuration paradigm.

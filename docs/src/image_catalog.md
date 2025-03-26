@@ -1,5 +1,5 @@
-<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Image Catalog
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
 `ImageCatalog` and `ClusterImageCatalog` are essential resources that empower
 you to define images for creating a `Cluster`.

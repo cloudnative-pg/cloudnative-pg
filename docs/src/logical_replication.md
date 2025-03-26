@@ -1,5 +1,5 @@
-<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Logical Replication
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
 PostgreSQL extends its replication capabilities beyond physical replication,
 which operates at the level of exact block addresses and byte-by-byte copying,
