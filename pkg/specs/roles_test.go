@@ -20,6 +20,7 @@ SPDX-License-Identifier: Apache-2.0
 package specs
 
 import (
+	"github.com/onsi/gomega/types"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -165,18 +166,102 @@ var _ = Describe("Roles", func() {
 	}
 
 	It("are created with the cluster name for pure k8s", func() {
-		serviceAccount := CreateRole(cluster, nil)
-		Expect(serviceAccount.Name).To(Equal(cluster.Name))
-		Expect(serviceAccount.Namespace).To(Equal(cluster.Namespace))
-		Expect(serviceAccount.Rules).To(HaveLen(15))
+		isBackupRule := func() types.GomegaMatcher {
+			return Or(
+				HaveField("Resources", ContainElement("backups")),
+				HaveField("Resources", ContainElement("backups/status")),
+			)
+		}
+
+		By("testing it when there is no involved backup", func() {
+			role := CreateRole(cluster, nil, nil)
+			Expect(role.Name).To(Equal(cluster.Name))
+			Expect(role.Namespace).To(Equal(cluster.Namespace))
+			Expect(role.Rules).To(HaveLen(13))
+			Expect(role.Rules).ToNot(ContainElement(isBackupRule()))
+		})
+
+		By("testing it when there are linked backups", func() {
+			backups := []string{
+				"backup-one",
+				"backup-two",
+				"backup-three",
+			}
+			role := CreateRole(cluster, nil, backups)
+			Expect(role.Name).To(Equal(cluster.Name))
+			Expect(role.Namespace).To(Equal(cluster.Namespace))
+			Expect(role.Rules).To(HaveLen(15))
+
+			Expect(role.Rules).To(ContainElement(isBackupRule()))
+			Expect(role.Rules).To(
+				HaveEach(
+					Or(
+						Not(isBackupRule()),
+						And(isBackupRule(), HaveField("ResourceNames", Equal(backups))),
+					),
+				),
+			)
+		})
+
+		By("testing it when the cluster is recovered from a backup object", func() {
+			backup := &apiv1.Backup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "backup-one",
+					Namespace: cluster.Namespace,
+				},
+			}
+			role := CreateRole(cluster, backup, nil)
+			Expect(role.Name).To(Equal(cluster.Name))
+			Expect(role.Namespace).To(Equal(cluster.Namespace))
+			Expect(role.Rules).To(HaveLen(15))
+
+			Expect(role.Rules).To(ContainElement(isBackupRule()))
+			Expect(role.Rules).To(
+				HaveEach(
+					Or(
+						Not(isBackupRule()),
+						And(isBackupRule(), HaveField("ResourceNames", ConsistOf("backup-one"))),
+					),
+				),
+			)
+		})
+
+		By("testing it when there are linked backups, and the cluster is bootstrapped from a backup object", func() {
+			originBackup := &apiv1.Backup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "backup-origin",
+					Namespace: cluster.Namespace,
+				},
+			}
+
+			backups := []string{
+				"backup-one",
+				"backup-two",
+				"backup-three",
+			}
+			role := CreateRole(cluster, originBackup, backups)
+			Expect(role.Name).To(Equal(cluster.Name))
+			Expect(role.Namespace).To(Equal(cluster.Namespace))
+			Expect(role.Rules).To(HaveLen(15))
+
+			Expect(role.Rules).To(ContainElement(isBackupRule()))
+			Expect(role.Rules).To(
+				HaveEach(
+					Or(
+						Not(isBackupRule()),
+						And(isBackupRule(), HaveField("ResourceNames", Equal(append(backups, "backup-origin")))),
+					),
+				),
+			)
+		})
 	})
 
 	It("should contain every secret of the origin backup and backup configuration of every external cluster", func() {
-		serviceAccount := CreateRole(cluster, &backupOrigin)
-		Expect(serviceAccount.Name).To(Equal(cluster.Name))
-		Expect(serviceAccount.Namespace).To(Equal(cluster.Namespace))
-		Expect(serviceAccount.Rules[0].ResourceNames).To(ConsistOf("thisTest", "testConfigMapKeySelector"))
-		Expect(serviceAccount.Rules[1].ResourceNames).To(ConsistOf(
+		role := CreateRole(cluster, &backupOrigin, nil)
+		Expect(role.Name).To(Equal(cluster.Name))
+		Expect(role.Namespace).To(Equal(cluster.Namespace))
+		Expect(role.Rules[0].ResourceNames).To(ConsistOf("thisTest", "testConfigMapKeySelector"))
+		Expect(role.Rules[1].ResourceNames).To(ConsistOf(
 			"testReplicationTLSSecret",
 			"testClientCASecret",
 			"testServerCASecret",
@@ -346,7 +431,7 @@ var _ = Describe("Managed Roles", func() {
 	It("gets the list of secrets needed by the managed roles", func() {
 		Expect(managedRolesSecrets(cluster)).
 			To(ConsistOf("my_secret1", "my_secret3"))
-		serviceAccount := CreateRole(cluster, nil)
+		serviceAccount := CreateRole(cluster, nil, nil)
 		Expect(serviceAccount.Name).To(Equal(cluster.Name))
 		Expect(serviceAccount.Namespace).To(Equal(cluster.Namespace))
 		var secretsPolicy rbacv1.PolicyRule

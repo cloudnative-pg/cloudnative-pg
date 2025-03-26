@@ -715,6 +715,11 @@ func (r *ClusterReconciler) createOrPatchRole(ctx context.Context, cluster *apiv
 		return err
 	}
 
+	backupNames, err := r.getBackupNamesOfCluster(ctx, cluster)
+	if err != nil {
+		return err
+	}
+
 	var role rbacv1.Role
 	if err := r.Get(ctx, client.ObjectKey{Name: cluster.Name, Namespace: cluster.Namespace}, &role); err != nil {
 		if !apierrs.IsNotFound(err) {
@@ -722,10 +727,10 @@ func (r *ClusterReconciler) createOrPatchRole(ctx context.Context, cluster *apiv
 		}
 
 		r.Recorder.Event(cluster, "Normal", "CreatingRole", "Creating Cluster Role")
-		return r.createRole(ctx, cluster, originBackup)
+		return r.createRole(ctx, cluster, originBackup, backupNames)
 	}
 
-	generatedRole := specs.CreateRole(*cluster, originBackup)
+	generatedRole := specs.CreateRole(*cluster, originBackup, backupNames)
 	if equality.Semantic.DeepEqual(generatedRole.Rules, role.Rules) {
 		// Everything fine, the two rules have the same content
 		return nil
@@ -1017,8 +1022,13 @@ func createOrPatchPodMonitor(
 }
 
 // createRole creates the role
-func (r *ClusterReconciler) createRole(ctx context.Context, cluster *apiv1.Cluster, backupOrigin *apiv1.Backup) error {
-	role := specs.CreateRole(*cluster, backupOrigin)
+func (r *ClusterReconciler) createRole(
+	ctx context.Context,
+	cluster *apiv1.Cluster,
+	backupOrigin *apiv1.Backup,
+	backupNames []string,
+) error {
+	role := specs.CreateRole(*cluster, backupOrigin, backupNames)
 	cluster.SetInheritedDataAndOwnership(&role.ObjectMeta)
 
 	err := r.Create(ctx, &role)
@@ -1232,6 +1242,22 @@ func (r *ClusterReconciler) getOriginBackup(ctx context.Context, cluster *apiv1.
 	}
 
 	return &backup, nil
+}
+
+func (r *ClusterReconciler) getBackupNamesOfCluster(ctx context.Context, cluster *apiv1.Cluster) ([]string, error) {
+	var backupList apiv1.BackupList
+	if err := r.List(ctx, &backupList, client.InNamespace(cluster.Namespace), client.MatchingFields{
+		backupClusterKey: cluster.Name,
+	}); err != nil {
+		return nil, fmt.Errorf("while looking for backups referred by a cluster: %w", err)
+	}
+
+	result := make([]string, len(backupList.Items))
+	for i := range backupList.Items {
+		result[i] = backupList.Items[i].Name
+	}
+
+	return result, nil
 }
 
 func (r *ClusterReconciler) joinReplicaInstance(

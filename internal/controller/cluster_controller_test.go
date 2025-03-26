@@ -25,6 +25,7 @@ import (
 	cnpgTypes "github.com/cloudnative-pg/machinery/pkg/types"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -313,4 +314,34 @@ var _ = Describe("isNodeUnschedulableOrBeingDrained", func() {
 		Entry("node is tainted", nodeTainted, true),
 		Entry("node has an unknown taint", nodeWithUnknownTaint, false),
 	)
+})
+
+var _ = Describe("Mapping backup to clusters", func() {
+	It("does not trigger any event if the backup do not refer to a cluster", func(ctx SpecContext) {
+		emptyBackup := apiv1.Backup{}
+		Expect(mapBackupsToClusters(ctx, &emptyBackup)).To(BeEmpty())
+	})
+
+	It("does trigger a event for the cluster being backed up", func(ctx SpecContext) {
+		const (
+			clusterName = "clusterName"
+			namespace   = "default"
+		)
+
+		emptyBackup := apiv1.Backup{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+			},
+			Spec: apiv1.BackupSpec{
+				Cluster: apiv1.LocalObjectReference{
+					Name: clusterName,
+				},
+			},
+		}
+
+		events := mapBackupsToClusters(ctx, &emptyBackup)
+		Expect(events).To(HaveLen(1))
+		Expect(events[0].Name).To(Equal(clusterName))
+		Expect(events[0].Namespace).To(Equal(namespace))
+	})
 })

@@ -66,12 +66,13 @@ import (
 )
 
 const (
-	podOwnerKey                   = ".metadata.controller"
-	pvcOwnerKey                   = ".metadata.controller"
-	jobOwnerKey                   = ".metadata.controller"
-	poolerClusterKey              = ".spec.cluster.name"
-	disableDefaultQueriesSpecPath = ".spec.monitoring.disableDefaultQueries"
-	imageCatalogKey               = ".spec.imageCatalog.name"
+	podOwnerKey                   = "pod.metadata.controller"
+	pvcOwnerKey                   = "pvc.metadata.controller"
+	jobOwnerKey                   = "job.metadata.controller"
+	poolerClusterKey              = "pooler.spec.cluster.name"
+	disableDefaultQueriesSpecPath = "cluster.spec.monitoring.disableDefaultQueries"
+	imageCatalogKey               = "cluster.spec.imageCatalog.name"
+	backupClusterKey              = "backup.spec.cluster.name"
 )
 
 var apiSGVString = apiv1.SchemeGroupVersion.String()
@@ -1186,6 +1187,10 @@ func (r *ClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 			handler.EnqueueRequestsFromMapFunc(r.mapClusterImageCatalogsToClusters()),
 			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
 		).
+		Watches(
+			&apiv1.Backup{},
+			handler.EnqueueRequestsFromMapFunc(mapBackupsToClusters),
+		).
 		Complete(r)
 }
 
@@ -1303,10 +1308,25 @@ func (r *ClusterReconciler) createFieldIndexes(ctx context.Context, mgr ctrl.Man
 	}
 
 	// Create a new indexed field on Jobs.
-	return mgr.GetFieldIndexer().IndexField(
+	if err := mgr.GetFieldIndexer().IndexField(
 		ctx,
 		&batchv1.Job{},
-		jobOwnerKey, jobOwnerIndexFunc)
+		jobOwnerKey, jobOwnerIndexFunc); err != nil {
+		return err
+	}
+
+	// Create a new indexed field on Backup.
+	if err := mgr.GetFieldIndexer().IndexField(
+		ctx,
+		&apiv1.Backup{},
+		backupClusterKey, func(rawObj client.Object) []string {
+			backup := rawObj.(*apiv1.Backup)
+			return []string{backup.Spec.Cluster.Name}
+		}); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // IsOwnedByCluster checks that an object is owned by a Cluster and returns
@@ -1416,6 +1436,28 @@ func (r *ClusterReconciler) mapConfigMapsToClusters() handler.MapFunc {
 		}
 		// build requests for clusters that refer the configmap
 		return filterClustersUsingConfigMap(clusters, config)
+	}
+}
+
+// mapBackupsToClusters returns a function mapping a backup to its cluster and is useful
+// to trigger a reconciliation loop on the cluster every time a backup is getting created
+func mapBackupsToClusters(_ context.Context, obj client.Object) []reconcile.Request {
+	backup, ok := obj.(*apiv1.Backup)
+	if !ok {
+		return nil
+	}
+
+	if backup.Spec.Cluster.Name == "" {
+		return nil
+	}
+
+	return []reconcile.Request{
+		{
+			NamespacedName: types.NamespacedName{
+				Namespace: backup.Namespace,
+				Name:      backup.Spec.Cluster.Name,
+			},
+		},
 	}
 }
 
