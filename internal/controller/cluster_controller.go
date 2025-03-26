@@ -89,6 +89,7 @@ type ClusterReconciler struct {
 	InstanceClient  remote.InstanceClient
 	Plugins         repository.Interface
 
+	drainTaints    []string
 	rolloutManager *rolloutManager.Manager
 }
 
@@ -97,6 +98,7 @@ func NewClusterReconciler(
 	mgr manager.Manager,
 	discoveryClient *discovery.DiscoveryClient,
 	plugins repository.Interface,
+	drainTaints []string,
 ) *ClusterReconciler {
 	return &ClusterReconciler{
 		InstanceClient:  remote.NewClient().Instance(),
@@ -109,6 +111,7 @@ func NewClusterReconciler(
 			configuration.Current.GetClustersRolloutDelay(),
 			configuration.Current.GetInstancesRolloutDelay(),
 		),
+		drainTaints: drainTaints,
 	}
 }
 
@@ -1081,7 +1084,7 @@ func (r *ClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 		Watches(
 			&corev1.Node{},
 			handler.EnqueueRequestsFromMapFunc(r.mapNodeToClusters()),
-			builder.WithPredicates(nodesPredicate),
+			builder.WithPredicates(r.nodesPredicate()),
 		).
 		Watches(
 			&apiv1.ImageCatalog{},
@@ -1369,11 +1372,13 @@ func filterClustersUsingConfigMap(
 func (r *ClusterReconciler) mapNodeToClusters() handler.MapFunc {
 	return func(ctx context.Context, obj client.Object) []reconcile.Request {
 		node := obj.(*corev1.Node)
+
 		// exit if the node is schedulable (e.g. not cordoned)
 		// could be expanded here with other conditions (e.g. pressure or issues)
-		if !node.Spec.Unschedulable {
+		if !isNodeUnschedulableOrBeingDrained(node, r.drainTaints) {
 			return nil
 		}
+
 		var childPods corev1.PodList
 		// get all the pods handled by the operator on that node
 		err := r.List(ctx, &childPods,

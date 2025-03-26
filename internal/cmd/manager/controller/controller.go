@@ -226,6 +226,7 @@ func RunController(
 		mgr,
 		discoveryClient,
 		pluginRepository,
+		conf.DrainTaints,
 	).SetupWithManager(ctx, mgr, maxConcurrentReconciles); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Cluster")
 		return err

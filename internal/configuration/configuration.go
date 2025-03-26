@@ -49,6 +49,27 @@ const (
 	DefaultKubernetesClusterDomain = "cluster.local"
 )
 
+// DefaultDrainTaints is the default list of taints the operator will watch and treat
+// as Unschedule
+var DefaultDrainTaints = []string{
+	// Kubernetes well-known unschedulable taint
+	// See: https://kubernetes.io/docs/reference/labels-annotations-taints/#node-kubernetes-io-unschedulable
+	"node.kubernetes.io/unschedulable",
+
+	// Used by the Kubernetes Cluster Autoscaler
+	// nolint: lll
+	// See: https://github.com/kubernetes/autoscaler/blob/aa1d413ea3bf319b56c7b2e65ade1a028e149439/cluster-autoscaler/cloudprovider/oci/nodepools/consts/annotations.go#L27
+	"ToBeDeletedByClusterAutoscaler",
+
+	// Used by Karpenter termination controller
+	// See: https://karpenter.sh/docs/concepts/disruption/#termination-controller
+	"karpenter.sh/disrupted",
+
+	// Used by Karpenter disruption controller
+	// See: https://karpenter.sh/v0.32/concepts/disruption/#disruption-controller
+	"karpenter.sh/disruption",
+}
+
 // DefaultPluginSocketDir is the default directory where the plugin sockets are located.
 const DefaultPluginSocketDir = "/plugins"
 
@@ -144,6 +165,9 @@ type Data struct {
 	// KubernetesClusterDomain defines the domain suffix for service FQDNs
 	// within the Kubernetes cluster. If left unset, it defaults to `cluster.local`.
 	KubernetesClusterDomain string `json:"kubernetesClusterDomain" env:"KUBERNETES_CLUSTER_DOMAIN"`
+
+	// DrainTaints is a list of taints the operator will watch and treat as Unschedule
+	DrainTaints []string `json:"drainTaints" env:"DRAIN_TAINTS"`
 }
 
 // Current is the configuration used by the operator
@@ -161,6 +185,7 @@ func newDefaultConfig() *Data {
 		ExpiringCheckThreshold:  ExpiringCheckThreshold,
 		StandbyTCPUserTimeout:   0,
 		KubernetesClusterDomain: DefaultKubernetesClusterDomain,
+		DrainTaints:             DefaultDrainTaints,
 	}
 }
 

@@ -67,7 +67,7 @@ func (r *ClusterReconciler) reconcileTargetPrimaryFromPods(
 	if primary := status.Items[0]; (primary.IsPrimary || (cluster.IsReplica() && primary.IsPodReady)) &&
 		primary.Pod.Name == cluster.Status.CurrentPrimary &&
 		cluster.Status.TargetPrimary == cluster.Status.CurrentPrimary {
-		isPrimaryOnUnschedulableNode, err := r.isNodeUnschedulable(ctx, primary.Node)
+		isPrimaryOnUnschedulableNode, err := r.isNodeUnschedulableOrBeingDrained(ctx, primary.Node)
 		if err != nil {
 			contextLogger.Error(err, "while checking if current primary is on an unschedulable node")
 			// in case of error it's better to proceed with the normal target primary reconciliation
@@ -169,14 +169,31 @@ func (r *ClusterReconciler) reconcileTargetPrimaryForNonReplicaCluster(
 	return mostAdvancedInstance.Pod.Name, r.setPrimaryInstance(ctx, cluster, mostAdvancedInstance.Pod.Name)
 }
 
-// isNodeUnschedulable checks whether a node is set to unschedulable
-func (r *ClusterReconciler) isNodeUnschedulable(ctx context.Context, nodeName string) (bool, error) {
+// isNodeUnschedulableOrBeingDrained checks if a node is currently being drained.
+// nolint: lll
+// Copied from https://github.com/kubernetes-sigs/aws-ebs-csi-driver/blob/7bacf2d36f397bd098b3388403e8759c480be7e5/cmd/hooks/prestop.go#L91
+func isNodeUnschedulableOrBeingDrained(node *corev1.Node, drainTaints []string) bool {
+	for _, taint := range node.Spec.Taints {
+		if slices.Contains(drainTaints, taint.Key) {
+			return true
+		}
+	}
+
+	return node.Spec.Unschedulable
+}
+
+// isNodeUnschedulableOrBeingDrained checks whether a node is set to unschedulable
+func (r *ClusterReconciler) isNodeUnschedulableOrBeingDrained(
+	ctx context.Context,
+	nodeName string,
+) (bool, error) {
 	var node corev1.Node
 	err := r.Get(ctx, client.ObjectKey{Name: nodeName}, &node)
 	if err != nil {
 		return false, err
 	}
-	return node.Spec.Unschedulable, nil
+
+	return isNodeUnschedulableOrBeingDrained(&node, r.drainTaints), nil
 }
 
 // Pick the next primary on a schedulable node, if the current is running on an unschedulable one,
@@ -220,7 +237,7 @@ func (r *ClusterReconciler) setPrimaryOnSchedulableNode(
 	// Start looking for the next primary among the pods
 	for _, candidate := range podsOnOtherNodes.Items {
 		// If candidate on an unschedulable node too, skip it
-		if unschedulable, _ := r.isNodeUnschedulable(ctx, candidate.Node); unschedulable {
+		if status, _ := r.isNodeUnschedulableOrBeingDrained(ctx, candidate.Node); status {
 			continue
 		}
 

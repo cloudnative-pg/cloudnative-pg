@@ -29,6 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
@@ -272,4 +273,44 @@ var _ = Describe("Updating target primary", func() {
 			Expect(err).ToNot(HaveOccurred())
 		})
 	})
+})
+
+var _ = Describe("isNodeUnschedulableOrBeingDrained", func() {
+	node := &corev1.Node{}
+	nodeUnschedulable := &corev1.Node{
+		Spec: corev1.NodeSpec{
+			Unschedulable: true,
+		},
+	}
+	nodeTainted := &corev1.Node{
+		Spec: corev1.NodeSpec{
+			Taints: []corev1.Taint{
+				{
+					Key:    "karpenter.sh/disrupted",
+					Effect: corev1.TaintEffectNoSchedule,
+				},
+			},
+		},
+	}
+	nodeWithUnknownTaint := &corev1.Node{
+		Spec: corev1.NodeSpec{
+			Taints: []corev1.Taint{
+				{
+					Key:    "unknown.io/taint",
+					Effect: corev1.TaintEffectPreferNoSchedule,
+				},
+			},
+		},
+	}
+
+	DescribeTable(
+		"it detects nodes that are unschedulable or being drained",
+		func(node *corev1.Node, expected bool) {
+			Expect(isNodeUnschedulableOrBeingDrained(node, configuration.DefaultDrainTaints)).To(Equal(expected))
+		},
+		Entry("plain node", node, false),
+		Entry("node is unschedulable", nodeUnschedulable, true),
+		Entry("node is tainted", nodeTainted, true),
+		Entry("node has an unknown taint", nodeWithUnknownTaint, false),
+	)
 })
