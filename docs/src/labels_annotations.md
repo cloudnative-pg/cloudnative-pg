@@ -228,6 +228,13 @@ CloudNativePG manages the following predefined annotations:
 `cnpg.io/snapshotEndTime`
 :   The time a snapshot was marked as ready to use.
 
+`cnpg.io/validation`
+:   When set to `disabled` on a CloudNativePG-managed custom resource, the
+    validation webhook allows all changes without restriction.
+
+    **⚠️ WARNING:** Disabling validation may permit unsafe or destructive
+    operations. Use this setting with caution and at your own risk.
+
 `cnpg.io/volumeSnapshotDeadline`
 :   Applied to `Backup` and `ScheduledBackup` resources, allows you to control
     how long the operator should retry recoverable errors before considering the

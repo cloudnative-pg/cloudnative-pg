@@ -246,6 +246,10 @@ const (
 	// PodPatchAnnotationName is the name of the annotation containing the
 	// patch to apply to the pod
 	PodPatchAnnotationName = MetadataNamespace + "/podPatch"
+
+	// WebhookValidationAnnotationName is the name of the annotation describing if
+	// the validation webhook should be enabled or disabled
+	WebhookValidationAnnotationName = MetadataNamespace + "/validation"
 )
 
 type annotationStatus string
