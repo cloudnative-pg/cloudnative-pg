@@ -64,6 +64,18 @@ func getPreserveNamespaces() []string {
 	return preserveNamespacesList
 }
 
+// CleanupClusterLogs cleans up the cluster logs of a given namespace
+func CleanupClusterLogs(namespace string, testFailed bool) error {
+	exists, _ := fileutils.FileExists(path.Join(SternLogDirectory, namespace))
+	if exists && !testFailed {
+		if err := fileutils.RemoveDirectory(path.Join(SternLogDirectory, namespace)); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // cleanupNamespace does cleanup duty related to the tear-down of a namespace,
 // and is intended to be called in a DeferCleanup clause
 func cleanupNamespace(
@@ -79,12 +91,9 @@ func cleanupNamespace(
 	if len(namespace) == 0 {
 		return fmt.Errorf("namespace is empty")
 	}
-	exists, _ := fileutils.FileExists(path.Join(SternLogDirectory, namespace))
-	if exists && !testFailed {
-		err := fileutils.RemoveDirectory(path.Join(SternLogDirectory, namespace))
-		if err != nil {
-			return err
-		}
+
+	if err := CleanupClusterLogs(namespace, testFailed); err != nil {
+		return err
 	}
 
 	return deleteNamespace(ctx, crudClient, namespace)
