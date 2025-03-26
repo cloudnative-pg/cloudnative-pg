@@ -236,6 +236,10 @@ const (
 	// PluginPortAnnotationName is the name of the annotation containing the
 	// port the plugin is listening to
 	PluginPortAnnotationName = MetadataNamespace + "/pluginPort"
+
+	// WebhookValidationAnnotationName is the name of the annotation describing if
+	// the validation webhook should be enabled or disabled
+	WebhookValidationAnnotationName = MetadataNamespace + "/validation"
 )
 
 type annotationStatus string
