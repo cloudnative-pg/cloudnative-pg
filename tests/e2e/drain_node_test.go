@@ -85,21 +85,22 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 	})
 
 	Context("Default maintenance and pvc", func() {
-		// Initialize empty global namespace variable
-		var namespace string
 		const sampleFile = fixturesDir + "/drain-node/cluster-drain-node-karpenter.yaml.template"
 		const clusterName = "cluster-drain-node-karpenter"
 
 		It("will remove the pod from a node tainted by karpenter", func() {
 			const namespacePrefix = "drain-node-e2e-karpeter-initiated"
-			var err error
-			// Create a cluster in a namespace we'll delete after the test
-			namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
-			Expect(err).ToNot(HaveOccurred())
-			AssertCreateCluster(namespace, clusterName, sampleFile, env)
+
+			var namespace string
+
+			By("creating the namespace and hte cluster", func() {
+				var err error
+				namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
+				Expect(err).ToNot(HaveOccurred())
+				AssertCreateCluster(namespace, clusterName, sampleFile, env)
+			})
 
 			By("waiting for the jobs to be removed", func() {
-				// Wait for jobs to be removed
 				timeout := 180
 				Eventually(func() (int, error) {
 					podList, err := pods.List(env.Ctx, env.Client, namespace)
@@ -110,20 +111,21 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 				}, timeout).Should(BeEquivalentTo(3))
 			})
 
-			// Load test data
 			tableLocator := TableLocator{
 				Namespace:    namespace,
 				ClusterName:  clusterName,
 				DatabaseName: postgres.AppDBName,
 				TableName:    "test",
 			}
-			AssertCreateTestData(env, tableLocator)
+
+			By("loading test data", func() {
+				AssertCreateTestData(env, tableLocator)
+			})
 
 			oldPrimary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 			Expect(err).ToNot(HaveOccurred())
 
 			By("adding a taint from karpenter to the node containing the primary", func() {
-				// mark the pod containing the primary so as distributed
 				cmd := fmt.Sprintf("kubectl taint nodes %v karpenter.sh/disruption:NoSchedule", oldPrimary.Spec.NodeName)
 				_, _, err := run.Run(cmd)
 				Expect(err).ToNot(HaveOccurred())
@@ -131,7 +133,6 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 
 			By("verifying failover after drain", func() {
 				timeout := 180
-				// Expect a failover to have happened
 				Eventually(func() (string, error) {
 					pod, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 					if err != nil {
@@ -150,8 +151,10 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 				Expect(err).ToNot(HaveOccurred())
 			})
 
-			AssertDataExpectedCount(env, tableLocator, 2)
-			AssertClusterStandbysAreStreaming(namespace, clusterName, 140)
+			By("data is present and standbys are streaming", func() {
+				AssertDataExpectedCount(env, tableLocator, 2)
+				AssertClusterStandbysAreStreaming(namespace, clusterName, 140)
+			})
 		})
 	})
 

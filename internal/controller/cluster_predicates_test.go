@@ -129,7 +129,6 @@ var _ = Describe("nodesPredicate", func() {
 
 			result = nodesPredicateFunctions.Update(updateEventNewToOld)
 			Expect(result).To(Equal(expectedResult))
-
 		},
 		Entry("with the same node",
 			nodeWithNoTaints, nodeWithNoTaints, false),
