@@ -93,7 +93,7 @@ var _ = Describe("E2E Drain Node", Serial, Label(tests.LabelDisruptive, tests.La
 
 			var namespace string
 
-			By("creating the namespace and hte cluster", func() {
+			By("creating the namespace and the cluster", func() {
 				var err error
 				namespace, err = env.CreateUniqueTestNamespace(env.Ctx, env.Client, namespacePrefix)
 				Expect(err).ToNot(HaveOccurred())
