@@ -1,5 +1,5 @@
-<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # PostgreSQL Upgrades
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
 PostgreSQL upgrades fall into two categories:
 
