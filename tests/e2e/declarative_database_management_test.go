@@ -226,6 +226,9 @@ var _ = Describe("Declarative database management", Label(tests.LabelSmoke, test
 			By("deleting the namespace and making sure it succeeds before timeout", func() {
 				err := namespaces.DeleteNamespaceAndWait(env.Ctx, env.Client, namespace, 120)
 				Expect(err).ToNot(HaveOccurred())
+				// we need to cleanup testing logs adhoc since we are not using a testingNamespace for this test
+				err = namespaces.CleanupClusterLogs(namespace, CurrentSpecReport().Failed())
+				Expect(err).ToNot(HaveOccurred())
 			})
 		})
 	})
