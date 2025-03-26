@@ -215,6 +215,13 @@ CloudNativePG manages the following predefined annotations:
 `cnpg.io/snapshotEndTime`
 :   The time a snapshot was marked as ready to use.
 
+`cnpg.io/validation`
+:   When set to `disabled` on a CloudNativePG-managed custom resource, the
+    validation webhook allows all changes without restriction.
+
+    **⚠️ WARNING:** Disabling validation may permit unsafe or destructive
+    operations. Use this setting with caution and at your own risk.
+
 `kubectl.kubernetes.io/restartedAt`
 :   When available, the time of last requested restart of a Postgres cluster.
 

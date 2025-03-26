@@ -212,6 +212,10 @@ const (
 	// ClusterRestartAnnotationName is the name of the annotation containing the
 	// latest required restart time
 	ClusterRestartAnnotationName = "kubectl.kubernetes.io/restartedAt"
+
+	// WebhookValidationAnnotationName is the name of the annotation describing if
+	// the validation webhook should be enabled or disabled
+	WebhookValidationAnnotationName = MetadataNamespace + "/validation"
 )
 
 type annotationStatus string

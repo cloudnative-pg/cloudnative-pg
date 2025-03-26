@@ -42,7 +42,7 @@ var backupLog = log.WithName("backup-resource").WithValues("version", "v1")
 // SetupBackupWebhookWithManager registers the webhook for Backup in the manager.
 func SetupBackupWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).For(&apiv1.Backup{}).
-		WithValidator(&BackupCustomValidator{}).
+		WithValidator(newBypassableValidator(&BackupCustomValidator{})).
 		WithDefaulter(&BackupCustomDefaulter{}).
 		Complete()
 }

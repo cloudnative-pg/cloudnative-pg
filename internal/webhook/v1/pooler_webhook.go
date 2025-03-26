@@ -84,7 +84,7 @@ var poolerLog = log.WithName("pooler-resource").WithValues("version", "v1")
 // SetupPoolerWebhookWithManager registers the webhook for Pooler in the manager.
 func SetupPoolerWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).For(&apiv1.Pooler{}).
-		WithValidator(&PoolerCustomValidator{}).
+		WithValidator(newBypassableValidator(&PoolerCustomValidator{})).
 		Complete()
 }
 

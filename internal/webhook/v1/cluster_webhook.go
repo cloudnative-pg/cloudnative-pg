@@ -60,7 +60,7 @@ var clusterLog = log.WithName("cluster-resource").WithValues("version", "v1")
 // SetupClusterWebhookWithManager registers the webhook for Cluster in the manager.
 func SetupClusterWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).For(&apiv1.Cluster{}).
-		WithValidator(&ClusterCustomValidator{}).
+		WithValidator(newBypassableValidator(&ClusterCustomValidator{})).
 		WithDefaulter(&ClusterCustomDefaulter{}).
 		Complete()
 }
