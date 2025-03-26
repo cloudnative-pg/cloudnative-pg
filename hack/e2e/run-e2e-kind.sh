@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 
 ##
-## Copyright The CloudNativePG Contributors
+## Copyright © contributors to CloudNativePG, established as
+## CloudNativePG a Series of LF Projects, LLC.
 ##
 ## Licensed under the Apache License, Version 2.0 (the "License");
 ## you may not use this file except in compliance with the License.
@@ -15,6 +16,9 @@
 ## See the License for the specific language governing permissions and
 ## limitations under the License.
 ##
+## SPDX-License-Identifier: Apache-2.0
+##
+
 # shellcheck disable=SC2317
 # standard bash error handling
 set -eEuo pipefail
