@@ -1,5 +1,5 @@
-<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Importing Postgres databases
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
 This section describes how to import one or more existing PostgreSQL
 databases inside a brand new CloudNativePG cluster.

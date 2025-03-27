@@ -1,5 +1,5 @@
-<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Certificates
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
 CloudNativePG was designed to natively support TLS certificates.
 To set up a cluster, the operator requires:

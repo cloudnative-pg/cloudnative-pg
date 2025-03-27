@@ -1,5 +1,5 @@
-<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Appendix A - Common object stores for backups
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
 You can store the [backup](../backup.md) files in any service that is supported
 by the Barman Cloud infrastructure. That is:

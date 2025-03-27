@@ -1,5 +1,5 @@
-<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Quickstart
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
 This section guides you through testing a PostgreSQL cluster on your local machine by
 deploying CloudNativePG on a local Kubernetes cluster

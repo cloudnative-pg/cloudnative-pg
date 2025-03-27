@@ -1,5 +1,5 @@
-<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # PostGIS
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
 [PostGIS](https://postgis.net/) is a very popular open source extension
 for PostgreSQL that introduces support for storing GIS (Geographic Information
