@@ -1,5 +1,5 @@
-<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Recovery
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
 In PostgreSQL terminology, recovery is the process of starting a PostgreSQL
 instance using an existing backup. The PostgreSQL recovery mechanism

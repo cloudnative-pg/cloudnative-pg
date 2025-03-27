@@ -1,5 +1,5 @@
-<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Monitoring
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
 !!! Important
     Installing Prometheus and Grafana is beyond the scope of this project.

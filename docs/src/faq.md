@@ -1,5 +1,5 @@
-<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Frequently Asked Questions (FAQ)
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
 ## Running PostgreSQL in Kubernetes
 

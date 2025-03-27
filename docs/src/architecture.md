@@ -1,5 +1,5 @@
-<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Architecture
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
 !!! Hint
     For a deeper understanding, we recommend reading our article on the CNCF

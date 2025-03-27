@@ -1,5 +1,5 @@
-<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Postgres instance manager
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
 CloudNativePG does not rely on an external tool for failover management.
 It simply relies on the Kubernetes API server and a native key component called:

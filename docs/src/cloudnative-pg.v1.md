@@ -1,6 +1,5 @@
-<!-- SPDX-License-Identifier: CC-BY-4.0 -->
-
 # API Reference
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
 <p>Package v1 contains API Schema definitions for the postgresql v1 API group</p>
 

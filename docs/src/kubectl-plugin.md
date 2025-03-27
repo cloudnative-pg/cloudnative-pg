@@ -1,5 +1,5 @@
-<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Kubectl Plugin
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
 CloudNativePG provides a plugin for `kubectl` to manage a cluster in Kubernetes.
 
