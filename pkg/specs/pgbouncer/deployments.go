@@ -19,22 +19,14 @@ limitations under the License.
 package pgbouncer
 
 import (
-	"path"
-
+	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	config "github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/podspec"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/hash"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
-
-	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
-	config "github.com/cloudnative-pg/cloudnative-pg/internal/configuration"
-	pgBouncerConfig "github.com/cloudnative-pg/cloudnative-pg/pkg/management/pgbouncer/config"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/url"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/podspec"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils/hash"
 )
 
 const (
@@ -42,7 +34,7 @@ const (
 	DefaultPgbouncerImage = "ghcr.io/cloudnative-pg/pgbouncer:1.24.0"
 )
 
-// Deployment create the deployment of pgbouncer, given
+// Deployment creates the deployment of Odyssey, given
 // the configurations we have in the pooler specifications
 func Deployment(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*appsv1.Deployment, error) {
 	operatorImageName := config.Current.OperatorImageName
@@ -52,80 +44,32 @@ func Deployment(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*appsv1.Deploymen
 		return nil, err
 	}
 
+	image := "cr.yandex/crpiskgukqn7io35108q/odyssey:dev-adugin"
+	const odysseyPort int32 = 6432
+
 	podTemplate := podspec.NewFrom(pooler.Spec.Template).
 		WithLabel(utils.PgbouncerNameLabel, pooler.Name).
 		WithLabel(utils.ClusterLabelName, cluster.Name).
 		WithLabel(utils.PodRoleLabelName, string(utils.PodRolePooler)).
+		WithLabel("app", "odyssey").
+		WithContainerImage("odyssey", image, false).
+		WithContainerPort("odyssey", &corev1.ContainerPort{
+			ContainerPort: odysseyPort,
+		}).
 		WithVolume(&corev1.Volume{
-			Name: "ca",
+			Name: "config-volume",
 			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName: cluster.GetServerCASecretName(),
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "odyssey-config",
+					},
 				},
 			},
 		}).
-		WithVolume(&corev1.Volume{
-			Name: "server-tls",
-			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName: cluster.GetServerTLSSecretName(),
-				},
-			},
-		}).
-		WithSecurityContext(specs.CreatePodSecurityContext(cluster.GetSeccompProfile(), 998, 996), true).
-		WithContainerImage("pgbouncer", DefaultPgbouncerImage, false).
-		WithContainerCommand("pgbouncer", []string{
-			"/controller/manager",
-			"pgbouncer",
-			"run",
-		}, false).
-		WithContainerPort("pgbouncer", &corev1.ContainerPort{
-			Name:          pgBouncerConfig.PgBouncerPortName,
-			ContainerPort: pgBouncerConfig.PgBouncerPort,
-		}).
-		WithContainerPort("pgbouncer", &corev1.ContainerPort{
-			Name:          "metrics",
-			ContainerPort: url.PgBouncerMetricsPort,
-		}).
-		WithInitContainerImage(specs.BootstrapControllerContainerName, operatorImageName, true).
-		WithInitContainerCommand(specs.BootstrapControllerContainerName,
-			[]string{"/manager", "bootstrap", "/controller/manager"},
-			true).
-		WithInitContainerSecurityContext(specs.BootstrapControllerContainerName,
-			specs.CreateContainerSecurityContext(cluster.GetSeccompProfile()),
-			true).
-		WithVolume(&corev1.Volume{
-			Name: "scratch-data",
-			VolumeSource: corev1.VolumeSource{
-				EmptyDir: &corev1.EmptyDirVolumeSource{},
-			},
-		}).
-		WithInitContainerVolumeMount(specs.BootstrapControllerContainerName, &corev1.VolumeMount{
-			Name:      "scratch-data",
-			MountPath: postgres.ScratchDataDirectory,
-		}, true).
-		WithContainerVolumeMount("pgbouncer", &corev1.VolumeMount{
-			Name:      "scratch-data",
-			MountPath: postgres.ScratchDataDirectory,
-		}, true).
-		WithContainerEnv("pgbouncer", corev1.EnvVar{Name: "NAMESPACE", Value: pooler.Namespace}, true).
-		WithContainerEnv("pgbouncer", corev1.EnvVar{Name: "POOLER_NAME", Value: pooler.Name}, true).
-		WithContainerEnv("pgbouncer", corev1.EnvVar{Name: "PGUSER", Value: "pgbouncer"}, false).
-		WithContainerEnv("pgbouncer", corev1.EnvVar{Name: "PGDATABASE", Value: "pgbouncer"}, false).
-		WithContainerEnv("pgbouncer", corev1.EnvVar{Name: "PGHOST", Value: "/controller/run"}, false).
-		WithContainerEnv("pgbouncer", corev1.EnvVar{
-			Name:  "PSQL_HISTORY",
-			Value: path.Join(postgres.TemporaryDirectory, ".psql_history"),
-		}, false).
-		WithContainerSecurityContext("pgbouncer", specs.CreateContainerSecurityContext(cluster.GetSeccompProfile()), true).
-		WithServiceAccountName(pooler.Name, true).
-		WithReadinessProbe("pgbouncer", &corev1.Probe{
-			TimeoutSeconds: 5,
-			ProbeHandler: corev1.ProbeHandler{
-				TCPSocket: &corev1.TCPSocketAction{
-					Port: intstr.FromInt32(pgBouncerConfig.PgBouncerPort),
-				},
-			},
+		WithContainerVolumeMount("odyssey", &corev1.VolumeMount{
+			Name:      "config-volume",
+			MountPath: "/etc/odyssey/odyssey.conf",
+			SubPath:   "odyssey.conf",
 		}, false).
 		Build()
 

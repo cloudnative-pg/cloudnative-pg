@@ -119,6 +119,7 @@ func (builder *Builder) WithContainerImage(name, image string, overwrite bool) *
 		if value.Name == name {
 			if overwrite || value.Image == "" {
 				builder.status.Spec.Containers[idx].Image = image
+				builder.status.Spec.Containers[idx].ImagePullPolicy = corev1.PullAlways
 			}
 		}
 	}

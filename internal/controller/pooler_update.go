@@ -40,14 +40,6 @@ func (r *PoolerReconciler) updateOwnedObjects(
 	pooler *apiv1.Pooler,
 	resources *poolerManagedResources,
 ) error {
-	if err := r.updateServiceAccount(ctx, pooler, resources); err != nil {
-		return err
-	}
-
-	if err := r.updateRBAC(ctx, pooler, resources); err != nil {
-		return err
-	}
-
 	if err := r.updateDeployment(ctx, pooler, resources); err != nil {
 		return err
 	}
@@ -56,7 +48,7 @@ func (r *PoolerReconciler) updateOwnedObjects(
 		return err
 	}
 
-	return createOrPatchPodMonitor(ctx, r.Client, r.DiscoveryClient, pgbouncer.NewPoolerPodMonitorManager(pooler))
+	return nil
 }
 
 // updateDeployment update the deployment or create it when needed
