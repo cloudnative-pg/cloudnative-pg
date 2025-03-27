@@ -1,4 +1,4 @@
-# Refresh the "licences" directory and create a PR if there are any changes
+# Refresh the "licenses" directory and create a PR if there are any changes
 
 name: refresh-licenses
 on:
