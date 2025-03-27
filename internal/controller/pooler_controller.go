@@ -177,6 +177,11 @@ func (r *PoolerReconciler) ensureManagedResourcesAreOwned(
 	contextLogger := log.FromContext(ctx)
 
 	var invalidData []interface{}
+
+	if resources.ConfigMap != nil && !isOwnedByPooler(pooler.Name, resources.ConfigMap) {
+		invalidData = append(invalidData, "notOwnedConfigMapName", resources.ConfigMap.Name)
+	}
+
 	if resources.Deployment != nil && !isOwnedByPooler(pooler.Name, resources.Deployment) {
 		invalidData = append(invalidData, "notOwnedDeploymentName", resources.Deployment.Name)
 	}

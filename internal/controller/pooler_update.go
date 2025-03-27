@@ -40,6 +40,10 @@ func (r *PoolerReconciler) updateOwnedObjects(
 	pooler *apiv1.Pooler,
 	resources *poolerManagedResources,
 ) error {
+	if err := r.reconcileConfigMap(ctx, pooler, resources); err != nil {
+		return err
+	}
+
 	if err := r.updateDeployment(ctx, pooler, resources); err != nil {
 		return err
 	}
@@ -48,6 +52,38 @@ func (r *PoolerReconciler) updateOwnedObjects(
 		return err
 	}
 
+	return nil
+}
+
+// reconcileConfigMap creates the ConfigMap if it doesn't exist
+// Since we treat the config as immutable, we don't update existing ConfigMaps
+func (r *PoolerReconciler) reconcileConfigMap(
+	ctx context.Context,
+	pooler *apiv1.Pooler,
+	resources *poolerManagedResources,
+) error {
+	contextLog := log.FromContext(ctx)
+
+	// Create if missing
+	if resources.ConfigMap == nil {
+		configMap, err := pgbouncer.ConfigMap(pooler, resources.Cluster)
+		if err != nil {
+			return err
+		}
+
+		if err := ctrl.SetControllerReference(pooler, configMap, r.Scheme); err != nil {
+			return err
+		}
+
+		contextLog.Info("Creating ConfigMap", "name", configMap.Name)
+		err = r.Create(ctx, configMap)
+		if err != nil && !apierrs.IsAlreadyExists(err) {
+			return err
+		}
+		resources.ConfigMap = configMap
+	}
+
+	// If ConfigMap exists, do nothing as we consider it immutable
 	return nil
 }
 

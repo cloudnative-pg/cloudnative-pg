@@ -35,6 +35,8 @@ type poolerManagedResources struct {
 	// the auth_query connection
 	AuthUserSecret *corev1.Secret
 
+	ConfigMap *corev1.ConfigMap
+
 	// This is the pgbouncer deployment
 	Deployment *appsv1.Deployment
 
@@ -61,6 +63,12 @@ func (r *PoolerReconciler) getManagedResources(ctx context.Context,
 	// Get the auth query secret if any
 	result.AuthUserSecret, err = getSecretOrNil(
 		ctx, r.Client, client.ObjectKey{Name: pooler.GetAuthQuerySecretName(), Namespace: pooler.Namespace})
+	if err != nil {
+		return nil, err
+	}
+
+	result.ConfigMap, err = getConfigMapOrNil(
+		ctx, r.Client, client.ObjectKey{Namespace: pooler.Namespace, Name: pooler.Name})
 	if err != nil {
 		return nil, err
 	}
@@ -216,4 +224,21 @@ func getClusterOrNil(ctx context.Context, r client.Client, objectKey client.Obje
 	}
 
 	return &cluster, nil
+}
+
+// getConfigMapOrNil gets a ConfigMap with a certain name, returning nil when it doesn't exist
+func getConfigMapOrNil(
+	ctx context.Context, r client.Client, objectKey client.ObjectKey,
+) (*corev1.ConfigMap, error) {
+	var configMap corev1.ConfigMap
+	err := r.Get(ctx, objectKey, &configMap)
+	if err != nil {
+		if apierrs.IsNotFound(err) {
+			return nil, nil
+		}
+
+		return nil, err
+	}
+
+	return &configMap, nil
 }

@@ -61,7 +61,7 @@ func Deployment(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*appsv1.Deploymen
 			VolumeSource: corev1.VolumeSource{
 				ConfigMap: &corev1.ConfigMapVolumeSource{
 					LocalObjectReference: corev1.LocalObjectReference{
-						Name: "odyssey-config",
+						Name: pooler.Name + "-config",
 					},
 				},
 			},
@@ -70,7 +70,7 @@ func Deployment(pooler *apiv1.Pooler, cluster *apiv1.Cluster) (*appsv1.Deploymen
 			Name:      "config-volume",
 			MountPath: "/etc/odyssey/odyssey.conf",
 			SubPath:   "odyssey.conf",
-		}, false).
+		}, true).
 		Build()
 
 	return &appsv1.Deployment{
