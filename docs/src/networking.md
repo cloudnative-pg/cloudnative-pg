@@ -1,5 +1,5 @@
-<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Networking
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
 CloudNativePG assumes the underlying Kubernetes cluster has the required
 connectivity already set up.

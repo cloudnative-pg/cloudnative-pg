@@ -1,5 +1,5 @@
-<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Architecture
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
 This section covers the main architectural aspects you need to consider
 when deploying PostgreSQL in Kubernetes.

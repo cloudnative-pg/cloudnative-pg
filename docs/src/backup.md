@@ -1,5 +1,5 @@
-<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Backup
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
 !!! Important
     With version 1.21, backup and recovery capabilities in CloudNativePG
@@ -381,4 +381,3 @@ spec:
 
 In the previous example, CloudNativePG will invariably choose the primary
 instance even if the `Cluster` is set to prefer replicas.
-

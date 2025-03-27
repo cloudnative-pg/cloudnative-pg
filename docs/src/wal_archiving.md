@@ -1,5 +1,5 @@
-<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # WAL archiving
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
 WAL archiving is the process that feeds a [WAL archive](backup.md#wal-archive)
 in CloudNativePG.

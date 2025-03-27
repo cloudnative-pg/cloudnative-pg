@@ -1,5 +1,5 @@
-<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # PostgreSQL Configuration
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
 Users that are familiar with PostgreSQL are aware of the existence of the
 following three files to configure an instance:

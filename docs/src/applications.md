@@ -1,5 +1,5 @@
-<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Connecting from an application
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
 Applications are supposed to work with the services created by CloudNativePG
 in the same Kubernetes cluster:

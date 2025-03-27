@@ -1,5 +1,5 @@
-<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Backup on object stores
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
 CloudNativePG natively supports **online/hot backup** of PostgreSQL
 clusters through continuous physical backup and WAL archiving on an object

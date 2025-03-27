@@ -1,5 +1,5 @@
-<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Backup on volume snapshots
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
 !!! Warning
     The initial release of volume snapshots (version 1.21.0) only supported

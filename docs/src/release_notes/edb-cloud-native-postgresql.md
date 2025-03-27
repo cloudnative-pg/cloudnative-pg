@@ -1,5 +1,5 @@
-<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Release notes for 1.14.0 and earlier
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
 The first public release of CloudNativePG is version 1.15.0. Before that,
 the product was entirely owned by EDB and distributed under the name of

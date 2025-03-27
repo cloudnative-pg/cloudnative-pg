@@ -1,5 +1,5 @@
-<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # CloudNativePG
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
 **CloudNativePG** is an open source
 [operator](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/)

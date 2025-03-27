@@ -1,5 +1,5 @@
-<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Backup and Recovery
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
 Until CloudNativePG 1.20, this page used to contain both the backup and
 recovery phases of a PostgreSQL cluster. The reason was that CloudNativePG

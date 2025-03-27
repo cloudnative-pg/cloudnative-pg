@@ -1,5 +1,5 @@
-<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Replica clusters
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
 A replica cluster is an independent CloudNativePG `Cluster` resource that has
 the main characteristic to be in replica from another Postgres instance,
