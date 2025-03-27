@@ -1,5 +1,5 @@
-<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Storage
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
 Storage is the most critical component in a database workload.
 Storage must always be available, scale, perform well,

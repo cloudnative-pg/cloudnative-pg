@@ -1,5 +1,5 @@
-<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Use cases
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
 CloudNativePG has been designed to work with applications
 that reside in the same Kubernetes cluster, for a full cloud native

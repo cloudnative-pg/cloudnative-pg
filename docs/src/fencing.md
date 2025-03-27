@@ -1,5 +1,5 @@
-<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Fencing
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
 Fencing in CloudNativePG is the ultimate process of protecting the
 data in one, more, or even all instances of a PostgreSQL cluster when they

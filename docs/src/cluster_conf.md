@@ -1,5 +1,5 @@
-<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Instance pod configuration
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
 ## Projected volumes
 

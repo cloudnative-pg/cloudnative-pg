@@ -1,5 +1,5 @@
-<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Preview Versions
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
 CloudNativePG candidate releases are pre-release versions made available for
 testing before the community issues a new generally available (GA) release.

@@ -1,5 +1,5 @@
-<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Troubleshooting
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
 In this page, you can find some basic information on how to troubleshoot
 CloudNativePG in your Kubernetes cluster deployment.

@@ -1,5 +1,5 @@
-<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # End-to-End Tests
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
 CloudNativePG is automatically tested after each
 commit via a suite of **End-to-end (E2E) tests** (or integration tests)

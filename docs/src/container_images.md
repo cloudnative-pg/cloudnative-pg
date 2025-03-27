@@ -1,5 +1,5 @@
-<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Container Image Requirements
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
 The CloudNativePG operator for Kubernetes is designed to
 work with any compatible container image of PostgreSQL that complies
