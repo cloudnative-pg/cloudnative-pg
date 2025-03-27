@@ -1,6 +1,6 @@
 # Refresh the "licenses" directory and create a PR if there are any changes
 
-name: refresh-licenses
+name: Refresh licenses directory
 on:
   workflow_dispatch:
   schedule:
