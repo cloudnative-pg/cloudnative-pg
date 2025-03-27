@@ -79,14 +79,21 @@ For details on supported image tags, see
 3. Initiates a new upgrade job, which:
    - Verifies that the binaries in the image and the data files align with a
      major upgrade request.
-   - Performs the upgrade using `pg_upgrade` with the `--link` option.
    - Creates new directories for `PGDATA`, and where applicable, WAL files and
      tablespaces.
+   - Performs the upgrade using `pg_upgrade` with the `--link` option.
+   - Upon successful completion, replaces the original directories with their
+     upgraded counterparts.
 
 !!! Warning
     During the upgrade process, the entire PostgreSQL cluster, including
     replicas, is unavailable to applications. Ensure that your system can
     tolerate this downtime before proceeding.
+
+!!! Warning
+    Performing an in-place upgrade is an exceptional operation that carries inherent
+    risks. It is strongly recommended to take a full backup of the cluster before
+    initiating the upgrade process.
 
 !!! Info
     For detailed guidance on `pg_upgrade`, refer to the official
@@ -110,15 +117,15 @@ If the upgrade is successful, CloudNativePG:
     `pg_upgrade` doesn't transfer optimizer statistics. After the upgrade, you
     may want to run `ANALYZE` on your databases to update them.
 
-If the upgrade fails, you must revert the major version change in the
-cluster's configuration, as CloudNativePG cannot automatically decide the
-rollback.
+If the upgrade fails, you must manually revert the major version change in the
+cluster's configuration and delete the upgrade job, as CloudNativePG cannot
+automatically decide the rollback.
 
 !!! Important
     This process **protects your existing database from data loss**, as no data
     is modified during the upgrade. If the upgrade fails, a rollback is
-    possible, without having to perform a full recovery from a backup. Ensure you
-    monitor the process closely and take corrective action if needed.
+    usually possible, without having to perform a full recovery from a backup.
+    Ensure you monitor the process closely and take corrective action if needed.
 
 ### Example: Performing a Major Upgrade
 
