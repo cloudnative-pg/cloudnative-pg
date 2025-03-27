@@ -411,9 +411,10 @@ This is typically triggered by:
     declarative configuration, enabling you to automate these procedures as part of
     your Infrastructure as Code (IaC) process, including GitOps.
 
-The designated primary in the above example is fed via WAL streaming
-(`primary_conninfo`), with fallback option for file-based WAL shipping through
-the `restore_command` and `barman-cloud-wal-restore`.
+In the example above, the designated primary receives WAL updates via streaming
+replication (`primary_conninfo`). As a fallback, it can retrieve WAL segments
+from an object store using file-based WAL shipping—for instance, with the
+Barman Cloud plugin through `restore_command` and `barman-cloud-wal-restore`.
 
 CloudNativePG allows you to define topologies with multiple replica clusters.
 You can also define replica clusters with a lower number of replicas, and then
