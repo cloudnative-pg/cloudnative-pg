@@ -11,6 +11,8 @@ on:
     paths:
       - 'pkg/versions/versions.go'
 
+permissions: read-all
+
 jobs:
   tag:
     runs-on: ubuntu-24.04
