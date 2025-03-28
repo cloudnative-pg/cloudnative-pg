@@ -17,11 +17,11 @@ jobs:
     steps:
       -
         name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
       -
         name: Create tag
         if: github.event.pull_request.merged == true && startsWith(github.head_ref, 'release/v')
-        uses: christophebedard/tag-version-commit@v1.7.0
+        uses: christophebedard/tag-version-commit@57ffb155fc61c8ab098fcfa273469b532c1d4ce7 # v1.7.0
         with:
           token: ${{ secrets.REPO_GHA_PAT }}
           version_regex: '^Version tag to ([0-9]+\.[0-9]+\.[0-9]+(?:-[a-z][0-9a-z]*)?)'
