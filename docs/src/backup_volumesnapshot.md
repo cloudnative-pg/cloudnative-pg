@@ -58,6 +58,8 @@ volumes of a given storage class, and managed as `VolumeSnapshot` and
 
 ## How to configure Volume Snapshot backups
 
+<!-- TODO: Change before 1.26.0 -->
+
 CloudNativePG allows you to configure a given Postgres cluster for Volume
 Snapshot backups through the `backup.volumeSnapshot` stanza.
 
@@ -332,6 +334,8 @@ spec:
 ```
 
 ## Example of Volume Snapshot Backup
+
+<!-- TODO: Change before 1.26.0 -->
 
 The following example shows how to configure volume snapshot base backups on an
 EKS cluster on AWS using the `ebs-sc` storage class and the `csi-aws-vsc`

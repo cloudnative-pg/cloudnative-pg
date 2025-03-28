@@ -253,12 +253,21 @@ When versions are not directly upgradable, the old version needs to be
 removed before installing the new one. This won't affect user data but
 only the operator itself.
 
-### Upgrading to 1.25 from a previous minor version
+
+<!--
+### Upgrading to 1.26.0 or 1.25.2
 
 !!! Important
     We strongly recommend that all CloudNativePG users upgrade to version
-    1.25.1 or at least to the latest stable version of the minor release you are
-    currently using (namely 1.24.x).
+    1.26.0 or at least to the latest stable version of the minor release you are
+    currently using (namely 1.25.x).
+
+- TOD: Mention hibernate command
+- TOD: Mention Barman Cloud
+
+-->
+
+### Upgrading to 1.25 from a previous minor version
 
 !!! Warning
     Every time you are upgrading to a higher minor release, make sure you
