@@ -7,14 +7,11 @@ on:
     tags:
       - v*
 
+permissions: read-all
+
 env:
   GOLANG_VERSION: "1.24.x"
   REGISTRY: "ghcr.io"
-
-permissions:
-  contents: write
-  packages: write
-  id-token: write
 
 jobs:
 
@@ -51,6 +48,8 @@ jobs:
   release:
     name: Create Github release
     runs-on: ubuntu-24.04
+    permissions:
+      contents: write
     needs:
       - check-version
     steps:
@@ -89,6 +88,9 @@ jobs:
   release-binaries:
     name: Build containers
     runs-on: ubuntu-24.04
+    permissions:
+      packages: write
+      id-token: write
     needs:
       - check-version
     outputs:
@@ -235,6 +237,9 @@ jobs:
   olm-bundle:
     name: Create OLM bundle and catalog
     runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      packages: write
     needs:
       - check-version
       - release-binaries
@@ -382,6 +387,9 @@ jobs:
     env:
       VERSION: ${{ needs.release-binaries.outputs.version }}
     runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      packages: write
     steps:
       -
         name: Checkout artifact

@@ -7,6 +7,8 @@ on:
   schedule:
     - cron: '0 0 * * *'
 
+permissions: read-all
+
 env:
   IMAGE_NAME: "cloudnative-pg-testing"
   CONTAINER_IMAGE_NAMES: "pgbouncer-testing, postgresql-testing, postgis-testing"

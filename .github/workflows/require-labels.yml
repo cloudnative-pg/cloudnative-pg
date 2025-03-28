@@ -10,6 +10,8 @@ on:
       - labeled
       - unlabeled
 
+permissions: read-all
+
 env:
   REPO_TOKEN:  ${{ secrets.GITHUB_TOKEN }}
 
@@ -17,6 +19,8 @@ jobs:
   require-labels:
     name: Require labels
     runs-on: ubuntu-24.04
+    permissions:
+      pull-requests: write
     steps:
       - name: Require labels
         uses: docker://agilepathway/pull-request-label-checker:v1.6.65

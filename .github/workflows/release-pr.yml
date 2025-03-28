@@ -2,6 +2,8 @@
 
 name: release-pr
 
+permissions: read-all
+
 on:
   push:
     branches:
@@ -29,6 +31,9 @@ jobs:
         name: Pull Request
         id: open-pr
         uses: repo-sync/pull-request@572331753c3787dee4a6c0b6719c889af9646b81 # v2.12
+        permissions:
+          contents: write
+          pull-requests: write
         with:
           destination_branch: ${{ env.DEST }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
