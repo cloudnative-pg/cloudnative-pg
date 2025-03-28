@@ -531,7 +531,7 @@ var _ = DescribeTable("Role status tests",
 			{
 				Name:          "roleWithChangedPassInDB",
 				Superuser:     true,
-				transactionID: 102,
+				TransactionID: 102,
 				Inherit:       true,
 			},
 		},
@@ -558,7 +558,7 @@ var _ = DescribeTable("Role status tests",
 			{
 				Name:          "roleWithChangedPassInSpec",
 				Superuser:     true,
-				transactionID: 101,
+				TransactionID: 101,
 				Inherit:       true,
 			},
 		},
@@ -619,7 +619,7 @@ var _ = DescribeTable("role secrets test",
 			WithObjects(&secret, &secretNoUser, &secretNoPass).
 			Build()
 		ctx := context.Background()
-		decoded, err := getPassword(ctx, cl, roleConfigurationAdapter{RoleConfiguration: *roleConfig}, namespace)
+		decoded, err := getPassword(ctx, cl, &(roleConfigurationAdapter{RoleConfiguration: *roleConfig}), namespace)
 		if expectError {
 			Expect(err).To(HaveOccurred())
 		} else {

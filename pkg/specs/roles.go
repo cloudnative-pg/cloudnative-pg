@@ -30,7 +30,7 @@ import (
 )
 
 // CreateRole create a role with the permissions needed by the instance manager
-func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) rbacv1.Role {
+func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup, roles []apiv1.PGRole) rbacv1.Role {
 	rules := []rbacv1.PolicyRule{
 		{
 			APIGroups: []string{
@@ -56,7 +56,7 @@ func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) rbacv1.Role {
 				"get",
 				"watch",
 			},
-			ResourceNames: getInvolvedSecretNames(cluster, backupOrigin),
+			ResourceNames: getInvolvedSecretNames(cluster, backupOrigin, roles),
 		},
 		{
 			APIGroups: []string{
@@ -213,6 +213,34 @@ func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) rbacv1.Role {
 				"update",
 			},
 		},
+		{
+			APIGroups: []string{
+				"postgresql.cnpg.io",
+			},
+			Resources: []string{
+				"pgroles",
+			},
+			Verbs: []string{
+				"get",
+				"update",
+				"list",
+				"watch",
+			},
+			ResourceNames: []string{},
+		},
+		{
+			APIGroups: []string{
+				"postgresql.cnpg.io",
+			},
+			Resources: []string{
+				"pgroles/status",
+			},
+			Verbs: []string{
+				"get",
+				"patch",
+				"update",
+			},
+		},
 	}
 
 	return rbacv1.Role{
@@ -224,7 +252,7 @@ func CreateRole(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) rbacv1.Role {
 	}
 }
 
-func getInvolvedSecretNames(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) []string {
+func getInvolvedSecretNames(cluster apiv1.Cluster, backupOrigin *apiv1.Backup, roles []apiv1.PGRole) []string {
 	involvedSecretNames := []string{
 		cluster.GetReplicationSecretName(),
 		cluster.GetClientCASecretName(),
@@ -244,6 +272,11 @@ func getInvolvedSecretNames(cluster apiv1.Cluster, backupOrigin *apiv1.Backup) [
 	involvedSecretNames = append(involvedSecretNames, backupSecrets(cluster, backupOrigin)...)
 	involvedSecretNames = append(involvedSecretNames, externalClusterSecrets(cluster)...)
 	involvedSecretNames = append(involvedSecretNames, managedRolesSecrets(cluster)...)
+	for _, r := range roles {
+		if secretName := crdRoleSecretName(r); secretName != "" {
+			involvedSecretNames = append(involvedSecretNames, secretName)
+		}
+	}
 
 	return cleanupResourceList(involvedSecretNames)
 }
@@ -436,4 +469,15 @@ func managedRolesSecrets(cluster apiv1.Cluster) []string {
 	}
 
 	return secretNames
+}
+
+func crdRoleSecretName(role apiv1.PGRole) string {
+	if role.Spec.DisablePassword || role.Spec.PasswordSecret == nil {
+		return ""
+	}
+	secretName := role.Spec.GetRoleSecretName()
+	if secretName != "" {
+		return secretName
+	}
+	return ""
 }
