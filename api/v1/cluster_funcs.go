@@ -154,6 +154,15 @@ func (status *ClusterStatus) GetAvailableArchitecture(archName string) *Availabl
 	return nil
 }
 
+// GetCurrentDataImage returns the Postgres image being used.
+func (status *ClusterStatus) GetCurrentDataImage() string {
+	if status.MajorVersionUpgradeFromImage != nil {
+		return *status.MajorVersionUpgradeFromImage
+	}
+
+	return status.Image
+}
+
 func (r *SynchronizeReplicasConfiguration) compileRegex() []error {
 	if r == nil {
 		return nil

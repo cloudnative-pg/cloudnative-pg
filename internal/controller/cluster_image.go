@@ -52,10 +52,7 @@ func (r *ClusterReconciler) reconcileImage(ctx context.Context, cluster *apiv1.C
 		return &ctrl.Result{}, r.RegisterPhase(ctx, cluster, apiv1.PhaseImageCatalogError, err.Error())
 	}
 
-	currentDataImage := cluster.Status.Image
-	if cluster.Status.MajorVersionUpgradeFromImage != nil {
-		currentDataImage = *cluster.Status.MajorVersionUpgradeFromImage
-	}
+	currentDataImage := cluster.Status.GetCurrentDataImage()
 
 	// Case 1: the cluster is being initialized and there is still no
 	// running image. In this case, we should simply apply the image selected by the user.
@@ -72,7 +69,6 @@ func (r *ClusterReconciler) reconcileImage(ctx context.Context, cluster *apiv1.C
 	// Case 2: there's a running image. The code checks if the user selected
 	// an image of the same major version or if a change in the major
 	// version has been requested.
-	var majorVersionUpgradeFromImage *string
 	currentVersion, err := version.FromTag(reference.New(currentDataImage).Tag)
 	if err != nil {
 		contextLogger.Error(err, "While parsing current major versions")
@@ -85,6 +81,7 @@ func (r *ClusterReconciler) reconcileImage(ctx context.Context, cluster *apiv1.C
 		return nil, err
 	}
 
+	var majorVersionUpgradeFromImage *string
 	switch {
 	case currentVersion.Major() < requestedVersion.Major():
 		// The current major version is older than the requested one
