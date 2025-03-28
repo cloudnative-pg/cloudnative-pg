@@ -1,6 +1,12 @@
 # Appendix A - Common object stores for backups
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
+!!! Warning
+    With the deprecation of native Barman Cloud support in CloudNativePG in
+    favour of the Barman Cloud Plugin, this page—and the backup and recovery
+    documentation—may undergo changes before the official release of version
+    1.26.0.
+
 You can store the [backup](../backup.md) files in any service that is supported
 by the Barman Cloud infrastructure. That is:
 
