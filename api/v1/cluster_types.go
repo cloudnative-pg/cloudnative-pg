@@ -196,7 +196,6 @@ type ImageCatalogRef struct {
 	// +kubebuilder:validation:XValidation:rule="self.kind == 'ImageCatalog' || self.kind == 'ClusterImageCatalog'",message="Only image catalogs are supported"
 	// +kubebuilder:validation:XValidation:rule="self.apiGroup == 'postgresql.cnpg.io'",message="Only image catalogs are supported"
 	corev1.TypedLocalObjectReference `json:",inline"`
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Major is immutable"
 	// The major version of PostgreSQL we want to use from the ImageCatalog
 	Major int `json:"major"`
 }
@@ -587,7 +586,10 @@ const (
 	// PhaseUpgrade upgrade in process
 	PhaseUpgrade = "Upgrading cluster"
 
-	// PhaseUpgradeDelayed is set when a cluster need to be upgraded
+	// PhaseMajorUpgrade major version upgrade in process
+	PhaseMajorUpgrade = "Upgrading Postgres major version"
+
+	// PhaseUpgradeDelayed is set when a cluster needs to be upgraded,
 	// but the operation is being delayed by the operator configuration
 	PhaseUpgradeDelayed = "Cluster upgrade delayed"
 
@@ -941,6 +943,11 @@ type ClusterStatus struct {
 	// Image contains the image name used by the pods
 	// +optional
 	Image string `json:"image,omitempty"`
+
+	// MajorVersionUpgradeFromImage contains the image that was
+	// running before the major version upgrade started.
+	// +optional
+	MajorVersionUpgradeFromImage *string `json:"majorVersionUpgradeFromImage,omitempty"`
 
 	// PluginStatus is the status of the loaded plugins
 	// +optional

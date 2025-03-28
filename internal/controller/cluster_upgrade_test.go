@@ -55,6 +55,9 @@ var _ = Describe("Pod upgrade", Ordered, func() {
 			Spec: apiv1.ClusterSpec{
 				ImageName: "postgres:13.11",
 			},
+			Status: apiv1.ClusterStatus{
+				Image: "postgres:13.11",
+			},
 		}
 		configuration.Current = configuration.NewConfiguration()
 	})

@@ -308,11 +308,8 @@ or a subsequent switchover of the cluster.
 ### Upgrade of the managed workload
 
 The operand can be upgraded using a declarative configuration approach as
-part of changing the CR and, in particular, the `imageName` parameter. The
-operator prevents major upgrades of PostgreSQL while making it possible to go
-in both directions in terms of minor PostgreSQL releases within a major
-version, enabling updates and rollbacks.
-
+part of changing the CR and, in particular, the `imageName` parameter.
+This is normally initiated by security updates or Postgres minor version updates.
 In the presence of standby servers, the operator performs rolling updates
 starting from the replicas. It does this by dropping the existing pod and creating a new
 one with the new requested operand image that reuses the underlying storage.
@@ -324,11 +321,24 @@ The setting to use depends on the business requirements, as the operation
 might generate some downtime for the applications. This downtime can range from a few seconds to
 minutes, based on the actual database workload.
 
+### Offline In-Place Major Upgrades of PostgreSQL
+
+CloudNativePG supports declarative offline in-place major upgrades when a new
+operand container image with a higher PostgreSQL major version is applied to a
+cluster. The upgrade can be triggered by updating the image tag via the
+`.spec.imageName` option or by using an image catalog to manage version
+changes. During the upgrade, all cluster pods are shut down to ensure data
+consistency. A new job is then created to validate the upgrade conditions,
+execute `pg_upgrade`, and create new directories for `PGDATA`, WAL files, and
+tablespaces if needed. Once the upgrade is complete, replicas are re-created.
+Failed upgrades can be rolled back.
+
 ### Display cluster availability status during upgrade
 
 At any time, convey the cluster's high availability status, for example,
 `Setting up primary`, `Creating a new replica`, `Cluster in healthy state`,
-`Switchover in progress`, `Failing over`, and `Upgrading cluster`.
+`Switchover in progress`, `Failing over`, `Upgrading cluster`, and `Upgrading
+Postgres major version`.
 
 ## Level 3: Full lifecycle
 

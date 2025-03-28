@@ -26,9 +26,12 @@ import (
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 )
 
-// SetClusterReadyConditionTX updates the cluster's readiness condition
+// Transaction is a function that modifies a cluster
+type Transaction func(cluster *apiv1.Cluster)
+
+// SetClusterReadyCondition updates the cluster's readiness condition
 // according to the cluster phase
-func SetClusterReadyConditionTX(cluster *apiv1.Cluster) {
+func SetClusterReadyCondition(cluster *apiv1.Cluster) {
 	if cluster.Status.Conditions == nil {
 		cluster.Status.Conditions = []metav1.Condition{}
 	}
@@ -52,10 +55,25 @@ func SetClusterReadyConditionTX(cluster *apiv1.Cluster) {
 	meta.SetStatusCondition(&cluster.Status.Conditions, condition)
 }
 
-// SetPhaseTX is a transaction that sets the cluster phase and reason
-func SetPhaseTX(phase string, reason string) func(cluster *apiv1.Cluster) {
+// SetPhase is a transaction that sets the cluster phase and reason
+func SetPhase(phase string, reason string) Transaction {
 	return func(cluster *apiv1.Cluster) {
 		cluster.Status.Phase = phase
 		cluster.Status.PhaseReason = reason
+	}
+}
+
+// SetImage is a transaction that sets the cluster image
+func SetImage(image string) Transaction {
+	return func(cluster *apiv1.Cluster) {
+		cluster.Status.Image = image
+	}
+}
+
+// SetMajorVersionUpgradeFromImage is a transaction that sets the cluster as upgrading to a newer major version
+// starting from the provided image
+func SetMajorVersionUpgradeFromImage(image *string) Transaction {
+	return func(cluster *apiv1.Cluster) {
+		cluster.Status.MajorVersionUpgradeFromImage = image
 	}
 }

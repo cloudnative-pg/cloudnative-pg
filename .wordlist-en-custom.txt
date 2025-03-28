@@ -961,6 +961,7 @@ lsn
 lt
 lz
 macOS
+majorVersionUpgradeFromImage
 malcolm
 mallocs
 managedRoleSecretVersion

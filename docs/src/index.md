@@ -118,6 +118,7 @@ Additionally, the community provides images for the [PostGIS extension](postgis.
     - Backups using volume snapshots (where supported by storage classes).
     - Full and Point-In-Time recovery from volume snapshots or object stores (via Barman Cloud plugin).
     - Backup from standby replicas to reduce primary workload impact.
+- Offline in-place major upgrades of PostgreSQL
 - Offline and online import of PostgreSQL databases, including major upgrades:
     - *Offline Import*: Direct restore from existing databases.
     - *Online Import*: PostgreSQL native logical replication via the `Subscription` resource.

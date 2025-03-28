@@ -3074,9 +3074,6 @@ spec:
                     description: The major version of PostgreSQL we want to use from
                       the ImageCatalog
                     type: integer
-                    x-kubernetes-validations:
-                    - message: Major is immutable
-                      rule: self == oldSelf
                   name:
                     description: Name is the name of resource being referenced
                     type: string
@@ -6180,6 +6177,11 @@ spec:
                 description: ID of the latest generated node (used to avoid node name
                   clashing)
                 type: integer
+              majorVersionUpgradeFromImage:
+                description: |-
+                  MajorVersionUpgradeFromImage contains the image that was
+                  running before the major version upgrade started.
+                type: string
               managedRolesStatus:
                 description: ManagedRolesStatus reports the state of the managed roles
                   in the cluster

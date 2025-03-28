@@ -39,7 +39,7 @@ func PatchWithOptimisticLock(
 	ctx context.Context,
 	c client.Client,
 	cluster *apiv1.Cluster,
-	txs ...func(cluster *apiv1.Cluster),
+	txs ...Transaction,
 ) error {
 	if cluster == nil {
 		return nil

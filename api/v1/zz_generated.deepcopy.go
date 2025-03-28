@@ -958,6 +958,11 @@ func (in *ClusterStatus) DeepCopyInto(out *ClusterStatus) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.MajorVersionUpgradeFromImage != nil {
+		in, out := &in.MajorVersionUpgradeFromImage, &out.MajorVersionUpgradeFromImage
+		*out = new(string)
+		**out = **in
+	}
 	if in.PluginStatus != nil {
 		in, out := &in.PluginStatus, &out.PluginStatus
 		*out = make([]PluginStatus, len(*in))

@@ -2265,6 +2265,14 @@ This field is reported when <code>.spec.failoverDelay</code> is populated or dur
    <p>Image contains the image name used by the pods</p>
 </td>
 </tr>
+<tr><td><code>majorVersionUpgradeFromImage</code><br/>
+<i>string</i>
+</td>
+<td>
+   <p>MajorVersionUpgradeFromImage contains the image that was
+running before the major version upgrade started.</p>
+</td>
+</tr>
 <tr><td><code>pluginStatus</code><br/>
 <a href="#postgresql-cnpg-io-v1-PluginStatus"><i>[]PluginStatus</i></a>
 </td>

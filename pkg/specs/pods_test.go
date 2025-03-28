@@ -941,6 +941,9 @@ var _ = Describe("NewInstance", func() {
 					utils.PodPatchAnnotationName: `[{"op": "replace", "path": "/spec/containers/0/image", "value": "new-image:latest"}]`, // nolint: lll
 				},
 			},
+			Status: v1.ClusterStatus{
+				Image: "test",
+			},
 		}
 
 		pod, err := NewInstance(ctx, cluster, 1, true)

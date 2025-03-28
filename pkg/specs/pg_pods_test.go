@@ -37,6 +37,9 @@ var _ = Describe("Extract the used image name", func() {
 			Name:      "clusterName",
 			Namespace: "default",
 		},
+		Status: apiv1.ClusterStatus{
+			Image: configuration.Current.PostgresImageName,
+		},
 	}
 	pod, err := NewInstance(context.TODO(), cluster, 1, true)
 	Expect(err).ToNot(HaveOccurred())

@@ -57,6 +57,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/hibernation"
 	instanceReconciler "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/instance"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/majorupgrade"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/persistentvolumeclaim"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/replicaclusterswitch"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
@@ -732,6 +733,20 @@ func (r *ClusterReconciler) reconcileResources(
 		return res, err
 	}
 
+	// In-place Postgres major version upgrades
+	if result, err := majorupgrade.Reconcile(
+		ctx,
+		r.Client,
+		cluster,
+		resources.instances.Items,
+		resources.pvcs.Items,
+		resources.jobs.Items,
+	); err != nil {
+		return ctrl.Result{}, fmt.Errorf("cannot reconcile in-place major version upgrades: %w", err)
+	} else if result != nil {
+		return *result, err
+	}
+
 	// Reconcile Pods
 	if res, err := r.reconcilePods(ctx, cluster, resources, instancesStatus); !res.IsZero() || err != nil {
 		return res, err
@@ -1099,6 +1114,19 @@ func (r *ClusterReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 		Complete(r)
 }
 
+// jobOwnerIndexFunc maps a job definition to its owning cluster and
+// is used as an index function to speed up the lookup of jobs
+// created by the operator.
+func jobOwnerIndexFunc(rawObj client.Object) []string {
+	job := rawObj.(*batchv1.Job)
+
+	if ownerName, ok := IsOwnedByCluster(job); ok {
+		return []string{ownerName}
+	}
+
+	return nil
+}
+
 // createFieldIndexes creates the indexes needed by this controller
 func (r *ClusterReconciler) createFieldIndexes(ctx context.Context, mgr ctrl.Manager) error {
 	// Create a new indexed field on Pods. This field will be used to easily
@@ -1203,15 +1231,7 @@ func (r *ClusterReconciler) createFieldIndexes(ctx context.Context, mgr ctrl.Man
 	return mgr.GetFieldIndexer().IndexField(
 		ctx,
 		&batchv1.Job{},
-		jobOwnerKey, func(rawObj client.Object) []string {
-			job := rawObj.(*batchv1.Job)
-
-			if ownerName, ok := IsOwnedByCluster(job); ok {
-				return []string{ownerName}
-			}
-
-			return nil
-		})
+		jobOwnerKey, jobOwnerIndexFunc)
 }
 
 // IsOwnedByCluster checks that an object is owned by a Cluster and returns

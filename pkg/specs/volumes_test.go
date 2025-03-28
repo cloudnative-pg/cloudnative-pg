@@ -298,7 +298,7 @@ var _ = Describe("test createVolumesAndVolumeMountsForSQLRefs", func() {
 
 var _ = DescribeTable("test creation of volume mounts",
 	func(cluster apiv1.Cluster, mounts []corev1.VolumeMount) {
-		mts := createPostgresVolumeMounts(cluster)
+		mts := CreatePostgresVolumeMounts(cluster)
 		Expect(mts).NotTo(BeEmpty())
 		for _, mt := range mounts {
 			Expect(mts).To(ContainElement(mt))
