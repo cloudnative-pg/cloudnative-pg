@@ -3,7 +3,7 @@
 
 !!! Warning
     With the deprecation of native Barman Cloud support in CloudNativePG in
-    favour of the Barman Cloud Plugin, this page—and the backup and recovery
+    favor of the Barman Cloud Plugin, this page—and the backup and recovery
     documentation—may undergo changes before the official release of version
     1.26.0.
 
