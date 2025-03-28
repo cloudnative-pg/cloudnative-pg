@@ -1,6 +1,12 @@
 # Backup
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
+!!! Warning
+    With the deprecation of native Barman Cloud support in CloudNativePG in
+    favour of the Barman Cloud Plugin, this page—and the backup and recovery
+    documentation—may undergo changes before the official release of version
+    1.26.0.
+
 PostgreSQL natively provides first class backup and recovery capabilities based
 on file system level (physical) copy. These have been successfully used for
 more than 15 years in mission critical production databases, helping
@@ -28,7 +34,9 @@ The WAL archive can only be stored on object stores at the moment.
 On the other hand, CloudNativePG supports two ways to store physical base backups:
 
 - on [object stores](backup_barmanobjectstore.md), as tarballs - optionally
-  compressed
+  compressed:
+    - Using the Barman Cloud plugin
+    - Natively via `.spec.backup.barmanObjectStore` (*deprecated, to be removed in CloudNativePG 1.28*)
 - on [Kubernetes Volume Snapshots](backup_volumesnapshot.md), if supported by
   the underlying storage class
 
@@ -41,11 +49,6 @@ On the other hand, CloudNativePG supports two ways to store physical base backup
     Please refer to the official Kubernetes documentation for a list of all
     the supported [Container Storage Interface (CSI) drivers](https://kubernetes-csi.github.io/docs/drivers.html)
     that provide snapshotting capabilities.
-
-!!! Info
-    Starting with version 1.25, CloudNativePG includes experimental support for
-    backup and recovery using plugins, such as the
-    [Barman Cloud plugin](https://github.com/cloudnative-pg/plugin-barman-cloud).
 
 ## WAL archive
 

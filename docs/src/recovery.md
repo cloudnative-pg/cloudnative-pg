@@ -1,6 +1,12 @@
 # Recovery
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
+!!! Warning
+    With the deprecation of native Barman Cloud support in CloudNativePG in
+    favour of the Barman Cloud Plugin, this page—and the backup and recovery
+    documentation—may undergo changes before the official release of version
+    1.26.0.
+
 In PostgreSQL terminology, recovery is the process of starting a PostgreSQL
 instance using an existing backup. The PostgreSQL recovery mechanism
 is very solid and rich. It also supports point-in-time recovery (PITR), which allows
