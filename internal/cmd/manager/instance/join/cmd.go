@@ -132,7 +132,10 @@ func joinSubCommand(ctx context.Context, instance *postgres.Instance, info postg
 	//
 	// Besides this, we should improve this situation to have
 	// a real error handling.
-	reconciler.RefreshSecrets(ctx, &cluster)
+	if _, err := reconciler.RefreshSecrets(ctx, &cluster); err != nil {
+		contextLogger.Error(err, "Error while refreshing secrets")
+		return err
+	}
 
 	// Run "pg_basebackup" to download the data directory from the primary
 	if err := info.Join(ctx, &cluster); err != nil {
