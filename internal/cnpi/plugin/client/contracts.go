@@ -64,26 +64,6 @@ func GetPluginClientFromContext(ctx context.Context) Client {
 	return cli
 }
 
-// SetPluginClientInContext records the plugin client in the given context
-func SetPluginClientInContext(ctx context.Context, client Client) context.Context {
-	return context.WithValue(ctx, contextutils.PluginClientKey, client)
-}
-
-// GetPluginClientFromContext gets the current plugin client from the context
-func GetPluginClientFromContext(ctx context.Context) Client {
-	v := ctx.Value(contextutils.PluginClientKey)
-	if v == nil {
-		return nil
-	}
-
-	cli, ok := v.(Client)
-	if !ok {
-		return nil
-	}
-
-	return cli
-}
-
 // Connection describes a set of behaviour needed to properly handle the plugin connections
 type Connection interface {
 	// Close closes the connection to every loaded plugin
