@@ -17,7 +17,7 @@ limitations under the License.
 SPDX-License-Identifier: Apache-2.0
 */
 
-package utils
+package context
 
 // contextKey a type used to assign values inside the context
 type contextKey string
