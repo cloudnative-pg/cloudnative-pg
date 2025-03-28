@@ -1,5 +1,4 @@
 # Recovery
-<!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
 In PostgreSQL terminology, recovery is the process of starting a PostgreSQL
 instance using an existing backup. The PostgreSQL recovery mechanism
@@ -89,8 +88,6 @@ spec:
           storageKey:
             name: recovery-object-store-secret
             key: storage_account_key
-        wal:
-          maxParallel: 8
 ```
 
 The previous example assumes that the application database and its owning user
@@ -104,13 +101,6 @@ as documented in ["Configure the application database"](#configure-the-applicati
     of the backup data within the object store. This name is normally reserved
     for the name of the server. You can specify a different folder name
     using the `barmanObjectStore.serverName` property.
-
-!!! Note
-    This example takes advantage of the parallel WAL restore feature,
-    dedicating up to 8 jobs to concurrently fetch the required WAL files from the
-    archive. This feature can appreciably reduce the recovery time. Make sure that
-    you plan ahead for this scenario and correctly tune the value of this parameter
-    for your environment. It will make a difference when you need it, and you will.
 
 ## Recovery from `VolumeSnapshot` objects
 
@@ -233,11 +223,6 @@ By default, recovery continues up to the latest available WAL on the default
 target timeline (`latest`). You can optionally specify a `recoveryTarget` to
 perform a point-in-time recovery (see [Point in Time Recovery (PITR)](#point-in-time-recovery-pitr)).
 
-!!! Important
-    Consider using the `barmanObjectStore.wal.maxParallel` option to speed
-    up WAL fetching from the archive by concurrently downloading the transaction
-    logs from the recovery object store.
-
 ## Point in time recovery (PITR)
 
 Instead of replaying all the WALs up to the latest one, after extracting a base
@@ -288,8 +273,6 @@ spec:
           storageKey:
             name: recovery-object-store-secret
             key: storage_account_key
-        wal:
-          maxParallel: 8
 ```
 
 In this example, you had to specify only the `targetTime` in the form of a
@@ -462,8 +445,6 @@ spec:
           storageKey:
             name: recovery-object-store-secret
             key: storage_account_key
-        wal:
-          maxParallel: 8
 ```
 
 ## Configure the application database
@@ -519,8 +500,7 @@ completed**:
 You can use the data uploaded to the object storage to *bootstrap* a new
 cluster from an existing backup. The operator orchestrates the recovery process
 using the `barman-cloud-restore` tool (for the base backup) and the
-`barman-cloud-wal-restore` tool (for WAL files, including parallel support, if
-requested).
+`barman-cloud-wal-restore` tool (for WAL files).
 
 For details and instructions on the `recovery` bootstrap method, see
 [Bootstrap from a backup](bootstrap.md#bootstrap-from-a-backup-recovery).
