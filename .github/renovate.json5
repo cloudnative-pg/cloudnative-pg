@@ -411,13 +411,13 @@
         'patch',
       ],
       groupName: 'all non-major github action',
-      pinDigests: false,
+      pinDigests: true,
     },
     {
       matchDepTypes: [
         'action',
       ],
-      pinDigests: false,
+      pinDigests: true,
     },
     {
       groupName: 'kubernetes CSI',
