@@ -22,7 +22,7 @@ jobs:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-issue') }}
     steps:
       - name: Verify Linked Issue
-        uses: hattan/verify-linked-issue-action@v1.1.5
+        uses: hattan/verify-linked-issue-action@2d8e2e47a462cc7b07ba5e6cab6f9d57bd36672e # v1.1.5
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
