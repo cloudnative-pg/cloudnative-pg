@@ -4,6 +4,7 @@
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/9933/badge)][openssf]
 [![Documentation][documentation-badge]][documentation]
 [![Stack Overflow](https://img.shields.io/badge/stackoverflow-cloudnative--pg-blue?logo=stackoverflow&logoColor=%23F48024&link=https%3A%2F%2Fstackoverflow.com%2Fquestions%2Ftagged%2Fcloudnative-pg)][stackoverflow]
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fcloudnative-pg%2Fcloudnative-pg.svg?type=small)](https://app.fossa.com/projects/git%2Bgithub.com%2Fcloudnative-pg%2Fcloudnative-pg?ref=badge_small)
 
 # Welcome to the CloudNativePG Project!
 
