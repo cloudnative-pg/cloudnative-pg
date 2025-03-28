@@ -107,6 +107,7 @@ func NewCmd() *cobra.Command {
 	return cmd
 }
 
+// nolint:gocognit
 func upgradeSubCommand(
 	ctx context.Context,
 	instance *postgres.Instance,
@@ -139,12 +140,9 @@ func upgradeSubCommand(
 		return err
 	}
 
-	// Since we're directly using the reconciler here, we cannot
-	// tell if the secrets were correctly downloaded or not.
-	// If they were the following "pg_upgrade" command will work, if
-	// they don't "pg_upgrade" with fail, complaining that the
-	// cryptographic material is not available.
-	reconciler.RefreshSecrets(ctx, &cluster)
+	if _, err := reconciler.RefreshSecrets(ctx, &cluster); err != nil {
+		return fmt.Errorf("error while downloading secrets: %w", err)
+	}
 
 	if err := reconciler.ReconcileWalStorage(ctx); err != nil {
 		return fmt.Errorf("error while reconciling the WAL storage: %w", err)
