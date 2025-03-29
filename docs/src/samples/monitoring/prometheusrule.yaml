@@ -53,10 +53,10 @@ spec:
         severity: warning
     - alert: DatabaseDeadlockConflicts
       annotations:
-        description: There are over 10 deadlock conflicts in {{ $labels.pod }}
-        summary: Checks the number of database conflicts
+      description: Over 5 deadlock conflicts on pod {{ $labels.pod }} in the last 60 seconds (1 minute)
+      summary: Checks the number of database conflicts
       expr: |-
-        cnpg_pg_stat_database_deadlocks > 10
+        increase(cnpg_pg_stat_database_deadlocks{datname!~"template[0-9]+|postgres"}[1m]) > 5
       for: 1m
       labels:
         severity: warning
