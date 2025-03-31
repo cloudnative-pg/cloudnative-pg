@@ -66,7 +66,7 @@ func New(serverInstance *postgres.Instance, exporter *Exporter) (*MetricsServer,
 		server.TLSConfig = &tls.Config{
 			MinVersion: tls.VersionTLS13,
 			GetCertificate: func(_ *tls.ClientHelloInfo) (*tls.Certificate, error) {
-				return serverInstance.ServerCertificate, nil
+				return serverInstance.GetServerCertificate(), nil
 			},
 		}
 	}

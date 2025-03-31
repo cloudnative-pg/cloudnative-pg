@@ -29,143 +29,14 @@ import (
 	"github.com/cloudnative-pg/machinery/pkg/fileutils"
 	"github.com/cloudnative-pg/machinery/pkg/log"
 	pgTime "github.com/cloudnative-pg/machinery/pkg/postgres/time"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
 	"github.com/cloudnative-pg/cloudnative-pg/internal/controller"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/archiver"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
-	postgresSpec "github.com/cloudnative-pg/cloudnative-pg/pkg/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 )
-
-// refreshServerCertificateFiles gets the latest server certificates files from the
-// secrets, and may set the instance certificate if it was missing our outdated.
-// Returns true if configuration has been changed or the instance has been updated
-func (r *InstanceReconciler) refreshServerCertificateFiles(ctx context.Context, cluster *apiv1.Cluster) (bool, error) {
-	contextLogger := log.FromContext(ctx)
-
-	var secret corev1.Secret
-
-	err := retry.OnError(retry.DefaultBackoff, func(error) bool { return true },
-		func() error {
-			err := r.GetClient().Get(
-				ctx,
-				client.ObjectKey{Namespace: r.instance.GetNamespaceName(), Name: cluster.Status.Certificates.ServerTLSSecret},
-				&secret)
-			if err != nil {
-				contextLogger.Info("Error accessing server TLS Certificate. Retrying with exponential backoff.",
-					"secret", cluster.Status.Certificates.ServerTLSSecret)
-				return err
-			}
-			return nil
-		})
-	if err != nil {
-		return false, err
-	}
-
-	changed, err := r.refreshCertificateFilesFromSecret(
-		ctx,
-		&secret,
-		postgresSpec.ServerCertificateLocation,
-		postgresSpec.ServerKeyLocation)
-	if err != nil {
-		return changed, err
-	}
-
-	if r.instance.ServerCertificate == nil || changed {
-		return changed, r.refreshInstanceCertificateFromSecret(&secret)
-	}
-
-	return changed, nil
-}
-
-// refreshReplicationUserCertificate gets the latest replication certificates from the
-// secrets. Returns true if configuration has been changed
-func (r *InstanceReconciler) refreshReplicationUserCertificate(
-	ctx context.Context,
-	cluster *apiv1.Cluster,
-) (bool, error) {
-	var secret corev1.Secret
-	err := r.GetClient().Get(
-		ctx,
-		client.ObjectKey{Namespace: r.instance.GetNamespaceName(), Name: cluster.Status.Certificates.ReplicationTLSSecret},
-		&secret)
-	if err != nil {
-		return false, err
-	}
-
-	return r.refreshCertificateFilesFromSecret(
-		ctx,
-		&secret,
-		postgresSpec.StreamingReplicaCertificateLocation,
-		postgresSpec.StreamingReplicaKeyLocation)
-}
-
-// refreshClientCA gets the latest client CA certificates from the secrets.
-// It returns true if configuration has been changed
-func (r *InstanceReconciler) refreshClientCA(ctx context.Context, cluster *apiv1.Cluster) (bool, error) {
-	var secret corev1.Secret
-	err := r.GetClient().Get(
-		ctx,
-		client.ObjectKey{Namespace: r.instance.GetNamespaceName(), Name: cluster.Status.Certificates.ClientCASecret},
-		&secret)
-	if err != nil {
-		return false, err
-	}
-
-	return r.refreshCAFromSecret(ctx, &secret, postgresSpec.ClientCACertificateLocation)
-}
-
-// refreshServerCA gets the latest server CA certificates from the secrets.
-// It returns true if configuration has been changed
-func (r *InstanceReconciler) refreshServerCA(ctx context.Context, cluster *apiv1.Cluster) (bool, error) {
-	var secret corev1.Secret
-	err := r.GetClient().Get(
-		ctx,
-		client.ObjectKey{Namespace: r.instance.GetNamespaceName(), Name: cluster.Status.Certificates.ServerCASecret},
-		&secret)
-	if err != nil {
-		return false, err
-	}
-
-	return r.refreshCAFromSecret(ctx, &secret, postgresSpec.ServerCACertificateLocation)
-}
-
-// refreshBarmanEndpointCA gets the latest barman endpoint CA certificates from the secrets.
-// It returns true if configuration has been changed
-func (r *InstanceReconciler) refreshBarmanEndpointCA(ctx context.Context, cluster *apiv1.Cluster) (bool, error) {
-	endpointCAs := map[string]*apiv1.SecretKeySelector{}
-	if cluster.Spec.Backup.IsBarmanEndpointCASet() {
-		endpointCAs[postgresSpec.BarmanBackupEndpointCACertificateLocation] = cluster.Spec.Backup.BarmanObjectStore.EndpointCA
-	}
-	if replicaBarmanCA := cluster.GetBarmanEndpointCAForReplicaCluster(); replicaBarmanCA != nil {
-		endpointCAs[postgresSpec.BarmanRestoreEndpointCACertificateLocation] = replicaBarmanCA
-	}
-	if len(endpointCAs) == 0 {
-		return false, nil
-	}
-
-	var changed bool
-	for target, secretKeySelector := range endpointCAs {
-		var secret corev1.Secret
-		err := r.GetClient().Get(
-			ctx,
-			client.ObjectKey{Namespace: r.instance.GetNamespaceName(), Name: secretKeySelector.Name},
-			&secret)
-		if err != nil {
-			return false, err
-		}
-		c, err := r.refreshFileFromSecret(ctx, &secret, secretKeySelector.Key, target)
-		changed = changed || c
-		if err != nil {
-			return changed, err
-		}
-	}
-	return changed, nil
-}
 
 // verifyPgDataCoherenceForPrimary will abort the execution if the current server is a primary
 // one from the PGDATA viewpoint, but is not classified as the target nor the
