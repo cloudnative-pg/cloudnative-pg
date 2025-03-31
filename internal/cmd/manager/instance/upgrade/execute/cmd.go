@@ -52,6 +52,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
 	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/metricserver"
+	instancecertificate "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/instance/certificate"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
@@ -131,21 +132,21 @@ func upgradeSubCommand(
 		return err
 	}
 
-	// Create a fake reconciler just to download the secrets and
-	// the cluster definition
-	metricExporter := metricserver.NewExporter(instance)
-	reconciler := controller.NewInstanceReconciler(instance, client, metricExporter)
-
 	// Download the cluster definition from the API server
 	var cluster apiv1.Cluster
-	if err := reconciler.GetClient().Get(ctx, clusterObjectKey, &cluster); err != nil {
+	if err := client.Get(ctx, clusterObjectKey, &cluster); err != nil {
 		contextLogger.Error(err, "Error while getting cluster")
 		return err
 	}
 
-	if _, err := reconciler.RefreshSecrets(ctx, &cluster); err != nil {
+	if _, err := instancecertificate.NewReconciler(client, instance).RefreshSecrets(ctx, &cluster); err != nil {
 		return fmt.Errorf("error while downloading secrets: %w", err)
 	}
+
+	// Create a fake reconciler just to download the secrets and
+	// the cluster definition
+	metricExporter := metricserver.NewExporter(instance)
+	reconciler := controller.NewInstanceReconciler(instance, client, metricExporter)
 
 	if err := reconciler.ReconcileWalStorage(ctx); err != nil {
 		return fmt.Errorf("error while reconciling the WAL storage: %w", err)
