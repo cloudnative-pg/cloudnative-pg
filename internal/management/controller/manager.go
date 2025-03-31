@@ -34,6 +34,7 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/concurrency"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/metricserver"
+	instancecertificate "github.com/cloudnative-pg/cloudnative-pg/pkg/reconciler/instance/certificate"
 )
 
 // InstanceReconciler reconciles the status of the Cluster resource with
@@ -49,6 +50,8 @@ type InstanceReconciler struct {
 	systemInitialization  *concurrency.Executed
 	firstReconcileDone    atomic.Bool
 	metricsServerExporter *metricserver.Exporter
+
+	certificateReconciler *instancecertificate.Reconciler
 }
 
 // NewInstanceReconciler creates a new instance reconciler
@@ -64,6 +67,7 @@ func NewInstanceReconciler(
 		extensionStatus:       make(map[string]bool),
 		systemInitialization:  concurrency.NewExecuted(),
 		metricsServerExporter: metricsExporter,
+		certificateReconciler: instancecertificate.NewReconciler(client, instance),
 	}
 }
 
