@@ -57,6 +57,12 @@ const (
 	// PgControlDataDatabaseClusterStateKey is the status
 	// of the latest primary that run on this data directory.
 	PgControlDataDatabaseClusterStateKey pgControlDataKey = "Database cluster state"
+
+	// PgControlDataDataPageChecksumVersion reports whether the checksums are enabled in the cluster
+	PgControlDataDataPageChecksumVersion pgControlDataKey = "Data page checksum version"
+
+	// PgControlDataBytesPerWALSegment reports the size of the WAL segments
+	PgControlDataBytesPerWALSegment pgControlDataKey = "Bytes per WAL segment"
 )
 
 // PgDataState represents the "Database cluster state" field of pg_controldata
