@@ -1,43 +1,40 @@
 # Container Image Requirements
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
-The CloudNativePG operator for Kubernetes is designed to
-work with any compatible container image of PostgreSQL that complies
-with the following requirements:
+The CloudNativePG operator for Kubernetes is designed to work with any
+compatible PostgreSQL container image that meets the following requirements:
 
-- PostgreSQL executables that must be in the path:
-    - `initdb`
-    - `postgres`
-    - `pg_ctl`
-    - `pg_controldata`
-    - `pg_basebackup`
-- Barman Cloud executables that must be in the path:
-    - `barman-cloud-backup`
-    - `barman-cloud-backup-delete`
-    - `barman-cloud-backup-list`
-    - `barman-cloud-check-wal-archive`
-    - `barman-cloud-restore`
-    - `barman-cloud-wal-archive`
-    - `barman-cloud-wal-restore`
-- PGAudit extension installed (optional - only if PGAudit is required
-  in the deployed clusters)
-- Appropriate locale settings
-- `du` (optional, for `kubectl cnpg status`)
+- PostgreSQL executables must be available in the system path:
+  - `initdb`
+  - `postgres`
+  - `pg_ctl`
+  - `pg_controldata`
+  - `pg_basebackup`
+- Proper locale settings configured
+
+Optional Components:
+
+- [PGAudit](https://www.pgaudit.org/) extension (only required if audit logging
+  is needed)
+- `du` (used for `kubectl cnpg status`)
 
 !!! Important
-    Only [PostgreSQL versions supported by the PGDG](https://postgresql.org/) are allowed.
+    Only [PostgreSQL versions officially supported by PGDG](https://postgresql.org/) are allowed.
 
-No entry point and/or command is required in the image definition, as
-CloudNativePG overrides it with its instance manager.
+!!! Info
+    Barman Cloud executables are no longer required in CloudNativePG. The
+    recommended approach is to use the dedicated [Barman Cloud Plugin](https://github.com/cloudnative-pg/plugin-barman-cloud).
+
+No entry point or command is required in the image definition. CloudNativePG
+automatically overrides it with its instance manager.
 
 !!! Warning
-    Application Container Images will be used by CloudNativePG
-    in a **Primary with multiple/optional Hot Standby Servers Architecture**
-    only.
+    CloudNativePG only supports **Primary with multiple/optional Hot Standby
+    Servers architecture** for PostgreSQL application container images.
 
-The CloudNativePG community provides and supports
+The CloudNativePG community provides and maintains
 [public PostgreSQL container images](https://github.com/cloudnative-pg/postgres-containers)
-that work with CloudNativePG, and publishes them on
+that are fully compatible with CloudNativePG. These images are published on
 [ghcr.io](https://ghcr.io/cloudnative-pg/postgresql).
 
 ## Image Tag Requirements

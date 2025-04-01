@@ -8,12 +8,12 @@
 The operator can be installed like any other resource in Kubernetes,
 through a YAML manifest applied via `kubectl`.
 
-You can install the [latest operator manifest](https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.25/releases/cnpg-1.25.1.yaml)
+You can install the [latest operator manifest](https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/main/releases/cnpg-1.26.0-rc1.yaml)
 for this minor release as follows:
 
 ```sh
 kubectl apply --server-side -f \
-  https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.25/releases/cnpg-1.25.1.yaml
+  https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/main/releases/cnpg-1.26.0-rc1.yaml
 ```
 
 You can verify that with:
@@ -74,7 +74,7 @@ specific minor release, you can just run:
 
 ```sh
 curl -sSfL \
-  https://raw.githubusercontent.com/cloudnative-pg/artifacts/release-1.25/manifests/operator-manifest.yaml | \
+  https://raw.githubusercontent.com/cloudnative-pg/artifacts/release-1.26/manifests/operator-manifest.yaml | \
   kubectl apply --server-side -f -
 ```
 
@@ -253,12 +253,21 @@ When versions are not directly upgradable, the old version needs to be
 removed before installing the new one. This won't affect user data but
 only the operator itself.
 
-### Upgrading to 1.25 from a previous minor version
+
+<!--
+### Upgrading to 1.26.0 or 1.25.2
 
 !!! Important
     We strongly recommend that all CloudNativePG users upgrade to version
-    1.25.1 or at least to the latest stable version of the minor release you are
-    currently using (namely 1.24.x).
+    1.26.0 or at least to the latest stable version of the minor release you are
+    currently using (namely 1.25.x).
+
+- TOD: Mention hibernate command
+- TOD: Mention Barman Cloud
+
+-->
+
+### Upgrading to 1.25 from a previous minor version
 
 !!! Warning
     Every time you are upgrading to a higher minor release, make sure you
