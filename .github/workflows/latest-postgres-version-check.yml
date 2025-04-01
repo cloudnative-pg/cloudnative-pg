@@ -17,10 +17,10 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
       - name: Set up Python 3.9
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@8d9ed9ac5c53483de85588cdf95a591a75ab9f55 # v5
         with:
           python-version: 3.9
 
@@ -67,7 +67,7 @@ jobs:
 
       - name: Create PR to update PostgreSQL version
         if: env.LATEST_POSTGRES_VERSION_IMAGE != env.CURRENT_POSTGRES_VERSION_IMAGE
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@271a8d0340265f705b14b6d32b9829c1cb33d45e # v7
         env:
           GITHUB_TOKEN: ${{ secrets.REPO_GHA_PAT }}
         with:
@@ -80,7 +80,7 @@ jobs:
 
       - name: Create Pull Request if postgresql versions have been updated
         if: env.LATEST_POSTGRES_VERSION_IMAGE == env.CURRENT_POSTGRES_VERSION_IMAGE
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@271a8d0340265f705b14b6d32b9829c1cb33d45e # v7
         env:
           GITHUB_TOKEN: ${{ secrets.REPO_GHA_PAT }}
         with:
