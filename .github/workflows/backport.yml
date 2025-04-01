@@ -24,7 +24,7 @@ jobs:
     steps:
       -
         name: Label the pull request
-        uses: actions-ecosystem/action-add-labels@v1
+        uses: actions-ecosystem/action-add-labels@18f1af5e3544586314bbe15c0273249c770b2daf # v1
         if: ${{ !contains(github.event.pull_request.labels.*.name, 'do not backport') }}
         with:
           github_token: ${{ secrets.REPO_GHA_PAT }}
@@ -36,7 +36,7 @@ jobs:
             release-1.25
       -
         name: Create comment
-        uses: peter-evans/create-or-update-comment@v4
+        uses: peter-evans/create-or-update-comment@71345be0265236311c031f5c7866368bd1eff043 # v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           issue-number: ${{ github.event.pull_request.number }}
@@ -49,7 +49,7 @@ jobs:
           reactions: heart
       -
         name: Remove redundant labels
-        uses: actions-ecosystem/action-remove-labels@v1
+        uses: actions-ecosystem/action-remove-labels@2ce5d41b4b6aa8503e285553f75ed56e0a40bae0 # v1
         if: ${{ contains(github.event.pull_request.labels.*.name, 'do not backport') }}
         with:
           github_token: ${{ secrets.REPO_GHA_PAT }}
@@ -82,14 +82,14 @@ jobs:
       -
         name: Checkout code
         if: contains( github.event.pull_request.labels.*.name, matrix.branch )
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
         with:
           fetch-depth: 0
           ref: ${{ matrix.branch }}
           token: ${{ secrets.REPO_GHA_PAT }}
       -
         name: Install Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5
         with:
           go-version: ${{ env.GOLANG_VERSION }}
           check-latest: true
@@ -144,7 +144,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: create ticket
-        uses: dacbd/create-issue-action@v2
+        uses: dacbd/create-issue-action@cdb57ab6ff8862aa09fee2be6ba77a59581921c2 # v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           title: Backport failure for pull request ${{ env.PR }}
