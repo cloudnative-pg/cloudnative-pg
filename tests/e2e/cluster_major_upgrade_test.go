@@ -102,6 +102,7 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 						"log_temp_files":              "1024",
 						"log_autovacuum_min_duration": "1000",
 						"log_replication_commands":    "on",
+						"max_slot_wal_keep_size":      "1GB",
 					},
 				},
 			},
