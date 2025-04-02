@@ -313,13 +313,19 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 		Expect(oldStdOut).To(ContainSubstring(strconv.Itoa(scenario.startingMajor)))
 
 		By("Updating the major")
-		cluster, err = clusterutils.Get(env.Ctx, env.Client, cluster.Namespace, cluster.Name)
-		Expect(err).ToNot(HaveOccurred())
-		cluster.Spec.ImageName = scenario.targetImage
-		// We wrap this in an Eventually to avoid possible failures if the cluster changes
 		Eventually(func() error {
+			cluster, err = clusterutils.Get(env.Ctx, env.Client, cluster.Namespace, cluster.Name)
+			if err != nil {
+				return err
+			}
+			cluster.Spec.ImageName = scenario.targetImage
 			return env.Client.Update(env.Ctx, cluster)
-		}).WithTimeout(1 * time.Minute).WithPolling(10 * time.Second).Should(Succeed())
+		}).WithTimeout(1*time.Minute).WithPolling(10*time.Second).Should(
+			Succeed(),
+			"Failed to update cluster image from %s to %s",
+			cluster.Spec.ImageName,
+			scenario.targetImage,
+		)
 
 		By("Waiting for the cluster to be in the major upgrade phase")
 		Eventually(func(g Gomega) {
