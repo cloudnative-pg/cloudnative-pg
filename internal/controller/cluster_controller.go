@@ -313,6 +313,16 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 		return ctrl.Result{}, fmt.Errorf("cannot update the resource status: %w", err)
 	}
 
+	// Get the replication status
+	instancesStatus := r.InstanceClient.GetStatusFromInstances(ctx, resources.instances)
+
+	err = r.reconcileRemapping(ctx, cluster, resources, instancesStatus)
+	if err != nil {
+		contextLogger.Error(err, "Remapping failed",
+			"pvc", resources.pvcs.Items,
+		)
+	}
+
 	// Calls pre-reconcile hooks
 	if hookResult := preReconcilePluginHooks(ctx, cluster, cluster); hookResult.StopReconciliation {
 		contextLogger.Info("Pre-reconcile hook stopped the reconciliation loop",
@@ -350,9 +360,6 @@ func (r *ClusterReconciler) reconcile(ctx context.Context, cluster *apiv1.Cluste
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-
-	// Get the replication status
-	instancesStatus := r.InstanceClient.GetStatusFromInstances(ctx, resources.instances)
 
 	// we update all the cluster status fields that require the instances status
 	if err := r.updateClusterStatusThatRequiresInstancesState(ctx, cluster, instancesStatus); err != nil {
