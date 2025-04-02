@@ -241,6 +241,12 @@ local {{.Username}} postgres
 
 	// SynchronousStandbyNames is the postgresql parameter key for synchronous standbys
 	SynchronousStandbyNames = "synchronous_standby_names"
+
+	// ExtensionControlPath is the postgresql parameter key for extension_control_path
+	ExtensionControlPath = "extension_control_path"
+
+	// DynamicLibraryPath is the postgresql parameter key dynamic_library_path
+	DynamicLibraryPath = "dynamic_library_path"
 )
 
 // hbaTemplate is the template used to create the HBA configuration
@@ -333,6 +339,9 @@ type ConfigurationInfo struct {
 
 	// Minimum apply delay of transaction
 	RecoveryMinApplyDelay time.Duration
+
+	// The list of extensions to be loaded
+	Extensions []string
 }
 
 // getAlterSystemEnabledValue returns a config compatible value for IsAlterSystemEnabled
@@ -710,6 +719,14 @@ func CreatePostgresqlConfiguration(info ConfigurationInfo) *PgConfiguration {
 		configuration.OverwriteConfig("temp_tablespaces", strings.Join(info.TemporaryTablespaces, ","))
 	}
 
+	if len(info.Extensions) > 0 {
+		// Set all ExtensionControlPaths
+		setExtensionControlPath(info, configuration)
+
+		// Set all DynamicLibraryPaths
+		setDynamicLibraryPath(info, configuration)
+	}
+
 	return configuration
 }
 
@@ -796,4 +813,44 @@ func CreatePostgresqlConfFile(configuration *PgConfiguration) (string, string) {
 // directly embeddable in the PostgreSQL configuration file
 func escapePostgresConfValue(value string) string {
 	return fmt.Sprintf("'%v'", strings.ReplaceAll(value, "'", "''"))
+}
+
+// setExtensionControlPath manages the `extension_control_path` GUC, merging
+// the paths defined by the user with the ones provided by the
+// `.spec.postgresql.extensions` stanza
+func setExtensionControlPath(info ConfigurationInfo, configuration *PgConfiguration) {
+	extensionControlPath := []string{"$system"}
+	for _, extension := range info.Extensions {
+		extensionControlPath = append(extensionControlPath, fmt.Sprintf("/extensions/%s/share", extension))
+	}
+
+	userDefinedPath := strings.Split(configuration.GetConfig(ExtensionControlPath), ":")
+	for _, path := range userDefinedPath {
+		if path == "" {
+			continue
+		}
+		extensionControlPath = append(extensionControlPath, path)
+	}
+
+	configuration.OverwriteConfig(ExtensionControlPath, strings.Join(extensionControlPath, ":"))
+}
+
+// setDynamicLibraryPath manages the `dynamic_library_path` GUC, merging the
+// paths defined by the user with the ones provided by the
+// `.spec.postgresql.extensions` stanza
+func setDynamicLibraryPath(info ConfigurationInfo, configuration *PgConfiguration) {
+	dynamicLibraryPath := []string{"$libdir"}
+	for _, extension := range info.Extensions {
+		dynamicLibraryPath = append(dynamicLibraryPath, fmt.Sprintf("/extensions/%s/lib", extension))
+	}
+
+	userDefinedPath := strings.Split(configuration.GetConfig(DynamicLibraryPath), ":")
+	for _, path := range userDefinedPath {
+		if path == "" {
+			continue
+		}
+		dynamicLibraryPath = append(dynamicLibraryPath, path)
+	}
+
+	configuration.OverwriteConfig(DynamicLibraryPath, strings.Join(dynamicLibraryPath, ":"))
 }
