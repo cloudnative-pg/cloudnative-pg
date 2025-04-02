@@ -32,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	v1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
@@ -78,6 +79,12 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 			},
 			Spec: v1.ClusterSpec{
 				Instances: 3,
+				Bootstrap: &v1.BootstrapConfiguration{
+					InitDB: &v1.BootstrapInitDB{
+						DataChecksums:  ptr.To(true),
+						WalSegmentSize: 32,
+					},
+				},
 				StorageConfiguration: v1.StorageConfiguration{
 					StorageClass: &storageClass,
 					Size:         "1Gi",
@@ -95,6 +102,7 @@ var _ = Describe("Postgres Major Upgrade", Label(tests.LabelPostgresMajorUpgrade
 						"log_temp_files":              "1024",
 						"log_autovacuum_min_duration": "1000",
 						"log_replication_commands":    "on",
+						"max_slot_wal_keep_size":      "1GB",
 					},
 				},
 			},

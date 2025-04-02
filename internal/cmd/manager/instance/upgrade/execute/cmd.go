@@ -27,6 +27,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -48,9 +49,10 @@ import (
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/constants"
-	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
+	postgresutils "github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/utils"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/management/postgres/webserver/metricserver"
 	"github.com/cloudnative-pg/cloudnative-pg/pkg/specs"
+	"github.com/cloudnative-pg/cloudnative-pg/pkg/utils"
 )
 
 // NewCmd creates the cobra command
@@ -107,6 +109,7 @@ func NewCmd() *cobra.Command {
 	return cmd
 }
 
+// nolint:gocognit
 func upgradeSubCommand(
 	ctx context.Context,
 	instance *postgres.Instance,
@@ -189,8 +192,14 @@ func upgradeSubCommand(
 		}
 	}
 
+	// Extract controldata information from the old data directory
+	controlData, err := getControlData(oldBinDir, pgData)
+	if err != nil {
+		return fmt.Errorf("error while getting old data directory control data: %w", err)
+	}
+
 	contextLogger.Info("Creating data directory", "directory", newDataDir)
-	if err := runInitDB(newDataDir, newWalDir); err != nil {
+	if err := runInitDB(newDataDir, newWalDir, controlData); err != nil {
 		return fmt.Errorf("error while creating the data directory: %w", err)
 	}
 
@@ -201,12 +210,12 @@ func upgradeSubCommand(
 
 	contextLogger.Info("Checking if we have anything to update")
 	// Read pg_version from both the old and new data directories
-	oldVersion, err := utils.GetPgdataVersion(pgData)
+	oldVersion, err := postgresutils.GetPgdataVersion(pgData)
 	if err != nil {
 		return fmt.Errorf("error while reading the old version: %w", err)
 	}
 
-	newVersion, err := utils.GetPgdataVersion(newDataDir)
+	newVersion, err := postgresutils.GetPgdataVersion(newDataDir)
 	if err != nil {
 		return fmt.Errorf("error while reading the new version: %w", err)
 	}
@@ -264,7 +273,20 @@ func upgradeSubCommand(
 	return nil
 }
 
-func runInitDB(destDir string, walDir *string) error {
+func getControlData(binDir, pgData string) (map[string]string, error) {
+	pgControlDataCmd := exec.Command(path.Join(binDir, "pg_controldata")) // #nosec
+	pgControlDataCmd.Env = os.Environ()
+	pgControlDataCmd.Env = append(pgControlDataCmd.Env, "PGDATA="+pgData)
+
+	out, err := pgControlDataCmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("while executing pg_controldata: %w", err)
+	}
+
+	return utils.ParsePgControldataOutput(string(out)), nil
+}
+
+func runInitDB(destDir string, walDir *string, pgControlData map[string]string) error {
 	// Invoke initdb to generate a data directory
 	options := []string{
 		"--username",
@@ -275,6 +297,31 @@ func runInitDB(destDir string, walDir *string) error {
 
 	if walDir != nil {
 		options = append(options, "--waldir", *walDir)
+	}
+
+	// Extract the WAL segment size from the pg_controldata output
+	walSegmentSizeString, ok := pgControlData[utils.PgControlDataBytesPerWALSegment]
+	if !ok {
+		return fmt.Errorf("no '%s' section into pg_controldata output", utils.PgControlDataBytesPerWALSegment)
+	}
+
+	walSegmentSize, err := strconv.Atoi(walSegmentSizeString)
+	if err != nil {
+		return fmt.Errorf(
+			"wrong '%s' pg_controldata value (not an integer): '%s' %w",
+			utils.PgControlDataBytesPerWALSegment, walSegmentSizeString, err)
+	}
+
+	options = append(options, "--wal-segsize="+strconv.Itoa(walSegmentSize/(1024*1024)))
+
+	// Extract the dat checksum version from the pg_controldata output
+	dataPageChecksumVersion, ok := pgControlData[utils.PgControlDataDataPageChecksumVersion]
+	if !ok {
+		return fmt.Errorf("no '%s' section into pg_controldata output", utils.PgControlDataDataPageChecksumVersion)
+	}
+
+	if dataPageChecksumVersion == "1" {
+		options = append(options, "--data-checksums")
 	}
 
 	// Certain CSI drivers may add setgid permissions on newly created folders.
@@ -300,8 +347,20 @@ func prepareConfigurationFiles(ctx context.Context, cluster apiv1.Cluster, destD
 		return fmt.Errorf("appending inclusion directives to postgresql.conf file resulted in an error: %w", err)
 	}
 
+	// Set `max_slot_wal_keep_size` to the default value because any other value it is not supported in pg_upgrade
+	tmpCluster := cluster.DeepCopy()
+	tmpCluster.Spec.PostgresConfiguration.Parameters["max_slot_wal_keep_size"] = "-1"
+
+	pgVersion, err := postgresutils.GetPgdataVersion(destDir)
+	if err != nil {
+		return fmt.Errorf("error while reading the new data directory version: %w", err)
+	}
+	if pgVersion.Major >= 18 {
+		tmpCluster.Spec.PostgresConfiguration.Parameters["idle_replication_slot_timeout"] = "0"
+	}
+
 	newInstance := postgres.Instance{PgData: destDir}
-	if _, err := newInstance.RefreshConfigurationFilesFromCluster(ctx, &cluster, false); err != nil {
+	if _, err := newInstance.RefreshConfigurationFilesFromCluster(ctx, tmpCluster, false); err != nil {
 		return fmt.Errorf("error while creating the configuration files for new datadir %q: %w", destDir, err)
 	}
 
