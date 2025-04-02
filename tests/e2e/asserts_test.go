@@ -2380,7 +2380,7 @@ func OfflineResizePVC(namespace, clusterName string, timeout int) {
 		// Gathering cluster primary
 		currentPrimary, err := clusterutils.GetPrimary(env.Ctx, env.Client, namespace, clusterName)
 		Expect(err).ToNot(HaveOccurred())
-		currentPrimaryWalStorageName := currentPrimary.Name + apiv1.WalArchiveVolumeSuffix
+		currentPrimaryWalStorageName := currentPrimary.Name + testWalArchiveVolumeSuffix
 		quickDelete := &ctrlclient.DeleteOptions{
 			GracePeriodSeconds: &quickDeletionPeriod,
 		}
@@ -2396,12 +2396,12 @@ func OfflineResizePVC(namespace, clusterName string, timeout int) {
 			if !specs.IsPodPrimary(p) {
 				// Deleting PVC
 				_, _, err = run.Run(
-					"kubectl delete pvc " + p.Name + apiv1.DataVolumeSuffix + " -n " + namespace + " --wait=false")
+					"kubectl delete pvc " + p.Name + testDataVolumeSuffix + " -n " + namespace + " --wait=false")
 				Expect(err).ToNot(HaveOccurred())
 				// Deleting WalStorage PVC if needed
 				if walStorageEnabled {
 					_, _, err = run.Run(
-						"kubectl delete pvc " + p.Name + apiv1.WalArchiveVolumeSuffix + " -n " + namespace + " --wait=false")
+						"kubectl delete pvc " + p.Name + testWalArchiveVolumeSuffix + " -n " + namespace + " --wait=false")
 					Expect(err).ToNot(HaveOccurred())
 				}
 				// Deleting standby and replica pods
@@ -2755,9 +2755,9 @@ func AssertPvcHasLabels(
 					ExpectedRole = "primary"
 				}
 				var ExpectedPvcRole string
-				if pvc.Name == podName+apiv1.DataVolumeSuffix {
+				if pvc.Name == podName+testDataVolumeSuffix {
 					ExpectedPvcRole = "PG_DATA"
-				} else if pvc.Name == podName+apiv1.WalArchiveVolumeSuffix {
+				} else if pvc.Name == podName+testWalArchiveVolumeSuffix {
 					ExpectedPvcRole = "PG_WAL"
 				} else {
 					ExpectedPvcRole = "UNKNOWN"
