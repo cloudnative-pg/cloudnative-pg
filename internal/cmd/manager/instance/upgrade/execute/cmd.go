@@ -344,8 +344,20 @@ func prepareConfigurationFiles(ctx context.Context, cluster apiv1.Cluster, destD
 		return fmt.Errorf("appending inclusion directives to postgresql.conf file resulted in an error: %w", err)
 	}
 
+	// Set `max_slot_wal_keep_size` to the default value because any other value it is not supported in pg_upgrade
+	tmpCluster := cluster.DeepCopy()
+	tmpCluster.Spec.PostgresConfiguration.Parameters["max_slot_wal_keep_size"] = "-1"
+
+	pgVersion, err := postgresutils.GetPgdataVersion(destDir)
+	if err != nil {
+		return fmt.Errorf("error while reading the new data directory version: %w", err)
+	}
+	if pgVersion.Major >= 18 {
+		tmpCluster.Spec.PostgresConfiguration.Parameters["idle_replication_slot_timeout"] = "0"
+	}
+
 	newInstance := postgres.Instance{PgData: destDir}
-	if _, err := newInstance.RefreshConfigurationFilesFromCluster(ctx, &cluster, false); err != nil {
+	if _, err := newInstance.RefreshConfigurationFilesFromCluster(ctx, tmpCluster, false); err != nil {
 		return fmt.Errorf("error while creating the configuration files for new datadir %q: %w", destDir, err)
 	}
 
